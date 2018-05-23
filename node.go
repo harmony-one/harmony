@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"time"
+	"math/rand"
 )
 
 var node_ips = []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
@@ -12,6 +14,23 @@ type Node struct {
 }
 type Nodes struct {
 	Nodes []*Node
+}
+type txn struct {
+	tx string
+}
+
+
+func randomInt(min, max int) int {
+    return min + rand.Intn(max-min)
+}
+
+// Generate a random string of A-Z chars with len = l
+func randomString(len int) string {
+    bytes := make([]byte, len)
+    for i := 0; i < len; i++ {
+        bytes[i] = byte(randomInt(97, 122))
+    }
+    return string(bytes)
 }
 
 func (n Node) send() {
@@ -48,4 +67,8 @@ func main() {
 			m.receive()
 		}
 	}
+	for i := 0; i < 100; i++ {
+	rand.Seed(time.Now().UnixNano())
+    fmt.Println(randomString(10)) // print 10 chars
+}
 }
