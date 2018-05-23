@@ -20,3 +20,5 @@ more to come ..
 #References
 
 https://github.com/lightningnetwork/lnd
+
+New Plan:
