@@ -2,11 +2,14 @@ package main
 
 import (
 	"fmt"
-	"time"
 	"math/rand"
 )
 
 var node_ips = []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+var numOfTxns = 1000
+var numOfTxnsInBlock = 10
+var lenOfRandomString = 10
+
 
 type Node struct {
 	ip     int
@@ -53,6 +56,16 @@ func pickLeader(i int) bool {
 
 var N = make([]Node, 10)
 
+func gen() <- chan string{
+	out := make(chan string)
+	go func() {
+		for i :=0; i<numOfTxns;i++{
+			out <- randomString(lenOfRandomString)
+		}
+		close(out)
+	}()
+	return out
+}
 func main() {
 	for i, id := range node_ips {
 		isLeader := pickLeader(i)
@@ -67,8 +80,9 @@ func main() {
 			m.receive()
 		}
 	}
+	k := gen()
 	for i := 0; i < 100; i++ {
-	rand.Seed(time.Now().UnixNano())
-    fmt.Println(randomString(10)) // print 10 chars
+		fmt.Println(<-k)
 }
+
 }
