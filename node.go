@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math/rand"
+	"time"
 )
 
 type Node struct {
@@ -30,6 +31,12 @@ func randomString(len int) string {
 }
 
 func (n Node) send(cin <-chan string, id int) {
+	for msg := range cin {
+		fmt.Printf("Leader has sent message %s to %d\n", msg, id)
+	}
+}
+
+func consume(cin <-chan string, id int) {
 	for msg := range cin {
 		fmt.Printf("Leader has sent message %s to %d\n", msg, id)
 	}
@@ -78,6 +85,7 @@ func TxnGenerator(numOfTxns int, lenOfRandomString int) <-chan string {
 	go func() {
 		for i := 0; i < numOfTxns; i++ {
 			out <- randomString(lenOfRandomString)
+			time.Sleep(2 * time.Second)
 		}
 		close(out)
 	}()
@@ -86,9 +94,9 @@ func TxnGenerator(numOfTxns int, lenOfRandomString int) <-chan string {
 
 func main() {
 	var (
-		isLeader          Node
+		//isLeader          Node
 		numOfTxns         = 1000
-		numOfTxnsInBlock  = 10
+		numOfNodes  = 10
 		N                 = make([]Node, 10)
 		lenOfRandomString = 10
 		node_ips          = []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
@@ -96,20 +104,15 @@ func main() {
 	for i := range node_ips {
 		m := pickLeader(i)
 		N[i] = m
-		if m.leader {
-			isLeader = m
-		}
+		// if m.leader {
+		// 	isLeader := m
+		// }
 	}
 	txnqueue := TxnGenerator(numOfTxns, lenOfRandomString)
-	blockFullOfTxns := BufferedTxnQueueWithFanOut(txnqueue, numOfTxnsInBlock)
-	for num := range blockFullOfTxns {
-		fmt.Println(num)
-		txn := blockFullOfTxns[num]
-		for i, m := range N {
-			if !m.leader {
-				go isLeader.send(txn, i)
-			}
+	Txns := BufferedTxnQueueWithFanOut(txnqueue, numOfNodes)
+	for num := range Txns {
+		txn := Txns[num]
+		go consume(txn,num)
 		}
-
-	}
+		time.Sleep(60 * time.Second)
 }

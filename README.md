@@ -9,45 +9,16 @@ https://github.com/lightningnetwork/lnd
 
 https://docs.google.com/document/d/1u-8C9MiEUYPA7QC1Ekg7Cg-yL09ArZIxxyUtCUF9Wp0/edit
 
+#Done
+
+* fan-out
+
 #TODO
 
-#DEBUG
-```
-0
-1
-2
-3
-4
-5
-6
-Leader has sent message gmwjgsapga to 1
-7
-Leader has sent message gmwjgsapga to 1
-Leader has sent message gmwjgsapga to 4
-Leader has sent message gmwjgsapga to 6
-Leader has sent message gmwjgsapga to 7
-Leader has sent message gmwjgsapga to 2
-Leader has sent message gmwjgsapga to 1
-Leader has sent message gmwjgsapga to 5
-8
-Leader has sent message gmwjgsapga to 2
-9
-Leader has sent message gmwjgsapga to 1
-Leader has sent message tlmodylumg to 2
-Leader has sent message tlmodylumg to 8
-Leader has sent message tlmodylumg to 1
-Leader has sent message tlmodylumg to 2
-Leader has sent message tlmodylumg to 8
-Leader has sent message tlmodylumg to 7
-Leader has sent message tlmodylumg to 1
-Leader has sent message qimgegmgkb to 3
-Leader has sent message uqdiwwmnpp to 2
-Leader has sent message uqdiwwmnpp to 2
-Leader has sent message uqdiwwmnpp to 3
-Leader has sent message tlmodylumg to 2
-Leader has sent message uqdiwwmnpp to 8
-Leader has sent message tlmodylumg to 1
-```
+* implement block of transactions, instead of individual generators
+* instead of _consume_ used leader.send function
+* understand when the program terminates and why we don't end up writing all the txns
+* simplify code, if it might be a overkill
 
 https://gist.github.com/rushilgupta/228dfdf379121cb9426d5e90d34c5b96 
 
