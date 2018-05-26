@@ -159,6 +159,6 @@ func main() {
 		}
 	}
 
-	fmt.Println("I'm a leader node")
+	log.Printf("I'm a leader node with port %d", *port)
 	SocketServer(*port)
 }

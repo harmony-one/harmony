@@ -86,6 +86,6 @@ func main() {
 		fmt.Fprintf(os.Stderr, "No port provided")
 		os.Exit(1)
 	}
-	fmt.Println("I'm a slave node with port %d.", *port)
+	log.Printf("I'm a slave node with port %d.", *port)
 	SocketServer(*port)
 }
