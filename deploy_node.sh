@@ -3,6 +3,6 @@ SLAVE_START_PORT=3000
 SLAVE_END_PORT=3009
 for port in `seq $SLAVE_START_PORT $SLAVE_END_PORT`;
 do
-    go run ./slave.go -port $port &
+    go run ./benchmark_node.go -mode slave -port $port &
 done
-go run ./leader.go -port $LEADER_PORT &
+go run ./benchmark_node.go -mode leader -port $LEADER_PORT &
