@@ -18,6 +18,7 @@ const (
 	StopCharacter = "\r\n\r\n"
 )
 
+// Start a server and process the request by a handler.
 func startServer(port int, handler func(net.Conn)) {
 	listen, err := net.Listen("tcp4", ":"+strconv.Itoa(port))
 	defer listen.Close()
@@ -36,6 +37,7 @@ func startServer(port int, handler func(net.Conn)) {
 	}
 }
 
+// Handler of the leader node.
 func leaderHandler(conn net.Conn) {
 	defer conn.Close()
 	var (
@@ -82,6 +84,7 @@ ILOOP:
 	log.Printf("Send: %s", Message)
 }
 
+// Helper library to convert '1,2,3,4' into []int{1,2,3,4}.
 func convertIntoInts(data string) []int {
 	var res = []int{}
 	items := strings.Split(data, " ")
@@ -93,6 +96,7 @@ func convertIntoInts(data string) []int {
 	return res
 }
 
+// Do check error.
 func checkError(err error) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Fatal error: %s", err.Error())
@@ -100,7 +104,7 @@ func checkError(err error) {
 	}
 }
 
-// SocketClient code.
+// SocketClient is to connect a socket given a port and send the given message.
 func SocketClient(ip, message string, port int) (res string) {
 	addr := strings.Join([]string{ip, strconv.Itoa(port)}, ":")
 	conn, err := net.Dial("tcp", addr)
@@ -121,7 +125,7 @@ func SocketClient(ip, message string, port int) (res string) {
 	return
 }
 
-// Send code.
+// Send a message to another node with given port.
 func Send(port int, message string, ch chan int) (returnMessage string) {
 	ip := "127.0.0.1"
 	returnMessage = SocketClient(ip, message, port)
@@ -130,6 +134,7 @@ func Send(port int, message string, ch chan int) (returnMessage string) {
 	return
 }
 
+// Handler for slave node.
 func slaveHandler(conn net.Conn) {
 	defer conn.Close()
 	var (
@@ -172,8 +177,10 @@ func main() {
 	flag.Parse()
 
 	if strings.ToLower(*mode) == "leader" {
+		// Start leader node.
 		startServer(*port, leaderHandler)
 	} else if strings.ToLower(*mode) == "slave" {
+		// Start slave node.
 		startServer(*port, slaveHandler)
 	}
 }
