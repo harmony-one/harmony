@@ -21,3 +21,6 @@ func main() {
                 }
 
                 io.WriteString(conn, fmt.Sprint("Hello World\n", time.Now(), "\n"))
+conn.Close()
+}
+}
