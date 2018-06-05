@@ -85,7 +85,8 @@ func TxnGenerator(numOfTxns int, lenOfRandomString int) <-chan string {
 	go func() {
 		for i := 0; i < numOfTxns; i++ {
 			out <- randomString(lenOfRandomString)
-			time.Sleep(2 * time.Second)
+			fmt.Printf("Transaction Number %d\n", i)
+			//time.Sleep(2 * time.Second)
 		}
 		close(out)
 	}()

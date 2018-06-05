@@ -10,6 +10,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"./consensus"
 )
 
 // Consts
@@ -19,7 +20,7 @@ const (
 )
 
 // Start a server and process the request by a handler.
-func startServer(port int, handler func(net.Conn)) {
+func startServer(port int, handler func(net.Conn, consensus.Consensus), consensus consensus.Consensus) {
 	listen, err := net.Listen("tcp4", ":"+strconv.Itoa(port))
 	defer listen.Close()
 	if err != nil {
@@ -33,17 +34,16 @@ func startServer(port int, handler func(net.Conn)) {
 			log.Fatalln(err)
 			continue
 		}
-		go handler(conn)
+		go handler(conn, consensus)
 	}
 }
 
 // Handler of the leader node.
-func leaderHandler(conn net.Conn) {
+func leaderHandler(conn net.Conn, consensus consensus.Consensus) {
 	defer conn.Close()
 	var (
 		buf = make([]byte, 1024)
 		r   = bufio.NewReader(conn)
-		w   = bufio.NewWriter(conn)
 	)
 
 	receivedMessage := ""
@@ -58,18 +58,32 @@ ILOOP:
 		case io.EOF:
 			break ILOOP
 		case nil:
-			log.Println("Receive:", data)
+			log.Println("[Leader] Received:", data)
 			if isTransportOver(data) {
 				break ILOOP
 			}
 
 		default:
-			log.Fatalf("Receive data failed:%s", err)
+			log.Fatalf("[Leader] Receive data failed:%s", err)
 			return
 		}
 	}
 	receivedMessage = strings.TrimSpace(receivedMessage)
-	ports := convertIntoInts(receivedMessage)
+	if consensus.IsLeader {
+		consensus.ProcessMessageLeader(parseMessageType(receivedMessage), receivedMessage)
+	} else {
+		consensus.ProcessMessageValidator(parseMessageType(receivedMessage), receivedMessage)
+	}
+	//relayToPorts(receivedMessage, conn)
+}
+
+func parseMessageType(receivedMessage string) consensus.MessageType {
+	return 4
+}
+
+func relayToPorts(msg string, conn net.Conn) {
+	w := bufio.NewWriter(conn)
+	ports := convertIntoInts(msg)
 	ch := make(chan int)
 	for i, port := range ports {
 		go Send(port, strconv.Itoa(i), ch)
@@ -82,6 +96,7 @@ ILOOP:
 	w.Write([]byte(Message))
 	w.Flush()
 	log.Printf("Send: %s", Message)
+
 }
 
 // Helper library to convert '1,2,3,4' into []int{1,2,3,4}.
@@ -135,7 +150,7 @@ func Send(port int, message string, ch chan int) (returnMessage string) {
 }
 
 // Handler for slave node.
-func slaveHandler(conn net.Conn) {
+func slaveHandler(conn net.Conn, consensus consensus.Consensus) {
 	defer conn.Close()
 	var (
 		buf = make([]byte, 1024)
@@ -152,18 +167,19 @@ ILOOP:
 		case io.EOF:
 			break ILOOP
 		case nil:
-			log.Println("Receive:", data)
-			if isTransportOver(data) {
-				break ILOOP
-			}
+			log.Println("[Slave] Received:", data)
+			break ILOOP
+			//if isTransportOver(data) {
+			//	break ILOOP
+			//}
 		default:
-			log.Fatalf("Receive data failed:%s", err)
+			log.Fatalf("[Slave] Receive data failed:%s", err)
 			return
 		}
 	}
 	w.Write([]byte(Message))
 	w.Flush()
-	log.Printf("Send: %s", Message)
+	log.Printf("[Slave] Send: %s", Message)
 }
 
 func isTransportOver(data string) (over bool) {
@@ -176,11 +192,14 @@ func main() {
 	mode := flag.String("mode", "leader", "should be slave or leader")
 	flag.Parse()
 
+	consensus := consensus.Consensus{}
 	if strings.ToLower(*mode) == "leader" {
 		// Start leader node.
-		startServer(*port, leaderHandler)
+		consensus.IsLeader = true
+		startServer(*port, leaderHandler, consensus)
 	} else if strings.ToLower(*mode) == "slave" {
 		// Start slave node.
-		startServer(*port, slaveHandler)
+		consensus.IsLeader = false
+		startServer(*port, slaveHandler, consensus)
 	}
 }
