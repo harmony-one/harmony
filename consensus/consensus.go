@@ -143,7 +143,6 @@ func (consensus Consensus) startConsensus(msg string) {
 	consensus.State = ANNOUNCE_DONE
 }
 
-
 func (consensus Consensus) processCommitMessage(msg string) {
 	// verify and aggregate all the signatures
 
@@ -152,11 +151,16 @@ func (consensus Consensus) processCommitMessage(msg string) {
 	consensus.State = CHALLENGE_DONE
 }
 
+func (consensus Consensus) firstResponse(msg string) {
+	fmt.Println("sending first response to leader")
+	p2p.SendMessage(consensus.Leader,"hi")
+}
 func (consensus Consensus) processResponseMessage(msg string) {
 	// verify and aggregate all signatures
 
 	// Set state to FINISHED
 	consensus.State = FINISHED
+	
 }
 
 // Validator's consensus message dispatcher
@@ -171,7 +175,8 @@ func (consensus Consensus) ProcessMessageValidator(msgType MessageType, msg stri
 		fmt.Println("Received and processing message with type: %s", msgType)
 		consensus.processChallengeMessage(msg)
 	case RESPONSE:
-		fmt.Println("Unexpected message type: %s", msgType)
+		fmt.Println("Received and processing message with type: %s", msgType)
+		consensus.processResponseMessage(msg)
 	default:
 		fmt.Println("Unexpected message type: %s", msgType)
 	}
@@ -186,6 +191,7 @@ func (consensus Consensus) processAnnounceMessage(msg string) {
 
 	// Set state to COMMIT_DONE
 	consensus.State = COMMIT_DONE
+	consensus.firstResponse(msg)
 
 }
 
