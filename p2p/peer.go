@@ -22,6 +22,7 @@ func SendMessage(peer Peer, msg string){
 	send(peer.Ip, peer.Port, msg)
 }
 
+// Send the message to a list of peers
 func BroadcastMessage(peers []Peer, msg string) {
 	fmt.Println(peers)
 	for _, peer := range peers {

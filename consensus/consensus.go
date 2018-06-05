@@ -24,7 +24,11 @@ type Consensus struct {
 	IsLeader bool
 }
 
-// Consensus state enum
+// Consensus state enum for both leader and validator
+// States for leader:
+//     READY, ANNOUNCE_DONE, CHALLENGE_DONE, FINISHED
+// States for validator:
+//     READY, COMMIT_DONE, RESPONSE_DONE, FINISHED
 type ConsensusState int
 const (
 	READY           ConsensusState = iota
@@ -35,7 +39,8 @@ const (
 	FINISHED
 )
 
-// Consensus communication message type
+// Consensus communication message type.
+// Leader and validator dispatch messages based on incoming message type
 type MessageType int
 const (
 	ANNOUNCE         MessageType = iota
@@ -76,10 +81,9 @@ func (state ConsensusState) String() string {
 	return names[state]
 }
 
-func main() {
-	fmt.Println(READY)
-}
-
+// For the current node to get a list of peers to send message to.
+// For leader the peers are all the validators.
+// For validators the peer is simply the leader.
 func (consensus Consensus) getPeers() (peers []p2p.Peer) {
 	if consensus.IsLeader {
 		peers = make([]p2p.Peer, 10)
@@ -105,35 +109,7 @@ func (consensus Consensus) getPeers() (peers []p2p.Peer) {
 	return
 }
 
-func (consensus Consensus) startConsensus(msg string) {
-	// prepare message and broadcast to validators
-
-	p2p.BroadcastMessage(consensus.getPeers(), "hello")
-	// Set state to ANNOUNCE_DONE
-	consensus.State = ANNOUNCE_DONE
-}
-
-func (consensus Consensus) processStartConsensusMessage(msg string) {
-	consensus.startConsensus(msg)
-}
-
-
-func (consensus Consensus) processCommitMessage(msg string) {
-	// verify and aggregate all the signatures
-
-	// Broadcast challenge
-	// Set state to CHALLENGE_DONE
-	consensus.State = CHALLENGE_DONE
-}
-
-func (consensus Consensus) processResponseMessage(msg string) {
-	// verify and aggregate all signatures
-
-	// Set state to FINISHED
-	consensus.State = FINISHED
-}
-
-// Leader's consensus message handler
+// Leader's consensus message dispatcher
 func (consensus Consensus) ProcessMessageLeader(msgType MessageType, msg string) {
 	switch msgType {
 	case ANNOUNCE:
@@ -154,6 +130,52 @@ func (consensus Consensus) ProcessMessageLeader(msgType MessageType, msg string)
 	}
 }
 
+// Handler for message which triggers consensus process
+func (consensus Consensus) processStartConsensusMessage(msg string) {
+	consensus.startConsensus(msg)
+}
+
+func (consensus Consensus) startConsensus(msg string) {
+	// prepare message and broadcast to validators
+
+	p2p.BroadcastMessage(consensus.getPeers(), "hello")
+	// Set state to ANNOUNCE_DONE
+	consensus.State = ANNOUNCE_DONE
+}
+
+
+func (consensus Consensus) processCommitMessage(msg string) {
+	// verify and aggregate all the signatures
+
+	// Broadcast challenge
+	// Set state to CHALLENGE_DONE
+	consensus.State = CHALLENGE_DONE
+}
+
+func (consensus Consensus) processResponseMessage(msg string) {
+	// verify and aggregate all signatures
+
+	// Set state to FINISHED
+	consensus.State = FINISHED
+}
+
+// Validator's consensus message dispatcher
+func (consensus Consensus) ProcessMessageValidator(msgType MessageType, msg string) {
+	switch msgType {
+	case ANNOUNCE:
+		fmt.Println("Received and processing message with type: %s", msgType)
+		consensus.processAnnounceMessage(msg)
+	case COMMIT:
+		fmt.Println("Unexpected message type: %s", msgType)
+	case CHALLENGE:
+		fmt.Println("Received and processing message with type: %s", msgType)
+		consensus.processChallengeMessage(msg)
+	case RESPONSE:
+		fmt.Println("Unexpected message type: %s", msgType)
+	default:
+		fmt.Println("Unexpected message type: %s", msgType)
+	}
+}
 
 func (consensus Consensus) processAnnounceMessage(msg string) {
 	// verify block data
@@ -177,23 +199,5 @@ func (consensus Consensus) processChallengeMessage(msg string) {
 
 	// Set state to RESPONSE_DONE
 	consensus.State = RESPONSE_DONE
-
 }
 
-// Validator's consensus message handler
-func (consensus Consensus) ProcessMessageValidator(msgType MessageType, msg string) {
-	switch msgType {
-	case ANNOUNCE:
-		fmt.Println("Received and processing message with type: %s", msgType)
-		consensus.processAnnounceMessage(msg)
-	case COMMIT:
-		fmt.Println("Unexpected message type: %s", msgType)
-	case CHALLENGE:
-		fmt.Println("Received and processing message with type: %s", msgType)
-		consensus.processChallengeMessage(msg)
-	case RESPONSE:
-		fmt.Println("Unexpected message type: %s", msgType)
-	default:
-		fmt.Println("Unexpected message type: %s", msgType)
-	}
-}
