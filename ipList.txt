@@ -1,0 +1,12 @@
+127.0.0.1 9000 leader
+127.0.0.1 9001 validator
+127.0.0.1 9002 validator
+127.0.0.1 9003 validator
+127.0.0.1 9004 validator
+127.0.0.1 9005 validator
+127.0.0.1 9006 validator
+127.0.0.1 9007 validator
+127.0.0.1 9008 validator
+127.0.0.1 9009 validator
+127.0.0.1 9010 validator
+127.0.0.1 9011 validator
