@@ -2,6 +2,7 @@
 
 ## Usage
 
+./deploy.sh iplist.txt
 
 ## References
 

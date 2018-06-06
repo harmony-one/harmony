@@ -21,8 +21,9 @@ const (
 )
 
 // Start a server and process the request by a handler.
-func startServer(port int, handler func(net.Conn, consensus.Consensus), consensus consensus.Consensus) {
-	listen, err := net.Listen("tcp4", ":"+strconv.Itoa(port))
+func startServer(portString string, handler func(net.Conn, consensus.Consensus), consensus consensus.Consensus) {
+	listen, err := net.Listen("tcp4", ":"+ portString)
+	port,_ := strconv.Atoi(portString)
 	defer listen.Close()
 	if err != nil {
 		log.Fatalf("Socket listen port %d failed,%s", port, err)
@@ -222,5 +223,5 @@ func main() {
 	consensus := initConsensus(*ip,*port,*ipfile)
 	fmt.Println(consensus)
 	fmt.Println()
-	//startServer(*port,NodeHandler,consensus)
+	startServer(*port,NodeHandler,consensus)
 }
