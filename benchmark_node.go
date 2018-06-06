@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -11,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"./consensus"
+	"./p2p"
 )
 
 // Consts
@@ -130,6 +130,7 @@ ILOOP:
 			break ILOOP
 		case nil:
 			if consensus.IsLeader {
+				log.Println("Leader Node is",consensus.Leader)
 				log.Println("[Leader] Received:", data)
 			if isTransportOver(data) {
 				break ILOOP
@@ -161,21 +162,35 @@ func isTransportOver(data string) (over bool) {
 	over = strings.HasSuffix(data, "\r\n\r\n")
 	return
 }
+func createConsensus(i int, port, Ip string) consensus.Consensus{
+	// The first Ip, port passed will be leader.
+	var leaderPeer p2p.Peer
+	consensus := consensus.Consensus{}
+	peer :=  p2p.Peer{Port: port, Ip:Ip}
+	if i == 0 {
+		consensus.IsLeader = true
+		consensus.Leader = peer
+		leaderPeer =  peer
+	} else {
+		consensus.IsLeader = false
+		consensus.Leader = leaderPeer
+	}
+	return consensus
+}
 
 func main() {
-	port := flag.Int("port", 3333, "port of the node.")
-	mode := flag.String("mode", "leader", "should be slave or leader")
-	flag.Parse()
-
-	consensus := consensus.Consensus{}
-	if strings.ToLower(*mode) == "leader" {
-		// Start leader node.
-		consensus.IsLeader = true
-		startServer(*port, NodeHandler, consensus)
-	} else if strings.ToLower(*mode) == "slave" {
-		// Start slave node.
-		consensus.IsLeader = false
-		startServer(*port, NodeHandler, consensus)
-	}
 	
+	// This should be read from a file
+	Ip := "127.0.0.1"
+	portInt := 3000
+	numOfNodes := 10
+
+	for i := 0; i < numOfNodes; i++ {
+		port := portInt + i 
+		portString := strconv.Itoa(port)
+		consensus := createConsensus(i,portString,Ip)
+		fmt.Println(port)
+		fmt.Println(consensus)
+		//startServer(port,NodeHandler,consensus)
+	}
 }

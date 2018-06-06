@@ -151,10 +151,6 @@ func (consensus Consensus) processCommitMessage(msg string) {
 	consensus.State = CHALLENGE_DONE
 }
 
-func (consensus Consensus) firstResponse(msg string) {
-	fmt.Println("sending first response to leader")
-	p2p.SendMessage(consensus.Leader,"hi")
-}
 func (consensus Consensus) processResponseMessage(msg string) {
 	// verify and aggregate all signatures
 
@@ -191,7 +187,10 @@ func (consensus Consensus) processAnnounceMessage(msg string) {
 
 	// Set state to COMMIT_DONE
 	consensus.State = COMMIT_DONE
-	consensus.firstResponse(msg)
+	peer :=  consensus.Leader
+	fmt.Println("my port is:",peer.Port)
+	fmt.Println(peer.Port)
+	p2p.SendMessage(consensus.Leader,"hi")
 
 }
 

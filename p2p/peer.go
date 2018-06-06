@@ -33,7 +33,7 @@ func BroadcastMessage(peers []Peer, msg string) {
 
 // SocketClient is to connect a socket given a port and send the given message.
 func sendWithSocketClient(ip, port, message string) (res string) {
-	fmt.Printf("Sending message to ip %s and port %s\n", ip, port)
+	log.Printf("Sending message to ip %s and port %s\n", ip, port)
 	addr := strings.Join([]string{ip, port}, ":")
 	conn, err := net.Dial("tcp", addr)
 
