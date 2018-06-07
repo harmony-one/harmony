@@ -1,5 +1,10 @@
 # Harmony Benchmark
 
+## Usage
+
+./deploy.sh ipList.txt
+./send_txn.sh
+
 ## References
 
 https://github.com/lightningnetwork/lnd
