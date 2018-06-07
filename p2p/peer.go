@@ -46,9 +46,9 @@ func sendWithSocketClient(ip, port, message string) (res string) {
 	conn.Write([]byte(message))
 	log.Printf("Sent to ip %s and port %s: %s\n", ip, port, message)
 
-	buff := make([]byte, 1024)
-	n, _ := conn.Read(buff) // do we need this?
-	res = string(buff[:n])
+
+	// No ack (reply) message from the receiver for now.
+	// TODO: think about
 	return
 }
 

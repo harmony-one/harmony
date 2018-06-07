@@ -6,12 +6,12 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"os"
 	"strconv"
 	"strings"
+	"io/ioutil"
 )
 
 // Consts
@@ -32,6 +32,7 @@ func startServer(port string, handler func(net.Conn, consensus.Consensus), conse
 	for {
 		conn, err := listen.Accept()
 		if err != nil {
+			log.Printf("Error listening on port: %s. Exiting.", port)
 			log.Fatalln(err)
 			continue
 		}
@@ -115,38 +116,57 @@ func Send(port int, message string, ch chan int) (returnMessage string) {
 // Handler of the leader node.
 func NodeHandler(conn net.Conn, consensus consensus.Consensus) {
 	defer conn.Close()
-	var (
-		buf = make([]byte, 1024)
-		r   = bufio.NewReader(conn)
-	)
-
 	receivedMessage := ""
-ILOOP:
-	for {
-		n, err := r.Read(buf)
-		data := string(buf[:n])
-		receivedMessage += data
-		switch err {
-		case io.EOF:
-			break ILOOP
-		case nil:
-			if consensus.IsLeader {
-				log.Println("Leader Node is", consensus.Leader)
-				log.Println("[Leader] Received:", data)
-				if isTransportOver(data) {
-					break ILOOP
-				}
-			} else {
-				log.Println("[Slave] Received:", data)
-				break ILOOP
-			}
-		default:
-			if consensus.IsLeader {
-				log.Fatalf("[Leader] Receive data failed:%s", err)
-			} else {
-				log.Fatalf("[Slave] Receive data failed:%s", err)
-			}
-			return
+
+	// since we close connection for each message, no need to mark the end of message
+	// TODO: define message protocol and use a field of message length to figure out when to end reading
+	//var (
+	//	buf = make([]byte, 1024)
+	//	r   = bufio.NewReader(conn)
+	//)
+//ILOOP:
+//	for {
+//		n, err := r.Read(buf)
+//		data := string(buf[:n])
+//		receivedMessage += data
+//		switch err {
+//		case io.EOF:
+//			break ILOOP
+//		case nil:
+//			if consensus.IsLeader {
+//				log.Println("Leader Node is", consensus.Leader)
+//				log.Println("[Leader] Received:", data)
+//				if isTransportOver(data) {
+//					break ILOOP
+//				}
+//			} else {
+//				log.Println("[Slave] Received:", data)
+//				break ILOOP
+//			}
+//		default:
+//			if consensus.IsLeader {
+//				log.Fatalf("[Leader] Receive data failed:%s", err)
+//			} else {
+//				log.Fatalf("[Slave] Receive data failed:%s", err)
+//			}
+//			return
+//		}
+//	}
+
+	message, err := ioutil.ReadAll(conn)
+	if err == nil {
+		data := string(message)
+		if consensus.IsLeader {
+			log.Println("Leader Node is", consensus.Leader)
+			log.Println("[Leader] Received:", data)
+		} else {
+			log.Println("[Slave] Received:", data)
+		}
+	} else {
+		if consensus.IsLeader {
+			log.Fatalf("[Leader] Receive data failed:%s", err)
+		} else {
+			log.Fatalf("[Slave] Receive data failed:%s", err)
 		}
 	}
 	receivedMessage = strings.TrimSpace(receivedMessage)
