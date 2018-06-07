@@ -1,4 +1,4 @@
-
+./kill_node.sh
 ipfile=$1
 while read ip port mode; do 
 	echo $ip $port $mode $ipfile

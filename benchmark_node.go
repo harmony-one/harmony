@@ -1,7 +1,10 @@
 package main
 
 import (
+	"./consensus"
+	"./p2p"
 	"bufio"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -9,9 +12,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"./consensus"
-	"./p2p"
-	"flag"
 )
 
 // Consts
@@ -21,15 +21,14 @@ const (
 )
 
 // Start a server and process the request by a handler.
-func startServer(portString string, handler func(net.Conn, consensus.Consensus), consensus consensus.Consensus) {
-	listen, err := net.Listen("tcp4", ":"+ portString)
-	port,_ := strconv.Atoi(portString)
+func startServer(port string, handler func(net.Conn, consensus.Consensus), consensus consensus.Consensus) {
+	listen, err := net.Listen("tcp4", ":"+port)
 	defer listen.Close()
 	if err != nil {
-		log.Fatalf("Socket listen port %d failed,%s", port, err)
+		log.Fatalf("Socket listen port %s failed,%s", port, err)
 		os.Exit(1)
 	}
-	log.Printf("Begin listen port: %d", port)
+	log.Printf("Begin listen port: %s", port)
 	for {
 		conn, err := listen.Accept()
 		if err != nil {
@@ -132,10 +131,10 @@ ILOOP:
 			break ILOOP
 		case nil:
 			if consensus.IsLeader {
-				log.Println("Leader Node is",consensus.Leader)
+				log.Println("Leader Node is", consensus.Leader)
 				log.Println("[Leader] Received:", data)
-			if isTransportOver(data) {
-				break ILOOP
+				if isTransportOver(data) {
+					break ILOOP
 				}
 			} else {
 				log.Println("[Slave] Received:", data)
@@ -164,11 +163,12 @@ func isTransportOver(data string) (over bool) {
 	over = strings.HasSuffix(data, "\r\n\r\n")
 	return
 }
-func initConsensus(Ip, port, ipfile string) consensus.Consensus{
+
+func initConsensus(ip, port, ipfile string) consensus.Consensus {
 	// The first Ip, port passed will be leader.
 	consensus := consensus.Consensus{}
-	peer :=  p2p.Peer{Port: port, Ip:Ip}
-	Peers := getPeers(Ip, port,ipfile)
+	peer := p2p.Peer{Port: port, Ip: ip}
+	Peers := getPeers(ip, port, ipfile)
 	leaderPeer := getLeader(ipfile)
 	if leaderPeer == peer {
 		consensus.IsLeader = true
@@ -179,49 +179,48 @@ func initConsensus(Ip, port, ipfile string) consensus.Consensus{
 	consensus.Validators = Peers
 	return consensus
 }
-func getLeader(iplist string) p2p.Peer{
+
+func getLeader(iplist string) p2p.Peer {
 	file, _ := os.Open(iplist)
-    fscanner := bufio.NewScanner(file)
-   	var leaderPeer p2p.Peer
-    for fscanner.Scan() {
-         p := strings.Split(fscanner.Text(), " ")
-		 ip,port,status := p[0],p[1],p[2]
-         if status == "leader" {
-         	leaderPeer.Ip = ip
-	        leaderPeer.Port = port 
-         }
-    }
-    return leaderPeer
+	fscanner := bufio.NewScanner(file)
+	var leaderPeer p2p.Peer
+	for fscanner.Scan() {
+		p := strings.Split(fscanner.Text(), " ")
+		ip, port, status := p[0], p[1], p[2]
+		if status == "leader" {
+			leaderPeer.Ip = ip
+			leaderPeer.Port = port
+		}
+	}
+	return leaderPeer
 }
-func getPeers(Ip, Port, iplist string) []p2p.Peer{
+
+func getPeers(Ip, Port, iplist string) []p2p.Peer {
 	file, _ := os.Open(iplist)
-    fscanner := bufio.NewScanner(file)
-    var peerList []p2p.Peer
-    for fscanner.Scan() {
-         p := strings.Split(fscanner.Text(), " ")
-		 ip,port,status := p[0],p[1],p[2]
-		 if status == "leader" || ip == Ip && port == Port{
-     	 	continue
-     	 }
-     	 peer :=  p2p.Peer{Port: port, Ip:ip}
-     	 peerList = append(peerList,peer)
-    }
-    return peerList
+	fscanner := bufio.NewScanner(file)
+	var peerList []p2p.Peer
+	for fscanner.Scan() {
+		p := strings.Split(fscanner.Text(), " ")
+		ip, port, status := p[0], p[1], p[2]
+		if status == "leader" || ip == Ip && port == Port {
+			continue
+		}
+		peer := p2p.Peer{Port: port, Ip: ip}
+		peerList = append(peerList, peer)
+	}
+	return peerList
 }
 
 func main() {
-	
-	// This should be read from a file
-	
-	ip   := flag.String("ip","127.0.0.1","IP of the node")
+	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9000", "port of the node.")
 	mode := flag.String("mode", "leader", "should be slave or leader")
-	ipfile := flag.String("ipfile","iplist.txt","file containing all ip addresses")
+	ipfile := flag.String("ipfile", "iplist.txt", "file containing all ip addresses")
 	flag.Parse()
 	fmt.Println()
-	fmt.Printf("This node is a %s node with ip: %s and port: %s\n",*mode,*ip,*port)
-	consensus := initConsensus(*ip,*port,*ipfile)
+	fmt.Printf("This node is a %s node with ip: %s and port: %s\n", *mode, *ip, *port)
+	consensus := initConsensus(*ip, *port, *ipfile)
 	fmt.Println(consensus)
 	fmt.Println()
-	startServer(*port,NodeHandler,consensus)
+	startServer(*port, NodeHandler, consensus)
 }

@@ -4,7 +4,6 @@ package consensus // consensus
 import (
 	"fmt"
 	"../p2p"
-	"strconv"
 )
 
 // Consensus data containing all info related to one consensus process
@@ -81,34 +80,6 @@ func (state ConsensusState) String() string {
 	return names[state]
 }
 
-// For the current node to get a list of peers to send message to.
-// For leader the peers are all the validators.
-// For validators the peer is simply the leader.
-func (consensus Consensus) getPeers() (peers []p2p.Peer) {
-	if consensus.IsLeader {
-		peers = make([]p2p.Peer, 10)
-		for i := 0; i < 10; i++ {
-			port := 3000 + i
-			peer := p2p.Peer{
-				"127.0.0.1",
-				strconv.Itoa(port),
-				strconv.Itoa(port),
-			}
-			peers[i] = peer
-		}
-	} else {
-		peers = []p2p.Peer{
-			{
-				"127.0.0.1",
-				"3333",
-				"3333",
-			},
-		}
-	}
-	fmt.Println(peers)
-	return
-}
-
 // Leader's consensus message dispatcher
 func (consensus Consensus) ProcessMessageLeader(msgType MessageType, msg string) {
 	switch msgType {
@@ -138,7 +109,7 @@ func (consensus Consensus) processStartConsensusMessage(msg string) {
 func (consensus Consensus) startConsensus(msg string) {
 	// prepare message and broadcast to validators
 
-	p2p.BroadcastMessage(consensus.getPeers(), "hello")
+	p2p.BroadcastMessage(consensus.Validators, "hello")
 	// Set state to ANNOUNCE_DONE
 	consensus.State = ANNOUNCE_DONE
 }

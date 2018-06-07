@@ -2,7 +2,8 @@
 
 ## Usage
 
-./deploy.sh iplist.txt
+./deploy.sh ipList.txt
+./send_txn.sh
 
 ## References
 
