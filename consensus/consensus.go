@@ -2,8 +2,8 @@
 package consensus // consensus
 
 import (
-	"fmt"
 	"../p2p"
+	"fmt"
 )
 
 // Consensus data containing all info related to one consensus process
@@ -29,8 +29,9 @@ type Consensus struct {
 // States for validator:
 //     READY, COMMIT_DONE, RESPONSE_DONE, FINISHED
 type ConsensusState int
+
 const (
-	READY           ConsensusState = iota
+	READY ConsensusState = iota
 	ANNOUNCE_DONE
 	COMMIT_DONE
 	CHALLENGE_DONE
@@ -41,8 +42,9 @@ const (
 // Consensus communication message type.
 // Leader and validator dispatch messages based on incoming message type
 type MessageType int
+
 const (
-	ANNOUNCE         MessageType = iota
+	ANNOUNCE MessageType = iota
 	COMMIT
 	CHALLENGE
 	RESPONSE
@@ -127,7 +129,7 @@ func (consensus Consensus) processResponseMessage(msg string) {
 
 	// Set state to FINISHED
 	consensus.State = FINISHED
-	
+
 }
 
 // Validator's consensus message dispatcher
@@ -158,13 +160,12 @@ func (consensus Consensus) processAnnounceMessage(msg string) {
 
 	// Set state to COMMIT_DONE
 	consensus.State = COMMIT_DONE
-	peer :=  consensus.Leader
-	fmt.Println("my port is:",peer.Port)
+	peer := consensus.Leader
+	fmt.Println("my port is:", peer.Port)
 	fmt.Println(peer.Port)
-	p2p.SendMessage(consensus.Leader,"hi")
+	p2p.SendMessage(consensus.Leader, "hi")
 
 }
-
 
 func (consensus Consensus) processChallengeMessage(msg string) {
 	// verify block data and the aggregated signatures
@@ -176,4 +177,3 @@ func (consensus Consensus) processChallengeMessage(msg string) {
 	// Set state to RESPONSE_DONE
 	consensus.State = RESPONSE_DONE
 }
-
