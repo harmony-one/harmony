@@ -234,13 +234,18 @@ func getPeers(Ip, Port, iplist string) []p2p.Peer {
 func main() {
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9000", "port of the node.")
-	mode := flag.String("mode", "leader", "should be slave or leader")
 	ipfile := flag.String("ipfile", "iplist.txt", "file containing all ip addresses")
 	flag.Parse()
 	fmt.Println()
-	fmt.Printf("This node is a %s node with ip: %s and port: %s\n", *mode, *ip, *port)
 	consensus := initConsensus(*ip, *port, *ipfile)
+	var nodeStatus string
+	if consensus.IsLeader {
+		nodeStatus = "leader"
+	} else {
+		nodeStatus = "validator"
+	}
 	fmt.Println(consensus)
+	fmt.Printf("This node is a %s node with ip: %s and port: %s\n", nodeStatus, *ip, *port)
 	fmt.Println()
 	startServer(*port, NodeHandler, consensus)
 }
