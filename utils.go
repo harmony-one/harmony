@@ -57,9 +57,9 @@ func ConvertIntoMap(data string) map[string]int {
 	var res = map[string]int
 	items := strings.Split(data, ",")
 	for _, value := range items {
-		pair := strings.Split(value, ":")
-		if len(pair) == 2 {
-			intValue, err := strconv.Atoi(pair[1])
+		pair := strings.Split(value, " ")
+		if len(pair) == 3 {
+			intValue, err := strconv.Atoi(pair[2])
 			if err != nil {
 				pair[0] = strings.Trim(pair[0])
 				res[pair[0]] = intValue

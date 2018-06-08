@@ -5,19 +5,32 @@ import (
 	"crypto/sha256"
 	"encoding/gob"
 	"log"
+	"strconv"
 	"strings"
 )
 
-const subsidy = 10
-
 // Transaction represents a Bitcoin transaction
 type Transaction struct {
-	ID   []byte
-	data string
+	ID            []byte
+	inputAddresss []string
+	outputAddress []string
+	value         []int
 }
 
-func (tx *Transaction) Parse() {
-	strings.Split("a,b,c", ",")
+func (tx *Transaction) Parse(data string) {
+	items := strings.Split(data, ",")
+	for _, value := range items {
+		pair := strings.Split(value, " ")
+		if len(pair) == 3 {
+			intValue, err := strconv.Atoi(pair[2])
+			if err != nil {
+				tx.inputAddress = append(tx.inputAddresss, strings.Trim(pair[0]))
+				tx.outputAddress = append(tx.outputAddress, strings.Trim(pair[1]))
+				tx.value = append(tx.value, intValue)
+			}
+		}
+	}
+	return res
 }
 
 // SetID sets ID of a transaction
