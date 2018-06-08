@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"encoding/gob"
 	"log"
+	"strconv"
+	"strings"
 )
 
 // IntToHex converts an int64 to a byte array
@@ -36,4 +38,33 @@ func DeserializeBlock(d []byte) *Block {
 	err := decoder.Decode(&block)
 
 	return &block
+}
+
+// Helper library to convert '1,2,3,4' into []int{1,2,3,4}.
+func ConvertIntoInts(data string) []int {
+	var res = []int{}
+	items := strings.Split(data, " ")
+	for _, value := range items {
+		intValue, err := strconv.Atoi(value)
+		checkError(err)
+		res = append(res, intValue)
+	}
+	return res
+}
+
+// Helper library to convert '1,2,3,4' into []int{1,2,3,4}.
+func ConvertIntoMap(data string) map[string]int {
+	var res = map[string]int
+	items := strings.Split(data, ",")
+	for _, value := range items {
+		pair := strings.Split(value, ":")
+		if len(pair) == 2 {
+			intValue, err := strconv.Atoi(pair[1])
+			if err != nil {
+				pair[0] = strings.Trim(pair[0])
+				res[pair[0]] = intValue
+			}
+		}
+	}
+	return res
 }
