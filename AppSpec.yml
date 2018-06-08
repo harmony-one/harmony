@@ -1,0 +1,22 @@
+version: 0.0
+os: linux
+files:
+  - source: ./
+    destination: /home/ec2-user/projects/
+hooks:
+  BeforeInstall:
+    - location: aws-scripts/say_hello.sh
+      timeout: 300
+      runas: root
+  AfterInstall:
+    - location: aws-scripts/say_hello.sh #maybe start the server
+      timeout: 300
+      runas: root
+  ApplicationStart:
+    - location: aws-scripts/say_hello.sh  #maybe start the server.
+      timeout: 300
+      runas: root
+  ApplicationStop:
+    - location: aws-scripts/say_hello.sh
+      timeout: 300
+      runas: root
