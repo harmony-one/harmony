@@ -20,7 +20,7 @@ const (
 )
 
 // Start a server and process the request by a handler.
-func startServer(port string, handler func(net.Conn, consensus.Consensus), consensus consensus.Consensus) {
+func startServer(port string, handler func(net.Conn, *consensus.Consensus), consensus *consensus.Consensus) {
 	listen, err := net.Listen("tcp4", ":"+port)
 	defer listen.Close()
 	if err != nil {
@@ -29,7 +29,6 @@ func startServer(port string, handler func(net.Conn, consensus.Consensus), conse
 	}
 	log.Printf("Begin listen port: %s", port)
 	for {
-		// BUG: somehow one message got received ten times for the leader
 		conn, err := listen.Accept()
 		if err != nil {
 			log.Printf("Error listening on port: %s. Exiting.", port)
@@ -110,7 +109,7 @@ func Send(port int, message string, ch chan int) (returnMessage string) {
 }
 
 // Handler of the leader node.
-func NodeHandler(conn net.Conn, consensus consensus.Consensus) {
+func NodeHandler(conn net.Conn, consensus *consensus.Consensus) {
 	defer conn.Close()
 
 	payload, err := p2p.ReadMessagePayload(conn)
@@ -142,6 +141,8 @@ func initConsensus(ip, port, ipfile string) consensus.Consensus {
 	}
 	consensus.Leader = leaderPeer
 	consensus.Validators = Peers
+
+	consensus.PriKey = ip + ":" + port // use ip:port as unique key for now
 	return consensus
 }
 
@@ -192,5 +193,5 @@ func main() {
 	fmt.Println(consensus)
 	fmt.Printf("This node is a %s node with ip: %s and port: %s\n", nodeStatus, *ip, *port)
 	fmt.Println()
-	startServer(*port, NodeHandler, consensus)
+	startServer(*port, NodeHandler, &consensus)
 }
