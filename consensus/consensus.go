@@ -4,6 +4,7 @@ package consensus // consensus
 import (
 	"../p2p"
 	"fmt"
+	"log"
 )
 
 // Consensus data containing all info related to one consensus process
@@ -39,33 +40,6 @@ const (
 	FINISHED
 )
 
-// Consensus communication message type.
-// Leader and validator dispatch messages based on incoming message type
-type MessageType int
-
-const (
-	ANNOUNCE MessageType = iota
-	COMMIT
-	CHALLENGE
-	RESPONSE
-	START_CONSENSUS
-)
-
-// Returns string name for the MessageType enum
-func (msgType MessageType) String() string {
-	names := [...]string{
-		"ANNOUNCE",
-		"COMMIT",
-		"CHALLENGE",
-		"RESPONSE",
-		"START_CONSENSUS"}
-
-	if msgType < ANNOUNCE || msgType > START_CONSENSUS {
-		return "Unknown"
-	}
-	return names[msgType]
-}
-
 // Returns string name for the ConsensusState enum
 func (state ConsensusState) String() string {
 	names := [...]string{
@@ -83,20 +57,29 @@ func (state ConsensusState) String() string {
 }
 
 // Leader's consensus message dispatcher
-func (consensus Consensus) ProcessMessageLeader(msgType MessageType, msg string) {
+func (consensus Consensus) ProcessMessageLeader(message []byte) {
+	msgType, err := GetConsensusMessageType(message)
+	if err != nil {
+		log.Print(err)
+	}
+
+	payload, err := GetConsensusMessagePayload(message)
+	if err != nil {
+		log.Print(err)
+	}
+
+	msg := string(payload)
+	fmt.Printf("[Leader] Received and processing message: %s, %s\n", msgType, msg)
 	switch msgType {
 	case ANNOUNCE:
 		fmt.Println("Unexpected message type: %s", msgType)
 	case COMMIT:
-		fmt.Println("Received and processing message with type: %s", msgType)
 		consensus.processCommitMessage(msg)
 	case CHALLENGE:
 		fmt.Println("Unexpected message type: %s", msgType)
 	case RESPONSE:
-		fmt.Println("Received and processing message with type: %s", msgType)
 		consensus.processResponseMessage(msg)
 	case START_CONSENSUS:
-		fmt.Printf("Received and processing message with type: %s\n", msgType)
 		consensus.processStartConsensusMessage(msg)
 	default:
 		fmt.Println("Unexpected message type: %s", msgType)
@@ -111,7 +94,8 @@ func (consensus Consensus) processStartConsensusMessage(msg string) {
 func (consensus Consensus) startConsensus(msg string) {
 	// prepare message and broadcast to validators
 
-	p2p.BroadcastMessage(consensus.Validators, "hello")
+	msgToSend := ConstructConsensusMessage(ANNOUNCE, []byte("block"))
+	p2p.BroadcastMessage(consensus.Validators, msgToSend)
 	// Set state to ANNOUNCE_DONE
 	consensus.State = ANNOUNCE_DONE
 }
@@ -133,19 +117,28 @@ func (consensus Consensus) processResponseMessage(msg string) {
 }
 
 // Validator's consensus message dispatcher
-func (consensus Consensus) ProcessMessageValidator(msgType MessageType, msg string) {
+func (consensus Consensus) ProcessMessageValidator(message []byte) {
+	msgType, err := GetConsensusMessageType(message)
+	if err != nil {
+		log.Print(err)
+	}
+
+	payload, err := GetConsensusMessagePayload(message)
+	if err != nil {
+		log.Print(err)
+	}
+
+	msg := string(payload)
+	fmt.Printf("[Validator] Received and processing message: %s, %s\n", msgType, msg)
 	switch msgType {
 	case ANNOUNCE:
-		fmt.Println("Received and processing message with type: %s", msgType)
 		consensus.processAnnounceMessage(msg)
 	case COMMIT:
 		fmt.Println("Unexpected message type: %s", msgType)
 	case CHALLENGE:
-		fmt.Println("Received and processing message with type: %s", msgType)
 		consensus.processChallengeMessage(msg)
 	case RESPONSE:
-		fmt.Println("Received and processing message with type: %s", msgType)
-		consensus.processResponseMessage(msg)
+		fmt.Println("Unexpected message type: %s", msgType)
 	default:
 		fmt.Println("Unexpected message type: %s", msgType)
 	}
@@ -157,13 +150,11 @@ func (consensus Consensus) processAnnounceMessage(msg string) {
 	// sign block
 
 	// return the signature(commit) to leader
+	msgToSend := ConstructConsensusMessage(COMMIT, []byte("COMMIT"))
+	p2p.SendMessage(consensus.Leader, msgToSend)
 
 	// Set state to COMMIT_DONE
 	consensus.State = COMMIT_DONE
-	peer := consensus.Leader
-	fmt.Println("my port is:", peer.Port)
-	fmt.Println(peer.Port)
-	p2p.SendMessage(consensus.Leader, "hi")
 
 }
 

@@ -5,6 +5,8 @@ import (
 	"net"
 	"log"
 	"fmt"
+	"encoding/binary"
+	"bytes"
 )
 
 // Object for a p2p peer (node)
@@ -18,21 +20,40 @@ type Peer struct {
 }
 
 // Send the message to the peer
-func SendMessage(peer Peer, msg string){
-	send(peer.Ip, peer.Port, msg)
+func SendMessage(peer Peer, msg []byte){
+	// Construct normal p2p message
+	payload := ConstructP2pMessage(byte(0), msg)
+
+	send(peer.Ip, peer.Port, payload)
 }
 
 // Send the message to a list of peers
-func BroadcastMessage(peers []Peer, msg string) {
-	fmt.Println(peers)
+func BroadcastMessage(peers []Peer, msg []byte) {
+	// Construct broadcast p2p message
+	payload := ConstructP2pMessage(byte(17), msg)
+
 	for _, peer := range peers {
-		SendMessage(peer, msg)
+		send(peer.Ip, peer.Port, payload)
 	}
+}
+
+func ConstructP2pMessage(msgType byte, payload []byte) []byte {
+
+	firstByte := byte(17)
+	sizeBytes := make([]byte, 4)
+
+	binary.BigEndian.PutUint32(sizeBytes, uint32(len(payload)))
+
+	byteBuffer := bytes.NewBuffer([]byte{})
+	byteBuffer.WriteByte(firstByte)
+	byteBuffer.Write(sizeBytes)
+	byteBuffer.Write(payload)
+	return byteBuffer.Bytes()
 }
 
 
 // SocketClient is to connect a socket given a port and send the given message.
-func sendWithSocketClient(ip, port, message string) (res string) {
+func sendWithSocketClient(ip, port string, message []byte) (res string) {
 	log.Printf("Sending message to ip %s and port %s\n", ip, port)
 	addr := strings.Join([]string{ip, port}, ":")
 	conn, err := net.Dial("tcp", addr)
@@ -43,7 +64,7 @@ func sendWithSocketClient(ip, port, message string) (res string) {
 	}
 	defer conn.Close()
 
-	conn.Write([]byte(message))
+	conn.Write(message)
 	log.Printf("Sent to ip %s and port %s: %s\n", ip, port, message)
 
 
@@ -53,7 +74,7 @@ func sendWithSocketClient(ip, port, message string) (res string) {
 }
 
 // Send a message to another node with given port.
-func send(ip, port, message string) (returnMessage string) {
+func send(ip, port string, message []byte) (returnMessage string) {
 	returnMessage = sendWithSocketClient(ip, port, message)
 	fmt.Println(returnMessage)
 	return

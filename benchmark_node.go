@@ -11,7 +11,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"io/ioutil"
 )
 
 // Consts
@@ -30,6 +29,7 @@ func startServer(port string, handler func(net.Conn, consensus.Consensus), conse
 	}
 	log.Printf("Begin listen port: %s", port)
 	for {
+		// BUG: somehow one message got received ten times for the leader
 		conn, err := listen.Accept()
 		if err != nil {
 			log.Printf("Error listening on port: %s. Exiting.", port)
@@ -38,10 +38,6 @@ func startServer(port string, handler func(net.Conn, consensus.Consensus), conse
 		}
 		go handler(conn, consensus)
 	}
-}
-
-func parseMessageType(receivedMessage string) consensus.MessageType {
-	return 4
 }
 
 func relayToPorts(msg string, conn net.Conn) {
@@ -116,72 +112,21 @@ func Send(port int, message string, ch chan int) (returnMessage string) {
 // Handler of the leader node.
 func NodeHandler(conn net.Conn, consensus consensus.Consensus) {
 	defer conn.Close()
-	receivedMessage := ""
 
-	// since we close connection for each message, no need to mark the end of message
-	// TODO: define message protocol and use a field of message length to figure out when to end reading
-	//var (
-	//	buf = make([]byte, 1024)
-	//	r   = bufio.NewReader(conn)
-	//)
-//ILOOP:
-//	for {
-//		n, err := r.Read(buf)
-//		data := string(buf[:n])
-//		receivedMessage += data
-//		switch err {
-//		case io.EOF:
-//			break ILOOP
-//		case nil:
-//			if consensus.IsLeader {
-//				log.Println("Leader Node is", consensus.Leader)
-//				log.Println("[Leader] Received:", data)
-//				if isTransportOver(data) {
-//					break ILOOP
-//				}
-//			} else {
-//				log.Println("[Slave] Received:", data)
-//				break ILOOP
-//			}
-//		default:
-//			if consensus.IsLeader {
-//				log.Fatalf("[Leader] Receive data failed:%s", err)
-//			} else {
-//				log.Fatalf("[Slave] Receive data failed:%s", err)
-//			}
-//			return
-//		}
-//	}
-
-	message, err := ioutil.ReadAll(conn)
-	if err == nil {
-		data := string(message)
-		if consensus.IsLeader {
-			log.Println("Leader Node is", consensus.Leader)
-			log.Println("[Leader] Received:", data)
-		} else {
-			log.Println("[Slave] Received:", data)
-		}
-	} else {
+	payload, err := p2p.ReadMessagePayload(conn)
+	if err != nil {
 		if consensus.IsLeader {
 			log.Fatalf("[Leader] Receive data failed:%s", err)
 		} else {
 			log.Fatalf("[Slave] Receive data failed:%s", err)
 		}
 	}
-	receivedMessage = strings.TrimSpace(receivedMessage)
 	if consensus.IsLeader {
-		consensus.ProcessMessageLeader(parseMessageType(receivedMessage), receivedMessage)
+		consensus.ProcessMessageLeader(payload)
 	} else {
-		log.Printf("[Slave] Send: %s", receivedMessage)
-		consensus.ProcessMessageValidator(0, receivedMessage)
+		consensus.ProcessMessageValidator(payload)
 	}
 	//relayToPorts(receivedMessage, conn)
-}
-
-func isTransportOver(data string) (over bool) {
-	over = strings.HasSuffix(data, "\r\n\r\n")
-	return
 }
 
 func initConsensus(ip, port, ipfile string) consensus.Consensus {
