@@ -55,16 +55,26 @@ func (consensus *Consensus) startConsensus(msg string) {
 
 func (consensus *Consensus) processCommitMessage(msg string) {
 	// verify and aggregate all the signatures
-	mutex.Lock()
-	consensus.Signatures = append(consensus.Signatures, msg)
+	if _, ok := consensus.Signatures[msg]; !ok {
+		mutex.Lock()
+		consensus.Signatures[msg] = msg
+		mutex.Unlock()
+	}
 
-	// Broadcast challenge
-	// Set state to CHALLENGE_DONE
-	consensus.State = CHALLENGE_DONE
-	mutex.Unlock()
 
 	log.Printf("Number of signatures received: %d", len(consensus.Signatures))
-	if len(consensus.Signatures) >= (2 * len(consensus.Validators)) / 3 + 1 {
+	if consensus.State != CHALLENGE_DONE && len(consensus.Signatures) >= (2 * len(consensus.Validators)) / 3 + 1 {
+
+		mutex.Lock()
+		if consensus.State == ANNOUNCE_DONE {
+			// Set state to CHALLENGE_DONE
+			consensus.State = CHALLENGE_DONE
+		}
+		mutex.Unlock()
+		// Broadcast challenge
+		msgToSend := ConstructConsensusMessage(CHALLENGE, []byte("challenge"))
+		p2p.BroadcastMessage(consensus.Validators, msgToSend)
+
 		log.Printf("Consensus reached with %d signatures: %s", len(consensus.Signatures), consensus.Signatures)
 	}
 

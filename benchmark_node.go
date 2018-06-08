@@ -128,24 +128,6 @@ func NodeHandler(conn net.Conn, consensus *consensus.Consensus) {
 	//relayToPorts(receivedMessage, conn)
 }
 
-func initConsensus(ip, port, ipfile string) consensus.Consensus {
-	// The first Ip, port passed will be leader.
-	consensus := consensus.Consensus{}
-	peer := p2p.Peer{Port: port, Ip: ip}
-	Peers := getPeers(ip, port, ipfile)
-	leaderPeer := getLeader(ipfile)
-	if leaderPeer == peer {
-		consensus.IsLeader = true
-	} else {
-		consensus.IsLeader = false
-	}
-	consensus.Leader = leaderPeer
-	consensus.Validators = Peers
-
-	consensus.PriKey = ip + ":" + port // use ip:port as unique key for now
-	return consensus
-}
-
 func getLeader(iplist string) p2p.Peer {
 	file, _ := os.Open(iplist)
 	fscanner := bufio.NewScanner(file)
@@ -183,15 +165,16 @@ func main() {
 	ipfile := flag.String("ipfile", "iplist.txt", "file containing all ip addresses")
 	flag.Parse()
 	fmt.Println()
-	consensus := initConsensus(*ip, *port, *ipfile)
+
+	consensusObj := consensus.InitConsensus(*ip, *port, getPeers(*ip, *port, *ipfile), getLeader(*ipfile))
 	var nodeStatus string
-	if consensus.IsLeader {
+	if consensusObj.IsLeader {
 		nodeStatus = "leader"
 	} else {
 		nodeStatus = "validator"
 	}
-	fmt.Println(consensus)
+	fmt.Println(consensusObj)
 	fmt.Printf("This node is a %s node with ip: %s and port: %s\n", nodeStatus, *ip, *port)
 	fmt.Println()
-	startServer(*port, NodeHandler, &consensus)
+	startServer(*port, NodeHandler, &consensusObj)
 }

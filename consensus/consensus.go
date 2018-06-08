@@ -9,7 +9,7 @@ import (
 type Consensus struct {
 	State ConsensusState
 	// Signatures collected from validators
-	Signatures []string
+	Signatures map[string]string
 	// Actual block data to reach consensus on
 	Data string
 	// List of validators
@@ -52,4 +52,23 @@ func (state ConsensusState) String() string {
 		return "Unknown"
 	}
 	return names[state]
+}
+
+func InitConsensus(ip, port string, peers []p2p.Peer, leader p2p.Peer) Consensus {
+	// The first Ip, port passed will be leader.
+	consensus := Consensus{}
+	peer := p2p.Peer{Port: port, Ip: ip}
+	Peers := peers
+	leaderPeer := leader
+	if leaderPeer == peer {
+		consensus.IsLeader = true
+	} else {
+		consensus.IsLeader = false
+	}
+	consensus.Signatures = make(map[string]string)
+	consensus.Leader = leaderPeer
+	consensus.Validators = Peers
+
+	consensus.PriKey = ip + ":" + port // use ip:port as unique key for now
+	return consensus
 }
