@@ -5,6 +5,7 @@ import (
 	"../p2p"
 	"fmt"
 	"log"
+	"sync"
 )
 
 // Consensus data containing all info related to one consensus process
@@ -40,6 +41,8 @@ const (
 	FINISHED
 )
 
+var mutex = &sync.Mutex{}
+
 // Returns string name for the ConsensusState enum
 func (state ConsensusState) String() string {
 	names := [...]string{
@@ -57,7 +60,7 @@ func (state ConsensusState) String() string {
 }
 
 // Leader's consensus message dispatcher
-func (consensus Consensus) ProcessMessageLeader(message []byte) {
+func (consensus *Consensus) ProcessMessageLeader(message []byte) {
 	msgType, err := GetConsensusMessageType(message)
 	if err != nil {
 		log.Print(err)
@@ -87,11 +90,11 @@ func (consensus Consensus) ProcessMessageLeader(message []byte) {
 }
 
 // Handler for message which triggers consensus process
-func (consensus Consensus) processStartConsensusMessage(msg string) {
+func (consensus *Consensus) processStartConsensusMessage(msg string) {
 	consensus.startConsensus(msg)
 }
 
-func (consensus Consensus) startConsensus(msg string) {
+func (consensus *Consensus) startConsensus(msg string) {
 	// prepare message and broadcast to validators
 
 	msgToSend := ConstructConsensusMessage(ANNOUNCE, []byte("block"))
@@ -100,15 +103,24 @@ func (consensus Consensus) startConsensus(msg string) {
 	consensus.State = ANNOUNCE_DONE
 }
 
-func (consensus Consensus) processCommitMessage(msg string) {
+func (consensus *Consensus) processCommitMessage(msg string) {
 	// verify and aggregate all the signatures
+	mutex.Lock()
+	consensus.Signatures = append(consensus.Signatures, msg)
 
 	// Broadcast challenge
 	// Set state to CHALLENGE_DONE
 	consensus.State = CHALLENGE_DONE
+	mutex.Unlock()
+
+	log.Printf("Number of signatures received: %d", len(consensus.Signatures))
+	if len(consensus.Signatures) >= (2 * len(consensus.Validators)) / 3 + 1 {
+		log.Printf("Consensus reached with %d signatures: %s", len(consensus.Signatures), consensus.Signatures)
+	}
+
 }
 
-func (consensus Consensus) processResponseMessage(msg string) {
+func (consensus *Consensus) processResponseMessage(msg string) {
 	// verify and aggregate all signatures
 
 	// Set state to FINISHED
@@ -117,7 +129,7 @@ func (consensus Consensus) processResponseMessage(msg string) {
 }
 
 // Validator's consensus message dispatcher
-func (consensus Consensus) ProcessMessageValidator(message []byte) {
+func (consensus *Consensus) ProcessMessageValidator(message []byte) {
 	msgType, err := GetConsensusMessageType(message)
 	if err != nil {
 		log.Print(err)
@@ -144,13 +156,14 @@ func (consensus Consensus) ProcessMessageValidator(message []byte) {
 	}
 }
 
-func (consensus Consensus) processAnnounceMessage(msg string) {
+func (consensus *Consensus) processAnnounceMessage(msg string) {
 	// verify block data
 
 	// sign block
 
-	// return the signature(commit) to leader
-	msgToSend := ConstructConsensusMessage(COMMIT, []byte("COMMIT"))
+	// TODO: return the signature(commit) to leader
+	// For now, simply return the private key of this node.
+	msgToSend := ConstructConsensusMessage(COMMIT, []byte(consensus.PriKey))
 	p2p.SendMessage(consensus.Leader, msgToSend)
 
 	// Set state to COMMIT_DONE
@@ -158,7 +171,7 @@ func (consensus Consensus) processAnnounceMessage(msg string) {
 
 }
 
-func (consensus Consensus) processChallengeMessage(msg string) {
+func (consensus *Consensus) processChallengeMessage(msg string) {
 	// verify block data and the aggregated signatures
 
 	// sign the message

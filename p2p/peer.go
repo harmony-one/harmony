@@ -1,18 +1,18 @@
 package p2p
 
 import (
-	"strings"
-	"net"
-	"log"
-	"fmt"
-	"encoding/binary"
 	"bytes"
+	"encoding/binary"
+	"fmt"
+	"log"
+	"net"
+	"strings"
 )
 
 // Object for a p2p peer (node)
 type Peer struct {
 	// Ip address of the peer
-	Ip   string
+	Ip string
 	// Port number of the peer
 	Port string
 	// Public key of the peer
@@ -20,7 +20,7 @@ type Peer struct {
 }
 
 // Send the message to the peer
-func SendMessage(peer Peer, msg []byte){
+func SendMessage(peer Peer, msg []byte) {
 	// Construct normal p2p message
 	payload := ConstructP2pMessage(byte(0), msg)
 
@@ -37,10 +37,11 @@ func BroadcastMessage(peers []Peer, msg []byte) {
 	}
 }
 
+// Construct the p2p message as [messageType, payloadSize, payload]
 func ConstructP2pMessage(msgType byte, payload []byte) []byte {
 
-	firstByte := byte(17)
-	sizeBytes := make([]byte, 4)
+	firstByte := byte(17)        // messageType
+	sizeBytes := make([]byte, 4) // payloadSize
 
 	binary.BigEndian.PutUint32(sizeBytes, uint32(len(payload)))
 
@@ -51,13 +52,11 @@ func ConstructP2pMessage(msgType byte, payload []byte) []byte {
 	return byteBuffer.Bytes()
 }
 
-
 // SocketClient is to connect a socket given a port and send the given message.
 func sendWithSocketClient(ip, port string, message []byte) (res string) {
 	log.Printf("Sending message to ip %s and port %s\n", ip, port)
 	addr := strings.Join([]string{ip, port}, ":")
 	conn, err := net.Dial("tcp", addr)
-
 
 	if err != nil {
 		log.Fatalln(err)
@@ -66,7 +65,6 @@ func sendWithSocketClient(ip, port string, message []byte) (res string) {
 
 	conn.Write(message)
 	log.Printf("Sent to ip %s and port %s: %s\n", ip, port, message)
-
 
 	// No ack (reply) message from the receiver for now.
 	// TODO: think about

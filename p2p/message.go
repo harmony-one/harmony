@@ -1,12 +1,12 @@
 package p2p
 
 import (
-	"net"
 	"bufio"
-	"io"
-	"log"
 	"bytes"
 	"encoding/binary"
+	"io"
+	"log"
+	"net"
 )
 
 /*
@@ -16,19 +16,20 @@ P2p Message data structure:
 1 byte            - message type
 		            0x00 - normal message (no need to forward)
                     0x11 - p2p message (may need to forward to other neighbors)
-4 bytes           - message side n in number of bytes
+4 bytes           - message size n in number of bytes
 payload (n bytes) - actual message payload
 ----  message end  -----
 
- */
+*/
 
+// Read the message type and payload size, and return the actual payload.
 func ReadMessagePayload(conn net.Conn) ([]byte, error) {
 	var (
-	    payloadBuf = bytes.NewBuffer([]byte{})
-		r = bufio.NewReader(conn)
+		payloadBuf = bytes.NewBuffer([]byte{})
+		r          = bufio.NewReader(conn)
 	)
 
-	// Read 1 byte for messge type
+	//// Read 1 byte for messge type
 	msgType, err := r.ReadByte()
 	if err != nil {
 		log.Fatalf("Error reading the p2p message type field")
@@ -37,10 +38,10 @@ func ReadMessagePayload(conn net.Conn) ([]byte, error) {
 	log.Printf("Received p2p message with type: %x", msgType)
 	// TODO: check on msgType and take actions accordingly
 
-	// Read 4 bytes for message size
+	//// Read 4 bytes for message size
 	fourBytes := make([]byte, 4)
 	n, err := r.Read(fourBytes)
-	if err != nil{
+	if err != nil {
 		log.Fatalf("Error reading the p2p message size field")
 		return payloadBuf.Bytes(), err
 	} else if n < len(fourBytes) {
@@ -53,7 +54,7 @@ func ReadMessagePayload(conn net.Conn) ([]byte, error) {
 	bytesToRead := binary.BigEndian.Uint32(fourBytes)
 	log.Printf("The payload size is %d bytes.", bytesToRead)
 
-	// Read the payload in chunk of 1024 bytes
+	//// Read the payload in chunk of 1024 bytes
 	tmpBuf := make([]byte, 1024)
 ILOOP:
 	for {
