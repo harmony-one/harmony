@@ -1,10 +1,11 @@
 package main
 
 import (
+	"./consensus"
+	"./p2p"
 	"bufio"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"os"
@@ -19,57 +20,28 @@ const (
 )
 
 // Start a server and process the request by a handler.
-func startServer(port int, handler func(net.Conn)) {
-	listen, err := net.Listen("tcp4", ":"+strconv.Itoa(port))
+func startServer(port string, handler func(net.Conn, *consensus.Consensus), consensus *consensus.Consensus) {
+	listen, err := net.Listen("tcp4", ":"+port)
 	defer listen.Close()
 	if err != nil {
-		log.Fatalf("Socket listen port %d failed,%s", port, err)
+		log.Fatalf("Socket listen port %s failed,%s", port, err)
 		os.Exit(1)
 	}
-	log.Printf("Begin listen port: %d", port)
+	log.Printf("Begin listen port: %s", port)
 	for {
 		conn, err := listen.Accept()
 		if err != nil {
+			log.Printf("Error listening on port: %s. Exiting.", port)
 			log.Fatalln(err)
 			continue
 		}
-		go handler(conn)
+		go handler(conn, consensus)
 	}
 }
 
-// Handler of the leader node.
-func leaderHandler(conn net.Conn) {
-	defer conn.Close()
-	var (
-		buf = make([]byte, 1024)
-		r   = bufio.NewReader(conn)
-		w   = bufio.NewWriter(conn)
-	)
-
-	receivedMessage := ""
-ILOOP:
-	for {
-		n, err := r.Read(buf)
-		data := string(buf[:n])
-
-		receivedMessage += data
-
-		switch err {
-		case io.EOF:
-			break ILOOP
-		case nil:
-			log.Println("Receive:", data)
-			if isTransportOver(data) {
-				break ILOOP
-			}
-
-		default:
-			log.Fatalf("Receive data failed:%s", err)
-			return
-		}
-	}
-	receivedMessage = strings.TrimSpace(receivedMessage)
-	ports := convertIntoInts(receivedMessage)
+func relayToPorts(msg string, conn net.Conn) {
+	w := bufio.NewWriter(conn)
+	ports := convertIntoInts(msg)
 	ch := make(chan int)
 	for i, port := range ports {
 		go Send(port, strconv.Itoa(i), ch)
@@ -82,6 +54,7 @@ ILOOP:
 	w.Write([]byte(Message))
 	w.Flush()
 	log.Printf("Send: %s", Message)
+
 }
 
 // Helper library to convert '1,2,3,4' into []int{1,2,3,4}.
@@ -125,6 +98,7 @@ func SocketClient(ip, message string, port int) (res string) {
 	return
 }
 
+//https://gist.github.com/kenshinx/5796276
 // Send a message to another node with given port.
 func Send(port int, message string, ch chan int) (returnMessage string) {
 	ip := "127.0.0.1"
@@ -134,53 +108,90 @@ func Send(port int, message string, ch chan int) (returnMessage string) {
 	return
 }
 
-// Handler for slave node.
-func slaveHandler(conn net.Conn) {
+// Handler of the leader node.
+func NodeHandler(conn net.Conn, consensus *consensus.Consensus) {
 	defer conn.Close()
-	var (
-		buf = make([]byte, 1024)
-		r   = bufio.NewReader(conn)
-		w   = bufio.NewWriter(conn)
-	)
 
-ILOOP:
-	for {
-		n, err := r.Read(buf)
-		data := string(buf[:n])
-
-		switch err {
-		case io.EOF:
-			break ILOOP
-		case nil:
-			log.Println("Receive:", data)
-			if isTransportOver(data) {
-				break ILOOP
-			}
-		default:
-			log.Fatalf("Receive data failed:%s", err)
-			return
+	payload, err := p2p.ReadMessagePayload(conn)
+	if err != nil {
+		if consensus.IsLeader {
+			log.Fatalf("[Leader] Receive data failed:%s", err)
+		} else {
+			log.Fatalf("[Slave] Receive data failed:%s", err)
 		}
 	}
-	w.Write([]byte(Message))
-	w.Flush()
-	log.Printf("Send: %s", Message)
+	if consensus.IsLeader {
+		consensus.ProcessMessageLeader(payload)
+	} else {
+		consensus.ProcessMessageValidator(payload)
+	}
+	//relayToPorts(receivedMessage, conn)
 }
 
-func isTransportOver(data string) (over bool) {
-	over = strings.HasSuffix(data, "\r\n\r\n")
-	return
+func initConsensus(ip, port, ipfile string) consensus.Consensus {
+	// The first Ip, port passed will be leader.
+	consensus := consensus.Consensus{}
+	peer := p2p.Peer{Port: port, Ip: ip}
+	Peers := getPeers(ip, port, ipfile)
+	leaderPeer := getLeader(ipfile)
+	if leaderPeer == peer {
+		consensus.IsLeader = true
+	} else {
+		consensus.IsLeader = false
+	}
+	consensus.Leader = leaderPeer
+	consensus.Validators = Peers
+
+	consensus.PriKey = ip + ":" + port // use ip:port as unique key for now
+	return consensus
+}
+
+func getLeader(iplist string) p2p.Peer {
+	file, _ := os.Open(iplist)
+	fscanner := bufio.NewScanner(file)
+	var leaderPeer p2p.Peer
+	for fscanner.Scan() {
+		p := strings.Split(fscanner.Text(), " ")
+		ip, port, status := p[0], p[1], p[2]
+		if status == "leader" {
+			leaderPeer.Ip = ip
+			leaderPeer.Port = port
+		}
+	}
+	return leaderPeer
+}
+
+func getPeers(Ip, Port, iplist string) []p2p.Peer {
+	file, _ := os.Open(iplist)
+	fscanner := bufio.NewScanner(file)
+	var peerList []p2p.Peer
+	for fscanner.Scan() {
+		p := strings.Split(fscanner.Text(), " ")
+		ip, port, status := p[0], p[1], p[2]
+		if status == "leader" || ip == Ip && port == Port {
+			continue
+		}
+		peer := p2p.Peer{Port: port, Ip: ip}
+		peerList = append(peerList, peer)
+	}
+	return peerList
 }
 
 func main() {
-	port := flag.Int("port", 3333, "port of the node.")
-	mode := flag.String("mode", "leader", "should be slave or leader")
+	ip := flag.String("ip", "127.0.0.1", "IP of the node")
+	port := flag.String("port", "9000", "port of the node.")
+	ipfile := flag.String("ipfile", "iplist.txt", "file containing all ip addresses")
 	flag.Parse()
-
-	if strings.ToLower(*mode) == "leader" {
-		// Start leader node.
-		startServer(*port, leaderHandler)
-	} else if strings.ToLower(*mode) == "slave" {
-		// Start slave node.
-		startServer(*port, slaveHandler)
+	fmt.Println()
+	consensus := initConsensus(*ip, *port, *ipfile)
+	var nodeStatus string
+	if consensus.IsLeader {
+		nodeStatus = "leader"
+	} else {
+		nodeStatus = "validator"
 	}
+	fmt.Println(consensus)
+	fmt.Printf("This node is a %s node with ip: %s and port: %s\n", nodeStatus, *ip, *port)
+	fmt.Println()
+	startServer(*port, NodeHandler, &consensus)
 }

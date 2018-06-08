@@ -85,7 +85,8 @@ func TxnGenerator(numOfTxns int, lenOfRandomString int) <-chan string {
 	go func() {
 		for i := 0; i < numOfTxns; i++ {
 			out <- randomString(lenOfRandomString)
-			time.Sleep(2 * time.Second)
+			fmt.Printf("Transaction Number %d\n", i)
+			//time.Sleep(2 * time.Second)
 		}
 		close(out)
 	}()
@@ -96,7 +97,7 @@ func main() {
 	var (
 		//isLeader          Node
 		numOfTxns         = 1000
-		numOfNodes  = 10
+		numOfNodes        = 10
 		N                 = make([]Node, 10)
 		lenOfRandomString = 10
 		node_ips          = []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
@@ -112,7 +113,7 @@ func main() {
 	Txns := BufferedTxnQueueWithFanOut(txnqueue, numOfNodes)
 	for num := range Txns {
 		txn := Txns[num]
-		go consume(txn,num)
-		}
-		time.Sleep(60 * time.Second)
+		go consume(txn, num)
+	}
+	time.Sleep(60 * time.Second)
 }
