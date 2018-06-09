@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"log"
-	"fmt"
 	"../p2p"
 )
 
@@ -19,18 +18,18 @@ func (consensus *Consensus) ProcessMessageValidator(message []byte) {
 	}
 
 	msg := string(payload)
-	fmt.Printf("[Validator] Received and processing message: %s, %s\n", msgType, msg)
+	log.Printf("[Validator] Received and processing message: %s, %s\n", msgType, msg)
 	switch msgType {
 	case ANNOUNCE:
 		consensus.processAnnounceMessage(msg)
 	case COMMIT:
-		fmt.Println("Unexpected message type: %s", msgType)
+		log.Println("Unexpected message type: %s", msgType)
 	case CHALLENGE:
 		consensus.processChallengeMessage(msg)
 	case RESPONSE:
-		fmt.Println("Unexpected message type: %s", msgType)
+		log.Println("Unexpected message type: %s", msgType)
 	default:
-		fmt.Println("Unexpected message type: %s", msgType)
+		log.Println("Unexpected message type: %s", msgType)
 	}
 }
 
@@ -41,11 +40,11 @@ func (consensus *Consensus) processAnnounceMessage(msg string) {
 
 	// TODO: return the signature(commit) to leader
 	// For now, simply return the private key of this node.
-	msgToSend := ConstructConsensusMessage(COMMIT, []byte(consensus.PriKey))
-	p2p.SendMessage(consensus.Leader, msgToSend)
+	msgToSend := ConstructConsensusMessage(COMMIT, []byte(consensus.priKey))
+	p2p.SendMessage(consensus.leader, msgToSend)
 
 	// Set state to COMMIT_DONE
-	consensus.State = COMMIT_DONE
+	consensus.state = COMMIT_DONE
 
 }
 
@@ -54,9 +53,12 @@ func (consensus *Consensus) processChallengeMessage(msg string) {
 
 	// sign the message
 
-	// return the signature(response) to leader
+	// TODO: return the signature(response) to leader
+	// For now, simply return the private key of this node.
+	msgToSend := ConstructConsensusMessage(RESPONSE, []byte(consensus.priKey))
+	p2p.SendMessage(consensus.leader, msgToSend)
 
 	// Set state to RESPONSE_DONE
-	consensus.State = RESPONSE_DONE
+	consensus.state = RESPONSE_DONE
 }
 

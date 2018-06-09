@@ -5,7 +5,6 @@ import (
 	"./p2p"
 	"bufio"
 	"flag"
-	"fmt"
 	"log"
 	"net"
 	"os"
@@ -48,7 +47,7 @@ func relayToPorts(msg string, conn net.Conn) {
 	}
 	count := 0
 	for count < len(ports) {
-		fmt.Println(<-ch)
+		log.Println(<-ch)
 		count++
 	}
 	w.Write([]byte(Message))
@@ -72,7 +71,7 @@ func convertIntoInts(data string) []int {
 // Do check error.
 func checkError(err error) {
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Fatal error: %s", err.Error())
+		log.Fatalln(os.Stderr, "Fatal error: %s", err.Error())
 		os.Exit(1)
 	}
 }
@@ -104,7 +103,7 @@ func Send(port int, message string, ch chan int) (returnMessage string) {
 	ip := "127.0.0.1"
 	returnMessage = SocketClient(ip, message, port)
 	ch <- port
-	fmt.Println(returnMessage)
+	log.Println(returnMessage)
 	return
 }
 
@@ -164,7 +163,7 @@ func main() {
 	port := flag.String("port", "9000", "port of the node.")
 	ipfile := flag.String("ipfile", "iplist.txt", "file containing all ip addresses")
 	flag.Parse()
-	fmt.Println()
+	log.Println()
 
 	consensusObj := consensus.InitConsensus(*ip, *port, getPeers(*ip, *port, *ipfile), getLeader(*ipfile))
 	var nodeStatus string
@@ -173,8 +172,8 @@ func main() {
 	} else {
 		nodeStatus = "validator"
 	}
-	fmt.Println(consensusObj)
-	fmt.Printf("This node is a %s node with ip: %s and port: %s\n", nodeStatus, *ip, *port)
-	fmt.Println()
+	log.Println(consensusObj)
+	log.Printf("This node is a %s node with ip: %s and port: %s\n", nodeStatus, *ip, *port)
+	log.Println()
 	startServer(*port, NodeHandler, &consensusObj)
 }
