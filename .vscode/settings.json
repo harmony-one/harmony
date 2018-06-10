@@ -1,0 +1,8 @@
+{
+  "workbench.colorTheme": "Solarized Light",
+  "npm.enableScriptExplorer": true,
+  "window.zoomLevel": 3,
+  "editor.tabSize": 4,
+  "editor.insertSpaces": true,
+  "editor.detectIndentation": true
+}

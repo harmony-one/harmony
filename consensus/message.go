@@ -12,7 +12,7 @@ Consensus message data structure:
 
 ---- message start -----
 1 byte            - consensus.MessageType
-		            0x00 - ANNOUNCE
+                    0x00 - ANNOUNCE
                     0x01 - COMMIT
                     ...
 payload (n bytes) - consensus message payload (the data to run consensus with)

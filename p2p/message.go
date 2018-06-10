@@ -14,7 +14,7 @@ P2p Message data structure:
 
 ---- message start -----
 1 byte            - message type
-		            0x00 - normal message (no need to forward)
+                    0x00 - normal message (no need to forward)
                     0x11 - p2p message (may need to forward to other neighbors)
 4 bytes           - message size n in number of bytes
 payload (n bytes) - actual message payload

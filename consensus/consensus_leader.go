@@ -2,8 +2,9 @@ package consensus
 
 import (
 	"log"
-	"../p2p"
 	"sync"
+
+	"../p2p"
 )
 
 var mutex = &sync.Mutex{}
@@ -63,8 +64,7 @@ func (consensus *Consensus) processCommitMessage(msg string) {
 		return
 	}
 
-
-	if consensus.state != CHALLENGE_DONE && len(consensus.commits) >= (2 * len(consensus.validators)) / 3 + 1 {
+	if consensus.state != CHALLENGE_DONE && len(consensus.commits) >= (2*len(consensus.validators))/3+1 {
 		mutex.Lock()
 		if consensus.state == ANNOUNCE_DONE {
 			// Set state to CHALLENGE_DONE
@@ -90,8 +90,7 @@ func (consensus *Consensus) processResponseMessage(msg string) {
 		return
 	}
 
-
-	if consensus.state != FINISHED && len(consensus.responses) >= (2 * len(consensus.validators)) / 3 + 1 {
+	if consensus.state != FINISHED && len(consensus.responses) >= (2*len(consensus.validators))/3+1 {
 		mutex.Lock()
 		if consensus.state == CHALLENGE_DONE {
 			// Set state to FINISHED
