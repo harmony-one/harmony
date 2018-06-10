@@ -1,8 +1,6 @@
 package main
 
 import (
-	"./consensus"
-	"./p2p"
 	"bufio"
 	"flag"
 	"fmt"
@@ -11,6 +9,9 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"./consensus"
+	"./p2p"
 )
 
 // Consts
