@@ -9,24 +9,24 @@ import (
 
 // Transaction represents a Bitcoin transaction
 type Transaction struct {
-	ID   []byte
-	Vin  []TXInput
-	Vout []TXOutput
+	id       []byte
+	txInput  []TXInput
+	txOutput []TXOutput
 }
 
 type TXOutput struct {
-	Addresss string
-	Value    int
+	address string
+	value   int
 }
 
 type TXInput struct {
-	Txid     []byte
-	outIndex int
-	Address  string
+	txId          []byte
+	txOutputIndex int
+	address       string
 }
 
 // SetID sets ID of a transaction
-func (tx *Transaction) SetID() {
+func (tx *Transaction) SetId() {
 	var encoded bytes.Buffer
 	var hash [32]byte
 
