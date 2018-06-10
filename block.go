@@ -26,18 +26,37 @@ func (b *Block) HashTransactions() []byte {
     return txHash[:]
 }
 
-// NewBlock creates and returns Block.
-func NewBlock(utxoPool []UTXOPool, prevBlockHash []byte) *Block {
+// Serialize serializes the block
+func (b *Block) Serialize() []byte {
+    var result bytes.Buffer
+    encoder := gob.NewEncoder(&result)
+    err := encoder.Encode(b)
+    if err != nil {
+    	log.Panic(err)
+    }
+    return result.Bytes()
+}
 
-    block := &Block{time.Now().Unix(), utxoPool, prevBlockHash, []byte{}}
-    block.SetHash()
+// NewBlock creates and returns Block.
+func NewBlock(transactions []*Transaction, prevBlockHash []byte) *Block {
+    block := &Block{time.Now().Unix(), transactions, prevBlockHash, []byte{}, 0}
+    block.Hash = block.HashTransactions()
     return block
 }
 
 // NewGenesisBlock creates and returns genesis Block.
-func NewGenesisBlock() *Block {
-    genesisUTXOPool := UTXOPool{}
-    genesisUTXOPool.utxos["genesis"] = TOTAL_COINS
-
-    return NewBlock(genesisUTXOPool, []byte{})
+func NewGenesisBlock(coinbase *Transaction) *Block {
+    return NewBlock([]*Transaction{coinbase}, []byte{})
 }
+
+// DeserializeBlock deserializes a block
+func DeserializeBlock(d []byte) *Block {
+    var block Block
+    decoder := gob.NewDecoder(bytes.NewReader(d))
+    err := decoder.Decode(&block)
+    if err != nil {
+        log.Panic(err)
+    }
+    return &block
+}
+
