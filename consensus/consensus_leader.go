@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"log"
-	"fmt"
 	"../p2p"
 	"sync"
 )
@@ -22,20 +21,20 @@ func (consensus *Consensus) ProcessMessageLeader(message []byte) {
 	}
 
 	msg := string(payload)
-	fmt.Printf("[Leader] Received and processing message: %s, %s\n", msgType, msg)
+	log.Printf("[Leader] Received and processing message: %s, %s\n", msgType, msg)
 	switch msgType {
 	case ANNOUNCE:
-		fmt.Println("Unexpected message type: %s", msgType)
+		log.Println("Unexpected message type: %s", msgType)
 	case COMMIT:
 		consensus.processCommitMessage(msg)
 	case CHALLENGE:
-		fmt.Println("Unexpected message type: %s", msgType)
+		log.Println("Unexpected message type: %s", msgType)
 	case RESPONSE:
 		consensus.processResponseMessage(msg)
 	case START_CONSENSUS:
 		consensus.processStartConsensusMessage(msg)
 	default:
-		fmt.Println("Unexpected message type: %s", msgType)
+		log.Println("Unexpected message type: %s", msgType)
 	}
 }
 
@@ -48,32 +47,60 @@ func (consensus *Consensus) startConsensus(msg string) {
 	// prepare message and broadcast to validators
 
 	msgToSend := ConstructConsensusMessage(ANNOUNCE, []byte("block"))
-	p2p.BroadcastMessage(consensus.Validators, msgToSend)
+	p2p.BroadcastMessage(consensus.validators, msgToSend)
 	// Set state to ANNOUNCE_DONE
-	consensus.State = ANNOUNCE_DONE
+	consensus.state = ANNOUNCE_DONE
 }
 
 func (consensus *Consensus) processCommitMessage(msg string) {
-	// verify and aggregate all the signatures
-	mutex.Lock()
-	consensus.Signatures = append(consensus.Signatures, msg)
-
-	// Broadcast challenge
-	// Set state to CHALLENGE_DONE
-	consensus.State = CHALLENGE_DONE
-	mutex.Unlock()
-
-	log.Printf("Number of signatures received: %d", len(consensus.Signatures))
-	if len(consensus.Signatures) >= (2 * len(consensus.Validators)) / 3 + 1 {
-		log.Printf("Consensus reached with %d signatures: %s", len(consensus.Signatures), consensus.Signatures)
+	// proceed only when the message is not received before and this consensus phase is not done.
+	if _, ok := consensus.commits[msg]; !ok && consensus.state != CHALLENGE_DONE {
+		mutex.Lock()
+		consensus.commits[msg] = msg
+		log.Printf("Number of commits received: %d", len(consensus.commits))
+		mutex.Unlock()
+	} else {
+		return
 	}
 
+
+	if consensus.state != CHALLENGE_DONE && len(consensus.commits) >= (2 * len(consensus.validators)) / 3 + 1 {
+		mutex.Lock()
+		if consensus.state == ANNOUNCE_DONE {
+			// Set state to CHALLENGE_DONE
+			consensus.state = CHALLENGE_DONE
+		}
+		mutex.Unlock()
+		// Broadcast challenge
+		msgToSend := ConstructConsensusMessage(CHALLENGE, []byte("challenge"))
+		p2p.BroadcastMessage(consensus.validators, msgToSend)
+
+		log.Printf("Enough commits received with %d signatures: %s", len(consensus.commits), consensus.commits)
+	}
 }
 
 func (consensus *Consensus) processResponseMessage(msg string) {
-	// verify and aggregate all signatures
+	// proceed only when the message is not received before and this consensus phase is not done.
+	if _, ok := consensus.responses[msg]; !ok && consensus.state != FINISHED {
+		mutex.Lock()
+		consensus.responses[msg] = msg
+		log.Printf("Number of responses received: %d", len(consensus.responses))
+		mutex.Unlock()
+	} else {
+		return
+	}
 
-	// Set state to FINISHED
-	consensus.State = FINISHED
 
+	if consensus.state != FINISHED && len(consensus.responses) >= (2 * len(consensus.validators)) / 3 + 1 {
+		mutex.Lock()
+		if consensus.state == CHALLENGE_DONE {
+			// Set state to FINISHED
+			consensus.state = FINISHED
+			log.Println("Hooray! Consensus reached!!!!!!!!!!!!!")
+		}
+		mutex.Unlock()
+		// TODO: composes new block and broadcast the new block to validators
+
+		log.Printf("Consensus reached with %d signatures: %s", len(consensus.responses), consensus.responses)
+	}
 }

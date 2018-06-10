@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"flag"
-	"fmt"
 	"log"
 	"net"
 	"os"
@@ -49,7 +48,7 @@ func relayToPorts(msg string, conn net.Conn) {
 	}
 	count := 0
 	for count < len(ports) {
-		fmt.Println(<-ch)
+		log.Println(<-ch)
 		count++
 	}
 	w.Write([]byte(Message))
@@ -73,7 +72,7 @@ func convertIntoInts(data string) []int {
 // Do check error.
 func checkError(err error) {
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Fatal error: %s", err.Error())
+		log.Fatalln(os.Stderr, "Fatal error: %s", err.Error())
 		os.Exit(1)
 	}
 }
@@ -105,7 +104,7 @@ func Send(port int, message string, ch chan int) (returnMessage string) {
 	ip := "127.0.0.1"
 	returnMessage = SocketClient(ip, message, port)
 	ch <- port
-	fmt.Println(returnMessage)
+	log.Println(returnMessage)
 	return
 }
 
@@ -127,24 +126,6 @@ func NodeHandler(conn net.Conn, consensus *consensus.Consensus) {
 		consensus.ProcessMessageValidator(payload)
 	}
 	//relayToPorts(receivedMessage, conn)
-}
-
-func initConsensus(ip, port, ipfile string) consensus.Consensus {
-	// The first Ip, port passed will be leader.
-	consensus := consensus.Consensus{}
-	peer := p2p.Peer{Port: port, Ip: ip}
-	Peers := getPeers(ip, port, ipfile)
-	leaderPeer := getLeader(ipfile)
-	if leaderPeer == peer {
-		consensus.IsLeader = true
-	} else {
-		consensus.IsLeader = false
-	}
-	consensus.Leader = leaderPeer
-	consensus.Validators = Peers
-
-	consensus.PriKey = ip + ":" + port // use ip:port as unique key for now
-	return consensus
 }
 
 func getLeader(iplist string) p2p.Peer {
@@ -183,16 +164,17 @@ func main() {
 	port := flag.String("port", "9000", "port of the node.")
 	ipfile := flag.String("ipfile", "iplist.txt", "file containing all ip addresses")
 	flag.Parse()
-	fmt.Println()
-	consensus := initConsensus(*ip, *port, *ipfile)
+	log.Println()
+
+	consensusObj := consensus.InitConsensus(*ip, *port, getPeers(*ip, *port, *ipfile), getLeader(*ipfile))
 	var nodeStatus string
-	if consensus.IsLeader {
+	if consensusObj.IsLeader {
 		nodeStatus = "leader"
 	} else {
 		nodeStatus = "validator"
 	}
-	fmt.Println(consensus)
-	fmt.Printf("This node is a %s node with ip: %s and port: %s\n", nodeStatus, *ip, *port)
-	fmt.Println()
-	startServer(*port, NodeHandler, &consensus)
+	log.Println(consensusObj)
+	log.Printf("This node is a %s node with ip: %s and port: %s\n", nodeStatus, *ip, *port)
+	log.Println()
+	startServer(*port, NodeHandler, &consensusObj)
 }

@@ -3,7 +3,6 @@ package p2p
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"log"
 	"net"
 	"strings"
@@ -74,6 +73,6 @@ func sendWithSocketClient(ip, port string, message []byte) (res string) {
 // Send a message to another node with given port.
 func send(ip, port string, message []byte) (returnMessage string) {
 	returnMessage = sendWithSocketClient(ip, port, message)
-	fmt.Println(returnMessage)
+	log.Println(returnMessage)
 	return
 }

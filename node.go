@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"math/rand"
 	"time"
 )
@@ -32,18 +32,18 @@ func randomString(len int) string {
 
 func (n Node) send(cin <-chan string, id int) {
 	for msg := range cin {
-		fmt.Printf("Leader has sent message %s to %d\n", msg, id)
+		log.Printf("Leader has sent message %s to %d\n", msg, id)
 	}
 }
 
 func consume(cin <-chan string, id int) {
 	for msg := range cin {
-		fmt.Printf("Leader has sent message %s to %d\n", msg, id)
+		log.Printf("Leader has sent message %s to %d\n", msg, id)
 	}
 }
 
 func (n Node) receive() {
-	fmt.Printf("Node: %d received message\n", n.ip)
+	log.Printf("Node: %d received message\n", n.ip)
 }
 
 func createNode(ip int, isLeader bool) Node {
@@ -85,7 +85,7 @@ func TxnGenerator(numOfTxns int, lenOfRandomString int) <-chan string {
 	go func() {
 		for i := 0; i < numOfTxns; i++ {
 			out <- randomString(lenOfRandomString)
-			fmt.Printf("Transaction Number %d\n", i)
+			log.Printf("Transaction Number %d\n", i)
 			//time.Sleep(2 * time.Second)
 		}
 		close(out)

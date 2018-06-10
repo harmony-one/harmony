@@ -7,17 +7,19 @@ import (
 
 // Consensus data containing all info related to one consensus process
 type Consensus struct {
-	State ConsensusState
+	state ConsensusState
 	// Signatures collected from validators
-	Signatures []string
+	commits map[string]string
+	// Signatures collected from validators
+	responses map[string]string
 	// Actual block data to reach consensus on
-	Data string
+	data string
 	// List of validators
-	Validators []p2p.Peer
+	validators []p2p.Peer
 	// Leader
-	Leader p2p.Peer
+	leader p2p.Peer
 	// private key of current node
-	PriKey string
+	priKey string
 	// Whether I am leader. False means I am validator
 	IsLeader bool
 }
@@ -52,4 +54,24 @@ func (state ConsensusState) String() string {
 		return "Unknown"
 	}
 	return names[state]
+}
+
+func InitConsensus(ip, port string, peers []p2p.Peer, leader p2p.Peer) Consensus {
+	// The first Ip, port passed will be leader.
+	consensus := Consensus{}
+	peer := p2p.Peer{Port: port, Ip: ip}
+	Peers := peers
+	leaderPeer := leader
+	if leaderPeer == peer {
+		consensus.IsLeader = true
+	} else {
+		consensus.IsLeader = false
+	}
+	consensus.commits = make(map[string]string)
+	consensus.responses = make(map[string]string)
+	consensus.leader = leaderPeer
+	consensus.validators = Peers
+
+	consensus.priKey = ip + ":" + port // use ip:port as unique key for now
+	return consensus
 }
