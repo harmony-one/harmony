@@ -9,6 +9,8 @@ type Blockchain struct {
 	blocks []*Block
 }
 
+const genesisCoinbaseData = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks"
+
 // NewBlockchain creates a new Blockchain with genesis Block
 func NewBlockchain(address string) *Blockchain {
 	return &Blockchain{[]*Block{NewGenesisBlock()}}
@@ -86,4 +88,16 @@ Work:
 	}
 
 	return accumulated, unspentOutputs
+}
+
+// CreateBlockchain creates a new blockchain DB
+func CreateBlockchain(address string) *Blockchain {
+	// TODO: We assume we have not created any blockchain before.
+	// In current bitcoin, we can check if we created a blockchain before accessing local db.
+	cbtx := NewCoinbaseTX(address, genesisCoinbaseData)
+	genesis := NewGenesisBlock(cbtx)
+
+	bc := Blockchain{[]*Block{genesis}}
+
+	return &bc
 }
