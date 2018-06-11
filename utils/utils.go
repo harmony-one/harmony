@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"bytes"
@@ -19,14 +19,15 @@ func IntToHex(num int64) []byte {
 	return buff.Bytes()
 }
 
-// Helper library to convert '1,2,3,4' into []int{1,2,3,4}.
+// ConvertIntoInts is to convert '1,2,3,4' into []int{1,2,3,4}.
 func ConvertIntoInts(data string) []int {
 	var res = []int{}
-	items := strings.Split(data, " ")
+	items := strings.Split(data, ",")
 	for _, value := range items {
 		intValue, err := strconv.Atoi(value)
-		checkError(err)
-		res = append(res, intValue)
+		if err == nil {
+			res = append(res, intValue)
+		}
 	}
 	return res
 }

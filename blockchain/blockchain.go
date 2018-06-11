@@ -1,4 +1,4 @@
-package main
+package blockchain
 
 import (
 	"encoding/hex"
@@ -11,11 +11,6 @@ type Blockchain struct {
 
 const genesisCoinbaseData = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks"
 
-// NewBlockchain creates a new Blockchain with genesis Block
-func NewBlockchain(address string) *Blockchain {
-	return &Blockchain{[]*Block{NewGenesisBlock()}}
-}
-
 // FindUnspentTransactions returns a list of transactions containing unspent outputs
 func (bc *Blockchain) FindUnspentTransactions(address string) []Transaction {
 	var unspentTXs []Transaction
@@ -26,14 +21,14 @@ func (bc *Blockchain) FindUnspentTransactions(address string) []Transaction {
 
 	BreakTransaction:
 		for _, tx := range block.Transactions {
-			txId := hex.EncodeToString(tx.Id)
+			txID := hex.EncodeToString(tx.id)
 
 			idx := -1
-			if spentTXOs[txId] != nil {
+			if spentTXOs[txID] != nil {
 				idx = 0
 			}
 			for outIdx, txOutput := range tx.txOutput {
-				if idx >= 0 && spentTXOs[txId][idx] == outIdx {
+				if idx >= 0 && spentTXOs[txID][idx] == outIdx {
 					idx++
 					continue
 				}
@@ -73,7 +68,7 @@ func (bc *Blockchain) FindSpendableOutputs(address string, amount int) (int, map
 
 Work:
 	for _, tx := range unspentTXs {
-		txID := hex.EncodeToString(tx.ID)
+		txID := hex.EncodeToString(tx.id)
 
 		for outIdx, txOutput := range tx.txOutput {
 			if txOutput.address == address && accumulated < amount {

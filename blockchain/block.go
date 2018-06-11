@@ -1,4 +1,4 @@
-package main
+package blockchain
 
 import (
 	"bytes"
@@ -44,7 +44,7 @@ func (b *Block) HashTransactions() []byte {
 	var txHash [32]byte
 
 	for _, tx := range b.Transactions {
-		txHashes = append(txHashes, tx.ID)
+		txHashes = append(txHashes, tx.id)
 	}
 	txHash = sha256.Sum256(bytes.Join(txHashes, []byte{}))
 	return txHash[:]
@@ -52,7 +52,7 @@ func (b *Block) HashTransactions() []byte {
 
 // NewBlock creates and returns Block.
 func NewBlock(transactions []*Transaction, prevBlockHash []byte) *Block {
-	block := &Block{time.Now().Unix(), transactions, prevBlockHash, []byte{}, 0}
+	block := &Block{time.Now().Unix(), transactions, prevBlockHash, []byte{}}
 	block.Hash = block.HashTransactions()
 	return block
 }
