@@ -1,8 +1,8 @@
 package consensus
 
 import (
+	"harmony-benchmark/p2p"
 	"log"
-	"../p2p"
 )
 
 // Validator's consensus message dispatcher
@@ -61,4 +61,3 @@ func (consensus *Consensus) processChallengeMessage(msg string) {
 	// Set state to RESPONSE_DONE
 	consensus.state = RESPONSE_DONE
 }
-

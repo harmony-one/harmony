@@ -2,7 +2,7 @@
 package consensus // consensus
 
 import (
-	"../p2p"
+	"harmony-benchmark/p2p"
 )
 
 // Consensus data containing all info related to one consensus process

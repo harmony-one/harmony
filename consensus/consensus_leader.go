@@ -4,7 +4,7 @@ import (
 	"log"
 	"sync"
 
-	"../p2p"
+	"harmony-benchmark/p2p"
 )
 
 var mutex = &sync.Mutex{}

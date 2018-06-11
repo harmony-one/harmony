@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
-	"./consensus"
-	"./p2p"
+	"harmony-benchmark/consensus"
+	"harmony-benchmark/p2p"
 )
 
 // Consts

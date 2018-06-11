@@ -2,4 +2,8 @@
     "workbench.colorTheme": "Solarized Light",
     "npm.enableScriptExplorer": true,
     "window.zoomLevel": 1,
+    "editor.tabCompletion": true,
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true,
+    "editor.detectIndentation": false,
 }
