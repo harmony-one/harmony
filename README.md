@@ -15,7 +15,7 @@ clone <harmony_repo>
 ## Usage
 ```
 
-./deploy.sh ipList.txt
+./deploy.sh local_iplist.txt
 
 ./send_txn.sh
 ```
