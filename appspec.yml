@@ -13,8 +13,8 @@ hooks:
       timeout: 300
       runas: root
   ApplicationStart:
-    - location: send_txn.sh  #send transactions to server
-      timeout: 10
+    - location: ./run_instances.sh  #send transactions to server
+      timeout: 300
       runas: root
   ApplicationStop:
     - location: aws-scripts/say_hello.sh
