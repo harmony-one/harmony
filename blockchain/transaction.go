@@ -30,7 +30,7 @@ type TXInput struct {
 }
 
 // DefaultCoinbaseValue is the default value of coinbase transaction.
-const DefaultCoinbaseValue = 10
+const DefaultCoinbaseValue = 1000
 
 // SetID sets ID of a transaction
 func (tx *Transaction) SetID() {
