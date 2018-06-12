@@ -85,6 +85,54 @@ Work:
 	return accumulated, unspentOutputs
 }
 
+// NewUTXOTransaction creates a new transaction
+func (bc *Blockchain) NewUTXOTransaction(from, to string, amount int) *Transaction {
+	var inputs []TXInput
+	var outputs []TXOutput
+
+	acc, validOutputs := bc.FindSpendableOutputs(from, amount)
+
+	if acc < amount {
+		return nil
+	}
+
+	// Build a list of inputs
+	for txid, outs := range validOutputs {
+		txID, err := hex.DecodeString(txid)
+		if err != nil {
+			return nil
+		}
+
+		for _, out := range outs {
+			input := TXInput{txID, out, from}
+			inputs = append(inputs, input)
+		}
+	}
+
+	// Build a list of outputs
+	outputs = append(outputs, TXOutput{amount, to})
+	if acc > amount {
+		outputs = append(outputs, TXOutput{acc - amount, from}) // a change
+	}
+
+	tx := Transaction{nil, inputs, outputs}
+	tx.SetID()
+
+	return &tx
+}
+
+// AddNewTransferAmount creates a new transaction and a block of that transaction.
+// Mostly used for testing.
+func (bc *Blockchain) AddNewTransferAmount(from, to string, amount int) *Blockchain {
+	tx := bc.NewUTXOTransaction(from, to, amount)
+	if tx != nil {
+		newBlock := NewBlock([]*Transaction{tx}, bc.blocks[len(bc.blocks)-1].PrevBlockHash)
+		bc.blocks = append(bc.blocks, newBlock)
+		return bc
+	}
+	return nil
+}
+
 // CreateBlockchain creates a new blockchain DB
 func CreateBlockchain(address string) *Blockchain {
 	// TODO: We assume we have not created any blockchain before.

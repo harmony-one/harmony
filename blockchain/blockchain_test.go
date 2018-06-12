@@ -37,3 +37,21 @@ func TestFindUTXO(t *testing.T) {
 		t.Error("FindUTXO failed.")
 	}
 }
+
+func TestAddNewTransferAmount(t *testing.T) {
+	bc := CreateBlockchain("minh")
+
+	bc = bc.AddNewTransferAmount("minh", "alok", 3)
+
+	if bc == nil {
+		t.Error("Failed to add new transfer")
+	}
+
+	t.Log(len(bc.blocks))
+	bc = bc.AddNewTransferAmount("minh", "rj", DefaultCoinbaseValue-2)
+
+	t.Log(len(bc.blocks))
+	if bc != nil {
+		t.Error("minh should not have enough fun to make the transfer")
+	}
+}
