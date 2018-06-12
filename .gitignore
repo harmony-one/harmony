@@ -1,5 +1,6 @@
 # IdeaIDE
 .idea
+.vscode
 
 # Executables
 *.exe
