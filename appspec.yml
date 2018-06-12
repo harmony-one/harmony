@@ -9,8 +9,8 @@ hooks:
       timeout: 10
       runas: root
   AfterInstall:
-    - location: aws-scripts/say_hello.sh #maybe start the server
-      timeout: 10
+    - location: aws-scripts/setup_golang.sh #setup golang
+      timeout: 300
       runas: root
   ApplicationStart:
     - location: aws-scripts/say_hello.sh  #maybe start the server.
