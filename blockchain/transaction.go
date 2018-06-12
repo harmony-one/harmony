@@ -11,26 +11,26 @@ import (
 
 // Transaction represents a Bitcoin transaction
 type Transaction struct {
-	id       []byte
-	txInput  []TXInput
-	txOutput []TXOutput
+	ID       []byte
+	TxInput  []TXInput
+	TxOutput []TXOutput
 }
 
 // TXOutput is the struct of transaction output in a transaction.
 type TXOutput struct {
-	value   int
-	address string
+	Value   int
+	Address string
 }
 
 // TXInput is the struct of transaction input in a transaction.
 type TXInput struct {
-	txID          []byte
-	txOutputIndex int
-	address       string
+	TxID          []byte
+	TxOutputIndex int
+	Address       string
 }
 
-// defaultCoinbaseValue is the default value of coinbase transaction.
-const defaultCoinbaseValue = 10
+// DefaultCoinbaseValue is the default value of coinbase transaction.
+const DefaultCoinbaseValue = 10
 
 // SetID sets ID of a transaction
 func (tx *Transaction) SetID() {
@@ -43,7 +43,7 @@ func (tx *Transaction) SetID() {
 		log.Panic(err)
 	}
 	hash = sha256.Sum256(encoded.Bytes())
-	tx.id = hash[:]
+	tx.ID = hash[:]
 }
 
 // NewCoinbaseTX creates a new coinbase transaction
@@ -53,7 +53,7 @@ func NewCoinbaseTX(to, data string) *Transaction {
 	}
 
 	txin := TXInput{[]byte{}, -1, data}
-	txout := TXOutput{defaultCoinbaseValue, to}
+	txout := TXOutput{DefaultCoinbaseValue, to}
 	tx := Transaction{nil, []TXInput{txin}, []TXOutput{txout}}
 	tx.SetID()
 

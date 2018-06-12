@@ -21,19 +21,19 @@ func (bc *Blockchain) FindUnspentTransactions(address string) []Transaction {
 
 	BreakTransaction:
 		for _, tx := range block.Transactions {
-			txID := hex.EncodeToString(tx.id)
+			txID := hex.EncodeToString(tx.ID)
 
 			idx := -1
 			if spentTXOs[txID] != nil {
 				idx = 0
 			}
-			for outIdx, txOutput := range tx.txOutput {
+			for outIdx, txOutput := range tx.TxOutput {
 				if idx >= 0 && spentTXOs[txID][idx] == outIdx {
 					idx++
 					continue
 				}
 
-				if txOutput.address == address {
+				if txOutput.Address == address {
 					unspentTXs = append(unspentTXs, *tx)
 					continue BreakTransaction
 				}
@@ -49,8 +49,8 @@ func (bc *Blockchain) FindUTXO(address string) []TXOutput {
 	unspentTXs := bc.FindUnspentTransactions(address)
 
 	for _, tx := range unspentTXs {
-		for _, txOutput := range tx.txOutput {
-			if txOutput.address == address {
+		for _, txOutput := range tx.TxOutput {
+			if txOutput.Address == address {
 				UTXOs = append(UTXOs, txOutput)
 				break
 			}
@@ -68,11 +68,11 @@ func (bc *Blockchain) FindSpendableOutputs(address string, amount int) (int, map
 
 Work:
 	for _, tx := range unspentTXs {
-		txID := hex.EncodeToString(tx.id)
+		txID := hex.EncodeToString(tx.ID)
 
-		for outIdx, txOutput := range tx.txOutput {
-			if txOutput.address == address && accumulated < amount {
-				accumulated += txOutput.value
+		for outIdx, txOutput := range tx.TxOutput {
+			if txOutput.Address == address && accumulated < amount {
+				accumulated += txOutput.Value
 				unspentOutputs[txID] = append(unspentOutputs[txID], outIdx)
 
 				if accumulated >= amount {
