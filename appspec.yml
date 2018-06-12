@@ -2,7 +2,7 @@ version: 0.0
 os: linux
 files:
   - source: /
-    destination: /home/ec2-user/
+    destination: /home/ec2-user/projects/src
 hooks:
   BeforeInstall:
     - location: aws-scripts/say_hello.sh

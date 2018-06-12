@@ -7,3 +7,4 @@ wget https://aws-codedeploy-$REGION.s3.amazonaws.com/latest/install
 chmod +x ./install
 ./install auto
 mkdir projects
+mkdir projects/src
