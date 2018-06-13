@@ -19,11 +19,11 @@ func (bc *Blockchain) FindUnspentTransactions(address string) []Transaction {
 	for index := len(bc.blocks) - 1; index >= 0; index-- {
 		block := bc.blocks[index]
 
-	BreakTransaction:
 		for _, tx := range block.Transactions {
 			txID := hex.EncodeToString(tx.ID)
 
 			idx := -1
+			// TODO(minhdoan): Optimize this.
 			if spentTXOs[txID] != nil {
 				idx = 0
 			}
@@ -35,7 +35,15 @@ func (bc *Blockchain) FindUnspentTransactions(address string) []Transaction {
 
 				if txOutput.Address == address {
 					unspentTXs = append(unspentTXs, *tx)
-					continue BreakTransaction
+					// Break because of the assumption that each address appears once in output.
+					break
+				}
+			}
+
+			for _, txInput := range tx.TxInput {
+				if address == txInput.Address {
+					ID := hex.EncodeToString(txInput.TxID)
+					spentTXOs[ID] = append(spentTXOs[ID], txInput.TxOutputIndex)
 				}
 			}
 		}

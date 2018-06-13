@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/gob"
+	"fmt"
 	"log"
 	"time"
 )
@@ -36,6 +37,17 @@ func DeserializeBlock(d []byte) *Block {
 		log.Panic(err)
 	}
 	return &block
+}
+
+// Used for debuging.
+func (b *Block) String() string {
+	res := fmt.Sprintf("Block created at %v\n", b.Timestamp)
+	for id, tx := range b.Transactions {
+		res += fmt.Sprintf("Transaction %v: %v\n", id, *tx)
+	}
+	res += fmt.Sprintf("previous blockhash: %v\n", b.PrevBlockHash)
+	res += fmt.Sprintf("hash: %v\n", b.Hash)
+	return res
 }
 
 // HashTransactions returns a hash of the transactions in the block

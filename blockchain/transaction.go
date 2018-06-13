@@ -60,38 +60,31 @@ func NewCoinbaseTX(to, data string) *Transaction {
 	return &tx
 }
 
-// NewUTXOTransaction creates a new transaction
-func NewUTXOTransaction(from, to string, amount int, bc *Blockchain) *Transaction {
-	var inputs []TXInput
-	var outputs []TXOutput
+// Used for debuging.
+func (txInput *TXInput) String() string {
+	res := fmt.Sprintf("TxID: %v, ", hex.EncodeToString(txInput.TxID))
+	res += fmt.Sprintf("TxOutputIndex: %v, ", txInput.TxOutputIndex)
+	res += fmt.Sprintf("Address: %v", txInput.Address)
+	return res
+}
 
-	acc, validOutputs := bc.FindSpendableOutputs(from, amount)
+// Used for debuging.
+func (txOutput *TXOutput) String() string {
+	res := fmt.Sprintf("Value: %v, ", txOutput.Value)
+	res += fmt.Sprintf("Address: %v", txOutput.Address)
+	return res
+}
 
-	if acc < amount {
-		return nil
+// Used for debuging.
+func (tx *Transaction) String() string {
+	res := fmt.Sprintf("ID: %v\n", hex.EncodeToString(tx.ID))
+	res += fmt.Sprintf("TxInput:\n")
+	for id, value := range tx.TxInput {
+		res += fmt.Sprintf("%v: %v\n", id, value.String())
 	}
-
-	// Build a list of inputs
-	for txid, outs := range validOutputs {
-		txID, err := hex.DecodeString(txid)
-		if err != nil {
-			return nil
-		}
-
-		for _, out := range outs {
-			input := TXInput{txID, out, from}
-			inputs = append(inputs, input)
-		}
+	res += fmt.Sprintf("TxOutput:\n")
+	for id, value := range tx.TxOutput {
+		res += fmt.Sprintf("%v: %v\n", id, value.String())
 	}
-
-	// Build a list of outputs
-	outputs = append(outputs, TXOutput{amount, to})
-	if acc > amount {
-		outputs = append(outputs, TXOutput{acc - amount, from}) // a change
-	}
-
-	tx := Transaction{nil, inputs, outputs}
-	tx.SetID()
-
-	return &tx
+	return res
 }

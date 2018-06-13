@@ -47,10 +47,8 @@ func TestAddNewTransferAmount(t *testing.T) {
 		t.Error("Failed to add new transfer")
 	}
 
-	t.Log(len(bc.blocks))
 	bc = bc.AddNewTransferAmount("minh", "rj", DefaultCoinbaseValue-2)
 
-	t.Log(len(bc.blocks))
 	if bc != nil {
 		t.Error("minh should not have enough fun to make the transfer")
 	}
