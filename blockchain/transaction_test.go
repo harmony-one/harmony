@@ -5,5 +5,7 @@ import (
 )
 
 func TestNewCoinbaseTX(t *testing.T) {
-	NewCoinbaseTX("minh", genesisCoinbaseData)
+	if NewCoinbaseTX("minh", genesisCoinbaseData) == nil {
+		t.Errorf("failed to create a coinbase transaction.")
+	}
 }

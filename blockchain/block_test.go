@@ -2,7 +2,6 @@ package blockchain
 
 import (
 	"bytes"
-	"fmt"
 	"testing"
 )
 
@@ -24,6 +23,4 @@ func TestBlockSerialize(t *testing.T) {
 	if bytes.Compare(block.Hash, deserializedBlock.Hash) != 0 {
 		t.Errorf("Serialize or Deserialize incorrect at Hash.")
 	}
-
-	fmt.Println(block)
 }

@@ -5,7 +5,9 @@ import (
 )
 
 func TestCreateBlockchain(t *testing.T) {
-	CreateBlockchain("minh")
+	if CreateBlockchain("minh") == nil {
+		t.Errorf("failed to create a blockchain")
+	}
 }
 
 func TestFindSpendableOutputs(t *testing.T) {
