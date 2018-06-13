@@ -48,58 +48,66 @@ func (consensus *Consensus) startConsensus(msg string) {
 	// prepare message and broadcast to validators
 
 	msgToSend := ConstructConsensusMessage(ANNOUNCE, []byte("block"))
-	p2p.BroadcastMessage(consensus.validators, msgToSend)
 	// Set state to ANNOUNCE_DONE
 	consensus.state = ANNOUNCE_DONE
+	p2p.BroadcastMessage(consensus.validators, msgToSend)
 }
 
 func (consensus *Consensus) processCommitMessage(msg string) {
 	// proceed only when the message is not received before and this consensus phase is not done.
-	if _, ok := consensus.commits[msg]; !ok && consensus.state != CHALLENGE_DONE {
-		mutex.Lock()
+	mutex.Lock()
+	_, ok := consensus.commits[msg]
+	shouldProcess := !ok && consensus.state == ANNOUNCE_DONE
+	if shouldProcess {
 		consensus.commits[msg] = msg
 		log.Printf("Number of commits received: %d", len(consensus.commits))
-		mutex.Unlock()
-	} else {
+	}
+	mutex.Unlock()
+
+	if !shouldProcess {
 		return
 	}
 
-	if consensus.state != CHALLENGE_DONE && len(consensus.commits) >= (2*len(consensus.validators))/3+1 {
-		mutex.Lock()
+	mutex.Lock()
+	if len(consensus.commits) >= (2*len(consensus.validators))/3+1 {
+		log.Printf("Enough commits received with %d signatures: %s", len(consensus.commits), consensus.commits)
 		if consensus.state == ANNOUNCE_DONE {
 			// Set state to CHALLENGE_DONE
 			consensus.state = CHALLENGE_DONE
 		}
-		mutex.Unlock()
 		// Broadcast challenge
 		msgToSend := ConstructConsensusMessage(CHALLENGE, []byte("challenge"))
 		p2p.BroadcastMessage(consensus.validators, msgToSend)
-
-		log.Printf("Enough commits received with %d signatures: %s", len(consensus.commits), consensus.commits)
 	}
+	mutex.Unlock()
 }
 
 func (consensus *Consensus) processResponseMessage(msg string) {
 	// proceed only when the message is not received before and this consensus phase is not done.
-	if _, ok := consensus.responses[msg]; !ok && consensus.state != FINISHED {
-		mutex.Lock()
+	mutex.Lock()
+	_, ok := consensus.responses[msg]
+	shouldProcess := !ok && consensus.state == CHALLENGE_DONE
+	if shouldProcess {
 		consensus.responses[msg] = msg
 		log.Printf("Number of responses received: %d", len(consensus.responses))
-		mutex.Unlock()
-	} else {
+	}
+	mutex.Unlock()
+
+	if !shouldProcess {
 		return
 	}
 
-	if consensus.state != FINISHED && len(consensus.responses) >= (2*len(consensus.validators))/3+1 {
-		mutex.Lock()
+	mutex.Lock()
+	if len(consensus.responses) >= (2*len(consensus.validators))/3+1 {
+		log.Printf("Consensus reached with %d signatures: %s", len(consensus.responses), consensus.responses)
 		if consensus.state == CHALLENGE_DONE {
 			// Set state to FINISHED
 			consensus.state = FINISHED
-			log.Println("Hooray! Consensus reached!!!!!!!!!!!!!")
+			// TODO: do followups on the consensus
+			log.Printf("HOORAY!!! CONSENSUS REACHED AMONG %d NODES!!!\n", len(consensus.validators))
+			consensus.ResetState()
 		}
-		mutex.Unlock()
 		// TODO: composes new block and broadcast the new block to validators
-
-		log.Printf("Consensus reached with %d signatures: %s", len(consensus.responses), consensus.responses)
 	}
+	mutex.Unlock()
 }

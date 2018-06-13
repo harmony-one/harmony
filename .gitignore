@@ -1,5 +1,7 @@
 # IdeaIDE
 .idea
+
+#VsIDE
 .vscode
 
 # Executables
@@ -11,4 +13,4 @@
 *.hex
 
 # Mac
-.DS_Store 
+.DS_Store
