@@ -6,7 +6,7 @@ sudo yum install -y golang
 echo "export GOROOT=/usr/lib/golang" >> $HOME/.bash_profile
 
 # GOPATH is the location of your work directory
-echo "export GOPATH=$HOME/projects" >> $HOME/.bash_profile
+echo "export GOPATH=/home/ec2-user/projects" >> $HOME/.bash_profile
 
 # PATH in order to access go binary system wide
 echo "export PATH=$PATH:$GOROOT/bin" >> $HOME/.bash_profile
