@@ -46,10 +46,16 @@ func TestAddNewTransferAmount(t *testing.T) {
 	bc = bc.AddNewTransferAmount("minh", "alok", 3)
 
 	if bc == nil {
-		t.Error("Failed to add new transfer")
+		t.Error("Failed to add new transfer to alok")
 	}
 
-	bc = bc.AddNewTransferAmount("minh", "rj", DefaultCoinbaseValue-2)
+	bc = bc.AddNewTransferAmount("minh", "rj", 100)
+
+	if bc == nil {
+		t.Error("Failed to add new transfer to rj")
+	}
+
+	bc = bc.AddNewTransferAmount("minh", "stephen", DefaultCoinbaseValue-102)
 
 	if bc != nil {
 		t.Error("minh should not have enough fun to make the transfer")
