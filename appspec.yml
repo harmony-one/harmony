@@ -13,7 +13,7 @@ hooks:
       timeout: 300
       runas: root
   ApplicationStart:
-    - location: ./run_instances.sh  #send transactions to server
+    - location: aws-scripts/run_instances.sh  #send transactions to server
       timeout: 300
       runas: root
   ApplicationStop:
