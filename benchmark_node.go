@@ -27,7 +27,6 @@ func startServer(port string, handler func(net.Conn, *consensus.Consensus), cons
 		log.Fatalf("Socket listen port %s failed,%s", port, err)
 		os.Exit(1)
 	}
-	log.Printf("Begin listen port: %s", port)
 	for {
 		conn, err := listen.Accept()
 		if err != nil {
@@ -115,10 +114,11 @@ func NodeHandler(conn net.Conn, consensus *consensus.Consensus) {
 	payload, err := p2p.ReadMessagePayload(conn)
 	if err != nil {
 		if consensus.IsLeader {
-			log.Fatalf("[Leader] Receive data failed:%s", err)
+			log.Printf("[Leader] Receive data failed:%s", err)
 		} else {
-			log.Fatalf("[Slave] Receive data failed:%s", err)
+			log.Printf("[Slave] Receive data failed:%s", err)
 		}
+		return
 	}
 	if consensus.IsLeader {
 		consensus.ProcessMessageLeader(payload)
@@ -164,7 +164,6 @@ func main() {
 	port := flag.String("port", "9000", "port of the node.")
 	ipfile := flag.String("ipfile", "iplist.txt", "file containing all ip addresses")
 	flag.Parse()
-	log.Println()
 
 	consensusObj := consensus.InitConsensus(*ip, *port, getPeers(*ip, *port, *ipfile), getLeader(*ipfile))
 	var nodeStatus string
@@ -173,8 +172,9 @@ func main() {
 	} else {
 		nodeStatus = "validator"
 	}
-	log.Println(consensusObj)
-	log.Printf("This node is a %s node with ip: %s and port: %s\n", nodeStatus, *ip, *port)
-	log.Println()
+
+	log.Println("======================================")
+	log.Printf("This node is a %s node listening on ip: %s and port: %s\n", nodeStatus, *ip, *port)
+	log.Println("======================================")
 	startServer(*port, NodeHandler, &consensusObj)
 }

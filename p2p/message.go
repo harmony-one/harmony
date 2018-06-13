@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"time"
 )
 
 /*
@@ -29,35 +30,46 @@ func ReadMessagePayload(conn net.Conn) ([]byte, error) {
 		r          = bufio.NewReader(conn)
 	)
 
+	timeoutDuration := 1 * time.Second
+	conn.SetReadDeadline(time.Now().Add(timeoutDuration))
+
 	//// Read 1 byte for messge type
-	msgType, err := r.ReadByte()
-	if err != nil {
-		log.Fatalf("Error reading the p2p message type field")
+	_, err := r.ReadByte()
+	switch err {
+	case io.EOF:
+		log.Printf("Error reading the p2p message type field: %s", err)
+		return payloadBuf.Bytes(), err
+	case nil:
+
+		//log.Printf("Received p2p message type: %x\n", msgType)
+	default:
+		log.Printf("Error reading the p2p message type field: %s", err)
 		return payloadBuf.Bytes(), err
 	}
-	log.Printf("Received p2p message with type: %x", msgType)
 	// TODO: check on msgType and take actions accordingly
 
 	//// Read 4 bytes for message size
 	fourBytes := make([]byte, 4)
 	n, err := r.Read(fourBytes)
 	if err != nil {
-		log.Fatalf("Error reading the p2p message size field")
+		log.Printf("Error reading the p2p message size field")
 		return payloadBuf.Bytes(), err
 	} else if n < len(fourBytes) {
-		log.Fatalf("Failed reading the p2p message size field: only read %d bytes", n)
+		log.Printf("Failed reading the p2p message size field: only read %d bytes", n)
 		return payloadBuf.Bytes(), err
 	}
 
-	log.Print(fourBytes)
+	//log.Print(fourBytes)
 	// Number of bytes for the message payload
 	bytesToRead := binary.BigEndian.Uint32(fourBytes)
-	log.Printf("The payload size is %d bytes.", bytesToRead)
+	//log.Printf("The payload size is %d bytes.", bytesToRead)
 
 	//// Read the payload in chunk of 1024 bytes
 	tmpBuf := make([]byte, 1024)
 ILOOP:
 	for {
+		timeoutDuration := 1 * time.Second
+		conn.SetReadDeadline(time.Now().Add(timeoutDuration))
 		if bytesToRead < 1024 {
 			// Read the last number of bytes less than 1024
 			tmpBuf = make([]byte, bytesToRead)

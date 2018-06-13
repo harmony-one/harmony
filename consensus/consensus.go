@@ -75,3 +75,11 @@ func InitConsensus(ip, port string, peers []p2p.Peer, leader p2p.Peer) Consensus
 	consensus.priKey = ip + ":" + port // use ip:port as unique key for now
 	return consensus
 }
+
+
+// Reset the state of the consensus
+func (consensus *Consensus) ResetState() {
+	consensus.state = READY
+	consensus.commits = make(map[string]string)
+	consensus.responses = make(map[string]string)
+}
