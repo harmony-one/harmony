@@ -10,14 +10,60 @@ Consensus message is the payload of p2p message.
 Consensus message data structure:
 
 
+ANNOUNCE:
 ---- message start -----
 1 byte            - consensus.MessageType
                     0x00 - ANNOUNCE
                     0x01 - COMMIT
                     ...
-payload (n bytes) - consensus message payload (the data to run consensus with)
+4 byte            - consensus id
+32 byte           - block hash
+2 byte            - leader id
+(n bytes)         - consensus payload (the data to run consensus with, e.g. block header data)
+4 byte            - payload size
+64 byte           - signature
 ----  message end  -----
 
+COMMIT:
+---- message start -----
+1 byte            - consensus.MessageType
+                    0x00 - ANNOUNCE
+                    0x01 - COMMIT
+                    ...
+4 byte            - consensus id
+32 byte           - block hash
+2 byte            - validator id
+33 byte           - commit message
+64 byte           - signature
+----  message end  -----
+
+CHALLENGE:
+---- message start -----
+1 byte            - consensus.MessageType
+                    0x00 - ANNOUNCE
+                    0x01 - COMMIT
+                    ...
+4 byte            - consensus id
+32 byte           - block hash
+2 byte            - leader id
+33 byte           - aggregated commit
+33 byte           - aggregated key
+32 byte           - challenge
+64 byte           - signature
+----  message end  -----
+
+RESPONSE:
+---- message start -----
+1 byte            - consensus.MessageType
+                    0x00 - ANNOUNCE
+                    0x01 - COMMIT
+                    ...
+4 byte            - consensus id
+32 byte           - block hash
+2 byte            - validator id
+32 byte           - response
+64 byte           - signature
+----  message end  -----
 */
 
 const MESSAGE_TYPE_BYTES = 1

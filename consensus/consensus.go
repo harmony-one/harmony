@@ -3,6 +3,9 @@ package consensus // consensus
 
 import (
 	"harmony-benchmark/p2p"
+	"regexp"
+	"log"
+	"strconv"
 )
 
 // Consensus data containing all info related to one consensus process
@@ -22,6 +25,14 @@ type Consensus struct {
 	priKey string
 	// Whether I am leader. False means I am validator
 	IsLeader bool
+	// Leader or validator Id - 2 byte
+	nodeId uint16
+	// Consensus Id (View Id) - 4 byte
+	consensusId uint32
+	// Blockhash - 32 byte
+	blockHash []byte
+	// BlockHeader to run consensus on
+	blockHeader []byte
 }
 
 // Consensus state enum for both leader and validator
@@ -73,6 +84,18 @@ func InitConsensus(ip, port string, peers []p2p.Peer, leader p2p.Peer) Consensus
 	consensus.validators = Peers
 
 	consensus.priKey = ip + ":" + port // use ip:port as unique key for now
+
+	reg, err := regexp.Compile("[^0-9]+")
+	if err != nil {
+		log.Fatal(err)
+	}
+	consensus.consensusId = 0
+
+	// For now use socket address as 16 byte Id
+	// TODO: populate with correct Id
+	socketId := reg.ReplaceAllString(consensus.priKey, "")
+	value, err := strconv.Atoi(socketId)
+	consensus.nodeId = uint16(value)
 	return consensus
 }
 

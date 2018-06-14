@@ -39,7 +39,7 @@ func BroadcastMessage(peers []Peer, msg []byte) {
 // Construct the p2p message as [messageType, payloadSize, payload]
 func ConstructP2pMessage(msgType byte, payload []byte) []byte {
 
-	firstByte := byte(17)        // messageType
+	firstByte := byte(17)        // messageType 0x11
 	sizeBytes := make([]byte, 4) // payloadSize
 
 	binary.BigEndian.PutUint32(sizeBytes, uint32(len(payload)))
