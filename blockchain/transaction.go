@@ -11,7 +11,7 @@ import (
 
 // Transaction represents a Bitcoin transaction
 type Transaction struct {
-	ID       []byte
+	ID       []byte         // 32 byte hash
 	TxInput  []TXInput
 	TxOutput []TXOutput
 }
@@ -32,7 +32,7 @@ type TXInput struct {
 // DefaultCoinbaseValue is the default value of coinbase transaction.
 const DefaultCoinbaseValue = 1000
 
-// SetID sets ID of a transaction
+// SetID sets ID of a transaction (32 byte hash of the whole transaction)
 func (tx *Transaction) SetID() {
 	var encoded bytes.Buffer
 	var hash [32]byte
