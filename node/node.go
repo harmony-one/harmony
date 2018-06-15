@@ -46,7 +46,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 	defer conn.Close()
 
 	// Read p2p message payload
-	payload, err := p2p.ReadMessageContent(conn)
+	content, err := p2p.ReadMessageContent(conn)
 
 	consensus := node.consensus
 	if err != nil {
@@ -58,7 +58,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 		return
 	}
 
-	msgCategory, err := message.GetMessageCategory(payload)
+	msgCategory, err := message.GetMessageCategory(content)
 	if err != nil {
 		if consensus.IsLeader {
 			log.Printf("[Leader] Read node type failed:%s", err)
@@ -68,7 +68,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 		return
 	}
 
-	msgType, err := message.GetMessageType(payload)
+	msgType, err := message.GetMessageType(content)
 	if err != nil {
 		if consensus.IsLeader {
 			log.Printf("[Leader] Read action type failed:%s", err)
@@ -78,7 +78,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 		return
 	}
 
-	msgPayload, err := message.GetMessagePayload(payload)
+	msgPayload, err := message.GetMessagePayload(content)
 	if err != nil {
 		if consensus.IsLeader {
 			log.Printf("[Leader] Read message payload failed:%s", err)
