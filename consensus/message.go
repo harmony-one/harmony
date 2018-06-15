@@ -78,6 +78,7 @@ const (
 	CHALLENGE
 	RESPONSE
 	START_CONSENSUS
+	STOP_CONSENSUS
 )
 
 // Returns string name for the MessageType enum
@@ -87,9 +88,11 @@ func (msgType MessageType) String() string {
 		"COMMIT",
 		"CHALLENGE",
 		"RESPONSE",
-		"START_CONSENSUS"}
+		"START_CONSENSUS"
+		"STOP_CONSENSUS"
+	}
 
-	if msgType < ANNOUNCE || msgType > START_CONSENSUS {
+	if msgType < ANNOUNCE || msgType > STOP_CONSENSUS {
 		return "Unknown"
 	}
 	return names[msgType]
