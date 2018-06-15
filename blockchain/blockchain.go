@@ -1,7 +1,9 @@
 package blockchain
 
 import (
+	"bytes"
 	"encoding/hex"
+	"fmt"
 )
 
 // Blockchain keeps a sequence of Blocks
@@ -134,11 +136,26 @@ func (bc *Blockchain) NewUTXOTransaction(from, to string, amount int) *Transacti
 func (bc *Blockchain) AddNewTransferAmount(from, to string, amount int) *Blockchain {
 	tx := bc.NewUTXOTransaction(from, to, amount)
 	if tx != nil {
-		newBlock := NewBlock([]*Transaction{tx}, bc.blocks[len(bc.blocks)-1].PrevBlockHash)
+		newBlock := NewBlock([]*Transaction{tx}, bc.blocks[len(bc.blocks)-1].Hash)
 		bc.blocks = append(bc.blocks, newBlock)
 		return bc
 	}
 	return nil
+}
+
+// VerifyNewBlock verifies if the new coming block is valid for the current blockchain.
+func (bc *Blockchain) VerifyNewBlock(block *Block) bool {
+	length := len(bc.blocks)
+	if bytes.Compare(block.PrevBlockHash, bc.blocks[length-1].Hash) != 0 {
+		fmt.Println("MINh1")
+		return false
+	}
+	if block.Timestamp < bc.blocks[length-1].Timestamp {
+		fmt.Println("MINh2")
+		return false
+	}
+	// TODO(minhdoan): Check Transactions parts
+	return true
 }
 
 // CreateBlockchain creates a new blockchain DB

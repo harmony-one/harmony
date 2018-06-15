@@ -62,7 +62,7 @@ func (b *Block) HashTransactions() []byte {
 	return txHash[:]
 }
 
-// NewBlock creates and returns Block.
+// NewBlock creates and returns a neew block.
 func NewBlock(transactions []*Transaction, prevBlockHash []byte) *Block {
 	block := &Block{time.Now().Unix(), transactions, prevBlockHash, []byte{}}
 	block.Hash = block.HashTransactions()
