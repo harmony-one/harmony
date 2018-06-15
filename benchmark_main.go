@@ -48,7 +48,7 @@ func main() {
 	ipfile := flag.String("ipfile", "iplist.txt", "file containing all ip addresses")
 	flag.Parse()
 
-	consensus := consensus.InitConsensus(*ip, *port, getPeers(*ip, *port, *ipfile), getLeader(*ipfile))
+	consensus := consensus.NewConsensus(*ip, *port, getPeers(*ip, *port, *ipfile), getLeader(*ipfile))
 	var nodeStatus string
 	if consensus.IsLeader {
 		nodeStatus = "leader"
@@ -60,6 +60,6 @@ func main() {
 	log.Printf("This node is a %s node listening on ip: %s and port: %s\n", nodeStatus, *ip, *port)
 	log.Println("======================================")
 
-	node := node.Node{}
-	node.StartServer(*port, &consensus)
+	node := node.NewNode(&consensus)
+	node.StartServer(*port)
 }

@@ -21,33 +21,33 @@ type Peer struct {
 // Send the message to the peer
 func SendMessage(peer Peer, msg []byte) {
 	// Construct normal p2p message
-	payload := ConstructP2pMessage(byte(0), msg)
+	content := ConstructP2pMessage(byte(0), msg)
 
-	send(peer.Ip, peer.Port, payload)
+	send(peer.Ip, peer.Port, content)
 }
 
 // Send the message to a list of peers
 func BroadcastMessage(peers []Peer, msg []byte) {
 	// Construct broadcast p2p message
-	payload := ConstructP2pMessage(byte(17), msg)
+	content := ConstructP2pMessage(byte(17), msg)
 
 	for _, peer := range peers {
-		send(peer.Ip, peer.Port, payload)
+		send(peer.Ip, peer.Port, content)
 	}
 }
 
-// Construct the p2p message as [messageType, payloadSize, payload]
-func ConstructP2pMessage(msgType byte, payload []byte) []byte {
+// Construct the p2p message as [messageType, contentSize, content]
+func ConstructP2pMessage(msgType byte, content []byte) []byte {
 
 	firstByte := byte(17)        // messageType 0x11
-	sizeBytes := make([]byte, 4) // payloadSize
+	sizeBytes := make([]byte, 4) // contentSize
 
-	binary.BigEndian.PutUint32(sizeBytes, uint32(len(payload)))
+	binary.BigEndian.PutUint32(sizeBytes, uint32(len(content)))
 
 	byteBuffer := bytes.NewBuffer([]byte{})
 	byteBuffer.WriteByte(firstByte)
 	byteBuffer.Write(sizeBytes)
-	byteBuffer.Write(payload)
+	byteBuffer.Write(content)
 	return byteBuffer.Bytes()
 }
 

@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"log"
 	"strconv"
+	"harmony-benchmark/message"
 )
 
 // Consensus data containing all info related to one consensus process
@@ -33,6 +34,10 @@ type Consensus struct {
 	blockHash []byte
 	// BlockHeader to run consensus on
 	blockHeader []byte
+
+	//// Network related fields
+	msgCategory byte
+	actionType byte
 }
 
 // Consensus state enum for both leader and validator
@@ -67,7 +72,8 @@ func (state ConsensusState) String() string {
 	return names[state]
 }
 
-func InitConsensus(ip, port string, peers []p2p.Peer, leader p2p.Peer) Consensus {
+// Create a new Consensus object
+func NewConsensus(ip, port string, peers []p2p.Peer, leader p2p.Peer) Consensus {
 	// The first Ip, port passed will be leader.
 	consensus := Consensus{}
 	peer := p2p.Peer{Port: port, Ip: ip}
@@ -96,6 +102,9 @@ func InitConsensus(ip, port string, peers []p2p.Peer, leader p2p.Peer) Consensus
 	socketId := reg.ReplaceAllString(consensus.priKey, "")
 	value, err := strconv.Atoi(socketId)
 	consensus.nodeId = uint16(value)
+
+	consensus.msgCategory = byte(message.COMMITTEE)
+	consensus.actionType = byte(message.CONSENSUS)
 	return consensus
 }
 

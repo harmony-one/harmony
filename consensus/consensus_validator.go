@@ -83,9 +83,7 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 
 	// Set state to COMMIT_DONE
 	consensus.state = COMMIT_DONE
-
 }
-
 
 // Construct the commit message to send to leader (assumption the consensus data is already verified)
 func (consensus Consensus) constructCommitMessage() []byte {
@@ -112,7 +110,7 @@ func (consensus Consensus) constructCommitMessage() []byte {
 	signature := signMessage(buffer.Bytes())
 	buffer.Write(signature)
 
-	return ConstructConsensusMessage(COMMIT, buffer.Bytes())
+	return consensus.ConstructConsensusMessage(COMMIT, buffer.Bytes())
 }
 
 // TODO: fill in this function
@@ -199,7 +197,7 @@ func (consensus Consensus) constructResponseMessage() []byte {
 	signature := signMessage(buffer.Bytes())
 	buffer.Write(signature)
 
-	return ConstructConsensusMessage(RESPONSE, buffer.Bytes())
+	return consensus.ConstructConsensusMessage(RESPONSE, buffer.Bytes())
 }
 
 // TODO: fill in this function

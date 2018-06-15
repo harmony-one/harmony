@@ -14,19 +14,20 @@ import (
 P2p Message data structure:
 
 ---- message start -----
-1 byte            - message type
-                    0x00 - normal message (no need to forward)
-                    0x11 - p2p message (may need to forward to other neighbors)
-4 bytes           - message size n in number of bytes
-payload (n bytes) - actual message payload
+1 byte            - p2p type
+                    0x00: unicast (no need to forward)
+                    0x01: broadcast (may need to forward to other neighbors)
+4 bytes           - message content size n in number of bytes
+content (n bytes) - actual message content
 ----  message end  -----
+
 
 */
 
-// Read the message type and payload size, and return the actual payload.
-func ReadMessagePayload(conn net.Conn) ([]byte, error) {
+// Read the message type and content size, and return the actual content.
+func ReadMessageContent(conn net.Conn) ([]byte, error) {
 	var (
-		payloadBuf = bytes.NewBuffer([]byte{})
+		contentBuf = bytes.NewBuffer([]byte{})
 		r          = bufio.NewReader(conn)
 	)
 
@@ -38,33 +39,33 @@ func ReadMessagePayload(conn net.Conn) ([]byte, error) {
 	switch err {
 	case io.EOF:
 		log.Printf("Error reading the p2p message type field: %s", err)
-		return payloadBuf.Bytes(), err
+		return contentBuf.Bytes(), err
 	case nil:
-
 		//log.Printf("Received p2p message type: %x\n", msgType)
 	default:
 		log.Printf("Error reading the p2p message type field: %s", err)
-		return payloadBuf.Bytes(), err
+		return contentBuf.Bytes(), err
 	}
 	// TODO: check on msgType and take actions accordingly
+
 
 	//// Read 4 bytes for message size
 	fourBytes := make([]byte, 4)
 	n, err := r.Read(fourBytes)
 	if err != nil {
 		log.Printf("Error reading the p2p message size field")
-		return payloadBuf.Bytes(), err
+		return contentBuf.Bytes(), err
 	} else if n < len(fourBytes) {
 		log.Printf("Failed reading the p2p message size field: only read %d bytes", n)
-		return payloadBuf.Bytes(), err
+		return contentBuf.Bytes(), err
 	}
 
 	//log.Print(fourBytes)
-	// Number of bytes for the message payload
+	// Number of bytes for the message content
 	bytesToRead := binary.BigEndian.Uint32(fourBytes)
-	//log.Printf("The payload size is %d bytes.", bytesToRead)
+	//log.Printf("The content size is %d bytes.", bytesToRead)
 
-	//// Read the payload in chunk of 1024 bytes
+	//// Read the content in chunk of 1024 bytes
 	tmpBuf := make([]byte, 1024)
 ILOOP:
 	for {
@@ -75,7 +76,7 @@ ILOOP:
 			tmpBuf = make([]byte, bytesToRead)
 		}
 		n, err := r.Read(tmpBuf)
-		payloadBuf.Write(tmpBuf[:n])
+		contentBuf.Write(tmpBuf[:n])
 
 		switch err {
 		case io.EOF:
@@ -92,5 +93,5 @@ ILOOP:
 			return []byte{}, err
 		}
 	}
-	return payloadBuf.Bytes(), nil
+	return contentBuf.Bytes(), nil
 }

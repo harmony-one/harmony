@@ -78,7 +78,6 @@ const (
 	CHALLENGE
 	RESPONSE
 	START_CONSENSUS
-	ERROR = -1
 )
 
 // Returns string name for the MessageType enum
@@ -96,15 +95,15 @@ func (msgType MessageType) String() string {
 	return names[msgType]
 }
 
-// Get the consensus message type from the p2p message payload
+// Get the consensus message type from the consensus message
 func GetConsensusMessageType(message []byte) (MessageType, error) {
 	if len(message) < 1 {
-		return ERROR, errors.New("Failed to get consensus message type: no data available.")
+		return 0, errors.New("Failed to get consensus message type: no data available.")
 	}
 	return MessageType(message[0]), nil
 }
 
-// Get the consensus message payload from the p2p message payload
+// Get the consensus message payload from the consensus message
 func GetConsensusMessagePayload(message []byte) ([]byte, error) {
 	if len(message) < 2 {
 		return []byte{}, errors.New("Failed to get consensus message payload: no data available.")
@@ -113,8 +112,10 @@ func GetConsensusMessagePayload(message []byte) ([]byte, error) {
 }
 
 // Concatenate msgType as one byte with payload, and return the whole byte array
-func ConstructConsensusMessage(msgType MessageType, payload []byte) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(msgType)})
+func (consensus Consensus) ConstructConsensusMessage(msgType MessageType, payload []byte) []byte {
+	byteBuffer := bytes.NewBuffer([]byte{consensus.msgCategory})
+	byteBuffer.WriteByte(consensus.actionType)
+	byteBuffer.WriteByte(byte(msgType))
 	byteBuffer.Write(payload)
 	return byteBuffer.Bytes()
 }

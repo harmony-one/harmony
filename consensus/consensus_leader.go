@@ -92,7 +92,7 @@ func (consensus Consensus) constructAnnounceMessage() ([]byte, error) {
 	signature := signMessage(buffer.Bytes())
 	buffer.Write(signature)
 
-	return ConstructConsensusMessage(ANNOUNCE, buffer.Bytes()), nil
+	return consensus.ConstructConsensusMessage(ANNOUNCE, buffer.Bytes()), nil
 }
 
 // TODO: fill in this function
@@ -203,7 +203,7 @@ func (consensus Consensus) constructChallengeMessage() []byte {
 	signature := signMessage(buffer.Bytes())
 	buffer.Write(signature)
 
-	return ConstructConsensusMessage(CHALLENGE, buffer.Bytes())
+	return consensus.ConstructConsensusMessage(CHALLENGE, buffer.Bytes())
 }
 
 // TODO: fill in this function
