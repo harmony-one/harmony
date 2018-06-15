@@ -34,7 +34,7 @@ func ReadMessageContent(conn net.Conn) ([]byte, error) {
 	timeoutDuration := 1 * time.Second
 	conn.SetReadDeadline(time.Now().Add(timeoutDuration))
 
-	//// Read 1 byte for messge type
+	//// Read 1 byte for message type
 	_, err := r.ReadByte()
 	switch err {
 	case io.EOF:

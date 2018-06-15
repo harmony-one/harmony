@@ -7,11 +7,15 @@ import (
 	"harmony-benchmark/p2p"
 	"harmony-benchmark/consensus"
 	"harmony-benchmark/message"
+	"harmony-benchmark/blockchain"
+	"bytes"
+	"encoding/gob"
 )
 
 // A node represents a program (machine) participating in the network
 type Node struct {
 	consensus *consensus.Consensus
+	pendingTransactions []blockchain.Transaction
 }
 
 // Start a server and process the request by a handler.
@@ -99,7 +103,15 @@ func (node *Node) NodeHandler(conn net.Conn) {
 		actionType := message.NodeMessageType(msgType)
 		switch actionType {
 		case message.TRANSACTION:
-			// TODO: process transaction
+			txDecoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the SEND messge type
+
+			txList := new([]blockchain.Transaction)
+			err := txDecoder.Decode(&txList)
+			if err != nil {
+				log.Println("Failed deserializing transaction list")
+			}
+			node.pendingTransactions = append(node.pendingTransactions, *txList...)
+			log.Println(len(node.pendingTransactions))
 		}
 	}
 }
