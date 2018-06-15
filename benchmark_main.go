@@ -61,5 +61,19 @@ func main() {
 	log.Println("======================================")
 
 	node := node.NewNode(&consensus)
+
+	if consensus.IsLeader {
+		// Let consensus run
+		go func() {
+			log.Println("Waiting for block")
+			consensus.WaitForNewBlock(node.BlockChannel)
+		}()
+		// Node waiting for consensus readiness to create new block
+		go func() {
+			log.Println("Waiting for consensus ready")
+			node.WaitForConsensusReady(consensus.ReadySignal)
+		}()
+	}
+
 	node.StartServer(*port)
 }

@@ -10,16 +10,18 @@ import (
 	"harmony-benchmark/blockchain"
 	"bytes"
 	"encoding/gob"
+	"time"
 )
 
 // A node represents a program (machine) participating in the network
 type Node struct {
 	consensus *consensus.Consensus
+	BlockChannel chan blockchain.Block
 	pendingTransactions []blockchain.Transaction
 }
 
 // Start a server and process the request by a handler.
-func (node Node) StartServer(port string) {
+func (node *Node) StartServer(port string) {
 	listenOnPort(port, node.NodeHandler)
 }
 
@@ -112,7 +114,28 @@ func (node *Node) NodeHandler(conn net.Conn) {
 			}
 			node.pendingTransactions = append(node.pendingTransactions, *txList...)
 			log.Println(len(node.pendingTransactions))
+
 		}
+	}
+}
+
+func (node *Node) WaitForConsensusReady(readySignal chan int) {
+	for { // keep waiting for consensus ready
+		<- readySignal
+		log.Println("got ready signal.....")
+		// create a new block
+		newBlock := new(blockchain.Block)
+		for {
+			if len(node.pendingTransactions) >= 10 {
+				log.Println("creating new block")
+				// TODO: package actual transactions
+				newBlock = blockchain.NewGenesisBlock(blockchain.NewCoinbaseTX("x", "y"))
+				break
+			}
+			time.Sleep(1 * time.Second) // Periodically check whether we have enough transactions to package into block.
+		}
+		log.Println("sending new block to consensus")
+		node.BlockChannel <- *newBlock
 	}
 }
 
@@ -120,5 +143,6 @@ func (node *Node) NodeHandler(conn net.Conn) {
 func NewNode(consensus *consensus.Consensus) Node {
 	node := Node{}
 	node.consensus = consensus
+	node.BlockChannel = make(chan blockchain.Block)
 	return node
 }

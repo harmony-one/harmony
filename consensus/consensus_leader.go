@@ -9,9 +9,22 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"harmony-benchmark/blockchain"
 )
 
 var mutex = &sync.Mutex{}
+
+
+func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) {
+	for { // keep waiting for new blocks
+		newBlock := <- blockChannel
+		log.Println("got block.....")
+		// TODO: think about potential race condition
+		if consensus.state == READY {
+			consensus.startConsensus(&newBlock)
+		}
+	}
+}
 
 // Leader's consensus message dispatcher
 func (consensus *Consensus) ProcessMessageLeader(message []byte) {
@@ -25,7 +38,6 @@ func (consensus *Consensus) ProcessMessageLeader(message []byte) {
 		log.Print(err)
 	}
 
-	msg := string(payload)
 	log.Printf("[Leader] Received and processing message: %s\n", msgType)
 	switch msgType {
 	case ANNOUNCE:
@@ -37,18 +49,22 @@ func (consensus *Consensus) ProcessMessageLeader(message []byte) {
 	case RESPONSE:
 		consensus.processResponseMessage(payload)
 	case START_CONSENSUS:
-		consensus.processStartConsensusMessage(msg)
+		consensus.processStartConsensusMessage(payload)
 	default:
 		log.Println("Unexpected message type: %s", msgType)
 	}
 }
 
 // Handler for message which triggers consensus process
-func (consensus *Consensus) processStartConsensusMessage(msg string) {
+func (consensus *Consensus) processStartConsensusMessage(payload []byte) {
+	consensus.startConsensus(blockchain.NewGenesisBlock(blockchain.NewCoinbaseTX("x", "y")))
+}
+
+func (consensus *Consensus) startConsensus(newBlock *blockchain.Block) {
 	// prepare message and broadcast to validators
 	// Construct new block
-	newBlock := constructNewBlock()
-	consensus.blockHash = getBlockHash(newBlock)
+	//newBlock := constructNewBlock()
+	consensus.blockHash = newBlock.Hash
 
 	msgToSend, err := consensus.constructAnnounceMessage()
 	if err != nil {
@@ -273,6 +289,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 			// TODO: do followups on the consensus
 			log.Printf("HOORAY!!! CONSENSUS REACHED AMONG %d NODES!!!\n", len(consensus.validators))
 			consensus.ResetState()
+			consensus.ReadySignal <- 1
 		}
 		// TODO: composes new block and broadcast the new block to validators
 	}
