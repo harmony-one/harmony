@@ -10,13 +10,14 @@ Node will process the content of the p2p message
 
 ----  content start -----
 1 byte            - message category
-                    0x00: consensus
-                    0x01: normal...
-1 byte            - action type
-                    - consensus node
+                    0x00: COMMITTEE
+                    0x01: NODE...
+1 byte            - message type
+                    - for COMMITTEE category
                       0x00: consensus
-				    - normal node
-                      0x00: transaction
+                      0x01: sharding ...
+				    - for NODE category
+                      0x00: transaction ...
 n - 2 bytes       - actual message payload
 ----   content end  -----
 

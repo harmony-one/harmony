@@ -61,3 +61,19 @@ func TestAddNewTransferAmount(t *testing.T) {
 		t.Error("minh should not have enough fun to make the transfer")
 	}
 }
+
+func TestVerifyNewBlock(t *testing.T) {
+	bc := CreateBlockchain("minh")
+	bc = bc.AddNewTransferAmount("minh", "alok", 3)
+	bc = bc.AddNewTransferAmount("minh", "rj", 100)
+
+	tx := bc.NewUTXOTransaction("minh", "mark", 10)
+	if tx == nil {
+		t.Error("failed to create a new transaction.")
+	}
+	newBlock := NewBlock([]*Transaction{tx}, bc.blocks[len(bc.blocks)-1].Hash)
+
+	if !bc.VerifyNewBlock(newBlock) {
+		t.Error("failed to add a new valid block.")
+	}
+}
