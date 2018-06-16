@@ -5,14 +5,14 @@ import (
 )
 
 func TestCreateBlockchain(t *testing.T) {
-	if CreateBlockchain("minh") == nil {
+	if bc, _ := CreateBlockchain("minh"); bc == nil {
 		t.Errorf("failed to create a blockchain")
 	}
 }
 
 func TestFindSpendableOutputs(t *testing.T) {
 	requestAmount := 3
-	bc := CreateBlockchain("minh")
+	bc, _ := CreateBlockchain("minh")
 	accumulated, unspentOutputs := bc.FindSpendableOutputs("minh", requestAmount)
 	if accumulated < DefaultCoinbaseValue {
 		t.Error("Failed to find enough unspent ouptuts")
@@ -24,7 +24,7 @@ func TestFindSpendableOutputs(t *testing.T) {
 }
 
 func TestFindUTXO(t *testing.T) {
-	bc := CreateBlockchain("minh")
+	bc, _ := CreateBlockchain("minh")
 	utxo := bc.FindUTXO("minh")
 
 	total := 0
@@ -40,32 +40,26 @@ func TestFindUTXO(t *testing.T) {
 	}
 }
 
-func TestAddNewTransferAmount(t *testing.T) {
-	bc := CreateBlockchain("minh")
+func TestAddNewUserTransfer(t *testing.T) {
+	bc, utxoPool := CreateBlockchain("minh")
 
-	bc = bc.AddNewTransferAmount("minh", "alok", 3)
-
-	if bc == nil {
-		t.Error("Failed to add new transfer to alok")
+	if !bc.AddNewUserTransfer(utxoPool, "minh", "alok", 3) {
+		t.Error("Failed to add new transfer to alok.")
 	}
 
-	bc = bc.AddNewTransferAmount("minh", "rj", 100)
-
-	if bc == nil {
-		t.Error("Failed to add new transfer to rj")
+	if !bc.AddNewUserTransfer(utxoPool, "minh", "rj", 100) {
+		t.Error("Failed to add new transfer to rj.")
 	}
 
-	bc = bc.AddNewTransferAmount("minh", "stephen", DefaultCoinbaseValue-102)
-
-	if bc != nil {
-		t.Error("minh should not have enough fun to make the transfer")
+	if bc.AddNewUserTransfer(utxoPool, "minh", "stephen", DefaultCoinbaseValue-102) {
+		t.Error("minh should not have enough fun to make the transfer.")
 	}
 }
 
 func TestVerifyNewBlock(t *testing.T) {
-	bc := CreateBlockchain("minh")
-	bc = bc.AddNewTransferAmount("minh", "alok", 3)
-	bc = bc.AddNewTransferAmount("minh", "rj", 100)
+	bc, utxoPool := CreateBlockchain("minh")
+	bc.AddNewUserTransfer(utxoPool, "minh", "alok", 3)
+	bc.AddNewUserTransfer(utxoPool, "minh", "rj", 100)
 
 	tx := bc.NewUTXOTransaction("minh", "mark", 10)
 	if tx == nil {
@@ -73,7 +67,7 @@ func TestVerifyNewBlock(t *testing.T) {
 	}
 	newBlock := NewBlock([]*Transaction{tx}, bc.blocks[len(bc.blocks)-1].Hash)
 
-	if !bc.VerifyNewBlock(nil, newBlock) {
+	if !bc.VerifyNewBlockAndUpdate(utxoPool, newBlock) {
 		t.Error("failed to add a new valid block.")
 	}
 }

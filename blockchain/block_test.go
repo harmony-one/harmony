@@ -6,7 +6,10 @@ import (
 )
 
 func TestBlockSerialize(t *testing.T) {
-	cbtx := NewCoinbaseTX("minh", genesisCoinbaseData)
+	cbtx, utxoPool := NewCoinbaseTX("minh", genesisCoinbaseData)
+	if cbtx == nil || utxoPool == nil {
+		t.Errorf("Failed to create a coinbase transaction.")
+	}
 	block := NewGenesisBlock(cbtx)
 
 	serializedValue := block.Serialize()

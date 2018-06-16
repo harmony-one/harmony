@@ -3,6 +3,7 @@ package blockchain
 import (
 	"bytes"
 	"encoding/hex"
+	"fmt"
 )
 
 // Blockchain keeps a sequence of Blocks
@@ -130,20 +131,21 @@ func (bc *Blockchain) NewUTXOTransaction(from, to string, amount int) *Transacti
 	return &tx
 }
 
-// AddNewTransferAmount creates a new transaction and a block of that transaction.
+// AddNewUserTransfer creates a new transaction and a block of that transaction.
 // Mostly used for testing.
-func (bc *Blockchain) AddNewTransferAmount(from, to string, amount int) *Blockchain {
+func (bc *Blockchain) AddNewUserTransfer(utxoPool *UTXOPool, from, to string, amount int) bool {
 	tx := bc.NewUTXOTransaction(from, to, amount)
 	if tx != nil {
 		newBlock := NewBlock([]*Transaction{tx}, bc.blocks[len(bc.blocks)-1].Hash)
-		bc.blocks = append(bc.blocks, newBlock)
-		return bc
+		if bc.VerifyNewBlockAndUpdate(utxoPool, newBlock) {
+			return true
+		}
 	}
-	return nil
+	return false
 }
 
-// VerifyNewBlock verifies if the new coming block is valid for the current blockchain.
-func (bc *Blockchain) VerifyNewBlock(utxopool *UTXOPool, block *Block) bool {
+// VerifyNewBlockAndUpdate verifies if the new coming block is valid for the current blockchain.
+func (bc *Blockchain) VerifyNewBlockAndUpdate(utxopool *UTXOPool, block *Block) bool {
 	length := len(bc.blocks)
 	if bytes.Compare(block.PrevBlockHash, bc.blocks[length-1].Hash) != 0 {
 		return false
@@ -152,40 +154,21 @@ func (bc *Blockchain) VerifyNewBlock(utxopool *UTXOPool, block *Block) bool {
 		return false
 	}
 
-	if utxopool != nil {
-		for _, tx := range block.Transactions {
-			inTotal := 0
-			// Calculate the sum of TxInput
-			for _, in := range tx.TxInput {
-				inTxID := hex.EncodeToString(in.TxID)
-				if val, ok := utxopool.utxo[in.Address][inTxID]; ok {
-					inTotal += val
-				} else {
-					return false
-				}
-			}
-
-			outTotal := 0
-			// Calculate the sum of TxOutput
-			for _, out := range tx.TxOutput {
-				outTotal += out.Value
-			}
-			if inTotal != outTotal {
-				return false
-			}
-		}
+	if utxopool != nil && !utxopool.VerifyAndUpdate(block.Transactions) {
+		fmt.Println("Minh2")
+		return false
 	}
 	return true
 }
 
 // CreateBlockchain creates a new blockchain DB
-func CreateBlockchain(address string) *Blockchain {
+func CreateBlockchain(address string) (*Blockchain, *UTXOPool) {
 	// TODO: We assume we have not created any blockchain before.
 	// In current bitcoin, we can check if we created a blockchain before accessing local db.
-	cbtx := NewCoinbaseTX(address, genesisCoinbaseData)
+	cbtx, utxoPool := NewCoinbaseTX(address, genesisCoinbaseData)
 	genesis := NewGenesisBlock(cbtx)
 
 	bc := Blockchain{[]*Block{genesis}}
 
-	return &bc
+	return &bc, utxoPool
 }

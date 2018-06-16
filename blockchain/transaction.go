@@ -47,7 +47,7 @@ func (tx *Transaction) SetID() {
 }
 
 // NewCoinbaseTX creates a new coinbase transaction
-func NewCoinbaseTX(to, data string) *Transaction {
+func NewCoinbaseTX(to, data string) (*Transaction, *UTXOPool) {
 	if data == "" {
 		data = fmt.Sprintf("Reward to '%s'", to)
 	}
@@ -56,8 +56,14 @@ func NewCoinbaseTX(to, data string) *Transaction {
 	txout := TXOutput{DefaultCoinbaseValue, to}
 	tx := Transaction{nil, []TXInput{txin}, []TXOutput{txout}}
 	tx.SetID()
+	txID := hex.EncodeToString(tx.ID)
 
-	return &tx
+	var utxoPool UTXOPool
+	utxoPool.utxo = make(map[string]map[string]int)
+	utxoPool.utxo[to] = make(map[string]int)
+	utxoPool.utxo[to][txID] = DefaultCoinbaseValue
+
+	return &tx, &utxoPool
 }
 
 // Used for debuging.
