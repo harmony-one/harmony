@@ -38,8 +38,6 @@ func (consensus *Consensus) ProcessMessageLeader(message []byte) {
 		consensus.processResponseMessage(payload)
 	case START_CONSENSUS:
 		consensus.processStartConsensusMessage(msg)
-	case STOP_CONSENSUS:
-		consensus.stopConsensusMessage(msg)
 	default:
 		log.Println("Unexpected message type: %s", msgType)
 	}
