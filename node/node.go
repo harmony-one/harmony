@@ -122,19 +122,23 @@ func (node *Node) NodeHandler(conn net.Conn) {
 func (node *Node) WaitForConsensusReady(readySignal chan int) {
 	for { // keep waiting for consensus ready
 		<- readySignal
-		log.Println("got ready signal.....")
 		// create a new block
 		newBlock := new(blockchain.Block)
 		for {
 			if len(node.pendingTransactions) >= 10 {
-				log.Println("creating new block")
-				// TODO: package actual transactions
-				newBlock = blockchain.NewGenesisBlock(blockchain.NewCoinbaseTX("x", "y"))
+				log.Println("Creating new block")
+				// TODO (Minh): package actual transactions
+				// For now, just take out 10 transactions
+				var txList []*blockchain.Transaction
+				for _, tx := range node.pendingTransactions[0:10] {
+					txList = append(txList, &tx)
+				}
+				node.pendingTransactions = node.pendingTransactions[10:]
+				newBlock = blockchain.NewBlock(txList, []byte{})
 				break
 			}
 			time.Sleep(1 * time.Second) // Periodically check whether we have enough transactions to package into block.
 		}
-		log.Println("sending new block to consensus")
 		node.BlockChannel <- *newBlock
 	}
 }

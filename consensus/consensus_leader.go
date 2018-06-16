@@ -18,7 +18,6 @@ var mutex = &sync.Mutex{}
 func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) {
 	for { // keep waiting for new blocks
 		newBlock := <- blockChannel
-		log.Println("got block.....")
 		// TODO: think about potential race condition
 		if consensus.state == READY {
 			consensus.startConsensus(&newBlock)

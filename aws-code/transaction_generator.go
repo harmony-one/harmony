@@ -22,15 +22,21 @@ func main() {
 
 	ip := flag.String("ip", "127.0.0.1", "IP of the leader")
 	port := flag.String("port", "9000", "port of the leader.")
+	txToSend := flag.Int("tx_count", 100, "number of transaction")
 
 	txs := make([]blockchain.Transaction, 10)
+	txCount := 0
 	for true {
+		if txCount >= *txToSend {
+			break
+		}
 		for i := range txs {
 			txs[i] = newRandTransaction()
 
 		}
 		msg := node.ConstructTransactionListMessage(txs)
 		p2p.SendMessage(p2p.Peer{*ip, *port, "n/a"}, msg)
+		txCount += len(txs)
 		time.Sleep(1 * time.Second)  // 10 transactions per second
 	}
 }
