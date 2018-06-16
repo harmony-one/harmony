@@ -4,20 +4,19 @@ import (
 	"log"
 	"sync"
 
-	"harmony-benchmark/p2p"
 	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"harmony-benchmark/blockchain"
+	"harmony-benchmark/p2p"
 )
 
 var mutex = &sync.Mutex{}
 
-
 func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) {
 	for { // keep waiting for new blocks
-		newBlock := <- blockChannel
+		newBlock := <-blockChannel
 		// TODO: think about potential race condition
 		if consensus.state == READY {
 			consensus.startConsensus(&newBlock)
@@ -134,23 +133,23 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 	//#### Read payload data
 	offset := 0
 	// 4 byte consensus id
-	consensusId := binary.BigEndian.Uint32(payload[offset:offset+4])
+	consensusId := binary.BigEndian.Uint32(payload[offset : offset+4])
 	offset += 4
 
 	// 32 byte block hash
-	blockHash := payload[offset:offset+32]
+	blockHash := payload[offset : offset+32]
 	offset += 32
 
 	// 2 byte validator id
-	validatorId := string(payload[offset:offset+2])
+	validatorId := string(payload[offset : offset+2])
 	offset += 2
 
 	// 33 byte commit
-	commit := payload[offset:offset+33]
+	commit := payload[offset : offset+33]
 	offset += 33
 
 	// 64 byte of signature on previous data
-	signature := payload[offset:offset+64]
+	signature := payload[offset : offset+64]
 	offset += 64
 	//#### END: Read payload data
 
@@ -240,23 +239,23 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 	//#### Read payload data
 	offset := 0
 	// 4 byte consensus id
-	consensusId := binary.BigEndian.Uint32(payload[offset:offset+4])
+	consensusId := binary.BigEndian.Uint32(payload[offset : offset+4])
 	offset += 4
 
 	// 32 byte block hash
-	blockHash := payload[offset:offset+32]
+	blockHash := payload[offset : offset+32]
 	offset += 32
 
 	// 2 byte validator id
-	validatorId := string(payload[offset:offset+2])
+	validatorId := string(payload[offset : offset+2])
 	offset += 2
 
 	// 32 byte response
-	response := payload[offset:offset+32]
+	response := payload[offset : offset+32]
 	offset += 32
 
 	// 64 byte of signature on previous data
-	signature := payload[offset:offset+64]
+	signature := payload[offset : offset+64]
 	offset += 64
 	//#### END: Read payload data
 

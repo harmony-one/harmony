@@ -1,22 +1,23 @@
 package node
 
 import (
+	"bytes"
+	"encoding/gob"
+	"harmony-benchmark/blockchain"
+	"harmony-benchmark/consensus"
+	"harmony-benchmark/message"
+	"harmony-benchmark/p2p"
 	"log"
 	"net"
 	"os"
-	"harmony-benchmark/p2p"
-	"harmony-benchmark/consensus"
-	"harmony-benchmark/message"
-	"harmony-benchmark/blockchain"
-	"bytes"
-	"encoding/gob"
 	"time"
 )
 
 // A node represents a program (machine) participating in the network
 type Node struct {
-	consensus *consensus.Consensus
-	BlockChannel chan blockchain.Block
+	consensus           *consensus.Consensus
+	consensus           *consensus.Consensus
+	BlockChannel        chan blockchain.Block
 	pendingTransactions []blockchain.Transaction
 }
 
@@ -114,6 +115,12 @@ func (node *Node) NodeHandler(conn net.Conn) {
 			}
 			node.pendingTransactions = append(node.pendingTransactions, *txList...)
 			log.Println(len(node.pendingTransactions))
+		case message.CONTROL:
+			controlType := msgPayload[0]
+			if ControlMessageType(controlType) == STOP {
+				log.Println("Stopping Node")
+				os.Exit(0)
+			}
 
 		}
 	}
@@ -121,7 +128,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 
 func (node *Node) WaitForConsensusReady(readySignal chan int) {
 	for { // keep waiting for consensus ready
-		<- readySignal
+		<-readySignal
 		// create a new block
 		newBlock := new(blockchain.Block)
 		for {

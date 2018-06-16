@@ -5,4 +5,4 @@ while read ip port mode; do
   go run ./benchmark_main.go -ip $ip -port $port -ipfile $ipfile&
 done < $ipfile
 
-go run ./aws-code/transaction_generator.go
+go run ./aws-code/transaction_generator.go -ipfile $ipfile

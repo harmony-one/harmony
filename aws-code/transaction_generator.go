@@ -1,12 +1,16 @@
 package main
 
 import (
-	"harmony-benchmark/blockchain"
-	"math/rand"
-	"time"
+	"bufio"
 	"flag"
+	"fmt"
+	"harmony-benchmark/blockchain"
 	"harmony-benchmark/node"
 	"harmony-benchmark/p2p"
+	"math/rand"
+	"os"
+	"strings"
+	"time"
 )
 
 func newRandTransaction() blockchain.Transaction {
@@ -18,16 +22,35 @@ func newRandTransaction() blockchain.Transaction {
 	return tx
 }
 
+func getPeers(Ip, Port, iplist string) []p2p.Peer {
+	file, _ := os.Open(iplist)
+	fscanner := bufio.NewScanner(file)
+	var peerList []p2p.Peer
+	for fscanner.Scan() {
+		p := strings.Split(fscanner.Text(), " ")
+		ip, port, status := p[0], p[1], p[2]
+		if status == "leader" || ip == Ip && port == Port {
+			continue
+		}
+		peer := p2p.Peer{Port: port, Ip: ip}
+		peerList = append(peerList, peer)
+	}
+	return peerList
+}
 func main() {
 
 	ip := flag.String("ip", "127.0.0.1", "IP of the leader")
 	port := flag.String("port", "9000", "port of the leader.")
-	txToSend := flag.Int("tx_count", 100, "number of transaction")
-
+	ipfile := flag.String("ipfile", "local_iplist.txt", "file containing all ip addresses")
+	//getLeader to get ip,port and get totaltime I want to run
+	start := time.Now()
+	totalTime := 60.0
 	txs := make([]blockchain.Transaction, 10)
 	txCount := 0
 	for true {
-		if txCount >= *txToSend {
+		t := time.Now()
+		if t.Sub(start).Seconds() >= totalTime {
+			fmt.Println(int(t.Sub(start)), start, totalTime)
 			break
 		}
 		for i := range txs {
@@ -36,7 +59,12 @@ func main() {
 		}
 		msg := node.ConstructTransactionListMessage(txs)
 		p2p.SendMessage(p2p.Peer{*ip, *port, "n/a"}, msg)
-		txCount += len(txs)
-		time.Sleep(1 * time.Second)  // 10 transactions per second
+		time.Sleep(1 * time.Second) // 10 transactions per second
 	}
+	msg := node.ConstructStopMessage()
+	var leaderPeer p2p.Peer
+	leaderPeer.Ip = *ip
+	leaderPeer.Port = *port
+	peers := append(getPeers(*ip, *port, *ipfile), leaderPeer)
+	p2p.BroadcastMessage(peers, msg)
 }
