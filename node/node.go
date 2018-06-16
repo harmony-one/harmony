@@ -16,7 +16,6 @@ import (
 // A node represents a program (machine) participating in the network
 type Node struct {
 	consensus           *consensus.Consensus
-	consensus           *consensus.Consensus
 	BlockChannel        chan blockchain.Block
 	pendingTransactions []blockchain.Transaction
 }
