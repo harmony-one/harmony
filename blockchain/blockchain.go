@@ -3,7 +3,6 @@ package blockchain
 import (
 	"bytes"
 	"encoding/hex"
-	"fmt"
 )
 
 // Blockchain keeps a sequence of Blocks
@@ -155,9 +154,9 @@ func (bc *Blockchain) VerifyNewBlockAndUpdate(utxopool *UTXOPool, block *Block) 
 	}
 
 	if utxopool != nil && !utxopool.VerifyAndUpdate(block.Transactions) {
-		fmt.Println("Minh2")
 		return false
 	}
+	bc.blocks = append(bc.blocks, block)
 	return true
 }
 

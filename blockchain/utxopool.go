@@ -1,6 +1,8 @@
 package blockchain
 
-import "encoding/hex"
+import (
+	"encoding/hex"
+)
 
 // UTXOPool stores transactions and balance associated with each address.
 type UTXOPool struct {
