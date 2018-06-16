@@ -87,7 +87,8 @@ func (msgType MessageType) String() string {
 		"COMMIT",
 		"CHALLENGE",
 		"RESPONSE",
-		"START_CONSENSUS"}
+		"START_CONSENSUS",
+	}
 
 	if msgType < ANNOUNCE || msgType > START_CONSENSUS {
 		return "Unknown"

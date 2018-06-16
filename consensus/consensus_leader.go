@@ -4,14 +4,25 @@ import (
 	"log"
 	"sync"
 
-	"harmony-benchmark/p2p"
 	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"harmony-benchmark/blockchain"
+	"harmony-benchmark/p2p"
 )
 
 var mutex = &sync.Mutex{}
+
+func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) {
+	for { // keep waiting for new blocks
+		newBlock := <-blockChannel
+		// TODO: think about potential race condition
+		if consensus.state == READY {
+			consensus.startConsensus(&newBlock)
+		}
+	}
+}
 
 // Leader's consensus message dispatcher
 func (consensus *Consensus) ProcessMessageLeader(message []byte) {
@@ -25,7 +36,6 @@ func (consensus *Consensus) ProcessMessageLeader(message []byte) {
 		log.Print(err)
 	}
 
-	msg := string(payload)
 	log.Printf("[Leader] Received and processing message: %s\n", msgType)
 	switch msgType {
 	case ANNOUNCE:
@@ -37,18 +47,22 @@ func (consensus *Consensus) ProcessMessageLeader(message []byte) {
 	case RESPONSE:
 		consensus.processResponseMessage(payload)
 	case START_CONSENSUS:
-		consensus.processStartConsensusMessage(msg)
+		consensus.processStartConsensusMessage(payload)
 	default:
 		log.Println("Unexpected message type: %s", msgType)
 	}
 }
 
 // Handler for message which triggers consensus process
-func (consensus *Consensus) processStartConsensusMessage(msg string) {
+func (consensus *Consensus) processStartConsensusMessage(payload []byte) {
+	consensus.startConsensus(blockchain.NewGenesisBlock(blockchain.NewCoinbaseTX("x", "y")))
+}
+
+func (consensus *Consensus) startConsensus(newBlock *blockchain.Block) {
 	// prepare message and broadcast to validators
 	// Construct new block
-	newBlock := constructNewBlock()
-	consensus.blockHash = getBlockHash(newBlock)
+	//newBlock := constructNewBlock()
+	consensus.blockHash = newBlock.Hash
 
 	msgToSend, err := consensus.constructAnnounceMessage()
 	if err != nil {
@@ -119,23 +133,23 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 	//#### Read payload data
 	offset := 0
 	// 4 byte consensus id
-	consensusId := binary.BigEndian.Uint32(payload[offset:offset+4])
+	consensusId := binary.BigEndian.Uint32(payload[offset : offset+4])
 	offset += 4
 
 	// 32 byte block hash
-	blockHash := payload[offset:offset+32]
+	blockHash := payload[offset : offset+32]
 	offset += 32
 
 	// 2 byte validator id
-	validatorId := string(payload[offset:offset+2])
+	validatorId := string(payload[offset : offset+2])
 	offset += 2
 
 	// 33 byte commit
-	commit := payload[offset:offset+33]
+	commit := payload[offset : offset+33]
 	offset += 33
 
 	// 64 byte of signature on previous data
-	signature := payload[offset:offset+64]
+	signature := payload[offset : offset+64]
 	offset += 64
 	//#### END: Read payload data
 
@@ -225,23 +239,23 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 	//#### Read payload data
 	offset := 0
 	// 4 byte consensus id
-	consensusId := binary.BigEndian.Uint32(payload[offset:offset+4])
+	consensusId := binary.BigEndian.Uint32(payload[offset : offset+4])
 	offset += 4
 
 	// 32 byte block hash
-	blockHash := payload[offset:offset+32]
+	blockHash := payload[offset : offset+32]
 	offset += 32
 
 	// 2 byte validator id
-	validatorId := string(payload[offset:offset+2])
+	validatorId := string(payload[offset : offset+2])
 	offset += 2
 
 	// 32 byte response
-	response := payload[offset:offset+32]
+	response := payload[offset : offset+32]
 	offset += 32
 
 	// 64 byte of signature on previous data
-	signature := payload[offset:offset+64]
+	signature := payload[offset : offset+64]
 	offset += 64
 	//#### END: Read payload data
 
@@ -273,6 +287,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 			// TODO: do followups on the consensus
 			log.Printf("HOORAY!!! CONSENSUS REACHED AMONG %d NODES!!!\n", len(consensus.validators))
 			consensus.ResetState()
+			consensus.ReadySignal <- 1
 		}
 		// TODO: composes new block and broadcast the new block to validators
 	}

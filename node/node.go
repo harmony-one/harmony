@@ -1,25 +1,27 @@
 package node
 
 import (
+	"bytes"
+	"encoding/gob"
+	"harmony-benchmark/blockchain"
+	"harmony-benchmark/consensus"
+	"harmony-benchmark/message"
+	"harmony-benchmark/p2p"
 	"log"
 	"net"
 	"os"
-	"harmony-benchmark/p2p"
-	"harmony-benchmark/consensus"
-	"harmony-benchmark/message"
-	"harmony-benchmark/blockchain"
-	"bytes"
-	"encoding/gob"
+	"time"
 )
 
 // A node represents a program (machine) participating in the network
 type Node struct {
-	consensus *consensus.Consensus
+	consensus           *consensus.Consensus
+	BlockChannel        chan blockchain.Block
 	pendingTransactions []blockchain.Transaction
 }
 
 // Start a server and process the request by a handler.
-func (node Node) StartServer(port string) {
+func (node *Node) StartServer(port string) {
 	listenOnPort(port, node.NodeHandler)
 }
 
@@ -112,7 +114,38 @@ func (node *Node) NodeHandler(conn net.Conn) {
 			}
 			node.pendingTransactions = append(node.pendingTransactions, *txList...)
 			log.Println(len(node.pendingTransactions))
+		case message.CONTROL:
+			controlType := msgPayload[0]
+			if ControlMessageType(controlType) == STOP {
+				log.Println("Stopping Node")
+				os.Exit(0)
+			}
+
 		}
+	}
+}
+
+func (node *Node) WaitForConsensusReady(readySignal chan int) {
+	for { // keep waiting for consensus ready
+		<-readySignal
+		// create a new block
+		newBlock := new(blockchain.Block)
+		for {
+			if len(node.pendingTransactions) >= 10 {
+				log.Println("Creating new block")
+				// TODO (Minh): package actual transactions
+				// For now, just take out 10 transactions
+				var txList []*blockchain.Transaction
+				for _, tx := range node.pendingTransactions[0:10] {
+					txList = append(txList, &tx)
+				}
+				node.pendingTransactions = node.pendingTransactions[10:]
+				newBlock = blockchain.NewBlock(txList, []byte{})
+				break
+			}
+			time.Sleep(1 * time.Second) // Periodically check whether we have enough transactions to package into block.
+		}
+		node.BlockChannel <- *newBlock
 	}
 }
 
@@ -120,5 +153,6 @@ func (node *Node) NodeHandler(conn net.Conn) {
 func NewNode(consensus *consensus.Consensus) Node {
 	node := Node{}
 	node.consensus = consensus
+	node.BlockChannel = make(chan blockchain.Block)
 	return node
 }

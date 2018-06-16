@@ -35,6 +35,9 @@ type Consensus struct {
 	// BlockHeader to run consensus on
 	blockHeader []byte
 
+	// Signal channel for starting a new consensus process
+	ReadySignal chan int
+
 	//// Network related fields
 	msgCategory byte
 	actionType byte
@@ -102,6 +105,14 @@ func NewConsensus(ip, port string, peers []p2p.Peer, leader p2p.Peer) Consensus 
 	socketId := reg.ReplaceAllString(consensus.priKey, "")
 	value, err := strconv.Atoi(socketId)
 	consensus.nodeId = uint16(value)
+
+	if consensus.IsLeader {
+		consensus.ReadySignal = make(chan int)
+		// send a signal to indicate it's ready to run consensus
+		go func() {
+			consensus.ReadySignal <- 1
+		}()
+	}
 
 	consensus.msgCategory = byte(message.COMMITTEE)
 	consensus.actionType = byte(message.CONSENSUS)
