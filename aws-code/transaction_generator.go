@@ -46,7 +46,6 @@ func main() {
 	start := time.Now()
 	totalTime := 60.0
 	txs := make([]blockchain.Transaction, 10)
-	txCount := 0
 	for true {
 		t := time.Now()
 		if t.Sub(start).Seconds() >= totalTime {
