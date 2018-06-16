@@ -73,7 +73,7 @@ func TestVerifyNewBlock(t *testing.T) {
 	}
 	newBlock := NewBlock([]*Transaction{tx}, bc.blocks[len(bc.blocks)-1].Hash)
 
-	if !bc.VerifyNewBlock(newBlock) {
+	if !bc.VerifyNewBlock(nil, newBlock) {
 		t.Error("failed to add a new valid block.")
 	}
 }

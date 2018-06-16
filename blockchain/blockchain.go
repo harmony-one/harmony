@@ -3,7 +3,6 @@ package blockchain
 import (
 	"bytes"
 	"encoding/hex"
-	"fmt"
 )
 
 // Blockchain keeps a sequence of Blocks
@@ -144,17 +143,38 @@ func (bc *Blockchain) AddNewTransferAmount(from, to string, amount int) *Blockch
 }
 
 // VerifyNewBlock verifies if the new coming block is valid for the current blockchain.
-func (bc *Blockchain) VerifyNewBlock(block *Block) bool {
+func (bc *Blockchain) VerifyNewBlock(utxopool *UTXOPool, block *Block) bool {
 	length := len(bc.blocks)
 	if bytes.Compare(block.PrevBlockHash, bc.blocks[length-1].Hash) != 0 {
-		fmt.Println("MINh1")
 		return false
 	}
 	if block.Timestamp < bc.blocks[length-1].Timestamp {
-		fmt.Println("MINh2")
 		return false
 	}
-	// TODO(minhdoan): Check Transactions parts
+
+	if utxopool != nil {
+		for _, tx := range block.Transactions {
+			inTotal := 0
+			// Calculate the sum of TxInput
+			for _, in := range tx.TxInput {
+				inTxID := hex.EncodeToString(in.TxID)
+				if val, ok := utxopool.utxo[in.Address][inTxID]; ok {
+					inTotal += val
+				} else {
+					return false
+				}
+			}
+
+			outTotal := 0
+			// Calculate the sum of TxOutput
+			for _, out := range tx.TxOutput {
+				outTotal += out.Value
+			}
+			if inTotal != outTotal {
+				return false
+			}
+		}
+	}
 	return true
 }
 

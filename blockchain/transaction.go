@@ -11,7 +11,7 @@ import (
 
 // Transaction represents a Bitcoin transaction
 type Transaction struct {
-	ID       []byte         // 32 byte hash
+	ID       []byte // 32 byte hash
 	TxInput  []TXInput
 	TxOutput []TXOutput
 }
