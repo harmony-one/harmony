@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func main() {
+func listenMain() { // TODO: temp fix to unblock test
 	ln, err := net.Listen("tcp", "localhost:9000")
 	if err != nil {
 		panic(err)

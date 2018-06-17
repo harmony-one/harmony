@@ -1,10 +1,10 @@
 package consensus
 
 import (
-	"harmony-benchmark/p2p"
-	"log"
 	"bytes"
 	"encoding/binary"
+	"harmony-benchmark/p2p"
+	"log"
 )
 
 // Validator's consensus message dispatcher
@@ -24,13 +24,13 @@ func (consensus *Consensus) ProcessMessageValidator(message []byte) {
 	case ANNOUNCE:
 		consensus.processAnnounceMessage(payload)
 	case COMMIT:
-		log.Println("Unexpected message type: %s", msgType)
+		log.Printf("Unexpected message type: %s", msgType)
 	case CHALLENGE:
 		consensus.processChallengeMessage(payload)
 	case RESPONSE:
-		log.Println("Unexpected message type: %s", msgType)
+		log.Printf("Unexpected message type: %s", msgType)
 	default:
-		log.Println("Unexpected message type: %s", msgType)
+		log.Printf("Unexpected message type: %s", msgType)
 	}
 }
 
@@ -38,28 +38,28 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	//#### Read payload data
 	offset := 0
 	// 4 byte consensus id
-	consensusId := binary.BigEndian.Uint32(payload[offset:offset+4])
+	consensusId := binary.BigEndian.Uint32(payload[offset : offset+4])
 	offset += 4
 
 	// 32 byte block hash
-	blockHash := payload[offset:offset+32]
+	blockHash := payload[offset : offset+32]
 	offset += 32
 
 	// 2 byte validator id
-	leaderId := string(payload[offset:offset+2])
+	leaderId := string(payload[offset : offset+2])
 	offset += 2
 
 	// n byte of block header
 	n := len(payload) - offset - 4 - 64 // the numbers means 4 byte payload and 64 signature
-	blockHeader := payload[offset:offset+n]
+	blockHeader := payload[offset : offset+n]
 	offset += n
 
 	// 4 byte of payload size (block header)
-	blockHeaderSize := payload[offset:offset+4]
+	blockHeaderSize := payload[offset : offset+4]
 	offset += 4
 
 	// 64 byte of signature on previous data
-	signature := payload[offset:offset+64]
+	signature := payload[offset : offset+64]
 	offset += 64
 	//#### END: Read payload data
 
@@ -122,31 +122,31 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 	//#### Read payload data
 	offset := 0
 	// 4 byte consensus id
-	consensusId := binary.BigEndian.Uint32(payload[offset:offset+4])
+	consensusId := binary.BigEndian.Uint32(payload[offset : offset+4])
 	offset += 4
 
 	// 32 byte block hash
-	blockHash := payload[offset:offset+32]
+	blockHash := payload[offset : offset+32]
 	offset += 32
 
 	// 2 byte leader id
-	leaderId := string(payload[offset:offset+2])
+	leaderId := string(payload[offset : offset+2])
 	offset += 2
 
 	// 33 byte of aggregated commit
-	aggreCommit := payload[offset:offset+33]
+	aggreCommit := payload[offset : offset+33]
 	offset += 33
 
 	// 33 byte of aggregated key
-	aggreKey := payload[offset:offset+33]
+	aggreKey := payload[offset : offset+33]
 	offset += 33
 
 	// 32 byte of aggregated key
-	challenge := payload[offset:offset+32]
+	challenge := payload[offset : offset+32]
 	offset += 32
 
 	// 64 byte of signature on previous data
-	signature := payload[offset:offset+64]
+	signature := payload[offset : offset+64]
 	offset += 64
 	//#### END: Read payload data
 

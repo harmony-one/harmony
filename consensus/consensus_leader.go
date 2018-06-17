@@ -39,17 +39,17 @@ func (consensus *Consensus) ProcessMessageLeader(message []byte) {
 	log.Printf("[Leader] Received and processing message: %s\n", msgType)
 	switch msgType {
 	case ANNOUNCE:
-		log.Println("Unexpected message type: %s", msgType)
+		log.Printf("Unexpected message type: %s", msgType)
 	case COMMIT:
 		consensus.processCommitMessage(payload)
 	case CHALLENGE:
-		log.Println("Unexpected message type: %s", msgType)
+		log.Printf("Unexpected message type: %s", msgType)
 	case RESPONSE:
 		consensus.processResponseMessage(payload)
 	case START_CONSENSUS:
 		consensus.processStartConsensusMessage(payload)
 	default:
-		log.Println("Unexpected message type: %s", msgType)
+		log.Printf("Unexpected message type: %s", msgType)
 	}
 }
 
