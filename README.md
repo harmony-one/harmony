@@ -11,7 +11,7 @@ mkdir -p $HOME/<path_of_your_choice>/src
 
 cd $HOME/<path_of_your_choice>/src
 
-clone <harmony_repo>
+git clone git@github.com:simple-rules/harmony-benchmark.git
 ```
 ## Usage
 ```
