@@ -2,11 +2,12 @@
 package consensus // consensus
 
 import (
-	"harmony-benchmark/p2p"
-	"regexp"
-	"log"
-	"strconv"
+	"fmt"
 	"harmony-benchmark/message"
+	"harmony-benchmark/p2p"
+	"log"
+	"regexp"
+	"strconv"
 )
 
 // Consensus data containing all info related to one consensus process
@@ -40,7 +41,7 @@ type Consensus struct {
 
 	//// Network related fields
 	msgCategory byte
-	actionType byte
+	actionType  byte
 }
 
 // Consensus state enum for both leader and validator
@@ -119,10 +120,30 @@ func NewConsensus(ip, port string, peers []p2p.Peer, leader p2p.Peer) Consensus 
 	return consensus
 }
 
-
 // Reset the state of the consensus
 func (consensus *Consensus) ResetState() {
 	consensus.state = READY
 	consensus.commits = make(map[string]string)
 	consensus.responses = make(map[string]string)
+}
+
+// Returns ID of this consensus
+func (consensus *Consensus) GetIdentityString() string {
+	var duty string
+	if consensus.IsLeader {
+		duty = "LDR" // leader
+	} else {
+		duty = "SLV" // slave
+	}
+	return fmt.Sprintf("[%s, %s, %v]", duty, consensus.priKey, consensus.nodeId)
+}
+
+// Prints log with ID of this consensus
+func (consensus *Consensus) Logln(v ...interface{}) {
+	log.Printf("%s %s", consensus.GetIdentityString(), fmt.Sprintln(v...))
+}
+
+// Prints formatted log with ID of this consensus
+func (consensus *Consensus) Logf(format string, v ...interface{}) {
+	log.Printf("%s %s", consensus.GetIdentityString(), fmt.Sprintf(format, v...))
 }

@@ -52,41 +52,25 @@ func (node *Node) NodeHandler(conn net.Conn) {
 
 	consensus := node.consensus
 	if err != nil {
-		if consensus.IsLeader {
-			log.Printf("[Leader] Read p2p data failed:%s", err)
-		} else {
-			log.Printf("[Slave] Read p2p data failed:%s", err)
-		}
+		node.Logf("Read p2p data failed:%s", err)
 		return
 	}
 
 	msgCategory, err := message.GetMessageCategory(content)
 	if err != nil {
-		if consensus.IsLeader {
-			log.Printf("[Leader] Read node type failed:%s", err)
-		} else {
-			log.Printf("[Slave] Read node type failed:%s", err)
-		}
+		node.Logf("Read node type failed:%s", err)
 		return
 	}
 
 	msgType, err := message.GetMessageType(content)
 	if err != nil {
-		if consensus.IsLeader {
-			log.Printf("[Leader] Read action type failed:%s", err)
-		} else {
-			log.Printf("[Slave] Read action type failed:%s", err)
-		}
+		node.Logf("Read action type failed:%s", err)
 		return
 	}
 
 	msgPayload, err := message.GetMessagePayload(content)
 	if err != nil {
-		if consensus.IsLeader {
-			log.Printf("[Leader] Read message payload failed:%s", err)
-		} else {
-			log.Printf("[Slave] Read message payload failed:%s", err)
-		}
+		node.Logf("Read message payload failed:%s", err)
 		return
 	}
 
@@ -110,14 +94,14 @@ func (node *Node) NodeHandler(conn net.Conn) {
 			txList := new([]blockchain.Transaction)
 			err := txDecoder.Decode(&txList)
 			if err != nil {
-				log.Println("Failed deserializing transaction list")
+				node.Logln("Failed deserializing transaction list")
 			}
 			node.pendingTransactions = append(node.pendingTransactions, *txList...)
-			log.Println(len(node.pendingTransactions))
+			node.Logln(len(node.pendingTransactions))
 		case message.CONTROL:
 			controlType := msgPayload[0]
 			if ControlMessageType(controlType) == STOP {
-				log.Println("Stopping Node")
+				node.Logln("Stopping Node")
 				os.Exit(0)
 			}
 
@@ -132,7 +116,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan int) {
 		newBlock := new(blockchain.Block)
 		for {
 			if len(node.pendingTransactions) >= 10 {
-				log.Println("Creating new block")
+				node.Logln("Creating new block")
 				// TODO (Minh): package actual transactions
 				// For now, just take out 10 transactions
 				var txList []*blockchain.Transaction
@@ -155,4 +139,19 @@ func NewNode(consensus *consensus.Consensus) Node {
 	node.consensus = consensus
 	node.BlockChannel = make(chan blockchain.Block)
 	return node
+}
+
+// Returns the identity string of this node
+func (node *Node) GetIdentityString() string {
+	return node.consensus.GetIdentityString()
+}
+
+// Prints log with ID of this node
+func (node *Node) Logln(v ...interface{}) {
+	node.consensus.Logln(v...)
+}
+
+// Prints formatted log with ID of this node
+func (node *Node) Logf(format string, v ...interface{}) {
+	node.consensus.Logf(format, v...)
 }

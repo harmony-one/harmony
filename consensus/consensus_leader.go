@@ -36,20 +36,20 @@ func (consensus *Consensus) ProcessMessageLeader(message []byte) {
 		log.Print(err)
 	}
 
-	log.Printf("[Leader] Received and processing message: %s\n", msgType)
+	consensus.Logf("Received and processing message: %s\n", msgType)
 	switch msgType {
 	case ANNOUNCE:
-		log.Printf("Unexpected message type: %s", msgType)
+		consensus.Logf("Unexpected message type: %s", msgType)
 	case COMMIT:
 		consensus.processCommitMessage(payload)
 	case CHALLENGE:
-		log.Printf("Unexpected message type: %s", msgType)
+		consensus.Logf("Unexpected message type: %s", msgType)
 	case RESPONSE:
 		consensus.processResponseMessage(payload)
 	case START_CONSENSUS:
 		consensus.processStartConsensusMessage(payload)
 	default:
-		log.Printf("Unexpected message type: %s", msgType)
+		consensus.Logf("Unexpected message type: %s", msgType)
 	}
 }
 
@@ -166,7 +166,7 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 	shouldProcess := !ok && consensus.state == ANNOUNCE_DONE
 	if shouldProcess {
 		consensus.commits[validatorId] = validatorId
-		log.Printf("Number of commits received: %d", len(consensus.commits))
+		consensus.Logf("Number of commits received: %d", len(consensus.commits))
 	}
 	mutex.Unlock()
 
@@ -176,7 +176,7 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 
 	mutex.Lock()
 	if len(consensus.commits) >= (2*len(consensus.validators))/3+1 {
-		log.Printf("Enough commits received with %d signatures", len(consensus.commits))
+		consensus.Logf("Enough commits received with %d signatures", len(consensus.commits))
 		if consensus.state == ANNOUNCE_DONE {
 			// Set state to CHALLENGE_DONE
 			consensus.state = CHALLENGE_DONE
@@ -271,7 +271,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 	shouldProcess := !ok && consensus.state == CHALLENGE_DONE
 	if shouldProcess {
 		consensus.responses[validatorId] = validatorId
-		log.Printf("Number of responses received: %d", len(consensus.responses))
+		consensus.Logf("Number of responses received: %d", len(consensus.responses))
 	}
 	mutex.Unlock()
 
@@ -281,12 +281,12 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 
 	mutex.Lock()
 	if len(consensus.responses) >= (2*len(consensus.validators))/3+1 {
-		log.Printf("Consensus reached with %d signatures.", len(consensus.responses))
+		consensus.Logf("Consensus reached with %d signatures.", len(consensus.responses))
 		if consensus.state == CHALLENGE_DONE {
 			// Set state to FINISHED
 			consensus.state = FINISHED
 			// TODO: do followups on the consensus
-			log.Printf("HOORAY!!! CONSENSUS REACHED AMONG %d NODES!!!\n", len(consensus.validators))
+			consensus.Logf("HOORAY!!! CONSENSUS REACHED AMONG %d NODES!!!\n", len(consensus.validators))
 			consensus.ResetState()
 			consensus.ReadySignal <- 1
 		}

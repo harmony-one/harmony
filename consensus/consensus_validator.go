@@ -19,18 +19,18 @@ func (consensus *Consensus) ProcessMessageValidator(message []byte) {
 		log.Print(err)
 	}
 
-	log.Printf("[Validator] Received and processing message: %s\n", msgType)
+	consensus.Logf("Received and processing message: %s\n", msgType)
 	switch msgType {
 	case ANNOUNCE:
 		consensus.processAnnounceMessage(payload)
 	case COMMIT:
-		log.Printf("Unexpected message type: %s", msgType)
+		consensus.Logf("Unexpected message type: %s", msgType)
 	case CHALLENGE:
 		consensus.processChallengeMessage(payload)
 	case RESPONSE:
-		log.Printf("Unexpected message type: %s", msgType)
+		consensus.Logf("Unexpected message type: %s", msgType)
 	default:
-		log.Printf("Unexpected message type: %s", msgType)
+		consensus.Logf("Unexpected message type: %s", msgType)
 	}
 }
 
