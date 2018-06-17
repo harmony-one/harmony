@@ -55,7 +55,7 @@ func (consensus *Consensus) ProcessMessageLeader(message []byte) {
 
 // Handler for message which triggers consensus process
 func (consensus *Consensus) processStartConsensusMessage(payload []byte) {
-	tx, _ := blockchain.NewCoinbaseTX("x", "y") // TODO: @minh, this fix is temporary to unblock the build. Please fix later.
+	tx := blockchain.NewCoinbaseTX("x", "y")
 	consensus.startConsensus(blockchain.NewGenesisBlock(tx))
 }
 
