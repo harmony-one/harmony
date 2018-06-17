@@ -2,3 +2,6 @@ language: go
 
 go:
   - master
+install:
+  - export GOPATH="${HOME}/gopath/"
+  - export TRAVIS_BUILD_DIR="${GOPATH}/src/harmony-benchmark"
