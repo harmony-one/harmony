@@ -1,10 +1,12 @@
 language: go
-
 go:
-  - master
+- master
 install: |
   export GOPATH=$HOME/gopath
   mkdir -p $HOME/gopath/src/harmony-benchmark
   rsync -az ${TRAVIS_BUILD_DIR}/ $HOME/gopath/src/harmony-benchmark/
   export TRAVIS_BUILD_DIR=$HOME/gopath/src/harmony-benchmark
   cd $HOME/gopath/src/harmony-benchmark
+notifications:
+  slack:
+    secure: F6PRLJ7fIVpvZAEAIikE9u53CwklytznkNSJPuzB7cxLttAejls8ou3jsFFUkdTyyyy+QKFP9Bj+IFcAI9dq3CDYp7MnTQx/ajn8TC0xBwKW3gEKYoptIQJkXzvdwp9OanpU78QynRe1oRLefkN8qrL0zWLvoqcaHSYwjh1kzDCbO9G13aiI5CiFdW7jKwBKEPlleze4so0UdAaaGxyXUiSsmvHrOwF72ElnahKLy9DzmIgT8PdQkf1BmV3yaH3VQoU4fyu8t5P/jy8NYIXomcpo+pavgUBfXwd3mPf1KkAoB2RXdGCkORzHNZ6h+63ZVDzi1t8FWAbuNmvJ/Hq07IScGcsjZCEdy+79NSSBHThUejnHnqD4QdcXdhr30PoWBX85+phwPEVehAtddzgLyzivGByKHQMfWcetvPRww7Im+MpJW3OssgHlPxbRCE0uFtSDYgD9UoKevuZzFnME3U1rT9xqTweqOzxdsGRpvU/fLbh0PQCJnDQJjOB054l6ZTu9mtt+ogbYpOhB2PO6qLJZ64cn7M5/wLMiswRWooT9DeN+5a7n5MRo1i/TWFDFWBFYQVWTYdiTaU+oZdSZsu25TMboVraHPw3HE5tKIGgqOBLLd187HbE5ZeR62bzUnlN1wK1tphfgVa4ztmL+NY9nTgHMKki7LiNIL1p7M68=
