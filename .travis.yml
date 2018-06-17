@@ -2,6 +2,9 @@ language: go
 
 go:
   - master
-install:
-  - export GOPATH="${HOME}/gopath/"
-  - export TRAVIS_BUILD_DIR="${GOPATH}/src/harmony-benchmark"
+install: |
+  export GOPATH=$HOME/gopath
+  mkdir -p $HOME/gopath/src/harmony-benchmark
+  rsync -az ${TRAVIS_BUILD_DIR}/ $HOME/gopath/src/harmony-benchmark/
+  export TRAVIS_BUILD_DIR=$HOME/gopath/src/harmony-benchmark
+  cd $HOME/gopath/src/harmony-benchmark
