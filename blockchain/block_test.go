@@ -6,8 +6,8 @@ import (
 )
 
 func TestBlockSerialize(t *testing.T) {
-	cbtx, utxoPool := NewCoinbaseTX("minh", genesisCoinbaseData)
-	if cbtx == nil || utxoPool == nil {
+	cbtx := NewCoinbaseTX("minh", genesisCoinbaseData)
+	if cbtx == nil {
 		t.Errorf("Failed to create a coinbase transaction.")
 	}
 	block := NewGenesisBlock(cbtx)

@@ -6,9 +6,9 @@ import (
 
 // UTXOPool stores transactions and balance associated with each address.
 type UTXOPool struct {
-	// Mapping from address to a map of transaction id to that balance.
-	// The assumption here is that one address only appears once output array in a transaction.
-	utxo map[string]map[string]map[int]int
+	// Mapping from address to a map of transaction id to a map of the index of output
+	// array in that transaction to that balance.
+	utxo map[string]map[string]int
 }
 
 // VerifyTransactions verifies if a list of transactions valid.
@@ -87,4 +87,29 @@ func (utxopool *UTXOPool) Update(transactions []*Transaction) {
 			}
 		}
 	}
+}
+
+// CreateUTXOPoolFromTransaction a utxo pool from a genesis transaction.
+func CreateUTXOPoolFromTransaction(tx *Transaction) *UTXOPool {
+	var utxoPool UTXOPool
+	txID := hex.EncodeToString(tx.ID)
+	utxoPool.utxo = make(map[string]map[string]int)
+	for _, out := range tx.TxOutput {
+		utxoPool.utxo[out.Address] = make(map[string]int)
+		utxoPool.utxo[out.Address][txID] = DefaultCoinbaseValue
+	}
+	return &utxoPool
+}
+
+// CreateUTXOPoolFromGenesisBlockChain a utxo pool from a genesis blockchain.
+func CreateUTXOPoolFromGenesisBlockChain(bc *Blockchain) *UTXOPool {
+	tx := bc.blocks[0].Transactions[0]
+	var utxoPool UTXOPool
+	txID := hex.EncodeToString(tx.ID)
+	utxoPool.utxo = make(map[string]map[string]int)
+	for _, out := range tx.TxOutput {
+		utxoPool.utxo[out.Address] = make(map[string]int)
+		utxoPool.utxo[out.Address][txID] = DefaultCoinbaseValue
+	}
+	return &utxoPool
 }

@@ -5,14 +5,14 @@ import (
 )
 
 func TestCreateBlockchain(t *testing.T) {
-	if bc, _ := CreateBlockchain("minh"); bc == nil {
+	if bc := CreateBlockchain("minh"); bc == nil {
 		t.Errorf("failed to create a blockchain")
 	}
 }
 
 func TestFindSpendableOutputs(t *testing.T) {
 	requestAmount := 3
-	bc, _ := CreateBlockchain("minh")
+	bc := CreateBlockchain("minh")
 	accumulated, unspentOutputs := bc.FindSpendableOutputs("minh", requestAmount)
 	if accumulated < DefaultCoinbaseValue {
 		t.Error("Failed to find enough unspent ouptuts")
@@ -24,7 +24,7 @@ func TestFindSpendableOutputs(t *testing.T) {
 }
 
 func TestFindUTXO(t *testing.T) {
-	bc, _ := CreateBlockchain("minh")
+	bc := CreateBlockchain("minh")
 	utxo := bc.FindUTXO("minh")
 
 	total := 0
@@ -41,7 +41,8 @@ func TestFindUTXO(t *testing.T) {
 }
 
 func TestAddNewUserTransfer(t *testing.T) {
-	bc, utxoPool := CreateBlockchain("minh")
+	bc := CreateBlockchain("minh")
+	utxoPool := CreateUTXOPoolFromGenesisBlockChain(bc)
 
 	if !bc.AddNewUserTransfer(utxoPool, "minh", "alok", 3) {
 		t.Error("Failed to add new transfer to alok.")
@@ -57,7 +58,9 @@ func TestAddNewUserTransfer(t *testing.T) {
 }
 
 func TestVerifyNewBlock(t *testing.T) {
-	bc, utxoPool := CreateBlockchain("minh")
+	bc := CreateBlockchain("minh")
+	utxoPool := CreateUTXOPoolFromGenesisBlockChain(bc)
+
 	bc.AddNewUserTransfer(utxoPool, "minh", "alok", 3)
 	bc.AddNewUserTransfer(utxoPool, "minh", "rj", 100)
 
