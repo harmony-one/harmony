@@ -1,4 +1,5 @@
 # Harmony Benchmark
+[![Build Status](https://travis-ci.com/simple-rules/harmony-benchmark.svg?token=DnoYvYiTAk7pqTo9XsTi&branch=master)](https://travis-ci.com/simple-rules/harmony-benchmark)
 
 ## Dev Environment Setup
 
