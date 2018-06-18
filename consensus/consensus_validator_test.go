@@ -8,7 +8,7 @@ import (
 func TestConstructCommitMessage(test *testing.T) {
 	leader := p2p.Peer{Ip: "1", Port:"2"}
 	validator := p2p.Peer{Ip: "3", Port:"5"}
-	consensus := NewConsensus("1", "2", []p2p.Peer{leader, validator}, leader)
+	consensus := NewConsensus("1", "2", "0", []p2p.Peer{leader, validator}, leader)
 	consensus.blockHash = getBlockHash(make([]byte, 10))
 	msg := consensus.constructCommitMessage()
 
@@ -20,7 +20,7 @@ func TestConstructCommitMessage(test *testing.T) {
 func TestConstructResponseMessage(test *testing.T) {
 	leader := p2p.Peer{Ip: "1", Port:"2"}
 	validator := p2p.Peer{Ip: "3", Port:"5"}
-	consensus := NewConsensus("1", "2", []p2p.Peer{leader, validator}, leader)
+	consensus := NewConsensus("1", "2", "0", []p2p.Peer{leader, validator}, leader)
 	consensus.blockHash = getBlockHash(make([]byte, 10))
 	msg := consensus.constructResponseMessage()
 

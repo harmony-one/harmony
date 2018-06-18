@@ -22,8 +22,8 @@ func newRandTransaction() blockchain.Transaction {
 	return tx
 }
 
-func getPeers(Ip, Port, iplist string) []p2p.Peer {
-	file, _ := os.Open(iplist)
+func getPeers(Ip, Port, config string) []p2p.Peer {
+	file, _ := os.Open(config)
 	fscanner := bufio.NewScanner(file)
 	var peerList []p2p.Peer
 	for fscanner.Scan() {
@@ -41,7 +41,7 @@ func main() {
 
 	ip := flag.String("ip", "127.0.0.1", "IP of the leader")
 	port := flag.String("port", "9000", "port of the leader.")
-	ipfile := flag.String("ipfile", "local_iplist.txt", "file containing all ip addresses")
+	configFile := flag.String("config_file", "local_config.txt", "file containing all ip addresses and config")
 	//getLeader to get ip,port and get totaltime I want to run
 	start := time.Now()
 	totalTime := 60.0
@@ -64,6 +64,6 @@ func main() {
 	var leaderPeer p2p.Peer
 	leaderPeer.Ip = *ip
 	leaderPeer.Port = *port
-	peers := append(getPeers(*ip, *port, *ipfile), leaderPeer)
+	peers := append(getPeers(*ip, *port, *configFile), leaderPeer)
 	p2p.BroadcastMessage(peers, msg)
 }

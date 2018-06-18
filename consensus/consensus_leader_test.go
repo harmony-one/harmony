@@ -9,7 +9,7 @@ func TestConstructAnnounceMessage(test *testing.T) {
 	header := getBlockHeader()
 	leader := p2p.Peer{Ip: "1", Port:"2"}
 	validator := p2p.Peer{Ip: "3", Port:"5"}
-	consensus := NewConsensus("1", "2", []p2p.Peer{leader, validator}, leader)
+	consensus := NewConsensus("1", "2", "0", []p2p.Peer{leader, validator}, leader)
 	consensus.blockHash = getBlockHash(make([]byte, 10))
 	msg, err := consensus.constructAnnounceMessage()
 
@@ -24,7 +24,7 @@ func TestConstructAnnounceMessage(test *testing.T) {
 func TestConstructChallengeMessage(test *testing.T) {
 	leader := p2p.Peer{Ip: "1", Port:"2"}
 	validator := p2p.Peer{Ip: "3", Port:"5"}
-	consensus := NewConsensus("1", "2", []p2p.Peer{leader, validator}, leader)
+	consensus := NewConsensus("1", "2", "0", []p2p.Peer{leader, validator}, leader)
 	consensus.blockHash = getBlockHash(make([]byte, 10))
 	msg := consensus.constructChallengeMessage()
 

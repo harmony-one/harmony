@@ -8,7 +8,7 @@ import (
 func TestNewConsensus(test *testing.T) {
 	leader := p2p.Peer{Ip: "1", Port:"2"}
 	validator := p2p.Peer{Ip: "3", Port:"5"}
-	consensus := NewConsensus("1", "2", []p2p.Peer{leader, validator}, leader)
+	consensus := NewConsensus("1", "2", "0", []p2p.Peer{leader, validator}, leader)
 	if consensus.consensusId != 0 {
 		test.Errorf("Consensus Id is initialized to the wrong value: %d", consensus.consensusId)
 	}
