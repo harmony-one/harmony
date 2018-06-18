@@ -36,8 +36,8 @@ func getLeader(myShardId string, config *[][]string) p2p.Peer {
 func getPeers(myIp, myPort, myShardId string, config *[][]string) []p2p.Peer {
 	var peerList []p2p.Peer
 	for _, node := range *config {
-		ip, port, status := node[0], node[1], node[2]
-		if status == "leader" || ip == myIp && port == myPort {
+		ip, port, status, shardId := node[0], node[1], node[2], node[3]
+		if status == "leader" || ip == myIp && port == myPort || myShardId != shardId {
 			continue
 		}
 		peer := p2p.Peer{Port: port, Ip: ip}
@@ -79,7 +79,7 @@ func main() {
 	}
 
 	log.Println("======================================")
-	log.Printf("This node is a %s node listening on ip: %s and port: %s\n", nodeStatus, *ip, *port)
+	log.Printf("This node is a %s node in shard %s listening on ip: %s and port: %s\n", nodeStatus, shardId, *ip, *port)
 	log.Println("======================================")
 
 	node := node.NewNode(&consensus)

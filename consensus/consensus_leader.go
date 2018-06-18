@@ -37,7 +37,7 @@ func (consensus *Consensus) ProcessMessageLeader(message []byte) {
 		log.Print(err)
 	}
 
-	log.Printf("[Leader] Received and processing message: %s\n", msgType)
+	log.Printf("[Leader-%d] Received and processing message: %s\n", consensus.ShardId, msgType)
 	switch msgType {
 	case ANNOUNCE:
 		log.Printf("Unexpected message type: %s", msgType)
@@ -287,7 +287,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 			// Set state to FINISHED
 			consensus.state = FINISHED
 			// TODO: do followups on the consensus
-			log.Printf("HOORAY!!! CONSENSUS REACHED AMONG %d NODES!!!\n", len(consensus.validators))
+			log.Printf("[Shard %d] HOORAY!!! CONSENSUS REACHED AMONG %d NODES WITH CONSENSUS ID %d!!!\n", consensus.ShardId, len(consensus.validators), consensus.consensusId)
 			consensus.ResetState()
 			consensus.consensusId++
 			consensus.ReadySignal <- 1

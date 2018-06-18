@@ -11,6 +11,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"log"
 )
 
 func newRandTransaction() blockchain.Transaction {
@@ -22,14 +23,14 @@ func newRandTransaction() blockchain.Transaction {
 	return tx
 }
 
-func getPeers(Ip, Port, config string) []p2p.Peer {
+func getValidators(config string) []p2p.Peer {
 	file, _ := os.Open(config)
 	fscanner := bufio.NewScanner(file)
 	var peerList []p2p.Peer
 	for fscanner.Scan() {
 		p := strings.Split(fscanner.Text(), " ")
 		ip, port, status := p[0], p[1], p[2]
-		if status == "leader" || ip == Ip && port == Port {
+		if status == "leader" {
 			continue
 		}
 		peer := p2p.Peer{Port: port, Ip: ip}
@@ -37,15 +38,39 @@ func getPeers(Ip, Port, config string) []p2p.Peer {
 	}
 	return peerList
 }
-func main() {
 
-	ip := flag.String("ip", "127.0.0.1", "IP of the leader")
-	port := flag.String("port", "9000", "port of the leader.")
+func getLeaders(config *[][]string) []p2p.Peer {
+	var peerList []p2p.Peer
+	for _, node := range *config {
+		ip, port, status := node[0], node[1], node[2]
+		if status == "leader" {
+			peerList = append(peerList, p2p.Peer{Ip: ip, Port: port})
+		}
+	}
+	return peerList
+}
+
+func readConfigFile(configFile string) [][]string{
+	file, _ := os.Open(configFile)
+	fscanner := bufio.NewScanner(file)
+
+	result := [][]string{}
+	for fscanner.Scan() {
+		p := strings.Split(fscanner.Text(), " ")
+		result = append(result, p)
+	}
+	return result
+}
+
+func main() {
 	configFile := flag.String("config_file", "local_config.txt", "file containing all ip addresses and config")
-	//getLeader to get ip,port and get totaltime I want to run
+	flag.Parse()
+	config := readConfigFile(*configFile)
+
 	start := time.Now()
 	totalTime := 60.0
 	txs := make([]blockchain.Transaction, 10)
+	leaders := getLeaders(&config)
 	for true {
 		t := time.Now()
 		if t.Sub(start).Seconds() >= totalTime {
@@ -57,13 +82,11 @@ func main() {
 
 		}
 		msg := node.ConstructTransactionListMessage(txs)
-		p2p.SendMessage(p2p.Peer{*ip, *port, "n/a"}, msg)
+		log.Printf("[Generator] Sending txs to %d leader[s]\n", len(leaders))
+		p2p.BroadcastMessage(leaders, msg)
 		time.Sleep(1 * time.Second) // 10 transactions per second
 	}
 	msg := node.ConstructStopMessage()
-	var leaderPeer p2p.Peer
-	leaderPeer.Ip = *ip
-	leaderPeer.Port = *port
-	peers := append(getPeers(*ip, *port, *configFile), leaderPeer)
+	peers := append(getValidators(*configFile), leaders...)
 	p2p.BroadcastMessage(peers, msg)
 }
