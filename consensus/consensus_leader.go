@@ -14,6 +14,7 @@ import (
 
 var mutex = &sync.Mutex{}
 
+// WaitForNewBlock waits for a new block.
 func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) {
 	for { // keep waiting for new blocks
 		newBlock := <-blockChannel
@@ -24,7 +25,7 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) 
 	}
 }
 
-// Leader's consensus message dispatcher
+// ProcessMessageLeader is the leader's consensus message dispatcher
 func (consensus *Consensus) ProcessMessageLeader(message []byte) {
 	msgType, err := GetConsensusMessageType(message)
 	if err != nil {
