@@ -2,11 +2,11 @@
 package consensus // consensus
 
 import (
-	"harmony-benchmark/p2p"
-	"regexp"
-	"log"
-	"strconv"
 	"harmony-benchmark/message"
+	"harmony-benchmark/p2p"
+	"log"
+	"regexp"
+	"strconv"
 )
 
 // Consensus data containing all info related to one consensus process
@@ -42,7 +42,7 @@ type Consensus struct {
 
 	//// Network related fields
 	msgCategory byte
-	actionType byte
+	actionType  byte
 }
 
 // Consensus state enum for both leader and validator
@@ -125,7 +125,6 @@ func NewConsensus(ip, port, shardId string, peers []p2p.Peer, leader p2p.Peer) C
 	consensus.actionType = byte(message.CONSENSUS)
 	return consensus
 }
-
 
 // Reset the state of the consensus
 func (consensus *Consensus) ResetState() {

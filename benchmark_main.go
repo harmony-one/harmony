@@ -1,13 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"harmony-benchmark/consensus"
-	"harmony-benchmark/p2p"
 	"harmony-benchmark/node"
+	"harmony-benchmark/p2p"
 	"log"
 	"os"
-	"bufio"
 	"strings"
 )
 
@@ -25,7 +25,7 @@ func getLeader(myShardId string, config *[][]string) p2p.Peer {
 	var leaderPeer p2p.Peer
 	for _, node := range *config {
 		ip, port, status, shardId := node[0], node[1], node[2], node[3]
-		if status == "leader" && myShardId == shardId{
+		if status == "leader" && myShardId == shardId {
 			leaderPeer.Ip = ip
 			leaderPeer.Port = port
 		}
@@ -46,7 +46,7 @@ func getPeers(myIp, myPort, myShardId string, config *[][]string) []p2p.Peer {
 	return peerList
 }
 
-func readConfigFile(configFile string) [][]string{
+func readConfigFile(configFile string) [][]string {
 	file, _ := os.Open(configFile)
 	fscanner := bufio.NewScanner(file)
 

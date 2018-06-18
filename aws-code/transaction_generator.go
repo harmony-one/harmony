@@ -7,11 +7,11 @@ import (
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/node"
 	"harmony-benchmark/p2p"
+	"log"
 	"math/rand"
 	"os"
 	"strings"
 	"time"
-	"log"
 )
 
 func newRandTransaction() blockchain.Transaction {
@@ -50,7 +50,7 @@ func getLeaders(config *[][]string) []p2p.Peer {
 	return peerList
 }
 
-func readConfigFile(configFile string) [][]string{
+func readConfigFile(configFile string) [][]string {
 	file, _ := os.Open(configFile)
 	fscanner := bufio.NewScanner(file)
 
