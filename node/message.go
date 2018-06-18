@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"harmony-benchmark/blockchain"
-	"harmony-benchmark/message"
+	"harmony-benchmark/common"
 )
 
 type TransactionMessageType int
@@ -21,8 +21,8 @@ const (
 
 //ConstructTransactionListMessage constructs serialized transactions
 func ConstructTransactionListMessage(transactions []blockchain.Transaction) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(message.NODE)})
-	byteBuffer.WriteByte(byte(message.TRANSACTION))
+	byteBuffer := bytes.NewBuffer([]byte{byte(common.NODE)})
+	byteBuffer.WriteByte(byte(common.TRANSACTION))
 	byteBuffer.WriteByte(byte(SEND))
 	encoder := gob.NewEncoder(byteBuffer)
 	encoder.Encode(transactions)
@@ -31,8 +31,8 @@ func ConstructTransactionListMessage(transactions []blockchain.Transaction) []by
 
 //ConstructStopMessage is  STOP message
 func ConstructStopMessage() []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(message.NODE)})
-	byteBuffer.WriteByte(byte(message.CONTROL))
+	byteBuffer := bytes.NewBuffer([]byte{byte(common.NODE)})
+	byteBuffer.WriteByte(byte(common.CONTROL))
 	byteBuffer.WriteByte(byte(STOP))
 	return byteBuffer.Bytes()
 }

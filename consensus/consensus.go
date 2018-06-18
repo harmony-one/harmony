@@ -2,7 +2,7 @@
 package consensus // consensus
 
 import (
-	"harmony-benchmark/message"
+	"harmony-benchmark/common"
 	"harmony-benchmark/p2p"
 	"log"
 	"regexp"
@@ -121,8 +121,8 @@ func NewConsensus(ip, port, shardId string, peers []p2p.Peer, leader p2p.Peer) C
 		}()
 	}
 
-	consensus.msgCategory = byte(message.COMMITTEE)
-	consensus.actionType = byte(message.CONSENSUS)
+	consensus.msgCategory = byte(common.COMMITTEE)
+	consensus.actionType = byte(common.CONSENSUS)
 	return consensus
 }
 

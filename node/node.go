@@ -5,7 +5,7 @@ import (
 	"encoding/gob"
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/consensus"
-	"harmony-benchmark/message"
+	"harmony-benchmark/common"
 	"harmony-benchmark/p2p"
 	"log"
 	"net"
@@ -60,7 +60,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 		return
 	}
 
-	msgCategory, err := message.GetMessageCategory(content)
+	msgCategory, err := common.GetMessageCategory(content)
 	if err != nil {
 		if consensus.IsLeader {
 			log.Printf("[Leader] Read node type failed:%s", err)
@@ -70,7 +70,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 		return
 	}
 
-	msgType, err := message.GetMessageType(content)
+	msgType, err := common.GetMessageType(content)
 	if err != nil {
 		if consensus.IsLeader {
 			log.Printf("[Leader] Read action type failed:%s", err)
@@ -80,7 +80,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 		return
 	}
 
-	msgPayload, err := message.GetMessagePayload(content)
+	msgPayload, err := common.GetMessagePayload(content)
 	if err != nil {
 		if consensus.IsLeader {
 			log.Printf("[Leader] Read message payload failed:%s", err)
@@ -91,20 +91,20 @@ func (node *Node) NodeHandler(conn net.Conn) {
 	}
 
 	switch msgCategory {
-	case message.COMMITTEE:
-		actionType := message.CommitteeMessageType(msgType)
+	case common.COMMITTEE:
+		actionType := common.CommitteeMessageType(msgType)
 		switch actionType {
-		case message.CONSENSUS:
+		case common.CONSENSUS:
 			if consensus.IsLeader {
 				consensus.ProcessMessageLeader(msgPayload)
 			} else {
 				consensus.ProcessMessageValidator(msgPayload)
 			}
 		}
-	case message.NODE:
-		actionType := message.NodeMessageType(msgType)
+	case common.NODE:
+		actionType := common.NodeMessageType(msgType)
 		switch actionType {
-		case message.TRANSACTION:
+		case common.TRANSACTION:
 			txDecoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the SEND messge type
 
 			txList := new([]blockchain.Transaction)
@@ -114,7 +114,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 			}
 			node.pendingTransactions = append(node.pendingTransactions, *txList...)
 			log.Println(len(node.pendingTransactions))
-		case message.CONTROL:
+		case common.CONTROL:
 			controlType := msgPayload[0]
 			if ControlMessageType(controlType) == STOP {
 				log.Println("Stopping Node")
