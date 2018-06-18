@@ -161,13 +161,13 @@ func (bc *Blockchain) VerifyNewBlockAndUpdate(utxopool *UTXOPool, block *Block) 
 }
 
 // CreateBlockchain creates a new blockchain DB
-func CreateBlockchain(address string) (*Blockchain, *UTXOPool) {
+func CreateBlockchain(address string) *Blockchain {
 	// TODO: We assume we have not created any blockchain before.
 	// In current bitcoin, we can check if we created a blockchain before accessing local db.
-	cbtx, utxoPool := NewCoinbaseTX(address, genesisCoinbaseData)
+	cbtx := NewCoinbaseTX(address, genesisCoinbaseData)
 	genesis := NewGenesisBlock(cbtx)
 
 	bc := Blockchain{[]*Block{genesis}}
 
-	return &bc, utxoPool
+	return &bc
 }
