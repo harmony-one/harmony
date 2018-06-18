@@ -74,7 +74,7 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	consensus.blockHash = blockHash
 	// verify block data
 	if consensusId != consensus.consensusId {
-		log.Println("Received message with consensus Id: %s. My consensus Id: %s", consensusId, consensus.consensusId)
+		log.Printf("Received message with consensus Id: %d. My consensus Id: %d\n", consensusId, consensus.consensusId)
 		return
 	}
 	// sign block
@@ -164,7 +164,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 
 	// verify block data and the aggregated signatures
 	if consensusId != consensus.consensusId {
-		log.Println("Received message with consensus Id: %s. My consensus Id: %s", consensusId, consensus.consensusId)
+		log.Printf("Received message with consensus Id: %d. My consensus Id: %d\n", consensusId, consensus.consensusId)
 		return
 	}
 
