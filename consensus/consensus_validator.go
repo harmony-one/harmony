@@ -73,7 +73,10 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 
 	consensus.blockHash = blockHash
 	// verify block data
-
+	if consensusId != consensus.consensusId {
+		log.Println("Received message with consensus Id: %s. My consensus Id: %s", consensusId, consensus.consensusId)
+		return
+	}
 	// sign block
 
 	// TODO: return the signature(commit) to leader
@@ -160,6 +163,10 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 	_ = signature
 
 	// verify block data and the aggregated signatures
+	if consensusId != consensus.consensusId {
+		log.Println("Received message with consensus Id: %s. My consensus Id: %s", consensusId, consensus.consensusId)
+		return
+	}
 
 	// sign the message
 
@@ -170,6 +177,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 
 	// Set state to RESPONSE_DONE
 	consensus.state = RESPONSE_DONE
+	consensus.consensusId++
 }
 
 // Construct the response message to send to leader (assumption the consensus data is already verified)

@@ -289,6 +289,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 			// TODO: do followups on the consensus
 			log.Printf("HOORAY!!! CONSENSUS REACHED AMONG %d NODES!!!\n", len(consensus.validators))
 			consensus.ResetState()
+			consensus.consensusId++
 			consensus.ReadySignal <- 1
 		}
 		// TODO: composes new block and broadcast the new block to validators
