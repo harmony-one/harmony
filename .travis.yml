@@ -7,6 +7,7 @@ install:
   - rsync -az ${TRAVIS_BUILD_DIR}/ $HOME/gopath/src/harmony-benchmark/
   - export TRAVIS_BUILD_DIR=$HOME/gopath/src/harmony-benchmark
   - cd $HOME/gopath/src/harmony-benchmark
+  - go get github.com/go-stack/stack
   - go build
 notifications:
   slack:
