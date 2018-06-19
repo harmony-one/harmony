@@ -191,7 +191,7 @@ func CreateUTXOPoolFromTransaction(tx *Transaction) *UTXOPool {
 
 // CreateUTXOPoolFromGenesisBlockChain a utxo pool from a genesis blockchain.
 func CreateUTXOPoolFromGenesisBlockChain(bc *Blockchain) *UTXOPool {
-	tx := bc.blocks[0].Transactions[0]
+	tx := bc.Blocks[0].Transactions[0]
 	return CreateUTXOPoolFromTransaction(tx)
 }
 
