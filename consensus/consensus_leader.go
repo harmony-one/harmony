@@ -10,10 +10,13 @@ import (
 	"fmt"
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/p2p"
+	"crypto/sha256"
+	"strings"
 )
 
 var mutex = &sync.Mutex{}
 
+// WaitForNewBlock waits for a new block.
 func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) {
 	for { // keep waiting for new blocks
 		newBlock := <-blockChannel
@@ -24,7 +27,7 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) 
 	}
 }
 
-// Leader's consensus message dispatcher
+// ProcessMessageLeader is the leader's consensus message dispatcher
 func (consensus *Consensus) ProcessMessageLeader(message []byte) {
 	msgType, err := GetConsensusMessageType(message)
 	if err != nil {
@@ -36,7 +39,7 @@ func (consensus *Consensus) ProcessMessageLeader(message []byte) {
 		log.Print(err)
 	}
 
-	log.Printf("[Leader] Received and processing message: %s\n", msgType)
+	log.Printf("[Leader-%d] Received and processing message: %s\n", consensus.ShardId, msgType)
 	switch msgType {
 	case ANNOUNCE:
 		log.Printf("Unexpected message type: %s", msgType)
@@ -63,7 +66,7 @@ func (consensus *Consensus) startConsensus(newBlock *blockchain.Block) {
 	// prepare message and broadcast to validators
 	// Construct new block
 	//newBlock := constructNewBlock()
-	consensus.blockHash = newBlock.Hash
+	copy(newBlock.Hash[:32], consensus.blockHash[:])
 
 	msgToSend, err := consensus.constructAnnounceMessage()
 	if err != nil {
@@ -87,7 +90,7 @@ func (consensus Consensus) constructAnnounceMessage() ([]byte, error) {
 	if len(consensus.blockHash) != 32 {
 		return buffer.Bytes(), errors.New(fmt.Sprintf("Block Hash size is %d bytes", len(consensus.blockHash)))
 	}
-	buffer.Write(consensus.blockHash)
+	buffer.Write(consensus.blockHash[:])
 
 	// 2 byte leader id
 	twoBytes := make([]byte, 2)
@@ -110,14 +113,9 @@ func (consensus Consensus) constructAnnounceMessage() ([]byte, error) {
 	return consensus.ConstructConsensusMessage(ANNOUNCE, buffer.Bytes()), nil
 }
 
-// TODO: fill in this function
-func constructNewBlock() []byte {
-	return make([]byte, 200)
-}
-
-// TODO: fill in this function
-func getBlockHash(block []byte) []byte {
-	return make([]byte, 32)
+// Get the hash of a block's byte stream
+func getBlockHash(block []byte) [32]byte {
+	return sha256.Sum256(block)
 }
 
 // TODO: fill in this function
@@ -125,9 +123,10 @@ func getBlockHeader() []byte {
 	return make([]byte, 200)
 }
 
-// TODO: fill in this function
 func signMessage(message []byte) []byte {
-	return make([]byte, 64)
+	// TODO: implement real ECC signature
+	mockSignature := sha256.Sum256(message)
+	return append(mockSignature[:], mockSignature[:]...)
 }
 
 func (consensus *Consensus) processCommitMessage(payload []byte) {
@@ -198,7 +197,7 @@ func (consensus Consensus) constructChallengeMessage() []byte {
 	buffer.Write(fourBytes)
 
 	// 32 byte block hash
-	buffer.Write(consensus.blockHash)
+	buffer.Write(consensus.blockHash[:])
 
 	// 2 byte leader id
 	twoBytes := make([]byte, 2)
@@ -206,10 +205,10 @@ func (consensus Consensus) constructChallengeMessage() []byte {
 	buffer.Write(twoBytes)
 
 	// 33 byte aggregated commit
-	buffer.Write(getAggregatedCommit())
+	buffer.Write(getAggregatedCommit(consensus.commits))
 
 	// 33 byte aggregated key
-	buffer.Write(getAggregatedKey())
+	buffer.Write(getAggregatedKey(consensus.commits))
 
 	// 32 byte challenge
 	buffer.Write(getChallenge())
@@ -221,18 +220,30 @@ func (consensus Consensus) constructChallengeMessage() []byte {
 	return consensus.ConstructConsensusMessage(CHALLENGE, buffer.Bytes())
 }
 
-// TODO: fill in this function
-func getAggregatedCommit() []byte {
-	return make([]byte, 33)
+func getAggregatedCommit(commits map[string]string) []byte {
+	// TODO: implement actual commit aggregation
+	var commitArray []string
+	for _, val := range commits {
+		commitArray = append(commitArray, val)
+	}
+	var commit [32]byte
+	commit = sha256.Sum256([]byte(strings.Join(commitArray, "")))
+	return append(commit[:], byte(0))
 }
 
-// TODO: fill in this function
-func getAggregatedKey() []byte {
-	return make([]byte, 33)
+func getAggregatedKey(commits map[string]string) []byte {
+	// TODO: implement actual key aggregation
+	var commitArray []string
+	for key := range commits {
+		commitArray = append(commitArray, key)
+	}
+	var commit [32]byte
+	commit = sha256.Sum256([]byte(strings.Join(commitArray, "")))
+	return append(commit[:], byte(0))
 }
 
-// TODO: fill in this function
 func getChallenge() []byte {
+	// TODO: implement actual challenge data
 	return make([]byte, 32)
 }
 
@@ -286,8 +297,9 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 			// Set state to FINISHED
 			consensus.state = FINISHED
 			// TODO: do followups on the consensus
-			log.Printf("HOORAY!!! CONSENSUS REACHED AMONG %d NODES!!!\n", len(consensus.validators))
+			log.Printf("[Shard %d] HOORAY!!! CONSENSUS REACHED AMONG %d NODES WITH CONSENSUS ID %d!!!\n", consensus.ShardId, len(consensus.validators), consensus.consensusId)
 			consensus.ResetState()
+			consensus.consensusId++
 			consensus.ReadySignal <- 1
 		}
 		// TODO: composes new block and broadcast the new block to validators

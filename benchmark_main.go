@@ -1,24 +1,31 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"harmony-benchmark/consensus"
-	"harmony-benchmark/p2p"
 	"harmony-benchmark/node"
+	"harmony-benchmark/p2p"
 	"log"
 	"os"
-	"bufio"
 	"strings"
 )
 
-func getLeader(iplist string) p2p.Peer {
-	file, _ := os.Open(iplist)
-	fscanner := bufio.NewScanner(file)
+func getShardId(myIp, myPort string, config *[][]string) string {
+	for _, node := range *config {
+		ip, port, shardId := node[0], node[1], node[3]
+		if ip == myIp && port == myPort {
+			return shardId
+		}
+	}
+	return "N/A"
+}
+
+func getLeader(myShardId string, config *[][]string) p2p.Peer {
 	var leaderPeer p2p.Peer
-	for fscanner.Scan() {
-		p := strings.Split(fscanner.Text(), " ")
-		ip, port, status := p[0], p[1], p[2]
-		if status == "leader" {
+	for _, node := range *config {
+		ip, port, status, shardId := node[0], node[1], node[2], node[3]
+		if status == "leader" && myShardId == shardId {
 			leaderPeer.Ip = ip
 			leaderPeer.Port = port
 		}
@@ -26,14 +33,11 @@ func getLeader(iplist string) p2p.Peer {
 	return leaderPeer
 }
 
-func getPeers(Ip, Port, iplist string) []p2p.Peer {
-	file, _ := os.Open(iplist)
-	fscanner := bufio.NewScanner(file)
+func getPeers(myIp, myPort, myShardId string, config *[][]string) []p2p.Peer {
 	var peerList []p2p.Peer
-	for fscanner.Scan() {
-		p := strings.Split(fscanner.Text(), " ")
-		ip, port, status := p[0], p[1], p[2]
-		if status == "leader" || ip == Ip && port == Port {
+	for _, node := range *config {
+		ip, port, status, shardId := node[0], node[1], node[2], node[3]
+		if status == "leader" || ip == myIp && port == myPort || myShardId != shardId {
 			continue
 		}
 		peer := p2p.Peer{Port: port, Ip: ip}
@@ -42,13 +46,31 @@ func getPeers(Ip, Port, iplist string) []p2p.Peer {
 	return peerList
 }
 
+func readConfigFile(configFile string) [][]string {
+	file, _ := os.Open(configFile)
+	fscanner := bufio.NewScanner(file)
+
+	result := [][]string{}
+	for fscanner.Scan() {
+		p := strings.Split(fscanner.Text(), " ")
+		result = append(result, p)
+	}
+	return result
+}
+
 func main() {
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9000", "port of the node.")
-	ipfile := flag.String("ipfile", "iplist.txt", "file containing all ip addresses")
+	configFile := flag.String("config_file", "config.txt", "file containing all ip addresses")
 	flag.Parse()
 
-	consensus := consensus.NewConsensus(*ip, *port, getPeers(*ip, *port, *ipfile), getLeader(*ipfile))
+	config := readConfigFile(*configFile)
+	shardId := getShardId(*ip, *port, &config)
+	peers := getPeers(*ip, *port, shardId, &config)
+	leader := getLeader(shardId, &config)
+
+	consensus := consensus.NewConsensus(*ip, *port, shardId, peers, leader)
+
 	var nodeStatus string
 	if consensus.IsLeader {
 		nodeStatus = "leader"
@@ -57,7 +79,7 @@ func main() {
 	}
 
 	log.Println("======================================")
-	log.Printf("This node is a %s node listening on ip: %s and port: %s\n", nodeStatus, *ip, *port)
+	log.Printf("This node is a %s node in shard %s listening on ip: %s and port: %s\n", nodeStatus, shardId, *ip, *port)
 	log.Println("======================================")
 
 	node := node.NewNode(&consensus)
