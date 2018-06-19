@@ -58,7 +58,6 @@ func (node *Node) listenOnPort(port string) {
 	}
 }
 
-
 func (node *Node) String() string {
 	return node.consensus.String()
 }
@@ -66,14 +65,22 @@ func (node *Node) String() string {
 // Create a new Node
 func NewNode(consensus *consensus.Consensus) Node {
 	node := Node{}
+
+	// Consensus and associated channel to communicate blocks
 	node.consensus = consensus
 	node.BlockChannel = make(chan blockchain.Block)
 
+	// Genesis Block
+	genesisBlock := &blockchain.Blockchain{}
+	genesisBlock.Blocks = make([]*blockchain.Block, 0)
 	coinbaseTx := blockchain.NewCoinbaseTX("harmony", "1")
-	node.blockchain = &blockchain.Blockchain{}
-	node.blockchain.Blocks = make([]*blockchain.Block, 0)
-	node.blockchain.Blocks = append(node.blockchain.Blocks, blockchain.NewGenesisBlock(coinbaseTx))
+	genesisBlock.Blocks = append(genesisBlock.Blocks, blockchain.NewGenesisBlock(coinbaseTx))
+	node.blockchain = genesisBlock
+
+	// UTXO pool from Genesis block
 	node.utxoPool = blockchain.CreateUTXOPoolFromGenesisBlockChain(node.blockchain)
+
+	// Logger
 	node.log = node.consensus.Log
 	node.log.Debug("New node", "node", node)
 	return node

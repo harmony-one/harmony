@@ -18,7 +18,6 @@ func (consensus *Consensus) ProcessMessageValidator(message []byte) {
 		consensus.Log.Error("Failed to get consensus message payload", "err", err, "consensus", consensus)
 	}
 
-	consensus.Log.Info("Received and processing message", "msgType", msgType, "consensus", consensus, "consensus", consensus)
 	switch msgType {
 	case ANNOUNCE:
 		consensus.processAnnounceMessage(payload)
@@ -73,7 +72,7 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	copy(blockHash[:32], consensus.blockHash[:])
 	// verify block data
 	if consensusId != consensus.consensusId {
-		consensus.Log.Debug("Received message", "fromConsensus", consensus, "myConsensus", consensus)
+		consensus.Log.Debug("Received message", "fromConsensus", consensus)
 		return
 	}
 	// sign block
@@ -163,7 +162,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 
 	// verify block data and the aggregated signatures
 	if consensusId != consensus.consensusId {
-		consensus.Log.Debug("Received message", "fromConsensus", consensusId, "consensus", consensus)
+		consensus.Log.Debug("Received message", "fromConsensus", consensusId)
 		return
 	}
 

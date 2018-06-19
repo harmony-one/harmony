@@ -39,7 +39,6 @@ func (consensus *Consensus) ProcessMessageLeader(message []byte) {
 		consensus.Log.Error("Failed to get consensus message payload.", "err", err, "consensus", consensus)
 	}
 
-	consensus.Log.Debug("Received and processing message", "sharedId", consensus.ShardId, "msgType", msgType, "consensus", consensus)
 	switch msgType {
 	case ANNOUNCE:
 		consensus.Log.Error("Unexpected message type", "msgType", msgType, "consensus", consensus)
@@ -165,7 +164,7 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 	shouldProcess := !ok && consensus.state == ANNOUNCE_DONE
 	if shouldProcess {
 		consensus.commits[validatorId] = validatorId
-		consensus.Log.Debug("Commits received", "numOfCommits", len(consensus.commits), "consensus", consensus)
+		//consensus.Log.Debug("Number of commits received", "count", len(consensus.commits))
 	}
 	mutex.Unlock()
 
@@ -175,7 +174,7 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 
 	mutex.Lock()
 	if len(consensus.commits) >= (2*len(consensus.validators))/3+1 {
-		consensus.Log.Debug("Enough commits received with signatures", "numOfSignatures", len(consensus.commits), "consensus", consensus)
+		consensus.Log.Debug("Enough commits received with signatures", "numOfSignatures", len(consensus.commits))
 		if consensus.state == ANNOUNCE_DONE {
 			// Set state to CHALLENGE_DONE
 			consensus.state = CHALLENGE_DONE
@@ -282,7 +281,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 	shouldProcess := !ok && consensus.state == CHALLENGE_DONE
 	if shouldProcess {
 		consensus.responses[validatorId] = validatorId
-		consensus.Log.Debug("Number of responses received", "count", len(consensus.responses), "consensus", consensus)
+		//consensus.Log.Debug("Number of responses received", "count", len(consensus.responses))
 	}
 	mutex.Unlock()
 
@@ -292,13 +291,13 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 
 	mutex.Lock()
 	if len(consensus.responses) >= (2*len(consensus.validators))/3+1 {
-		consensus.Log.Debug("Consensus reached with signatures.", "numOfSignatures", len(consensus.responses), "consensus", consensus)
+		consensus.Log.Debug("Consensus reached with signatures.", "numOfSignatures", len(consensus.responses))
 		if consensus.state == CHALLENGE_DONE {
 			// Set state to FINISHED
 			consensus.state = FINISHED
 			// TODO: do followups on the consensus
 
-			consensus.Log.Debug("HOORAY!!! CONSENSUS REACHED!!!", "numOfNodes", len(consensus.validators), "consensus", consensus)
+			consensus.Log.Debug("HOORAY!!! CONSENSUS REACHED!!!", "numOfNodes", len(consensus.validators))
 
 			consensus.ResetState()
 			consensus.consensusId++

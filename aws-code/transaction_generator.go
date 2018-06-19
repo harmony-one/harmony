@@ -64,12 +64,13 @@ func readConfigFile(configFile string) [][]string {
 
 func main() {
 	configFile := flag.String("config_file", "local_config.txt", "file containing all ip addresses and config")
+	numTxsPerBatch := flag.Int("num_txs_per_batch", 100, "number of transactions to send per message")
 	flag.Parse()
 	config := readConfigFile(*configFile)
 
 	start := time.Now()
 	totalTime := 60.0
-	txs := make([]blockchain.Transaction, 10)
+	txs := make([]blockchain.Transaction, *numTxsPerBatch)
 	leaders := getLeaders(&config)
 	for true {
 		t := time.Now()
