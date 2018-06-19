@@ -132,7 +132,7 @@ func (utxopool *UTXOPool) VerifyOneTransactionAndUpdate(tx *Transaction) bool {
         utxopool.Update(tx)
         return true
     }
-    retur false
+    return false
 }
 
 // VerifyAndUpdate verifies a list of transactions and update utxoPool.

@@ -2,8 +2,6 @@
 package consensus // consensus
 
 import (
-	"fmt"
-	"harmony-benchmark/message"
 	"harmony-benchmark/common"
 	"harmony-benchmark/p2p"
 	"log"
