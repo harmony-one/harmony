@@ -18,6 +18,8 @@ type Node struct {
 	consensus           *consensus.Consensus
 	BlockChannel        chan blockchain.Block
 	pendingTransactions []blockchain.Transaction
+	blockchain          *blockchain.Blockchain
+	utxoPool            *blockchain.UTXOPool
 	log                 log.Logger
 }
 
@@ -182,9 +184,13 @@ func NewNode(consensus *consensus.Consensus) Node {
 	node := Node{}
 	node.consensus = consensus
 	node.BlockChannel = make(chan blockchain.Block)
+
+	coinbaseTx := blockchain.NewCoinbaseTX("harmony", "1")
+	node.blockchain = &blockchain.Blockchain{}
+	node.blockchain.Blocks = make([]*blockchain.Block, 0)
+	node.blockchain.Blocks = append(node.blockchain.Blocks, blockchain.NewGenesisBlock(coinbaseTx))
+	node.utxoPool = blockchain.CreateUTXOPoolFromGenesisBlockChain(node.blockchain)
 	node.log = node.consensus.Log
-
 	node.log.Debug("New node", "node", node)
-
 	return node
 }

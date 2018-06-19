@@ -16,8 +16,7 @@ func TestVerifyOneTransactionAndUpdate(t *testing.T) {
 		t.Error("failed to create a new transaction.")
 	}
 
-	// if utxoPool.VerifyOneTransaction(tx) {
-	// 	t.Error("failed to verify a valid transaction.")
-	// }
-
+	if !utxoPool.VerifyOneTransaction(tx) {
+		t.Error("failed to verify a valid transaction.")
+	}
 }
