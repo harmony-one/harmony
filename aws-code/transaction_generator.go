@@ -5,9 +5,9 @@ import (
 	"flag"
 	"fmt"
 	"harmony-benchmark/blockchain"
+	"harmony-benchmark/log"
 	"harmony-benchmark/node"
 	"harmony-benchmark/p2p"
-	"log"
 	"math/rand"
 	"os"
 	"strings"
@@ -82,7 +82,7 @@ func main() {
 
 		}
 		msg := node.ConstructTransactionListMessage(txs)
-		log.Printf("[Generator] Sending txs to %d leader[s]\n", len(leaders))
+		log.Debug("[Generator] Sending txs to leader[s]", "numOfLeader", len(leaders))
 		p2p.BroadcastMessage(leaders, msg)
 		time.Sleep(1 * time.Second) // 10 transactions per second
 	}

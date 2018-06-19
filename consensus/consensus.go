@@ -44,7 +44,7 @@ type Consensus struct {
 	//// Network related fields
 	msgCategory byte
 	actionType  byte
-	
+
 	Log log.Logger
 }
 
@@ -101,7 +101,7 @@ func NewConsensus(ip, port, shardId string, peers []p2p.Peer, leader p2p.Peer) C
 
 	reg, err := regexp.Compile("[^0-9]+")
 	if err != nil {
-		consensus.Log.Crit("Regex Compilation Failed", "err", err)
+		consensus.Log.Crit("Regex Compilation Failed", "err", err, "consensus", consensus)
 	}
 	consensus.consensusId = 0
 	myShardId, err := strconv.Atoi(shardId)
@@ -139,12 +139,12 @@ func (consensus *Consensus) ResetState() {
 }
 
 // Returns ID of this consensus
-func (consensus *Consensus) GetIdentityString() string {
+func (consensus *Consensus) String() string {
 	var duty string
 	if consensus.IsLeader {
 		duty = "LDR" // leader
 	} else {
-		duty = "SLV" // slave
+		duty = "VLD" // validator
 	}
-	return fmt.Sprintf("[%s, %s, %v]", duty, consensus.priKey, consensus.nodeId)
+	return fmt.Sprintf("[%s, %s, %v, %v]", duty, consensus.priKey, consensus.ShardId, consensus.nodeId)
 }
