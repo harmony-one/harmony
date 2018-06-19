@@ -48,7 +48,6 @@ func ReadMessageContent(conn net.Conn) ([]byte, error) {
 	}
 	// TODO: check on msgType and take actions accordingly
 
-
 	//// Read 4 bytes for message size
 	fourBytes := make([]byte, 4)
 	n, err := r.Read(fourBytes)

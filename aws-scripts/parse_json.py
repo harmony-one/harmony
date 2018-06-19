@@ -9,7 +9,7 @@ def get_public_ip(all_reservations):
 		all_public_ip_addresses.append(instance_information['PublicIpAddress'])
 	return all_public_ip_addresses
 
-def make_peers_list(all_reservations,port="9001",filename="ipList.txt"):
+def make_peers_list(all_reservations,port="9001",filename="config.txt"):
 	p = get_public_ip(all_reservations)
 	f = open(filename,"w")
 	for i in range(len(p)):

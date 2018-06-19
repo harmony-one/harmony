@@ -1,4 +1,4 @@
-package message
+package common
 
 import (
 	"errors"
@@ -26,7 +26,7 @@ n - 2 bytes       - actual message payload
 const NODE_TYPE_BYTES = 1
 const ACTION_TYPE_BYTES = 1
 
-// The category of messages
+// The CATEGORY of messages
 type MessageCategory byte
 
 const (
@@ -35,7 +35,8 @@ const (
 	// TODO: add more types
 )
 
-// The specific types of message under committee category
+
+// The specific types of message under COMMITTEE category
 type CommitteeMessageType byte
 
 const (
@@ -43,7 +44,7 @@ const (
 	// TODO: add more types
 )
 
-// The specific types of message under node category
+// The specific types of message under NODE category
 type NodeMessageType byte
 
 const (
@@ -51,6 +52,7 @@ const (
 	CONTROL
 	// TODO: add more types
 )
+
 
 // Get the message category from the p2p message content
 func GetMessageCategory(message []byte) (MessageCategory, error) {

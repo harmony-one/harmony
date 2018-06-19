@@ -14,9 +14,9 @@ echo "Inside deploy linux"
 echo $GOPATH
 echo "Inside deploy linux line 2"
 
-ipfile=$1
+config=$1
 while read ip port mode; do 
-	#echo $ip $port $mode $ipfile
-  go run ./benchmark_main.go -ip $ip -port $port -ipfile $ipfile&
-done < $ipfile
-go run ./aws-code/transaction_generator.go -ipfile $ipfile
+	#echo $ip $port $mode $config
+  go run ./benchmark_main.go -ip $ip -port $port -config_file $config&
+done < $config
+go run ./aws-code/transaction_generator.go -config_file $config

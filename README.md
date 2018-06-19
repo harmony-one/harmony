@@ -16,7 +16,7 @@ git clone git@github.com:simple-rules/harmony-benchmark.git
 ## Usage
 ```
 
-./deploy.sh local_iplist.txt
+./deploy.sh local_config.txt
 
 ./send_txn.sh
 ```

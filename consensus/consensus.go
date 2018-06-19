@@ -4,6 +4,7 @@ package consensus // consensus
 import (
 	"fmt"
 	"harmony-benchmark/message"
+	"harmony-benchmark/common"
 	"harmony-benchmark/p2p"
 	"log"
 	"regexp"
@@ -32,9 +33,11 @@ type Consensus struct {
 	// Consensus Id (View Id) - 4 byte
 	consensusId uint32
 	// Blockhash - 32 byte
-	blockHash []byte
+	blockHash [32]byte
 	// BlockHeader to run consensus on
 	blockHeader []byte
+	// Shard Id which this node belongs to
+	ShardId uint32
 
 	// Signal channel for starting a new consensus process
 	ReadySignal chan int
@@ -77,7 +80,7 @@ func (state ConsensusState) String() string {
 }
 
 // Create a new Consensus object
-func NewConsensus(ip, port string, peers []p2p.Peer, leader p2p.Peer) Consensus {
+func NewConsensus(ip, port, shardId string, peers []p2p.Peer, leader p2p.Peer) Consensus {
 	// The first Ip, port passed will be leader.
 	consensus := Consensus{}
 	peer := p2p.Peer{Port: port, Ip: ip}
@@ -100,6 +103,11 @@ func NewConsensus(ip, port string, peers []p2p.Peer, leader p2p.Peer) Consensus 
 		log.Fatal(err)
 	}
 	consensus.consensusId = 0
+	myShardId, err := strconv.Atoi(shardId)
+	if err != nil {
+		panic("Unparseable shard Id" + shardId)
+	}
+	consensus.ShardId = uint32(myShardId)
 
 	// For now use socket address as 16 byte Id
 	// TODO: populate with correct Id
@@ -115,8 +123,8 @@ func NewConsensus(ip, port string, peers []p2p.Peer, leader p2p.Peer) Consensus 
 		}()
 	}
 
-	consensus.msgCategory = byte(message.COMMITTEE)
-	consensus.actionType = byte(message.CONSENSUS)
+	consensus.msgCategory = byte(common.COMMITTEE)
+	consensus.actionType = byte(common.CONSENSUS)
 	return consensus
 }
 
@@ -126,7 +134,6 @@ func (consensus *Consensus) ResetState() {
 	consensus.commits = make(map[string]string)
 	consensus.responses = make(map[string]string)
 }
-
 // Returns ID of this consensus
 func (consensus *Consensus) GetIdentityString() string {
 	var duty string

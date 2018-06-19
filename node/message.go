@@ -4,35 +4,47 @@ import (
 	"bytes"
 	"encoding/gob"
 	"harmony-benchmark/blockchain"
-	"harmony-benchmark/message"
+	"harmony-benchmark/common"
 )
 
+// The types of messages used for NODE/TRANSACTION
 type TransactionMessageType int
-
 const (
 	SEND TransactionMessageType = iota
+	REQUEST
 )
 
+// The types of messages used for NODE/CONTROL
 type ControlMessageType int
-
 const (
 	STOP ControlMessageType = iota
 )
 
 //ConstructTransactionListMessage constructs serialized transactions
 func ConstructTransactionListMessage(transactions []blockchain.Transaction) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(message.NODE)})
-	byteBuffer.WriteByte(byte(message.TRANSACTION))
+	byteBuffer := bytes.NewBuffer([]byte{byte(common.NODE)})
+	byteBuffer.WriteByte(byte(common.TRANSACTION))
 	byteBuffer.WriteByte(byte(SEND))
 	encoder := gob.NewEncoder(byteBuffer)
 	encoder.Encode(transactions)
 	return byteBuffer.Bytes()
 }
 
+//ConstructTransactionListMessage constructs serialized transactions
+func ConstructRequestTransactionsMessage(transactionIds [][]byte) []byte {
+	byteBuffer := bytes.NewBuffer([]byte{byte(common.NODE)})
+	byteBuffer.WriteByte(byte(common.TRANSACTION))
+	byteBuffer.WriteByte(byte(REQUEST))
+	for _, txId := range transactionIds {
+		byteBuffer.Write(txId)
+	}
+	return byteBuffer.Bytes()
+}
+
 //ConstructStopMessage is  STOP message
 func ConstructStopMessage() []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(message.NODE)})
-	byteBuffer.WriteByte(byte(message.CONTROL))
+	byteBuffer := bytes.NewBuffer([]byte{byte(common.NODE)})
+	byteBuffer.WriteByte(byte(common.CONTROL))
 	byteBuffer.WriteByte(byte(STOP))
 	return byteBuffer.Bytes()
 }
