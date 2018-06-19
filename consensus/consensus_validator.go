@@ -4,33 +4,32 @@ import (
 	"bytes"
 	"encoding/binary"
 	"harmony-benchmark/p2p"
-	"log"
 )
 
 // Validator's consensus message dispatcher
 func (consensus *Consensus) ProcessMessageValidator(message []byte) {
 	msgType, err := GetConsensusMessageType(message)
 	if err != nil {
-		log.Print(err)
+		consensus.Log.Error("Failed to get consensus message type", "err", err)
 	}
 
 	payload, err := GetConsensusMessagePayload(message)
 	if err != nil {
-		log.Print(err)
+		consensus.Log.Error("Failed to get consensus message payload", "err", err)
 	}
 
-	consensus.Logf("Received and processing message: %s\n", msgType)
+	consensus.Log.Info("Received and processing message", "msgType", msgType)
 	switch msgType {
 	case ANNOUNCE:
 		consensus.processAnnounceMessage(payload)
 	case COMMIT:
-		consensus.Logf("Unexpected message type: %s", msgType)
+		consensus.Log.Error("Unexpected message type", "msgType", msgType)
 	case CHALLENGE:
 		consensus.processChallengeMessage(payload)
 	case RESPONSE:
-		consensus.Logf("Unexpected message type: %s", msgType)
+		consensus.Log.Error("Unexpected message type", "msgType", msgType)
 	default:
-		consensus.Logf("Unexpected message type: %s", msgType)
+		consensus.Log.Error("Unexpected message type", "msgType", msgType)
 	}
 }
 
@@ -74,7 +73,7 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	copy(blockHash[:32], consensus.blockHash[:])
 	// verify block data
 	if consensusId != consensus.consensusId {
-		log.Printf("Received message with consensus Id: %d. My consensus Id: %d\n", consensusId, consensus.consensusId)
+		consensus.Log.Debug("Received message", "fromConsensusId", consensusId, "myConsensusId", consensus.consensusId)
 		return
 	}
 	// sign block
@@ -164,7 +163,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 
 	// verify block data and the aggregated signatures
 	if consensusId != consensus.consensusId {
-		log.Printf("Received message with consensus Id: %d. My consensus Id: %d\n", consensusId, consensus.consensusId)
+		consensus.Log.Debug("Received message with consensus Id: %d. My consensus Id: %d\n", consensusId, consensus.consensusId)
 		return
 	}
 

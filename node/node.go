@@ -5,7 +5,7 @@ import (
 	"harmony-benchmark/consensus"
 	"harmony-benchmark/common"
 	"harmony-benchmark/p2p"
-	"log"
+	"harmony-benchmark/log"
 	"net"
 	"os"
 	"time"
@@ -18,28 +18,28 @@ type Node struct {
 	consensus           *consensus.Consensus
 	BlockChannel        chan blockchain.Block
 	pendingTransactions []blockchain.Transaction
+	log log.Logger
 }
 
 // Start a server and process the request by a handler.
 func (node *Node) StartServer(port string) {
-	listenOnPort(port, node.NodeHandler)
+	node.listenOnPort(port)
 }
 
-func listenOnPort(port string, handler func(net.Conn)) {
+func (node *Node)listenOnPort(port string) {
 	listen, err := net.Listen("tcp4", ":"+port)
 	defer listen.Close()
 	if err != nil {
-		log.Fatalf("Socket listen port %s failed,%s", port, err)
+		node.log.Crit("Socket listen port failed", "port", port, "err", err)
 		os.Exit(1)
 	}
 	for {
 		conn, err := listen.Accept()
 		if err != nil {
-			log.Printf("Error listening on port: %s. Exiting.", port)
-			log.Fatalln(err)
+			node.log.Crit("Error listening on port. Exiting.", "port", port)
 			continue
 		}
-		go handler(conn)
+		go node.NodeHandler(conn)
 	}
 }
 
@@ -52,25 +52,25 @@ func (node *Node) NodeHandler(conn net.Conn) {
 
 	consensus := node.consensus
 	if err != nil {
-		node.Logf("Read p2p data failed:%s", err)
+		node.log.Error("Read p2p data failed", "err", err)
 		return
 	}
 
 	msgCategory, err := common.GetMessageCategory(content)
 	if err != nil {
-		node.Logf("Read node type failed:%s", err)
+		node.log.Error("Read node type failed", "err", err)
 		return
 	}
 
 	msgType, err := common.GetMessageType(content)
 	if err != nil {
-		node.Logf("Read action type failed:%s", err)
+		node.log.Error("Read action type failed", "err", err)
 		return
 	}
 
 	msgPayload, err := common.GetMessagePayload(content)
 	if err != nil {
-		node.Logf("Read message payload failed:%s", err)
+		node.log.Error("Read message payload failed", "err", err)
 		return
 	}
 
@@ -93,7 +93,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 		case common.CONTROL:
 			controlType := msgPayload[0]
 			if ControlMessageType(controlType) == STOP {
-				node.Logln("Stopping Node")
+				node.log.Debug("Stopping Node")
 				os.Exit(0)
 			}
 
@@ -111,7 +111,7 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 		txList := new([]blockchain.Transaction)
 		err := txDecoder.Decode(&txList)
 		if err != nil {
-			log.Println("Failed deserializing transaction list")
+			node.log.Error("Failed deserializing transaction list")
 		}
 		node.pendingTransactions = append(node.pendingTransactions, *txList...)
 	case REQUEST:
@@ -154,7 +154,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan int) {
 		newBlock := new(blockchain.Block)
 		for {
 			if len(node.pendingTransactions) >= 10 {
-				node.Logln("Creating new block")
+				node.log.Debug("Creating new block")
 				// TODO (Minh): package actual transactions
 				// For now, just take out 10 transactions
 				var txList []*blockchain.Transaction
@@ -176,20 +176,6 @@ func NewNode(consensus *consensus.Consensus) Node {
 	node := Node{}
 	node.consensus = consensus
 	node.BlockChannel = make(chan blockchain.Block)
+	node.log = node.consensus.Log
 	return node
-}
-
-// Returns the identity string of this node
-func (node *Node) GetIdentityString() string {
-	return node.consensus.GetIdentityString()
-}
-
-// Prints log with ID of this node
-func (node *Node) Logln(v ...interface{}) {
-	node.consensus.Logln(v...)
-}
-
-// Prints formatted log with ID of this node
-func (node *Node) Logf(format string, v ...interface{}) {
-	node.consensus.Logf(format, v...)
 }

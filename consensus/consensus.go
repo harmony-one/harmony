@@ -2,9 +2,10 @@
 package consensus // consensus
 
 import (
+	"fmt"
 	"harmony-benchmark/common"
+	"harmony-benchmark/log"
 	"harmony-benchmark/p2p"
-	"log"
 	"regexp"
 	"strconv"
 )
@@ -43,6 +44,8 @@ type Consensus struct {
 	//// Network related fields
 	msgCategory byte
 	actionType  byte
+	
+	Log log.Logger
 }
 
 // Consensus state enum for both leader and validator
@@ -98,7 +101,7 @@ func NewConsensus(ip, port, shardId string, peers []p2p.Peer, leader p2p.Peer) C
 
 	reg, err := regexp.Compile("[^0-9]+")
 	if err != nil {
-		log.Fatal(err)
+		consensus.Log.Crit("Regex Compilation Failed", "err", err)
 	}
 	consensus.consensusId = 0
 	myShardId, err := strconv.Atoi(shardId)
@@ -123,6 +126,8 @@ func NewConsensus(ip, port, shardId string, peers []p2p.Peer, leader p2p.Peer) C
 
 	consensus.msgCategory = byte(common.COMMITTEE)
 	consensus.actionType = byte(common.CONSENSUS)
+
+	consensus.Log = log.New()
 	return consensus
 }
 
@@ -132,6 +137,7 @@ func (consensus *Consensus) ResetState() {
 	consensus.commits = make(map[string]string)
 	consensus.responses = make(map[string]string)
 }
+
 // Returns ID of this consensus
 func (consensus *Consensus) GetIdentityString() string {
 	var duty string
@@ -141,14 +147,4 @@ func (consensus *Consensus) GetIdentityString() string {
 		duty = "SLV" // slave
 	}
 	return fmt.Sprintf("[%s, %s, %v]", duty, consensus.priKey, consensus.nodeId)
-}
-
-// Prints log with ID of this consensus
-func (consensus *Consensus) Logln(v ...interface{}) {
-	log.Printf("%s %s", consensus.GetIdentityString(), fmt.Sprintln(v...))
-}
-
-// Prints formatted log with ID of this consensus
-func (consensus *Consensus) Logf(format string, v ...interface{}) {
-	log.Printf("%s %s", consensus.GetIdentityString(), fmt.Sprintf(format, v...))
 }

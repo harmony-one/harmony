@@ -5,12 +5,12 @@ import (
 	"sync"
 
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/p2p"
-	"crypto/sha256"
 	"strings"
 )
 
@@ -39,21 +39,20 @@ func (consensus *Consensus) ProcessMessageLeader(message []byte) {
 		log.Print(err)
 	}
 
-
-	log.Printf("[Leader-%d] Received and processing message: %s\n", consensus.ShardId, msgType)
+	consensus.Log.Debug("Received and processing message", "sharedId", consensus.ShardId, "msgType", msgType)
 	switch msgType {
 	case ANNOUNCE:
-		consensus.Logf("Unexpected message type: %s", msgType)
+		consensus.Log.Error("Unexpected message type", "msgType", msgType)
 	case COMMIT:
 		consensus.processCommitMessage(payload)
 	case CHALLENGE:
-		consensus.Logf("Unexpected message type: %s", msgType)
+		consensus.Log.Error("Unexpected message type", "msgType", msgType)
 	case RESPONSE:
 		consensus.processResponseMessage(payload)
 	case START_CONSENSUS:
 		consensus.processStartConsensusMessage(payload)
 	default:
-		consensus.Logf("Unexpected message type: %s", msgType)
+		consensus.Log.Error("Unexpected message type", "msgType", msgType)
 	}
 }
 
@@ -166,7 +165,7 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 	shouldProcess := !ok && consensus.state == ANNOUNCE_DONE
 	if shouldProcess {
 		consensus.commits[validatorId] = validatorId
-		consensus.Logf("Number of commits received: %d", len(consensus.commits))
+		consensus.Log.Debug("Number of commits received", len(consensus.commits))
 	}
 	mutex.Unlock()
 
@@ -176,7 +175,7 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 
 	mutex.Lock()
 	if len(consensus.commits) >= (2*len(consensus.validators))/3+1 {
-		consensus.Logf("Enough commits received with %d signatures", len(consensus.commits))
+		consensus.Log.Debug("Enough commits received with %d signatures", len(consensus.commits))
 		if consensus.state == ANNOUNCE_DONE {
 			// Set state to CHALLENGE_DONE
 			consensus.state = CHALLENGE_DONE
@@ -283,7 +282,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 	shouldProcess := !ok && consensus.state == CHALLENGE_DONE
 	if shouldProcess {
 		consensus.responses[validatorId] = validatorId
-		consensus.Logf("Number of responses received: %d", len(consensus.responses))
+		consensus.Log.Debug("Number of responses received", "count", len(consensus.responses))
 	}
 	mutex.Unlock()
 
@@ -293,13 +292,13 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 
 	mutex.Lock()
 	if len(consensus.responses) >= (2*len(consensus.validators))/3+1 {
-		consensus.Logf("Consensus reached with %d signatures.", len(consensus.responses))
+		consensus.Log.Debug("Consensus reached with %d signatures.", len(consensus.responses))
 		if consensus.state == CHALLENGE_DONE {
 			// Set state to FINISHED
 			consensus.state = FINISHED
 			// TODO: do followups on the consensus
 
-			log.Printf("[Shard %d] HOORAY!!! CONSENSUS REACHED AMONG %d NODES WITH CONSENSUS ID %d!!!\n", consensus.ShardId, len(consensus.validators), consensus.consensusId)
+			consensus.Log.Debug("HOORAY!!! CONSENSUS REACHED!!!", "shardId", consensus.ShardId, "numOfNodes", len(consensus.validators), "consensusId", consensus.consensusId)
 
 			consensus.ResetState()
 			consensus.consensusId++
