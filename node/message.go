@@ -7,14 +7,15 @@ import (
 	"harmony-benchmark/common"
 )
 
+// The types of messages used for NODE/TRANSACTION
 type TransactionMessageType int
-
 const (
 	SEND TransactionMessageType = iota
+	REQUEST
 )
 
+// The types of messages used for NODE/CONTROL
 type ControlMessageType int
-
 const (
 	STOP ControlMessageType = iota
 )
@@ -26,6 +27,17 @@ func ConstructTransactionListMessage(transactions []blockchain.Transaction) []by
 	byteBuffer.WriteByte(byte(SEND))
 	encoder := gob.NewEncoder(byteBuffer)
 	encoder.Encode(transactions)
+	return byteBuffer.Bytes()
+}
+
+//ConstructTransactionListMessage constructs serialized transactions
+func ConstructRequestTransactionsMessage(transactionIds [][]byte) []byte {
+	byteBuffer := bytes.NewBuffer([]byte{byte(common.NODE)})
+	byteBuffer.WriteByte(byte(common.TRANSACTION))
+	byteBuffer.WriteByte(byte(REQUEST))
+	for _, txId := range transactionIds {
+		byteBuffer.Write(txId)
+	}
 	return byteBuffer.Bytes()
 }
 

@@ -1,8 +1,6 @@
 package node
 
 import (
-	"bytes"
-	"encoding/gob"
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/consensus"
 	"harmony-benchmark/common"
@@ -11,6 +9,8 @@ import (
 	"net"
 	"os"
 	"time"
+	"bytes"
+	"encoding/gob"
 )
 
 // A node represents a program (machine) participating in the network
@@ -105,15 +105,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 		actionType := common.NodeMessageType(msgType)
 		switch actionType {
 		case common.TRANSACTION:
-			txDecoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the SEND messge type
-
-			txList := new([]blockchain.Transaction)
-			err := txDecoder.Decode(&txList)
-			if err != nil {
-				log.Println("Failed deserializing transaction list")
-			}
-			node.pendingTransactions = append(node.pendingTransactions, *txList...)
-			log.Println(len(node.pendingTransactions))
+			node.transactionMessageHandler(msgPayload)
 		case common.CONTROL:
 			controlType := msgPayload[0]
 			if ControlMessageType(controlType) == STOP {
@@ -122,6 +114,24 @@ func (node *Node) NodeHandler(conn net.Conn) {
 			}
 
 		}
+	}
+}
+
+func (node *Node) transactionMessageHandler(msgPayload []byte) {
+	txMessageType := TransactionMessageType(msgPayload[0])
+
+	switch txMessageType {
+	case SEND:
+		txDecoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the SEND messge type
+
+		txList := new([]blockchain.Transaction)
+		err := txDecoder.Decode(&txList)
+		if err != nil {
+			log.Println("Failed deserializing transaction list")
+		}
+		node.pendingTransactions = append(node.pendingTransactions, *txList...)
+	case REQUEST:
+		// TODO: fill in logic to return the request transactions
 	}
 }
 
