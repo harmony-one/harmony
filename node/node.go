@@ -131,8 +131,36 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 		}
 		node.pendingTransactions = append(node.pendingTransactions, *txList...)
 	case REQUEST:
-		// TODO: fill in logic to return the request transactions
+		reader := bytes.NewBuffer(msgPayload[1:])
+		var txIds map[[32]byte]bool
+		txId := make([]byte, 32) // 32 byte hash Id
+		for {
+			_, err := reader.Read(txId)
+			if err != nil {
+				break
+			}
+
+			txIds[getFixedByteTxId(txId)] = true
+		}
+
+		var txToReturn []blockchain.Transaction
+		for _, tx := range node.pendingTransactions {
+			if txIds[getFixedByteTxId(tx.ID)] {
+				txToReturn = append(txToReturn, tx)
+			}
+		}
+
+		// TODO: return the transaction list to requester
 	}
+}
+
+// Copy the txId byte slice over to 32 byte array so the map can key on it
+func getFixedByteTxId(txId []byte) [32]byte {
+	var id [32]byte
+	for i := range id {
+		id[i] = txId[i]
+	}
+	return id
 }
 
 func (node *Node) WaitForConsensusReady(readySignal chan int) {
