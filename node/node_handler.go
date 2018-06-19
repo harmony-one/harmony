@@ -76,12 +76,12 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 	case SEND:
 		txDecoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the SEND messge type
 
-		txList := new([]blockchain.Transaction)
+		txList := new([]*blockchain.Transaction)
 		err := txDecoder.Decode(&txList)
 		if err != nil {
 			node.log.Error("Failed deserializing transaction list", "node", node)
 		}
-		node.pendingTransactions = append(node.pendingTransactions, *txList...)
+		node.addPendingTransactions(*txList)
 	case REQUEST:
 		reader := bytes.NewBuffer(msgPayload[1:])
 		var txIds map[[32]byte]bool
@@ -95,7 +95,7 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 			txIds[getFixedByteTxId(txId)] = true
 		}
 
-		var txToReturn []blockchain.Transaction
+		var txToReturn []*blockchain.Transaction
 		for _, tx := range node.pendingTransactions {
 			if txIds[getFixedByteTxId(tx.ID)] {
 				txToReturn = append(txToReturn, tx)
@@ -125,14 +125,8 @@ func (node *Node) WaitForConsensusReady(readySignal chan int) {
 		for {
 			if len(node.pendingTransactions) >= 10 {
 				node.log.Debug("Creating new block", "node", node)
-				// TODO (Minh): package actual transactions
-				// For now, just take out 10 transactions
-				var txList []*blockchain.Transaction
-				for _, tx := range node.pendingTransactions[0:10] {
-					txList = append(txList, &tx)
-				}
-				node.pendingTransactions = node.pendingTransactions[10:]
-				newBlock = blockchain.NewBlock(txList, []byte{})
+				selectedTxs := node.getTransactionsForNewBlock()
+				newBlock = blockchain.NewBlock(selectedTxs, []byte{})
 				break
 			}
 			time.Sleep(1 * time.Second) // Periodically check whether we have enough transactions to package into block.

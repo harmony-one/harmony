@@ -6,16 +6,34 @@ import (
 	"harmony-benchmark/log"
 	"net"
 	"os"
+	"sync"
 )
+
+var pendingTxMutex = &sync.Mutex{}
 
 // A node represents a program (machine) participating in the network
 type Node struct {
-	consensus           *consensus.Consensus
-	BlockChannel        chan blockchain.Block
-	pendingTransactions []blockchain.Transaction
-	blockchain          *blockchain.Blockchain
-	utxoPool            *blockchain.UTXOPool
-	log                 log.Logger
+	consensus              *consensus.Consensus
+	BlockChannel           chan blockchain.Block
+	pendingTransactions    []*blockchain.Transaction
+	transactionInConsensus []*blockchain.Transaction
+	blockchain             *blockchain.Blockchain
+	utxoPool               *blockchain.UTXOPool
+	log                    log.Logger
+}
+
+func (node *Node) addPendingTransactions(newTxs []*blockchain.Transaction) {
+	pendingTxMutex.Lock()
+	node.pendingTransactions = append(node.pendingTransactions, newTxs...)
+	pendingTxMutex.Unlock()
+}
+
+func (node *Node) getTransactionsForNewBlock() []*blockchain.Transaction {
+	pendingTxMutex.Lock()
+	selected, unselected := node.utxoPool.SelectTransactionsForNewBlock(node.pendingTransactions)
+	node.pendingTransactions = unselected
+	pendingTxMutex.Unlock()
+	return selected
 }
 
 // Start a server and process the request by a handler.
