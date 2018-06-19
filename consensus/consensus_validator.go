@@ -71,7 +71,7 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	_ = blockHeaderSize
 	_ = signature
 
-	consensus.blockHash = blockHash
+	copy(blockHash[:32], consensus.blockHash[:])
 	// verify block data
 	if consensusId != consensus.consensusId {
 		log.Printf("Received message with consensus Id: %d. My consensus Id: %d\n", consensusId, consensus.consensusId)
@@ -98,7 +98,7 @@ func (consensus Consensus) constructCommitMessage() []byte {
 	buffer.Write(fourBytes)
 
 	// 32 byte block hash
-	buffer.Write(consensus.blockHash)
+	buffer.Write(consensus.blockHash[:])
 
 	// 2 byte validator id
 	twoBytes := make([]byte, 2)
@@ -190,7 +190,7 @@ func (consensus Consensus) constructResponseMessage() []byte {
 	buffer.Write(fourBytes)
 
 	// 32 byte block hash
-	buffer.Write(consensus.blockHash)
+	buffer.Write(consensus.blockHash[:32])
 
 	// 2 byte validator id
 	twoBytes := make([]byte, 2)

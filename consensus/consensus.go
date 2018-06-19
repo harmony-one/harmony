@@ -31,7 +31,7 @@ type Consensus struct {
 	// Consensus Id (View Id) - 4 byte
 	consensusId uint32
 	// Blockhash - 32 byte
-	blockHash []byte
+	blockHash [32]byte
 	// BlockHeader to run consensus on
 	blockHeader []byte
 	// Shard Id which this node belongs to
