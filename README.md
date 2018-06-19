@@ -12,6 +12,10 @@ mkdir -p $HOME/<path_of_your_choice>/src
 cd $HOME/<path_of_your_choice>/src
 
 git clone git@github.com:simple-rules/harmony-benchmark.git
+
+cd harmony-benchmark
+
+go get github.com/go-stack/stack
 ```
 ## Usage
 ```
