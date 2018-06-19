@@ -66,9 +66,9 @@ func main() {
 	configFile := flag.String("config_file", "global_nodes.txt", "file containing all ip addresses and config")
 	flag.Parse()
 	config := readConfigFile(*configFile)
+	totalTime := 60.0
 	time.Sleep(totalTime) //Sleep Time to let all instances come up
 	start := time.Now()
-	totalTime := 60.0
 	txs := make([]blockchain.Transaction, 10)
 	leaders := getLeaders(&config)
 	for true {

@@ -15,8 +15,6 @@ FILE='isTransaction.txt'
 config=$1
 if [ -f $FILE ]; then
     go run ./aws-code/transaction_generator.go -config_file $config
-else:
+else
     go run ./benchmark_main.go -config_file $config&
-   
-
-
+fi
