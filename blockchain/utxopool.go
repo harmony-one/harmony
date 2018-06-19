@@ -2,6 +2,7 @@ package blockchain
 
 import (
 	"encoding/hex"
+	"fmt"
 )
 
 const (
@@ -73,9 +74,6 @@ func (utxoPool *UTXOPool) VerifyOneTransaction(tx *Transaction) bool {
 		index := in.TxOutputIndex
 		// Check if the transaction with the addres is spent or not.
 		if val, ok := utxoPool.utxo[in.Address][inTxID][index]; ok {
-			if spentTXOs[in.Address][inTxID][index] {
-				return false
-			}
 			inTotal += val
 		} else {
 			return false
@@ -86,6 +84,9 @@ func (utxoPool *UTXOPool) VerifyOneTransaction(tx *Transaction) bool {
 		}
 		if _, ok := spentTXOs[in.Address][inTxID]; !ok {
 			spentTXOs[in.Address][inTxID] = make(map[int]bool)
+		}
+		if spentTXOs[in.Address][inTxID][index] {
+			return false
 		}
 		spentTXOs[in.Address][inTxID][index] = true
 	}
@@ -190,7 +191,7 @@ func CreateUTXOPoolFromTransaction(tx *Transaction) *UTXOPool {
 
 // CreateUTXOPoolFromGenesisBlockChain a utxo pool from a genesis blockchain.
 func CreateUTXOPoolFromGenesisBlockChain(bc *Blockchain) *UTXOPool {
-	tx := bc.blocks[0].Transactions[0]
+	tx := bc.Blocks[0].Transactions[0]
 	return CreateUTXOPoolFromTransaction(tx)
 }
 
@@ -205,4 +206,18 @@ func (utxoPool *UTXOPool) SelectTransactionsForNewBlock(transactions []*Transact
 		}
 	}
 	return selected, unselected
+}
+
+// Used for debugging.
+func (utxoPool *UTXOPool) String() string {
+	res := ""
+	for address, v1 := range utxoPool.utxo {
+		for txid, v2 := range v1 {
+			for index, value := range v2 {
+				res += fmt.Sprintf("address: %v, tx id: %v, index: %v, value: %v\n", address, txid, index, value)
+
+			}
+		}
+	}
+	return res
 }
