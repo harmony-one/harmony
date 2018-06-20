@@ -287,6 +287,16 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 			consensus.Log.Debug("HOORAY!!! CONSENSUS REACHED!!!", "numOfNodes", len(consensus.validators))
 
 			consensus.ResetState()
+
+			// TODO: reconstruct the whole block from header and transactions
+			// For now, we used the stored whole block in consensus.blockHeader
+			txDecoder := gob.NewDecoder(bytes.NewReader(consensus.blockHeader))
+			var blockHeaderObj blockchain.Block
+			err := txDecoder.Decode(&blockHeaderObj)
+			if err != nil {
+				consensus.Log.Debug("failed to construct the new block after consensus")
+			}
+			consensus.OnConsensusDone(&blockHeaderObj)
 			consensus.consensusId++
 
 			// Send signal to Node so the new block can be added and new round of consensus can be triggered

@@ -116,14 +116,6 @@ func (node *Node) WaitForConsensusReady(readySignal chan int) {
 	for { // keep waiting for consensus ready
 		<-readySignal
 		//node.log.Debug("Adding new block", "currentChainSize", len(node.blockchain.Blocks), "numTxs", len(node.blockchain.GetLatestBlock().Transactions), "PrevHash", node.blockchain.GetLatestBlock().PrevBlockHash, "Hash", node.blockchain.GetLatestBlock().Hash)
-		if newBlock != nil {
-			// Consensus is done on the newBlock (in the previous round of consensus), add it to blockchain
-			node.blockchain.Blocks = append(node.blockchain.Blocks, newBlock)
-			// Update UTXO pool
-			node.UtxoPool.Update(node.transactionInConsensus)
-			// Clear transaction-in-consensus list
-			node.transactionInConsensus = []*blockchain.Transaction{}
-		}
 		for {
 			// Once we have more than 10 transactions pending we will try creating a new block
 			if len(node.pendingTransactions) >= 10 {
@@ -149,6 +141,15 @@ func (node *Node) WaitForConsensusReady(readySignal chan int) {
 	}
 }
 
-func (node *Node) VerifyNewBlock(block *blockchain.Block) bool {
-	return node.UtxoPool.VerifyTransactions(block.Transactions)
+func (node *Node) VerifyNewBlock(newBlock *blockchain.Block) bool {
+	return node.UtxoPool.VerifyTransactions(newBlock.Transactions)
+}
+
+func (node *Node) AddNewBlockToBlockchain(newBlock *blockchain.Block) {
+	// Add it to blockchain
+	node.blockchain.Blocks = append(node.blockchain.Blocks, newBlock)
+	// Update UTXO pool
+	node.UtxoPool.Update(newBlock.Transactions)
+	// Clear transaction-in-consensus list
+	node.transactionInConsensus = []*blockchain.Transaction{}
 }

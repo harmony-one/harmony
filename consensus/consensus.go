@@ -41,7 +41,11 @@ type Consensus struct {
 
 	// Signal channel for starting a new consensus process
 	ReadySignal chan int
+	// The verifier func passed from Node object
 	BlockVerifier func(*blockchain.Block)bool
+	// The post-consensus processing func passed from Node object
+	// Called when consensus on a new block is done
+	OnConsensusDone func(*blockchain.Block)
 
 	//// Network related fields
 	msgCategory byte

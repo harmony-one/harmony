@@ -94,13 +94,13 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 
 	// check block header is valid
 	txDecoder := gob.NewDecoder(bytes.NewReader(blockHeader))
-
-	var blockHeaderObj blockchain.Block // TODO: separate header from block
+	var blockHeaderObj blockchain.Block // TODO: separate header from block. Right now, this blockHeader data is actually the whole block
 	err := txDecoder.Decode(&blockHeaderObj)
 	if err != nil {
 		consensus.Log.Debug("[ERROR] Unparseable block header data")
 		return
 	}
+	consensus.blockHeader = blockHeader
 
 	// check block hash
 	if bytes.Compare(blockHash[:], blockHeaderObj.HashTransactions()[:]) != 0 || bytes.Compare(blockHeaderObj.Hash[:], blockHeaderObj.HashTransactions()[:]) != 0 {
@@ -230,6 +230,20 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 	// Set state to RESPONSE_DONE
 	consensus.state = RESPONSE_DONE
 	consensus.consensusId++
+
+
+	// TODO: think about when validators know about the consensus is reached.
+	// For now, the blockchain is updated right here.
+
+	// TODO: reconstruct the whole block from header and transactions
+	// For now, we used the stored whole block in consensus.blockHeader
+	txDecoder := gob.NewDecoder(bytes.NewReader(consensus.blockHeader))
+	var blockHeaderObj blockchain.Block
+	err := txDecoder.Decode(&blockHeaderObj)
+	if err != nil {
+		consensus.Log.Debug("failed to construct the new block after consensus")
+	}
+	consensus.OnConsensusDone(&blockHeaderObj)
 }
 
 // Construct the response message to send to leader (assumption the consensus data is already verified)
