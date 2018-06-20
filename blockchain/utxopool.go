@@ -212,7 +212,7 @@ func CreateUTXOPoolFromGenesisBlockChain(bc *Blockchain) *UTXOPool {
 func (utxoPool *UTXOPool) SelectTransactionsForNewBlock(transactions []*Transaction) ([]*Transaction, []*Transaction) {
 	selected, unselected := []*Transaction{}, []*Transaction{}
 	for _, tx := range transactions {
-		if len(selected) < MaxNumberOfTransactions && utxoPool.VerifyOneTransactionAndUpdate(tx) {
+		if len(selected) < MaxNumberOfTransactions && utxoPool.VerifyOneTransaction(tx) {
 			selected = append(selected, tx)
 		} else {
 			unselected = append(unselected, tx)

@@ -118,19 +118,29 @@ func getFixedByteTxId(txId []byte) [32]byte {
 func (node *Node) WaitForConsensusReady(readySignal chan int) {
 	node.log.Debug("Waiting for consensus ready", "node", node)
 
+	var newBlock *blockchain.Block
 	for { // keep waiting for consensus ready
 		<-readySignal
-		// create a new block
-		newBlock := new(blockchain.Block)
+		//node.log.Debug("Adding new block", "currentChainSize", len(node.blockchain.Blocks), "numTxs", len(node.blockchain.GetLatestBlock().Transactions), "PrevHash", node.blockchain.GetLatestBlock().PrevBlockHash, "Hash", node.blockchain.GetLatestBlock().Hash)
+		if newBlock != nil {
+			// Consensus is done on the previous newBlock, add it to blockchain
+			node.blockchain.Blocks = append(node.blockchain.Blocks, newBlock)
+			// Update UTXO pool
+			node.UtxoPool.Update(node.transactionInConsensus)
+			// Clear transaction in consensus slice
+			node.transactionInConsensus = []*blockchain.Transaction{}
+		}
 		for {
 			if len(node.pendingTransactions) >= 10 {
 				selectedTxs := node.getTransactionsForNewBlock()
+
 				if len(selectedTxs) == 0 {
 					node.log.Debug("No transactions is selected for consensus", "pendingTx", len(node.pendingTransactions))
 				} else {
-					node.log.Debug("Creating new block", "numTxs", len(selectedTxs), "pendingTxs", len(node.pendingTransactions))
+					node.log.Debug("Creating new block", "numTxs", len(selectedTxs), "pendingTxs", len(node.pendingTransactions), "currentChainSize", len(node.blockchain.Blocks))
 
-					newBlock = blockchain.NewBlock(selectedTxs, []byte{})
+					node.transactionInConsensus = selectedTxs
+					newBlock = blockchain.NewBlock(selectedTxs, node.blockchain.GetLatestBlock().Hash[:])
 					break
 				}
 			}
