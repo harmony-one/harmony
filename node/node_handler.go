@@ -148,3 +148,8 @@ func (node *Node) WaitForConsensusReady(readySignal chan int) {
 		node.BlockChannel <- *newBlock
 	}
 }
+
+func (node *Node) VerifyNewBlock(block *blockchain.Block) bool {
+	// TODO: fill in this function
+	return true
+}

@@ -8,6 +8,7 @@ import (
 	"harmony-benchmark/p2p"
 	"regexp"
 	"strconv"
+	"harmony-benchmark/blockchain"
 )
 
 // Consensus data containing all info related to one consensus process
@@ -40,6 +41,7 @@ type Consensus struct {
 
 	// Signal channel for starting a new consensus process
 	ReadySignal chan int
+	BlockVerifier func(*blockchain.Block)bool
 
 	//// Network related fields
 	msgCategory byte

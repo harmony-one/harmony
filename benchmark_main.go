@@ -76,6 +76,8 @@ func main() {
 	consensus := consensus.NewConsensus(*ip, *port, shardId, peers, leader)
 
 	node := node.NewNode(&consensus)
+	consensus.BlockVerifier = node.VerifyNewBlock // Assign block verifier to the consensus
+
 	// Temporary testing code, to be removed.
 	node.AddMoreFakeTransactions()
 

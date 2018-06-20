@@ -4,6 +4,10 @@ import (
 	"bytes"
 	"encoding/binary"
 	"harmony-benchmark/p2p"
+	"strconv"
+	"regexp"
+	"encoding/gob"
+	"harmony-benchmark/blockchain"
 )
 
 // Validator's consensus message dispatcher
@@ -43,8 +47,8 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	blockHash := payload[offset : offset+32]
 	offset += 32
 
-	// 2 byte validator id
-	leaderId := string(payload[offset : offset+2])
+	// 2 byte leader id
+	leaderId := binary.BigEndian.Uint16(payload[offset : offset+2])
 	offset += 2
 
 	// n byte of block header
@@ -63,18 +67,54 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 
 	// TODO: make use of the data. This is just to avoid the unused variable warning
 	_ = consensusId
-	_ = blockHash
+
 	_ = leaderId
 	_ = blockHeader
 	_ = blockHeaderSize
 	_ = signature
 
-	copy(blockHash[:32], consensus.blockHash[:])
-	// verify block data
+	copy(consensus.blockHash[:], blockHash[:])
+
+	// Verify block data
+	// check consensus Id
 	if consensusId != consensus.consensusId {
-		consensus.Log.Debug("Received message", "fromConsensus", consensus)
+		consensus.Log.Debug("[ERROR] Received message with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId)
 		return
 	}
+
+	// check leader Id
+	leaderPrivKey := consensus.leader.Ip + consensus.leader.Port
+	reg, _ := regexp.Compile("[^0-9]+")
+	socketId := reg.ReplaceAllString(leaderPrivKey, "")
+	value, _ := strconv.Atoi(socketId)
+	if leaderId != uint16(value) {
+		consensus.Log.Debug("[ERROR] Received message from wrong leader", "myLeaderId", consensus.consensusId, "receivedLeaderId", consensusId)
+		return
+	}
+
+	// check block header is valid
+	txDecoder := gob.NewDecoder(bytes.NewReader(blockHeader)) // skip the SEND messge type
+
+	var blockHeaderObj blockchain.Block // TODO: separate header from block
+	err := txDecoder.Decode(&blockHeaderObj)
+	if err != nil {
+		consensus.Log.Debug("[ERROR] Unparseable block header data")
+		return
+	}
+
+	// check block hash
+	if bytes.Compare(blockHash[:], blockHeaderObj.HashTransactions()[:]) != 0 || bytes.Compare(blockHeaderObj.Hash[:], blockHeaderObj.HashTransactions()[:]) != 0 {
+		consensus.Log.Debug("[ERROR] Block hash doesn't match")
+		return
+	}
+
+	// check block data (transactions
+	if !consensus.BlockVerifier(&blockHeaderObj) {
+		consensus.Log.Debug("[ERROR] Block content is not verified successfully")
+		return
+	}
+
+
 	// sign block
 
 	// TODO: return the signature(commit) to leader
