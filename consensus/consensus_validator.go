@@ -93,7 +93,7 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	}
 
 	// check block header is valid
-	txDecoder := gob.NewDecoder(bytes.NewReader(blockHeader)) // skip the SEND messge type
+	txDecoder := gob.NewDecoder(bytes.NewReader(blockHeader))
 
 	var blockHeaderObj blockchain.Block // TODO: separate header from block
 	err := txDecoder.Decode(&blockHeaderObj)
@@ -113,9 +113,6 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 		consensus.Log.Debug("[ERROR] Block content is not verified successfully")
 		return
 	}
-
-
-	// sign block
 
 	// TODO: return the signature(commit) to leader
 	// For now, simply return the private key of this node.
@@ -154,8 +151,8 @@ func (consensus Consensus) constructCommitMessage() []byte {
 	return consensus.ConstructConsensusMessage(COMMIT, buffer.Bytes())
 }
 
-// TODO: fill in this function
 func getCommitMessage() []byte {
+	// TODO: use real cosi signature
 	return make([]byte, 33)
 }
 
@@ -171,7 +168,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 	offset += 32
 
 	// 2 byte leader id
-	leaderId := string(payload[offset : offset+2])
+	leaderId := binary.BigEndian.Uint16(payload[offset : offset+2])
 	offset += 2
 
 	// 33 byte of aggregated commit
@@ -200,13 +197,30 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 	_ = challenge
 	_ = signature
 
-	// verify block data and the aggregated signatures
+	// erify block data and the aggregated signatures
+	// check consensus Id
 	if consensusId != consensus.consensusId {
-		consensus.Log.Debug("Received message", "fromConsensus", consensusId)
+		consensus.Log.Debug("[ERROR] Received message with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId)
 		return
 	}
 
-	// sign the message
+	// check leader Id
+	leaderPrivKey := consensus.leader.Ip + consensus.leader.Port
+	reg, _ := regexp.Compile("[^0-9]+")
+	socketId := reg.ReplaceAllString(leaderPrivKey, "")
+	value, _ := strconv.Atoi(socketId)
+	if leaderId != uint16(value) {
+		consensus.Log.Debug("[ERROR] Received message from wrong leader", "myLeaderId", consensus.consensusId, "receivedLeaderId", consensusId)
+		return
+	}
+
+	// check block hash
+	if bytes.Compare(blockHash[:], consensus.blockHash[:]) != 0 {
+		consensus.Log.Debug("[ERROR] Block hash doesn't match")
+		return
+	}
+
+	// TODO: verify aggregated commits with real schnor cosign verification
 
 	// TODO: return the signature(response) to leader
 	// For now, simply return the private key of this node.

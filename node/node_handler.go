@@ -150,6 +150,5 @@ func (node *Node) WaitForConsensusReady(readySignal chan int) {
 }
 
 func (node *Node) VerifyNewBlock(block *blockchain.Block) bool {
-	// TODO: fill in this function
-	return true
+	return node.UtxoPool.VerifyTransactions(block.Transactions)
 }
