@@ -1,16 +1,15 @@
 package consensus
 
 import (
-	"log"
 	"sync"
 
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/p2p"
-	"crypto/sha256"
 	"strings"
 )
 
@@ -18,6 +17,7 @@ var mutex = &sync.Mutex{}
 
 // WaitForNewBlock waits for a new block.
 func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) {
+	consensus.Log.Debug("Waiting for block", "consensus", consensus)
 	for { // keep waiting for new blocks
 		newBlock := <-blockChannel
 		// TODO: think about potential race condition
@@ -31,28 +31,27 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) 
 func (consensus *Consensus) ProcessMessageLeader(message []byte) {
 	msgType, err := GetConsensusMessageType(message)
 	if err != nil {
-		log.Print(err)
+		consensus.Log.Error("Failed to get consensus message type.", "err", err, "consensus", consensus)
 	}
 
 	payload, err := GetConsensusMessagePayload(message)
 	if err != nil {
-		log.Print(err)
+		consensus.Log.Error("Failed to get consensus message payload.", "err", err, "consensus", consensus)
 	}
 
-	log.Printf("[Leader-%d] Received and processing message: %s\n", consensus.ShardId, msgType)
 	switch msgType {
 	case ANNOUNCE:
-		log.Printf("Unexpected message type: %s", msgType)
+		consensus.Log.Error("Unexpected message type", "msgType", msgType, "consensus", consensus)
 	case COMMIT:
 		consensus.processCommitMessage(payload)
 	case CHALLENGE:
-		log.Printf("Unexpected message type: %s", msgType)
+		consensus.Log.Error("Unexpected message type", "msgType", msgType, "consensus", consensus)
 	case RESPONSE:
 		consensus.processResponseMessage(payload)
 	case START_CONSENSUS:
 		consensus.processStartConsensusMessage(payload)
 	default:
-		log.Printf("Unexpected message type: %s", msgType)
+		consensus.Log.Error("Unexpected message type", "msgType", msgType, "consensus", consensus)
 	}
 }
 
@@ -165,7 +164,7 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 	shouldProcess := !ok && consensus.state == ANNOUNCE_DONE
 	if shouldProcess {
 		consensus.commits[validatorId] = validatorId
-		log.Printf("Number of commits received: %d", len(consensus.commits))
+		//consensus.Log.Debug("Number of commits received", "count", len(consensus.commits))
 	}
 	mutex.Unlock()
 
@@ -175,7 +174,7 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 
 	mutex.Lock()
 	if len(consensus.commits) >= (2*len(consensus.validators))/3+1 {
-		log.Printf("Enough commits received with %d signatures", len(consensus.commits))
+		consensus.Log.Debug("Enough commits received with signatures", "numOfSignatures", len(consensus.commits))
 		if consensus.state == ANNOUNCE_DONE {
 			// Set state to CHALLENGE_DONE
 			consensus.state = CHALLENGE_DONE
@@ -282,7 +281,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 	shouldProcess := !ok && consensus.state == CHALLENGE_DONE
 	if shouldProcess {
 		consensus.responses[validatorId] = validatorId
-		log.Printf("Number of responses received: %d", len(consensus.responses))
+		//consensus.Log.Debug("Number of responses received", "count", len(consensus.responses))
 	}
 	mutex.Unlock()
 
@@ -292,14 +291,18 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 
 	mutex.Lock()
 	if len(consensus.responses) >= (2*len(consensus.validators))/3+1 {
-		log.Printf("Consensus reached with %d signatures.", len(consensus.responses))
+		consensus.Log.Debug("Consensus reached with signatures.", "numOfSignatures", len(consensus.responses))
 		if consensus.state == CHALLENGE_DONE {
 			// Set state to FINISHED
 			consensus.state = FINISHED
 			// TODO: do followups on the consensus
-			log.Printf("[Shard %d] HOORAY!!! CONSENSUS REACHED AMONG %d NODES WITH CONSENSUS ID %d!!!\n", consensus.ShardId, len(consensus.validators), consensus.consensusId)
+
+			consensus.Log.Debug("HOORAY!!! CONSENSUS REACHED!!!", "numOfNodes", len(consensus.validators))
+
 			consensus.ResetState()
 			consensus.consensusId++
+
+			// Send signal to Node so the new block can be added and new round of consensus can be triggered
 			consensus.ReadySignal <- 1
 		}
 		// TODO: composes new block and broadcast the new block to validators

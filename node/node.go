@@ -3,194 +3,108 @@ package node
 import (
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/consensus"
-	"harmony-benchmark/common"
-	"harmony-benchmark/p2p"
-	"log"
+	"harmony-benchmark/log"
 	"net"
 	"os"
-	"time"
-	"bytes"
-	"encoding/gob"
+	"sync"
+	"strconv"
 )
+
+var pendingTxMutex = &sync.Mutex{}
 
 // A node represents a program (machine) participating in the network
 type Node struct {
-	consensus           *consensus.Consensus
-	BlockChannel        chan blockchain.Block
-	pendingTransactions []blockchain.Transaction
+	// Consensus object containing all consensus related data (e.g. committee members, signatures, commits)
+	consensus              *consensus.Consensus
+	// The channel to receive new blocks from Node
+	BlockChannel           chan blockchain.Block
+	// All the transactions received but not yet processed for consensus
+	pendingTransactions    []*blockchain.Transaction
+	// The transactions selected into the new block and under consensus process
+	transactionInConsensus []*blockchain.Transaction
+	// The blockchain for the shard where this node belongs
+	blockchain             *blockchain.Blockchain
+	// The corresponding UTXO pool of the current blockchain
+	UtxoPool               *blockchain.UTXOPool
+
+	// Log utility
+	log                    log.Logger
+}
+
+// Add new transactions to the pending transaction list
+func (node *Node) addPendingTransactions(newTxs []*blockchain.Transaction) {
+	pendingTxMutex.Lock()
+	node.pendingTransactions = append(node.pendingTransactions, newTxs...)
+	pendingTxMutex.Unlock()
+}
+
+// Take out a subset of valid transactions from the pending transaction list
+// Note the pending transaction list will then contain the rest of the txs
+func (node *Node) getTransactionsForNewBlock() []*blockchain.Transaction {
+	pendingTxMutex.Lock()
+	selected, unselected := node.UtxoPool.SelectTransactionsForNewBlock(node.pendingTransactions)
+	node.pendingTransactions = unselected
+	pendingTxMutex.Unlock()
+	return selected
 }
 
 // Start a server and process the request by a handler.
 func (node *Node) StartServer(port string) {
-	listenOnPort(port, node.NodeHandler)
+	node.log.Debug("Starting server", "node", node)
+	node.listenOnPort(port)
 }
 
-func listenOnPort(port string, handler func(net.Conn)) {
+func (node *Node) listenOnPort(port string) {
 	listen, err := net.Listen("tcp4", ":"+port)
 	defer listen.Close()
 	if err != nil {
-		log.Fatalf("Socket listen port %s failed,%s", port, err)
+		node.log.Crit("Socket listen port failed", "port", port, "err", err)
 		os.Exit(1)
 	}
 	for {
 		conn, err := listen.Accept()
 		if err != nil {
-			log.Printf("Error listening on port: %s. Exiting.", port)
-			log.Fatalln(err)
+			node.log.Crit("Error listening on port. Exiting.", "port", port)
 			continue
 		}
-		go handler(conn)
+		go node.NodeHandler(conn)
 	}
 }
 
-// Handler of the leader node.
-func (node *Node) NodeHandler(conn net.Conn) {
-	defer conn.Close()
-
-	// Read p2p message payload
-	content, err := p2p.ReadMessageContent(conn)
-
-	consensus := node.consensus
-	if err != nil {
-		if consensus.IsLeader {
-			log.Printf("[Leader] Read p2p data failed:%s", err)
-		} else {
-			log.Printf("[Slave] Read p2p data failed:%s", err)
-		}
-		return
-	}
-
-	msgCategory, err := common.GetMessageCategory(content)
-	if err != nil {
-		if consensus.IsLeader {
-			log.Printf("[Leader] Read node type failed:%s", err)
-		} else {
-			log.Printf("[Slave] Read node type failed:%s", err)
-		}
-		return
-	}
-
-	msgType, err := common.GetMessageType(content)
-	if err != nil {
-		if consensus.IsLeader {
-			log.Printf("[Leader] Read action type failed:%s", err)
-		} else {
-			log.Printf("[Slave] Read action type failed:%s", err)
-		}
-		return
-	}
-
-	msgPayload, err := common.GetMessagePayload(content)
-	if err != nil {
-		if consensus.IsLeader {
-			log.Printf("[Leader] Read message payload failed:%s", err)
-		} else {
-			log.Printf("[Slave] Read message payload failed:%s", err)
-		}
-		return
-	}
-
-	switch msgCategory {
-	case common.COMMITTEE:
-		actionType := common.CommitteeMessageType(msgType)
-		switch actionType {
-		case common.CONSENSUS:
-			if consensus.IsLeader {
-				consensus.ProcessMessageLeader(msgPayload)
-			} else {
-				consensus.ProcessMessageValidator(msgPayload)
-			}
-		}
-	case common.NODE:
-		actionType := common.NodeMessageType(msgType)
-		switch actionType {
-		case common.TRANSACTION:
-			node.transactionMessageHandler(msgPayload)
-		case common.CONTROL:
-			controlType := msgPayload[0]
-			if ControlMessageType(controlType) == STOP {
-				log.Println("Stopping Node")
-				os.Exit(0)
-			}
-
-		}
-	}
+func (node *Node) String() string {
+	return node.consensus.String()
 }
 
-func (node *Node) transactionMessageHandler(msgPayload []byte) {
-	txMessageType := TransactionMessageType(msgPayload[0])
-
-	switch txMessageType {
-	case SEND:
-		txDecoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the SEND messge type
-
-		txList := new([]blockchain.Transaction)
-		err := txDecoder.Decode(&txList)
-		if err != nil {
-			log.Println("Failed deserializing transaction list")
-		}
-		node.pendingTransactions = append(node.pendingTransactions, *txList...)
-	case REQUEST:
-		reader := bytes.NewBuffer(msgPayload[1:])
-		var txIds map[[32]byte]bool
-		txId := make([]byte, 32) // 32 byte hash Id
-		for {
-			_, err := reader.Read(txId)
-			if err != nil {
-				break
-			}
-
-			txIds[getFixedByteTxId(txId)] = true
-		}
-
-		var txToReturn []blockchain.Transaction
-		for _, tx := range node.pendingTransactions {
-			if txIds[getFixedByteTxId(tx.ID)] {
-				txToReturn = append(txToReturn, tx)
-			}
-		}
-
-		// TODO: return the transaction list to requester
+// [Testing code] Should be deleted for production
+// Create in genesis block 1000 transactions which assign 1000 token to each address in [1 - 1000]
+func (node *Node) AddMoreFakeTransactions() {
+	txs := make([]*blockchain.Transaction, 1000)
+	for i := range txs {
+		txs[i] = blockchain.NewCoinbaseTX(strconv.Itoa(i), "")
 	}
-}
-
-// Copy the txId byte slice over to 32 byte array so the map can key on it
-func getFixedByteTxId(txId []byte) [32]byte {
-	var id [32]byte
-	for i := range id {
-		id[i] = txId[i]
-	}
-	return id
-}
-
-func (node *Node) WaitForConsensusReady(readySignal chan int) {
-	for { // keep waiting for consensus ready
-		<-readySignal
-		// create a new block
-		newBlock := new(blockchain.Block)
-		for {
-			if len(node.pendingTransactions) >= 10 {
-				log.Println("Creating new block")
-				// TODO (Minh): package actual transactions
-				// For now, just take out 10 transactions
-				var txList []*blockchain.Transaction
-				for _, tx := range node.pendingTransactions[0:10] {
-					txList = append(txList, &tx)
-				}
-				node.pendingTransactions = node.pendingTransactions[10:]
-				newBlock = blockchain.NewBlock(txList, []byte{})
-				break
-			}
-			time.Sleep(1 * time.Second) // Periodically check whether we have enough transactions to package into block.
-		}
-		node.BlockChannel <- *newBlock
-	}
+	node.blockchain.Blocks[0].Transactions = append(node.blockchain.Blocks[0].Transactions, txs...)
+	node.UtxoPool.Update(txs)
 }
 
 // Create a new Node
 func NewNode(consensus *consensus.Consensus) Node {
 	node := Node{}
+
+	// Consensus and associated channel to communicate blocks
 	node.consensus = consensus
 	node.BlockChannel = make(chan blockchain.Block)
+
+	// Genesis Block
+	genesisBlock := &blockchain.Blockchain{}
+	genesisBlock.Blocks = make([]*blockchain.Block, 0)
+	coinbaseTx := blockchain.NewCoinbaseTX("harmony", "1")
+	genesisBlock.Blocks = append(genesisBlock.Blocks, blockchain.NewGenesisBlock(coinbaseTx))
+	node.blockchain = genesisBlock
+
+	// UTXO pool from Genesis block
+	node.UtxoPool = blockchain.CreateUTXOPoolFromGenesisBlockChain(node.blockchain)
+
+	// Logger
+	node.log = node.consensus.Log
 	return node
 }

@@ -4,9 +4,9 @@ import (
 	"bufio"
 	"flag"
 	"harmony-benchmark/consensus"
+	"harmony-benchmark/log"
 	"harmony-benchmark/node"
 	"harmony-benchmark/p2p"
-	"log"
 	"os"
 	"strings"
 )
@@ -59,6 +59,10 @@ func readConfigFile(configFile string) [][]string {
 }
 
 func main() {
+	// Setup a stdout logger
+	h := log.CallerFileHandler(log.StdoutHandler)
+	log.Root().SetHandler(h)
+
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9000", "port of the node.")
 	configFile := flag.String("config_file", "config.txt", "file containing all ip addresses")
@@ -71,28 +75,17 @@ func main() {
 
 	consensus := consensus.NewConsensus(*ip, *port, shardId, peers, leader)
 
-	var nodeStatus string
-	if consensus.IsLeader {
-		nodeStatus = "leader"
-	} else {
-		nodeStatus = "validator"
-	}
-
-	log.Println("======================================")
-	log.Printf("This node is a %s node in shard %s listening on ip: %s and port: %s\n", nodeStatus, shardId, *ip, *port)
-	log.Println("======================================")
-
 	node := node.NewNode(&consensus)
+	// Temporary testing code, to be removed.
+	node.AddMoreFakeTransactions()
 
 	if consensus.IsLeader {
 		// Let consensus run
 		go func() {
-			log.Println("Waiting for block")
 			consensus.WaitForNewBlock(node.BlockChannel)
 		}()
 		// Node waiting for consensus readiness to create new block
 		go func() {
-			log.Println("Waiting for consensus ready")
 			node.WaitForConsensusReady(consensus.ReadySignal)
 		}()
 	}

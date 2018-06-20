@@ -7,18 +7,26 @@ import (
 
 // Blockchain keeps a sequence of Blocks
 type Blockchain struct {
-	blocks []*Block
+	Blocks []*Block
 }
 
 const genesisCoinbaseData = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks"
+
+// Get the latest block at the end of the chain
+func (bc *Blockchain) GetLatestBlock() *Block{
+	if len(bc.Blocks) == 0 {
+		return nil
+	}
+	return bc.Blocks[len(bc.Blocks) - 1]
+}
 
 // FindUnspentTransactions returns a list of transactions containing unspent outputs
 func (bc *Blockchain) FindUnspentTransactions(address string) []Transaction {
 	var unspentTXs []Transaction
 	spentTXOs := make(map[string][]int)
 
-	for index := len(bc.blocks) - 1; index >= 0; index-- {
-		block := bc.blocks[index]
+	for index := len(bc.Blocks) - 1; index >= 0; index-- {
+		block := bc.Blocks[index]
 
 		for _, tx := range block.Transactions {
 			txID := hex.EncodeToString(tx.ID)
@@ -135,7 +143,7 @@ func (bc *Blockchain) NewUTXOTransaction(from, to string, amount int) *Transacti
 func (bc *Blockchain) AddNewUserTransfer(utxoPool *UTXOPool, from, to string, amount int) bool {
 	tx := bc.NewUTXOTransaction(from, to, amount)
 	if tx != nil {
-		newBlock := NewBlock([]*Transaction{tx}, bc.blocks[len(bc.blocks)-1].Hash)
+		newBlock := NewBlock([]*Transaction{tx}, bc.Blocks[len(bc.Blocks)-1].Hash)
 		if bc.VerifyNewBlockAndUpdate(utxoPool, newBlock) {
 			return true
 		}
@@ -145,18 +153,18 @@ func (bc *Blockchain) AddNewUserTransfer(utxoPool *UTXOPool, from, to string, am
 
 // VerifyNewBlockAndUpdate verifies if the new coming block is valid for the current blockchain.
 func (bc *Blockchain) VerifyNewBlockAndUpdate(utxopool *UTXOPool, block *Block) bool {
-	length := len(bc.blocks)
-	if bytes.Compare(block.PrevBlockHash, bc.blocks[length-1].Hash) != 0 {
+	length := len(bc.Blocks)
+	if bytes.Compare(block.PrevBlockHash[:], bc.Blocks[length-1].Hash[:]) != 0 {
 		return false
 	}
-	if block.Timestamp < bc.blocks[length-1].Timestamp {
+	if block.Timestamp < bc.Blocks[length-1].Timestamp {
 		return false
 	}
 
 	if utxopool != nil && !utxopool.VerifyAndUpdate(block.Transactions) {
 		return false
 	}
-	bc.blocks = append(bc.blocks, block)
+	bc.Blocks = append(bc.Blocks, block)
 	return true
 }
 
