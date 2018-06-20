@@ -76,6 +76,7 @@ func main() {
 	consensus := consensus.NewConsensus(*ip, *port, shardId, peers, leader)
 
 	node := node.NewNode(&consensus)
+	node.AddMoreFakeTransactions()
 
 	if consensus.IsLeader {
 		// Let consensus run

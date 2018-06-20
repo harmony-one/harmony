@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"sync"
+	"strconv"
 )
 
 var pendingTxMutex = &sync.Mutex{}
@@ -18,7 +19,7 @@ type Node struct {
 	pendingTransactions    []*blockchain.Transaction
 	transactionInConsensus []*blockchain.Transaction
 	blockchain             *blockchain.Blockchain
-	utxoPool               *blockchain.UTXOPool
+	UtxoPool               *blockchain.UTXOPool
 	log                    log.Logger
 }
 
@@ -30,7 +31,7 @@ func (node *Node) addPendingTransactions(newTxs []*blockchain.Transaction) {
 
 func (node *Node) getTransactionsForNewBlock() []*blockchain.Transaction {
 	pendingTxMutex.Lock()
-	selected, unselected := node.utxoPool.SelectTransactionsForNewBlock(node.pendingTransactions)
+	selected, unselected := node.UtxoPool.SelectTransactionsForNewBlock(node.pendingTransactions)
 	node.pendingTransactions = unselected
 	pendingTxMutex.Unlock()
 	return selected
@@ -38,6 +39,7 @@ func (node *Node) getTransactionsForNewBlock() []*blockchain.Transaction {
 
 // Start a server and process the request by a handler.
 func (node *Node) StartServer(port string) {
+	node.log.Debug("Starting server", "node", node)
 	node.listenOnPort(port)
 }
 
@@ -62,6 +64,18 @@ func (node *Node) String() string {
 	return node.consensus.String()
 }
 
+
+// Testing code. Should be deleted for production
+// Create in genesis block 1000 transactions assigning 1000 token to each address in [1 - 1000]
+func (node *Node) AddMoreFakeTransactions() {
+	txs := make([]*blockchain.Transaction, 1000)
+	for i := range txs {
+		txs[i] = blockchain.NewCoinbaseTX(strconv.Itoa(i), "")
+	}
+	node.blockchain.Blocks[0].Transactions = append(node.blockchain.Blocks[0].Transactions, txs...)
+	node.UtxoPool.Update(txs)
+}
+
 // Create a new Node
 func NewNode(consensus *consensus.Consensus) Node {
 	node := Node{}
@@ -78,10 +92,9 @@ func NewNode(consensus *consensus.Consensus) Node {
 	node.blockchain = genesisBlock
 
 	// UTXO pool from Genesis block
-	node.utxoPool = blockchain.CreateUTXOPoolFromGenesisBlockChain(node.blockchain)
+	node.UtxoPool = blockchain.CreateUTXOPoolFromGenesisBlockChain(node.blockchain)
 
 	// Logger
 	node.log = node.consensus.Log
-	node.log.Debug("New node", "node", node)
 	return node
 }

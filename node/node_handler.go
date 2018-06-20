@@ -123,14 +123,14 @@ func (node *Node) WaitForConsensusReady(readySignal chan int) {
 		// create a new block
 		newBlock := new(blockchain.Block)
 		for {
-			if len(node.pendingTransactions) >= 100 {
+			if len(node.pendingTransactions) >= 10 {
 				selectedTxs := node.getTransactionsForNewBlock()
 				if len(selectedTxs) == 0 {
 					node.log.Debug("No transactions is selected for consensus", "pendingTx", len(node.pendingTransactions))
 				} else {
-					node.log.Debug("Creating new block", "node", node)
+					node.log.Debug("Creating new block", "numTxs", len(selectedTxs), "pendingTxs", len(node.pendingTransactions))
+
 					newBlock = blockchain.NewBlock(selectedTxs, []byte{})
-					node.log.Debug("Num of Pending Tx", "count", len(node.pendingTransactions))
 					break
 				}
 			}

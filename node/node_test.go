@@ -28,7 +28,7 @@ func TestNewNewNode(test *testing.T) {
 		test.Error("Coinbase TX is not initialized for the node")
 	}
 
-	if node.utxoPool == nil {
+	if node.UtxoPool == nil {
 		test.Error("Utxo pool is not initialized for the node")
 	}
 }
