@@ -36,7 +36,7 @@ type Consensus struct {
 	// BlockHeader to run consensus on
 	blockHeader []byte
 	// Shard Id which this node belongs to
-	ShardId uint32
+	ShardIDShardID uint32
 
 	// Signal channel for starting a new consensus process
 	ReadySignal chan int
@@ -80,8 +80,10 @@ func (state ConsensusState) String() string {
 	return names[state]
 }
 
-// Create a new Consensus object
-func NewConsensus(ip, port, shardId string, peers []p2p.Peer, leader p2p.Peer) Consensus {
+// NewConsensus creates a new Consensus object
+// TODO(minhdoan): Maybe convert it into just New
+// FYI, see https://golang.org/doc/effective_go.html?#package-names
+func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) Consensus {
 	// The first Ip, port passed will be leader.
 	consensus := Consensus{}
 	peer := p2p.Peer{Port: port, Ip: ip}
@@ -104,11 +106,11 @@ func NewConsensus(ip, port, shardId string, peers []p2p.Peer, leader p2p.Peer) C
 		consensus.Log.Crit("Regex Compilation Failed", "err", err, "consensus", consensus)
 	}
 	consensus.consensusId = 0
-	myShardId, err := strconv.Atoi(shardId)
+	myShardIDShardID, err := strconv.Atoi(ShardID)
 	if err != nil {
-		panic("Unparseable shard Id" + shardId)
+		panic("Unparseable shard Id" + ShardID)
 	}
-	consensus.ShardId = uint32(myShardId)
+	consensus.ShardIDShardID = uint32(myShardIDShardID)
 
 	// For now use socket address as 16 byte Id
 	// TODO: populate with correct Id
@@ -146,5 +148,5 @@ func (consensus *Consensus) String() string {
 	} else {
 		duty = "VLD" // validator
 	}
-	return fmt.Sprintf("[%s, %s, %v, %v]", duty, consensus.priKey, consensus.ShardId, consensus.nodeId)
+	return fmt.Sprintf("[%s, %s, %v, %v]", duty, consensus.priKey, consensus.ShardIDShardID, consensus.nodeId)
 }

@@ -14,8 +14,10 @@ const msgKey = "msg"
 const errorKey = "LOG15_ERROR"
 const skipLevel = 2
 
+// Lvl type.
 type Lvl int
 
+// Constants.
 const (
 	LvlCrit Lvl = iota
 	LvlError

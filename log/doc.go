@@ -1,3 +1,5 @@
+package log
+
 /*
 Package log15 provides an opinionated, simple toolkit for best-practice logging that is
 both human and machine readable. It is modeled after the standard library's io and net/http
@@ -330,4 +332,3 @@ The Name
 https://xkcd.com/927/
 
 */
-package log
