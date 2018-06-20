@@ -14,21 +14,32 @@ var pendingTxMutex = &sync.Mutex{}
 
 // A node represents a program (machine) participating in the network
 type Node struct {
+	// Consensus object containing all consensus related data (e.g. committee members, signatures, commits)
 	consensus              *consensus.Consensus
+	// The channel to receive new blocks from Node
 	BlockChannel           chan blockchain.Block
+	// All the transactions received but not yet processed for consensus
 	pendingTransactions    []*blockchain.Transaction
+	// The transactions selected into the new block and under consensus process
 	transactionInConsensus []*blockchain.Transaction
+	// The blockchain for the shard where this node belongs
 	blockchain             *blockchain.Blockchain
+	// The corresponding UTXO pool of the current blockchain
 	UtxoPool               *blockchain.UTXOPool
+
+	// Log utility
 	log                    log.Logger
 }
 
+// Add new transactions to the pending transaction list
 func (node *Node) addPendingTransactions(newTxs []*blockchain.Transaction) {
 	pendingTxMutex.Lock()
 	node.pendingTransactions = append(node.pendingTransactions, newTxs...)
 	pendingTxMutex.Unlock()
 }
 
+// Take out a subset of valid transactions from the pending transaction list
+// Note the pending transaction list will then contain the rest of the txs
 func (node *Node) getTransactionsForNewBlock() []*blockchain.Transaction {
 	pendingTxMutex.Lock()
 	selected, unselected := node.UtxoPool.SelectTransactionsForNewBlock(node.pendingTransactions)
@@ -64,9 +75,8 @@ func (node *Node) String() string {
 	return node.consensus.String()
 }
 
-
-// Testing code. Should be deleted for production
-// Create in genesis block 1000 transactions assigning 1000 token to each address in [1 - 1000]
+// [Testing code] Should be deleted for production
+// Create in genesis block 1000 transactions which assign 1000 token to each address in [1 - 1000]
 func (node *Node) AddMoreFakeTransactions() {
 	txs := make([]*blockchain.Transaction, 1000)
 	for i := range txs {

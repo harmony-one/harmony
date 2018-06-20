@@ -301,6 +301,8 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 
 			consensus.ResetState()
 			consensus.consensusId++
+
+			// Send signal to Node so the new block can be added and new round of consensus can be triggered
 			consensus.ReadySignal <- 1
 		}
 		// TODO: composes new block and broadcast the new block to validators

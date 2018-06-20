@@ -12,6 +12,7 @@ type Blockchain struct {
 
 const genesisCoinbaseData = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks"
 
+// Get the latest block at the end of the chain
 func (bc *Blockchain) GetLatestBlock() *Block{
 	if len(bc.Blocks) == 0 {
 		return nil
@@ -142,7 +143,7 @@ func (bc *Blockchain) NewUTXOTransaction(from, to string, amount int) *Transacti
 func (bc *Blockchain) AddNewUserTransfer(utxoPool *UTXOPool, from, to string, amount int) bool {
 	tx := bc.NewUTXOTransaction(from, to, amount)
 	if tx != nil {
-		newBlock := NewBlock([]*Transaction{tx}, bc.Blocks[len(bc.Blocks)-1].Hash[:])
+		newBlock := NewBlock([]*Transaction{tx}, bc.Blocks[len(bc.Blocks)-1].Hash)
 		if bc.VerifyNewBlockAndUpdate(utxoPool, newBlock) {
 			return true
 		}
@@ -153,7 +154,7 @@ func (bc *Blockchain) AddNewUserTransfer(utxoPool *UTXOPool, from, to string, am
 // VerifyNewBlockAndUpdate verifies if the new coming block is valid for the current blockchain.
 func (bc *Blockchain) VerifyNewBlockAndUpdate(utxopool *UTXOPool, block *Block) bool {
 	length := len(bc.Blocks)
-	if bytes.Compare(block.PrevBlockHash, bc.Blocks[length-1].Hash[:]) != 0 {
+	if bytes.Compare(block.PrevBlockHash[:], bc.Blocks[length-1].Hash[:]) != 0 {
 		return false
 	}
 	if block.Timestamp < bc.Blocks[length-1].Timestamp {

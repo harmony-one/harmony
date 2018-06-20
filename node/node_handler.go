@@ -123,29 +123,34 @@ func (node *Node) WaitForConsensusReady(readySignal chan int) {
 		<-readySignal
 		//node.log.Debug("Adding new block", "currentChainSize", len(node.blockchain.Blocks), "numTxs", len(node.blockchain.GetLatestBlock().Transactions), "PrevHash", node.blockchain.GetLatestBlock().PrevBlockHash, "Hash", node.blockchain.GetLatestBlock().Hash)
 		if newBlock != nil {
-			// Consensus is done on the previous newBlock, add it to blockchain
+			// Consensus is done on the newBlock (in the previous round of consensus), add it to blockchain
 			node.blockchain.Blocks = append(node.blockchain.Blocks, newBlock)
 			// Update UTXO pool
 			node.UtxoPool.Update(node.transactionInConsensus)
-			// Clear transaction in consensus slice
+			// Clear transaction-in-consensus list
 			node.transactionInConsensus = []*blockchain.Transaction{}
 		}
 		for {
+			// Once we have more than 10 transactions pending we will try creating a new block
 			if len(node.pendingTransactions) >= 10 {
 				selectedTxs := node.getTransactionsForNewBlock()
 
 				if len(selectedTxs) == 0 {
-					node.log.Debug("No transactions is selected for consensus", "pendingTx", len(node.pendingTransactions))
+					node.log.Debug("No valid transactions exist", "pendingTx", len(node.pendingTransactions))
 				} else {
 					node.log.Debug("Creating new block", "numTxs", len(selectedTxs), "pendingTxs", len(node.pendingTransactions), "currentChainSize", len(node.blockchain.Blocks))
 
 					node.transactionInConsensus = selectedTxs
-					newBlock = blockchain.NewBlock(selectedTxs, node.blockchain.GetLatestBlock().Hash[:])
+					newBlock = blockchain.NewBlock(selectedTxs, node.blockchain.GetLatestBlock().Hash)
 					break
 				}
 			}
-			time.Sleep(1 * time.Second) // Periodically check whether we have enough transactions to package into block.
+			// If not enough transactions to run consensus,
+			// periodically check whether we have enough transactions to package into block.
+			time.Sleep(1 * time.Second)
 		}
+
+		// Send the new block to consensus so it can be confirmed.
 		node.BlockChannel <- *newBlock
 	}
 }

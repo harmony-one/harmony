@@ -24,8 +24,8 @@ import (
 // NOTE: the genesis block should contain 1000 coinbase transactions adding
 //       value to each address in [1 - 1000]. See node.AddMoreFakeTransactions()
 func getNewFakeTransactions(dataNode *node.Node, numTxs int) []*blockchain.Transaction {
-
 	/*
+	  UTXO map structure:
 	     address - [
 	                txId1 - [
 	                        outputIndex1 - value1
@@ -37,7 +37,6 @@ func getNewFakeTransactions(dataNode *node.Node, numTxs int) []*blockchain.Trans
 	                       ]
 	               ]
 	*/
-
 	var outputs []*blockchain.Transaction
 	count := 0
 	countAll := 0
@@ -119,15 +118,15 @@ func main() {
 	numTxsPerBatch := flag.Int("num_txs_per_batch", 1000, "number of transactions to send per message")
 	flag.Parse()
 	config := readConfigFile(*configFile)
+	leaders := getLeaders(&config)
 
-	// Testing node
+	// Testing node to mirror the node data in consensus
 	dataNode := node.NewNode(&consensus.Consensus{})
 	dataNode.AddMoreFakeTransactions()
 
 	start := time.Now()
 	totalTime := 60.0
-	leaders := getLeaders(&config)
-	time.Sleep(5 * time.Second) // wait for nodes to run
+	time.Sleep(3 * time.Second) // wait for nodes to be ready
 	for true {
 		t := time.Now()
 		if t.Sub(start).Seconds() >= totalTime {
@@ -139,9 +138,12 @@ func main() {
 		log.Debug("[Generator] Sending txs...", "numTxs", len(txsToSend))
 		p2p.BroadcastMessage(leaders, msg)
 
+		// Update local utxo pool to mirror the utxo pool of a real node
 		dataNode.UtxoPool.Update(txsToSend)
-		time.Sleep(1 * time.Second) // 10 transactions per second
+		time.Sleep(1 * time.Second) // Send a batch of transactions every second
 	}
+
+	// Send a stop message to stop the nodes at the end
 	msg := node.ConstructStopMessage()
 	peers := append(getValidators(*configFile), leaders...)
 	p2p.BroadcastMessage(peers, msg)
