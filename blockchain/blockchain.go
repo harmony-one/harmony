@@ -29,7 +29,7 @@ func (bc *Blockchain) FindUnspentTransactions(address string) []Transaction {
 		block := bc.Blocks[index]
 
 		for _, tx := range block.Transactions {
-			txID := hex.EncodeToString(tx.ID)
+			txID := hex.EncodeToString(tx.ID[:])
 
 			idx := -1
 			// TODO(minhdoan): Optimize this.
@@ -85,7 +85,7 @@ func (bc *Blockchain) FindSpendableOutputs(address string, amount int) (int, map
 
 Work:
 	for _, tx := range unspentTXs {
-		txID := hex.EncodeToString(tx.ID)
+		txID := hex.EncodeToString(tx.ID[:])
 
 		for outIdx, txOutput := range tx.TxOutput {
 			if txOutput.Address == address && accumulated < amount {
@@ -132,7 +132,7 @@ func (bc *Blockchain) NewUTXOTransaction(from, to string, amount int) *Transacti
 		outputs = append(outputs, TXOutput{acc - amount, from}) // a change
 	}
 
-	tx := Transaction{nil, inputs, outputs}
+	tx := Transaction{[32]byte{}, inputs, outputs}
 	tx.SetID()
 
 	return &tx

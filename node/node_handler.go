@@ -85,19 +85,21 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 	case REQUEST:
 		reader := bytes.NewBuffer(msgPayload[1:])
 		var txIds map[[32]byte]bool
-		txId := make([]byte, 32) // 32 byte hash Id
+		buf := make([]byte, 32) // 32 byte hash Id
 		for {
-			_, err := reader.Read(txId)
+			_, err := reader.Read(buf)
 			if err != nil {
 				break
 			}
 
-			txIds[getFixedByteTxId(txId)] = true
+			var txId [32]byte
+			copy(txId[:], buf)
+			txIds[txId] = true
 		}
 
 		var txToReturn []*blockchain.Transaction
 		for _, tx := range node.pendingTransactions {
-			if txIds[getFixedByteTxId(tx.ID)] {
+			if txIds[tx.ID] {
 				txToReturn = append(txToReturn, tx)
 			}
 		}
@@ -106,14 +108,6 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 	}
 }
 
-// Copy the txId byte slice over to 32 byte array so the map can key on it
-func getFixedByteTxId(txId []byte) [32]byte {
-	var id [32]byte
-	for i := range id {
-		id[i] = txId[i]
-	}
-	return id
-}
 
 func (node *Node) WaitForConsensusReady(readySignal chan int) {
 	node.log.Debug("Waiting for consensus ready", "node", node)

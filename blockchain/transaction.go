@@ -11,7 +11,7 @@ import (
 
 // Transaction represents a Bitcoin transaction
 type Transaction struct {
-	ID       []byte // 32 byte hash
+	ID       [32]byte // 32 byte hash
 	TxInput  []TXInput
 	TxOutput []TXOutput
 }
@@ -43,7 +43,7 @@ func (tx *Transaction) SetID() {
 		log.Panic(err)
 	}
 	hash = sha256.Sum256(encoded.Bytes())
-	tx.ID = hash[:]
+	tx.ID = hash
 }
 
 // NewCoinbaseTX creates a new coinbase transaction
@@ -54,7 +54,7 @@ func NewCoinbaseTX(to, data string) *Transaction {
 
 	txin := TXInput{[]byte{}, -1, data}
 	txout := TXOutput{DefaultCoinbaseValue, to}
-	tx := Transaction{nil, []TXInput{txin}, []TXOutput{txout}}
+	tx := Transaction{[32]byte{}, []TXInput{txin}, []TXOutput{txout}}
 	tx.SetID()
 	return &tx
 }
@@ -76,7 +76,7 @@ func (txOutput *TXOutput) String() string {
 
 // Used for debuging.
 func (tx *Transaction) String() string {
-	res := fmt.Sprintf("ID: %v\n", hex.EncodeToString(tx.ID))
+	res := fmt.Sprintf("ID: %v\n", hex.EncodeToString(tx.ID[:]))
 	res += fmt.Sprintf("TxInput:\n")
 	for id, value := range tx.TxInput {
 		res += fmt.Sprintf("%v: %v\n", id, value.String())
