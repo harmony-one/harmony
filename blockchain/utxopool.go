@@ -233,16 +233,23 @@ func (utxoPool *UTXOPool) DeleteOneBalanceItem(address, txID string, index int) 
 }
 
 // CleanUp cleans up UTXOPool.
-// func (utxoPool *UTXOPool) CleanUp() string {
-// 	for address, txMap := range utxoPool.UtxoMap {
-// 		for txid, outIndexes := range txMap {
-// 			if len(outIndexes) == 0 {
-// 				utxoPool.UtxoMap[address] = delete(utxoPool.UtxoMap[address], txid)
-// 			}
-// 		}
-// 	}
-// 	return res
-// }
+func (utxoPool *UTXOPool) CleanUp() {
+	for address, txMap := range utxoPool.UtxoMap {
+		for txid, outIndexes := range txMap {
+			for index, value := range outIndexes {
+				if value == 0 {
+					delete(utxoPool.UtxoMap[address][txid], index)
+				}
+			}
+			if len(utxoPool.UtxoMap[address][txid]) == 0 {
+				delete(utxoPool.UtxoMap[address], txid)
+			}
+		}
+		if len(utxoPool.UtxoMap[address]) == 0 {
+			delete(utxoPool.UtxoMap, address)
+		}
+	}
+}
 
 // Used for debugging.
 func (utxoPool *UTXOPool) String() string {
