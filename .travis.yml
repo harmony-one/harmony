@@ -8,6 +8,7 @@ install:
   - mv github.com/simple-rules/harmony-benchmark ./
   - cd harmony-benchmark
   - go get github.com/go-stack/stack
+  - ./.travis.gofmt.sh
   - go build
 notifications:
   slack:
