@@ -2,27 +2,27 @@ package node
 
 import (
 	"bytes"
-	"harmony-benchmark/blockchain"
-	"time"
-	"net"
-	"harmony-benchmark/p2p"
-	"harmony-benchmark/common"
-	"os"
 	"encoding/gob"
+	"harmony-benchmark/blockchain"
+	"harmony-benchmark/common"
+	"harmony-benchmark/p2p"
+	"net"
+	"os"
+	"time"
 )
 
-// Handler of the leader node.
+// NodeHandler handles a new incoming connection.
 func (node *Node) NodeHandler(conn net.Conn) {
 	defer conn.Close()
 
 	// Read p2p message payload
 	content, err := p2p.ReadMessageContent(conn)
 
-	consensus := node.consensus
 	if err != nil {
 		node.log.Error("Read p2p data failed", "err", err, "node", node)
 		return
 	}
+	consensus := node.consensus
 
 	msgCategory, err := common.GetMessageCategory(content)
 	if err != nil {
@@ -106,7 +106,7 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 	}
 }
 
-// Copy the txId byte slice over to 32 byte array so the map can key on it
+// getFixedByteTxId copies the txId byte slice over to 32 byte array so the map can key on it
 func getFixedByteTxId(txId []byte) [32]byte {
 	var id [32]byte
 	for i := range id {
@@ -115,6 +115,7 @@ func getFixedByteTxId(txId []byte) [32]byte {
 	return id
 }
 
+// WaitForConsensusReady ...
 func (node *Node) WaitForConsensusReady(readySignal chan int) {
 	node.log.Debug("Waiting for consensus ready", "node", node)
 

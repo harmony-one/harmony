@@ -6,29 +6,30 @@ import (
 	"harmony-benchmark/log"
 	"net"
 	"os"
-	"sync"
 	"strconv"
+	"sync"
 )
 
 var pendingTxMutex = &sync.Mutex{}
 
-// A node represents a program (machine) participating in the network
+// Node represents a program (machine) participating in the network
+// TODO(minhdoan, rj): consider using BlockChannel *chan blockchain.Block for efficiency.
 type Node struct {
 	// Consensus object containing all consensus related data (e.g. committee members, signatures, commits)
-	consensus              *consensus.Consensus
+	consensus *consensus.Consensus
 	// The channel to receive new blocks from Node
-	BlockChannel           chan blockchain.Block
+	BlockChannel chan blockchain.Block
 	// All the transactions received but not yet processed for consensus
-	pendingTransactions    []*blockchain.Transaction
+	pendingTransactions []*blockchain.Transaction
 	// The transactions selected into the new block and under consensus process
 	transactionInConsensus []*blockchain.Transaction
 	// The blockchain for the shard where this node belongs
-	blockchain             *blockchain.Blockchain
+	blockchain *blockchain.Blockchain
 	// The corresponding UTXO pool of the current blockchain
-	UtxoPool               *blockchain.UTXOPool
+	UtxoPool *blockchain.UTXOPool
 
 	// Log utility
-	log                    log.Logger
+	log log.Logger
 }
 
 // Add new transactions to the pending transaction list
