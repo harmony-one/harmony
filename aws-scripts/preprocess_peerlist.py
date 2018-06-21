@@ -8,12 +8,14 @@ if __name__ == "__main__":
         mylist = myline.split(" ")
         ip = mylist[0]
         node = mylist[2]
-        if node != "transaction":
-            peerList.append(myline)
+        if str(ip) != str(current_ip):
+            if node != "transaction":
+                peerList.append(myline)
         else:
-            h = open("isTransaction.txt","w")
-            h.write("I am just a transaction generator node")
-            h.close()
+            if node == "transaction":
+                h = open("isTransaction.txt","w")
+                h.write("I am just a transaction generator node")
+                h.close()
     f.close()
     g = open("global_peerlist.txt","w")
     for myline in peerList:
