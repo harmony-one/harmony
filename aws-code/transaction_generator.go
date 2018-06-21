@@ -110,6 +110,7 @@ func readConfigFile(configFile string) [][]string {
 }
 
 func main() {
+<<<<<<< HEAD
 	// Setup a stdout logger
 	h := log.CallerFileHandler(log.StdoutHandler)
 	log.Root().SetHandler(h)
@@ -130,23 +131,25 @@ func main() {
 	start := time.Now()
 	totalTime := 60.0
 	time.Sleep(3 * time.Second) // wait for nodes to be ready
+=======
+	configFile := flag.String("config_file", "global_nodes.txt", "file containing all ip addresses and config")
+	flag.Parse()
+	config := readConfigFile(*configFile)
+	totalTime := 60.0
+	time.Sleep(totalTime) //Sleep Time to let all instances come up
+	start := time.Now()
+	txs := make([]blockchain.Transaction, 10)
+	leaders := getLeaders(&config)
+>>>>>>> aadf3f9b34b9b4b84841dce554814f05f120aed1
 	for true {
 		t := time.Now()
 		if t.Sub(start).Seconds() >= totalTime {
 			fmt.Println(int(t.Sub(start)), start, totalTime)
 			break
 		}
-<<<<<<< HEAD
-		for i := range txs {
-			txs[i] = newRandTransaction()
-		}
-		msg := node.ConstructTransactionListMessage(txs)
-		log.Printf("[Generator] Sending txs to %d leader[s]\n", len(leaders))
-=======
 		txsToSend := getNewFakeTransactions(&dataNode, *numTxsPerBatch)
 		msg := node.ConstructTransactionListMessage(txsToSend)
 		log.Debug("[Generator] Sending txs...", "numTxs", len(txsToSend))
->>>>>>> 31f111ed5d49c01a9c3a20e92e053016c05ebafc
 		p2p.BroadcastMessage(leaders, msg)
 
 		// Update local utxo pool to mirror the utxo pool of a real node
