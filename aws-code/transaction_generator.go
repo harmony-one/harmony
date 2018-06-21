@@ -53,7 +53,7 @@ func getNewFakeTransactions(dataNode *node.Node, numTxs int) []*blockchain.Trans
 				    // Spend the money of current UTXO to a random address in [1 - 1000]
 					txin := blockchain.TXInput{txId, index, address}
 					txout := blockchain.TXOutput{value, strconv.Itoa(rand.Intn(1000))}
-					tx := blockchain.Transaction{nil, []blockchain.TXInput{txin}, []blockchain.TXOutput{txout}}
+					tx := blockchain.Transaction{[32]byte{}, []blockchain.TXInput{txin}, []blockchain.TXOutput{txout}}
 					tx.SetID()
 
 					if count >= numTxs {

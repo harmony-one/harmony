@@ -85,34 +85,27 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 	case REQUEST:
 		reader := bytes.NewBuffer(msgPayload[1:])
 		var txIds map[[32]byte]bool
-		txId := make([]byte, 32) // 32 byte hash Id
+		buf := make([]byte, 32) // 32 byte hash Id
 		for {
-			_, err := reader.Read(txId)
+			_, err := reader.Read(buf)
 			if err != nil {
 				break
 			}
 
-			txIds[getFixedByteTxId(txId)] = true
+			var txId [32]byte
+			copy(txId[:], buf)
+			txIds[txId] = true
 		}
 
 		var txToReturn []*blockchain.Transaction
 		for _, tx := range node.pendingTransactions {
-			if txIds[getFixedByteTxId(tx.ID)] {
+			if txIds[tx.ID] {
 				txToReturn = append(txToReturn, tx)
 			}
 		}
 
 		// TODO: return the transaction list to requester
 	}
-}
-
-// getFixedByteTxId copies the txId byte slice over to 32 byte array so the map can key on it
-func getFixedByteTxId(txId []byte) [32]byte {
-	var id [32]byte
-	for i := range id {
-		id[i] = txId[i]
-	}
-	return id
 }
 
 // WaitForConsensusReady ...
@@ -123,14 +116,6 @@ func (node *Node) WaitForConsensusReady(readySignal chan int) {
 	for { // keep waiting for consensus ready
 		<-readySignal
 		//node.log.Debug("Adding new block", "currentChainSize", len(node.blockchain.Blocks), "numTxs", len(node.blockchain.GetLatestBlock().Transactions), "PrevHash", node.blockchain.GetLatestBlock().PrevBlockHash, "Hash", node.blockchain.GetLatestBlock().Hash)
-		if newBlock != nil {
-			// Consensus is done on the newBlock (in the previous round of consensus), add it to blockchain
-			node.blockchain.Blocks = append(node.blockchain.Blocks, newBlock)
-			// Update UTXO pool
-			node.UtxoPool.Update(node.transactionInConsensus)
-			// Clear transaction-in-consensus list
-			node.transactionInConsensus = []*blockchain.Transaction{}
-		}
 		for {
 			// Once we have more than 10 transactions pending we will try creating a new block
 			if len(node.pendingTransactions) >= 10 {
@@ -154,4 +139,17 @@ func (node *Node) WaitForConsensusReady(readySignal chan int) {
 		// Send the new block to consensus so it can be confirmed.
 		node.BlockChannel <- *newBlock
 	}
+}
+
+func (node *Node) VerifyNewBlock(newBlock *blockchain.Block) bool {
+	return node.UtxoPool.VerifyTransactions(newBlock.Transactions)
+}
+
+func (node *Node) AddNewBlockToBlockchain(newBlock *blockchain.Block) {
+	// Add it to blockchain
+	node.blockchain.Blocks = append(node.blockchain.Blocks, newBlock)
+	// Update UTXO pool
+	node.UtxoPool.Update(newBlock.Transactions)
+	// Clear transaction-in-consensus list
+	node.transactionInConsensus = []*blockchain.Transaction{}
 }

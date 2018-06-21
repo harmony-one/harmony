@@ -79,7 +79,7 @@ func (utxoPool *UTXOPool) VerifyTransactions(transactions []*Transaction) bool {
 // VerifyOneTransaction verifies if a list of transactions valid.
 func (utxoPool *UTXOPool) VerifyOneTransaction(tx *Transaction) bool {
 	spentTXOs := make(map[string]map[string]map[int]bool)
-	txID := hex.EncodeToString(tx.ID)
+	txID := hex.EncodeToString(tx.ID[:])
 	inTotal := 0
 	// Calculate the sum of TxInput
 	for _, in := range tx.TxInput {
@@ -121,7 +121,7 @@ func (utxoPool *UTXOPool) VerifyOneTransaction(tx *Transaction) bool {
 // UpdateOneTransaction updates utxoPool in respect to the new Transaction.
 func (utxoPool *UTXOPool) UpdateOneTransaction(tx *Transaction) {
 	if utxoPool != nil {
-		txID := hex.EncodeToString(tx.ID)
+		txID := hex.EncodeToString(tx.ID[:])
 
 		// Remove
 		for _, in := range tx.TxInput {
@@ -166,7 +166,7 @@ func (utxoPool *UTXOPool) VerifyAndUpdate(transactions []*Transaction) bool {
 func (utxoPool *UTXOPool) Update(transactions []*Transaction) {
 	if utxoPool != nil {
 		for _, tx := range transactions {
-			curTxID := hex.EncodeToString(tx.ID)
+			curTxID := hex.EncodeToString(tx.ID[:])
 
 			// Remove
 			for _, in := range tx.TxInput {
@@ -192,7 +192,7 @@ func (utxoPool *UTXOPool) Update(transactions []*Transaction) {
 // CreateUTXOPoolFromTransaction a Utxo pool from a genesis transaction.
 func CreateUTXOPoolFromTransaction(tx *Transaction) *UTXOPool {
 	var utxoPool UTXOPool
-	txID := hex.EncodeToString(tx.ID)
+	txID := hex.EncodeToString(tx.ID[:])
 	utxoPool.UtxoMap = make(map[string]map[string]map[int]int)
 	for index, out := range tx.TxOutput {
 		utxoPool.UtxoMap[out.Address] = make(map[string]map[int]int)

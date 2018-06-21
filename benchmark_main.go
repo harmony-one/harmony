@@ -76,6 +76,10 @@ func main() {
 	consensus := consensus.NewConsensus(*ip, *port, shardId, peers, leader)
 
 	node := node.NewNode(&consensus)
+	// Assign closure functions to the consensus object
+	consensus.BlockVerifier = node.VerifyNewBlock
+	consensus.OnConsensusDone = node.AddNewBlockToBlockchain
+
 	// Temporary testing code, to be removed.
 	node.AddMoreFakeTransactions()
 
@@ -85,6 +89,11 @@ func main() {
 			consensus.WaitForNewBlock(node.BlockChannel)
 		}()
 		// Node waiting for consensus readiness to create new block
+		go func() {
+			node.WaitForConsensusReady(consensus.ReadySignal)
+		}()
+	} else {
+		// Node waiting to add new block to the blockchain
 		go func() {
 			node.WaitForConsensusReady(consensus.ReadySignal)
 		}()

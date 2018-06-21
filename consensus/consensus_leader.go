@@ -6,11 +6,10 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
-	"errors"
-	"fmt"
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/p2p"
 	"strings"
+	"encoding/gob"
 )
 
 var mutex = &sync.Mutex{}
@@ -63,21 +62,23 @@ func (consensus *Consensus) processStartConsensusMessage(payload []byte) {
 
 func (consensus *Consensus) startConsensus(newBlock *blockchain.Block) {
 	// prepare message and broadcast to validators
-	// Construct new block
-	//newBlock := constructNewBlock()
-	copy(newBlock.Hash[:32], consensus.blockHash[:])
 
-	msgToSend, err := consensus.constructAnnounceMessage()
-	if err != nil {
-		return
-	}
+	// Copy over block hash and block header data
+	copy(consensus.blockHash[:], newBlock.Hash[:])
+
+	byteBuffer := bytes.NewBuffer([]byte{})
+	encoder := gob.NewEncoder(byteBuffer)
+	encoder.Encode(newBlock)
+	consensus.blockHeader = byteBuffer.Bytes()
+
+	msgToSend := consensus.constructAnnounceMessage()
 	// Set state to ANNOUNCE_DONE
 	consensus.state = ANNOUNCE_DONE
 	p2p.BroadcastMessage(consensus.validators, msgToSend)
 }
 
 // Construct the announce message to send to validators
-func (consensus Consensus) constructAnnounceMessage() ([]byte, error) {
+func (consensus Consensus) constructAnnounceMessage() []byte {
 	buffer := bytes.NewBuffer([]byte{})
 
 	// 4 byte consensus id
@@ -86,9 +87,6 @@ func (consensus Consensus) constructAnnounceMessage() ([]byte, error) {
 	buffer.Write(fourBytes)
 
 	// 32 byte block hash
-	if len(consensus.blockHash) != 32 {
-		return buffer.Bytes(), errors.New(fmt.Sprintf("Block Hash size is %d bytes", len(consensus.blockHash)))
-	}
 	buffer.Write(consensus.blockHash[:])
 
 	// 2 byte leader id
@@ -97,11 +95,10 @@ func (consensus Consensus) constructAnnounceMessage() ([]byte, error) {
 	buffer.Write(twoBytes)
 
 	// n byte of block header
-	blockHeader := getBlockHeader()
-	buffer.Write(blockHeader)
+	buffer.Write(consensus.blockHeader)
 
 	// 4 byte of payload size
-	sizeOfPayload := uint32(len(blockHeader))
+	sizeOfPayload := uint32(len(consensus.blockHeader))
 	binary.BigEndian.PutUint32(fourBytes, sizeOfPayload)
 	buffer.Write(fourBytes)
 
@@ -109,17 +106,7 @@ func (consensus Consensus) constructAnnounceMessage() ([]byte, error) {
 	signature := signMessage(buffer.Bytes())
 	buffer.Write(signature)
 
-	return consensus.ConstructConsensusMessage(ANNOUNCE, buffer.Bytes()), nil
-}
-
-// Get the hash of a block's byte stream
-func getBlockHash(block []byte) [32]byte {
-	return sha256.Sum256(block)
-}
-
-// TODO: fill in this function
-func getBlockHeader() []byte {
-	return make([]byte, 200)
+	return consensus.ConstructConsensusMessage(ANNOUNCE, buffer.Bytes())
 }
 
 func signMessage(message []byte) []byte {
@@ -300,6 +287,16 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 			consensus.Log.Debug("HOORAY!!! CONSENSUS REACHED!!!", "numOfNodes", len(consensus.validators))
 
 			consensus.ResetState()
+
+			// TODO: reconstruct the whole block from header and transactions
+			// For now, we used the stored whole block in consensus.blockHeader
+			txDecoder := gob.NewDecoder(bytes.NewReader(consensus.blockHeader))
+			var blockHeaderObj blockchain.Block
+			err := txDecoder.Decode(&blockHeaderObj)
+			if err != nil {
+				consensus.Log.Debug("failed to construct the new block after consensus")
+			}
+			consensus.OnConsensusDone(&blockHeaderObj)
 			consensus.consensusId++
 
 			// Send signal to Node so the new block can be added and new round of consensus can be triggered
