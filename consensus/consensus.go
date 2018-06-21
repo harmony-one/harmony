@@ -38,11 +38,10 @@ type Consensus struct {
 	// BlockHeader to run consensus on
 	blockHeader []byte
 	// Shard Id which this node belongs to
-	ShardIDShardID uint32
+	ShardID uint32
 
-    // global consensus mutex
+	// global consensus mutex
 	mutex sync.Mutex
-
 
 	// Validator specific fields
 	// Blocks received but not done with consensus yet
@@ -51,7 +50,7 @@ type Consensus struct {
 	// Signal channel for starting a new consensus process
 	ReadySignal chan int
 	// The verifier func passed from Node object
-	BlockVerifier func(*blockchain.Block)bool
+	BlockVerifier func(*blockchain.Block) bool
 	// The post-consensus processing func passed from Node object
 	// Called when consensus on a new block is done
 	OnConsensusDone func(*blockchain.Block)
@@ -84,12 +83,13 @@ type BlockConsensusStatus struct {
 type ConsensusState int
 
 const (
-	FINISHED ConsensusState = iota  // initial state or state after previous consensus is done.
+	FINISHED ConsensusState = iota // initial state or state after previous consensus is done.
 	ANNOUNCE_DONE
 	COMMIT_DONE
 	CHALLENGE_DONE
 	RESPONSE_DONE
 )
+
 // Returns string name for the ConsensusState enum
 func (state ConsensusState) String() string {
 	names := [...]string{
@@ -131,11 +131,11 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) C
 		consensus.Log.Crit("Regex Compilation Failed", "err", err, "consensus", consensus)
 	}
 	consensus.consensusId = 0
-	myShardIDShardID, err := strconv.Atoi(ShardID)
+	myShardID, err := strconv.Atoi(ShardID)
 	if err != nil {
 		panic("Unparseable shard Id" + ShardID)
 	}
-	consensus.ShardIDShardID = uint32(myShardIDShardID)
+	consensus.ShardID = uint32(myShardID)
 
 	// For validators
 	consensus.blocksReceived = make(map[uint32]*BlockConsensusStatus)
@@ -176,5 +176,5 @@ func (consensus *Consensus) String() string {
 	} else {
 		duty = "VLD" // validator
 	}
-	return fmt.Sprintf("[%s, %s, %v, %v, %s]", duty, consensus.priKey, consensus.ShardIDShardID, consensus.nodeId, consensus.state)
+	return fmt.Sprintf("[%s, %s, %v, %v, %s]", duty, consensus.priKey, consensus.ShardID, consensus.nodeId, consensus.state)
 }
