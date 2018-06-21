@@ -66,7 +66,6 @@ func main() {
 	configFile := flag.String("config_file", "local_config.txt", "file containing all ip addresses and config")
 	flag.Parse()
 	config := readConfigFile(*configFile)
-
 	start := time.Now()
 	totalTime := 60.0
 	txs := make([]blockchain.Transaction, 10)
@@ -79,7 +78,6 @@ func main() {
 		}
 		for i := range txs {
 			txs[i] = newRandTransaction()
-
 		}
 		msg := node.ConstructTransactionListMessage(txs)
 		log.Printf("[Generator] Sending txs to %d leader[s]\n", len(leaders))
