@@ -49,10 +49,10 @@ func getNewFakeTransactions(dataNode *node.Node, numTxs int) []*blockchain.Trans
 			}
 			for index, value := range utxoMap {
 				countAll++
-				if rand.Intn(100) <= 50 { // 20% sample rate to select UTXO to use for new transactions
+				if rand.Intn(100) < 50 { // 50% sample rate to select UTXO to use for new transactions
 					// Spend the money of current UTXO to a random address in [1 - 1000]
 					txin := blockchain.TXInput{txId, index, address}
-					txout := blockchain.TXOutput{value, strconv.Itoa(rand.Intn(1000))}
+					txout := blockchain.TXOutput{value, strconv.Itoa(rand.Intn(10000))}
 					tx := blockchain.Transaction{[32]byte{}, []blockchain.TXInput{txin}, []blockchain.TXOutput{txout}}
 					tx.SetID()
 
@@ -115,32 +115,39 @@ func main() {
 	log.Root().SetHandler(h)
 
 	configFile := flag.String("config_file", "local_config.txt", "file containing all ip addresses and config")
-	numTxsPerBatch := flag.Int("num_txs_per_batch", 1000, "number of transactions to send per message")
+	numTxsPerBatch := flag.Int("num_txs_per_batch", 10000, "number of transactions to send per message")
 	flag.Parse()
 	config := readConfigFile(*configFile)
 	leaders := getLeaders(&config)
 
 	// Testing node to mirror the node data in consensus
 	dataNode := node.NewNode(&consensus.Consensus{})
-	dataNode.AddMoreFakeTransactions(1000)
+	dataNode.AddMoreFakeTransactions(10000)
+
+	time.Sleep(5 * time.Second) // wait for nodes to be ready
 
 	start := time.Now()
 	totalTime := 60.0
-	time.Sleep(3 * time.Second) // wait for nodes to be ready
 	for true {
 		t := time.Now()
 		if t.Sub(start).Seconds() >= totalTime {
 			fmt.Println(int(t.Sub(start)), start, totalTime)
 			break
 		}
+		t = time.Now()
 		txsToSend := getNewFakeTransactions(&dataNode, *numTxsPerBatch)
+		fmt.Printf("CREATE TX TO LEADER took %s", time.Since(t))
 		msg := node.ConstructTransactionListMessage(txsToSend)
 		log.Debug("[Generator] Sending txs...", "numTxs", len(txsToSend))
+
+		t = time.Now()
 		p2p.BroadcastMessage(leaders, msg)
 
+		fmt.Printf("SEND TX TO LEADER took %s", time.Since(t))
 		// Update local utxo pool to mirror the utxo pool of a real node
 		dataNode.UtxoPool.Update(txsToSend)
-		time.Sleep(1 * time.Second) // Send a batch of transactions every second
+
+		time.Sleep(500 * time.Millisecond) // Send a batch of transactions periodically
 	}
 
 	// Send a stop message to stop the nodes at the end

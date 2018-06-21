@@ -5,11 +5,6 @@ import (
 	"fmt"
 )
 
-const (
-	// MaxNumberOfTransactions is the max number of transaction per a block.
-	MaxNumberOfTransactions = 100
-)
-
 // UTXOPool stores transactions and balance associated with each address.
 type UTXOPool struct {
 	// Mapping from address to a map of transaction id to a map of the index of output
@@ -209,10 +204,10 @@ func CreateUTXOPoolFromGenesisBlockChain(bc *Blockchain) *UTXOPool {
 }
 
 // SelectTransactionsForNewBlock returns a list of index of valid transactions for the new block.
-func (utxoPool *UTXOPool) SelectTransactionsForNewBlock(transactions []*Transaction) ([]*Transaction, []*Transaction) {
+func (utxoPool *UTXOPool) SelectTransactionsForNewBlock(transactions []*Transaction, maxNumTxs int) ([]*Transaction, []*Transaction) {
 	selected, unselected := []*Transaction{}, []*Transaction{}
 	for _, tx := range transactions {
-		if len(selected) < MaxNumberOfTransactions && utxoPool.VerifyOneTransaction(tx) {
+		if len(selected) < maxNumTxs && utxoPool.VerifyOneTransaction(tx) {
 			selected = append(selected, tx)
 		} else {
 			unselected = append(unselected, tx)

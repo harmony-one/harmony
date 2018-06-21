@@ -74,7 +74,9 @@ func (consensus *Consensus) startConsensus(newBlock *blockchain.Block) {
 
 	msgToSend := consensus.constructAnnounceMessage()
 	fmt.Printf("BROADCAST ANNOUNCE: %d\n", consensus.consensusId)
+	t := time.Now()
 	p2p.BroadcastMessage(consensus.validators, msgToSend)
+	fmt.Printf("ANNOUNCE took %s", time.Since(t))
 	fmt.Printf("BROADCAST ANNOUNCE DONE: %d\n", consensus.consensusId)
 	// Set state to ANNOUNCE_DONE
 	consensus.state = ANNOUNCE_DONE
@@ -177,7 +179,9 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 			// Broadcast challenge
 			msgToSend := consensus.constructChallengeMessage()
 			//fmt.Printf("BROADCAST CHALLENGE: %d\n", consensus.consensusId)
+			t := time.Now()
 			p2p.BroadcastMessage(consensus.validators, msgToSend)
+			fmt.Printf("ANNOUNCE took %s", time.Since(t))
 			//fmt.Printf("BROADCAST CHALLENGE DONE: %d\n", consensus.consensusId)
 			// Set state to CHALLENGE_DONE
 			consensus.state = CHALLENGE_DONE

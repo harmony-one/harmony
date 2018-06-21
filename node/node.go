@@ -36,9 +36,9 @@ func (node *Node) addPendingTransactions(newTxs []*blockchain.Transaction) {
 
 // Take out a subset of valid transactions from the pending transaction list
 // Note the pending transaction list will then contain the rest of the txs
-func (node *Node) getTransactionsForNewBlock() []*blockchain.Transaction {
+func (node *Node) getTransactionsForNewBlock(maxNumTxs int) []*blockchain.Transaction {
 	pendingTxMutex.Lock()
-	selected, unselected := node.UtxoPool.SelectTransactionsForNewBlock(node.pendingTransactions)
+	selected, unselected := node.UtxoPool.SelectTransactionsForNewBlock(node.pendingTransactions, maxNumTxs)
 	node.pendingTransactions = unselected
 	pendingTxMutex.Unlock()
 	return selected

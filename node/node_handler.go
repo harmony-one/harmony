@@ -11,6 +11,11 @@ import (
 	"time"
 )
 
+const (
+	// The max number of transaction per a block.
+	MaxNumberOfTransactionsPerBlock = 3000
+)
+
 // NodeHandler handles a new incoming connection.
 func (node *Node) NodeHandler(conn net.Conn) {
 	defer conn.Close()
@@ -128,8 +133,8 @@ func (node *Node) WaitForConsensusReady(readySignal chan int) {
 		if !retry {
 			for {
 				// Once we have more than 10 transactions pending we will try creating a new block
-				if len(node.pendingTransactions) >= 10 {
-					selectedTxs := node.getTransactionsForNewBlock()
+				if len(node.pendingTransactions) >= 100 {
+					selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
 
 					if len(selectedTxs) == 0 {
 						node.log.Debug("No valid transactions exist", "pendingTx", len(node.pendingTransactions))
