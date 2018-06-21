@@ -12,7 +12,7 @@ type Blockchain struct {
 
 const genesisCoinbaseData = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks"
 
-// Get the latest block at the end of the chain
+// GetLatestBlock gests the latest block at the end of the chain
 func (bc *Blockchain) GetLatestBlock() *Block {
 	if len(bc.Blocks) == 0 {
 		return nil
