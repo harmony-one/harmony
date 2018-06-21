@@ -99,11 +99,6 @@ func main() {
 		go func() {
 			node.WaitForConsensusReady(consensus.ReadySignal)
 		}()
-	} else {
-		// Node waiting to add new block to the blockchain
-		go func() {
-			node.WaitForConsensusReady(consensus.ReadySignal)
-		}()
 	}
 
 	node.StartServer(*port)

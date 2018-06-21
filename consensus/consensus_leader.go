@@ -276,16 +276,19 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 	_ = response
 	_ = signature
 
-	// check consensus Id
-	if consensusId != consensus.consensusId {
-		consensus.Log.Debug("[ERROR] Received RESPONSE with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId, "consensus", consensus)
-		return
-	}
 
 	// proceed only when the message is not received before and this consensus phase is not done.
+
+	shouldProcess := true
 	consensus.mutex.Lock()
+	// check consensus Id
+	if consensusId != consensus.consensusId {
+		shouldProcess = false
+		consensus.Log.Debug("[ERROR] Received RESPONSE with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId, "consensus", consensus)
+	}
+
 	_, ok := consensus.responses[validatorId]
-	shouldProcess := !ok
+	shouldProcess = shouldProcess && !ok
 	if shouldProcess {
 		consensus.responses[validatorId] = validatorId
 		//consensus.Log.Debug("Number of responses received", "count", len(consensus.responses), "consensudId", consensusId)

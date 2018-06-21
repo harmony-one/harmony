@@ -113,31 +113,44 @@ func (node *Node) WaitForConsensusReady(readySignal chan int) {
 	node.log.Debug("Waiting for consensus ready", "node", node)
 
 	var newBlock *blockchain.Block
+	timeoutCount := 0
 	for { // keep waiting for consensus ready
-		<-readySignal
+		retry := false
+		select {
+		case <-readySignal:
+		case <-time.After(8 * time.Second):
+			retry = true
+			timeoutCount++
+			node.log.Debug("Consensus timeout, retry!", "count", timeoutCount, "node", node)
+		}
+
 		//node.log.Debug("Adding new block", "currentChainSize", len(node.blockchain.Blocks), "numTxs", len(node.blockchain.GetLatestBlock().Transactions), "PrevHash", node.blockchain.GetLatestBlock().PrevBlockHash, "Hash", node.blockchain.GetLatestBlock().Hash)
-		for {
-			// Once we have more than 10 transactions pending we will try creating a new block
-			if len(node.pendingTransactions) >= 10 {
-				selectedTxs := node.getTransactionsForNewBlock()
+		if !retry {
+			for {
+				// Once we have more than 10 transactions pending we will try creating a new block
+				if len(node.pendingTransactions) >= 10 {
+					selectedTxs := node.getTransactionsForNewBlock()
 
-				if len(selectedTxs) == 0 {
-					node.log.Debug("No valid transactions exist", "pendingTx", len(node.pendingTransactions))
-				} else {
-					node.log.Debug("Creating new block", "numTxs", len(selectedTxs), "pendingTxs", len(node.pendingTransactions), "currentChainSize", len(node.blockchain.Blocks))
+					if len(selectedTxs) == 0 {
+						node.log.Debug("No valid transactions exist", "pendingTx", len(node.pendingTransactions))
+					} else {
+						node.log.Debug("Creating new block", "numTxs", len(selectedTxs), "pendingTxs", len(node.pendingTransactions), "currentChainSize", len(node.blockchain.Blocks))
 
-					node.transactionInConsensus = selectedTxs
-					newBlock = blockchain.NewBlock(selectedTxs, node.blockchain.GetLatestBlock().Hash)
-					break
+						node.transactionInConsensus = selectedTxs
+						newBlock = blockchain.NewBlock(selectedTxs, node.blockchain.GetLatestBlock().Hash)
+						break
+					}
 				}
+				// If not enough transactions to run consensus,
+				// periodically check whether we have enough transactions to package into block.
+				time.Sleep(1 * time.Second)
 			}
-			// If not enough transactions to run consensus,
-			// periodically check whether we have enough transactions to package into block.
 		}
 
 		// Send the new block to consensus so it can be confirmed.
-		node.BlockChannel <- *newBlock
-		time.Sleep(2 * time.Second)
+		if newBlock != nil {
+			node.BlockChannel <- *newBlock
+		}
 	}
 }
 
