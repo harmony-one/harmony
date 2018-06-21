@@ -2,19 +2,19 @@ package main
 
 import (
 	"bufio"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"harmony-benchmark/blockchain"
+	"harmony-benchmark/consensus"
 	"harmony-benchmark/log"
 	"harmony-benchmark/node"
 	"harmony-benchmark/p2p"
 	"math/rand"
 	"os"
+	"strconv"
 	"strings"
 	"time"
-	"harmony-benchmark/consensus"
-	"encoding/hex"
-	"strconv"
 )
 
 // Get numTxs number of Fake transactions based on the existing UtxoPool.
@@ -50,7 +50,7 @@ func getNewFakeTransactions(dataNode *node.Node, numTxs int) []*blockchain.Trans
 			for index, value := range utxoMap {
 				countAll++
 				if rand.Intn(100) <= 20 { // 20% sample rate to select UTXO to use for new transactions
-				    // Spend the money of current UTXO to a random address in [1 - 1000]
+					// Spend the money of current UTXO to a random address in [1 - 1000]
 					txin := blockchain.TXInput{txId, index, address}
 					txout := blockchain.TXOutput{value, strconv.Itoa(rand.Intn(1000))}
 					tx := blockchain.Transaction{[32]byte{}, []blockchain.TXInput{txin}, []blockchain.TXOutput{txout}}
