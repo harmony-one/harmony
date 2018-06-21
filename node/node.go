@@ -82,6 +82,16 @@ func (node *Node) AddMoreFakeTransactions() {
 	node.UtxoPool.Update(txs)
 }
 
+// Count the total number of transactions in the blockchain
+// Currently used for stats reporting purpose
+func (node *Node) countNumTransactionsInBlockchain() int {
+	count := 0
+	for _, block := range node.blockchain.Blocks {
+		count += len(block.Transactions)
+	}
+	return count
+}
+
 // Create a new Node
 func NewNode(consensus *consensus.Consensus) Node {
 	node := Node{}

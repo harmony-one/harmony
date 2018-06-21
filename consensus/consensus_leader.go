@@ -276,7 +276,6 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 	_ = response
 	_ = signature
 
-
 	// proceed only when the message is not received before and this consensus phase is not done.
 
 	shouldProcess := true

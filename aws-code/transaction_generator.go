@@ -49,7 +49,7 @@ func getNewFakeTransactions(dataNode *node.Node, numTxs int) []*blockchain.Trans
 			}
 			for index, value := range utxoMap {
 				countAll++
-				if rand.Intn(100) <= 20 { // 20% sample rate to select UTXO to use for new transactions
+				if rand.Intn(100) <= 50 { // 20% sample rate to select UTXO to use for new transactions
 					// Spend the money of current UTXO to a random address in [1 - 1000]
 					txin := blockchain.TXInput{txId, index, address}
 					txout := blockchain.TXOutput{value, strconv.Itoa(rand.Intn(1000))}
@@ -125,7 +125,7 @@ func main() {
 	dataNode.AddMoreFakeTransactions()
 
 	start := time.Now()
-	totalTime := 600.0
+	totalTime := 60.0
 	time.Sleep(3 * time.Second) // wait for nodes to be ready
 	for true {
 		t := time.Now()
@@ -140,7 +140,7 @@ func main() {
 
 		// Update local utxo pool to mirror the utxo pool of a real node
 		dataNode.UtxoPool.Update(txsToSend)
-		time.Sleep(2 * time.Second) // Send a batch of transactions every second
+		time.Sleep(1 * time.Second) // Send a batch of transactions every second
 	}
 
 	// Send a stop message to stop the nodes at the end

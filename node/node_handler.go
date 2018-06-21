@@ -61,7 +61,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 		case common.CONTROL:
 			controlType := msgPayload[0]
 			if ControlMessageType(controlType) == STOP {
-				node.log.Debug("Stopping Node", "node", node)
+				node.log.Debug("Stopping Node", "node", node, "numTxsProcessed", node.countNumTransactionsInBlockchain())
 				os.Exit(0)
 			}
 
