@@ -133,11 +133,11 @@ func (node *Node) WaitForConsensusReady(readySignal chan int) {
 			}
 			// If not enough transactions to run consensus,
 			// periodically check whether we have enough transactions to package into block.
-			time.Sleep(1 * time.Second)
 		}
 
 		// Send the new block to consensus so it can be confirmed.
 		node.BlockChannel <- *newBlock
+		time.Sleep(2 * time.Second)
 	}
 }
 

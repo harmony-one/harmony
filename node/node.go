@@ -26,9 +26,12 @@ type Node struct {
 
 // Add new transactions to the pending transaction list
 func (node *Node) addPendingTransactions(newTxs []*blockchain.Transaction) {
+
 	pendingTxMutex.Lock()
 	node.pendingTransactions = append(node.pendingTransactions, newTxs...)
 	pendingTxMutex.Unlock()
+	node.log.Debug("Got more transactions", "num", len(newTxs))
+	node.log.Debug("Total pending transactions", "num", len(node.pendingTransactions))
 }
 
 // Take out a subset of valid transactions from the pending transaction list

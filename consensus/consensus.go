@@ -9,58 +9,97 @@ import (
 	"harmony-benchmark/p2p"
 	"regexp"
 	"strconv"
+	"sync"
 )
 
 // Consensus data containing all info related to one consensus process
 type Consensus struct {
-	state           ConsensusState
-	commits         map[string]string            // Signatures collected from validators
-	responses       map[string]string            // Signatures collected from validators
-	data            string                       // Actual block data to reach consensus on
-	validators      []p2p.Peer                   // List of validators
-	leader          p2p.Peer                     // Leader
-	priKey          string                       // private key of current node
-	IsLeader        bool                         // Whether I am leader. False means I am validator
-	nodeId          uint16                       // Leader or validator Id - 2 byte
-	consensusId     uint32                       // Consensus Id (View Id) - 4 byte
-	blockHash       [32]byte                     // Blockhash - 32 byte
-	blockHeader     []byte                       // BlockHeader to run consensus on
-	ShardIDShardID  uint32                       // Shard Id which this node belongs to
-	ReadySignal     chan int                     // Signal channel for starting a new consensus process
-	BlockVerifier   func(*blockchain.Block) bool // The verifier func passed from Node object
-	OnConsensusDone func(*blockchain.Block)      // The post-consensus processing func passed from Node object. Called when consensus on a new block is done
-	msgCategory     byte                         // Network related fields
-	actionType      byte
-	Log             log.Logger
+	state ConsensusState
+	// Signatures collected from validators
+	commits map[string]string
+	// Signatures collected from validators
+	responses map[string]string
+	// Actual block data to reach consensus on
+	data string
+	// List of validators
+	validators []p2p.Peer
+	// Leader
+	leader p2p.Peer
+	// private key of current node
+	priKey string
+	// Whether I am leader. False means I am validator
+	IsLeader bool
+	// Leader or validator Id - 2 byte
+	nodeId uint16
+	// Consensus Id (View Id) - 4 byte
+	consensusId uint32
+	// Blockhash - 32 byte
+	blockHash [32]byte
+	// BlockHeader to run consensus on
+	blockHeader []byte
+	// Shard Id which this node belongs to
+	ShardIDShardID uint32
+
+    // global consensus mutex
+	mutex sync.Mutex
+
+
+	// Validator specific fields
+	// Blocks received but not done with consensus yet
+	blocksReceived map[uint32]*BlockConsensusStatus
+
+	// Signal channel for starting a new consensus process
+	ReadySignal chan int
+	// The verifier func passed from Node object
+	BlockVerifier func(*blockchain.Block)bool
+	// The post-consensus processing func passed from Node object
+	// Called when consensus on a new block is done
+	OnConsensusDone func(*blockchain.Block)
+
+	//// Network related fields
+	msgCategory byte
+	actionType  byte
+
+	Log log.Logger
+}
+
+// This used to keep track of the consensus status of multiple blocks received so far
+// This is mainly used in the case that this node is lagging behind and needs to catch up.
+// For example, the consensus moved to round N and this node received message(N).
+// However, this node may still not finished with round N-1, so the newly received message(N)
+// should be stored in this temporary structure. In case the round N-1 finishes, it can catch
+// up to the latest state of round N by using this structure.
+type BlockConsensusStatus struct {
+	// BlockHeader to run consensus on
+	blockHeader []byte
+
+	state ConsensusState
 }
 
 // Consensus state enum for both leader and validator
 // States for leader:
-//     READY, ANNOUNCE_DONE, CHALLENGE_DONE, FINISHED
+//     FINISHED, ANNOUNCE_DONE, CHALLENGE_DONE
 // States for validator:
-//     READY, COMMIT_DONE, RESPONSE_DONE, FINISHED
+//     FINISHED, COMMIT_DONE, RESPONSE_DONE
 type ConsensusState int
 
 const (
-	READY ConsensusState = iota
+	FINISHED ConsensusState = iota  // initial state or state after previous consensus is done.
 	ANNOUNCE_DONE
 	COMMIT_DONE
 	CHALLENGE_DONE
 	RESPONSE_DONE
-	FINISHED
 )
-
 // Returns string name for the ConsensusState enum
 func (state ConsensusState) String() string {
 	names := [...]string{
-		"READY",
+		"FINISHED",
 		"ANNOUNCE_DONE",
 		"COMMIT_DONE",
 		"CHALLENGE_DONE",
-		"RESPONSE_DONE",
-		"FINISHED"}
+		"RESPONSE_DONE"}
 
-	if state < READY || state > RESPONSE_DONE {
+	if state < FINISHED || state > RESPONSE_DONE {
 		return "Unknown"
 	}
 	return names[state]
@@ -98,6 +137,9 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) C
 	}
 	consensus.ShardIDShardID = uint32(myShardIDShardID)
 
+	// For validators
+	consensus.blocksReceived = make(map[uint32]*BlockConsensusStatus)
+
 	// For now use socket address as 16 byte Id
 	// TODO: populate with correct Id
 	socketId := reg.ReplaceAllString(consensus.priKey, "")
@@ -121,7 +163,7 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) C
 
 // Reset the state of the consensus
 func (consensus *Consensus) ResetState() {
-	consensus.state = READY
+	consensus.state = FINISHED
 	consensus.commits = make(map[string]string)
 	consensus.responses = make(map[string]string)
 }
@@ -134,5 +176,5 @@ func (consensus *Consensus) String() string {
 	} else {
 		duty = "VLD" // validator
 	}
-	return fmt.Sprintf("[%s, %s, %v, %v]", duty, consensus.priKey, consensus.ShardIDShardID, consensus.nodeId)
+	return fmt.Sprintf("[%s, %s, %v, %v, %s]", duty, consensus.priKey, consensus.ShardIDShardID, consensus.nodeId, consensus.state)
 }

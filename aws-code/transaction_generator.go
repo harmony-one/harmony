@@ -125,7 +125,7 @@ func main() {
 	dataNode.AddMoreFakeTransactions()
 
 	start := time.Now()
-	totalTime := 60.0
+	totalTime := 600.0
 	time.Sleep(3 * time.Second) // wait for nodes to be ready
 	for true {
 		t := time.Now()
@@ -140,7 +140,7 @@ func main() {
 
 		// Update local utxo pool to mirror the utxo pool of a real node
 		dataNode.UtxoPool.Update(txsToSend)
-		time.Sleep(1 * time.Second) // Send a batch of transactions every second
+		time.Sleep(2 * time.Second) // Send a batch of transactions every second
 	}
 
 	// Send a stop message to stop the nodes at the end

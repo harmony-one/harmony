@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"encoding/gob"
 	"harmony-benchmark/blockchain"
+	"fmt"
 )
 
 // Validator's consensus message dispatcher
@@ -76,19 +77,13 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	copy(consensus.blockHash[:], blockHash[:])
 
 	// Verify block data
-	// check consensus Id
-	if consensusId != consensus.consensusId {
-		consensus.Log.Debug("[ERROR] Received message with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId)
-		return
-	}
-
 	// check leader Id
 	leaderPrivKey := consensus.leader.Ip + consensus.leader.Port
 	reg, _ := regexp.Compile("[^0-9]+")
 	socketId := reg.ReplaceAllString(leaderPrivKey, "")
 	value, _ := strconv.Atoi(socketId)
 	if leaderId != uint16(value) {
-		consensus.Log.Debug("[ERROR] Received message from wrong leader", "myLeaderId", consensus.consensusId, "receivedLeaderId", consensusId)
+		consensus.Log.Debug("[ERROR] Received message from wrong leader", "myLeaderId", consensus.consensusId, "receivedLeaderId", consensusId, "consensus", consensus)
 		return
 	}
 
@@ -97,26 +92,36 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	var blockHeaderObj blockchain.Block // TODO: separate header from block. Right now, this blockHeader data is actually the whole block
 	err := txDecoder.Decode(&blockHeaderObj)
 	if err != nil {
-		consensus.Log.Debug("[ERROR] Unparseable block header data")
+		consensus.Log.Debug("[ERROR] Unparseable block header data", "consensus", consensus)
 		return
 	}
-	consensus.blockHeader = blockHeader
+	consensus.blockHeader = blockHeader // TODO: think about remove this field and use blocksReceived instead
+	consensus.mutex.Lock()
+	consensus.blocksReceived[consensusId] = &BlockConsensusStatus{blockHeader, consensus.state}
+	consensus.mutex.Unlock()
+
+	// check consensus Id
+	if consensusId != consensus.consensusId {
+		consensus.Log.Debug("[ERROR] Received message with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId, "consensus", consensus)
+		return
+	}
 
 	// check block hash
 	if bytes.Compare(blockHash[:], blockHeaderObj.HashTransactions()[:]) != 0 || bytes.Compare(blockHeaderObj.Hash[:], blockHeaderObj.HashTransactions()[:]) != 0 {
-		consensus.Log.Debug("[ERROR] Block hash doesn't match")
+		consensus.Log.Debug("[ERROR] Block hash doesn't match", "consensus", consensus)
 		return
 	}
 
 	// check block data (transactions
 	if !consensus.BlockVerifier(&blockHeaderObj) {
-		consensus.Log.Debug("[ERROR] Block content is not verified successfully")
+		consensus.Log.Debug("[ERROR] Block content is not verified successfully", "consensus", consensus)
 		return
 	}
 
 	// TODO: return the signature(commit) to leader
 	// For now, simply return the private key of this node.
 	msgToSend := consensus.constructCommitMessage()
+	fmt.Printf("SENDING COMMIT: %d\n", consensus.consensusId)
 	p2p.SendMessage(consensus.leader, msgToSend)
 
 	// Set state to COMMIT_DONE
@@ -124,7 +129,7 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 }
 
 // Construct the commit message to send to leader (assumption the consensus data is already verified)
-func (consensus Consensus) constructCommitMessage() []byte {
+func (consensus *Consensus) constructCommitMessage() []byte {
 	buffer := bytes.NewBuffer([]byte{})
 
 	// 4 byte consensus id
@@ -197,12 +202,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 	_ = challenge
 	_ = signature
 
-	// erify block data and the aggregated signatures
-	// check consensus Id
-	if consensusId != consensus.consensusId {
-		consensus.Log.Debug("[ERROR] Received message with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId)
-		return
-	}
+	// Verify block data and the aggregated signatures
 
 	// check leader Id
 	leaderPrivKey := consensus.leader.Ip + consensus.leader.Port
@@ -210,44 +210,78 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 	socketId := reg.ReplaceAllString(leaderPrivKey, "")
 	value, _ := strconv.Atoi(socketId)
 	if leaderId != uint16(value) {
-		consensus.Log.Debug("[ERROR] Received message from wrong leader", "myLeaderId", consensus.consensusId, "receivedLeaderId", consensusId)
+		consensus.Log.Debug("[ERROR] Received message from wrong leader", "myLeaderId", consensus.consensusId, "receivedLeaderId", consensusId, "consensus", consensus)
 		return
 	}
 
 	// check block hash
 	if bytes.Compare(blockHash[:], consensus.blockHash[:]) != 0 {
-		consensus.Log.Debug("[ERROR] Block hash doesn't match")
+		consensus.Log.Debug("[ERROR] Block hash doesn't match", "consensus", consensus)
 		return
 	}
+
+	// check consensus Id
+	if consensusId != consensus.consensusId {
+		consensus.Log.Debug("[ERROR] Received message with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId, "consensus", consensus)
+		return
+	}
+
 
 	// TODO: verify aggregated commits with real schnor cosign verification
 
 	// TODO: return the signature(response) to leader
 	// For now, simply return the private key of this node.
 	msgToSend := consensus.constructResponseMessage()
+	//consensus.Log.Debug("sh......")
+	//time.Sleep(100 * time.Millisecond)
+	fmt.Printf("SENDING RESPONSE: %d\n", consensus.consensusId)
 	p2p.SendMessage(consensus.leader, msgToSend)
 
 	// Set state to RESPONSE_DONE
 	consensus.state = RESPONSE_DONE
-	consensus.consensusId++
+
+	// BIG TODO: the block catch up logic is basically a mock now. More checks need to be done to make it correct.
+	// The logic is roll up to the latest blocks received one by one to try catching up with the leader.
+	for {
+		consensus.mutex.Lock()
+		val, ok := consensus.blocksReceived[consensus.consensusId]
+		consensus.mutex.Unlock()
+		if ok {
+			consensus.mutex.Lock()
+			delete(consensus.blocksReceived, consensus.consensusId)
+
+			consensus.consensusId++ // roll up one by one, until the next block is not received yet.
+			consensus.mutex.Unlock()
 
 
-	// TODO: think about when validators know about the consensus is reached.
-	// For now, the blockchain is updated right here.
+			// TODO: think about when validators know about the consensus is reached.
+			// For now, the blockchain is updated right here.
 
-	// TODO: reconstruct the whole block from header and transactions
-	// For now, we used the stored whole block in consensus.blockHeader
-	txDecoder := gob.NewDecoder(bytes.NewReader(consensus.blockHeader))
-	var blockHeaderObj blockchain.Block
-	err := txDecoder.Decode(&blockHeaderObj)
-	if err != nil {
-		consensus.Log.Debug("failed to construct the new block after consensus")
+			// TODO: reconstruct the whole block from header and transactions
+			// For now, we used the stored whole block in consensus.blockHeader
+			txDecoder := gob.NewDecoder(bytes.NewReader(val.blockHeader))
+			var blockHeaderObj blockchain.Block
+			err := txDecoder.Decode(&blockHeaderObj)
+			if err != nil {
+				consensus.Log.Debug("failed to construct the new block after consensus")
+			}
+			// check block data (transactions
+			if !consensus.BlockVerifier(&blockHeaderObj) {
+				consensus.Log.Debug("[ERROR] Block content is not verified successfully", "consensusId", consensus.consensusId)
+				return
+			}
+			consensus.OnConsensusDone(&blockHeaderObj)
+		} else {
+			break
+		}
+
 	}
-	consensus.OnConsensusDone(&blockHeaderObj)
+
+
 }
 
 // Construct the response message to send to leader (assumption the consensus data is already verified)
-func (consensus Consensus) constructResponseMessage() []byte {
+func (consensus *Consensus) constructResponseMessage() []byte {
 	buffer := bytes.NewBuffer([]byte{})
 
 	// 4 byte consensus id
