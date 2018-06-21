@@ -126,7 +126,7 @@ func (utxoPool *UTXOPool) UpdateOneTransaction(tx *Transaction) {
 		// Remove
 		for _, in := range tx.TxInput {
 			inTxID := hex.EncodeToString(in.TxID)
-			delete(utxoPool.UtxoMap[in.Address][inTxID], in.TxOutputIndex)
+			utxoPool.DeleteOneBalanceItem(in.Address, inTxID, in.TxOutputIndex)
 		}
 
 		// Update
@@ -171,7 +171,7 @@ func (utxoPool *UTXOPool) Update(transactions []*Transaction) {
 			// Remove
 			for _, in := range tx.TxInput {
 				inTxID := hex.EncodeToString(in.TxID)
-				delete(utxoPool.UtxoMap[in.Address][inTxID], in.TxOutputIndex)
+				utxoPool.DeleteOneBalanceItem(in.Address, inTxID, in.TxOutputIndex)
 			}
 
 			// Update
@@ -220,6 +220,29 @@ func (utxoPool *UTXOPool) SelectTransactionsForNewBlock(transactions []*Transact
 	}
 	return selected, unselected
 }
+
+// DeleteOneBalanceItem deletes one balance item of UTXOPool and clean up if possible.
+func (utxoPool *UTXOPool) DeleteOneBalanceItem(address, txID string, index int) {
+	delete(utxoPool.UtxoMap[address][txID], index)
+	if len(utxoPool.UtxoMap[address][txID]) == 0 {
+		delete(utxoPool.UtxoMap[address], txID)
+		if len(utxoPool.UtxoMap[address]) == 0 {
+			delete(utxoPool.UtxoMap, address)
+		}
+	}
+}
+
+// CleanUp cleans up UTXOPool.
+// func (utxoPool *UTXOPool) CleanUp() string {
+// 	for address, txMap := range utxoPool.UtxoMap {
+// 		for txid, outIndexes := range txMap {
+// 			if len(outIndexes) == 0 {
+// 				utxoPool.UtxoMap[address] = delete(utxoPool.UtxoMap[address], txid)
+// 			}
+// 		}
+// 	}
+// 	return res
+// }
 
 // Used for debugging.
 func (utxoPool *UTXOPool) String() string {

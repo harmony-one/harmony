@@ -1,6 +1,7 @@
 package blockchain
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -20,4 +21,19 @@ func TestVerifyOneTransactionAndUpdate(t *testing.T) {
 		t.Error("failed to verify a valid transaction.")
 	}
 	utxoPool.VerifyOneTransactionAndUpdate(tx)
+}
+
+func TestDeleteOneBalanceItem(t *testing.T) {
+	bc := CreateBlockchain("minh")
+	utxoPool := CreateUTXOPoolFromGenesisBlockChain(bc)
+
+	bc.AddNewUserTransfer(utxoPool, "minh", "alok", 3)
+	fmt.Println("first\n", utxoPool.String())
+	bc.AddNewUserTransfer(utxoPool, "alok", "rj", 3)
+	fmt.Println("second\n", utxoPool.String())
+
+	fmt.Println(utxoPool.String())
+	if _, ok := utxoPool.UtxoMap["alok"]; ok {
+		t.Errorf("alok should not be contained in the balance map")
+	}
 }
