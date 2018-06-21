@@ -3,10 +3,10 @@ go:
 - master
 install:
   - export GOPATH=$HOME/gopath
-  - mkdir -p $HOME/gopath/src/harmony-benchmark
-  - rsync -az ${TRAVIS_BUILD_DIR}/ $HOME/gopath/src/harmony-benchmark/
   - export TRAVIS_BUILD_DIR=$HOME/gopath/src/harmony-benchmark
-  - cd $HOME/gopath/src/harmony-benchmark
+  - cd $HOME/gopath/src
+  - mv github.com/simple-rules/harmony-benchmark ./
+  - cd harmony-benchmark
   - go get github.com/go-stack/stack
   - go build
 notifications:
