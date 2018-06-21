@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/gob"
-	"fmt"
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/p2p"
 	"strings"
@@ -62,22 +61,17 @@ func (consensus *Consensus) processStartConsensusMessage(payload []byte) {
 }
 
 func (consensus *Consensus) startConsensus(newBlock *blockchain.Block) {
-	// prepare message and broadcast to validators
-
 	// Copy over block hash and block header data
 	copy(consensus.blockHash[:], newBlock.Hash[:])
 
+	// prepare message and broadcast to validators
 	byteBuffer := bytes.NewBuffer([]byte{})
 	encoder := gob.NewEncoder(byteBuffer)
 	encoder.Encode(newBlock)
 	consensus.blockHeader = byteBuffer.Bytes()
 
 	msgToSend := consensus.constructAnnounceMessage()
-	fmt.Printf("BROADCAST ANNOUNCE: %d\n", consensus.consensusId)
-	t := time.Now()
 	p2p.BroadcastMessage(consensus.validators, msgToSend)
-	fmt.Printf("ANNOUNCE took %s", time.Since(t))
-	fmt.Printf("BROADCAST ANNOUNCE DONE: %d\n", consensus.consensusId)
 	// Set state to ANNOUNCE_DONE
 	consensus.state = ANNOUNCE_DONE
 }
@@ -111,7 +105,6 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 	signature := signMessage(buffer.Bytes())
 	buffer.Write(signature)
 
-	consensus.Log.Debug("SENDING ANNOUNCE")
 	return consensus.ConstructConsensusMessage(ANNOUNCE, buffer.Bytes())
 }
 
@@ -146,25 +139,27 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 	//#### END: Read payload data
 
 	// TODO: make use of the data. This is just to avoid the unused variable warning
-	_ = consensusId
-	_ = blockHash
 	_ = commit
 	_ = signature
 
 	// check consensus Id
 	if consensusId != consensus.consensusId {
-		consensus.Log.Debug("[ERROR] Received COMMIT with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId, "consensus", consensus)
+		consensus.Log.Debug("[WARNING] Received COMMIT with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId, "consensus", consensus)
 		return
 	}
 
-	// proceed only when the message is not received before and this consensus phase is not done.
+	if bytes.Compare(blockHash, consensus.blockHash[:]) != 0 {
+		consensus.Log.Debug("[WARNING] Received COMMIT with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId, "consensus", consensus)
+		return
+	}
+
+	// proceed only when the message is not received before
 	consensus.mutex.Lock()
 	_, ok := consensus.commits[validatorId]
 	shouldProcess := !ok
 	if shouldProcess {
 		consensus.commits[validatorId] = validatorId
 		//consensus.Log.Debug("Number of commits received", "count", len(consensus.commits))
-		fmt.Printf("Number of COMMITS received %d\n", len(consensus.commits))
 	}
 	consensus.mutex.Unlock()
 
@@ -176,13 +171,11 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 		consensus.mutex.Lock()
 		if len(consensus.commits) >= (2*len(consensus.validators))/3+1 && consensus.state < CHALLENGE_DONE {
 			consensus.Log.Debug("Enough commits received with signatures", "numOfSignatures", len(consensus.commits))
+
 			// Broadcast challenge
 			msgToSend := consensus.constructChallengeMessage()
-			//fmt.Printf("BROADCAST CHALLENGE: %d\n", consensus.consensusId)
-			t := time.Now()
 			p2p.BroadcastMessage(consensus.validators, msgToSend)
-			fmt.Printf("ANNOUNCE took %s", time.Since(t))
-			//fmt.Printf("BROADCAST CHALLENGE DONE: %d\n", consensus.consensusId)
+
 			// Set state to CHALLENGE_DONE
 			consensus.state = CHALLENGE_DONE
 		}
@@ -280,22 +273,19 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 	_ = response
 	_ = signature
 
-	// proceed only when the message is not received before and this consensus phase is not done.
-
 	shouldProcess := true
 	consensus.mutex.Lock()
 	// check consensus Id
 	if consensusId != consensus.consensusId {
 		shouldProcess = false
-		consensus.Log.Debug("[ERROR] Received RESPONSE with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId, "consensus", consensus)
+		consensus.Log.Debug("[WARNING] Received RESPONSE with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId, "consensus", consensus)
 	}
 
+	// proceed only when the message is not received before
 	_, ok := consensus.responses[validatorId]
 	shouldProcess = shouldProcess && !ok
 	if shouldProcess {
 		consensus.responses[validatorId] = validatorId
-		//consensus.Log.Debug("Number of responses received", "count", len(consensus.responses), "consensudId", consensusId)
-		fmt.Printf("Number of RESPONSES received %d\n", len(consensus.responses))
 	}
 	consensus.mutex.Unlock()
 
@@ -314,7 +304,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 			consensus.Log.Debug("HOORAY!!! CONSENSUS REACHED!!!", "consensusId", consensus.consensusId)
 
 			// TODO: reconstruct the whole block from header and transactions
-			// For now, we used the stored whole block in consensus.blockHeader
+			// For now, we used the stored whole block already stored in consensus.blockHeader
 			txDecoder := gob.NewDecoder(bytes.NewReader(consensus.blockHeader))
 			var blockHeaderObj blockchain.Block
 			err := txDecoder.Decode(&blockHeaderObj)
@@ -327,7 +317,5 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 			consensus.ReadySignal <- 1
 		}
 		consensus.mutex.Unlock()
-
-		// TODO: composes new block and broadcast the new block to validators
 	}
 }

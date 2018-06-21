@@ -83,7 +83,7 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	socketId := reg.ReplaceAllString(leaderPrivKey, "")
 	value, _ := strconv.Atoi(socketId)
 	if leaderId != uint16(value) {
-		consensus.Log.Debug("[ERROR] Received message from wrong leader", "myLeaderId", consensus.consensusId, "receivedLeaderId", consensusId, "consensus", consensus)
+		consensus.Log.Debug("[WARNING] Received message from wrong leader", "myLeaderId", consensus.consensusId, "receivedLeaderId", consensusId, "consensus", consensus)
 		return
 	}
 
@@ -92,7 +92,7 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	var blockHeaderObj blockchain.Block // TODO: separate header from block. Right now, this blockHeader data is actually the whole block
 	err := txDecoder.Decode(&blockHeaderObj)
 	if err != nil {
-		consensus.Log.Debug("[ERROR] Unparseable block header data", "consensus", consensus)
+		consensus.Log.Debug("[WARNING] Unparseable block header data", "consensus", consensus)
 		return
 	}
 	consensus.blockHeader = blockHeader // TODO: think about remove this field and use blocksReceived instead
@@ -102,19 +102,19 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 
 	// check consensus Id
 	if consensusId != consensus.consensusId {
-		consensus.Log.Debug("[ERROR] Received message with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId, "consensus", consensus)
+		consensus.Log.Debug("[WARNING] Received message with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId, "consensus", consensus)
 		return
 	}
 
 	// check block hash
 	if bytes.Compare(blockHash[:], blockHeaderObj.HashTransactions()[:]) != 0 || bytes.Compare(blockHeaderObj.Hash[:], blockHeaderObj.HashTransactions()[:]) != 0 {
-		consensus.Log.Debug("[ERROR] Block hash doesn't match", "consensus", consensus)
+		consensus.Log.Debug("[WARNING] Block hash doesn't match", "consensus", consensus)
 		return
 	}
 
 	// check block data (transactions
 	if !consensus.BlockVerifier(&blockHeaderObj) {
-		consensus.Log.Debug("[ERROR] Block content is not verified successfully", "consensus", consensus)
+		consensus.Log.Debug("[WARNING] Block content is not verified successfully", "consensus", consensus)
 		return
 	}
 
@@ -210,19 +210,19 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 	socketId := reg.ReplaceAllString(leaderPrivKey, "")
 	value, _ := strconv.Atoi(socketId)
 	if leaderId != uint16(value) {
-		consensus.Log.Debug("[ERROR] Received message from wrong leader", "myLeaderId", consensus.consensusId, "receivedLeaderId", consensusId, "consensus", consensus)
+		consensus.Log.Debug("[WARNING] Received message from wrong leader", "myLeaderId", consensus.consensusId, "receivedLeaderId", consensusId, "consensus", consensus)
 		return
 	}
 
 	// check block hash
 	if bytes.Compare(blockHash[:], consensus.blockHash[:]) != 0 {
-		consensus.Log.Debug("[ERROR] Block hash doesn't match", "consensus", consensus)
+		consensus.Log.Debug("[WARNING] Block hash doesn't match", "consensus", consensus)
 		return
 	}
 
 	// check consensus Id
 	if consensusId != consensus.consensusId {
-		consensus.Log.Debug("[ERROR] Received message with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId, "consensus", consensus)
+		consensus.Log.Debug("[WARNING] Received message with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId, "consensus", consensus)
 		return
 	}
 
@@ -265,7 +265,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 			}
 			// check block data (transactions
 			if !consensus.BlockVerifier(&blockHeaderObj) {
-				consensus.Log.Debug("[ERROR] Block content is not verified successfully", "consensusId", consensus.consensusId)
+				consensus.Log.Debug("[WARNING] Block content is not verified successfully", "consensusId", consensus.consensusId)
 				return
 			}
 			consensus.OnConsensusDone(&blockHeaderObj)

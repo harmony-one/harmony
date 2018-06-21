@@ -134,16 +134,15 @@ func main() {
 			fmt.Println(int(t.Sub(start)), start, totalTime)
 			break
 		}
+
 		t = time.Now()
 		txsToSend := getNewFakeTransactions(&dataNode, *numTxsPerBatch)
-		fmt.Printf("CREATE TX TO LEADER took %s", time.Since(t))
 		msg := node.ConstructTransactionListMessage(txsToSend)
-		log.Debug("[Generator] Sending txs...", "numTxs", len(txsToSend))
+		fmt.Printf("[Generator] Creating fake txs for leader took %s", time.Since(t))
 
-		t = time.Now()
+		log.Debug("[Generator] Sending txs...", "numTxs", len(txsToSend))
 		p2p.BroadcastMessage(leaders, msg)
 
-		fmt.Printf("SEND TX TO LEADER took %s", time.Since(t))
 		// Update local utxo pool to mirror the utxo pool of a real node
 		dataNode.UtxoPool.Update(txsToSend)
 
