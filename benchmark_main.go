@@ -3,12 +3,14 @@ package main
 import (
 	"bufio"
 	"flag"
+	"fmt"
 	"harmony-benchmark/consensus"
 	"harmony-benchmark/log"
 	"harmony-benchmark/node"
 	"harmony-benchmark/p2p"
 	"os"
 	"strings"
+	"time"
 )
 
 func getShardId(myIp, myPort string, config *[][]string) string {
@@ -59,8 +61,13 @@ func readConfigFile(configFile string) [][]string {
 }
 
 func main() {
-	// Setup a stdout logger
-	h := log.CallerFileHandler(log.StdoutHandler)
+	// Setup a logger to stdout and log file.
+	logFileName := fmt.Sprintf("./%v.log", time.Now().Format("20060102150405"))
+	h := log.MultiHandler(
+		log.Must.FileHandler(logFileName, log.LogfmtFormat()),
+		log.StdoutHandler)
+	// In cases where you just want a stdout logger, use the following one instead.
+	// h := log.CallerFileHandler(log.StdoutHandler)
 	log.Root().SetHandler(h)
 
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
