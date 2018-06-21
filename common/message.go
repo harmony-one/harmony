@@ -35,7 +35,6 @@ const (
 	// TODO: add more types
 )
 
-
 // The specific types of message under COMMITTEE category
 type CommitteeMessageType byte
 
@@ -52,7 +51,6 @@ const (
 	CONTROL
 	// TODO: add more types
 )
-
 
 // Get the message category from the p2p message content
 func GetMessageCategory(message []byte) (MessageCategory, error) {

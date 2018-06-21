@@ -1,9 +1,9 @@
 package node
 
 import (
+	"harmony-benchmark/consensus"
 	"harmony-benchmark/p2p"
 	"testing"
-	"harmony-benchmark/consensus"
 )
 
 func TestNewNewNode(test *testing.T) {

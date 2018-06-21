@@ -17,9 +17,7 @@ type Block struct {
 	Hash            [32]byte
 	NumTransactions int32
 	TransactionIds  [][32]byte
-
-	// Transactions
-	Transactions  []*Transaction
+	Transactions    []*Transaction // Transactions
 
 	// Signature...
 }
@@ -77,7 +75,7 @@ func NewBlock(transactions []*Transaction, prevBlockHash [32]byte) *Block {
 	for _, tx := range transactions {
 		txIds = append(txIds, tx.ID)
 	}
-	block := &Block{time.Now().Unix(),  prevBlockHash, [32]byte{},numTxs, txIds,transactions}
+	block := &Block{time.Now().Unix(), prevBlockHash, [32]byte{}, numTxs, txIds, transactions}
 	copy(block.Hash[:], block.HashTransactions()[:]) // TODO(Minh): the blockhash should be a hash of everything in the block
 
 	return block

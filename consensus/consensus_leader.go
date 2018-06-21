@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
+	"encoding/gob"
+	"fmt"
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/p2p"
 	"strings"
-	"encoding/gob"
-	"fmt"
 	"time"
 )
 
@@ -275,7 +275,6 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 	_ = blockHash
 	_ = response
 	_ = signature
-
 
 	// check consensus Id
 	if consensusId != consensus.consensusId {

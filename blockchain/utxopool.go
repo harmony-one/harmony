@@ -26,7 +26,7 @@ type UTXOPool struct {
 	                        outputIndex2 - value2
 	                       ]
 	               ]
-	 */
+	*/
 	UtxoMap map[string]map[string]map[int]int
 }
 

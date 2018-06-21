@@ -13,11 +13,11 @@ type Blockchain struct {
 const genesisCoinbaseData = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks"
 
 // Get the latest block at the end of the chain
-func (bc *Blockchain) GetLatestBlock() *Block{
+func (bc *Blockchain) GetLatestBlock() *Block {
 	if len(bc.Blocks) == 0 {
 		return nil
 	}
-	return bc.Blocks[len(bc.Blocks) - 1]
+	return bc.Blocks[len(bc.Blocks)-1]
 }
 
 // FindUnspentTransactions returns a list of transactions containing unspent outputs

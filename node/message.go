@@ -9,6 +9,7 @@ import (
 
 // The types of messages used for NODE/TRANSACTION
 type TransactionMessageType int
+
 const (
 	SEND TransactionMessageType = iota
 	REQUEST
@@ -16,6 +17,7 @@ const (
 
 // The types of messages used for NODE/CONTROL
 type ControlMessageType int
+
 const (
 	STOP ControlMessageType = iota
 )

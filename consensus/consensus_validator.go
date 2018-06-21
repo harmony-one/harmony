@@ -3,12 +3,12 @@ package consensus
 import (
 	"bytes"
 	"encoding/binary"
-	"harmony-benchmark/p2p"
-	"strconv"
-	"regexp"
 	"encoding/gob"
-	"harmony-benchmark/blockchain"
 	"fmt"
+	"harmony-benchmark/blockchain"
+	"harmony-benchmark/p2p"
+	"regexp"
+	"strconv"
 )
 
 // Validator's consensus message dispatcher
@@ -226,7 +226,6 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 		return
 	}
 
-
 	// TODO: verify aggregated commits with real schnor cosign verification
 
 	// TODO: return the signature(response) to leader
@@ -253,7 +252,6 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 			consensus.consensusId++ // roll up one by one, until the next block is not received yet.
 			consensus.mutex.Unlock()
 
-
 			// TODO: think about when validators know about the consensus is reached.
 			// For now, the blockchain is updated right here.
 
@@ -276,7 +274,6 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 		}
 
 	}
-
 
 }
 
