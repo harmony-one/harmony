@@ -1,7 +1,6 @@
 package blockchain
 
 import (
-	"fmt"
 	"testing"
 )
 
@@ -28,12 +27,24 @@ func TestDeleteOneBalanceItem(t *testing.T) {
 	utxoPool := CreateUTXOPoolFromGenesisBlockChain(bc)
 
 	bc.AddNewUserTransfer(utxoPool, "minh", "alok", 3)
-	fmt.Println("first\n", utxoPool.String())
 	bc.AddNewUserTransfer(utxoPool, "alok", "rj", 3)
-	fmt.Println("second\n", utxoPool.String())
 
-	fmt.Println(utxoPool.String())
 	if _, ok := utxoPool.UtxoMap["alok"]; ok {
 		t.Errorf("alok should not be contained in the balance map")
+	}
+}
+
+func TestCleanUp(t *testing.T) {
+	var utxoPool UTXOPool
+	utxoPool.UtxoMap = make(map[string]map[string]map[int]int)
+	utxoPool.UtxoMap["minh"] = make(map[string]map[int]int)
+	utxoPool.UtxoMap["rj"] = map[string]map[int]int{
+		"abcd": {
+			0: 1,
+		},
+	}
+	utxoPool.CleanUp()
+	if _, ok := utxoPool.UtxoMap["minh"]; ok {
+		t.Errorf("minh should not be contained in the balance map")
 	}
 }
