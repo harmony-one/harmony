@@ -9,12 +9,19 @@ import (
 	"time"
 )
 
-// Block keeps block headers.
+// Block keeps block headers, transactions and signature.
 type Block struct {
-	Timestamp     int64
+	// Header
+	Timestamp       int64
+	PrevBlockHash   [32]byte
+	Hash            [32]byte
+	NumTransactions int32
+	TransactionIds  [][32]byte
+
+	// Transactions
 	Transactions  []*Transaction
-	PrevBlockHash []byte
-	Hash          []byte
+
+	// Signature...
 }
 
 // Serialize serializes the block
@@ -56,20 +63,27 @@ func (b *Block) HashTransactions() []byte {
 	var txHash [32]byte
 
 	for _, tx := range b.Transactions {
-		txHashes = append(txHashes, tx.ID)
+		txHashes = append(txHashes, tx.ID[:])
 	}
 	txHash = sha256.Sum256(bytes.Join(txHashes, []byte{}))
 	return txHash[:]
 }
 
 // NewBlock creates and returns a neew block.
-func NewBlock(transactions []*Transaction, prevBlockHash []byte) *Block {
-	block := &Block{time.Now().Unix(), transactions, prevBlockHash, []byte{}}
-	block.Hash = block.HashTransactions()
+func NewBlock(transactions []*Transaction, prevBlockHash [32]byte) *Block {
+	numTxs := int32(len(transactions))
+	var txIds [][32]byte
+
+	for _, tx := range transactions {
+		txIds = append(txIds, tx.ID)
+	}
+	block := &Block{time.Now().Unix(),  prevBlockHash, [32]byte{},numTxs, txIds,transactions}
+	copy(block.Hash[:], block.HashTransactions()[:]) // TODO(Minh): the blockhash should be a hash of everything in the block
+
 	return block
 }
 
 // NewGenesisBlock creates and returns genesis Block.
 func NewGenesisBlock(coinbase *Transaction) *Block {
-	return NewBlock([]*Transaction{coinbase}, []byte{})
+	return NewBlock([]*Transaction{coinbase}, [32]byte{})
 }

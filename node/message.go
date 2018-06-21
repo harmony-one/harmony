@@ -21,12 +21,17 @@ const (
 )
 
 //ConstructTransactionListMessage constructs serialized transactions
-func ConstructTransactionListMessage(transactions []blockchain.Transaction) []byte {
+func ConstructTransactionListMessage(transactions []*blockchain.Transaction) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(common.NODE)})
 	byteBuffer.WriteByte(byte(common.TRANSACTION))
 	byteBuffer.WriteByte(byte(SEND))
 	encoder := gob.NewEncoder(byteBuffer)
-	encoder.Encode(transactions)
+	// Copy over the tx data
+	txs := make([]blockchain.Transaction, len(transactions))
+	for i := range txs {
+		txs[i] = *transactions[i]
+	}
+	encoder.Encode(txs)
 	return byteBuffer.Bytes()
 }
 

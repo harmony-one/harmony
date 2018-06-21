@@ -4,33 +4,35 @@ import (
 	"bytes"
 	"encoding/binary"
 	"harmony-benchmark/p2p"
-	"log"
+	"strconv"
+	"regexp"
+	"encoding/gob"
+	"harmony-benchmark/blockchain"
 )
 
 // Validator's consensus message dispatcher
 func (consensus *Consensus) ProcessMessageValidator(message []byte) {
 	msgType, err := GetConsensusMessageType(message)
 	if err != nil {
-		log.Print(err)
+		consensus.Log.Error("Failed to get consensus message type", "err", err, "consensus", consensus)
 	}
 
 	payload, err := GetConsensusMessagePayload(message)
 	if err != nil {
-		log.Print(err)
+		consensus.Log.Error("Failed to get consensus message payload", "err", err, "consensus", consensus)
 	}
 
-	log.Printf("[Validator] Received and processing message: %s\n", msgType)
 	switch msgType {
 	case ANNOUNCE:
 		consensus.processAnnounceMessage(payload)
 	case COMMIT:
-		log.Printf("Unexpected message type: %s", msgType)
+		consensus.Log.Error("Unexpected message type", "msgType", msgType, "consensus", consensus)
 	case CHALLENGE:
 		consensus.processChallengeMessage(payload)
 	case RESPONSE:
-		log.Printf("Unexpected message type: %s", msgType)
+		consensus.Log.Error("Unexpected message type", "msgType", msgType, "consensus", consensus)
 	default:
-		log.Printf("Unexpected message type: %s", msgType)
+		consensus.Log.Error("Unexpected message type", "msgType", msgType, "consensus", consensus)
 	}
 }
 
@@ -45,8 +47,8 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	blockHash := payload[offset : offset+32]
 	offset += 32
 
-	// 2 byte validator id
-	leaderId := string(payload[offset : offset+2])
+	// 2 byte leader id
+	leaderId := binary.BigEndian.Uint16(payload[offset : offset+2])
 	offset += 2
 
 	// n byte of block header
@@ -65,19 +67,52 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 
 	// TODO: make use of the data. This is just to avoid the unused variable warning
 	_ = consensusId
-	_ = blockHash
+
 	_ = leaderId
 	_ = blockHeader
 	_ = blockHeaderSize
 	_ = signature
 
-	consensus.blockHash = blockHash
-	// verify block data
+	copy(consensus.blockHash[:], blockHash[:])
+
+	// Verify block data
+	// check consensus Id
 	if consensusId != consensus.consensusId {
-		log.Printf("Received message with consensus Id: %d. My consensus Id: %d\n", consensusId, consensus.consensusId)
+		consensus.Log.Debug("[ERROR] Received message with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId)
 		return
 	}
-	// sign block
+
+	// check leader Id
+	leaderPrivKey := consensus.leader.Ip + consensus.leader.Port
+	reg, _ := regexp.Compile("[^0-9]+")
+	socketId := reg.ReplaceAllString(leaderPrivKey, "")
+	value, _ := strconv.Atoi(socketId)
+	if leaderId != uint16(value) {
+		consensus.Log.Debug("[ERROR] Received message from wrong leader", "myLeaderId", consensus.consensusId, "receivedLeaderId", consensusId)
+		return
+	}
+
+	// check block header is valid
+	txDecoder := gob.NewDecoder(bytes.NewReader(blockHeader))
+	var blockHeaderObj blockchain.Block // TODO: separate header from block. Right now, this blockHeader data is actually the whole block
+	err := txDecoder.Decode(&blockHeaderObj)
+	if err != nil {
+		consensus.Log.Debug("[ERROR] Unparseable block header data")
+		return
+	}
+	consensus.blockHeader = blockHeader
+
+	// check block hash
+	if bytes.Compare(blockHash[:], blockHeaderObj.HashTransactions()[:]) != 0 || bytes.Compare(blockHeaderObj.Hash[:], blockHeaderObj.HashTransactions()[:]) != 0 {
+		consensus.Log.Debug("[ERROR] Block hash doesn't match")
+		return
+	}
+
+	// check block data (transactions
+	if !consensus.BlockVerifier(&blockHeaderObj) {
+		consensus.Log.Debug("[ERROR] Block content is not verified successfully")
+		return
+	}
 
 	// TODO: return the signature(commit) to leader
 	// For now, simply return the private key of this node.
@@ -98,7 +133,7 @@ func (consensus Consensus) constructCommitMessage() []byte {
 	buffer.Write(fourBytes)
 
 	// 32 byte block hash
-	buffer.Write(consensus.blockHash)
+	buffer.Write(consensus.blockHash[:])
 
 	// 2 byte validator id
 	twoBytes := make([]byte, 2)
@@ -116,8 +151,8 @@ func (consensus Consensus) constructCommitMessage() []byte {
 	return consensus.ConstructConsensusMessage(COMMIT, buffer.Bytes())
 }
 
-// TODO: fill in this function
 func getCommitMessage() []byte {
+	// TODO: use real cosi signature
 	return make([]byte, 33)
 }
 
@@ -133,7 +168,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 	offset += 32
 
 	// 2 byte leader id
-	leaderId := string(payload[offset : offset+2])
+	leaderId := binary.BigEndian.Uint16(payload[offset : offset+2])
 	offset += 2
 
 	// 33 byte of aggregated commit
@@ -162,13 +197,30 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 	_ = challenge
 	_ = signature
 
-	// verify block data and the aggregated signatures
+	// erify block data and the aggregated signatures
+	// check consensus Id
 	if consensusId != consensus.consensusId {
-		log.Printf("Received message with consensus Id: %d. My consensus Id: %d\n", consensusId, consensus.consensusId)
+		consensus.Log.Debug("[ERROR] Received message with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId)
 		return
 	}
 
-	// sign the message
+	// check leader Id
+	leaderPrivKey := consensus.leader.Ip + consensus.leader.Port
+	reg, _ := regexp.Compile("[^0-9]+")
+	socketId := reg.ReplaceAllString(leaderPrivKey, "")
+	value, _ := strconv.Atoi(socketId)
+	if leaderId != uint16(value) {
+		consensus.Log.Debug("[ERROR] Received message from wrong leader", "myLeaderId", consensus.consensusId, "receivedLeaderId", consensusId)
+		return
+	}
+
+	// check block hash
+	if bytes.Compare(blockHash[:], consensus.blockHash[:]) != 0 {
+		consensus.Log.Debug("[ERROR] Block hash doesn't match")
+		return
+	}
+
+	// TODO: verify aggregated commits with real schnor cosign verification
 
 	// TODO: return the signature(response) to leader
 	// For now, simply return the private key of this node.
@@ -178,6 +230,20 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 	// Set state to RESPONSE_DONE
 	consensus.state = RESPONSE_DONE
 	consensus.consensusId++
+
+
+	// TODO: think about when validators know about the consensus is reached.
+	// For now, the blockchain is updated right here.
+
+	// TODO: reconstruct the whole block from header and transactions
+	// For now, we used the stored whole block in consensus.blockHeader
+	txDecoder := gob.NewDecoder(bytes.NewReader(consensus.blockHeader))
+	var blockHeaderObj blockchain.Block
+	err := txDecoder.Decode(&blockHeaderObj)
+	if err != nil {
+		consensus.Log.Debug("failed to construct the new block after consensus")
+	}
+	consensus.OnConsensusDone(&blockHeaderObj)
 }
 
 // Construct the response message to send to leader (assumption the consensus data is already verified)
@@ -190,7 +256,7 @@ func (consensus Consensus) constructResponseMessage() []byte {
 	buffer.Write(fourBytes)
 
 	// 32 byte block hash
-	buffer.Write(consensus.blockHash)
+	buffer.Write(consensus.blockHash[:32])
 
 	// 2 byte validator id
 	twoBytes := make([]byte, 2)

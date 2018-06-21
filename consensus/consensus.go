@@ -2,47 +2,36 @@
 package consensus // consensus
 
 import (
+	"fmt"
+	"harmony-benchmark/blockchain"
 	"harmony-benchmark/common"
+	"harmony-benchmark/log"
 	"harmony-benchmark/p2p"
-	"log"
 	"regexp"
 	"strconv"
 )
 
 // Consensus data containing all info related to one consensus process
 type Consensus struct {
-	state ConsensusState
-	// Signatures collected from validators
-	commits map[string]string
-	// Signatures collected from validators
-	responses map[string]string
-	// Actual block data to reach consensus on
-	data string
-	// List of validators
-	validators []p2p.Peer
-	// Leader
-	leader p2p.Peer
-	// private key of current node
-	priKey string
-	// Whether I am leader. False means I am validator
-	IsLeader bool
-	// Leader or validator Id - 2 byte
-	nodeId uint16
-	// Consensus Id (View Id) - 4 byte
-	consensusId uint32
-	// Blockhash - 32 byte
-	blockHash []byte
-	// BlockHeader to run consensus on
-	blockHeader []byte
-	// Shard Id which this node belongs to
-	ShardId uint32
-
-	// Signal channel for starting a new consensus process
-	ReadySignal chan int
-
-	//// Network related fields
-	msgCategory byte
-	actionType  byte
+	state           ConsensusState
+	commits         map[string]string            // Signatures collected from validators
+	responses       map[string]string            // Signatures collected from validators
+	data            string                       // Actual block data to reach consensus on
+	validators      []p2p.Peer                   // List of validators
+	leader          p2p.Peer                     // Leader
+	priKey          string                       // private key of current node
+	IsLeader        bool                         // Whether I am leader. False means I am validator
+	nodeId          uint16                       // Leader or validator Id - 2 byte
+	consensusId     uint32                       // Consensus Id (View Id) - 4 byte
+	blockHash       [32]byte                     // Blockhash - 32 byte
+	blockHeader     []byte                       // BlockHeader to run consensus on
+	ShardIDShardID  uint32                       // Shard Id which this node belongs to
+	ReadySignal     chan int                     // Signal channel for starting a new consensus process
+	BlockVerifier   func(*blockchain.Block) bool // The verifier func passed from Node object
+	OnConsensusDone func(*blockchain.Block)      // The post-consensus processing func passed from Node object. Called when consensus on a new block is done
+	msgCategory     byte                         // Network related fields
+	actionType      byte
+	Log             log.Logger
 }
 
 // Consensus state enum for both leader and validator
@@ -77,8 +66,10 @@ func (state ConsensusState) String() string {
 	return names[state]
 }
 
-// Create a new Consensus object
-func NewConsensus(ip, port, shardId string, peers []p2p.Peer, leader p2p.Peer) Consensus {
+// NewConsensus creates a new Consensus object
+// TODO(minhdoan): Maybe convert it into just New
+// FYI, see https://golang.org/doc/effective_go.html?#package-names
+func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) Consensus {
 	// The first Ip, port passed will be leader.
 	consensus := Consensus{}
 	peer := p2p.Peer{Port: port, Ip: ip}
@@ -98,14 +89,14 @@ func NewConsensus(ip, port, shardId string, peers []p2p.Peer, leader p2p.Peer) C
 
 	reg, err := regexp.Compile("[^0-9]+")
 	if err != nil {
-		log.Fatal(err)
+		consensus.Log.Crit("Regex Compilation Failed", "err", err, "consensus", consensus)
 	}
 	consensus.consensusId = 0
-	myShardId, err := strconv.Atoi(shardId)
+	myShardIDShardID, err := strconv.Atoi(ShardID)
 	if err != nil {
-		panic("Unparseable shard Id" + shardId)
+		panic("Unparseable shard Id" + ShardID)
 	}
-	consensus.ShardId = uint32(myShardId)
+	consensus.ShardIDShardID = uint32(myShardIDShardID)
 
 	// For now use socket address as 16 byte Id
 	// TODO: populate with correct Id
@@ -123,6 +114,8 @@ func NewConsensus(ip, port, shardId string, peers []p2p.Peer, leader p2p.Peer) C
 
 	consensus.msgCategory = byte(common.COMMITTEE)
 	consensus.actionType = byte(common.CONSENSUS)
+
+	consensus.Log = log.New()
 	return consensus
 }
 
@@ -131,4 +124,15 @@ func (consensus *Consensus) ResetState() {
 	consensus.state = READY
 	consensus.commits = make(map[string]string)
 	consensus.responses = make(map[string]string)
+}
+
+// Returns ID of this consensus
+func (consensus *Consensus) String() string {
+	var duty string
+	if consensus.IsLeader {
+		duty = "LDR" // leader
+	} else {
+		duty = "VLD" // validator
+	}
+	return fmt.Sprintf("[%s, %s, %v, %v]", duty, consensus.priKey, consensus.ShardIDShardID, consensus.nodeId)
 }

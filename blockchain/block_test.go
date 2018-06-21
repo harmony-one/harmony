@@ -19,11 +19,11 @@ func TestBlockSerialize(t *testing.T) {
 		t.Errorf("Serialize or Deserialize incorrect at TimeStamp.")
 	}
 
-	if bytes.Compare(block.PrevBlockHash, deserializedBlock.PrevBlockHash) != 0 {
+	if bytes.Compare(block.PrevBlockHash[:], deserializedBlock.PrevBlockHash[:]) != 0 {
 		t.Errorf("Serialize or Deserialize incorrect at PrevBlockHash.")
 	}
 
-	if bytes.Compare(block.Hash, deserializedBlock.Hash) != 0 {
+	if bytes.Compare(block.Hash[:], deserializedBlock.Hash[:]) != 0 {
 		t.Errorf("Serialize or Deserialize incorrect at Hash.")
 	}
 }
