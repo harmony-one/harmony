@@ -2,19 +2,19 @@ package main
 
 import (
 	"bufio"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"harmony-benchmark/blockchain"
+	"harmony-benchmark/consensus"
 	"harmony-benchmark/log"
 	"harmony-benchmark/node"
 	"harmony-benchmark/p2p"
 	"math/rand"
 	"os"
+	"strconv"
 	"strings"
 	"time"
-	"harmony-benchmark/consensus"
-	"encoding/hex"
-	"strconv"
 )
 
 // Get numTxs number of Fake transactions based on the existing UtxoPool.
@@ -50,7 +50,7 @@ func getNewFakeTransactions(dataNode *node.Node, numTxs int) []*blockchain.Trans
 			for index, value := range utxoMap {
 				countAll++
 				if rand.Intn(100) <= 20 { // 20% sample rate to select UTXO to use for new transactions
-				    // Spend the money of current UTXO to a random address in [1 - 1000]
+					// Spend the money of current UTXO to a random address in [1 - 1000]
 					txin := blockchain.TXInput{txId, index, address}
 					txout := blockchain.TXOutput{value, strconv.Itoa(rand.Intn(1000))}
 					tx := blockchain.Transaction{[32]byte{}, []blockchain.TXInput{txin}, []blockchain.TXOutput{txout}}
@@ -110,7 +110,6 @@ func readConfigFile(configFile string) [][]string {
 }
 
 func main() {
-<<<<<<< HEAD
 	// Setup a stdout logger
 	h := log.CallerFileHandler(log.StdoutHandler)
 	log.Root().SetHandler(h)
@@ -119,28 +118,15 @@ func main() {
 	numTxsPerBatch := flag.Int("num_txs_per_batch", 1000, "number of transactions to send per message")
 	flag.Parse()
 	config := readConfigFile(*configFile)
-<<<<<<< HEAD
-=======
 	leaders := getLeaders(&config)
 
 	// Testing node to mirror the node data in consensus
 	dataNode := node.NewNode(&consensus.Consensus{})
 	dataNode.AddMoreFakeTransactions()
 
->>>>>>> 31f111ed5d49c01a9c3a20e92e053016c05ebafc
 	start := time.Now()
-	totalTime := 60.0
+	totalTime := 600.0
 	time.Sleep(3 * time.Second) // wait for nodes to be ready
-=======
-	configFile := flag.String("config_file", "global_nodes.txt", "file containing all ip addresses and config")
-	flag.Parse()
-	config := readConfigFile(*configFile)
-	totalTime := 60.0
-	time.Sleep(totalTime) //Sleep Time to let all instances come up
-	start := time.Now()
-	txs := make([]blockchain.Transaction, 10)
-	leaders := getLeaders(&config)
->>>>>>> aadf3f9b34b9b4b84841dce554814f05f120aed1
 	for true {
 		t := time.Now()
 		if t.Sub(start).Seconds() >= totalTime {
