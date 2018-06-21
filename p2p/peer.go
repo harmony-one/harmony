@@ -8,17 +8,14 @@ import (
 	"strings"
 )
 
-// Object for a p2p peer (node)
+// Peer is the object for a p2p peer (node)
 type Peer struct {
-	// Ip address of the peer
-	Ip string
-	// Port number of the peer
-	Port string
-	// Public key of the peer
-	PubKey string
+	Ip     string // Ip address of the peer
+	Port   string // Port number of the peer
+	PubKey string // Public key of the peer
 }
 
-// Send the message to the peer
+// SendMessage sends the message to the peer
 func SendMessage(peer Peer, msg []byte) {
 	// Construct normal p2p message
 	content := ConstructP2pMessage(byte(0), msg)
@@ -26,7 +23,7 @@ func SendMessage(peer Peer, msg []byte) {
 	send(peer.Ip, peer.Port, content)
 }
 
-// Send the message to a list of peers
+// BroadcastMessage sends the message to a list of peers
 func BroadcastMessage(peers []Peer, msg []byte) {
 	// Construct broadcast p2p message
 	content := ConstructP2pMessage(byte(17), msg)
@@ -36,7 +33,7 @@ func BroadcastMessage(peers []Peer, msg []byte) {
 	}
 }
 
-// Construct the p2p message as [messageType, contentSize, content]
+// ConstructP2pMessage constructs the p2p message as [messageType, contentSize, content]
 func ConstructP2pMessage(msgType byte, content []byte) []byte {
 
 	firstByte := byte(17)        // messageType 0x11

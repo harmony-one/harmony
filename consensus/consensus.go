@@ -3,55 +3,35 @@ package consensus // consensus
 
 import (
 	"fmt"
+	"harmony-benchmark/blockchain"
 	"harmony-benchmark/common"
 	"harmony-benchmark/log"
 	"harmony-benchmark/p2p"
 	"regexp"
 	"strconv"
-	"harmony-benchmark/blockchain"
 )
 
 // Consensus data containing all info related to one consensus process
 type Consensus struct {
-	state ConsensusState
-	// Signatures collected from validators
-	commits map[string]string
-	// Signatures collected from validators
-	responses map[string]string
-	// Actual block data to reach consensus on
-	data string
-	// List of validators
-	validators []p2p.Peer
-	// Leader
-	leader p2p.Peer
-	// private key of current node
-	priKey string
-	// Whether I am leader. False means I am validator
-	IsLeader bool
-	// Leader or validator Id - 2 byte
-	nodeId uint16
-	// Consensus Id (View Id) - 4 byte
-	consensusId uint32
-	// Blockhash - 32 byte
-	blockHash [32]byte
-	// BlockHeader to run consensus on
-	blockHeader []byte
-	// Shard Id which this node belongs to
-	ShardIDShardID uint32
-
-	// Signal channel for starting a new consensus process
-	ReadySignal chan int
-	// The verifier func passed from Node object
-	BlockVerifier func(*blockchain.Block)bool
-	// The post-consensus processing func passed from Node object
-	// Called when consensus on a new block is done
-	OnConsensusDone func(*blockchain.Block)
-
-	//// Network related fields
-	msgCategory byte
-	actionType  byte
-
-	Log log.Logger
+	state           ConsensusState
+	commits         map[string]string            // Signatures collected from validators
+	responses       map[string]string            // Signatures collected from validators
+	data            string                       // Actual block data to reach consensus on
+	validators      []p2p.Peer                   // List of validators
+	leader          p2p.Peer                     // Leader
+	priKey          string                       // private key of current node
+	IsLeader        bool                         // Whether I am leader. False means I am validator
+	nodeId          uint16                       // Leader or validator Id - 2 byte
+	consensusId     uint32                       // Consensus Id (View Id) - 4 byte
+	blockHash       [32]byte                     // Blockhash - 32 byte
+	blockHeader     []byte                       // BlockHeader to run consensus on
+	ShardIDShardID  uint32                       // Shard Id which this node belongs to
+	ReadySignal     chan int                     // Signal channel for starting a new consensus process
+	BlockVerifier   func(*blockchain.Block) bool // The verifier func passed from Node object
+	OnConsensusDone func(*blockchain.Block)      // The post-consensus processing func passed from Node object. Called when consensus on a new block is done
+	msgCategory     byte                         // Network related fields
+	actionType      byte
+	Log             log.Logger
 }
 
 // Consensus state enum for both leader and validator
