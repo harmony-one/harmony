@@ -122,7 +122,7 @@ func main() {
 
 	// Testing node to mirror the node data in consensus
 	dataNode := node.NewNode(&consensus.Consensus{})
-	dataNode.AddMoreFakeTransactions()
+	dataNode.AddMoreFakeTransactions(1000)
 
 	start := time.Now()
 	totalTime := 60.0

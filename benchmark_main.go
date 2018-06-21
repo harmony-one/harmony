@@ -88,7 +88,7 @@ func main() {
 	consensus.OnConsensusDone = node.AddNewBlockToBlockchain
 
 	// Temporary testing code, to be removed.
-	node.AddMoreFakeTransactions()
+	node.AddMoreFakeTransactions(1000)
 
 	if consensus.IsLeader {
 		// Let consensus run

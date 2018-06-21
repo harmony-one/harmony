@@ -32,3 +32,15 @@ func TestNewNewNode(test *testing.T) {
 		test.Error("Utxo pool is not initialized for the node")
 	}
 }
+
+func TestCountNumTransactionsInBlockchain(test *testing.T) {
+	leader := p2p.Peer{Ip: "1", Port: "2"}
+	validator := p2p.Peer{Ip: "3", Port: "5"}
+	consensus := consensus.NewConsensus("1", "2", "0", []p2p.Peer{leader, validator}, leader)
+
+	node := NewNode(&consensus)
+	node.AddMoreFakeTransactions(1000)
+	if node.countNumTransactionsInBlockchain() != 1001 {
+		test.Error("Count of transactions in the blockchain is incorrect")
+	}
+}
