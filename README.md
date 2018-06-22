@@ -28,7 +28,6 @@ go get github.com/go-stack/stack
 
 ./deploy.sh local_config.txt
 
-./send_txn.sh
 ```
 
 
