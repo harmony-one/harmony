@@ -22,11 +22,12 @@ type TXOutput struct {
 	Address string
 }
 
-// TXInput is the struct of transaction input in a transaction.
+// TXInput is the struct of transaction input (a UTXO) in a transaction.
 type TXInput struct {
 	TxID          []byte
 	TxOutputIndex int
 	Address       string
+	ShardId       uint32 // The Id of the shard where this UTXO belongs
 }
 
 // DefaultCoinbaseValue is the default value of coinbase transaction.
@@ -47,12 +48,12 @@ func (tx *Transaction) SetID() {
 }
 
 // NewCoinbaseTX creates a new coinbase transaction
-func NewCoinbaseTX(to, data string) *Transaction {
+func NewCoinbaseTX(to, data string, shardId uint32) *Transaction {
 	if data == "" {
 		data = fmt.Sprintf("Reward to '%s'", to)
 	}
 
-	txin := TXInput{[]byte{}, -1, data}
+	txin := TXInput{[]byte{}, -1, data, shardId}
 	txout := TXOutput{DefaultCoinbaseValue, to}
 	tx := Transaction{[32]byte{}, []TXInput{txin}, []TXOutput{txout}}
 	tx.SetID()

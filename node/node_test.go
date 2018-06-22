@@ -12,7 +12,7 @@ func TestNewNewNode(test *testing.T) {
 	consensus := consensus.NewConsensus("1", "2", "0", []p2p.Peer{leader, validator}, leader)
 
 	node := NewNode(&consensus)
-	if node.consensus == nil {
+	if node.Consensus == nil {
 		test.Error("Consensus is not initialized for the node")
 	}
 

@@ -15,10 +15,10 @@ var pendingTxMutex = &sync.Mutex{}
 // Node represents a program (machine) participating in the network
 // TODO(minhdoan, rj): consider using BlockChannel *chan blockchain.Block for efficiency.
 type Node struct {
-	consensus              *consensus.Consensus      // Consensus object containing all consensus related data (e.g. committee members, signatures, commits)
+	Consensus              *consensus.Consensus      // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
 	BlockChannel           chan blockchain.Block     // The channel to receive new blocks from Node
-	pendingTransactions    []*blockchain.Transaction // All the transactions received but not yet processed for consensus
-	transactionInConsensus []*blockchain.Transaction // The transactions selected into the new block and under consensus process
+	pendingTransactions    []*blockchain.Transaction // All the transactions received but not yet processed for Consensus
+	transactionInConsensus []*blockchain.Transaction // The transactions selected into the new block and under Consensus process
 	blockchain             *blockchain.Blockchain    // The blockchain for the shard where this node belongs
 	UtxoPool               *blockchain.UTXOPool      // The corresponding UTXO pool of the current blockchain
 	log                    log.Logger                // Log utility
@@ -68,7 +68,7 @@ func (node *Node) listenOnPort(port string) {
 }
 
 func (node *Node) String() string {
-	return node.consensus.String()
+	return node.Consensus.String()
 }
 
 // [Testing code] Should be deleted for production
@@ -76,7 +76,7 @@ func (node *Node) String() string {
 func (node *Node) AddMoreFakeTransactions(numTxs int) {
 	txs := make([]*blockchain.Transaction, numTxs)
 	for i := range txs {
-		txs[i] = blockchain.NewCoinbaseTX(strconv.Itoa(i), "")
+		txs[i] = blockchain.NewCoinbaseTX(strconv.Itoa(i), "", node.Consensus.ShardID)
 	}
 	node.blockchain.Blocks[0].Transactions = append(node.blockchain.Blocks[0].Transactions, txs...)
 	node.UtxoPool.Update(txs)
@@ -97,20 +97,20 @@ func NewNode(consensus *consensus.Consensus) Node {
 	node := Node{}
 
 	// Consensus and associated channel to communicate blocks
-	node.consensus = consensus
+	node.Consensus = consensus
 	node.BlockChannel = make(chan blockchain.Block)
 
 	// Genesis Block
 	genesisBlock := &blockchain.Blockchain{}
 	genesisBlock.Blocks = make([]*blockchain.Block, 0)
-	coinbaseTx := blockchain.NewCoinbaseTX("harmony", "1")
-	genesisBlock.Blocks = append(genesisBlock.Blocks, blockchain.NewGenesisBlock(coinbaseTx))
+	coinbaseTx := blockchain.NewCoinbaseTX("harmony", "1", node.Consensus.ShardID)
+	genesisBlock.Blocks = append(genesisBlock.Blocks, blockchain.NewGenesisBlock(coinbaseTx, node.Consensus.ShardID))
 	node.blockchain = genesisBlock
 
 	// UTXO pool from Genesis block
 	node.UtxoPool = blockchain.CreateUTXOPoolFromGenesisBlockChain(node.blockchain)
 
 	// Logger
-	node.log = node.consensus.Log
+	node.log = node.Consensus.Log
 	return node
 }

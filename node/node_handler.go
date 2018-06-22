@@ -27,7 +27,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 		node.log.Error("Read p2p data failed", "err", err, "node", node)
 		return
 	}
-	consensus := node.consensus
+	consensus := node.Consensus
 
 	msgCategory, err := common.GetMessageCategory(content)
 	if err != nil {
@@ -115,11 +115,11 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 
 // WaitForConsensusReady ...
 func (node *Node) WaitForConsensusReady(readySignal chan int) {
-	node.log.Debug("Waiting for consensus ready", "node", node)
+	node.log.Debug("Waiting for Consensus ready", "node", node)
 
 	var newBlock *blockchain.Block
 	timeoutCount := 0
-	for { // keep waiting for consensus ready
+	for { // keep waiting for Consensus ready
 		retry := false
 		select {
 		case <-readySignal:
@@ -142,17 +142,17 @@ func (node *Node) WaitForConsensusReady(readySignal chan int) {
 						node.log.Debug("Creating new block", "numTxs", len(selectedTxs), "pendingTxs", len(node.pendingTransactions), "currentChainSize", len(node.blockchain.Blocks))
 
 						node.transactionInConsensus = selectedTxs
-						newBlock = blockchain.NewBlock(selectedTxs, node.blockchain.GetLatestBlock().Hash)
+						newBlock = blockchain.NewBlock(selectedTxs, node.blockchain.GetLatestBlock().Hash, node.Consensus.ShardID)
 						break
 					}
 				}
-				// If not enough transactions to run consensus,
+				// If not enough transactions to run Consensus,
 				// periodically check whether we have enough transactions to package into block.
 				time.Sleep(1 * time.Second)
 			}
 		}
 
-		// Send the new block to consensus so it can be confirmed.
+		// Send the new block to Consensus so it can be confirmed.
 		if newBlock != nil {
 			node.BlockChannel <- *newBlock
 		}
@@ -168,6 +168,6 @@ func (node *Node) AddNewBlockToBlockchain(newBlock *blockchain.Block) {
 	node.blockchain.Blocks = append(node.blockchain.Blocks, newBlock)
 	// Update UTXO pool
 	node.UtxoPool.Update(newBlock.Transactions)
-	// Clear transaction-in-consensus list
+	// Clear transaction-in-Consensus list
 	node.transactionInConsensus = []*blockchain.Transaction{}
 }

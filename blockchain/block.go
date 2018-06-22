@@ -18,7 +18,7 @@ type Block struct {
 	NumTransactions int32
 	TransactionIds  [][32]byte
 	Transactions    []*Transaction // Transactions
-
+	ShardId         uint32
 	// Signature...
 }
 
@@ -68,20 +68,20 @@ func (b *Block) HashTransactions() []byte {
 }
 
 // NewBlock creates and returns a neew block.
-func NewBlock(transactions []*Transaction, prevBlockHash [32]byte) *Block {
+func NewBlock(transactions []*Transaction, prevBlockHash [32]byte, shardId uint32) *Block {
 	numTxs := int32(len(transactions))
 	var txIds [][32]byte
 
 	for _, tx := range transactions {
 		txIds = append(txIds, tx.ID)
 	}
-	block := &Block{time.Now().Unix(), prevBlockHash, [32]byte{}, numTxs, txIds, transactions}
+	block := &Block{time.Now().Unix(), prevBlockHash, [32]byte{}, numTxs, txIds, transactions, shardId}
 	copy(block.Hash[:], block.HashTransactions()[:]) // TODO(Minh): the blockhash should be a hash of everything in the block
 
 	return block
 }
 
 // NewGenesisBlock creates and returns genesis Block.
-func NewGenesisBlock(coinbase *Transaction) *Block {
-	return NewBlock([]*Transaction{coinbase}, [32]byte{})
+func NewGenesisBlock(coinbase *Transaction, shardId uint32) *Block {
+	return NewBlock([]*Transaction{coinbase}, [32]byte{}, shardId)
 }

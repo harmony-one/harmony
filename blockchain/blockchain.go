@@ -103,7 +103,7 @@ Work:
 }
 
 // NewUTXOTransaction creates a new transaction
-func (bc *Blockchain) NewUTXOTransaction(from, to string, amount int) *Transaction {
+func (bc *Blockchain) NewUTXOTransaction(from, to string, amount int, shardId uint32) *Transaction {
 	var inputs []TXInput
 	var outputs []TXOutput
 
@@ -121,7 +121,7 @@ func (bc *Blockchain) NewUTXOTransaction(from, to string, amount int) *Transacti
 		}
 
 		for _, out := range outs {
-			input := TXInput{txID, out, from}
+			input := TXInput{txID, out, from, shardId}
 			inputs = append(inputs, input)
 		}
 	}
@@ -140,10 +140,10 @@ func (bc *Blockchain) NewUTXOTransaction(from, to string, amount int) *Transacti
 
 // AddNewUserTransfer creates a new transaction and a block of that transaction.
 // Mostly used for testing.
-func (bc *Blockchain) AddNewUserTransfer(utxoPool *UTXOPool, from, to string, amount int) bool {
-	tx := bc.NewUTXOTransaction(from, to, amount)
+func (bc *Blockchain) AddNewUserTransfer(utxoPool *UTXOPool, from, to string, amount int, shardId uint32) bool {
+	tx := bc.NewUTXOTransaction(from, to, amount, shardId)
 	if tx != nil {
-		newBlock := NewBlock([]*Transaction{tx}, bc.Blocks[len(bc.Blocks)-1].Hash)
+		newBlock := NewBlock([]*Transaction{tx}, bc.Blocks[len(bc.Blocks)-1].Hash, shardId)
 		if bc.VerifyNewBlockAndUpdate(utxoPool, newBlock) {
 			return true
 		}
@@ -169,11 +169,11 @@ func (bc *Blockchain) VerifyNewBlockAndUpdate(utxopool *UTXOPool, block *Block) 
 }
 
 // CreateBlockchain creates a new blockchain DB
-func CreateBlockchain(address string) *Blockchain {
+func CreateBlockchain(address string, shardId uint32) *Blockchain {
 	// TODO: We assume we have not created any blockchain before.
 	// In current bitcoin, we can check if we created a blockchain before accessing local db.
-	cbtx := NewCoinbaseTX(address, genesisCoinbaseData)
-	genesis := NewGenesisBlock(cbtx)
+	cbtx := NewCoinbaseTX(address, genesisCoinbaseData, shardId)
+	genesis := NewGenesisBlock(cbtx, shardId)
 
 	bc := Blockchain{[]*Block{genesis}}
 

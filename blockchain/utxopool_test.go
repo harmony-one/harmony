@@ -5,13 +5,13 @@ import (
 )
 
 func TestVerifyOneTransactionAndUpdate(t *testing.T) {
-	bc := CreateBlockchain("minh")
+	bc := CreateBlockchain("minh", 0)
 	utxoPool := CreateUTXOPoolFromGenesisBlockChain(bc)
 
-	bc.AddNewUserTransfer(utxoPool, "minh", "alok", 3)
-	bc.AddNewUserTransfer(utxoPool, "minh", "rj", 100)
+	bc.AddNewUserTransfer(utxoPool, "minh", "alok", 3, 0)
+	bc.AddNewUserTransfer(utxoPool, "minh", "rj", 100, 0)
 
-	tx := bc.NewUTXOTransaction("minh", "mark", 10)
+	tx := bc.NewUTXOTransaction("minh", "mark", 10, 0)
 	if tx == nil {
 		t.Error("failed to create a new transaction.")
 	}
@@ -23,11 +23,11 @@ func TestVerifyOneTransactionAndUpdate(t *testing.T) {
 }
 
 func TestDeleteOneBalanceItem(t *testing.T) {
-	bc := CreateBlockchain("minh")
+	bc := CreateBlockchain("minh", 0)
 	utxoPool := CreateUTXOPoolFromGenesisBlockChain(bc)
 
-	bc.AddNewUserTransfer(utxoPool, "minh", "alok", 3)
-	bc.AddNewUserTransfer(utxoPool, "alok", "rj", 3)
+	bc.AddNewUserTransfer(utxoPool, "minh", "alok", 3, 0)
+	bc.AddNewUserTransfer(utxoPool, "alok", "rj", 3, 0)
 
 	if _, ok := utxoPool.UtxoMap["alok"]; ok {
 		t.Errorf("alok should not be contained in the balance map")
