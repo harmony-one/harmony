@@ -30,40 +30,7 @@ func (utxoPool *UTXOPool) VerifyTransactions(transactions []*Transaction) bool {
 	spentTXOs := make(map[string]map[string]map[int]bool)
 	if utxoPool != nil {
 		for _, tx := range transactions {
-			inTotal := 0
-			// Calculate the sum of TxInput
-			for _, in := range tx.TxInput {
-				inTxID := hex.EncodeToString(in.TxID)
-				index := in.TxOutputIndex
-				// Check if the transaction with the addres is spent or not.
-				if val, ok := spentTXOs[in.Address][inTxID][index]; ok {
-					if val {
-						return false
-					}
-				}
-				// Mark the transactions with the address and index spent.
-				if _, ok := spentTXOs[in.Address]; !ok {
-					spentTXOs[in.Address] = make(map[string]map[int]bool)
-				}
-				if _, ok := spentTXOs[in.Address][inTxID]; !ok {
-					spentTXOs[in.Address][inTxID] = make(map[int]bool)
-				}
-				spentTXOs[in.Address][inTxID][index] = true
-
-				// Sum the balance up to the inTotal.
-				if val, ok := utxoPool.UtxoMap[in.Address][inTxID][index]; ok {
-					inTotal += val
-				} else {
-					return false
-				}
-			}
-
-			outTotal := 0
-			// Calculate the sum of TxOutput
-			for _, out := range tx.TxOutput {
-				outTotal += out.Value
-			}
-			if inTotal != outTotal {
+			if !utxoPool.VerifyOneTransaction(tx, &spentTXOs) {
 				return false
 			}
 		}
@@ -72,45 +39,58 @@ func (utxoPool *UTXOPool) VerifyTransactions(transactions []*Transaction) bool {
 }
 
 // VerifyOneTransaction verifies if a list of transactions valid.
-func (utxoPool *UTXOPool) VerifyOneTransaction(tx *Transaction) bool {
-	spentTXOs := make(map[string]map[string]map[int]bool)
-	txID := hex.EncodeToString(tx.ID[:])
+func (utxoPool *UTXOPool) VerifyOneTransaction(tx *Transaction, spentTXOs *map[string]map[string]map[int]bool) bool {
+	if spentTXOs == nil {
+		spentTXOs = &map[string]map[string]map[int]bool{}
+	}
+
 	inTotal := 0
 	// Calculate the sum of TxInput
 	for _, in := range tx.TxInput {
 		inTxID := hex.EncodeToString(in.TxID)
 		index := in.TxOutputIndex
 		// Check if the transaction with the addres is spent or not.
+		if val, ok := (*spentTXOs)[in.Address][inTxID][index]; ok {
+			if val {
+				return false
+			}
+		}
+		// Mark the transactions with the address and index spent.
+		if _, ok := (*spentTXOs)[in.Address]; !ok {
+			(*spentTXOs)[in.Address] = make(map[string]map[int]bool)
+		}
+		if _, ok := (*spentTXOs)[in.Address][inTxID]; !ok {
+			(*spentTXOs)[in.Address][inTxID] = make(map[int]bool)
+		}
+		(*spentTXOs)[in.Address][inTxID][index] = true
+
+		// Sum the balance up to the inTotal.
 		if val, ok := utxoPool.UtxoMap[in.Address][inTxID][index]; ok {
 			inTotal += val
 		} else {
 			return false
 		}
-		// Mark the transactions with the address and index spent.
-		if _, ok := spentTXOs[in.Address]; !ok {
-			spentTXOs[in.Address] = make(map[string]map[int]bool)
-		}
-		if _, ok := spentTXOs[in.Address][inTxID]; !ok {
-			spentTXOs[in.Address][inTxID] = make(map[int]bool)
-		}
-		if spentTXOs[in.Address][inTxID][index] {
-			return false
-		}
-		spentTXOs[in.Address][inTxID][index] = true
 	}
 
 	outTotal := 0
 	// Calculate the sum of TxOutput
-	for index, out := range tx.TxOutput {
-		if _, ok := spentTXOs[out.Address][txID][index]; ok {
-			return false
-		}
+	for _, out := range tx.TxOutput {
 		outTotal += out.Value
 	}
 	if inTotal != outTotal {
 		return false
 	}
+
 	return true
+}
+
+// Update Utxo balances with a list of new transactions.
+func (utxoPool *UTXOPool) Update(transactions []*Transaction) {
+	if utxoPool != nil {
+		for _, tx := range transactions {
+			utxoPool.UpdateOneTransaction(tx)
+		}
+	}
 }
 
 // UpdateOneTransaction updates utxoPool in respect to the new Transaction.
@@ -141,7 +121,7 @@ func (utxoPool *UTXOPool) UpdateOneTransaction(tx *Transaction) {
 // VerifyOneTransactionAndUpdate verifies and update a valid transaction.
 // Return false if the transaction is not valid.
 func (utxoPool *UTXOPool) VerifyOneTransactionAndUpdate(tx *Transaction) bool {
-	if utxoPool.VerifyOneTransaction(tx) {
+	if utxoPool.VerifyOneTransaction(tx, nil) {
 		utxoPool.UpdateOneTransaction(tx)
 		return true
 	}
@@ -155,33 +135,6 @@ func (utxoPool *UTXOPool) VerifyAndUpdate(transactions []*Transaction) bool {
 		return true
 	}
 	return false
-}
-
-// Update Utxo balances with a list of new transactions.
-func (utxoPool *UTXOPool) Update(transactions []*Transaction) {
-	if utxoPool != nil {
-		for _, tx := range transactions {
-			curTxID := hex.EncodeToString(tx.ID[:])
-
-			// Remove
-			for _, in := range tx.TxInput {
-				inTxID := hex.EncodeToString(in.TxID)
-				utxoPool.DeleteOneBalanceItem(in.Address, inTxID, in.TxOutputIndex)
-			}
-
-			// Update
-			for index, out := range tx.TxOutput {
-				if _, ok := utxoPool.UtxoMap[out.Address]; !ok {
-					utxoPool.UtxoMap[out.Address] = make(map[string]map[int]int)
-					utxoPool.UtxoMap[out.Address][curTxID] = make(map[int]int)
-				}
-				if _, ok := utxoPool.UtxoMap[out.Address][curTxID]; !ok {
-					utxoPool.UtxoMap[out.Address][curTxID] = make(map[int]int)
-				}
-				utxoPool.UtxoMap[out.Address][curTxID][index] = out.Value
-			}
-		}
-	}
 }
 
 // CreateUTXOPoolFromTransaction a Utxo pool from a genesis transaction.
@@ -206,8 +159,9 @@ func CreateUTXOPoolFromGenesisBlockChain(bc *Blockchain) *UTXOPool {
 // SelectTransactionsForNewBlock returns a list of index of valid transactions for the new block.
 func (utxoPool *UTXOPool) SelectTransactionsForNewBlock(transactions []*Transaction, maxNumTxs int) ([]*Transaction, []*Transaction) {
 	selected, unselected := []*Transaction{}, []*Transaction{}
+	spentTXOs := make(map[string]map[string]map[int]bool)
 	for _, tx := range transactions {
-		if len(selected) < maxNumTxs && utxoPool.VerifyOneTransaction(tx) {
+		if len(selected) < maxNumTxs && utxoPool.VerifyOneTransaction(tx, &spentTXOs) {
 			selected = append(selected, tx)
 		} else {
 			unselected = append(unselected, tx)

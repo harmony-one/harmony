@@ -49,7 +49,7 @@ func getNewFakeTransactions(dataNode *node.Node, numTxs int) []*blockchain.Trans
 			}
 			for index, value := range utxoMap {
 				countAll++
-				if rand.Intn(100) < 50 { // 50% sample rate to select UTXO to use for new transactions
+				if rand.Intn(100) < 30 { // 30% sample rate to select UTXO to use for new transactions
 					// Spend the money of current UTXO to a random address in [1 - 1000]
 					txin := blockchain.TXInput{txId, index, address, dataNode.Consensus.ShardID}
 					txout := blockchain.TXOutput{value, strconv.Itoa(rand.Intn(10000))}
