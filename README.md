@@ -25,12 +25,15 @@ go get github.com/go-stack/stack
 ```
 ## Usage
 ```
-
 ./deploy.sh local_config.txt
-
 ```
 
+## Testing
 
+Make sure you the following command and make sure everything passed before submitting your code.
+'''
+./test_before_submit.sh
+'''
 
 
 

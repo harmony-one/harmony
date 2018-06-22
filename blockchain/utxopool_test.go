@@ -34,7 +34,6 @@ func TestVerifyOneTransactionFail(t *testing.T) {
 		t.Error("failed to create a new transaction.")
 	}
 
-
 	tx.TxInput = append(tx.TxInput, tx.TxInput[0])
 	if utxoPool.VerifyOneTransaction(tx, nil) {
 		t.Error("Tx with multiple identical TxInput shouldn't be valid")
