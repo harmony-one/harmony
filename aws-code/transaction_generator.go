@@ -124,7 +124,7 @@ func main() {
 	dataNode := node.NewNode(&consensus.Consensus{})
 	dataNode.AddMoreFakeTransactions(10000)
 
-	time.Sleep(5 * time.Second) // wait for nodes to be ready
+	time.Sleep(10 * time.Second) // wait for nodes to be ready
 
 	start := time.Now()
 	totalTime := 60.0

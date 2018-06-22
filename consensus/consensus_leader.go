@@ -144,12 +144,12 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 
 	// check consensus Id
 	if consensusId != consensus.consensusId {
-		consensus.Log.Debug("[WARNING] Received COMMIT with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId, "consensus", consensus)
+		consensus.Log.Warn("Received COMMIT with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId, "consensus", consensus)
 		return
 	}
 
 	if bytes.Compare(blockHash, consensus.blockHash[:]) != 0 {
-		consensus.Log.Debug("[WARNING] Received COMMIT with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId, "consensus", consensus)
+		consensus.Log.Warn("Received COMMIT with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId, "consensus", consensus)
 		return
 	}
 
@@ -278,7 +278,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 	// check consensus Id
 	if consensusId != consensus.consensusId {
 		shouldProcess = false
-		consensus.Log.Debug("[WARNING] Received RESPONSE with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId, "consensus", consensus)
+		consensus.Log.Warn("Received RESPONSE with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId, "consensus", consensus)
 	}
 
 	// proceed only when the message is not received before
