@@ -112,13 +112,13 @@ func readConfigFile(configFile string) [][]string {
 func main() {
 	configFile := flag.String("config_file", "local_config.txt", "file containing all ip addresses and config")
 	numTxsPerBatch := flag.Int("num_txs_per_batch", 10000, "number of transactions to send per message")
-	timestamp := flag.String("timestamp", "latest", "timestamp of this execution")
+	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	flag.Parse()
 	config := readConfigFile(*configFile)
 	leaders := getLeaders(&config)
 
 	// Setup a logger to stdout and log file.
-	logFileName := fmt.Sprintf("./%v-tx-generator.log", *timestamp)
+	logFileName := fmt.Sprintf("./%v/tx-generator.log", *logFolder)
 	h := log.MultiHandler(
 		log.Must.FileHandler(logFileName, log.LogfmtFormat()),
 		log.StdoutHandler)

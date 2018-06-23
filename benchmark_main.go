@@ -63,7 +63,7 @@ func main() {
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9000", "port of the node.")
 	configFile := flag.String("config_file", "config.txt", "file containing all ip addresses")
-	timestamp := flag.String("timestamp", "latest", "timestamp of this execution")
+	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	flag.Parse()
 
 	config := readConfigFile(*configFile)
@@ -72,7 +72,7 @@ func main() {
 	leader := getLeader(shardId, &config)
 
 	// Setup a logger to stdout and log file.
-	logFileName := fmt.Sprintf("./%v-%v.log", *timestamp, *port)
+	logFileName := fmt.Sprintf("./%v/%v.log", *logFolder, *port)
 	h := log.MultiHandler(
 		log.Must.FileHandler(logFileName, log.LogfmtFormat()),
 		log.StdoutHandler)
