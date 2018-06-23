@@ -120,6 +120,7 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	// TODO: return the signature(commit) to leader
 	// For now, simply return the private key of this node.
 	msgToSend := consensus.constructCommitMessage()
+	// consensus.Log.Debug("SENDING COMMIT", "consensusId", consensus.consensusId, "consensus", consensus)
 	p2p.SendMessage(consensus.leader, msgToSend)
 
 	// Set state to COMMIT_DONE
@@ -212,16 +213,23 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 		return
 	}
 
+	consensus.mutex.Lock()
 	// check block hash
 	if bytes.Compare(blockHash[:], consensus.blockHash[:]) != 0 {
 		consensus.Log.Warn("Block hash doesn't match", "consensus", consensus)
+		consensus.mutex.Unlock()
 		return
 	}
 
 	// check consensus Id
 	if consensusId != consensus.consensusId {
 		consensus.Log.Warn("Received message with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId, "consensus", consensus)
-		return
+		if _, ok := consensus.blocksReceived[consensus.consensusId]; !ok {
+			consensus.mutex.Unlock()
+			return
+		}
+		consensus.Log.Warn("ROLLING UP", "consensus", consensus)
+		// If I received previous block (which haven't been processed. I will roll up to current block if everything checks.
 	}
 
 	// TODO: verify aggregated commits with real schnor cosign verification
@@ -229,6 +237,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 	// TODO: return the signature(response) to leader
 	// For now, simply return the private key of this node.
 	msgToSend := consensus.constructResponseMessage()
+	// consensus.Log.Debug("SENDING RESPONSE", "consensusId", consensus.consensusId, "consensus", consensus)
 	p2p.SendMessage(consensus.leader, msgToSend)
 
 	// Set state to RESPONSE_DONE
@@ -237,15 +246,12 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 	// BIG TODO: the block catch up logic is basically a mock now. More checks need to be done to make it correct.
 	// The logic is to roll up to the latest blocks one by one to try catching up with the leader.
 	for {
-		consensus.mutex.Lock()
 		val, ok := consensus.blocksReceived[consensus.consensusId]
-		consensus.mutex.Unlock()
 		if ok {
-			consensus.mutex.Lock()
 			delete(consensus.blocksReceived, consensus.consensusId)
 
+			consensus.blockHash = [32]byte{}
 			consensus.consensusId++ // roll up one by one, until the next block is not received yet.
-			consensus.mutex.Unlock()
 
 			// TODO: think about when validators know about the consensus is reached.
 			// For now, the blockchain is updated right here.
@@ -261,6 +267,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 			// check block data (transactions
 			if !consensus.BlockVerifier(&blockHeaderObj) {
 				consensus.Log.Debug("[WARNING] Block content is not verified successfully", "consensusId", consensus.consensusId)
+				consensus.mutex.Unlock()
 				return
 			}
 			consensus.OnConsensusDone(&blockHeaderObj)
@@ -269,7 +276,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 		}
 
 	}
-
+	consensus.mutex.Unlock()
 }
 
 // Construct the response message to send to leader (assumption the consensus data is already verified)

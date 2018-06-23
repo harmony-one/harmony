@@ -3,6 +3,7 @@ package blockchain
 import (
 	"encoding/hex"
 	"fmt"
+	"sync"
 )
 
 // UTXOPool stores transactions and balance associated with each address.
@@ -25,6 +26,7 @@ type UTXOPool struct {
 	UtxoMap map[string]map[string]map[int]int
 
 	ShardId uint32
+	mutex   sync.Mutex
 }
 
 // VerifyTransactions verifies if a list of transactions valid for this shard.
@@ -72,11 +74,14 @@ func (utxoPool *UTXOPool) VerifyOneTransaction(tx *Transaction, spentTXOs *map[s
 		(*spentTXOs)[in.Address][inTxID][index] = true
 
 		// Sum the balance up to the inTotal.
+		utxoPool.mutex.Lock()
 		if val, ok := utxoPool.UtxoMap[in.Address][inTxID][index]; ok {
 			inTotal += val
 		} else {
+			utxoPool.mutex.Unlock()
 			return false, crossShard
 		}
+		utxoPool.mutex.Unlock()
 	}
 
 	outTotal := 0
@@ -102,6 +107,8 @@ func (utxoPool *UTXOPool) Update(transactions []*Transaction) {
 
 // UpdateOneTransaction updates utxoPool in respect to the new Transaction.
 func (utxoPool *UTXOPool) UpdateOneTransaction(tx *Transaction) {
+	utxoPool.mutex.Lock()
+	defer utxoPool.mutex.Unlock()
 	if utxoPool != nil {
 		txID := hex.EncodeToString(tx.ID[:])
 

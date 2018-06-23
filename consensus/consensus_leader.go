@@ -143,32 +143,31 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 	_ = signature
 
 	// check consensus Id
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
 	if consensusId != consensus.consensusId {
 		consensus.Log.Warn("Received COMMIT with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId, "consensus", consensus)
 		return
 	}
 
 	if bytes.Compare(blockHash, consensus.blockHash[:]) != 0 {
-		consensus.Log.Warn("Received COMMIT with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId, "consensus", consensus)
+		consensus.Log.Warn("Received COMMIT with wrong blockHash", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId, "consensus", consensus)
 		return
 	}
 
 	// proceed only when the message is not received before
-	consensus.mutex.Lock()
 	_, ok := consensus.commits[validatorId]
 	shouldProcess := !ok
 	if shouldProcess {
 		consensus.commits[validatorId] = validatorId
-		//consensus.Log.Debug("Number of commits received", "count", len(consensus.commits))
+		//consensus.Log.Debug("Number of commits received", "consensusId", consensus.consensusId, "count", len(consensus.commits))
 	}
-	consensus.mutex.Unlock()
 
 	if !shouldProcess {
 		return
 	}
 
 	if len(consensus.commits) >= (2*len(consensus.validators))/3+1 && consensus.state < CHALLENGE_DONE {
-		consensus.mutex.Lock()
 		if len(consensus.commits) >= (2*len(consensus.validators))/3+1 && consensus.state < CHALLENGE_DONE {
 			consensus.Log.Debug("Enough commits received with signatures", "numOfSignatures", len(consensus.commits))
 
@@ -179,7 +178,6 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 			// Set state to CHALLENGE_DONE
 			consensus.state = CHALLENGE_DONE
 		}
-		consensus.mutex.Unlock()
 	}
 }
 
@@ -281,11 +279,17 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 		consensus.Log.Warn("Received RESPONSE with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId, "consensus", consensus)
 	}
 
+	if bytes.Compare(blockHash, consensus.blockHash[:]) != 0 {
+		consensus.Log.Warn("Received RESPONSE with wrong blockHash", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId, "consensus", consensus)
+		return
+	}
+
 	// proceed only when the message is not received before
 	_, ok := consensus.responses[validatorId]
 	shouldProcess = shouldProcess && !ok
 	if shouldProcess {
 		consensus.responses[validatorId] = validatorId
+		//consensus.Log.Debug("Number of responses received", "consensusId", consensus.consensusId, "count", len(consensus.responses))
 	}
 	consensus.mutex.Unlock()
 
