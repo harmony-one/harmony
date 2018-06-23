@@ -10,38 +10,49 @@ import (
 	"sync"
 )
 
-var pendingTxMutex = &sync.Mutex{}
-
 // Node represents a program (machine) participating in the network
 // TODO(minhdoan, rj): consider using BlockChannel *chan blockchain.Block for efficiency.
 type Node struct {
-	Consensus              *consensus.Consensus      // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
-	BlockChannel           chan blockchain.Block     // The channel to receive new blocks from Node
-	pendingTransactions    []*blockchain.Transaction // All the transactions received but not yet processed for Consensus
-	transactionInConsensus []*blockchain.Transaction // The transactions selected into the new block and under Consensus process
-	blockchain             *blockchain.Blockchain    // The blockchain for the shard where this node belongs
-	UtxoPool               *blockchain.UTXOPool      // The corresponding UTXO pool of the current blockchain
-	log                    log.Logger                // Log utility
+	Consensus              *consensus.Consensus               // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
+	BlockChannel           chan blockchain.Block              // The channel to receive new blocks from Node
+	pendingTransactions    []*blockchain.Transaction          // All the transactions received but not yet processed for Consensus
+	transactionInConsensus []*blockchain.Transaction          // The transactions selected into the new block and under Consensus process
+	blockchain             *blockchain.Blockchain             // The blockchain for the shard where this node belongs
+	UtxoPool               *blockchain.UTXOPool               // The corresponding UTXO pool of the current blockchain
+	CrossTxsInConsensus    []*blockchain.CrossShardTxAndProof // The cross shard txs that is under consensus, the proof is not filled yet.
+	CrossTxsToReturn       []*blockchain.CrossShardTxAndProof // The cross shard txs and proof that needs to be sent back to the user client.
+	log                    log.Logger                         // Log utility
+
+	pendingTxMutex       sync.Mutex
+	crossTxToReturnMutex sync.Mutex
+}
+
+// Add new crossTx and proofs to the list of crossTx that needs to be sent back to client
+func (node *Node) addCrossTxsToReturn(crossTxs []*blockchain.CrossShardTxAndProof) {
+	node.crossTxToReturnMutex.Lock()
+	node.CrossTxsToReturn = append(node.CrossTxsToReturn, crossTxs...)
+	node.crossTxToReturnMutex.Unlock()
+	node.log.Debug("Got more cross transactions to return", "num", len(crossTxs))
+	node.log.Debug("Total cross transactions to return", "num", len(node.CrossTxsToReturn))
 }
 
 // Add new transactions to the pending transaction list
 func (node *Node) addPendingTransactions(newTxs []*blockchain.Transaction) {
-
-	pendingTxMutex.Lock()
+	node.pendingTxMutex.Lock()
 	node.pendingTransactions = append(node.pendingTransactions, newTxs...)
-	pendingTxMutex.Unlock()
+	node.pendingTxMutex.Unlock()
 	node.log.Debug("Got more transactions", "num", len(newTxs))
 	node.log.Debug("Total pending transactions", "num", len(node.pendingTransactions))
 }
 
 // Take out a subset of valid transactions from the pending transaction list
 // Note the pending transaction list will then contain the rest of the txs
-func (node *Node) getTransactionsForNewBlock(maxNumTxs int) []*blockchain.Transaction {
-	pendingTxMutex.Lock()
-	selected, unselected := node.UtxoPool.SelectTransactionsForNewBlock(node.pendingTransactions, maxNumTxs)
+func (node *Node) getTransactionsForNewBlock(maxNumTxs int) ([]*blockchain.Transaction, []*blockchain.CrossShardTxAndProof) {
+	node.pendingTxMutex.Lock()
+	selected, unselected, crossShardTxs := node.UtxoPool.SelectTransactionsForNewBlock(node.pendingTransactions, maxNumTxs)
 	node.pendingTransactions = unselected
-	pendingTxMutex.Unlock()
-	return selected
+	node.pendingTxMutex.Unlock()
+	return selected, crossShardTxs
 }
 
 // Start a server and process the request by a handler.

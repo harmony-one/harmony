@@ -86,7 +86,7 @@ func main() {
 
 	// Assign closure functions to the consensus object
 	consensus.BlockVerifier = node.VerifyNewBlock
-	consensus.OnConsensusDone = node.AddNewBlockToBlockchain
+	consensus.OnConsensusDone = node.PostConsensusProcessing
 
 	// Temporary testing code, to be removed.
 	node.AddMoreFakeTransactions(10000)

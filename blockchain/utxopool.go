@@ -89,8 +89,13 @@ func (utxoPool *UTXOPool) VerifyOneTransaction(tx *Transaction, spentTXOs *map[s
 	for _, out := range tx.TxOutput {
 		outTotal += out.Value
 	}
+
 	if inTotal != outTotal {
 		return false, crossShard
+	}
+
+	if inTotal == 0 {
+		return false, false // Here crossShard is false, because if there is no business for this shard, it's effectively not crossShard no matter what.
 	}
 
 	return true, crossShard
@@ -191,8 +196,8 @@ func CreateUTXOPoolFromGenesisBlockChain(bc *Blockchain) *UTXOPool {
 }
 
 // SelectTransactionsForNewBlock returns a list of index of valid transactions for the new block.
-func (utxoPool *UTXOPool) SelectTransactionsForNewBlock(transactions []*Transaction, maxNumTxs int) ([]*Transaction, []*Transaction) {
-	selected, unselected, crossShardTxs := []*Transaction{}, []*Transaction{}, []*Transaction{}
+func (utxoPool *UTXOPool) SelectTransactionsForNewBlock(transactions []*Transaction, maxNumTxs int) ([]*Transaction, []*Transaction, []*CrossShardTxAndProof) {
+	selected, unselected, crossShardTxs := []*Transaction{}, []*Transaction{}, []*CrossShardTxAndProof{}
 	spentTXOs := make(map[string]map[string]map[int]bool)
 	for _, tx := range transactions {
 		valid, crossShard := utxoPool.VerifyOneTransaction(tx, &spentTXOs)
@@ -200,14 +205,25 @@ func (utxoPool *UTXOPool) SelectTransactionsForNewBlock(transactions []*Transact
 		if len(selected) < maxNumTxs && valid {
 			selected = append(selected, tx)
 			if crossShard {
-				crossShardTxs = append(crossShardTxs, tx)
+				proof := CrossShardTxProof{RejectOrAccept: valid, TxID: tx.ID, TxInput: getShardTxInput(tx, utxoPool.ShardId)}
+				txAndProof := CrossShardTxAndProof{tx, &proof}
+				crossShardTxs = append(crossShardTxs, &txAndProof)
 			}
 		} else {
 			unselected = append(unselected, tx)
 		}
 	}
-	// TODO: return crossShardTxs and keep track of it at node level
-	return selected, unselected
+	return selected, unselected, crossShardTxs
+}
+
+func getShardTxInput(transaction *Transaction, shardId uint32) []*TXInput {
+	result := []*TXInput{}
+	for _, txInput := range transaction.TxInput {
+		if txInput.ShardId == shardId {
+			result = append(result, &txInput)
+		}
+	}
+	return result
 }
 
 // DeleteOneBalanceItem deletes one balance item of UTXOPool and clean up if possible.

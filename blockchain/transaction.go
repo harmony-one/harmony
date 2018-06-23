@@ -30,6 +30,20 @@ type TXInput struct {
 	ShardId       uint32 // The Id of the shard where this UTXO belongs
 }
 
+type CrossShardTxProof struct {
+	RejectOrAccept bool       // false means rejection, true means acceptance
+	TxID           [32]byte   // Id of transaction whose utxo is related to this proof
+	TxInput        []*TXInput // The list of Utxo that this proof is referring to. They should be in the same shard.
+	BlockHash      [32]byte   // The hash of the block where the proof is registered
+	// Signatures
+}
+
+// This is a internal data structure that doesn't go across network
+type CrossShardTxAndProof struct {
+	Transaction *Transaction       // The cross shard tx
+	Proof       *CrossShardTxProof // The proof
+}
+
 // DefaultCoinbaseValue is the default value of coinbase transaction.
 const DefaultCoinbaseValue = 1000
 

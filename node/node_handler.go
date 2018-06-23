@@ -134,7 +134,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan int) {
 			for {
 				// Once we have more than 10 transactions pending we will try creating a new block
 				if len(node.pendingTransactions) >= 100 {
-					selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
+					selectedTxs, crossShardTxAndProofs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
 
 					if len(selectedTxs) == 0 {
 						node.log.Debug("No valid transactions exist", "pendingTx", len(node.pendingTransactions))
@@ -142,6 +142,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan int) {
 						node.log.Debug("Creating new block", "numTxs", len(selectedTxs), "pendingTxs", len(node.pendingTransactions), "currentChainSize", len(node.blockchain.Blocks))
 
 						node.transactionInConsensus = selectedTxs
+						node.CrossTxsInConsensus = crossShardTxAndProofs
 						newBlock = blockchain.NewBlock(selectedTxs, node.blockchain.GetLatestBlock().Hash, node.Consensus.ShardID)
 						break
 					}
@@ -159,15 +160,29 @@ func (node *Node) WaitForConsensusReady(readySignal chan int) {
 	}
 }
 
+// This is called by consensus participants to verify the block they are running consensus on
 func (node *Node) VerifyNewBlock(newBlock *blockchain.Block) bool {
 	return node.UtxoPool.VerifyTransactions(newBlock.Transactions)
 }
 
-func (node *Node) AddNewBlockToBlockchain(newBlock *blockchain.Block) {
+// This is called by consensus participants, after consensus is done, to:
+// 1. add the new block to blockchain
+// 2. [leader] move cross shard tx and proof to the list where they wait to be sent to the client
+func (node *Node) PostConsensusProcessing(newBlock *blockchain.Block) {
 	// Add it to blockchain
 	node.blockchain.Blocks = append(node.blockchain.Blocks, newBlock)
 	// Update UTXO pool
 	node.UtxoPool.Update(newBlock.Transactions)
 	// Clear transaction-in-Consensus list
 	node.transactionInConsensus = []*blockchain.Transaction{}
+
+	if node.Consensus.IsLeader {
+		// Move crossTx in consensus into the list to be returned to client
+		for _, crossTxAndProof := range node.CrossTxsInConsensus {
+			crossTxAndProof.Proof.BlockHash = newBlock.Hash
+			// TODO: fill in the signature proofs
+		}
+		node.addCrossTxsToReturn(node.CrossTxsInConsensus)
+		node.CrossTxsInConsensus = []*blockchain.CrossShardTxAndProof{}
+	}
 }
