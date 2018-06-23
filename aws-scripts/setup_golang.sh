@@ -3,6 +3,7 @@ sudo yum update -y
 sudo yum install -y golang
 
 
+echo "now setting up go-lang paths"
 # GOROOT is the location where Go package is installed on your system
 echo "export GOROOT=/usr/lib/golang" >> $HOME/.bash_profile
 
