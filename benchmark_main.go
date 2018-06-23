@@ -10,7 +10,6 @@ import (
 	"harmony-benchmark/p2p"
 	"os"
 	"strings"
-	"time"
 )
 
 func getShardId(myIp, myPort string, config *[][]string) string {
@@ -61,18 +60,10 @@ func readConfigFile(configFile string) [][]string {
 }
 
 func main() {
-	// Setup a logger to stdout and log file.
-	logFileName := fmt.Sprintf("./%v.log", time.Now().Format("20060102150405"))
-	h := log.MultiHandler(
-		log.Must.FileHandler(logFileName, log.LogfmtFormat()),
-		log.StdoutHandler)
-	// In cases where you just want a stdout logger, use the following one instead.
-	// h := log.CallerFileHandler(log.StdoutHandler)
-	log.Root().SetHandler(h)
-
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9000", "port of the node.")
 	configFile := flag.String("config_file", "config.txt", "file containing all ip addresses")
+	timestamp := flag.String("timestamp", "latest", "timestamp of this execution")
 	flag.Parse()
 
 	config := readConfigFile(*configFile)
@@ -80,9 +71,19 @@ func main() {
 	peers := getPeers(*ip, *port, shardId, &config)
 	leader := getLeader(shardId, &config)
 
+	// Setup a logger to stdout and log file.
+	logFileName := fmt.Sprintf("./%v-%v.log", *timestamp, *port)
+	h := log.MultiHandler(
+		log.Must.FileHandler(logFileName, log.LogfmtFormat()),
+		log.StdoutHandler)
+	// In cases where you just want a stdout logger, use the following one instead.
+	// h := log.CallerFileHandler(log.StdoutHandler)
+	log.Root().SetHandler(h)
+
 	consensus := consensus.NewConsensus(*ip, *port, shardId, peers, leader)
 
 	node := node.NewNode(&consensus)
+
 	// Assign closure functions to the consensus object
 	consensus.BlockVerifier = node.VerifyNewBlock
 	consensus.OnConsensusDone = node.AddNewBlockToBlockchain

@@ -110,15 +110,21 @@ func readConfigFile(configFile string) [][]string {
 }
 
 func main() {
-	// Setup a stdout logger
-	h := log.CallerFileHandler(log.StdoutHandler)
-	log.Root().SetHandler(h)
-
 	configFile := flag.String("config_file", "local_config.txt", "file containing all ip addresses and config")
 	numTxsPerBatch := flag.Int("num_txs_per_batch", 10000, "number of transactions to send per message")
+	timestamp := flag.String("timestamp", "latest", "timestamp of this execution")
 	flag.Parse()
 	config := readConfigFile(*configFile)
 	leaders := getLeaders(&config)
+
+	// Setup a logger to stdout and log file.
+	logFileName := fmt.Sprintf("./%v-tx-generator.log", *timestamp)
+	h := log.MultiHandler(
+		log.Must.FileHandler(logFileName, log.LogfmtFormat()),
+		log.StdoutHandler)
+	// In cases where you just want a stdout logger, use the following one instead.
+	// h := log.CallerFileHandler(log.StdoutHandler)
+	log.Root().SetHandler(h)
 
 	// Testing node to mirror the node data in consensus
 	dataNode := node.NewNode(&consensus.Consensus{})
