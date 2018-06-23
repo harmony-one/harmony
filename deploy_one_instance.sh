@@ -14,9 +14,9 @@ python aws-scripts/preprocess_peerlist.py
 FILE='isTransaction.txt'
 config=$1
 log_folder=logs/
-mkdir -p log_folder
+mkdir -p $log_folder
 if [ -f $FILE ]; then
-    go run ./aws-code/transaction_generator.go -config_file $config -log_folder $log_folder
+    go run ./aws-code/transaction_generator.go -config_file $config -log_folder $log_folder&
 else
-    go run ./benchmark_main.go -config_file $config& -log_folder $log_folder
+    go run ./benchmark_main.go -config_file $config -log_folder $log_folder&
 fi
