@@ -10,6 +10,9 @@ sudo sysctl -w net.ipv4.tcp_mem='65536 873800 1534217728';
 
 ./kill_node.sh
 source ~/.bash_profile
+export GOROOT=/usr/lib/golang
+export GOPATH=$HOME/projects
+export PATH=$PATH:$GOROOT/bin
 python aws-scripts/preprocess_peerlist.py 
 FILE='isTransaction.txt'
 config=$1
