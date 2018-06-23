@@ -13,8 +13,10 @@ source ~/.bash_profile
 python aws-scripts/preprocess_peerlist.py 
 FILE='isTransaction.txt'
 config=$1
+log_folder=logs/
+mkdir -p log_folder
 if [ -f $FILE ]; then
     go run ./aws-code/transaction_generator.go -config_file $config
 else
-    go run ./benchmark_main.go -config_file $config&
+    go run ./benchmark_main.go -config_file $config& -log_folder $log_folder
 fi
