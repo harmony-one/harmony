@@ -86,15 +86,22 @@ func getValidators(config string) []p2p.Peer {
 	return peerList
 }
 
-func getLeaders(config *[][]string) []p2p.Peer {
+func getLeadersAndShardIds(config *[][]string) ([]p2p.Peer, []uint32) {
 	var peerList []p2p.Peer
+	var shardIds []uint32
 	for _, node := range *config {
-		ip, port, status := node[0], node[1], node[2]
+		ip, port, status, shardId := node[0], node[1], node[2], node[3]
 		if status == "leader" {
 			peerList = append(peerList, p2p.Peer{Ip: ip, Port: port})
+			val, err := strconv.Atoi(shardId)
+			if err == nil {
+				shardIds = append(shardIds, uint32(val))
+			} else {
+				log.Error("[Generator] Error parsing the shard Id ", shardId)
+			}
 		}
 	}
-	return peerList
+	return peerList, shardIds
 }
 
 func readConfigFile(configFile string) [][]string {
@@ -115,7 +122,7 @@ func main() {
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	flag.Parse()
 	config := readConfigFile(*configFile)
-	leaders := getLeaders(&config)
+	leaders, shardIds := getLeadersAndShardIds(&config)
 
 	// Setup a logger to stdout and log file.
 	logFileName := fmt.Sprintf("./%v/tx-generator.log", *logFolder)
@@ -127,8 +134,12 @@ func main() {
 	log.Root().SetHandler(h)
 
 	// Testing node to mirror the node data in consensus
-	dataNode := node.NewNode(&consensus.Consensus{})
-	dataNode.AddMoreFakeTransactions(10000)
+	nodes := []node.Node{}
+	for _, shardId := range shardIds {
+		node := node.NewNode(&consensus.Consensus{ShardID: shardId})
+		node.AddMoreFakeTransactions(10000)
+		nodes = append(nodes, node)
+	}
 
 	time.Sleep(10 * time.Second) // wait for nodes to be ready
 
@@ -142,15 +153,17 @@ func main() {
 		}
 
 		t = time.Now()
-		txsToSend := getNewFakeTransactions(&dataNode, *numTxsPerBatch)
-		msg := node.ConstructTransactionListMessage(txsToSend)
-		fmt.Printf("[Generator] Creating fake txs for leader took %s", time.Since(t))
+		for i, leader := range leaders {
+			txsToSend := getNewFakeTransactions(&nodes[i], *numTxsPerBatch)
+			msg := node.ConstructTransactionListMessage(txsToSend)
+			fmt.Printf("[Generator] Creating fake txs for leader took %s", time.Since(t))
 
-		log.Debug("[Generator] Sending txs...", "numTxs", len(txsToSend))
-		p2p.BroadcastMessage(leaders, msg)
+			log.Debug("[Generator] Sending txs ...", "leader", leader, "numTxs", len(txsToSend))
+			p2p.SendMessage(leader, msg)
 
-		// Update local utxo pool to mirror the utxo pool of a real node
-		dataNode.UtxoPool.Update(txsToSend)
+			// Update local utxo pool to mirror the utxo pool of a real node
+			nodes[i].UtxoPool.Update(txsToSend)
+		}
 
 		time.Sleep(500 * time.Millisecond) // Send a batch of transactions periodically
 	}
