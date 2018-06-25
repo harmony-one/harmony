@@ -14,6 +14,11 @@ source ~/.bash_profile
 export GOROOT=/usr/lib/golang
 export GOPATH=$MyHOME/projects
 export PATH=$PATH:$GOROOT/bin
+wget http://169.254.169.254/latest/meta-data/public-ipv4  #Calling for public IPv4
+current_ip=$(head -n 1 public-ipv4)
+echo "Current IP is >>>"
+echo $current_ip
+echo ">>>>"
 python aws-scripts/preprocess_peerlist.py 
 FILE='isTransaction.txt'
 config=$1
@@ -22,5 +27,5 @@ mkdir -p $log_folder
 if [ -f $FILE ]; then
     go run ./aws-code/transaction_generator.go -config_file $config -log_folder $log_folder&
 else
-    go run ./benchmark_main.go -config_file $config -log_folder $log_folder&
+    go run ./benchmark_main.go -ip $current_ip -config_file $config -log_folder $log_folder&
 fi
