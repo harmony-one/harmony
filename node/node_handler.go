@@ -76,7 +76,9 @@ func (node *Node) NodeHandler(conn net.Conn) {
 		actionType := client.ClientMessageType(msgType)
 		switch actionType {
 		case client.TRANSACTION:
-			node.Client.TransactionMessageHandler(msgPayload)
+			if node.Client != nil {
+				node.Client.TransactionMessageHandler(msgPayload)
+			}
 		}
 	}
 }
@@ -169,7 +171,15 @@ func (node *Node) WaitForConsensusReady(readySignal chan int) {
 // This is called by consensus participants to verify the block they are running consensus on
 func (node *Node) SendBackProofOfAcceptOrReject() {
 	if node.ClientPeer != nil {
-		p2p.SendMessage(*node.ClientPeer, client.ConstructProofOfAcceptOrRejectMessage())
+		node.crossTxToReturnMutex.Lock()
+		proofs := []blockchain.CrossShardTxProof{}
+		for _, txAndProof := range node.CrossTxsToReturn {
+			proofs = append(proofs, *txAndProof.Proof)
+		}
+		node.CrossTxsToReturn = nil
+		node.crossTxToReturnMutex.Unlock()
+
+		p2p.SendMessage(*node.ClientPeer, client.ConstructProofOfAcceptOrRejectMessage(proofs))
 	}
 }
 
@@ -190,7 +200,7 @@ func (node *Node) PostConsensusProcessing(newBlock *blockchain.Block) {
 	node.transactionInConsensus = []*blockchain.Transaction{}
 
 	if node.Consensus.IsLeader {
-		// Move crossTx in consensus into the list to be returned to client
+		// Move crossTx-in-consensus into the list to be returned to client
 		for _, crossTxAndProof := range node.CrossTxsInConsensus {
 			crossTxAndProof.Proof.BlockHash = newBlock.Hash
 			// TODO: fill in the signature proofs

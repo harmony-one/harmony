@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"harmony-benchmark/blockchain"
+	"harmony-benchmark/client"
 	"harmony-benchmark/consensus"
 	"harmony-benchmark/log"
 	"harmony-benchmark/node"
@@ -50,6 +51,32 @@ func getNewFakeTransactions(dataNode *node.Node, numTxs int) []*blockchain.Trans
 			for index, value := range utxoMap {
 				countAll++
 				if rand.Intn(100) < 30 { // 30% sample rate to select UTXO to use for new transactions
+					// Sharding related test code. To be deleted soon
+					//if dataNode.Consensus.ShardID == 0 {
+					//	txin := blockchain.TXInput{txId, index, address, dataNode.Consensus.ShardID}
+					//	txin2 := blockchain.TXInput{txId, index, address, dataNode.Consensus.ShardID+1}
+					//	txout := blockchain.TXOutput{value, strconv.Itoa(rand.Intn(10000))}
+					//	tx := blockchain.Transaction{[32]byte{}, []blockchain.TXInput{txin, txin2}, []blockchain.TXOutput{txout}}
+					//	tx.SetID()
+					//
+					//	if count >= numTxs {
+					//		continue
+					//	}
+					//	outputs = append(outputs, &tx)
+					//	count++
+					//} else {
+					//	txin := blockchain.TXInput{txId, index, address, dataNode.Consensus.ShardID}
+					//	txout := blockchain.TXOutput{value, strconv.Itoa(rand.Intn(10000))}
+					//	tx := blockchain.Transaction{[32]byte{}, []blockchain.TXInput{txin}, []blockchain.TXOutput{txout}}
+					//	tx.SetID()
+					//
+					//	if count >= numTxs {
+					//		continue
+					//	}
+					//	outputs = append(outputs, &tx)
+					//	count++
+					//}
+
 					// Spend the money of current UTXO to a random address in [1 - 1000]
 					txin := blockchain.TXInput{txId, index, address, dataNode.Consensus.ShardID}
 					txout := blockchain.TXOutput{value, strconv.Itoa(rand.Intn(10000))}
@@ -149,7 +176,7 @@ func main() {
 		consensusObj := consensus.NewConsensus("0", clientPort, "0", nil, p2p.Peer{})
 
 		clientNode := node.NewNode(&consensusObj)
-
+		clientNode.Client = client.NewClient()
 		go func() {
 			clientNode.StartServer(clientPort)
 		}()

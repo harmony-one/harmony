@@ -2,6 +2,8 @@ package client
 
 import (
 	"bytes"
+	"encoding/gob"
+	"harmony-benchmark/blockchain"
 	"harmony-benchmark/common"
 )
 
@@ -21,9 +23,11 @@ const (
 )
 
 //ConstructStopMessage is STOP message
-func ConstructProofOfAcceptOrRejectMessage() []byte {
+func ConstructProofOfAcceptOrRejectMessage(proofs []blockchain.CrossShardTxProof) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(common.CLIENT)})
 	byteBuffer.WriteByte(byte(TRANSACTION))
 	byteBuffer.WriteByte(byte(CROSS_TX))
+	encoder := gob.NewEncoder(byteBuffer)
+	encoder.Encode(proofs)
 	return byteBuffer.Bytes()
 }
