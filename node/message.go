@@ -13,6 +13,7 @@ type TransactionMessageType int
 const (
 	SEND TransactionMessageType = iota
 	REQUEST
+	CROSS_TX_PROOF // The proof of accept or reject returned by the leader to the cross shard transaction client.
 )
 
 // The types of messages used for NODE/CONTROL
@@ -22,7 +23,7 @@ const (
 	STOP ControlMessageType = iota
 )
 
-//ConstructTransactionListMessage constructs serialized transactions
+// Constructs serialized transactions
 func ConstructTransactionListMessage(transactions []*blockchain.Transaction) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(common.NODE)})
 	byteBuffer.WriteByte(byte(common.TRANSACTION))
@@ -37,7 +38,7 @@ func ConstructTransactionListMessage(transactions []*blockchain.Transaction) []b
 	return byteBuffer.Bytes()
 }
 
-//ConstructTransactionListMessage constructs serialized transactions
+// Constructs serialized transactions
 func ConstructRequestTransactionsMessage(transactionIds [][]byte) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(common.NODE)})
 	byteBuffer.WriteByte(byte(common.TRANSACTION))
@@ -48,10 +49,18 @@ func ConstructRequestTransactionsMessage(transactionIds [][]byte) []byte {
 	return byteBuffer.Bytes()
 }
 
-//ConstructStopMessage is  STOP message
+// Constructs STOP message for node to stop
 func ConstructStopMessage() []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(common.NODE)})
 	byteBuffer.WriteByte(byte(common.CONTROL))
 	byteBuffer.WriteByte(byte(STOP))
+	return byteBuffer.Bytes()
+}
+
+//ConstructStopMessage is  STOP message
+func ConstructProofOfAcceptOrRejectMessage() []byte {
+	byteBuffer := bytes.NewBuffer([]byte{byte(common.NODE)})
+	byteBuffer.WriteByte(byte(common.TRANSACTION))
+	byteBuffer.WriteByte(byte(CROSS_TX_PROOF))
 	return byteBuffer.Bytes()
 }

@@ -108,8 +108,9 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 				txToReturn = append(txToReturn, tx)
 			}
 		}
-
 		// TODO: return the transaction list to requester
+	case CROSS_TX_PROOF:
+		// TODO: implement this
 	}
 }
 
@@ -161,6 +162,13 @@ func (node *Node) WaitForConsensusReady(readySignal chan int) {
 }
 
 // This is called by consensus participants to verify the block they are running consensus on
+func (node *Node) SendBackProofOfAcceptOrReject() {
+	if node.ClientPeer != nil {
+		p2p.SendMessage(*node.ClientPeer, ConstructProofOfAcceptOrRejectMessage())
+	}
+}
+
+// This is called by consensus participants to verify the block they are running consensus on
 func (node *Node) VerifyNewBlock(newBlock *blockchain.Block) bool {
 	return node.UtxoPool.VerifyTransactions(newBlock.Transactions)
 }
@@ -184,5 +192,7 @@ func (node *Node) PostConsensusProcessing(newBlock *blockchain.Block) {
 		}
 		node.addCrossTxsToReturn(node.CrossTxsInConsensus)
 		node.CrossTxsInConsensus = []*blockchain.CrossShardTxAndProof{}
+
+		node.SendBackProofOfAcceptOrReject()
 	}
 }

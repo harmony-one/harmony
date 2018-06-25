@@ -4,6 +4,7 @@ import (
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/consensus"
 	"harmony-benchmark/log"
+	"harmony-benchmark/p2p"
 	"net"
 	"os"
 	"strconv"
@@ -25,6 +26,8 @@ type Node struct {
 
 	pendingTxMutex       sync.Mutex
 	crossTxToReturnMutex sync.Mutex
+
+	ClientPeer *p2p.Peer // The peer for the benchmark tx generator client, used to return proof-of-accept
 }
 
 // Add new crossTx and proofs to the list of crossTx that needs to be sent back to client
