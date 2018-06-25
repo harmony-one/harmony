@@ -38,7 +38,7 @@ func getPeers(myIp, myPort, myShardId string, config *[][]string) []p2p.Peer {
 	var peerList []p2p.Peer
 	for _, node := range *config {
 		ip, port, status, shardId := node[0], node[1], node[2], node[3]
-		if status == "leader" || ip == myIp && port == myPort || myShardId != shardId {
+		if status != "validator" || ip == myIp && port == myPort || myShardId != shardId {
 			continue
 		}
 		peer := p2p.Peer{Port: port, Ip: ip}
