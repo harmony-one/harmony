@@ -1,6 +1,6 @@
 # Create a tmp folder for logs
 t=`date +"%Y%m%d-%H%M%S"`
-log_folder="log-$t"
+log_folder="tmp_log/log-$t"
 
 if [ ! -d $log_folder ] 
 then
