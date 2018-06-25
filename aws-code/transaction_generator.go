@@ -143,7 +143,6 @@ func main() {
 	// h := log.CallerFileHandler(log.StdoutHandler)
 	log.Root().SetHandler(h)
 
-
 	// Client server setup
 	clientPort := getClientPort(&config)
 	if clientPort != "" {
@@ -155,7 +154,6 @@ func main() {
 			clientNode.StartServer(clientPort)
 		}()
 	}
-
 
 	// Testing node to mirror the node data in consensus
 	nodes := []node.Node{}
@@ -191,7 +189,6 @@ func main() {
 
 		time.Sleep(500 * time.Millisecond) // Send a batch of transactions periodically
 	}
-
 
 	// Send a stop message to stop the nodes at the end
 	msg := node.ConstructStopMessage()
