@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/go-stack/stack"
+	"harmony-benchmark/stack"
 )
 
 // Handler defines where and how log records are written.
