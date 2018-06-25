@@ -155,7 +155,7 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) C
 	}
 
 	consensus.msgCategory = byte(common.COMMITTEE)
-	consensus.actionType = byte(common.CONSENSUS)
+	consensus.actionType = byte(CONSENSUS)
 
 	consensus.Log = log.New()
 	return consensus

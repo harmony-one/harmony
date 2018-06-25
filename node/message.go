@@ -7,13 +7,21 @@ import (
 	"harmony-benchmark/common"
 )
 
+// The specific types of message under NODE category
+type NodeMessageType byte
+
+const (
+	TRANSACTION NodeMessageType = iota
+	CONTROL
+	// TODO: add more types
+)
+
 // The types of messages used for NODE/TRANSACTION
 type TransactionMessageType int
 
 const (
 	SEND TransactionMessageType = iota
 	REQUEST
-	CROSS_TX_PROOF // The proof of accept or reject returned by the leader to the cross shard transaction client.
 )
 
 // The types of messages used for NODE/CONTROL
@@ -26,7 +34,7 @@ const (
 // Constructs serialized transactions
 func ConstructTransactionListMessage(transactions []*blockchain.Transaction) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(common.NODE)})
-	byteBuffer.WriteByte(byte(common.TRANSACTION))
+	byteBuffer.WriteByte(byte(TRANSACTION))
 	byteBuffer.WriteByte(byte(SEND))
 	encoder := gob.NewEncoder(byteBuffer)
 	// Copy over the tx data
@@ -41,7 +49,7 @@ func ConstructTransactionListMessage(transactions []*blockchain.Transaction) []b
 // Constructs serialized transactions
 func ConstructRequestTransactionsMessage(transactionIds [][]byte) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(common.NODE)})
-	byteBuffer.WriteByte(byte(common.TRANSACTION))
+	byteBuffer.WriteByte(byte(TRANSACTION))
 	byteBuffer.WriteByte(byte(REQUEST))
 	for _, txId := range transactionIds {
 		byteBuffer.Write(txId)
@@ -52,15 +60,7 @@ func ConstructRequestTransactionsMessage(transactionIds [][]byte) []byte {
 // Constructs STOP message for node to stop
 func ConstructStopMessage() []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(common.NODE)})
-	byteBuffer.WriteByte(byte(common.CONTROL))
+	byteBuffer.WriteByte(byte(CONTROL))
 	byteBuffer.WriteByte(byte(STOP))
-	return byteBuffer.Bytes()
-}
-
-//ConstructStopMessage is  STOP message
-func ConstructProofOfAcceptOrRejectMessage() []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(common.NODE)})
-	byteBuffer.WriteByte(byte(common.TRANSACTION))
-	byteBuffer.WriteByte(byte(CROSS_TX_PROOF))
 	return byteBuffer.Bytes()
 }

@@ -68,6 +68,14 @@ RESPONSE:
 
 const MESSAGE_TYPE_BYTES = 1
 
+// The specific types of message under COMMITTEE category
+type CommitteeMessageType byte
+
+const (
+	CONSENSUS CommitteeMessageType = iota
+	// TODO: add more types
+)
+
 // Consensus communication message type.
 // Leader and validator dispatch messages based on incoming message type
 type MessageType int

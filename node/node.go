@@ -2,6 +2,7 @@ package node
 
 import (
 	"harmony-benchmark/blockchain"
+	"harmony-benchmark/client"
 	"harmony-benchmark/consensus"
 	"harmony-benchmark/log"
 	"harmony-benchmark/p2p"
@@ -27,7 +28,9 @@ type Node struct {
 	pendingTxMutex       sync.Mutex
 	crossTxToReturnMutex sync.Mutex
 
-	ClientPeer *p2p.Peer // The peer for the benchmark tx generator client, used to return proof-of-accept
+	ClientPeer *p2p.Peer // The peer for the benchmark tx generator client, used for leaders to return proof-of-accept
+
+	Client *client.Client // The presence of a client object means this node will also act as a client
 }
 
 // Add new crossTx and proofs to the list of crossTx that needs to be sent back to client

@@ -32,23 +32,7 @@ type MessageCategory byte
 const (
 	COMMITTEE MessageCategory = iota
 	NODE
-	// TODO: add more types
-)
-
-// The specific types of message under COMMITTEE category
-type CommitteeMessageType byte
-
-const (
-	CONSENSUS CommitteeMessageType = iota
-	// TODO: add more types
-)
-
-// The specific types of message under NODE category
-type NodeMessageType byte
-
-const (
-	TRANSACTION NodeMessageType = iota
-	CONTROL
+	CLIENT
 	// TODO: add more types
 )
 
@@ -60,7 +44,7 @@ func GetMessageCategory(message []byte) (MessageCategory, error) {
 	return MessageCategory(message[NODE_TYPE_BYTES-1]), nil
 }
 
-// Get the action type from the p2p message content
+// Get the message type from the p2p message content
 func GetMessageType(message []byte) (byte, error) {
 	if len(message) < NODE_TYPE_BYTES+ACTION_TYPE_BYTES {
 		return 0, errors.New("Failed to get action type: no data available.")

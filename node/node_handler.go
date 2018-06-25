@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/gob"
 	"harmony-benchmark/blockchain"
+	"harmony-benchmark/client"
 	"harmony-benchmark/common"
+	"harmony-benchmark/consensus"
 	"harmony-benchmark/p2p"
 	"net"
 	"os"
@@ -27,7 +29,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 		node.log.Error("Read p2p data failed", "err", err, "node", node)
 		return
 	}
-	consensus := node.Consensus
+	consensusObj := node.Consensus
 
 	msgCategory, err := common.GetMessageCategory(content)
 	if err != nil {
@@ -49,27 +51,32 @@ func (node *Node) NodeHandler(conn net.Conn) {
 
 	switch msgCategory {
 	case common.COMMITTEE:
-		actionType := common.CommitteeMessageType(msgType)
+		actionType := consensus.CommitteeMessageType(msgType)
 		switch actionType {
-		case common.CONSENSUS:
-			if consensus.IsLeader {
-				consensus.ProcessMessageLeader(msgPayload)
+		case consensus.CONSENSUS:
+			if consensusObj.IsLeader {
+				consensusObj.ProcessMessageLeader(msgPayload)
 			} else {
-				consensus.ProcessMessageValidator(msgPayload)
+				consensusObj.ProcessMessageValidator(msgPayload)
 			}
 		}
 	case common.NODE:
-		actionType := common.NodeMessageType(msgType)
+		actionType := NodeMessageType(msgType)
 		switch actionType {
-		case common.TRANSACTION:
+		case TRANSACTION:
 			node.transactionMessageHandler(msgPayload)
-		case common.CONTROL:
+		case CONTROL:
 			controlType := msgPayload[0]
 			if ControlMessageType(controlType) == STOP {
 				node.log.Debug("Stopping Node", "node", node, "numBlocks", len(node.blockchain.Blocks), "numTxsProcessed", node.countNumTransactionsInBlockchain())
 				os.Exit(0)
 			}
-
+		}
+	case common.CLIENT:
+		actionType := client.ClientMessageType(msgType)
+		switch actionType {
+		case client.TRANSACTION:
+			node.Client.TransactionMessageHandler(msgPayload)
 		}
 	}
 }
@@ -109,8 +116,6 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 			}
 		}
 		// TODO: return the transaction list to requester
-	case CROSS_TX_PROOF:
-		// TODO: implement this
 	}
 }
 
@@ -164,7 +169,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan int) {
 // This is called by consensus participants to verify the block they are running consensus on
 func (node *Node) SendBackProofOfAcceptOrReject() {
 	if node.ClientPeer != nil {
-		p2p.SendMessage(*node.ClientPeer, ConstructProofOfAcceptOrRejectMessage())
+		p2p.SendMessage(*node.ClientPeer, client.ConstructProofOfAcceptOrRejectMessage())
 	}
 }
 
