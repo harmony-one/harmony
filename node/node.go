@@ -57,7 +57,7 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int) ([]*blockchain.Trans
 
 // Start a server and process the request by a handler.
 func (node *Node) StartServer(port string) {
-	node.log.Debug("Starting server", "node", node)
+	node.log.Debug("Starting server", "node", node, "port", port)
 	node.listenOnPort(port)
 }
 
