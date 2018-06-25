@@ -116,6 +116,16 @@ func readConfigFile(configFile string) [][]string {
 	return result
 }
 
+func getClientPort(config *[][]string) string {
+	for _, node := range *config {
+		_, port, status, _ := node[0], node[1], node[2], node[3]
+		if status == "client" {
+			return port
+		}
+	}
+	return ""
+}
+
 func main() {
 	configFile := flag.String("config_file", "local_config.txt", "file containing all ip addresses and config")
 	numTxsPerBatch := flag.Int("num_txs_per_batch", 10000, "number of transactions to send per message")
@@ -132,6 +142,20 @@ func main() {
 	// In cases where you just want a stdout logger, use the following one instead.
 	// h := log.CallerFileHandler(log.StdoutHandler)
 	log.Root().SetHandler(h)
+
+
+	// Client server setup
+	clientPort := getClientPort(&config)
+	if clientPort != "" {
+		consensusObj := consensus.NewConsensus("0", clientPort, "0", nil, p2p.Peer{})
+
+		clientNode := node.NewNode(&consensusObj)
+
+		go func() {
+			clientNode.StartServer(clientPort)
+		}()
+	}
+
 
 	// Testing node to mirror the node data in consensus
 	nodes := []node.Node{}
@@ -167,6 +191,7 @@ func main() {
 
 		time.Sleep(500 * time.Millisecond) // Send a batch of transactions periodically
 	}
+
 
 	// Send a stop message to stop the nodes at the end
 	msg := node.ConstructStopMessage()
