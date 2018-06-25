@@ -7,7 +7,8 @@ install:
   - cd $HOME/gopath/src
   - mv github.com/simple-rules/harmony-benchmark ./
   - cd harmony-benchmark
-  - go get github.com/go-stack/stack
+  # TODO: @RL, get this back after the AWS deployment is unblocked.
+  # - go get github.com/go-stack/stack
   - ./.travis.gofmt.sh
   - go build
 notifications:
