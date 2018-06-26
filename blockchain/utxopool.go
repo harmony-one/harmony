@@ -56,7 +56,7 @@ func (utxoPool *UTXOPool) VerifyOneTransaction(tx *Transaction, spentTXOs *map[s
 			continue
 		}
 
-		inTxID := hex.EncodeToString(in.TxID)
+		inTxID := hex.EncodeToString(in.TxID[:])
 		index := in.TxOutputIndex
 		// Check if the transaction with the addres is spent or not.
 		if val, ok := (*spentTXOs)[in.Address][inTxID][index]; ok {
@@ -126,7 +126,7 @@ func (utxoPool *UTXOPool) UpdateOneTransaction(tx *Transaction) {
 				continue
 			}
 
-			inTxID := hex.EncodeToString(in.TxID)
+			inTxID := hex.EncodeToString(in.TxID[:])
 			utxoPool.DeleteOneBalanceItem(in.Address, inTxID, in.TxOutputIndex)
 		}
 
