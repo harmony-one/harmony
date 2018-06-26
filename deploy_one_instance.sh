@@ -22,8 +22,15 @@ echo ">>>>"
 python aws-scripts/preprocess_peerlist.py 
 FILE='isTransaction.txt'
 config=$1
-log_folder=logs/
-mkdir -p $log_folder
+
+t=`date +"%Y%m%d-%H%M%S"`
+log_folder="logs/log-$t"
+
+if [ ! -d $log_folder ] 
+then
+    mkdir -p $log_folder
+fi
+
 if [ -f $FILE ]; then
     go run ./aws-code/transaction_generator.go -config_file $config -log_folder $log_folder&
 else

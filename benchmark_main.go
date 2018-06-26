@@ -85,16 +85,6 @@ func main() {
 
 	// Setup a logger to stdout and log file.
 	logFileName := fmt.Sprintf("./%v/%v.log", *logFolder, *port)
-	_, err := os.Stat(logFileName)
-	if err == nil {
-		fmt.Printf("file %s exists", logFileName)
-		os.Remove(logFileName)
-		fmt.Printf("removed file %s", logFileName)
-	} else if os.IsNotExist(err) {
-		fmt.Printf("file %s not exists", logFileName)
-	} else {
-		fmt.Printf("file %s stat error: %v", logFileName, err)
-	}
 	h := log.MultiHandler(
 		log.Must.FileHandler(logFileName, log.LogfmtFormat()),
 		log.StdoutHandler)
