@@ -124,7 +124,7 @@ func getValidators(config string) []p2p.Peer {
 	for fscanner.Scan() {
 		p := strings.Split(fscanner.Text(), " ")
 		ip, port, status := p[0], p[1], p[2]
-		if status == "leader" {
+		if status == "leader" || status == "client" {
 			continue
 		}
 		peer := p2p.Peer{Port: port, Ip: ip}
