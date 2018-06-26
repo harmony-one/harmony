@@ -126,10 +126,9 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 		if err != nil {
 			node.log.Error("Failed deserializing transaction and proofs list", "node", node)
 		}
-		node.log.Debug("RECEIVED UNLOCK MESSAGE")
-		//node.log.Debug("UNLOCK PROOF FROM CLIENT", "txAndProof", (*txAndProofs)[:10])
+		node.log.Debug("RECEIVED UNLOCK MESSAGE", "num", len(*txAndProofs))
 
-		// TODO: process the tx and proofs
+		node.addPendingTransactions(*txAndProofs)
 	}
 }
 

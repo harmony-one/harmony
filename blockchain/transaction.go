@@ -22,6 +22,7 @@ type Transaction struct {
 type TXOutput struct {
 	Value   int
 	Address string
+	ShardId uint32 // The Id of the shard where this UTXO belongs
 }
 
 // TXInput is the struct of transaction input (a UTXO) in a transaction.
@@ -70,7 +71,7 @@ func NewCoinbaseTX(to, data string, shardId uint32) *Transaction {
 	}
 
 	txin := TXInput{[32]byte{}, -1, data, shardId}
-	txout := TXOutput{DefaultCoinbaseValue, to}
+	txout := TXOutput{DefaultCoinbaseValue, to, shardId}
 	tx := Transaction{[32]byte{}, []TXInput{txin}, []TXOutput{txout}, nil}
 	tx.SetID()
 	return &tx
@@ -93,6 +94,12 @@ func (txOutput *TXOutput) String() string {
 }
 
 // Used for debuging.
+func (proof *CrossShardTxProof) String() string {
+	res := fmt.Sprintf("RejectOrAccept: %v, ", proof.RejectOrAccept)
+	return res
+}
+
+// Used for debuging.
 func (tx *Transaction) String() string {
 	res := fmt.Sprintf("ID: %v\n", hex.EncodeToString(tx.ID[:]))
 	res += fmt.Sprintf("TxInput:\n")
@@ -101,6 +108,9 @@ func (tx *Transaction) String() string {
 	}
 	res += fmt.Sprintf("TxOutput:\n")
 	for id, value := range tx.TxOutput {
+		res += fmt.Sprintf("%v: %v\n", id, value.String())
+	}
+	for id, value := range tx.Proofs {
 		res += fmt.Sprintf("%v: %v\n", id, value.String())
 	}
 	return res

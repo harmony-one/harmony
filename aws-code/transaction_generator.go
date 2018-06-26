@@ -91,7 +91,7 @@ func getNewFakeTransactions(shardId int, dataNodes *[]node.Node, numTxs int, num
 							txInputs = append(txInputs, *crossTxin)
 						}
 
-						txout := blockchain.TXOutput{value + crossValue, strconv.Itoa(rand.Intn(10000))}
+						txout := blockchain.TXOutput{value + crossValue, strconv.Itoa(rand.Intn(10000)), (*dataNodes)[shardId].Consensus.ShardID}
 						tx := blockchain.Transaction{[32]byte{}, txInputs, []blockchain.TXOutput{txout}, nil}
 						tx.SetID()
 
@@ -102,7 +102,7 @@ func getNewFakeTransactions(shardId int, dataNodes *[]node.Node, numTxs int, num
 						count++
 					} else {
 						txin := blockchain.TXInput{txId, index, address, (*dataNodes)[shardId].Consensus.ShardID}
-						txout := blockchain.TXOutput{value, strconv.Itoa(rand.Intn(10000))}
+						txout := blockchain.TXOutput{value, strconv.Itoa(rand.Intn(10000)), (*dataNodes)[shardId].Consensus.ShardID}
 						tx := blockchain.Transaction{[32]byte{}, []blockchain.TXInput{txin}, []blockchain.TXOutput{txout}, nil}
 						tx.SetID()
 
