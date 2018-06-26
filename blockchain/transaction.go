@@ -14,6 +14,8 @@ type Transaction struct {
 	ID       [32]byte // 32 byte hash
 	TxInput  []TXInput
 	TxOutput []TXOutput
+
+	Proofs []CrossShardTxProof // The proofs for crossShard tx unlock-to-commit/abort
 }
 
 // TXOutput is the struct of transaction output in a transaction.
@@ -69,7 +71,7 @@ func NewCoinbaseTX(to, data string, shardId uint32) *Transaction {
 
 	txin := TXInput{[32]byte{}, -1, data, shardId}
 	txout := TXOutput{DefaultCoinbaseValue, to}
-	tx := Transaction{[32]byte{}, []TXInput{txin}, []TXOutput{txout}}
+	tx := Transaction{[32]byte{}, []TXInput{txin}, []TXOutput{txout}, nil}
 	tx.SetID()
 	return &tx
 }

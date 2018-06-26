@@ -12,7 +12,7 @@ import (
 
 // A client represent a entity/user which send transactions and receive responses from the harmony network
 type Client struct {
-	PendingCrossTxs      map[[32]byte]*CrossShardTxAndProofs // map of TxId to pending cross shard txs
+	PendingCrossTxs      map[[32]byte]*blockchain.Transaction // map of TxId to pending cross shard txs
 	PendingCrossTxsMutex sync.Mutex
 	leaders              *[]p2p.Peer
 
@@ -31,7 +31,7 @@ func (client *Client) TransactionMessageHandler(msgPayload []byte) {
 			client.log.Error("Failed deserializing cross transaction proof list")
 		}
 
-		txsToSend := []CrossShardTxAndProofs{}
+		txsToSend := []blockchain.Transaction{}
 		client.PendingCrossTxsMutex.Lock()
 
 		//client.log.Debug("RECEIVED PROOFS FROM LEADER---", "txAndProofs", (*proofList)[:10])
@@ -48,7 +48,7 @@ func (client *Client) TransactionMessageHandler(msgPayload []byte) {
 						txInputs[txInput] = true
 					}
 				}
-				for _, txInput := range txAndProofs.Transaction.TxInput {
+				for _, txInput := range txAndProofs.TxInput {
 					val, ok := txInputs[txInput]
 					if !ok || !val {
 						readyToUnlock = false
@@ -62,7 +62,7 @@ func (client *Client) TransactionMessageHandler(msgPayload []byte) {
 			}
 		}
 		for _, txToSend := range txsToSend {
-			delete(client.PendingCrossTxs, txToSend.Transaction.ID)
+			delete(client.PendingCrossTxs, txToSend.ID)
 		}
 		client.PendingCrossTxsMutex.Unlock()
 
@@ -72,7 +72,7 @@ func (client *Client) TransactionMessageHandler(msgPayload []byte) {
 	}
 }
 
-func (client *Client) sendCrossShardTxUnlockMessage(txsToSend *[]CrossShardTxAndProofs) {
+func (client *Client) sendCrossShardTxUnlockMessage(txsToSend *[]blockchain.Transaction) {
 	// TODO: Send unlock message back to output shards
 	fmt.Println("SENDING UNLOCK MESSAGE")
 	//client.log.Debug("SENDING UNLOCK PROOFS TO LEADERS---", "txAndProof", (*txsToSend)[:10])
@@ -83,7 +83,7 @@ func (client *Client) sendCrossShardTxUnlockMessage(txsToSend *[]CrossShardTxAnd
 // Create a new Node
 func NewClient(leaders *[]p2p.Peer) *Client {
 	client := Client{}
-	client.PendingCrossTxs = make(map[[32]byte]*CrossShardTxAndProofs)
+	client.PendingCrossTxs = make(map[[32]byte]*blockchain.Transaction)
 	client.leaders = leaders
 
 	// Logger

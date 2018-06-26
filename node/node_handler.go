@@ -121,7 +121,7 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 	case UNLOCK:
 		txAndProofDecoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the UNLOCK messge type
 
-		txAndProofs := new([]*client.CrossShardTxAndProofs)
+		txAndProofs := new([]*blockchain.Transaction)
 		err := txAndProofDecoder.Decode(&txAndProofs)
 		if err != nil {
 			node.log.Error("Failed deserializing transaction and proofs list", "node", node)

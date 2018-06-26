@@ -134,7 +134,7 @@ func (bc *Blockchain) NewUTXOTransaction(from, to string, amount int, shardId ui
 		outputs = append(outputs, TXOutput{acc - amount, from}) // a change
 	}
 
-	tx := Transaction{[32]byte{}, inputs, outputs}
+	tx := Transaction{[32]byte{}, inputs, outputs, nil}
 	tx.SetID()
 
 	return &tx

@@ -92,7 +92,7 @@ func getNewFakeTransactions(shardId int, dataNodes *[]node.Node, numTxs int, num
 						}
 
 						txout := blockchain.TXOutput{value + crossValue, strconv.Itoa(rand.Intn(10000))}
-						tx := blockchain.Transaction{[32]byte{}, txInputs, []blockchain.TXOutput{txout}}
+						tx := blockchain.Transaction{[32]byte{}, txInputs, []blockchain.TXOutput{txout}, nil}
 						tx.SetID()
 
 						if count >= numTxs {
@@ -103,7 +103,7 @@ func getNewFakeTransactions(shardId int, dataNodes *[]node.Node, numTxs int, num
 					} else {
 						txin := blockchain.TXInput{txId, index, address, (*dataNodes)[shardId].Consensus.ShardID}
 						txout := blockchain.TXOutput{value, strconv.Itoa(rand.Intn(10000))}
-						tx := blockchain.Transaction{[32]byte{}, []blockchain.TXInput{txin}, []blockchain.TXOutput{txout}}
+						tx := blockchain.Transaction{[32]byte{}, []blockchain.TXInput{txin}, []blockchain.TXOutput{txout}, nil}
 						tx.SetID()
 
 						if count >= numTxs {
@@ -253,7 +253,7 @@ func main() {
 		clientNode.Client.PendingCrossTxsMutex.Lock()
 		for _, tx := range allCrossTxs {
 			//fmt.Printf("CROSS SHARD TX: %s", tx.String())
-			clientNode.Client.PendingCrossTxs[tx.ID] = &client.CrossShardTxAndProofs{Transaction: *tx}
+			clientNode.Client.PendingCrossTxs[tx.ID] = tx
 		}
 		clientNode.Client.PendingCrossTxsMutex.Unlock()
 
