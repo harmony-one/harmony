@@ -121,15 +121,14 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 	case UNLOCK:
 		txAndProofDecoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the UNLOCK messge type
 
-		txAndProofs := new([]*blockchain.CrossShardTxAndProof)
+		txAndProofs := new([]*client.CrossShardTxAndProofs)
 		err := txAndProofDecoder.Decode(&txAndProofs)
 		if err != nil {
 			node.log.Error("Failed deserializing transaction and proofs list", "node", node)
 		}
 		node.log.Debug("RECEIVED UNLOCK MESSAGE")
-		for _, val := range *txAndProofs {
-			node.log.Debug("receiving---", "txAndProof", *val)
-		}
+		//node.log.Debug("UNLOCK PROOF FROM CLIENT", "txAndProof", (*txAndProofs)[:10])
+
 		// TODO: process the tx and proofs
 	}
 }
@@ -163,6 +162,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan int) {
 						node.log.Debug("Creating new block", "numTxs", len(selectedTxs), "pendingTxs", len(node.pendingTransactions), "currentChainSize", len(node.blockchain.Blocks))
 
 						node.transactionInConsensus = selectedTxs
+						node.log.Debug("CROSS SHARD TX", "num", len(crossShardTxAndProofs))
 						node.CrossTxsInConsensus = crossShardTxAndProofs
 						newBlock = blockchain.NewBlock(selectedTxs, node.blockchain.GetLatestBlock().Hash, node.Consensus.ShardID)
 						break
@@ -183,7 +183,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan int) {
 
 // This is called by consensus participants to verify the block they are running consensus on
 func (node *Node) SendBackProofOfAcceptOrReject() {
-	if node.ClientPeer != nil {
+	if node.ClientPeer != nil && len(node.CrossTxsToReturn) != 0 {
 		node.crossTxToReturnMutex.Lock()
 		proofs := []blockchain.CrossShardTxProof{}
 		for _, txAndProof := range node.CrossTxsToReturn {
@@ -192,6 +192,7 @@ func (node *Node) SendBackProofOfAcceptOrReject() {
 		node.CrossTxsToReturn = nil
 		node.crossTxToReturnMutex.Unlock()
 
+		node.log.Debug("SENDING PROOF TO CLIENT", "proofs", len(proofs))
 		p2p.SendMessage(*node.ClientPeer, client.ConstructProofOfAcceptOrRejectMessage(proofs))
 	}
 }
@@ -218,8 +219,10 @@ func (node *Node) PostConsensusProcessing(newBlock *blockchain.Block) {
 			crossTxAndProof.Proof.BlockHash = newBlock.Hash
 			// TODO: fill in the signature proofs
 		}
-		node.addCrossTxsToReturn(node.CrossTxsInConsensus)
-		node.CrossTxsInConsensus = []*blockchain.CrossShardTxAndProof{}
+		if len(node.CrossTxsInConsensus) != 0 {
+			node.addCrossTxsToReturn(node.CrossTxsInConsensus)
+			node.CrossTxsInConsensus = []*blockchain.CrossShardTxAndProof{}
+		}
 
 		node.SendBackProofOfAcceptOrReject()
 	}

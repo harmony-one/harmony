@@ -34,6 +34,7 @@ func ConstructProofOfAcceptOrRejectMessage(proofs []blockchain.CrossShardTxProof
 	byteBuffer.WriteByte(byte(TRANSACTION))
 	byteBuffer.WriteByte(byte(PROOF_OF_LOCK))
 	encoder := gob.NewEncoder(byteBuffer)
+
 	encoder.Encode(proofs)
 	return byteBuffer.Bytes()
 }

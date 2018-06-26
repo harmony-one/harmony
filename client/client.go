@@ -33,6 +33,8 @@ func (client *Client) TransactionMessageHandler(msgPayload []byte) {
 
 		txsToSend := []CrossShardTxAndProofs{}
 		client.PendingCrossTxsMutex.Lock()
+
+		//client.log.Debug("RECEIVED PROOFS FROM LEADER---", "txAndProofs", (*proofList)[:10])
 		for _, proof := range *proofList {
 
 			txAndProofs, ok := client.PendingCrossTxs[proof.TxID]
@@ -41,15 +43,15 @@ func (client *Client) TransactionMessageHandler(msgPayload []byte) {
 			if ok {
 				txAndProofs.Proofs = append(txAndProofs.Proofs, proof)
 				txInputs := make(map[blockchain.TXInput]bool)
-				for _, txInput := range txAndProofs.Transaction.TxInput {
-					txInputs[txInput] = true
-				}
 				for _, curProof := range txAndProofs.Proofs {
 					for _, txInput := range curProof.TxInput {
-						val, ok := txInputs[*txInput]
-						if !ok || !val {
-							readyToUnlock = false
-						}
+						txInputs[txInput] = true
+					}
+				}
+				for _, txInput := range txAndProofs.Transaction.TxInput {
+					val, ok := txInputs[txInput]
+					if !ok || !val {
+						readyToUnlock = false
 					}
 				}
 			} else {
@@ -65,11 +67,6 @@ func (client *Client) TransactionMessageHandler(msgPayload []byte) {
 		client.PendingCrossTxsMutex.Unlock()
 
 		if len(txsToSend) != 0 {
-
-			client.log.Debug("SENDING UNLOCK MESSAGE")
-			for _, val := range txsToSend {
-				client.log.Debug("sending---", "txAndProof", val)
-			}
 			client.sendCrossShardTxUnlockMessage(&txsToSend)
 		}
 	}
@@ -78,6 +75,8 @@ func (client *Client) TransactionMessageHandler(msgPayload []byte) {
 func (client *Client) sendCrossShardTxUnlockMessage(txsToSend *[]CrossShardTxAndProofs) {
 	// TODO: Send unlock message back to output shards
 	fmt.Println("SENDING UNLOCK MESSAGE")
+	//client.log.Debug("SENDING UNLOCK PROOFS TO LEADERS---", "txAndProof", (*txsToSend)[:10])
+
 	p2p.BroadcastMessage(*client.leaders, ConstructUnlockToCommitOrAbortMessage(*txsToSend))
 }
 

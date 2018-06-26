@@ -34,7 +34,7 @@ func (utxoPool *UTXOPool) VerifyTransactions(transactions []*Transaction) bool {
 	spentTXOs := make(map[string]map[string]map[int]bool)
 	if utxoPool != nil {
 		for _, tx := range transactions {
-			if valid, _ := utxoPool.VerifyOneTransaction(tx, &spentTXOs); !valid {
+			if valid, crossShard := utxoPool.VerifyOneTransaction(tx, &spentTXOs); !crossShard && !valid {
 				return false
 			}
 		}
@@ -90,7 +90,7 @@ func (utxoPool *UTXOPool) VerifyOneTransaction(tx *Transaction, spentTXOs *map[s
 		outTotal += out.Value
 	}
 
-	if inTotal != outTotal {
+	if (crossShard && inTotal >= outTotal) || (!crossShard && inTotal != outTotal) {
 		return false, crossShard
 	}
 
@@ -202,12 +202,14 @@ func (utxoPool *UTXOPool) SelectTransactionsForNewBlock(transactions []*Transact
 	for _, tx := range transactions {
 		valid, crossShard := utxoPool.VerifyOneTransaction(tx, &spentTXOs)
 
-		if len(selected) < maxNumTxs && valid {
-			selected = append(selected, tx)
-			if crossShard {
-				proof := CrossShardTxProof{RejectOrAccept: valid, TxID: tx.ID, TxInput: getShardTxInput(tx, utxoPool.ShardId)}
-				txAndProof := CrossShardTxAndProof{tx, &proof}
-				crossShardTxs = append(crossShardTxs, &txAndProof)
+		if len(selected) < maxNumTxs {
+			if valid || crossShard {
+				selected = append(selected, tx)
+				if crossShard {
+					proof := CrossShardTxProof{RejectOrAccept: valid, TxID: tx.ID, TxInput: getShardTxInput(tx, utxoPool.ShardId)}
+					txAndProof := CrossShardTxAndProof{tx, &proof}
+					crossShardTxs = append(crossShardTxs, &txAndProof)
+				}
 			}
 		} else {
 			unselected = append(unselected, tx)
@@ -216,11 +218,11 @@ func (utxoPool *UTXOPool) SelectTransactionsForNewBlock(transactions []*Transact
 	return selected, unselected, crossShardTxs
 }
 
-func getShardTxInput(transaction *Transaction, shardId uint32) []*TXInput {
-	result := []*TXInput{}
+func getShardTxInput(transaction *Transaction, shardId uint32) []TXInput {
+	result := []TXInput{}
 	for _, txInput := range transaction.TxInput {
 		if txInput.ShardId == shardId {
-			result = append(result, &txInput)
+			result = append(result, txInput)
 		}
 	}
 	return result

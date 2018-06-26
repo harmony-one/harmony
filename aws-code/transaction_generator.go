@@ -64,7 +64,7 @@ func getNewFakeTransactions(shardId int, dataNodes *[]node.Node, numTxs int, num
 						crossShardNode := (*dataNodes)[crossShardId]
 						crossShardUtxosMap := crossShardNode.UtxoPool.UtxoMap[address]
 
-						crossTxin := new(blockchain.TXInput)
+						var crossTxin *blockchain.TXInput
 						crossValue := 0
 						for crossTxIdStr, crossShardUtxos := range crossShardUtxosMap {
 							id, err := hex.DecodeString(crossTxIdStr)
@@ -77,6 +77,10 @@ func getNewFakeTransactions(shardId int, dataNodes *[]node.Node, numTxs int, num
 							for crossShardIndex, crossShardValue := range crossShardUtxos {
 								crossValue = crossShardValue
 								crossTxin = &blockchain.TXInput{crossTxId, crossShardIndex, address, uint32(crossShardId)}
+								break
+							}
+							if crossTxin != nil {
+								break
 							}
 						}
 
@@ -248,6 +252,7 @@ func main() {
 
 		clientNode.Client.PendingCrossTxsMutex.Lock()
 		for _, tx := range allCrossTxs {
+			//fmt.Printf("CROSS SHARD TX: %s", tx.String())
 			clientNode.Client.PendingCrossTxs[tx.ID] = &client.CrossShardTxAndProofs{Transaction: *tx}
 		}
 		clientNode.Client.PendingCrossTxsMutex.Unlock()

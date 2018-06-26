@@ -31,10 +31,10 @@ type TXInput struct {
 }
 
 type CrossShardTxProof struct {
-	RejectOrAccept bool       // false means rejection, true means acceptance
-	TxID           [32]byte   // Id of transaction whose utxo is related to this proof
-	TxInput        []*TXInput // The list of Utxo that this proof is referring to. They should be in the same shard.
-	BlockHash      [32]byte   // The hash of the block where the proof is registered
+	RejectOrAccept bool      // false means rejection, true means acceptance
+	TxID           [32]byte  // Id of transaction whose utxo is related to this proof
+	TxInput        []TXInput // The list of Utxo that this proof is referring to. They should be in the same shard.
+	BlockHash      [32]byte  // The hash of the block where the proof is registered
 	// Signatures
 }
 
@@ -78,7 +78,8 @@ func NewCoinbaseTX(to, data string, shardId uint32) *Transaction {
 func (txInput *TXInput) String() string {
 	res := fmt.Sprintf("TxID: %v, ", hex.EncodeToString(txInput.TxID[:]))
 	res += fmt.Sprintf("TxOutputIndex: %v, ", txInput.TxOutputIndex)
-	res += fmt.Sprintf("Address: %v", txInput.Address)
+	res += fmt.Sprintf("Address: %v, ", txInput.Address)
+	res += fmt.Sprintf("Shard Id: %v", txInput.ShardId)
 	return res
 }
 
