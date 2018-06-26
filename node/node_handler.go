@@ -118,6 +118,19 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 			}
 		}
 		// TODO: return the transaction list to requester
+	case UNLOCK:
+		txAndProofDecoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the UNLOCK messge type
+
+		txAndProofs := new([]*blockchain.CrossShardTxAndProof)
+		err := txAndProofDecoder.Decode(&txAndProofs)
+		if err != nil {
+			node.log.Error("Failed deserializing transaction and proofs list", "node", node)
+		}
+		node.log.Debug("RECEIVED UNLOCK MESSAGE")
+		for _, val := range *txAndProofs {
+			node.log.Debug("receiving---", "txAndProof", *val)
+		}
+		// TODO: process the tx and proofs
 	}
 }
 

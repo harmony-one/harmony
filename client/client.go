@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/log"
+	"harmony-benchmark/p2p"
 	"sync"
 )
 
@@ -13,6 +14,7 @@ import (
 type Client struct {
 	PendingCrossTxs      map[[32]byte]*CrossShardTxAndProofs // map of TxId to pending cross shard txs
 	PendingCrossTxsMutex sync.Mutex
+	leaders              *[]p2p.Peer
 
 	log log.Logger // Log utility
 }
@@ -20,8 +22,8 @@ type Client struct {
 func (client *Client) TransactionMessageHandler(msgPayload []byte) {
 	messageType := TransactionMessageType(msgPayload[0])
 	switch messageType {
-	case CROSS_TX:
-		txDecoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the CROSS_TX messge type
+	case PROOF_OF_LOCK:
+		txDecoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the PROOF_OF_LOCK messge type
 
 		proofList := new([]blockchain.CrossShardTxProof)
 		err := txDecoder.Decode(&proofList)
@@ -50,6 +52,8 @@ func (client *Client) TransactionMessageHandler(msgPayload []byte) {
 						}
 					}
 				}
+			} else {
+				readyToUnlock = false
 			}
 			if readyToUnlock {
 				txsToSend = append(txsToSend, *txAndProofs)
@@ -60,7 +64,12 @@ func (client *Client) TransactionMessageHandler(msgPayload []byte) {
 		}
 		client.PendingCrossTxsMutex.Unlock()
 
-		if txsToSend != nil {
+		if len(txsToSend) != 0 {
+
+			client.log.Debug("SENDING UNLOCK MESSAGE")
+			for _, val := range txsToSend {
+				client.log.Debug("sending---", "txAndProof", val)
+			}
 			client.sendCrossShardTxUnlockMessage(&txsToSend)
 		}
 	}
@@ -69,12 +78,15 @@ func (client *Client) TransactionMessageHandler(msgPayload []byte) {
 func (client *Client) sendCrossShardTxUnlockMessage(txsToSend *[]CrossShardTxAndProofs) {
 	// TODO: Send unlock message back to output shards
 	fmt.Println("SENDING UNLOCK MESSAGE")
+	p2p.BroadcastMessage(*client.leaders, ConstructUnlockToCommitOrAbortMessage(*txsToSend))
 }
 
 // Create a new Node
-func NewClient() *Client {
+func NewClient(leaders *[]p2p.Peer) *Client {
 	client := Client{}
 	client.PendingCrossTxs = make(map[[32]byte]*CrossShardTxAndProofs)
+	client.leaders = leaders
+
 	// Logger
 	client.log = log.New()
 	return &client

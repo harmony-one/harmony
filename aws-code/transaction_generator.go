@@ -177,7 +177,7 @@ func main() {
 	configFile := flag.String("config_file", "local_config.txt", "file containing all ip addresses and config")
 	numTxsPerBatch := flag.Int("num_txs_per_batch", 10000, "number of transactions to send per message")
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
-	crossShard := flag.Bool("cross_shard", false, "whether to send cross shard txs")
+	crossShard := flag.Bool("cross_shard", true, "whether to send cross shard txs")
 	flag.Parse()
 	config := readConfigFile(*configFile)
 	leaders, shardIds := getLeadersAndShardIds(&config)
@@ -197,7 +197,7 @@ func main() {
 
 	clientNode := node.NewNode(&consensusObj)
 	if clientPort != "" {
-		clientNode.Client = client.NewClient()
+		clientNode.Client = client.NewClient(&leaders)
 		go func() {
 			clientNode.StartServer(clientPort)
 		}()
