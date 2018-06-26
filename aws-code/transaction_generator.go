@@ -80,7 +80,6 @@ func getNewFakeTransactions(shardId int, dataNodes *[]node.Node, numTxs int, num
 							}
 						}
 
-
 						// Fill in the utxo from current shard
 						txin := blockchain.TXInput{txId, index, address, (*dataNodes)[shardId].Consensus.ShardID}
 						txInputs := []blockchain.TXInput{txin}
