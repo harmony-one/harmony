@@ -51,7 +51,7 @@ func (bc *Blockchain) FindUnspentTransactions(address string) []Transaction {
 
 			for _, txInput := range tx.TxInput {
 				if address == txInput.Address {
-					ID := hex.EncodeToString(txInput.TxID)
+					ID := hex.EncodeToString(txInput.TxID[:])
 					spentTXOs[ID] = append(spentTXOs[ID], txInput.TxOutputIndex)
 				}
 			}
@@ -115,13 +115,15 @@ func (bc *Blockchain) NewUTXOTransaction(from, to string, amount int, shardId ui
 
 	// Build a list of inputs
 	for txid, outs := range validOutputs {
-		txID, err := hex.DecodeString(txid)
+		id, err := hex.DecodeString(txid)
 		if err != nil {
 			return nil
 		}
 
+		txId := [32]byte{}
+		copy(txId[:], id[:])
 		for _, out := range outs {
-			input := TXInput{txID, out, from, shardId}
+			input := TXInput{txId, out, from, shardId}
 			inputs = append(inputs, input)
 		}
 	}

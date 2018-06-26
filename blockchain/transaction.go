@@ -24,7 +24,7 @@ type TXOutput struct {
 
 // TXInput is the struct of transaction input (a UTXO) in a transaction.
 type TXInput struct {
-	TxID          []byte
+	TxID          [32]byte
 	TxOutputIndex int
 	Address       string
 	ShardId       uint32 // The Id of the shard where this UTXO belongs
@@ -67,7 +67,7 @@ func NewCoinbaseTX(to, data string, shardId uint32) *Transaction {
 		data = fmt.Sprintf("Reward to '%s'", to)
 	}
 
-	txin := TXInput{[]byte{}, -1, data, shardId}
+	txin := TXInput{[32]byte{}, -1, data, shardId}
 	txout := TXOutput{DefaultCoinbaseValue, to}
 	tx := Transaction{[32]byte{}, []TXInput{txin}, []TXOutput{txout}}
 	tx.SetID()
@@ -76,7 +76,7 @@ func NewCoinbaseTX(to, data string, shardId uint32) *Transaction {
 
 // Used for debuging.
 func (txInput *TXInput) String() string {
-	res := fmt.Sprintf("TxID: %v, ", hex.EncodeToString(txInput.TxID))
+	res := fmt.Sprintf("TxID: %v, ", hex.EncodeToString(txInput.TxID[:]))
 	res += fmt.Sprintf("TxOutputIndex: %v, ", txInput.TxOutputIndex)
 	res += fmt.Sprintf("Address: %v", txInput.Address)
 	return res

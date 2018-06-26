@@ -22,6 +22,12 @@ const (
 	CROSS_TX TransactionMessageType = iota // The proof of accept or reject returned by the leader to the cross shard transaction client.
 )
 
+// Used to aggregated proofs and unlock utxos in cross shard tx
+type CrossShardTxAndProofs struct {
+	Transaction blockchain.Transaction         // The cross shard tx
+	Proofs      []blockchain.CrossShardTxProof // The proofs
+}
+
 //ConstructStopMessage is STOP message
 func ConstructProofOfAcceptOrRejectMessage(proofs []blockchain.CrossShardTxProof) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(common.CLIENT)})
