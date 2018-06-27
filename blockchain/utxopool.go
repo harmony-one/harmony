@@ -25,8 +25,9 @@ type UTXOPool struct {
 	*/
 	UtxoMap map[string]map[string]map[int]int
 
-	ShardId uint32
-	mutex   sync.Mutex
+	lockedUtxoMap map[string]map[string]map[int]int
+	ShardId       uint32
+	mutex         sync.Mutex
 }
 
 // VerifyTransactions verifies if a list of transactions valid for this shard.
@@ -136,44 +137,98 @@ func (utxoPool *UTXOPool) Update(transactions []*Transaction) {
 // UpdateOneTransaction updates utxoPool in respect to the new Transaction.
 func (utxoPool *UTXOPool) UpdateOneTransaction(tx *Transaction) {
 	isUnlockTx := len(tx.Proofs) != 0
+	unlockToCommit := true
+	if isUnlockTx {
+		for _, proof := range tx.Proofs {
+			if !proof.RejectOrAccept {
+				unlockToCommit = false // if any proof is a rejection, they it's a unlock-to-abort tx. Otherwise, it's unlock-to-commit
+			}
+		}
+	}
+
+	isCrossShard := false
+	// check whether it's a cross shard tx.
+	for _, in := range tx.TxInput {
+		if in.ShardId != utxoPool.ShardId {
+			isCrossShard = true
+			break
+		}
+	}
 
 	utxoPool.mutex.Lock()
 	defer utxoPool.mutex.Unlock()
 	if utxoPool != nil {
 		txID := hex.EncodeToString(tx.ID[:])
 
-		isCrossShard := false
 		// Remove
 		if !isUnlockTx {
 			for _, in := range tx.TxInput {
 				// Only check the input for my own shard.
 				if in.ShardId != utxoPool.ShardId {
-					isCrossShard = true
 					continue
 				}
 
+				// NOTE: for the locking phase of cross tx, the utxo is simply removed from the pool.
 				inTxID := hex.EncodeToString(in.TxID[:])
-				utxoPool.DeleteOneBalanceItem(in.Address, inTxID, in.TxOutputIndex)
+				value := utxoPool.UtxoMap[in.Address][inTxID][in.TxOutputIndex]
+				utxoPool.DeleteOneUtxo(in.Address, inTxID, in.TxOutputIndex)
+				if isCrossShard {
+					// put the delete (locked) utxo into a separate locked utxo pool
+					inTxID := hex.EncodeToString(in.TxID[:])
+					if _, ok := utxoPool.lockedUtxoMap[in.Address]; !ok {
+						utxoPool.lockedUtxoMap[in.Address] = make(map[string]map[int]int)
+						utxoPool.lockedUtxoMap[in.Address][inTxID] = make(map[int]int)
+					}
+					if _, ok := utxoPool.lockedUtxoMap[in.Address][inTxID]; !ok {
+						utxoPool.lockedUtxoMap[in.Address][inTxID] = make(map[int]int)
+					}
+					utxoPool.lockedUtxoMap[in.Address][inTxID][in.TxOutputIndex] = value
+				}
 			}
 		}
 
 		// Update
-		if !isCrossShard {
-			for index, out := range tx.TxOutput {
-				// Only check the input for my own shard.
-				if out.ShardId != utxoPool.ShardId {
-					continue
+		if !isCrossShard || isUnlockTx {
+			if !unlockToCommit {
+				// unlock-to-abort, bring back (unlock) the utxo input
+				for _, in := range tx.TxInput {
+					// Only unlock the input for my own shard.
+					if in.ShardId != utxoPool.ShardId {
+						isCrossShard = true
+						continue
+					}
+
+					// Simply bring back the locked (removed) utxo
+					inTxID := hex.EncodeToString(in.TxID[:])
+					if _, ok := utxoPool.UtxoMap[in.Address]; !ok {
+						utxoPool.UtxoMap[in.Address] = make(map[string]map[int]int)
+						utxoPool.UtxoMap[in.Address][inTxID] = make(map[int]int)
+					}
+					if _, ok := utxoPool.UtxoMap[in.Address][inTxID]; !ok {
+						utxoPool.UtxoMap[in.Address][inTxID] = make(map[int]int)
+					}
+					value := utxoPool.lockedUtxoMap[in.Address][inTxID][in.TxOutputIndex]
+					utxoPool.UtxoMap[in.Address][inTxID][in.TxOutputIndex] = value
+					utxoPool.DeleteOneLockedUtxo(in.Address, inTxID, in.TxOutputIndex)
 				}
-				if _, ok := utxoPool.UtxoMap[out.Address]; !ok {
-					utxoPool.UtxoMap[out.Address] = make(map[string]map[int]int)
-					utxoPool.UtxoMap[out.Address][txID] = make(map[int]int)
+			} else {
+				// normal utxo output update
+				for index, out := range tx.TxOutput {
+					// Only check the input for my own shard.
+					if out.ShardId != utxoPool.ShardId {
+						continue
+					}
+					if _, ok := utxoPool.UtxoMap[out.Address]; !ok {
+						utxoPool.UtxoMap[out.Address] = make(map[string]map[int]int)
+						utxoPool.UtxoMap[out.Address][txID] = make(map[int]int)
+					}
+					if _, ok := utxoPool.UtxoMap[out.Address][txID]; !ok {
+						utxoPool.UtxoMap[out.Address][txID] = make(map[int]int)
+					}
+					utxoPool.UtxoMap[out.Address][txID][index] = out.Value
 				}
-				if _, ok := utxoPool.UtxoMap[out.Address][txID]; !ok {
-					utxoPool.UtxoMap[out.Address][txID] = make(map[int]int)
-				}
-				utxoPool.UtxoMap[out.Address][txID][index] = out.Value
 			}
-		} // If it's a cross shard Tx, then don't update so the input UTXOs are locked (removed), and the money is not spendable until unlock-to-commit or unlock-to-abort
+		} // If it's a cross shard locking Tx, then don't update so the input UTXOs are locked (removed), and the money is not spendable until unlock-to-commit or unlock-to-abort
 
 		// TODO: unlock-to-commit and unlock-to-abort
 	}
@@ -210,6 +265,7 @@ func CreateUTXOPoolFromTransaction(tx *Transaction, shardId uint32) *UTXOPool {
 	var utxoPool UTXOPool
 	txID := hex.EncodeToString(tx.ID[:])
 	utxoPool.UtxoMap = make(map[string]map[string]map[int]int)
+	utxoPool.lockedUtxoMap = make(map[string]map[string]map[int]int)
 	for index, out := range tx.TxOutput {
 		utxoPool.UtxoMap[out.Address] = make(map[string]map[int]int)
 		utxoPool.UtxoMap[out.Address][txID] = make(map[int]int)
@@ -260,12 +316,23 @@ func getShardTxInput(transaction *Transaction, shardId uint32) []TXInput {
 }
 
 // DeleteOneBalanceItem deletes one balance item of UTXOPool and clean up if possible.
-func (utxoPool *UTXOPool) DeleteOneBalanceItem(address, txID string, index int) {
+func (utxoPool *UTXOPool) DeleteOneUtxo(address, txID string, index int) {
 	delete(utxoPool.UtxoMap[address][txID], index)
 	if len(utxoPool.UtxoMap[address][txID]) == 0 {
 		delete(utxoPool.UtxoMap[address], txID)
 		if len(utxoPool.UtxoMap[address]) == 0 {
 			delete(utxoPool.UtxoMap, address)
+		}
+	}
+}
+
+// DeleteOneBalanceItem deletes one balance item of UTXOPool and clean up if possible.
+func (utxoPool *UTXOPool) DeleteOneLockedUtxo(address, txID string, index int) {
+	delete(utxoPool.lockedUtxoMap[address][txID], index)
+	if len(utxoPool.lockedUtxoMap[address][txID]) == 0 {
+		delete(utxoPool.lockedUtxoMap[address], txID)
+		if len(utxoPool.lockedUtxoMap[address]) == 0 {
+			delete(utxoPool.lockedUtxoMap, address)
 		}
 	}
 }
