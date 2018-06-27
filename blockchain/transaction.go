@@ -14,12 +14,15 @@ type Transaction struct {
 	ID       [32]byte // 32 byte hash
 	TxInput  []TXInput
 	TxOutput []TXOutput
+
+	Proofs []CrossShardTxProof // The proofs for crossShard tx unlock-to-commit/abort
 }
 
 // TXOutput is the struct of transaction output in a transaction.
 type TXOutput struct {
 	Value   int
 	Address string
+	ShardId uint32 // The Id of the shard where this UTXO belongs
 }
 
 // TXInput is the struct of transaction input (a UTXO) in a transaction.
@@ -31,10 +34,10 @@ type TXInput struct {
 }
 
 type CrossShardTxProof struct {
-	RejectOrAccept bool       // false means rejection, true means acceptance
-	TxID           [32]byte   // Id of transaction whose utxo is related to this proof
-	TxInput        []*TXInput // The list of Utxo that this proof is referring to. They should be in the same shard.
-	BlockHash      [32]byte   // The hash of the block where the proof is registered
+	RejectOrAccept bool      // false means rejection, true means acceptance
+	TxID           [32]byte  // Id of transaction whose utxo is related to this proof
+	TxInput        []TXInput // The list of Utxo that this proof is referring to. They should be in the same shard.
+	BlockHash      [32]byte  // The hash of the block where the proof is registered
 	// Signatures
 }
 
@@ -68,8 +71,8 @@ func NewCoinbaseTX(to, data string, shardId uint32) *Transaction {
 	}
 
 	txin := TXInput{[32]byte{}, -1, data, shardId}
-	txout := TXOutput{DefaultCoinbaseValue, to}
-	tx := Transaction{[32]byte{}, []TXInput{txin}, []TXOutput{txout}}
+	txout := TXOutput{DefaultCoinbaseValue, to, shardId}
+	tx := Transaction{[32]byte{}, []TXInput{txin}, []TXOutput{txout}, nil}
 	tx.SetID()
 	return &tx
 }
@@ -78,7 +81,8 @@ func NewCoinbaseTX(to, data string, shardId uint32) *Transaction {
 func (txInput *TXInput) String() string {
 	res := fmt.Sprintf("TxID: %v, ", hex.EncodeToString(txInput.TxID[:]))
 	res += fmt.Sprintf("TxOutputIndex: %v, ", txInput.TxOutputIndex)
-	res += fmt.Sprintf("Address: %v", txInput.Address)
+	res += fmt.Sprintf("Address: %v, ", txInput.Address)
+	res += fmt.Sprintf("Shard Id: %v", txInput.ShardId)
 	return res
 }
 
@@ -86,6 +90,12 @@ func (txInput *TXInput) String() string {
 func (txOutput *TXOutput) String() string {
 	res := fmt.Sprintf("Value: %v, ", txOutput.Value)
 	res += fmt.Sprintf("Address: %v", txOutput.Address)
+	return res
+}
+
+// Used for debuging.
+func (proof *CrossShardTxProof) String() string {
+	res := fmt.Sprintf("RejectOrAccept: %v, ", proof.RejectOrAccept)
 	return res
 }
 
@@ -98,6 +108,9 @@ func (tx *Transaction) String() string {
 	}
 	res += fmt.Sprintf("TxOutput:\n")
 	for id, value := range tx.TxOutput {
+		res += fmt.Sprintf("%v: %v\n", id, value.String())
+	}
+	for id, value := range tx.Proofs {
 		res += fmt.Sprintf("%v: %v\n", id, value.String())
 	}
 	return res
