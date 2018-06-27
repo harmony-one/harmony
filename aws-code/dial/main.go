@@ -6,7 +6,7 @@ import (
 	"net"
 )
 
-func dialMain() { // TODO: temp fix to unblock test
+func main() {
 	conn, err := net.Dial("tcp", ":9000")
 	if err != nil {
 		panic(err)

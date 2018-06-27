@@ -11,6 +11,9 @@
 *.i*86
 *.x86_64
 *.hex
+benchmark
+txgen
+!txgen/ # unignore txgen folder
 
 # Mac
 .DS_Store
