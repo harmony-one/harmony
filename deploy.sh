@@ -1,20 +1,29 @@
+# Kill nodes if any
+./kill_node.sh
+
+# Since `go run` will generate a temporary exe every time,
+# On windows, your system will pop up a network security dialog for each instance
+# and you won't be able to turn it off. With `go build` generating one
+# exe, the dialog will only pop up once at the very first time.
+# Also it's recommended to use `go build` for testing the whole exe. 
+go build -o benchmark # Build the harmony-benchmark.exe
+go build -o txgen aws-code/txgen/main.go
+
 # Create a tmp folder for logs
 t=`date +"%Y%m%d-%H%M%S"`
 log_folder="tmp_log/log-$t"
 
-if [ ! -d $log_folder ] 
-then
-    mkdir -p $log_folder
-fi
+mkdir -p $log_folder
 
-./kill_node.sh
+# Start nodes
 config=$1
 while IFS='' read -r line || [[ -n "$line" ]]; do
   IFS=' ' read ip port mode shardId <<< $line
-	#echo $ip $port $mode $config
+	#echo $ip $port $mode
   if [ "$mode" != "client" ]; then
-    go run ./benchmark_main.go -ip $ip -port $port -config_file $config -log_folder $log_folder&
+    ./benchmark -ip $ip -port $port -config_file $config -log_folder $log_folder&
   fi
 done < $config
 
-go run ./aws-code/transaction_generator.go -config_file $config -log_folder $log_folder
+# Generate transactions
+./txgen -config_file $config -log_folder $log_folder
