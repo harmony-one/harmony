@@ -222,7 +222,7 @@ func main() {
 	for true {
 		t := time.Now()
 		if t.Sub(start).Seconds() >= totalTime {
-			fmt.Println(int(t.Sub(start)), start, totalTime)
+			log.Debug("TIME OUT", "duration", (int(t.Sub(start))), "startTime", start, "totalTime", totalTime)
 			break
 		}
 
