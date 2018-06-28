@@ -3,7 +3,6 @@ package client
 import (
 	"bytes"
 	"encoding/gob"
-	"fmt"
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/log"
 	"harmony-benchmark/p2p"
@@ -16,8 +15,7 @@ type Client struct {
 	PendingCrossTxsMutex sync.Mutex
 	leaders              *[]p2p.Peer
 
-	UpdateUtxoPool func(pool blockchain.UTXOPool)      // func used to update utxo pool
-	UpdateUtxos    func(txs []*blockchain.Transaction) // func used to update utxo pool with list of txs
+	UpdateBlocks func([]*blockchain.Block) // func used to sync blocks with the leader
 
 	log log.Logger // Log utility
 }
@@ -75,16 +73,11 @@ func (client *Client) TransactionMessageHandler(msgPayload []byte) {
 			for i, _ := range txsToSend {
 				tempList = append(tempList, &txsToSend[i])
 			}
-			client.UpdateUtxos(tempList)
 		}
 	}
 }
 
 func (client *Client) sendCrossShardTxUnlockMessage(txsToSend *[]blockchain.Transaction) {
-	// TODO: Send unlock message back to output shards
-	fmt.Println("SENDING UNLOCK MESSAGE")
-	//client.log.Debug("SENDING UNLOCK PROOFS TO LEADERS---", "txAndProof", (*txsToSend)[:10])
-
 	p2p.BroadcastMessage(*client.leaders, ConstructUnlockToCommitOrAbortMessage(*txsToSend))
 }
 

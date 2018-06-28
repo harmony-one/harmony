@@ -12,6 +12,7 @@ type NodeMessageType byte
 
 const (
 	TRANSACTION NodeMessageType = iota // TODO: Don't move this until the hack in client/message.go is resolved
+	BLOCK
 	CONTROL
 
 	EXPERIMENT // Exist only for experiment setup
@@ -25,6 +26,13 @@ const (
 	SEND TransactionMessageType = iota
 	REQUEST
 	UNLOCK // The unlock to commit or abort message sent by the client to leaders.  TODO: Don't move this until the hack in client/message.go is resolved
+)
+
+// The types of messages used for NODE/BLOCK
+type BlockMessageType int
+
+const (
+	SYNC BlockMessageType = iota
 )
 
 // The types of messages used for NODE/CONTROL
@@ -92,5 +100,16 @@ func ConstructUtxoRequestMessage() []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(common.NODE)})
 	byteBuffer.WriteByte(byte(EXPERIMENT))
 	byteBuffer.WriteByte(byte(UTXO_REQUEST))
+	return byteBuffer.Bytes()
+}
+
+// Constructs blocks sync message to send blocks to other nodes
+func ConstructBlocksSyncMessage(blocks []blockchain.Block) []byte {
+	byteBuffer := bytes.NewBuffer([]byte{byte(common.NODE)})
+	byteBuffer.WriteByte(byte(BLOCK))
+	byteBuffer.WriteByte(byte(SYNC))
+	encoder := gob.NewEncoder(byteBuffer)
+
+	encoder.Encode(blocks)
 	return byteBuffer.Bytes()
 }

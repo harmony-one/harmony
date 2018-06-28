@@ -38,8 +38,7 @@ func (node *Node) addCrossTxsToReturn(crossTxs []*blockchain.CrossShardTxAndProo
 	node.crossTxToReturnMutex.Lock()
 	node.CrossTxsToReturn = append(node.CrossTxsToReturn, crossTxs...)
 	node.crossTxToReturnMutex.Unlock()
-	node.log.Debug("Got more cross transactions to return", "num", len(crossTxs))
-	node.log.Debug("Total cross transactions to return", "num", len(node.CrossTxsToReturn))
+	node.log.Debug("Got more cross transactions to return", "num", len(crossTxs), len(node.pendingTransactions), "node", node)
 }
 
 // Add new transactions to the pending transaction list
@@ -47,8 +46,7 @@ func (node *Node) addPendingTransactions(newTxs []*blockchain.Transaction) {
 	node.pendingTxMutex.Lock()
 	node.pendingTransactions = append(node.pendingTransactions, newTxs...)
 	node.pendingTxMutex.Unlock()
-	node.log.Debug("Got more transactions", "num", len(newTxs))
-	node.log.Debug("Total pending transactions", "num", len(node.pendingTransactions))
+	node.log.Debug("Got more transactions", "num", len(newTxs), "totalPending", len(node.pendingTransactions), "node", node)
 }
 
 // Take out a subset of valid transactions from the pending transaction list

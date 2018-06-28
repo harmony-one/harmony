@@ -46,8 +46,8 @@ func getNewFakeTransactions(shardId int, dataNodes []*node.Node, numTxs int, num
 	count := 0
 	countAll := 0
 
+	utxoPoolMutex.Lock()
 	for address, txMap := range dataNodes[shardId].UtxoPool.UtxoMap {
-		utxoPoolMutex.Lock()
 		for txIdStr, utxoMap := range txMap {
 			id, err := hex.DecodeString(txIdStr)
 			if err != nil {
@@ -126,8 +126,8 @@ func getNewFakeTransactions(shardId int, dataNodes []*node.Node, numTxs int, num
 				}
 			}
 		}
-		utxoPoolMutex.Unlock()
 	}
+	utxoPoolMutex.Unlock()
 
 	log.Debug("UTXO", "poolSize", countAll, "numTxsToSend", numTxs)
 	return txs, crossTxs
@@ -214,10 +214,12 @@ func main() {
 	configFile := flag.String("config_file", "local_config.txt", "file containing all ip addresses and config")
 	maxNumTxsPerBatch := flag.Int("max_num_txs_per_batch", 10000, "number of transactions to send per message")
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
-	crossShard := flag.Bool("cross_shard", true, "whether to send cross shard txs")
 	flag.Parse()
+
 	config := readConfigFile(*configFile)
 	leaders, shardIds := getLeadersAndShardIds(&config)
+
+	crossShard := len(shardIds) > 1
 
 	// Setup a logger to stdout and log file.
 	logFileName := fmt.Sprintf("./%v/tx-generator.log", *logFolder)
@@ -228,7 +230,7 @@ func main() {
 	// h := log.CallerFileHandler(log.StdoutHandler)
 	log.Root().SetHandler(h)
 
-	// Testing node to mirror the node data in consensus
+	// Testing nodes to mirror the node data in consensus
 	nodes := []*node.Node{}
 	for _, shardId := range shardIds {
 		node := node.NewNode(&consensus.Consensus{ShardID: shardId})
@@ -236,75 +238,41 @@ func main() {
 		nodes = append(nodes, &node)
 	}
 
-	// Client server setup
+	// Client/txgen server setup
 	clientPort := getClientPort(&config)
 	consensusObj := consensus.NewConsensus("0", clientPort, "0", nil, p2p.Peer{})
 	clientNode := node.NewNode(&consensusObj)
 	if clientPort != "" {
 		clientNode.Client = client.NewClient(&leaders)
+
+		updateBlocksFunc := func(blocks []*blockchain.Block) {
+			log.Debug("Received new block from leader", "len", len(blocks))
+			for _, block := range blocks {
+				for _, node := range nodes {
+					if node.Consensus.ShardID == block.ShardId {
+						log.Debug("Adding block from leader", "shardId", block.ShardId)
+						// Add it to blockchain
+						utxoPoolMutex.Lock()
+						node.AddNewBlock(block)
+						utxoPoolMutex.Unlock()
+					} else {
+						continue
+					}
+				}
+			}
+		}
+		clientNode.Client.UpdateBlocks = updateBlocksFunc
+
 		go func() {
 			clientNode.StartServer(clientPort)
 		}()
 
-		updateUtxoPoolFunc := func(pool blockchain.UTXOPool) {
-			for _, node := range nodes {
-				if node.Consensus.ShardID == pool.ShardId {
-					log.Debug("Syncing UTXO pool", "shardId", pool.ShardId)
-					utxoPoolMutex.Lock()
-					node.UtxoPool = &pool
-					utxoPoolMutex.Unlock()
-					log.Debug("Syncing UTXO pool DONE", "shardId", pool.ShardId)
-				} else {
-					continue
-				}
-			}
-		}
-		clientNode.Client.UpdateUtxoPool = updateUtxoPoolFunc
-
-		updateUtxos := func(txs []*blockchain.Transaction) {
-			for _, node := range nodes {
-				utxoPoolMutex.Lock()
-
-				numValid := 0
-				for _, tx := range txs {
-					numValid++
-					txInputs := make(map[blockchain.TXInput]bool)
-					for _, curProof := range tx.Proofs {
-						for _, txInput := range curProof.TxInput {
-							txInputs[txInput] = true
-						}
-					}
-					for _, txInput := range tx.TxInput {
-						val, ok := txInputs[txInput]
-						if !ok || !val {
-							numValid--
-							break
-						}
-					}
-				}
-				log.Debug("Updating UTXOs cross shard UNLOCK", "poolSize", countNumOfUtxos(node.UtxoPool), "numTxs", len(txs), "numValid", numValid, "shardId", node.Consensus.ShardID)
-				node.UtxoPool.Update(txs)
-				log.Debug("Updating UTXOs cross shard UNLOCK DONE", "poolSize", countNumOfUtxos(node.UtxoPool), "shardId", node.Consensus.ShardID)
-				utxoPoolMutex.Unlock()
-			}
-		}
-		clientNode.Client.UpdateUtxos = updateUtxos
 	}
 
 	time.Sleep(10 * time.Second) // wait for nodes to be ready
 
 	start := time.Now()
 	totalTime := 60.0
-
-	if clientPort != "" {
-		go func() {
-			// Keep syncing latest utxos with the leaders
-			for {
-				time.Sleep(4 * time.Second)
-				//p2p.BroadcastMessage(leaders, node.ConstructUtxoRequestMessage())
-			}
-		}()
-	}
 
 	for true {
 		t := time.Now()
@@ -316,7 +284,7 @@ func main() {
 		t = time.Now()
 		allCrossTxs := []*blockchain.Transaction{}
 		for i, leader := range leaders {
-			txs, crossTxs := getNewFakeTransactions(i, nodes, *maxNumTxsPerBatch, len(shardIds), *crossShard)
+			txs, crossTxs := getNewFakeTransactions(i, nodes, *maxNumTxsPerBatch, len(shardIds), crossShard)
 			allCrossTxs = append(allCrossTxs, crossTxs...)
 
 			msg := node.ConstructTransactionListMessage(txs)
@@ -324,27 +292,10 @@ func main() {
 			log.Debug("[Generator] Sending txs ...", "leader", leader, "numTxs", len(txs), "numCrossTxs", len(crossTxs))
 			p2p.SendMessage(leader, msg)
 
-			// Update local utxo pool to mirror the utxo pool of a real node (within-shard tx)
-			utxoPoolMutex.Lock()
-
-			log.Debug("Updating UTXOs single shard", "poolSize", countNumOfUtxos(nodes[i].UtxoPool), "numTxs", len(txs), "shardId", nodes[i].Consensus.ShardID)
-			nodes[i].UtxoPool.Update(txs)
-			log.Debug("Updating UTXOs single shard DONE", "poolSize", countNumOfUtxos(nodes[i].UtxoPool), "shardId", nodes[i].Consensus.ShardID)
-			utxoPoolMutex.Unlock()
 		}
 
 		msg := node.ConstructTransactionListMessage(allCrossTxs)
 		p2p.BroadcastMessage(leaders, msg)
-
-		for _, node := range nodes {
-			// Update local utxo pool to mirror the utxo pool of a real node (cross-shard tx)
-			utxoPoolMutex.Lock()
-
-			log.Debug("Updating UTXOs cross shard LOCK", "poolSize", countNumOfUtxos(node.UtxoPool), "numTxs", len(allCrossTxs), "shardId", node.Consensus.ShardID)
-			node.UtxoPool.Update(allCrossTxs)
-			log.Debug("Updating UTXOs cross shard LOCK DONE", "poolSize", countNumOfUtxos(node.UtxoPool), "shardId", node.Consensus.ShardID)
-			utxoPoolMutex.Unlock()
-		}
 
 		if clientPort != "" {
 			clientNode.Client.PendingCrossTxsMutex.Lock()

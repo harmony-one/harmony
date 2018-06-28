@@ -65,6 +65,19 @@ func (node *Node) NodeHandler(conn net.Conn) {
 		switch actionType {
 		case TRANSACTION:
 			node.transactionMessageHandler(msgPayload)
+		case BLOCK:
+			if node.Client != nil {
+				blockMsgType := BlockMessageType(msgPayload[0])
+				switch blockMsgType {
+				case SYNC:
+					decoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the SYNC messge type
+					blocks := new([]*blockchain.Block)
+					decoder.Decode(blocks)
+					if node.Client != nil && blocks != nil {
+						node.Client.UpdateBlocks(*blocks)
+					}
+				}
+			}
 		case CONTROL:
 			controlType := msgPayload[0]
 			if ControlMessageType(controlType) == STOP {
@@ -99,7 +112,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 				utxoPool := new(blockchain.UTXOPool)
 				decoder.Decode(utxoPool)
 				if node.Client != nil && utxoPool != nil {
-					node.Client.UpdateUtxoPool(*utxoPool)
+					//node.Client.UpdateUtxoPool(*utxoPool)
 				}
 			}
 		}
@@ -173,6 +186,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan int) {
 		retry := false
 		select {
 		case <-readySignal:
+			time.Sleep(100 * time.Millisecond) // Delay a bit so validator is catched up.
 		case <-time.After(8 * time.Second):
 			retry = true
 			timeoutCount++
@@ -227,6 +241,15 @@ func (node *Node) SendBackProofOfAcceptOrReject() {
 	}
 }
 
+// This is called by consensus leader to sync new blocks with other clients/nodes.
+// For now, just send to the client.
+func (node *Node) BroadcastNewBlock(newBlock *blockchain.Block) {
+	if node.ClientPeer != nil {
+		node.log.Debug("SENDING NEW BLOCK TO CLIENT")
+		p2p.SendMessage(*node.ClientPeer, ConstructBlocksSyncMessage([]blockchain.Block{*newBlock}))
+	}
+}
+
 // This is called by consensus participants to verify the block they are running consensus on
 func (node *Node) VerifyNewBlock(newBlock *blockchain.Block) bool {
 	return node.UtxoPool.VerifyTransactions(newBlock.Transactions)
@@ -236,12 +259,7 @@ func (node *Node) VerifyNewBlock(newBlock *blockchain.Block) bool {
 // 1. add the new block to blockchain
 // 2. [leader] move cross shard tx and proof to the list where they wait to be sent to the client
 func (node *Node) PostConsensusProcessing(newBlock *blockchain.Block) {
-	// Add it to blockchain
-	node.blockchain.Blocks = append(node.blockchain.Blocks, newBlock)
-	// Update UTXO pool
-	node.UtxoPool.Update(newBlock.Transactions)
-	// Clear transaction-in-Consensus list
-	node.transactionInConsensus = []*blockchain.Transaction{}
+	node.AddNewBlock(newBlock)
 
 	if node.Consensus.IsLeader {
 		// Move crossTx-in-consensus into the list to be returned to client
@@ -255,5 +273,15 @@ func (node *Node) PostConsensusProcessing(newBlock *blockchain.Block) {
 		}
 
 		node.SendBackProofOfAcceptOrReject()
+		node.BroadcastNewBlock(newBlock)
 	}
+}
+
+func (node *Node) AddNewBlock(newBlock *blockchain.Block) {
+	// Add it to blockchain
+	node.blockchain.Blocks = append(node.blockchain.Blocks, newBlock)
+	// Update UTXO pool
+	node.UtxoPool.Update(newBlock.Transactions)
+	// Clear transaction-in-Consensus list
+	node.transactionInConsensus = []*blockchain.Transaction{}
 }
