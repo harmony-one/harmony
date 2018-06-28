@@ -118,6 +118,7 @@ func NewNode(consensus *consensus.Consensus) Node {
 	node.BlockChannel = make(chan blockchain.Block)
 
 	// Genesis Block
+	// TODO(minh): Use or implement new function in blockchain package for this.
 	genesisBlock := &blockchain.Blockchain{}
 	genesisBlock.Blocks = make([]*blockchain.Block, 0)
 	coinbaseTx := blockchain.NewCoinbaseTX("harmony", "1", node.Consensus.ShardID)

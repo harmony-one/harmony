@@ -35,7 +35,10 @@ Make sure you the following command and make sure everything passed before submi
 ./test_before_submit.sh
 '''
 
+## Linting
 
-
-
+Make sure you the following command and make sure everything passes golint.
+'''
+./lint_before_submit.sh
+'''
 
