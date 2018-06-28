@@ -106,7 +106,7 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	}
 
 	// check block hash
-	if bytes.Compare(blockHash[:], blockHeaderObj.HashTransactions()[:]) != 0 || bytes.Compare(blockHeaderObj.Hash[:], blockHeaderObj.HashTransactions()[:]) != 0 {
+	if bytes.Compare(blockHash[:], blockHeaderObj.CalculateBlockHash()[:]) != 0 || bytes.Compare(blockHeaderObj.Hash[:], blockHeaderObj.CalculateBlockHash()[:]) != 0 {
 		consensus.Log.Warn("Block hash doesn't match", "consensus", consensus)
 		return
 	}

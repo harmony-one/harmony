@@ -8,14 +8,13 @@ import (
 	"strings"
 )
 
-// IntToHex converts an int64 to a byte array
-func IntToHex(num int64) []byte {
+// ConvertFixedDataIntoByteArray converts an empty interface data to a byte array
+func ConvertFixedDataIntoByteArray(data interface{}) []byte {
 	buff := new(bytes.Buffer)
-	err := binary.Write(buff, binary.BigEndian, num)
+	err := binary.Write(buff, binary.BigEndian, data)
 	if err != nil {
 		log.Panic(err)
 	}
-
 	return buff.Bytes()
 }
 

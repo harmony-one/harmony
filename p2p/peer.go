@@ -28,6 +28,7 @@ func BroadcastMessage(peers []Peer, msg []byte) {
 	// Construct broadcast p2p message
 	content := ConstructP2pMessage(byte(17), msg)
 
+	// TODO(rj): Can optimize by calling goroutine.
 	for _, peer := range peers {
 		send(peer.Ip, peer.Port, content)
 	}

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/gob"
 	"fmt"
+	"harmony-benchmark/utils"
 	"log"
 	"time"
 )
@@ -14,11 +15,11 @@ type Block struct {
 	// Header
 	Timestamp       int64
 	PrevBlockHash   [32]byte
-	Hash            [32]byte
 	NumTransactions int32
 	TransactionIds  [][32]byte
 	Transactions    []*Transaction // Transactions
 	ShardId         uint32
+	Hash            [32]byte
 	// Signature...
 }
 
@@ -67,6 +68,25 @@ func (b *Block) HashTransactions() []byte {
 	return txHash[:]
 }
 
+// CalculateBlockHash returns a hash of the block
+func (b *Block) CalculateBlockHash() []byte {
+	var hashes [][]byte
+	var blockHash [32]byte
+
+	hashes = append(hashes, utils.ConvertFixedDataIntoByteArray(b.Timestamp))
+	hashes = append(hashes, b.PrevBlockHash[:])
+	for _, id := range b.TransactionIds {
+		hashes = append(hashes, id[:])
+	}
+	for _, tx := range b.Transactions {
+		hashes = append(hashes, tx.ID[:])
+	}
+	hashes = append(hashes, utils.ConvertFixedDataIntoByteArray(b.ShardId))
+
+	blockHash = sha256.Sum256(bytes.Join(hashes, []byte{}))
+	return blockHash[:]
+}
+
 // NewBlock creates and returns a neew block.
 func NewBlock(transactions []*Transaction, prevBlockHash [32]byte, shardId uint32) *Block {
 	numTxs := int32(len(transactions))
@@ -75,8 +95,8 @@ func NewBlock(transactions []*Transaction, prevBlockHash [32]byte, shardId uint3
 	for _, tx := range transactions {
 		txIds = append(txIds, tx.ID)
 	}
-	block := &Block{time.Now().Unix(), prevBlockHash, [32]byte{}, numTxs, txIds, transactions, shardId}
-	copy(block.Hash[:], block.HashTransactions()[:]) // TODO(Minh): the blockhash should be a hash of everything in the block
+	block := &Block{time.Now().Unix(), prevBlockHash, numTxs, txIds, transactions, shardId, [32]byte{}}
+	copy(block.Hash[:], block.CalculateBlockHash()[:])
 
 	return block
 }
