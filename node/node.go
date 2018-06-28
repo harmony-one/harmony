@@ -89,7 +89,7 @@ func (node *Node) String() string {
 }
 
 // [Testing code] Should be deleted for production
-// Create in genesis block 1000 transactions which assign 1000 token to each address in [1 - 1000]
+// Create in genesis block numTxs transactions which assign 1000 token to each address in [1 - numTxs]
 func (node *Node) AddMoreFakeTransactions(numTxs int) {
 	txs := make([]*blockchain.Transaction, numTxs)
 	for i := range txs {

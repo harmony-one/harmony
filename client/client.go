@@ -16,6 +16,9 @@ type Client struct {
 	PendingCrossTxsMutex sync.Mutex
 	leaders              *[]p2p.Peer
 
+	UpdateUtxoPool func(pool blockchain.UTXOPool)      // func used to update utxo pool
+	UpdateUtxos    func(txs []*blockchain.Transaction) // func used to update utxo pool with list of txs
+
 	log log.Logger // Log utility
 }
 
@@ -34,7 +37,6 @@ func (client *Client) TransactionMessageHandler(msgPayload []byte) {
 		txsToSend := []blockchain.Transaction{}
 		client.PendingCrossTxsMutex.Lock()
 
-		//client.log.Debug("RECEIVED PROOFS FROM LEADER---", "txAndProofs", (*proofList)[:10])
 		for _, proof := range *proofList {
 
 			txAndProofs, ok := client.PendingCrossTxs[proof.TxID]
@@ -42,6 +44,7 @@ func (client *Client) TransactionMessageHandler(msgPayload []byte) {
 			readyToUnlock := true
 			if ok {
 				txAndProofs.Proofs = append(txAndProofs.Proofs, proof)
+
 				txInputs := make(map[blockchain.TXInput]bool)
 				for _, curProof := range txAndProofs.Proofs {
 					for _, txInput := range curProof.TxInput {
@@ -68,6 +71,11 @@ func (client *Client) TransactionMessageHandler(msgPayload []byte) {
 
 		if len(txsToSend) != 0 {
 			client.sendCrossShardTxUnlockMessage(&txsToSend)
+			tempList := []*blockchain.Transaction{}
+			for i, _ := range txsToSend {
+				tempList = append(tempList, &txsToSend[i])
+			}
+			client.UpdateUtxos(tempList)
 		}
 	}
 }
