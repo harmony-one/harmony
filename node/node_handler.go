@@ -69,7 +69,38 @@ func (node *Node) NodeHandler(conn net.Conn) {
 			controlType := msgPayload[0]
 			if ControlMessageType(controlType) == STOP {
 				node.log.Debug("Stopping Node", "node", node, "numBlocks", len(node.blockchain.Blocks), "numTxsProcessed", node.countNumTransactionsInBlockchain())
+
+				byteBuffer := bytes.NewBuffer([]byte{})
+				encoder := gob.NewEncoder(byteBuffer)
+				encoder.Encode(node.UtxoPool.UtxoMap)
+				node.log.Debug("UtxoPool Report", "numEntries", len(node.UtxoPool.UtxoMap), "sizeInBytes", len(byteBuffer.Bytes()))
+
+				avgBlockSizeInBytes := 0
+				for _, block := range node.blockchain.Blocks {
+					byteBuffer = bytes.NewBuffer([]byte{})
+					encoder = gob.NewEncoder(byteBuffer)
+					encoder.Encode(block)
+					avgBlockSizeInBytes += len(byteBuffer.Bytes())
+				}
+				avgBlockSizeInBytes = avgBlockSizeInBytes / len(node.blockchain.Blocks)
+				node.log.Debug("Blockchain Report", "numBlocks", len(node.blockchain.Blocks), "sizeInBytes", avgBlockSizeInBytes)
+
 				os.Exit(0)
+			}
+		case EXPERIMENT:
+			expType := msgPayload[0]
+			switch ExperimentMessageType(expType) {
+			case UTXO_REQUEST:
+				node.log.Debug("Received UTXO request")
+				p2p.SendMessage(*node.ClientPeer, ConstructUtxoResponseMessage(node.UtxoPool.GetSnapshot()))
+			case UTXO_RESPONSE:
+				node.log.Debug("Received UTXO response")
+				decoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the UTXO_RESPONSE messge type
+				utxoPool := new(blockchain.UTXOPool)
+				decoder.Decode(utxoPool)
+				if node.Client != nil && utxoPool != nil {
+					node.Client.UpdateUtxoPool(*utxoPool)
+				}
 			}
 		}
 	case common.CLIENT:
