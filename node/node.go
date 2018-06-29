@@ -86,10 +86,10 @@ func (node *Node) String() string {
 	return node.Consensus.String()
 }
 
-// [Testing code] Should be deleted for production
-// Create in genesis block numTxs transactions which assign 1000 token to each address in [1 - numTxs]
-func (node *Node) AddMoreFakeTransactions(numTxs int) {
-	txs := make([]*blockchain.Transaction, numTxs)
+// [Testing code] Should be deleted after production
+// Creates in genesis block numAddress transactions which assign 1000 token to each address in [0 - numAddress)
+func (node *Node) AddTestingAddresses(numAddress int) {
+	txs := make([]*blockchain.Transaction, numAddress)
 	for i := range txs {
 		txs[i] = blockchain.NewCoinbaseTX(strconv.Itoa(i), "", node.Consensus.ShardID)
 	}

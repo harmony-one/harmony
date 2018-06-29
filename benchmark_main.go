@@ -107,7 +107,7 @@ func main() {
 	consensus.OnConsensusDone = node.PostConsensusProcessing
 
 	// Temporary testing code, to be removed.
-	node.AddMoreFakeTransactions(10000)
+	node.AddTestingAddresses(10000)
 
 	if consensus.IsLeader {
 		// Let consensus run
