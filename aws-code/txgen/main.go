@@ -219,7 +219,7 @@ func main() {
 	config := readConfigFile(*configFile)
 	leaders, shardIds := getLeadersAndShardIds(&config)
 
-	crossShard := len(shardIds) > 1
+	crossShard := false //len(shardIds) > 1
 
 	// Setup a logger to stdout and log file.
 	logFileName := fmt.Sprintf("./%v/tx-generator.log", *logFolder)
@@ -294,16 +294,18 @@ func main() {
 
 		}
 
-		msg := node.ConstructTransactionListMessage(allCrossTxs)
-		p2p.BroadcastMessage(leaders, msg)
+		if len(allCrossTxs) > 0 {
+			msg := node.ConstructTransactionListMessage(allCrossTxs)
+			p2p.BroadcastMessage(leaders, msg)
 
-		if clientPort != "" {
-			clientNode.Client.PendingCrossTxsMutex.Lock()
+			if clientPort != "" {
+				clientNode.Client.PendingCrossTxsMutex.Lock()
 
-			for _, tx := range allCrossTxs {
-				clientNode.Client.PendingCrossTxs[tx.ID] = tx
+				for _, tx := range allCrossTxs {
+					clientNode.Client.PendingCrossTxs[tx.ID] = tx
+				}
+				clientNode.Client.PendingCrossTxsMutex.Unlock()
 			}
-			clientNode.Client.PendingCrossTxsMutex.Unlock()
 		}
 
 		time.Sleep(500 * time.Millisecond) // Send a batch of transactions periodically

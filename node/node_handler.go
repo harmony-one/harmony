@@ -85,7 +85,8 @@ func (node *Node) NodeHandler(conn net.Conn) {
 
 				byteBuffer := bytes.NewBuffer([]byte{})
 				encoder := gob.NewEncoder(byteBuffer)
-				encoder.Encode(node.UtxoPool.UtxoMap)
+				utxoPool := node.UtxoPool.GetSnapshot()
+				encoder.Encode(utxoPool.UtxoMap)
 				node.log.Debug("UtxoPool Report", "numEntries", len(node.UtxoPool.UtxoMap), "sizeInBytes", len(byteBuffer.Bytes()))
 
 				avgBlockSizeInBytes := 0
@@ -96,7 +97,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 					avgBlockSizeInBytes += len(byteBuffer.Bytes())
 				}
 				avgBlockSizeInBytes = avgBlockSizeInBytes / len(node.blockchain.Blocks)
-				node.log.Debug("Blockchain Report", "numBlocks", len(node.blockchain.Blocks), "sizeInBytes", avgBlockSizeInBytes)
+				node.log.Debug("Blockchain Report", "numBlocks", len(node.blockchain.Blocks), "avgSizeInBytes", avgBlockSizeInBytes)
 
 				os.Exit(0)
 			}

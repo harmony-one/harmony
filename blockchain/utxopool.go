@@ -301,6 +301,7 @@ func (utxoPool *UTXOPool) SelectTransactionsForNewBlock(transactions []*Transact
 				unselected = append(unselected, tx)
 			}
 		} else {
+			// TODO: discard invalid transactions
 			unselected = append(unselected, tx)
 		}
 	}
