@@ -219,7 +219,7 @@ func main() {
 	config := readConfigFile(*configFile)
 	leaders, shardIds := getLeadersAndShardIds(&config)
 
-	crossShard := false //len(shardIds) > 1
+	crossShard := len(shardIds) > 1
 
 	// Setup a logger to stdout and log file.
 	logFileName := fmt.Sprintf("./%v/tx-generator.log", *logFolder)
