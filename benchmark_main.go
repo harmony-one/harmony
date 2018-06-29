@@ -87,7 +87,8 @@ func main() {
 	logFileName := fmt.Sprintf("./%v/%v.log", *logFolder, *port)
 	h := log.MultiHandler(
 		log.Must.FileHandler(logFileName, log.LogfmtFormat()),
-		log.StdoutHandler)
+		log.StdoutHandler,
+		log.Must.NetHandler("tcp", ":3000", log.JSONFormat()))
 	// In cases where you just want a stdout logger, use the following one instead.
 	// h := log.CallerFileHandler(log.StdoutHandler)
 	log.Root().SetHandler(h)
