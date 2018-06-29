@@ -148,6 +148,7 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) C
 
 	if consensus.IsLeader {
 		consensus.ReadySignal = make(chan int)
+		// TODO: why do we need to do go rountine here.
 		// send a signal to indicate it's ready to run consensus
 		go func() {
 			consensus.ReadySignal <- 1
