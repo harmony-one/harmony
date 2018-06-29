@@ -7,7 +7,7 @@
 # exe, the dialog will only pop up once at the very first time.
 # Also it's recommended to use `go build` for testing the whole exe. 
 go build -o benchmark # Build the harmony-benchmark.exe
-go build -o txgen client/txgen/main.go
+go build -o txgen client/txgenerator/main.go
 
 # Create a tmp folder for logs
 t=`date +"%Y%m%d-%H%M%S"`
