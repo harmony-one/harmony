@@ -4,6 +4,7 @@ import (
 	"errors"
 )
 
+// TODO: Fix the comments below.
 /*
 
 Node will process the content of the p2p message
@@ -23,7 +24,15 @@ n - 2 bytes       - actual message payload
 
 */
 
+// NODE_TYPE_BYTES is # of bytes  message category
 const NODE_TYPE_BYTES = 1
+
+// ACTION_TYPE_BYTES is # of bytes for message type which can be
+// - for COMMITTEE category
+// 0x00: consensus
+// 0x01: sharding ...
+// - for NODE category
+// 0x00: transaction ...
 const ACTION_TYPE_BYTES = 1
 
 // The CATEGORY of messages
