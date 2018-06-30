@@ -19,7 +19,7 @@ const (
 type TransactionMessageType int
 
 const (
-	PROOF_OF_LOCK TransactionMessageType = iota // The proof of accept or reject returned by the leader to the cross shard transaction client.
+	PROOF_OF_LOCK TransactionMessageType = iota // The proof of accept or reject returned by the leader to the client tnat issued cross shard transactions.
 )
 
 // [leader] Constructs the proof of accept or reject message that will be sent to client

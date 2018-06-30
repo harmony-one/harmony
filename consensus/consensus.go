@@ -19,8 +19,6 @@ type Consensus struct {
 	commits map[string]string
 	// Signatures collected from validators
 	responses map[string]string
-	// Actual block data to reach consensus on
-	data string
 	// List of validators
 	validators []p2p.Peer
 	// Leader

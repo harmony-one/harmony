@@ -32,7 +32,7 @@ then
 fi
 
 if [ -f $FILE ]; then
-    go run ./aws-code/transaction_generator.go -config_file $config -log_folder $log_folder&
+    go run ./client/txgen/main.go -config_file $config -log_folder $log_folder&
 else
-    go run ./benchmark_main.go -ip $current_ip -config_file $config -log_folder $log_folder&
+    go run ./benchmark.go -ip $current_ip -config_file $config -log_folder $log_folder&
 fi

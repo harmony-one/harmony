@@ -168,16 +168,14 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 	}
 
 	if len(consensus.commits) >= (2*len(consensus.validators))/3+1 && consensus.state < CHALLENGE_DONE {
-		if len(consensus.commits) >= (2*len(consensus.validators))/3+1 && consensus.state < CHALLENGE_DONE {
-			consensus.Log.Debug("Enough commits received with signatures", "numOfSignatures", len(consensus.commits))
+		consensus.Log.Debug("Enough commits received with signatures", "numOfSignatures", len(consensus.commits))
 
-			// Broadcast challenge
-			msgToSend := consensus.constructChallengeMessage()
-			p2p.BroadcastMessage(consensus.validators, msgToSend)
+		// Broadcast challenge
+		msgToSend := consensus.constructChallengeMessage()
+		p2p.BroadcastMessage(consensus.validators, msgToSend)
 
-			// Set state to CHALLENGE_DONE
-			consensus.state = CHALLENGE_DONE
-		}
+		// Set state to CHALLENGE_DONE
+		consensus.state = CHALLENGE_DONE
 	}
 }
 
