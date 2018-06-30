@@ -257,10 +257,10 @@ func main() {
 	// Setup a logger to stdout and log file.
 	logFileName := fmt.Sprintf("./%v/tx-generator.log", *logFolder)
 	h := log.MultiHandler(
-		log.Must.FileHandler(logFileName, log.LogfmtFormat()),
-		log.StdoutHandler)
-	// In cases where you just want a stdout logger, use the following one instead.
-	// h := log.CallerFileHandler(log.StdoutHandler)
+		log.StdoutHandler,                                     // Log to terminal
+		log.Must.FileHandler(logFileName, log.LogfmtFormat()), // Log to file
+		// log.Must.NetHandler("tcp", ":3000", log.JSONFormat()) // Log to remote
+	)
 	log.Root().SetHandler(h)
 
 	// Nodes containing utxopools to mirror the shards' data in the network
