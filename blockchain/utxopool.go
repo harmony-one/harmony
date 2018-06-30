@@ -248,8 +248,6 @@ func (utxoPool *UTXOPool) UpdateOneTransaction(tx *Transaction) {
 				}
 			}
 		} // If it's a cross shard locking Tx, then don't update so the input UTXOs are locked (removed), and the money is not spendable until unlock-to-commit or unlock-to-abort
-
-		// TODO: unlock-to-commit and unlock-to-abort
 	}
 }
 
