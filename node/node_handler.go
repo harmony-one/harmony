@@ -244,7 +244,7 @@ func (node *Node) SendBackProofOfAcceptOrReject() {
 }
 
 // This is called by consensus leader to sync new blocks with other clients/nodes.
-// For now, just send to the client.
+// NOTE: For now, just send to the client (basically not broadcasting)
 func (node *Node) BroadcastNewBlock(newBlock *blockchain.Block) {
 	if node.ClientPeer != nil {
 		node.log.Debug("SENDING NEW BLOCK TO CLIENT")
