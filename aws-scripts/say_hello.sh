@@ -1,1 +1,1 @@
-echo "Hi, I am in aws-scripts and its seems to have worked."
+echo "Hello" > tmplog
