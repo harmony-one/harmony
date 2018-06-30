@@ -17,6 +17,6 @@ hooks:
       timeout: 300
       runas: root
   ApplicationStop:
-    - location: aws-scripts/say_hello.sh
+    - location: aws-scripts/say_bye.sh
       timeout: 10
       runas: root
