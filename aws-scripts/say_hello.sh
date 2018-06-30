@@ -1,1 +1,1 @@
-echo "Hello" > tmplog
+echo "Hello" >> tmplog
