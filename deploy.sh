@@ -6,8 +6,8 @@
 # and you won't be able to turn it off. With `go build` generating one
 # exe, the dialog will only pop up once at the very first time.
 # Also it's recommended to use `go build` for testing the whole exe. 
-go build -o benchmark # Build the harmony-benchmark.exe
-go build -o txgen client/txgen/main.go
+go build -o bin/benchmark
+go build -o bin/txgen client/txgen/main.go
 
 # Create a tmp folder for logs
 t=`date +"%Y%m%d-%H%M%S"`
@@ -21,9 +21,9 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
   IFS=' ' read ip port mode shardId <<< $line
 	#echo $ip $port $mode
   if [ "$mode" != "client" ]; then
-    ./benchmark -ip $ip -port $port -config_file $config -log_folder $log_folder&
+    ./bin/benchmark -ip $ip -port $port -config_file $config -log_folder $log_folder&
   fi
 done < $config
 
 # Generate transactions
-./txgen -config_file $config -log_folder $log_folder
+./bin/txgen -config_file $config -log_folder $log_folder

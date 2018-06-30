@@ -39,7 +39,7 @@ func TestCountNumTransactionsInBlockchain(test *testing.T) {
 	consensus := consensus.NewConsensus("1", "2", "0", []p2p.Peer{leader, validator}, leader)
 
 	node := NewNode(&consensus)
-	node.AddMoreFakeTransactions(1000)
+	node.AddTestingAddresses(1000)
 	if node.countNumTransactionsInBlockchain() != 1001 {
 		test.Error("Count of transactions in the blockchain is incorrect")
 	}
