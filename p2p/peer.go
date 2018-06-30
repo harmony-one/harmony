@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"strings"
+	"sync"
 )
 
 // Peer is the object for a p2p peer (node)
@@ -28,10 +29,16 @@ func BroadcastMessage(peers []Peer, msg []byte) {
 	// Construct broadcast p2p message
 	content := ConstructP2pMessage(byte(17), msg)
 
-	// TODO(rj): Can optimize by calling goroutine.
+	var wg sync.WaitGroup
+	wg.Add(len(peers))
 	for _, peer := range peers {
-		send(peer.Ip, peer.Port, content)
+		// send(peer.Ip, peer.Port, content)
+		go func() {
+			defer wg.Done()
+			send(peer.Ip, peer.Port, content)
+		}()
 	}
+	wg.Wait()
 }
 
 // ConstructP2pMessage constructs the p2p message as [messageType, contentSize, content]
