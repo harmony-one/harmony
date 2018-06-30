@@ -86,7 +86,7 @@ func main() {
 	// Setup a logger to stdout and log file.
 	logFileName := fmt.Sprintf("./%v/%v.log", *logFolder, *port)
 	h := log.MultiHandler(
-		log.StdoutHandler,                                     // Log to terminal
+		log.StdoutHandler,
 		log.Must.FileHandler(logFileName, log.LogfmtFormat()), // Log to file
 		// log.Must.NetHandler("tcp", ":3000", log.JSONFormat()) // Log to remote
 	)
