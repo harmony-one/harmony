@@ -17,4 +17,4 @@ export GOROOT=/usr/lib/golang
 export GOPATH=$MyHOME/projects
 export PATH=$PATH:$GOROOT/bin
 source $MyHOME/.bash_profile
-sudo go get github.com/go-stack/stack
+#sudo go get github.com/go-stack/stack
