@@ -9,8 +9,10 @@ import (
 	"harmony-benchmark/log"
 	"harmony-benchmark/node"
 	"harmony-benchmark/p2p"
+	"math/rand"
 	"os"
 	"strings"
+	"time"
 )
 
 func getShardId(myIp, myPort string, config *[][]string) string {
@@ -78,6 +80,9 @@ func main() {
 	configFile := flag.String("config_file", "config.txt", "file containing all ip addresses")
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	flag.Parse()
+
+	// Set up randomization seed.
+	rand.Seed(int64(time.Now().Nanosecond()))
 
 	config := readConfigFile(*configFile)
 	shardId := getShardId(*ip, *port, &config)

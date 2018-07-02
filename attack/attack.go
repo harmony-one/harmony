@@ -3,11 +3,15 @@ package attack
 import (
 	"harmony-benchmark/consensus"
 	"harmony-benchmark/log"
+	"math/rand"
+	"os"
 	"time"
 )
 
 const (
-	DroppingTimerDuration = 2 * time.Second
+	DroppingTickDuration = 2 * time.Second
+	AttackEnabled        = false
+	HitRate              = 10
 )
 
 // AttackModel contains different models of attacking.
@@ -22,20 +26,25 @@ func New(consensus *consensus.Consensus) *Attack {
 	return &attackModel
 }
 
+// Run runs all attack models in goroutine mode.
 func (attack *Attack) Run() {
+	if !AttackEnabled {
+		return
+	}
 	// Adding attack model here.
 	go func() {
-		// TODO(minhdoan): Enable it later after done attacking.
-		// attack.NodeKilledByItSelf()
+		attack.NodeKilledByItSelf()
 	}()
 }
 
-// NodeKilledByItSelf
-// Attack #1 in the doc.
+// NodeKilledByItSelf runs killing itself attack
 func (attack *Attack) NodeKilledByItSelf() {
-	tick := time.Tick(DroppingTimerDuration)
+	tick := time.Tick(DroppingTickDuration)
 	for {
 		<-tick
-		attack.log.Debug("**********************************killed itself**********************************")
+		if rand.Intn(HitRate) == 0 {
+			attack.log.Debug("***********************Killing myself***********************", "PID: ", os.Getpid())
+			os.Exit(1)
+		}
 	}
 }
