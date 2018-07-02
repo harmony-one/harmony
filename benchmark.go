@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"harmony-benchmark/attack"
 	"harmony-benchmark/consensus"
 	"harmony-benchmark/log"
 	"harmony-benchmark/node"
@@ -95,6 +96,7 @@ func main() {
 	consensus := consensus.NewConsensus(*ip, *port, shardId, peers, leader)
 
 	node := node.NewNode(&consensus)
+	attack := attack.New(&consensus)
 
 	clientPeer := getClientPeer(&config)
 	// If there is a client configured in the node list.
@@ -119,6 +121,10 @@ func main() {
 			node.WaitForConsensusReady(consensus.ReadySignal)
 		}()
 	}
+
+	// TODO(minhdoan): Enable it later after done attacking.
+	// Run attack.
+	attack.Run()
 
 	node.StartServer(*port)
 }
