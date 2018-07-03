@@ -3,6 +3,7 @@ package p2p
 import (
 	"bytes"
 	"encoding/binary"
+	"harmony-benchmark/attack"
 	"log"
 	"net"
 	"strings"
@@ -77,6 +78,9 @@ func sendWithSocketClient(ip, port string, message []byte) (res string) {
 
 // Send a message to another node with given port.
 func send(ip, port string, message []byte) (returnMessage string) {
+	// Add attack code here.
+	attack.DelayResponse()
+
 	sendWithSocketClient(ip, port, message)
 	return
 }

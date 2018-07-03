@@ -101,7 +101,7 @@ func main() {
 	consensus := consensus.NewConsensus(*ip, *port, shardId, peers, leader)
 
 	node := node.NewNode(&consensus)
-	attack := attack.New(&consensus)
+	attack := attack.New(consensus.Log)
 
 	clientPeer := getClientPeer(&config)
 	// If there is a client configured in the node list.

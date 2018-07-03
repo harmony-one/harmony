@@ -1,7 +1,6 @@
 package attack
 
 import (
-	"harmony-benchmark/consensus"
 	"harmony-benchmark/log"
 	"math/rand"
 	"os"
@@ -9,9 +8,10 @@ import (
 )
 
 const (
-	DroppingTickDuration = 2 * time.Second
-	AttackEnabled        = false
-	HitRate              = 10
+	DroppingTickDuration  = 2 * time.Second
+	AttackEnabled         = false
+	HitRate               = 10
+	DelayResponseDuration = 10 * time.Second
 )
 
 // AttackModel contains different models of attacking.
@@ -19,10 +19,10 @@ type Attack struct {
 	log log.Logger // Log utility
 }
 
-func New(consensus *consensus.Consensus) *Attack {
+func New(log log.Logger) *Attack {
 	attackModel := Attack{}
 	// Logger
-	attackModel.log = consensus.Log
+	attackModel.log = log
 	return &attackModel
 }
 
@@ -46,5 +46,14 @@ func (attack *Attack) NodeKilledByItSelf() {
 			attack.log.Debug("***********************Killing myself***********************", "PID: ", os.Getpid())
 			os.Exit(1)
 		}
+	}
+}
+
+func DelayResponse() {
+	if !AttackEnabled {
+		return
+	}
+	if rand.Intn(HitRate) == 0 {
+		time.Sleep(DelayResponseDuration)
 	}
 }
