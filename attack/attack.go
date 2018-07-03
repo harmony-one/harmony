@@ -4,6 +4,7 @@ import (
 	"harmony-benchmark/log"
 	"math/rand"
 	"os"
+	"sync"
 	"time"
 )
 
@@ -16,19 +17,29 @@ const (
 
 // AttackModel contains different models of attacking.
 type Attack struct {
-	log log.Logger // Log utility
+	AttackEnabled bool
+	log           log.Logger // Log utility
 }
 
-func New(log log.Logger) *Attack {
-	attackModel := Attack{}
-	// Logger
-	attackModel.log = log
-	return &attackModel
+var attack *Attack
+var once sync.Once
+
+// GetAttackModel returns attack model by using singleton pattern.
+func GetAttackModel() *Attack {
+	once.Do(func() {
+		attack = &Attack{}
+		attack.AttackEnabled = AttackEnabled
+	})
+	return attack
+}
+
+func (attack *Attack) SetLogger(log log.Logger) {
+	attack.log = log
 }
 
 // Run runs all attack models in goroutine mode.
 func (attack *Attack) Run() {
-	if !AttackEnabled {
+	if !attack.AttackEnabled {
 		return
 	}
 	// Adding attack model here.
@@ -49,8 +60,8 @@ func (attack *Attack) NodeKilledByItSelf() {
 	}
 }
 
-func DelayResponse() {
-	if !AttackEnabled {
+func (attack *Attack) DelayResponse() {
+	if !attack.AttackEnabled {
 		return
 	}
 	if rand.Intn(HitRate) == 0 {

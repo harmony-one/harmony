@@ -15,6 +15,10 @@ import (
 	"time"
 )
 
+const (
+	AttackProbability = 20
+)
+
 func getShardId(myIp, myPort string, config *[][]string) string {
 	for _, node := range *config {
 		ip, port, shardId := node[0], node[1], node[3]
@@ -74,15 +78,31 @@ func readConfigFile(configFile string) [][]string {
 	return result
 }
 
+func attackDetermination(attackedMode int) bool {
+	switch attackedMode {
+	case 0:
+		return false
+	case 1:
+		return true
+	case 2:
+		return rand.Intn(100) < AttackProbability
+	}
+	return false
+}
+
 func main() {
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9000", "port of the node.")
 	configFile := flag.String("config_file", "config.txt", "file containing all ip addresses")
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
+	attackedMode := flag.Int("attacked_mode", 0, "0 means not attacked, 1 means attacked, 2 means being open to be selected as attacked")
 	flag.Parse()
 
 	// Set up randomization seed.
 	rand.Seed(int64(time.Now().Nanosecond()))
+
+	// Attack determination.
+	attack.GetAttackModel().AttackEnabled = attackDetermination(*attackedMode)
 
 	config := readConfigFile(*configFile)
 	shardId := getShardId(*ip, *port, &config)
@@ -101,7 +121,8 @@ func main() {
 	consensus := consensus.NewConsensus(*ip, *port, shardId, peers, leader)
 
 	node := node.NewNode(&consensus)
-	attack := attack.New(consensus.Log)
+	// Set logger to attack model.
+	attack.GetAttackModel().SetLogger(consensus.Log)
 
 	clientPeer := getClientPeer(&config)
 	// If there is a client configured in the node list.
@@ -129,7 +150,7 @@ func main() {
 
 	// TODO(minhdoan): Enable it later after done attacking.
 	// Run attack.
-	attack.Run()
+	attack.GetAttackModel().Run()
 
 	node.StartServer(*port)
 }
