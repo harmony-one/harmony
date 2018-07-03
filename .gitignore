@@ -5,6 +5,7 @@
 .vscode
 
 # Executables
+harmony-benchmark
 *.exe
 *.out
 *.app
