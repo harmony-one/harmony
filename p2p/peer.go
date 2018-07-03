@@ -32,11 +32,12 @@ func BroadcastMessage(peers []Peer, msg []byte) {
 
 	var wg sync.WaitGroup
 	wg.Add(len(peers))
+
 	for _, peer := range peers {
-		// send(peer.Ip, peer.Port, content)
+		peerCopy := peer
 		go func() {
 			defer wg.Done()
-			send(peer.Ip, peer.Port, content)
+			send(peerCopy.Ip, peerCopy.Port, content)
 		}()
 	}
 	wg.Wait()
