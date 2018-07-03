@@ -7,6 +7,7 @@ import (
 	"encoding/gob"
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/p2p"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -320,14 +321,24 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 			}
 			consensus.OnConsensusDone(&blockHeaderObj)
 
+			// TODO: @ricl these logic are irrelevant to consensus, move them to another file, say profiler.
 			endTime := time.Now()
 			timeElapsed := endTime.Sub(startTime)
 			numOfTxs := blockHeaderObj.NumTransactions
-			consensus.Log.Info("TPS Reporta", "numOfTXs", numOfTxs, "timeElapsed", timeElapsed, "TPS", float64(numOfTxs)/timeElapsed.Seconds())
+			consensus.Log.Info("TPS Report", "numOfTXs", numOfTxs, "timeElapsed", timeElapsed, "TPS", float64(numOfTxs)/timeElapsed.Seconds())
+
+			var m runtime.MemStats
+			runtime.ReadMemStats(&m)
+			consensus.Log.Info("Mem Report", "Alloc", bToMb(m.Alloc), "TotalAlloc", bToMb(m.TotalAlloc),
+				"Sys", bToMb(m.Sys), "NumGC", m.NumGC)
 
 			// Send signal to Node so the new block can be added and new round of consensus can be triggered
 			consensus.ReadySignal <- 1
 		}
 		consensus.mutex.Unlock()
 	}
+}
+
+func bToMb(b uint64) uint64 {
+	return b / 1024 / 1024
 }
