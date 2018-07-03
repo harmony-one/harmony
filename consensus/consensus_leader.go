@@ -11,6 +11,10 @@ import (
 	"time"
 )
 
+var (
+	startTime time.Time
+)
+
 // WaitForNewBlock waits for a new block.
 func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) {
 	consensus.Log.Debug("Waiting for block", "consensus", consensus)
@@ -56,6 +60,7 @@ func (consensus *Consensus) ProcessMessageLeader(message []byte) {
 
 // Handler for message which triggers consensus process
 func (consensus *Consensus) processStartConsensusMessage(payload []byte) {
+	startTime = time.Now()
 	tx := blockchain.NewCoinbaseTX("x", "y", 0)
 	consensus.startConsensus(blockchain.NewGenesisBlock(tx, 0))
 }
@@ -314,6 +319,11 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 				consensus.Log.Debug("failed to construct the new block after consensus")
 			}
 			consensus.OnConsensusDone(&blockHeaderObj)
+
+			endTime := time.Now()
+			timeElapsed := endTime.Sub(startTime)
+			numOfTxs := blockHeaderObj.NumTransactions
+			consensus.Log.Info("TPS Reporta", "numOfTXs", numOfTxs, "timeElapsed", timeElapsed, "TPS", float64(numOfTxs)/timeElapsed.Seconds())
 
 			// Send signal to Node so the new block can be added and new round of consensus can be triggered
 			consensus.ReadySignal <- 1
