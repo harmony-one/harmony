@@ -1,5 +1,8 @@
 import requests
 amazon_ipv4_url = "http://169.254.169.254/latest/meta-data/public-ipv4"
+def get_my_ip():
+    return current_ip = requests.get(amazon_ipv4_url).text
+
 if __name__ == "__main__":
     current_ip = requests.get(amazon_ipv4_url).text
     f = open("global_nodes.txt","r")
