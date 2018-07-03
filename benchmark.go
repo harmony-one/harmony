@@ -4,12 +4,15 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"harmony-benchmark/attack"
 	"harmony-benchmark/consensus"
 	"harmony-benchmark/log"
 	"harmony-benchmark/node"
 	"harmony-benchmark/p2p"
+	"math/rand"
 	"os"
 	"strings"
+	"time"
 )
 
 func getShardId(myIp, myPort string, config *[][]string) string {
@@ -78,6 +81,9 @@ func main() {
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	flag.Parse()
 
+	// Set up randomization seed.
+	rand.Seed(int64(time.Now().Nanosecond()))
+
 	config := readConfigFile(*configFile)
 	shardId := getShardId(*ip, *port, &config)
 	peers := getPeers(*ip, *port, shardId, &config)
@@ -95,6 +101,7 @@ func main() {
 	consensus := consensus.NewConsensus(*ip, *port, shardId, peers, leader)
 
 	node := node.NewNode(&consensus)
+	attack := attack.New(consensus.Log)
 
 	clientPeer := getClientPeer(&config)
 	// If there is a client configured in the node list.
@@ -119,6 +126,10 @@ func main() {
 			node.WaitForConsensusReady(consensus.ReadySignal)
 		}()
 	}
+
+	// TODO(minhdoan): Enable it later after done attacking.
+	// Run attack.
+	attack.Run()
 
 	node.StartServer(*port)
 }
