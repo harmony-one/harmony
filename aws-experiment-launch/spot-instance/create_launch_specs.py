@@ -3,6 +3,7 @@ import argparse
 import json
 import time
 import datetime
+import base64
 
 REGION_NAME = 'region_name'
 REGION_KEY = 'region_key'
@@ -11,8 +12,9 @@ REGION_HUMAN_NAME = 'region_human_name'
 
 INSTANCE_TYPE = 'm3.medium' # 't2.micro'
 AMI = 'ami-f2d3638a' # 'ami-a9d09ed1'
-# base64 userdata.sh
-USER_DATA = 'IyEvYmluL2Jhc2gKUkVHSU9OPSQoY3VybCAxNjkuMjU0LjE2OS4yNTQvbGF0ZXN0L21ldGEtZGF0YS9wbGFjZW1lbnQvYXZhaWxhYmlsaXR5LXpvbmUvIHwgc2VkICdzL1thLXpdJC8vJykKeXVtIC15IHVwZGF0ZQp5dW0gaW5zdGFsbCAteSBydWJ5CmNkIC9ob21lL2VjMi11c2VyCmN1cmwgLU8gaHR0cHM6Ly9hd3MtY29kZWRlcGxveS0kUkVHSU9OLnMzLmFtYXpvbmF3cy5jb20vbGF0ZXN0L2luc3RhbGwKY2htb2QgK3ggLi9pbnN0YWxsCi4vaW5zdGFsbCBhdXRv'
+# UserData must be base64 encoded.
+with open("userdata.sh", "rb") as userdata_file:
+    USER_DATA = base64.b64encode(userdata_file.read())
 IAM_INSTANCE_PROFILE = 'BenchMarkCodeDeployInstanceProfile'
 
 def read_configuration_file(filename):
