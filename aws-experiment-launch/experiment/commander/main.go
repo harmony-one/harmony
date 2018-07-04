@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	message       = "Ping"
+	message       = "init http://localhost:8080/configuration.txt"
 	StopCharacter = "\r\n\r\n"
 )
 
@@ -23,13 +23,12 @@ func SocketClient(ip string, port int) {
 	}
 
 	conn.Write([]byte(message))
-	conn.Write([]byte(StopCharacter))
+	// conn.Write([]byte(StopCharacter))
 	log.Printf("Send: %s", message)
 
 	buff := make([]byte, 1024)
 	n, _ := conn.Read(buff)
 	log.Printf("Receive: %s", buff[:n])
-
 }
 
 func main() {

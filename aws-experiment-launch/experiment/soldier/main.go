@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -57,10 +58,12 @@ ILOOP:
 			break ILOOP
 		case nil:
 			log.Println("Receive:", data)
-			go handleCommand(data)
 			if isTransportOver(data) {
+				log.Println("Tranport Over!")
 				break ILOOP
 			}
+
+			go handleCommand(data)
 
 		default:
 			log.Fatalf("Receive data failed:%s", err)
@@ -75,34 +78,53 @@ ILOOP:
 }
 
 func handleCommand(command string) {
-	// assume this is init command
-	handleInitCommand(command)
+	args := strings.Split(command, " ")
+
+	if len(args) <= 0 {
+		return
+	}
+
+	switch command := args[0]; command {
+	case "init":
+		{
+			handleInitCommand(args[1:])
+		}
+	case "close":
+		{
+			log.Println("close command")
+		}
+	}
 }
 
-func handleInitCommand(command string) {
-	log.Println("Init command")
-	out, err := os.Create("config_copy.txt")
+func handleInitCommand(args []string) {
+	log.Println("Init command", args)
+	// create local config file
+	localConfig := "node_config.txt"
+	out, err := os.Create(localConfig)
 	if err != nil {
-		panic("Failed to create local file")
+		log.Fatal("Failed to create local file")
 	}
-	log.Println("Created local file")
 	defer out.Close()
-	resp, err := http.Get("http://localhost/config.txt")
+
+	// get remote config file
+	configURL := args[0]
+	resp, err := http.Get(configURL)
 	if err != nil {
-		log.Println("Failed to read file content")
-		panic("Failed to read file content")
+		log.Fatal("Failed to read file content")
 	}
-	log.Println("Read file content")
-	log.Println(resp)
-	log.Println(resp.Body)
-	n, err := io.Copy(out, resp.Body)
-	if err != nil {
-		panic("Failed to copy file")
-	}
-	log.Println("copy done")
-	log.Println(resp.Body)
 	defer resp.Body.Close()
-	log.Println(n)
+
+	// copy remote to local
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		log.Fatal("Failed to copy file")
+	}
+
+	content, err := ioutil.ReadFile(localConfig)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("File contents: %s", content)
 }
 
 func isTransportOver(data string) (over bool) {
