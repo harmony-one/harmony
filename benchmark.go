@@ -102,7 +102,7 @@ func main() {
 	rand.Seed(int64(time.Now().Nanosecond()))
 
 	// Attack determination.
-	attack.GetAttackModel().SetAttackEnabled(attackDetermination(*attackedMode))
+	attack.GetInstance().SetAttackEnabled(attackDetermination(*attackedMode))
 
 	config := readConfigFile(*configFile)
 	shardId := getShardId(*ip, *port, &config)
@@ -122,7 +122,7 @@ func main() {
 
 	node := node.NewNode(&consensus)
 	// Set logger to attack model.
-	attack.GetAttackModel().SetLogger(consensus.Log)
+	attack.GetInstance().SetLogger(consensus.Log)
 
 	clientPeer := getClientPeer(&config)
 	// If there is a client configured in the node list.

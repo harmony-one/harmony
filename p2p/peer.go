@@ -80,7 +80,7 @@ func sendWithSocketClient(ip, port string, message []byte) (res string) {
 // Send a message to another node with given port.
 func send(ip, port string, message []byte) (returnMessage string) {
 	// Add attack code here.
-	attack.GetAttackModel().DelayResponse()
+	attack.GetInstance().Run()
 
 	sendWithSocketClient(ip, port, message)
 	return

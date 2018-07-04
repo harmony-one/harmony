@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/gob"
+	"harmony-benchmark/attack"
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/p2p"
 	"regexp"
@@ -233,6 +234,9 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 		consensus.Log.Warn("ROLLING UP", "consensus", consensus)
 		// If I received previous block (which haven't been processed. I will roll up to current block if everything checks.
 	}
+
+	// Update readyByConsensus for attack.
+	attack.GetInstance().UpdateConsensusReady(consensusId)
 
 	// TODO: verify aggregated commits with real schnor cosign verification
 

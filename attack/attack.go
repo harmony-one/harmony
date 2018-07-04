@@ -29,7 +29,7 @@ const (
 type Attack struct {
 	AttackEnabled        bool
 	attackType           AttackType
-	ConsensusIdThreshold int
+	ConsensusIdThreshold uint32
 	readyByConsensus     bool
 	log                  log.Logger // Log utility
 }
@@ -37,8 +37,8 @@ type Attack struct {
 var attack *Attack
 var once sync.Once
 
-// GetAttackModel returns attack model by using singleton pattern.
-func GetAttackModel() *Attack {
+// GetInstance returns attack model by using singleton pattern.
+func GetInstance() *Attack {
 	once.Do(func() {
 		attack = &Attack{}
 		attack.Init()
@@ -55,7 +55,7 @@ func (attack *Attack) SetAttackEnabled(AttackEnabled bool) {
 	attack.AttackEnabled = AttackEnabled
 	if AttackEnabled {
 		attack.attackType = AttackType(rand.Intn(3))
-		attack.ConsensusIdThreshold = ConsensusIdThresholdMin + rand.Intn(ConsensusIdThresholdMax-ConsensusIdThresholdMin)
+		attack.ConsensusIdThreshold = uint32(ConsensusIdThresholdMin + rand.Intn(ConsensusIdThresholdMax-ConsensusIdThresholdMin))
 	}
 }
 
@@ -63,9 +63,14 @@ func (attack *Attack) SetLogger(log log.Logger) {
 	attack.log = log
 }
 
+func (attack *Attack) Run() {
+	attack.NodeKilledByItSelf()
+	attack.DelayResponse()
+}
+
 // NodeKilledByItSelf runs killing itself attack
 func (attack *Attack) NodeKilledByItSelf() {
-	if !attack.AttackEnabled || attack.attackType != DelayResponse || !attack.readyByConsensus {
+	if !attack.AttackEnabled || attack.attackType != KilledItself || !attack.readyByConsensus {
 		return
 	}
 
@@ -84,7 +89,7 @@ func (attack *Attack) DelayResponse() {
 	}
 }
 
-func (attack *Attack) UpdateConsensusReady(consensusId int) {
+func (attack *Attack) UpdateConsensusReady(consensusId uint32) {
 	if consensusId > attack.ConsensusIdThreshold {
 		attack.readyByConsensus = true
 	}
