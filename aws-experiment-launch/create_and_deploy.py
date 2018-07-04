@@ -17,28 +17,67 @@ REPO = "simple-rules/harmony-benchmark"
 APPLICATION_NAME = 'benchmark-experiments'
 time_stamp = time.time()
 PLACEMENT_GROUP = "PLACEMENT-" + datetime.datetime.fromtimestamp(time_stamp).strftime('%H-%M-%S-%Y-%m-%d')
-    
+
+def get_instance_ids(response):
+    instance_ids = []
+    for reservation in response["Reservations"]:
+        for instance in reservation["Instances"]:
+            instance_ids.append(instance["InstanceId"])
+    return instance_ids   
+
 def run_one_region_instances(config,region_number,number_of_instances):
+    #todo: explore the use ec2 resource and not client. e.g. create_instances --  Might make for better code.
+    """
+    e.g. ec2.create_instances
+    """
     region_name = config[region_number][REGION_NAME]
     session = boto3.Session(region_name=region_name)
     ec2_client = session.client('ec2')
     response,placement = create_instances(config,ec2_client,region_number,int(number_of_instances))
+    print(placement)
     return session,placement
 
 def run_one_region_codedeploy(region_number,placement_group,commitId):
+    #todo: explore the use ec2 resource and not client. e.g. create_instances --  Might make for better code.
+    """
+    for getting instance ids:---
+    ec2 = boto3.resource('ec2', region_name=region_name])
+    result = ec2.instances.filter(Filters=[{'Name': 'instance-state-name', 'Values': ['running']}])
+    for instance in result:
+        instances.append(instance.id)
+    
+    for getting public ips : --
+        ec2 = boto3.resource('ec2')
+        instance
+    """
     region_name = config[region_number][REGION_NAME]
     session = boto3.Session(region_name=region_name)
-    waiter = session.get_waiter('instance_running')
-    waiter.wait(
+    ec2_client = session.client('ec2')
+    
+    
+    response = ec2_client.describe_instances(
         Filters = [
             {
-                'Name': placement-group-name
+                'Name': 'placement-group-name',
                 'Values' : [
                         placement_group
                 ]
             }
         ]
     )
+    instance_ids = get_instance_ids(response)
+    
+    print("Waiting for all instances to start running")
+    waiter = ec2_client.get_waiter('instance_running')
+    waiter.wait(InstanceIds=instance_ids)
+
+    print("Waiting for all instances to be status ok")
+    waiter = ec2_client.get_waiter('instance_status_ok')
+    waiter.wait(InstanceIds=instance_ids)
+
+    waiter = ec2_client.get_waiter('system_status_ok')
+    waiter.wait(InstanceIds=instance_ids)
+
     codedeploy = session.client('codedeploy')
     application_name = APPLICATION_NAME
     deployment_group = APPLICATION_NAME + "-" + str(commitId)
@@ -67,7 +106,11 @@ def get_one_availability_zone(ec2_client):
         sys.exit()
 
 def create_instances(config,ec2_client,region_number,number_of_instances):
-    placement_group = region_number + "-" + PLACEMENT_GROUP 
+    placement_group = region_number + "-" + PLACEMENT_GROUP
+    response = ec2_client.create_placement_group(
+    GroupName = placement_group,
+    Strategy = 'spread'
+    ) 
     response = ec2_client.run_instances(
         MinCount = number_of_instances,
         MaxCount = number_of_instances,
@@ -95,7 +138,7 @@ def create_instances(config,ec2_client,region_number,number_of_instances):
           },
         ]
     )
-    return response
+    return response,placement_group
 
 def get_deployment_group(codedeploy,application_name,deployment_group):
     response = codedeploy.list_deployment_groups(
@@ -212,9 +255,8 @@ if __name__ == "__main__":
     instances_list = args.numInstances.split(',')
     assert len(region_list) == len(instances_list),"number of regions: %d != number of instances per region: %d" % (len(region_list),len(intances_list))
     commitId = args.commitId
-    print("current session is %s" % current_session)
-    
     placement_groups = []
+
     for i in range(len(region_list)):
         region_number = region_list[i]
         number_of_instances = instances_list[i]
@@ -223,7 +265,7 @@ if __name__ == "__main__":
         
     for i in range(len(region_list)):
         region_number = region_list[i]
-        placement_group = placements[i]
+        placement_group = placement_groups[i]
         run_one_region_codedeploy(region_number,placement_group,commitId)
 
    
