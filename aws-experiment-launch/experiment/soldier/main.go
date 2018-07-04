@@ -9,8 +9,9 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"strconv"
+	"os/exec"
 	"strings"
+	"time"
 )
 
 const (
@@ -18,17 +19,19 @@ const (
 )
 
 var (
-	port *int
+	ip          *string
+	port        *string
+	localConfig string
 )
 
-func SocketServer(port int) {
-	listen, err := net.Listen("tcp4", ":"+strconv.Itoa(port))
+func SocketServer() {
+	listen, err := net.Listen("tcp4", ":"+*port)
 	defer listen.Close()
 	if err != nil {
-		log.Fatalf("Socket listen port %d failed,%s", port, err)
+		log.Fatalf("Socket listen port %s failed,%s", *port, err)
 		os.Exit(1)
 	}
-	log.Printf("Begin listen for command on port: %d", port)
+	log.Printf("Begin listen for command on port: %s", *port)
 
 	for {
 		conn, err := listen.Accept()
@@ -96,7 +99,6 @@ func handleCommand(command string, w *bufio.Writer) {
 func handleInitCommand(args []string, w *bufio.Writer) {
 	log.Println("Init command", args)
 	// create local config file
-	localConfig := "node_config_" + strconv.Itoa(*port) + ".txt"
 	out, err := os.Create(localConfig)
 	if err != nil {
 		log.Fatal("Failed to create local file")
@@ -117,15 +119,36 @@ func handleInitCommand(args []string, w *bufio.Writer) {
 		log.Fatal("Failed to copy file")
 	}
 
+	// log config file
 	content, err := ioutil.ReadFile(localConfig)
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println("Successfully init-ed with config")
+	log.Println("Successfully downloaded config")
 	log.Println(string(content))
+
+	runInstance()
 
 	w.Write([]byte("Successfully init-ed"))
 	w.Flush()
+}
+
+func runInstance() {
+	t := time.Now().Format("20060102-150405")
+	logFolder := "../tmp_log/log-" + t
+	err := os.MkdirAll(logFolder, os.ModePerm)
+	if err != nil {
+		log.Fatal("Failed to create log folder")
+	}
+	cmdName := "./benchmark"
+	cmdArgs := []string{"-ip", *ip, "-port", *port, "-config_file", localConfig, "-log_folder", logFolder}
+	log.Println(cmdName, cmdArgs)
+	cmdOut, err := exec.Command(cmdName, cmdArgs...).Output()
+	if err != nil {
+		log.Fatal("Failed to run command: ", err)
+	}
+
+	log.Println(string(cmdOut))
 }
 
 func isTransportOver(data string) (over bool) {
@@ -134,8 +157,10 @@ func isTransportOver(data string) (over bool) {
 }
 
 func main() {
-	port = flag.Int("port", 3333, "port of the node.")
+	ip = flag.String("ip", "127.0.0.1", "IP of the node.")
+	port = flag.String("port", "3000", "port of the node.")
 	flag.Parse()
 
-	SocketServer(*port)
+	localConfig = "node_config_" + *port + ".txt"
+	SocketServer()
 }
