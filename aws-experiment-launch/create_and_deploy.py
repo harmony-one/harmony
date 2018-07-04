@@ -13,12 +13,24 @@ INSTANCE_TYPE = 't2.micro'
 REGION_AMI = 'region_ami'
 USER_DATA = 'user-data.sh'
 IAM_INSTANCE_PROFILE = 'BenchMarkCodeDeployInstanceProfile'
+REPO = "simple-rules/harmony-benchmark"
+APPLICATION_NAME = 'benchmark-experiments'
 
-def run_one_region(config,region_number,number_of_instances):
+def run_one_region(config,region_number,number_of_instances,commitId):
     region_name = config[region_number][REGION_NAME]
     session = boto3.Session(region_name=region_name)
-    ec2_client = session.client('ec2')
-    create_instances(config,ec2_client,region_number,int(number_of_instances))
+    # ec2_client = session.client('ec2')
+    # response = create_instances(config,ec2_client,region_number,int(number_of_instances))
+    codedeploy = session.client('codedeploy')
+    #commitId = get_commitId(commitId)
+    application_name = APPLICATION_NAME
+    deployment_group = APPLICATION_NAME + str(commitId)
+    repo = REPO
+    response = get_application(codedeploy,application_name)
+    response  = get_deployment_group(codedeploy,application_name,deployment_group)
+    print(response)
+    # deploy(codedeploy, application_name, deployment_group, repo, commitId, wait=True)
+    # return response
     
 def get_availability_zones(ec2_client):
     response = ec2_client.describe_availability_zones()
@@ -65,8 +77,94 @@ def create_instances(config,ec2_client,region_number,number_of_instances):
           },
         ]
     )
-    print(response)
     return response
+
+def get_deployment_group(codedeploy,application_name,deployment_group):
+    response = codedeploy.create_deployment_group(
+            applicationName = application_name,
+            deploymentGroupName = deployment_group,
+            deploymentConfigName='CodeDeployDefault.AllAtAOnce',
+            serviceRoleArn = 'arn:aws:iam::656503231766:role/BenchMarkCodeDeployServiceRole',
+            deploymentStyle={
+                'deploymentType': 'IN_PLACE'
+            },
+            ec2TagSet={
+                'ec2TagSetList': [
+                    [
+                       {
+                        'Key': 'Name',
+                        'Value': 'Node',
+                        'Type': 'KEY_AND_VALUE'
+                       },
+                    ],
+                ]
+            }
+        )
+    return response
+
+def get_commitId(commitId):
+    if commitId is None:
+        commitId = run("git rev-list --max-count=1 HEAD",
+                       hide=True).stdout.strip()
+        print("Got newest commitId as " + commitId)
+    return commitId
+
+def get_application(codedeploy,application_name):
+    response = codedeploy.list_applications()
+    if application_name in response['applications']:
+        return response
+    else:
+        response = codedeploy.create_application(
+        applicationName= application_name,
+        computePlatform='Server'
+    )
+    return response
+
+def deploy(codedeploy, application_name,deployment_group,repo, commitId, wait=True):
+    """Deploy new code at specified revision to instance.
+
+    arguments:
+    - repo: GitHub repository path from which to get the code
+    - commitId: commit ID to be deployed
+    - wait: wait until the CodeDeploy finishes
+    """
+    print("Launching CodeDeploy with commit " + commitId)
+    res = codedeploy.create_deployment(
+            applicationName = application_name,
+            deploymentGroupName = deployment_group,
+            deploymentConfigName = 'CodeDeployDefault.AllAtAOnce',
+            description = 'benchmark experiments',
+            revision = {
+                'revisionType': 'GitHub',
+                'gitHubLocation': {
+                'repository': repo,
+                'commitId': commitId,
+                }
+            }
+        )
+    depId = res["deploymentId"]
+    print("Deployment ID: " + depId)
+
+    # The deployment is launched at this point, so exit unless asked to wait
+    # until it finishes
+    if not wait:
+        return
+
+    # This should use a boto3 waiter instead, but that hasn't been
+    # implemented yet: https://github.com/boto/boto3/issues/708
+    # So instead we check the status every few seconds manually
+    info = {'status': 'Created'}
+    start = time.time()
+    while info['status'] not in ('Succeeded', 'Failed', 'Stopped',) and (time.time() - start < 300.0):
+        info = codedeploy.get_deployment(deploymentId=depId)['deploymentInfo']
+        print(info)
+        print(info['status'])
+        time.sleep(15)
+    if info['status'] == 'Succeeded':
+        print("\nDeploy Succeeded")
+    else:
+        print("\nDeploy Failed")
+        print(info)
 
 def read_configuration_file(filename):
     config = {}
@@ -87,10 +185,9 @@ if __name__ == "__main__":
     parser.add_argument('--regions',type=str,dest='regions',default='3',help="Supply a csv list of all regions")
     parser.add_argument('--instances', type=str,dest='numInstances',default='1',help='number of instances')
     parser.add_argument('--configuration',type=str,dest='config',default='configuration.txt')
-    #parser.add_argument('--availability',type=str,dest='availability',default='availability-zones.txt')
+    parser.add_argument('--commitId',type=str,dest='commitId',default='1f7e6e7ca7cf1c1190cedec10e791c01a29971cf')
     args = parser.parse_args()
     config = read_configuration_file(args.config)
-    #availability_zone = read_availability_zone(args.availability)
     region_list = args.regions.split(',')
     instances_list = args.numInstances.split(',')
     assert len(region_list) == len(instances_list),"number of regions: %d != number of instances per region: %d" % (len(region_list),len(intances_list))
@@ -99,4 +196,5 @@ if __name__ == "__main__":
     print("current session is %s" % current_session)
     region_number  = '1'
     number_of_instances = '2'
-    print run_one_region(config,region_number,number_of_instances)
+    run_one_region(config,region_number,number_of_instances,args.commitId)
+   
