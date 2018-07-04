@@ -28,16 +28,18 @@ func SocketClient(ip string, port int) {
 
 	buff := make([]byte, 1024)
 	n, _ := conn.Read(buff)
-	log.Printf("Receive: %s", buff[:n])
+	log.Printf("Receive from %v: %s", port, buff[:n])
 }
 
 func main() {
 
 	var (
-		ip   = "127.0.0.1"
-		port = 3333
+		ip       = "127.0.0.1"
+		portList = []int{3333, 4444}
 	)
 
-	SocketClient(ip, port)
+	for _, port := range portList {
+		SocketClient(ip, port)
+	}
 
 }
