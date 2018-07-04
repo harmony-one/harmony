@@ -19,10 +19,11 @@ APPLICATION_NAME = 'benchmark-experiments'
 def run_one_region(config,region_number,number_of_instances,commitId):
     region_name = config[region_number][REGION_NAME]
     session = boto3.Session(region_name=region_name)
-    ec2_client = session.client('ec2')
-    response = create_instances(config,ec2_client,region_number,int(number_of_instances))
+    # ec2_client = session.client('ec2')
+    # response = create_instances(config,ec2_client,region_number,int(number_of_instances))
+    # time.sleep(60)
+    # print("Sleeping for 60 secs waiting for instances to come up")
     codedeploy = session.client('codedeploy')
-    #commitId = get_commitId(commitId)
     application_name = APPLICATION_NAME
     deployment_group = APPLICATION_NAME + "-" + str(commitId)
     repo = REPO
@@ -155,15 +156,10 @@ def deploy(codedeploy, application_name,deployment_group,repo, commitId, wait=Tr
     # until it finishes
     if not wait:
         return
-
-    # This should use a boto3 waiter instead, but that hasn't been
-    # implemented yet: https://github.com/boto/boto3/issues/708
-    # So instead we check the status every few seconds manually
     info = {'status': 'Created'}
     start = time.time()
     while info['status'] not in ('Succeeded', 'Failed', 'Stopped',) and (time.time() - start < 300.0):
         info = codedeploy.get_deployment(deploymentId=depId)['deploymentInfo']
-        print(info['deploymentOverview'])
         print(info['status'])
         time.sleep(15)
     if info['status'] == 'Succeeded':
@@ -200,7 +196,8 @@ if __name__ == "__main__":
     time_stamp = time.time()
     current_session = datetime.datetime.fromtimestamp(time_stamp).strftime('%H-%M-%S-%Y-%m-%d')
     print("current session is %s" % current_session)
-    region_number  = '1'
-    number_of_instances = '2'
-    run_one_region(config,region_number,number_of_instances,args.commitId)
+    for i in range(len(region_list)):
+        region_number = region_list[i]
+        number_of_instances = instances_list[i]
+        run_one_region(config,region_number,number_of_instances,args.commitId)
    
