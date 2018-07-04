@@ -22,7 +22,7 @@ type AttackType byte
 const (
 	KilledItself AttackType = iota
 	DelayResponse
-	IncorrectTransaction
+	IncorrectResponse
 )
 
 // AttackModel contains different models of attacking.
@@ -75,7 +75,7 @@ func (attack *Attack) NodeKilledByItSelf() {
 	}
 
 	if rand.Intn(HitRate) == 0 {
-		attack.log.Debug("******Killing myself*******", "PID: ", os.Getpid())
+		attack.log.Debug("******************Killing myself******************", "PID: ", os.Getpid())
 		os.Exit(1)
 	}
 }
@@ -85,8 +85,20 @@ func (attack *Attack) DelayResponse() {
 		return
 	}
 	if rand.Intn(HitRate) == 0 {
+		attack.log.Debug("******************Attack: DelayResponse******************", "PID: ", os.Getpid())
 		time.Sleep(DelayResponseDuration)
 	}
+}
+
+func (attack *Attack) IncorrectResponse() bool {
+	if !attack.AttackEnabled || attack.attackType != IncorrectResponse || !attack.readyByConsensus {
+		return false
+	}
+	if rand.Intn(HitRate) == 0 {
+		attack.log.Debug("******************Attack: IncorrectResponse******************", "PID: ", os.Getpid())
+		return true
+	}
+	return false
 }
 
 func (attack *Attack) UpdateConsensusReady(consensusId uint32) {

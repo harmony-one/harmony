@@ -206,6 +206,9 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 
 	// Verify block data and the aggregated signatures
 
+	// Update readyByConsensus for attack.
+	attack.GetInstance().UpdateConsensusReady(consensusId)
+
 	// check leader Id
 	leaderPrivKey := consensus.leader.Ip + consensus.leader.Port
 	reg, _ := regexp.Compile("[^0-9]+")
@@ -217,6 +220,14 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 	}
 
 	consensus.mutex.Lock()
+
+	// Add attack model of IncorrectResponse.
+	if attack.GetInstance().IncorrectResponse() {
+		consensus.Log.Warn("IncorrectResponse attacked")
+		consensus.mutex.Unlock()
+		return
+	}
+
 	// check block hash
 	if bytes.Compare(blockHash[:], consensus.blockHash[:]) != 0 {
 		consensus.Log.Warn("Block hash doesn't match", "consensus", consensus)
@@ -234,9 +245,6 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 		consensus.Log.Warn("ROLLING UP", "consensus", consensus)
 		// If I received previous block (which haven't been processed. I will roll up to current block if everything checks.
 	}
-
-	// Update readyByConsensus for attack.
-	attack.GetInstance().UpdateConsensusReady(consensusId)
 
 	// TODO: verify aggregated commits with real schnor cosign verification
 
