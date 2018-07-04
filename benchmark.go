@@ -102,7 +102,7 @@ func main() {
 	rand.Seed(int64(time.Now().Nanosecond()))
 
 	// Attack determination.
-	attack.GetAttackModel().AttackEnabled = attackDetermination(*attackedMode)
+	attack.GetAttackModel().SetAttackEnabled(attackDetermination(*attackedMode))
 
 	config := readConfigFile(*configFile)
 	shardId := getShardId(*ip, *port, &config)
@@ -147,10 +147,6 @@ func main() {
 			node.WaitForConsensusReady(consensus.ReadySignal)
 		}()
 	}
-
-	// TODO(minhdoan): Enable it later after done attacking.
-	// Run attack.
-	attack.GetAttackModel().Run()
 
 	node.StartServer(*port)
 }
