@@ -4,12 +4,9 @@ import sys
 import json
 import time
 import datetime
-<<<<<<< HEAD
 from threading import Thread
 from Queue import Queue
-=======
 import base64
->>>>>>> 2580d1fc425fc25917ebb637328a62ddc45b084a
 
 REGION_NAME = 'region_name'
 REGION_KEY = 'region_key'
@@ -47,7 +44,7 @@ Build (argparse,functions) support for
 ### CREATE INSTANCES ###
 
 
-def run_one_region_instances(config, region_number, number_of_instances):
+def run_one_region_instances(config, region_number, number_of_instances, isOnDemand=True):
     #todo: explore the use ec2 resource and not client. e.g. create_instances --  Might make for better code.
     """
     e.g. ec2.create_instances
@@ -55,48 +52,84 @@ def run_one_region_instances(config, region_number, number_of_instances):
     region_name = config[region_number][REGION_NAME]
     session = boto3.Session(region_name=region_name)
     ec2_client = session.client('ec2')
-    response = create_instances(config,ec2_client,region_number,int(number_of_instances))
+    if isOnDemand:
+        response = create_instances(
+            config, ec2_client, region_number, int(number_of_instances))
+    else:
+        response = request_spots(
+            config, ec2_client, region_number, int(number_of_instances))
     return session
 
-def create_instances(config,ec2_client,region_number,number_of_instances):
+
+def create_instances(config, ec2_client, region_number, number_of_instances):
     NODE_NAME = region_number + "-" + NODE_NAME_SUFFIX
     response = ec2_client.run_instances(
-        MinCount = number_of_instances,
-        MaxCount = number_of_instances,
-        ImageId = config[region_number][REGION_AMI],
-        Placement = {
-        'AvailabilityZone': get_one_availability_zone(ec2_client),
+        MinCount=number_of_instances,
+        MaxCount=number_of_instances,
+        ImageId=config[region_number][REGION_AMI],
+        Placement={
+            'AvailabilityZone': get_one_availability_zone(ec2_client),
         },
-        SecurityGroups = [config[region_number][REGION_SECURITY_GROUP]],
-        IamInstanceProfile = {
-            'Name' : IAM_INSTANCE_PROFILE
+        SecurityGroups=[config[region_number][REGION_SECURITY_GROUP]],
+        IamInstanceProfile={
+            'Name': IAM_INSTANCE_PROFILE
         },
-        KeyName = config[region_number][REGION_KEY],
-        UserData = USER_DATA,
-        InstanceType = INSTANCE_TYPE,
-        TagSpecifications = [
-          {
-            'ResourceType' : 'instance',
-            'Tags': [
-                {
-                    'Key': 'Name',
-                    'Value': NODE_NAME
-                },
-            ]
-          },
+        KeyName=config[region_number][REGION_KEY],
+        UserData=USER_DATA,
+        InstanceType=INSTANCE_TYPE,
+        TagSpecifications=[
+            {
+                'ResourceType': 'instance',
+                'Tags': [
+                    {
+                        'Key': 'Name',
+                        'Value': NODE_NAME
+                    },
+                ]
+            },
         ]
     )
     return response
 
+
+def request_spots(config, ec2_client, region_number, number_of_instances):
+    placement_group = region_number + "-" + PLACEMENT_GROUP
+    response = ec2_client.create_placement_group(
+        GroupName=placement_group,
+        Strategy='spread'
+    )
+    response = ec2_client.request_spot_instances(
+        # DryRun=True,
+        BlockDurationMinutes=60,
+        InstanceCount=number_of_instances,
+        LaunchSpecification={
+            'SecurityGroups': [config[region_number][REGION_SECURITY_GROUP]],
+            'IamInstanceProfile': {
+                'Name': IAM_INSTANCE_PROFILE
+            },
+            'UserData': USER_DATA,
+            'ImageId': config[region_number][REGION_AMI],
+            'InstanceType': INSTANCE_TYPE,
+            'KeyName': config[region_number][REGION_KEY],
+            'Placement': {
+                'AvailabilityZone': get_one_availability_zone(ec2_client),
+                'GroupName': placement_group
+            }
+        }
+    )
+    return response
+
+
 def get_availability_zones(ec2_client):
     response = ec2_client.describe_availability_zones()
     all_zones = []
-    if response.get('AvailabilityZones',None):
+    if response.get('AvailabilityZones', None):
        region_info = response.get('AvailabilityZones')
        for info in region_info:
            if info['State'] == 'available':
                all_zones.append(info['ZoneName'])
     return all_zones
+
 
 def get_one_availability_zone(ec2_client):
     all_zones = get_availability_zones(ec2_client)
@@ -104,11 +137,12 @@ def get_one_availability_zone(ec2_client):
         return all_zones[0]
     else:
         print("No availability zone for this region")
-        sys.exit() 
+        sys.exit()
 
 #### CODEDEPLOY ###
 
-def run_one_region_codedeploy(region_number,commitId):
+
+def run_one_region_codedeploy(region_number, commitId):
     #todo: explore the use ec2 resource and not client. e.g. create_instances --  Might make for better code.
     """
     for getting instance ids:---
@@ -125,13 +159,13 @@ def run_one_region_codedeploy(region_number,commitId):
     NODE_NAME = region_number + "-" + NODE_NAME_SUFFIX
     session = boto3.Session(region_name=region_name)
     ec2_client = session.client('ec2')
-    filters =  [
-            {
-                'Name': 'tag:Name',
-                'Values' : [NODE_NAME]
-            }
-        ]
-    
+    filters = [
+        {
+            'Name': 'tag:Name',
+            'Values': [NODE_NAME]
+        }
+    ]
+
     print("Waiting for all instances to start running")
     waiter = ec2_client.get_waiter('instance_running')
     waiter.wait(Filters=filters)
@@ -148,12 +182,15 @@ def run_one_region_codedeploy(region_number,commitId):
     application_name = APPLICATION_NAME
     deployment_group = APPLICATION_NAME + "-" + str(commitId)
     repo = REPO
-    response = get_application(codedeploy,application_name)
-    response  = get_deployment_group(codedeploy,application_name,deployment_group)
-    depId = deploy(codedeploy, application_name, deployment_group, repo, commitId)
-    return region_number,depId
-    
-def get_deployment_group(codedeploy,application_name,deployment_group):
+    response = get_application(codedeploy, application_name)
+    response = get_deployment_group(
+        codedeploy, application_name, deployment_group)
+    depId = deploy(codedeploy, application_name,
+                   deployment_group, repo, commitId)
+    return region_number, depId
+
+
+def get_deployment_group(codedeploy, application_name, deployment_group):
     NODE_NAME = region_number + "-" + NODE_NAME_SUFFIX
     response = codedeploy.list_deployment_groups(
         applicationName=application_name
@@ -184,7 +221,8 @@ def get_deployment_group(codedeploy,application_name,deployment_group):
         )
         return response
 
-def get_application(codedeploy,application_name):
+
+def get_application(codedeploy, application_name):
     response = codedeploy.list_applications()
     if application_name in response['applications']:
         return response
@@ -195,7 +233,8 @@ def get_application(codedeploy,application_name):
         )
     return response
 
-def deploy(codedeploy, application_name,deployment_group,repo, commitId):
+
+def deploy(codedeploy, application_name, deployment_group, repo, commitId):
     """Deploy new code at specified revision to instance.
 
     arguments:
@@ -235,16 +274,19 @@ def deploy(codedeploy, application_name,deployment_group,repo, commitId):
         print(info)
         return depId
 
-def run_one_region_codedeploy_wrapper(region_number,commitId,queue):
-    region_number,depId = run_one_region_codedeploy(region_number,commitId)
-    queue.put((region_number,depId))
 
-def launch_code_deploy(region_list,commitId):
+def run_one_region_codedeploy_wrapper(region_number, commitId, queue):
+    region_number, depId = run_one_region_codedeploy(region_number, commitId)
+    queue.put((region_number, depId))
+
+
+def launch_code_deploy(region_list, commitId):
     queue = Queue()
     jobs = []
     for i in range(len(region_list)):
         region_number = region_list[i]
-        my_thread = Thread(target=run_one_region_codedeploy_wrapper, args=(region_number,commitId,queue))
+        my_thread = Thread(target=run_one_region_codedeploy_wrapper, args=(
+            region_number, commitId, queue))
         my_thread.start()
         jobs.append(my_thread)
     for my_thread in jobs:
@@ -254,12 +296,13 @@ def launch_code_deploy(region_list,commitId):
 
 ##### UTILS ####
 
+
 def get_instance_ids(describe_instances_response):
     instance_ids = []
     for reservation in describe_instances_response["Reservations"]:
         for instance in reservation["Instances"]:
             instance_ids.append(instance["InstanceId"])
-    return instance_ids  
+    return instance_ids
 
 
 def read_configuration_file(filename):
@@ -276,6 +319,7 @@ def read_configuration_file(filename):
             config[region_num][REGION_AMI] = mylist[5]
     return config
 
+
 def get_commitId(commitId):
     if commitId is None:
         commitId = run("git rev-list --max-count=1 HEAD",
@@ -284,6 +328,7 @@ def get_commitId(commitId):
     return commitId
 
 ##### UTILS ####
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -306,8 +351,7 @@ if __name__ == "__main__":
     for i in range(len(region_list)):
         region_number = region_list[i]
         number_of_instances = instances_list[i]
-        session = run_one_region_instances(config,region_number,number_of_instances)
-    results = launch_code_deploy(region_list,commitId)
+        session = run_one_region_instances(
+            config, region_number, number_of_instances, False)
+    results = launch_code_deploy(region_list, commitId)
     print(results)
-   
-   
