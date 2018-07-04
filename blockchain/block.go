@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// Block keeps block headers, transactions and signature.
+// A block in the blockchain that contains block headers, transactions and signature etc.
 type Block struct {
 	// Header
 	Timestamp       int64
@@ -87,7 +87,7 @@ func (b *Block) CalculateBlockHash() []byte {
 	return blockHash[:]
 }
 
-// NewBlock creates and returns a neew block.
+// NewBlock creates and returns a new block.
 func NewBlock(transactions []*Transaction, prevBlockHash [32]byte, shardId uint32) *Block {
 	numTxs := int32(len(transactions))
 	var txIds [][32]byte

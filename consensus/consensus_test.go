@@ -22,8 +22,8 @@ func TestNewConsensus(test *testing.T) {
 		test.Error("Consensus ReadySignal should be initialized")
 	}
 
-	if consensus.actionType != byte(CONSENSUS) {
-		test.Error("Consensus actionType should be CONSENSUS")
+	if consensus.msgType != byte(CONSENSUS) {
+		test.Error("Consensus msgType should be CONSENSUS")
 	}
 
 	if consensus.msgCategory != byte(common.COMMITTEE) {
