@@ -10,8 +10,7 @@ import (
 )
 
 const (
-	message       = "init http://localhost:8080/configuration.txt"
-	defaultPort   = 6000
+	message       = "init http://localhost:8080/config.txt"
 	StopCharacter = "\r\n\r\n"
 )
 
