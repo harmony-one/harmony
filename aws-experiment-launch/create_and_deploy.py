@@ -15,7 +15,7 @@ REGION_HUMAN_NAME = 'region_human_name'
 INSTANCE_TYPE = 't2.micro'
 REGION_AMI = 'region_ami'
 # USER_DATA = 'user-data.sh'
-# UserData must be base64 encoded.
+# UserData must be base64 encoded for spot instances.
 with open("user-data.sh", "rb") as userdata_file:
     USER_DATA = base64.b64encode(userdata_file.read())
 
@@ -352,6 +352,6 @@ if __name__ == "__main__":
         region_number = region_list[i]
         number_of_instances = instances_list[i]
         session = run_one_region_instances(
-            config, region_number, number_of_instances, False)
+            config, region_number, number_of_instances)
     results = launch_code_deploy(region_list, commitId)
     print(results)
