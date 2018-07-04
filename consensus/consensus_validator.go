@@ -36,6 +36,7 @@ func (consensus *Consensus) ProcessMessageValidator(message []byte) {
 	}
 }
 
+// Processes the announce message sent from the leader
 func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	//#### Read payload data
 	offset := 0
@@ -160,6 +161,7 @@ func getCommitMessage() []byte {
 	return make([]byte, 33)
 }
 
+// Processes the challenge message sent from the leader
 func (consensus *Consensus) processChallengeMessage(payload []byte) {
 	//#### Read payload data
 	offset := 0
@@ -307,7 +309,7 @@ func (consensus *Consensus) constructResponseMessage() []byte {
 	return consensus.ConstructConsensusMessage(RESPONSE, buffer.Bytes())
 }
 
-// TODO: fill in this function
 func getResponseMessage() []byte {
+	// TODO: construct real response
 	return make([]byte, 32)
 }

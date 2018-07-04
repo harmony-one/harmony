@@ -66,7 +66,8 @@ RESPONSE:
 ----  message end  -----
 */
 
-const MESSAGE_TYPE_BYTES = 1
+// the number of bytes consensus action type occupies
+const ACTION_TYPE_BYTES = 1
 
 // The specific types of message under COMMITTEE category
 type CommitteeMessageType byte
@@ -117,13 +118,13 @@ func GetConsensusMessagePayload(message []byte) ([]byte, error) {
 	if len(message) < 2 {
 		return []byte{}, errors.New("Failed to get consensus message payload: no data available.")
 	}
-	return message[MESSAGE_TYPE_BYTES:], nil
+	return message[ACTION_TYPE_BYTES:], nil
 }
 
 // Concatenate msgType as one byte with payload, and return the whole byte array
 func (consensus Consensus) ConstructConsensusMessage(consensusMsgType MessageType, payload []byte) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{consensus.msgCategory})
-	byteBuffer.WriteByte(consensus.actionType)
+	byteBuffer.WriteByte(consensus.msgType)
 	byteBuffer.WriteByte(byte(consensusMsgType))
 	byteBuffer.Write(payload)
 	return byteBuffer.Bytes()
