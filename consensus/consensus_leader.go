@@ -7,6 +7,7 @@ import (
 	"encoding/gob"
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/p2p"
+	"harmony-benchmark/utils"
 	"runtime"
 	"strings"
 	"time"
@@ -16,13 +17,14 @@ var (
 	startTime time.Time
 )
 
-// WaitForNewBlock waits for a new block.
+// Waits for the next new block to run consensus on
 func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) {
 	consensus.Log.Debug("Waiting for block", "consensus", consensus)
 	for { // keep waiting for new blocks
 		newBlock := <-blockChannel
 		// TODO: think about potential race condition
-		consensus.Log.Debug("STARTING CONSENSUS", "consensus", consensus)
+		startTime = time.Now()
+		consensus.Log.Info("STARTING CONSENSUS", "consensus", consensus, "startTime", startTime)
 		for consensus.state == FINISHED {
 			time.Sleep(500 * time.Millisecond)
 			consensus.startConsensus(&newBlock)
@@ -31,7 +33,7 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) 
 	}
 }
 
-// ProcessMessageLeader is the leader's consensus message dispatcher
+// Consensus message dispatcher for the leader
 func (consensus *Consensus) ProcessMessageLeader(message []byte) {
 	msgType, err := GetConsensusMessageType(message)
 	if err != nil {
@@ -61,11 +63,11 @@ func (consensus *Consensus) ProcessMessageLeader(message []byte) {
 
 // Handler for message which triggers consensus process
 func (consensus *Consensus) processStartConsensusMessage(payload []byte) {
-	startTime = time.Now()
 	tx := blockchain.NewCoinbaseTX("x", "y", 0)
 	consensus.startConsensus(blockchain.NewGenesisBlock(tx, 0))
 }
 
+// Starts a new consensus for a block by broadcast a announce message to the validators
 func (consensus *Consensus) startConsensus(newBlock *blockchain.Block) {
 	// Copy over block hash and block header data
 	copy(consensus.blockHash[:], newBlock.Hash[:])
@@ -82,7 +84,7 @@ func (consensus *Consensus) startConsensus(newBlock *blockchain.Block) {
 	consensus.state = ANNOUNCE_DONE
 }
 
-// Construct the announce message to send to validators
+// Constructs the announce message
 func (consensus *Consensus) constructAnnounceMessage() []byte {
 	buffer := bytes.NewBuffer([]byte{})
 
@@ -120,6 +122,7 @@ func signMessage(message []byte) []byte {
 	return append(mockSignature[:], mockSignature[:]...)
 }
 
+// Processes the commit message sent from validators
 func (consensus *Consensus) processCommitMessage(payload []byte) {
 	//#### Read payload data
 	offset := 0
@@ -185,7 +188,7 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 	}
 }
 
-// Construct the challenge message to send to validators
+// Construct the challenge message
 func (consensus *Consensus) constructChallengeMessage() []byte {
 	buffer := bytes.NewBuffer([]byte{})
 
@@ -245,6 +248,7 @@ func getChallenge() []byte {
 	return make([]byte, 32)
 }
 
+// Processes the response message sent from validators
 func (consensus *Consensus) processResponseMessage(payload []byte) {
 	//#### Read payload data
 	offset := 0
@@ -325,20 +329,21 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 			endTime := time.Now()
 			timeElapsed := endTime.Sub(startTime)
 			numOfTxs := blockHeaderObj.NumTransactions
-			consensus.Log.Info("TPS Report", "numOfTXs", numOfTxs, "timeElapsed", timeElapsed, "TPS", float64(numOfTxs)/timeElapsed.Seconds())
+			consensus.Log.Info("TPS Report",
+				"numOfTXs", numOfTxs,
+				"startTime", startTime,
+				"endTime", endTime,
+				"timeElapsed", timeElapsed,
+				"TPS", float64(numOfTxs)/timeElapsed.Seconds())
 
 			var m runtime.MemStats
 			runtime.ReadMemStats(&m)
-			consensus.Log.Info("Mem Report", "Alloc", bToMb(m.Alloc), "TotalAlloc", bToMb(m.TotalAlloc),
-				"Sys", bToMb(m.Sys), "NumGC", m.NumGC)
+			consensus.Log.Info("Mem Report", "Alloc", utils.BToMb(m.Alloc), "TotalAlloc", utils.BToMb(m.TotalAlloc),
+				"Sys", utils.BToMb(m.Sys), "NumGC", m.NumGC)
 
 			// Send signal to Node so the new block can be added and new round of consensus can be triggered
 			consensus.ReadySignal <- 1
 		}
 		consensus.mutex.Unlock()
 	}
-}
-
-func bToMb(b uint64) uint64 {
-	return b / 1024 / 1024
 }

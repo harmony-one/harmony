@@ -140,7 +140,7 @@ func (utxoPool *UTXOPool) UpdateOneTransaction(tx *Transaction) {
 	unlockToCommit := true
 	if isUnlockTx {
 		for _, proof := range tx.Proofs {
-			if !proof.RejectOrAccept {
+			if !proof.Accept {
 				unlockToCommit = false // if any proof is a rejection, they it's a unlock-to-abort tx. Otherwise, it's unlock-to-commit
 			}
 		}
@@ -303,7 +303,7 @@ func (utxoPool *UTXOPool) SelectTransactionsForNewBlock(transactions []*Transact
 			if valid || crossShard {
 				selected = append(selected, tx)
 				if crossShard {
-					proof := CrossShardTxProof{RejectOrAccept: valid, TxID: tx.ID, TxInput: getShardTxInput(tx, utxoPool.ShardId)}
+					proof := CrossShardTxProof{Accept: valid, TxID: tx.ID, TxInput: getShardTxInput(tx, utxoPool.ShardId)}
 					txAndProof := CrossShardTxAndProof{tx, &proof}
 					crossShardTxs = append(crossShardTxs, &txAndProof)
 				}

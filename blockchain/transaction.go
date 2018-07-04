@@ -33,11 +33,14 @@ type TXInput struct {
 	ShardId       uint32 // The Id of the shard where this UTXO belongs
 }
 
+// The proof of accept or reject in the cross shard transaction locking phase.
+// This is created by the shard leader, filled with proof signatures after consensus, and returned back to the client.
+// One proof structure is only tied to one shard. Therefore, the utxos in the proof are all with the same shard.
 type CrossShardTxProof struct {
-	RejectOrAccept bool      // false means rejection, true means acceptance
-	TxID           [32]byte  // Id of transaction whose utxo is related to this proof
-	TxInput        []TXInput // The list of Utxo that this proof is referring to. They should be in the same shard.
-	BlockHash      [32]byte  // The hash of the block where the proof is registered
+	Accept    bool      // false means proof-of-reject, true means proof-of-accept
+	TxID      [32]byte  // Id of the transaction which this proof is on
+	TxInput   []TXInput // The list of Utxo that this proof is on. They should be in the same shard.
+	BlockHash [32]byte  // The hash of the block where the proof is registered
 	// Signatures
 }
 
@@ -95,7 +98,7 @@ func (txOutput *TXOutput) String() string {
 
 // Used for debuging.
 func (proof *CrossShardTxProof) String() string {
-	res := fmt.Sprintf("RejectOrAccept: %v, ", proof.RejectOrAccept)
+	res := fmt.Sprintf("Accept: %v, ", proof.Accept)
 	return res
 }
 
