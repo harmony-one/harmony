@@ -1,19 +1,21 @@
 package main
 
 import (
+	"bufio"
+	"flag"
 	"log"
 	"net"
-	"strconv"
+	"os"
 	"strings"
 )
 
 const (
 	message       = "init http://localhost:8080/configuration.txt"
+	defaultPort   = 6000
 	StopCharacter = "\r\n\r\n"
 )
 
-func SocketClient(ip string, port int) {
-	addr := strings.Join([]string{ip, strconv.Itoa(port)}, ":")
+func SocketClient(addr string) {
 	conn, err := net.Dial("tcp", addr)
 
 	defer conn.Close()
@@ -28,18 +30,39 @@ func SocketClient(ip string, port int) {
 
 	buff := make([]byte, 1024)
 	n, _ := conn.Read(buff)
-	log.Printf("Receive from %v: %s", port, buff[:n])
+	log.Printf("Receive from %s: %s", addr, buff[:n])
 }
 
 func main() {
+	configFile := flag.String("config_file", "config.txt", "file containing all ip addresses")
+	flag.Parse()
 
-	var (
-		ip       = "127.0.0.1"
-		portList = []int{3333, 4444}
-	)
+	configs := readConfigFile(*configFile)
 
-	for _, port := range portList {
-		SocketClient(ip, port)
+	for _, config := range configs {
+		ip := config[0]
+		port := config[1]
+		addr := strings.Join([]string{ip, port}, ":")
+		SocketClient(addr)
 	}
+}
 
+func readConfigFile(configFile string) [][]string {
+	file, _ := os.Open(configFile)
+	fscanner := bufio.NewScanner(file)
+
+	result := [][]string{}
+	for fscanner.Scan() {
+		p := strings.Split(fscanner.Text(), " ")
+		result = append(result, p)
+	}
+	return result
+}
+
+func Map(vs []string, f func(string) string) []string {
+	vsm := make([]string, len(vs))
+	for i, v := range vs {
+		vsm[i] = f(v)
+	}
+	return vsm
 }
