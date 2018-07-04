@@ -23,7 +23,8 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) 
 	for { // keep waiting for new blocks
 		newBlock := <-blockChannel
 		// TODO: think about potential race condition
-		consensus.Log.Debug("STARTING CONSENSUS", "consensus", consensus)
+		startTime = time.Now()
+		consensus.Log.Info("STARTING CONSENSUS", "consensus", consensus, "startTime", startTime)
 		for consensus.state == FINISHED {
 			time.Sleep(500 * time.Millisecond)
 			consensus.startConsensus(&newBlock)
@@ -62,7 +63,6 @@ func (consensus *Consensus) ProcessMessageLeader(message []byte) {
 
 // Handler for message which triggers consensus process
 func (consensus *Consensus) processStartConsensusMessage(payload []byte) {
-	startTime = time.Now()
 	tx := blockchain.NewCoinbaseTX("x", "y", 0)
 	consensus.startConsensus(blockchain.NewGenesisBlock(tx, 0))
 }
@@ -329,7 +329,12 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 			endTime := time.Now()
 			timeElapsed := endTime.Sub(startTime)
 			numOfTxs := blockHeaderObj.NumTransactions
-			consensus.Log.Info("TPS Report", "numOfTXs", numOfTxs, "timeElapsed", timeElapsed, "TPS", float64(numOfTxs)/timeElapsed.Seconds())
+			consensus.Log.Info("TPS Report",
+				"numOfTXs", numOfTxs,
+				"startTime", startTime,
+				"endTime", endTime,
+				"timeElapsed", timeElapsed,
+				"TPS", float64(numOfTxs)/timeElapsed.Seconds())
 
 			var m runtime.MemStats
 			runtime.ReadMemStats(&m)
