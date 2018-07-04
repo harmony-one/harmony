@@ -15,14 +15,30 @@ USER_DATA = 'user-data.sh'
 IAM_INSTANCE_PROFILE = 'BenchMarkCodeDeployInstanceProfile'
 REPO = "simple-rules/harmony-benchmark"
 APPLICATION_NAME = 'benchmark-experiments'
-
-def run_one_region(config,region_number,number_of_instances,commitId):
+time_stamp = time.time()
+PLACEMENT_GROUP = "PLACEMENT-" + datetime.datetime.fromtimestamp(time_stamp).strftime('%H-%M-%S-%Y-%m-%d')
+    
+def run_one_region_instances(config,region_number,number_of_instances):
     region_name = config[region_number][REGION_NAME]
     session = boto3.Session(region_name=region_name)
-    # ec2_client = session.client('ec2')
-    # response = create_instances(config,ec2_client,region_number,int(number_of_instances))
-    # time.sleep(60)
-    # print("Sleeping for 60 secs waiting for instances to come up")
+    ec2_client = session.client('ec2')
+    response,placement = create_instances(config,ec2_client,region_number,int(number_of_instances))
+    return session,placement
+
+def run_one_region_codedeploy(region_number,placement_group,commitId):
+    region_name = config[region_number][REGION_NAME]
+    session = boto3.Session(region_name=region_name)
+    waiter = session.get_waiter('instance_running')
+    waiter.wait(
+        Filters = [
+            {
+                'Name': placement-group-name
+                'Values' : [
+                        placement_group
+                ]
+            }
+        ]
+    )
     codedeploy = session.client('codedeploy')
     application_name = APPLICATION_NAME
     deployment_group = APPLICATION_NAME + "-" + str(commitId)
@@ -30,7 +46,7 @@ def run_one_region(config,region_number,number_of_instances,commitId):
     response = get_application(codedeploy,application_name)
     response  = get_deployment_group(codedeploy,application_name,deployment_group)
     deploy(codedeploy, application_name, deployment_group, repo, commitId, wait=True)
-    # return response
+    return response
     
 def get_availability_zones(ec2_client):
     response = ec2_client.describe_availability_zones()
@@ -51,12 +67,14 @@ def get_one_availability_zone(ec2_client):
         sys.exit()
 
 def create_instances(config,ec2_client,region_number,number_of_instances):
+    placement_group = region_number + "-" + PLACEMENT_GROUP 
     response = ec2_client.run_instances(
         MinCount = number_of_instances,
         MaxCount = number_of_instances,
         ImageId = config[region_number][REGION_AMI],
         Placement = {
-        'AvailabilityZone': get_one_availability_zone(ec2_client)
+        'AvailabilityZone': get_one_availability_zone(ec2_client),
+        'GroupName': placement_group
         },
         SecurityGroups = [config[region_number][REGION_SECURITY_GROUP]],
         IamInstanceProfile = {
@@ -193,11 +211,19 @@ if __name__ == "__main__":
     region_list = args.regions.split(',')
     instances_list = args.numInstances.split(',')
     assert len(region_list) == len(instances_list),"number of regions: %d != number of instances per region: %d" % (len(region_list),len(intances_list))
-    time_stamp = time.time()
-    current_session = datetime.datetime.fromtimestamp(time_stamp).strftime('%H-%M-%S-%Y-%m-%d')
+    commitId = args.commitId
     print("current session is %s" % current_session)
+    
+    placement_groups = []
     for i in range(len(region_list)):
         region_number = region_list[i]
         number_of_instances = instances_list[i]
-        run_one_region(config,region_number,number_of_instances,args.commitId)
+        session,placement_group = run_one_region_instances(config,region_number,number_of_instances)
+        placement_groups.append(placement_group)
+        
+    for i in range(len(region_list)):
+        region_number = region_list[i]
+        placement_group = placements[i]
+        run_one_region_codedeploy(region_number,placement_group,commitId)
+
    
