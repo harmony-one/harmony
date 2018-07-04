@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"io"
 	"io/ioutil"
 	"log"
@@ -13,12 +14,14 @@ import (
 )
 
 const (
-	Message       = "Pong"
 	StopCharacter = "\r\n\r\n"
 )
 
-func SocketServer(port int) {
+var (
+	port *int
+)
 
+func SocketServer(port int) {
 	listen, err := net.Listen("tcp4", ":"+strconv.Itoa(port))
 	defer listen.Close()
 	if err != nil {
@@ -35,11 +38,9 @@ func SocketServer(port int) {
 		}
 		go handler(conn)
 	}
-
 }
 
 func handler(conn net.Conn) {
-
 	defer conn.Close()
 
 	var (
@@ -63,7 +64,7 @@ ILOOP:
 				break ILOOP
 			}
 
-			go handleCommand(data)
+			go handleCommand(data, w)
 
 		default:
 			log.Fatalf("Receive data failed:%s", err)
@@ -71,13 +72,9 @@ ILOOP:
 		}
 
 	}
-	w.Write([]byte(Message))
-	w.Flush()
-	log.Printf("Send: %s", Message)
-
 }
 
-func handleCommand(command string) {
+func handleCommand(command string, w *bufio.Writer) {
 	args := strings.Split(command, " ")
 
 	if len(args) <= 0 {
@@ -87,7 +84,7 @@ func handleCommand(command string) {
 	switch command := args[0]; command {
 	case "init":
 		{
-			handleInitCommand(args[1:])
+			handleInitCommand(args[1:], w)
 		}
 	case "close":
 		{
@@ -96,10 +93,10 @@ func handleCommand(command string) {
 	}
 }
 
-func handleInitCommand(args []string) {
+func handleInitCommand(args []string, w *bufio.Writer) {
 	log.Println("Init command", args)
 	// create local config file
-	localConfig := "node_config.txt"
+	localConfig := "node_config_" + strconv.Itoa(*port) + ".txt"
 	out, err := os.Create(localConfig)
 	if err != nil {
 		log.Fatal("Failed to create local file")
@@ -124,7 +121,10 @@ func handleInitCommand(args []string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("File contents: %s", content)
+	log.Println("Successfully init-ed with config", content)
+
+	w.Write([]byte("Successfully init-ed"))
+	w.Flush()
 }
 
 func isTransportOver(data string) (over bool) {
@@ -133,9 +133,8 @@ func isTransportOver(data string) (over bool) {
 }
 
 func main() {
+	port = flag.Int("port", 3333, "port of the node.")
+	flag.Parse()
 
-	port := 3333
-
-	SocketServer(port)
-
+	SocketServer(*port)
 }
