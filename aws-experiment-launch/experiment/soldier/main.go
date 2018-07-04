@@ -121,7 +121,8 @@ func handleInitCommand(args []string, w *bufio.Writer) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println("Successfully init-ed with config", content)
+	log.Println("Successfully init-ed with config")
+	log.Println(string(content))
 
 	w.Write([]byte("Successfully init-ed"))
 	w.Flush()
