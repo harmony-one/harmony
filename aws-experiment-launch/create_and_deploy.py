@@ -48,7 +48,7 @@ def get_instance_ids(response):
     return instance_ids
 
 
-def run_one_region_instances(config, region_number, number_of_instances):
+def run_one_region_instances(config, region_number, number_of_instances, isOnDemand=True):
     #todo: explore the use ec2 resource and not client. e.g. create_instances --  Might make for better code.
     """
     e.g. ec2.create_instances
@@ -56,20 +56,12 @@ def run_one_region_instances(config, region_number, number_of_instances):
     region_name = config[region_number][REGION_NAME]
     session = boto3.Session(region_name=region_name)
     ec2_client = session.client('ec2')
-    # response, placement = create_instances(
-    #     config, ec2_client, region_number, int(number_of_instances))
-    response, placement = request_spots(
-        config, ec2_client, region_number, int(number_of_instances))
-    print(placement)
-    return session, placement
-
-
-def run_one_region_spots(config, region_number, number_of_instances):
-    region_name = config[region_number][REGION_NAME]
-    session = boto3.Session(region_name=region_name)
-    ec2_client = session.client('ec2')
-    response, placement = create_instances(
-        config, ec2_client, region_number, int(number_of_instances))
+    if isOnDemand:
+        response, placement = create_instances(
+            config, ec2_client, region_number, int(number_of_instances))
+    else:
+        response, placement = request_spots(
+            config, ec2_client, region_number, int(number_of_instances))
     print(placement)
     return session, placement
 
@@ -354,4 +346,4 @@ if __name__ == "__main__":
     for i in range(len(region_list)):
         region_number = region_list[i]
         placement_group = placement_groups[i]
-        run_one_region_codedeploy(region_number,placement_group,commitId)
+        run_one_region_codedeploy(region_number, placement_group, commitId)
