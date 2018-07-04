@@ -19,17 +19,16 @@ APPLICATION_NAME = 'benchmark-experiments'
 def run_one_region(config,region_number,number_of_instances,commitId):
     region_name = config[region_number][REGION_NAME]
     session = boto3.Session(region_name=region_name)
-    # ec2_client = session.client('ec2')
-    # response = create_instances(config,ec2_client,region_number,int(number_of_instances))
+    ec2_client = session.client('ec2')
+    response = create_instances(config,ec2_client,region_number,int(number_of_instances))
     codedeploy = session.client('codedeploy')
     #commitId = get_commitId(commitId)
     application_name = APPLICATION_NAME
-    deployment_group = APPLICATION_NAME + str(commitId)
+    deployment_group = APPLICATION_NAME + "-" + str(commitId)
     repo = REPO
     response = get_application(codedeploy,application_name)
     response  = get_deployment_group(codedeploy,application_name,deployment_group)
-    print(response)
-    # deploy(codedeploy, application_name, deployment_group, repo, commitId, wait=True)
+    deploy(codedeploy, application_name, deployment_group, repo, commitId, wait=True)
     # return response
     
 def get_availability_zones(ec2_client):
@@ -80,27 +79,34 @@ def create_instances(config,ec2_client,region_number,number_of_instances):
     return response
 
 def get_deployment_group(codedeploy,application_name,deployment_group):
-    response = codedeploy.create_deployment_group(
-            applicationName = application_name,
-            deploymentGroupName = deployment_group,
-            deploymentConfigName='CodeDeployDefault.AllAtAOnce',
-            serviceRoleArn = 'arn:aws:iam::656503231766:role/BenchMarkCodeDeployServiceRole',
-            deploymentStyle={
-                'deploymentType': 'IN_PLACE'
-            },
-            ec2TagSet={
-                'ec2TagSetList': [
-                    [
-                       {
-                        'Key': 'Name',
-                        'Value': 'Node',
-                        'Type': 'KEY_AND_VALUE'
-                       },
-                    ],
-                ]
-            }
+    response = codedeploy.list_deployment_groups(
+        applicationName = application_name
+    )
+    if deployment_group in response['deploymentGroups']:
+        return response
+    else: 
+        response = codedeploy.create_deployment_group(
+                applicationName = application_name,
+                deploymentGroupName = deployment_group,
+                deploymentConfigName = 'CodeDeployDefault.AllAtOnce',
+                serviceRoleArn = 'arn:aws:iam::656503231766:role/BenchMarkCodeDeployServiceRole',
+                deploymentStyle={
+                    'deploymentType': 'IN_PLACE',
+                    'deploymentOption': 'WITHOUT_TRAFFIC_CONTROL'
+                },
+                ec2TagSet={
+                    'ec2TagSetList': [
+                        [
+                        {
+                            'Key': 'Name',
+                            'Value': 'Node',
+                            'Type': 'KEY_AND_VALUE'
+                        },
+                        ],
+                    ]
+                }
         )
-    return response
+        return response
 
 def get_commitId(commitId):
     if commitId is None:
@@ -132,7 +138,7 @@ def deploy(codedeploy, application_name,deployment_group,repo, commitId, wait=Tr
     res = codedeploy.create_deployment(
             applicationName = application_name,
             deploymentGroupName = deployment_group,
-            deploymentConfigName = 'CodeDeployDefault.AllAtAOnce',
+            deploymentConfigName = 'CodeDeployDefault.AllAtOnce',
             description = 'benchmark experiments',
             revision = {
                 'revisionType': 'GitHub',
@@ -157,7 +163,7 @@ def deploy(codedeploy, application_name,deployment_group,repo, commitId, wait=Tr
     start = time.time()
     while info['status'] not in ('Succeeded', 'Failed', 'Stopped',) and (time.time() - start < 300.0):
         info = codedeploy.get_deployment(deploymentId=depId)['deploymentInfo']
-        print(info)
+        print(info['deploymentOverview'])
         print(info['status'])
         time.sleep(15)
     if info['status'] == 'Succeeded':
