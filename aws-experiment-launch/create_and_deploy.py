@@ -16,8 +16,22 @@ IAM_INSTANCE_PROFILE = 'BenchMarkCodeDeployInstanceProfile'
 REPO = "simple-rules/harmony-benchmark"
 APPLICATION_NAME = 'benchmark-experiments'
 time_stamp = time.time()
-PLACEMENT_GROUP = "PLACEMENT-" + datetime.datetime.fromtimestamp(time_stamp).strftime('%H-%M-%S-%Y-%m-%d')
+CURRENT_SESSION = datetime.datetime.fromtimestamp(time_stamp).strftime('%H-%M-%S-%Y-%m-%d')
+PLACEMENT_GROUP = "PLACEMENT-" + CURRENT_SESSION
+NODE_VALUE = "NODE-" + CURRENT_SESSION
 
+"""
+TODO:
+NODE = region_number + NODE_VALUE
+Use that to retrieve ids, only deploy on specific nodes (right now it deploys everywere), remove placement group. 
+save NODE to disk, so that you can selectively only run deploy (not recreate instances). 
+Right now all instances have "NODE" so this has uninted consequences of running on instances that were previous created.
+Build (argparse,functions) support for 
+1. run only create instance (multiple times)
+2. run only codedeploy (multiple times)
+3. run create instance followed by codedeploy
+
+"""
 def get_instance_ids(response):
     instance_ids = []
     for reservation in response["Reservations"]:
@@ -53,8 +67,6 @@ def run_one_region_codedeploy(region_number,placement_group,commitId):
     region_name = config[region_number][REGION_NAME]
     session = boto3.Session(region_name=region_name)
     ec2_client = session.client('ec2')
-    
-    
     response = ec2_client.describe_instances(
         Filters = [
             {
@@ -75,6 +87,7 @@ def run_one_region_codedeploy(region_number,placement_group,commitId):
     waiter = ec2_client.get_waiter('instance_status_ok')
     waiter.wait(InstanceIds=instance_ids)
 
+    print("Waiting for system to be status ok")
     waiter = ec2_client.get_waiter('system_status_ok')
     waiter.wait(InstanceIds=instance_ids)
 
