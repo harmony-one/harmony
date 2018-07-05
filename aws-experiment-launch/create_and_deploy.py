@@ -87,17 +87,22 @@ def create_instances(config, ec2_client, region_number, number_of_instances):
                     },
                 ]
             },
-        ]
+        ],
+        # We can also request spot instances this way but this way will block the
+        # process until spot requests are fulfilled, otherwise it will throw exception
+        # after 4 failed re-try.
+        # InstanceMarketOptions= {
+        #     'MarketType': 'spot',
+        #     'SpotOptions': {
+        #         'SpotInstanceType': 'one-time',
+        #         'BlockDurationMinutes': 60,
+        #     }
+        # }
     )
     return response
 
 
 def request_spots(config, ec2_client, region_number, number_of_instances):
-    placement_group = region_number + "-" + PLACEMENT_GROUP
-    response = ec2_client.create_placement_group(
-        GroupName=placement_group,
-        Strategy='spread'
-    )
     response = ec2_client.request_spot_instances(
         # DryRun=True,
         BlockDurationMinutes=60,
@@ -112,8 +117,7 @@ def request_spots(config, ec2_client, region_number, number_of_instances):
             'InstanceType': INSTANCE_TYPE,
             'KeyName': config[region_number][REGION_KEY],
             'Placement': {
-                'AvailabilityZone': get_one_availability_zone(ec2_client),
-                'GroupName': placement_group
+                'AvailabilityZone': get_one_availability_zone(ec2_client)
             }
         }
     )
