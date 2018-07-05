@@ -258,7 +258,7 @@ def deploy(codedeploy, application_name, deployment_group, repo, commitId):
     # until it finishes
     info = {'status': 'Created'}
     start = time.time()
-    while info['status'] not in ('Succeeded', 'Failed', 'Stopped',) and (time.time() - start < 300.0):
+    while info['status'] not in ('Succeeded', 'Failed', 'Stopped',) and (time.time() - start < 600.0):
         info = codedeploy.get_deployment(deploymentId=depId)['deploymentInfo']
         print(info['status'])
         time.sleep(15)
@@ -338,7 +338,7 @@ if __name__ == "__main__":
     region_list = args.regions.split(',')
     instances_list = args.numInstances.split(',')
     assert len(region_list) == len(instances_list), "number of regions: %d != number of instances per region: %d" % (
-        len(region_list), len(intances_list))
+        len(region_list), len(instances_list))
     commitId = args.commitId
     for i in range(len(region_list)):
         region_number = region_list[i]
