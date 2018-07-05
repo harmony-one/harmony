@@ -8,18 +8,24 @@ from threading import Thread
 from Queue import Queue
 import base64
 
+
+class InstanceType:
+    ON_DEMAND = 1
+    SPOT_INSTANCE = 2
+    SPOT_FLEET = 3
+
+
 REGION_NAME = 'region_name'
 REGION_KEY = 'region_key'
 REGION_SECURITY_GROUP = 'region_security_group'
 REGION_HUMAN_NAME = 'region_human_name'
-INSTANCE_TYPE = 't2.micro'
+INSTANCE_TYPE = 't2.small'
 REGION_AMI = 'region_ami'
 with open("user-data.sh", "r") as userdata_file:
     USER_DATA = userdata_file.read()
 
 # UserData must be base64 encoded for spot instances.
-with open("user-data.sh", "rb") as userdata_file:
-    USER_DATA_SPOT = base64.b64encode(userdata_file.read())
+USER_DATA_BASE64 = base64.b64encode(USER_DATA)
 
 IAM_INSTANCE_PROFILE = 'BenchMarkCodeDeployInstanceProfile'
 REPO = "simple-rules/harmony-benchmark"
@@ -45,7 +51,7 @@ Build (argparse,functions) support for
 ### CREATE INSTANCES ###
 
 
-def run_one_region_instances(config, region_number, number_of_instances, isOnDemand=True):
+def run_one_region_instances(config, region_number, number_of_instances, instance_type=InstanceType.ON_DEMAND):
     #todo: explore the use ec2 resource and not client. e.g. create_instances --  Might make for better code.
     """
     e.g. ec2.create_instances
@@ -53,12 +59,15 @@ def run_one_region_instances(config, region_number, number_of_instances, isOnDem
     region_name = config[region_number][REGION_NAME]
     session = boto3.Session(region_name=region_name)
     ec2_client = session.client('ec2')
-    if isOnDemand:
+    if instance_type == InstanceType.ON_DEMAND:
         NODE_NAME = create_instances(
             config, ec2_client, region_number, int(number_of_instances))
         print("Created %s in region %s"%(NODE_NAME,region_number))  ##REPLACE ALL print with logger
+    elif instance_type == InstanceType.SPOT_INSTANCE:
+        response = request_spot_instances(
+            config, ec2_client, region_number, int(number_of_instances))
     else:
-        response = request_spots(
+        response = request_spot_fleet(
             config, ec2_client, region_number, int(number_of_instances))
     return session
 
@@ -104,7 +113,8 @@ def create_instances(config, ec2_client, region_number, number_of_instances):
     return NODE_NAME
 
 
-def request_spots(config, ec2_client, region_number, number_of_instances):
+def request_spot_instances(config, ec2_client, region_number, number_of_instances):
+    NODE_NAME = region_number + "-" + NODE_NAME_SUFFIX
     response = ec2_client.request_spot_instances(
         # DryRun=True,
         BlockDurationMinutes=60,
@@ -114,13 +124,62 @@ def request_spots(config, ec2_client, region_number, number_of_instances):
             'IamInstanceProfile': {
                 'Name': IAM_INSTANCE_PROFILE
             },
-            'UserData': USER_DATA_SPOT,
+            'UserData': USER_DATA_BASE64,
             'ImageId': config[region_number][REGION_AMI],
             'InstanceType': INSTANCE_TYPE,
             'KeyName': config[region_number][REGION_KEY],
             'Placement': {
                 'AvailabilityZone': get_one_availability_zone(ec2_client)
             }
+        }
+    )
+    return response
+
+
+def request_spot_fleet(config, ec2_client, region_number, number_of_instances):
+    NODE_NAME = region_number + "-" + NODE_NAME_SUFFIX
+    # https://boto3.readthedocs.io/en/latest/reference/services/ec2.html#EC2.Client.request_spot_fleet
+    response = ec2_client.request_spot_fleet(
+        # DryRun=True,
+        SpotFleetRequestConfig={
+            # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-fleet.html#spot-fleet-allocation-strategy
+            'AllocationStrategy': 'diversified',
+            # 'IamFleetRole': IAM_INSTANCE_PROFILE, // TODO@ricl, create fleet role.
+            'LaunchSpecifications': [
+                {
+                    'SecurityGroups': [
+                        {
+                            'GroupName': config[region_number][REGION_SECURITY_GROUP]
+                        }
+                    ],
+                    'IamInstanceProfile': {
+                        'Name': IAM_INSTANCE_PROFILE
+                    },
+                    'ImageId': config[region_number][REGION_AMI],
+                    'InstanceType': INSTANCE_TYPE,
+                    'KeyName': config[region_number][REGION_KEY],
+                    'Placement': {
+                        'AvailabilityZone': get_one_availability_zone(ec2_client)
+                    },
+                    'UserData': USER_DATA,
+                    # 'WeightedCapacity': 123.0,
+                    'TagSpecifications': [
+                        {
+                            'ResourceType': 'instance',
+                            'Tags': [
+                                {
+                                    'Key': 'Name',
+                                    'Value': NODE_NAME
+                                },
+                            ]
+                        }
+                    ]
+                },
+            ],
+            # 'SpotPrice': 'string', # The maximum price per unit hour that you are willing to pay for a Spot Instance. The default is the On-Demand price.
+            'TargetCapacity': 1,
+            'OnDemandTargetCapacity': 0,
+            'Type': 'maintain',
         }
     )
     return response
@@ -344,6 +403,6 @@ if __name__ == "__main__":
         region_number = region_list[i]
         number_of_instances = instances_list[i]
         session = run_one_region_instances(
-            config, region_number, number_of_instances)
+            config, region_number, number_of_instances, InstanceType.SPOT_FLEET)
     results = launch_code_deploy(region_list, commitId)
     print(results)
