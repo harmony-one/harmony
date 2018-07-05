@@ -14,10 +14,12 @@ REGION_SECURITY_GROUP = 'region_security_group'
 REGION_HUMAN_NAME = 'region_human_name'
 INSTANCE_TYPE = 't2.micro'
 REGION_AMI = 'region_ami'
-# USER_DATA = 'user-data.sh'
+with open("user-data.sh", "r") as userdata_file:
+    USER_DATA = userdata_file.read()
+    
 # UserData must be base64 encoded for spot instances.
 with open("user-data.sh", "rb") as userdata_file:
-    USER_DATA = base64.b64encode(userdata_file.read())
+    USER_DATA_SPOT = base64.b64encode(userdata_file.read())
 
 IAM_INSTANCE_PROFILE = 'BenchMarkCodeDeployInstanceProfile'
 REPO = "simple-rules/harmony-benchmark"
@@ -112,7 +114,7 @@ def request_spots(config, ec2_client, region_number, number_of_instances):
             'IamInstanceProfile': {
                 'Name': IAM_INSTANCE_PROFILE
             },
-            'UserData': USER_DATA,
+            'UserData': USER_DATA_SPOT,
             'ImageId': config[region_number][REGION_AMI],
             'InstanceType': INSTANCE_TYPE,
             'KeyName': config[region_number][REGION_KEY],
@@ -349,5 +351,5 @@ if __name__ == "__main__":
         number_of_instances = instances_list[i]
         session = run_one_region_instances(
             config, region_number, number_of_instances)
-    results = launch_code_deploy(region_list, commitId)
-    print(results)
+    #results = launch_code_deploy(region_list, commitId)
+    #print(results)
