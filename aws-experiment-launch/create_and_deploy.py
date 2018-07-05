@@ -16,7 +16,7 @@ INSTANCE_TYPE = 't2.micro'
 REGION_AMI = 'region_ami'
 with open("user-data.sh", "r") as userdata_file:
     USER_DATA = userdata_file.read()
-    
+
 # UserData must be base64 encoded for spot instances.
 with open("user-data.sh", "rb") as userdata_file:
     USER_DATA_SPOT = base64.b64encode(userdata_file.read())
@@ -184,12 +184,12 @@ def run_one_region_codedeploy(region_number, commitId):
 
     codedeploy = session.client('codedeploy')
     application_name = APPLICATION_NAME
-    deployment_group = APPLICATION_NAME + "-" + str(commitId) + "-1"
+    deployment_group = APPLICATION_NAME + "-" + str(commitId)[6] + "-" + CURRENT_SESSION
     repo = REPO
 
     print("Setting up to deploy commitId %s on region %s"%(commitId,region_number))
     response = get_application(codedeploy, application_name)
-    response = get_deployment_group(
+    deployment_group = get_deployment_group(
         codedeploy, region_number, application_name, deployment_group)
     depId = deploy(codedeploy, application_name,
                    deployment_group, repo, commitId)
@@ -198,30 +198,24 @@ def run_one_region_codedeploy(region_number, commitId):
 
 def get_deployment_group(codedeploy, region_number,application_name, deployment_group):
     NODE_NAME = region_number + "-" + NODE_NAME_SUFFIX
-    response = codedeploy.list_deployment_groups(
-        applicationName=application_name
+    response = codedeploy.create_deployment_group(
+        applicationName=application_name,
+        deploymentGroupName=deployment_group,
+        deploymentConfigName='CodeDeployDefault.AllAtOnce',
+        serviceRoleArn='arn:aws:iam::656503231766:role/BenchMarkCodeDeployServiceRole',
+        deploymentStyle={
+            'deploymentType': 'IN_PLACE',
+            'deploymentOption': 'WITHOUT_TRAFFIC_CONTROL'
+        },
+        ec2TagFilters = [
+            {
+                'Key': 'Name',
+                'Value': NODE_NAME,
+                'Type': 'KEY_AND_VALUE'
+            }
+        ]
     )
-    if deployment_group in response['deploymentGroups']:
-        return response
-    else:
-        response = codedeploy.create_deployment_group(
-            applicationName=application_name,
-            deploymentGroupName=deployment_group,
-            deploymentConfigName='CodeDeployDefault.AllAtOnce',
-            serviceRoleArn='arn:aws:iam::656503231766:role/BenchMarkCodeDeployServiceRole',
-            deploymentStyle={
-                'deploymentType': 'IN_PLACE',
-                'deploymentOption': 'WITHOUT_TRAFFIC_CONTROL'
-            },
-            ec2TagFilters = [
-                {
-                    'Key': 'Name',
-                    'Value': NODE_NAME,
-                    'Type': 'KEY_AND_VALUE'
-                }
-            ]
-        )
-        return response
+    return deployment_group
 
 
 def get_application(codedeploy, application_name):
