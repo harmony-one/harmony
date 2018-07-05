@@ -101,6 +101,12 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	consensus.blocksReceived[consensusId] = &BlockConsensusStatus{blockHeader, consensus.state}
 	consensus.mutex.Unlock()
 
+	// Add attack model of IncorrectResponse.
+	if attack.GetInstance().IncorrectResponse() {
+		consensus.Log.Warn("IncorrectResponse attacked")
+		return
+	}
+
 	// check consensus Id
 	if consensusId != consensus.consensusId {
 		consensus.Log.Warn("Received message with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId, "consensus", consensus)

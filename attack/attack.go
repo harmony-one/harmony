@@ -10,7 +10,6 @@ import (
 
 const (
 	DroppingTickDuration    = 2 * time.Second
-	AttackEnabled           = false
 	HitRate                 = 10
 	DelayResponseDuration   = 10 * time.Second
 	ConsensusIdThresholdMin = 10
@@ -27,11 +26,11 @@ const (
 
 // AttackModel contains different models of attacking.
 type Attack struct {
-	AttackEnabled        bool
-	attackType           AttackType
-	ConsensusIdThreshold uint32
-	readyByConsensus     bool
-	log                  log.Logger // Log utility
+	AttackEnabled             bool
+	attackType                AttackType
+	ConsensusIdThreshold      uint32
+	readyByConsensusThreshold bool
+	log                       log.Logger // Log utility
 }
 
 var attack *Attack
@@ -47,8 +46,8 @@ func GetInstance() *Attack {
 }
 
 func (attack *Attack) Init() {
-	attack.AttackEnabled = AttackEnabled
-	attack.readyByConsensus = false
+	attack.AttackEnabled = false
+	attack.readyByConsensusThreshold = false
 }
 
 func (attack *Attack) SetAttackEnabled(AttackEnabled bool) {
@@ -70,7 +69,7 @@ func (attack *Attack) Run() {
 
 // NodeKilledByItSelf runs killing itself attack
 func (attack *Attack) NodeKilledByItSelf() {
-	if !attack.AttackEnabled || attack.attackType != KilledItself || !attack.readyByConsensus {
+	if !attack.AttackEnabled || attack.attackType != KilledItself || !attack.readyByConsensusThreshold {
 		return
 	}
 
@@ -81,7 +80,7 @@ func (attack *Attack) NodeKilledByItSelf() {
 }
 
 func (attack *Attack) DelayResponse() {
-	if !attack.AttackEnabled || attack.attackType != DelayResponse || !attack.readyByConsensus {
+	if !attack.AttackEnabled || attack.attackType != DelayResponse || !attack.readyByConsensusThreshold {
 		return
 	}
 	if rand.Intn(HitRate) == 0 {
@@ -91,7 +90,7 @@ func (attack *Attack) DelayResponse() {
 }
 
 func (attack *Attack) IncorrectResponse() bool {
-	if !attack.AttackEnabled || attack.attackType != IncorrectResponse || !attack.readyByConsensus {
+	if !attack.AttackEnabled || attack.attackType != IncorrectResponse || !attack.readyByConsensusThreshold {
 		return false
 	}
 	if rand.Intn(HitRate) == 0 {
@@ -103,6 +102,6 @@ func (attack *Attack) IncorrectResponse() bool {
 
 func (attack *Attack) UpdateConsensusReady(consensusId uint32) {
 	if consensusId > attack.ConsensusIdThreshold {
-		attack.readyByConsensus = true
+		attack.readyByConsensusThreshold = true
 	}
 }
