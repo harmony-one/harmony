@@ -9,7 +9,7 @@ from Queue import Queue
 import base64
 
 
-class InstanceType:
+class InstanceRequest:
     ON_DEMAND = 1
     SPOT_INSTANCE = 2
     SPOT_FLEET = 3
@@ -51,7 +51,7 @@ Build (argparse,functions) support for
 ### CREATE INSTANCES ###
 
 
-def run_one_region_instances(config, region_number, number_of_instances, instance_type=InstanceType.ON_DEMAND):
+def run_one_region_instances(config, region_number, number_of_instances, instance_type=InstanceRequest.ON_DEMAND):
     #todo: explore the use ec2 resource and not client. e.g. create_instances --  Might make for better code.
     """
     e.g. ec2.create_instances
@@ -59,11 +59,11 @@ def run_one_region_instances(config, region_number, number_of_instances, instanc
     region_name = config[region_number][REGION_NAME]
     session = boto3.Session(region_name=region_name)
     ec2_client = session.client('ec2')
-    if instance_type == InstanceType.ON_DEMAND:
+    if instance_type == InstanceRequest.ON_DEMAND:
         NODE_NAME = create_instances(
             config, ec2_client, region_number, int(number_of_instances))
         print("Created %s in region %s"%(NODE_NAME,region_number))  ##REPLACE ALL print with logger
-    elif instance_type == InstanceType.SPOT_INSTANCE:
+    elif instance_type == InstanceRequest.SPOT_INSTANCE:
         response = request_spot_instances(
             config, ec2_client, region_number, int(number_of_instances))
     else:
@@ -87,7 +87,7 @@ def create_instances(config, ec2_client, region_number, number_of_instances):
         },
         KeyName=config[region_number][REGION_KEY],
         UserData=USER_DATA,
-        InstanceType=INSTANCE_TYPE,
+        InstanceRequest=INSTANCE_TYPE,
         TagSpecifications=[
             {
                 'ResourceType': 'instance',
@@ -403,6 +403,6 @@ if __name__ == "__main__":
         region_number = region_list[i]
         number_of_instances = instances_list[i]
         session = run_one_region_instances(
-            config, region_number, number_of_instances, InstanceType.SPOT_FLEET)
+            config, region_number, number_of_instances, InstanceRequest.SPOT_FLEET)
     results = launch_code_deploy(region_list, commitId)
     print(results)
