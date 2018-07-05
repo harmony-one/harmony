@@ -24,13 +24,13 @@ var (
 	localConfig string
 )
 
-func SocketServer() {
+func socketServer() {
 	listen, err := net.Listen("tcp4", ":"+*port)
-	defer listen.Close()
 	if err != nil {
 		log.Fatalf("Socket listen port %s failed,%s", *port, err)
 		os.Exit(1)
 	}
+	defer listen.Close()
 	log.Printf("Begin listen for command on port: %s", *port)
 
 	for {
@@ -61,13 +61,15 @@ ILOOP:
 		case io.EOF:
 			break ILOOP
 		case nil:
-			log.Println("Receive:", data)
+			log.Println("Received command", data)
 			if isTransportOver(data) {
 				log.Println("Tranport Over!")
 				break ILOOP
 			}
 
-			go handleCommand(data, w)
+			handleCommand(data, w)
+
+			log.Println("Waiting for new command...")
 
 		default:
 			log.Fatalf("Receive data failed:%s", err)
@@ -141,17 +143,18 @@ func createLogFolder() string {
 	if err != nil {
 		log.Fatal("Failed to create log folder")
 	}
+	log.Println("Created log folder", logFolder)
 	return logFolder
 }
 
 func runCmd(name string, args []string) {
 	log.Println(name, args)
-	out, err := exec.Command(name, args...).Output()
+	err := exec.Command(name, args...).Start()
 	if err != nil {
 		log.Fatal("Failed to run command: ", err)
 	}
 
-	log.Println(string(out))
+	log.Println("Command running")
 }
 
 func run() {
@@ -214,5 +217,5 @@ func main() {
 	port = flag.String("port", "3000", "port of the node.")
 	flag.Parse()
 
-	SocketServer()
+	socketServer()
 }
