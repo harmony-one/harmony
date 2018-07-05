@@ -345,5 +345,5 @@ if __name__ == "__main__":
         number_of_instances = instances_list[i]
         session = run_one_region_instances(
             config, region_number, number_of_instances)
-    #results = launch_code_deploy(region_list, commitId)
-    #print(results)
+    results = launch_code_deploy(region_list, commitId)
+    print(results)
