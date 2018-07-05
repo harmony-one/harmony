@@ -10,8 +10,11 @@ import (
 )
 
 const (
-	message       = "init http://localhost:8080/config.txt"
 	StopCharacter = "\r\n\r\n"
+)
+
+var (
+	configFile *string
 )
 
 func SocketClient(addr string) {
@@ -23,6 +26,7 @@ func SocketClient(addr string) {
 		log.Fatalln(err)
 	}
 
+	message := "init http://localhost:8080/" + *configFile
 	conn.Write([]byte(message))
 	// conn.Write([]byte(StopCharacter))
 	log.Printf("Send: %s", message)
@@ -33,7 +37,7 @@ func SocketClient(addr string) {
 }
 
 func main() {
-	configFile := flag.String("config_file", "config.txt", "file containing all ip addresses")
+	configFile = flag.String("config_file", "test.txt", "file containing all ip addresses")
 	flag.Parse()
 
 	configs := readConfigFile(*configFile)
