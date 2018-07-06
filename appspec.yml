@@ -9,11 +9,11 @@ hooks:
       timeout: 10
       runas: root
   AfterInstall:
-    - location: aws-scripts/setup_golang.sh #setup golang
+    - location: aws-scripts/setup.sh
       timeout: 300
       runas: root
   ApplicationStart:
-    - location: aws-scripts/run_instances.sh  #send transactions to server
+    - location: aws-scripts/run_instance.sh
       timeout: 300
       runas: root
   ApplicationStop:
