@@ -7,7 +7,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='This script helps you to genereate distribution config')
     parser.add_argument('--ip_list_file', type=str, dest='ip_list_file',
                         default=None, help="the file containing available raw ips")
-    # If the raw_ip_file is None we need to use the region, node_name_tag and region_config to collect raw_ip                        
+    # If the ip_list_file is None we need to use the region, node_name_tag and region_config to collect raw_ip                        
     parser.add_argument('--region', type=str, dest='region_number',
                         default="4", help="region number")
     parser.add_argument('--node_name_tag', type=str,
@@ -15,19 +15,17 @@ if __name__ == "__main__":
     parser.add_argument('--region_config', type=str,
                         dest='region_config', default='configuration.txt')
 
-    parser.add_argument('--shard_num', type=int, dest='shard_num', default=1)
+    parser.add_argument('--shard_num', type=int, dest='shard_number', default=1)
     parser.add_argument('--client_num', type=int, dest='client_number', default=1)
     parser.add_argument('--distribution_config', type=str,
                         dest='distribution_config', default='distribution_config.txt')
     args = parser.parse_args()
 
-    if args.raw_ip_file == None:
+    if args.ip_list_file == None:
         utils.generate_distribution_config2(
                 args.region_number, args.node_name_tag, args.region_config,
-                args.shard_num, args.client_num, args.distribution_config)
+                args.shard_number, args.client_number, args.distribution_config)
     else:
-        with open(args.ip_list_file, "r") as fin:
-            lines = fin.readlines()
-            ip_list = [line.strip() for line in lines]
-
-    ip_list = utils.collect_public_ips(args.region_number, args.node_name_tag, args.region_config)
+        utils.generate_distribution_config3(args.shard_number, args.client_number,
+                                            args.ip_list_file, args.distribution_config)
+    print "Done writing %s" % args.distribution_config
