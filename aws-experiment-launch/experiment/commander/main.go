@@ -43,10 +43,6 @@ func main() {
 	for _, config := range configs {
 		ip := config[0]
 		port := "1" + config[1] // the port number of solider is "1" + node port
-		duty := config[2]
-		if duty == "client" {
-			continue
-		}
 		addr := strings.Join([]string{ip, port}, ":")
 		SocketClient(addr)
 	}
