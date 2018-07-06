@@ -4,10 +4,12 @@ import sys
 import json
 import time
 import datetime
+import logging
 from threading import Thread
 from Queue import Queue
 import base64
 
+LOGGER = logging.getLogger(__name__)
 
 class InstanceResource:
     ON_DEMAND = 1
@@ -384,6 +386,25 @@ def get_public_ips(response):
         ips.append(instance['PublicIpAddress'])
     return ips
 
+def generate_config_file(shard_num, client_num, ips, config_filename):
+    if len(ips) < shard_num * 2 + client_num:
+        print("Not enough nodes to generate a config file")
+        return False
+
+    # Create ip for clients.
+    client_id, leader_id, validator_id = 0, 0, 0
+    with open(config_filename, "w") as fout:
+        for i in range(len(ips)):
+            if client_id < client_num:
+                fout.write("%s 9000 client %d\n" % (ips[i], client_id % shard_num))
+                client_id = client_id + 1
+            elif leader_id < shard_num:
+                fout.write("%s 9000 leader %d\n" % (ips[i], leader_id))
+                leader_id = leader_id + 1
+            else:
+                fout.write("%s 9000 validator %d\n" % (ips[i], validator_id % shard_num))
+                validator_id = validator_id + 1
+
 ##### UTILS ####
 
 
@@ -398,8 +419,10 @@ if __name__ == "__main__":
                         dest='config', default='configuration.txt')
     parser.add_argument('--commitId', type=str, dest='commitId',
                         default='1f7e6e7ca7cf1c1190cedec10e791c01a29971cf')
-    parser.add_argument('--shard_num', type=int, dest='shardNumber', default=1, help='number of shards')
-    parser.add_argument('--client_num', type=int, dest='clientNumber', default=1, help='number of clients')
+    parser.add_argument('--shard_num', type=int, dest='shard_number', default=1, help='number of shards')
+    parser.add_argument('--client_num', type=int, dest='client_number', default=1, help='number of clients')
+    parser.add_argument('--config_filename', type=str, dest='config_filename', default="benchmark_config.txt",
+                        help='The filename of the config')
 
     args = parser.parse_args()
     config = read_configuration_file(args.config)
@@ -413,6 +436,9 @@ if __name__ == "__main__":
         number_of_instances = instances_list[i]
         response, node_name_tag = create_one_region_instances(
             config, region_number, number_of_instances, InstanceResource.ON_DEMAND)
+
+        ips = get_public_ips(response)
+        generate_config_file(args.shard_num, args.client_num, ips, args.config_filename)
         
     # Enable the below code when creating instances working.
     # results = launch_code_deploy(region_list, commitId)
