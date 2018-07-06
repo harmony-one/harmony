@@ -1,5 +1,9 @@
-import sys
 import boto3
+import datetime
+import json
+import sys
+import time
+
 
 REGION_NAME = 'region_name'
 REGION_KEY = 'region_key'
@@ -63,6 +67,13 @@ def generate_distribution_config(shard_number, client_number, ip_list, distribut
             else:
                 fout.write("%s 9000 validator %d\n" % (ip_list[i], validator_id % shard_number))
                 validator_id = validator_id + 1
+
+def get_availability_zones(ec2_client):
+    response = ec2_client.describe_availability_zones()
+    all_zones = []
+    if response.get('AvailabilityZones', None):
+        all_zones = [info['ZoneName'] for info in response.get('AvailabilityZones') if info['State'] == 'available']
+    return all_zones
 
 # used for testing only.
 # if __name__ == "__main__":
