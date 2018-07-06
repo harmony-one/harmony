@@ -109,6 +109,6 @@ if __name__ == "__main__":
         region_number = region_list[i]
         number_of_instances = instances_list[i]
         if run_one_region_instances(config, region_number, number_of_instances, InstanceResource.ON_DEMAND):
-            print("Created instances for region %s" % region_number )
+            print("Managed to create instances for region %s" % region_number )
         else:
             print("Failed to create instances for region %s" % region_number )
