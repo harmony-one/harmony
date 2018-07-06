@@ -5,7 +5,7 @@ REGION_NAME = 'region_name'
 REGION_KEY = 'region_key'
 REGION_SECURITY_GROUP = 'region_security_group'
 REGION_HUMAN_NAME = 'region_human_name'
-INSTANCE_TYPE = 't2.small'
+INSTANCE_TYPE = 't2.micro'
 REGION_AMI = 'region_ami'
 
 def read_configuration_file(region_config='configuration.txt'):
@@ -34,7 +34,11 @@ def collect_public_ips(region_number, node_name_tag, region_config):
         ip_list.extend(instance['PublicIpAddress'] for instance in reservation['Instances'])
     return ip_list
 
-def generate_config_file(shard_num, client_num, ip_list, config_filename):
+def generate_distribution_config2(region_number, node_name_tag, region_config, shard_num, client_num, config_filename):
+    ip_list = collect_public_ips(region_number, node_name_tag, region_config)
+    generate_distribution_config(shard_num, client_num, ip_list, config_filename)
+
+def generate_distribution_config(shard_num, client_num, ip_list, config_filename):
     if len(ip_list) < shard_num * 2 + client_num:
         print("Not enough nodes to generate a config file")
         return False
@@ -54,4 +58,5 @@ def generate_config_file(shard_num, client_num, ip_list, config_filename):
                 validator_id = validator_id + 1
 
 if __name__ == "__main__":
-    collect_public_ips('4', "4-NODE-14-46-47-2018-07-05", "configuration.txt")
+    ip_list = collect_public_ips('4', "4-NODE-14-46-47-2018-07-05", "configuration.txt")
+    generate_distribution_config(2, 2, ip_list, "config_test.txt")
