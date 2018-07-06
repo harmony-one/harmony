@@ -18,16 +18,10 @@ class InstanceResource:
 with open("user-data.sh", "r") as userdata_file:
     USER_DATA = userdata_file.read()
 
-# UserData must be base64 encoded for spot instances.
-USER_DATA_BASE64 = base64.b64encode(USER_DATA)
-
 IAM_INSTANCE_PROFILE = 'BenchMarkCodeDeployInstanceProfile'
-REPO = "simple-rules/harmony-benchmark"
-APPLICATION_NAME = 'benchmark-experiments'
 time_stamp = time.time()
 CURRENT_SESSION = datetime.datetime.fromtimestamp(
     time_stamp).strftime('%H-%M-%S-%Y-%m-%d')
-PLACEMENT_GROUP = "PLACEMENT-" + CURRENT_SESSION
 NODE_NAME_SUFFIX = "NODE-" + CURRENT_SESSION
 
 def run_one_region_instances(config, region_number, number_of_instances, instance_resource=InstanceResource.ON_DEMAND):
