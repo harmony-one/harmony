@@ -32,16 +32,24 @@ def get_ip_list(response):
     else:
         return []
 
-def collect_public_ips(region_number, node_name_tag, region_config):
-    config = read_configuration_file(region_config)
+def create_ec2_client(region_number, region_config):
+    config = read_region_config(region_config)
     region_name = config[region_number][REGION_NAME]
     session = boto3.Session(region_name=region_name)
-    ec2_client = session.client('ec2')
+    return session.client('ec2')
+
+def collect_public_ips_from_ec2_client(ec2_client, node_name_tag):
     filters = [{'Name': 'tag:Name','Values': [node_name_tag]}]
     response = ec2_client.describe_instances(Filters=filters)
     ip_list = []
-    for reservation in response[u'Reservations']:
-        ip_list.extend(instance['PublicIpAddress'] for instance in reservation['Instances'])
+    if response.get('Reservations'):
+        for reservation in response[u'Reservations']:
+            ip_list.extend(instance['PublicIpAddress'] for instance in reservation['Instances'] if instance.get('PublicIpAddress'))
+    return ip_list
+
+def collect_public_ips(region_number, node_name_tag, region_config):
+    ec2_client = create_ec2_client(region_number, region_config)
+    ip_list = collect_public_ips_from_ec2_client(ec2_client, node_name_tag)
     return ip_list
 
 def generate_distribution_config2(region_number, node_name_tag, region_config,
