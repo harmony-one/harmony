@@ -58,5 +58,6 @@ def generate_distribution_config(shard_num, client_num, ip_list, config_filename
                 validator_id = validator_id + 1
 
 if __name__ == "__main__":
-    ip_list = collect_public_ips('4', "4-NODE-14-46-47-2018-07-05", "configuration.txt")
-    generate_distribution_config(2, 2, ip_list, "config_test.txt")
+    ip_list = collect_public_ips('4', "4-NODE-23-36-01-2018-07-05", "configuration.txt")
+    print ip_list
+    generate_distribution_config(2, 1, ip_list, "config_test.txt")
