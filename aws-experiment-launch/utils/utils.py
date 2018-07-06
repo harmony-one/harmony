@@ -36,7 +36,7 @@ def create_ec2_client(region_number, region_config):
     config = read_region_config(region_config)
     region_name = config[region_number][REGION_NAME]
     session = boto3.Session(region_name=region_name)
-    return session.client('ec2')
+    return session.client('ec2'), session
 
 def collect_public_ips_from_ec2_client(ec2_client, node_name_tag):
     filters = [{'Name': 'tag:Name','Values': [node_name_tag]}]
@@ -48,7 +48,7 @@ def collect_public_ips_from_ec2_client(ec2_client, node_name_tag):
     return ip_list
 
 def collect_public_ips(region_number, node_name_tag, region_config):
-    ec2_client = create_ec2_client(region_number, region_config)
+    ec2_client, _ = create_ec2_client(region_number, region_config)
     ip_list = collect_public_ips_from_ec2_client(ec2_client, node_name_tag)
     return ip_list
 
@@ -95,6 +95,14 @@ def get_one_availability_zone(ec2_client):
         return all_zones[0]
     else:
         return None
+
+# Get instance_ids from describe_instances_response.
+def get_instance_ids(describe_instances_response):
+    instance_ids = []
+    if describe_instances_response["Reservations"]:
+        for reservation in describe_instances_response["Reservations"]:
+            instance_ids.extend(instance["InstanceId"] for instance in reservation["Instances"] if instance.get("InstanceId"))
+    return instance_ids
 
 # used for testing only.
 # if __name__ == "__main__":

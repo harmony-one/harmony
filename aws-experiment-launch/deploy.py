@@ -30,25 +30,10 @@ CURRENT_SESSION = datetime.datetime.fromtimestamp(
 PLACEMENT_GROUP = "PLACEMENT-" + CURRENT_SESSION
 NODE_NAME_SUFFIX = "NODE-" + CURRENT_SESSION
 
-def run_one_region_codedeploy(region_number, commit_id):
-    #todo: explore the use ec2 resource and not client. e.g. create_instances --  Might make for better code.
-    """
-    for getting instance ids:---
-    ec2 = boto3.resource('ec2', region_name=region_name])
-    result = ec2.instances.filter(Filters=[{'Name': 'instance-state-name', 'Values': ['running']}])
-    for instance in result:
-        instances.append(instance.id)
-    
-    for getting public ips : --
-        ec2 = boto3.resource('ec2')
-        instance
-    """
-    region_name = config[region_number][REGION_NAME]
-    NODE_NAME = region_number + "-" + NODE_NAME_SUFFIX
-    session = boto3.Session(region_name=region_name)
-    ec2_client = session.client('ec2')
-    filters = [{'Name': 'tag:Name','Values': [NODE_NAME]}]
-    instance_ids = get_instance_ids(ec2_client.describe_instances(Filters=filters))
+def run_one_region_codedeploy(region_number, region_config, node_name_tag, commit_id):
+    ec2_client, session = utils.create_ec2_client(region_number, region_config)
+    filters = [{'Name': 'tag:Name','Values': [node_name_tag]}]
+    instance_ids = utils.get_instance_ids(ec2_client.describe_instances(Filters=filters))
     
     print("Number of instances: %d" % len(instance_ids))
 
@@ -169,13 +154,6 @@ def launch_code_deploy(region_list, commit_id):
         my_thread.join()
     results = [queue.get() for job in jobs]
     return results
-
-def get_instance_ids(describe_instances_response):
-    instance_ids = []
-    for reservation in describe_instances_response["Reservations"]:
-        for instance in reservation["Instances"]:
-            instance_ids.append(instance["InstanceId"])
-    return instance_ids
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
