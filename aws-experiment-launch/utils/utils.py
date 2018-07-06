@@ -34,18 +34,25 @@ def collect_public_ips(region_number, node_name_tag, region_config):
         ip_list.extend(instance['PublicIpAddress'] for instance in reservation['Instances'])
     return ip_list
 
-def generate_distribution_config2(region_number, node_name_tag, region_config, shard_num, client_num, config_filename):
+def generate_distribution_config2(region_number, node_name_tag, region_config,
+                                  shard_num, client_num, distribution_config):
     ip_list = collect_public_ips(region_number, node_name_tag, region_config)
-    generate_distribution_config(shard_num, client_num, ip_list, config_filename)
+    generate_distribution_config(shard_num, client_num, ip_list, distribution_config)
 
-def generate_distribution_config(shard_num, client_num, ip_list, config_filename):
+def generate_distribution_config3(shard_num, client_num, ip_list_file, distribution_config):
+    with open(ip_list_file, "r") as fin:
+        lines = fin.readlines()
+        ip_list = [line.strip() for line in lines]
+    generate_distribution_config(shard_num, client_num, ip_list, distribution_config)
+
+def generate_distribution_config(shard_num, client_num, ip_list, distribution_config):
     if len(ip_list) < shard_num * 2 + client_num:
         print("Not enough nodes to generate a config file")
         return False
 
     # Create ip for clients.
     client_id, leader_id, validator_id = 0, 0, 0
-    with open(config_filename, "w") as fout:
+    with open(distribution_config, "w") as fout:
         for i in range(len(ip_list)):
             if client_id < client_num:
                 fout.write("%s 9000 client %d\n" % (ip_list[i], client_id % shard_num))
