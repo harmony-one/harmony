@@ -10,7 +10,6 @@ import base64
 
 from utils import utils
 
-
 class InstanceResource:
     ON_DEMAND = 1
     SPOT_INSTANCE = 2
@@ -33,26 +32,31 @@ NODE_NAME_SUFFIX = "NODE-" + CURRENT_SESSION
 
 def run_one_region_instances(config, region_number, number_of_instances, instance_resource=InstanceResource.ON_DEMAND):
     region_name = config[region_number][utils.REGION_NAME]
+    # Create session.
     session = boto3.Session(region_name=region_name)
+    # Create a client.
     ec2_client = session.client('ec2')
-    print utils.get_one_availability_zone(ec2_client)
+
     if instance_resource == InstanceResource.ON_DEMAND:
-        response, node_name_tag = create_instances(
+        return create_instances(
             config, ec2_client, region_number, int(number_of_instances))
         print("Created %s in region %s" % (node_name_tag, region_number))
     else:
-        return None, node_name_tag
-    return response, node_name_tag
+        return False
 
 
 def create_instances(config, ec2_client, region_number, number_of_instances):
     node_name_tag = region_number + "-" + NODE_NAME_SUFFIX
+    print("Creating node_name_tag: %s" % node_name_tag)
+    available_zone = utils.get_one_availability_zone(ec2_client)
+    print("Looking at zone %s to create instances." % available_zone)
+
     response = ec2_client.run_instances(
         MinCount=number_of_instances,
         MaxCount=number_of_instances,
         ImageId=config[region_number][utils.REGION_AMI],
         Placement={
-            'AvailabilityZone': utils.get_one_availability_zone(ec2_client),
+            'AvailabilityZone': available_zone,
         },
         SecurityGroups=[config[region_number][utils.REGION_SECURITY_GROUP]],
         IamInstanceProfile={
@@ -73,7 +77,17 @@ def create_instances(config, ec2_client, region_number, number_of_instances):
             },
         ],
     )
-    return response, node_name_tag
+
+    count = 0
+    while count < 40:
+        time.sleep(5)
+        print("Waiting ...")
+        ip_list = utils.collect_public_ips_from_ec2_client(ec2_client, node_name_tag)
+        if len(ip_list) == number_of_instances:
+            print("Created %d instances" % number_of_instances)
+            return True
+        count = count + 1
+    return False
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -93,10 +107,8 @@ if __name__ == "__main__":
     for i in range(len(region_list)):
         region_number = region_list[i]
         number_of_instances = instances_list[i]
-        response, node_name_tag = run_one_region_instances(
-            config, region_number, number_of_instances, InstanceResource.ON_DEMAND)
-        if response:
-            print utils.get_ip_list(response)
+        if run_one_region_instances(config, region_number, number_of_instances, InstanceResource.ON_DEMAND):
+            print("Created instances for region %s" % region_number )
 
     # Enable the code below later.
     # results = launch_code_deploy(region_list, commitId)
