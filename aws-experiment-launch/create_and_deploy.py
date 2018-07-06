@@ -401,6 +401,6 @@ if __name__ == "__main__":
         region_number = region_list[i]
         number_of_instances = instances_list[i]
         session = run_one_region_instances(
-            config, region_number, number_of_instances)
-    results = launch_code_deploy(region_list, commitId,InstanceResource.ON_DEMAND)
+            config, region_number, number_of_instances,InstanceResource.ON_DEMAND)
+    results = launch_code_deploy(region_list, commitId)
     print(results)
