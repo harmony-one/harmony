@@ -4,10 +4,12 @@ import sys
 import json
 import time
 import datetime
+import logging
 from threading import Thread
 from Queue import Queue
 import base64
 
+LOGGER = logging.getLogger(__name__)
 
 class InstanceResource:
     ON_DEMAND = 1
@@ -51,7 +53,7 @@ Build (argparse,functions) support for
 ### CREATE INSTANCES ###
 
 
-def run_one_region_instances(config, region_number, number_of_instances, instance_resource=InstanceResource.ON_DEMAND):
+def create_one_region_instances(config, region_number, number_of_instances, instance_resource=InstanceResource.ON_DEMAND):
     #todo: explore the use ec2 resource and not client. e.g. create_instances --  Might make for better code.
     """
     e.g. ec2.create_instances
@@ -60,16 +62,16 @@ def run_one_region_instances(config, region_number, number_of_instances, instanc
     session = boto3.Session(region_name=region_name)
     ec2_client = session.client('ec2')
     if instance_resource == InstanceResource.ON_DEMAND:
-        NODE_NAME = create_instances(
+        response, NODE_NAME = create_instances(
             config, ec2_client, region_number, int(number_of_instances))
         print("Created %s in region %s"%(NODE_NAME,region_number))  ##REPLACE ALL print with logger
     elif instance_resource == InstanceResource.SPOT_INSTANCE:
-        response = request_spot_instances(
+        response, NODE_NAME = request_spot_instances(
             config, ec2_client, region_number, int(number_of_instances))
     else:
-        response = request_spot_fleet(
+        response, NODE_NAME = request_spot_fleet(
             config, ec2_client, region_number, int(number_of_instances))
-    return session
+    return response, NODE_NAME
 
 
 def create_instances(config, ec2_client, region_number, number_of_instances):
@@ -110,7 +112,7 @@ def create_instances(config, ec2_client, region_number, number_of_instances):
         #     }
         # }
     )
-    return NODE_NAME
+    return response, NODE_NAME
 
 
 def request_spot_instances(config, ec2_client, region_number, number_of_instances):
@@ -133,7 +135,7 @@ def request_spot_instances(config, ec2_client, region_number, number_of_instance
             }
         }
     )
-    return response
+    return response, NODE_NAME
 
 
 def request_spot_fleet(config, ec2_client, region_number, number_of_instances):
@@ -182,7 +184,7 @@ def request_spot_fleet(config, ec2_client, region_number, number_of_instances):
             'Type': 'maintain',
         }
     )
-    return response
+    return response, NODE_NAME
 
 
 def get_availability_zones(ec2_client):
@@ -378,6 +380,31 @@ def get_commitId(commitId):
         print("Got newest commitId as " + commitId)
     return commitId
 
+def get_public_ips(response):
+    ips = []
+    for instance in response['Instances']:
+        ips.append(instance['PublicIpAddress'])
+    return ips
+
+def generate_config_file(shard_num, client_num, ips, config_filename):
+    if len(ips) < shard_num * 2 + client_num:
+        print("Not enough nodes to generate a config file")
+        return False
+
+    # Create ip for clients.
+    client_id, leader_id, validator_id = 0, 0, 0
+    with open(config_filename, "w") as fout:
+        for i in range(len(ips)):
+            if client_id < client_num:
+                fout.write("%s 9000 client %d\n" % (ips[i], client_id % shard_num))
+                client_id = client_id + 1
+            elif leader_id < shard_num:
+                fout.write("%s 9000 leader %d\n" % (ips[i], leader_id))
+                leader_id = leader_id + 1
+            else:
+                fout.write("%s 9000 validator %d\n" % (ips[i], validator_id % shard_num))
+                validator_id = validator_id + 1
+
 ##### UTILS ####
 
 
@@ -392,6 +419,11 @@ if __name__ == "__main__":
                         dest='config', default='configuration.txt')
     parser.add_argument('--commitId', type=str, dest='commitId',
                         default='1f7e6e7ca7cf1c1190cedec10e791c01a29971cf')
+    parser.add_argument('--shard_num', type=int, dest='shard_number', default=1, help='number of shards')
+    parser.add_argument('--client_num', type=int, dest='client_number', default=1, help='number of clients')
+    parser.add_argument('--config_filename', type=str, dest='config_filename', default="benchmark_config.txt",
+                        help='The filename of the config')
+
     args = parser.parse_args()
     config = read_configuration_file(args.config)
     region_list = args.regions.split(',')
@@ -402,7 +434,12 @@ if __name__ == "__main__":
     for i in range(len(region_list)):
         region_number = region_list[i]
         number_of_instances = instances_list[i]
-        session = run_one_region_instances(
+        response, node_name_tag = create_one_region_instances(
             config, region_number, number_of_instances, InstanceResource.ON_DEMAND)
-    results = launch_code_deploy(region_list, commitId)
-    print(results)
+
+        ips = get_public_ips(response)
+        generate_config_file(args.shard_num, args.client_num, ips, args.config_filename)
+        
+    # Enable the below code when creating instances working.
+    # results = launch_code_deploy(region_list, commitId)
+    # print(results)
