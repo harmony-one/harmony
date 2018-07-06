@@ -20,7 +20,8 @@ var (
 func SocketClient(addr string) {
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
-		log.Fatalln(err)
+		log.Println(err)
+		return
 	}
 	defer conn.Close()
 
