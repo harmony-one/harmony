@@ -12,11 +12,11 @@ REGION_HUMAN_NAME = 'region_human_name'
 INSTANCE_TYPE = 't2.micro'
 REGION_AMI = 'region_ami'
 
-def read_configuration_file(region_config='configuration.txt'):
+def read_region_config(region_config='configuration.txt'):
     config = {}
     with open(region_config, 'r') as f:
         for myline in f:
-            mylist = myline.strip().split(',')
+            mylist = [item.strip() for item in myline.strip().split(',')]
             region_num = mylist[0]
             config[region_num] = {}
             config[region_num][REGION_NAME] = mylist[1]
@@ -25,6 +25,12 @@ def read_configuration_file(region_config='configuration.txt'):
             config[region_num][REGION_HUMAN_NAME] = mylist[4]
             config[region_num][REGION_AMI] = mylist[5]
     return config
+
+def get_ip_list(response):
+    if response.get('Instances', None):
+        return [instance.get('PublicIpAddress', None) for instance in response['Instances']]
+    else:
+        return []
 
 def collect_public_ips(region_number, node_name_tag, region_config):
     config = read_configuration_file(region_config)
@@ -74,6 +80,13 @@ def get_availability_zones(ec2_client):
     if response.get('AvailabilityZones', None):
         all_zones = [info['ZoneName'] for info in response.get('AvailabilityZones') if info['State'] == 'available']
     return all_zones
+
+def get_one_availability_zone(ec2_client):
+    all_zones = get_availability_zones(ec2_client)
+    if len(all_zones) > 0:
+        return all_zones[0]
+    else:
+        return None
 
 # used for testing only.
 # if __name__ == "__main__":
