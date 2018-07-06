@@ -1,6 +1,6 @@
 #!/bin/bash -x
 echo "Setup Golang" >> tmplog
-sudo yum update -y
+#sudo yum update -y
 sudo yum install -y golang
 
 MyHOME=/home/ec2-user
