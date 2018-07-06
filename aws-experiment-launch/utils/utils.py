@@ -35,18 +35,18 @@ def collect_public_ips(region_number, node_name_tag, region_config):
     return ip_list
 
 def generate_distribution_config2(region_number, node_name_tag, region_config,
-                                  shard_num, client_num, distribution_config):
+                                  shard_number, client_number, distribution_config):
     ip_list = collect_public_ips(region_number, node_name_tag, region_config)
-    generate_distribution_config(shard_num, client_num, ip_list, distribution_config)
+    generate_distribution_config(shard_number, client_number, ip_list, distribution_config)
 
-def generate_distribution_config3(shard_num, client_num, ip_list_file, distribution_config):
+def generate_distribution_config3(shard_number, client_number, ip_list_file, distribution_config):
     with open(ip_list_file, "r") as fin:
         lines = fin.readlines()
         ip_list = [line.strip() for line in lines]
-    generate_distribution_config(shard_num, client_num, ip_list, distribution_config)
+        generate_distribution_config(shard_number, client_number, ip_list, distribution_config)
 
-def generate_distribution_config(shard_num, client_num, ip_list, distribution_config):
-    if len(ip_list) < shard_num * 2 + client_num:
+def generate_distribution_config(shard_number, client_number, ip_list, distribution_config):
+    if len(ip_list) < shard_number * 2 + client_number:
         print("Not enough nodes to generate a config file")
         return False
 
@@ -54,14 +54,14 @@ def generate_distribution_config(shard_num, client_num, ip_list, distribution_co
     client_id, leader_id, validator_id = 0, 0, 0
     with open(distribution_config, "w") as fout:
         for i in range(len(ip_list)):
-            if client_id < client_num:
-                fout.write("%s 9000 client %d\n" % (ip_list[i], client_id % shard_num))
+            if client_id < client_number:
+                fout.write("%s 9000 client %d\n" % (ip_list[i], client_id % shard_number))
                 client_id = client_id + 1
-            elif leader_id < shard_num:
+            elif leader_id < shard_number:
                 fout.write("%s 9000 leader %d\n" % (ip_list[i], leader_id))
                 leader_id = leader_id + 1
             else:
-                fout.write("%s 9000 validator %d\n" % (ip_list[i], validator_id % shard_num))
+                fout.write("%s 9000 validator %d\n" % (ip_list[i], validator_id % shard_number))
                 validator_id = validator_id + 1
 
 # used for testing only.
