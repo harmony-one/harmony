@@ -19,7 +19,7 @@ REGION_NAME = 'region_name'
 REGION_KEY = 'region_key'
 REGION_SECURITY_GROUP = 'region_security_group'
 REGION_HUMAN_NAME = 'region_human_name'
-INSTANCE_TYPE = 't2.small'
+INSTANCE_TYPE = 't2.micro'
 REGION_AMI = 'region_ami'
 with open("user-data.sh", "r") as userdata_file:
     USER_DATA = userdata_file.read()
@@ -39,8 +39,6 @@ NODE_NAME_SUFFIX = "NODE-" + CURRENT_SESSION
 """
 TODO:
 
-save NODE to disk, so that you can selectively only run deploy (not recreate instances). 
-Right now all instances have "NODE" so this has uninted consequences of running on instances that were previous created.
 Build (argparse,functions) support for 
 1. run only create instance (multiple times)
 2. run only codedeploy (multiple times)
@@ -161,7 +159,7 @@ def request_spot_fleet(config, ec2_client, region_number, number_of_instances):
                     'Placement': {
                         'AvailabilityZone': get_one_availability_zone(ec2_client)
                     },
-                    'UserData': USER_DATA,
+                    'UserData': USER_DATA_BASE64,
                     # 'WeightedCapacity': 123.0,
                     'TagSpecifications': [
                         {
@@ -403,6 +401,6 @@ if __name__ == "__main__":
         region_number = region_list[i]
         number_of_instances = instances_list[i]
         session = run_one_region_instances(
-            config, region_number, number_of_instances, InstanceResource.ON_DEMAND)
-    results = launch_code_deploy(region_list, commitId)
+            config, region_number, number_of_instances)
+    results = launch_code_deploy(region_list, commitId,InstanceResource.ON_DEMAND)
     print(results)
