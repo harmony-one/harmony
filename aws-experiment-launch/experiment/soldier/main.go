@@ -25,13 +25,14 @@ var (
 )
 
 func socketServer() {
-	listen, err := net.Listen("tcp4", ":"+*port)
+	soldierPort := "1" + *port // the soldier port is "1" + node port
+	listen, err := net.Listen("tcp4", ":"+soldierPort)
 	if err != nil {
-		log.Fatalf("Socket listen port %s failed,%s", *port, err)
+		log.Fatalf("Socket listen port %s failed,%s", soldierPort, err)
 		os.Exit(1)
 	}
 	defer listen.Close()
-	log.Printf("Begin listen for command on port: %s", *port)
+	log.Printf("Begin listen for command on port: %s", soldierPort)
 
 	for {
 		conn, err := listen.Accept()
@@ -132,6 +133,7 @@ func handleInitCommand(args []string, w *bufio.Writer) {
 
 	run()
 
+	log.Println("Successfully init-ed")
 	w.Write([]byte("Successfully init-ed"))
 	w.Flush()
 }

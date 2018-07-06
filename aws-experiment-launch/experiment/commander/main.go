@@ -19,12 +19,10 @@ var (
 
 func SocketClient(addr string) {
 	conn, err := net.Dial("tcp", addr)
-
-	defer conn.Close()
-
 	if err != nil {
 		log.Fatalln(err)
 	}
+	defer conn.Close()
 
 	message := "init http://localhost:8080/" + *configFile
 	conn.Write([]byte(message))
@@ -44,7 +42,11 @@ func main() {
 
 	for _, config := range configs {
 		ip := config[0]
-		port := config[1]
+		port := "1" + config[1] // the port number of solider is "1" + node port
+		duty := config[2]
+		if duty == "client" {
+			continue
+		}
 		addr := strings.Join([]string{ip, port}, ":")
 		SocketClient(addr)
 	}
