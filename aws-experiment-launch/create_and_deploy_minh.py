@@ -51,7 +51,7 @@ def create_instances(config, ec2_client, region_number, number_of_instances):
     available_zone = utils.get_one_availability_zone(ec2_client)
     print("Looking at zone %s to create instances." % available_zone)
 
-    response = ec2_client.run_instances(
+    ec2_client.run_instances(
         MinCount=number_of_instances,
         MaxCount=number_of_instances,
         ImageId=config[region_number][utils.REGION_AMI],
@@ -87,6 +87,7 @@ def create_instances(config, ec2_client, region_number, number_of_instances):
             print("Created %d instances" % number_of_instances)
             return True
         count = count + 1
+    print("Can not create %d instances" % number_of_instances)
     return False
 
 if __name__ == "__main__":
@@ -109,7 +110,5 @@ if __name__ == "__main__":
         number_of_instances = instances_list[i]
         if run_one_region_instances(config, region_number, number_of_instances, InstanceResource.ON_DEMAND):
             print("Created instances for region %s" % region_number )
-
-    # Enable the code below later.
-    # results = launch_code_deploy(region_list, commitId)
-    # print(results)
+        else:
+            print("Failed to create instances for region %s" % region_number )
