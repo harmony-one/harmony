@@ -57,7 +57,8 @@ def generate_distribution_config(shard_num, client_num, ip_list, config_filename
                 fout.write("%s 9000 validator %d\n" % (ip_list[i], validator_id % shard_num))
                 validator_id = validator_id + 1
 
-if __name__ == "__main__":
-    ip_list = collect_public_ips('4', "4-NODE-23-36-01-2018-07-05", "configuration.txt")
-    print ip_list
-    generate_distribution_config(2, 1, ip_list, "config_test.txt")
+# used for testing only.
+# if __name__ == "__main__":
+#     ip_list = collect_public_ips('4', "4-NODE-23-36-01-2018-07-05", "configuration.txt")
+#     print ip_list
+#     generate_distribution_config(2, 1, ip_list, "config_test.txt")
