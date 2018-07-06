@@ -18,5 +18,5 @@ if __name__ == "__main__":
     ip_list = utils.collect_public_ips(args.region_number, args.node_name_tag, args.region_config)
     with open(args.file_output, "w") as fout:
         for ip in ip_list:
-            fout.write(ip + "\n")
+            fout.write(ip + " " + args.node_name_tag + "\n")
     print "Done writing %s" % args.file_output
