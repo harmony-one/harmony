@@ -19,4 +19,4 @@ if __name__ == "__main__":
     with open(args.file_output, "w") as fout:
         for ip in ip_list:
             fout.write(ip + "\n")
-
+    print "Done writing %s" % args.file_output
