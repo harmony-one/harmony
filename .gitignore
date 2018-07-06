@@ -6,6 +6,7 @@
 
 # Executables
 harmony-benchmark
+*.pyc
 *.exe
 *.out
 *.app

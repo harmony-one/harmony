@@ -51,7 +51,7 @@ Build (argparse,functions) support for
 ### CREATE INSTANCES ###
 
 
-def run_one_region_instances(config, region_number, number_of_instances, instance_resource=InstanceResource.ON_DEMAND):
+def create_one_region_instances(config, region_number, number_of_instances, instance_resource=InstanceResource.ON_DEMAND):
     #todo: explore the use ec2 resource and not client. e.g. create_instances --  Might make for better code.
     """
     e.g. ec2.create_instances
@@ -60,16 +60,16 @@ def run_one_region_instances(config, region_number, number_of_instances, instanc
     session = boto3.Session(region_name=region_name)
     ec2_client = session.client('ec2')
     if instance_resource == InstanceResource.ON_DEMAND:
-        NODE_NAME = create_instances(
+        response, NODE_NAME = create_instances(
             config, ec2_client, region_number, int(number_of_instances))
         print("Created %s in region %s"%(NODE_NAME,region_number))  ##REPLACE ALL print with logger
     elif instance_resource == InstanceResource.SPOT_INSTANCE:
-        response = request_spot_instances(
+        response, NODE_NAME = request_spot_instances(
             config, ec2_client, region_number, int(number_of_instances))
     else:
-        response = request_spot_fleet(
+        response, NODE_NAME = request_spot_fleet(
             config, ec2_client, region_number, int(number_of_instances))
-    return session
+    return response, NODE_NAME
 
 
 def create_instances(config, ec2_client, region_number, number_of_instances):
@@ -110,7 +110,7 @@ def create_instances(config, ec2_client, region_number, number_of_instances):
         #     }
         # }
     )
-    return NODE_NAME
+    return response, NODE_NAME
 
 
 def request_spot_instances(config, ec2_client, region_number, number_of_instances):
@@ -133,7 +133,7 @@ def request_spot_instances(config, ec2_client, region_number, number_of_instance
             }
         }
     )
-    return response
+    return response, NODE_NAME
 
 
 def request_spot_fleet(config, ec2_client, region_number, number_of_instances):
@@ -182,7 +182,7 @@ def request_spot_fleet(config, ec2_client, region_number, number_of_instances):
             'Type': 'maintain',
         }
     )
-    return response
+    return response, NODE_NAME
 
 
 def get_availability_zones(ec2_client):
@@ -378,6 +378,12 @@ def get_commitId(commitId):
         print("Got newest commitId as " + commitId)
     return commitId
 
+def get_public_ips(response):
+    ips = []
+    for instance in response['Instances']:
+        ips.append(instance['PublicIpAddress'])
+    return ips
+
 ##### UTILS ####
 
 
@@ -392,6 +398,9 @@ if __name__ == "__main__":
                         dest='config', default='configuration.txt')
     parser.add_argument('--commitId', type=str, dest='commitId',
                         default='1f7e6e7ca7cf1c1190cedec10e791c01a29971cf')
+    parser.add_argument('--shard_num', type=int, dest='shardNumber', default=1, help='number of shards')
+    parser.add_argument('--client_num', type=int, dest='clientNumber', default=1, help='number of clients')
+
     args = parser.parse_args()
     config = read_configuration_file(args.config)
     region_list = args.regions.split(',')
@@ -402,7 +411,9 @@ if __name__ == "__main__":
     for i in range(len(region_list)):
         region_number = region_list[i]
         number_of_instances = instances_list[i]
-        session = run_one_region_instances(
+        response, node_name_tag = create_one_region_instances(
             config, region_number, number_of_instances, InstanceResource.ON_DEMAND)
-    results = launch_code_deploy(region_list, commitId)
-    print(results)
+        
+    # Enable the below code when creating instances working.
+    # results = launch_code_deploy(region_list, commitId)
+    # print(results)
