@@ -241,7 +241,7 @@ def run_one_region_codedeploy(region_number, commitId):
 
     codedeploy = session.client('codedeploy')
     application_name = APPLICATION_NAME
-    deployment_group = APPLICATION_NAME + "-" + str(commitId)[6] + "-" + CURRENT_SESSION
+    deployment_group = APPLICATION_NAME + "-" + commitId[:6] + "-" + CURRENT_SESSION
     repo = REPO
 
     print("Setting up to deploy commitId %s on region %s"%(commitId,region_number))
