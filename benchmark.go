@@ -9,8 +9,10 @@ import (
 	"harmony-benchmark/log"
 	"harmony-benchmark/node"
 	"harmony-benchmark/p2p"
+	"harmony-benchmark/utils"
 	"math/rand"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -90,6 +92,16 @@ func attackDetermination(attackedMode int) bool {
 	return false
 }
 
+func logMemUsage(consensus *consensus.Consensus) {
+	for {
+		var m runtime.MemStats
+		runtime.ReadMemStats(&m)
+		log.Info("Mem Report", "Alloc", utils.BToMb(m.Alloc), "TotalAlloc", utils.BToMb(m.TotalAlloc),
+			"Sys", utils.BToMb(m.Sys), "NumGC", m.NumGC, "consensus", consensus)
+		time.Sleep(10 * time.Second)
+	}
+}
+
 func main() {
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9000", "port of the node.")
@@ -119,6 +131,8 @@ func main() {
 	log.Root().SetHandler(h)
 
 	consensus := consensus.NewConsensus(*ip, *port, shardId, peers, leader)
+
+	go logMemUsage(&consensus)
 
 	node := node.NewNode(&consensus)
 	// Set logger to attack model.
