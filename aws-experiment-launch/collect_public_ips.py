@@ -1,5 +1,6 @@
 import argparse
 import os
+import random
 import sys
 
 from utils import utils
@@ -25,6 +26,7 @@ if __name__ == "__main__":
                 region_number = items[1].strip()
                 node_name_tag = items[0].strip()
                 ip_list = utils.collect_public_ips(region_number, node_name_tag, args.region_config)
+                random.shuffle(ip_list)
                 for ip in ip_list:
                     fout.write(ip + " " + node_name_tag + "\n")
         print "Done collecting public ips %s" % args.file_output
