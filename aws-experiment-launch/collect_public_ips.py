@@ -16,7 +16,7 @@ if __name__ == "__main__":
                         dest='file_output', default='raw_ip.txt')
     args = parser.parse_args()
 
-    if not args.instance_output or not args.instance_output or not os.path.isfile(args.instance_output):
+    if not args.instance_output or not os.path.isfile(args.instance_output):
         print "%s or %s are not existed" % (args.file_output, args.instance_output)
         sys.exit(1)
     if args.instance_output:
