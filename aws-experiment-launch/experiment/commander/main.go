@@ -2,21 +2,22 @@ package main
 
 import (
 	"bufio"
-	"fmt"
+	"flag"
 	"log"
 	"net"
 	"os"
 	"strings"
 )
 
-type CommanderSetting struct {
-	addr       string
+type commanderSetting struct {
+	ip         string
+	port       string
 	configFile string
 	configs    [][]string
 }
 
 var (
-	setting CommanderSetting
+	setting commanderSetting
 )
 
 func socketClient(addr string, handler func(net.Conn, string)) {
@@ -24,7 +25,11 @@ func socketClient(addr string, handler func(net.Conn, string)) {
 }
 
 func readConfigFile() [][]string {
-	file, _ := os.Open(setting.configFile)
+	file, err := os.Open(setting.configFile)
+	if err != nil {
+		log.Println("Failed to read config file")
+		return nil
+	}
 	fscanner := bufio.NewScanner(file)
 
 	result := [][]string{}
@@ -37,19 +42,15 @@ func readConfigFile() [][]string {
 
 func handleCommand(command string) {
 	args := strings.Split(command, " ")
-
+	log.Println(args)
 	if len(args) <= 0 {
 		return
 	}
 
 	switch cmd := args[0]; cmd {
-	case "config":
-		{
-			handleConfigCommand(args[1], args[2])
-		}
 	case "init":
 		{
-			dictateNodes("init" + setting.addr + setting.configFile)
+			dictateNodes("init http://" + setting.ip + ":" + setting.port + "/" + setting.configFile)
 		}
 	default:
 		{
@@ -58,10 +59,12 @@ func handleCommand(command string) {
 	}
 }
 
-func handleConfigCommand(addr string, configFile string) {
-	setting.addr = addr
+func config(ip string, port string, configFile string) {
+	setting.ip = ip
+	setting.port = port
 	setting.configFile = configFile
 	setting.configs = readConfigFile()
+	log.Println("Config-ed", setting.configs)
 }
 
 func dictateNodes(command string) {
@@ -94,10 +97,18 @@ func dictateNodes(command string) {
 }
 
 func main() {
-	for {
-		reader := bufio.NewReader(os.Stdin)
-		fmt.Print("Listening to Your Command:")
-		command, _ := reader.ReadString('\n')
-		handleCommand(command)
+	ip := flag.String("ip", "127.0.0.1", "ip of commander")
+	port := flag.String("port", "8080", "port of config file")
+	configFile := flag.String("config_file", "test.txt", "file name of config file")
+
+	config(*ip, *port, *configFile)
+
+	scanner := bufio.NewScanner(os.Stdin)
+	for true {
+		log.Printf("Listening to Your Command:")
+		if !scanner.Scan() {
+			break
+		}
+		handleCommand(scanner.Text())
 	}
 }
