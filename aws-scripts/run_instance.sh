@@ -27,8 +27,7 @@ echo ">>>>"
 
 echo "Run soldier" >> tmplog
 # Run soldier
-cd $GOPATH/src/harmony-benchmark
 node_port=3000
-./bin/soldier -ip $ip -port $node_port &
+$GOPATH/src/harmony-benchmark/bin/soldier -ip $ip -port $node_port &
 
 echo "Run Instances done" >> tmplog
