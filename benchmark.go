@@ -117,12 +117,19 @@ func main() {
 	attack.GetInstance().SetAttackEnabled(attackDetermination(*attackedMode))
 
 	config := readConfigFile(*configFile)
-	shardId := getShardId(*ip, *port, &config)
-	peers := getPeers(*ip, *port, shardId, &config)
-	leader := getLeader(shardId, &config)
+	shardID := getShardId(*ip, *port, &config)
+	peers := getPeers(*ip, *port, shardID, &config)
+	leader := getLeader(shardID, &config)
+
+	var role string
+	if leader.Ip == *ip && leader.Port == *port {
+		role = "leader"
+	} else {
+		role = "validator"
+	}
 
 	// Setup a logger to stdout and log file.
-	logFileName := fmt.Sprintf("./%v/%v.log", *logFolder, *port)
+	logFileName := fmt.Sprintf("./%v/%s-%v.log", *logFolder, role, *port)
 	h := log.MultiHandler(
 		log.StdoutHandler,
 		log.Must.FileHandler(logFileName, log.LogfmtFormat()), // Log to file
@@ -130,7 +137,7 @@ func main() {
 	)
 	log.Root().SetHandler(h)
 
-	consensus := consensus.NewConsensus(*ip, *port, shardId, peers, leader)
+	consensus := consensus.NewConsensus(*ip, *port, shardID, peers, leader)
 
 	go logMemUsage(&consensus)
 
