@@ -26,5 +26,7 @@ if __name__ == "__main__":
                 ec2_client, session = utils.create_ec2_client(region_number, args.region_config)
                 filters = [{'Name': 'tag:Name','Values': [node_name_tag]}]
                 instance_ids = utils.get_instance_ids(ec2_client.describe_instances(Filters=filters))
-                print ec2_client.terminate_instances(instanceIds=instance_ids)
-
+                ec2_client.terminate_instances(InstanceIds=instance_ids)
+                print "waiting until instances with tag %s died." % node_name_tag
+                waiter = ec2_client.get_waiter('instance_terminated')
+                waiter.wait(InstanceIds=instance_ids)
