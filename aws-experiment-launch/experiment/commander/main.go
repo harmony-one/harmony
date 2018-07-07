@@ -2,55 +2,29 @@ package main
 
 import (
 	"bufio"
-	"flag"
+	"fmt"
 	"log"
 	"net"
 	"os"
 	"strings"
 )
 
-const (
-	StopCharacter = "\r\n\r\n"
-)
+type CommanderSetting struct {
+	addr       string
+	configFile string
+	configs    [][]string
+}
 
 var (
-	configFile *string
+	setting CommanderSetting
 )
 
-func SocketClient(addr string) {
-	conn, err := net.Dial("tcp", addr)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	defer conn.Close()
+func socketClient(addr string, handler func(net.Conn, string)) {
 
-	message := "init http://localhost:8080/" + *configFile
-	conn.Write([]byte(message))
-	// conn.Write([]byte(StopCharacter))
-	log.Printf("Send: %s", message)
-
-	buff := make([]byte, 1024)
-	n, _ := conn.Read(buff)
-	log.Printf("Receive from %s: %s", addr, buff[:n])
 }
 
-func main() {
-	configFile = flag.String("config_file", "test.txt", "file containing all ip addresses")
-	flag.Parse()
-
-	configs := readConfigFile(*configFile)
-
-	for _, config := range configs {
-		ip := config[0]
-		port := "1" + config[1] // the port number of solider is "1" + node port
-		addr := strings.Join([]string{ip, port}, ":")
-		SocketClient(addr)
-	}
-}
-
-func readConfigFile(configFile string) [][]string {
-	file, _ := os.Open(configFile)
+func readConfigFile() [][]string {
+	file, _ := os.Open(setting.configFile)
 	fscanner := bufio.NewScanner(file)
 
 	result := [][]string{}
@@ -61,10 +35,69 @@ func readConfigFile(configFile string) [][]string {
 	return result
 }
 
-func Map(vs []string, f func(string) string) []string {
-	vsm := make([]string, len(vs))
-	for i, v := range vs {
-		vsm[i] = f(v)
+func handleCommand(command string) {
+	args := strings.Split(command, " ")
+
+	if len(args) <= 0 {
+		return
 	}
-	return vsm
+
+	switch cmd := args[0]; cmd {
+	case "config":
+		{
+			handleConfigCommand(args[1], args[2])
+		}
+	case "init":
+		{
+			dictateNodes("init" + setting.addr + setting.configFile)
+		}
+	default:
+		{
+			dictateNodes(command)
+		}
+	}
+}
+
+func handleConfigCommand(addr string, configFile string) {
+	setting.addr = addr
+	setting.configFile = configFile
+	setting.configs = readConfigFile()
+}
+
+func dictateNodes(command string) {
+	for _, config := range setting.configs {
+		ip := config[0]
+		port := "1" + config[1] // the port number of solider is "1" + node port
+		addr := strings.Join([]string{ip, port}, ":")
+
+		// creates client
+		conn, err := net.Dial("tcp", addr)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		defer conn.Close()
+
+		// send command
+		_, err = conn.Write([]byte(command))
+		if err != nil {
+			log.Printf("Failed to send command to %s", addr)
+			return
+		}
+		log.Printf("Send: %s", command)
+
+		// read response
+		buff := make([]byte, 1024)
+		n, _ := conn.Read(buff)
+		log.Printf("Receive from %s: %s", addr, buff[:n])
+	}
+}
+
+func main() {
+	for {
+		reader := bufio.NewReader(os.Stdin)
+		fmt.Print("Listening to Your Command:")
+		command, _ := reader.ReadString('\n')
+		handleCommand(command)
+	}
 }

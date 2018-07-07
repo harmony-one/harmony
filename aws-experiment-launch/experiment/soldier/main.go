@@ -14,18 +14,18 @@ import (
 	"time"
 )
 
-const (
-	StopCharacter = "\r\n\r\n"
-)
+type soliderSetting struct {
+	ip          string
+	port        string
+	localConfig string
+}
 
 var (
-	ip          *string
-	port        *string
-	localConfig string
+	setting soliderSetting
 )
 
 func socketServer() {
-	soldierPort := "1" + *port // the soldier port is "1" + node port
+	soldierPort := "1" + setting.port // the soldier port is "1" + node port
 	listen, err := net.Listen("tcp4", ":"+soldierPort)
 	if err != nil {
 		log.Fatalf("Socket listen port %s failed,%s", soldierPort, err)
@@ -92,9 +92,9 @@ func handleCommand(command string, w *bufio.Writer) {
 		{
 			handleInitCommand(args[1:], w)
 		}
-	case "close":
+	case "kill":
 		{
-			log.Println("close command")
+			handleKillCommand(w)
 		}
 	}
 }
@@ -102,8 +102,8 @@ func handleCommand(command string, w *bufio.Writer) {
 func handleInitCommand(args []string, w *bufio.Writer) {
 	log.Println("Init command", args)
 	// create local config file
-	localConfig = "node_config_" + *port + ".txt"
-	out, err := os.Create(localConfig)
+	setting.localConfig = "node_config_" + setting.port + ".txt"
+	out, err := os.Create(setting.localConfig)
 	if err != nil {
 		log.Fatal("Failed to create local file", err)
 	}
@@ -124,7 +124,7 @@ func handleInitCommand(args []string, w *bufio.Writer) {
 	}
 
 	// log config file
-	content, err := ioutil.ReadFile(localConfig)
+	content, err := ioutil.ReadFile(setting.localConfig)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -133,8 +133,18 @@ func handleInitCommand(args []string, w *bufio.Writer) {
 
 	run()
 
-	log.Println("Successfully init-ed")
-	w.Write([]byte("Successfully init-ed"))
+	logAndReply(w, "Successfully init-ed")
+}
+
+func handleKillCommand(w *bufio.Writer) {
+	log.Println("Kill command")
+	runCmd("../kill_node.sh")
+	logAndReply(w, "Kill command done.")
+}
+
+func logAndReply(w *bufio.Writer, message string) {
+	log.Println(message)
+	w.Write([]byte(message))
 	w.Flush()
 }
 
@@ -149,39 +159,33 @@ func createLogFolder() string {
 	return logFolder
 }
 
-func runCmd(name string, args []string) {
-	log.Println(name, args)
+func runCmd(name string, args ...string) error {
 	err := exec.Command(name, args...).Start()
-	if err != nil {
-		log.Fatal("Failed to run command: ", err)
-	}
-
-	log.Println("Command running")
+	log.Println("Command running", name, args)
+	return err
 }
 
 func run() {
-	config := readConfigFile(localConfig)
+	config := readConfigFile(setting.localConfig)
 
-	myConfig := getMyConfig(*ip, *port, &config)
+	myConfig := getMyConfig(setting.ip, setting.port, &config)
 
-	log.Println(myConfig)
+	logFolder := createLogFolder()
 	if myConfig[2] == "client" {
-		runClient()
+		runClient(logFolder)
 	} else {
-		runInstance()
+		runInstance(logFolder)
 	}
 }
 
-func runInstance() {
+func runInstance(logFolder string) error {
 	log.Println("running instance")
-	logFolder := createLogFolder()
-	runCmd("./benchmark", []string{"-ip", *ip, "-port", *port, "-config_file", localConfig, "-log_folder", logFolder})
+	return runCmd("./benchmark", "-ip", setting.ip, "-port", setting.port, "-config_file", setting.localConfig, "-log_folder", logFolder)
 }
 
-func runClient() {
+func runClient(logFolder string) error {
 	log.Println("running client")
-	logFolder := createLogFolder()
-	runCmd("./txgen", []string{"-config_file", localConfig, "-log_folder", logFolder})
+	return runCmd("./txgen", "-config_file", setting.localConfig, "-log_folder", logFolder)
 }
 
 func isTransportOver(data string) (over bool) {
@@ -215,9 +219,12 @@ func getMyConfig(myIP string, myPort string, config *[][]string) []string {
 // cd bin/
 // ./soldier --port=xxxx
 func main() {
-	ip = flag.String("ip", "127.0.0.1", "IP of the node.")
-	port = flag.String("port", "3000", "port of the node.")
+	ip := flag.String("ip", "127.0.0.1", "IP of the node.")
+	port := flag.String("port", "3000", "port of the node.")
 	flag.Parse()
+
+	setting.ip = *ip
+	setting.port = *port
 
 	socketServer()
 }
