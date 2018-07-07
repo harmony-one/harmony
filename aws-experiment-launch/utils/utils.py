@@ -52,6 +52,38 @@ def collect_public_ips(region_number, node_name_tag, region_config):
     ip_list = collect_public_ips_from_ec2_client(ec2_client, node_name_tag)
     return ip_list
 
+def get_application(codedeploy, application_name):
+    response = codedeploy.list_applications()
+    if application_name in response['applications']:
+        return response
+    else:
+        response = codedeploy.create_application(
+            applicationName=application_name,
+            computePlatform='Server'
+        )
+    return response
+
+def create_deployment_group(codedeploy, region_number,application_name, deployment_group, node_name_tag):
+    _ = codedeploy.create_deployment_group(
+        applicationName=application_name,
+        deploymentGroupName=deployment_group,
+        deploymentConfigName='CodeDeployDefault.AllAtOnce',
+        serviceRoleArn='arn:aws:iam::656503231766:role/BenchMarkCodeDeployServiceRole',
+        deploymentStyle={
+            'deploymentType': 'IN_PLACE',
+            'deploymentOption': 'WITHOUT_TRAFFIC_CONTROL'
+        },
+        ec2TagFilters = [
+            {
+                'Key': 'Name',
+                'Value': node_name_tag,
+                'Type': 'KEY_AND_VALUE'
+            }
+        ]
+    )
+    # Checking??
+    return deployment_group
+
 def generate_distribution_config2(region_number, node_name_tag, region_config,
                                   shard_number, client_number, distribution_config):
     ip_list = collect_public_ips(region_number, node_name_tag, region_config)
