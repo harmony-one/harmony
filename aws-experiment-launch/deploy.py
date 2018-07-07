@@ -1,12 +1,14 @@
-import boto3
 import argparse
-import sys
-import json
-import time
-import datetime
-from threading import Thread
-from Queue import Queue
 import base64
+import boto3
+import datetime
+import json
+import os
+import sys
+import time
+
+from Queue import Queue
+from threading import Thread
 
 from utils import utils
 
@@ -51,50 +53,15 @@ def run_one_region_codedeploy(region_number, region_config, node_name_tag, commi
 
     codedeploy = session.client('codedeploy')
     application_name = APPLICATION_NAME
-    deployment_group = APPLICATION_NAME + "-" + str(commit_id)[6] + "-" + CURRENT_SESSION
+    deployment_group = APPLICATION_NAME + "-" + commit_id[:6] + "-" + CURRENT_SESSION
     repo = REPO
 
-    print("Setting up to deploy commit_id %s on region %s"%(commit_id,region_number))
-    response = get_application(codedeploy, application_name)
-    deployment_group = get_deployment_group(
-        codedeploy, region_number, application_name, deployment_group)
-    depId = deploy(codedeploy, application_name,
-                   deployment_group, repo, commit_id)
-    return region_number, depId
-
-
-def get_deployment_group(codedeploy, region_number,application_name, deployment_group):
-    NODE_NAME = region_number + "-" + NODE_NAME_SUFFIX
-    response = codedeploy.create_deployment_group(
-        applicationName=application_name,
-        deploymentGroupName=deployment_group,
-        deploymentConfigName='CodeDeployDefault.AllAtOnce',
-        serviceRoleArn='arn:aws:iam::656503231766:role/BenchMarkCodeDeployServiceRole',
-        deploymentStyle={
-            'deploymentType': 'IN_PLACE',
-            'deploymentOption': 'WITHOUT_TRAFFIC_CONTROL'
-        },
-        ec2TagFilters = [
-            {
-                'Key': 'Name',
-                'Value': NODE_NAME,
-                'Type': 'KEY_AND_VALUE'
-            }
-        ]
-    )
-    return deployment_group
-
-
-def get_application(codedeploy, application_name):
-    response = codedeploy.list_applications()
-    if application_name in response['applications']:
-        return response
-    else:
-        response = codedeploy.create_application(
-            applicationName=application_name,
-            computePlatform='Server'
-        )
-    return response
+    print("Setting up to deploy commit_id %s on region %s" % (commit_id, region_number))
+    utils.get_application(codedeploy, application_name)
+    deployment_group = utils.create_deployment_group(
+        codedeploy, region_number, application_name, deployment_group, node_name_tag)
+    deployment_id = deploy(codedeploy, application_name, deployment_group, repo, commit_id)
+    return region_number, deployment_id
 
 
 def deploy(codedeploy, application_name, deployment_group, repo, commit_id):
@@ -115,39 +82,39 @@ def deploy(codedeploy, application_name, deployment_group, repo, commit_id):
             'revisionType': 'GitHub',
             'gitHubLocation': {
                     'repository': repo,
-                    'commit_id': commit_id,
+                    'commitId': commit_id,
             }
         }
     )
-    depId = res["deploymentId"]
-    print("Deployment ID: " + depId)
+    deployment_id = res["deploymentId"]
+    print("Deployment ID: " + deployment_id)
     # The deployment is launched at this point, so exit unless asked to wait
     # until it finishes
     info = {'status': 'Created'}
     start = time.time()
     while info['status'] not in ('Succeeded', 'Failed', 'Stopped',) and (time.time() - start < 600.0):
-        info = codedeploy.get_deployment(deploymentId=depId)['deploymentInfo']
+        info = codedeploy.get_deployment(deploymentId=deployment_id)['deploymentInfo']
         print(info['status'])
         time.sleep(15)
     if info['status'] == 'Succeeded':
         print("\nDeploy Succeeded")
-        return depId
     else:
         print("\nDeploy Failed")
         print(info)
-        return depId
+    return deployment_id
 
-def run_one_region_codedeploy_wrapper(region_number, commit_id, queue):
-    region_number, depId = run_one_region_codedeploy(region_number, commit_id)
-    queue.put((region_number, depId))
+def run_one_region_codedeploy_wrapper(region_number, region_config, node_name_tag, commit_id, queue):
+    region_number, deployment_id = run_one_region_codedeploy(region_number, region_config, node_name_tag, commit_id)
+    queue.put((region_number, deployment_id))
 
-def launch_code_deploy(region_list, commit_id):
+def launch_code_deploy(region_list, region_config, commit_id):
     queue = Queue()
     jobs = []
-    for i in range(len(region_list)):
-        region_number = region_list[i]
+    for region_tuppple in region_list:
+        # node_name_tag comes first.
+        node_name_tag, region_number = region_tuppple
         my_thread = Thread(target=run_one_region_codedeploy_wrapper, args=(
-            region_number, commit_id, queue))
+            region_number, region_config, node_name_tag, commit_id, queue))
         my_thread.start()
         jobs.append(my_thread)
     for my_thread in jobs:
@@ -158,21 +125,21 @@ def launch_code_deploy(region_list, commit_id):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='This script helps you start instances across multiple regions')
-    parser.add_argument('--regions', type=str, dest='regions',
-                        default='3', help="Supply a csv list of all regions")
-    parser.add_argument('--instances', type=str, dest='numInstances',
-                        default='1', help='number of instances')
-    parser.add_argument('--configuration', type=str,
-                        dest='config', default='configuration.txt')
+    parser.add_argument('--instance_output', type=str, dest='instance_output',
+                        default='instance_output.txt',
+                        help='the file contains node_name_tag and region number of created instances.')
+    parser.add_argument('--region_config', type=str, dest='region_config', default='configuration.txt')
     parser.add_argument('--commit_id', type=str, dest='commit_id',
                         default='1f7e6e7ca7cf1c1190cedec10e791c01a29971cf')
     args = parser.parse_args()
-    config = utils.read_region_config(args.config)
-    region_list = [item.strip() for item in args.regions.split(',')]
-    instances_list = [item.strip() for item in args.numInstances.split(',')]
-    assert len(region_list) == len(instances_list), "number of regions: %d != number of instances per region: %d" % (
-        len(region_list), len(instances_list))
     commit_id = args.commit_id
 
-    results = launch_code_deploy(region_list, commit_id)
-    print(results)
+    if not os.path.isfile(args.instance_output) or not commit_id:
+        print "%s does not exist" % args.instance_output
+        sys.exit(1)
+
+    with open(args.instance_output, "r") as fin:
+        region_list = [line.split(" ") for line in fin.readlines()]
+        region_list = [(item[0].strip(), item[1].strip()) for item in region_list]
+        results = launch_code_deploy(region_list, args.region_config, commit_id)
+        print(results)
