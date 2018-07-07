@@ -1,5 +1,5 @@
 #!/bin/bash -x
-echo "Run Instances" >> tmplog
+echo "Run Instances starts" >> tmplog
 
 echo "Update systcl" >> tmplog
 sudo sysctl net.core.somaxconn=1024
@@ -30,3 +30,5 @@ echo "Run soldier" >> tmplog
 cd $GOPATH/src/harmony-benchmark
 node_port=3000
 ./bin/soldier -ip $ip -port $node_port &
+
+echo "Run Instances done" >> tmplog
