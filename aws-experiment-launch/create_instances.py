@@ -96,7 +96,8 @@ if __name__ == "__main__":
                         dest='config', default='configuration.txt')
     parser.add_argument('--instance_output', type=str, dest='instance_output',
                         default='instance_output.txt', help='the file to append or write')
-    parser.add_argument('--append', dest='append', default=False, help='append to the current instance_output')
+    parser.add_argument('--append', dest='append', type=bool, default=False,
+                        help='append to the current instance_output')
     args = parser.parse_args()
     config = utils.read_region_config(args.config)
     region_list = args.regions.split(',')
