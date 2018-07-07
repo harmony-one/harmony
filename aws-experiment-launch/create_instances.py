@@ -96,13 +96,14 @@ if __name__ == "__main__":
                         dest='config', default='configuration.txt')
     parser.add_argument('--instance_output', type=str, dest='instance_output',
                         default='instance_output.txt', help='the file to append or write')
+    parser.add_argument('--append', dest='append', default=False, help='append to the current instance_output')
     args = parser.parse_args()
     config = utils.read_region_config(args.config)
     region_list = args.regions.split(',')
     instances_list = args.numInstances.split(',')
     assert len(region_list) == len(instances_list), "number of regions: %d != number of instances per region: %d" % (len(region_list), len(instances_list))
 
-    with open(args.instance_output, "a") as fout:
+    with open(args.instance_output, "a" if args.append else "w") as fout:
         for i in range(len(region_list)):
             region_number = region_list[i]
             number_of_instances = instances_list[i]
