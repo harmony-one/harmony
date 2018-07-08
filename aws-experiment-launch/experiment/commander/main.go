@@ -3,11 +3,16 @@ package main
 import (
 	"bufio"
 	"flag"
+	"fmt"
+	"io"
+	"io/ioutil"
 	"log"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
 
 type commanderSetting struct {
@@ -15,6 +20,7 @@ type commanderSetting struct {
 	port       string
 	configFile string
 	configs    [][]string
+	sessionID  string
 }
 
 var (
@@ -46,11 +52,11 @@ func handleCommand(command string) {
 	switch cmd := args[0]; cmd {
 	case "init":
 		{
-			dictateNodes("init http://" + setting.ip + ":" + setting.port + "/" + setting.configFile)
+			setting.sessionID = time.Now().Format("20060102-150405")
+			log.Println("New session", setting.sessionID)
+			dictateNodes(fmt.Sprintf("init %v %v %v %v", setting.ip, setting.port, setting.configFile, setting.sessionID))
 		}
-	case "ping":
-		fallthrough
-	case "kill":
+	case "ping", "kill", "log":
 		{
 			dictateNodes(command)
 		}
@@ -102,10 +108,75 @@ func dictateNode(addr string, command string) {
 	log.Printf("Receive from %s: %s", addr, buff[:n])
 }
 
-func hostConfigFile() {
-	err := http.ListenAndServe(":"+setting.port, http.FileServer(http.Dir("./")))
+func handleUploadRequest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		// reject non-post requests
+		jsonResponse(w, http.StatusBadRequest, "Only post request is accepted.")
+		return
+	}
+
+	// create upload folder
+	uploadFolder := fmt.Sprintf("upload/%s", setting.sessionID)
+	err := os.MkdirAll(uploadFolder, os.ModePerm)
 	if err != nil {
-		panic("Failed to host config file!")
+		jsonResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	reader, err := r.MultipartReader()
+	if err != nil {
+		jsonResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	for {
+		part, err := reader.NextPart()
+		if err == io.EOF {
+			break
+		}
+
+		dst, err := os.Create(fmt.Sprintf("%s/%s", uploadFolder, part.FileName()))
+		log.Println(part.FileName())
+		if err != nil {
+			jsonResponse(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		defer dst.Close()
+
+		if _, err := io.Copy(dst, part); err != nil {
+			jsonResponse(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+	}
+}
+
+func saveFile(w http.ResponseWriter, file multipart.File, handle *multipart.FileHeader) {
+	data, err := ioutil.ReadAll(file)
+	if err != nil {
+		jsonResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	err = ioutil.WriteFile("./files/"+handle.Filename, data, 0666)
+	if err != nil {
+		jsonResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	jsonResponse(w, http.StatusCreated, "File uploaded successfully!")
+}
+
+func jsonResponse(w http.ResponseWriter, code int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	fmt.Fprint(w, message)
+	log.Println(message)
+}
+
+func serve() {
+	http.Handle("/", http.FileServer(http.Dir("./")))
+	http.HandleFunc("/upload", handleUploadRequest)
+	err := http.ListenAndServe(":"+setting.port, nil)
+	if err != nil {
+		log.Fatalf("Failed to setup server! Error: %s", err.Error())
 	}
 }
 
@@ -117,7 +188,8 @@ func main() {
 	config(*ip, *port, *configFile)
 
 	log.Println("Start to host config file at http://" + setting.ip + ":" + setting.port + "/" + setting.configFile)
-	go hostConfigFile()
+
+	go serve()
 
 	scanner := bufio.NewScanner(os.Stdin)
 	for true {
