@@ -10,10 +10,13 @@ def terminate_instances_by_region(region_number, region_config):
     ec2_client, _ = utils.create_ec2_client(region_number, args.region_config)
     filters = [{'Name': 'tag:Name','Values': [node_name_tag]}]
     instance_ids = utils.get_instance_ids(ec2_client.describe_instances(Filters=filters))
-    ec2_client.terminate_instances(InstanceIds=instance_ids)
-    print "waiting until instances with tag %s died." % node_name_tag
-    waiter = ec2_client.get_waiter('instance_terminated')
-    waiter.wait(InstanceIds=instance_ids)
+    if instance_ids:
+        ec2_client.terminate_instances(InstanceIds=instance_ids)
+        print "waiting until instances with tag %s died." % node_name_tag
+        waiter = ec2_client.get_waiter('instance_terminated')
+        waiter.wait(InstanceIds=instance_ids)
+    else:
+        print 'there is no instances to terminate'
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='This script helps you to collect public ips')
