@@ -110,9 +110,9 @@ func hostConfigFile() {
 }
 
 func main() {
-	ip := flag.String("ip", "127.0.0.1", "ip of commander")
-	port := flag.String("port", "8080", "port of config file")
-	configFile := flag.String("config_file", "test.txt", "file name of config file")
+	ip := flag.String("ip", "127.0.0.1", "The ip of commander, i.e. this machine")
+	port := flag.String("port", "8080", "The port where you want to host the config file")
+	configFile := flag.String("config_file", "test.txt", "The file name of config file which should be put in the same of folder as commander")
 
 	config(*ip, *port, *configFile)
 
