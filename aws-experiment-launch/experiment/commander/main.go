@@ -39,7 +39,6 @@ func readConfigFile() [][]string {
 
 func handleCommand(command string) {
 	args := strings.Split(command, " ")
-	log.Println(args)
 	if len(args) <= 0 {
 		return
 	}
