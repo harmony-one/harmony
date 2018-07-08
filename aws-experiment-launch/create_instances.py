@@ -114,8 +114,7 @@ if __name__ == "__main__":
             if node_name_tag:
                 print("Managed to create instances for region %s" % region_number )
                 fout.write("%s %s\n" % (node_name_tag, region_number))
-                filters = [{'Name': 'tag:Name','Values': [node_name_tag]}]
-                instance_ids = utils.get_instance_ids(ec2_client.describe_instances(Filters=filters))
+                instance_ids = utils.get_instance_ids2(ec2_client, node_name_tag)
                 for instance_id in instance_ids:
                     fout2.write(instance_id + " " + node_name_tag + " " + region_number + " " + config[region_number][utils.REGION_NAME] + "\n")
             else:
