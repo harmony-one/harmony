@@ -1,16 +1,20 @@
+from Queue import Queue
+from threading import Thread
 import argparse
 import base64
 import boto3
 import datetime
 import json
+import logging
 import os
 import sys
 import time
 
-from Queue import Queue
-from threading import Thread
-
 from utils import utils
+
+logging.basicConfig(level=logging.INFO, format='%(threadName)s %(asctime)s - %(name)s - %(levelname)s - %(message)s')
+LOGGER = logging.getLogger(__file__)
+LOGGER.setLevel(logging.INFO)
 
 class InstanceResource:
     ON_DEMAND = 1
@@ -37,17 +41,17 @@ def run_one_region_codedeploy(region_number, region_config, node_name_tag, commi
     filters = [{'Name': 'tag:Name','Values': [node_name_tag]}]
     instance_ids = utils.get_instance_ids(ec2_client.describe_instances(Filters=filters))
     
-    print("Number of instances: %d" % len(instance_ids))
+    LOGGER.info("Number of instances: %d" % len(instance_ids))
 
-    print("Waiting for all %d instances in region %s to start running"%(len(instance_ids),region_number))
+    LOGGER.info("Waiting for all %d instances in region %s to start running"%(len(instance_ids),region_number))
     waiter = ec2_client.get_waiter('instance_running')
     waiter.wait(InstanceIds=instance_ids)
 
-    print("Waiting for all %d instances in region %s to be INSTANCE STATUS OK"%(len(instance_ids),region_number))
+    LOGGER.info("Waiting for all %d instances in region %s to be INSTANCE STATUS OK"%(len(instance_ids),region_number))
     waiter = ec2_client.get_waiter('instance_status_ok')
     waiter.wait(InstanceIds=instance_ids)
 
-    print("Waiting for all %d instances in region %s to be SYSTEM STATUS OK"%(len(instance_ids),region_number))
+    LOGGER.info("Waiting for all %d instances in region %s to be SYSTEM STATUS OK"%(len(instance_ids),region_number))
     waiter = ec2_client.get_waiter('system_status_ok')
     waiter.wait(InstanceIds=instance_ids)
 
@@ -56,7 +60,7 @@ def run_one_region_codedeploy(region_number, region_config, node_name_tag, commi
     deployment_group = APPLICATION_NAME + "-" + commit_id[:6] + "-" + CURRENT_SESSION
     repo = REPO
 
-    print("Setting up to deploy commit_id %s on region %s" % (commit_id, region_number))
+    LOGGER.info("Setting up to deploy commit_id %s on region %s" % (commit_id, region_number))
     utils.get_application(codedeploy, application_name)
     deployment_group = utils.create_deployment_group(
         codedeploy, region_number, application_name, deployment_group, node_name_tag)
@@ -72,7 +76,7 @@ def deploy(codedeploy, application_name, deployment_group, repo, commit_id):
     - commit_id: commit ID to be deployed
     - wait: wait until the CodeDeploy finishes
     """
-    print("Launching CodeDeploy with commit " + commit_id)
+    LOGGER.info("Launching CodeDeploy with commit " + commit_id)
     res = codedeploy.create_deployment(
         applicationName=application_name,
         deploymentGroupName=deployment_group,
@@ -87,20 +91,20 @@ def deploy(codedeploy, application_name, deployment_group, repo, commit_id):
         }
     )
     deployment_id = res["deploymentId"]
-    print("Deployment ID: " + deployment_id)
+    LOGGER.info("Deployment ID: " + deployment_id)
     # The deployment is launched at this point, so exit unless asked to wait
     # until it finishes
     info = {'status': 'Created'}
     start = time.time()
     while info['status'] not in ('Succeeded', 'Failed', 'Stopped',) and (time.time() - start < 600.0):
         info = codedeploy.get_deployment(deploymentId=deployment_id)['deploymentInfo']
-        print(info['status'])
+        LOGGER.info(info['status'])
         time.sleep(15)
     if info['status'] == 'Succeeded':
-        print("\nDeploy Succeeded")
+        LOGGER.info("\nDeploy Succeeded")
     else:
-        print("\nDeploy Failed")
-        print(info)
+        LOGGER.info("\nDeploy Failed")
+        LOGGER.info(info)
     return deployment_id
 
 def run_one_region_codedeploy_wrapper(region_number, region_config, node_name_tag, commit_id, queue):
@@ -135,11 +139,11 @@ if __name__ == "__main__":
     commit_id = args.commit_id
 
     if not os.path.isfile(args.instance_output) or not commit_id:
-        print "%s does not exist" % args.instance_output
+        LOGGER.info("%s does not exist" % args.instance_output)
         sys.exit(1)
 
     with open(args.instance_output, "r") as fin:
         region_list = [line.split(" ") for line in fin.readlines()]
         region_list = [(item[0].strip(), item[1].strip()) for item in region_list]
         results = launch_code_deploy(region_list, args.region_config, commit_id)
-        print(results)
+        LOGGER.info(results)
