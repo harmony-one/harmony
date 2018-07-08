@@ -1,12 +1,11 @@
-import boto3
 import argparse
-import sys
-import json
-import time
-import datetime
-from threading import Thread
-from Queue import Queue
 import base64
+import boto3
+import datetime
+import json
+import sys
+import threading
+import time
 
 from utils import utils
 
@@ -85,6 +84,23 @@ def create_instances(config, ec2_client, region_number, number_of_instances):
     print("Can not create %d instances" % number_of_instances)
     return None
 
+lock = threading.Lock()
+
+def run_for_one_region(config, region_number, number_of_instances, instance_resouce, fout, fout2):
+    node_name_tag, ec2_client = run_one_region_instances(config, region_number, number_of_instances, InstanceResource.ON_DEMAND)
+    if node_name_tag:
+        print("Managed to create instances for region %s" % region_number )
+        instance_ids = utils.get_instance_ids2(ec2_client, node_name_tag)
+        lock.acquire()
+        try:
+            fout.write("%s %s\n" % (node_name_tag, region_number))
+            for instance_id in instance_ids:
+                fout2.write(instance_id + " " + node_name_tag + " " + region_number + " " + config[region_number][utils.REGION_NAME] + "\n")
+        finally:
+            lock.release()
+    else:
+        print("Failed to create instances for region %s" % region_number )
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='This script helps you start instances across multiple regions')
@@ -107,15 +123,14 @@ if __name__ == "__main__":
 
     write_mode = "a" if args.append else "w"
     with open(args.instance_output, write_mode) as fout, open(args.instance_ids_output, write_mode) as fout2:
+        thread_pool = []
         for i in range(len(region_list)):
             region_number = region_list[i]
             number_of_instances = num_instance_list[i]
-            node_name_tag, ec2_client = run_one_region_instances(config, region_number, number_of_instances, InstanceResource.ON_DEMAND)
-            if node_name_tag:
-                print("Managed to create instances for region %s" % region_number )
-                fout.write("%s %s\n" % (node_name_tag, region_number))
-                instance_ids = utils.get_instance_ids2(ec2_client, node_name_tag)
-                for instance_id in instance_ids:
-                    fout2.write(instance_id + " " + node_name_tag + " " + region_number + " " + config[region_number][utils.REGION_NAME] + "\n")
-            else:
-                print("Failed to create instances for region %s" % region_number )
+            t = threading.Thread(target=run_for_one_region, args=(config, region_number, number_of_instances, InstanceResource.ON_DEMAND, fout, fout2))
+            print("creating thread for region %s" % region_number)
+            t.start()
+            thread_pool.append(t)
+        for t in thread_pool:
+            t.join()
+        print("done.")
