@@ -128,6 +128,10 @@ def get_one_availability_zone(ec2_client):
     else:
         return None
 
+def get_instance_ids2(ec2_client, node_name_tag):
+    filters = [{'Name': 'tag:Name','Values': [node_name_tag]}]
+    return get_instance_ids(ec2_client.describe_instances(Filters=filters))
+
 # Get instance_ids from describe_instances_response.
 def get_instance_ids(describe_instances_response):
     instance_ids = []
