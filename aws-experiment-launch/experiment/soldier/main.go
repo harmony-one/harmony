@@ -96,6 +96,10 @@ func handleCommand(command string, w *bufio.Writer) {
 		{
 			handleKillCommand(w)
 		}
+	case "ping":
+		{
+			handlePingCommand(w)
+		}
 	}
 }
 
@@ -140,6 +144,11 @@ func handleKillCommand(w *bufio.Writer) {
 	log.Println("Kill command")
 	runCmd("../kill_node.sh")
 	logAndReply(w, "Kill command done.")
+}
+
+func handlePingCommand(w *bufio.Writer) {
+	log.Println("Ping command")
+	logAndReply(w, "I'm alive")
 }
 
 func logAndReply(w *bufio.Writer, message string) {
