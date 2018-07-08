@@ -75,27 +75,31 @@ func dictateNodes(command string) {
 		port := "1" + config[1] // the port number of solider is "1" + node port
 		addr := strings.Join([]string{ip, port}, ":")
 
-		// creates client
-		conn, err := net.Dial("tcp", addr)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		defer conn.Close()
-
-		// send command
-		_, err = conn.Write([]byte(command))
-		if err != nil {
-			log.Printf("Failed to send command to %s", addr)
-			return
-		}
-		log.Printf("Send: %s", command)
-
-		// read response
-		buff := make([]byte, 1024)
-		n, _ := conn.Read(buff)
-		log.Printf("Receive from %s: %s", addr, buff[:n])
+		go dictateNode(addr, command)
 	}
+}
+
+func dictateNode(addr string, command string) {
+	// creates client
+	conn, err := net.Dial("tcp", addr)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	defer conn.Close()
+
+	// send command
+	_, err = conn.Write([]byte(command))
+	if err != nil {
+		log.Printf("Failed to send command to %s", addr)
+		return
+	}
+	log.Printf("Send: %s", command)
+
+	// read response
+	buff := make([]byte, 1024)
+	n, _ := conn.Read(buff)
+	log.Printf("Receive from %s: %s", addr, buff[:n])
 }
 
 func hostConfigFile() {
