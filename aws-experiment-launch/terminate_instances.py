@@ -1,9 +1,9 @@
-import threading
 import argparse
+import logging
 import os
 import random
 import sys
-import logging
+import threading
 
 from utils import utils
 

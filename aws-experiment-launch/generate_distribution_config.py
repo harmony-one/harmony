@@ -1,7 +1,13 @@
 import argparse
+import logging
 import sys
 
 from utils import utils
+
+logging.basicConfig(level=logging.INFO, format='%(threadName)s %(asctime)s - %(name)s - %(levelname)s - %(message)s')
+LOGGER = logging.getLogger(__file__)
+LOGGER.setLevel(logging.INFO)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='This script helps you to genereate distribution config')
@@ -28,4 +34,4 @@ if __name__ == "__main__":
     else:
         utils.generate_distribution_config3(args.shard_number, args.client_number,
                                             args.ip_list_file, args.distribution_config)
-    print "Done writing %s" % args.distribution_config
+    LOGGER.info("Done writing %s" % args.distribution_config)
