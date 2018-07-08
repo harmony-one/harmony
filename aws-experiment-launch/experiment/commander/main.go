@@ -94,7 +94,7 @@ func dictateNode(addr string, command string) {
 		log.Printf("Failed to send command to %s", addr)
 		return
 	}
-	log.Printf("Send: %s", command)
+	log.Printf("Send \"%s\" to %s", command, addr)
 
 	// read response
 	buff := make([]byte, 1024)
