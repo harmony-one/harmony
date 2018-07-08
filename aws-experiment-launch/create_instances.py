@@ -103,8 +103,7 @@ if __name__ == "__main__":
     config = utils.read_region_config(args.region_config)
     region_list = args.regions.split(',')
     num_instance_list = args.num_instance_list.split(',')
-    assert(len(region_list) == len(num_instance_list),
-           "number of regions: %d != number of instances per region: %d" % (len(region_list), len(num_instance_list)))
+    assert len(region_list) == len(num_instance_list), "number of regions: %d != number of instances per region: %d" % (len(region_list), len(num_instance_list))
 
     write_mode = "a" if args.append else "w"
     with open(args.instance_output, write_mode) as fout, open(args.instance_ids_output, write_mode) as fout2:
@@ -118,6 +117,6 @@ if __name__ == "__main__":
                 filters = [{'Name': 'tag:Name','Values': [node_name_tag]}]
                 instance_ids = utils.get_instance_ids(ec2_client.describe_instances(Filters=filters))
                 for instance_id in instance_ids:
-                    fout2.write(instance_id + " " + node_name_tag + " " + region_number)
+                    fout2.write(instance_id + " " + node_name_tag + " " + region_number + " " + config[region_number][utils.REGION_NAME] + "\n")
             else:
                 print("Failed to create instances for region %s" % region_number )
