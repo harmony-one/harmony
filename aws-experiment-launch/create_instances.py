@@ -3,11 +3,16 @@ import base64
 import boto3
 import datetime
 import json
+import logging
 import sys
 import threading
 import time
 
 from utils import utils
+
+logging.basicConfig(level=logging.INFO, format='%(threadName)s %(asctime)s - %(name)s - %(levelname)s - %(message)s')
+LOGGER = logging.getLogger(__file__)
+LOGGER.setLevel(logging.INFO)
 
 class InstanceResource:
     ON_DEMAND = 1
@@ -33,7 +38,7 @@ def run_one_region_instances(config, region_number, number_of_instances, instanc
     if instance_resource == InstanceResource.ON_DEMAND:
         node_name_tag = create_instances(
             config, ec2_client, region_number, int(number_of_instances))
-        print("Created %s in region %s" % (node_name_tag, region_number))
+        LOGGER.info("Created %s in region %s" % (node_name_tag, region_number))
         return node_name_tag, ec2_client
     else:
         return None, None
@@ -41,9 +46,9 @@ def run_one_region_instances(config, region_number, number_of_instances, instanc
 
 def create_instances(config, ec2_client, region_number, number_of_instances):
     node_name_tag = region_number + "-" + NODE_NAME_SUFFIX
-    print("Creating node_name_tag: %s" % node_name_tag)
+    LOGGER.info("Creating node_name_tag: %s" % node_name_tag)
     available_zone = utils.get_one_availability_zone(ec2_client)
-    print("Looking at zone %s to create instances." % available_zone)
+    LOGGER.info("Looking at zone %s to create instances." % available_zone)
 
     ec2_client.run_instances(
         MinCount=number_of_instances,
@@ -75,13 +80,13 @@ def create_instances(config, ec2_client, region_number, number_of_instances):
     count = 0
     while count < 40:
         time.sleep(5)
-        print("Waiting ...")
+        LOGGER.info("Waiting ...")
         ip_list = utils.collect_public_ips_from_ec2_client(ec2_client, node_name_tag)
         if len(ip_list) == number_of_instances:
-            print("Created %d instances" % number_of_instances)
+            LOGGER.info("Created %d instances" % number_of_instances)
             return node_name_tag
         count = count + 1
-    print("Can not create %d instances" % number_of_instances)
+    LOGGER.info("Can not create %d instances" % number_of_instances)
     return None
 
 lock = threading.Lock()
@@ -89,7 +94,7 @@ lock = threading.Lock()
 def run_for_one_region(config, region_number, number_of_instances, instance_resouce, fout, fout2):
     node_name_tag, ec2_client = run_one_region_instances(config, region_number, number_of_instances, InstanceResource.ON_DEMAND)
     if node_name_tag:
-        print("Managed to create instances for region %s" % region_number )
+        LOGGER.info("Managed to create instances for region %s" % region_number )
         instance_ids = utils.get_instance_ids2(ec2_client, node_name_tag)
         lock.acquire()
         try:
@@ -99,7 +104,7 @@ def run_for_one_region(config, region_number, number_of_instances, instance_reso
         finally:
             lock.release()
     else:
-        print("Failed to create instances for region %s" % region_number )
+        LOGGER.info("Failed to create instances for region %s" % region_number )
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -128,9 +133,9 @@ if __name__ == "__main__":
             region_number = region_list[i]
             number_of_instances = num_instance_list[i]
             t = threading.Thread(target=run_for_one_region, args=(config, region_number, number_of_instances, InstanceResource.ON_DEMAND, fout, fout2))
-            print("creating thread for region %s" % region_number)
+            LOGGER.info("creating thread for region %s" % region_number)
             t.start()
             thread_pool.append(t)
         for t in thread_pool:
             t.join()
-        print("done.")
+        LOGGER.info("done.")
