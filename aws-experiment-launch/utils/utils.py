@@ -105,17 +105,18 @@ def generate_distribution_config(shard_number, client_number, ip_list, distribut
 
     # Create ip for clients.
     client_id, leader_id, validator_id = 0, 0, 0
+    validator_number = len(ip_list) - client_number - shard_number
     with open(distribution_config, "w") as fout:
-        for i in range(len(ip_list)):
-            if client_id < client_number:
-                fout.write("%s 9000 client %d\n" % (ip_list[i], client_id % shard_number))
-                client_id = client_id + 1
+        for i in range(len(ip_list)):            
+            if validator_id < validator_number:
+                fout.write("%s 9000 validator %d\n" % (ip_list[i], validator_id % shard_number))
+                validator_id = validator_id + 1
             elif leader_id < shard_number:
                 fout.write("%s 9000 leader %d\n" % (ip_list[i], leader_id))
                 leader_id = leader_id + 1
             else:
-                fout.write("%s 9000 validator %d\n" % (ip_list[i], validator_id % shard_number))
-                validator_id = validator_id + 1
+                fout.write("%s 9000 client %d\n" % (ip_list[i], client_id % shard_number))
+                client_id = client_id + 1
 
 def get_availability_zones(ec2_client):
     response = ec2_client.describe_availability_zones()
