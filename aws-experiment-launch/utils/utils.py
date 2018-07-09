@@ -99,23 +99,27 @@ def generate_distribution_config3(shard_number, client_number, ip_list_file, dis
         generate_distribution_config(shard_number, client_number, ip_list, distribution_config)
 
 def generate_distribution_config(shard_number, client_number, ip_list, distribution_config):
-    if len(ip_list) < shard_number * 2 + client_number:
+    if len(ip_list) < shard_number * 2 + client_number + 1:
         print("Not enough nodes to generate a config file")
         return False
 
     # Create ip for clients.
-    client_id, leader_id, validator_id = 0, 0, 0
-    validator_number = len(ip_list) - client_number - shard_number
+    client_id, leader_id, validator_id, commander_id = 0, 0, 0, 0
+    validator_number = len(ip_list) - client_number - shard_number - 1
     with open(distribution_config, "w") as fout:
-        for i in range(len(ip_list)):            
-            if validator_id < validator_number:
-                fout.write("%s 9000 validator %d\n" % (ip_list[i], validator_id % shard_number))
+        for i in range(len(ip_list)):
+            ip, node_name_tag = ip_list[i].split(" ")
+            if commander_id < 1:
+                fout.write("%s 9000 commander %d %s\n" % (ip, commander_id % shard_number, node_name_tag))
+                commander_id = commander_id + 1
+            elif validator_id < validator_number:
+                fout.write("%s 9000 validator %d %s\n" % (ip, validator_id % shard_number, node_name_tag))
                 validator_id = validator_id + 1
             elif leader_id < shard_number:
-                fout.write("%s 9000 leader %d\n" % (ip_list[i], leader_id))
+                fout.write("%s 9000 leader %d %s\n" % (ip, leader_id, node_name_tag))
                 leader_id = leader_id + 1
             else:
-                fout.write("%s 9000 client %d\n" % (ip_list[i], client_id % shard_number))
+                fout.write("%s 9000 client %d %s\n" % (ip, client_id % shard_number, node_name_tag))
                 client_id = client_id + 1
 
 def get_availability_zones(ec2_client):
