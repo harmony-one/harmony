@@ -63,26 +63,29 @@ def get_application(codedeploy, application_name):
         )
     return response
 
-def create_deployment_group(codedeploy, region_number,application_name, deployment_group, node_name_tag):
-    _ = codedeploy.create_deployment_group(
-        applicationName=application_name,
-        deploymentGroupName=deployment_group,
-        deploymentConfigName='CodeDeployDefault.AllAtOnce',
-        serviceRoleArn='arn:aws:iam::656503231766:role/BenchMarkCodeDeployServiceRole',
-        deploymentStyle={
-            'deploymentType': 'IN_PLACE',
-            'deploymentOption': 'WITHOUT_TRAFFIC_CONTROL'
-        },
-        ec2TagFilters = [
-            {
-                'Key': 'Name',
-                'Value': node_name_tag,
-                'Type': 'KEY_AND_VALUE'
-            }
-        ]
-    )
-    # Checking??
-    return deployment_group
+def create_deployment_group(codedeploy, region_number,application_name, deployment_group_name, node_name_tag):
+    response = codedeploy.list_deployment_groups(applicationName=application_name)
+    if response.get('deploymentGroups') and (deployment_group_name in response['deploymentGroups']):
+        return None
+    else:
+        response = codedeploy.create_deployment_group(
+            applicationName=application_name,
+            deploymentGroupName=deployment_group_name,
+            deploymentConfigName='CodeDeployDefault.AllAtOnce',
+            serviceRoleArn='arn:aws:iam::656503231766:role/BenchMarkCodeDeployServiceRole',
+            deploymentStyle={
+                'deploymentType': 'IN_PLACE',
+                'deploymentOption': 'WITHOUT_TRAFFIC_CONTROL'
+            },
+            ec2TagFilters = [
+                {
+                    'Key': 'Name',
+                    'Value': node_name_tag,
+                    'Type': 'KEY_AND_VALUE'
+                }
+            ]
+        )
+        return response['deploymentGroupId']
 
 def generate_distribution_config2(region_number, node_name_tag, region_config,
                                   shard_number, client_number, distribution_config):

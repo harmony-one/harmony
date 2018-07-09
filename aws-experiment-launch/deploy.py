@@ -1,5 +1,3 @@
-from Queue import Queue
-from threading import Thread
 import argparse
 import base64
 import boto3
@@ -8,6 +6,7 @@ import json
 import logging
 import os
 import sys
+import threading
 import time
 
 from utils import utils
@@ -43,12 +42,12 @@ def run_one_region_codedeploy(region_number, region_config, node_name_tag, commi
     
     LOGGER.info("Number of instances: %d" % len(instance_ids))
 
-    LOGGER.info("Waiting for all %d instances in region %s to start running"%(len(instance_ids),region_number))
+    LOGGER.info("Waiting for all %d instances in region %s to startK"%(len(instance_ids),region_number))
+    waiter = ec2_client.get_waiter('instance_status_ok') running"%(len(instance_ids),region_number))
     waiter = ec2_client.get_waiter('instance_running')
     waiter.wait(InstanceIds=instance_ids)
 
-    LOGGER.info("Waiting for all %d instances in region %s to be INSTANCE STATUS OK"%(len(instance_ids),region_number))
-    waiter = ec2_client.get_waiter('instance_status_ok')
+    LOGGER.info("Waiting for all %d instances in region %s to be INSTANCE STATUS O
     waiter.wait(InstanceIds=instance_ids)
 
     LOGGER.info("Waiting for all %d instances in region %s to be SYSTEM STATUS OK"%(len(instance_ids),region_number))
@@ -57,14 +56,18 @@ def run_one_region_codedeploy(region_number, region_config, node_name_tag, commi
 
     codedeploy = session.client('codedeploy')
     application_name = APPLICATION_NAME
-    deployment_group = APPLICATION_NAME + "-" + commit_id[:6] + "-" + CURRENT_SESSION
+    deployment_group_name = APPLICATION_NAME + "-" + commit_id[:6] + "-" + CURRENT_SESSION
     repo = REPO
 
     LOGGER.info("Setting up to deploy commit_id %s on region %s" % (commit_id, region_number))
     utils.get_application(codedeploy, application_name)
-    deployment_group = utils.create_deployment_group(
-        codedeploy, region_number, application_name, deployment_group, node_name_tag)
-    deployment_id = deploy(codedeploy, application_name, deployment_group, repo, commit_id)
+    deployment_group_id = utils.create_deployment_group(
+        codedeploy, region_number, application_name, deployment_group_name, node_name_tag)
+    if deployment_group_id:
+        LOGGER.info("Created deployment group with id %s" % deployment_group_id)
+    else:
+        LOGGER.info("Created deployment group with name %s was created" % deployment_group_name)
+    deployment_id = deploy(codedeploy, application_name, deployment_group_name, repo, commit_id)
     return region_number, deployment_id
 
 
@@ -77,7 +80,7 @@ def deploy(codedeploy, application_name, deployment_group, repo, commit_id):
     - wait: wait until the CodeDeploy finishes
     """
     LOGGER.info("Launching CodeDeploy with commit " + commit_id)
-    res = codedeploy.create_deployment(
+    response = codedeploy.create_deployment(
         applicationName=application_name,
         deploymentGroupName=deployment_group,
         deploymentConfigName='CodeDeployDefault.AllAtOnce',
@@ -90,41 +93,40 @@ def deploy(codedeploy, application_name, deployment_group, repo, commit_id):
             }
         }
     )
-    deployment_id = res["deploymentId"]
-    LOGGER.info("Deployment ID: " + deployment_id)
-    # The deployment is launched at this point, so exit unless asked to wait
-    # until it finishes
-    info = {'status': 'Created'}
-    start = time.time()
-    while info['status'] not in ('Succeeded', 'Failed', 'Stopped',) and (time.time() - start < 600.0):
-        info = codedeploy.get_deployment(deploymentId=deployment_id)['deploymentInfo']
-        LOGGER.info(info['status'])
-        time.sleep(15)
-    if info['status'] == 'Succeeded':
-        LOGGER.info("\nDeploy Succeeded")
+    if response:
+        LOGGER.info("Deployment returned with deployment id: " + res["deploymentId"])
     else:
-        LOGGER.info("\nDeploy Failed")
-        LOGGER.info(info)
+        LOGGER.error("Deployment failed.")
+    start_time = time.time()
+    status = None
+    while time.time() - start_time < 600:
+        response = codedeploy.get_deployment(deploymentId=deployment_id)
+        if response and response.get('deploymentInfo'):
+            status = response.get['deploymentInfo']['status']
+            if status in ('Succeeded', 'Failed', 'Stopped'):
+                break
+    if status:
+        LOGGER.info("Deployment status " + status)
+    else:
+        LOGGER.info("Deployment status: time out")
     return deployment_id
 
-def run_one_region_codedeploy_wrapper(region_number, region_config, node_name_tag, commit_id, queue):
+def run_one_region_codedeploy_wrapper(region_number, region_config, node_name_tag, commit_id):
     region_number, deployment_id = run_one_region_codedeploy(region_number, region_config, node_name_tag, commit_id)
-    queue.put((region_number, deployment_id))
+    LOGGER.info("deployment of region %s finished with deployment id %s" % (region_number, deployment_id))
 
 def launch_code_deploy(region_list, region_config, commit_id):
-    queue = Queue()
-    jobs = []
+    thread_pool = []
     for region_tuppple in region_list:
         # node_name_tag comes first.
         node_name_tag, region_number = region_tuppple
-        my_thread = Thread(target=run_one_region_codedeploy_wrapper, args=(
-            region_number, region_config, node_name_tag, commit_id, queue))
-        my_thread.start()
-        jobs.append(my_thread)
-    for my_thread in jobs:
-        my_thread.join()
-    results = [queue.get() for job in jobs]
-    return results
+        t = threading.Thread(target=run_one_region_codedeploy_wrapper, args=(
+            region_number, region_config, node_name_tag, commit_id))
+        t.start()
+        thread_pool.append(t)
+    for t in thread_pool:
+        t.join()
+    LOGGER.info("Done deploying all regions")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -145,5 +147,4 @@ if __name__ == "__main__":
     with open(args.instance_output, "r") as fin:
         region_list = [line.split(" ") for line in fin.readlines()]
         region_list = [(item[0].strip(), item[1].strip()) for item in region_list]
-        results = launch_code_deploy(region_list, args.region_config, commit_id)
-        LOGGER.info(results)
+        launch_code_deploy(region_list, args.region_config, commit_id)
