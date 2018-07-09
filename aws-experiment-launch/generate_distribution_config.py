@@ -12,7 +12,7 @@ LOGGER.setLevel(logging.INFO)
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='This script helps you to genereate distribution config')
     parser.add_argument('--ip_list_file', type=str, dest='ip_list_file',
-                        default=None, help="the file containing available raw ips")
+                        default='raw_ip.txt', help="the file containing available raw ips")
     # If the ip_list_file is None we need to use the region, node_name_tag and region_config to collect raw_ip                        
     parser.add_argument('--region', type=str, dest='region_number',
                         default="4", help="region number")
@@ -21,8 +21,8 @@ if __name__ == "__main__":
     parser.add_argument('--region_config', type=str,
                         dest='region_config', default='configuration.txt')
 
-    parser.add_argument('--shard_num', type=int, dest='shard_number', default=1)
-    parser.add_argument('--client_num', type=int, dest='client_number', default=1)
+    parser.add_argument('--shard_number', type=int, dest='shard_number', default=1)
+    parser.add_argument('--client_number', type=int, dest='client_number', default=1)
     parser.add_argument('--distribution_config', type=str,
                         dest='distribution_config', default='distribution_config.txt')
     args = parser.parse_args()
