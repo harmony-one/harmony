@@ -42,15 +42,15 @@ def run_one_region_codedeploy(region_number, region_config, node_name_tag, commi
     
     LOGGER.info("Number of instances: %d" % len(instance_ids))
 
-    LOGGER.info("Waiting for all %d instances in region %s to startK"%(len(instance_ids),region_number))
-    waiter = ec2_client.get_waiter('instance_status_ok') running"%(len(instance_ids),region_number))
+    LOGGER.info("Waiting for all %d instances in region %s to be in RUNNING" % (len(instance_ids), region_number))
     waiter = ec2_client.get_waiter('instance_running')
     waiter.wait(InstanceIds=instance_ids)
 
-    LOGGER.info("Waiting for all %d instances in region %s to be INSTANCE STATUS O
+    print("Waiting for all %d instances in region %s with status OK"% (len(instance_ids), region_number))
+    waiter = ec2_client.get_waiter('instance_status_ok')
     waiter.wait(InstanceIds=instance_ids)
 
-    LOGGER.info("Waiting for all %d instances in region %s to be SYSTEM STATUS OK"%(len(instance_ids),region_number))
+    print("Waiting for all %d instances in region %s with system in OK"% (len(instance_ids), region_number))
     waiter = ec2_client.get_waiter('system_status_ok')
     waiter.wait(InstanceIds=instance_ids)
 
