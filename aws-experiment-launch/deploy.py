@@ -138,7 +138,7 @@ if __name__ == "__main__":
                         help='the file contains node_name_tag and region number of created instances.')
     parser.add_argument('--region_config', type=str, dest='region_config', default='configuration.txt')
     parser.add_argument('--commit_id', type=str, dest='commit_id',
-                        default='5dd72ec97530694348e3dcbe1592665a61afb177')
+                        default='0e8e1028168447d3fc27b12b0ecca7b917ecffc5')
     args = parser.parse_args()
     commit_id = args.commit_id
 
