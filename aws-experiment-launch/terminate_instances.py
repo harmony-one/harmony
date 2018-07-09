@@ -12,8 +12,8 @@ logging.basicConfig(level=logging.INFO, format='%(threadName)s %(asctime)s - %(n
 LOGGER = logging.getLogger(__file__)
 LOGGER.setLevel(logging.INFO)
 
-def terminate_instances_by_region(region_number, region_config):
-    ec2_client, _ = utils.create_ec2_client(region_number, args.region_config)
+def terminate_instances_by_region(region_number, region_config, node_name_tag):
+    ec2_client, _ = utils.create_ec2_client(region_number, region_config)
     filters = [{'Name': 'tag:Name','Values': [node_name_tag]}]
     instance_ids = utils.get_instance_ids(ec2_client.describe_instances(Filters=filters))
     if instance_ids:
@@ -21,6 +21,7 @@ def terminate_instances_by_region(region_number, region_config):
         LOGGER.info("waiting until instances with tag %s died." % node_name_tag)
         waiter = ec2_client.get_waiter('instance_terminated')
         waiter.wait(InstanceIds=instance_ids)
+        LOGGER.info("instances with node name tag %s terminated." % node_name_tag)
     else:
         pass
         LOGGER.warn("there is no instances to terminate")
@@ -54,7 +55,7 @@ if __name__ == "__main__":
                 items = line.split(" ")
                 region_number = items[1].strip()
                 node_name_tag = items[0].strip()
-                t = threading.Thread(target=terminate_instances_by_region, args=(region_number, args.region_config))
+                t = threading.Thread(target=terminate_instances_by_region, args=(region_number, args.region_config, node_name_tag))
                 t.start()
                 thread_pool.append(t)
             for t in thread_pool:
