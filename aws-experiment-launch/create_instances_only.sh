@@ -1,6 +1,6 @@
 if [ $# -eq 0 ]; then
-    echo "Your command line contains $# arguments"
-    exit(1)
+    echo "Please provide # of instances"
+    exit 1
 fi
 INSTANCE_NUM=$1
 echo "Creating $INSTANCE_NUM instances at 8 regions"
