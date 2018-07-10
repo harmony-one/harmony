@@ -5,9 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
-	"mime/multipart"
 	"net"
 	"net/http"
 	"os"
@@ -20,18 +18,23 @@ type commanderSetting struct {
 	port       string
 	configFile string
 	configs    [][]string
-	sessionID  string
+}
+
+type sessionInfo struct {
+	id           string
+	uploadFolder string
 }
 
 var (
 	setting commanderSetting
+	session sessionInfo
 )
 
 func readConfigFile() [][]string {
 	file, err := os.Open(setting.configFile)
 	if err != nil {
-		log.Println("Failed to read config file")
-		return nil
+		log.Fatal("Failed to read config file", setting.configFile,
+			"\nNOTE: The config path should be relative to commander.")
 	}
 	fscanner := bufio.NewScanner(file)
 
@@ -52,9 +55,17 @@ func handleCommand(command string) {
 	switch cmd := args[0]; cmd {
 	case "init":
 		{
-			setting.sessionID = time.Now().Format("20060102-150405")
-			log.Println("New session", setting.sessionID)
-			dictateNodes(fmt.Sprintf("init %v %v %v %v", setting.ip, setting.port, setting.configFile, setting.sessionID))
+			session.id = time.Now().Format("150405-20060102")
+			// create upload folder
+			session.uploadFolder = fmt.Sprintf("upload/%s", session.id)
+			err := os.MkdirAll(session.uploadFolder, os.ModePerm)
+			if err != nil {
+				log.Println("Failed to create upload folder", session.uploadFolder)
+				return
+			}
+			log.Println("New session", session.id)
+
+			dictateNodes(fmt.Sprintf("init %v %v %v %v", setting.ip, setting.port, setting.configFile, session.id))
 		}
 	case "ping", "kill", "log":
 		{
@@ -115,14 +126,6 @@ func handleUploadRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// create upload folder
-	uploadFolder := fmt.Sprintf("upload/%s", setting.sessionID)
-	err := os.MkdirAll(uploadFolder, os.ModePerm)
-	if err != nil {
-		jsonResponse(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
 	reader, err := r.MultipartReader()
 	if err != nil {
 		jsonResponse(w, http.StatusBadRequest, err.Error())
@@ -135,7 +138,7 @@ func handleUploadRequest(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
-		dst, err := os.Create(fmt.Sprintf("%s/%s", uploadFolder, part.FileName()))
+		dst, err := os.Create(fmt.Sprintf("%s/%s", session.uploadFolder, part.FileName()))
 		log.Println(part.FileName())
 		if err != nil {
 			jsonResponse(w, http.StatusInternalServerError, err.Error())
@@ -148,20 +151,6 @@ func handleUploadRequest(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-}
-
-func saveFile(w http.ResponseWriter, file multipart.File, handle *multipart.FileHeader) {
-	data, err := ioutil.ReadAll(file)
-	if err != nil {
-		jsonResponse(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	err = ioutil.WriteFile("./files/"+handle.Filename, data, 0666)
-	if err != nil {
-		jsonResponse(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	jsonResponse(w, http.StatusCreated, "File uploaded successfully!")
 }
 
 func jsonResponse(w http.ResponseWriter, code int, message string) {
@@ -182,8 +171,8 @@ func serve() {
 
 func main() {
 	ip := flag.String("ip", "127.0.0.1", "The ip of commander, i.e. this machine")
-	port := flag.String("port", "8080", "The port where you want to host the config file")
-	configFile := flag.String("config_file", "test.txt", "The file name of config file which should be put in the same of folder as commander")
+	port := flag.String("port", "8080", "The port which the commander uses to communicate with soldiers")
+	configFile := flag.String("config_file", "distribution_config.txt", "The file name of config file")
 	flag.Parse()
 
 	config(*ip, *port, *configFile)
