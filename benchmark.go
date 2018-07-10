@@ -129,7 +129,7 @@ func main() {
 	}
 
 	// Setup a logger to stdout and log file.
-	logFileName := fmt.Sprintf("./%v/%s-%v.log", *logFolder, role, *port)
+	logFileName := fmt.Sprintf("./%v/%s-%v-%v.log", *logFolder, role, *ip, *port)
 	h := log.MultiHandler(
 		log.StdoutHandler,
 		log.Must.FileHandler(logFileName, log.LogfmtFormat()), // Log to file

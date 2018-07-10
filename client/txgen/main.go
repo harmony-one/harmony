@@ -255,7 +255,7 @@ func main() {
 
 	// TODO(Richard): refactor this chuck to a single method
 	// Setup a logger to stdout and log file.
-	logFileName := fmt.Sprintf("./%v/tx-generator.log", *logFolder)
+	logFileName := fmt.Sprintf("./%v/txgen.log", *logFolder)
 	h := log.MultiHandler(
 		log.StdoutHandler,
 		log.Must.FileHandler(logFileName, log.LogfmtFormat()), // Log to file
