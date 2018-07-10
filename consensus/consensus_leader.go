@@ -332,7 +332,8 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 				"startTime", startTime,
 				"endTime", endTime,
 				"timeElapsed", timeElapsed,
-				"TPS", float64(numOfTxs)/timeElapsed.Seconds())
+				"TPS", float64(numOfTxs)/timeElapsed.Seconds(),
+				"consensus", consensus)
 
 			// Send signal to Node so the new block can be added and new round of consensus can be triggered
 			consensus.ReadySignal <- 1

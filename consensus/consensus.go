@@ -148,5 +148,6 @@ func (consensus *Consensus) String() string {
 	} else {
 		duty = "VLD" // validator
 	}
-	return fmt.Sprintf("[%s, %s, %v, %v, %s]", duty, consensus.priKey, consensus.ShardID, consensus.nodeId, consensus.state)
+	return fmt.Sprintf("[duty:%s, priKey:%s, ShardID:%v, nodeId:%v, state:%s]",
+		duty, consensus.priKey, consensus.ShardID, consensus.nodeId, consensus.state)
 }
