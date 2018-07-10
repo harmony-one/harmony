@@ -26,4 +26,4 @@ go build -o bin/benchmark benchmark.go
 go build -o bin/txgen client/txgen/main.go
 
 # Change ownership
-sudo chown -R ec2-user:ec2-user ~/projects/src
+chown -R ec2-user:ec2-user ~/projects/src
