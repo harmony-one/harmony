@@ -55,7 +55,7 @@ func handleCommand(command string) {
 	switch cmd := args[0]; cmd {
 	case "init":
 		{
-			session.id = time.Now().Format("20060102-150405")
+			session.id = time.Now().Format("150405-20060102")
 			// create upload folder
 			session.uploadFolder = fmt.Sprintf("upload/%s", session.id)
 			err := os.MkdirAll(session.uploadFolder, os.ModePerm)
