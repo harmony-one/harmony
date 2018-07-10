@@ -5,6 +5,7 @@ import datetime
 import json
 import logging
 import os
+import subprocess
 import sys
 import threading
 import time
@@ -130,6 +131,15 @@ def launch_code_deploy(region_list, region_config, commit_id):
         t.join()
     LOGGER.info("Finished.")
 
+def get_head_commit_id():
+    git_head_hash = None
+    try:
+        process = subprocess.Popen(['git', 'rev-parse', 'HEAD'], shell=False, stdout=subprocess.PIPE)
+        git_head_hash = process.communicate()[0].strip()
+    finally:
+        return git_head_hash 
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='This script helps you start instances across multiple regions')
@@ -138,9 +148,10 @@ if __name__ == "__main__":
                         help='the file contains node_name_tag and region number of created instances.')
     parser.add_argument('--region_config', type=str, dest='region_config', default='configuration.txt')
     parser.add_argument('--commit_id', type=str, dest='commit_id',
-                        default='0e8e1028168447d3fc27b12b0ecca7b917ecffc5')
+                        default='f092d25d7a814622079fe92e9b36e10e46bc0d97')
     args = parser.parse_args()
-    commit_id = args.commit_id
+    LOGGER.info("********* MAKE SURE YOU'RE RUNNING under harmony-benchmark code base *********")
+    commit_id = get_head_commit_id() or args.commit_id
 
     if not os.path.isfile(args.instance_output) or not commit_id:
         LOGGER.info("%s does not exist" % args.instance_output)
