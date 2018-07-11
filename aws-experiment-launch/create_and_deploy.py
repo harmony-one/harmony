@@ -18,6 +18,7 @@ class InstanceResource:
 REGION_NAME = 'region_name'
 REGION_KEY = 'region_key'
 REGION_SECURITY_GROUP = 'region_security_group'
+REGION_SECURITY_GROUP_ID = 'region_security_group_id'
 REGION_HUMAN_NAME = 'region_human_name'
 INSTANCE_TYPE = 't2.micro'
 REGION_AMI = 'region_ami'
@@ -51,8 +52,7 @@ def create_launch_specification(region_number, instanceType):
             {
                 # In certain scenarios, we have to use group id instead of group name
                 # https://github.com/boto/boto/issues/350#issuecomment-27359492
-                # 'GroupName': config[region_number][REGION_SECURITY_GROUP]
-                'GroupId': 'sg-06f90158506dca54f'
+                'GroupId': config[region_number][REGION_SECURITY_GROUP_ID]
             }
         ],
         'ImageId': config[region_number][REGION_AMI],
@@ -393,6 +393,7 @@ def read_configuration_file(filename):
             config[region_num][REGION_SECURITY_GROUP] = mylist[3]
             config[region_num][REGION_HUMAN_NAME] = mylist[4]
             config[region_num][REGION_AMI] = mylist[5]
+            config[region_num][REGION_SECURITY_GROUP_ID] = mylist[6]
     return config
 
 ##### UTILS ####
