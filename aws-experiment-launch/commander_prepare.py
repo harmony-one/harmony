@@ -27,6 +27,8 @@ if __name__ == "__main__":
                         dest='distribution_config', default='distribution_config.txt')
     parser.add_argument('--commander_logging', type=str,
                         dest='commander_logging', default='commander_logging.sh')
+    parser.add_argument('--logs_download', type=str,
+                        dest='logs_download', default='logs_download.sh')
     parser.add_argument('--commander_info', type=str,
                         dest='commander_info', default='commander_info.txt')
 
@@ -67,5 +69,12 @@ if __name__ == "__main__":
     st = os.stat(args.commander_logging)
     os.chmod(args.commander_logging, st.st_mode | stat.S_IEXEC)
     LOGGER.info("Generated %s" % args.commander_logging)
+
+    with open(args.logs_download, "w") as fout:
+        fout.write("scp -i ../keys/%s ec2-user@%s:~/projects/src/harmony-benchmark/bin/upload tmp/\n" % (PEMS[commander_region - 1], args.distribution_config, commander_address))
+    st = os.stat(args.logs_download)
+    os.chmod(args.logs_download, st.st_mode | stat.S_IEXEC)
+    LOGGER.info("Generated %s" % args.logs_download)
+
     LOGGER.info("DONE.")
 
