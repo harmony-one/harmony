@@ -133,7 +133,6 @@ def request_spot_instances(config, ec2_client, region_number, number_of_instance
     )
     return response
 
-
 def request_spot_fleet(config, ec2_client, region_number, number_of_instances):
     NODE_NAME = region_number + "-" + NODE_NAME_SUFFIX
     # https://boto3.readthedocs.io/en/latest/reference/services/ec2.html#EC2.Client.request_spot_fleet
@@ -142,12 +141,15 @@ def request_spot_fleet(config, ec2_client, region_number, number_of_instances):
         SpotFleetRequestConfig={
             # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-fleet.html#spot-fleet-allocation-strategy
             'AllocationStrategy': 'diversified',
-            # 'IamFleetRole': IAM_INSTANCE_PROFILE, // TODO@ricl, create fleet role.
+            'IamFleetRole': 'arn:aws:iam::656503231766:role/RichardFleetRole',
             'LaunchSpecifications': [
                 {
                     'SecurityGroups': [
                         {
-                            'GroupName': config[region_number][REGION_SECURITY_GROUP]
+                            # In certain scenarios, we have to use group id instead of group name
+                            # https://github.com/boto/boto/issues/350#issuecomment-27359492
+                            # 'GroupName': config[region_number][REGION_SECURITY_GROUP]
+                            'GroupId': 'sg-06f90158506dca54f'
                         }
                     ],
                     'IamInstanceProfile': {
@@ -156,9 +158,9 @@ def request_spot_fleet(config, ec2_client, region_number, number_of_instances):
                     'ImageId': config[region_number][REGION_AMI],
                     'InstanceType': INSTANCE_TYPE,
                     'KeyName': config[region_number][REGION_KEY],
-                    'Placement': {
-                        'AvailabilityZone': get_one_availability_zone(ec2_client)
-                    },
+                    # 'Placement': {
+                    #     # 'AvailabilityZone': get_one_availability_zone(ec2_client)
+                    # },
                     'UserData': USER_DATA_BASE64,
                     # 'WeightedCapacity': 123.0,
                     'TagSpecifications': [
@@ -175,9 +177,9 @@ def request_spot_fleet(config, ec2_client, region_number, number_of_instances):
                 },
             ],
             # 'SpotPrice': 'string', # The maximum price per unit hour that you are willing to pay for a Spot Instance. The default is the On-Demand price.
-            'TargetCapacity': 1,
+            'TargetCapacity': number_of_instances,
             'OnDemandTargetCapacity': 0,
-            'Type': 'maintain',
+            'Type': 'maintain'
         }
     )
     return response
@@ -368,13 +370,6 @@ def read_configuration_file(filename):
             config[region_num][REGION_HUMAN_NAME] = mylist[4]
             config[region_num][REGION_AMI] = mylist[5]
     return config
-
-def get_commitId(commitId):
-    if commitId is None:
-        commitId = run("git rev-list --max-count=1 HEAD",
-                       hide=True).stdout.strip()
-        print("Got newest commitId as " + commitId)
-    return commitId
 
 ##### UTILS ####
 
