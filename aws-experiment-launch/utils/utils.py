@@ -8,6 +8,7 @@ import time
 REGION_NAME = 'region_name'
 REGION_KEY = 'region_key'
 REGION_SECURITY_GROUP = 'region_security_group'
+REGION_SECURITY_GROUP_ID = 'region_security_group_id'
 REGION_HUMAN_NAME = 'region_human_name'
 INSTANCE_TYPE = 't2.micro'
 REGION_AMI = 'region_ami'
@@ -24,6 +25,7 @@ def read_region_config(region_config='configuration.txt'):
             config[region_num][REGION_SECURITY_GROUP] = mylist[3]
             config[region_num][REGION_HUMAN_NAME] = mylist[4]
             config[region_num][REGION_AMI] = mylist[5]
+            config[region_num][REGION_SECURITY_GROUP_ID] = mylist[6]
     return config
 
 def get_ip_list(response):
