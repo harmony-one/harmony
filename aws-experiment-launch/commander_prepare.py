@@ -39,26 +39,33 @@ if __name__ == "__main__":
 
     commander_address = None
     commander_region = None
-    with open(args.distribution_config, "w") as fout, open(args.commander_info, "w") as fout2:
+    commander_output = None
+    with open(args.distribution_config, "w") as fout:
         for line in lines:
             if "commander" in line:
                 items = [item.strip() for item in line.split(" ")]
                 commander_address = items[0]
                 commander_region = int(items[4][0])
-                fout2.write("\n".join(items))
+                commander_output = "\n".join(items)
             else:
                 fout.write(line.strip() + "\n")
     if not commander_address or not commander_region:
         LOGGER.info("Failed to extract commander address and commander region.")
         sys.exit(1)
 
+    with open(args.commander_info, "w") as fout:
+        fout.write(commander_output)
+
+    LOGGER.info("Generated %s" % args.distribution_config)
+    LOGGER.info("Generated %s" % args.commander_info)
     with open(args.commander_logging, "w") as fout:
-        fout.write("scp -i ../keys/%s %s ec2-user@%s:~/projects/src/harmony-benchmark/bin/distribution_config.txt\n" % (PEMS[commander_region - 1], args.distribution_config, commander_address))
-        fout.write("scp -i ../keys/%s %s ec2-user@%s:~/projects/src/harmony-benchmark/bin/commander_info.txt\n" % (PEMS[commander_region - 1], args.commander_info, commander_address))
+        fout.write("scp -i ../keys/%s %s ec2-user@%s:/tmp/distribution_config.txt\n" % (PEMS[commander_region - 1], args.distribution_config, commander_address))
+        fout.write("scp -i ../keys/%s %s ec2-user@%s:/tmp/commander_info.txt\n" % (PEMS[commander_region - 1], args.commander_info, commander_address))
         fout.write("if [ $? -eq 0 ]; then\n\t")
         fout.write("ssh -i ../keys/%s ec2-user@%s\n" % (PEMS[commander_region - 1], commander_address))
         fout.write("else\n\techo \"Failed to send %s to the commander machine\"\nfi\n" % args.distribution_config)
     st = os.stat(args.commander_logging)
     os.chmod(args.commander_logging, st.st_mode | stat.S_IEXEC)
+    LOGGER.info("Generated %s" % args.commander_logging)
     LOGGER.info("DONE.")
 
