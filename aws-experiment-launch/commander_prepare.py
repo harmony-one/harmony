@@ -71,7 +71,7 @@ if __name__ == "__main__":
     LOGGER.info("Generated %s" % args.commander_logging)
 
     with open(args.logs_download, "w") as fout:
-        fout.write("scp -i ../keys/%s ec2-user@%s:~/projects/src/harmony-benchmark/bin/upload tmp/\n" % (PEMS[commander_region - 1], args.distribution_config, commander_address))
+        fout.write("scp -i ../keys/%s ec2-user@%s:~/projects/src/harmony-benchmark/bin/upload tmp/\n" % (PEMS[commander_region - 1], commander_address))
     st = os.stat(args.logs_download)
     os.chmod(args.logs_download, st.st_mode | stat.S_IEXEC)
     LOGGER.info("Generated %s" % args.logs_download)
