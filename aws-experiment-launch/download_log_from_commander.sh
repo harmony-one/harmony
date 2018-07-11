@@ -4,4 +4,5 @@ if [ $# -eq 0 ]; then
     exit 1
 fi
 ADDRESS=$1
-scp -r -i "california-key-benchmark.pem" ec2-user@$ADDRESS:~/projects/src/harmony-benchmark/bin/upload .
+mkdir -p ./tmp
+scp -r -i "california-key-benchmark.pem" ec2-user@$ADDRESS:~/projects/src/harmony-benchmark/bin/upload ./tmp/
