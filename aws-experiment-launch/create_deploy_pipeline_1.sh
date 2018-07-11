@@ -2,8 +2,8 @@ INSTANCE_NUM=1
 SHARD_NUM=1
 CLIENT_NUM=1
 
-echo "Creating $INSTANCE_NUM instances at 8 regions"
-python create_instances.py --regions 1,2,3,4,5,6,7,8 --instances $INSTANCE_NUM,$INSTANCE_NUM,$INSTANCE_NUM,$INSTANCE_NUM,$INSTANCE_NUM,$INSTANCE_NUM,$INSTANCE_NUM,$INSTANCE_NUM
+# echo "Creating $INSTANCE_NUM instances at 8 regions"
+# python create_instances.py --regions 1,2,3,4,5,6,7,8 --instances $INSTANCE_NUM,$INSTANCE_NUM,$INSTANCE_NUM,$INSTANCE_NUM,$INSTANCE_NUM,$INSTANCE_NUM,$INSTANCE_NUM,$INSTANCE_NUM
 
 echo "Rung collecint raw ips"
 python collect_public_ips.py --instance_output instance_output.txt
