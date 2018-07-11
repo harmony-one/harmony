@@ -36,6 +36,50 @@ CURRENT_SESSION = datetime.datetime.fromtimestamp(
 PLACEMENT_GROUP = "PLACEMENT-" + CURRENT_SESSION
 NODE_NAME_SUFFIX = "NODE-" + CURRENT_SESSION
 
+
+def create_launch_specification(region_number, instanceType):
+    NODE_NAME = region_number + "-" + NODE_NAME_SUFFIX
+    return {
+        # Region irrelevant fields
+        'IamInstanceProfile': {
+            'Name': IAM_INSTANCE_PROFILE
+        },
+        'InstanceType': instanceType,
+        'UserData': USER_DATA_BASE64,
+        # Region relevant fields
+        'SecurityGroups': [
+            {
+                # In certain scenarios, we have to use group id instead of group name
+                # https://github.com/boto/boto/issues/350#issuecomment-27359492
+                # 'GroupName': config[region_number][REGION_SECURITY_GROUP]
+                'GroupId': 'sg-06f90158506dca54f'
+            }
+        ],
+        'ImageId': config[region_number][REGION_AMI],
+        'KeyName': config[region_number][REGION_KEY],
+        'UserData': USER_DATA_BASE64,
+        'TagSpecifications': [
+            {
+                'ResourceType': 'instance',
+                'Tags': [
+                    {
+                        'Key': 'Name',
+                        'Value': NODE_NAME
+                    }
+                ]
+            }
+        ],
+        # 'WeightedCapacity': 123.0,
+        # 'Placement': {
+        #     # 'AvailabilityZone': get_one_availability_zone(ec2_client)
+        # }
+    }
+
+
+def create_launch_specification_list(region_number, instance_type_list):
+    return list(map(lambda type: create_launch_specification(region_number, type), instance_type_list))
+
+
 """
 TODO:
 
@@ -60,13 +104,16 @@ def run_one_region_instances(config, region_number, number_of_instances, instanc
     if instance_resource == InstanceResource.ON_DEMAND:
         NODE_NAME = create_instances(
             config, ec2_client, region_number, int(number_of_instances))
-        print("Created %s in region %s"%(NODE_NAME,region_number))  ##REPLACE ALL print with logger
+        # REPLACE ALL print with logger
+        print("Created %s in region %s" % (NODE_NAME, region_number))
     elif instance_resource == InstanceResource.SPOT_INSTANCE:
         response = request_spot_instances(
             config, ec2_client, region_number, int(number_of_instances))
     else:
+        instance_type_list = ['t2.micro', 't2.small', 'm3.medium']
         response = request_spot_fleet(
-            config, ec2_client, region_number, int(number_of_instances))
+            config, ec2_client, region_number, int(number_of_instances), instance_type_list)
+        return
     return session
 
 
@@ -133,7 +180,8 @@ def request_spot_instances(config, ec2_client, region_number, number_of_instance
     )
     return response
 
-def request_spot_fleet(config, ec2_client, region_number, number_of_instances):
+
+def request_spot_fleet(config, ec2_client, region_number, number_of_instances, instance_type_list):
     NODE_NAME = region_number + "-" + NODE_NAME_SUFFIX
     # https://boto3.readthedocs.io/en/latest/reference/services/ec2.html#EC2.Client.request_spot_fleet
     response = ec2_client.request_spot_fleet(
@@ -142,40 +190,7 @@ def request_spot_fleet(config, ec2_client, region_number, number_of_instances):
             # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-fleet.html#spot-fleet-allocation-strategy
             'AllocationStrategy': 'diversified',
             'IamFleetRole': 'arn:aws:iam::656503231766:role/RichardFleetRole',
-            'LaunchSpecifications': [
-                {
-                    'SecurityGroups': [
-                        {
-                            # In certain scenarios, we have to use group id instead of group name
-                            # https://github.com/boto/boto/issues/350#issuecomment-27359492
-                            # 'GroupName': config[region_number][REGION_SECURITY_GROUP]
-                            'GroupId': 'sg-06f90158506dca54f'
-                        }
-                    ],
-                    'IamInstanceProfile': {
-                        'Name': IAM_INSTANCE_PROFILE
-                    },
-                    'ImageId': config[region_number][REGION_AMI],
-                    'InstanceType': INSTANCE_TYPE,
-                    'KeyName': config[region_number][REGION_KEY],
-                    # 'Placement': {
-                    #     # 'AvailabilityZone': get_one_availability_zone(ec2_client)
-                    # },
-                    'UserData': USER_DATA_BASE64,
-                    # 'WeightedCapacity': 123.0,
-                    'TagSpecifications': [
-                        {
-                            'ResourceType': 'instance',
-                            'Tags': [
-                                {
-                                    'Key': 'Name',
-                                    'Value': NODE_NAME
-                                },
-                            ]
-                        }
-                    ]
-                },
-            ],
+            'LaunchSpecifications': create_launch_specification_list(region_number, instance_type_list),
             # 'SpotPrice': 'string', # The maximum price per unit hour that you are willing to pay for a Spot Instance. The default is the On-Demand price.
             'TargetCapacity': number_of_instances,
             'OnDemandTargetCapacity': 0,
@@ -224,29 +239,35 @@ def run_one_region_codedeploy(region_number, commitId):
     NODE_NAME = region_number + "-" + NODE_NAME_SUFFIX
     session = boto3.Session(region_name=region_name)
     ec2_client = session.client('ec2')
-    filters = [{'Name': 'tag:Name','Values': [NODE_NAME]}]
-    instance_ids = get_instance_ids(ec2_client.describe_instances(Filters=filters))
-    
+    filters = [{'Name': 'tag:Name', 'Values': [NODE_NAME]}]
+    instance_ids = get_instance_ids(
+        ec2_client.describe_instances(Filters=filters))
+
     print("Number of instances: %d" % len(instance_ids))
 
-    print("Waiting for all %d instances in region %s to start running"%(len(instance_ids),region_number))
+    print("Waiting for all %d instances in region %s to start running" %
+          (len(instance_ids), region_number))
     waiter = ec2_client.get_waiter('instance_running')
     waiter.wait(InstanceIds=instance_ids)
 
-    print("Waiting for all %d instances in region %s to be INSTANCE STATUS OK"%(len(instance_ids),region_number))
+    print("Waiting for all %d instances in region %s to be INSTANCE STATUS OK" % (
+        len(instance_ids), region_number))
     waiter = ec2_client.get_waiter('instance_status_ok')
     waiter.wait(InstanceIds=instance_ids)
 
-    print("Waiting for all %d instances in region %s to be SYSTEM STATUS OK"%(len(instance_ids),region_number))
+    print("Waiting for all %d instances in region %s to be SYSTEM STATUS OK" %
+          (len(instance_ids), region_number))
     waiter = ec2_client.get_waiter('system_status_ok')
     waiter.wait(InstanceIds=instance_ids)
 
     codedeploy = session.client('codedeploy')
     application_name = APPLICATION_NAME
-    deployment_group = APPLICATION_NAME + "-" + commitId[:6] + "-" + CURRENT_SESSION
+    deployment_group = APPLICATION_NAME + "-" + \
+        commitId[:6] + "-" + CURRENT_SESSION
     repo = REPO
 
-    print("Setting up to deploy commitId %s on region %s"%(commitId,region_number))
+    print("Setting up to deploy commitId %s on region %s" %
+          (commitId, region_number))
     response = get_application(codedeploy, application_name)
     deployment_group = get_deployment_group(
         codedeploy, region_number, application_name, deployment_group)
@@ -255,7 +276,7 @@ def run_one_region_codedeploy(region_number, commitId):
     return region_number, depId
 
 
-def get_deployment_group(codedeploy, region_number,application_name, deployment_group):
+def get_deployment_group(codedeploy, region_number, application_name, deployment_group):
     NODE_NAME = region_number + "-" + NODE_NAME_SUFFIX
     response = codedeploy.create_deployment_group(
         applicationName=application_name,
@@ -266,7 +287,7 @@ def get_deployment_group(codedeploy, region_number,application_name, deployment_
             'deploymentType': 'IN_PLACE',
             'deploymentOption': 'WITHOUT_TRAFFIC_CONTROL'
         },
-        ec2TagFilters = [
+        ec2TagFilters=[
             {
                 'Key': 'Name',
                 'Value': NODE_NAME,
@@ -329,9 +350,11 @@ def deploy(codedeploy, application_name, deployment_group, repo, commitId):
         print(info)
         return depId
 
+
 def run_one_region_codedeploy_wrapper(region_number, commitId, queue):
     region_number, depId = run_one_region_codedeploy(region_number, commitId)
     queue.put((region_number, depId))
+
 
 def launch_code_deploy(region_list, commitId):
     queue = Queue()
@@ -356,6 +379,7 @@ def get_instance_ids(describe_instances_response):
         for instance in reservation["Instances"]:
             instance_ids.append(instance["InstanceId"])
     return instance_ids
+
 
 def read_configuration_file(filename):
     config = {}
@@ -396,6 +420,6 @@ if __name__ == "__main__":
         region_number = region_list[i]
         number_of_instances = instances_list[i]
         session = run_one_region_instances(
-            config, region_number, number_of_instances,InstanceResource.ON_DEMAND)
+            config, region_number, number_of_instances, InstanceResource.SPOT_FLEET)
     results = launch_code_deploy(region_list, commitId)
     print(results)
