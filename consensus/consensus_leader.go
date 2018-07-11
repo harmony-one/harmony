@@ -7,8 +7,6 @@ import (
 	"encoding/gob"
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/p2p"
-	"harmony-benchmark/utils"
-	"runtime"
 	"strings"
 	"time"
 )
@@ -334,12 +332,8 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 				"startTime", startTime,
 				"endTime", endTime,
 				"timeElapsed", timeElapsed,
-				"TPS", float64(numOfTxs)/timeElapsed.Seconds())
-
-			var m runtime.MemStats
-			runtime.ReadMemStats(&m)
-			consensus.Log.Info("Mem Report", "Alloc", utils.BToMb(m.Alloc), "TotalAlloc", utils.BToMb(m.TotalAlloc),
-				"Sys", utils.BToMb(m.Sys), "NumGC", m.NumGC)
+				"TPS", float64(numOfTxs)/timeElapsed.Seconds(),
+				"consensus", consensus)
 
 			// Send signal to Node so the new block can be added and new round of consensus can be triggered
 			consensus.ReadySignal <- 1

@@ -2,36 +2,48 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"flag"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
-	"time"
 )
 
-const (
-	StopCharacter = "\r\n\r\n"
-)
+type soliderSetting struct {
+	ip   string
+	port string
+}
+
+type sessionInfo struct {
+	id                  string
+	commanderIP         string
+	commanderPort       string
+	localConfigFileName string
+	logFolder           string
+}
 
 var (
-	ip          *string
-	port        *string
-	localConfig string
+	setting soliderSetting
+	session sessionInfo
 )
 
 func socketServer() {
-	listen, err := net.Listen("tcp4", ":"+*port)
+	soldierPort := "1" + setting.port // the soldier port is "1" + node port
+	listen, err := net.Listen("tcp4", ":"+soldierPort)
 	if err != nil {
-		log.Fatalf("Socket listen port %s failed,%s", *port, err)
+		log.Fatalf("Socket listen port %s failed,%s", soldierPort, err)
 		os.Exit(1)
 	}
 	defer listen.Close()
-	log.Printf("Begin listen for command on port: %s", *port)
+	log.Printf("Begin listen for command on port: %s", soldierPort)
 
 	for {
 		conn, err := listen.Accept()
@@ -62,10 +74,6 @@ ILOOP:
 			break ILOOP
 		case nil:
 			log.Println("Received command", data)
-			if isTransportOver(data) {
-				log.Println("Tranport Over!")
-				break ILOOP
-			}
 
 			handleCommand(data, w)
 
@@ -87,29 +95,49 @@ func handleCommand(command string, w *bufio.Writer) {
 	}
 
 	switch command := args[0]; command {
+	case "ping":
+		{
+			handlePingCommand(w)
+		}
 	case "init":
 		{
 			handleInitCommand(args[1:], w)
 		}
-	case "close":
+	case "kill":
 		{
-			log.Println("close command")
+			handleKillCommand(w)
+		}
+	case "log":
+		{
+			handleLogCommand(w)
 		}
 	}
 }
 
 func handleInitCommand(args []string, w *bufio.Writer) {
+	// init ip port config_file sessionID
 	log.Println("Init command", args)
+
+	// read arguments
+	ip := args[0]
+	session.commanderIP = ip
+	port := args[1]
+	session.commanderPort = port
+	configFile := args[2]
+	sessionID := args[3]
+	session.id = sessionID
+	configURL := fmt.Sprintf("http://%v:%v/%v", ip, port, configFile)
+	session.logFolder = fmt.Sprintf("../tmp_log/log-%v", sessionID)
+
 	// create local config file
-	localConfig = "node_config_" + *port + ".txt"
-	out, err := os.Create(localConfig)
+	session.localConfigFileName = fmt.Sprintf("node_config_%v_%v.txt", setting.port, session.id)
+	out, err := os.Create(session.localConfigFileName)
 	if err != nil {
 		log.Fatal("Failed to create local file", err)
 	}
 	defer out.Close()
 
 	// get remote config file
-	configURL := args[0]
 	resp, err := http.Get(configURL)
 	if err != nil {
 		log.Fatal("Failed to read file content")
@@ -123,68 +151,126 @@ func handleInitCommand(args []string, w *bufio.Writer) {
 	}
 
 	// log config file
-	content, err := ioutil.ReadFile(localConfig)
+	content, err := ioutil.ReadFile(session.localConfigFileName)
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.Println("Successfully downloaded config")
 	log.Println(string(content))
 
-	run()
+	runInstance()
 
-	w.Write([]byte("Successfully init-ed"))
+	logAndReply(w, "Successfully init-ed")
+}
+
+func handleKillCommand(w *bufio.Writer) {
+	log.Println("Kill command")
+	runCmd("../kill_node.sh")
+	logAndReply(w, "Kill command done.")
+}
+
+func handlePingCommand(w *bufio.Writer) {
+	log.Println("Ping command")
+	logAndReply(w, "I'm alive")
+}
+
+func handleLogCommand(w *bufio.Writer) {
+	log.Println("Log command")
+
+	files, err := ioutil.ReadDir(session.logFolder)
+	if err != nil {
+		logAndReply(w, fmt.Sprintf("Failed to create access log folder. Error: %s", err.Error()))
+		return
+	}
+
+	filePaths := make([]string, len(files))
+	for i, f := range files {
+		filePaths[i] = fmt.Sprintf("%s/%s", session.logFolder, f.Name())
+	}
+
+	req, err := newUploadFileRequest(
+		fmt.Sprintf("http://%s:%s/upload", session.commanderIP, session.commanderPort),
+		"file",
+		filePaths,
+		nil)
+	if err != nil {
+		logAndReply(w, fmt.Sprintf("Failed to create upload request. Error: %s", err.Error()))
+		return
+	}
+	client := &http.Client{}
+	_, err = client.Do(req)
+	if err != nil {
+		logAndReply(w, fmt.Sprintf("Failed to upload log. Error: %s", err.Error()))
+		return
+	}
+	logAndReply(w, "Upload log done!")
+}
+
+// Creates a new file upload http request with optional extra params
+func newUploadFileRequest(uri string, paramName string, paths []string, params map[string]string) (*http.Request, error) {
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	for _, path := range paths {
+		file, err := os.Open(path)
+		if err != nil {
+			return nil, err
+		}
+		defer file.Close()
+		part, err := writer.CreateFormFile(paramName, filepath.Base(path))
+		if err != nil {
+			return nil, err
+		}
+		_, err = io.Copy(part, file)
+		log.Printf(path)
+	}
+
+	for key, val := range params {
+		_ = writer.WriteField(key, val)
+	}
+	err := writer.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", uri, body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	return req, err
+}
+
+func logAndReply(w *bufio.Writer, message string) {
+	log.Println(message)
+	w.Write([]byte(message))
 	w.Flush()
 }
 
-func createLogFolder() string {
-	t := time.Now().Format("20060102-150405")
-	logFolder := "../tmp_log/log-" + t
-	err := os.MkdirAll(logFolder, os.ModePerm)
-	if err != nil {
-		log.Fatal("Failed to create log folder")
-	}
-	log.Println("Created log folder", logFolder)
-	return logFolder
-}
-
-func runCmd(name string, args []string) {
-	log.Println(name, args)
+func runCmd(name string, args ...string) error {
 	err := exec.Command(name, args...).Start()
-	if err != nil {
-		log.Fatal("Failed to run command: ", err)
-	}
-
-	log.Println("Command running")
-}
-
-func run() {
-	config := readConfigFile(localConfig)
-
-	myConfig := getMyConfig(*ip, *port, &config)
-
-	log.Println(myConfig)
-	if myConfig[2] == "client" {
-		runClient()
-	} else {
-		runInstance()
-	}
+	log.Println("Command running", name, args)
+	return err
 }
 
 func runInstance() {
+	config := readConfigFile(session.localConfigFileName)
+
+	myConfig := getMyConfig(setting.ip, setting.port, &config)
+
+	os.MkdirAll(session.logFolder, os.ModePerm)
+
+	if myConfig[2] == "client" {
+		runClient()
+	} else {
+		runNode()
+	}
+}
+
+func runNode() error {
 	log.Println("running instance")
-	logFolder := createLogFolder()
-	runCmd("./benchmark", []string{"-ip", *ip, "-port", *port, "-config_file", localConfig, "-log_folder", logFolder})
+	return runCmd("./benchmark", "-ip", setting.ip, "-port", setting.port, "-config_file", session.localConfigFileName, "-log_folder", session.logFolder)
 }
 
-func runClient() {
+func runClient() error {
 	log.Println("running client")
-	logFolder := createLogFolder()
-	runCmd("./txgen", []string{"-config_file", localConfig, "-log_folder", logFolder})
-}
-
-func isTransportOver(data string) (over bool) {
-	over = strings.HasSuffix(data, "\r\n\r\n")
-	return
+	return runCmd("./txgen", "-config_file", session.localConfigFileName, "-log_folder", session.logFolder)
 }
 
 func readConfigFile(configFile string) [][]string {
@@ -209,13 +295,16 @@ func getMyConfig(myIP string, myPort string, config *[][]string) []string {
 	return nil
 }
 
-// go build -o bin/soldier aws-experiment-launch/experiment/soldier/main.go
-// cd bin/
-// ./soldier --port=xxxx
+// cd harmony-benchmark
+// go build -o soldier ../aws-experiment-launch/experiment/soldier/main.go
+// ./soldier -ip=xx -port=xx
 func main() {
-	ip = flag.String("ip", "127.0.0.1", "IP of the node.")
-	port = flag.String("port", "3000", "port of the node.")
+	ip := flag.String("ip", "127.0.0.1", "IP of the node.")
+	port := flag.String("port", "3000", "port of the node.")
 	flag.Parse()
+
+	setting.ip = *ip
+	setting.port = *port
 
 	socketServer()
 }

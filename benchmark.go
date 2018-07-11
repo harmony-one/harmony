@@ -9,8 +9,10 @@ import (
 	"harmony-benchmark/log"
 	"harmony-benchmark/node"
 	"harmony-benchmark/p2p"
+	"harmony-benchmark/utils"
 	"math/rand"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -90,6 +92,16 @@ func attackDetermination(attackedMode int) bool {
 	return false
 }
 
+func logMemUsage(consensus *consensus.Consensus) {
+	for {
+		var m runtime.MemStats
+		runtime.ReadMemStats(&m)
+		log.Info("Mem Report", "Alloc", utils.BToMb(m.Alloc), "TotalAlloc", utils.BToMb(m.TotalAlloc),
+			"Sys", utils.BToMb(m.Sys), "NumGC", m.NumGC, "consensus", consensus)
+		time.Sleep(10 * time.Second)
+	}
+}
+
 func main() {
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9000", "port of the node.")
@@ -105,12 +117,19 @@ func main() {
 	attack.GetInstance().SetAttackEnabled(attackDetermination(*attackedMode))
 
 	config := readConfigFile(*configFile)
-	shardId := getShardId(*ip, *port, &config)
-	peers := getPeers(*ip, *port, shardId, &config)
-	leader := getLeader(shardId, &config)
+	shardID := getShardId(*ip, *port, &config)
+	peers := getPeers(*ip, *port, shardID, &config)
+	leader := getLeader(shardID, &config)
+
+	var role string
+	if leader.Ip == *ip && leader.Port == *port {
+		role = "leader"
+	} else {
+		role = "validator"
+	}
 
 	// Setup a logger to stdout and log file.
-	logFileName := fmt.Sprintf("./%v/%v.log", *logFolder, *port)
+	logFileName := fmt.Sprintf("./%v/%s-%v-%v.log", *logFolder, role, *ip, *port)
 	h := log.MultiHandler(
 		log.StdoutHandler,
 		log.Must.FileHandler(logFileName, log.LogfmtFormat()), // Log to file
@@ -118,7 +137,9 @@ func main() {
 	)
 	log.Root().SetHandler(h)
 
-	consensus := consensus.NewConsensus(*ip, *port, shardId, peers, leader)
+	consensus := consensus.NewConsensus(*ip, *port, shardID, peers, leader)
+
+	go logMemUsage(&consensus)
 
 	node := node.NewNode(&consensus)
 	// Set logger to attack model.
