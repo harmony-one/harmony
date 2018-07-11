@@ -3,6 +3,7 @@ import datetime
 import json
 import sys
 import time
+import base64
 
 
 REGION_NAME = 'region_name'
@@ -12,6 +13,20 @@ REGION_SECURITY_GROUP_ID = 'region_security_group_id'
 REGION_HUMAN_NAME = 'region_human_name'
 INSTANCE_TYPE = 't2.micro'
 REGION_AMI = 'region_ami'
+IAM_INSTANCE_PROFILE = 'BenchMarkCodeDeployInstanceProfile'
+time_stamp = time.time()
+CURRENT_SESSION = datetime.datetime.fromtimestamp(
+    time_stamp).strftime('%H-%M-%S-%Y-%m-%d')
+NODE_NAME_SUFFIX = "NODE-" + CURRENT_SESSION
+
+def get_node_name_tag(region_number):
+    return region_number + "-" + NODE_NAME_SUFFIX
+
+with open("user-data.sh", "r") as userdata_file:
+    USER_DATA = userdata_file.read()
+
+# UserData must be base64 encoded for spot instances.
+USER_DATA_BASE64 = base64.b64encode(USER_DATA)
 
 def read_region_config(region_config='configuration.txt'):
     config = {}

@@ -3,30 +3,18 @@ import base64
 import boto3
 import datetime
 import json
-import logging
 import sys
 import threading
 import time
 
-from utils import utils
+from utils import utils, spot_fleet, logger
 
-logging.basicConfig(level=logging.INFO, format='%(threadName)s %(asctime)s - %(name)s - %(levelname)s - %(message)s')
-LOGGER = logging.getLogger(__file__)
-LOGGER.setLevel(logging.INFO)
+LOGGER = logger.getLogger(__file__)
 
 class InstanceResource:
     ON_DEMAND = 1
     SPOT_INSTANCE = 2
     SPOT_FLEET = 3
-
-with open("user-data.sh", "r") as userdata_file:
-    USER_DATA = userdata_file.read()
-
-IAM_INSTANCE_PROFILE = 'BenchMarkCodeDeployInstanceProfile'
-time_stamp = time.time()
-CURRENT_SESSION = datetime.datetime.fromtimestamp(
-    time_stamp).strftime('%H-%M-%S-%Y-%m-%d')
-NODE_NAME_SUFFIX = "NODE-" + CURRENT_SESSION
 
 def run_one_region_instances(config, region_number, number_of_instances, instance_resource=InstanceResource.ON_DEMAND):
     region_name = config[region_number][utils.REGION_NAME]
@@ -40,12 +28,17 @@ def run_one_region_instances(config, region_number, number_of_instances, instanc
             config, ec2_client, region_number, int(number_of_instances))
         LOGGER.info("Created %s in region %s" % (node_name_tag, region_number))
         return node_name_tag, ec2_client
+    elif instance_resource == InstanceResource.SPOT_FLEET:
+        instance_type_list = ['t2.micro', 't2.small', 'm3.medium']
+        node_name_tag = spot_fleet.request_spot_fleet(
+            config, ec2_client, region_number, int(number_of_instances), instance_type_list)
+        return node_name_tag, ec2_client
     else:
         return None, None
 
 
 def create_instances(config, ec2_client, region_number, number_of_instances):
-    node_name_tag = region_number + "-" + NODE_NAME_SUFFIX
+    node_name_tag = utils.get_node_name_tag(region_number)
     LOGGER.info("Creating node_name_tag: %s" % node_name_tag)
     available_zone = utils.get_one_availability_zone(ec2_client)
     LOGGER.info("Looking at zone %s to create instances." % available_zone)
@@ -59,10 +52,10 @@ def create_instances(config, ec2_client, region_number, number_of_instances):
         },
         SecurityGroups=[config[region_number][utils.REGION_SECURITY_GROUP]],
         IamInstanceProfile={
-            'Name': IAM_INSTANCE_PROFILE
+            'Name': utils.IAM_INSTANCE_PROFILE
         },
         KeyName=config[region_number][utils.REGION_KEY],
-        UserData=USER_DATA,
+        UserData=utils.USER_DATA,
         InstanceType=utils.INSTANCE_TYPE,
         TagSpecifications=[
             {
@@ -78,7 +71,8 @@ def create_instances(config, ec2_client, region_number, number_of_instances):
     )
 
     instance_ids = utils.get_instance_ids2(ec2_client, node_name_tag)
-    LOGGER.info("Waiting for all %d instances in region %s to be in RUNNING" % (len(instance_ids), region_number))
+    LOGGER.info("Waiting for all %d instances in region %s to be in RUNNING" % (
+        len(instance_ids), region_number))
     waiter = ec2_client.get_waiter('instance_running')
     waiter.wait(InstanceIds=instance_ids)
 
@@ -86,7 +80,8 @@ def create_instances(config, ec2_client, region_number, number_of_instances):
     while count < 40:
         time.sleep(5)
         LOGGER.info("Waiting ...")
-        ip_list = utils.collect_public_ips_from_ec2_client(ec2_client, node_name_tag)
+        ip_list = utils.collect_public_ips_from_ec2_client(
+            ec2_client, node_name_tag)
         if len(ip_list) == number_of_instances:
             LOGGER.info("Created %d instances" % number_of_instances)
             return node_name_tag
@@ -94,22 +89,28 @@ def create_instances(config, ec2_client, region_number, number_of_instances):
     LOGGER.info("Can not create %d instances" % number_of_instances)
     return None
 
+
 lock = threading.Lock()
 
+
 def run_for_one_region(config, region_number, number_of_instances, instance_resouce, fout, fout2):
-    node_name_tag, ec2_client = run_one_region_instances(config, region_number, number_of_instances, InstanceResource.ON_DEMAND)
+    node_name_tag, ec2_client = run_one_region_instances(
+        config, region_number, number_of_instances, instance_resouce)
     if node_name_tag:
-        LOGGER.info("Managed to create instances for region %s" % region_number )
+        LOGGER.info("Managed to create instances for region %s" %
+                    region_number)
         instance_ids = utils.get_instance_ids2(ec2_client, node_name_tag)
         lock.acquire()
         try:
             fout.write("%s %s\n" % (node_name_tag, region_number))
             for instance_id in instance_ids:
-                fout2.write(instance_id + " " + node_name_tag + " " + region_number + " " + config[region_number][utils.REGION_NAME] + "\n")
+                fout2.write(instance_id + " " + node_name_tag + " " + region_number +
+                            " " + config[region_number][utils.REGION_NAME] + "\n")
         finally:
             lock.release()
     else:
-        LOGGER.info("Failed to create instances for region %s" % region_number )
+        LOGGER.info("Failed to create instances for region %s" % region_number)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -118,7 +119,8 @@ if __name__ == "__main__":
                         default='3', help="Supply a csv list of all regions")
     parser.add_argument('--instances', type=str, dest='num_instance_list',
                         default='1', help='number of instances in respective of region')
-    parser.add_argument('--region_config', type=str, dest='region_config', default='configuration.txt')
+    parser.add_argument('--region_config', type=str,
+                        dest='region_config', default='configuration.txt')
     parser.add_argument('--instance_output', type=str, dest='instance_output',
                         default='instance_output.txt', help='the file to append or write')
     parser.add_argument('--instance_ids_output', type=str, dest='instance_ids_output',
@@ -129,7 +131,8 @@ if __name__ == "__main__":
     config = utils.read_region_config(args.region_config)
     region_list = args.regions.split(',')
     num_instance_list = args.num_instance_list.split(',')
-    assert len(region_list) == len(num_instance_list), "number of regions: %d != number of instances per region: %d" % (len(region_list), len(num_instance_list))
+    assert len(region_list) == len(num_instance_list), "number of regions: %d != number of instances per region: %d" % (
+        len(region_list), len(num_instance_list))
 
     write_mode = "a" if args.append else "w"
     with open(args.instance_output, write_mode) as fout, open(args.instance_ids_output, write_mode) as fout2:
@@ -137,7 +140,8 @@ if __name__ == "__main__":
         for i in range(len(region_list)):
             region_number = region_list[i]
             number_of_instances = num_instance_list[i]
-            t = threading.Thread(target=run_for_one_region, args=(config, region_number, number_of_instances, InstanceResource.ON_DEMAND, fout, fout2))
+            t = threading.Thread(target=run_for_one_region, args=(
+                config, region_number, number_of_instances, InstanceResource.SPOT_FLEET, fout, fout2))
             LOGGER.info("creating thread for region %s" % region_number)
             t.start()
             thread_pool.append(t)
