@@ -11,10 +11,12 @@ from utils import utils, spot_fleet, logger
 
 LOGGER = logger.getLogger(__file__)
 
+
 class InstanceResource:
     ON_DEMAND = 1
     SPOT_INSTANCE = 2
     SPOT_FLEET = 3
+
 
 def run_one_region_instances(config, region_number, number_of_instances, instance_resource=InstanceResource.ON_DEMAND):
     region_name = config[region_number][utils.REGION_NAME]
@@ -30,8 +32,10 @@ def run_one_region_instances(config, region_number, number_of_instances, instanc
         return node_name_tag, ec2_client
     elif instance_resource == InstanceResource.SPOT_FLEET:
         instance_type_list = ['t2.micro', 't2.small', 'm3.medium']
-        node_name_tag = spot_fleet.request_spot_fleet(
-            config, ec2_client, region_number, int(number_of_instances), instance_type_list)
+        node_name_tag = spot_fleet.request_spot_fleet_with_on_demand(
+            config, ec2_client, region_number, int(number_of_instances), 1, instance_type_list)
+        # node_name_tag = spot_fleet.request_spot_fleet(
+        #     config, ec2_client, region_number, int(number_of_instances), instance_type_list)
         return node_name_tag, ec2_client
     else:
         return None, None
