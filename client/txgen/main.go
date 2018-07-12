@@ -266,16 +266,16 @@ func main() {
 	// Nodes containing utxopools to mirror the shards' data in the network
 	nodes := []*node.Node{}
 	for _, shardId := range shardIds {
-		node := node.NewNode(&consensus.Consensus{ShardID: shardId})
+		node := node.New(&consensus.Consensus{ShardID: shardId})
 		// Assign many fake addresses so we have enough address to place with at first
 		node.AddTestingAddresses(10000)
-		nodes = append(nodes, &node)
+		nodes = append(nodes, node)
 	}
 
 	// Client/txgenerator server node setup
 	clientPort := getClientPort(&config)
 	consensusObj := consensus.NewConsensus("0", clientPort, "0", nil, p2p.Peer{})
-	clientNode := node.NewNode(&consensusObj)
+	clientNode := node.New(&consensusObj)
 
 	if clientPort != "" {
 		clientNode.Client = client.NewClient(&leaders)

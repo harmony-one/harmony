@@ -141,33 +141,33 @@ func main() {
 
 	go logMemUsage(&consensus)
 
-	node := node.NewNode(&consensus)
+	currentNode := node.New(&consensus)
 	// Set logger to attack model.
 	attack.GetInstance().SetLogger(consensus.Log)
 
 	clientPeer := getClientPeer(&config)
 	// If there is a client configured in the node list.
 	if clientPeer != nil {
-		node.ClientPeer = clientPeer
+		currentNode.ClientPeer = clientPeer
 	}
 
 	// Assign closure functions to the consensus object
-	consensus.BlockVerifier = node.VerifyNewBlock
-	consensus.OnConsensusDone = node.PostConsensusProcessing
+	consensus.BlockVerifier = currentNode.VerifyNewBlock
+	consensus.OnConsensusDone = currentNode.PostConsensusProcessing
 
 	// Temporary testing code, to be removed.
-	node.AddTestingAddresses(10000)
+	currentNode.AddTestingAddresses(10000)
 
 	if consensus.IsLeader {
 		// Let consensus run
 		go func() {
-			consensus.WaitForNewBlock(node.BlockChannel)
+			consensus.WaitForNewBlock(currentNode.BlockChannel)
 		}()
 		// Node waiting for consensus readiness to create new block
 		go func() {
-			node.WaitForConsensusReady(consensus.ReadySignal)
+			currentNode.WaitForConsensusReady(consensus.ReadySignal)
 		}()
 	}
 
-	node.StartServer(*port)
+	currentNode.StartServer(*port)
 }

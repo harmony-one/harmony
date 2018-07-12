@@ -96,7 +96,7 @@ func (node *Node) countNumTransactionsInBlockchain() int {
 }
 
 // Create a new Node
-func NewNode(consensus *consensus.Consensus) Node {
+func New(consensus *consensus.Consensus) *Node {
 	node := Node{}
 
 	// Consensus and associated channel to communicate blocks
@@ -116,5 +116,5 @@ func NewNode(consensus *consensus.Consensus) Node {
 
 	// Logger
 	node.log = node.Consensus.Log
-	return node
+	return &node
 }
