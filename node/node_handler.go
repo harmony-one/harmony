@@ -101,21 +101,6 @@ func (node *Node) NodeHandler(conn net.Conn) {
 
 				os.Exit(0)
 			}
-		case EXPERIMENT:
-			expType := msgPayload[0]
-			switch ExperimentMessageType(expType) {
-			case UTXO_REQUEST:
-				node.log.Debug("Received UTXO request")
-				p2p.SendMessage(*node.ClientPeer, ConstructUtxoResponseMessage(node.UtxoPool.GetSnapshot()))
-			case UTXO_RESPONSE:
-				node.log.Debug("Received UTXO response")
-				decoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the UTXO_RESPONSE messge type
-				utxoPool := new(blockchain.UTXOPool)
-				decoder.Decode(utxoPool)
-				if node.Client != nil && utxoPool != nil {
-					//node.Client.UpdateUtxoPool(*utxoPool)
-				}
-			}
 		}
 	case common.CLIENT:
 		actionType := client.ClientMessageType(msgType)

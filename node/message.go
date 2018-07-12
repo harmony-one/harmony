@@ -15,7 +15,6 @@ const (
 	BLOCK
 	CONTROL
 
-	EXPERIMENT // Exist only for experiment setup
 	// TODO: add more types
 )
 
@@ -40,14 +39,6 @@ type ControlMessageType int
 
 const (
 	STOP ControlMessageType = iota
-)
-
-// The types of messages used for NODE/EXPERIMENT
-type ExperimentMessageType int
-
-const (
-	UTXO_REQUEST ExperimentMessageType = iota
-	UTXO_RESPONSE
 )
 
 // Constructs serialized transactions
@@ -81,17 +72,6 @@ func ConstructStopMessage() []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(common.NODE)})
 	byteBuffer.WriteByte(byte(CONTROL))
 	byteBuffer.WriteByte(byte(STOP))
-	return byteBuffer.Bytes()
-}
-
-// Constructs utxo response message with serialized utxoPool to return
-func ConstructUtxoResponseMessage(pool blockchain.UTXOPool) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(common.NODE)})
-	byteBuffer.WriteByte(byte(EXPERIMENT))
-	byteBuffer.WriteByte(byte(UTXO_RESPONSE))
-	encoder := gob.NewEncoder(byteBuffer)
-
-	encoder.Encode(pool)
 	return byteBuffer.Bytes()
 }
 
