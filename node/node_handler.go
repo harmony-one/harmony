@@ -83,16 +83,13 @@ func (node *Node) NodeHandler(conn net.Conn) {
 			if ControlMessageType(controlType) == STOP {
 				node.log.Debug("Stopping Node", "node", node, "numBlocks", len(node.blockchain.Blocks), "numTxsProcessed", node.countNumTransactionsInBlockchain())
 
-				byteBuffer := bytes.NewBuffer([]byte{})
-				encoder := gob.NewEncoder(byteBuffer)
-				utxoPool := node.UtxoPool.GetSnapshot()
-				encoder.Encode(utxoPool.UtxoMap)
-				node.log.Debug("UtxoPool Report", "numEntries", len(node.UtxoPool.UtxoMap), "sizeInBytes", len(byteBuffer.Bytes()))
+				sizeInBytes := node.UtxoPool.GetSizeInByteOfUtxoMap()
+				node.log.Debug("UtxoPool Report", "numEntries", len(node.UtxoPool.UtxoMap), "sizeInBytes", sizeInBytes)
 
 				avgBlockSizeInBytes := 0
 				for _, block := range node.blockchain.Blocks {
-					byteBuffer = bytes.NewBuffer([]byte{})
-					encoder = gob.NewEncoder(byteBuffer)
+					byteBuffer := bytes.NewBuffer([]byte{})
+					encoder := gob.NewEncoder(byteBuffer)
 					encoder.Encode(block)
 					avgBlockSizeInBytes += len(byteBuffer.Bytes())
 				}

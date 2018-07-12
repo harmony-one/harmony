@@ -1,6 +1,8 @@
 package blockchain
 
 import (
+	"bytes"
+	"encoding/gob"
 	"encoding/hex"
 	"fmt"
 	"sync"
@@ -383,8 +385,11 @@ func (utxoPool *UTXOPool) String() string {
 }
 
 // Get a snapshot copy of the current pool
-func (utxoPool *UTXOPool) GetSnapshot() UTXOPool {
+func (utxoPool *UTXOPool) GetSizeInByteOfUtxoMap() int {
 	utxoPool.mutex.Lock()
 	defer utxoPool.mutex.Unlock()
-	return *utxoPool
+	byteBuffer := bytes.NewBuffer([]byte{})
+	encoder := gob.NewEncoder(byteBuffer)
+	encoder.Encode(utxoPool.UtxoMap)
+	return len(byteBuffer.Bytes())
 }
