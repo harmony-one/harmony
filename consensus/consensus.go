@@ -74,7 +74,7 @@ type BlockConsensusStatus struct {
 // NewConsensus creates a new Consensus object
 // TODO(minhdoan): Maybe convert it into just New
 // FYI, see https://golang.org/doc/effective_go.html?#package-names
-func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) Consensus {
+func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Consensus {
 	consensus := Consensus{}
 	Peers := peers
 	leaderPeer := leader
@@ -130,7 +130,7 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) C
 	consensus.msgType = byte(CONSENSUS)
 
 	consensus.Log = log.New()
-	return consensus
+	return &consensus
 }
 
 // Reset the state of the consensus

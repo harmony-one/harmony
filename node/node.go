@@ -23,13 +23,10 @@ type Node struct {
 	CrossTxsInConsensus    []*blockchain.CrossShardTxAndProof // The cross shard txs that is under consensus, the proof is not filled yet.
 	CrossTxsToReturn       []*blockchain.CrossShardTxAndProof // The cross shard txs and proof that needs to be sent back to the user client.
 	log                    log.Logger                         // Log utility
-
-	pendingTxMutex       sync.Mutex
-	crossTxToReturnMutex sync.Mutex
-
-	ClientPeer *p2p.Peer // The peer for the benchmark tx generator client, used for leaders to return proof-of-accept
-
-	Client *client.Client // The presence of a client object means this node will also act as a client
+	pendingTxMutex         sync.Mutex
+	crossTxToReturnMutex   sync.Mutex
+	ClientPeer             *p2p.Peer      // The peer for the benchmark tx generator client, used for leaders to return proof-of-accept
+	Client                 *client.Client // The presence of a client object means this node will also act as a client
 }
 
 // Add new crossTx and proofs to the list of crossTx that needs to be sent back to client

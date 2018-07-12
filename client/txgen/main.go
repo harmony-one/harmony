@@ -275,7 +275,7 @@ func main() {
 	// Client/txgenerator server node setup
 	clientPort := getClientPort(&config)
 	consensusObj := consensus.NewConsensus("0", clientPort, "0", nil, p2p.Peer{})
-	clientNode := node.New(&consensusObj)
+	clientNode := node.New(consensusObj)
 
 	if clientPort != "" {
 		clientNode.Client = client.NewClient(&leaders)

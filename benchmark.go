@@ -137,14 +137,15 @@ func main() {
 	)
 	log.Root().SetHandler(h)
 
+	// Consensus object.
 	consensus := consensus.NewConsensus(*ip, *port, shardID, peers, leader)
-
-	go logMemUsage(&consensus)
-
-	currentNode := node.New(&consensus)
+	// Logging for consensus.
+	go logMemUsage(consensus)
 	// Set logger to attack model.
 	attack.GetInstance().SetLogger(consensus.Log)
-
+	// Current node.
+	currentNode := node.New(consensus)
+	// Create client peer.
 	clientPeer := getClientPeer(&config)
 	// If there is a client configured in the node list.
 	if clientPeer != nil {
