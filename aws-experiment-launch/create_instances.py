@@ -6,19 +6,20 @@ import json
 import sys
 import threading
 import time
+import enum
 
 from utils import utils, spot_fleet, logger
 
 LOGGER = logger.getLogger(__file__)
 
 
-class InstanceResource:
+class InstanceResource(enum.Enum):
     ON_DEMAND = 1
     SPOT_INSTANCE = 2
     SPOT_FLEET = 3
 
 
-def run_one_region_instances(config, region_number, number_of_instances, instance_resource=InstanceResource.ON_DEMAND):
+def run_one_region_instances(config, region_number, number_of_instances, instance_resource):
     region_name = config[region_number][utils.REGION_NAME]
     # Create session.
     session = boto3.Session(region_name=region_name)
@@ -129,6 +130,8 @@ if __name__ == "__main__":
                         default='instance_output.txt', help='the file to append or write')
     parser.add_argument('--instance_ids_output', type=str, dest='instance_ids_output',
                         default='instance_ids_output.txt', help='the file to append or write')
+    parser.add_argument('--instance_resource', dest='instance_resource', type=InstanceResource,
+                        default=InstanceResource.ON_DEMAND, choices=list(InstanceResource))
     parser.add_argument('--append', dest='append', type=bool, default=False,
                         help='append to the current instance_output')
     args = parser.parse_args()
@@ -145,7 +148,7 @@ if __name__ == "__main__":
             region_number = region_list[i]
             number_of_instances = num_instance_list[i]
             t = threading.Thread(target=run_for_one_region, args=(
-                config, region_number, number_of_instances, InstanceResource.SPOT_FLEET, fout, fout2))
+                config, region_number, number_of_instances, InstanceResource.ON_DEMAND, fout, fout2))
             LOGGER.info("creating thread for region %s" % region_number)
             t.start()
             thread_pool.append(t)
