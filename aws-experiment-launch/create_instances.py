@@ -14,9 +14,12 @@ LOGGER = logger.getLogger(__file__)
 
 
 class InstanceResource(enum.Enum):
-    ON_DEMAND = 1
-    SPOT_INSTANCE = 2
-    SPOT_FLEET = 3
+    ON_DEMAND = 'ondemand'
+    SPOT_INSTANCE = 'spot'
+    SPOT_FLEET = 'fleet'
+
+    def __str__(self):
+        return self.value
 
 def run_one_region_on_demand_instances(config, region_number, number_of_instances):
     ec2_client = utils.create_client(config, region_number)
