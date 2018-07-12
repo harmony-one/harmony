@@ -4,7 +4,7 @@ import launch_template
 LOGGER = logger.getLogger(__file__)
 
 
-def create_launch_specification(config, region_number, instanceType):
+def create_launch_specification(region_number, instanceType):
     return {
         # Region irrelevant fields
         'IamInstanceProfile': {
@@ -17,11 +17,11 @@ def create_launch_specification(config, region_number, instanceType):
             {
                 # In certain scenarios, we have to use group id instead of group name
                 # https://github.com/boto/boto/issues/350#issuecomment-27359492
-                'GroupId': config[region_number][utils.REGION_SECURITY_GROUP_ID]
+                'GroupId': utils.CONFIG[region_number][utils.REGION_SECURITY_GROUP_ID]
             }
         ],
-        'ImageId': config[region_number][utils.REGION_AMI],
-        'KeyName': config[region_number][utils.REGION_KEY],
+        'ImageId': utils.CONFIG[region_number][utils.REGION_AMI],
+        'KeyName': utils.CONFIG[region_number][utils.REGION_KEY],
         'TagSpecifications': [
             {
                 'ResourceType': 'instance',
@@ -40,14 +40,14 @@ def create_launch_specification(config, region_number, instanceType):
     }
 
 
-def create_launch_specification_list(config, region_number, instance_type_list):
-    return list(map(lambda type: create_launch_specification(config, region_number, type), instance_type_list))
+def create_launch_specification_list(region_number, instance_type_list):
+    return list(map(lambda type: create_launch_specification(region_number, type), instance_type_list))
 
 
-def get_launch_template(config, region_number, instance_type):
+def get_launch_template(region_number, instance_type):
     return {
         'LaunchTemplateSpecification': {
-            'LaunchTemplateName': launch_template.get_launch_template_name(config, region_number),
+            'LaunchTemplateName': launch_template.get_launch_template_name(region_number),
             'Version': '1'
         },
         'Overrides': [
@@ -58,11 +58,11 @@ def get_launch_template(config, region_number, instance_type):
     }
 
 
-def get_launch_template_list(config, region_number, instance_type_list):
-    return list(map(lambda type: get_launch_template(config, region_number, type), instance_type_list))
+def get_launch_template_list(region_number, instance_type_list):
+    return list(map(lambda type: get_launch_template(region_number, type), instance_type_list))
 
 
-def request_spot_fleet(config, ec2_client, region_number, number_of_instances, instance_type_list):
+def request_spot_fleet(ec2_client, region_number, number_of_instances, instance_type_list):
     LOGGER.info("Requesting spot fleet")
     LOGGER.info("Creating node_name_tag: %s" %
                 utils.get_node_name_tag(region_number))
@@ -73,7 +73,7 @@ def request_spot_fleet(config, ec2_client, region_number, number_of_instances, i
             # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-fleet.html#spot-fleet-allocation-strategy
             'AllocationStrategy': 'diversified',
             'IamFleetRole': 'arn:aws:iam::656503231766:role/RichardFleetRole',
-            'LaunchSpecifications': create_launch_specification_list(config, region_number, instance_type_list),
+            'LaunchSpecifications': create_launch_specification_list(region_number, instance_type_list),
             # 'SpotPrice': 'string', # The maximum price per unit hour that you are willing to pay for a Spot Instance. The default is the On-Demand price.
             'TargetCapacity': number_of_instances,
             'Type': 'maintain'
@@ -82,7 +82,7 @@ def request_spot_fleet(config, ec2_client, region_number, number_of_instances, i
     return response
 
 
-def request_spot_fleet_with_on_demand(config, ec2_client, region_number, number_of_instances, number_of_on_demand, instance_type_list):
+def request_spot_fleet_with_on_demand(ec2_client, region_number, number_of_instances, number_of_on_demand, instance_type_list):
     LOGGER.info("Requesting spot fleet")
     LOGGER.info("Creating node_name_tag: %s" %
                 utils.get_node_name_tag(region_number))
@@ -93,7 +93,7 @@ def request_spot_fleet_with_on_demand(config, ec2_client, region_number, number_
             # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-fleet.html#spot-fleet-allocation-strategy
             'AllocationStrategy': 'diversified',
             'IamFleetRole': 'arn:aws:iam::656503231766:role/RichardFleetRole',
-            'LaunchTemplateConfigs': get_launch_template_list(config, region_number, instance_type_list),
+            'LaunchTemplateConfigs': get_launch_template_list(region_number, instance_type_list),
             # 'SpotPrice': 'string', # The maximum price per unit hour that you are willing to pay for a Spot Instance. The default is the On-Demand price.
             'TargetCapacity': number_of_instances,
             'OnDemandTargetCapacity': number_of_on_demand,
@@ -101,3 +101,18 @@ def request_spot_fleet_with_on_demand(config, ec2_client, region_number, number_
         }
     )
     return response
+
+def get_instance_ids(ec2_client, request_id):
+    res = ec2_client.describe_spot_fleet_instances(
+        SpotFleetRequestId=request_id
+    )
+    return [ inst.InstanceId for inst in res.ActiveInstances ]
+
+def run_one_region(region_number, number_of_instances, fout, fout2):
+    client = utils.create_client(utils.CONFIG, region_number)
+    instance_type_list = ['t2.micro', 't2.small', 'm3.medium']
+    # node_name_tag = request_spot_fleet_with_on_demand(
+    #     client, region_number, int(number_of_instances), 1, instance_type_list)
+    node_name_tag = request_spot_fleet(
+        client, region_number, int(number_of_instances), instance_type_list)
+    return node_name_tag, client

@@ -28,7 +28,15 @@ with open("user-data.sh", "r") as userdata_file:
 # UserData must be base64 encoded for spot instances.
 USER_DATA_BASE64 = base64.b64encode(USER_DATA)
 
+def create_client(config, region_number):
+    region_name = config[region_number][REGION_NAME]
+    # Create session.
+    session = boto3.Session(region_name=region_name)
+    # Create a client.
+    return session.client('ec2')
+
 def read_region_config(region_config='configuration.txt'):
+    global CONFIG
     config = {}
     with open(region_config, 'r') as f:
         for myline in f:
@@ -41,6 +49,7 @@ def read_region_config(region_config='configuration.txt'):
             config[region_num][REGION_HUMAN_NAME] = mylist[4]
             config[region_num][REGION_AMI] = mylist[5]
             config[region_num][REGION_SECURITY_GROUP_ID] = mylist[6]
+    CONFIG = config
     return config
 
 def get_ip_list(response):
