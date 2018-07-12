@@ -192,7 +192,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan int) {
 		//node.log.Debug("Adding new block", "currentChainSize", len(node.blockchain.Blocks), "numTxs", len(node.blockchain.GetLatestBlock().Transactions), "PrevHash", node.blockchain.GetLatestBlock().PrevBlockHash, "Hash", node.blockchain.GetLatestBlock().Hash)
 		if !retry {
 			for {
-				// Once we have more than 10 transactions pending we will try creating a new block
+				// Once we have more than 100 transactions pending we will try creating a new block
 				if len(node.pendingTransactions) >= 100 {
 					selectedTxs, crossShardTxAndProofs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
 
