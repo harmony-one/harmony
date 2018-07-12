@@ -6,20 +6,20 @@ import json
 import sys
 import threading
 import time
+import enum
 
 from utils import utils, spot_fleet, logger
 
 LOGGER = logger.getLogger(__file__)
 
 
-class InstanceResource:
+class InstanceResource(enum.Enum):
     ON_DEMAND = 1
     SPOT_INSTANCE = 2
     SPOT_FLEET = 3
 
 def run_one_region_on_demand_instances(config, region_number, number_of_instances):
     ec2_client = utils.create_client(config, region_number)
-
     node_name_tag = create_instances(
         config, ec2_client, region_number, int(number_of_instances))
     LOGGER.info("Created %s in region %s" % (node_name_tag, region_number))
@@ -113,6 +113,8 @@ if __name__ == "__main__":
                         default='instance_output.txt', help='the file to append or write')
     parser.add_argument('--instance_ids_output', type=str, dest='instance_ids_output',
                         default='instance_ids_output.txt', help='the file to append or write')
+    parser.add_argument('--instance_resource', dest='instance_resource', type=InstanceResource,
+                        default=InstanceResource.ON_DEMAND, choices=list(InstanceResource))
     parser.add_argument('--append', dest='append', type=bool, default=False,
                         help='append to the current instance_output')
     instanceResource = InstanceResource.SPOT_FLEET
