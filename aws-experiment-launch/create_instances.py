@@ -17,29 +17,13 @@ class InstanceResource:
     SPOT_INSTANCE = 2
     SPOT_FLEET = 3
 
+def run_one_region_on_demand_instances(config, region_number, number_of_instances):
+    ec2_client = utils.create_client(config, region_number)
 
-def run_one_region_instances(config, region_number, number_of_instances, instance_resource=InstanceResource.ON_DEMAND):
-    region_name = config[region_number][utils.REGION_NAME]
-    # Create session.
-    session = boto3.Session(region_name=region_name)
-    # Create a client.
-    ec2_client = session.client('ec2')
-
-    if instance_resource == InstanceResource.ON_DEMAND:
-        node_name_tag = create_instances(
-            config, ec2_client, region_number, int(number_of_instances))
-        LOGGER.info("Created %s in region %s" % (node_name_tag, region_number))
-        return node_name_tag, ec2_client
-    elif instance_resource == InstanceResource.SPOT_FLEET:
-        instance_type_list = ['t2.micro', 't2.small', 'm3.medium']
-        node_name_tag = spot_fleet.request_spot_fleet_with_on_demand(
-            config, ec2_client, region_number, int(number_of_instances), 1, instance_type_list)
-        # node_name_tag = spot_fleet.request_spot_fleet(
-        #     config, ec2_client, region_number, int(number_of_instances), instance_type_list)
-        return node_name_tag, ec2_client
-    else:
-        return None, None
-
+    node_name_tag = create_instances(
+        config, ec2_client, region_number, int(number_of_instances))
+    LOGGER.info("Created %s in region %s" % (node_name_tag, region_number))
+    return node_name_tag, ec2_client
 
 def create_instances(config, ec2_client, region_number, number_of_instances):
     node_name_tag = utils.get_node_name_tag(region_number)
@@ -97,9 +81,9 @@ def create_instances(config, ec2_client, region_number, number_of_instances):
 lock = threading.Lock()
 
 
-def run_for_one_region(config, region_number, number_of_instances, instance_resouce, fout, fout2):
-    node_name_tag, ec2_client = run_one_region_instances(
-        config, region_number, number_of_instances, instance_resouce)
+def run_for_one_region_on_demand(config, region_number, number_of_instances, fout, fout2):
+    node_name_tag, ec2_client = run_one_region_on_demand_instances(
+        config, region_number, number_of_instances)
     if node_name_tag:
         LOGGER.info("Managed to create instances for region %s" %
                     region_number)
@@ -131,6 +115,7 @@ if __name__ == "__main__":
                         default='instance_ids_output.txt', help='the file to append or write')
     parser.add_argument('--append', dest='append', type=bool, default=False,
                         help='append to the current instance_output')
+    instanceResource = InstanceResource.SPOT_FLEET
     args = parser.parse_args()
     config = utils.read_region_config(args.region_config)
     region_list = args.regions.split(',')
@@ -144,8 +129,12 @@ if __name__ == "__main__":
         for i in range(len(region_list)):
             region_number = region_list[i]
             number_of_instances = num_instance_list[i]
-            t = threading.Thread(target=run_for_one_region, args=(
-                config, region_number, number_of_instances, InstanceResource.SPOT_FLEET, fout, fout2))
+            if instanceResource == InstanceResource.ON_DEMAND:
+                t = threading.Thread(target=run_for_one_region_on_demand, args=(
+                    config, region_number, number_of_instances, fout, fout2))
+            elif instanceResource == InstanceResource.SPOT_FLEET:
+                t = threading.Thread(target=spot_fleet.run_one_region, args=(
+                    region_number, number_of_instances, fout, fout2))
             LOGGER.info("creating thread for region %s" % region_number)
             t.start()
             thread_pool.append(t)
