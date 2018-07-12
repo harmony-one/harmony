@@ -117,11 +117,11 @@ if __name__ == "__main__":
                         default=InstanceResource.ON_DEMAND, choices=list(InstanceResource))
     parser.add_argument('--append', dest='append', type=bool, default=False,
                         help='append to the current instance_output')
-    instanceResource = InstanceResource.SPOT_FLEET
     args = parser.parse_args()
     config = utils.read_region_config(args.region_config)
     region_list = args.regions.split(',')
     num_instance_list = args.num_instance_list.split(',')
+    instance_resource = args.instance_resource
     assert len(region_list) == len(num_instance_list), "number of regions: %d != number of instances per region: %d" % (
         len(region_list), len(num_instance_list))
 
@@ -131,10 +131,10 @@ if __name__ == "__main__":
         for i in range(len(region_list)):
             region_number = region_list[i]
             number_of_instances = num_instance_list[i]
-            if instanceResource == InstanceResource.ON_DEMAND:
+            if instance_resource == InstanceResource.ON_DEMAND:
                 t = threading.Thread(target=run_for_one_region_on_demand, args=(
                     config, region_number, number_of_instances, fout, fout2))
-            elif instanceResource == InstanceResource.SPOT_FLEET:
+            elif instance_resource == InstanceResource.SPOT_FLEET:
                 t = threading.Thread(target=spot_fleet.run_one_region, args=(
                     region_number, number_of_instances, fout, fout2))
             LOGGER.info("creating thread for region %s" % region_number)
