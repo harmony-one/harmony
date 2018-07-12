@@ -79,7 +79,7 @@ def request_spot_fleet(ec2_client, region_number, number_of_instances, instance_
             'Type': 'maintain'
         }
     )
-    return response
+    return response["SpotFleetRequestId"]
 
 
 def request_spot_fleet_with_on_demand(ec2_client, region_number, number_of_instances, number_of_on_demand, instance_type_list):
@@ -102,17 +102,18 @@ def request_spot_fleet_with_on_demand(ec2_client, region_number, number_of_insta
     )
     return response
 
-def get_instance_ids(ec2_client, request_id):
-    res = ec2_client.describe_spot_fleet_instances(
+def get_instance_ids(client, request_id):
+    res = client.describe_spot_fleet_instances(
         SpotFleetRequestId=request_id
     )
-    return [ inst.InstanceId for inst in res.ActiveInstances ]
+    return [ inst["InstanceId"] for inst in res["ActiveInstances"] ]
 
 def run_one_region(region_number, number_of_instances, fout, fout2):
     client = utils.create_client(utils.CONFIG, region_number)
     instance_type_list = ['t2.micro', 't2.small', 'm3.medium']
     # node_name_tag = request_spot_fleet_with_on_demand(
     #     client, region_number, int(number_of_instances), 1, instance_type_list)
-    node_name_tag = request_spot_fleet(
+    request_id = request_spot_fleet(
         client, region_number, int(number_of_instances), instance_type_list)
-    return node_name_tag, client
+    instance_ids = get_instance_ids(client, request_id)
+    print(instance_ids) # TODO@ricl, no data here since the request is not fulfilled.
