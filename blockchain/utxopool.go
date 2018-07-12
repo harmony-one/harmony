@@ -23,8 +23,7 @@ type UTXOPool struct {
 	                       ]
 	               ]
 	*/
-	UtxoMap map[string]map[string]map[int]int
-
+	UtxoMap       map[string]map[string]map[int]int
 	LockedUtxoMap map[string]map[string]map[int]int
 	ShardId       uint32
 	mutex         sync.Mutex

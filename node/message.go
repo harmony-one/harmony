@@ -95,14 +95,6 @@ func ConstructUtxoResponseMessage(pool blockchain.UTXOPool) []byte {
 	return byteBuffer.Bytes()
 }
 
-// Constructs utxo request message
-func ConstructUtxoRequestMessage() []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(common.NODE)})
-	byteBuffer.WriteByte(byte(EXPERIMENT))
-	byteBuffer.WriteByte(byte(UTXO_REQUEST))
-	return byteBuffer.Bytes()
-}
-
 // Constructs blocks sync message to send blocks to other nodes
 func ConstructBlocksSyncMessage(blocks []blockchain.Block) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(common.NODE)})
