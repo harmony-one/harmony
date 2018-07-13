@@ -34,6 +34,7 @@ def create_instances(config, ec2_client, region_number, number_of_instances, tag
     available_zone = utils.get_one_availability_zone(ec2_client)
     LOGGER.info("Looking at zone %s to create instances." % available_zone)
 
+    time.sleep(10)
     ec2_client.run_instances(
         MinCount=number_of_instances,
         MaxCount=number_of_instances,
@@ -60,10 +61,11 @@ def create_instances(config, ec2_client, region_number, number_of_instances, tag
             },
         ],
     )
+    time.sleep(10)
     instance_ids = utils.get_instance_ids2(ec2_client, node_name_tag)
     LOGGER.info("Waiting for all %d instances in region %s with node_name_tag %s to be in RUNNING" % (
         len(instance_ids), region_number, node_name_tag))
-    time.sleep(10)
+    time.sleep(20)
     waiter = ec2_client.get_waiter('instance_running')
     waiter.wait(InstanceIds=instance_ids)
 
