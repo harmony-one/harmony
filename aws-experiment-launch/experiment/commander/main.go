@@ -108,6 +108,7 @@ func dictateNodes(command string) {
 		// Because of the limitation of ulimit
 		if count == 0 {
 			wg.Wait()
+			time.Sleep(time.Second)
 			count = MaxFileOpen
 		}
 	}
