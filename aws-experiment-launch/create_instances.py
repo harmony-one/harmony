@@ -81,8 +81,7 @@ def create_instances(config, ec2_client, region_number, number_of_instances):
     return None
 
 
-lock = threading.Lock()
-
+LOCK_FOR_RUN_ONE_REGION = threading.Lock()
 
 def run_for_one_region_on_demand(config, region_number, number_of_instances, fout, fout2):
     node_name_tag, ec2_client = run_one_region_on_demand_instances(
@@ -91,14 +90,14 @@ def run_for_one_region_on_demand(config, region_number, number_of_instances, fou
         LOGGER.info("Managed to create instances for region %s" %
                     region_number)
         instance_ids = utils.get_instance_ids2(ec2_client, node_name_tag)
-        lock.acquire()
+        LOCK_FOR_RUN_ONE_REGION.acquire()
         try:
             fout.write("%s %s\n" % (node_name_tag, region_number))
             for instance_id in instance_ids:
                 fout2.write(instance_id + " " + node_name_tag + " " + region_number +
                             " " + config[region_number][utils.REGION_NAME] + "\n")
         finally:
-            lock.release()
+            LOCK_FOR_RUN_ONE_REGION.release()
     else:
         LOGGER.info("Failed to create instances for region %s" % region_number)
 
