@@ -184,7 +184,7 @@ def get_instance_ids(describe_instances_response):
 
 WAITER_LOCK = threading.Lock() 
 def run_waiter_100_instances_for_status(ec2_client, status, instance_ids):
-    time.sleep(1)
+    time.sleep(10)
     WAITER_LOCK.acquire()
     waiter = ec2_client.get_waiter('instance_running')
     WAITER_LOCK.release()
