@@ -158,6 +158,7 @@ def get_availability_zones(ec2_client):
     return all_zones
 
 def get_one_availability_zone(ec2_client):
+    time.sleep(1)
     all_zones = get_availability_zones(ec2_client)
     if len(all_zones) > 0:
         return all_zones[0]
@@ -165,6 +166,7 @@ def get_one_availability_zone(ec2_client):
         return None
 
 def get_instance_ids2(ec2_client, node_name_tag):
+    time.sleep(5)
     filters = [{'Name': 'tag:Name','Values': [node_name_tag]}]
     return get_instance_ids(ec2_client.describe_instances(Filters=filters))
 
@@ -178,6 +180,7 @@ def get_instance_ids(describe_instances_response):
 
 WAITER_LOCK = threading.Lock() 
 def run_waiter_100_instances_for_status(ec2_client, status, instance_ids):
+    time.sleep(1)
     WAITER_LOCK.acquire()
     waiter = ec2_client.get_waiter('instance_running')
     WAITER_LOCK.release()

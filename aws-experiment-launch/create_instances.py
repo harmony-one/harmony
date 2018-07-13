@@ -60,16 +60,16 @@ def create_instances(config, ec2_client, region_number, number_of_instances):
             },
         ],
     )
-
     instance_ids = utils.get_instance_ids2(ec2_client, node_name_tag)
     LOGGER.info("Waiting for all %d instances in region %s to be in RUNNING" % (
         len(instance_ids), region_number))
+    time.sleep(10)
     waiter = ec2_client.get_waiter('instance_running')
     waiter.wait(InstanceIds=instance_ids)
 
     count = 0
     while count < 40:
-        time.sleep(5)
+        time.sleep(10)
         LOGGER.info("Waiting ...")
         ip_list = utils.collect_public_ips_from_ec2_client(
             ec2_client, node_name_tag)
