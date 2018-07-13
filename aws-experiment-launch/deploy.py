@@ -36,8 +36,6 @@ CURRENT_SESSION = datetime.datetime.fromtimestamp(
 PLACEMENT_GROUP = "PLACEMENT-" + CURRENT_SESSION
 NODE_NAME_SUFFIX = "NODE-" + CURRENT_SESSION
 
-MAX_INSTANCES_FOR_DEPLOYMENT = 500
-
 def run_one_region_codedeploy(region_number, region_config, node_name_tag, commit_id):
     ec2_client, session = utils.create_ec2_client(region_number, region_config)
     filters = [{'Name': 'tag:Name','Values': [node_name_tag]}]
@@ -47,13 +45,13 @@ def run_one_region_codedeploy(region_number, region_config, node_name_tag, commi
     thread_pool = []
     i = 0
     while i < total_instances:
-        j = min(total_instances, i + MAX_INSTANCES_FOR_DEPLOYMENT)
+        j = min(total_instances, i + utils.MAX_INSTANCES_FOR_DEPLOYMENT)
         t = threading.Thread(target=run_one_region_codedeploy_with_max_500_instances, args=(
                             ec2_client, session, region_number, instance_ids[i:j],
                             node_name_tag, commit_id, i))
         t.start()
         thread_pool.append(t)
-        i = i + MAX_INSTANCES_FOR_DEPLOYMENT
+        i = i + utils.MAX_INSTANCES_FOR_DEPLOYMENT
     for t in thread_pool:
         t.join()
 

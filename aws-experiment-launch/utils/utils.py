@@ -8,6 +8,7 @@ import threading
 
 
 MAX_INTANCES_FOR_WAITER = 100
+MAX_INSTANCES_FOR_DEPLOYMENT = 2
 REGION_NAME = 'region_name'
 REGION_KEY = 'region_key'
 REGION_SECURITY_GROUP = 'region_security_group'
@@ -23,6 +24,9 @@ NODE_NAME_SUFFIX = "NODE-" + CURRENT_SESSION
 
 def get_node_name_tag(region_number):
     return region_number + "-" + NODE_NAME_SUFFIX
+
+def get_node_name_tag2(region_number, tag):
+    return region_number + "-" + NODE_NAME_SUFFIX + "-" + str(tag)
 
 with open("user-data.sh", "r") as userdata_file:
     USER_DATA = userdata_file.read()
