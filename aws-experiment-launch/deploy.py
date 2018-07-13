@@ -36,60 +36,45 @@ CURRENT_SESSION = datetime.datetime.fromtimestamp(
 PLACEMENT_GROUP = "PLACEMENT-" + CURRENT_SESSION
 NODE_NAME_SUFFIX = "NODE-" + CURRENT_SESSION
 
-def run_one_region_codedeploy(region_number, region_config, node_name_tag, commit_id):
+
+def run_one_region_codedeploy(region_number, region_config, node_name_tag_list, commit_id):
     ec2_client, session = utils.create_ec2_client(region_number, region_config)
-    filters = [{'Name': 'tag:Name','Values': [node_name_tag]}]
-    instance_ids = utils.get_instance_ids(ec2_client.describe_instances(Filters=filters))
+    for node_name_tag in node_name_tag_list:
+        filters = [{'Name': 'tag:Name','Values': [node_name_tag]}]
+        instance_ids = utils.get_instance_ids(ec2_client.describe_instances(Filters=filters))
 
-    total_instances = len(instance_ids)
-    thread_pool = []
-    i = 0
-    while i < total_instances:
-        j = min(total_instances, i + utils.MAX_INSTANCES_FOR_DEPLOYMENT)
-        t = threading.Thread(target=run_one_region_codedeploy_with_max_500_instances, args=(
-                            ec2_client, session, region_number, instance_ids[i:j],
-                            node_name_tag, commit_id, i))
-        t.start()
-        thread_pool.append(t)
-        i = i + utils.MAX_INSTANCES_FOR_DEPLOYMENT
-    for t in thread_pool:
-        t.join()
+        LOGGER.info("Number of instances: %d" % len(instance_ids))
 
+        LOGGER.info("Waiting for %d instances in region %s to be in RUNNING" % (len(instance_ids), region_number))
+        utils.run_waiter_for_status(ec2_client, 'instance_running', instance_ids)
+        # waiter = ec2_client.get_waiter('instance_running')
+        # waiter.wait(InstanceIds=instance_ids)
 
-def run_one_region_codedeploy_with_max_500_instances(ec2_client, session, region_number,
-        instance_ids, node_name_tag, commit_id, tag_id):
-    LOGGER.info("Number of instances: %d" % len(instance_ids))
+        LOGGER.info("Waiting for %d instances in region %s with status OK"% (len(instance_ids), region_number))
+        utils.run_waiter_for_status(ec2_client, 'instance_status_ok', instance_ids)
+        # waiter = ec2_client.get_waiter('instance_status_ok')
+        # waiter.wait(InstanceIds=instance_ids)
 
-    LOGGER.info("Waiting for %d instances in region %s to be in RUNNING" % (len(instance_ids), region_number))
-    utils.run_waiter_for_status(ec2_client, 'instance_running', instance_ids)
-    # waiter = ec2_client.get_waiter('instance_running')
-    # waiter.wait(InstanceIds=instance_ids)
+        LOGGER.info("Waiting for %d instances in region %s with system in OK"% (len(instance_ids), region_number))
+        utils.run_waiter_for_status(ec2_client, 'system_status_ok', instance_ids)
+        # waiter = ec2_client.get_waiter('system_status_ok')
+        # waiter.wait(InstanceIds=instance_ids)
 
-    LOGGER.info("Waiting for %d instances in region %s with status OK"% (len(instance_ids), region_number))
-    utils.run_waiter_for_status(ec2_client, 'instance_status_ok', instance_ids)
-    # waiter = ec2_client.get_waiter('instance_status_ok')
-    # waiter.wait(InstanceIds=instance_ids)
+        codedeploy = session.client('codedeploy')
+        application_name = APPLICATION_NAME
+        deployment_group_name = APPLICATION_NAME + "-" + commit_id[:6] + "-" + node_name_tag + "-" + CURRENT_SESSION
+        repo = REPO
 
-    LOGGER.info("Waiting for %d instances in region %s with system in OK"% (len(instance_ids), region_number))
-    utils.run_waiter_for_status(ec2_client, 'system_status_ok', instance_ids)
-    # waiter = ec2_client.get_waiter('system_status_ok')
-    # waiter.wait(InstanceIds=instance_ids)
-
-    codedeploy = session.client('codedeploy')
-    application_name = APPLICATION_NAME
-    deployment_group_name = APPLICATION_NAME + "-" + commit_id[:6] + "-" + str(tag_id) + "-" + CURRENT_SESSION
-    repo = REPO
-
-    LOGGER.info("Setting up to deploy commit_id %s on region %s" % (commit_id, region_number))
-    utils.get_application(codedeploy, application_name)
-    deployment_group_id = utils.create_deployment_group(
-        codedeploy, region_number, application_name, deployment_group_name, node_name_tag)
-    if deployment_group_id:
-        LOGGER.info("Created deployment group with id %s" % deployment_group_id)
-    else:
-        LOGGER.info("Created deployment group with name %s was created" % deployment_group_name)
-    deployment_id, status = deploy(codedeploy, application_name, deployment_group_name, repo, commit_id)
-    return region_number, deployment_id, status
+        LOGGER.info("Setting up to deploy commit_id %s on region %s" % (commit_id, region_number))
+        utils.get_application(codedeploy, application_name)
+        deployment_group_id = utils.create_deployment_group(
+            codedeploy, region_number, application_name, deployment_group_name, node_name_tag)
+        if deployment_group_id:
+            LOGGER.info("Created deployment group with id %s" % deployment_group_id)
+        else:
+            LOGGER.info("Created deployment group with name %s was created" % deployment_group_name)
+        deployment_id, status = deploy(codedeploy, application_name, deployment_group_name, repo, commit_id)
+        LOGGER.info("Done with deployment with id: %s and status: %s" % (deployment_id, status))
 
 
 def deploy(codedeploy, application_name, deployment_group, repo, commit_id):
@@ -137,12 +122,17 @@ def deploy(codedeploy, application_name, deployment_group, repo, commit_id):
     return deployment_id, status
 
 def launch_code_deploy(region_list, region_config, commit_id):
-    thread_pool = []
+    region_collection = {}
     for region_tuppple in region_list:
         # node_name_tag comes first.
         node_name_tag, region_number = region_tuppple
+        if not region_collection.get(region_number):
+            region_collection[region_number] = []
+        region_collection[region_number].append(node_name_tag)
+    thread_pool = []
+    for region_number in region_collection.iterkeys():
         t = threading.Thread(target=run_one_region_codedeploy, args=(
-            region_number, region_config, node_name_tag, commit_id))
+            region_number, region_config, region_collection[region_number], commit_id))
         t.start()
         thread_pool.append(t)
     for t in thread_pool:
