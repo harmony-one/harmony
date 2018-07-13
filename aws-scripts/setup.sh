@@ -2,7 +2,6 @@
 echo "Setup Golang" >> tmplog
 #sudo yum update -y
 sudo yum install -y golang
-
 MyHOME=/home/ec2-user
 echo "now setting up go-lang paths"
 # GOROOT is the location where Go package is installed on your system
@@ -24,3 +23,14 @@ cd $GOPATH/src/harmony-benchmark
 go build -o bin/soldier aws-experiment-launch/experiment/soldier/main.go
 go build -o bin/benchmark benchmark.go
 go build -o bin/txgen client/txgen/main.go
+
+# Setup ulimit
+echo "* soft     nproc          65535" | sudo tee -a /etc/security/limits.conf
+echo "* hard     nproc          65535" | sudo tee -a /etc/security/limits.conf
+echo "* soft     nofile         65535" | sudo tee -a /etc/security/limits.conf
+echo "* hard     nofile         65535" | sudo tee -a /etc/security/limits.conf
+echo "root soft     nproc          65535" | sudo tee -a /etc/security/limits.conf
+echo "root hard     nproc          65535" | sudo tee -a /etc/security/limits.conf
+echo "root soft     nofile         65535" | sudo tee -a /etc/security/limits.conf
+echo "root hard     nofile         65535" | sudo tee -a /etc/security/limits.conf
+echo "session required pam_limits.so" | sudo tee -a /etc/pam.d/common-session
