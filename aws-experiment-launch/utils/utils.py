@@ -8,7 +8,7 @@ import threading
 
 
 MAX_INTANCES_FOR_WAITER = 100
-MAX_INSTANCES_FOR_DEPLOYMENT = 2
+MAX_INSTANCES_FOR_DEPLOYMENT = 500
 REGION_NAME = 'region_name'
 REGION_KEY = 'region_key'
 REGION_SECURITY_GROUP = 'region_security_group'
