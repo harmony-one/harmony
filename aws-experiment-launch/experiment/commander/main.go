@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -32,6 +33,7 @@ var (
 
 func readConfigFile() [][]string {
 	file, err := os.Open(setting.configFile)
+	defer file.Close()
 	if err != nil {
 		log.Fatal("Failed to read config file", setting.configFile,
 			"\nNOTE: The config path should be relative to commander.")
@@ -87,12 +89,27 @@ func config(ip string, port string, configFile string) {
 }
 
 func dictateNodes(command string) {
+	const MaxFileOpen = 5000
+	var wg sync.WaitGroup
+	count := MaxFileOpen
 	for _, config := range setting.configs {
 		ip := config[0]
 		port := "1" + config[1] // the port number of solider is "1" + node port
 		addr := strings.Join([]string{ip, port}, ":")
 
-		go dictateNode(addr, command)
+		if count == MaxFileOpen {
+			wg.Add(MaxFileOpen)
+		}
+		go func() {
+			defer wg.Done()
+			dictateNode(addr, command)
+		}()
+		count -= 1
+		// Because of the limitation of ulimit
+		if count == 0 {
+			wg.Wait()
+			count = MaxFileOpen
+		}
 	}
 }
 
