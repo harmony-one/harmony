@@ -41,13 +41,18 @@ if __name__ == "__main__":
         LOGGER.info("%s is not existed" % args.instance_output)
         sys.exit(1)
     if args.region_number and args.node_name_tag:
-        ec2_client, session = utils.create_ec2_client(args.region_number, args.region_config)
-        filters = [{'Name': 'tag:Name','Values': [args.node_name_tag]}]
-        instance_ids = utils.get_instance_ids(ec2_client.describe_instances(Filters=filters))
-        ec2_client.terminate_instances(InstanceIds=instance_ids)
-        LOGGER.info("waiting until instances with tag %s died." % args.node_name_tag)
-        waiter = ec2_client.get_waiter('instance_terminated')
-        waiter.wait(InstanceIds=instance_ids)
+        region_number_items = args.region_number.split(",")
+        node_name_tag_items = args.node_name_tag.split(",")
+        thread_pool = []
+        for i in range(len(region_number_items)):
+            region_number = region_number_items[i]
+            node_name_tag = node_name_tag_items[i]
+            t = threading.Thread(target=terminate_instances_by_region, args=(region_number, args.region_config, node_name_tag))
+            t.start()
+            thread_pool.append(t)
+        for t in thread_pool:
+            t.join()
+        LOGGER.info("done.")
     elif args.instance_output:
         with open(args.instance_output, "r") as fin:
             thread_pool = []
