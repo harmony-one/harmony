@@ -4,8 +4,10 @@ import json
 import sys
 import time
 import base64
+import threading
 
 
+MAX_INTANCES_FOR_WAITER = 100
 REGION_NAME = 'region_name'
 REGION_KEY = 'region_key'
 REGION_SECURITY_GROUP = 'region_security_group'
@@ -173,6 +175,26 @@ def get_instance_ids(describe_instances_response):
         for reservation in describe_instances_response["Reservations"]:
             instance_ids.extend(instance["InstanceId"] for instance in reservation["Instances"] if instance.get("InstanceId"))
     return instance_ids
+
+WAITER_LOCK = threading.Lock() 
+def run_waiter_100_instances_for_status(ec2_client, status, instance_ids):
+    WAITER_LOCK.acquire()
+    waiter = ec2_client.get_waiter('instance_running')
+    WAITER_LOCK.release()
+    waiter.wait(InstanceIds=instance_ids)
+
+def run_waiter_for_status(ec2_client, status, instance_ids):
+    thread_pool = []
+    i = 0
+    while i < len(instance_ids):
+        j = i + min(len(instance_ids), i + MAX_INTANCES_FOR_WAITER)
+        t = threading.Thread(target=run_waiter_100_instances_for_status, args=(
+                            ec2_client, status, instance_ids[i:j]))
+        t.start()
+        thread_pool.append(t)
+        i = i + MAX_INTANCES_FOR_WAITER
+    for t in thread_pool:
+        t.join()
 
 # used for testing only.
 # if __name__ == "__main__":
