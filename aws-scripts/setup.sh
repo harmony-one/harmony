@@ -18,6 +18,9 @@ export GOPATH=$MyHOME/projects
 export PATH=$PATH:$GOROOT/bin
 source $MyHOME/.bash_profile
 
+# go get dependencies
+go get github.com/go-stack/stack
+
 # build executables
 cd $GOPATH/src/harmony-benchmark
 go build -o bin/soldier aws-experiment-launch/experiment/soldier/main.go
