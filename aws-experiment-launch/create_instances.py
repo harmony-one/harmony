@@ -91,8 +91,8 @@ def run_for_one_region_on_demand(config, region_number, number_of_instances, fou
         node_name_tag, ec2_client = run_one_region_on_demand_instances(
             config, region_number, number_of_creation, tag)
         if node_name_tag:
-            LOGGER.info("Managed to create instances for region %s" %
-                        region_number)
+            LOGGER.info("Managed to create instances for region %s with name_name_tag %s" %
+                        (region_number, node_name_tag))
             instance_ids = utils.get_instance_ids2(ec2_client, node_name_tag)
             LOCK_FOR_RUN_ONE_REGION.acquire()
             try:
