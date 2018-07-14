@@ -55,6 +55,11 @@ func handleCommand(command string) {
 	}
 
 	switch cmd := args[0]; cmd {
+	case "config":
+		{
+			setting.configs = readConfigFile()
+			log.Println("Loaded config file", setting.configs)
+		}
 	case "init":
 		{
 			session.id = time.Now().Format("150405-20060102")
@@ -84,8 +89,6 @@ func config(ip string, port string, configFile string) {
 	setting.ip = ip
 	setting.port = port
 	setting.configFile = configFile
-	setting.configs = readConfigFile()
-	log.Println("Loaded config file", setting.configs)
 }
 
 func dictateNodes(command string) {
@@ -195,7 +198,7 @@ func main() {
 
 	config(*ip, *port, *configFile)
 
-	log.Println("Start to host config file at http://" + setting.ip + ":" + setting.port + "/" + setting.configFile)
+	log.Println("Start to host config files at http://" + setting.ip + ":" + setting.port)
 
 	go serve()
 
