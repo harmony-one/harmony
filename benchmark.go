@@ -9,10 +9,8 @@ import (
 	"harmony-benchmark/log"
 	"harmony-benchmark/node"
 	"harmony-benchmark/p2p"
-	"harmony-benchmark/utils"
 	"math/rand"
 	"os"
-	"runtime"
 	"strings"
 	"time"
 
@@ -95,25 +93,21 @@ func attackDetermination(attackedMode int) bool {
 }
 
 func logMemUsage(consensus *consensus.Consensus) {
+	p, _ := process.NewProcess(int32(os.Getpid()))
 	for {
-		var m runtime.MemStats
-		runtime.ReadMemStats(&m)
-		log.Info("Mem Report", "Alloc", utils.BToMb(m.Alloc), "TotalAlloc", utils.BToMb(m.TotalAlloc),
-			"Sys", utils.BToMb(m.Sys), "NumGC", m.NumGC, "consensus", consensus)
+		info, _ := p.MemoryInfo()
+		memMap, _ := p.MemoryMaps(false)
+		log.Info("Mem Report", "info", info, "map", memMap)
 		time.Sleep(10 * time.Second)
 	}
 }
 
 // TODO: @ricl, start another process for reporting.
 func logCPUUsage(consensus *consensus.Consensus) {
-	log.Info("PPID", "ppid", os.Getpid())
 	p, _ := process.NewProcess(int32(os.Getpid()))
 	for {
 		percent, _ := p.CPUPercent()
-		times, err := p.Times()
-		if err != nil {
-			log.Info("ERR", "Err", err)
-		}
+		times, _ := p.Times()
 		log.Info("CPU Report", "Percent", percent, "Times", times, "consensus", consensus)
 		time.Sleep(10 * time.Second)
 	}
@@ -157,7 +151,6 @@ func main() {
 	// Consensus object.
 	consensus := consensus.NewConsensus(*ip, *port, shardID, peers, leader)
 	// Logging for consensus.
-	log.Info("PID", "pid", os.Getpid())
 	go logMemUsage(consensus)
 	go logCPUUsage(consensus)
 
