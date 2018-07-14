@@ -5,7 +5,7 @@ import (
 	"os"
 	"time"
 
-	"harmony-benchmark/stack"
+	"github.com/go-stack/stack"
 )
 
 const timeKey = "t"
