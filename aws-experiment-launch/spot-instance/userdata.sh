@@ -1,4 +1,5 @@
 #!/bin/bash
+cd home/ec2-user
 commanderIP=`curl https://gist.githubusercontent.com/lzl124631x/c44471f85ced6743a173cc113393dc81/raw/4a6b73493f75363de5a61051c8e339294191ca00/commanderIP`
 curl http://$commanderIP:8080/soldier -o soldier
 chmod +x ./soldier
