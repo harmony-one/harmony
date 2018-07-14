@@ -108,7 +108,7 @@ func logCPUUsage(consensus *consensus.Consensus) {
 	for {
 		percent, _ := p.CPUPercent()
 		times, _ := p.Times()
-		log.Info("CPU Report", "Percent", percent, "Times", times, "consensus", consensus)
+		log.Info("CPU Report", "percent", percent, "times", times, "consensus", consensus)
 		time.Sleep(10 * time.Second)
 	}
 }
@@ -143,7 +143,7 @@ func main() {
 	logFileName := fmt.Sprintf("./%v/%s-%v-%v.log", *logFolder, role, *ip, *port)
 	h := log.MultiHandler(
 		log.StdoutHandler,
-		log.Must.FileHandler(logFileName, log.LogfmtFormat()), // Log to file
+		log.Must.FileHandler(logFileName, log.JSONFormat()), // Log to file
 		// log.Must.NetHandler("tcp", ":3000", log.JSONFormat()) // Log to remote
 	)
 	log.Root().SetHandler(h)
