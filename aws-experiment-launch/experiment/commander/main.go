@@ -119,7 +119,7 @@ func dictateNodes(command string) {
 
 func dictateNode(addr string, command string) {
 	// creates client
-	conn, err := net.Dial("tcp", addr)
+	conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
 	if err != nil {
 		log.Println(err)
 		return

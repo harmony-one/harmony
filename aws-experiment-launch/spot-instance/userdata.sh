@@ -9,8 +9,7 @@ curl http://$commanderIP:8080/txgen -o txgen
 chmod +x ./txgen
 
 # Get My IP
-wget http://169.254.169.254/latest/meta-data/public-ipv4
-ip=$(head -n 1 public-ipv4)
+ip=`curl http://169.254.169.254/latest/meta-data/public-ipv4`
 
 node_port=9000
 soldier_port=1$node_port
