@@ -9,12 +9,12 @@ import (
 	"harmony-benchmark/log"
 	"harmony-benchmark/node"
 	"harmony-benchmark/p2p"
-	"harmony-benchmark/utils"
 	"math/rand"
 	"os"
-	"runtime"
 	"strings"
 	"time"
+
+	"github.com/shirou/gopsutil/process"
 )
 
 const (
@@ -93,11 +93,22 @@ func attackDetermination(attackedMode int) bool {
 }
 
 func logMemUsage(consensus *consensus.Consensus) {
+	p, _ := process.NewProcess(int32(os.Getpid()))
 	for {
-		var m runtime.MemStats
-		runtime.ReadMemStats(&m)
-		log.Info("Mem Report", "Alloc", utils.BToMb(m.Alloc), "TotalAlloc", utils.BToMb(m.TotalAlloc),
-			"Sys", utils.BToMb(m.Sys), "NumGC", m.NumGC, "consensus", consensus)
+		info, _ := p.MemoryInfo()
+		memMap, _ := p.MemoryMaps(false)
+		log.Info("Mem Report", "info", info, "map", memMap)
+		time.Sleep(10 * time.Second)
+	}
+}
+
+// TODO: @ricl, start another process for reporting.
+func logCPUUsage(consensus *consensus.Consensus) {
+	p, _ := process.NewProcess(int32(os.Getpid()))
+	for {
+		percent, _ := p.CPUPercent()
+		times, _ := p.Times()
+		log.Info("CPU Report", "percent", percent, "times", times, "consensus", consensus)
 		time.Sleep(10 * time.Second)
 	}
 }
@@ -132,7 +143,7 @@ func main() {
 	logFileName := fmt.Sprintf("./%v/%s-%v-%v.log", *logFolder, role, *ip, *port)
 	h := log.MultiHandler(
 		log.StdoutHandler,
-		log.Must.FileHandler(logFileName, log.LogfmtFormat()), // Log to file
+		log.Must.FileHandler(logFileName, log.JSONFormat()), // Log to file
 		// log.Must.NetHandler("tcp", ":3000", log.JSONFormat()) // Log to remote
 	)
 	log.Root().SetHandler(h)
@@ -141,6 +152,8 @@ func main() {
 	consensus := consensus.NewConsensus(*ip, *port, shardID, peers, leader)
 	// Logging for consensus.
 	go logMemUsage(consensus)
+	go logCPUUsage(consensus)
+
 	// Set logger to attack model.
 	attack.GetInstance().SetLogger(consensus.Log)
 	// Current node.
