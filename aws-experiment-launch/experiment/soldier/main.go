@@ -300,7 +300,7 @@ func getMyConfig(myIP string, myPort string, config *[][]string) []string {
 // ./soldier -ip=xx -port=xx
 func main() {
 	ip := flag.String("ip", "127.0.0.1", "IP of the node.")
-	port := flag.String("port", "3000", "port of the node.")
+	port := flag.String("port", "9000", "port of the node.")
 	flag.Parse()
 
 	setting.ip = *ip

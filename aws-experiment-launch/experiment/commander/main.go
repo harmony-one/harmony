@@ -35,7 +35,7 @@ func readConfigFile() [][]string {
 	file, err := os.Open(setting.configFile)
 	defer file.Close()
 	if err != nil {
-		log.Fatal("Failed to read config file", setting.configFile,
+		log.Fatal("Failed to read config file ", setting.configFile,
 			"\nNOTE: The config path should be relative to commander.")
 	}
 	fscanner := bufio.NewScanner(file)
