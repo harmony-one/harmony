@@ -15,6 +15,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/shirou/gopsutil/process"
 )
 
 const (
@@ -102,6 +104,21 @@ func logMemUsage(consensus *consensus.Consensus) {
 	}
 }
 
+// TODO: @ricl, start another process for reporting.
+func logCPUUsage(consensus *consensus.Consensus) {
+	log.Info("PPID", "ppid", os.Getpid())
+	p, _ := process.NewProcess(int32(os.Getpid()))
+	for {
+		percent, _ := p.CPUPercent()
+		times, err := p.Times()
+		if err != nil {
+			log.Info("ERR", "Err", err)
+		}
+		log.Info("CPU Report", "Percent", percent, "Times", times, "consensus", consensus)
+		time.Sleep(10 * time.Second)
+	}
+}
+
 func main() {
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9000", "port of the node.")
@@ -140,7 +157,10 @@ func main() {
 	// Consensus object.
 	consensus := consensus.NewConsensus(*ip, *port, shardID, peers, leader)
 	// Logging for consensus.
+	log.Info("PID", "pid", os.Getpid())
 	go logMemUsage(consensus)
+	go logCPUUsage(consensus)
+
 	// Set logger to attack model.
 	attack.GetInstance().SetLogger(consensus.Log)
 	// Current node.
