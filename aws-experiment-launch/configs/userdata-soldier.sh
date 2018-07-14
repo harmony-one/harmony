@@ -1,6 +1,6 @@
 #!/bin/bash
 cd home/ec2-user
-commanderIP=# <- Put the commander IP here.
+commanderIP= # <- Put the commander IP here.
 curl http://$commanderIP:8080/soldier -o soldier
 chmod +x ./soldier
 curl http://$commanderIP:8080/benchmark -o benchmark
