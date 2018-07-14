@@ -107,7 +107,7 @@ def run_one_region_instances(config, region_number, number_of_instances, instanc
             config, ec2_client, region_number, int(number_of_instances))
         # REPLACE ALL print with logger
         print("Created %s in region %s" % (NODE_NAME, region_number))
-    elif instance_resource == InstanceResource.ON_DEMAND:
+    elif instance_resource == InstanceResource.SPOT_INSTANCE:
         response = request_spot_instances(
             config, ec2_client, region_number, int(number_of_instances))
     else:
@@ -145,16 +145,6 @@ def create_instances(config, ec2_client, region_number, number_of_instances):
                 ]
             },
         ],
-        # We can also request spot instances this way but this way will block the
-        # process until spot requests are fulfilled, otherwise it will throw exception
-        # after 4 failed re-try.
-        # InstanceMarketOptions= {
-        #     'MarketType': 'spot',
-        #     'SpotOptions': {
-        #         'SpotInstanceType': 'one-time',
-        #         'BlockDurationMinutes': 60,
-        #     }
-        # }
     )
     return NODE_NAME
 
@@ -410,24 +400,16 @@ def get_head_commit_id():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='This script helps you start instances across multiple regions')
-    parser.add_argument('--regions', type=str, dest='regions',
+    parser.add_argument('--region_number', type=str, dest='region_number',
                         default='3', help="Supply a csv list of all regions")
-    parser.add_argument('--instances', type=str, dest='numInstances',
+    parser.add_argument('--instances', type=str, dest='number_of_instances',
                         default='1', help='number of instances')
     parser.add_argument('--configuration', type=str,
                         dest='config', default='configuration.txt')
     parser.add_argument('--commitId', type=str, dest='commitId',default='f092d25d7a814622079fe92e9b36e10e46bc0d97')
     args = parser.parse_args()
     config = read_configuration_file(args.config)
-    region_list = args.regions.split(',')
-    instances_list = args.numInstances.split(',')
-    assert len(region_list) == len(instances_list), "number of regions: %d != number of instances per region: %d" % (
-        len(region_list), len(instances_list))
     commitId = get_head_commit_id() or args.commitId
-    for i in range(len(region_list)):
-        region_number = region_list[i]
-        number_of_instances = instances_list[i]
-        session = run_one_region_instances(
-            config, region_number, number_of_instances, InstanceResource.SPOT_FLEET)
-    results = launch_code_deploy(region_list, commitId)
+    run_one_region_instances(config, args.region_number, args.number_of_instances)
+    results = run_one_region_codedeploy(args.region_number, commitId)
     print(results)

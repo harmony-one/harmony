@@ -1,7 +1,9 @@
 #!/bin/bash -x
 echo "Setup Golang" >> tmplog
 #sudo yum update -y
+
 sudo yum install -y golang
+sudo yum install git
 MyHOME=/home/ec2-user
 echo "now setting up go-lang paths"
 # GOROOT is the location where Go package is installed on your system
@@ -19,6 +21,7 @@ export PATH=$PATH:$GOROOT/bin
 source $MyHOME/.bash_profile
 
 cd $GOPATH/src/harmony-benchmark
+touch 'yum_not_updated.txt'
 # go get dependencies
 go get ./...
 
