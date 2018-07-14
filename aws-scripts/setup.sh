@@ -24,6 +24,7 @@ go get ./...
 
 # build executables
 go build -o bin/soldier aws-experiment-launch/experiment/soldier/main.go
+go build -o bin/commander aws-experiment-launch/experiment/commander/main.go
 go build -o bin/benchmark benchmark.go
 go build -o bin/txgen client/txgen/main.go
 
