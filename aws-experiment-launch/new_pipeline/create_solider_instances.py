@@ -12,7 +12,13 @@ import enum
 from utils import utils, spot_fleet, logger
 
 LOGGER = logger.getLogger(__file__)
-
+REGION_NAME = 'region_name'
+REGION_KEY = 'region_key'
+REGION_SECURITY_GROUP = 'region_security_group'
+REGION_SECURITY_GROUP_ID = 'region_security_group_id'
+REGION_HUMAN_NAME = 'region_human_name'
+INSTANCE_TYPE = 't2.micro'
+REGION_AMI = 'region_ami'
 
 class InstanceResource:
     ON_DEMAND = 1
@@ -141,7 +147,7 @@ if __name__ == "__main__":
     parser.add_argument('--instance_ids_output', type=str, dest='instance_ids_output',
                         default='instance_ids_output.txt', help='the file to append or write')
     parser.add_argument('--instance_resource', dest='instance_resource', type=InstanceResource,
-                        default=InstanceResource.ON_DEMAND, choices=list(InstanceResource))
+                        default=InstanceResource.ON_DEMAND)
     parser.add_argument('--append', dest='append', type=bool, default=False,
                         help='append to the current instance_output')
     args = parser.parse_args()
