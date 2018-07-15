@@ -24,7 +24,7 @@ cd $GOPATH/src/harmony-benchmark
 touch 'yum_not_updated.txt'
 # go get dependencies
 go get ./...
-
+curl --silent http://169.254.169.254/latest/meta-data/public-ipv4 >> bin/myip.txt
 # build executables
 go build -o bin/soldier aws-experiment-launch/experiment/soldier/main.go
 go build -o bin/commander aws-experiment-launch/experiment/commander/main.go
