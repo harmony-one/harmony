@@ -3,7 +3,7 @@ echo "Setup Golang" >> tmplog
 #sudo yum update -y
 
 sudo yum install -y golang
-sudo yum install git
+sudo yum install -y git
 MyHOME=/home/ec2-user
 echo "now setting up go-lang paths"
 # GOROOT is the location where Go package is installed on your system
