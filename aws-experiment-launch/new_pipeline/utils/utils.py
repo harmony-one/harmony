@@ -41,7 +41,7 @@ def create_client(config, region_number):
     # Create a client.
     return session.client('ec2')
 
-def read_region_config(region_config='configuration.txt'):
+def read_region_config(region_config):
     global CONFIG
     config = {}
     with open(region_config, 'r') as f:
