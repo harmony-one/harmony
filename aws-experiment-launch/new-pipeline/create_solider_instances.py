@@ -20,10 +20,10 @@ REGION_HUMAN_NAME = 'region_human_name'
 INSTANCE_TYPE = 't2.micro'
 REGION_AMI = 'region_ami'
 
-class InstanceResource:
-    ON_DEMAND = 1
-    SPOT_INSTANCE = 2
-    SPOT_FLEET = 3
+class InstanceResource(enum.Enum):
+    ON_DEMAND = 'ondemand'
+    SPOT_INSTANCE = 'spot'
+    SPOT_FLEET = 'fleet'
 
     def __str__(self):
         return self.value
@@ -147,7 +147,7 @@ if __name__ == "__main__":
     parser.add_argument('--instance_ids_output', type=str, dest='instance_ids_output',
                         default='instance_ids_output.txt', help='the file to append or write')
     parser.add_argument('--instance_resource', dest='instance_resource', type=InstanceResource,
-                        default=InstanceResource.ON_DEMAND)
+                        default=InstanceResource.ON_DEMAND, choices=list(InstanceResource))
     parser.add_argument('--append', dest='append', type=bool, default=False,
                         help='append to the current instance_output')
     args = parser.parse_args()
