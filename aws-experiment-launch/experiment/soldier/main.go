@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"harmony-benchmark/aws-experiment-launch/experiment/soldier/s3"
+	"harmony-benchmark/aws-experiment-launch/experiment/utils"
 	"io"
 	"io/ioutil"
 	"log"
@@ -140,32 +141,8 @@ func handleInitCommand(args []string, w *bufio.Writer) {
 
 	// create local config file
 	globalSession.localConfigFileName = fmt.Sprintf("node_config_%v_%v.txt", setting.port, globalSession.id)
-	out, err := os.Create(globalSession.localConfigFileName)
-	if err != nil {
-		log.Fatal("Failed to create local file", err)
-	}
-	defer out.Close()
-
-	// get remote config file
-	resp, err := http.Get(configURL)
-	if err != nil {
-		log.Fatal("Failed to read file content")
-	}
-	defer resp.Body.Close()
-
-	// copy remote to local
-	_, err = io.Copy(out, resp.Body)
-	if err != nil {
-		log.Fatal("Failed to copy file")
-	}
-
-	// log config file
-	content, err := ioutil.ReadFile(globalSession.localConfigFileName)
-	if err != nil {
-		log.Fatal(err)
-	}
+	utils.DownloadFile(globalSession.localConfigFileName, configURL)
 	log.Println("Successfully downloaded config")
-	log.Println(string(content))
 
 	runInstance()
 
@@ -181,6 +158,7 @@ func handleKillCommand(w *bufio.Writer) {
 func handlePingCommand(w *bufio.Writer) {
 	log.Println("Ping command")
 	logAndReply(w, "I'm alive")
+	utils.DownloadFile
 }
 
 func handleLogCommand(w *bufio.Writer) {
