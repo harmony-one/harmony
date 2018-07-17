@@ -1,9 +1,9 @@
 #!/bin/bash
-yum install ruby wget -y
-cd $HOME
-wget http://unique-bucket-bin.s3.amazonaws.com/txgen
-wget http://unique-bucket-bin.s3.amazonaws.com/soldier
-wget http://unique-bucket-bin.s3.amazonaws.com/benchmark
+yum install ruby -y
+cd /home/ec2-user/
+curl http://unique-bucket-bin.s3.amazonaws.com/txgen -o txgen
+curl http://unique-bucket-bin.s3.amazonaws.com/soldier -o soldier
+curl http://unique-bucket-bin.s3.amazonaws.com/benchmark -o benchmark
 chmod +x ./soldier
 chmod +x ./txgen
 chmod +x ./benchmark
