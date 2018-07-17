@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -58,6 +59,32 @@ func handleCommand(command string) {
 	switch cmd := args[0]; cmd {
 	case "config":
 		{
+			out, err := os.Create(setting.configFile)
+			if err != nil {
+				log.Fatal("Failed to create local file", err)
+			}
+			defer out.Close()
+
+			// get remote config file
+			resp, err := http.Get(setting.configURL)
+			if err != nil {
+				log.Fatal("Failed to read file content")
+			}
+			defer resp.Body.Close()
+
+			// copy remote to local
+			_, err = io.Copy(out, resp.Body)
+			if err != nil {
+				log.Fatal("Failed to copy file")
+			}
+
+			// log config file
+			content, err := ioutil.ReadFile(setting.configFile)
+			if err != nil {
+				log.Fatal(err)
+			}
+			log.Println("Successfully downloaded config")
+			log.Println(string(content))
 			setting.configs = readConfigFile()
 			log.Println("Loaded config file", setting.configs)
 		}
