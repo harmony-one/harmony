@@ -212,7 +212,7 @@ func main() {
 
 	log.Println("Start to host config files at http://" + setting.ip + ":" + setting.port)
 
-	// go serve()
+	go serve()
 
 	scanner := bufio.NewScanner(os.Stdin)
 	for true {

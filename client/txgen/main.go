@@ -242,7 +242,7 @@ func countNumOfUtxos(utxoPool *blockchain.UTXOPool) int {
 
 func main() {
 	configFile := flag.String("config_file", "local_config.txt", "file containing all ip addresses and config")
-	maxNumTxsPerBatch := flag.Int("max_num_txs_per_batch", 10000, "number of transactions to send per message")
+	maxNumTxsPerBatch := flag.Int("max_num_txs_per_batch", 100000, "number of transactions to send per message")
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	flag.Parse()
 
@@ -309,7 +309,7 @@ func main() {
 	// Transaction generation process
 	time.Sleep(10 * time.Second) // wait for nodes to be ready
 	start := time.Now()
-	totalTime := 60.0
+	totalTime := 300.0 //run for 5 minutes
 
 	for true {
 		t := time.Now()
