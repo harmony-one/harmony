@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"harmony-benchmark/aws-experiment-launch/experiment/soldier/s3"
 	"io"
 	"io/ioutil"
 	"log"
@@ -30,9 +31,14 @@ type sessionInfo struct {
 	logFolder           string
 }
 
+const (
+	bucketName      = "richard-bucket-test"
+	logFolderPrefix = "../tmp_log/"
+)
+
 var (
-	setting soliderSetting
-	session sessionInfo
+	setting       soliderSetting
+	globalSession sessionInfo
 )
 
 func socketServer() {
@@ -111,6 +117,10 @@ func handleCommand(command string, w *bufio.Writer) {
 		{
 			handleLogCommand(w)
 		}
+	case "log2":
+		{
+			handleLog2Command(w)
+		}
 	}
 }
 
@@ -120,17 +130,17 @@ func handleInitCommand(args []string, w *bufio.Writer) {
 
 	// read arguments
 	ip := args[0]
-	session.commanderIP = ip
+	globalSession.commanderIP = ip
 	port := args[1]
-	session.commanderPort = port
+	globalSession.commanderPort = port
 	configURL := args[2]
 	sessionID := args[3]
-	session.id = sessionID
-	session.logFolder = fmt.Sprintf("../tmp_log/log-%v", sessionID)
+	globalSession.id = sessionID
+	globalSession.logFolder = fmt.Sprintf("%slog-%v", logFolderPrefix, sessionID)
 
 	// create local config file
-	session.localConfigFileName = fmt.Sprintf("node_config_%v_%v.txt", setting.port, session.id)
-	out, err := os.Create(session.localConfigFileName)
+	globalSession.localConfigFileName = fmt.Sprintf("node_config_%v_%v.txt", setting.port, globalSession.id)
+	out, err := os.Create(globalSession.localConfigFileName)
 	if err != nil {
 		log.Fatal("Failed to create local file", err)
 	}
@@ -150,7 +160,7 @@ func handleInitCommand(args []string, w *bufio.Writer) {
 	}
 
 	// log config file
-	content, err := ioutil.ReadFile(session.localConfigFileName)
+	content, err := ioutil.ReadFile(globalSession.localConfigFileName)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -176,19 +186,19 @@ func handlePingCommand(w *bufio.Writer) {
 func handleLogCommand(w *bufio.Writer) {
 	log.Println("Log command")
 
-	files, err := ioutil.ReadDir(session.logFolder)
+	files, err := ioutil.ReadDir(globalSession.logFolder)
 	if err != nil {
-		logAndReply(w, fmt.Sprintf("Failed to create access log folder. Error: %s", err.Error()))
+		logAndReply(w, fmt.Sprintf("Failed to create log folder. Error: %s", err.Error()))
 		return
 	}
 
 	filePaths := make([]string, len(files))
 	for i, f := range files {
-		filePaths[i] = fmt.Sprintf("%s/%s", session.logFolder, f.Name())
+		filePaths[i] = fmt.Sprintf("%s/%s", globalSession.logFolder, f.Name())
 	}
 
 	req, err := newUploadFileRequest(
-		fmt.Sprintf("http://%s:%s/upload", session.commanderIP, session.commanderPort),
+		fmt.Sprintf("http://%s:%s/upload", globalSession.commanderIP, globalSession.commanderPort),
 		"file",
 		filePaths,
 		nil)
@@ -242,6 +252,29 @@ func logAndReply(w *bufio.Writer, message string) {
 	w.Flush()
 }
 
+func handleLog2Command(w *bufio.Writer) {
+	log.Println("Log command")
+
+	files, err := ioutil.ReadDir(globalSession.logFolder)
+	if err != nil {
+		logAndReply(w, fmt.Sprintf("Failed to create log folder. Error: %s", err.Error()))
+		return
+	}
+
+	filePaths := make([]string, len(files))
+	for i, f := range files {
+		filePaths[i] = fmt.Sprintf("%s/%s", globalSession.logFolder, f.Name())
+	}
+
+	// TODO: currently only upload the first file.
+	_, err = s3.UploadFile(bucketName, filePaths[0], strings.Replace(filePaths[0], logFolderPrefix, "", 1))
+	if err != nil {
+		logAndReply(w, fmt.Sprintf("Failed to create upload request. Error: %s", err.Error()))
+		return
+	}
+	logAndReply(w, "Upload log done!")
+}
+
 func runCmd(name string, args ...string) error {
 	err := exec.Command(name, args...).Start()
 	log.Println("Command running", name, args)
@@ -249,11 +282,11 @@ func runCmd(name string, args ...string) error {
 }
 
 func runInstance() {
-	config := readConfigFile(session.localConfigFileName)
+	config := readConfigFile(globalSession.localConfigFileName)
 
 	myConfig := getMyConfig(setting.ip, setting.port, &config)
 
-	os.MkdirAll(session.logFolder, os.ModePerm)
+	os.MkdirAll(globalSession.logFolder, os.ModePerm)
 
 	if myConfig[2] == "client" {
 		runClient()
@@ -264,12 +297,12 @@ func runInstance() {
 
 func runNode() error {
 	log.Println("running instance")
-	return runCmd("./benchmark", "-ip", setting.ip, "-port", setting.port, "-config_file", session.localConfigFileName, "-log_folder", session.logFolder)
+	return runCmd("./benchmark", "-ip", setting.ip, "-port", setting.port, "-config_file", globalSession.localConfigFileName, "-log_folder", globalSession.logFolder)
 }
 
 func runClient() error {
 	log.Println("running client")
-	return runCmd("./txgen", "-config_file", session.localConfigFileName, "-log_folder", session.logFolder)
+	return runCmd("./txgen", "-config_file", globalSession.localConfigFileName, "-log_folder", globalSession.logFolder)
 }
 
 func readConfigFile(configFile string) [][]string {
