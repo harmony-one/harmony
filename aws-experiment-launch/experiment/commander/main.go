@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -32,49 +31,55 @@ var (
 	session sessionInfo
 )
 
-func readConfigFile() [][]string {
-	configFile := "distribution_config.txt"
-	out, err := os.Create(configFile)
+func downloadFile(filepath string, url string) error {
+	// Create the file
+	out, err := os.Create(filepath)
 	if err != nil {
-		log.Fatal("Failed to create local file", err)
+		return err
 	}
+	defer out.Close()
 
-	// get remote config file
-	resp, err := http.Get(setting.configURL)
+	log.Println(url)
+	// Get the data
+	resp, err := http.Get(url)
 	if err != nil {
-		log.Fatal("Failed to read file content")
+		return err
 	}
 	defer resp.Body.Close()
 
-	// copy remote to local
+	log.Println(resp.Body)
+	// Write the body to file
 	_, err = io.Copy(out, resp.Body)
 	if err != nil {
-		log.Fatal("Failed to copy file")
+		return err
 	}
-	out.Close()
+	return nil
+}
 
-	// log config file
-	content, err := ioutil.ReadFile(configFile)
+func readConfigFile() [][]string {
+	configFile := "distribution_config.txt"
+	err := downloadFile(configFile, setting.configURL)
+
 	if err != nil {
-		log.Fatal(err)
-	}
-	log.Println("Successfully downloaded config")
-	log.Println(string(content))
+		file, err := os.Open(configFile)
+		defer file.Close()
+		if err != nil {
+			log.Fatal("Failed to read config file ", configFile,
+				"\nNOTE: The config path should be relative to commander.")
+		}
+		fscanner := bufio.NewScanner(file)
 
-	file, err := os.Open(configFile)
-	defer file.Close()
-	if err != nil {
-		log.Fatal("Failed to read config file ", configFile,
-			"\nNOTE: The config path should be relative to commander.")
+		result := [][]string{}
+		for fscanner.Scan() {
+			p := strings.Split(fscanner.Text(), " ")
+			result = append(result, p)
+		}
+		log.Println(result)
+		return result
+	} else {
+		return nil
 	}
-	fscanner := bufio.NewScanner(file)
 
-	result := [][]string{}
-	for fscanner.Scan() {
-		p := strings.Split(fscanner.Text(), " ")
-		result = append(result, p)
-	}
-	return result
 }
 
 func handleCommand(command string) {
@@ -87,7 +92,11 @@ func handleCommand(command string) {
 	case "config":
 		{
 			setting.configs = readConfigFile()
-			log.Println("Loaded config file", setting.configs)
+			if setting.configs != nil {
+				log.Println("Loaded config file", setting.configs)
+			} else {
+				log.Println("failed to read config file")
+			}
 		}
 	case "init":
 		{
@@ -229,7 +238,7 @@ func main() {
 
 	log.Println("Start to host config files at http://" + setting.ip + ":" + setting.port)
 
-	go serve()
+	// go serve()
 
 	scanner := bufio.NewScanner(os.Stdin)
 	for true {
