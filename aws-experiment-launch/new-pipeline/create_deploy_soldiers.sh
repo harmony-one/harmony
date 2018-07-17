@@ -21,3 +21,5 @@ python collect_public_ips.py --instance_output instance_output.txt
 sleep 10
 echo "Generate distribution_config"
 python generate_distribution_config.py --ip_list_file raw_ip.txt --shard_num $SHARD_NUM --client_num $CLIENT_NUM
+
+aws s3 cp distribution_config.txt s3://unique-bucket-bin/distribution_config.txt

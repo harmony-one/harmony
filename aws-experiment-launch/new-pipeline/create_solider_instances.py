@@ -42,7 +42,7 @@ def create_instances(config, ec2_client, region_number, number_of_instances, tag
     LOGGER.info("Looking at zone %s to create instances." % available_zone)
 
 
-    LOGGER.info("USER_DATA: \n%s" % utils\)
+    LOGGER.info("USER_DATA: \n%s" % utils.USER_DATA)
     time.sleep(2)
     ec2_client.run_instances(
         MinCount=number_of_instances,
