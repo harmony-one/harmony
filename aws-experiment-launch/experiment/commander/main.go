@@ -38,7 +38,6 @@ func readConfigFile() [][]string {
 	if err != nil {
 		log.Fatal("Failed to create local file", err)
 	}
-	defer out.Close()
 
 	// get remote config file
 	resp, err := http.Get(setting.configURL)
@@ -52,6 +51,7 @@ func readConfigFile() [][]string {
 	if err != nil {
 		log.Fatal("Failed to copy file")
 	}
+	out.Close()
 
 	// log config file
 	content, err := ioutil.ReadFile(configFile)
@@ -60,6 +60,7 @@ func readConfigFile() [][]string {
 	}
 	log.Println("Successfully downloaded config")
 	log.Println(string(content))
+
 	file, err := os.Open(configFile)
 	defer file.Close()
 	if err != nil {
