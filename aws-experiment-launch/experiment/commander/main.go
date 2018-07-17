@@ -31,55 +31,50 @@ var (
 	session sessionInfo
 )
 
-func downloadFile(filepath string, url string) error {
+const (
+	DistributionFileName = "distribution_config.txt"
+)
+
+func downloadFile(filepath string, url string) {
 	// Create the file
 	out, err := os.Create(filepath)
 	if err != nil {
-		return err
+		panic(err)
 	}
 	defer out.Close()
 
-	log.Println(url)
 	// Get the data
 	resp, err := http.Get(url)
 	if err != nil {
-		return err
+		panic(err)
 	}
 	defer resp.Body.Close()
 
-	log.Println(resp.Body)
 	// Write the body to file
 	_, err = io.Copy(out, resp.Body)
 	if err != nil {
-		return err
+		panic(err)
 	}
-	return nil
 }
 
 func readConfigFile() [][]string {
-	configFile := "distribution_config.txt"
-	err := downloadFile(configFile, setting.configURL)
+	downloadFile(DistributionFileName, setting.configURL)
 
+	file, err := os.Open(DistributionFileName)
+	defer file.Close()
 	if err != nil {
-		file, err := os.Open(configFile)
-		defer file.Close()
-		if err != nil {
-			log.Fatal("Failed to read config file ", configFile,
-				"\nNOTE: The config path should be relative to commander.")
-		}
-		fscanner := bufio.NewScanner(file)
-
-		result := [][]string{}
-		for fscanner.Scan() {
-			p := strings.Split(fscanner.Text(), " ")
-			result = append(result, p)
-		}
-		log.Println(result)
-		return result
-	} else {
-		return nil
+		log.Fatal("Failed to read config file ", DistributionFileName,
+			"\nNOTE: The config path should be relative to commander.")
 	}
+	fscanner := bufio.NewScanner(file)
 
+	result := [][]string{}
+	for fscanner.Scan() {
+		p := strings.Split(fscanner.Text(), " ")
+		result = append(result, p)
+	}
+	log.Println(result)
+	return result
 }
 
 func handleCommand(command string) {
@@ -231,7 +226,7 @@ func serve() {
 func main() {
 	ip := flag.String("ip", "127.0.0.1", "The ip of commander, i.e. this machine")
 	port := flag.String("port", "8080", "The port which the commander uses to communicate with soldiers")
-	configURL := flag.String("config_url", "http://unique-bucket-bin.amazonaws.com/distribution_config.txt", "The config URL")
+	configURL := flag.String("config_url", "https://s3-us-west-2.amazonaws.com/unique-bucket-bin/distribution_config.txt", "The config URL")
 	flag.Parse()
 
 	config(*ip, *port, *configURL)
