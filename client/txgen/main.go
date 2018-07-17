@@ -309,7 +309,7 @@ func main() {
 	// Transaction generation process
 	time.Sleep(10 * time.Second) // wait for nodes to be ready
 	start := time.Now()
-	totalTime := 60.0
+	totalTime := 300.0 //run for 5 minutes
 
 	for true {
 		t := time.Now()
