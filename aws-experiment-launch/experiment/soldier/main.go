@@ -158,7 +158,6 @@ func handleKillCommand(w *bufio.Writer) {
 func handlePingCommand(w *bufio.Writer) {
 	log.Println("Ping command")
 	logAndReply(w, "I'm alive")
-	utils.DownloadFile
 }
 
 func handleLogCommand(w *bufio.Writer) {
