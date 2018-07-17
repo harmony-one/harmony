@@ -136,8 +136,8 @@ def generate_distribution_config(shard_number, client_number, ip_list, distribut
         return False
 
     # Create ip for clients.
-    client_id, leader_id, validator_id, commander_id = 0, 0, 0, 0
-    validator_number = len(ip_list) - client_number - shard_number - 1
+    client_id, leader_id, validator_id = 0, 0, 0
+    validator_number = len(ip_list) - client_number - shard_number
     with open(distribution_config, "w") as fout:
         for i in range(len(ip_list)):
             ip, node_name_tag = ip_list[i].split(" ")
