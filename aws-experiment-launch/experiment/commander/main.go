@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -15,10 +16,10 @@ import (
 )
 
 type commanderSetting struct {
-	ip         string
-	port       string
-	configFile string
-	configs    [][]string
+	ip        string
+	port      string
+	configURL string
+	configs   [][]string
 }
 
 type sessionInfo struct {
@@ -32,10 +33,37 @@ var (
 )
 
 func readConfigFile() [][]string {
-	file, err := os.Open(setting.configFile)
+	configFile := "distribution_config.txt"
+	out, err := os.Create(configFile)
+	if err != nil {
+		log.Fatal("Failed to create local file", err)
+	}
+	defer out.Close()
+
+	// get remote config file
+	resp, err := http.Get(setting.configURL)
+	if err != nil {
+		log.Fatal("Failed to read file content")
+	}
+	defer resp.Body.Close()
+
+	// copy remote to local
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		log.Fatal("Failed to copy file")
+	}
+
+	// log config file
+	content, err := ioutil.ReadFile(configFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Println("Successfully downloaded config")
+	log.Println(string(content))
+	file, err := os.Open(configFile)
 	defer file.Close()
 	if err != nil {
-		log.Fatal("Failed to read config file ", setting.configFile,
+		log.Fatal("Failed to read config file ", configFile,
 			"\nNOTE: The config path should be relative to commander.")
 	}
 	fscanner := bufio.NewScanner(file)
@@ -72,7 +100,7 @@ func handleCommand(command string) {
 			}
 			log.Println("New session", session.id)
 
-			dictateNodes(fmt.Sprintf("init %v %v %v %v", setting.ip, setting.port, setting.configFile, session.id))
+			dictateNodes(fmt.Sprintf("init %v %v %v %v", setting.ip, setting.port, setting.configURL, session.id))
 		}
 	case "ping", "kill", "log":
 		{
@@ -85,10 +113,10 @@ func handleCommand(command string) {
 	}
 }
 
-func config(ip string, port string, configFile string) {
+func config(ip string, port string, configURL string) {
 	setting.ip = ip
 	setting.port = port
-	setting.configFile = configFile
+	setting.configURL = configURL
 }
 
 func dictateNodes(command string) {
@@ -193,10 +221,10 @@ func serve() {
 func main() {
 	ip := flag.String("ip", "127.0.0.1", "The ip of commander, i.e. this machine")
 	port := flag.String("port", "8080", "The port which the commander uses to communicate with soldiers")
-	configFile := flag.String("config_file", "distribution_config.txt", "The file name of config file")
+	configURL := flag.String("config_url", "http://unique-bucket-bin.amazonaws.com/distribution_config.txt", "The config URL")
 	flag.Parse()
 
-	config(*ip, *port, *configFile)
+	config(*ip, *port, *configURL)
 
 	log.Println("Start to host config files at http://" + setting.ip + ":" + setting.port)
 
