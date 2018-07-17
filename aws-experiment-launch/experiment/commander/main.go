@@ -16,11 +16,10 @@ import (
 )
 
 type commanderSetting struct {
-	ip         string
-	port       string
-	configFile string
-	configURL  string
-	configs    [][]string
+	ip        string
+	port      string
+	configURL string
+	configs   [][]string
 }
 
 type sessionInfo struct {
@@ -33,11 +32,11 @@ var (
 	session sessionInfo
 )
 
-func readConfigFile() [][]string {
-	file, err := os.Open(setting.configFile)
+func readConfigFile(configFile string) [][]string {
+	file, err := os.Open(configFile)
 	defer file.Close()
 	if err != nil {
-		log.Fatal("Failed to read config file ", setting.configFile,
+		log.Fatal("Failed to read config file ", configFile,
 			"\nNOTE: The config path should be relative to commander.")
 	}
 	fscanner := bufio.NewScanner(file)
@@ -59,7 +58,8 @@ func handleCommand(command string) {
 	switch cmd := args[0]; cmd {
 	case "config":
 		{
-			out, err := os.Create(setting.configFile)
+			configFile := "distribution_config.txt"
+			out, err := os.Create(configFile)
 			if err != nil {
 				log.Fatal("Failed to create local file", err)
 			}
@@ -79,13 +79,13 @@ func handleCommand(command string) {
 			}
 
 			// log config file
-			content, err := ioutil.ReadFile(setting.configFile)
+			content, err := ioutil.ReadFile(configFile)
 			if err != nil {
 				log.Fatal(err)
 			}
 			log.Println("Successfully downloaded config")
 			log.Println(string(content))
-			setting.configs = readConfigFile()
+			setting.configs = readConfigFile(configFile)
 			log.Println("Loaded config file", setting.configs)
 		}
 	case "init":
@@ -113,10 +113,9 @@ func handleCommand(command string) {
 	}
 }
 
-func config(ip string, port string, configFile string, configURL string) {
+func config(ip string, port string, configURL string) {
 	setting.ip = ip
 	setting.port = port
-	setting.configFile = configFile
 	setting.configURL = configURL
 }
 
@@ -222,11 +221,10 @@ func serve() {
 func main() {
 	ip := flag.String("ip", "127.0.0.1", "The ip of commander, i.e. this machine")
 	port := flag.String("port", "8080", "The port which the commander uses to communicate with soldiers")
-	configFile := flag.String("config_file", "distribution_config.txt", "The file name of config file")
 	configURL := flag.String("config_url", "http://unique-bucket-bin.amazonaws.com/distribution_config.txt", "The config URL")
 	flag.Parse()
 
-	config(*ip, *port, *configFile, *configURL)
+	config(*ip, *port, *configURL)
 
 	log.Println("Start to host config files at http://" + setting.ip + ":" + setting.port)
 

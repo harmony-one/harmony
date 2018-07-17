@@ -126,8 +126,6 @@ func handleInitCommand(args []string, w *bufio.Writer) {
 	configURL := args[2]
 	sessionID := args[3]
 	session.id = sessionID
-	//configURL := fmt.Sprintf("http://%v:%v/%v", ip, port, configFile)
-
 	session.logFolder = fmt.Sprintf("../tmp_log/log-%v", sessionID)
 
 	// create local config file
