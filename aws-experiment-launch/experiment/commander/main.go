@@ -112,7 +112,7 @@ func handleCommand(command string) {
 
 			dictateNodes(fmt.Sprintf("init %v %v %v %v", setting.ip, setting.port, setting.configURL, session.id))
 		}
-	case "ping", "kill", "log":
+	case "ping", "kill", "log", "log2":
 		{
 			dictateNodes(command)
 		}
