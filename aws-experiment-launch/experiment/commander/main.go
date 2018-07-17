@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"harmony-benchmark/aws-experiment-launch/experiment/utils"
 	"io"
 	"log"
 	"net"
@@ -35,30 +36,8 @@ const (
 	DistributionFileName = "distribution_config.txt"
 )
 
-func downloadFile(filepath string, url string) {
-	// Create the file
-	out, err := os.Create(filepath)
-	if err != nil {
-		panic(err)
-	}
-	defer out.Close()
-
-	// Get the data
-	resp, err := http.Get(url)
-	if err != nil {
-		panic(err)
-	}
-	defer resp.Body.Close()
-
-	// Write the body to file
-	_, err = io.Copy(out, resp.Body)
-	if err != nil {
-		panic(err)
-	}
-}
-
 func readConfigFile() [][]string {
-	downloadFile(DistributionFileName, setting.configURL)
+	utils.DownloadFile(DistributionFileName, setting.configURL)
 
 	file, err := os.Open(DistributionFileName)
 	defer file.Close()
