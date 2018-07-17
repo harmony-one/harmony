@@ -21,12 +21,15 @@ if __name__ == "__main__":
         sys.exit(1)
     if args.instance_output:
         with open(args.instance_output, "r") as fin, open(args.file_output, "w") as fout:
+            total_ips = []
+            node_name_tag_list = []
             for line in fin.readlines():
                 items = line.split(" ")
                 region_number = items[1].strip()
                 node_name_tag = items[0].strip()
                 ip_list = utils.collect_public_ips(region_number, node_name_tag, args.region_config)
-                random.shuffle(ip_list)
-                for ip in ip_list:
-                    fout.write(ip + " " + node_name_tag + "\n")
+                total_ips.extend([(ip, node_name_tag) for ip in ip_list])
+            random.shuffle(total_ips)
+            for tuple in total_ips:
+                fout.write(tuple[0] + " " + tuple[1] + "\n")
         print "Done collecting public ips %s" % args.file_output
