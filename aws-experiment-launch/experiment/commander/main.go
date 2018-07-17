@@ -18,6 +18,7 @@ type commanderSetting struct {
 	ip         string
 	port       string
 	configFile string
+	configURL  string
 	configs    [][]string
 }
 
@@ -72,7 +73,7 @@ func handleCommand(command string) {
 			}
 			log.Println("New session", session.id)
 
-			dictateNodes(fmt.Sprintf("init %v %v %v %v", setting.ip, setting.port, setting.configFile, session.id))
+			dictateNodes(fmt.Sprintf("init %v %v %v %v", setting.ip, setting.port, setting.configURL, session.id))
 		}
 	case "ping", "kill", "log":
 		{
@@ -85,10 +86,11 @@ func handleCommand(command string) {
 	}
 }
 
-func config(ip string, port string, configFile string) {
+func config(ip string, port string, configFile string, configURL string) {
 	setting.ip = ip
 	setting.port = port
 	setting.configFile = configFile
+	setting.configURL = configURL
 }
 
 func dictateNodes(command string) {
@@ -194,9 +196,10 @@ func main() {
 	ip := flag.String("ip", "127.0.0.1", "The ip of commander, i.e. this machine")
 	port := flag.String("port", "8080", "The port which the commander uses to communicate with soldiers")
 	configFile := flag.String("config_file", "distribution_config.txt", "The file name of config file")
+	configURL := flag.String("config_url", "http://unique-bucket-bin.amazonaws.com/distribution_config.txt", "The config URL")
 	flag.Parse()
 
-	config(*ip, *port, *configFile)
+	config(*ip, *port, *configFile, *configURL)
 
 	log.Println("Start to host config files at http://" + setting.ip + ":" + setting.port)
 
