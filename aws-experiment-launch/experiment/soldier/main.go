@@ -150,7 +150,7 @@ func handleInitCommand(args []string, w *bufio.Writer) {
 
 func handleKillCommand(w *bufio.Writer) {
 	log.Println("Kill command")
-	runCmd("../kill_node.sh")
+	runCmd("./kill_node.sh")
 	logAndReply(w, "Kill command done.")
 }
 

@@ -5,10 +5,12 @@ curl http://unique-bucket-bin.s3.amazonaws.com/txgen -o txgen
 curl http://unique-bucket-bin.s3.amazonaws.com/soldier -o soldier
 curl http://unique-bucket-bin.s3.amazonaws.com/commander -o commander
 curl http://unique-bucket-bin.s3.amazonaws.com/benchmark -o benchmark
+curl http://unique-bucket-bin.s3.amazonaws.com/kill_node.sh -o kill_node.sh
 chmod +x ./soldier
 chmod +x ./txgen
 chmod +x ./benchmark
 chmod +x ./commander
+chmod +x ./kill_node.sh
 
 # Get My IP
 ip=`curl http://169.254.169.254/latest/meta-data/public-ipv4`

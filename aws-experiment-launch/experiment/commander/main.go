@@ -126,9 +126,12 @@ func dictateNode(addr string, command string) int {
 
 	// read response
 	buff := make([]byte, 1024)
-	n, _ := conn.Read(buff)
-	log.Printf("Receive from %s: %s", addr, buff[:n])
-	return 1
+	if n, err := conn.Read(buff); err == nil {
+		log.Printf("Receive from %s: %s", addr, buff[:n])
+		return 1
+	} else {
+		return 0
+	}
 }
 
 func handleUploadRequest(w http.ResponseWriter, r *http.Request) {
