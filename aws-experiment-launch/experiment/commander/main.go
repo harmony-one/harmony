@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"math"
 	"net"
 	"net/http"
 	"os"
@@ -95,13 +96,14 @@ func dictateNodes(command string) int {
 	var wg sync.WaitGroup
 	count := MaxFileOpen
 	result_chan := make(chan int)
-	for _, config := range setting.configs {
+	total := len(setting.configs)
+	for i, config := range setting.configs {
 		ip := config[0]
 		port := "1" + config[1] // the port number of solider is "1" + node port
 		addr := strings.Join([]string{ip, port}, ":")
 
 		if count == MaxFileOpen {
-			wg.Add(MaxFileOpen)
+			wg.Add(int(math.Min(float64(total-i), MaxFileOpen)))
 		}
 		go func() {
 			defer wg.Done()
