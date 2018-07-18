@@ -252,9 +252,21 @@ func handleLog2Command(w *bufio.Writer) {
 }
 
 func runCmd(name string, args ...string) error {
-	err := exec.Command(name, args...).Start()
-	log.Println("Command running", name, args)
-	return err
+	cmd := exec.Command(name, args...)
+	if err := cmd.Start(); err != nil {
+		log.Fatal(err)
+		return err
+	} else {
+		log.Println("Command running", name, args)
+		go func() {
+			if err = cmd.Wait(); err != nil {
+				log.Printf("Command finished with error: %v", err)
+			} else {
+				log.Printf("Command finished successfully")
+			}
+		}()
+		return nil
+	}
 }
 
 func runInstance() {
