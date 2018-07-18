@@ -37,23 +37,15 @@ const (
 )
 
 func readConfigFile() [][]string {
-	utils.DownloadFile(DistributionFileName, setting.configURL)
-
-	file, err := os.Open(DistributionFileName)
-	defer file.Close()
-	if err != nil {
-		log.Fatal("Failed to read config file ", DistributionFileName,
-			"\nNOTE: The config path should be relative to commander.")
+	if err := utils.DownloadFile(DistributionFileName, setting.configURL); err != nil {
+		panic(err)
 	}
-	fscanner := bufio.NewScanner(file)
 
-	result := [][]string{}
-	for fscanner.Scan() {
-		p := strings.Split(fscanner.Text(), " ")
-		result = append(result, p)
+	if result, err := utils.ReadDistributionConfig(DistributionFileName); err != nil {
+		panic(err)
+	} else {
+		return result
 	}
-	log.Println(result)
-	return result
 }
 
 func handleCommand(command string) {
@@ -67,7 +59,7 @@ func handleCommand(command string) {
 		{
 			setting.configs = readConfigFile()
 			if setting.configs != nil {
-				log.Println("Loaded config file", setting.configs)
+				log.Printf("The loaded config has %v nodes\n", len(setting.configs))
 			} else {
 				log.Println("failed to read config file")
 			}
@@ -85,10 +77,13 @@ func handleCommand(command string) {
 			log.Println("New session", session.id)
 
 			dictateNodes(fmt.Sprintf("init %v %v %v %v", setting.ip, setting.port, setting.configURL, session.id))
+			// log.Printf("Finished init with %v nodes\n", count)
 		}
 	case "ping", "kill", "log", "log2":
 		{
 			dictateNodes(command)
+			// count := dictateNodes(command)
+			// log.Printf("Finished %v with %v nodes\n", cmd, count)
 		}
 	default:
 		{
@@ -107,6 +102,7 @@ func dictateNodes(command string) {
 	const MaxFileOpen = 5000
 	var wg sync.WaitGroup
 	count := MaxFileOpen
+
 	for _, config := range setting.configs {
 		ip := config[0]
 		port := "1" + config[1] // the port number of solider is "1" + node port
@@ -127,14 +123,18 @@ func dictateNodes(command string) {
 			count = MaxFileOpen
 		}
 	}
+	if count < MaxFileOpen {
+		wg.Wait()
+		time.Sleep(time.Second)
+	}
 }
 
-func dictateNode(addr string, command string) {
+func dictateNode(addr string, command string) bool {
 	// creates client
 	conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
 	if err != nil {
 		log.Println(err)
-		return
+		return false
 	}
 	defer conn.Close()
 
@@ -142,14 +142,15 @@ func dictateNode(addr string, command string) {
 	_, err = conn.Write([]byte(command))
 	if err != nil {
 		log.Printf("Failed to send command to %s", addr)
-		return
+		return false
 	}
 	log.Printf("Send \"%s\" to %s", command, addr)
 
 	// read response
 	buff := make([]byte, 1024)
-	n, _ := conn.Read(buff)
+	n, err := conn.Read(buff)
 	log.Printf("Receive from %s: %s", addr, buff[:n])
+	return err == nil
 }
 
 func handleUploadRequest(w http.ResponseWriter, r *http.Request) {
@@ -211,7 +212,6 @@ func main() {
 	config(*ip, *port, *configURL)
 
 	log.Println("Start to host config files at http://" + setting.ip + ":" + setting.port)
-
 	go serve()
 
 	scanner := bufio.NewScanner(os.Stdin)
