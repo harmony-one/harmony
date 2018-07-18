@@ -73,14 +73,13 @@ if __name__ == "__main__":
                         default='instance_output.txt',
                         help='the file contains node_name_tag and region number of created instances.')
     parser.add_argument('--node_name_tag', type=str, dest='node_name_tag')
-    parser.add_argument('--region_number', type=str, dest='region_number')
     parser.add_argument('--region_config', type=str,
                         dest='region_config', default='configuration.txt')
     args = parser.parse_args()
 
-    if args.region_number and args.node_name_tag:
-        region_number_items = args.region_number.split(",")
+    if args.node_name_tag:
         node_name_tag_items = args.node_name_tag.split(",")
+        region_number_items = [item[:1] for item in node_name_tag_items]
         thread_pool = []
         for i in range(len(region_number_items)):
             region_number = region_number_items[i]
