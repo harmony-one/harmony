@@ -10,3 +10,4 @@ aws s3 cp bin/benchmark s3://unique-bucket-bin/benchmark --acl public-read-write
 aws s3 cp bin/soldier s3://unique-bucket-bin/soldier --acl public-read-write
 aws s3 cp bin/commander s3://unique-bucket-bin/commander --acl public-read-write
 aws s3 cp bin/txgen s3://unique-bucket-bin/txgen --acl public-read-write
+aws s3 cp kill_node.sh s3://unique-bucket-bin/kill_node.sh --acl public-read-write
