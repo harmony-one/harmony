@@ -54,7 +54,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     with open(args.commander_logging, "w") as fout:
-        fout.write("ssh -i ../keys/%s ec2-user@%s\n" % (PEMS[commander_region - 1], commander_address))
+        fout.write("ssh -i ./keys/%s ec2-user@%s\n" % (PEMS[commander_region - 1], commander_address))
     st = os.stat(args.commander_logging)
     os.chmod(args.commander_logging, st.st_mode | stat.S_IEXEC)
     LOGGER.info("Generated %s" % args.commander_logging)
