@@ -28,7 +28,7 @@ def get_node_name_tag(region_number):
 def get_node_name_tag2(region_number, tag):
     return region_number + "-" + NODE_NAME_SUFFIX + "-" + str(tag)
 
-with open("user-data.sh", "r") as userdata_file:
+with open("userdata-soldier.sh", "r") as userdata_file:
     USER_DATA = userdata_file.read()
 
 # UserData must be base64 encoded for spot instances.
@@ -128,7 +128,7 @@ def generate_distribution_config3(shard_number, client_number, ip_list_file, dis
     with open(ip_list_file, "r") as fin:
         lines = fin.readlines()
         ip_list = [line.strip() for line in lines]
-        generate_distribution_config(shard_number, client_number, ip_list, distribution_config)
+    generate_distribution_config(shard_number, client_number, ip_list, distribution_config)
 
 def generate_distribution_config(shard_number, client_number, ip_list, distribution_config):
     if len(ip_list) < shard_number * 2 + client_number + 1:
@@ -136,12 +136,15 @@ def generate_distribution_config(shard_number, client_number, ip_list, distribut
         return False
 
     # Create ip for clients.
-    client_id, leader_id, validator_id= 0, 0, 0
-    validator_number = len(ip_list) - client_number - shard_number
+    commander_id, client_id, leader_id, validator_id = 0, 0, 0, 0
+    validator_number = len(ip_list) - client_number - shard_number - 1
     with open(distribution_config, "w") as fout:
         for i in range(len(ip_list)):
             ip, node_name_tag = ip_list[i].split(" ")
-            if leader_id < shard_number:
+            if commander_id < 1:
+                fout.write("%s 9000 commander %d %s\n" % (ip, commander_id, node_name_tag))
+                commander_id = commander_id + 1
+            elif leader_id < shard_number:
                 fout.write("%s 9000 leader %d %s\n" % (ip, leader_id, node_name_tag))
                 leader_id = leader_id + 1
             elif validator_id < validator_number:
