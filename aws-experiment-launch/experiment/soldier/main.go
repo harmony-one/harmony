@@ -90,7 +90,6 @@ ILOOP:
 			log.Fatalf("Receive data failed:%s", err)
 			return
 		}
-
 	}
 }
 

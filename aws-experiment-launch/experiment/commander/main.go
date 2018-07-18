@@ -6,14 +6,11 @@ import (
 	"fmt"
 	"harmony-benchmark/aws-experiment-launch/experiment/utils"
 	"io"
-	"io/ioutil"
 	"log"
-	"math"
 	"net"
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -36,7 +33,6 @@ var (
 
 const (
 	DistributionFileName = "distribution_config.txt"
-	MaxFileOpen          = 5000
 )
 
 func readConfigFile() [][]string {
@@ -93,36 +89,19 @@ func config(ip string, port string, configURL string) {
 }
 
 func dictateNodes(command string) int {
-	var wg sync.WaitGroup
-	count := MaxFileOpen
 	result_chan := make(chan int)
-	total := len(setting.configs)
-	for i, config := range setting.configs {
+	for _, config := range setting.configs {
 		ip := config[0]
 		port := "1" + config[1] // the port number of solider is "1" + node port
 		addr := strings.Join([]string{ip, port}, ":")
 
-		if count == MaxFileOpen {
-			wg.Add(int(math.Min(float64(total-i), MaxFileOpen)))
-		}
-		go func() {
-			defer wg.Done()
+		go func(result_chan chan int) {
 			result_chan <- dictateNode(addr, command)
-		}()
-		count -= 1
-		// Because of the limitation of ulimit
-		if count == 0 {
-			wg.Wait()
-			time.Sleep(time.Second)
-			count = MaxFileOpen
-		}
+		}(result_chan)
 	}
-	if count < MaxFileOpen {
-		wg.Wait()
-	}
-	count = len(setting.configs)
+	count := len(setting.configs)
 	res := 0
-	for count > 0 {
+	for ; count > 0; count -= 1 {
 		res += <-result_chan
 	}
 	return res
@@ -146,12 +125,10 @@ func dictateNode(addr string, command string) int {
 	log.Printf("Send \"%s\" to %s", command, addr)
 
 	// read response
-	if buf, err := ioutil.ReadAll(conn); err != nil {
-		return 0
-	} else {
-		log.Printf("Receive from %s: %s", addr, buf)
-		return 1
-	}
+	buff := make([]byte, 1024)
+	n, _ := conn.Read(buff)
+	log.Printf("Receive from %s: %s", addr, buff[:n])
+	return 1
 }
 
 func handleUploadRequest(w http.ResponseWriter, r *http.Request) {
