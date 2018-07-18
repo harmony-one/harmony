@@ -35,6 +35,7 @@ var (
 
 const (
 	DistributionFileName = "distribution_config.txt"
+	MaxFileOpen          = 5000
 )
 
 func readConfigFile() [][]string {
@@ -74,12 +75,11 @@ func handleCommand(command string) {
 		}
 		log.Println("New session", session.id)
 
-		dictateNodes(fmt.Sprintf("init %v %v %v %v", setting.ip, setting.port, setting.configURL, session.id))
-		// log.Printf("Finished init with %v nodes\n", count)
+		count := dictateNodes(fmt.Sprintf("init %v %v %v %v", setting.ip, setting.port, setting.configURL, session.id))
+		log.Printf("Finished init with %v nodes\n", count)
 	case "ping", "kill", "log", "log2":
-		dictateNodes(command)
-		// count := dictateNodes(command)
-		// log.Printf("Finished %v with %v nodes\n", cmd, count)
+		count := dictateNodes(command)
+		log.Printf("Finished %v with %v nodes\n", cmd, count)
 	default:
 		log.Println("Unknown command")
 	}
@@ -91,11 +91,10 @@ func config(ip string, port string, configURL string) {
 	setting.configURL = configURL
 }
 
-func dictateNodes(command string) {
-	const MaxFileOpen = 5000
+func dictateNodes(command string) int {
 	var wg sync.WaitGroup
 	count := MaxFileOpen
-
+	result_chan := make(chan int)
 	for _, config := range setting.configs {
 		ip := config[0]
 		port := "1" + config[1] // the port number of solider is "1" + node port
@@ -106,7 +105,7 @@ func dictateNodes(command string) {
 		}
 		go func() {
 			defer wg.Done()
-			dictateNode(addr, command)
+			result_chan <- dictateNode(addr, command)
 		}()
 		count -= 1
 		// Because of the limitation of ulimit
@@ -119,14 +118,20 @@ func dictateNodes(command string) {
 	if count < MaxFileOpen {
 		wg.Wait()
 	}
+	count = len(setting.configs)
+	res := 0
+	for count > 0 {
+		res += <-result_chan
+	}
+	return res
 }
 
-func dictateNode(addr string, command string) bool {
+func dictateNode(addr string, command string) int {
 	// creates client
 	conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
 	if err != nil {
 		log.Println(err)
-		return false
+		return 0
 	}
 	defer conn.Close()
 
@@ -134,16 +139,16 @@ func dictateNode(addr string, command string) bool {
 	_, err = conn.Write([]byte(command))
 	if err != nil {
 		log.Printf("Failed to send command to %s", addr)
-		return false
+		return 0
 	}
 	log.Printf("Send \"%s\" to %s", command, addr)
 
 	// read response
 	if buf, err := ioutil.ReadAll(conn); err != nil {
-		return false
+		return 0
 	} else {
 		log.Printf("Receive from %s: %s", addr, buf)
-		return true
+		return 1
 	}
 }
 
