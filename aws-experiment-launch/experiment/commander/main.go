@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"harmony-benchmark/aws-experiment-launch/experiment/utils"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -56,39 +57,31 @@ func handleCommand(command string) {
 
 	switch cmd := args[0]; cmd {
 	case "config":
-		{
-			setting.configs = readConfigFile()
-			if setting.configs != nil {
-				log.Printf("The loaded config has %v nodes\n", len(setting.configs))
-			} else {
-				log.Println("failed to read config file")
-			}
+		setting.configs = readConfigFile()
+		if setting.configs != nil {
+			log.Printf("The loaded config has %v nodes\n", len(setting.configs))
+		} else {
+			log.Println("failed to read config file")
 		}
 	case "init":
-		{
-			session.id = time.Now().Format("150405-20060102")
-			// create upload folder
-			session.uploadFolder = fmt.Sprintf("upload/%s", session.id)
-			err := os.MkdirAll(session.uploadFolder, os.ModePerm)
-			if err != nil {
-				log.Println("Failed to create upload folder", session.uploadFolder)
-				return
-			}
-			log.Println("New session", session.id)
+		session.id = time.Now().Format("150405-20060102")
+		// create upload folder
+		session.uploadFolder = fmt.Sprintf("upload/%s", session.id)
+		err := os.MkdirAll(session.uploadFolder, os.ModePerm)
+		if err != nil {
+			log.Println("Failed to create upload folder", session.uploadFolder)
+			return
+		}
+		log.Println("New session", session.id)
 
-			dictateNodes(fmt.Sprintf("init %v %v %v %v", setting.ip, setting.port, setting.configURL, session.id))
-			// log.Printf("Finished init with %v nodes\n", count)
-		}
+		dictateNodes(fmt.Sprintf("init %v %v %v %v", setting.ip, setting.port, setting.configURL, session.id))
+		// log.Printf("Finished init with %v nodes\n", count)
 	case "ping", "kill", "log", "log2":
-		{
-			dictateNodes(command)
-			// count := dictateNodes(command)
-			// log.Printf("Finished %v with %v nodes\n", cmd, count)
-		}
+		dictateNodes(command)
+		// count := dictateNodes(command)
+		// log.Printf("Finished %v with %v nodes\n", cmd, count)
 	default:
-		{
-			log.Println("Unknown command")
-		}
+		log.Println("Unknown command")
 	}
 }
 
@@ -125,7 +118,6 @@ func dictateNodes(command string) {
 	}
 	if count < MaxFileOpen {
 		wg.Wait()
-		time.Sleep(time.Second)
 	}
 }
 
@@ -147,10 +139,12 @@ func dictateNode(addr string, command string) bool {
 	log.Printf("Send \"%s\" to %s", command, addr)
 
 	// read response
-	buff := make([]byte, 1024)
-	n, err := conn.Read(buff)
-	log.Printf("Receive from %s: %s", addr, buff[:n])
-	return err == nil
+	if buf, err := ioutil.ReadAll(conn); err != nil {
+		return false
+	} else {
+		log.Printf("Receive from %s: %s", addr, buf)
+		return true
+	}
 }
 
 func handleUploadRequest(w http.ResponseWriter, r *http.Request) {
