@@ -128,7 +128,7 @@ def generate_distribution_config3(shard_number, client_number, ip_list_file, dis
     with open(ip_list_file, "r") as fin:
         lines = fin.readlines()
         ip_list = [line.strip() for line in lines]
-        generate_distribution_config(shard_number, client_number, ip_list, distribution_config)
+    generate_distribution_config(shard_number, client_number, ip_list, distribution_config)
 
 def generate_distribution_config(shard_number, client_number, ip_list, distribution_config):
     if len(ip_list) < shard_number * 2 + client_number + 1:
@@ -144,7 +144,7 @@ def generate_distribution_config(shard_number, client_number, ip_list, distribut
             if commander_id < 1:
                 fout.write("%s 9000 commander %d %s\n" % (ip, commander_id, node_name_tag))
                 commander_id = commander_id + 1
-            if leader_id < shard_number:
+            elif leader_id < shard_number:
                 fout.write("%s 9000 leader %d %s\n" % (ip, leader_id, node_name_tag))
                 leader_id = leader_id + 1
             elif validator_id < validator_number:
