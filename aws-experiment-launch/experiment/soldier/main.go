@@ -16,6 +16,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -150,8 +151,18 @@ func handleInitCommand(args []string, w *bufio.Writer) {
 
 func handleKillCommand(w *bufio.Writer) {
 	log.Println("Kill command")
-	runCmd("./kill_node.sh")
+	killPort(setting.port)
 	logAndReply(w, "Kill command done.")
+}
+
+func killPort(port string) {
+	if runtime.GOOS == "windows" {
+		command := fmt.Sprintf("(Get-NetTCPConnection -LocalPort %s).OwningProcess -Force", port)
+		runCmd("Stop-Process", "-Id", command)
+	} else {
+		command := fmt.Sprintf("lsof -i tcp:%s | grep LISTEN | awk '{print $2}' | xargs kill -9", port)
+		runCmd("bash", "-c", command)
+	}
 }
 
 func handlePingCommand(w *bufio.Writer) {
