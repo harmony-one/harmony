@@ -1,1 +1,0 @@
-python collect_public_ips.py --instance_output instance_output.txt --file_output raw_ip.txt

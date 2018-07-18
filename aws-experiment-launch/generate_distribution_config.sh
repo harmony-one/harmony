@@ -1,1 +1,0 @@
-python generate_distribution_config.py --ip_list_file raw_ip.txt --shard_num 2 --client_num 2
