@@ -93,7 +93,7 @@ def create_instances(config, ec2_client, region_number, number_of_instances, tag
 
     retry_count = 10
     while retry_count > 0:
-        time.sleep(10)
+        time.sleep(20)
         LOGGER.info("Waiting ...")
         ip_list = utils.collect_public_ips_from_ec2_client(
             ec2_client, node_name_tag)
@@ -101,8 +101,8 @@ def create_instances(config, ec2_client, region_number, number_of_instances, tag
             LOGGER.info("Created %d instances" % number_of_instances)
             return node_name_tag
         retry_count -= 10
-    LOGGER.info("Can not create %d instances" % number_of_instances)
-    return None
+    LOGGER.info("Can not get %d instances" % number_of_instances)
+    return node_name_tag
 
 
 LOCK_FOR_RUN_ONE_REGION = threading.Lock()
