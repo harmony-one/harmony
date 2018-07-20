@@ -15,7 +15,7 @@ python create_solider_instances.py --regions 1,2,3,4,5,6,7,8 --instances $INSTAN
 echo "Sleep for $SLEEP_TIME seconds"
 sleep $SLEEP_TIME
 
-echo "Rung collecint raw ips"
+echo "Rung collecting raw ips"
 python collect_public_ips.py --instance_output instance_output.txt
 
 # sleep 10
