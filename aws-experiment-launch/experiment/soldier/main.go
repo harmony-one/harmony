@@ -180,7 +180,7 @@ func handleLogCommand(w *bufio.Writer) {
 
 	files, err := ioutil.ReadDir(globalSession.logFolder)
 	if err != nil {
-		logAndReply(w, fmt.Sprintf("Failed to create log folder. Error: %s", err.Error()))
+		logAndReply(w, fmt.Sprintf("Failed to read log folder. Error: %s", err.Error()))
 		return
 	}
 

@@ -59,7 +59,7 @@ func handleCommand(command string) {
 		if setting.configs != nil {
 			log.Printf("The loaded config has %v nodes\n", len(setting.configs))
 		} else {
-			log.Println("failed to read config file")
+			log.Println("Failed to read config file")
 		}
 	case "init":
 		session.id = time.Now().Format("150405-20060102")
@@ -72,11 +72,9 @@ func handleCommand(command string) {
 		}
 		log.Println("New session", session.id)
 
-		count := dictateNodes(fmt.Sprintf("init %v %v %v %v", setting.ip, setting.port, setting.configURL, session.id))
-		log.Printf("Finished init with %v nodes\n", count)
+		dictateNodes(fmt.Sprintf("init %v %v %v %v", setting.ip, setting.port, setting.configURL, session.id))
 	case "ping", "kill", "log", "log2":
-		count := dictateNodes(command)
-		log.Printf("Finished %v with %v nodes\n", cmd, count)
+		dictateNodes(command)
 	default:
 		log.Println("Unknown command")
 	}
@@ -88,23 +86,24 @@ func config(ip string, port string, configURL string) {
 	setting.configURL = configURL
 }
 
-func dictateNodes(command string) int {
-	result_chan := make(chan int)
+func dictateNodes(command string) {
+	resultChan := make(chan int)
 	for _, config := range setting.configs {
 		ip := config[0]
 		port := "1" + config[1] // the port number of solider is "1" + node port
 		addr := strings.Join([]string{ip, port}, ":")
 
-		go func(result_chan chan int) {
-			result_chan <- dictateNode(addr, command)
-		}(result_chan)
+		go func(resultChan chan int) {
+			resultChan <- dictateNode(addr, command)
+		}(resultChan)
 	}
 	count := len(setting.configs)
 	res := 0
-	for ; count > 0; count -= 1 {
-		res += <-result_chan
+	for ; count > 0; count-- {
+		res += <-resultChan
 	}
-	return res
+
+	log.Printf("Finished %s with %v nodes\n", command, res)
 }
 
 func dictateNode(addr string, command string) int {
@@ -134,9 +133,8 @@ func dictateNode(addr string, command string) int {
 		} else {
 			return 1
 		}
-	} else {
-		return 0
 	}
+	return 0
 }
 
 func handleUploadRequest(w http.ResponseWriter, r *http.Request) {
@@ -181,12 +179,12 @@ func jsonResponse(w http.ResponseWriter, code int, message string) {
 }
 
 func serve() {
-	http.Handle("/", http.FileServer(http.Dir("./")))
 	http.HandleFunc("/upload", handleUploadRequest)
 	err := http.ListenAndServe(":"+setting.port, nil)
 	if err != nil {
 		log.Fatalf("Failed to setup server! Error: %s", err.Error())
 	}
+	log.Printf("Start to host upload endpoint at http://%s:%s/upload\n", setting.ip, setting.port)
 }
 
 func main() {
@@ -197,7 +195,6 @@ func main() {
 
 	config(*ip, *port, *configURL)
 
-	log.Println("Start to host config files at http://" + setting.ip + ":" + setting.port)
 	go serve()
 
 	scanner := bufio.NewScanner(os.Stdin)
