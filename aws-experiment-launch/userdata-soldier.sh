@@ -11,6 +11,15 @@ chmod +x ./txgen
 chmod +x ./benchmark
 chmod +x ./commander
 chmod +x ./kill_node.sh
+echo "* soft     nproc          65535" | sudo tee -a /etc/security/limits.conf
+echo "* hard     nproc          65535" | sudo tee -a /etc/security/limits.conf
+echo "* soft     nofile         65535" | sudo tee -a /etc/security/limits.conf
+echo "* hard     nofile         65535" | sudo tee -a /etc/security/limits.conf
+echo "root soft     nproc          65535" | sudo tee -a /etc/security/limits.conf
+echo "root hard     nproc          65535" | sudo tee -a /etc/security/limits.conf
+echo "root soft     nofile         65535" | sudo tee -a /etc/security/limits.conf
+echo "root hard     nofile         65535" | sudo tee -a /etc/security/limits.conf
+echo "session required pam_limits.so" | sudo tee -a /etc/pam.d/common-session
 
 # Get My IP
 ip=`curl http://169.254.169.254/latest/meta-data/public-ipv4`
