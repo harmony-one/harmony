@@ -103,7 +103,7 @@ func dictateNodes(command string) {
 		res += <-resultChan
 	}
 
-	log.Printf("Finished %s with %v nodes\n", command, count)
+	log.Printf("Finished %s with %v nodes\n", command, res)
 }
 
 func dictateNode(addr string, command string) int {
