@@ -122,13 +122,18 @@ func dictateNode(addr string, command string) int {
 		log.Printf("Failed to send command to %s", addr)
 		return 0
 	}
-	log.Printf("Send \"%s\" to %s", command, addr)
+	// log.Printf("Send \"%s\" to %s", command, addr)
 
 	// read response
 	buff := make([]byte, 1024)
 	if n, err := conn.Read(buff); err == nil {
-		log.Printf("Receive from %s: %s", addr, buff[:n])
-		return 1
+		received := string(buff[:n])
+		// log.Printf("Receive from %s: %s", addr, buff[:n])
+		if strings.Contains(received, "Failed") {
+			return 0
+		} else {
+			return 1
+		}
 	} else {
 		return 0
 	}

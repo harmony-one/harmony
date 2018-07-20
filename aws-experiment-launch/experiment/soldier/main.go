@@ -144,24 +144,29 @@ func handleInitCommand(args []string, w *bufio.Writer) {
 	utils.DownloadFile(globalSession.localConfigFileName, configURL)
 	log.Println("Successfully downloaded config")
 
-	runInstance()
-
-	logAndReply(w, "Successfully init-ed")
+	if err := runInstance(); err == nil {
+		logAndReply(w, "Done init.")
+	} else {
+		logAndReply(w, "Failed.")
+	}
 }
 
 func handleKillCommand(w *bufio.Writer) {
 	log.Println("Kill command")
-	killPort(setting.port)
-	logAndReply(w, "Kill command done.")
+	if err := killPort(setting.port); err == nil {
+		logAndReply(w, "Done kill.")
+	} else {
+		logAndReply(w, "Failed.")
+	}
 }
 
-func killPort(port string) {
+func killPort(port string) error {
 	if runtime.GOOS == "windows" {
 		command := fmt.Sprintf("(Get-NetTCPConnection -LocalPort %s).OwningProcess -Force", port)
-		runCmd("Stop-Process", "-Id", command)
+		return runCmd("Stop-Process", "-Id", command)
 	} else {
 		command := fmt.Sprintf("lsof -i tcp:%s | grep LISTEN | awk '{print $2}' | xargs kill -9", port)
-		runCmd("bash", "-c", command)
+		return runCmd("bash", "-c", command)
 	}
 }
 
@@ -280,7 +285,7 @@ func runCmd(name string, args ...string) error {
 	}
 }
 
-func runInstance() {
+func runInstance() error {
 	config := readConfigFile(globalSession.localConfigFileName)
 
 	myConfig := getMyConfig(setting.ip, setting.port, &config)
@@ -288,9 +293,9 @@ func runInstance() {
 	os.MkdirAll(globalSession.logFolder, os.ModePerm)
 
 	if myConfig[2] == "client" {
-		runClient()
+		return runClient()
 	} else {
-		runNode()
+		return runNode()
 	}
 }
 
