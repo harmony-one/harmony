@@ -84,6 +84,7 @@ func generateSimulatedTransactions(shardId int, dataNodes []*node.Node) ([]*bloc
 UTXOLOOP:
 	// Loop over all addresses
 	for address, txMap := range dataNodes[shardId].UtxoPool.UtxoMap {
+		txInfo.address = address
 		// Loop over all txIds for the address
 		for txIdStr, utxoMap := range txMap {
 			// Parse TxId
@@ -92,7 +93,6 @@ UTXOLOOP:
 				continue
 			}
 			copy(txInfo.id[:], id[:])
-			txInfo.address = address
 
 			// Loop over all utxos for the txId
 			for index, value := range utxoMap {
