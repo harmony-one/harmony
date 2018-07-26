@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"harmony-benchmark/aws-experiment-launch/experiment/soldier/s3"
 	"harmony-benchmark/aws-experiment-launch/experiment/utils"
-	"harmony-benchmark/configreader"
+	"harmony-benchmark/configr"
 	"io"
 	"io/ioutil"
 	"log"
@@ -287,7 +287,7 @@ func runCmd(name string, args ...string) error {
 }
 
 func runInstance() error {
-	config, _ := configreader.ReadConfigFile(globalSession.localConfigFileName)
+	config, _ := configr.ReadConfigFile(globalSession.localConfigFileName)
 
 	myConfig := getMyConfig(setting.ip, setting.port, &config)
 

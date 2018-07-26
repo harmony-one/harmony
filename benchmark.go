@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"harmony-benchmark/attack"
-	"harmony-benchmark/configreader"
+	"harmony-benchmark/configr"
 	"harmony-benchmark/consensus"
 	"harmony-benchmark/log"
 	"harmony-benchmark/node"
@@ -102,7 +102,7 @@ func main() {
 	// Attack determination.
 	attack.GetInstance().SetAttackEnabled(attackDetermination(*attackedMode))
 
-	config, _ := configreader.ReadConfigFile(*configFile)
+	config, _ := configr.ReadConfigFile(*configFile)
 	shardID := getShardId(*ip, *port, &config)
 	peers := getPeers(*ip, *port, shardID, &config)
 	leader := getLeader(shardID, &config)
@@ -134,7 +134,7 @@ func main() {
 	// Current node.
 	currentNode := node.New(consensus)
 	// Create client peer.
-	clientPeer := configreader.GetClientPeer(&config)
+	clientPeer := configr.GetClientPeer(&config)
 	// If there is a client configured in the node list.
 	if clientPeer != nil {
 		currentNode.ClientPeer = clientPeer

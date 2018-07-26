@@ -1,4 +1,4 @@
-package configreader
+package configr
 
 import (
 	"bufio"

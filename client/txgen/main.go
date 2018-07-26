@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/client"
-	"harmony-benchmark/configreader"
+	"harmony-benchmark/configr"
 	"harmony-benchmark/consensus"
 	"harmony-benchmark/log"
 	"harmony-benchmark/node"
@@ -204,8 +204,8 @@ func main() {
 	flag.Parse()
 
 	// Read the configs
-	config, _ := configreader.ReadConfigFile(*configFile)
-	leaders, shardIds := configreader.GetLeadersAndShardIds(&config)
+	config, _ := configr.ReadConfigFile(*configFile)
+	leaders, shardIds := configr.GetLeadersAndShardIds(&config)
 
 	setting.numOfAddress = 10000
 	// Do cross shard tx if there are more than one shard
@@ -309,6 +309,6 @@ func main() {
 
 	// Send a stop message to stop the nodes at the end
 	msg := node.ConstructStopMessage()
-	peers := append(configreader.GetValidators(*configFile), leaders...)
+	peers := append(configr.GetValidators(*configFile), leaders...)
 	p2p.BroadcastMessage(peers, msg)
 }
