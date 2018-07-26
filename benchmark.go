@@ -1,17 +1,16 @@
 package main
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
 	"harmony-benchmark/attack"
+	"harmony-benchmark/configreader"
 	"harmony-benchmark/consensus"
 	"harmony-benchmark/log"
 	"harmony-benchmark/node"
 	"harmony-benchmark/p2p"
 	"math/rand"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/shirou/gopsutil/process"
@@ -68,18 +67,6 @@ func getClientPeer(config *[][]string) *p2p.Peer {
 	return nil
 }
 
-func readConfigFile(configFile string) [][]string {
-	file, _ := os.Open(configFile)
-	fscanner := bufio.NewScanner(file)
-
-	result := [][]string{}
-	for fscanner.Scan() {
-		p := strings.Split(fscanner.Text(), " ")
-		result = append(result, p)
-	}
-	return result
-}
-
 func attackDetermination(attackedMode int) bool {
 	switch attackedMode {
 	case 0:
@@ -127,7 +114,7 @@ func main() {
 	// Attack determination.
 	attack.GetInstance().SetAttackEnabled(attackDetermination(*attackedMode))
 
-	config := readConfigFile(*configFile)
+	config, _ := configreader.ReadConfigFile(*configFile)
 	shardID := getShardId(*ip, *port, &config)
 	peers := getPeers(*ip, *port, shardID, &config)
 	leader := getLeader(shardID, &config)

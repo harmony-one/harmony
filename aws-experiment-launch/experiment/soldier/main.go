@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"harmony-benchmark/aws-experiment-launch/experiment/soldier/s3"
 	"harmony-benchmark/aws-experiment-launch/experiment/utils"
+	"harmony-benchmark/configreader"
 	"io"
 	"io/ioutil"
 	"log"
@@ -286,7 +287,7 @@ func runCmd(name string, args ...string) error {
 }
 
 func runInstance() error {
-	config := readConfigFile(globalSession.localConfigFileName)
+	config, _ := configreader.ReadConfigFile(globalSession.localConfigFileName)
 
 	myConfig := getMyConfig(setting.ip, setting.port, &config)
 
@@ -307,18 +308,6 @@ func runNode() error {
 func runClient() error {
 	log.Println("running client")
 	return runCmd("./txgen", "-config_file", globalSession.localConfigFileName, "-log_folder", globalSession.logFolder)
-}
-
-func readConfigFile(configFile string) [][]string {
-	file, _ := os.Open(configFile)
-	fscanner := bufio.NewScanner(file)
-
-	result := [][]string{}
-	for fscanner.Scan() {
-		p := strings.Split(fscanner.Text(), " ")
-		result = append(result, p)
-	}
-	return result
 }
 
 func getMyConfig(myIP string, myPort string, config *[][]string) []string {
