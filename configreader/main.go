@@ -45,6 +45,18 @@ func GetLeadersAndShardIds(config *[][]string) ([]p2p.Peer, []uint32) {
 	return peerList, shardIds
 }
 
+func GetClientPeer(config *[][]string) *p2p.Peer {
+	for _, node := range *config {
+		ip, port, status := node[0], node[1], node[2]
+		if status != "client" {
+			continue
+		}
+		peer := p2p.Peer{Port: port, Ip: ip}
+		return &peer
+	}
+	return nil
+}
+
 // Parse the config file and return a 2d array containing the file data
 func ReadConfigFile(filename string) ([][]string, error) {
 	file, err := os.Open(filename)

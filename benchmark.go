@@ -55,18 +55,6 @@ func getPeers(myIp, myPort, myShardId string, config *[][]string) []p2p.Peer {
 	return peerList
 }
 
-func getClientPeer(config *[][]string) *p2p.Peer {
-	for _, node := range *config {
-		ip, port, status := node[0], node[1], node[2]
-		if status != "client" {
-			continue
-		}
-		peer := p2p.Peer{Port: port, Ip: ip}
-		return &peer
-	}
-	return nil
-}
-
 func attackDetermination(attackedMode int) bool {
 	switch attackedMode {
 	case 0:
@@ -146,7 +134,7 @@ func main() {
 	// Current node.
 	currentNode := node.New(consensus)
 	// Create client peer.
-	clientPeer := getClientPeer(&config)
+	clientPeer := configreader.GetClientPeer(&config)
 	// If there is a client configured in the node list.
 	if clientPeer != nil {
 		currentNode.ClientPeer = clientPeer
