@@ -1,20 +1,18 @@
 package main
 
 import (
-	"bufio"
 	"encoding/hex"
 	"flag"
 	"fmt"
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/client"
+	"harmony-benchmark/configr"
 	"harmony-benchmark/consensus"
 	"harmony-benchmark/log"
 	"harmony-benchmark/node"
 	"harmony-benchmark/p2p"
 	"math/rand"
-	"os"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 )
@@ -166,55 +164,6 @@ UTXOLOOP:
 	return txs, crossTxs
 }
 
-// Gets all the validator peers
-func getValidators(config string) []p2p.Peer {
-	file, _ := os.Open(config)
-	fscanner := bufio.NewScanner(file)
-	var peerList []p2p.Peer
-	for fscanner.Scan() {
-		p := strings.Split(fscanner.Text(), " ")
-		ip, port, status := p[0], p[1], p[2]
-		if status == "leader" || status == "client" {
-			continue
-		}
-		peer := p2p.Peer{Port: port, Ip: ip}
-		peerList = append(peerList, peer)
-	}
-	return peerList
-}
-
-// Gets all the leader peers and corresponding shard Ids
-func getLeadersAndShardIds(config *[][]string) ([]p2p.Peer, []uint32) {
-	var peerList []p2p.Peer
-	var shardIds []uint32
-	for _, node := range *config {
-		ip, port, status, shardId := node[0], node[1], node[2], node[3]
-		if status == "leader" {
-			peerList = append(peerList, p2p.Peer{Ip: ip, Port: port})
-			val, err := strconv.Atoi(shardId)
-			if err == nil {
-				shardIds = append(shardIds, uint32(val))
-			} else {
-				log.Error("[Generator] Error parsing the shard Id ", shardId)
-			}
-		}
-	}
-	return peerList, shardIds
-}
-
-// Parse the config file and return a 2d array containing the file data
-func readConfigFile(configFile string) [][]string {
-	file, _ := os.Open(configFile)
-	fscanner := bufio.NewScanner(file)
-
-	result := [][]string{}
-	for fscanner.Scan() {
-		p := strings.Split(fscanner.Text(), " ")
-		result = append(result, p)
-	}
-	return result
-}
-
 // Gets the port of the client node in the config
 func getClientPort(config *[][]string) string {
 	for _, node := range *config {
@@ -255,8 +204,8 @@ func main() {
 	flag.Parse()
 
 	// Read the configs
-	config := readConfigFile(*configFile)
-	leaders, shardIds := getLeadersAndShardIds(&config)
+	config, _ := configr.ReadConfigFile(*configFile)
+	leaders, shardIds := configr.GetLeadersAndShardIds(&config)
 
 	setting.numOfAddress = 10000
 	// Do cross shard tx if there are more than one shard
@@ -360,6 +309,6 @@ func main() {
 
 	// Send a stop message to stop the nodes at the end
 	msg := node.ConstructStopMessage()
-	peers := append(getValidators(*configFile), leaders...)
+	peers := append(configr.GetValidators(*configFile), leaders...)
 	p2p.BroadcastMessage(peers, msg)
 }

@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"harmony-benchmark/aws-experiment-launch/experiment/utils"
+	"harmony-benchmark/configr"
 	"io"
 	"log"
 	"net"
@@ -40,7 +41,7 @@ func readConfigFile() [][]string {
 		panic(err)
 	}
 
-	if result, err := utils.ReadDistributionConfig(DistributionFileName); err != nil {
+	if result, err := configr.ReadConfigFile(DistributionFileName); err != nil {
 		panic(err)
 	} else {
 		return result

@@ -1,17 +1,16 @@
 package main
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
 	"harmony-benchmark/attack"
+	"harmony-benchmark/configr"
 	"harmony-benchmark/consensus"
 	"harmony-benchmark/log"
 	"harmony-benchmark/node"
 	"harmony-benchmark/p2p"
 	"math/rand"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/shirou/gopsutil/process"
@@ -54,30 +53,6 @@ func getPeers(myIp, myPort, myShardId string, config *[][]string) []p2p.Peer {
 		peerList = append(peerList, peer)
 	}
 	return peerList
-}
-
-func getClientPeer(config *[][]string) *p2p.Peer {
-	for _, node := range *config {
-		ip, port, status := node[0], node[1], node[2]
-		if status != "client" {
-			continue
-		}
-		peer := p2p.Peer{Port: port, Ip: ip}
-		return &peer
-	}
-	return nil
-}
-
-func readConfigFile(configFile string) [][]string {
-	file, _ := os.Open(configFile)
-	fscanner := bufio.NewScanner(file)
-
-	result := [][]string{}
-	for fscanner.Scan() {
-		p := strings.Split(fscanner.Text(), " ")
-		result = append(result, p)
-	}
-	return result
 }
 
 func attackDetermination(attackedMode int) bool {
@@ -127,7 +102,7 @@ func main() {
 	// Attack determination.
 	attack.GetInstance().SetAttackEnabled(attackDetermination(*attackedMode))
 
-	config := readConfigFile(*configFile)
+	config, _ := configr.ReadConfigFile(*configFile)
 	shardID := getShardId(*ip, *port, &config)
 	peers := getPeers(*ip, *port, shardID, &config)
 	leader := getLeader(shardID, &config)
@@ -159,7 +134,7 @@ func main() {
 	// Current node.
 	currentNode := node.New(consensus)
 	// Create client peer.
-	clientPeer := getClientPeer(&config)
+	clientPeer := configr.GetClientPeer(&config)
 	// If there is a client configured in the node list.
 	if clientPeer != nil {
 		currentNode.ClientPeer = clientPeer
