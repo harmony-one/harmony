@@ -164,17 +164,6 @@ UTXOLOOP:
 	return txs, crossTxs
 }
 
-// Gets the port of the client node in the config
-func getClientPort(config *[][]string) string {
-	for _, node := range *config {
-		_, port, status, _ := node[0], node[1], node[2], node[3]
-		if status == "client" {
-			return port
-		}
-	}
-	return ""
-}
-
 // A utility func that counts the total number of utxos in a pool.
 func countNumOfUtxos(utxoPool *blockchain.UTXOPool) int {
 	countAll := 0
@@ -232,7 +221,7 @@ func main() {
 	}
 
 	// Client/txgenerator server node setup
-	clientPort := getClientPort(&config)
+	clientPort := configr.GetClientPort(&config)
 	consensusObj := consensus.NewConsensus("0", clientPort, "0", nil, p2p.Peer{})
 	clientNode := node.New(consensusObj)
 

@@ -57,6 +57,17 @@ func GetClientPeer(config *[][]string) *p2p.Peer {
 	return nil
 }
 
+// Gets the port of the client node in the config
+func GetClientPort(config *[][]string) string {
+	for _, node := range *config {
+		_, port, status, _ := node[0], node[1], node[2], node[3]
+		if status == "client" {
+			return port
+		}
+	}
+	return ""
+}
+
 // Parse the config file and return a 2d array containing the file data
 func ReadConfigFile(filename string) ([][]string, error) {
 	file, err := os.Open(filename)
