@@ -98,11 +98,8 @@ UTXOLOOP:
 			for index, value := range utxoMap {
 				txInfo.index = index
 				txInfo.value = value
-				if txInfo.txCount >= setting.maxNumTxsPerBatch {
-					break UTXOLOOP
-				}
-				randNum := rand.Intn(100)
 
+				randNum := rand.Intn(100)
 				// 30% sample rate to select UTXO to use for new transactions
 				if randNum >= 30 {
 					continue
@@ -111,6 +108,9 @@ UTXOLOOP:
 					generateCrossShardTx(txInfo)
 				} else {
 					generateSingleShardTx(txInfo)
+				}
+				if txInfo.txCount >= setting.maxNumTxsPerBatch {
+					break UTXOLOOP
 				}
 			}
 		}
