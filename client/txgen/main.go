@@ -117,6 +117,7 @@ UTXOLOOP:
 	}
 	utxoPoolMutex.Unlock()
 
+	log.Debug("[Generator] generated transations", "single-shard", len(txInfo.txs), "cross-shard", len(txInfo.crossTxs))
 	return txInfo.txs, txInfo.crossTxs
 }
 
