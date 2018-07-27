@@ -55,12 +55,12 @@ type TxInfo struct {
 //       token (1000) to each address in [0 - N). See node.AddTestingAddresses()
 //
 // Params:
-//     shardId                    - the shardId for current shard
+//     shardID                    - the shardID for current shard
 //     dataNodes                  - nodes containing utxopools of all shards
 // Returns:
 //     all single-shard txs
 //     all cross-shard txs
-func generateSimulatedTransactions(shardId int, dataNodes []*node.Node) ([]*blockchain.Transaction, []*blockchain.Transaction) {
+func generateSimulatedTransactions(shardID int, dataNodes []*node.Node) ([]*blockchain.Transaction, []*blockchain.Transaction) {
 	/*
 	  UTXO map structure:
 	     address - [
@@ -77,13 +77,13 @@ func generateSimulatedTransactions(shardId int, dataNodes []*node.Node) ([]*bloc
 
 	utxoPoolMutex.Lock()
 	txInfo := TxInfo{}
-	txInfo.shardID = shardId
+	txInfo.shardID = shardID
 	txInfo.dataNodes = dataNodes
 	txInfo.txCount = 0
 
 UTXOLOOP:
 	// Loop over all addresses
-	for address, txMap := range dataNodes[shardId].UtxoPool.UtxoMap {
+	for address, txMap := range dataNodes[shardID].UtxoPool.UtxoMap {
 		txInfo.address = address
 		// Loop over all txIds for the address
 		for txIdStr, utxoMap := range txMap {
@@ -105,9 +105,9 @@ UTXOLOOP:
 					continue
 				}
 				if setting.crossShard && randNum < 10 { // 1/3 cross shard transactions: add another txinput from another shard
-					generateCrossShardTx(txInfo)
+					generateCrossShardTx(&txInfo)
 				} else {
-					generateSingleShardTx(txInfo)
+					generateSingleShardTx(&txInfo)
 				}
 				if txInfo.txCount >= setting.maxNumTxsPerBatch {
 					break UTXOLOOP
@@ -120,9 +120,10 @@ UTXOLOOP:
 	return txInfo.txs, txInfo.crossTxs
 }
 
-func generateCrossShardTx(txInfo TxInfo) {
+func generateCrossShardTx(txInfo *TxInfo) {
+	nodeShardID := txInfo.dataNodes[txInfo.shardID].Consensus.ShardID
 	// shard with neighboring Id
-	crossShardId := (int(txInfo.dataNodes[txInfo.shardID].Consensus.ShardID) + 1) % len(txInfo.dataNodes)
+	crossShardId := (int(nodeShardID) + 1) % len(txInfo.dataNodes)
 
 	crossShardNode := txInfo.dataNodes[crossShardId]
 	crossShardUtxosMap := crossShardNode.UtxoPool.UtxoMap[txInfo.address]
@@ -151,7 +152,7 @@ func generateCrossShardTx(txInfo TxInfo) {
 	}
 
 	// Add the utxo from current shard
-	txin := blockchain.TXInput{txInfo.id, txInfo.index, txInfo.address, txInfo.dataNodes[txInfo.shardID].Consensus.ShardID}
+	txin := blockchain.TXInput{txInfo.id, txInfo.index, txInfo.address, nodeShardID}
 	txInputs := []blockchain.TXInput{txin}
 
 	// Add the utxo from the other shard, if any
@@ -160,7 +161,7 @@ func generateCrossShardTx(txInfo TxInfo) {
 	}
 
 	// Spend the utxo from the current shard to a random address in [0 - N)
-	txout := blockchain.TXOutput{txInfo.value, strconv.Itoa(rand.Intn(setting.numOfAddress)), txInfo.dataNodes[txInfo.shardID].Consensus.ShardID}
+	txout := blockchain.TXOutput{txInfo.value, strconv.Itoa(rand.Intn(setting.numOfAddress)), nodeShardID}
 	txOutputs := []blockchain.TXOutput{txout}
 
 	// Spend the utxo from the other shard, if any, to a random address in [0 - N)
@@ -177,12 +178,13 @@ func generateCrossShardTx(txInfo TxInfo) {
 	txInfo.txCount++
 }
 
-func generateSingleShardTx(txInfo TxInfo) {
+func generateSingleShardTx(txInfo *TxInfo) {
+	nodeShardID := txInfo.dataNodes[txInfo.shardID].Consensus.ShardID
 	// Add the utxo as new tx input
-	txin := blockchain.TXInput{txInfo.id, txInfo.index, txInfo.address, txInfo.dataNodes[txInfo.shardID].Consensus.ShardID}
+	txin := blockchain.TXInput{txInfo.id, txInfo.index, txInfo.address, nodeShardID}
 
 	// Spend the utxo to a random address in [0 - N)
-	txout := blockchain.TXOutput{txInfo.value, strconv.Itoa(rand.Intn(setting.numOfAddress)), txInfo.dataNodes[txInfo.shardID].Consensus.ShardID}
+	txout := blockchain.TXOutput{txInfo.value, strconv.Itoa(rand.Intn(setting.numOfAddress)), nodeShardID}
 	tx := blockchain.Transaction{[32]byte{}, []blockchain.TXInput{txin}, []blockchain.TXOutput{txout}, nil}
 	tx.SetID()
 
