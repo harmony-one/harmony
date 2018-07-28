@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/proto"
+	"harmony-benchmark/proto/node"
 )
 
 // The specific types of message under CLIENT category
@@ -36,8 +37,8 @@ func ConstructProofOfAcceptOrRejectMessage(proofs []blockchain.CrossShardTxProof
 // [client] Constructs the unlock to commit or abort message that will be sent to leaders
 func ConstructUnlockToCommitOrAbortMessage(txsAndProofs []blockchain.Transaction) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
-	byteBuffer.WriteByte(byte(0)) // A temporary hack to represent node.TRANSACTION, to avoid cyclical import. TODO: Potentially solution is to refactor all the message enums into a proto package
-	byteBuffer.WriteByte(byte(2)) // A temporary hack to represent node.UNLOCK, to avoid cyclical import. TODO: Potentially solution is to refactor all the message enums into a proto package
+	byteBuffer.WriteByte(byte(node.TRANSACTION))
+	byteBuffer.WriteByte(byte(node.UNLOCK))
 	encoder := gob.NewEncoder(byteBuffer)
 	encoder.Encode(txsAndProofs)
 	return byteBuffer.Bytes()

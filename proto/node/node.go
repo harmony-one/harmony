@@ -11,7 +11,7 @@ import (
 type NodeMessageType byte
 
 const (
-	TRANSACTION NodeMessageType = iota // TODO: Don't move this until the hack in client/common.go is resolved
+	TRANSACTION NodeMessageType = iota
 	BLOCK
 	CONTROL
 
@@ -24,7 +24,7 @@ type TransactionMessageType int
 const (
 	SEND TransactionMessageType = iota
 	REQUEST
-	UNLOCK // The unlock to commit or abort message sent by the client to leaders.  TODO: Don't move this until the hack in client/message.go is resolved
+	UNLOCK
 )
 
 // The types of messages used for NODE/BLOCK

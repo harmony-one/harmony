@@ -3,6 +3,7 @@ package consensus
 import (
 	"bytes"
 	"errors"
+	"harmony-benchmark/proto"
 )
 
 /*
@@ -122,9 +123,9 @@ func GetConsensusMessagePayload(message []byte) ([]byte, error) {
 }
 
 // Concatenate msgType as one byte with payload, and return the whole byte array
-func (consensus Consensus) ConstructConsensusMessage(consensusMsgType MessageType, payload []byte) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{consensus.msgCategory})
-	byteBuffer.WriteByte(consensus.msgType)
+func ConstructConsensusMessage(consensusMsgType MessageType, payload []byte) []byte {
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.CONSENSUS)})
+	byteBuffer.WriteByte(byte(CONSENSUS))
 	byteBuffer.WriteByte(byte(consensusMsgType))
 	byteBuffer.Write(payload)
 	return byteBuffer.Bytes()
