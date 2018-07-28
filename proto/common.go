@@ -4,9 +4,7 @@ import (
 	"errors"
 )
 
-// TODO: Fix the comments below.
 /*
-
 The message structure of any message in Harmony network
 
 ----  content start -----
@@ -21,14 +19,7 @@ The message structure of any message in Harmony network
                       0x00: transaction ...
 n - 2 bytes       - actual message payload
 ----   content end  -----
-
 */
-
-// MESSAGE_CATEGORY_BYTES is the number of bytes message category takes
-const MESSAGE_CATEGORY_BYTES = 1
-
-// MESSAGE_TYPE_BYTES is the number of bytes message type takes
-const MESSAGE_TYPE_BYTES = 1
 
 // The message category enum
 type MessageCategory byte
@@ -39,6 +30,12 @@ const (
 	CLIENT
 	// TODO: add more types
 )
+
+// MESSAGE_CATEGORY_BYTES is the number of bytes message category takes
+const MESSAGE_CATEGORY_BYTES = 1
+
+// MESSAGE_TYPE_BYTES is the number of bytes message type takes
+const MESSAGE_TYPE_BYTES = 1
 
 // Get the message category from the p2p message content
 func GetMessageCategory(message []byte) (MessageCategory, error) {

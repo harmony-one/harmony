@@ -6,6 +6,7 @@ import (
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/log"
 	"harmony-benchmark/p2p"
+	proto_client "harmony-benchmark/proto/client"
 	"sync"
 )
 
@@ -21,9 +22,9 @@ type Client struct {
 
 // The message handler for CLIENT/TRANSACTION messages.
 func (client *Client) TransactionMessageHandler(msgPayload []byte) {
-	messageType := TransactionMessageType(msgPayload[0])
+	messageType := proto_client.TransactionMessageType(msgPayload[0])
 	switch messageType {
-	case PROOF_OF_LOCK:
+	case proto_client.PROOF_OF_LOCK:
 		// Decode the list of blockchain.CrossShardTxProof
 		txDecoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the PROOF_OF_LOCK messge type
 		proofs := new([]blockchain.CrossShardTxProof)
@@ -90,7 +91,7 @@ func (client *Client) handleProofOfLockMessage(proofs *[]blockchain.CrossShardTx
 }
 
 func (client *Client) broadcastCrossShardTxUnlockMessage(txsToSend *[]blockchain.Transaction) {
-	p2p.BroadcastMessage(*client.leaders, ConstructUnlockToCommitOrAbortMessage(*txsToSend))
+	p2p.BroadcastMessage(*client.leaders, proto_client.ConstructUnlockToCommitOrAbortMessage(*txsToSend))
 }
 
 // Create a new Client

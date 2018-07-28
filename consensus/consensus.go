@@ -6,7 +6,6 @@ import (
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/log"
 	"harmony-benchmark/p2p"
-	"harmony-benchmark/proto"
 	"regexp"
 	"strconv"
 	"sync"
@@ -52,10 +51,6 @@ type Consensus struct {
 	// The post-consensus processing func passed from Node object
 	// Called when consensus on a new block is done
 	OnConsensusDone func(*blockchain.Block)
-
-	//// Network related fields
-	msgCategory byte
-	msgType     byte
 
 	Log log.Logger
 }
@@ -124,10 +119,6 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 			consensus.ReadySignal <- 1
 		}()
 	}
-
-	// The message category and type used for any messages sent for consensus
-	consensus.msgCategory = byte(proto.CONSENSUS)
-	consensus.msgType = byte(CONSENSUS)
 
 	consensus.Log = log.New()
 	return &consensus

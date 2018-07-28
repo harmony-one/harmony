@@ -7,30 +7,31 @@ import (
 	"harmony-benchmark/attack"
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/p2p"
+	proto_consensus "harmony-benchmark/proto/consensus"
 	"regexp"
 	"strconv"
 )
 
 // Validator's consensus message dispatcher
 func (consensus *Consensus) ProcessMessageValidator(message []byte) {
-	msgType, err := GetConsensusMessageType(message)
+	msgType, err := proto_consensus.GetConsensusMessageType(message)
 	if err != nil {
 		consensus.Log.Error("Failed to get consensus message type", "err", err, "consensus", consensus)
 	}
 
-	payload, err := GetConsensusMessagePayload(message)
+	payload, err := proto_consensus.GetConsensusMessagePayload(message)
 	if err != nil {
 		consensus.Log.Error("Failed to get consensus message payload", "err", err, "consensus", consensus)
 	}
 
 	switch msgType {
-	case ANNOUNCE:
+	case proto_consensus.ANNOUNCE:
 		consensus.processAnnounceMessage(payload)
-	case COMMIT:
+	case proto_consensus.COMMIT:
 		consensus.Log.Error("Unexpected message type", "msgType", msgType, "consensus", consensus)
-	case CHALLENGE:
+	case proto_consensus.CHALLENGE:
 		consensus.processChallengeMessage(payload)
-	case RESPONSE:
+	case proto_consensus.RESPONSE:
 		consensus.Log.Error("Unexpected message type", "msgType", msgType, "consensus", consensus)
 	default:
 		consensus.Log.Error("Unexpected message type", "msgType", msgType, "consensus", consensus)
@@ -160,7 +161,7 @@ func (consensus *Consensus) constructCommitMessage() []byte {
 	signature := signMessage(buffer.Bytes())
 	buffer.Write(signature)
 
-	return consensus.ConstructConsensusMessage(COMMIT, buffer.Bytes())
+	return proto_consensus.ConstructConsensusMessage(proto_consensus.COMMIT, buffer.Bytes())
 }
 
 func getCommitMessage() []byte {
@@ -324,7 +325,7 @@ func (consensus *Consensus) constructResponseMessage() []byte {
 	signature := signMessage(buffer.Bytes())
 	buffer.Write(signature)
 
-	return consensus.ConstructConsensusMessage(RESPONSE, buffer.Bytes())
+	return proto_consensus.ConstructConsensusMessage(proto_consensus.RESPONSE, buffer.Bytes())
 }
 
 func getResponseMessage() []byte {
