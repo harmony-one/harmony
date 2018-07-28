@@ -26,8 +26,8 @@ func TestNewConsensus(test *testing.T) {
 		test.Error("Consensus msgType should be CONSENSUS")
 	}
 
-	if consensus.msgCategory != byte(common.COMMITTEE) {
-		test.Error("Consensus msgCategory should be COMMITTEE")
+	if consensus.msgCategory != byte(common.CONSENSUS) {
+		test.Error("Consensus msgCategory should be CONSENSUS")
 	}
 
 	if consensus.leader != leader {

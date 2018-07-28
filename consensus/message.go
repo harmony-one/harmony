@@ -69,11 +69,11 @@ RESPONSE:
 // the number of bytes consensus action type occupies
 const ACTION_TYPE_BYTES = 1
 
-// The specific types of message under COMMITTEE category
-type CommitteeMessageType byte
+// The specific types of message under CONSENSUS category
+type ConsensusMessageType byte
 
 const (
-	CONSENSUS CommitteeMessageType = iota
+	CONSENSUS ConsensusMessageType = iota
 	// TODO: add more types
 )
 

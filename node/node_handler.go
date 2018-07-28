@@ -50,8 +50,8 @@ func (node *Node) NodeHandler(conn net.Conn) {
 	}
 
 	switch msgCategory {
-	case common.COMMITTEE:
-		actionType := consensus.CommitteeMessageType(msgType)
+	case common.CONSENSUS:
+		actionType := consensus.ConsensusMessageType(msgType)
 		switch actionType {
 		case consensus.CONSENSUS:
 			if consensusObj.IsLeader {

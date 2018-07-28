@@ -126,7 +126,7 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 	}
 
 	// The message category and type used for any messages sent for consensus
-	consensus.msgCategory = byte(common.COMMITTEE)
+	consensus.msgCategory = byte(common.CONSENSUS)
 	consensus.msgType = byte(CONSENSUS)
 
 	consensus.Log = log.New()

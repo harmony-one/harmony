@@ -7,14 +7,14 @@ import (
 // TODO: Fix the comments below.
 /*
 
-Node will process the content of the p2p message
+The message structure of any message in Harmony network
 
 ----  content start -----
 1 byte            - message category
-                    0x00: COMMITTEE
+                    0x00: CONSENSUS
                     0x01: NODE...
 1 byte            - message type
-                    - for COMMITTEE category
+                    - for CONSENSUS category
                       0x00: consensus
                       0x01: sharding ...
 				    - for NODE category
@@ -28,7 +28,7 @@ n - 2 bytes       - actual message payload
 const NODE_TYPE_BYTES = 1
 
 // ACTION_TYPE_BYTES is # of bytes for message type which can be
-// - for COMMITTEE category
+// - for CONSENSUS category
 // 0x00: consensus
 // 0x01: sharding ...
 // - for NODE category
@@ -39,7 +39,7 @@ const ACTION_TYPE_BYTES = 1
 type MessageCategory byte
 
 const (
-	COMMITTEE MessageCategory = iota
+	CONSENSUS MessageCategory = iota
 	NODE
 	CLIENT
 	// TODO: add more types
