@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"harmony-benchmark/blockchain"
-	"harmony-benchmark/common"
+	"harmony-benchmark/proto"
 )
 
 // The specific types of message under CLIENT category
@@ -24,7 +24,7 @@ const (
 
 // [leader] Constructs the proof of accept or reject message that will be sent to client
 func ConstructProofOfAcceptOrRejectMessage(proofs []blockchain.CrossShardTxProof) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(common.CLIENT)})
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.CLIENT)})
 	byteBuffer.WriteByte(byte(TRANSACTION))
 	byteBuffer.WriteByte(byte(PROOF_OF_LOCK))
 	encoder := gob.NewEncoder(byteBuffer)
@@ -35,9 +35,9 @@ func ConstructProofOfAcceptOrRejectMessage(proofs []blockchain.CrossShardTxProof
 
 // [client] Constructs the unlock to commit or abort message that will be sent to leaders
 func ConstructUnlockToCommitOrAbortMessage(txsAndProofs []blockchain.Transaction) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(common.NODE)})
-	byteBuffer.WriteByte(byte(0)) // A temporary hack to represent node.TRANSACTION, to avoid cyclical import. TODO: Potentially solution is to refactor all the message enums into a common package
-	byteBuffer.WriteByte(byte(2)) // A temporary hack to represent node.UNLOCK, to avoid cyclical import. TODO: Potentially solution is to refactor all the message enums into a common package
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
+	byteBuffer.WriteByte(byte(0)) // A temporary hack to represent node.TRANSACTION, to avoid cyclical import. TODO: Potentially solution is to refactor all the message enums into a proto package
+	byteBuffer.WriteByte(byte(2)) // A temporary hack to represent node.UNLOCK, to avoid cyclical import. TODO: Potentially solution is to refactor all the message enums into a proto package
 	encoder := gob.NewEncoder(byteBuffer)
 	encoder.Encode(txsAndProofs)
 	return byteBuffer.Bytes()

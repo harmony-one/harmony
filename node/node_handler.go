@@ -5,9 +5,9 @@ import (
 	"encoding/gob"
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/client"
-	"harmony-benchmark/common"
 	"harmony-benchmark/consensus"
 	"harmony-benchmark/p2p"
+	"harmony-benchmark/proto"
 	"net"
 	"os"
 	"time"
@@ -31,26 +31,26 @@ func (node *Node) NodeHandler(conn net.Conn) {
 	}
 	consensusObj := node.Consensus
 
-	msgCategory, err := common.GetMessageCategory(content)
+	msgCategory, err := proto.GetMessageCategory(content)
 	if err != nil {
 		node.log.Error("Read node type failed", "err", err, "node", node)
 		return
 	}
 
-	msgType, err := common.GetMessageType(content)
+	msgType, err := proto.GetMessageType(content)
 	if err != nil {
 		node.log.Error("Read action type failed", "err", err, "node", node)
 		return
 	}
 
-	msgPayload, err := common.GetMessagePayload(content)
+	msgPayload, err := proto.GetMessagePayload(content)
 	if err != nil {
 		node.log.Error("Read message payload failed", "err", err, "node", node)
 		return
 	}
 
 	switch msgCategory {
-	case common.CONSENSUS:
+	case proto.CONSENSUS:
 		actionType := consensus.ConsensusMessageType(msgType)
 		switch actionType {
 		case consensus.CONSENSUS:
@@ -60,7 +60,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 				consensusObj.ProcessMessageValidator(msgPayload)
 			}
 		}
-	case common.NODE:
+	case proto.NODE:
 		actionType := NodeMessageType(msgType)
 		switch actionType {
 		case TRANSACTION:
@@ -111,7 +111,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 				os.Exit(0)
 			}
 		}
-	case common.CLIENT:
+	case proto.CLIENT:
 		actionType := client.ClientMessageType(msgType)
 		switch actionType {
 		case client.TRANSACTION:

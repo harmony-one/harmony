@@ -1,8 +1,8 @@
 package consensus
 
 import (
-	"harmony-benchmark/common"
 	"harmony-benchmark/p2p"
+	"harmony-benchmark/proto"
 	"testing"
 )
 
@@ -26,7 +26,7 @@ func TestNewConsensus(test *testing.T) {
 		test.Error("Consensus msgType should be CONSENSUS")
 	}
 
-	if consensus.msgCategory != byte(common.CONSENSUS) {
+	if consensus.msgCategory != byte(proto.CONSENSUS) {
 		test.Error("Consensus msgCategory should be CONSENSUS")
 	}
 

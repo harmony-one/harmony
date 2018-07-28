@@ -4,9 +4,9 @@ package consensus // consensus
 import (
 	"fmt"
 	"harmony-benchmark/blockchain"
-	"harmony-benchmark/common"
 	"harmony-benchmark/log"
 	"harmony-benchmark/p2p"
+	"harmony-benchmark/proto"
 	"regexp"
 	"strconv"
 	"sync"
@@ -126,7 +126,7 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 	}
 
 	// The message category and type used for any messages sent for consensus
-	consensus.msgCategory = byte(common.CONSENSUS)
+	consensus.msgCategory = byte(proto.CONSENSUS)
 	consensus.msgType = byte(CONSENSUS)
 
 	consensus.Log = log.New()
