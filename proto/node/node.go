@@ -14,7 +14,6 @@ const (
 	TRANSACTION NodeMessageType = iota
 	BLOCK
 	CONTROL
-
 	// TODO: add more types
 )
 

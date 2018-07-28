@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"encoding/gob"
 	"harmony-benchmark/blockchain"
-	"harmony-benchmark/client"
-	"harmony-benchmark/consensus"
 	"harmony-benchmark/p2p"
 	"harmony-benchmark/proto"
+	"harmony-benchmark/proto/client"
+	"harmony-benchmark/proto/consensus"
+	proto_node "harmony-benchmark/proto/node"
 	"net"
 	"os"
 	"time"
@@ -61,15 +62,15 @@ func (node *Node) NodeHandler(conn net.Conn) {
 			}
 		}
 	case proto.NODE:
-		actionType := NodeMessageType(msgType)
+		actionType := proto_node.NodeMessageType(msgType)
 		switch actionType {
-		case TRANSACTION:
+		case proto_node.TRANSACTION:
 			node.transactionMessageHandler(msgPayload)
-		case BLOCK:
+		case proto_node.BLOCK:
 			if node.Client != nil {
-				blockMsgType := BlockMessageType(msgPayload[0])
+				blockMsgType := proto_node.BlockMessageType(msgPayload[0])
 				switch blockMsgType {
-				case SYNC:
+				case proto_node.SYNC:
 					decoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the SYNC messge type
 					blocks := new([]*blockchain.Block)
 					decoder.Decode(blocks)
@@ -78,9 +79,9 @@ func (node *Node) NodeHandler(conn net.Conn) {
 					}
 				}
 			}
-		case CONTROL:
+		case proto_node.CONTROL:
 			controlType := msgPayload[0]
-			if ControlMessageType(controlType) == STOP {
+			if proto_node.ControlMessageType(controlType) == proto_node.STOP {
 				node.log.Debug("Stopping Node", "node", node, "numBlocks", len(node.blockchain.Blocks), "numTxsProcessed", node.countNumTransactionsInBlockchain())
 
 				sizeInBytes := node.UtxoPool.GetSizeInByteOfUtxoMap()
@@ -123,10 +124,10 @@ func (node *Node) NodeHandler(conn net.Conn) {
 }
 
 func (node *Node) transactionMessageHandler(msgPayload []byte) {
-	txMessageType := TransactionMessageType(msgPayload[0])
+	txMessageType := proto_node.TransactionMessageType(msgPayload[0])
 
 	switch txMessageType {
-	case SEND:
+	case proto_node.SEND:
 		txDecoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the SEND messge type
 
 		txList := new([]*blockchain.Transaction)
@@ -135,7 +136,7 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 			node.log.Error("Failed deserializing transaction list", "node", node)
 		}
 		node.addPendingTransactions(*txList)
-	case REQUEST:
+	case proto_node.REQUEST:
 		reader := bytes.NewBuffer(msgPayload[1:])
 		var txIds map[[32]byte]bool
 		buf := make([]byte, 32) // 32 byte hash Id
@@ -157,7 +158,7 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 			}
 		}
 		// TODO: return the transaction list to requester
-	case UNLOCK:
+	case proto_node.UNLOCK:
 		txAndProofDecoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the UNLOCK messge type
 
 		txAndProofs := new([]*blockchain.Transaction)
@@ -242,7 +243,7 @@ func (node *Node) SendBackProofOfAcceptOrReject() {
 func (node *Node) BroadcastNewBlock(newBlock *blockchain.Block) {
 	if node.ClientPeer != nil {
 		node.log.Debug("SENDING NEW BLOCK TO CLIENT")
-		p2p.SendMessage(*node.ClientPeer, ConstructBlocksSyncMessage([]blockchain.Block{*newBlock}))
+		p2p.SendMessage(*node.ClientPeer, proto_node.ConstructBlocksSyncMessage([]blockchain.Block{*newBlock}))
 	}
 }
 

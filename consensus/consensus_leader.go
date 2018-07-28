@@ -7,6 +7,7 @@ import (
 	"encoding/gob"
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/p2p"
+	proto_consensus "harmony-benchmark/proto/consensus"
 	"strings"
 	"time"
 )
@@ -33,26 +34,26 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) 
 
 // Consensus message dispatcher for the leader
 func (consensus *Consensus) ProcessMessageLeader(message []byte) {
-	msgType, err := GetConsensusMessageType(message)
+	msgType, err := proto_consensus.GetConsensusMessageType(message)
 	if err != nil {
 		consensus.Log.Error("Failed to get consensus message type.", "err", err, "consensus", consensus)
 	}
 
-	payload, err := GetConsensusMessagePayload(message)
+	payload, err := proto_consensus.GetConsensusMessagePayload(message)
 	if err != nil {
 		consensus.Log.Error("Failed to get consensus message payload.", "err", err, "consensus", consensus)
 	}
 
 	switch msgType {
-	case ANNOUNCE:
+	case proto_consensus.ANNOUNCE:
 		consensus.Log.Error("Unexpected message type", "msgType", msgType, "consensus", consensus)
-	case COMMIT:
+	case proto_consensus.COMMIT:
 		consensus.processCommitMessage(payload)
-	case CHALLENGE:
+	case proto_consensus.CHALLENGE:
 		consensus.Log.Error("Unexpected message type", "msgType", msgType, "consensus", consensus)
-	case RESPONSE:
+	case proto_consensus.RESPONSE:
 		consensus.processResponseMessage(payload)
-	case START_CONSENSUS:
+	case proto_consensus.START_CONSENSUS:
 		consensus.processStartConsensusMessage(payload)
 	default:
 		consensus.Log.Error("Unexpected message type", "msgType", msgType, "consensus", consensus)
@@ -111,7 +112,7 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 	signature := signMessage(buffer.Bytes())
 	buffer.Write(signature)
 
-	return consensus.ConstructConsensusMessage(ANNOUNCE, buffer.Bytes())
+	return proto_consensus.ConstructConsensusMessage(proto_consensus.ANNOUNCE, buffer.Bytes())
 }
 
 func signMessage(message []byte) []byte {
@@ -216,7 +217,7 @@ func (consensus *Consensus) constructChallengeMessage() []byte {
 	signature := signMessage(buffer.Bytes())
 	buffer.Write(signature)
 
-	return consensus.ConstructConsensusMessage(CHALLENGE, buffer.Bytes())
+	return proto_consensus.ConstructConsensusMessage(proto_consensus.CHALLENGE, buffer.Bytes())
 }
 
 func getAggregatedCommit(commits map[string]string) []byte {
