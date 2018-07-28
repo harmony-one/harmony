@@ -4,7 +4,6 @@ import (
 	"errors"
 )
 
-// TODO: Fix the comments below.
 /*
 
 The message structure of any message in Harmony network
