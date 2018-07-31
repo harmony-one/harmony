@@ -156,6 +156,38 @@ func countNumOfUtxos(utxoPool *blockchain.UTXOPool) int {
 	return countAll
 }
 
+func initClient(clientNode *node.Node, clientPort string, leaders *[]p2p.Peer, nodes *[]*node.Node) {
+	if clientPort == "" {
+		return
+	}
+
+	clientNode.Client = client.NewClient(leaders)
+
+	// This func is used to update the client's utxopool when new blocks are received from the leaders
+	updateBlocksFunc := func(blocks []*blockchain.Block) {
+		log.Debug("Received new block from leader", "len", len(blocks))
+		for _, block := range blocks {
+			for _, node := range *nodes {
+				if node.Consensus.ShardID == block.ShardId {
+					log.Debug("Adding block from leader", "shardId", block.ShardId)
+					// Add it to blockchain
+					utxoPoolMutex.Lock()
+					node.AddNewBlock(block)
+					utxoPoolMutex.Unlock()
+				} else {
+					continue
+				}
+			}
+		}
+	}
+	clientNode.Client.UpdateBlocks = updateBlocksFunc
+
+	// Start the client server to listen to leader's message
+	go func() {
+		clientNode.StartServer(clientPort)
+	}()
+}
+
 func main() {
 	configFile := flag.String("config_file", "local_config.txt", "file containing all ip addresses and config")
 	maxNumTxsPerBatch := flag.Int("max_num_txs_per_batch", 100000, "number of transactions to send per message")
@@ -164,11 +196,11 @@ func main() {
 
 	// Read the configs
 	config, _ := configr.ReadConfigFile(*configFile)
-	leaders, shardIds := configr.GetLeadersAndShardIds(&config)
+	leaders, shardIDs := configr.GetLeadersAndShardIds(&config)
 
 	setting.numOfAddress = 10000
 	// Do cross shard tx if there are more than one shard
-	setting.crossShard = len(shardIds) > 1
+	setting.crossShard = len(shardIDs) > 1
 	setting.maxNumTxsPerBatch = *maxNumTxsPerBatch
 
 	// TODO(Richard): refactor this chuck to a single method
@@ -185,11 +217,8 @@ func main() {
 
 	// Nodes containing utxopools to mirror the shards' data in the network
 	nodes := []*node.Node{}
-	for _, shardId := range shardIds {
-		node := node.New(&consensus.Consensus{ShardID: shardId})
-		// // Assign many fake addresses so we have enough address to play with at first
-		// node.AddTestingAddresses(setting.numOfAddress)
-		nodes = append(nodes, node)
+	for _, shardID := range shardIDs {
+		nodes = append(nodes, node.New(&consensus.Consensus{ShardID: shardID}))
 	}
 
 	// Client/txgenerator server node setup
@@ -197,34 +226,7 @@ func main() {
 	consensusObj := consensus.NewConsensus("0", clientPort, "0", nil, p2p.Peer{})
 	clientNode := node.New(consensusObj)
 
-	if clientPort != "" {
-		clientNode.Client = client.NewClient(&leaders)
-
-		// This func is used to update the client's utxopool when new blocks are received from the leaders
-		updateBlocksFunc := func(blocks []*blockchain.Block) {
-			log.Debug("Received new block from leader", "len", len(blocks))
-			for _, block := range blocks {
-				for _, node := range nodes {
-					if node.Consensus.ShardID == block.ShardId {
-						log.Debug("Adding block from leader", "shardId", block.ShardId)
-						// Add it to blockchain
-						utxoPoolMutex.Lock()
-						node.AddNewBlock(block)
-						utxoPoolMutex.Unlock()
-					} else {
-						continue
-					}
-				}
-			}
-		}
-		clientNode.Client.UpdateBlocks = updateBlocksFunc
-
-		// Start the client server to listen to leader's message
-		go func() {
-			clientNode.StartServer(clientPort)
-		}()
-
-	}
+	initClient(clientNode, clientPort, &leaders, &nodes)
 
 	// Transaction generation process
 	time.Sleep(10 * time.Second) // wait for nodes to be ready
