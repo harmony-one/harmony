@@ -21,7 +21,7 @@ git clone git@github.com:simple-rules/harmony-benchmark.git
 
 cd harmony-benchmark
 
-go get github.com/go-stack/stack
+go get ./...
 ```
 ## Usage
 ```
