@@ -36,3 +36,7 @@ func (iter *BTCTXIterator) IterateBTCTX() *btc.Block {
 	blk.BuildTxList()
 	return blk
 }
+
+func (iter *BTCTXIterator) GetIndex() int {
+	return iter.index
+}
