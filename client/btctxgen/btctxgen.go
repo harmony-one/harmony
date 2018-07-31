@@ -6,14 +6,13 @@ import (
 	"fmt"
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/client"
+	"harmony-benchmark/client/btctxiter"
 	"harmony-benchmark/configr"
 	"harmony-benchmark/consensus"
 	"harmony-benchmark/log"
 	"harmony-benchmark/node"
 	"harmony-benchmark/p2p"
-	proto_node "harmony-benchmark/proto/node"
 	"math/rand"
-	"strconv"
 	"sync"
 	"time"
 )
@@ -27,6 +26,7 @@ type txGenSettings struct {
 var (
 	utxoPoolMutex sync.Mutex
 	setting       txGenSettings
+	btcTXIter     btctxiter.BTCTXIterator
 )
 
 type TxInfo struct {
@@ -105,11 +105,7 @@ UTXOLOOP:
 				if randNum >= 30 {
 					continue
 				}
-				if setting.crossShard && randNum < 10 { // 1/3 cross shard transactions: add another txinput from another shard
-					generateCrossShardTx(&txInfo)
-				} else {
-					generateSingleShardTx(&txInfo)
-				}
+				generateSingleShardTx(&txInfo)
 				if txInfo.txCount >= setting.maxNumTxsPerBatch {
 					break UTXOLOOP
 				}
@@ -122,75 +118,19 @@ UTXOLOOP:
 	return txInfo.txs, txInfo.crossTxs
 }
 
-func generateCrossShardTx(txInfo *TxInfo) {
-	nodeShardID := txInfo.dataNodes[txInfo.shardID].Consensus.ShardID
-	// shard with neighboring Id
-	crossShardId := (int(nodeShardID) + 1) % len(txInfo.dataNodes)
-
-	crossShardNode := txInfo.dataNodes[crossShardId]
-	crossShardUtxosMap := crossShardNode.UtxoPool.UtxoMap[txInfo.address]
-
-	// Get the cross shard utxo from another shard
-	var crossTxin *blockchain.TXInput
-	crossUtxoValue := 0
-	// Loop over utxos for the same address from the other shard and use the first utxo as the second cross tx input
-	for crossTxIdStr, crossShardUtxos := range crossShardUtxosMap {
-		// Parse TxId
-		id, err := hex.DecodeString(crossTxIdStr)
-		if err != nil {
-			continue
-		}
-		crossTxId := [32]byte{}
-		copy(crossTxId[:], id[:])
-
-		for crossShardIndex, crossShardValue := range crossShardUtxos {
-			crossUtxoValue = crossShardValue
-			crossTxin = &blockchain.TXInput{crossTxId, crossShardIndex, txInfo.address, uint32(crossShardId)}
-			break
-		}
-		if crossTxin != nil {
-			break
-		}
-	}
-
-	// Add the utxo from current shard
-	txin := blockchain.TXInput{txInfo.id, txInfo.index, txInfo.address, nodeShardID}
-	txInputs := []blockchain.TXInput{txin}
-
-	// Add the utxo from the other shard, if any
-	if crossTxin != nil {
-		txInputs = append(txInputs, *crossTxin)
-	}
-
-	// Spend the utxo from the current shard to a random address in [0 - N)
-	txout := blockchain.TXOutput{txInfo.value, strconv.Itoa(rand.Intn(setting.numOfAddress)), nodeShardID}
-	txOutputs := []blockchain.TXOutput{txout}
-
-	// Spend the utxo from the other shard, if any, to a random address in [0 - N)
-	if crossTxin != nil {
-		crossTxout := blockchain.TXOutput{crossUtxoValue, strconv.Itoa(rand.Intn(setting.numOfAddress)), uint32(crossShardId)}
-		txOutputs = append(txOutputs, crossTxout)
-	}
-
-	// Construct the new transaction
-	tx := blockchain.Transaction{[32]byte{}, txInputs, txOutputs, nil}
-	tx.SetID()
-
-	txInfo.crossTxs = append(txInfo.crossTxs, &tx)
-	txInfo.txCount++
-}
-
 func generateSingleShardTx(txInfo *TxInfo) {
-	nodeShardID := txInfo.dataNodes[txInfo.shardID].Consensus.ShardID
+	// nodeShardID := txInfo.dataNodes[txInfo.shardID].Consensus.ShardID
+	// blk := btcTXIter.IterateBTCTX()
+
 	// Add the utxo as new tx input
-	txin := blockchain.TXInput{txInfo.id, txInfo.index, txInfo.address, nodeShardID}
+	// txin := blockchain.TXInput{txInfo.id, txInfo.index, txInfo.address, nodeShardID}
 
-	// Spend the utxo to a random address in [0 - N)
-	txout := blockchain.TXOutput{txInfo.value, strconv.Itoa(rand.Intn(setting.numOfAddress)), nodeShardID}
-	tx := blockchain.Transaction{[32]byte{}, []blockchain.TXInput{txin}, []blockchain.TXOutput{txout}, nil}
-	tx.SetID()
+	// // Spend the utxo to a random address in [0 - N)
+	// txout := blockchain.TXOutput{txInfo.value, strconv.Itoa(rand.Intn(setting.numOfAddress)), nodeShardID}
+	// tx := blockchain.Transaction{[32]byte{}, []blockchain.TXInput{txin}, []blockchain.TXOutput{txout}, nil}
+	// tx.SetID()
 
-	txInfo.txs = append(txInfo.txs, &tx)
+	// txInfo.txs = append(txInfo.txs, &tx)
 	txInfo.txCount++
 }
 
@@ -241,12 +181,14 @@ func main() {
 	)
 	log.Root().SetHandler(h)
 
+	btcTXIter.Init()
+
 	// Nodes containing utxopools to mirror the shards' data in the network
 	nodes := []*node.Node{}
 	for _, shardId := range shardIds {
 		node := node.New(&consensus.Consensus{ShardID: shardId})
-		// Assign many fake addresses so we have enough address to play with at first
-		node.AddTestingAddresses(setting.numOfAddress)
+		// // Assign many fake addresses so we have enough address to play with at first
+		// node.AddTestingAddresses(setting.numOfAddress)
 		nodes = append(nodes, node)
 	}
 
@@ -303,14 +245,14 @@ func main() {
 			allCrossTxs = append(allCrossTxs, crossTxs...)
 
 			log.Debug("[Generator] Sending single-shard txs ...", "leader", leader, "numTxs", len(txs), "numCrossTxs", len(crossTxs))
-			msg := proto_node.ConstructTransactionListMessage(txs)
+			msg := node.ConstructTransactionListMessage(txs)
 			p2p.SendMessage(leader, msg)
 			// Note cross shard txs are later sent in batch
 		}
 
 		if len(allCrossTxs) > 0 {
 			log.Debug("[Generator] Broadcasting cross-shard txs ...", "allCrossTxs", len(allCrossTxs))
-			msg := proto_node.ConstructTransactionListMessage(allCrossTxs)
+			msg := node.ConstructTransactionListMessage(allCrossTxs)
 			p2p.BroadcastMessage(leaders, msg)
 
 			// Put cross shard tx into a pending list waiting for proofs from leaders
@@ -327,7 +269,7 @@ func main() {
 	}
 
 	// Send a stop message to stop the nodes at the end
-	msg := proto_node.ConstructStopMessage()
+	msg := node.ConstructStopMessage()
 	peers := append(configr.GetValidators(*configFile), leaders...)
 	p2p.BroadcastMessage(peers, msg)
 }
