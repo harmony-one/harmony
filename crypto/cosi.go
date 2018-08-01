@@ -74,6 +74,16 @@ func AggregateCommitments(suite Suite, commitments []kyber.Point, masks [][]byte
 	return aggCom, aggMask, nil
 }
 
+// AggregateCommitmentsOnly returns the sum of the given commitments.
+func AggregateCommitmentsOnly(suite Suite, commitments []kyber.Point) kyber.Point {
+	aggCom := suite.Point().Null()
+
+	for i := range commitments {
+		aggCom = suite.Point().Add(aggCom, commitments[i])
+	}
+	return aggCom
+}
+
 // Challenge creates the collective challenge from the given aggregate
 // commitment V, aggregate public key A, and message M, i.e., it returns
 // c = H(V || A || M).
