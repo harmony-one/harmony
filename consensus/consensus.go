@@ -3,6 +3,7 @@ package consensus // consensus
 
 import (
 	"fmt"
+	"github.com/dedis/kyber"
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/log"
 	"harmony-benchmark/p2p"
@@ -43,6 +44,8 @@ type Consensus struct {
 	// Validator specific fields
 	// Blocks received but not done with consensus yet
 	blocksReceived map[uint32]*BlockConsensusStatus
+	// Commitment secret
+	secret kyber.Scalar
 
 	// Signal channel for starting a new consensus process
 	ReadySignal chan int

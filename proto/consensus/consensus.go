@@ -34,7 +34,7 @@ COMMIT:
 4 byte            - consensus id
 32 byte           - block hash
 2 byte            - validator id
-33 byte           - commit message
+32 byte           - commit message (Note it's different than Zilliqa's ECPoint which takes 33 bytes: https://crypto.stackexchange.com/questions/51703/how-to-convert-from-curve25519-33-byte-to-32-byte-representation)
 64 byte           - signature
 ----  message end  -----
 

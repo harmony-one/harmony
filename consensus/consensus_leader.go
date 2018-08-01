@@ -137,9 +137,9 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 	validatorId := string(payload[offset : offset+2])
 	offset += 2
 
-	// 33 byte commit
-	commit := payload[offset : offset+33]
-	offset += 33
+	// 32 byte commit
+	commit := payload[offset : offset+32]
+	offset += 32
 
 	// 64 byte of signature on previous data
 	signature := payload[offset : offset+64]
