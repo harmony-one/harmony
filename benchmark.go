@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/shirou/gopsutil/process"
+	"harmony-benchmark/crypto"
 )
 
 const (
@@ -37,6 +38,8 @@ func getLeader(myShardId string, config *[][]string) p2p.Peer {
 		if status == "leader" && myShardId == shardId {
 			leaderPeer.Ip = ip
 			leaderPeer.Port = port
+			priKey := crypto.Hash(ip + ":" + port) // use ip:port as unique private key for now. TODO: use real private key
+			leaderPeer.PubKey = crypto.GetPublicKeyFromPrivateKey(crypto.Curve, priKey)
 		}
 	}
 	return leaderPeer
@@ -49,7 +52,8 @@ func getPeers(myIp, myPort, myShardId string, config *[][]string) []p2p.Peer {
 		if status != "validator" || ip == myIp && port == myPort || myShardId != shardId {
 			continue
 		}
-		peer := p2p.Peer{Port: port, Ip: ip}
+		priKey := crypto.Hash(ip + ":" + port) // use ip:port as unique private key for now. TODO: use real private key
+		peer := p2p.Peer{Port: port, Ip: ip, PubKey: crypto.GetPublicKeyFromPrivateKey(crypto.Curve, priKey)}
 		peerList = append(peerList, peer)
 	}
 	return peerList

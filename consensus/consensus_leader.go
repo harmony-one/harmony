@@ -81,6 +81,7 @@ func (consensus *Consensus) startConsensus(newBlock *blockchain.Block) {
 	p2p.BroadcastMessage(consensus.validators, msgToSend)
 	// Set state to ANNOUNCE_DONE
 	consensus.state = ANNOUNCE_DONE
+	// Generate leader's own commitment
 }
 
 // Constructs the announce message
@@ -168,7 +169,6 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 	shouldProcess := !ok
 	if shouldProcess {
 		consensus.commits[validatorId] = validatorId
-		//consensus.Log.Debug("Number of commits received", "consensusId", consensus.consensusId, "count", len(consensus.commits))
 	}
 
 	if !shouldProcess {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/dedis/kyber"
 	"harmony-benchmark/blockchain"
+	"harmony-benchmark/crypto"
 	"harmony-benchmark/log"
 	"harmony-benchmark/p2p"
 	"regexp"
@@ -15,8 +16,10 @@ import (
 // Consensus data containing all info related to one round of consensus process
 type Consensus struct {
 	state ConsensusState
-	// Signatures collected from validators
+	// Commits collected from validators.
 	commits map[string]string
+	// Commits collected from validators.
+	commitments *crypto.Mask
 	// Signatures collected from validators
 	responses map[string]string
 	// List of validators
@@ -24,7 +27,7 @@ type Consensus struct {
 	// Leader
 	leader p2p.Peer
 	// private key of current node
-	priKey string
+	priKey [32]byte
 	// Whether I am leader. False means I am validator
 	IsLeader bool
 	// Leader or validator Id - 2 byte
@@ -74,11 +77,8 @@ type BlockConsensusStatus struct {
 // FYI, see https://golang.org/doc/effective_go.html?#package-names
 func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Consensus {
 	consensus := Consensus{}
-	Peers := peers
-	leaderPeer := leader
-	selfPeer := p2p.Peer{Port: port, Ip: ip}
 
-	if leaderPeer == selfPeer {
+	if leader.Port == port && leader.Ip == ip {
 		consensus.IsLeader = true
 	} else {
 		consensus.IsLeader = false
@@ -87,12 +87,24 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 	consensus.commits = make(map[string]string)
 	consensus.responses = make(map[string]string)
 
-	consensus.leader = leaderPeer
-	consensus.validators = Peers
+	consensus.leader = leader
+	consensus.validators = peers
 
-	consensus.priKey = ip + ":" + port // use ip:port as unique key for now
+	// Initialize cosign bitmap
+	allPublics := make([]kyber.Point, 0)
+	for _, validatorPeer := range consensus.validators {
+		allPublics = append(allPublics, validatorPeer.PubKey)
+	}
+	allPublics = append(allPublics, leader.PubKey)
+	mask, err := crypto.NewMask(crypto.Curve, allPublics, consensus.leader.PubKey)
+	if err != nil {
+		panic("Failed to create commitment mask")
+	}
+	consensus.commitments = mask
 
-	consensus.consensusId = 0 // or view Id in the original pbft paper
+	// Set private key for myself so that I can sign messages.
+	consensus.priKey = crypto.Hash(ip + ":" + port) // use ip:port as unique private key for now. TODO: use real private key
+	consensus.consensusId = 0                       // or view Id in the original pbft paper
 
 	myShardID, err := strconv.Atoi(ShardID)
 	if err != nil {
@@ -109,7 +121,7 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 	if err != nil {
 		consensus.Log.Crit("Regex Compilation Failed", "err", err, "consensus", consensus)
 	}
-	socketId := reg.ReplaceAllString(consensus.priKey, "")
+	socketId := reg.ReplaceAllString(ip+port, "") // A integer Id formed by unique IP/PORT pair
 	value, err := strconv.Atoi(socketId)
 	consensus.nodeId = uint16(value)
 
@@ -143,5 +155,5 @@ func (consensus *Consensus) String() string {
 		duty = "VLD" // validator
 	}
 	return fmt.Sprintf("[duty:%s, priKey:%s, ShardID:%v, nodeId:%v, state:%s]",
-		duty, consensus.priKey, consensus.ShardID, consensus.nodeId, consensus.state)
+		duty, fmt.Sprintf("%x", consensus.priKey), consensus.ShardID, consensus.nodeId, consensus.state)
 }
