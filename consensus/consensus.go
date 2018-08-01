@@ -16,18 +16,20 @@ import (
 // Consensus data containing all info related to one round of consensus process
 type Consensus struct {
 	state ConsensusState
+	// Commits collected from validators. A map from node Id to its commitment
+	commitments map[uint16]kyber.Point
 	// Commits collected from validators.
-	commits map[string]string
-	// Commits collected from validators.
-	commitments *crypto.Mask
+	bitmap *crypto.Mask
 	// Signatures collected from validators
 	responses map[string]string
 	// List of validators
 	validators []p2p.Peer
 	// Leader
 	leader p2p.Peer
-	// private key of current node
-	priKey [32]byte
+	// private/public keys of current node
+	priKey kyber.Scalar
+	pubKey kyber.Point
+
 	// Whether I am leader. False means I am validator
 	IsLeader bool
 	// Leader or validator Id - 2 byte
@@ -84,7 +86,7 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 		consensus.IsLeader = false
 	}
 
-	consensus.commits = make(map[string]string)
+	consensus.commitments = make(map[uint16]kyber.Point)
 	consensus.responses = make(map[string]string)
 
 	consensus.leader = leader
@@ -100,11 +102,15 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 	if err != nil {
 		panic("Failed to create commitment mask")
 	}
-	consensus.commitments = mask
+	consensus.bitmap = mask
 
 	// Set private key for myself so that I can sign messages.
-	consensus.priKey = crypto.Hash(ip + ":" + port) // use ip:port as unique private key for now. TODO: use real private key
-	consensus.consensusId = 0                       // or view Id in the original pbft paper
+	scalar := crypto.Curve.Scalar()
+	priKeyInBytes := crypto.Hash(ip + ":" + port)
+	scalar.UnmarshalBinary(priKeyInBytes[:]) // use ip:port as unique private key for now. TODO: use real private key
+	consensus.priKey = scalar
+	consensus.pubKey = crypto.GetPublicKeyFromScalar(crypto.Curve, consensus.priKey)
+	consensus.consensusId = 0 // or view Id in the original pbft paper
 
 	myShardID, err := strconv.Atoi(ShardID)
 	if err != nil {
@@ -142,7 +148,7 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 // Reset the state of the consensus
 func (consensus *Consensus) ResetState() {
 	consensus.state = FINISHED
-	consensus.commits = make(map[string]string)
+	consensus.commitments = make(map[uint16]kyber.Point)
 	consensus.responses = make(map[string]string)
 }
 

@@ -5,10 +5,11 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/gob"
+	"github.com/dedis/kyber"
 	"harmony-benchmark/blockchain"
+	"harmony-benchmark/crypto"
 	"harmony-benchmark/p2p"
 	proto_consensus "harmony-benchmark/proto/consensus"
-	"strings"
 	"time"
 )
 
@@ -82,6 +83,10 @@ func (consensus *Consensus) startConsensus(newBlock *blockchain.Block) {
 	// Set state to ANNOUNCE_DONE
 	consensus.state = ANNOUNCE_DONE
 	// Generate leader's own commitment
+	secret, commitment := crypto.Commit(crypto.Curve)
+	consensus.secret = secret
+	consensus.commitments[consensus.nodeId] = commitment
+	consensus.bitmap.SetKey(consensus.pubKey, true)
 }
 
 // Constructs the announce message
@@ -135,11 +140,11 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 	offset += 32
 
 	// 2 byte validator id
-	validatorId := string(payload[offset : offset+2])
+	validatorId := binary.BigEndian.Uint16(payload[offset : offset+2])
 	offset += 2
 
 	// 32 byte commit
-	commit := payload[offset : offset+32]
+	commitment := payload[offset : offset+32]
 	offset += 32
 
 	// 64 byte of signature on previous data
@@ -148,7 +153,6 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 	//#### END: Read payload data
 
 	// TODO: make use of the data. This is just to avoid the unused variable warning
-	_ = commit
 	_ = signature
 
 	// check consensus Id
@@ -165,18 +169,20 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 	}
 
 	// proceed only when the message is not received before
-	_, ok := consensus.commits[validatorId]
+	_, ok := consensus.commitments[validatorId]
 	shouldProcess := !ok
 	if shouldProcess {
-		consensus.commits[validatorId] = validatorId
+		point := crypto.Curve.Point()
+		point.UnmarshalBinary(commitment)
+		consensus.commitments[validatorId] = point
 	}
 
 	if !shouldProcess {
 		return
 	}
 
-	if len(consensus.commits) >= (2*len(consensus.validators))/3+1 && consensus.state < CHALLENGE_DONE {
-		consensus.Log.Debug("Enough commits received with signatures", "numOfSignatures", len(consensus.commits))
+	if len(consensus.commitments) >= (2*len(consensus.validators))/3+1 && consensus.state < CHALLENGE_DONE {
+		consensus.Log.Debug("Enough commitments received with signatures", "numOfSignatures", len(consensus.commitments))
 
 		// Broadcast challenge
 		msgToSend := consensus.constructChallengeMessage()
@@ -205,10 +211,10 @@ func (consensus *Consensus) constructChallengeMessage() []byte {
 	buffer.Write(twoBytes)
 
 	// 33 byte aggregated commit
-	buffer.Write(getAggregatedCommit(consensus.commits))
+	buffer.Write(getAggregatedCommit(consensus.commitments))
 
 	// 33 byte aggregated key
-	buffer.Write(getAggregatedKey(consensus.commits))
+	buffer.Write(getAggregatedKey(consensus.bitmap))
 
 	// 32 byte challenge
 	buffer.Write(getChallenge())
@@ -220,26 +226,16 @@ func (consensus *Consensus) constructChallengeMessage() []byte {
 	return proto_consensus.ConstructConsensusMessage(proto_consensus.CHALLENGE, buffer.Bytes())
 }
 
-func getAggregatedCommit(commits map[string]string) []byte {
+func getAggregatedCommit(commits map[uint16]kyber.Point) []byte {
 	// TODO: implement actual commit aggregation
-	var commitArray []string
-	for _, val := range commits {
-		commitArray = append(commitArray, val)
-	}
-	var commit [32]byte
-	commit = sha256.Sum256([]byte(strings.Join(commitArray, "")))
-	return append(commit[:], byte(0))
+	commitment := sha256.Sum256([]byte("ABC"))
+	return append(commitment[:], byte(0))
 }
 
-func getAggregatedKey(commits map[string]string) []byte {
+func getAggregatedKey(bitmap *crypto.Mask) []byte {
 	// TODO: implement actual key aggregation
-	var commitArray []string
-	for key := range commits {
-		commitArray = append(commitArray, key)
-	}
-	var commit [32]byte
-	commit = sha256.Sum256([]byte(strings.Join(commitArray, "")))
-	return append(commit[:], byte(0))
+	commitment := sha256.Sum256([]byte("ABC"))
+	return append(commitment[:], byte(0))
 }
 
 func getChallenge() []byte {

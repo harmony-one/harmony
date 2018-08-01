@@ -253,7 +253,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 		// If I received previous block (which haven't been processed. I will roll up to current block if everything checks.
 	}
 
-	// TODO: verify aggregated commits with real schnor cosign verification
+	// TODO: verify aggregated commitments with real schnor cosign verification
 
 	// TODO: return the signature(response) to leader
 	// For now, simply return the private key of this node.
