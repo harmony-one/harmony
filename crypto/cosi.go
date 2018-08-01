@@ -326,6 +326,16 @@ func (m *Mask) KeyEnabled(public kyber.Point) (bool, error) {
 	return false, errors.New("key not found")
 }
 
+// SetKey set the bit in the mask for the given cosigner
+func (m *Mask) SetKey(public kyber.Point, enable bool) error {
+	for i, key := range m.publics {
+		if key.Equal(public) {
+			return m.SetBit(i, enable)
+		}
+	}
+	return errors.New("key not found")
+}
+
 // CountEnabled returns the number of enabled nodes in the CoSi participation
 // mask.
 func (m *Mask) CountEnabled() int {
