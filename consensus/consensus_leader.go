@@ -108,11 +108,6 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 	// n byte of block header
 	buffer.Write(consensus.blockHeader)
 
-	// 4 byte of payload size
-	sizeOfPayload := uint32(len(consensus.blockHeader))
-	binary.BigEndian.PutUint32(fourBytes, sizeOfPayload)
-	buffer.Write(fourBytes)
-
 	// 64 byte of signature on previous data
 	signature := consensus.signMessage(buffer.Bytes())
 	buffer.Write(signature)

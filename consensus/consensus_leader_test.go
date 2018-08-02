@@ -14,7 +14,7 @@ func TestConstructAnnounceMessage(test *testing.T) {
 	header := consensus.blockHeader
 	msg := consensus.constructAnnounceMessage()
 
-	if len(msg) != 1+1+1+4+32+2+4+64+len(header) {
+	if len(msg) != 1+1+1+4+32+2+64+len(header) {
 		test.Errorf("Annouce message is not constructed in the correct size: %d", len(msg))
 	}
 }

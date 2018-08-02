@@ -56,14 +56,10 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	leaderId := binary.BigEndian.Uint16(payload[offset : offset+2])
 	offset += 2
 
-	// n byte of block header
-	n := len(payload) - offset - 4 - 64 // the numbers means 4 byte payload and 64 signature
+	// n byte of message to cosign
+	n := len(payload) - offset - 64 // the number means 64 signature
 	blockHeader := payload[offset : offset+n]
 	offset += n
-
-	// 4 byte of payload size (block header)
-	blockHeaderSize := payload[offset : offset+4]
-	offset += 4
 
 	// 64 byte of signature on previous data
 	signature := payload[offset : offset+64]
@@ -71,11 +67,6 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	//#### END: Read payload data
 
 	// TODO: make use of the data. This is just to avoid the unused variable warning
-	_ = consensusId
-
-	_ = leaderId
-	_ = blockHeader
-	_ = blockHeaderSize
 	_ = signature
 
 	copy(consensus.blockHash[:], blockHash[:])
