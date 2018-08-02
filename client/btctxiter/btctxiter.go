@@ -8,7 +8,10 @@ import (
 )
 
 type BTCTXIterator struct {
-	index         int
+	blockIndex    int
+	block         *btc.Block
+	txIndex       int
+	tx            *btc.Tx
 	blockDatabase *blockdb.BlockDB
 }
 
@@ -18,25 +21,63 @@ func (iter *BTCTXIterator) Init() {
 
 	// Specify blocks directory
 	iter.blockDatabase = blockdb.NewBlockDB("/Users/ricl/Library/Application Support/Bitcoin/blocks", Magic)
-	iter.index = -1
+	iter.blockIndex = -1
+	iter.block = nil
+	iter.nextBlock()
 }
 
-func (iter *BTCTXIterator) IterateBTCTX() *btc.Block {
-	iter.index++
+// Move to the next transaction
+func (iter *BTCTXIterator) NextTx() *btc.Tx {
+	iter.txIndex++
+	if iter.txIndex >= iter.block.TxCount {
+		iter.nextBlock()
+		iter.txIndex++
+	}
+	iter.tx = iter.block.Txs[iter.txIndex]
+	return iter.tx
+}
+
+// Gets the index/height of the current block
+func (iter *BTCTXIterator) GetBlockIndex() int {
+	return iter.blockIndex
+}
+
+// Gets the current block
+func (iter *BTCTXIterator) GetBlock() *btc.Block {
+	return iter.block
+}
+
+// Gets the index of the current transaction
+func (iter *BTCTXIterator) GetTxIndex() int {
+	return iter.txIndex
+}
+
+// Gets the current transaction
+func (iter *BTCTXIterator) GetTx() *btc.Tx {
+	return iter.tx
+}
+
+func (iter *BTCTXIterator) resetTx() {
+	iter.txIndex = -1
+	iter.tx = nil
+}
+
+// Move to the next block
+func (iter *BTCTXIterator) nextBlock() *btc.Block {
+	iter.blockIndex++
 	dat, err := iter.blockDatabase.FetchNextBlock()
 	if dat == nil || err != nil {
 		log.Println("END of DB file")
 	}
-	blk, err := btc.NewBlock(dat[:])
+	iter.block, err = btc.NewBlock(dat[:])
 
 	if err != nil {
 		println("Block inconsistent:", err.Error())
 	}
 
-	blk.BuildTxList()
-	return blk
-}
+	iter.block.BuildTxList()
 
-func (iter *BTCTXIterator) GetIndex() int {
-	return iter.index
+	iter.resetTx()
+
+	return iter.block
 }

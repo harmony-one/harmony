@@ -68,37 +68,34 @@ func generateSimulatedTransactions(shardID int, dataNodes []*node.Node) ([]*bloc
 
 LOOP:
 	for true {
-		blk := btcTXIter.IterateBTCTX()
-		blk.BuildTxList()
-		for _, btcTx := range blk.Txs {
-			tx := blockchain.Transaction{}
-			// tx.ID = tx.Hash.String()
-			if btcTx.IsCoinBase() {
-				// TxIn coinbase, newly generated coins
-				prevTxID := [32]byte{}
-				// TODO: merge txID with txIndex
-				tx.TxInput = []blockchain.TXInput{blockchain.TXInput{prevTxID, -1, "", nodeShardID}}
-			} else {
-				for _, txi := range btcTx.TxIn {
-					tx.TxInput = append(tx.TxInput, blockchain.TXInput{txi.Input.Hash, int(txi.Input.Vout), "", nodeShardID})
-				}
+		btcTx := btcTXIter.NextTx()
+		tx := blockchain.Transaction{}
+		// tx.ID = tx.Hash.String()
+		if btcTx.IsCoinBase() {
+			// TxIn coinbase, newly generated coins
+			prevTxID := [32]byte{}
+			// TODO: merge txID with txIndex in TxInput
+			tx.TxInput = []blockchain.TXInput{blockchain.TXInput{prevTxID, -1, "", nodeShardID}}
+		} else {
+			for _, txi := range btcTx.TxIn {
+				tx.TxInput = append(tx.TxInput, blockchain.TXInput{txi.Input.Hash, int(txi.Input.Vout), "", nodeShardID})
 			}
+		}
 
-			for _, txo := range btcTx.TxOut {
-				txoAddr := btc.NewAddrFromPkScript(txo.Pk_script, false)
-				if txoAddr == nil {
-					log.Warn("TxOut: can't decode address")
-				}
-				txout := blockchain.TXOutput{int(txo.Value), txoAddr.String(), nodeShardID}
-				tx.TxOutput = append(tx.TxOutput, txout)
+		for _, txo := range btcTx.TxOut {
+			txoAddr := btc.NewAddrFromPkScript(txo.Pk_script, false)
+			if txoAddr == nil {
+				log.Warn("TxOut: can't decode address")
 			}
-			tx.SetID()
-			txs = append(txs, &tx)
-			log.Debug("[Generator] transformed btc tx", "block height", btcTXIter.GetIndex(), "txi", len(tx.TxInput), "txo", len(tx.TxOutput), "txCount", cnt)
-			cnt++
-			if cnt >= setting.maxNumTxsPerBatch {
-				break LOOP
-			}
+			txout := blockchain.TXOutput{int(txo.Value), txoAddr.String(), nodeShardID}
+			tx.TxOutput = append(tx.TxOutput, txout)
+		}
+		tx.SetID()
+		txs = append(txs, &tx)
+		// log.Debug("[Generator] transformed btc tx", "block height", btcTXIter.GetBlockIndex(), "block tx count", btcTXIter.GetBlock().TxCount, "block tx cnt", len(btcTXIter.GetBlock().Txs), "txi", len(tx.TxInput), "txo", len(tx.TxOutput), "txCount", cnt)
+		cnt++
+		if cnt >= setting.maxNumTxsPerBatch {
+			break LOOP
 		}
 	}
 
