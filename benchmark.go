@@ -39,7 +39,7 @@ func getLeader(myShardId string, config *[][]string) p2p.Peer {
 			leaderPeer.Ip = ip
 			leaderPeer.Port = port
 			priKey := crypto.Hash(ip + ":" + port) // use ip:port as unique private key for now. TODO: use real private key
-			leaderPeer.PubKey = crypto.GetPublicKeyFromPrivateKey(crypto.Curve, priKey)
+			leaderPeer.PubKey = crypto.GetPublicKeyFromPrivateKey(crypto.Ed25519Curve, priKey)
 		}
 	}
 	return leaderPeer
@@ -53,7 +53,7 @@ func getPeers(myIp, myPort, myShardId string, config *[][]string) []p2p.Peer {
 			continue
 		}
 		priKey := crypto.Hash(ip + ":" + port) // use ip:port as unique private key for now. TODO: use real private key
-		peer := p2p.Peer{Port: port, Ip: ip, PubKey: crypto.GetPublicKeyFromPrivateKey(crypto.Curve, priKey)}
+		peer := p2p.Peer{Port: port, Ip: ip, PubKey: crypto.GetPublicKeyFromPrivateKey(crypto.Ed25519Curve, priKey)}
 		peerList = append(peerList, peer)
 	}
 	return peerList

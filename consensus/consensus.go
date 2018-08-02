@@ -98,18 +98,18 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 		allPublics = append(allPublics, validatorPeer.PubKey)
 	}
 	allPublics = append(allPublics, leader.PubKey)
-	mask, err := crypto.NewMask(crypto.Curve, allPublics, consensus.leader.PubKey)
+	mask, err := crypto.NewMask(crypto.Ed25519Curve, allPublics, consensus.leader.PubKey)
 	if err != nil {
 		panic("Failed to create commitment mask")
 	}
 	consensus.bitmap = mask
 
 	// Set private key for myself so that I can sign messages.
-	scalar := crypto.Curve.Scalar()
+	scalar := crypto.Ed25519Curve.Scalar()
 	priKeyInBytes := crypto.Hash(ip + ":" + port)
 	scalar.UnmarshalBinary(priKeyInBytes[:]) // use ip:port as unique private key for now. TODO: use real private key
 	consensus.priKey = scalar
-	consensus.pubKey = crypto.GetPublicKeyFromScalar(crypto.Curve, consensus.priKey)
+	consensus.pubKey = crypto.GetPublicKeyFromScalar(crypto.Ed25519Curve, consensus.priKey)
 	consensus.consensusId = 0 // or view Id in the original pbft paper
 
 	myShardID, err := strconv.Atoi(ShardID)

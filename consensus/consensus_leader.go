@@ -83,7 +83,7 @@ func (consensus *Consensus) startConsensus(newBlock *blockchain.Block) {
 	// Set state to ANNOUNCE_DONE
 	consensus.state = ANNOUNCE_DONE
 	// Generate leader's own commitment
-	secret, commitment := crypto.Commit(crypto.Curve)
+	secret, commitment := crypto.Commit(crypto.Ed25519Curve)
 	consensus.secret = secret
 	consensus.commitments[consensus.nodeId] = commitment
 	consensus.bitmap.SetKey(consensus.pubKey, true)
@@ -172,7 +172,7 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 	_, ok := consensus.commitments[validatorId]
 	shouldProcess := !ok
 	if shouldProcess {
-		point := crypto.Curve.Point()
+		point := crypto.Ed25519Curve.Point()
 		point.UnmarshalBinary(commitment)
 		consensus.commitments[validatorId] = point
 	}
@@ -232,7 +232,7 @@ func (consensus *Consensus) constructChallengeMessage() []byte {
 }
 
 func getAggregatedCommit(commitments []kyber.Point) (commitment kyber.Point, bytes []byte) {
-	aggCommitment := crypto.AggregateCommitmentsOnly(crypto.Curve, commitments)
+	aggCommitment := crypto.AggregateCommitmentsOnly(crypto.Ed25519Curve, commitments)
 	bytes, err := aggCommitment.MarshalBinary()
 	if err != nil {
 		panic("Failed to deserialize the aggregated commitment")
@@ -249,7 +249,7 @@ func getAggregatedKey(bitmap *crypto.Mask) []byte {
 }
 
 func getChallenge(aggCommitment, aggKey kyber.Point, message []byte) []byte {
-	crypto.Challenge(crypto.Curve, aggCommitment, aggKey, message)
+	crypto.Challenge(crypto.Ed25519Curve, aggCommitment, aggKey, message)
 	return make([]byte, 32)
 }
 

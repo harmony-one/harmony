@@ -159,7 +159,7 @@ func (consensus *Consensus) constructCommitMessage() (secret kyber.Scalar, commi
 	buffer.Write(twoBytes)
 
 	// 32 byte of commit (Note it's different than Zilliqa's ECPoint which takes 33 bytes: https://crypto.stackexchange.com/questions/51703/how-to-convert-from-curve25519-33-byte-to-32-byte-representation)
-	secret, commitment := crypto.Commit(crypto.Curve)
+	secret, commitment := crypto.Commit(crypto.Ed25519Curve)
 	commitment.MarshalTo(buffer)
 
 	// 64 byte of signature on previous data

@@ -20,16 +20,16 @@ func TestConstructAnnounceMessage(test *testing.T) {
 }
 
 func TestConstructChallengeMessage(test *testing.T) {
-	leaderPriKey := crypto.Curve.Scalar()
+	leaderPriKey := crypto.Ed25519Curve.Scalar()
 	priKeyInBytes := crypto.Hash("12")
 	leaderPriKey.UnmarshalBinary(priKeyInBytes[:]) // use ip:port as unique private key for now. TODO: use real private key
-	leaderPubKey := crypto.GetPublicKeyFromScalar(crypto.Curve, leaderPriKey)
+	leaderPubKey := crypto.GetPublicKeyFromScalar(crypto.Ed25519Curve, leaderPriKey)
 	leader := p2p.Peer{Ip: "1", Port: "2", PubKey: leaderPubKey}
 
-	validatorPriKey := crypto.Curve.Scalar()
+	validatorPriKey := crypto.Ed25519Curve.Scalar()
 	priKeyInBytes = crypto.Hash("12")
 	validatorPriKey.UnmarshalBinary(priKeyInBytes[:]) // use ip:port as unique private key for now. TODO: use real private key
-	validatorPubKey := crypto.GetPublicKeyFromScalar(crypto.Curve, leaderPriKey)
+	validatorPubKey := crypto.GetPublicKeyFromScalar(crypto.Ed25519Curve, leaderPriKey)
 	validator := p2p.Peer{Ip: "3", Port: "5", PubKey: validatorPubKey}
 
 	consensus := NewConsensus("1", "2", "0", []p2p.Peer{leader, validator}, leader)
