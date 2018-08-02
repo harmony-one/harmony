@@ -3,12 +3,13 @@ package p2p
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/dedis/kyber"
 	"harmony-benchmark/attack"
 	"log"
 	"net"
 	"strings"
 	"sync"
+
+	"github.com/dedis/kyber"
 )
 
 // Peer is the object for a p2p peer (node)
