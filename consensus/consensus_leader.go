@@ -240,9 +240,11 @@ func getAggregatedCommit(commitments []kyber.Point, bitmap *crypto.Mask) []byte 
 }
 
 func getAggregatedKey(bitmap *crypto.Mask) []byte {
-	// TODO: implement actual key aggregation
-	commitment := sha256.Sum256([]byte("ABC"))
-	return append(commitment[:], byte(0))
+	bytes, err := bitmap.AggregatePublic.MarshalBinary()
+	if err != nil {
+		panic("Failed to deserialize the aggregated key")
+	}
+	return append(bytes[:], byte(0))
 }
 
 func getChallenge() []byte {
