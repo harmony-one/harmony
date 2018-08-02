@@ -4,11 +4,11 @@ package consensus // consensus
 import (
 	"fmt"
 	"github.com/dedis/kyber"
+	"github.com/dedis/kyber/sign/schnorr"
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/crypto"
 	"harmony-benchmark/log"
 	"harmony-benchmark/p2p"
-	"kyber/sign/schnorr"
 	"regexp"
 	"strconv"
 	"sync"
