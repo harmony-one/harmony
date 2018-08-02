@@ -10,6 +10,7 @@ import (
 	"harmony-benchmark/crypto"
 	"harmony-benchmark/p2p"
 	proto_consensus "harmony-benchmark/proto/consensus"
+	"kyber/sign/schnorr"
 	"regexp"
 	"strconv"
 )
@@ -66,10 +67,13 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	offset += 64
 	//#### END: Read payload data
 
-	// TODO: make use of the data. This is just to avoid the unused variable warning
-	_ = signature
-
 	copy(consensus.blockHash[:], blockHash[:])
+
+	// Verify signature
+	if schnorr.Verify(crypto.Ed25519Curve, consensus.leader.PubKey, payload[:offset-64], signature) != nil {
+		consensus.Log.Warn("Received message with invalid signature", "leaderKey", consensus.leader.PubKey, "consensus", consensus)
+		return
+	}
 
 	// Verify block data
 	// check leader Id
@@ -78,7 +82,7 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	socketId := reg.ReplaceAllString(leaderPrivKey, "")
 	value, _ := strconv.Atoi(socketId)
 	if leaderId != uint16(value) {
-		consensus.Log.Warn("Received message from wrong leader", "myLeaderId", consensus.consensusId, "receivedLeaderId", consensusId, "consensus", consensus)
+		consensus.Log.Warn("Received message from wrong leader", "myLeaderId", uint16(value), "receivedLeaderId", leaderId, "consensus", consensus)
 		return
 	}
 

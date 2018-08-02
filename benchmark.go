@@ -15,6 +15,8 @@ import (
 
 	"github.com/shirou/gopsutil/process"
 	"harmony-benchmark/crypto"
+	"regexp"
+	"strconv"
 )
 
 const (
@@ -38,8 +40,16 @@ func getLeader(myShardId string, config *[][]string) p2p.Peer {
 		if status == "leader" && myShardId == shardId {
 			leaderPeer.Ip = ip
 			leaderPeer.Port = port
-			priKey := crypto.Hash(ip + ":" + port) // use ip:port as unique private key for now. TODO: use real private key
-			leaderPeer.PubKey = crypto.GetPublicKeyFromPrivateKey(crypto.Ed25519Curve, priKey)
+
+			// Get public key deterministically based on ip and port
+			reg, err := regexp.Compile("[^0-9]+")
+			if err != nil {
+				log.Crit("Regex Compilation Failed", "err", err)
+			}
+			socketId := reg.ReplaceAllString(ip+port, "") // A integer Id formed by unique IP/PORT pair
+			value, _ := strconv.Atoi(socketId)
+			priKey := crypto.Ed25519Curve.Scalar().SetInt64(int64(value))
+			leaderPeer.PubKey = crypto.GetPublicKeyFromScalar(crypto.Ed25519Curve, priKey)
 		}
 	}
 	return leaderPeer
@@ -52,8 +62,15 @@ func getPeers(myIp, myPort, myShardId string, config *[][]string) []p2p.Peer {
 		if status != "validator" || ip == myIp && port == myPort || myShardId != shardId {
 			continue
 		}
-		priKey := crypto.Hash(ip + ":" + port) // use ip:port as unique private key for now. TODO: use real private key
-		peer := p2p.Peer{Port: port, Ip: ip, PubKey: crypto.GetPublicKeyFromPrivateKey(crypto.Ed25519Curve, priKey)}
+		// Get public key deterministically based on ip and port
+		reg, err := regexp.Compile("[^0-9]+")
+		if err != nil {
+			log.Crit("Regex Compilation Failed", "err", err)
+		}
+		socketId := reg.ReplaceAllString(ip+port, "") // A integer Id formed by unique IP/PORT pair
+		value, _ := strconv.Atoi(socketId)
+		priKey := crypto.Ed25519Curve.Scalar().SetInt64(int64(value))
+		peer := p2p.Peer{Port: port, Ip: ip, PubKey: crypto.GetPublicKeyFromScalar(crypto.Ed25519Curve, priKey)}
 		peerList = append(peerList, peer)
 	}
 	return peerList

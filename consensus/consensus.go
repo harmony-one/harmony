@@ -106,10 +106,13 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 	consensus.bitmap = mask
 
 	// Set private key for myself so that I can sign messages.
-	scalar := crypto.Ed25519Curve.Scalar()
-	priKeyInBytes := crypto.Hash(ip + ":" + port)
-	scalar.UnmarshalBinary(priKeyInBytes[:]) // use ip:port as unique private key for now. TODO: use real private key
-	consensus.priKey = scalar
+	reg, err := regexp.Compile("[^0-9]+")
+	if err != nil {
+		log.Crit("Regex Compilation Failed", "err", err)
+	}
+	socketId := reg.ReplaceAllString(ip+port, "") // A integer Id formed by unique IP/PORT pair
+	value, _ := strconv.Atoi(socketId)
+	consensus.priKey = crypto.Ed25519Curve.Scalar().SetInt64(int64(value))
 	consensus.pubKey = crypto.GetPublicKeyFromScalar(crypto.Ed25519Curve, consensus.priKey)
 	consensus.consensusId = 0 // or view Id in the original pbft paper
 
@@ -124,12 +127,6 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 
 	// For now use socket address as 16 byte Id
 	// TODO: populate with correct Id
-	reg, err := regexp.Compile("[^0-9]+")
-	if err != nil {
-		consensus.Log.Crit("Regex Compilation Failed", "err", err, "consensus", consensus)
-	}
-	socketId := reg.ReplaceAllString(ip+port, "") // A integer Id formed by unique IP/PORT pair
-	value, err := strconv.Atoi(socketId)
 	consensus.nodeId = uint16(value)
 
 	if consensus.IsLeader {

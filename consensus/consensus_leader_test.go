@@ -22,13 +22,13 @@ func TestConstructAnnounceMessage(test *testing.T) {
 func TestConstructChallengeMessage(test *testing.T) {
 	leaderPriKey := crypto.Ed25519Curve.Scalar()
 	priKeyInBytes := crypto.Hash("12")
-	leaderPriKey.UnmarshalBinary(priKeyInBytes[:]) // use ip:port as unique private key for now. TODO: use real private key
+	leaderPriKey.UnmarshalBinary(priKeyInBytes[:])
 	leaderPubKey := crypto.GetPublicKeyFromScalar(crypto.Ed25519Curve, leaderPriKey)
 	leader := p2p.Peer{Ip: "1", Port: "2", PubKey: leaderPubKey}
 
 	validatorPriKey := crypto.Ed25519Curve.Scalar()
 	priKeyInBytes = crypto.Hash("12")
-	validatorPriKey.UnmarshalBinary(priKeyInBytes[:]) // use ip:port as unique private key for now. TODO: use real private key
+	validatorPriKey.UnmarshalBinary(priKeyInBytes[:])
 	validatorPubKey := crypto.GetPublicKeyFromScalar(crypto.Ed25519Curve, leaderPriKey)
 	validator := p2p.Peer{Ip: "3", Port: "5", PubKey: validatorPubKey}
 
