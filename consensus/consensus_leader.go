@@ -215,13 +215,14 @@ func (consensus *Consensus) constructChallengeMessage() []byte {
 	for _, val := range consensus.commitments {
 		commitments = append(commitments, val)
 	}
-	buffer.Write(getAggregatedCommit(commitments, consensus.bitmap))
+	aggCommitment, aggCommitmentBytes := getAggregatedCommit(commitments)
+	buffer.Write(aggCommitmentBytes)
 
 	// 33 byte aggregated key
 	buffer.Write(getAggregatedKey(consensus.bitmap))
 
 	// 32 byte challenge
-	buffer.Write(getChallenge())
+	buffer.Write(getChallenge(aggCommitment, consensus.bitmap.AggregatePublic, buffer.Bytes()[:36])) // message contains consensus id and block hash for now.
 
 	// 64 byte of signature on previous data
 	signature := signMessage(buffer.Bytes())
@@ -230,13 +231,13 @@ func (consensus *Consensus) constructChallengeMessage() []byte {
 	return proto_consensus.ConstructConsensusMessage(proto_consensus.CHALLENGE, buffer.Bytes())
 }
 
-func getAggregatedCommit(commitments []kyber.Point, bitmap *crypto.Mask) []byte {
+func getAggregatedCommit(commitments []kyber.Point) (commitment kyber.Point, bytes []byte) {
 	aggCommitment := crypto.AggregateCommitmentsOnly(crypto.Curve, commitments)
 	bytes, err := aggCommitment.MarshalBinary()
 	if err != nil {
 		panic("Failed to deserialize the aggregated commitment")
 	}
-	return append(bytes[:], byte(0))
+	return aggCommitment, append(bytes[:], byte(0))
 }
 
 func getAggregatedKey(bitmap *crypto.Mask) []byte {
@@ -247,8 +248,8 @@ func getAggregatedKey(bitmap *crypto.Mask) []byte {
 	return append(bytes[:], byte(0))
 }
 
-func getChallenge() []byte {
-	// TODO: implement actual challenge data
+func getChallenge(aggCommitment, aggKey kyber.Point, message []byte) []byte {
+	crypto.Challenge(crypto.Curve, aggCommitment, aggKey, message)
 	return make([]byte, 32)
 }
 
