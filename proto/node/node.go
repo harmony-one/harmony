@@ -4,17 +4,16 @@ import (
 	"bytes"
 	"encoding/gob"
 	"harmony-benchmark/blockchain"
-	"harmony-benchmark/common"
+	"harmony-benchmark/proto"
 )
 
 // The specific types of message under NODE category
 type NodeMessageType byte
 
 const (
-	TRANSACTION NodeMessageType = iota // TODO: Don't move this until the hack in client/message.go is resolved
+	TRANSACTION NodeMessageType = iota
 	BLOCK
 	CONTROL
-
 	// TODO: add more types
 )
 
@@ -24,7 +23,7 @@ type TransactionMessageType int
 const (
 	SEND TransactionMessageType = iota
 	REQUEST
-	UNLOCK // The unlock to commit or abort message sent by the client to leaders.  TODO: Don't move this until the hack in client/message.go is resolved
+	UNLOCK
 )
 
 // The types of messages used for NODE/BLOCK
@@ -43,7 +42,7 @@ const (
 
 // Constructs serialized transactions
 func ConstructTransactionListMessage(transactions []*blockchain.Transaction) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(common.NODE)})
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
 	byteBuffer.WriteByte(byte(TRANSACTION))
 	byteBuffer.WriteByte(byte(SEND))
 	encoder := gob.NewEncoder(byteBuffer)
@@ -58,7 +57,7 @@ func ConstructTransactionListMessage(transactions []*blockchain.Transaction) []b
 
 // Constructs serialized transactions
 func ConstructRequestTransactionsMessage(transactionIds [][]byte) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(common.NODE)})
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
 	byteBuffer.WriteByte(byte(TRANSACTION))
 	byteBuffer.WriteByte(byte(REQUEST))
 	for _, txId := range transactionIds {
@@ -69,7 +68,7 @@ func ConstructRequestTransactionsMessage(transactionIds [][]byte) []byte {
 
 // Constructs STOP message for node to stop
 func ConstructStopMessage() []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(common.NODE)})
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
 	byteBuffer.WriteByte(byte(CONTROL))
 	byteBuffer.WriteByte(byte(STOP))
 	return byteBuffer.Bytes()
@@ -77,7 +76,7 @@ func ConstructStopMessage() []byte {
 
 // Constructs blocks sync message to send blocks to other nodes
 func ConstructBlocksSyncMessage(blocks []blockchain.Block) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(common.NODE)})
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
 	byteBuffer.WriteByte(byte(BLOCK))
 	byteBuffer.WriteByte(byte(SYNC))
 	encoder := gob.NewEncoder(byteBuffer)

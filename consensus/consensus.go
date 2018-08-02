@@ -3,8 +3,9 @@ package consensus // consensus
 
 import (
 	"fmt"
+	"github.com/dedis/kyber"
 	"harmony-benchmark/blockchain"
-	"harmony-benchmark/common"
+	"harmony-benchmark/crypto"
 	"harmony-benchmark/log"
 	"harmony-benchmark/p2p"
 	"regexp"
@@ -15,16 +16,20 @@ import (
 // Consensus data containing all info related to one round of consensus process
 type Consensus struct {
 	state ConsensusState
-	// Signatures collected from validators
-	commits map[string]string
+	// Commits collected from validators. A map from node Id to its commitment
+	commitments map[uint16]kyber.Point
+	// Commits collected from validators.
+	bitmap *crypto.Mask
 	// Signatures collected from validators
 	responses map[string]string
 	// List of validators
 	validators []p2p.Peer
 	// Leader
 	leader p2p.Peer
-	// private key of current node
-	priKey string
+	// private/public keys of current node
+	priKey kyber.Scalar
+	pubKey kyber.Point
+
 	// Whether I am leader. False means I am validator
 	IsLeader bool
 	// Leader or validator Id - 2 byte
@@ -44,6 +49,8 @@ type Consensus struct {
 	// Validator specific fields
 	// Blocks received but not done with consensus yet
 	blocksReceived map[uint32]*BlockConsensusStatus
+	// Commitment secret
+	secret kyber.Scalar
 
 	// Signal channel for starting a new consensus process
 	ReadySignal chan int
@@ -52,10 +59,6 @@ type Consensus struct {
 	// The post-consensus processing func passed from Node object
 	// Called when consensus on a new block is done
 	OnConsensusDone func(*blockchain.Block)
-
-	//// Network related fields
-	msgCategory byte
-	msgType     byte
 
 	Log log.Logger
 }
@@ -76,24 +79,37 @@ type BlockConsensusStatus struct {
 // FYI, see https://golang.org/doc/effective_go.html?#package-names
 func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Consensus {
 	consensus := Consensus{}
-	Peers := peers
-	leaderPeer := leader
-	selfPeer := p2p.Peer{Port: port, Ip: ip}
 
-	if leaderPeer == selfPeer {
+	if leader.Port == port && leader.Ip == ip {
 		consensus.IsLeader = true
 	} else {
 		consensus.IsLeader = false
 	}
 
-	consensus.commits = make(map[string]string)
+	consensus.commitments = make(map[uint16]kyber.Point)
 	consensus.responses = make(map[string]string)
 
-	consensus.leader = leaderPeer
-	consensus.validators = Peers
+	consensus.leader = leader
+	consensus.validators = peers
 
-	consensus.priKey = ip + ":" + port // use ip:port as unique key for now
+	// Initialize cosign bitmap
+	allPublics := make([]kyber.Point, 0)
+	for _, validatorPeer := range consensus.validators {
+		allPublics = append(allPublics, validatorPeer.PubKey)
+	}
+	allPublics = append(allPublics, leader.PubKey)
+	mask, err := crypto.NewMask(crypto.Curve, allPublics, consensus.leader.PubKey)
+	if err != nil {
+		panic("Failed to create commitment mask")
+	}
+	consensus.bitmap = mask
 
+	// Set private key for myself so that I can sign messages.
+	scalar := crypto.Curve.Scalar()
+	priKeyInBytes := crypto.Hash(ip + ":" + port)
+	scalar.UnmarshalBinary(priKeyInBytes[:]) // use ip:port as unique private key for now. TODO: use real private key
+	consensus.priKey = scalar
+	consensus.pubKey = crypto.GetPublicKeyFromScalar(crypto.Curve, consensus.priKey)
 	consensus.consensusId = 0 // or view Id in the original pbft paper
 
 	myShardID, err := strconv.Atoi(ShardID)
@@ -111,7 +127,7 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 	if err != nil {
 		consensus.Log.Crit("Regex Compilation Failed", "err", err, "consensus", consensus)
 	}
-	socketId := reg.ReplaceAllString(consensus.priKey, "")
+	socketId := reg.ReplaceAllString(ip+port, "") // A integer Id formed by unique IP/PORT pair
 	value, err := strconv.Atoi(socketId)
 	consensus.nodeId = uint16(value)
 
@@ -125,10 +141,6 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 		}()
 	}
 
-	// The message category and type used for any messages sent for consensus
-	consensus.msgCategory = byte(common.COMMITTEE)
-	consensus.msgType = byte(CONSENSUS)
-
 	consensus.Log = log.New()
 	return &consensus
 }
@@ -136,7 +148,7 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 // Reset the state of the consensus
 func (consensus *Consensus) ResetState() {
 	consensus.state = FINISHED
-	consensus.commits = make(map[string]string)
+	consensus.commitments = make(map[uint16]kyber.Point)
 	consensus.responses = make(map[string]string)
 }
 
@@ -149,5 +161,5 @@ func (consensus *Consensus) String() string {
 		duty = "VLD" // validator
 	}
 	return fmt.Sprintf("[duty:%s, priKey:%s, ShardID:%v, nodeId:%v, state:%s]",
-		duty, consensus.priKey, consensus.ShardID, consensus.nodeId, consensus.state)
+		duty, fmt.Sprintf("%x", consensus.priKey), consensus.ShardID, consensus.nodeId, consensus.state)
 }

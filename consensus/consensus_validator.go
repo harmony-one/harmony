@@ -4,33 +4,36 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/gob"
+	"github.com/dedis/kyber"
 	"harmony-benchmark/attack"
 	"harmony-benchmark/blockchain"
+	"harmony-benchmark/crypto"
 	"harmony-benchmark/p2p"
+	proto_consensus "harmony-benchmark/proto/consensus"
 	"regexp"
 	"strconv"
 )
 
 // Validator's consensus message dispatcher
 func (consensus *Consensus) ProcessMessageValidator(message []byte) {
-	msgType, err := GetConsensusMessageType(message)
+	msgType, err := proto_consensus.GetConsensusMessageType(message)
 	if err != nil {
 		consensus.Log.Error("Failed to get consensus message type", "err", err, "consensus", consensus)
 	}
 
-	payload, err := GetConsensusMessagePayload(message)
+	payload, err := proto_consensus.GetConsensusMessagePayload(message)
 	if err != nil {
 		consensus.Log.Error("Failed to get consensus message payload", "err", err, "consensus", consensus)
 	}
 
 	switch msgType {
-	case ANNOUNCE:
+	case proto_consensus.ANNOUNCE:
 		consensus.processAnnounceMessage(payload)
-	case COMMIT:
+	case proto_consensus.COMMIT:
 		consensus.Log.Error("Unexpected message type", "msgType", msgType, "consensus", consensus)
-	case CHALLENGE:
+	case proto_consensus.CHALLENGE:
 		consensus.processChallengeMessage(payload)
-	case RESPONSE:
+	case proto_consensus.RESPONSE:
 		consensus.Log.Error("Unexpected message type", "msgType", msgType, "consensus", consensus)
 	default:
 		consensus.Log.Error("Unexpected message type", "msgType", msgType, "consensus", consensus)
@@ -127,7 +130,10 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 
 	// TODO: return the signature(commit) to leader
 	// For now, simply return the private key of this node.
-	msgToSend := consensus.constructCommitMessage()
+	secret, msgToSend := consensus.constructCommitMessage()
+	// Store the commitment secret
+	consensus.secret = secret
+
 	// consensus.Log.Debug("SENDING COMMIT", "consensusId", consensus.consensusId, "consensus", consensus)
 	p2p.SendMessage(consensus.leader, msgToSend)
 
@@ -136,7 +142,7 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 }
 
 // Construct the commit message to send to leader (assumption the consensus data is already verified)
-func (consensus *Consensus) constructCommitMessage() []byte {
+func (consensus *Consensus) constructCommitMessage() (secret kyber.Scalar, commitMsg []byte) {
 	buffer := bytes.NewBuffer([]byte{})
 
 	// 4 byte consensus id
@@ -152,20 +158,15 @@ func (consensus *Consensus) constructCommitMessage() []byte {
 	binary.BigEndian.PutUint16(twoBytes, consensus.nodeId)
 	buffer.Write(twoBytes)
 
-	// 33 byte of commit
-	commit := getCommitMessage()
-	buffer.Write(commit)
+	// 32 byte of commit (Note it's different than Zilliqa's ECPoint which takes 33 bytes: https://crypto.stackexchange.com/questions/51703/how-to-convert-from-curve25519-33-byte-to-32-byte-representation)
+	secret, commitment := crypto.Commit(crypto.Curve)
+	commitment.MarshalTo(buffer)
 
 	// 64 byte of signature on previous data
 	signature := signMessage(buffer.Bytes())
 	buffer.Write(signature)
 
-	return consensus.ConstructConsensusMessage(COMMIT, buffer.Bytes())
-}
-
-func getCommitMessage() []byte {
-	// TODO: use real cosi signature
-	return make([]byte, 33)
+	return secret, proto_consensus.ConstructConsensusMessage(proto_consensus.COMMIT, buffer.Bytes())
 }
 
 // Processes the challenge message sent from the leader
@@ -252,7 +253,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 		// If I received previous block (which haven't been processed. I will roll up to current block if everything checks.
 	}
 
-	// TODO: verify aggregated commits with real schnor cosign verification
+	// TODO: verify aggregated commitments with real schnor cosign verification
 
 	// TODO: return the signature(response) to leader
 	// For now, simply return the private key of this node.
@@ -324,7 +325,7 @@ func (consensus *Consensus) constructResponseMessage() []byte {
 	signature := signMessage(buffer.Bytes())
 	buffer.Write(signature)
 
-	return consensus.ConstructConsensusMessage(RESPONSE, buffer.Bytes())
+	return proto_consensus.ConstructConsensusMessage(proto_consensus.RESPONSE, buffer.Bytes())
 }
 
 func getResponseMessage() []byte {

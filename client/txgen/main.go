@@ -11,6 +11,7 @@ import (
 	"harmony-benchmark/log"
 	"harmony-benchmark/node"
 	"harmony-benchmark/p2p"
+	proto_node "harmony-benchmark/proto/node"
 	"math/rand"
 	"strconv"
 	"sync"
@@ -302,14 +303,14 @@ func main() {
 			allCrossTxs = append(allCrossTxs, crossTxs...)
 
 			log.Debug("[Generator] Sending single-shard txs ...", "leader", leader, "numTxs", len(txs), "numCrossTxs", len(crossTxs))
-			msg := node.ConstructTransactionListMessage(txs)
+			msg := proto_node.ConstructTransactionListMessage(txs)
 			p2p.SendMessage(leader, msg)
 			// Note cross shard txs are later sent in batch
 		}
 
 		if len(allCrossTxs) > 0 {
 			log.Debug("[Generator] Broadcasting cross-shard txs ...", "allCrossTxs", len(allCrossTxs))
-			msg := node.ConstructTransactionListMessage(allCrossTxs)
+			msg := proto_node.ConstructTransactionListMessage(allCrossTxs)
 			p2p.BroadcastMessage(leaders, msg)
 
 			// Put cross shard tx into a pending list waiting for proofs from leaders
@@ -326,7 +327,7 @@ func main() {
 	}
 
 	// Send a stop message to stop the nodes at the end
-	msg := node.ConstructStopMessage()
+	msg := proto_node.ConstructStopMessage()
 	peers := append(configr.GetValidators(*configFile), leaders...)
 	p2p.BroadcastMessage(peers, msg)
 }

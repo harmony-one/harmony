@@ -3,6 +3,7 @@ package p2p
 import (
 	"bytes"
 	"encoding/binary"
+	"github.com/dedis/kyber"
 	"harmony-benchmark/attack"
 	"log"
 	"net"
@@ -12,9 +13,9 @@ import (
 
 // Peer is the object for a p2p peer (node)
 type Peer struct {
-	Ip     string // Ip address of the peer
-	Port   string // Port number of the peer
-	PubKey string // Public key of the peer
+	Ip     string      // Ip address of the peer
+	Port   string      // Port number of the peer
+	PubKey kyber.Point // Public key of the peer
 }
 
 // SendMessage sends the message to the peer
