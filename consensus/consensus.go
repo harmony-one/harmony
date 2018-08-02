@@ -8,6 +8,7 @@ import (
 	"harmony-benchmark/crypto"
 	"harmony-benchmark/log"
 	"harmony-benchmark/p2p"
+	"kyber/sign/schnorr"
 	"regexp"
 	"strconv"
 	"sync"
@@ -143,6 +144,14 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 
 	consensus.Log = log.New()
 	return &consensus
+}
+
+func (consensus *Consensus) signMessage(message []byte) []byte {
+	signature, err := schnorr.Sign(crypto.Ed25519Curve, consensus.priKey, message)
+	if err != nil {
+		panic("Failed to sign message with Schnorr signature.")
+	}
+	return signature
 }
 
 // Reset the state of the consensus

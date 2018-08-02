@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"encoding/binary"
 	"encoding/gob"
 	"github.com/dedis/kyber"
@@ -115,16 +114,10 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 	buffer.Write(fourBytes)
 
 	// 64 byte of signature on previous data
-	signature := signMessage(buffer.Bytes())
+	signature := consensus.signMessage(buffer.Bytes())
 	buffer.Write(signature)
 
 	return proto_consensus.ConstructConsensusMessage(proto_consensus.ANNOUNCE, buffer.Bytes())
-}
-
-func signMessage(message []byte) []byte {
-	// TODO: implement real ECC signature
-	mockSignature := sha256.Sum256(message)
-	return append(mockSignature[:], mockSignature[:]...)
 }
 
 // Processes the commit message sent from validators
@@ -225,7 +218,7 @@ func (consensus *Consensus) constructChallengeMessage() []byte {
 	buffer.Write(getChallenge(aggCommitment, consensus.bitmap.AggregatePublic, buffer.Bytes()[:36])) // message contains consensus id and block hash for now.
 
 	// 64 byte of signature on previous data
-	signature := signMessage(buffer.Bytes())
+	signature := consensus.signMessage(buffer.Bytes())
 	buffer.Write(signature)
 
 	return proto_consensus.ConstructConsensusMessage(proto_consensus.CHALLENGE, buffer.Bytes())

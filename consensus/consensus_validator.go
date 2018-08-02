@@ -163,7 +163,7 @@ func (consensus *Consensus) constructCommitMessage() (secret kyber.Scalar, commi
 	commitment.MarshalTo(buffer)
 
 	// 64 byte of signature on previous data
-	signature := signMessage(buffer.Bytes())
+	signature := consensus.signMessage(buffer.Bytes())
 	buffer.Write(signature)
 
 	return secret, proto_consensus.ConstructConsensusMessage(proto_consensus.COMMIT, buffer.Bytes())
@@ -322,7 +322,7 @@ func (consensus *Consensus) constructResponseMessage() []byte {
 	buffer.Write(response)
 
 	// 64 byte of signature on previous data
-	signature := signMessage(buffer.Bytes())
+	signature := consensus.signMessage(buffer.Bytes())
 	buffer.Write(signature)
 
 	return proto_consensus.ConstructConsensusMessage(proto_consensus.RESPONSE, buffer.Bytes())
