@@ -4,16 +4,14 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/gob"
+	"github.com/dedis/kyber"
+	"github.com/dedis/kyber/sign/schnorr"
 	"harmony-benchmark/attack"
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/crypto"
 	"harmony-benchmark/p2p"
 	proto_consensus "harmony-benchmark/proto/consensus"
-	"regexp"
-	"strconv"
-
-	"github.com/dedis/kyber"
-	"github.com/dedis/kyber/sign/schnorr"
+	"harmony-benchmark/utils"
 )
 
 // Validator's consensus message dispatcher
@@ -70,20 +68,17 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 
 	copy(consensus.blockHash[:], blockHash[:])
 
-	// Verify signature
-	if schnorr.Verify(crypto.Ed25519Curve, consensus.leader.PubKey, payload[:offset-64], signature) != nil {
-		consensus.Log.Warn("Received message with invalid signature", "leaderKey", consensus.leader.PubKey, "consensus", consensus)
+	// Verify block data
+	// check leader Id
+	myLeaderId := utils.GetUniqueIdFromPeer(consensus.leader)
+	if leaderId != myLeaderId {
+		consensus.Log.Warn("Received message from wrong leader", "myLeaderId", myLeaderId, "receivedLeaderId", leaderId, "consensus", consensus)
 		return
 	}
 
-	// Verify block data
-	// check leader Id
-	leaderPrivKey := consensus.leader.Ip + consensus.leader.Port
-	reg, _ := regexp.Compile("[^0-9]+")
-	socketId := reg.ReplaceAllString(leaderPrivKey, "")
-	value, _ := strconv.Atoi(socketId)
-	if leaderId != uint16(value) {
-		consensus.Log.Warn("Received message from wrong leader", "myLeaderId", uint16(value), "receivedLeaderId", leaderId, "consensus", consensus)
+	// Verify signature
+	if schnorr.Verify(crypto.Ed25519Curve, consensus.leader.PubKey, payload[:offset-64], signature) != nil {
+		consensus.Log.Warn("Received message with invalid signature", "leaderKey", consensus.leader.PubKey, "consensus", consensus)
 		return
 	}
 
@@ -196,26 +191,25 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 	//#### END: Read payload data
 
 	// TODO: make use of the data. This is just to avoid the unused variable warning
-	_ = consensusId
-	_ = blockHash
-	_ = leaderId
 	_ = aggreCommit
 	_ = aggreKey
 	_ = challenge
 	_ = signature
 
-	// Verify block data and the aggregated signatures
-
 	// Update readyByConsensus for attack.
 	attack.GetInstance().UpdateConsensusReady(consensusId)
 
+	// Verify block data and the aggregated signatures
 	// check leader Id
-	leaderPrivKey := consensus.leader.Ip + consensus.leader.Port
-	reg, _ := regexp.Compile("[^0-9]+")
-	socketId := reg.ReplaceAllString(leaderPrivKey, "")
-	value, _ := strconv.Atoi(socketId)
-	if leaderId != uint16(value) {
-		consensus.Log.Warn("Received message from wrong leader", "myLeaderId", consensus.consensusId, "receivedLeaderId", consensusId, "consensus", consensus)
+	myLeaderId := utils.GetUniqueIdFromPeer(consensus.leader)
+	if leaderId != myLeaderId {
+		consensus.Log.Warn("Received message from wrong leader", "myLeaderId", myLeaderId, "receivedLeaderId", leaderId, "consensus", consensus)
+		return
+	}
+
+	// Verify signature
+	if schnorr.Verify(crypto.Ed25519Curve, consensus.leader.PubKey, payload[:offset-64], signature) != nil {
+		consensus.Log.Warn("Received message with invalid signature", "leaderKey", consensus.leader.PubKey, "consensus", consensus)
 		return
 	}
 
