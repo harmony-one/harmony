@@ -9,6 +9,7 @@ import (
 	"harmony-benchmark/attack"
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/crypto"
+	"harmony-benchmark/log"
 	"harmony-benchmark/p2p"
 	proto_consensus "harmony-benchmark/proto/consensus"
 	"harmony-benchmark/utils"
@@ -181,7 +182,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 	aggreKey := payload[offset : offset+33]
 	offset += 33
 
-	// 32 byte of aggregated key
+	// 32 byte of challenge
 	challenge := payload[offset : offset+32]
 	offset += 32
 
@@ -242,10 +243,21 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 
 	// TODO: verify aggregated commitments with real schnor cosign verification
 
-	// TODO: return the signature(response) to leader
 	// For now, simply return the private key of this node.
-	msgToSend := consensus.constructResponseMessage()
-	// consensus.Log.Debug("SENDING RESPONSE", "consensusId", consensus.consensusId, "consensus", consensus)
+	challengeScalar := crypto.Ed25519Curve.Scalar()
+	err := challengeScalar.UnmarshalBinary(challenge)
+	if err != nil {
+		log.Error("Failed to deserialize challenge", "err", err)
+		return
+	}
+
+	response, err := crypto.Response(crypto.Ed25519Curve, consensus.priKey, consensus.secret, challengeScalar)
+	if err != nil {
+		log.Error("Failed to generate response", "err", err)
+		return
+	}
+	msgToSend := consensus.constructResponseMessage(response)
+
 	p2p.SendMessage(consensus.leader, msgToSend)
 
 	// Set state to RESPONSE_DONE
@@ -288,7 +300,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 }
 
 // Construct the response message to send to leader (assumption the consensus data is already verified)
-func (consensus *Consensus) constructResponseMessage() []byte {
+func (consensus *Consensus) constructResponseMessage(response kyber.Scalar) []byte {
 	buffer := bytes.NewBuffer([]byte{})
 
 	// 4 byte consensus id
@@ -305,17 +317,11 @@ func (consensus *Consensus) constructResponseMessage() []byte {
 	buffer.Write(twoBytes)
 
 	// 32 byte of response
-	response := getResponseMessage()
-	buffer.Write(response)
+	response.MarshalTo(buffer)
 
 	// 64 byte of signature on previous data
 	signature := consensus.signMessage(buffer.Bytes())
 	buffer.Write(signature)
 
 	return proto_consensus.ConstructConsensusMessage(proto_consensus.RESPONSE, buffer.Bytes())
-}
-
-func getResponseMessage() []byte {
-	// TODO: construct real response
-	return make([]byte, 32)
 }

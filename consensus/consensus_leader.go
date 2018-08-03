@@ -178,7 +178,7 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 		return
 	}
 
-	if len(consensus.commitments) >= (2*len(consensus.validators))/3+1 && consensus.state < CHALLENGE_DONE {
+	if len(consensus.commitments) >= (2*(len(consensus.validators)+1))/3+1 && consensus.state < CHALLENGE_DONE {
 		consensus.Log.Debug("Enough commitments received with signatures", "numOfSignatures", len(consensus.commitments))
 
 		// Broadcast challenge

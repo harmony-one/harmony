@@ -117,6 +117,7 @@ func Response(suite Suite, private, random, challenge kyber.Scalar) (kyber.Scala
 	if challenge == nil {
 		return nil, errors.New("no challenge provided")
 	}
+	// TODO: figure out why in the paper it says r = v - cx
 	ca := suite.Scalar().Mul(private, challenge)
 	return ca.Add(random, ca), nil
 }

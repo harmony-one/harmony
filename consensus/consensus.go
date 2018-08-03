@@ -161,6 +161,7 @@ func (consensus *Consensus) ResetState() {
 	consensus.state = FINISHED
 	consensus.commitments = make(map[uint16]kyber.Point)
 	consensus.responses = make(map[string]string)
+	consensus.secret = nil
 }
 
 // Returns a string representation of this consensus
