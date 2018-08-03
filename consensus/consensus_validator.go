@@ -4,15 +4,16 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/gob"
-	"github.com/dedis/kyber"
 	"harmony-benchmark/attack"
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/crypto"
 	"harmony-benchmark/p2p"
 	proto_consensus "harmony-benchmark/proto/consensus"
-	"kyber/sign/schnorr"
 	"regexp"
 	"strconv"
+
+	"github.com/dedis/kyber"
+	"github.com/dedis/kyber/sign/schnorr"
 )
 
 // Validator's consensus message dispatcher

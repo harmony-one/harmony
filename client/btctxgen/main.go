@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/hex"
 	"flag"
 	"fmt"
 	"harmony-benchmark/blockchain"
@@ -103,28 +102,6 @@ LOOP:
 
 	log.Debug("[Generator] generated transations", "single-shard", len(txs), "cross-shard", len(crossTxs))
 	return txs, crossTxs
-}
-
-// A utility func that counts the total number of utxos in a pool.
-func countNumOfUtxos(utxoPool *blockchain.UTXOPool) int {
-	countAll := 0
-	for _, utxoMap := range utxoPool.UtxoMap {
-		for txIDStr, val := range utxoMap {
-			_ = val
-			id, err := hex.DecodeString(txIDStr)
-			if err != nil {
-				continue
-			}
-
-			txID := [32]byte{}
-			copy(txID[:], id[:])
-			for _, utxo := range val {
-				_ = utxo
-				countAll++
-			}
-		}
-	}
-	return countAll
 }
 
 func initClient(clientNode *node.Node, clientPort string, leaders *[]p2p.Peer, nodes *[]*node.Node) {
