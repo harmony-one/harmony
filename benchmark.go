@@ -48,7 +48,7 @@ func getLeader(myShardId string, config *[][]string) p2p.Peer {
 			}
 			socketId := reg.ReplaceAllString(ip+port, "") // A integer Id formed by unique IP/PORT pair
 			value, _ := strconv.Atoi(socketId)
-			priKey := crypto.Ed25519Curve.Scalar().SetInt64(int64(value))
+			priKey := crypto.Ed25519Curve.Scalar().SetInt64(int64(value)) // TODO: figure out why using a random hash value doesn't work for private key (schnorr)
 			leaderPeer.PubKey = crypto.GetPublicKeyFromScalar(crypto.Ed25519Curve, priKey)
 		}
 	}

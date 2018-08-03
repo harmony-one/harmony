@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/gob"
 	"github.com/dedis/kyber"
+	"github.com/dedis/kyber/sign/schnorr"
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/crypto"
 	"harmony-benchmark/p2p"
@@ -78,9 +79,10 @@ func (consensus *Consensus) startConsensus(newBlock *blockchain.Block) {
 	consensus.blockHeader = byteBuffer.Bytes()
 
 	msgToSend := consensus.constructAnnounceMessage()
-	p2p.BroadcastMessage(consensus.validators, msgToSend)
+	p2p.BroadcastMessage(consensus.getValidatorPeers(), msgToSend)
 	// Set state to ANNOUNCE_DONE
 	consensus.state = ANNOUNCE_DONE
+
 	// Generate leader's own commitment
 	secret, commitment := crypto.Commit(crypto.Ed25519Curve)
 	consensus.secret = secret
@@ -117,7 +119,7 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 
 // Processes the commit message sent from validators
 func (consensus *Consensus) processCommitMessage(payload []byte) {
-	//#### Read payload data
+	// Read payload data
 	offset := 0
 	// 4 byte consensus id
 	consensusId := binary.BigEndian.Uint32(payload[offset : offset+4])
@@ -135,13 +137,20 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 	commitment := payload[offset : offset+32]
 	offset += 32
 
-	// 64 byte of signature on previous data
+	// 64 byte of signature on all above data
 	signature := payload[offset : offset+64]
 	offset += 64
-	//#### END: Read payload data
 
-	// TODO: make use of the data. This is just to avoid the unused variable warning
-	_ = signature
+	// Verify signature
+	value, ok := consensus.validators[validatorId]
+	if !ok {
+		consensus.Log.Warn("Received message from unrecognized validator", "validatorId", validatorId, "consensus", consensus)
+		return
+	}
+	if schnorr.Verify(crypto.Ed25519Curve, value.PubKey, payload[:offset-64], signature) != nil {
+		consensus.Log.Warn("Received message with invalid signature", "validatorKey", consensus.leader.PubKey, "consensus", consensus)
+		return
+	}
 
 	// check consensus Id
 	consensus.mutex.Lock()
@@ -157,7 +166,7 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 	}
 
 	// proceed only when the message is not received before
-	_, ok := consensus.commitments[validatorId]
+	_, ok = consensus.commitments[validatorId]
 	shouldProcess := !ok
 	if shouldProcess {
 		point := crypto.Ed25519Curve.Point()
@@ -174,7 +183,7 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 
 		// Broadcast challenge
 		msgToSend := consensus.constructChallengeMessage()
-		p2p.BroadcastMessage(consensus.validators, msgToSend)
+		p2p.BroadcastMessage(consensus.getValidatorPeers(), msgToSend)
 
 		// Set state to CHALLENGE_DONE
 		consensus.state = CHALLENGE_DONE

@@ -124,13 +124,10 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 		return
 	}
 
-	// TODO: return the signature(commit) to leader
-	// For now, simply return the private key of this node.
 	secret, msgToSend := consensus.constructCommitMessage()
 	// Store the commitment secret
 	consensus.secret = secret
 
-	// consensus.Log.Debug("SENDING COMMIT", "consensusId", consensus.consensusId, "consensus", consensus)
 	p2p.SendMessage(consensus.leader, msgToSend)
 
 	// Set state to COMMIT_DONE
@@ -154,7 +151,7 @@ func (consensus *Consensus) constructCommitMessage() (secret kyber.Scalar, commi
 	binary.BigEndian.PutUint16(twoBytes, consensus.nodeId)
 	buffer.Write(twoBytes)
 
-	// 32 byte of commit (Note it's different than Zilliqa's ECPoint which takes 33 bytes: https://crypto.stackexchange.com/questions/51703/how-to-convert-from-curve25519-33-byte-to-32-byte-representation)
+	// 32 byte of commit (TODO: figure out why it's different than Zilliqa's ECPoint which takes 33 bytes: https://crypto.stackexchange.com/questions/51703/how-to-convert-from-curve25519-33-byte-to-32-byte-representation)
 	secret, commitment := crypto.Commit(crypto.Ed25519Curve)
 	commitment.MarshalTo(buffer)
 

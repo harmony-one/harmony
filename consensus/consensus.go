@@ -23,8 +23,8 @@ type Consensus struct {
 	bitmap *crypto.Mask
 	// Signatures collected from validators
 	responses map[string]string
-	// List of validators
-	validators []p2p.Peer
+	// map of nodeId to validator Peer object
+	validators map[uint16]p2p.Peer
 	// Leader
 	leader p2p.Peer
 	// private/public keys of current node
@@ -88,10 +88,19 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 	}
 
 	consensus.commitments = make(map[uint16]kyber.Point)
+	consensus.validators = make(map[uint16]p2p.Peer)
 	consensus.responses = make(map[string]string)
 
 	consensus.leader = leader
-	consensus.validators = peers
+	reg, err := regexp.Compile("[^0-9]+")
+	if err != nil {
+		log.Crit("Regex Compilation Failed", "err", err)
+	}
+	for _, peer := range peers {
+		socketId := reg.ReplaceAllString(peer.Ip+peer.Port, "") // A integer Id formed by unique IP/PORT pair
+		value, _ := strconv.Atoi(socketId)
+		consensus.validators[uint16(value)] = peer
+	}
 
 	// Initialize cosign bitmap
 	allPublics := make([]kyber.Point, 0)
@@ -106,10 +115,6 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 	consensus.bitmap = mask
 
 	// Set private key for myself so that I can sign messages.
-	reg, err := regexp.Compile("[^0-9]+")
-	if err != nil {
-		log.Crit("Regex Compilation Failed", "err", err)
-	}
 	socketId := reg.ReplaceAllString(ip+port, "") // A integer Id formed by unique IP/PORT pair
 	value, _ := strconv.Atoi(socketId)
 	consensus.priKey = crypto.Ed25519Curve.Scalar().SetInt64(int64(value))
@@ -149,6 +154,14 @@ func (consensus *Consensus) signMessage(message []byte) []byte {
 		panic("Failed to sign message with Schnorr signature.")
 	}
 	return signature
+}
+
+func (consensus *Consensus) getValidatorPeers() []p2p.Peer {
+	validatorPeers := make([]p2p.Peer, 0)
+	for _, validatorPeer := range consensus.validators {
+		validatorPeers = append(validatorPeers, validatorPeer)
+	}
+	return validatorPeers
 }
 
 // Reset the state of the consensus
