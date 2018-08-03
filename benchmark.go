@@ -15,8 +15,7 @@ import (
 
 	"github.com/shirou/gopsutil/process"
 	"harmony-benchmark/crypto"
-	"regexp"
-	"strconv"
+	"harmony-benchmark/utils"
 )
 
 const (
@@ -42,13 +41,7 @@ func getLeader(myShardId string, config *[][]string) p2p.Peer {
 			leaderPeer.Port = port
 
 			// Get public key deterministically based on ip and port
-			reg, err := regexp.Compile("[^0-9]+")
-			if err != nil {
-				log.Crit("Regex Compilation Failed", "err", err)
-			}
-			socketId := reg.ReplaceAllString(ip+port, "") // A integer Id formed by unique IP/PORT pair
-			value, _ := strconv.Atoi(socketId)
-			priKey := crypto.Ed25519Curve.Scalar().SetInt64(int64(value)) // TODO: figure out why using a random hash value doesn't work for private key (schnorr)
+			priKey := crypto.Ed25519Curve.Scalar().SetInt64(int64(utils.GetUniqueIdFromPeer(leaderPeer))) // TODO: figure out why using a random hash value doesn't work for private key (schnorr)
 			leaderPeer.PubKey = crypto.GetPublicKeyFromScalar(crypto.Ed25519Curve, priKey)
 		}
 	}
@@ -63,14 +56,9 @@ func getPeers(myIp, myPort, myShardId string, config *[][]string) []p2p.Peer {
 			continue
 		}
 		// Get public key deterministically based on ip and port
-		reg, err := regexp.Compile("[^0-9]+")
-		if err != nil {
-			log.Crit("Regex Compilation Failed", "err", err)
-		}
-		socketId := reg.ReplaceAllString(ip+port, "") // A integer Id formed by unique IP/PORT pair
-		value, _ := strconv.Atoi(socketId)
-		priKey := crypto.Ed25519Curve.Scalar().SetInt64(int64(value))
-		peer := p2p.Peer{Port: port, Ip: ip, PubKey: crypto.GetPublicKeyFromScalar(crypto.Ed25519Curve, priKey)}
+		peer := p2p.Peer{Port: port, Ip: ip}
+		priKey := crypto.Ed25519Curve.Scalar().SetInt64(int64(utils.GetUniqueIdFromPeer(peer)))
+		peer.PubKey = crypto.GetPublicKeyFromScalar(crypto.Ed25519Curve, priKey)
 		peerList = append(peerList, peer)
 	}
 	return peerList

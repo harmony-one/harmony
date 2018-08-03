@@ -9,7 +9,7 @@ import (
 	"harmony-benchmark/crypto"
 	"harmony-benchmark/log"
 	"harmony-benchmark/p2p"
-	"regexp"
+	"harmony-benchmark/utils"
 	"strconv"
 	"sync"
 )
@@ -92,14 +92,8 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 	consensus.responses = make(map[string]string)
 
 	consensus.leader = leader
-	reg, err := regexp.Compile("[^0-9]+")
-	if err != nil {
-		log.Crit("Regex Compilation Failed", "err", err)
-	}
 	for _, peer := range peers {
-		socketId := reg.ReplaceAllString(peer.Ip+peer.Port, "") // A integer Id formed by unique IP/PORT pair
-		value, _ := strconv.Atoi(socketId)
-		consensus.validators[uint16(value)] = peer
+		consensus.validators[utils.GetUniqueIdFromPeer(peer)] = peer
 	}
 
 	// Initialize cosign bitmap
@@ -114,10 +108,12 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 	}
 	consensus.bitmap = mask
 
+	// For now use socket address as 16 byte Id
+	// TODO: populate with correct Id
+	consensus.nodeId = utils.GetUniqueIdFromPeer(p2p.Peer{Ip: ip, Port: port})
+
 	// Set private key for myself so that I can sign messages.
-	socketId := reg.ReplaceAllString(ip+port, "") // A integer Id formed by unique IP/PORT pair
-	value, _ := strconv.Atoi(socketId)
-	consensus.priKey = crypto.Ed25519Curve.Scalar().SetInt64(int64(value))
+	consensus.priKey = crypto.Ed25519Curve.Scalar().SetInt64(int64(consensus.nodeId))
 	consensus.pubKey = crypto.GetPublicKeyFromScalar(crypto.Ed25519Curve, consensus.priKey)
 	consensus.consensusId = 0 // or view Id in the original pbft paper
 
@@ -129,10 +125,6 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 
 	// For validators to keep track of all blocks received but not yet committed, so as to catch up to latest consensus if lagged behind.
 	consensus.blocksReceived = make(map[uint32]*BlockConsensusStatus)
-
-	// For now use socket address as 16 byte Id
-	// TODO: populate with correct Id
-	consensus.nodeId = uint16(value)
 
 	if consensus.IsLeader {
 		consensus.ReadySignal = make(chan int)
