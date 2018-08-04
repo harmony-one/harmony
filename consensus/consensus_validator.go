@@ -191,12 +191,6 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 	offset += 64
 	//#### END: Read payload data
 
-	// TODO: make use of the data. This is just to avoid the unused variable warning
-	_ = aggreCommit
-	_ = aggreKey
-	_ = challenge
-	_ = signature
-
 	// Update readyByConsensus for attack.
 	attack.GetInstance().UpdateConsensusReady(consensusId)
 
@@ -240,8 +234,6 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 		consensus.Log.Warn("ROLLING UP", "consensus", consensus)
 		// If I received previous block (which haven't been processed. I will roll up to current block if everything checks.
 	}
-
-	// TODO: verify aggregated commitments with real schnor cosign verification
 
 	aggCommitment := crypto.Ed25519Curve.Point()
 	aggCommitment.UnmarshalBinary(aggreCommit[:32]) // TODO: figure out whether it's 33 bytes or 32 bytes
