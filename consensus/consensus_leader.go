@@ -8,6 +8,7 @@ import (
 	"github.com/dedis/kyber/sign/schnorr"
 	"harmony-benchmark/blockchain"
 	"harmony-benchmark/crypto"
+	"harmony-benchmark/log"
 	"harmony-benchmark/p2p"
 	proto_consensus "harmony-benchmark/proto/consensus"
 	"time"
@@ -246,8 +247,15 @@ func getAggregatedKey(bitmap *crypto.Mask) []byte {
 }
 
 func getChallenge(aggCommitment, aggKey kyber.Point, message []byte) []byte {
-	crypto.Challenge(crypto.Ed25519Curve, aggCommitment, aggKey, message)
-	return make([]byte, 32)
+	challenge, err := crypto.Challenge(crypto.Ed25519Curve, aggCommitment, aggKey, message)
+	if err != nil {
+		log.Error("Failed to generate challenge")
+	}
+	bytes, err := challenge.MarshalBinary()
+	if err != nil {
+		log.Error("Failed to serialize challenge")
+	}
+	return bytes
 }
 
 // Processes the response message sent from validators

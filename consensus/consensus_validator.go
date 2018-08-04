@@ -243,15 +243,32 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 
 	// TODO: verify aggregated commitments with real schnor cosign verification
 
+	aggCommitment := crypto.Ed25519Curve.Point()
+	aggCommitment.UnmarshalBinary(aggreCommit[:32]) // TODO: figure out whether it's 33 bytes or 32 bytes
+	aggKey := crypto.Ed25519Curve.Point()
+	aggKey.UnmarshalBinary(aggreKey[:32])
+
+	reconstructedChallenge, err := crypto.Challenge(crypto.Ed25519Curve, aggCommitment, aggKey, payload[:36]) // Only consensus Id and block hash
+
+	if err != nil {
+		log.Error("Failed to reconstruct the challenge from commits and keys")
+		return
+	}
+
 	// For now, simply return the private key of this node.
-	challengeScalar := crypto.Ed25519Curve.Scalar()
-	err := challengeScalar.UnmarshalBinary(challenge)
+	receivedChallenge := crypto.Ed25519Curve.Scalar()
+	err = receivedChallenge.UnmarshalBinary(challenge)
 	if err != nil {
 		log.Error("Failed to deserialize challenge", "err", err)
 		return
 	}
 
-	response, err := crypto.Response(crypto.Ed25519Curve, consensus.priKey, consensus.secret, challengeScalar)
+	if !reconstructedChallenge.Equal(receivedChallenge) {
+		log.Error("The challenge doesn't match the commitments and keys")
+		return
+	}
+
+	response, err := crypto.Response(crypto.Ed25519Curve, consensus.priKey, consensus.secret, receivedChallenge)
 	if err != nil {
 		log.Error("Failed to generate response", "err", err)
 		return
