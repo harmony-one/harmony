@@ -221,6 +221,7 @@ func (consensus *Consensus) constructChallengeMessage() []byte {
 
 	// 32 byte challenge
 	buffer.Write(getChallenge(aggCommitment, consensus.bitmap.AggregatePublic, buffer.Bytes()[:36])) // message contains consensus id and block hash for now.
+	consensus.aggregatedCommitment = aggCommitment
 
 	// 64 byte of signature on previous data
 	signature := consensus.signMessage(buffer.Bytes())
@@ -325,6 +326,23 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 	if len(consensus.responses) >= (2*len(consensus.validators))/3+1 && consensus.state != FINISHED {
 		consensus.mutex.Lock()
 		if len(consensus.responses) >= (2*len(consensus.validators))/3+1 && consensus.state != FINISHED {
+			// Aggregate responses
+			responses := make([]kyber.Scalar, 0)
+			for _, val := range consensus.responses {
+				responses = append(responses, val)
+			}
+			aggResponse, err := crypto.AggregateResponses(crypto.Ed25519Curve, responses)
+			if err != nil {
+				log.Error("Failed to aggregate responses")
+				return
+			}
+			collectiveSign, err := crypto.Sign(crypto.Ed25519Curve, consensus.aggregatedCommitment, aggResponse, consensus.bitmap)
+			if err != nil {
+				log.Error("Failed to create collective signature")
+				return
+			}
+			_ = collectiveSign // TODO: put the collective signature into block and broadcast
+
 			consensus.Log.Debug("Consensus reached with signatures.", "numOfSignatures", len(consensus.responses))
 			// Reset state to FINISHED, and clear other data.
 			consensus.ResetState()
@@ -335,7 +353,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 			// For now, we used the stored whole block already stored in consensus.blockHeader
 			txDecoder := gob.NewDecoder(bytes.NewReader(consensus.blockHeader))
 			var blockHeaderObj blockchain.Block
-			err := txDecoder.Decode(&blockHeaderObj)
+			err = txDecoder.Decode(&blockHeaderObj)
 			if err != nil {
 				consensus.Log.Debug("failed to construct the new block after consensus")
 			}

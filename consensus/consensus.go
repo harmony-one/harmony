@@ -18,7 +18,9 @@ import (
 type Consensus struct {
 	state ConsensusState
 	// Commits collected from validators. A map from node Id to its commitment
-	commitments map[uint16]kyber.Point
+	commitments          map[uint16]kyber.Point
+	aggregatedCommitment kyber.Point
+
 	// Commits collected from validators.
 	bitmap *crypto.Mask
 	// Responses collected from validators
