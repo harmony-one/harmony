@@ -271,7 +271,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 	offset += 32
 
 	// 2 byte validator id
-	validatorId := string(payload[offset : offset+2])
+	validatorId := binary.BigEndian.Uint16(payload[offset : offset+2])
 	offset += 2
 
 	// 32 byte response
@@ -282,12 +282,6 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 	signature := payload[offset : offset+64]
 	offset += 64
 	//#### END: Read payload data
-
-	// TODO: make use of the data. This is just to avoid the unused variable warning
-	_ = consensusId
-	_ = blockHash
-	_ = response
-	_ = signature
 
 	shouldProcess := true
 	consensus.mutex.Lock()
@@ -302,12 +296,24 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 		return
 	}
 
+	// Verify signature
+	value, ok := consensus.validators[validatorId]
+	if !ok {
+		consensus.Log.Warn("Received message from unrecognized validator", "validatorId", validatorId, "consensus", consensus)
+		return
+	}
+	if schnorr.Verify(crypto.Ed25519Curve, value.PubKey, payload[:offset-64], signature) != nil {
+		consensus.Log.Warn("Received message with invalid signature", "validatorKey", consensus.leader.PubKey, "consensus", consensus)
+		return
+	}
+
 	// proceed only when the message is not received before
-	_, ok := consensus.responses[validatorId]
+	_, ok = consensus.responses[validatorId]
 	shouldProcess = shouldProcess && !ok
 	if shouldProcess {
-		consensus.responses[validatorId] = validatorId
-		//consensus.Log.Debug("Number of responses received", "consensusId", consensus.consensusId, "count", len(consensus.responses))
+		scalar := crypto.Ed25519Curve.Scalar()
+		scalar.UnmarshalBinary(response)
+		consensus.responses[validatorId] = scalar
 	}
 	consensus.mutex.Unlock()
 

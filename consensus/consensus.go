@@ -21,8 +21,8 @@ type Consensus struct {
 	commitments map[uint16]kyber.Point
 	// Commits collected from validators.
 	bitmap *crypto.Mask
-	// Signatures collected from validators
-	responses map[string]string
+	// Responses collected from validators
+	responses map[uint16]kyber.Scalar
 	// map of nodeId to validator Peer object
 	validators map[uint16]p2p.Peer
 	// Leader
@@ -89,7 +89,7 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 
 	consensus.commitments = make(map[uint16]kyber.Point)
 	consensus.validators = make(map[uint16]p2p.Peer)
-	consensus.responses = make(map[string]string)
+	consensus.responses = make(map[uint16]kyber.Scalar)
 
 	consensus.leader = leader
 	for _, peer := range peers {
@@ -160,7 +160,7 @@ func (consensus *Consensus) getValidatorPeers() []p2p.Peer {
 func (consensus *Consensus) ResetState() {
 	consensus.state = FINISHED
 	consensus.commitments = make(map[uint16]kyber.Point)
-	consensus.responses = make(map[string]string)
+	consensus.responses = make(map[uint16]kyber.Scalar)
 	consensus.secret = nil
 }
 
