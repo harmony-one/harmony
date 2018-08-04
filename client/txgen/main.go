@@ -158,7 +158,7 @@ func generateCrossShardTx(txInfo *TxInfo) {
 	txInputs := []blockchain.TXInput{txin}
 
 	// Add the utxo from the other shard, if any
-	if crossTxin != nil {
+	if crossTxin != nil { // This means the ratio of cross shard tx could be lower than 1/3
 		txInputs = append(txInputs, *crossTxin)
 	}
 

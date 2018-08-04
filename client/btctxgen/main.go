@@ -23,10 +23,16 @@ type txGenSettings struct {
 	maxNumTxsPerBatch int
 }
 
+type TXRef struct {
+	txID    [32]byte
+	shardID uint32
+}
+
 var (
 	utxoPoolMutex sync.Mutex
 	setting       txGenSettings
 	btcTXIter     btctxiter.BTCTXIterator
+	utxoMapping   map[string]TXRef // btcTXID to { txID, shardID }
 )
 
 // Generates at most "maxNumTxs" number of simulated transactions based on the current UtxoPools of all shards.
@@ -69,15 +75,15 @@ LOOP:
 	for true {
 		btcTx := btcTXIter.NextTx()
 		tx := blockchain.Transaction{}
-		// tx.ID = tx.Hash.String()
+		isCrossShardTx := false
 		if btcTx.IsCoinBase() {
-			// TxIn coinbase, newly generated coins
-			prevTxID := [32]byte{}
 			// TODO: merge txID with txIndex in TxInput
-			tx.TxInput = []blockchain.TXInput{blockchain.TXInput{prevTxID, -1, "", nodeShardID}}
+			tx.TxInput = []blockchain.TXInput{blockchain.TXInput{[32]byte{}, -1, "", nodeShardID}}
 		} else {
-			for _, txi := range btcTx.TxIn {
-				tx.TxInput = append(tx.TxInput, blockchain.TXInput{txi.Input.Hash, int(txi.Input.Vout), "", nodeShardID})
+			for _, btcTXI := range btcTx.TxIn {
+				btcTXIDStr := btc.NewUint256(btcTXI.Input.Hash[:]).String()
+				txi := utxoMapping[btcTXIDStr]
+				tx.TxInput = append(tx.TxInput, blockchain.TXInput{txi.txID, int(btcTXI.Input.Vout), "", txi.shardID})
 			}
 		}
 
@@ -90,7 +96,12 @@ LOOP:
 			tx.TxOutput = append(tx.TxOutput, txout)
 		}
 		tx.SetID()
-		txs = append(txs, &tx)
+		utxoMapping[btcTx.Hash.String()] = TXRef{tx.ID, nodeShardID}
+		if isCrossShardTx {
+			crossTxs = append(crossTxs, &tx)
+		} else {
+			txs = append(txs, &tx)
+		}
 		// log.Debug("[Generator] transformed btc tx", "block height", btcTXIter.GetBlockIndex(), "block tx count", btcTXIter.GetBlock().TxCount, "block tx cnt", len(btcTXIter.GetBlock().Txs), "txi", len(tx.TxInput), "txo", len(tx.TxOutput), "txCount", cnt)
 		cnt++
 		if cnt >= setting.maxNumTxsPerBatch {
@@ -161,6 +172,7 @@ func main() {
 	log.Root().SetHandler(h)
 
 	btcTXIter.Init()
+	utxoMapping = make(map[string]TXRef)
 
 	// Nodes containing utxopools to mirror the shards' data in the network
 	nodes := []*node.Node{}
@@ -193,7 +205,7 @@ func main() {
 			txs, crossTxs := generateSimulatedTransactions(i, nodes)
 			allCrossTxs = append(allCrossTxs, crossTxs...)
 
-			log.Debug("[Generator] Sending single-shard txs ...", "leader", leader, "numTxs", len(txs), "numCrossTxs", len(crossTxs))
+			log.Debug("[Generator] Sending txs ...", "leader", leader, "numTxs", len(txs), "numCrossTxs", len(crossTxs))
 			msg := proto_node.ConstructTransactionListMessage(txs)
 			p2p.SendMessage(leader, msg)
 			// Note cross shard txs are later sent in batch
