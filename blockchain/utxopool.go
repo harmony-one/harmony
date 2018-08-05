@@ -66,7 +66,7 @@ func (utxoPool *UTXOPool) VerifyOneTransaction(tx *Transaction, spentTXOs *map[s
 			continue
 		}
 
-		inTxID := hex.EncodeToString(in.PreviousOutPoint.Hash[:])
+		inTxID := hex.EncodeToString(in.PreviousOutPoint.TxID[:])
 		index := in.PreviousOutPoint.Index
 		// Check if the transaction with the addres is spent or not.
 		if val, ok := (*spentTXOs)[in.Address][inTxID][index]; ok {
@@ -168,7 +168,7 @@ func (utxoPool *UTXOPool) UpdateOneTransaction(tx *Transaction) {
 			if in.ShardID != utxoPool.ShardID {
 				continue
 			}
-			inTxID := hex.EncodeToString(in.PreviousOutPoint.Hash[:])
+			inTxID := hex.EncodeToString(in.PreviousOutPoint.TxID[:])
 			if _, ok := utxoPool.UtxoMap[in.Address][inTxID][in.PreviousOutPoint.Index]; !ok {
 				isValidCrossShard = false
 			}
@@ -190,12 +190,12 @@ func (utxoPool *UTXOPool) UpdateOneTransaction(tx *Transaction) {
 					}
 
 					// NOTE: for the locking phase of cross tx, the utxo is simply removed from the pool.
-					inTxID := hex.EncodeToString(in.PreviousOutPoint.Hash[:])
+					inTxID := hex.EncodeToString(in.PreviousOutPoint.TxID[:])
 					value := utxoPool.UtxoMap[in.Address][inTxID][in.PreviousOutPoint.Index]
 					utxoPool.DeleteOneUtxo(in.Address, inTxID, in.PreviousOutPoint.Index)
 					if isCrossShard {
 						// put the delete (locked) utxo into a separate locked utxo pool
-						inTxID := hex.EncodeToString(in.PreviousOutPoint.Hash[:])
+						inTxID := hex.EncodeToString(in.PreviousOutPoint.TxID[:])
 						if _, ok := utxoPool.LockedUtxoMap[in.Address]; !ok {
 							utxoPool.LockedUtxoMap[in.Address] = make(TXHash2Vout2AmountMap)
 							utxoPool.LockedUtxoMap[in.Address][inTxID] = make(Vout2AmountMap)
@@ -221,7 +221,7 @@ func (utxoPool *UTXOPool) UpdateOneTransaction(tx *Transaction) {
 						}
 
 						// Simply bring back the locked (removed) utxo
-						inTxID := hex.EncodeToString(in.PreviousOutPoint.Hash[:])
+						inTxID := hex.EncodeToString(in.PreviousOutPoint.TxID[:])
 						if _, ok := utxoPool.UtxoMap[in.Address]; !ok {
 							utxoPool.UtxoMap[in.Address] = make(TXHash2Vout2AmountMap)
 							utxoPool.UtxoMap[in.Address][inTxID] = make(Vout2AmountMap)
@@ -239,7 +239,7 @@ func (utxoPool *UTXOPool) UpdateOneTransaction(tx *Transaction) {
 				// normal utxo output update
 				for index, out := range tx.TxOutput {
 					// Only check the input for my own shard.
-					if out.ShardId != utxoPool.ShardID {
+					if out.ShardID != utxoPool.ShardID {
 						continue
 					}
 					if _, ok := utxoPool.UtxoMap[out.Address]; !ok {

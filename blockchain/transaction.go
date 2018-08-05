@@ -14,7 +14,7 @@ var (
 	// zeroHash is the zero value for a Hash and is defined as
 	// a package level variable to avoid the need to create a new instance
 	// every time a check is needed.
-	zeroHash Hash
+	zeroHash TxID
 )
 
 type Transaction struct {
@@ -29,25 +29,25 @@ type Transaction struct {
 type TXOutput struct {
 	Value   int
 	Address string
-	ShardId uint32 // The Id of the shard where this UTXO belongs
+	ShardID uint32 // The Id of the shard where this UTXO belongs
 }
 
-type Hash = [32]byte
+type TxID = [32]byte
 
 // Output defines a data type that is used to track previous
 // transaction outputs.
-// Hash is the transaction id
+// TxID is the transaction id
 // Index is the index of the transaction ouput in the previous transaction
 type OutPoint struct {
-	Hash  Hash
+	TxID  TxID
 	Index uint32
 }
 
 // NewOutPoint returns a new transaction outpoint point with the
-// provided hash and index.
-func NewOutPoint(hash *Hash, index uint32) *OutPoint {
+// provided txID and index.
+func NewOutPoint(txID *TxID, index uint32) *OutPoint {
 	return &OutPoint{
-		Hash:  *hash,
+		TxID:  *txID,
 		Index: index,
 	}
 }
@@ -109,7 +109,7 @@ func NewCoinbaseTX(to, data string, shardID uint32) *Transaction {
 		data = fmt.Sprintf("Reward to '%s'", to)
 	}
 
-	txin := NewTXInput(NewOutPoint(&Hash{}, math.MaxUint32), to, shardID)
+	txin := NewTXInput(NewOutPoint(&TxID{}, math.MaxUint32), to, shardID)
 	txout := TXOutput{DefaultCoinbaseValue, to, shardID}
 	tx := Transaction{[32]byte{}, []TXInput{*txin}, []TXOutput{txout}, nil}
 	tx.SetID()
@@ -118,7 +118,7 @@ func NewCoinbaseTX(to, data string, shardID uint32) *Transaction {
 
 // Used for debuging.
 func (txInput *TXInput) String() string {
-	res := fmt.Sprintf("TxID: %v, ", hex.EncodeToString(txInput.PreviousOutPoint.Hash[:]))
+	res := fmt.Sprintf("TxID: %v, ", hex.EncodeToString(txInput.PreviousOutPoint.TxID[:]))
 	res += fmt.Sprintf("TxOutputIndex: %v, ", txInput.PreviousOutPoint.Index)
 	res += fmt.Sprintf("Address: %v, ", txInput.Address)
 	res += fmt.Sprintf("Shard Id: %v", txInput.ShardID)
