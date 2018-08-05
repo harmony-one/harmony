@@ -25,12 +25,41 @@ type TXOutput struct {
 	ShardId uint32 // The Id of the shard where this UTXO belongs
 }
 
+type Hash = [32]byte
+
+// Output defines a data type that is used to track previous
+// transaction outputs.
+// Hash is the transaction id
+// Index is the index of the transaction ouput in the previous transaction
+type OutPoint struct {
+	Hash  Hash
+	Index int
+}
+
+// NewOutPoint returns a new transaction outpoint point with the
+// provided hash and index.
+func NewOutPoint(hash *Hash, index int) *OutPoint {
+	return &OutPoint{
+		Hash:  *hash,
+		Index: index,
+	}
+}
+
 // TXInput is the struct of transaction input (a UTXO) in a transaction.
 type TXInput struct {
-	TxID          [32]byte
-	TxOutputIndex int
-	Address       string
-	ShardId       uint32 // The Id of the shard where this UTXO belongs
+	PreviousOutPoint OutPoint
+	Address          string
+	ShardID          uint32 // The Id of the shard where this UTXO belongs
+}
+
+// NewTXInput returns a new transaction input with the provided
+// previous outpoint point, output address and shardID
+func NewTXInput(prevOut *OutPoint, address string, shardID uint32) *TXInput {
+	return &TXInput{
+		PreviousOutPoint: *prevOut,
+		Address:          address,
+		ShardID:          shardID,
+	}
 }
 
 // The proof of accept or reject in the cross shard transaction locking phase.
@@ -68,24 +97,24 @@ func (tx *Transaction) SetID() {
 }
 
 // NewCoinbaseTX creates a new coinbase transaction
-func NewCoinbaseTX(to, data string, shardId uint32) *Transaction {
+func NewCoinbaseTX(to, data string, shardID uint32) *Transaction {
 	if data == "" {
 		data = fmt.Sprintf("Reward to '%s'", to)
 	}
 
-	txin := TXInput{[32]byte{}, -1, data, shardId}
-	txout := TXOutput{DefaultCoinbaseValue, to, shardId}
-	tx := Transaction{[32]byte{}, []TXInput{txin}, []TXOutput{txout}, nil}
+	txin := NewTXInput(nil, to, shardID)
+	txout := TXOutput{DefaultCoinbaseValue, to, shardID}
+	tx := Transaction{[32]byte{}, []TXInput{*txin}, []TXOutput{txout}, nil}
 	tx.SetID()
 	return &tx
 }
 
 // Used for debuging.
 func (txInput *TXInput) String() string {
-	res := fmt.Sprintf("TxID: %v, ", hex.EncodeToString(txInput.TxID[:]))
-	res += fmt.Sprintf("TxOutputIndex: %v, ", txInput.TxOutputIndex)
+	res := fmt.Sprintf("TxID: %v, ", hex.EncodeToString(txInput.PreviousOutPoint.Hash[:]))
+	res += fmt.Sprintf("TxOutputIndex: %v, ", txInput.PreviousOutPoint.Index)
 	res += fmt.Sprintf("Address: %v, ", txInput.Address)
-	res += fmt.Sprintf("Shard Id: %v", txInput.ShardId)
+	res += fmt.Sprintf("Shard Id: %v", txInput.ShardID)
 	return res
 }
 

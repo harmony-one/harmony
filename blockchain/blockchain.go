@@ -51,8 +51,8 @@ func (bc *Blockchain) FindUnspentTransactions(address string) []Transaction {
 
 			for _, txInput := range tx.TxInput {
 				if address == txInput.Address {
-					ID := hex.EncodeToString(txInput.TxID[:])
-					spentTXOs[ID] = append(spentTXOs[ID], txInput.TxOutputIndex)
+					ID := hex.EncodeToString(txInput.PreviousOutPoint.Hash[:])
+					spentTXOs[ID] = append(spentTXOs[ID], txInput.PreviousOutPoint.Index)
 				}
 			}
 		}
@@ -103,7 +103,7 @@ Work:
 }
 
 // NewUTXOTransaction creates a new transaction
-func (bc *Blockchain) NewUTXOTransaction(from, to string, amount int, shardId uint32) *Transaction {
+func (bc *Blockchain) NewUTXOTransaction(from, to string, amount int, shardID uint32) *Transaction {
 	var inputs []TXInput
 	var outputs []TXOutput
 
@@ -120,18 +120,18 @@ func (bc *Blockchain) NewUTXOTransaction(from, to string, amount int, shardId ui
 			return nil
 		}
 
-		txId := [32]byte{}
-		copy(txId[:], id[:])
+		txID := Hash{}
+		copy(txID[:], id[:])
 		for _, out := range outs {
-			input := TXInput{txId, out, from, shardId}
-			inputs = append(inputs, input)
+			input := NewTXInput(NewOutPoint(&txID, out), from, shardID)
+			inputs = append(inputs, *input)
 		}
 	}
 
 	// Build a list of outputs
-	outputs = append(outputs, TXOutput{amount, to, shardId})
+	outputs = append(outputs, TXOutput{amount, to, shardID})
 	if acc > amount {
-		outputs = append(outputs, TXOutput{acc - amount, from, shardId}) // a change
+		outputs = append(outputs, TXOutput{acc - amount, from, shardID}) // a change
 	}
 
 	tx := Transaction{[32]byte{}, inputs, outputs, nil}

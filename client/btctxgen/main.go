@@ -78,7 +78,7 @@ LOOP:
 		isCrossShardTx := false
 		if btcTx.IsCoinBase() {
 			// TODO: merge txID with txIndex in TxInput
-			tx.TxInput = []blockchain.TXInput{blockchain.TXInput{[32]byte{}, -1, "", nodeShardID}}
+			tx.TxInput = []blockchain.TXInput{*blockchain.NewTXInput(nil, "", nodeShardID)}
 		} else {
 			for _, btcTXI := range btcTx.TxIn {
 				btcTXIDStr := btc.NewUint256(btcTXI.Input.Hash[:]).String()
@@ -86,7 +86,7 @@ LOOP:
 				if txRef.shardID != nodeShardID {
 					isCrossShardTx = true
 				}
-				tx.TxInput = append(tx.TxInput, blockchain.TXInput{txRef.txID, int(btcTXI.Input.Vout), "", txRef.shardID})
+				tx.TxInput = append(tx.TxInput, *blockchain.NewTXInput(blockchain.NewOutPoint(&txRef.txID, int(btcTXI.Input.Vout)), "", txRef.shardID))
 			}
 		}
 
