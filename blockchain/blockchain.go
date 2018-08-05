@@ -23,7 +23,7 @@ func (bc *Blockchain) GetLatestBlock() *Block {
 // FindUnspentTransactions returns a list of transactions containing unspent outputs
 func (bc *Blockchain) FindUnspentTransactions(address string) []Transaction {
 	var unspentTXs []Transaction
-	spentTXOs := make(map[string][]int)
+	spentTXOs := make(map[string][]uint32)
 
 	for index := len(bc.Blocks) - 1; index >= 0; index-- {
 		block := bc.Blocks[index]
@@ -37,7 +37,7 @@ func (bc *Blockchain) FindUnspentTransactions(address string) []Transaction {
 				idx = 0
 			}
 			for outIdx, txOutput := range tx.TxOutput {
-				if idx >= 0 && spentTXOs[txID][idx] == outIdx {
+				if idx >= 0 && spentTXOs[txID][idx] == uint32(outIdx) {
 					idx++
 					continue
 				}
@@ -78,8 +78,8 @@ func (bc *Blockchain) FindUTXO(address string) []TXOutput {
 }
 
 // FindSpendableOutputs finds and returns unspent outputs to reference in inputs
-func (bc *Blockchain) FindSpendableOutputs(address string, amount int) (int, map[string][]int) {
-	unspentOutputs := make(map[string][]int)
+func (bc *Blockchain) FindSpendableOutputs(address string, amount int) (int, map[string][]uint32) {
+	unspentOutputs := make(map[string][]uint32)
 	unspentTXs := bc.FindUnspentTransactions(address)
 	accumulated := 0
 
@@ -90,7 +90,7 @@ Work:
 		for outIdx, txOutput := range tx.TxOutput {
 			if txOutput.Address == address && accumulated < amount {
 				accumulated += txOutput.Value
-				unspentOutputs[txID] = append(unspentOutputs[txID], outIdx)
+				unspentOutputs[txID] = append(unspentOutputs[txID], uint32(outIdx))
 
 				if accumulated >= amount {
 					break Work

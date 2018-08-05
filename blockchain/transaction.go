@@ -7,9 +7,16 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"math"
 )
 
-// Transaction represents a Bitcoin transaction
+var (
+	// zeroHash is the zero value for a Hash and is defined as
+	// a package level variable to avoid the need to create a new instance
+	// every time a check is needed.
+	zeroHash Hash
+)
+
 type Transaction struct {
 	ID       [32]byte // 32 byte hash
 	TxInput  []TXInput
@@ -33,12 +40,12 @@ type Hash = [32]byte
 // Index is the index of the transaction ouput in the previous transaction
 type OutPoint struct {
 	Hash  Hash
-	Index int
+	Index uint32
 }
 
 // NewOutPoint returns a new transaction outpoint point with the
 // provided hash and index.
-func NewOutPoint(hash *Hash, index int) *OutPoint {
+func NewOutPoint(hash *Hash, index uint32) *OutPoint {
 	return &OutPoint{
 		Hash:  *hash,
 		Index: index,
@@ -102,7 +109,7 @@ func NewCoinbaseTX(to, data string, shardID uint32) *Transaction {
 		data = fmt.Sprintf("Reward to '%s'", to)
 	}
 
-	txin := NewTXInput(nil, to, shardID)
+	txin := NewTXInput(NewOutPoint(&Hash{}, math.MaxUint32), to, shardID)
 	txout := TXOutput{DefaultCoinbaseValue, to, shardID}
 	tx := Transaction{[32]byte{}, []TXInput{*txin}, []TXOutput{txout}, nil}
 	tx.SetID()

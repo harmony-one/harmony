@@ -35,7 +35,7 @@ type TxInfo struct {
 	dataNodes []*node.Node
 	// Temp Input
 	id      [32]byte
-	index   int
+	index   uint32
 	value   int
 	address string
 	// Output

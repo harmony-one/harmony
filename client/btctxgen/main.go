@@ -12,6 +12,7 @@ import (
 	"harmony-benchmark/node"
 	"harmony-benchmark/p2p"
 	proto_node "harmony-benchmark/proto/node"
+	"math"
 	"sync"
 	"time"
 
@@ -77,8 +78,7 @@ LOOP:
 		tx := blockchain.Transaction{}
 		isCrossShardTx := false
 		if btcTx.IsCoinBase() {
-			// TODO: merge txID with txIndex in TxInput
-			tx.TxInput = []blockchain.TXInput{*blockchain.NewTXInput(nil, "", nodeShardID)}
+			tx.TxInput = []blockchain.TXInput{*blockchain.NewTXInput(blockchain.NewOutPoint(&blockchain.Hash{}, math.MaxUint32), "", nodeShardID)}
 		} else {
 			for _, btcTXI := range btcTx.TxIn {
 				btcTXIDStr := btc.NewUint256(btcTXI.Input.Hash[:]).String()
@@ -86,7 +86,7 @@ LOOP:
 				if txRef.shardID != nodeShardID {
 					isCrossShardTx = true
 				}
-				tx.TxInput = append(tx.TxInput, *blockchain.NewTXInput(blockchain.NewOutPoint(&txRef.txID, int(btcTXI.Input.Vout)), "", txRef.shardID))
+				tx.TxInput = append(tx.TxInput, *blockchain.NewTXInput(blockchain.NewOutPoint(&txRef.txID, btcTXI.Input.Vout), "", txRef.shardID))
 			}
 		}
 
