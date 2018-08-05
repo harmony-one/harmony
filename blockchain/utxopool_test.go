@@ -54,9 +54,9 @@ func TestDeleteOneBalanceItem(t *testing.T) {
 
 func TestCleanUp(t *testing.T) {
 	var utxoPool UTXOPool
-	utxoPool.UtxoMap = make(map[string]map[string]map[int]int)
-	utxoPool.UtxoMap["minh"] = make(map[string]map[int]int)
-	utxoPool.UtxoMap["rj"] = map[string]map[int]int{
+	utxoPool.UtxoMap = make(UtxoMap)
+	utxoPool.UtxoMap["minh"] = make(TXHash2Vout2AmountMap)
+	utxoPool.UtxoMap["rj"] = TXHash2Vout2AmountMap{
 		"abcd": {
 			0: 1,
 		},

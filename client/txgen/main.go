@@ -35,7 +35,7 @@ type TxInfo struct {
 	dataNodes []*node.Node
 	// Temp Input
 	id      [32]byte
-	index   int
+	index   uint32
 	value   int
 	address string
 	// Output
@@ -145,7 +145,7 @@ func generateCrossShardTx(txInfo *TxInfo) {
 
 		for crossShardIndex, crossShardValue := range crossShardUtxos {
 			crossUtxoValue = crossShardValue
-			crossTxin = &blockchain.TXInput{crossTxId, crossShardIndex, txInfo.address, uint32(crossShardId)}
+			crossTxin = blockchain.NewTXInput(blockchain.NewOutPoint(&crossTxId, crossShardIndex), txInfo.address, uint32(crossShardId))
 			break
 		}
 		if crossTxin != nil {
@@ -154,8 +154,8 @@ func generateCrossShardTx(txInfo *TxInfo) {
 	}
 
 	// Add the utxo from current shard
-	txin := blockchain.TXInput{txInfo.id, txInfo.index, txInfo.address, nodeShardID}
-	txInputs := []blockchain.TXInput{txin}
+	txIn := blockchain.NewTXInput(blockchain.NewOutPoint(&txInfo.id, txInfo.index), txInfo.address, nodeShardID)
+	txInputs := []blockchain.TXInput{*txIn}
 
 	// Add the utxo from the other shard, if any
 	if crossTxin != nil { // This means the ratio of cross shard tx could be lower than 1/3
@@ -183,11 +183,11 @@ func generateCrossShardTx(txInfo *TxInfo) {
 func generateSingleShardTx(txInfo *TxInfo) {
 	nodeShardID := txInfo.dataNodes[txInfo.shardID].Consensus.ShardID
 	// Add the utxo as new tx input
-	txin := blockchain.TXInput{txInfo.id, txInfo.index, txInfo.address, nodeShardID}
+	txin := blockchain.NewTXInput(blockchain.NewOutPoint(&txInfo.id, txInfo.index), txInfo.address, nodeShardID)
 
 	// Spend the utxo to a random address in [0 - N)
 	txout := blockchain.TXOutput{txInfo.value, strconv.Itoa(rand.Intn(setting.numOfAddress)), nodeShardID}
-	tx := blockchain.Transaction{[32]byte{}, []blockchain.TXInput{txin}, []blockchain.TXOutput{txout}, nil}
+	tx := blockchain.Transaction{[32]byte{}, []blockchain.TXInput{*txin}, []blockchain.TXOutput{txout}, nil}
 	tx.SetID()
 
 	txInfo.txs = append(txInfo.txs, &tx)

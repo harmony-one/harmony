@@ -7,9 +7,16 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"math"
 )
 
-// Transaction represents a Bitcoin transaction
+var (
+	// zeroHash is the zero value for a Hash and is defined as
+	// a package level variable to avoid the need to create a new instance
+	// every time a check is needed.
+	zeroHash TxID
+)
+
 type Transaction struct {
 	ID       [32]byte // 32 byte hash
 	TxInput  []TXInput
@@ -22,15 +29,44 @@ type Transaction struct {
 type TXOutput struct {
 	Value   int
 	Address string
-	ShardId uint32 // The Id of the shard where this UTXO belongs
+	ShardID uint32 // The Id of the shard where this UTXO belongs
+}
+
+type TxID = [32]byte
+
+// Output defines a data type that is used to track previous
+// transaction outputs.
+// TxID is the transaction id
+// Index is the index of the transaction ouput in the previous transaction
+type OutPoint struct {
+	TxID  TxID
+	Index uint32
+}
+
+// NewOutPoint returns a new transaction outpoint point with the
+// provided txID and index.
+func NewOutPoint(txID *TxID, index uint32) *OutPoint {
+	return &OutPoint{
+		TxID:  *txID,
+		Index: index,
+	}
 }
 
 // TXInput is the struct of transaction input (a UTXO) in a transaction.
 type TXInput struct {
-	TxID          [32]byte
-	TxOutputIndex int
-	Address       string
-	ShardId       uint32 // The Id of the shard where this UTXO belongs
+	PreviousOutPoint OutPoint
+	Address          string
+	ShardID          uint32 // The Id of the shard where this UTXO belongs
+}
+
+// NewTXInput returns a new transaction input with the provided
+// previous outpoint point, output address and shardID
+func NewTXInput(prevOut *OutPoint, address string, shardID uint32) *TXInput {
+	return &TXInput{
+		PreviousOutPoint: *prevOut,
+		Address:          address,
+		ShardID:          shardID,
+	}
 }
 
 // The proof of accept or reject in the cross shard transaction locking phase.
@@ -68,24 +104,24 @@ func (tx *Transaction) SetID() {
 }
 
 // NewCoinbaseTX creates a new coinbase transaction
-func NewCoinbaseTX(to, data string, shardId uint32) *Transaction {
+func NewCoinbaseTX(to, data string, shardID uint32) *Transaction {
 	if data == "" {
 		data = fmt.Sprintf("Reward to '%s'", to)
 	}
 
-	txin := TXInput{[32]byte{}, -1, data, shardId}
-	txout := TXOutput{DefaultCoinbaseValue, to, shardId}
-	tx := Transaction{[32]byte{}, []TXInput{txin}, []TXOutput{txout}, nil}
+	txin := NewTXInput(NewOutPoint(&TxID{}, math.MaxUint32), to, shardID)
+	txout := TXOutput{DefaultCoinbaseValue, to, shardID}
+	tx := Transaction{[32]byte{}, []TXInput{*txin}, []TXOutput{txout}, nil}
 	tx.SetID()
 	return &tx
 }
 
 // Used for debuging.
 func (txInput *TXInput) String() string {
-	res := fmt.Sprintf("TxID: %v, ", hex.EncodeToString(txInput.TxID[:]))
-	res += fmt.Sprintf("TxOutputIndex: %v, ", txInput.TxOutputIndex)
+	res := fmt.Sprintf("TxID: %v, ", hex.EncodeToString(txInput.PreviousOutPoint.TxID[:]))
+	res += fmt.Sprintf("TxOutputIndex: %v, ", txInput.PreviousOutPoint.Index)
 	res += fmt.Sprintf("Address: %v, ", txInput.Address)
-	res += fmt.Sprintf("Shard Id: %v", txInput.ShardId)
+	res += fmt.Sprintf("Shard Id: %v", txInput.ShardID)
 	return res
 }
 

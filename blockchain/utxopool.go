@@ -8,6 +8,10 @@ import (
 	"sync"
 )
 
+type Vout2AmountMap = map[uint32]int
+type TXHash2Vout2AmountMap = map[string]Vout2AmountMap
+type UtxoMap = map[string]TXHash2Vout2AmountMap
+
 // UTXOPool stores transactions and balance associated with each address.
 type UTXOPool struct {
 	// Mapping from address to a map of transaction id to a map of the index of output
@@ -25,15 +29,15 @@ type UTXOPool struct {
 	                       ]
 	               ]
 	*/
-	UtxoMap       map[string]map[string]map[int]int
-	LockedUtxoMap map[string]map[string]map[int]int
-	ShardId       uint32
+	UtxoMap       UtxoMap
+	LockedUtxoMap UtxoMap
+	ShardID       uint32
 	mutex         sync.Mutex
 }
 
 // VerifyTransactions verifies if a list of transactions valid for this shard.
 func (utxoPool *UTXOPool) VerifyTransactions(transactions []*Transaction) bool {
-	spentTXOs := make(map[string]map[string]map[int]bool)
+	spentTXOs := make(map[string]map[string]map[uint32]bool)
 	if utxoPool != nil {
 		for _, tx := range transactions {
 			if valid, crossShard := utxoPool.VerifyOneTransaction(tx, &spentTXOs); !crossShard && !valid {
@@ -45,25 +49,25 @@ func (utxoPool *UTXOPool) VerifyTransactions(transactions []*Transaction) bool {
 }
 
 // VerifyOneTransaction verifies if a list of transactions valid.
-func (utxoPool *UTXOPool) VerifyOneTransaction(tx *Transaction, spentTXOs *map[string]map[string]map[int]bool) (valid, crossShard bool) {
+func (utxoPool *UTXOPool) VerifyOneTransaction(tx *Transaction, spentTXOs *map[string]map[string]map[uint32]bool) (valid, crossShard bool) {
 	if len(tx.Proofs) != 0 {
 		return utxoPool.VerifyUnlockTransaction(tx)
 	}
 
 	if spentTXOs == nil {
-		spentTXOs = &map[string]map[string]map[int]bool{}
+		spentTXOs = &map[string]map[string]map[uint32]bool{}
 	}
 	inTotal := 0
 	// Calculate the sum of TxInput
 	for _, in := range tx.TxInput {
 		// Only check the input for my own shard.
-		if in.ShardId != utxoPool.ShardId {
+		if in.ShardID != utxoPool.ShardID {
 			crossShard = true
 			continue
 		}
 
-		inTxID := hex.EncodeToString(in.TxID[:])
-		index := in.TxOutputIndex
+		inTxID := hex.EncodeToString(in.PreviousOutPoint.TxID[:])
+		index := in.PreviousOutPoint.Index
 		// Check if the transaction with the addres is spent or not.
 		if val, ok := (*spentTXOs)[in.Address][inTxID][index]; ok {
 			if val {
@@ -72,10 +76,10 @@ func (utxoPool *UTXOPool) VerifyOneTransaction(tx *Transaction, spentTXOs *map[s
 		}
 		// Mark the transactions with the address and index spent.
 		if _, ok := (*spentTXOs)[in.Address]; !ok {
-			(*spentTXOs)[in.Address] = make(map[string]map[int]bool)
+			(*spentTXOs)[in.Address] = make(map[string]map[uint32]bool)
 		}
 		if _, ok := (*spentTXOs)[in.Address][inTxID]; !ok {
-			(*spentTXOs)[in.Address][inTxID] = make(map[int]bool)
+			(*spentTXOs)[in.Address][inTxID] = make(map[uint32]bool)
 		}
 		(*spentTXOs)[in.Address][inTxID][index] = true
 
@@ -150,7 +154,7 @@ func (utxoPool *UTXOPool) UpdateOneTransaction(tx *Transaction) {
 	isCrossShard := false
 	// check whether it's a cross shard tx.
 	for _, in := range tx.TxInput {
-		if in.ShardId != utxoPool.ShardId {
+		if in.ShardID != utxoPool.ShardID {
 			isCrossShard = true
 			break
 		}
@@ -161,11 +165,11 @@ func (utxoPool *UTXOPool) UpdateOneTransaction(tx *Transaction) {
 		// Check whether for this shard this cross transaction is valid or not.
 		for _, in := range tx.TxInput {
 			// Only check the input for my own shard.
-			if in.ShardId != utxoPool.ShardId {
+			if in.ShardID != utxoPool.ShardID {
 				continue
 			}
-			inTxID := hex.EncodeToString(in.TxID[:])
-			if _, ok := utxoPool.UtxoMap[in.Address][inTxID][in.TxOutputIndex]; !ok {
+			inTxID := hex.EncodeToString(in.PreviousOutPoint.TxID[:])
+			if _, ok := utxoPool.UtxoMap[in.Address][inTxID][in.PreviousOutPoint.Index]; !ok {
 				isValidCrossShard = false
 			}
 		}
@@ -181,25 +185,25 @@ func (utxoPool *UTXOPool) UpdateOneTransaction(tx *Transaction) {
 			if isValidCrossShard {
 				for _, in := range tx.TxInput {
 					// Only check the input for my own shard.
-					if in.ShardId != utxoPool.ShardId {
+					if in.ShardID != utxoPool.ShardID {
 						continue
 					}
 
 					// NOTE: for the locking phase of cross tx, the utxo is simply removed from the pool.
-					inTxID := hex.EncodeToString(in.TxID[:])
-					value := utxoPool.UtxoMap[in.Address][inTxID][in.TxOutputIndex]
-					utxoPool.DeleteOneUtxo(in.Address, inTxID, in.TxOutputIndex)
+					inTxID := hex.EncodeToString(in.PreviousOutPoint.TxID[:])
+					value := utxoPool.UtxoMap[in.Address][inTxID][in.PreviousOutPoint.Index]
+					utxoPool.DeleteOneUtxo(in.Address, inTxID, in.PreviousOutPoint.Index)
 					if isCrossShard {
 						// put the delete (locked) utxo into a separate locked utxo pool
-						inTxID := hex.EncodeToString(in.TxID[:])
+						inTxID := hex.EncodeToString(in.PreviousOutPoint.TxID[:])
 						if _, ok := utxoPool.LockedUtxoMap[in.Address]; !ok {
-							utxoPool.LockedUtxoMap[in.Address] = make(map[string]map[int]int)
-							utxoPool.LockedUtxoMap[in.Address][inTxID] = make(map[int]int)
+							utxoPool.LockedUtxoMap[in.Address] = make(TXHash2Vout2AmountMap)
+							utxoPool.LockedUtxoMap[in.Address][inTxID] = make(Vout2AmountMap)
 						}
 						if _, ok := utxoPool.LockedUtxoMap[in.Address][inTxID]; !ok {
-							utxoPool.LockedUtxoMap[in.Address][inTxID] = make(map[int]int)
+							utxoPool.LockedUtxoMap[in.Address][inTxID] = make(Vout2AmountMap)
 						}
-						utxoPool.LockedUtxoMap[in.Address][inTxID][in.TxOutputIndex] = value
+						utxoPool.LockedUtxoMap[in.Address][inTxID][in.PreviousOutPoint.Index] = value
 					}
 				}
 			}
@@ -212,40 +216,40 @@ func (utxoPool *UTXOPool) UpdateOneTransaction(tx *Transaction) {
 					// unlock-to-abort, bring back (unlock) the utxo input
 					for _, in := range tx.TxInput {
 						// Only unlock the input for my own shard.
-						if in.ShardId != utxoPool.ShardId {
+						if in.ShardID != utxoPool.ShardID {
 							continue
 						}
 
 						// Simply bring back the locked (removed) utxo
-						inTxID := hex.EncodeToString(in.TxID[:])
+						inTxID := hex.EncodeToString(in.PreviousOutPoint.TxID[:])
 						if _, ok := utxoPool.UtxoMap[in.Address]; !ok {
-							utxoPool.UtxoMap[in.Address] = make(map[string]map[int]int)
-							utxoPool.UtxoMap[in.Address][inTxID] = make(map[int]int)
+							utxoPool.UtxoMap[in.Address] = make(TXHash2Vout2AmountMap)
+							utxoPool.UtxoMap[in.Address][inTxID] = make(Vout2AmountMap)
 						}
 						if _, ok := utxoPool.UtxoMap[in.Address][inTxID]; !ok {
-							utxoPool.UtxoMap[in.Address][inTxID] = make(map[int]int)
+							utxoPool.UtxoMap[in.Address][inTxID] = make(Vout2AmountMap)
 						}
-						value := utxoPool.LockedUtxoMap[in.Address][inTxID][in.TxOutputIndex]
-						utxoPool.UtxoMap[in.Address][inTxID][in.TxOutputIndex] = value
+						value := utxoPool.LockedUtxoMap[in.Address][inTxID][in.PreviousOutPoint.Index]
+						utxoPool.UtxoMap[in.Address][inTxID][in.PreviousOutPoint.Index] = value
 
-						utxoPool.DeleteOneLockedUtxo(in.Address, inTxID, in.TxOutputIndex)
+						utxoPool.DeleteOneLockedUtxo(in.Address, inTxID, in.PreviousOutPoint.Index)
 					}
 				}
 			} else {
 				// normal utxo output update
 				for index, out := range tx.TxOutput {
 					// Only check the input for my own shard.
-					if out.ShardId != utxoPool.ShardId {
+					if out.ShardID != utxoPool.ShardID {
 						continue
 					}
 					if _, ok := utxoPool.UtxoMap[out.Address]; !ok {
-						utxoPool.UtxoMap[out.Address] = make(map[string]map[int]int)
-						utxoPool.UtxoMap[out.Address][txID] = make(map[int]int)
+						utxoPool.UtxoMap[out.Address] = make(TXHash2Vout2AmountMap)
+						utxoPool.UtxoMap[out.Address][txID] = make(Vout2AmountMap)
 					}
 					if _, ok := utxoPool.UtxoMap[out.Address][txID]; !ok {
-						utxoPool.UtxoMap[out.Address][txID] = make(map[int]int)
+						utxoPool.UtxoMap[out.Address][txID] = make(Vout2AmountMap)
 					}
-					utxoPool.UtxoMap[out.Address][txID][index] = out.Value
+					utxoPool.UtxoMap[out.Address][txID][uint32(index)] = out.Value
 				}
 			}
 		} // If it's a cross shard locking Tx, then don't update so the input UTXOs are locked (removed), and the money is not spendable until unlock-to-commit or unlock-to-abort
@@ -275,14 +279,14 @@ func (utxoPool *UTXOPool) VerifyAndUpdate(transactions []*Transaction) bool {
 func CreateUTXOPoolFromTransaction(tx *Transaction, shardId uint32) *UTXOPool {
 	var utxoPool UTXOPool
 	txID := hex.EncodeToString(tx.ID[:])
-	utxoPool.UtxoMap = make(map[string]map[string]map[int]int)
-	utxoPool.LockedUtxoMap = make(map[string]map[string]map[int]int)
+	utxoPool.UtxoMap = make(UtxoMap)
+	utxoPool.LockedUtxoMap = make(UtxoMap)
 	for index, out := range tx.TxOutput {
-		utxoPool.UtxoMap[out.Address] = make(map[string]map[int]int)
-		utxoPool.UtxoMap[out.Address][txID] = make(map[int]int)
-		utxoPool.UtxoMap[out.Address][txID][index] = out.Value
+		utxoPool.UtxoMap[out.Address] = make(TXHash2Vout2AmountMap)
+		utxoPool.UtxoMap[out.Address][txID] = make(Vout2AmountMap)
+		utxoPool.UtxoMap[out.Address][txID][uint32(index)] = out.Value
 	}
-	utxoPool.ShardId = shardId
+	utxoPool.ShardID = shardId
 	return &utxoPool
 }
 
@@ -296,7 +300,7 @@ func CreateUTXOPoolFromGenesisBlockChain(bc *Blockchain) *UTXOPool {
 // SelectTransactionsForNewBlock returns a list of index of valid transactions for the new block.
 func (utxoPool *UTXOPool) SelectTransactionsForNewBlock(transactions []*Transaction, maxNumTxs int) ([]*Transaction, []*Transaction, []*CrossShardTxAndProof) {
 	selected, unselected, crossShardTxs := []*Transaction{}, []*Transaction{}, []*CrossShardTxAndProof{}
-	spentTXOs := make(map[string]map[string]map[int]bool)
+	spentTXOs := make(map[string]map[string]map[uint32]bool)
 	for _, tx := range transactions {
 		valid, crossShard := utxoPool.VerifyOneTransaction(tx, &spentTXOs)
 
@@ -304,7 +308,7 @@ func (utxoPool *UTXOPool) SelectTransactionsForNewBlock(transactions []*Transact
 			if valid || crossShard {
 				selected = append(selected, tx)
 				if crossShard {
-					proof := CrossShardTxProof{Accept: valid, TxID: tx.ID, TxInput: getShardTxInput(tx, utxoPool.ShardId)}
+					proof := CrossShardTxProof{Accept: valid, TxID: tx.ID, TxInput: getShardTxInput(tx, utxoPool.ShardID)}
 					txAndProof := CrossShardTxAndProof{tx, &proof}
 					crossShardTxs = append(crossShardTxs, &txAndProof)
 				}
@@ -319,10 +323,10 @@ func (utxoPool *UTXOPool) SelectTransactionsForNewBlock(transactions []*Transact
 	return selected, unselected, crossShardTxs
 }
 
-func getShardTxInput(transaction *Transaction, shardId uint32) []TXInput {
+func getShardTxInput(transaction *Transaction, shardID uint32) []TXInput {
 	result := []TXInput{}
 	for _, txInput := range transaction.TxInput {
-		if txInput.ShardId == shardId {
+		if txInput.ShardID == shardID {
 			result = append(result, txInput)
 		}
 	}
@@ -330,7 +334,7 @@ func getShardTxInput(transaction *Transaction, shardId uint32) []TXInput {
 }
 
 // DeleteOneBalanceItem deletes one balance item of UTXOPool and clean up if possible.
-func (utxoPool *UTXOPool) DeleteOneUtxo(address, txID string, index int) {
+func (utxoPool *UTXOPool) DeleteOneUtxo(address, txID string, index uint32) {
 	delete(utxoPool.UtxoMap[address][txID], index)
 	if len(utxoPool.UtxoMap[address][txID]) == 0 {
 		delete(utxoPool.UtxoMap[address], txID)
@@ -341,7 +345,7 @@ func (utxoPool *UTXOPool) DeleteOneUtxo(address, txID string, index int) {
 }
 
 // DeleteOneBalanceItem deletes one balance item of UTXOPool and clean up if possible.
-func (utxoPool *UTXOPool) DeleteOneLockedUtxo(address, txID string, index int) {
+func (utxoPool *UTXOPool) DeleteOneLockedUtxo(address, txID string, index uint32) {
 	delete(utxoPool.LockedUtxoMap[address][txID], index)
 	if len(utxoPool.LockedUtxoMap[address][txID]) == 0 {
 		delete(utxoPool.LockedUtxoMap[address], txID)
