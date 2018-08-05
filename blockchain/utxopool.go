@@ -8,6 +8,10 @@ import (
 	"sync"
 )
 
+type Vout2AmountMap = map[uint32]int
+type TXHash2Vout2AmountMap = map[string]Vout2AmountMap
+type UtxoMap = map[string]TXHash2Vout2AmountMap
+
 // UTXOPool stores transactions and balance associated with each address.
 type UTXOPool struct {
 	// Mapping from address to a map of transaction id to a map of the index of output
@@ -25,9 +29,9 @@ type UTXOPool struct {
 	                       ]
 	               ]
 	*/
-	UtxoMap       map[string]map[string]map[uint32]int
-	LockedUtxoMap map[string]map[string]map[uint32]int
-	ShardId       uint32
+	UtxoMap       UtxoMap
+	LockedUtxoMap UtxoMap
+	ShardID       uint32
 	mutex         sync.Mutex
 }
 
@@ -57,7 +61,7 @@ func (utxoPool *UTXOPool) VerifyOneTransaction(tx *Transaction, spentTXOs *map[s
 	// Calculate the sum of TxInput
 	for _, in := range tx.TxInput {
 		// Only check the input for my own shard.
-		if in.ShardID != utxoPool.ShardId {
+		if in.ShardID != utxoPool.ShardID {
 			crossShard = true
 			continue
 		}
@@ -150,7 +154,7 @@ func (utxoPool *UTXOPool) UpdateOneTransaction(tx *Transaction) {
 	isCrossShard := false
 	// check whether it's a cross shard tx.
 	for _, in := range tx.TxInput {
-		if in.ShardID != utxoPool.ShardId {
+		if in.ShardID != utxoPool.ShardID {
 			isCrossShard = true
 			break
 		}
@@ -161,7 +165,7 @@ func (utxoPool *UTXOPool) UpdateOneTransaction(tx *Transaction) {
 		// Check whether for this shard this cross transaction is valid or not.
 		for _, in := range tx.TxInput {
 			// Only check the input for my own shard.
-			if in.ShardID != utxoPool.ShardId {
+			if in.ShardID != utxoPool.ShardID {
 				continue
 			}
 			inTxID := hex.EncodeToString(in.PreviousOutPoint.Hash[:])
@@ -181,7 +185,7 @@ func (utxoPool *UTXOPool) UpdateOneTransaction(tx *Transaction) {
 			if isValidCrossShard {
 				for _, in := range tx.TxInput {
 					// Only check the input for my own shard.
-					if in.ShardID != utxoPool.ShardId {
+					if in.ShardID != utxoPool.ShardID {
 						continue
 					}
 
@@ -193,11 +197,11 @@ func (utxoPool *UTXOPool) UpdateOneTransaction(tx *Transaction) {
 						// put the delete (locked) utxo into a separate locked utxo pool
 						inTxID := hex.EncodeToString(in.PreviousOutPoint.Hash[:])
 						if _, ok := utxoPool.LockedUtxoMap[in.Address]; !ok {
-							utxoPool.LockedUtxoMap[in.Address] = make(map[string]map[uint32]int)
-							utxoPool.LockedUtxoMap[in.Address][inTxID] = make(map[uint32]int)
+							utxoPool.LockedUtxoMap[in.Address] = make(TXHash2Vout2AmountMap)
+							utxoPool.LockedUtxoMap[in.Address][inTxID] = make(Vout2AmountMap)
 						}
 						if _, ok := utxoPool.LockedUtxoMap[in.Address][inTxID]; !ok {
-							utxoPool.LockedUtxoMap[in.Address][inTxID] = make(map[uint32]int)
+							utxoPool.LockedUtxoMap[in.Address][inTxID] = make(Vout2AmountMap)
 						}
 						utxoPool.LockedUtxoMap[in.Address][inTxID][in.PreviousOutPoint.Index] = value
 					}
@@ -212,18 +216,18 @@ func (utxoPool *UTXOPool) UpdateOneTransaction(tx *Transaction) {
 					// unlock-to-abort, bring back (unlock) the utxo input
 					for _, in := range tx.TxInput {
 						// Only unlock the input for my own shard.
-						if in.ShardID != utxoPool.ShardId {
+						if in.ShardID != utxoPool.ShardID {
 							continue
 						}
 
 						// Simply bring back the locked (removed) utxo
 						inTxID := hex.EncodeToString(in.PreviousOutPoint.Hash[:])
 						if _, ok := utxoPool.UtxoMap[in.Address]; !ok {
-							utxoPool.UtxoMap[in.Address] = make(map[string]map[uint32]int)
-							utxoPool.UtxoMap[in.Address][inTxID] = make(map[uint32]int)
+							utxoPool.UtxoMap[in.Address] = make(TXHash2Vout2AmountMap)
+							utxoPool.UtxoMap[in.Address][inTxID] = make(Vout2AmountMap)
 						}
 						if _, ok := utxoPool.UtxoMap[in.Address][inTxID]; !ok {
-							utxoPool.UtxoMap[in.Address][inTxID] = make(map[uint32]int)
+							utxoPool.UtxoMap[in.Address][inTxID] = make(Vout2AmountMap)
 						}
 						value := utxoPool.LockedUtxoMap[in.Address][inTxID][in.PreviousOutPoint.Index]
 						utxoPool.UtxoMap[in.Address][inTxID][in.PreviousOutPoint.Index] = value
@@ -235,15 +239,15 @@ func (utxoPool *UTXOPool) UpdateOneTransaction(tx *Transaction) {
 				// normal utxo output update
 				for index, out := range tx.TxOutput {
 					// Only check the input for my own shard.
-					if out.ShardId != utxoPool.ShardId {
+					if out.ShardId != utxoPool.ShardID {
 						continue
 					}
 					if _, ok := utxoPool.UtxoMap[out.Address]; !ok {
-						utxoPool.UtxoMap[out.Address] = make(map[string]map[uint32]int)
-						utxoPool.UtxoMap[out.Address][txID] = make(map[uint32]int)
+						utxoPool.UtxoMap[out.Address] = make(TXHash2Vout2AmountMap)
+						utxoPool.UtxoMap[out.Address][txID] = make(Vout2AmountMap)
 					}
 					if _, ok := utxoPool.UtxoMap[out.Address][txID]; !ok {
-						utxoPool.UtxoMap[out.Address][txID] = make(map[uint32]int)
+						utxoPool.UtxoMap[out.Address][txID] = make(Vout2AmountMap)
 					}
 					utxoPool.UtxoMap[out.Address][txID][uint32(index)] = out.Value
 				}
@@ -275,14 +279,14 @@ func (utxoPool *UTXOPool) VerifyAndUpdate(transactions []*Transaction) bool {
 func CreateUTXOPoolFromTransaction(tx *Transaction, shardId uint32) *UTXOPool {
 	var utxoPool UTXOPool
 	txID := hex.EncodeToString(tx.ID[:])
-	utxoPool.UtxoMap = make(map[string]map[string]map[uint32]int)
-	utxoPool.LockedUtxoMap = make(map[string]map[string]map[uint32]int)
+	utxoPool.UtxoMap = make(UtxoMap)
+	utxoPool.LockedUtxoMap = make(UtxoMap)
 	for index, out := range tx.TxOutput {
-		utxoPool.UtxoMap[out.Address] = make(map[string]map[uint32]int)
-		utxoPool.UtxoMap[out.Address][txID] = make(map[uint32]int)
+		utxoPool.UtxoMap[out.Address] = make(TXHash2Vout2AmountMap)
+		utxoPool.UtxoMap[out.Address][txID] = make(Vout2AmountMap)
 		utxoPool.UtxoMap[out.Address][txID][uint32(index)] = out.Value
 	}
-	utxoPool.ShardId = shardId
+	utxoPool.ShardID = shardId
 	return &utxoPool
 }
 
@@ -304,7 +308,7 @@ func (utxoPool *UTXOPool) SelectTransactionsForNewBlock(transactions []*Transact
 			if valid || crossShard {
 				selected = append(selected, tx)
 				if crossShard {
-					proof := CrossShardTxProof{Accept: valid, TxID: tx.ID, TxInput: getShardTxInput(tx, utxoPool.ShardId)}
+					proof := CrossShardTxProof{Accept: valid, TxID: tx.ID, TxInput: getShardTxInput(tx, utxoPool.ShardID)}
 					txAndProof := CrossShardTxAndProof{tx, &proof}
 					crossShardTxs = append(crossShardTxs, &txAndProof)
 				}
