@@ -1,19 +1,22 @@
-package main
-
 /*
 The btctxgen iterates the btc tx history block by block, transaction by transaction.
+
 The btxtxiter provide a simple api called `NextTx` for us to move thru TXs one by one.
+
 Same as txgen, iterate on each shard to generate simulated TXs (GenerateSimulatedTransactions):
+
  1. Get a new btc tx
  2. If it's a coinbase tx, create a corresponding coinbase tx in our blockchain
- 3. Otherwise, create a normal TX, which might be cross-shard and might not, depending on whether
- all the TX inputs belong to the current shard.
+ 3. Otherwise, create a normal TX, which might be cross-shard and might not, depending on whether all the TX inputs belong to the current shard.
 
 Same as txgen, send single shard tx shard by shard, then broadcast cross shard tx.
 
-TODO:
-* correct the logic to outputing to one of the input shard, rather than the current shard
+TODO
+
+Some todos for ricl
+  * correct the logic to outputing to one of the input shard, rather than the current shard
 */
+package main
 
 import (
 	"flag"
