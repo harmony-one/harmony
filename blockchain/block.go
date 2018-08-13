@@ -5,9 +5,10 @@ import (
 	"crypto/sha256"
 	"encoding/gob"
 	"fmt"
-	"harmony-benchmark/utils"
 	"log"
 	"time"
+
+	"github.com/simple-rules/harmony-benchmark/utils"
 )
 
 // A block in the blockchain that contains block headers, transactions and signature etc.

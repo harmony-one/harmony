@@ -1,14 +1,15 @@
 package node
 
 import (
-	"harmony-benchmark/blockchain"
-	"harmony-benchmark/client"
-	"harmony-benchmark/consensus"
-	"harmony-benchmark/log"
-	"harmony-benchmark/p2p"
 	"net"
 	"os"
 	"sync"
+
+	"github.com/simple-rules/harmony-benchmark/blockchain"
+	"github.com/simple-rules/harmony-benchmark/client"
+	"github.com/simple-rules/harmony-benchmark/consensus"
+	"github.com/simple-rules/harmony-benchmark/log"
+	"github.com/simple-rules/harmony-benchmark/p2p"
 )
 
 // Node represents a program (machine) participating in the network

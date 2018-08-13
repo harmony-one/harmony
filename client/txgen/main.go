@@ -4,18 +4,19 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"harmony-benchmark/blockchain"
-	"harmony-benchmark/client"
-	"harmony-benchmark/configr"
-	"harmony-benchmark/consensus"
-	"harmony-benchmark/log"
-	"harmony-benchmark/node"
-	"harmony-benchmark/p2p"
-	proto_node "harmony-benchmark/proto/node"
 	"math/rand"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/simple-rules/harmony-benchmark/blockchain"
+	"github.com/simple-rules/harmony-benchmark/client"
+	"github.com/simple-rules/harmony-benchmark/configr"
+	"github.com/simple-rules/harmony-benchmark/consensus"
+	"github.com/simple-rules/harmony-benchmark/log"
+	"github.com/simple-rules/harmony-benchmark/node"
+	"github.com/simple-rules/harmony-benchmark/p2p"
+	proto_node "github.com/simple-rules/harmony-benchmark/proto/node"
 )
 
 type txGenSettings struct {

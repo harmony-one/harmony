@@ -5,9 +5,6 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"harmony-benchmark/aws-experiment-launch/experiment/soldier/s3"
-	"harmony-benchmark/aws-experiment-launch/experiment/utils"
-	"harmony-benchmark/configr"
 	"io"
 	"io/ioutil"
 	"log"
@@ -19,6 +16,10 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/simple-rules/harmony-benchmark/aws-experiment-launch/experiment/soldier/s3"
+	"github.com/simple-rules/harmony-benchmark/aws-experiment-launch/experiment/utils"
+	"github.com/simple-rules/harmony-benchmark/configr"
 )
 
 type soliderSetting struct {

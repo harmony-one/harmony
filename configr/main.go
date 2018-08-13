@@ -2,11 +2,12 @@ package configr
 
 import (
 	"bufio"
-	"harmony-benchmark/p2p"
 	"log"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/simple-rules/harmony-benchmark/p2p"
 )
 
 // Gets all the validator peers

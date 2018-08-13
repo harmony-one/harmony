@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/gob"
+	"time"
+
 	"github.com/dedis/kyber"
 	"github.com/dedis/kyber/sign/schnorr"
-	"harmony-benchmark/blockchain"
-	"harmony-benchmark/crypto"
-	"harmony-benchmark/log"
-	"harmony-benchmark/p2p"
-	proto_consensus "harmony-benchmark/proto/consensus"
-	"time"
+	"github.com/simple-rules/harmony-benchmark/blockchain"
+	"github.com/simple-rules/harmony-benchmark/crypto"
+	"github.com/simple-rules/harmony-benchmark/log"
+	"github.com/simple-rules/harmony-benchmark/p2p"
+	proto_consensus "github.com/simple-rules/harmony-benchmark/proto/consensus"
 )
 
 var (

@@ -3,11 +3,12 @@ package utils
 import (
 	"bytes"
 	"encoding/binary"
-	"harmony-benchmark/p2p"
 	"log"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/simple-rules/harmony-benchmark/p2p"
 )
 
 // ConvertFixedDataIntoByteArray converts an empty interface data to a byte array

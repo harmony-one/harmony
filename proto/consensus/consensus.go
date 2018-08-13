@@ -3,7 +3,8 @@ package consensus
 import (
 	"bytes"
 	"errors"
-	"harmony-benchmark/proto"
+
+	"github.com/simple-rules/harmony-benchmark/proto"
 )
 
 /*

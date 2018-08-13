@@ -1,8 +1,9 @@
 package node
 
 import (
-	"harmony-benchmark/blockchain"
 	"strconv"
+
+	"github.com/simple-rules/harmony-benchmark/blockchain"
 )
 
 // AddTestingAddresses creates in genesis block numAddress transactions which assign 1000 token to each address in [0 - numAddress)

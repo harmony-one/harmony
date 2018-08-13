@@ -3,15 +3,16 @@ package consensus // consensus
 
 import (
 	"fmt"
-	"github.com/dedis/kyber"
-	"github.com/dedis/kyber/sign/schnorr"
-	"harmony-benchmark/blockchain"
-	"harmony-benchmark/crypto"
-	"harmony-benchmark/log"
-	"harmony-benchmark/p2p"
-	"harmony-benchmark/utils"
 	"strconv"
 	"sync"
+
+	"github.com/dedis/kyber"
+	"github.com/dedis/kyber/sign/schnorr"
+	"github.com/simple-rules/harmony-benchmark/blockchain"
+	"github.com/simple-rules/harmony-benchmark/crypto"
+	"github.com/simple-rules/harmony-benchmark/log"
+	"github.com/simple-rules/harmony-benchmark/p2p"
+	"github.com/simple-rules/harmony-benchmark/utils"
 )
 
 // Consensus data containing all info related to one round of consensus process
