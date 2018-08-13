@@ -4,8 +4,6 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"harmony-benchmark/aws-experiment-launch/experiment/utils"
-	"harmony-benchmark/configr"
 	"io"
 	"log"
 	"net"
@@ -13,6 +11,9 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/simple-rules/harmony-benchmark/aws-experiment-launch/experiment/utils"
+	"github.com/simple-rules/harmony-benchmark/configr"
 )
 
 type commanderSetting struct {

@@ -1,8 +1,9 @@
 package consensus
 
 import (
-	"harmony-benchmark/p2p"
 	"testing"
+
+	"github.com/simple-rules/harmony-benchmark/p2p"
 )
 
 func TestNewConsensus(test *testing.T) {

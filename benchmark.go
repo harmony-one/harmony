@@ -3,19 +3,20 @@ package main
 import (
 	"flag"
 	"fmt"
-	"harmony-benchmark/attack"
-	"harmony-benchmark/configr"
-	"harmony-benchmark/consensus"
-	"harmony-benchmark/log"
-	"harmony-benchmark/node"
-	"harmony-benchmark/p2p"
 	"math/rand"
 	"os"
 	"time"
 
+	"github.com/simple-rules/harmony-benchmark/attack"
+	"github.com/simple-rules/harmony-benchmark/configr"
+	"github.com/simple-rules/harmony-benchmark/consensus"
+	"github.com/simple-rules/harmony-benchmark/log"
+	"github.com/simple-rules/harmony-benchmark/node"
+	"github.com/simple-rules/harmony-benchmark/p2p"
+
 	"github.com/shirou/gopsutil/process"
-	"harmony-benchmark/crypto"
-	"harmony-benchmark/utils"
+	"github.com/simple-rules/harmony-benchmark/crypto"
+	"github.com/simple-rules/harmony-benchmark/utils"
 )
 
 const (

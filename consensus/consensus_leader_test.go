@@ -1,9 +1,10 @@
 package consensus
 
 import (
-	"harmony-benchmark/crypto"
-	"harmony-benchmark/p2p"
 	"testing"
+
+	"github.com/simple-rules/harmony-benchmark/crypto"
+	"github.com/simple-rules/harmony-benchmark/p2p"
 )
 
 func TestConstructAnnounceMessage(test *testing.T) {

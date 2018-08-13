@@ -3,9 +3,10 @@ package client
 import (
 	"bytes"
 	"encoding/gob"
-	"harmony-benchmark/blockchain"
-	"harmony-benchmark/proto"
-	"harmony-benchmark/proto/node"
+
+	"github.com/simple-rules/harmony-benchmark/blockchain"
+	"github.com/simple-rules/harmony-benchmark/proto"
+	"github.com/simple-rules/harmony-benchmark/proto/node"
 )
 
 // The specific types of message under CLIENT category

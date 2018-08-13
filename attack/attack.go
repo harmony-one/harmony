@@ -1,11 +1,12 @@
 package attack
 
 import (
-	"harmony-benchmark/log"
 	"math/rand"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/simple-rules/harmony-benchmark/log"
 )
 
 const (

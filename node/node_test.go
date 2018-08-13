@@ -1,9 +1,10 @@
 package node
 
 import (
-	"harmony-benchmark/consensus"
-	"harmony-benchmark/p2p"
 	"testing"
+
+	"github.com/simple-rules/harmony-benchmark/consensus"
+	"github.com/simple-rules/harmony-benchmark/p2p"
 )
 
 func TestNewNewNode(test *testing.T) {

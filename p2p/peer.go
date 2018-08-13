@@ -3,11 +3,12 @@ package p2p
 import (
 	"bytes"
 	"encoding/binary"
-	"harmony-benchmark/attack"
 	"log"
 	"net"
 	"strings"
 	"sync"
+
+	"github.com/simple-rules/harmony-benchmark/attack"
 
 	"github.com/dedis/kyber"
 )

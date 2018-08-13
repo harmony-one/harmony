@@ -3,15 +3,16 @@ package node
 import (
 	"bytes"
 	"encoding/gob"
-	"harmony-benchmark/blockchain"
-	"harmony-benchmark/p2p"
-	"harmony-benchmark/proto"
-	"harmony-benchmark/proto/client"
-	"harmony-benchmark/proto/consensus"
-	proto_node "harmony-benchmark/proto/node"
 	"net"
 	"os"
 	"time"
+
+	"github.com/simple-rules/harmony-benchmark/blockchain"
+	"github.com/simple-rules/harmony-benchmark/p2p"
+	"github.com/simple-rules/harmony-benchmark/proto"
+	"github.com/simple-rules/harmony-benchmark/proto/client"
+	"github.com/simple-rules/harmony-benchmark/proto/consensus"
+	proto_node "github.com/simple-rules/harmony-benchmark/proto/node"
 )
 
 const (

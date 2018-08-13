@@ -3,11 +3,12 @@ package client
 import (
 	"bytes"
 	"encoding/gob"
-	"harmony-benchmark/blockchain"
-	"harmony-benchmark/log"
-	"harmony-benchmark/p2p"
-	proto_client "harmony-benchmark/proto/client"
 	"sync"
+
+	"github.com/simple-rules/harmony-benchmark/blockchain"
+	"github.com/simple-rules/harmony-benchmark/log"
+	"github.com/simple-rules/harmony-benchmark/p2p"
+	proto_client "github.com/simple-rules/harmony-benchmark/proto/client"
 )
 
 // A client represents a node (e.g. a wallet) which  sends transactions and receives responses from the harmony network

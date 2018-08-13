@@ -3,10 +3,8 @@ go:
 - master
 install:
   - export GOPATH=$HOME/gopath
-  - export TRAVIS_BUILD_DIR=$HOME/gopath/src/harmony-benchmark
   - cd $HOME/gopath/src
-  - mv github.com/simple-rules/harmony-benchmark ./
-  - cd harmony-benchmark
+  - cd github.com/simple-rules/harmony-benchmark
   - go get ./...
   - ./.travis.gofmt.sh
   - go build -v ./...

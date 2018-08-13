@@ -3,8 +3,9 @@ package node
 import (
 	"bytes"
 	"encoding/gob"
-	"harmony-benchmark/blockchain"
-	"harmony-benchmark/proto"
+
+	"github.com/simple-rules/harmony-benchmark/blockchain"
+	"github.com/simple-rules/harmony-benchmark/proto"
 )
 
 // The specific types of message under NODE category
