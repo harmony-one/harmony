@@ -3,6 +3,7 @@ package waitnode
 import (
 	"net"
 	"os"
+
 	"github.com/simple-rules/harmony-benchmark/log"
 )
 
@@ -16,7 +17,7 @@ type WaitNode struct {
 	Address address
 	Worker  string
 	ID      int
-	Log     log.new()
+	Log     log.Logger
 }
 
 func (node *WaitNode) doPoW(pow string) {
@@ -47,12 +48,11 @@ func (node *WaitNode) listenOnPort(port string) {
 }
 
 // New Create a new Node
-func New(address *address) *WaitNode {
+func New(address *address, id int) *WaitNode {
 	node := WaitNode{}
-
-	// Consensus and associated channel to communicate blocks
 	node.Address = *address
-	node.ID = 1
+	node.ID = id
 	node.Worker = "pow"
+	node.Log = log.new()
 	return &node
 }
