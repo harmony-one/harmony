@@ -8,6 +8,9 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"github.com/dedis/kyber"
+	"github.com/dedis/kyber/sign/schnorr"
+	"github.com/simple-rules/harmony-benchmark/crypto"
 )
 
 var (
@@ -104,6 +107,18 @@ func (tx *Transaction) SetID() {
 	tx.ID = hash
 }
 
+func (tx *Transaction) Sign(priKey kyber.Scalar) error {
+	var encoded bytes.Buffer
+	enc := gob.NewEncoder(&encoded)
+	err := enc.Encode(tx)
+	if err != nil {
+		log.Panic(err)
+	}
+	signature, err := schnorr.Sign(crypto.Ed25519Curve, priKey, encoded.Bytes())
+	copy(tx.Signature[:], signature)
+	return err
+}
+
 // NewCoinbaseTX creates a new coinbase transaction
 func NewCoinbaseTX(toAddress [20]byte, data string, shardID uint32) *Transaction {
 	if data == "" {
@@ -113,6 +128,7 @@ func NewCoinbaseTX(toAddress [20]byte, data string, shardID uint32) *Transaction
 	txin := NewTXInput(NewOutPoint(&TxID{}, math.MaxUint32), toAddress, shardID)
 	txout := TXOutput{DefaultCoinbaseValue, toAddress, shardID}
 	tx := Transaction{ID: [32]byte{}, TxInput: []TXInput{*txin}, TxOutput: []TXOutput{txout}, Proofs: nil}
+	// TODO: take care of the signature of coinbase transaction.
 	tx.SetID()
 	return &tx
 }

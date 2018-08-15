@@ -189,7 +189,8 @@ func generateSingleShardTx(txInfo *TxInfo) {
 	// Spend the utxo to a random address in [0 - N)
 	txout := blockchain.TXOutput{txInfo.value, pki.GetAddressFromInt(rand.Intn(setting.numOfAddress)), nodeShardID}
 	tx := blockchain.Transaction{ID: [32]byte{}, TxInput: []blockchain.TXInput{*txin}, TxOutput: []blockchain.TXOutput{txout}, Proofs: nil}
-	tx.SetID()
+	tx.SetID() // TODO(RJ): figure out the correct way to set Tx ID.
+	//TODO(RJ): tx.Sign()
 
 	txInfo.txs = append(txInfo.txs, &tx)
 	txInfo.txCount++
