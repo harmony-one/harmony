@@ -1,3 +1,16 @@
+/*
+Commander has two modes to setup configuration: Local and S3.
+
+Local Config Mode
+
+The Default Mode.
+
+Add `-mode local` or omit `-mode` to enter local config mode. In this mode, the `commander` will host the config file `config.txt` on the commander machine and `solider`s will download the config file from `http://{commander_ip}:{commander_port}/distribution_config.txt`.
+
+Remote Config Mode
+
+Add `-mode remote` to enter remote config mode. In this mode, the `soldier`s will download the config file from a remote URL (use `-config_url {url}` to set the URL).
+*/
 package main
 
 import (
@@ -17,10 +30,13 @@ import (
 )
 
 type commanderSetting struct {
-	ip        string
-	port      string
+	ip   string
+	port string
+	mode string
+	// Options in s3 mode
 	configURL string
-	configs   [][]string
+
+	configs [][]string
 }
 
 type sessionInfo struct {
@@ -35,13 +51,10 @@ var (
 
 const (
 	DistributionFileName = "distribution_config.txt"
+	DefaultConfigUrl     = "https://s3-us-west-2.amazonaws.com/unique-bucket-bin/distribution_config.txt"
 )
 
 func readConfigFile() [][]string {
-	if err := utils.DownloadFile(DistributionFileName, setting.configURL); err != nil {
-		panic(err)
-	}
-
 	if result, err := configr.ReadConfigFile(DistributionFileName); err != nil {
 		panic(err)
 	} else {
@@ -57,6 +70,13 @@ func handleCommand(command string) {
 
 	switch cmd := args[0]; cmd {
 	case "config":
+		if setting.mode == "s3" {
+			// In s3 mode, download the config file from configURL first.
+			if err := utils.DownloadFile(DistributionFileName, setting.configURL); err != nil {
+				panic(err)
+			}
+		}
+
 		setting.configs = readConfigFile()
 		if setting.configs != nil {
 			log.Printf("The loaded config has %v nodes\n", len(setting.configs))
@@ -82,10 +102,15 @@ func handleCommand(command string) {
 	}
 }
 
-func config(ip string, port string, configURL string) {
+func config(ip string, port string, mode string, configURL string) {
 	setting.ip = ip
 	setting.port = port
-	setting.configURL = configURL
+	setting.mode = mode
+	if mode == "local" {
+		setting.configURL = fmt.Sprintf("http://%s:%s/%s", ip, port, DistributionFileName)
+	} else {
+		setting.configURL = configURL
+	}
 }
 
 func dictateNodes(command string) {
@@ -181,6 +206,10 @@ func jsonResponse(w http.ResponseWriter, code int, message string) {
 }
 
 func serve() {
+	if setting.mode == "local" {
+		// Only host config file if in local mode
+		http.Handle("/", http.FileServer(http.Dir("./")))
+	}
 	http.HandleFunc("/upload", handleUploadRequest)
 	err := http.ListenAndServe(":"+setting.port, nil)
 	if err != nil {
@@ -192,10 +221,11 @@ func serve() {
 func main() {
 	ip := flag.String("ip", "127.0.0.1", "The ip of commander, i.e. this machine")
 	port := flag.String("port", "8080", "The port which the commander uses to communicate with soldiers")
-	configURL := flag.String("config_url", "https://s3-us-west-2.amazonaws.com/unique-bucket-bin/distribution_config.txt", "The config URL")
+	mode := flag.String("mode", "local", "The config mode, local or s3")
+	configURL := flag.String("config_url", DefaultConfigUrl, "The config URL")
 	flag.Parse()
 
-	config(*ip, *port, *configURL)
+	config(*ip, *port, *mode, *configURL)
 
 	go serve()
 
