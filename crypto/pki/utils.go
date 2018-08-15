@@ -20,9 +20,20 @@ func GetAddressFromPublicKey(pubKey kyber.Point) [20]byte {
 
 // Temporary helper function for benchmark use
 func GetAddressFromInt(value int) [20]byte {
-	return GetAddressFromPublicKey(crypto.GetPublicKeyFromScalar(crypto.Ed25519Curve, getPrivateKeyFromInt(value)))
+	return GetAddressFromPublicKey(GetPublicKeyFromScalar(crypto.Ed25519Curve, getPrivateKeyFromInt(value)))
 }
 
 func getPrivateKeyFromInt(value int) kyber.Scalar {
 	return crypto.Ed25519Curve.Scalar().SetInt64(int64(value))
+}
+
+func GetPublicKeyFromPrivateKey(suite crypto.Suite, priKey [32]byte) kyber.Point {
+	scalar := suite.Scalar()
+	scalar.UnmarshalBinary(priKey[:])
+	return suite.Point().Mul(scalar, nil)
+}
+
+// Same as GetPublicKeyFromPrivateKey, but it directly works on kyber.Scalar object.
+func GetPublicKeyFromScalar(suite crypto.Suite, priKey kyber.Scalar) kyber.Point {
+	return suite.Point().Mul(priKey, nil)
 }
