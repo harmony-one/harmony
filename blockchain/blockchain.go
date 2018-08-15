@@ -21,7 +21,7 @@ func (bc *Blockchain) GetLatestBlock() *Block {
 }
 
 // FindUnspentTransactions returns a list of transactions containing unspent outputs
-func (bc *Blockchain) FindUnspentTransactions(address string) []Transaction {
+func (bc *Blockchain) FindUnspentTransactions(address [20]byte) []Transaction {
 	var unspentTXs []Transaction
 	spentTXOs := make(map[string][]uint32)
 
@@ -61,7 +61,7 @@ func (bc *Blockchain) FindUnspentTransactions(address string) []Transaction {
 }
 
 // FindUTXO finds and returns all unspent transaction outputs
-func (bc *Blockchain) FindUTXO(address string) []TXOutput {
+func (bc *Blockchain) FindUTXO(address [20]byte) []TXOutput {
 	var UTXOs []TXOutput
 	unspentTXs := bc.FindUnspentTransactions(address)
 
@@ -78,7 +78,7 @@ func (bc *Blockchain) FindUTXO(address string) []TXOutput {
 }
 
 // FindSpendableOutputs finds and returns unspent outputs to reference in inputs
-func (bc *Blockchain) FindSpendableOutputs(address string, amount int) (int, map[string][]uint32) {
+func (bc *Blockchain) FindSpendableOutputs(address [20]byte, amount int) (int, map[string][]uint32) {
 	unspentOutputs := make(map[string][]uint32)
 	unspentTXs := bc.FindUnspentTransactions(address)
 	accumulated := 0
@@ -89,7 +89,7 @@ Work:
 
 		for outIdx, txOutput := range tx.TxOutput {
 			if txOutput.Address == address && accumulated < amount {
-				accumulated += txOutput.Value
+				accumulated += txOutput.Amount
 				unspentOutputs[txID] = append(unspentOutputs[txID], uint32(outIdx))
 
 				if accumulated >= amount {
@@ -103,7 +103,7 @@ Work:
 }
 
 // NewUTXOTransaction creates a new transaction
-func (bc *Blockchain) NewUTXOTransaction(from, to string, amount int, shardID uint32) *Transaction {
+func (bc *Blockchain) NewUTXOTransaction(from, to [20]byte, amount int, shardID uint32) *Transaction {
 	var inputs []TXInput
 	var outputs []TXOutput
 
@@ -134,7 +134,7 @@ func (bc *Blockchain) NewUTXOTransaction(from, to string, amount int, shardID ui
 		outputs = append(outputs, TXOutput{acc - amount, from, shardID}) // a change
 	}
 
-	tx := Transaction{[32]byte{}, inputs, outputs, nil}
+	tx := Transaction{ID: [32]byte{}, TxInput: inputs, TxOutput: outputs, Proofs: nil}
 	tx.SetID()
 
 	return &tx
@@ -142,7 +142,7 @@ func (bc *Blockchain) NewUTXOTransaction(from, to string, amount int, shardID ui
 
 // AddNewUserTransfer creates a new transaction and a block of that transaction.
 // Mostly used for testing.
-func (bc *Blockchain) AddNewUserTransfer(utxoPool *UTXOPool, from, to string, amount int, shardId uint32) bool {
+func (bc *Blockchain) AddNewUserTransfer(utxoPool *UTXOPool, from, to [20]byte, amount int, shardId uint32) bool {
 	tx := bc.NewUTXOTransaction(from, to, amount, shardId)
 	if tx != nil {
 		newBlock := NewBlock([]*Transaction{tx}, bc.Blocks[len(bc.Blocks)-1].Hash, shardId)
@@ -171,7 +171,7 @@ func (bc *Blockchain) VerifyNewBlockAndUpdate(utxopool *UTXOPool, block *Block) 
 }
 
 // CreateBlockchain creates a new blockchain DB
-func CreateBlockchain(address string, shardId uint32) *Blockchain {
+func CreateBlockchain(address [20]byte, shardId uint32) *Blockchain {
 	// TODO: We assume we have not created any blockchain before.
 	// In current bitcoin, we can check if we created a blockchain before accessing local db.
 	cbtx := NewCoinbaseTX(address, genesisCoinbaseData, shardId)

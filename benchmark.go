@@ -12,58 +12,13 @@ import (
 	"github.com/simple-rules/harmony-benchmark/consensus"
 	"github.com/simple-rules/harmony-benchmark/log"
 	"github.com/simple-rules/harmony-benchmark/node"
-	"github.com/simple-rules/harmony-benchmark/p2p"
 
 	"github.com/shirou/gopsutil/process"
-	"github.com/simple-rules/harmony-benchmark/crypto"
-	"github.com/simple-rules/harmony-benchmark/utils"
 )
 
 const (
 	AttackProbability = 20
 )
-
-func getShardId(myIp, myPort string, config *[][]string) string {
-	for _, node := range *config {
-		ip, port, shardId := node[0], node[1], node[3]
-		if ip == myIp && port == myPort {
-			return shardId
-		}
-	}
-	return "N/A"
-}
-
-func getLeader(myShardId string, config *[][]string) p2p.Peer {
-	var leaderPeer p2p.Peer
-	for _, node := range *config {
-		ip, port, status, shardId := node[0], node[1], node[2], node[3]
-		if status == "leader" && myShardId == shardId {
-			leaderPeer.Ip = ip
-			leaderPeer.Port = port
-
-			// Get public key deterministically based on ip and port
-			priKey := crypto.Ed25519Curve.Scalar().SetInt64(int64(utils.GetUniqueIdFromPeer(leaderPeer))) // TODO: figure out why using a random hash value doesn't work for private key (schnorr)
-			leaderPeer.PubKey = crypto.GetPublicKeyFromScalar(crypto.Ed25519Curve, priKey)
-		}
-	}
-	return leaderPeer
-}
-
-func getPeers(myIp, myPort, myShardId string, config *[][]string) []p2p.Peer {
-	var peerList []p2p.Peer
-	for _, node := range *config {
-		ip, port, status, shardId := node[0], node[1], node[2], node[3]
-		if status != "validator" || ip == myIp && port == myPort || myShardId != shardId {
-			continue
-		}
-		// Get public key deterministically based on ip and port
-		peer := p2p.Peer{Port: port, Ip: ip}
-		priKey := crypto.Ed25519Curve.Scalar().SetInt64(int64(utils.GetUniqueIdFromPeer(peer)))
-		peer.PubKey = crypto.GetPublicKeyFromScalar(crypto.Ed25519Curve, priKey)
-		peerList = append(peerList, peer)
-	}
-	return peerList
-}
 
 func attackDetermination(attackedMode int) bool {
 	switch attackedMode {
@@ -113,9 +68,9 @@ func main() {
 	attack.GetInstance().SetAttackEnabled(attackDetermination(*attackedMode))
 
 	config, _ := configr.ReadConfigFile(*configFile)
-	shardID := getShardId(*ip, *port, &config)
-	peers := getPeers(*ip, *port, shardID, &config)
-	leader := getLeader(shardID, &config)
+	shardID := configr.GetShardID(*ip, *port, &config)
+	peers := configr.GetPeers(*ip, *port, shardID, &config)
+	leader := configr.GetLeader(shardID, &config)
 
 	var role string
 	if leader.Ip == *ip && leader.Port == *port {

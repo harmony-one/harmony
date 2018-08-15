@@ -7,7 +7,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/simple-rules/harmony-benchmark/crypto"
+	"github.com/simple-rules/harmony-benchmark/crypto/pki"
 	"github.com/simple-rules/harmony-benchmark/p2p"
+	"github.com/simple-rules/harmony-benchmark/utils"
 )
 
 // Gets all the validator peers
@@ -67,6 +70,51 @@ func GetClientPort(config *[][]string) string {
 		}
 	}
 	return ""
+}
+
+// GetShardID Gets the shard id of the node corresponding to this ip and port
+func GetShardID(myIp, myPort string, config *[][]string) string {
+	for _, node := range *config {
+		ip, port, shardId := node[0], node[1], node[3]
+		if ip == myIp && port == myPort {
+			return shardId
+		}
+	}
+	return "N/A"
+}
+
+// GetPeers Gets the peer list of the node corresponding to this ip and port
+func GetPeers(myIp, myPort, myShardId string, config *[][]string) []p2p.Peer {
+	var peerList []p2p.Peer
+	for _, node := range *config {
+		ip, port, status, shardId := node[0], node[1], node[2], node[3]
+		if status != "validator" || ip == myIp && port == myPort || myShardId != shardId {
+			continue
+		}
+		// Get public key deterministically based on ip and port
+		peer := p2p.Peer{Port: port, Ip: ip}
+		priKey := crypto.Ed25519Curve.Scalar().SetInt64(int64(utils.GetUniqueIdFromPeer(peer)))
+		peer.PubKey = pki.GetPublicKeyFromScalar(crypto.Ed25519Curve, priKey)
+		peerList = append(peerList, peer)
+	}
+	return peerList
+}
+
+// GetLeader Gets the leader of this shard id
+func GetLeader(myShardId string, config *[][]string) p2p.Peer {
+	var leaderPeer p2p.Peer
+	for _, node := range *config {
+		ip, port, status, shardId := node[0], node[1], node[2], node[3]
+		if status == "leader" && myShardId == shardId {
+			leaderPeer.Ip = ip
+			leaderPeer.Port = port
+
+			// Get public key deterministically based on ip and port
+			priKey := crypto.Ed25519Curve.Scalar().SetInt64(int64(utils.GetUniqueIdFromPeer(leaderPeer))) // TODO: figure out why using a random hash value doesn't work for private key (schnorr)
+			leaderPeer.PubKey = pki.GetPublicKeyFromScalar(crypto.Ed25519Curve, priKey)
+		}
+	}
+	return leaderPeer
 }
 
 // Parse the config file and return a 2d array containing the file data
