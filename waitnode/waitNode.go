@@ -1,8 +1,7 @@
 package waitnode
 
 import (
-	"net"
-	"os"
+	"fmt"
 
 	"github.com/simple-rules/harmony-benchmark/log"
 )
@@ -17,34 +16,34 @@ type WaitNode struct {
 	Address address
 	Worker  string
 	ID      int
-	Log     log.Logger
+	log     log.Logger
 }
 
-func (node *WaitNode) doPoW(pow string) {
-	return "pow"
+func (node *WaitNode) doPoW() {
+	node.log.Debug("Node with ID %d and IP %s is doing POW", node.ID, node.Address.IP)
 }
 
 // StartServer a server and process the request by a handler.
 func (node *WaitNode) StartServer(add address) {
-	node.log.Debug("Starting waitnode on server", "node", node.Id, "port", add.IP)
-	node.listenOnPort(add.Port)
+	node.log.Debug("Starting waitnode on server %d", "node", node.ID, "port", add.IP)
+	node.connectIdentityChain(add.Port)
 }
 
-func (node *WaitNode) listenOnPort(port string) {
-	listen, err := net.Listen("tcp4", ":"+port)
-	defer listen.Close()
-	if err != nil {
-		node.log.Crit("Socket listen port failed", "port", port, "err", err)
-		os.Exit(1)
-	}
-	for {
-		conn, err := listen.Accept()
-		if err != nil {
-			node.log.Crit("Error listening on port. Exiting.", "port", port)
-			continue
-		}
-		go node.NodeHandler(conn)
-	}
+func (node *WaitNode) connectIdentityChain(port string) {
+	fmt.Println("Connecting to identity chain")
+	// listen, err := net.Listen("tcp4", ":"+port)
+	// defer listen.Close()
+	// if err != nil {
+	// 	node.log.Crit("Socket listen port failed", "port", port, "err", err)
+	// 	os.Exit(1)
+	// }
+	// for {
+	// 	conn, err := listen.Accept()
+	// 	if err != nil {
+	// 		node.log.Crit("Error listening on port. Exiting.", "port", port)
+	// 		continue
+	// 	}
+	// }
 }
 
 // New Create a new Node
@@ -53,6 +52,6 @@ func New(address *address, id int) *WaitNode {
 	node.Address = *address
 	node.ID = id
 	node.Worker = "pow"
-	node.Log = log.new()
+	node.log = log.New()
 	return &node
 }

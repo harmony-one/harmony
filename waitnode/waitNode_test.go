@@ -7,11 +7,11 @@ import (
 )
 
 func TestNewNode(test *testing.T) {
-	Address := address{IP: "1", Port: "2"}
+	addressNode := address{IP: "1", Port: "2"}
 	Worker := "pow"
 	ID := 1
-	Log := log.new()
-	node := New(address, ID)
+	Log := log.New()
+	node := New(addressNode, ID)
 	if node.Address == nil {
 		test.Error("Address is not initialized for the node")
 	}
@@ -20,7 +20,7 @@ func TestNewNode(test *testing.T) {
 		test.Error("ID is not initialized for the node")
 	}
 
-	if node.Wroker == nil {
+	if node.Worker == nil {
 		test.Error("Worker is not initialized for the node")
 	}
 }
