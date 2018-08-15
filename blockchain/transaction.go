@@ -18,9 +18,10 @@ var (
 )
 
 type Transaction struct {
-	ID       [32]byte // 32 byte hash
-	TxInput  []TXInput
-	TxOutput []TXOutput
+	ID        [32]byte // 32 byte hash
+	TxInput   []TXInput
+	TxOutput  []TXOutput
+	Signature [64]byte
 
 	Proofs []CrossShardTxProof // The proofs for crossShard tx unlock-to-commit/abort
 }
@@ -111,7 +112,7 @@ func NewCoinbaseTX(toAddress [20]byte, data string, shardID uint32) *Transaction
 
 	txin := NewTXInput(NewOutPoint(&TxID{}, math.MaxUint32), toAddress, shardID)
 	txout := TXOutput{DefaultCoinbaseValue, toAddress, shardID}
-	tx := Transaction{[32]byte{}, []TXInput{*txin}, []TXOutput{txout}, nil}
+	tx := Transaction{ID: [32]byte{}, TxInput: []TXInput{*txin}, TxOutput: []TXOutput{txout}, Proofs: nil}
 	tx.SetID()
 	return &tx
 }

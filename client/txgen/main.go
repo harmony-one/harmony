@@ -174,7 +174,7 @@ func generateCrossShardTx(txInfo *TxInfo) {
 	}
 
 	// Construct the new transaction
-	tx := blockchain.Transaction{[32]byte{}, txInputs, txOutputs, nil}
+	tx := blockchain.Transaction{ID: [32]byte{}, TxInput: txInputs, TxOutput: txOutputs, Proofs: nil}
 	tx.SetID()
 
 	txInfo.crossTxs = append(txInfo.crossTxs, &tx)
@@ -188,7 +188,7 @@ func generateSingleShardTx(txInfo *TxInfo) {
 
 	// Spend the utxo to a random address in [0 - N)
 	txout := blockchain.TXOutput{txInfo.value, pki.GetAddressFromInt(rand.Intn(setting.numOfAddress)), nodeShardID}
-	tx := blockchain.Transaction{[32]byte{}, []blockchain.TXInput{*txin}, []blockchain.TXOutput{txout}, nil}
+	tx := blockchain.Transaction{ID: [32]byte{}, TxInput: []blockchain.TXInput{*txin}, TxOutput: []blockchain.TXOutput{txout}, Proofs: nil}
 	tx.SetID()
 
 	txInfo.txs = append(txInfo.txs, &tx)
