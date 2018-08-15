@@ -176,6 +176,12 @@ func generateCrossShardTx(txInfo *TxInfo) {
 	// Construct the new transaction
 	tx := blockchain.Transaction{ID: [32]byte{}, TxInput: txInputs, TxOutput: txOutputs, Proofs: nil}
 	tx.SetID()
+	priKeyInt, ok := client.AddressToIntPriKeyMap[txInfo.address]
+	if ok {
+		tx.Sign(pki.GetPrivateKeyFromInt(priKeyInt))
+	} else {
+		panic("Failed to look up the corresponding private key from address")
+	}
 
 	txInfo.crossTxs = append(txInfo.crossTxs, &tx)
 	txInfo.txCount++
@@ -190,7 +196,12 @@ func generateSingleShardTx(txInfo *TxInfo) {
 	txout := blockchain.TXOutput{txInfo.value, pki.GetAddressFromInt(rand.Intn(setting.numOfAddress)), nodeShardID}
 	tx := blockchain.Transaction{ID: [32]byte{}, TxInput: []blockchain.TXInput{*txin}, TxOutput: []blockchain.TXOutput{txout}, Proofs: nil}
 	tx.SetID() // TODO(RJ): figure out the correct way to set Tx ID.
-	//TODO(RJ): tx.Sign()
+	priKeyInt, ok := client.AddressToIntPriKeyMap[txInfo.address]
+	if ok {
+		tx.Sign(pki.GetPrivateKeyFromInt(priKeyInt))
+	} else {
+		panic("Failed to look up the corresponding private key from address")
+	}
 
 	txInfo.txs = append(txInfo.txs, &tx)
 	txInfo.txCount++

@@ -2,7 +2,7 @@ package client
 
 import "github.com/simple-rules/harmony-benchmark/crypto/pki"
 
-var AddressToIntPriKeyMap map[[20]byte]int  // For convenience, we use int as the secret seed for generating private key
+var AddressToIntPriKeyMap map[[20]byte]int // For convenience, we use int as the secret seed for generating private key
 
 func init() {
 	AddressToIntPriKeyMap := make(map[[20]byte]int)

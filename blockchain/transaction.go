@@ -6,11 +6,11 @@ import (
 	"encoding/gob"
 	"encoding/hex"
 	"fmt"
-	"log"
-	"math"
 	"github.com/dedis/kyber"
 	"github.com/dedis/kyber/sign/schnorr"
 	"github.com/simple-rules/harmony-benchmark/crypto"
+	"log"
+	"math"
 )
 
 var (
