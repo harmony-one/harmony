@@ -27,9 +27,9 @@ type Transaction struct {
 
 // TXOutput is the struct of transaction output in a transaction.
 type TXOutput struct {
-	Value   int
-	Address string
-	ShardID uint32 // The Id of the shard where this UTXO belongs
+	Amount  int
+	Address [20]byte // last 20 bytes of the hash of public key
+	ShardID uint32   // The Id of the shard where this UTXO belongs
 }
 
 type TxID = [32]byte
@@ -55,13 +55,13 @@ func NewOutPoint(txID *TxID, index uint32) *OutPoint {
 // TXInput is the struct of transaction input (a UTXO) in a transaction.
 type TXInput struct {
 	PreviousOutPoint OutPoint
-	Address          string
-	ShardID          uint32 // The Id of the shard where this UTXO belongs
+	Address          [20]byte // TODO: @minh do we really need this?
+	ShardID          uint32   // The Id of the shard where this UTXO belongs
 }
 
 // NewTXInput returns a new transaction input with the provided
 // previous outpoint point, output address and shardID
-func NewTXInput(prevOut *OutPoint, address string, shardID uint32) *TXInput {
+func NewTXInput(prevOut *OutPoint, address [20]byte, shardID uint32) *TXInput {
 	return &TXInput{
 		PreviousOutPoint: *prevOut,
 		Address:          address,
@@ -104,13 +104,13 @@ func (tx *Transaction) SetID() {
 }
 
 // NewCoinbaseTX creates a new coinbase transaction
-func NewCoinbaseTX(to, data string, shardID uint32) *Transaction {
+func NewCoinbaseTX(toAddress [20]byte, data string, shardID uint32) *Transaction {
 	if data == "" {
-		data = fmt.Sprintf("Reward to '%s'", to)
+		data = fmt.Sprintf("Reward to '%b'", toAddress)
 	}
 
-	txin := NewTXInput(NewOutPoint(&TxID{}, math.MaxUint32), to, shardID)
-	txout := TXOutput{DefaultCoinbaseValue, to, shardID}
+	txin := NewTXInput(NewOutPoint(&TxID{}, math.MaxUint32), toAddress, shardID)
+	txout := TXOutput{DefaultCoinbaseValue, toAddress, shardID}
 	tx := Transaction{[32]byte{}, []TXInput{*txin}, []TXOutput{txout}, nil}
 	tx.SetID()
 	return &tx
@@ -127,7 +127,7 @@ func (txInput *TXInput) String() string {
 
 // Used for debuging.
 func (txOutput *TXOutput) String() string {
-	res := fmt.Sprintf("Value: %v, ", txOutput.Value)
+	res := fmt.Sprintf("Amount: %v, ", txOutput.Amount)
 	res += fmt.Sprintf("Address: %v", txOutput.Address)
 	return res
 }

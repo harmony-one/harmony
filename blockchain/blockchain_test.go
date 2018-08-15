@@ -4,16 +4,23 @@ import (
 	"testing"
 )
 
+var (
+	TestAddressOne   = [20]byte{1}
+	TestAddressTwo   = [20]byte{2}
+	TestAddressThree = [20]byte{3}
+	TestAddressFour  = [20]byte{4}
+)
+
 func TestCreateBlockchain(t *testing.T) {
-	if bc := CreateBlockchain("minh", 0); bc == nil {
+	if bc := CreateBlockchain(TestAddressOne, 0); bc == nil {
 		t.Errorf("failed to create a blockchain")
 	}
 }
 
 func TestFindSpendableOutputs(t *testing.T) {
 	requestAmount := 3
-	bc := CreateBlockchain("minh", 0)
-	accumulated, unspentOutputs := bc.FindSpendableOutputs("minh", requestAmount)
+	bc := CreateBlockchain(TestAddressOne, 0)
+	accumulated, unspentOutputs := bc.FindSpendableOutputs(TestAddressOne, requestAmount)
 	if accumulated < DefaultCoinbaseValue {
 		t.Error("Failed to find enough unspent ouptuts")
 	}
@@ -24,13 +31,13 @@ func TestFindSpendableOutputs(t *testing.T) {
 }
 
 func TestFindUTXO(t *testing.T) {
-	bc := CreateBlockchain("minh", 0)
-	utxo := bc.FindUTXO("minh")
+	bc := CreateBlockchain(TestAddressOne, 0)
+	utxo := bc.FindUTXO(TestAddressOne)
 
 	total := 0
 	for _, value := range utxo {
-		total += value.Value
-		if value.Address != "minh" {
+		total += value.Amount
+		if value.Address != TestAddressOne {
 			t.Error("FindUTXO failed.")
 		}
 	}
@@ -41,30 +48,30 @@ func TestFindUTXO(t *testing.T) {
 }
 
 func TestAddNewUserTransfer(t *testing.T) {
-	bc := CreateBlockchain("minh", 0)
+	bc := CreateBlockchain(TestAddressOne, 0)
 	utxoPool := CreateUTXOPoolFromGenesisBlockChain(bc)
 
-	if !bc.AddNewUserTransfer(utxoPool, "minh", "alok", 3, 0) {
+	if !bc.AddNewUserTransfer(utxoPool, TestAddressOne, TestAddressThree, 3, 0) {
 		t.Error("Failed to add new transfer to alok.")
 	}
 
-	if !bc.AddNewUserTransfer(utxoPool, "minh", "rj", 100, 0) {
+	if !bc.AddNewUserTransfer(utxoPool, TestAddressOne, TestAddressTwo, 100, 0) {
 		t.Error("Failed to add new transfer to rj.")
 	}
 
-	if bc.AddNewUserTransfer(utxoPool, "minh", "stephen", DefaultCoinbaseValue-102, 0) {
+	if bc.AddNewUserTransfer(utxoPool, TestAddressOne, TestAddressFour, DefaultCoinbaseValue-102, 0) {
 		t.Error("minh should not have enough fun to make the transfer.")
 	}
 }
 
 func TestVerifyNewBlock(t *testing.T) {
-	bc := CreateBlockchain("minh", 0)
+	bc := CreateBlockchain(TestAddressOne, 0)
 	utxoPool := CreateUTXOPoolFromGenesisBlockChain(bc)
 
-	bc.AddNewUserTransfer(utxoPool, "minh", "alok", 3, 0)
-	bc.AddNewUserTransfer(utxoPool, "minh", "rj", 100, 0)
+	bc.AddNewUserTransfer(utxoPool, TestAddressOne, TestAddressThree, 3, 0)
+	bc.AddNewUserTransfer(utxoPool, TestAddressOne, TestAddressTwo, 100, 0)
 
-	tx := bc.NewUTXOTransaction("minh", "mark", 10, 0)
+	tx := bc.NewUTXOTransaction(TestAddressOne, TestAddressFour, 10, 0)
 	if tx == nil {
 		t.Error("failed to create a new transaction.")
 	}

@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"math/rand"
-	"strconv"
 	"sync"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/simple-rules/harmony-benchmark/client"
 	"github.com/simple-rules/harmony-benchmark/configr"
 	"github.com/simple-rules/harmony-benchmark/consensus"
+	"github.com/simple-rules/harmony-benchmark/crypto/pki"
 	"github.com/simple-rules/harmony-benchmark/log"
 	"github.com/simple-rules/harmony-benchmark/node"
 	"github.com/simple-rules/harmony-benchmark/p2p"
@@ -38,7 +38,7 @@ type TxInfo struct {
 	id      [32]byte
 	index   uint32
 	value   int
-	address string
+	address [20]byte
 	// Output
 	txs      []*blockchain.Transaction
 	crossTxs []*blockchain.Transaction
@@ -164,12 +164,12 @@ func generateCrossShardTx(txInfo *TxInfo) {
 	}
 
 	// Spend the utxo from the current shard to a random address in [0 - N)
-	txout := blockchain.TXOutput{txInfo.value, strconv.Itoa(rand.Intn(setting.numOfAddress)), nodeShardID}
+	txout := blockchain.TXOutput{txInfo.value, pki.GetAddressFromInt(rand.Intn(setting.numOfAddress)), nodeShardID}
 	txOutputs := []blockchain.TXOutput{txout}
 
 	// Spend the utxo from the other shard, if any, to a random address in [0 - N)
 	if crossTxin != nil {
-		crossTxout := blockchain.TXOutput{crossUtxoValue, strconv.Itoa(rand.Intn(setting.numOfAddress)), uint32(crossShardId)}
+		crossTxout := blockchain.TXOutput{crossUtxoValue, pki.GetAddressFromInt(rand.Intn(setting.numOfAddress)), uint32(crossShardId)}
 		txOutputs = append(txOutputs, crossTxout)
 	}
 
@@ -187,7 +187,7 @@ func generateSingleShardTx(txInfo *TxInfo) {
 	txin := blockchain.NewTXInput(blockchain.NewOutPoint(&txInfo.id, txInfo.index), txInfo.address, nodeShardID)
 
 	// Spend the utxo to a random address in [0 - N)
-	txout := blockchain.TXOutput{txInfo.value, strconv.Itoa(rand.Intn(setting.numOfAddress)), nodeShardID}
+	txout := blockchain.TXOutput{txInfo.value, pki.GetAddressFromInt(rand.Intn(setting.numOfAddress)), nodeShardID}
 	tx := blockchain.Transaction{[32]byte{}, []blockchain.TXInput{*txin}, []blockchain.TXOutput{txout}, nil}
 	tx.SetID()
 
@@ -288,7 +288,7 @@ func main() {
 	// Transaction generation process
 	time.Sleep(10 * time.Second) // wait for nodes to be ready
 	start := time.Now()
-	totalTime := 300.0 //run for 5 minutes
+	totalTime := 60.0 //run for 1 minutes
 
 	for true {
 		t := time.Now()

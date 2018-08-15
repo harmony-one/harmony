@@ -5,7 +5,7 @@ import (
 )
 
 func TestNewCoinbaseTX(t *testing.T) {
-	if cbtx := NewCoinbaseTX("minh", genesisCoinbaseData, 0); cbtx == nil {
+	if cbtx := NewCoinbaseTX(TestAddressOne, genesisCoinbaseData, 0); cbtx == nil {
 		t.Errorf("failed to create a coinbase transaction.")
 	}
 }

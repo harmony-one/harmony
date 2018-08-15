@@ -105,7 +105,7 @@ func New(consensus *consensus.Consensus) *Node {
 	// TODO(minh): Use or implement new function in blockchain package for this.
 	genesisBlock := &blockchain.Blockchain{}
 	genesisBlock.Blocks = make([]*blockchain.Block, 0)
-	coinbaseTx := blockchain.NewCoinbaseTX("harmony", "1", node.Consensus.ShardID)
+	coinbaseTx := blockchain.NewCoinbaseTX([20]byte{0}, "0", node.Consensus.ShardID)
 	genesisBlock.Blocks = append(genesisBlock.Blocks, blockchain.NewGenesisBlock(coinbaseTx, node.Consensus.ShardID))
 	node.blockchain = genesisBlock
 
