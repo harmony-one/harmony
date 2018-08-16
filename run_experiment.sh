@@ -5,6 +5,7 @@ go build -o bin/benchmark
 go build -o bin/txgen client/txgen/main.go
 go build -o bin/commander aws-experiment-launch/experiment/commander/main.go
 go build -o bin/soldier aws-experiment-launch/experiment/soldier/main.go
+go build -o bin/profiler profiler/main.go
 cd bin
 
 # Create a tmp folder for logs

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/simple-rules/harmony-benchmark/attack"
@@ -12,8 +13,7 @@ import (
 	"github.com/simple-rules/harmony-benchmark/consensus"
 	"github.com/simple-rules/harmony-benchmark/log"
 	"github.com/simple-rules/harmony-benchmark/node"
-
-	"github.com/shirou/gopsutil/process"
+	"github.com/simple-rules/harmony-benchmark/utils"
 )
 
 const (
@@ -32,24 +32,10 @@ func attackDetermination(attackedMode int) bool {
 	return false
 }
 
-func logMemUsage(consensus *consensus.Consensus) {
-	p, _ := process.NewProcess(int32(os.Getpid()))
-	for {
-		info, _ := p.MemoryInfo()
-		memMap, _ := p.MemoryMaps(false)
-		log.Info("Mem Report", "info", info, "map", memMap)
-		time.Sleep(10 * time.Second)
-	}
-}
-
-// TODO: @ricl, start another process for reporting.
-func logCPUUsage(consensus *consensus.Consensus) {
-	p, _ := process.NewProcess(int32(os.Getpid()))
-	for {
-		percent, _ := p.CPUPercent()
-		times, _ := p.Times()
-		log.Info("CPU Report", "percent", percent, "times", times, "consensus", consensus)
-		time.Sleep(10 * time.Second)
+func startProfiler(shardID string, logFolder string) {
+	err := utils.RunCmd("./bin/profiler", "-pid", strconv.Itoa(os.Getpid()), "-shard_id", shardID, "-log_folder", logFolder)
+	if err != nil {
+		log.Error("Failed to start profiler")
 	}
 }
 
@@ -90,9 +76,11 @@ func main() {
 
 	// Consensus object.
 	consensus := consensus.NewConsensus(*ip, *port, shardID, peers, leader)
-	// Logging for consensus.
-	go logMemUsage(consensus)
-	go logCPUUsage(consensus)
+
+	// Start Profiler for leader
+	if role == "leader" {
+		startProfiler(shardID, *logFolder)
+	}
 
 	// Set logger to attack model.
 	attack.GetInstance().SetLogger(consensus.Log)
