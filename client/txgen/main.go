@@ -164,12 +164,12 @@ func generateCrossShardTx(txInfo *TxInfo) {
 	}
 
 	// Spend the utxo from the current shard to a random address in [0 - N)
-	txout := blockchain.TXOutput{txInfo.value, pki.GetAddressFromInt(rand.Intn(setting.numOfAddress)), nodeShardID}
+	txout := blockchain.TXOutput{txInfo.value, pki.GetAddressFromInt(rand.Intn(setting.numOfAddress) + 1), nodeShardID}
 	txOutputs := []blockchain.TXOutput{txout}
 
 	// Spend the utxo from the other shard, if any, to a random address in [0 - N)
 	if crossTxin != nil {
-		crossTxout := blockchain.TXOutput{crossUtxoValue, pki.GetAddressFromInt(rand.Intn(setting.numOfAddress)), uint32(crossShardId)}
+		crossTxout := blockchain.TXOutput{crossUtxoValue, pki.GetAddressFromInt(rand.Intn(setting.numOfAddress) + 1), uint32(crossShardId)}
 		txOutputs = append(txOutputs, crossTxout)
 	}
 
@@ -182,12 +182,14 @@ func generateCrossShardTx(txInfo *TxInfo) {
 		if err == nil {
 			copy(tx.PublicKey[:], bytes)
 		} else {
-			// TODO(RJ)
+			log.Error("Failed to serialized public key", "error", err)
+			return
 		}
 		tx.SetID() // TODO(RJ): figure out the correct way to set Tx ID.
 		tx.Sign(pki.GetPrivateKeyFromInt(priKeyInt))
 	} else {
 		log.Error("Failed to look up the corresponding private key from address", "Address", txInfo.address)
+		return
 	}
 
 	txInfo.crossTxs = append(txInfo.crossTxs, &tx)
@@ -200,7 +202,7 @@ func generateSingleShardTx(txInfo *TxInfo) {
 	txin := blockchain.NewTXInput(blockchain.NewOutPoint(&txInfo.id, txInfo.index), txInfo.address, nodeShardID)
 
 	// Spend the utxo to a random address in [0 - N)
-	txout := blockchain.TXOutput{txInfo.value, pki.GetAddressFromInt(rand.Intn(setting.numOfAddress)), nodeShardID}
+	txout := blockchain.TXOutput{txInfo.value, pki.GetAddressFromInt(rand.Intn(setting.numOfAddress) + 1), nodeShardID}
 	tx := blockchain.Transaction{ID: [32]byte{}, TxInput: []blockchain.TXInput{*txin}, TxOutput: []blockchain.TXOutput{txout}, Proofs: nil}
 
 	priKeyInt, ok := client.LookUpIntPriKey(txInfo.address)
@@ -209,12 +211,14 @@ func generateSingleShardTx(txInfo *TxInfo) {
 		if err == nil {
 			copy(tx.PublicKey[:], bytes)
 		} else {
-			// TODO(RJ)
+			log.Error("Failed to serialized public key", "error", err)
+			return
 		}
 		tx.SetID() // TODO(RJ): figure out the correct way to set Tx ID.
 		tx.Sign(pki.GetPrivateKeyFromInt(priKeyInt))
 	} else {
 		log.Error("Failed to look up the corresponding private key from address", "Address", txInfo.address)
+		return
 	}
 
 	txInfo.txs = append(txInfo.txs, &tx)

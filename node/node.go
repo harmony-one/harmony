@@ -107,7 +107,7 @@ func New(consensus *consensus.Consensus) *Node {
 	genesisBlock := &blockchain.Blockchain{}
 	genesisBlock.Blocks = make([]*blockchain.Block, 0)
 	// TODO(RJ): use miner's address as coinbase address
-	coinbaseTx := blockchain.NewCoinbaseTX(pki.GetAddressFromInt(99999), "0", node.Consensus.ShardID)
+	coinbaseTx := blockchain.NewCoinbaseTX(pki.GetAddressFromInt(1), "0", node.Consensus.ShardID)
 	genesisBlock.Blocks = append(genesisBlock.Blocks, blockchain.NewGenesisBlock(coinbaseTx, node.Consensus.ShardID))
 	node.blockchain = genesisBlock
 
