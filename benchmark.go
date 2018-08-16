@@ -53,10 +53,11 @@ func main() {
 	// Attack determination.
 	attack.GetInstance().SetAttackEnabled(attackDetermination(*attackedMode))
 
-	config, _ := configr.ReadConfigFile(*configFile)
-	shardID := configr.GetShardID(*ip, *port, &config)
-	peers := configr.GetPeers(*ip, *port, shardID, &config)
-	leader := configr.GetLeader(shardID, &config)
+	configr := configr.NewConfigr()
+	configr.ReadConfigFile(*configFile)
+	shardID := configr.GetShardID(*ip, *port)
+	peers := configr.GetPeers(*ip, *port, shardID)
+	leader := configr.GetLeader(shardID)
 
 	var role string
 	if leader.Ip == *ip && leader.Port == *port {
@@ -87,7 +88,7 @@ func main() {
 	// Current node.
 	currentNode := node.New(consensus)
 	// Create client peer.
-	clientPeer := configr.GetClientPeer(&config)
+	clientPeer := configr.GetClientPeer()
 	// If there is a client configured in the node list.
 	if clientPeer != nil {
 		currentNode.ClientPeer = clientPeer

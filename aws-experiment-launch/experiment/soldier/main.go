@@ -40,7 +40,8 @@ type sessionInfo struct {
 	commanderPort       string
 	localConfigFileName string
 	logFolder           string
-	myConfig            []string
+	configr             *configr.Configr
+	myConfig            configr.ConfigEntry
 }
 
 const (
@@ -153,6 +154,9 @@ func handleInitCommand(args []string, w *bufio.Writer) {
 	globalSession.localConfigFileName = fmt.Sprintf("node_config_%v_%v.txt", setting.port, globalSession.id)
 	utils.DownloadFile(globalSession.localConfigFileName, configURL)
 	log.Println("Successfully downloaded config")
+
+	globalSession.configr.ReadConfigFile(globalSession.localConfigFileName)
+	globalSession.myConfig = *globalSession.configr.GetMyConfigEntry(setting.ip, setting.port)
 
 	if err := runInstance(); err == nil {
 		logAndReply(w, "Done init.")
@@ -278,17 +282,12 @@ func handleLog2Command(w *bufio.Writer) {
 }
 
 func runInstance() error {
-	config, _ := configr.ReadConfigFile(globalSession.localConfigFileName)
-
-	globalSession.myConfig = getMyConfig(setting.ip, setting.port, &config)
-
 	os.MkdirAll(globalSession.logFolder, os.ModePerm)
 
-	if globalSession.myConfig[2] == "client" {
+	if globalSession.myConfig.Role == "client" {
 		return runClient()
-	} else {
-		return runNode()
 	}
+	return runNode()
 }
 
 func runNode() error {
@@ -299,16 +298,6 @@ func runNode() error {
 func runClient() error {
 	log.Println("running client")
 	return globalUtils.RunCmd("./txgen", "-config_file", globalSession.localConfigFileName, "-log_folder", globalSession.logFolder)
-}
-
-func getMyConfig(myIP string, myPort string, config *[][]string) []string {
-	for _, node := range *config {
-		ip, port := node[0], node[1]
-		if ip == myIP && port == myPort {
-			return node
-		}
-	}
-	return nil
 }
 
 func main() {
