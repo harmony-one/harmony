@@ -175,12 +175,19 @@ func generateCrossShardTx(txInfo *TxInfo) {
 
 	// Construct the new transaction
 	tx := blockchain.Transaction{ID: [32]byte{}, TxInput: txInputs, TxOutput: txOutputs, Proofs: nil}
-	tx.SetID()
-	priKeyInt, ok := client.AddressToIntPriKeyMap[txInfo.address]
+
+	priKeyInt, ok := client.LookUpIntPriKey(txInfo.address)
 	if ok {
+		bytes, err := pki.GetPublicKeyFromScalar(pki.GetPrivateKeyFromInt(priKeyInt)).MarshalBinary()
+		if err == nil {
+			copy(tx.PublicKey[:], bytes)
+		} else {
+			// TODO(RJ)
+		}
+		tx.SetID() // TODO(RJ): figure out the correct way to set Tx ID.
 		tx.Sign(pki.GetPrivateKeyFromInt(priKeyInt))
 	} else {
-		panic("Failed to look up the corresponding private key from address")
+		log.Error("Failed to look up the corresponding private key from address", "Address", txInfo.address)
 	}
 
 	txInfo.crossTxs = append(txInfo.crossTxs, &tx)
@@ -195,12 +202,19 @@ func generateSingleShardTx(txInfo *TxInfo) {
 	// Spend the utxo to a random address in [0 - N)
 	txout := blockchain.TXOutput{txInfo.value, pki.GetAddressFromInt(rand.Intn(setting.numOfAddress)), nodeShardID}
 	tx := blockchain.Transaction{ID: [32]byte{}, TxInput: []blockchain.TXInput{*txin}, TxOutput: []blockchain.TXOutput{txout}, Proofs: nil}
-	tx.SetID() // TODO(RJ): figure out the correct way to set Tx ID.
-	priKeyInt, ok := client.AddressToIntPriKeyMap[txInfo.address]
+
+	priKeyInt, ok := client.LookUpIntPriKey(txInfo.address)
 	if ok {
+		bytes, err := pki.GetPublicKeyFromScalar(pki.GetPrivateKeyFromInt(priKeyInt)).MarshalBinary()
+		if err == nil {
+			copy(tx.PublicKey[:], bytes)
+		} else {
+			// TODO(RJ)
+		}
+		tx.SetID() // TODO(RJ): figure out the correct way to set Tx ID.
 		tx.Sign(pki.GetPrivateKeyFromInt(priKeyInt))
 	} else {
-		panic("Failed to look up the corresponding private key from address")
+		log.Error("Failed to look up the corresponding private key from address", "Address", txInfo.address)
 	}
 
 	txInfo.txs = append(txInfo.txs, &tx)

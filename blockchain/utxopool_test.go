@@ -8,10 +8,10 @@ func TestVerifyOneTransactionAndUpdate(t *testing.T) {
 	bc := CreateBlockchain(TestAddressOne, 0)
 	utxoPool := CreateUTXOPoolFromGenesisBlockChain(bc)
 
-	bc.AddNewUserTransfer(utxoPool, TestAddressOne, TestAddressThree, 3, 0)
-	bc.AddNewUserTransfer(utxoPool, TestAddressOne, TestAddressTwo, 100, 0)
+	bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressThree, 3, 0)
+	bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressTwo, 100, 0)
 
-	tx := bc.NewUTXOTransaction(TestAddressOne, TestAddressFour, 10, 0)
+	tx := bc.NewUTXOTransaction(PriKeyOne, TestAddressOne, TestAddressFour, 10, 0)
 	if tx == nil {
 		t.Error("failed to create a new transaction.")
 	}
@@ -26,10 +26,10 @@ func TestVerifyOneTransactionFail(t *testing.T) {
 	bc := CreateBlockchain(TestAddressOne, 0)
 	utxoPool := CreateUTXOPoolFromGenesisBlockChain(bc)
 
-	bc.AddNewUserTransfer(utxoPool, TestAddressOne, TestAddressThree, 3, 0)
-	bc.AddNewUserTransfer(utxoPool, TestAddressOne, TestAddressTwo, 100, 0)
+	bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressThree, 3, 0)
+	bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressTwo, 100, 0)
 
-	tx := bc.NewUTXOTransaction(TestAddressOne, TestAddressFour, 10, 0)
+	tx := bc.NewUTXOTransaction(PriKeyOne, TestAddressOne, TestAddressFour, 10, 0)
 	if tx == nil {
 		t.Error("failed to create a new transaction.")
 	}
@@ -44,8 +44,8 @@ func TestDeleteOneBalanceItem(t *testing.T) {
 	bc := CreateBlockchain(TestAddressOne, 0)
 	utxoPool := CreateUTXOPoolFromGenesisBlockChain(bc)
 
-	bc.AddNewUserTransfer(utxoPool, TestAddressOne, TestAddressThree, 3, 0)
-	bc.AddNewUserTransfer(utxoPool, TestAddressThree, TestAddressTwo, 3, 0)
+	bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressThree, 3, 0)
+	bc.AddNewUserTransfer(utxoPool, PriKeyThree, TestAddressThree, TestAddressTwo, 3, 0)
 
 	if _, ok := utxoPool.UtxoMap[TestAddressThree]; ok {
 		t.Errorf("alok should not be contained in the balance map")

@@ -1,14 +1,23 @@
 package blockchain
 
 import (
+	"github.com/simple-rules/harmony-benchmark/crypto/pki"
 	"testing"
 )
 
 var (
-	TestAddressOne   = [20]byte{1}
-	TestAddressTwo   = [20]byte{2}
-	TestAddressThree = [20]byte{3}
-	TestAddressFour  = [20]byte{4}
+	PriIntOne        = 111
+	PriIntTwo        = 2
+	PriIntThree      = 3
+	PriIntFour       = 4
+	PriKeyOne        = pki.GetPrivateKeyFromInt(PriIntOne)
+	PriKeyTwo        = pki.GetPrivateKeyFromInt(PriIntTwo)
+	PriKeyThree      = pki.GetPrivateKeyFromInt(PriIntThree)
+	PriKeyFour       = pki.GetPrivateKeyFromInt(PriIntFour)
+	TestAddressOne   = pki.GetAddressFromInt(PriIntOne)
+	TestAddressTwo   = pki.GetAddressFromInt(PriIntTwo)
+	TestAddressThree = pki.GetAddressFromInt(PriIntThree)
+	TestAddressFour  = pki.GetAddressFromInt(PriIntFour)
 )
 
 func TestCreateBlockchain(t *testing.T) {
@@ -51,15 +60,15 @@ func TestAddNewUserTransfer(t *testing.T) {
 	bc := CreateBlockchain(TestAddressOne, 0)
 	utxoPool := CreateUTXOPoolFromGenesisBlockChain(bc)
 
-	if !bc.AddNewUserTransfer(utxoPool, TestAddressOne, TestAddressThree, 3, 0) {
+	if !bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressThree, 3, 0) {
 		t.Error("Failed to add new transfer to alok.")
 	}
 
-	if !bc.AddNewUserTransfer(utxoPool, TestAddressOne, TestAddressTwo, 100, 0) {
+	if !bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressTwo, 100, 0) {
 		t.Error("Failed to add new transfer to rj.")
 	}
 
-	if bc.AddNewUserTransfer(utxoPool, TestAddressOne, TestAddressFour, DefaultCoinbaseValue-102, 0) {
+	if bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressFour, DefaultCoinbaseValue-102, 0) {
 		t.Error("minh should not have enough fun to make the transfer.")
 	}
 }
@@ -68,10 +77,10 @@ func TestVerifyNewBlock(t *testing.T) {
 	bc := CreateBlockchain(TestAddressOne, 0)
 	utxoPool := CreateUTXOPoolFromGenesisBlockChain(bc)
 
-	bc.AddNewUserTransfer(utxoPool, TestAddressOne, TestAddressThree, 3, 0)
-	bc.AddNewUserTransfer(utxoPool, TestAddressOne, TestAddressTwo, 100, 0)
+	bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressThree, 3, 0)
+	bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressTwo, 100, 0)
 
-	tx := bc.NewUTXOTransaction(TestAddressOne, TestAddressFour, 10, 0)
+	tx := bc.NewUTXOTransaction(PriKeyOne, TestAddressOne, TestAddressFour, 10, 0)
 	if tx == nil {
 		t.Error("failed to create a new transaction.")
 	}

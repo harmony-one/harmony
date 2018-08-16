@@ -118,7 +118,7 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 
 	// Set private key for myself so that I can sign messages.
 	consensus.priKey = crypto.Ed25519Curve.Scalar().SetInt64(int64(consensus.nodeId))
-	consensus.pubKey = pki.GetPublicKeyFromScalar(crypto.Ed25519Curve, consensus.priKey)
+	consensus.pubKey = pki.GetPublicKeyFromScalar(consensus.priKey)
 	consensus.consensusId = 0 // or view Id in the original pbft paper
 
 	myShardID, err := strconv.Atoi(ShardID)
