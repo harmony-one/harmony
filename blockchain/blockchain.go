@@ -3,6 +3,8 @@ package blockchain
 import (
 	"bytes"
 	"encoding/hex"
+	"github.com/dedis/kyber"
+	"github.com/simple-rules/harmony-benchmark/crypto/pki"
 )
 
 // Blockchain keeps a sequence of Blocks
@@ -103,7 +105,7 @@ Work:
 }
 
 // NewUTXOTransaction creates a new transaction
-func (bc *Blockchain) NewUTXOTransaction(from, to [20]byte, amount int, shardID uint32) *Transaction {
+func (bc *Blockchain) NewUTXOTransaction(priKey kyber.Scalar, from, to [20]byte, amount int, shardID uint32) *Transaction {
 	var inputs []TXInput
 	var outputs []TXOutput
 
@@ -137,13 +139,23 @@ func (bc *Blockchain) NewUTXOTransaction(from, to [20]byte, amount int, shardID 
 	tx := Transaction{ID: [32]byte{}, TxInput: inputs, TxOutput: outputs, Proofs: nil}
 	tx.SetID()
 
+	pubKey := pki.GetPublicKeyFromScalar(priKey)
+	bytes, err := pubKey.MarshalBinary()
+	if err == nil {
+		copy(tx.PublicKey[:], bytes)
+	} else {
+		panic("Failed to serialize public key")
+	}
+	tx.SetID() // TODO(RJ): figure out the correct way to set Tx ID.
+	tx.Sign(priKey)
+
 	return &tx
 }
 
 // AddNewUserTransfer creates a new transaction and a block of that transaction.
 // Mostly used for testing.
-func (bc *Blockchain) AddNewUserTransfer(utxoPool *UTXOPool, from, to [20]byte, amount int, shardId uint32) bool {
-	tx := bc.NewUTXOTransaction(from, to, amount, shardId)
+func (bc *Blockchain) AddNewUserTransfer(utxoPool *UTXOPool, priKey kyber.Scalar, from, to [20]byte, amount int, shardId uint32) bool {
+	tx := bc.NewUTXOTransaction(priKey, from, to, amount, shardId)
 	if tx != nil {
 		newBlock := NewBlock([]*Transaction{tx}, bc.Blocks[len(bc.Blocks)-1].Hash, shardId)
 		if bc.VerifyNewBlockAndUpdate(utxoPool, newBlock) {

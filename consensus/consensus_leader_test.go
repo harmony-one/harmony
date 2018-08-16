@@ -25,13 +25,13 @@ func TestConstructChallengeMessage(test *testing.T) {
 	leaderPriKey := crypto.Ed25519Curve.Scalar()
 	priKeyInBytes := crypto.HashSha256("12")
 	leaderPriKey.UnmarshalBinary(priKeyInBytes[:])
-	leaderPubKey := pki.GetPublicKeyFromScalar(crypto.Ed25519Curve, leaderPriKey)
+	leaderPubKey := pki.GetPublicKeyFromScalar(leaderPriKey)
 	leader := p2p.Peer{Ip: "1", Port: "2", PubKey: leaderPubKey}
 
 	validatorPriKey := crypto.Ed25519Curve.Scalar()
 	priKeyInBytes = crypto.HashSha256("12")
 	validatorPriKey.UnmarshalBinary(priKeyInBytes[:])
-	validatorPubKey := pki.GetPublicKeyFromScalar(crypto.Ed25519Curve, leaderPriKey)
+	validatorPubKey := pki.GetPublicKeyFromScalar(leaderPriKey)
 	validator := p2p.Peer{Ip: "3", Port: "5", PubKey: validatorPubKey}
 
 	consensus := NewConsensus("1", "2", "0", []p2p.Peer{leader, validator}, leader)

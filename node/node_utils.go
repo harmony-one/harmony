@@ -11,7 +11,7 @@ import (
 func (node *Node) AddTestingAddresses(numAddress int) {
 	txs := make([]*blockchain.Transaction, numAddress)
 	for i := range txs {
-		txs[i] = blockchain.NewCoinbaseTX(pki.GetAddressFromInt(i), "", node.Consensus.ShardID)
+		txs[i] = blockchain.NewCoinbaseTX(pki.GetAddressFromInt(i+1), "", node.Consensus.ShardID)
 	}
 	node.blockchain.Blocks[0].Transactions = append(node.blockchain.Blocks[0].Transactions, txs...)
 	node.UtxoPool.Update(txs)

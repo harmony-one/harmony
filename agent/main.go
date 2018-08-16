@@ -27,7 +27,6 @@ func logMemUsage() {
 	}
 }
 
-// TODO: @ricl, start another process for reporting.
 func logCPUUsage() {
 	p, _ := process.NewProcess(pid)
 	for {
@@ -37,6 +36,7 @@ func logCPUUsage() {
 		time.Sleep(3 * time.Second)
 	}
 }
+
 func main() {
 	_ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	_port := flag.String("port", "9000", "port of the node.")
@@ -45,7 +45,6 @@ func main() {
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	flag.Parse()
 
-	fmt.Print(*configFile)
 	ip = *_ip
 	port = *_port
 	pid = int32(*_pid)

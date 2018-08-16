@@ -5,6 +5,9 @@ import (
 	"encoding/gob"
 	"encoding/hex"
 	"fmt"
+	"github.com/dedis/kyber/sign/schnorr"
+	"github.com/simple-rules/harmony-benchmark/crypto"
+	"github.com/simple-rules/harmony-benchmark/log"
 	"sync"
 )
 
@@ -108,6 +111,17 @@ func (utxoPool *UTXOPool) VerifyOneTransaction(tx *Transaction, spentTXOs *map[[
 		return false, false // Here crossShard is false, because if there is no business for this shard, it's effectively not crossShard no matter what.
 	}
 
+	// Verify the signature
+	pubKey := crypto.Ed25519Curve.Point()
+	err := pubKey.UnmarshalBinary(tx.PublicKey[:])
+	if err != nil {
+		log.Error("Failed to deserialize public key", "error", err)
+	}
+	err = schnorr.Verify(crypto.Ed25519Curve, pubKey, tx.GetContentToVerify(), tx.Signature[:])
+	if err != nil {
+		log.Error("Failed to verify signature", "error", err, "public key", pubKey, "pubKey in bytes", tx.PublicKey[:])
+		return false, crossShard
+	}
 	return true, crossShard
 }
 

@@ -24,6 +24,7 @@ type Transaction struct {
 	ID        [32]byte // 32 byte hash
 	TxInput   []TXInput
 	TxOutput  []TXOutput
+	PublicKey [32]byte
 	Signature [64]byte
 
 	Proofs []CrossShardTxProof // The proofs for crossShard tx unlock-to-commit/abort
@@ -115,8 +116,25 @@ func (tx *Transaction) Sign(priKey kyber.Scalar) error {
 		log.Panic(err)
 	}
 	signature, err := schnorr.Sign(crypto.Ed25519Curve, priKey, encoded.Bytes())
+	if err != nil {
+		log.Panic(err)
+	}
+
 	copy(tx.Signature[:], signature)
 	return err
+}
+
+func (tx *Transaction) GetContentToVerify() []byte {
+	tempTx := *tx
+	tempTx.Signature = [64]byte{}
+
+	var encoded bytes.Buffer
+	enc := gob.NewEncoder(&encoded)
+	err := enc.Encode(tempTx)
+	if err != nil {
+		log.Panic(err)
+	}
+	return encoded.Bytes()
 }
 
 // NewCoinbaseTX creates a new coinbase transaction
