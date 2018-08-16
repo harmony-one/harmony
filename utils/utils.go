@@ -6,7 +6,6 @@ import (
 	"log"
 	"regexp"
 	"strconv"
-	"strings"
 
 	"github.com/simple-rules/harmony-benchmark/p2p"
 )
@@ -19,19 +18,6 @@ func ConvertFixedDataIntoByteArray(data interface{}) []byte {
 		log.Panic(err)
 	}
 	return buff.Bytes()
-}
-
-// ConvertIntoInts is to convert '1,2,3,4' into []int{1,2,3,4}.
-func ConvertIntoInts(data string) []int {
-	var res = []int{}
-	items := strings.Split(data, ",")
-	for _, value := range items {
-		intValue, err := strconv.Atoi(value)
-		if err == nil {
-			res = append(res, intValue)
-		}
-	}
-	return res
 }
 
 func GetUniqueIdFromPeer(peer p2p.Peer) uint16 {
