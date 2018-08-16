@@ -339,11 +339,13 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 				return
 			}
 			collectiveSign, err := crypto.Sign(crypto.Ed25519Curve, consensus.aggregatedCommitment, aggResponse, consensus.bitmap)
+
 			if err != nil {
 				log.Error("Failed to create collective signature")
 				return
+			} else {
+				log.Info("CollectiveSig created.", "size", len(collectiveSign))
 			}
-			_ = collectiveSign // TODO: put the collective signature into block and broadcast
 
 			consensus.Log.Debug("Consensus reached with signatures.", "numOfSignatures", len(consensus.responses))
 			// Reset state to FINISHED, and clear other data.
@@ -359,6 +361,10 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 			if err != nil {
 				consensus.Log.Debug("failed to construct the new block after consensus")
 			}
+
+			// Sign the block
+			// TODO(RJ): populate bitmap
+			copy(blockHeaderObj.Signature[:], collectiveSign)
 			consensus.OnConsensusDone(&blockHeaderObj)
 
 			// TODO: @ricl these logic are irrelevant to consensus, move them to another file, say profiler.

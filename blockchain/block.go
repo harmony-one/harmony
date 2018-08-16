@@ -22,6 +22,8 @@ type Block struct {
 	ShardId         uint32
 	Hash            [32]byte
 	// Signature...
+	bitmap    []byte   // Contains which validator signed the block.
+	Signature [66]byte // Schnorr collective signature
 }
 
 // Serialize serializes the block
@@ -96,7 +98,7 @@ func NewBlock(transactions []*Transaction, prevBlockHash [32]byte, shardId uint3
 	for _, tx := range transactions {
 		txIds = append(txIds, tx.ID)
 	}
-	block := &Block{time.Now().Unix(), prevBlockHash, numTxs, txIds, transactions, shardId, [32]byte{}}
+	block := &Block{Timestamp: time.Now().Unix(), PrevBlockHash: prevBlockHash, NumTransactions: numTxs, TransactionIds: txIds, Transactions: transactions, ShardId: shardId, Hash: [32]byte{}}
 	copy(block.Hash[:], block.CalculateBlockHash()[:])
 
 	return block
