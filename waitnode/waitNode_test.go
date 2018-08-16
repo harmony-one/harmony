@@ -2,25 +2,19 @@ package waitnode
 
 import (
 	"testing"
-
-	"github.com/simple-rules/harmony-benchmark/log"
 )
 
 func TestNewNode(test *testing.T) {
-	addressNode := address{IP: "1", Port: "2"}
-	Worker := "pow"
+	addressNode := &address{IP: "1", Port: "2"}
 	ID := 1
-	Log := log.New()
 	node := New(addressNode, ID)
 	if node.Address == nil {
 		test.Error("Address is not initialized for the node")
 	}
-
-	if node.ID == nil {
+	if node.ID != 1 {
 		test.Error("ID is not initialized for the node")
 	}
-
-	if node.Worker == nil {
+	if node.Worker != "pow" {
 		test.Error("Worker is not initialized for the node")
 	}
 }

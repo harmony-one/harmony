@@ -13,7 +13,7 @@ type address struct {
 
 //WaitNode is for nodes waiting to join consensus
 type WaitNode struct {
-	Address address
+	Address *address
 	Worker  string
 	ID      int
 	log     log.Logger
@@ -49,7 +49,7 @@ func (node *WaitNode) connectIdentityChain(port string) {
 // New Create a new Node
 func New(address *address, id int) *WaitNode {
 	node := WaitNode{}
-	node.Address = *address
+	node.Address = address
 	node.ID = id
 	node.Worker = "pow"
 	node.log = log.New()
