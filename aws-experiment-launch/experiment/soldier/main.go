@@ -16,10 +16,13 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
+	"github.com/shirou/gopsutil/process"
 	"github.com/simple-rules/harmony-benchmark/aws-experiment-launch/experiment/soldier/s3"
 	"github.com/simple-rules/harmony-benchmark/aws-experiment-launch/experiment/utils"
 	"github.com/simple-rules/harmony-benchmark/configr"
+	hlog "github.com/simple-rules/harmony-benchmark/log"
 )
 
 type soliderSetting struct {
@@ -33,6 +36,7 @@ type sessionInfo struct {
 	commanderPort       string
 	localConfigFileName string
 	logFolder           string
+	myConfig            []string
 }
 
 const (
@@ -269,11 +273,11 @@ func handleLog2Command(w *bufio.Writer) {
 	logAndReply(w, "Upload log done!")
 }
 
-func runCmd(name string, args ...string) error {
+func runAndGetPid(name string, args ...string) (int, error) {
 	cmd := exec.Command(name, args...)
 	if err := cmd.Start(); err != nil {
 		log.Fatal(err)
-		return err
+		return -1, err
 	} else {
 		log.Println("Command running", name, args)
 		go func() {
@@ -283,32 +287,77 @@ func runCmd(name string, args ...string) error {
 				log.Printf("Command finished successfully")
 			}
 		}()
-		return nil
+		return cmd.Process.Pid, nil
 	}
+}
+
+func runCmd(name string, args ...string) error {
+	_, err := runAndGetPid(name, args...)
+	return err
 }
 
 func runInstance() error {
 	config, _ := configr.ReadConfigFile(globalSession.localConfigFileName)
 
-	myConfig := getMyConfig(setting.ip, setting.port, &config)
+	globalSession.myConfig = getMyConfig(setting.ip, setting.port, &config)
 
 	os.MkdirAll(globalSession.logFolder, os.ModePerm)
 
-	if myConfig[2] == "client" {
-		return runClient()
+	var err error
+	if globalSession.myConfig[2] == "client" {
+		_, err = runClient()
 	} else {
-		return runNode()
+		var pid int
+		pid, err = runNode()
+		if globalSession.myConfig[2] == "leader" {
+			logPerf(int32(pid))
+		}
+	}
+	return err
+}
+
+func logPerf(pid int32) {
+	// Setup a logger to stdout and log file.
+	logFileName := fmt.Sprintf("./%s/soldier-%s-%v-%v.log", globalSession.logFolder, globalSession.myConfig[2], setting.ip, setting.port)
+
+	h := hlog.MultiHandler(
+		hlog.StdoutHandler,
+		hlog.Must.FileHandler(logFileName, hlog.JSONFormat()), // Log to file
+		// log.Must.NetHandler("tcp", ":3000", log.JSONFormat()) // Log to remote
+	)
+	hlog.Root().SetHandler(h)
+	go logMemUsage(pid)
+	go logCPUUsage(pid)
+}
+
+func logMemUsage(pid int32) {
+	p, _ := process.NewProcess(pid)
+	for {
+		info, _ := p.MemoryInfo()
+		memMap, _ := p.MemoryMaps(false)
+		hlog.Info("Mem Report", "info", info, "map", memMap, "shardID", globalSession.myConfig[3])
+		time.Sleep(3 * time.Second)
 	}
 }
 
-func runNode() error {
-	log.Println("running instance")
-	return runCmd("./benchmark", "-ip", setting.ip, "-port", setting.port, "-config_file", globalSession.localConfigFileName, "-log_folder", globalSession.logFolder)
+func logCPUUsage(pid int32) {
+	p, _ := process.NewProcess(pid)
+	for {
+		percent, _ := p.CPUPercent()
+		times, _ := p.Times()
+		hlog.Info("CPU Report", "percent", percent, "times", times, "shardID", globalSession.myConfig[3])
+		time.Sleep(3 * time.Second)
+	}
 }
 
-func runClient() error {
+func runNode() (int, error) {
+	log.Println("running instance")
+	return runAndGetPid("./benchmark", "-ip", setting.ip, "-port", setting.port, "-config_file", globalSession.localConfigFileName, "-log_folder", globalSession.logFolder)
+}
+
+func runClient() (int, error) {
 	log.Println("running client")
-	return runCmd("./txgen", "-config_file", globalSession.localConfigFileName, "-log_folder", globalSession.logFolder)
+	return runAndGetPid("./txgen", "-config_file", globalSession.localConfigFileName, "-log_folder", globalSession.logFolder)
 }
 
 func getMyConfig(myIP string, myPort string, config *[][]string) []string {
