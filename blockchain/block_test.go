@@ -1,7 +1,7 @@
 package blockchain
 
 import (
-	"bytes"
+	"reflect"
 	"testing"
 )
 
@@ -15,15 +15,7 @@ func TestBlockSerialize(t *testing.T) {
 	serializedValue := block.Serialize()
 	deserializedBlock := DeserializeBlock(serializedValue)
 
-	if block.Timestamp != deserializedBlock.Timestamp {
-		t.Errorf("Serialize or Deserialize incorrect at TimeStamp.")
-	}
-
-	if bytes.Compare(block.PrevBlockHash[:], deserializedBlock.PrevBlockHash[:]) != 0 {
-		t.Errorf("Serialize or Deserialize incorrect at PrevBlockHash.")
-	}
-
-	if bytes.Compare(block.Hash[:], deserializedBlock.Hash[:]) != 0 {
-		t.Errorf("Serialize or Deserialize incorrect at Hash.")
+	if !reflect.DeepEqual(block, deserializedBlock) {
+		t.Errorf("Original block and the deserialized block not equal.")
 	}
 }
