@@ -1,3 +1,30 @@
+#!/bin/bash
+
+set -eo pipefail
+
+
+function usage {
+   local ME=$(basename $0)
+
+   cat<<EOU
+USAGE: $ME config_file_name
+
+This script will build all the binaries and start benchmark and txgen based on the configuration file.
+
+EXAMPLES:
+
+   $ME local_config.txt
+
+
+EOU
+   exit 0
+}
+
+config=$1
+if [ -z "$config" ]; then
+   usage
+fi
+
 # Kill nodes if any
 ./kill_node.sh
 
@@ -17,7 +44,6 @@ log_folder="tmp_log/log-$t"
 mkdir -p $log_folder
 
 # Start nodes
-config=$1
 while IFS='' read -r line || [[ -n "$line" ]]; do
   IFS=' ' read ip port mode shardId <<< $line
 	#echo $ip $port $mode
