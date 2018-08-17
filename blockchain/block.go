@@ -8,6 +8,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/simple-rules/harmony-benchmark/db"
 	"github.com/simple-rules/harmony-benchmark/utils"
 )
 
@@ -67,6 +68,10 @@ func (b *Block) HashTransactions() []byte {
 	}
 	txHash = sha256.Sum256(bytes.Join(txHashes, []byte{}))
 	return txHash[:]
+}
+
+func (b *Block) Write(db db.Database, key string) error {
+	return db.Put([]byte(key), b.Serialize())
 }
 
 // CalculateBlockHash returns a hash of the block
