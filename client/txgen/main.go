@@ -254,8 +254,9 @@ func main() {
 	flag.Parse()
 
 	// Read the configs
-	config, _ := configr.ReadConfigFile(*configFile)
-	leaders, shardIds := configr.GetLeadersAndShardIds(&config)
+	configr := configr.NewConfigr()
+	configr.ReadConfigFile(*configFile)
+	leaders, shardIds := configr.GetLeadersAndShardIds()
 
 	setting.numOfAddress = 10000
 	// Do cross shard tx if there are more than one shard
@@ -282,7 +283,7 @@ func main() {
 	}
 
 	// Client/txgenerator server node setup
-	clientPort := configr.GetClientPort(&config)
+	clientPort := configr.GetClientPort()
 	consensusObj := consensus.NewConsensus("0", clientPort, "0", nil, p2p.Peer{})
 	clientNode := node.New(consensusObj)
 
@@ -359,6 +360,6 @@ func main() {
 
 	// Send a stop message to stop the nodes at the end
 	msg := proto_node.ConstructStopMessage()
-	peers := append(configr.GetValidators(*configFile), leaders...)
+	peers := append(configr.GetValidators(), leaders...)
 	p2p.BroadcastMessage(peers, msg)
 }

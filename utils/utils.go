@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"log"
+	"os/exec"
 	"regexp"
 	"strconv"
 
@@ -28,4 +29,23 @@ func GetUniqueIdFromPeer(peer p2p.Peer) uint16 {
 	socketId := reg.ReplaceAllString(peer.Ip+peer.Port, "") // A integer Id formed by unique IP/PORT pair
 	value, _ := strconv.Atoi(socketId)
 	return uint16(value)
+}
+
+// RunCmd Runs command `name` with arguments `args`
+func RunCmd(name string, args ...string) error {
+	cmd := exec.Command(name, args...)
+	if err := cmd.Start(); err != nil {
+		log.Fatal(err)
+		return err
+	}
+
+	log.Println("Command running", name, args)
+	go func() {
+		if err := cmd.Wait(); err != nil {
+			log.Printf("Command finished with error: %v", err)
+		} else {
+			log.Printf("Command finished successfully")
+		}
+	}()
+	return nil
 }
