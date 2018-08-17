@@ -175,6 +175,8 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 		point := crypto.Ed25519Curve.Point()
 		point.UnmarshalBinary(commitment)
 		consensus.commitments[validatorId] = point
+		// Set the bitmap indicate this validate signed. TODO: figure out how to resolve the inconsistency of validators from commit and response messages
+		consensus.bitmap.SetKey(value.PubKey, true)
 	}
 
 	if !shouldProcess {
@@ -317,6 +319,8 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 		scalar := crypto.Ed25519Curve.Scalar()
 		scalar.UnmarshalBinary(response)
 		consensus.responses[validatorId] = scalar
+		// Set the bitmap indicate this validate signed. TODO: figure out how to resolve the inconsistency of validators from commit and response messages
+		consensus.bitmap.SetKey(value.PubKey, true)
 	}
 	consensus.mutex.Unlock()
 
@@ -338,13 +342,14 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 				log.Error("Failed to aggregate responses")
 				return
 			}
-			collectiveSign, err := crypto.Sign(crypto.Ed25519Curve, consensus.aggregatedCommitment, aggResponse, consensus.bitmap)
+			collectiveSig, err := crypto.Sign(crypto.Ed25519Curve, consensus.aggregatedCommitment, aggResponse, consensus.bitmap)
 
+			log.Error("collective signature size", "size", len(collectiveSig))
 			if err != nil {
 				log.Error("Failed to create collective signature")
 				return
 			} else {
-				log.Info("CollectiveSig created.", "size", len(collectiveSign))
+				log.Info("CollectiveSig created.", "size", len(collectiveSig))
 			}
 
 			consensus.Log.Debug("Consensus reached with signatures.", "numOfSignatures", len(consensus.responses))
@@ -364,7 +369,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 
 			// Sign the block
 			// TODO(RJ): populate bitmap
-			copy(blockHeaderObj.Signature[:], collectiveSign)
+			copy(blockHeaderObj.Signature[:], collectiveSig)
 			consensus.OnConsensusDone(&blockHeaderObj)
 
 			// TODO: @ricl these logic are irrelevant to consensus, move them to another file, say profiler.
