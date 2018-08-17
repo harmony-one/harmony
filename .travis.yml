@@ -6,6 +6,7 @@ install:
   - cd $HOME/gopath/src
   - cd github.com/simple-rules/harmony-benchmark
   - go get ./...
+  - go get gopkg.in/check.v1
   - ./.travis.gofmt.sh
   - go build -v ./...
 notifications:
