@@ -8,6 +8,7 @@ import (
 	"github.com/simple-rules/harmony-benchmark/blockchain"
 	"github.com/simple-rules/harmony-benchmark/client"
 	"github.com/simple-rules/harmony-benchmark/consensus"
+	"github.com/simple-rules/harmony-benchmark/crypto/pki"
 	"github.com/simple-rules/harmony-benchmark/log"
 	"github.com/simple-rules/harmony-benchmark/p2p"
 )
@@ -105,7 +106,8 @@ func New(consensus *consensus.Consensus) *Node {
 	// TODO(minh): Use or implement new function in blockchain package for this.
 	genesisBlock := &blockchain.Blockchain{}
 	genesisBlock.Blocks = make([]*blockchain.Block, 0)
-	coinbaseTx := blockchain.NewCoinbaseTX("harmony", "1", node.Consensus.ShardID)
+	// TODO(RJ): use miner's address as coinbase address
+	coinbaseTx := blockchain.NewCoinbaseTX(pki.GetAddressFromInt(1), "0", node.Consensus.ShardID)
 	genesisBlock.Blocks = append(genesisBlock.Blocks, blockchain.NewGenesisBlock(coinbaseTx, node.Consensus.ShardID))
 	node.blockchain = genesisBlock
 

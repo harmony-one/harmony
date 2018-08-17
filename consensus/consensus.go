@@ -10,6 +10,7 @@ import (
 	"github.com/dedis/kyber/sign/schnorr"
 	"github.com/simple-rules/harmony-benchmark/blockchain"
 	"github.com/simple-rules/harmony-benchmark/crypto"
+	"github.com/simple-rules/harmony-benchmark/crypto/pki"
 	"github.com/simple-rules/harmony-benchmark/log"
 	"github.com/simple-rules/harmony-benchmark/p2p"
 	"github.com/simple-rules/harmony-benchmark/utils"
@@ -117,7 +118,7 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 
 	// Set private key for myself so that I can sign messages.
 	consensus.priKey = crypto.Ed25519Curve.Scalar().SetInt64(int64(consensus.nodeId))
-	consensus.pubKey = crypto.GetPublicKeyFromScalar(crypto.Ed25519Curve, consensus.priKey)
+	consensus.pubKey = pki.GetPublicKeyFromScalar(consensus.priKey)
 	consensus.consensusId = 0 // or view Id in the original pbft paper
 
 	myShardID, err := strconv.Atoi(ShardID)

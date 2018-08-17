@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/simple-rules/harmony-benchmark/crypto"
+	"github.com/simple-rules/harmony-benchmark/crypto/pki"
 	"github.com/simple-rules/harmony-benchmark/p2p"
 	"github.com/simple-rules/harmony-benchmark/utils"
 )
@@ -155,5 +156,5 @@ func (configr *Configr) GetMyConfigEntry(ip string, port string) *ConfigEntry {
 func setKey(peer *p2p.Peer) {
 	// Get public key deterministically based on ip and port
 	priKey := crypto.Ed25519Curve.Scalar().SetInt64(int64(utils.GetUniqueIdFromPeer(*peer))) // TODO: figure out why using a random hash value doesn't work for private key (schnorr)
-	peer.PubKey = crypto.GetPublicKeyFromScalar(crypto.Ed25519Curve, priKey)
+	peer.PubKey = pki.GetPublicKeyFromScalar(priKey)
 }

@@ -97,7 +97,7 @@ LOOP:
 		tx := blockchain.Transaction{}
 		isCrossShardTx := false
 		if btcTx.IsCoinBase() {
-			tx.TxInput = []blockchain.TXInput{*blockchain.NewTXInput(blockchain.NewOutPoint(&blockchain.TxID{}, math.MaxUint32), "", nodeShardID)}
+			tx.TxInput = []blockchain.TXInput{*blockchain.NewTXInput(blockchain.NewOutPoint(&blockchain.TxID{}, math.MaxUint32), [20]byte{}, nodeShardID)}
 		} else {
 			for _, btcTXI := range btcTx.TxIn {
 				btcTXIDStr := btc.NewUint256(btcTXI.Input.Hash[:]).String()
@@ -105,7 +105,7 @@ LOOP:
 				if txRef.shardID != nodeShardID {
 					isCrossShardTx = true
 				}
-				tx.TxInput = append(tx.TxInput, *blockchain.NewTXInput(blockchain.NewOutPoint(&txRef.txID, btcTXI.Input.Vout), "", txRef.shardID))
+				tx.TxInput = append(tx.TxInput, *blockchain.NewTXInput(blockchain.NewOutPoint(&txRef.txID, btcTXI.Input.Vout), [20]byte{}, txRef.shardID))
 			}
 		}
 
@@ -114,7 +114,7 @@ LOOP:
 			if btcTXOAddr == nil {
 				log.Warn("TxOut: can't decode address")
 			}
-			txo := blockchain.TXOutput{int(btcTXO.Value), btcTXOAddr.String(), nodeShardID}
+			txo := blockchain.TXOutput{int(btcTXO.Value), btcTXOAddr.Hash160, nodeShardID}
 			tx.TxOutput = append(tx.TxOutput, txo)
 		}
 		tx.SetID()

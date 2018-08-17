@@ -5,13 +5,13 @@ import (
 )
 
 func TestVerifyOneTransactionAndUpdate(t *testing.T) {
-	bc := CreateBlockchain("minh", 0)
+	bc := CreateBlockchain(TestAddressOne, 0)
 	utxoPool := CreateUTXOPoolFromGenesisBlockChain(bc)
 
-	bc.AddNewUserTransfer(utxoPool, "minh", "alok", 3, 0)
-	bc.AddNewUserTransfer(utxoPool, "minh", "rj", 100, 0)
+	bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressThree, 3, 0)
+	bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressTwo, 100, 0)
 
-	tx := bc.NewUTXOTransaction("minh", "mark", 10, 0)
+	tx := bc.NewUTXOTransaction(PriKeyOne, TestAddressOne, TestAddressFour, 10, 0)
 	if tx == nil {
 		t.Error("failed to create a new transaction.")
 	}
@@ -23,13 +23,13 @@ func TestVerifyOneTransactionAndUpdate(t *testing.T) {
 }
 
 func TestVerifyOneTransactionFail(t *testing.T) {
-	bc := CreateBlockchain("minh", 0)
+	bc := CreateBlockchain(TestAddressOne, 0)
 	utxoPool := CreateUTXOPoolFromGenesisBlockChain(bc)
 
-	bc.AddNewUserTransfer(utxoPool, "minh", "alok", 3, 0)
-	bc.AddNewUserTransfer(utxoPool, "minh", "rj", 100, 0)
+	bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressThree, 3, 0)
+	bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressTwo, 100, 0)
 
-	tx := bc.NewUTXOTransaction("minh", "mark", 10, 0)
+	tx := bc.NewUTXOTransaction(PriKeyOne, TestAddressOne, TestAddressFour, 10, 0)
 	if tx == nil {
 		t.Error("failed to create a new transaction.")
 	}
@@ -41,13 +41,13 @@ func TestVerifyOneTransactionFail(t *testing.T) {
 }
 
 func TestDeleteOneBalanceItem(t *testing.T) {
-	bc := CreateBlockchain("minh", 0)
+	bc := CreateBlockchain(TestAddressOne, 0)
 	utxoPool := CreateUTXOPoolFromGenesisBlockChain(bc)
 
-	bc.AddNewUserTransfer(utxoPool, "minh", "alok", 3, 0)
-	bc.AddNewUserTransfer(utxoPool, "alok", "rj", 3, 0)
+	bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressThree, 3, 0)
+	bc.AddNewUserTransfer(utxoPool, PriKeyThree, TestAddressThree, TestAddressTwo, 3, 0)
 
-	if _, ok := utxoPool.UtxoMap["alok"]; ok {
+	if _, ok := utxoPool.UtxoMap[TestAddressThree]; ok {
 		t.Errorf("alok should not be contained in the balance map")
 	}
 }
@@ -55,14 +55,14 @@ func TestDeleteOneBalanceItem(t *testing.T) {
 func TestCleanUp(t *testing.T) {
 	var utxoPool UTXOPool
 	utxoPool.UtxoMap = make(UtxoMap)
-	utxoPool.UtxoMap["minh"] = make(TXHash2Vout2AmountMap)
-	utxoPool.UtxoMap["rj"] = TXHash2Vout2AmountMap{
+	utxoPool.UtxoMap[TestAddressOne] = make(TXHash2Vout2AmountMap)
+	utxoPool.UtxoMap[TestAddressTwo] = TXHash2Vout2AmountMap{
 		"abcd": {
 			0: 1,
 		},
 	}
 	utxoPool.CleanUp()
-	if _, ok := utxoPool.UtxoMap["minh"]; ok {
+	if _, ok := utxoPool.UtxoMap[TestAddressOne]; ok {
 		t.Errorf("minh should not be contained in the balance map")
 	}
 }
