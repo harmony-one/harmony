@@ -1,3 +1,10 @@
+/*
+Soldier is responsible for receiving commands from commander and doing tasks such as starting nodes, uploading logs.
+
+   cd harmony-benchmark/bin
+   go build -o soldier ../aws-experiment-launch/experiment/soldier/main.go
+   ./soldier -ip={node_ip} -port={node_port}
+*/
 package main
 
 import (
@@ -12,7 +19,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -20,6 +26,7 @@ import (
 	"github.com/simple-rules/harmony-benchmark/aws-experiment-launch/experiment/soldier/s3"
 	"github.com/simple-rules/harmony-benchmark/aws-experiment-launch/experiment/utils"
 	"github.com/simple-rules/harmony-benchmark/configr"
+	globalUtils "github.com/simple-rules/harmony-benchmark/utils"
 )
 
 type soliderSetting struct {
@@ -33,6 +40,8 @@ type sessionInfo struct {
 	commanderPort       string
 	localConfigFileName string
 	logFolder           string
+	configr             *configr.Configr
+	myConfig            configr.ConfigEntry
 }
 
 const (
@@ -146,6 +155,9 @@ func handleInitCommand(args []string, w *bufio.Writer) {
 	utils.DownloadFile(globalSession.localConfigFileName, configURL)
 	log.Println("Successfully downloaded config")
 
+	globalSession.configr.ReadConfigFile(globalSession.localConfigFileName)
+	globalSession.myConfig = *globalSession.configr.GetMyConfigEntry(setting.ip, setting.port)
+
 	if err := runInstance(); err == nil {
 		logAndReply(w, "Done init.")
 	} else {
@@ -165,10 +177,10 @@ func handleKillCommand(w *bufio.Writer) {
 func killPort(port string) error {
 	if runtime.GOOS == "windows" {
 		command := fmt.Sprintf("(Get-NetTCPConnection -LocalPort %s).OwningProcess -Force", port)
-		return runCmd("Stop-Process", "-Id", command)
+		return globalUtils.RunCmd("Stop-Process", "-Id", command)
 	} else {
 		command := fmt.Sprintf("lsof -i tcp:%s | grep LISTEN | awk '{print $2}' | xargs kill -9", port)
-		return runCmd("bash", "-c", command)
+		return globalUtils.RunCmd("bash", "-c", command)
 	}
 }
 
@@ -269,61 +281,25 @@ func handleLog2Command(w *bufio.Writer) {
 	logAndReply(w, "Upload log done!")
 }
 
-func runCmd(name string, args ...string) error {
-	cmd := exec.Command(name, args...)
-	if err := cmd.Start(); err != nil {
-		log.Fatal(err)
-		return err
-	} else {
-		log.Println("Command running", name, args)
-		go func() {
-			if err = cmd.Wait(); err != nil {
-				log.Printf("Command finished with error: %v", err)
-			} else {
-				log.Printf("Command finished successfully")
-			}
-		}()
-		return nil
-	}
-}
-
 func runInstance() error {
-	config, _ := configr.ReadConfigFile(globalSession.localConfigFileName)
-
-	myConfig := getMyConfig(setting.ip, setting.port, &config)
-
 	os.MkdirAll(globalSession.logFolder, os.ModePerm)
 
-	if myConfig[2] == "client" {
+	if globalSession.myConfig.Role == "client" {
 		return runClient()
-	} else {
-		return runNode()
 	}
+	return runNode()
 }
 
 func runNode() error {
 	log.Println("running instance")
-	return runCmd("./benchmark", "-ip", setting.ip, "-port", setting.port, "-config_file", globalSession.localConfigFileName, "-log_folder", globalSession.logFolder)
+	return globalUtils.RunCmd("./benchmark", "-ip", setting.ip, "-port", setting.port, "-config_file", globalSession.localConfigFileName, "-log_folder", globalSession.logFolder)
 }
 
 func runClient() error {
 	log.Println("running client")
-	return runCmd("./txgen", "-config_file", globalSession.localConfigFileName, "-log_folder", globalSession.logFolder)
+	return globalUtils.RunCmd("./txgen", "-config_file", globalSession.localConfigFileName, "-log_folder", globalSession.logFolder)
 }
 
-func getMyConfig(myIP string, myPort string, config *[][]string) []string {
-	for _, node := range *config {
-		ip, port := node[0], node[1]
-		if ip == myIP && port == myPort {
-			return node
-		}
-	}
-	return nil
-}
-
-// cd harmony-benchmark
-// go build -o soldier ../aws-experiment-launch/experiment/soldier/main.go
-// ./soldier -ip=xx -port=xx
 func main() {
 	ip := flag.String("ip", "127.0.0.1", "IP of the node.")
 	port := flag.String("port", "9000", "port of the node.")
