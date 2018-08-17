@@ -8,6 +8,7 @@
 # Also it's recommended to use `go build` for testing the whole exe. 
 go build -o bin/benchmark
 go build -o bin/txgen client/txgen/main.go
+go build -o bin/profiler profiler/main.go
 
 # Create a tmp folder for logs
 t=`date +"%Y%m%d-%H%M%S"`

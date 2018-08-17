@@ -36,7 +36,7 @@ type commanderSetting struct {
 	// Options in s3 mode
 	configURL string
 
-	configs [][]string
+	configr *configr.Configr
 }
 
 type sessionInfo struct {
@@ -54,14 +54,6 @@ const (
 	DefaultConfigUrl     = "https://s3-us-west-2.amazonaws.com/unique-bucket-bin/distribution_config.txt"
 )
 
-func readConfigFile() [][]string {
-	if result, err := configr.ReadConfigFile(DistributionFileName); err != nil {
-		panic(err)
-	} else {
-		return result
-	}
-}
-
 func handleCommand(command string) {
 	args := strings.Split(command, " ")
 	if len(args) <= 0 {
@@ -77,9 +69,9 @@ func handleCommand(command string) {
 			}
 		}
 
-		setting.configs = readConfigFile()
-		if setting.configs != nil {
-			log.Printf("The loaded config has %v nodes\n", len(setting.configs))
+		err := setting.configr.ReadConfigFile(DistributionFileName)
+		if err == nil {
+			log.Printf("The loaded config has %v nodes\n", len(setting.configr.GetConfigEntries()))
 		} else {
 			log.Println("Failed to read config file")
 		}
@@ -111,20 +103,21 @@ func config(ip string, port string, mode string, configURL string) {
 	} else {
 		setting.configURL = configURL
 	}
+	setting.configr = configr.NewConfigr()
 }
 
 func dictateNodes(command string) {
 	resultChan := make(chan int)
-	for _, config := range setting.configs {
-		ip := config[0]
-		port := "1" + config[1] // the port number of solider is "1" + node port
-		addr := strings.Join([]string{ip, port}, ":")
+	configs := setting.configr.GetConfigEntries()
+	for _, entry := range configs {
+		port := "1" + entry.Port // the port number of solider is "1" + node port
+		addr := strings.Join([]string{entry.IP, port}, ":")
 
 		go func(resultChan chan int) {
 			resultChan <- dictateNode(addr, command)
 		}(resultChan)
 	}
-	count := len(setting.configs)
+	count := len(configs)
 	res := 0
 	for ; count > 0; count-- {
 		res += <-resultChan
