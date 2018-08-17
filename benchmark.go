@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/simple-rules/harmony-benchmark/attack"
-	"github.com/simple-rules/harmony-benchmark/configr"
 	"github.com/simple-rules/harmony-benchmark/consensus"
 	"github.com/simple-rules/harmony-benchmark/log"
 	"github.com/simple-rules/harmony-benchmark/node"
@@ -53,11 +52,11 @@ func main() {
 	// Attack determination.
 	attack.GetInstance().SetAttackEnabled(attackDetermination(*attackedMode))
 
-	configr := configr.NewConfigr()
-	configr.ReadConfigFile(*configFile)
-	shardID := configr.GetShardID(*ip, *port)
-	peers := configr.GetPeers(*ip, *port, shardID)
-	leader := configr.GetLeader(shardID)
+	distributionConfig := utils.NewDistributionConfig()
+	distributionConfig.ReadConfigFile(*configFile)
+	shardID := distributionConfig.GetShardID(*ip, *port)
+	peers := distributionConfig.GetPeers(*ip, *port, shardID)
+	leader := distributionConfig.GetLeader(shardID)
 
 	var role string
 	if leader.Ip == *ip && leader.Port == *port {
@@ -88,7 +87,7 @@ func main() {
 	// Current node.
 	currentNode := node.New(consensus)
 	// Create client peer.
-	clientPeer := configr.GetClientPeer()
+	clientPeer := distributionConfig.GetClientPeer()
 	// If there is a client configured in the node list.
 	if clientPeer != nil {
 		currentNode.ClientPeer = clientPeer
