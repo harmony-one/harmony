@@ -13,6 +13,10 @@ const (
 	COMMIT_DONE
 	CHALLENGE_DONE
 	RESPONSE_DONE
+	COLLECTIVE_SIG_DONE
+	FINAL_COMMIT_DONE
+	FINAL_CHALLENGE_DONE
+	FINAL_RESPONSE_DONE
 )
 
 // Returns string name for the ConsensusState enum
@@ -22,9 +26,13 @@ func (state ConsensusState) String() string {
 		"ANNOUNCE_DONE",
 		"COMMIT_DONE",
 		"CHALLENGE_DONE",
-		"RESPONSE_DONE"}
+		"RESPONSE_DONE",
+		"COLLECTIVE_SIG_DONE",
+		"FINAL_COMMIT_DONE",
+		"FINAL_CHALLENGE_DONE",
+		"FINAL_RESPONSE_DONE"}
 
-	if state < FINISHED || state > RESPONSE_DONE {
+	if state < FINISHED || state > FINAL_RESPONSE_DONE {
 		return "Unknown"
 	}
 	return names[state]
