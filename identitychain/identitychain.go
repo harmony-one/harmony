@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/simple-rules/harmony-benchmark/log"
+	"github.com/simple-rules/harmony-benchmark/p2p"
 	"github.com/simple-rules/harmony-benchmark/waitnode"
 )
 
@@ -17,18 +18,6 @@ type IdentityChain struct {
 	Identities        []*IdentityBlock
 	PendingIdentities []*waitnode.WaitNode
 	log               log.Logger
-}
-
-func main() {
-	var IDC IdentityChain
-
-	go func() {
-		genesisBlock := &IdentityBlock{0, "127.0.0.1", "8080", 0}
-		mutex.Lock()
-		IDC.Identities = append(IDC.Identities, genesisBlock)
-		mutex.Unlock()
-
-	}()
 }
 
 //IdentityChainHandler handles transactions
@@ -50,4 +39,16 @@ func (IDC *IdentityChain) listenOnPort(port string) {
 		}
 		go IDC.IdentityChainHandler(conn)
 	}
+}
+
+func main() {
+	var IDC IdentityChain
+	var nullPeer p2p.Peer
+	go func() {
+		genesisBlock := &IdentityBlock{nullPeer, 0}
+		mutex.Lock()
+		IDC.Identities = append(IDC.Identities, genesisBlock)
+		mutex.Unlock()
+
+	}()
 }
