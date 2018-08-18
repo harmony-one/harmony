@@ -2,6 +2,8 @@ package waitnode
 
 import (
 	"fmt"
+	"net"
+	"os"
 
 	"github.com/simple-rules/harmony-benchmark/log"
 )
@@ -30,14 +32,16 @@ func (node *WaitNode) StartServer(add address) {
 }
 
 func (node *WaitNode) connectIdentityChain(port string) {
+	// replace by p2p peer
+	identityChainIp := "127.0.0.1"
 	fmt.Println("Connecting to identity chain")
-	// listen, err := net.Listen("tcp4", ":"+port)
-	// defer listen.Close()
-	// if err != nil {
-	// 	node.log.Crit("Socket listen port failed", "port", port, "err", err)
-	// 	os.Exit(1)
-	// }
-	// for {
+	conn, err := net.Dial("tcp4", identityChainIp+":"+port)
+	defer conn.Close()
+	if err != nil {
+		node.log.Crit("Socket listen port failed", "port", port, "err", err)
+		os.Exit(1)
+	}
+	//for {
 	// 	conn, err := listen.Accept()
 	// 	if err != nil {
 	// 		node.log.Crit("Error listening on port. Exiting.", "port", port)
