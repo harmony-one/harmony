@@ -6,28 +6,18 @@ import (
 	"os"
 
 	"github.com/simple-rules/harmony-benchmark/log"
+	"github.com/simple-rules/harmony-benchmark/p2p"
 )
-
-type address struct {
-	IP   string
-	Port string
-}
 
 //WaitNode is for nodes waiting to join consensus
 type WaitNode struct {
-	Address *address
-	Worker  string
-	ID      int
-	log     log.Logger
-}
-
-func (node *WaitNode) doPoW() {
-	node.log.Debug("Node with ID %d and IP %s is doing POW", node.ID, node.Address.IP)
+	Peer p2p.Peer
+	log  log.Logger
 }
 
 // StartServer a server and process the request by a handler.
-func (node *WaitNode) StartServer(add address) {
-	node.log.Debug("Starting waitnode on server %d", "node", node.ID, "port", add.IP)
+func (node *WaitNode) StartServer(add p2p.Peer) {
+	node.log.Debug("Starting waitnode on server %d", "node", node.Peer.Ip, "port", node.Peer.Port)
 	node.connectIdentityChain(add.Port)
 }
 
