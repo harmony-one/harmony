@@ -12,23 +12,23 @@ import (
 //WaitNode is for nodes waiting to join consensus
 type WaitNode struct {
 	Peer p2p.Peer
-	log  log.Logger
+	Log  log.Logger
 }
 
 // StartServer a server and process the request by a handler.
 func (node *WaitNode) StartServer(add p2p.Peer) {
-	node.log.Debug("Starting waitnode on server %d", "node", node.Peer.Ip, "port", node.Peer.Port)
+	node.Log.Debug("Starting waitnode on server %d", "node", node.Peer.Ip, "port", node.Peer.Port)
 	node.connectIdentityChain(add.Port)
 }
 
 func (node *WaitNode) connectIdentityChain(port string) {
 	// replace by p2p peer
-	identityChainIp := "127.0.0.1"
+	identityChainIP := "127.0.0.1"
 	fmt.Println("Connecting to identity chain")
-	conn, err := net.Dial("tcp4", identityChainIp+":"+port)
+	conn, err := net.Dial("tcp4", identityChainIP+":"+port)
 	defer conn.Close()
 	if err != nil {
-		node.log.Crit("Socket listen port failed", "port", port, "err", err)
+		node.Log.Crit("Socket listen port failed", "port", port, "err", err)
 		os.Exit(1)
 	}
 	//for {
@@ -41,11 +41,9 @@ func (node *WaitNode) connectIdentityChain(port string) {
 }
 
 // New Create a new Node
-func New(address *address, id int) *WaitNode {
+func New(Peer p2p.Peer) *WaitNode {
 	node := WaitNode{}
-	node.Address = address
-	node.ID = id
-	node.Worker = "pow"
-	node.log = log.New()
+	node.Peer = Peer
+	node.Log = log.New()
 	return &node
 }
