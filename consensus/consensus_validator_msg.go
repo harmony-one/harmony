@@ -9,7 +9,7 @@ import (
 )
 
 // Construct the commit message to send to leader (assumption the consensus data is already verified)
-func (consensus *Consensus) constructCommitMessage() (secret kyber.Scalar, commitMsg []byte) {
+func (consensus *Consensus) constructCommitMessage(msgType proto_consensus.MessageType) (secret kyber.Scalar, commitMsg []byte) {
 	buffer := bytes.NewBuffer([]byte{})
 
 	// 4 byte consensus id
@@ -33,7 +33,7 @@ func (consensus *Consensus) constructCommitMessage() (secret kyber.Scalar, commi
 	signature := consensus.signMessage(buffer.Bytes())
 	buffer.Write(signature)
 
-	return secret, proto_consensus.ConstructConsensusMessage(proto_consensus.COMMIT, buffer.Bytes())
+	return secret, proto_consensus.ConstructConsensusMessage(msgType, buffer.Bytes())
 }
 
 // Construct the response message to send to leader (assumption the consensus data is already verified)
