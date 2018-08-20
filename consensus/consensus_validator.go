@@ -237,7 +237,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 		log.Info("Failed to generate response", "err", err)
 		return
 	}
-	msgToSend := consensus.constructResponseMessage(response)
+	msgToSend := consensus.constructResponseMessage(proto_consensus.RESPONSE, response)
 
 	p2p.SendMessage(consensus.leader, msgToSend)
 
