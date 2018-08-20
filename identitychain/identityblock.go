@@ -43,12 +43,12 @@ func DeserializeBlock(d []byte) *IdentityBlock {
 
 // NewBlock creates and returns a new block.
 func NewBlock(Identities []*waitnode.WaitNode, prevBlockHash [32]byte) *IdentityBlock {
-	numTxs := int32(len(Identities))
+	numIds := int32(len(Identities))
 	var Ids []*waitnode.WaitNode
 	for _, ids := range Identities {
 		Ids = append(Ids, ids)
 	}
-	block := &IdentityBlock{Timestamp: time.Now().Unix(), PrevBlockHash: prevBlockHash, NumIdentities: numTxs, Identities: Ids}
+	block := &IdentityBlock{Timestamp: time.Now().Unix(), PrevBlockHash: prevBlockHash, NumIdentities: numIds, Identities: Ids}
 	return block
 }
 
@@ -64,4 +64,12 @@ func (b *IdentityBlock) CalculateBlockHash() []byte {
 	hashes = append(hashes, utils.ConvertFixedDataIntoByteArray(b.ShardId))
 	blockHash = sha256.Sum256(bytes.Join(hashes, []byte{}))
 	return blockHash[:]
+}
+
+// NewGenesisBlock creates and returns genesis Block.
+func NewGenesisBlock() *IdentityBlock {
+	numTxs := 0
+	var Ids []*waitnode.WaitNode
+	block := &IdentityBlock{Timestamp: time.Now().Unix(), PrevBlockHash: [32]byte{}, NumIdentities: 1, Identities: Ids}
+	return block
 }
