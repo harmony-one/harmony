@@ -160,7 +160,7 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 		consensus.Log.Debug("Enough commitments received with signatures", "numOfSignatures", len(consensus.commitments))
 
 		// Broadcast challenge
-		msgToSend := consensus.constructChallengeMessage()
+		msgToSend := consensus.constructChallengeMessage(proto_consensus.CHALLENGE)
 		p2p.BroadcastMessage(consensus.getValidatorPeers(), msgToSend)
 
 		// Set state to CHALLENGE_DONE

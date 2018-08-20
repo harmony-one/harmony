@@ -234,7 +234,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 
 	response, err := crypto.Response(crypto.Ed25519Curve, consensus.priKey, consensus.secret, receivedChallenge)
 	if err != nil {
-		log.Error("Failed to generate response", "err", err)
+		log.Info("Failed to generate response", "err", err)
 		return
 	}
 	msgToSend := consensus.constructResponseMessage(response)
