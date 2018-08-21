@@ -280,9 +280,9 @@ func (node *Node) AddNewBlock(newBlock *blockchain.Block) {
 	// Add it to blockchain
 	node.blockchain.Blocks = append(node.blockchain.Blocks, newBlock)
 	// Store it into leveldb.
-	if node.DB != nil {
+	if node.db != nil {
 		node.log.Info("Writing new block into disk.")
-		newBlock.Write(node.DB, strconv.Itoa(len(node.blockchain.Blocks)))
+		newBlock.Write(node.db, strconv.Itoa(len(node.blockchain.Blocks)))
 	}
 	// Update UTXO pool
 	node.UtxoPool.Update(newBlock.Transactions)

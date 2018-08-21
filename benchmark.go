@@ -86,6 +86,13 @@ func main() {
 	)
 	log.Root().SetHandler(h)
 
+	// Initialize leveldb if dbSupported.
+	var ldb *db.LDBDatabase = nil
+
+	if *dbSupported == 1 {
+		ldb, _ = InitLDBDatabase(*ip, *port)
+	}
+
 	// Consensus object.
 	consensus := consensus.NewConsensus(*ip, *port, shardID, peers, leader)
 
@@ -97,11 +104,7 @@ func main() {
 	// Set logger to attack model.
 	attack.GetInstance().SetLogger(consensus.Log)
 	// Current node.
-	currentNode := node.New(consensus, true)
-	// Initialize leveldb if dbSupported.
-	if *dbSupported == 1 {
-		currentNode.DB, _ = InitLDBDatabase(*ip, *port)
-	}
+	currentNode := node.New(consensus, ldb)
 	// Create client peer.
 	clientPeer := distributionConfig.GetClientPeer()
 	// If there is a client configured in the node list.

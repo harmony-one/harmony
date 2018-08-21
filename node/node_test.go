@@ -12,7 +12,7 @@ func TestNewNewNode(test *testing.T) {
 	validator := p2p.Peer{Ip: "3", Port: "5"}
 	consensus := consensus.NewConsensus("1", "2", "0", []p2p.Peer{leader, validator}, leader)
 
-	node := New(consensus, false)
+	node := New(consensus, nil)
 	if node.Consensus == nil {
 		test.Error("Consensus is not initialized for the node")
 	}
@@ -39,7 +39,7 @@ func TestCountNumTransactionsInBlockchain(test *testing.T) {
 	validator := p2p.Peer{Ip: "3", Port: "5"}
 	consensus := consensus.NewConsensus("1", "2", "0", []p2p.Peer{leader, validator}, leader)
 
-	node := New(consensus, false)
+	node := New(consensus, nil)
 	node.AddTestingAddresses(1000)
 	if node.countNumTransactionsInBlockchain() != 1001 {
 		test.Error("Count of transactions in the blockchain is incorrect")
