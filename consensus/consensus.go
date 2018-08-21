@@ -23,6 +23,9 @@ type Consensus struct {
 	commitments          map[uint16]kyber.Point
 	aggregatedCommitment kyber.Point
 
+	// Challenges
+	challenge [32]byte
+
 	// Commits collected from validators.
 	bitmap *crypto.Mask
 	// Responses collected from validators
@@ -31,6 +34,9 @@ type Consensus struct {
 	validators map[uint16]p2p.Peer
 	// Leader
 	leader p2p.Peer
+	// Public keys of the committee including leader and validators
+	publicKeys []kyber.Point
+
 	// private/public keys of current node
 	priKey kyber.Scalar
 	pubKey kyber.Point
@@ -101,15 +107,16 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 	}
 
 	// Initialize cosign bitmap
-	allPublics := make([]kyber.Point, 0)
+	allPublicKeys := make([]kyber.Point, 0)
 	for _, validatorPeer := range consensus.validators {
-		allPublics = append(allPublics, validatorPeer.PubKey)
+		allPublicKeys = append(allPublicKeys, validatorPeer.PubKey)
 	}
-	allPublics = append(allPublics, leader.PubKey)
-	mask, err := crypto.NewMask(crypto.Ed25519Curve, allPublics, consensus.leader.PubKey)
+	allPublicKeys = append(allPublicKeys, leader.PubKey)
+	mask, err := crypto.NewMask(crypto.Ed25519Curve, allPublicKeys, consensus.leader.PubKey)
 	if err != nil {
 		panic("Failed to create commitment mask")
 	}
+	consensus.publicKeys = allPublicKeys
 	consensus.bitmap = mask
 
 	// For now use socket address as 16 byte Id

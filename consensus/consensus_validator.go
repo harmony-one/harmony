@@ -32,6 +32,8 @@ func (consensus *Consensus) ProcessMessageValidator(message []byte) {
 		consensus.processAnnounceMessage(payload)
 	case proto_consensus.CHALLENGE:
 		consensus.processChallengeMessage(payload)
+	case proto_consensus.COLLECTIVE_SIG:
+		consensus.processCollectiveSigMessage(payload)
 	default:
 		consensus.Log.Error("Unexpected message type", "msgType", msgType, "consensus", consensus)
 	}
@@ -230,7 +232,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 
 	response, err := crypto.Response(crypto.Ed25519Curve, consensus.priKey, consensus.secret, receivedChallenge)
 	if err != nil {
-		log.Info("Failed to generate response", "err", err)
+		log.Warn("Failed to generate response", "err", err)
 		return
 	}
 	msgToSend := consensus.constructResponseMessage(proto_consensus.RESPONSE, response)
@@ -274,4 +276,84 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 
 	}
 	consensus.mutex.Unlock()
+}
+
+// Processes the collective signature message sent from the leader
+func (consensus *Consensus) processCollectiveSigMessage(payload []byte) {
+	//#### Read payload data
+	offset := 0
+	// 4 byte consensus id
+	consensusId := binary.BigEndian.Uint32(payload[offset : offset+4])
+	offset += 4
+
+	// 32 byte block hash
+	blockHash := payload[offset : offset+32]
+	offset += 32
+
+	// 2 byte leader id
+	leaderId := binary.BigEndian.Uint16(payload[offset : offset+2])
+	offset += 2
+
+	// 64 byte of collective signature
+	collectiveSig := payload[offset : offset+64]
+	offset += 64
+
+	// N byte of bitmap
+	n := len(payload) - offset - 64 // the number means 64 signature
+	bitmap := payload[offset : offset+n]
+	offset += n
+
+	// 64 byte of signature on previous data
+	signature := payload[offset : offset+64]
+	offset += 64
+	//#### END: Read payload data
+
+	copy(consensus.blockHash[:], blockHash[:])
+
+	// Verify block data
+	// check leader Id
+	myLeaderId := utils.GetUniqueIdFromPeer(consensus.leader)
+	if leaderId != myLeaderId {
+		consensus.Log.Warn("Received message from wrong leader", "myLeaderId", myLeaderId, "receivedLeaderId", leaderId, "consensus", consensus)
+		return
+	}
+
+	// Verify signature
+	if schnorr.Verify(crypto.Ed25519Curve, consensus.leader.PubKey, payload[:offset-64], signature) != nil {
+		consensus.Log.Warn("Received message with invalid signature", "leaderKey", consensus.leader.PubKey, "consensus", consensus)
+		return
+	}
+
+	// Verify collective signature
+	err := crypto.Verify(crypto.Ed25519Curve, consensus.publicKeys, payload[:36], append(collectiveSig, bitmap...), crypto.NewThresholdPolicy(len(consensus.publicKeys)/2))
+	if err != nil {
+		consensus.Log.Warn("Failed to verify the collective sig message", "consensusId", consensusId, "err", err)
+	}
+
+	// Add attack model of IncorrectResponse.
+	if attack.GetInstance().IncorrectResponse() {
+		consensus.Log.Warn("IncorrectResponse attacked")
+		return
+	}
+
+	// check consensus Id
+	if consensusId != consensus.consensusId {
+		consensus.Log.Warn("Received message with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId, "consensus", consensus)
+		return
+	}
+
+	// check block hash
+	if bytes.Compare(blockHash[:], consensus.blockHash[:]) != 0 {
+		consensus.Log.Warn("Block hash doesn't match", "consensus", consensus)
+		return
+	}
+
+	secret, msgToSend := consensus.constructCommitMessage(proto_consensus.FINAL_COMMIT)
+	// Store the commitment secret
+	consensus.secret = secret
+
+	p2p.SendMessage(consensus.leader, msgToSend)
+
+	// Set state to COMMIT_DONE
+	consensus.state = FINAL_COMMIT_DONE
 }

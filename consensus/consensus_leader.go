@@ -152,11 +152,24 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 		return
 	}
 
-	if len(consensus.commitments) >= (2*(len(consensus.validators)+1))/3+1 && consensus.state < CHALLENGE_DONE {
-		consensus.Log.Debug("Enough commitments received with signatures", "numOfSignatures", len(consensus.commitments))
+	if len(consensus.commitments) >= len(consensus.validators)+1 && consensus.state < CHALLENGE_DONE {
+		consensus.Log.Debug("Enough commitments received with signatures", "num", len(consensus.commitments))
 
 		// Broadcast challenge
 		msgToSend := consensus.constructChallengeMessage(proto_consensus.CHALLENGE)
+
+		// Add leader's response
+		challengeScalar := crypto.Ed25519Curve.Scalar()
+		challengeScalar.UnmarshalBinary(consensus.challenge[:])
+		response, err := crypto.Response(crypto.Ed25519Curve, consensus.priKey, consensus.secret, challengeScalar)
+		if err == nil {
+			consensus.responses[consensus.nodeId] = response
+			consensus.bitmap.SetKey(consensus.pubKey, true)
+		} else {
+			log.Warn("Failed to generate response", "err", err)
+		}
+
+		// Broadcast challenge message
 		p2p.BroadcastMessage(consensus.getValidatorPeers(), msgToSend)
 
 		// Set state to CHALLENGE_DONE
@@ -230,20 +243,22 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 	}
 
 	//consensus.Log.Debug("RECEIVED RESPONSE", "consensusId", consensusId)
-	if len(consensus.responses) >= (2*len(consensus.validators))/3+1 && consensus.state != FINISHED {
+	if len(consensus.responses) >= len(consensus.validators)+1 && consensus.state != FINISHED {
 		consensus.mutex.Lock()
-		if len(consensus.responses) >= (2*len(consensus.validators))/3+1 && consensus.state != FINISHED {
+		if len(consensus.responses) >= len(consensus.validators)+1 && consensus.state != FINISHED {
+			consensus.Log.Debug("Enough responses received with signatures", "num", len(consensus.responses))
 			// Aggregate responses
-			responses := make([]kyber.Scalar, 0)
+			responses := []kyber.Scalar{}
 			for _, val := range consensus.responses {
 				responses = append(responses, val)
 			}
-			aggResponse, err := crypto.AggregateResponses(crypto.Ed25519Curve, responses)
+
+			aggregatedResponse, err := crypto.AggregateResponses(crypto.Ed25519Curve, responses)
 			if err != nil {
 				log.Error("Failed to aggregate responses")
 				return
 			}
-			collectiveSigAndBitmap, err := crypto.Sign(crypto.Ed25519Curve, consensus.aggregatedCommitment, aggResponse, consensus.bitmap)
+			collectiveSigAndBitmap, err := crypto.Sign(crypto.Ed25519Curve, consensus.aggregatedCommitment, aggregatedResponse, consensus.bitmap)
 
 			if err != nil {
 				log.Error("Failed to create collective signature")

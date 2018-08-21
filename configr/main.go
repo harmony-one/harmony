@@ -112,11 +112,11 @@ func (configr *Configr) GetShardID(ip, port string) string {
 	return "N/A"
 }
 
-// GetPeers Gets the peer list of the node corresponding to this ip and port
+// GetPeers Gets the validator list
 func (configr *Configr) GetPeers(ip, port, shardID string) []p2p.Peer {
 	var peerList []p2p.Peer
 	for _, entry := range configr.config {
-		if entry.Role != "validator" || entry.IP == ip && entry.Port == port || entry.ShardID != shardID {
+		if entry.Role != "validator" || entry.ShardID != shardID {
 			continue
 		}
 		// Get public key deterministically based on ip and port

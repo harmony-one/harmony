@@ -65,7 +65,9 @@ func (consensus *Consensus) constructChallengeMessage(msgType proto_consensus.Me
 	buffer.Write(getAggregatedKey(consensus.bitmap))
 
 	// 32 byte challenge
-	buffer.Write(getChallenge(aggCommitment, consensus.bitmap.AggregatePublic, buffer.Bytes()[:36])) // message contains consensus id and block hash for now.
+	challenge := getChallenge(aggCommitment, consensus.bitmap.AggregatePublic, buffer.Bytes()[:36])
+	buffer.Write(challenge) // message contains consensus id and block hash for now.
+	copy(consensus.challenge[:], challenge)
 	consensus.aggregatedCommitment = aggCommitment
 
 	// 64 byte of signature on previous data
