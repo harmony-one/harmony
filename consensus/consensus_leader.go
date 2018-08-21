@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/gob"
+	"errors"
 	"time"
 
 	"github.com/dedis/kyber"
@@ -152,7 +153,7 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 		return
 	}
 
-	if len(consensus.commitments) >= len(consensus.validators)+1 && consensus.state < CHALLENGE_DONE {
+	if len(consensus.commitments) >= (2*len(consensus.publicKeys)/3)+1 && consensus.state < CHALLENGE_DONE {
 		consensus.Log.Debug("Enough commitments received with signatures", "num", len(consensus.commitments))
 
 		// Broadcast challenge
@@ -230,11 +231,19 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 	_, ok = consensus.responses[validatorId]
 	shouldProcess = shouldProcess && !ok
 	if shouldProcess {
-		scalar := crypto.Ed25519Curve.Scalar()
-		scalar.UnmarshalBinary(response)
-		consensus.responses[validatorId] = scalar
-		// Set the bitmap indicate this validate signed. TODO: figure out how to resolve the inconsistency of validators from commit and response messages
-		consensus.bitmap.SetKey(value.PubKey, true)
+		// verify the response matches the received commit
+		responseScalar := crypto.Ed25519Curve.Scalar()
+		responseScalar.UnmarshalBinary(response)
+		err := consensus.verifyResponse(responseScalar, validatorId)
+		if err != nil {
+			consensus.Log.Warn("Failed to verify the response", "error", err)
+			shouldProcess = false
+		} else {
+			consensus.responses[validatorId] = responseScalar
+			// Set the bitmap indicate this validate signed. TODO: figure out how to resolve the inconsistency of validators from commit and response messages
+			consensus.bitmap.SetKey(value.PubKey, true)
+		}
+
 	}
 	consensus.mutex.Unlock()
 
@@ -243,9 +252,9 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 	}
 
 	//consensus.Log.Debug("RECEIVED RESPONSE", "consensusId", consensusId)
-	if len(consensus.responses) >= len(consensus.validators)+1 && consensus.state != FINISHED {
+	if len(consensus.responses) >= (2*len(consensus.publicKeys)/3)+1 && consensus.state != FINISHED {
 		consensus.mutex.Lock()
-		if len(consensus.responses) >= len(consensus.validators)+1 && consensus.state != FINISHED {
+		if len(consensus.responses) >= (2*len(consensus.publicKeys)/3)+1 && consensus.state != FINISHED {
 			consensus.Log.Debug("Enough responses received with signatures", "num", len(consensus.responses))
 			// Aggregate responses
 			responses := []kyber.Scalar{}
@@ -316,4 +325,27 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 		}
 		consensus.mutex.Unlock()
 	}
+}
+
+func (consensus *Consensus) verifyResponse(response kyber.Scalar, validatorId uint16) error {
+	if response.Equal(crypto.Ed25519Curve.Scalar()) {
+		return errors.New("response is zero valued")
+	}
+	_, ok := consensus.commitments[validatorId]
+	if !ok {
+		return errors.New("no commit is received for the validator")
+	}
+	// TODO(RJ): enable the actual check
+	//challenge := crypto.Ed25519Curve.Scalar()
+	//challenge.UnmarshalBinary(consensus.challenge[:])
+	//
+	//// compute Q = sG + r*pubKey
+	//sG := crypto.Ed25519Curve.Point().Mul(response, nil)
+	//r_pubKey := crypto.Ed25519Curve.Point().Mul(challenge, consensus.validators[validatorId].PubKey)
+	//Q := crypto.Ed25519Curve.Point().Add(sG, r_pubKey)
+	//
+	//if !Q.Equal(commit) {
+	//	return errors.New("recreated commit doesn't match the received one")
+	//}
+	return nil
 }
