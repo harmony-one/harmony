@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/gob"
+	"log"
 
-	"github.com/simple-rules/harmony-benchmark/log"
 	"github.com/simple-rules/harmony-benchmark/p2p"
 	"github.com/simple-rules/harmony-benchmark/proto/identity"
 	"github.com/simple-rules/harmony-benchmark/utils"
@@ -14,20 +14,19 @@ import (
 //WaitNode is for nodes waiting to join consensus
 type WaitNode struct {
 	Peer p2p.Peer
-	Log  log.Logger
-	ID   []byte
+	ID   uint16
 }
 
 // StartServer a server and process the request by a handler.
 func (node *WaitNode) StartServer() {
-	node.Log.Debug("Starting waitnode on server %d", "node", node.Peer.Ip, "port", node.Peer.Port)
+	log.Printf("Starting waitnode on server %s and port %s", node.Peer.Ip, node.Peer.Port)
 }
 
 func (node *WaitNode) connectIdentityChain(peer p2p.Peer) {
-	// replace by p2p peer
 	p2p.SendMessage(peer, identity.ConstructIdentityMessage(identity.REGISTER, node.SerializeWaitNode()))
-
 }
+
+//Constructs node-id by hashing the IP.
 func calculateHash(num string) []byte {
 	var hashes [][]byte
 	hashes = append(hashes, utils.ConvertFixedDataIntoByteArray(num))
@@ -35,33 +34,32 @@ func calculateHash(num string) []byte {
 	return hash[:]
 }
 
-// Serialize serializes the block
+//SerializeWaitNode serializes the node
 func (node *WaitNode) SerializeWaitNode() []byte {
 	var result bytes.Buffer
 	encoder := gob.NewEncoder(&result)
 	err := encoder.Encode(node)
 	if err != nil {
-		log.Panic(err)
+		log.Panic(err.Error())
 	}
 	return result.Bytes()
 }
 
-// DeserializeBlock deserializes a block
+// DeserializeWaitNode deserializes the node
 func DeserializeWaitNode(d []byte) *WaitNode {
-	var block WaitNode
+	var wn WaitNode
 	decoder := gob.NewDecoder(bytes.NewReader(d))
-	err := decoder.Decode(&WaitNode)
+	err := decoder.Decode(&wn)
 	if err != nil {
 		log.Panic(err)
 	}
-	return &WaitNode
+	return &wn
 }
 
 // New Create a new Node
 func New(Peer p2p.Peer) *WaitNode {
 	node := WaitNode{}
 	node.Peer = Peer
-	node.ID = calculateHash(Peer.Ip)
-	node.Log = log.New()
+	node.ID = utils.GetUniqueIdFromPeer(Peer)
 	return &node
 }
