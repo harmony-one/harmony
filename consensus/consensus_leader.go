@@ -247,14 +247,25 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 				log.Error("Failed to aggregate responses")
 				return
 			}
-			collectiveSig, err := crypto.Sign(crypto.Ed25519Curve, consensus.aggregatedCommitment, aggResponse, consensus.bitmap)
+			collectiveSigAndBitmap, err := crypto.Sign(crypto.Ed25519Curve, consensus.aggregatedCommitment, aggResponse, consensus.bitmap)
 
 			if err != nil {
 				log.Error("Failed to create collective signature")
 				return
 			} else {
-				log.Info("CollectiveSig created.", "size", len(collectiveSig))
+				log.Info("CollectiveSig and Bitmap created.", "size", len(collectiveSigAndBitmap))
 			}
+
+			// Start the second round of Cosi
+			collectiveSig := [64]byte{}
+			copy(collectiveSig[:], collectiveSigAndBitmap[:64])
+			bitmap := collectiveSigAndBitmap[64:]
+			msgToSend := consensus.constructCollectiveSigMessage(collectiveSig, bitmap)
+
+			p2p.BroadcastMessage(consensus.getValidatorPeers(), msgToSend)
+
+			// Set state to CHALLENGE_DONE
+			consensus.state = COLLECTIVE_SIG_DONE
 
 			consensus.Log.Debug("Consensus reached with signatures.", "numOfSignatures", len(consensus.responses))
 			// Reset state to FINISHED, and clear other data.
@@ -273,7 +284,8 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 
 			// Sign the block
 			// TODO(RJ): populate bitmap
-			copy(blockHeaderObj.Signature[:], collectiveSig)
+			copy(blockHeaderObj.Signature[:], collectiveSig[:])
+			copy(blockHeaderObj.Bitmap[:], bitmap)
 			consensus.OnConsensusDone(&blockHeaderObj)
 
 			// TODO: @ricl these logic are irrelevant to consensus, move them to another file, say profiler.

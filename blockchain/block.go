@@ -23,7 +23,7 @@ type Block struct {
 	ShardId         uint32
 	Hash            [32]byte
 	// Signature...
-	bitmap    []byte   // Contains which validator signed the block.
+	Bitmap    []byte   // Contains which validator signed the block.
 	Signature [66]byte // Schnorr collective signature
 }
 
