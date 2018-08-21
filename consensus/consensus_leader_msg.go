@@ -75,6 +75,36 @@ func (consensus *Consensus) constructChallengeMessage() []byte {
 	return proto_consensus.ConstructConsensusMessage(proto_consensus.CHALLENGE, buffer.Bytes())
 }
 
+// Construct the collective signature message
+func (consensus *Consensus) constructCollectiveSigMessage(collectiveSig [64]byte, bitmap []byte) []byte {
+	buffer := bytes.NewBuffer([]byte{})
+
+	// 4 byte consensus id
+	fourBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(fourBytes, consensus.consensusId)
+	buffer.Write(fourBytes)
+
+	// 32 byte block hash
+	buffer.Write(consensus.blockHash[:])
+
+	// 2 byte leader id
+	twoBytes := make([]byte, 2)
+	binary.BigEndian.PutUint16(twoBytes, consensus.nodeId)
+	buffer.Write(twoBytes)
+
+	// 64 byte collective signature
+	buffer.Write(collectiveSig[:])
+
+	// N byte bitmap
+	buffer.Write(bitmap)
+
+	// 64 byte of signature on previous data
+	signature := consensus.signMessage(buffer.Bytes())
+	buffer.Write(signature)
+
+	return proto_consensus.ConstructConsensusMessage(proto_consensus.COLLECTIVE_SIG, buffer.Bytes())
+}
+
 func getAggregatedCommit(commitments []kyber.Point) (commitment kyber.Point, bytes []byte) {
 	aggCommitment := crypto.AggregateCommitmentsOnly(crypto.Ed25519Curve, commitments)
 	bytes, err := aggCommitment.MarshalBinary()

@@ -24,10 +24,12 @@ n - 2 bytes       - actual message payload
 // The message category enum
 type MessageCategory byte
 
+//CONSENSUS and other message categories
 const (
 	CONSENSUS MessageCategory = iota
 	NODE
 	CLIENT
+	IDENTITY
 	// TODO: add more types
 )
 

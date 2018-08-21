@@ -120,7 +120,7 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 		return
 	}
 
-	secret, msgToSend := consensus.constructCommitMessage()
+	secret, msgToSend := consensus.constructCommitMessage(proto_consensus.COMMIT)
 	// Store the commitment secret
 	consensus.secret = secret
 
