@@ -56,7 +56,7 @@ func (b *IdentityBlock) CalculateBlockHash() []byte {
 	for _, id := range b.Identities {
 		hashes = append(hashes, id)
 	}
-	hashes = append(hashes, utils.ConvertFixedDataIntoByteArray(b.ShardId))
+	hashes = append(hashes, utils.ConvertFixedDataIntoByteArray(b.NumIdentities)
 	blockHash = sha256.Sum256(bytes.Join(hashes, []byte{}))
 	return blockHash[:]
 }

@@ -17,6 +17,7 @@ type IdentityChain struct {
 	Identities        []*IdentityBlock
 	PendingIdentities []*waitnode.WaitNode
 	log               log.Logger
+	Peer			   p2p.Peer
 }
 
 //IdentityChainHandler handles registration of new Identities
@@ -80,8 +81,8 @@ func (IDC *IdentityChain) MakeNewBlock() *IdentityBlock {
 	}
 }
 
-func (IDC *IdentityChain) listenOnPort(port string) {
-	listen, err := net.Listen("tcp4", ":"+port)
+func (IDC *IdentityChain) listenOnPort() {
+	listen, err := net.Listen("tcp4", IDC.Peer.Ip + ":" IDC.Peer.Port)
 	defer listen.Close()
 	if err != nil {
 		IDC.log.Crit("Socket listen port failed", "port", port, "err", err)
