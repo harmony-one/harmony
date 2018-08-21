@@ -30,12 +30,8 @@ func (consensus *Consensus) ProcessMessageValidator(message []byte) {
 	switch msgType {
 	case proto_consensus.ANNOUNCE:
 		consensus.processAnnounceMessage(payload)
-	case proto_consensus.COMMIT:
-		consensus.Log.Error("Unexpected message type", "msgType", msgType, "consensus", consensus)
 	case proto_consensus.CHALLENGE:
 		consensus.processChallengeMessage(payload)
-	case proto_consensus.RESPONSE:
-		consensus.Log.Error("Unexpected message type", "msgType", msgType, "consensus", consensus)
 	default:
 		consensus.Log.Error("Unexpected message type", "msgType", msgType, "consensus", consensus)
 	}

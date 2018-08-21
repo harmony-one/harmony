@@ -48,12 +48,8 @@ func (consensus *Consensus) ProcessMessageLeader(message []byte) {
 	}
 
 	switch msgType {
-	case proto_consensus.ANNOUNCE:
-		consensus.Log.Error("Unexpected message type", "msgType", msgType, "consensus", consensus)
 	case proto_consensus.COMMIT:
 		consensus.processCommitMessage(payload)
-	case proto_consensus.CHALLENGE:
-		consensus.Log.Error("Unexpected message type", "msgType", msgType, "consensus", consensus)
 	case proto_consensus.RESPONSE:
 		consensus.processResponseMessage(payload)
 	case proto_consensus.START_CONSENSUS:
