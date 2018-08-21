@@ -37,7 +37,7 @@ func (consensus *Consensus) constructCommitMessage(msgType proto_consensus.Messa
 }
 
 // Construct the response message to send to leader (assumption the consensus data is already verified)
-func (consensus *Consensus) constructResponseMessage(response kyber.Scalar) []byte {
+func (consensus *Consensus) constructResponseMessage(msgType proto_consensus.MessageType, response kyber.Scalar) []byte {
 	buffer := bytes.NewBuffer([]byte{})
 
 	// 4 byte consensus id
@@ -60,5 +60,5 @@ func (consensus *Consensus) constructResponseMessage(response kyber.Scalar) []by
 	signature := consensus.signMessage(buffer.Bytes())
 	buffer.Write(signature)
 
-	return proto_consensus.ConstructConsensusMessage(proto_consensus.RESPONSE, buffer.Bytes())
+	return proto_consensus.ConstructConsensusMessage(msgType, buffer.Bytes())
 }

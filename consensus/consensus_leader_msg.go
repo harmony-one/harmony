@@ -37,7 +37,7 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 }
 
 // Construct the challenge message
-func (consensus *Consensus) constructChallengeMessage() []byte {
+func (consensus *Consensus) constructChallengeMessage(msgType proto_consensus.MessageType) []byte {
 	buffer := bytes.NewBuffer([]byte{})
 
 	// 4 byte consensus id
@@ -72,7 +72,7 @@ func (consensus *Consensus) constructChallengeMessage() []byte {
 	signature := consensus.signMessage(buffer.Bytes())
 	buffer.Write(signature)
 
-	return proto_consensus.ConstructConsensusMessage(proto_consensus.CHALLENGE, buffer.Bytes())
+	return proto_consensus.ConstructConsensusMessage(msgType, buffer.Bytes())
 }
 
 // Construct the collective signature message
