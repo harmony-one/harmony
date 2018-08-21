@@ -8,6 +8,7 @@ import (
 	"github.com/simple-rules/harmony-benchmark/log"
 	"github.com/simple-rules/harmony-benchmark/p2p"
 	"github.com/simple-rules/harmony-benchmark/waitnode"
+	"github.com/simple-rules/harmony-benchmark/proto"
 )
 
 var mutex sync.Mutex
@@ -46,11 +47,8 @@ func (IDC *IdentityChain) IdentityChainHandler(conn net.Conn) {
 		IDC.log.Error("Read message payload failed", "err", err, "node", node)
 		return
 	}
-	content, err := p2p.ReadMessageContent(conn)
-	if err != nil {
-		IDC.log.Error("Read p2p data failed", "err", err, "node", node)
-		return
-	}
+	NewWaitNode := *waitnode.DeserializeWaitNode(msgPayload)
+	IDC.PendingIdentities = append(IDC.PendingIdentities, NewWaitNode)
 }
 
 // GetLatestBlock gests the latest block at the end of the chain
