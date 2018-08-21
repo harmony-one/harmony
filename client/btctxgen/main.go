@@ -200,13 +200,13 @@ func main() {
 	// Nodes containing utxopools to mirror the shards' data in the network
 	nodes := []*node.Node{}
 	for _, shardID := range shardIDs {
-		nodes = append(nodes, node.New(&consensus.Consensus{ShardID: shardID}))
+		nodes = append(nodes, node.New(&consensus.Consensus{ShardID: shardID}, false))
 	}
 
 	// Client/txgenerator server node setup
 	clientPort := configr.GetClientPort()
 	consensusObj := consensus.NewConsensus("0", clientPort, "0", nil, p2p.Peer{})
-	clientNode := node.New(consensusObj)
+	clientNode := node.New(consensusObj, false)
 
 	initClient(clientNode, clientPort, &leaders, &nodes)
 
