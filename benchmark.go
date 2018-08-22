@@ -10,6 +10,7 @@ import (
 
 	"github.com/simple-rules/harmony-benchmark/attack"
 	"github.com/simple-rules/harmony-benchmark/consensus"
+	"github.com/simple-rules/harmony-benchmark/db"
 	"github.com/simple-rules/harmony-benchmark/log"
 	"github.com/simple-rules/harmony-benchmark/node"
 	"github.com/simple-rules/harmony-benchmark/utils"
@@ -38,12 +39,23 @@ func startProfiler(shardID string, logFolder string) {
 	}
 }
 
+func InitLDBDatabase(ip string, port string) (*db.LDBDatabase, error) {
+	// TODO(minhdoan): Refactor this.
+	dbFileName := "/tmp/harmony_" + ip + port + ".dat"
+	var err = os.RemoveAll(dbFileName)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	return db.NewLDBDatabase(dbFileName, 0, 0)
+}
+
 func main() {
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9000", "port of the node.")
 	configFile := flag.String("config_file", "config.txt", "file containing all ip addresses")
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	attackedMode := flag.Int("attacked_mode", 0, "0 means not attacked, 1 means attacked, 2 means being open to be selected as attacked")
+	dbSupported := flag.Int("db_supported", 0, "0 means not db_supported, 1 means db_supported")
 	flag.Parse()
 
 	// Set up randomization seed.
@@ -74,6 +86,13 @@ func main() {
 	)
 	log.Root().SetHandler(h)
 
+	// Initialize leveldb if dbSupported.
+	var ldb *db.LDBDatabase = nil
+
+	if *dbSupported == 1 {
+		ldb, _ = InitLDBDatabase(*ip, *port)
+	}
+
 	// Consensus object.
 	consensus := consensus.NewConsensus(*ip, *port, shardID, peers, leader)
 
@@ -85,7 +104,7 @@ func main() {
 	// Set logger to attack model.
 	attack.GetInstance().SetLogger(consensus.Log)
 	// Current node.
-	currentNode := node.New(consensus)
+	currentNode := node.New(consensus, ldb)
 	// Create client peer.
 	clientPeer := distributionConfig.GetClientPeer()
 	// If there is a client configured in the node list.

@@ -37,7 +37,7 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 }
 
 // Construct the challenge message
-func (consensus *Consensus) constructChallengeMessage(msgType proto_consensus.MessageType) []byte {
+func (consensus *Consensus) constructChallengeMessage(msgTypeToSend proto_consensus.MessageType) ([]byte, kyber.Scalar) {
 	buffer := bytes.NewBuffer([]byte{})
 
 	// 4 byte consensus id
@@ -53,28 +53,45 @@ func (consensus *Consensus) constructChallengeMessage(msgType proto_consensus.Me
 	binary.BigEndian.PutUint16(twoBytes, consensus.nodeId)
 	buffer.Write(twoBytes)
 
+	commitmentsMap := consensus.commitments // msgType == CHALLENGE
+	bitmap := consensus.bitmap
+	if msgTypeToSend == proto_consensus.FINAL_CHALLENGE {
+		commitmentsMap = consensus.finalCommitments
+		bitmap = consensus.finalBitmap
+	}
+
 	// 33 byte aggregated commit
 	commitments := make([]kyber.Point, 0)
-	for _, val := range consensus.commitments {
+	for _, val := range *commitmentsMap {
 		commitments = append(commitments, val)
 	}
 	aggCommitment, aggCommitmentBytes := getAggregatedCommit(commitments)
 	buffer.Write(aggCommitmentBytes)
 
 	// 33 byte aggregated key
-	buffer.Write(getAggregatedKey(consensus.bitmap))
+	buffer.Write(getAggregatedKey(bitmap))
 
 	// 32 byte challenge
-	challenge := getChallenge(aggCommitment, consensus.bitmap.AggregatePublic, buffer.Bytes()[:36])
-	buffer.Write(challenge) // message contains consensus id and block hash for now.
-	copy(consensus.challenge[:], challenge)
-	consensus.aggregatedCommitment = aggCommitment
+	challengeScalar := getChallenge(aggCommitment, bitmap.AggregatePublic, buffer.Bytes()[:36])
+	bytes, err := challengeScalar.MarshalBinary()
+	if err != nil {
+		log.Error("Failed to serialize challenge")
+	}
+	buffer.Write(bytes)
+
+	if msgTypeToSend == proto_consensus.CHALLENGE {
+		copy(consensus.challenge[:], bytes)
+		consensus.aggregatedCommitment = aggCommitment
+	} else if msgTypeToSend == proto_consensus.FINAL_CHALLENGE {
+		copy(consensus.finalChallenge[:], bytes)
+		consensus.aggregatedFinalCommitment = aggCommitment
+	}
 
 	// 64 byte of signature on previous data
 	signature := consensus.signMessage(buffer.Bytes())
 	buffer.Write(signature)
 
-	return proto_consensus.ConstructConsensusMessage(msgType, buffer.Bytes())
+	return proto_consensus.ConstructConsensusMessage(msgTypeToSend, buffer.Bytes()), challengeScalar
 }
 
 // Construct the collective signature message
@@ -124,14 +141,10 @@ func getAggregatedKey(bitmap *crypto.Mask) []byte {
 	return append(bytes[:], byte(0))
 }
 
-func getChallenge(aggCommitment, aggKey kyber.Point, message []byte) []byte {
+func getChallenge(aggCommitment, aggKey kyber.Point, message []byte) kyber.Scalar {
 	challenge, err := crypto.Challenge(crypto.Ed25519Curve, aggCommitment, aggKey, message)
 	if err != nil {
 		log.Error("Failed to generate challenge")
 	}
-	bytes, err := challenge.MarshalBinary()
-	if err != nil {
-		log.Error("Failed to serialize challenge")
-	}
-	return bytes
+	return challenge
 }

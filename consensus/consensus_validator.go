@@ -31,7 +31,9 @@ func (consensus *Consensus) ProcessMessageValidator(message []byte) {
 	case proto_consensus.ANNOUNCE:
 		consensus.processAnnounceMessage(payload)
 	case proto_consensus.CHALLENGE:
-		consensus.processChallengeMessage(payload)
+		consensus.processChallengeMessage(payload, RESPONSE_DONE)
+	case proto_consensus.FINAL_CHALLENGE:
+		consensus.processChallengeMessage(payload, FINAL_RESPONSE_DONE)
 	case proto_consensus.COLLECTIVE_SIG:
 		consensus.processCollectiveSigMessage(payload)
 	default:
@@ -129,7 +131,7 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 }
 
 // Processes the challenge message sent from the leader
-func (consensus *Consensus) processChallengeMessage(payload []byte) {
+func (consensus *Consensus) processChallengeMessage(payload []byte, targetState ConsensusState) {
 	//#### Read payload data
 	offset := 0
 	// 4 byte consensus id
@@ -235,46 +237,50 @@ func (consensus *Consensus) processChallengeMessage(payload []byte) {
 		log.Warn("Failed to generate response", "err", err)
 		return
 	}
-	msgToSend := consensus.constructResponseMessage(proto_consensus.RESPONSE, response)
+	msgTypeToSend := proto_consensus.RESPONSE
+	if targetState == FINAL_RESPONSE_DONE {
+		msgTypeToSend = proto_consensus.FINAL_RESPONSE
+	}
+	msgToSend := consensus.constructResponseMessage(msgTypeToSend, response)
 
 	p2p.SendMessage(consensus.leader, msgToSend)
 
-	// Set state to RESPONSE_DONE
-	consensus.state = RESPONSE_DONE
+	// Set state to target state (RESPONSE_DONE, FINAL_RESPONSE_DONE)
+	consensus.state = targetState
 
 	// BIG TODO: the block catch up logic is basically a mock now. More checks need to be done to make it correct.
 	// The logic is to roll up to the latest blocks one by one to try catching up with the leader.
-	for {
-		val, ok := consensus.blocksReceived[consensus.consensusId]
-		if ok {
-			delete(consensus.blocksReceived, consensus.consensusId)
-
-			consensus.blockHash = [32]byte{}
-			consensus.consensusId++ // roll up one by one, until the next block is not received yet.
-
-			// TODO: think about when validators know about the consensus is reached.
-			// For now, the blockchain is updated right here.
-
-			// TODO: reconstruct the whole block from header and transactions
-			// For now, we used the stored whole block in consensus.blockHeader
-			txDecoder := gob.NewDecoder(bytes.NewReader(val.blockHeader))
-			var blockHeaderObj blockchain.Block
-			err := txDecoder.Decode(&blockHeaderObj)
-			if err != nil {
-				consensus.Log.Debug("failed to construct the new block after consensus")
-			}
-			// check block data (transactions
-			if !consensus.BlockVerifier(&blockHeaderObj) {
-				consensus.Log.Debug("[WARNING] Block content is not verified successfully", "consensusId", consensus.consensusId)
-				consensus.mutex.Unlock()
-				return
-			}
-			consensus.OnConsensusDone(&blockHeaderObj)
-		} else {
-			break
-		}
-
-	}
+	//for {
+	//	val, ok := consensus.blocksReceived[consensus.consensusId]
+	//	if ok {
+	//		delete(consensus.blocksReceived, consensus.consensusId)
+	//
+	//		consensus.blockHash = [32]byte{}
+	//		consensus.consensusId++ // roll up one by one, until the next block is not received yet.
+	//
+	//		// TODO: think about when validators know about the consensus is reached.
+	//		// For now, the blockchain is updated right here.
+	//
+	//		// TODO: reconstruct the whole block from header and transactions
+	//		// For now, we used the stored whole block in consensus.blockHeader
+	//		txDecoder := gob.NewDecoder(bytes.NewReader(val.blockHeader))
+	//		var blockHeaderObj blockchain.Block
+	//		err := txDecoder.Decode(&blockHeaderObj)
+	//		if err != nil {
+	//			consensus.Log.Debug("failed to construct the new block after consensus")
+	//		}
+	//		// check block data (transactions
+	//		if !consensus.BlockVerifier(&blockHeaderObj) {
+	//			consensus.Log.Debug("[WARNING] Block content is not verified successfully", "consensusId", consensus.consensusId)
+	//			consensus.mutex.Unlock()
+	//			return
+	//		}
+	//		consensus.OnConsensusDone(&blockHeaderObj)
+	//	} else {
+	//		break
+	//	}
+	//
+	//}
 	consensus.mutex.Unlock()
 }
 
@@ -325,7 +331,7 @@ func (consensus *Consensus) processCollectiveSigMessage(payload []byte) {
 	}
 
 	// Verify collective signature
-	err := crypto.Verify(crypto.Ed25519Curve, consensus.publicKeys, payload[:36], append(collectiveSig, bitmap...), crypto.NewThresholdPolicy(len(consensus.publicKeys)/2))
+	err := crypto.Verify(crypto.Ed25519Curve, consensus.publicKeys, payload[:36], append(collectiveSig, bitmap...), crypto.NewThresholdPolicy((2*len(consensus.publicKeys)/3)+1))
 	if err != nil {
 		consensus.Log.Warn("Failed to verify the collective sig message", "consensusId", consensusId, "err", err)
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/simple-rules/harmony-benchmark/client"
 	"github.com/simple-rules/harmony-benchmark/consensus"
 	"github.com/simple-rules/harmony-benchmark/crypto/pki"
+	"github.com/simple-rules/harmony-benchmark/db"
 	"github.com/simple-rules/harmony-benchmark/log"
 	"github.com/simple-rules/harmony-benchmark/p2p"
 )
@@ -21,6 +22,7 @@ type Node struct {
 	pendingTransactions    []*blockchain.Transaction          // All the transactions received but not yet processed for Consensus
 	transactionInConsensus []*blockchain.Transaction          // The transactions selected into the new block and under Consensus process
 	blockchain             *blockchain.Blockchain             // The blockchain for the shard where this node belongs
+	db                     *db.LDBDatabase                    // LevelDB to store blockchain.
 	UtxoPool               *blockchain.UTXOPool               // The corresponding UTXO pool of the current blockchain
 	CrossTxsInConsensus    []*blockchain.CrossShardTxAndProof // The cross shard txs that is under consensus, the proof is not filled yet.
 	CrossTxsToReturn       []*blockchain.CrossShardTxAndProof // The cross shard txs and proof that needs to be sent back to the user client.
@@ -95,7 +97,7 @@ func (node *Node) countNumTransactionsInBlockchain() int {
 }
 
 // Create a new Node
-func New(consensus *consensus.Consensus) *Node {
+func New(consensus *consensus.Consensus, db *db.LDBDatabase) *Node {
 	node := Node{}
 
 	// Consensus and associated channel to communicate blocks
@@ -116,5 +118,9 @@ func New(consensus *consensus.Consensus) *Node {
 
 	// Logger
 	node.log = node.Consensus.Log
+
+	// Initialize level db.
+	node.db = db
+
 	return &node
 }

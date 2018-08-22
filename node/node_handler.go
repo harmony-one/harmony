@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"net"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/simple-rules/harmony-benchmark/blockchain"
@@ -278,6 +279,11 @@ func (node *Node) PostConsensusProcessing(newBlock *blockchain.Block) {
 func (node *Node) AddNewBlock(newBlock *blockchain.Block) {
 	// Add it to blockchain
 	node.blockchain.Blocks = append(node.blockchain.Blocks, newBlock)
+	// Store it into leveldb.
+	if node.db != nil {
+		node.log.Info("Writing new block into disk.")
+		newBlock.Write(node.db, strconv.Itoa(len(node.blockchain.Blocks)))
+	}
 	// Update UTXO pool
 	node.UtxoPool.Update(newBlock.Transactions)
 	// Clear transaction-in-Consensus list

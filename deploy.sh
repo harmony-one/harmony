@@ -25,6 +25,8 @@ if [ -z "$config" ]; then
    usage
 fi
 
+db_supported=$2
+
 # Kill nodes if any
 ./kill_node.sh
 
@@ -48,7 +50,11 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
   IFS=' ' read ip port mode shardId <<< $line
 	#echo $ip $port $mode
   if [ "$mode" != "client" ]; then
-    ./bin/benchmark -ip $ip -port $port -config_file $config -log_folder $log_folder&
+    if [ -z "$db_supported" ]; then
+      ./bin/benchmark -ip $ip -port $port -config_file $config -log_folder $log_folder&
+    else
+      ./bin/benchmark -ip $ip -port $port -config_file $config -log_folder $log_folder  -db_supported 1&
+    fi
   fi
 done < $config
 
