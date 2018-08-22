@@ -49,12 +49,14 @@ func (consensus *Consensus) ProcessMessageLeader(message []byte) {
 	}
 
 	switch msgType {
-	case proto_consensus.COMMIT:
-		consensus.processCommitMessage(payload)
-	case proto_consensus.RESPONSE:
-		consensus.processResponseMessage(payload)
 	case proto_consensus.START_CONSENSUS:
 		consensus.processStartConsensusMessage(payload)
+	case proto_consensus.COMMIT:
+		consensus.processCommitMessage(payload, CHALLENGE_DONE)
+	case proto_consensus.RESPONSE:
+		consensus.processResponseMessage(payload)
+	case proto_consensus.FINAL_COMMIT:
+		consensus.processCommitMessage(payload, FINAL_CHALLENGE_DONE)
 	default:
 		consensus.Log.Error("Unexpected message type", "msgType", msgType, "consensus", consensus)
 	}
@@ -82,16 +84,25 @@ func (consensus *Consensus) startConsensus(newBlock *blockchain.Block) {
 	p2p.BroadcastMessage(consensus.getValidatorPeers(), msgToSend)
 	// Set state to ANNOUNCE_DONE
 	consensus.state = ANNOUNCE_DONE
+	consensus.commitByLeader(true)
+}
 
+// Leader commit to the message itself before receiving others commits
+func (consensus *Consensus) commitByLeader(firstRound bool) {
 	// Generate leader's own commitment
 	secret, commitment := crypto.Commit(crypto.Ed25519Curve)
 	consensus.secret = secret
-	consensus.commitments[consensus.nodeId] = commitment
-	consensus.bitmap.SetKey(consensus.pubKey, true)
+	if firstRound {
+		(*consensus.commitments)[consensus.nodeId] = commitment
+		consensus.bitmap.SetKey(consensus.pubKey, true)
+	} else {
+		(*consensus.finalCommitments)[consensus.nodeId] = commitment
+		consensus.finalBitmap.SetKey(consensus.pubKey, true)
+	}
 }
 
 // Processes the commit message sent from validators
-func (consensus *Consensus) processCommitMessage(payload []byte) {
+func (consensus *Consensus) processCommitMessage(payload []byte, targetState ConsensusState) {
 	// Read payload data
 	offset := 0
 	// 4 byte consensus id
@@ -138,34 +149,43 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 		return
 	}
 
+	commitments := consensus.commitments // targetState == CHALLENGE_DONE
+	bitmap := consensus.bitmap
+	if targetState == FINAL_CHALLENGE_DONE {
+		commitments = consensus.finalCommitments
+		bitmap = consensus.finalBitmap
+	}
+
 	// proceed only when the message is not received before
-	_, ok = consensus.commitments[validatorId]
+	_, ok = (*commitments)[validatorId]
 	shouldProcess := !ok
 	if shouldProcess {
 		point := crypto.Ed25519Curve.Point()
 		point.UnmarshalBinary(commitment)
-		consensus.commitments[validatorId] = point
+		(*commitments)[validatorId] = point
 		// Set the bitmap indicate this validate signed. TODO: figure out how to resolve the inconsistency of validators from commit and response messages
-		consensus.bitmap.SetKey(value.PubKey, true)
+		bitmap.SetKey(value.PubKey, true)
 	}
 
 	if !shouldProcess {
 		return
 	}
 
-	if len(consensus.commitments) >= (2*len(consensus.publicKeys)/3)+1 && consensus.state < CHALLENGE_DONE {
-		consensus.Log.Debug("Enough commitments received with signatures", "num", len(consensus.commitments))
+	if len((*commitments)) >= len(consensus.publicKeys) && consensus.state < targetState {
+		consensus.Log.Debug("Enough commitments received with signatures", "num", len((*commitments)), "state", consensus.state)
 
 		// Broadcast challenge
-		msgToSend := consensus.constructChallengeMessage(proto_consensus.CHALLENGE)
+		msgTypeToSend := proto_consensus.CHALLENGE // targetState == CHALLENGE_DONE
+		if targetState == FINAL_CHALLENGE_DONE {
+			msgTypeToSend = proto_consensus.FINAL_CHALLENGE
+		}
+		msgToSend, challengeScalar := consensus.constructChallengeMessage(msgTypeToSend)
 
 		// Add leader's response
-		challengeScalar := crypto.Ed25519Curve.Scalar()
-		challengeScalar.UnmarshalBinary(consensus.challenge[:])
 		response, err := crypto.Response(crypto.Ed25519Curve, consensus.priKey, consensus.secret, challengeScalar)
 		if err == nil {
 			consensus.responses[consensus.nodeId] = response
-			consensus.bitmap.SetKey(consensus.pubKey, true)
+			bitmap.SetKey(consensus.pubKey, true)
 		} else {
 			log.Warn("Failed to generate response", "err", err)
 		}
@@ -173,8 +193,8 @@ func (consensus *Consensus) processCommitMessage(payload []byte) {
 		// Broadcast challenge message
 		p2p.BroadcastMessage(consensus.getValidatorPeers(), msgToSend)
 
-		// Set state to CHALLENGE_DONE
-		consensus.state = CHALLENGE_DONE
+		// Set state to targetState (CHALLENGE_DONE or FINAL_CHALLENGE_DONE)
+		consensus.state = targetState
 	}
 }
 
@@ -252,9 +272,9 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 	}
 
 	//consensus.Log.Debug("RECEIVED RESPONSE", "consensusId", consensusId)
-	if len(consensus.responses) >= (2*len(consensus.publicKeys)/3)+1 && consensus.state != FINISHED {
+	if len(consensus.responses) >= len(consensus.publicKeys) && consensus.state != FINISHED {
 		consensus.mutex.Lock()
-		if len(consensus.responses) >= (2*len(consensus.publicKeys)/3)+1 && consensus.state != FINISHED {
+		if len(consensus.responses) >= len(consensus.publicKeys) && consensus.state != FINISHED {
 			consensus.Log.Debug("Enough responses received with signatures", "num", len(consensus.responses))
 			// Aggregate responses
 			responses := []kyber.Scalar{}
@@ -286,42 +306,43 @@ func (consensus *Consensus) processResponseMessage(payload []byte) {
 
 			// Set state to CHALLENGE_DONE
 			consensus.state = COLLECTIVE_SIG_DONE
+			consensus.commitByLeader(false)
 
-			consensus.Log.Debug("Consensus reached with signatures.", "numOfSignatures", len(consensus.responses))
-			// Reset state to FINISHED, and clear other data.
-			consensus.ResetState()
-			consensus.consensusId++
-			consensus.Log.Debug("HOORAY!!! CONSENSUS REACHED!!!", "consensusId", consensus.consensusId)
-
-			// TODO: reconstruct the whole block from header and transactions
-			// For now, we used the stored whole block already stored in consensus.blockHeader
-			txDecoder := gob.NewDecoder(bytes.NewReader(consensus.blockHeader))
-			var blockHeaderObj blockchain.Block
-			err = txDecoder.Decode(&blockHeaderObj)
-			if err != nil {
-				consensus.Log.Debug("failed to construct the new block after consensus")
-			}
-
-			// Sign the block
-			// TODO(RJ): populate bitmap
-			copy(blockHeaderObj.Signature[:], collectiveSig[:])
-			copy(blockHeaderObj.Bitmap[:], bitmap)
-			consensus.OnConsensusDone(&blockHeaderObj)
-
-			// TODO: @ricl these logic are irrelevant to consensus, move them to another file, say profiler.
-			endTime := time.Now()
-			timeElapsed := endTime.Sub(startTime)
-			numOfTxs := blockHeaderObj.NumTransactions
-			consensus.Log.Info("TPS Report",
-				"numOfTXs", numOfTxs,
-				"startTime", startTime,
-				"endTime", endTime,
-				"timeElapsed", timeElapsed,
-				"TPS", float64(numOfTxs)/timeElapsed.Seconds(),
-				"consensus", consensus)
-
-			// Send signal to Node so the new block can be added and new round of consensus can be triggered
-			consensus.ReadySignal <- 1
+			//consensus.Log.Debug("Consensus reached with signatures.", "numOfSignatures", len(consensus.responses))
+			//// Reset state to FINISHED, and clear other data.
+			//consensus.ResetState()
+			//consensus.consensusId++
+			//consensus.Log.Debug("HOORAY!!! CONSENSUS REACHED!!!", "consensusId", consensus.consensusId)
+			//
+			//// TODO: reconstruct the whole block from header and transactions
+			//// For now, we used the stored whole block already stored in consensus.blockHeader
+			//txDecoder := gob.NewDecoder(bytes.NewReader(consensus.blockHeader))
+			//var blockHeaderObj blockchain.Block
+			//err = txDecoder.Decode(&blockHeaderObj)
+			//if err != nil {
+			//	consensus.Log.Debug("failed to construct the new block after consensus")
+			//}
+			//
+			//// Sign the block
+			//// TODO(RJ): populate bitmap
+			//copy(blockHeaderObj.Signature[:], collectiveSig[:])
+			//copy(blockHeaderObj.Bitmap[:], bitmap)
+			//consensus.OnConsensusDone(&blockHeaderObj)
+			//
+			//// TODO: @ricl these logic are irrelevant to consensus, move them to another file, say profiler.
+			//endTime := time.Now()
+			//timeElapsed := endTime.Sub(startTime)
+			//numOfTxs := blockHeaderObj.NumTransactions
+			//consensus.Log.Info("TPS Report",
+			//	"numOfTXs", numOfTxs,
+			//	"startTime", startTime,
+			//	"endTime", endTime,
+			//	"timeElapsed", timeElapsed,
+			//	"TPS", float64(numOfTxs)/timeElapsed.Seconds(),
+			//	"consensus", consensus)
+			//
+			//// Send signal to Node so the new block can be added and new round of consensus can be triggered
+			//consensus.ReadySignal <- 1
 		}
 		consensus.mutex.Unlock()
 	}
@@ -331,7 +352,7 @@ func (consensus *Consensus) verifyResponse(response kyber.Scalar, validatorId ui
 	if response.Equal(crypto.Ed25519Curve.Scalar()) {
 		return errors.New("response is zero valued")
 	}
-	_, ok := consensus.commitments[validatorId]
+	_, ok := (*consensus.commitments)[validatorId]
 	if !ok {
 		return errors.New("no commit is received for the validator")
 	}

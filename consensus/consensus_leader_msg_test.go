@@ -37,12 +37,12 @@ func TestConstructChallengeMessage(test *testing.T) {
 
 	consensus := NewConsensus("1", "2", "0", []p2p.Peer{leader, validator}, leader)
 	consensus.blockHash = [32]byte{}
-	consensus.commitments[0] = leaderPubKey
-	consensus.commitments[1] = validatorPubKey
+	(*consensus.commitments)[0] = leaderPubKey
+	(*consensus.commitments)[1] = validatorPubKey
 	consensus.bitmap.SetKey(leaderPubKey, true)
 	consensus.bitmap.SetKey(validatorPubKey, true)
 
-	msg := consensus.constructChallengeMessage(consensus_proto.CHALLENGE)
+	msg, _ := consensus.constructChallengeMessage(consensus_proto.CHALLENGE)
 
 	if len(msg) != 1+1+1+4+32+2+33+33+32+64 {
 		test.Errorf("Annouce message is not constructed in the correct size: %d", len(msg))

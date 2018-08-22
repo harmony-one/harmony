@@ -20,14 +20,17 @@ import (
 type Consensus struct {
 	state ConsensusState
 	// Commits collected from validators. A map from node Id to its commitment
-	commitments          map[uint16]kyber.Point
-	aggregatedCommitment kyber.Point
+	commitments               *map[uint16]kyber.Point
+	finalCommitments          *map[uint16]kyber.Point
+	aggregatedCommitment      kyber.Point
+	aggregatedFinalCommitment kyber.Point
+	bitmap                    *crypto.Mask
+	finalBitmap               *crypto.Mask
 
 	// Challenges
-	challenge [32]byte
+	challenge      [32]byte
+	finalChallenge [32]byte
 
-	// Commits collected from validators.
-	bitmap *crypto.Mask
 	// Responses collected from validators
 	responses map[uint16]kyber.Scalar
 	// map of nodeId to validator Peer object
@@ -97,7 +100,8 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 		consensus.IsLeader = false
 	}
 
-	consensus.commitments = make(map[uint16]kyber.Point)
+	consensus.commitments = &map[uint16]kyber.Point{}
+	consensus.finalCommitments = &map[uint16]kyber.Point{}
 	consensus.validators = make(map[uint16]p2p.Peer)
 	consensus.responses = make(map[uint16]kyber.Scalar)
 
@@ -114,10 +118,15 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 	allPublicKeys = append(allPublicKeys, leader.PubKey)
 	mask, err := crypto.NewMask(crypto.Ed25519Curve, allPublicKeys, consensus.leader.PubKey)
 	if err != nil {
-		panic("Failed to create commitment mask")
+		panic("Failed to create mask")
+	}
+	finalMask, err := crypto.NewMask(crypto.Ed25519Curve, allPublicKeys, consensus.leader.PubKey)
+	if err != nil {
+		panic("Failed to create final mask")
 	}
 	consensus.publicKeys = allPublicKeys
 	consensus.bitmap = mask
+	consensus.finalBitmap = finalMask
 
 	// For now use socket address as 16 byte Id
 	// TODO: populate with correct Id
@@ -170,7 +179,10 @@ func (consensus *Consensus) getValidatorPeers() []p2p.Peer {
 // Reset the state of the consensus
 func (consensus *Consensus) ResetState() {
 	consensus.state = FINISHED
-	consensus.commitments = make(map[uint16]kyber.Point)
+	consensus.commitments = &map[uint16]kyber.Point{}
+	consensus.bitmap.SetMask([]byte{})
+	consensus.finalCommitments = &map[uint16]kyber.Point{}
+	consensus.finalBitmap.SetMask([]byte{})
 	consensus.responses = make(map[uint16]kyber.Scalar)
 	consensus.secret = nil
 }
