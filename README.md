@@ -24,8 +24,15 @@ cd harmony-benchmark
 go get ./...
 ```
 ## Usage
+
+### Running local test without db
 ```
 ./deploy.sh local_config.txt
+```
+
+### Running local test with db
+```
+./deploy.sh local_config.txt 1
 ```
 
 ## Testing
