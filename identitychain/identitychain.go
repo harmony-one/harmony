@@ -93,13 +93,12 @@ func (IDC *IdentityChain) UpdateIdentityChain() {
 }
 
 func (IDC *IdentityChain) listenOnPort() {
-	fmt.Print(IDC.Peer.Port)
 	listen, err := net.Listen("tcp4", ":"+IDC.Peer.Port)
 	if err != nil {
 		IDC.log.Crit("Socket listen port failed")
 		os.Exit(1)
 	} else {
-		IDC.log.Info("Identity chain is now listening..")
+		IDC.log.Info("Identity chain is now listening ..")
 	}
 	defer listen.Close()
 	for {
@@ -116,5 +115,6 @@ func (IDC *IdentityChain) listenOnPort() {
 func New(Peer p2p.Peer) *IdentityChain {
 	IDC := IdentityChain{}
 	IDC.Peer = Peer
+	IDC.log = log.New()
 	return &IDC
 }
