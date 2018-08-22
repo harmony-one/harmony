@@ -32,7 +32,8 @@ type Consensus struct {
 	finalChallenge [32]byte
 
 	// Responses collected from validators
-	responses map[uint16]kyber.Scalar
+	responses      *map[uint16]kyber.Scalar
+	finalResponses *map[uint16]kyber.Scalar
 	// map of nodeId to validator Peer object
 	validators map[uint16]p2p.Peer
 	// Leader
@@ -103,7 +104,8 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 	consensus.commitments = &map[uint16]kyber.Point{}
 	consensus.finalCommitments = &map[uint16]kyber.Point{}
 	consensus.validators = make(map[uint16]p2p.Peer)
-	consensus.responses = make(map[uint16]kyber.Scalar)
+	consensus.responses = &map[uint16]kyber.Scalar{}
+	consensus.finalResponses = &map[uint16]kyber.Scalar{}
 
 	consensus.leader = leader
 	for _, peer := range peers {
@@ -183,7 +185,8 @@ func (consensus *Consensus) ResetState() {
 	consensus.bitmap.SetMask([]byte{})
 	consensus.finalCommitments = &map[uint16]kyber.Point{}
 	consensus.finalBitmap.SetMask([]byte{})
-	consensus.responses = make(map[uint16]kyber.Scalar)
+	consensus.responses = &map[uint16]kyber.Scalar{}
+	consensus.finalResponses = &map[uint16]kyber.Scalar{}
 	consensus.secret = nil
 }
 

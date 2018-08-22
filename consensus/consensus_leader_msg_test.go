@@ -42,7 +42,7 @@ func TestConstructChallengeMessage(test *testing.T) {
 	consensus.bitmap.SetKey(leaderPubKey, true)
 	consensus.bitmap.SetKey(validatorPubKey, true)
 
-	msg, _ := consensus.constructChallengeMessage(consensus_proto.CHALLENGE)
+	msg, _, _ := consensus.constructChallengeMessage(consensus_proto.CHALLENGE)
 
 	if len(msg) != 1+1+1+4+32+2+33+33+32+64 {
 		test.Errorf("Annouce message is not constructed in the correct size: %d", len(msg))

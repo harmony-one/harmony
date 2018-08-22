@@ -248,39 +248,41 @@ func (consensus *Consensus) processChallengeMessage(payload []byte, targetState 
 	// Set state to target state (RESPONSE_DONE, FINAL_RESPONSE_DONE)
 	consensus.state = targetState
 
-	// BIG TODO: the block catch up logic is basically a mock now. More checks need to be done to make it correct.
-	// The logic is to roll up to the latest blocks one by one to try catching up with the leader.
-	//for {
-	//	val, ok := consensus.blocksReceived[consensus.consensusId]
-	//	if ok {
-	//		delete(consensus.blocksReceived, consensus.consensusId)
-	//
-	//		consensus.blockHash = [32]byte{}
-	//		consensus.consensusId++ // roll up one by one, until the next block is not received yet.
-	//
-	//		// TODO: think about when validators know about the consensus is reached.
-	//		// For now, the blockchain is updated right here.
-	//
-	//		// TODO: reconstruct the whole block from header and transactions
-	//		// For now, we used the stored whole block in consensus.blockHeader
-	//		txDecoder := gob.NewDecoder(bytes.NewReader(val.blockHeader))
-	//		var blockHeaderObj blockchain.Block
-	//		err := txDecoder.Decode(&blockHeaderObj)
-	//		if err != nil {
-	//			consensus.Log.Debug("failed to construct the new block after consensus")
-	//		}
-	//		// check block data (transactions
-	//		if !consensus.BlockVerifier(&blockHeaderObj) {
-	//			consensus.Log.Debug("[WARNING] Block content is not verified successfully", "consensusId", consensus.consensusId)
-	//			consensus.mutex.Unlock()
-	//			return
-	//		}
-	//		consensus.OnConsensusDone(&blockHeaderObj)
-	//	} else {
-	//		break
-	//	}
-	//
-	//}
+	if consensus.state == FINAL_RESPONSE_DONE {
+		// BIG TODO: the block catch up logic is basically a mock now. More checks need to be done to make it correct.
+		// The logic is to roll up to the latest blocks one by one to try catching up with the leader.
+		for {
+			val, ok := consensus.blocksReceived[consensus.consensusId]
+			if ok {
+				delete(consensus.blocksReceived, consensus.consensusId)
+
+				consensus.blockHash = [32]byte{}
+				consensus.consensusId++ // roll up one by one, until the next block is not received yet.
+
+				// TODO: think about when validators know about the consensus is reached.
+				// For now, the blockchain is updated right here.
+
+				// TODO: reconstruct the whole block from header and transactions
+				// For now, we used the stored whole block in consensus.blockHeader
+				txDecoder := gob.NewDecoder(bytes.NewReader(val.blockHeader))
+				var blockHeaderObj blockchain.Block
+				err := txDecoder.Decode(&blockHeaderObj)
+				if err != nil {
+					consensus.Log.Debug("failed to construct the new block after consensus")
+				}
+				// check block data (transactions
+				if !consensus.BlockVerifier(&blockHeaderObj) {
+					consensus.Log.Debug("[WARNING] Block content is not verified successfully", "consensusId", consensus.consensusId)
+					consensus.mutex.Unlock()
+					return
+				}
+				consensus.OnConsensusDone(&blockHeaderObj)
+			} else {
+				break
+			}
+
+		}
+	}
 	consensus.mutex.Unlock()
 }
 

@@ -36,8 +36,8 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 	return proto_consensus.ConstructConsensusMessage(proto_consensus.ANNOUNCE, buffer.Bytes())
 }
 
-// Construct the challenge message
-func (consensus *Consensus) constructChallengeMessage(msgTypeToSend proto_consensus.MessageType) ([]byte, kyber.Scalar) {
+// Construct the challenge message, returning challenge message in bytes, challenge scalar and aggregated commmitment point.
+func (consensus *Consensus) constructChallengeMessage(msgTypeToSend proto_consensus.MessageType) ([]byte, kyber.Scalar, kyber.Point) {
 	buffer := bytes.NewBuffer([]byte{})
 
 	// 4 byte consensus id
@@ -79,19 +79,11 @@ func (consensus *Consensus) constructChallengeMessage(msgTypeToSend proto_consen
 	}
 	buffer.Write(bytes)
 
-	if msgTypeToSend == proto_consensus.CHALLENGE {
-		copy(consensus.challenge[:], bytes)
-		consensus.aggregatedCommitment = aggCommitment
-	} else if msgTypeToSend == proto_consensus.FINAL_CHALLENGE {
-		copy(consensus.finalChallenge[:], bytes)
-		consensus.aggregatedFinalCommitment = aggCommitment
-	}
-
 	// 64 byte of signature on previous data
 	signature := consensus.signMessage(buffer.Bytes())
 	buffer.Write(signature)
 
-	return proto_consensus.ConstructConsensusMessage(msgTypeToSend, buffer.Bytes()), challengeScalar
+	return proto_consensus.ConstructConsensusMessage(msgTypeToSend, buffer.Bytes()), challengeScalar, aggCommitment
 }
 
 // Construct the collective signature message
