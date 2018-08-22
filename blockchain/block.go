@@ -22,6 +22,7 @@ type Block struct {
 	Transactions    []*Transaction // Transactions
 	ShardId         uint32
 	Hash            [32]byte
+	MerkleRootData  []byte
 	// Signature...
 	Bitmap    []byte   // Contains which validator signed the block.
 	Signature [66]byte // Schnorr collective signature
@@ -60,6 +61,16 @@ func (b *Block) String() string {
 	return res
 }
 
+func (b *Block) generateMerkleRootData() {
+	var data [][]byte
+
+	for _, txId := range b.TransactionIds {
+		data = append(data, txId[:])
+	}
+	merkleTre := NewMerkleTree(data)
+	b.MerkleRootData = merkleTre.RootNode.Data
+}
+
 func (b *Block) Write(db db.Database, key string) error {
 	return db.Put([]byte(key), b.Serialize())
 }
@@ -74,9 +85,9 @@ func (b *Block) CalculateBlockHash() []byte {
 	for _, id := range b.TransactionIds {
 		hashes = append(hashes, id[:])
 	}
-	for _, tx := range b.Transactions {
-		hashes = append(hashes, tx.ID[:])
-	}
+	b.generateMerkleRootData()
+
+	hashes = append(hashes, b.MerkleRootData)
 	hashes = append(hashes, utils.ConvertFixedDataIntoByteArray(b.ShardId))
 
 	blockHash = sha256.Sum256(bytes.Join(hashes, []byte{}))
