@@ -55,7 +55,7 @@ func main() {
 	configFile := flag.String("config_file", "config.txt", "file containing all ip addresses")
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	attackedMode := flag.Int("attacked_mode", 0, "0 means not attacked, 1 means attacked, 2 means being open to be selected as attacked")
-	dbSupported := flag.Int("db_supported", 0, "0 means not db_supported, 1 means db_supported")
+	dbSupported := flag.Bool("db_supported", false, "false means not db_supported, true means db_supported")
 	flag.Parse()
 
 	// Set up randomization seed.
@@ -89,7 +89,7 @@ func main() {
 	// Initialize leveldb if dbSupported.
 	var ldb *db.LDBDatabase = nil
 
-	if *dbSupported == 1 {
+	if *dbSupported {
 		ldb, _ = InitLDBDatabase(*ip, *port)
 	}
 
