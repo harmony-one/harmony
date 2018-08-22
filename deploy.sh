@@ -53,7 +53,7 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
     if [ -z "$db_supported" ]; then
       ./bin/benchmark -ip $ip -port $port -config_file $config -log_folder $log_folder&
     else
-      ./bin/benchmark -ip $ip -port $port -config_file $config -log_folder $log_folder  -db_supported 1&
+      ./bin/benchmark -ip $ip -port $port -config_file $config -log_folder $log_folder  -db_supported&
     fi
   fi
 done < $config
