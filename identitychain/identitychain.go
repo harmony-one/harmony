@@ -1,14 +1,15 @@
 package identitychain
 
 import (
+	"bufio"
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/simple-rules/harmony-benchmark/log"
 	"github.com/simple-rules/harmony-benchmark/p2p"
-	"github.com/simple-rules/harmony-benchmark/proto"
 	"github.com/simple-rules/harmony-benchmark/waitnode"
 )
 
@@ -31,21 +32,32 @@ func (IDC *IdentityChain) shard() {
 // This could have been its seperate package like consensus, but am avoiding creating a lot of packages.
 func (IDC *IdentityChain) IdentityChainHandler(conn net.Conn) {
 	// Read p2p message payload
-	content, err := p2p.ReadMessageContent(conn)
-	if err != nil {
-		IDC.log.Error("Read p2p data failed")
-		return
-	}
-	fmt.Printf("content is %b", content)
-	msgCategory, err := proto.GetMessageCategory(content)
-	if err != nil {
-		IDC.log.Error("Read message category failed", "err", err)
-		return
-	}
-	if msgCategory != proto.IDENTITY {
-		IDC.log.Error("Identity Chain Recieved incorrect protocol message")
-	}
-	fmt.Println(msgCategory)
+	message, _ := bufio.NewReader(conn).ReadString('\n')
+	// output message received
+	fmt.Print("Message Received by IDC", string(message))
+	// sample process for string received
+	newmessage := strings.ToUpper(message)
+	// send new string back to client
+	conn.Write([]byte(newmessage + "\n"))
+	/////////////////////////////////
+	// content, err := p2p.ReadMessageContent(conn)
+	// if err != nil {
+	// 	IDC.log.Error("Read p2p data failed")
+	// 	return
+	// }
+	// fmt.Printf("content is %b", content)
+	// msgCategory, err := proto.GetMessageCategory(content)
+	// if err != nil {
+	// 	IDC.log.Error("Read message category failed", "err", err)
+	// 	return
+	// }
+	// if msgCategory != proto.IDENTITY {
+	// 	IDC.log.Error("Identity Chain Recieved incorrect protocol message")
+	// }
+	// fmt.Println(msgCategory)
+
+	///////////////////////////////////
+
 	// msgType, err := proto.GetMessageType(content)
 	// if err != nil {
 	// 	IDC.log.Error("Read action type failed", "err", err, "node", node)
@@ -92,20 +104,30 @@ func (IDC *IdentityChain) UpdateIdentityChain() {
 
 }
 
+//StartServer a server and process the request by a handler.
+func (IDC *IdentityChain) StartServer() {
+	fmt.Println("Starting server...")
+	IDC.log.Info("Starting IDC server...") //log.Info does nothing for me! (ak)
+	IDC.listenOnPort()
+}
+
 func (IDC *IdentityChain) listenOnPort() {
 	listen, err := net.Listen("tcp4", ":"+IDC.Peer.Port)
 	if err != nil {
 		IDC.log.Crit("Socket listen port failed")
 		os.Exit(1)
 	} else {
-		IDC.log.Info("Identity chain is now listening ..")
+		fmt.Println("Starting server...now listening")
+		IDC.log.Info("Identity chain is now listening ..") //log.Info does nothing for me! (ak) remove this
 	}
 	defer listen.Close()
 	for {
 		conn, err := listen.Accept()
 		if err != nil {
-			IDC.log.Crit("Error listening on port. Exiting.", "port", IDC.Peer.Port)
+			IDC.log.Crit("Error listening on port. Exiting", IDC.Peer.Port)
 			continue
+		} else {
+			fmt.Println("I am accepting connections now")
 		}
 		go IDC.IdentityChainHandler(conn)
 	}

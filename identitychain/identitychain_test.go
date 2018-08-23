@@ -16,3 +16,5 @@ func TestIDCFormed(test *testing.T) {
 		os.Exit(1)
 	}
 }
+
+//TODO Mock netconnection to test whether identitychain is listening.
