@@ -1,16 +1,13 @@
 package waitnode
 
 import (
-	"bufio"
 	"bytes"
 	"crypto/sha256"
 	"encoding/gob"
-	"fmt"
 	"log"
-	"net"
-	"os"
 
 	"github.com/simple-rules/harmony-benchmark/p2p"
+	"github.com/simple-rules/harmony-benchmark/proto/identity"
 	"github.com/simple-rules/harmony-benchmark/utils"
 )
 
@@ -27,19 +24,7 @@ func (node *WaitNode) StartServer() {
 
 //ConnectIdentityChain connects to identity chain
 func (node *WaitNode) ConnectIdentityChain(peer p2p.Peer) {
-	fmt.Println("Connecting to Identity Chain")
-
-	conn, err := net.Dial("tcp", ":"+peer.Port)
-	if err != nil {
-		fmt.Println("connection")
-		os.Exit(1)
-	}
-	text := "Hi I am alok"
-	fmt.Fprintf(conn, text+"\n")
-	message, _ := bufio.NewReader(conn).ReadString('\n')
-	fmt.Print("Message from server: " + message)
-
-	//p2p.SendMessage(peer, identity.ConstructIdentityMessage(identity.REGISTER, node.SerializeWaitNode()))
+	p2p.SendMessage(peer, identity.ConstructIdentityMessage(identity.REGISTER, node.SerializeWaitNode()))
 }
 
 //Constructs node-id by hashing the IP.

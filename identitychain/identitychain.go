@@ -1,15 +1,15 @@
 package identitychain
 
 import (
-	"bufio"
 	"fmt"
 	"net"
 	"os"
-	"strings"
 	"sync"
 
 	"github.com/simple-rules/harmony-benchmark/log"
 	"github.com/simple-rules/harmony-benchmark/p2p"
+	"github.com/simple-rules/harmony-benchmark/proto"
+	proto_identity "github.com/simple-rules/harmony-benchmark/proto/identity"
 	"github.com/simple-rules/harmony-benchmark/waitnode"
 )
 
@@ -31,46 +31,33 @@ func (IDC *IdentityChain) shard() {
 //IdentityChainHandler handles registration of new Identities
 // This could have been its seperate package like consensus, but am avoiding creating a lot of packages.
 func (IDC *IdentityChain) IdentityChainHandler(conn net.Conn) {
-	// Read p2p message payload
-	message, _ := bufio.NewReader(conn).ReadString('\n')
-	// output message received
-	fmt.Print("Message Received by IDC", string(message))
-	// sample process for string received
-	newmessage := strings.ToUpper(message)
-	// send new string back to client
-	conn.Write([]byte(newmessage + "\n"))
-	/////////////////////////////////
-	// content, err := p2p.ReadMessageContent(conn)
-	// if err != nil {
-	// 	IDC.log.Error("Read p2p data failed")
-	// 	return
-	// }
-	// fmt.Printf("content is %b", content)
-	// msgCategory, err := proto.GetMessageCategory(content)
-	// if err != nil {
-	// 	IDC.log.Error("Read message category failed", "err", err)
-	// 	return
-	// }
-	// if msgCategory != proto.IDENTITY {
-	// 	IDC.log.Error("Identity Chain Recieved incorrect protocol message")
-	// }
-	// fmt.Println(msgCategory)
-
-	///////////////////////////////////
-
-	// msgType, err := proto.GetMessageType(content)
-	// if err != nil {
-	// 	IDC.log.Error("Read action type failed", "err", err, "node", node)
-	// 	return
-	// }
-
-	// msgPayload, err := proto.GetMessagePayload(content)
-	// if err != nil {
-	// 	IDC.log.Error("Read message payload failed", "err", err, "node", node)
-	// 	return
-	// }
-	// NewWaitNode := *waitnode.DeserializeWaitNode(msgPayload)
-	// IDC.PendingIdentities = append(IDC.PendingIdentities, NewWaitNode)
+	content, err := p2p.ReadMessageContent(conn)
+	if err != nil {
+		IDC.log.Error("Read p2p data failed")
+		return
+	}
+	msgCategory, err := proto.GetMessageCategory(content)
+	if err != nil {
+		IDC.log.Error("Read message category failed", "err", err)
+		return
+	}
+	if msgCategory != proto.IDENTITY {
+		IDC.log.Error("Identity Chain Recieved incorrect protocol message")
+	}
+	msgType, err := proto_identity.GetIdentityMessageType(content)
+	if err != nil {
+		IDC.log.Error("Read action type failed")
+		return
+	}
+	fmt.Println(msgType)
+	msgPayload, err := proto_identity.GetIdentityMessagePayload(content)
+	if err != nil {
+		IDC.log.Error("Read message payload failed")
+		return
+	}
+	fmt.Println(msgPayload)
+	NewWaitNode := waitnode.DeserializeWaitNode(msgPayload)
+	IDC.PendingIdentities = append(IDC.PendingIdentities, NewWaitNode)
 }
 
 // GetLatestBlock gests the latest block at the end of the chain
