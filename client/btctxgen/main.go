@@ -114,7 +114,7 @@ LOOP:
 			if btcTXOAddr == nil {
 				log.Warn("TxOut: can't decode address")
 			}
-			txo := blockchain.TXOutput{int(btcTXO.Value), btcTXOAddr.Hash160, nodeShardID}
+			txo := blockchain.TXOutput{Amount: int(btcTXO.Value), Address: btcTXOAddr.Hash160, ShardID: nodeShardID}
 			tx.TxOutput = append(tx.TxOutput, txo)
 		}
 		tx.SetID()

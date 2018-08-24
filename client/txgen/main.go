@@ -164,10 +164,7 @@ func generateCrossShardTx(txInfo *TxInfo) {
 	}
 
 	// Spend the utxo from the current shard to a random address in [0 - N)
-	txout := blockchain.TXOutput{
-		Amount:  txInfo.value,
-		Address: pki.GetAddressFromInt(rand.Intn(setting.numOfAddress) + 1),
-		ShardID: nodeShardID}
+	txout := blockchain.TXOutput{Amount: txInfo.value, Address: pki.GetAddressFromInt(rand.Intn(setting.numOfAddress) + 1), ShardID: nodeShardID}
 
 	txOutputs := []blockchain.TXOutput{txout}
 
