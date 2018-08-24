@@ -8,7 +8,6 @@ import (
 
 	"github.com/simple-rules/harmony-benchmark/log"
 	"github.com/simple-rules/harmony-benchmark/p2p"
-	"github.com/simple-rules/harmony-benchmark/proto"
 	"github.com/simple-rules/harmony-benchmark/waitnode"
 )
 
@@ -25,40 +24,6 @@ type IdentityChain struct {
 
 func (IDC *IdentityChain) shard() {
 	return
-}
-
-//IdentityChainHandler handles registration of new Identities
-// This could have been its seperate package like consensus, but am avoiding creating a lot of packages.
-func (IDC *IdentityChain) IdentityChainHandler(conn net.Conn) {
-	// Read p2p message payload
-	content, err := p2p.ReadMessageContent(conn)
-	if err != nil {
-		IDC.log.Error("Read p2p data failed")
-		return
-	}
-	fmt.Printf("content is %b", content)
-	msgCategory, err := proto.GetMessageCategory(content)
-	if err != nil {
-		IDC.log.Error("Read message category failed", "err", err)
-		return
-	}
-	if msgCategory != proto.IDENTITY {
-		IDC.log.Error("Identity Chain Recieved incorrect protocol message")
-	}
-	fmt.Println(msgCategory)
-	// msgType, err := proto.GetMessageType(content)
-	// if err != nil {
-	// 	IDC.log.Error("Read action type failed", "err", err, "node", node)
-	// 	return
-	// }
-
-	// msgPayload, err := proto.GetMessagePayload(content)
-	// if err != nil {
-	// 	IDC.log.Error("Read message payload failed", "err", err, "node", node)
-	// 	return
-	// }
-	// NewWaitNode := *waitnode.DeserializeWaitNode(msgPayload)
-	// IDC.PendingIdentities = append(IDC.PendingIdentities, NewWaitNode)
 }
 
 // GetLatestBlock gests the latest block at the end of the chain
@@ -92,21 +57,30 @@ func (IDC *IdentityChain) UpdateIdentityChain() {
 
 }
 
+//StartServer a server and process the request by a handler.
+func (IDC *IdentityChain) StartServer() {
+	fmt.Println("Starting server...")
+	IDC.log.Info("Starting IDC server...") //log.Info does nothing for me! (ak)
+	IDC.listenOnPort()
+}
+
 func (IDC *IdentityChain) listenOnPort() {
-	fmt.Print(IDC.Peer.Port)
 	listen, err := net.Listen("tcp4", ":"+IDC.Peer.Port)
 	if err != nil {
 		IDC.log.Crit("Socket listen port failed")
 		os.Exit(1)
 	} else {
-		IDC.log.Info("Identity chain is now listening..")
+		fmt.Println("Starting server...now listening")
+		IDC.log.Info("Identity chain is now listening ..") //log.Info does nothing for me! (ak) remove this
 	}
 	defer listen.Close()
 	for {
 		conn, err := listen.Accept()
 		if err != nil {
-			IDC.log.Crit("Error listening on port. Exiting.", "port", IDC.Peer.Port)
+			IDC.log.Crit("Error listening on port. Exiting", IDC.Peer.Port)
 			continue
+		} else {
+			fmt.Println("I am accepting connections now")
 		}
 		go IDC.IdentityChainHandler(conn)
 	}
@@ -116,5 +90,6 @@ func (IDC *IdentityChain) listenOnPort() {
 func New(Peer p2p.Peer) *IdentityChain {
 	IDC := IdentityChain{}
 	IDC.Peer = Peer
+	IDC.log = log.New()
 	return &IDC
 }

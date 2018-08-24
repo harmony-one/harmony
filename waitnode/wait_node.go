@@ -22,7 +22,8 @@ func (node *WaitNode) StartServer() {
 	log.Printf("Starting waitnode on server %s and port %s", node.Peer.Ip, node.Peer.Port)
 }
 
-func (node *WaitNode) connectIdentityChain(peer p2p.Peer) {
+//ConnectIdentityChain connects to identity chain
+func (node *WaitNode) ConnectIdentityChain(peer p2p.Peer) {
 	p2p.SendMessage(peer, identity.ConstructIdentityMessage(identity.REGISTER, node.SerializeWaitNode()))
 }
 
