@@ -43,21 +43,35 @@ func (IDC *IdentityChain) IdentityChainHandler(conn net.Conn) {
 	}
 	if msgCategory != proto.IDENTITY {
 		IDC.log.Error("Identity Chain Recieved incorrect protocol message")
+		os.Exit(1)
 	}
-	msgType, err := proto_identity.GetIdentityMessageType(content)
+	msgType, err := proto.GetMessageType(content)
 	if err != nil {
 		IDC.log.Error("Read action type failed")
 		return
 	}
-	fmt.Println(msgType)
-	msgPayload, err := proto_identity.GetIdentityMessagePayload(content)
+	msgPayload, err := proto.GetMessagePayload(content)
 	if err != nil {
 		IDC.log.Error("Read message payload failed")
 		return
 	}
-	fmt.Println(msgPayload)
-	NewWaitNode := waitnode.DeserializeWaitNode(msgPayload)
-	IDC.PendingIdentities = append(IDC.PendingIdentities, NewWaitNode)
+	switch msgCategory {
+	case proto.IDENTITY:
+		actionType := proto_identity.IdentityMessageType(msgType)
+		switch actionType {
+		case proto_identity.IDENTITY:
+			identity_payload, err := proto_identity.GetIdentityMessagePayload(msgPayload)
+			if err != nil {
+				IDC.log.Error("identity payload not read")
+			} else {
+				fmt.Println("identity payload read")
+			}
+			NewWaitNode := waitnode.DeserializeWaitNode(identity_payload)
+			IDC.PendingIdentities = append(IDC.PendingIdentities, NewWaitNode)
+			fmt.Println(len(IDC.PendingIdentities))
+		}
+
+	}
 }
 
 // GetLatestBlock gests the latest block at the end of the chain
