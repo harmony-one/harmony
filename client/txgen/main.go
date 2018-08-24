@@ -164,12 +164,16 @@ func generateCrossShardTx(txInfo *TxInfo) {
 	}
 
 	// Spend the utxo from the current shard to a random address in [0 - N)
-	txout := blockchain.TXOutput{txInfo.value, pki.GetAddressFromInt(rand.Intn(setting.numOfAddress) + 1), nodeShardID}
+	txout := blockchain.TXOutput{
+		Amount:  txInfo.value,
+		Address: pki.GetAddressFromInt(rand.Intn(setting.numOfAddress) + 1),
+		ShardID: nodeShardID}
+
 	txOutputs := []blockchain.TXOutput{txout}
 
 	// Spend the utxo from the other shard, if any, to a random address in [0 - N)
 	if crossTxin != nil {
-		crossTxout := blockchain.TXOutput{crossUtxoValue, pki.GetAddressFromInt(rand.Intn(setting.numOfAddress) + 1), uint32(crossShardId)}
+		crossTxout := blockchain.TXOutput{Amount: crossUtxoValue, Address: pki.GetAddressFromInt(rand.Intn(setting.numOfAddress) + 1), ShardID: uint32(crossShardId)}
 		txOutputs = append(txOutputs, crossTxout)
 	}
 
@@ -202,7 +206,7 @@ func generateSingleShardTx(txInfo *TxInfo) {
 	txin := blockchain.NewTXInput(blockchain.NewOutPoint(&txInfo.id, txInfo.index), txInfo.address, nodeShardID)
 
 	// Spend the utxo to a random address in [0 - N)
-	txout := blockchain.TXOutput{txInfo.value, pki.GetAddressFromInt(rand.Intn(setting.numOfAddress) + 1), nodeShardID}
+	txout := blockchain.TXOutput{Amount: txInfo.value, Address: pki.GetAddressFromInt(rand.Intn(setting.numOfAddress) + 1), ShardID: nodeShardID}
 	tx := blockchain.Transaction{ID: [32]byte{}, TxInput: []blockchain.TXInput{*txin}, TxOutput: []blockchain.TXOutput{txout}, Proofs: nil}
 
 	priKeyInt, ok := client.LookUpIntPriKey(txInfo.address)
