@@ -1,4 +1,4 @@
-package db_test
+package db
 
 import (
 	"bytes"
@@ -8,16 +8,14 @@ import (
 	"strconv"
 	"sync"
 	"testing"
-
-	"github.com/simple-rules/harmony-benchmark/db"
 )
 
-func newTestLDB() (*db.LDBDatabase, func()) {
+func newTestLDB() (*LDBDatabase, func()) {
 	dirname, err := ioutil.TempDir(os.TempDir(), "db_test_")
 	if err != nil {
 		panic("failed to create test file: " + err.Error())
 	}
-	db, err := db.NewLDBDatabase(dirname, 0, 0)
+	db, err := NewLDBDatabase(dirname, 0, 0)
 	if err != nil {
 		panic("failed to create test database: " + err.Error())
 	}
@@ -37,10 +35,10 @@ func TestLDB_PutGet(t *testing.T) {
 }
 
 func TestMemoryDB_PutGet(t *testing.T) {
-	testPutGet(db.NewMemDatabase(), t)
+	testPutGet(NewMemDatabase(), t)
 }
 
-func testPutGet(db db.Database, t *testing.T) {
+func testPutGet(db Database, t *testing.T) {
 	t.Parallel()
 
 	for _, k := range test_values {
@@ -136,10 +134,10 @@ func TestLDB_ParallelPutGet(t *testing.T) {
 }
 
 func TestMemoryDB_ParallelPutGet(t *testing.T) {
-	testParallelPutGet(db.NewMemDatabase(), t)
+	testParallelPutGet(NewMemDatabase(), t)
 }
 
-func testParallelPutGet(db db.Database, t *testing.T) {
+func testParallelPutGet(db Database, t *testing.T) {
 	const n = 8
 	var pending sync.WaitGroup
 

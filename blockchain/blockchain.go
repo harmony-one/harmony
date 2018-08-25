@@ -3,6 +3,7 @@ package blockchain
 import (
 	"bytes"
 	"encoding/hex"
+
 	"github.com/dedis/kyber"
 	"github.com/simple-rules/harmony-benchmark/crypto/pki"
 )
@@ -183,6 +184,7 @@ func (bc *Blockchain) VerifyNewBlockAndUpdate(utxopool *UTXOPool, block *Block) 
 }
 
 // CreateBlockchain creates a new blockchain DB
+// TODO(minhdoan): This func is not used, consider to remove.
 func CreateBlockchain(address [20]byte, shardId uint32) *Blockchain {
 	// TODO: We assume we have not created any blockchain before.
 	// In current bitcoin, we can check if we created a blockchain before accessing local db.
