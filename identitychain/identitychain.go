@@ -22,6 +22,12 @@ type IdentityChain struct {
 	Peer              p2p.Peer
 }
 
+//GlobalBlockchainConfig stores global level blockchain configurations.
+type GlobalBlockchainConfig struct {
+	NumberOfShards int
+	EpochTimeSecs  int16
+}
+
 func (IDC *IdentityChain) shard() {
 	return
 }

@@ -13,8 +13,9 @@ import (
 
 //WaitNode is for nodes waiting to join consensus
 type WaitNode struct {
-	Peer p2p.Peer
-	ID   uint16
+	Peer      p2p.Peer
+	ID        uint16
+	SeedPeers p2p.Peer
 }
 
 // StartServer a server and process the request by a handler.

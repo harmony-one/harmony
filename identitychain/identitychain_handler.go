@@ -43,16 +43,20 @@ func (IDC *IdentityChain) IdentityChainHandler(conn net.Conn) {
 		actionType := proto_identity.IdentityMessageType(msgType)
 		switch actionType {
 		case proto_identity.IDENTITY:
-			identityPayload, err := proto_identity.GetIdentityMessagePayload(msgPayload)
-			if err != nil {
-				IDC.log.Error("identity payload not read")
-			} else {
-				fmt.Println("identity payload read")
-			}
-			NewWaitNode := waitnode.DeserializeWaitNode(identityPayload)
-			IDC.PendingIdentities = append(IDC.PendingIdentities, NewWaitNode)
-			fmt.Println(len(IDC.PendingIdentities))
+			IDC.registerIdentity(msgPayload)
 		}
 
 	}
+}
+
+func (IDC *IdentityChain) registerIdentity(msgPayload []byte) {
+	identityPayload, err := proto_identity.GetIdentityMessagePayload(msgPayload)
+	if err != nil {
+		IDC.log.Error("identity payload not read")
+	} else {
+		fmt.Println("identity payload read")
+	}
+	NewWaitNode := waitnode.DeserializeWaitNode(identityPayload)
+	IDC.PendingIdentities = append(IDC.PendingIdentities, NewWaitNode)
+	fmt.Println(len(IDC.PendingIdentities))
 }
