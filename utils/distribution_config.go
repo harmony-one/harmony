@@ -101,7 +101,6 @@ func (config *DistributionConfig) ReadConfigFile(filename string) error {
 		entry := ConfigEntry{p[0], p[1], p[2], p[3]}
 		result = append(result, entry)
 	}
-	log.Println(result)
 	config.config = result
 	return nil
 }
