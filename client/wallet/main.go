@@ -4,9 +4,11 @@ import (
 	"crypto/rand"
 	"flag"
 	"fmt"
+	"github.com/dedis/kyber"
 	"github.com/simple-rules/harmony-benchmark/crypto"
 	"github.com/simple-rules/harmony-benchmark/crypto/pki"
 	"io"
+	"io/ioutil"
 	"os"
 )
 
@@ -52,9 +54,24 @@ func main() {
 				return
 			}
 			priKey := crypto.Ed25519Curve.Scalar().SetBytes(randomBytes[:])
+			priKeyBytes, err := priKey.MarshalBinary()
+			if err != nil {
+				panic("Failed to generate private key")
+			}
 			pubKey := pki.GetPublicKeyFromScalar(priKey)
 			address := pki.GetAddressFromPublicKey(pubKey)
+			StorePrivateKey(priKeyBytes)
 			fmt.Printf("New account created:\nAddress: {%x}\n", address)
+		case "list":
+			fmt.Println("Listing existing accounts...")
+			keys := ReadPrivateKeys()
+			for i, key := range keys {
+				address := pki.GetAddressFromPrivateKey(key)
+				fmt.Printf("Account %d:\n {%x}\n", i+1, address)
+			}
+		case "clearAll":
+			fmt.Println("Deleting existing accounts...")
+			DeletePrivateKey()
 		}
 	case "transaction":
 		switch os.Args[2] {
@@ -65,4 +82,36 @@ func main() {
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
+}
+
+func StorePrivateKey(priKey []byte) {
+	f, err := os.OpenFile("keystore", os.O_APPEND|os.O_WRONLY, 0644)
+
+	if err != nil {
+		panic("Failed to open keystore")
+	}
+	_, err = f.Write(priKey)
+
+	if err != nil {
+		panic("Failed to write to keystore")
+	}
+	f.Close()
+}
+
+func DeletePrivateKey() {
+	ioutil.WriteFile("keystore", []byte{}, 0644)
+}
+
+func ReadPrivateKeys() []kyber.Scalar {
+	keys, err := ioutil.ReadFile("keystore")
+	if err != nil {
+		return []kyber.Scalar{}
+	}
+	keyScalars := []kyber.Scalar{}
+	for i := 0; i < len(keys); i += 32 {
+		priKey := crypto.Ed25519Curve.Scalar()
+		priKey.UnmarshalBinary(keys[i : i+32])
+		keyScalars = append(keyScalars, priKey)
+	}
+	return keyScalars
 }

@@ -21,3 +21,6 @@ bin/
 # Log
 *.log
 log-*
+
+# Wallet
+keystore
