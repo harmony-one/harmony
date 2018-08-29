@@ -18,6 +18,10 @@ func GetAddressFromPublicKey(pubKey kyber.Point) [20]byte {
 	return address
 }
 
+func GetAddressFromPrivateKey(priKey kyber.Scalar) [20]byte {
+	return GetAddressFromPublicKey(GetPublicKeyFromScalar(priKey))
+}
+
 // Temporary helper function for benchmark use
 func GetAddressFromInt(value int) [20]byte {
 	return GetAddressFromPublicKey(GetPublicKeyFromScalar(GetPrivateKeyFromInt(value)))
