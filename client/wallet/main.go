@@ -2,11 +2,17 @@ package main
 
 import (
 	"crypto/rand"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"github.com/dedis/kyber"
+	"github.com/simple-rules/harmony-benchmark/client"
+	"github.com/simple-rules/harmony-benchmark/configr"
 	"github.com/simple-rules/harmony-benchmark/crypto"
 	"github.com/simple-rules/harmony-benchmark/crypto/pki"
+	"github.com/simple-rules/harmony-benchmark/node"
+	"github.com/simple-rules/harmony-benchmark/p2p"
+	proto_client "github.com/simple-rules/harmony-benchmark/proto/client"
 	"io"
 	"io/ioutil"
 	"os"
@@ -14,7 +20,7 @@ import (
 
 func main() {
 	// Account subcommands
-	//accountNewCommand := flag.NewFlagSet("new", flag.ExitOnError)
+	accountImportCommand := flag.NewFlagSet("import", flag.ExitOnError)
 	//accountListCommand := flag.NewFlagSet("list", flag.ExitOnError)
 	//
 	//// Transaction subcommands
@@ -22,7 +28,7 @@ func main() {
 	//
 	//// Account subcommand flag pointers
 	//// Adding a new choice for --metric of 'substring' and a new --substring flag
-	//accountNewPtr := accountNewCommand.Bool("new", false, "N/A")
+	accountImportPtr := accountImportCommand.String("privateKey", "", "Specify the private key to import")
 	//accountListPtr := accountNewCommand.Bool("new", false, "N/A")
 	//
 	//// Transaction subcommand flag pointers
@@ -63,15 +69,43 @@ func main() {
 			StorePrivateKey(priKeyBytes)
 			fmt.Printf("New account created:\nAddress: {%x}\n", address)
 		case "list":
-			fmt.Println("Listing existing accounts...")
-			keys := ReadPrivateKeys()
-			for i, key := range keys {
-				address := pki.GetAddressFromPrivateKey(key)
+			for i, address := range ReadAddresses() {
 				fmt.Printf("Account %d:\n {%x}\n", i+1, address)
 			}
 		case "clearAll":
 			fmt.Println("Deleting existing accounts...")
 			DeletePrivateKey()
+		case "import":
+			fmt.Println("Importing private key...")
+			accountImportCommand.Parse(os.Args[3:])
+			priKey := *accountImportPtr
+			if accountImportCommand.Parsed() {
+				fmt.Println(priKey)
+			} else {
+				fmt.Println("Failed to parse flags")
+			}
+			priKeyBytes, err := hex.DecodeString(priKey)
+			if err != nil {
+				panic("Failed to parse the private key into bytes")
+			}
+			StorePrivateKey(priKeyBytes)
+		case "showBalance":
+			configr := configr.NewConfigr()
+			configr.ReadConfigFile("local_config_shards.txt")
+			leaders, _ := configr.GetLeadersAndShardIds()
+			walletNode := node.New(nil, nil)
+			walletNode.Client = client.NewClient(&leaders)
+			p2p.BroadcastMessage(leaders, proto_client.ConstructFetchUtxoMessage(ReadAddresses()))
+			fmt.Println("Fetching account balance...")
+		case "test":
+			priKey := pki.GetPrivateKeyScalarFromInt(33)
+			address := pki.GetAddressFromPrivateKey(priKey)
+			priKeyBytes, err := priKey.MarshalBinary()
+			if err != nil {
+				panic("Failed to deserialize private key scalar.")
+			}
+			fmt.Printf("Private Key :\n {%x}\n", priKeyBytes)
+			fmt.Printf("Address :\n {%x}\n", address)
 		}
 	case "transaction":
 		switch os.Args[2] {
@@ -84,8 +118,23 @@ func main() {
 	}
 }
 
+func ReadAddresses() [][20]byte {
+	priKeys := ReadPrivateKeys()
+	addresses := [][20]byte{}
+	for _, key := range priKeys {
+		addresses = append(addresses, pki.GetAddressFromPrivateKey(key))
+	}
+	return addresses
+}
+
 func StorePrivateKey(priKey []byte) {
-	f, err := os.OpenFile("keystore", os.O_APPEND|os.O_WRONLY, 0644)
+	for _, address := range ReadAddresses() {
+		if address == pki.GetAddressFromPrivateKey(crypto.Ed25519Curve.Scalar().SetBytes(priKey)) {
+			fmt.Println("The key already exists in the keystore")
+			return
+		}
+	}
+	f, err := os.OpenFile("keystore", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 
 	if err != nil {
 		panic("Failed to open keystore")

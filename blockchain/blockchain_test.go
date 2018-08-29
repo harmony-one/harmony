@@ -10,10 +10,10 @@ var (
 	PriIntTwo        = 2
 	PriIntThree      = 3
 	PriIntFour       = 4
-	PriKeyOne        = pki.GetPrivateKeyFromInt(PriIntOne)
-	PriKeyTwo        = pki.GetPrivateKeyFromInt(PriIntTwo)
-	PriKeyThree      = pki.GetPrivateKeyFromInt(PriIntThree)
-	PriKeyFour       = pki.GetPrivateKeyFromInt(PriIntFour)
+	PriKeyOne        = pki.GetPrivateKeyScalarFromInt(PriIntOne)
+	PriKeyTwo        = pki.GetPrivateKeyScalarFromInt(PriIntTwo)
+	PriKeyThree      = pki.GetPrivateKeyScalarFromInt(PriIntThree)
+	PriKeyFour       = pki.GetPrivateKeyScalarFromInt(PriIntFour)
 	TestAddressOne   = pki.GetAddressFromInt(PriIntOne)
 	TestAddressTwo   = pki.GetAddressFromInt(PriIntTwo)
 	TestAddressThree = pki.GetAddressFromInt(PriIntThree)

@@ -117,7 +117,7 @@ func New(consensus *consensus.Consensus, db *db.LDBDatabase) *Node {
 	node.UtxoPool = blockchain.CreateUTXOPoolFromGenesisBlockChain(node.blockchain)
 
 	// Logger
-	node.log = node.Consensus.Log
+	node.log = log.New()
 
 	// Initialize level db.
 	node.db = db

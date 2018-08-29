@@ -179,7 +179,7 @@ func generateCrossShardTx(txInfo *TxInfo) {
 
 	priKeyInt, ok := client.LookUpIntPriKey(txInfo.address)
 	if ok {
-		bytes, err := pki.GetPublicKeyFromScalar(pki.GetPrivateKeyFromInt(priKeyInt)).MarshalBinary()
+		bytes, err := pki.GetPublicKeyFromScalar(pki.GetPrivateKeyScalarFromInt(priKeyInt)).MarshalBinary()
 		if err == nil {
 			copy(tx.PublicKey[:], bytes)
 		} else {
@@ -187,7 +187,7 @@ func generateCrossShardTx(txInfo *TxInfo) {
 			return
 		}
 		tx.SetID() // TODO(RJ): figure out the correct way to set Tx ID.
-		tx.Sign(pki.GetPrivateKeyFromInt(priKeyInt))
+		tx.Sign(pki.GetPrivateKeyScalarFromInt(priKeyInt))
 	} else {
 		log.Error("Failed to look up the corresponding private key from address", "Address", txInfo.address)
 		return
@@ -208,7 +208,7 @@ func generateSingleShardTx(txInfo *TxInfo) {
 
 	priKeyInt, ok := client.LookUpIntPriKey(txInfo.address)
 	if ok {
-		bytes, err := pki.GetPublicKeyFromScalar(pki.GetPrivateKeyFromInt(priKeyInt)).MarshalBinary()
+		bytes, err := pki.GetPublicKeyFromScalar(pki.GetPrivateKeyScalarFromInt(priKeyInt)).MarshalBinary()
 		if err == nil {
 			copy(tx.PublicKey[:], bytes)
 		} else {
@@ -216,7 +216,7 @@ func generateSingleShardTx(txInfo *TxInfo) {
 			return
 		}
 		tx.SetID() // TODO(RJ): figure out the correct way to set Tx ID.
-		tx.Sign(pki.GetPrivateKeyFromInt(priKeyInt))
+		tx.Sign(pki.GetPrivateKeyScalarFromInt(priKeyInt))
 	} else {
 		log.Error("Failed to look up the corresponding private key from address", "Address", txInfo.address)
 		return

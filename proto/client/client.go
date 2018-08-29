@@ -44,3 +44,14 @@ func ConstructUnlockToCommitOrAbortMessage(txsAndProofs []blockchain.Transaction
 	encoder.Encode(txsAndProofs)
 	return byteBuffer.Bytes()
 }
+
+// [client] Constructs the fetch utxo message that will be sent to Harmony network
+func ConstructFetchUtxoMessage(addresses [][20]byte) []byte {
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
+	byteBuffer.WriteByte(byte(node.TRANSACTION))
+	byteBuffer.WriteByte(byte(node.UNLOCK))
+	for _, address := range addresses {
+		byteBuffer.Write(address[:])
+	}
+	return byteBuffer.Bytes()
+}
