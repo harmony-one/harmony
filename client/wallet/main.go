@@ -93,9 +93,11 @@ func main() {
 			configr := configr.NewConfigr()
 			configr.ReadConfigFile("local_config_shards.txt")
 			leaders, _ := configr.GetLeadersAndShardIds()
+			clientPeer := configr.GetClientPeer()
 			walletNode := node.New(nil, nil)
 			walletNode.Client = client.NewClient(&leaders)
-			p2p.BroadcastMessage(leaders, proto_client.ConstructFetchUtxoMessage(ReadAddresses()))
+			fmt.Println(leaders)
+			p2p.BroadcastMessage(leaders, proto_client.ConstructFetchUtxoMessage(*clientPeer, ReadAddresses()))
 			fmt.Println("Fetching account balance...")
 		case "test":
 			priKey := pki.GetPrivateKeyScalarFromInt(33)

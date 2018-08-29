@@ -1,6 +1,7 @@
 package node
 
 import (
+	"github.com/simple-rules/harmony-benchmark/crypto/pki"
 	"net"
 	"os"
 	"sync"
@@ -8,7 +9,6 @@ import (
 	"github.com/simple-rules/harmony-benchmark/blockchain"
 	"github.com/simple-rules/harmony-benchmark/client"
 	"github.com/simple-rules/harmony-benchmark/consensus"
-	"github.com/simple-rules/harmony-benchmark/crypto/pki"
 	"github.com/simple-rules/harmony-benchmark/db"
 	"github.com/simple-rules/harmony-benchmark/log"
 	"github.com/simple-rules/harmony-benchmark/p2p"
@@ -100,27 +100,29 @@ func (node *Node) countNumTransactionsInBlockchain() int {
 func New(consensus *consensus.Consensus, db *db.LDBDatabase) *Node {
 	node := Node{}
 
-	// Consensus and associated channel to communicate blocks
-	node.Consensus = consensus
-	node.BlockChannel = make(chan blockchain.Block)
+	if consensus != nil {
+		// Consensus and associated channel to communicate blocks
+		node.Consensus = consensus
+		node.BlockChannel = make(chan blockchain.Block)
 
-	// Genesis Block
-	// TODO(minh): Use or implement new function in blockchain package for this.
-	genesisBlock := &blockchain.Blockchain{}
-	genesisBlock.Blocks = make([]*blockchain.Block, 0)
-	// TODO(RJ): use miner's address as coinbase address
-	coinbaseTx := blockchain.NewCoinbaseTX(pki.GetAddressFromInt(1), "0", node.Consensus.ShardID)
-	genesisBlock.Blocks = append(genesisBlock.Blocks, blockchain.NewGenesisBlock(coinbaseTx, node.Consensus.ShardID))
-	node.blockchain = genesisBlock
+		// Genesis Block
+		// TODO(minh): Use or implement new function in blockchain package for this.
+		genesisBlock := &blockchain.Blockchain{}
+		genesisBlock.Blocks = make([]*blockchain.Block, 0)
+		// TODO(RJ): use miner's address as coinbase address
+		coinbaseTx := blockchain.NewCoinbaseTX(pki.GetAddressFromInt(1), "0", node.Consensus.ShardID)
+		genesisBlock.Blocks = append(genesisBlock.Blocks, blockchain.NewGenesisBlock(coinbaseTx, node.Consensus.ShardID))
+		node.blockchain = genesisBlock
 
-	// UTXO pool from Genesis block
-	node.UtxoPool = blockchain.CreateUTXOPoolFromGenesisBlockChain(node.blockchain)
+		// UTXO pool from Genesis block
+		node.UtxoPool = blockchain.CreateUTXOPoolFromGenesisBlockChain(node.blockchain)
 
+		// Initialize level db.
+		node.db = db
+
+	}
 	// Logger
 	node.log = log.New()
-
-	// Initialize level db.
-	node.db = db
 
 	return &node
 }

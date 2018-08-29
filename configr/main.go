@@ -97,7 +97,6 @@ func (configr *Configr) ReadConfigFile(filename string) error {
 		entry := ConfigEntry{p[0], p[1], p[2], p[3]}
 		result = append(result, entry)
 	}
-	log.Println(result)
 	configr.config = result
 	return nil
 }

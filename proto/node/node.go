@@ -14,6 +14,7 @@ type NodeMessageType byte
 const (
 	TRANSACTION NodeMessageType = iota
 	BLOCK
+	CLIENT
 	CONTROL
 	// TODO: add more types
 )
@@ -32,6 +33,13 @@ type BlockMessageType int
 
 const (
 	SYNC BlockMessageType = iota
+)
+
+// The types of messages used for NODE/BLOCK
+type ClientMessageType int
+
+const (
+	LOOKUP_UTXO ClientMessageType = iota
 )
 
 // The types of messages used for NODE/CONTROL

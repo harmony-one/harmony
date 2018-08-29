@@ -3,6 +3,7 @@ package node
 import (
 	"bytes"
 	"encoding/gob"
+	"github.com/simple-rules/harmony-benchmark/log"
 	"net"
 	"os"
 	"strconv"
@@ -69,17 +70,27 @@ func (node *Node) NodeHandler(conn net.Conn) {
 		case proto_node.TRANSACTION:
 			node.transactionMessageHandler(msgPayload)
 		case proto_node.BLOCK:
-			if node.Client != nil {
-				blockMsgType := proto_node.BlockMessageType(msgPayload[0])
-				switch blockMsgType {
-				case proto_node.SYNC:
-					decoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the SYNC messge type
-					blocks := new([]*blockchain.Block)
-					decoder.Decode(blocks)
-					if node.Client != nil && blocks != nil {
-						node.Client.UpdateBlocks(*blocks)
-					}
+			blockMsgType := proto_node.BlockMessageType(msgPayload[0])
+			switch blockMsgType {
+			case proto_node.SYNC:
+				decoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the SYNC messge type
+				blocks := new([]*blockchain.Block)
+				decoder.Decode(blocks)
+				if node.Client != nil && blocks != nil {
+					node.Client.UpdateBlocks(*blocks)
 				}
+			}
+		case proto_node.CLIENT:
+			clientMsgType := proto_node.ClientMessageType(msgPayload[0])
+			switch clientMsgType {
+			case proto_node.LOOKUP_UTXO:
+				decoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the LOOKUP_UTXO messge type
+
+				fetchUtxoMessage := new(client.FetchUtxoMessage)
+				decoder.Decode(fetchUtxoMessage)
+
+				log.Info("Payload", "Detail", msgPayload)
+				log.Info("Client message", "Detail", fetchUtxoMessage)
 			}
 		case proto_node.CONTROL:
 			controlType := msgPayload[0]
