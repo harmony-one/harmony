@@ -89,8 +89,9 @@ func (node *Node) NodeHandler(conn net.Conn) {
 				fetchUtxoMessage := new(client.FetchUtxoMessage)
 				decoder.Decode(fetchUtxoMessage)
 
-				log.Info("Payload", "Detail", msgPayload)
-				log.Info("Client message", "Detail", fetchUtxoMessage)
+				utxoMap := node.UtxoPool.GetUtxoMapByAddresses(fetchUtxoMessage.Addresses)
+
+				log.Info("Utxo Map", "Detail", utxoMap)
 			}
 		case proto_node.CONTROL:
 			controlType := msgPayload[0]

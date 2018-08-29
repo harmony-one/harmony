@@ -38,6 +38,18 @@ type UTXOPool struct {
 	mutex         sync.Mutex
 }
 
+// Gets the Utxo map for specific addresses
+func (utxoPool *UTXOPool) GetUtxoMapByAddresses(addresses [][20]byte) UtxoMap {
+	result := make(UtxoMap)
+	for _, address := range addresses {
+		utxos, ok := utxoPool.UtxoMap[address]
+		if ok {
+			result[address] = utxos
+		}
+	}
+	return result
+}
+
 // VerifyTransactions verifies if a list of transactions valid for this shard.
 func (utxoPool *UTXOPool) VerifyTransactions(transactions []*Transaction) bool {
 	spentTXOs := make(map[[20]byte]map[string]map[uint32]bool)
