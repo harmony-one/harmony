@@ -86,11 +86,12 @@ func (node *Node) NodeHandler(conn net.Conn) {
 			case proto_node.LOOKUP_UTXO:
 				decoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the LOOKUP_UTXO messge type
 
-				fetchUtxoMessage := new(client.FetchUtxoMessage)
+				fetchUtxoMessage := new(proto_node.FetchUtxoMessage)
 				decoder.Decode(fetchUtxoMessage)
 
 				utxoMap := node.UtxoPool.GetUtxoMapByAddresses(fetchUtxoMessage.Addresses)
 
+				p2p.SendMessage(fetchUtxoMessage.Sender, client.ConstructFetchUtxoResponseMessage(&utxoMap, node.UtxoPool.ShardID))
 				log.Info("Utxo Map", "Detail", utxoMap)
 			}
 		case proto_node.CONTROL:

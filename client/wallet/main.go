@@ -6,16 +6,18 @@ import (
 	"flag"
 	"fmt"
 	"github.com/dedis/kyber"
+	"github.com/simple-rules/harmony-benchmark/blockchain"
 	"github.com/simple-rules/harmony-benchmark/client"
 	"github.com/simple-rules/harmony-benchmark/configr"
 	"github.com/simple-rules/harmony-benchmark/crypto"
 	"github.com/simple-rules/harmony-benchmark/crypto/pki"
 	"github.com/simple-rules/harmony-benchmark/node"
 	"github.com/simple-rules/harmony-benchmark/p2p"
-	proto_client "github.com/simple-rules/harmony-benchmark/proto/client"
+	proto_node "github.com/simple-rules/harmony-benchmark/proto/node"
 	"io"
 	"io/ioutil"
 	"os"
+	"time"
 )
 
 func main() {
@@ -96,9 +98,22 @@ func main() {
 			clientPeer := configr.GetClientPeer()
 			walletNode := node.New(nil, nil)
 			walletNode.Client = client.NewClient(&leaders)
-			fmt.Println(leaders)
-			p2p.BroadcastMessage(leaders, proto_client.ConstructFetchUtxoMessage(*clientPeer, ReadAddresses()))
+			go walletNode.StartServer(clientPeer.Port)
 			fmt.Println("Fetching account balance...")
+			walletNode.Client.ShardResponseTracker = make(map[uint32]bool)
+			walletNode.Client.UtxoMap = make(blockchain.UtxoMap)
+			p2p.BroadcastMessage(leaders, proto_node.ConstructFetchUtxoMessage(*clientPeer, ReadAddresses()))
+
+			go func() {
+				for true {
+					if len(walletNode.Client.ShardResponseTracker) == len(leaders) {
+						fmt.Println("All response received")
+						walletNode.Client.PrintUtxoBalance()
+						break
+					}
+				}
+			}()
+			time.Sleep(3 * time.Second) // Wait 3 seconds for the response. Exit afterward.
 		case "test":
 			priKey := pki.GetPrivateKeyScalarFromInt(33)
 			address := pki.GetAddressFromPrivateKey(priKey)

@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 
 	"github.com/simple-rules/harmony-benchmark/blockchain"
+	"github.com/simple-rules/harmony-benchmark/p2p"
 	"github.com/simple-rules/harmony-benchmark/proto"
 )
 
@@ -48,6 +49,34 @@ type ControlMessageType int
 const (
 	STOP ControlMessageType = iota
 )
+
+// The wrapper struct FetchUtxoMessage sent from client wallet
+type FetchUtxoMessage struct {
+	Addresses [][20]byte
+	Sender    p2p.Peer
+}
+
+// [client] Constructs the unlock to commit or abort message that will be sent to leaders
+func ConstructUnlockToCommitOrAbortMessage(txsAndProofs []blockchain.Transaction) []byte {
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
+	byteBuffer.WriteByte(byte(TRANSACTION))
+	byteBuffer.WriteByte(byte(UNLOCK))
+	encoder := gob.NewEncoder(byteBuffer)
+	encoder.Encode(txsAndProofs)
+	return byteBuffer.Bytes()
+}
+
+// [client] Constructs the fetch utxo message that will be sent to Harmony network
+func ConstructFetchUtxoMessage(sender p2p.Peer, addresses [][20]byte) []byte {
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
+	byteBuffer.WriteByte(byte(CLIENT))
+	byteBuffer.WriteByte(byte(LOOKUP_UTXO))
+
+	encoder := gob.NewEncoder(byteBuffer)
+	encoder.Encode(FetchUtxoMessage{Addresses: addresses, Sender: sender})
+
+	return byteBuffer.Bytes()
+}
 
 // Constructs serialized transactions
 func ConstructTransactionListMessage(transactions []*blockchain.Transaction) []byte {
