@@ -60,6 +60,6 @@ done < $config
 
 txgen_enabled=$3
 # Generate transactions
-if [ "$txgen_enabled" ]; then
+if [ -z "$txgen_enabled" ]; then
   ./bin/txgen -config_file $config -log_folder $log_folder
 fi
