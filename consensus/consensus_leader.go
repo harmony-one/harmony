@@ -5,6 +5,9 @@ import (
 	"encoding/binary"
 	"encoding/gob"
 	"errors"
+	"net/http"
+	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/dedis/kyber"
@@ -368,18 +371,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState C
 				copy(blockHeaderObj.Bitmap[:], bitmap)
 				consensus.OnConsensusDone(&blockHeaderObj)
 
-				// TODO: @ricl these logic are irrelevant to consensus, move them to another file, say profiler.
-				endTime := time.Now()
-				timeElapsed := endTime.Sub(startTime)
-				numOfTxs := blockHeaderObj.NumTransactions
-				consensus.Log.Info("TPS Report",
-					"numOfTXs", numOfTxs,
-					"startTime", startTime,
-					"endTime", endTime,
-					"timeElapsed", timeElapsed,
-					"TPS", float64(numOfTxs)/timeElapsed.Seconds(),
-					"consensus", consensus)
-
+				consensus.reportTPS(blockHeaderObj.NumTransactions)
 				// Send signal to Node so the new block can be added and new round of consensus can be triggered
 				consensus.ReadySignal <- 1
 			}
@@ -409,4 +401,32 @@ func (consensus *Consensus) verifyResponse(commitments *map[uint16]kyber.Point, 
 	//	return errors.New("recreated commit doesn't match the received one")
 	//}
 	return nil
+}
+
+func (consensus *Consensus) reportTPS(numOfTxs int32) {
+	endTime := time.Now()
+	timeElapsed := endTime.Sub(startTime)
+	tps := float64(numOfTxs) / timeElapsed.Seconds()
+	consensus.Log.Info("TPS Report",
+		"numOfTXs", numOfTxs,
+		"startTime", startTime,
+		"endTime", endTime,
+		"timeElapsed", timeElapsed,
+		"TPS", tps,
+		"consensus", consensus)
+	reportMetrics(tps)
+}
+
+func reportMetrics(tps float64) {
+	URL := "http://localhost:3000/report"
+	form := url.Values{
+		"tps": {strconv.FormatFloat(tps, 'f', 2, 64)},
+	}
+
+	body := bytes.NewBufferString(form.Encode())
+	rsp, err := http.Post(URL, "application/x-www-form-urlencoded", body)
+	if err != nil {
+		return
+	}
+	defer rsp.Body.Close()
 }
