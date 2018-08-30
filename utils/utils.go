@@ -21,6 +21,7 @@ func ConvertFixedDataIntoByteArray(data interface{}) []byte {
 	return buff.Bytes()
 }
 
+// TODO(minhdoan): this is probably a hack, probably needs some strong non-collision hash.
 func GetUniqueIdFromPeer(peer p2p.Peer) uint16 {
 	reg, err := regexp.Compile("[^0-9]+")
 	if err != nil {
