@@ -270,7 +270,6 @@ func main() {
 	h := log.MultiHandler(
 		log.StdoutHandler,
 		log.Must.FileHandler(logFileName, log.LogfmtFormat()), // Log to file
-		// log.Must.NetHandler("tcp", ":3000", log.JSONFormat()) // Log to remote
 	)
 	log.Root().SetHandler(h)
 
