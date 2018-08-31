@@ -17,12 +17,14 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"strconv"
 	"time"
 )
 
 func main() {
 	// Account subcommands
 	accountImportCommand := flag.NewFlagSet("import", flag.ExitOnError)
+	transferCommand := flag.NewFlagSet("transfer", flag.ExitOnError)
 	//accountListCommand := flag.NewFlagSet("list", flag.ExitOnError)
 	//
 	//// Transaction subcommands
@@ -31,6 +33,10 @@ func main() {
 	//// Account subcommand flag pointers
 	//// Adding a new choice for --metric of 'substring' and a new --substring flag
 	accountImportPtr := accountImportCommand.String("privateKey", "", "Specify the private key to import")
+
+	transferSenderPtr := transferCommand.String("sender", "0", "Specify the sender account address or index")
+	transferReceiverPtr := transferCommand.String("receiver", "", "Specify the receiver account")
+	transferAmountPtr := transferCommand.Int("amount", 0, "Specify the amount to transfer")
 	//accountListPtr := accountNewCommand.Bool("new", false, "N/A")
 	//
 	//// Transaction subcommand flag pointers
@@ -115,7 +121,7 @@ func main() {
 			}()
 			time.Sleep(3 * time.Second) // Wait 3 seconds for the response. Exit afterward.
 		case "test":
-			priKey := pki.GetPrivateKeyScalarFromInt(33)
+			priKey := pki.GetPrivateKeyScalarFromInt(444)
 			address := pki.GetAddressFromPrivateKey(priKey)
 			priKeyBytes, err := priKey.MarshalBinary()
 			if err != nil {
@@ -124,11 +130,59 @@ func main() {
 			fmt.Printf("Private Key :\n {%x}\n", priKeyBytes)
 			fmt.Printf("Address :\n {%x}\n", address)
 		}
-	case "transaction":
-		switch os.Args[2] {
-		case "new":
-			fmt.Println("Creating new transaction...")
+	case "transfer":
+		fmt.Println("Transfer...")
+		transferCommand.Parse(os.Args[2:])
+		priKey := *accountImportPtr
+		if transferCommand.Parsed() {
+			fmt.Println(priKey)
+		} else {
+			fmt.Println("Failed to parse flags")
 		}
+		sender := *transferSenderPtr
+		receiver := *transferReceiverPtr
+		amount := *transferAmountPtr
+
+		if amount <= 0 {
+			fmt.Println("Please specify positive amount to transfer")
+		}
+		priKeys := ReadPrivateKeys()
+		if len(priKeys) == 0 {
+			fmt.Println("No existing account to send money from.")
+			return
+		}
+		senderIndex, err := strconv.Atoi(sender)
+		senderAddress := ""
+		addresses := ReadAddresses()
+		if err != nil {
+			senderIndex = -1
+			for i, address := range addresses {
+				if fmt.Sprintf("%x", address) == senderAddress {
+					senderIndex = i
+					break
+				}
+			}
+			if senderIndex == -1 {
+				fmt.Println("Specified sender account is not imported yet.")
+				break
+			}
+		}
+		if senderIndex >= len(priKeys) {
+			fmt.Println("Sender account index out of bounds.")
+			return
+		}
+		senderPriKey := priKeys[senderIndex]
+
+		receiverAddress, err := hex.DecodeString(receiver)
+		if err != nil || len(receiverAddress) != 20 {
+			fmt.Println("The receiver address is not a valid address.")
+			return
+		}
+
+		fmt.Println(senderPriKey)
+		fmt.Println(amount)
+		fmt.Println(receiverAddress)
+		// Generate transaction
 	default:
 		flag.PrintDefaults()
 		os.Exit(1)
