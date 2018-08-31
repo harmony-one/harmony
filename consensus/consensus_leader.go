@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/gob"
+	"encoding/hex"
 	"errors"
 	"net/http"
 	"net/url"
@@ -371,7 +372,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState C
 				copy(blockHeaderObj.Bitmap[:], bitmap)
 				consensus.OnConsensusDone(&blockHeaderObj)
 
-				consensus.reportTPS(blockHeaderObj.NumTransactions)
+				consensus.reportMetrics(blockHeaderObj)
 				// Send signal to Node so the new block can be added and new round of consensus can be triggered
 				consensus.ReadySignal <- 1
 			}
@@ -403,9 +404,10 @@ func (consensus *Consensus) verifyResponse(commitments *map[uint16]kyber.Point, 
 	return nil
 }
 
-func (consensus *Consensus) reportTPS(numOfTxs int32) {
+func (consensus *Consensus) reportMetrics(block blockchain.Block) {
 	endTime := time.Now()
 	timeElapsed := endTime.Sub(startTime)
+	numOfTxs := block.NumTransactions
 	tps := float64(numOfTxs) / timeElapsed.Seconds()
 	consensus.Log.Info("TPS Report",
 		"numOfTXs", numOfTxs,
@@ -414,21 +416,20 @@ func (consensus *Consensus) reportTPS(numOfTxs int32) {
 		"timeElapsed", timeElapsed,
 		"TPS", tps,
 		"consensus", consensus)
-	consensus.reportMetrics(numOfTxs, tps)
-}
 
-func (consensus *Consensus) reportMetrics(numOfTxs int32, tps float64) {
+	// Post metrics
 	URL := "http://localhost:3000/report"
 	form := url.Values{
-		"tps":       {strconv.FormatFloat(tps, 'f', 2, 64)},
-		"txCount":   {strconv.Itoa(int(numOfTxs))},
-		"nodeCount": {strconv.Itoa(len(consensus.validators) + 1)},
+		"tps":             {strconv.FormatFloat(tps, 'f', 2, 64)},
+		"txCount":         {strconv.Itoa(int(numOfTxs))},
+		"nodeCount":       {strconv.Itoa(len(consensus.validators) + 1)},
+		"latestBlockHash": {hex.EncodeToString(consensus.blockHash[:])},
+		"latestTxHash":    {hex.EncodeToString(block.TransactionIds[len(block.TransactionIds)-1][:])},
 	}
 
 	body := bytes.NewBufferString(form.Encode())
 	rsp, err := http.Post(URL, "application/x-www-form-urlencoded", body)
-	if err != nil {
-		return
+	if err == nil {
+		defer rsp.Body.Close()
 	}
-	defer rsp.Body.Close()
 }
