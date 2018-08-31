@@ -1,5 +1,7 @@
 package main
 
+import "fmt"
+
 // import (
 // 	"flag"
 
@@ -8,6 +10,7 @@ package main
 // )
 
 func main() {
+	fmt.Println("hello")
 	// 	ip := flag.String("ip", "127.0.0.0", "IP of the node")
 	// 	port := flag.String("port", "8080", "port of the node")
 	// 	flag.Parse()
