@@ -2,6 +2,7 @@ package identitychain
 
 import (
 	"fmt"
+	"math"
 	"net"
 	"os"
 	"sync"
@@ -52,6 +53,7 @@ func (IDC *IdentityChain) SelectIds() {
 	selectNumber := IDC.NumberOfNodesInShard - len(IDC.Identities)
 	IB := IDC.GetLatestBlock()
 	currentIDS := IB.GetIdentities()
+	selectNumber = int(math.Min(float64(len(IDC.PendingIdentities)), float64(selectNumber)))
 	pending := IDC.PendingIdentities[:selectNumber]
 	IDC.SelectedIdentitites = append(currentIDS, pending...)
 	IDC.PendingIdentities = []*waitnode.WaitNode{}
