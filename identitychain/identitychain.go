@@ -3,6 +3,7 @@ package identitychain
 import (
 	"fmt"
 	"math"
+	"math/rand"
 	"net"
 	"os"
 	"sync"
@@ -23,8 +24,8 @@ type IdentityChain struct {
 	Peer                  p2p.Peer
 	SelectedIdentitites   []*waitnode.WaitNode
 	EpochNum              int
-	PeerToShardMap        map[p2p.Peer]int
-	ShardLeaderMap        map[int]p2p.Peer
+	PeerToShardMap        map[*waitnode.WaitNode]int
+	ShardLeaderMap        map[int]*waitnode.WaitNode
 	PubKey                string
 	CurrentEpochStartTime int64
 	NumberOfShards        int
@@ -32,7 +33,12 @@ type IdentityChain struct {
 }
 
 func seekRandomNumber(EpochNum int, SelectedIdentitites []*waitnode.WaitNode) int {
-	return 10
+	// Broadcast message to all nodes and collect back their numbers, do consensus and get a leader.
+	// Use leader to generate a random number.
+	//all here mocked
+	// interact with "node" and "wait_node"
+	return rand.Intn(1000)
+
 }
 
 //GlobalBlockchainConfig stores global level blockchain configurations.
@@ -45,7 +51,34 @@ type GlobalBlockchainConfig struct {
 //Shard
 func (IDC *IdentityChain) Shard() {
 	num := seekRandomNumber(IDC.EpochNum, IDC.SelectedIdentitites)
-	fmt.Println(num)
+	IDC.CreateShardAssignment(num)
+	IDC.ElectLeaders()
+}
+
+//
+func (IDC *IdentityChain) ElectLeaders() {
+}
+
+//CreateShardAssignment
+func (IDC *IdentityChain) CreateShardAssignment(num int) {
+	IDC.NumberOfShards = IDC.NumberOfShards + needNewShards()
+	IDC.SelectedIdentitites = generateRandomPermutations(num, IDC.SelectedIdentitites)
+	IDC.PeerToShardMap = make(map[*waitnode.WaitNode]int)
+	numberInOneShard := len(IDC.SelectedIdentitites) / IDC.NumberOfShards
+	for peerNum := 1; peerNum <= len(IDC.SelectedIdentitites); peerNum++ {
+		IDC.PeerToShardMap[IDC.SelectedIdentitites[peerNum]] = peerNum / numberInOneShard
+	}
+}
+
+func generateRandomPermutations(num int, SelectedIdentitites []*waitnode.WaitNode) []*waitnode.WaitNode {
+	src := rand.NewSource(int64(num))
+	rnd := rand.New(src)
+	perm := rnd.Perm(len(SelectedIdentitites))
+	SelectedIdentititesCopy := make([]*waitnode.WaitNode, len(SelectedIdentitites))
+	for j, i := range perm {
+		SelectedIdentititesCopy[j] = SelectedIdentitites[i]
+	}
+	return SelectedIdentititesCopy
 }
 
 // SelectIds
