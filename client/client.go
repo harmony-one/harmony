@@ -3,7 +3,6 @@ package client
 import (
 	"bytes"
 	"encoding/gob"
-	"fmt"
 	"github.com/simple-rules/harmony-benchmark/proto/node"
 	"sync"
 
@@ -25,20 +24,6 @@ type Client struct {
 	log                  log.Logger      // Log utility
 }
 
-func (client *Client) PrintUtxoBalance() {
-	for address, txHash2Vout2AmountMap := range client.UtxoMap {
-		balance := 0
-		for _, vout2AmountMap := range txHash2Vout2AmountMap {
-			for _, amount := range vout2AmountMap {
-				balance += amount
-			}
-
-		}
-		fmt.Printf("Address: {%x}\n", address)
-		fmt.Printf("Balance: %d\n", balance)
-	}
-}
-
 // The message handler for CLIENT/TRANSACTION messages.
 func (client *Client) TransactionMessageHandler(msgPayload []byte) {
 	messageType := client_proto.TransactionMessageType(msgPayload[0])
@@ -54,7 +39,6 @@ func (client *Client) TransactionMessageHandler(msgPayload []byte) {
 		}
 		client.handleProofOfLockMessage(proofs)
 	case client_proto.UTXO_RESPONSE:
-		fmt.Print("Received utxo resposne")
 		txDecoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the PROOF_OF_LOCK messge type
 		fetchUtxoResponse := new(client_proto.FetchUtxoResponseMessage)
 		err := txDecoder.Decode(fetchUtxoResponse)

@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
 	"github.com/dedis/kyber"
@@ -98,28 +99,11 @@ func main() {
 			}
 			StorePrivateKey(priKeyBytes)
 		case "showBalance":
-			configr := configr.NewConfigr()
-			configr.ReadConfigFile("local_config_shards.txt")
-			leaders, _ := configr.GetLeadersAndShardIds()
-			clientPeer := configr.GetClientPeer()
-			walletNode := node.New(nil, nil)
-			walletNode.Client = client.NewClient(&leaders)
-			go walletNode.StartServer(clientPeer.Port)
-			fmt.Println("Fetching account balance...")
-			walletNode.Client.ShardResponseTracker = make(map[uint32]bool)
-			walletNode.Client.UtxoMap = make(blockchain.UtxoMap)
-			p2p.BroadcastMessage(leaders, proto_node.ConstructFetchUtxoMessage(*clientPeer, ReadAddresses()))
-
-			go func() {
-				for true {
-					if len(walletNode.Client.ShardResponseTracker) == len(leaders) {
-						fmt.Println("All response received")
-						walletNode.Client.PrintUtxoBalance()
-						break
-					}
-				}
-			}()
-			time.Sleep(3 * time.Second) // Wait 3 seconds for the response. Exit afterward.
+			utxoMap, err := FetchUtxos()
+			if err != nil {
+				fmt.Println(err)
+			}
+			PrintUtxoBalance(utxoMap)
 		case "test":
 			priKey := pki.GetPrivateKeyScalarFromInt(444)
 			address := pki.GetAddressFromPrivateKey(priKey)
@@ -183,9 +167,56 @@ func main() {
 		fmt.Println(amount)
 		fmt.Println(receiverAddress)
 		// Generate transaction
+
+		//txIn := blockchain.NewTXInput(blockchain.NewOutPoint(&txInfo.id, txInfo.index), txInfo.address, nodeShardID)
+		//txInputs := []blockchain.TXInput{*txIn}
 	default:
 		flag.PrintDefaults()
 		os.Exit(1)
+	}
+}
+
+func FetchUtxos() (blockchain.UtxoMap, error) {
+	configr := configr.NewConfigr()
+	configr.ReadConfigFile("local_config_shards.txt")
+	leaders, _ := configr.GetLeadersAndShardIds()
+	clientPeer := configr.GetClientPeer()
+	walletNode := node.New(nil, nil)
+	walletNode.Client = client.NewClient(&leaders)
+	go walletNode.StartServer(clientPeer.Port)
+	fmt.Println("Fetching account balance...")
+	walletNode.Client.ShardResponseTracker = make(map[uint32]bool)
+	walletNode.Client.UtxoMap = make(blockchain.UtxoMap)
+	p2p.BroadcastMessage(leaders, proto_node.ConstructFetchUtxoMessage(*clientPeer, ReadAddresses()))
+
+	doneSignal := make(chan int)
+	go func() {
+		for true {
+			if len(walletNode.Client.ShardResponseTracker) == len(leaders) {
+				doneSignal <- 0
+			}
+		}
+	}()
+
+	select {
+	case <-doneSignal:
+		return walletNode.Client.UtxoMap, nil
+	case <-time.After(5 * time.Second):
+		return nil, errors.New("Utxo fetch timed out")
+	}
+}
+
+func PrintUtxoBalance(utxoMap blockchain.UtxoMap) {
+	for address, txHash2Vout2AmountMap := range utxoMap {
+		balance := 0
+		for _, vout2AmountMap := range txHash2Vout2AmountMap {
+			for _, amount := range vout2AmountMap {
+				balance += amount
+			}
+
+		}
+		fmt.Printf("Address: {%x}\n", address)
+		fmt.Printf("Balance: %d\n", balance)
 	}
 }
 
