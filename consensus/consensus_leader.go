@@ -414,14 +414,15 @@ func (consensus *Consensus) reportTPS(numOfTxs int32) {
 		"timeElapsed", timeElapsed,
 		"TPS", tps,
 		"consensus", consensus)
-	reportMetrics(numOfTxs, tps)
+	consensus.reportMetrics(numOfTxs, tps)
 }
 
-func reportMetrics(numOfTxs int32, tps float64) {
+func (consensus *Consensus) reportMetrics(numOfTxs int32, tps float64) {
 	URL := "http://localhost:3000/report"
 	form := url.Values{
-		"tps":     {strconv.FormatFloat(tps, 'f', 2, 64)},
-		"txCount": {strconv.Itoa(int(numOfTxs))},
+		"tps":       {strconv.FormatFloat(tps, 'f', 2, 64)},
+		"txCount":   {strconv.Itoa(int(numOfTxs))},
+		"nodeCount": {strconv.Itoa(len(consensus.validators) + 1)},
 	}
 
 	body := bytes.NewBufferString(form.Encode())
