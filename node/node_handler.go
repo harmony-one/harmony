@@ -3,13 +3,13 @@ package node
 import (
 	"bytes"
 	"encoding/gob"
-	"github.com/simple-rules/harmony-benchmark/log"
 	"net"
 	"os"
 	"strconv"
 	"time"
 
 	"github.com/simple-rules/harmony-benchmark/blockchain"
+	"github.com/simple-rules/harmony-benchmark/log"
 	"github.com/simple-rules/harmony-benchmark/p2p"
 	"github.com/simple-rules/harmony-benchmark/proto"
 	"github.com/simple-rules/harmony-benchmark/proto/client"
@@ -80,6 +80,8 @@ func (node *Node) NodeHandler(conn net.Conn) {
 					node.Client.UpdateBlocks(*blocks)
 				}
 			}
+		case proto_node.SYNC:
+			node.transactionMessageHandler(msgPayload)
 		case proto_node.CLIENT:
 			clientMsgType := proto_node.ClientMessageType(msgPayload[0])
 			switch clientMsgType {

@@ -17,6 +17,7 @@ const (
 	BLOCK
 	CLIENT
 	CONTROL
+	SYNC
 	// TODO: add more types
 )
 
