@@ -10,7 +10,7 @@ import (
 
 	"github.com/simple-rules/harmony-benchmark/blockchain"
 	"github.com/simple-rules/harmony-benchmark/client"
-	"github.com/simple-rules/harmony-benchmark/configr"
+	"github.com/simple-rules/harmony-benchmark/client/config"
 	"github.com/simple-rules/harmony-benchmark/consensus"
 	"github.com/simple-rules/harmony-benchmark/crypto/pki"
 	"github.com/simple-rules/harmony-benchmark/log"
@@ -255,7 +255,7 @@ func main() {
 	flag.Parse()
 
 	// Read the configs
-	configr := configr.NewConfigr()
+	configr := config.NewConfig()
 	configr.ReadConfigFile(*configFile)
 	leaders, shardIds := configr.GetLeadersAndShardIds()
 

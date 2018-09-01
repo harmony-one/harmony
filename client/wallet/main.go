@@ -6,20 +6,21 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/dedis/kyber"
-	"github.com/simple-rules/harmony-benchmark/blockchain"
-	"github.com/simple-rules/harmony-benchmark/client"
-	"github.com/simple-rules/harmony-benchmark/configr"
-	"github.com/simple-rules/harmony-benchmark/crypto"
-	"github.com/simple-rules/harmony-benchmark/crypto/pki"
-	"github.com/simple-rules/harmony-benchmark/node"
-	"github.com/simple-rules/harmony-benchmark/p2p"
-	proto_node "github.com/simple-rules/harmony-benchmark/proto/node"
 	"io"
 	"io/ioutil"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/dedis/kyber"
+	"github.com/simple-rules/harmony-benchmark/blockchain"
+	"github.com/simple-rules/harmony-benchmark/client"
+	"github.com/simple-rules/harmony-benchmark/client/config"
+	"github.com/simple-rules/harmony-benchmark/crypto"
+	"github.com/simple-rules/harmony-benchmark/crypto/pki"
+	"github.com/simple-rules/harmony-benchmark/node"
+	"github.com/simple-rules/harmony-benchmark/p2p"
+	proto_node "github.com/simple-rules/harmony-benchmark/proto/node"
 )
 
 func main() {
@@ -177,7 +178,7 @@ func main() {
 }
 
 func FetchUtxos() (blockchain.UtxoMap, error) {
-	configr := configr.NewConfigr()
+	configr := config.NewConfig()
 	configr.ReadConfigFile("local_config_shards.txt")
 	leaders, _ := configr.GetLeadersAndShardIds()
 	clientPeer := configr.GetClientPeer()
