@@ -97,3 +97,16 @@ func (config *Config) ReadConfigFile(filename string) error {
 	config.config = result
 	return nil
 }
+
+func (config *Config) GetMyConfigEntry(ip string, port string) *ConfigEntry {
+	for _, entry := range config.config {
+		if entry.IP == ip && entry.Port == port {
+			return &entry
+		}
+	}
+	return nil
+}
+
+func (config *Config) GetConfigEntries() []ConfigEntry {
+	return config.config
+}
