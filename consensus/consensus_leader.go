@@ -425,6 +425,7 @@ func (consensus *Consensus) reportMetrics(block blockchain.Block) {
 		"nodeCount":       {strconv.Itoa(len(consensus.validators) + 1)},
 		"latestBlockHash": {hex.EncodeToString(consensus.blockHash[:])},
 		"latestTxHash":    {hex.EncodeToString(block.TransactionIds[len(block.TransactionIds)-1][:])},
+		"blockLatency":    {strconv.Itoa(int(timeElapsed / time.Millisecond))},
 	}
 
 	body := bytes.NewBufferString(form.Encode())
