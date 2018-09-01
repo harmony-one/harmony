@@ -15,7 +15,7 @@ import (
 	"github.com/dedis/kyber"
 	"github.com/simple-rules/harmony-benchmark/blockchain"
 	"github.com/simple-rules/harmony-benchmark/client"
-	"github.com/simple-rules/harmony-benchmark/client/config"
+	client_config "github.com/simple-rules/harmony-benchmark/client/config"
 	"github.com/simple-rules/harmony-benchmark/crypto"
 	"github.com/simple-rules/harmony-benchmark/crypto/pki"
 	"github.com/simple-rules/harmony-benchmark/node"
@@ -178,10 +178,10 @@ func main() {
 }
 
 func FetchUtxos() (blockchain.UtxoMap, error) {
-	configr := config.NewConfig()
-	configr.ReadConfigFile("local_config_shards.txt")
-	leaders, _ := configr.GetLeadersAndShardIds()
-	clientPeer := configr.GetClientPeer()
+	config := client_config.NewConfig()
+	config.ReadConfigFile("local_config_shards.txt")
+	leaders, _ := config.GetLeadersAndShardIds()
+	clientPeer := config.GetClientPeer()
 	walletNode := node.New(nil, nil)
 	walletNode.Client = client.NewClient(&leaders)
 	go walletNode.StartServer(clientPeer.Port)

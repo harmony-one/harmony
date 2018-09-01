@@ -22,14 +22,14 @@ type Config struct {
 }
 
 func NewConfig() *Config {
-	configr := Config{}
-	return &configr
+	config := Config{}
+	return &config
 }
 
 // Gets all the validator peers
-func (configr *Config) GetValidators() []p2p.Peer {
+func (config *Config) GetValidators() []p2p.Peer {
 	var peerList []p2p.Peer
-	for _, entry := range configr.config {
+	for _, entry := range config.config {
 		if entry.Role != "validator" {
 			continue
 		}
@@ -40,10 +40,10 @@ func (configr *Config) GetValidators() []p2p.Peer {
 }
 
 // Gets all the leader peers and corresponding shard Ids
-func (configr *Config) GetLeadersAndShardIds() ([]p2p.Peer, []uint32) {
+func (config *Config) GetLeadersAndShardIds() ([]p2p.Peer, []uint32) {
 	var peerList []p2p.Peer
 	var shardIDs []uint32
-	for _, entry := range configr.config {
+	for _, entry := range config.config {
 		if entry.Role == "leader" {
 			peerList = append(peerList, p2p.Peer{Ip: entry.IP, Port: entry.Port})
 			val, err := strconv.Atoi(entry.ShardID)
@@ -57,8 +57,8 @@ func (configr *Config) GetLeadersAndShardIds() ([]p2p.Peer, []uint32) {
 	return peerList, shardIDs
 }
 
-func (configr *Config) GetClientPeer() *p2p.Peer {
-	for _, entry := range configr.config {
+func (config *Config) GetClientPeer() *p2p.Peer {
+	for _, entry := range config.config {
 		if entry.Role != "client" {
 			continue
 		}
@@ -69,8 +69,8 @@ func (configr *Config) GetClientPeer() *p2p.Peer {
 }
 
 // Gets the port of the client node in the config
-func (configr *Config) GetClientPort() string {
-	for _, entry := range configr.config {
+func (config *Config) GetClientPort() string {
+	for _, entry := range config.config {
 		if entry.Role == "client" {
 			return entry.Port
 		}
@@ -79,7 +79,7 @@ func (configr *Config) GetClientPort() string {
 }
 
 // Parse the config file and return a 2d array containing the file data
-func (configr *Config) ReadConfigFile(filename string) error {
+func (config *Config) ReadConfigFile(filename string) error {
 	file, err := os.Open(filename)
 	defer file.Close()
 	if err != nil {
@@ -94,6 +94,6 @@ func (configr *Config) ReadConfigFile(filename string) error {
 		entry := ConfigEntry{p[0], p[1], p[2], p[3]}
 		result = append(result, entry)
 	}
-	configr.config = result
+	config.config = result
 	return nil
 }
