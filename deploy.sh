@@ -58,8 +58,8 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
   fi
 done < $config
 
-txgen_enabled=$3
+txgen_disabled=$3
 # Generate transactions
-if [ -z "$txgen_enabled" ]; then
+if [ -z "$txgen_disabled" ]; then
   ./bin/txgen -config_file $config -log_folder $log_folder
 fi

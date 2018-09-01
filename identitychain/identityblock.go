@@ -30,6 +30,11 @@ func (b *IdentityBlock) Serialize() []byte {
 	return result.Bytes()
 }
 
+//Get Identities
+func (b *IdentityBlock) GetIdentities() []*waitnode.WaitNode {
+	return b.Identities
+}
+
 // DeserializeBlock deserializes a block
 func DeserializeBlock(d []byte) *IdentityBlock {
 	var block IdentityBlock

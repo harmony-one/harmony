@@ -28,7 +28,7 @@ import (
 	"github.com/simple-rules/harmony-benchmark/blockchain"
 	"github.com/simple-rules/harmony-benchmark/client"
 	"github.com/simple-rules/harmony-benchmark/client/btctxiter"
-	"github.com/simple-rules/harmony-benchmark/configr"
+	client_config "github.com/simple-rules/harmony-benchmark/client/config"
 	"github.com/simple-rules/harmony-benchmark/consensus"
 	"github.com/simple-rules/harmony-benchmark/log"
 	"github.com/simple-rules/harmony-benchmark/node"
@@ -176,9 +176,9 @@ func main() {
 	flag.Parse()
 
 	// Read the configs
-	configr := configr.NewConfigr()
-	configr.ReadConfigFile(*configFile)
-	leaders, shardIDs := configr.GetLeadersAndShardIds()
+	config := client_config.NewConfig()
+	config.ReadConfigFile(*configFile)
+	leaders, shardIDs := config.GetLeadersAndShardIds()
 
 	// Do cross shard tx if there are more than one shard
 	setting.crossShard = len(shardIDs) > 1
@@ -204,7 +204,7 @@ func main() {
 	}
 
 	// Client/txgenerator server node setup
-	clientPort := configr.GetClientPort()
+	clientPort := config.GetClientPort()
 	consensusObj := consensus.NewConsensus("0", clientPort, "0", nil, p2p.Peer{})
 	clientNode := node.New(consensusObj, nil)
 
@@ -254,6 +254,6 @@ func main() {
 
 	// Send a stop message to stop the nodes at the end
 	msg := proto_node.ConstructStopMessage()
-	peers := append(configr.GetValidators(), leaders...)
+	peers := append(config.GetValidators(), leaders...)
 	p2p.BroadcastMessage(peers, msg)
 }
