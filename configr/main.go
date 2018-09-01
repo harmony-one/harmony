@@ -7,10 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/simple-rules/harmony-benchmark/crypto"
-	"github.com/simple-rules/harmony-benchmark/crypto/pki"
 	"github.com/simple-rules/harmony-benchmark/p2p"
-	"github.com/simple-rules/harmony-benchmark/utils"
 )
 
 type ConfigEntry struct {
@@ -99,61 +96,4 @@ func (configr *Configr) ReadConfigFile(filename string) error {
 	}
 	configr.config = result
 	return nil
-}
-
-// GetShardID Gets the shard id of the node corresponding to this ip and port
-func (configr *Configr) GetShardID(ip, port string) string {
-	for _, entry := range configr.config {
-		if entry.IP == ip && entry.Port == port {
-			return entry.ShardID
-		}
-	}
-	return "N/A"
-}
-
-// GetPeers Gets the validator list
-func (configr *Configr) GetPeers(ip, port, shardID string) []p2p.Peer {
-	var peerList []p2p.Peer
-	for _, entry := range configr.config {
-		if entry.Role != "validator" || entry.ShardID != shardID {
-			continue
-		}
-		// Get public key deterministically based on ip and port
-		peer := p2p.Peer{Port: entry.Port, Ip: entry.IP}
-		setKey(&peer)
-		peerList = append(peerList, peer)
-	}
-	return peerList
-}
-
-// GetLeader Gets the leader of this shard id
-func (configr *Configr) GetLeader(shardID string) p2p.Peer {
-	var leaderPeer p2p.Peer
-	for _, entry := range configr.config {
-		if entry.Role == "leader" && entry.ShardID == shardID {
-			leaderPeer.Ip = entry.IP
-			leaderPeer.Port = entry.Port
-			setKey(&leaderPeer)
-		}
-	}
-	return leaderPeer
-}
-
-func (configr *Configr) GetConfigEntries() []ConfigEntry {
-	return configr.config
-}
-
-func (configr *Configr) GetMyConfigEntry(ip string, port string) *ConfigEntry {
-	for _, entry := range configr.config {
-		if entry.IP == ip && entry.Port == port {
-			return &entry
-		}
-	}
-	return nil
-}
-
-func setKey(peer *p2p.Peer) {
-	// Get public key deterministically based on ip and port
-	priKey := crypto.Ed25519Curve.Scalar().SetInt64(int64(utils.GetUniqueIdFromPeer(*peer))) // TODO: figure out why using a random hash value doesn't work for private key (schnorr)
-	peer.PubKey = pki.GetPublicKeyFromScalar(priKey)
 }
