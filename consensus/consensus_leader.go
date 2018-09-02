@@ -419,17 +419,19 @@ func (consensus *Consensus) reportMetrics(block blockchain.Block) {
 
 	// Post metrics
 	URL := "http://localhost:3000/report"
+	txHashes := []string{}
+	for i := 1; i <= 3; i++ {
+		if len(block.TransactionIds)-i >= 0 {
+			txHashes = append(txHashes, hex.EncodeToString(block.TransactionIds[len(block.TransactionIds)-i][:]))
+		}
+	}
 	form := url.Values{
 		"tps":             {strconv.FormatFloat(tps, 'f', 2, 64)},
 		"txCount":         {strconv.Itoa(int(numOfTxs))},
 		"nodeCount":       {strconv.Itoa(len(consensus.validators) + 1)},
 		"latestBlockHash": {hex.EncodeToString(consensus.blockHash[:])},
-		"latestTxHashes": {
-			hex.EncodeToString(block.TransactionIds[len(block.TransactionIds)-1][:]),
-			hex.EncodeToString(block.TransactionIds[len(block.TransactionIds)-2][:]),
-			hex.EncodeToString(block.TransactionIds[len(block.TransactionIds)-3][:]),
-		},
-		"blockLatency": {strconv.Itoa(int(timeElapsed / time.Millisecond))},
+		"latestTxHashes":  txHashes,
+		"blockLatency":    {strconv.Itoa(int(timeElapsed / time.Millisecond))},
 	}
 
 	body := bytes.NewBufferString(form.Encode())
