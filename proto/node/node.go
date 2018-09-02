@@ -3,7 +3,6 @@ package node
 import (
 	"bytes"
 	"encoding/gob"
-
 	"github.com/simple-rules/harmony-benchmark/blockchain"
 	"github.com/simple-rules/harmony-benchmark/p2p"
 	"github.com/simple-rules/harmony-benchmark/proto"
@@ -89,7 +88,10 @@ func ConstructTransactionListMessage(transactions []*blockchain.Transaction) []b
 	for i := range txs {
 		txs[i] = *transactions[i]
 	}
-	encoder.Encode(txs)
+	err := encoder.Encode(txs)
+	if err != nil {
+		return []byte{} // TODO(RJ): better handle of the error
+	}
 	return byteBuffer.Bytes()
 }
 

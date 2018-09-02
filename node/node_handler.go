@@ -3,7 +3,7 @@ package node
 import (
 	"bytes"
 	"encoding/gob"
-	"github.com/simple-rules/harmony-benchmark/log"
+	"log"
 	"net"
 	"os"
 	"strconv"
@@ -76,7 +76,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 				decoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the SYNC messge type
 				blocks := new([]*blockchain.Block)
 				decoder.Decode(blocks)
-				if node.Client != nil && blocks != nil {
+				if node.Client != nil && node.Client.UpdateBlocks != nil && blocks != nil {
 					node.Client.UpdateBlocks(*blocks)
 				}
 			}
@@ -92,7 +92,6 @@ func (node *Node) NodeHandler(conn net.Conn) {
 				utxoMap := node.UtxoPool.GetUtxoMapByAddresses(fetchUtxoMessage.Addresses)
 
 				p2p.SendMessage(fetchUtxoMessage.Sender, client.ConstructFetchUtxoResponseMessage(&utxoMap, node.UtxoPool.ShardID))
-				log.Info("Utxo Map", "Detail", utxoMap)
 			}
 		case proto_node.CONTROL:
 			controlType := msgPayload[0]
@@ -141,14 +140,14 @@ func (node *Node) NodeHandler(conn net.Conn) {
 func (node *Node) transactionMessageHandler(msgPayload []byte) {
 	txMessageType := proto_node.TransactionMessageType(msgPayload[0])
 
+	log.Println(txMessageType)
 	switch txMessageType {
 	case proto_node.SEND:
 		txDecoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the SEND messge type
-
 		txList := new([]*blockchain.Transaction)
-		err := txDecoder.Decode(&txList)
+		err := txDecoder.Decode(txList)
 		if err != nil {
-			node.log.Error("Failed deserializing transaction list", "node", node)
+			node.log.Error("Failed to deserialize transaction list", "error", err)
 		}
 		node.addPendingTransactions(*txList)
 	case proto_node.REQUEST:
@@ -208,8 +207,8 @@ func (node *Node) WaitForConsensusReady(readySignal chan int) {
 		//node.log.Debug("Adding new block", "currentChainSize", len(node.blockchain.Blocks), "numTxs", len(node.blockchain.GetLatestBlock().Transactions), "PrevHash", node.blockchain.GetLatestBlock().PrevBlockHash, "Hash", node.blockchain.GetLatestBlock().Hash)
 		if !retry {
 			for {
-				// Once we have more than 100 transactions pending we will try creating a new block
-				if len(node.pendingTransactions) >= 100 {
+				// Once we have pending transactions we will try creating a new block
+				if len(node.pendingTransactions) >= 1 {
 					selectedTxs, crossShardTxAndProofs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
 
 					if len(selectedTxs) == 0 {

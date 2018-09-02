@@ -15,8 +15,10 @@ import (
 	"github.com/simple-rules/harmony-benchmark/node"
 	"github.com/simple-rules/harmony-benchmark/p2p"
 	proto_node "github.com/simple-rules/harmony-benchmark/proto/node"
+	"github.com/simple-rules/harmony-benchmark/utils"
 	"io"
 	"io/ioutil"
+	math_rand "math/rand"
 	"os"
 	"strconv"
 	"time"
@@ -88,9 +90,7 @@ func main() {
 			fmt.Println("Importing private key...")
 			accountImportCommand.Parse(os.Args[3:])
 			priKey := *accountImportPtr
-			if accountImportCommand.Parsed() {
-				fmt.Println(priKey)
-			} else {
+			if !accountImportCommand.Parsed() {
 				fmt.Println("Failed to parse flags")
 			}
 			priKeyBytes, err := hex.DecodeString(priKey)
@@ -99,11 +99,20 @@ func main() {
 			}
 			StorePrivateKey(priKeyBytes)
 		case "showBalance":
-			utxoMap, err := FetchUtxos()
+			configr := configr.NewConfigr()
+			configr.ReadConfigFile("local_config_shards.txt")
+			leaders, _ := configr.GetLeadersAndShardIds()
+			clientPeer := configr.GetClientPeer()
+			walletNode := node.New(nil, nil)
+			walletNode.Client = client.NewClient(&leaders)
+			walletNode.ClientPeer = clientPeer
+			go walletNode.StartServer(clientPeer.Port)
+
+			shardUtxoMap, err := FetchUtxos(ReadAddresses(), walletNode)
 			if err != nil {
 				fmt.Println(err)
 			}
-			PrintUtxoBalance(utxoMap)
+			PrintUtxoBalance(shardUtxoMap)
 		case "test":
 			priKey := pki.GetPrivateKeyScalarFromInt(444)
 			address := pki.GetAddressFromPrivateKey(priKey)
@@ -115,12 +124,8 @@ func main() {
 			fmt.Printf("Address :\n {%x}\n", address)
 		}
 	case "transfer":
-		fmt.Println("Transfer...")
 		transferCommand.Parse(os.Args[2:])
-		priKey := *accountImportPtr
-		if transferCommand.Parsed() {
-			fmt.Println(priKey)
-		} else {
+		if !transferCommand.Parsed() {
 			fmt.Println("Failed to parse flags")
 		}
 		sender := *transferSenderPtr
@@ -155,66 +160,150 @@ func main() {
 			fmt.Println("Sender account index out of bounds.")
 			return
 		}
-		senderPriKey := priKeys[senderIndex]
-
 		receiverAddress, err := hex.DecodeString(receiver)
 		if err != nil || len(receiverAddress) != 20 {
 			fmt.Println("The receiver address is not a valid address.")
 			return
 		}
 
-		fmt.Println(senderPriKey)
-		fmt.Println(amount)
-		fmt.Println(receiverAddress)
 		// Generate transaction
+		trimmedReceiverAddress := [20]byte{}
+		copy(trimmedReceiverAddress[:], receiverAddress[:20])
 
-		//txIn := blockchain.NewTXInput(blockchain.NewOutPoint(&txInfo.id, txInfo.index), txInfo.address, nodeShardID)
-		//txInputs := []blockchain.TXInput{*txIn}
+		senderPriKey := priKeys[senderIndex]
+		senderAddressBytes := pki.GetAddressFromPrivateKey(senderPriKey)
+
+		// Start client server
+		configr := configr.NewConfigr()
+		configr.ReadConfigFile("local_config_shards.txt")
+		leaders, _ := configr.GetLeadersAndShardIds()
+		clientPeer := configr.GetClientPeer()
+		walletNode := node.New(nil, nil)
+		walletNode.Client = client.NewClient(&leaders)
+		walletNode.ClientPeer = clientPeer
+		go walletNode.StartServer(clientPeer.Port)
+
+		shardUtxoMap, err := FetchUtxos([][20]byte{senderAddressBytes}, walletNode)
+		if err != nil {
+			fmt.Printf("Failed to fetch utxos: %s\n", err)
+		}
+
+		cummulativeBalance := 0
+		txInputs := []blockchain.TXInput{}
+	LOOP:
+		for shardId, utxoMap := range shardUtxoMap {
+			for txId, vout2AmountMap := range utxoMap[senderAddressBytes] {
+				txIdBytes, err := utils.Get32BytesFromString(txId)
+				if err != nil {
+					fmt.Println("Failed to parse txId")
+					continue
+				}
+				for voutIndex, utxoAmount := range vout2AmountMap {
+					cummulativeBalance += utxoAmount
+					txIn := blockchain.NewTXInput(blockchain.NewOutPoint(&txIdBytes, voutIndex), senderAddressBytes, shardId)
+					txInputs = append(txInputs, *txIn)
+					if cummulativeBalance >= amount {
+						break LOOP
+					}
+				}
+			}
+		}
+		txout := blockchain.TXOutput{Amount: amount, Address: trimmedReceiverAddress, ShardID: uint32(math_rand.Intn(len(shardUtxoMap)))}
+
+		txOutputs := []blockchain.TXOutput{txout}
+		if cummulativeBalance > amount {
+			changeTxOut := blockchain.TXOutput{Amount: cummulativeBalance - amount, Address: senderAddressBytes, ShardID: uint32(math_rand.Intn(len(shardUtxoMap)))}
+			txOutputs = append(txOutputs, changeTxOut)
+		}
+
+		tx := blockchain.Transaction{ID: [32]byte{}, PublicKey: pki.GetBytesFromPublicKey(pki.GetPublicKeyFromScalar(senderPriKey)), TxInput: txInputs, TxOutput: txOutputs, Proofs: nil}
+		tx.SetID() // TODO(RJ): figure out the correct way to set Tx ID.
+		tx.Sign(senderPriKey)
+
+		pubKey := crypto.Ed25519Curve.Point()
+		err = pubKey.UnmarshalBinary(tx.PublicKey[:])
+		if err != nil {
+			fmt.Println("Failed to deserialize public key", "error", err)
+		}
+
+		ExecuteTransaction(tx, walletNode)
 	default:
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
 }
 
-func FetchUtxos() (blockchain.UtxoMap, error) {
-	configr := configr.NewConfigr()
-	configr.ReadConfigFile("local_config_shards.txt")
-	leaders, _ := configr.GetLeadersAndShardIds()
-	clientPeer := configr.GetClientPeer()
-	walletNode := node.New(nil, nil)
-	walletNode.Client = client.NewClient(&leaders)
-	go walletNode.StartServer(clientPeer.Port)
-	fmt.Println("Fetching account balance...")
-	walletNode.Client.ShardResponseTracker = make(map[uint32]bool)
-	walletNode.Client.UtxoMap = make(blockchain.UtxoMap)
-	p2p.BroadcastMessage(leaders, proto_node.ConstructFetchUtxoMessage(*clientPeer, ReadAddresses()))
+func ExecuteTransaction(tx blockchain.Transaction, walletNode *node.Node) error {
+	if tx.IsCrossShard() {
+		walletNode.Client.PendingCrossTxsMutex.Lock()
+		walletNode.Client.PendingCrossTxs[tx.ID] = &tx
+		walletNode.Client.PendingCrossTxsMutex.Unlock()
+
+	}
+	fmt.Println("Sending transaction...")
+
+	msg := proto_node.ConstructTransactionListMessage([]*blockchain.Transaction{&tx})
+	p2p.BroadcastMessage(*walletNode.Client.Leaders, msg)
 
 	doneSignal := make(chan int)
 	go func() {
 		for true {
-			if len(walletNode.Client.ShardResponseTracker) == len(leaders) {
+			if len(walletNode.Client.PendingCrossTxs) == 0 {
 				doneSignal <- 0
+				break
 			}
 		}
 	}()
 
 	select {
 	case <-doneSignal:
-		return walletNode.Client.UtxoMap, nil
+		time.Sleep(100 * time.Millisecond)
+		return nil
 	case <-time.After(5 * time.Second):
+		return errors.New("Cross-shard tx timed out")
+	}
+}
+
+func FetchUtxos(addresses [][20]byte, walletNode *node.Node) (map[uint32]blockchain.UtxoMap, error) {
+	fmt.Println("Fetching account balance...")
+	walletNode.Client.ShardUtxoMap = make(map[uint32]blockchain.UtxoMap)
+	p2p.BroadcastMessage(*walletNode.Client.Leaders, proto_node.ConstructFetchUtxoMessage(*walletNode.ClientPeer, addresses))
+
+	doneSignal := make(chan int)
+	go func() {
+		for true {
+			if len(walletNode.Client.ShardUtxoMap) == len(*walletNode.Client.Leaders) {
+				doneSignal <- 0
+				break
+			}
+		}
+	}()
+
+	select {
+	case <-doneSignal:
+		return walletNode.Client.ShardUtxoMap, nil
+	case <-time.After(3 * time.Second):
 		return nil, errors.New("Utxo fetch timed out")
 	}
 }
 
-func PrintUtxoBalance(utxoMap blockchain.UtxoMap) {
-	for address, txHash2Vout2AmountMap := range utxoMap {
-		balance := 0
-		for _, vout2AmountMap := range txHash2Vout2AmountMap {
-			for _, amount := range vout2AmountMap {
-				balance += amount
+func PrintUtxoBalance(shardUtxoMap map[uint32]blockchain.UtxoMap) {
+	addressBalance := make(map[[20]byte]int)
+	for _, utxoMap := range shardUtxoMap {
+		for address, txHash2Vout2AmountMap := range utxoMap {
+			for _, vout2AmountMap := range txHash2Vout2AmountMap {
+				for _, amount := range vout2AmountMap {
+					value, ok := addressBalance[address]
+					if ok {
+						addressBalance[address] = value + amount
+					} else {
+						addressBalance[address] = amount
+					}
+				}
 			}
-
 		}
+	}
+	for address, balance := range addressBalance {
 		fmt.Printf("Address: {%x}\n", address)
 		fmt.Printf("Balance: %d\n", balance)
 	}
