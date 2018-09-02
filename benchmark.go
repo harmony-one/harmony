@@ -33,7 +33,7 @@ func attackDetermination(attackedMode int) bool {
 }
 
 func startProfiler(shardID string, logFolder string) {
-	err := utils.RunCmd("./bin/profiler", "-pid", strconv.Itoa(os.Getpid()), "-shard_id", shardID, "-log_folder", logFolder)
+	err := utils.RunCmd("./profiler", "-pid", strconv.Itoa(os.Getpid()), "-shard_id", shardID, "-log_folder", logFolder)
 	if err != nil {
 		log.Error("Failed to start profiler")
 	}

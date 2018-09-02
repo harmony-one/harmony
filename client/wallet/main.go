@@ -6,10 +6,11 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+
 	"github.com/dedis/kyber"
 	"github.com/simple-rules/harmony-benchmark/blockchain"
 	"github.com/simple-rules/harmony-benchmark/client"
-	"github.com/simple-rules/harmony-benchmark/configr"
+	client_config "github.com/simple-rules/harmony-benchmark/client/config"
 	"github.com/simple-rules/harmony-benchmark/crypto"
 	"github.com/simple-rules/harmony-benchmark/crypto/pki"
 	"github.com/simple-rules/harmony-benchmark/node"
@@ -99,7 +100,7 @@ func main() {
 			}
 			StorePrivateKey(priKeyBytes)
 		case "showBalance":
-			configr := configr.NewConfigr()
+			configr := client_config.NewConfig()
 			configr.ReadConfigFile("local_config_shards.txt")
 			leaders, _ := configr.GetLeadersAndShardIds()
 			clientPeer := configr.GetClientPeer()
@@ -174,7 +175,7 @@ func main() {
 		senderAddressBytes := pki.GetAddressFromPrivateKey(senderPriKey)
 
 		// Start client server
-		configr := configr.NewConfigr()
+		configr := client_config.NewConfig()
 		configr.ReadConfigFile("local_config_shards.txt")
 		leaders, _ := configr.GetLeadersAndShardIds()
 		clientPeer := configr.GetClientPeer()
