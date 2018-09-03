@@ -112,3 +112,21 @@ func NewBlock(transactions []*Transaction, prevBlockHash [32]byte, shardId uint3
 func NewGenesisBlock(coinbase *Transaction, shardId uint32) *Block {
 	return NewBlock([]*Transaction{coinbase}, [32]byte{}, shardId)
 }
+
+// NewStateBlock creates and returns a state Block based on utxo pool.
+func NewStateBlock(utxoPool *UTXOPool) *Block {
+	stateTransactions := []*Transaction{}
+	for address, txHash2Vout2AmountMap := range utxoPool.UtxoMap {
+		stateTransaction := Transaction{}
+		for _, vout2AmountMap := range txHash2Vout2AmountMap {
+			for _, amount := range vout2AmountMap {
+				stateTransaction.TxOutput = append(stateTransaction.TxOutput, TXOutput{Amount: amount, Address: address, ShardID: utxoPool.ShardID})
+			}
+		}
+		if len(stateTransaction.TxOutput) != 0 {
+			stateTransaction.SetID()
+			stateTransactions = append(stateTransactions, &stateTransaction)
+		}
+	}
+	return NewBlock(stateTransactions, [32]byte{}, utxoPool.ShardID)
+}

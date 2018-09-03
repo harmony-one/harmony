@@ -456,3 +456,8 @@ func (utxoPool *UTXOPool) GetSizeInByteOfUtxoMap() int {
 	encoder.Encode(utxoPool.UtxoMap)
 	return len(byteBuffer.Bytes())
 }
+
+// Create state block based on the utxos.
+func (utxoPool *UTXOPool) CreateStateBlock() *Block {
+	return NewStateBlock(utxoPool)
+}
