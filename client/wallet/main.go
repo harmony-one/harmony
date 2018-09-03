@@ -28,42 +28,27 @@ import (
 func main() {
 	// Account subcommands
 	accountImportCommand := flag.NewFlagSet("import", flag.ExitOnError)
-	transferCommand := flag.NewFlagSet("transfer", flag.ExitOnError)
-	//accountListCommand := flag.NewFlagSet("list", flag.ExitOnError)
-	//
-	//// Transaction subcommands
-	//transactionNewCommand := flag.NewFlagSet("new", flag.ExitOnError)
-	//
-	//// Account subcommand flag pointers
-	//// Adding a new choice for --metric of 'substring' and a new --substring flag
 	accountImportPtr := accountImportCommand.String("privateKey", "", "Specify the private key to import")
 
+	// Transfer subcommands
+	transferCommand := flag.NewFlagSet("transfer", flag.ExitOnError)
 	transferSenderPtr := transferCommand.String("sender", "0", "Specify the sender account address or index")
 	transferReceiverPtr := transferCommand.String("receiver", "", "Specify the receiver account")
 	transferAmountPtr := transferCommand.Int("amount", 0, "Specify the amount to transfer")
-	//accountListPtr := accountNewCommand.Bool("new", false, "N/A")
-	//
-	//// Transaction subcommand flag pointers
-	//transactionNewPtr := transactionNewCommand.String("text", "", "Text to parse. (Required)")
 
 	// Verify that a subcommand has been provided
 	// os.Arg[0] is the main command
 	// os.Arg[1] will be the subcommand
 	if len(os.Args) < 2 {
-		fmt.Println("account or transaction subcommand is required")
+		fmt.Println("account or transfer subcommand is required")
 		os.Exit(1)
 	}
 
 	// Switch on the subcommand
-	// Parse the flags for appropriate FlagSet
-	// FlagSet.Parse() requires a set of arguments to parse as input
-	// os.Args[2:] will be all arguments starting after the subcommand at os.Args[1]
 	switch os.Args[1] {
 	case "account":
 		switch os.Args[2] {
 		case "new":
-			fmt.Println("Creating new account...")
-
 			randomBytes := [32]byte{}
 			_, err := io.ReadFull(rand.Reader, randomBytes[:])
 
@@ -74,7 +59,7 @@ func main() {
 			priKey := crypto.Ed25519Curve.Scalar().SetBytes(randomBytes[:])
 			priKeyBytes, err := priKey.MarshalBinary()
 			if err != nil {
-				panic("Failed to generate private key")
+				panic("Failed to serialize the private key")
 			}
 			pubKey := pki.GetPublicKeyFromScalar(priKey)
 			address := pki.GetAddressFromPublicKey(pubKey)
@@ -82,13 +67,12 @@ func main() {
 			fmt.Printf("New account created:\nAddress: {%x}\n", address)
 		case "list":
 			for i, address := range ReadAddresses() {
-				fmt.Printf("Account %d:\n {%x}\n", i+1, address)
+				fmt.Printf("Account %d:\n  {%x}\n", i+1, address)
 			}
 		case "clearAll":
-			fmt.Println("Deleting existing accounts...")
-			DeletePrivateKey()
+			ClearKeystore()
+			fmt.Println("All existing accounts deleted...")
 		case "import":
-			fmt.Println("Importing private key...")
 			accountImportCommand.Parse(os.Args[3:])
 			priKey := *accountImportPtr
 			if !accountImportCommand.Parsed() {
@@ -99,15 +83,10 @@ func main() {
 				panic("Failed to parse the private key into bytes")
 			}
 			StorePrivateKey(priKeyBytes)
+			fmt.Println("Private key imported...")
 		case "showBalance":
-			configr := client_config.NewConfig()
-			configr.ReadConfigFile("local_config_shards.txt")
-			leaders, _ := configr.GetLeadersAndShardIds()
-			clientPeer := configr.GetClientPeer()
-			walletNode := node.New(nil, nil)
-			walletNode.Client = client.NewClient(&leaders)
-			walletNode.ClientPeer = clientPeer
-			go walletNode.StartServer(clientPeer.Port)
+			walletNode := CreateWalletServerNode()
+			go walletNode.StartServer(walletNode.ClientPeer.Port)
 
 			shardUtxoMap, err := FetchUtxos(ReadAddresses(), walletNode)
 			if err != nil {
@@ -115,6 +94,7 @@ func main() {
 			}
 			PrintUtxoBalance(shardUtxoMap)
 		case "test":
+			// Testing code
 			priKey := pki.GetPrivateKeyScalarFromInt(444)
 			address := pki.GetAddressFromPrivateKey(priKey)
 			priKeyBytes, err := priKey.MarshalBinary()
@@ -138,7 +118,7 @@ func main() {
 		}
 		priKeys := ReadPrivateKeys()
 		if len(priKeys) == 0 {
-			fmt.Println("No existing account to send money from.")
+			fmt.Println("No imported account to use.")
 			return
 		}
 		senderIndex, err := strconv.Atoi(sender)
@@ -153,7 +133,7 @@ func main() {
 				}
 			}
 			if senderIndex == -1 {
-				fmt.Println("Specified sender account is not imported yet.")
+				fmt.Println("The specified sender account is not imported yet.")
 				break
 			}
 		}
@@ -163,7 +143,7 @@ func main() {
 		}
 		receiverAddress, err := hex.DecodeString(receiver)
 		if err != nil || len(receiverAddress) != 20 {
-			fmt.Println("The receiver address is not a valid address.")
+			fmt.Println("The receiver address is not a valid.")
 			return
 		}
 
@@ -175,14 +155,8 @@ func main() {
 		senderAddressBytes := pki.GetAddressFromPrivateKey(senderPriKey)
 
 		// Start client server
-		configr := client_config.NewConfig()
-		configr.ReadConfigFile("local_config_shards.txt")
-		leaders, _ := configr.GetLeadersAndShardIds()
-		clientPeer := configr.GetClientPeer()
-		walletNode := node.New(nil, nil)
-		walletNode.Client = client.NewClient(&leaders)
-		walletNode.ClientPeer = clientPeer
-		go walletNode.StartServer(clientPeer.Port)
+		walletNode := CreateWalletServerNode()
+		go walletNode.StartServer(walletNode.ClientPeer.Port)
 
 		shardUtxoMap, err := FetchUtxos([][20]byte{senderAddressBytes}, walletNode)
 		if err != nil {
@@ -227,21 +201,37 @@ func main() {
 			fmt.Println("Failed to deserialize public key", "error", err)
 		}
 
-		ExecuteTransaction(tx, walletNode)
+		err = ExecuteTransaction(tx, walletNode)
+
+		if err != nil {
+			fmt.Println(err)
+		} else {
+			fmt.Println("Transaction submitted successfully")
+		}
 	default:
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
 }
 
+func CreateWalletServerNode() *node.Node {
+	configr := client_config.NewConfig()
+	configr.ReadConfigFile("local_config_shards.txt")
+	leaders, _ := configr.GetLeadersAndShardIds()
+	clientPeer := configr.GetClientPeer()
+	walletNode := node.New(nil, nil)
+	walletNode.Client = client.NewClient(&leaders)
+	walletNode.ClientPeer = clientPeer
+	return walletNode
+}
+
+// Issue the transaction to the Harmony network
 func ExecuteTransaction(tx blockchain.Transaction, walletNode *node.Node) error {
 	if tx.IsCrossShard() {
 		walletNode.Client.PendingCrossTxsMutex.Lock()
 		walletNode.Client.PendingCrossTxs[tx.ID] = &tx
 		walletNode.Client.PendingCrossTxsMutex.Unlock()
-
 	}
-	fmt.Println("Sending transaction...")
 
 	msg := proto_node.ConstructTransactionListMessage([]*blockchain.Transaction{&tx})
 	p2p.BroadcastMessage(*walletNode.Client.Leaders, msg)
@@ -261,10 +251,11 @@ func ExecuteTransaction(tx blockchain.Transaction, walletNode *node.Node) error 
 		time.Sleep(100 * time.Millisecond)
 		return nil
 	case <-time.After(5 * time.Second):
-		return errors.New("Cross-shard tx timed out")
+		return errors.New("Cross-shard Transaction processing timed out")
 	}
 }
 
+// Fetch utxos of specified address from the Harmony network
 func FetchUtxos(addresses [][20]byte, walletNode *node.Node) (map[uint32]blockchain.UtxoMap, error) {
 	fmt.Println("Fetching account balance...")
 	walletNode.Client.ShardUtxoMap = make(map[uint32]blockchain.UtxoMap)
@@ -310,6 +301,7 @@ func PrintUtxoBalance(shardUtxoMap map[uint32]blockchain.UtxoMap) {
 	}
 }
 
+// Read the addresses stored in local keystore
 func ReadAddresses() [][20]byte {
 	priKeys := ReadPrivateKeys()
 	addresses := [][20]byte{}
@@ -319,6 +311,7 @@ func ReadAddresses() [][20]byte {
 	return addresses
 }
 
+// Store the specified private key in local keystore
 func StorePrivateKey(priKey []byte) {
 	for _, address := range ReadAddresses() {
 		if address == pki.GetAddressFromPrivateKey(crypto.Ed25519Curve.Scalar().SetBytes(priKey)) {
@@ -339,10 +332,12 @@ func StorePrivateKey(priKey []byte) {
 	f.Close()
 }
 
-func DeletePrivateKey() {
+// Delete all data in the local keystore
+func ClearKeystore() {
 	ioutil.WriteFile("keystore", []byte{}, 0644)
 }
 
+// Read all the private key stored in local keystore
 func ReadPrivateKeys() []kyber.Scalar {
 	keys, err := ioutil.ReadFile("keystore")
 	if err != nil {
