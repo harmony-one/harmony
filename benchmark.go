@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/simple-rules/harmony-benchmark/attack"
@@ -13,6 +12,7 @@ import (
 	"github.com/simple-rules/harmony-benchmark/db"
 	"github.com/simple-rules/harmony-benchmark/log"
 	"github.com/simple-rules/harmony-benchmark/node"
+	"github.com/simple-rules/harmony-benchmark/profiler"
 	"github.com/simple-rules/harmony-benchmark/utils"
 )
 
@@ -32,13 +32,6 @@ func attackDetermination(attackedMode int) bool {
 	return false
 }
 
-func startProfiler(shardID string, logFolder string) {
-	err := utils.RunCmd("./profiler", "-pid", strconv.Itoa(os.Getpid()), "-shard_id", shardID, "-log_folder", logFolder)
-	if err != nil {
-		log.Error("Failed to start profiler")
-	}
-}
-
 func InitLDBDatabase(ip string, port string) (*db.LDBDatabase, error) {
 	// TODO(minhdoan): Refactor this.
 	dbFileName := "/tmp/harmony_" + ip + port + ".dat"
@@ -56,6 +49,7 @@ func main() {
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	attackedMode := flag.Int("attacked_mode", 0, "0 means not attacked, 1 means attacked, 2 means being open to be selected as attacked")
 	dbSupported := flag.Bool("db_supported", false, "false means not db_supported, true means db_supported")
+	profile := flag.Bool("profile", false, "Turn on profiling (CPU, Memory).")
 	flag.Parse()
 
 	// Set up randomization seed.
@@ -95,9 +89,10 @@ func main() {
 	// Consensus object.
 	consensus := consensus.NewConsensus(*ip, *port, shardID, peers, leader)
 
-	// Start Profiler for leader
-	if role == "leader" {
-		startProfiler(shardID, *logFolder)
+	// Start Profiler for leader if profile argument is on
+	if *profile && role == "leader" {
+		profiler := profiler.NewProfiler(consensus.Log, os.Getpid(), shardID)
+		profiler.Start()
 	}
 
 	// Set logger to attack model.
