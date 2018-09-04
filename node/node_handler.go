@@ -21,7 +21,7 @@ const (
 	// The max number of transaction per a block.
 	MaxNumberOfTransactionsPerBlock = 3000
 	// The number of blocks allowed before generating state block
-	NumBlocksBeforeStateBlock = 10
+	NumBlocksBeforeStateBlock = 100
 )
 
 // NodeHandler handles a new incoming connection.
@@ -105,25 +105,38 @@ func (node *Node) NodeHandler(conn net.Conn) {
 
 				avgBlockSizeInBytes := 0
 				txCount := 0
+				blockCount := 0
+				totalTxCount := 0
+				totalBlockCount := 0
 				avgTxSize := 0
 
 				for _, block := range node.blockchain.Blocks {
-					byteBuffer := bytes.NewBuffer([]byte{})
-					encoder := gob.NewEncoder(byteBuffer)
-					encoder.Encode(block)
-					avgBlockSizeInBytes += len(byteBuffer.Bytes())
+					if block.IsStateBlock() {
+						totalTxCount += int(block.State.NumTransactions)
+						totalBlockCount += int(block.State.NumBlocks)
+					} else {
+						byteBuffer := bytes.NewBuffer([]byte{})
+						encoder := gob.NewEncoder(byteBuffer)
+						encoder.Encode(block)
+						avgBlockSizeInBytes += len(byteBuffer.Bytes())
 
-					txCount += len(block.Transactions)
+						txCount += len(block.Transactions)
+						blockCount += 1
+						totalTxCount += len(block.TransactionIds)
+						totalBlockCount += 1
 
-					byteBuffer = bytes.NewBuffer([]byte{})
-					encoder = gob.NewEncoder(byteBuffer)
-					encoder.Encode(block.Transactions)
-					avgTxSize += len(byteBuffer.Bytes())
+						byteBuffer = bytes.NewBuffer([]byte{})
+						encoder = gob.NewEncoder(byteBuffer)
+						encoder.Encode(block.Transactions)
+						avgTxSize += len(byteBuffer.Bytes())
+					}
 				}
-				avgBlockSizeInBytes = avgBlockSizeInBytes / len(node.blockchain.Blocks)
-				avgTxSize = avgTxSize / txCount
+				if blockCount != 0 {
+					avgBlockSizeInBytes = avgBlockSizeInBytes / blockCount
+					avgTxSize = avgTxSize / txCount
+				}
 
-				node.log.Debug("Blockchain Report", "numBlocks", len(node.blockchain.Blocks), "avgBlockSize", avgBlockSizeInBytes, "numTxs", txCount, "avgTxSzie", avgTxSize)
+				node.log.Debug("Blockchain Report", "totalNumBlocks", totalBlockCount, "avgBlockSizeInCurrentEpoch", avgBlockSizeInBytes, "totalNumTxs", totalTxCount, "avgTxSzieInCurrentEpoch", avgTxSize)
 
 				os.Exit(0)
 			}
