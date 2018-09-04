@@ -367,7 +367,6 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState C
 				}
 
 				// Sign the block
-				// TODO(RJ): populate bitmap
 				copy(blockHeaderObj.Signature[:], collectiveSig[:])
 				copy(blockHeaderObj.Bitmap[:], bitmap)
 				consensus.OnConsensusDone(&blockHeaderObj)
