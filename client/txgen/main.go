@@ -243,6 +243,7 @@ func main() {
 	maxNumTxsPerBatch := flag.Int("max_num_txs_per_batch", 100000, "number of transactions to send per message")
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	numSubset := flag.Int("numSubset", 3, "the number of subsets of utxos to process separately")
+	duration := flag.Int("duration", 60, "duration of the tx generation in second")
 	flag.Parse()
 
 	// Read the configs
@@ -310,7 +311,7 @@ func main() {
 	// Transaction generation process
 	time.Sleep(10 * time.Second) // wait for nodes to be ready
 	start := time.Now()
-	totalTime := 60.0 //run for 1 minutes
+	totalTime := float64(*duration)
 
 	batchCounter := 0
 	for true {
