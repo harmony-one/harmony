@@ -53,7 +53,8 @@ func (node *Node) addPendingTransactions(newTxs []*blockchain.Transaction) {
 // Note the pending transaction list will then contain the rest of the txs
 func (node *Node) getTransactionsForNewBlock(maxNumTxs int) ([]*blockchain.Transaction, []*blockchain.CrossShardTxAndProof) {
 	node.pendingTxMutex.Lock()
-	selected, unselected, crossShardTxs := node.UtxoPool.SelectTransactionsForNewBlock(node.pendingTransactions, maxNumTxs)
+	selected, unselected, invalid, crossShardTxs := node.UtxoPool.SelectTransactionsForNewBlock(node.pendingTransactions, maxNumTxs)
+	_ = invalid // invalid txs are discard
 	node.pendingTransactions = unselected
 	node.pendingTxMutex.Unlock()
 	return selected, crossShardTxs
