@@ -87,7 +87,29 @@ func (utxoPool *UTXOPool) VerifyTransactions(transactions []*Transaction) bool {
 
 // VerifyStateBlock verifies if the given state block matches the current utxo pool.
 func (utxoPool *UTXOPool) VerifyStateBlock(stateBlock *Block) bool {
-	// TODO: implement this
+	accountBalanceInUtxoPool := make(map[[20]byte]int)
+
+	for address, txHash2Vout2AmountMap := range utxoPool.UtxoMap {
+		for _, vout2AmountMap := range txHash2Vout2AmountMap {
+			for _, amount := range vout2AmountMap {
+				accountBalanceInUtxoPool[address] = accountBalanceInUtxoPool[address] + amount
+			}
+		}
+	}
+	for _, transaction := range stateBlock.Transactions {
+		for _, txOutput := range transaction.TxOutput {
+			if txOutput.ShardID != utxoPool.ShardID {
+				return false
+			}
+			accountBalanceInUtxoPool[txOutput.Address] = accountBalanceInUtxoPool[txOutput.Address] - txOutput.Amount
+		}
+	}
+
+	for _, amount := range accountBalanceInUtxoPool {
+		if amount != 0 {
+			return false
+		}
+	}
 	return true
 }
 

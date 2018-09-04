@@ -21,7 +21,7 @@ const (
 	// The max number of transaction per a block.
 	MaxNumberOfTransactionsPerBlock = 3000
 	// The number of blocks allowed before generating state block
-	NumBlocksBeforeStateBlock = 100
+	NumBlocksBeforeStateBlock = 10
 )
 
 // NodeHandler handles a new incoming connection.

@@ -128,14 +128,21 @@ func NewGenesisBlock(coinbase *Transaction, shardId uint32) *Block {
 }
 
 // NewStateBlock creates and returns a state Block based on utxo pool.
+// TODO(RJ): take care of dangling cross shard transaction
 func NewStateBlock(utxoPool *UTXOPool, numBlocks, numTxs int32) *Block {
 	stateTransactions := []*Transaction{}
 	stateTransactionIds := [][32]byte{}
 	for address, txHash2Vout2AmountMap := range utxoPool.UtxoMap {
 		stateTransaction := Transaction{}
-		for _, vout2AmountMap := range txHash2Vout2AmountMap {
-			for _, amount := range vout2AmountMap {
-				stateTransaction.TxOutput = append(stateTransaction.TxOutput, TXOutput{Amount: amount, Address: address, ShardID: utxoPool.ShardID})
+		for txHash, vout2AmountMap := range txHash2Vout2AmountMap {
+			for index, amount := range vout2AmountMap {
+				txHashBytes, err := utils.Get32BytesFromString(txHash)
+				if err == nil {
+					stateTransaction.TxInput = append(stateTransaction.TxInput, *NewTXInput(NewOutPoint(&txHashBytes, index), address, utxoPool.ShardID))
+					stateTransaction.TxOutput = append(stateTransaction.TxOutput, TXOutput{Amount: amount, Address: address, ShardID: utxoPool.ShardID})
+				} else {
+					return nil
+				}
 			}
 		}
 		if len(stateTransaction.TxOutput) != 0 {
