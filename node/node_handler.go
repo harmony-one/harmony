@@ -20,6 +20,8 @@ import (
 const (
 	// The max number of transaction per a block.
 	MaxNumberOfTransactionsPerBlock = 3000
+	// The number of blocks allowed before generating state block
+	NumBlocksBeforeStateBlock = 10
 )
 
 // NodeHandler handles a new incoming connection.
@@ -206,26 +208,32 @@ func (node *Node) WaitForConsensusReady(readySignal chan int) {
 
 		//node.log.Debug("Adding new block", "currentChainSize", len(node.blockchain.Blocks), "numTxs", len(node.blockchain.GetLatestBlock().Transactions), "PrevHash", node.blockchain.GetLatestBlock().PrevBlockHash, "Hash", node.blockchain.GetLatestBlock().Hash)
 		if !retry {
-			for {
-				// Once we have pending transactions we will try creating a new block
-				if len(node.pendingTransactions) >= 1 {
-					selectedTxs, crossShardTxAndProofs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
+			if len(node.blockchain.Blocks) > NumBlocksBeforeStateBlock {
+				// Generate state block and run consensus on it
+				newBlock = node.UtxoPool.CreateStateBlock()
+			} else {
+				// Normal tx block consensus
+				for {
+					// Once we have pending transactions we will try creating a new block
+					if len(node.pendingTransactions) >= 1 {
+						selectedTxs, crossShardTxAndProofs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
 
-					if len(selectedTxs) == 0 {
-						node.log.Debug("No valid transactions exist", "pendingTx", len(node.pendingTransactions))
-					} else {
-						node.log.Debug("Creating new block", "numTxs", len(selectedTxs), "pendingTxs", len(node.pendingTransactions), "currentChainSize", len(node.blockchain.Blocks))
+						if len(selectedTxs) == 0 {
+							node.log.Debug("No valid transactions exist", "pendingTx", len(node.pendingTransactions))
+						} else {
+							node.log.Debug("Creating new block", "numTxs", len(selectedTxs), "pendingTxs", len(node.pendingTransactions), "currentChainSize", len(node.blockchain.Blocks))
 
-						node.transactionInConsensus = selectedTxs
-						node.log.Debug("CROSS SHARD TX", "num", len(crossShardTxAndProofs))
-						node.CrossTxsInConsensus = crossShardTxAndProofs
-						newBlock = blockchain.NewBlock(selectedTxs, node.blockchain.GetLatestBlock().Hash, node.Consensus.ShardID)
-						break
+							node.transactionInConsensus = selectedTxs
+							node.log.Debug("CROSS SHARD TX", "num", len(crossShardTxAndProofs))
+							node.CrossTxsInConsensus = crossShardTxAndProofs
+							newBlock = blockchain.NewBlock(selectedTxs, node.blockchain.GetLatestBlock().Hash, node.Consensus.ShardID)
+							break
+						}
 					}
+					// If not enough transactions to run Consensus,
+					// periodically check whether we have enough transactions to package into block.
+					time.Sleep(1 * time.Second)
 				}
-				// If not enough transactions to run Consensus,
-				// periodically check whether we have enough transactions to package into block.
-				time.Sleep(1 * time.Second)
 			}
 		}
 
