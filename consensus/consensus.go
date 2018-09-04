@@ -199,5 +199,5 @@ func (consensus *Consensus) String() string {
 		duty = "VLD" // validator
 	}
 	return fmt.Sprintf("[duty:%s, priKey:%s, ShardID:%v, nodeId:%v, state:%s]",
-		duty, fmt.Sprintf("%x", consensus.priKey), consensus.ShardID, consensus.nodeId, consensus.state)
+		duty, consensus.priKey.String(), consensus.ShardID, consensus.nodeId, consensus.state)
 }

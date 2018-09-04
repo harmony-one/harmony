@@ -38,6 +38,28 @@ type UTXOPool struct {
 	mutex         sync.Mutex
 }
 
+// Merges the utxoMap into that of the UtxoPool
+func (utxoPool *UTXOPool) MergeUtxoMap(utxoMap UtxoMap) {
+	for address, txHash2Vout2AmountMap := range utxoMap {
+		clientTxHashMap, ok := utxoPool.UtxoMap[address]
+		if ok {
+			for txHash, vout2AmountMap := range txHash2Vout2AmountMap {
+				clientVout2AmountMap, ok := clientTxHashMap[txHash]
+				if ok {
+					for vout, amount := range vout2AmountMap {
+						clientVout2AmountMap[vout] = amount
+					}
+				} else {
+					clientTxHashMap[txHash] = vout2AmountMap
+				}
+
+			}
+		} else {
+			utxoPool.UtxoMap[address] = txHash2Vout2AmountMap
+		}
+	}
+}
+
 // Gets the Utxo map for specific addresses
 func (utxoPool *UTXOPool) GetUtxoMapByAddresses(addresses [][20]byte) UtxoMap {
 	result := make(UtxoMap)
@@ -60,6 +82,12 @@ func (utxoPool *UTXOPool) VerifyTransactions(transactions []*Transaction) bool {
 			}
 		}
 	}
+	return true
+}
+
+// VerifyStateBlock verifies if the given state block matches the current utxo pool.
+func (utxoPool *UTXOPool) VerifyStateBlock(stateBlock *Block) bool {
+	// TODO: implement this
 	return true
 }
 
@@ -113,9 +141,14 @@ func (utxoPool *UTXOPool) VerifyOneTransaction(tx *Transaction, spentTXOs *map[[
 	// Calculate the sum of TxOutput
 	for _, out := range tx.TxOutput {
 		outTotal += out.Amount
+
+		if out.ShardID != utxoPool.ShardID {
+			crossShard = true
+		}
 	}
 
-	if (crossShard && inTotal >= outTotal) || (!crossShard && inTotal != outTotal) {
+	// TODO: improve this checking logic
+	if (crossShard && inTotal > outTotal) || (!crossShard && inTotal != outTotal) {
 		return false, crossShard
 	}
 
@@ -185,10 +218,16 @@ func (utxoPool *UTXOPool) UpdateOneTransaction(tx *Transaction) {
 			break
 		}
 	}
+	for _, out := range tx.TxOutput {
+		if out.ShardID != utxoPool.ShardID {
+			isCrossShard = true
+			break
+		}
+	}
 
 	isValidCrossShard := true
 	if isCrossShard {
-		// Check whether for this shard this cross transaction is valid or not.
+		// Check whether for this cross shard transaction is valid or not.
 		for _, in := range tx.TxInput {
 			// Only check the input for my own shard.
 			if in.ShardID != utxoPool.ShardID {

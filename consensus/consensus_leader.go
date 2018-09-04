@@ -367,7 +367,6 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState C
 				}
 
 				// Sign the block
-				// TODO(RJ): populate bitmap
 				copy(blockHeaderObj.Signature[:], collectiveSig[:])
 				copy(blockHeaderObj.Bitmap[:], bitmap)
 				consensus.OnConsensusDone(&blockHeaderObj)
@@ -405,31 +404,41 @@ func (consensus *Consensus) verifyResponse(commitments *map[uint16]kyber.Point, 
 }
 
 func (consensus *Consensus) reportMetrics(block blockchain.Block) {
-	endTime := time.Now()
-	timeElapsed := endTime.Sub(startTime)
-	numOfTxs := block.NumTransactions
-	tps := float64(numOfTxs) / timeElapsed.Seconds()
-	consensus.Log.Info("TPS Report",
-		"numOfTXs", numOfTxs,
-		"startTime", startTime,
-		"endTime", endTime,
-		"timeElapsed", timeElapsed,
-		"TPS", tps,
-		"consensus", consensus)
+	if !block.IsStateBlock() { // Skip state block stats
+		endTime := time.Now()
+		timeElapsed := endTime.Sub(startTime)
+		numOfTxs := block.NumTransactions
+		tps := float64(numOfTxs) / timeElapsed.Seconds()
+		consensus.Log.Info("TPS Report",
+			"numOfTXs", numOfTxs,
+			"startTime", startTime,
+			"endTime", endTime,
+			"timeElapsed", timeElapsed,
+			"TPS", tps,
+			"consensus", consensus)
 
-	// Post metrics
-	URL := "http://localhost:3000/report"
-	form := url.Values{
-		"tps":             {strconv.FormatFloat(tps, 'f', 2, 64)},
-		"txCount":         {strconv.Itoa(int(numOfTxs))},
-		"nodeCount":       {strconv.Itoa(len(consensus.validators) + 1)},
-		"latestBlockHash": {hex.EncodeToString(consensus.blockHash[:])},
-		"latestTxHash":    {hex.EncodeToString(block.TransactionIds[len(block.TransactionIds)-1][:])},
-	}
+		// Post metrics
+		URL := "http://localhost:3000/report"
+		txHashes := []string{}
+		for i := 1; i <= 3; i++ {
+			if len(block.TransactionIds)-i >= 0 {
+				txHashes = append(txHashes, hex.EncodeToString(block.TransactionIds[len(block.TransactionIds)-i][:]))
+			}
+		}
+		form := url.Values{
+			"key":             {consensus.pubKey.String()},
+			"tps":             {strconv.FormatFloat(tps, 'f', 2, 64)},
+			"txCount":         {strconv.Itoa(int(numOfTxs))},
+			"nodeCount":       {strconv.Itoa(len(consensus.validators) + 1)},
+			"latestBlockHash": {hex.EncodeToString(consensus.blockHash[:])},
+			"latestTxHashes":  txHashes,
+			"blockLatency":    {strconv.Itoa(int(timeElapsed / time.Millisecond))},
+		}
 
-	body := bytes.NewBufferString(form.Encode())
-	rsp, err := http.Post(URL, "application/x-www-form-urlencoded", body)
-	if err == nil {
-		defer rsp.Body.Close()
+		body := bytes.NewBufferString(form.Encode())
+		rsp, err := http.Post(URL, "application/x-www-form-urlencoded", body)
+		if err == nil {
+			defer rsp.Body.Close()
+		}
 	}
 }

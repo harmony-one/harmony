@@ -3,7 +3,6 @@ package node
 import (
 	"github.com/simple-rules/harmony-benchmark/crypto/pki"
 	"net"
-	"os"
 	"sync"
 
 	"github.com/simple-rules/harmony-benchmark/blockchain"
@@ -62,20 +61,25 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int) ([]*blockchain.Trans
 // Start a server and process the request by a handler.
 func (node *Node) StartServer(port string) {
 	node.log.Debug("Starting server", "node", node, "port", port)
+
 	node.listenOnPort(port)
 }
 
 func (node *Node) listenOnPort(port string) {
 	listen, err := net.Listen("tcp4", ":"+port)
-	defer listen.Close()
+	defer func() {
+		if listen != nil {
+			listen.Close()
+		}
+	}()
 	if err != nil {
-		node.log.Crit("Socket listen port failed", "port", port, "err", err)
-		os.Exit(1)
+		node.log.Error("Socket listen port failed", "port", port, "err", err)
+		return
 	}
 	for {
 		conn, err := listen.Accept()
 		if err != nil {
-			node.log.Crit("Error listening on port. Exiting.", "port", port)
+			node.log.Error("Error listening on port.", "port", port)
 			continue
 		}
 		go node.NodeHandler(conn)
