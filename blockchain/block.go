@@ -23,9 +23,19 @@ type Block struct {
 	ShardId         uint32
 	Hash            [32]byte
 	MerkleRootData  []byte
+	State           *State // If present, this block is state block
 	// Signature...
 	Bitmap    []byte   // Contains which validator signed the block.
 	Signature [66]byte // Schnorr collective signature
+}
+
+type State struct {
+	NumBlocks       int32 // Total number of blocks
+	NumTransactions int32 // Total number of transactions
+}
+
+func (b *Block) IsStateBlock() bool {
+	return b.State != nil && bytes.Equal(b.PrevBlockHash[:], (&[32]byte{})[:]) // TODO: think of a better indicator to check
 }
 
 // Serialize serializes the block
@@ -75,6 +85,10 @@ func (b *Block) Write(db db.Database, key string) error {
 	return db.Put([]byte(key), b.Serialize())
 }
 
+func Delete(db db.Database, key string) error {
+	return db.Delete([]byte(key))
+}
+
 // CalculateBlockHash returns a hash of the block
 func (b *Block) CalculateBlockHash() []byte {
 	var hashes [][]byte
@@ -111,4 +125,33 @@ func NewBlock(transactions []*Transaction, prevBlockHash [32]byte, shardId uint3
 // NewGenesisBlock creates and returns genesis Block.
 func NewGenesisBlock(coinbase *Transaction, shardId uint32) *Block {
 	return NewBlock([]*Transaction{coinbase}, [32]byte{}, shardId)
+}
+
+// NewStateBlock creates and returns a state Block based on utxo pool.
+// TODO(RJ): take care of dangling cross shard transaction
+func NewStateBlock(utxoPool *UTXOPool, numBlocks, numTxs int32) *Block {
+	stateTransactions := []*Transaction{}
+	stateTransactionIds := [][32]byte{}
+	for address, txHash2Vout2AmountMap := range utxoPool.UtxoMap {
+		stateTransaction := Transaction{}
+		for txHash, vout2AmountMap := range txHash2Vout2AmountMap {
+			for index, amount := range vout2AmountMap {
+				txHashBytes, err := utils.Get32BytesFromString(txHash)
+				if err == nil {
+					stateTransaction.TxInput = append(stateTransaction.TxInput, *NewTXInput(NewOutPoint(&txHashBytes, index), address, utxoPool.ShardID))
+					stateTransaction.TxOutput = append(stateTransaction.TxOutput, TXOutput{Amount: amount, Address: address, ShardID: utxoPool.ShardID})
+				} else {
+					return nil
+				}
+			}
+		}
+		if len(stateTransaction.TxOutput) != 0 {
+			stateTransaction.SetID()
+			stateTransactionIds = append(stateTransactionIds, stateTransaction.ID)
+			stateTransactions = append(stateTransactions, &stateTransaction)
+		}
+	}
+	newBlock := NewBlock(stateTransactions, [32]byte{}, utxoPool.ShardID)
+	newBlock.State = &State{NumBlocks: numBlocks, NumTransactions: numTxs}
+	return newBlock
 }

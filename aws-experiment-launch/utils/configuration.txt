@@ -1,8 +1,0 @@
-1,us-east-1,virginia-key-benchmark,virginia-security-group,virginia,ami-b70554c8,sg-04d0b62ee08ce8800
-2,us-east-2,ohio-key-benchmark,ohio-security-group,ohio,ami-8c122be9,sg-0789078f1c76defbe
-3,us-west-1,california-key-benchmark,california-security-group,california,ami-e0ba5c83,sg-0a66ccb6ab9161a14
-4,us-west-2,oregon-key-benchmark,oregon-security-group,oregon,ami-a9d09ed1,sg-020cb5729fa212d43
-5,ap-northeast-1,tokyo-key-benchmark,tokyo-security-group,tokyo,ami-e99f4896,sg-009aeb97f675c1ad5
-6,ap-southeast-1,singapore-key-benchmark,singapore-security-group,singapore,ami-05868579,sg-05f9b60044a19dfb2
-7,eu-central-1,frankfurt-key-benchmark,frankfurt-security-group,frankfurt,ami-7c4f7097,sg-0bb06fcd8b25b5910
-8,eu-west-1,ireland-key-benchmark,ireland-security-group,ireland,ami-466768ac,sg-0aa8954acb79fdb58

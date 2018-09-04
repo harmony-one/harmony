@@ -17,6 +17,7 @@ const (
 	BLOCK
 	CLIENT
 	CONTROL
+	BLOCKCHAIN_SYNC
 	// TODO: add more types
 )
 
@@ -89,7 +90,10 @@ func ConstructTransactionListMessage(transactions []*blockchain.Transaction) []b
 	for i := range txs {
 		txs[i] = *transactions[i]
 	}
-	encoder.Encode(txs)
+	err := encoder.Encode(txs)
+	if err != nil {
+		return []byte{} // TODO(RJ): better handle of the error
+	}
 	return byteBuffer.Bytes()
 }
 

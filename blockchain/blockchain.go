@@ -195,3 +195,19 @@ func CreateBlockchain(address [20]byte, shardId uint32) *Blockchain {
 
 	return &bc
 }
+
+// Create state block based on the utxos.
+func (bc *Blockchain) CreateStateBlock(utxoPool *UTXOPool) *Block {
+	var numBlocks int32 = 0
+	var numTxs int32 = 0
+	for _, block := range bc.Blocks {
+		if block.IsStateBlock() {
+			numBlocks += block.State.NumBlocks
+			numTxs += block.State.NumTransactions
+		} else {
+			numBlocks += 1
+			numTxs += block.NumTransactions
+		}
+	}
+	return NewStateBlock(utxoPool, numBlocks, numTxs)
+}

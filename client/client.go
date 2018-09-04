@@ -3,7 +3,6 @@ package client
 import (
 	"bytes"
 	"encoding/gob"
-	"fmt"
 	"github.com/simple-rules/harmony-benchmark/proto/node"
 	"sync"
 
@@ -17,26 +16,11 @@ import (
 type Client struct {
 	PendingCrossTxs      map[[32]byte]*blockchain.Transaction // Map of TxId to pending cross shard txs. Pending means the proof-of-accept/rejects are not complete
 	PendingCrossTxsMutex sync.Mutex                           // Mutex for the pending txs list
-	leaders              *[]p2p.Peer                          // All the leaders for each shard
+	Leaders              *[]p2p.Peer                          // All the leaders for each shard
 	UpdateBlocks         func([]*blockchain.Block)            // Closure function used to sync new block with the leader. Once the leader finishes the consensus on a new block, it will send it to the clients. Clients use this method to update their blockchain
 
-	UtxoMap              blockchain.UtxoMap
-	ShardResponseTracker map[uint32]bool // A map containing the shard id of responded shard.
-	log                  log.Logger      // Log utility
-}
-
-func (client *Client) PrintUtxoBalance() {
-	for address, txHash2Vout2AmountMap := range client.UtxoMap {
-		balance := 0
-		for _, vout2AmountMap := range txHash2Vout2AmountMap {
-			for _, amount := range vout2AmountMap {
-				balance += amount
-			}
-
-		}
-		fmt.Printf("Address: {%x}\n", address)
-		fmt.Printf("Balance: %d\n", balance)
-	}
+	ShardUtxoMap map[uint32]blockchain.UtxoMap
+	log          log.Logger // Log utility
 }
 
 // The message handler for CLIENT/TRANSACTION messages.
@@ -54,7 +38,6 @@ func (client *Client) TransactionMessageHandler(msgPayload []byte) {
 		}
 		client.handleProofOfLockMessage(proofs)
 	case client_proto.UTXO_RESPONSE:
-		fmt.Print("Received utxo resposne")
 		txDecoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the PROOF_OF_LOCK messge type
 		fetchUtxoResponse := new(client_proto.FetchUtxoResponseMessage)
 		err := txDecoder.Decode(fetchUtxoResponse)
@@ -120,41 +103,22 @@ func (client *Client) handleProofOfLockMessage(proofs *[]blockchain.CrossShardTx
 }
 
 func (client *Client) handleFetchUtxoResponseMessage(utxoResponse client_proto.FetchUtxoResponseMessage) {
-	_, ok := client.ShardResponseTracker[utxoResponse.ShardId]
+	_, ok := client.ShardUtxoMap[utxoResponse.ShardId]
 	if ok {
 		return
 	}
-	client.ShardResponseTracker[utxoResponse.ShardId] = true
-	// Merge utxo response into client utxo map.
-	for address, txHash2Vout2AmountMap := range utxoResponse.UtxoMap {
-		clientTxHashMap, ok := client.UtxoMap[address]
-		if ok {
-			for txHash, vout2AmountMap := range txHash2Vout2AmountMap {
-				clientVout2AmountMap, ok := clientTxHashMap[txHash]
-				if ok {
-					for vout, amount := range vout2AmountMap {
-						clientVout2AmountMap[vout] = amount
-					}
-				} else {
-					clientTxHashMap[txHash] = vout2AmountMap
-				}
-
-			}
-		} else {
-			client.UtxoMap[address] = txHash2Vout2AmountMap
-		}
-	}
+	client.ShardUtxoMap[utxoResponse.ShardId] = utxoResponse.UtxoMap
 }
 
 func (client *Client) broadcastCrossShardTxUnlockMessage(txsToSend *[]blockchain.Transaction) {
-	p2p.BroadcastMessage(*client.leaders, node.ConstructUnlockToCommitOrAbortMessage(*txsToSend))
+	p2p.BroadcastMessage(*client.Leaders, node.ConstructUnlockToCommitOrAbortMessage(*txsToSend))
 }
 
 // Create a new Client
 func NewClient(leaders *[]p2p.Peer) *Client {
 	client := Client{}
 	client.PendingCrossTxs = make(map[[32]byte]*blockchain.Transaction)
-	client.leaders = leaders
+	client.Leaders = leaders
 
 	// Logger
 	client.log = log.New()

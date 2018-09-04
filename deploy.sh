@@ -37,7 +37,6 @@ db_supported=$2
 # Also it's recommended to use `go build` for testing the whole exe. 
 go build -o bin/benchmark
 go build -o bin/txgen client/txgen/main.go
-go build -o bin/profiler profiler/main.go
 
 # Create a tmp folder for logs
 t=`date +"%Y%m%d-%H%M%S"`
@@ -58,8 +57,8 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
   fi
 done < $config
 
-txgen_enabled=$3
+txgen_disabled=$3
 # Generate transactions
-if [ -z "$txgen_enabled" ]; then
+if [ -z "$txgen_disabled" ]; then
   ./bin/txgen -config_file $config -log_folder $log_folder
 fi

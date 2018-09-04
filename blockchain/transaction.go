@@ -3,6 +3,7 @@ package blockchain
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/gob"
 	"encoding/hex"
 	"fmt"
@@ -32,7 +33,7 @@ type Transaction struct {
 
 // TXOutput is the struct of transaction output in a transaction.
 type TXOutput struct {
-	Amount  int
+	Amount  int      // TODO: Switch to big int or uint32
 	Address [20]byte // last 20 bytes of the hash of public key
 	ShardID uint32   // The Id of the shard where this UTXO belongs
 }
@@ -109,13 +110,7 @@ func (tx *Transaction) SetID() {
 }
 
 func (tx *Transaction) Sign(priKey kyber.Scalar) error {
-	var encoded bytes.Buffer
-	enc := gob.NewEncoder(&encoded)
-	err := enc.Encode(tx)
-	if err != nil {
-		log.Panic(err)
-	}
-	signature, err := schnorr.Sign(crypto.Ed25519Curve, priKey, encoded.Bytes())
+	signature, err := schnorr.Sign(crypto.Ed25519Curve, priKey, tx.GetContentToVerify())
 	if err != nil {
 		log.Panic(err)
 	}
@@ -124,17 +119,23 @@ func (tx *Transaction) Sign(priKey kyber.Scalar) error {
 	return err
 }
 
+func (tx *Transaction) IsCrossShard() bool {
+	shardIds := make(map[uint32]bool)
+	for _, value := range tx.TxInput {
+		shardIds[value.ShardID] = true
+	}
+	for _, value := range tx.TxOutput {
+		shardIds[value.ShardID] = true
+	}
+	return len(shardIds) > 1
+}
+
 func (tx *Transaction) GetContentToVerify() []byte {
 	tempTx := *tx
 	tempTx.Signature = [64]byte{}
+	tempTx.Proofs = []CrossShardTxProof{}
 
-	var encoded bytes.Buffer
-	enc := gob.NewEncoder(&encoded)
-	err := enc.Encode(tempTx)
-	if err != nil {
-		log.Panic(err)
-	}
-	return encoded.Bytes()
+	return tempTx.Serialize()
 }
 
 // NewCoinbaseTX creates a new coinbase transaction
@@ -156,7 +157,7 @@ func (txInput *TXInput) String() string {
 	res := fmt.Sprintf("TxID: %v, ", hex.EncodeToString(txInput.PreviousOutPoint.TxID[:]))
 	res += fmt.Sprintf("TxOutputIndex: %v, ", txInput.PreviousOutPoint.Index)
 	res += fmt.Sprintf("Address: %v, ", txInput.Address)
-	res += fmt.Sprintf("Shard Id: %v", txInput.ShardID)
+	res += fmt.Sprintf("ShardId: %v", txInput.ShardID)
 	return res
 }
 
@@ -164,12 +165,19 @@ func (txInput *TXInput) String() string {
 func (txOutput *TXOutput) String() string {
 	res := fmt.Sprintf("Amount: %v, ", txOutput.Amount)
 	res += fmt.Sprintf("Address: %v", txOutput.Address)
+	res += fmt.Sprintf("ShardId: %v", txOutput.ShardID)
 	return res
 }
 
 // Used for debuging.
 func (proof *CrossShardTxProof) String() string {
 	res := fmt.Sprintf("Accept: %v, ", proof.Accept)
+	res += fmt.Sprintf("TxId: %v, ", hex.EncodeToString(proof.TxID[:]))
+	res += fmt.Sprintf("BlockHash: %v, ", hex.EncodeToString(proof.BlockHash[:]))
+	res += fmt.Sprintf("TxInput:\n")
+	for id, value := range proof.TxInput {
+		res += fmt.Sprintf("%v: %v\n", id, value.String())
+	}
 	return res
 }
 
@@ -185,7 +193,71 @@ func (tx *Transaction) String() string {
 		res += fmt.Sprintf("%v: %v\n", id, value.String())
 	}
 	for id, value := range tx.Proofs {
+		res += fmt.Sprintf("Proof:\n")
 		res += fmt.Sprintf("%v: %v\n", id, value.String())
 	}
+	res += fmt.Sprintf("PublicKey: %v\n", hex.EncodeToString(tx.PublicKey[:]))
+	res += fmt.Sprintf("Sig: %v\n", hex.EncodeToString(tx.Signature[:]))
 	return res
+}
+
+func (tx *Transaction) Serialize() []byte {
+	buffer := bytes.NewBuffer([]byte{})
+	buffer.Write(tx.ID[:])
+	for _, value := range tx.TxInput {
+		buffer.Write(value.Serialize())
+	}
+	for _, value := range tx.TxOutput {
+		buffer.Write(value.Serialize())
+	}
+	for _, value := range tx.Proofs {
+		buffer.Write(value.Serialize())
+	}
+	buffer.Write(tx.PublicKey[:])
+	buffer.Write(tx.Signature[:])
+	return buffer.Bytes()
+}
+
+func (txInput *TXInput) Serialize() []byte {
+	buffer := bytes.NewBuffer([]byte{})
+	buffer.Write(txInput.Address[:])
+
+	fourBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(fourBytes, txInput.ShardID)
+	buffer.Write(fourBytes)
+
+	binary.BigEndian.PutUint32(fourBytes, txInput.PreviousOutPoint.Index)
+	buffer.Write(fourBytes)
+
+	buffer.Write(txInput.PreviousOutPoint.TxID[:])
+	return buffer.Bytes()
+}
+
+func (txOutput *TXOutput) Serialize() []byte {
+	buffer := bytes.NewBuffer([]byte{})
+	buffer.Write(txOutput.Address[:])
+
+	fourBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(fourBytes, txOutput.ShardID)
+	buffer.Write(fourBytes)
+
+	binary.BigEndian.PutUint32(fourBytes, uint32(txOutput.Amount)) // TODO(RJ): make amount a bigInt
+	buffer.Write(fourBytes)
+
+	return buffer.Bytes()
+}
+
+func (crossProof *CrossShardTxProof) Serialize() []byte {
+	buffer := bytes.NewBuffer([]byte{})
+	buffer.Write(crossProof.TxID[:])
+	buffer.Write(crossProof.BlockHash[:])
+	for _, value := range crossProof.TxInput {
+		buffer.Write(value.Serialize())
+	}
+	if crossProof.Accept {
+		buffer.WriteByte(byte(1))
+	} else {
+		buffer.WriteByte(byte(0))
+	}
+	return buffer.Bytes()
 }
