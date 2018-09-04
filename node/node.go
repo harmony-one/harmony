@@ -1,10 +1,15 @@
 package node
 
 import (
-	"github.com/simple-rules/harmony-benchmark/crypto/pki"
+	"bytes"
+	"encoding/gob"
 	"net"
 	"os"
 	"sync"
+
+	"github.com/simple-rules/harmony-benchmark/crypto/pki"
+	"github.com/simple-rules/harmony-benchmark/pow"
+	"github.com/simple-rules/harmony-benchmark/proto/identity"
 
 	"github.com/simple-rules/harmony-benchmark/blockchain"
 	"github.com/simple-rules/harmony-benchmark/client"
@@ -31,6 +36,9 @@ type Node struct {
 	crossTxToReturnMutex   sync.Mutex
 	ClientPeer             *p2p.Peer      // The peer for the benchmark tx generator client, used for leaders to return proof-of-accept
 	Client                 *client.Client // The presence of a client object means this node will also act as a client
+	IsWaiting              bool
+	Self                   p2p.Peer
+	IDCPeer                p2p.Peer
 }
 
 // Add new crossTx and proofs to the list of crossTx that needs to be sent back to client
@@ -94,6 +102,90 @@ func (node *Node) countNumTransactionsInBlockchain() int {
 		count += len(block.Transactions)
 	}
 	return count
+}
+
+//ConnectIdentityChain connects to identity chain
+func (node *Node) ConnectIdentityChain() {
+	IDCPeer := node.IDCPeer
+	p2p.SendMessage(IDCPeer, identity.ConstructIdentityMessage(identity.ANNOUNCE, node.SerializeNode()))
+}
+
+//NewWaitNode is a way to initiate a waiting no
+func NewWaitNode(peer, IDCPeer p2p.Peer) Node {
+	node := Node{}
+	node.Self = peer
+	node.IDCPeer = IDCPeer
+	return node
+}
+
+//NewNodefromIDC
+func NewNodefromIDC(node Node, consensus *consensus.Consensus, db *db.LDBDatabase) *Node {
+
+	if consensus != nil {
+		// Consensus and associated channel to communicate blocks
+		node.Consensus = consensus
+		node.BlockChannel = make(chan blockchain.Block)
+
+		// Genesis Block
+		// TODO(minh): Use or implement new function in blockchain package for this.
+		genesisBlock := &blockchain.Blockchain{}
+		genesisBlock.Blocks = make([]*blockchain.Block, 0)
+		// TODO(RJ): use miner's address as coinbase address
+		coinbaseTx := blockchain.NewCoinbaseTX(pki.GetAddressFromInt(1), "0", node.Consensus.ShardID)
+		genesisBlock.Blocks = append(genesisBlock.Blocks, blockchain.NewGenesisBlock(coinbaseTx, node.Consensus.ShardID))
+		node.blockchain = genesisBlock
+
+		// UTXO pool from Genesis block
+		node.UtxoPool = blockchain.CreateUTXOPoolFromGenesisBlockChain(node.blockchain)
+
+		// Initialize level db.
+		node.db = db
+
+	}
+	// Logger
+	node.log = log.New()
+
+	return &node
+}
+
+func (node *Node) processPOWMessage(payload []byte) {
+	IDCPeer := node.IDCPeer
+	offset := 0
+	// 4 byte challenge nonce id
+	req := pow.NewRequest(5, payload[offset:offset+64])
+	proof, _ := pow.Fulfil(req, []byte("This is blockchash data")) //"some bound dat"
+
+	proofBytes := make([]byte, 64)
+	copy(proofBytes[:], proof)
+	buffer := bytes.NewBuffer([]byte{})
+	buffer.Write(proofBytes)
+
+	buffer.Write(node.SerializeNode())
+
+	msgPayload := buffer.Bytes()
+	p2p.SendMessage(IDCPeer, identity.ConstructIdentityMessage(identity.REGISTER, msgPayload))
+}
+
+//SerializeWaitNode serializes the node
+func (node *Node) SerializeNode() []byte {
+	var result bytes.Buffer
+	encoder := gob.NewEncoder(&result)
+	err := encoder.Encode(node)
+	if err != nil {
+		node.log.Error("Could not serialize node")
+	}
+	return result.Bytes()
+}
+
+// DeserializeWaitNode deserializes the node
+func DeserializeNode(d []byte) *Node {
+	var wn Node
+	decoder := gob.NewDecoder(bytes.NewReader(d))
+	err := decoder.Decode(&wn)
+	if err != nil {
+		log.Error("Could not de-serialize node")
+	}
+	return &wn
 }
 
 // Create a new Node

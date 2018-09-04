@@ -30,6 +30,7 @@ type IdentityChain struct {
 	CurrentEpochStartTime int64
 	NumberOfShards        int
 	NumberOfNodesInShard  int
+	PowMap                map[p2p.Peer]uint32
 }
 
 func seekRandomNumber(EpochNum int, SelectedIdentitites []*waitnode.WaitNode) int {
@@ -50,17 +51,25 @@ type GlobalBlockchainConfig struct {
 
 //Shard
 func (IDC *IdentityChain) Shard() {
-	num := seekRandomNumber(IDC.EpochNum, IDC.SelectedIdentitites)
-	IDC.CreateShardAssignment(num)
+	IDC.CreateShardAssignment()
 	IDC.ElectLeaders()
+	IDC.BroadCastNewConfiguration()
 }
 
 //
 func (IDC *IdentityChain) ElectLeaders() {
 }
 
+func (IDC *IdentityChain) BroadCastNewConfiguration() {
+	// allPeers := make([]p2p.Peer, len(IDC.SelectedIdentitites))
+	// msgToSend := proto.
+	// 	p2p.BroadCastMessage(allPeers, msgToSend)
+
+}
+
 //CreateShardAssignment
-func (IDC *IdentityChain) CreateShardAssignment(num int) {
+func (IDC *IdentityChain) CreateShardAssignment() {
+	num := seekRandomNumber(IDC.EpochNum, IDC.SelectedIdentitites)
 	IDC.NumberOfShards = IDC.NumberOfShards + needNewShards()
 	IDC.SelectedIdentitites = generateRandomPermutations(num, IDC.SelectedIdentitites)
 	IDC.PeerToShardMap = make(map[*waitnode.WaitNode]int)
@@ -81,7 +90,7 @@ func generateRandomPermutations(num int, SelectedIdentitites []*waitnode.WaitNod
 	return SelectedIdentititesCopy
 }
 
-// SelectIds
+// SelectIds as
 func (IDC *IdentityChain) SelectIds() {
 	selectNumber := IDC.NumberOfNodesInShard - len(IDC.Identities)
 	IB := IDC.GetLatestBlock()
