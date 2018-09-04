@@ -1,9 +1,10 @@
 package node
 
 import (
-	"github.com/simple-rules/harmony-benchmark/crypto/pki"
 	"net"
 	"sync"
+
+	"github.com/simple-rules/harmony-benchmark/crypto/pki"
 
 	"github.com/simple-rules/harmony-benchmark/blockchain"
 	"github.com/simple-rules/harmony-benchmark/client"
@@ -67,11 +68,11 @@ func (node *Node) StartServer(port string) {
 
 func (node *Node) listenOnPort(port string) {
 	listen, err := net.Listen("tcp4", ":"+port)
-	defer func() {
+	defer func(listen net.Listener) {
 		if listen != nil {
 			listen.Close()
 		}
-	}()
+	}(listen)
 	if err != nil {
 		node.log.Error("Socket listen port failed", "port", port, "err", err)
 		return
