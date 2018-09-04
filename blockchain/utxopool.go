@@ -85,6 +85,12 @@ func (utxoPool *UTXOPool) VerifyTransactions(transactions []*Transaction) bool {
 	return true
 }
 
+// VerifyStateBlock verifies if the given state block matches the current utxo pool.
+func (utxoPool *UTXOPool) VerifyStateBlock(stateBlock *Block) bool {
+	// TODO: implement this
+	return true
+}
+
 // VerifyOneTransaction verifies if a list of transactions valid.
 func (utxoPool *UTXOPool) VerifyOneTransaction(tx *Transaction, spentTXOs *map[[20]byte]map[string]map[uint32]bool) (valid, crossShard bool) {
 	if len(tx.Proofs) != 0 {

@@ -271,7 +271,11 @@ func (node *Node) BroadcastNewBlock(newBlock *blockchain.Block) {
 
 // This is called by consensus participants to verify the block they are running consensus on
 func (node *Node) VerifyNewBlock(newBlock *blockchain.Block) bool {
-	return node.UtxoPool.VerifyTransactions(newBlock.Transactions)
+	if bytes.Equal(newBlock.PrevBlockHash[:], (&[32]byte{})[:]) {
+		return node.UtxoPool.VerifyStateBlock(newBlock)
+	} else {
+		return node.UtxoPool.VerifyTransactions(newBlock.Transactions)
+	}
 }
 
 // This is called by consensus participants, after consensus is done, to:
