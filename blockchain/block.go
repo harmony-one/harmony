@@ -28,6 +28,10 @@ type Block struct {
 	Signature [66]byte // Schnorr collective signature
 }
 
+func (b *Block) IsStateBlock() bool {
+	return bytes.Equal(b.PrevBlockHash[:], (&[32]byte{})[:]) // TODO: think of a better indicator to check
+}
+
 // Serialize serializes the block
 func (b *Block) Serialize() []byte {
 	var result bytes.Buffer
@@ -73,6 +77,10 @@ func (b *Block) generateMerkleRootData() {
 
 func (b *Block) Write(db db.Database, key string) error {
 	return db.Put([]byte(key), b.Serialize())
+}
+
+func Delete(db db.Database, key string) error {
+	return db.Delete([]byte(key))
 }
 
 // CalculateBlockHash returns a hash of the block
