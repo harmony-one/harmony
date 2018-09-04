@@ -23,13 +23,19 @@ type Block struct {
 	ShardId         uint32
 	Hash            [32]byte
 	MerkleRootData  []byte
+	State           *State // If present, this block is state block
 	// Signature...
 	Bitmap    []byte   // Contains which validator signed the block.
 	Signature [66]byte // Schnorr collective signature
 }
 
+type State struct {
+	NumBlocks       int32 // Total number of blocks
+	NumTransactions int32 // Total number of transactions
+}
+
 func (b *Block) IsStateBlock() bool {
-	return bytes.Equal(b.PrevBlockHash[:], (&[32]byte{})[:]) // TODO: think of a better indicator to check
+	return b.State != nil && bytes.Equal(b.PrevBlockHash[:], (&[32]byte{})[:]) // TODO: think of a better indicator to check
 }
 
 // Serialize serializes the block
@@ -122,8 +128,9 @@ func NewGenesisBlock(coinbase *Transaction, shardId uint32) *Block {
 }
 
 // NewStateBlock creates and returns a state Block based on utxo pool.
-func NewStateBlock(utxoPool *UTXOPool) *Block {
+func NewStateBlock(utxoPool *UTXOPool, numBlocks, numTxs int32) *Block {
 	stateTransactions := []*Transaction{}
+	stateTransactionIds := [][32]byte{}
 	for address, txHash2Vout2AmountMap := range utxoPool.UtxoMap {
 		stateTransaction := Transaction{}
 		for _, vout2AmountMap := range txHash2Vout2AmountMap {
@@ -133,8 +140,11 @@ func NewStateBlock(utxoPool *UTXOPool) *Block {
 		}
 		if len(stateTransaction.TxOutput) != 0 {
 			stateTransaction.SetID()
+			stateTransactionIds = append(stateTransactionIds, stateTransaction.ID)
 			stateTransactions = append(stateTransactions, &stateTransaction)
 		}
 	}
-	return NewBlock(stateTransactions, [32]byte{}, utxoPool.ShardID)
+	newBlock := NewBlock(stateTransactions, [32]byte{}, utxoPool.ShardID)
+	newBlock.State = &State{NumBlocks: numBlocks, NumTransactions: numTxs}
+	return newBlock
 }

@@ -210,7 +210,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan int) {
 		if !retry {
 			if len(node.blockchain.Blocks) > NumBlocksBeforeStateBlock {
 				// Generate state block and run consensus on it
-				newBlock = node.UtxoPool.CreateStateBlock()
+				newBlock = node.blockchain.CreateStateBlock(node.UtxoPool)
 			} else {
 				// Normal tx block consensus
 				for {
