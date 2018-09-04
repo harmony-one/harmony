@@ -426,6 +426,7 @@ func (consensus *Consensus) reportMetrics(block blockchain.Block) {
 		}
 	}
 	form := url.Values{
+		"key":             {consensus.pubKey.String()},
 		"tps":             {strconv.FormatFloat(tps, 'f', 2, 64)},
 		"txCount":         {strconv.Itoa(int(numOfTxs))},
 		"nodeCount":       {strconv.Itoa(len(consensus.validators) + 1)},
