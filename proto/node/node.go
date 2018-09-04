@@ -3,6 +3,7 @@ package node
 import (
 	"bytes"
 	"encoding/gob"
+
 	"github.com/simple-rules/harmony-benchmark/blockchain"
 	"github.com/simple-rules/harmony-benchmark/p2p"
 	"github.com/simple-rules/harmony-benchmark/proto"
@@ -16,6 +17,7 @@ const (
 	BLOCK
 	CLIENT
 	CONTROL
+	BLOCKCHAIN_SYNC
 	// TODO: add more types
 )
 

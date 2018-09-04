@@ -3,7 +3,6 @@ package node
 import (
 	"bytes"
 	"encoding/gob"
-	"log"
 	"net"
 	"os"
 	"strconv"
@@ -82,6 +81,8 @@ func (node *Node) NodeHandler(conn net.Conn) {
 					node.Client.UpdateBlocks(*blocks)
 				}
 			}
+		case proto_node.BLOCKCHAIN_SYNC:
+			node.transactionMessageHandler(msgPayload)
 		case proto_node.CLIENT:
 			clientMsgType := proto_node.ClientMessageType(msgPayload[0])
 			switch clientMsgType {
@@ -155,7 +156,6 @@ func (node *Node) NodeHandler(conn net.Conn) {
 func (node *Node) transactionMessageHandler(msgPayload []byte) {
 	txMessageType := proto_node.TransactionMessageType(msgPayload[0])
 
-	log.Println(txMessageType)
 	switch txMessageType {
 	case proto_node.SEND:
 		txDecoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the SEND messge type
