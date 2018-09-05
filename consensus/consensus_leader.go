@@ -6,10 +6,11 @@ import (
 	"encoding/gob"
 	"encoding/hex"
 	"errors"
-	"net/http"
 	"net/url"
 	"strconv"
 	"time"
+
+	"github.com/simple-rules/harmony-benchmark/profiler"
 
 	"github.com/dedis/kyber"
 	"github.com/dedis/kyber/sign/schnorr"
@@ -417,14 +418,18 @@ func (consensus *Consensus) reportMetrics(block blockchain.Block) {
 		"consensus", consensus)
 
 	// Post metrics
-	URL := "http://localhost:3000/report"
+	profiler := profiler.GetProfiler()
+	if profiler.MetricsReportURL == "" {
+		return
+	}
+
 	txHashes := []string{}
 	for i := 1; i <= 3; i++ {
 		if len(block.TransactionIds)-i >= 0 {
 			txHashes = append(txHashes, hex.EncodeToString(block.TransactionIds[len(block.TransactionIds)-i][:]))
 		}
 	}
-	form := url.Values{
+	metrics := url.Values{
 		"key":             {consensus.pubKey.String()},
 		"tps":             {strconv.FormatFloat(tps, 'f', 2, 64)},
 		"txCount":         {strconv.Itoa(int(numOfTxs))},
@@ -433,10 +438,5 @@ func (consensus *Consensus) reportMetrics(block blockchain.Block) {
 		"latestTxHashes":  txHashes,
 		"blockLatency":    {strconv.Itoa(int(timeElapsed / time.Millisecond))},
 	}
-
-	body := bytes.NewBufferString(form.Encode())
-	rsp, err := http.Post(URL, "application/x-www-form-urlencoded", body)
-	if err == nil {
-		defer rsp.Body.Close()
-	}
+	profiler.LogMetrics(metrics)
 }
