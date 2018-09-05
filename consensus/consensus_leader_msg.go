@@ -3,6 +3,7 @@ package consensus
 import (
 	"bytes"
 	"encoding/binary"
+
 	"github.com/dedis/kyber"
 	"github.com/simple-rules/harmony-benchmark/crypto"
 	"github.com/simple-rules/harmony-benchmark/log"
@@ -27,6 +28,7 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 	buffer.Write(twoBytes)
 
 	// n byte of block header
+	// TODO(rj,minhdoan): Better to write the size of blockHeader
 	buffer.Write(consensus.blockHeader)
 
 	// 64 byte of signature on previous data

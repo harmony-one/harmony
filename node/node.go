@@ -29,6 +29,8 @@ type Node struct {
 	log                    log.Logger                         // Log utility
 	pendingTxMutex         sync.Mutex
 	crossTxToReturnMutex   sync.Mutex
+	blockSyncing           chan struct{}
+	doneSyncing            chan struct{}
 	ClientPeer             *p2p.Peer      // The peer for the benchmark tx generator client, used for leaders to return proof-of-accept
 	Client                 *client.Client // The presence of a client object means this node will also act as a client
 }
@@ -78,12 +80,18 @@ func (node *Node) listenOnPort(port string) {
 		return
 	}
 	for {
-		conn, err := listen.Accept()
-		if err != nil {
-			node.log.Error("Error listening on port.", "port", port)
-			continue
+		select {
+		case <-node.blockSyncing:
+			// Wait until the syncing part gets finished.
+			<-node.doneSyncing
+		default:
+			conn, err := listen.Accept()
+			if err != nil {
+				node.log.Error("Error listening on port.", "port", port)
+				continue
+			}
+			go node.NodeHandler(conn)
 		}
-		go node.NodeHandler(conn)
 	}
 }
 
