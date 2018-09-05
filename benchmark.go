@@ -50,6 +50,7 @@ func main() {
 	attackedMode := flag.Int("attacked_mode", 0, "0 means not attacked, 1 means attacked, 2 means being open to be selected as attacked")
 	dbSupported := flag.Bool("db_supported", false, "false means not db_supported, true means db_supported")
 	profile := flag.Bool("profile", false, "Turn on profiling (CPU, Memory).")
+	metricsReportURL := flag.String("metrics_profile_url", "", "If set, reports metrics to this URL.")
 	flag.Parse()
 
 	// Set up randomization seed.
@@ -90,9 +91,12 @@ func main() {
 	consensus := consensus.NewConsensus(*ip, *port, shardID, peers, leader)
 
 	// Start Profiler for leader if profile argument is on
-	if *profile && role == "leader" {
-		profiler := profiler.NewProfiler(consensus.Log, os.Getpid(), shardID)
-		profiler.Start()
+	if role == "leader" && (*profile || *metricsReportURL != "") {
+		prof := profiler.GetProfiler()
+		prof.Config(consensus.Log, shardID, *metricsReportURL)
+		if *profile {
+			prof.Start()
+		}
 	}
 
 	// Set logger to attack model.

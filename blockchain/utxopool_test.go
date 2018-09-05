@@ -16,7 +16,7 @@ func TestVerifyOneTransactionAndUpdate(t *testing.T) {
 		t.Error("failed to create a new transaction.")
 	}
 
-	if valid, _ := utxoPool.VerifyOneTransaction(tx, nil); !valid {
+	if err, _ := utxoPool.VerifyOneTransaction(tx, nil); err != nil {
 		t.Error("failed to verify a valid transaction.")
 	}
 	utxoPool.VerifyOneTransactionAndUpdate(tx)
@@ -35,7 +35,7 @@ func TestVerifyOneTransactionFail(t *testing.T) {
 	}
 
 	tx.TxInput = append(tx.TxInput, tx.TxInput[0])
-	if valid, _ := utxoPool.VerifyOneTransaction(tx, nil); valid {
+	if err, _ := utxoPool.VerifyOneTransaction(tx, nil); err == nil {
 		t.Error("Tx with multiple identical TxInput shouldn't be valid")
 	}
 }

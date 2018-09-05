@@ -18,9 +18,9 @@ import (
 
 const (
 	// The max number of transaction per a block.
-	MaxNumberOfTransactionsPerBlock = 3000
+	MaxNumberOfTransactionsPerBlock = 10000
 	// The number of blocks allowed before generating state block
-	NumBlocksBeforeStateBlock = 10
+	NumBlocksBeforeStateBlock = 100
 )
 
 // NodeHandler handles a new incoming connection.
