@@ -401,14 +401,9 @@ func (utxoPool *UTXOPool) SelectTransactionsForNewBlock(transactions []*Transact
 					crossShardTxs = append(crossShardTxs, &txAndProof)
 				}
 			} else {
-				//if err != nil {
-				//	log.Warn("Tx Verification failed", "Error:", err)
-				//}
-				unselected = append(unselected, tx)
 				invalid = append(invalid, tx)
 			}
 		} else {
-			// TODO: discard invalid transactions
 			unselected = append(unselected, tx)
 		}
 	}
