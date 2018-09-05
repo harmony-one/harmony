@@ -202,7 +202,7 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 }
 
 // WaitForConsensusReady ...
-func (node *Node) WaitForConsensusReady(readySignal chan int) {
+func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
 	node.log.Debug("Waiting for Consensus ready", "node", node)
 
 	var newBlock *blockchain.Block

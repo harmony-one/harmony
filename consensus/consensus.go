@@ -68,7 +68,7 @@ type Consensus struct {
 	secret kyber.Scalar
 
 	// Signal channel for starting a new consensus process
-	ReadySignal chan int
+	ReadySignal chan struct{}
 	// The verifier func passed from Node object
 	BlockVerifier func(*blockchain.Block) bool
 	// The post-consensus processing func passed from Node object
@@ -149,12 +149,12 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 	consensus.blocksReceived = make(map[uint32]*BlockConsensusStatus)
 
 	if consensus.IsLeader {
-		consensus.ReadySignal = make(chan int)
+		consensus.ReadySignal = make(chan struct{})
 		// send a signal to indicate it's ready to run consensus
 		// this signal is consumed by node object to create a new block and in turn trigger a new consensus on it
 		// this is a goroutine because go channel without buffer will block
 		go func() {
-			consensus.ReadySignal <- 1
+			consensus.ReadySignal <- struct{}{}
 		}()
 	}
 

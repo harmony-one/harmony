@@ -374,7 +374,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState C
 
 				consensus.reportMetrics(blockHeaderObj)
 				// Send signal to Node so the new block can be added and new round of consensus can be triggered
-				consensus.ReadySignal <- 1
+				consensus.ReadySignal <- struct{}{}
 			}
 		}
 		consensus.mutex.Unlock()
