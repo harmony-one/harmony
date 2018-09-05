@@ -134,6 +134,9 @@ func New(consensus *consensus.Consensus, db *db.LDBDatabase) *Node {
 		// Initialize level db.
 		node.db = db
 
+		// Initialize channel for syncing.
+		node.doneSyncing = make(chan struct{})
+		node.blockSyncing = make(chan struct{})
 	}
 	// Logger
 	node.log = log.New()
