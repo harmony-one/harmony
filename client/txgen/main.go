@@ -106,7 +106,7 @@ UTXOLOOP:
 
 					randNum := rand.Intn(100)
 
-					if setting.crossShard && randNum < 0 { // 1/3 cross shard transactions: add another txinput from another shard
+					if setting.crossShard && randNum < 30 { // 1/3 cross shard transactions: add another txinput from another shard
 						generateCrossShardTx(&txInfo)
 					} else {
 						generateSingleShardTx(&txInfo)
@@ -126,8 +126,8 @@ UTXOLOOP:
 
 func generateCrossShardTx(txInfo *TxInfo) {
 	nodeShardID := txInfo.dataNodes[txInfo.shardID].Consensus.ShardID
-	// shard with neighboring Id
-	crossShardId := (int(nodeShardID) + 1) % len(txInfo.dataNodes)
+	// a random shard to spend money to
+	crossShardId := rand.Intn(len(txInfo.dataNodes))
 
 	crossShardNode := txInfo.dataNodes[crossShardId]
 	crossShardUtxosMap := crossShardNode.UtxoPool.UtxoMap[txInfo.address]
