@@ -3,7 +3,6 @@ package node
 import (
 	"bytes"
 	"encoding/gob"
-	"log"
 	"net"
 	"os"
 	"strconv"
@@ -19,9 +18,9 @@ import (
 
 const (
 	// The max number of transaction per a block.
-	MaxNumberOfTransactionsPerBlock = 3000
+	MaxNumberOfTransactionsPerBlock = 10000
 	// The number of blocks allowed before generating state block
-	NumBlocksBeforeStateBlock = 10
+	NumBlocksBeforeStateBlock = 100
 )
 
 // NodeHandler handles a new incoming connection.
@@ -82,6 +81,8 @@ func (node *Node) NodeHandler(conn net.Conn) {
 					node.Client.UpdateBlocks(*blocks)
 				}
 			}
+		case proto_node.BLOCKCHAIN_SYNC:
+			node.transactionMessageHandler(msgPayload)
 		case proto_node.CLIENT:
 			clientMsgType := proto_node.ClientMessageType(msgPayload[0])
 			switch clientMsgType {
@@ -105,25 +106,38 @@ func (node *Node) NodeHandler(conn net.Conn) {
 
 				avgBlockSizeInBytes := 0
 				txCount := 0
+				blockCount := 0
+				totalTxCount := 0
+				totalBlockCount := 0
 				avgTxSize := 0
 
 				for _, block := range node.blockchain.Blocks {
-					byteBuffer := bytes.NewBuffer([]byte{})
-					encoder := gob.NewEncoder(byteBuffer)
-					encoder.Encode(block)
-					avgBlockSizeInBytes += len(byteBuffer.Bytes())
+					if block.IsStateBlock() {
+						totalTxCount += int(block.State.NumTransactions)
+						totalBlockCount += int(block.State.NumBlocks)
+					} else {
+						byteBuffer := bytes.NewBuffer([]byte{})
+						encoder := gob.NewEncoder(byteBuffer)
+						encoder.Encode(block)
+						avgBlockSizeInBytes += len(byteBuffer.Bytes())
 
-					txCount += len(block.Transactions)
+						txCount += len(block.Transactions)
+						blockCount += 1
+						totalTxCount += len(block.TransactionIds)
+						totalBlockCount += 1
 
-					byteBuffer = bytes.NewBuffer([]byte{})
-					encoder = gob.NewEncoder(byteBuffer)
-					encoder.Encode(block.Transactions)
-					avgTxSize += len(byteBuffer.Bytes())
+						byteBuffer = bytes.NewBuffer([]byte{})
+						encoder = gob.NewEncoder(byteBuffer)
+						encoder.Encode(block.Transactions)
+						avgTxSize += len(byteBuffer.Bytes())
+					}
 				}
-				avgBlockSizeInBytes = avgBlockSizeInBytes / len(node.blockchain.Blocks)
-				avgTxSize = avgTxSize / txCount
+				if blockCount != 0 {
+					avgBlockSizeInBytes = avgBlockSizeInBytes / blockCount
+					avgTxSize = avgTxSize / txCount
+				}
 
-				node.log.Debug("Blockchain Report", "numBlocks", len(node.blockchain.Blocks), "avgBlockSize", avgBlockSizeInBytes, "numTxs", txCount, "avgTxSzie", avgTxSize)
+				node.log.Debug("Blockchain Report", "totalNumBlocks", totalBlockCount, "avgBlockSizeInCurrentEpoch", avgBlockSizeInBytes, "totalNumTxs", totalTxCount, "avgTxSzieInCurrentEpoch", avgTxSize)
 
 				os.Exit(0)
 			}
@@ -142,7 +156,6 @@ func (node *Node) NodeHandler(conn net.Conn) {
 func (node *Node) transactionMessageHandler(msgPayload []byte) {
 	txMessageType := proto_node.TransactionMessageType(msgPayload[0])
 
-	log.Println(txMessageType)
 	switch txMessageType {
 	case proto_node.SEND:
 		txDecoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the SEND messge type
@@ -210,7 +223,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan int) {
 		if !retry {
 			if len(node.blockchain.Blocks) > NumBlocksBeforeStateBlock {
 				// Generate state block and run consensus on it
-				newBlock = node.UtxoPool.CreateStateBlock()
+				newBlock = node.blockchain.CreateStateBlock(node.UtxoPool)
 			} else {
 				// Normal tx block consensus
 				for {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"github.com/dedis/kyber/sign/schnorr"
 	"github.com/simple-rules/harmony-benchmark/crypto"
@@ -77,7 +78,7 @@ func (utxoPool *UTXOPool) VerifyTransactions(transactions []*Transaction) bool {
 	spentTXOs := make(map[[20]byte]map[string]map[uint32]bool)
 	if utxoPool != nil {
 		for _, tx := range transactions {
-			if valid, crossShard := utxoPool.VerifyOneTransaction(tx, &spentTXOs); !crossShard && !valid {
+			if err, crossShard := utxoPool.VerifyOneTransaction(tx, &spentTXOs); !crossShard && err != nil {
 				return false
 			}
 		}
@@ -87,12 +88,34 @@ func (utxoPool *UTXOPool) VerifyTransactions(transactions []*Transaction) bool {
 
 // VerifyStateBlock verifies if the given state block matches the current utxo pool.
 func (utxoPool *UTXOPool) VerifyStateBlock(stateBlock *Block) bool {
-	// TODO: implement this
+	accountBalanceInUtxoPool := make(map[[20]byte]int)
+
+	for address, txHash2Vout2AmountMap := range utxoPool.UtxoMap {
+		for _, vout2AmountMap := range txHash2Vout2AmountMap {
+			for _, amount := range vout2AmountMap {
+				accountBalanceInUtxoPool[address] = accountBalanceInUtxoPool[address] + amount
+			}
+		}
+	}
+	for _, transaction := range stateBlock.Transactions {
+		for _, txOutput := range transaction.TxOutput {
+			if txOutput.ShardID != utxoPool.ShardID {
+				return false
+			}
+			accountBalanceInUtxoPool[txOutput.Address] = accountBalanceInUtxoPool[txOutput.Address] - txOutput.Amount
+		}
+	}
+
+	for _, amount := range accountBalanceInUtxoPool {
+		if amount != 0 {
+			return false
+		}
+	}
 	return true
 }
 
 // VerifyOneTransaction verifies if a list of transactions valid.
-func (utxoPool *UTXOPool) VerifyOneTransaction(tx *Transaction, spentTXOs *map[[20]byte]map[string]map[uint32]bool) (valid, crossShard bool) {
+func (utxoPool *UTXOPool) VerifyOneTransaction(tx *Transaction, spentTXOs *map[[20]byte]map[string]map[uint32]bool) (err error, crossShard bool) {
 	if len(tx.Proofs) != 0 {
 		return utxoPool.VerifyUnlockTransaction(tx)
 	}
@@ -111,10 +134,10 @@ func (utxoPool *UTXOPool) VerifyOneTransaction(tx *Transaction, spentTXOs *map[[
 
 		inTxID := hex.EncodeToString(in.PreviousOutPoint.TxID[:])
 		index := in.PreviousOutPoint.Index
-		// Check if the transaction with the addres is spent or not.
+		// Check if the transaction with the address is spent or not.
 		if val, ok := (*spentTXOs)[in.Address][inTxID][index]; ok {
 			if val {
-				return false, crossShard
+				return errors.New("TxInput is already spent"), crossShard
 			}
 		}
 		// Mark the transactions with the address and index spent.
@@ -132,7 +155,7 @@ func (utxoPool *UTXOPool) VerifyOneTransaction(tx *Transaction, spentTXOs *map[[
 			inTotal += val
 		} else {
 			utxoPool.mutex.Unlock()
-			return false, crossShard
+			return errors.New("Specified TxInput does not exist in utxo pool"), crossShard
 		}
 		utxoPool.mutex.Unlock()
 	}
@@ -149,30 +172,30 @@ func (utxoPool *UTXOPool) VerifyOneTransaction(tx *Transaction, spentTXOs *map[[
 
 	// TODO: improve this checking logic
 	if (crossShard && inTotal > outTotal) || (!crossShard && inTotal != outTotal) {
-		return false, crossShard
+		return errors.New("Input and output amount doesn't match"), crossShard
 	}
 
 	if inTotal == 0 {
-		return false, false // Here crossShard is false, because if there is no business for this shard, it's effectively not crossShard no matter what.
+		return errors.New("Input amount is 0"), false // Here crossShard is false, because if there is no business for this shard, it's effectively not crossShard no matter what.
 	}
 
 	// Verify the signature
 	pubKey := crypto.Ed25519Curve.Point()
-	err := pubKey.UnmarshalBinary(tx.PublicKey[:])
-	if err != nil {
-		log.Error("Failed to deserialize public key", "error", err)
+	tempErr := pubKey.UnmarshalBinary(tx.PublicKey[:])
+	if tempErr != nil {
+		log.Error("Failed to deserialize public key", "error", tempErr)
 	}
-	err = schnorr.Verify(crypto.Ed25519Curve, pubKey, tx.GetContentToVerify(), tx.Signature[:])
-	if err != nil {
-		log.Error("Failed to verify signature", "error", err, "public key", pubKey, "pubKey in bytes", tx.PublicKey[:])
-		return false, crossShard
+	tempErr = schnorr.Verify(crypto.Ed25519Curve, pubKey, tx.GetContentToVerify(), tx.Signature[:])
+	if tempErr != nil {
+		log.Error("Failed to verify signature", "error", tempErr, "public key", pubKey, "pubKey in bytes", tx.PublicKey[:])
+		return errors.New("Invalid signature"), crossShard
 	}
-	return true, crossShard
+	return nil, crossShard
 }
 
 // Verify a cross shard transaction that contains proofs for unlock-to-commit/abort.
-func (utxoPool *UTXOPool) VerifyUnlockTransaction(tx *Transaction) (valid, crossShard bool) {
-	valid = true
+func (utxoPool *UTXOPool) VerifyUnlockTransaction(tx *Transaction) (err error, crossShard bool) {
+	err = nil
 	crossShard = false // unlock transaction is treated as crossShard=false because it will be finalized now (doesn't need more steps)
 	txInputs := make(map[TXInput]bool)
 	for _, curProof := range tx.Proofs {
@@ -183,7 +206,7 @@ func (utxoPool *UTXOPool) VerifyUnlockTransaction(tx *Transaction) (valid, cross
 	for _, txInput := range tx.TxInput {
 		val, ok := txInputs[txInput]
 		if !ok || !val {
-			valid = false
+			err = errors.New("Invalid unlock transaction: not all proofs are provided for tx inputs")
 		}
 	}
 	return
@@ -324,7 +347,7 @@ func (utxoPool *UTXOPool) UpdateOneTransaction(tx *Transaction) {
 // VerifyOneTransactionAndUpdate verifies and update a valid transaction.
 // Return false if the transaction is not valid.
 func (utxoPool *UTXOPool) VerifyOneTransactionAndUpdate(tx *Transaction) bool {
-	if valid, _ := utxoPool.VerifyOneTransaction(tx, nil); valid {
+	if err, _ := utxoPool.VerifyOneTransaction(tx, nil); err == nil {
 		utxoPool.UpdateOneTransaction(tx)
 		return true
 	}
@@ -363,29 +386,33 @@ func CreateUTXOPoolFromGenesisBlockChain(bc *Blockchain) *UTXOPool {
 }
 
 // SelectTransactionsForNewBlock returns a list of index of valid transactions for the new block.
-func (utxoPool *UTXOPool) SelectTransactionsForNewBlock(transactions []*Transaction, maxNumTxs int) ([]*Transaction, []*Transaction, []*CrossShardTxAndProof) {
-	selected, unselected, crossShardTxs := []*Transaction{}, []*Transaction{}, []*CrossShardTxAndProof{}
+func (utxoPool *UTXOPool) SelectTransactionsForNewBlock(transactions []*Transaction, maxNumTxs int) ([]*Transaction, []*Transaction, []*Transaction, []*CrossShardTxAndProof) {
+	selected, unselected, invalid, crossShardTxs := []*Transaction{}, []*Transaction{}, []*Transaction{}, []*CrossShardTxAndProof{}
 	spentTXOs := make(map[[20]byte]map[string]map[uint32]bool)
 	for _, tx := range transactions {
-		valid, crossShard := utxoPool.VerifyOneTransaction(tx, &spentTXOs)
+		err, crossShard := utxoPool.VerifyOneTransaction(tx, &spentTXOs)
 
 		if len(selected) < maxNumTxs {
-			if valid || crossShard {
+			if err == nil || crossShard {
 				selected = append(selected, tx)
 				if crossShard {
-					proof := CrossShardTxProof{Accept: valid, TxID: tx.ID, TxInput: getShardTxInput(tx, utxoPool.ShardID)}
+					proof := CrossShardTxProof{Accept: err == nil, TxID: tx.ID, TxInput: getShardTxInput(tx, utxoPool.ShardID)}
 					txAndProof := CrossShardTxAndProof{tx, &proof}
 					crossShardTxs = append(crossShardTxs, &txAndProof)
 				}
 			} else {
+				//if err != nil {
+				//	log.Warn("Tx Verification failed", "Error:", err)
+				//}
 				unselected = append(unselected, tx)
+				invalid = append(invalid, tx)
 			}
 		} else {
 			// TODO: discard invalid transactions
 			unselected = append(unselected, tx)
 		}
 	}
-	return selected, unselected, crossShardTxs
+	return selected, unselected, invalid, crossShardTxs
 }
 
 func getShardTxInput(transaction *Transaction, shardID uint32) []TXInput {
@@ -461,9 +488,4 @@ func (utxoPool *UTXOPool) GetSizeInByteOfUtxoMap() int {
 	encoder := gob.NewEncoder(byteBuffer)
 	encoder.Encode(utxoPool.UtxoMap)
 	return len(byteBuffer.Bytes())
-}
-
-// Create state block based on the utxos.
-func (utxoPool *UTXOPool) CreateStateBlock() *Block {
-	return NewStateBlock(utxoPool)
 }

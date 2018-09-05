@@ -405,6 +405,10 @@ func (consensus *Consensus) verifyResponse(commitments *map[uint16]kyber.Point, 
 }
 
 func (consensus *Consensus) reportMetrics(block blockchain.Block) {
+	if block.IsStateBlock() { // Skip state block stats
+		return
+	}
+
 	endTime := time.Now()
 	timeElapsed := endTime.Sub(startTime)
 	numOfTxs := block.NumTransactions

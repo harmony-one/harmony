@@ -33,7 +33,7 @@ type Transaction struct {
 
 // TXOutput is the struct of transaction output in a transaction.
 type TXOutput struct {
-	Amount  int
+	Amount  int      // TODO: Switch to big int or uint32
 	Address [20]byte // last 20 bytes of the hash of public key
 	ShardID uint32   // The Id of the shard where this UTXO belongs
 }
