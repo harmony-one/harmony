@@ -3,6 +3,7 @@ package node
 import (
 	"bytes"
 	"encoding/gob"
+	"fmt"
 	"net"
 	"os"
 	"strconv"
@@ -13,6 +14,7 @@ import (
 	"github.com/simple-rules/harmony-benchmark/proto"
 	"github.com/simple-rules/harmony-benchmark/proto/client"
 	"github.com/simple-rules/harmony-benchmark/proto/consensus"
+	proto_identity "github.com/simple-rules/harmony-benchmark/proto/identity"
 	proto_node "github.com/simple-rules/harmony-benchmark/proto/node"
 )
 
@@ -55,6 +57,19 @@ func (node *Node) NodeHandler(conn net.Conn) {
 	}
 
 	switch msgCategory {
+	case proto.IDENTITY:
+		actionType := proto_identity.IdentityMessageType(msgType)
+		switch actionType {
+		case proto_identity.IDENTITY:
+			messageType := proto_identity.MessageType(msgPayload[0])
+			switch messageType {
+			case proto_identity.REGISTER:
+				fmt.Println("received a identity message")
+				node.processPOWMessage(msgPayload)
+			case proto_identity.ANNOUNCE:
+				node.log.Error("Announce message should be sent to IdentityChain")
+			}
+		}
 	case proto.CONSENSUS:
 		actionType := consensus.ConsensusMessageType(msgType)
 		switch actionType {

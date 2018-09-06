@@ -1,14 +1,19 @@
 package identitychain
 
 import (
+	"bytes"
 	"fmt"
+	"math/rand"
 	"net"
 	"os"
+	"strconv"
+	"time"
 
+	"github.com/simple-rules/harmony-benchmark/node"
 	"github.com/simple-rules/harmony-benchmark/p2p"
+	"github.com/simple-rules/harmony-benchmark/pow"
 	"github.com/simple-rules/harmony-benchmark/proto"
 	proto_identity "github.com/simple-rules/harmony-benchmark/proto/identity"
-	"github.com/simple-rules/harmony-benchmark/waitnode"
 )
 
 //IdentityChainHandler handles registration of new Identities
@@ -27,6 +32,8 @@ func (IDC *IdentityChain) IdentityChainHandler(conn net.Conn) {
 	if msgCategory != proto.IDENTITY {
 		IDC.log.Error("Identity Chain Recieved incorrect protocol message")
 		os.Exit(1)
+	} else {
+		fmt.Println("Message category is correct")
 	}
 	msgType, err := proto.GetMessageType(content)
 	if err != nil {
@@ -43,20 +50,73 @@ func (IDC *IdentityChain) IdentityChainHandler(conn net.Conn) {
 		actionType := proto_identity.IdentityMessageType(msgType)
 		switch actionType {
 		case proto_identity.IDENTITY:
-			IDC.registerIdentity(msgPayload)
+			idMsgType, err := proto_identity.GetIdentityMessageType(msgPayload)
+			if err != nil {
+				fmt.Println("Error finding the identity message type")
+			}
+			switch idMsgType {
+			case proto_identity.REGISTER:
+				IDC.registerIdentity(msgPayload)
+			case proto_identity.ANNOUNCE:
+				IDC.acceptNewConnection(msgPayload)
+			}
+
 		}
 
 	}
 }
 
 func (IDC *IdentityChain) registerIdentity(msgPayload []byte) {
-	identityPayload, err := proto_identity.GetIdentityMessagePayload(msgPayload)
+	payload, err := proto_identity.GetIdentityMessagePayload(msgPayload)
 	if err != nil {
 		IDC.log.Error("identity payload not read")
 	} else {
 		fmt.Println("identity payload read")
 	}
-	NewWaitNode := waitnode.DeserializeWaitNode(identityPayload)
-	IDC.PendingIdentities = append(IDC.PendingIdentities, NewWaitNode)
-	fmt.Println(len(IDC.PendingIdentities))
+	fmt.Println("we are now registering identities")
+	//reconstruct the challenge and check whether its correct
+	offset := 0
+	proof := payload[offset : offset+32]
+	offset = offset + 32
+	Node := node.DeserializeWaitNode(payload[offset:])
+	req := IDC.PowMap[Node.Self]
+	ok, err := pow.Check(req, string(proof), []byte(""))
+	fmt.Println(err)
+	if ok {
+		fmt.Println("Proof of work accepted")
+		IDC.PendingIdentities = append(IDC.PendingIdentities, Node)
+		fmt.Println(len(IDC.PendingIdentities)) //Fix why IDC does not have log working.
+	} else {
+		fmt.Println("identity proof of work not accepted")
+	}
+}
+
+func (IDC *IdentityChain) acceptNewConnection(msgPayload []byte) {
+
+	identityPayload, err := proto_identity.GetIdentityMessagePayload(msgPayload)
+	if err != nil {
+		fmt.Println("There was a error in reading the identity payload")
+	} else {
+		fmt.Println("accepted new connection")
+	}
+	fmt.Println("Sleeping for 2 secs ...")
+	time.Sleep(2 * time.Second)
+	Node := node.DeserializeWaitNode(identityPayload)
+	buffer := bytes.NewBuffer([]byte{})
+	src := rand.NewSource(time.Now().UnixNano())
+	rnd := rand.New(src)
+	challengeNonce := int((rnd.Int31()))
+	req := pow.NewRequest(5, []byte(strconv.Itoa(challengeNonce)))
+	IDC.PowMap[Node.Self] = req
+	fmt.Println(req)
+	buffer.Write([]byte(req))
+	// 32 byte block hash
+	// buffer.Write(prevBlockHash)
+	// The message is missing previous BlockHash, this is because we don't actively maintain a identitychain
+	// This canbe included in the fulfill request.
+	// Message should be encrypted and then signed to follow PKE.
+	//IDC should accept node publickey, encrypt the nonce and blockhash
+	// Then sign the message by own private key and send the message back.
+	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.REGISTER, buffer.Bytes())
+	p2p.SendMessage(Node.Self, msgToSend)
 }

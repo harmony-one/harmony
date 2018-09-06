@@ -21,15 +21,17 @@ type MessageType int
 
 const (
 	REGISTER MessageType = iota
+	ANNOUNCE
 )
 
 // Returns string name for the MessageType enum
 func (msgType MessageType) String() string {
 	names := [...]string{
 		"REGISTER",
+		"ANNOUNCE",
 	}
 
-	if msgType < REGISTER || msgType > REGISTER {
+	if msgType < REGISTER || msgType > ANNOUNCE {
 		return "Unknown"
 	}
 	return names[msgType]
