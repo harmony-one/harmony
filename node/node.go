@@ -2,11 +2,9 @@ package node
 
 import (
 	"bytes"
-	"encoding/binary"
 	"encoding/gob"
 	"fmt"
 	"net"
-	"strconv"
 	"sync"
 
 	"github.com/simple-rules/harmony-benchmark/crypto/pki"
@@ -155,7 +153,7 @@ func NewNodefromIDC(node Node, consensus *consensus.Consensus, db *db.LDBDatabas
 		node.blockchain = genesisBlock
 
 		// UTXO pool from Genesis block
-		node.UtxoPool = blockchain.CreateUTXOPoolFromGenesisBlockChain(node.blockchain)
+		//node.UtxoPool = blockchain.CreateUTXOPoolFromGenesisBlockChain(node.blockchain)
 
 		// Initialize level db.
 		node.db = db
@@ -173,12 +171,9 @@ func (node *Node) processPOWMessage(message []byte) {
 		fmt.Println("Could not read payload")
 	}
 	IDCPeer := node.IDCPeer
-	offset := 0
 	// 4 byte challengeNonce id
-	challengeNonce := int(binary.BigEndian.Uint32(payload[offset : offset+4]))
-	offset += 4
-	fmt.Println(challengeNonce)
-	req := pow.NewRequest(5, []byte(strconv.Itoa(challengeNonce)))
+	req := string(payload)
+	fmt.Println(req)
 	proof, _ := pow.Fulfil(req, []byte("")) //"This could be blockhasdata"
 	buffer := bytes.NewBuffer([]byte{})
 	proofBytes := make([]byte, 32) //proof seems to be 32 byte here

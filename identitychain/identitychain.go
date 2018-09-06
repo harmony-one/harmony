@@ -30,7 +30,7 @@ type IdentityChain struct {
 	CurrentEpochStartTime int64
 	NumberOfShards        int
 	NumberOfNodesInShard  int
-	PowMap                map[p2p.Peer]uint32
+	PowMap                map[p2p.Peer]string
 }
 
 func seekRandomNumber(EpochNum int, SelectedIdentitites []*node.Node) int {
@@ -171,6 +171,6 @@ func New(Peer p2p.Peer) *IdentityChain {
 	IDC := IdentityChain{}
 	IDC.Peer = Peer
 	IDC.log = log.New()
-	IDC.PowMap = make(map[p2p.Peer]uint32)
+	IDC.PowMap = make(map[p2p.Peer]string)
 	return &IDC
 }

@@ -2,7 +2,6 @@ package identitychain
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"math/rand"
 	"net"
@@ -80,8 +79,7 @@ func (IDC *IdentityChain) registerIdentity(msgPayload []byte) {
 	proof := payload[offset : offset+32]
 	offset = offset + 32
 	Node := node.DeserializeWaitNode(payload[offset:])
-	id := int(IDC.PowMap[Node.Self])
-	req := pow.NewRequest(5, []byte(strconv.Itoa(id)))
+	req := IDC.PowMap[Node.Self]
 	ok, err := pow.Check(req, string(proof), []byte(""))
 	fmt.Println(err)
 	if ok {
@@ -102,30 +100,23 @@ func (IDC *IdentityChain) acceptNewConnection(msgPayload []byte) {
 		fmt.Println("accepted new connection")
 	}
 	fmt.Println("Sleeping for 2 secs ...")
-	time.Sleep(5 * time.Second)
+	time.Sleep(2 * time.Second)
 	Node := node.DeserializeWaitNode(identityPayload)
 	buffer := bytes.NewBuffer([]byte{})
 	src := rand.NewSource(time.Now().UnixNano())
 	rnd := rand.New(src)
-	challengeNonce := uint32(rnd.Int31())
-	//challengeNonce := uint32(rand.Intn(1000)) //fix so that different nonce is sent everytime.
-	fmt.Println("Challenge Nonce Sent:")
-	fmt.Println(challengeNonce)
-	IDC.PowMap[Node.Self] = challengeNonce
-	// 4 byte length of challengeNonce
-
-	fourBytes := make([]byte, 4)
-	binary.BigEndian.PutUint32(fourBytes, challengeNonce)
-	buffer.Write(fourBytes)
+	challengeNonce := int((rnd.Int31()))
+	req := pow.NewRequest(5, []byte(strconv.Itoa(challengeNonce)))
+	IDC.PowMap[Node.Self] = req
+	fmt.Println(req)
+	buffer.Write([]byte(req))
 	// 32 byte block hash
 	// buffer.Write(prevBlockHash)
 	// The message is missing previous BlockHash, this is because we don't actively maintain a identitychain
 	// This canbe included in the fulfill request.
-
 	// Message should be encrypted and then signed to follow PKE.
 	//IDC should accept node publickey, encrypt the nonce and blockhash
 	// Then sign the message by own private key and send the message back.
-	fmt.Println("Done sleeping. Ready or not here i come!")
 	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.REGISTER, buffer.Bytes())
 	p2p.SendMessage(Node.Self, msgToSend)
 }
