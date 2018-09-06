@@ -18,6 +18,8 @@ type Peer struct {
 	Ip     string      // Ip address of the peer
 	Port   string      // Port number of the peer
 	PubKey kyber.Point // Public key of the peer
+	Ready  bool        // Ready is true if the peer is ready to join consensus.
+	// TODO(minhdoan, rj): use this Ready to not send/broadcast to this peer if it wasn't available.
 }
 
 // SendMessage sends the message to the peer
@@ -62,6 +64,7 @@ func ConstructP2pMessage(msgType byte, content []byte) []byte {
 }
 
 // SocketClient is to connect a socket given a port and send the given message.
+// TODO(minhdoan, rj): need to check if a peer is reachable or not.
 func sendWithSocketClient(ip, port string, message []byte) (res string) {
 	//log.Printf("Sending message to ip %s and port %s\n", ip, port)
 	addr := strings.Join([]string{ip, port}, ":")

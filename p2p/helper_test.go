@@ -6,10 +6,10 @@ import (
 	"testing"
 )
 
-func setUpTestServer(times int, t *testing.T, conCreated chan bool) {
+func setUpTestServer(times int, t *testing.T, conCreated chan struct{}) {
 	t.Parallel()
 	ln, _ := net.Listen("tcp", ":8081")
-	conCreated <- true
+	conCreated <- struct{}{}
 	conn, _ := ln.Accept()
 	defer conn.Close()
 
@@ -29,11 +29,12 @@ func setUpTestServer(times int, t *testing.T, conCreated chan bool) {
 }
 func TestNewNewNode(t *testing.T) {
 	times := 100
-	conCreated := make(chan bool)
+	conCreated := make(chan struct{})
 	go setUpTestServer(times, t, conCreated)
 	<-conCreated
 
 	conn, _ := net.Dial("tcp", "127.0.0.1:8081")
+	defer conn.Close()
 
 	for times > 0 {
 		times--
@@ -49,5 +50,4 @@ func TestNewNewNode(t *testing.T) {
 			t.Error("did not receive expected message")
 		}
 	}
-	conn.Close()
 }

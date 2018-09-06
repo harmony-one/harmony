@@ -6,10 +6,11 @@ import (
 	"encoding/gob"
 	"encoding/hex"
 	"errors"
-	"net/http"
 	"net/url"
 	"strconv"
 	"time"
+
+	"github.com/simple-rules/harmony-benchmark/profiler"
 
 	"github.com/dedis/kyber"
 	"github.com/dedis/kyber/sign/schnorr"
@@ -373,7 +374,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState C
 
 				consensus.reportMetrics(blockHeaderObj)
 				// Send signal to Node so the new block can be added and new round of consensus can be triggered
-				consensus.ReadySignal <- 1
+				consensus.ReadySignal <- struct{}{}
 			}
 		}
 		consensus.mutex.Unlock()
@@ -404,41 +405,42 @@ func (consensus *Consensus) verifyResponse(commitments *map[uint16]kyber.Point, 
 }
 
 func (consensus *Consensus) reportMetrics(block blockchain.Block) {
-	if !block.IsStateBlock() { // Skip state block stats
-		endTime := time.Now()
-		timeElapsed := endTime.Sub(startTime)
-		numOfTxs := block.NumTransactions
-		tps := float64(numOfTxs) / timeElapsed.Seconds()
-		consensus.Log.Info("TPS Report",
-			"numOfTXs", numOfTxs,
-			"startTime", startTime,
-			"endTime", endTime,
-			"timeElapsed", timeElapsed,
-			"TPS", tps,
-			"consensus", consensus)
+	if block.IsStateBlock() { // Skip state block stats
+		return
+	}
 
-		// Post metrics
-		URL := "http://localhost:3000/report"
-		txHashes := []string{}
-		for i := 1; i <= 3; i++ {
-			if len(block.TransactionIds)-i >= 0 {
-				txHashes = append(txHashes, hex.EncodeToString(block.TransactionIds[len(block.TransactionIds)-i][:]))
-			}
-		}
-		form := url.Values{
-			"key":             {consensus.pubKey.String()},
-			"tps":             {strconv.FormatFloat(tps, 'f', 2, 64)},
-			"txCount":         {strconv.Itoa(int(numOfTxs))},
-			"nodeCount":       {strconv.Itoa(len(consensus.validators) + 1)},
-			"latestBlockHash": {hex.EncodeToString(consensus.blockHash[:])},
-			"latestTxHashes":  txHashes,
-			"blockLatency":    {strconv.Itoa(int(timeElapsed / time.Millisecond))},
-		}
+	endTime := time.Now()
+	timeElapsed := endTime.Sub(startTime)
+	numOfTxs := block.NumTransactions
+	tps := float64(numOfTxs) / timeElapsed.Seconds()
+	consensus.Log.Info("TPS Report",
+		"numOfTXs", numOfTxs,
+		"startTime", startTime,
+		"endTime", endTime,
+		"timeElapsed", timeElapsed,
+		"TPS", tps,
+		"consensus", consensus)
 
-		body := bytes.NewBufferString(form.Encode())
-		rsp, err := http.Post(URL, "application/x-www-form-urlencoded", body)
-		if err == nil {
-			defer rsp.Body.Close()
+	// Post metrics
+	profiler := profiler.GetProfiler()
+	if profiler.MetricsReportURL == "" {
+		return
+	}
+
+	txHashes := []string{}
+	for i := 1; i <= 3; i++ {
+		if len(block.TransactionIds)-i >= 0 {
+			txHashes = append(txHashes, hex.EncodeToString(block.TransactionIds[len(block.TransactionIds)-i][:]))
 		}
 	}
+	metrics := url.Values{
+		"key":             {consensus.pubKey.String()},
+		"tps":             {strconv.FormatFloat(tps, 'f', 2, 64)},
+		"txCount":         {strconv.Itoa(int(numOfTxs))},
+		"nodeCount":       {strconv.Itoa(len(consensus.validators) + 1)},
+		"latestBlockHash": {hex.EncodeToString(consensus.blockHash[:])},
+		"latestTxHashes":  txHashes,
+		"blockLatency":    {strconv.Itoa(int(timeElapsed / time.Millisecond))},
+	}
+	profiler.LogMetrics(metrics)
 }

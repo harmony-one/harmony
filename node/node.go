@@ -36,6 +36,8 @@ type Node struct {
 	log                    log.Logger                         // Log utility
 	pendingTxMutex         sync.Mutex
 	crossTxToReturnMutex   sync.Mutex
+	blockSyncing           chan struct{}
+	doneSyncing            chan struct{}
 	ClientPeer             *p2p.Peer      // The peer for the benchmark tx generator client, used for leaders to return proof-of-accept
 	Client                 *client.Client // The presence of a client object means this node will also act as a client
 	IsWaiting              bool
@@ -63,7 +65,8 @@ func (node *Node) addPendingTransactions(newTxs []*blockchain.Transaction) {
 // Note the pending transaction list will then contain the rest of the txs
 func (node *Node) getTransactionsForNewBlock(maxNumTxs int) ([]*blockchain.Transaction, []*blockchain.CrossShardTxAndProof) {
 	node.pendingTxMutex.Lock()
-	selected, unselected, crossShardTxs := node.UtxoPool.SelectTransactionsForNewBlock(node.pendingTransactions, maxNumTxs)
+	selected, unselected, invalid, crossShardTxs := node.UtxoPool.SelectTransactionsForNewBlock(node.pendingTransactions, maxNumTxs)
+	_ = invalid // invalid txs are discard
 	node.pendingTransactions = unselected
 	node.pendingTxMutex.Unlock()
 	return selected, crossShardTxs
@@ -89,12 +92,18 @@ func (node *Node) listenOnPort(port string) {
 		return
 	}
 	for {
-		conn, err := listen.Accept()
-		if err != nil {
-			node.log.Error("Error listening on port.", "port", port)
-			continue
+		select {
+		case <-node.blockSyncing:
+			// Wait until the syncing part gets finished.
+			<-node.doneSyncing
+		default:
+			conn, err := listen.Accept()
+			if err != nil {
+				node.log.Error("Error listening on port.", "port", port)
+				continue
+			}
+			go node.NodeHandler(conn)
 		}
-		go node.NodeHandler(conn)
 	}
 }
 
@@ -231,11 +240,14 @@ func New(consensus *consensus.Consensus, db *db.LDBDatabase) *Node {
 		node.blockchain = genesisBlock
 
 		// UTXO pool from Genesis block
-		node.UtxoPool = blockchain.CreateUTXOPoolFromGenesisBlockChain(node.blockchain)
+		node.UtxoPool = blockchain.CreateUTXOPoolFromGenesisBlock(node.blockchain.Blocks[0])
 
 		// Initialize level db.
 		node.db = db
 
+		// Initialize channel for syncing.
+		node.doneSyncing = make(chan struct{})
+		node.blockSyncing = make(chan struct{})
 	}
 	// Logger
 	node.log = log.New()

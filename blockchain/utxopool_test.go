@@ -6,7 +6,7 @@ import (
 
 func TestVerifyOneTransactionAndUpdate(t *testing.T) {
 	bc := CreateBlockchain(TestAddressOne, 0)
-	utxoPool := CreateUTXOPoolFromGenesisBlockChain(bc)
+	utxoPool := CreateUTXOPoolFromGenesisBlock(bc.Blocks[0])
 
 	bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressThree, 3, 0)
 	bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressTwo, 100, 0)
@@ -16,7 +16,7 @@ func TestVerifyOneTransactionAndUpdate(t *testing.T) {
 		t.Error("failed to create a new transaction.")
 	}
 
-	if valid, _ := utxoPool.VerifyOneTransaction(tx, nil); !valid {
+	if err, _ := utxoPool.VerifyOneTransaction(tx, nil); err != nil {
 		t.Error("failed to verify a valid transaction.")
 	}
 	utxoPool.VerifyOneTransactionAndUpdate(tx)
@@ -24,7 +24,7 @@ func TestVerifyOneTransactionAndUpdate(t *testing.T) {
 
 func TestVerifyOneTransactionFail(t *testing.T) {
 	bc := CreateBlockchain(TestAddressOne, 0)
-	utxoPool := CreateUTXOPoolFromGenesisBlockChain(bc)
+	utxoPool := CreateUTXOPoolFromGenesisBlock(bc.Blocks[0])
 
 	bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressThree, 3, 0)
 	bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressTwo, 100, 0)
@@ -35,14 +35,14 @@ func TestVerifyOneTransactionFail(t *testing.T) {
 	}
 
 	tx.TxInput = append(tx.TxInput, tx.TxInput[0])
-	if valid, _ := utxoPool.VerifyOneTransaction(tx, nil); valid {
+	if err, _ := utxoPool.VerifyOneTransaction(tx, nil); err == nil {
 		t.Error("Tx with multiple identical TxInput shouldn't be valid")
 	}
 }
 
 func TestDeleteOneBalanceItem(t *testing.T) {
 	bc := CreateBlockchain(TestAddressOne, 0)
-	utxoPool := CreateUTXOPoolFromGenesisBlockChain(bc)
+	utxoPool := CreateUTXOPoolFromGenesisBlock(bc.Blocks[0])
 
 	bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressThree, 3, 0)
 	bc.AddNewUserTransfer(utxoPool, PriKeyThree, TestAddressThree, TestAddressTwo, 3, 0)

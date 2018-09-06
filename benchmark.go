@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"path"
 	"time"
 
 	"github.com/simple-rules/harmony-benchmark/attack"
@@ -14,6 +15,13 @@ import (
 	"github.com/simple-rules/harmony-benchmark/node"
 	"github.com/simple-rules/harmony-benchmark/profiler"
 	"github.com/simple-rules/harmony-benchmark/utils"
+)
+
+var (
+	version string
+	builtBy string
+	builtAt string
+	commit  string
 )
 
 const (
@@ -42,6 +50,11 @@ func InitLDBDatabase(ip string, port string) (*db.LDBDatabase, error) {
 	return db.NewLDBDatabase(dbFileName, 0, 0)
 }
 
+func printVersion(me string) {
+	fmt.Fprintf(os.Stderr, "Harmony (C) 2018. %v, version %v-%v (%v %v)\n", path.Base(me), version, commit, builtBy, builtAt)
+	os.Exit(0)
+}
+
 func main() {
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9000", "port of the node.")
@@ -50,7 +63,14 @@ func main() {
 	attackedMode := flag.Int("attacked_mode", 0, "0 means not attacked, 1 means attacked, 2 means being open to be selected as attacked")
 	dbSupported := flag.Bool("db_supported", false, "false means not db_supported, true means db_supported")
 	profile := flag.Bool("profile", false, "Turn on profiling (CPU, Memory).")
+	metricsReportURL := flag.String("metrics_profile_url", "", "If set, reports metrics to this URL.")
+	versionFlag := flag.Bool("version", false, "Output version info")
+
 	flag.Parse()
+
+	if *versionFlag {
+		printVersion(os.Args[0])
+	}
 
 	// Set up randomization seed.
 	rand.Seed(int64(time.Now().Nanosecond()))
@@ -90,9 +110,12 @@ func main() {
 	consensus := consensus.NewConsensus(*ip, *port, shardID, peers, leader)
 
 	// Start Profiler for leader if profile argument is on
-	if *profile && role == "leader" {
-		profiler := profiler.NewProfiler(consensus.Log, os.Getpid(), shardID)
-		profiler.Start()
+	if role == "leader" && (*profile || *metricsReportURL != "") {
+		prof := profiler.GetProfiler()
+		prof.Config(consensus.Log, shardID, *metricsReportURL)
+		if *profile {
+			prof.Start()
+		}
 	}
 
 	// Set logger to attack model.

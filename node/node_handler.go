@@ -20,9 +20,9 @@ import (
 
 const (
 	// The max number of transaction per a block.
-	MaxNumberOfTransactionsPerBlock = 3000
+	MaxNumberOfTransactionsPerBlock = 10000
 	// The number of blocks allowed before generating state block
-	NumBlocksBeforeStateBlock = 10
+	NumBlocksBeforeStateBlock = 100
 )
 
 // NodeHandler handles a new incoming connection.
@@ -217,7 +217,7 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 }
 
 // WaitForConsensusReady ...
-func (node *Node) WaitForConsensusReady(readySignal chan int) {
+func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
 	node.log.Debug("Waiting for Consensus ready", "node", node)
 
 	var newBlock *blockchain.Block
@@ -319,27 +319,25 @@ func (node *Node) PostConsensusProcessing(newBlock *blockchain.Block) {
 			}
 		}
 		node.blockchain.Blocks = []*blockchain.Block{}
-		node.AddNewBlock(newBlock)
-	} else {
-		node.AddNewBlock(newBlock)
-		node.UpdateUtxoAndState(newBlock)
-
-		if node.Consensus.IsLeader {
-			// Move crossTx-in-consensus into the list to be returned to client
-			for _, crossTxAndProof := range node.CrossTxsInConsensus {
-				crossTxAndProof.Proof.BlockHash = newBlock.Hash
-				// TODO: fill in the signature proofs
-			}
-			if len(node.CrossTxsInConsensus) != 0 {
-				node.addCrossTxsToReturn(node.CrossTxsInConsensus)
-				node.CrossTxsInConsensus = []*blockchain.CrossShardTxAndProof{}
-			}
-
-			node.SendBackProofOfAcceptOrReject()
-			node.BroadcastNewBlock(newBlock)
-		}
 	}
 
+	if node.Consensus.IsLeader {
+		// Move crossTx-in-consensus into the list to be returned to client
+		for _, crossTxAndProof := range node.CrossTxsInConsensus {
+			crossTxAndProof.Proof.BlockHash = newBlock.Hash
+			// TODO: fill in the signature proofs
+		}
+		if len(node.CrossTxsInConsensus) != 0 {
+			node.addCrossTxsToReturn(node.CrossTxsInConsensus)
+			node.CrossTxsInConsensus = []*blockchain.CrossShardTxAndProof{}
+		}
+
+		node.SendBackProofOfAcceptOrReject()
+		node.BroadcastNewBlock(newBlock)
+	}
+
+	node.AddNewBlock(newBlock)
+	node.UpdateUtxoAndState(newBlock)
 }
 
 func (node *Node) AddNewBlock(newBlock *blockchain.Block) {
@@ -354,7 +352,12 @@ func (node *Node) AddNewBlock(newBlock *blockchain.Block) {
 
 func (node *Node) UpdateUtxoAndState(newBlock *blockchain.Block) {
 	// Update UTXO pool
-	node.UtxoPool.Update(newBlock.Transactions)
+	if newBlock.IsStateBlock() {
+		newUtxoPool := blockchain.CreateUTXOPoolFromGenesisBlock(newBlock)
+		node.UtxoPool.UtxoMap = newUtxoPool.UtxoMap
+	} else {
+		node.UtxoPool.Update(newBlock.Transactions)
+	}
 	// Clear transaction-in-Consensus list
 	node.transactionInConsensus = []*blockchain.Transaction{}
 }

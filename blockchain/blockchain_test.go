@@ -58,7 +58,7 @@ func TestFindUTXO(t *testing.T) {
 
 func TestAddNewUserTransfer(t *testing.T) {
 	bc := CreateBlockchain(TestAddressOne, 0)
-	utxoPool := CreateUTXOPoolFromGenesisBlockChain(bc)
+	utxoPool := CreateUTXOPoolFromGenesisBlock(bc.Blocks[0])
 
 	if !bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressThree, 3, 0) {
 		t.Error("Failed to add new transfer to alok.")
@@ -75,7 +75,7 @@ func TestAddNewUserTransfer(t *testing.T) {
 
 func TestVerifyNewBlock(t *testing.T) {
 	bc := CreateBlockchain(TestAddressOne, 0)
-	utxoPool := CreateUTXOPoolFromGenesisBlockChain(bc)
+	utxoPool := CreateUTXOPoolFromGenesisBlock(bc.Blocks[0])
 
 	bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressThree, 3, 0)
 	bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressTwo, 100, 0)
