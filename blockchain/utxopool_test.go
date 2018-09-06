@@ -6,7 +6,7 @@ import (
 
 func TestVerifyOneTransactionAndUpdate(t *testing.T) {
 	bc := CreateBlockchain(TestAddressOne, 0)
-	utxoPool := CreateUTXOPoolFromGenesisBlockChain(bc)
+	utxoPool := CreateUTXOPoolFromGenesisBlock(bc.Blocks[0])
 
 	bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressThree, 3, 0)
 	bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressTwo, 100, 0)
@@ -24,7 +24,7 @@ func TestVerifyOneTransactionAndUpdate(t *testing.T) {
 
 func TestVerifyOneTransactionFail(t *testing.T) {
 	bc := CreateBlockchain(TestAddressOne, 0)
-	utxoPool := CreateUTXOPoolFromGenesisBlockChain(bc)
+	utxoPool := CreateUTXOPoolFromGenesisBlock(bc.Blocks[0])
 
 	bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressThree, 3, 0)
 	bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressTwo, 100, 0)
@@ -42,7 +42,7 @@ func TestVerifyOneTransactionFail(t *testing.T) {
 
 func TestDeleteOneBalanceItem(t *testing.T) {
 	bc := CreateBlockchain(TestAddressOne, 0)
-	utxoPool := CreateUTXOPoolFromGenesisBlockChain(bc)
+	utxoPool := CreateUTXOPoolFromGenesisBlock(bc.Blocks[0])
 
 	bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressThree, 3, 0)
 	bc.AddNewUserTransfer(utxoPool, PriKeyThree, TestAddressThree, TestAddressTwo, 3, 0)

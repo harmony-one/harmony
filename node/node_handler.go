@@ -304,27 +304,25 @@ func (node *Node) PostConsensusProcessing(newBlock *blockchain.Block) {
 			}
 		}
 		node.blockchain.Blocks = []*blockchain.Block{}
-		node.AddNewBlock(newBlock)
-	} else {
-		node.AddNewBlock(newBlock)
-		node.UpdateUtxoAndState(newBlock)
-
-		if node.Consensus.IsLeader {
-			// Move crossTx-in-consensus into the list to be returned to client
-			for _, crossTxAndProof := range node.CrossTxsInConsensus {
-				crossTxAndProof.Proof.BlockHash = newBlock.Hash
-				// TODO: fill in the signature proofs
-			}
-			if len(node.CrossTxsInConsensus) != 0 {
-				node.addCrossTxsToReturn(node.CrossTxsInConsensus)
-				node.CrossTxsInConsensus = []*blockchain.CrossShardTxAndProof{}
-			}
-
-			node.SendBackProofOfAcceptOrReject()
-			node.BroadcastNewBlock(newBlock)
-		}
 	}
 
+	if node.Consensus.IsLeader {
+		// Move crossTx-in-consensus into the list to be returned to client
+		for _, crossTxAndProof := range node.CrossTxsInConsensus {
+			crossTxAndProof.Proof.BlockHash = newBlock.Hash
+			// TODO: fill in the signature proofs
+		}
+		if len(node.CrossTxsInConsensus) != 0 {
+			node.addCrossTxsToReturn(node.CrossTxsInConsensus)
+			node.CrossTxsInConsensus = []*blockchain.CrossShardTxAndProof{}
+		}
+
+		node.SendBackProofOfAcceptOrReject()
+		node.BroadcastNewBlock(newBlock)
+	}
+
+	node.AddNewBlock(newBlock)
+	node.UpdateUtxoAndState(newBlock)
 }
 
 func (node *Node) AddNewBlock(newBlock *blockchain.Block) {
@@ -339,7 +337,12 @@ func (node *Node) AddNewBlock(newBlock *blockchain.Block) {
 
 func (node *Node) UpdateUtxoAndState(newBlock *blockchain.Block) {
 	// Update UTXO pool
-	node.UtxoPool.Update(newBlock.Transactions)
+	if newBlock.IsStateBlock() {
+		newUtxoPool := blockchain.CreateUTXOPoolFromGenesisBlock(newBlock)
+		node.UtxoPool.UtxoMap = newUtxoPool.UtxoMap
+	} else {
+		node.UtxoPool.Update(newBlock.Transactions)
+	}
 	// Clear transaction-in-Consensus list
 	node.transactionInConsensus = []*blockchain.Transaction{}
 }

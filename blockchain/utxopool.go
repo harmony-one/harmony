@@ -363,26 +363,29 @@ func (utxoPool *UTXOPool) VerifyAndUpdate(transactions []*Transaction) bool {
 	return false
 }
 
-// CreateUTXOPoolFromTransaction a Utxo pool from a genesis transaction.
-func CreateUTXOPoolFromTransaction(tx *Transaction, shardId uint32) *UTXOPool {
+// CreateUTXOPoolFromGenesisBlock a Utxo pool from a genesis block.
+func CreateUTXOPoolFromGenesisBlock(block *Block) *UTXOPool {
+	shardId := block.ShardId
 	var utxoPool UTXOPool
-	txID := hex.EncodeToString(tx.ID[:])
 	utxoPool.UtxoMap = make(UtxoMap)
 	utxoPool.LockedUtxoMap = make(UtxoMap)
-	for index, out := range tx.TxOutput {
-		utxoPool.UtxoMap[out.Address] = make(TXHash2Vout2AmountMap)
-		utxoPool.UtxoMap[out.Address][txID] = make(Vout2AmountMap)
-		utxoPool.UtxoMap[out.Address][txID][uint32(index)] = out.Amount
+	for _, tx := range block.Transactions {
+		txID := hex.EncodeToString(tx.ID[:])
+		for index, out := range tx.TxOutput {
+			_, ok := utxoPool.UtxoMap[out.Address]
+			if !ok {
+				utxoPool.UtxoMap[out.Address] = make(TXHash2Vout2AmountMap)
+			}
+
+			_, ok = utxoPool.UtxoMap[out.Address][txID]
+			if !ok {
+				utxoPool.UtxoMap[out.Address][txID] = make(Vout2AmountMap)
+			}
+			utxoPool.UtxoMap[out.Address][txID][uint32(index)] = out.Amount
+		}
 	}
 	utxoPool.ShardID = shardId
 	return &utxoPool
-}
-
-// CreateUTXOPoolFromGenesisBlockChain a Utxo pool from a genesis blockchain.
-func CreateUTXOPoolFromGenesisBlockChain(bc *Blockchain) *UTXOPool {
-	tx := bc.Blocks[0].Transactions[0]
-	shardId := bc.Blocks[0].ShardId
-	return CreateUTXOPoolFromTransaction(tx, shardId)
 }
 
 // SelectTransactionsForNewBlock returns a list of index of valid transactions for the new block.
@@ -483,4 +486,20 @@ func (utxoPool *UTXOPool) GetSizeInByteOfUtxoMap() int {
 	encoder := gob.NewEncoder(byteBuffer)
 	encoder.Encode(utxoPool.UtxoMap)
 	return len(byteBuffer.Bytes())
+}
+
+// A utility func that counts the total number of utxos in a pool.
+func (utxoPool *UTXOPool) CountNumOfUtxos() int {
+	countAll := 0
+	for _, utxoMap := range utxoPool.UtxoMap {
+		for txIdStr, val := range utxoMap {
+			_, err := hex.DecodeString(txIdStr)
+			if err != nil {
+				continue
+			}
+
+			countAll += len(val)
+		}
+	}
+	return countAll
 }

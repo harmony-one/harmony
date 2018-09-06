@@ -119,7 +119,6 @@ UTXOLOOP:
 		}
 	}
 	utxoPoolMutex.Unlock()
-
 	log.Debug("[Generator] generated transations", "single-shard", len(txInfo.txs), "cross-shard", len(txInfo.crossTxs))
 	return txInfo.txs, txInfo.crossTxs
 }
@@ -216,28 +215,6 @@ func generateSingleShardTx(txInfo *TxInfo) {
 	txInfo.txCount++
 }
 
-// A utility func that counts the total number of utxos in a pool.
-func countNumOfUtxos(utxoPool *blockchain.UTXOPool) int {
-	countAll := 0
-	for _, utxoMap := range utxoPool.UtxoMap {
-		for txIdStr, val := range utxoMap {
-			_ = val
-			id, err := hex.DecodeString(txIdStr)
-			if err != nil {
-				continue
-			}
-
-			txId := [32]byte{}
-			copy(txId[:], id[:])
-			for _, utxo := range val {
-				_ = utxo
-				countAll++
-			}
-		}
-	}
-	return countAll
-}
-
 func main() {
 	configFile := flag.String("config_file", "local_config.txt", "file containing all ip addresses and config")
 	maxNumTxsPerBatch := flag.Int("max_num_txs_per_batch", 100000, "number of transactions to send per message")
@@ -290,8 +267,8 @@ func main() {
 					if node.Consensus.ShardID == block.ShardId {
 						log.Debug("Adding block from leader", "shardId", block.ShardId)
 						// Add it to blockchain
-						utxoPoolMutex.Lock()
 						node.AddNewBlock(block)
+						utxoPoolMutex.Lock()
 						node.UpdateUtxoAndState(block)
 						utxoPoolMutex.Unlock()
 					} else {
@@ -324,7 +301,7 @@ func main() {
 			constructAndSendTransaction(batchCounter, *numSubset, shardId, leaders, nodes, clientNode, clientPort)
 		}
 		batchCounter++
-		time.Sleep(1000 * time.Millisecond)
+		time.Sleep(2000 * time.Millisecond)
 	}
 
 	// Send a stop message to stop the nodes at the end
