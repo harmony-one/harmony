@@ -9,12 +9,17 @@ import (
 )
 
 func main() {
-	fmt.Println("hello")
-	ip := flag.String("ip", "127.0.0.0", "IP of the node")
+	ip := flag.String("ip", "localhost", "IP of the node")
 	port := flag.String("port", "8080", "port of the node")
 	flag.Parse()
 	peer := p2p.Peer{Ip: *ip, Port: *port}
 	idcpeer := p2p.Peer{Ip: "localhost", Port: "9000"} //Hardcoded here.
 	node := node.NewWaitNode(peer, idcpeer)
-	node.ConnectIdentityChain()
+	go func() {
+		node.ConnectIdentityChain()
+	}()
+	fmt.Println("control is back with me")
+	node.StartServer(*port)
+	fmt.Println("starting the server")
+
 }
