@@ -70,9 +70,9 @@ function upload
    fi
 
    for bin in "${!SRC[@]}"; do
-      [ -e $BINDIR/$bin ] && $AWSCLI s3 cp $BINDIR/$bin s3://$BUCKET/$FOLDER/$bin --acl public-read
+      [ -e $BINDIR/$bin ] && $AWSCLI s3 cp $BINDIR/$bin s3://${BUCKET}$FOLDER/$bin --acl public-read
    done
-   [ -e $BINDIR/md5sum.txt ] && $AWSCLI s3 cp $BINDIR/md5sum.txt s3://$BUCKET/$FOLDER/md5sum.txt --acl public-read
+   [ -e $BINDIR/md5sum.txt ] && $AWSCLI s3 cp $BINDIR/md5sum.txt s3://${BUCKET}$FOLDER/md5sum.txt --acl public-read
 }
 
 ################################ MAIN FUNCTION ##############################
@@ -82,7 +82,7 @@ while getopts "hp:a:o:b:f:" option; do
       p) PROFILE=$OPTARG ;;
       a) GOARCH=$OPTARG ;;
       o) GOOS=$OPTARG ;;
-      b) BUCKET=$OPTARG ;;
+      b) BUCKET=$OPTARG/ ;;
       f) FOLDER=$OPTARG ;;
    esac
 done
