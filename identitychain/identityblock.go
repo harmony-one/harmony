@@ -7,8 +7,8 @@ import (
 	"log"
 	"time"
 
+	"github.com/simple-rules/harmony-benchmark/node"
 	"github.com/simple-rules/harmony-benchmark/utils"
-	"github.com/simple-rules/harmony-benchmark/waitnode"
 )
 
 // IdentityBlock has the information of one node
@@ -16,7 +16,7 @@ type IdentityBlock struct {
 	Timestamp     int64
 	PrevBlockHash [32]byte
 	NumIdentities int32
-	Identities    []*waitnode.WaitNode
+	Identities    []*node.Node
 }
 
 // Serialize serializes the block
@@ -31,7 +31,7 @@ func (b *IdentityBlock) Serialize() []byte {
 }
 
 //Get Identities
-func (b *IdentityBlock) GetIdentities() []*waitnode.WaitNode {
+func (b *IdentityBlock) GetIdentities() []*node.Node {
 	return b.Identities
 }
 
@@ -47,7 +47,7 @@ func DeserializeBlock(d []byte) *IdentityBlock {
 }
 
 // NewBlock creates and returns a new block.
-func NewBlock(Identities []*waitnode.WaitNode, prevBlockHash [32]byte) *IdentityBlock {
+func NewBlock(Identities []*node.Node, prevBlockHash [32]byte) *IdentityBlock {
 	block := &IdentityBlock{Timestamp: time.Now().Unix(), PrevBlockHash: prevBlockHash, NumIdentities: int32(len(Identities)), Identities: Identities}
 	return block
 }
@@ -59,7 +59,7 @@ func (b *IdentityBlock) CalculateBlockHash() [32]byte {
 	hashes = append(hashes, utils.ConvertFixedDataIntoByteArray(b.Timestamp))
 	hashes = append(hashes, b.PrevBlockHash[:])
 	for _, id := range b.Identities {
-		hashes = append(hashes, utils.ConvertFixedDataIntoByteArray(id.ID))
+		hashes = append(hashes, utils.ConvertFixedDataIntoByteArray(id))
 	}
 	hashes = append(hashes, utils.ConvertFixedDataIntoByteArray(b.NumIdentities))
 	blockHash = sha256.Sum256(bytes.Join(hashes, []byte{}))
@@ -68,7 +68,7 @@ func (b *IdentityBlock) CalculateBlockHash() [32]byte {
 
 // NewGenesisBlock creates and returns genesis Block.
 func NewGenesisBlock() *IdentityBlock {
-	var Ids []*waitnode.WaitNode
+	var Ids []*node.Node
 	block := &IdentityBlock{Timestamp: time.Now().Unix(), PrevBlockHash: [32]byte{}, NumIdentities: 1, Identities: Ids}
 	return block
 }

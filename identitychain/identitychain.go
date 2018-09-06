@@ -9,8 +9,8 @@ import (
 	"sync"
 
 	"github.com/simple-rules/harmony-benchmark/log"
+	"github.com/simple-rules/harmony-benchmark/node"
 	"github.com/simple-rules/harmony-benchmark/p2p"
-	"github.com/simple-rules/harmony-benchmark/waitnode"
 )
 
 var mutex sync.Mutex
@@ -19,13 +19,13 @@ var identityPerBlock = 100000
 // IdentityChain (Blockchain) keeps Identities per epoch, currently centralized!
 type IdentityChain struct {
 	Identities            []*IdentityBlock
-	PendingIdentities     []*waitnode.WaitNode
+	PendingIdentities     []*node.Node
 	log                   log.Logger
 	Peer                  p2p.Peer
-	SelectedIdentitites   []*waitnode.WaitNode
+	SelectedIdentitites   []*node.Node
 	EpochNum              int
-	PeerToShardMap        map[*waitnode.WaitNode]int
-	ShardLeaderMap        map[int]*waitnode.WaitNode
+	PeerToShardMap        map[*node.Node]int
+	ShardLeaderMap        map[int]*node.Node
 	PubKey                string
 	CurrentEpochStartTime int64
 	NumberOfShards        int
@@ -33,7 +33,7 @@ type IdentityChain struct {
 	PowMap                map[p2p.Peer]uint32
 }
 
-func seekRandomNumber(EpochNum int, SelectedIdentitites []*waitnode.WaitNode) int {
+func seekRandomNumber(EpochNum int, SelectedIdentitites []*node.Node) int {
 	// Broadcast message to all nodes and collect back their numbers, do consensus and get a leader.
 	// Use leader to generate a random number.
 	//all here mocked
@@ -72,18 +72,18 @@ func (IDC *IdentityChain) CreateShardAssignment() {
 	num := seekRandomNumber(IDC.EpochNum, IDC.SelectedIdentitites)
 	IDC.NumberOfShards = IDC.NumberOfShards + needNewShards()
 	IDC.SelectedIdentitites = generateRandomPermutations(num, IDC.SelectedIdentitites)
-	IDC.PeerToShardMap = make(map[*waitnode.WaitNode]int)
+	IDC.PeerToShardMap = make(map[*node.Node]int)
 	numberInOneShard := len(IDC.SelectedIdentitites) / IDC.NumberOfShards
 	for peerNum := 1; peerNum <= len(IDC.SelectedIdentitites); peerNum++ {
 		IDC.PeerToShardMap[IDC.SelectedIdentitites[peerNum]] = peerNum / numberInOneShard
 	}
 }
 
-func generateRandomPermutations(num int, SelectedIdentitites []*waitnode.WaitNode) []*waitnode.WaitNode {
+func generateRandomPermutations(num int, SelectedIdentitites []*node.Node) []*node.Node {
 	src := rand.NewSource(int64(num))
 	rnd := rand.New(src)
 	perm := rnd.Perm(len(SelectedIdentitites))
-	SelectedIdentititesCopy := make([]*waitnode.WaitNode, len(SelectedIdentitites))
+	SelectedIdentititesCopy := make([]*node.Node, len(SelectedIdentitites))
 	for j, i := range perm {
 		SelectedIdentititesCopy[j] = SelectedIdentitites[i]
 	}
@@ -98,7 +98,7 @@ func (IDC *IdentityChain) SelectIds() {
 	selectNumber = int(math.Min(float64(len(IDC.PendingIdentities)), float64(selectNumber)))
 	pending := IDC.PendingIdentities[:selectNumber]
 	IDC.SelectedIdentitites = append(currentIDS, pending...)
-	IDC.PendingIdentities = []*waitnode.WaitNode{}
+	IDC.PendingIdentities = []*node.Node{}
 }
 
 //Checks how many new shards we need. Currently we say 0.
@@ -129,7 +129,7 @@ func (IDC *IdentityChain) UpdateIdentityChain() {
 		prevBlock := IDC.GetLatestBlock()
 		prevBlockHash := prevBlock.CalculateBlockHash()
 		NewIdentities := IDC.PendingIdentities[:identityPerBlock]
-		IDC.PendingIdentities = []*waitnode.WaitNode{}
+		IDC.PendingIdentities = []*node.Node{}
 		//All other blocks are dropped, we need to inform them that they are dropped?
 		IDBlock := NewBlock(NewIdentities, prevBlockHash)
 		IDC.Identities = append(IDC.Identities, IDBlock)
@@ -171,5 +171,6 @@ func New(Peer p2p.Peer) *IdentityChain {
 	IDC := IdentityChain{}
 	IDC.Peer = Peer
 	IDC.log = log.New()
+	IDC.PowMap = make(map[p2p.Peer]uint32)
 	return &IDC
 }

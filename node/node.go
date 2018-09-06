@@ -2,8 +2,11 @@ package node
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/gob"
+	"fmt"
 	"net"
+	"strconv"
 	"sync"
 
 	"github.com/simple-rules/harmony-benchmark/crypto/pki"
@@ -68,6 +71,7 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int) ([]*blockchain.Trans
 
 // Start a server and process the request by a handler.
 func (node *Node) StartServer(port string) {
+	fmt.Println("Hello in server now")
 	node.log.Debug("Starting server", "node", node, "port", port)
 
 	node.listenOnPort(port)
@@ -111,7 +115,8 @@ func (node *Node) countNumTransactionsInBlockchain() int {
 //ConnectIdentityChain connects to identity chain
 func (node *Node) ConnectIdentityChain() {
 	IDCPeer := node.IDCPeer
-	p2p.SendMessage(IDCPeer, identity.ConstructIdentityMessage(identity.ANNOUNCE, node.SerializeNode()))
+	p2p.SendMessage(IDCPeer, identity.ConstructIdentityMessage(identity.ANNOUNCE, node.SerializeWaitNode()))
+	return
 }
 
 //NewWaitNode is a way to initiate a waiting no
@@ -119,6 +124,7 @@ func NewWaitNode(peer, IDCPeer p2p.Peer) Node {
 	node := Node{}
 	node.Self = peer
 	node.IDCPeer = IDCPeer
+	node.log = log.New()
 	return node
 }
 
@@ -152,40 +158,54 @@ func NewNodefromIDC(node Node, consensus *consensus.Consensus, db *db.LDBDatabas
 	return &node
 }
 
-func (node *Node) processPOWMessage(payload []byte) {
+func (node *Node) processPOWMessage(message []byte) {
+	payload, err := identity.GetIdentityMessagePayload(message)
+	if err != nil {
+		fmt.Println("Could not read payload")
+	}
 	IDCPeer := node.IDCPeer
 	offset := 0
-	// 4 byte challenge nonce id
-	req := pow.NewRequest(5, payload[offset:offset+64])
-	proof, _ := pow.Fulfil(req, []byte("This is blockchash data")) //"some bound dat"
-
-	proofBytes := make([]byte, 64)
-	copy(proofBytes[:], proof)
+	// 4 byte challengeNonce id
+	challengeNonce := int(binary.BigEndian.Uint32(payload[offset : offset+4]))
+	offset += 4
+	fmt.Println(challengeNonce)
+	req := pow.NewRequest(5, []byte(strconv.Itoa(challengeNonce)))
+	proof, _ := pow.Fulfil(req, []byte("")) //"This could be blockhasdata"
 	buffer := bytes.NewBuffer([]byte{})
+	proofBytes := make([]byte, 32) //proof seems to be 32 byte here
+	copy(proofBytes[:], proof)
 	buffer.Write(proofBytes)
-
-	buffer.Write(node.SerializeNode())
-
+	buffer.Write(node.SerializeWaitNode())
 	msgPayload := buffer.Bytes()
 	p2p.SendMessage(IDCPeer, identity.ConstructIdentityMessage(identity.REGISTER, msgPayload))
 }
 
+//https://stackoverflow.com/questions/12854125/how-do-i-dump-the-struct-into-the-byte-array-without-reflection/12854659#12854659
 //SerializeWaitNode serializes the node
-func (node *Node) SerializeNode() []byte {
-	var result bytes.Buffer
-	encoder := gob.NewEncoder(&result)
-	err := encoder.Encode(node)
+func (node *Node) SerializeWaitNode() []byte {
+	//Needs to escape the serialization of unexported fields
+	result := new(bytes.Buffer)
+	encoder := gob.NewEncoder(result)
+	err := encoder.Encode(node.Self)
 	if err != nil {
-		node.log.Error("Could not serialize node")
+		fmt.Println("Could not serialize node")
+		fmt.Println("ERROR", err)
+		//node.log.Error("Could not serialize node")
 	}
+	err = encoder.Encode(node.IDCPeer)
 	return result.Bytes()
 }
 
 // DeserializeWaitNode deserializes the node
-func DeserializeNode(d []byte) *Node {
+func DeserializeWaitNode(d []byte) *Node {
 	var wn Node
-	decoder := gob.NewDecoder(bytes.NewReader(d))
-	err := decoder.Decode(&wn)
+	r := bytes.NewBuffer(d)
+	decoder := gob.NewDecoder(r)
+	err := decoder.Decode(&wn.Self)
+	if err != nil {
+		log.Error("Could not de-serialize node")
+	}
+	err = decoder.Decode(&wn.IDCPeer)
 	if err != nil {
 		log.Error("Could not de-serialize node")
 	}
