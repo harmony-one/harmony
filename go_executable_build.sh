@@ -70,7 +70,7 @@ function upload
    for bin in "${!SRC[@]}"; do
       [ -e $BINDIR/$bin ] && $AWSCLI s3 cp $BINDIR/$bin s3://$BUCKET/$bin --acl public-read
    done
-   [ -e $BINDIR/md5sum.txt ] && $AWSCLI s3 cp $BINDIR/md5sum.txt s3://$BUCKET/$bin --acl public-read
+   [ -e $BINDIR/md5sum.txt ] && $AWSCLI s3 cp $BINDIR/md5sum.txt s3://$BUCKET/md5sum.txt --acl public-read
 }
 
 ################################ MAIN FUNCTION ##############################
