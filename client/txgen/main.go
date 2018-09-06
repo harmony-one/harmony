@@ -6,6 +6,8 @@ import (
 	"flag"
 	"fmt"
 	"math/rand"
+	"os"
+	"path"
 	"sync"
 	"time"
 
@@ -18,6 +20,13 @@ import (
 	"github.com/simple-rules/harmony-benchmark/node"
 	"github.com/simple-rules/harmony-benchmark/p2p"
 	proto_node "github.com/simple-rules/harmony-benchmark/proto/node"
+)
+
+var (
+	version string
+	builtBy string
+	builtAt string
+	commit  string
 )
 
 type txGenSettings struct {
@@ -215,13 +224,23 @@ func generateSingleShardTx(txInfo *TxInfo) {
 	txInfo.txCount++
 }
 
+func printVersion(me string) {
+	fmt.Fprintf(os.Stderr, "Harmony (C) 2018. %v, version %v-%v (%v %v)\n", path.Base(me), version, commit, builtBy, builtAt)
+	os.Exit(0)
+}
+
 func main() {
 	configFile := flag.String("config_file", "local_config.txt", "file containing all ip addresses and config")
 	maxNumTxsPerBatch := flag.Int("max_num_txs_per_batch", 100000, "number of transactions to send per message")
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	numSubset := flag.Int("numSubset", 3, "the number of subsets of utxos to process separately")
 	duration := flag.Int("duration", 60, "duration of the tx generation in second")
+	versionFlag := flag.Bool("version", false, "Output version info")
 	flag.Parse()
+
+	if *versionFlag {
+		printVersion(os.Args[0])
+	}
 
 	// Read the configs
 	config := client_config.NewConfig()
