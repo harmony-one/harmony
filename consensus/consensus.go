@@ -55,6 +55,8 @@ type Consensus struct {
 	blockHash [32]byte
 	// BlockHeader to run consensus on
 	blockHeader []byte
+	// Array of block hashes.
+	blockHashes [][32]byte
 	// Shard Id which this node belongs to
 	ShardID uint32
 
