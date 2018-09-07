@@ -173,7 +173,6 @@ func (node *Node) processPOWMessage(message []byte) {
 	IDCPeer := node.IDCPeer
 	// 4 byte challengeNonce id
 	req := string(payload)
-	fmt.Println(req)
 	proof, _ := pow.Fulfil(req, []byte("")) //"This could be blockhasdata"
 	buffer := bytes.NewBuffer([]byte{})
 	proofBytes := make([]byte, 32) //proof seems to be 32 byte here

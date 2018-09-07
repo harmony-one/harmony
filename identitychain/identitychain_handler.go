@@ -74,7 +74,6 @@ func (IDC *IdentityChain) registerIdentity(msgPayload []byte) {
 		fmt.Println("identity payload read")
 	}
 	fmt.Println("we are now registering identities")
-	//reconstruct the challenge and check whether its correct
 	offset := 0
 	proof := payload[offset : offset+32]
 	offset = offset + 32
@@ -108,6 +107,7 @@ func (IDC *IdentityChain) acceptNewConnection(msgPayload []byte) {
 	challengeNonce := int((rnd.Int31()))
 	req := pow.NewRequest(5, []byte(strconv.Itoa(challengeNonce)))
 	IDC.PowMap[Node.Self] = req
+	fmt.Println(Node.Self)
 	fmt.Println(req)
 	buffer.Write([]byte(req))
 	// 32 byte block hash
