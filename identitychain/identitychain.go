@@ -18,7 +18,8 @@ var identityPerBlock = 100000
 
 // IdentityChain (Blockchain) keeps Identities per epoch, currently centralized!
 type IdentityChain struct {
-	Identities            []*IdentityBlock
+	//Identities            []*IdentityBlock //No need to have the identity block as of now
+	Identities            []*node.Node
 	PendingIdentities     []*node.Node
 	log                   log.Logger
 	Peer                  p2p.Peer
@@ -51,16 +52,21 @@ type GlobalBlockchainConfig struct {
 
 //Shard
 func (IDC *IdentityChain) Shard() {
+
+	IDC.SelectIds()
 	IDC.CreateShardAssignment()
 	IDC.ElectLeaders()
 	IDC.BroadCastNewConfiguration()
 }
 
-//
+//ElectLeaders
 func (IDC *IdentityChain) ElectLeaders() {
+	return
 }
 
+//BroadCastNewConfiguration
 func (IDC *IdentityChain) BroadCastNewConfiguration() {
+	fmt.Println("Broadcasting leader and shard info to everyone!")
 	// allPeers := make([]p2p.Peer, len(IDC.SelectedIdentitites))
 	// msgToSend := proto.
 	// 	p2p.BroadCastMessage(allPeers, msgToSend)
@@ -71,70 +77,43 @@ func (IDC *IdentityChain) BroadCastNewConfiguration() {
 func (IDC *IdentityChain) CreateShardAssignment() {
 	num := seekRandomNumber(IDC.EpochNum, IDC.SelectedIdentitites)
 	IDC.NumberOfShards = IDC.NumberOfShards + needNewShards()
-	IDC.SelectedIdentitites = generateRandomPermutations(num, IDC.SelectedIdentitites)
+	IDC.generateRandomPermutations(num)
 	IDC.PeerToShardMap = make(map[*node.Node]int)
 	numberInOneShard := len(IDC.SelectedIdentitites) / IDC.NumberOfShards
-	for peerNum := 1; peerNum <= len(IDC.SelectedIdentitites); peerNum++ {
+	fmt.Println(len(IDC.SelectedIdentitites))
+	for peerNum := 0; peerNum < len(IDC.SelectedIdentitites); peerNum++ {
 		IDC.PeerToShardMap[IDC.SelectedIdentitites[peerNum]] = peerNum / numberInOneShard
 	}
 }
 
-func generateRandomPermutations(num int, SelectedIdentitites []*node.Node) []*node.Node {
+func (IDC *IdentityChain) generateRandomPermutations(num int) {
 	src := rand.NewSource(int64(num))
 	rnd := rand.New(src)
-	perm := rnd.Perm(len(SelectedIdentitites))
-	SelectedIdentititesCopy := make([]*node.Node, len(SelectedIdentitites))
+	perm := rnd.Perm(len(IDC.SelectedIdentitites))
+	SelectedIdentititesCopy := make([]*node.Node, len(IDC.SelectedIdentitites))
 	for j, i := range perm {
-		SelectedIdentititesCopy[j] = SelectedIdentitites[i]
+		SelectedIdentititesCopy[j] = IDC.SelectedIdentitites[i]
 	}
-	return SelectedIdentititesCopy
+	IDC.SelectedIdentitites = SelectedIdentititesCopy
 }
 
 // SelectIds as
 func (IDC *IdentityChain) SelectIds() {
 	selectNumber := IDC.NumberOfNodesInShard - len(IDC.Identities)
-	IB := IDC.GetLatestBlock()
-	currentIDS := IB.GetIdentities()
+	// Insert the lines below once you have a identity block
+	// IB := IDC.GetLatestBlock()
+	// currentIDS := IB.GetIdentities()
+	currentIDS := IDC.Identities
 	selectNumber = int(math.Min(float64(len(IDC.PendingIdentities)), float64(selectNumber)))
 	pending := IDC.PendingIdentities[:selectNumber]
 	IDC.SelectedIdentitites = append(currentIDS, pending...)
 	IDC.PendingIdentities = []*node.Node{}
+
 }
 
 //Checks how many new shards we need. Currently we say 0.
 func needNewShards() int {
 	return 0
-}
-
-// GetLatestBlock gests the latest block at the end of the chain
-func (IDC *IdentityChain) GetLatestBlock() *IdentityBlock {
-	if len(IDC.Identities) == 0 {
-		return nil
-	}
-	return IDC.Identities[len(IDC.Identities)-1]
-}
-
-//UpdateIdentityChain is to create the Blocks to be added to the chain
-func (IDC *IdentityChain) UpdateIdentityChain() {
-
-	//If there are no more Identities registring the blockchain is dead
-	if len(IDC.PendingIdentities) == 0 {
-		// This is abd, because previous block might not be alive
-		return
-	}
-	if len(IDC.Identities) == 0 {
-		block := NewGenesisBlock()
-		IDC.Identities = append(IDC.Identities, block)
-	} else {
-		prevBlock := IDC.GetLatestBlock()
-		prevBlockHash := prevBlock.CalculateBlockHash()
-		NewIdentities := IDC.PendingIdentities[:identityPerBlock]
-		IDC.PendingIdentities = []*node.Node{}
-		//All other blocks are dropped, we need to inform them that they are dropped?
-		IDBlock := NewBlock(NewIdentities, prevBlockHash)
-		IDC.Identities = append(IDC.Identities, IDBlock)
-	}
-
 }
 
 //StartServer a server and process the request by a handler.
@@ -171,6 +150,47 @@ func New(Peer p2p.Peer) *IdentityChain {
 	IDC := IdentityChain{}
 	IDC.Peer = Peer
 	IDC.log = log.New()
+	IDC.NumberOfShards = 1         //to be filled via global config
+	IDC.NumberOfNodesInShard = 500 //to be filled via global config
+	IDC.Identities = make([]*node.Node, 0)
+	IDC.PendingIdentities = make([]*node.Node, 0)
+	IDC.SelectedIdentitites = make([]*node.Node, 0)
 	IDC.PowMap = make(map[p2p.Peer]string)
 	return &IDC
 }
+
+// -------------------------------------------------------------
+
+// The code below is needed when we have a actual identity block
+// GetLatestBlock gests the latest block at the end of the chain
+// func (IDC *IdentityChain) GetLatestBlock() *IdentityBlock {
+// 	if len(IDC.Identities) == 0 {
+// 		return nil
+// 	}
+// 	return IDC.Identities[len(IDC.Identities)-1]
+// }
+
+//UpdateIdentityChain is to create the Blocks to be added to the chain
+// func (IDC *IdentityChain) UpdateIdentityChain() {
+
+// 	//If there are no more Identities registring the blockchain is dead
+// 	if len(IDC.PendingIdentities) == 0 {
+// 		// This is abd, because previous block might not be alive
+// 		return
+// 	}
+// 	if len(IDC.Identities) == 0 {
+// 		block := NewGenesisBlock()
+// 		IDC.Identities = append(IDC.Identities, block)
+// 	} else {
+// 		prevBlock := IDC.GetLatestBlock()
+// 		prevBlockHash := prevBlock.CalculateBlockHash()
+// 		NewIdentities := IDC.PendingIdentities[:identityPerBlock]
+// 		IDC.PendingIdentities = []*node.Node{}
+// 		//All other blocks are dropped, we need to inform them that they are dropped?
+// 		IDBlock := NewBlock(NewIdentities, prevBlockHash)
+// 		IDC.Identities = append(IDC.Identities, IDBlock)
+// 	}
+
+// }
+
+// -------------------------------------------------------------
