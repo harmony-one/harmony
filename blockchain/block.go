@@ -133,7 +133,7 @@ func NewStateBlock(utxoPool *UTXOPool, numBlocks, numTxs int32) *Block {
 	stateTransactions := []*Transaction{}
 	stateTransactionIds := [][32]byte{}
 	for address, txHash2Vout2AmountMap := range utxoPool.UtxoMap {
-		stateTransaction := Transaction{}
+		stateTransaction := &Transaction{}
 		for txHash, vout2AmountMap := range txHash2Vout2AmountMap {
 			for index, amount := range vout2AmountMap {
 				txHashBytes, err := utils.Get32BytesFromString(txHash)
@@ -148,7 +148,7 @@ func NewStateBlock(utxoPool *UTXOPool, numBlocks, numTxs int32) *Block {
 		if len(stateTransaction.TxOutput) != 0 {
 			stateTransaction.SetID()
 			stateTransactionIds = append(stateTransactionIds, stateTransaction.ID)
-			stateTransactions = append(stateTransactions, &stateTransaction)
+			stateTransactions = append(stateTransactions, stateTransaction)
 		}
 	}
 	newBlock := NewBlock(stateTransactions, [32]byte{}, utxoPool.ShardID)

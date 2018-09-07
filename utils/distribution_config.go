@@ -148,6 +148,9 @@ func (config *DistributionConfig) GetConfigEntries() []ConfigEntry {
 }
 
 func (config *DistributionConfig) GetMyConfigEntry(ip string, port string) *ConfigEntry {
+	if config.config == nil {
+		return nil
+	}
 	for _, entry := range config.config {
 		if entry.IP == ip && entry.Port == port {
 			return &entry

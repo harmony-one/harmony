@@ -3,6 +3,7 @@ package node
 import (
 	"bytes"
 	"encoding/gob"
+	"fmt"
 	"net"
 	"os"
 	"strconv"
@@ -13,6 +14,7 @@ import (
 	"github.com/simple-rules/harmony-benchmark/proto"
 	"github.com/simple-rules/harmony-benchmark/proto/client"
 	"github.com/simple-rules/harmony-benchmark/proto/consensus"
+	proto_identity "github.com/simple-rules/harmony-benchmark/proto/identity"
 	proto_node "github.com/simple-rules/harmony-benchmark/proto/node"
 )
 
@@ -20,7 +22,7 @@ const (
 	// The max number of transaction per a block.
 	MaxNumberOfTransactionsPerBlock = 10000
 	// The number of blocks allowed before generating state block
-	NumBlocksBeforeStateBlock = 100
+	NumBlocksBeforeStateBlock = 1000
 )
 
 // NodeHandler handles a new incoming connection.
@@ -55,6 +57,19 @@ func (node *Node) NodeHandler(conn net.Conn) {
 	}
 
 	switch msgCategory {
+	case proto.IDENTITY:
+		actionType := proto_identity.IdentityMessageType(msgType)
+		switch actionType {
+		case proto_identity.IDENTITY:
+			messageType := proto_identity.MessageType(msgPayload[0])
+			switch messageType {
+			case proto_identity.REGISTER:
+				fmt.Println("received a identity message")
+				node.processPOWMessage(msgPayload)
+			case proto_identity.ANNOUNCE:
+				node.log.Error("Announce message should be sent to IdentityChain")
+			}
+		}
 	case proto.CONSENSUS:
 		actionType := consensus.ConsensusMessageType(msgType)
 		switch actionType {
@@ -304,27 +319,25 @@ func (node *Node) PostConsensusProcessing(newBlock *blockchain.Block) {
 			}
 		}
 		node.blockchain.Blocks = []*blockchain.Block{}
-		node.AddNewBlock(newBlock)
-	} else {
-		node.AddNewBlock(newBlock)
-		node.UpdateUtxoAndState(newBlock)
-
-		if node.Consensus.IsLeader {
-			// Move crossTx-in-consensus into the list to be returned to client
-			for _, crossTxAndProof := range node.CrossTxsInConsensus {
-				crossTxAndProof.Proof.BlockHash = newBlock.Hash
-				// TODO: fill in the signature proofs
-			}
-			if len(node.CrossTxsInConsensus) != 0 {
-				node.addCrossTxsToReturn(node.CrossTxsInConsensus)
-				node.CrossTxsInConsensus = []*blockchain.CrossShardTxAndProof{}
-			}
-
-			node.SendBackProofOfAcceptOrReject()
-			node.BroadcastNewBlock(newBlock)
-		}
 	}
 
+	if node.Consensus.IsLeader {
+		// Move crossTx-in-consensus into the list to be returned to client
+		for _, crossTxAndProof := range node.CrossTxsInConsensus {
+			crossTxAndProof.Proof.BlockHash = newBlock.Hash
+			// TODO: fill in the signature proofs
+		}
+		if len(node.CrossTxsInConsensus) != 0 {
+			node.addCrossTxsToReturn(node.CrossTxsInConsensus)
+			node.CrossTxsInConsensus = []*blockchain.CrossShardTxAndProof{}
+		}
+
+		node.SendBackProofOfAcceptOrReject()
+		node.BroadcastNewBlock(newBlock)
+	}
+
+	node.AddNewBlock(newBlock)
+	node.UpdateUtxoAndState(newBlock)
 }
 
 func (node *Node) AddNewBlock(newBlock *blockchain.Block) {
@@ -339,7 +352,22 @@ func (node *Node) AddNewBlock(newBlock *blockchain.Block) {
 
 func (node *Node) UpdateUtxoAndState(newBlock *blockchain.Block) {
 	// Update UTXO pool
-	node.UtxoPool.Update(newBlock.Transactions)
+	if newBlock.IsStateBlock() {
+		newUtxoPool := blockchain.CreateUTXOPoolFromGenesisBlock(newBlock)
+		node.UtxoPool.UtxoMap = newUtxoPool.UtxoMap
+	} else {
+		node.UtxoPool.Update(newBlock.Transactions)
+	}
 	// Clear transaction-in-Consensus list
 	node.transactionInConsensus = []*blockchain.Transaction{}
+	//if node.Consensus.IsLeader {
+	//	fmt.Printf("TX in New BLOCK - %d %s\n", node.UtxoPool.ShardID, newBlock.IsStateBlock())
+	//	//fmt.Println(newBlock.Transactions)
+	//	fmt.Printf("LEADER CURRENT UTXO - %d\n", node.UtxoPool.ShardID)
+	//	fmt.Println(node.UtxoPool.CountNumOfUtxos())
+	//	//fmt.Println(node.UtxoPool)
+	//	fmt.Printf("LEADER LOCKED UTXO - %d\n", node.UtxoPool.ShardID)
+	//	fmt.Println(node.UtxoPool.CountNumOfLockedUtxos())
+	//	//fmt.Println(node.UtxoPool.StringOfLockedUtxos())
+	//}
 }

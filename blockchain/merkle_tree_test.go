@@ -13,6 +13,7 @@ func TestNewMerkleNode(t *testing.T) {
 		[]byte("node3"),
 	}
 
+	fmt.Println("TEting")
 	// Level 1
 
 	n1 := NewMerkleNode(nil, nil, data[0])
@@ -53,6 +54,26 @@ func TestNewMerkleTree(t *testing.T) {
 	n7 := NewMerkleNode(n5, n6, nil)
 
 	rootHash := fmt.Sprintf("%x", n7.Data)
+	mTree := NewMerkleTree(data)
+
+	if rootHash != fmt.Sprintf("%x", mTree.RootNode.Data) {
+		t.Errorf("Merkle tree root hash is incorrect")
+	}
+}
+
+func TestNewMerkleTree2(t *testing.T) {
+	data := [][]byte{
+		[]byte("node1"),
+		[]byte("node2"),
+	}
+	// Level 1
+	n1 := NewMerkleNode(nil, nil, data[0])
+	n2 := NewMerkleNode(nil, nil, data[1])
+
+	// Level 2
+	n3 := NewMerkleNode(n1, n2, nil)
+
+	rootHash := fmt.Sprintf("%x", n3.Data)
 	mTree := NewMerkleTree(data)
 
 	if rootHash != fmt.Sprintf("%x", mTree.RootNode.Data) {

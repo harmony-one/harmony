@@ -6,6 +6,8 @@ import (
 	"flag"
 	"fmt"
 	"math/rand"
+	"os"
+	"path"
 	"sync"
 	"time"
 
@@ -20,10 +22,18 @@ import (
 	proto_node "github.com/simple-rules/harmony-benchmark/proto/node"
 )
 
+var (
+	version string
+	builtBy string
+	builtAt string
+	commit  string
+)
+
 type txGenSettings struct {
 	numOfAddress      int
 	crossShard        bool
 	maxNumTxsPerBatch int
+	crossShardRatio   int
 }
 
 var (
@@ -64,7 +74,7 @@ type TxInfo struct {
 // Returns:
 //     all single-shard txs
 //     all cross-shard txs
-func generateSimulatedTransactions(subsetId, numSubset int, shardID int, dataNodes []*node.Node) ([]*blockchain.Transaction, []*blockchain.Transaction) {
+func generateSimulatedTransactions(subsetId, numSubset int, shardId int, dataNodes []*node.Node) ([]*blockchain.Transaction, []*blockchain.Transaction) {
 	/*
 	  UTXO map structure:
 	     address - [
@@ -81,13 +91,13 @@ func generateSimulatedTransactions(subsetId, numSubset int, shardID int, dataNod
 
 	utxoPoolMutex.Lock()
 	txInfo := TxInfo{}
-	txInfo.shardID = shardID
+	txInfo.shardID = shardId
 	txInfo.dataNodes = dataNodes
 	txInfo.txCount = 0
 
 UTXOLOOP:
 	// Loop over all addresses
-	for address, txMap := range dataNodes[shardID].UtxoPool.UtxoMap {
+	for address, txMap := range dataNodes[shardId].UtxoPool.UtxoMap {
 		if int(binary.BigEndian.Uint32(address[:]))%numSubset == subsetId%numSubset { // Work on one subset of utxo at a time
 			txInfo.address = address
 			// Loop over all txIds for the address
@@ -106,7 +116,7 @@ UTXOLOOP:
 
 					randNum := rand.Intn(100)
 
-					if setting.crossShard && randNum < 30 { // 1/3 cross shard transactions: add another txinput from another shard
+					if setting.crossShard && randNum < setting.crossShardRatio { // 30% cross shard transactions: add another txinput from another shard
 						generateCrossShardTx(&txInfo)
 					} else {
 						generateSingleShardTx(&txInfo)
@@ -118,16 +128,23 @@ UTXOLOOP:
 			}
 		}
 	}
+	//fmt.Printf("UTXO CLIENT - %d\n", shardId)
+	//fmt.Println(dataNodes[shardId].UtxoPool.CountNumOfUtxos())
 	utxoPoolMutex.Unlock()
-
 	log.Debug("[Generator] generated transations", "single-shard", len(txInfo.txs), "cross-shard", len(txInfo.crossTxs))
 	return txInfo.txs, txInfo.crossTxs
 }
 
 func generateCrossShardTx(txInfo *TxInfo) {
 	nodeShardID := txInfo.dataNodes[txInfo.shardID].Consensus.ShardID
+	crossShardId := nodeShardID
 	// a random shard to spend money to
-	crossShardId := rand.Intn(len(txInfo.dataNodes))
+	for true {
+		crossShardId = uint32(rand.Intn(len(txInfo.dataNodes)))
+		if crossShardId != nodeShardID {
+			break
+		}
+	}
 
 	crossShardNode := txInfo.dataNodes[crossShardId]
 	crossShardUtxosMap := crossShardNode.UtxoPool.UtxoMap[txInfo.address]
@@ -147,7 +164,7 @@ func generateCrossShardTx(txInfo *TxInfo) {
 
 		for crossShardIndex, crossShardValue := range crossShardUtxos {
 			crossUtxoValue = crossShardValue
-			crossTxin = blockchain.NewTXInput(blockchain.NewOutPoint(&crossTxId, crossShardIndex), txInfo.address, uint32(crossShardId))
+			crossTxin = blockchain.NewTXInput(blockchain.NewOutPoint(&crossTxId, crossShardIndex), txInfo.address, crossShardId)
 			break
 		}
 		if crossTxin != nil {
@@ -171,7 +188,7 @@ func generateCrossShardTx(txInfo *TxInfo) {
 
 	// Spend the utxo from the other shard, if any, to a random address in [0 - N)
 	if crossTxin != nil {
-		crossTxout := blockchain.TXOutput{Amount: crossUtxoValue, Address: pki.GetAddressFromInt(rand.Intn(setting.numOfAddress) + 1), ShardID: uint32(crossShardId)}
+		crossTxout := blockchain.TXOutput{Amount: crossUtxoValue, Address: pki.GetAddressFromInt(rand.Intn(setting.numOfAddress) + 1), ShardID: crossShardId}
 		txOutputs = append(txOutputs, crossTxout)
 	}
 
@@ -216,35 +233,24 @@ func generateSingleShardTx(txInfo *TxInfo) {
 	txInfo.txCount++
 }
 
-// A utility func that counts the total number of utxos in a pool.
-func countNumOfUtxos(utxoPool *blockchain.UTXOPool) int {
-	countAll := 0
-	for _, utxoMap := range utxoPool.UtxoMap {
-		for txIdStr, val := range utxoMap {
-			_ = val
-			id, err := hex.DecodeString(txIdStr)
-			if err != nil {
-				continue
-			}
-
-			txId := [32]byte{}
-			copy(txId[:], id[:])
-			for _, utxo := range val {
-				_ = utxo
-				countAll++
-			}
-		}
-	}
-	return countAll
+func printVersion(me string) {
+	fmt.Fprintf(os.Stderr, "Harmony (C) 2018. %v, version %v-%v (%v %v)\n", path.Base(me), version, commit, builtBy, builtAt)
+	os.Exit(0)
 }
 
 func main() {
 	configFile := flag.String("config_file", "local_config.txt", "file containing all ip addresses and config")
-	maxNumTxsPerBatch := flag.Int("max_num_txs_per_batch", 100000, "number of transactions to send per message")
+	maxNumTxsPerBatch := flag.Int("max_num_txs_per_batch", 10000, "number of transactions to send per message")
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	numSubset := flag.Int("numSubset", 3, "the number of subsets of utxos to process separately")
-	duration := flag.Int("duration", 60, "duration of the tx generation in second")
+	duration := flag.Int("duration", 60, "duration of the tx generation in second. If it's negative, the experiment runs forever.")
+	versionFlag := flag.Bool("version", false, "Output version info")
+	crossShardRatio := flag.Int("cross_shard_ratio", 30, "The percentage of cross shard transactions.")
 	flag.Parse()
+
+	if *versionFlag {
+		printVersion(os.Args[0])
+	}
 
 	// Read the configs
 	config := client_config.NewConfig()
@@ -255,6 +261,7 @@ func main() {
 	// Do cross shard tx if there are more than one shard
 	setting.crossShard = len(shardIds) > 1
 	setting.maxNumTxsPerBatch = *maxNumTxsPerBatch
+	setting.crossShardRatio = *crossShardRatio
 
 	// TODO(Richard): refactor this chuck to a single method
 	// Setup a logger to stdout and log file.
@@ -290,8 +297,8 @@ func main() {
 					if node.Consensus.ShardID == block.ShardId {
 						log.Debug("Adding block from leader", "shardId", block.ShardId)
 						// Add it to blockchain
-						utxoPoolMutex.Lock()
 						node.AddNewBlock(block)
+						utxoPoolMutex.Lock()
 						node.UpdateUtxoAndState(block)
 						utxoPoolMutex.Unlock()
 					} else {
@@ -316,7 +323,7 @@ func main() {
 	batchCounter := 0
 	for true {
 		t := time.Now()
-		if t.Sub(start).Seconds() >= totalTime {
+		if totalTime > 0 && t.Sub(start).Seconds() >= totalTime {
 			log.Debug("Generator timer ended.", "duration", (int(t.Sub(start))), "startTime", start, "totalTime", totalTime)
 			break
 		}
@@ -324,7 +331,7 @@ func main() {
 			constructAndSendTransaction(batchCounter, *numSubset, shardId, leaders, nodes, clientNode, clientPort)
 		}
 		batchCounter++
-		time.Sleep(1000 * time.Millisecond)
+		time.Sleep(5000 * time.Millisecond)
 	}
 
 	// Send a stop message to stop the nodes at the end
@@ -341,13 +348,15 @@ func constructAndSendTransaction(subsetId, numSubset, shardId int, leaders []p2p
 	txs, crossTxs := generateSimulatedTransactions(subsetId, numSubset, shardId, nodes)
 	allCrossTxs = append(allCrossTxs, crossTxs...)
 
-	log.Debug("[Generator] Sending single-shard txs ...", "leader", leader, "numTxs", len(txs), "numCrossTxs", len(crossTxs))
+	log.Debug("[Generator] Sending single-shard txs ...", "leader", leader, "numTxs", len(txs))
 	msg := proto_node.ConstructTransactionListMessage(txs)
 	p2p.SendMessage(leader, msg)
 	// Note cross shard txs are later sent in batch
 
 	if len(allCrossTxs) > 0 {
 		log.Debug("[Generator] Broadcasting cross-shard txs ...", "allCrossTxs", len(allCrossTxs))
+		//fmt.Printf("SENDING CLIENT TXS: %d\n", shardId)
+		//fmt.Println(allCrossTxs)
 		msg := proto_node.ConstructTransactionListMessage(allCrossTxs)
 		p2p.BroadcastMessage(leaders, msg)
 
