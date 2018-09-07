@@ -33,6 +33,7 @@ type txGenSettings struct {
 	numOfAddress      int
 	crossShard        bool
 	maxNumTxsPerBatch int
+	crossShardRatio   int
 }
 
 var (
@@ -115,7 +116,7 @@ UTXOLOOP:
 
 					randNum := rand.Intn(100)
 
-					if setting.crossShard && randNum < 30 { // 1/3 cross shard transactions: add another txinput from another shard
+					if setting.crossShard && randNum < setting.crossShardRatio { // 30% cross shard transactions: add another txinput from another shard
 						generateCrossShardTx(&txInfo)
 					} else {
 						generateSingleShardTx(&txInfo)
@@ -234,8 +235,9 @@ func main() {
 	maxNumTxsPerBatch := flag.Int("max_num_txs_per_batch", 100000, "number of transactions to send per message")
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	numSubset := flag.Int("numSubset", 3, "the number of subsets of utxos to process separately")
-	duration := flag.Int("duration", 60, "duration of the tx generation in second")
+	duration := flag.Int("duration", 60, "duration of the tx generation in second. If it's negative, the experiment runs forever.")
 	versionFlag := flag.Bool("version", false, "Output version info")
+	crossShardRatio := flag.Int("cross_shard_ratio", 30, "The percentage of cross shard transactions.")
 	flag.Parse()
 
 	if *versionFlag {
@@ -251,6 +253,7 @@ func main() {
 	// Do cross shard tx if there are more than one shard
 	setting.crossShard = len(shardIds) > 1
 	setting.maxNumTxsPerBatch = *maxNumTxsPerBatch
+	setting.crossShardRatio = *crossShardRatio
 
 	// TODO(Richard): refactor this chuck to a single method
 	// Setup a logger to stdout and log file.
@@ -312,7 +315,7 @@ func main() {
 	batchCounter := 0
 	for true {
 		t := time.Now()
-		if t.Sub(start).Seconds() >= totalTime {
+		if totalTime > 0 && t.Sub(start).Seconds() >= totalTime {
 			log.Debug("Generator timer ended.", "duration", (int(t.Sub(start))), "startTime", start, "totalTime", totalTime)
 			break
 		}
