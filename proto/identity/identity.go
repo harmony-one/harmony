@@ -22,6 +22,7 @@ type MessageType int
 const (
 	REGISTER MessageType = iota
 	ANNOUNCE
+	CONFIG
 )
 
 // Returns string name for the MessageType enum
@@ -29,15 +30,16 @@ func (msgType MessageType) String() string {
 	names := [...]string{
 		"REGISTER",
 		"ANNOUNCE",
+		"CONFIG",
 	}
 
-	if msgType < REGISTER || msgType > ANNOUNCE {
+	if msgType < REGISTER || msgType > CONFIG {
 		return "Unknown"
 	}
 	return names[msgType]
 }
 
-// GetIdentityMessageType Get the consensus message type from the identity message
+// GetIdentityMessageType Get the identity message type from the identity message
 func GetIdentityMessageType(message []byte) (MessageType, error) {
 	if len(message) < 1 {
 		return 0, errors.New("Failed to get identity message type: no data available.")
