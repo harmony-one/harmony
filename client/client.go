@@ -57,6 +57,7 @@ func (client *Client) TransactionMessageHandler(msgPayload []byte) {
 func (client *Client) handleProofOfLockMessage(proofs *[]blockchain.CrossShardTxProof) {
 	txsToSend := []blockchain.Transaction{}
 
+	//fmt.Printf("PENDING CLIENT TX - %d\n", len(client.PendingCrossTxs))
 	// Loop through the newly received list of proofs
 	client.PendingCrossTxsMutex.Lock()
 	for _, proof := range *proofs {
