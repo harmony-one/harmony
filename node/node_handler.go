@@ -360,14 +360,14 @@ func (node *Node) UpdateUtxoAndState(newBlock *blockchain.Block) {
 	}
 	// Clear transaction-in-Consensus list
 	node.transactionInConsensus = []*blockchain.Transaction{}
-	if node.Consensus.IsLeader {
-		fmt.Printf("TX in New BLOCK - %d %s\n", node.UtxoPool.ShardID, newBlock.IsStateBlock())
-		//fmt.Println(newBlock.Transactions)
-		fmt.Printf("LEADER CURRENT UTXO - %d\n", node.UtxoPool.ShardID)
-		fmt.Println(node.UtxoPool.CountNumOfUtxos())
-		fmt.Println(node.UtxoPool)
-		fmt.Printf("LEADER LOCKED UTXO - %d\n", node.UtxoPool.ShardID)
-		fmt.Println(node.UtxoPool.CountNumOfLockedUtxos())
-		fmt.Println(node.UtxoPool.StringOfLockedUtxos())
-	}
+	//if node.Consensus.IsLeader {
+	//	fmt.Printf("TX in New BLOCK - %d %s\n", node.UtxoPool.ShardID, newBlock.IsStateBlock())
+	//	//fmt.Println(newBlock.Transactions)
+	//	fmt.Printf("LEADER CURRENT UTXO - %d\n", node.UtxoPool.ShardID)
+	//	fmt.Println(node.UtxoPool.CountNumOfUtxos())
+	//	fmt.Println(node.UtxoPool)
+	//	fmt.Printf("LEADER LOCKED UTXO - %d\n", node.UtxoPool.ShardID)
+	//	fmt.Println(node.UtxoPool.CountNumOfLockedUtxos())
+	//	fmt.Println(node.UtxoPool.StringOfLockedUtxos())
+	//}
 }
