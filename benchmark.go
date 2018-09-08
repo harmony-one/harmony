@@ -63,7 +63,7 @@ func main() {
 	attackedMode := flag.Int("attacked_mode", 0, "0 means not attacked, 1 means attacked, 2 means being open to be selected as attacked")
 	dbSupported := flag.Bool("db_supported", false, "false means not db_supported, true means db_supported")
 	profile := flag.Bool("profile", false, "Turn on profiling (CPU, Memory).")
-	metricsReportURL := flag.String("metrics_profile_url", "", "If set, reports metrics to this URL.")
+	metricsReportURL := flag.String("metrics_report_url", "", "If set, reports metrics to this URL.")
 	versionFlag := flag.Bool("version", false, "Output version info")
 
 	flag.Parse()
