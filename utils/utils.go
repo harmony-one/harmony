@@ -3,10 +3,7 @@ package utils
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
-	"fmt"
 	"log"
-	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -37,9 +34,6 @@ func GetUniqueIdFromPeer(peer p2p.Peer) uint16 {
 
 // RunCmd Runs command `name` with arguments `args`
 func RunCmd(name string, args ...string) error {
-	if _, err := os.Stat(name); os.IsNotExist(err) {
-		return errors.New(fmt.Sprintf("file: %v doesn't exist", name))
-	}
 	cmd := exec.Command(name, args...)
 	if err := cmd.Start(); err != nil {
 		log.Fatal(err)
