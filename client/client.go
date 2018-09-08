@@ -19,8 +19,9 @@ type Client struct {
 	Leaders              *[]p2p.Peer                          // All the leaders for each shard
 	UpdateBlocks         func([]*blockchain.Block)            // Closure function used to sync new block with the leader. Once the leader finishes the consensus on a new block, it will send it to the clients. Clients use this method to update their blockchain
 
-	ShardUtxoMap map[uint32]blockchain.UtxoMap
-	log          log.Logger // Log utility
+	ShardUtxoMap         map[uint32]blockchain.UtxoMap
+	ShardUtxoMapMutex    sync.Mutex                           // Mutex for the UTXO maps
+	log                  log.Logger                           // Log utility
 }
 
 // The message handler for CLIENT/TRANSACTION messages.
@@ -104,6 +105,8 @@ func (client *Client) handleProofOfLockMessage(proofs *[]blockchain.CrossShardTx
 }
 
 func (client *Client) handleFetchUtxoResponseMessage(utxoResponse client_proto.FetchUtxoResponseMessage) {
+	client.ShardUtxoMapMutex.Lock()
+	defer client.ShardUtxoMapMutex.Unlock()
 	_, ok := client.ShardUtxoMap[utxoResponse.ShardId]
 	if ok {
 		return
