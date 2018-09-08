@@ -22,7 +22,7 @@ const (
 	// The max number of transaction per a block.
 	MaxNumberOfTransactionsPerBlock = 10000
 	// The number of blocks allowed before generating state block
-	NumBlocksBeforeStateBlock = 100
+	NumBlocksBeforeStateBlock = 1000
 )
 
 // NodeHandler handles a new incoming connection.
@@ -360,4 +360,14 @@ func (node *Node) UpdateUtxoAndState(newBlock *blockchain.Block) {
 	}
 	// Clear transaction-in-Consensus list
 	node.transactionInConsensus = []*blockchain.Transaction{}
+	//if node.Consensus.IsLeader {
+	//	fmt.Printf("TX in New BLOCK - %d %s\n", node.UtxoPool.ShardID, newBlock.IsStateBlock())
+	//	//fmt.Println(newBlock.Transactions)
+	//	fmt.Printf("LEADER CURRENT UTXO - %d\n", node.UtxoPool.ShardID)
+	//	fmt.Println(node.UtxoPool.CountNumOfUtxos())
+	//	//fmt.Println(node.UtxoPool)
+	//	fmt.Printf("LEADER LOCKED UTXO - %d\n", node.UtxoPool.ShardID)
+	//	fmt.Println(node.UtxoPool.CountNumOfLockedUtxos())
+	//	//fmt.Println(node.UtxoPool.StringOfLockedUtxos())
+	//}
 }
