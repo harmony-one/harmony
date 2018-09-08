@@ -234,7 +234,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
 		select {
 		case <-readySignal:
 			time.Sleep(100 * time.Millisecond) // Delay a bit so validator is catched up.
-		case <-time.After(10 * time.Second):
+		case <-time.After(100 * time.Second):
 			retry = true
 			node.Consensus.ResetState()
 			timeoutCount++
@@ -372,9 +372,9 @@ func (node *Node) UpdateUtxoAndState(newBlock *blockchain.Block) {
 	//	//fmt.Println(newBlock.Transactions)
 	//	fmt.Printf("LEADER CURRENT UTXO - %d\n", node.UtxoPool.ShardID)
 	//	fmt.Println(node.UtxoPool.CountNumOfUtxos())
-	//	//fmt.Println(node.UtxoPool)
+	//	fmt.Println(node.UtxoPool)
 	//	fmt.Printf("LEADER LOCKED UTXO - %d\n", node.UtxoPool.ShardID)
 	//	fmt.Println(node.UtxoPool.CountNumOfLockedUtxos())
-	//	//fmt.Println(node.UtxoPool.StringOfLockedUtxos())
+	//	fmt.Println(node.UtxoPool.StringOfLockedUtxos())
 	//}
 }
