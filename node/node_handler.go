@@ -77,7 +77,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 			if consensusObj.IsLeader {
 				consensusObj.ProcessMessageLeader(msgPayload)
 			} else {
-				consensusObj.ProcessMessageValidator(msgPayload)
+				consensusObj.ProcessMessageValidator(msgPayload, node.blockSyncing, node.syncNode)
 			}
 		}
 	case proto.NODE:
@@ -97,7 +97,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 				}
 			}
 		case proto_node.BLOCKCHAIN_SYNC:
-			node.transactionMessageHandler(msgPayload)
+			node.handleBlockchainSync(conn)
 		case proto_node.CLIENT:
 			clientMsgType := proto_node.ClientMessageType(msgPayload[0])
 			switch clientMsgType {
@@ -168,6 +168,12 @@ func (node *Node) NodeHandler(conn net.Conn) {
 	}
 }
 
+func (node *Node) handleBlockchainSync(conn net.Conn) {
+	for {
+
+	}
+}
+
 func (node *Node) transactionMessageHandler(msgPayload []byte) {
 	txMessageType := proto_node.TransactionMessageType(msgPayload[0])
 
@@ -224,6 +230,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
 	timeoutCount := 0
 	for { // keep waiting for Consensus ready
 		retry := false
+		// TODO(minhdoan, rj): Refactor by sending signal in channel instead of waiting for 10 seconds.
 		select {
 		case <-readySignal:
 			time.Sleep(100 * time.Millisecond) // Delay a bit so validator is catched up.
