@@ -75,6 +75,10 @@ func main() {
 		case "import":
 			accountImportCommand.Parse(os.Args[3:])
 			priKey := *accountImportPtr
+			if priKey == "" {
+				fmt.Println("Error: --privateKey is required")
+				return
+			}
 			if !accountImportCommand.Parsed() {
 				fmt.Println("Failed to parse flags")
 			}
