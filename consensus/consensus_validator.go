@@ -16,7 +16,7 @@ import (
 )
 
 // Validator's consensus message dispatcher
-func (consensus *Consensus) ProcessMessageValidator(message []byte) {
+func (consensus *Consensus) ProcessMessageValidator(message []byte, blockSyncing chan struct{}, syncNode bool) {
 	msgType, err := proto_consensus.GetConsensusMessageType(message)
 	if err != nil {
 		consensus.Log.Error("Failed to get consensus message type", "err", err, "consensus", consensus)
@@ -27,6 +27,10 @@ func (consensus *Consensus) ProcessMessageValidator(message []byte) {
 		consensus.Log.Error("Failed to get consensus message payload", "err", err, "consensus", consensus)
 	}
 
+	if syncNode {
+		blockSyncing <- struct{}{}
+		return
+	}
 	switch msgType {
 	case proto_consensus.ANNOUNCE:
 		consensus.processAnnounceMessage(payload)

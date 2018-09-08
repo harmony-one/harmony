@@ -41,6 +41,7 @@ type Node struct {
 	IsWaiting              bool
 	Self                   p2p.Peer
 	IDCPeer                p2p.Peer
+	syncNode               bool // TODO(minhdoan): Remove it later.
 }
 
 // Add new crossTx and proofs to the list of crossTx that needs to be sent back to client
@@ -93,6 +94,7 @@ func (node *Node) listenOnPort(port string) {
 		select {
 		case <-node.blockSyncing:
 			// Wait until the syncing part gets finished.
+			node.startBlockSyncing()
 			<-node.doneSyncing
 		default:
 			conn, err := listen.Accept()
@@ -102,6 +104,11 @@ func (node *Node) listenOnPort(port string) {
 			}
 			go node.NodeHandler(conn)
 		}
+	}
+}
+func (node *Node) startBlockSyncing() {
+	// TODO(minhdoan):
+	for {
 	}
 }
 
@@ -127,16 +134,16 @@ func (node *Node) ConnectIdentityChain() {
 }
 
 //NewWaitNode is a way to initiate a waiting no
-func NewWaitNode(peer, IDCPeer p2p.Peer) Node {
+func NewWaitNode(peer, IDCPeer p2p.Peer) *Node {
 	node := Node{}
 	node.Self = peer
 	node.IDCPeer = IDCPeer
 	node.log = log.New()
-	return node
+	return &node
 }
 
 //NewNodefromIDC
-func NewNodefromIDC(node Node, consensus *consensus.Consensus, db *db.LDBDatabase) *Node {
+func NewNodefromIDC(node *Node, consensus *consensus.Consensus, db *db.LDBDatabase) *Node {
 
 	if consensus != nil {
 		// Consensus and associated channel to communicate blocks
@@ -162,7 +169,7 @@ func NewNodefromIDC(node Node, consensus *consensus.Consensus, db *db.LDBDatabas
 	// Logger
 	node.log = log.New()
 
-	return &node
+	return node
 }
 
 func (node *Node) processPOWMessage(message []byte) {
