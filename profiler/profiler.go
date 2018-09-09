@@ -2,8 +2,8 @@ package profiler
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/http"
-	"net/url"
 	"os"
 	"sync"
 	"time"
@@ -61,9 +61,9 @@ func (profiler *Profiler) LogCPU() {
 	}
 }
 
-func (profiler *Profiler) LogMetrics(metrics url.Values) {
-	body := bytes.NewBufferString(metrics.Encode())
-	rsp, err := http.Post(profiler.MetricsReportURL, "application/x-www-form-urlencoded", body)
+func (profiler *Profiler) LogMetrics(metrics map[string]interface{}) {
+	jsonValue, _ := json.Marshal(metrics)
+	rsp, err := http.Post(profiler.MetricsReportURL, "application/json", bytes.NewBuffer(jsonValue))
 	if err == nil {
 		defer rsp.Body.Close()
 	}

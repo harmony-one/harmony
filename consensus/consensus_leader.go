@@ -6,8 +6,6 @@ import (
 	"encoding/gob"
 	"encoding/hex"
 	"errors"
-	"net/url"
-	"strconv"
 	"time"
 
 	"github.com/simple-rules/harmony-benchmark/profiler"
@@ -428,19 +426,17 @@ func (consensus *Consensus) reportMetrics(block blockchain.Block) {
 	}
 
 	txHashes := []string{}
-	for i := 1; i <= 3; i++ {
-		if len(block.TransactionIds)-i >= 0 {
-			txHashes = append(txHashes, hex.EncodeToString(block.TransactionIds[len(block.TransactionIds)-i][:]))
-		}
+	for i, end := 0, len(block.TransactionIds); i < 3 && i < end; i++ {
+		txHashes = append(txHashes, hex.EncodeToString(block.TransactionIds[end-1-i][:]))
 	}
-	metrics := url.Values{
-		"key":             {consensus.pubKey.String()},
-		"tps":             {strconv.FormatFloat(tps, 'f', 2, 64)},
-		"txCount":         {strconv.Itoa(int(numOfTxs))},
-		"nodeCount":       {strconv.Itoa(len(consensus.validators) + 1)},
-		"latestBlockHash": {hex.EncodeToString(consensus.blockHash[:])},
+	metrics := map[string]interface{}{
+		"key":             consensus.pubKey.String(),
+		"tps":             tps,
+		"txCount":         numOfTxs,
+		"nodeCount":       len(consensus.validators) + 1,
+		"latestBlockHash": hex.EncodeToString(consensus.blockHash[:]),
 		"latestTxHashes":  txHashes,
-		"blockLatency":    {strconv.Itoa(int(timeElapsed / time.Millisecond))},
+		"blockLatency":    int(timeElapsed / time.Millisecond),
 	}
 	profiler.LogMetrics(metrics)
 }
