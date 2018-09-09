@@ -128,8 +128,7 @@ UTXOLOOP:
 			}
 		}
 	}
-	//fmt.Printf("UTXO CLIENT - %d\n", shardId)
-	//fmt.Println(dataNodes[shardId].UtxoPool.CountNumOfUtxos())
+	log.Info("UTXO CLIENT", "numUtxo", dataNodes[shardId].UtxoPool.CountNumOfUtxos(), "shardId", shardId)
 	utxoPoolMutex.Unlock()
 	log.Debug("[Generator] generated transations", "single-shard", len(txInfo.txs), "cross-shard", len(txInfo.crossTxs))
 	return txInfo.txs, txInfo.crossTxs

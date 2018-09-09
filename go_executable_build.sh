@@ -10,7 +10,7 @@ BINDIR=bin
 BUCKET=unique-bucket-bin
 GOOS=linux
 GOARCH=amd64
-FOLDER=/$(whoami)
+FOLDER=/${WHOAMI:-$USER}
 
 function usage
 {
