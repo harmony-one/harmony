@@ -47,6 +47,7 @@ func (consensus *Consensus) ProcessMessageValidator(message []byte, blockSyncing
 
 // Processes the announce message sent from the leader
 func (consensus *Consensus) processAnnounceMessage(payload []byte) {
+	consensus.Log.Info("Received Announce Message")
 	//#### Read payload data
 	offset := 0
 	// 4 byte consensus id
@@ -70,6 +71,8 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	signature := payload[offset : offset+64]
 	offset += 64
 	//#### END: Read payload data
+
+	consensus.Log.Info("Received Announce Message", "LeaderId", leaderId)
 
 	copy(consensus.blockHash[:], blockHash[:])
 
