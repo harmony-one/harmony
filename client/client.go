@@ -61,7 +61,7 @@ func (client *Client) handleProofOfLockMessage(proofs *[]blockchain.CrossShardTx
 	//fmt.Printf("PENDING CLIENT TX - %d\n", len(client.PendingCrossTxs))
 	// Loop through the newly received list of proofs
 	client.PendingCrossTxsMutex.Lock()
-	log.Info("CLIENT PENDING TX", "num", len(client.PendingCrossTxs))
+	log.Info("CLIENT PENDING CROSS TX", "num", len(client.PendingCrossTxs))
 	for _, proof := range *proofs {
 		// Find the corresponding pending cross tx
 		txAndProofs, ok := client.PendingCrossTxs[proof.TxID]
