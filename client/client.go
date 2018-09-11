@@ -16,7 +16,7 @@ import (
 type Client struct {
 	PendingCrossTxs      map[[32]byte]*blockchain.Transaction // Map of TxId to pending cross shard txs. Pending means the proof-of-accept/rejects are not complete
 	PendingCrossTxsMutex sync.Mutex                           // Mutex for the pending txs list
-	Leaders              *[]p2p.Peer                          // All the leaders for each shard
+	Leaders              *map[uint32]p2p.Peer                 // Map of shard Id and corresponding leader
 	UpdateBlocks         func([]*blockchain.Block)            // Closure function used to sync new block with the leader. Once the leader finishes the consensus on a new block, it will send it to the clients. Clients use this method to update their blockchain
 
 	ShardUtxoMap      map[uint32]blockchain.UtxoMap
@@ -56,7 +56,7 @@ func (client *Client) TransactionMessageHandler(msgPayload []byte) {
 // 3) checks whether all input utxos of the transaction have a corresponding proof.
 // 4) for all transactions with full proofs, broadcast them back to the leaders
 func (client *Client) handleProofOfLockMessage(proofs *[]blockchain.CrossShardTxProof) {
-	txsToSend := []blockchain.Transaction{}
+	txsToSend := []*blockchain.Transaction{}
 
 	//fmt.Printf("PENDING CLIENT TX - %d\n", len(client.PendingCrossTxs))
 	// Loop through the newly received list of proofs
@@ -89,7 +89,7 @@ func (client *Client) handleProofOfLockMessage(proofs *[]blockchain.CrossShardTx
 		}
 
 		if readyToUnlock {
-			txsToSend = append(txsToSend, *txAndProofs)
+			txsToSend = append(txsToSend, txAndProofs)
 		}
 	}
 
@@ -101,7 +101,7 @@ func (client *Client) handleProofOfLockMessage(proofs *[]blockchain.CrossShardTx
 
 	// Broadcast the cross txs with full proofs for unlock-to-commit/abort
 	if len(txsToSend) != 0 {
-		client.broadcastCrossShardTxUnlockMessage(&txsToSend)
+		client.sendCrossShardTxUnlockMessage(txsToSend)
 	}
 }
 
@@ -115,12 +115,14 @@ func (client *Client) handleFetchUtxoResponseMessage(utxoResponse client_proto.F
 	client.ShardUtxoMap[utxoResponse.ShardId] = utxoResponse.UtxoMap
 }
 
-func (client *Client) broadcastCrossShardTxUnlockMessage(txsToSend *[]blockchain.Transaction) {
-	p2p.BroadcastMessage(*client.Leaders, node.ConstructUnlockToCommitOrAbortMessage(*txsToSend))
+func (client *Client) sendCrossShardTxUnlockMessage(txsToSend []*blockchain.Transaction) {
+	for shardId, txs := range BuildOutputShardTransactionMap(txsToSend) {
+		p2p.SendMessage((*client.Leaders)[shardId], node.ConstructUnlockToCommitOrAbortMessage(txs))
+	}
 }
 
 // Create a new Client
-func NewClient(leaders *[]p2p.Peer) *Client {
+func NewClient(leaders *map[uint32]p2p.Peer) *Client {
 	client := Client{}
 	client.PendingCrossTxs = make(map[[32]byte]*blockchain.Transaction)
 	client.Leaders = leaders
@@ -128,4 +130,40 @@ func NewClient(leaders *[]p2p.Peer) *Client {
 	// Logger
 	client.log = log.New()
 	return &client
+}
+
+func BuildOutputShardTransactionMap(txs []*blockchain.Transaction) map[uint32][]*blockchain.Transaction {
+	txsShardMap := make(map[uint32][]*blockchain.Transaction)
+
+	// Put txs into corresponding output shards
+	for _, crossTx := range txs {
+		for curShardId, _ := range GetOutputShardIdsOfCrossShardTx(crossTx) {
+			txsShardMap[curShardId] = append(txsShardMap[curShardId], crossTx)
+		}
+	}
+	return txsShardMap
+}
+
+func GetInputShardIdsOfCrossShardTx(crossTx *blockchain.Transaction) map[uint32]bool {
+	shardIds := map[uint32]bool{}
+	for _, txInput := range crossTx.TxInput {
+		shardIds[txInput.ShardID] = true
+	}
+	return shardIds
+}
+
+func GetOutputShardIdsOfCrossShardTx(crossTx *blockchain.Transaction) map[uint32]bool {
+	shardIds := map[uint32]bool{}
+	for _, txOutput := range crossTx.TxOutput {
+		shardIds[txOutput.ShardID] = true
+	}
+	return shardIds
+}
+
+func (client *Client) GetLeaders() []p2p.Peer {
+	leaders := []p2p.Peer{}
+	for _, leader := range *client.Leaders {
+		leaders = append(leaders, leader)
+	}
+	return leaders
 }

@@ -237,10 +237,10 @@ func getLeaders() []p2p.Peer {
 func CreateWalletServerNode() *node.Node {
 	configr := client_config.NewConfig()
 	configr.ReadConfigFile("local_config_shards.txt")
-	leaders, _ := configr.GetLeadersAndShardIds()
+	shardIdLeaderMap := configr.GetShardIdToLeaderMap()
 	clientPeer := configr.GetClientPeer()
 	walletNode := node.New(nil, nil)
-	walletNode.Client = client.NewClient(&leaders)
+	walletNode.Client = client.NewClient(&shardIdLeaderMap)
 	walletNode.ClientPeer = clientPeer
 	return walletNode
 }
@@ -254,7 +254,7 @@ func ExecuteTransaction(tx blockchain.Transaction, walletNode *node.Node) error 
 	}
 
 	msg := proto_node.ConstructTransactionListMessage([]*blockchain.Transaction{&tx})
-	p2p.BroadcastMessage(*walletNode.Client.Leaders, msg)
+	p2p.BroadcastMessage(walletNode.Client.GetLeaders(), msg)
 
 	doneSignal := make(chan int)
 	go func() {
@@ -279,7 +279,7 @@ func ExecuteTransaction(tx blockchain.Transaction, walletNode *node.Node) error 
 func FetchUtxos(addresses [][20]byte, walletNode *node.Node) (map[uint32]blockchain.UtxoMap, error) {
 	fmt.Println("Fetching account balance...")
 	walletNode.Client.ShardUtxoMap = make(map[uint32]blockchain.UtxoMap)
-	p2p.BroadcastMessage(*walletNode.Client.Leaders, proto_node.ConstructFetchUtxoMessage(*walletNode.ClientPeer, addresses))
+	p2p.BroadcastMessage(walletNode.Client.GetLeaders(), proto_node.ConstructFetchUtxoMessage(*walletNode.ClientPeer, addresses))
 
 	doneSignal := make(chan int)
 	go func() {

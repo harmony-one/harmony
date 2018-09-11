@@ -58,7 +58,7 @@ type FetchUtxoMessage struct {
 }
 
 // [client] Constructs the unlock to commit or abort message that will be sent to leaders
-func ConstructUnlockToCommitOrAbortMessage(txsAndProofs []blockchain.Transaction) []byte {
+func ConstructUnlockToCommitOrAbortMessage(txsAndProofs []*blockchain.Transaction) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
 	byteBuffer.WriteByte(byte(TRANSACTION))
 	byteBuffer.WriteByte(byte(UNLOCK))
