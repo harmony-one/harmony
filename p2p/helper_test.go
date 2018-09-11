@@ -2,13 +2,9 @@ package p2p_test
 
 import (
 	"bufio"
-	"bytes"
-	"encoding/gob"
 	"net"
-	"reflect"
 	"testing"
 
-	"github.com/simple-rules/harmony-benchmark/blockchain"
 	"github.com/simple-rules/harmony-benchmark/p2p"
 )
 
@@ -55,22 +51,5 @@ func TestNewNewNode(t *testing.T) {
 		if string(data) != myMsg {
 			t.Error("did not receive expected message")
 		}
-	}
-}
-
-func TestGobEncode(t *testing.T) {
-	block := blockchain.CreateTestingGenesisBlock()
-
-	var tmp bytes.Buffer
-	enc := gob.NewEncoder(&tmp)
-	enc.Encode(*block)
-
-	tmp2 := bytes.NewBuffer(tmp.Bytes())
-	dec := gob.NewDecoder(tmp2)
-
-	var block2 blockchain.Block
-	dec.Decode(&block2)
-	if !reflect.DeepEqual(*block, block2) {
-		t.Error("Error in GobEncode")
 	}
 }

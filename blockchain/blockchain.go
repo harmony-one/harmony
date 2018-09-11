@@ -205,16 +205,6 @@ func CreateBlockchain(address [20]byte, shardId uint32) *Blockchain {
 	return &bc
 }
 
-// Creat testing genesis block.
-func CreateTestingGenesisBlock() *Block {
-	priIntOne := 111
-	shardId := uint32(1)
-	testAddressOne := pki.GetAddressFromInt(priIntOne)
-	cbtx := NewCoinbaseTX(testAddressOne, genesisCoinbaseData, shardId)
-	genesis := NewGenesisBlock(cbtx, shardId)
-	return genesis
-}
-
 // Create state block based on the utxos.
 func (bc *Blockchain) CreateStateBlock(utxoPool *UTXOPool) *Block {
 	var numBlocks int32 = 0
