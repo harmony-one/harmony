@@ -15,6 +15,15 @@ type Blockchain struct {
 
 const genesisCoinbaseData = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks"
 
+func (bc *Blockchain) FindBlock(blockHash [32]byte) *Block {
+	for _, block := range bc.Blocks {
+		if bytes.Compare(block.Hash[:], blockHash[:]) == 0 {
+			return block
+		}
+	}
+	return nil
+}
+
 // GetLatestBlock gests the latest block at the end of the chain
 func (bc *Blockchain) GetLatestBlock() *Block {
 	if len(bc.Blocks) == 0 {
@@ -194,6 +203,16 @@ func CreateBlockchain(address [20]byte, shardId uint32) *Blockchain {
 	bc := Blockchain{[]*Block{genesis}}
 
 	return &bc
+}
+
+// Creat testing genesis block.
+func CreateTestingGenesisBlock() *Block {
+	priIntOne := 111
+	shardId := uint32(1)
+	testAddressOne := pki.GetAddressFromInt(priIntOne)
+	cbtx := NewCoinbaseTX(testAddressOne, genesisCoinbaseData, shardId)
+	genesis := NewGenesisBlock(cbtx, shardId)
+	return genesis
 }
 
 // Create state block based on the utxos.

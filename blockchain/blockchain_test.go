@@ -1,8 +1,9 @@
 package blockchain
 
 import (
-	"github.com/simple-rules/harmony-benchmark/crypto/pki"
 	"testing"
+
+	"github.com/simple-rules/harmony-benchmark/crypto/pki"
 )
 
 var (
