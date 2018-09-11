@@ -6,6 +6,14 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"strings"
+
+	"io"
+	"io/ioutil"
+	math_rand "math/rand"
+	"os"
+	"strconv"
+	"time"
 
 	"github.com/dedis/kyber"
 	"github.com/simple-rules/harmony-benchmark/blockchain"
@@ -17,12 +25,6 @@ import (
 	"github.com/simple-rules/harmony-benchmark/p2p"
 	proto_node "github.com/simple-rules/harmony-benchmark/proto/node"
 	"github.com/simple-rules/harmony-benchmark/utils"
-	"io"
-	"io/ioutil"
-	math_rand "math/rand"
-	"os"
-	"strconv"
-	"time"
 )
 
 func main() {
@@ -216,6 +218,20 @@ func main() {
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
+}
+
+func getLeaders() []p2p.Peer {
+	str, _ := client.DownloadUrlAsString("https://s3-us-west-2.amazonaws.com/unique-bucket-bin/leaders.txt")
+	lines := strings.Split(str, "\n")
+	var leaders []p2p.Peer
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		parts := strings.Split(line, " ")
+		leaders = append(leaders, p2p.Peer{Ip: parts[0], Port: parts[1]})
+	}
+	return leaders
 }
 
 func CreateWalletServerNode() *node.Node {
