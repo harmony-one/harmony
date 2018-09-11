@@ -34,14 +34,12 @@ type Node struct {
 	log                    log.Logger                         // Log utility
 	pendingTxMutex         sync.Mutex
 	crossTxToReturnMutex   sync.Mutex
-	blockSyncing           chan struct{}
-	doneSyncing            chan struct{}
 	ClientPeer             *p2p.Peer      // The peer for the benchmark tx generator client, used for leaders to return proof-of-accept
 	Client                 *client.Client // The presence of a client object means this node will also act as a client
 	IsWaiting              bool
 	Self                   p2p.Peer
 	IDCPeer                p2p.Peer
-	syncNode               bool // TODO(minhdoan): Remove it later.
+	SyncNode               bool // TODO(minhdoan): Remove it later.
 }
 
 // Add new crossTx and proofs to the list of crossTx that needs to be sent back to client
@@ -73,6 +71,9 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int) ([]*blockchain.Trans
 
 // Start a server and process the request by a handler.
 func (node *Node) StartServer(port string) {
+	if node.SyncNode {
+		node.startBlockSyncing()
+	}
 	fmt.Println("Hello in server now")
 	node.log.Debug("Starting server", "node", node, "port", port)
 
@@ -91,24 +92,17 @@ func (node *Node) listenOnPort(port string) {
 		return
 	}
 	for {
-		select {
-		case <-node.blockSyncing:
-			// Wait until the syncing part gets finished.
-			node.startBlockSyncing()
-			<-node.doneSyncing
-		default:
-			conn, err := listen.Accept()
-			if err != nil {
-				node.log.Error("Error listening on port.", "port", port)
-				continue
-			}
-			go node.NodeHandler(conn)
+		conn, err := listen.Accept()
+		if err != nil {
+			node.log.Error("Error listening on port.", "port", port)
+			continue
 		}
+		go node.NodeHandler(conn)
 	}
 }
 func (node *Node) startBlockSyncing() {
-	// TODO(minhdoan):
 	for {
+
 	}
 }
 
@@ -245,10 +239,6 @@ func New(consensus *consensus.Consensus, db *db.LDBDatabase) *Node {
 
 		// Initialize level db.
 		node.db = db
-
-		// Initialize channel for syncing.
-		node.doneSyncing = make(chan struct{})
-		node.blockSyncing = make(chan struct{})
 	}
 	// Logger
 	node.log = log.New()

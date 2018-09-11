@@ -97,6 +97,14 @@ func ConstructTransactionListMessage(transactions []*blockchain.Transaction) []b
 	return byteBuffer.Bytes()
 }
 
+// Constructs Blockchain Sync Message.
+func ConstructBlockchainSyncMessage(blockHash [32]byte) []byte {
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
+	byteBuffer.WriteByte(byte(BLOCKCHAIN_SYNC))
+	byteBuffer.Write(blockHash[:])
+	return byteBuffer.Bytes()
+}
+
 // Constructs serialized transactions
 func ConstructRequestTransactionsMessage(transactionIds [][]byte) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})

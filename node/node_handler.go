@@ -1,6 +1,7 @@
 package node
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/gob"
 	"fmt"
@@ -77,7 +78,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 			if consensusObj.IsLeader {
 				consensusObj.ProcessMessageLeader(msgPayload)
 			} else {
-				consensusObj.ProcessMessageValidator(msgPayload, node.blockSyncing, node.syncNode)
+				consensusObj.ProcessMessageValidator(msgPayload)
 			}
 		}
 	case proto.NODE:
@@ -97,7 +98,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 				}
 			}
 		case proto_node.BLOCKCHAIN_SYNC:
-			node.handleBlockchainSync(conn)
+			node.handleBlockchainSync(msgPayload, conn)
 		case proto_node.CLIENT:
 			clientMsgType := proto_node.ClientMessageType(msgPayload[0])
 			switch clientMsgType {
@@ -168,9 +169,12 @@ func (node *Node) NodeHandler(conn net.Conn) {
 	}
 }
 
-func (node *Node) handleBlockchainSync(conn net.Conn) {
-	for {
-
+func (node *Node) handleBlockchainSync(payload []byte, conn net.Conn) {
+	// TODO(minhdoan): Looking to removing this.
+	w := bufio.NewWriter(conn)
+	for _, block := range node.blockchain.Blocks {
+		w.Write(block.Serialize())
+		w.Flush()
 	}
 }
 
