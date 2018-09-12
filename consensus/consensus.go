@@ -172,7 +172,7 @@ func (consensus *Consensus) signMessage(message []byte) []byte {
 	return signature
 }
 
-func (consensus *Consensus) getValidatorPeers() []p2p.Peer {
+func (consensus *Consensus) GetValidatorPeers() []p2p.Peer {
 	validatorPeers := make([]p2p.Peer, 0)
 	for _, validatorPeer := range consensus.validators {
 		validatorPeers = append(validatorPeers, validatorPeer)

@@ -172,10 +172,48 @@ func (node *Node) NodeHandler(conn net.Conn) {
 func (node *Node) handleBlockchainSync(payload []byte, conn net.Conn) {
 	// TODO(minhdoan): Looking to removing this.
 	w := bufio.NewWriter(conn)
-	for _, block := range node.blockchain.Blocks {
-		w.Write(block.Serialize())
-		w.Flush()
+FOR_LOOP:
+	for {
+		syncMsgType := proto_node.BlockchainSyncMessageType(payload[0])
+		switch syncMsgType {
+		case proto_node.GET_BLOCK:
+			block := node.blockchain.FindBlock(payload[1:33])
+			w.Write(block.Serialize())
+			w.Flush()
+		case proto_node.GET_LAST_BLOCK_HASH:
+			block := node.blockchain.GetLatestBlock()
+			w.Write(block.Serialize())
+			w.Flush()
+		case proto_node.DONE:
+			break FOR_LOOP
+		}
+		content, err := p2p.ReadMessageContent(conn)
+
+		if err != nil {
+			node.log.Error("Failed in reading message content from syncing node", err)
+			return
+		}
+
+		msgCategory, _ := proto.GetMessageCategory(content)
+		if err != nil || msgCategory != proto.NODE {
+			node.log.Error("Failed in reading message category from syncing node", err)
+			return
+		}
+
+		msgType, err := proto.GetMessageType(content)
+		actionType := proto_node.NodeMessageType(msgType)
+		if err != nil || actionType != proto_node.BLOCKCHAIN_SYNC {
+			node.log.Error("Failed in reading message type from syncing node", err)
+			return
+		}
+
+		payload, err = proto.GetMessagePayload(content)
+		if err != nil {
+			node.log.Error("Failed in reading payload from syncing node", err)
+			return
+		}
 	}
+	node.log.Info("HOORAY: Done sending info to syncing node.")
 }
 
 func (node *Node) transactionMessageHandler(msgPayload []byte) {

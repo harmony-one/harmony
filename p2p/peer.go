@@ -91,3 +91,10 @@ func send(ip, port string, message []byte) (returnMessage string) {
 	sendWithSocketClient(ip, port, message)
 	return
 }
+
+func DialWithSocketClient(ip, port string) (conn net.Conn, err error) {
+	//log.Printf("Sending message to ip %s and port %s\n", ip, port)
+	addr := strings.Join([]string{ip, port}, ":")
+	conn, err = net.Dial("tcp", addr)
+	return
+}

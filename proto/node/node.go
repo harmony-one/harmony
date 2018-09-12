@@ -21,6 +21,19 @@ const (
 	// TODO: add more types
 )
 
+type BlockchainSyncMessage struct {
+	msgType   BlockchainSyncMessageType
+	blockHash [32]byte
+	block     *blockchain.Block
+}
+type BlockchainSyncMessageType int
+
+const (
+	DONE BlockchainSyncMessageType = iota
+	GET_LAST_BLOCK_HASH
+	GET_BLOCK
+)
+
 // The types of messages used for NODE/TRANSACTION
 type TransactionMessageType int
 
@@ -98,11 +111,19 @@ func ConstructTransactionListMessage(transactions []*blockchain.Transaction) []b
 }
 
 // Constructs Blockchain Sync Message.
-func ConstructBlockchainSyncMessage(blockHash [32]byte) []byte {
+func ConstructBlockchainSyncMessage(msgType BlockchainSyncMessageType, blockHash [32]byte) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
 	byteBuffer.WriteByte(byte(BLOCKCHAIN_SYNC))
+	byteBuffer.WriteByte(byte(msgType))
 	byteBuffer.Write(blockHash[:])
 	return byteBuffer.Bytes()
+}
+
+func GenerateBlockchainSyncMessage(payload []byte) *BlockchainSyncMessage {
+	dec := gob.NewDecoder(bytes.NewBuffer(payload))
+	var res BlockchainSyncMessage
+	dec.Decode(&res)
+	return &res
 }
 
 // Constructs serialized transactions

@@ -1,22 +1,23 @@
 package node
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/gob"
 	"fmt"
 	"net"
 	"sync"
 
-	"github.com/simple-rules/harmony-benchmark/crypto/pki"
-	"github.com/simple-rules/harmony-benchmark/pow"
-	"github.com/simple-rules/harmony-benchmark/proto/identity"
-
 	"github.com/simple-rules/harmony-benchmark/blockchain"
 	"github.com/simple-rules/harmony-benchmark/client"
 	"github.com/simple-rules/harmony-benchmark/consensus"
+	"github.com/simple-rules/harmony-benchmark/crypto/pki"
 	"github.com/simple-rules/harmony-benchmark/db"
 	"github.com/simple-rules/harmony-benchmark/log"
 	"github.com/simple-rules/harmony-benchmark/p2p"
+	"github.com/simple-rules/harmony-benchmark/pow"
+	"github.com/simple-rules/harmony-benchmark/proto/identity"
+	proto_node "github.com/simple-rules/harmony-benchmark/proto/node"
 )
 
 // Node represents a program (machine) participating in the network
@@ -40,6 +41,19 @@ type Node struct {
 	Self                   p2p.Peer
 	IDCPeer                p2p.Peer
 	SyncNode               bool // TODO(minhdoan): Remove it later.
+}
+
+type SyncPeerConfig struct {
+	peer        p2p.Peer
+	conn        net.Conn
+	block       *blockchain.Block
+	w           *bufio.Writer
+	receivedMsg []byte
+	err         error
+}
+
+type SyncConfig struct {
+	peers []SyncPeerConfig
 }
 
 // Add new crossTx and proofs to the list of crossTx that needs to be sent back to client
@@ -101,8 +115,64 @@ func (node *Node) listenOnPort(port string) {
 	}
 }
 func (node *Node) startBlockSyncing() {
-	for {
+	peers := node.Consensus.GetValidatorPeers()
+	peer_number := len(peers)
+	syncConfig := SyncConfig{
+		peers: make([]SyncPeerConfig, peer_number),
+	}
+	for id := range syncConfig.peers {
+		syncConfig.peers[id].peer = peers[id]
+	}
 
+	var wg sync.WaitGroup
+	wg.Add(peer_number)
+
+	for id := range syncConfig.peers {
+		go func(peerConfig *SyncPeerConfig) {
+			defer wg.Done()
+			peerConfig.conn, peerConfig.err = p2p.DialWithSocketClient(peerConfig.peer.Ip, peerConfig.peer.Port)
+		}(&syncConfig.peers[id])
+	}
+	wg.Wait()
+
+	activePeerNumber := 0
+	for _, configPeer := range syncConfig.peers {
+		if configPeer.err == nil {
+			activePeerNumber++
+			configPeer.w = bufio.NewWriter(configPeer.conn)
+		}
+	}
+	var prevHash [32]byte
+	for {
+		var wg sync.WaitGroup
+		wg.Add(activePeerNumber)
+
+		for _, configPeer := range syncConfig.peers {
+			if configPeer.err != nil {
+				continue
+			}
+			go func(peerConfig *SyncPeerConfig, prevHash [32]byte) {
+				msg := proto_node.ConstructBlockchainSyncMessage(proto_node.GET_BLOCK, prevHash)
+				peerConfig.w.Write(msg)
+				peerConfig.w.Flush()
+			}(&configPeer, prevHash)
+		}
+		wg.Wait()
+		wg.Add(activePeerNumber)
+
+		for _, configPeer := range syncConfig.peers {
+			if configPeer.err != nil {
+				continue
+			}
+			go func(peerConfig *SyncPeerConfig, prevHash [32]byte) {
+				defer wg.Done()
+				peerConfig.receivedMsg, peerConfig.err = p2p.ReadMessageContent(peerConfig.conn)
+				if peerConfig.err == nil {
+					peerConfig.block, peerConfig.err = blockchain.DeserializeBlock(peerConfig.receivedMsg)
+				}
+			}(&configPeer, prevHash)
+		}
+		wg.Wait()
 	}
 }
 
