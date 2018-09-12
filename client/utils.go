@@ -2,12 +2,12 @@ package client
 
 import (
 	"bytes"
-	"github.com/simple-rules/harmony-benchmark/crypto/pki"
 	"io"
 	"log"
 	"net/http"
 	"sync"
 
+	"github.com/simple-rules/harmony-benchmark/crypto/pki"
 )
 
 var AddressToIntPriKeyMap map[[20]byte]int // For convenience, we use int as the secret seed for generating private key

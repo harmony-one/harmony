@@ -95,7 +95,7 @@ func generateSimulatedTransactions(subsetId, numSubset int, shardId int, dataNod
 	txInfo.txCount = 0
 
 UTXOLOOP:
-    // Loop over all addresses
+	// Loop over all addresses
 	for address, txMap := range dataNodes[shardId].UtxoPool.UtxoMap {
 		if int(binary.BigEndian.Uint32(address[:]))%numSubset == subsetId%numSubset { // Work on one subset of utxo at a time
 			txInfo.address = address
