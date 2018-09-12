@@ -169,6 +169,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 	}
 }
 
+// Refactor by moving this code into a sync package.
 func (node *Node) handleBlockchainSync(payload []byte, conn net.Conn) {
 	// TODO(minhdoan): Looking to removing this.
 	w := bufio.NewWriter(conn)
@@ -181,8 +182,11 @@ FOR_LOOP:
 			w.Write(block.Serialize())
 			w.Flush()
 		case proto_node.GET_LAST_BLOCK_HASH:
-			block := node.blockchain.GetLatestBlock()
-			w.Write(block.Serialize())
+			blockchainSyncMessage := proto_node.BlockchainSyncMessage{
+				Block:       node.blockchain.GetLatestBlock(),
+				BlockHeight: len(node.blockchain.Blocks),
+			}
+			w.Write(proto_node.SerializeBlockchainSyncMessage(&blockchainSyncMessage))
 			w.Flush()
 		case proto_node.DONE:
 			break FOR_LOOP

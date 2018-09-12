@@ -3,6 +3,7 @@ package node
 import (
 	"bytes"
 	"encoding/gob"
+	"log"
 
 	"github.com/simple-rules/harmony-benchmark/blockchain"
 	"github.com/simple-rules/harmony-benchmark/p2p"
@@ -22,9 +23,8 @@ const (
 )
 
 type BlockchainSyncMessage struct {
-	msgType   BlockchainSyncMessageType
-	blockHash [32]byte
-	block     *blockchain.Block
+	Block       *blockchain.Block
+	BlockHeight int
 }
 type BlockchainSyncMessageType int
 
@@ -68,6 +68,28 @@ const (
 type FetchUtxoMessage struct {
 	Addresses [][20]byte
 	Sender    p2p.Peer
+}
+
+// Serialize serializes the block
+func SerializeBlockchainSyncMessage(blockchainSyncMessage *BlockchainSyncMessage) []byte {
+	var result bytes.Buffer
+	encoder := gob.NewEncoder(&result)
+	err := encoder.Encode(blockchainSyncMessage)
+	if err != nil {
+		log.Panic(err)
+	}
+	return result.Bytes()
+}
+
+// DeserializeBlock deserializes a block
+func DeserializeBlock(d []byte) (*BlockchainSyncMessage, error) {
+	var blockchainSyncMessage BlockchainSyncMessage
+	decoder := gob.NewDecoder(bytes.NewReader(d))
+	err := decoder.Decode(&blockchainSyncMessage)
+	if err != nil {
+		log.Panic(err)
+	}
+	return &blockchainSyncMessage, err
 }
 
 // [client] Constructs the unlock to commit or abort message that will be sent to leaders
