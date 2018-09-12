@@ -23,14 +23,14 @@ const (
 )
 
 type BlockchainSyncMessage struct {
-	Block       *blockchain.Block
 	BlockHeight int
+	BlockHashes [][32]byte
 }
 type BlockchainSyncMessageType int
 
 const (
 	DONE BlockchainSyncMessageType = iota
-	GET_LAST_BLOCK_HASH
+	GET_LAST_BLOCK_HASHES
 	GET_BLOCK
 )
 
@@ -82,7 +82,7 @@ func SerializeBlockchainSyncMessage(blockchainSyncMessage *BlockchainSyncMessage
 }
 
 // DeserializeBlock deserializes a block
-func DeserializeBlock(d []byte) (*BlockchainSyncMessage, error) {
+func DeserializeBlockchainSyncMessage(d []byte) (*BlockchainSyncMessage, error) {
 	var blockchainSyncMessage BlockchainSyncMessage
 	decoder := gob.NewDecoder(bytes.NewReader(d))
 	err := decoder.Decode(&blockchainSyncMessage)
@@ -137,7 +137,9 @@ func ConstructBlockchainSyncMessage(msgType BlockchainSyncMessageType, blockHash
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
 	byteBuffer.WriteByte(byte(BLOCKCHAIN_SYNC))
 	byteBuffer.WriteByte(byte(msgType))
-	byteBuffer.Write(blockHash[:])
+	if msgType != GET_LAST_BLOCK_HASHES {
+		byteBuffer.Write(blockHash[:])
+	}
 	return byteBuffer.Bytes()
 }
 

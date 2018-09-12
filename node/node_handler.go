@@ -181,10 +181,10 @@ FOR_LOOP:
 			block := node.blockchain.FindBlock(payload[1:33])
 			w.Write(block.Serialize())
 			w.Flush()
-		case proto_node.GET_LAST_BLOCK_HASH:
+		case proto_node.GET_LAST_BLOCK_HASHES:
 			blockchainSyncMessage := proto_node.BlockchainSyncMessage{
-				Block:       node.blockchain.GetLatestBlock(),
 				BlockHeight: len(node.blockchain.Blocks),
+				BlockHashes: node.blockchain.GetBlockHashes(),
 			}
 			w.Write(proto_node.SerializeBlockchainSyncMessage(&blockchainSyncMessage))
 			w.Flush()

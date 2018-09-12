@@ -48,6 +48,14 @@ func (bc *Blockchain) GetLatestBlock() *Block {
 	return bc.Blocks[len(bc.Blocks)-1]
 }
 
+func (bc *Blockchain) GetBlockHashes() [][32]byte {
+	res := [][32]byte{}
+	for _, block := range bc.Blocks {
+		res = append(res, block.Hash)
+	}
+	return res
+}
+
 // FindUnspentTransactions returns a list of transactions containing unspent outputs
 func (bc *Blockchain) FindUnspentTransactions(address [20]byte) []Transaction {
 	var unspentTXs []Transaction

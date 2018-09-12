@@ -8,6 +8,7 @@ import (
 	"net"
 	"sync"
 
+	"github.com/Workiva/go-datastructures/queue"
 	"github.com/simple-rules/harmony-benchmark/blockchain"
 	"github.com/simple-rules/harmony-benchmark/client"
 	"github.com/simple-rules/harmony-benchmark/consensus"
@@ -50,8 +51,15 @@ type SyncPeerConfig struct {
 	w           *bufio.Writer
 	receivedMsg []byte
 	err         error
+	trusted     bool
+	indexes     []uint16
+	blockHashes [][32]byte
 }
 
+type SyncBlockTask struct {
+	index     int
+	blockHash [32]byte
+}
 type SyncConfig struct {
 	peers []SyncPeerConfig
 }
@@ -114,6 +122,11 @@ func (node *Node) listenOnPort(port string) {
 		go node.NodeHandler(conn)
 	}
 }
+
+func (node *Node) getConsensus(syncConfig *SyncConfig) bool {
+	return true
+}
+
 func (node *Node) startBlockSyncing() {
 	peers := node.Consensus.GetValidatorPeers()
 	peer_number := len(peers)
@@ -122,6 +135,7 @@ func (node *Node) startBlockSyncing() {
 	}
 	for id := range syncConfig.peers {
 		syncConfig.peers[id].peer = peers[id]
+		syncConfig.peers[id].trusted = false
 	}
 
 	var wg sync.WaitGroup
@@ -140,9 +154,12 @@ func (node *Node) startBlockSyncing() {
 		if configPeer.err == nil {
 			activePeerNumber++
 			configPeer.w = bufio.NewWriter(configPeer.conn)
+			configPeer.trusted = true
 		}
 	}
-	var prevHash [32]byte
+
+	// Looping to get an array of block hashes from honest nodes.
+LOOP_HONEST_NODE:
 	for {
 		var wg sync.WaitGroup
 		wg.Add(activePeerNumber)
@@ -151,26 +168,55 @@ func (node *Node) startBlockSyncing() {
 			if configPeer.err != nil {
 				continue
 			}
-			go func(peerConfig *SyncPeerConfig, prevHash [32]byte) {
-				msg := proto_node.ConstructBlockchainSyncMessage(proto_node.GET_BLOCK, prevHash)
+			go func(peerConfig *SyncPeerConfig) {
+				defer wg.Done()
+				msg := proto_node.ConstructBlockchainSyncMessage(proto_node.GET_LAST_BLOCK_HASHES, [32]byte{})
 				peerConfig.w.Write(msg)
 				peerConfig.w.Flush()
-			}(&configPeer, prevHash)
+				var content []byte
+				content, peerConfig.err = p2p.ReadMessageContent(peerConfig.conn)
+				if peerConfig.err != nil {
+					peerConfig.trusted = false
+					return
+				}
+				var blockchainSyncMessage *proto_node.BlockchainSyncMessage
+				blockchainSyncMessage, peerConfig.err = proto_node.DeserializeBlockchainSyncMessage(content)
+				if peerConfig.err != nil {
+					peerConfig.trusted = false
+					return
+				}
+				peerConfig.blockHashes = blockchainSyncMessage.BlockHashes
+			}(&configPeer)
 		}
 		wg.Wait()
+
+		if node.getConsensus(&syncConfig) {
+			break LOOP_HONEST_NODE
+		}
+	}
+
+	taskSyncQueue := queue.New(0)
+TASK_LOOP:
+	for _, configPeer := range syncConfig.peers {
+		if configPeer.trusted {
+			for id, blockHash := range configPeer.blockHashes {
+				taskSyncQueue.Put(SyncBlockTask{index: id, blockHash: blockHash})
+			}
+			break TASK_LOOP
+		}
+	}
+	// loop to do syncing.
+	for {
+		var wg sync.WaitGroup
 		wg.Add(activePeerNumber)
 
 		for _, configPeer := range syncConfig.peers {
 			if configPeer.err != nil {
 				continue
 			}
-			go func(peerConfig *SyncPeerConfig, prevHash [32]byte) {
+			go func(peerConfig *SyncPeerConfig, taskSyncQueue *queue.Queue) {
 				defer wg.Done()
-				peerConfig.receivedMsg, peerConfig.err = p2p.ReadMessageContent(peerConfig.conn)
-				if peerConfig.err == nil {
-					peerConfig.block, peerConfig.err = blockchain.DeserializeBlock(peerConfig.receivedMsg)
-				}
-			}(&configPeer, prevHash)
+			}(&configPeer, taskSyncQueue)
 		}
 		wg.Wait()
 	}
