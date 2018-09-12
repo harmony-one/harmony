@@ -361,14 +361,16 @@ func main() {
 		utxoPoolMutex.Unlock()
 		wg.Wait()
 
-		go func() {
-			for shardId, txs := range shardIdTxsMap { // Send the txs to corresponding shards
+		lock.Lock()
+		for shardId, txs := range shardIdTxsMap { // Send the txs to corresponding shards
+			go func() {
 				SendTxsToLeader(shardIdLeaderMap[shardId], txs)
-			}
-		}()
+			}()
+		}
+		lock.Unlock()
 
 		subsetCounter++
-		time.Sleep(2000 * time.Millisecond)
+		time.Sleep(5000 * time.Millisecond)
 	}
 
 	// Send a stop message to stop the nodes at the end
