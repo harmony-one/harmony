@@ -15,7 +15,11 @@ type Blockchain struct {
 
 const genesisCoinbaseData = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks"
 
-func (bc *Blockchain) FindBlock(blockHash [32]byte) *Block {
+// blockHash should have size of 32.
+func (bc *Blockchain) FindBlock(blockHash []byte) *Block {
+	if len(blockHash) != 32 {
+		return nil
+	}
 	for _, block := range bc.Blocks {
 		if bytes.Compare(block.Hash[:], blockHash[:]) == 0 {
 			return block

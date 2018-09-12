@@ -50,14 +50,14 @@ func (b *Block) Serialize() []byte {
 }
 
 // DeserializeBlock deserializes a block
-func DeserializeBlock(d []byte) *Block {
+func DeserializeBlock(d []byte) (*Block, error) {
 	var block Block
 	decoder := gob.NewDecoder(bytes.NewReader(d))
 	err := decoder.Decode(&block)
 	if err != nil {
 		log.Panic(err)
 	}
-	return &block
+	return &block, err
 }
 
 // Used for debuging.

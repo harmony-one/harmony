@@ -13,7 +13,7 @@ func TestBlockSerialize(t *testing.T) {
 	block := NewGenesisBlock(cbtx, 0)
 
 	serializedValue := block.Serialize()
-	deserializedBlock := DeserializeBlock(serializedValue)
+	deserializedBlock, _ := DeserializeBlock(serializedValue)
 
 	if !reflect.DeepEqual(block, deserializedBlock) {
 		t.Errorf("Original block and the deserialized block not equal.")
