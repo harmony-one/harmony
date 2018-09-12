@@ -28,6 +28,18 @@ func (bc *Blockchain) FindBlock(blockHash []byte) *Block {
 	return nil
 }
 
+func (bc *Blockchain) FindBlockWithPrevHash(prevHash []byte) *Block {
+	if len(prevHash) != 32 {
+		return nil
+	}
+	for _, block := range bc.Blocks {
+		if bytes.Compare(block.PrevBlockHash[:], prevHash[:]) == 0 {
+			return block
+		}
+	}
+	return nil
+}
+
 // GetLatestBlock gests the latest block at the end of the chain
 func (bc *Blockchain) GetLatestBlock() *Block {
 	if len(bc.Blocks) == 0 {
