@@ -137,12 +137,12 @@ LOOP:
 	return txs, crossTxs
 }
 
-func initClient(clientNode *node.Node, clientPort string, leaders *[]p2p.Peer, nodes *[]*node.Node) {
+func initClient(clientNode *node.Node, clientPort string, shardIdLeaderMap *map[uint32]p2p.Peer, nodes *[]*node.Node) {
 	if clientPort == "" {
 		return
 	}
 
-	clientNode.Client = client.NewClient(leaders)
+	clientNode.Client = client.NewClient(shardIdLeaderMap)
 
 	// This func is used to update the client's utxopool when new blocks are received from the leaders
 	updateBlocksFunc := func(blocks []*blockchain.Block) {
@@ -178,10 +178,10 @@ func main() {
 	// Read the configs
 	config := client_config.NewConfig()
 	config.ReadConfigFile(*configFile)
-	leaders, shardIDs := config.GetLeadersAndShardIds()
+	shardIdLeaderMap := config.GetShardIdToLeaderMap()
 
 	// Do cross shard tx if there are more than one shard
-	setting.crossShard = len(shardIDs) > 1
+	setting.crossShard = len(shardIdLeaderMap) > 1
 	setting.maxNumTxsPerBatch = *maxNumTxsPerBatch
 
 	// TODO(Richard): refactor this chuck to a single method
@@ -199,7 +199,7 @@ func main() {
 
 	// Nodes containing utxopools to mirror the shards' data in the network
 	nodes := []*node.Node{}
-	for _, shardID := range shardIDs {
+	for shardID, _ := range shardIdLeaderMap {
 		nodes = append(nodes, node.New(&consensus.Consensus{ShardID: shardID}, nil))
 	}
 
@@ -208,12 +208,17 @@ func main() {
 	consensusObj := consensus.NewConsensus("0", clientPort, "0", nil, p2p.Peer{})
 	clientNode := node.New(consensusObj, nil)
 
-	initClient(clientNode, clientPort, &leaders, &nodes)
+	initClient(clientNode, clientPort, &shardIdLeaderMap, &nodes)
 
 	// Transaction generation process
 	time.Sleep(10 * time.Second) // wait for nodes to be ready
 	start := time.Now()
 	totalTime := 300.0 //run for 5 minutes
+
+	leaders := []p2p.Peer{}
+	for _, leader := range shardIdLeaderMap {
+		leaders = append(leaders, leader)
+	}
 
 	for true {
 		t := time.Now()
@@ -224,8 +229,8 @@ func main() {
 
 		allCrossTxs := []*blockchain.Transaction{}
 		// Generate simulated transactions
-		for i, leader := range leaders {
-			txs, crossTxs := generateSimulatedTransactions(i, nodes)
+		for shardId, leader := range shardIdLeaderMap {
+			txs, crossTxs := generateSimulatedTransactions(int(shardId), nodes)
 			allCrossTxs = append(allCrossTxs, crossTxs...)
 
 			log.Debug("[Generator] Sending single-shard txs ...", "leader", leader, "numTxs", len(txs), "numCrossTxs", len(crossTxs), "block height", btcTXIter.GetBlockIndex())

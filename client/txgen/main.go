@@ -254,11 +254,11 @@ func main() {
 	// Read the configs
 	config := client_config.NewConfig()
 	config.ReadConfigFile(*configFile)
-	leaders, shardIds := config.GetLeadersAndShardIds()
+	shardIdLeaderMap := config.GetShardIdToLeaderMap()
 
 	setting.numOfAddress = 10000
 	// Do cross shard tx if there are more than one shard
-	setting.crossShard = len(shardIds) > 1
+	setting.crossShard = len(shardIdLeaderMap) > 1
 	setting.maxNumTxsPerBatch = *maxNumTxsPerBatch
 	setting.crossShardRatio = *crossShardRatio
 
@@ -273,7 +273,7 @@ func main() {
 
 	// Nodes containing utxopools to mirror the shards' data in the network
 	nodes := []*node.Node{}
-	for _, shardId := range shardIds {
+	for shardId, _ := range shardIdLeaderMap {
 		node := node.New(&consensus.Consensus{ShardID: shardId}, nil)
 		// Assign many fake addresses so we have enough address to play with at first
 		node.AddTestingAddresses(setting.numOfAddress)
@@ -286,7 +286,7 @@ func main() {
 	clientNode := node.New(consensusObj, nil)
 
 	if clientPort != "" {
-		clientNode.Client = client.NewClient(&leaders)
+		clientNode.Client = client.NewClient(&shardIdLeaderMap)
 
 		// This func is used to update the client's utxopool when new blocks are received from the leaders
 		updateBlocksFunc := func(blocks []*blockchain.Block) {
@@ -319,53 +319,51 @@ func main() {
 	start := time.Now()
 	totalTime := float64(*duration)
 
-	batchCounter := 0
+	subsetCounter := 0
 	for true {
 		t := time.Now()
 		if totalTime > 0 && t.Sub(start).Seconds() >= totalTime {
 			log.Debug("Generator timer ended.", "duration", (int(t.Sub(start))), "startTime", start, "totalTime", totalTime)
 			break
 		}
-		for shardId := 0; shardId < len(nodes); shardId++ {
-			constructAndSendTransaction(batchCounter, *numSubset, shardId, leaders, nodes, clientNode, clientPort)
+		shardIdTxsMap := make(map[uint32][]*blockchain.Transaction)
+		for shardId, _ := range shardIdLeaderMap { // Generate simulated transactions
+			txs, crossTxs := generateSimulatedTransactions(subsetCounter, *numSubset, int(shardId), nodes)
+
+			// Put cross shard tx into a pending list waiting for proofs from leaders
+			if clientPort != "" {
+				clientNode.Client.PendingCrossTxsMutex.Lock()
+				for _, tx := range crossTxs {
+					clientNode.Client.PendingCrossTxs[tx.ID] = tx
+				}
+				clientNode.Client.PendingCrossTxsMutex.Unlock()
+			}
+
+			// Put txs into corresponding shards
+			shardIdTxsMap[shardId] = append(shardIdTxsMap[shardId], txs...)
+			for _, crossTx := range crossTxs {
+				for curShardId, _ := range client.GetInputShardIdsOfCrossShardTx(crossTx) {
+					shardIdTxsMap[curShardId] = append(shardIdTxsMap[curShardId], crossTx)
+				}
+			}
 		}
-		batchCounter++
-		time.Sleep(5000 * time.Millisecond)
+
+		for shardId, txs := range shardIdTxsMap { // Send the txs to corresponding shards
+			SendTxsToLeader(shardIdLeaderMap[shardId], txs)
+		}
+
+		subsetCounter++
+		time.Sleep(2000 * time.Millisecond)
 	}
 
 	// Send a stop message to stop the nodes at the end
 	msg := proto_node.ConstructStopMessage()
-	peers := append(config.GetValidators(), leaders...)
+	peers := append(config.GetValidators(), clientNode.Client.GetLeaders()...)
 	p2p.BroadcastMessage(peers, msg)
 }
 
-func constructAndSendTransaction(subsetId, numSubset, shardId int, leaders []p2p.Peer, nodes []*node.Node, clientNode *node.Node, clientPort string) {
-	allCrossTxs := []*blockchain.Transaction{}
-	// Generate simulated transactions
-	leader := leaders[shardId]
-
-	txs, crossTxs := generateSimulatedTransactions(subsetId, numSubset, shardId, nodes)
-	allCrossTxs = append(allCrossTxs, crossTxs...)
-
-	log.Debug("[Generator] Sending single-shard txs ...", "leader", leader, "numTxs", len(txs))
+func SendTxsToLeader(leader p2p.Peer, txs []*blockchain.Transaction) {
+	log.Debug("[Generator] Sending txs to...", "leader", leader, "numTxs", len(txs))
 	msg := proto_node.ConstructTransactionListMessage(txs)
 	p2p.SendMessage(leader, msg)
-	// Note cross shard txs are later sent in batch
-
-	if len(allCrossTxs) > 0 {
-		log.Debug("[Generator] Broadcasting cross-shard txs ...", "allCrossTxs", len(allCrossTxs))
-		//fmt.Printf("SENDING CLIENT TXS: %d\n", shardId)
-		//fmt.Println(allCrossTxs)
-		msg := proto_node.ConstructTransactionListMessage(allCrossTxs)
-		p2p.BroadcastMessage(leaders, msg)
-
-		// Put cross shard tx into a pending list waiting for proofs from leaders
-		if clientPort != "" {
-			clientNode.Client.PendingCrossTxsMutex.Lock()
-			for _, tx := range allCrossTxs {
-				clientNode.Client.PendingCrossTxs[tx.ID] = tx
-			}
-			clientNode.Client.PendingCrossTxsMutex.Unlock()
-		}
-	}
 }

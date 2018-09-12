@@ -27,6 +27,7 @@ func (consensus *Consensus) ProcessMessageValidator(message []byte) {
 		consensus.Log.Error("Failed to get consensus message payload", "err", err, "consensus", consensus)
 	}
 
+	consensus.Log.Info("Received consensus Message", "type", msgType)
 	switch msgType {
 	case proto_consensus.ANNOUNCE:
 		consensus.processAnnounceMessage(payload)
@@ -67,8 +68,6 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	signature := payload[offset : offset+64]
 	offset += 64
 	//#### END: Read payload data
-
-	consensus.Log.Info("Received Announce Message", "LeaderId", leaderId)
 
 	copy(consensus.blockHash[:], blockHash[:])
 
