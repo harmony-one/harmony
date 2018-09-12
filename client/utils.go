@@ -2,22 +2,29 @@ package client
 
 import (
 	"bytes"
+	"github.com/simple-rules/harmony-benchmark/crypto/pki"
 	"io"
 	"log"
 	"net/http"
+	"sync"
 
-	"github.com/simple-rules/harmony-benchmark/crypto/pki"
 )
 
 var AddressToIntPriKeyMap map[[20]byte]int // For convenience, we use int as the secret seed for generating private key
+var AddressToIntPriKeyMapLock sync.Mutex
 
-func LookUpIntPriKey(address [20]byte) (int, bool) {
+func InitLookUpIntPriKeyMap() {
 	if AddressToIntPriKeyMap == nil {
+		AddressToIntPriKeyMapLock.Lock()
 		AddressToIntPriKeyMap = make(map[[20]byte]int)
 		for i := 1; i <= 10000; i++ {
 			AddressToIntPriKeyMap[pki.GetAddressFromInt(i)] = i
 		}
+		AddressToIntPriKeyMapLock.Unlock()
 	}
+}
+
+func LookUpIntPriKey(address [20]byte) (int, bool) {
 	value, ok := AddressToIntPriKeyMap[address]
 	return value, ok
 }

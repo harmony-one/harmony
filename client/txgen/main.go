@@ -89,14 +89,13 @@ func generateSimulatedTransactions(subsetId, numSubset int, shardId int, dataNod
 	               ]
 	*/
 
-	utxoPoolMutex.Lock()
 	txInfo := TxInfo{}
 	txInfo.shardID = shardId
 	txInfo.dataNodes = dataNodes
 	txInfo.txCount = 0
 
 UTXOLOOP:
-	// Loop over all addresses
+    // Loop over all addresses
 	for address, txMap := range dataNodes[shardId].UtxoPool.UtxoMap {
 		if int(binary.BigEndian.Uint32(address[:]))%numSubset == subsetId%numSubset { // Work on one subset of utxo at a time
 			txInfo.address = address
@@ -129,7 +128,6 @@ UTXOLOOP:
 		}
 	}
 	log.Info("UTXO CLIENT", "numUtxo", dataNodes[shardId].UtxoPool.CountNumOfUtxos(), "shardId", shardId)
-	utxoPoolMutex.Unlock()
 	log.Debug("[Generator] generated transations", "single-shard", len(txInfo.txs), "cross-shard", len(txInfo.crossTxs))
 	return txInfo.txs, txInfo.crossTxs
 }
@@ -319,7 +317,9 @@ func main() {
 	start := time.Now()
 	totalTime := float64(*duration)
 
+	client.InitLookUpIntPriKeyMap()
 	subsetCounter := 0
+
 	for true {
 		t := time.Now()
 		if totalTime > 0 && t.Sub(start).Seconds() >= totalTime {
@@ -327,30 +327,45 @@ func main() {
 			break
 		}
 		shardIdTxsMap := make(map[uint32][]*blockchain.Transaction)
+		lock := sync.Mutex{}
+		var wg sync.WaitGroup
+		wg.Add(len(shardIdLeaderMap))
+
+		utxoPoolMutex.Lock()
+		log.Warn("STARTING TX GEN")
 		for shardId, _ := range shardIdLeaderMap { // Generate simulated transactions
-			txs, crossTxs := generateSimulatedTransactions(subsetCounter, *numSubset, int(shardId), nodes)
+			go func() {
+				txs, crossTxs := generateSimulatedTransactions(subsetCounter, *numSubset, int(shardId), nodes)
 
-			// Put cross shard tx into a pending list waiting for proofs from leaders
-			if clientPort != "" {
-				clientNode.Client.PendingCrossTxsMutex.Lock()
-				for _, tx := range crossTxs {
-					clientNode.Client.PendingCrossTxs[tx.ID] = tx
+				// Put cross shard tx into a pending list waiting for proofs from leaders
+				if clientPort != "" {
+					clientNode.Client.PendingCrossTxsMutex.Lock()
+					for _, tx := range crossTxs {
+						clientNode.Client.PendingCrossTxs[tx.ID] = tx
+					}
+					clientNode.Client.PendingCrossTxsMutex.Unlock()
 				}
-				clientNode.Client.PendingCrossTxsMutex.Unlock()
-			}
 
-			// Put txs into corresponding shards
-			shardIdTxsMap[shardId] = append(shardIdTxsMap[shardId], txs...)
-			for _, crossTx := range crossTxs {
-				for curShardId, _ := range client.GetInputShardIdsOfCrossShardTx(crossTx) {
-					shardIdTxsMap[curShardId] = append(shardIdTxsMap[curShardId], crossTx)
+				lock.Lock()
+				// Put txs into corresponding shards
+				shardIdTxsMap[shardId] = append(shardIdTxsMap[shardId], txs...)
+				for _, crossTx := range crossTxs {
+					for curShardId, _ := range client.GetInputShardIdsOfCrossShardTx(crossTx) {
+						shardIdTxsMap[curShardId] = append(shardIdTxsMap[curShardId], crossTx)
+					}
 				}
-			}
+				lock.Unlock()
+				wg.Done()
+			}()
 		}
+		utxoPoolMutex.Unlock()
+		wg.Wait()
 
-		for shardId, txs := range shardIdTxsMap { // Send the txs to corresponding shards
-			SendTxsToLeader(shardIdLeaderMap[shardId], txs)
-		}
+		go func() {
+			for shardId, txs := range shardIdTxsMap { // Send the txs to corresponding shards
+				SendTxsToLeader(shardIdLeaderMap[shardId], txs)
+			}
+		}()
 
 		subsetCounter++
 		time.Sleep(2000 * time.Millisecond)
