@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/Workiva/go-datastructures/queue"
 	"github.com/simple-rules/harmony-benchmark/blockchain"
@@ -196,14 +197,20 @@ LOOP_HONEST_NODE:
 	}
 
 	taskSyncQueue := queue.New(0)
+	blockSize := 0
 TASK_LOOP:
 	for _, configPeer := range syncConfig.peers {
 		if configPeer.trusted {
 			for id, blockHash := range configPeer.blockHashes {
 				taskSyncQueue.Put(SyncBlockTask{index: id, blockHash: blockHash})
 			}
+			blockSize = len(configPeer.blockHashes)
 			break TASK_LOOP
 		}
+	}
+	// Initialize blockchain
+	node.blockchain = &blockchain.Blockchain{
+		Blocks: make([]*blockchain.Block, blockSize),
 	}
 	// loop to do syncing.
 	for {
@@ -214,9 +221,29 @@ TASK_LOOP:
 			if configPeer.err != nil {
 				continue
 			}
-			go func(peerConfig *SyncPeerConfig, taskSyncQueue *queue.Queue) {
+			go func(peerConfig *SyncPeerConfig, taskSyncQueue *queue.Queue, bc *blockchain.Blockchain) {
 				defer wg.Done()
-			}(&configPeer, taskSyncQueue)
+				for !taskSyncQueue.Empty() {
+					task, err := taskSyncQueue.Poll(1, time.Millisecond)
+					if err == queue.ErrTimeout {
+						break
+					}
+					syncTask := task[0].(SyncBlockTask)
+					msg := proto_node.ConstructBlockchainSyncMessage(proto_node.GET_BLOCK, syncTask.blockHash)
+					peerConfig.w.Write(msg)
+					peerConfig.w.Flush()
+					var content []byte
+					content, peerConfig.err = p2p.ReadMessageContent(peerConfig.conn)
+					if peerConfig.err != nil {
+						peerConfig.trusted = false
+						return
+					}
+					block, err := blockchain.DeserializeBlock(content)
+					if err == nil {
+						bc.Blocks[syncTask.index] = block
+					}
+				}
+			}(&configPeer, taskSyncQueue, node.blockchain)
 		}
 		wg.Wait()
 	}
