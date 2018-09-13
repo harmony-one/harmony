@@ -9,7 +9,6 @@ import (
 	"github.com/dedis/kyber/sign/schnorr"
 	"github.com/simple-rules/harmony-benchmark/crypto"
 	"github.com/simple-rules/harmony-benchmark/log"
-	"math/rand"
 	"sync"
 )
 
@@ -409,9 +408,9 @@ func (utxoPool *UTXOPool) SelectTransactionsForNewBlock(transactions []*Transact
 		err, crossShard := utxoPool.VerifyOneTransaction(tx, &spentTXOs)
 
 		if len(selected) < maxNumTxs {
-			if err != nil && rand.Intn(10) < 1 {
-				log.Warn("Invalid Transaction", "Reason", err)
-			}
+			//if err != nil && rand.Intn(10) < 1 {
+			//	log.Warn("Invalid Transaction", "Reason", err)
+			//}
 			if err == nil || crossShard {
 				if crossShard {
 					proof := CrossShardTxProof{Accept: err == nil, TxID: tx.ID, TxInput: getShardTxInput(tx, utxoPool.ShardID)}
