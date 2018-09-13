@@ -13,10 +13,11 @@ import (
 )
 
 type ConfigEntry struct {
-	IP      string
-	Port    string
-	Role    string
-	ShardID string
+	IP          string
+	Port        string
+	Role        string
+	ShardID     string
+	ValidatorID int // Validator ID in its shard.
 }
 
 type DistributionConfig struct {
@@ -29,21 +30,6 @@ func NewDistributionConfig() *DistributionConfig {
 	return &config
 }
 
-// done
-// Gets all the validator peers
-func (config *DistributionConfig) GetValidators() []p2p.Peer {
-	var peerList []p2p.Peer
-	for _, entry := range config.config {
-		if entry.Role != "validator" {
-			continue
-		}
-		peer := p2p.Peer{Port: entry.Port, Ip: entry.IP}
-		peerList = append(peerList, peer)
-	}
-	return peerList
-}
-
-// done
 // Gets all the leader peers and corresponding shard Ids
 func (config *DistributionConfig) GetLeadersAndShardIds() ([]p2p.Peer, []uint32) {
 	var peerList []p2p.Peer
@@ -96,9 +82,16 @@ func (config *DistributionConfig) ReadConfigFile(filename string) error {
 	fscanner := bufio.NewScanner(file)
 
 	result := []ConfigEntry{}
+	validatorMap := map[int]int{}
 	for fscanner.Scan() {
 		p := strings.Split(fscanner.Text(), " ")
-		entry := ConfigEntry{p[0], p[1], p[2], p[3]}
+		shardID, _ := strconv.Atoi(p[3])
+		validatorID := -1
+		if p[2] == "validator" {
+			validatorID = validatorMap[shardID]
+			validatorMap[shardID]++
+		}
+		entry := ConfigEntry{p[0], p[1], p[2], p[3], validatorID}
 		result = append(result, entry)
 	}
 	config.config = result
@@ -123,7 +116,7 @@ func (config *DistributionConfig) GetPeers(ip, port, shardID string) []p2p.Peer 
 			continue
 		}
 		// Get public key deterministically based on ip and port
-		peer := p2p.Peer{Port: entry.Port, Ip: entry.IP}
+		peer := p2p.Peer{Port: entry.Port, Ip: entry.IP, ValidatorID: entry.ValidatorID}
 		setKey(&peer)
 		peerList = append(peerList, peer)
 	}

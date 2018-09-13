@@ -15,12 +15,15 @@ import (
 
 // Peer is the object for a p2p peer (node)
 type Peer struct {
-	Ip     string      // Ip address of the peer
-	Port   string      // Port number of the peer
-	PubKey kyber.Point // Public key of the peer
-	Ready  bool        // Ready is true if the peer is ready to join consensus.
+	Ip          string      // Ip address of the peer
+	Port        string      // Port number of the peer
+	PubKey      kyber.Point // Public key of the peer
+	Ready       bool        // Ready is true if the peer is ready to join consensus.
+	ValidatorID int
 	// TODO(minhdoan, rj): use this Ready to not send/broadcast to this peer if it wasn't available.
 }
+
+const MAX_BROADCAST = 20
 
 // SendMessage sends the message to the peer
 func SendMessage(peer Peer, msg []byte) {
@@ -32,6 +35,24 @@ func SendMessage(peer Peer, msg []byte) {
 
 // BroadcastMessage sends the message to a list of peers
 func BroadcastMessage(peers []Peer, msg []byte) {
+	// Construct broadcast p2p message
+	content := ConstructP2pMessage(byte(17), msg)
+
+	var wg sync.WaitGroup
+	wg.Add(len(peers))
+
+	for _, peer := range peers {
+		peerCopy := peer
+		go func() {
+			defer wg.Done()
+			send(peerCopy.Ip, peerCopy.Port, content)
+		}()
+	}
+	wg.Wait()
+}
+
+// BroadcastMessage sends the message to a list of peers from a leader.
+func BroadcastMessageFromLeader(peers []Peer, msg []byte) {
 	// Construct broadcast p2p message
 	content := ConstructP2pMessage(byte(17), msg)
 
