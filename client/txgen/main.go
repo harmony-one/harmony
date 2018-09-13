@@ -335,7 +335,7 @@ func main() {
 		utxoPoolMutex.Lock()
 		log.Warn("STARTING TX GEN", "gomaxprocs", runtime.GOMAXPROCS(0))
 		for shardId, _ := range shardIdLeaderMap { // Generate simulated transactions
-			go func() {
+			go func(shardId uint32) {
 				txs, crossTxs := generateSimulatedTransactions(subsetCounter, *numSubset, int(shardId), nodes)
 
 				// Put cross shard tx into a pending list waiting for proofs from leaders
@@ -357,16 +357,16 @@ func main() {
 				}
 				lock.Unlock()
 				wg.Done()
-			}()
+			}(shardId)
 		}
 		utxoPoolMutex.Unlock()
 		wg.Wait()
 
 		lock.Lock()
 		for shardId, txs := range shardIdTxsMap { // Send the txs to corresponding shards
-			go func() {
+			go func(shardId uint32, txs []*blockchain.Transaction) {
 				SendTxsToLeader(shardIdLeaderMap[shardId], txs)
-			}()
+			}(shardId, txs)
 		}
 		lock.Unlock()
 
