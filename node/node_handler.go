@@ -26,6 +26,12 @@ const (
 	NumBlocksBeforeStateBlock = 1000
 )
 
+func (node *Node) MaybeBroadcastAsValidator(content []byte) {
+	if node.SelfPeer.ValidatorID > 0 && node.SelfPeer.ValidatorID < p2p.MAX_BROADCAST {
+		go p2p.BroadcastMessageFromValidator(node.SelfPeer, node.Consensus.GetValidatorPeers(), content)
+	}
+}
+
 // NodeHandler handles a new incoming connection.
 func (node *Node) NodeHandler(conn net.Conn) {
 	defer conn.Close()
@@ -37,6 +43,8 @@ func (node *Node) NodeHandler(conn net.Conn) {
 		node.log.Error("Read p2p data failed", "err", err, "node", node)
 		return
 	}
+	node.MaybeBroadcastAsValidator(content)
+
 	consensusObj := node.Consensus
 
 	msgCategory, err := proto.GetMessageCategory(content)
