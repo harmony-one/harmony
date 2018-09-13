@@ -3,12 +3,14 @@ package p2p
 import (
 	"bytes"
 	"encoding/binary"
-	"log"
 	"net"
+	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/simple-rules/harmony-benchmark/attack"
+	"github.com/simple-rules/harmony-benchmark/log"
 
 	"github.com/dedis/kyber"
 )
@@ -38,6 +40,8 @@ func BroadcastMessage(peers []Peer, msg []byte) {
 	var wg sync.WaitGroup
 	wg.Add(len(peers))
 
+	log.Info("Start Broadcasting", "gomaxprocs", runtime.GOMAXPROCS(0))
+	start := time.Now()
 	for _, peer := range peers {
 		peerCopy := peer
 		go func() {
@@ -46,6 +50,7 @@ func BroadcastMessage(peers []Peer, msg []byte) {
 		}()
 	}
 	wg.Wait()
+	log.Info("Broadcasting Down", "time spent", time.Now().Sub(start).Seconds())
 }
 
 // ConstructP2pMessage constructs the p2p message as [messageType, contentSize, content]
