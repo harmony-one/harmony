@@ -123,6 +123,17 @@ func (config *DistributionConfig) GetPeers(ip, port, shardID string) []p2p.Peer 
 	return peerList
 }
 
+// GetPeers Gets the validator list
+func (config *DistributionConfig) GetSelfPeer(ip, port, shardID string) p2p.Peer {
+	for _, entry := range config.config {
+		if entry.IP == ip && entry.Port == port && entry.ShardID == shardID {
+			peer := p2p.Peer{Port: entry.Port, Ip: entry.IP, ValidatorID: entry.ValidatorID}
+			return peer
+		}
+	}
+	return p2p.Peer{}
+}
+
 // GetLeader Gets the leader of this shard id
 func (config *DistributionConfig) GetLeader(shardID string) p2p.Peer {
 	var leaderPeer p2p.Peer

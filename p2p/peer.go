@@ -56,11 +56,42 @@ func BroadcastMessage(peers []Peer, msg []byte) {
 	log.Info("Broadcasting Down", "time spent", time.Now().Sub(start).Seconds())
 }
 
+func SelectMyPeers(peers []Peer, min int, max int) []Peer {
+	res := []Peer{}
+	for _, peer := range peers {
+		if peer.ValidatorID >= min && peer.ValidatorID <= max {
+			res = append(res, peer)
+		}
+	}
+	return res
+}
+
 // BroadcastMessage sends the message to a list of peers from a leader.
 func BroadcastMessageFromLeader(peers []Peer, msg []byte) {
 	// Construct broadcast p2p message
 	content := ConstructP2pMessage(byte(17), msg)
 
+	peers = SelectMyPeers(peers, 0, MAX_BROADCAST-1)
+	var wg sync.WaitGroup
+	wg.Add(len(peers))
+
+	for _, peer := range peers {
+		peerCopy := peer
+		go func() {
+			defer wg.Done()
+			send(peerCopy.Ip, peerCopy.Port, content)
+		}()
+	}
+	wg.Wait()
+}
+
+// BroadcastMessage sends the message to a list of peers from a leader.
+func BroadcastMessageFromValidator(Self Peer, peers []Peer, msg []byte) {
+
+	// Construct broadcast p2p message
+	content := ConstructP2pMessage(byte(17), msg)
+
+	peers = SelectMyPeers(peers, 0, MAX_BROADCAST-1)
 	var wg sync.WaitGroup
 	wg.Add(len(peers))
 

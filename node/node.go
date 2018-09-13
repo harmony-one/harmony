@@ -37,6 +37,7 @@ type Node struct {
 	ClientPeer             *p2p.Peer      // The peer for the benchmark tx generator client, used for leaders to return proof-of-accept
 	Client                 *client.Client // The presence of a client object means this node will also act as a client
 	IsWaiting              bool
+	SelfPeer               p2p.Peer // TODO(minhdoan): it could be duplicated with Self below whose is Alok work.
 	Self                   p2p.Peer
 	IDCPeer                p2p.Peer
 	SyncNode               bool // TODO(minhdoan): Remove it later.

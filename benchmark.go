@@ -84,6 +84,7 @@ func main() {
 	shardID := distributionConfig.GetShardID(*ip, *port)
 	peers := distributionConfig.GetPeers(*ip, *port, shardID)
 	leader := distributionConfig.GetLeader(shardID)
+	selfPeer := distributionConfig.GetSelfPeer(*ip, *port, shardID)
 
 	var role string
 	if leader.Ip == *ip && leader.Port == *port {
@@ -123,6 +124,8 @@ func main() {
 	attack.GetInstance().SetLogger(consensus.Log)
 	// Current node.
 	currentNode := node.New(consensus, ldb)
+	// Add self peer.
+	currentNode.SelfPeer = selfPeer
 	// Add sync node configuration.
 	currentNode.SyncNode = *syncNode
 	// Create client peer.
