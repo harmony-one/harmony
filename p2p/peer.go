@@ -76,7 +76,7 @@ func sendWithSocketClient(ip, port string, message []byte) (res string) {
 	conn, err := net.Dial("tcp", addr)
 
 	if err != nil {
-		log.Println(err)
+		log.Warn("Error dailing tcp", "address", addr, "error", err)
 		return
 	}
 	defer conn.Close()
