@@ -86,7 +86,7 @@ func (consensus *Consensus) startConsensus(newBlock *blockchain.Block) {
 	consensus.blockHeader = byteBuffer.Bytes()
 
 	msgToSend := consensus.constructAnnounceMessage()
-	p2p.BroadcastMessage(consensus.GetValidatorPeers(), msgToSend)
+	p2p.BroadcastMessageFromLeader(consensus.GetValidatorPeers(), msgToSend)
 	// Set state to ANNOUNCE_DONE
 	consensus.state = ANNOUNCE_DONE
 	consensus.commitByLeader(true)
@@ -203,7 +203,7 @@ func (consensus *Consensus) processCommitMessage(payload []byte, targetState Con
 		consensus.responseByLeader(challengeScalar, targetState == CHALLENGE_DONE)
 
 		// Broadcast challenge message
-		p2p.BroadcastMessage(consensus.GetValidatorPeers(), msgToSend)
+		p2p.BroadcastMessageFromLeader(consensus.GetValidatorPeers(), msgToSend)
 
 		// Set state to targetState (CHALLENGE_DONE or FINAL_CHALLENGE_DONE)
 		consensus.state = targetState
@@ -349,7 +349,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState C
 				// Start the second round of Cosi
 				msgToSend := consensus.constructCollectiveSigMessage(collectiveSig, bitmap)
 
-				p2p.BroadcastMessage(consensus.GetValidatorPeers(), msgToSend)
+				p2p.BroadcastMessageFromLeader(consensus.GetValidatorPeers(), msgToSend)
 				consensus.commitByLeader(false)
 			} else {
 				consensus.Log.Debug("Consensus reached with signatures.", "numOfSignatures", len(*responses))
