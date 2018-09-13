@@ -8,6 +8,8 @@ import (
 	"log"
 	"net"
 	"time"
+
+	"github.com/golang/snappy"
 )
 
 /*
@@ -113,4 +115,19 @@ func SendMessageContent(conn net.Conn, data []byte) {
 	w := bufio.NewWriter(conn)
 	w.Write(msgToSend)
 	w.Flush()
+}
+
+func decompressContent(content []byte) []byte {
+	var decomp []byte
+	decomp, err := snappy.Decode(decomp, content)
+	if err != nil {
+		log.Printf("Could not de-compress content")
+	}
+	return decomp
+}
+
+func compressContent(content []byte) []byte {
+	var comp []byte
+	comp = snappy.Encode(comp, content)
+	return comp
 }

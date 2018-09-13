@@ -65,7 +65,7 @@ func ConstructP2pMessage(msgType byte, content []byte) []byte {
 	byteBuffer.WriteByte(firstByte)
 	byteBuffer.Write(sizeBytes)
 	byteBuffer.Write(content)
-	return byteBuffer.Bytes()
+	return compressContent(byteBuffer.Bytes())
 }
 
 // SocketClient is to connect a socket given a port and send the given message.
