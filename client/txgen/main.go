@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"os"
 	"path"
+	"runtime"
 	"sync"
 	"time"
 
@@ -332,7 +333,7 @@ func main() {
 		wg.Add(len(shardIdLeaderMap))
 
 		utxoPoolMutex.Lock()
-		log.Warn("STARTING TX GEN")
+		log.Warn("STARTING TX GEN", "gomaxprocs", runtime.GOMAXPROCS(0))
 		for shardId, _ := range shardIdLeaderMap { // Generate simulated transactions
 			go func() {
 				txs, crossTxs := generateSimulatedTransactions(subsetCounter, *numSubset, int(shardId), nodes)
@@ -370,7 +371,7 @@ func main() {
 		lock.Unlock()
 
 		subsetCounter++
-		time.Sleep(5000 * time.Millisecond)
+		//time.Sleep(5000 * time.Millisecond)
 	}
 
 	// Send a stop message to stop the nodes at the end
