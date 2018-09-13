@@ -128,7 +128,7 @@ func (node *Node) getConsensus(syncConfig *SyncConfig) bool {
 	return true
 }
 
-func (node *Node) startBlockSyncing() {
+func (node *Node) startBlockSyncing() *blockchain.Blockchain {
 	peers := node.Consensus.GetValidatorPeers()
 	peer_number := len(peers)
 	syncConfig := SyncConfig{
@@ -209,7 +209,7 @@ TASK_LOOP:
 		}
 	}
 	// Initialize blockchain
-	node.blockchain = &blockchain.Blockchain{
+	bc := &blockchain.Blockchain{
 		Blocks: make([]*blockchain.Block, blockSize),
 	}
 	// loop to do syncing.
@@ -243,10 +243,11 @@ TASK_LOOP:
 						bc.Blocks[syncTask.index] = block
 					}
 				}
-			}(&configPeer, taskSyncQueue, node.blockchain)
+			}(&configPeer, taskSyncQueue, bc)
 		}
 		wg.Wait()
 	}
+	return bc
 }
 
 func (node *Node) String() string {
