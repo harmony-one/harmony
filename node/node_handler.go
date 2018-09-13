@@ -43,7 +43,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 		node.log.Error("Read p2p data failed", "err", err, "node", node)
 		return
 	}
-	node.MaybeBroadcastAsValidator(content)
+	// node.MaybeBroadcastAsValidator(content)
 
 	consensusObj := node.Consensus
 

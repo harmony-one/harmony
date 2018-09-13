@@ -68,7 +68,8 @@ func SelectMyPeers(peers []Peer, min int, max int) []Peer {
 
 // BroadcastMessage sends the message to a list of peers from a leader.
 func BroadcastMessageFromLeader(peers []Peer, msg []byte) {
-	peers = SelectMyPeers(peers, 0, MAX_BROADCAST-1)
+	// TODO(minhdoan): Enable back for multicast.
+	// peers = SelectMyPeers(peers, 0, MAX_BROADCAST-1)
 	BroadcastMessage(peers, msg)
 }
 
