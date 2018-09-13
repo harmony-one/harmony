@@ -20,6 +20,7 @@ import (
 	"github.com/simple-rules/harmony-benchmark/pow"
 	"github.com/simple-rules/harmony-benchmark/proto/identity"
 	proto_node "github.com/simple-rules/harmony-benchmark/proto/node"
+	"github.com/simple-rules/harmony-benchmark/syncing"
 )
 
 // Node represents a program (machine) participating in the network
@@ -95,7 +96,7 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int) ([]*blockchain.Trans
 // Start a server and process the request by a handler.
 func (node *Node) StartServer(port string) {
 	if node.SyncNode {
-		node.startBlockSyncing()
+		node.blockchain = syncing.StartBlockSyncing(node.Consensus.GetValidatorPeers())
 	}
 	fmt.Println("Hello in server now")
 	node.log.Debug("Starting server", "node", node, "port", port)
