@@ -3,12 +3,14 @@ package p2p
 import (
 	"bytes"
 	"encoding/binary"
-	"log"
 	"net"
+	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/simple-rules/harmony-benchmark/attack"
+	"github.com/simple-rules/harmony-benchmark/log"
 
 	"github.com/dedis/kyber"
 )
@@ -41,6 +43,8 @@ func BroadcastMessage(peers []Peer, msg []byte) {
 	var wg sync.WaitGroup
 	wg.Add(len(peers))
 
+	log.Info("Start Broadcasting", "gomaxprocs", runtime.GOMAXPROCS(0))
+	start := time.Now()
 	for _, peer := range peers {
 		peerCopy := peer
 		go func() {
@@ -49,6 +53,7 @@ func BroadcastMessage(peers []Peer, msg []byte) {
 		}()
 	}
 	wg.Wait()
+	log.Info("Broadcasting Down", "time spent", time.Now().Sub(start).Seconds())
 }
 
 // BroadcastMessage sends the message to a list of peers from a leader.
@@ -92,7 +97,7 @@ func sendWithSocketClient(ip, port string, message []byte) (res string) {
 	conn, err := net.Dial("tcp", addr)
 
 	if err != nil {
-		log.Println(err)
+		log.Warn("Error dailing tcp", "address", addr, "error", err)
 		return
 	}
 	defer conn.Close()

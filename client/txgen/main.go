@@ -371,7 +371,7 @@ func main() {
 		lock.Unlock()
 
 		subsetCounter++
-		//time.Sleep(5000 * time.Millisecond)
+		time.Sleep(3000 * time.Millisecond)
 	}
 
 	// Send a stop message to stop the nodes at the end
