@@ -232,7 +232,6 @@ func (consensus *Consensus) responseByLeader(challenge kyber.Scalar, firstRound 
 
 // Processes the response message sent from validators
 func (consensus *Consensus) processResponseMessage(payload []byte, targetState ConsensusState) {
-	consensus.Log.Warn("Received RESPONSE 1")
 	//#### Read payload data
 	offset := 0
 	// 4 byte consensus id
@@ -282,7 +281,6 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState C
 		return
 	}
 
-	consensus.Log.Warn("Received RESPONSE 2")
 	commitments := consensus.commitments // targetState == COLLECTIVE_SIG_DONE
 	responses := consensus.responses
 	bitmap := consensus.bitmap
@@ -297,7 +295,6 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState C
 	shouldProcess = shouldProcess && !ok
 
 	if len((*responses)) >= ((len(consensus.publicKeys)*2)/3 + 1) {
-		consensus.Log.Warn("quiting 3")
 		shouldProcess = false
 	}
 
@@ -318,11 +315,9 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState C
 	}
 
 	if !shouldProcess {
-		consensus.Log.Warn("returning 3")
 		return
 	}
 
-	consensus.Log.Warn("Received RESPONSE 3")
 	if len(*responses) >= ((len(consensus.publicKeys)*2)/3+1) && consensus.state != targetState {
 		if len(*responses) >= ((len(consensus.publicKeys)*2)/3+1) && consensus.state != targetState {
 			consensus.Log.Debug("Enough responses received with signatures", "num", len(*responses), "state", consensus.state)

@@ -127,6 +127,7 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	consensus.secret[consensusId] = secret
 
 	p2p.SendMessage(consensus.leader, msgToSend)
+	// consensus.Log.Warn("Sending Commit to leader", "state", targetState)
 
 	// Set state to COMMIT_DONE
 	consensus.state = COMMIT_DONE
@@ -244,7 +245,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte, targetState 
 	msgToSend := consensus.constructResponseMessage(msgTypeToSend, response)
 
 	p2p.SendMessage(consensus.leader, msgToSend)
-	consensus.Log.Warn("Sending Response", "state", targetState)
+	// consensus.Log.Warn("Sending Response to leader", "state", targetState)
 	// Set state to target state (RESPONSE_DONE, FINAL_RESPONSE_DONE)
 	consensus.state = targetState
 
