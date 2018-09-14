@@ -88,8 +88,8 @@ func (config *DistributionConfig) ReadConfigFile(filename string) error {
 		shardID, _ := strconv.Atoi(p[3])
 		validatorID := -1
 		if p[2] == "validator" {
-			validatorID = validatorMap[shardID]
 			validatorMap[shardID]++
+			validatorID = validatorMap[shardID]
 		}
 		entry := ConfigEntry{p[0], p[1], p[2], p[3], validatorID}
 		result = append(result, entry)
