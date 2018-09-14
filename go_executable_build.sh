@@ -1,9 +1,105 @@
 #!/usr/bin/env bash
+declare -A SRC
+SRC[benchmark]=benchmark.go
+SRC[txgen]=client/txgen/main.go
+
+BINDIR=bin
+BUCKET=unique-bucket-bin
 GOOS=linux
 GOARCH=amd64
-env GOOS=$GOOS GOARCH=$GOARCH go build -o bin/benchmark benchmark.go
-env GOOS=$GOOS GOARCH=$GOARCH go build -o bin/txgen client/txgen/main.go
+FOLDER=/${WHOAMI:-$USER}
 
-aws s3 cp bin/benchmark s3://unique-bucket-bin/benchmark --acl public-read-write
-aws s3 cp bin/txgen s3://unique-bucket-bin/txgen --acl public-read-write
-aws s3 cp kill_node.sh s3://unique-bucket-bin/kill_node.sh --acl public-read-write
+if [ "$(uname -s)" == "Darwin" ]; then
+   MD5='md5 -r'
+else
+   MD5=md5sum
+fi
+
+function usage
+{
+   ME=$(basename $0)
+   cat<<EOF
+
+Usage: $ME [OPTIONS] ACTION
+
+OPTIONS:
+   -h             print this help message
+   -p profile     aws profile name
+   -a arch        set build arch (default: $GOARCH)
+   -o os          set build OS (default: $GOOS, windows is supported)
+   -b bucket      set the upload bucket name (default: $BUCKET)
+   -f folder      set the upload folder name in the bucket (default: $FOLDER)
+
+ACTION:
+   build       build binaries only (default action)
+   upload      upload binaries to s3
+
+EXAMPLES:
+
+# build linux binaries only by default
+   $ME
+
+# build windows binaries
+   $ME -o windows
+
+# upload binaries to my s3 bucket, 0908 folder
+   $ME -b mybucket -f 0908 upload
+
+EOF
+   exit 1
+}
+
+function build_only
+{
+   VERSION=$(git rev-list --all --count)
+   COMMIT=$(git describe --always --long --dirty)
+   BUILTAT=$(date +%FT%T%z)
+   BUILTBY=${USER}@
+
+   for bin in "${!SRC[@]}"; do
+      env GOOS=$GOOS GOARCH=$GOARCH go build -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin ${SRC[$bin]}
+      if [ "$(uname -s)" == "Linux" ]; then
+         $BINDIR/$bin -version
+      fi
+   done
+
+   $MD5 $BINDIR/* > $BINDIR/md5sum.txt 2> /dev/null
+}
+
+function upload
+{
+   AWSCLI=aws
+
+   if [ -n "$PROFILE" ]; then
+      AWSCLI+=" --profile $PROFILE"
+   fi
+
+   for bin in "${!SRC[@]}"; do
+      [ -e $BINDIR/$bin ] && $AWSCLI s3 cp $BINDIR/$bin s3://${BUCKET}$FOLDER/$bin --acl public-read
+   done
+   [ -e $BINDIR/md5sum.txt ] && $AWSCLI s3 cp $BINDIR/md5sum.txt s3://${BUCKET}$FOLDER/md5sum.txt --acl public-read
+}
+
+################################ MAIN FUNCTION ##############################
+while getopts "hp:a:o:b:f:" option; do
+   case $option in
+      h) usage ;;
+      p) PROFILE=$OPTARG ;;
+      a) GOARCH=$OPTARG ;;
+      o) GOOS=$OPTARG ;;
+      b) BUCKET=$OPTARG/ ;;
+      f) FOLDER=$OPTARG ;;
+   esac
+done
+
+mkdir -p $BINDIR
+
+shift $(($OPTIND-1))
+
+ACTION=${1:-build}
+
+case "$ACTION" in
+   "build") build_only ;;
+   "upload") upload ;;
+   *) usage ;;
+esac
