@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/simple-rules/harmony-benchmark/blockchain"
 	"github.com/simple-rules/harmony-benchmark/client"
@@ -93,11 +94,13 @@ func (node *Node) listenOnPort(port string) {
 		return
 	}
 	defer listen.Close()
+	backoff := p2p.NewExpBackoff(250*time.Millisecond, 15*time.Second, 2.0)
 	for {
 		conn, err := listen.Accept()
 		if err != nil {
 			node.log.Error("Error listening on port.", "port", port,
 				"err", err)
+			backoff.Sleep()
 			continue
 		}
 		go node.NodeHandler(conn)
