@@ -93,6 +93,10 @@ func (node *Node) listenOnPort(port string) {
 		node.log.Error("Socket listen port failed", "addr", addr, "err", err)
 		return
 	}
+	if listen == nil {
+		node.log.Error("Listen returned nil", "addr", addr)
+		return
+	}
 	for {
 		conn, err := listen.Accept()
 		if err != nil {
