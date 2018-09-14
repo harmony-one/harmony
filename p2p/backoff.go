@@ -16,7 +16,7 @@ type BackoffBase struct {
 	Min, Cur, Max time.Duration
 }
 
-func NewBackoffBase(min, max time.Duration) *BackoffBase{
+func NewBackoffBase(min, max time.Duration) *BackoffBase {
 	return &BackoffBase{min, min, max}
 }
 
