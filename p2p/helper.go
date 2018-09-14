@@ -132,6 +132,6 @@ func decompressContent(content []byte) ([]byte, error) {
 
 func compressContent(content []byte) []byte {
 	var comp []byte
-	comp = snappy.Encode(comp, content)
+	comp = snappy.Encode(nil, content)
 	return comp
 }
