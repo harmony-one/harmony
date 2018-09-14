@@ -53,7 +53,7 @@ func BroadcastMessage(peers []Peer, msg []byte) {
 		}()
 	}
 	wg.Wait()
-	log.Info("Broadcasting Done", "time spent", time.Now().Sub(start).Seconds())
+	log.Info("Broadcasting Done", "time spent(s)", time.Now().Sub(start).Seconds())
 }
 
 func SelectMyPeers(peers []Peer, min int, max int) []Peer {

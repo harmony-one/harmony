@@ -67,7 +67,7 @@ type Consensus struct {
 	// Blocks received but not done with consensus yet
 	blocksReceived map[uint32]*BlockConsensusStatus
 	// Commitment secret
-	secret kyber.Scalar
+	secret map[uint32]kyber.Scalar
 
 	// Signal channel for starting a new consensus process
 	ReadySignal chan struct{}
@@ -116,7 +116,7 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 
 	// Initialize cosign bitmap
 	allPublicKeys := make([]kyber.Point, 0)
-	for _, validatorPeer := range consensus.validators {
+	for _, validatorPeer := range peers {
 		allPublicKeys = append(allPublicKeys, validatorPeer.PubKey)
 	}
 	allPublicKeys = append(allPublicKeys, leader.PubKey)
@@ -131,6 +131,8 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 	consensus.publicKeys = allPublicKeys
 	consensus.bitmap = mask
 	consensus.finalBitmap = finalMask
+
+	consensus.secret = map[uint32]kyber.Scalar{}
 
 	// For now use socket address as 16 byte Id
 	// TODO: populate with correct Id
@@ -184,12 +186,20 @@ func (consensus *Consensus) GetValidatorPeers() []p2p.Peer {
 func (consensus *Consensus) ResetState() {
 	consensus.state = FINISHED
 	consensus.commitments = &map[uint16]kyber.Point{}
-	consensus.bitmap.SetMask([]byte{})
 	consensus.finalCommitments = &map[uint16]kyber.Point{}
-	consensus.finalBitmap.SetMask([]byte{})
 	consensus.responses = &map[uint16]kyber.Scalar{}
 	consensus.finalResponses = &map[uint16]kyber.Scalar{}
-	consensus.secret = nil
+
+	mask, _ := crypto.NewMask(crypto.Ed25519Curve, consensus.publicKeys, consensus.leader.PubKey)
+	finalMask, _ := crypto.NewMask(crypto.Ed25519Curve, consensus.publicKeys, consensus.leader.PubKey)
+	consensus.bitmap = mask
+	consensus.finalBitmap = finalMask
+	consensus.bitmap.SetMask([]byte{})
+	consensus.finalBitmap.SetMask([]byte{})
+
+	consensus.aggregatedCommitment = nil
+	consensus.aggregatedFinalCommitment = nil
+	consensus.secret = map[uint32]kyber.Scalar{}
 }
 
 // Returns a string representation of this consensus

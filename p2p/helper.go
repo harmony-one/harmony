@@ -66,11 +66,11 @@ func ReadMessageContent(conn net.Conn) ([]byte, error) {
 	bytesToRead := binary.BigEndian.Uint32(fourBytes)
 	//log.Printf("The content size is %d bytes.", bytesToRead)
 
-	//// Read the content in chunk of 1024 bytes
+	//// Read the content in chunk of 16 * 1024 bytes
 	tmpBuf := make([]byte, BATCH_SIZE)
 ILOOP:
 	for {
-		timeoutDuration := 1 * time.Second
+		timeoutDuration := 10 * time.Second
 		conn.SetReadDeadline(time.Now().Add(timeoutDuration))
 		if bytesToRead < BATCH_SIZE {
 			// Read the last number of bytes less than 1024

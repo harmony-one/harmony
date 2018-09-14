@@ -124,7 +124,7 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 
 	secret, msgToSend := consensus.constructCommitMessage(proto_consensus.COMMIT)
 	// Store the commitment secret
-	consensus.secret = secret
+	consensus.secret[consensusId] = secret
 
 	p2p.SendMessage(consensus.leader, msgToSend)
 
@@ -182,19 +182,18 @@ func (consensus *Consensus) processChallengeMessage(payload []byte, targetState 
 		return
 	}
 
-	consensus.mutex.Lock()
-
 	// Add attack model of IncorrectResponse.
 	if attack.GetInstance().IncorrectResponse() {
 		consensus.Log.Warn("IncorrectResponse attacked")
-		consensus.mutex.Unlock()
 		return
 	}
+
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
 
 	// check block hash
 	if bytes.Compare(blockHash[:], consensus.blockHash[:]) != 0 {
 		consensus.Log.Warn("Block hash doesn't match", "consensus", consensus)
-		consensus.mutex.Unlock()
 		return
 	}
 
@@ -202,7 +201,6 @@ func (consensus *Consensus) processChallengeMessage(payload []byte, targetState 
 	if consensusId != consensus.consensusId {
 		consensus.Log.Warn("Received message with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId, "consensus", consensus)
 		if _, ok := consensus.blocksReceived[consensus.consensusId]; !ok {
-			consensus.mutex.Unlock()
 			return
 		}
 		consensus.Log.Warn("ROLLING UP", "consensus", consensus)
@@ -234,7 +232,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte, targetState 
 		return
 	}
 
-	response, err := crypto.Response(crypto.Ed25519Curve, consensus.priKey, consensus.secret, receivedChallenge)
+	response, err := crypto.Response(crypto.Ed25519Curve, consensus.priKey, consensus.secret[consensusId], receivedChallenge)
 	if err != nil {
 		log.Warn("Failed to generate response", "err", err)
 		return
@@ -246,7 +244,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte, targetState 
 	msgToSend := consensus.constructResponseMessage(msgTypeToSend, response)
 
 	p2p.SendMessage(consensus.leader, msgToSend)
-
+	consensus.Log.Warn("Sending Response", "state", targetState)
 	// Set state to target state (RESPONSE_DONE, FINAL_RESPONSE_DONE)
 	consensus.state = targetState
 
@@ -259,6 +257,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte, targetState 
 				delete(consensus.blocksReceived, consensus.consensusId)
 
 				consensus.blockHash = [32]byte{}
+				delete(consensus.secret, consensusId)
 				consensus.consensusId++ // roll up one by one, until the next block is not received yet.
 
 				// TODO: think about when validators know about the consensus is reached.
@@ -275,9 +274,9 @@ func (consensus *Consensus) processChallengeMessage(payload []byte, targetState 
 				// check block data (transactions
 				if !consensus.BlockVerifier(&blockHeaderObj) {
 					consensus.Log.Debug("[WARNING] Block content is not verified successfully", "consensusId", consensus.consensusId)
-					consensus.mutex.Unlock()
 					return
 				}
+				consensus.Log.Info("Finished Response. Adding block to chain", "numTx", len(blockHeaderObj.Transactions))
 				consensus.OnConsensusDone(&blockHeaderObj)
 			} else {
 				break
@@ -285,7 +284,6 @@ func (consensus *Consensus) processChallengeMessage(payload []byte, targetState 
 
 		}
 	}
-	consensus.mutex.Unlock()
 }
 
 // Processes the collective signature message sent from the leader
@@ -338,6 +336,7 @@ func (consensus *Consensus) processCollectiveSigMessage(payload []byte) {
 	err := crypto.Verify(crypto.Ed25519Curve, consensus.publicKeys, payload[:36], append(collectiveSig, bitmap...), crypto.NewThresholdPolicy((2*len(consensus.publicKeys)/3)+1))
 	if err != nil {
 		consensus.Log.Warn("Failed to verify the collective sig message", "consensusId", consensusId, "err", err)
+		return
 	}
 
 	// Add attack model of IncorrectResponse.
@@ -360,7 +359,7 @@ func (consensus *Consensus) processCollectiveSigMessage(payload []byte) {
 
 	secret, msgToSend := consensus.constructCommitMessage(proto_consensus.FINAL_COMMIT)
 	// Store the commitment secret
-	consensus.secret = secret
+	consensus.secret[consensusId] = secret
 
 	p2p.SendMessage(consensus.leader, msgToSend)
 
