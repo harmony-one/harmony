@@ -3,6 +3,7 @@ package p2p
 import (
 	"bytes"
 	"encoding/binary"
+	"io"
 	"log"
 	"net"
 	"runtime"
@@ -99,7 +100,7 @@ func ConstructP2pMessage(msgType byte, content []byte) []byte {
 
 // SocketClient is to connect a socket given a port and send the given message.
 // TODO(minhdoan, rj): need to check if a peer is reachable or not.
-func sendWithSocketClient(ip, port string, message []byte) (res string) {
+func sendWithSocketClient(ip, port string, message []byte) (err error) {
 	//log.Printf("Sending message to ip %s and port %s\n", ip, port)
 	addr := net.JoinHostPort(ip, port)
 	conn, err := net.Dial("tcp", addr)
@@ -110,7 +111,17 @@ func sendWithSocketClient(ip, port string, message []byte) (res string) {
 	}
 	defer conn.Close()
 
-	conn.Write(message)
+	nw, err := conn.Write(message)
+	if err != nil {
+		log.Printf("Write() to %s failed: %v", conn.RemoteAddr(), err)
+		return
+	}
+	if nw < len(message) {
+		log.Printf("short write to %s: %d < %d", conn.RemoteAddr(),
+			nw, len(message))
+		return io.ErrShortWrite
+	}
+
 	//log.Printf("Sent to ip %s and port %s: %s\n", ip, port, message)
 
 	// No ack (reply) message from the receiver for now.
