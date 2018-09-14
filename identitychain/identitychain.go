@@ -124,7 +124,8 @@ func (IDC *IdentityChain) StartServer() {
 }
 
 func (IDC *IdentityChain) listenOnPort() {
-	listen, err := net.Listen("tcp4", ":"+IDC.Peer.Port)
+	addr := net.JoinHostPort("", IDC.Peer.Port)
+	listen, err := net.Listen("tcp4", addr)
 	if err != nil {
 		IDC.log.Crit("Socket listen port failed")
 		os.Exit(1)

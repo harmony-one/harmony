@@ -100,7 +100,7 @@ func ConstructP2pMessage(msgType byte, content []byte) []byte {
 // TODO(minhdoan, rj): need to check if a peer is reachable or not.
 func sendWithSocketClient(ip, port string, message []byte) (res string) {
 	//log.Printf("Sending message to ip %s and port %s\n", ip, port)
-	addr := strings.Join([]string{ip, port}, ":")
+	addr := net.JoinHostPort(ip, port)
 	conn, err := net.Dial("tcp", addr)
 
 	if err != nil {
@@ -127,7 +127,7 @@ func send(ip, port string, message []byte) (returnMessage string) {
 
 func DialWithSocketClient(ip, port string) (conn net.Conn, err error) {
 	//log.Printf("Sending message to ip %s and port %s\n", ip, port)
-	addr := strings.Join([]string{ip, port}, ":")
+	addr := net.JoinHostPort(ip, port)
 	conn, err = net.Dial("tcp", addr)
 	return
 }
