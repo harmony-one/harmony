@@ -129,12 +129,21 @@ func sendWithSocketClient(ip, port string, message []byte) (err error) {
 }
 
 // Send a message to another node with given port.
-func send(ip, port string, message []byte) (returnMessage string) {
+func send(ip, port string, message []byte) {
 	// Add attack code here.
 	attack.GetInstance().Run()
 
-	sendWithSocketClient(ip, port, message)
-	return
+	backoff := NewExpBackoff(250*time.Millisecond, 10*time.Second, 2)
+
+	for {
+		err := sendWithSocketClient(ip, port, message)
+		if err == nil {
+			break
+		}
+		log.Printf("sleeping %s before trying to send to %s again",
+			backoff.Cur, net.JoinHostPort(ip, port))
+		backoff.Sleep()
+	}
 }
 
 func DialWithSocketClient(ip, port string) (conn net.Conn, err error) {
