@@ -66,7 +66,6 @@ func ReadMessageContent(conn net.Conn) ([]byte, error) {
 	// Number of bytes for the message content
 	bytesToRead := binary.BigEndian.Uint32(fourBytes)
 	//log.Printf("The content size is %d bytes.", bytesToRead)
-
 	//// Read the content in chunk of 16 * 1024 bytes
 	tmpBuf := make([]byte, BATCH_SIZE)
 ILOOP:
@@ -78,6 +77,8 @@ ILOOP:
 			tmpBuf = make([]byte, bytesToRead)
 		}
 		n, err := r.Read(tmpBuf)
+		contentBuf.Write(tmpBuf[:n])
+
 		switch err {
 		case io.EOF:
 			// TODO: should we return error here, or just ignore it?
@@ -92,10 +93,12 @@ ILOOP:
 			log.Printf("Error reading compressed p2p message")
 			return []byte{}, err
 		}
-		tmpBuf, err = decompressContent(tmpBuf)
-		contentBuf.Write(tmpBuf[:n])
 	}
-	return contentBuf.Bytes(), nil
+	decompressedContent, err := decompressContent(contentBuf.Bytes())
+	if err != nil {
+		log.Printf("Error decompressing payload content")
+	}
+	return decompressedContent, nil
 }
 
 func CreateMessage(msgType byte, data []byte) []byte {
@@ -120,7 +123,7 @@ func SendMessageContent(conn net.Conn, data []byte) {
 
 func decompressContent(content []byte) ([]byte, error) {
 	var decomp []byte
-	decomp, err := snappy.Decode(decomp, content)
+	decomp, err := snappy.Decode(nil, content)
 	if err != nil {
 		log.Printf("Could not de-compress content")
 	}

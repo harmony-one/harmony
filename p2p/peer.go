@@ -87,12 +87,12 @@ func ConstructP2pMessage(msgType byte, content []byte) []byte {
 	firstByte := byte(17)        // messageType 0x11
 	sizeBytes := make([]byte, 4) // contentSize
 
-	binary.BigEndian.PutUint32(sizeBytes, uint32(len(content)))
-
+	compressedContent := compressContent(content)
+	binary.BigEndian.PutUint32(sizeBytes, uint32(len(compressedContent)))
 	byteBuffer := bytes.NewBuffer([]byte{})
 	byteBuffer.WriteByte(firstByte)
 	byteBuffer.Write(sizeBytes)
-	byteBuffer.Write(compressContent(content)) //compressing content
+	byteBuffer.Write(compressedContent) // sending compressed content
 	return byteBuffer.Bytes()
 }
 
