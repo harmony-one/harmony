@@ -96,7 +96,8 @@ func (node *Node) listenOnPort(port string) {
 	for {
 		conn, err := listen.Accept()
 		if err != nil {
-			node.log.Error("Error listening on port.", "port", port)
+			node.log.Error("Error listening on port.", "port", port,
+				"err", err)
 			continue
 		}
 		go node.NodeHandler(conn)
