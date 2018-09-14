@@ -96,7 +96,7 @@ func (consensus *Consensus) startConsensus(newBlock *blockchain.Block) {
 func (consensus *Consensus) commitByLeader(firstRound bool) {
 	// Generate leader's own commitment
 	secret, commitment := crypto.Commit(crypto.Ed25519Curve)
-	consensus.secret = secret
+	consensus.secret[consensus.consensusId] = secret
 	if firstRound {
 		(*consensus.commitments)[consensus.nodeId] = commitment
 		consensus.bitmap.SetKey(consensus.pubKey, true)
@@ -164,6 +164,9 @@ func (consensus *Consensus) processCommitMessage(payload []byte, targetState Con
 	// proceed only when the message is not received before
 	_, ok = (*commitments)[validatorId]
 	shouldProcess := !ok
+	if len((*commitments)) >= ((len(consensus.publicKeys)*2)/3 + 1) {
+		shouldProcess = false
+	}
 	if shouldProcess {
 		point := crypto.Ed25519Curve.Point()
 		point.UnmarshalBinary(commitment)
@@ -177,7 +180,7 @@ func (consensus *Consensus) processCommitMessage(payload []byte, targetState Con
 		return
 	}
 
-	if len((*commitments)) >= len(consensus.publicKeys) && consensus.state < targetState {
+	if len((*commitments)) >= ((len(consensus.publicKeys)*2)/3+1) && consensus.state < targetState {
 		consensus.Log.Debug("Enough commitments received with signatures", "num", len(*commitments), "state", consensus.state)
 
 		// Broadcast challenge
@@ -213,7 +216,7 @@ func (consensus *Consensus) processCommitMessage(payload []byte, targetState Con
 // Leader commit to the message itself before receiving others commits
 func (consensus *Consensus) responseByLeader(challenge kyber.Scalar, firstRound bool) {
 	// Generate leader's own commitment
-	response, err := crypto.Response(crypto.Ed25519Curve, consensus.priKey, consensus.secret, challenge)
+	response, err := crypto.Response(crypto.Ed25519Curve, consensus.priKey, consensus.secret[consensus.consensusId], challenge)
 	if err == nil {
 		if firstRound {
 			(*consensus.responses)[consensus.nodeId] = response
@@ -254,6 +257,8 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState C
 
 	shouldProcess := true
 	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+
 	// check consensus Id
 	if consensusId != consensus.consensusId {
 		shouldProcess = false
@@ -288,6 +293,11 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState C
 	// proceed only when the message is not received before
 	_, ok = (*responses)[validatorId]
 	shouldProcess = shouldProcess && !ok
+
+	if len((*responses)) >= ((len(consensus.publicKeys)*2)/3 + 1) {
+		shouldProcess = false
+	}
+
 	if shouldProcess {
 		// verify the response matches the received commit
 		responseScalar := crypto.Ed25519Curve.Scalar()
@@ -300,19 +310,16 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState C
 			(*responses)[validatorId] = responseScalar
 			consensus.Log.Debug("Received new response message", "num", len(*responses))
 			// Set the bitmap indicate this validate signed. TODO: figure out how to resolve the inconsistency of validators from commit and response messages
-			consensus.bitmap.SetKey(value.PubKey, true)
+			bitmap.SetKey(value.PubKey, true)
 		}
-
 	}
-	consensus.mutex.Unlock()
 
 	if !shouldProcess {
 		return
 	}
 
-	if len(*responses) >= len(consensus.publicKeys) && consensus.state != targetState {
-		consensus.mutex.Lock()
-		if len(*responses) >= len(consensus.publicKeys) && consensus.state != targetState {
+	if len(*responses) >= ((len(consensus.publicKeys)*2)/3+1) && consensus.state != targetState {
+		if len(*responses) >= ((len(consensus.publicKeys)*2)/3+1) && consensus.state != targetState {
 			consensus.Log.Debug("Enough responses received with signatures", "num", len(*responses), "state", consensus.state)
 			// Aggregate responses
 			responseScalars := []kyber.Scalar{}
@@ -329,6 +336,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState C
 			if targetState == FINISHED {
 				aggregatedCommitment = consensus.aggregatedFinalCommitment
 			}
+
 			collectiveSigAndBitmap, err := crypto.Sign(crypto.Ed25519Curve, aggregatedCommitment, aggregatedResponse, bitmap)
 
 			if err != nil {
@@ -377,7 +385,6 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState C
 				consensus.ReadySignal <- struct{}{}
 			}
 		}
-		consensus.mutex.Unlock()
 	}
 }
 

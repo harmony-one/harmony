@@ -250,6 +250,9 @@ func main() {
 		printVersion(os.Args[0])
 	}
 
+	// Add GOMAXPROCS to achieve max performance.
+	runtime.GOMAXPROCS(1024)
+
 	// Read the configs
 	config := client_config.NewConfig()
 	config.ReadConfigFile(*configFile)
@@ -359,8 +362,8 @@ func main() {
 				wg.Done()
 			}(shardId)
 		}
-		utxoPoolMutex.Unlock()
 		wg.Wait()
+		utxoPoolMutex.Unlock()
 
 		lock.Lock()
 		for shardId, txs := range shardIdTxsMap { // Send the txs to corresponding shards

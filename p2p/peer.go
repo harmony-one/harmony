@@ -53,7 +53,7 @@ func BroadcastMessage(peers []Peer, msg []byte) {
 		}()
 	}
 	wg.Wait()
-	log.Info("Broadcasting Down", "time spent", time.Now().Sub(start).Seconds())
+	log.Info("Broadcasting Done", "time spent(s)", time.Now().Sub(start).Seconds())
 }
 
 func SelectMyPeers(peers []Peer, min int, max int) []Peer {
@@ -69,14 +69,16 @@ func SelectMyPeers(peers []Peer, min int, max int) []Peer {
 // BroadcastMessage sends the message to a list of peers from a leader.
 func BroadcastMessageFromLeader(peers []Peer, msg []byte) {
 	// TODO(minhdoan): Enable back for multicast.
-	// peers = SelectMyPeers(peers, 0, MAX_BROADCAST-1)
+	peers = SelectMyPeers(peers, 1, MAX_BROADCAST)
 	BroadcastMessage(peers, msg)
+	log.Info("Done sending from leader")
 }
 
 // BroadcastMessage sends the message to a list of peers from a validator.
 func BroadcastMessageFromValidator(selfPeer Peer, peers []Peer, msg []byte) {
-	peers = SelectMyPeers(peers, (selfPeer.ValidatorID+1)*MAX_BROADCAST, (selfPeer.ValidatorID+2)*MAX_BROADCAST-1)
+	peers = SelectMyPeers(peers, selfPeer.ValidatorID*MAX_BROADCAST+1, (selfPeer.ValidatorID+1)*MAX_BROADCAST)
 	BroadcastMessage(peers, msg)
+	log.Info("Done sending from validator")
 }
 
 // ConstructP2pMessage constructs the p2p message as [messageType, contentSize, content]

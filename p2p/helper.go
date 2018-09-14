@@ -26,6 +26,8 @@ content (n bytes) - actual message content
 
 */
 
+const BATCH_SIZE = 1 << 16
+
 // Read the message type and content size, and return the actual content.
 func ReadMessageContent(conn net.Conn) ([]byte, error) {
 	var (
@@ -65,13 +67,13 @@ func ReadMessageContent(conn net.Conn) ([]byte, error) {
 	bytesToRead := binary.BigEndian.Uint32(fourBytes)
 	//log.Printf("The content size is %d bytes.", bytesToRead)
 
-	//// Read the content in chunk of 1024 bytes
-	tmpBuf := make([]byte, 1024)
+	//// Read the content in chunk of 16 * 1024 bytes
+	tmpBuf := make([]byte, BATCH_SIZE)
 ILOOP:
 	for {
-		timeoutDuration := 1 * time.Second
+		timeoutDuration := 10 * time.Second
 		conn.SetReadDeadline(time.Now().Add(timeoutDuration))
-		if bytesToRead < 1024 {
+		if bytesToRead < BATCH_SIZE {
 			// Read the last number of bytes less than 1024
 			tmpBuf = make([]byte, bytesToRead)
 		}
