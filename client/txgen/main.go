@@ -362,8 +362,8 @@ func main() {
 				wg.Done()
 			}(shardId)
 		}
-		utxoPoolMutex.Unlock()
 		wg.Wait()
+		utxoPoolMutex.Unlock()
 
 		lock.Lock()
 		for shardId, txs := range shardIdTxsMap { // Send the txs to corresponding shards
