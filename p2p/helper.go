@@ -35,7 +35,6 @@ func ReadMessageContent(conn net.Conn) ([]byte, error) {
 
 	timeoutDuration := 1 * time.Second
 	conn.SetReadDeadline(time.Now().Add(timeoutDuration))
-
 	//// Read 1 byte for message type
 	_, err := r.ReadByte()
 	switch err {
@@ -77,12 +76,10 @@ ILOOP:
 			tmpBuf = make([]byte, bytesToRead)
 		}
 		n, err := r.Read(tmpBuf)
-		contentBuf.Write(tmpBuf[:n])
-
 		switch err {
 		case io.EOF:
 			// TODO: should we return error here, or just ignore it?
-			log.Printf("EOF reached while reading p2p message")
+			log.Printf("EOF reached while reading compressed p2p message")
 			break ILOOP
 		case nil:
 			bytesToRead -= uint32(n) // TODO: think about avoid the casting in every loop
@@ -90,9 +87,11 @@ ILOOP:
 				break ILOOP
 			}
 		default:
-			log.Printf("Error reading p2p message")
+			log.Printf("Error reading compressed p2p message")
 			return []byte{}, err
 		}
+		tmpBuf, err = decompressContent(tmpBuf)
+		contentBuf.Write(tmpBuf[:n])
 	}
 	return contentBuf.Bytes(), nil
 }
@@ -117,13 +116,13 @@ func SendMessageContent(conn net.Conn, data []byte) {
 	w.Flush()
 }
 
-func decompressContent(content []byte) []byte {
+func decompressContent(content []byte) ([]byte, error) {
 	var decomp []byte
 	decomp, err := snappy.Decode(decomp, content)
 	if err != nil {
 		log.Printf("Could not de-compress content")
 	}
-	return decomp
+	return decomp, err
 }
 
 func compressContent(content []byte) []byte {
