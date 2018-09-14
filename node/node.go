@@ -84,11 +84,6 @@ func (node *Node) StartServer(port string) {
 func (node *Node) listenOnPort(port string) {
 	addr := net.JoinHostPort("", port)
 	listen, err := net.Listen("tcp4", addr)
-	defer func(listen net.Listener) {
-		if listen != nil {
-			listen.Close()
-		}
-	}(listen)
 	if err != nil {
 		node.log.Error("Socket listen port failed", "addr", addr, "err", err)
 		return
@@ -97,6 +92,7 @@ func (node *Node) listenOnPort(port string) {
 		node.log.Error("Listen returned nil", "addr", addr)
 		return
 	}
+	defer listen.Close()
 	for {
 		conn, err := listen.Accept()
 		if err != nil {
