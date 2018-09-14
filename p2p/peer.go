@@ -3,6 +3,7 @@ package p2p
 import (
 	"bytes"
 	"encoding/binary"
+	"log"
 	"net"
 	"runtime"
 	"strings"
@@ -104,7 +105,7 @@ func sendWithSocketClient(ip, port string, message []byte) (res string) {
 	conn, err := net.Dial("tcp", addr)
 
 	if err != nil {
-		log.Warn("Error dailing tcp", "address", addr, "error", err)
+		log.Printf("Dial(%s) failed: %v", addr, err)
 		return
 	}
 	defer conn.Close()
