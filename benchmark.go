@@ -67,6 +67,7 @@ func main() {
 	metricsReportURL := flag.String("metrics_report_url", "", "If set, reports metrics to this URL.")
 	versionFlag := flag.Bool("version", false, "Output version info")
 	syncNode := flag.Bool("sync_node", false, "Whether this node is a new node joining blockchain and it needs to get synced before joining consensus.")
+	onlyLogTps := flag.Bool("only_log_tps", false, "Only log TPS if true")
 
 	flag.Parse()
 
@@ -103,6 +104,9 @@ func main() {
 		log.StdoutHandler,
 		log.Must.FileHandler(logFileName, log.JSONFormat()), // Log to file
 	)
+	if *onlyLogTps {
+		h = log.MatchFilterHandler("msg", "TPS Report", h)
+	}
 	log.Root().SetHandler(h)
 
 	// Initialize leveldb if dbSupported.
