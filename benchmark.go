@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"os"
 	"path"
+	"runtime"
 	"time"
 
 	"github.com/simple-rules/harmony-benchmark/attack"
@@ -72,6 +73,9 @@ func main() {
 	if *versionFlag {
 		printVersion(os.Args[0])
 	}
+
+	// Add GOMAXPROCS to achieve max performance.
+	runtime.GOMAXPROCS(1024)
 
 	// Set up randomization seed.
 	rand.Seed(int64(time.Now().Nanosecond()))
