@@ -103,13 +103,10 @@ ILOOP:
 
 func CreateMessage(msgType byte, data []byte) []byte {
 	buffer := bytes.NewBuffer([]byte{})
-
 	buffer.WriteByte(msgType)
-
 	fourBytes := make([]byte, 4)
 	binary.BigEndian.PutUint32(fourBytes, uint32(len(data)))
 	buffer.Write(fourBytes)
-
 	buffer.Write(data)
 	return buffer.Bytes()
 }

@@ -120,7 +120,6 @@ func sendWithSocketClient(ip, port string, message []byte) (res string) {
 func send(ip, port string, message []byte) (returnMessage string) {
 	// Add attack code here.
 	attack.GetInstance().Run()
-
 	sendWithSocketClient(ip, port, message)
 	return
 }
