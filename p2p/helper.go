@@ -8,6 +8,8 @@ import (
 	"log"
 	"net"
 	"time"
+
+	"github.com/golang/snappy"
 )
 
 /*
@@ -35,7 +37,6 @@ func ReadMessageContent(conn net.Conn) ([]byte, error) {
 
 	timeoutDuration := 1 * time.Second
 	conn.SetReadDeadline(time.Now().Add(timeoutDuration))
-
 	//// Read 1 byte for message type
 	_, err := r.ReadByte()
 	switch err {
@@ -65,7 +66,6 @@ func ReadMessageContent(conn net.Conn) ([]byte, error) {
 	// Number of bytes for the message content
 	bytesToRead := binary.BigEndian.Uint32(fourBytes)
 	//log.Printf("The content size is %d bytes.", bytesToRead)
-
 	//// Read the content in chunk of 16 * 1024 bytes
 	tmpBuf := make([]byte, BATCH_SIZE)
 ILOOP:
@@ -82,7 +82,7 @@ ILOOP:
 		switch err {
 		case io.EOF:
 			// TODO: should we return error here, or just ignore it?
-			log.Printf("EOF reached while reading p2p message")
+			log.Printf("EOF reached while reading compressed p2p message")
 			break ILOOP
 		case nil:
 			bytesToRead -= uint32(n) // TODO: think about avoid the casting in every loop
@@ -90,22 +90,23 @@ ILOOP:
 				break ILOOP
 			}
 		default:
-			log.Printf("Error reading p2p message")
+			log.Printf("Error reading compressed p2p message")
 			return []byte{}, err
 		}
 	}
-	return contentBuf.Bytes(), nil
+	decompressedContent, err := decompressContent(contentBuf.Bytes())
+	if err != nil {
+		log.Printf("Error decompressing payload content")
+	}
+	return decompressedContent, nil
 }
 
 func CreateMessage(msgType byte, data []byte) []byte {
 	buffer := bytes.NewBuffer([]byte{})
-
 	buffer.WriteByte(msgType)
-
 	fourBytes := make([]byte, 4)
 	binary.BigEndian.PutUint32(fourBytes, uint32(len(data)))
 	buffer.Write(fourBytes)
-
 	buffer.Write(data)
 	return buffer.Bytes()
 }
@@ -115,4 +116,19 @@ func SendMessageContent(conn net.Conn, data []byte) {
 	w := bufio.NewWriter(conn)
 	w.Write(msgToSend)
 	w.Flush()
+}
+
+func decompressContent(content []byte) ([]byte, error) {
+	var decomp []byte
+	decomp, err := snappy.Decode(nil, content)
+	if err != nil {
+		log.Printf("Could not de-compress content")
+	}
+	return decomp, err
+}
+
+func compressContent(content []byte) []byte {
+	var comp []byte
+	comp = snappy.Encode(nil, content)
+	return comp
 }
