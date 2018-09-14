@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
-	"log"
 	"net"
 	"runtime"
 	"sync"
@@ -105,19 +104,19 @@ func sendWithSocketClient(ip, port string, message []byte) (err error) {
 	conn, err := net.Dial("tcp", addr)
 
 	if err != nil {
-		log.Printf("Dial(%s) failed: %v", addr, err)
+		log.Warn("Dial() failed", "addr", addr, "error", err)
 		return
 	}
 	defer conn.Close()
 
 	nw, err := conn.Write(message)
 	if err != nil {
-		log.Printf("Write() to %s failed: %v", conn.RemoteAddr(), err)
+		log.Warn("Write() failed", "addr", conn.RemoteAddr(), "error", err)
 		return
 	}
 	if nw < len(message) {
-		log.Printf("short write to %s: %d < %d", conn.RemoteAddr(),
-			nw, len(message))
+		log.Warn("Write() returned short count",
+			"addr", conn.RemoteAddr(), "actual", nw, "expected", len(message))
 		return io.ErrShortWrite
 	}
 
@@ -139,8 +138,8 @@ func send(ip, port string, message []byte) {
 		if err == nil {
 			break
 		}
-		log.Printf("sleeping %s before trying to send to %s again",
-			backoff.Cur, net.JoinHostPort(ip, port))
+		log.Info("sleeping before trying to send again",
+			"duration", backoff.Cur, "addr", net.JoinHostPort(ip, port))
 		backoff.Sleep()
 	}
 }
