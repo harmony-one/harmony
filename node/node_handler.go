@@ -20,6 +20,8 @@ import (
 )
 
 const (
+	// The min number of transaction per a block.
+	MinNumberOfTransactionsPerBlock = 6000
 	// The max number of transaction per a block.
 	MaxNumberOfTransactionsPerBlock = 10000
 	// The number of blocks allowed before generating state block
@@ -304,11 +306,11 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
 				// Normal tx block consensus
 				for {
 					// Once we have pending transactions we will try creating a new block
-					if len(node.pendingTransactions) >= 1 {
+					if len(node.pendingTransactions) >= MaxNumberOfTransactionsPerBlock {
 						node.log.Debug("Start selecting transactions")
 						selectedTxs, crossShardTxAndProofs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
 
-						if len(selectedTxs) == 0 {
+						if len(selectedTxs)+len(crossShardTxAndProofs) < MinNumberOfTransactionsPerBlock {
 							node.log.Debug("No valid transactions exist", "pendingTx", len(node.pendingTransactions))
 						} else {
 							node.log.Debug("Creating new block", "numAllTxs", len(selectedTxs), "numCrossTxs", len(crossShardTxAndProofs), "pendingTxs", len(node.pendingTransactions), "currentChainSize", len(node.blockchain.Blocks))
