@@ -22,6 +22,10 @@ var (
 	zeroHash TxID
 )
 
+// DefaultCoinbaseValue is the default value of coinbase transaction.
+const DefaultCoinbaseValue = 1
+const DefaultNumUtxos = 100
+
 type Transaction struct {
 	ID        [32]byte // 32 byte hash
 	TxInput   []TXInput
@@ -93,9 +97,6 @@ type CrossShardTxAndProof struct {
 	Proof       *CrossShardTxProof // The proof
 }
 
-// DefaultCoinbaseValue is the default value of coinbase transaction.
-const DefaultCoinbaseValue = 1000
-
 // SetID sets ID of a transaction (32 byte hash of the whole transaction)
 func (tx *Transaction) SetID() {
 	var encoded bytes.Buffer
@@ -146,8 +147,11 @@ func NewCoinbaseTX(toAddress [20]byte, data string, shardID uint32) *Transaction
 	}
 
 	txin := NewTXInput(NewOutPoint(&TxID{}, math.MaxUint32), toAddress, shardID)
-	txout := TXOutput{DefaultCoinbaseValue, toAddress, shardID}
-	tx := Transaction{ID: [32]byte{}, TxInput: []TXInput{*txin}, TxOutput: []TXOutput{txout}, Proofs: nil}
+	outputs := []TXOutput{}
+	for i := 0; i < DefaultNumUtxos; i++ {
+		outputs = append(outputs, TXOutput{DefaultCoinbaseValue, toAddress, shardID})
+	}
+	tx := Transaction{ID: [32]byte{}, TxInput: []TXInput{*txin}, TxOutput: outputs, Proofs: nil}
 	// TODO: take care of the signature of coinbase transaction.
 	tx.SetID()
 	return &tx

@@ -3,7 +3,6 @@ package blockchain
 import (
 	"bytes"
 	"encoding/hex"
-
 	"github.com/dedis/kyber"
 	"github.com/simple-rules/harmony-benchmark/crypto/pki"
 )
@@ -56,10 +55,10 @@ func (bc *Blockchain) GetBlockHashes() [][32]byte {
 	return res
 }
 
-// FindUnspentTransactions returns a list of transactions containing unspent outputs
-func (bc *Blockchain) FindUnspentTransactions(address [20]byte) []Transaction {
-	var unspentTXs []Transaction
+// FindUnspentUtxos returns a list of transactions containing unspent outputs
+func (bc *Blockchain) FindUnspentUtxos(address [20]byte) map[TxID]map[uint32]TXOutput {
 	spentTXOs := make(map[string][]uint32)
+	result := make(map[TxID]map[uint32]TXOutput)
 
 	for index := len(bc.Blocks) - 1; index >= 0; index-- {
 		block := bc.Blocks[index]
@@ -67,21 +66,23 @@ func (bc *Blockchain) FindUnspentTransactions(address [20]byte) []Transaction {
 		for _, tx := range block.Transactions {
 			txID := hex.EncodeToString(tx.ID[:])
 
-			idx := -1
-			// TODO(minhdoan): Optimize this.
-			if spentTXOs[txID] != nil {
-				idx = 0
-			}
 			for outIdx, txOutput := range tx.TxOutput {
-				if idx >= 0 && spentTXOs[txID][idx] == uint32(outIdx) {
-					idx++
+				shouldContinue := false
+				for index, _ := range spentTXOs[txID] {
+					if spentTXOs[txID][index] == uint32(outIdx) {
+						shouldContinue = true
+						break
+					}
+				}
+				if shouldContinue {
 					continue
 				}
-
 				if txOutput.Address == address {
-					unspentTXs = append(unspentTXs, *tx)
-					// Break because of the assumption that each address appears once in output.
-					break
+					_, ok := result[tx.ID]
+					if !ok {
+						result[tx.ID] = make(map[uint32]TXOutput)
+					}
+					result[tx.ID][uint32(outIdx)] = txOutput
 				}
 			}
 
@@ -93,16 +94,16 @@ func (bc *Blockchain) FindUnspentTransactions(address [20]byte) []Transaction {
 			}
 		}
 	}
-	return unspentTXs
+	return result
 }
 
 // FindUTXO finds and returns all unspent transaction outputs
 func (bc *Blockchain) FindUTXO(address [20]byte) []TXOutput {
 	var UTXOs []TXOutput
-	unspentTXs := bc.FindUnspentTransactions(address)
+	unspentTXs := bc.FindUnspentUtxos(address)
 
-	for _, tx := range unspentTXs {
-		for _, txOutput := range tx.TxOutput {
+	for _, utxos := range unspentTXs {
+		for _, txOutput := range utxos {
 			if txOutput.Address == address {
 				UTXOs = append(UTXOs, txOutput)
 				break
@@ -116,14 +117,14 @@ func (bc *Blockchain) FindUTXO(address [20]byte) []TXOutput {
 // FindSpendableOutputs finds and returns unspent outputs to reference in inputs
 func (bc *Blockchain) FindSpendableOutputs(address [20]byte, amount int) (int, map[string][]uint32) {
 	unspentOutputs := make(map[string][]uint32)
-	unspentTXs := bc.FindUnspentTransactions(address)
+	unspentUtxos := bc.FindUnspentUtxos(address)
 	accumulated := 0
 
 Work:
-	for _, tx := range unspentTXs {
-		txID := hex.EncodeToString(tx.ID[:])
+	for txId, txOutputs := range unspentUtxos {
+		txID := hex.EncodeToString(txId[:])
 
-		for outIdx, txOutput := range tx.TxOutput {
+		for outIdx, txOutput := range txOutputs {
 			if txOutput.Address == address && accumulated < amount {
 				accumulated += txOutput.Amount
 				unspentOutputs[txID] = append(unspentOutputs[txID], uint32(outIdx))

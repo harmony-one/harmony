@@ -64,12 +64,11 @@ func TestAddNewUserTransfer(t *testing.T) {
 	if !bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressThree, 3, 0) {
 		t.Error("Failed to add new transfer to alok.")
 	}
-
-	if !bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressTwo, 100, 0) {
+	if !bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressTwo, 3, 0) {
 		t.Error("Failed to add new transfer to rj.")
 	}
 
-	if bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressFour, DefaultCoinbaseValue-102, 0) {
+	if bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressFour, 100, 0) {
 		t.Error("minh should not have enough fun to make the transfer.")
 	}
 }
@@ -79,7 +78,7 @@ func TestVerifyNewBlock(t *testing.T) {
 	utxoPool := CreateUTXOPoolFromGenesisBlock(bc.Blocks[0])
 
 	bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressThree, 3, 0)
-	bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressTwo, 100, 0)
+	bc.AddNewUserTransfer(utxoPool, PriKeyOne, TestAddressOne, TestAddressTwo, 10, 0)
 
 	tx := bc.NewUTXOTransaction(PriKeyOne, TestAddressOne, TestAddressFour, 10, 0)
 	if tx == nil {

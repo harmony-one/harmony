@@ -110,19 +110,30 @@ UTXOLOOP:
 				copy(txInfo.id[:], id[:])
 
 				// Loop over all utxos for the txId
+				utxoSize := len(utxoMap)
+				batchSize := utxoSize / numSubset
+				i := subsetId % numSubset
+				counter := 0
 				for index, value := range utxoMap {
+					counter++
+					if batchSize*i < counter && counter > batchSize*(i+1) {
+						continue
+					}
 					txInfo.index = index
 					txInfo.value = value
 
 					randNum := rand.Intn(100)
 
-					if setting.crossShard && randNum < setting.crossShardRatio { // 30% cross shard transactions: add another txinput from another shard
-						generateCrossShardTx(&txInfo)
-					} else {
-						generateSingleShardTx(&txInfo)
-					}
-					if txInfo.txCount >= setting.maxNumTxsPerBatch {
-						break UTXOLOOP
+					subsetRatio := 100         // / numSubset
+					if randNum < subsetRatio { // Sample based on batch size
+						if setting.crossShard && randNum < subsetRatio*setting.crossShardRatio/100 { // 30% cross shard transactions: add another txinput from another shard
+							generateCrossShardTx(&txInfo)
+						} else {
+							generateSingleShardTx(&txInfo)
+						}
+						if txInfo.txCount >= setting.maxNumTxsPerBatch {
+							break UTXOLOOP
+						}
 					}
 				}
 			}
@@ -238,7 +249,7 @@ func printVersion(me string) {
 
 func main() {
 	configFile := flag.String("config_file", "local_config.txt", "file containing all ip addresses and config")
-	maxNumTxsPerBatch := flag.Int("max_num_txs_per_batch", 10000, "number of transactions to send per message")
+	maxNumTxsPerBatch := flag.Int("max_num_txs_per_batch", 20000, "number of transactions to send per message")
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	numSubset := flag.Int("numSubset", 3, "the number of subsets of utxos to process separately")
 	duration := flag.Int("duration", 120, "duration of the tx generation in second. If it's negative, the experiment runs forever.")

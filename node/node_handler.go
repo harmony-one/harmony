@@ -23,7 +23,7 @@ const (
 	// The min number of transaction per a block.
 	MinNumberOfTransactionsPerBlock = 6000
 	// The max number of transaction per a block.
-	MaxNumberOfTransactionsPerBlock = 10000
+	MaxNumberOfTransactionsPerBlock = 20000
 	// The number of blocks allowed before generating state block
 	NumBlocksBeforeStateBlock = 1000
 )
