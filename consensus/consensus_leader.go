@@ -30,9 +30,9 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) 
 		newBlock := <-blockChannel
 		// TODO: think about potential race condition
 		startTime = time.Now()
-		consensus.Log.Info("STARTING CONSENSUS", "consensus", consensus, "startTime", startTime)
+		consensus.Log.Debug("STARTING CONSENSUS", "consensus", consensus, "startTime", startTime)
 		for consensus.state == FINISHED {
-			time.Sleep(500 * time.Millisecond)
+			// time.Sleep(500 * time.Millisecond)
 			consensus.startConsensus(&newBlock)
 			break
 		}
@@ -79,12 +79,14 @@ func (consensus *Consensus) startConsensus(newBlock *blockchain.Block) {
 	// Copy over block hash and block header data
 	copy(consensus.blockHash[:], newBlock.Hash[:])
 
+	consensus.Log.Debug("Start encoding block")
 	// prepare message and broadcast to validators
 	byteBuffer := bytes.NewBuffer([]byte{})
 	encoder := gob.NewEncoder(byteBuffer)
 	encoder.Encode(newBlock)
 	consensus.blockHeader = byteBuffer.Bytes()
 
+	consensus.Log.Debug("Stop encoding block")
 	msgToSend := consensus.constructAnnounceMessage()
 	p2p.BroadcastMessageFromLeader(consensus.GetValidatorPeers(), msgToSend)
 	// Set state to ANNOUNCE_DONE

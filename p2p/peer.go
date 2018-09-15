@@ -77,8 +77,10 @@ func BroadcastMessageFromLeader(peers []Peer, msg []byte) {
 // BroadcastMessage sends the message to a list of peers from a validator.
 func BroadcastMessageFromValidator(selfPeer Peer, peers []Peer, msg []byte) {
 	peers = SelectMyPeers(peers, selfPeer.ValidatorID*MAX_BROADCAST+1, (selfPeer.ValidatorID+1)*MAX_BROADCAST)
-	BroadcastMessage(peers, msg)
-	log.Info("Done sending from validator")
+	if len(peers) > 0 {
+		BroadcastMessage(peers, msg)
+		log.Info("Done sending from validator")
+	}
 }
 
 // ConstructP2pMessage constructs the p2p message as [messageType, contentSize, content]

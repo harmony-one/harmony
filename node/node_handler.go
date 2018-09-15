@@ -305,15 +305,15 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
 				for {
 					// Once we have pending transactions we will try creating a new block
 					if len(node.pendingTransactions) >= 1 {
+						node.log.Debug("Start selecting transactions")
 						selectedTxs, crossShardTxAndProofs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
 
 						if len(selectedTxs) == 0 {
 							node.log.Debug("No valid transactions exist", "pendingTx", len(node.pendingTransactions))
 						} else {
-							node.log.Debug("Creating new block", "numTxs", len(selectedTxs), "pendingTxs", len(node.pendingTransactions), "currentChainSize", len(node.blockchain.Blocks))
+							node.log.Debug("Creating new block", "numAllTxs", len(selectedTxs), "numCrossTxs", len(crossShardTxAndProofs), "pendingTxs", len(node.pendingTransactions), "currentChainSize", len(node.blockchain.Blocks))
 
 							node.transactionInConsensus = selectedTxs
-							node.log.Debug("CROSS SHARD TX", "num", len(crossShardTxAndProofs))
 							node.CrossTxsInConsensus = crossShardTxAndProofs
 							newBlock = blockchain.NewBlock(selectedTxs, node.blockchain.GetLatestBlock().Hash, node.Consensus.ShardID)
 							break
