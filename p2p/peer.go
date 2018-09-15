@@ -3,9 +3,9 @@ package p2p
 import (
 	"bytes"
 	"encoding/binary"
+	"io"
 	"net"
 	"runtime"
-	"strings"
 	"sync"
 	"time"
 
@@ -98,18 +98,28 @@ func ConstructP2pMessage(msgType byte, content []byte) []byte {
 
 // SocketClient is to connect a socket given a port and send the given message.
 // TODO(minhdoan, rj): need to check if a peer is reachable or not.
-func sendWithSocketClient(ip, port string, message []byte) (res string) {
+func sendWithSocketClient(ip, port string, message []byte) (err error) {
 	//log.Printf("Sending message to ip %s and port %s\n", ip, port)
-	addr := strings.Join([]string{ip, port}, ":")
+	addr := net.JoinHostPort(ip, port)
 	conn, err := net.Dial("tcp", addr)
 
 	if err != nil {
-		log.Warn("Error dailing tcp", "address", addr, "error", err)
+		log.Warn("Dial() failed", "addr", addr, "error", err)
 		return
 	}
 	defer conn.Close()
 
-	conn.Write(message)
+	nw, err := conn.Write(message)
+	if err != nil {
+		log.Warn("Write() failed", "addr", conn.RemoteAddr(), "error", err)
+		return
+	}
+	if nw < len(message) {
+		log.Warn("Write() returned short count",
+			"addr", conn.RemoteAddr(), "actual", nw, "expected", len(message))
+		return io.ErrShortWrite
+	}
+
 	//log.Printf("Sent to ip %s and port %s: %s\n", ip, port, message)
 
 	// No ack (reply) message from the receiver for now.
@@ -117,17 +127,26 @@ func sendWithSocketClient(ip, port string, message []byte) (res string) {
 }
 
 // Send a message to another node with given port.
-func send(ip, port string, message []byte) (returnMessage string) {
+func send(ip, port string, message []byte) {
 	// Add attack code here.
 	attack.GetInstance().Run()
 
-	sendWithSocketClient(ip, port, message)
-	return
+	backoff := NewExpBackoff(250*time.Millisecond, 10*time.Second, 2)
+
+	for {
+		err := sendWithSocketClient(ip, port, message)
+		if err == nil {
+			break
+		}
+		log.Info("sleeping before trying to send again",
+			"duration", backoff.Cur, "addr", net.JoinHostPort(ip, port))
+		backoff.Sleep()
+	}
 }
 
 func DialWithSocketClient(ip, port string) (conn net.Conn, err error) {
 	//log.Printf("Sending message to ip %s and port %s\n", ip, port)
-	addr := strings.Join([]string{ip, port}, ":")
+	addr := net.JoinHostPort(ip, port)
 	conn, err = net.Dial("tcp", addr)
 	return
 }
