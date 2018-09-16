@@ -3,8 +3,9 @@ package client
 import (
 	"bytes"
 	"encoding/gob"
-	"github.com/simple-rules/harmony-benchmark/proto/node"
 	"sync"
+
+	"github.com/simple-rules/harmony-benchmark/proto/node"
 
 	"github.com/simple-rules/harmony-benchmark/blockchain"
 	"github.com/simple-rules/harmony-benchmark/log"
@@ -42,9 +43,10 @@ func (client *Client) TransactionMessageHandler(msgPayload []byte) {
 		txDecoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the PROOF_OF_LOCK messge type
 		fetchUtxoResponse := new(client_proto.FetchUtxoResponseMessage)
 		err := txDecoder.Decode(fetchUtxoResponse)
+		client.log.Debug("UTXO_RESPONSE")
 
 		if err != nil {
-			client.log.Error("Failed deserializing utxo resposne")
+			client.log.Error("Failed deserializing utxo response")
 		}
 		client.handleFetchUtxoResponseMessage(*fetchUtxoResponse)
 	}

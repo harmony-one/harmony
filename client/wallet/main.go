@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log"
 	"strings"
 
 	"io"
@@ -27,7 +28,19 @@ import (
 	"github.com/simple-rules/harmony-benchmark/utils"
 )
 
+type walletSetting struct {
+	localDebug bool
+}
+
+var (
+	setting walletSetting
+)
+
 func main() {
+	localDebug := flag.Bool("local_debug", false, "If true only use local nodes")
+	flag.Parse()
+	setting.localDebug = *localDebug
+
 	// Account subcommands
 	accountImportCommand := flag.NewFlagSet("import", flag.ExitOnError)
 	accountImportPtr := accountImportCommand.String("privateKey", "", "Specify the private key to import")
@@ -220,27 +233,43 @@ func main() {
 	}
 }
 
-func getLeaders() []p2p.Peer {
+func getShardIdToLeaderMap() map[uint32]p2p.Peer {
+	// TODO(ricl): Later use data.harmony.one for API.
 	str, _ := client.DownloadUrlAsString("https://s3-us-west-2.amazonaws.com/unique-bucket-bin/leaders.txt")
 	lines := strings.Split(str, "\n")
-	var leaders []p2p.Peer
+	shardIDLeaderMap := map[uint32]p2p.Peer{}
+	log.Print(lines)
 	for _, line := range lines {
 		if line == "" {
 			continue
 		}
 		parts := strings.Split(line, " ")
-		leaders = append(leaders, p2p.Peer{Ip: parts[0], Port: parts[1]})
+
+		shardID := parts[3]
+		id, err := strconv.Atoi(shardID)
+		if err == nil {
+			shardIDLeaderMap[uint32(id)] = p2p.Peer{Ip: parts[0], Port: parts[1]}
+		} else {
+			log.Print("[Generator] Error parsing the shard Id ", shardID)
+		}
 	}
-	return leaders
+	return shardIDLeaderMap
 }
 
 func CreateWalletServerNode() *node.Node {
 	configr := client_config.NewConfig()
-	configr.ReadConfigFile("local_config_shards.txt")
-	shardIdLeaderMap := configr.GetShardIdToLeaderMap()
-	clientPeer := configr.GetClientPeer()
+	var shardIDLeaderMap map[uint32]p2p.Peer
+	var clientPeer *p2p.Peer
+	if setting.localDebug {
+		configr.ReadConfigFile("local_config_shards.txt")
+		shardIDLeaderMap = configr.GetShardIdToLeaderMap()
+		clientPeer = configr.GetClientPeer()
+	} else {
+		shardIDLeaderMap = getShardIdToLeaderMap()
+		clientPeer = &p2p.Peer{Port: "127.0.0.1", Ip: "1234"}
+	}
 	walletNode := node.New(nil, nil)
-	walletNode.Client = client.NewClient(&shardIdLeaderMap)
+	walletNode.Client = client.NewClient(&shardIDLeaderMap)
 	walletNode.ClientPeer = clientPeer
 	return walletNode
 }
