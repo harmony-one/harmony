@@ -31,7 +31,7 @@ func SendMessage(peer Peer, msg []byte) {
 	// Construct normal p2p message
 	content := ConstructP2pMessage(byte(0), msg)
 
-	send(peer.Ip, peer.Port, content)
+	go send(peer.Ip, peer.Port, content)
 }
 
 // BroadcastMessage sends the message to a list of peers
