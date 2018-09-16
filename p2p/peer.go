@@ -6,7 +6,6 @@ import (
 	"io"
 	"net"
 	"runtime"
-	"sync"
 	"time"
 
 	"github.com/simple-rules/harmony-benchmark/attack"
@@ -43,19 +42,12 @@ func BroadcastMessage(peers []Peer, msg []byte) {
 	// Construct broadcast p2p message
 	content := ConstructP2pMessage(byte(17), msg)
 
-	var wg sync.WaitGroup
-	wg.Add(len(peers))
-
 	log.Info("Start Broadcasting", "gomaxprocs", runtime.GOMAXPROCS(0))
 	start := time.Now()
 	for _, peer := range peers {
 		peerCopy := peer
-		go func() {
-			defer wg.Done()
-			send(peerCopy.Ip, peerCopy.Port, content)
-		}()
+		go send(peerCopy.Ip, peerCopy.Port, content)
 	}
-	wg.Wait()
 	log.Info("Broadcasting Done", "time spent(s)", time.Now().Sub(start).Seconds())
 }
 
