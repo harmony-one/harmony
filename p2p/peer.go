@@ -6,7 +6,6 @@ import (
 	"io"
 	"net"
 	"runtime"
-	"sync"
 	"time"
 
 	"github.com/simple-rules/harmony-benchmark/attack"
@@ -32,7 +31,7 @@ func SendMessage(peer Peer, msg []byte) {
 	// Construct normal p2p message
 	content := ConstructP2pMessage(byte(0), msg)
 
-	send(peer.Ip, peer.Port, content)
+	go send(peer.Ip, peer.Port, content)
 }
 
 // BroadcastMessage sends the message to a list of peers
@@ -43,19 +42,12 @@ func BroadcastMessage(peers []Peer, msg []byte) {
 	// Construct broadcast p2p message
 	content := ConstructP2pMessage(byte(17), msg)
 
-	var wg sync.WaitGroup
-	wg.Add(len(peers))
-
 	log.Info("Start Broadcasting", "gomaxprocs", runtime.GOMAXPROCS(0))
 	start := time.Now()
 	for _, peer := range peers {
 		peerCopy := peer
-		go func() {
-			defer wg.Done()
-			send(peerCopy.Ip, peerCopy.Port, content)
-		}()
+		go send(peerCopy.Ip, peerCopy.Port, content)
 	}
-	wg.Wait()
 	log.Info("Broadcasting Done", "time spent(s)", time.Now().Sub(start).Seconds())
 }
 
@@ -136,15 +128,16 @@ func send(ip, port string, message []byte) {
 
 	backoff := NewExpBackoff(250*time.Millisecond, 10*time.Second, 2)
 
-	for {
+	for trial := 0; trial < 10; trial++ {
 		err := sendWithSocketClient(ip, port, message)
 		if err == nil {
-			break
+			return
 		}
 		log.Info("sleeping before trying to send again",
 			"duration", backoff.Cur, "addr", net.JoinHostPort(ip, port))
 		backoff.Sleep()
 	}
+	log.Error("gave up sending a message", "addr", net.JoinHostPort(ip, port))
 }
 
 func DialWithSocketClient(ip, port string) (conn net.Conn, err error) {
