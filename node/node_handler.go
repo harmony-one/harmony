@@ -310,7 +310,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
 						node.log.Debug("Start selecting transactions")
 						selectedTxs, crossShardTxAndProofs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
 
-						if len(selectedTxs)+len(crossShardTxAndProofs) < MinNumberOfTransactionsPerBlock {
+						if len(selectedTxs) < MinNumberOfTransactionsPerBlock {
 							node.log.Debug("No valid transactions exist", "pendingTx", len(node.pendingTransactions))
 						} else {
 							node.log.Debug("Creating new block", "numAllTxs", len(selectedTxs), "numCrossTxs", len(crossShardTxAndProofs), "pendingTxs", len(node.pendingTransactions), "currentChainSize", len(node.blockchain.Blocks))
