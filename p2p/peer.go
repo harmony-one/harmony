@@ -128,15 +128,16 @@ func send(ip, port string, message []byte) {
 
 	backoff := NewExpBackoff(250*time.Millisecond, 10*time.Second, 2)
 
-	for {
+	for trial := 0; trial < 10; trial++ {
 		err := sendWithSocketClient(ip, port, message)
 		if err == nil {
-			break
+			return
 		}
 		log.Info("sleeping before trying to send again",
 			"duration", backoff.Cur, "addr", net.JoinHostPort(ip, port))
 		backoff.Sleep()
 	}
+	log.Error("gave up sending a message", "addr", net.JoinHostPort(ip, port))
 }
 
 func DialWithSocketClient(ip, port string) (conn net.Conn, err error) {
