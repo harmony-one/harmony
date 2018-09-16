@@ -28,19 +28,7 @@ import (
 	"github.com/simple-rules/harmony-benchmark/utils"
 )
 
-type walletSetting struct {
-	localDebug bool
-}
-
-var (
-	setting walletSetting
-)
-
 func main() {
-	localDebug := flag.Bool("local_debug", false, "If true only use local nodes")
-	flag.Parse()
-	setting.localDebug = *localDebug
-
 	// Account subcommands
 	accountImportCommand := flag.NewFlagSet("import", flag.ExitOnError)
 	accountImportPtr := accountImportCommand.String("privateKey", "", "Specify the private key to import")
@@ -260,8 +248,8 @@ func CreateWalletServerNode() *node.Node {
 	configr := client_config.NewConfig()
 	var shardIDLeaderMap map[uint32]p2p.Peer
 	var clientPeer *p2p.Peer
-	if setting.localDebug {
-		configr.ReadConfigFile("local_config_shards.txt")
+	if true {
+		configr.ReadConfigFile("local_config2.txt")
 		shardIDLeaderMap = configr.GetShardIdToLeaderMap()
 		clientPeer = configr.GetClientPeer()
 	} else {
