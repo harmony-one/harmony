@@ -113,7 +113,7 @@ func main() {
 	log.Root().SetHandler(h)
 
 	// Initialize leveldb if dbSupported.
-	var ldb *db.LDBDatabase = nil
+	var ldb *db.LDBDatabase
 
 	if *dbSupported {
 		ldb, _ = InitLDBDatabase(*ip, *port)
