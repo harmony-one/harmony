@@ -56,6 +56,19 @@ func printVersion(me string) {
 	os.Exit(0)
 }
 
+func loggingInit(logFolder, role, ip, port string, onlyLogTps bool) {
+	// Setup a logger to stdout and log file.
+	logFileName := fmt.Sprintf("./%v/%s-%v-%v.log", logFolder, role, ip, port)
+	h := log.MultiHandler(
+		log.StdoutHandler,
+		log.Must.FileHandler(logFileName, log.JSONFormat()), // Log to file
+	)
+	if onlyLogTps {
+		h = log.MatchFilterHandler("msg", "TPS Report", h)
+	}
+	log.Root().SetHandler(h)
+
+}
 func main() {
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9000", "port of the node.")
@@ -98,16 +111,8 @@ func main() {
 		role = "validator"
 	}
 
-	// Setup a logger to stdout and log file.
-	logFileName := fmt.Sprintf("./%v/%s-%v-%v.log", *logFolder, role, *ip, *port)
-	h := log.MultiHandler(
-		log.StdoutHandler,
-		log.Must.FileHandler(logFileName, log.JSONFormat()), // Log to file
-	)
-	if *onlyLogTps {
-		h = log.MatchFilterHandler("msg", "TPS Report", h)
-	}
-	log.Root().SetHandler(h)
+	// Init logging.
+	loggingInit(*logFolder, role, *ip, *port, *onlyLogTps)
 
 	// Initialize leveldb if dbSupported.
 	var ldb *db.LDBDatabase = nil
