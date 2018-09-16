@@ -26,6 +26,8 @@ var (
 )
 
 const (
+	// AttackProbability is the probability of this node being selected as
+	// an attacker, in percents.
 	AttackProbability = 20
 )
 
@@ -41,6 +43,7 @@ func attackDetermination(attackedMode int) bool {
 	return false
 }
 
+// InitLDBDatabase initializes a new database for this node in /tmp.
 func InitLDBDatabase(ip string, port string) (*db.LDBDatabase, error) {
 	// TODO(minhdoan): Refactor this.
 	dbFileName := "/tmp/harmony_" + ip + port + ".dat"
