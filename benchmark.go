@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"syscall"
 	"time"
 
 	"github.com/simple-rules/harmony-benchmark/attack"
@@ -71,6 +72,9 @@ func main() {
 	versionFlag := flag.Bool("version", false, "Output version info")
 	syncNode := flag.Bool("sync_node", false, "Whether this node is a new node joining blockchain and it needs to get synced before joining consensus.")
 	onlyLogTps := flag.Bool("only_log_tps", false, "Only log TPS if true")
+	logRusage := flag.Int("log_rusage", 0,
+		"Log resource usage at given interval in seconds.  "+
+			"0 (default) disables logging.")
 
 	flag.Parse()
 
@@ -129,6 +133,35 @@ func main() {
 		if *profile {
 			prof.Start()
 		}
+	}
+	// Measure CPU usage periodically and log
+	if *logRusage > 0 {
+		rusageTicker := time.NewTicker(time.Duration(*logRusage) * time.Second)
+		breaker := make(chan int)
+		go func(tickChan <-chan time.Time) {
+			logger := log.New()
+			logger.Info("logging resource usage", "interval", *logRusage)
+		rusageLoop:
+			for {
+				select {
+				case tick := <-tickChan:
+					rusage := syscall.Rusage{}
+					err := syscall.Getrusage(syscall.RUSAGE_SELF, &rusage)
+					if err != nil {
+						logger.Error("getrusage() failed", "error", err)
+						continue
+					}
+					logger.Info("resource usage",
+						"tick", tick, "rusage", rusage)
+				case <-breaker:
+					break rusageLoop
+				}
+			}
+		}(rusageTicker.C)
+		defer func() {
+			rusageTicker.Stop()
+			breaker <- 1
+		}()
 	}
 
 	// Set logger to attack model.
