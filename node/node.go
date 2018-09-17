@@ -66,6 +66,8 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int) ([]*blockchain.Trans
 	node.pendingTxMutex.Lock()
 	selected, unselected, invalid, crossShardTxs := node.UtxoPool.SelectTransactionsForNewBlock(node.pendingTransactions, maxNumTxs)
 	_ = invalid // invalid txs are discard
+
+	node.log.Debug("Invalid transactions discarded", "number", len(invalid))
 	node.pendingTransactions = unselected
 	node.pendingTxMutex.Unlock()
 	return selected, crossShardTxs
