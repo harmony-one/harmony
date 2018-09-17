@@ -94,9 +94,6 @@ func main() {
 	// Set up randomization seed.
 	rand.Seed(int64(time.Now().Nanosecond()))
 
-	// Attack determination.
-	attack.GetInstance().SetAttackEnabled(attackDetermination(*attackedMode))
-
 	distributionConfig := utils.NewDistributionConfig()
 	distributionConfig.ReadConfigFile(*configFile)
 	shardID := distributionConfig.GetShardID(*ip, *port)
@@ -109,6 +106,11 @@ func main() {
 		role = "leader"
 	} else {
 		role = "validator"
+	}
+
+	if role == "validator" {
+		// Attack determination.
+		attack.GetInstance().SetAttackEnabled(attackDetermination(*attackedMode))
 	}
 
 	// Init logging.
