@@ -155,51 +155,51 @@ func generateCrossShardTx(txInfo *TxInfo) {
 		}
 	}
 
-	crossShardNode := txInfo.dataNodes[crossShardId]
-	crossShardUtxosMap := crossShardNode.UtxoPool.UtxoMap[txInfo.address]
-
-	// Get the cross shard utxo from another shard
-	var crossTxin *blockchain.TXInput
-	crossUtxoValue := 0
-	// Loop over utxos for the same address from the other shard and use the first utxo as the second cross tx input
-	for crossTxIdStr, crossShardUtxos := range crossShardUtxosMap {
-		// Parse TxId
-		id, err := hex.DecodeString(crossTxIdStr)
-		if err != nil {
-			continue
-		}
-		crossTxId := [32]byte{}
-		copy(crossTxId[:], id[:])
-
-		for crossShardIndex, crossShardValue := range crossShardUtxos {
-			crossUtxoValue = crossShardValue
-			crossTxin = blockchain.NewTXInput(blockchain.NewOutPoint(&crossTxId, crossShardIndex), txInfo.address, crossShardId)
-			break
-		}
-		if crossTxin != nil {
-			break
-		}
-	}
+	//crossShardNode := txInfo.dataNodes[crossShardId]
+	//crossShardUtxosMap := crossShardNode.UtxoPool.UtxoMap[txInfo.address]
+	//
+	//// Get the cross shard utxo from another shard
+	//var crossTxin *blockchain.TXInput
+	//crossUtxoValue := 0
+	//// Loop over utxos for the same address from the other shard and use the first utxo as the second cross tx input
+	//for crossTxIdStr, crossShardUtxos := range crossShardUtxosMap {
+	//	// Parse TxId
+	//	id, err := hex.DecodeString(crossTxIdStr)
+	//	if err != nil {
+	//		continue
+	//	}
+	//	crossTxId := [32]byte{}
+	//	copy(crossTxId[:], id[:])
+	//
+	//	for crossShardIndex, crossShardValue := range crossShardUtxos {
+	//		crossUtxoValue = crossShardValue
+	//		crossTxin = blockchain.NewTXInput(blockchain.NewOutPoint(&crossTxId, crossShardIndex), txInfo.address, crossShardId)
+	//		break
+	//	}
+	//	if crossTxin != nil {
+	//		break
+	//	}
+	//}
 
 	// Add the utxo from current shard
 	txIn := blockchain.NewTXInput(blockchain.NewOutPoint(&txInfo.id, txInfo.index), txInfo.address, nodeShardID)
 	txInputs := []blockchain.TXInput{*txIn}
 
 	// Add the utxo from the other shard, if any
-	if crossTxin != nil { // This means the ratio of cross shard tx could be lower than 1/3
-		txInputs = append(txInputs, *crossTxin)
-	}
+	//if crossTxin != nil { // This means the ratio of cross shard tx could be lower than 1/3
+	//	txInputs = append(txInputs, *crossTxin)
+	//}
 
 	// Spend the utxo from the current shard to a random address in [0 - N)
-	txout := blockchain.TXOutput{Amount: txInfo.value, Address: pki.GetAddressFromInt(rand.Intn(setting.numOfAddress) + 1), ShardID: nodeShardID}
+	txout := blockchain.TXOutput{Amount: txInfo.value, Address: pki.GetAddressFromInt(rand.Intn(setting.numOfAddress) + 1), ShardID: crossShardId}
 
 	txOutputs := []blockchain.TXOutput{txout}
 
 	// Spend the utxo from the other shard, if any, to a random address in [0 - N)
-	if crossTxin != nil {
-		crossTxout := blockchain.TXOutput{Amount: crossUtxoValue, Address: pki.GetAddressFromInt(rand.Intn(setting.numOfAddress) + 1), ShardID: crossShardId}
-		txOutputs = append(txOutputs, crossTxout)
-	}
+	//if crossTxin != nil {
+	//	crossTxout := blockchain.TXOutput{Amount: crossUtxoValue, Address: pki.GetAddressFromInt(rand.Intn(setting.numOfAddress) + 1), ShardID: crossShardId}
+	//	txOutputs = append(txOutputs, crossTxout)
+	//}
 
 	// Construct the new transaction
 	tx := blockchain.Transaction{ID: [32]byte{}, TxInput: txInputs, TxOutput: txOutputs, Proofs: nil}
