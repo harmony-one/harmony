@@ -25,6 +25,9 @@ import (
 	"sync"
 	"time"
 
+	btcblockchain "github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/simple-rules/harmony-benchmark/blockchain"
 	"github.com/simple-rules/harmony-benchmark/client"
 	"github.com/simple-rules/harmony-benchmark/client/btctxiter"
@@ -34,8 +37,6 @@ import (
 	"github.com/simple-rules/harmony-benchmark/node"
 	"github.com/simple-rules/harmony-benchmark/p2p"
 	proto_node "github.com/simple-rules/harmony-benchmark/proto/node"
-
-	"github.com/piotrnar/gocoin/lib/btc"
 )
 
 type txGenSettings struct {
@@ -94,31 +95,39 @@ func generateSimulatedTransactions(shardID int, dataNodes []*node.Node) ([]*bloc
 LOOP:
 	for true {
 		btcTx := btcTXIter.NextTx()
+		fmt.Println(btcTXIter.GetBlockIndex(), btcTXIter.GetTxIndex(), btcTx)
 		tx := blockchain.Transaction{}
 		isCrossShardTx := false
-		if btcTx.IsCoinBase() {
+		if btcblockchain.IsCoinBaseTx(btcTx.MsgTx()) {
 			tx.TxInput = []blockchain.TXInput{*blockchain.NewTXInput(blockchain.NewOutPoint(&blockchain.TxID{}, math.MaxUint32), [20]byte{}, nodeShardID)}
 		} else {
-			for _, btcTXI := range btcTx.TxIn {
-				btcTXIDStr := btc.NewUint256(btcTXI.Input.Hash[:]).String()
+			for _, btcTXI := range btcTx.MsgTx().TxIn {
+				btcTXIDStr := btcTXI.PreviousOutPoint.Hash.String()
 				txRef := utxoMapping[btcTXIDStr]
 				if txRef.shardID != nodeShardID {
 					isCrossShardTx = true
 				}
-				tx.TxInput = append(tx.TxInput, *blockchain.NewTXInput(blockchain.NewOutPoint(&txRef.txID, btcTXI.Input.Vout), [20]byte{}, txRef.shardID))
+				tx.TxInput = append(tx.TxInput, *blockchain.NewTXInput(blockchain.NewOutPoint(&txRef.txID, btcTXI.PreviousOutPoint.Index), [20]byte{}, txRef.shardID))
 			}
 		}
 
-		for _, btcTXO := range btcTx.TxOut {
-			btcTXOAddr := btc.NewAddrFromPkScript(btcTXO.Pk_script, false)
-			if btcTXOAddr == nil {
-				log.Warn("TxOut: can't decode address")
+		for _, btcTXO := range btcTx.MsgTx().TxOut {
+			scriptClass, addresses, _, _ := txscript.ExtractPkScriptAddrs(
+				btcTXO.PkScript, &chaincfg.MainNetParams)
+			if scriptClass.String() == "pubkey" || scriptClass.String() == "pubkeyhash" {
+				btcTXOAddr := addresses[0]
+				if btcTXOAddr == nil {
+					log.Warn("TxOut: can't decode address")
+				}
+				var addr [20]byte
+				copy(addr[:], btcTXOAddr.ScriptAddress())
+				txo := blockchain.TXOutput{Amount: int(btcTXO.Value), Address: addr, ShardID: nodeShardID}
+				tx.TxOutput = append(tx.TxOutput, txo)
 			}
-			txo := blockchain.TXOutput{Amount: int(btcTXO.Value), Address: btcTXOAddr.Hash160, ShardID: nodeShardID}
-			tx.TxOutput = append(tx.TxOutput, txo)
+
 		}
 		tx.SetID()
-		utxoMapping[btcTx.Hash.String()] = TXRef{tx.ID, nodeShardID}
+		utxoMapping[btcTx.Hash().String()] = TXRef{tx.ID, nodeShardID}
 		if isCrossShardTx {
 			crossTxs = append(crossTxs, &tx)
 		} else {
