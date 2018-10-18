@@ -95,7 +95,6 @@ func generateSimulatedTransactions(shardID int, dataNodes []*node.Node) ([]*bloc
 LOOP:
 	for true {
 		btcTx := btcTXIter.NextTx()
-		fmt.Println(btcTXIter.GetBlockIndex(), btcTXIter.GetTxIndex(), btcTx)
 		tx := blockchain.Transaction{}
 		isCrossShardTx := false
 		if btcblockchain.IsCoinBaseTx(btcTx.MsgTx()) {

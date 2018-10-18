@@ -56,7 +56,7 @@ func (iter *BTCTXIterator) NextTx() *btcutil.Tx {
 		log.Println("Failed to get raw tx", iter.blockIndex, iter.txIndex, hashes[iter.txIndex], err)
 		return nil
 	}
-	log.Println("get raw tx", iter.blockIndex, iter.txIndex, hashes[iter.txIndex], iter.tx)
+	log.Println(iter.blockIndex, iter.txIndex, hashes[iter.txIndex])
 	return iter.tx
 }
 
