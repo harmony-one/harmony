@@ -220,8 +220,6 @@ func main() {
 
 	// Transaction generation process
 	time.Sleep(10 * time.Second) // wait for nodes to be ready
-	start := time.Now()
-	totalTime := 300.0 //run for 5 minutes
 
 	leaders := []p2p.Peer{}
 	for _, leader := range shardIdLeaderMap {
@@ -229,12 +227,6 @@ func main() {
 	}
 
 	for true {
-		t := time.Now()
-		if t.Sub(start).Seconds() >= totalTime {
-			log.Debug("Generator timer ended.", "duration", (int(t.Sub(start))), "startTime", start, "totalTime", totalTime)
-			break
-		}
-
 		allCrossTxs := []*blockchain.Transaction{}
 		// Generate simulated transactions
 		for shardId, leader := range shardIdLeaderMap {
