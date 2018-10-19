@@ -21,7 +21,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"math"
 	"sync"
 	"time"
 
@@ -57,12 +56,18 @@ var (
 	btcTXIter     btctxiter.BTCTXIterator
 	utxoMapping   map[string]TXRef // btcTXID to { txID, shardID }
 	// map from bitcoin address to a int value (the privKey in hmy)
-	addrMapping map[[20]byte]int
-	currentInt  int
+	addressMapping map[[20]byte]int
+	currentInt     int
 )
 
-func addMapping(btcAddr [20]byte, privKey int) {
-
+func getHmyInt(btcAddr [20]byte) int {
+	var privKey int
+	if privKey, ok := addressMapping[btcAddr]; !ok { // If cannot find key
+		privKey = currentInt
+		addressMapping[btcAddr] = privKey
+		currentInt++
+	}
+	return privKey
 }
 
 // Generates at most "maxNumTxs" number of simulated transactions based on the current UtxoPools of all shards.
@@ -106,30 +111,24 @@ LOOP:
 		btcTx := btcTXIter.NextTx()
 		tx := blockchain.Transaction{}
 		isCrossShardTx := false
-		var fromAddresses [][20]byte
-		var toAddress [20]byte
-		if btcblockchain.IsCoinBaseTx(btcTx.MsgTx()) {
-			for _, btcTXO := range btcTx.MsgTx().TxOut {
-				_, addresses, _, _ := txscript.ExtractPkScriptAddrs(
-					btcTXO.PkScript, &chaincfg.MainNetParams)
-				for _, btcTXOAddr := range addresses {
-					if btcTXOAddr == nil {
-						log.Warn("TxOut: can't decode address")
-					}
-					var toAddress [20]byte
-					copy(toAddress[:], btcTXOAddr.ScriptAddress())
-					txo := blockchain.TXOutput{Amount: int(btcTXO.Value), Address: toAddress, ShardID: nodeShardID}
-					tx.TxOutput = append(tx.TxOutput, txo)
-				}
-			}
 
-			if val, ok := addrMapping["foo"]; ok {
-				//do something here
+		if btcblockchain.IsCoinBaseTx(btcTx.MsgTx()) {
+			// ricl: coinbase tx should just have one txo
+			btcTXO := btcTx.MsgTx().TxOut[0]
+			_, addresses, _, _ := txscript.ExtractPkScriptAddrs(
+				btcTXO.PkScript, &chaincfg.MainNetParams)
+			btcTXOAddr := addresses[0]
+			if btcTXOAddr == nil {
+				log.Warn("TxOut: can't decode address")
 			}
-			// generate coinbase tx
-			blockchain.NewCoinbaseTX(pki.GetAddressFromInt(i+1), "", node.Consensus.ShardID)
-			tx.TxInput = []blockchain.TXInput{*blockchain.NewTXInput(blockchain.NewOutPoint(&blockchain.TxID{}, math.MaxUint32), [20]byte{}, nodeShardID)}
+			var toAddress [20]byte
+			copy(toAddress[:], btcTXOAddr.ScriptAddress())
+			hmyInt := getHmyInt(toAddress)
+			tx = *blockchain.NewCoinbaseTX(pki.GetAddressFromInt(hmyInt), "", nodeShardID)
+
+			utxoMapping[btcTx.Hash().String()] = TXRef{tx.ID, nodeShardID, toAddress}
 		} else {
+			var btcFromAddresses [][20]byte
 			for _, btcTXI := range btcTx.MsgTx().TxIn {
 				btcTXIDStr := btcTXI.PreviousOutPoint.Hash.String()
 				txRef := utxoMapping[btcTXIDStr] // find the corresponding harmony tx info
@@ -138,7 +137,7 @@ LOOP:
 				}
 				tx.TxInput = append(tx.TxInput, *blockchain.NewTXInput(blockchain.NewOutPoint(&txRef.txID, btcTXI.PreviousOutPoint.Index), [20]byte{}, txRef.shardID))
 				// Add the from address to array, so that we can later use it to sign the tx.
-				fromAddresses = append(fromAddresses, txRef.toAddress)
+				btcFromAddresses = append(btcFromAddresses, txRef.toAddress)
 			}
 			for _, btcTXO := range btcTx.MsgTx().TxOut {
 				_, addresses, _, _ := txscript.ExtractPkScriptAddrs(
@@ -151,22 +150,17 @@ LOOP:
 					copy(toAddress[:], btcTXOAddr.ScriptAddress())
 					txo := blockchain.TXOutput{Amount: int(btcTXO.Value), Address: toAddress, ShardID: nodeShardID}
 					tx.TxOutput = append(tx.TxOutput, txo)
+					utxoMapping[btcTx.Hash().String()] = TXRef{tx.ID, nodeShardID, toAddress}
 				}
 			}
 			// get private key and sign the tx
-			for _, fromAddress := range fromAddresses {
-				priKeyInt, ok := client.LookUpIntPriKey(fromAddress)
-				if ok {
-					tx.SetID() // TODO(RJ): figure out the correct way to set Tx ID.
-					tx.Sign(pki.GetPrivateKeyScalarFromInt(priKeyInt))
-				} else {
-					log.Error("Failed to look up the corresponding private key from address", "Address", fromAddress)
-					// throw error
-				}
+			for _, btcFromAddress := range btcFromAddresses {
+				hmyInt := getHmyInt(btcFromAddress)
+				tx.SetID() // TODO(RJ): figure out the correct way to set Tx ID.
+				tx.Sign(pki.GetPrivateKeyScalarFromInt(hmyInt))
 			}
 		}
 
-		utxoMapping[btcTx.Hash().String()] = TXRef{tx.ID, nodeShardID, toAddress}
 		if isCrossShardTx {
 			crossTxs = append(crossTxs, &tx)
 		} else {
@@ -219,7 +213,7 @@ func initClient(clientNode *node.Node, clientPort string, shardIdLeaderMap *map[
 
 func main() {
 	configFile := flag.String("config_file", "local_config.txt", "file containing all ip addresses and config")
-	maxNumTxsPerBatch := flag.Int("max_num_txs_per_batch", 100, "number of transactions to send per message")
+	maxNumTxsPerBatch := flag.Int("max_num_txs_per_batch", 1, "number of transactions to send per message")
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	flag.Parse()
 
@@ -244,6 +238,7 @@ func main() {
 
 	btcTXIter.Init()
 	utxoMapping = make(map[string]TXRef)
+	addressMapping = make(map[[20]byte]int)
 
 	currentInt = 1 // start from address 1
 	// Nodes containing utxopools to mirror the shards' data in the network
@@ -261,7 +256,7 @@ func main() {
 	initClient(clientNode, clientPort, &shardIdLeaderMap, &nodes)
 
 	// Transaction generation process
-	time.Sleep(10 * time.Second) // wait for nodes to be ready
+	time.Sleep(3 * time.Second) // wait for nodes to be ready
 
 	leaders := []p2p.Peer{}
 	for _, leader := range shardIdLeaderMap {

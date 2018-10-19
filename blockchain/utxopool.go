@@ -6,10 +6,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"sync"
+
 	"github.com/dedis/kyber/sign/schnorr"
 	"github.com/simple-rules/harmony-benchmark/crypto"
 	"github.com/simple-rules/harmony-benchmark/log"
-	"sync"
 )
 
 type Vout2AmountMap = map[uint32]int
@@ -117,6 +118,10 @@ func (utxoPool *UTXOPool) VerifyStateBlock(stateBlock *Block) bool {
 // VerifyOneTransaction verifies if a list of transactions valid.
 // Add another sanity check function (e.g. spending the same utxo) called before this one.
 func (utxoPool *UTXOPool) VerifyOneTransaction(tx *Transaction, spentTXOs *map[[20]byte]map[string]map[uint32]bool) (err error, crossShard bool) {
+	var nilPubKey [32]byte
+	if tx.PublicKey == nilPubKey { // TODO(ricl): remove. just for btc replay.
+		return nil, false
+	}
 	if len(tx.Proofs) > 1 {
 		return utxoPool.VerifyUnlockTransaction(tx)
 	}
