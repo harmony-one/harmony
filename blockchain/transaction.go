@@ -157,6 +157,22 @@ func NewCoinbaseTX(toAddress [20]byte, data string, shardID uint32) *Transaction
 	return &tx
 }
 
+func NewCoinbaseTXBTC(toAddress [20]byte, data string, shardID uint32) *Transaction {
+	if data == "" {
+		data = fmt.Sprintf("Reward to '%b'", toAddress)
+	}
+
+	txin := NewTXInput(NewOutPoint(&TxID{}, math.MaxUint32), toAddress, shardID)
+	outputs := []TXOutput{}
+	for i := 0; i < 21000000; i++ {
+		outputs = append(outputs, TXOutput{DefaultCoinbaseValue, toAddress, shardID})
+	}
+	tx := Transaction{ID: [32]byte{}, TxInput: []TXInput{*txin}, TxOutput: outputs, Proofs: nil}
+	// TODO: take care of the signature of coinbase transaction.
+	tx.SetID()
+	return &tx
+}
+
 // Used for debuging.
 func (txInput *TXInput) String() string {
 	res := fmt.Sprintf("TxID: %v, ", hex.EncodeToString(txInput.PreviousOutPoint.TxID[:]))

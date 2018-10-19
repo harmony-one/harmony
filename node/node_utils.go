@@ -5,7 +5,9 @@ import (
 	"github.com/simple-rules/harmony-benchmark/crypto/pki"
 )
 
-// AddTestingAddresses creates in genesis block numAddress transactions which assign 1000 token to each address in [0 - numAddress)
+// AddTestingAddresses creates in genesis block numAddress transactions which assign k token to each address in [0 - numAddress)
+// k = DefaultCoinbaseValue * DefaultNumUtxos
+// Assume we have S shards, then each account possesses k*S tokens
 // This is used by client code.
 // TODO: Consider to remove it later when moving to production.
 func (node *Node) AddTestingAddresses(numAddress int) {
