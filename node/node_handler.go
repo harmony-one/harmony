@@ -21,9 +21,9 @@ import (
 
 const (
 	// The min number of transaction per a block.
-	MinNumberOfTransactionsPerBlock = 1
+	MinNumberOfTransactionsPerBlock = 6000
 	// The max number of transaction per a block.
-	MaxNumberOfTransactionsPerBlock = 2
+	MaxNumberOfTransactionsPerBlock = 20000
 	// The number of blocks allowed before generating state block
 	NumBlocksBeforeStateBlock = 1000
 )
