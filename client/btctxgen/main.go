@@ -246,7 +246,7 @@ func main() {
 	for shardID, _ := range shardIdLeaderMap {
 		node := node.New(&consensus.Consensus{ShardID: shardID}, nil)
 		// Assign many fake addresses so we have enough address to play with at first
-		node.AddTestingAddresses(100000000)
+		node.AddTestingAddresses(10000)
 		nodes = append(nodes, node)
 	}
 
