@@ -213,7 +213,7 @@ func initClient(clientNode *node.Node, clientPort string, shardIdLeaderMap *map[
 
 func main() {
 	configFile := flag.String("config_file", "local_config.txt", "file containing all ip addresses and config")
-	maxNumTxsPerBatch := flag.Int("max_num_txs_per_batch", 1, "number of transactions to send per message")
+	maxNumTxsPerBatch := flag.Int("max_num_txs_per_batch", 10000, "number of transactions to send per message")
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	flag.Parse()
 
@@ -245,6 +245,8 @@ func main() {
 	nodes := []*node.Node{}
 	for shardID, _ := range shardIdLeaderMap {
 		node := node.New(&consensus.Consensus{ShardID: shardID}, nil)
+		// Assign many fake addresses so we have enough address to play with at first
+		node.AddTestingAddresses(100000000)
 		nodes = append(nodes, node)
 	}
 
