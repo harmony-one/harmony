@@ -1,34 +1,36 @@
 package btctxiter
 
 import (
+	"io/ioutil"
 	"log"
+	"path/filepath"
 
-	"github.com/btcsuite/btcutil"
-
+	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/rpcclient"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcutil"
 )
 
 type BTCTXIterator struct {
 	blockIndex int64
-	block      *wire.MsgBlock
+	block      *btcjson.GetBlockVerboseResult
 	txIndex    int
-	tx         *btcutil.Tx
+	tx         *btcjson.TxRawResult
 	client     *rpcclient.Client
 }
 
 func (iter *BTCTXIterator) Init() {
-	// Connect to local bitcoin core RPC server using HTTP POST mode.
-	connCfg := &rpcclient.ConnConfig{
-		Host:         "localhost:8332",
-		User:         "ricl",
-		Pass:         "123",
-		HTTPPostMode: true, // Bitcoin core only supports HTTP POST mode
-		DisableTLS:   true, // Bitcoin core does not provide TLS by default
+	btcdHomeDir := btcutil.AppDataDir("btcd", false)
+	certs, err := ioutil.ReadFile(filepath.Join(btcdHomeDir, "rpc.cert"))
+	if err != nil {
+		log.Fatal(err)
 	}
-	// Notice the notification parameter is nil since notifications are
-	// not supported in HTTP POST mode.
-	var err error
+	connCfg := &rpcclient.ConnConfig{
+		Host:         "localhost:8334",
+		Endpoint:     "ws",
+		User:         "yourusername",
+		Pass:         "yourpassword",
+		Certificates: certs,
+	}
 	iter.client, err = rpcclient.New(connCfg, nil)
 	if err != nil {
 		log.Fatal(err)
@@ -40,23 +42,14 @@ func (iter *BTCTXIterator) Init() {
 }
 
 // Move to the next transaction
-func (iter *BTCTXIterator) NextTx() *btcutil.Tx {
+func (iter *BTCTXIterator) NextTx() *btcjson.TxRawResult {
 	iter.txIndex++
-	hashes, err := iter.block.TxHashes()
-	if err != nil {
-		log.Println("Failed to get tx hashes", iter.blockIndex, iter.txIndex, err)
-		return nil
-	}
-	if iter.txIndex >= len(hashes) {
+	if iter.txIndex >= len(iter.block.RawTx) {
 		iter.nextBlock()
 		iter.txIndex++
 	}
-	iter.tx, err = iter.client.GetRawTransaction(&hashes[iter.txIndex])
-	if err != nil {
-		log.Println("Failed to get raw tx", iter.blockIndex, iter.txIndex, hashes[iter.txIndex], err)
-		return nil
-	}
-	log.Println(iter.blockIndex, iter.txIndex, hashes[iter.txIndex])
+	iter.tx = &iter.block.RawTx[iter.txIndex]
+	// log.Println(iter.blockIndex, iter.txIndex, hashes[iter.txIndex])
 	return iter.tx
 }
 
@@ -66,7 +59,7 @@ func (iter *BTCTXIterator) GetBlockIndex() int64 {
 }
 
 // Gets the current block
-func (iter *BTCTXIterator) GetBlock() *wire.MsgBlock {
+func (iter *BTCTXIterator) GetBlock() *btcjson.GetBlockVerboseResult {
 	return iter.block
 }
 
@@ -76,8 +69,17 @@ func (iter *BTCTXIterator) GetTxIndex() int {
 }
 
 // Gets the current transaction
-func (iter *BTCTXIterator) GetTx() *btcutil.Tx {
+func (iter *BTCTXIterator) GetTx() *btcjson.TxRawResult {
 	return iter.tx
+}
+
+func (iter *BTCTXIterator) IsCoinBaseTx(tx *btcjson.TxRawResult) bool {
+	// A coin base must only have one transaction input.
+	if len(tx.Vin) != 1 {
+		return false
+	}
+
+	return tx.Vin[0].IsCoinBase()
 }
 
 func (iter *BTCTXIterator) resetTx() {
@@ -86,15 +88,15 @@ func (iter *BTCTXIterator) resetTx() {
 }
 
 // Move to the next block
-func (iter *BTCTXIterator) nextBlock() *wire.MsgBlock {
+func (iter *BTCTXIterator) nextBlock() *btcjson.GetBlockVerboseResult {
 	iter.blockIndex++
 	hash, err := iter.client.GetBlockHash(iter.blockIndex)
 	if err != nil {
-		log.Println("Failed to get block hash at", iter.blockIndex)
+		log.Panic("Failed to get block hash at", iter.blockIndex, err)
 	}
-	iter.block, err = iter.client.GetBlock(hash)
+	iter.block, err = iter.client.GetBlockVerboseTx(hash)
 	if err != nil {
-		log.Println("Failed to get block", iter.blockIndex, iter.block)
+		log.Panic("Failed to get block", iter.blockIndex, err)
 	}
 	iter.resetTx()
 

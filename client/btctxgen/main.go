@@ -24,9 +24,6 @@ import (
 	"sync"
 	"time"
 
-	btcblockchain "github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/txscript"
 	"github.com/simple-rules/harmony-benchmark/blockchain"
 	"github.com/simple-rules/harmony-benchmark/client"
 	"github.com/simple-rules/harmony-benchmark/client/btctxiter"
@@ -53,7 +50,7 @@ type TXRef struct {
 var (
 	utxoPoolMutex sync.Mutex
 	setting       txGenSettings
-	btcTXIter     btctxiter.BTCTXIterator
+	iter          btctxiter.BTCTXIterator
 	utxoMapping   map[string]TXRef // btcTXID to { txID, shardID }
 	// map from bitcoin address to a int value (the privKey in hmy)
 	addressMapping map[[20]byte]int
@@ -108,49 +105,42 @@ func generateSimulatedTransactions(shardID int, dataNodes []*node.Node) ([]*bloc
 
 LOOP:
 	for true {
-		btcTx := btcTXIter.NextTx()
+		btcTx := iter.NextTx()
+		if btcTx == nil {
+			log.Error("Failed to parse tx", "height", iter.GetBlockIndex())
+		}
 		tx := blockchain.Transaction{}
 		isCrossShardTx := false
 
-		if btcblockchain.IsCoinBaseTx(btcTx.MsgTx()) {
+		if iter.IsCoinBaseTx(btcTx) {
 			// ricl: coinbase tx should just have one txo
-			btcTXO := btcTx.MsgTx().TxOut[0]
-			_, addresses, _, _ := txscript.ExtractPkScriptAddrs(
-				btcTXO.PkScript, &chaincfg.MainNetParams)
-			btcTXOAddr := addresses[0]
-			if btcTXOAddr == nil {
-				log.Warn("TxOut: can't decode address")
-			}
+			btcTXO := btcTx.Vout[0]
+			btcTXOAddr := btcTXO.ScriptPubKey.Addresses[0]
 			var toAddress [20]byte
-			copy(toAddress[:], btcTXOAddr.ScriptAddress())
+			copy(toAddress[:], btcTXOAddr) // TODO(ricl): string to [20]byte
 			hmyInt := getHmyInt(toAddress)
 			tx = *blockchain.NewCoinbaseTX(pki.GetAddressFromInt(hmyInt), "", nodeShardID)
 
-			utxoMapping[btcTx.Hash().String()] = TXRef{tx.ID, nodeShardID, toAddress}
+			utxoMapping[btcTx.Hash] = TXRef{tx.ID, nodeShardID, toAddress}
 		} else {
 			var btcFromAddresses [][20]byte
-			for _, btcTXI := range btcTx.MsgTx().TxIn {
-				btcTXIDStr := btcTXI.PreviousOutPoint.Hash.String()
+			for _, btcTXI := range btcTx.Vin {
+				btcTXIDStr := btcTXI.Txid
 				txRef := utxoMapping[btcTXIDStr] // find the corresponding harmony tx info
 				if txRef.shardID != nodeShardID {
 					isCrossShardTx = true
 				}
-				tx.TxInput = append(tx.TxInput, *blockchain.NewTXInput(blockchain.NewOutPoint(&txRef.txID, btcTXI.PreviousOutPoint.Index), [20]byte{}, txRef.shardID))
+				tx.TxInput = append(tx.TxInput, *blockchain.NewTXInput(blockchain.NewOutPoint(&txRef.txID, btcTXI.Vout), [20]byte{}, txRef.shardID))
 				// Add the from address to array, so that we can later use it to sign the tx.
 				btcFromAddresses = append(btcFromAddresses, txRef.toAddress)
 			}
-			for _, btcTXO := range btcTx.MsgTx().TxOut {
-				_, addresses, _, _ := txscript.ExtractPkScriptAddrs(
-					btcTXO.PkScript, &chaincfg.MainNetParams)
-				for _, btcTXOAddr := range addresses {
-					if btcTXOAddr == nil {
-						log.Warn("TxOut: can't decode address")
-					}
+			for _, btcTXO := range btcTx.Vout {
+				for _, btcTXOAddr := range btcTXO.ScriptPubKey.Addresses {
 					var toAddress [20]byte
-					copy(toAddress[:], btcTXOAddr.ScriptAddress())
+					copy(toAddress[:], btcTXOAddr) //TODO(ricl): string to [20]byte
 					txo := blockchain.TXOutput{Amount: int(btcTXO.Value), Address: toAddress, ShardID: nodeShardID}
 					tx.TxOutput = append(tx.TxOutput, txo)
-					utxoMapping[btcTx.Hash().String()] = TXRef{tx.ID, nodeShardID, toAddress}
+					utxoMapping[btcTx.Txid] = TXRef{tx.ID, nodeShardID, toAddress}
 				}
 			}
 			// get private key and sign the tx
@@ -166,7 +156,7 @@ LOOP:
 		} else {
 			txs = append(txs, &tx)
 		}
-		// log.Debug("[Generator] transformed btc tx", "block height", btcTXIter.GetBlockIndex(), "block tx count", btcTXIter.GetBlock().TxCount, "block tx cnt", len(btcTXIter.GetBlock().Txs), "txi", len(tx.TxInput), "txo", len(tx.TxOutput), "txCount", cnt)
+		// log.Debug("[Generator] transformed btc tx", "block height", iter.GetBlockIndex(), "block tx count", iter.GetBlock().TxCount, "block tx cnt", len(iter.GetBlock().Txs), "txi", len(tx.TxInput), "txo", len(tx.TxOutput), "txCount", cnt)
 		cnt++
 		if cnt >= setting.maxNumTxsPerBatch {
 			break LOOP
@@ -236,7 +226,7 @@ func main() {
 	)
 	log.Root().SetHandler(h)
 
-	btcTXIter.Init()
+	iter.Init()
 	utxoMapping = make(map[string]TXRef)
 	addressMapping = make(map[[20]byte]int)
 
@@ -272,7 +262,7 @@ func main() {
 			txs, crossTxs := generateSimulatedTransactions(int(shardId), nodes)
 			allCrossTxs = append(allCrossTxs, crossTxs...)
 
-			log.Debug("[Generator] Sending single-shard txs ...", "leader", leader, "numTxs", len(txs), "numCrossTxs", len(crossTxs), "block height", btcTXIter.GetBlockIndex())
+			log.Debug("[Generator] Sending single-shard txs ...", "leader", leader, "numTxs", len(txs), "numCrossTxs", len(crossTxs), "block height", iter.GetBlockIndex())
 			msg := proto_node.ConstructTransactionListMessage(txs)
 			p2p.SendMessage(leader, msg)
 			// Note cross shard txs are later sent in batch
