@@ -1,3 +1,7 @@
+// Uses btcd node.
+// Use `GetBlockVerboseTx` to get block and tx at once.
+// This way is faster
+
 package btctxiter
 
 import (
@@ -25,10 +29,10 @@ func (iter *BTCTXIterator) Init() {
 		log.Fatal(err)
 	}
 	connCfg := &rpcclient.ConnConfig{
-		Host:         "localhost:8334",
+		Host:         "localhost:8334", // This goes to btcd
 		Endpoint:     "ws",
-		User:         "yourusername",
-		Pass:         "yourpassword",
+		User:         "",
+		Pass:         "",
 		Certificates: certs,
 	}
 	iter.client, err = rpcclient.New(connCfg, nil)
@@ -71,15 +75,6 @@ func (iter *BTCTXIterator) GetTxIndex() int {
 // Gets the current transaction
 func (iter *BTCTXIterator) GetTx() *btcjson.TxRawResult {
 	return iter.tx
-}
-
-func (iter *BTCTXIterator) IsCoinBaseTx(tx *btcjson.TxRawResult) bool {
-	// A coin base must only have one transaction input.
-	if len(tx.Vin) != 1 {
-		return false
-	}
-
-	return tx.Vin[0].IsCoinBase()
 }
 
 func (iter *BTCTXIterator) resetTx() {
