@@ -97,3 +97,12 @@ func (iter *BTCTXIterator) nextBlock() *btcjson.GetBlockVerboseResult {
 
 	return iter.block
 }
+
+func IsCoinBaseTx(tx *btcjson.TxRawResult) bool {
+	// A coin base must only have one transaction input.
+	if len(tx.Vin) != 1 {
+		return false
+	}
+
+	return tx.Vin[0].IsCoinBase()
+}

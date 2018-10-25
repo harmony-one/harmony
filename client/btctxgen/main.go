@@ -112,7 +112,7 @@ LOOP:
 		tx := blockchain.Transaction{}
 		isCrossShardTx := false
 
-		if iter.IsCoinBaseTx(btcTx) {
+		if btctxiter.IsCoinBaseTx(btcTx) {
 			// ricl: coinbase tx should just have one txo
 			btcTXO := btcTx.Vout[0]
 			btcTXOAddr := btcTXO.ScriptPubKey.Addresses[0]
