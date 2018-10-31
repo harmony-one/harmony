@@ -119,7 +119,8 @@ func (utxoPool *UTXOPool) VerifyStateBlock(stateBlock *Block) bool {
 // Add another sanity check function (e.g. spending the same utxo) called before this one.
 func (utxoPool *UTXOPool) VerifyOneTransaction(tx *Transaction, spentTXOs *map[[20]byte]map[string]map[uint32]bool) (err error, crossShard bool) {
 	var nilPubKey [32]byte
-	if tx.PublicKey == nilPubKey { // TODO(ricl): remove. just for btc replay.
+	// TODO(ricl): remove. just for btc replay.
+	if tx.PublicKey == nilPubKey {
 		return nil, false
 	}
 	if len(tx.Proofs) > 1 {

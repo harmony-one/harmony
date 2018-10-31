@@ -14,6 +14,7 @@ import (
 	"github.com/btcsuite/btcutil"
 )
 
+// BTCTXIterator is a btc transaction iterator.
 type BTCTXIterator struct {
 	blockIndex int64
 	block      *btcjson.GetBlockVerboseResult
@@ -22,6 +23,7 @@ type BTCTXIterator struct {
 	client     *rpcclient.Client
 }
 
+// Init is an init function of BTCTXIterator.
 func (iter *BTCTXIterator) Init() {
 	btcdHomeDir := btcutil.AppDataDir("btcd", false)
 	certs, err := ioutil.ReadFile(filepath.Join(btcdHomeDir, "rpc.cert"))
@@ -45,7 +47,7 @@ func (iter *BTCTXIterator) Init() {
 	// defer iter.client.Shutdown()
 }
 
-// Move to the next transaction
+// NextTx is to move to the next transaction.
 func (iter *BTCTXIterator) NextTx() *btcjson.TxRawResult {
 	iter.txIndex++
 	if iter.txIndex >= len(iter.block.RawTx) {
@@ -57,22 +59,22 @@ func (iter *BTCTXIterator) NextTx() *btcjson.TxRawResult {
 	return iter.tx
 }
 
-// Gets the index/height of the current block
+// GetBlockIndex gets the index/height of the current block
 func (iter *BTCTXIterator) GetBlockIndex() int64 {
 	return iter.blockIndex
 }
 
-// Gets the current block
+// GetBlock gets the current block
 func (iter *BTCTXIterator) GetBlock() *btcjson.GetBlockVerboseResult {
 	return iter.block
 }
 
-// Gets the index of the current transaction
+// GetTxIndex gets the index of the current transaction
 func (iter *BTCTXIterator) GetTxIndex() int {
 	return iter.txIndex
 }
 
-// Gets the current transaction
+// GetTx gets the current transaction
 func (iter *BTCTXIterator) GetTx() *btcjson.TxRawResult {
 	return iter.tx
 }
@@ -98,6 +100,7 @@ func (iter *BTCTXIterator) nextBlock() *btcjson.GetBlockVerboseResult {
 	return iter.block
 }
 
+// IsCoinBaseTx returns true if tx is a coinbase tx.
 func IsCoinBaseTx(tx *btcjson.TxRawResult) bool {
 	// A coin base must only have one transaction input.
 	if len(tx.Vin) != 1 {
