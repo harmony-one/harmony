@@ -22,5 +22,8 @@ bin/
 *.log
 log-*
 
+# gcloud
+gcloud.txt
+
 # Wallet
 keystore

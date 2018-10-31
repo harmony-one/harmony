@@ -12,33 +12,36 @@ import (
 	"github.com/simple-rules/harmony-benchmark/utils"
 )
 
-// A block in the blockchain that contains block headers, transactions and signature etc.
+// Block is a block in the blockchain that contains block headers, transactions and signature etc.
 type Block struct {
 	// Header
 	Timestamp       int64
 	PrevBlockHash   [32]byte
 	NumTransactions int32
 	TransactionIds  [][32]byte
-	Transactions    []*Transaction // Transactions
+	Transactions    []*Transaction // Transactions.
 	ShardId         uint32
 	Hash            [32]byte
 	MerkleRootData  []byte
-	State           *State // If present, this block is state block
+	State           *State // If present, this block is state block.
 	// Signature...
 	Bitmap    []byte   // Contains which validator signed the block.
-	Signature [66]byte // Schnorr collective signature
+	Signature [66]byte // Schnorr collective signature.
 }
 
+// State is used in Block to indicate that block is a state block.
 type State struct {
-	NumBlocks       int32 // Total number of blocks
-	NumTransactions int32 // Total number of transactions
+	NumBlocks       int32 // Total number of blocks.
+	NumTransactions int32 // Total number of transactions.
 }
 
+// IsStateBlock is used to check if a block is a state block.
 func (b *Block) IsStateBlock() bool {
-	return b.State != nil && bytes.Equal(b.PrevBlockHash[:], (&[32]byte{})[:]) // TODO: think of a better indicator to check
+	// TODO: think of a better indicator to check.
+	return b.State != nil && bytes.Equal(b.PrevBlockHash[:], (&[32]byte{})[:])
 }
 
-// Serialize serializes the block
+// Serialize serializes the block.
 func (b *Block) Serialize() []byte {
 	var result bytes.Buffer
 	encoder := gob.NewEncoder(&result)
@@ -49,7 +52,7 @@ func (b *Block) Serialize() []byte {
 	return result.Bytes()
 }
 
-// DeserializeBlock deserializes a block
+// DeserializeBlock deserializes a block.
 func DeserializeBlock(d []byte) (*Block, error) {
 	var block Block
 	decoder := gob.NewDecoder(bytes.NewReader(d))
@@ -85,6 +88,7 @@ func (b *Block) Write(db db.Database, key string) error {
 	return db.Put([]byte(key), b.Serialize())
 }
 
+// Delete deletes the given key in the given databse.
 func Delete(db db.Database, key string) error {
 	return db.Delete([]byte(key))
 }
