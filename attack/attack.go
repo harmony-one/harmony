@@ -101,8 +101,8 @@ func (attack *Attack) IncorrectResponse() bool {
 	return false
 }
 
-func (attack *Attack) UpdateConsensusReady(consensusId uint32) {
-	if consensusId > attack.ConsensusIdThreshold {
+func (attack *Attack) UpdateConsensusReady(consensusID uint32) {
+	if consensusID > attack.ConsensusIdThreshold {
 		attack.readyByConsensusThreshold = true
 	}
 }

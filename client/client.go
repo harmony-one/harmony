@@ -29,9 +29,9 @@ type Client struct {
 func (client *Client) TransactionMessageHandler(msgPayload []byte) {
 	messageType := client_proto.TransactionMessageType(msgPayload[0])
 	switch messageType {
-	case client_proto.PROOF_OF_LOCK:
+	case client_proto.ProofOfLock:
 		// Decode the list of blockchain.CrossShardTxProof
-		txDecoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the PROOF_OF_LOCK messge type
+		txDecoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the ProofOfLock messge type
 		proofs := new([]blockchain.CrossShardTxProof)
 		err := txDecoder.Decode(proofs)
 
@@ -39,11 +39,11 @@ func (client *Client) TransactionMessageHandler(msgPayload []byte) {
 			client.log.Error("Failed deserializing cross transaction proof list")
 		}
 		client.handleProofOfLockMessage(proofs)
-	case client_proto.UTXO_RESPONSE:
-		txDecoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the PROOF_OF_LOCK messge type
+	case client_proto.UtxoResponse:
+		txDecoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the ProofOfLock messge type
 		fetchUtxoResponse := new(client_proto.FetchUtxoResponseMessage)
 		err := txDecoder.Decode(fetchUtxoResponse)
-		client.log.Debug("UTXO_RESPONSE")
+		client.log.Debug("UtxoResponse")
 
 		if err != nil {
 			client.log.Error("Failed deserializing utxo response")

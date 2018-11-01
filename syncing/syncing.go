@@ -74,7 +74,7 @@ LOOP_HONEST_NODE:
 			}
 			go func(peerConfig *SyncPeerConfig) {
 				defer wg.Done()
-				msg := proto_node.ConstructBlockchainSyncMessage(proto_node.GET_LAST_BLOCK_HASHES, [32]byte{})
+				msg := proto_node.ConstructBlockchainSyncMessage(proto_node.GetLastBlockHashes, [32]byte{})
 				peerConfig.w.Write(msg)
 				peerConfig.w.Flush()
 				var content []byte
@@ -128,7 +128,7 @@ TASK_LOOP:
 					break
 				}
 				syncTask := task[0].(SyncBlockTask)
-				msg := proto_node.ConstructBlockchainSyncMessage(proto_node.GET_BLOCK, syncTask.blockHash)
+				msg := proto_node.ConstructBlockchainSyncMessage(proto_node.GetBlock, syncTask.blockHash)
 				peerConfig.w.Write(msg)
 				peerConfig.w.Flush()
 				var content []byte

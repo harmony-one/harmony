@@ -23,7 +23,7 @@ var (
 	startTime time.Time
 )
 
-// Waits for the next new block to run consensus on
+// WaitForNewBlock waits for the next new block to run consensus on
 func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) {
 	consensus.Log.Debug("Waiting for block", "consensus", consensus)
 	for { // keep waiting for new blocks
@@ -39,7 +39,7 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) 
 	}
 }
 
-// Consensus message dispatcher for the leader
+// ProcessMessageLeader dispatches consensus message for the leader.
 func (consensus *Consensus) ProcessMessageLeader(message []byte) {
 	msgType, err := proto_consensus.GetConsensusMessageType(message)
 	if err != nil {
@@ -52,29 +52,29 @@ func (consensus *Consensus) ProcessMessageLeader(message []byte) {
 	}
 
 	switch msgType {
-	case proto_consensus.START_CONSENSUS:
+	case proto_consensus.StartConsensus:
 		consensus.processStartConsensusMessage(payload)
 	case proto_consensus.COMMIT:
-		consensus.processCommitMessage(payload, CHALLENGE_DONE)
+		consensus.processCommitMessage(payload, ChallengeDone)
 	case proto_consensus.RESPONSE:
-		consensus.processResponseMessage(payload, COLLECTIVE_SIG_DONE)
-	case proto_consensus.FINAL_COMMIT:
-		consensus.processCommitMessage(payload, FINAL_CHALLENGE_DONE)
-	case proto_consensus.FINAL_RESPONSE:
+		consensus.processResponseMessage(payload, CollectiveSigDone)
+	case proto_consensus.FinalCommit:
+		consensus.processCommitMessage(payload, FinalChallengeDone)
+	case proto_consensus.FinalResponse:
 		consensus.processResponseMessage(payload, FINISHED)
 	default:
 		consensus.Log.Error("Unexpected message type", "msgType", msgType, "consensus", consensus)
 	}
 }
 
-// Handler for message which triggers consensus process
+// processStartConsensusMessage is the handler for message which triggers consensus process.
 func (consensus *Consensus) processStartConsensusMessage(payload []byte) {
 	// TODO: remove these method after testnet
 	tx := blockchain.NewCoinbaseTX([20]byte{0}, "y", 0)
 	consensus.startConsensus(blockchain.NewGenesisBlock(tx, 0))
 }
 
-// Starts a new consensus for a block by broadcast a announce message to the validators
+// startConsensus starts a new consensus for a block by broadcast a announce message to the validators
 func (consensus *Consensus) startConsensus(newBlock *blockchain.Block) {
 	// Copy over block hash and block header data
 	copy(consensus.blockHash[:], newBlock.Hash[:])
@@ -89,16 +89,16 @@ func (consensus *Consensus) startConsensus(newBlock *blockchain.Block) {
 	consensus.Log.Debug("Stop encoding block")
 	msgToSend := consensus.constructAnnounceMessage()
 	p2p.BroadcastMessageFromLeader(consensus.GetValidatorPeers(), msgToSend)
-	// Set state to ANNOUNCE_DONE
-	consensus.state = ANNOUNCE_DONE
+	// Set state to AnnounceDone
+	consensus.state = AnnounceDone
 	consensus.commitByLeader(true)
 }
 
-// Leader commit to the message itself before receiving others commits
+// commitByLeader commits to the message itself before receiving others commits
 func (consensus *Consensus) commitByLeader(firstRound bool) {
 	// Generate leader's own commitment
 	secret, commitment := crypto.Commit(crypto.Ed25519Curve)
-	consensus.secret[consensus.consensusId] = secret
+	consensus.secret[consensus.consensusID] = secret
 	if firstRound {
 		(*consensus.commitments)[consensus.nodeId] = commitment
 		consensus.bitmap.SetKey(consensus.pubKey, true)
@@ -108,12 +108,12 @@ func (consensus *Consensus) commitByLeader(firstRound bool) {
 	}
 }
 
-// Processes the commit message sent from validators
+// processCommitMessage processes the commit message sent from validators
 func (consensus *Consensus) processCommitMessage(payload []byte, targetState ConsensusState) {
 	// Read payload data
 	offset := 0
 	// 4 byte consensus id
-	consensusId := binary.BigEndian.Uint32(payload[offset : offset+4])
+	consensusID := binary.BigEndian.Uint32(payload[offset : offset+4])
 	offset += 4
 
 	// 32 byte block hash
@@ -146,19 +146,19 @@ func (consensus *Consensus) processCommitMessage(payload []byte, targetState Con
 	// check consensus Id
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
-	if consensusId != consensus.consensusId {
-		consensus.Log.Warn("Received COMMIT with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId, "consensus", consensus)
+	if consensusID != consensus.consensusID {
+		consensus.Log.Warn("Received COMMIT with wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
 		return
 	}
 
 	if bytes.Compare(blockHash, consensus.blockHash[:]) != 0 {
-		consensus.Log.Warn("Received COMMIT with wrong blockHash", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId, "consensus", consensus)
+		consensus.Log.Warn("Received COMMIT with wrong blockHash", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
 		return
 	}
 
-	commitments := consensus.commitments // targetState == CHALLENGE_DONE
+	commitments := consensus.commitments // targetState == ChallengeDone
 	bitmap := consensus.bitmap
-	if targetState == FINAL_CHALLENGE_DONE {
+	if targetState == FinalChallengeDone {
 		commitments = consensus.finalCommitments
 		bitmap = consensus.finalBitmap
 	}
@@ -186,8 +186,8 @@ func (consensus *Consensus) processCommitMessage(payload []byte, targetState Con
 		consensus.Log.Debug("Enough commitments received with signatures", "num", len(*commitments), "state", consensus.state)
 
 		// Broadcast challenge
-		msgTypeToSend := proto_consensus.CHALLENGE // targetState == CHALLENGE_DONE
-		if targetState == FINAL_CHALLENGE_DONE {
+		msgTypeToSend := proto_consensus.CHALLENGE // targetState == ChallengeDone
+		if targetState == FinalChallengeDone {
 			msgTypeToSend = proto_consensus.FINAL_CHALLENGE
 		}
 		msgToSend, challengeScalar, aggCommitment := consensus.constructChallengeMessage(msgTypeToSend)
@@ -205,12 +205,12 @@ func (consensus *Consensus) processCommitMessage(payload []byte, targetState Con
 		}
 
 		// Add leader's response
-		consensus.responseByLeader(challengeScalar, targetState == CHALLENGE_DONE)
+		consensus.responseByLeader(challengeScalar, targetState == ChallengeDone)
 
 		// Broadcast challenge message
 		p2p.BroadcastMessageFromLeader(consensus.GetValidatorPeers(), msgToSend)
 
-		// Set state to targetState (CHALLENGE_DONE or FINAL_CHALLENGE_DONE)
+		// Set state to targetState (ChallengeDone or FinalChallengeDone)
 		consensus.state = targetState
 	}
 }
@@ -218,7 +218,7 @@ func (consensus *Consensus) processCommitMessage(payload []byte, targetState Con
 // Leader commit to the message itself before receiving others commits
 func (consensus *Consensus) responseByLeader(challenge kyber.Scalar, firstRound bool) {
 	// Generate leader's own commitment
-	response, err := crypto.Response(crypto.Ed25519Curve, consensus.priKey, consensus.secret[consensus.consensusId], challenge)
+	response, err := crypto.Response(crypto.Ed25519Curve, consensus.priKey, consensus.secret[consensus.consensusID], challenge)
 	if err == nil {
 		if firstRound {
 			(*consensus.responses)[consensus.nodeId] = response
@@ -237,7 +237,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState C
 	//#### Read payload data
 	offset := 0
 	// 4 byte consensus id
-	consensusId := binary.BigEndian.Uint32(payload[offset : offset+4])
+	consensusID := binary.BigEndian.Uint32(payload[offset : offset+4])
 	offset += 4
 
 	// 32 byte block hash
@@ -262,13 +262,13 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState C
 	defer consensus.mutex.Unlock()
 
 	// check consensus Id
-	if consensusId != consensus.consensusId {
+	if consensusID != consensus.consensusID {
 		shouldProcess = false
-		consensus.Log.Warn("Received RESPONSE with wrong consensus Id", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId, "consensus", consensus)
+		consensus.Log.Warn("Received RESPONSE with wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
 	}
 
 	if bytes.Compare(blockHash, consensus.blockHash[:]) != 0 {
-		consensus.Log.Warn("Received RESPONSE with wrong blockHash", "myConsensusId", consensus.consensusId, "theirConsensusId", consensusId, "consensus", consensus)
+		consensus.Log.Warn("Received RESPONSE with wrong blockHash", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
 		return
 	}
 
@@ -283,7 +283,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState C
 		return
 	}
 
-	commitments := consensus.commitments // targetState == COLLECTIVE_SIG_DONE
+	commitments := consensus.commitments // targetState == CollectiveSigDone
 	responses := consensus.responses
 	bitmap := consensus.bitmap
 	if targetState == FINISHED {
@@ -352,7 +352,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState C
 			copy(collectiveSig[:], collectiveSigAndBitmap[:64])
 			bitmap := collectiveSigAndBitmap[64:]
 
-			// Set state to COLLECTIVE_SIG_DONE or FINISHED
+			// Set state to CollectiveSigDone or FINISHED
 			consensus.state = targetState
 
 			if consensus.state != FINISHED {
@@ -365,8 +365,8 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState C
 				consensus.Log.Debug("Consensus reached with signatures.", "numOfSignatures", len(*responses))
 				// Reset state to FINISHED, and clear other data.
 				consensus.ResetState()
-				consensus.consensusId++
-				consensus.Log.Debug("HOORAY!!! CONSENSUS REACHED!!!", "consensusId", consensus.consensusId)
+				consensus.consensusID++
+				consensus.Log.Debug("HOORAY!!! CONSENSUS REACHED!!!", "consensusID", consensus.consensusID)
 
 				// TODO: reconstruct the whole block from header and transactions
 				// For now, we used the stored whole block already stored in consensus.blockHeader

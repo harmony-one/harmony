@@ -16,7 +16,7 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 
 	// 4 byte consensus id
 	fourBytes := make([]byte, 4)
-	binary.BigEndian.PutUint32(fourBytes, consensus.consensusId)
+	binary.BigEndian.PutUint32(fourBytes, consensus.consensusID)
 	buffer.Write(fourBytes)
 
 	// 32 byte block hash
@@ -44,7 +44,7 @@ func (consensus *Consensus) constructChallengeMessage(msgTypeToSend proto_consen
 
 	// 4 byte consensus id
 	fourBytes := make([]byte, 4)
-	binary.BigEndian.PutUint32(fourBytes, consensus.consensusId)
+	binary.BigEndian.PutUint32(fourBytes, consensus.consensusID)
 	buffer.Write(fourBytes)
 
 	// 32 byte block hash
@@ -94,7 +94,7 @@ func (consensus *Consensus) constructCollectiveSigMessage(collectiveSig [64]byte
 
 	// 4 byte consensus id
 	fourBytes := make([]byte, 4)
-	binary.BigEndian.PutUint32(fourBytes, consensus.consensusId)
+	binary.BigEndian.PutUint32(fourBytes, consensus.consensusID)
 	buffer.Write(fourBytes)
 
 	// 32 byte block hash

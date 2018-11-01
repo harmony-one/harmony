@@ -50,7 +50,7 @@ type Consensus struct {
 	// Leader or validator Id - 2 byte
 	nodeId uint16
 	// Consensus Id (View Id) - 4 byte
-	consensusId uint32
+	consensusID uint32
 	// Blockhash - 32 byte
 	blockHash [32]byte
 	// BlockHeader to run consensus on
@@ -141,7 +141,7 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 	// Set private key for myself so that I can sign messages.
 	consensus.priKey = crypto.Ed25519Curve.Scalar().SetInt64(int64(consensus.nodeId))
 	consensus.pubKey = pki.GetPublicKeyFromScalar(consensus.priKey)
-	consensus.consensusId = 0 // or view Id in the original pbft paper
+	consensus.consensusID = 0 // or view Id in the original pbft paper
 
 	myShardID, err := strconv.Atoi(ShardID)
 	if err != nil {

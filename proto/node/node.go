@@ -18,7 +18,7 @@ const (
 	BLOCK
 	CLIENT
 	CONTROL
-	BLOCKCHAIN_SYNC
+	BlockchainSync
 	// TODO: add more types
 )
 
@@ -33,8 +33,8 @@ type BlockchainSyncMessageType int
 
 const (
 	DONE BlockchainSyncMessageType = iota
-	GET_LAST_BLOCK_HASHES
-	GET_BLOCK
+	GetLastBlockHashes
+	GetBlock
 )
 
 // TransactionMessageType representa the types of messages used for NODE/Transaction
@@ -57,7 +57,7 @@ const (
 type ClientMessageType int
 
 const (
-	LOOKUP_UTXO ClientMessageType = iota
+	LookupUtxo ClientMessageType = iota
 )
 
 // The types of messages used for NODE/CONTROL
@@ -112,7 +112,7 @@ func ConstructUnlockToCommitOrAbortMessage(txsAndProofs []*blockchain.Transactio
 func ConstructFetchUtxoMessage(sender p2p.Peer, addresses [][20]byte) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
 	byteBuffer.WriteByte(byte(CLIENT))
-	byteBuffer.WriteByte(byte(LOOKUP_UTXO))
+	byteBuffer.WriteByte(byte(LookupUtxo))
 
 	encoder := gob.NewEncoder(byteBuffer)
 	encoder.Encode(FetchUtxoMessage{Addresses: addresses, Sender: sender})
@@ -141,9 +141,9 @@ func ConstructTransactionListMessage(transactions []*blockchain.Transaction) []b
 // ConstructBlockchainSyncMessage constructs Blockchain Sync Message.
 func ConstructBlockchainSyncMessage(msgType BlockchainSyncMessageType, blockHash [32]byte) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
-	byteBuffer.WriteByte(byte(BLOCKCHAIN_SYNC))
+	byteBuffer.WriteByte(byte(BlockchainSync))
 	byteBuffer.WriteByte(byte(msgType))
-	if msgType != GET_LAST_BLOCK_HASHES {
+	if msgType != GetLastBlockHashes {
 		byteBuffer.Write(blockHash[:])
 	}
 	return byteBuffer.Bytes()

@@ -69,7 +69,7 @@ RESPONSE:
 */
 
 // the number of bytes consensus message type occupies
-const CONSENSUS_MESSAGE_TYPE_BYTES = 1
+const ConsensusMessageTypeBytes = 1
 
 // The specific types of message under CONSENSUS category
 type ConsensusMessageType byte
@@ -89,10 +89,10 @@ const (
 	CHALLENGE
 	RESPONSE
 	COLLECTIVE_SIG
-	FINAL_COMMIT
+	FinalCommit
 	FINAL_CHALLENGE
-	FINAL_RESPONSE
-	START_CONSENSUS
+	FinalResponse
+	StartConsensus
 )
 
 // Returns string name for the MessageType enum
@@ -103,13 +103,13 @@ func (msgType MessageType) String() string {
 		"CHALLENGE",
 		"RESPONSE",
 		"COLLECTIVE_SIG",
-		"FINAL_COMMIT",
+		"FinalCommit",
 		"FINAL_CHALLENGE",
-		"FINAL_RESPONSE",
-		"START_CONSENSUS",
+		"FinalResponse",
+		"StartConsensus",
 	}
 
-	if msgType < ANNOUNCE || msgType > START_CONSENSUS {
+	if msgType < ANNOUNCE || msgType > StartConsensus {
 		return "Unknown"
 	}
 	return names[msgType]
@@ -128,7 +128,7 @@ func GetConsensusMessagePayload(message []byte) ([]byte, error) {
 	if len(message) < 2 {
 		return []byte{}, errors.New("Failed to get consensus message payload: no data available.")
 	}
-	return message[CONSENSUS_MESSAGE_TYPE_BYTES:], nil
+	return message[ConsensusMessageTypeBytes:], nil
 }
 
 // Concatenate msgType as one byte with payload, and return the whole byte array

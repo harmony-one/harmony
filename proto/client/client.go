@@ -20,8 +20,8 @@ const (
 type TransactionMessageType int
 
 const (
-	PROOF_OF_LOCK TransactionMessageType = iota // The proof of accept or reject returned by the leader to the client tnat issued cross shard transactions.
-	UTXO_RESPONSE
+	ProofOfLock TransactionMessageType = iota // The proof of accept or reject returned by the leader to the client tnat issued cross shard transactions.
+	UtxoResponse
 )
 
 type FetchUtxoResponseMessage struct {
@@ -33,7 +33,7 @@ type FetchUtxoResponseMessage struct {
 func ConstructProofOfAcceptOrRejectMessage(proofs []blockchain.CrossShardTxProof) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.CLIENT)})
 	byteBuffer.WriteByte(byte(Transaction))
-	byteBuffer.WriteByte(byte(PROOF_OF_LOCK))
+	byteBuffer.WriteByte(byte(ProofOfLock))
 	encoder := gob.NewEncoder(byteBuffer)
 
 	encoder.Encode(proofs)
@@ -44,7 +44,7 @@ func ConstructProofOfAcceptOrRejectMessage(proofs []blockchain.CrossShardTxProof
 func ConstructFetchUtxoResponseMessage(utxoMap *blockchain.UtxoMap, shardID uint32) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.CLIENT)})
 	byteBuffer.WriteByte(byte(Transaction))
-	byteBuffer.WriteByte(byte(UTXO_RESPONSE))
+	byteBuffer.WriteByte(byte(UtxoResponse))
 	encoder := gob.NewEncoder(byteBuffer)
 
 	encoder.Encode(FetchUtxoResponseMessage{*utxoMap, shardID})

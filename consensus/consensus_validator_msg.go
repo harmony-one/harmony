@@ -3,6 +3,7 @@ package consensus
 import (
 	"bytes"
 	"encoding/binary"
+
 	"github.com/dedis/kyber"
 	"github.com/simple-rules/harmony-benchmark/crypto"
 	proto_consensus "github.com/simple-rules/harmony-benchmark/proto/consensus"
@@ -14,7 +15,7 @@ func (consensus *Consensus) constructCommitMessage(msgType proto_consensus.Messa
 
 	// 4 byte consensus id
 	fourBytes := make([]byte, 4)
-	binary.BigEndian.PutUint32(fourBytes, consensus.consensusId)
+	binary.BigEndian.PutUint32(fourBytes, consensus.consensusID)
 	buffer.Write(fourBytes)
 
 	// 32 byte block hash
@@ -42,7 +43,7 @@ func (consensus *Consensus) constructResponseMessage(msgType proto_consensus.Mes
 
 	// 4 byte consensus id
 	fourBytes := make([]byte, 4)
-	binary.BigEndian.PutUint32(fourBytes, consensus.consensusId)
+	binary.BigEndian.PutUint32(fourBytes, consensus.consensusID)
 	buffer.Write(fourBytes)
 
 	// 32 byte block hash

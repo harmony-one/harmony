@@ -108,13 +108,13 @@ func (node *Node) NodeHandler(conn net.Conn) {
 					node.Client.UpdateBlocks(*blocks)
 				}
 			}
-		case proto_node.BLOCKCHAIN_SYNC:
+		case proto_node.BlockchainSync:
 			node.handleBlockchainSync(msgPayload, conn)
 		case proto_node.CLIENT:
 			clientMsgType := proto_node.ClientMessageType(msgPayload[0])
 			switch clientMsgType {
-			case proto_node.LOOKUP_UTXO:
-				decoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the LOOKUP_UTXO messge type
+			case proto_node.LookupUtxo:
+				decoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the LookupUtxo messge type
 
 				fetchUtxoMessage := new(proto_node.FetchUtxoMessage)
 				decoder.Decode(fetchUtxoMessage)
@@ -188,11 +188,11 @@ FOR_LOOP:
 	for {
 		syncMsgType := proto_node.BlockchainSyncMessageType(payload[0])
 		switch syncMsgType {
-		case proto_node.GET_BLOCK:
+		case proto_node.GetBlock:
 			block := node.blockchain.FindBlock(payload[1:33])
 			w.Write(block.Serialize())
 			w.Flush()
-		case proto_node.GET_LAST_BLOCK_HASHES:
+		case proto_node.GetLastBlockHashes:
 			blockchainSyncMessage := proto_node.BlockchainSyncMessage{
 				BlockHeight: len(node.blockchain.Blocks),
 				BlockHashes: node.blockchain.GetBlockHashes(),
@@ -217,7 +217,7 @@ FOR_LOOP:
 
 		msgType, err := proto.GetMessageType(content)
 		actionType := proto_node.NodeMessageType(msgType)
-		if err != nil || actionType != proto_node.BLOCKCHAIN_SYNC {
+		if err != nil || actionType != proto_node.BlockchainSync {
 			node.log.Error("Failed in reading message type from syncing node", err)
 			return
 		}
