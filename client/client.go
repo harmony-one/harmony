@@ -25,7 +25,7 @@ type Client struct {
 	log               log.Logger // Log utility
 }
 
-// The message handler for CLIENT/TRANSACTION messages.
+// The message handler for CLIENT/Transaction messages.
 func (client *Client) TransactionMessageHandler(msgPayload []byte) {
 	messageType := client_proto.TransactionMessageType(msgPayload[0])
 	switch messageType {

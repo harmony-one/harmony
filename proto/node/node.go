@@ -10,11 +10,11 @@ import (
 	"github.com/simple-rules/harmony-benchmark/proto"
 )
 
-// The specific types of message under NODE category
+// NodeMessageType is to indicate the specific type of message under NODE category
 type NodeMessageType byte
 
 const (
-	TRANSACTION NodeMessageType = iota
+	Transaction NodeMessageType = iota
 	BLOCK
 	CLIENT
 	CONTROL
@@ -22,10 +22,13 @@ const (
 	// TODO: add more types
 )
 
+// BlockchainSyncMessage is a struct for blockchain sync message.
 type BlockchainSyncMessage struct {
 	BlockHeight int
 	BlockHashes [][32]byte
 }
+
+// BlockchainSyncMessageType represents BlockchainSyncMessageType type.
 type BlockchainSyncMessageType int
 
 const (
@@ -34,7 +37,7 @@ const (
 	GET_BLOCK
 )
 
-// The types of messages used for NODE/TRANSACTION
+// TransactionMessageType representa the types of messages used for NODE/Transaction
 type TransactionMessageType int
 
 const (
@@ -43,7 +46,7 @@ const (
 	UNLOCK
 )
 
-// The types of messages used for NODE/BLOCK
+// BlockMessageType represents the types of messages used for NODE/BLOCK
 type BlockMessageType int
 
 const (
@@ -97,7 +100,7 @@ func DeserializeBlockchainSyncMessage(d []byte) (*BlockchainSyncMessage, error) 
 // This is for client.
 func ConstructUnlockToCommitOrAbortMessage(txsAndProofs []*blockchain.Transaction) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
-	byteBuffer.WriteByte(byte(TRANSACTION))
+	byteBuffer.WriteByte(byte(Transaction))
 	byteBuffer.WriteByte(byte(UNLOCK))
 	encoder := gob.NewEncoder(byteBuffer)
 	encoder.Encode(txsAndProofs)
@@ -120,7 +123,7 @@ func ConstructFetchUtxoMessage(sender p2p.Peer, addresses [][20]byte) []byte {
 // ConstructTransactionListMessage constructs serialized transactions
 func ConstructTransactionListMessage(transactions []*blockchain.Transaction) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
-	byteBuffer.WriteByte(byte(TRANSACTION))
+	byteBuffer.WriteByte(byte(Transaction))
 	byteBuffer.WriteByte(byte(SEND))
 	encoder := gob.NewEncoder(byteBuffer)
 	// Copy over the tx data
@@ -157,7 +160,7 @@ func GenerateBlockchainSyncMessage(payload []byte) *BlockchainSyncMessage {
 // ConstructRequestTransactionsMessage constructs serialized transactions
 func ConstructRequestTransactionsMessage(transactionIds [][]byte) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
-	byteBuffer.WriteByte(byte(TRANSACTION))
+	byteBuffer.WriteByte(byte(Transaction))
 	byteBuffer.WriteByte(byte(REQUEST))
 	for _, txID := range transactionIds {
 		byteBuffer.Write(txID)

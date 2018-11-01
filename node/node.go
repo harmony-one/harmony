@@ -73,7 +73,7 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int) ([]*blockchain.Trans
 	return selected, crossShardTxs
 }
 
-// Start a server and process the request by a handler.
+// StartServer starts a server and process the request by a handler.
 func (node *Node) StartServer(port string) {
 	if node.SyncNode {
 		node.blockchain = syncing.StartBlockSyncing(node.Consensus.GetValidatorPeers())
@@ -139,7 +139,7 @@ func NewWaitNode(peer, IDCPeer p2p.Peer) *Node {
 	return &node
 }
 
-//NewNodefromIDC
+// NewNodefromIDC is the new node for identity chain.
 func NewNodefromIDC(node *Node, consensus *consensus.Consensus, db *db.LDBDatabase) *Node {
 
 	if consensus != nil {
@@ -187,8 +187,8 @@ func (node *Node) processPOWMessage(message []byte) {
 	p2p.SendMessage(IDCPeer, identity.ConstructIdentityMessage(identity.REGISTER, msgPayload))
 }
 
-//https://stackoverflow.com/questions/12854125/how-do-i-dump-the-struct-into-the-byte-array-without-reflection/12854659#12854659
-//SerializeWaitNode serializes the node
+// SerializeWaitNode serializes the node
+// https://stackoverflow.com/questions/12854125/how-do-i-dump-the-struct-into-the-byte-array-without-reflection/12854659#12854659
 func (node *Node) SerializeWaitNode() []byte {
 	//Needs to escape the serialization of unexported fields
 	result := new(bytes.Buffer)
@@ -219,7 +219,7 @@ func DeserializeWaitNode(d []byte) *Node {
 	return &wn
 }
 
-// Create a new Node
+// New creates a new node.
 func New(consensus *consensus.Consensus, db *db.LDBDatabase) *Node {
 	node := Node{}
 

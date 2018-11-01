@@ -12,11 +12,11 @@ import (
 type ClientMessageType byte
 
 const (
-	TRANSACTION ClientMessageType = iota
+	Transaction ClientMessageType = iota
 	// TODO: add more types
 )
 
-// The types of messages used for CLIENT/TRANSACTION
+// The types of messages used for CLIENT/Transaction
 type TransactionMessageType int
 
 const (
@@ -32,7 +32,7 @@ type FetchUtxoResponseMessage struct {
 // [leader] Constructs the proof of accept or reject message that will be sent to client
 func ConstructProofOfAcceptOrRejectMessage(proofs []blockchain.CrossShardTxProof) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.CLIENT)})
-	byteBuffer.WriteByte(byte(TRANSACTION))
+	byteBuffer.WriteByte(byte(Transaction))
 	byteBuffer.WriteByte(byte(PROOF_OF_LOCK))
 	encoder := gob.NewEncoder(byteBuffer)
 
@@ -43,7 +43,7 @@ func ConstructProofOfAcceptOrRejectMessage(proofs []blockchain.CrossShardTxProof
 // Constructs the response message to fetch utxo message
 func ConstructFetchUtxoResponseMessage(utxoMap *blockchain.UtxoMap, shardID uint32) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.CLIENT)})
-	byteBuffer.WriteByte(byte(TRANSACTION))
+	byteBuffer.WriteByte(byte(Transaction))
 	byteBuffer.WriteByte(byte(UTXO_RESPONSE))
 	encoder := gob.NewEncoder(byteBuffer)
 

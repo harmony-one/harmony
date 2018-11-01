@@ -20,14 +20,15 @@ import (
 )
 
 const (
-	// The min number of transaction per a block.
+	// MinNumberOfTransactionsPerBlock is the min number of transaction per a block.
 	MinNumberOfTransactionsPerBlock = 6000
-	// The max number of transaction per a block.
+	// MaxNumberOfTransactionsPerBlock is the max number of transaction per a block.
 	MaxNumberOfTransactionsPerBlock = 20000
-	// The number of blocks allowed before generating state block
+	// NumBlocksBeforeStateBlock is the number of blocks allowed before generating state block
 	NumBlocksBeforeStateBlock = 1000
 )
 
+// MaybeBroadcastAsValidator returns if the node is a validator node.
 func (node *Node) MaybeBroadcastAsValidator(content []byte) {
 	if node.SelfPeer.ValidatorID > 0 && node.SelfPeer.ValidatorID <= p2p.MAX_BROADCAST {
 		go p2p.BroadcastMessageFromValidator(node.SelfPeer, node.Consensus.GetValidatorPeers(), content)
@@ -94,7 +95,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 	case proto.NODE:
 		actionType := proto_node.NodeMessageType(msgType)
 		switch actionType {
-		case proto_node.TRANSACTION:
+		case proto_node.Transaction:
 			node.transactionMessageHandler(msgPayload)
 		case proto_node.BLOCK:
 			blockMsgType := proto_node.BlockMessageType(msgPayload[0])
@@ -148,9 +149,9 @@ func (node *Node) NodeHandler(conn net.Conn) {
 						avgBlockSizeInBytes += len(byteBuffer.Bytes())
 
 						txCount += len(block.Transactions)
-						blockCount += 1
+						blockCount++
 						totalTxCount += len(block.TransactionIds)
-						totalBlockCount += 1
+						totalBlockCount++
 
 						byteBuffer = bytes.NewBuffer([]byte{})
 						encoder = gob.NewEncoder(byteBuffer)
@@ -171,7 +172,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 	case proto.CLIENT:
 		actionType := client.ClientMessageType(msgType)
 		switch actionType {
-		case client.TRANSACTION:
+		case client.Transaction:
 			if node.Client != nil {
 				node.Client.TransactionMessageHandler(msgPayload)
 			}
@@ -335,7 +336,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
 	}
 }
 
-// This is called by consensus participants to verify the block they are running consensus on
+// SendBackProofOfAcceptOrReject is called by consensus participants to verify the block they are running consensus on
 func (node *Node) SendBackProofOfAcceptOrReject() {
 	if node.ClientPeer != nil && len(node.CrossTxsToReturn) != 0 {
 		node.crossTxToReturnMutex.Lock()
@@ -351,7 +352,7 @@ func (node *Node) SendBackProofOfAcceptOrReject() {
 	}
 }
 
-// This is called by consensus leader to sync new blocks with other clients/nodes.
+// BroadcastNewBlock is called by consensus leader to sync new blocks with other clients/nodes.
 // NOTE: For now, just send to the client (basically not broadcasting)
 func (node *Node) BroadcastNewBlock(newBlock *blockchain.Block) {
 	if node.ClientPeer != nil {
@@ -360,16 +361,15 @@ func (node *Node) BroadcastNewBlock(newBlock *blockchain.Block) {
 	}
 }
 
-// This is called by consensus participants to verify the block they are running consensus on
+// VerifyNewBlock is called by consensus participants to verify the block they are running consensus on
 func (node *Node) VerifyNewBlock(newBlock *blockchain.Block) bool {
 	if newBlock.IsStateBlock() {
 		return node.UtxoPool.VerifyStateBlock(newBlock)
-	} else {
-		return node.UtxoPool.VerifyTransactions(newBlock.Transactions)
 	}
+	return node.UtxoPool.VerifyTransactions(newBlock.Transactions)
 }
 
-// This is called by consensus participants, after consensus is done, to:
+// PostConsensusProcessing is called by consensus participants, after consensus is done, to:
 // 1. add the new block to blockchain
 // 2. [leader] move cross shard tx and proof to the list where they wait to be sent to the client
 func (node *Node) PostConsensusProcessing(newBlock *blockchain.Block) {
@@ -403,6 +403,7 @@ func (node *Node) PostConsensusProcessing(newBlock *blockchain.Block) {
 	node.UpdateUtxoAndState(newBlock)
 }
 
+// AddNewBlock is usedd to add new block into the blockchain.
 func (node *Node) AddNewBlock(newBlock *blockchain.Block) {
 	// Add it to blockchain
 	node.blockchain.Blocks = append(node.blockchain.Blocks, newBlock)
@@ -413,6 +414,7 @@ func (node *Node) AddNewBlock(newBlock *blockchain.Block) {
 	}
 }
 
+// UpdateUtxoAndState updates Utxo and state.
 func (node *Node) UpdateUtxoAndState(newBlock *blockchain.Block) {
 	// Update UTXO pool
 	if newBlock.IsStateBlock() {
