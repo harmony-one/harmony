@@ -40,19 +40,19 @@ func (config *Config) GetValidators() []p2p.Peer {
 }
 
 // Gets all the leader peers and corresponding shard Ids
-func (config *Config) GetShardIdToLeaderMap() map[uint32]p2p.Peer {
-	shardIdLeaderMap := map[uint32]p2p.Peer{}
+func (config *Config) GetShardIDToLeaderMap() map[uint32]p2p.Peer {
+	shardIDLeaderMap := map[uint32]p2p.Peer{}
 	for _, entry := range config.config {
 		if entry.Role == "leader" {
 			val, err := strconv.Atoi(entry.ShardID)
 			if err == nil {
-				shardIdLeaderMap[uint32(val)] = p2p.Peer{Ip: entry.IP, Port: entry.Port}
+				shardIDLeaderMap[uint32(val)] = p2p.Peer{Ip: entry.IP, Port: entry.Port}
 			} else {
 				log.Print("[Generator] Error parsing the shard Id ", entry.ShardID)
 			}
 		}
 	}
-	return shardIdLeaderMap
+	return shardIDLeaderMap
 }
 
 func (config *Config) GetClientPeer() *p2p.Peer {

@@ -129,14 +129,14 @@ func (tx *Transaction) Sign(priKey kyber.Scalar) error {
 
 // IsCrossShard returns if the transaction is a cross transation.
 func (tx *Transaction) IsCrossShard() bool {
-	shardIds := make(map[uint32]bool)
+	shardIDs := make(map[uint32]bool)
 	for _, value := range tx.TxInput {
-		shardIds[value.ShardID] = true
+		shardIDs[value.ShardID] = true
 	}
 	for _, value := range tx.TxOutput {
-		shardIds[value.ShardID] = true
+		shardIDs[value.ShardID] = true
 	}
-	return len(shardIds) > 1
+	return len(shardIDs) > 1
 }
 
 // GetContentToVerify gets content to verify.
@@ -170,7 +170,7 @@ func (txInput *TXInput) String() string {
 	res := fmt.Sprintf("TxID: %v, ", hex.EncodeToString(txInput.PreviousOutPoint.TxID[:]))
 	res += fmt.Sprintf("TxOutputIndex: %v, ", txInput.PreviousOutPoint.Index)
 	res += fmt.Sprintf("Address: %v, ", txInput.Address)
-	res += fmt.Sprintf("ShardId: %v", txInput.ShardID)
+	res += fmt.Sprintf("ShardID: %v", txInput.ShardID)
 	return res
 }
 
@@ -178,7 +178,7 @@ func (txInput *TXInput) String() string {
 func (txOutput *TXOutput) String() string {
 	res := fmt.Sprintf("Amount: %v, ", txOutput.Amount)
 	res += fmt.Sprintf("Address: %v", txOutput.Address)
-	res += fmt.Sprintf("ShardId: %v", txOutput.ShardID)
+	res += fmt.Sprintf("ShardID: %v", txOutput.ShardID)
 	return res
 }
 

@@ -110,16 +110,16 @@ func (client *Client) handleProofOfLockMessage(proofs *[]blockchain.CrossShardTx
 func (client *Client) handleFetchUtxoResponseMessage(utxoResponse client_proto.FetchUtxoResponseMessage) {
 	client.ShardUtxoMapMutex.Lock()
 	defer client.ShardUtxoMapMutex.Unlock()
-	_, ok := client.ShardUtxoMap[utxoResponse.ShardId]
+	_, ok := client.ShardUtxoMap[utxoResponse.ShardID]
 	if ok {
 		return
 	}
-	client.ShardUtxoMap[utxoResponse.ShardId] = utxoResponse.UtxoMap
+	client.ShardUtxoMap[utxoResponse.ShardID] = utxoResponse.UtxoMap
 }
 
 func (client *Client) sendCrossShardTxUnlockMessage(txsToSend []*blockchain.Transaction) {
-	for shardId, txs := range BuildOutputShardTransactionMap(txsToSend) {
-		p2p.SendMessage((*client.Leaders)[shardId], node.ConstructUnlockToCommitOrAbortMessage(txs))
+	for shardID, txs := range BuildOutputShardTransactionMap(txsToSend) {
+		p2p.SendMessage((*client.Leaders)[shardID], node.ConstructUnlockToCommitOrAbortMessage(txs))
 	}
 }
 
@@ -139,27 +139,27 @@ func BuildOutputShardTransactionMap(txs []*blockchain.Transaction) map[uint32][]
 
 	// Put txs into corresponding output shards
 	for _, crossTx := range txs {
-		for curShardId, _ := range GetOutputShardIdsOfCrossShardTx(crossTx) {
-			txsShardMap[curShardId] = append(txsShardMap[curShardId], crossTx)
+		for curShardID, _ := range GetOutputShardIDsOfCrossShardTx(crossTx) {
+			txsShardMap[curShardID] = append(txsShardMap[curShardID], crossTx)
 		}
 	}
 	return txsShardMap
 }
 
-func GetInputShardIdsOfCrossShardTx(crossTx *blockchain.Transaction) map[uint32]bool {
-	shardIds := map[uint32]bool{}
+func GetInputShardIDsOfCrossShardTx(crossTx *blockchain.Transaction) map[uint32]bool {
+	shardIDs := map[uint32]bool{}
 	for _, txInput := range crossTx.TxInput {
-		shardIds[txInput.ShardID] = true
+		shardIDs[txInput.ShardID] = true
 	}
-	return shardIds
+	return shardIDs
 }
 
-func GetOutputShardIdsOfCrossShardTx(crossTx *blockchain.Transaction) map[uint32]bool {
-	shardIds := map[uint32]bool{}
+func GetOutputShardIDsOfCrossShardTx(crossTx *blockchain.Transaction) map[uint32]bool {
+	shardIDs := map[uint32]bool{}
 	for _, txOutput := range crossTx.TxOutput {
-		shardIds[txOutput.ShardID] = true
+		shardIDs[txOutput.ShardID] = true
 	}
-	return shardIds
+	return shardIDs
 }
 
 func (client *Client) GetLeaders() []p2p.Peer {

@@ -18,7 +18,7 @@ mkdir -p $log_folder
 # Start nodes
 config=$1
 while IFS='' read -r line || [[ -n "$line" ]]; do
-  IFS=' ' read ip port mode shardId <<< $line
+  IFS=' ' read ip port mode shardID <<< $line
 	#echo $ip $port $mode
   if [ "$mode" != "client" ]; then
     ./bin/benchmark -ip $ip -port $port -config_file $config -log_folder $log_folder&

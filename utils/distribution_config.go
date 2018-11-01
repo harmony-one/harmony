@@ -31,7 +31,7 @@ func NewDistributionConfig() *DistributionConfig {
 }
 
 // Gets all the leader peers and corresponding shard Ids
-func (config *DistributionConfig) GetLeadersAndShardIds() ([]p2p.Peer, []uint32) {
+func (config *DistributionConfig) GetLeadersAndShardIDs() ([]p2p.Peer, []uint32) {
 	var peerList []p2p.Peer
 	var shardIDs []uint32
 	for _, entry := range config.config {

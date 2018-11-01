@@ -388,7 +388,7 @@ func (utxoPool *UTXOPool) VerifyAndUpdate(transactions []*Transaction) bool {
 
 // CreateUTXOPoolFromGenesisBlock a Utxo pool from a genesis block.
 func CreateUTXOPoolFromGenesisBlock(block *Block) *UTXOPool {
-	shardId := block.ShardId
+	shardID := block.ShardID
 	var utxoPool UTXOPool
 	utxoPool.UtxoMap = make(UtxoMap)
 	utxoPool.LockedUtxoMap = make(UtxoMap)
@@ -407,7 +407,7 @@ func CreateUTXOPoolFromGenesisBlock(block *Block) *UTXOPool {
 			utxoPool.UtxoMap[out.Address][txID][uint32(index)] = out.Amount
 		}
 	}
-	utxoPool.ShardID = shardId
+	utxoPool.ShardID = shardID
 	return &utxoPool
 }
 

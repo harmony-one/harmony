@@ -75,7 +75,7 @@ type TxInfo struct {
 // Returns:
 //     all single-shard txs
 //     all cross-shard txs
-func generateSimulatedTransactions(subsetId, numSubset int, shardId int, dataNodes []*node.Node) ([]*blockchain.Transaction, []*blockchain.Transaction) {
+func generateSimulatedTransactions(subsetId, numSubset int, shardID int, dataNodes []*node.Node) ([]*blockchain.Transaction, []*blockchain.Transaction) {
 	/*
 	  UTXO map structure:
 	     address - [
@@ -91,13 +91,13 @@ func generateSimulatedTransactions(subsetId, numSubset int, shardId int, dataNod
 	*/
 
 	txInfo := TxInfo{}
-	txInfo.shardID = shardId
+	txInfo.shardID = shardID
 	txInfo.dataNodes = dataNodes
 	txInfo.txCount = 0
 
 UTXOLOOP:
 	// Loop over all addresses
-	for address, txMap := range dataNodes[shardId].UtxoPool.UtxoMap {
+	for address, txMap := range dataNodes[shardID].UtxoPool.UtxoMap {
 		if int(binary.BigEndian.Uint32(address[:]))%numSubset == subsetId%numSubset { // Work on one subset of utxo at a time
 			txInfo.address = address
 			// Loop over all txIds for the address
@@ -139,23 +139,23 @@ UTXOLOOP:
 			}
 		}
 	}
-	log.Info("UTXO CLIENT", "numUtxo", dataNodes[shardId].UtxoPool.CountNumOfUtxos(), "shardId", shardId)
+	log.Info("UTXO CLIENT", "numUtxo", dataNodes[shardID].UtxoPool.CountNumOfUtxos(), "shardID", shardID)
 	log.Debug("[Generator] generated transations", "single-shard", len(txInfo.txs), "cross-shard", len(txInfo.crossTxs))
 	return txInfo.txs, txInfo.crossTxs
 }
 
 func generateCrossShardTx(txInfo *TxInfo) {
 	nodeShardID := txInfo.dataNodes[txInfo.shardID].Consensus.ShardID
-	crossShardId := nodeShardID
+	crossShardID := nodeShardID
 	// a random shard to spend money to
 	for true {
-		crossShardId = uint32(rand.Intn(len(txInfo.dataNodes)))
-		if crossShardId != nodeShardID {
+		crossShardID = uint32(rand.Intn(len(txInfo.dataNodes)))
+		if crossShardID != nodeShardID {
 			break
 		}
 	}
 
-	//crossShardNode := txInfo.dataNodes[crossShardId]
+	//crossShardNode := txInfo.dataNodes[crossShardID]
 	//crossShardUtxosMap := crossShardNode.UtxoPool.UtxoMap[txInfo.address]
 	//
 	//// Get the cross shard utxo from another shard
@@ -173,7 +173,7 @@ func generateCrossShardTx(txInfo *TxInfo) {
 	//
 	//	for crossShardIndex, crossShardValue := range crossShardUtxos {
 	//		crossUtxoValue = crossShardValue
-	//		crossTxin = blockchain.NewTXInput(blockchain.NewOutPoint(&crossTxId, crossShardIndex), txInfo.address, crossShardId)
+	//		crossTxin = blockchain.NewTXInput(blockchain.NewOutPoint(&crossTxId, crossShardIndex), txInfo.address, crossShardID)
 	//		break
 	//	}
 	//	if crossTxin != nil {
@@ -191,13 +191,13 @@ func generateCrossShardTx(txInfo *TxInfo) {
 	//}
 
 	// Spend the utxo from the current shard to a random address in [0 - N)
-	txout := blockchain.TXOutput{Amount: txInfo.value, Address: pki.GetAddressFromInt(rand.Intn(setting.numOfAddress) + 1), ShardID: crossShardId}
+	txout := blockchain.TXOutput{Amount: txInfo.value, Address: pki.GetAddressFromInt(rand.Intn(setting.numOfAddress) + 1), ShardID: crossShardID}
 
 	txOutputs := []blockchain.TXOutput{txout}
 
 	// Spend the utxo from the other shard, if any, to a random address in [0 - N)
 	//if crossTxin != nil {
-	//	crossTxout := blockchain.TXOutput{Amount: crossUtxoValue, Address: pki.GetAddressFromInt(rand.Intn(setting.numOfAddress) + 1), ShardID: crossShardId}
+	//	crossTxout := blockchain.TXOutput{Amount: crossUtxoValue, Address: pki.GetAddressFromInt(rand.Intn(setting.numOfAddress) + 1), ShardID: crossShardID}
 	//	txOutputs = append(txOutputs, crossTxout)
 	//}
 
@@ -267,11 +267,11 @@ func main() {
 	// Read the configs
 	config := client_config.NewConfig()
 	config.ReadConfigFile(*configFile)
-	shardIdLeaderMap := config.GetShardIdToLeaderMap()
+	shardIDLeaderMap := config.GetShardIDToLeaderMap()
 
 	setting.numOfAddress = 10000
 	// Do cross shard tx if there are more than one shard
-	setting.crossShard = len(shardIdLeaderMap) > 1
+	setting.crossShard = len(shardIDLeaderMap) > 1
 	setting.maxNumTxsPerBatch = *maxNumTxsPerBatch
 	setting.crossShardRatio = *crossShardRatio
 
@@ -286,8 +286,8 @@ func main() {
 
 	// Nodes containing utxopools to mirror the shards' data in the network
 	nodes := []*node.Node{}
-	for shardId, _ := range shardIdLeaderMap {
-		node := node.New(&consensus.Consensus{ShardID: shardId}, nil)
+	for shardID, _ := range shardIDLeaderMap {
+		node := node.New(&consensus.Consensus{ShardID: shardID}, nil)
 		// Assign many fake addresses so we have enough address to play with at first
 		node.AddTestingAddresses(setting.numOfAddress)
 		nodes = append(nodes, node)
@@ -299,15 +299,15 @@ func main() {
 	clientNode := node.New(consensusObj, nil)
 
 	if clientPort != "" {
-		clientNode.Client = client.NewClient(&shardIdLeaderMap)
+		clientNode.Client = client.NewClient(&shardIDLeaderMap)
 
 		// This func is used to update the client's utxopool when new blocks are received from the leaders
 		updateBlocksFunc := func(blocks []*blockchain.Block) {
 			log.Debug("Received new block from leader", "len", len(blocks))
 			for _, block := range blocks {
 				for _, node := range nodes {
-					if node.Consensus.ShardID == block.ShardId {
-						log.Debug("Adding block from leader", "shardId", block.ShardId)
+					if node.Consensus.ShardID == block.ShardID {
+						log.Debug("Adding block from leader", "shardID", block.ShardID)
 						// Add it to blockchain
 						node.AddNewBlock(block)
 						utxoPoolMutex.Lock()
@@ -341,16 +341,16 @@ func main() {
 			log.Debug("Generator timer ended.", "duration", (int(t.Sub(start))), "startTime", start, "totalTime", totalTime)
 			break
 		}
-		shardIdTxsMap := make(map[uint32][]*blockchain.Transaction)
+		shardIDTxsMap := make(map[uint32][]*blockchain.Transaction)
 		lock := sync.Mutex{}
 		var wg sync.WaitGroup
-		wg.Add(len(shardIdLeaderMap))
+		wg.Add(len(shardIDLeaderMap))
 
 		utxoPoolMutex.Lock()
 		log.Warn("STARTING TX GEN", "gomaxprocs", runtime.GOMAXPROCS(0))
-		for shardId, _ := range shardIdLeaderMap { // Generate simulated transactions
-			go func(shardId uint32) {
-				txs, crossTxs := generateSimulatedTransactions(subsetCounter, *numSubset, int(shardId), nodes)
+		for shardID, _ := range shardIDLeaderMap { // Generate simulated transactions
+			go func(shardID uint32) {
+				txs, crossTxs := generateSimulatedTransactions(subsetCounter, *numSubset, int(shardID), nodes)
 
 				// Put cross shard tx into a pending list waiting for proofs from leaders
 				if clientPort != "" {
@@ -363,24 +363,24 @@ func main() {
 
 				lock.Lock()
 				// Put txs into corresponding shards
-				shardIdTxsMap[shardId] = append(shardIdTxsMap[shardId], txs...)
+				shardIDTxsMap[shardID] = append(shardIDTxsMap[shardID], txs...)
 				for _, crossTx := range crossTxs {
-					for curShardId, _ := range client.GetInputShardIdsOfCrossShardTx(crossTx) {
-						shardIdTxsMap[curShardId] = append(shardIdTxsMap[curShardId], crossTx)
+					for curShardID, _ := range client.GetInputShardIDsOfCrossShardTx(crossTx) {
+						shardIDTxsMap[curShardID] = append(shardIDTxsMap[curShardID], crossTx)
 					}
 				}
 				lock.Unlock()
 				wg.Done()
-			}(shardId)
+			}(shardID)
 		}
 		wg.Wait()
 		utxoPoolMutex.Unlock()
 
 		lock.Lock()
-		for shardId, txs := range shardIdTxsMap { // Send the txs to corresponding shards
-			go func(shardId uint32, txs []*blockchain.Transaction) {
-				SendTxsToLeader(shardIdLeaderMap[shardId], txs)
-			}(shardId, txs)
+		for shardID, txs := range shardIDTxsMap { // Send the txs to corresponding shards
+			go func(shardID uint32, txs []*blockchain.Transaction) {
+				SendTxsToLeader(shardIDLeaderMap[shardID], txs)
+			}(shardID, txs)
 		}
 		lock.Unlock()
 

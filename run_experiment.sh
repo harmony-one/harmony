@@ -14,7 +14,7 @@ mkdir -p $log_folder
 # For each of the nodes, start soldier
 config=distribution_config.txt
 while IFS='' read -r line || [[ -n "$line" ]]; do
-  IFS=' ' read ip port mode shardId <<< $line
+  IFS=' ' read ip port mode shardID <<< $line
 	#echo $ip $port $mode
   ./soldier -ip $ip -port $port&
 done < $config

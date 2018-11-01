@@ -20,7 +20,7 @@ type Block struct {
 	NumTransactions int32
 	TransactionIds  [][32]byte
 	Transactions    []*Transaction // Transactions.
-	ShardId         uint32
+	ShardID         uint32
 	Hash            [32]byte
 	MerkleRootData  []byte
 	State           *State // If present, this block is state block.
@@ -106,29 +106,29 @@ func (b *Block) CalculateBlockHash() []byte {
 	b.generateMerkleRootData()
 
 	hashes = append(hashes, b.MerkleRootData)
-	hashes = append(hashes, utils.ConvertFixedDataIntoByteArray(b.ShardId))
+	hashes = append(hashes, utils.ConvertFixedDataIntoByteArray(b.ShardID))
 
 	blockHash = sha256.Sum256(bytes.Join(hashes, []byte{}))
 	return blockHash[:]
 }
 
 // NewBlock creates and returns a new block.
-func NewBlock(transactions []*Transaction, prevBlockHash [32]byte, shardId uint32) *Block {
+func NewBlock(transactions []*Transaction, prevBlockHash [32]byte, shardID uint32) *Block {
 	numTxs := int32(len(transactions))
 	var txIds [][32]byte
 
 	for _, tx := range transactions {
 		txIds = append(txIds, tx.ID)
 	}
-	block := &Block{Timestamp: time.Now().Unix(), PrevBlockHash: prevBlockHash, NumTransactions: numTxs, TransactionIds: txIds, Transactions: transactions, ShardId: shardId, Hash: [32]byte{}}
+	block := &Block{Timestamp: time.Now().Unix(), PrevBlockHash: prevBlockHash, NumTransactions: numTxs, TransactionIds: txIds, Transactions: transactions, ShardID: shardID, Hash: [32]byte{}}
 	copy(block.Hash[:], block.CalculateBlockHash()[:])
 
 	return block
 }
 
 // NewGenesisBlock creates and returns genesis Block.
-func NewGenesisBlock(coinbase *Transaction, shardId uint32) *Block {
-	return NewBlock([]*Transaction{coinbase}, [32]byte{}, shardId)
+func NewGenesisBlock(coinbase *Transaction, shardID uint32) *Block {
+	return NewBlock([]*Transaction{coinbase}, [32]byte{}, shardID)
 }
 
 // NewStateBlock creates and returns a state Block based on utxo pool.

@@ -192,10 +192,10 @@ func (bc *Blockchain) NewUTXOTransaction(priKey kyber.Scalar, from, to [20]byte,
 
 // AddNewUserTransfer creates a new transaction and a block of that transaction.
 // Mostly used for testing.
-func (bc *Blockchain) AddNewUserTransfer(utxoPool *UTXOPool, priKey kyber.Scalar, from, to [20]byte, amount int, shardId uint32) bool {
-	tx := bc.NewUTXOTransaction(priKey, from, to, amount, shardId)
+func (bc *Blockchain) AddNewUserTransfer(utxoPool *UTXOPool, priKey kyber.Scalar, from, to [20]byte, amount int, shardID uint32) bool {
+	tx := bc.NewUTXOTransaction(priKey, from, to, amount, shardID)
 	if tx != nil {
-		newBlock := NewBlock([]*Transaction{tx}, bc.Blocks[len(bc.Blocks)-1].Hash, shardId)
+		newBlock := NewBlock([]*Transaction{tx}, bc.Blocks[len(bc.Blocks)-1].Hash, shardID)
 		if bc.VerifyNewBlockAndUpdate(utxoPool, newBlock) {
 			return true
 		}
@@ -222,11 +222,11 @@ func (bc *Blockchain) VerifyNewBlockAndUpdate(utxopool *UTXOPool, block *Block) 
 
 // CreateBlockchain creates a new blockchain DB
 // TODO(minhdoan): This func is not used, consider to remove.
-func CreateBlockchain(address [20]byte, shardId uint32) *Blockchain {
+func CreateBlockchain(address [20]byte, shardID uint32) *Blockchain {
 	// TODO: We assume we have not created any blockchain before.
 	// In current bitcoin, we can check if we created a blockchain before accessing local db.
-	cbtx := NewCoinbaseTX(address, genesisCoinbaseData, shardId)
-	genesis := NewGenesisBlock(cbtx, shardId)
+	cbtx := NewCoinbaseTX(address, genesisCoinbaseData, shardID)
+	genesis := NewGenesisBlock(cbtx, shardID)
 
 	bc := Blockchain{[]*Block{genesis}}
 

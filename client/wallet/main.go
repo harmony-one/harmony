@@ -173,7 +173,7 @@ func main() {
 		cummulativeBalance := 0
 		txInputs := []blockchain.TXInput{}
 	LOOP:
-		for shardId, utxoMap := range shardUtxoMap {
+		for shardID, utxoMap := range shardUtxoMap {
 			for txId, vout2AmountMap := range utxoMap[senderAddressBytes] {
 				txIdBytes, err := utils.Get32BytesFromString(txId)
 				if err != nil {
@@ -182,7 +182,7 @@ func main() {
 				}
 				for voutIndex, utxoAmount := range vout2AmountMap {
 					cummulativeBalance += utxoAmount
-					txIn := blockchain.NewTXInput(blockchain.NewOutPoint(&txIdBytes, voutIndex), senderAddressBytes, shardId)
+					txIn := blockchain.NewTXInput(blockchain.NewOutPoint(&txIdBytes, voutIndex), senderAddressBytes, shardID)
 					txInputs = append(txInputs, *txIn)
 					if cummulativeBalance >= amount {
 						break LOOP
@@ -221,7 +221,7 @@ func main() {
 	}
 }
 
-func getShardIdToLeaderMap() map[uint32]p2p.Peer {
+func getShardIDToLeaderMap() map[uint32]p2p.Peer {
 	// TODO(ricl): Later use data.harmony.one for API.
 	str, _ := client.DownloadUrlAsString("https://s3-us-west-2.amazonaws.com/unique-bucket-bin/leaders.txt")
 	lines := strings.Split(str, "\n")
@@ -250,10 +250,10 @@ func CreateWalletServerNode() *node.Node {
 	var clientPeer *p2p.Peer
 	if true {
 		configr.ReadConfigFile("local_config2.txt")
-		shardIDLeaderMap = configr.GetShardIdToLeaderMap()
+		shardIDLeaderMap = configr.GetShardIDToLeaderMap()
 		clientPeer = configr.GetClientPeer()
 	} else {
-		shardIDLeaderMap = getShardIdToLeaderMap()
+		shardIDLeaderMap = getShardIDToLeaderMap()
 		clientPeer = &p2p.Peer{Port: "127.0.0.1", Ip: "1234"}
 	}
 	walletNode := node.New(nil, nil)

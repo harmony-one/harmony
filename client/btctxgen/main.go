@@ -169,20 +169,20 @@ LOOP:
 	return txs, crossTxs
 }
 
-func initClient(clientNode *node.Node, clientPort string, shardIdLeaderMap *map[uint32]p2p.Peer, nodes *[]*node.Node) {
+func initClient(clientNode *node.Node, clientPort string, shardIDLeaderMap *map[uint32]p2p.Peer, nodes *[]*node.Node) {
 	if clientPort == "" {
 		return
 	}
 
-	clientNode.Client = client.NewClient(shardIdLeaderMap)
+	clientNode.Client = client.NewClient(shardIDLeaderMap)
 
 	// This func is used to update the client's utxopool when new blocks are received from the leaders
 	updateBlocksFunc := func(blocks []*blockchain.Block) {
 		log.Debug("Received new block from leader", "len", len(blocks))
 		for _, block := range blocks {
 			for _, node := range *nodes {
-				if node.Consensus.ShardID == block.ShardId {
-					log.Debug("Adding block from leader", "shardId", block.ShardId)
+				if node.Consensus.ShardID == block.ShardID {
+					log.Debug("Adding block from leader", "shardID", block.ShardID)
 					// Add it to blockchain
 					utxoPoolMutex.Lock()
 					node.AddNewBlock(block)
@@ -210,10 +210,10 @@ func main() {
 	// Read the configs
 	config := client_config.NewConfig()
 	config.ReadConfigFile(*configFile)
-	shardIdLeaderMap := config.GetShardIdToLeaderMap()
+	shardIDLeaderMap := config.GetShardIDToLeaderMap()
 
 	// Do cross shard tx if there are more than one shard
-	setting.crossShard = len(shardIdLeaderMap) > 1
+	setting.crossShard = len(shardIDLeaderMap) > 1
 	setting.maxNumTxsPerBatch = *maxNumTxsPerBatch
 
 	// TODO(Richard): refactor this chuck to a single method
@@ -233,7 +233,7 @@ func main() {
 	currentInt = 1 // start from address 1
 	// Nodes containing utxopools to mirror the shards' data in the network
 	nodes := []*node.Node{}
-	for shardID, _ := range shardIdLeaderMap {
+	for shardID, _ := range shardIDLeaderMap {
 		node := node.New(&consensus.Consensus{ShardID: shardID}, nil)
 		// Assign many fake addresses so we have enough address to play with at first
 		node.AddTestingAddresses(10000)
@@ -245,21 +245,21 @@ func main() {
 	consensusObj := consensus.NewConsensus("0", clientPort, "0", nil, p2p.Peer{})
 	clientNode := node.New(consensusObj, nil)
 
-	initClient(clientNode, clientPort, &shardIdLeaderMap, &nodes)
+	initClient(clientNode, clientPort, &shardIDLeaderMap, &nodes)
 
 	// Transaction generation process
 	time.Sleep(3 * time.Second) // wait for nodes to be ready
 
 	leaders := []p2p.Peer{}
-	for _, leader := range shardIdLeaderMap {
+	for _, leader := range shardIDLeaderMap {
 		leaders = append(leaders, leader)
 	}
 
 	for true {
 		allCrossTxs := []*blockchain.Transaction{}
 		// Generate simulated transactions
-		for shardId, leader := range shardIdLeaderMap {
-			txs, crossTxs := generateSimulatedTransactions(int(shardId), nodes)
+		for shardID, leader := range shardIDLeaderMap {
+			txs, crossTxs := generateSimulatedTransactions(int(shardID), nodes)
 			allCrossTxs = append(allCrossTxs, crossTxs...)
 
 			log.Debug("[Generator] Sending single-shard txs ...", "leader", leader, "numTxs", len(txs), "numCrossTxs", len(crossTxs), "block height", iter.GetBlockIndex())

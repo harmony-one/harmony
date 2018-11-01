@@ -424,8 +424,8 @@ func (node *Node) UpdateUtxoAndState(newBlock *blockchain.Block) {
 	// Clear transaction-in-Consensus list
 	node.transactionInConsensus = []*blockchain.Transaction{}
 	if node.Consensus.IsLeader {
-		node.log.Info("TX in New BLOCK", "num", len(newBlock.Transactions), "ShardId", node.UtxoPool.ShardID, "IsStateBlock", newBlock.IsStateBlock())
-		node.log.Info("LEADER CURRENT UTXO", "num", node.UtxoPool.CountNumOfUtxos(), "ShardId", node.UtxoPool.ShardID)
-		node.log.Info("LEADER LOCKED UTXO", "num", node.UtxoPool.CountNumOfLockedUtxos(), "ShardId", node.UtxoPool.ShardID)
+		node.log.Info("TX in New BLOCK", "num", len(newBlock.Transactions), "ShardID", node.UtxoPool.ShardID, "IsStateBlock", newBlock.IsStateBlock())
+		node.log.Info("LEADER CURRENT UTXO", "num", node.UtxoPool.CountNumOfUtxos(), "ShardID", node.UtxoPool.ShardID)
+		node.log.Info("LEADER LOCKED UTXO", "num", node.UtxoPool.CountNumOfLockedUtxos(), "ShardID", node.UtxoPool.ShardID)
 	}
 }

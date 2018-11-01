@@ -46,7 +46,7 @@ mkdir -p $log_folder
 
 # Start nodes
 while IFS='' read -r line || [[ -n "$line" ]]; do
-  IFS=' ' read ip port mode shardId <<< $line
+  IFS=' ' read ip port mode shardID <<< $line
 	#echo $ip $port $mode
   if [ "$mode" != "client" ]; then
     if [ -z "$db_supported" ]; then
