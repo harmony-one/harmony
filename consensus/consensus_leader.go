@@ -121,7 +121,7 @@ func (consensus *Consensus) processCommitMessage(payload []byte, targetState Con
 	offset += 32
 
 	// 2 byte validator id
-	validatorId := binary.BigEndian.Uint16(payload[offset : offset+2])
+	validatorID := binary.BigEndian.Uint16(payload[offset : offset+2])
 	offset += 2
 
 	// 32 byte commit
@@ -133,9 +133,9 @@ func (consensus *Consensus) processCommitMessage(payload []byte, targetState Con
 	offset += 64
 
 	// Verify signature
-	value, ok := consensus.validators[validatorId]
+	value, ok := consensus.validators[validatorID]
 	if !ok {
-		consensus.Log.Warn("Received message from unrecognized validator", "validatorId", validatorId, "consensus", consensus)
+		consensus.Log.Warn("Received message from unrecognized validator", "validatorID", validatorID, "consensus", consensus)
 		return
 	}
 	if schnorr.Verify(crypto.Ed25519Curve, value.PubKey, payload[:offset-64], signature) != nil {
@@ -164,7 +164,7 @@ func (consensus *Consensus) processCommitMessage(payload []byte, targetState Con
 	}
 
 	// proceed only when the message is not received before
-	_, ok = (*commitments)[validatorId]
+	_, ok = (*commitments)[validatorID]
 	shouldProcess := !ok
 	if len((*commitments)) >= ((len(consensus.publicKeys)*2)/3 + 1) {
 		shouldProcess = false
@@ -172,7 +172,7 @@ func (consensus *Consensus) processCommitMessage(payload []byte, targetState Con
 	if shouldProcess {
 		point := crypto.Ed25519Curve.Point()
 		point.UnmarshalBinary(commitment)
-		(*commitments)[validatorId] = point
+		(*commitments)[validatorID] = point
 		consensus.Log.Debug("Received new commit message", "num", len(*commitments))
 		// Set the bitmap indicate this validate signed. TODO: figure out how to resolve the inconsistency of validators from commit and response messages
 		bitmap.SetKey(value.PubKey, true)
@@ -245,7 +245,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState C
 	offset += 32
 
 	// 2 byte validator id
-	validatorId := binary.BigEndian.Uint16(payload[offset : offset+2])
+	validatorID := binary.BigEndian.Uint16(payload[offset : offset+2])
 	offset += 2
 
 	// 32 byte response
@@ -273,9 +273,9 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState C
 	}
 
 	// Verify signature
-	value, ok := consensus.validators[validatorId]
+	value, ok := consensus.validators[validatorID]
 	if !ok {
-		consensus.Log.Warn("Received message from unrecognized validator", "validatorId", validatorId, "consensus", consensus)
+		consensus.Log.Warn("Received message from unrecognized validator", "validatorID", validatorID, "consensus", consensus)
 		return
 	}
 	if schnorr.Verify(crypto.Ed25519Curve, value.PubKey, payload[:offset-64], signature) != nil {
@@ -293,7 +293,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState C
 	}
 
 	// proceed only when the message is not received before
-	_, ok = (*responses)[validatorId]
+	_, ok = (*responses)[validatorID]
 	shouldProcess = shouldProcess && !ok
 
 	if len((*responses)) >= ((len(consensus.publicKeys)*2)/3 + 1) {
@@ -304,12 +304,12 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState C
 		// verify the response matches the received commit
 		responseScalar := crypto.Ed25519Curve.Scalar()
 		responseScalar.UnmarshalBinary(response)
-		err := consensus.verifyResponse(commitments, responseScalar, validatorId)
+		err := consensus.verifyResponse(commitments, responseScalar, validatorID)
 		if err != nil {
 			consensus.Log.Warn("Failed to verify the response", "error", err)
 			shouldProcess = false
 		} else {
-			(*responses)[validatorId] = responseScalar
+			(*responses)[validatorID] = responseScalar
 			consensus.Log.Debug("Received new response message", "num", len(*responses))
 			// Set the bitmap indicate this validate signed. TODO: figure out how to resolve the inconsistency of validators from commit and response messages
 			bitmap.SetKey(value.PubKey, true)
@@ -390,11 +390,11 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState C
 	}
 }
 
-func (consensus *Consensus) verifyResponse(commitments *map[uint16]kyber.Point, response kyber.Scalar, validatorId uint16) error {
+func (consensus *Consensus) verifyResponse(commitments *map[uint16]kyber.Point, response kyber.Scalar, validatorID uint16) error {
 	if response.Equal(crypto.Ed25519Curve.Scalar()) {
 		return errors.New("response is zero valued")
 	}
-	_, ok := (*commitments)[validatorId]
+	_, ok := (*commitments)[validatorID]
 	if !ok {
 		return errors.New("no commit is received for the validator")
 	}
@@ -404,7 +404,7 @@ func (consensus *Consensus) verifyResponse(commitments *map[uint16]kyber.Point, 
 	//
 	//// compute Q = sG + r*pubKey
 	//sG := crypto.Ed25519Curve.Point().Mul(response, nil)
-	//r_pubKey := crypto.Ed25519Curve.Point().Mul(challenge, consensus.validators[validatorId].PubKey)
+	//r_pubKey := crypto.Ed25519Curve.Point().Mul(challenge, consensus.validators[validatorID].PubKey)
 	//Q := crypto.Ed25519Curve.Point().Add(sG, r_pubKey)
 	//
 	//if !Q.Equal(commit) {
