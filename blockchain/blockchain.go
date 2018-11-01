@@ -3,6 +3,7 @@ package blockchain
 import (
 	"bytes"
 	"encoding/hex"
+
 	"github.com/dedis/kyber"
 	"github.com/simple-rules/harmony-benchmark/crypto/pki"
 )
@@ -14,7 +15,7 @@ type Blockchain struct {
 
 const genesisCoinbaseData = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks"
 
-// blockHash should have size of 32.
+// FindBlock finds a block with given blockHash.
 func (bc *Blockchain) FindBlock(blockHash []byte) *Block {
 	if len(blockHash) != 32 {
 		return nil
@@ -27,6 +28,7 @@ func (bc *Blockchain) FindBlock(blockHash []byte) *Block {
 	return nil
 }
 
+// FindBlockWithPrevHash fins a block with given prevHash.
 func (bc *Blockchain) FindBlockWithPrevHash(prevHash []byte) *Block {
 	if len(prevHash) != 32 {
 		return nil
@@ -47,6 +49,7 @@ func (bc *Blockchain) GetLatestBlock() *Block {
 	return bc.Blocks[len(bc.Blocks)-1]
 }
 
+// GetBlockHashes returns array of hashes of the given blockchain.
 func (bc *Blockchain) GetBlockHashes() [][32]byte {
 	res := [][32]byte{}
 	for _, block := range bc.Blocks {
@@ -55,7 +58,7 @@ func (bc *Blockchain) GetBlockHashes() [][32]byte {
 	return res
 }
 
-// FindUnspentUtxos returns a list of transactions containing unspent outputs
+// FindUnspentUtxos returns a list of transactions containing unspent outputs.
 func (bc *Blockchain) FindUnspentUtxos(address [20]byte) map[TxID]map[uint32]TXOutput {
 	spentTXOs := make(map[string][]uint32)
 	result := make(map[TxID]map[uint32]TXOutput)
@@ -97,7 +100,7 @@ func (bc *Blockchain) FindUnspentUtxos(address [20]byte) map[TxID]map[uint32]TXO
 	return result
 }
 
-// FindUTXO finds and returns all unspent transaction outputs
+// FindUTXO finds and returns all unspent transaction outputs.
 func (bc *Blockchain) FindUTXO(address [20]byte) []TXOutput {
 	var UTXOs []TXOutput
 	unspentTXs := bc.FindUnspentUtxos(address)
@@ -114,7 +117,7 @@ func (bc *Blockchain) FindUTXO(address [20]byte) []TXOutput {
 	return UTXOs
 }
 
-// FindSpendableOutputs finds and returns unspent outputs to reference in inputs
+// FindSpendableOutputs finds and returns unspent outputs to reference in inputs.
 func (bc *Blockchain) FindSpendableOutputs(address [20]byte, amount int) (int, map[string][]uint32) {
 	unspentOutputs := make(map[string][]uint32)
 	unspentUtxos := bc.FindUnspentUtxos(address)
@@ -230,16 +233,16 @@ func CreateBlockchain(address [20]byte, shardId uint32) *Blockchain {
 	return &bc
 }
 
-// Create state block based on the utxos.
+// CreateStateBlock creates state block based on the utxos.
 func (bc *Blockchain) CreateStateBlock(utxoPool *UTXOPool) *Block {
-	var numBlocks int32 = 0
-	var numTxs int32 = 0
+	var numBlocks int32
+	var numTxs int32
 	for _, block := range bc.Blocks {
 		if block.IsStateBlock() {
 			numBlocks += block.State.NumBlocks
 			numTxs += block.State.NumTransactions
 		} else {
-			numBlocks += 1
+			numBlocks++
 			numTxs += block.NumTransactions
 		}
 	}

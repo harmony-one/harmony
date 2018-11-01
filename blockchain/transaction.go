@@ -22,10 +22,14 @@ var (
 	zeroHash TxID
 )
 
-// DefaultCoinbaseValue is the default value of coinbase transaction.
-const DefaultCoinbaseValue = 1
-const DefaultNumUtxos = 100
+const (
+	// DefaultCoinbaseValue is the default value of coinbase transaction.
+	DefaultCoinbaseValue = 1
+	// DefaultNumUtxos is the default value of number Utxos.
+	DefaultNumUtxos = 100
+)
 
+// Transaction is the struct of a Transaction.
 type Transaction struct {
 	ID        [32]byte // 32 byte hash
 	TxInput   []TXInput
@@ -45,7 +49,7 @@ type TXOutput struct {
 
 type TxID = [32]byte
 
-// Output defines a data type that is used to track previous
+// OutPoint defines a data type that is used to track previous
 // transaction outputs.
 // TxID is the transaction id
 // Index is the index of the transaction ouput in the previous transaction
@@ -80,7 +84,7 @@ func NewTXInput(prevOut *OutPoint, address [20]byte, shardID uint32) *TXInput {
 	}
 }
 
-// The proof of accept or reject in the cross shard transaction locking phase.
+// CrossShardTxProof is the proof of accept or reject in the cross shard transaction locking phase.
 // This is created by the shard leader, filled with proof signatures after consensus, and returned back to the client.
 // One proof structure is only tied to one shard. Therefore, the utxos in the proof are all with the same shard.
 type CrossShardTxProof struct {
@@ -91,6 +95,7 @@ type CrossShardTxProof struct {
 	// Signatures
 }
 
+// CrossShardTxAndProof is the proof of accept or reject in the cross shard transaction locking phase.
 // This is a internal data structure that doesn't go across network
 type CrossShardTxAndProof struct {
 	Transaction *Transaction       // The cross shard tx
@@ -111,6 +116,7 @@ func (tx *Transaction) SetID() {
 	tx.ID = hash
 }
 
+// Sign signs the given transaction with a private key.
 func (tx *Transaction) Sign(priKey kyber.Scalar) error {
 	signature, err := schnorr.Sign(crypto.Ed25519Curve, priKey, tx.GetContentToVerify())
 	if err != nil {
@@ -121,6 +127,7 @@ func (tx *Transaction) Sign(priKey kyber.Scalar) error {
 	return err
 }
 
+// IsCrossShard returns if the transaction is a cross transation.
 func (tx *Transaction) IsCrossShard() bool {
 	shardIds := make(map[uint32]bool)
 	for _, value := range tx.TxInput {
@@ -132,6 +139,7 @@ func (tx *Transaction) IsCrossShard() bool {
 	return len(shardIds) > 1
 }
 
+// GetContentToVerify gets content to verify.
 func (tx *Transaction) GetContentToVerify() []byte {
 	tempTx := *tx
 	tempTx.Signature = [64]byte{}
@@ -206,6 +214,7 @@ func (tx *Transaction) String() string {
 	return res
 }
 
+// Serialize return serialized bytes of the transaction.
 func (tx *Transaction) Serialize() []byte {
 	buffer := bytes.NewBuffer([]byte{})
 	buffer.Write(tx.ID[:])
@@ -223,6 +232,7 @@ func (tx *Transaction) Serialize() []byte {
 	return buffer.Bytes()
 }
 
+// Serialize return serialized bytes of the TXInput.
 func (txInput *TXInput) Serialize() []byte {
 	buffer := bytes.NewBuffer([]byte{})
 	buffer.Write(txInput.Address[:])
@@ -238,6 +248,7 @@ func (txInput *TXInput) Serialize() []byte {
 	return buffer.Bytes()
 }
 
+// Serialize return serialized bytes of the TXOutput.
 func (txOutput *TXOutput) Serialize() []byte {
 	buffer := bytes.NewBuffer([]byte{})
 	buffer.Write(txOutput.Address[:])
@@ -252,14 +263,15 @@ func (txOutput *TXOutput) Serialize() []byte {
 	return buffer.Bytes()
 }
 
-func (crossProof *CrossShardTxProof) Serialize() []byte {
+// Serialize returns serialized bytes of the CrossShardTxProof.
+func (proof *CrossShardTxProof) Serialize() []byte {
 	buffer := bytes.NewBuffer([]byte{})
-	buffer.Write(crossProof.TxID[:])
-	buffer.Write(crossProof.BlockHash[:])
-	for _, value := range crossProof.TxInput {
+	buffer.Write(proof.TxID[:])
+	buffer.Write(proof.BlockHash[:])
+	for _, value := range proof.TxInput {
 		buffer.Write(value.Serialize())
 	}
-	if crossProof.Accept {
+	if proof.Accept {
 		buffer.WriteByte(byte(1))
 	} else {
 		buffer.WriteByte(byte(0))
