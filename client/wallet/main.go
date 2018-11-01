@@ -174,15 +174,15 @@ func main() {
 		txInputs := []blockchain.TXInput{}
 	LOOP:
 		for shardID, utxoMap := range shardUtxoMap {
-			for txId, vout2AmountMap := range utxoMap[senderAddressBytes] {
-				txIdBytes, err := utils.Get32BytesFromString(txId)
+			for txID, vout2AmountMap := range utxoMap[senderAddressBytes] {
+				txIDBytes, err := utils.Get32BytesFromString(txID)
 				if err != nil {
-					fmt.Println("Failed to parse txId")
+					fmt.Println("Failed to parse txID")
 					continue
 				}
 				for voutIndex, utxoAmount := range vout2AmountMap {
 					cummulativeBalance += utxoAmount
-					txIn := blockchain.NewTXInput(blockchain.NewOutPoint(&txIdBytes, voutIndex), senderAddressBytes, shardID)
+					txIn := blockchain.NewTXInput(blockchain.NewOutPoint(&txIDBytes, voutIndex), senderAddressBytes, shardID)
 					txInputs = append(txInputs, *txIn)
 					if cummulativeBalance >= amount {
 						break LOOP

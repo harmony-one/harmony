@@ -77,8 +77,8 @@ func (b *Block) String() string {
 func (b *Block) generateMerkleRootData() {
 	var data [][]byte
 
-	for _, txId := range b.TransactionIds {
-		data = append(data, txId[:])
+	for _, txID := range b.TransactionIds {
+		data = append(data, txID[:])
 	}
 	merkleTre := NewMerkleTree(data)
 	b.MerkleRootData = merkleTre.RootNode.Data
@@ -115,12 +115,12 @@ func (b *Block) CalculateBlockHash() []byte {
 // NewBlock creates and returns a new block.
 func NewBlock(transactions []*Transaction, prevBlockHash [32]byte, shardID uint32) *Block {
 	numTxs := int32(len(transactions))
-	var txIds [][32]byte
+	var txIDs [][32]byte
 
 	for _, tx := range transactions {
-		txIds = append(txIds, tx.ID)
+		txIDs = append(txIDs, tx.ID)
 	}
-	block := &Block{Timestamp: time.Now().Unix(), PrevBlockHash: prevBlockHash, NumTransactions: numTxs, TransactionIds: txIds, Transactions: transactions, ShardID: shardID, Hash: [32]byte{}}
+	block := &Block{Timestamp: time.Now().Unix(), PrevBlockHash: prevBlockHash, NumTransactions: numTxs, TransactionIds: txIDs, Transactions: transactions, ShardID: shardID, Hash: [32]byte{}}
 	copy(block.Hash[:], block.CalculateBlockHash()[:])
 
 	return block

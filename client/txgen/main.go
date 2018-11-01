@@ -79,11 +79,11 @@ func generateSimulatedTransactions(subsetId, numSubset int, shardID int, dataNod
 	/*
 	  UTXO map structure:
 	     address - [
-	                txId1 - [
+	                txID1 - [
 	                        outputIndex1 - value1
 	                        outputIndex2 - value2
 	                       ]
-	                txId2 - [
+	                txID2 - [
 	                        outputIndex1 - value1
 	                        outputIndex2 - value2
 	                       ]
@@ -100,16 +100,16 @@ UTXOLOOP:
 	for address, txMap := range dataNodes[shardID].UtxoPool.UtxoMap {
 		if int(binary.BigEndian.Uint32(address[:]))%numSubset == subsetId%numSubset { // Work on one subset of utxo at a time
 			txInfo.address = address
-			// Loop over all txIds for the address
-			for txIdStr, utxoMap := range txMap {
+			// Loop over all txIDs for the address
+			for txIDStr, utxoMap := range txMap {
 				// Parse TxId
-				id, err := hex.DecodeString(txIdStr)
+				id, err := hex.DecodeString(txIDStr)
 				if err != nil {
 					continue
 				}
 				copy(txInfo.id[:], id[:])
 
-				// Loop over all utxos for the txId
+				// Loop over all utxos for the txID
 				utxoSize := len(utxoMap)
 				batchSize := utxoSize / numSubset
 				i := subsetId % numSubset

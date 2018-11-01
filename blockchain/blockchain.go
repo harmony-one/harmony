@@ -124,8 +124,8 @@ func (bc *Blockchain) FindSpendableOutputs(address [20]byte, amount int) (int, m
 	accumulated := 0
 
 Work:
-	for txId, txOutputs := range unspentUtxos {
-		txID := hex.EncodeToString(txId[:])
+	for txID, txOutputs := range unspentUtxos {
+		txID := hex.EncodeToString(txID[:])
 
 		for outIdx, txOutput := range txOutputs {
 			if txOutput.Address == address && accumulated < amount {

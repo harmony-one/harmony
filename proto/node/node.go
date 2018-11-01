@@ -155,8 +155,8 @@ func ConstructRequestTransactionsMessage(transactionIds [][]byte) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
 	byteBuffer.WriteByte(byte(TRANSACTION))
 	byteBuffer.WriteByte(byte(REQUEST))
-	for _, txId := range transactionIds {
-		byteBuffer.Write(txId)
+	for _, txID := range transactionIds {
+		byteBuffer.Write(txID)
 	}
 	return byteBuffer.Bytes()
 }

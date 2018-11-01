@@ -29,11 +29,11 @@ type UTXOPool struct {
 	/*
 	   The 3-d map's structure:
 	     address - [
-	                txId1 - [
+	                txID1 - [
 	                        outputIndex1 - value1
 	                        outputIndex2 - value2
 	                       ]
-	                txId2 - [
+	                txID2 - [
 	                        outputIndex1 - value1
 	                        outputIndex2 - value2
 	                       ]
@@ -554,8 +554,8 @@ func (utxoPool *UTXOPool) CountNumOfLockedUtxos() int {
 func countNumOfUtxos(utxos *UtxoMap) int {
 	countAll := 0
 	for _, utxoMap := range *utxos {
-		for txIdStr, val := range utxoMap {
-			_, err := hex.DecodeString(txIdStr)
+		for txIDStr, val := range utxoMap {
+			_, err := hex.DecodeString(txIDStr)
 			if err != nil {
 				continue
 			}

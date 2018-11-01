@@ -244,7 +244,7 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 		node.addPendingTransactions(*txList)
 	case proto_node.REQUEST:
 		reader := bytes.NewBuffer(msgPayload[1:])
-		var txIds map[[32]byte]bool
+		var txIDs map[[32]byte]bool
 		buf := make([]byte, 32) // 32 byte hash Id
 		for {
 			_, err := reader.Read(buf)
@@ -252,14 +252,14 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 				break
 			}
 
-			var txId [32]byte
-			copy(txId[:], buf)
-			txIds[txId] = true
+			var txID [32]byte
+			copy(txID[:], buf)
+			txIDs[txID] = true
 		}
 
 		var txToReturn []*blockchain.Transaction
 		for _, tx := range node.pendingTransactions {
-			if txIds[tx.ID] {
+			if txIDs[tx.ID] {
 				txToReturn = append(txToReturn, tx)
 			}
 		}
