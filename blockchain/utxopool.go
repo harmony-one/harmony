@@ -13,8 +13,13 @@ import (
 	"github.com/simple-rules/harmony-benchmark/log"
 )
 
+// Vout2AmountMap is a TODO type.
 type Vout2AmountMap = map[uint32]int
+
+// TXHash2Vout2AmountMap is a TODO type.
 type TXHash2Vout2AmountMap = map[string]Vout2AmountMap
+
+// UtxoMap is a TODO type.
 type UtxoMap = map[[20]byte]TXHash2Vout2AmountMap
 
 // UTXOPool stores transactions and balance associated with each address.
@@ -40,7 +45,7 @@ type UTXOPool struct {
 	mutex         sync.Mutex
 }
 
-// Merges the utxoMap into that of the UtxoPool
+// MergeUtxoMap merges the utxoMap into that of the UtxoPool
 func (utxoPool *UTXOPool) MergeUtxoMap(utxoMap UtxoMap) {
 	for address, txHash2Vout2AmountMap := range utxoMap {
 		clientTxHashMap, ok := utxoPool.UtxoMap[address]
@@ -62,7 +67,7 @@ func (utxoPool *UTXOPool) MergeUtxoMap(utxoMap UtxoMap) {
 	}
 }
 
-// Gets the Utxo map for specific addresses
+// GetUtxoMapByAddresses gets the Utxo map for specific addresses
 func (utxoPool *UTXOPool) GetUtxoMapByAddresses(addresses [][20]byte) UtxoMap {
 	result := make(UtxoMap)
 	for _, address := range addresses {
@@ -200,7 +205,7 @@ func (utxoPool *UTXOPool) VerifyOneTransaction(tx *Transaction, spentTXOs *map[[
 	return nil, crossShard
 }
 
-// Verify a cross shard transaction that contains proofs for unlock-to-commit/abort.
+// VerifyUnlockTransaction verifies a cross shard transaction that contains proofs for unlock-to-commit/abort.
 func (utxoPool *UTXOPool) VerifyUnlockTransaction(tx *Transaction) (err error, crossShard bool) {
 	err = nil
 	crossShard = false // unlock transaction is treated as crossShard=false because it will be finalized now (doesn't need more steps)
@@ -219,7 +224,7 @@ func (utxoPool *UTXOPool) VerifyUnlockTransaction(tx *Transaction) (err error, c
 	return
 }
 
-// Update Utxo balances with a list of new transactions.
+// Update updates Utxo balances with a list of new transactions.
 func (utxoPool *UTXOPool) Update(transactions []*Transaction) {
 	if utxoPool != nil {
 		for _, tx := range transactions {
@@ -445,7 +450,7 @@ func getShardTxInput(transaction *Transaction, shardID uint32) []TXInput {
 	return result
 }
 
-// DeleteOneBalanceItem deletes one balance item of UTXOPool and clean up if possible.
+// DeleteOneUtxo deletes TODO.
 func (utxoPool *UTXOPool) DeleteOneUtxo(address [20]byte, txID string, index uint32) {
 	delete(utxoPool.UtxoMap[address][txID], index)
 	if len(utxoPool.UtxoMap[address][txID]) == 0 {
@@ -456,7 +461,7 @@ func (utxoPool *UTXOPool) DeleteOneUtxo(address [20]byte, txID string, index uin
 	}
 }
 
-// DeleteOneBalanceItem deletes one balance item of UTXOPool and clean up if possible.
+// LockedUtxoExists checks if the looked utxo exists.
 func (utxoPool *UTXOPool) LockedUtxoExists(address [20]byte, txID string, index uint32) bool {
 	_, ok := utxoPool.LockedUtxoMap[address]
 	if !ok {
@@ -473,7 +478,7 @@ func (utxoPool *UTXOPool) LockedUtxoExists(address [20]byte, txID string, index 
 	return true
 }
 
-// DeleteOneBalanceItem deletes one balance item of UTXOPool and clean up if possible.
+// DeleteOneLockedUtxo deletes one balance item of UTXOPool and clean up if possible.
 func (utxoPool *UTXOPool) DeleteOneLockedUtxo(address [20]byte, txID string, index uint32) {
 	delete(utxoPool.LockedUtxoMap[address][txID], index)
 	if len(utxoPool.LockedUtxoMap[address][txID]) == 0 {
@@ -508,7 +513,7 @@ func (utxoPool *UTXOPool) String() string {
 	return printUtxos(&utxoPool.UtxoMap)
 }
 
-// Used for debugging.
+// StringOfLockedUtxos is used for debugging.
 func (utxoPool *UTXOPool) StringOfLockedUtxos() string {
 	return printUtxos(&utxoPool.LockedUtxoMap)
 }
@@ -526,7 +531,7 @@ func printUtxos(utxos *UtxoMap) string {
 	return res
 }
 
-// Get a snapshot copy of the current pool
+// GetSizeInByteOfUtxoMap gets a snapshot copy of the current pool
 func (utxoPool *UTXOPool) GetSizeInByteOfUtxoMap() int {
 	utxoPool.mutex.Lock()
 	defer utxoPool.mutex.Unlock()
@@ -536,12 +541,12 @@ func (utxoPool *UTXOPool) GetSizeInByteOfUtxoMap() int {
 	return len(byteBuffer.Bytes())
 }
 
-// A utility func that counts the total number of utxos in a pool.
+// CountNumOfUtxos counts the total number of utxos in a pool.
 func (utxoPool *UTXOPool) CountNumOfUtxos() int {
 	return countNumOfUtxos(&utxoPool.UtxoMap)
 }
 
-// A utility func that counts the total number of locked utxos in a pool.
+// CountNumOfLockedUtxos counts the total number of locked utxos in a pool.
 func (utxoPool *UTXOPool) CountNumOfLockedUtxos() int {
 	return countNumOfUtxos(&utxoPool.LockedUtxoMap)
 }
