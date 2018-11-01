@@ -184,7 +184,7 @@ func (consensus *Consensus) GetValidatorPeers() []p2p.Peer {
 
 // Reset the state of the consensus
 func (consensus *Consensus) ResetState() {
-	consensus.state = FINISHED
+	consensus.state = Finished
 	consensus.commitments = &map[uint16]kyber.Point{}
 	consensus.finalCommitments = &map[uint16]kyber.Point{}
 	consensus.responses = &map[uint16]kyber.Scalar{}

@@ -31,7 +31,7 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) 
 		// TODO: think about potential race condition
 		startTime = time.Now()
 		consensus.Log.Debug("STARTING CONSENSUS", "consensus", consensus, "startTime", startTime)
-		for consensus.state == FINISHED {
+		for consensus.state == Finished {
 			// time.Sleep(500 * time.Millisecond)
 			consensus.startConsensus(&newBlock)
 			break
@@ -61,7 +61,7 @@ func (consensus *Consensus) ProcessMessageLeader(message []byte) {
 	case proto_consensus.FinalCommit:
 		consensus.processCommitMessage(payload, FinalChallengeDone)
 	case proto_consensus.FinalResponse:
-		consensus.processResponseMessage(payload, FINISHED)
+		consensus.processResponseMessage(payload, Finished)
 	default:
 		consensus.Log.Error("Unexpected message type", "msgType", msgType, "consensus", consensus)
 	}
@@ -286,7 +286,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState C
 	commitments := consensus.commitments // targetState == CollectiveSigDone
 	responses := consensus.responses
 	bitmap := consensus.bitmap
-	if targetState == FINISHED {
+	if targetState == Finished {
 		commitments = consensus.finalCommitments
 		responses = consensus.finalResponses
 		bitmap = consensus.finalBitmap
@@ -335,7 +335,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState C
 				return
 			}
 			aggregatedCommitment := consensus.aggregatedCommitment
-			if targetState == FINISHED {
+			if targetState == Finished {
 				aggregatedCommitment = consensus.aggregatedFinalCommitment
 			}
 
@@ -352,10 +352,10 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState C
 			copy(collectiveSig[:], collectiveSigAndBitmap[:64])
 			bitmap := collectiveSigAndBitmap[64:]
 
-			// Set state to CollectiveSigDone or FINISHED
+			// Set state to CollectiveSigDone or Finished
 			consensus.state = targetState
 
-			if consensus.state != FINISHED {
+			if consensus.state != Finished {
 				// Start the second round of Cosi
 				msgToSend := consensus.constructCollectiveSigMessage(collectiveSig, bitmap)
 
@@ -363,7 +363,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState C
 				consensus.commitByLeader(false)
 			} else {
 				consensus.Log.Debug("Consensus reached with signatures.", "numOfSignatures", len(*responses))
-				// Reset state to FINISHED, and clear other data.
+				// Reset state to Finished, and clear other data.
 				consensus.ResetState()
 				consensus.consensusID++
 				consensus.Log.Debug("HOORAY!!! CONSENSUS REACHED!!!", "consensusID", consensus.consensusID)

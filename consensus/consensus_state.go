@@ -2,13 +2,13 @@ package consensus
 
 // Consensus state enum for both leader and validator
 // States for leader:
-//     FINISHED, AnnounceDone, ChallengeDone
+//     Finished, AnnounceDone, ChallengeDone
 // States for validator:
-//     FINISHED, CommitDone, ResponseDone
+//     Finished, CommitDone, ResponseDone
 type ConsensusState int
 
 const (
-	FINISHED ConsensusState = iota // initial state or state after previous consensus is done.
+	Finished ConsensusState = iota // initial state or state after previous consensus is done.
 	AnnounceDone
 	CommitDone
 	ChallengeDone
@@ -22,7 +22,7 @@ const (
 // Returns string name for the ConsensusState enum
 func (state ConsensusState) String() string {
 	names := [...]string{
-		"FINISHED",
+		"Finished",
 		"AnnounceDone",
 		"CommitDone",
 		"ChallengeDone",
@@ -32,7 +32,7 @@ func (state ConsensusState) String() string {
 		"FinalChallengeDone",
 		"FinalResponseDone"}
 
-	if state < FINISHED || state > FinalResponseDone {
+	if state < Finished || state > FinalResponseDone {
 		return "Unknown"
 	}
 	return names[state]
