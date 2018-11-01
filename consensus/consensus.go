@@ -34,7 +34,7 @@ type Consensus struct {
 	// Responses collected from validators
 	responses      *map[uint16]kyber.Scalar
 	finalResponses *map[uint16]kyber.Scalar
-	// map of nodeId to validator Peer object
+	// map of nodeID to validator Peer object
 	validators map[uint16]p2p.Peer
 	// Leader
 	leader p2p.Peer
@@ -48,7 +48,7 @@ type Consensus struct {
 	// Whether I am leader. False means I am validator
 	IsLeader bool
 	// Leader or validator Id - 2 byte
-	nodeId uint16
+	nodeID uint16
 	// Consensus Id (View Id) - 4 byte
 	consensusID uint32
 	// Blockhash - 32 byte
@@ -136,10 +136,10 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 
 	// For now use socket address as 16 byte Id
 	// TODO: populate with correct Id
-	consensus.nodeId = utils.GetUniqueIdFromPeer(p2p.Peer{Ip: ip, Port: port})
+	consensus.nodeID = utils.GetUniqueIdFromPeer(p2p.Peer{Ip: ip, Port: port})
 
 	// Set private key for myself so that I can sign messages.
-	consensus.priKey = crypto.Ed25519Curve.Scalar().SetInt64(int64(consensus.nodeId))
+	consensus.priKey = crypto.Ed25519Curve.Scalar().SetInt64(int64(consensus.nodeID))
 	consensus.pubKey = pki.GetPublicKeyFromScalar(consensus.priKey)
 	consensus.consensusID = 0 // or view Id in the original pbft paper
 
@@ -210,6 +210,6 @@ func (consensus *Consensus) String() string {
 	} else {
 		duty = "VLD" // validator
 	}
-	return fmt.Sprintf("[duty:%s, priKey:%s, ShardID:%v, nodeId:%v, state:%s]",
-		duty, consensus.priKey.String(), consensus.ShardID, consensus.nodeId, consensus.state)
+	return fmt.Sprintf("[duty:%s, priKey:%s, ShardID:%v, nodeID:%v, state:%s]",
+		duty, consensus.priKey.String(), consensus.ShardID, consensus.nodeID, consensus.state)
 }

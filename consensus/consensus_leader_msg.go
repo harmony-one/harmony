@@ -24,7 +24,7 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 
 	// 2 byte leader id
 	twoBytes := make([]byte, 2)
-	binary.BigEndian.PutUint16(twoBytes, consensus.nodeId)
+	binary.BigEndian.PutUint16(twoBytes, consensus.nodeID)
 	buffer.Write(twoBytes)
 
 	// n byte of block header
@@ -52,7 +52,7 @@ func (consensus *Consensus) constructChallengeMessage(msgTypeToSend proto_consen
 
 	// 2 byte leader id
 	twoBytes := make([]byte, 2)
-	binary.BigEndian.PutUint16(twoBytes, consensus.nodeId)
+	binary.BigEndian.PutUint16(twoBytes, consensus.nodeID)
 	buffer.Write(twoBytes)
 
 	commitmentsMap := consensus.commitments // msgType == CHALLENGE
@@ -102,7 +102,7 @@ func (consensus *Consensus) constructCollectiveSigMessage(collectiveSig [64]byte
 
 	// 2 byte leader id
 	twoBytes := make([]byte, 2)
-	binary.BigEndian.PutUint16(twoBytes, consensus.nodeId)
+	binary.BigEndian.PutUint16(twoBytes, consensus.nodeID)
 	buffer.Write(twoBytes)
 
 	// 64 byte collective signature

@@ -23,7 +23,7 @@ func (consensus *Consensus) constructCommitMessage(msgType proto_consensus.Messa
 
 	// 2 byte validator id
 	twoBytes := make([]byte, 2)
-	binary.BigEndian.PutUint16(twoBytes, consensus.nodeId)
+	binary.BigEndian.PutUint16(twoBytes, consensus.nodeID)
 	buffer.Write(twoBytes)
 
 	// 32 byte of commit (TODO: figure out why it's different than Zilliqa's ECPoint which takes 33 bytes: https://crypto.stackexchange.com/questions/51703/how-to-convert-from-curve25519-33-byte-to-32-byte-representation)
@@ -51,7 +51,7 @@ func (consensus *Consensus) constructResponseMessage(msgType proto_consensus.Mes
 
 	// 2 byte validator id
 	twoBytes := make([]byte, 2)
-	binary.BigEndian.PutUint16(twoBytes, consensus.nodeId)
+	binary.BigEndian.PutUint16(twoBytes, consensus.nodeID)
 	buffer.Write(twoBytes)
 
 	// 32 byte of response

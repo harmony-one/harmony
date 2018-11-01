@@ -100,10 +100,10 @@ func (consensus *Consensus) commitByLeader(firstRound bool) {
 	secret, commitment := crypto.Commit(crypto.Ed25519Curve)
 	consensus.secret[consensus.consensusID] = secret
 	if firstRound {
-		(*consensus.commitments)[consensus.nodeId] = commitment
+		(*consensus.commitments)[consensus.nodeID] = commitment
 		consensus.bitmap.SetKey(consensus.pubKey, true)
 	} else {
-		(*consensus.finalCommitments)[consensus.nodeId] = commitment
+		(*consensus.finalCommitments)[consensus.nodeID] = commitment
 		consensus.finalBitmap.SetKey(consensus.pubKey, true)
 	}
 }
@@ -221,10 +221,10 @@ func (consensus *Consensus) responseByLeader(challenge kyber.Scalar, firstRound 
 	response, err := crypto.Response(crypto.Ed25519Curve, consensus.priKey, consensus.secret[consensus.consensusID], challenge)
 	if err == nil {
 		if firstRound {
-			(*consensus.responses)[consensus.nodeId] = response
+			(*consensus.responses)[consensus.nodeID] = response
 			consensus.bitmap.SetKey(consensus.pubKey, true)
 		} else {
-			(*consensus.finalResponses)[consensus.nodeId] = response
+			(*consensus.finalResponses)[consensus.nodeID] = response
 			consensus.finalBitmap.SetKey(consensus.pubKey, true)
 		}
 	} else {
