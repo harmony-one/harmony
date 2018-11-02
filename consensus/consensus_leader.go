@@ -344,9 +344,8 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState C
 			if err != nil {
 				log.Error("Failed to create collective signature")
 				return
-			} else {
-				log.Info("CollectiveSig and Bitmap created.", "size", len(collectiveSigAndBitmap))
 			}
+			log.Info("CollectiveSig and Bitmap created.", "size", len(collectiveSigAndBitmap))
 
 			collectiveSig := [64]byte{}
 			copy(collectiveSig[:], collectiveSigAndBitmap[:64])

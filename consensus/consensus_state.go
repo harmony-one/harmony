@@ -1,14 +1,15 @@
 package consensus
 
-// Consensus state enum for both leader and validator
+// ConsensusState is the consensus state enum for both leader and validator
 // States for leader:
 //     Finished, AnnounceDone, ChallengeDone
 // States for validator:
 //     Finished, CommitDone, ResponseDone
 type ConsensusState int
 
+// Followings are the set of states of validators or leaders during consensus.
 const (
-	Finished ConsensusState = iota // initial state or state after previous consensus is done.
+	Finished ConsensusState = iota
 	AnnounceDone
 	CommitDone
 	ChallengeDone

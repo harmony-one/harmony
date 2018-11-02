@@ -15,7 +15,7 @@ import (
 	"github.com/simple-rules/harmony-benchmark/utils"
 )
 
-// Validator's consensus message dispatcher
+// ProcessMessageValidator dispatches validator's consensus message.
 func (consensus *Consensus) ProcessMessageValidator(message []byte) {
 	msgType, err := proto_consensus.GetConsensusMessageType(message)
 	if err != nil {
@@ -56,7 +56,7 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	offset += 32
 
 	// 2 byte leader id
-	leaderId := binary.BigEndian.Uint16(payload[offset : offset+2])
+	leaderID := binary.BigEndian.Uint16(payload[offset : offset+2])
 	offset += 2
 
 	// n byte of message to cosign
@@ -74,8 +74,8 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	// Verify block data
 	// check leader Id
 	myLeaderID := utils.GetUniqueIdFromPeer(consensus.leader)
-	if leaderId != myLeaderID {
-		consensus.Log.Warn("Received message from wrong leader", "myLeaderID", myLeaderID, "receivedLeaderId", leaderId, "consensus", consensus)
+	if leaderID != myLeaderID {
+		consensus.Log.Warn("Received message from wrong leader", "myLeaderID", myLeaderID, "receivedLeaderId", leaderID, "consensus", consensus)
 		return
 	}
 
@@ -146,7 +146,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte, targetState 
 	offset += 32
 
 	// 2 byte leader id
-	leaderId := binary.BigEndian.Uint16(payload[offset : offset+2])
+	leaderID := binary.BigEndian.Uint16(payload[offset : offset+2])
 	offset += 2
 
 	// 33 byte of aggregated commit
@@ -172,8 +172,8 @@ func (consensus *Consensus) processChallengeMessage(payload []byte, targetState 
 	// Verify block data and the aggregated signatures
 	// check leader Id
 	myLeaderID := utils.GetUniqueIdFromPeer(consensus.leader)
-	if leaderId != myLeaderID {
-		consensus.Log.Warn("Received message from wrong leader", "myLeaderID", myLeaderID, "receivedLeaderId", leaderId, "consensus", consensus)
+	if leaderID != myLeaderID {
+		consensus.Log.Warn("Received message from wrong leader", "myLeaderID", myLeaderID, "receivedLeaderId", leaderID, "consensus", consensus)
 		return
 	}
 
@@ -300,7 +300,7 @@ func (consensus *Consensus) processCollectiveSigMessage(payload []byte) {
 	offset += 32
 
 	// 2 byte leader id
-	leaderId := binary.BigEndian.Uint16(payload[offset : offset+2])
+	leaderID := binary.BigEndian.Uint16(payload[offset : offset+2])
 	offset += 2
 
 	// 64 byte of collective signature
@@ -322,8 +322,8 @@ func (consensus *Consensus) processCollectiveSigMessage(payload []byte) {
 	// Verify block data
 	// check leader Id
 	myLeaderID := utils.GetUniqueIdFromPeer(consensus.leader)
-	if leaderId != myLeaderID {
-		consensus.Log.Warn("Received message from wrong leader", "myLeaderID", myLeaderID, "receivedLeaderId", leaderId, "consensus", consensus)
+	if leaderID != myLeaderID {
+		consensus.Log.Warn("Received message from wrong leader", "myLeaderID", myLeaderID, "receivedLeaderId", leaderID, "consensus", consensus)
 		return
 	}
 

@@ -1,4 +1,4 @@
-// Consensus package implements the Cosi PBFT consensus
+// Package consensus implements the Cosi PBFT consensus
 package consensus // consensus
 
 import (
@@ -80,7 +80,7 @@ type Consensus struct {
 	Log log.Logger
 }
 
-// This used to keep track of the consensus status of multiple blocks received so far
+// BlockConsensusStatus used to keep track of the consensus status of multiple blocks received so far
 // This is mainly used in the case that this node is lagging behind and needs to catch up.
 // For example, the consensus moved to round N and this node received message(N).
 // However, this node may still not finished with round N-1, so the newly received message(N)
@@ -174,6 +174,7 @@ func (consensus *Consensus) signMessage(message []byte) []byte {
 	return signature
 }
 
+// GetValidatorPeers returns list of validator peers.
 func (consensus *Consensus) GetValidatorPeers() []p2p.Peer {
 	validatorPeers := make([]p2p.Peer, 0)
 	for _, validatorPeer := range consensus.validators {
@@ -182,7 +183,7 @@ func (consensus *Consensus) GetValidatorPeers() []p2p.Peer {
 	return validatorPeers
 }
 
-// Reset the state of the consensus
+// ResetState resets the state of the consensus
 func (consensus *Consensus) ResetState() {
 	consensus.state = Finished
 	consensus.commitments = &map[uint16]kyber.Point{}
