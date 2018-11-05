@@ -54,7 +54,7 @@ func (consensus *Consensus) ProcessMessageLeader(message []byte) {
 	switch msgType {
 	case proto_consensus.StartConsensus:
 		consensus.processStartConsensusMessage(payload)
-	case proto_consensus.COMMIT:
+	case proto_consensus.Commit:
 		consensus.processCommitMessage(payload, ChallengeDone)
 	case proto_consensus.RESPONSE:
 		consensus.processResponseMessage(payload, CollectiveSigDone)
@@ -147,12 +147,12 @@ func (consensus *Consensus) processCommitMessage(payload []byte, targetState Con
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 	if consensusID != consensus.consensusID {
-		consensus.Log.Warn("Received COMMIT with wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
+		consensus.Log.Warn("Received Commit with wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
 		return
 	}
 
 	if bytes.Compare(blockHash, consensus.blockHash[:]) != 0 {
-		consensus.Log.Warn("Received COMMIT with wrong blockHash", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
+		consensus.Log.Warn("Received Commit with wrong blockHash", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
 		return
 	}
 

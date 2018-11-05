@@ -35,7 +35,7 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 	signature := consensus.signMessage(buffer.Bytes())
 	buffer.Write(signature)
 
-	return proto_consensus.ConstructConsensusMessage(proto_consensus.ANNOUNCE, buffer.Bytes())
+	return proto_consensus.ConstructConsensusMessage(proto_consensus.Announce, buffer.Bytes())
 }
 
 // Construct the challenge message, returning challenge message in bytes, challenge scalar and aggregated commmitment point.

@@ -8,7 +8,7 @@ import (
 )
 
 // the number of bytes consensus message type occupies
-const IDENTITY_MESSAGE_TYPE_BYTES = 1
+const IdentityMessageTypeBytes = 1
 
 type IdentityMessageType byte
 
@@ -21,7 +21,7 @@ type MessageType int
 
 const (
 	REGISTER MessageType = iota
-	ANNOUNCE
+	Announce
 	CONFIG
 )
 
@@ -29,7 +29,7 @@ const (
 func (msgType MessageType) String() string {
 	names := [...]string{
 		"REGISTER",
-		"ANNOUNCE",
+		"Announce",
 		"CONFIG",
 	}
 
@@ -52,7 +52,7 @@ func GetIdentityMessagePayload(message []byte) ([]byte, error) {
 	if len(message) < 2 {
 		return []byte{}, errors.New("Failed to get identity message payload: no data available.")
 	}
-	return message[IDENTITY_MESSAGE_TYPE_BYTES:], nil
+	return message[IdentityMessageTypeBytes:], nil
 }
 
 // Concatenate msgType as one byte with payload, and return the whole byte array

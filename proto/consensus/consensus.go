@@ -12,11 +12,11 @@ Consensus message is the payload of p2p message.
 Consensus message data structure:
 
 
-ANNOUNCE:
+Announce:
 ---- message start -----
 1 byte            - consensus.MessageType
-                    0x00 - ANNOUNCE
-                    0x01 - COMMIT
+                    0x00 - Announce
+                    0x01 - Commit
                     ...
 4 byte            - consensus id
 32 byte           - block hash
@@ -26,11 +26,11 @@ ANNOUNCE:
 64 byte           - signature
 ----  message end  -----
 
-COMMIT:
+Commit:
 ---- message start -----
 1 byte            - consensus.MessageType
-                    0x00 - ANNOUNCE
-                    0x01 - COMMIT
+                    0x00 - Announce
+                    0x01 - Commit
                     ...
 4 byte            - consensus id
 32 byte           - block hash
@@ -42,8 +42,8 @@ COMMIT:
 CHALLENGE:
 ---- message start -----
 1 byte            - consensus.MessageType
-                    0x00 - ANNOUNCE
-                    0x01 - COMMIT
+                    0x00 - Announce
+                    0x01 - Commit
                     ...
 4 byte            - consensus id
 32 byte           - block hash
@@ -57,8 +57,8 @@ CHALLENGE:
 RESPONSE:
 ---- message start -----
 1 byte            - consensus.MessageType
-                    0x00 - ANNOUNCE
-                    0x01 - COMMIT
+                    0x00 - Announce
+                    0x01 - Commit
                     ...
 4 byte            - consensus id
 32 byte           - block hash
@@ -84,8 +84,8 @@ const (
 type MessageType int
 
 const (
-	ANNOUNCE MessageType = iota
-	COMMIT
+	Announce MessageType = iota
+	Commit
 	CHALLENGE
 	RESPONSE
 	COLLECTIVE_SIG
@@ -98,8 +98,8 @@ const (
 // Returns string name for the MessageType enum
 func (msgType MessageType) String() string {
 	names := [...]string{
-		"ANNOUNCE",
-		"COMMIT",
+		"Announce",
+		"Commit",
 		"CHALLENGE",
 		"RESPONSE",
 		"COLLECTIVE_SIG",
@@ -109,7 +109,7 @@ func (msgType MessageType) String() string {
 		"StartConsensus",
 	}
 
-	if msgType < ANNOUNCE || msgType > StartConsensus {
+	if msgType < Announce || msgType > StartConsensus {
 		return "Unknown"
 	}
 	return names[msgType]

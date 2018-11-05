@@ -32,7 +32,7 @@ type BlockchainSyncMessage struct {
 type BlockchainSyncMessageType int
 
 const (
-	DONE BlockchainSyncMessageType = iota
+	Done BlockchainSyncMessageType = iota
 	GetLastBlockHashes
 	GetBlock
 )
@@ -41,7 +41,7 @@ const (
 type TransactionMessageType int
 
 const (
-	SEND TransactionMessageType = iota
+	Send TransactionMessageType = iota
 	REQUEST
 	UNLOCK
 )
@@ -50,7 +50,7 @@ const (
 type BlockMessageType int
 
 const (
-	SYNC BlockMessageType = iota
+	Sync BlockMessageType = iota
 )
 
 // The types of messages used for NODE/BLOCK
@@ -124,7 +124,7 @@ func ConstructFetchUtxoMessage(sender p2p.Peer, addresses [][20]byte) []byte {
 func ConstructTransactionListMessage(transactions []*blockchain.Transaction) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
 	byteBuffer.WriteByte(byte(Transaction))
-	byteBuffer.WriteByte(byte(SEND))
+	byteBuffer.WriteByte(byte(Send))
 	encoder := gob.NewEncoder(byteBuffer)
 	// Copy over the tx data
 	txs := make([]blockchain.Transaction, len(transactions))
@@ -180,7 +180,7 @@ func ConstructStopMessage() []byte {
 func ConstructBlocksSyncMessage(blocks []blockchain.Block) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
 	byteBuffer.WriteByte(byte(BLOCK))
-	byteBuffer.WriteByte(byte(SYNC))
+	byteBuffer.WriteByte(byte(Sync))
 	encoder := gob.NewEncoder(byteBuffer)
 
 	encoder.Encode(blocks)

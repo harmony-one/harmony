@@ -29,7 +29,7 @@ func (consensus *Consensus) ProcessMessageValidator(message []byte) {
 
 	consensus.Log.Info("Received consensus Message", "type", msgType)
 	switch msgType {
-	case proto_consensus.ANNOUNCE:
+	case proto_consensus.Announce:
 		consensus.processAnnounceMessage(payload)
 	case proto_consensus.CHALLENGE:
 		consensus.processChallengeMessage(payload, ResponseDone)
@@ -122,7 +122,7 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 		return
 	}
 
-	secret, msgToSend := consensus.constructCommitMessage(proto_consensus.COMMIT)
+	secret, msgToSend := consensus.constructCommitMessage(proto_consensus.Commit)
 	// Store the commitment secret
 	consensus.secret[consensusID] = secret
 
