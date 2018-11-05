@@ -1,11 +1,12 @@
 # Harmony Benchmark
 [![Build Status](https://travis-ci.com/simple-rules/harmony-benchmark.svg?token=DnoYvYiTAk7pqTo9XsTi&branch=master)](https://travis-ci.com/simple-rules/harmony-benchmark)
 
-## Golang Coding Convention
+## Coding Guidelines
 
-* Follow [effective_go](https://golang.org/doc/effective_go.html)
-* Constant enum should follow CamelCase.
-* Comments of each element in a struct is written right after the element.
+* In general, we should follow [effective_go](https://golang.org/doc/effective_go.html)
+* Code must adhere to the official [Go formatting guidelines](https://golang.org/doc/effective_go.html#formatting) (i.e. uses [gofmt](https://golang.org/cmd/gofmt/)).
+* Code must be documented adhering to the official Go [commentary](https://golang.org/doc/effective_go.html#commentary) guidelines.
+
 
 ## Dev Environment Setup
 
