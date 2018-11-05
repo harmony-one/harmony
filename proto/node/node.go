@@ -42,8 +42,8 @@ type TransactionMessageType int
 
 const (
 	Send TransactionMessageType = iota
-	REQUEST
-	UNLOCK
+	Request
+	Unlock
 )
 
 // BlockMessageType represents the types of messages used for NODE/BLOCK
@@ -101,7 +101,7 @@ func DeserializeBlockchainSyncMessage(d []byte) (*BlockchainSyncMessage, error) 
 func ConstructUnlockToCommitOrAbortMessage(txsAndProofs []*blockchain.Transaction) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
 	byteBuffer.WriteByte(byte(Transaction))
-	byteBuffer.WriteByte(byte(UNLOCK))
+	byteBuffer.WriteByte(byte(Unlock))
 	encoder := gob.NewEncoder(byteBuffer)
 	encoder.Encode(txsAndProofs)
 	return byteBuffer.Bytes()
@@ -161,7 +161,7 @@ func GenerateBlockchainSyncMessage(payload []byte) *BlockchainSyncMessage {
 func ConstructRequestTransactionsMessage(transactionIds [][]byte) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
 	byteBuffer.WriteByte(byte(Transaction))
-	byteBuffer.WriteByte(byte(REQUEST))
+	byteBuffer.WriteByte(byte(Request))
 	for _, txID := range transactionIds {
 		byteBuffer.Write(txID)
 	}
