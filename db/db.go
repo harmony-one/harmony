@@ -17,8 +17,7 @@ const (
 	writePauseWarningThrottler = 1 * time.Minute
 )
 
-var OpenFileLimit = 64
-
+// LDBDatabase is database based on leveldb.
 type LDBDatabase struct {
 	fn string      // filename for reporting
 	db *leveldb.DB // LevelDB instance
@@ -73,6 +72,7 @@ func (db *LDBDatabase) Put(key []byte, value []byte) error {
 	return db.db.Put(key, value, nil)
 }
 
+// Has is used to check if the given key is included into the database.
 func (db *LDBDatabase) Has(key []byte) (bool, error) {
 	return db.db.Has(key, nil)
 }
@@ -91,6 +91,7 @@ func (db *LDBDatabase) Delete(key []byte) error {
 	return db.db.Delete(key, nil)
 }
 
+// NewIterator returns the current iterator of the db.
 func (db *LDBDatabase) NewIterator() iterator.Iterator {
 	return db.db.NewIterator(nil, nil)
 }
@@ -100,6 +101,7 @@ func (db *LDBDatabase) NewIteratorWithPrefix(prefix []byte) iterator.Iterator {
 	return db.db.NewIterator(util.BytesPrefix(prefix), nil)
 }
 
+// Close closes the database.
 func (db *LDBDatabase) Close() {
 	// Stop the metrics collection to avoid internal database races
 	db.quitLock.Lock()
@@ -121,12 +123,15 @@ func (db *LDBDatabase) Close() {
 	}
 }
 
+// LDB returns the pointer to leveldb on which the LDBDatabase is built.
 func (db *LDBDatabase) LDB() *leveldb.DB {
 	return db.db
 }
 
-// TODO(minhdoan): Might add meter func from ethereum-go repo
+/* TODO(minhdoan): Might add meter func from ethereum-go repo
+ */
 
+// NewBatch returns Batch interface for a series of leveldb transactions.
 func (db *LDBDatabase) NewBatch() Batch {
 	return &ldbBatch{db: db.db, b: new(leveldb.Batch)}
 }
@@ -137,26 +142,31 @@ type ldbBatch struct {
 	size int
 }
 
+// Put is used to put key, value into the batch of transactions.
 func (b *ldbBatch) Put(key, value []byte) error {
 	b.b.Put(key, value)
 	b.size += len(value)
 	return nil
 }
 
+// Delete is used to delete the item associated with the given key as a part of the batch.
 func (b *ldbBatch) Delete(key []byte) error {
 	b.b.Delete(key)
-	b.size += 1
+	b.size++
 	return nil
 }
 
+// Write writes the patch of transactions.
 func (b *ldbBatch) Write() error {
 	return b.db.Write(b.b, nil)
 }
 
+// ValueSize returns the size of the patch.
 func (b *ldbBatch) ValueSize() int {
 	return b.size
 }
 
+// Reset resets the batch.
 func (b *ldbBatch) Reset() {
 	b.b.Reset()
 	b.size = 0

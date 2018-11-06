@@ -71,11 +71,11 @@ RESPONSE:
 // the number of bytes consensus message type occupies
 const ConsensusMessageTypeBytes = 1
 
-// The specific types of message under CONSENSUS category
+// The specific types of message under Consensus category
 type ConsensusMessageType byte
 
 const (
-	CONSENSUS ConsensusMessageType = iota
+	Consensus ConsensusMessageType = iota
 	// TODO: add more types
 )
 
@@ -133,8 +133,8 @@ func GetConsensusMessagePayload(message []byte) ([]byte, error) {
 
 // Concatenate msgType as one byte with payload, and return the whole byte array
 func ConstructConsensusMessage(consensusMsgType MessageType, payload []byte) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.CONSENSUS)})
-	byteBuffer.WriteByte(byte(CONSENSUS))
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Consensus)})
+	byteBuffer.WriteByte(byte(Consensus))
 	byteBuffer.WriteByte(byte(consensusMsgType))
 	byteBuffer.Write(payload)
 	return byteBuffer.Bytes()

@@ -7,26 +7,27 @@ import (
 	"github.com/simple-rules/harmony-benchmark/utils"
 )
 
-/*
- * This is a test memory database. Do not use for any production it does not get persisted
- */
+// MemDatabase is the test memory database. It won't be used for any production.
 type MemDatabase struct {
 	db   map[string][]byte
 	lock sync.RWMutex
 }
 
+// NewMemDatabase returns a pointer of the new creation of MemDatabase.
 func NewMemDatabase() *MemDatabase {
 	return &MemDatabase{
 		db: make(map[string][]byte),
 	}
 }
 
+// NewMemDatabase returns a pointer of the new creation of MemDatabase with the given size.
 func NewMemDatabaseWithCap(size int) *MemDatabase {
 	return &MemDatabase{
 		db: make(map[string][]byte, size),
 	}
 }
 
+// Put puts (key, value) item into MemDatabase.
 func (db *MemDatabase) Put(key []byte, value []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
@@ -35,6 +36,7 @@ func (db *MemDatabase) Put(key []byte, value []byte) error {
 	return nil
 }
 
+// Has checks if the key is included into MemDatabase.
 func (db *MemDatabase) Has(key []byte) (bool, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
@@ -43,6 +45,7 @@ func (db *MemDatabase) Has(key []byte) (bool, error) {
 	return ok, nil
 }
 
+// Get gets value of the given key.
 func (db *MemDatabase) Get(key []byte) ([]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
@@ -53,6 +56,7 @@ func (db *MemDatabase) Get(key []byte) ([]byte, error) {
 	return nil, errors.New("not found")
 }
 
+// Keys returns all keys of the given MemDatabase.
 func (db *MemDatabase) Keys() [][]byte {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
@@ -64,6 +68,7 @@ func (db *MemDatabase) Keys() [][]byte {
 	return keys
 }
 
+// Delete deletes the given key.
 func (db *MemDatabase) Delete(key []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
@@ -72,12 +77,15 @@ func (db *MemDatabase) Delete(key []byte) error {
 	return nil
 }
 
+// Close closes the given db.
 func (db *MemDatabase) Close() {}
 
+// NewBatch returns a batch of MemDatabase transactions.
 func (db *MemDatabase) NewBatch() Batch {
 	return &memBatch{db: db}
 }
 
+// Len returns the length of the given db.
 func (db *MemDatabase) Len() int { return len(db.db) }
 
 type kv struct {
@@ -99,7 +107,7 @@ func (b *memBatch) Put(key, value []byte) error {
 
 func (b *memBatch) Delete(key []byte) error {
 	b.writes = append(b.writes, kv{utils.CopyBytes(key), nil, true})
-	b.size += 1
+	b.size++
 	return nil
 }
 

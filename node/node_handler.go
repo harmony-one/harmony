@@ -82,10 +82,10 @@ func (node *Node) NodeHandler(conn net.Conn) {
 				node.log.Error("Announce message should be sent to IdentityChain")
 			}
 		}
-	case proto.CONSENSUS:
+	case proto.Consensus:
 		actionType := consensus.ConsensusMessageType(msgType)
 		switch actionType {
-		case consensus.CONSENSUS:
+		case consensus.Consensus:
 			if consensusObj.IsLeader {
 				consensusObj.ProcessMessageLeader(msgPayload)
 			} else {
