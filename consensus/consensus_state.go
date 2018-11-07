@@ -1,15 +1,15 @@
 package consensus
 
-// ConsensusState is the consensus state enum for both leader and validator
+// State is the consensus state enum for both leader and validator
 // States for leader:
 //     Finished, AnnounceDone, ChallengeDone
 // States for validator:
 //     Finished, CommitDone, ResponseDone
-type ConsensusState int
+type State int
 
 // Followings are the set of states of validators or leaders during consensus.
 const (
-	Finished ConsensusState = iota
+	Finished State = iota
 	AnnounceDone
 	CommitDone
 	ChallengeDone
@@ -20,8 +20,8 @@ const (
 	FinalResponseDone
 )
 
-// Returns string name for the ConsensusState enum
-func (state ConsensusState) String() string {
+// Returns string name for the State enum
+func (state State) String() string {
 	names := [...]string{
 		"Finished",
 		"AnnounceDone",

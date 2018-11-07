@@ -39,7 +39,7 @@ Commit:
 64 byte           - signature
 ----  message end  -----
 
-CHALLENGE:
+Challenge:
 ---- message start -----
 1 byte            - consensus.MessageType
                     0x00 - Announce
@@ -54,7 +54,7 @@ CHALLENGE:
 64 byte           - signature
 ----  message end  -----
 
-RESPONSE:
+Response:
 ---- message start -----
 1 byte            - consensus.MessageType
                     0x00 - Announce
@@ -68,29 +68,31 @@ RESPONSE:
 ----  message end  -----
 */
 
-// the number of bytes consensus message type occupies
+// ConsensusMessageTypeBytes is the number of bytes consensus message type occupies
 const ConsensusMessageTypeBytes = 1
 
-// The specific types of message under Consensus category
+// ConsensusMessageType is the specific types of message under Consensus category
 type ConsensusMessageType byte
 
+// Consensus message type constants.
 const (
 	Consensus ConsensusMessageType = iota
 	// TODO: add more types
 )
 
-// Consensus communication message type.
+// MessageType is the consensus communication message type.
 // Leader and validator dispatch messages based on incoming message type
 type MessageType int
 
+// Message type constants.
 const (
 	Announce MessageType = iota
 	Commit
-	CHALLENGE
-	RESPONSE
-	COLLECTIVE_SIG
+	Challenge
+	Response
+	CollectiveSig
 	FinalCommit
-	FINAL_CHALLENGE
+	FinalChallenge
 	FinalResponse
 	StartConsensus
 )
@@ -100,11 +102,11 @@ func (msgType MessageType) String() string {
 	names := [...]string{
 		"Announce",
 		"Commit",
-		"CHALLENGE",
-		"RESPONSE",
-		"COLLECTIVE_SIG",
+		"Challenge",
+		"Response",
+		"CollectiveSig",
 		"FinalCommit",
-		"FINAL_CHALLENGE",
+		"FinalChallenge",
 		"FinalResponse",
 		"StartConsensus",
 	}

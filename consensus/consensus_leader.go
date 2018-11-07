@@ -56,7 +56,7 @@ func (consensus *Consensus) ProcessMessageLeader(message []byte) {
 		consensus.processStartConsensusMessage(payload)
 	case proto_consensus.Commit:
 		consensus.processCommitMessage(payload, ChallengeDone)
-	case proto_consensus.RESPONSE:
+	case proto_consensus.Response:
 		consensus.processResponseMessage(payload, CollectiveSigDone)
 	case proto_consensus.FinalCommit:
 		consensus.processCommitMessage(payload, FinalChallengeDone)
@@ -109,7 +109,7 @@ func (consensus *Consensus) commitByLeader(firstRound bool) {
 }
 
 // processCommitMessage processes the commit message sent from validators
-func (consensus *Consensus) processCommitMessage(payload []byte, targetState ConsensusState) {
+func (consensus *Consensus) processCommitMessage(payload []byte, targetState State) {
 	// Read payload data
 	offset := 0
 	// 4 byte consensus id
@@ -186,9 +186,9 @@ func (consensus *Consensus) processCommitMessage(payload []byte, targetState Con
 		consensus.Log.Debug("Enough commitments received with signatures", "num", len(*commitments), "state", consensus.state)
 
 		// Broadcast challenge
-		msgTypeToSend := proto_consensus.CHALLENGE // targetState == ChallengeDone
+		msgTypeToSend := proto_consensus.Challenge // targetState == ChallengeDone
 		if targetState == FinalChallengeDone {
-			msgTypeToSend = proto_consensus.FINAL_CHALLENGE
+			msgTypeToSend = proto_consensus.FinalChallenge
 		}
 		msgToSend, challengeScalar, aggCommitment := consensus.constructChallengeMessage(msgTypeToSend)
 		bytes, err := challengeScalar.MarshalBinary()
@@ -196,10 +196,10 @@ func (consensus *Consensus) processCommitMessage(payload []byte, targetState Con
 			log.Error("Failed to serialize challenge")
 		}
 
-		if msgTypeToSend == proto_consensus.CHALLENGE {
+		if msgTypeToSend == proto_consensus.Challenge {
 			copy(consensus.challenge[:], bytes)
 			consensus.aggregatedCommitment = aggCommitment
-		} else if msgTypeToSend == proto_consensus.FINAL_CHALLENGE {
+		} else if msgTypeToSend == proto_consensus.FinalChallenge {
 			copy(consensus.finalChallenge[:], bytes)
 			consensus.aggregatedFinalCommitment = aggCommitment
 		}
@@ -233,7 +233,7 @@ func (consensus *Consensus) responseByLeader(challenge kyber.Scalar, firstRound 
 }
 
 // Processes the response message sent from validators
-func (consensus *Consensus) processResponseMessage(payload []byte, targetState ConsensusState) {
+func (consensus *Consensus) processResponseMessage(payload []byte, targetState State) {
 	//#### Read payload data
 	offset := 0
 	// 4 byte consensus id
@@ -264,11 +264,11 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState C
 	// check consensus Id
 	if consensusID != consensus.consensusID {
 		shouldProcess = false
-		consensus.Log.Warn("Received RESPONSE with wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
+		consensus.Log.Warn("Received Response with wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
 	}
 
 	if bytes.Compare(blockHash, consensus.blockHash[:]) != 0 {
-		consensus.Log.Warn("Received RESPONSE with wrong blockHash", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
+		consensus.Log.Warn("Received Response with wrong blockHash", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
 		return
 	}
 

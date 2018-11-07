@@ -31,11 +31,11 @@ func (consensus *Consensus) ProcessMessageValidator(message []byte) {
 	switch msgType {
 	case proto_consensus.Announce:
 		consensus.processAnnounceMessage(payload)
-	case proto_consensus.CHALLENGE:
+	case proto_consensus.Challenge:
 		consensus.processChallengeMessage(payload, ResponseDone)
-	case proto_consensus.FINAL_CHALLENGE:
+	case proto_consensus.FinalChallenge:
 		consensus.processChallengeMessage(payload, FinalResponseDone)
-	case proto_consensus.COLLECTIVE_SIG:
+	case proto_consensus.CollectiveSig:
 		consensus.processCollectiveSigMessage(payload)
 	default:
 		consensus.Log.Error("Unexpected message type", "msgType", msgType, "consensus", consensus)
@@ -134,7 +134,7 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 }
 
 // Processes the challenge message sent from the leader
-func (consensus *Consensus) processChallengeMessage(payload []byte, targetState ConsensusState) {
+func (consensus *Consensus) processChallengeMessage(payload []byte, targetState State) {
 	//#### Read payload data
 	offset := 0
 	// 4 byte consensus id
@@ -238,7 +238,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte, targetState 
 		log.Warn("Failed to generate response", "err", err)
 		return
 	}
-	msgTypeToSend := proto_consensus.RESPONSE
+	msgTypeToSend := proto_consensus.Response
 	if targetState == FinalResponseDone {
 		msgTypeToSend = proto_consensus.FinalResponse
 	}

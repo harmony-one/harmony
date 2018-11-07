@@ -20,7 +20,7 @@ func NewMemDatabase() *MemDatabase {
 	}
 }
 
-// NewMemDatabase returns a pointer of the new creation of MemDatabase with the given size.
+// NewMemDatabaseWithCap returns a pointer of the new creation of MemDatabase with the given size.
 func NewMemDatabaseWithCap(size int) *MemDatabase {
 	return &MemDatabase{
 		db: make(map[string][]byte, size),

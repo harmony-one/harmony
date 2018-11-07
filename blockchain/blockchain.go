@@ -71,7 +71,7 @@ func (bc *Blockchain) FindUnspentUtxos(address [20]byte) map[TxID]map[uint32]TXO
 
 			for outIdx, txOutput := range tx.TxOutput {
 				shouldContinue := false
-				for index, _ := range spentTXOs[txID] {
+				for index := range spentTXOs[txID] {
 					if spentTXOs[txID][index] == uint32(outIdx) {
 						shouldContinue = true
 						break
