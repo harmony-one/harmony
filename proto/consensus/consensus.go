@@ -68,8 +68,8 @@ Response:
 ----  message end  -----
 */
 
-// ConsensusMessageTypeBytes is the number of bytes consensus message type occupies
-const ConsensusMessageTypeBytes = 1
+// MessageTypeBytes is the number of bytes consensus message type occupies
+const MessageTypeBytes = 1
 
 // ConsensusMessageType is the specific types of message under Consensus category
 type ConsensusMessageType byte
@@ -130,7 +130,7 @@ func GetConsensusMessagePayload(message []byte) ([]byte, error) {
 	if len(message) < 2 {
 		return []byte{}, errors.New("Failed to get consensus message payload: no data available.")
 	}
-	return message[ConsensusMessageTypeBytes:], nil
+	return message[MessageTypeBytes:], nil
 }
 
 // Concatenate msgType as one byte with payload, and return the whole byte array

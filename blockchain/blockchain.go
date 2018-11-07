@@ -21,7 +21,7 @@ func (bc *Blockchain) FindBlock(blockHash []byte) *Block {
 		return nil
 	}
 	for _, block := range bc.Blocks {
-		if bytes.Compare(block.Hash[:], blockHash[:]) == 0 {
+		if bytes.Equal(block.Hash[:], blockHash[:]) {
 			return block
 		}
 	}

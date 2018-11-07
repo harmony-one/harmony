@@ -74,11 +74,11 @@ func (config *DistributionConfig) GetClientPort() string {
 // Parse the config file and return a 2d array containing the file data
 func (config *DistributionConfig) ReadConfigFile(filename string) error {
 	file, err := os.Open(filename)
-	defer file.Close()
 	if err != nil {
 		log.Fatal("Failed to read config file ", filename)
 		return err
 	}
+	defer file.Close()
 	fscanner := bufio.NewScanner(file)
 
 	result := []ConfigEntry{}

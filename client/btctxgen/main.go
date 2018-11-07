@@ -104,7 +104,7 @@ func generateSimulatedTransactions(shardID int, dataNodes []*node.Node) ([]*bloc
 	cnt := 0
 
 LOOP:
-	for true {
+	for {
 		btcTx := iter.NextTx()
 		if btcTx == nil {
 			log.Error("Failed to parse tx", "height", iter.GetBlockIndex())
@@ -255,7 +255,7 @@ func main() {
 		leaders = append(leaders, leader)
 	}
 
-	for true {
+	for {
 		allCrossTxs := []*blockchain.Transaction{}
 		// Generate simulated transactions
 		for shardID, leader := range shardIDLeaderMap {

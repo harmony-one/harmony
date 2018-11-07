@@ -148,7 +148,7 @@ func generateCrossShardTx(txInfo *TxInfo) {
 	nodeShardID := txInfo.dataNodes[txInfo.shardID].Consensus.ShardID
 	crossShardID := nodeShardID
 	// a random shard to spend money to
-	for true {
+	for {
 		crossShardID = uint32(rand.Intn(len(txInfo.dataNodes)))
 		if crossShardID != nodeShardID {
 			break
@@ -335,7 +335,7 @@ func main() {
 	client.InitLookUpIntPriKeyMap()
 	subsetCounter := 0
 
-	for true {
+	for {
 		t := time.Now()
 		if totalTime > 0 && t.Sub(start).Seconds() >= totalTime {
 			log.Debug("Generator timer ended.", "duration", (int(t.Sub(start))), "startTime", start, "totalTime", totalTime)

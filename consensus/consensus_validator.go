@@ -111,7 +111,7 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	}
 
 	// check block hash
-	if bytes.Compare(blockHash[:], blockHeaderObj.CalculateBlockHash()[:]) != 0 || bytes.Compare(blockHeaderObj.Hash[:], blockHeaderObj.CalculateBlockHash()[:]) != 0 {
+	if !bytes.Equal(blockHash[:], blockHeaderObj.CalculateBlockHash()[:]) || !bytes.Equal(blockHeaderObj.Hash[:], blockHeaderObj.CalculateBlockHash()[:]) {
 		consensus.Log.Warn("Block hash doesn't match", "consensus", consensus)
 		return
 	}
@@ -193,7 +193,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte, targetState 
 	defer consensus.mutex.Unlock()
 
 	// check block hash
-	if bytes.Compare(blockHash[:], consensus.blockHash[:]) != 0 {
+	if !bytes.Equal(blockHash[:], consensus.blockHash[:]) {
 		consensus.Log.Warn("Block hash doesn't match", "consensus", consensus)
 		return
 	}
@@ -353,7 +353,7 @@ func (consensus *Consensus) processCollectiveSigMessage(payload []byte) {
 	}
 
 	// check block hash
-	if bytes.Compare(blockHash[:], consensus.blockHash[:]) != 0 {
+	if !bytes.Equal(blockHash[:], consensus.blockHash[:]) {
 		consensus.Log.Warn("Block hash doesn't match", "consensus", consensus)
 		return
 	}

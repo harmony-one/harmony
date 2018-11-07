@@ -472,10 +472,7 @@ func (utxoPool *UTXOPool) LockedUtxoExists(address [20]byte, txID string, index 
 		return false
 	}
 	_, ok = utxoPool.LockedUtxoMap[address][txID][index]
-	if !ok {
-		return false
-	}
-	return true
+	return ok
 }
 
 // DeleteOneLockedUtxo deletes one balance item of UTXOPool and clean up if possible.

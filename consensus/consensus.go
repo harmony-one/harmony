@@ -87,8 +87,8 @@ type Consensus struct {
 // should be stored in this temporary structure. In case the round N-1 finishes, it can catch
 // up to the latest state of round N by using this structure.
 type BlockConsensusStatus struct {
-	blockHeader []byte         // the block header of the block which the consensus is running on
-	state       State // the latest state of the consensus
+	blockHeader []byte // the block header of the block which the consensus is running on
+	state       State  // the latest state of the consensus
 }
 
 // NewConsensus creates a new Consensus object
