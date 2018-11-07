@@ -84,7 +84,7 @@ func (utxoPool *UTXOPool) VerifyTransactions(transactions []*Transaction) bool {
 	spentTXOs := make(map[[20]byte]map[string]map[uint32]bool)
 	if utxoPool != nil {
 		for _, tx := range transactions {
-			if err, crossShard := utxoPool.VerifyOneTransaction(tx, &spentTXOs); !crossShard && err != nil {
+			if crossShard, err := utxoPool.VerifyOneTransaction(tx, &spentTXOs); !crossShard && err != nil {
 				return false
 			}
 		}
@@ -122,11 +122,11 @@ func (utxoPool *UTXOPool) VerifyStateBlock(stateBlock *Block) bool {
 
 // VerifyOneTransaction verifies if a list of transactions valid.
 // Add another sanity check function (e.g. spending the same utxo) called before this one.
-func (utxoPool *UTXOPool) VerifyOneTransaction(tx *Transaction, spentTXOs *map[[20]byte]map[string]map[uint32]bool) (err error, crossShard bool) {
+func (utxoPool *UTXOPool) VerifyOneTransaction(tx *Transaction, spentTXOs *map[[20]byte]map[string]map[uint32]bool) (crossShard bool, err error) {
 	var nilPubKey [32]byte
 	// TODO(ricl): remove. just for btc replay.
 	if tx.PublicKey == nilPubKey {
-		return nil, false
+		return false, nil
 	}
 	if len(tx.Proofs) > 1 {
 		return utxoPool.VerifyUnlockTransaction(tx)
@@ -149,7 +149,7 @@ func (utxoPool *UTXOPool) VerifyOneTransaction(tx *Transaction, spentTXOs *map[[
 		// Check if the transaction with the address is spent or not.
 		if val, ok := (*spentTXOs)[in.Address][inTxID][index]; ok {
 			if val {
-				return errors.New("TxInput is already spent"), crossShard
+				return crossShard, errors.New("TxInput is already spent")
 			}
 		}
 		// Mark the transactions with the address and index spent.
@@ -167,7 +167,7 @@ func (utxoPool *UTXOPool) VerifyOneTransaction(tx *Transaction, spentTXOs *map[[
 			inTotal += val
 		} else {
 			utxoPool.mutex.Unlock()
-			return errors.New("Specified TxInput does not exist in utxo pool"), crossShard
+			return crossShard, errors.New("Specified TxInput does not exist in utxo pool")
 		}
 		utxoPool.mutex.Unlock()
 	}
@@ -184,11 +184,11 @@ func (utxoPool *UTXOPool) VerifyOneTransaction(tx *Transaction, spentTXOs *map[[
 
 	// TODO: improve this checking logic
 	if (crossShard && inTotal > outTotal) || (!crossShard && inTotal != outTotal) {
-		return errors.New("Input and output amount doesn't match"), crossShard
+		return crossShard, errors.New("Input and output amount doesn't match")
 	}
 
 	if inTotal == 0 {
-		return errors.New("Input amount is 0"), false // Here crossShard is false, because if there is no business for this shard, it's effectively not crossShard no matter what.
+		return false, errors.New("Input amount is 0") // Here crossShard is false, because if there is no business for this shard, it's effectively not crossShard no matter what.
 	}
 
 	// Verify the signature
@@ -200,13 +200,13 @@ func (utxoPool *UTXOPool) VerifyOneTransaction(tx *Transaction, spentTXOs *map[[
 	tempErr = schnorr.Verify(crypto.Ed25519Curve, pubKey, tx.GetContentToVerify(), tx.Signature[:])
 	if tempErr != nil {
 		log.Error("Failed to verify signature", "error", tempErr, "public key", pubKey, "pubKey in bytes", tx.PublicKey[:])
-		return errors.New("Invalid signature"), crossShard
+		return crossShard, errors.New("Invalid signature")
 	}
-	return nil, crossShard
+	return crossShard, nil
 }
 
 // VerifyUnlockTransaction verifies a cross shard transaction that contains proofs for unlock-to-commit/abort.
-func (utxoPool *UTXOPool) VerifyUnlockTransaction(tx *Transaction) (err error, crossShard bool) {
+func (utxoPool *UTXOPool) VerifyUnlockTransaction(tx *Transaction) (crossShard bool, err error) {
 	err = nil
 	crossShard = false // unlock transaction is treated as crossShard=false because it will be finalized now (doesn't need more steps)
 	txInputs := make(map[TXInput]bool)
@@ -370,7 +370,7 @@ func (utxoPool *UTXOPool) UpdateOneTransaction(tx *Transaction) {
 // VerifyOneTransactionAndUpdate verifies and update a valid transaction.
 // Return false if the transaction is not valid.
 func (utxoPool *UTXOPool) VerifyOneTransactionAndUpdate(tx *Transaction) bool {
-	if err, _ := utxoPool.VerifyOneTransaction(tx, nil); err == nil {
+	if _, err := utxoPool.VerifyOneTransaction(tx, nil); err == nil {
 		utxoPool.UpdateOneTransaction(tx)
 		return true
 	}
@@ -416,7 +416,7 @@ func (utxoPool *UTXOPool) SelectTransactionsForNewBlock(transactions []*Transact
 	selected, unselected, invalid, crossShardTxs := []*Transaction{}, []*Transaction{}, []*Transaction{}, []*CrossShardTxAndProof{}
 	spentTXOs := make(map[[20]byte]map[string]map[uint32]bool)
 	for _, tx := range transactions {
-		err, crossShard := utxoPool.VerifyOneTransaction(tx, &spentTXOs)
+		crossShard, err := utxoPool.VerifyOneTransaction(tx, &spentTXOs)
 
 		if len(selected) < maxNumTxs {
 			//if err != nil && rand.Intn(10) < 1 {

@@ -47,6 +47,7 @@ type TXOutput struct {
 	ShardID uint32   // The Id of the shard where this UTXO belongs
 }
 
+// TxID structure type.
 type TxID = [32]byte
 
 // OutPoint defines a data type that is used to track previous
