@@ -77,7 +77,8 @@ func (node *Node) NodeHandler(conn net.Conn) {
 			switch messageType {
 			case proto_identity.Register:
 				fmt.Println("received a identity message")
-				node.processPOWMessage(msgPayload)
+				// TODO(ak): fix it.
+				// node.processPOWMessage(msgPayload)
 			case proto_identity.Announce:
 				node.log.Error("Announce message should be sent to IdentityChain")
 			}

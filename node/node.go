@@ -15,7 +15,6 @@ import (
 	"github.com/simple-rules/harmony-benchmark/db"
 	"github.com/simple-rules/harmony-benchmark/log"
 	"github.com/simple-rules/harmony-benchmark/p2p"
-	"github.com/simple-rules/harmony-benchmark/pow"
 	"github.com/simple-rules/harmony-benchmark/proto/identity"
 	"github.com/simple-rules/harmony-benchmark/syncing"
 )
@@ -168,23 +167,24 @@ func NewNodefromIDC(node *Node, consensus *consensus.Consensus, db *db.LDBDataba
 	return node
 }
 
-func (node *Node) processPOWMessage(message []byte) {
-	payload, err := identity.GetIdentityMessagePayload(message)
-	if err != nil {
-		fmt.Println("Could not read payload")
-	}
-	IDCPeer := node.IDCPeer
-	// 4 byte challengeNonce id
-	req := string(payload)
-	proof, _ := pow.Fulfil(req, []byte("")) //"This could be blockhasdata"
-	buffer := bytes.NewBuffer([]byte{})
-	proofBytes := make([]byte, 32) //proof seems to be 32 byte here
-	copy(proofBytes[:], proof)
-	buffer.Write(proofBytes)
-	buffer.Write(node.SerializeWaitNode())
-	msgPayload := buffer.Bytes()
-	p2p.SendMessage(IDCPeer, identity.ConstructIdentityMessage(identity.Register, msgPayload))
-}
+// TODO(alok): Fix it or revert the cl on 11/8.
+// func (node *Node) processPOWMessage(message []byte) {
+// 	payload, err := identity.GetIdentityMessagePayload(message)
+// 	if err != nil {
+// 		fmt.Println("Could not read payload")
+// 	}
+// 	IDCPeer := node.IDCPeer
+// 	// 4 byte challengeNonce id
+// 	req := string(payload)
+// 	proof, _ := pow.Fulfil(req, []byte("")) //"This could be blockhasdata"
+// 	buffer := bytes.NewBuffer([]byte{})
+// 	proofBytes := make([]byte, 32) //proof seems to be 32 byte here
+// 	copy(proofBytes[:], proof)
+// 	buffer.Write(proofBytes)
+// 	buffer.Write(node.SerializeWaitNode())
+// 	msgPayload := buffer.Bytes()
+// 	p2p.SendMessage(IDCPeer, identity.ConstructIdentityMessage(identity.Register, msgPayload))
+// }
 
 // SerializeWaitNode serializes the node
 // https://stackoverflow.com/questions/12854125/how-do-i-dump-the-struct-into-the-byte-array-without-reflection/12854659#12854659
