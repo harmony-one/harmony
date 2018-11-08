@@ -20,7 +20,6 @@ var identityPerBlock = 100000
 type IdentityChain struct {
 	//Identities            []*IdentityBlock //No need to have the identity block as of now
 	Identities            []*node.Node
-	PendingIdentities     []*node.Node
 	log                   log.Logger
 	Peer                  p2p.Peer
 	SelectedIdentitites   []*node.Node
@@ -31,7 +30,6 @@ type IdentityChain struct {
 	CurrentEpochStartTime int64
 	NumberOfShards        int
 	NumberOfNodesInShard  int
-	PowMap                map[p2p.Peer]string
 }
 
 func seekRandomNumber(EpochNum int, SelectedIdentitites []*node.Node) int {
@@ -71,6 +69,11 @@ func (IDC *IdentityChain) BroadCastNewConfiguration() {
 	// msgToSend := proto.
 	// 	p2p.BroadCastMessage(allPeers, msgToSend)
 
+}
+
+//BroadCast Peer Infor to Node
+func (IDC *IdentityChain) SendPeerInfo(Node node) {
+	return
 }
 
 //CreateShardAssignment
