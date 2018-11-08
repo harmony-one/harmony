@@ -32,7 +32,7 @@ type BlockchainSyncMessage struct {
 type BlockchainSyncMessageType int
 
 const (
-	DONE BlockchainSyncMessageType = iota
+	Done BlockchainSyncMessageType = iota
 	GetLastBlockHashes
 	GetBlock
 )
@@ -41,16 +41,16 @@ const (
 type TransactionMessageType int
 
 const (
-	SEND TransactionMessageType = iota
-	REQUEST
-	UNLOCK
+	Send TransactionMessageType = iota
+	Request
+	Unlock
 )
 
 // BlockMessageType represents the types of messages used for NODE/BLOCK
 type BlockMessageType int
 
 const (
-	SYNC BlockMessageType = iota
+	Sync BlockMessageType = iota
 )
 
 // The types of messages used for NODE/BLOCK
@@ -101,7 +101,7 @@ func DeserializeBlockchainSyncMessage(d []byte) (*BlockchainSyncMessage, error) 
 func ConstructUnlockToCommitOrAbortMessage(txsAndProofs []*blockchain.Transaction) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
 	byteBuffer.WriteByte(byte(Transaction))
-	byteBuffer.WriteByte(byte(UNLOCK))
+	byteBuffer.WriteByte(byte(Unlock))
 	encoder := gob.NewEncoder(byteBuffer)
 	encoder.Encode(txsAndProofs)
 	return byteBuffer.Bytes()
@@ -124,7 +124,7 @@ func ConstructFetchUtxoMessage(sender p2p.Peer, addresses [][20]byte) []byte {
 func ConstructTransactionListMessage(transactions []*blockchain.Transaction) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
 	byteBuffer.WriteByte(byte(Transaction))
-	byteBuffer.WriteByte(byte(SEND))
+	byteBuffer.WriteByte(byte(Send))
 	encoder := gob.NewEncoder(byteBuffer)
 	// Copy over the tx data
 	txs := make([]blockchain.Transaction, len(transactions))
@@ -161,7 +161,7 @@ func GenerateBlockchainSyncMessage(payload []byte) *BlockchainSyncMessage {
 func ConstructRequestTransactionsMessage(transactionIds [][]byte) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
 	byteBuffer.WriteByte(byte(Transaction))
-	byteBuffer.WriteByte(byte(REQUEST))
+	byteBuffer.WriteByte(byte(Request))
 	for _, txID := range transactionIds {
 		byteBuffer.Write(txID)
 	}
@@ -180,7 +180,7 @@ func ConstructStopMessage() []byte {
 func ConstructBlocksSyncMessage(blocks []blockchain.Block) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
 	byteBuffer.WriteByte(byte(BLOCK))
-	byteBuffer.WriteByte(byte(SYNC))
+	byteBuffer.WriteByte(byte(Sync))
 	encoder := gob.NewEncoder(byteBuffer)
 
 	encoder.Encode(blocks)

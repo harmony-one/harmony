@@ -35,7 +35,7 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 	signature := consensus.signMessage(buffer.Bytes())
 	buffer.Write(signature)
 
-	return proto_consensus.ConstructConsensusMessage(proto_consensus.ANNOUNCE, buffer.Bytes())
+	return proto_consensus.ConstructConsensusMessage(proto_consensus.Announce, buffer.Bytes())
 }
 
 // Construct the challenge message, returning challenge message in bytes, challenge scalar and aggregated commmitment point.
@@ -55,9 +55,9 @@ func (consensus *Consensus) constructChallengeMessage(msgTypeToSend proto_consen
 	binary.BigEndian.PutUint16(twoBytes, consensus.nodeID)
 	buffer.Write(twoBytes)
 
-	commitmentsMap := consensus.commitments // msgType == CHALLENGE
+	commitmentsMap := consensus.commitments // msgType == Challenge
 	bitmap := consensus.bitmap
-	if msgTypeToSend == proto_consensus.FINAL_CHALLENGE {
+	if msgTypeToSend == proto_consensus.FinalChallenge {
 		commitmentsMap = consensus.finalCommitments
 		bitmap = consensus.finalBitmap
 	}
@@ -115,7 +115,7 @@ func (consensus *Consensus) constructCollectiveSigMessage(collectiveSig [64]byte
 	signature := consensus.signMessage(buffer.Bytes())
 	buffer.Write(signature)
 
-	return proto_consensus.ConstructConsensusMessage(proto_consensus.COLLECTIVE_SIG, buffer.Bytes())
+	return proto_consensus.ConstructConsensusMessage(proto_consensus.CollectiveSig, buffer.Bytes())
 }
 
 func getAggregatedCommit(commitments []kyber.Point) (commitment kyber.Point, bytes []byte) {

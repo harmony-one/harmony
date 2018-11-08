@@ -21,7 +21,7 @@ func (bc *Blockchain) FindBlock(blockHash []byte) *Block {
 		return nil
 	}
 	for _, block := range bc.Blocks {
-		if bytes.Compare(block.Hash[:], blockHash[:]) == 0 {
+		if bytes.Equal(block.Hash[:], blockHash[:]) {
 			return block
 		}
 	}
@@ -71,7 +71,7 @@ func (bc *Blockchain) FindUnspentUtxos(address [20]byte) map[TxID]map[uint32]TXO
 
 			for outIdx, txOutput := range tx.TxOutput {
 				shouldContinue := false
-				for index, _ := range spentTXOs[txID] {
+				for index := range spentTXOs[txID] {
 					if spentTXOs[txID][index] == uint32(outIdx) {
 						shouldContinue = true
 						break

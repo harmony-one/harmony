@@ -77,10 +77,7 @@ func (req *Request) UnmarshalText(buf []byte) error {
 	}
 	req.Difficulty = uint32(diff)
 	req.Nonce, err = base64.RawStdEncoding.DecodeString(bits[2])
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 // Convenience function to check whether a proof of work is fulfilled

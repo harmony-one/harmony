@@ -30,7 +30,7 @@ func (b *IdentityBlock) Serialize() []byte {
 	return result.Bytes()
 }
 
-//Get Identities
+// GetIdentities returns a list of identities.
 func (b *IdentityBlock) GetIdentities() []*node.Node {
 	return b.Identities
 }

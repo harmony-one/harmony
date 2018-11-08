@@ -275,7 +275,7 @@ func ExecuteTransaction(tx blockchain.Transaction, walletNode *node.Node) error 
 
 	doneSignal := make(chan int)
 	go func() {
-		for true {
+		for {
 			if len(walletNode.Client.PendingCrossTxs) == 0 {
 				doneSignal <- 0
 				break
@@ -300,7 +300,7 @@ func FetchUtxos(addresses [][20]byte, walletNode *node.Node) (map[uint32]blockch
 
 	doneSignal := make(chan int)
 	go func() {
-		for true {
+		for {
 			if len(walletNode.Client.ShardUtxoMap) == len(*walletNode.Client.Leaders) {
 				doneSignal <- 0
 				break

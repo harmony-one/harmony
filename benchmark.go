@@ -25,6 +25,7 @@ var (
 	commit  string
 )
 
+// Constants used by the benchmark.
 const (
 	AttackProbability = 20
 )
@@ -41,6 +42,7 @@ func attackDetermination(attackedMode int) bool {
 	return false
 }
 
+// InitLDBDatabase initializes a LDBDatabase.
 func InitLDBDatabase(ip string, port string) (*db.LDBDatabase, error) {
 	// TODO(minhdoan): Refactor this.
 	dbFileName := "/tmp/harmony_" + ip + port + ".dat"
@@ -117,7 +119,7 @@ func main() {
 	loggingInit(*logFolder, role, *ip, *port, *onlyLogTps)
 
 	// Initialize leveldb if dbSupported.
-	var ldb *db.LDBDatabase = nil
+	var ldb *db.LDBDatabase
 
 	if *dbSupported {
 		ldb, _ = InitLDBDatabase(*ip, *port)

@@ -15,12 +15,9 @@ import (
 type SyncPeerConfig struct {
 	peer        p2p.Peer
 	conn        net.Conn
-	block       *blockchain.Block
 	w           *bufio.Writer
-	receivedMsg []byte
 	err         error
 	trusted     bool
-	indexes     []uint16
 	blockHashes [][32]byte
 }
 

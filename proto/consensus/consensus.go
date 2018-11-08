@@ -12,11 +12,11 @@ Consensus message is the payload of p2p message.
 Consensus message data structure:
 
 
-ANNOUNCE:
+Announce:
 ---- message start -----
 1 byte            - consensus.MessageType
-                    0x00 - ANNOUNCE
-                    0x01 - COMMIT
+                    0x00 - Announce
+                    0x01 - Commit
                     ...
 4 byte            - consensus id
 32 byte           - block hash
@@ -26,11 +26,11 @@ ANNOUNCE:
 64 byte           - signature
 ----  message end  -----
 
-COMMIT:
+Commit:
 ---- message start -----
 1 byte            - consensus.MessageType
-                    0x00 - ANNOUNCE
-                    0x01 - COMMIT
+                    0x00 - Announce
+                    0x01 - Commit
                     ...
 4 byte            - consensus id
 32 byte           - block hash
@@ -39,11 +39,11 @@ COMMIT:
 64 byte           - signature
 ----  message end  -----
 
-CHALLENGE:
+Challenge:
 ---- message start -----
 1 byte            - consensus.MessageType
-                    0x00 - ANNOUNCE
-                    0x01 - COMMIT
+                    0x00 - Announce
+                    0x01 - Commit
                     ...
 4 byte            - consensus id
 32 byte           - block hash
@@ -54,11 +54,11 @@ CHALLENGE:
 64 byte           - signature
 ----  message end  -----
 
-RESPONSE:
+Response:
 ---- message start -----
 1 byte            - consensus.MessageType
-                    0x00 - ANNOUNCE
-                    0x01 - COMMIT
+                    0x00 - Announce
+                    0x01 - Commit
                     ...
 4 byte            - consensus id
 32 byte           - block hash
@@ -68,29 +68,31 @@ RESPONSE:
 ----  message end  -----
 */
 
-// the number of bytes consensus message type occupies
-const ConsensusMessageTypeBytes = 1
+// MessageTypeBytes is the number of bytes consensus message type occupies
+const MessageTypeBytes = 1
 
-// The specific types of message under CONSENSUS category
+// ConsensusMessageType is the specific types of message under Consensus category
 type ConsensusMessageType byte
 
+// Consensus message type constants.
 const (
-	CONSENSUS ConsensusMessageType = iota
+	Consensus ConsensusMessageType = iota
 	// TODO: add more types
 )
 
-// Consensus communication message type.
+// MessageType is the consensus communication message type.
 // Leader and validator dispatch messages based on incoming message type
 type MessageType int
 
+// Message type constants.
 const (
-	ANNOUNCE MessageType = iota
-	COMMIT
-	CHALLENGE
-	RESPONSE
-	COLLECTIVE_SIG
+	Announce MessageType = iota
+	Commit
+	Challenge
+	Response
+	CollectiveSig
 	FinalCommit
-	FINAL_CHALLENGE
+	FinalChallenge
 	FinalResponse
 	StartConsensus
 )
@@ -98,18 +100,18 @@ const (
 // Returns string name for the MessageType enum
 func (msgType MessageType) String() string {
 	names := [...]string{
-		"ANNOUNCE",
-		"COMMIT",
-		"CHALLENGE",
-		"RESPONSE",
-		"COLLECTIVE_SIG",
+		"Announce",
+		"Commit",
+		"Challenge",
+		"Response",
+		"CollectiveSig",
 		"FinalCommit",
-		"FINAL_CHALLENGE",
+		"FinalChallenge",
 		"FinalResponse",
 		"StartConsensus",
 	}
 
-	if msgType < ANNOUNCE || msgType > StartConsensus {
+	if msgType < Announce || msgType > StartConsensus {
 		return "Unknown"
 	}
 	return names[msgType]
@@ -128,13 +130,13 @@ func GetConsensusMessagePayload(message []byte) ([]byte, error) {
 	if len(message) < 2 {
 		return []byte{}, errors.New("Failed to get consensus message payload: no data available.")
 	}
-	return message[ConsensusMessageTypeBytes:], nil
+	return message[MessageTypeBytes:], nil
 }
 
 // Concatenate msgType as one byte with payload, and return the whole byte array
 func ConstructConsensusMessage(consensusMsgType MessageType, payload []byte) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.CONSENSUS)})
-	byteBuffer.WriteByte(byte(CONSENSUS))
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Consensus)})
+	byteBuffer.WriteByte(byte(Consensus))
 	byteBuffer.WriteByte(byte(consensusMsgType))
 	byteBuffer.Write(payload)
 	return byteBuffer.Bytes()

@@ -29,13 +29,13 @@ func (consensus *Consensus) ProcessMessageValidator(message []byte) {
 
 	consensus.Log.Info("Received consensus Message", "type", msgType)
 	switch msgType {
-	case proto_consensus.ANNOUNCE:
+	case proto_consensus.Announce:
 		consensus.processAnnounceMessage(payload)
-	case proto_consensus.CHALLENGE:
+	case proto_consensus.Challenge:
 		consensus.processChallengeMessage(payload, ResponseDone)
-	case proto_consensus.FINAL_CHALLENGE:
+	case proto_consensus.FinalChallenge:
 		consensus.processChallengeMessage(payload, FinalResponseDone)
-	case proto_consensus.COLLECTIVE_SIG:
+	case proto_consensus.CollectiveSig:
 		consensus.processCollectiveSigMessage(payload)
 	default:
 		consensus.Log.Error("Unexpected message type", "msgType", msgType, "consensus", consensus)
@@ -111,7 +111,7 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	}
 
 	// check block hash
-	if bytes.Compare(blockHash[:], blockHeaderObj.CalculateBlockHash()[:]) != 0 || bytes.Compare(blockHeaderObj.Hash[:], blockHeaderObj.CalculateBlockHash()[:]) != 0 {
+	if !bytes.Equal(blockHash[:], blockHeaderObj.CalculateBlockHash()[:]) || !bytes.Equal(blockHeaderObj.Hash[:], blockHeaderObj.CalculateBlockHash()[:]) {
 		consensus.Log.Warn("Block hash doesn't match", "consensus", consensus)
 		return
 	}
@@ -122,7 +122,7 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 		return
 	}
 
-	secret, msgToSend := consensus.constructCommitMessage(proto_consensus.COMMIT)
+	secret, msgToSend := consensus.constructCommitMessage(proto_consensus.Commit)
 	// Store the commitment secret
 	consensus.secret[consensusID] = secret
 
@@ -134,7 +134,7 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 }
 
 // Processes the challenge message sent from the leader
-func (consensus *Consensus) processChallengeMessage(payload []byte, targetState ConsensusState) {
+func (consensus *Consensus) processChallengeMessage(payload []byte, targetState State) {
 	//#### Read payload data
 	offset := 0
 	// 4 byte consensus id
@@ -193,7 +193,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte, targetState 
 	defer consensus.mutex.Unlock()
 
 	// check block hash
-	if bytes.Compare(blockHash[:], consensus.blockHash[:]) != 0 {
+	if !bytes.Equal(blockHash[:], consensus.blockHash[:]) {
 		consensus.Log.Warn("Block hash doesn't match", "consensus", consensus)
 		return
 	}
@@ -238,7 +238,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte, targetState 
 		log.Warn("Failed to generate response", "err", err)
 		return
 	}
-	msgTypeToSend := proto_consensus.RESPONSE
+	msgTypeToSend := proto_consensus.Response
 	if targetState == FinalResponseDone {
 		msgTypeToSend = proto_consensus.FinalResponse
 	}
@@ -353,7 +353,7 @@ func (consensus *Consensus) processCollectiveSigMessage(payload []byte) {
 	}
 
 	// check block hash
-	if bytes.Compare(blockHash[:], consensus.blockHash[:]) != 0 {
+	if !bytes.Equal(blockHash[:], consensus.blockHash[:]) {
 		consensus.Log.Warn("Block hash doesn't match", "consensus", consensus)
 		return
 	}

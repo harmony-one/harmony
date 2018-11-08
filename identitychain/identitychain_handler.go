@@ -57,7 +57,7 @@ func (IDC *IdentityChain) IdentityChainHandler(conn net.Conn) {
 			switch idMsgType {
 			case proto_identity.REGISTER:
 				IDC.registerIdentity(msgPayload)
-			case proto_identity.ANNOUNCE:
+			case proto_identity.Announce:
 				IDC.acceptNewConnection(msgPayload)
 			}
 
@@ -107,8 +107,6 @@ func (IDC *IdentityChain) acceptNewConnection(msgPayload []byte) {
 	challengeNonce := int((rnd.Int31()))
 	req := pow.NewRequest(5, []byte(strconv.Itoa(challengeNonce)))
 	IDC.PowMap[Node.Self] = req
-	fmt.Println(Node.Self)
-	fmt.Println(req)
 	buffer.Write([]byte(req))
 	// 32 byte block hash
 	// buffer.Write(prevBlockHash)

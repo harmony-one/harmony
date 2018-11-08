@@ -48,7 +48,7 @@ func BroadcastMessage(peers []Peer, msg []byte) {
 		peerCopy := peer
 		go send(peerCopy.Ip, peerCopy.Port, content)
 	}
-	log.Info("Broadcasting Done", "time spent(s)", time.Now().Sub(start).Seconds())
+	log.Info("Broadcasting Done", "time spent(s)", time.Since(start).Seconds())
 }
 
 func SelectMyPeers(peers []Peer, min int, max int) []Peer {

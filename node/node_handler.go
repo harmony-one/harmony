@@ -78,14 +78,14 @@ func (node *Node) NodeHandler(conn net.Conn) {
 			case proto_identity.REGISTER:
 				fmt.Println("received a identity message")
 				node.processPOWMessage(msgPayload)
-			case proto_identity.ANNOUNCE:
+			case proto_identity.Announce:
 				node.log.Error("Announce message should be sent to IdentityChain")
 			}
 		}
-	case proto.CONSENSUS:
+	case proto.Consensus:
 		actionType := consensus.ConsensusMessageType(msgType)
 		switch actionType {
-		case consensus.CONSENSUS:
+		case consensus.Consensus:
 			if consensusObj.IsLeader {
 				consensusObj.ProcessMessageLeader(msgPayload)
 			} else {
@@ -100,8 +100,8 @@ func (node *Node) NodeHandler(conn net.Conn) {
 		case proto_node.BLOCK:
 			blockMsgType := proto_node.BlockMessageType(msgPayload[0])
 			switch blockMsgType {
-			case proto_node.SYNC:
-				decoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the SYNC messge type
+			case proto_node.Sync:
+				decoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the Sync messge type
 				blocks := new([]*blockchain.Block)
 				decoder.Decode(blocks)
 				if node.Client != nil && node.Client.UpdateBlocks != nil && blocks != nil {
@@ -199,7 +199,7 @@ FOR_LOOP:
 			}
 			w.Write(proto_node.SerializeBlockchainSyncMessage(&blockchainSyncMessage))
 			w.Flush()
-		case proto_node.DONE:
+		case proto_node.Done:
 			break FOR_LOOP
 		}
 		content, err := p2p.ReadMessageContent(conn)
@@ -235,15 +235,15 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 	txMessageType := proto_node.TransactionMessageType(msgPayload[0])
 
 	switch txMessageType {
-	case proto_node.SEND:
-		txDecoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the SEND messge type
+	case proto_node.Send:
+		txDecoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the Send messge type
 		txList := new([]*blockchain.Transaction)
 		err := txDecoder.Decode(txList)
 		if err != nil {
 			node.log.Error("Failed to deserialize transaction list", "error", err)
 		}
 		node.addPendingTransactions(*txList)
-	case proto_node.REQUEST:
+	case proto_node.Request:
 		reader := bytes.NewBuffer(msgPayload[1:])
 		var txIDs map[[32]byte]bool
 		buf := make([]byte, 32) // 32 byte hash Id
@@ -265,15 +265,15 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 			}
 		}
 		// TODO: return the transaction list to requester
-	case proto_node.UNLOCK:
-		txAndProofDecoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the UNLOCK messge type
+	case proto_node.Unlock:
+		txAndProofDecoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the Unlock messge type
 
 		txAndProofs := new([]*blockchain.Transaction)
 		err := txAndProofDecoder.Decode(&txAndProofs)
 		if err != nil {
 			node.log.Error("Failed deserializing transaction and proofs list", "node", node)
 		}
-		node.log.Debug("RECEIVED UNLOCK MESSAGE", "num", len(*txAndProofs))
+		node.log.Debug("RECEIVED Unlock MESSAGE", "num", len(*txAndProofs))
 
 		node.addPendingTransactions(*txAndProofs)
 	}
