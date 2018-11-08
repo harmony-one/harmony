@@ -2,7 +2,6 @@ package identitychain
 
 import (
 	"fmt"
-	"math"
 	"math/rand"
 	"net"
 	"os"
@@ -20,7 +19,6 @@ var identityPerBlock = 100000
 type IdentityChain struct {
 	//Identities            []*IdentityBlock //No need to have the identity block as of now
 	Identities            []*node.Node
-	PendingIdentities     []*node.Node
 	log                   log.Logger
 	Peer                  p2p.Peer
 	SelectedIdentitites   []*node.Node
@@ -31,7 +29,6 @@ type IdentityChain struct {
 	CurrentEpochStartTime int64
 	NumberOfShards        int
 	NumberOfNodesInShard  int
-	PowMap                map[p2p.Peer]string
 }
 
 func seekRandomNumber(EpochNum int, SelectedIdentitites []*node.Node) int {
@@ -72,6 +69,11 @@ func (IDC *IdentityChain) BroadCastNewConfiguration() {
 
 }
 
+//BroadCast Peer Infor to Node
+// func (IDC *IdentityChain) SendPeerInfo(Node node) {
+// 	return
+// }
+
 //CreateShardAssignment
 func (IDC *IdentityChain) CreateShardAssignment() {
 	num := seekRandomNumber(IDC.EpochNum, IDC.SelectedIdentitites)
@@ -98,15 +100,15 @@ func (IDC *IdentityChain) generateRandomPermutations(num int) {
 
 // SelectIds as
 func (IDC *IdentityChain) SelectIds() {
-	selectNumber := IDC.NumberOfNodesInShard - len(IDC.Identities)
+	// selectNumber := IDC.NumberOfNodesInShard - len(IDC.Identities)
 	// Insert the lines below once you have a identity block
 	// IB := IDC.GetLatestBlock()
 	// currentIDS := IB.GetIdentities()
-	currentIDS := IDC.Identities
-	selectNumber = int(math.Min(float64(len(IDC.PendingIdentities)), float64(selectNumber)))
-	pending := IDC.PendingIdentities[:selectNumber]
-	IDC.SelectedIdentitites = append(currentIDS, pending...)
-	IDC.PendingIdentities = []*node.Node{}
+	// currentIDS := IDC.Identities
+	// selectNumber = int(math.Min(float64(len(IDC.PendingIdentities)), float64(selectNumber)))
+	// pending := IDC.PendingIdentities[:selectNumber]
+	// IDC.SelectedIdentitites = append(currentIDS, pending...)
+	// IDC.PendingIdentities = []*node.Node{}
 
 }
 
@@ -153,9 +155,9 @@ func New(Peer p2p.Peer) *IdentityChain {
 	IDC.NumberOfShards = 1         //to be filled via global config
 	IDC.NumberOfNodesInShard = 500 //to be filled via global config
 	IDC.Identities = make([]*node.Node, 0)
-	IDC.PendingIdentities = make([]*node.Node, 0)
+	// IDC.PendingIdentities = make([]*node.Node, 0)
 	IDC.SelectedIdentitites = make([]*node.Node, 0)
-	IDC.PowMap = make(map[p2p.Peer]string)
+	// IDC.PowMap = make(map[p2p.Peer]string)
 	return &IDC
 }
 
