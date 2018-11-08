@@ -286,7 +286,7 @@ func main() {
 
 	// Nodes containing utxopools to mirror the shards' data in the network
 	nodes := []*node.Node{}
-	for shardID, _ := range shardIDLeaderMap {
+	for shardID := range shardIDLeaderMap {
 		node := node.New(&consensus.Consensus{ShardID: shardID}, nil)
 		// Assign many fake addresses so we have enough address to play with at first
 		node.AddTestingAddresses(setting.numOfAddress)

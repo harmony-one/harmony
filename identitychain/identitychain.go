@@ -61,7 +61,6 @@ func (IDC *IdentityChain) Shard() {
 
 //ElectLeaders
 func (IDC *IdentityChain) ElectLeaders() {
-	return
 }
 
 //BroadCastNewConfiguration

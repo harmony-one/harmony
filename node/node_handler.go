@@ -30,7 +30,7 @@ const (
 
 // MaybeBroadcastAsValidator returns if the node is a validator node.
 func (node *Node) MaybeBroadcastAsValidator(content []byte) {
-	if node.SelfPeer.ValidatorID > 0 && node.SelfPeer.ValidatorID <= p2p.MAX_BROADCAST {
+	if node.SelfPeer.ValidatorID > 0 && node.SelfPeer.ValidatorID <= p2p.MaxBroadCast {
 		go p2p.BroadcastMessageFromValidator(node.SelfPeer, node.Consensus.GetValidatorPeers(), content)
 	}
 }

@@ -24,7 +24,7 @@ type Peer struct {
 	// TODO(minhdoan, rj): use this Ready to not send/broadcast to this peer if it wasn't available.
 }
 
-const MAX_BROADCAST = 20
+const MaxBroadCast = 20
 
 // SendMessage sends the message to the peer
 func SendMessage(peer Peer, msg []byte) {
@@ -64,14 +64,14 @@ func SelectMyPeers(peers []Peer, min int, max int) []Peer {
 // BroadcastMessage sends the message to a list of peers from a leader.
 func BroadcastMessageFromLeader(peers []Peer, msg []byte) {
 	// TODO(minhdoan): Enable back for multicast.
-	peers = SelectMyPeers(peers, 1, MAX_BROADCAST)
+	peers = SelectMyPeers(peers, 1, MaxBroadCast)
 	BroadcastMessage(peers, msg)
 	log.Info("Done sending from leader")
 }
 
 // BroadcastMessage sends the message to a list of peers from a validator.
 func BroadcastMessageFromValidator(selfPeer Peer, peers []Peer, msg []byte) {
-	peers = SelectMyPeers(peers, selfPeer.ValidatorID*MAX_BROADCAST+1, (selfPeer.ValidatorID+1)*MAX_BROADCAST)
+	peers = SelectMyPeers(peers, selfPeer.ValidatorID*MaxBroadCast+1, (selfPeer.ValidatorID+1)*MaxBroadCast)
 	BroadcastMessage(peers, msg)
 	log.Info("Done sending from validator")
 }
