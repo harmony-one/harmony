@@ -69,13 +69,13 @@ func (node *Node) NodeHandler(conn net.Conn) {
 	}
 
 	switch msgCategory {
-	case proto.IDENTITY:
+	case proto.Identity:
 		actionType := proto_identity.IdentityMessageType(msgType)
 		switch actionType {
-		case proto_identity.IDENTITY:
+		case proto_identity.Identity:
 			messageType := proto_identity.MessageType(msgPayload[0])
 			switch messageType {
-			case proto_identity.REGISTER:
+			case proto_identity.Register:
 				fmt.Println("received a identity message")
 				node.processPOWMessage(msgPayload)
 			case proto_identity.Announce:
@@ -245,7 +245,7 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 		node.addPendingTransactions(*txList)
 	case proto_node.Request:
 		reader := bytes.NewBuffer(msgPayload[1:])
-		var txIDs map[[32]byte]bool
+		txIDs := make(map[[32]byte]bool)
 		buf := make([]byte, 32) // 32 byte hash Id
 		for {
 			_, err := reader.Read(buf)

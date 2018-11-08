@@ -183,7 +183,7 @@ func (node *Node) processPOWMessage(message []byte) {
 	buffer.Write(proofBytes)
 	buffer.Write(node.SerializeWaitNode())
 	msgPayload := buffer.Bytes()
-	p2p.SendMessage(IDCPeer, identity.ConstructIdentityMessage(identity.REGISTER, msgPayload))
+	p2p.SendMessage(IDCPeer, identity.ConstructIdentityMessage(identity.Register, msgPayload))
 }
 
 // SerializeWaitNode serializes the node

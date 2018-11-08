@@ -14,7 +14,7 @@ func TestNewConsensus(test *testing.T) {
 		test.Errorf("Consensus Id is initialized to the wrong value: %d", consensus.consensusID)
 	}
 
-	if consensus.IsLeader != true {
+	if !consensus.IsLeader {
 		test.Error("Consensus should belong to a leader")
 	}
 

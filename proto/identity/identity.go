@@ -7,33 +7,37 @@ import (
 	"github.com/simple-rules/harmony-benchmark/proto"
 )
 
-// the number of bytes consensus message type occupies
+// IdentityMessageTypeBytes is the number of bytes consensus message type occupies
 const IdentityMessageTypeBytes = 1
 
+// IdentityMessageType is the identity message type.
 type IdentityMessageType byte
 
+// Constants of IdentityMessageType.
 const (
-	IDENTITY IdentityMessageType = iota
+	Identity IdentityMessageType = iota
 	// TODO: add more types
 )
 
+// MessageType ...
 type MessageType int
 
+// Constants of MessageType.
 const (
-	REGISTER MessageType = iota
+	Register MessageType = iota
 	Announce
-	CONFIG
+	Config
 )
 
 // Returns string name for the MessageType enum
 func (msgType MessageType) String() string {
 	names := [...]string{
-		"REGISTER",
+		"Register",
 		"Announce",
-		"CONFIG",
+		"Config",
 	}
 
-	if msgType < REGISTER || msgType > CONFIG {
+	if msgType < Register || msgType > Config {
 		return "Unknown"
 	}
 	return names[msgType]
@@ -57,8 +61,8 @@ func GetIdentityMessagePayload(message []byte) ([]byte, error) {
 
 // Concatenate msgType as one byte with payload, and return the whole byte array
 func ConstructIdentityMessage(identityMessageType MessageType, payload []byte) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.IDENTITY)})
-	byteBuffer.WriteByte(byte(IDENTITY))
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Identity)})
+	byteBuffer.WriteByte(byte(Identity))
 	byteBuffer.WriteByte(byte(identityMessageType))
 	byteBuffer.Write(payload)
 	return byteBuffer.Bytes()

@@ -13,6 +13,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
+// Constants for db which can be used to customize later.
 const (
 	writePauseWarningThrottler = 1 * time.Minute
 )

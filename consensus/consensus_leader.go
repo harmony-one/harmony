@@ -151,7 +151,7 @@ func (consensus *Consensus) processCommitMessage(payload []byte, targetState Sta
 		return
 	}
 
-	if bytes.Compare(blockHash, consensus.blockHash[:]) != 0 {
+	if !bytes.Equal(blockHash, consensus.blockHash[:]) {
 		consensus.Log.Warn("Received Commit with wrong blockHash", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
 		return
 	}
@@ -267,7 +267,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState S
 		consensus.Log.Warn("Received Response with wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
 	}
 
-	if bytes.Compare(blockHash, consensus.blockHash[:]) != 0 {
+	if !bytes.Equal(blockHash, consensus.blockHash[:]) {
 		consensus.Log.Warn("Received Response with wrong blockHash", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
 		return
 	}

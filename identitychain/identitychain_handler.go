@@ -29,7 +29,7 @@ func (IDC *IdentityChain) IdentityChainHandler(conn net.Conn) {
 		IDC.log.Error("Read message category failed", "err", err)
 		return
 	}
-	if msgCategory != proto.IDENTITY {
+	if msgCategory != proto.Identity {
 		IDC.log.Error("Identity Chain Recieved incorrect protocol message")
 		os.Exit(1)
 	} else {
@@ -46,16 +46,16 @@ func (IDC *IdentityChain) IdentityChainHandler(conn net.Conn) {
 		return
 	}
 	switch msgCategory {
-	case proto.IDENTITY:
+	case proto.Identity:
 		actionType := proto_identity.IdentityMessageType(msgType)
 		switch actionType {
-		case proto_identity.IDENTITY:
+		case proto_identity.Identity:
 			idMsgType, err := proto_identity.GetIdentityMessageType(msgPayload)
 			if err != nil {
 				fmt.Println("Error finding the identity message type")
 			}
 			switch idMsgType {
-			case proto_identity.REGISTER:
+			case proto_identity.Register:
 				IDC.registerIdentity(msgPayload)
 			case proto_identity.Announce:
 				IDC.acceptNewConnection(msgPayload)
@@ -115,6 +115,6 @@ func (IDC *IdentityChain) acceptNewConnection(msgPayload []byte) {
 	// Message should be encrypted and then signed to follow PKE.
 	//IDC should accept node publickey, encrypt the nonce and blockhash
 	// Then sign the message by own private key and send the message back.
-	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.REGISTER, buffer.Bytes())
+	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Register, buffer.Bytes())
 	p2p.SendMessage(Node.Self, msgToSend)
 }

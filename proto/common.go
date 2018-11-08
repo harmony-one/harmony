@@ -29,7 +29,7 @@ const (
 	Consensus MessageCategory = iota
 	NODE
 	CLIENT
-	IDENTITY
+	Identity
 	// TODO: add more types
 )
 

@@ -34,7 +34,7 @@ func (bc *Blockchain) FindBlockWithPrevHash(prevHash []byte) *Block {
 		return nil
 	}
 	for _, block := range bc.Blocks {
-		if bytes.Compare(block.PrevBlockHash[:], prevHash[:]) == 0 {
+		if bytes.Equal(block.PrevBlockHash[:], prevHash[:]) {
 			return block
 		}
 	}
@@ -206,7 +206,7 @@ func (bc *Blockchain) AddNewUserTransfer(utxoPool *UTXOPool, priKey kyber.Scalar
 // VerifyNewBlockAndUpdate verifies if the new coming block is valid for the current blockchain.
 func (bc *Blockchain) VerifyNewBlockAndUpdate(utxopool *UTXOPool, block *Block) bool {
 	length := len(bc.Blocks)
-	if bytes.Compare(block.PrevBlockHash[:], bc.Blocks[length-1].Hash[:]) != 0 {
+	if !bytes.Equal(block.PrevBlockHash[:], bc.Blocks[length-1].Hash[:]) {
 		return false
 	}
 	if block.Timestamp < bc.Blocks[length-1].Timestamp {
