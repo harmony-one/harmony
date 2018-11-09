@@ -173,12 +173,13 @@ func (consensus *Consensus) processCommitMessage(payload []byte, targetState Sta
 		point := crypto.Ed25519Curve.Point()
 		point.UnmarshalBinary(commitment)
 		(*commitments)[validatorID] = point
-		consensus.Log.Debug("Received new commit message", "num", len(*commitments))
+		consensus.Log.Debug("Received new commit message", "num", len(*commitments), "validatorID", validatorID)
 		// Set the bitmap indicate this validate signed. TODO: figure out how to resolve the inconsistency of validators from commit and response messages
 		bitmap.SetKey(value.PubKey, true)
 	}
 
 	if !shouldProcess {
+		consensus.Log.Debug("Received new commit message", "validatorID", validatorID)
 		return
 	}
 
@@ -310,13 +311,14 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState S
 			shouldProcess = false
 		} else {
 			(*responses)[validatorID] = responseScalar
-			consensus.Log.Debug("Received new response message", "num", len(*responses))
+			consensus.Log.Debug("Received new response message", "num", len(*responses), "validatorID", validatorID)
 			// Set the bitmap indicate this validate signed. TODO: figure out how to resolve the inconsistency of validators from commit and response messages
 			bitmap.SetKey(value.PubKey, true)
 		}
 	}
 
 	if !shouldProcess {
+		consensus.Log.Debug("Received new response message", "validatorID", validatorID)
 		return
 	}
 

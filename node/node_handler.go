@@ -79,6 +79,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 				fmt.Println("received a identity message")
 				// TODO(ak): fix it.
 				// node.processPOWMessage(msgPayload)
+				node.log.Info("NET: received message: IDENTITY/REGISTER")
 			case proto_identity.Announce:
 				node.log.Error("Announce message should be sent to IdentityChain")
 			}
@@ -88,8 +89,10 @@ func (node *Node) NodeHandler(conn net.Conn) {
 		switch actionType {
 		case consensus.Consensus:
 			if consensusObj.IsLeader {
+				node.log.Info("NET: received message: Consensus/Leader")
 				consensusObj.ProcessMessageLeader(msgPayload)
 			} else {
+				node.log.Info("NET: received message: Consensus/Validator")
 				consensusObj.ProcessMessageValidator(msgPayload)
 			}
 		}
@@ -97,8 +100,10 @@ func (node *Node) NodeHandler(conn net.Conn) {
 		actionType := proto_node.NodeMessageType(msgType)
 		switch actionType {
 		case proto_node.Transaction:
+			node.log.Info("NET: received message: Node/Transaction")
 			node.transactionMessageHandler(msgPayload)
 		case proto_node.BLOCK:
+			node.log.Info("NET: received message: Node/BLOCK")
 			blockMsgType := proto_node.BlockMessageType(msgPayload[0])
 			switch blockMsgType {
 			case proto_node.Sync:
@@ -110,8 +115,10 @@ func (node *Node) NodeHandler(conn net.Conn) {
 				}
 			}
 		case proto_node.BlockchainSync:
+			node.log.Info("NET: received message: Node/BlockchainSync")
 			node.handleBlockchainSync(msgPayload, conn)
 		case proto_node.CLIENT:
+			node.log.Info("NET: received message: Node/CLIENT")
 			clientMsgType := proto_node.ClientMessageType(msgPayload[0])
 			switch clientMsgType {
 			case proto_node.LookupUtxo:
@@ -125,6 +132,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 				p2p.SendMessage(fetchUtxoMessage.Sender, client.ConstructFetchUtxoResponseMessage(&utxoMap, node.UtxoPool.ShardID))
 			}
 		case proto_node.CONTROL:
+			node.log.Info("NET: received message: Node/CONTROL")
 			controlType := msgPayload[0]
 			if proto_node.ControlMessageType(controlType) == proto_node.STOP {
 				node.log.Debug("Stopping Node", "node", node, "numBlocks", len(node.blockchain.Blocks), "numTxsProcessed", node.countNumTransactionsInBlockchain())
@@ -172,6 +180,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 		}
 	case proto.CLIENT:
 		actionType := client.ClientMessageType(msgType)
+		node.log.Info("NET: received message: CLIENT/Transaction")
 		switch actionType {
 		case client.Transaction:
 			if node.Client != nil {
@@ -357,7 +366,7 @@ func (node *Node) SendBackProofOfAcceptOrReject() {
 // NOTE: For now, just send to the client (basically not broadcasting)
 func (node *Node) BroadcastNewBlock(newBlock *blockchain.Block) {
 	if node.ClientPeer != nil {
-		node.log.Debug("SENDING NEW BLOCK TO CLIENT")
+		node.log.Debug("NET: SENDING NEW BLOCK TO CLIENT")
 		p2p.SendMessage(*node.ClientPeer, proto_node.ConstructBlocksSyncMessage([]blockchain.Block{*newBlock}))
 	}
 }
