@@ -27,7 +27,6 @@ func (consensus *Consensus) ProcessMessageValidator(message []byte) {
 		consensus.Log.Error("Failed to get consensus message payload", "err", err, "consensus", consensus)
 	}
 
-	consensus.Log.Info("Received consensus Message", "type", msgType)
 	switch msgType {
 	case proto_consensus.Announce:
 		consensus.processAnnounceMessage(payload)
@@ -44,7 +43,7 @@ func (consensus *Consensus) ProcessMessageValidator(message []byte) {
 
 // Processes the announce message sent from the leader
 func (consensus *Consensus) processAnnounceMessage(payload []byte) {
-	consensus.Log.Info("Received Announce Message")
+	consensus.Log.Info("Received Announce Message", "Size", len(payload))
 	//#### Read payload data
 	offset := 0
 	// 4 byte consensus id

@@ -42,7 +42,7 @@ func BroadcastMessage(peers []Peer, msg []byte) {
 	// Construct broadcast p2p message
 	content := ConstructP2pMessage(byte(17), msg)
 
-	log.Info("Start Broadcasting", "gomaxprocs", runtime.GOMAXPROCS(0))
+	log.Info("Start Broadcasting", "gomaxprocs", runtime.GOMAXPROCS(0), "Size", len(content))
 	start := time.Now()
 	for _, peer := range peers {
 		peerCopy := peer
