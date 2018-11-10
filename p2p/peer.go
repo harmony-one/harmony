@@ -41,14 +41,21 @@ func BroadcastMessage(peers []Peer, msg []byte) {
 	}
 	// Construct broadcast p2p message
 	content := ConstructP2pMessage(byte(17), msg)
+	length := len(content)
 
-	log.Info("Start Broadcasting", "gomaxprocs", runtime.GOMAXPROCS(0), "Size", len(content))
+	log.Info("Start Broadcasting", "gomaxprocs", runtime.GOMAXPROCS(0), "Size", length)
 	start := time.Now()
 	for _, peer := range peers {
 		peerCopy := peer
 		go send(peerCopy.Ip, peerCopy.Port, content)
 	}
 	log.Info("Broadcasting Done", "time spent(s)", time.Since(start).Seconds())
+
+	// Keep track of block propagation time
+	// Assume 1M message is for block propagation
+	if length > 1000000 {
+		log.Debug("NET: START BLOCK PROPAGATION", "Size", length)
+	}
 }
 
 func SelectMyPeers(peers []Peer, min int, max int) []Peer {
