@@ -25,16 +25,22 @@ type MessageType int
 // Constants of MessageType.
 const (
 	Register MessageType = iota
-	Announce
-	Config
+	Acknowledge
+	Leader
+	IDCKey
+	Node_Info
+	Peers
 )
 
 // Returns string name for the MessageType enum
 func (msgType MessageType) String() string {
 	names := [...]string{
 		"Register",
-		"Announce",
-		"Config",
+		"Acknowledge",
+		"Leader",
+		"IDCKey"
+		"Node_Info"
+		"Peers"
 	}
 
 	if msgType < Register || msgType > Config {
