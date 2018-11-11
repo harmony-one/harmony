@@ -38,12 +38,12 @@ func (msgType MessageType) String() string {
 		"Register",
 		"Acknowledge",
 		"Leader",
-		"IDCKey"
-		"Node_Info"
-		"Peers"
+		"IDCKey",
+		"Node_Info",
+		"Peers",
 	}
 
-	if msgType < Register || msgType > Config {
+	if msgType < Register || msgType > Peers {
 		return "Unknown"
 	}
 	return names[msgType]

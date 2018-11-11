@@ -63,6 +63,15 @@ func (IDC *IdentityChain) SelectIds() {
 
 }
 
+//AcceptConnections welcomes new connections
+func (IDC *IdentityChain) AcceptConnections() {
+	registerNode()
+}
+
+func (IDC *IdentityChain) registerNode() {
+
+}
+
 //StartServer a server and process the request by a handler.
 func (IDC *IdentityChain) StartServer() {
 	fmt.Println("Starting server...")
