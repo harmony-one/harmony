@@ -18,63 +18,15 @@ var identityPerBlock = 100000
 // IdentityChain (Blockchain) keeps Identities per epoch, currently centralized!
 type IdentityChain struct {
 	//Identities            []*IdentityBlock //No need to have the identity block as of now
-	Identities            []*node.Node
-	log                   log.Logger
-	Peer                  p2p.Peer
-	SelectedIdentitites   []*node.Node
-	EpochNum              int
-	PeerToShardMap        map[*node.Node]int
-	ShardLeaderMap        map[int]*node.Node
-	PubKey                string
-	CurrentEpochStartTime int64
-	NumberOfShards        int
-	NumberOfNodesInShard  int
+	Identities           []*node.Node
+	log                  log.Logger
+	PeerToShardMap       map[*node.Node]int
+	ShardLeaderMap       map[int]*node.Node
+	PubKey               string
+	NumberOfShards       int
+	NumberOfLeadersAdded int
 }
 
-func seekRandomNumber(EpochNum int, SelectedIdentitites []*node.Node) int {
-	// Broadcast message to all nodes and collect back their numbers, do consensus and get a leader.
-	// Use leader to generate a random number.
-	//all here mocked
-	// interact with "node" and "wait_node"
-	return rand.Intn(1000)
-
-}
-
-//GlobalBlockchainConfig stores global level blockchain configurations.
-type GlobalBlockchainConfig struct {
-	NumberOfShards  int
-	EpochTimeSecs   int16
-	MaxNodesInShard int
-}
-
-//Shard
-func (IDC *IdentityChain) Shard() {
-
-	IDC.SelectIds()
-	IDC.CreateShardAssignment()
-	IDC.ElectLeaders()
-	IDC.BroadCastNewConfiguration()
-}
-
-//ElectLeaders
-func (IDC *IdentityChain) ElectLeaders() {
-}
-
-//BroadCastNewConfiguration
-func (IDC *IdentityChain) BroadCastNewConfiguration() {
-	fmt.Println("Broadcasting leader and shard info to everyone!")
-	// allPeers := make([]p2p.Peer, len(IDC.SelectedIdentitites))
-	// msgToSend := proto.
-	// 	p2p.BroadCastMessage(allPeers, msgToSend)
-
-}
-
-//BroadCast Peer Infor to Node
-// func (IDC *IdentityChain) SendPeerInfo(Node node) {
-// 	return
-// }
-
-//CreateShardAssignment
 func (IDC *IdentityChain) CreateShardAssignment() {
 	num := seekRandomNumber(IDC.EpochNum, IDC.SelectedIdentitites)
 	IDC.NumberOfShards = IDC.NumberOfShards + needNewShards()
