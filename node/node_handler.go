@@ -80,7 +80,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 				// TODO(ak): fix it.
 				// node.processPOWMessage(msgPayload)
 				node.log.Info("NET: received message: IDENTITY/REGISTER")
-			case proto_identity.Announce:
+			default:
 				node.log.Error("Announce message should be sent to IdentityChain")
 			}
 		}

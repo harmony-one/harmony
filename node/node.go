@@ -125,7 +125,7 @@ func (node *Node) countNumTransactionsInBlockchain() int {
 //ConnectIdentityChain connects to identity chain
 func (node *Node) ConnectIdentityChain() {
 	IDCPeer := node.IDCPeer
-	p2p.SendMessage(IDCPeer, identity.ConstructIdentityMessage(identity.Announce, node.SerializeWaitNode()))
+	p2p.SendMessage(IDCPeer, identity.ConstructIdentityMessage(identity.Register, node.SerializeWaitNode()))
 }
 
 //NewWaitNode is a way to initiate a waiting no
