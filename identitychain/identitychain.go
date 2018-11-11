@@ -9,7 +9,6 @@ import (
 
 	"github.com/simple-rules/harmony-benchmark/log"
 	"github.com/simple-rules/harmony-benchmark/node"
-	"github.com/simple-rules/harmony-benchmark/p2p"
 )
 
 var mutex sync.Mutex
@@ -64,11 +63,6 @@ func (IDC *IdentityChain) SelectIds() {
 
 }
 
-//Checks how many new shards we need. Currently we say 0.
-func needNewShards() int {
-	return 0
-}
-
 //StartServer a server and process the request by a handler.
 func (IDC *IdentityChain) StartServer() {
 	fmt.Println("Starting server...")
@@ -98,53 +92,3 @@ func (IDC *IdentityChain) listenOnPort() {
 		go IDC.IdentityChainHandler(conn)
 	}
 }
-
-// New Create a new Node
-func New(Peer p2p.Peer) *IdentityChain {
-	IDC := IdentityChain{}
-	IDC.Peer = Peer
-	IDC.log = log.New()
-	IDC.NumberOfShards = 1         //to be filled via global config
-	IDC.NumberOfNodesInShard = 500 //to be filled via global config
-	IDC.Identities = make([]*node.Node, 0)
-	// IDC.PendingIdentities = make([]*node.Node, 0)
-	IDC.SelectedIdentitites = make([]*node.Node, 0)
-	// IDC.PowMap = make(map[p2p.Peer]string)
-	return &IDC
-}
-
-// -------------------------------------------------------------
-
-// The code below is needed when we have a actual identity block
-// GetLatestBlock gests the latest block at the end of the chain
-// func (IDC *IdentityChain) GetLatestBlock() *IdentityBlock {
-// 	if len(IDC.Identities) == 0 {
-// 		return nil
-// 	}
-// 	return IDC.Identities[len(IDC.Identities)-1]
-// }
-
-//UpdateIdentityChain is to create the Blocks to be added to the chain
-// func (IDC *IdentityChain) UpdateIdentityChain() {
-
-// 	//If there are no more Identities registring the blockchain is dead
-// 	if len(IDC.PendingIdentities) == 0 {
-// 		// This is abd, because previous block might not be alive
-// 		return
-// 	}
-// 	if len(IDC.Identities) == 0 {
-// 		block := NewGenesisBlock()
-// 		IDC.Identities = append(IDC.Identities, block)
-// 	} else {
-// 		prevBlock := IDC.GetLatestBlock()
-// 		prevBlockHash := prevBlock.CalculateBlockHash()
-// 		NewIdentities := IDC.PendingIdentities[:identityPerBlock]
-// 		IDC.PendingIdentities = []*node.Node{}
-// 		//All other blocks are dropped, we need to inform them that they are dropped?
-// 		IDBlock := NewBlock(NewIdentities, prevBlockHash)
-// 		IDC.Identities = append(IDC.Identities, IDBlock)
-// 	}
-
-// }
-
-// -------------------------------------------------------------
