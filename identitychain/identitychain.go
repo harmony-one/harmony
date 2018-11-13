@@ -6,6 +6,8 @@ import (
 	"os"
 	"sync"
 
+	"github.com/dedis/kyber"
+	"github.com/simple-rules/harmony-benchmark/crypto/pki"
 	"github.com/simple-rules/harmony-benchmark/log"
 	"github.com/simple-rules/harmony-benchmark/node"
 )
@@ -20,7 +22,7 @@ type IdentityChain struct {
 	log                  log.Logger
 	PeerToShardMap       map[*node.Node]int
 	ShardLeaderMap       map[int]*node.Node
-	PubKey               string
+	PubKey               kyber.Point
 	NumberOfShards       int
 	NumberOfLeadersAdded int
 }
@@ -31,18 +33,22 @@ func (IDC *IdentityChain) CreateShardAssignment() {
 func (IDC *IdentityChain) generateRandomPermutations(num int) {
 }
 
-// SelectIds as
-func (IDC *IdentityChain) SelectIds() {
-	// selectNumber := IDC.NumberOfNodesInShard - len(IDC.Identities)
-	// Insert the lines below once you have a identity block
-	// IB := IDC.GetLatestBlock()
-	// currentIDS := IB.GetIdentities()
-	// currentIDS := IDC.Identities
-	// selectNumber = int(math.Min(float64(len(IDC.PendingIdentities)), float64(selectNumber)))
-	// pending := IDC.PendingIdentities[:selectNumber]
-	// IDC.SelectedIdentitites = append(currentIDS, pending...)
-	// IDC.PendingIdentities = []*node.Node{}
+//Init
+func New(filename string) {
+	idc := IdentityChain{}
+	idc.NumberOfShards = readConfigFile(filename)
+	idc.PubKey = generateIDCKeys()
+	idc.StartServer()
+}
 
+func readConfigFile(filename string) int {
+	return 2
+}
+
+func generateIDCKeys() kyber.Point {
+	priKey := pki.GetPrivateKeyFromInt(10)
+	pubkey := pki.GetPublicKeyFromPrivateKey(priKey)
+	return pubkey
 }
 
 //AcceptConnections welcomes new connections
