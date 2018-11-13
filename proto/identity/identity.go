@@ -27,8 +27,7 @@ const (
 	Register MessageType = iota
 	Acknowledge
 	Leader
-	IDCKey
-	Node_Info
+	NodeInfo
 	Peers
 )
 
@@ -38,7 +37,7 @@ func (msgType MessageType) String() string {
 		"Register",
 		"Acknowledge",
 		"Leader",
-		"Node_Info",
+		"NodeInfo",
 		"Peers",
 	}
 

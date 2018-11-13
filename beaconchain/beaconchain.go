@@ -1,7 +1,6 @@
 package beaconchain
 
 import (
-	"fmt"
 	"net"
 	"os"
 	"sync"
@@ -70,22 +69,17 @@ func (IDC *BeaconChain) CommunicatePublicKeyToNode(Peer p2p.Peer) {
 
 //StartServer a server and process the request by a handler.
 func (IDC *BeaconChain) StartServer() {
-	fmt.Println("Starting server...")
-	fmt.Println(IDC.PubKey)
-	IDC.log.Debug("Starting IDC server...") //log.Info does nothing for me! (ak)
+	IDC.log.Info("Starting IDC server...") //log.Info does nothing for me! (ak)
 	IDC.listenOnPort()
 }
 
 func (IDC *BeaconChain) listenOnPort() {
-	fmt.Println("now in listenport")
 	addr := net.JoinHostPort("", "8081")
 	listen, err := net.Listen("tcp4", addr)
 	if err != nil {
 		IDC.log.Crit("Socket listen port failed") //Log.Crit does nothing for me!
-		fmt.Print(err.Error())
 		os.Exit(1)
 	} else {
-		fmt.Println("Starting server...now listening")
 		IDC.log.Info("Identity chain is now listening ..") //log.Info does nothing for me! (ak) remove this
 	}
 	defer listen.Close()
@@ -95,7 +89,7 @@ func (IDC *BeaconChain) listenOnPort() {
 			IDC.log.Crit("Error listening on port. Exiting", "8081")
 			continue
 		} else {
-			fmt.Println("I am accepting connections now")
+			IDC.log.Info("I am accepting connections now")
 		}
 		go IDC.BeaconChainHandler(conn)
 	}
