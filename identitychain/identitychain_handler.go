@@ -50,7 +50,7 @@ func (IDC *IdentityChain) IdentityChainHandler(conn net.Conn) {
 			}
 			switch idMsgType {
 			case proto_identity.Register:
-				// IDC.registerIdentity(msgPayload)
+				IDC.AcceptConnections(msgPayload)
 			case proto_identity.Acknowledge:
 				// IDC.acceptNewConnection(msgPayload)
 			}

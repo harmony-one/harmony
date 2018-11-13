@@ -125,64 +125,6 @@ func (node *Node) countNumTransactionsInBlockchain() int {
 func (node *Node) ConnectIdentityChain() {
 }
 
-//NewWaitNode is a way to initiate a waiting no
-func NewWaitNode(peer, IDCPeer p2p.Peer) *Node {
-	node := Node{}
-	node.Self = peer
-	node.IDCPeer = IDCPeer
-	node.log = log.New()
-	return &node
-}
-
-// NewNodefromIDC is the new node for identity chain.
-func NewNodefromIDC(node *Node, consensus *consensus.Consensus, db *db.LDBDatabase) *Node {
-
-	if consensus != nil {
-		// Consensus and associated channel to communicate blocks
-		node.Consensus = consensus
-		node.BlockChannel = make(chan blockchain.Block)
-
-		// Genesis Block
-		// TODO(minh): Use or implement new function in blockchain package for this.
-		genesisBlock := &blockchain.Blockchain{}
-		genesisBlock.Blocks = make([]*blockchain.Block, 0)
-		// TODO(RJ): use miner's address as coinbase address
-		coinbaseTx := blockchain.NewCoinbaseTX(pki.GetAddressFromInt(1), "0", node.Consensus.ShardID)
-		genesisBlock.Blocks = append(genesisBlock.Blocks, blockchain.NewGenesisBlock(coinbaseTx, node.Consensus.ShardID))
-		node.blockchain = genesisBlock
-
-		// UTXO pool from Genesis block
-		//node.UtxoPool = blockchain.CreateUTXOPoolFromGenesisBlockChain(node.blockchain)
-
-		// Initialize level db.
-		node.db = db
-
-	}
-	// Logger
-	node.log = log.New()
-
-	return node
-}
-
-// TODO(alok): Fix it or revert the cl on 11/8.
-// func (node *Node) processPOWMessage(message []byte) {
-// 	payload, err := identity.GetIdentityMessagePayload(message)
-// 	if err != nil {
-// 		fmt.Println("Could not read payload")
-// 	}
-// 	IDCPeer := node.IDCPeer
-// 	// 4 byte challengeNonce id
-// 	req := string(payload)
-// 	proof, _ := pow.Fulfil(req, []byte("")) //"This could be blockhasdata"
-// 	buffer := bytes.NewBuffer([]byte{})
-// 	proofBytes := make([]byte, 32) //proof seems to be 32 byte here
-// 	copy(proofBytes[:], proof)
-// 	buffer.Write(proofBytes)
-// 	buffer.Write(node.SerializeWaitNode())
-// 	msgPayload := buffer.Bytes()
-// 	p2p.SendMessage(IDCPeer, identity.ConstructIdentityMessage(identity.Register, msgPayload))
-// }
-
 // SerializeWaitNode serializes the node
 // https://stackoverflow.com/questions/12854125/how-do-i-dump-the-struct-into-the-byte-array-without-reflection/12854659#12854659
 func (node *Node) SerializeWaitNode() []byte {

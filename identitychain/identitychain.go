@@ -27,12 +27,6 @@ type IdentityChain struct {
 	NumberOfLeadersAdded int
 }
 
-func (IDC *IdentityChain) CreateShardAssignment() {
-}
-
-func (IDC *IdentityChain) generateRandomPermutations(num int) {
-}
-
 //Init
 func New(filename string) {
 	idc := IdentityChain{}
@@ -52,11 +46,14 @@ func generateIDCKeys() kyber.Point {
 }
 
 //AcceptConnections welcomes new connections
-func (IDC *IdentityChain) AcceptConnections() {
-	registerNode()
+func (IDC *IdentityChain) AcceptConnections(b []byte) {
+
+	Node := node.DeserializeWaitNode(b)
+	IDC.registerNode(*Node)
 }
 
-func registerNode() {
+func (IDC *IdentityChain) registerNode(Node node.Node) {
+
 	return
 }
 
