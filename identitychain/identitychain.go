@@ -10,6 +10,7 @@ import (
 	"github.com/simple-rules/harmony-benchmark/crypto/pki"
 	"github.com/simple-rules/harmony-benchmark/log"
 	"github.com/simple-rules/harmony-benchmark/node"
+	"github.com/simple-rules/harmony-benchmark/p2p"
 )
 
 var mutex sync.Mutex
@@ -47,14 +48,20 @@ func generateIDCKeys() kyber.Point {
 
 //AcceptConnections welcomes new connections
 func (IDC *IdentityChain) AcceptConnections(b []byte) {
-
 	Node := node.DeserializeWaitNode(b)
-	IDC.registerNode(*Node)
+	IDC.registerNode(Node) //This copies lock value of sync.mutex, we need to have a way around it by creating auxiliary data struct.
 }
 
-func (IDC *IdentityChain) registerNode(Node node.Node) {
-
+func (IDC *IdentityChain) registerNode(Node *node.Node) {
+	IDC.Identities = append(IDC.Identities, Node)
+	IDC.CommunicatePublicKeyToNode(Node.Self)
 	return
+}
+
+func (IDC *IdentityChain) CommunicatePublicKeyToNode(Peer p2p.Peer) {
+	pbkey := pki.GetBytesFromPublicKey(IDC.PubKey)
+	fmt.Print(pbkey)
+	//proto_identity.ConstructIdentityMessage(Acknowledge, pbkey)
 }
 
 //StartServer a server and process the request by a handler.
