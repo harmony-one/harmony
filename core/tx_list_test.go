@@ -20,8 +20,8 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/simple-rules/harmony-benchmark/core/types"
 )
 
 // Tests that transactions can be added to strict lists and list contents and

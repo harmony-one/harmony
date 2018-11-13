@@ -27,13 +27,13 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/consensus"
-	"github.com/ethereum/go-ethereum/core/rawdb"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/hashicorp/golang-lru"
+	"github.com/simple-rules/harmony-benchmark/consensus"
+	"github.com/simple-rules/harmony-benchmark/core/rawdb"
+	"github.com/simple-rules/harmony-benchmark/core/types"
 )
 
 const (
@@ -149,7 +149,7 @@ func (hc *HeaderChain) WriteHeader(header *types.Header) (status WriteStatus, er
 	if err := hc.WriteTd(hash, number, externTd); err != nil {
 		log.Crit("Failed to write header total difficulty", "err", err)
 	}
-	rawdb.WriteHeader(hc.chainDb, header)
+	//rawdb.WriteHeader(hc.chainDb, header)
 
 	// If the total difficulty is higher than our known, add it to the canonical chain
 	// Second clause in the if statement reduces the vulnerability to selfish mining.
@@ -228,22 +228,22 @@ func (hc *HeaderChain) ValidateHeaderChain(chain []*types.Header, checkFreq int)
 	}
 	seals[len(seals)-1] = true // Last should always be verified to avoid junk
 
-	abort, results := hc.engine.VerifyHeaders(hc, chain, seals)
-	defer close(abort)
-
-	// Iterate over the headers and ensure they all check out
-	for i, _ := range chain {
-		// If the chain is terminating, stop processing blocks
-		if hc.procInterrupt() {
-			log.Debug("Premature abort during headers verification")
-			return 0, errors.New("aborted")
-		}
-
-		// Otherwise wait for headers checks and ensure they pass
-		if err := <-results; err != nil {
-			return i, err
-		}
-	}
+	//abort, results := hc.engine.VerifyHeaders(hc, chain, seals)
+	//defer close(abort)
+	//
+	//// Iterate over the headers and ensure they all check out
+	//for i, _ := range chain {
+	//	// If the chain is terminating, stop processing blocks
+	//	if hc.procInterrupt() {
+	//		log.Debug("Premature abort during headers verification")
+	//		return 0, errors.New("aborted")
+	//	}
+	//
+	//	// Otherwise wait for headers checks and ensure they pass
+	//	if err := <-results; err != nil {
+	//		return i, err
+	//	}
+	//}
 
 	return 0, nil
 }
