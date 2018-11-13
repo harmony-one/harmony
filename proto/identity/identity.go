@@ -28,7 +28,7 @@ const (
 	Acknowledge
 	Leader
 	IDCKey
-	Node_Info
+	NodeInfo
 	Peers
 )
 
@@ -39,7 +39,7 @@ func (msgType MessageType) String() string {
 		"Acknowledge",
 		"Leader",
 		"IDCKey",
-		"Node_Info",
+		"NodeInfo",
 		"Peers",
 	}
 
