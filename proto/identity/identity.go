@@ -38,7 +38,6 @@ func (msgType MessageType) String() string {
 		"Register",
 		"Acknowledge",
 		"Leader",
-		"IDCKey",
 		"Node_Info",
 		"Peers",
 	}
