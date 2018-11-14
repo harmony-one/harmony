@@ -1,4 +1,4 @@
-package identitychain
+package beaconchain
 
 import (
 	"fmt"
@@ -10,9 +10,9 @@ import (
 	proto_identity "github.com/simple-rules/harmony-benchmark/proto/identity"
 )
 
-//IdentityChainHandler handles registration of new Identities
+//BeaconChainHandler handles registration of new Identities
 // This could have been its seperate package like consensus, but am avoiding creating a lot of packages.
-func (IDC *IdentityChain) IdentityChainHandler(conn net.Conn) {
+func (IDC *BeaconChain) BeaconChainHandler(conn net.Conn) {
 	content, err := p2p.ReadMessageContent(conn)
 	if err != nil {
 		IDC.log.Error("Read p2p data failed")

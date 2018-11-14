@@ -1,7 +1,6 @@
-package identitychain
+package beaconchain
 
 import (
-	"fmt"
 	"net"
 	"os"
 	"sync"
@@ -11,13 +10,14 @@ import (
 	"github.com/simple-rules/harmony-benchmark/log"
 	"github.com/simple-rules/harmony-benchmark/node"
 	"github.com/simple-rules/harmony-benchmark/p2p"
+	proto_identity "github.com/simple-rules/harmony-benchmark/proto/identity"
 )
 
 var mutex sync.Mutex
 var identityPerBlock = 100000
 
-// IdentityChain (Blockchain) keeps Identities per epoch, currently centralized!
-type IdentityChain struct {
+// BeaconChain (Blockchain) keeps Identities per epoch, currently centralized!
+type BeaconChain struct {
 	//Identities            []*IdentityBlock //No need to have the identity block as of now
 	Identities           []*node.Node
 	log                  log.Logger
@@ -29,11 +29,14 @@ type IdentityChain struct {
 }
 
 //Init
-func New(filename string) {
-	idc := IdentityChain{}
-	idc.NumberOfShards = readConfigFile(filename)
+func New(filename string) *BeaconChain {
+	idc := BeaconChain{}
+	//idc.NumberOfShards = readConfigFile(filename)
+	idc.log = log.New()
+	idc.NumberOfShards = 2
 	idc.PubKey = generateIDCKeys()
 	idc.StartServer()
+	return &idc
 }
 
 func readConfigFile(filename string) int {
@@ -47,38 +50,36 @@ func generateIDCKeys() kyber.Point {
 }
 
 //AcceptConnections welcomes new connections
-func (IDC *IdentityChain) AcceptConnections(b []byte) {
+func (IDC *BeaconChain) AcceptConnections(b []byte) {
 	Node := node.DeserializeWaitNode(b)
 	IDC.registerNode(Node) //This copies lock value of sync.mutex, we need to have a way around it by creating auxiliary data struct.
 }
 
-func (IDC *IdentityChain) registerNode(Node *node.Node) {
+func (IDC *BeaconChain) registerNode(Node *node.Node) {
 	IDC.Identities = append(IDC.Identities, Node)
 	IDC.CommunicatePublicKeyToNode(Node.Self)
 	return
 }
 
-func (IDC *IdentityChain) CommunicatePublicKeyToNode(Peer p2p.Peer) {
+func (IDC *BeaconChain) CommunicatePublicKeyToNode(Peer p2p.Peer) {
 	pbkey := pki.GetBytesFromPublicKey(IDC.PubKey)
-	fmt.Print(pbkey)
-	//proto_identity.ConstructIdentityMessage(Acknowledge, pbkey)
+	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Acknowledge, pbkey[:])
+	p2p.SendMessage(Peer, msgToSend)
 }
 
 //StartServer a server and process the request by a handler.
-func (IDC *IdentityChain) StartServer() {
-	fmt.Println("Starting server...")
+func (IDC *BeaconChain) StartServer() {
 	IDC.log.Info("Starting IDC server...") //log.Info does nothing for me! (ak)
 	IDC.listenOnPort()
 }
 
-func (IDC *IdentityChain) listenOnPort() {
+func (IDC *BeaconChain) listenOnPort() {
 	addr := net.JoinHostPort("", "8081")
 	listen, err := net.Listen("tcp4", addr)
 	if err != nil {
-		IDC.log.Crit("Socket listen port failed")
+		IDC.log.Crit("Socket listen port failed") //Log.Crit does nothing for me!
 		os.Exit(1)
 	} else {
-		fmt.Println("Starting server...now listening")
 		IDC.log.Info("Identity chain is now listening ..") //log.Info does nothing for me! (ak) remove this
 	}
 	defer listen.Close()
@@ -88,8 +89,9 @@ func (IDC *IdentityChain) listenOnPort() {
 			IDC.log.Crit("Error listening on port. Exiting", "8081")
 			continue
 		} else {
-			fmt.Println("I am accepting connections now")
+			IDC.log.Info("I am accepting connections now")
 		}
-		go IDC.IdentityChainHandler(conn)
+		go IDC.BeaconChainHandler(conn)
 	}
+
 }
