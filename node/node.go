@@ -127,7 +127,7 @@ func (node *Node) ConnectIdentityChain() {
 
 // SerializeWaitNode serializes the node
 // https://stackoverflow.com/questions/12854125/how-do-i-dump-the-struct-into-the-byte-array-without-reflection/12854659#12854659
-func (node *Node) SerializeWaitNode() []byte {
+func (node *Node) SerializeNode() []byte {
 	//Needs to escape the serialization of unexported fields
 	result := new(bytes.Buffer)
 	encoder := gob.NewEncoder(result)
@@ -142,7 +142,7 @@ func (node *Node) SerializeWaitNode() []byte {
 }
 
 // DeserializeWaitNode deserializes the node
-func DeserializeWaitNode(d []byte) *Node {
+func DeserializeNode(d []byte) *Node {
 	var wn Node
 	r := bytes.NewBuffer(d)
 	decoder := gob.NewDecoder(r)
