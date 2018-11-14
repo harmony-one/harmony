@@ -4,13 +4,11 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/simple-rules/harmony-benchmark/beaconchain"
 	"github.com/simple-rules/harmony-benchmark/node"
 	"github.com/simple-rules/harmony-benchmark/p2p"
 )
 
 func main() {
-	bc := beaconchain.New("temp")
 
 	ip := flag.String("ip", "127.0.0.0", "IP of the node")
 	port := flag.String("port", "9000", "port of the node.")
@@ -22,5 +20,5 @@ func main() {
 	fmt.Print(msg)
 	// fmt.Println(ip)
 	// fmt.Println(peer)
-	fmt.Print(bc)
+
 }
