@@ -57,7 +57,7 @@ func (IDC *BeaconChain) AcceptConnections(b []byte) {
 
 func (IDC *BeaconChain) registerNode(Node *node.Node) {
 	IDC.Identities = append(IDC.Identities, Node)
-	IDC.CommunicatePublicKeyToNode(Node.Self)
+	IDC.CommunicatePublicKeyToNode(Node.SelfPeer)
 	return
 }
 

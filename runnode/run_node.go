@@ -15,8 +15,14 @@ func main() {
 	flag.Parse()
 	peer := p2p.Peer{Ip: *ip, Port: *port}
 	node := node.Node{}
-	node.Self = peer
+	node.SelfPeer = peer
+	node.IDCPeer = p2p.Peer{Ip: *ip, Port: "8081"}
+	fmt.Println("now in go run mode")
 	msg := node.SerializeNode()
+	node.SetLog()
+	fmt.Println("set the log")
+	go node.StartServer(*port)
+	node.ConnectIdentityChain()
 	fmt.Print(msg)
 	// fmt.Println(ip)
 	// fmt.Println(peer)

@@ -15,6 +15,7 @@ import (
 	"github.com/simple-rules/harmony-benchmark/db"
 	"github.com/simple-rules/harmony-benchmark/log"
 	"github.com/simple-rules/harmony-benchmark/p2p"
+	proto_identity "github.com/simple-rules/harmony-benchmark/proto/identity"
 	"github.com/simple-rules/harmony-benchmark/syncing"
 )
 
@@ -37,7 +38,6 @@ type Node struct {
 	Client                 *client.Client // The presence of a client object means this node will also act as a client
 	IsWaiting              bool
 	SelfPeer               p2p.Peer // TODO(minhdoan): it could be duplicated with Self below whose is Alok work.
-	Self                   p2p.Peer
 	IDCPeer                p2p.Peer
 	SyncNode               bool // TODO(minhdoan): Remove it later.
 }
@@ -76,10 +76,13 @@ func (node *Node) StartServer(port string) {
 	if node.SyncNode {
 		node.blockchain = syncing.StartBlockSyncing(node.Consensus.GetValidatorPeers())
 	}
-	fmt.Println("Hello in server now")
-	node.log.Debug("Starting server", "node", node, "port", port)
-
+	fmt.Println("going to start server")
+	//node.log.Debug("Starting server", "node", node, "port", port)
 	node.listenOnPort(port)
+}
+
+func (node *Node) SetLog() {
+	node.log = log.New()
 }
 
 func (node *Node) listenOnPort(port string) {
@@ -123,15 +126,19 @@ func (node *Node) countNumTransactionsInBlockchain() int {
 
 //ConnectIdentityChain connects to identity chain
 func (node *Node) ConnectIdentityChain() {
+	fmt.Println("In identity chain now")
+	msg := node.SerializeNode()
+	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Register, msg)
+	p2p.SendMessage(node.IDCPeer, msgToSend)
 }
 
-// SerializeWaitNode serializes the node
+// SerializeNode serializes the node
 // https://stackoverflow.com/questions/12854125/how-do-i-dump-the-struct-into-the-byte-array-without-reflection/12854659#12854659
 func (node *Node) SerializeNode() []byte {
 	//Needs to escape the serialization of unexported fields
 	result := new(bytes.Buffer)
 	encoder := gob.NewEncoder(result)
-	err := encoder.Encode(node.Self)
+	err := encoder.Encode(node.SelfPeer)
 	if err != nil {
 		fmt.Println("Could not serialize node")
 		fmt.Println("ERROR", err)
@@ -141,12 +148,12 @@ func (node *Node) SerializeNode() []byte {
 	return result.Bytes()
 }
 
-// DeserializeWaitNode deserializes the node
+// DeserializeNode deserializes the node
 func DeserializeNode(d []byte) *Node {
 	var wn Node
 	r := bytes.NewBuffer(d)
 	decoder := gob.NewDecoder(r)
-	err := decoder.Decode(&wn.Self)
+	err := decoder.Decode(&wn.SelfPeer)
 	if err != nil {
 		log.Error("Could not de-serialize node")
 	}
