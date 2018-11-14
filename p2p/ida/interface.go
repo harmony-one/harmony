@@ -18,5 +18,6 @@ type RaptorQ interface {
 
 // IDA interface.
 type IDA interface {
+	TakeRaptorQ(raptorQImp *RaptorQ)
 	Process(msg Message, peers []p2p.Peer, timeout int)
 }
