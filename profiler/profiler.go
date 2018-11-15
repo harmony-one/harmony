@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/shirou/gopsutil/process"
 	"github.com/harmony-one/harmony/log"
+	"github.com/shirou/gopsutil/process"
 )
 
 type Profiler struct {
