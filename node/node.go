@@ -81,8 +81,9 @@ func (node *Node) StartServer(port string) {
 	node.listenOnPort(port)
 }
 
-func (node *Node) SetLog() {
+func (node *Node) SetLog() *Node {
 	node.log = log.New()
+	return node
 }
 
 func (node *Node) listenOnPort(port string) {
@@ -125,8 +126,7 @@ func (node *Node) countNumTransactionsInBlockchain() int {
 }
 
 //ConnectIdentityChain connects to identity chain
-func (node *Node) ConnectIdentityChain() {
-	fmt.Println("In identity chain now")
+func (node *Node) ConnectBeaconChain() {
 	msg := node.SerializeNode()
 	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Register, msg)
 	p2p.SendMessage(node.IDCPeer, msgToSend)

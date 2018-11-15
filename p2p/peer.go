@@ -8,7 +8,6 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/simple-rules/harmony-benchmark/attack"
 	"github.com/simple-rules/harmony-benchmark/log"
 
 	"github.com/dedis/kyber"
@@ -30,7 +29,6 @@ const MaxBroadCast = 20
 func SendMessage(peer Peer, msg []byte) {
 	// Construct normal p2p message
 	content := ConstructP2pMessage(byte(0), msg)
-
 	go send(peer.Ip, peer.Port, content)
 }
 
@@ -131,8 +129,7 @@ func sendWithSocketClient(ip, port string, message []byte) (err error) {
 // Send a message to another node with given port.
 func send(ip, port string, message []byte) {
 	// Add attack code here.
-	attack.GetInstance().Run()
-
+	//attack.GetInstance().Run()
 	backoff := NewExpBackoff(250*time.Millisecond, 10*time.Second, 2)
 
 	for trial := 0; trial < 10; trial++ {
