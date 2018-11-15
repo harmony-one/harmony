@@ -5,7 +5,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/simple-rules/harmony-benchmark/p2p"
+	"github.com/harmony-one/harmony/p2p"
 )
 
 func setUpTestServer(times int, t *testing.T, conCreated chan struct{}) {

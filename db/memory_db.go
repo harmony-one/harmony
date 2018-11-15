@@ -4,7 +4,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/simple-rules/harmony-benchmark/utils"
+	"github.com/harmony-one/harmony/utils"
 )
 
 // MemDatabase is the test memory database. It won't be used for any production.

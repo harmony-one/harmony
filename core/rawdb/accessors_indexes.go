@@ -20,7 +20,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/simple-rules/harmony-benchmark/core/types"
+	"github.com/harmony-one/harmony/core/types"
 )
 
 // ReadTxLookupEntry retrieves the positional metadata associated with a transaction

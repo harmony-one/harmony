@@ -23,8 +23,8 @@ import (
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/simple-rules/harmony-benchmark/consensus"
-	"github.com/simple-rules/harmony-benchmark/core/types"
+	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/core/types"
 )
 
 // StateProcessor is a basic Processor, which takes care of transitioning

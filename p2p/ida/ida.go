@@ -3,7 +3,7 @@ package ida
 import (
 	"time"
 
-	"github.com/simple-rules/harmony-benchmark/p2p"
+	"github.com/harmony-one/harmony/p2p"
 )
 
 // IDAImp implements IDA interface.

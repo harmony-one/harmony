@@ -5,9 +5,9 @@ import (
 	"encoding/gob"
 	"log"
 
-	"github.com/simple-rules/harmony-benchmark/blockchain"
-	"github.com/simple-rules/harmony-benchmark/p2p"
-	"github.com/simple-rules/harmony-benchmark/proto"
+	"github.com/harmony-one/harmony/blockchain"
+	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/proto"
 )
 
 // NodeMessageType is to indicate the specific type of message under NODE category

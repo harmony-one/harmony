@@ -22,7 +22,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/simple-rules/harmony-benchmark/core/types"
+	"github.com/harmony-one/harmony/core/types"
 )
 
 // Tests that positional lookup metadata can be stored and retrieved.

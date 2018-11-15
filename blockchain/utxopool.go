@@ -9,8 +9,8 @@ import (
 	"sync"
 
 	"github.com/dedis/kyber/sign/schnorr"
-	"github.com/simple-rules/harmony-benchmark/crypto"
-	"github.com/simple-rules/harmony-benchmark/log"
+	"github.com/harmony-one/harmony/crypto"
+	"github.com/harmony-one/harmony/log"
 )
 
 // Vout2AmountMap is a TODO type.

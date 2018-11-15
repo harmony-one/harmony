@@ -6,13 +6,13 @@ import (
 	"encoding/gob"
 
 	"github.com/dedis/kyber/sign/schnorr"
-	"github.com/simple-rules/harmony-benchmark/attack"
-	"github.com/simple-rules/harmony-benchmark/blockchain"
-	"github.com/simple-rules/harmony-benchmark/crypto"
-	"github.com/simple-rules/harmony-benchmark/log"
-	"github.com/simple-rules/harmony-benchmark/p2p"
-	proto_consensus "github.com/simple-rules/harmony-benchmark/proto/consensus"
-	"github.com/simple-rules/harmony-benchmark/utils"
+	"github.com/harmony-one/harmony/attack"
+	"github.com/harmony-one/harmony/blockchain"
+	"github.com/harmony-one/harmony/crypto"
+	"github.com/harmony-one/harmony/log"
+	"github.com/harmony-one/harmony/p2p"
+	proto_consensus "github.com/harmony-one/harmony/proto/consensus"
+	"github.com/harmony-one/harmony/utils"
 )
 
 // ProcessMessageValidator dispatches validator's consensus message.

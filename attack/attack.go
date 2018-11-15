@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/simple-rules/harmony-benchmark/log"
+	"github.com/harmony-one/harmony/log"
 )
 
 // Constants used for attack model.

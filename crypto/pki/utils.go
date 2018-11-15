@@ -3,8 +3,8 @@ package pki
 import (
 	"crypto/sha256"
 	"github.com/dedis/kyber"
-	"github.com/simple-rules/harmony-benchmark/crypto"
-	"github.com/simple-rules/harmony-benchmark/log"
+	"github.com/harmony-one/harmony/crypto"
+	"github.com/harmony-one/harmony/log"
 )
 
 func GetAddressFromPublicKey(pubKey kyber.Point) [20]byte {

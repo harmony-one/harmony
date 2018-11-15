@@ -41,9 +41,9 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/hashicorp/golang-lru"
-	"github.com/simple-rules/harmony-benchmark/consensus"
-	"github.com/simple-rules/harmony-benchmark/core/rawdb"
-	"github.com/simple-rules/harmony-benchmark/core/types"
+	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/core/rawdb"
+	"github.com/harmony-one/harmony/core/types"
 )
 
 var (

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"errors"
 
-	"github.com/simple-rules/harmony-benchmark/proto"
+	"github.com/harmony-one/harmony/proto"
 )
 
 /*

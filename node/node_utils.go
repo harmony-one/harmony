@@ -1,8 +1,8 @@
 package node
 
 import (
-	"github.com/simple-rules/harmony-benchmark/blockchain"
-	"github.com/simple-rules/harmony-benchmark/crypto/pki"
+	"github.com/harmony-one/harmony/blockchain"
+	"github.com/harmony-one/harmony/crypto/pki"
 )
 
 // AddTestingAddresses creates in genesis block numAddress transactions which assign k token to each address in [0 - numAddress)

@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/simple-rules/harmony-benchmark/p2p"
+	"github.com/harmony-one/harmony/p2p"
 )
 
 // ConvertFixedDataIntoByteArray converts an empty interface data to a byte array

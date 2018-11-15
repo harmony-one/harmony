@@ -5,8 +5,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/simple-rules/harmony-benchmark/core"
-	"github.com/simple-rules/harmony-benchmark/core/types"
+	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/types"
 	"math/big"
 )
 

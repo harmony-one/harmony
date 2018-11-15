@@ -8,15 +8,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/simple-rules/harmony-benchmark/blockchain"
-	"github.com/simple-rules/harmony-benchmark/client"
-	"github.com/simple-rules/harmony-benchmark/consensus"
-	"github.com/simple-rules/harmony-benchmark/crypto/pki"
-	"github.com/simple-rules/harmony-benchmark/db"
-	"github.com/simple-rules/harmony-benchmark/log"
-	"github.com/simple-rules/harmony-benchmark/p2p"
-	proto_identity "github.com/simple-rules/harmony-benchmark/proto/identity"
-	"github.com/simple-rules/harmony-benchmark/syncing"
+	"github.com/harmony-one/harmony/blockchain"
+	"github.com/harmony-one/harmony/client"
+	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/crypto/pki"
+	"github.com/harmony-one/harmony/db"
+	"github.com/harmony-one/harmony/log"
+	"github.com/harmony-one/harmony/p2p"
+	proto_identity "github.com/harmony-one/harmony/proto/identity"
+	"github.com/harmony-one/harmony/syncing"
 )
 
 type NetworkNode struct {

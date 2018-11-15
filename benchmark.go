@@ -9,13 +9,13 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/simple-rules/harmony-benchmark/attack"
-	"github.com/simple-rules/harmony-benchmark/consensus"
-	"github.com/simple-rules/harmony-benchmark/db"
-	"github.com/simple-rules/harmony-benchmark/log"
-	"github.com/simple-rules/harmony-benchmark/node"
-	"github.com/simple-rules/harmony-benchmark/profiler"
-	"github.com/simple-rules/harmony-benchmark/utils"
+	"github.com/harmony-one/harmony/attack"
+	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/db"
+	"github.com/harmony-one/harmony/log"
+	"github.com/harmony-one/harmony/node"
+	"github.com/harmony-one/harmony/profiler"
+	"github.com/harmony-one/harmony/utils"
 )
 
 var (

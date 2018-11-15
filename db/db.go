@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/simple-rules/harmony-benchmark/log"
+	"github.com/harmony-one/harmony/log"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 	"github.com/syndtr/goleveldb/leveldb/filter"

@@ -8,12 +8,12 @@ import (
 
 	"github.com/dedis/kyber"
 	"github.com/dedis/kyber/sign/schnorr"
-	"github.com/simple-rules/harmony-benchmark/blockchain"
-	"github.com/simple-rules/harmony-benchmark/crypto"
-	"github.com/simple-rules/harmony-benchmark/crypto/pki"
-	"github.com/simple-rules/harmony-benchmark/log"
-	"github.com/simple-rules/harmony-benchmark/p2p"
-	"github.com/simple-rules/harmony-benchmark/utils"
+	"github.com/harmony-one/harmony/blockchain"
+	"github.com/harmony-one/harmony/crypto"
+	"github.com/harmony-one/harmony/crypto/pki"
+	"github.com/harmony-one/harmony/log"
+	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/utils"
 )
 
 // Consensus data containing all info related to one round of consensus process

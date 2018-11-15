@@ -24,7 +24,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/simple-rules/harmony-benchmark/core/types"
+	"github.com/harmony-one/harmony/core/types"
 )
 
 // nonceHeap is a heap.Interface implementation over 64bit unsigned integers for

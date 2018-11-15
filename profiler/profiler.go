@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/shirou/gopsutil/process"
-	"github.com/simple-rules/harmony-benchmark/log"
+	"github.com/harmony-one/harmony/log"
 )
 
 type Profiler struct {

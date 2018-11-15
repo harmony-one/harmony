@@ -5,12 +5,12 @@ import (
 	"encoding/gob"
 	"sync"
 
-	"github.com/simple-rules/harmony-benchmark/proto/node"
+	"github.com/harmony-one/harmony/proto/node"
 
-	"github.com/simple-rules/harmony-benchmark/blockchain"
-	"github.com/simple-rules/harmony-benchmark/log"
-	"github.com/simple-rules/harmony-benchmark/p2p"
-	client_proto "github.com/simple-rules/harmony-benchmark/proto/client"
+	"github.com/harmony-one/harmony/blockchain"
+	"github.com/harmony-one/harmony/log"
+	"github.com/harmony-one/harmony/p2p"
+	client_proto "github.com/harmony-one/harmony/proto/client"
 )
 
 // A client represents a node (e.g. a wallet) which  sends transactions and receives responses from the harmony network

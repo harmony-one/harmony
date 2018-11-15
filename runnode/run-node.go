@@ -4,8 +4,8 @@ import (
 	"flag"
 	"time"
 
-	"github.com/simple-rules/harmony-benchmark/node"
-	"github.com/simple-rules/harmony-benchmark/p2p"
+	"github.com/harmony-one/harmony/node"
+	"github.com/harmony-one/harmony/p2p"
 )
 
 func main() {

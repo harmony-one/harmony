@@ -8,8 +8,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/simple-rules/harmony-benchmark/db"
-	"github.com/simple-rules/harmony-benchmark/utils"
+	"github.com/harmony-one/harmony/db"
+	"github.com/harmony-one/harmony/utils"
 )
 
 // Block is a block in the blockchain that contains block headers, transactions and signature etc.

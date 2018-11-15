@@ -17,15 +17,15 @@ import (
 	"time"
 
 	"github.com/dedis/kyber"
-	"github.com/simple-rules/harmony-benchmark/blockchain"
-	"github.com/simple-rules/harmony-benchmark/client"
-	client_config "github.com/simple-rules/harmony-benchmark/client/config"
-	"github.com/simple-rules/harmony-benchmark/crypto"
-	"github.com/simple-rules/harmony-benchmark/crypto/pki"
-	"github.com/simple-rules/harmony-benchmark/node"
-	"github.com/simple-rules/harmony-benchmark/p2p"
-	proto_node "github.com/simple-rules/harmony-benchmark/proto/node"
-	"github.com/simple-rules/harmony-benchmark/utils"
+	"github.com/harmony-one/harmony/blockchain"
+	"github.com/harmony-one/harmony/client"
+	client_config "github.com/harmony-one/harmony/client/config"
+	"github.com/harmony-one/harmony/crypto"
+	"github.com/harmony-one/harmony/crypto/pki"
+	"github.com/harmony-one/harmony/node"
+	"github.com/harmony-one/harmony/p2p"
+	proto_node "github.com/harmony-one/harmony/proto/node"
+	"github.com/harmony-one/harmony/utils"
 )
 
 func main() {

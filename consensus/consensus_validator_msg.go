@@ -5,8 +5,8 @@ import (
 	"encoding/binary"
 
 	"github.com/dedis/kyber"
-	"github.com/simple-rules/harmony-benchmark/crypto"
-	proto_consensus "github.com/simple-rules/harmony-benchmark/proto/consensus"
+	"github.com/harmony-one/harmony/crypto"
+	proto_consensus "github.com/harmony-one/harmony/proto/consensus"
 )
 
 // Construct the commit message to send to leader (assumption the consensus data is already verified)

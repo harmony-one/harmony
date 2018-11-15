@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/simple-rules/harmony-benchmark/crypto"
-	"github.com/simple-rules/harmony-benchmark/crypto/pki"
-	"github.com/simple-rules/harmony-benchmark/p2p"
+	"github.com/harmony-one/harmony/crypto"
+	"github.com/harmony-one/harmony/crypto/pki"
+	"github.com/harmony-one/harmony/p2p"
 )
 
 type ConfigEntry struct {

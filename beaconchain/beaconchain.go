@@ -7,11 +7,11 @@ import (
 	"sync"
 
 	"github.com/dedis/kyber"
-	"github.com/simple-rules/harmony-benchmark/crypto/pki"
-	"github.com/simple-rules/harmony-benchmark/log"
-	"github.com/simple-rules/harmony-benchmark/node"
-	"github.com/simple-rules/harmony-benchmark/p2p"
-	proto_identity "github.com/simple-rules/harmony-benchmark/proto/identity"
+	"github.com/harmony-one/harmony/crypto/pki"
+	"github.com/harmony-one/harmony/log"
+	"github.com/harmony-one/harmony/node"
+	"github.com/harmony-one/harmony/p2p"
+	proto_identity "github.com/harmony-one/harmony/proto/identity"
 )
 
 var mutex sync.Mutex

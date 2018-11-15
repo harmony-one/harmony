@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 
 	"github.com/dedis/kyber"
-	"github.com/simple-rules/harmony-benchmark/crypto/pki"
+	"github.com/harmony-one/harmony/crypto/pki"
 )
 
 // Blockchain keeps a sequence of Blocks

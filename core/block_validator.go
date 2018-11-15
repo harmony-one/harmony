@@ -21,8 +21,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/simple-rules/harmony-benchmark/consensus"
-	"github.com/simple-rules/harmony-benchmark/core/types"
+	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/core/types"
 )
 
 // BlockValidator is responsible for validating block headers, uncles and

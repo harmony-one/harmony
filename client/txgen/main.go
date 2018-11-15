@@ -12,15 +12,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/simple-rules/harmony-benchmark/blockchain"
-	"github.com/simple-rules/harmony-benchmark/client"
-	client_config "github.com/simple-rules/harmony-benchmark/client/config"
-	"github.com/simple-rules/harmony-benchmark/consensus"
-	"github.com/simple-rules/harmony-benchmark/crypto/pki"
-	"github.com/simple-rules/harmony-benchmark/log"
-	"github.com/simple-rules/harmony-benchmark/node"
-	"github.com/simple-rules/harmony-benchmark/p2p"
-	proto_node "github.com/simple-rules/harmony-benchmark/proto/node"
+	"github.com/harmony-one/harmony/blockchain"
+	"github.com/harmony-one/harmony/client"
+	client_config "github.com/harmony-one/harmony/client/config"
+	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/crypto/pki"
+	"github.com/harmony-one/harmony/log"
+	"github.com/harmony-one/harmony/node"
+	"github.com/harmony-one/harmony/p2p"
+	proto_node "github.com/harmony-one/harmony/proto/node"
 )
 
 var (

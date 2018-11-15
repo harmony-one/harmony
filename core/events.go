@@ -18,7 +18,7 @@ package core
 
 import (
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/simple-rules/harmony-benchmark/core/types"
+	"github.com/harmony-one/harmony/core/types"
 )
 
 // NewTxsEvent is posted when a batch of transactions enter the transaction pool.

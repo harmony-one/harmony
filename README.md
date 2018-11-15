@@ -1,5 +1,5 @@
 # Harmony Benchmark
-[![Build Status](https://travis-ci.com/simple-rules/harmony-benchmark.svg?token=DnoYvYiTAk7pqTo9XsTi&branch=master)](https://travis-ci.com/simple-rules/harmony-benchmark)
+[![Build Status](https://travis-ci.com/harmony-one/harmony.svg?token=DnoYvYiTAk7pqTo9XsTi&branch=master)](https://travis-ci.com/harmony-one/harmony)
 
 ## Coding Guidelines
 
@@ -18,7 +18,7 @@ mkdir -p $HOME/<path_of_your_choice>/src
 
 cd $HOME/<path_of_your_choice>/src
 
-git clone git@github.com:simple-rules/harmony-benchmark.git
+git clone git@github.com:harmony-one/harmony.git
 
 cd harmony-benchmark
 

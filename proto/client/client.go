@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"encoding/gob"
 
-	"github.com/simple-rules/harmony-benchmark/blockchain"
-	"github.com/simple-rules/harmony-benchmark/proto"
+	"github.com/harmony-one/harmony/blockchain"
+	"github.com/harmony-one/harmony/proto"
 )
 
 // The specific types of message under CLIENT category

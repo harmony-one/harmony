@@ -12,7 +12,7 @@ import (
 
 	"github.com/dedis/kyber"
 	"github.com/dedis/kyber/sign/schnorr"
-	"github.com/simple-rules/harmony-benchmark/crypto"
+	"github.com/harmony-one/harmony/crypto"
 )
 
 var (

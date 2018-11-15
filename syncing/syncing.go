@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/Workiva/go-datastructures/queue"
-	"github.com/simple-rules/harmony-benchmark/blockchain"
-	"github.com/simple-rules/harmony-benchmark/p2p"
-	proto_node "github.com/simple-rules/harmony-benchmark/proto/node"
+	"github.com/harmony-one/harmony/blockchain"
+	"github.com/harmony-one/harmony/p2p"
+	proto_node "github.com/harmony-one/harmony/proto/node"
 )
 
 type SyncPeerConfig struct {

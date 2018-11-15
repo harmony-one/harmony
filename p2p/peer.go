@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/simple-rules/harmony-benchmark/log"
+	"github.com/harmony-one/harmony/log"
 
 	"github.com/dedis/kyber"
 )

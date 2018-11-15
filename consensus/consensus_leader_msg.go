@@ -5,9 +5,9 @@ import (
 	"encoding/binary"
 
 	"github.com/dedis/kyber"
-	"github.com/simple-rules/harmony-benchmark/crypto"
-	"github.com/simple-rules/harmony-benchmark/log"
-	proto_consensus "github.com/simple-rules/harmony-benchmark/proto/consensus"
+	"github.com/harmony-one/harmony/crypto"
+	"github.com/harmony-one/harmony/log"
+	proto_consensus "github.com/harmony-one/harmony/proto/consensus"
 )
 
 // Constructs the announce message

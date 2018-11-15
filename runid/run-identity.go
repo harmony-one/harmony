@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/simple-rules/harmony-benchmark/beaconchain"
+	"github.com/harmony-one/harmony/beaconchain"
 )
 
 func main() {
