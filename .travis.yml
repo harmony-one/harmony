@@ -4,7 +4,7 @@ go:
 install:
   - export GOPATH=$HOME/gopath
   - cd $HOME/gopath/src
-  - cd github.com/simple-rules/harmony-benchmark
+  - cd github.com/harmony-one/harmony
   - go get ./...
   - go get gopkg.in/check.v1
   - ./.travis.gofmt.sh
