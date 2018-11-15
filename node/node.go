@@ -19,6 +19,11 @@ import (
 	"github.com/simple-rules/harmony-benchmark/syncing"
 )
 
+type NetworkNode struct {
+	SelfPeer p2p.Peer
+	IDCPeer  p2p.Peer
+}
+
 // Node represents a program (machine) participating in the network
 // TODO(minhdoan, rj): consider using BlockChannel *chan blockchain.Block for efficiency.
 type Node struct {
@@ -127,40 +132,41 @@ func (node *Node) countNumTransactionsInBlockchain() int {
 
 //ConnectIdentityChain connects to identity chain
 func (node *Node) ConnectBeaconChain() {
-	msg := node.SerializeNode()
+	Nnode := &NetworkNode{SelfPeer: node.SelfPeer, IDCPeer: node.IDCPeer}
+	msg := node.SerializeNode(Nnode)
 	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Register, msg)
 	p2p.SendMessage(node.IDCPeer, msgToSend)
 }
 
 // SerializeNode serializes the node
 // https://stackoverflow.com/questions/12854125/how-do-i-dump-the-struct-into-the-byte-array-without-reflection/12854659#12854659
-func (node *Node) SerializeNode() []byte {
+func (node *Node) SerializeNode(nnode *NetworkNode) []byte {
 	//Needs to escape the serialization of unexported fields
-	result := new(bytes.Buffer)
-	encoder := gob.NewEncoder(result)
-	err := encoder.Encode(node.SelfPeer)
+	var result bytes.Buffer
+	encoder := gob.NewEncoder(&result)
+	err := encoder.Encode(nnode)
 	if err != nil {
 		fmt.Println("Could not serialize node")
 		fmt.Println("ERROR", err)
 		//node.log.Error("Could not serialize node")
 	}
-	err = encoder.Encode(node.IDCPeer)
+	//err = encoder.Encode(node.IDCPeer)
 	return result.Bytes()
 }
 
 // DeserializeNode deserializes the node
-func DeserializeNode(d []byte) *Node {
-	var wn Node
+func DeserializeNode(d []byte) *NetworkNode {
+	var wn NetworkNode
 	r := bytes.NewBuffer(d)
 	decoder := gob.NewDecoder(r)
-	err := decoder.Decode(&wn.SelfPeer)
+	err := decoder.Decode(&wn)
 	if err != nil {
-		log.Error("Could not de-serialize node")
+		log.Error("Could not de-serialize node 1")
 	}
-	err = decoder.Decode(&wn.IDCPeer)
-	if err != nil {
-		log.Error("Could not de-serialize node")
-	}
+	// err = decoder.Decode(&wn.IDCPeer)
+	// if err != nil {
+	// 	log.Error("Could not de-serialize node 2")
+	// }
 	return &wn
 }
 
