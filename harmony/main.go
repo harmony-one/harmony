@@ -1,10 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"math/big"
@@ -43,8 +45,11 @@ func main() {
 		}
 	)
 
-	chain, _ := core.NewBlockChain(database, nil, gspec.Config, nil, vm.Config{}, nil)
+	genesis := gspec.MustCommit(database)
 
+	chain, _ := core.NewBlockChain(database, nil, gspec.Config, consensus.NewFaker(), vm.Config{}, nil)
+
+	fmt.Println(chain)
 	txpool := core.NewTxPool(core.DefaultTxPoolConfig, chainConfig, chain)
 
 	backend := &testWorkerBackend{
@@ -53,4 +58,15 @@ func main() {
 		txPool: txpool,
 	}
 	backend.txPool.AddLocals(pendingTxs)
+
+	// Generate a small n-block chain and an uncle block for it
+	n := 10
+	if n > 0 {
+		blocks, _ := core.GenerateChain(chainConfig, genesis, consensus.NewFaker(), database, n, func(i int, gen *core.BlockGen) {
+			gen.SetCoinbase(testBankAddress)
+		})
+		if _, err := chain.InsertChain(blocks); err != nil {
+			fmt.Errorf("failed to insert origin chain: %v", err)
+		}
+	}
 }
