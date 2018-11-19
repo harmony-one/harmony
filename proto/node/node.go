@@ -19,6 +19,8 @@ const (
 	CLIENT
 	CONTROL
 	BlockchainSync
+	PING // node send ip/pki to register with leader
+	PONG // leader
 	// TODO: add more types
 )
 
