@@ -1,2 +1,6 @@
+#!/bin/bash
+
+DIRROOT=$(dirname $0)
+
 go test ./...
-./.travis.gofmt.sh
+$DIRROOT/.travis.gofmt.sh
