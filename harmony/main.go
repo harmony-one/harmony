@@ -29,6 +29,17 @@ var (
 	newTxs     []*types.Transaction
 )
 
+func init() {
+	tx1, _ := types.SignTx(types.NewTransaction(0, testUserAddress, big.NewInt(1000), params.TxGas, nil, nil), types.HomesteadSigner{}, testBankKey)
+	tx2, _ := types.SignTx(types.NewTransaction(1, testUserAddress, big.NewInt(1000), params.TxGas, nil, nil), types.HomesteadSigner{}, testBankKey)
+	tx3, _ := types.SignTx(types.NewTransaction(2, testUserAddress, big.NewInt(1000), params.TxGas, nil, nil), types.HomesteadSigner{}, testBankKey)
+	pendingTxs = append(pendingTxs, tx1)
+	pendingTxs = append(pendingTxs, tx2)
+	pendingTxs = append(pendingTxs, tx3)
+	tx4, _ := types.SignTx(types.NewTransaction(1, testUserAddress, big.NewInt(1000), params.TxGas, nil, nil), types.HomesteadSigner{}, testBankKey)
+	newTxs = append(newTxs, tx4)
+}
+
 type testWorkerBackend struct {
 	db     ethdb.Database
 	txPool *core.TxPool
@@ -36,7 +47,6 @@ type testWorkerBackend struct {
 }
 
 func main() {
-
 	var (
 		database = ethdb.NewMemDatabase()
 		gspec    = core.Genesis{
@@ -49,7 +59,10 @@ func main() {
 
 	chain, _ := core.NewBlockChain(database, nil, gspec.Config, consensus.NewFaker(), vm.Config{}, nil)
 
-	fmt.Println(chain)
+	fmt.Println(testBankAddress)
+	fmt.Println(testUserAddress)
+	fmt.Println(genesis.Root())
+
 	txpool := core.NewTxPool(core.DefaultTxPoolConfig, chainConfig, chain)
 
 	backend := &testWorkerBackend{
@@ -60,13 +73,21 @@ func main() {
 	backend.txPool.AddLocals(pendingTxs)
 
 	// Generate a small n-block chain and an uncle block for it
-	n := 10
+	n := 3
 	if n > 0 {
 		blocks, _ := core.GenerateChain(chainConfig, genesis, consensus.NewFaker(), database, n, func(i int, gen *core.BlockGen) {
 			gen.SetCoinbase(testBankAddress)
+			gen.AddTx(pendingTxs[i])
 		})
 		if _, err := chain.InsertChain(blocks); err != nil {
 			fmt.Errorf("failed to insert origin chain: %v", err)
 		}
+		fmt.Println(blocks[0].NumberU64())
+		fmt.Println(chain.GetBlockByNumber(0).Root())
+		fmt.Println(chain.GetBlockByNumber(1).Root())
+		fmt.Println(blocks[1].Root())
+		fmt.Println(chain.GetBlockByNumber(2).Root())
+		fmt.Println(blocks[2].Root())
+		fmt.Println("Yeah")
 	}
 }
