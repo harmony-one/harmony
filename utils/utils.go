@@ -8,6 +8,9 @@ import (
 	"regexp"
 	"strconv"
 
+	"github.com/dedis/kyber"
+	"github.com/harmony-one/harmony/crypto"
+	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/p2p"
 )
 
@@ -32,6 +35,16 @@ func GetUniqueIdFromPeer(peer p2p.Peer) uint16 {
 	return uint16(value)
 }
 
+func GetUniqueIdFromIpPort(ip, port string) uint16 {
+	reg, err := regexp.Compile("[^0-9]+")
+	if err != nil {
+		log.Panic("Regex Compilation Failed", "err", err)
+	}
+	socketId := reg.ReplaceAllString(ip+port, "") // A integer Id formed by unique IP/PORT pair
+	value, _ := strconv.Atoi(socketId)
+	return uint16(value)
+}
+
 // RunCmd Runs command `name` with arguments `args`
 func RunCmd(name string, args ...string) error {
 	cmd := exec.Command(name, args...)
@@ -49,4 +62,11 @@ func RunCmd(name string, args ...string) error {
 		}
 	}()
 	return nil
+}
+
+func GenKey(ip, port string) (kyber.Scalar, kyber.Point) {
+	priKey := crypto.Ed25519Curve.Scalar().SetInt64(int64(GetUniqueIdFromIpPort(ip, port))) // TODO: figure out why using a random hash value doesn't work for private key (schnorr)
+	pubKey := pki.GetPublicKeyFromScalar(priKey)
+
+	return priKey, pubKey
 }
