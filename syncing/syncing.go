@@ -12,6 +12,7 @@ import (
 	proto_node "github.com/harmony-one/harmony/proto/node"
 )
 
+// SyncPeerConfig is peer config to sync.
 type SyncPeerConfig struct {
 	peer        p2p.Peer
 	conn        net.Conn
@@ -21,18 +22,36 @@ type SyncPeerConfig struct {
 	blockHashes [][32]byte
 }
 
+// SyncBlockTask is the task struct to sync a specific block.
 type SyncBlockTask struct {
 	index     int
 	blockHash [32]byte
 }
+
+// SyncConfig contains an array of SyncPeerConfig.
 type SyncConfig struct {
 	peers []SyncPeerConfig
 }
 
-func StartBlockSyncing(peers []p2p.Peer) *blockchain.Blockchain {
-	peer_number := len(peers)
+// StateSync is the main object used to do state sync.
+type StateSync struct {
+}
+
+// ProcessStateSync used to do state sync.
+func (ss *StateSync) ProcessStateSync(peers []p2p.Peer, bc *blockchain.Blockchain) (chan struct{}, error) {
+	done := make(chan struct{})
+	go func() {
+		ss.StartStateSync(peers, bc)
+		done <- struct{}{}
+	}()
+	return done, nil
+}
+
+// StartStateSync starts state sync.
+func (ss *StateSync) StartStateSync(peers []p2p.Peer, bc *blockchain.Blockchain) {
+	peerNumber := len(peers)
 	syncConfig := SyncConfig{
-		peers: make([]SyncPeerConfig, peer_number),
+		peers: make([]SyncPeerConfig, peerNumber),
 	}
 	for id := range syncConfig.peers {
 		syncConfig.peers[id].peer = peers[id]
@@ -40,7 +59,7 @@ func StartBlockSyncing(peers []p2p.Peer) *blockchain.Blockchain {
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(peer_number)
+	wg.Add(peerNumber)
 
 	for id := range syncConfig.peers {
 		go func(peerConfig *SyncPeerConfig) {
@@ -109,9 +128,7 @@ TASK_LOOP:
 		}
 	}
 	// Initialize blockchain
-	bc := &blockchain.Blockchain{
-		Blocks: make([]*blockchain.Block, blockSize),
-	}
+	bc.Blocks = make([]*blockchain.Block, blockSize)
 	wg.Add(activePeerNumber)
 	for _, configPeer := range syncConfig.peers {
 		if configPeer.err != nil {
@@ -142,7 +159,6 @@ TASK_LOOP:
 		}(&configPeer, taskSyncQueue, bc)
 	}
 	wg.Wait()
-	return bc
 }
 
 func getConsensus(syncConfig *SyncConfig) bool {

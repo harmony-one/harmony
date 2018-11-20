@@ -46,6 +46,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 		node.log.Error("Read p2p data failed", "err", err, "node", node)
 		return
 	}
+	// TODO: this is tree broadcasting. this needs to be removed later. Actually the whole logic needs to be replaced by p2p.
 	node.MaybeBroadcastAsValidator(content)
 
 	consensusObj := node.Consensus
