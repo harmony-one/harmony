@@ -134,6 +134,8 @@ func (node *Node) countNumTransactionsInBlockchain() int {
 func (node *Node) ConnectBeaconChain() {
 	Nnode := &NetworkNode{SelfPeer: node.SelfPeer, IDCPeer: node.IDCPeer}
 	msg := node.SerializeNode(Nnode)
+	fmt.Println("message payload from node side")
+	fmt.Println(msg)
 	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Register, msg)
 	p2p.SendMessage(node.IDCPeer, msgToSend)
 }
@@ -150,7 +152,7 @@ func (node *Node) SerializeNode(nnode *NetworkNode) []byte {
 		fmt.Println("ERROR", err)
 		//node.log.Error("Could not serialize node")
 	}
-	//err = encoder.Encode(node.IDCPeer)
+
 	return result.Bytes()
 }
 
@@ -163,10 +165,6 @@ func DeserializeNode(d []byte) *NetworkNode {
 	if err != nil {
 		log.Error("Could not de-serialize node 1")
 	}
-	// err = decoder.Decode(&wn.IDCPeer)
-	// if err != nil {
-	// 	log.Error("Could not de-serialize node 2")
-	// }
 	return &wn
 }
 

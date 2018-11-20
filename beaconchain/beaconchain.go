@@ -52,8 +52,7 @@ func generateIDCKeys() kyber.Point {
 //AcceptConnections welcomes new connections
 func (IDC *BeaconChain) AcceptConnections(b []byte) {
 	NewNode := node.DeserializeNode(b)
-	Node := &node.Node{SelfPeer: NewNode.SelfPeer, IDCPeer: NewNode.IDCPeer}
-	IDC.registerNode(Node) //This copies lock value of sync.mutex, we need to have a way around it by creating auxiliary data struct.
+	fmt.Println(NewNode)
 }
 
 func (IDC *BeaconChain) registerNode(Node *node.Node) {
