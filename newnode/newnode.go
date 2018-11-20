@@ -13,31 +13,29 @@ import (
 )
 
 type NewNode struct {
-	IP          string
-	Port        string
 	Role        string
 	ShardID     string
 	ValidatorID int // Validator ID in its shard.
 	leader      p2p.Peer
-	self        p2p.Peer
+	Self        p2p.Peer
 	peers       []p2p.Peer
 	pubK        kyber.Scalar
 	priK        kyber.Point
 }
 
-func (config NewNode) String() string {
-	return fmt.Sprintf("idc: %v:%v", config.IP, config.Port)
+func (node NewNode) String() string {
+	return fmt.Sprintf("idc: %v:%v", node.Self.Ip, node.Self.Port)
 }
 
 func New(ip string, port string) *NewNode {
 	pubKey, priKey := utils.GenKey(ip, port)
-	var config NewNode
-	config.pubK = pubKey
-	config.priK = priKey
+	var node NewNode
+	node.pubK = pubKey
+	node.priK = priKey
+	node.Self = p2p.Peer{Ip: ip, Port: port}
+	node.peers = make([]p2p.Peer, 0)
 
-	config.peers = make([]p2p.Peer, 0)
-
-	return &config
+	return &node
 }
 
 //ConnectIdentityChain connects to identity chain
@@ -73,10 +71,7 @@ func DeserializeNode(d []byte) *NewNode {
 	}
 	return &wn
 }
-func (config *NewNode) StartClientMode(idcIP, idcPort string) error {
-	config.IP = "myip"
-	config.Port = "myport"
-
+func (node *NewNode) StartClientMode(idcIP, idcPort string) error {
 	fmt.Printf("idc ip/port: %v/%v\n", idcIP, idcPort)
 
 	// ...
@@ -84,18 +79,18 @@ func (config *NewNode) StartClientMode(idcIP, idcPort string) error {
 	return nil
 }
 
-func (config *NewNode) GetShardID() string {
-	return config.ShardID
+func (node *NewNode) GetShardID() string {
+	return node.ShardID
 }
 
-func (config *NewNode) GetPeers() []p2p.Peer {
-	return config.peers
+func (node *NewNode) GetPeers() []p2p.Peer {
+	return node.peers
 }
 
-func (config *NewNode) GetLeader() p2p.Peer {
-	return config.leader
+func (node *NewNode) GetLeader() p2p.Peer {
+	return node.leader
 }
 
-func (config *NewNode) GetSelfPeer() p2p.Peer {
-	return config.self
+func (node *NewNode) GetSelfPeer() p2p.Peer {
+	return node.Self
 }
