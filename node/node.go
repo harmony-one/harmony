@@ -1,8 +1,6 @@
 package node
 
 import (
-	"bytes"
-	"encoding/gob"
 	"fmt"
 	"net"
 	"sync"
@@ -15,7 +13,6 @@ import (
 	"github.com/harmony-one/harmony/db"
 	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/p2p"
-	proto_identity "github.com/harmony-one/harmony/proto/identity"
 )
 
 type NetworkNode struct {
@@ -128,42 +125,6 @@ func (node *Node) countNumTransactionsInBlockchain() int {
 		count += len(block.Transactions)
 	}
 	return count
-}
-
-//ConnectIdentityChain connects to identity chain
-func (node *Node) ConnectBeaconChain() {
-	Nnode := &NetworkNode{SelfPeer: node.SelfPeer, IDCPeer: node.IDCPeer}
-	msg := node.SerializeNode(Nnode)
-	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Register, msg)
-	p2p.SendMessage(node.IDCPeer, msgToSend)
-}
-
-// SerializeNode serializes the node
-// https://stackoverflow.com/questions/12854125/how-do-i-dump-the-struct-into-the-byte-array-without-reflection/12854659#12854659
-func (node *Node) SerializeNode(nnode *NetworkNode) []byte {
-	//Needs to escape the serialization of unexported fields
-	var result bytes.Buffer
-	encoder := gob.NewEncoder(&result)
-	err := encoder.Encode(nnode)
-	if err != nil {
-		fmt.Println("Could not serialize node")
-		fmt.Println("ERROR", err)
-		//node.log.Error("Could not serialize node")
-	}
-
-	return result.Bytes()
-}
-
-// DeserializeNode deserializes the node
-func DeserializeNode(d []byte) *NetworkNode {
-	var wn NetworkNode
-	r := bytes.NewBuffer(d)
-	decoder := gob.NewDecoder(r)
-	err := decoder.Decode(&wn)
-	if err != nil {
-		log.Error("Could not de-serialize node 1")
-	}
-	return &wn
 }
 
 // New creates a new node.

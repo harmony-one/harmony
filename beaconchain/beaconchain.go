@@ -9,6 +9,7 @@ import (
 	"github.com/dedis/kyber"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/log"
+	"github.com/harmony-one/harmony/newnode"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	proto_identity "github.com/harmony-one/harmony/proto/identity"
@@ -17,16 +18,22 @@ import (
 var mutex sync.Mutex
 var identityPerBlock = 100000
 
+type registerResponseRandomNumber struct {
+	NumberOfShards     int
+	NumberOfNodesAdded int
+	Leaders            []*newnode.NewNode
+}
+
 // BeaconChain (Blockchain) keeps Identities per epoch, currently centralized!
 type BeaconChain struct {
 	//Identities            []*IdentityBlock //No need to have the identity block as of now
-	Identities           []*node.Node
-	log                  log.Logger
-	PeerToShardMap       map[*node.Node]int
-	ShardLeaderMap       map[int]*node.Node
-	PubKey               kyber.Point
-	NumberOfShards       int
-	NumberOfLeadersAdded int
+	Leaders            []*newnode.NewNode
+	log                log.Logger
+	PeerToShardMap     map[*node.Node]int
+	ShardLeaderMap     map[int]*node.Node
+	PubKey             kyber.Point
+	NumberOfShards     int
+	NumberOfNodesAdded int
 }
 
 //Init
@@ -34,8 +41,9 @@ func New(filename string) *BeaconChain {
 	idc := BeaconChain{}
 	//idc.NumberOfShards = readConfigFile(filename)
 	idc.log = log.New()
-	idc.NumberOfShards = 2
+	idc.NumberOfShards = 2 //hardcode.
 	idc.PubKey = generateIDCKeys()
+	idc.NumberOfNodesAdded = 0
 	return &idc
 }
 
@@ -51,21 +59,19 @@ func generateIDCKeys() kyber.Point {
 
 //AcceptConnections welcomes new connections
 func (IDC *BeaconChain) AcceptConnections(b []byte) {
-	NewNode := node.DeserializeNode(b)
-	fmt.Println(NewNode)
+	NewNode := newnode.DeserializeNode(b)
+	IDC.registerNode(NewNode)
 }
 
-func (IDC *BeaconChain) registerNode(Node *node.Node) {
-	IDC.Identities = append(IDC.Identities, Node)
-	fmt.Println(IDC.Identities)
-	//IDC.CommunicatePublicKeyToNode(Node.SelfPeer)
+func (IDC *BeaconChain) registerNode(Node *newnode.NewNode) {
+	IDC.NumberOfNodesAdded = IDC.NumberOfNodesAdded + 1
+	if IDC.NumberOfNodesAdded <= IDC.NumberOfShards {
+		IDC.Leaders = append(IDC.Leaders, Node)
+	}
+	response := registerResponseRandomNumber{NumberOfShards: IDC.NumberOfShards, NumberOfNodesAdded: IDC.NumberOfNodesAdded, Leaders: IDC.Leaders}
+	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Acknowledge, response)
+	p2p.SendMessage(Node.Self, msgToSend)
 	return
-}
-
-func (IDC *BeaconChain) CommunicatePublicKeyToNode(Peer p2p.Peer) {
-	pbkey := pki.GetBytesFromPublicKey(IDC.PubKey)
-	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Acknowledge, pbkey[:])
-	p2p.SendMessage(Peer, msgToSend)
 }
 
 //StartServer a server and process the request by a handler.

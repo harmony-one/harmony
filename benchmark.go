@@ -12,8 +12,8 @@ import (
 	"github.com/harmony-one/harmony/attack"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/db"
-	"github.com/harmony-one/harmony/discovery"
 	"github.com/harmony-one/harmony/log"
+	"github.com/harmony-one/harmony/newnode"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/profiler"
@@ -112,23 +112,19 @@ func main() {
 
 	// Use Peer Discovery to get shard/leader/peer/...
 	if *peerDisvoery {
-		pubKey, priKey := utils.GenKey(*ip, *port)
-		// Contact Identity Chain
-		// This is a blocking call
-		// Assume @ak has get it working
-		// TODO: this has to work with @ak's fix
-		discoveryConfig := discovery.New(pubKey, priKey)
-
+		newnode := NewNode.New(ip, port)
+		BCPeer = p2p.Peer{Ip: idcIP, Port: idcPort}
+		newnode.ConnectBeaconChain(BCPeer)
 		err := discoveryConfig.StartClientMode(*idcIP, *idcPort)
 		if err != nil {
 			fmt.Println("Unable to start peer discovery! ", err)
 			os.Exit(1)
 		}
 
-		shardID = discoveryConfig.GetShardID()
-		leader = discoveryConfig.GetLeader()
-		peers = discoveryConfig.GetPeers()
-		selfPeer = discoveryConfig.GetSelfPeer()
+		shardID = newnode.GetShardID()
+		leader = newnode.GetLeader()
+		peers = newnode.GetPeers()
+		selfPeer = newnode.GetSelfPeer()
 	} else {
 		distributionConfig := utils.NewDistributionConfig()
 		distributionConfig.ReadConfigFile(*configFile)
