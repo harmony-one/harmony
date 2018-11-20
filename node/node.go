@@ -134,8 +134,6 @@ func (node *Node) countNumTransactionsInBlockchain() int {
 func (node *Node) ConnectBeaconChain() {
 	Nnode := &NetworkNode{SelfPeer: node.SelfPeer, IDCPeer: node.IDCPeer}
 	msg := node.SerializeNode(Nnode)
-	fmt.Println("message payload from node side")
-	fmt.Println(msg)
 	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Register, msg)
 	p2p.SendMessage(node.IDCPeer, msgToSend)
 }

@@ -41,6 +41,11 @@ func (IDC *BeaconChain) BeaconChainHandler(conn net.Conn) {
 		IDC.log.Error("Read message payload failed")
 		return
 	}
+	identityMsgPayload, err := proto_identity.GetIdentityMessagePayload(msgPayload)
+	if err != nil {
+		IDC.log.Error("Read message payload failed")
+		return
+	}
 	switch msgCategory {
 	case proto.Identity:
 		actionType := proto_identity.IdentityMessageType(msgType)
@@ -52,7 +57,7 @@ func (IDC *BeaconChain) BeaconChainHandler(conn net.Conn) {
 			}
 			switch idMsgType {
 			case proto_identity.Register:
-				IDC.AcceptConnections(msgPayload)
+				IDC.AcceptConnections(identityMsgPayload)
 			case proto_identity.Acknowledge:
 				// IDC.acceptNewConnection(msgPayload)
 			}
