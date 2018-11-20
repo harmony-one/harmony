@@ -12,8 +12,10 @@ import (
 	"github.com/harmony-one/harmony/attack"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/db"
+	"github.com/harmony-one/harmony/discovery"
 	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/node"
+	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/profiler"
 	"github.com/harmony-one/harmony/utils"
 )
@@ -72,6 +74,7 @@ func loggingInit(logFolder, role, ip, port string, onlyLogTps bool) {
 
 }
 func main() {
+	// TODO: use http://getmyipaddress.org/ or http://www.get-myip.com/ to retrieve my IP address
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9000", "port of the node.")
 	configFile := flag.String("config_file", "config.txt", "file containing all ip addresses")
@@ -83,6 +86,11 @@ func main() {
 	versionFlag := flag.Bool("version", false, "Output version info")
 	syncNode := flag.Bool("sync_node", false, "Whether this node is a new node joining blockchain and it needs to get synced before joining consensus.")
 	onlyLogTps := flag.Bool("only_log_tps", false, "Only log TPS if true")
+
+	// This IP belongs to jenkins.harmony.one
+	idcIP := flag.String("idc", "54.183.5.66", "IP of the identity chain")
+	idcPort := flag.String("idc_port", "8080", "port of the identity chain")
+	peerDisvoery := flag.Bool("peer_discovery", false, "Enable Peer Discovery")
 
 	flag.Parse()
 
@@ -96,12 +104,42 @@ func main() {
 	// Set up randomization seed.
 	rand.Seed(int64(time.Now().Nanosecond()))
 
-	distributionConfig := utils.NewDistributionConfig()
-	distributionConfig.ReadConfigFile(*configFile)
-	shardID := distributionConfig.GetShardID(*ip, *port)
-	peers := distributionConfig.GetPeers(*ip, *port, shardID)
-	leader := distributionConfig.GetLeader(shardID)
-	selfPeer := distributionConfig.GetSelfPeer(*ip, *port, shardID)
+	var shardID string
+	var peers []p2p.Peer
+	var leader p2p.Peer
+	var selfPeer p2p.Peer
+	var clientPeer *p2p.Peer
+
+	// Use Peer Discovery to get shard/leader/peer/...
+	if *peerDisvoery {
+		pubKey, priKey := utils.GenKey(*ip, *port)
+		// Contact Identity Chain
+		// This is a blocking call
+		// Assume @ak has get it working
+		// TODO: this has to work with @ak's fix
+		discoveryConfig := discovery.New(pubKey, priKey)
+
+		err := discoveryConfig.StartClientMode(*idcIP, *idcPort)
+		if err != nil {
+			fmt.Println("Unable to start peer discovery! ", err)
+			os.Exit(1)
+		}
+
+		shardID = discoveryConfig.GetShardID()
+		leader = discoveryConfig.GetLeader()
+		peers = discoveryConfig.GetPeers()
+		selfPeer = discoveryConfig.GetSelfPeer()
+	} else {
+		distributionConfig := utils.NewDistributionConfig()
+		distributionConfig.ReadConfigFile(*configFile)
+		shardID = distributionConfig.GetShardID(*ip, *port)
+		peers = distributionConfig.GetPeers(*ip, *port, shardID)
+		leader = distributionConfig.GetLeader(shardID)
+		selfPeer = distributionConfig.GetSelfPeer(*ip, *port, shardID)
+
+		// Create client peer.
+		clientPeer = distributionConfig.GetClientPeer()
+	}
 
 	var role string
 	if leader.Ip == *ip && leader.Port == *port {
@@ -145,8 +183,6 @@ func main() {
 	currentNode.SelfPeer = selfPeer
 	// Add sync node configuration.
 	currentNode.SyncNode = *syncNode
-	// Create client peer.
-	clientPeer := distributionConfig.GetClientPeer()
 	// If there is a client configured in the node list.
 	if clientPeer != nil {
 		currentNode.ClientPeer = clientPeer

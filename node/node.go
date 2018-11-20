@@ -16,7 +16,6 @@ import (
 	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/p2p"
 	proto_identity "github.com/harmony-one/harmony/proto/identity"
-	"github.com/harmony-one/harmony/syncing"
 )
 
 type NetworkNode struct {
@@ -79,7 +78,8 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int) ([]*blockchain.Trans
 // StartServer starts a server and process the request by a handler.
 func (node *Node) StartServer(port string) {
 	if node.SyncNode {
-		node.blockchain = syncing.StartBlockSyncing(node.Consensus.GetValidatorPeers())
+		// Disable this temporarily.
+		// node.blockchain = syncing.StartBlockSyncing(node.Consensus.GetValidatorPeers())
 	}
 	fmt.Println("going to start server")
 	//node.log.Debug("Starting server", "node", node, "port", port)
