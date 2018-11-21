@@ -28,3 +28,6 @@ gcloud.txt
 # Wallet
 keystore
 *.swp
+
+# Cscope files
+cscope.*
