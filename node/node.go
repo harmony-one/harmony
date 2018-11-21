@@ -44,7 +44,7 @@ type Node struct {
 	ClientPeer             *p2p.Peer      // The peer for the benchmark tx generator client, used for leaders to return proof-of-accept
 	Client                 *client.Client // The presence of a client object means this node will also act as a client
 	IsWaiting              bool
-	SelfPeer               p2p.Peer             // TODO(minhdoan): it could be duplicated with Self below whose is Alok work.
+	SelfPeer               p2p.Peer // TODO(minhdoan): it could be duplicated with Self below whose is Alok work.
 	IDCPeer                p2p.Peer
 	SyncNode               bool                 // TODO(minhdoan): Remove it later.
 	chain                  *core.BlockChain     // Account Model
@@ -86,7 +86,7 @@ func (node *Node) StartServer(port string) {
 		// Disable this temporarily.
 		// node.blockchain = syncing.StartBlockSyncing(node.Consensus.GetValidatorPeers())
 	}
-	fmt.Println("going to start server")
+	fmt.Println("going to start server on port:", port)
 	//node.log.Debug("Starting server", "node", node, "port", port)
 	node.listenOnPort(port)
 }

@@ -194,6 +194,8 @@ func (node *Node) NodeHandler(conn net.Conn) {
 				node.Client.TransactionMessageHandler(msgPayload)
 			}
 		}
+	default:
+		node.log.Error("Unknown", "MsgCateory:", msgCategory)
 	}
 }
 
@@ -455,7 +457,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte) {
 		node.log.Error("Can't get Ping Message")
 		return
 	}
-	node.log.Info("Ping: %v", ping)
+	node.log.Info("Ping", "Msg", ping)
 	return
 }
 
@@ -465,6 +467,6 @@ func (node *Node) pongMessageHandler(msgPayload []byte) {
 		node.log.Error("Can't get Pong Message")
 		return
 	}
-	node.log.Info("Pong: %v", pong)
+	node.log.Info("Pong", "Msg", pong)
 	return
 }
