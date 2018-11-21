@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"github.com/harmony-one/harmony/core/types"
 	"net"
 	"os"
 	"strconv"
@@ -351,6 +352,37 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
 		// Send the new block to Consensus so it can be confirmed.
 		if newBlock != nil {
 			node.BlockChannel <- *newBlock
+		}
+	}
+}
+
+// WaitForConsensusReady ...
+func (node *Node) WaitForConsensusReadyAccount(readySignal chan struct{}) {
+	node.log.Debug("Waiting for Consensus ready", "node", node)
+
+	var newBlock *types.Block
+	timeoutCount := 0
+	for { // keep waiting for Consensus ready
+		retry := false
+		// TODO(minhdoan, rj): Refactor by sending signal in channel instead of waiting for 10 seconds.
+		select {
+		case <-readySignal:
+			time.Sleep(100 * time.Millisecond) // Delay a bit so validator is catched up.
+		case <-time.After(100 * time.Second):
+			retry = true
+			node.Consensus.ResetState()
+			timeoutCount++
+			node.log.Debug("Consensus timeout, retry!", "count", timeoutCount, "node", node)
+		}
+
+		if !retry {
+			// Normal tx block consensus
+			// TODO: add new block generation logic
+		}
+
+		// Send the new block to Consensus so it can be confirmed.
+		if newBlock != nil {
+			node.BlockChannelAccount <- newBlock
 		}
 	}
 }

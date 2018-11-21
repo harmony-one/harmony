@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"net"
 	"sync"
@@ -47,9 +49,15 @@ type Node struct {
 	IsWaiting              bool
 	SelfPeer               p2p.Peer // TODO(minhdoan): it could be duplicated with Self below whose is Alok work.
 	IDCPeer                p2p.Peer
-	SyncNode               bool                 // TODO(minhdoan): Remove it later.
-	chain                  *core.BlockChain     // Account Model
-	Neighbors              map[string]*p2p.Peer // All the neighbor nodes, key is the sha256 of Peer IP/Port
+
+	SyncNode  bool                 // TODO(minhdoan): Remove it later.
+	chain     *core.BlockChain     // Account Model
+	Neighbors map[string]*p2p.Peer // All the neighbor nodes, key is the sha256 of Peer IP/Port
+
+	// Account Model
+	Chain               *core.BlockChain
+	TxPool              *core.TxPool
+	BlockChannelAccount chan *types.Block // The channel to receive new blocks from Node
 }
 
 // Add new crossTx and proofs to the list of crossTx that needs to be sent back to client
@@ -190,20 +198,24 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 		genesisBlock.Blocks = append(genesisBlock.Blocks, blockchain.NewGenesisBlock(coinbaseTx, node.Consensus.ShardID))
 		node.blockchain = genesisBlock
 
-		// Genesis Block (account model)
+		// UTXO pool from Genesis block
+		node.UtxoPool = blockchain.CreateUTXOPoolFromGenesisBlock(node.blockchain.Blocks[0])
+
+		// Initialize level db.
+		node.db = db
+
+		// (account model)
 		database := hdb.NewMemDatabase()
 		gspec := core.Genesis{}
 
 		genesis := gspec.MustCommit(database)
 		fmt.Println(genesis.Root())
 		chain, _ := core.NewBlockChain(database, nil, gspec.Config, bft.NewFaker(), vm.Config{}, nil)
-		node.chain = chain
 
-		// UTXO pool from Genesis block
-		node.UtxoPool = blockchain.CreateUTXOPoolFromGenesisBlock(node.blockchain.Blocks[0])
+		node.Chain = chain
+		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, params.TestChainConfig, chain)
+		node.BlockChannelAccount = make(chan *types.Block)
 
-		// Initialize level db.
-		node.db = db
 	}
 	// Logger
 	node.log = log.New()
