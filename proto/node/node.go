@@ -14,13 +14,17 @@ import (
 type NodeMessageType byte
 
 const (
+	PROTOCOL_VERSION = 1
+)
+
+const (
 	Transaction NodeMessageType = iota
 	BLOCK
 	CLIENT
 	CONTROL
 	BlockchainSync
 	PING // node send ip/pki to register with leader
-	PONG // leader
+	PONG // node broadcast pubK
 	// TODO: add more types
 )
 
