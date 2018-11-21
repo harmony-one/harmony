@@ -59,8 +59,8 @@ func (w *Worker) makeCurrent(parent *types.Block, header *types.Header) error {
 		return err
 	}
 	env := &environment{
-		state:     state,
-		header:    header,
+		state:  state,
+		header: header,
 	}
 
 	w.current = env
@@ -69,12 +69,12 @@ func (w *Worker) makeCurrent(parent *types.Block, header *types.Header) error {
 
 func New(config *params.ChainConfig, chain *core.BlockChain) *Worker {
 	worker := &Worker{
-		config:             config,
-		chain:              chain,
+		config: config,
+		chain:  chain,
 	}
 	worker.gasFloor = 0
 	worker.gasCeil = 10000000
-	
+
 	parent := worker.chain.CurrentBlock()
 	num := parent.Number()
 	timestamp := time.Now().Unix()
