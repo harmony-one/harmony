@@ -8,6 +8,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/node/worker"
 	"net"
 	"sync"
 	"time"
@@ -58,6 +59,7 @@ type Node struct {
 	Chain               *core.BlockChain
 	TxPool              *core.TxPool
 	BlockChannelAccount chan *types.Block // The channel to receive new blocks from Node
+	worker              *worker.Worker
 }
 
 // Add new crossTx and proofs to the list of crossTx that needs to be sent back to client
