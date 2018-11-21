@@ -92,6 +92,9 @@ func main() {
 	idcPort := flag.String("idc_port", "8080", "port of the identity chain")
 	peerDisvoery := flag.Bool("peer_discovery", false, "Enable Peer Discovery")
 
+	// Leader needs to have a minimal number of peers to start consensus
+	minPeers := flag.Int("min_peers", 100, "Minimal number of Peers in shard")
+
 	flag.Parse()
 
 	if *versionFlag {
@@ -165,6 +168,7 @@ func main() {
 
 	// Consensus object.
 	consensus := consensus.NewConsensus(*ip, *port, shardID, peers, leader)
+	consensus.MinPeers = *minPeers
 
 	// Start Profiler for leader if profile argument is on
 	if role == "leader" && (*profile || *metricsReportURL != "") {
