@@ -14,6 +14,10 @@ import (
 type NodeMessageType byte
 
 const (
+	PROTOCOL_VERSION = 1
+)
+
+const (
 	Transaction NodeMessageType = iota
 	BLOCK
 	CLIENT
