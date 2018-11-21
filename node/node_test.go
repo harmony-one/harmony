@@ -1,13 +1,17 @@
 package node
 
 import (
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/crypto/pki"
 
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/p2p"
+
+	proto_node "github.com/harmony-one/harmony/proto/node"
 )
 
 func TestNewNewNode(test *testing.T) {
@@ -87,4 +91,63 @@ func TestAddPeers(test *testing.T) {
 	if r2 != e2 {
 		test.Errorf("Add %v peers, expectd %v", r2, e2)
 	}
+}
+
+func sendPingMessage(leader p2p.Peer) {
+	priKey1 := crypto.Ed25519Curve.Scalar().SetInt64(int64(333))
+	pubKey1 := pki.GetPublicKeyFromScalar(priKey1)
+
+	p1 := p2p.Peer{
+		Ip:     "127.0.0.1",
+		Port:   "9999",
+		PubKey: pubKey1,
+	}
+
+	ping1 := proto_node.NewPingMessage(p1)
+	buf1 := ping1.ConstructPingMessage()
+
+	fmt.Println("waiting for 5 seconds ...")
+	time.Sleep(5 * time.Second)
+
+	p2p.SendMessage(leader, buf1)
+	fmt.Println("sent ping message ...")
+}
+
+func sendPongMessage(leader p2p.Peer) {
+	priKey1 := crypto.Ed25519Curve.Scalar().SetInt64(int64(333))
+	pubKey1 := pki.GetPublicKeyFromScalar(priKey1)
+	p1 := p2p.Peer{
+		Ip:     "127.0.0.1",
+		Port:   "9998",
+		PubKey: pubKey1,
+	}
+	priKey2 := crypto.Ed25519Curve.Scalar().SetInt64(int64(999))
+	pubKey2 := pki.GetPublicKeyFromScalar(priKey2)
+	p2 := p2p.Peer{
+		Ip:     "127.0.0.1",
+		Port:   "9999",
+		PubKey: pubKey2,
+	}
+
+	pong1 := proto_node.NewPongMessage([]p2p.Peer{p1, p2})
+	buf1 := pong1.ConstructPongMessage()
+
+	fmt.Println("waiting for 10 seconds ...")
+	time.Sleep(10 * time.Second)
+
+	p2p.SendMessage(leader, buf1)
+	fmt.Println("sent pong message ...")
+}
+
+func TestPingPongHandler(test *testing.T) {
+	leader := p2p.Peer{Ip: "127.0.0.1", Port: "8881"}
+	validator := p2p.Peer{Ip: "127.0.0.1", Port: "9991"}
+	consensus := consensus.NewConsensus("127.0.0.1", "8881", "0", []p2p.Peer{leader, validator}, leader)
+
+	node := New(consensus, nil)
+
+	go sendPingMessage(leader)
+	go sendPongMessage(leader)
+
+	node.StartServer("8881")
 }
