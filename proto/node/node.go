@@ -24,7 +24,7 @@ const (
 	CONTROL
 	BlockchainSync
 	PING // node send ip/pki to register with leader
-	PONG // leader
+	PONG // node broadcast pubK
 	// TODO: add more types
 )
 

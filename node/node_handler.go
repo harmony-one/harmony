@@ -178,6 +178,12 @@ func (node *Node) NodeHandler(conn net.Conn) {
 
 				os.Exit(0)
 			}
+		case proto_node.PING:
+			node.log.Info("NET: received message: PING")
+			node.pingMessageHandler(msgPayload)
+		case proto_node.PONG:
+			node.log.Info("NET: received message: PONG")
+			node.pongMessageHandler(msgPayload)
 		}
 	case proto.CLIENT:
 		actionType := client.ClientMessageType(msgType)
@@ -441,4 +447,24 @@ func (node *Node) UpdateUtxoAndState(newBlock *blockchain.Block) {
 		node.log.Info("LEADER CURRENT UTXO", "num", node.UtxoPool.CountNumOfUtxos(), "ShardID", node.UtxoPool.ShardID)
 		node.log.Info("LEADER LOCKED UTXO", "num", node.UtxoPool.CountNumOfLockedUtxos(), "ShardID", node.UtxoPool.ShardID)
 	}
+}
+
+func (node *Node) pingMessageHandler(msgPayload []byte) {
+	ping, err := proto_node.GetPingMessage(msgPayload)
+	if err != nil {
+		node.log.Error("Can't get Ping Message")
+		return
+	}
+	node.log.Info("Ping: %v", ping)
+	return
+}
+
+func (node *Node) pongMessageHandler(msgPayload []byte) {
+	pong, err := proto_node.GetPongMessage(msgPayload)
+	if err != nil {
+		node.log.Error("Can't get Pong Message")
+		return
+	}
+	node.log.Info("Pong: %v", pong)
+	return
 }

@@ -17,6 +17,8 @@ import (
 	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/p2p"
 	proto_identity "github.com/harmony-one/harmony/proto/identity"
+
+	"github.com/jinzhu/copier"
 )
 
 type NetworkNode struct {
@@ -42,12 +44,11 @@ type Node struct {
 	ClientPeer             *p2p.Peer      // The peer for the benchmark tx generator client, used for leaders to return proof-of-accept
 	Client                 *client.Client // The presence of a client object means this node will also act as a client
 	IsWaiting              bool
-	SelfPeer               p2p.Peer // TODO(minhdoan): it could be duplicated with Self below whose is Alok work.
+	SelfPeer               p2p.Peer             // TODO(minhdoan): it could be duplicated with Self below whose is Alok work.
 	IDCPeer                p2p.Peer
-	SyncNode               bool // TODO(minhdoan): Remove it later.
-
-	// Account Model
-	chain *core.BlockChain
+	SyncNode               bool                 // TODO(minhdoan): Remove it later.
+	chain                  *core.BlockChain     // Account Model
+	Neighbors              map[string]*p2p.Peer // All the neighbor nodes, key is the sha256 of Peer IP/Port
 }
 
 // Add new crossTx and proofs to the list of crossTx that needs to be sent back to client
@@ -200,6 +201,29 @@ func New(consensus *consensus.Consensus, db *db.LDBDatabase) *Node {
 	}
 	// Logger
 	node.log = log.New()
+	node.Neighbors = make(map[string]*p2p.Peer)
 
 	return &node
+}
+
+// Add neighbors nodes
+func (node *Node) AddPeers(peers []p2p.Peer) int {
+	count := 0
+	for _, p := range peers {
+		key := fmt.Sprintf("%v", p.PubKey)
+		_, ok := node.Neighbors[key]
+		if !ok {
+			np := new(p2p.Peer)
+			copier.Copy(np, &p)
+			node.Neighbors[key] = np
+			count++
+		}
+	}
+	node.log.Info("Added", "# of peers", count)
+
+	if count > 0 {
+		c := node.Consensus.AddPeers(peers)
+		node.log.Info("Added in Consensus", "# of peers", c)
+	}
+	return count
 }
