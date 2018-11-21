@@ -11,8 +11,6 @@ import (
 	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/newnode"
 	"github.com/harmony-one/harmony/node"
-	"github.com/harmony-one/harmony/p2p"
-	proto_identity "github.com/harmony-one/harmony/proto/identity"
 )
 
 var mutex sync.Mutex
@@ -69,9 +67,10 @@ func (IDC *BeaconChain) registerNode(Node *newnode.NewNode) {
 		IDC.Leaders = append(IDC.Leaders, Node)
 	}
 	response := registerResponseRandomNumber{NumberOfShards: IDC.NumberOfShards, NumberOfNodesAdded: IDC.NumberOfNodesAdded, Leaders: IDC.Leaders}
-	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Acknowledge, response)
-	p2p.SendMessage(Node.Self, msgToSend)
-	return
+	fmt.Println(response)
+	// msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Acknowledge, response)
+	// p2p.SendMessage(Node.Self, msgToSend)
+	// return
 }
 
 //StartServer a server and process the request by a handler.

@@ -85,8 +85,8 @@ func main() {
 	// onlyLogTps := flag.Bool("only_log_tps", false, "Only log TPS if true")
 
 	// This IP belongs to jenkins.harmony.one
-	idcIP := flag.String("idc", "54.183.5.66", "IP of the identity chain")
-	idcPort := flag.String("idc_port", "8080", "port of the identity chain")
+	idcIP := flag.String("idc", "127.0.0.1", "IP of the identity chain")
+	idcPort := flag.String("idc_port", "8081", "port of the identity chain")
 	peerDisvoery := flag.Bool("peer_discovery", true, "Enable Peer Discovery")
 
 	flag.Parse()
@@ -112,6 +112,7 @@ func main() {
 		newnode := newnode.New(*ip, *port)
 		BCPeer := p2p.Peer{Ip: *idcIP, Port: *idcPort}
 		newnode.ConnectBeaconChain(BCPeer)
+		time.Sleep(5 * time.Second)
 		err := newnode.StartClientMode(*idcIP, *idcPort)
 		if err != nil {
 			fmt.Println("Unable to start peer discovery! ", err)
@@ -133,7 +134,7 @@ func main() {
 		// Create client peer.
 		clientPeer = distributionConfig.GetClientPeer()
 	}
-
+	fmt.Println(peers, leader, selfPeer, clientPeer)
 	// var role string
 	// if leader.Ip == *ip && leader.Port == *port {
 	// 	role = "leader"
