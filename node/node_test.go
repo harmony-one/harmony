@@ -2,6 +2,7 @@ package node
 
 import (
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -139,6 +140,13 @@ func sendPongMessage(leader p2p.Peer) {
 	fmt.Println("sent pong message ...")
 }
 
+func exitServer() {
+	fmt.Println("wait 15 seconds to terminate the process ...")
+	time.Sleep(15 * time.Second)
+
+	os.Exit(0)
+}
+
 func TestPingPongHandler(test *testing.T) {
 	leader := p2p.Peer{Ip: "127.0.0.1", Port: "8881"}
 	validator := p2p.Peer{Ip: "127.0.0.1", Port: "9991"}
@@ -148,6 +156,7 @@ func TestPingPongHandler(test *testing.T) {
 
 	go sendPingMessage(leader)
 	go sendPongMessage(leader)
+	go exitServer()
 
 	node.StartServer("8881")
 }
