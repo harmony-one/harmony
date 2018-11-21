@@ -4,16 +4,19 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/core/vm"
 	"net"
 	"sync"
 	"time"
 
 	"github.com/harmony-one/harmony/blockchain"
 	"github.com/harmony-one/harmony/client"
-	"github.com/harmony-one/harmony/consensus"
+	bft "github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/crypto/pki"
-	"github.com/harmony-one/harmony/db"
+	hdb "github.com/harmony-one/harmony/db"
 	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/p2p"
 	proto_identity "github.com/harmony-one/harmony/proto/identity"
@@ -29,12 +32,12 @@ type NetworkNode struct {
 // Node represents a program (machine) participating in the network
 // TODO(minhdoan, rj): consider using BlockChannel *chan blockchain.Block for efficiency.
 type Node struct {
-	Consensus              *consensus.Consensus               // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
+	Consensus              *bft.Consensus                     // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
 	BlockChannel           chan blockchain.Block              // The channel to receive new blocks from Node
 	pendingTransactions    []*blockchain.Transaction          // All the transactions received but not yet processed for Consensus
 	transactionInConsensus []*blockchain.Transaction          // The transactions selected into the new block and under Consensus process
 	blockchain             *blockchain.Blockchain             // The blockchain for the shard where this node belongs
-	db                     *db.LDBDatabase                    // LevelDB to store blockchain.
+	db                     *hdb.LDBDatabase                   // LevelDB to store blockchain.
 	UtxoPool               *blockchain.UTXOPool               // The corresponding UTXO pool of the current blockchain
 	CrossTxsInConsensus    []*blockchain.CrossShardTxAndProof // The cross shard txs that is under consensus, the proof is not filled yet.
 	CrossTxsToReturn       []*blockchain.CrossShardTxAndProof // The cross shard txs and proof that needs to be sent back to the user client.
@@ -46,9 +49,15 @@ type Node struct {
 	IsWaiting              bool
 	SelfPeer               p2p.Peer // TODO(minhdoan): it could be duplicated with Self below whose is Alok work.
 	IDCPeer                p2p.Peer
-	SyncNode               bool                 // TODO(minhdoan): Remove it later.
-	chain                  *core.BlockChain     // Account Model
-	Neighbors              map[string]*p2p.Peer // All the neighbor nodes, key is the sha256 of Peer IP/Port
+
+	SyncNode  bool                 // TODO(minhdoan): Remove it later.
+	chain     *core.BlockChain     // Account Model
+	Neighbors map[string]*p2p.Peer // All the neighbor nodes, key is the sha256 of Peer IP/Port
+
+	// Account Model
+	Chain               *core.BlockChain
+	TxPool              *core.TxPool
+	BlockChannelAccount chan *types.Block // The channel to receive new blocks from Node
 }
 
 // Add new crossTx and proofs to the list of crossTx that needs to be sent back to client
@@ -172,7 +181,7 @@ func DeserializeNode(d []byte) *NetworkNode {
 }
 
 // New creates a new node.
-func New(consensus *consensus.Consensus, db *db.LDBDatabase) *Node {
+func New(consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 	node := Node{}
 
 	if consensus != nil {
@@ -189,15 +198,24 @@ func New(consensus *consensus.Consensus, db *db.LDBDatabase) *Node {
 		genesisBlock.Blocks = append(genesisBlock.Blocks, blockchain.NewGenesisBlock(coinbaseTx, node.Consensus.ShardID))
 		node.blockchain = genesisBlock
 
-		// Genesis Block (account model)
-		//gspec = core.Genesis{}
-		//
-		//genesis := gspec.MustCommit(ethdb.NewMemDatabase())
 		// UTXO pool from Genesis block
 		node.UtxoPool = blockchain.CreateUTXOPoolFromGenesisBlock(node.blockchain.Blocks[0])
 
 		// Initialize level db.
 		node.db = db
+
+		// (account model)
+		database := hdb.NewMemDatabase()
+		gspec := core.Genesis{}
+
+		genesis := gspec.MustCommit(database)
+		fmt.Println(genesis.Root())
+		chain, _ := core.NewBlockChain(database, nil, gspec.Config, bft.NewFaker(), vm.Config{}, nil)
+
+		node.Chain = chain
+		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, params.TestChainConfig, chain)
+		node.BlockChannelAccount = make(chan *types.Block)
+
 	}
 	// Logger
 	node.log = log.New()

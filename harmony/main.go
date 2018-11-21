@@ -59,10 +59,6 @@ func main() {
 
 	chain, _ := core.NewBlockChain(database, nil, gspec.Config, consensus.NewFaker(), vm.Config{}, nil)
 
-	fmt.Println(testBankAddress)
-	fmt.Println(testUserAddress)
-	fmt.Println(genesis.Root())
-
 	txpool := core.NewTxPool(core.DefaultTxPoolConfig, chainConfig, chain)
 
 	backend := &testWorkerBackend{
@@ -79,29 +75,8 @@ func main() {
 			gen.SetCoinbase(testBankAddress)
 			gen.AddTx(pendingTxs[i])
 		})
-		fmt.Println("Printing blocks 1")
-		fmt.Println(blocks[0].Root())
-		fmt.Println(blocks[1].Root())
-		fmt.Println(blocks[2].Root())
 		if _, err := chain.InsertChain(blocks); err != nil {
 			fmt.Errorf("failed to insert origin chain: %v", err)
 		}
-		fmt.Println("Printing blocks 2")
-		fmt.Println(chain.GetBlockByNumber(0).Root())
-		fmt.Println(chain.GetBlockByNumber(0).Coinbase())
-		fmt.Println(chain.GetBlockByNumber(0).Header())
-		fmt.Println(chain.GetBlockByNumber(0).Transactions())
-		fmt.Println(chain.GetBlockByNumber(0).ParentHash())
-		fmt.Println(chain.GetBlockByNumber(0))
-		fmt.Println(genesis.Root())
-		fmt.Println(chain.GetBlockByNumber(1).Root())
-		fmt.Println(chain.GetBlockByNumber(1).Coinbase())
-		fmt.Println(chain.GetBlockByNumber(1).Transactions()[0].Value())
-		fmt.Println(blocks[0].Root())
-		fmt.Println(chain.GetBlockByNumber(2).Root())
-		fmt.Println(blocks[1].Root())
-		fmt.Println(chain.GetBlockByNumber(3).Root())
-		fmt.Println(blocks[2].Root())
-		fmt.Println("Yeah")
 	}
 }
