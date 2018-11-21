@@ -39,6 +39,11 @@ type Consensus struct {
 	// However, we have assumed uint16 in consensus/consensus_leader.go:136
 	// we won't change it now
 	validators map[uint16]p2p.Peer
+
+	// Minimal number of peers in the shard
+	// If the number of validators is less than minPeers, the consensus won't start
+	MinPeers int
+
 	// Leader
 	leader p2p.Peer
 	// Public keys of the committee including leader and validators

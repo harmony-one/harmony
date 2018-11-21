@@ -28,6 +28,13 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) 
 	consensus.Log.Debug("Waiting for block", "consensus", consensus)
 	for { // keep waiting for new blocks
 		newBlock := <-blockChannel
+
+		if !consensus.HasEnoughValidators() {
+			consensus.Log.Debug("Not enough validators", "# Validators", len(consensus.validators))
+			time.Sleep(500 * time.Millisecond)
+			continue
+		}
+
 		// TODO: think about potential race condition
 		startTime = time.Now()
 		consensus.Log.Debug("STARTING CONSENSUS", "consensus", consensus, "startTime", startTime)
@@ -451,4 +458,11 @@ func (consensus *Consensus) reportMetrics(block blockchain.Block) {
 		"blockLatency":    int(timeElapsed / time.Millisecond),
 	}
 	profiler.LogMetrics(metrics)
+}
+
+func (consensus *Consensus) HasEnoughValidators() bool {
+	if len(consensus.validators) < consensus.MinPeers {
+		return false
+	}
+	return true
 }
