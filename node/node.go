@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"github.com/harmony-one/harmony/core"
 	"net"
 	"sync"
 	"time"
@@ -44,6 +45,9 @@ type Node struct {
 	SelfPeer               p2p.Peer // TODO(minhdoan): it could be duplicated with Self below whose is Alok work.
 	IDCPeer                p2p.Peer
 	SyncNode               bool // TODO(minhdoan): Remove it later.
+
+	// Account Model
+	chain *core.BlockChain
 }
 
 // Add new crossTx and proofs to the list of crossTx that needs to be sent back to client
@@ -184,6 +188,10 @@ func New(consensus *consensus.Consensus, db *db.LDBDatabase) *Node {
 		genesisBlock.Blocks = append(genesisBlock.Blocks, blockchain.NewGenesisBlock(coinbaseTx, node.Consensus.ShardID))
 		node.blockchain = genesisBlock
 
+		// Genesis Block (account model)
+		//gspec = core.Genesis{}
+		//
+		//genesis := gspec.MustCommit(ethdb.NewMemDatabase())
 		// UTXO pool from Genesis block
 		node.UtxoPool = blockchain.CreateUTXOPoolFromGenesisBlock(node.blockchain.Blocks[0])
 
