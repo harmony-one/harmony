@@ -226,9 +226,11 @@ func main() {
 			}()
 		}
 	} else {
-		go func() {
-			currentNode.JoinShard(leader)
-		}()
+		if *peerDisvoery {
+			go func() {
+				currentNode.JoinShard(leader)
+			}()
+		}
 	}
 
 	currentNode.StartServer(*port)
