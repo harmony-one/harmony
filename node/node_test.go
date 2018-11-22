@@ -154,7 +154,7 @@ func TestPingPongHandler(test *testing.T) {
 
 	node := New(consensus, nil)
 
-	go sendPingMessage(leader)
+	//	go sendPingMessage(leader)
 	go sendPongMessage(leader)
 	go exitServer()
 

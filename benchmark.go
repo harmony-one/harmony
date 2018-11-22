@@ -203,6 +203,8 @@ func main() {
 	// Temporary testing code, to be removed.
 	currentNode.AddTestingAddresses(10000)
 
+	currentNode.State = node.WAIT
+
 	if consensus.IsLeader {
 		if *accountModel {
 			// Let consensus run
@@ -223,6 +225,10 @@ func main() {
 				currentNode.WaitForConsensusReady(consensus.ReadySignal)
 			}()
 		}
+	} else {
+		go func() {
+			currentNode.JoinShard(leader)
+		}()
 	}
 
 	currentNode.StartServer(*port)

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/blockchain"
+	hmy_crypto "github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/proto"
 	"github.com/harmony-one/harmony/proto/client"
@@ -510,6 +511,33 @@ func (node *Node) pingMessageHandler(msgPayload []byte) {
 		return
 	}
 	node.log.Info("Ping", "Msg", ping)
+
+	peer := new(p2p.Peer)
+	peer.Ip = ping.Node.IP
+	peer.Port = ping.Node.Port
+
+	peer.PubKey = hmy_crypto.Ed25519Curve.Point()
+	err = peer.PubKey.UnmarshalBinary(ping.Node.PubKey[:])
+	if err != nil {
+		node.log.Error("UnmarshalBinary Failed", "error", err)
+		return
+	}
+
+	node.AddPeers([]p2p.Peer{*peer})
+	// TODO: add public key to consensus.pubkeys
+
+	// Send a Pong message back
+	peers := make([]p2p.Peer, 0)
+	for _, v := range node.Neighbors {
+		peers = append(peers, *v)
+	}
+	pong := proto_node.NewPongMessage(peers)
+	buffer := pong.ConstructPongMessage()
+
+	p2p.SendMessage(*peer, buffer)
+
+	// TODO: broadcast pong messages to all neighbors
+
 	return
 }
 
@@ -520,5 +548,25 @@ func (node *Node) pongMessageHandler(msgPayload []byte) {
 		return
 	}
 	node.log.Info("Pong", "Msg", pong)
+
+	peers := make([]p2p.Peer, 0)
+
+	for _, p := range pong.Peers {
+		peer := new(p2p.Peer)
+		peer.Ip = p.IP
+		peer.Port = p.Port
+
+		peer.PubKey = hmy_crypto.Ed25519Curve.Point()
+		err = peer.PubKey.UnmarshalBinary(p.PubKey[:])
+		if err != nil {
+			node.log.Error("UnmarshalBinary Failed", "error", err)
+			continue
+		}
+		peers = append(peers, *peer)
+	}
+
+	node.AddPeers(peers)
+	// TODO: add public key to consensus.pubkeys
+
 	return
 }
