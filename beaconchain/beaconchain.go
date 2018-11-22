@@ -1,6 +1,8 @@
 package beaconchain
 
 import (
+	"bytes"
+	"encoding/gob"
 	"fmt"
 	"net"
 	"os"
@@ -11,6 +13,9 @@ import (
 	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/newnode"
 	"github.com/harmony-one/harmony/node"
+	"github.com/harmony-one/harmony/p2p"
+	proto_identity "github.com/harmony-one/harmony/proto/identity"
+	"github.com/harmony-one/harmony/utils"
 )
 
 var mutex sync.Mutex
@@ -61,16 +66,44 @@ func (IDC *BeaconChain) AcceptConnections(b []byte) {
 	IDC.registerNode(NewNode)
 }
 
+//SerializeNode
+func (IDC *BeaconChain) SerializeRandomInfo(response registerResponseRandomNumber) []byte {
+	//Needs to escape the serialization of unexported fields
+	var result bytes.Buffer
+	encoder := gob.NewEncoder(&result)
+	err := encoder.Encode(response)
+	if err != nil {
+		fmt.Println("Could not serialize node")
+		fmt.Println("ERROR", err)
+		//node.log.Error("Could not serialize node")
+	}
+
+	return result.Bytes()
+}
+
+// DeserializeNode deserializes the node
+func DeserializeRandomInfo(d []byte) *registerResponseRandomNumber {
+	var wn registerResponseRandomNumber
+	r := bytes.NewBuffer(d)
+	decoder := gob.NewDecoder(r)
+	err := decoder.Decode(&wn)
+	if err != nil {
+		log.Error("Could not de-serialize node 1")
+	}
+	return &wn
+}
+
 func (IDC *BeaconChain) registerNode(Node *newnode.NewNode) {
+	fmt.Println("I am in register messages")
 	IDC.NumberOfNodesAdded = IDC.NumberOfNodesAdded + 1
-	if IDC.NumberOfNodesAdded <= IDC.NumberOfShards {
+	_, isLeader := utils.AllocateShard(IDC.NumberOfNodesAdded, IDC.NumberOfShards)
+	if isLeader {
 		IDC.Leaders = append(IDC.Leaders, Node)
 	}
 	response := registerResponseRandomNumber{NumberOfShards: IDC.NumberOfShards, NumberOfNodesAdded: IDC.NumberOfNodesAdded, Leaders: IDC.Leaders}
-	fmt.Println(response)
-	// msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Acknowledge, response)
-	// p2p.SendMessage(Node.Self, msgToSend)
-	// return
+	msg := IDC.SerializeRandomInfo(response)
+	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Acknowledge, msg)
+	p2p.SendMessage(Node.Self, msgToSend)
 }
 
 //StartServer a server and process the request by a handler.

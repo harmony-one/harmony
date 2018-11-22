@@ -73,7 +73,7 @@ func main() {
 	// TODO: use http://getmyipaddress.org/ or http://www.get-myip.com/ to retrieve my IP address
 
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
-	port := flag.String("port", "9000", "port of the node.")
+	port := flag.String("port", "9002", "port of the node.")
 	configFile := flag.String("config_file", "config.txt", "file containing all ip addresses")
 	// logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	// attackedMode := flag.Int("attacked_mode", 0, "0 means not attacked, 1 means attacked, 2 means being open to be selected as attacked")
@@ -111,13 +111,13 @@ func main() {
 	if *peerDisvoery {
 		newnode := newnode.New(*ip, *port)
 		BCPeer := p2p.Peer{Ip: *idcIP, Port: *idcPort}
-		newnode.ConnectBeaconChain(BCPeer)
-		time.Sleep(5 * time.Second)
-		err := newnode.StartClientMode(*idcIP, *idcPort)
-		if err != nil {
-			fmt.Println("Unable to start peer discovery! ", err)
-			os.Exit(1)
-		}
+		go newnode.ConnectBC(BCPeer)
+		newnode.StartServer() //add error handling here
+
+		// if err != nil {
+		// 	fmt.Println("Unable to start peer discovery! ", err)
+		// 	os.Exit(1)
+		// }
 
 		shardID = newnode.GetShardID()
 		leader = newnode.GetLeader()

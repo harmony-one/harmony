@@ -70,3 +70,17 @@ func GenKey(ip, port string) (kyber.Scalar, kyber.Point) {
 
 	return priKey, pubKey
 }
+
+func AllocateShard(numnode, numshards int) (int, bool) {
+	if numnode <= numshards {
+		return numnode, true
+	} else {
+		shardnum := numnode % numshards
+		if shardnum == 0 {
+			return numshards, false
+		} else {
+			return shardnum, false
+		}
+
+	}
+}
