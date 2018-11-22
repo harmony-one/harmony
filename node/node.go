@@ -2,12 +2,16 @@ package node
 
 import (
 	"bytes"
+	"crypto/ecdsa"
 	"encoding/gob"
 	"fmt"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/node/worker"
+	"math/big"
 	"net"
 	"sync"
 	"time"
@@ -58,6 +62,10 @@ type Node struct {
 	Chain               *core.BlockChain
 	TxPool              *core.TxPool
 	BlockChannelAccount chan *types.Block // The channel to receive new blocks from Node
+	worker              *worker.Worker
+
+	// Test only
+	testBankKey *ecdsa.PrivateKey
 }
 
 // Add new crossTx and proofs to the list of crossTx that needs to be sent back to client
@@ -205,8 +213,14 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 		node.db = db
 
 		// (account model)
+
+		node.testBankKey, _ = crypto.GenerateKey()
+		testBankAddress := crypto.PubkeyToAddress(node.testBankKey.PublicKey)
+		testBankFunds := big.NewInt(1000000000000000000)
 		database := hdb.NewMemDatabase()
-		gspec := core.Genesis{}
+		gspec := core.Genesis{
+			Alloc: core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
+		}
 
 		genesis := gspec.MustCommit(database)
 		fmt.Println(genesis.Root())
@@ -215,6 +229,7 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 		node.Chain = chain
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, params.TestChainConfig, chain)
 		node.BlockChannelAccount = make(chan *types.Block)
+		node.worker = worker.New(params.TestChainConfig, chain, bft.NewFaker())
 
 	}
 	// Logger

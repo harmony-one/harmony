@@ -5,7 +5,10 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/core/types"
+	"math/big"
 	"net"
 	"os"
 	"strconv"
@@ -364,7 +367,6 @@ func (node *Node) WaitForConsensusReadyAccount(readySignal chan struct{}) {
 	timeoutCount := 0
 	for { // keep waiting for Consensus ready
 		retry := false
-		// TODO(minhdoan, rj): Refactor by sending signal in channel instead of waiting for 10 seconds.
 		select {
 		case <-readySignal:
 			time.Sleep(100 * time.Millisecond) // Delay a bit so validator is catched up.
@@ -378,6 +380,19 @@ func (node *Node) WaitForConsensusReadyAccount(readySignal chan struct{}) {
 		if !retry {
 			// Normal tx block consensus
 			// TODO: add new block generation logic
+			txs := make([]*types.Transaction, 100)
+			for i, _ := range txs {
+				randomUserKey, _ := crypto.GenerateKey()
+				randomUserAddress := crypto.PubkeyToAddress(randomUserKey.PublicKey)
+				tx, _ := types.SignTx(types.NewTransaction(node.worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(node.testBankKey.PublicKey)), randomUserAddress, big.NewInt(1000), params.TxGas, nil, nil), types.HomesteadSigner{}, node.testBankKey)
+				txs[i] = tx
+			}
+			node.worker.CommitTransactions(txs, crypto.PubkeyToAddress(node.testBankKey.PublicKey))
+			newBlock = node.worker.Commit()
+
+			// If not enough transactions to run Consensus,
+			// periodically check whether we have enough transactions to package into block.
+			time.Sleep(1 * time.Second)
 		}
 
 		// Send the new block to Consensus so it can be confirmed.
@@ -418,6 +433,11 @@ func (node *Node) VerifyNewBlock(newBlock *blockchain.Block) bool {
 		return node.UtxoPool.VerifyStateBlock(newBlock)
 	}
 	return node.UtxoPool.VerifyTransactions(newBlock.Transactions)
+}
+
+// VerifyNewBlock is called by consensus participants to verify the block (account model) they are running consensus on
+func (node *Node) VerifyNewBlockAccount(newBlock *blockchain.Block) bool {
+	return true // TODO: implement the logic
 }
 
 // PostConsensusProcessing is called by consensus participants, after consensus is done, to:
