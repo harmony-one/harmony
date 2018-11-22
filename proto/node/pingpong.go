@@ -22,7 +22,7 @@ import (
 type nodeInfo struct {
 	IP     string
 	Port   string
-	PubKey string
+	PubKey []byte
 }
 
 type PingMessageType struct {
@@ -50,10 +50,16 @@ func (p PongMessageType) String() string {
 func NewPingMessage(peer p2p.Peer) *PingMessageType {
 	ping := new(PingMessageType)
 
+	var err error
 	ping.Version = PROTOCOL_VERSION
 	ping.Node.IP = peer.Ip
 	ping.Node.Port = peer.Port
-	ping.Node.PubKey = fmt.Sprintf("%v", peer.PubKey)
+	ping.Node.PubKey, err = peer.PubKey.MarshalBinary()
+
+	if err != nil {
+		fmt.Printf("Error Marshall PubKey: %v", err)
+		return nil
+	}
 
 	return ping
 }
@@ -64,12 +70,16 @@ func NewPongMessage(peers []p2p.Peer) *PongMessageType {
 	pong.Version = PROTOCOL_VERSION
 	pong.Peers = make([]nodeInfo, 0)
 
+	var err error
 	for _, p := range peers {
 		n := nodeInfo{}
 		n.IP = p.Ip
 		n.Port = p.Port
-		n.PubKey = fmt.Sprintf("%v", p.PubKey)
-
+		n.PubKey, err = p.PubKey.MarshalBinary()
+		if err != nil {
+			fmt.Printf("Error Marshall PubKey: %v", err)
+			continue
+		}
 		pong.Peers = append(pong.Peers, n)
 	}
 
