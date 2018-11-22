@@ -389,6 +389,10 @@ func (node *Node) WaitForConsensusReadyAccount(readySignal chan struct{}) {
 			}
 			node.worker.CommitTransactions(txs, crypto.PubkeyToAddress(node.testBankKey.PublicKey))
 			newBlock = node.worker.Commit()
+
+			// If not enough transactions to run Consensus,
+			// periodically check whether we have enough transactions to package into block.
+			time.Sleep(1 * time.Second)
 		}
 
 		// Send the new block to Consensus so it can be confirmed.
@@ -429,6 +433,11 @@ func (node *Node) VerifyNewBlock(newBlock *blockchain.Block) bool {
 		return node.UtxoPool.VerifyStateBlock(newBlock)
 	}
 	return node.UtxoPool.VerifyTransactions(newBlock.Transactions)
+}
+
+// VerifyNewBlock is called by consensus participants to verify the block (account model) they are running consensus on
+func (node *Node) VerifyNewBlockAccount(newBlock *blockchain.Block) bool {
+	return true // TODO: implement the logic
 }
 
 // PostConsensusProcessing is called by consensus participants, after consensus is done, to:

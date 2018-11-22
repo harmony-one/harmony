@@ -252,7 +252,7 @@ func main() {
 	maxNumTxsPerBatch := flag.Int("max_num_txs_per_batch", 20000, "number of transactions to send per message")
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	numSubset := flag.Int("numSubset", 3, "the number of subsets of utxos to process separately")
-	duration := flag.Int("duration", 120, "duration of the tx generation in second. If it's negative, the experiment runs forever.")
+	duration := flag.Int("duration", 60, "duration of the tx generation in second. If it's negative, the experiment runs forever.")
 	versionFlag := flag.Bool("version", false, "Output version info")
 	crossShardRatio := flag.Int("cross_shard_ratio", 30, "The percentage of cross shard transactions.")
 	flag.Parse()
@@ -392,6 +392,7 @@ func main() {
 	msg := proto_node.ConstructStopMessage()
 	peers := append(config.GetValidators(), clientNode.Client.GetLeaders()...)
 	p2p.BroadcastMessage(peers, msg)
+	time.Sleep(3000 * time.Millisecond)
 }
 
 func SendTxsToLeader(leader p2p.Peer, txs []*blockchain.Transaction) {
