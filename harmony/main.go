@@ -9,6 +9,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/db"
+	"github.com/harmony-one/harmony/node/worker"
 	"math/big"
 )
 
@@ -56,7 +57,7 @@ func main() {
 	)
 
 	genesis := gspec.MustCommit(database)
-
+	_ = genesis
 	chain, _ := core.NewBlockChain(database, nil, gspec.Config, consensus.NewFaker(), vm.Config{}, nil)
 
 	txpool := core.NewTxPool(core.DefaultTxPoolConfig, chainConfig, chain)
@@ -68,7 +69,7 @@ func main() {
 	}
 	backend.txPool.AddLocals(pendingTxs)
 
-	// Generate a small n-block chain and an uncle block for it
+	//// Generate a small n-block chain and an uncle block for it
 	n := 3
 	if n > 0 {
 		blocks, _ := core.GenerateChain(chainConfig, genesis, consensus.NewFaker(), database, n, func(i int, gen *core.BlockGen) {
@@ -79,4 +80,24 @@ func main() {
 			fmt.Errorf("failed to insert origin chain: %v", err)
 		}
 	}
+
+	fmt.Println(chain.GetBlockByNumber(1).Root())
+	fmt.Println(chain.GetBlockByNumber(2).Root())
+	fmt.Println(chain.GetBlockByNumber(3).Root())
+	txs := make([]*types.Transaction, 100)
+	worker := worker.New(params.TestChainConfig, chain, consensus.NewFaker())
+	fmt.Println(worker.GetCurrentState().GetBalance(testBankAddress))
+	fmt.Println(worker.Commit().Root())
+
+	for i, _ := range txs {
+		randomUserKey, _ := crypto.GenerateKey()
+		randomUserAddress := crypto.PubkeyToAddress(randomUserKey.PublicKey)
+		tx, _ := types.SignTx(types.NewTransaction(worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(testBankKey.PublicKey)), randomUserAddress, big.NewInt(1000), params.TxGas, nil, nil), types.HomesteadSigner{}, testBankKey)
+		txs[i] = tx
+	}
+
+	worker.CommitTransactions(txs, crypto.PubkeyToAddress(testBankKey.PublicKey))
+
+	fmt.Println(worker.GetCurrentState().GetBalance(testBankAddress))
+	fmt.Println(worker.Commit().Root())
 }

@@ -384,10 +384,11 @@ func (node *Node) WaitForConsensusReadyAccount(readySignal chan struct{}) {
 			for i, _ := range txs {
 				randomUserKey, _ := crypto.GenerateKey()
 				randomUserAddress := crypto.PubkeyToAddress(randomUserKey.PublicKey)
-				tx, _ := types.SignTx(types.NewTransaction(0, randomUserAddress, big.NewInt(1000), params.TxGas, nil, nil), types.HomesteadSigner{}, node.testBankKey)
+				tx, _ := types.SignTx(types.NewTransaction(node.worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(node.testBankKey.PublicKey)), randomUserAddress, big.NewInt(1000), params.TxGas, nil, nil), types.HomesteadSigner{}, node.testBankKey)
 				txs[i] = tx
 			}
 			node.worker.CommitTransactions(txs, crypto.PubkeyToAddress(node.testBankKey.PublicKey))
+			newBlock = node.worker.Commit()
 		}
 
 		// Send the new block to Consensus so it can be confirmed.

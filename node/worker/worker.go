@@ -3,6 +3,7 @@ package worker
 import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -28,6 +29,8 @@ type Worker struct {
 	chain   *core.BlockChain
 	current *environment // An environment for current running cycle.
 
+	engine consensus.Engine
+
 	gasFloor uint64
 	gasCeil  uint64
 }
@@ -47,6 +50,10 @@ func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 }
 
 func (w *Worker) CommitTransactions(txs []*types.Transaction, coinbase common.Address) {
+	if w.current.gasPool == nil {
+		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit)
+	}
+
 	for _, tx := range txs {
 		w.commitTransaction(tx, coinbase)
 	}
@@ -67,10 +74,24 @@ func (w *Worker) makeCurrent(parent *types.Block, header *types.Header) error {
 	return nil
 }
 
-func New(config *params.ChainConfig, chain *core.BlockChain) *Worker {
+func (w *Worker) GetCurrentState() *state.StateDB {
+	return w.current.state
+}
+
+func (w *Worker) Commit() *types.Block {
+	s := w.current.state.Copy()
+	block, err := w.engine.Finalize(w.chain, w.current.header, s, w.current.txs, w.current.receipts)
+	if err != nil {
+		return nil
+	}
+	return block
+}
+
+func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus.Engine) *Worker {
 	worker := &Worker{
 		config: config,
 		chain:  chain,
+		engine: engine,
 	}
 	worker.gasFloor = 0
 	worker.gasCeil = 10000000
