@@ -24,8 +24,18 @@ import (
 	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/p2p"
 	proto_identity "github.com/harmony-one/harmony/proto/identity"
+	proto_node "github.com/harmony-one/harmony/proto/node"
 
 	"github.com/jinzhu/copier"
+)
+
+type NodeState byte
+
+const (
+	INIT    NodeState = iota // Node just started, before contacting BeaconChain
+	WAIT                     // Node contacted BeaconChain, wait to join Shard
+	JOIN                     // Node joined Shard, ready for consensus
+	OFFLINE                  // Node is offline
 )
 
 type NetworkNode struct {
@@ -57,6 +67,7 @@ type Node struct {
 	SyncNode  bool                 // TODO(minhdoan): Remove it later.
 	chain     *core.BlockChain     // Account Model
 	Neighbors map[string]*p2p.Peer // All the neighbor nodes, key is the sha256 of Peer IP/Port
+	State     NodeState            // State of the Node
 
 	// Account Model
 	Chain               *core.BlockChain
@@ -235,6 +246,7 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 	// Logger
 	node.log = log.New()
 	node.Neighbors = make(map[string]*p2p.Peer)
+	node.State = INIT
 
 	return &node
 }
@@ -259,4 +271,19 @@ func (node *Node) AddPeers(peers []p2p.Peer) int {
 		node.log.Info("Added in Consensus", "# of peers", c)
 	}
 	return count
+}
+
+func (node *Node) JoinShard(leader p2p.Peer) {
+	// try to join the shard, with 10 minutes time-out
+	backoff := p2p.NewExpBackoff(500*time.Millisecond, 10*time.Minute, 2)
+
+	for node.State == WAIT {
+		backoff.Sleep()
+		ping := proto_node.NewPingMessage(node.SelfPeer)
+		buffer := ping.ConstructPingMessage()
+
+		p2p.SendMessage(leader, buffer)
+		node.log.Debug("Sent ping message")
+	}
+
 }
