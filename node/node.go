@@ -229,6 +229,7 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 		node.Chain = chain
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, params.TestChainConfig, chain)
 		node.BlockChannelAccount = make(chan *types.Block)
+		node.worker = worker.New(params.TestChainConfig, chain, bft.NewFaker())
 
 	}
 	// Logger
