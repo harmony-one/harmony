@@ -80,7 +80,7 @@ func (bft *Bft) Finalize(chain ChainReader, header *types.Header, state *state.S
 	// Accumulate any block and uncle rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
 	accumulateRewards(chain.Config(), state, header)
-	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
+	header.Root = state.IntermediateRoot(false)
 	return types.NewBlock(header, txs, receipts), nil
 }
 

@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"encoding/hex"
 	"errors"
+	"github.com/harmony-one/harmony/core/types"
 	"time"
 
 	"github.com/harmony-one/harmony/profiler"
@@ -34,6 +35,22 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) 
 		for consensus.state == Finished {
 			// time.Sleep(500 * time.Millisecond)
 			consensus.startConsensus(&newBlock)
+			break
+		}
+	}
+}
+
+// WaitForNewBlock waits for the next new block to run consensus on
+func (consensus *Consensus) WaitForNewBlockAccount(blockChannel chan *types.Block) {
+	consensus.Log.Debug("Waiting for block", "consensus", consensus)
+	for { // keep waiting for new blocks
+		newBlock := <-blockChannel
+		// TODO: think about potential race condition
+		startTime = time.Now()
+		consensus.Log.Debug("STARTING CONSENSUS", "consensus", consensus, "startTime", startTime)
+		for consensus.state == Finished {
+			// time.Sleep(500 * time.Millisecond)
+			consensus.startConsensus(&blockchain.Block{Hash: newBlock.Hash(), AccountBlock: newBlock})
 			break
 		}
 	}
