@@ -124,7 +124,7 @@ func GetPongMessage(payload []byte) (*PongMessageType, error) {
 
 // ConstructPingMessage contructs ping message from node to leader
 func (ping PingMessageType) ConstructPingMessage() []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
 	byteBuffer.WriteByte(byte(PING))
 
 	encoder := gob.NewEncoder(byteBuffer)
@@ -138,7 +138,7 @@ func (ping PingMessageType) ConstructPingMessage() []byte {
 
 // ConstructPongMessage contructs pong message from leader to node
 func (pong PongMessageType) ConstructPongMessage() []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
 	byteBuffer.WriteByte(byte(PONG))
 
 	encoder := gob.NewEncoder(byteBuffer)

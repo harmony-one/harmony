@@ -10,12 +10,12 @@ The message structure of any message in Harmony network
 ----  content start -----
 1 byte            - message category
                     0x00: Consensus
-                    0x01: NODE...
+                    0x01: Node...
 1 byte            - message type
                     - for Consensus category
                       0x00: consensus
                       0x01: sharding ...
-				    - for NODE category
+				    - for Node category
                       0x00: transaction ...
 n - 2 bytes       - actual message payload
 ----   content end  -----
@@ -27,8 +27,8 @@ type MessageCategory byte
 //Consensus and other message categories
 const (
 	Consensus MessageCategory = iota
-	NODE
-	CLIENT
+	Node
+	Client
 	Identity
 	// TODO: add more types
 )
