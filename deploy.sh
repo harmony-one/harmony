@@ -13,6 +13,7 @@ USAGE: $ME [OPTIONS] config_file_name
    -p             use peer discovery (default: $PEER)
    -d             enable db support (default: $DB)
    -t             toggle txgen (default: $TXGEN)
+   -D duration    txgen run duration (default: $DURATION)
 
 This script will build all the binaries and start benchmark and txgen based on the configuration file.
 
@@ -28,13 +29,15 @@ EOU
 PEER=
 DB=
 TXGEN=true
+DURATION=60
 
-while getopts "hpdt" option; do
+while getopts "hpdtD:" option; do
    case $option in
       h) usage ;;
       p) PEER='-peer_discovery' ;;
       d) DB='-db_supported' ;;
       t) TXGEN=false ;;
+      D) DURATION=$OPTARG ;;
    esac
 done
 
@@ -72,5 +75,5 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
 done < $config
 
 if [ "$TXGEN" == "true" ]; then
-  ./bin/txgen -config_file $config -log_folder $log_folder
+  ./bin/txgen -config_file $config -log_folder $log_folder -duration $DURATION
 fi
