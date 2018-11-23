@@ -203,7 +203,7 @@ func main() {
 	// Temporary testing code, to be removed.
 	currentNode.AddTestingAddresses(10000)
 
-	currentNode.State = node.WAIT
+	currentNode.State = node.NodeWaitToJoin
 
 	if consensus.IsLeader {
 		if *accountModel {

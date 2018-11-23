@@ -32,10 +32,10 @@ import (
 type NodeState byte
 
 const (
-	INIT    NodeState = iota // Node just started, before contacting BeaconChain
-	WAIT                     // Node contacted BeaconChain, wait to join Shard
-	JOIN                     // Node joined Shard, ready for consensus
-	OFFLINE                  // Node is offline
+	NodeInit        NodeState = iota // Node just started, before contacting BeaconChain
+	NodeWaitToJoin                   // Node contacted BeaconChain, wait to join Shard
+	NodeJoinedShard                  // Node joined Shard, ready for consensus
+	NodeOffline                      // Node is offline
 )
 
 type NetworkNode struct {
@@ -245,7 +245,7 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 	}
 	// Logger
 	node.log = log.New()
-	node.State = INIT
+	node.State = NodeInit
 
 	return &node
 }
@@ -275,7 +275,7 @@ func (node *Node) JoinShard(leader p2p.Peer) {
 	// try to join the shard, with 10 minutes time-out
 	backoff := p2p.NewExpBackoff(1*time.Second, 10*time.Minute, 2)
 
-	for node.State == WAIT {
+	for node.State == NodeWaitToJoin {
 		backoff.Sleep()
 		ping := proto_node.NewPingMessage(node.SelfPeer)
 		buffer := ping.ConstructPingMessage()
