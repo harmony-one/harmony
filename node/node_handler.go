@@ -29,7 +29,7 @@ const (
 	// MinNumberOfTransactionsPerBlock is the min number of transaction per a block.
 	MinNumberOfTransactionsPerBlock = 6000
 	// MaxNumberOfTransactionsPerBlock is the max number of transaction per a block.
-	MaxNumberOfTransactionsPerBlock = 20000
+	MaxNumberOfTransactionsPerBlock = 8000
 	// NumBlocksBeforeStateBlock is the number of blocks allowed before generating state block
 	NumBlocksBeforeStateBlock = 1000
 )
@@ -103,14 +103,14 @@ func (node *Node) NodeHandler(conn net.Conn) {
 				consensusObj.ProcessMessageValidator(msgPayload)
 			}
 		}
-	case proto.NODE:
+	case proto.Node:
 		actionType := proto_node.NodeMessageType(msgType)
 		switch actionType {
 		case proto_node.Transaction:
 			node.log.Info("NET: received message: Node/Transaction")
 			node.transactionMessageHandler(msgPayload)
-		case proto_node.BLOCK:
-			node.log.Info("NET: received message: Node/BLOCK")
+		case proto_node.Block:
+			node.log.Info("NET: received message: Node/Block")
 			blockMsgType := proto_node.BlockMessageType(msgPayload[0])
 			switch blockMsgType {
 			case proto_node.Sync:
@@ -124,8 +124,8 @@ func (node *Node) NodeHandler(conn net.Conn) {
 		case proto_node.BlockchainSync:
 			node.log.Info("NET: received message: Node/BlockchainSync")
 			node.handleBlockchainSync(msgPayload, conn)
-		case proto_node.CLIENT:
-			node.log.Info("NET: received message: Node/CLIENT")
+		case proto_node.Client:
+			node.log.Info("NET: received message: Node/Client")
 			clientMsgType := proto_node.ClientMessageType(msgPayload[0])
 			switch clientMsgType {
 			case proto_node.LookupUtxo:
@@ -138,8 +138,8 @@ func (node *Node) NodeHandler(conn net.Conn) {
 
 				p2p.SendMessage(fetchUtxoMessage.Sender, client.ConstructFetchUtxoResponseMessage(&utxoMap, node.UtxoPool.ShardID))
 			}
-		case proto_node.CONTROL:
-			node.log.Info("NET: received message: Node/CONTROL")
+		case proto_node.Control:
+			node.log.Info("NET: received message: Node/Control")
 			controlType := msgPayload[0]
 			if proto_node.ControlMessageType(controlType) == proto_node.STOP {
 				node.log.Debug("Stopping Node", "node", node, "numBlocks", len(node.blockchain.Blocks), "numTxsProcessed", node.countNumTransactionsInBlockchain())
@@ -191,9 +191,9 @@ func (node *Node) NodeHandler(conn net.Conn) {
 			node.log.Info("NET: received message: PONG")
 			node.pongMessageHandler(msgPayload)
 		}
-	case proto.CLIENT:
+	case proto.Client:
 		actionType := client.ClientMessageType(msgType)
-		node.log.Info("NET: received message: CLIENT/Transaction")
+		node.log.Info("NET: received message: Client/Transaction")
 		switch actionType {
 		case client.Transaction:
 			if node.Client != nil {
@@ -235,7 +235,7 @@ FOR_LOOP:
 		}
 
 		msgCategory, _ := proto.GetMessageCategory(content)
-		if err != nil || msgCategory != proto.NODE {
+		if err != nil || msgCategory != proto.Node {
 			node.log.Error("Failed in reading message category from syncing node", err)
 			return
 		}

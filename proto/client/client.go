@@ -8,7 +8,7 @@ import (
 	"github.com/harmony-one/harmony/proto"
 )
 
-// The specific types of message under CLIENT category
+// The specific types of message under Client category
 type ClientMessageType byte
 
 const (
@@ -16,7 +16,7 @@ const (
 	// TODO: add more types
 )
 
-// The types of messages used for CLIENT/Transaction
+// The types of messages used for Client/Transaction
 type TransactionMessageType int
 
 const (
@@ -31,7 +31,7 @@ type FetchUtxoResponseMessage struct {
 
 // [leader] Constructs the proof of accept or reject message that will be sent to client
 func ConstructProofOfAcceptOrRejectMessage(proofs []blockchain.CrossShardTxProof) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.CLIENT)})
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Client)})
 	byteBuffer.WriteByte(byte(Transaction))
 	byteBuffer.WriteByte(byte(ProofOfLock))
 	encoder := gob.NewEncoder(byteBuffer)
@@ -42,7 +42,7 @@ func ConstructProofOfAcceptOrRejectMessage(proofs []blockchain.CrossShardTxProof
 
 // Constructs the response message to fetch utxo message
 func ConstructFetchUtxoResponseMessage(utxoMap *blockchain.UtxoMap, shardID uint32) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.CLIENT)})
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Client)})
 	byteBuffer.WriteByte(byte(Transaction))
 	byteBuffer.WriteByte(byte(UtxoResponse))
 	encoder := gob.NewEncoder(byteBuffer)
