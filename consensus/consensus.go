@@ -223,14 +223,37 @@ func (consensus *Consensus) String() string {
 		duty, consensus.priKey.String(), consensus.ShardID, consensus.nodeID, consensus.state)
 }
 
+// AddPeers will add new peers into the validator map of the consensus
+// and add the public keys
 func (consensus *Consensus) AddPeers(peers []p2p.Peer) int {
 	count := 0
 	for _, peer := range peers {
 		_, ok := consensus.validators[utils.GetUniqueIdFromPeer(peer)]
 		if !ok {
 			consensus.validators[utils.GetUniqueIdFromPeer(peer)] = peer
+			consensus.publicKeys = append(consensus.publicKeys, peer.PubKey)
 			count++
 		}
 	}
+	if count > 0 {
+		// regenerate bitmaps
+		mask, err := crypto.NewMask(crypto.Ed25519Curve, consensus.publicKeys, consensus.leader.PubKey)
+		if err != nil {
+			panic("Failed to create mask")
+		}
+		finalMask, err := crypto.NewMask(crypto.Ed25519Curve, consensus.publicKeys, consensus.leader.PubKey)
+		if err != nil {
+			panic("Failed to create final mask")
+		}
+		consensus.bitmap = mask
+		consensus.finalBitmap = finalMask
+	}
 	return count
+}
+
+// RemovePeers will remove the peers from the validator list and publicKeys
+// It will be called when leader/node lost connection to peers
+func (consensus *Consensus) RemovePeers(peers []p2p.Peer) int {
+	// TODO (lc) we need to have a corresponding RemovePeers function
+	return 0
 }
