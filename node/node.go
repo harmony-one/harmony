@@ -264,7 +264,6 @@ func (node *Node) AddPeers(peers []p2p.Peer) int {
 			count++
 		}
 	}
-	node.log.Info("Added", "# of peers", count)
 
 	if count > 0 {
 		c := node.Consensus.AddPeers(peers)
@@ -275,7 +274,7 @@ func (node *Node) AddPeers(peers []p2p.Peer) int {
 
 func (node *Node) JoinShard(leader p2p.Peer) {
 	// try to join the shard, with 10 minutes time-out
-	backoff := p2p.NewExpBackoff(500*time.Millisecond, 10*time.Minute, 2)
+	backoff := p2p.NewExpBackoff(1*time.Second, 10*time.Minute, 2)
 
 	for node.State == WAIT {
 		backoff.Sleep()
@@ -285,5 +284,4 @@ func (node *Node) JoinShard(leader p2p.Peer) {
 		p2p.SendMessage(leader, buffer)
 		node.log.Debug("Sent ping message")
 	}
-
 }
