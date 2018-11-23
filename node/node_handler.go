@@ -528,9 +528,16 @@ func (node *Node) pingMessageHandler(msgPayload []byte) {
 
 	// Send a Pong message back
 	peers := make([]p2p.Peer, 0)
-	for _, v := range node.Neighbors {
-		peers = append(peers, *v)
-	}
+	count := 0
+	node.Neighbors.Range(func(k, v interface{}) bool {
+		if p, ok := v.(p2p.Peer); ok {
+			peers = append(peers, p)
+			count++
+			return true
+		} else {
+			return false
+		}
+	})
 	pong := proto_node.NewPongMessage(peers)
 	buffer := pong.ConstructPongMessage()
 
@@ -547,7 +554,8 @@ func (node *Node) pongMessageHandler(msgPayload []byte) {
 		node.log.Error("Can't get Pong Message")
 		return
 	}
-	node.log.Info("Pong", "Msg", pong)
+	//	node.log.Info("Pong", "Msg", pong)
+	node.State = JOIN
 
 	peers := make([]p2p.Peer, 0)
 
