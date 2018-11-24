@@ -195,9 +195,6 @@ func main() {
 
 	// Assign closure functions to the consensus object
 	consensus.BlockVerifier = currentNode.VerifyNewBlock
-	if *accountModel {
-		consensus.BlockVerifier = currentNode.VerifyNewBlockAccount
-	}
 	consensus.OnConsensusDone = currentNode.PostConsensusProcessing
 
 	// Temporary testing code, to be removed.

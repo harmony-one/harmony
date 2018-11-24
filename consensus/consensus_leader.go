@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"encoding/hex"
 	"errors"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
 	"time"
 
@@ -57,7 +58,12 @@ func (consensus *Consensus) WaitForNewBlockAccount(blockChannel chan *types.Bloc
 		consensus.Log.Debug("STARTING CONSENSUS", "consensus", consensus, "startTime", startTime)
 		for consensus.state == Finished {
 			// time.Sleep(500 * time.Millisecond)
-			consensus.startConsensus(&blockchain.Block{Hash: newBlock.Hash(), AccountBlock: newBlock})
+			data, err := rlp.EncodeToBytes(newBlock)
+			if err == nil {
+				consensus.startConsensus(&blockchain.Block{Hash: newBlock.Hash(), AccountBlock: data})
+			} else {
+				consensus.Log.Error("Failed encoding the block with RLP")
+			}
 			break
 		}
 	}
