@@ -555,7 +555,7 @@ func (node *Node) pongMessageHandler(msgPayload []byte) {
 		return
 	}
 	//	node.log.Info("Pong", "Msg", pong)
-	node.State = JOIN
+	node.State = NodeJoinedShard
 
 	peers := make([]p2p.Peer, 0)
 

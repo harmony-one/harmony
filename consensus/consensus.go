@@ -38,7 +38,7 @@ type Consensus struct {
 	// FIXME: should use PubKey of p2p.Peer as the hashkey
 	// However, we have assumed uint16 in consensus/consensus_leader.go:136
 	// we won't change it now
-	validators map[uint16]p2p.Peer
+	validators sync.Map // key is uint16, value is p2p.Peer
 
 	// Minimal number of peers in the shard
 	// If the number of validators is less than minPeers, the consensus won't start
@@ -113,13 +113,12 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 
 	consensus.commitments = &map[uint16]kyber.Point{}
 	consensus.finalCommitments = &map[uint16]kyber.Point{}
-	consensus.validators = make(map[uint16]p2p.Peer)
 	consensus.responses = &map[uint16]kyber.Scalar{}
 	consensus.finalResponses = &map[uint16]kyber.Scalar{}
 
 	consensus.leader = leader
 	for _, peer := range peers {
-		consensus.validators[utils.GetUniqueIdFromPeer(peer)] = peer
+		consensus.validators.Store(utils.GetUniqueIdFromPeer(peer), peer)
 	}
 
 	// Initialize cosign bitmap
@@ -185,9 +184,15 @@ func (consensus *Consensus) signMessage(message []byte) []byte {
 // GetValidatorPeers returns list of validator peers.
 func (consensus *Consensus) GetValidatorPeers() []p2p.Peer {
 	validatorPeers := make([]p2p.Peer, 0)
-	for _, validatorPeer := range consensus.validators {
-		validatorPeers = append(validatorPeers, validatorPeer)
-	}
+
+	consensus.validators.Range(func(k, v interface{}) bool {
+		if peer, ok := v.(p2p.Peer); ok {
+			validatorPeers = append(validatorPeers, peer)
+			return true
+		}
+		return false
+	})
+
 	return validatorPeers
 }
 
@@ -223,14 +228,37 @@ func (consensus *Consensus) String() string {
 		duty, consensus.priKey.String(), consensus.ShardID, consensus.nodeID, consensus.state)
 }
 
+// AddPeers will add new peers into the validator map of the consensus
+// and add the public keys
 func (consensus *Consensus) AddPeers(peers []p2p.Peer) int {
 	count := 0
 	for _, peer := range peers {
-		_, ok := consensus.validators[utils.GetUniqueIdFromPeer(peer)]
+		_, ok := consensus.validators.Load(utils.GetUniqueIdFromPeer(peer))
 		if !ok {
-			consensus.validators[utils.GetUniqueIdFromPeer(peer)] = peer
+			consensus.validators.Store(utils.GetUniqueIdFromPeer(peer), peer)
+			consensus.publicKeys = append(consensus.publicKeys, peer.PubKey)
 			count++
 		}
 	}
+	if count > 0 {
+		// regenerate bitmaps
+		mask, err := crypto.NewMask(crypto.Ed25519Curve, consensus.publicKeys, consensus.leader.PubKey)
+		if err != nil {
+			panic("Failed to create mask")
+		}
+		finalMask, err := crypto.NewMask(crypto.Ed25519Curve, consensus.publicKeys, consensus.leader.PubKey)
+		if err != nil {
+			panic("Failed to create final mask")
+		}
+		consensus.bitmap = mask
+		consensus.finalBitmap = finalMask
+	}
 	return count
+}
+
+// RemovePeers will remove the peers from the validator list and publicKeys
+// It will be called when leader/node lost connection to peers
+func (consensus *Consensus) RemovePeers(peers []p2p.Peer) int {
+	// TODO (lc) we need to have a corresponding RemovePeers function
+	return 0
 }
