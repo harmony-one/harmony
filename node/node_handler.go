@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
 	"math/big"
 	"net"
@@ -430,6 +431,14 @@ func (node *Node) BroadcastNewBlock(newBlock *blockchain.Block) {
 
 // VerifyNewBlock is called by consensus participants to verify the block they are running consensus on
 func (node *Node) VerifyNewBlock(newBlock *blockchain.Block) bool {
+	if newBlock.AccountBlock != nil {
+		accountBlock := new(types.Block)
+		err := rlp.DecodeBytes(newBlock.AccountBlock, accountBlock)
+		if err != nil {
+			node.log.Error("Failed decoding the block with RLP")
+		}
+		return node.VerifyNewBlockAccount(accountBlock)
+	}
 	if newBlock.IsStateBlock() {
 		return node.UtxoPool.VerifyStateBlock(newBlock)
 	}
@@ -437,8 +446,8 @@ func (node *Node) VerifyNewBlock(newBlock *blockchain.Block) bool {
 }
 
 // VerifyNewBlock is called by consensus participants to verify the block (account model) they are running consensus on
-func (node *Node) VerifyNewBlockAccount(newBlock *blockchain.Block) bool {
-	return true // TODO: implement the logic
+func (node *Node) VerifyNewBlockAccount(newBlock *types.Block) bool {
+	return node.Chain.ValidateNewBlock(newBlock)
 }
 
 // PostConsensusProcessing is called by consensus participants, after consensus is done, to:

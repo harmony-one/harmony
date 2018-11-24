@@ -14,7 +14,6 @@ import (
 )
 
 var (
-
 	// Test accounts
 	testBankKey, _  = crypto.GenerateKey()
 	testBankAddress = crypto.PubkeyToAddress(testBankKey.PublicKey)
@@ -81,9 +80,6 @@ func main() {
 		}
 	}
 
-	fmt.Println(chain.GetBlockByNumber(1).Root())
-	fmt.Println(chain.GetBlockByNumber(2).Root())
-	fmt.Println(chain.GetBlockByNumber(3).Root())
 	txs := make([]*types.Transaction, 100)
 	worker := worker.New(params.TestChainConfig, chain, consensus.NewFaker())
 	fmt.Println(worker.GetCurrentState().GetBalance(testBankAddress))

@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/gob"
 	"fmt"
-	"github.com/harmony-one/harmony/core/types"
 	"log"
 	"time"
 
@@ -29,7 +28,7 @@ type Block struct {
 	Bitmap    []byte   // Contains which validator signed the block.
 	Signature [66]byte // Schnorr collective signature.
 
-	AccountBlock *types.Block // Temporary piggy-back.
+	AccountBlock []byte // Temporary piggy-back.
 }
 
 // State is used in Block to indicate that block is a state block.

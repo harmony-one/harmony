@@ -230,7 +230,8 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 		testBankFunds := big.NewInt(1000000000000000000)
 		database := hdb.NewMemDatabase()
 		gspec := core.Genesis{
-			Alloc: core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
+			Config: params.TestChainConfig,
+			Alloc:  core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
 		}
 
 		genesis := gspec.MustCommit(database)
