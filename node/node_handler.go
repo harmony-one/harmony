@@ -447,7 +447,11 @@ func (node *Node) VerifyNewBlock(newBlock *blockchain.Block) bool {
 
 // VerifyNewBlock is called by consensus participants to verify the block (account model) they are running consensus on
 func (node *Node) VerifyNewBlockAccount(newBlock *types.Block) bool {
-	return node.Chain.ValidateNewBlock(newBlock)
+	fmt.Println("VerifyingNNNNNNNNNNNNNN")
+
+	fmt.Println("BALANCE 1")
+	fmt.Println(node.worker.GetCurrentState().GetBalance(crypto.PubkeyToAddress(node.testBankKey.PublicKey)))
+	return node.Chain.ValidateNewBlock(newBlock, crypto.PubkeyToAddress(node.testBankKey.PublicKey))
 }
 
 // PostConsensusProcessing is called by consensus participants, after consensus is done, to:
