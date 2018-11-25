@@ -80,6 +80,16 @@ type Node struct {
 	testBankKey *ecdsa.PrivateKey
 }
 
+// GetBlockHashes used for state download.
+func (node *Node) GetBlockHashes() [][32]byte {
+	return node.blockchain.GetBlockHashes()
+}
+
+// SetBlockchain is used for testing
+func (node *Node) SetBlockchain(bc *blockchain.Blockchain) {
+	node.blockchain = bc
+}
+
 // Add new crossTx and proofs to the list of crossTx that needs to be sent back to client
 func (node *Node) addCrossTxsToReturn(crossTxs []*blockchain.CrossShardTxAndProof) {
 	node.crossTxToReturnMutex.Lock()
