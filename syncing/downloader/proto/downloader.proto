@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package downloader;
+
+// Downloader is the service used for downloading/sycning blocks.
+service Downloader {
+  rpc Query(DownloaderRequest) returns (DownloaderResponse) {}
+}
+
+// DownloaderRequest is the generic download request.
+message DownloaderRequest {
+  enum RequestType {
+    HEADER = 0;
+    BLOCK = 1;
+    UNKOWN = 2;
+  }
+ 
+  // Request type.
+  RequestType type = 1;
+
+  // The array of ids or heights of the blocks we want to download.
+  repeated int32 height = 2;
+}
+
+// DownloaderResponse is the generic response of DownloaderRequest.
+message DownloaderResponse {
+  // payload of Block.
+  repeated bytes payload = 1;
+}
