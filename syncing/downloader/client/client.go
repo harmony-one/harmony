@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"flag"
+	"fmt"
 	"log"
 	"time"
 
@@ -10,12 +10,50 @@ import (
 	"google.golang.org/grpc"
 )
 
-// printResult ...
-func printResult(client pb.DownloaderClient) {
+// PrintResult ...
+func PrintResult(client *Client) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_HEADER}
-	response, err := client.Query(ctx, request)
+	response, err := client.dlClient.Query(ctx, request)
+	if err != nil {
+		log.Fatalf("Error")
+	}
+	log.Println(response)
+}
+
+// Client ...
+type Client struct {
+	dlClient pb.DownloaderClient
+	opts     []grpc.DialOption
+	conn     *grpc.ClientConn
+}
+
+// ClientSetup ...
+func ClientSetup(ip, port string) *Client {
+	client := Client{}
+	client.opts = append(client.opts, grpc.WithInsecure())
+	var err error
+	client.conn, err = grpc.Dial(fmt.Sprintf("%s:%s", ip, port), client.opts...)
+	if err != nil {
+		log.Fatalf("fail to dial: %v", err)
+	}
+
+	client.dlClient = pb.NewDownloaderClient(client.conn)
+	return &client
+}
+
+// Close ...
+func (client *Client) Close() {
+	client.conn.Close()
+}
+
+// GetHeaders ...
+func (client *Client) GetHeaders() {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_HEADER}
+	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
 		log.Fatalf("Error")
 	}
@@ -23,15 +61,7 @@ func printResult(client pb.DownloaderClient) {
 }
 
 func main() {
-	flag.Parse()
-	var opts []grpc.DialOption
-	opts = append(opts, grpc.WithInsecure())
-	conn, err := grpc.Dial("localhost:9999", opts...)
-	if err != nil {
-		log.Fatalf("fail to dial: %v", err)
-	}
-	defer conn.Close()
-	client := pb.NewDownloaderClient(conn)
-
-	printResult(client)
+	client := ClientSetup("localhost", "9999")
+	client.GetHeaders()
+	defer client.Close()
 }
