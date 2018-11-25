@@ -382,15 +382,20 @@ func (node *Node) WaitForConsensusReadyAccount(readySignal chan struct{}) {
 		if !retry {
 			// Normal tx block consensus
 			// TODO: add new block generation logic
-			txs := make([]*types.Transaction, 100)
+			txs := make([]*types.Transaction, 10)
+			baseNonce := node.worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(node.testBankKey.PublicKey))
+			node.worker.UpdateCurrent()
 			for i, _ := range txs {
 				randomUserKey, _ := crypto.GenerateKey()
 				randomUserAddress := crypto.PubkeyToAddress(randomUserKey.PublicKey)
-				tx, _ := types.SignTx(types.NewTransaction(node.worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(node.testBankKey.PublicKey)), randomUserAddress, big.NewInt(1000), params.TxGas, nil, nil), types.HomesteadSigner{}, node.testBankKey)
+				tx, _ := types.SignTx(types.NewTransaction(baseNonce+uint64(i), randomUserAddress, big.NewInt(1000), params.TxGas, nil, nil), types.HomesteadSigner{}, node.testBankKey)
 				txs[i] = tx
 			}
-			node.worker.CommitTransactions(txs, crypto.PubkeyToAddress(node.testBankKey.PublicKey))
-			newBlock = node.worker.Commit()
+			if node.worker.CommitTransactions(txs, crypto.PubkeyToAddress(node.testBankKey.PublicKey)) {
+				newBlock = node.worker.Commit()
+			} else {
+				node.log.Debug("Failed to create new block")
+			}
 
 			// If not enough transactions to run Consensus,
 			// periodically check whether we have enough transactions to package into block.
@@ -447,10 +452,6 @@ func (node *Node) VerifyNewBlock(newBlock *blockchain.Block) bool {
 
 // VerifyNewBlock is called by consensus participants to verify the block (account model) they are running consensus on
 func (node *Node) VerifyNewBlockAccount(newBlock *types.Block) bool {
-	fmt.Println("VerifyingNNNNNNNNNNNNNN")
-
-	fmt.Println("BALANCE 1")
-	fmt.Println(node.worker.GetCurrentState().GetBalance(crypto.PubkeyToAddress(node.testBankKey.PublicKey)))
 	return node.Chain.ValidateNewBlock(newBlock, crypto.PubkeyToAddress(node.testBankKey.PublicKey))
 }
 
@@ -484,11 +485,24 @@ func (node *Node) PostConsensusProcessing(newBlock *blockchain.Block) {
 		node.BroadcastNewBlock(newBlock)
 	}
 
+	accountBlock := new(types.Block)
+	err := rlp.DecodeBytes(newBlock.AccountBlock, accountBlock)
+	if err != nil {
+		node.log.Error("Failed decoding the block with RLP")
+	}
+	node.AddNewBlockAccount(accountBlock)
+	// For utxo model only
 	node.AddNewBlock(newBlock)
 	node.UpdateUtxoAndState(newBlock)
+
 }
 
-// AddNewBlock is usedd to add new block into the blockchain.
+// AddNewBlockAccount is usedd to add new block into the blockchain.
+func (node *Node) AddNewBlockAccount(newBlock *types.Block) {
+	node.Chain.InsertChain([]*types.Block{newBlock})
+}
+
+// AddNewBlock is usedd to add new block into the utxo-based blockchain.
 func (node *Node) AddNewBlock(newBlock *blockchain.Block) {
 	// Add it to blockchain
 	node.blockchain.Blocks = append(node.blockchain.Blocks, newBlock)

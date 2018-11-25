@@ -242,10 +242,6 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, params.TestChainConfig, chain)
 		node.BlockChannelAccount = make(chan *types.Block)
 		node.worker = worker.New(params.TestChainConfig, chain, bft.NewFaker())
-
-		fmt.Println("BALANCE")
-		fmt.Println(node.worker.GetCurrentState().GetBalance(testBankAddress))
-
 	}
 	// Logger
 	node.log = log.New()

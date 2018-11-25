@@ -74,7 +74,7 @@ func loggingInit(logFolder, role, ip, port string, onlyLogTps bool) {
 
 }
 func main() {
-	accountModel := flag.Bool("account_model", false, "Whether to use account model")
+	accountModel := flag.Bool("account_model", true, "Whether to use account model")
 	// TODO: use http://getmyipaddress.org/ or http://www.get-myip.com/ to retrieve my IP address
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9000", "port of the node.")

@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/consensus"
@@ -49,14 +50,35 @@ func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	return receipt.Logs, nil
 }
 
-func (w *Worker) CommitTransactions(txs []*types.Transaction, coinbase common.Address) {
+func (w *Worker) CommitTransactions(txs []*types.Transaction, coinbase common.Address) bool {
+	snap := w.current.state.Snapshot()
+
 	if w.current.gasPool == nil {
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit)
 	}
-
 	for _, tx := range txs {
-		w.commitTransaction(tx, coinbase)
+		_, err := w.commitTransaction(tx, coinbase)
+		if err != nil {
+			fmt.Println(err)
+			w.current.state.RevertToSnapshot(snap)
+			return false
+
+		}
 	}
+	return true
+}
+
+func (w *Worker) UpdateCurrent() error {
+	parent := w.chain.CurrentBlock()
+	num := parent.Number()
+	timestamp := time.Now().Unix()
+	header := &types.Header{
+		ParentHash: parent.Hash(),
+		Number:     num.Add(num, common.Big1),
+		GasLimit:   core.CalcGasLimit(parent, w.gasFloor, w.gasCeil),
+		Time:       big.NewInt(timestamp),
+	}
+	return w.makeCurrent(parent, header)
 }
 
 // makeCurrent creates a new environment for the current cycle.
