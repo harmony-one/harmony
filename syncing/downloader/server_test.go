@@ -1,6 +1,7 @@
 package downloader
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/harmony-one/harmony/blockchain"
@@ -16,14 +17,17 @@ const (
 
 var (
 	PriIntOne      = 111
+	PriIntTwo      = 222
 	TestAddressOne = pki.GetAddressFromInt(PriIntOne)
+	TestAddressTwo = pki.GetAddressFromInt(PriIntTwo)
 )
 
 func setupServer() *Server {
-	bc := blockchain.CreateBlockchain(TestAddressOne, 0)
+	bc := blockchain.CreateBlockchainWithMoreBlocks([][20]byte{TestAddressOne, TestAddressTwo}, 0)
 	node := &node.Node{}
 	node.SetBlockchain(bc)
 	server := NewServer(node)
+	fmt.Println("minh ", len(bc.Blocks))
 	return server
 }
 
