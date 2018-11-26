@@ -1,4 +1,4 @@
-package main
+package downloader
 
 import (
 	"context"
@@ -49,7 +49,7 @@ func (client *Client) Close() {
 }
 
 // GetHeaders ...
-func (client *Client) GetHeaders() {
+func (client *Client) GetHeaders() []byte {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_HEADER}
@@ -57,7 +57,7 @@ func (client *Client) GetHeaders() {
 	if err != nil {
 		log.Fatalf("Error")
 	}
-	log.Println(response)
+	return response.Payload[0]
 }
 
 func main() {
