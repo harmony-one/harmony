@@ -1,4 +1,4 @@
-package main
+package downloader
 
 import (
 	"context"
@@ -25,7 +25,7 @@ func (s *Server) Query(ctx context.Context, request *pb.DownloaderRequest) (*pb.
 }
 
 // Start ...
-func (s *Server) Start(ip, port string) error {
+func (s *Server) Start(ip, port string) (*grpc.Server, error) {
 	// if s.node == nil {
 	// 	return ErrDownloaderWithNoNode
 	// }
@@ -36,8 +36,8 @@ func (s *Server) Start(ip, port string) error {
 	var opts []grpc.ServerOption
 	grpcServer := grpc.NewServer(opts...)
 	pb.RegisterDownloaderServer(grpcServer, s)
-	grpcServer.Serve(lis)
-	return nil
+	go grpcServer.Serve(lis)
+	return grpcServer, nil
 }
 
 // NewServer ...

@@ -1,12 +1,11 @@
 package downloader
 
 import (
-	"fmt"
 	"testing"
 
-	"github.com/harmony-one/harmony/blockchain"
 	"github.com/harmony-one/harmony/crypto/pki"
-	"github.com/harmony-one/harmony/node"
+	client "github.com/harmony-one/harmony/syncing/downloader/client"
+	server "github.com/harmony-one/harmony/syncing/downloader/server"
 )
 
 const (
@@ -22,19 +21,20 @@ var (
 	TestAddressTwo = pki.GetAddressFromInt(PriIntTwo)
 )
 
-func setupServer() *Server {
-	bc := blockchain.CreateBlockchainWithMoreBlocks([][20]byte{TestAddressOne, TestAddressTwo}, 0)
-	node := &node.Node{}
-	node.SetBlockchain(bc)
-	server := NewServer(node)
-	fmt.Println("minh ", len(bc.Blocks))
-	return server
-}
-
 func TestGetBlockHashes(t *testing.T) {
-	server := setupServer()
-	server.Start(serverIP)
+	s := server.NewServer(nil)
+	grcpServer, err := s.Start(serverIP, serverPort)
+	if err != nil {
+		t.Error(err)
+	}
+	defer grcpServer.Stop()
 
-	// client := ClientSetUp(serverIP, serverPort)
-	// client.GetHeaders()
+	client := client.ClientSetup(serverIP, serverPort)
+	payload := client.GetHeaders()
+	if payload[2] != 2 {
+		t.Error("minh")
+	}
+
+	defer client.Close()
+	client.GetHeaders()
 }
