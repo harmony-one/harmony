@@ -550,12 +550,12 @@ func (node *Node) pingMessageHandler(msgPayload []byte) {
 		return
 	}
 
-	node.AddPeers([]p2p.Peer{*peer})
-	// TODO: add public key to consensus.pubkeys
+	// Add to Node's peer list
+	count := node.AddPeers([]p2p.Peer{*peer})
 
 	// Send a Pong message back
 	peers := make([]p2p.Peer, 0)
-	count := 0
+	count = 0
 	node.Neighbors.Range(func(k, v interface{}) bool {
 		if p, ok := v.(p2p.Peer); ok {
 			peers = append(peers, p)
