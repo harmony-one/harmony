@@ -27,8 +27,6 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	proto_identity "github.com/harmony-one/harmony/proto/identity"
 	proto_node "github.com/harmony-one/harmony/proto/node"
-
-	"github.com/jinzhu/copier"
 )
 
 type NodeState byte
@@ -262,9 +260,7 @@ func (node *Node) AddPeers(peers []p2p.Peer) int {
 		key := fmt.Sprintf("%v", p.PubKey)
 		_, ok := node.Neighbors.Load(key)
 		if !ok {
-			np := new(p2p.Peer)
-			copier.Copy(np, &p)
-			node.Neighbors.Store(key, *np)
+			node.Neighbors.Store(key, p)
 			count++
 		}
 	}

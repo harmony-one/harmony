@@ -317,7 +317,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
 		select {
 		case <-readySignal:
 			time.Sleep(100 * time.Millisecond) // Delay a bit so validator is catched up.
-		case <-time.After(100 * time.Second):
+		case <-time.After(200 * time.Second):
 			retry = true
 			node.Consensus.ResetState()
 			timeoutCount++
@@ -524,11 +524,12 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 		node.log.Error("Can't get Ping Message")
 		return -1
 	}
-	node.log.Info("Ping", "Msg", ping)
+//	node.log.Info("Ping", "Msg", ping)
 
 	peer := new(p2p.Peer)
 	peer.Ip = ping.Node.IP
 	peer.Port = ping.Node.Port
+	peer.ValidatorID = ping.Node.ValidatorID
 
 	peer.PubKey = hmy_crypto.Ed25519Curve.Point()
 	err = peer.PubKey.UnmarshalBinary(ping.Node.PubKey[:])
@@ -538,20 +539,10 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 	}
 
 	// Add to Node's peer list
-	count := node.AddPeers([]p2p.Peer{*peer})
+	node.AddPeers([]p2p.Peer{*peer})
 
 	// Send a Pong message back
-	peers := make([]p2p.Peer, 0)
-	count = 0
-	node.Neighbors.Range(func(k, v interface{}) bool {
-		if p, ok := v.(p2p.Peer); ok {
-			peers = append(peers, p)
-			count++
-			return true
-		} else {
-			return false
-		}
-	})
+	peers := node.Consensus.GetValidatorPeers()
 	pong := proto_node.NewPongMessage(peers)
 	buffer := pong.ConstructPongMessage()
 
@@ -559,7 +550,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 		p2p.SendMessage(p, buffer)
 	}
 
-	return count
+	return len(peers)
 }
 
 func (node *Node) pongMessageHandler(msgPayload []byte) int {
@@ -568,7 +559,7 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		node.log.Error("Can't get Pong Message")
 		return -1
 	}
-	//	node.log.Info("Pong", "Msg", pong)
+	// node.log.Info("Pong", "Msg", pong)
 	node.State = NodeJoinedShard
 
 	peers := make([]p2p.Peer, 0)
@@ -577,6 +568,7 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		peer := new(p2p.Peer)
 		peer.Ip = p.IP
 		peer.Port = p.Port
+		peer.ValidatorID = p.ValidatorID
 
 		peer.PubKey = hmy_crypto.Ed25519Curve.Point()
 		err = peer.PubKey.UnmarshalBinary(p.PubKey[:])
