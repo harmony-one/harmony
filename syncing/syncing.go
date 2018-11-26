@@ -84,7 +84,7 @@ func (ss *StateSync) ProcessStateSyncFromSinglePeer(peer *p2p.Peer, bc *blockcha
 	return nil, nil
 }
 
-func (ss *StateSync) createSyncConfig(peers []p2p.Peer) {
+func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer) {
 	ss.peerNumber = len(peers)
 	ss.syncConfig = &SyncConfig{
 		peers: make([]SyncPeerConfig, ss.peerNumber),
@@ -190,10 +190,17 @@ func (ss *StateSync) downloadBlocks(bc *blockchain.Blockchain) {
 					id := syncTask.index
 					heights := []int32{int32(id)}
 					payload, err := peerConfig.GetBlocks(heights)
-					if err != nil {
-						// Write log
-					} else {
-						bc.Blocks[id], err = blockchain.DeserializeBlock(payload[0])
+					if err == nil {
+						stop := true
+						for i, id := range heights {
+							bc.Blocks[id], err = blockchain.DeserializeBlock(payload[i])
+							if err != nil {
+								stop = false
+							}
+						}
+						if stop {
+							break
+						}
 					}
 				}
 			}
@@ -205,7 +212,7 @@ func (ss *StateSync) downloadBlocks(bc *blockchain.Blockchain) {
 // StartStateSync starts state sync.
 func (ss *StateSync) StartStateSync(peers []p2p.Peer, bc *blockchain.Blockchain) {
 	// Creates sync config.
-	ss.createSyncConfig(peers)
+	ss.CreateSyncConfig(peers)
 
 	// Makes connections to peers.
 	ss.makeConnectionToPeers()

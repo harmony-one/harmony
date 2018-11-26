@@ -11,8 +11,4 @@ type StateSyncInterface interface {
 	// Syncing blockchain from other peers.
 	// The returned channel is the signal of syncing finish.
 	ProcessStateSyncFromPeers(peers []p2p.Peer, bc *blockchain.Blockchain) (chan struct{}, error)
-
-	// Syncing blockchain from a single peer.
-	// The returned channel is the signal of syncing finish.
-	ProcessStateSyncFromSinglePeer(peer *p2p.Peer, bc *blockchain.Blockchain) (chan struct{}, error)
 }
