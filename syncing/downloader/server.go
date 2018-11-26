@@ -8,20 +8,23 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/harmony-one/harmony/node"
 	pb "github.com/harmony-one/harmony/syncing/downloader/proto"
 )
 
 // Server ...
 type Server struct {
-	node *node.Node
+	downloadInterface DownloadInterface
 }
 
 // Query returns the feature at the given point.
 func (s *Server) Query(ctx context.Context, request *pb.DownloaderRequest) (*pb.DownloaderResponse, error) {
-	response := pb.DownloaderResponse{}
-	response.Payload = [][]byte{{0, 0, 2}}
-	return &response, nil
+	response, err := s.downloadInterface.CalculateResponse(request)
+	if err != nil {
+		return nil, err
+	}
+	// response := pb.DownloaderResponse{}
+	// response.Payload = [][]byte{{0, 0, 2}}
+	return response, nil
 }
 
 // Start ...
@@ -38,7 +41,7 @@ func (s *Server) Start(ip, port string) (*grpc.Server, error) {
 }
 
 // NewServer ...
-func NewServer(node *node.Node) *Server {
-	s := &Server{node: node}
+func NewServer(dlInterface DownloadInterface) *Server {
+	s := &Server{downloadInterface: dlInterface}
 	return s
 }

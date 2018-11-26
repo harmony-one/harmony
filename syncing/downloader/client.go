@@ -48,8 +48,8 @@ func (client *Client) Close() {
 	client.conn.Close()
 }
 
-// GetHeaders ...
-func (client *Client) GetHeaders() []byte {
+// GetBlockHashes ...
+func (client *Client) GetBlockHashes() *pb.DownloaderResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_HEADER}
@@ -57,5 +57,5 @@ func (client *Client) GetHeaders() []byte {
 	if err != nil {
 		log.Fatalf("Error")
 	}
-	return response.Payload[0]
+	return response
 }
