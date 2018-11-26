@@ -18,8 +18,9 @@ package core
 
 import (
 	"fmt"
-	hdb "github.com/harmony-one/harmony/db"
 	"math/big"
+
+	hdb "github.com/harmony-one/harmony/db"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/params"

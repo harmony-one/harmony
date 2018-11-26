@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"math/big"
+
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/consensus"
@@ -10,7 +12,6 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/db"
 	"github.com/harmony-one/harmony/node/worker"
-	"math/big"
 )
 
 var (
