@@ -5,16 +5,17 @@ import (
 	"crypto/ecdsa"
 	"encoding/gob"
 	"fmt"
+	"math/big"
+	"sync"
+	"time"
+
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/node/worker"
-	"math/big"
-	"net"
-	"sync"
-	"time"
+	"github.com/harmony-one/harmony/p2pv2"
 
 	"github.com/harmony-one/harmony/blockchain"
 	"github.com/harmony-one/harmony/client"
@@ -25,7 +26,6 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	proto_identity "github.com/harmony-one/harmony/proto/identity"
 	proto_node "github.com/harmony-one/harmony/proto/node"
-
 	"github.com/jinzhu/copier"
 )
 
@@ -114,9 +114,10 @@ func (node *Node) StartServer(port string) {
 		// Disable this temporarily.
 		// node.blockchain = syncing.StartBlockSyncing(node.Consensus.GetValidatorPeers())
 	}
-	fmt.Println("going to start server on port:", port)
-	//node.log.Debug("Starting server", "node", node, "port", port)
-	node.listenOnPort(port)
+	p2pv2.InitHost(port)
+	log.Debug("StartServer", "port", port, "host", p2pv2.GetHost().ID())
+	// Hang forever
+	<-make(chan struct{})
 }
 
 func (node *Node) SetLog() *Node {
@@ -125,28 +126,7 @@ func (node *Node) SetLog() *Node {
 }
 
 func (node *Node) listenOnPort(port string) {
-	addr := net.JoinHostPort("", port)
-	listen, err := net.Listen("tcp4", addr)
-	if err != nil {
-		node.log.Error("Socket listen port failed", "addr", addr, "err", err)
-		return
-	}
-	if listen == nil {
-		node.log.Error("Listen returned nil", "addr", addr)
-		return
-	}
-	defer listen.Close()
-	backoff := p2p.NewExpBackoff(250*time.Millisecond, 15*time.Second, 2.0)
-	for {
-		conn, err := listen.Accept()
-		if err != nil {
-			node.log.Error("Error listening on port.", "port", port,
-				"err", err)
-			backoff.Sleep()
-			continue
-		}
-		go node.NodeHandler(conn)
-	}
+	go node.NodeHandler(conn)
 }
 
 func (node *Node) String() string {
@@ -241,7 +221,6 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, params.TestChainConfig, chain)
 		node.BlockChannelAccount = make(chan *types.Block)
 		node.worker = worker.New(params.TestChainConfig, chain, bft.NewFaker())
-
 	}
 	// Logger
 	node.log = log.New()

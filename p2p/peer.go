@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/log"
+	"github.com/harmony-one/harmony/p2pv2"
 
 	"github.com/dedis/kyber"
 )
@@ -133,7 +134,8 @@ func send(ip, port string, message []byte) {
 	backoff := NewExpBackoff(250*time.Millisecond, 10*time.Second, 2)
 
 	for trial := 0; trial < 10; trial++ {
-		err := sendWithSocketClient(ip, port, message)
+		// err := sendWithSocketClient(ip, port, message)
+		err := p2pv2.Send(ip, port, message)
 		if err == nil {
 			return
 		}

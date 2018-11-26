@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/p2pv2"
+
 	"github.com/harmony-one/harmony/blockchain"
 	"github.com/harmony-one/harmony/client"
 	client_config "github.com/harmony-one/harmony/client/config"
@@ -299,6 +301,7 @@ func main() {
 	clientNode := node.New(consensusObj, nil)
 
 	if clientPort != "" {
+		p2pv2.InitHost(clientPort) // TODO: this should be moved into client node.
 		clientNode.Client = client.NewClient(&shardIDLeaderMap)
 
 		// This func is used to update the client's utxopool when new blocks are received from the leaders
@@ -326,7 +329,6 @@ func main() {
 			clientNode.StartServer(clientPort)
 		}()
 	}
-
 	// Transaction generation process
 	time.Sleep(10 * time.Second) // wait for nodes to be ready
 	start := time.Now()
@@ -334,7 +336,6 @@ func main() {
 
 	client.InitLookUpIntPriKeyMap()
 	subsetCounter := 0
-
 	for {
 		t := time.Now()
 		if totalTime > 0 && t.Sub(start).Seconds() >= totalTime {
