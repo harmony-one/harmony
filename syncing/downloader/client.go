@@ -37,6 +37,7 @@ func ClientSetup(ip, port string) *Client {
 	client.conn, err = grpc.Dial(fmt.Sprintf("%s:%s", ip, port), client.opts...)
 	if err != nil {
 		log.Fatalf("fail to dial: %v", err)
+		return nil
 	}
 
 	client.dlClient = pb.NewDownloaderClient(client.conn)
