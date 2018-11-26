@@ -6,9 +6,10 @@ import (
 	"encoding/gob"
 	"encoding/hex"
 	"errors"
+	"time"
+
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
-	"time"
 
 	"github.com/harmony-one/harmony/profiler"
 

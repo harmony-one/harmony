@@ -1,8 +1,9 @@
 package ida
 
 import (
-	"github.com/harmony-one/harmony/p2p"
 	"time"
+
+	"github.com/harmony-one/harmony/p2p"
 )
 
 // Symbol is produced from a RaptorQ implementation.

@@ -20,13 +20,14 @@ package core
 import (
 	"errors"
 	"fmt"
-	hdb "github.com/harmony-one/harmony/db"
 	"io"
 	"math/big"
 	mrand "math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	hdb "github.com/harmony-one/harmony/db"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/mclock"

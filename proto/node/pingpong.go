@@ -14,9 +14,10 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"log"
+
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/proto"
-	"log"
 )
 
 // refer to Peer struct in p2p/peer.go
