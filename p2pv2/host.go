@@ -31,23 +31,20 @@ func InitHost(port string) {
 		libp2p.ListenAddrs(sourceAddr),
 		libp2p.Identity(priv))
 	catchError(err)
-	myHost.SetStreamHandler("/harmony/0.0.1", readStream)
 	log.Debug("Host is up!", "port", port, "id", myHost.ID().Pretty(), "addrs", sourceAddr)
 }
 
-func readStream(s net.Stream) {
-	log.Debug("READ!!")
+func BindHandler(handler net.StreamHandler) {
+	myHost.SetStreamHandler("/harmony/0.0.1", handler)
+}
+
+func ReadData(s net.Stream) ([]byte, error) {
 	timeoutDuration := 1 * time.Second
 	s.SetReadDeadline(time.Now().Add(timeoutDuration))
 
 	// Create a buffered stream so that read and writes are non blocking.
 	rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
 
-	// Create a thread to read and write data.
-	go readData(rw)
-}
-
-func readData(rw *bufio.ReadWriter) {
 	contentBuf := bytes.NewBuffer([]byte{})
 	// Read 1 byte for message type
 	_, err := rw.ReadByte()
@@ -58,7 +55,7 @@ func readData(rw *bufio.ReadWriter) {
 		fallthrough
 	default:
 		log.Error("Error reading the p2p message type field", "err", err)
-		return //contentBuf.Bytes(), err
+		return contentBuf.Bytes(), err
 	}
 	// TODO: check on msgType and take actions accordingly
 
@@ -67,10 +64,10 @@ func readData(rw *bufio.ReadWriter) {
 	n, err := rw.Read(fourBytes)
 	if err != nil {
 		log.Error("Error reading the p2p message size field", "err", err)
-		return //contentBuf.Bytes(), err
+		return contentBuf.Bytes(), err
 	} else if n < len(fourBytes) {
 		log.Error("Invalid byte size", "bytes", n)
-		return //contentBuf.Bytes(), err
+		return contentBuf.Bytes(), err
 	}
 
 	//log.Print(fourBytes)
@@ -104,10 +101,10 @@ ILOOP:
 			}
 		default:
 			log.Error("Error reading p2p message")
-			return //[]byte{}, err
+			return []byte{}, err
 		}
 	}
-	//return contentBuf.Bytes(), nil
+	return contentBuf.Bytes(), nil
 }
 
 func writeData(w *bufio.Writer, data []byte) {

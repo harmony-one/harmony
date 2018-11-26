@@ -115,7 +115,7 @@ func (node *Node) StartServer(port string) {
 		// node.blockchain = syncing.StartBlockSyncing(node.Consensus.GetValidatorPeers())
 	}
 	p2pv2.InitHost(port)
-	log.Debug("StartServer", "port", port, "host", p2pv2.GetHost().ID())
+	p2pv2.BindHandler(node.NodeHandler)
 	// Hang forever
 	<-make(chan struct{})
 }
@@ -123,10 +123,6 @@ func (node *Node) StartServer(port string) {
 func (node *Node) SetLog() *Node {
 	node.log = log.New()
 	return node
-}
-
-func (node *Node) listenOnPort(port string) {
-	go node.NodeHandler(conn)
 }
 
 func (node *Node) String() string {

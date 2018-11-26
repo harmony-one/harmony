@@ -4,9 +4,6 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"net"
-
-	"github.com/harmony-one/harmony/log"
 
 	host "github.com/libp2p/go-libp2p-host"
 	peer "github.com/libp2p/go-libp2p-peer"
@@ -32,7 +29,6 @@ func Send(ip, port string, message []byte) error {
 
 	priv := portToPrivKey(port)
 	peerID, _ := peer.IDFromPrivateKey(priv)
-	log.Debug("Send", "port", port, "id", peerID)
 	myHost.Peerstore().AddAddrs(peerID, []multiaddr.Multiaddr{targetAddr}, peerstore.PermanentAddrTTL)
 	s, err := myHost.NewStream(context.Background(), peerID, "/harmony/0.0.1")
 	catchError(err)
@@ -43,10 +39,4 @@ func Send(ip, port string, message []byte) error {
 	// Create a thread to read and write data.
 	go writeData(w, message)
 	return nil
-}
-
-func Read(conn net.Conn) ([]byte, error) {
-	// myHost.SetStreamHandler("/harmony/0.0.1", handleStream)
-	var data []byte
-	return data, nil
 }

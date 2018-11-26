@@ -5,23 +5,24 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/params"
-	"github.com/harmony-one/harmony/core/types"
 	"math/big"
-	"net"
 	"os"
 	"strconv"
 	"time"
 
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/blockchain"
+	"github.com/harmony-one/harmony/core/types"
 	hmy_crypto "github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/p2pv2"
 	"github.com/harmony-one/harmony/proto"
 	"github.com/harmony-one/harmony/proto/client"
 	"github.com/harmony-one/harmony/proto/consensus"
 	proto_identity "github.com/harmony-one/harmony/proto/identity"
 	proto_node "github.com/harmony-one/harmony/proto/node"
+	net "github.com/libp2p/go-libp2p-net"
 )
 
 const (
@@ -41,11 +42,11 @@ func (node *Node) MaybeBroadcastAsValidator(content []byte) {
 }
 
 // NodeHandler handles a new incoming connection.
-func (node *Node) NodeHandler(conn net.Conn) {
-	defer conn.Close()
+func (node *Node) NodeHandler(s net.Stream) {
+	defer s.Close()
 
 	// Read p2p message payload
-	content, err := p2p.ReadMessageContent(conn)
+	content, err := p2pv2.ReadData(s)
 
 	if err != nil {
 		node.log.Error("Read p2p data failed", "err", err, "node", node)
@@ -122,7 +123,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 			}
 		case proto_node.BlockchainSync:
 			node.log.Info("NET: received message: Node/BlockchainSync")
-			node.handleBlockchainSync(msgPayload, conn)
+			node.handleBlockchainSync(msgPayload, s)
 		case proto_node.CLIENT:
 			node.log.Info("NET: received message: Node/CLIENT")
 			clientMsgType := proto_node.ClientMessageType(msgPayload[0])
@@ -205,9 +206,9 @@ func (node *Node) NodeHandler(conn net.Conn) {
 }
 
 // Refactor by moving this code into a sync package.
-func (node *Node) handleBlockchainSync(payload []byte, conn net.Conn) {
+func (node *Node) handleBlockchainSync(payload []byte, s net.Stream) {
 	// TODO(minhdoan): Looking to removing this.
-	w := bufio.NewWriter(conn)
+	w := bufio.NewWriter(bufio.NewWriter(s))
 FOR_LOOP:
 	for {
 		syncMsgType := proto_node.BlockchainSyncMessageType(payload[0])
@@ -226,7 +227,7 @@ FOR_LOOP:
 		case proto_node.Done:
 			break FOR_LOOP
 		}
-		content, err := p2p.ReadMessageContent(conn)
+		content, err := p2pv2.ReadData(s)
 
 		if err != nil {
 			node.log.Error("Failed in reading message content from syncing node", err)

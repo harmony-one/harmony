@@ -5,8 +5,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"net"
-
-	"github.com/harmony-one/harmony/p2pv2"
 )
 
 /*
@@ -24,11 +22,6 @@ content (n bytes) - actual message content
 */
 
 const BATCH_SIZE = 1 << 16
-
-// Read the message type and content size, and return the actual content.
-func ReadMessageContent(conn net.Conn) ([]byte, error) {
-	return p2pv2.Read(conn)
-}
 
 func CreateMessage(msgType byte, data []byte) []byte {
 	buffer := bytes.NewBuffer([]byte{})
