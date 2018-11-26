@@ -5,17 +5,18 @@ import (
 	"crypto/ecdsa"
 	"encoding/gob"
 	"fmt"
+	"math/big"
+	"net"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/node/worker"
-	"math/big"
-	"net"
-	"strings"
-	"sync"
-	"time"
 
 	"github.com/harmony-one/harmony/blockchain"
 	"github.com/harmony-one/harmony/client"
@@ -78,16 +79,6 @@ type Node struct {
 
 	// Test only
 	testBankKey *ecdsa.PrivateKey
-}
-
-// GetBlockHashes used for state download.
-func (node *Node) GetBlockHashes() [][32]byte {
-	return node.blockchain.GetBlockHashes()
-}
-
-// SetBlockchain is used for testing
-func (node *Node) SetBlockchain(bc *blockchain.Blockchain) {
-	node.blockchain = bc
 }
 
 // Add new crossTx and proofs to the list of crossTx that needs to be sent back to client
