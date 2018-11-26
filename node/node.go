@@ -165,6 +165,17 @@ func (node *Node) countNumTransactionsInBlockchain() int {
 	return count
 }
 
+// Count the total number of transactions in the blockchain
+// Currently used for stats reporting purpose
+func (node *Node) countNumTransactionsInBlockchainAccount() int {
+	count := 0
+	for curBlock := node.Chain.CurrentBlock(); curBlock != nil; {
+		count += len(curBlock.Transactions())
+		curBlock = node.Chain.GetBlockByHash(curBlock.ParentHash())
+	}
+	return count
+}
+
 //ConnectIdentityChain connects to identity chain
 func (node *Node) ConnectBeaconChain() {
 	Nnode := &NetworkNode{SelfPeer: node.SelfPeer, IDCPeer: node.IDCPeer}

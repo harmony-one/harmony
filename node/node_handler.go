@@ -142,45 +142,49 @@ func (node *Node) NodeHandler(conn net.Conn) {
 			node.log.Info("NET: received message: Node/Control")
 			controlType := msgPayload[0]
 			if proto_node.ControlMessageType(controlType) == proto_node.STOP {
-				node.log.Debug("Stopping Node", "node", node, "numBlocks", len(node.blockchain.Blocks), "numTxsProcessed", node.countNumTransactionsInBlockchain())
+				if node.Chain == nil {
+					node.log.Debug("Stopping Node", "node", node, "numBlocks", len(node.blockchain.Blocks), "numTxsProcessed", node.countNumTransactionsInBlockchain())
 
-				sizeInBytes := node.UtxoPool.GetSizeInByteOfUtxoMap()
-				node.log.Debug("UtxoPool Report", "numEntries", len(node.UtxoPool.UtxoMap), "sizeInBytes", sizeInBytes)
+					sizeInBytes := node.UtxoPool.GetSizeInByteOfUtxoMap()
+					node.log.Debug("UtxoPool Report", "numEntries", len(node.UtxoPool.UtxoMap), "sizeInBytes", sizeInBytes)
 
-				avgBlockSizeInBytes := 0
-				txCount := 0
-				blockCount := 0
-				totalTxCount := 0
-				totalBlockCount := 0
-				avgTxSize := 0
+					avgBlockSizeInBytes := 0
+					txCount := 0
+					blockCount := 0
+					totalTxCount := 0
+					totalBlockCount := 0
+					avgTxSize := 0
 
-				for _, block := range node.blockchain.Blocks {
-					if block.IsStateBlock() {
-						totalTxCount += int(block.State.NumTransactions)
-						totalBlockCount += int(block.State.NumBlocks)
-					} else {
-						byteBuffer := bytes.NewBuffer([]byte{})
-						encoder := gob.NewEncoder(byteBuffer)
-						encoder.Encode(block)
-						avgBlockSizeInBytes += len(byteBuffer.Bytes())
+					for _, block := range node.blockchain.Blocks {
+						if block.IsStateBlock() {
+							totalTxCount += int(block.State.NumTransactions)
+							totalBlockCount += int(block.State.NumBlocks)
+						} else {
+							byteBuffer := bytes.NewBuffer([]byte{})
+							encoder := gob.NewEncoder(byteBuffer)
+							encoder.Encode(block)
+							avgBlockSizeInBytes += len(byteBuffer.Bytes())
 
-						txCount += len(block.Transactions)
-						blockCount++
-						totalTxCount += len(block.TransactionIds)
-						totalBlockCount++
+							txCount += len(block.Transactions)
+							blockCount++
+							totalTxCount += len(block.TransactionIds)
+							totalBlockCount++
 
-						byteBuffer = bytes.NewBuffer([]byte{})
-						encoder = gob.NewEncoder(byteBuffer)
-						encoder.Encode(block.Transactions)
-						avgTxSize += len(byteBuffer.Bytes())
+							byteBuffer = bytes.NewBuffer([]byte{})
+							encoder = gob.NewEncoder(byteBuffer)
+							encoder.Encode(block.Transactions)
+							avgTxSize += len(byteBuffer.Bytes())
+						}
 					}
-				}
-				if blockCount != 0 {
-					avgBlockSizeInBytes = avgBlockSizeInBytes / blockCount
-					avgTxSize = avgTxSize / txCount
-				}
+					if blockCount != 0 {
+						avgBlockSizeInBytes = avgBlockSizeInBytes / blockCount
+						avgTxSize = avgTxSize / txCount
+					}
 
-				node.log.Debug("Blockchain Report", "totalNumBlocks", totalBlockCount, "avgBlockSizeInCurrentEpoch", avgBlockSizeInBytes, "totalNumTxs", totalTxCount, "avgTxSzieInCurrentEpoch", avgTxSize)
+					node.log.Debug("Blockchain Report", "totalNumBlocks", totalBlockCount, "avgBlockSizeInCurrentEpoch", avgBlockSizeInBytes, "totalNumTxs", totalTxCount, "avgTxSzieInCurrentEpoch", avgTxSize)
+				} else {
+					node.log.Debug("Stopping Node (Account Model)", "node", node, "CurBlockNum", node.Chain.CurrentHeader().Number, "numTxsProcessed", node.countNumTransactionsInBlockchainAccount())
+				}
 
 				os.Exit(0)
 			}
