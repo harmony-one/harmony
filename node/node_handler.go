@@ -518,11 +518,11 @@ func (node *Node) UpdateUtxoAndState(newBlock *blockchain.Block) {
 	}
 }
 
-func (node *Node) pingMessageHandler(msgPayload []byte) {
+func (node *Node) pingMessageHandler(msgPayload []byte) int {
 	ping, err := proto_node.GetPingMessage(msgPayload)
 	if err != nil {
 		node.log.Error("Can't get Ping Message")
-		return
+		return -1
 	}
 	node.log.Info("Ping", "Msg", ping)
 
@@ -534,7 +534,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte) {
 	err = peer.PubKey.UnmarshalBinary(ping.Node.PubKey[:])
 	if err != nil {
 		node.log.Error("UnmarshalBinary Failed", "error", err)
-		return
+		return -1
 	}
 
 	// Add to Node's peer list
@@ -555,18 +555,18 @@ func (node *Node) pingMessageHandler(msgPayload []byte) {
 	pong := proto_node.NewPongMessage(peers)
 	buffer := pong.ConstructPongMessage()
 
-	p2p.SendMessage(*peer, buffer)
+	for _, p := range peers {
+		p2p.SendMessage(p, buffer)
+	}
 
-	// TODO: broadcast pong messages to all neighbors
-
-	return
+	return count
 }
 
-func (node *Node) pongMessageHandler(msgPayload []byte) {
+func (node *Node) pongMessageHandler(msgPayload []byte) int {
 	pong, err := proto_node.GetPongMessage(msgPayload)
 	if err != nil {
 		node.log.Error("Can't get Pong Message")
-		return
+		return -1
 	}
 	//	node.log.Info("Pong", "Msg", pong)
 	node.State = NodeJoinedShard
@@ -587,8 +587,5 @@ func (node *Node) pongMessageHandler(msgPayload []byte) {
 		peers = append(peers, *peer)
 	}
 
-	node.AddPeers(peers)
-	// TODO: add public key to consensus.pubkeys
-
-	return
+	return node.AddPeers(peers)
 }
