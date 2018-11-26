@@ -59,3 +59,17 @@ func (client *Client) GetBlockHashes() *pb.DownloaderResponse {
 	}
 	return response
 }
+
+// GetBlocks ...
+func (client *Client) GetBlocks(heights []int32) *pb.DownloaderResponse {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_BLOCK}
+	request.Height = make([]int32, len(heights))
+	copy(request.Height, heights)
+	response, err := client.dlClient.Query(ctx, request)
+	if err != nil {
+		log.Fatalf("Error")
+	}
+	return response
+}
