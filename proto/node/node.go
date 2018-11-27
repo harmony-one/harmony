@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
-	"go-ethereum/rlp"
 	"log"
 
 	"github.com/harmony-one/harmony/blockchain"

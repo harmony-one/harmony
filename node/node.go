@@ -103,7 +103,7 @@ func (node *Node) addPendingTransactionsAccount(newTxs types.Transactions) {
 	node.pendingTxMutexAccount.Lock()
 	node.pendingTransactionsAccount = append(node.pendingTransactionsAccount, newTxs...)
 	node.pendingTxMutexAccount.Unlock()
-	node.log.Debug("Got more transactions (account model)", "num", len(newTxs), "totalPending", len(node.pendingTransactions), "node", node)
+	node.log.Debug("Got more transactions (account model)", "num", len(newTxs), "totalPending", len(node.pendingTransactionsAccount), "node", node)
 }
 
 // Take out a subset of valid transactions from the pending transaction list

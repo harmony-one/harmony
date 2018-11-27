@@ -49,7 +49,7 @@ func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	return receipt.Logs, nil
 }
 
-func (w *Worker) CommitTransactions(txs []*types.Transaction, coinbase common.Address) bool {
+func (w *Worker) CommitTransactions(txs []*types.Transaction, coinbase common.Address) error {
 	snap := w.current.state.Snapshot()
 
 	if w.current.gasPool == nil {
@@ -59,11 +59,11 @@ func (w *Worker) CommitTransactions(txs []*types.Transaction, coinbase common.Ad
 		_, err := w.commitTransaction(tx, coinbase)
 		if err != nil {
 			w.current.state.RevertToSnapshot(snap)
-			return false
+			return err
 
 		}
 	}
-	return true
+	return nil
 }
 
 func (w *Worker) UpdateCurrent() error {
@@ -98,13 +98,13 @@ func (w *Worker) GetCurrentState() *state.StateDB {
 	return w.current.state
 }
 
-func (w *Worker) Commit() *types.Block {
+func (w *Worker) Commit() (*types.Block, error) {
 	s := w.current.state.Copy()
 	block, err := w.engine.Finalize(w.chain, w.current.header, s, w.current.txs, w.current.receipts)
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	return block
+	return block, nil
 }
 
 func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus.Engine) *Worker {

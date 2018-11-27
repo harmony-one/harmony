@@ -390,18 +390,27 @@ func (node *Node) WaitForConsensusReadyAccount(readySignal chan struct{}) {
 		}
 
 		if !retry {
-			if len(node.pendingTransactionsAccount) >= 1000 {
-				// Normal tx block consensus
-				selectedTxs, _ := node.getTransactionsForNewBlockAccount(MaxNumberOfTransactionsPerBlock)
-				if node.Worker.CommitTransactions(selectedTxs, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey)) {
-					newBlock = node.Worker.Commit()
-				} else {
-					node.log.Debug("Failed to create new block")
+			for {
+				if len(node.pendingTransactionsAccount) >= 1000 {
+					// Normal tx block consensus
+					selectedTxs, _ := node.getTransactionsForNewBlockAccount(MaxNumberOfTransactionsPerBlock)
+					err := node.Worker.CommitTransactions(selectedTxs, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey))
+					if err == nil {
+						block, err := node.Worker.Commit()
+						if err != nil {
+							node.log.Debug("Failed commiting new block", "Error", err)
+						} else {
+							newBlock = block
+							break
+						}
+					} else {
+						node.log.Debug("Failed to create new block", "Error", err)
+					}
 				}
+				// If not enough transactions to run Consensus,
+				// periodically check whether we have enough transactions to package into block.
+				time.Sleep(1 * time.Second)
 			}
-			// If not enough transactions to run Consensus,
-			// periodically check whether we have enough transactions to package into block.
-			time.Sleep(1 * time.Second)
 		}
 
 		// Send the new block to Consensus so it can be confirmed.
