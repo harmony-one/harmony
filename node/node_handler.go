@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"github.com/harmony-one/harmony/core/types"
 	"net"
 	"os"
 	"strconv"
@@ -178,6 +179,12 @@ func (node *Node) NodeHandler(conn net.Conn) {
 
 				os.Exit(0)
 			}
+		case proto_node.PING:
+			node.log.Info("NET: received message: PING")
+			node.pingMessageHandler(msgPayload)
+		case proto_node.PONG:
+			node.log.Info("NET: received message: PONG")
+			node.pongMessageHandler(msgPayload)
 		}
 	case proto.CLIENT:
 		actionType := client.ClientMessageType(msgType)
@@ -188,6 +195,8 @@ func (node *Node) NodeHandler(conn net.Conn) {
 				node.Client.TransactionMessageHandler(msgPayload)
 			}
 		}
+	default:
+		node.log.Error("Unknown", "MsgCateory:", msgCategory)
 	}
 }
 
@@ -347,6 +356,37 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
 	}
 }
 
+// WaitForConsensusReady ...
+func (node *Node) WaitForConsensusReadyAccount(readySignal chan struct{}) {
+	node.log.Debug("Waiting for Consensus ready", "node", node)
+
+	var newBlock *types.Block
+	timeoutCount := 0
+	for { // keep waiting for Consensus ready
+		retry := false
+		// TODO(minhdoan, rj): Refactor by sending signal in channel instead of waiting for 10 seconds.
+		select {
+		case <-readySignal:
+			time.Sleep(100 * time.Millisecond) // Delay a bit so validator is catched up.
+		case <-time.After(100 * time.Second):
+			retry = true
+			node.Consensus.ResetState()
+			timeoutCount++
+			node.log.Debug("Consensus timeout, retry!", "count", timeoutCount, "node", node)
+		}
+
+		if !retry {
+			// Normal tx block consensus
+			// TODO: add new block generation logic
+		}
+
+		// Send the new block to Consensus so it can be confirmed.
+		if newBlock != nil {
+			node.BlockChannelAccount <- newBlock
+		}
+	}
+}
+
 // SendBackProofOfAcceptOrReject is called by consensus participants to verify the block they are running consensus on
 func (node *Node) SendBackProofOfAcceptOrReject() {
 	if node.ClientPeer != nil && len(node.CrossTxsToReturn) != 0 {
@@ -441,4 +481,24 @@ func (node *Node) UpdateUtxoAndState(newBlock *blockchain.Block) {
 		node.log.Info("LEADER CURRENT UTXO", "num", node.UtxoPool.CountNumOfUtxos(), "ShardID", node.UtxoPool.ShardID)
 		node.log.Info("LEADER LOCKED UTXO", "num", node.UtxoPool.CountNumOfLockedUtxos(), "ShardID", node.UtxoPool.ShardID)
 	}
+}
+
+func (node *Node) pingMessageHandler(msgPayload []byte) {
+	ping, err := proto_node.GetPingMessage(msgPayload)
+	if err != nil {
+		node.log.Error("Can't get Ping Message")
+		return
+	}
+	node.log.Info("Ping", "Msg", ping)
+	return
+}
+
+func (node *Node) pongMessageHandler(msgPayload []byte) {
+	pong, err := proto_node.GetPongMessage(msgPayload)
+	if err != nil {
+		node.log.Error("Can't get Pong Message")
+		return
+	}
+	node.log.Info("Pong", "Msg", pong)
+	return
 }

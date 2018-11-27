@@ -29,7 +29,7 @@ func (IDC *BeaconChain) BeaconChainHandler(conn net.Conn) {
 		IDC.log.Error("Identity Chain Recieved incorrect protocol message")
 		os.Exit(1)
 	} else {
-		fmt.Println("Message category is correct")
+		IDC.log.Info("Message category is correct")
 	}
 	msgType, err := proto.GetMessageType(content)
 	if err != nil {

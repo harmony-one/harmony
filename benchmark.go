@@ -69,6 +69,7 @@ func loggingInit(logFolder, role, ip, port string, onlyLogTps bool) {
 	log.Root().SetHandler(h)
 
 }
+
 func main() {
 	// TODO: use http://getmyipaddress.org/ or http://www.get-myip.com/ to retrieve my IP address
 
@@ -84,10 +85,13 @@ func main() {
 	// syncNode := flag.Bool("sync_node", false, "Whether this node is a new node joining blockchain and it needs to get synced before joining consensus.")
 	// onlyLogTps := flag.Bool("only_log_tps", false, "Only log TPS if true")
 
-	// This IP belongs to jenkins.harmony.one
+	//This IP belongs to jenkins.harmony.one
 	idcIP := flag.String("idc", "127.0.0.1", "IP of the identity chain")
 	idcPort := flag.String("idc_port", "8081", "port of the identity chain")
 	peerDisvoery := flag.Bool("peer_discovery", true, "Enable Peer Discovery")
+
+	// // Leader needs to have a minimal number of peers to start consensus
+	// minPeers := flag.Int("min_peers", 100, "Minimal number of Peers in shard")
 
 	flag.Parse()
 
@@ -105,24 +109,53 @@ func main() {
 	var peers []p2p.Peer
 	var leader p2p.Peer
 	var selfPeer p2p.Peer
-	var clientPeer *p2p.Peer
+	// var clientPeer *p2p.Peer
+	// ewnode := newnode.New(*ip, *port)
+	// go ewnode.StartServer()
+	// time.Sleep(5 * time.Second)
+	// fmt.Print("Hello within server right now")
+	// ewnode.StopServer()
+	// time.Sleep(5 * time.Second)
+	// fmt.Println("will try to close server before the program exits")
+	// //ewnode := newnode.New(*ip, *port)
+	// go ewnode.StartNewServer()
+	// time.Sleep(5 * time.Second)
+	// ewnode.StopServer()
+	// time.Sleep(5 * time.Second)
+	// fmt.Println("hello")
+	// fmt.Print("Hello done closeing now")
 
-	// Use Peer Discovery to get shard/leader/peer/...
+	//Use Peer Discovery to get shard/leader/peer/...
 	if *peerDisvoery {
 		newnode := newnode.New(*ip, *port)
-		BCPeer := p2p.Peer{Ip: *idcIP, Port: *idcPort}
-		go newnode.ConnectBC(BCPeer)
-		newnode.StartServer() //add error handling here
-
-		// if err != nil {
-		// 	fmt.Println("Unable to start peer discovery! ", err)
-		// 	os.Exit(1)
-		// }
-
+		//BCPeer := p2p.Peer{Ip: *idcIP, Port: *idcPort}
+		go newnode.StartServer() //add error handling here
+		//newnode.ConnectBeaconChain(BCPeer)
+		time.Sleep(5 * time.Second)
+		// ticker := time.NewTicker(10 * time.Second)
+		// quit := make(chan struct{})
+		// go func() {
+		// 	for {
+		// 		select {
+		// 		case <-ticker.C:
+		// 			if newnode.SetInfo {
+		// 				fmt.Println("shutting down server")
+		// 				newnode.StopServer()
+		// 				close(quit)
+		// 				<-quit
+		// 			}
+		// 		case <-quit:
+		// 			ticker.Stop()
+		// 			return
+		// 		}
+		// 	}
+		// }()
 		shardID = newnode.GetShardID()
 		leader = newnode.GetLeader()
 		peers = newnode.GetPeers()
 		selfPeer = newnode.GetSelfPeer()
+		newnode.StopServer()
+
 	} else {
 		distributionConfig := utils.NewDistributionConfig()
 		distributionConfig.ReadConfigFile(*configFile)
@@ -130,11 +163,15 @@ func main() {
 		peers = distributionConfig.GetPeers(*ip, *port, shardID)
 		leader = distributionConfig.GetLeader(shardID)
 		selfPeer = distributionConfig.GetSelfPeer(*ip, *port, shardID)
-
-		// Create client peer.
-		clientPeer = distributionConfig.GetClientPeer()
 	}
-	fmt.Println(peers, leader, selfPeer, clientPeer)
+	//Create client peer.
+	// clientPeer = distributionConfig.GetClientPeer()
+	//}
+	ewnode := newnode.New(*ip, *port)
+	go ewnode.StartServer()
+	time.Sleep(10 * time.Second)
+	fmt.Println("hello")
+	fmt.Println(shardID, leader, peers, selfPeer, idcIP, idcPort)
 	// var role string
 	// if leader.Ip == *ip && leader.Port == *port {
 	// 	role = "leader"
@@ -159,6 +196,7 @@ func main() {
 
 	// // Consensus object.
 	// consensus := consensus.NewConsensus(*ip, *port, shardID, peers, leader)
+	// consensus.MinPeers = *minPeers
 
 	// // Start Profiler for leader if profile argument is on
 	// if role == "leader" && (*profile || *metricsReportURL != "") {

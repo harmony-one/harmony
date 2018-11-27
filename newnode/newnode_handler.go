@@ -12,7 +12,12 @@ import (
 // NodeHandler handles a new incoming connection.
 func (node *NewNode) NodeHandler(conn net.Conn) {
 	defer conn.Close()
-
+	// select {
+	// case <-node.quit:
+	// 	return
+	// default:
+	// 	fmt.Println("hey!")
+	// }
 	// Read p2p message payload
 	content, err := p2p.ReadMessageContent(conn)
 

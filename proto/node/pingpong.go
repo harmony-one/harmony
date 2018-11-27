@@ -4,11 +4,7 @@ Package proto/node implements the communication protocol among nodes.
 pingpong.go adds support of ping/pong messages.
 
 ping: from node to peers, sending IP/Port/PubKey info
-TODO: add protocol version support
-
 pong: peer responds to ping messages, sending all pubkeys known by peer
-TODO:
-* add the version of the protocol
 
 */
 
@@ -18,25 +14,66 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/proto"
 	"log"
 )
 
-type PingMessageType struct {
+type nodeInfo struct {
 	IP     string
 	Port   string
 	PubKey string
 }
 
+type PingMessageType struct {
+	Version uint16 // version of the protocol
+	Node    nodeInfo
+}
+
 type PongMessageType struct {
-	PubKeys []string
+	Version uint16 // version of the protocol
+	Peers   []nodeInfo
 }
 
 func (p PingMessageType) String() string {
-	return fmt.Sprintf("%v:%v/%v", p.IP, p.Port, p.PubKey)
+	return fmt.Sprintf("%v=>%v:%v/%v", p.Version, p.Node.IP, p.Node.Port, p.Node.PubKey)
 }
 
 func (p PongMessageType) String() string {
-	return fmt.Sprintf("# Keys: %v", len(p.PubKeys))
+	str := fmt.Sprintf("%v=># Peers: %v", p.Version, len(p.Peers))
+	for _, p := range p.Peers {
+		str = fmt.Sprintf("%v\n%v:%v/%v", str, p.IP, p.Port, p.PubKey)
+	}
+	return str
+}
+
+func NewPingMessage(peer p2p.Peer) *PingMessageType {
+	ping := new(PingMessageType)
+
+	ping.Version = PROTOCOL_VERSION
+	ping.Node.IP = peer.Ip
+	ping.Node.Port = peer.Port
+	ping.Node.PubKey = fmt.Sprintf("%v", peer.PubKey)
+
+	return ping
+}
+
+func NewPongMessage(peers []p2p.Peer) *PongMessageType {
+	pong := new(PongMessageType)
+
+	pong.Version = PROTOCOL_VERSION
+	pong.Peers = make([]nodeInfo, 0)
+
+	for _, p := range peers {
+		n := nodeInfo{}
+		n.IP = p.Ip
+		n.Port = p.Port
+		n.PubKey = fmt.Sprintf("%v", p.PubKey)
+
+		pong.Peers = append(pong.Peers, n)
+	}
+
+	return pong
 }
 
 // Deserialize Ping Message
@@ -71,8 +108,10 @@ func GetPongMessage(payload []byte) (*PongMessageType, error) {
 
 // ConstructPingMessage contructs ping message from node to leader
 func (ping PingMessageType) ConstructPingMessage() []byte {
-	var byteBuffer bytes.Buffer
-	encoder := gob.NewEncoder(&byteBuffer)
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
+	byteBuffer.WriteByte(byte(PING))
+
+	encoder := gob.NewEncoder(byteBuffer)
 	err := encoder.Encode(ping)
 	if err != nil {
 		log.Panic("Can't serialize Ping message", "error:", err)
@@ -83,8 +122,10 @@ func (ping PingMessageType) ConstructPingMessage() []byte {
 
 // ConstructPongMessage contructs pong message from leader to node
 func (pong PongMessageType) ConstructPongMessage() []byte {
-	var byteBuffer bytes.Buffer
-	encoder := gob.NewEncoder(&byteBuffer)
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
+	byteBuffer.WriteByte(byte(PONG))
+
+	encoder := gob.NewEncoder(byteBuffer)
 	err := encoder.Encode(pong)
 	if err != nil {
 		log.Panic("Can't serialize Pong message", "error:", err)

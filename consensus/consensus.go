@@ -35,7 +35,15 @@ type Consensus struct {
 	responses      *map[uint16]kyber.Scalar
 	finalResponses *map[uint16]kyber.Scalar
 	// map of nodeID to validator Peer object
+	// FIXME: should use PubKey of p2p.Peer as the hashkey
+	// However, we have assumed uint16 in consensus/consensus_leader.go:136
+	// we won't change it now
 	validators map[uint16]p2p.Peer
+
+	// Minimal number of peers in the shard
+	// If the number of validators is less than minPeers, the consensus won't start
+	MinPeers int
+
 	// Leader
 	leader p2p.Peer
 	// Public keys of the committee including leader and validators
@@ -213,4 +221,16 @@ func (consensus *Consensus) String() string {
 	}
 	return fmt.Sprintf("[duty:%s, priKey:%s, ShardID:%v, nodeID:%v, state:%s]",
 		duty, consensus.priKey.String(), consensus.ShardID, consensus.nodeID, consensus.state)
+}
+
+func (consensus *Consensus) AddPeers(peers []p2p.Peer) int {
+	count := 0
+	for _, peer := range peers {
+		_, ok := consensus.validators[utils.GetUniqueIdFromPeer(peer)]
+		if !ok {
+			consensus.validators[utils.GetUniqueIdFromPeer(peer)] = peer
+			count++
+		}
+	}
+	return count
 }

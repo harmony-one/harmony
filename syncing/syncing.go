@@ -3,6 +3,7 @@ package syncing
 import (
 	"bufio"
 	"net"
+	"reflect"
 	"sync"
 	"time"
 
@@ -33,12 +34,23 @@ type SyncConfig struct {
 	peers []SyncPeerConfig
 }
 
-// StateSync is the main object used to do state sync.
-type StateSync struct {
+// GetStateSync returns the implementation of StateSyncInterface interface.
+func GetStateSync() *StateSync {
+	return &StateSync{}
 }
 
-// ProcessStateSync used to do state sync.
-func (ss *StateSync) ProcessStateSync(peers []p2p.Peer, bc *blockchain.Blockchain) (chan struct{}, error) {
+// StateSync is the struct that implements StateSyncInterface.
+type StateSync struct {
+	peerNumber         int
+	activePeerNumber   int
+	blockHeight        int
+	syncConfig         *SyncConfig
+	stateSyncTaskQueue *queue.Queue
+}
+
+// ProcessStateSyncFromPeers used to do state sync.
+func (ss *StateSync) ProcessStateSyncFromPeers(peers []p2p.Peer, bc *blockchain.Blockchain) (chan struct{}, error) {
+	// TODO: Validate peers.
 	done := make(chan struct{})
 	go func() {
 		ss.StartStateSync(peers, bc)
@@ -47,44 +59,67 @@ func (ss *StateSync) ProcessStateSync(peers []p2p.Peer, bc *blockchain.Blockchai
 	return done, nil
 }
 
-// StartStateSync starts state sync.
-func (ss *StateSync) StartStateSync(peers []p2p.Peer, bc *blockchain.Blockchain) {
-	peerNumber := len(peers)
-	syncConfig := SyncConfig{
-		peers: make([]SyncPeerConfig, peerNumber),
-	}
-	for id := range syncConfig.peers {
-		syncConfig.peers[id].peer = peers[id]
-		syncConfig.peers[id].trusted = false
-	}
+// ProcessStateSyncFromSinglePeer used to do state sync from a single peer.
+func (ss *StateSync) ProcessStateSyncFromSinglePeer(peer *p2p.Peer, bc *blockchain.Blockchain) (chan struct{}, error) {
+	// Later.
+	return nil, nil
+}
 
+func (ss *StateSync) createSyncConfig(peers []p2p.Peer) {
+	ss.peerNumber = len(peers)
+	ss.syncConfig = &SyncConfig{
+		peers: make([]SyncPeerConfig, ss.peerNumber),
+	}
+	for id := range ss.syncConfig.peers {
+		ss.syncConfig.peers[id].peer = peers[id]
+		ss.syncConfig.peers[id].trusted = false
+	}
+}
+
+func (ss *StateSync) makeConnectionToPeers() {
 	var wg sync.WaitGroup
-	wg.Add(peerNumber)
+	wg.Add(ss.peerNumber)
 
-	for id := range syncConfig.peers {
+	for _, synPeerConfig := range ss.syncConfig.peers {
 		go func(peerConfig *SyncPeerConfig) {
 			defer wg.Done()
 			peerConfig.conn, peerConfig.err = p2p.DialWithSocketClient(peerConfig.peer.Ip, peerConfig.peer.Port)
-		}(&syncConfig.peers[id])
+		}(&synPeerConfig)
 	}
 	wg.Wait()
-
-	activePeerNumber := 0
-	for _, configPeer := range syncConfig.peers {
+	ss.activePeerNumber = 0
+	for _, configPeer := range ss.syncConfig.peers {
 		if configPeer.err == nil {
-			activePeerNumber++
+			ss.activePeerNumber++
 			configPeer.w = bufio.NewWriter(configPeer.conn)
 			configPeer.trusted = true
 		}
 	}
+}
 
-	// Looping to get an array of block hashes from honest nodes.
-LOOP_HONEST_NODE:
+// areConsensusHashesEqual chesk if all consensus hashes are equal.
+func (ss *StateSync) areConsensusHashesEqual() bool {
+	var fixedPeer *SyncPeerConfig
+	for _, configPeer := range ss.syncConfig.peers {
+		if configPeer.trusted {
+			if fixedPeer == nil {
+				fixedPeer = &configPeer
+			}
+			if !reflect.DeepEqual(configPeer.blockHashes, fixedPeer) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// getConsensusHashes gets all hashes needed to download.
+func (ss *StateSync) getConsensusHashes() {
 	for {
 		var wg sync.WaitGroup
-		wg.Add(activePeerNumber)
+		wg.Add(ss.activePeerNumber)
 
-		for _, configPeer := range syncConfig.peers {
+		for _, configPeer := range ss.syncConfig.peers {
 			if configPeer.err != nil {
 				continue
 			}
@@ -108,36 +143,39 @@ LOOP_HONEST_NODE:
 				peerConfig.blockHashes = blockchainSyncMessage.BlockHashes
 			}(&configPeer)
 		}
-		wg.Wait()
-
-		if getConsensus(&syncConfig) {
-			break LOOP_HONEST_NODE
+		if ss.areConsensusHashesEqual() {
+			break
 		}
 	}
+}
 
-	taskSyncQueue := queue.New(0)
-	blockSize := 0
-TASK_LOOP:
-	for _, configPeer := range syncConfig.peers {
+// getConsensusHashes gets all hashes needed to download.
+func (ss *StateSync) generateStateSyncTaskQueue() {
+	ss.stateSyncTaskQueue = queue.New(0)
+	for _, configPeer := range ss.syncConfig.peers {
 		if configPeer.trusted {
 			for id, blockHash := range configPeer.blockHashes {
-				taskSyncQueue.Put(SyncBlockTask{index: id, blockHash: blockHash})
+				ss.stateSyncTaskQueue.Put(SyncBlockTask{index: id, blockHash: blockHash})
 			}
-			blockSize = len(configPeer.blockHashes)
-			break TASK_LOOP
+			ss.blockHeight = len(configPeer.blockHashes)
 		}
 	}
+}
+
+// downloadBlocks downloads blocks from state sync task queue.
+func (ss *StateSync) downloadBlocks(bc *blockchain.Blockchain) {
 	// Initialize blockchain
-	bc.Blocks = make([]*blockchain.Block, blockSize)
-	wg.Add(activePeerNumber)
-	for _, configPeer := range syncConfig.peers {
+	bc.Blocks = make([]*blockchain.Block, ss.blockHeight)
+	var wg sync.WaitGroup
+	wg.Add(int(ss.stateSyncTaskQueue.Len()))
+	for _, configPeer := range ss.syncConfig.peers {
 		if configPeer.err != nil {
 			continue
 		}
-		go func(peerConfig *SyncPeerConfig, taskSyncQueue *queue.Queue, bc *blockchain.Blockchain) {
+		go func(peerConfig *SyncPeerConfig, stateSyncTaskQueue *queue.Queue, bc *blockchain.Blockchain) {
 			defer wg.Done()
-			for !taskSyncQueue.Empty() {
-				task, err := taskSyncQueue.Poll(1, time.Millisecond)
+			for !stateSyncTaskQueue.Empty() {
+				task, err := stateSyncTaskQueue.Poll(1, time.Millisecond)
 				if err == queue.ErrTimeout {
 					break
 				}
@@ -156,9 +194,26 @@ TASK_LOOP:
 					bc.Blocks[syncTask.index] = block
 				}
 			}
-		}(&configPeer, taskSyncQueue, bc)
+		}(&configPeer, ss.stateSyncTaskQueue, bc)
 	}
 	wg.Wait()
+}
+
+// StartStateSync starts state sync.
+func (ss *StateSync) StartStateSync(peers []p2p.Peer, bc *blockchain.Blockchain) {
+	// Creates sync config.
+	ss.createSyncConfig(peers)
+
+	// Makes connections to peers.
+	ss.makeConnectionToPeers()
+
+	// Gets consensus hashes.
+	ss.getConsensusHashes()
+
+	// Generates state-sync task queue.
+	ss.generateStateSyncTaskQueue()
+
+	ss.downloadBlocks(bc)
 }
 
 func getConsensus(syncConfig *SyncConfig) bool {

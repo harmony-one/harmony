@@ -2,13 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/db"
 	"math/big"
 )
 
@@ -41,14 +41,14 @@ func init() {
 }
 
 type testWorkerBackend struct {
-	db     ethdb.Database
+	db     db.Database
 	txPool *core.TxPool
 	chain  *core.BlockChain
 }
 
 func main() {
 	var (
-		database = ethdb.NewMemDatabase()
+		database = db.NewMemDatabase()
 		gspec    = core.Genesis{
 			Config: chainConfig,
 			Alloc:  core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
@@ -58,10 +58,6 @@ func main() {
 	genesis := gspec.MustCommit(database)
 
 	chain, _ := core.NewBlockChain(database, nil, gspec.Config, consensus.NewFaker(), vm.Config{}, nil)
-
-	fmt.Println(testBankAddress)
-	fmt.Println(testUserAddress)
-	fmt.Println(genesis.Root())
 
 	txpool := core.NewTxPool(core.DefaultTxPoolConfig, chainConfig, chain)
 
@@ -82,12 +78,5 @@ func main() {
 		if _, err := chain.InsertChain(blocks); err != nil {
 			fmt.Errorf("failed to insert origin chain: %v", err)
 		}
-		fmt.Println(blocks[0].NumberU64())
-		fmt.Println(chain.GetBlockByNumber(0).Root())
-		fmt.Println(chain.GetBlockByNumber(1).Root())
-		fmt.Println(blocks[1].Root())
-		fmt.Println(chain.GetBlockByNumber(2).Root())
-		fmt.Println(blocks[2].Root())
-		fmt.Println("Yeah")
 	}
 }
