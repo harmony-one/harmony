@@ -6,7 +6,6 @@ import (
 )
 
 // StateSyncInterface is the interface to do state-sync.
-// TODO(minhdoan): Nice to have, we should abstract the Blockchain type as generic type.
 type StateSyncInterface interface {
 	// Syncing blockchain from other peers.
 	// The returned channel is the signal of syncing finish.
