@@ -16,25 +16,40 @@ import (
 	"github.com/harmony-one/harmony/utils"
 )
 
+// An uninteresting service.
+type ServiceState struct {
+	quit      chan bool
+	waitGroup *sync.WaitGroup
+}
+
 type NewNode struct {
-	Role        string
-	ShardID     string
-	ValidatorID int // Validator ID in its shard.
-	leader      p2p.Peer
-	Self        p2p.Peer
-	peers       []p2p.Peer
-	pubK        kyber.Scalar
-	priK        kyber.Point
-	log         log.Logger
-	quit        chan bool
-	SetInfo     bool
-	waitGroup   *sync.WaitGroup
+	Role         string
+	ShardID      string
+	ValidatorID  int // Validator ID in its shard.
+	leader       p2p.Peer
+	Self         p2p.Peer
+	peers        []p2p.Peer
+	pubK         kyber.Scalar
+	priK         kyber.Point
+	log          log.Logger
+	SetInfo      bool
+	ServiceState *ServiceState
 }
 
 type registerResponseRandomNumber struct {
 	NumberOfShards     int
 	NumberOfNodesAdded int
 	Leaders            []*NewNode
+}
+
+// Make a new Service.
+func NewServiceState() *ServiceState {
+	s := &ServiceState{
+		quit:      make(chan bool),
+		waitGroup: &sync.WaitGroup{},
+	}
+	s.waitGroup.Add(1)
+	return s
 }
 
 func (node NewNode) String() string {
@@ -50,7 +65,7 @@ func New(ip string, port string) *NewNode {
 	node.peers = make([]p2p.Peer, 0)
 	node.log = log.New()
 	node.SetInfo = false
-	node.quit = make(chan bool)
+	node.ServiceState = NewServiceState()
 
 	return &node
 }
@@ -137,17 +152,18 @@ func (node *NewNode) StartServer() {
 	node.log.Info("Starting Server ..")
 
 	backoff := p2p.NewExpBackoff(250*time.Millisecond, 15*time.Second, 2.0)
+	defer node.ServiceState.waitGroup.Done()
 	for {
-		p := <-node.quit
-		fmt.Println(p)
-		//fmt.Println("node quit value in start server", <-node.quit)
+		// p := <-node.quit
+		// fmt.Println(p)
+		// //fmt.Println("node quit value in start server", <-node.quit)
 		//time.Sleep(1 * time.Second)
 		//Here I am trying to comment and uncomment above line
 		// commenting and uncommenting this line is difference between correct and incorrect execution
 		//comment is correct execution
 
 		select {
-		case <-node.quit:
+		case <-node.ServiceState.quit:
 			node.log.Info("Going to close listener")
 			fmt.Println("closing listener")
 			listen.Close()
@@ -164,13 +180,15 @@ func (node *NewNode) StartServer() {
 			continue
 		}
 		fmt.Println("Handling Connections", err, conn)
+		node.ServiceState.waitGroup.Add(1)
 		go node.NodeHandler(conn)
 	}
 }
 
 func (node *NewNode) StopServer() {
 	node.log.Info("server stopping")
-	close(node.quit)
+	close(node.ServiceState.quit)
+	node.ServiceState.waitGroup.Wait()
 	node.log.Info("server stopped")
 }
 
