@@ -14,6 +14,7 @@ USAGE: $ME [OPTIONS] config_file_name
    -d             enable db support (default: $DB)
    -t             toggle txgen (default: $TXGEN)
    -D duration    txgen run duration (default: $DURATION)
+   -m min_peers   minimal number of peers to start consensus (default: $MIN)
 
 This script will build all the binaries and start benchmark and txgen based on the configuration file.
 
@@ -29,15 +30,17 @@ EOU
 PEER=
 DB=
 TXGEN=true
-DURATION=60
+DURATION=90
+MIN=5
 
-while getopts "hpdtD:" option; do
+while getopts "hpdtD:m:" option; do
    case $option in
       h) usage ;;
       p) PEER='-peer_discovery' ;;
       d) DB='-db_supported' ;;
       t) TXGEN=false ;;
       D) DURATION=$OPTARG ;;
+      m) MIN=$OPTARG ;;
    esac
 done
 
@@ -70,7 +73,7 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
   IFS=' ' read ip port mode shardID <<< $line
 	#echo $ip $port $mode
   if [ "$mode" != "client" ]; then
-    ./bin/benchmark -ip $ip -port $port -config_file $config -log_folder $log_folder $DB $PEER &
+    ./bin/benchmark -ip $ip -port $port -config_file $config -log_folder $log_folder $DB $PEER -min_peers $MIN &
   fi
 done < $config
 

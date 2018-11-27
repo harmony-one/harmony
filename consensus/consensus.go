@@ -239,7 +239,9 @@ func (consensus *Consensus) AddPeers(peers []p2p.Peer) int {
 	for _, peer := range peers {
 		_, ok := consensus.validators.Load(utils.GetUniqueIdFromPeer(peer))
 		if !ok {
-			peer.ValidatorID = int(consensus.uniqueIdInstance.GetUniqueId())
+			if peer.ValidatorID == -1 {
+				peer.ValidatorID = int(consensus.uniqueIdInstance.GetUniqueId())
+			}
 			consensus.validators.Store(utils.GetUniqueIdFromPeer(peer), peer)
 			consensus.publicKeys = append(consensus.publicKeys, peer.PubKey)
 			count++
@@ -266,4 +268,30 @@ func (consensus *Consensus) AddPeers(peers []p2p.Peer) int {
 func (consensus *Consensus) RemovePeers(peers []p2p.Peer) int {
 	// TODO (lc) we need to have a corresponding RemovePeers function
 	return 0
+}
+
+// DebugPrintPublicKeys print all the publicKeys in string format in Consensus
+func (consensus *Consensus) DebugPrintPublicKeys() {
+	for _, k := range consensus.publicKeys {
+		str := fmt.Sprintf("%s", k)
+		consensus.Log.Debug("pk:", "string", str)
+	}
+
+	consensus.Log.Debug("PublicKeys:", "#", len(consensus.publicKeys))
+}
+
+// DebugPrintValidators print all validator ip/port/key in string format in Consensus
+func (consensus *Consensus) DebugPrintValidators() {
+	count := 0
+	consensus.validators.Range(func(k, v interface{}) bool {
+		if p, ok := v.(p2p.Peer); ok {
+			str2 := fmt.Sprintf("%s", p.PubKey)
+			consensus.Log.Debug("validator:", "IP", p.Ip, "Port", p.Port, "VID", p.ValidatorID, "Key", str2)
+			count++
+			return true
+		} else {
+			return false
+		}
+	})
+	consensus.Log.Debug("Validators", "#", count)
 }
