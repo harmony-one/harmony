@@ -94,7 +94,7 @@ func (IDC *BeaconChain) listenOnPort() {
 		} else {
 			IDC.log.Info("I am accepting connections now")
 		}
-		go IDC.BeaconChainHandler(conn)
+		// go IDC.BeaconChainHandler(conn)
 	}
 
 }

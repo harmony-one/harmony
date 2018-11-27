@@ -2,18 +2,18 @@ package beaconchain
 
 import (
 	"fmt"
-	"net"
 	"os"
 
-	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/p2pv2"
 	"github.com/harmony-one/harmony/proto"
 	proto_identity "github.com/harmony-one/harmony/proto/identity"
+	net "github.com/libp2p/go-libp2p-net"
 )
 
 //BeaconChainHandler handles registration of new Identities
 // This could have been its seperate package like consensus, but am avoiding creating a lot of packages.
-func (IDC *BeaconChain) BeaconChainHandler(conn net.Conn) {
-	content, err := p2p.ReadMessageContent(conn)
+func (IDC *BeaconChain) BeaconChainHandler(s net.Stream) {
+	content, err := p2pv2.ReadData(s)
 	if err != nil {
 		IDC.log.Error("Read p2p data failed")
 		return
