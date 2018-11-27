@@ -139,6 +139,7 @@ func send(ip, port string, message []byte) {
 	backoff := NewExpBackoff(250*time.Millisecond, 10*time.Second, 2)
 
 	for trial := 0; trial < 10; trial++ {
+		// TODO(ricl): remove sendWithSocketClient related code.
 		// err := sendWithSocketClient(ip, port, message)
 		err := p2pv2.Send(ip, port, message)
 		if err == nil {

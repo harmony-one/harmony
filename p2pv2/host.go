@@ -13,6 +13,8 @@ import (
 	libp2p "github.com/libp2p/go-libp2p"
 	host "github.com/libp2p/go-libp2p-host"
 	net "github.com/libp2p/go-libp2p-net"
+	peer "github.com/libp2p/go-libp2p-peer"
+	peerstore "github.com/libp2p/go-libp2p-peerstore"
 	multiaddr "github.com/multiformats/go-multiaddr"
 )
 
@@ -22,6 +24,7 @@ var (
 
 const BATCH_SIZE = 1 << 16
 
+// InitHost Initialize a host for p2p communication
 func InitHost(port string) {
 	addr := fmt.Sprintf("/ip4/127.0.0.1/tcp/%s", port)
 	sourceAddr, err := multiaddr.NewMultiaddr(addr)
@@ -34,10 +37,31 @@ func InitHost(port string) {
 	log.Debug("Host is up!", "port", port, "id", myHost.ID().Pretty(), "addrs", sourceAddr)
 }
 
+// BindHandler bind a streamHandler to the harmony protocol.
 func BindHandler(handler net.StreamHandler) {
 	myHost.SetStreamHandler("/harmony/0.0.1", handler)
 }
 
+// Send a p2p message sending function with signature compatible to p2pv1.
+func Send(ip, port string, message []byte) error {
+	addr := fmt.Sprintf("/ip4/127.0.0.1/tcp/%s", port)
+	targetAddr, err := multiaddr.NewMultiaddr(addr)
+
+	priv := portToPrivKey(port)
+	peerID, _ := peer.IDFromPrivateKey(priv)
+	myHost.Peerstore().AddAddrs(peerID, []multiaddr.Multiaddr{targetAddr}, peerstore.PermanentAddrTTL)
+	s, err := myHost.NewStream(context.Background(), peerID, "/harmony/0.0.1")
+	catchError(err)
+
+	// Create a buffered stream so that read and writes are non blocking.
+	w := bufio.NewWriter(bufio.NewWriter(s))
+
+	// Create a thread to read and write data.
+	go writeData(w, message)
+	return nil
+}
+
+// ReadData Call this function in streamHandler to get the binary data.
 func ReadData(s net.Stream) ([]byte, error) {
 	timeoutDuration := 1 * time.Second
 	s.SetReadDeadline(time.Now().Add(timeoutDuration))
@@ -107,13 +131,7 @@ ILOOP:
 	return contentBuf.Bytes(), nil
 }
 
-func writeData(w *bufio.Writer, data []byte) {
-	for {
-		w.Write(data)
-		w.Flush()
-	}
-}
-
+// GetHost Get the p2p host
 func GetHost() host.Host {
 	return myHost
 }

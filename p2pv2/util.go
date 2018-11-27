@@ -1,6 +1,7 @@
 package p2pv2
 
 import (
+	"bufio"
 	"math/rand"
 	"strconv"
 
@@ -21,4 +22,11 @@ func portToPrivKey(port string) ic.PrivKey {
 	r := rand.New(rand.NewSource(portNum))
 	priv, _, err := ic.GenerateKeyPairWithReader(ic.RSA, 512, r)
 	return priv
+}
+
+func writeData(w *bufio.Writer, data []byte) {
+	for {
+		w.Write(data)
+		w.Flush()
+	}
 }
