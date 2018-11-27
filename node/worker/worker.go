@@ -1,8 +1,6 @@
 package worker
 
 import (
-	"math/big"
-	"time"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/consensus"
@@ -10,6 +8,8 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"math/big"
+	"time"
 )
 
 // environment is the worker's current environment and holds all of the current state information.

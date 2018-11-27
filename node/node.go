@@ -73,13 +73,15 @@ type Node struct {
 	State     NodeState        // State of the Node
 
 	// Account Model
-	Chain               *core.BlockChain
-	TxPool              *core.TxPool
-	BlockChannelAccount chan *types.Block // The channel to receive new blocks from Node
-	worker              *worker.Worker
+	pendingTransactionsAccount types.Transactions // TODO: replace with txPool
+	pendingTxMutexAccount      sync.Mutex
+	Chain                      *core.BlockChain
+	TxPool                     *core.TxPool
+	BlockChannelAccount        chan *types.Block // The channel to receive new blocks from Node
+	Worker                     *worker.Worker
 
 	// Test only
-	testBankKeys []*ecdsa.PrivateKey
+	TestBankKeys []*ecdsa.PrivateKey
 }
 
 // Add new crossTx and proofs to the list of crossTx that needs to be sent back to client
@@ -98,6 +100,14 @@ func (node *Node) addPendingTransactions(newTxs []*blockchain.Transaction) {
 	node.log.Debug("Got more transactions", "num", len(newTxs), "totalPending", len(node.pendingTransactions), "node", node)
 }
 
+// Add new transactions to the pending transaction list
+func (node *Node) addPendingTransactionsAccount(newTxs types.Transactions) {
+	node.pendingTxMutexAccount.Lock()
+	node.pendingTransactionsAccount = append(node.pendingTransactionsAccount, newTxs...)
+	node.pendingTxMutexAccount.Unlock()
+	node.log.Debug("Got more transactions (account model)", "num", len(newTxs), "totalPending", len(node.pendingTransactions), "node", node)
+}
+
 // Take out a subset of valid transactions from the pending transaction list
 // Note the pending transaction list will then contain the rest of the txs
 func (node *Node) getTransactionsForNewBlock(maxNumTxs int) ([]*blockchain.Transaction, []*blockchain.CrossShardTxAndProof) {
@@ -109,6 +119,19 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int) ([]*blockchain.Trans
 	node.pendingTransactions = unselected
 	node.pendingTxMutex.Unlock()
 	return selected, crossShardTxs
+}
+
+// Take out a subset of valid transactions from the pending transaction list
+// Note the pending transaction list will then contain the rest of the txs
+func (node *Node) getTransactionsForNewBlockAccount(maxNumTxs int) (types.Transactions, []*blockchain.CrossShardTxAndProof) {
+	node.pendingTxMutexAccount.Lock()
+	selected, unselected, invalid, crossShardTxs := node.pendingTransactionsAccount, types.Transactions{}, types.Transactions{}, []*blockchain.CrossShardTxAndProof{}
+	_ = invalid // invalid txs are discard
+
+	node.log.Debug("Invalid transactions discarded", "number", len(invalid))
+	node.pendingTransactionsAccount = unselected
+	node.pendingTxMutexAccount.Unlock()
+	return selected, crossShardTxs //TODO: replace cross-shard proofs for account model
 }
 
 // StartServer starts a server and process the request by a handler.
@@ -251,7 +274,7 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 			testBankAddress := crypto.PubkeyToAddress(testBankKey.PublicKey)
 			testBankFunds := big.NewInt(10000000000)
 			genesisAloc[testBankAddress] = core.GenesisAccount{Balance: testBankFunds}
-			node.testBankKeys = append(node.testBankKeys, testBankKey)
+			node.TestBankKeys = append(node.TestBankKeys, testBankKey)
 		}
 
 		database := hdb.NewMemDatabase()
@@ -266,7 +289,7 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 		node.Chain = chain
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, params.TestChainConfig, chain)
 		node.BlockChannelAccount = make(chan *types.Block)
-		node.worker = worker.New(params.TestChainConfig, chain, bft.NewFaker())
+		node.Worker = worker.New(params.TestChainConfig, chain, bft.NewFaker())
 	}
 	// Logger
 	node.log = log.New()

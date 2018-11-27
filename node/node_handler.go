@@ -5,17 +5,13 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/pki"
-	"math/big"
 	"net"
 	"os"
 	"strconv"
 	"time"
-
 
 	"github.com/harmony-one/harmony/blockchain"
 	hmy_crypto "github.com/harmony-one/harmony/crypto"
@@ -267,13 +263,23 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 
 	switch txMessageType {
 	case proto_node.Send:
-		txDecoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the Send messge type
-		txList := new([]*blockchain.Transaction)
-		err := txDecoder.Decode(txList)
-		if err != nil {
-			node.log.Error("Failed to deserialize transaction list", "error", err)
+		if node.Chain != nil {
+			txs := types.Transactions{}
+			err := rlp.Decode(bytes.NewReader(msgPayload[1:]), &txs) // skip the Send messge type
+			if err != nil {
+				node.log.Error("Failed to deserialize transaction list", "error", err)
+			}
+			node.addPendingTransactionsAccount(txs)
+		} else {
+			txDecoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the Send messge type
+			txList := new([]*blockchain.Transaction)
+			err := txDecoder.Decode(&txList)
+			if err != nil {
+				node.log.Error("Failed to deserialize transaction list", "error", err)
+			}
+			node.addPendingTransactions(*txList)
 		}
-		node.addPendingTransactions(*txList)
+
 	case proto_node.Request:
 		reader := bytes.NewBuffer(msgPayload[1:])
 		txIDs := make(map[[32]byte]bool)
@@ -386,26 +392,15 @@ func (node *Node) WaitForConsensusReadyAccount(readySignal chan struct{}) {
 		}
 
 		if !retry {
-			// Normal tx block consensus
-			// TODO: add new block generation logic
-			txs := make([]*types.Transaction, 1000)
-			for i := 0; i < 100; i++ {
-				baseNonce := node.worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(node.testBankKeys[i].PublicKey))
-				node.worker.UpdateCurrent()
-				for j := 0; j < 10; j++ {
-					randomUserKey, _ := crypto.GenerateKey()
-					randomUserAddress := crypto.PubkeyToAddress(randomUserKey.PublicKey)
-					tx, _ := types.SignTx(types.NewTransaction(baseNonce+uint64(j), randomUserAddress, big.NewInt(1000), params.TxGas, nil, nil), types.HomesteadSigner{}, node.testBankKeys[i])
-					txs[i*10+j] = tx
+			if len(node.pendingTransactionsAccount) >= 1000 {
+				// Normal tx block consensus
+				selectedTxs, _ := node.getTransactionsForNewBlockAccount(MaxNumberOfTransactionsPerBlock)
+				if node.Worker.CommitTransactions(selectedTxs, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey)) {
+					newBlock = node.Worker.Commit()
+				} else {
+					node.log.Debug("Failed to create new block")
 				}
 			}
-
-			if node.worker.CommitTransactions(txs, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey)) {
-				newBlock = node.worker.Commit()
-			} else {
-				node.log.Debug("Failed to create new block")
-			}
-
 			// If not enough transactions to run Consensus,
 			// periodically check whether we have enough transactions to package into block.
 			time.Sleep(1 * time.Second)
@@ -463,6 +458,7 @@ func (node *Node) VerifyNewBlock(newBlock *blockchain.Block) bool {
 func (node *Node) VerifyNewBlockAccount(newBlock *types.Block) bool {
 	err := node.Chain.ValidateNewBlock(newBlock, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey))
 	if err != nil {
+		node.log.Debug("Failed verifying new block", "Error", err)
 		return false
 	}
 	return true
@@ -512,7 +508,12 @@ func (node *Node) PostConsensusProcessing(newBlock *blockchain.Block) {
 
 // AddNewBlockAccount is usedd to add new block into the blockchain.
 func (node *Node) AddNewBlockAccount(newBlock *types.Block) {
-	node.Chain.InsertChain([]*types.Block{newBlock})
+	fmt.Println("Adding BLOCK")
+	fmt.Println(len(newBlock.Transactions()))
+	num, err := node.Chain.InsertChain([]*types.Block{newBlock})
+	if err != nil {
+		fmt.Println("Error adding to chain", "numBlocks", num, "Error", err)
+	}
 }
 
 // AddNewBlock is usedd to add new block into the utxo-based blockchain.
