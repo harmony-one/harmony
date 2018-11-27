@@ -14,15 +14,20 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"log"
+
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/proto"
-	"log"
 )
 
+// refer to Peer struct in p2p/peer.go
+// this is basically a simplified version of Peer
+// for network transportation
 type nodeInfo struct {
-	IP     string
-	Port   string
-	PubKey []byte
+	IP          string
+	Port        string
+	PubKey      []byte
+	ValidatorID int
 }
 
 type PingMessageType struct {
@@ -36,13 +41,13 @@ type PongMessageType struct {
 }
 
 func (p PingMessageType) String() string {
-	return fmt.Sprintf("%v=>%v:%v/%v", p.Version, p.Node.IP, p.Node.Port, p.Node.PubKey)
+	return fmt.Sprintf("ping:%v=>%v:%v:%v/%v", p.Version, p.Node.IP, p.Node.Port, p.Node.ValidatorID, p.Node.PubKey)
 }
 
 func (p PongMessageType) String() string {
-	str := fmt.Sprintf("%v=># Peers: %v", p.Version, len(p.Peers))
+	str := fmt.Sprintf("pong:%v=>length:%v\n", p.Version, len(p.Peers))
 	for _, p := range p.Peers {
-		str = fmt.Sprintf("%v\n%v:%v/%v", str, p.IP, p.Port, p.PubKey)
+		str = fmt.Sprintf("%v%v:%v:%v/%v\n", str, p.IP, p.Port, p.ValidatorID, p.PubKey)
 	}
 	return str
 }
@@ -54,6 +59,7 @@ func NewPingMessage(peer p2p.Peer) *PingMessageType {
 	ping.Version = PROTOCOL_VERSION
 	ping.Node.IP = peer.Ip
 	ping.Node.Port = peer.Port
+	ping.Node.ValidatorID = peer.ValidatorID
 	ping.Node.PubKey, err = peer.PubKey.MarshalBinary()
 
 	if err != nil {
@@ -75,6 +81,7 @@ func NewPongMessage(peers []p2p.Peer) *PongMessageType {
 		n := nodeInfo{}
 		n.IP = p.Ip
 		n.Port = p.Port
+		n.ValidatorID = p.ValidatorID
 		n.PubKey, err = p.PubKey.MarshalBinary()
 		if err != nil {
 			fmt.Printf("Error Marshall PubKey: %v", err)
@@ -118,7 +125,7 @@ func GetPongMessage(payload []byte) (*PongMessageType, error) {
 
 // ConstructPingMessage contructs ping message from node to leader
 func (ping PingMessageType) ConstructPingMessage() []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
 	byteBuffer.WriteByte(byte(PING))
 
 	encoder := gob.NewEncoder(byteBuffer)
@@ -132,7 +139,7 @@ func (ping PingMessageType) ConstructPingMessage() []byte {
 
 // ConstructPongMessage contructs pong message from leader to node
 func (pong PongMessageType) ConstructPongMessage() []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
 	byteBuffer.WriteByte(byte(PONG))
 
 	encoder := gob.NewEncoder(byteBuffer)

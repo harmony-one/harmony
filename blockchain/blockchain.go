@@ -233,6 +233,18 @@ func CreateBlockchain(address [20]byte, shardID uint32) *Blockchain {
 	return &bc
 }
 
+// CreateBlockchainWithMoreBlocks ...
+func CreateBlockchainWithMoreBlocks(addresses [][20]byte, shardID uint32) *Blockchain {
+	blocks := make([]*Block, 0)
+	for _, address := range addresses {
+		cbtx := NewCoinbaseTX(address, genesisCoinbaseData, shardID)
+		blocks = append(blocks, NewGenesisBlock(cbtx, shardID))
+	}
+
+	bc := Blockchain{blocks}
+	return &bc
+}
+
 // CreateStateBlock creates state block based on the utxos.
 func (bc *Blockchain) CreateStateBlock(utxoPool *UTXOPool) *Block {
 	var numBlocks int32

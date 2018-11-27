@@ -18,8 +18,9 @@ package trie
 
 import (
 	"bytes"
-	"github.com/harmony-one/harmony/db"
 	"testing"
+
+	"github.com/harmony-one/harmony/db"
 
 	"github.com/ethereum/go-ethereum/common"
 )

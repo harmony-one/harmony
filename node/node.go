@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"math/big"
+	"strings"
 	"sync"
 	"time"
 
@@ -201,22 +202,25 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 
 		// (account model)
 
-		node.testBankKey, _ = crypto.GenerateKey()
+		node.testBankKey, _ = ecdsa.GenerateKey(crypto.S256(), strings.NewReader("Fixed source of randomnessasdffffffffffffffffffffffffffffffffffffffffsdffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
 		testBankAddress := crypto.PubkeyToAddress(node.testBankKey.PublicKey)
 		testBankFunds := big.NewInt(1000000000000000000)
 		database := hdb.NewMemDatabase()
 		gspec := core.Genesis{
-			Alloc: core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
+			Config: params.TestChainConfig,
+			Alloc:  core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
 		}
 
-		genesis := gspec.MustCommit(database)
-		fmt.Println(genesis.Root())
+		_ = gspec.MustCommit(database)
 		chain, _ := core.NewBlockChain(database, nil, gspec.Config, bft.NewFaker(), vm.Config{}, nil)
 
 		node.Chain = chain
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, params.TestChainConfig, chain)
 		node.BlockChannelAccount = make(chan *types.Block)
 		node.worker = worker.New(params.TestChainConfig, chain, bft.NewFaker())
+
+		fmt.Println("BALANCE")
+		fmt.Println(node.worker.GetCurrentState().GetBalance(testBankAddress))
 	}
 	// Logger
 	node.log = log.New()
@@ -241,7 +245,7 @@ func (node *Node) AddPeers(peers []p2p.Peer) int {
 
 	if count > 0 {
 		c := node.Consensus.AddPeers(peers)
-		node.log.Info("Added in Consensus", "# of peers", c)
+		node.log.Info("Node.AddPeers", "#", c)
 	}
 	return count
 }

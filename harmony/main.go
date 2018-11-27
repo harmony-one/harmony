@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"math/big"
+
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/consensus"
@@ -10,11 +12,9 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/db"
 	"github.com/harmony-one/harmony/node/worker"
-	"math/big"
 )
 
 var (
-
 	// Test accounts
 	testBankKey, _  = crypto.GenerateKey()
 	testBankAddress = crypto.PubkeyToAddress(testBankKey.PublicKey)
@@ -81,9 +81,6 @@ func main() {
 		}
 	}
 
-	fmt.Println(chain.GetBlockByNumber(1).Root())
-	fmt.Println(chain.GetBlockByNumber(2).Root())
-	fmt.Println(chain.GetBlockByNumber(3).Root())
 	txs := make([]*types.Transaction, 100)
 	worker := worker.New(params.TestChainConfig, chain, consensus.NewFaker())
 	fmt.Println(worker.GetCurrentState().GetBalance(testBankAddress))

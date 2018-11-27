@@ -2,6 +2,7 @@ package pki
 
 import (
 	"crypto/sha256"
+
 	"github.com/dedis/kyber"
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/log"

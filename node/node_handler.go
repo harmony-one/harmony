@@ -12,8 +12,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/harmony-one/harmony/blockchain"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
+
+	"github.com/harmony-one/harmony/blockchain"
 	hmy_crypto "github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2pv2"
@@ -29,7 +31,7 @@ const (
 	// MinNumberOfTransactionsPerBlock is the min number of transaction per a block.
 	MinNumberOfTransactionsPerBlock = 6000
 	// MaxNumberOfTransactionsPerBlock is the max number of transaction per a block.
-	MaxNumberOfTransactionsPerBlock = 20000
+	MaxNumberOfTransactionsPerBlock = 8000
 	// NumBlocksBeforeStateBlock is the number of blocks allowed before generating state block
 	NumBlocksBeforeStateBlock = 1000
 )
@@ -103,14 +105,14 @@ func (node *Node) NodeHandler(s net.Stream) {
 				consensusObj.ProcessMessageValidator(msgPayload)
 			}
 		}
-	case proto.NODE:
+	case proto.Node:
 		actionType := proto_node.NodeMessageType(msgType)
 		switch actionType {
 		case proto_node.Transaction:
 			node.log.Info("NET: received message: Node/Transaction")
 			node.transactionMessageHandler(msgPayload)
-		case proto_node.BLOCK:
-			node.log.Info("NET: received message: Node/BLOCK")
+		case proto_node.Block:
+			node.log.Info("NET: received message: Node/Block")
 			blockMsgType := proto_node.BlockMessageType(msgPayload[0])
 			switch blockMsgType {
 			case proto_node.Sync:
@@ -124,8 +126,8 @@ func (node *Node) NodeHandler(s net.Stream) {
 		case proto_node.BlockchainSync:
 			node.log.Info("NET: received message: Node/BlockchainSync")
 			node.handleBlockchainSync(msgPayload, s)
-		case proto_node.CLIENT:
-			node.log.Info("NET: received message: Node/CLIENT")
+		case proto_node.Client:
+			node.log.Info("NET: received message: Node/Client")
 			clientMsgType := proto_node.ClientMessageType(msgPayload[0])
 			switch clientMsgType {
 			case proto_node.LookupUtxo:
@@ -138,8 +140,8 @@ func (node *Node) NodeHandler(s net.Stream) {
 
 				p2p.SendMessage(fetchUtxoMessage.Sender, client.ConstructFetchUtxoResponseMessage(&utxoMap, node.UtxoPool.ShardID))
 			}
-		case proto_node.CONTROL:
-			node.log.Info("NET: received message: Node/CONTROL")
+		case proto_node.Control:
+			node.log.Info("NET: received message: Node/Control")
 			controlType := msgPayload[0]
 			if proto_node.ControlMessageType(controlType) == proto_node.STOP {
 				node.log.Debug("Stopping Node", "node", node, "numBlocks", len(node.blockchain.Blocks), "numTxsProcessed", node.countNumTransactionsInBlockchain())
@@ -191,9 +193,9 @@ func (node *Node) NodeHandler(s net.Stream) {
 			node.log.Info("NET: received message: PONG")
 			node.pongMessageHandler(msgPayload)
 		}
-	case proto.CLIENT:
+	case proto.Client:
 		actionType := client.ClientMessageType(msgType)
-		node.log.Info("NET: received message: CLIENT/Transaction")
+		node.log.Info("NET: received message: Client/Transaction")
 		switch actionType {
 		case client.Transaction:
 			if node.Client != nil {
@@ -235,7 +237,7 @@ FOR_LOOP:
 		}
 
 		msgCategory, _ := proto.GetMessageCategory(content)
-		if err != nil || msgCategory != proto.NODE {
+		if err != nil || msgCategory != proto.Node {
 			node.log.Error("Failed in reading message category from syncing node", err)
 			return
 		}
@@ -431,6 +433,14 @@ func (node *Node) BroadcastNewBlock(newBlock *blockchain.Block) {
 
 // VerifyNewBlock is called by consensus participants to verify the block they are running consensus on
 func (node *Node) VerifyNewBlock(newBlock *blockchain.Block) bool {
+	if newBlock.AccountBlock != nil {
+		accountBlock := new(types.Block)
+		err := rlp.DecodeBytes(newBlock.AccountBlock, accountBlock)
+		if err != nil {
+			node.log.Error("Failed decoding the block with RLP")
+		}
+		return node.VerifyNewBlockAccount(accountBlock)
+	}
 	if newBlock.IsStateBlock() {
 		return node.UtxoPool.VerifyStateBlock(newBlock)
 	}
@@ -438,8 +448,12 @@ func (node *Node) VerifyNewBlock(newBlock *blockchain.Block) bool {
 }
 
 // VerifyNewBlock is called by consensus participants to verify the block (account model) they are running consensus on
-func (node *Node) VerifyNewBlockAccount(newBlock *blockchain.Block) bool {
-	return true // TODO: implement the logic
+func (node *Node) VerifyNewBlockAccount(newBlock *types.Block) bool {
+	fmt.Println("VerifyingNNNNNNNNNNNNNN")
+
+	fmt.Println("BALANCE 1")
+	fmt.Println(node.worker.GetCurrentState().GetBalance(crypto.PubkeyToAddress(node.testBankKey.PublicKey)))
+	return node.Chain.ValidateNewBlock(newBlock, crypto.PubkeyToAddress(node.testBankKey.PublicKey))
 }
 
 // PostConsensusProcessing is called by consensus participants, after consensus is done, to:
@@ -524,12 +538,12 @@ func (node *Node) pingMessageHandler(msgPayload []byte) {
 		return
 	}
 
-	node.AddPeers([]p2p.Peer{*peer})
-	// TODO: add public key to consensus.pubkeys
+	// Add to Node's peer list
+	count := node.AddPeers([]p2p.Peer{*peer})
 
 	// Send a Pong message back
 	peers := make([]p2p.Peer, 0)
-	count := 0
+	count = 0
 	node.Neighbors.Range(func(k, v interface{}) bool {
 		if p, ok := v.(p2p.Peer); ok {
 			peers = append(peers, p)

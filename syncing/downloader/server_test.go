@@ -1,0 +1,109 @@
+package downloader_test
+
+import (
+	"fmt"
+	"reflect"
+	"testing"
+
+	bc "github.com/harmony-one/harmony/blockchain"
+	"github.com/harmony-one/harmony/crypto/pki"
+	"github.com/harmony-one/harmony/syncing/downloader"
+	pb "github.com/harmony-one/harmony/syncing/downloader/proto"
+)
+
+const (
+	serverPort = "9997"
+	serverIP   = "127.0.0.1"
+	clientPort = "9999"
+)
+
+var (
+	PriIntOne      = 111
+	PriIntTwo      = 222
+	TestAddressOne = pki.GetAddressFromInt(PriIntOne)
+	TestAddressTwo = pki.GetAddressFromInt(PriIntTwo)
+	ShardID        = uint32(0)
+)
+
+type FakeNode struct {
+	bc *bc.Blockchain
+}
+
+// GetBlockHashes used for state download.
+func (node *FakeNode) GetBlockHashes() [][]byte {
+	res := [][]byte{}
+	for _, block := range node.bc.Blocks {
+		res = append(res, block.Hash[:])
+	}
+	return res
+}
+
+// GetBlocks used for state download.
+func (node *FakeNode) GetBlocks() [][]byte {
+	res := [][]byte{}
+	for _, block := range node.bc.Blocks {
+		res = append(res, block.Serialize())
+	}
+	return res
+}
+
+// SetBlockchain is used for testing
+func (node *FakeNode) Init() {
+	addresses := [][20]byte{TestAddressOne, TestAddressTwo}
+	node.bc = bc.CreateBlockchainWithMoreBlocks(addresses, ShardID)
+}
+
+func (node *FakeNode) CalculateResponse(request *pb.DownloaderRequest) (*pb.DownloaderResponse, error) {
+	response := &pb.DownloaderResponse{}
+	if request.Type == pb.DownloaderRequest_HEADER {
+		for _, block := range node.bc.Blocks {
+			response.Payload = append(response.Payload, block.Hash[:])
+		}
+	} else {
+		for _, id := range request.Height {
+			response.Payload = append(response.Payload, node.bc.Blocks[id].Serialize())
+		}
+	}
+	return response, nil
+}
+
+func TestGetBlockHashes(t *testing.T) {
+	fakeNode := &FakeNode{}
+	fakeNode.Init()
+	s := downloader.NewServer(fakeNode)
+	grcpServer, err := s.Start(serverIP, serverPort)
+	if err != nil {
+		t.Error(err)
+	}
+	defer grcpServer.Stop()
+
+	client := downloader.ClientSetup(serverIP, serverPort)
+	defer client.Close()
+	response := client.GetBlockHashes()
+	if !reflect.DeepEqual(response.Payload, fakeNode.GetBlockHashes()) {
+		t.Error("not equal")
+	}
+}
+
+func TestGetBlocks(t *testing.T) {
+	fakeNode := &FakeNode{}
+	fakeNode.Init()
+	s := downloader.NewServer(fakeNode)
+	grcpServer, err := s.Start(serverIP, serverPort)
+	if err != nil {
+		t.Error(err)
+	}
+	defer grcpServer.Stop()
+
+	client := downloader.ClientSetup(serverIP, serverPort)
+	defer client.Close()
+	response := client.GetBlockHashes()
+	if !reflect.DeepEqual(response.Payload, fakeNode.GetBlockHashes()) {
+		t.Error("not equal")
+	}
+	response = client.GetBlocks([]int32{0, 1})
+	fmt.Println(len(response.Payload))
+	if !reflect.DeepEqual(response.Payload, fakeNode.GetBlocks()) {
+		t.Error("not equal")
+	}
+}
