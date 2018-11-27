@@ -1,6 +1,7 @@
 package syncing_test
 
 import (
+	"reflect"
 	"testing"
 
 	bc "github.com/harmony-one/harmony/blockchain"
@@ -79,8 +80,9 @@ func (node *FakeNode) CalculateResponse(request *pb.DownloaderRequest) (*pb.Down
 			response.Payload = append(response.Payload, block.Hash[:])
 		}
 	} else {
-		for _, id := range request.Height {
-			response.Payload = append(response.Payload, node.bc.Blocks[id].Serialize())
+		for i := range request.Hashes {
+			block := node.bc.FindBlock(request.Hashes[i])
+			response.Payload = append(response.Payload, block.Serialize())
 		}
 	}
 	return response, nil
@@ -102,7 +104,14 @@ func TestSyncing(t *testing.T) {
 		peers[i].Ip = fakeNodes[i].ip
 		peers[i].Port = fakeNodes[i].port
 	}
+
 	stateSync.StartStateSync(peers, bc)
+
+	for i := range bc.Blocks {
+		if !reflect.DeepEqual(bc.Blocks[i], fakeNodes[0].bc.Blocks[i]) {
+			t.Error("not equal")
+		}
+	}
 
 	for _, fakeNode := range fakeNodes {
 		fakeNode.grpcServer.Stop()
