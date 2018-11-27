@@ -16,18 +16,18 @@ type ConfigEntry struct {
 	leader      p2p.Peer
 	self        p2p.Peer
 	peers       []p2p.Peer
-	pubK        kyber.Scalar
-	priK        kyber.Point
+	priK        kyber.Scalar
+	pubK        kyber.Point
 }
 
 func (config ConfigEntry) String() string {
 	return fmt.Sprintf("idc: %v:%v", config.IP, config.Port)
 }
 
-func New(pubK kyber.Scalar, priK kyber.Point) *ConfigEntry {
+func New(priK kyber.Scalar, pubK kyber.Point) *ConfigEntry {
 	var config ConfigEntry
-	config.pubK = pubK
 	config.priK = priK
+	config.pubK = pubK
 
 	config.peers = make([]p2p.Peer, 0)
 

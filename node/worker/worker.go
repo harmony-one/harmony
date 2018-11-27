@@ -114,7 +114,7 @@ func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus.En
 		engine: engine,
 	}
 	worker.gasFloor = 0
-	worker.gasCeil = 10000000
+	worker.gasCeil = 1000000000000000
 
 	parent := worker.chain.CurrentBlock()
 	num := parent.Number()

@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"math/big"
+	"math/rand"
 	"net"
 	"strings"
 	"sync"
@@ -78,7 +79,7 @@ type Node struct {
 	worker              *worker.Worker
 
 	// Test only
-	testBankKey *ecdsa.PrivateKey
+	testBankKeys []*ecdsa.PrivateKey
 }
 
 // Add new crossTx and proofs to the list of crossTx that needs to be sent back to client
@@ -237,14 +238,26 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 		node.db = db
 
 		// (account model)
+		rand.Seed(0)
+		len := 1000000
+		bytes := make([]byte, len)
+		for i := 0; i < len; i++ {
+			bytes[i] = byte(rand.Intn(100))
+		}
+		reader := strings.NewReader(string(bytes))
+		genesisAloc := make(core.GenesisAlloc)
+		for i := 0; i < 100; i++ {
+			testBankKey, _ := ecdsa.GenerateKey(crypto.S256(), reader)
+			testBankAddress := crypto.PubkeyToAddress(testBankKey.PublicKey)
+			testBankFunds := big.NewInt(10000000000)
+			genesisAloc[testBankAddress] = core.GenesisAccount{Balance: testBankFunds}
+			node.testBankKeys = append(node.testBankKeys, testBankKey)
+		}
 
-		node.testBankKey, _ = ecdsa.GenerateKey(crypto.S256(), strings.NewReader("Fixed source of randomnessasdffffffffffffffffffffffffffffffffffffffffsdffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
-		testBankAddress := crypto.PubkeyToAddress(node.testBankKey.PublicKey)
-		testBankFunds := big.NewInt(1000000000000000000)
 		database := hdb.NewMemDatabase()
 		gspec := core.Genesis{
 			Config: params.TestChainConfig,
-			Alloc:  core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
+			Alloc:  genesisAloc,
 		}
 
 		_ = gspec.MustCommit(database)

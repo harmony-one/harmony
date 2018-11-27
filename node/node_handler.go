@@ -5,16 +5,17 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/crypto/pki"
 	"math/big"
 	"net"
 	"os"
 	"strconv"
 	"time"
 
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/harmony/core/types"
 
 	"github.com/harmony-one/harmony/blockchain"
 	hmy_crypto "github.com/harmony-one/harmony/crypto"
@@ -387,16 +388,19 @@ func (node *Node) WaitForConsensusReadyAccount(readySignal chan struct{}) {
 		if !retry {
 			// Normal tx block consensus
 			// TODO: add new block generation logic
-			txs := make([]*types.Transaction, 10)
-			baseNonce := node.worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(node.testBankKey.PublicKey))
-			node.worker.UpdateCurrent()
-			for i, _ := range txs {
-				randomUserKey, _ := crypto.GenerateKey()
-				randomUserAddress := crypto.PubkeyToAddress(randomUserKey.PublicKey)
-				tx, _ := types.SignTx(types.NewTransaction(baseNonce+uint64(i), randomUserAddress, big.NewInt(1000), params.TxGas, nil, nil), types.HomesteadSigner{}, node.testBankKey)
-				txs[i] = tx
+			txs := make([]*types.Transaction, 1000)
+			for i := 0; i < 100; i++ {
+				baseNonce := node.worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(node.testBankKeys[i].PublicKey))
+				node.worker.UpdateCurrent()
+				for j := 0; j < 10; j++ {
+					randomUserKey, _ := crypto.GenerateKey()
+					randomUserAddress := crypto.PubkeyToAddress(randomUserKey.PublicKey)
+					tx, _ := types.SignTx(types.NewTransaction(baseNonce+uint64(j), randomUserAddress, big.NewInt(1000), params.TxGas, nil, nil), types.HomesteadSigner{}, node.testBankKeys[i])
+					txs[i*10+j] = tx
+				}
 			}
-			if node.worker.CommitTransactions(txs, crypto.PubkeyToAddress(node.testBankKey.PublicKey)) {
+
+			if node.worker.CommitTransactions(txs, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey)) {
 				newBlock = node.worker.Commit()
 			} else {
 				node.log.Debug("Failed to create new block")
@@ -457,7 +461,11 @@ func (node *Node) VerifyNewBlock(newBlock *blockchain.Block) bool {
 
 // VerifyNewBlock is called by consensus participants to verify the block (account model) they are running consensus on
 func (node *Node) VerifyNewBlockAccount(newBlock *types.Block) bool {
-	return node.Chain.ValidateNewBlock(newBlock, crypto.PubkeyToAddress(node.testBankKey.PublicKey))
+	err := node.Chain.ValidateNewBlock(newBlock, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey))
+	if err != nil {
+		return false
+	}
+	return true
 }
 
 // PostConsensusProcessing is called by consensus participants, after consensus is done, to:

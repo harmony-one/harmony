@@ -245,7 +245,7 @@ func (g *Genesis) ToBlock(db hdb.Database) *types.Block {
 		Root:       root,
 	}
 	if g.GasLimit == 0 {
-		head.GasLimit = params.GenesisGasLimit
+		head.GasLimit = 10000000000 // TODO(RJ): figure out better solution. // params.GenesisGasLimit
 	}
 	if g.Difficulty == nil {
 		head.Difficulty = params.GenesisDifficulty
