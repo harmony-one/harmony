@@ -12,7 +12,6 @@ import (
 // NodeHandler handles a new incoming connection.
 func (node *NewNode) NodeHandler(conn net.Conn) {
 	defer conn.Close()
-	defer node.ServiceState.waitGroup.Done()
 
 	content, err := p2p.ReadMessageContent(conn)
 

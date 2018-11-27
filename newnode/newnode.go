@@ -17,39 +17,114 @@ import (
 )
 
 // An uninteresting service.
-type ServiceState struct {
-	quit      chan bool
+type Service struct {
+	ch        chan bool
 	waitGroup *sync.WaitGroup
 }
 
+// Make a new Service.
+func NewService(ip, port string) *Service {
+	// Listen on 127.0.0.1:48879.  That's my favorite port number because in
+	// hex 48879 is 0xBEEF.
+	laddr, err := net.ResolveTCPAddr("tcp", ip+":"+port)
+	if nil != err {
+		fmt.Println(err)
+	}
+	listener, err := net.ListenTCP("tcp", laddr)
+	if nil != err {
+		fmt.Println(err)
+	}
+	fmt.Println("listening on", listener.Addr())
+
+	s := &Service{
+		ch:        make(chan bool),
+		waitGroup: &sync.WaitGroup{},
+	}
+	s.waitGroup.Add(1)
+	go s.Serve(listener)
+	return s
+}
+
+// Accept connections and spawn a goroutine to serve each one.  Stop listening
+// if anything is received on the service's channel.
+func (s *Service) Serve(listener *net.TCPListener) {
+	defer s.waitGroup.Done()
+	for {
+		select {
+		case <-s.ch:
+			fmt.Println("stopping listening on", listener.Addr())
+			listener.Close()
+			return
+		default:
+		}
+		listener.SetDeadline(time.Now().Add(1e9))
+		conn, err := listener.AcceptTCP()
+		if nil != err {
+			if opErr, ok := err.(*net.OpError); ok && opErr.Timeout() {
+				continue
+			}
+			fmt.Println(err)
+
+		}
+		fmt.Println(conn.RemoteAddr(), "connected")
+		s.waitGroup.Add(1)
+		go s.serve(conn)
+	}
+}
+
+// Stop the service by closing the service's channel.  Block until the service
+// is really stopped.
+func (s *Service) Stop() {
+	close(s.ch)
+	s.waitGroup.Wait()
+}
+
+// Serve a connection by reading and writing what was read.  That's right, this
+// is an echo service.  Stop reading and writing if anything is received on the
+// service's channel but only after writing what was read.
+func (s *Service) serve(conn *net.TCPConn) {
+	defer conn.Close()
+	defer s.waitGroup.Done()
+	for {
+		select {
+		case <-s.ch:
+			fmt.Println("disconnecting", conn.RemoteAddr())
+			return
+		default:
+		}
+		conn.SetDeadline(time.Now().Add(1e9))
+		buf := make([]byte, 4096)
+		if _, err := conn.Read(buf); nil != err {
+			if opErr, ok := err.(*net.OpError); ok && opErr.Timeout() {
+				continue
+			}
+			fmt.Println(err)
+			return
+		}
+		if _, err := conn.Write(buf); nil != err {
+			fmt.Println(err)
+			return
+		}
+	}
+}
+
 type NewNode struct {
-	Role         string
-	ShardID      string
-	ValidatorID  int // Validator ID in its shard.
-	leader       p2p.Peer
-	Self         p2p.Peer
-	peers        []p2p.Peer
-	pubK         kyber.Scalar
-	priK         kyber.Point
-	log          log.Logger
-	SetInfo      bool
-	ServiceState *ServiceState
+	Role        string
+	ShardID     string
+	ValidatorID int // Validator ID in its shard.
+	leader      p2p.Peer
+	Self        p2p.Peer
+	peers       []p2p.Peer
+	pubK        kyber.Scalar
+	priK        kyber.Point
+	log         log.Logger
+	SetInfo     bool
 }
 
 type registerResponseRandomNumber struct {
 	NumberOfShards     int
 	NumberOfNodesAdded int
 	Leaders            []*NewNode
-}
-
-// Make a new Service.
-func NewServiceState() *ServiceState {
-	s := &ServiceState{
-		quit:      make(chan bool),
-		waitGroup: &sync.WaitGroup{},
-	}
-	s.waitGroup.Add(1)
-	return s
 }
 
 func (node NewNode) String() string {
@@ -65,7 +140,6 @@ func New(ip string, port string) *NewNode {
 	node.peers = make([]p2p.Peer, 0)
 	node.log = log.New()
 	node.SetInfo = false
-	node.ServiceState = NewServiceState()
 
 	return &node
 }
@@ -76,6 +150,18 @@ func (node *NewNode) ConnectBeaconChain(BCPeer p2p.Peer) {
 	msg := node.SerializeNode()
 	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Register, msg)
 	p2p.SendMessage(BCPeer, msgToSend)
+}
+
+// DeserializeNode deserializes the node
+func DeserializeRandomInfo(d []byte) *registerResponseRandomNumber {
+	var wn registerResponseRandomNumber
+	r := bytes.NewBuffer(d)
+	decoder := gob.NewDecoder(r)
+	err := decoder.Decode(&wn)
+	if err != nil {
+		log.Error("Could not de-serialize node 1")
+	}
+	return &wn
 }
 
 //ProcessShardInfo
@@ -112,18 +198,6 @@ func (node *NewNode) SerializeNode() []byte {
 }
 
 // DeserializeNode deserializes the node
-func DeserializeRandomInfo(d []byte) *registerResponseRandomNumber {
-	var wn registerResponseRandomNumber
-	r := bytes.NewBuffer(d)
-	decoder := gob.NewDecoder(r)
-	err := decoder.Decode(&wn)
-	if err != nil {
-		log.Error("Could not de-serialize node 1")
-	}
-	return &wn
-}
-
-// DeserializeNode deserializes the node
 func DeserializeNode(d []byte) *NewNode {
 	var wn NewNode
 	r := bytes.NewBuffer(d)
@@ -133,63 +207,6 @@ func DeserializeNode(d []byte) *NewNode {
 		log.Error("Could not de-serialize node 1")
 	}
 	return &wn
-}
-
-// StartServer starts a server and process the request by a handler.
-func (node *NewNode) StartServer() {
-	port := node.Self.Port
-	addr := net.JoinHostPort("", port)
-	listen, err := net.Listen("tcp4", addr)
-	if err != nil {
-		fmt.Println("Socket listen port failed", "addr", addr, "err", err)
-		return
-	}
-	if listen == nil {
-		fmt.Println("Listen returned nil", "addr", addr)
-		return
-	}
-	defer listen.Close()
-	node.log.Info("Starting Server ..")
-
-	backoff := p2p.NewExpBackoff(250*time.Millisecond, 15*time.Second, 2.0)
-	defer node.ServiceState.waitGroup.Done()
-	for {
-		// p := <-node.quit
-		// fmt.Println(p)
-		// //fmt.Println("node quit value in start server", <-node.quit)
-		//time.Sleep(1 * time.Second)
-		//Here I am trying to comment and uncomment above line
-		// commenting and uncommenting this line is difference between correct and incorrect execution
-		//comment is correct execution
-
-		select {
-		case <-node.ServiceState.quit:
-			node.log.Info("Going to close listener")
-			fmt.Println("closing listener")
-			listen.Close()
-			return
-		default:
-			node.log.Info("going to OPEN listener")
-		}
-		conn, err := listen.Accept()
-		if err != nil {
-
-			fmt.Println("Error listening on port.", "port", port,
-				"err", err)
-			backoff.Sleep()
-			continue
-		}
-		fmt.Println("Handling Connections", err, conn)
-		node.ServiceState.waitGroup.Add(1)
-		go node.NodeHandler(conn)
-	}
-}
-
-func (node *NewNode) StopServer() {
-	node.log.Info("server stopping")
-	close(node.ServiceState.quit)
-	node.ServiceState.waitGroup.Wait()
-	node.log.Info("server stopped")
 }
 
 func (node *NewNode) GetShardID() string {

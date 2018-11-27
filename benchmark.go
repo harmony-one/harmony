@@ -11,7 +11,7 @@ import (
 
 	"github.com/harmony-one/harmony/db"
 	"github.com/harmony-one/harmony/log"
-	"github.com/harmony-one/harmony/newnode"
+	pkg_newnode "github.com/harmony-one/harmony/newnode"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/utils"
 )
@@ -127,9 +127,9 @@ func main() {
 
 	//Use Peer Discovery to get shard/leader/peer/...
 	if *peerDisvoery {
-		newnode := newnode.New(*ip, *port)
+		newnode := pkg_newnode.New(*ip, *port)
 		//BCPeer := p2p.Peer{Ip: *idcIP, Port: *idcPort}
-		go newnode.StartServer() //add error handling here
+		service := pkg_newnode.NewService(*ip, *port)
 		//newnode.ConnectBeaconChain(BCPeer)
 		time.Sleep(5 * time.Second)
 		// ticker := time.NewTicker(10 * time.Second)
@@ -154,7 +154,7 @@ func main() {
 		leader = newnode.GetLeader()
 		peers = newnode.GetPeers()
 		selfPeer = newnode.GetSelfPeer()
-		newnode.StopServer()
+		service.Stop()
 
 	} else {
 		distributionConfig := utils.NewDistributionConfig()
@@ -167,11 +167,11 @@ func main() {
 	//Create client peer.
 	// clientPeer = distributionConfig.GetClientPeer()
 	//}
-	ewnode := newnode.New(*ip, *port)
-	go ewnode.StartServer()
+	ewnode := pkg_newnode.New(*ip, *port)
+	nservice := pkg_newnode.NewService(*ip, *port)
 	time.Sleep(10 * time.Second)
 	fmt.Println("hello")
-	fmt.Println(shardID, leader, peers, selfPeer, idcIP, idcPort)
+	fmt.Println(shardID, leader, peers, selfPeer, idcIP, idcPort, ewnode, nservice)
 	// var role string
 	// if leader.Ip == *ip && leader.Port == *port {
 	// 	role = "leader"
