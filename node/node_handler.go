@@ -186,10 +186,8 @@ func (node *Node) NodeHandler(conn net.Conn) {
 				os.Exit(0)
 			}
 		case proto_node.PING:
-			node.log.Info("NET: received message: PING")
 			node.pingMessageHandler(msgPayload)
 		case proto_node.PONG:
-			node.log.Info("NET: received message: PONG")
 			node.pongMessageHandler(msgPayload)
 		}
 	case proto.Client:
@@ -373,7 +371,7 @@ func (node *Node) WaitForConsensusReadyAccount(readySignal chan struct{}) {
 		select {
 		case <-readySignal:
 			time.Sleep(100 * time.Millisecond) // Delay a bit so validator is catched up.
-		case <-time.After(100 * time.Second):
+		case <-time.After(200 * time.Second):
 			retry = true
 			node.Consensus.ResetState()
 			timeoutCount++
@@ -524,7 +522,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 		node.log.Error("Can't get Ping Message")
 		return -1
 	}
-//	node.log.Info("Ping", "Msg", ping)
+	//	node.log.Info("Ping", "Msg", ping)
 
 	peer := new(p2p.Peer)
 	peer.Ip = ping.Node.IP
