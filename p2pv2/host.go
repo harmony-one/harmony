@@ -22,13 +22,19 @@ var (
 	myHost host.Host // TODO(ricl): this should be a field in node.
 )
 
-const BATCH_SIZE = 1 << 16
+const (
+	// BatchSize The batch size in which we return data
+	BatchSize = 1 << 16
+	// ProtocolID The ID of protocol used in stream handling.
+	ProtocolID = "/harmony/0.0.1"
+)
 
 // InitHost Initialize a host for p2p communication
 func InitHost(port string) {
 	addr := fmt.Sprintf("/ip4/127.0.0.1/tcp/%s", port)
 	sourceAddr, err := multiaddr.NewMultiaddr(addr)
 	catchError(err)
+	// TODO(ricl): use ip as well.
 	priv := portToPrivKey(port)
 	myHost, err = libp2p.New(context.Background(),
 		libp2p.ListenAddrs(sourceAddr),
@@ -39,7 +45,7 @@ func InitHost(port string) {
 
 // BindHandler bind a streamHandler to the harmony protocol.
 func BindHandler(handler net.StreamHandler) {
-	myHost.SetStreamHandler("/harmony/0.0.1", handler)
+	myHost.SetStreamHandler(ProtocolID, handler)
 }
 
 // Send a p2p message sending function with signature compatible to p2pv1.
@@ -50,7 +56,7 @@ func Send(ip, port string, message []byte) error {
 	priv := portToPrivKey(port)
 	peerID, _ := peer.IDFromPrivateKey(priv)
 	myHost.Peerstore().AddAddrs(peerID, []multiaddr.Multiaddr{targetAddr}, peerstore.PermanentAddrTTL)
-	s, err := myHost.NewStream(context.Background(), peerID, "/harmony/0.0.1")
+	s, err := myHost.NewStream(context.Background(), peerID, ProtocolID)
 	catchError(err)
 
 	// Create a buffered stream so that read and writes are non blocking.
@@ -100,13 +106,13 @@ func ReadData(s net.Stream) ([]byte, error) {
 	//log.Printf("The content size is %d bytes.", bytesToRead)
 
 	// Read the content in chunk of 16 * 1024 bytes
-	tmpBuf := make([]byte, BATCH_SIZE)
+	tmpBuf := make([]byte, BatchSize)
 ILOOP:
 	for {
 		// TODO(ricl): is this necessary? If yes, figure out how to make it work
 		// timeoutDuration := 10 * time.Second
 		// s.SetReadDeadline(time.Now().Add(timeoutDuration))
-		if bytesToRead < BATCH_SIZE {
+		if bytesToRead < BatchSize {
 			// Read the last number of bytes less than 1024
 			tmpBuf = make([]byte, bytesToRead)
 		}
