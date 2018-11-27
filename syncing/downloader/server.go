@@ -22,8 +22,6 @@ func (s *Server) Query(ctx context.Context, request *pb.DownloaderRequest) (*pb.
 	if err != nil {
 		return nil, err
 	}
-	// response := pb.DownloaderResponse{}
-	// response.Payload = [][]byte{{0, 0, 2}}
 	return response, nil
 }
 
