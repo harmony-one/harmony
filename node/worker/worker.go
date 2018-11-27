@@ -1,7 +1,8 @@
 package worker
 
 import (
-	"fmt"
+	"math/big"
+	"time"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/consensus"
@@ -9,8 +10,6 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	"math/big"
-	"time"
 )
 
 // environment is the worker's current environment and holds all of the current state information.
@@ -59,7 +58,6 @@ func (w *Worker) CommitTransactions(txs []*types.Transaction, coinbase common.Ad
 	for _, tx := range txs {
 		_, err := w.commitTransaction(tx, coinbase)
 		if err != nil {
-			fmt.Println(err)
 			w.current.state.RevertToSnapshot(snap)
 			return false
 

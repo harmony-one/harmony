@@ -18,11 +18,12 @@ package trie
 
 import (
 	"fmt"
-	hdb "github.com/harmony-one/harmony/db"
-	"github.com/simple-rules/harmony-benchmark/db"
 	"io"
 	"sync"
 	"time"
+
+	hdb "github.com/harmony-one/harmony/db"
+	"github.com/simple-rules/harmony-benchmark/db"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"

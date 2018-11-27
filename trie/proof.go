@@ -19,6 +19,7 @@ package trie
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/harmony-one/harmony/db"
 
 	"github.com/ethereum/go-ethereum/common"
