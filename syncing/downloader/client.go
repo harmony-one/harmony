@@ -10,18 +10,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-// PrintResult ...
-func PrintResult(client *Client) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_HEADER}
-	response, err := client.dlClient.Query(ctx, request)
-	if err != nil {
-		log.Fatalf("Error")
-	}
-	log.Println(response)
-}
-
 // Client ...
 type Client struct {
 	dlClient pb.DownloaderClient
@@ -62,12 +50,15 @@ func (client *Client) GetBlockHashes() *pb.DownloaderResponse {
 }
 
 // GetBlocks ...
-func (client *Client) GetBlocks(heights []int32) *pb.DownloaderResponse {
+func (client *Client) GetBlocks(hashes [][]byte) *pb.DownloaderResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_BLOCK}
-	request.Height = make([]int32, len(heights))
-	copy(request.Height, heights)
+	request.Hashes = make([][]byte, len(hashes))
+	for i := range hashes {
+		request.Hashes[i] = make([]byte, len(hashes[i]))
+		copy(request.Hashes[i], hashes[i])
+	}
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
 		log.Fatalf("Error")
