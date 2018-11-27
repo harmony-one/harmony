@@ -33,6 +33,11 @@ func SendMessage(peer Peer, msg []byte) {
 	go send(peer.Ip, peer.Port, content)
 }
 
+func ReadMessageContent(conn net.Conn) ([]byte, error) {
+	// TODO(ricl): this is a fake stub. Will be removed later.
+	return []byte{}, nil
+}
+
 // BroadcastMessage sends the message to a list of peers
 func BroadcastMessage(peers []Peer, msg []byte) {
 	if len(peers) == 0 {
