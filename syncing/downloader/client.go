@@ -10,14 +10,14 @@ import (
 	"google.golang.org/grpc"
 )
 
-// Client ...
+// Client is the client model for downloader package.
 type Client struct {
 	dlClient pb.DownloaderClient
 	opts     []grpc.DialOption
 	conn     *grpc.ClientConn
 }
 
-// ClientSetup ...
+// ClientSetup setups a Client given ip and port.
 func ClientSetup(ip, port string) *Client {
 	client := Client{}
 	client.opts = append(client.opts, grpc.WithInsecure())
@@ -32,12 +32,12 @@ func ClientSetup(ip, port string) *Client {
 	return &client
 }
 
-// Close ...
+// Close closes the Client.
 func (client *Client) Close() {
 	client.conn.Close()
 }
 
-// GetBlockHashes ...
+// GetBlockHashes gets block hashes from all the peers by calling grpc request.
 func (client *Client) GetBlockHashes() *pb.DownloaderResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -49,7 +49,7 @@ func (client *Client) GetBlockHashes() *pb.DownloaderResponse {
 	return response
 }
 
-// GetBlocks ...
+// GetBlocks gets blocks in serialization byte array by calling a grpc request.
 func (client *Client) GetBlocks(hashes [][]byte) *pb.DownloaderResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

@@ -52,6 +52,7 @@ func (node *FakeNode) Init() {
 	node.bc = bc.CreateBlockchainWithMoreBlocks(addresses, ShardID)
 }
 
+// CalculateResponse is the implementation for DownloadInterface.
 func (node *FakeNode) CalculateResponse(request *pb.DownloaderRequest) (*pb.DownloaderResponse, error) {
 	response := &pb.DownloaderResponse{}
 	if request.Type == pb.DownloaderRequest_HEADER {
@@ -67,6 +68,7 @@ func (node *FakeNode) CalculateResponse(request *pb.DownloaderRequest) (*pb.Down
 	return response, nil
 }
 
+// TestGetBlockHashes tests GetBlockHashes function.
 func TestGetBlockHashes(t *testing.T) {
 	fakeNode := &FakeNode{}
 	fakeNode.Init()
@@ -85,6 +87,7 @@ func TestGetBlockHashes(t *testing.T) {
 	}
 }
 
+// TestGetBlocks tests GetBlocks function.
 func TestGetBlocks(t *testing.T) {
 	fakeNode := &FakeNode{}
 	fakeNode.Init()
