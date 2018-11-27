@@ -187,10 +187,8 @@ func (node *Node) NodeHandler(conn net.Conn) {
 				os.Exit(0)
 			}
 		case proto_node.PING:
-			node.log.Info("NET: received message: PING")
 			node.pingMessageHandler(msgPayload)
 		case proto_node.PONG:
-			node.log.Info("NET: received message: PONG")
 			node.pongMessageHandler(msgPayload)
 		}
 	case proto.Client:
@@ -328,7 +326,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
 		select {
 		case <-readySignal:
 			time.Sleep(100 * time.Millisecond) // Delay a bit so validator is catched up.
-		case <-time.After(100 * time.Second):
+		case <-time.After(200 * time.Second):
 			retry = true
 			node.Consensus.ResetState()
 			timeoutCount++
@@ -384,7 +382,7 @@ func (node *Node) WaitForConsensusReadyAccount(readySignal chan struct{}) {
 		select {
 		case <-readySignal:
 			time.Sleep(100 * time.Millisecond) // Delay a bit so validator is catched up.
-		case <-time.After(100 * time.Second):
+		case <-time.After(200 * time.Second):
 			retry = true
 			node.Consensus.ResetState()
 			timeoutCount++
@@ -545,57 +543,48 @@ func (node *Node) UpdateUtxoAndState(newBlock *blockchain.Block) {
 	}
 }
 
-func (node *Node) pingMessageHandler(msgPayload []byte) {
+func (node *Node) pingMessageHandler(msgPayload []byte) int {
 	ping, err := proto_node.GetPingMessage(msgPayload)
 	if err != nil {
 		node.log.Error("Can't get Ping Message")
-		return
+		return -1
 	}
-	node.log.Info("Ping", "Msg", ping)
+	//	node.log.Info("Ping", "Msg", ping)
 
 	peer := new(p2p.Peer)
 	peer.Ip = ping.Node.IP
 	peer.Port = ping.Node.Port
+	peer.ValidatorID = ping.Node.ValidatorID
 
 	peer.PubKey = hmy_crypto.Ed25519Curve.Point()
 	err = peer.PubKey.UnmarshalBinary(ping.Node.PubKey[:])
 	if err != nil {
 		node.log.Error("UnmarshalBinary Failed", "error", err)
-		return
+		return -1
 	}
 
 	// Add to Node's peer list
-	count := node.AddPeers([]p2p.Peer{*peer})
+	node.AddPeers([]p2p.Peer{*peer})
 
 	// Send a Pong message back
-	peers := make([]p2p.Peer, 0)
-	count = 0
-	node.Neighbors.Range(func(k, v interface{}) bool {
-		if p, ok := v.(p2p.Peer); ok {
-			peers = append(peers, p)
-			count++
-			return true
-		} else {
-			return false
-		}
-	})
+	peers := node.Consensus.GetValidatorPeers()
 	pong := proto_node.NewPongMessage(peers)
 	buffer := pong.ConstructPongMessage()
 
-	p2p.SendMessage(*peer, buffer)
+	for _, p := range peers {
+		p2p.SendMessage(p, buffer)
+	}
 
-	// TODO: broadcast pong messages to all neighbors
-
-	return
+	return len(peers)
 }
 
-func (node *Node) pongMessageHandler(msgPayload []byte) {
+func (node *Node) pongMessageHandler(msgPayload []byte) int {
 	pong, err := proto_node.GetPongMessage(msgPayload)
 	if err != nil {
 		node.log.Error("Can't get Pong Message")
-		return
+		return -1
 	}
-	//	node.log.Info("Pong", "Msg", pong)
+	// node.log.Info("Pong", "Msg", pong)
 	node.State = NodeJoinedShard
 
 	peers := make([]p2p.Peer, 0)
@@ -604,6 +593,7 @@ func (node *Node) pongMessageHandler(msgPayload []byte) {
 		peer := new(p2p.Peer)
 		peer.Ip = p.IP
 		peer.Port = p.Port
+		peer.ValidatorID = p.ValidatorID
 
 		peer.PubKey = hmy_crypto.Ed25519Curve.Point()
 		err = peer.PubKey.UnmarshalBinary(p.PubKey[:])
@@ -614,8 +604,5 @@ func (node *Node) pongMessageHandler(msgPayload []byte) {
 		peers = append(peers, *peer)
 	}
 
-	node.AddPeers(peers)
-	// TODO: add public key to consensus.pubkeys
-
-	return
+	return node.AddPeers(peers)
 }

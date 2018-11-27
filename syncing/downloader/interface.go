@@ -4,7 +4,7 @@ import (
 	pb "github.com/harmony-one/harmony/syncing/downloader/proto"
 )
 
-// DownloadInterface ...
+// DownloadInterface is the interface for downloader package.
 type DownloadInterface interface {
 	// Syncing blockchain from other peers.
 	// The returned channel is the signal of syncing finish.
