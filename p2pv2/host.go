@@ -35,10 +35,14 @@ func InitHost(port string) {
 	sourceAddr, err := multiaddr.NewMultiaddr(addr)
 	catchError(err)
 	// TODO(ricl): use ip as well.
-	priv := portToPrivKey(port)
+	priv := addrToPrivKey(addr)
 	myHost, err = libp2p.New(context.Background(),
 		libp2p.ListenAddrs(sourceAddr),
-		libp2p.Identity(priv))
+		libp2p.Identity(priv),
+		libp2p.NoSecurity, // The security (signature generation and verification) is, for now, taken care by ourselves.
+		// TODO(ricl): Other features to probe
+		// libp2p.EnableRelay; libp2p.Routing;
+	)
 	catchError(err)
 	log.Debug("Host is up!", "port", port, "id", myHost.ID().Pretty(), "addrs", sourceAddr)
 }
@@ -53,7 +57,7 @@ func Send(ip, port string, message []byte) error {
 	addr := fmt.Sprintf("/ip4/127.0.0.1/tcp/%s", port)
 	targetAddr, err := multiaddr.NewMultiaddr(addr)
 
-	priv := portToPrivKey(port)
+	priv := addrToPrivKey(addr)
 	peerID, _ := peer.IDFromPrivateKey(priv)
 	myHost.Peerstore().AddAddrs(peerID, []multiaddr.Multiaddr{targetAddr}, peerstore.PermanentAddrTTL)
 	s, err := myHost.NewStream(context.Background(), peerID, ProtocolID)

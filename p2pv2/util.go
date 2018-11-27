@@ -2,8 +2,8 @@ package p2pv2
 
 import (
 	"bufio"
+	"hash/fnv"
 	"math/rand"
-	"strconv"
 
 	"github.com/harmony-one/harmony/log"
 	ic "github.com/libp2p/go-libp2p-crypto"
@@ -16,10 +16,11 @@ func catchError(err error) {
 	}
 }
 
-func portToPrivKey(port string) ic.PrivKey {
-	portNum, err := strconv.ParseInt(port, 10, 64)
+func addrToPrivKey(addr string) ic.PrivKey {
+	h := fnv.New32a()
+	_, err := h.Write([]byte(addr))
 	catchError(err)
-	r := rand.New(rand.NewSource(portNum))
+	r := rand.New(rand.NewSource(int64(h.Sum32())))
 	priv, _, err := ic.GenerateKeyPairWithReader(ic.RSA, 512, r)
 	return priv
 }
