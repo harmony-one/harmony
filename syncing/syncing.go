@@ -44,7 +44,7 @@ type StateSync struct {
 	stateSyncTaskQueue *queue.Queue
 }
 
-// GetBlockHashes ...
+// GetBlockHashes gets block hashes by calling grpc request to the corresponding peer.
 func (peerConfig *SyncPeerConfig) GetBlockHashes() error {
 	if peerConfig.client == nil {
 		return ErrSyncPeerConfigClientNotReady
@@ -58,7 +58,7 @@ func (peerConfig *SyncPeerConfig) GetBlockHashes() error {
 	return nil
 }
 
-// GetBlocks ...
+// GetBlocks gets blocks by calling grpc request to the corresponding peer.
 func (peerConfig *SyncPeerConfig) GetBlocks(hashes [][]byte) ([][]byte, error) {
 	if peerConfig.client == nil {
 		return nil, ErrSyncPeerConfigClientNotReady
@@ -78,7 +78,7 @@ func (ss *StateSync) ProcessStateSyncFromPeers(peers []p2p.Peer, bc *blockchain.
 	return done, nil
 }
 
-// CreateSyncConfig ...
+// CreateSyncConfig creates SyncConfig for StateSync object.
 func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer) {
 	ss.peerNumber = len(peers)
 	ss.syncConfig = &SyncConfig{
@@ -92,6 +92,7 @@ func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer) {
 	}
 }
 
+// makeConnectionToPeers makes grpc connection to all peers.
 func (ss *StateSync) makeConnectionToPeers() {
 	var wg sync.WaitGroup
 	wg.Add(ss.peerNumber)
