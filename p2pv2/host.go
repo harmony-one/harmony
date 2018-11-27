@@ -30,8 +30,8 @@ const (
 )
 
 // InitHost Initialize a host for p2p communication
-func InitHost(port string) {
-	addr := fmt.Sprintf("/ip4/127.0.0.1/tcp/%s", port)
+func InitHost(ip, port string) {
+	addr := fmt.Sprintf("/ip4/%s/tcp/%s", ip, port)
 	sourceAddr, err := multiaddr.NewMultiaddr(addr)
 	catchError(err)
 	// TODO(ricl): use ip as well.

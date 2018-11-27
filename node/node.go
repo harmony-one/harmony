@@ -115,7 +115,7 @@ func (node *Node) StartServer(port string) {
 		// Disable this temporarily.
 		// node.blockchain = syncing.StartBlockSyncing(node.Consensus.GetValidatorPeers())
 	}
-	p2pv2.InitHost(port)
+	p2pv2.InitHost(node.SelfPeer.Ip, port)
 	p2pv2.BindHandler(node.NodeHandler)
 	// Hang forever
 	<-make(chan struct{})
