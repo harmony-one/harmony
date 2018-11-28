@@ -338,7 +338,7 @@ func (consensus *Consensus) processCollectiveSigMessage(payload []byte) {
 	}
 
 	// Verify collective signature
-	err := crypto.Verify(crypto.Ed25519Curve, consensus.publicKeys, payload[:36], append(collectiveSig, bitmap...), crypto.NewThresholdPolicy((2*len(consensus.publicKeys)/3)+1))
+	err := crypto.Verify(crypto.Ed25519Curve, consensus.PublicKeys, payload[:36], append(collectiveSig, bitmap...), crypto.NewThresholdPolicy((2*len(consensus.PublicKeys)/3)+1))
 	if err != nil {
 		consensus.Log.Warn("Failed to verify the collective sig message", "consensusID", consensusID, "err", err)
 		return

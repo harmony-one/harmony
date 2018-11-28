@@ -47,7 +47,7 @@ type Consensus struct {
 	// Leader
 	leader p2p.Peer
 	// Public keys of the committee including leader and validators
-	publicKeys []kyber.Point
+	PublicKeys []kyber.Point
 
 	// private/public keys of current node
 	priKey kyber.Scalar
@@ -137,7 +137,7 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 	if err != nil {
 		panic("Failed to create final mask")
 	}
-	consensus.publicKeys = allPublicKeys
+	consensus.PublicKeys = allPublicKeys
 	consensus.bitmap = mask
 	consensus.finalBitmap = finalMask
 
@@ -208,8 +208,8 @@ func (consensus *Consensus) ResetState() {
 	consensus.responses = &map[uint16]kyber.Scalar{}
 	consensus.finalResponses = &map[uint16]kyber.Scalar{}
 
-	mask, _ := crypto.NewMask(crypto.Ed25519Curve, consensus.publicKeys, consensus.leader.PubKey)
-	finalMask, _ := crypto.NewMask(crypto.Ed25519Curve, consensus.publicKeys, consensus.leader.PubKey)
+	mask, _ := crypto.NewMask(crypto.Ed25519Curve, consensus.PublicKeys, consensus.leader.PubKey)
+	finalMask, _ := crypto.NewMask(crypto.Ed25519Curve, consensus.PublicKeys, consensus.leader.PubKey)
 	consensus.bitmap = mask
 	consensus.finalBitmap = finalMask
 	consensus.bitmap.SetMask([]byte{})
@@ -236,6 +236,7 @@ func (consensus *Consensus) String() string {
 // and add the public keys
 func (consensus *Consensus) AddPeers(peers []p2p.Peer) int {
 	count := 0
+
 	for _, peer := range peers {
 		_, ok := consensus.validators.Load(utils.GetUniqueIdFromPeer(peer))
 		if !ok {
@@ -243,41 +244,28 @@ func (consensus *Consensus) AddPeers(peers []p2p.Peer) int {
 				peer.ValidatorID = int(consensus.uniqueIdInstance.GetUniqueId())
 			}
 			consensus.validators.Store(utils.GetUniqueIdFromPeer(peer), peer)
-			consensus.publicKeys = append(consensus.publicKeys, peer.PubKey)
-			count++
+			consensus.PublicKeys = append(consensus.PublicKeys, peer.PubKey)
 		}
-	}
-	if count > 0 {
-		// regenerate bitmaps
-		mask, err := crypto.NewMask(crypto.Ed25519Curve, consensus.publicKeys, consensus.leader.PubKey)
-		if err != nil {
-			panic("Failed to create mask")
-		}
-		finalMask, err := crypto.NewMask(crypto.Ed25519Curve, consensus.publicKeys, consensus.leader.PubKey)
-		if err != nil {
-			panic("Failed to create final mask")
-		}
-		consensus.bitmap = mask
-		consensus.finalBitmap = finalMask
+		count++
 	}
 	return count
 }
 
-// RemovePeers will remove the peers from the validator list and publicKeys
+// RemovePeers will remove the peers from the validator list and PublicKeys
 // It will be called when leader/node lost connection to peers
 func (consensus *Consensus) RemovePeers(peers []p2p.Peer) int {
 	// TODO (lc) we need to have a corresponding RemovePeers function
 	return 0
 }
 
-// DebugPrintPublicKeys print all the publicKeys in string format in Consensus
+// DebugPrintPublicKeys print all the PublicKeys in string format in Consensus
 func (consensus *Consensus) DebugPrintPublicKeys() {
-	for _, k := range consensus.publicKeys {
+	for _, k := range consensus.PublicKeys {
 		str := fmt.Sprintf("%s", k)
 		consensus.Log.Debug("pk:", "string", str)
 	}
 
-	consensus.Log.Debug("PublicKeys:", "#", len(consensus.publicKeys))
+	consensus.Log.Debug("PublicKeys:", "#", len(consensus.PublicKeys))
 }
 
 // DebugPrintValidators print all validator ip/port/key in string format in Consensus
