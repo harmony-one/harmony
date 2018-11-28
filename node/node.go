@@ -13,29 +13,32 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/core/vm"
-	"github.com/harmony-one/harmony/node/worker"
-
 	"github.com/harmony-one/harmony/blockchain"
 	"github.com/harmony-one/harmony/client"
 	bft "github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/crypto/pki"
 	hdb "github.com/harmony-one/harmony/db"
 	"github.com/harmony-one/harmony/log"
+	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
 	proto_identity "github.com/harmony-one/harmony/proto/identity"
 	proto_node "github.com/harmony-one/harmony/proto/node"
+	"github.com/harmony-one/harmony/syncing/downloader"
+	downloader_pb "github.com/harmony-one/harmony/syncing/downloader/proto"
 )
 
 type NodeState byte
 
 const (
-	NodeInit        NodeState = iota // Node just started, before contacting BeaconChain
-	NodeWaitToJoin                   // Node contacted BeaconChain, wait to join Shard
-	NodeJoinedShard                  // Node joined Shard, ready for consensus
-	NodeOffline                      // Node is offline
+	NodeInit              NodeState = iota // Node just started, before contacting BeaconChain
+	NodeWaitToJoin                         // Node contacted BeaconChain, wait to join Shard
+	NodeJoinedShard                        // Node joined Shard, ready for consensus
+	NodeOffline                            // Node is offline
+	NodeReadyForConsensus                  // Node is ready to do consensus
+	NodeDoingConsensus                     // Node is already doing consensus
 )
 
 type NetworkNode struct {
@@ -74,6 +77,9 @@ type Node struct {
 	TxPool              *core.TxPool
 	BlockChannelAccount chan *types.Block // The channel to receive new blocks from Node
 	worker              *worker.Worker
+
+	// Syncing component.
+	downloaderServer *downloader.Server
 
 	// Test only
 	testBankKey *ecdsa.PrivateKey
@@ -272,6 +278,7 @@ func (node *Node) AddPeers(peers []p2p.Peer) int {
 	return count
 }
 
+// JoinShard helps a new node to join a shard.
 func (node *Node) JoinShard(leader p2p.Peer) {
 	// try to join the shard, with 10 minutes time-out
 	backoff := p2p.NewExpBackoff(1*time.Second, 10*time.Minute, 2)
@@ -284,4 +291,26 @@ func (node *Node) JoinShard(leader p2p.Peer) {
 		p2p.SendMessage(leader, buffer)
 		node.log.Debug("Sent ping message")
 	}
+}
+
+// StartDownloaderServer starts downloader server.
+func (node *Node) StartDownloaderServer() {
+	node.downloaderServer = downloader.NewServer(node)
+	// node.downloaderServer.Start(node.)
+}
+
+// CalculateResponse implements DownloadInterface on Node object.
+func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*downloader_pb.DownloaderResponse, error) {
+	response := &downloader_pb.DownloaderResponse{}
+	if request.Type == downloader_pb.DownloaderRequest_HEADER {
+		for _, block := range node.blockchain.Blocks {
+			response.Payload = append(response.Payload, block.Hash[:])
+		}
+	} else {
+		for i := range request.Hashes {
+			block := node.blockchain.FindBlock(request.Hashes[i])
+			response.Payload = append(response.Payload, block.Serialize())
+		}
+	}
+	return response, nil
 }
