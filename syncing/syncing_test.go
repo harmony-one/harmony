@@ -22,20 +22,23 @@ const (
 )
 
 var (
-	PriIntOne      = 111
-	PriIntTwo      = 222
-	TestAddressOne = pki.GetAddressFromInt(PriIntOne)
-	TestAddressTwo = pki.GetAddressFromInt(PriIntTwo)
-	ShardID        = uint32(0)
-	ServerPorts    = []string{serverPort1, serverPort2, serverPort3}
+	PriIntOne        = 111
+	PriIntTwo        = 222
+	PriIntThree      = 222
+	TestAddressOne   = pki.GetAddressFromInt(PriIntOne)
+	TestAddressTwo   = pki.GetAddressFromInt(PriIntTwo)
+	TestAddressThree = pki.GetAddressFromInt(PriIntThree)
+	ShardID          = uint32(0)
+	ServerPorts      = []string{serverPort1, serverPort2, serverPort3}
 )
 
 type FakeNode struct {
-	bc         *bc.Blockchain
-	server     *downloader.Server
-	ip         string
-	port       string
-	grpcServer *grpc.Server
+	bc            *bc.Blockchain
+	server        *downloader.Server
+	ip            string
+	port          string
+	grpcServer    *grpc.Server
+	doneFirstTime bool
 }
 
 // GetBlockHashes used for state download.
@@ -73,12 +76,21 @@ func (node *FakeNode) Start() error {
 	return err
 }
 
+func (node *FakeNode) addOneMoreBlock() {
+	addresses := [][20]byte{TestAddressThree}
+	node.bc.Blocks = append(node.bc.Blocks, bc.CreateMoreBlocks(addresses, ShardID)...)
+}
+
 func (node *FakeNode) CalculateResponse(request *pb.DownloaderRequest) (*pb.DownloaderResponse, error) {
 	response := &pb.DownloaderResponse{}
 	if request.Type == pb.DownloaderRequest_HEADER {
 		for _, block := range node.bc.Blocks {
 			response.Payload = append(response.Payload, block.Hash[:])
 		}
+		if !node.doneFirstTime {
+			node.addOneMoreBlock()
+		}
+		node.doneFirstTime = true
 	} else {
 		for i := range request.Hashes {
 			block := node.bc.FindBlock(request.Hashes[i])

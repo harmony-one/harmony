@@ -233,16 +233,19 @@ func CreateBlockchain(address [20]byte, shardID uint32) *Blockchain {
 	return &bc
 }
 
-// CreateBlockchainWithMoreBlocks ...
+// CreateBlockchainWithMoreBlocks is used for syncing testing.
 func CreateBlockchainWithMoreBlocks(addresses [][20]byte, shardID uint32) *Blockchain {
-	blocks := make([]*Block, 0)
+	return &Blockchain{CreateMoreBlocks(addresses, shardID)}
+}
+
+// CreateMoreBlocks is used for syncing testing.
+func CreateMoreBlocks(addresses [][20]byte, shardID uint32) []*Block {
+	blocks := []*Block{}
 	for _, address := range addresses {
 		cbtx := NewCoinbaseTX(address, genesisCoinbaseData, shardID)
 		blocks = append(blocks, NewGenesisBlock(cbtx, shardID))
 	}
-
-	bc := Blockchain{blocks}
-	return &bc
+	return blocks
 }
 
 // CreateStateBlock creates state block based on the utxos.
