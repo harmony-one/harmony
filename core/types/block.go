@@ -42,6 +42,9 @@ var (
 // out on a block.
 type BlockNonce [8]byte
 
+// A Shard is a 16-bit id for the shard a block belongs to
+type ShardId [8]byte
+
 // EncodeNonce converts the given integer to a block nonce.
 func EncodeNonce(i uint64) BlockNonce {
 	var n BlockNonce
@@ -82,6 +85,7 @@ type Header struct {
 	Extra       []byte         `json:"extraData"        gencodec:"required"`
 	MixDigest   common.Hash    `json:"mixHash"          gencodec:"required"`
 	Nonce       BlockNonce     `json:"nonce"            gencodec:"required"`
+	ShardId     ShardId        `json:"shardId"          gencodec:"required"`
 }
 
 // field type overrides for gencodec
@@ -280,6 +284,7 @@ func (b *Block) Time() *big.Int       { return new(big.Int).Set(b.header.Time) }
 func (b *Block) NumberU64() uint64        { return b.header.Number.Uint64() }
 func (b *Block) MixDigest() common.Hash   { return b.header.MixDigest }
 func (b *Block) Nonce() uint64            { return binary.BigEndian.Uint64(b.header.Nonce[:]) }
+func (b *Block) ShardId() uint16          { return binary.BigEndian.Uint16(b.header.ShardId[:]) }
 func (b *Block) Bloom() Bloom             { return b.header.Bloom }
 func (b *Block) Coinbase() common.Address { return b.header.Coinbase }
 func (b *Block) Root() common.Hash        { return b.header.Root }
