@@ -1,9 +1,6 @@
 package worker
 
 import (
-	"math/big"
-	"time"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/consensus"
@@ -11,6 +8,8 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"math/big"
+	"time"
 )
 
 // environment is the worker's current environment and holds all of the current state information.
@@ -50,14 +49,34 @@ func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	return receipt.Logs, nil
 }
 
-func (w *Worker) CommitTransactions(txs []*types.Transaction, coinbase common.Address) {
+func (w *Worker) CommitTransactions(txs []*types.Transaction, coinbase common.Address) error {
+	snap := w.current.state.Snapshot()
+
 	if w.current.gasPool == nil {
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit)
 	}
-
 	for _, tx := range txs {
-		w.commitTransaction(tx, coinbase)
+		_, err := w.commitTransaction(tx, coinbase)
+		if err != nil {
+			w.current.state.RevertToSnapshot(snap)
+			return err
+
+		}
 	}
+	return nil
+}
+
+func (w *Worker) UpdateCurrent() error {
+	parent := w.chain.CurrentBlock()
+	num := parent.Number()
+	timestamp := time.Now().Unix()
+	header := &types.Header{
+		ParentHash: parent.Hash(),
+		Number:     num.Add(num, common.Big1),
+		GasLimit:   core.CalcGasLimit(parent, w.gasFloor, w.gasCeil),
+		Time:       big.NewInt(timestamp),
+	}
+	return w.makeCurrent(parent, header)
 }
 
 // makeCurrent creates a new environment for the current cycle.
@@ -79,13 +98,13 @@ func (w *Worker) GetCurrentState() *state.StateDB {
 	return w.current.state
 }
 
-func (w *Worker) Commit() *types.Block {
+func (w *Worker) Commit() (*types.Block, error) {
 	s := w.current.state.Copy()
 	block, err := w.engine.Finalize(w.chain, w.current.header, s, w.current.txs, w.current.receipts)
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	return block
+	return block, nil
 }
 
 func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus.Engine) *Worker {
@@ -95,7 +114,7 @@ func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus.En
 		engine: engine,
 	}
 	worker.gasFloor = 0
-	worker.gasCeil = 10000000
+	worker.gasCeil = 1000000000000000
 
 	parent := worker.chain.CurrentBlock()
 	num := parent.Number()

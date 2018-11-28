@@ -10,26 +10,14 @@ import (
 	"google.golang.org/grpc"
 )
 
-// PrintResult ...
-func PrintResult(client *Client) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_HEADER}
-	response, err := client.dlClient.Query(ctx, request)
-	if err != nil {
-		log.Fatalf("Error")
-	}
-	log.Println(response)
-}
-
-// Client ...
+// Client is the client model for downloader package.
 type Client struct {
 	dlClient pb.DownloaderClient
 	opts     []grpc.DialOption
 	conn     *grpc.ClientConn
 }
 
-// ClientSetup ...
+// ClientSetup setups a Client given ip and port.
 func ClientSetup(ip, port string) *Client {
 	client := Client{}
 	client.opts = append(client.opts, grpc.WithInsecure())
@@ -44,12 +32,12 @@ func ClientSetup(ip, port string) *Client {
 	return &client
 }
 
-// Close ...
+// Close closes the Client.
 func (client *Client) Close() {
 	client.conn.Close()
 }
 
-// GetBlockHashes ...
+// GetBlockHashes gets block hashes from all the peers by calling grpc request.
 func (client *Client) GetBlockHashes() *pb.DownloaderResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -61,13 +49,16 @@ func (client *Client) GetBlockHashes() *pb.DownloaderResponse {
 	return response
 }
 
-// GetBlocks ...
-func (client *Client) GetBlocks(heights []int32) *pb.DownloaderResponse {
+// GetBlocks gets blocks in serialization byte array by calling a grpc request.
+func (client *Client) GetBlocks(hashes [][]byte) *pb.DownloaderResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_BLOCK}
-	request.Height = make([]int32, len(heights))
-	copy(request.Height, heights)
+	request.Hashes = make([][]byte, len(hashes))
+	for i := range hashes {
+		request.Hashes[i] = make([]byte, len(hashes[i]))
+		copy(request.Hashes[i], hashes[i])
+	}
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
 		log.Fatalf("Error")

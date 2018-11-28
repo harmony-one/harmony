@@ -17,10 +17,10 @@ var (
 	p1      = p2p.Peer{
 		Ip:          "127.0.0.1",
 		Port:        "9999",
-		ValidatorID: 8888,
+		ValidatorID: -1,
 		PubKey:      pubKey1,
 	}
-	e1 = "ping:1=>127.0.0.1:9999:8888/[90 217 28 68 64 211 160 232 61 244 159 244 160 36 61 161 237 242 236 45 147 118 237 88 234 122 198 188 157 116 90 228]"
+	e1 = "ping:1=>127.0.0.1:9999:-1/[90 217 28 68 64 211 160 232 61 244 159 244 160 36 61 161 237 242 236 45 147 118 237 88 234 122 198 188 157 116 90 228]"
 
 	priKey2 = crypto.Ed25519Curve.Scalar().SetInt64(int64(999))
 	pubKey2 = pki.GetPublicKeyFromScalar(priKey2)
@@ -31,14 +31,14 @@ var (
 			Port:        "8888",
 			PubKey:      pubKey1,
 			Ready:       true,
-			ValidatorID: 1,
+			ValidatorID: -1,
 		},
 		{
 			Ip:          "127.0.0.1",
 			Port:        "9999",
 			PubKey:      pubKey2,
 			Ready:       false,
-			ValidatorID: 2,
+			ValidatorID: -2,
 		},
 	}
 	e2 = "pong:1=>length:2"

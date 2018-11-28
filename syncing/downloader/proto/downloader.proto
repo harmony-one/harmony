@@ -18,8 +18,8 @@ message DownloaderRequest {
   // Request type.
   RequestType type = 1;
 
-  // The array of ids or heights of the blocks we want to download.
-  repeated int32 height = 2;
+  // The hashes of the blocks we want to download.
+  repeated bytes hashes = 2;
 }
 
 // DownloaderResponse is the generic response of DownloaderRequest.

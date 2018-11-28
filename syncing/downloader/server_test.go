@@ -1,7 +1,6 @@
 package downloader_test
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -53,6 +52,7 @@ func (node *FakeNode) Init() {
 	node.bc = bc.CreateBlockchainWithMoreBlocks(addresses, ShardID)
 }
 
+// CalculateResponse is the implementation for DownloadInterface.
 func (node *FakeNode) CalculateResponse(request *pb.DownloaderRequest) (*pb.DownloaderResponse, error) {
 	response := &pb.DownloaderResponse{}
 	if request.Type == pb.DownloaderRequest_HEADER {
@@ -60,13 +60,15 @@ func (node *FakeNode) CalculateResponse(request *pb.DownloaderRequest) (*pb.Down
 			response.Payload = append(response.Payload, block.Hash[:])
 		}
 	} else {
-		for _, id := range request.Height {
-			response.Payload = append(response.Payload, node.bc.Blocks[id].Serialize())
+		for i := range request.Hashes {
+			block := node.bc.FindBlock(request.Hashes[i])
+			response.Payload = append(response.Payload, block.Serialize())
 		}
 	}
 	return response, nil
 }
 
+// TestGetBlockHashes tests GetBlockHashes function.
 func TestGetBlockHashes(t *testing.T) {
 	fakeNode := &FakeNode{}
 	fakeNode.Init()
@@ -85,6 +87,7 @@ func TestGetBlockHashes(t *testing.T) {
 	}
 }
 
+// TestGetBlocks tests GetBlocks function.
 func TestGetBlocks(t *testing.T) {
 	fakeNode := &FakeNode{}
 	fakeNode.Init()
@@ -101,8 +104,7 @@ func TestGetBlocks(t *testing.T) {
 	if !reflect.DeepEqual(response.Payload, fakeNode.GetBlockHashes()) {
 		t.Error("not equal")
 	}
-	response = client.GetBlocks([]int32{0, 1})
-	fmt.Println(len(response.Payload))
+	response = client.GetBlocks([][]byte{response.Payload[0], response.Payload[1]})
 	if !reflect.DeepEqual(response.Payload, fakeNode.GetBlocks()) {
 		t.Error("not equal")
 	}
