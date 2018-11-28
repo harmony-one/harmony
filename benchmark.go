@@ -71,7 +71,7 @@ func loggingInit(logFolder, role, ip, port string, onlyLogTps bool) {
 }
 
 func main() {
-	accountModel := flag.Bool("account_model", false, "Whether to use account model")
+	//accountModel := flag.Bool("account_model", false, "Whether to use account model")
 	// TODO: use http://getmyipaddress.org/ or http://www.get-myip.com/ to retrieve my IP address
 
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
@@ -132,27 +132,7 @@ func main() {
 		leader = distributionConfig.GetLeader(shardID)
 		selfPeer = distributionConfig.GetSelfPeer(*ip, *port, shardID)
 	}
-<<<<<<< HEAD
-	//Create client peer.
-	// clientPeer = distributionConfig.GetClientPeer()
-	//}
-	ewnode := pkg_newnode.New(*ip, *port)
-	nservice := ewnode.NewService(*ip, *port)
-	time.Sleep(10 * time.Second)
-	fmt.Println("hello")
-	fmt.Println(shardID, leader, peers, selfPeer, idcIP, idcPort, ewnode, nservice)
-	// var role string
-	// if leader.Ip == *ip && leader.Port == *port {
-	// 	role = "leader"
-	// } else {
-	// 	role = "validator"
-	// }
-
-	// if role == "validator" {
-	// 	// Attack determination.
-	// 	attack.GetInstance().SetAttackEnabled(attackDetermination(*attackedMode))
-	// }
-
+	fmt.Println(peers, leader, selfPeer)
 	// // Init logging.
 	// loggingInit(*logFolder, role, *ip, *port, *onlyLogTps)
 
@@ -196,93 +176,35 @@ func main() {
 	// // Temporary testing code, to be removed.
 	// currentNode.AddTestingAddresses(10000)
 
+	// currentNode.State = node.NodeWaitToJoin
+
 	// if consensus.IsLeader {
-	// 	// Let consensus run
-	// 	go func() {
-	// 		consensus.WaitForNewBlock(currentNode.BlockChannel)
-	// 	}()
-	// 	// Node waiting for consensus readiness to create new block
-	// 	go func() {
-	// 		currentNode.WaitForConsensusReady(consensus.ReadySignal)
-	// 	}()
+	// 	if *accountModel {
+	// 		// Let consensus run
+	// 		go func() {
+	// 			consensus.WaitForNewBlockAccount(currentNode.BlockChannelAccount)
+	// 		}()
+	// 		// Node waiting for consensus readiness to create new block
+	// 		go func() {
+	// 			currentNode.WaitForConsensusReadyAccount(consensus.ReadySignal)
+	// 		}()
+	// 	} else {
+	// 		// Let consensus run
+	// 		go func() {
+	// 			consensus.WaitForNewBlock(currentNode.BlockChannel)
+	// 		}()
+	// 		// Node waiting for consensus readiness to create new block
+	// 		go func() {
+	// 			currentNode.WaitForConsensusReady(consensus.ReadySignal)
+	// 		}()
+	// 	}
+	// } else {
+	// 	if *peerDisvoery {
+	// 		go func() {
+	// 			currentNode.JoinShard(leader)
+	// 		}()
+	// 	}
 	// }
 
 	// currentNode.StartServer(*port)
-=======
-
-	// Init logging.
-	loggingInit(*logFolder, role, *ip, *port, *onlyLogTps)
-
-	// Initialize leveldb if dbSupported.
-	var ldb *db.LDBDatabase
-
-	if *dbSupported {
-		ldb, _ = InitLDBDatabase(*ip, *port)
-	}
-
-	// Consensus object.
-	consensus := consensus.NewConsensus(*ip, *port, shardID, peers, leader)
-	consensus.MinPeers = *minPeers
-
-	// Start Profiler for leader if profile argument is on
-	if role == "leader" && (*profile || *metricsReportURL != "") {
-		prof := profiler.GetProfiler()
-		prof.Config(consensus.Log, shardID, *metricsReportURL)
-		if *profile {
-			prof.Start()
-		}
-	}
-
-	// Set logger to attack model.
-	attack.GetInstance().SetLogger(consensus.Log)
-	// Current node.
-	currentNode := node.New(consensus, ldb)
-	// Add self peer.
-	currentNode.SelfPeer = selfPeer
-	// Add sync node configuration.
-	currentNode.SyncNode = *syncNode
-	// If there is a client configured in the node list.
-	if clientPeer != nil {
-		currentNode.ClientPeer = clientPeer
-	}
-
-	// Assign closure functions to the consensus object
-	consensus.BlockVerifier = currentNode.VerifyNewBlock
-	consensus.OnConsensusDone = currentNode.PostConsensusProcessing
-
-	// Temporary testing code, to be removed.
-	currentNode.AddTestingAddresses(10000)
-
-	currentNode.State = node.NodeWaitToJoin
-
-	if consensus.IsLeader {
-		if *accountModel {
-			// Let consensus run
-			go func() {
-				consensus.WaitForNewBlockAccount(currentNode.BlockChannelAccount)
-			}()
-			// Node waiting for consensus readiness to create new block
-			go func() {
-				currentNode.WaitForConsensusReadyAccount(consensus.ReadySignal)
-			}()
-		} else {
-			// Let consensus run
-			go func() {
-				consensus.WaitForNewBlock(currentNode.BlockChannel)
-			}()
-			// Node waiting for consensus readiness to create new block
-			go func() {
-				currentNode.WaitForConsensusReady(consensus.ReadySignal)
-			}()
-		}
-	} else {
-		if *peerDisvoery {
-			go func() {
-				currentNode.JoinShard(leader)
-			}()
-		}
-	}
-
-	currentNode.StartServer(*port)
->>>>>>> fadc5b086dc28bacdf55a56de08de07318a26038
 }
