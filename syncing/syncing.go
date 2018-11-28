@@ -171,14 +171,6 @@ func (syncConfig *SyncConfig) GetHowManyMaxConsensus() (int, int) {
 	return maxFirstID, maxCount
 }
 
-// InitForTesting used for testing.
-func (syncConfig *SyncConfig) InitForTesting(client *downloader.Client, blockHashes [][]byte) {
-	for i := range syncConfig.peers {
-		syncConfig.peers[i].blockHashes = blockHashes
-		syncConfig.peers[i].client = client
-	}
-}
-
 // CleanUpPeers cleans up all peers whose blockHashes are not equal to consensus block hashes.
 func (syncConfig *SyncConfig) CleanUpPeers(maxFirstID int) {
 	fixedPeer := syncConfig.peers[maxFirstID]
@@ -192,6 +184,29 @@ func (syncConfig *SyncConfig) CleanUpPeers(maxFirstID int) {
 			syncConfig.peers[len(syncConfig.peers)-1] = nil
 			syncConfig.peers = syncConfig.peers[:len(syncConfig.peers)-1]
 		}
+	}
+}
+
+// getBlockHashesConsensusAndCleanUp chesk if all consensus hashes are equal.
+func (ss *StateSync) getBlockHashesConsensusAndCleanUp() bool {
+	// Sort all peers by the blockHashes.
+	sort.Slice(ss.syncConfig.peers, func(i, j int) bool {
+		return CompareSyncPeerConfigByblockHashes(ss.syncConfig.peers[i], ss.syncConfig.peers[j]) == -1
+	})
+	maxFirstID, maxCount := ss.syncConfig.GetHowManyMaxConsensus()
+	if float64(maxCount) >= ConsensusRatio*float64(ss.activePeerNumber) {
+		ss.syncConfig.CleanUpPeers(maxFirstID)
+		ss.CleanUpNilPeers()
+		return true
+	}
+	return false
+}
+
+// InitForTesting used for testing.
+func (syncConfig *SyncConfig) InitForTesting(client *downloader.Client, blockHashes [][]byte) {
+	for i := range syncConfig.peers {
+		syncConfig.peers[i].blockHashes = blockHashes
+		syncConfig.peers[i].client = client
 	}
 }
 
