@@ -22,37 +22,60 @@ type Service struct {
 	waitGroup *sync.WaitGroup
 }
 
+type NodeInfo struct {
+	Self p2p.Peer
+	PubK []byte
+}
+type NewNode struct {
+	Role        string
+	ShardID     string
+	ValidatorID int // Validator ID in its shard.
+	leader      p2p.Peer
+	isLeader    bool
+	Self        p2p.Peer
+	peers       []p2p.Peer
+	PubK        kyber.Scalar
+	priK        kyber.Point
+	log         log.Logger
+	SetInfo     bool
+	Service     *Service
+}
+
+type registerResponseRandomNumber struct {
+	NumberOfShards     int
+	NumberOfNodesAdded int
+	Leaders            []*NodeInfo
+}
+
 // Make a new Service.
-func NewService(ip, port string) *Service {
-	// Listen on 127.0.0.1:48879.  That's my favorite port number because in
-	// hex 48879 is 0xBEEF.
+func (node *NewNode) NewService(ip, port string) *Service {
 	laddr, err := net.ResolveTCPAddr("tcp", ip+":"+port)
 	if nil != err {
-		fmt.Println(err)
+		node.log.Crit("cannot resolve the tcp address of the new node", err)
 	}
 	listener, err := net.ListenTCP("tcp", laddr)
 	if nil != err {
-		fmt.Println(err)
+		node.log.Crit("cannot start a listener for new node", err)
 	}
-	fmt.Println("listening on", listener.Addr())
+	node.log.Debug("listening on", "address", laddr.String())
 
-	s := &Service{
+	node.Service = &Service{
 		ch:        make(chan bool),
 		waitGroup: &sync.WaitGroup{},
 	}
-	s.waitGroup.Add(1)
-	go s.Serve(listener)
-	return s
+	node.Service.waitGroup.Add(1)
+	go node.Serve(listener)
+	return node.Service
 }
 
 // Accept connections and spawn a goroutine to serve each one.  Stop listening
 // if anything is received on the service's channel.
-func (s *Service) Serve(listener *net.TCPListener) {
-	defer s.waitGroup.Done()
+func (node *NewNode) Serve(listener *net.TCPListener) {
+	defer node.Service.waitGroup.Done()
 	for {
 		select {
-		case <-s.ch:
-			fmt.Println("stopping listening on", listener.Addr())
+		case <-node.Service.ch:
+			node.log.Debug("stopping listening on", "address", listener.Addr())
 			listener.Close()
 			return
 		default:
@@ -63,12 +86,11 @@ func (s *Service) Serve(listener *net.TCPListener) {
 			if opErr, ok := err.(*net.OpError); ok && opErr.Timeout() {
 				continue
 			}
-			fmt.Println(err)
+			node.log.Error(err.Error())
 
 		}
-		fmt.Println(conn.RemoteAddr(), "connected")
-		s.waitGroup.Add(1)
-		go s.serve(conn)
+		node.Service.waitGroup.Add(1)
+		go node.NodeHandler(conn)
 	}
 }
 
@@ -79,77 +101,57 @@ func (s *Service) Stop() {
 	s.waitGroup.Wait()
 }
 
-// Serve a connection by reading and writing what was read.  That's right, this
-// is an echo service.  Stop reading and writing if anything is received on the
-// service's channel but only after writing what was read.
-func (s *Service) serve(conn *net.TCPConn) {
-	defer conn.Close()
-	defer s.waitGroup.Done()
-	for {
-		select {
-		case <-s.ch:
-			fmt.Println("disconnecting", conn.RemoteAddr())
-			return
-		default:
-		}
-		conn.SetDeadline(time.Now().Add(1e9))
-		buf := make([]byte, 4096)
-		if _, err := conn.Read(buf); nil != err {
-			if opErr, ok := err.(*net.OpError); ok && opErr.Timeout() {
-				continue
-			}
-			fmt.Println(err)
-			return
-		}
-		if _, err := conn.Write(buf); nil != err {
-			fmt.Println(err)
-			return
-		}
-	}
-}
-
-type NewNode struct {
-	Role        string
-	ShardID     string
-	ValidatorID int // Validator ID in its shard.
-	leader      p2p.Peer
-	Self        p2p.Peer
-	peers       []p2p.Peer
-	pubK        kyber.Scalar
-	priK        kyber.Point
-	log         log.Logger
-	SetInfo     bool
-}
-
-type registerResponseRandomNumber struct {
-	NumberOfShards     int
-	NumberOfNodesAdded int
-	Leaders            []*NewNode
-}
-
 func (node NewNode) String() string {
 	return fmt.Sprintf("idc: %v:%v and node infi %v", node.Self.Ip, node.Self.Port, node.SetInfo)
 }
 
+//NewNode
 func New(ip string, port string) *NewNode {
 	pubKey, priKey := utils.GenKey(ip, port)
 	var node NewNode
-	node.pubK = pubKey
+	node.PubK = pubKey
 	node.priK = priKey
 	node.Self = p2p.Peer{Ip: ip, Port: port}
 	node.peers = make([]p2p.Peer, 0)
 	node.log = log.New()
 	node.SetInfo = false
-
 	return &node
 }
 
 //ConnectIdentityChain connects to identity chain
 func (node *NewNode) ConnectBeaconChain(BCPeer p2p.Peer) {
-	time.Sleep(5 * time.Second)
-	msg := node.SerializeNode()
+	pubk, err := node.PubK.MarshalBinary()
+	if err != nil {
+		node.log.Error("Could not Marshall public key into binary")
+	}
+	//nodeInfo := &NodeInfo{Self: node.Self, PubK: node.PubK}
+	nodeInfo := &NodeInfo{Self: node.Self, PubK: pubk}
+	msg := SerializeNodeInfo(nodeInfo)
 	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Register, msg)
-	p2p.SendMessage(BCPeer, msgToSend)
+	p2p.SendMessage(BCPeer, msgToSend) //need backoff behavior for connecting to beaconchain
+}
+
+//SerializeNode
+func SerializeNodeInfo(nodeinfo *NodeInfo) []byte {
+	var result bytes.Buffer
+	encoder := gob.NewEncoder(&result)
+	err := encoder.Encode(nodeinfo)
+	if err != nil {
+		log.Error("Could not serialize node info", err)
+	}
+	return result.Bytes()
+}
+
+// DeserializeNode deserializes the node
+func DeserializeNodeInfo(d []byte) *NodeInfo {
+	var wn NodeInfo
+	r := bytes.NewBuffer(d)
+	decoder := gob.NewDecoder(r)
+	err := decoder.Decode(&wn)
+	if err != nil {
+		log.Error("Could not de-serialize node info", err)
+	}
+	return &wn
 }
 
 // DeserializeNode deserializes the node
@@ -159,7 +161,7 @@ func DeserializeRandomInfo(d []byte) *registerResponseRandomNumber {
 	decoder := gob.NewDecoder(r)
 	err := decoder.Decode(&wn)
 	if err != nil {
-		log.Error("Could not de-serialize node 1")
+		log.Error("Could not de-serialize random info for 1")
 	}
 	return &wn
 }
@@ -171,42 +173,11 @@ func (node *NewNode) processShardInfo(msgPayload []byte) bool {
 	leaders := leadersInfo.Leaders
 	shardNum, isLeader := utils.AllocateShard(leadersInfo.NumberOfNodesAdded, leadersInfo.NumberOfShards)
 	leaderNode := leaders[shardNum-1] //0 indexing.
-	if isLeader {
-		node.leader = leaderNode.Self
-	} else {
-		node.leader = leaderNode.Self
-	}
+	node.leader = leaderNode.Self
+	node.isLeader = isLeader
 	node.SetInfo = true
-	fmt.Println("processing shard info")
+	node.log.Info("Shard information obtained ..")
 	return true
-	//todo set the channel to tell to exit server
-}
-
-//SerializeNode
-func (node *NewNode) SerializeNode() []byte {
-	//Needs to escape the serialization of unexported fields
-	var result bytes.Buffer
-	encoder := gob.NewEncoder(&result)
-	err := encoder.Encode(node)
-	if err != nil {
-		fmt.Println("Could not serialize node")
-		fmt.Println("ERROR", err)
-		//node.log.Error("Could not serialize node")
-	}
-
-	return result.Bytes()
-}
-
-// DeserializeNode deserializes the node
-func DeserializeNode(d []byte) *NewNode {
-	var wn NewNode
-	r := bytes.NewBuffer(d)
-	decoder := gob.NewDecoder(r)
-	err := decoder.Decode(&wn)
-	if err != nil {
-		log.Error("Could not de-serialize node 1")
-	}
-	return &wn
 }
 
 func (node *NewNode) GetShardID() string {

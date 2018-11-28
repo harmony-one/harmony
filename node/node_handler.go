@@ -5,11 +5,12 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	"github.com/harmony-one/harmony/core/types"
 	"net"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/harmony-one/harmony/core/types"
 
 	"github.com/harmony-one/harmony/blockchain"
 	"github.com/harmony-one/harmony/p2p"

@@ -110,50 +110,17 @@ func main() {
 	var leader p2p.Peer
 	var selfPeer p2p.Peer
 	// var clientPeer *p2p.Peer
-	// ewnode := newnode.New(*ip, *port)
-	// go ewnode.StartServer()
-	// time.Sleep(5 * time.Second)
-	// fmt.Print("Hello within server right now")
-	// ewnode.StopServer()
-	// time.Sleep(5 * time.Second)
-	// fmt.Println("will try to close server before the program exits")
-	// //ewnode := newnode.New(*ip, *port)
-	// go ewnode.StartNewServer()
-	// time.Sleep(5 * time.Second)
-	// ewnode.StopServer()
-	// time.Sleep(5 * time.Second)
-	// fmt.Println("hello")
-	// fmt.Print("Hello done closeing now")
-
 	//Use Peer Discovery to get shard/leader/peer/...
 	if *peerDisvoery {
-		newnode := pkg_newnode.New(*ip, *port)
-		//BCPeer := p2p.Peer{Ip: *idcIP, Port: *idcPort}
-		service := pkg_newnode.NewService(*ip, *port)
-		//newnode.ConnectBeaconChain(BCPeer)
-		time.Sleep(5 * time.Second)
-		// ticker := time.NewTicker(10 * time.Second)
-		// quit := make(chan struct{})
-		// go func() {
-		// 	for {
-		// 		select {
-		// 		case <-ticker.C:
-		// 			if newnode.SetInfo {
-		// 				fmt.Println("shutting down server")
-		// 				newnode.StopServer()
-		// 				close(quit)
-		// 				<-quit
-		// 			}
-		// 		case <-quit:
-		// 			ticker.Stop()
-		// 			return
-		// 		}
-		// 	}
-		// }()
-		shardID = newnode.GetShardID()
-		leader = newnode.GetLeader()
-		peers = newnode.GetPeers()
-		selfPeer = newnode.GetSelfPeer()
+		candidateNode := pkg_newnode.New(*ip, *port)
+		BCPeer := p2p.Peer{Ip: *idcIP, Port: *idcPort}
+		service := candidateNode.NewService(*ip, *port)
+		candidateNode.ConnectBeaconChain(BCPeer)
+		time.Sleep(5 * time.Second) //Ideally there should be a ticker to check, with time out.
+		shardID = candidateNode.GetShardID()
+		leader = candidateNode.GetLeader()
+		peers = candidateNode.GetPeers()
+		selfPeer = candidateNode.GetSelfPeer()
 		service.Stop()
 
 	} else {
@@ -168,7 +135,7 @@ func main() {
 	// clientPeer = distributionConfig.GetClientPeer()
 	//}
 	ewnode := pkg_newnode.New(*ip, *port)
-	nservice := pkg_newnode.NewService(*ip, *port)
+	nservice := ewnode.NewService(*ip, *port)
 	time.Sleep(10 * time.Second)
 	fmt.Println("hello")
 	fmt.Println(shardID, leader, peers, selfPeer, idcIP, idcPort, ewnode, nservice)

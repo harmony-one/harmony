@@ -1,7 +1,6 @@
 package newnode
 
 import (
-	"fmt"
 	"net"
 
 	"github.com/harmony-one/harmony/p2p"
@@ -12,6 +11,7 @@ import (
 // NodeHandler handles a new incoming connection.
 func (node *NewNode) NodeHandler(conn net.Conn) {
 	defer conn.Close()
+	defer node.Service.waitGroup.Done()
 
 	content, err := p2p.ReadMessageContent(conn)
 
@@ -49,14 +49,16 @@ func (node *NewNode) NodeHandler(conn net.Conn) {
 		case proto_identity.Identity:
 			idMsgType, err := proto_identity.GetIdentityMessageType(msgPayload)
 			if err != nil {
-				fmt.Println("Error finding the identity message type")
+				node.log.Error("Error finding the identity message type", err)
 			}
 			switch idMsgType {
 			case proto_identity.Acknowledge:
 				node.processShardInfo(identityMsgPayload)
+			default:
+				panic("The identity message type is wrong/missing and newnode does not handle this identity message type")
 			}
-
+		default:
+			panic("The msgCategory is wrong/missing and newnode does not handle this protocol message type")
 		}
-
 	}
 }

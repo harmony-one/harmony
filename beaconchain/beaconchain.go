@@ -3,7 +3,6 @@ package beaconchain
 import (
 	"bytes"
 	"encoding/gob"
-	"fmt"
 	"net"
 	"os"
 	"sync"
@@ -12,7 +11,6 @@ import (
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/newnode"
-	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	proto_identity "github.com/harmony-one/harmony/proto/identity"
 	"github.com/harmony-one/harmony/utils"
@@ -24,16 +22,14 @@ var identityPerBlock = 100000
 type registerResponseRandomNumber struct {
 	NumberOfShards     int
 	NumberOfNodesAdded int
-	Leaders            []*newnode.NewNode
+	Leaders            []*newnode.NodeInfo
 }
 
 // BeaconChain (Blockchain) keeps Identities per epoch, currently centralized!
 type BeaconChain struct {
-	//Identities            []*IdentityBlock //No need to have the identity block as of now
-	Leaders            []*newnode.NewNode
+	Leaders            []*newnode.NodeInfo
 	log                log.Logger
-	PeerToShardMap     map[*node.Node]int
-	ShardLeaderMap     map[int]*node.Node
+	ShardLeaderMap     map[int]*newnode.NodeInfo
 	PubKey             kyber.Point
 	NumberOfShards     int
 	NumberOfNodesAdded int
@@ -41,13 +37,13 @@ type BeaconChain struct {
 
 //Init
 func New(filename string) *BeaconChain {
-	idc := BeaconChain{}
-	//idc.NumberOfShards = readConfigFile(filename)
-	idc.log = log.New()
-	idc.NumberOfShards = 2 //hardcode.
-	idc.PubKey = generateIDCKeys()
-	idc.NumberOfNodesAdded = 0
-	return &idc
+	bc := BeaconChain{}
+	//bc.NumberOfShards = readConfigFile(filename)
+	bc.log = log.New()
+	bc.NumberOfShards = 2 //hardcode.
+	bc.PubKey = generateIDCKeys()
+	bc.NumberOfNodesAdded = 0
+	return &bc
 }
 
 func readConfigFile(filename string) int {
@@ -61,20 +57,41 @@ func generateIDCKeys() kyber.Point {
 }
 
 //AcceptConnections welcomes new connections
-func (IDC *BeaconChain) AcceptConnections(b []byte) {
-	NewNode := newnode.DeserializeNode(b)
-	IDC.registerNode(NewNode)
+func (bc *BeaconChain) AcceptConnections(b []byte) {
+	NewNodeInfo := newnode.DeserializeNodeInfo(b)
+	bc.registerNode(NewNodeInfo)
+}
+
+func (bc *BeaconChain) registerNode(Node *newnode.NodeInfo) {
+	bc.NumberOfNodesAdded = bc.NumberOfNodesAdded + 1
+	_, isLeader := utils.AllocateShard(bc.NumberOfNodesAdded, bc.NumberOfShards)
+	if isLeader {
+		bc.Leaders = append(bc.Leaders, Node)
+	}
+	/**
+
+	**IMPORTANT**
+
+	Note that public key is not in kyber.Scalar form it is in byte form.
+	Use following conversion to get back the actual key
+	//peer.PubKey = crypto.Ed25519Curve.Point()
+	//err = peer.PubKey.UnmarshalBinary(p.PubKey[:])
+
+	**/
+	response := registerResponseRandomNumber{NumberOfShards: bc.NumberOfShards, NumberOfNodesAdded: bc.NumberOfNodesAdded, Leaders: bc.Leaders}
+	msg := bc.SerializeRandomInfo(response)
+	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Acknowledge, msg)
+	p2p.SendMessage(Node.Self, msgToSend)
 }
 
 //SerializeNode
-func (IDC *BeaconChain) SerializeRandomInfo(response registerResponseRandomNumber) []byte {
+func (bc *BeaconChain) SerializeRandomInfo(response registerResponseRandomNumber) []byte {
 	//Needs to escape the serialization of unexported fields
 	var result bytes.Buffer
 	encoder := gob.NewEncoder(&result)
 	err := encoder.Encode(response)
 	if err != nil {
-		fmt.Println("Could not serialize node")
-		fmt.Println("ERROR", err)
+		bc.log.Crit("ERROR", err)
 		//node.log.Error("Could not serialize node")
 	}
 
@@ -88,51 +105,28 @@ func DeserializeRandomInfo(d []byte) *registerResponseRandomNumber {
 	decoder := gob.NewDecoder(r)
 	err := decoder.Decode(&wn)
 	if err != nil {
-		log.Error("Could not de-serialize node 1")
+		log.Crit("Could not de-serialize random number information")
 	}
 	return &wn
 }
 
-func (IDC *BeaconChain) registerNode(Node *newnode.NewNode) {
-	fmt.Println("I am in register messages")
-	IDC.NumberOfNodesAdded = IDC.NumberOfNodesAdded + 1
-	_, isLeader := utils.AllocateShard(IDC.NumberOfNodesAdded, IDC.NumberOfShards)
-	if isLeader {
-		IDC.Leaders = append(IDC.Leaders, Node)
-	}
-	response := registerResponseRandomNumber{NumberOfShards: IDC.NumberOfShards, NumberOfNodesAdded: IDC.NumberOfNodesAdded, Leaders: IDC.Leaders}
-	msg := IDC.SerializeRandomInfo(response)
-	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Acknowledge, msg)
-	p2p.SendMessage(Node.Self, msgToSend)
-}
-
 //StartServer a server and process the request by a handler.
-func (IDC *BeaconChain) StartServer() {
-	IDC.log.Info("Starting IDC server...") //log.Info does nothing for me! (ak)
-	IDC.listenOnPort()
-}
-
-func (IDC *BeaconChain) listenOnPort() {
+func (bc *BeaconChain) StartServer() {
+	bc.log.Info("Starting Beaconchain server ...")
 	addr := net.JoinHostPort("127.0.0.1", "8081")
 	listen, err := net.Listen("tcp", addr)
 	if err != nil {
-		IDC.log.Crit("Socket listen port failed")
+		bc.log.Crit("Socket listen port failed")
 		os.Exit(1)
-	} else {
-		IDC.log.Info("Identity chain is now listening ..")
 	}
 	defer listen.Close()
 	for {
-		IDC.log.Info("I am accepting connections now")
+		bc.log.Info("beacon chain is now listening ..")
 		conn, err := listen.Accept()
-		fmt.Println(conn)
 		if err != nil {
-			IDC.log.Crit("Error listening on port. Exiting", "8081")
+			bc.log.Crit("Error listening on port. Exiting", "8081")
 			continue
-		} else {
-			IDC.log.Info("I am accepting connections now")
 		}
-		go IDC.BeaconChainHandler(conn)
+		go bc.BeaconChainHandler(conn)
 	}
-
 }
