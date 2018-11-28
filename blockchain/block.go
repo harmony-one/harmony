@@ -27,6 +27,8 @@ type Block struct {
 	// Signature...
 	Bitmap    []byte   // Contains which validator signed the block.
 	Signature [66]byte // Schnorr collective signature.
+
+	AccountBlock []byte // Temporary piggy-back.
 }
 
 // State is used in Block to indicate that block is a state block.

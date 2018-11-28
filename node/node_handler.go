@@ -5,14 +5,19 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"math/big"
 	"net"
 	"os"
 	"strconv"
 	"time"
 
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
 
 	"github.com/harmony-one/harmony/blockchain"
+	hmy_crypto "github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/proto"
 	"github.com/harmony-one/harmony/proto/client"
@@ -25,7 +30,7 @@ const (
 	// MinNumberOfTransactionsPerBlock is the min number of transaction per a block.
 	MinNumberOfTransactionsPerBlock = 6000
 	// MaxNumberOfTransactionsPerBlock is the max number of transaction per a block.
-	MaxNumberOfTransactionsPerBlock = 20000
+	MaxNumberOfTransactionsPerBlock = 8000
 	// NumBlocksBeforeStateBlock is the number of blocks allowed before generating state block
 	NumBlocksBeforeStateBlock = 1000
 )
@@ -99,14 +104,14 @@ func (node *Node) NodeHandler(conn net.Conn) {
 				consensusObj.ProcessMessageValidator(msgPayload)
 			}
 		}
-	case proto.NODE:
+	case proto.Node:
 		actionType := proto_node.NodeMessageType(msgType)
 		switch actionType {
 		case proto_node.Transaction:
 			node.log.Info("NET: received message: Node/Transaction")
 			node.transactionMessageHandler(msgPayload)
-		case proto_node.BLOCK:
-			node.log.Info("NET: received message: Node/BLOCK")
+		case proto_node.Block:
+			node.log.Info("NET: received message: Node/Block")
 			blockMsgType := proto_node.BlockMessageType(msgPayload[0])
 			switch blockMsgType {
 			case proto_node.Sync:
@@ -120,8 +125,8 @@ func (node *Node) NodeHandler(conn net.Conn) {
 		case proto_node.BlockchainSync:
 			node.log.Info("NET: received message: Node/BlockchainSync")
 			node.handleBlockchainSync(msgPayload, conn)
-		case proto_node.CLIENT:
-			node.log.Info("NET: received message: Node/CLIENT")
+		case proto_node.Client:
+			node.log.Info("NET: received message: Node/Client")
 			clientMsgType := proto_node.ClientMessageType(msgPayload[0])
 			switch clientMsgType {
 			case proto_node.LookupUtxo:
@@ -134,8 +139,8 @@ func (node *Node) NodeHandler(conn net.Conn) {
 
 				p2p.SendMessage(fetchUtxoMessage.Sender, client.ConstructFetchUtxoResponseMessage(&utxoMap, node.UtxoPool.ShardID))
 			}
-		case proto_node.CONTROL:
-			node.log.Info("NET: received message: Node/CONTROL")
+		case proto_node.Control:
+			node.log.Info("NET: received message: Node/Control")
 			controlType := msgPayload[0]
 			if proto_node.ControlMessageType(controlType) == proto_node.STOP {
 				node.log.Debug("Stopping Node", "node", node, "numBlocks", len(node.blockchain.Blocks), "numTxsProcessed", node.countNumTransactionsInBlockchain())
@@ -181,15 +186,13 @@ func (node *Node) NodeHandler(conn net.Conn) {
 				os.Exit(0)
 			}
 		case proto_node.PING:
-			node.log.Info("NET: received message: PING")
 			node.pingMessageHandler(msgPayload)
 		case proto_node.PONG:
-			node.log.Info("NET: received message: PONG")
 			node.pongMessageHandler(msgPayload)
 		}
-	case proto.CLIENT:
+	case proto.Client:
 		actionType := client.ClientMessageType(msgType)
-		node.log.Info("NET: received message: CLIENT/Transaction")
+		node.log.Info("NET: received message: Client/Transaction")
 		switch actionType {
 		case client.Transaction:
 			if node.Client != nil {
@@ -231,7 +234,7 @@ FOR_LOOP:
 		}
 
 		msgCategory, _ := proto.GetMessageCategory(content)
-		if err != nil || msgCategory != proto.NODE {
+		if err != nil || msgCategory != proto.Node {
 			node.log.Error("Failed in reading message category from syncing node", err)
 			return
 		}
@@ -312,7 +315,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
 		select {
 		case <-readySignal:
 			time.Sleep(100 * time.Millisecond) // Delay a bit so validator is catched up.
-		case <-time.After(100 * time.Second):
+		case <-time.After(200 * time.Second):
 			retry = true
 			node.Consensus.ResetState()
 			timeoutCount++
@@ -365,11 +368,10 @@ func (node *Node) WaitForConsensusReadyAccount(readySignal chan struct{}) {
 	timeoutCount := 0
 	for { // keep waiting for Consensus ready
 		retry := false
-		// TODO(minhdoan, rj): Refactor by sending signal in channel instead of waiting for 10 seconds.
 		select {
 		case <-readySignal:
 			time.Sleep(100 * time.Millisecond) // Delay a bit so validator is catched up.
-		case <-time.After(100 * time.Second):
+		case <-time.After(200 * time.Second):
 			retry = true
 			node.Consensus.ResetState()
 			timeoutCount++
@@ -379,6 +381,19 @@ func (node *Node) WaitForConsensusReadyAccount(readySignal chan struct{}) {
 		if !retry {
 			// Normal tx block consensus
 			// TODO: add new block generation logic
+			txs := make([]*types.Transaction, 100)
+			for i, _ := range txs {
+				randomUserKey, _ := crypto.GenerateKey()
+				randomUserAddress := crypto.PubkeyToAddress(randomUserKey.PublicKey)
+				tx, _ := types.SignTx(types.NewTransaction(node.worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(node.testBankKey.PublicKey)), randomUserAddress, big.NewInt(1000), params.TxGas, nil, nil), types.HomesteadSigner{}, node.testBankKey)
+				txs[i] = tx
+			}
+			node.worker.CommitTransactions(txs, crypto.PubkeyToAddress(node.testBankKey.PublicKey))
+			newBlock = node.worker.Commit()
+
+			// If not enough transactions to run Consensus,
+			// periodically check whether we have enough transactions to package into block.
+			time.Sleep(1 * time.Second)
 		}
 
 		// Send the new block to Consensus so it can be confirmed.
@@ -415,10 +430,27 @@ func (node *Node) BroadcastNewBlock(newBlock *blockchain.Block) {
 
 // VerifyNewBlock is called by consensus participants to verify the block they are running consensus on
 func (node *Node) VerifyNewBlock(newBlock *blockchain.Block) bool {
+	if newBlock.AccountBlock != nil {
+		accountBlock := new(types.Block)
+		err := rlp.DecodeBytes(newBlock.AccountBlock, accountBlock)
+		if err != nil {
+			node.log.Error("Failed decoding the block with RLP")
+		}
+		return node.VerifyNewBlockAccount(accountBlock)
+	}
 	if newBlock.IsStateBlock() {
 		return node.UtxoPool.VerifyStateBlock(newBlock)
 	}
 	return node.UtxoPool.VerifyTransactions(newBlock.Transactions)
+}
+
+// VerifyNewBlock is called by consensus participants to verify the block (account model) they are running consensus on
+func (node *Node) VerifyNewBlockAccount(newBlock *types.Block) bool {
+	fmt.Println("VerifyingNNNNNNNNNNNNNN")
+
+	fmt.Println("BALANCE 1")
+	fmt.Println(node.worker.GetCurrentState().GetBalance(crypto.PubkeyToAddress(node.testBankKey.PublicKey)))
+	return node.Chain.ValidateNewBlock(newBlock, crypto.PubkeyToAddress(node.testBankKey.PublicKey))
 }
 
 // PostConsensusProcessing is called by consensus participants, after consensus is done, to:
@@ -484,22 +516,66 @@ func (node *Node) UpdateUtxoAndState(newBlock *blockchain.Block) {
 	}
 }
 
-func (node *Node) pingMessageHandler(msgPayload []byte) {
+func (node *Node) pingMessageHandler(msgPayload []byte) int {
 	ping, err := proto_node.GetPingMessage(msgPayload)
 	if err != nil {
 		node.log.Error("Can't get Ping Message")
-		return
+		return -1
 	}
-	node.log.Info("Ping", "Msg", ping)
-	return
+	//	node.log.Info("Ping", "Msg", ping)
+
+	peer := new(p2p.Peer)
+	peer.Ip = ping.Node.IP
+	peer.Port = ping.Node.Port
+	peer.ValidatorID = ping.Node.ValidatorID
+
+	peer.PubKey = hmy_crypto.Ed25519Curve.Point()
+	err = peer.PubKey.UnmarshalBinary(ping.Node.PubKey[:])
+	if err != nil {
+		node.log.Error("UnmarshalBinary Failed", "error", err)
+		return -1
+	}
+
+	// Add to Node's peer list
+	node.AddPeers([]p2p.Peer{*peer})
+
+	// Send a Pong message back
+	peers := node.Consensus.GetValidatorPeers()
+	pong := proto_node.NewPongMessage(peers)
+	buffer := pong.ConstructPongMessage()
+
+	for _, p := range peers {
+		p2p.SendMessage(p, buffer)
+	}
+
+	return len(peers)
 }
 
-func (node *Node) pongMessageHandler(msgPayload []byte) {
+func (node *Node) pongMessageHandler(msgPayload []byte) int {
 	pong, err := proto_node.GetPongMessage(msgPayload)
 	if err != nil {
 		node.log.Error("Can't get Pong Message")
-		return
+		return -1
 	}
-	node.log.Info("Pong", "Msg", pong)
-	return
+	// node.log.Info("Pong", "Msg", pong)
+	node.State = NodeJoinedShard
+
+	peers := make([]p2p.Peer, 0)
+
+	for _, p := range pong.Peers {
+		peer := new(p2p.Peer)
+		peer.Ip = p.IP
+		peer.Port = p.Port
+		peer.ValidatorID = p.ValidatorID
+
+		peer.PubKey = hmy_crypto.Ed25519Curve.Point()
+		err = peer.PubKey.UnmarshalBinary(p.PubKey[:])
+		if err != nil {
+			node.log.Error("UnmarshalBinary Failed", "error", err)
+			continue
+		}
+		peers = append(peers, *peer)
+	}
+
+	return node.AddPeers(peers)
 }

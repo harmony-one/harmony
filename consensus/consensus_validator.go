@@ -110,9 +110,14 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	}
 
 	// check block hash
-	if !bytes.Equal(blockHash[:], blockHeaderObj.CalculateBlockHash()[:]) || !bytes.Equal(blockHeaderObj.Hash[:], blockHeaderObj.CalculateBlockHash()[:]) {
-		consensus.Log.Warn("Block hash doesn't match", "consensus", consensus)
-		return
+	if blockHeaderObj.AccountBlock != nil {
+		// TODO: deal with block hash of account model
+	} else {
+		// TODO: totally switch to account model.
+		if !bytes.Equal(blockHash[:], blockHeaderObj.CalculateBlockHash()[:]) || !bytes.Equal(blockHeaderObj.Hash[:], blockHeaderObj.CalculateBlockHash()[:]) {
+			consensus.Log.Warn("Block hash doesn't match", "consensus", consensus)
+			return
+		}
 	}
 
 	// check block data (transactions

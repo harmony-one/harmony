@@ -61,6 +61,9 @@ function build_only
       if [ "$(uname -s)" == "Linux" ]; then
          $BINDIR/$bin -version
       fi
+      if [ "$(uname -s)" == "Darwin" -a "$GOOS" == "darwin" ]; then
+         $BINDIR/$bin -version
+      fi
    done
 
    $MD5 $BINDIR/* > $BINDIR/md5sum.txt 2> /dev/null

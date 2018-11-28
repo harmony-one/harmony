@@ -10,7 +10,7 @@ import (
 	"github.com/harmony-one/harmony/proto"
 )
 
-// NodeMessageType is to indicate the specific type of message under NODE category
+// NodeMessageType is to indicate the specific type of message under Node category
 type NodeMessageType byte
 
 const (
@@ -19,9 +19,9 @@ const (
 
 const (
 	Transaction NodeMessageType = iota
-	BLOCK
-	CLIENT
-	CONTROL
+	Block
+	Client
+	Control
 	BlockchainSync
 	PING // node send ip/pki to register with leader
 	PONG // node broadcast pubK
@@ -43,7 +43,7 @@ const (
 	GetBlock
 )
 
-// TransactionMessageType representa the types of messages used for NODE/Transaction
+// TransactionMessageType representa the types of messages used for Node/Transaction
 type TransactionMessageType int
 
 const (
@@ -52,21 +52,21 @@ const (
 	Unlock
 )
 
-// BlockMessageType represents the types of messages used for NODE/BLOCK
+// BlockMessageType represents the types of messages used for Node/Block
 type BlockMessageType int
 
 const (
 	Sync BlockMessageType = iota
 )
 
-// The types of messages used for NODE/BLOCK
+// The types of messages used for Node/Block
 type ClientMessageType int
 
 const (
 	LookupUtxo ClientMessageType = iota
 )
 
-// The types of messages used for NODE/CONTROL
+// The types of messages used for Node/Control
 type ControlMessageType int
 
 // ControlMessageType
@@ -105,7 +105,7 @@ func DeserializeBlockchainSyncMessage(d []byte) (*BlockchainSyncMessage, error) 
 // ConstructUnlockToCommitOrAbortMessage constructs the unlock to commit or abort message that will be sent to leaders.
 // This is for client.
 func ConstructUnlockToCommitOrAbortMessage(txsAndProofs []*blockchain.Transaction) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
 	byteBuffer.WriteByte(byte(Transaction))
 	byteBuffer.WriteByte(byte(Unlock))
 	encoder := gob.NewEncoder(byteBuffer)
@@ -116,8 +116,8 @@ func ConstructUnlockToCommitOrAbortMessage(txsAndProofs []*blockchain.Transactio
 // ConstructFetchUtxoMessage constructs the fetch utxo message that will be sent to Harmony network.
 // this is for client.
 func ConstructFetchUtxoMessage(sender p2p.Peer, addresses [][20]byte) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
-	byteBuffer.WriteByte(byte(CLIENT))
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
+	byteBuffer.WriteByte(byte(Client))
 	byteBuffer.WriteByte(byte(LookupUtxo))
 
 	encoder := gob.NewEncoder(byteBuffer)
@@ -128,7 +128,7 @@ func ConstructFetchUtxoMessage(sender p2p.Peer, addresses [][20]byte) []byte {
 
 // ConstructTransactionListMessage constructs serialized transactions
 func ConstructTransactionListMessage(transactions []*blockchain.Transaction) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
 	byteBuffer.WriteByte(byte(Transaction))
 	byteBuffer.WriteByte(byte(Send))
 	encoder := gob.NewEncoder(byteBuffer)
@@ -146,7 +146,7 @@ func ConstructTransactionListMessage(transactions []*blockchain.Transaction) []b
 
 // ConstructBlockchainSyncMessage constructs Blockchain Sync Message.
 func ConstructBlockchainSyncMessage(msgType BlockchainSyncMessageType, blockHash [32]byte) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
 	byteBuffer.WriteByte(byte(BlockchainSync))
 	byteBuffer.WriteByte(byte(msgType))
 	if msgType != GetLastBlockHashes {
@@ -165,7 +165,7 @@ func GenerateBlockchainSyncMessage(payload []byte) *BlockchainSyncMessage {
 
 // ConstructRequestTransactionsMessage constructs serialized transactions
 func ConstructRequestTransactionsMessage(transactionIds [][]byte) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
 	byteBuffer.WriteByte(byte(Transaction))
 	byteBuffer.WriteByte(byte(Request))
 	for _, txID := range transactionIds {
@@ -176,16 +176,16 @@ func ConstructRequestTransactionsMessage(transactionIds [][]byte) []byte {
 
 // ConstructStopMessage constructs STOP message for node to stop
 func ConstructStopMessage() []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
-	byteBuffer.WriteByte(byte(CONTROL))
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
+	byteBuffer.WriteByte(byte(Control))
 	byteBuffer.WriteByte(byte(STOP))
 	return byteBuffer.Bytes()
 }
 
 // ConstructBlocksSyncMessage constructs blocks sync message to send blocks to other nodes
 func ConstructBlocksSyncMessage(blocks []blockchain.Block) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.NODE)})
-	byteBuffer.WriteByte(byte(BLOCK))
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
+	byteBuffer.WriteByte(byte(Block))
 	byteBuffer.WriteByte(byte(Sync))
 	encoder := gob.NewEncoder(byteBuffer)
 

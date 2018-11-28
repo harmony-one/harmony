@@ -64,9 +64,6 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 	//if err := v.engine.VerifyUncles(v.bc, block); err != nil {
 	//	return err
 	//}
-	if hash := types.CalcUncleHash(block.Uncles()); hash != header.UncleHash {
-		return fmt.Errorf("uncle root hash mismatch: have %x, want %x", hash, header.UncleHash)
-	}
 	if hash := types.DeriveSha(block.Transactions()); hash != header.TxHash {
 		return fmt.Errorf("transaction root hash mismatch: have %x, want %x", hash, header.TxHash)
 	}

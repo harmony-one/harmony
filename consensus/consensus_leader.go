@@ -8,6 +8,9 @@ import (
 	"errors"
 	"time"
 
+	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/core/types"
+
 	"github.com/harmony-one/harmony/profiler"
 
 	"github.com/dedis/kyber"
@@ -30,7 +33,7 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) 
 		newBlock := <-blockChannel
 
 		if !consensus.HasEnoughValidators() {
-			consensus.Log.Debug("Not enough validators", "# Validators", len(consensus.validators))
+			consensus.Log.Debug("Not enough validators", "# Validators", len(consensus.publicKeys))
 			time.Sleep(500 * time.Millisecond)
 			continue
 		}
@@ -41,6 +44,27 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) 
 		for consensus.state == Finished {
 			// time.Sleep(500 * time.Millisecond)
 			consensus.startConsensus(&newBlock)
+			break
+		}
+	}
+}
+
+// WaitForNewBlock waits for the next new block to run consensus on
+func (consensus *Consensus) WaitForNewBlockAccount(blockChannel chan *types.Block) {
+	consensus.Log.Debug("Waiting for block", "consensus", consensus)
+	for { // keep waiting for new blocks
+		newBlock := <-blockChannel
+		// TODO: think about potential race condition
+		startTime = time.Now()
+		consensus.Log.Debug("STARTING CONSENSUS", "consensus", consensus, "startTime", startTime)
+		for consensus.state == Finished {
+			// time.Sleep(500 * time.Millisecond)
+			data, err := rlp.EncodeToBytes(newBlock)
+			if err == nil {
+				consensus.startConsensus(&blockchain.Block{Hash: newBlock.Hash(), AccountBlock: data})
+			} else {
+				consensus.Log.Error("Failed encoding the block with RLP")
+			}
 			break
 		}
 	}
@@ -140,11 +164,17 @@ func (consensus *Consensus) processCommitMessage(payload []byte, targetState Sta
 	offset += 64
 
 	// Verify signature
-	value, ok := consensus.validators[validatorID]
+	v, ok := consensus.validators.Load(validatorID)
 	if !ok {
 		consensus.Log.Warn("Received message from unrecognized validator", "validatorID", validatorID, "consensus", consensus)
 		return
 	}
+	value, ok := v.(p2p.Peer)
+	if !ok {
+		consensus.Log.Warn("Invalid validator", "validatorID", validatorID, "consensus", consensus)
+		return
+	}
+
 	if schnorr.Verify(crypto.Ed25519Curve, value.PubKey, payload[:offset-64], signature) != nil {
 		consensus.Log.Warn("Received message with invalid signature", "validatorKey", consensus.leader.PubKey, "consensus", consensus)
 		return
@@ -281,11 +311,17 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState S
 	}
 
 	// Verify signature
-	value, ok := consensus.validators[validatorID]
+	v, ok := consensus.validators.Load(validatorID)
 	if !ok {
 		consensus.Log.Warn("Received message from unrecognized validator", "validatorID", validatorID, "consensus", consensus)
 		return
 	}
+	value, ok := v.(p2p.Peer)
+	if !ok {
+		consensus.Log.Warn("Invalid validator", "validatorID", validatorID, "consensus", consensus)
+		return
+	}
+
 	if schnorr.Verify(crypto.Ed25519Curve, value.PubKey, payload[:offset-64], signature) != nil {
 		consensus.Log.Warn("Received message with invalid signature", "validatorKey", consensus.leader.PubKey, "consensus", consensus)
 		return
@@ -452,7 +488,7 @@ func (consensus *Consensus) reportMetrics(block blockchain.Block) {
 		"key":             consensus.pubKey.String(),
 		"tps":             tps,
 		"txCount":         numOfTxs,
-		"nodeCount":       len(consensus.validators) + 1,
+		"nodeCount":       len(consensus.publicKeys) + 1,
 		"latestBlockHash": hex.EncodeToString(consensus.blockHash[:]),
 		"latestTxHashes":  txHashes,
 		"blockLatency":    int(timeElapsed / time.Millisecond),
@@ -461,7 +497,7 @@ func (consensus *Consensus) reportMetrics(block blockchain.Block) {
 }
 
 func (consensus *Consensus) HasEnoughValidators() bool {
-	if len(consensus.validators) < consensus.MinPeers {
+	if len(consensus.publicKeys) < consensus.MinPeers {
 		return false
 	}
 	return true

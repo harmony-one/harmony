@@ -7,25 +7,49 @@ function usage {
    local ME=$(basename $0)
 
    cat<<EOU
-USAGE: $ME config_file_name
+USAGE: $ME [OPTIONS] config_file_name
+
+   -h             print this help message
+   -p             use peer discovery (default: $PEER)
+   -d             enable db support (default: $DB)
+   -t             toggle txgen (default: $TXGEN)
+   -D duration    txgen run duration (default: $DURATION)
+   -m min_peers   minimal number of peers to start consensus (default: $MIN)
 
 This script will build all the binaries and start benchmark and txgen based on the configuration file.
 
 EXAMPLES:
 
    $ME local_config.txt
-
+   $ME -p local_config.txt
 
 EOU
    exit 0
 }
 
+PEER=
+DB=
+TXGEN=true
+DURATION=90
+MIN=5
+
+while getopts "hpdtD:m:" option; do
+   case $option in
+      h) usage ;;
+      p) PEER='-peer_discovery' ;;
+      d) DB='-db_supported' ;;
+      t) TXGEN=false ;;
+      D) DURATION=$OPTARG ;;
+      m) MIN=$OPTARG ;;
+   esac
+done
+
+shift $((OPTIND-1))
+
 config=$1
 if [ -z "$config" ]; then
    usage
 fi
-
-db_supported=$2
 
 # Kill nodes if any
 ./kill_node.sh
@@ -49,16 +73,10 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
   IFS=' ' read ip port mode shardID <<< $line
 	#echo $ip $port $mode
   if [ "$mode" != "client" ]; then
-    if [ -z "$db_supported" ]; then
-      ./bin/benchmark -ip $ip -port $port -config_file $config -log_folder $log_folder&
-    else
-      ./bin/benchmark -ip $ip -port $port -config_file $config -log_folder $log_folder  -db_supported&
-    fi
+    ./bin/benchmark -ip $ip -port $port -config_file $config -log_folder $log_folder $DB $PEER -min_peers $MIN &
   fi
 done < $config
 
-txgen_disabled=$3
-# Generate transactions
-if [ -z "$txgen_disabled" ]; then
-  ./bin/txgen -config_file $config -log_folder $log_folder
+if [ "$TXGEN" == "true" ]; then
+  ./bin/txgen -config_file $config -log_folder $log_folder -duration $DURATION
 fi

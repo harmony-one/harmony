@@ -19,7 +19,7 @@ type Peer struct {
 	Port        string      // Port number of the peer
 	PubKey      kyber.Point // Public key of the peer
 	Ready       bool        // Ready is true if the peer is ready to join consensus.
-	ValidatorID int
+	ValidatorID int         // -1 is the default value, means not assigned any validator ID in the shard
 	// TODO(minhdoan, rj): use this Ready to not send/broadcast to this peer if it wasn't available.
 }
 
