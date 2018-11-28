@@ -153,6 +153,7 @@ func TestPingPongHandler(test *testing.T) {
 	consensus := consensus.NewConsensus("127.0.0.1", "8881", "0", []p2p.Peer{leader, validator}, leader)
 
 	node := New(consensus, nil)
+	node.SelfPeer = leader
 
 	//	go sendPingMessage(leader)
 	go sendPongMessage(leader)

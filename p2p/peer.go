@@ -26,16 +26,16 @@ type Peer struct {
 
 const MaxBroadCast = 20
 
+// Version The version number of p2p library
+// 0 - Direct socket connection
+// 1 - libp2p
+const Version = 1
+
 // SendMessage sends the message to the peer
 func SendMessage(peer Peer, msg []byte) {
 	// Construct normal p2p message
 	content := ConstructP2pMessage(byte(0), msg)
 	go send(peer.Ip, peer.Port, content)
-}
-
-func ReadMessageContent(conn net.Conn) ([]byte, error) {
-	// TODO(ricl): this is a fake stub. Will be removed later.
-	return []byte{}, nil
 }
 
 // BroadcastMessage sends the message to a list of peers
@@ -139,9 +139,13 @@ func send(ip, port string, message []byte) {
 	backoff := NewExpBackoff(250*time.Millisecond, 10*time.Second, 2)
 
 	for trial := 0; trial < 10; trial++ {
-		// TODO(ricl): remove sendWithSocketClient related code.
-		// err := sendWithSocketClient(ip, port, message)
-		err := p2pv2.Send(ip, port, message)
+		var err error
+		if Version == 0 {
+			// TODO(ricl): remove sendWithSocketClient related code.
+			err = sendWithSocketClient(ip, port, message)
+		} else {
+			err = p2pv2.Send(ip, port, message)
+		}
 		if err == nil {
 			return
 		}
