@@ -50,7 +50,7 @@ const (
 	TimeToSleepForSyncing = time.Second * 30
 )
 
-// NetworkNode is TODO(leo)
+// NetworkNode ...
 type NetworkNode struct {
 	SelfPeer p2p.Peer
 	IDCPeer  p2p.Peer
@@ -350,17 +350,10 @@ func (node *Node) JoinShard(leader p2p.Peer) {
 	}
 }
 
-// StartHelpSyncing keeps sleeping until it's doing consensus or it's a leader.
-func (node *Node) StartHelpSyncing() {
-	for {
-		time.Sleep(TimeToSleepForSyncing)
-		//
-		if node.State == NodeDoingConsensus || node.State == NodeLeader {
-			node.InitSyncingServer()
-			node.StartHelpSyncing()
-			break
-		}
-	}
+// SupportSyncing keeps sleeping until it's doing consensus or it's a leader.
+func (node *Node) SupportSyncing() {
+	node.InitSyncingServer()
+	node.StartSyncingServer()
 }
 
 // InitSyncingServer starts downloader server.
@@ -371,7 +364,7 @@ func (node *Node) InitSyncingServer() {
 // StartSyncingServer starts syncing server.
 func (node *Node) StartSyncingServer() {
 	// Handles returned grpcServer??
-	node.downloaderServer.Start("localhost", downloader.DefaultDownloadPort)
+	node.downloaderServer.Start(node.SelfPeer.Ip, downloader.DefaultDownloadPort)
 }
 
 // CalculateResponse implements DownloadInterface on Node object.
