@@ -27,8 +27,8 @@ type Peer struct {
 const MaxBroadCast = 20
 
 // Version The version number of p2p library
-// 0 - Direct socket connection
-// 1 - libp2p
+// 1 - Direct socket connection
+// 2 - libp2p
 const Version = 1
 
 // SendMessage sends the message to the peer
@@ -140,7 +140,7 @@ func send(ip, port string, message []byte) {
 
 	for trial := 0; trial < 10; trial++ {
 		var err error
-		if Version == 0 {
+		if Version == 1 {
 			// TODO(ricl): remove sendWithSocketClient related code.
 			err = sendWithSocketClient(ip, port, message)
 		} else {

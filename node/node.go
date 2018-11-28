@@ -146,7 +146,7 @@ func (node *Node) StartServer(port string) {
 		// Disable this temporarily.
 		// node.blockchain = syncing.StartBlockSyncing(node.Consensus.GetValidatorPeers())
 	}
-	if p2p.Version == 0 {
+	if p2p.Version == 1 {
 		fmt.Println("going to start server on port:", port)
 		//node.log.Debug("Starting server", "node", node, "port", port)
 		node.listenOnPort(port)
