@@ -330,8 +330,7 @@ func (node *Node) AddPeers(peers []p2p.Peer) int {
 	}
 
 	if count > 0 {
-		c := node.Consensus.AddPeers(peers)
-		node.log.Info("Node.AddPeers", "#", c)
+		node.Consensus.AddPeers(peers)
 	}
 	return count
 }
