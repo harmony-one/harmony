@@ -5,16 +5,13 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	"math/big"
+	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/crypto/pki"
 	"net"
 	"os"
 	"strconv"
 	"time"
-
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/harmony/core/types"
 
 	"github.com/harmony-one/harmony/blockchain"
 	hmy_crypto "github.com/harmony-one/harmony/crypto"
@@ -143,45 +140,49 @@ func (node *Node) NodeHandler(conn net.Conn) {
 			node.log.Info("NET: received message: Node/Control")
 			controlType := msgPayload[0]
 			if proto_node.ControlMessageType(controlType) == proto_node.STOP {
-				node.log.Debug("Stopping Node", "node", node, "numBlocks", len(node.blockchain.Blocks), "numTxsProcessed", node.countNumTransactionsInBlockchain())
+				if node.Chain == nil {
+					node.log.Debug("Stopping Node", "node", node, "numBlocks", len(node.blockchain.Blocks), "numTxsProcessed", node.countNumTransactionsInBlockchain())
 
-				sizeInBytes := node.UtxoPool.GetSizeInByteOfUtxoMap()
-				node.log.Debug("UtxoPool Report", "numEntries", len(node.UtxoPool.UtxoMap), "sizeInBytes", sizeInBytes)
+					sizeInBytes := node.UtxoPool.GetSizeInByteOfUtxoMap()
+					node.log.Debug("UtxoPool Report", "numEntries", len(node.UtxoPool.UtxoMap), "sizeInBytes", sizeInBytes)
 
-				avgBlockSizeInBytes := 0
-				txCount := 0
-				blockCount := 0
-				totalTxCount := 0
-				totalBlockCount := 0
-				avgTxSize := 0
+					avgBlockSizeInBytes := 0
+					txCount := 0
+					blockCount := 0
+					totalTxCount := 0
+					totalBlockCount := 0
+					avgTxSize := 0
 
-				for _, block := range node.blockchain.Blocks {
-					if block.IsStateBlock() {
-						totalTxCount += int(block.State.NumTransactions)
-						totalBlockCount += int(block.State.NumBlocks)
-					} else {
-						byteBuffer := bytes.NewBuffer([]byte{})
-						encoder := gob.NewEncoder(byteBuffer)
-						encoder.Encode(block)
-						avgBlockSizeInBytes += len(byteBuffer.Bytes())
+					for _, block := range node.blockchain.Blocks {
+						if block.IsStateBlock() {
+							totalTxCount += int(block.State.NumTransactions)
+							totalBlockCount += int(block.State.NumBlocks)
+						} else {
+							byteBuffer := bytes.NewBuffer([]byte{})
+							encoder := gob.NewEncoder(byteBuffer)
+							encoder.Encode(block)
+							avgBlockSizeInBytes += len(byteBuffer.Bytes())
 
-						txCount += len(block.Transactions)
-						blockCount++
-						totalTxCount += len(block.TransactionIds)
-						totalBlockCount++
+							txCount += len(block.Transactions)
+							blockCount++
+							totalTxCount += len(block.TransactionIds)
+							totalBlockCount++
 
-						byteBuffer = bytes.NewBuffer([]byte{})
-						encoder = gob.NewEncoder(byteBuffer)
-						encoder.Encode(block.Transactions)
-						avgTxSize += len(byteBuffer.Bytes())
+							byteBuffer = bytes.NewBuffer([]byte{})
+							encoder = gob.NewEncoder(byteBuffer)
+							encoder.Encode(block.Transactions)
+							avgTxSize += len(byteBuffer.Bytes())
+						}
 					}
-				}
-				if blockCount != 0 {
-					avgBlockSizeInBytes = avgBlockSizeInBytes / blockCount
-					avgTxSize = avgTxSize / txCount
-				}
+					if blockCount != 0 {
+						avgBlockSizeInBytes = avgBlockSizeInBytes / blockCount
+						avgTxSize = avgTxSize / txCount
+					}
 
-				node.log.Debug("Blockchain Report", "totalNumBlocks", totalBlockCount, "avgBlockSizeInCurrentEpoch", avgBlockSizeInBytes, "totalNumTxs", totalTxCount, "avgTxSzieInCurrentEpoch", avgTxSize)
+					node.log.Debug("Blockchain Report", "totalNumBlocks", totalBlockCount, "avgBlockSizeInCurrentEpoch", avgBlockSizeInBytes, "totalNumTxs", totalTxCount, "avgTxSzieInCurrentEpoch", avgTxSize)
+				} else {
+					node.log.Debug("Stopping Node (Account Model)", "node", node, "CurBlockNum", node.Chain.CurrentHeader().Number, "numTxsProcessed", node.countNumTransactionsInBlockchainAccount())
+				}
 
 				os.Exit(0)
 			}
@@ -260,13 +261,23 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 
 	switch txMessageType {
 	case proto_node.Send:
-		txDecoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the Send messge type
-		txList := new([]*blockchain.Transaction)
-		err := txDecoder.Decode(txList)
-		if err != nil {
-			node.log.Error("Failed to deserialize transaction list", "error", err)
+		if node.Chain != nil {
+			txs := types.Transactions{}
+			err := rlp.Decode(bytes.NewReader(msgPayload[1:]), &txs) // skip the Send messge type
+			if err != nil {
+				node.log.Error("Failed to deserialize transaction list", "error", err)
+			}
+			node.addPendingTransactionsAccount(txs)
+		} else {
+			txDecoder := gob.NewDecoder(bytes.NewReader(msgPayload[1:])) // skip the Send messge type
+			txList := new([]*blockchain.Transaction)
+			err := txDecoder.Decode(&txList)
+			if err != nil {
+				node.log.Error("Failed to deserialize transaction list", "error", err)
+			}
+			node.addPendingTransactions(*txList)
 		}
-		node.addPendingTransactions(*txList)
+
 	case proto_node.Request:
 		reader := bytes.NewBuffer(msgPayload[1:])
 		txIDs := make(map[[32]byte]bool)
@@ -379,21 +390,31 @@ func (node *Node) WaitForConsensusReadyAccount(readySignal chan struct{}) {
 		}
 
 		if !retry {
-			// Normal tx block consensus
-			// TODO: add new block generation logic
-			txs := make([]*types.Transaction, 100)
-			for i, _ := range txs {
-				randomUserKey, _ := crypto.GenerateKey()
-				randomUserAddress := crypto.PubkeyToAddress(randomUserKey.PublicKey)
-				tx, _ := types.SignTx(types.NewTransaction(node.worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(node.testBankKey.PublicKey)), randomUserAddress, big.NewInt(1000), params.TxGas, nil, nil), types.HomesteadSigner{}, node.testBankKey)
-				txs[i] = tx
+			for {
+				if len(node.pendingTransactionsAccount) >= 1000 {
+					// Normal tx block consensus
+					selectedTxs, _ := node.getTransactionsForNewBlockAccount(MaxNumberOfTransactionsPerBlock)
+					err := node.Worker.UpdateCurrent()
+					if err != nil {
+						node.log.Debug("Failed updating worker's state", "Error", err)
+					}
+					err = node.Worker.CommitTransactions(selectedTxs, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey))
+					if err == nil {
+						block, err := node.Worker.Commit()
+						if err != nil {
+							node.log.Debug("Failed commiting new block", "Error", err)
+						} else {
+							newBlock = block
+							break
+						}
+					} else {
+						node.log.Debug("Failed to create new block", "Error", err)
+					}
+				}
+				// If not enough transactions to run Consensus,
+				// periodically check whether we have enough transactions to package into block.
+				time.Sleep(1 * time.Second)
 			}
-			node.worker.CommitTransactions(txs, crypto.PubkeyToAddress(node.testBankKey.PublicKey))
-			newBlock = node.worker.Commit()
-
-			// If not enough transactions to run Consensus,
-			// periodically check whether we have enough transactions to package into block.
-			time.Sleep(1 * time.Second)
 		}
 
 		// Send the new block to Consensus so it can be confirmed.
@@ -446,11 +467,12 @@ func (node *Node) VerifyNewBlock(newBlock *blockchain.Block) bool {
 
 // VerifyNewBlock is called by consensus participants to verify the block (account model) they are running consensus on
 func (node *Node) VerifyNewBlockAccount(newBlock *types.Block) bool {
-	fmt.Println("VerifyingNNNNNNNNNNNNNN")
-
-	fmt.Println("BALANCE 1")
-	fmt.Println(node.worker.GetCurrentState().GetBalance(crypto.PubkeyToAddress(node.testBankKey.PublicKey)))
-	return node.Chain.ValidateNewBlock(newBlock, crypto.PubkeyToAddress(node.testBankKey.PublicKey))
+	err := node.Chain.ValidateNewBlock(newBlock, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey))
+	if err != nil {
+		node.log.Debug("Failed verifying new block", "Error", err, "tx", newBlock.Transactions()[0])
+		return false
+	}
+	return true
 }
 
 // PostConsensusProcessing is called by consensus participants, after consensus is done, to:
@@ -483,11 +505,26 @@ func (node *Node) PostConsensusProcessing(newBlock *blockchain.Block) {
 		node.BroadcastNewBlock(newBlock)
 	}
 
+	accountBlock := new(types.Block)
+	err := rlp.DecodeBytes(newBlock.AccountBlock, accountBlock)
+	if err != nil {
+		node.log.Error("Failed decoding the block with RLP")
+	}
+
 	node.AddNewBlock(newBlock)
 	node.UpdateUtxoAndState(newBlock)
+
 }
 
-// AddNewBlock is usedd to add new block into the blockchain.
+// AddNewBlockAccount is usedd to add new block into the blockchain.
+func (node *Node) AddNewBlockAccount(newBlock *types.Block) {
+	num, err := node.Chain.InsertChain([]*types.Block{newBlock})
+	if err != nil {
+		node.log.Debug("Error adding to chain", "numBlocks", num, "Error", err)
+	}
+}
+
+// AddNewBlock is usedd to add new block into the utxo-based blockchain.
 func (node *Node) AddNewBlock(newBlock *blockchain.Block) {
 	// Add it to blockchain
 	node.blockchain.Blocks = append(node.blockchain.Blocks, newBlock)
@@ -496,6 +533,14 @@ func (node *Node) AddNewBlock(newBlock *blockchain.Block) {
 		node.log.Info("Writing new block into disk.")
 		newBlock.Write(node.db, strconv.Itoa(len(node.blockchain.Blocks)))
 	}
+
+	// Account model
+	accountBlock := new(types.Block)
+	err := rlp.DecodeBytes(newBlock.AccountBlock, accountBlock)
+	if err != nil {
+		node.log.Error("Failed decoding the block with RLP")
+	}
+	node.AddNewBlockAccount(accountBlock)
 }
 
 // UpdateUtxoAndState updates Utxo and state.

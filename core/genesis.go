@@ -115,7 +115,6 @@ func (h *storageJSON) UnmarshalText(text []byte) error {
 	}
 	offset := len(h) - len(text)/2 // pad on the left
 	if _, err := hex.Decode(h[offset:], text); err != nil {
-		fmt.Println(err)
 		return fmt.Errorf("invalid hex storage key/value %q", text)
 	}
 	return nil
@@ -246,7 +245,7 @@ func (g *Genesis) ToBlock(db hdb.Database) *types.Block {
 		Root:       root,
 	}
 	if g.GasLimit == 0 {
-		head.GasLimit = params.GenesisGasLimit
+		head.GasLimit = 10000000000 // TODO(RJ): figure out better solution. // params.GenesisGasLimit
 	}
 	if g.Difficulty == nil {
 		head.Difficulty = params.GenesisDifficulty
