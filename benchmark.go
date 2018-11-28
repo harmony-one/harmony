@@ -114,52 +114,28 @@ func main() {
 	//var peers []p2p.Peer
 	var leader p2p.Peer
 	var selfPeer p2p.Peer
-	// // var clientPeer *p2p.Peer
+	var clientPeer *p2p.Peer
 	//Use Peer Discovery to get shard/leader/peer/...
 	if *peerDiscovery {
 		candidateNode := pkg_newnode.New(*ip, *port)
 		BCPeer := p2p.Peer{Ip: *idcIP, Port: *idcPort}
 		service := candidateNode.NewService(*ip, *port)
 		candidateNode.ConnectBeaconChain(BCPeer)
-		timeout := time.After(300 * time.Second)
-		tick := time.Tick(1 * time.Second)
-		// Keep trying until we're timed out or got a result or got an error
-		gotShardInfo := false
-	checkLoop:
-		for {
-			select {
-			case <-timeout:
-				gotShardInfo = false
-				break
-			// Got a tick, we should check on doSomething()
-			case <-tick:
-				if candidateNode.SetInfo {
-					gotShardInfo = true
-					break checkLoop
-				}
-			}
-		}
-		if !gotShardInfo {
-			//log.Error("Could not get sharding info after", "time", beaconChainConnectionTimeout)
-			fmt.Println("Hello")
-			os.Exit(1)
-		}
-		time.Sleep(5 * time.Second) //Ideally there should be a ticker to check, with time out.
 		shardID = candidateNode.GetShardID()
 		leader = candidateNode.GetLeader()
 		selfPeer = candidateNode.GetSelfPeer()
+		clientPeer = candidateNode.GetClientPeer()
 		service.Stop()
 
 	} else {
 		distributionConfig := utils.NewDistributionConfig()
 		distributionConfig.ReadConfigFile(*configFile)
 		shardID = distributionConfig.GetShardID(*ip, *port)
-
 		leader = distributionConfig.GetLeader(shardID)
 		selfPeer = distributionConfig.GetSelfPeer(*ip, *port, shardID)
 
 		// Create client peer.
-		//clientPeer = distributionConfig.GetClientPeer()
+		clientPeer = distributionConfig.GetClientPeer()
 	}
 	fmt.Println(shardID, leader, selfPeer)
 	// selfPeer.PubKey = pubKey

@@ -72,6 +72,8 @@ func GenKey(ip, port string) (kyber.Scalar, kyber.Point) {
 	return priKey, pubKey
 }
 
+// AllocateShard uses the number of current nodes and number of shards
+// to return the shardnum a new node belongs to, it also tells whether the node is a leader
 func AllocateShard(numnode, numshards int) (int, bool) {
 	if numnode <= numshards {
 		return numnode, true

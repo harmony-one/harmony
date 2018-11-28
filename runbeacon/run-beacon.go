@@ -6,8 +6,6 @@ import (
 	"github.com/harmony-one/harmony/beaconchain"
 )
 
-// this is a comment
-
 func main() {
 	numShards := flag.Int("numShards", 2, "number of shards of identity chain")
 	ip := flag.String("ip", "127.0.0.1", "port on which beaconchain listens")
