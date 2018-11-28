@@ -48,6 +48,7 @@ type Consensus struct {
 	leader p2p.Peer
 	// Public keys of the committee including leader and validators
 	PublicKeys []kyber.Point
+	pubKeyLock sync.Mutex
 
 	// private/public keys of current node
 	priKey kyber.Scalar
@@ -87,7 +88,7 @@ type Consensus struct {
 
 	Log log.Logger
 
-	uniqueIdInstance *utils.UniqueValidatorId
+	uniqueIDInstance *utils.UniqueValidatorId
 }
 
 // BlockConsensusStatus used to keep track of the consensus status of multiple blocks received so far
@@ -172,7 +173,7 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 	}
 
 	consensus.Log = log.New()
-	consensus.uniqueIdInstance = utils.GetUniqueValidatorIdInstance()
+	consensus.uniqueIDInstance = utils.GetUniqueValidatorIdInstance()
 
 	return &consensus
 }
@@ -241,7 +242,7 @@ func (consensus *Consensus) AddPeers(peers []p2p.Peer) int {
 		_, ok := consensus.validators.Load(utils.GetUniqueIdFromPeer(peer))
 		if !ok {
 			if peer.ValidatorID == -1 {
-				peer.ValidatorID = int(consensus.uniqueIdInstance.GetUniqueId())
+				peer.ValidatorID = int(consensus.uniqueIDInstance.GetUniqueId())
 			}
 			consensus.validators.Store(utils.GetUniqueIdFromPeer(peer), peer)
 			consensus.PublicKeys = append(consensus.PublicKeys, peer.PubKey)
@@ -277,9 +278,17 @@ func (consensus *Consensus) DebugPrintValidators() {
 			consensus.Log.Debug("validator:", "IP", p.Ip, "Port", p.Port, "VID", p.ValidatorID, "Key", str2)
 			count++
 			return true
-		} else {
-			return false
 		}
+		return false
 	})
 	consensus.Log.Debug("Validators", "#", count)
+}
+
+// UpdatePublicKeys updates the PublicKeys variable, protected by a mutex
+func (consensus *Consensus) UpdatePublicKeys(pubKeys []kyber.Point) int {
+	consensus.pubKeyLock.Lock()
+	consensus.PublicKeys = append(pubKeys[:0:0], pubKeys...)
+	consensus.pubKeyLock.Unlock()
+
+	return len(consensus.PublicKeys)
 }

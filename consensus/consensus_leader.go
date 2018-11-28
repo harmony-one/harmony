@@ -53,9 +53,16 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) 
 // WaitForNewBlock waits for the next new block to run consensus on
 func (consensus *Consensus) WaitForNewBlockAccount(blockChannel chan *types.Block) {
 	consensus.Log.Debug("Waiting for block", "consensus", consensus)
+	backoff := p2p.NewExpBackoff(500*time.Millisecond, 30*time.Second, 2.0)
 	for { // keep waiting for new blocks
 		newBlock := <-blockChannel
 		// TODO: think about potential race condition
+
+		if !consensus.HasEnoughValidators() {
+			consensus.Log.Debug("Not enough validators", "# Validators", len(consensus.PublicKeys))
+			backoff.Sleep()
+		}
+
 		startTime = time.Now()
 		consensus.Log.Debug("STARTING CONSENSUS", "consensus", consensus, "startTime", startTime)
 		for consensus.state == Finished {
