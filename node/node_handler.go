@@ -394,7 +394,11 @@ func (node *Node) WaitForConsensusReadyAccount(readySignal chan struct{}) {
 				if len(node.pendingTransactionsAccount) >= 1000 {
 					// Normal tx block consensus
 					selectedTxs, _ := node.getTransactionsForNewBlockAccount(MaxNumberOfTransactionsPerBlock)
-					err := node.Worker.CommitTransactions(selectedTxs, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey))
+					err := node.Worker.UpdateCurrent()
+					if err != nil {
+						node.log.Debug("Failed updating worker's state", "Error", err)
+					}
+					err = node.Worker.CommitTransactions(selectedTxs, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey))
 					if err == nil {
 						block, err := node.Worker.Commit()
 						if err != nil {
@@ -465,7 +469,7 @@ func (node *Node) VerifyNewBlock(newBlock *blockchain.Block) bool {
 func (node *Node) VerifyNewBlockAccount(newBlock *types.Block) bool {
 	err := node.Chain.ValidateNewBlock(newBlock, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey))
 	if err != nil {
-		node.log.Debug("Failed verifying new block", "Error", err)
+		node.log.Debug("Failed verifying new block", "Error", err, "tx", newBlock.Transactions()[0])
 		return false
 	}
 	return true
@@ -506,8 +510,7 @@ func (node *Node) PostConsensusProcessing(newBlock *blockchain.Block) {
 	if err != nil {
 		node.log.Error("Failed decoding the block with RLP")
 	}
-	node.AddNewBlockAccount(accountBlock)
-	// For utxo model only
+
 	node.AddNewBlock(newBlock)
 	node.UpdateUtxoAndState(newBlock)
 
@@ -515,11 +518,9 @@ func (node *Node) PostConsensusProcessing(newBlock *blockchain.Block) {
 
 // AddNewBlockAccount is usedd to add new block into the blockchain.
 func (node *Node) AddNewBlockAccount(newBlock *types.Block) {
-	fmt.Println("Adding BLOCK")
-	fmt.Println(len(newBlock.Transactions()))
 	num, err := node.Chain.InsertChain([]*types.Block{newBlock})
 	if err != nil {
-		fmt.Println("Error adding to chain", "numBlocks", num, "Error", err)
+		node.log.Debug("Error adding to chain", "numBlocks", num, "Error", err)
 	}
 }
 
@@ -532,6 +533,14 @@ func (node *Node) AddNewBlock(newBlock *blockchain.Block) {
 		node.log.Info("Writing new block into disk.")
 		newBlock.Write(node.db, strconv.Itoa(len(node.blockchain.Blocks)))
 	}
+
+	// Account model
+	accountBlock := new(types.Block)
+	err := rlp.DecodeBytes(newBlock.AccountBlock, accountBlock)
+	if err != nil {
+		node.log.Error("Failed decoding the block with RLP")
+	}
+	node.AddNewBlockAccount(accountBlock)
 }
 
 // UpdateUtxoAndState updates Utxo and state.

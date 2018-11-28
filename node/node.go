@@ -134,6 +134,7 @@ func (node *Node) getTransactionsForNewBlockAccount(maxNumTxs int) (types.Transa
 
 	node.log.Debug("Invalid transactions discarded", "number", len(invalid))
 	node.pendingTransactionsAccount = unselected
+	node.log.Debug("Remaining pending transactions", "number", len(node.pendingTransactionsAccount))
 	node.pendingTxMutexAccount.Unlock()
 	return selected, crossShardTxs //TODO: replace cross-shard proofs for account model
 }

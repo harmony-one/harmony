@@ -84,7 +84,6 @@ func main() {
 	txs := make([]*types.Transaction, 100)
 	worker := worker.New(params.TestChainConfig, chain, consensus.NewFaker())
 	fmt.Println(worker.GetCurrentState().GetBalance(testBankAddress))
-	fmt.Println(worker.Commit().Root())
 
 	for i, _ := range txs {
 		randomUserKey, _ := crypto.GenerateKey()
@@ -96,5 +95,4 @@ func main() {
 	worker.CommitTransactions(txs, crypto.PubkeyToAddress(testBankKey.PublicKey))
 
 	fmt.Println(worker.GetCurrentState().GetBalance(testBankAddress))
-	fmt.Println(worker.Commit().Root())
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/client/txgen/txgen"
 	"github.com/harmony-one/harmony/core/types"
 	"os"
@@ -103,6 +104,19 @@ func main() {
 						utxoPoolMutex.Lock()
 						node.UpdateUtxoAndState(block)
 						utxoPoolMutex.Unlock()
+
+						accountBlock := new(types.Block)
+						err := rlp.DecodeBytes(block.AccountBlock, accountBlock)
+						fmt.Println("RECEIVED NEW BLOCK ", len(accountBlock.Transactions()))
+						if err != nil {
+							log.Error("Failed decoding the block with RLP")
+						} else {
+							err = node.Worker.CommitTransactions(accountBlock.Transactions(), accountBlock.Coinbase())
+							node.Worker.UpdateCurrent()
+							if err != nil {
+								log.Debug("Failed to add new block to worker", "Error", err)
+							}
+						}
 					} else {
 						continue
 					}

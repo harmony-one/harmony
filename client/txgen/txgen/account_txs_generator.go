@@ -21,7 +21,6 @@ func GenerateSimulatedTransactionsAccount(shardID int, dataNodes []*node.Node, s
 	txs := make([]*types.Transaction, 1000)
 	for i := 0; i < 100; i++ {
 		baseNonce := node.Worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(node.TestBankKeys[i].PublicKey))
-		node.Worker.UpdateCurrent()
 		for j := 0; j < 10; j++ {
 			randomUserKey, _ := crypto.GenerateKey()
 			randomUserAddress := crypto.PubkeyToAddress(randomUserKey.PublicKey)
