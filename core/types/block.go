@@ -52,6 +52,13 @@ func EncodeNonce(i uint64) BlockNonce {
 	return n
 }
 
+// EncodeShardId converts the given integer to a shard id.
+func EncodeShardId(i uint16) ShardId {
+	var n ShardId
+	binary.BigEndian.PutUint16(n[:], i)
+	return n
+}
+
 // Uint64 returns the integer value of a block nonce.
 func (n BlockNonce) Uint64() uint64 {
 	return binary.BigEndian.Uint64(n[:])

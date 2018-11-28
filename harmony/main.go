@@ -51,8 +51,9 @@ func main() {
 	var (
 		database = db.NewMemDatabase()
 		gspec    = core.Genesis{
-			Config: chainConfig,
-			Alloc:  core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
+			Config:  chainConfig,
+			Alloc:   core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
+			ShardId: 10,
 		}
 	)
 
@@ -74,6 +75,7 @@ func main() {
 	if n > 0 {
 		blocks, _ := core.GenerateChain(chainConfig, genesis, consensus.NewFaker(), database, n, func(i int, gen *core.BlockGen) {
 			gen.SetCoinbase(testBankAddress)
+			gen.SetShardId(types.EncodeShardId(10))
 			gen.AddTx(pendingTxs[i])
 		})
 		if _, err := chain.InsertChain(blocks); err != nil {
@@ -83,16 +85,13 @@ func main() {
 
 	txs := make([]*types.Transaction, 100)
 	worker := worker.New(params.TestChainConfig, chain, consensus.NewFaker())
-	fmt.Println(worker.GetCurrentState().GetBalance(testBankAddress))
-
+	nonce := worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(testBankKey.PublicKey))
 	for i, _ := range txs {
 		randomUserKey, _ := crypto.GenerateKey()
 		randomUserAddress := crypto.PubkeyToAddress(randomUserKey.PublicKey)
-		tx, _ := types.SignTx(types.NewTransaction(worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(testBankKey.PublicKey)), randomUserAddress, big.NewInt(1000), params.TxGas, nil, nil), types.HomesteadSigner{}, testBankKey)
+		tx, _ := types.SignTx(types.NewTransaction(nonce+uint64(i), randomUserAddress, big.NewInt(1000), params.TxGas, nil, nil), types.HomesteadSigner{}, testBankKey)
 		txs[i] = tx
 	}
 
 	worker.CommitTransactions(txs, crypto.PubkeyToAddress(testBankKey.PublicKey))
-
-	fmt.Println(worker.GetCurrentState().GetBalance(testBankAddress))
 }
