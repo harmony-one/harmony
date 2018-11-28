@@ -20,7 +20,7 @@ import (
 var mutex sync.Mutex
 var identityPerBlock = 100000
 
-type registerResponseRandomNumber struct {
+type ResponseRandomNumber struct {
 	NumberOfShards     int
 	NumberOfNodesAdded int
 	Leaders            []*newnode.NodeInfo
@@ -34,15 +34,19 @@ type BeaconChain struct {
 	PubKey             kyber.Point
 	NumberOfShards     int
 	NumberOfNodesAdded int
+	IP                 string
+	Port               string
 }
 
 //Init
-func New(numShards int) *BeaconChain {
+func New(numShards int, ip, port string) *BeaconChain {
 	bc := BeaconChain{}
 	bc.log = log.New()
 	bc.NumberOfShards = numShards
 	bc.PubKey = generateIDCKeys()
 	bc.NumberOfNodesAdded = 0
+	bc.Port = port
+	bc.IP = ip
 	return &bc
 }
 
@@ -76,29 +80,28 @@ func (bc *BeaconChain) registerNode(Node *newnode.NodeInfo) {
 	//err = peer.PubKey.UnmarshalBinary(p.PubKey[:])
 
 	**/
-	response := registerResponseRandomNumber{NumberOfShards: bc.NumberOfShards, NumberOfNodesAdded: bc.NumberOfNodesAdded, Leaders: bc.Leaders}
+	response := ResponseRandomNumber{NumberOfShards: bc.NumberOfShards, NumberOfNodesAdded: bc.NumberOfNodesAdded, Leaders: bc.Leaders}
 	msg := bc.SerializeRandomInfo(response)
 	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Acknowledge, msg)
 	p2p.SendMessage(Node.Self, msgToSend)
 }
 
 //SerializeNode
-func (bc *BeaconChain) SerializeRandomInfo(response registerResponseRandomNumber) []byte {
+func (bc *BeaconChain) SerializeRandomInfo(response ResponseRandomNumber) []byte {
 	//Needs to escape the serialization of unexported fields
 	var result bytes.Buffer
 	encoder := gob.NewEncoder(&result)
 	err := encoder.Encode(response)
 	if err != nil {
-		bc.log.Crit("ERROR", err)
-		//node.log.Error("Could not serialize node")
+		bc.log.Crit("Could not serialize randomn number information", "error", err)
 	}
 
 	return result.Bytes()
 }
 
 // DeserializeNode deserializes the node
-func DeserializeRandomInfo(d []byte) *registerResponseRandomNumber {
-	var wn registerResponseRandomNumber
+func DeserializeRandomInfo(d []byte) *ResponseRandomNumber {
+	var wn ResponseRandomNumber
 	r := bytes.NewBuffer(d)
 	decoder := gob.NewDecoder(r)
 	err := decoder.Decode(&wn)
@@ -111,7 +114,9 @@ func DeserializeRandomInfo(d []byte) *registerResponseRandomNumber {
 //StartServer a server and process the request by a handler.
 func (bc *BeaconChain) StartServer() {
 	bc.log.Info("Starting Beaconchain server ...")
-	addr := net.JoinHostPort("127.0.0.1", "8081")
+	ip := bc.IP
+	port := bc.Port
+	addr := net.JoinHostPort(ip, port)
 	listen, err := net.Listen("tcp", addr)
 	if err != nil {
 		bc.log.Crit("Socket listen port failed")

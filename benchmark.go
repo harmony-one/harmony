@@ -9,14 +9,10 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/harmony-one/harmony/attack"
-	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/db"
 	"github.com/harmony-one/harmony/log"
 	pkg_newnode "github.com/harmony-one/harmony/newnode"
-	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/profiler"
 	"github.com/harmony-one/harmony/utils"
 )
 
@@ -75,12 +71,13 @@ func loggingInit(logFolder, role, ip, port string, onlyLogTps bool) {
 }
 
 func main() {
-	accountModel := flag.Bool("account_model", true, "Whether to use account model")
+	//accountModel := flag.Bool("account_model", true, "Whether to use account model")
 	// TODO: use http://getmyipaddress.org/ or http://www.get-myip.com/ to retrieve my IP address
 
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
-	port := flag.String("port", "9002", "port of the node.")
+	port := flag.String("port", "9000", "port of the node.")
 	configFile := flag.String("config_file", "config.txt", "file containing all ip addresses")
+	//beaconChainConnectionTimeout := flag.Int("bctimeout", 300, "seconds to wait before timing out connection to beaconchain")
 	// logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	// attackedMode := flag.Int("attacked_mode", 0, "0 means not attacked, 1 means attacked, 2 means being open to be selected as attacked")
 	// dbSupported := flag.Bool("db_supported", false, "false means not db_supported, true means db_supported")
@@ -110,17 +107,43 @@ func main() {
 	// Set up randomization seed.
 	rand.Seed(int64(time.Now().Nanosecond()))
 
+	// Init logging.
+	//xloggingInit(*logFolder, role, *ip, *port, *onlyLogTps)
+
 	var shardID string
-	var peers []p2p.Peer
+	//var peers []p2p.Peer
 	var leader p2p.Peer
 	var selfPeer p2p.Peer
-	// var clientPeer *p2p.Peer
+	// // var clientPeer *p2p.Peer
 	//Use Peer Discovery to get shard/leader/peer/...
 	if *peerDiscovery {
 		candidateNode := pkg_newnode.New(*ip, *port)
 		BCPeer := p2p.Peer{Ip: *idcIP, Port: *idcPort}
 		service := candidateNode.NewService(*ip, *port)
 		candidateNode.ConnectBeaconChain(BCPeer)
+		timeout := time.After(300 * time.Second)
+		tick := time.Tick(1 * time.Second)
+		// Keep trying until we're timed out or got a result or got an error
+		gotShardInfo := false
+	checkLoop:
+		for {
+			select {
+			case <-timeout:
+				gotShardInfo = false
+				break
+			// Got a tick, we should check on doSomething()
+			case <-tick:
+				if candidateNode.SetInfo {
+					gotShardInfo = true
+					break checkLoop
+				}
+			}
+		}
+		if !gotShardInfo {
+			//log.Error("Could not get sharding info after", "time", beaconChainConnectionTimeout)
+			fmt.Println("Hello")
+			os.Exit(1)
+		}
 		time.Sleep(5 * time.Second) //Ideally there should be a ticker to check, with time out.
 		shardID = candidateNode.GetShardID()
 		leader = candidateNode.GetLeader()
@@ -136,94 +159,93 @@ func main() {
 		selfPeer = distributionConfig.GetSelfPeer(*ip, *port, shardID)
 
 		// Create client peer.
-		clientPeer = distributionConfig.GetClientPeer()
+		//clientPeer = distributionConfig.GetClientPeer()
 	}
-	selfPeer.PubKey = pubKey
+	fmt.Println(shardID, leader, selfPeer)
+	// selfPeer.PubKey = pubKey
 
-	var role string
-	if leader.Ip == *ip && leader.Port == *port {
-		role = "leader"
-	} else {
-		role = "validator"
-	}
+	// var role string
+	// if leader.Ip == *ip && leader.Port == *port {
+	// 	role = "leader"
+	// } else {
+	// 	role = "validator"
+	// }
 
-	if role == "validator" {
-		// Attack determination.
-		attack.GetInstance().SetAttackEnabled(attackDetermination(*attackedMode))
-	}
-	fmt.Println(peers, leader, selfPeer)
-	// Init logging.
-	loggingInit(*logFolder, role, *ip, *port, *onlyLogTps)
+	// if role == "validator" {
+	// 	// Attack determination.
+	// 	attack.GetInstance().SetAttackEnabled(attackDetermination(*attackedMode))
+	// }
+	// fmt.Println(peers, leader, selfPeer)
 
-	// Initialize leveldb if dbSupported.
-	var ldb *db.LDBDatabase
+	// // Initialize leveldb if dbSupported.
+	// var ldb *db.LDBDatabase
 
-	if *dbSupported {
-		ldb, _ = InitLDBDatabase(*ip, *port)
-	}
+	// if *dbSupported {
+	// 	ldb, _ = InitLDBDatabase(*ip, *port)
+	// }
 
-	// Consensus object.
-	consensus := consensus.NewConsensus(*ip, *port, shardID, peers, leader)
-	consensus.MinPeers = *minPeers
+	// // Consensus object.
+	// consensus := consensus.NewConsensus(*ip, *port, shardID, peers, leader)
+	// consensus.MinPeers = *minPeers
 
-	// Start Profiler for leader if profile argument is on
-	if role == "leader" && (*profile || *metricsReportURL != "") {
-		prof := profiler.GetProfiler()
-		prof.Config(consensus.Log, shardID, *metricsReportURL)
-		if *profile {
-			prof.Start()
-		}
-	}
+	// // Start Profiler for leader if profile argument is on
+	// if role == "leader" && (*profile || *metricsReportURL != "") {
+	// 	prof := profiler.GetProfiler()
+	// 	prof.Config(consensus.Log, shardID, *metricsReportURL)
+	// 	if *profile {
+	// 		prof.Start()
+	// 	}
+	// }
 
-	// Set logger to attack model.
-	attack.GetInstance().SetLogger(consensus.Log)
-	// Current node.
-	currentNode := node.New(consensus, ldb)
-	// Add self peer.
-	currentNode.SelfPeer = selfPeer
-	// Add sync node configuration.
-	currentNode.SyncNode = *syncNode
-	// If there is a client configured in the node list.
-	if clientPeer != nil {
-		currentNode.ClientPeer = clientPeer
-	}
+	// // Set logger to attack model.
+	// attack.GetInstance().SetLogger(consensus.Log)
+	// // Current node.
+	// currentNode := node.New(consensus, ldb)
+	// // Add self peer.
+	// currentNode.SelfPeer = selfPeer
+	// // Add sync node configuration.
+	// currentNode.SyncNode = *syncNode
+	// // If there is a client configured in the node list.
+	// if clientPeer != nil {
+	// 	currentNode.ClientPeer = clientPeer
+	// }
 
-	// Assign closure functions to the consensus object
-	consensus.BlockVerifier = currentNode.VerifyNewBlock
-	consensus.OnConsensusDone = currentNode.PostConsensusProcessing
+	// // Assign closure functions to the consensus object
+	// consensus.BlockVerifier = currentNode.VerifyNewBlock
+	// consensus.OnConsensusDone = currentNode.PostConsensusProcessing
 
-	// Temporary testing code, to be removed.
-	currentNode.AddTestingAddresses(10000)
+	// // Temporary testing code, to be removed.
+	// currentNode.AddTestingAddresses(10000)
 
-	currentNode.State = node.NodeWaitToJoin
+	// currentNode.State = node.NodeWaitToJoin
 
-	if consensus.IsLeader {
-		if *accountModel {
-			// Let consensus run
-			go func() {
-				consensus.WaitForNewBlockAccount(currentNode.BlockChannelAccount)
-			}()
-			// Node waiting for consensus readiness to create new block
-			go func() {
-				currentNode.WaitForConsensusReadyAccount(consensus.ReadySignal)
-			}()
-		} else {
-			// Let consensus run
-			go func() {
-				consensus.WaitForNewBlock(currentNode.BlockChannel)
-			}()
-			// Node waiting for consensus readiness to create new block
-			go func() {
-				currentNode.WaitForConsensusReady(consensus.ReadySignal)
-			}()
-		}
-	} else {
-		if *peerDiscovery {
-			go func() {
-				currentNode.JoinShard(leader)
-			}()
-		}
-	}
+	// if consensus.IsLeader {
+	// 	if *accountModel {
+	// 		// Let consensus run
+	// 		go func() {
+	// 			consensus.WaitForNewBlockAccount(currentNode.BlockChannelAccount)
+	// 		}()
+	// 		// Node waiting for consensus readiness to create new block
+	// 		go func() {
+	// 			currentNode.WaitForConsensusReadyAccount(consensus.ReadySignal)
+	// 		}()
+	// 	} else {
+	// 		// Let consensus run
+	// 		go func() {
+	// 			consensus.WaitForNewBlock(currentNode.BlockChannel)
+	// 		}()
+	// 		// Node waiting for consensus readiness to create new block
+	// 		go func() {
+	// 			currentNode.WaitForConsensusReady(consensus.ReadySignal)
+	// 		}()
+	// 	}
+	// } else {
+	// 	if *peerDiscovery {
+	// 		go func() {
+	// 			currentNode.JoinShard(leader)
+	// 		}()
+	// 	}
+	// }
 
-	currentNode.StartServer(*port)
+	// currentNode.StartServer(*port)
 }

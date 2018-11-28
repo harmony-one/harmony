@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"net"
+	"strconv"
 	"sync"
 	"time"
 
@@ -181,8 +182,8 @@ func (node *NewNode) processShardInfo(msgPayload []byte) bool {
 	return true
 }
 
-func (node *NewNode) GetShardID() int {
-	return node.ShardID
+func (node *NewNode) GetShardID() string {
+	return strconv.Itoa(node.ShardID)
 }
 
 func (node *NewNode) GetLeader() p2p.Peer {

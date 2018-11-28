@@ -64,6 +64,7 @@ func RunCmd(name string, args ...string) error {
 	return nil
 }
 
+//Takes ip and port to generate a public and private key
 func GenKey(ip, port string) (kyber.Scalar, kyber.Point) {
 	priKey := crypto.Ed25519Curve.Scalar().SetInt64(int64(GetUniqueIdFromIpPort(ip, port))) // TODO: figure out why using a random hash value doesn't work for private key (schnorr)
 	pubKey := pki.GetPublicKeyFromScalar(priKey)
