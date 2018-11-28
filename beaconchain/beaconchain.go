@@ -3,6 +3,7 @@ package beaconchain
 import (
 	"bytes"
 	"encoding/gob"
+	"math/rand"
 	"net"
 	"os"
 	"sync"
@@ -36,22 +37,18 @@ type BeaconChain struct {
 }
 
 //Init
-func New(filename string) *BeaconChain {
+func New(numShards int) *BeaconChain {
 	bc := BeaconChain{}
-	//bc.NumberOfShards = readConfigFile(filename)
 	bc.log = log.New()
-	bc.NumberOfShards = 2 //hardcode.
+	bc.NumberOfShards = numShards
 	bc.PubKey = generateIDCKeys()
 	bc.NumberOfNodesAdded = 0
 	return &bc
 }
 
-func readConfigFile(filename string) int {
-	return 2
-}
-
 func generateIDCKeys() kyber.Point {
-	priKey := pki.GetPrivateKeyFromInt(10)
+	r := rand.Intn(1000)
+	priKey := pki.GetPrivateKeyFromInt(r)
 	pubkey := pki.GetPublicKeyFromPrivateKey(priKey)
 	return pubkey
 }
@@ -63,6 +60,7 @@ func (bc *BeaconChain) AcceptConnections(b []byte) {
 }
 
 func (bc *BeaconChain) registerNode(Node *newnode.NodeInfo) {
+	bc.log.Info("Obtained node information, updating local information")
 	bc.NumberOfNodesAdded = bc.NumberOfNodesAdded + 1
 	_, isLeader := utils.AllocateShard(bc.NumberOfNodesAdded, bc.NumberOfShards)
 	if isLeader {

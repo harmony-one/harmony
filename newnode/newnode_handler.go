@@ -12,7 +12,6 @@ import (
 func (node *NewNode) NodeHandler(conn net.Conn) {
 	defer conn.Close()
 	defer node.Service.waitGroup.Done()
-
 	content, err := p2p.ReadMessageContent(conn)
 
 	if err != nil {

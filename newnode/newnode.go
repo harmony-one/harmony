@@ -28,7 +28,7 @@ type NodeInfo struct {
 }
 type NewNode struct {
 	Role        string
-	ShardID     string
+	ShardID     int
 	ValidatorID int // Validator ID in its shard.
 	leader      p2p.Peer
 	isLeader    bool
@@ -77,6 +77,7 @@ func (node *NewNode) Serve(listener *net.TCPListener) {
 		case <-node.Service.ch:
 			node.log.Debug("stopping listening on", "address", listener.Addr())
 			listener.Close()
+			node.log.Debug("stopped listening")
 			return
 		default:
 		}
@@ -120,15 +121,15 @@ func New(ip string, port string) *NewNode {
 
 //ConnectIdentityChain connects to identity chain
 func (node *NewNode) ConnectBeaconChain(BCPeer p2p.Peer) {
+	node.log.Info("connecting to beacon chain now ...")
 	pubk, err := node.PubK.MarshalBinary()
 	if err != nil {
 		node.log.Error("Could not Marshall public key into binary")
 	}
-	//nodeInfo := &NodeInfo{Self: node.Self, PubK: node.PubK}
 	nodeInfo := &NodeInfo{Self: node.Self, PubK: pubk}
 	msg := SerializeNodeInfo(nodeInfo)
 	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Register, msg)
-	p2p.SendMessage(BCPeer, msgToSend) //need backoff behavior for connecting to beaconchain
+	p2p.SendMessage(BCPeer, msgToSend) //TODO: need backoff behavior for connecting to beaconchain over minuted
 }
 
 //SerializeNode
@@ -168,24 +169,20 @@ func DeserializeRandomInfo(d []byte) *registerResponseRandomNumber {
 
 //ProcessShardInfo
 func (node *NewNode) processShardInfo(msgPayload []byte) bool {
-
 	leadersInfo := DeserializeRandomInfo(msgPayload)
 	leaders := leadersInfo.Leaders
 	shardNum, isLeader := utils.AllocateShard(leadersInfo.NumberOfNodesAdded, leadersInfo.NumberOfShards)
 	leaderNode := leaders[shardNum-1] //0 indexing.
 	node.leader = leaderNode.Self
 	node.isLeader = isLeader
+	node.ShardID = shardNum
 	node.SetInfo = true
 	node.log.Info("Shard information obtained ..")
 	return true
 }
 
-func (node *NewNode) GetShardID() string {
+func (node *NewNode) GetShardID() int {
 	return node.ShardID
-}
-
-func (node *NewNode) GetPeers() []p2p.Peer {
-	return node.peers
 }
 
 func (node *NewNode) GetLeader() p2p.Peer {

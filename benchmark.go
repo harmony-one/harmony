@@ -89,7 +89,7 @@ func main() {
 	//This IP belongs to jenkins.harmony.one
 	idcIP := flag.String("idc", "127.0.0.1", "IP of the identity chain")
 	idcPort := flag.String("idc_port", "8081", "port of the identity chain")
-	peerDisvoery := flag.Bool("peer_discovery", true, "Enable Peer Discovery")
+	peerDiscovery := flag.Bool("peer_discovery", true, "Enable Peer Discovery")
 
 	// // Leader needs to have a minimal number of peers to start consensus
 	// minPeers := flag.Int("min_peers", 100, "Minimal number of Peers in shard")
@@ -112,7 +112,7 @@ func main() {
 	var selfPeer p2p.Peer
 	// var clientPeer *p2p.Peer
 	//Use Peer Discovery to get shard/leader/peer/...
-	if *peerDisvoery {
+	if *peerDiscovery {
 		candidateNode := pkg_newnode.New(*ip, *port)
 		BCPeer := p2p.Peer{Ip: *idcIP, Port: *idcPort}
 		service := candidateNode.NewService(*ip, *port)
@@ -120,7 +120,6 @@ func main() {
 		time.Sleep(5 * time.Second) //Ideally there should be a ticker to check, with time out.
 		shardID = candidateNode.GetShardID()
 		leader = candidateNode.GetLeader()
-		peers = candidateNode.GetPeers()
 		selfPeer = candidateNode.GetSelfPeer()
 		service.Stop()
 
@@ -128,9 +127,16 @@ func main() {
 		distributionConfig := utils.NewDistributionConfig()
 		distributionConfig.ReadConfigFile(*configFile)
 		shardID = distributionConfig.GetShardID(*ip, *port)
-		peers = distributionConfig.GetPeers(*ip, *port, shardID)
+		
 		leader = distributionConfig.GetLeader(shardID)
 		selfPeer = distributionConfig.GetSelfPeer(*ip, *port, shardID)
+	}
+	if *peerDiscovery {
+		/**
+		Leader pings back the peers of the node
+		*//
+	} else {
+		peers = distributionConfig.GetPeers(*ip, *port, shardID)
 	}
 	fmt.Println(peers, leader, selfPeer)
 	// // Init logging.
@@ -199,7 +205,7 @@ func main() {
 	// 		}()
 	// 	}
 	// } else {
-	// 	if *peerDisvoery {
+	// 	if *peerDiscovery {
 	// 		go func() {
 	// 			currentNode.JoinShard(leader)
 	// 		}()
