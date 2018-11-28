@@ -372,7 +372,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
 	}
 }
 
-// WaitForConsensusReady ...
+// WaitForConsensusReadyAccount ...
 func (node *Node) WaitForConsensusReadyAccount(readySignal chan struct{}) {
 	node.log.Debug("Waiting for Consensus ready", "node", node)
 
@@ -466,7 +466,7 @@ func (node *Node) VerifyNewBlock(newBlock *blockchain.Block) bool {
 	return node.UtxoPool.VerifyTransactions(newBlock.Transactions)
 }
 
-// VerifyNewBlock is called by consensus participants to verify the block (account model) they are running consensus on
+// VerifyNewBlockAccount is called by consensus participants to verify the block (account model) they are running consensus on
 func (node *Node) VerifyNewBlockAccount(newBlock *types.Block) bool {
 	err := node.Chain.ValidateNewBlock(newBlock, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey))
 	if err != nil {

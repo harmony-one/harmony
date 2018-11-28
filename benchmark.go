@@ -230,5 +230,8 @@ func main() {
 		}
 	}
 
-	currentNode.StartServer(*port)
+	go currentNode.StartServer(*port)
+	go currentNode.StartHelpSyncing()
+	// Keep waiting.
+	<-make(chan struct{})
 }
