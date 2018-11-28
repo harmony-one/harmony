@@ -74,7 +74,7 @@ func loggingInit(logFolder, role, ip, port string, onlyLogTps bool) {
 
 }
 func main() {
-	accountModel := flag.Bool("account_model", false, "Whether to use account model")
+	accountModel := flag.Bool("account_model", true, "Whether to use account model")
 	// TODO: use http://getmyipaddress.org/ or http://www.get-myip.com/ to retrieve my IP address
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9000", "port of the node.")
@@ -113,15 +113,14 @@ func main() {
 	var leader p2p.Peer
 	var selfPeer p2p.Peer
 	var clientPeer *p2p.Peer
-
 	// Use Peer Discovery to get shard/leader/peer/...
+	priKey, pubKey := utils.GenKey(*ip, *port)
 	if *peerDisvoery {
-		pubKey, priKey := utils.GenKey(*ip, *port)
 		// Contact Identity Chain
 		// This is a blocking call
 		// Assume @ak has get it working
 		// TODO: this has to work with @ak's fix
-		discoveryConfig := discovery.New(pubKey, priKey)
+		discoveryConfig := discovery.New(priKey, pubKey)
 
 		err := discoveryConfig.StartClientMode(*idcIP, *idcPort)
 		if err != nil {
@@ -144,6 +143,7 @@ func main() {
 		// Create client peer.
 		clientPeer = distributionConfig.GetClientPeer()
 	}
+	selfPeer.PubKey = pubKey
 
 	var role string
 	if leader.Ip == *ip && leader.Port == *port {

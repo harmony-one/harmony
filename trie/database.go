@@ -18,17 +18,14 @@ package trie
 
 import (
 	"fmt"
-	"io"
-	"sync"
-	"time"
-
-	hdb "github.com/harmony-one/harmony/db"
-	"github.com/simple-rules/harmony-benchmark/db"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/rlp"
+	hdb "github.com/harmony-one/harmony/db"
+	"io"
+	"sync"
+	"time"
 )
 
 var (
@@ -674,7 +671,7 @@ func (db *Database) Commit(node common.Hash, report bool) error {
 }
 
 // commit is the private locked version of Commit.
-func (db *Database) commit(hash common.Hash, batch db.Batch) error {
+func (db *Database) commit(hash common.Hash, batch hdb.Batch) error {
 	// If the node does not exist, it's a previously committed node
 	node, ok := db.nodes[hash]
 	if !ok {

@@ -3,6 +3,9 @@ package node
 import (
 	"bytes"
 	"encoding/gob"
+	"fmt"
+	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/core/types"
 	"log"
 
 	"github.com/harmony-one/harmony/blockchain"
@@ -141,6 +144,21 @@ func ConstructTransactionListMessage(transactions []*blockchain.Transaction) []b
 	if err != nil {
 		return []byte{} // TODO(RJ): better handle of the error
 	}
+	return byteBuffer.Bytes()
+}
+
+// ConstructTransactionListMessageAccount constructs serialized transactions in account model
+func ConstructTransactionListMessageAccount(transactions types.Transactions) []byte {
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
+	byteBuffer.WriteByte(byte(Transaction))
+	byteBuffer.WriteByte(byte(Send))
+
+	txs, err := rlp.EncodeToBytes(transactions)
+	if err != nil {
+		fmt.Errorf("ERROR RLP %s", err)
+		return []byte{} // TODO(RJ): better handle of the error
+	}
+	byteBuffer.Write(txs)
 	return byteBuffer.Bytes()
 }
 

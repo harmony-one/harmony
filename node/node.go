@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"math/big"
+	"math/rand"
 	"net"
 	"strings"
 	"sync"
@@ -73,16 +74,18 @@ type Node struct {
 	State     NodeState        // State of the Node
 
 	// Account Model
-	Chain               *core.BlockChain
-	TxPool              *core.TxPool
-	BlockChannelAccount chan *types.Block // The channel to receive new blocks from Node
-	worker              *worker.Worker
+	pendingTransactionsAccount types.Transactions // TODO: replace with txPool
+	pendingTxMutexAccount      sync.Mutex
+	Chain                      *core.BlockChain
+	TxPool                     *core.TxPool
+	BlockChannelAccount        chan *types.Block // The channel to receive new blocks from Node
+	Worker                     *worker.Worker
 
 	// Syncing component.
 	downloaderServer *downloader.Server
 
 	// Test only
-	testBankKey *ecdsa.PrivateKey
+	TestBankKeys []*ecdsa.PrivateKey
 }
 
 // Add new crossTx and proofs to the list of crossTx that needs to be sent back to client
@@ -101,6 +104,14 @@ func (node *Node) addPendingTransactions(newTxs []*blockchain.Transaction) {
 	node.log.Debug("Got more transactions", "num", len(newTxs), "totalPending", len(node.pendingTransactions), "node", node)
 }
 
+// Add new transactions to the pending transaction list
+func (node *Node) addPendingTransactionsAccount(newTxs types.Transactions) {
+	node.pendingTxMutexAccount.Lock()
+	node.pendingTransactionsAccount = append(node.pendingTransactionsAccount, newTxs...)
+	node.pendingTxMutexAccount.Unlock()
+	node.log.Debug("Got more transactions (account model)", "num", len(newTxs), "totalPending", len(node.pendingTransactionsAccount), "node", node)
+}
+
 // Take out a subset of valid transactions from the pending transaction list
 // Note the pending transaction list will then contain the rest of the txs
 func (node *Node) getTransactionsForNewBlock(maxNumTxs int) ([]*blockchain.Transaction, []*blockchain.CrossShardTxAndProof) {
@@ -112,6 +123,20 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int) ([]*blockchain.Trans
 	node.pendingTransactions = unselected
 	node.pendingTxMutex.Unlock()
 	return selected, crossShardTxs
+}
+
+// Take out a subset of valid transactions from the pending transaction list
+// Note the pending transaction list will then contain the rest of the txs
+func (node *Node) getTransactionsForNewBlockAccount(maxNumTxs int) (types.Transactions, []*blockchain.CrossShardTxAndProof) {
+	node.pendingTxMutexAccount.Lock()
+	selected, unselected, invalid, crossShardTxs := node.pendingTransactionsAccount, types.Transactions{}, types.Transactions{}, []*blockchain.CrossShardTxAndProof{}
+	_ = invalid // invalid txs are discard
+
+	node.log.Debug("Invalid transactions discarded", "number", len(invalid))
+	node.pendingTransactionsAccount = unselected
+	node.log.Debug("Remaining pending transactions", "number", len(node.pendingTransactionsAccount))
+	node.pendingTxMutexAccount.Unlock()
+	return selected, crossShardTxs //TODO: replace cross-shard proofs for account model
 }
 
 // StartServer starts a server and process the request by a handler.
@@ -165,6 +190,17 @@ func (node *Node) countNumTransactionsInBlockchain() int {
 	count := 0
 	for _, block := range node.blockchain.Blocks {
 		count += len(block.Transactions)
+	}
+	return count
+}
+
+// Count the total number of transactions in the blockchain
+// Currently used for stats reporting purpose
+func (node *Node) countNumTransactionsInBlockchainAccount() int {
+	count := 0
+	for curBlock := node.Chain.CurrentBlock(); curBlock != nil; {
+		count += len(curBlock.Transactions())
+		curBlock = node.Chain.GetBlockByHash(curBlock.ParentHash())
 	}
 	return count
 }
@@ -230,14 +266,26 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 		node.db = db
 
 		// (account model)
+		rand.Seed(0)
+		len := 1000000
+		bytes := make([]byte, len)
+		for i := 0; i < len; i++ {
+			bytes[i] = byte(rand.Intn(100))
+		}
+		reader := strings.NewReader(string(bytes))
+		genesisAloc := make(core.GenesisAlloc)
+		for i := 0; i < 100; i++ {
+			testBankKey, _ := ecdsa.GenerateKey(crypto.S256(), reader)
+			testBankAddress := crypto.PubkeyToAddress(testBankKey.PublicKey)
+			testBankFunds := big.NewInt(10000000000)
+			genesisAloc[testBankAddress] = core.GenesisAccount{Balance: testBankFunds}
+			node.TestBankKeys = append(node.TestBankKeys, testBankKey)
+		}
 
-		node.testBankKey, _ = ecdsa.GenerateKey(crypto.S256(), strings.NewReader("Fixed source of randomnessasdffffffffffffffffffffffffffffffffffffffffsdffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
-		testBankAddress := crypto.PubkeyToAddress(node.testBankKey.PublicKey)
-		testBankFunds := big.NewInt(1000000000000000000)
 		database := hdb.NewMemDatabase()
 		gspec := core.Genesis{
 			Config: params.TestChainConfig,
-			Alloc:  core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
+			Alloc:  genesisAloc,
 		}
 
 		_ = gspec.MustCommit(database)
@@ -246,11 +294,7 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 		node.Chain = chain
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, params.TestChainConfig, chain)
 		node.BlockChannelAccount = make(chan *types.Block)
-		node.worker = worker.New(params.TestChainConfig, chain, bft.NewFaker())
-
-		fmt.Println("BALANCE")
-		fmt.Println(node.worker.GetCurrentState().GetBalance(testBankAddress))
-
+		node.Worker = worker.New(params.TestChainConfig, chain, bft.NewFaker())
 	}
 	// Logger
 	node.log = log.New()

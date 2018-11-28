@@ -189,30 +189,26 @@ func NewBlockChain(db hdb.Database, cacheConfig *CacheConfig, chainConfig *param
 	return bc, nil
 }
 
-func (bc *BlockChain) ValidateNewBlock(block *types.Block, address common.Address) bool {
+func (bc *BlockChain) ValidateNewBlock(block *types.Block, address common.Address) error {
 	state, err := state.New(bc.CurrentBlock().Root(), bc.stateCache)
 
-	fmt.Println("WITHIN NNNNNNNNNNNNNN", err)
 	if err != nil {
-		return false
+		return err
 	}
 
-	fmt.Println("Balance 3 ", state.GetBalance(address))
 	// Process block using the parent state as reference point.
 	receipts, _, usedGas, err := bc.processor.Process(block, state, bc.vmConfig)
 	if err != nil {
 		bc.reportBlock(block, receipts, err)
-		return false
+		return err
 	}
 
-	fmt.Println("WITHIN NNNNNNNNNNNNNN2", err)
 	err = bc.Validator().ValidateState(block, bc.CurrentBlock(), state, receipts, usedGas)
 	if err != nil {
 		bc.reportBlock(block, receipts, err)
-		return false
+		return err
 	}
-	fmt.Println("WITHIN NNNNNNNNNNNNNN3", err)
-	return true
+	return nil
 }
 
 func (bc *BlockChain) getProcInterrupt() bool {
