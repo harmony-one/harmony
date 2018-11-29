@@ -45,7 +45,7 @@ var errGenesisNoConfig = errors.New("genesis has no chain configuration")
 type Genesis struct {
 	Config     *params.ChainConfig `json:"config"`
 	Nonce      uint64              `json:"nonce"`
-	ShardId    uint16              `json:"shardId"`
+	ShardId    uint32              `json:"shardId"`
 	Timestamp  uint64              `json:"timestamp"`
 	ExtraData  []byte              `json:"extraData"`
 	GasLimit   uint64              `json:"gasLimit"   gencodec:"required"`
