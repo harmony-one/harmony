@@ -10,6 +10,7 @@ import (
 	"github.com/harmony-one/harmony/syncing"
 	"github.com/harmony-one/harmony/syncing/downloader"
 	pb "github.com/harmony-one/harmony/syncing/downloader/proto"
+	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 )
 
@@ -69,6 +70,16 @@ func (node *FakeNode) Init(ip, port string) {
 	node.server = downloader.NewServer(node)
 }
 
+// SetBlockchain is used for testing
+func (node *FakeNode) Init2(ip, port string) {
+	addresses := [][20]byte{TestAddressOne}
+	node.bc = bc.CreateBlockchainWithMoreBlocks(addresses, ShardID)
+	node.ip = ip
+	node.port = port
+
+	node.server = downloader.NewServer(node)
+}
+
 // Start ...
 func (node *FakeNode) Start() error {
 	var err error
@@ -100,6 +111,16 @@ func (node *FakeNode) CalculateResponse(request *pb.DownloaderRequest) (*pb.Down
 	return response, nil
 }
 
+func TestCompareSyncPeerConfigByBlockHashes(t *testing.T) {
+	a := syncing.CreateTestSyncPeerConfig(nil, [][]byte{{1, 2, 3, 4, 5, 6}, {1, 2, 3, 4, 5, 6}})
+	b := syncing.CreateTestSyncPeerConfig(nil, [][]byte{{1, 2, 3, 4, 5, 6}, {1, 2, 3, 4, 5, 6}})
+	assert.Equal(t, syncing.CompareSyncPeerConfigByblockHashes(a, b), 0, "they should be equal")
+	c := syncing.CreateTestSyncPeerConfig(nil, [][]byte{{1, 2, 3, 4, 5, 7}, {1, 2, 3, 4, 5, 6}})
+	assert.Equal(t, syncing.CompareSyncPeerConfigByblockHashes(a, c), -1, "a should be less than c")
+	d := syncing.CreateTestSyncPeerConfig(nil, [][]byte{{1, 2, 3, 4, 5, 4}, {1, 2, 3, 4, 5, 6}})
+	assert.Equal(t, syncing.CompareSyncPeerConfigByblockHashes(a, d), 1, "a should be greater than c")
+}
+
 func TestSyncing(t *testing.T) {
 	fakeNodes := []*FakeNode{&FakeNode{}, &FakeNode{}, &FakeNode{}}
 	for i := range fakeNodes {
@@ -108,6 +129,11 @@ func TestSyncing(t *testing.T) {
 			t.Error(err)
 		}
 	}
+	defer func() {
+		for _, fakeNode := range fakeNodes {
+			fakeNode.grpcServer.Stop()
+		}
+	}()
 
 	stateSync := &syncing.StateSync{}
 	bc := &bc.Blockchain{}
@@ -125,7 +151,41 @@ func TestSyncing(t *testing.T) {
 		}
 	}
 
-	for _, fakeNode := range fakeNodes {
-		fakeNode.grpcServer.Stop()
+}
+
+func TestSyncingIncludingBadNode(t *testing.T) {
+	fakeNodes := []*FakeNode{&FakeNode{}, &FakeNode{}, &FakeNode{}}
+	for i := range fakeNodes {
+		if i == 2 {
+			// Bad node.
+			fakeNodes[i].Init2(serverIP, ServerPorts[i])
+		} else {
+			// Good node.
+			fakeNodes[i].Init(serverIP, ServerPorts[i])
+		}
+		if err := fakeNodes[i].Start(); err != nil {
+			t.Error(err)
+		}
+	}
+	defer func() {
+		for _, fakeNode := range fakeNodes {
+			fakeNode.grpcServer.Stop()
+		}
+	}()
+
+	stateSync := &syncing.StateSync{}
+	bc := &bc.Blockchain{}
+	peers := make([]p2p.Peer, len(fakeNodes))
+	for i := range peers {
+		peers[i].Ip = fakeNodes[i].ip
+		peers[i].Port = fakeNodes[i].port
+	}
+
+	stateSync.StartStateSync(peers, bc)
+
+	for i := range bc.Blocks {
+		if !reflect.DeepEqual(bc.Blocks[i], fakeNodes[0].bc.Blocks[i]) {
+			t.Error("not equal")
+		}
 	}
 }
