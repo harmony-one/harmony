@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/log"
+	"github.com/harmony-one/harmony/p2pv2"
 
 	"github.com/dedis/kyber"
 )
@@ -24,6 +25,11 @@ type Peer struct {
 }
 
 const MaxBroadCast = 20
+
+// Version The version number of p2p library
+// 1 - Direct socket connection
+// 2 - libp2p
+const Version = 1
 
 // SendMessage sends the message to the peer
 func SendMessage(peer Peer, msg []byte) {
@@ -133,7 +139,13 @@ func send(ip, port string, message []byte) {
 	backoff := NewExpBackoff(250*time.Millisecond, 10*time.Second, 2)
 
 	for trial := 0; trial < 10; trial++ {
-		err := sendWithSocketClient(ip, port, message)
+		var err error
+		if Version == 1 {
+			// TODO(ricl): remove sendWithSocketClient related code.
+			err = sendWithSocketClient(ip, port, message)
+		} else {
+			err = p2pv2.Send(ip, port, message)
+		}
 		if err == nil {
 			if trial > 0 {
 				log.Warn("retry sendWithSocketClient", "rety", trial)
