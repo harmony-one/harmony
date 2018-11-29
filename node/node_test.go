@@ -130,7 +130,7 @@ func sendPongMessage(leader p2p.Peer) {
 		PubKey: pubKey2,
 	}
 
-	pong1 := proto_node.NewPongMessage([]p2p.Peer{p1, p2})
+	pong1 := proto_node.NewPongMessage([]p2p.Peer{p1, p2}, nil)
 	buf1 := pong1.ConstructPongMessage()
 
 	fmt.Println("waiting for 10 seconds ...")

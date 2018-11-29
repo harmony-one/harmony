@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dedis/kyber"
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/p2p"
@@ -43,6 +44,8 @@ var (
 	}
 	e2 = "pong:1=>length:2"
 
+	pubKeys = []kyber.Point{pubKey1, pubKey2}
+
 	buf1 []byte
 	buf2 []byte
 )
@@ -57,7 +60,7 @@ func TestString(test *testing.T) {
 		fmt.Println(r1)
 	}
 
-	pong1 := NewPongMessage(p2)
+	pong1 := NewPongMessage(p2, pubKeys)
 	r2 := fmt.Sprintf("%v", *pong1)
 
 	if !strings.HasPrefix(r2, e2) {
@@ -72,7 +75,7 @@ func TestSerialize(test *testing.T) {
 	buf1 = ping1.ConstructPingMessage()
 	fmt.Printf("buf ping: %v\n", buf1)
 
-	pong1 := NewPongMessage(p2)
+	pong1 := NewPongMessage(p2, pubKeys)
 	buf2 = pong1.ConstructPongMessage()
 	fmt.Printf("buf pong: %v\n", buf2)
 }

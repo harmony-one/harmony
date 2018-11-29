@@ -29,13 +29,13 @@ var (
 // WaitForNewBlock waits for the next new block to run consensus on
 func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) {
 	consensus.Log.Debug("Waiting for block", "consensus", consensus)
+	backoff := p2p.NewExpBackoff(500*time.Millisecond, 30*time.Second, 2.0)
 	for { // keep waiting for new blocks
 		newBlock := <-blockChannel
 
 		if !consensus.HasEnoughValidators() {
-			consensus.Log.Debug("Not enough validators", "# Validators", len(consensus.publicKeys))
-			time.Sleep(500 * time.Millisecond)
-			continue
+			consensus.Log.Debug("Not enough validators", "# Validators", len(consensus.PublicKeys))
+			backoff.Sleep()
 		}
 
 		// TODO: think about potential race condition
@@ -43,6 +43,7 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) 
 		consensus.Log.Debug("STARTING CONSENSUS", "consensus", consensus, "startTime", startTime)
 		for consensus.state == Finished {
 			// time.Sleep(500 * time.Millisecond)
+			consensus.ResetState()
 			consensus.startConsensus(&newBlock)
 			break
 		}
@@ -204,7 +205,7 @@ func (consensus *Consensus) processCommitMessage(payload []byte, targetState Sta
 	// proceed only when the message is not received before
 	_, ok = (*commitments)[validatorID]
 	shouldProcess := !ok
-	if len((*commitments)) >= ((len(consensus.publicKeys)*2)/3 + 1) {
+	if len((*commitments)) >= ((len(consensus.PublicKeys)*2)/3 + 1) {
 		shouldProcess = false
 	}
 	if shouldProcess {
@@ -221,7 +222,7 @@ func (consensus *Consensus) processCommitMessage(payload []byte, targetState Sta
 		return
 	}
 
-	if len((*commitments)) >= ((len(consensus.publicKeys)*2)/3+1) && consensus.state < targetState {
+	if len((*commitments)) >= ((len(consensus.PublicKeys)*2)/3+1) && consensus.state < targetState {
 		consensus.Log.Debug("Enough commitments received with signatures", "num", len(*commitments), "state", consensus.state)
 
 		// Broadcast challenge
@@ -341,7 +342,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState S
 	_, ok = (*responses)[validatorID]
 	shouldProcess = shouldProcess && !ok
 
-	if len((*responses)) >= ((len(consensus.publicKeys)*2)/3 + 1) {
+	if len((*responses)) >= ((len(consensus.PublicKeys)*2)/3 + 1) {
 		shouldProcess = false
 	}
 
@@ -366,8 +367,8 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState S
 		return
 	}
 
-	if len(*responses) >= ((len(consensus.publicKeys)*2)/3+1) && consensus.state != targetState {
-		if len(*responses) >= ((len(consensus.publicKeys)*2)/3+1) && consensus.state != targetState {
+	if len(*responses) >= ((len(consensus.PublicKeys)*2)/3+1) && consensus.state != targetState {
+		if len(*responses) >= ((len(consensus.PublicKeys)*2)/3+1) && consensus.state != targetState {
 			consensus.Log.Debug("Enough responses received with signatures", "num", len(*responses), "state", consensus.state)
 			// Aggregate responses
 			responseScalars := []kyber.Scalar{}
@@ -489,7 +490,7 @@ func (consensus *Consensus) reportMetrics(block blockchain.Block) {
 		"key":             consensus.pubKey.String(),
 		"tps":             tps,
 		"txCount":         numOfTxs,
-		"nodeCount":       len(consensus.publicKeys) + 1,
+		"nodeCount":       len(consensus.PublicKeys) + 1,
 		"latestBlockHash": hex.EncodeToString(consensus.blockHash[:]),
 		"latestTxHashes":  txHashes,
 		"blockLatency":    int(timeElapsed / time.Millisecond),
@@ -498,7 +499,7 @@ func (consensus *Consensus) reportMetrics(block blockchain.Block) {
 }
 
 func (consensus *Consensus) HasEnoughValidators() bool {
-	if len(consensus.publicKeys) < consensus.MinPeers {
+	if len(consensus.PublicKeys) < consensus.MinPeers {
 		return false
 	}
 	return true

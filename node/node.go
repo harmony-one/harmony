@@ -32,17 +32,26 @@ import (
 	downloader_pb "github.com/harmony-one/harmony/syncing/downloader/proto"
 )
 
-type NodeState byte
+// State is a state of a node.
+type State byte
 
+// All constants except the NodeLeader below are for validators only.
 const (
-	NodeInit              NodeState = iota // Node just started, before contacting BeaconChain
-	NodeWaitToJoin                         // Node contacted BeaconChain, wait to join Shard
-	NodeJoinedShard                        // Node joined Shard, ready for consensus
-	NodeOffline                            // Node is offline
-	NodeReadyForConsensus                  // Node is ready to do consensus
-	NodeDoingConsensus                     // Node is already doing consensus
+	NodeInit              State = iota // Node just started, before contacting BeaconChain
+	NodeWaitToJoin                     // Node contacted BeaconChain, wait to join Shard
+	NodeJoinedShard                    // Node joined Shard, ready for consensus
+	NodeOffline                        // Node is offline
+	NodeReadyForConsensus              // Node is ready to do consensus
+	NodeDoingConsensus                 // Node is already doing consensus
+	NodeLeader                         // Node is the leader of some shard.
 )
 
+const (
+	// TimeToSleepForSyncing is the time waiting for node transformed into NodeDoingConsensus
+	TimeToSleepForSyncing = time.Second * 30
+)
+
+// NetworkNode ...
 type NetworkNode struct {
 	SelfPeer p2p.Peer
 	IDCPeer  p2p.Peer
@@ -72,7 +81,7 @@ type Node struct {
 	SyncNode  bool             // TODO(minhdoan): Remove it later.
 	chain     *core.BlockChain // Account Model
 	Neighbors sync.Map         // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
-	State     NodeState        // State of the Node
+	State     State            // State of the Node
 
 	// Account Model
 	pendingTransactionsAccount types.Transactions // TODO: replace with txPool
@@ -158,6 +167,7 @@ func (node *Node) StartServer(port string) {
 	}
 }
 
+// SetLog sets log for Node.
 func (node *Node) SetLog() *Node {
 	node.log = log.New()
 	return node
@@ -214,7 +224,7 @@ func (node *Node) countNumTransactionsInBlockchainAccount() int {
 	return count
 }
 
-//ConnectIdentityChain connects to identity chain
+//ConnectBeaconChain connects to identity chain
 func (node *Node) ConnectBeaconChain() {
 	Nnode := &NetworkNode{SelfPeer: node.SelfPeer, IDCPeer: node.IDCPeer}
 	msg := node.SerializeNode(Nnode)
@@ -307,12 +317,16 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 	}
 	// Logger
 	node.log = log.New()
-	node.State = NodeInit
+	if consensus.IsLeader {
+		node.State = NodeLeader
+	} else {
+		node.State = NodeInit
+	}
 
 	return &node
 }
 
-// Add neighbors nodes
+// AddPeers adds neighbors nodes
 func (node *Node) AddPeers(peers []p2p.Peer) int {
 	count := 0
 	for _, p := range peers {
@@ -325,8 +339,7 @@ func (node *Node) AddPeers(peers []p2p.Peer) int {
 	}
 
 	if count > 0 {
-		c := node.Consensus.AddPeers(peers)
-		node.log.Info("Node.AddPeers", "#", c)
+		node.Consensus.AddPeers(peers)
 	}
 	return count
 }
@@ -346,10 +359,21 @@ func (node *Node) JoinShard(leader p2p.Peer) {
 	}
 }
 
-// StartDownloaderServer starts downloader server.
-func (node *Node) StartDownloaderServer() {
+// SupportSyncing keeps sleeping until it's doing consensus or it's a leader.
+func (node *Node) SupportSyncing() {
+	node.InitSyncingServer()
+	node.StartSyncingServer()
+}
+
+// InitSyncingServer starts downloader server.
+func (node *Node) InitSyncingServer() {
 	node.downloaderServer = downloader.NewServer(node)
-	// node.downloaderServer.Start(node.)
+}
+
+// StartSyncingServer starts syncing server.
+func (node *Node) StartSyncingServer() {
+	// Handles returned grpcServer??
+	node.downloaderServer.Start(node.SelfPeer.Ip, downloader.DefaultDownloadPort)
 }
 
 // CalculateResponse implements DownloadInterface on Node object.
