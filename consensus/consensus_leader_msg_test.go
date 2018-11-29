@@ -12,7 +12,7 @@ import (
 func TestConstructAnnounceMessage(test *testing.T) {
 	leader := p2p.Peer{Ip: "1", Port: "2"}
 	validator := p2p.Peer{Ip: "3", Port: "5"}
-	consensus := NewConsensus("1", "2", "0", []p2p.Peer{leader, validator}, leader)
+	consensus := New(leader, "0", []p2p.Peer{leader, validator}, leader)
 	consensus.blockHash = [32]byte{}
 	header := consensus.blockHeader
 	msg := consensus.constructAnnounceMessage()
@@ -35,7 +35,7 @@ func TestConstructChallengeMessage(test *testing.T) {
 	validatorPubKey := pki.GetPublicKeyFromScalar(leaderPriKey)
 	validator := p2p.Peer{Ip: "3", Port: "5", PubKey: validatorPubKey}
 
-	consensus := NewConsensus("1", "2", "0", []p2p.Peer{leader, validator}, leader)
+	consensus := New(leader, "0", []p2p.Peer{leader, validator}, leader)
 	consensus.blockHash = [32]byte{}
 	(*consensus.commitments)[0] = leaderPubKey
 	(*consensus.commitments)[1] = validatorPubKey

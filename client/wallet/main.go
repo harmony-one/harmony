@@ -256,7 +256,7 @@ func CreateWalletServerNode() *node.Node {
 		shardIDLeaderMap = getShardIDToLeaderMap()
 		clientPeer = &p2p.Peer{Port: "127.0.0.1", Ip: "1234"}
 	}
-	walletNode := node.New(nil, nil)
+	walletNode := node.New(nil, nil, *clientPeer) // TODO(ricl): shouldn't the selfPeer for client being clientPeer??
 	walletNode.Client = client.NewClient(&shardIDLeaderMap)
 	walletNode.ClientPeer = clientPeer
 	return walletNode

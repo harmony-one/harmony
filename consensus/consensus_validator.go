@@ -72,7 +72,7 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 
 	// Verify block data
 	// check leader Id
-	myLeaderID := utils.GetUniqueIdFromPeer(consensus.leader)
+	myLeaderID := utils.GetUniqueIDFromPeer(consensus.leader)
 	if leaderID != myLeaderID {
 		consensus.Log.Warn("Received message from wrong leader", "myLeaderID", myLeaderID, "receivedLeaderId", leaderID, "consensus", consensus)
 		return
@@ -175,7 +175,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte, targetState 
 
 	// Verify block data and the aggregated signatures
 	// check leader Id
-	myLeaderID := utils.GetUniqueIdFromPeer(consensus.leader)
+	myLeaderID := utils.GetUniqueIDFromPeer(consensus.leader)
 	if leaderID != myLeaderID {
 		consensus.Log.Warn("Received message from wrong leader", "myLeaderID", myLeaderID, "receivedLeaderId", leaderID, "consensus", consensus)
 		return
@@ -325,7 +325,7 @@ func (consensus *Consensus) processCollectiveSigMessage(payload []byte) {
 
 	// Verify block data
 	// check leader Id
-	myLeaderID := utils.GetUniqueIdFromPeer(consensus.leader)
+	myLeaderID := utils.GetUniqueIDFromPeer(consensus.leader)
 	if leaderID != myLeaderID {
 		consensus.Log.Warn("Received message from wrong leader", "myLeaderID", myLeaderID, "receivedLeaderId", leaderID, "consensus", consensus)
 		return

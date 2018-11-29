@@ -165,6 +165,6 @@ func (config *DistributionConfig) GetMyConfigEntry(ip string, port string) *Conf
 
 func setKey(peer *p2p.Peer) {
 	// Get public key deterministically based on ip and port
-	priKey := crypto.Ed25519Curve.Scalar().SetInt64(int64(GetUniqueIdFromPeer(*peer))) // TODO: figure out why using a random hash value doesn't work for private key (schnorr)
+	priKey := crypto.Ed25519Curve.Scalar().SetInt64(int64(GetUniqueIDFromPeer(*peer))) // TODO: figure out why using a random hash value doesn't work for private key (schnorr)
 	peer.PubKey = pki.GetPublicKeyFromScalar(priKey)
 }

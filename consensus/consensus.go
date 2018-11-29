@@ -102,13 +102,11 @@ type BlockConsensusStatus struct {
 	state       State  // the latest state of the consensus
 }
 
-// NewConsensus creates a new Consensus object
-// TODO(minhdoan): Maybe convert it into just New
-// FYI, see https://golang.org/doc/effective_go.html?#package-names
-func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Consensus {
+// New creates a new Consensus object
+func New(selfPeer p2p.Peer, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Consensus {
 	consensus := Consensus{}
 
-	if leader.Port == port && leader.Ip == ip {
+	if leader.Port == selfPeer.Port && leader.Ip == selfPeer.Ip {
 		consensus.IsLeader = true
 	} else {
 		consensus.IsLeader = false
@@ -121,7 +119,7 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 
 	consensus.leader = leader
 	for _, peer := range peers {
-		consensus.validators.Store(utils.GetUniqueIdFromPeer(peer), peer)
+		consensus.validators.Store(utils.GetUniqueIDFromPeer(peer), peer)
 	}
 
 	// Initialize cosign bitmap
@@ -146,7 +144,7 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 
 	// For now use socket address as 16 byte Id
 	// TODO: populate with correct Id
-	consensus.nodeID = utils.GetUniqueIdFromPeer(p2p.Peer{Ip: ip, Port: port})
+	consensus.nodeID = utils.GetUniqueIDFromPeer(selfPeer)
 
 	// Set private key for myself so that I can sign messages.
 	consensus.priKey = crypto.Ed25519Curve.Scalar().SetInt64(int64(consensus.nodeID))
@@ -239,12 +237,12 @@ func (consensus *Consensus) AddPeers(peers []p2p.Peer) int {
 	count := 0
 
 	for _, peer := range peers {
-		_, ok := consensus.validators.Load(utils.GetUniqueIdFromPeer(peer))
+		_, ok := consensus.validators.Load(utils.GetUniqueIDFromPeer(peer))
 		if !ok {
 			if peer.ValidatorID == -1 {
 				peer.ValidatorID = int(consensus.uniqueIDInstance.GetUniqueId())
 			}
-			consensus.validators.Store(utils.GetUniqueIdFromPeer(peer), peer)
+			consensus.validators.Store(utils.GetUniqueIDFromPeer(peer), peer)
 			consensus.PublicKeys = append(consensus.PublicKeys, peer.PubKey)
 		}
 		count++
