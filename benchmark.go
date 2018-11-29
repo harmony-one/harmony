@@ -224,9 +224,7 @@ func main() {
 		}
 	} else {
 		if *peerDisvoery {
-			go func() {
-				currentNode.JoinShard(leader)
-			}()
+			go currentNode.JoinShard(leader)
 		}
 	}
 
