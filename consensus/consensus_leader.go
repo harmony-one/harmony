@@ -476,7 +476,12 @@ func (consensus *Consensus) reportMetrics(block blockchain.Block) {
 
 	endTime := time.Now()
 	timeElapsed := endTime.Sub(startTime)
-	numOfTxs := block.NumTransactions
+	numOfTxs := int(block.NumTransactions)
+	if block.AccountBlock != nil {
+		accountBlock := new(types.Block)
+		rlp.DecodeBytes(block.AccountBlock, accountBlock)
+		numOfTxs = len(accountBlock.Transactions())
+	}
 	tps := float64(numOfTxs) / timeElapsed.Seconds()
 	consensus.Log.Info("TPS Report",
 		"numOfTXs", numOfTxs,
