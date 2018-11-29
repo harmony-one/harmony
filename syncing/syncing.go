@@ -51,7 +51,16 @@ type StateSync struct {
 	stateSyncTaskQueue *queue.Queue
 }
 
-func compareSyncPeerConfigByBlockHashes(a *SyncPeerConfig, b *SyncPeerConfig) int {
+// CreateTestSyncPeerConfig used for testing.
+func CreateTestSyncPeerConfig(client *downloader.Client, blockHashes [][]byte) *SyncPeerConfig {
+	return &SyncPeerConfig{
+		client:      client,
+		blockHashes: blockHashes,
+	}
+}
+
+// CompareSyncPeerConfigByblockHashes compares two SyncPeerConfig by blockHashes.
+func CompareSyncPeerConfigByblockHashes(a *SyncPeerConfig, b *SyncPeerConfig) int {
 	if len(a.blockHashes) != len(b.blockHashes) {
 		if len(a.blockHashes) < len(b.blockHashes) {
 			return -1
@@ -114,8 +123,8 @@ func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer) {
 	}
 }
 
-// makeConnectionToPeers makes grpc connection to all peers.
-func (ss *StateSync) makeConnectionToPeers() {
+// MakeConnectionToPeers makes grpc connection to all peers.
+func (ss *StateSync) MakeConnectionToPeers() {
 	var wg sync.WaitGroup
 	wg.Add(ss.peerNumber)
 
@@ -139,16 +148,16 @@ func (ss *StateSync) CleanUpNilPeers() {
 	}
 }
 
-// getHowMaxConsensus returns max number of consensus nodes and the first ID of consensus group.
-// Assumption: all peers are sorted by compareSyncPeerConfigByBlockHashes first.
-func (syncConfig *SyncConfig) getHowMaxConsensus() (int, int) {
+// GetHowManyMaxConsensus returns max number of consensus nodes and the first ID of consensus group.
+// Assumption: all peers are sorted by CompareSyncPeerConfigByBlockHashes first.
+func (syncConfig *SyncConfig) GetHowManyMaxConsensus() (int, int) {
 	// As all peers are sorted by their blockHashes, all equal blockHashes should come together and consecutively.
 	curCount := 0
 	curFirstID := -1
 	maxCount := 0
 	maxFirstID := -1
 	for i := range syncConfig.peers {
-		if curFirstID == -1 || compareSyncPeerConfigByBlockHashes(syncConfig.peers[curFirstID], syncConfig.peers[i]) != 0 {
+		if curFirstID == -1 || CompareSyncPeerConfigByblockHashes(syncConfig.peers[curFirstID], syncConfig.peers[i]) != 0 {
 			curCount = 1
 			curFirstID = i
 		} else {
@@ -162,10 +171,19 @@ func (syncConfig *SyncConfig) getHowMaxConsensus() (int, int) {
 	return maxFirstID, maxCount
 }
 
+// InitForTesting used for testing.
+func (syncConfig *SyncConfig) InitForTesting(client *downloader.Client, blockHashes [][]byte) {
+	for i := range syncConfig.peers {
+		syncConfig.peers[i].blockHashes = blockHashes
+		syncConfig.peers[i].client = client
+	}
+}
+
 // CleanUpPeers cleans up all peers whose blockHashes are not equal to consensus block hashes.
 func (syncConfig *SyncConfig) CleanUpPeers(maxFirstID int) {
-	for i := range syncConfig.peers {
-		if compareSyncPeerConfigByBlockHashes(syncConfig.peers[maxFirstID], syncConfig.peers[i]) != 0 {
+	fixedPeer := syncConfig.peers[maxFirstID]
+	for i := 0; i < len(syncConfig.peers); i++ {
+		if CompareSyncPeerConfigByblockHashes(fixedPeer, syncConfig.peers[i]) != 0 {
 			// TODO: move it into a util delete func.
 			// See tip https://github.com/golang/go/wiki/SliceTricks
 			// Close the client and remove the peer out of the
@@ -177,13 +195,14 @@ func (syncConfig *SyncConfig) CleanUpPeers(maxFirstID int) {
 	}
 }
 
-// getBlockHashesConsensusAndCleanUp chesk if all consensus hashes are equal.
-func (ss *StateSync) getBlockHashesConsensusAndCleanUp() bool {
+// GetBlockHashesConsensusAndCleanUp chesk if all consensus hashes are equal.
+func (ss *StateSync) GetBlockHashesConsensusAndCleanUp() bool {
 	// Sort all peers by the blockHashes.
 	sort.Slice(ss.syncConfig.peers, func(i, j int) bool {
-		return compareSyncPeerConfigByBlockHashes(ss.syncConfig.peers[i], ss.syncConfig.peers[j]) == -1
+		return CompareSyncPeerConfigByblockHashes(ss.syncConfig.peers[i], ss.syncConfig.peers[j]) == -1
 	})
-	maxCount, maxFirstID := ss.syncConfig.getHowMaxConsensus()
+
+	maxFirstID, maxCount := ss.syncConfig.GetHowManyMaxConsensus()
 	if float64(maxCount) >= ConsensusRatio*float64(ss.activePeerNumber) {
 		ss.syncConfig.CleanUpPeers(maxFirstID)
 		ss.CleanUpNilPeers()
@@ -192,8 +211,8 @@ func (ss *StateSync) getBlockHashesConsensusAndCleanUp() bool {
 	return false
 }
 
-// getConsensusHashes gets all hashes needed to download.
-func (ss *StateSync) getConsensusHashes() {
+// GetConsensusHashes gets all hashes needed to download.
+func (ss *StateSync) GetConsensusHashes() {
 	for {
 		var wg sync.WaitGroup
 		wg.Add(ss.activePeerNumber)
@@ -209,7 +228,7 @@ func (ss *StateSync) getConsensusHashes() {
 			}(ss.syncConfig.peers[id])
 		}
 		wg.Wait()
-		if ss.getBlockHashesConsensusAndCleanUp() {
+		if ss.GetBlockHashesConsensusAndCleanUp() {
 			break
 		}
 	}
@@ -272,10 +291,10 @@ func (ss *StateSync) StartStateSync(peers []p2p.Peer, bc *blockchain.Blockchain)
 	// Creates sync config.
 	ss.CreateSyncConfig(peers)
 	// Makes connections to peers.
-	ss.makeConnectionToPeers()
+	ss.MakeConnectionToPeers()
 	for {
 		// Gets consensus hashes.
-		ss.getConsensusHashes()
+		ss.GetConsensusHashes()
 
 		// Generates state-sync task queue.
 		ss.generateStateSyncTaskQueue(bc)
