@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	DefaultDownloadPort = "8888"
+	DefaultDownloadPort = "6666"
 )
 
 // Server is the Server struct for downloader package.
