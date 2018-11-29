@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"log"
+
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
-	"log"
 
 	"github.com/harmony-one/harmony/blockchain"
 	"github.com/harmony-one/harmony/p2p"
@@ -25,7 +26,6 @@ const (
 	Block
 	Client
 	Control
-	BlockchainSync
 	PING // node send ip/pki to register with leader
 	PONG // node broadcast pubK
 	// TODO: add more types
@@ -160,25 +160,6 @@ func ConstructTransactionListMessageAccount(transactions types.Transactions) []b
 	}
 	byteBuffer.Write(txs)
 	return byteBuffer.Bytes()
-}
-
-// ConstructBlockchainSyncMessage constructs Blockchain Sync Message.
-func ConstructBlockchainSyncMessage(msgType BlockchainSyncMessageType, blockHash [32]byte) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
-	byteBuffer.WriteByte(byte(BlockchainSync))
-	byteBuffer.WriteByte(byte(msgType))
-	if msgType != GetLastBlockHashes {
-		byteBuffer.Write(blockHash[:])
-	}
-	return byteBuffer.Bytes()
-}
-
-// GenerateBlockchainSyncMessage generates blockchain sync message.
-func GenerateBlockchainSyncMessage(payload []byte) *BlockchainSyncMessage {
-	dec := gob.NewDecoder(bytes.NewBuffer(payload))
-	var res BlockchainSyncMessage
-	dec.Decode(&res)
-	return &res
 }
 
 // ConstructRequestTransactionsMessage constructs serialized transactions

@@ -1,7 +1,6 @@
 package node
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/gob"
 	"fmt"
@@ -120,9 +119,6 @@ func (node *Node) NodeHandler(conn net.Conn) {
 					node.Client.UpdateBlocks(*blocks)
 				}
 			}
-		case proto_node.BlockchainSync:
-			node.log.Info("NET: received message: Node/BlockchainSync")
-			node.handleBlockchainSync(msgPayload, conn)
 		case proto_node.Client:
 			node.log.Info("NET: received message: Node/Client")
 			clientMsgType := proto_node.ClientMessageType(msgPayload[0])
@@ -204,57 +200,6 @@ func (node *Node) NodeHandler(conn net.Conn) {
 	default:
 		node.log.Error("Unknown", "MsgCateory:", msgCategory)
 	}
-}
-
-// Refactor by moving this code into a sync package.
-func (node *Node) handleBlockchainSync(payload []byte, conn net.Conn) {
-	// TODO(minhdoan): Looking to removing this.
-	w := bufio.NewWriter(conn)
-FOR_LOOP:
-	for {
-		syncMsgType := proto_node.BlockchainSyncMessageType(payload[0])
-		switch syncMsgType {
-		case proto_node.GetBlock:
-			block := node.blockchain.FindBlock(payload[1:33])
-			w.Write(block.Serialize())
-			w.Flush()
-		case proto_node.GetLastBlockHashes:
-			blockchainSyncMessage := proto_node.BlockchainSyncMessage{
-				BlockHeight: len(node.blockchain.Blocks),
-				BlockHashes: node.blockchain.GetBlockHashes(),
-			}
-			w.Write(proto_node.SerializeBlockchainSyncMessage(&blockchainSyncMessage))
-			w.Flush()
-		case proto_node.Done:
-			break FOR_LOOP
-		}
-		content, err := p2p.ReadMessageContent(conn)
-
-		if err != nil {
-			node.log.Error("Failed in reading message content from syncing node", err)
-			return
-		}
-
-		msgCategory, _ := proto.GetMessageCategory(content)
-		if err != nil || msgCategory != proto.Node {
-			node.log.Error("Failed in reading message category from syncing node", err)
-			return
-		}
-
-		msgType, err := proto.GetMessageType(content)
-		actionType := proto_node.NodeMessageType(msgType)
-		if err != nil || actionType != proto_node.BlockchainSync {
-			node.log.Error("Failed in reading message type from syncing node", err)
-			return
-		}
-
-		payload, err = proto.GetMessagePayload(content)
-		if err != nil {
-			node.log.Error("Failed in reading payload from syncing node", err)
-			return
-		}
-	}
-	node.log.Info("HOORAY: Done sending info to syncing node.")
 }
 
 func (node *Node) transactionMessageHandler(msgPayload []byte) {
