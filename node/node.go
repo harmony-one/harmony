@@ -346,7 +346,6 @@ func (node *Node) JoinShard(leader p2p.Peer) {
 		buffer := ping.ConstructPingMessage()
 
 		p2p.SendMessage(leader, buffer)
-		node.log.Debug("Sent ping message")
 	}
 }
 
