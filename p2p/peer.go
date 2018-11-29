@@ -135,6 +135,9 @@ func send(ip, port string, message []byte) {
 	for trial := 0; trial < 10; trial++ {
 		err := sendWithSocketClient(ip, port, message)
 		if err == nil {
+			if trial > 0 {
+				log.Warn("retry sendWithSocketClient", "rety", trial)
+			}
 			return
 		}
 		log.Info("sleeping before trying to send again",

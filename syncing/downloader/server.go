@@ -11,6 +11,10 @@ import (
 	pb "github.com/harmony-one/harmony/syncing/downloader/proto"
 )
 
+const (
+	DefaultDownloadPort = "6666"
+)
+
 // Server is the Server struct for downloader package.
 type Server struct {
 	downloadInterface DownloadInterface

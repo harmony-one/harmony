@@ -372,7 +372,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
 	}
 }
 
-// WaitForConsensusReady ...
+// WaitForConsensusReadyAccount ...
 func (node *Node) WaitForConsensusReadyAccount(readySignal chan struct{}) {
 	node.log.Debug("Waiting for Consensus ready", "node", node)
 
@@ -466,7 +466,7 @@ func (node *Node) VerifyNewBlock(newBlock *blockchain.Block) bool {
 	return node.UtxoPool.VerifyTransactions(newBlock.Transactions)
 }
 
-// VerifyNewBlock is called by consensus participants to verify the block (account model) they are running consensus on
+// VerifyNewBlockAccount is called by consensus participants to verify the block (account model) they are running consensus on
 func (node *Node) VerifyNewBlockAccount(newBlock *types.Block) bool {
 	err := node.Chain.ValidateNewBlock(newBlock, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey))
 	if err != nil {
@@ -604,6 +604,7 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		return -1
 	}
 	// node.log.Info("Pong", "Msg", pong)
+	// TODO (lc) state syncing, and wait for all public keys
 	node.State = NodeJoinedShard
 
 	peers := make([]p2p.Peer, 0)
@@ -621,15 +622,16 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 			continue
 		}
 		peers = append(peers, *peer)
-
 	}
 
-	count := node.AddPeers(peers)
+	if len(peers) > 0 {
+		node.AddPeers(peers)
+	}
 
 	// Reset Validator PublicKeys every time we receive PONG message from Leader
 	// The PublicKeys has to be idential across the shard on every node
 	// TODO (lc): we need to handle RemovePeer situation
-	node.Consensus.PublicKeys = make([]kyber.Point, 0)
+	publicKeys := make([]kyber.Point, 0)
 
 	// Create the the PubKey from the []byte sent from leader
 	for _, k := range pong.PubKeys {
@@ -639,8 +641,8 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 			node.log.Error("UnmarshalBinary Failed PubKeys", "error", err)
 			continue
 		}
-		node.Consensus.PublicKeys = append(node.Consensus.PublicKeys, key)
+		publicKeys = append(publicKeys, key)
 	}
 
-	return count
+	return node.Consensus.UpdatePublicKeys(publicKeys)
 }
