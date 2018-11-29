@@ -147,6 +147,9 @@ func send(ip, port string, message []byte) {
 			err = p2pv2.Send(ip, port, message)
 		}
 		if err == nil {
+			if trial > 0 {
+				log.Warn("retry sendWithSocketClient", "rety", trial)
+			}
 			return
 		}
 		log.Info("sleeping before trying to send again",
