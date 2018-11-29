@@ -1,11 +1,12 @@
 package txgen
 
 import (
+	"math/big"
+
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/node"
-	"math/big"
 )
 
 type TxGenSettings struct {

@@ -27,7 +27,6 @@ import (
 	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
-	proto_identity "github.com/harmony-one/harmony/proto/identity"
 	proto_node "github.com/harmony-one/harmony/proto/node"
 	"github.com/harmony-one/harmony/syncing/downloader"
 	downloader_pb "github.com/harmony-one/harmony/syncing/downloader/proto"
@@ -214,14 +213,6 @@ func (node *Node) countNumTransactionsInBlockchainAccount() int {
 		curBlock = node.Chain.GetBlockByHash(curBlock.ParentHash())
 	}
 	return count
-}
-
-//ConnectBeaconChain connects to identity chain
-func (node *Node) ConnectBeaconChain() {
-	Nnode := &NetworkNode{SelfPeer: node.SelfPeer, IDCPeer: node.IDCPeer}
-	msg := node.SerializeNode(Nnode)
-	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Register, msg)
-	p2p.SendMessage(node.IDCPeer, msgToSend)
 }
 
 // SerializeNode serializes the node

@@ -3,12 +3,13 @@ package txgen
 import (
 	"encoding/binary"
 	"encoding/hex"
+	"math/rand"
+
 	"github.com/harmony-one/harmony/blockchain"
 	"github.com/harmony-one/harmony/client"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/node"
-	"math/rand"
 )
 
 type TxInfo struct {

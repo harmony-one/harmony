@@ -3,14 +3,15 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/harmony/client/txgen/txgen"
-	"github.com/harmony-one/harmony/core/types"
 	"os"
 	"path"
 	"runtime"
 	"sync"
 	"time"
+
+	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/client/txgen/txgen"
+	"github.com/harmony-one/harmony/core/types"
 
 	"github.com/harmony-one/harmony/blockchain"
 	"github.com/harmony-one/harmony/client"
