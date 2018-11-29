@@ -230,6 +230,6 @@ func main() {
 		}
 	}
 
-	// go currentNode.SupportSyncing()
+	go currentNode.SupportSyncing()
 	currentNode.StartServer(*port)
 }

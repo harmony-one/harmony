@@ -8,6 +8,8 @@ import (
 	"math/big"
 	"math/rand"
 	"net"
+	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -73,8 +75,7 @@ type Node struct {
 	crossTxToReturnMutex   sync.Mutex
 	ClientPeer             *p2p.Peer      // The peer for the benchmark tx generator client, used for leaders to return proof-of-accept
 	Client                 *client.Client // The presence of a client object means this node will also act as a client
-	IsWaiting              bool
-	SelfPeer               p2p.Peer // TODO(minhdoan): it could be duplicated with Self below whose is Alok work.
+	SelfPeer               p2p.Peer       // TODO(minhdoan): it could be duplicated with Self below whose is Alok work.
 	IDCPeer                p2p.Peer
 
 	SyncNode  bool             // TODO(minhdoan): Remove it later.
@@ -362,8 +363,12 @@ func (node *Node) InitSyncingServer() {
 
 // StartSyncingServer starts syncing server.
 func (node *Node) StartSyncingServer() {
-	// Handles returned grpcServer??
-	node.downloaderServer.Start(node.SelfPeer.Ip, downloader.DefaultDownloadPort)
+	if port, err := strconv.Atoi(node.SelfPeer.Port); err == nil {
+		node.downloaderServer.Start(node.SelfPeer.Ip, fmt.Sprintf("%d", port-1000))
+	} else {
+		node.log.Error("Wrong port format provided")
+		os.Exit(1)
+	}
 }
 
 // CalculateResponse implements DownloadInterface on Node object.
