@@ -542,9 +542,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 	pong := proto_node.NewPongMessage(peers, node.Consensus.PublicKeys)
 	buffer := pong.ConstructPongMessage()
 
-	for _, p := range peers {
-		p2p.SendMessage(p, buffer)
-	}
+	p2p.BroadcastMessageFromLeader(peers, buffer)
 
 	return len(peers)
 }
