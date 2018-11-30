@@ -71,6 +71,11 @@ func (b *BlockGen) SetNonce(nonce types.BlockNonce) {
 	b.header.Nonce = nonce
 }
 
+// SetShardId sets the shardId field of the generated block.
+func (b *BlockGen) SetShardId(shardId types.ShardId) {
+	b.header.ShardId = shardId
+}
+
 // AddTx adds a transaction to the generated block. If no coinbase has
 // been set, the block's coinbase is set to the zero address.
 //

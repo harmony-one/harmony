@@ -285,9 +285,12 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 		}
 
 		database := hdb.NewMemDatabase()
+		chainConfig := params.TestChainConfig
+		chainConfig.ChainID = big.NewInt(int64(node.Consensus.ShardID)) // Use ChainId as piggybacked ShardId
 		gspec := core.Genesis{
-			Config: params.TestChainConfig,
-			Alloc:  genesisAloc,
+			Config:  chainConfig,
+			Alloc:   genesisAloc,
+			ShardId: uint32(node.Consensus.ShardID),
 		}
 
 		_ = gspec.MustCommit(database)

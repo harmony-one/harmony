@@ -522,6 +522,9 @@ func (node *Node) AddNewBlockAccount(newBlock *types.Block) {
 	num, err := node.Chain.InsertChain([]*types.Block{newBlock})
 	if err != nil {
 		node.log.Debug("Error adding to chain", "numBlocks", num, "Error", err)
+		if node.Consensus != nil {
+			fmt.Println("SHARD ID", node.Consensus.ShardID)
+		}
 	}
 }
 
