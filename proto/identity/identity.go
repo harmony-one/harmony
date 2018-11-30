@@ -10,12 +10,12 @@ import (
 // IdentityMessageTypeBytes is the number of bytes consensus message type occupies
 const IdentityMessageTypeBytes = 1
 
-// IdentityMessageType is the identity message type.
-type IdentityMessageType byte
+// IDMessageType is the identity message type.
+type IDMessageType byte
 
 // Constants of IdentityMessageType.
 const (
-	Identity IdentityMessageType = iota
+	Identity IDMessageType = iota
 	// TODO: add more types
 )
 
@@ -44,7 +44,7 @@ func (msgType MessageType) String() string {
 // GetIdentityMessageType Get the identity message type from the identity message
 func GetIdentityMessageType(message []byte) (MessageType, error) {
 	if len(message) < 1 {
-		return 0, errors.New("Failed to get identity message type: no data available.")
+		return 0, errors.New("failed to get identity message type: no data available")
 	}
 	return MessageType(message[0]), nil
 }
@@ -52,12 +52,12 @@ func GetIdentityMessageType(message []byte) (MessageType, error) {
 // GetIdentityMessagePayload message payload from the identity message
 func GetIdentityMessagePayload(message []byte) ([]byte, error) {
 	if len(message) < 2 {
-		return []byte{}, errors.New("Failed to get identity message payload: no data available.")
+		return []byte{}, errors.New("failed to get identity message payload: no data available")
 	}
 	return message[IdentityMessageTypeBytes:], nil
 }
 
-// Concatenate msgType as one byte with payload, and return the whole byte array
+// ConstructIdentityMessage concatenates msgType as one byte with payload, and return the whole byte array
 func ConstructIdentityMessage(identityMessageType MessageType, payload []byte) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Identity)})
 	byteBuffer.WriteByte(byte(Identity))

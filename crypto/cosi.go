@@ -1,5 +1,5 @@
 /*
-Package cosi implements the collective signing (CoSi) algorithm as presented in
+Package crypto implements the collective signing (CoSi) algorithm as presented in
 the paper "Keeping Authorities 'Honest or Bust' with Decentralized Witness
 Cosigning" by Ewa Syta et al. See https://arxiv.org/abs/1503.08768. This
 package only provides the functionality for the cryptographic operations of

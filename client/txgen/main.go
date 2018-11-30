@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/client/txgen/txgen"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/p2pv2"
 
 	"github.com/harmony-one/harmony/blockchain"
 	"github.com/harmony-one/harmony/client"
@@ -79,18 +80,19 @@ func main() {
 	// Nodes containing utxopools to mirror the shards' data in the network
 	nodes := []*node.Node{}
 	for shardID := range shardIDLeaderMap {
-		node := node.New(&consensus.Consensus{ShardID: shardID}, nil)
+		node := node.New(&consensus.Consensus{ShardID: shardID}, nil, p2p.Peer{})
 		// Assign many fake addresses so we have enough address to play with at first
 		node.AddTestingAddresses(setting.NumOfAddress)
 		nodes = append(nodes, node)
 	}
 
 	// Client/txgenerator server node setup
-	clientPort := config.GetClientPort()
-	consensusObj := consensus.NewConsensus("0", clientPort, "0", nil, p2p.Peer{})
-	clientNode := node.New(consensusObj, nil)
+	clientPeer := config.GetClientPeer()
+	consensusObj := consensus.New(*clientPeer, "0", nil, p2p.Peer{})
+	clientNode := node.New(consensusObj, nil, *clientPeer)
 
-	if clientPort != "" {
+	if clientPeer != nil {
+		p2pv2.InitHost(clientPeer.IP, clientPeer.Port) // TODO: this should be moved into client node.
 		clientNode.Client = client.NewClient(&shardIDLeaderMap)
 
 		// This func is used to update the client's utxopool when new blocks are received from the leaders
@@ -98,15 +100,15 @@ func main() {
 			log.Debug("Received new block from leader", "len", len(blocks))
 			for _, block := range blocks {
 				for _, node := range nodes {
-					shardId := block.ShardID
+					shardID := block.ShardID
 
 					accountBlock := new(types.Block)
 					err := rlp.DecodeBytes(block.AccountBlock, accountBlock)
 					if err == nil {
-						shardId = accountBlock.ShardID()
+						shardID = accountBlock.ShardID()
 					}
-					if node.Consensus.ShardID == shardId {
-						log.Debug("Adding block from leader", "shardID", shardId)
+					if node.Consensus.ShardID == shardID {
+						log.Debug("Adding block from leader", "shardID", shardID)
 						// Add it to blockchain
 						node.AddNewBlock(block)
 						utxoPoolMutex.Lock()
@@ -133,10 +135,9 @@ func main() {
 
 		// Start the client server to listen to leader's message
 		go func() {
-			clientNode.StartServer(clientPort)
+			clientNode.StartServer(clientPeer.Port)
 		}()
 	}
-
 	// Transaction generation process
 	time.Sleep(10 * time.Second) // wait for nodes to be ready
 	start := time.Now()
@@ -159,7 +160,7 @@ func main() {
 
 			utxoPoolMutex.Lock()
 			log.Warn("STARTING TX GEN", "gomaxprocs", runtime.GOMAXPROCS(0))
-			for shardID, _ := range shardIDLeaderMap { // Generate simulated transactions
+			for shardID := range shardIDLeaderMap { // Generate simulated transactions
 				go func(shardID uint32) {
 					txs, _ := txgen.GenerateSimulatedTransactionsAccount(int(shardID), nodes, setting)
 
@@ -200,12 +201,12 @@ func main() {
 
 			utxoPoolMutex.Lock()
 			log.Warn("STARTING TX GEN", "gomaxprocs", runtime.GOMAXPROCS(0))
-			for shardID, _ := range shardIDLeaderMap { // Generate simulated transactions
+			for shardID := range shardIDLeaderMap { // Generate simulated transactions
 				go func(shardID uint32) {
 					txs, crossTxs := txgen.GenerateSimulatedTransactions(subsetCounter, *numSubset, int(shardID), nodes, setting)
 
 					// Put cross shard tx into a pending list waiting for proofs from leaders
-					if clientPort != "" {
+					if clientPeer != nil {
 						clientNode.Client.PendingCrossTxsMutex.Lock()
 						for _, tx := range crossTxs {
 							clientNode.Client.PendingCrossTxs[tx.ID] = tx
@@ -217,7 +218,7 @@ func main() {
 					// Put txs into corresponding shards
 					shardIDTxsMap[shardID] = append(shardIDTxsMap[shardID], txs...)
 					for _, crossTx := range crossTxs {
-						for curShardID, _ := range client.GetInputShardIDsOfCrossShardTx(crossTx) {
+						for curShardID := range client.GetInputShardIDsOfCrossShardTx(crossTx) {
 							shardIDTxsMap[curShardID] = append(shardIDTxsMap[curShardID], crossTx)
 						}
 					}
@@ -248,12 +249,14 @@ func main() {
 	time.Sleep(3000 * time.Millisecond)
 }
 
+// SendTxsToLeader sends txs to leader.
 func SendTxsToLeader(leader p2p.Peer, txs []*blockchain.Transaction) {
 	log.Debug("[Generator] Sending txs to...", "leader", leader, "numTxs", len(txs))
 	msg := proto_node.ConstructTransactionListMessage(txs)
 	p2p.SendMessage(leader, msg)
 }
 
+// SendTxsToLeaderAccount sends txs to leader account.
 func SendTxsToLeaderAccount(leader p2p.Peer, txs types.Transactions) {
 	log.Debug("[Generator] Sending account-based txs to...", "leader", leader, "numTxs", len(txs))
 	msg := proto_node.ConstructTransactionListMessageAccount(txs)

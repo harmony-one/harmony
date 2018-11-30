@@ -17,9 +17,8 @@ func (IDC *BeaconChain) BeaconChainHandler(conn net.Conn) {
 	if err != nil {
 		IDC.log.Error("Read p2p data failed")
 		return
-	} else {
-		IDC.log.Info("received connection")
 	}
+	IDC.log.Info("received connection")
 	msgCategory, err := proto.GetMessageCategory(content)
 	if err != nil {
 		IDC.log.Error("Read message category failed", "err", err)
@@ -48,7 +47,7 @@ func (IDC *BeaconChain) BeaconChainHandler(conn net.Conn) {
 	}
 	switch msgCategory {
 	case proto.Identity:
-		actionType := proto_identity.IdentityMessageType(msgType)
+		actionType := proto_identity.IDMessageType(msgType)
 		switch actionType {
 		case proto_identity.Identity:
 			idMsgType, err := proto_identity.GetIdentityMessageType(msgPayload)

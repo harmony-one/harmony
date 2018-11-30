@@ -27,6 +27,7 @@ import (
 	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/p2pv2"
 	proto_node "github.com/harmony-one/harmony/proto/node"
 	"github.com/harmony-one/harmony/syncing/downloader"
 	downloader_pb "github.com/harmony-one/harmony/syncing/downloader/proto"
@@ -154,9 +155,16 @@ func (node *Node) StartServer(port string) {
 		// Disable this temporarily.
 		// node.blockchain = syncing.StartBlockSyncing(node.Consensus.GetValidatorPeers())
 	}
-	fmt.Println("going to start server on port:", port)
-	//node.log.Debug("Starting server", "node", node, "port", port)
-	node.listenOnPort(port)
+	if p2p.Version == 1 {
+		fmt.Println("going to start server on port:", port)
+		//node.log.Debug("Starting server", "node", node, "port", port)
+		node.listenOnPort(port)
+	} else {
+		p2pv2.InitHost(node.SelfPeer.IP, port)
+		p2pv2.BindHandler(node.NodeHandlerV1)
+		// Hang forever
+		<-make(chan struct{})
+	}
 }
 
 // SetLog sets log for Node.
@@ -165,6 +173,7 @@ func (node *Node) SetLog() *Node {
 	return node
 }
 
+// Version 0 p2p. Going to be deprecated.
 func (node *Node) listenOnPort(port string) {
 	addr := net.JoinHostPort("", port)
 	listen, err := net.Listen("tcp4", addr)
@@ -244,7 +253,7 @@ func DeserializeNode(d []byte) *NetworkNode {
 }
 
 // New creates a new node.
-func New(consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
+func New(consensus *bft.Consensus, db *hdb.LDBDatabase, selfPeer p2p.Peer) *Node {
 	node := Node{}
 
 	if consensus != nil {
@@ -301,6 +310,9 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 		node.BlockChannelAccount = make(chan *types.Block)
 		node.Worker = worker.New(params.TestChainConfig, chain, bft.NewFaker())
 	}
+
+	node.SelfPeer = selfPeer
+
 	// Logger
 	node.log = log.New()
 	if consensus.IsLeader {
@@ -340,6 +352,7 @@ func (node *Node) JoinShard(leader p2p.Peer) {
 		ping := proto_node.NewPingMessage(node.SelfPeer)
 		buffer := ping.ConstructPingMessage()
 
+		// Talk to leader.
 		p2p.SendMessage(leader, buffer)
 	}
 }
