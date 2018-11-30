@@ -352,6 +352,7 @@ func (node *Node) JoinShard(leader p2p.Peer) {
 		ping := proto_node.NewPingMessage(node.SelfPeer)
 		buffer := ping.ConstructPingMessage()
 
+		// Talk to leader.
 		p2p.SendMessage(leader, buffer)
 	}
 }
