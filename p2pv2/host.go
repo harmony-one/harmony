@@ -34,7 +34,6 @@ func InitHost(ip, port string) {
 	addr := fmt.Sprintf("/ip4/%s/tcp/%s", ip, port)
 	sourceAddr, err := multiaddr.NewMultiaddr(addr)
 	catchError(err)
-	// TODO(ricl): use ip as well.
 	priv := addrToPrivKey(addr)
 	myHost, err = libp2p.New(context.Background(),
 		libp2p.ListenAddrs(sourceAddr),
