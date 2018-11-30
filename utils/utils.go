@@ -24,18 +24,13 @@ func ConvertFixedDataIntoByteArray(data interface{}) []byte {
 	return buff.Bytes()
 }
 
-// GetUniqueIDFromPeer returns unique id from peer.
+// TODO(minhdoan): this is probably a hack, probably needs some strong non-collision hash.
+// GetUniqueIDFromPeer --
 func GetUniqueIDFromPeer(peer p2p.Peer) uint16 {
-	reg, err := regexp.Compile("[^0-9]+")
-	if err != nil {
-		log.Panic("Regex Compilation Failed", "err", err)
-	}
-	socketID := reg.ReplaceAllString(peer.IP+peer.Port, "") // A integer Id formed by unique IP/PORT pair
-	value, _ := strconv.Atoi(socketID)
-	return uint16(value)
+	return GetUniqueIDFromIPPort(peer.IP, peer.Port)
 }
 
-// GetUniqueIDFromIPPort return unique id from ip port.
+// GetUniqueIDFromIPPort --
 func GetUniqueIDFromIPPort(ip, port string) uint16 {
 	reg, err := regexp.Compile("[^0-9]+")
 	if err != nil {

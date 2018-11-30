@@ -18,9 +18,9 @@ import (
 func TestNewNewNode(test *testing.T) {
 	leader := p2p.Peer{IP: "1", Port: "2"}
 	validator := p2p.Peer{IP: "3", Port: "5"}
-	consensus := consensus.NewConsensus("1", "2", "0", []p2p.Peer{leader, validator}, leader)
+	consensus := consensus.New(leader, "0", []p2p.Peer{leader, validator}, leader)
 
-	node := New(consensus, nil)
+	node := New(consensus, nil, leader)
 	if node.Consensus == nil {
 		test.Error("Consensus is not initialized for the node")
 	}
@@ -45,9 +45,9 @@ func TestNewNewNode(test *testing.T) {
 func TestCountNumTransactionsInBlockchain(test *testing.T) {
 	leader := p2p.Peer{IP: "1", Port: "2"}
 	validator := p2p.Peer{IP: "3", Port: "5"}
-	consensus := consensus.NewConsensus("1", "2", "0", []p2p.Peer{leader, validator}, leader)
+	consensus := consensus.New(leader, "0", []p2p.Peer{leader, validator}, leader)
 
-	node := New(consensus, nil)
+	node := New(consensus, nil, leader)
 	node.AddTestingAddresses(1000)
 	if node.countNumTransactionsInBlockchain() != 1001 {
 		test.Error("Count of transactions in the blockchain is incorrect")
@@ -79,9 +79,9 @@ func TestAddPeers(test *testing.T) {
 	}
 	leader := p2p.Peer{IP: "1", Port: "2"}
 	validator := p2p.Peer{IP: "3", Port: "5"}
-	consensus := consensus.NewConsensus("1", "2", "0", []p2p.Peer{leader, validator}, leader)
+	consensus := consensus.New(leader, "0", []p2p.Peer{leader, validator}, leader)
 
-	node := New(consensus, nil)
+	node := New(consensus, nil, leader)
 	r1 := node.AddPeers(peers1)
 	e1 := 2
 	if r1 != e1 {
@@ -149,12 +149,11 @@ func exitServer() {
 
 // func TestPingPongHandler(test *testing.T) {
 // 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8881"}
-// 	consensus := consensus.NewConsensus("127.0.0.1", "8881", "0", []p2p.Peer{leader}, leader)
+// 	// validator := p2p.Peer{IP: "127.0.0.1", Port: "9991"}
+// 	consensus := consensus.New("127.0.0.1", "8881", "0", []p2p.Peer{leader}, leader)
 // 	node := New(consensus, nil)
-
 // 	//	go sendPingMessage(leader)
 // 	go sendPongMessage(leader)
 // 	go exitServer()
-
 // 	node.StartServer("8881")
 // }

@@ -253,7 +253,7 @@ func DeserializeNode(d []byte) *NetworkNode {
 }
 
 // New creates a new node.
-func New(consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
+func New(consensus *bft.Consensus, db *hdb.LDBDatabase, selfPeer p2p.Peer) *Node {
 	node := Node{}
 
 	if consensus != nil {
@@ -310,6 +310,9 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 		node.BlockChannelAccount = make(chan *types.Block)
 		node.Worker = worker.New(params.TestChainConfig, chain, bft.NewFaker())
 	}
+
+	node.SelfPeer = selfPeer
+
 	// Logger
 	node.log = log.New()
 	if consensus.IsLeader {

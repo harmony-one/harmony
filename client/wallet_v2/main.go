@@ -257,7 +257,7 @@ func CreateWalletServerNode() *node.Node {
 		shardIDLeaderMap = getShardIDToLeaderMap()
 		clientPeer = &p2p.Peer{Port: "127.0.0.1", IP: "1234"}
 	}
-	walletNode := node.New(nil, nil)
+	walletNode := node.New(nil, nil, *clientPeer)
 	walletNode.Client = client.NewClient(&shardIDLeaderMap)
 	walletNode.ClientPeer = clientPeer
 	return walletNode
