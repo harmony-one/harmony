@@ -201,10 +201,6 @@ func (ss *StateSync) GetBlockHashesConsensusAndCleanUp() bool {
 	sort.Slice(ss.syncConfig.peers, func(i, j int) bool {
 		return CompareSyncPeerConfigByblockHashes(ss.syncConfig.peers[i], ss.syncConfig.peers[j]) == -1
 	})
-<<<<<<< HEAD
-=======
-
->>>>>>> add more tests when bad node participarting in syncing
 	maxFirstID, maxCount := ss.syncConfig.GetHowManyMaxConsensus()
 	if float64(maxCount) >= ConsensusRatio*float64(ss.activePeerNumber) {
 		ss.syncConfig.CleanUpPeers(maxFirstID)
@@ -214,33 +210,6 @@ func (ss *StateSync) GetBlockHashesConsensusAndCleanUp() bool {
 	return false
 }
 
-<<<<<<< HEAD
-// InitForTesting used for testing.
-func (syncConfig *SyncConfig) InitForTesting(client *downloader.Client, blockHashes [][]byte) {
-	for i := range syncConfig.peers {
-		syncConfig.peers[i].blockHashes = blockHashes
-		syncConfig.peers[i].client = client
-	}
-}
-
-// GetBlockHashesConsensusAndCleanUp chesk if all consensus hashes are equal.
-func (ss *StateSync) GetBlockHashesConsensusAndCleanUp() bool {
-	// Sort all peers by the blockHashes.
-	sort.Slice(ss.syncConfig.peers, func(i, j int) bool {
-		return CompareSyncPeerConfigByblockHashes(ss.syncConfig.peers[i], ss.syncConfig.peers[j]) == -1
-	})
-
-	maxFirstID, maxCount := ss.syncConfig.GetHowManyMaxConsensus()
-	if float64(maxCount) >= ConsensusRatio*float64(ss.activePeerNumber) {
-		ss.syncConfig.CleanUpPeers(maxFirstID)
-		ss.CleanUpNilPeers()
-		return true
-	}
-	return false
-}
-
-=======
->>>>>>> add more tests when bad node participarting in syncing
 // GetConsensusHashes gets all hashes needed to download.
 func (ss *StateSync) GetConsensusHashes() {
 	for {
