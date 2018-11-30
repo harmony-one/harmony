@@ -27,6 +27,7 @@ import (
 	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/p2pv2"
 	proto_node "github.com/harmony-one/harmony/proto/node"
 	"github.com/harmony-one/harmony/syncing/downloader"
 	downloader_pb "github.com/harmony-one/harmony/syncing/downloader/proto"
@@ -154,9 +155,16 @@ func (node *Node) StartServer(port string) {
 		// Disable this temporarily.
 		// node.blockchain = syncing.StartBlockSyncing(node.Consensus.GetValidatorPeers())
 	}
-	fmt.Println("going to start server on port:", port)
-	//node.log.Debug("Starting server", "node", node, "port", port)
-	node.listenOnPort(port)
+	if p2p.Version == 1 {
+		fmt.Println("going to start server on port:", port)
+		//node.log.Debug("Starting server", "node", node, "port", port)
+		node.listenOnPort(port)
+	} else {
+		p2pv2.InitHost(node.SelfPeer.IP, port)
+		p2pv2.BindHandler(node.NodeHandlerV1)
+		// Hang forever
+		<-make(chan struct{})
+	}
 }
 
 // SetLog sets log for Node.
@@ -165,6 +173,7 @@ func (node *Node) SetLog() *Node {
 	return node
 }
 
+// Version 0 p2p. Going to be deprecated.
 func (node *Node) listenOnPort(port string) {
 	addr := net.JoinHostPort("", port)
 	listen, err := net.Listen("tcp4", addr)

@@ -24,8 +24,8 @@ content (n bytes) - actual message content
 
 */
 
-// BatchSize defines the size of buffer
-const BatchSize = 1 << 16
+// BatchSizeInByte defines the size of buffer (64MB)
+const BatchSizeInByte = 1 << 16
 
 // ReadMessageContent reads the message type and content size, and return the actual content.
 func ReadMessageContent(conn net.Conn) ([]byte, error) {
@@ -33,10 +33,8 @@ func ReadMessageContent(conn net.Conn) ([]byte, error) {
 		contentBuf = bytes.NewBuffer([]byte{})
 		r          = bufio.NewReader(conn)
 	)
-
 	timeoutDuration := 1 * time.Second
 	conn.SetReadDeadline(time.Now().Add(timeoutDuration))
-
 	//// Read 1 byte for message type
 	_, err := r.ReadByte()
 	switch err {
@@ -50,7 +48,6 @@ func ReadMessageContent(conn net.Conn) ([]byte, error) {
 		return contentBuf.Bytes(), err
 	}
 	// TODO: check on msgType and take actions accordingly
-
 	//// Read 4 bytes for message size
 	fourBytes := make([]byte, 4)
 	n, err := r.Read(fourBytes)
@@ -61,25 +58,22 @@ func ReadMessageContent(conn net.Conn) ([]byte, error) {
 		log.Printf("Failed reading the p2p message size field: only read %d bytes", n)
 		return contentBuf.Bytes(), err
 	}
-
 	//log.Print(fourBytes)
 	// Number of bytes for the message content
 	bytesToRead := binary.BigEndian.Uint32(fourBytes)
 	//log.Printf("The content size is %d bytes.", bytesToRead)
-
 	//// Read the content in chunk of 16 * 1024 bytes
-	tmpBuf := make([]byte, BatchSize)
+	tmpBuf := make([]byte, BatchSizeInByte)
 ILOOP:
 	for {
 		timeoutDuration := 10 * time.Second
 		conn.SetReadDeadline(time.Now().Add(timeoutDuration))
-		if bytesToRead < BatchSize {
+		if bytesToRead < BatchSizeInByte {
 			// Read the last number of bytes less than 1024
 			tmpBuf = make([]byte, bytesToRead)
 		}
 		n, err := r.Read(tmpBuf)
 		contentBuf.Write(tmpBuf[:n])
-
 		switch err {
 		case io.EOF:
 			// TODO: should we return error here, or just ignore it?

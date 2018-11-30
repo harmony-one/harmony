@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/client/txgen/txgen"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/p2pv2"
 
 	"github.com/harmony-one/harmony/blockchain"
 	"github.com/harmony-one/harmony/client"
@@ -86,11 +87,15 @@ func main() {
 	}
 
 	// Client/txgenerator server node setup
-	clientPort := config.GetClientPort()
-	consensusObj := consensus.NewConsensus("0", clientPort, "0", nil, p2p.Peer{})
+	clientPeer := config.GetClientPeer()
+	consensusObj := consensus.NewConsensus(clientPeer.IP, clientPeer.Port, "0", nil, p2p.Peer{})
 	clientNode := node.New(consensusObj, nil)
+	// Add self peer.
+	// TODO(ricl): setting self peer should be moved into consensus / node New!
+	clientNode.SelfPeer = *clientPeer
 
-	if clientPort != "" {
+	if clientPeer != nil {
+		p2pv2.InitHost(clientPeer.IP, clientPeer.Port) // TODO: this should be moved into client node.
 		clientNode.Client = client.NewClient(&shardIDLeaderMap)
 
 		// This func is used to update the client's utxopool when new blocks are received from the leaders
@@ -133,10 +138,9 @@ func main() {
 
 		// Start the client server to listen to leader's message
 		go func() {
-			clientNode.StartServer(clientPort)
+			clientNode.StartServer(clientPeer.Port)
 		}()
 	}
-
 	// Transaction generation process
 	time.Sleep(10 * time.Second) // wait for nodes to be ready
 	start := time.Now()
@@ -205,7 +209,7 @@ func main() {
 					txs, crossTxs := txgen.GenerateSimulatedTransactions(subsetCounter, *numSubset, int(shardID), nodes, setting)
 
 					// Put cross shard tx into a pending list waiting for proofs from leaders
-					if clientPort != "" {
+					if clientPeer != nil {
 						clientNode.Client.PendingCrossTxsMutex.Lock()
 						for _, tx := range crossTxs {
 							clientNode.Client.PendingCrossTxs[tx.ID] = tx
