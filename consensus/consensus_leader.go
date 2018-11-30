@@ -22,6 +22,10 @@ import (
 	proto_consensus "github.com/harmony-one/harmony/proto/consensus"
 )
 
+const (
+	waitForEnoughValidators = 300
+)
+
 var (
 	startTime time.Time
 )
@@ -33,9 +37,8 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) 
 		newBlock := <-blockChannel
 
 		if !consensus.HasEnoughValidators() {
-			consensus.Log.Debug("Not enough validators", "# Validators", len(consensus.publicKeys))
-			time.Sleep(500 * time.Millisecond)
-			continue
+			consensus.Log.Debug("Not enough validators", "# Validators", len(consensus.PublicKeys))
+			time.Sleep(waitForEnoughValidators * time.Millisecond)
 		}
 
 		// TODO: think about potential race condition
@@ -43,18 +46,25 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) 
 		consensus.Log.Debug("STARTING CONSENSUS", "consensus", consensus, "startTime", startTime)
 		for consensus.state == Finished {
 			// time.Sleep(500 * time.Millisecond)
+			consensus.ResetState()
 			consensus.startConsensus(&newBlock)
 			break
 		}
 	}
 }
 
-// WaitForNewBlock waits for the next new block to run consensus on
+// WaitForNewBlockAccount waits for the next new block to run consensus on
 func (consensus *Consensus) WaitForNewBlockAccount(blockChannel chan *types.Block) {
 	consensus.Log.Debug("Waiting for block", "consensus", consensus)
 	for { // keep waiting for new blocks
 		newBlock := <-blockChannel
 		// TODO: think about potential race condition
+
+		if !consensus.HasEnoughValidators() {
+			consensus.Log.Debug("Not enough validators", "# Validators", len(consensus.PublicKeys))
+			time.Sleep(waitForEnoughValidators * time.Millisecond)
+		}
+
 		startTime = time.Now()
 		consensus.Log.Debug("STARTING CONSENSUS", "consensus", consensus, "startTime", startTime)
 		for consensus.state == Finished {
@@ -62,6 +72,7 @@ func (consensus *Consensus) WaitForNewBlockAccount(blockChannel chan *types.Bloc
 			data, err := rlp.EncodeToBytes(newBlock)
 			if err == nil {
 				consensus.Log.Debug("Sample tx", "tx", newBlock.Transactions()[0])
+				consensus.ResetState()
 				consensus.startConsensus(&blockchain.Block{Hash: newBlock.Hash(), AccountBlock: data})
 			} else {
 				consensus.Log.Error("Failed encoding the block with RLP")
@@ -204,7 +215,7 @@ func (consensus *Consensus) processCommitMessage(payload []byte, targetState Sta
 	// proceed only when the message is not received before
 	_, ok = (*commitments)[validatorID]
 	shouldProcess := !ok
-	if len((*commitments)) >= ((len(consensus.publicKeys)*2)/3 + 1) {
+	if len((*commitments)) >= ((len(consensus.PublicKeys)*2)/3 + 1) {
 		shouldProcess = false
 	}
 	if shouldProcess {
@@ -221,7 +232,7 @@ func (consensus *Consensus) processCommitMessage(payload []byte, targetState Sta
 		return
 	}
 
-	if len((*commitments)) >= ((len(consensus.publicKeys)*2)/3+1) && consensus.state < targetState {
+	if len((*commitments)) >= ((len(consensus.PublicKeys)*2)/3+1) && consensus.state < targetState {
 		consensus.Log.Debug("Enough commitments received with signatures", "num", len(*commitments), "state", consensus.state)
 
 		// Broadcast challenge
@@ -341,7 +352,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState S
 	_, ok = (*responses)[validatorID]
 	shouldProcess = shouldProcess && !ok
 
-	if len((*responses)) >= ((len(consensus.publicKeys)*2)/3 + 1) {
+	if len((*responses)) >= ((len(consensus.PublicKeys)*2)/3 + 1) {
 		shouldProcess = false
 	}
 
@@ -366,8 +377,8 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState S
 		return
 	}
 
-	if len(*responses) >= ((len(consensus.publicKeys)*2)/3+1) && consensus.state != targetState {
-		if len(*responses) >= ((len(consensus.publicKeys)*2)/3+1) && consensus.state != targetState {
+	if len(*responses) >= ((len(consensus.PublicKeys)*2)/3+1) && consensus.state != targetState {
+		if len(*responses) >= ((len(consensus.PublicKeys)*2)/3+1) && consensus.state != targetState {
 			consensus.Log.Debug("Enough responses received with signatures", "num", len(*responses), "state", consensus.state)
 			// Aggregate responses
 			responseScalars := []kyber.Scalar{}
@@ -465,7 +476,12 @@ func (consensus *Consensus) reportMetrics(block blockchain.Block) {
 
 	endTime := time.Now()
 	timeElapsed := endTime.Sub(startTime)
-	numOfTxs := block.NumTransactions
+	numOfTxs := int(block.NumTransactions)
+	if block.AccountBlock != nil {
+		accountBlock := new(types.Block)
+		rlp.DecodeBytes(block.AccountBlock, accountBlock)
+		numOfTxs = len(accountBlock.Transactions())
+	}
 	tps := float64(numOfTxs) / timeElapsed.Seconds()
 	consensus.Log.Info("TPS Report",
 		"numOfTXs", numOfTxs,
@@ -489,7 +505,7 @@ func (consensus *Consensus) reportMetrics(block blockchain.Block) {
 		"key":             consensus.pubKey.String(),
 		"tps":             tps,
 		"txCount":         numOfTxs,
-		"nodeCount":       len(consensus.publicKeys) + 1,
+		"nodeCount":       len(consensus.PublicKeys) + 1,
 		"latestBlockHash": hex.EncodeToString(consensus.blockHash[:]),
 		"latestTxHashes":  txHashes,
 		"blockLatency":    int(timeElapsed / time.Millisecond),
@@ -497,8 +513,12 @@ func (consensus *Consensus) reportMetrics(block blockchain.Block) {
 	profiler.LogMetrics(metrics)
 }
 
+// HasEnoughValidators checks the number of publicKeys to determine
+// if the shard has enough validators
+// FIXME (HAR-82): we need epoch support or a better way to determine
+// when to initiate the consensus
 func (consensus *Consensus) HasEnoughValidators() bool {
-	if len(consensus.publicKeys) < consensus.MinPeers {
+	if len(consensus.PublicKeys) < consensus.MinPeers {
 		return false
 	}
 	return true

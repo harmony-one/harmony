@@ -5,16 +5,17 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/crypto/pki"
 	"net"
 	"os"
 	"strconv"
 	"time"
 
+	"github.com/dedis/kyber"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/blockchain"
+	"github.com/harmony-one/harmony/core/types"
 	hmy_crypto "github.com/harmony-one/harmony/crypto"
+	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/proto"
 	"github.com/harmony-one/harmony/proto/client"
@@ -371,7 +372,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
 	}
 }
 
-// WaitForConsensusReady ...
+// WaitForConsensusReadyAccount ...
 func (node *Node) WaitForConsensusReadyAccount(readySignal chan struct{}) {
 	node.log.Debug("Waiting for Consensus ready", "node", node)
 
@@ -465,7 +466,7 @@ func (node *Node) VerifyNewBlock(newBlock *blockchain.Block) bool {
 	return node.UtxoPool.VerifyTransactions(newBlock.Transactions)
 }
 
-// VerifyNewBlock is called by consensus participants to verify the block (account model) they are running consensus on
+// VerifyNewBlockAccount is called by consensus participants to verify the block (account model) they are running consensus on
 func (node *Node) VerifyNewBlockAccount(newBlock *types.Block) bool {
 	err := node.Chain.ValidateNewBlock(newBlock, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey))
 	if err != nil {
@@ -521,6 +522,9 @@ func (node *Node) AddNewBlockAccount(newBlock *types.Block) {
 	num, err := node.Chain.InsertChain([]*types.Block{newBlock})
 	if err != nil {
 		node.log.Debug("Error adding to chain", "numBlocks", num, "Error", err)
+		if node.Consensus != nil {
+			fmt.Println("SHARD ID", node.Consensus.ShardID)
+		}
 	}
 }
 
@@ -586,7 +590,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 
 	// Send a Pong message back
 	peers := node.Consensus.GetValidatorPeers()
-	pong := proto_node.NewPongMessage(peers)
+	pong := proto_node.NewPongMessage(peers, node.Consensus.PublicKeys)
 	buffer := pong.ConstructPongMessage()
 
 	for _, p := range peers {
@@ -603,6 +607,7 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		return -1
 	}
 	// node.log.Info("Pong", "Msg", pong)
+	// TODO (lc) state syncing, and wait for all public keys
 	node.State = NodeJoinedShard
 
 	peers := make([]p2p.Peer, 0)
@@ -622,5 +627,25 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		peers = append(peers, *peer)
 	}
 
-	return node.AddPeers(peers)
+	if len(peers) > 0 {
+		node.AddPeers(peers)
+	}
+
+	// Reset Validator PublicKeys every time we receive PONG message from Leader
+	// The PublicKeys has to be idential across the shard on every node
+	// TODO (lc): we need to handle RemovePeer situation
+	publicKeys := make([]kyber.Point, 0)
+
+	// Create the the PubKey from the []byte sent from leader
+	for _, k := range pong.PubKeys {
+		key := hmy_crypto.Ed25519Curve.Point()
+		err = key.UnmarshalBinary(k[:])
+		if err != nil {
+			node.log.Error("UnmarshalBinary Failed PubKeys", "error", err)
+			continue
+		}
+		publicKeys = append(publicKeys, key)
+	}
+
+	return node.Consensus.UpdatePublicKeys(publicKeys)
 }

@@ -2,13 +2,16 @@ package downloader
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net"
 
 	"google.golang.org/grpc"
 
 	pb "github.com/harmony-one/harmony/syncing/downloader/proto"
+)
+
+const (
+	DefaultDownloadPort = "6666"
 )
 
 // Server is the Server struct for downloader package.
@@ -27,7 +30,9 @@ func (s *Server) Query(ctx context.Context, request *pb.DownloaderRequest) (*pb.
 
 // Start starts the Server on given ip and port.
 func (s *Server) Start(ip, port string) (*grpc.Server, error) {
-	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%s", ip, port))
+	// TODO(minhdoan): Currently not using ip. Fix it later.
+	addr := net.JoinHostPort("", port)
+	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}

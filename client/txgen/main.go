@@ -3,14 +3,15 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/harmony/client/txgen/txgen"
-	"github.com/harmony-one/harmony/core/types"
 	"os"
 	"path"
 	"runtime"
 	"sync"
 	"time"
+
+	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/client/txgen/txgen"
+	"github.com/harmony-one/harmony/core/types"
 
 	"github.com/harmony-one/harmony/blockchain"
 	"github.com/harmony-one/harmony/client"
@@ -97,21 +98,26 @@ func main() {
 			log.Debug("Received new block from leader", "len", len(blocks))
 			for _, block := range blocks {
 				for _, node := range nodes {
-					if node.Consensus.ShardID == block.ShardID {
-						log.Debug("Adding block from leader", "shardID", block.ShardID)
+					shardId := block.ShardID
+
+					accountBlock := new(types.Block)
+					err := rlp.DecodeBytes(block.AccountBlock, accountBlock)
+					if err == nil {
+						shardId = accountBlock.ShardId()
+					}
+					if node.Consensus.ShardID == shardId {
+						log.Debug("Adding block from leader", "shardID", shardId)
 						// Add it to blockchain
 						node.AddNewBlock(block)
 						utxoPoolMutex.Lock()
 						node.UpdateUtxoAndState(block)
 						utxoPoolMutex.Unlock()
 
-						accountBlock := new(types.Block)
-						err := rlp.DecodeBytes(block.AccountBlock, accountBlock)
-						fmt.Println("RECEIVED NEW BLOCK ", len(accountBlock.Transactions()))
 						if err != nil {
 							log.Error("Failed decoding the block with RLP")
 						} else {
-							err = node.Worker.CommitTransactions(accountBlock.Transactions(), accountBlock.Coinbase())
+							fmt.Println("RECEIVED NEW BLOCK ", len(accountBlock.Transactions()))
+							node.AddNewBlockAccount(accountBlock)
 							node.Worker.UpdateCurrent()
 							if err != nil {
 								log.Debug("Failed to add new block to worker", "Error", err)

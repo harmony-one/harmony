@@ -225,5 +225,6 @@ func main() {
 		}
 	}
 
+	go currentNode.SupportSyncing()
 	currentNode.StartServer(*port)
 }

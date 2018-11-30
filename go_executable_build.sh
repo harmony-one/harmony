@@ -8,6 +8,7 @@ BUCKET=unique-bucket-bin
 GOOS=linux
 GOARCH=amd64
 FOLDER=/${WHOAMI:-$USER}
+RACE=
 
 if [ "$(uname -s)" == "Darwin" ]; then
    MD5='md5 -r'
@@ -29,6 +30,7 @@ OPTIONS:
    -o os          set build OS (default: $GOOS, windows is supported)
    -b bucket      set the upload bucket name (default: $BUCKET)
    -f folder      set the upload folder name in the bucket (default: $FOLDER)
+   -r             enable -race build option (default: $RACE)
 
 ACTION:
    build       build binaries only (default action)
@@ -57,7 +59,7 @@ function build_only
    BUILTBY=${USER}@
 
    for bin in "${!SRC[@]}"; do
-      env GOOS=$GOOS GOARCH=$GOARCH go build -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin ${SRC[$bin]}
+      env GOOS=$GOOS GOARCH=$GOARCH go build -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE ${SRC[$bin]}
       if [ "$(uname -s)" == "Linux" ]; then
          $BINDIR/$bin -version
       fi
@@ -84,7 +86,7 @@ function upload
 }
 
 ################################ MAIN FUNCTION ##############################
-while getopts "hp:a:o:b:f:" option; do
+while getopts "hp:a:o:b:f:r" option; do
    case $option in
       h) usage ;;
       p) PROFILE=$OPTARG ;;
@@ -92,6 +94,7 @@ while getopts "hp:a:o:b:f:" option; do
       o) GOOS=$OPTARG ;;
       b) BUCKET=$OPTARG/ ;;
       f) FOLDER=$OPTARG ;;
+      r) RACE=-race ;;
    esac
 done
 
