@@ -15,34 +15,34 @@ import (
 	proto_node "github.com/harmony-one/harmony/proto/node"
 )
 
-func TestNewNewNode(test *testing.T) {
+func TestNewNewNode(t *testing.T) {
 	leader := p2p.Peer{IP: "1", Port: "2"}
 	validator := p2p.Peer{IP: "3", Port: "5"}
 	consensus := consensus.New(leader, "0", []p2p.Peer{leader, validator}, leader)
 
 	node := New(consensus, nil, leader)
 	if node.Consensus == nil {
-		test.Error("Consensus is not initialized for the node")
+		t.Error("Consensus is not initialized for the node")
 	}
 
 	if node.blockchain == nil {
-		test.Error("Blockchain is not initialized for the node")
+		t.Error("Blockchain is not initialized for the node")
 	}
 
 	if len(node.blockchain.Blocks) != 1 {
-		test.Error("Genesis block is not initialized for the node")
+		t.Error("Genesis block is not initialized for the node")
 	}
 
 	if len(node.blockchain.Blocks[0].Transactions) != 1 {
-		test.Error("Coinbase TX is not initialized for the node")
+		t.Error("Coinbase TX is not initialized for the node")
 	}
 
 	if node.UtxoPool == nil {
-		test.Error("Utxo pool is not initialized for the node")
+		t.Error("Utxo pool is not initialized for the node")
 	}
 }
 
-func TestCountNumTransactionsInBlockchain(test *testing.T) {
+func TestCountNumTransactionsInBlockchain(t *testing.T) {
 	leader := p2p.Peer{IP: "1", Port: "2"}
 	validator := p2p.Peer{IP: "3", Port: "5"}
 	consensus := consensus.New(leader, "0", []p2p.Peer{leader, validator}, leader)
@@ -50,11 +50,27 @@ func TestCountNumTransactionsInBlockchain(test *testing.T) {
 	node := New(consensus, nil, leader)
 	node.AddTestingAddresses(1000)
 	if node.countNumTransactionsInBlockchain() != 1001 {
-		test.Error("Count of transactions in the blockchain is incorrect")
+		t.Error("Count of transactions in the blockchain is incorrect")
 	}
 }
 
-func TestAddPeers(test *testing.T) {
+func TestGetPeers(t *testing.T) {
+	leader := p2p.Peer{IP: "1", Port: "2"}
+	validator := p2p.Peer{IP: "3", Port: "5"}
+	consensus := consensus.New(leader, "0", []p2p.Peer{leader, validator}, leader)
+
+	node := New(consensus, nil, leader)
+	peer := p2p.Peer{IP: "1.1.1.1"}
+	peer2 := p2p.Peer{IP: "2.1.1.1"}
+	node.Neighbors.Store("minh", peer)
+	node.Neighbors.Store("mark", peer2)
+	res := node.GetPeers()
+	if len(res) != 2 || res[0] != peer || res[1] != peer2 {
+		t.Error("GetPeers should return list of {peer, peer2}")
+	}
+}
+
+func TestAddPeers(t *testing.T) {
 	priKey1 := crypto.Ed25519Curve.Scalar().SetInt64(int64(333))
 	pubKey1 := pki.GetPublicKeyFromScalar(priKey1)
 
@@ -85,12 +101,12 @@ func TestAddPeers(test *testing.T) {
 	r1 := node.AddPeers(peers1)
 	e1 := 2
 	if r1 != e1 {
-		test.Errorf("Add %v peers, expectd %v", r1, e1)
+		t.Errorf("Add %v peers, expectd %v", r1, e1)
 	}
 	r2 := node.AddPeers(peers1)
 	e2 := 0
 	if r2 != e2 {
-		test.Errorf("Add %v peers, expectd %v", r2, e2)
+		t.Errorf("Add %v peers, expectd %v", r2, e2)
 	}
 }
 

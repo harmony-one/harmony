@@ -203,6 +203,7 @@ func main() {
 	currentNode.State = node.NodeWaitToJoin
 
 	if consensus.IsLeader {
+		currentNode.State = node.NodeLeader
 		if *accountModel {
 			// Let consensus run
 			go func() {
@@ -225,6 +226,8 @@ func main() {
 	} else {
 		if *peerDisvoery {
 			go currentNode.JoinShard(leader)
+		} else {
+			node.State = node.NodeDoingConsensus
 		}
 	}
 

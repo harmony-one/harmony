@@ -38,13 +38,12 @@ type State byte
 
 // All constants except the NodeLeader below are for validators only.
 const (
-	NodeInit              State = iota // Node just started, before contacting BeaconChain
-	NodeWaitToJoin                     // Node contacted BeaconChain, wait to join Shard
-	NodeJoinedShard                    // Node joined Shard, ready for consensus
-	NodeOffline                        // Node is offline
-	NodeReadyForConsensus              // Node is ready to do consensus
-	NodeDoingConsensus                 // Node is already doing consensus
-	NodeLeader                         // Node is the leader of some shard.
+	NodeInit           State = iota // Node just started, before contacting BeaconChain
+	NodeWaitToJoin                  // Node contacted BeaconChain, wait to join Shard
+	NodeJoinedShard                 // Node joined Shard, ready for consensus
+	NodeOffline                     // Node is offline
+	NodeDoingConsensus              // Node is already doing consensus
+	NodeLeader                      // Node is the leader of some shard.
 )
 
 const (
@@ -324,6 +323,11 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase, selfPeer p2p.Peer) *Node
 	return &node
 }
 
+// DoSyncing starts syncing.
+func (node *Node) DoSyncing() {
+
+}
+
 // AddPeers adds neighbors nodes
 func (node *Node) AddPeers(peers []p2p.Peer) int {
 	count := 0
@@ -340,6 +344,16 @@ func (node *Node) AddPeers(peers []p2p.Peer) int {
 		node.Consensus.AddPeers(peers)
 	}
 	return count
+}
+
+// GetPeers returns list of peers.
+func (node *Node) GetPeers() []p2p.Peer {
+	res := []p2p.Peer{}
+	node.Neighbors.Range(func(k, v interface{}) bool {
+		res = append(res, v.(p2p.Peer))
+		return true
+	})
+	return res
 }
 
 // JoinShard helps a new node to join a shard.

@@ -90,6 +90,12 @@ func (node *Node) NodeHandler(conn net.Conn) {
 			}
 		}
 	case proto.Consensus:
+		if !(node.State == NodeDoingConsensus || node.State == NodeLeader) {
+			if node.State == NodeJoinedShard {
+
+			}
+			return
+		}
 		actionType := consensus.ConMessageType(msgType)
 		switch actionType {
 		case consensus.Consensus:
