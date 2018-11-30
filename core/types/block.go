@@ -32,6 +32,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
+// Constants for block.
 var (
 	EmptyRootHash  = DeriveSha(Transactions{})
 	EmptyUncleHash = CalcUncleHash(nil)
@@ -42,8 +43,8 @@ var (
 // out on a block.
 type BlockNonce [8]byte
 
-// A Shard is a 32-bit id for the shard a block belongs to
-type ShardId [4]byte
+// ShardID is a 32-bit id for the shard a block belongs to
+type ShardID [4]byte
 
 // EncodeNonce converts the given integer to a block nonce.
 func EncodeNonce(i uint64) BlockNonce {
@@ -52,9 +53,9 @@ func EncodeNonce(i uint64) BlockNonce {
 	return n
 }
 
-// EncodeShardId converts the given integer to a shard id.
-func EncodeShardId(i uint32) ShardId {
-	var n ShardId
+// EncodeShardID converts the given integer to a shard id.
+func EncodeShardID(i uint32) ShardID {
+	var n ShardID
 	binary.BigEndian.PutUint32(n[:], i)
 	return n
 }
@@ -92,7 +93,7 @@ type Header struct {
 	Extra       []byte         `json:"extraData"        gencodec:"required"`
 	MixDigest   common.Hash    `json:"mixHash"          gencodec:"required"`
 	Nonce       BlockNonce     `json:"nonce"            gencodec:"required"`
-	ShardId     ShardId        `json:"shardId"          gencodec:"required"`
+	ShardID     ShardID        `json:"shardId"          gencodec:"required"`
 }
 
 // field type overrides for gencodec
@@ -159,10 +160,10 @@ func (b *Block) DeprecatedTd() *big.Int {
 	return b.td
 }
 
-// [deprecated by eth/63]
 // StorageBlock defines the RLP encoding of a Block stored in the
 // state database. The StorageBlock encoding contains fields that
 // would otherwise need to be recomputed.
+// [deprecated by eth/63]
 type StorageBlock Block
 
 // "external" block encoding. used for eth protocol, etc.
@@ -258,6 +259,7 @@ func (b *Block) EncodeRLP(w io.Writer) error {
 	})
 }
 
+// DecodeRLP decodes RLP
 // [deprecated by eth/63]
 func (b *StorageBlock) DecodeRLP(s *rlp.Stream) error {
 	var sb storageblock
@@ -268,11 +270,17 @@ func (b *StorageBlock) DecodeRLP(s *rlp.Stream) error {
 	return nil
 }
 
-// TODO: copies
+// Uncles return uncles.
+func (b *Block) Uncles() []*Header {
+	return b.uncles
+}
 
-func (b *Block) Uncles() []*Header          { return b.uncles }
-func (b *Block) Transactions() Transactions { return b.transactions }
+// Transactions returns transactions.
+func (b *Block) Transactions() Transactions {
+	return b.transactions
+}
 
+// Transaction returns Transaction.
 func (b *Block) Transaction(hash common.Hash) *Transaction {
 	for _, transaction := range b.transactions {
 		if transaction.Hash() == hash {
@@ -282,16 +290,32 @@ func (b *Block) Transaction(hash common.Hash) *Transaction {
 	return nil
 }
 
-func (b *Block) Number() *big.Int     { return new(big.Int).Set(b.header.Number) }
-func (b *Block) GasLimit() uint64     { return b.header.GasLimit }
-func (b *Block) GasUsed() uint64      { return b.header.GasUsed }
-func (b *Block) Difficulty() *big.Int { return new(big.Int).Set(b.header.Difficulty) }
-func (b *Block) Time() *big.Int       { return new(big.Int).Set(b.header.Time) }
+// Number returns header number.
+func (b *Block) Number() *big.Int { return new(big.Int).Set(b.header.Number) }
 
-func (b *Block) NumberU64() uint64        { return b.header.Number.Uint64() }
-func (b *Block) MixDigest() common.Hash   { return b.header.MixDigest }
-func (b *Block) Nonce() uint64            { return binary.BigEndian.Uint64(b.header.Nonce[:]) }
-func (b *Block) ShardId() uint32          { return binary.BigEndian.Uint32(b.header.ShardId[:]) }
+// GasLimit returns header gas limit.
+func (b *Block) GasLimit() uint64 { return b.header.GasLimit }
+
+// GasUsed returns header gas used.
+func (b *Block) GasUsed() uint64 { return b.header.GasUsed }
+
+// Difficulty is the header difficulty.
+func (b *Block) Difficulty() *big.Int { return new(big.Int).Set(b.header.Difficulty) }
+
+// TIme is header time.
+func (b *Block) Time() *big.Int { return new(big.Int).Set(b.header.Time) }
+
+// NumberU64 is the header number in uint64.
+func (b *Block) NumberU64() uint64 { return b.header.Number.Uint64() }
+
+// MixDigest is the header mix digest.
+func (b *Block) MixDigest() common.Hash { return b.header.MixDigest }
+
+// Nonce is the header nonce.
+func (b *Block) Nonce() uint64 { return binary.BigEndian.Uint64(b.header.Nonce[:]) }
+
+// ShardID is the header ShardID
+func (b *Block) ShardID() uint32          { return binary.BigEndian.Uint32(b.header.ShardID[:]) }
 func (b *Block) Bloom() Bloom             { return b.header.Bloom }
 func (b *Block) Coinbase() common.Address { return b.header.Coinbase }
 func (b *Block) Root() common.Hash        { return b.header.Root }
@@ -365,14 +389,17 @@ func (b *Block) Hash() common.Hash {
 	return v
 }
 
+// Blocks is an array of Block.
 type Blocks []*Block
 
+// BlockBy is the func type.
 type BlockBy func(b1, b2 *Block) bool
 
-func (self BlockBy) Sort(blocks Blocks) {
+// Sort sorts blocks.
+func (blockBy BlockBy) Sort(blocks Blocks) {
 	bs := blockSorter{
 		blocks: blocks,
-		by:     self,
+		by:     blockBy,
 	}
 	sort.Sort(bs)
 }
@@ -382,10 +409,16 @@ type blockSorter struct {
 	by     func(b1, b2 *Block) bool
 }
 
+// Len returns len of the blocks.
 func (self blockSorter) Len() int { return len(self.blocks) }
+
+// Swap swaps block i and block j.
 func (self blockSorter) Swap(i, j int) {
 	self.blocks[i], self.blocks[j] = self.blocks[j], self.blocks[i]
 }
+
+// Less checks if block i is less than block j.
 func (self blockSorter) Less(i, j int) bool { return self.by(self.blocks[i], self.blocks[j]) }
 
+// Number checks if block b1 is less than block b2.
 func Number(b1, b2 *Block) bool { return b1.header.Number.Cmp(b2.header.Number) < 0 }

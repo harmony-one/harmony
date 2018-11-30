@@ -105,7 +105,7 @@ func main() {
 					accountBlock := new(types.Block)
 					err := rlp.DecodeBytes(block.AccountBlock, accountBlock)
 					if err == nil {
-						shardID = accountBlock.ShardId()
+						shardID = accountBlock.ShardID()
 					}
 					if node.Consensus.ShardID == shardID {
 						log.Debug("Adding block from leader", "shardID", shardID)

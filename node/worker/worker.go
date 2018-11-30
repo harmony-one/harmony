@@ -78,7 +78,7 @@ func (w *Worker) UpdateCurrent() error {
 		Number:     num.Add(num, common.Big1),
 		GasLimit:   core.CalcGasLimit(parent, w.gasFloor, w.gasCeil),
 		Time:       big.NewInt(timestamp),
-		ShardId:    types.EncodeShardId(w.chain.ShardId()),
+		ShardID:    types.EncodeShardID(w.chain.ShardID()),
 	}
 	return w.makeCurrent(parent, header)
 }
@@ -131,7 +131,7 @@ func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus.En
 		Number:     num.Add(num, common.Big1),
 		GasLimit:   core.CalcGasLimit(parent, worker.gasFloor, worker.gasCeil),
 		Time:       big.NewInt(timestamp),
-		ShardId:    types.EncodeShardId(worker.chain.ShardId()),
+		ShardID:    types.EncodeShardID(worker.chain.ShardID()),
 	}
 	worker.makeCurrent(parent, header)
 
