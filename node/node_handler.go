@@ -340,21 +340,13 @@ func (node *Node) WaitForConsensusReadyAccount(readySignal chan struct{}) {
 				if len(node.pendingTransactionsAccount) >= 1000 {
 					// Normal tx block consensus
 					selectedTxs, _ := node.getTransactionsForNewBlockAccount(MaxNumberOfTransactionsPerBlock)
-					err := node.Worker.UpdateCurrent()
+					node.Worker.CommitTransactions(selectedTxs)
+					block, err := node.Worker.Commit()
 					if err != nil {
-						node.log.Debug("Failed updating worker's state", "Error", err)
-					}
-					err = node.Worker.CommitTransactions(selectedTxs, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey))
-					if err == nil {
-						block, err := node.Worker.Commit()
-						if err != nil {
-							node.log.Debug("Failed commiting new block", "Error", err)
-						} else {
-							newBlock = block
-							break
-						}
+						node.log.Debug("Failed commiting new block", "Error", err)
 					} else {
-						node.log.Debug("Failed to create new block", "Error", err)
+						newBlock = block
+						break
 					}
 				}
 				// If not enough transactions to run Consensus,
