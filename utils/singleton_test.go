@@ -6,10 +6,10 @@ import (
 	"time"
 )
 
-var NumThreads int = 20
+var NumThreads = 20
 
 func TestSingleton(t *testing.T) {
-	si := GetUniqueValidatorIdInstance()
+	si := GetUniqueValidatorIDInstance()
 	var wg sync.WaitGroup
 
 	t.Log("unique ID provided by singleton instance")
@@ -18,7 +18,7 @@ func TestSingleton(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			t.Logf("id:%v\n", si.GetUniqueId())
+			t.Logf("id:%v\n", si.GetUniqueID())
 			time.Sleep(time.Millisecond)
 
 		}()

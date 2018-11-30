@@ -88,7 +88,7 @@ type Consensus struct {
 
 	Log log.Logger
 
-	uniqueIDInstance *utils.UniqueValidatorId
+	uniqueIDInstance *utils.UniqueValidatorID
 }
 
 // BlockConsensusStatus used to keep track of the consensus status of multiple blocks received so far
@@ -173,7 +173,7 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 	}
 
 	consensus.Log = log.New()
-	consensus.uniqueIDInstance = utils.GetUniqueValidatorIdInstance()
+	consensus.uniqueIDInstance = utils.GetUniqueValidatorIDInstance()
 
 	return &consensus
 }
@@ -242,7 +242,7 @@ func (consensus *Consensus) AddPeers(peers []p2p.Peer) int {
 		_, ok := consensus.validators.Load(utils.GetUniqueIdFromPeer(peer))
 		if !ok {
 			if peer.ValidatorID == -1 {
-				peer.ValidatorID = int(consensus.uniqueIDInstance.GetUniqueId())
+				peer.ValidatorID = int(consensus.uniqueIDInstance.GetUniqueID())
 			}
 			consensus.validators.Store(utils.GetUniqueIdFromPeer(peer), peer)
 			consensus.PublicKeys = append(consensus.PublicKeys, peer.PubKey)
