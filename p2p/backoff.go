@@ -16,6 +16,7 @@ type BackoffBase struct {
 	Min, Cur, Max time.Duration
 }
 
+// NewBackoffBase creates a new BackOffBase structure
 func NewBackoffBase(min, max time.Duration) *BackoffBase {
 	return &BackoffBase{min, min, max}
 }
@@ -40,21 +41,23 @@ func (b *BackoffBase) Sleep() {
 	}
 }
 
-// Adjust the duration.  Subtypes shall implement this.
+// Backoff adjusts the duration.  Subtypes shall implement this.
 func (b *BackoffBase) Backoff() {
 	// default implementation does not backoff
 }
 
-// Exponential backoff.
+// ExpBackoff is an exponential backoff data structure.
 type ExpBackoff struct {
 	BackoffBase
 	Factor float64
 }
 
+// NewExpBackoff creates a new ExpBackOff structure
 func NewExpBackoff(min, max time.Duration, factor float64) *ExpBackoff {
 	return &ExpBackoff{*NewBackoffBase(min, max), factor}
 }
 
+// Backoff implements the exponential backoff
 func (b *ExpBackoff) Backoff() {
 	b.Cur = time.Duration(float64(b.Cur) * b.Factor)
 }
