@@ -95,7 +95,6 @@ func (ms *ManagedState) GetNonce(addr common.Address) uint64 {
 		return uint64(len(account.nonces)) + account.nstart
 	}
 	return ms.StateDB.GetNonce(addr)
-
 }
 
 // SetNonce sets the new canonical nonce for the managed state

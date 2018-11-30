@@ -1,4 +1,3 @@
-// package state ...
 // Copyright 2014 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
@@ -19,7 +18,6 @@
 package state
 
 import (
-	"github.com/harmony-one/harmony/core/state"
 	"errors"
 	"fmt"
 	"math/big"
@@ -451,7 +449,7 @@ func (stateDB *StateDB) setStateObject(object *stateObject) {
 }
 
 // GetOrNewStateObject retrieves a state object or create a new state object if nil.
-func (stateDB *StateDB) GetOrNewStateObject(addr common.Address) *StateObject {
+func (stateDB *StateDB) GetOrNewStateObject(addr common.Address) *stateObject {
 	stateObject := stateDB.getStateObject(addr)
 	if stateObject == nil || stateObject.deleted {
 		stateObject, _ = stateDB.createObject(addr)
@@ -605,23 +603,23 @@ func (stateDB *StateDB) Finalise(deleteEmptyObjects bool) {
 		}
 
 		if stateObject.suicided || (deleteEmptyObjects && stateObject.empty()) {
-			s.deleteStateObject(stateObject)
+			stateDB.deleteStateObject(stateObject)
 		} else {
-			stateObject.updateRoot(s.db)
-			s.updateStateObject(stateObject)
+			stateObject.updateRoot(stateDB.db)
+			stateDB.updateStateObject(stateObject)
 		}
-		s.stateObjectsDirty[addr] = struct{}{}
+		stateDB.stateObjectsDirty[addr] = struct{}{}
 	}
 	// Invalidate journal because reverting across transactions is not allowed.
-	s.clearJournalAndRefund()
+	stateDB.clearJournalAndRefund()
 }
 
 // IntermediateRoot computes the current root hash of the state trie.
 // It is called in between transactions to get the root hash that
 // goes into transaction receipts.
 func (stateDB *StateDB) IntermediateRoot(deleteEmptyObjects bool) common.Hash {
-	s.Finalise(deleteEmptyObjects)
-	return s.trie.Hash()
+	stateDB.Finalise(deleteEmptyObjects)
+	return stateDB.trie.Hash()
 }
 
 // Prepare sets the current transaction hash and index and block hash which is
@@ -633,53 +631,53 @@ func (stateDB *StateDB) Prepare(thash, bhash common.Hash, ti int) {
 }
 
 func (stateDB *StateDB) clearJournalAndRefund() {
-	s.journal = newJournal()
-	s.validRevisions = s.validRevisions[:0]
-	s.refund = 0
+	stateDB.journal = newJournal()
+	stateDB.validRevisions = stateDB.validRevisions[:0]
+	stateDB.refund = 0
 }
 
 // Commit writes the state to the underlying in-memory trie database.
 func (stateDB *StateDB) Commit(deleteEmptyObjects bool) (root common.Hash, err error) {
-	defer s.clearJournalAndRefund()
+	defer stateDB.clearJournalAndRefund()
 
-	for addr := range s.journal.dirties {
-		s.stateObjectsDirty[addr] = struct{}{}
+	for addr := range stateDB.journal.dirties {
+		stateDB.stateObjectsDirty[addr] = struct{}{}
 	}
 	// Commit objects to the trie.
-	for addr, stateObject := range s.stateObjects {
-		_, isDirty := s.stateObjectsDirty[addr]
+	for addr, stateObject := range stateDB.stateObjects {
+		_, isDirty := stateDB.stateObjectsDirty[addr]
 		switch {
 		case stateObject.suicided || (isDirty && deleteEmptyObjects && stateObject.empty()):
 			// If the object has been removed, don't bother syncing it
 			// and just mark it for deletion in the trie.
-			s.deleteStateObject(stateObject)
+			stateDB.deleteStateObject(stateObject)
 		case isDirty:
 			// Write any contract code associated with the state object
 			if stateObject.code != nil && stateObject.dirtyCode {
-				s.db.TrieDB().InsertBlob(common.BytesToHash(stateObject.CodeHash()), stateObject.code)
+				stateDB.db.TrieDB().InsertBlob(common.BytesToHash(stateObject.CodeHash()), stateObject.code)
 				stateObject.dirtyCode = false
 			}
 			// Write any storage changes in the state object to its storage trie.
-			if err := stateObject.CommitTrie(s.db); err != nil {
+			if err := stateObject.CommitTrie(stateDB.db); err != nil {
 				return common.Hash{}, err
 			}
 			// Update the object in the main account trie.
-			s.updateStateObject(stateObject)
+			stateDB.updateStateObject(stateObject)
 		}
-		delete(s.stateObjectsDirty, addr)
+		delete(stateDB.stateObjectsDirty, addr)
 	}
 	// Write trie changes.
-	root, err = s.trie.Commit(func(leaf []byte, parent common.Hash) error {
+	root, err = stateDB.trie.Commit(func(leaf []byte, parent common.Hash) error {
 		var account Account
 		if err := rlp.DecodeBytes(leaf, &account); err != nil {
 			return nil
 		}
 		if account.Root != emptyState {
-			s.db.TrieDB().Reference(account.Root, parent)
+			stateDB.db.TrieDB().Reference(account.Root, parent)
 		}
 		code := common.BytesToHash(account.CodeHash)
 		if code != emptyCode {
-			s.db.TrieDB().Reference(code, parent)
+			stateDB.db.TrieDB().Reference(code, parent)
 		}
 		return nil
 	})

@@ -59,8 +59,8 @@ func (storage Storage) Copy() Storage {
 // stateObject represents an Ethereum account which is being modified.
 //
 // The usage pattern is as follows:
-// First you need to obtain a state s.
-// Account values can be accessed and modified through the s.
+// First you need to obtain a state object.
+// Account values can be accessed and modified through the object.
 // Finally, call CommitTrie to write the modified storage trie into a database.
 type stateObject struct {
 	address  common.Address
@@ -104,7 +104,7 @@ type Account struct {
 	CodeHash []byte
 }
 
-// newObject creates a state s.
+// newObject creates a state object.
 func newObject(db *StateDB, address common.Address, data Account) *stateObject {
 	if data.Balance == nil {
 		data.Balance = new(big.Int)
