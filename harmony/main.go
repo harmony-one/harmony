@@ -53,7 +53,7 @@ func main() {
 		gspec    = core.Genesis{
 			Config:  chainConfig,
 			Alloc:   core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
-			ShardId: 10,
+			ShardID: 10,
 		}
 	)
 
@@ -75,7 +75,7 @@ func main() {
 	if n > 0 {
 		blocks, _ := core.GenerateChain(chainConfig, genesis, consensus.NewFaker(), database, n, func(i int, gen *core.BlockGen) {
 			gen.SetCoinbase(testBankAddress)
-			gen.SetShardId(types.EncodeShardId(10))
+			gen.SetShardID(types.EncodeShardID(10))
 			gen.AddTx(pendingTxs[i])
 		})
 		if _, err := chain.InsertChain(blocks); err != nil {

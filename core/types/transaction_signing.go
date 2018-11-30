@@ -27,6 +27,7 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 )
 
+// Constants for transaction signing.
 var (
 	ErrInvalidChainId = errors.New("invalid chain id for signer")
 )
