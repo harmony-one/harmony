@@ -10,14 +10,12 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/harmony/client/txgen/txgen"
-	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/p2pv2"
-
 	"github.com/harmony-one/harmony/blockchain"
 	"github.com/harmony-one/harmony/client"
 	client_config "github.com/harmony-one/harmony/client/config"
+	"github.com/harmony-one/harmony/client/txgen/txgen"
 	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
@@ -92,7 +90,7 @@ func main() {
 	clientNode := node.New(consensusObj, nil, *clientPeer)
 
 	if clientPeer != nil {
-		p2pv2.InitHost(clientPeer.IP, clientPeer.Port) // TODO: this should be moved into client node.
+		//p2pv2.InitHost(clientPeer.IP, clientPeer.Port) // TODO: this should be moved into client node.
 		clientNode.Client = client.NewClient(&shardIDLeaderMap)
 
 		// This func is used to update the client's utxopool when new blocks are received from the leaders
