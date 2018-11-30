@@ -348,6 +348,11 @@ func (bc *BlockChain) FastSyncCommitHead(hash common.Hash) error {
 	return nil
 }
 
+// ShardId returns the shard Id of the blockchain.
+func (bc *BlockChain) ShardId() uint32 {
+	return uint32(bc.chainConfig.ChainID.Int64())
+}
+
 // GasLimit returns the gas limit of the current HEAD block.
 func (bc *BlockChain) GasLimit() uint64 {
 	return bc.CurrentBlock().GasLimit()

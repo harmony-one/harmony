@@ -88,7 +88,7 @@ type Consensus struct {
 
 	Log log.Logger
 
-	uniqueIDInstance *utils.UniqueValidatorId
+	uniqueIDInstance *utils.UniqueValidatorID
 }
 
 // BlockConsensusStatus used to keep track of the consensus status of multiple blocks received so far
@@ -106,7 +106,7 @@ type BlockConsensusStatus struct {
 func New(selfPeer p2p.Peer, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Consensus {
 	consensus := Consensus{}
 
-	if leader.Port == selfPeer.Port && leader.Ip == selfPeer.Ip {
+	if leader.Port == selfPeer.Port && leader.IP == selfPeer.IP {
 		consensus.IsLeader = true
 	} else {
 		consensus.IsLeader = false
@@ -171,7 +171,7 @@ func New(selfPeer p2p.Peer, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 	}
 
 	consensus.Log = log.New()
-	consensus.uniqueIDInstance = utils.GetUniqueValidatorIdInstance()
+	consensus.uniqueIDInstance = utils.GetUniqueValidatorIDInstance()
 
 	return &consensus
 }
@@ -240,7 +240,7 @@ func (consensus *Consensus) AddPeers(peers []p2p.Peer) int {
 		_, ok := consensus.validators.Load(utils.GetUniqueIDFromPeer(peer))
 		if !ok {
 			if peer.ValidatorID == -1 {
-				peer.ValidatorID = int(consensus.uniqueIDInstance.GetUniqueId())
+				peer.ValidatorID = int(consensus.uniqueIDInstance.GetUniqueID())
 			}
 			consensus.validators.Store(utils.GetUniqueIDFromPeer(peer), peer)
 			consensus.PublicKeys = append(consensus.PublicKeys, peer.PubKey)
@@ -273,7 +273,7 @@ func (consensus *Consensus) DebugPrintValidators() {
 	consensus.validators.Range(func(k, v interface{}) bool {
 		if p, ok := v.(p2p.Peer); ok {
 			str2 := fmt.Sprintf("%s", p.PubKey)
-			consensus.Log.Debug("validator:", "IP", p.Ip, "Port", p.Port, "VID", p.ValidatorID, "Key", str2)
+			consensus.Log.Debug("validator:", "IP", p.IP, "Port", p.Port, "VID", p.ValidatorID, "Key", str2)
 			count++
 			return true
 		}

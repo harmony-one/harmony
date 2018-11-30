@@ -26,8 +26,6 @@ func addrToPrivKey(addr string) ic.PrivKey {
 }
 
 func writeData(w *bufio.Writer, data []byte) {
-	for {
-		w.Write(data)
-		w.Flush()
-	}
+	w.Write(data)
+	w.Flush()
 }

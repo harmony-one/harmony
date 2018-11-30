@@ -12,6 +12,7 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 )
 
+// ConfigEntry is the config entry.
 type ConfigEntry struct {
 	IP          string
 	Port        string
@@ -20,23 +21,24 @@ type ConfigEntry struct {
 	ValidatorID int // Validator ID in its shard.
 }
 
+// DistributionConfig is the distribution config.
 type DistributionConfig struct {
 	config []ConfigEntry
 }
 
-// done
+// NewDistributionConfig creates new DistributionConfig
 func NewDistributionConfig() *DistributionConfig {
 	config := DistributionConfig{}
 	return &config
 }
 
-// Gets all the leader peers and corresponding shard Ids
+// GetLeadersAndShardIDs gets all the leader peers and corresponding shard Ids
 func (config *DistributionConfig) GetLeadersAndShardIDs() ([]p2p.Peer, []uint32) {
 	var peerList []p2p.Peer
 	var shardIDs []uint32
 	for _, entry := range config.config {
 		if entry.Role == "leader" {
-			peerList = append(peerList, p2p.Peer{Ip: entry.IP, Port: entry.Port})
+			peerList = append(peerList, p2p.Peer{IP: entry.IP, Port: entry.Port})
 			val, err := strconv.Atoi(entry.ShardID)
 			if err == nil {
 				shardIDs = append(shardIDs, uint32(val))
@@ -48,19 +50,19 @@ func (config *DistributionConfig) GetLeadersAndShardIDs() ([]p2p.Peer, []uint32)
 	return peerList, shardIDs
 }
 
+// GetClientPeer returns client peer.
 func (config *DistributionConfig) GetClientPeer() *p2p.Peer {
 	for _, entry := range config.config {
 		if entry.Role != "client" {
 			continue
 		}
-		peer := p2p.Peer{Port: entry.Port, Ip: entry.IP}
+		peer := p2p.Peer{Port: entry.Port, IP: entry.IP}
 		return &peer
 	}
 	return nil
 }
 
-// done
-// Gets the port of the client node in the config
+// GetClientPort gets the port of the client node in the config
 func (config *DistributionConfig) GetClientPort() string {
 	for _, entry := range config.config {
 		if entry.Role == "client" {
@@ -70,8 +72,7 @@ func (config *DistributionConfig) GetClientPort() string {
 	return ""
 }
 
-// done
-// Parse the config file and return a 2d array containing the file data
+// ReadConfigFile parses the config file and return a 2d array containing the file data
 func (config *DistributionConfig) ReadConfigFile(filename string) error {
 	file, err := os.Open(filename)
 	if err != nil {
@@ -116,18 +117,18 @@ func (config *DistributionConfig) GetPeers(ip, port, shardID string) []p2p.Peer 
 			continue
 		}
 		// Get public key deterministically based on ip and port
-		peer := p2p.Peer{Port: entry.Port, Ip: entry.IP, ValidatorID: entry.ValidatorID}
+		peer := p2p.Peer{Port: entry.Port, IP: entry.IP, ValidatorID: entry.ValidatorID}
 		setKey(&peer)
 		peerList = append(peerList, peer)
 	}
 	return peerList
 }
 
-// GetPeers Gets the validator list
+// GetSelfPeer Gets the validator list
 func (config *DistributionConfig) GetSelfPeer(ip, port, shardID string) p2p.Peer {
 	for _, entry := range config.config {
 		if entry.IP == ip && entry.Port == port && entry.ShardID == shardID {
-			peer := p2p.Peer{Port: entry.Port, Ip: entry.IP, ValidatorID: entry.ValidatorID}
+			peer := p2p.Peer{Port: entry.Port, IP: entry.IP, ValidatorID: entry.ValidatorID}
 			return peer
 		}
 	}
@@ -139,7 +140,7 @@ func (config *DistributionConfig) GetLeader(shardID string) p2p.Peer {
 	var leaderPeer p2p.Peer
 	for _, entry := range config.config {
 		if entry.Role == "leader" && entry.ShardID == shardID {
-			leaderPeer.Ip = entry.IP
+			leaderPeer.IP = entry.IP
 			leaderPeer.Port = entry.Port
 			setKey(&leaderPeer)
 		}
@@ -147,10 +148,12 @@ func (config *DistributionConfig) GetLeader(shardID string) p2p.Peer {
 	return leaderPeer
 }
 
+// GetConfigEntries returns a list of ConfigEntry.
 func (config *DistributionConfig) GetConfigEntries() []ConfigEntry {
 	return config.config
 }
 
+// GetMyConfigEntry ...
 func (config *DistributionConfig) GetMyConfigEntry(ip string, port string) *ConfigEntry {
 	if config.config == nil {
 		return nil

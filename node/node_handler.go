@@ -1,7 +1,6 @@
 package node
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/gob"
 	"fmt"
@@ -10,6 +9,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/harmony-one/harmony/p2pv2"
+
 	"github.com/dedis/kyber"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/blockchain"
@@ -17,7 +18,6 @@ import (
 	hmy_crypto "github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/p2pv2"
 	"github.com/harmony-one/harmony/proto"
 	"github.com/harmony-one/harmony/proto/client"
 	"github.com/harmony-one/harmony/proto/consensus"
@@ -78,7 +78,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 
 	switch msgCategory {
 	case proto.Identity:
-		actionType := proto_identity.IdentityMessageType(msgType)
+		actionType := proto_identity.IDMessageType(msgType)
 		switch actionType {
 		case proto_identity.Identity:
 			messageType := proto_identity.MessageType(msgPayload[0])
@@ -93,7 +93,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 			}
 		}
 	case proto.Consensus:
-		actionType := consensus.ConsensusMessageType(msgType)
+		actionType := consensus.ConMessageType(msgType)
 		switch actionType {
 		case consensus.Consensus:
 			if consensusObj.IsLeader {
@@ -105,7 +105,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 			}
 		}
 	case proto.Node:
-		actionType := proto_node.NodeMessageType(msgType)
+		actionType := proto_node.MessageType(msgType)
 		switch actionType {
 		case proto_node.Transaction:
 			node.log.Info("NET: received message: Node/Transaction")
@@ -122,9 +122,6 @@ func (node *Node) NodeHandler(conn net.Conn) {
 					node.Client.UpdateBlocks(*blocks)
 				}
 			}
-		case proto_node.BlockchainSync:
-			node.log.Info("NET: received message: Node/BlockchainSync")
-			node.handleBlockchainSync(msgPayload, conn)
 		case proto_node.Client:
 			node.log.Info("NET: received message: Node/Client")
 			clientMsgType := proto_node.ClientMessageType(msgPayload[0])
@@ -195,7 +192,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 			node.pongMessageHandler(msgPayload)
 		}
 	case proto.Client:
-		actionType := client.ClientMessageType(msgType)
+		actionType := client.MessageType(msgType)
 		node.log.Info("NET: received message: Client/Transaction")
 		switch actionType {
 		case client.Transaction:
@@ -208,7 +205,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 	}
 }
 
-// NodeHandlerV1 handles a new incoming connection.
+// NodeHandler handles a new incoming connection.
 func (node *Node) NodeHandlerV1(s netp2p.Stream) {
 	defer s.Close()
 
@@ -244,7 +241,7 @@ func (node *Node) NodeHandlerV1(s netp2p.Stream) {
 
 	switch msgCategory {
 	case proto.Identity:
-		actionType := proto_identity.IdentityMessageType(msgType)
+		actionType := proto_identity.IDMessageType(msgType)
 		switch actionType {
 		case proto_identity.Identity:
 			messageType := proto_identity.MessageType(msgPayload[0])
@@ -259,7 +256,7 @@ func (node *Node) NodeHandlerV1(s netp2p.Stream) {
 			}
 		}
 	case proto.Consensus:
-		actionType := consensus.ConsensusMessageType(msgType)
+		actionType := consensus.ConMessageType(msgType)
 		switch actionType {
 		case consensus.Consensus:
 			if consensusObj.IsLeader {
@@ -271,7 +268,7 @@ func (node *Node) NodeHandlerV1(s netp2p.Stream) {
 			}
 		}
 	case proto.Node:
-		actionType := proto_node.NodeMessageType(msgType)
+		actionType := proto_node.MessageType(msgType)
 		switch actionType {
 		case proto_node.Transaction:
 			node.log.Info("NET: received message: Node/Transaction")
@@ -288,9 +285,6 @@ func (node *Node) NodeHandlerV1(s netp2p.Stream) {
 					node.Client.UpdateBlocks(*blocks)
 				}
 			}
-		case proto_node.BlockchainSync:
-			node.log.Info("NET: received message: Node/BlockchainSync")
-			node.handleBlockchainSyncV1(msgPayload, s)
 		case proto_node.Client:
 			node.log.Info("NET: received message: Node/Client")
 			clientMsgType := proto_node.ClientMessageType(msgPayload[0])
@@ -361,7 +355,7 @@ func (node *Node) NodeHandlerV1(s netp2p.Stream) {
 			node.pongMessageHandler(msgPayload)
 		}
 	case proto.Client:
-		actionType := client.ClientMessageType(msgType)
+		actionType := client.MessageType(msgType)
 		node.log.Info("NET: received message: Client/Transaction")
 		switch actionType {
 		case client.Transaction:
@@ -372,108 +366,6 @@ func (node *Node) NodeHandlerV1(s netp2p.Stream) {
 	default:
 		node.log.Error("Unknown", "MsgCateory:", msgCategory)
 	}
-}
-
-// Refactor by moving this code into a sync package.
-func (node *Node) handleBlockchainSyncV1(payload []byte, s netp2p.Stream) {
-	// TODO(minhdoan): Looking to removing this.
-	w := bufio.NewWriter(bufio.NewWriter(s))
-FOR_LOOP:
-	for {
-		syncMsgType := proto_node.BlockchainSyncMessageType(payload[0])
-		switch syncMsgType {
-		case proto_node.GetBlock:
-			block := node.blockchain.FindBlock(payload[1:33])
-			w.Write(block.Serialize())
-			w.Flush()
-		case proto_node.GetLastBlockHashes:
-			blockchainSyncMessage := proto_node.BlockchainSyncMessage{
-				BlockHeight: len(node.blockchain.Blocks),
-				BlockHashes: node.blockchain.GetBlockHashes(),
-			}
-			w.Write(proto_node.SerializeBlockchainSyncMessage(&blockchainSyncMessage))
-			w.Flush()
-		case proto_node.Done:
-			break FOR_LOOP
-		}
-		content, err := p2pv2.ReadData(s)
-
-		if err != nil {
-			node.log.Error("Failed in reading message content from syncing node", err)
-			return
-		}
-
-		msgCategory, _ := proto.GetMessageCategory(content)
-		if err != nil || msgCategory != proto.Node {
-			node.log.Error("Failed in reading message category from syncing node", err)
-			return
-		}
-
-		msgType, err := proto.GetMessageType(content)
-		actionType := proto_node.NodeMessageType(msgType)
-		if err != nil || actionType != proto_node.BlockchainSync {
-			node.log.Error("Failed in reading message type from syncing node", err)
-			return
-		}
-
-		payload, err = proto.GetMessagePayload(content)
-		if err != nil {
-			node.log.Error("Failed in reading payload from syncing node", err)
-			return
-		}
-	}
-	node.log.Info("HOORAY: Done sending info to syncing node.")
-}
-
-// Refactor by moving this code into a sync package.
-func (node *Node) handleBlockchainSync(payload []byte, conn net.Conn) {
-	// TODO(minhdoan): Looking to removing this.
-	w := bufio.NewWriter(conn)
-FOR_LOOP:
-	for {
-		syncMsgType := proto_node.BlockchainSyncMessageType(payload[0])
-		switch syncMsgType {
-		case proto_node.GetBlock:
-			block := node.blockchain.FindBlock(payload[1:33])
-			w.Write(block.Serialize())
-			w.Flush()
-		case proto_node.GetLastBlockHashes:
-			blockchainSyncMessage := proto_node.BlockchainSyncMessage{
-				BlockHeight: len(node.blockchain.Blocks),
-				BlockHashes: node.blockchain.GetBlockHashes(),
-			}
-			w.Write(proto_node.SerializeBlockchainSyncMessage(&blockchainSyncMessage))
-			w.Flush()
-		case proto_node.Done:
-			break FOR_LOOP
-		}
-		content, err := p2p.ReadMessageContent(conn)
-
-		if err != nil {
-			node.log.Error("Failed in reading message content from syncing node", err)
-			return
-		}
-
-		msgCategory, _ := proto.GetMessageCategory(content)
-		if err != nil || msgCategory != proto.Node {
-			node.log.Error("Failed in reading message category from syncing node", err)
-			return
-		}
-
-		msgType, err := proto.GetMessageType(content)
-		actionType := proto_node.NodeMessageType(msgType)
-		if err != nil || actionType != proto_node.BlockchainSync {
-			node.log.Error("Failed in reading message type from syncing node", err)
-			return
-		}
-
-		payload, err = proto.GetMessagePayload(content)
-		if err != nil {
-			node.log.Error("Failed in reading payload from syncing node", err)
-			return
-		}
-	}
-	node.log.Info("HOORAY: Done sending info to syncing node.")
 }
 
 func (node *Node) transactionMessageHandler(msgPayload []byte) {
@@ -741,6 +633,9 @@ func (node *Node) AddNewBlockAccount(newBlock *types.Block) {
 	num, err := node.Chain.InsertChain([]*types.Block{newBlock})
 	if err != nil {
 		node.log.Debug("Error adding to chain", "numBlocks", num, "Error", err)
+		if node.Consensus != nil {
+			fmt.Println("SHARD ID", node.Consensus.ShardID)
+		}
 	}
 }
 
@@ -790,7 +685,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 	//	node.log.Info("Ping", "Msg", ping)
 
 	peer := new(p2p.Peer)
-	peer.Ip = ping.Node.IP
+	peer.IP = ping.Node.IP
 	peer.Port = ping.Node.Port
 	peer.ValidatorID = ping.Node.ValidatorID
 
@@ -830,7 +725,7 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 
 	for _, p := range pong.Peers {
 		peer := new(p2p.Peer)
-		peer.Ip = p.IP
+		peer.IP = p.IP
 		peer.Port = p.Port
 		peer.ValidatorID = p.ValidatorID
 
