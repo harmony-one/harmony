@@ -24,9 +24,10 @@ content (n bytes) - actual message content
 
 */
 
-const BATCH_SIZE = 1 << 16
+// BatchSize defines the size of buffer
+const BatchSize = 1 << 16
 
-// Read the message type and content size, and return the actual content.
+// ReadMessageContent reads the message type and content size, and return the actual content.
 func ReadMessageContent(conn net.Conn) ([]byte, error) {
 	var (
 		contentBuf = bytes.NewBuffer([]byte{})
@@ -67,12 +68,12 @@ func ReadMessageContent(conn net.Conn) ([]byte, error) {
 	//log.Printf("The content size is %d bytes.", bytesToRead)
 
 	//// Read the content in chunk of 16 * 1024 bytes
-	tmpBuf := make([]byte, BATCH_SIZE)
+	tmpBuf := make([]byte, BatchSize)
 ILOOP:
 	for {
 		timeoutDuration := 10 * time.Second
 		conn.SetReadDeadline(time.Now().Add(timeoutDuration))
-		if bytesToRead < BATCH_SIZE {
+		if bytesToRead < BatchSize {
 			// Read the last number of bytes less than 1024
 			tmpBuf = make([]byte, bytesToRead)
 		}
@@ -97,6 +98,7 @@ ILOOP:
 	return contentBuf.Bytes(), nil
 }
 
+// CreateMessage create a general message. FIXME: this is not used
 func CreateMessage(msgType byte, data []byte) []byte {
 	buffer := bytes.NewBuffer([]byte{})
 
@@ -110,6 +112,7 @@ func CreateMessage(msgType byte, data []byte) []byte {
 	return buffer.Bytes()
 }
 
+// SendMessageContent send message over net connection. FIXME: this is not used
 func SendMessageContent(conn net.Conn, data []byte) {
 	msgToSend := CreateMessage(byte(1), data)
 	w := bufio.NewWriter(conn)
