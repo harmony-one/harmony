@@ -236,7 +236,7 @@ func getShardIDToLeaderMap() map[uint32]p2p.Peer {
 		shardID := parts[3]
 		id, err := strconv.Atoi(shardID)
 		if err == nil {
-			shardIDLeaderMap[uint32(id)] = p2p.Peer{Ip: parts[0], Port: parts[1]}
+			shardIDLeaderMap[uint32(id)] = p2p.Peer{IP: parts[0], Port: parts[1]}
 		} else {
 			log.Print("[Generator] Error parsing the shard Id ", shardID)
 		}
@@ -254,7 +254,7 @@ func CreateWalletServerNode() *node.Node {
 		clientPeer = configr.GetClientPeer()
 	} else {
 		shardIDLeaderMap = getShardIDToLeaderMap()
-		clientPeer = &p2p.Peer{Port: "127.0.0.1", Ip: "1234"}
+		clientPeer = &p2p.Peer{Port: "127.0.0.1", IP: "1234"}
 	}
 	walletNode := node.New(nil, nil)
 	walletNode.Client = client.NewClient(&shardIDLeaderMap)

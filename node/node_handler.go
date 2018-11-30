@@ -103,7 +103,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 			}
 		}
 	case proto.Node:
-		actionType := proto_node.NodeMessageType(msgType)
+		actionType := proto_node.MessageType(msgType)
 		switch actionType {
 		case proto_node.Transaction:
 			node.log.Info("NET: received message: Node/Transaction")
@@ -242,7 +242,7 @@ FOR_LOOP:
 		}
 
 		msgType, err := proto.GetMessageType(content)
-		actionType := proto_node.NodeMessageType(msgType)
+		actionType := proto_node.MessageType(msgType)
 		if err != nil || actionType != proto_node.BlockchainSync {
 			node.log.Error("Failed in reading message type from syncing node", err)
 			return
@@ -574,7 +574,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 	//	node.log.Info("Ping", "Msg", ping)
 
 	peer := new(p2p.Peer)
-	peer.Ip = ping.Node.IP
+	peer.IP = ping.Node.IP
 	peer.Port = ping.Node.Port
 	peer.ValidatorID = ping.Node.ValidatorID
 
@@ -614,7 +614,7 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 
 	for _, p := range pong.Peers {
 		peer := new(p2p.Peer)
-		peer.Ip = p.IP
+		peer.IP = p.IP
 		peer.Port = p.Port
 		peer.ValidatorID = p.ValidatorID
 
