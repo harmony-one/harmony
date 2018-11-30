@@ -108,7 +108,7 @@ type BlockConsensusStatus struct {
 func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Consensus {
 	consensus := Consensus{}
 
-	if leader.Port == port && leader.Ip == ip {
+	if leader.Port == port && leader.IP == ip {
 		consensus.IsLeader = true
 	} else {
 		consensus.IsLeader = false
@@ -146,7 +146,7 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 
 	// For now use socket address as 16 byte Id
 	// TODO: populate with correct Id
-	consensus.nodeID = utils.GetUniqueIdFromPeer(p2p.Peer{Ip: ip, Port: port})
+	consensus.nodeID = utils.GetUniqueIdFromPeer(p2p.Peer{IP: ip, Port: port})
 
 	// Set private key for myself so that I can sign messages.
 	consensus.priKey = crypto.Ed25519Curve.Scalar().SetInt64(int64(consensus.nodeID))
@@ -275,7 +275,7 @@ func (consensus *Consensus) DebugPrintValidators() {
 	consensus.validators.Range(func(k, v interface{}) bool {
 		if p, ok := v.(p2p.Peer); ok {
 			str2 := fmt.Sprintf("%s", p.PubKey)
-			consensus.Log.Debug("validator:", "IP", p.Ip, "Port", p.Port, "VID", p.ValidatorID, "Key", str2)
+			consensus.Log.Debug("validator:", "IP", p.IP, "Port", p.Port, "VID", p.ValidatorID, "Key", str2)
 			count++
 			return true
 		}

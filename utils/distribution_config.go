@@ -36,7 +36,7 @@ func (config *DistributionConfig) GetLeadersAndShardIDs() ([]p2p.Peer, []uint32)
 	var shardIDs []uint32
 	for _, entry := range config.config {
 		if entry.Role == "leader" {
-			peerList = append(peerList, p2p.Peer{Ip: entry.IP, Port: entry.Port})
+			peerList = append(peerList, p2p.Peer{IP: entry.IP, Port: entry.Port})
 			val, err := strconv.Atoi(entry.ShardID)
 			if err == nil {
 				shardIDs = append(shardIDs, uint32(val))
@@ -53,7 +53,7 @@ func (config *DistributionConfig) GetClientPeer() *p2p.Peer {
 		if entry.Role != "client" {
 			continue
 		}
-		peer := p2p.Peer{Port: entry.Port, Ip: entry.IP}
+		peer := p2p.Peer{Port: entry.Port, IP: entry.IP}
 		return &peer
 	}
 	return nil
@@ -116,7 +116,7 @@ func (config *DistributionConfig) GetPeers(ip, port, shardID string) []p2p.Peer 
 			continue
 		}
 		// Get public key deterministically based on ip and port
-		peer := p2p.Peer{Port: entry.Port, Ip: entry.IP, ValidatorID: entry.ValidatorID}
+		peer := p2p.Peer{Port: entry.Port, IP: entry.IP, ValidatorID: entry.ValidatorID}
 		setKey(&peer)
 		peerList = append(peerList, peer)
 	}
@@ -127,7 +127,7 @@ func (config *DistributionConfig) GetPeers(ip, port, shardID string) []p2p.Peer 
 func (config *DistributionConfig) GetSelfPeer(ip, port, shardID string) p2p.Peer {
 	for _, entry := range config.config {
 		if entry.IP == ip && entry.Port == port && entry.ShardID == shardID {
-			peer := p2p.Peer{Port: entry.Port, Ip: entry.IP, ValidatorID: entry.ValidatorID}
+			peer := p2p.Peer{Port: entry.Port, IP: entry.IP, ValidatorID: entry.ValidatorID}
 			return peer
 		}
 	}
@@ -139,7 +139,7 @@ func (config *DistributionConfig) GetLeader(shardID string) p2p.Peer {
 	var leaderPeer p2p.Peer
 	for _, entry := range config.config {
 		if entry.Role == "leader" && entry.ShardID == shardID {
-			leaderPeer.Ip = entry.IP
+			leaderPeer.IP = entry.IP
 			leaderPeer.Port = entry.Port
 			setKey(&leaderPeer)
 		}

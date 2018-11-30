@@ -59,7 +59,7 @@ func NewPingMessage(peer p2p.Peer) *PingMessageType {
 
 	var err error
 	ping.Version = ProtocolVersion
-	ping.Node.IP = peer.Ip
+	ping.Node.IP = peer.IP
 	ping.Node.Port = peer.Port
 	ping.Node.ValidatorID = peer.ValidatorID
 	ping.Node.PubKey, err = peer.PubKey.MarshalBinary()
@@ -83,7 +83,7 @@ func NewPongMessage(peers []p2p.Peer, pubKeys []kyber.Point) *PongMessageType {
 	var err error
 	for _, p := range peers {
 		n := nodeInfo{}
-		n.IP = p.Ip
+		n.IP = p.IP
 		n.Port = p.Port
 		n.ValidatorID = p.ValidatorID
 		n.PubKey, err = p.PubKey.MarshalBinary()

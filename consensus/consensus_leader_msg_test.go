@@ -10,8 +10,8 @@ import (
 )
 
 func TestConstructAnnounceMessage(test *testing.T) {
-	leader := p2p.Peer{Ip: "1", Port: "2"}
-	validator := p2p.Peer{Ip: "3", Port: "5"}
+	leader := p2p.Peer{IP: "1", Port: "2"}
+	validator := p2p.Peer{IP: "3", Port: "5"}
 	consensus := NewConsensus("1", "2", "0", []p2p.Peer{leader, validator}, leader)
 	consensus.blockHash = [32]byte{}
 	header := consensus.blockHeader
@@ -27,13 +27,13 @@ func TestConstructChallengeMessage(test *testing.T) {
 	priKeyInBytes := crypto.HashSha256("12")
 	leaderPriKey.UnmarshalBinary(priKeyInBytes[:])
 	leaderPubKey := pki.GetPublicKeyFromScalar(leaderPriKey)
-	leader := p2p.Peer{Ip: "1", Port: "2", PubKey: leaderPubKey}
+	leader := p2p.Peer{IP: "1", Port: "2", PubKey: leaderPubKey}
 
 	validatorPriKey := crypto.Ed25519Curve.Scalar()
 	priKeyInBytes = crypto.HashSha256("12")
 	validatorPriKey.UnmarshalBinary(priKeyInBytes[:])
 	validatorPubKey := pki.GetPublicKeyFromScalar(leaderPriKey)
-	validator := p2p.Peer{Ip: "3", Port: "5", PubKey: validatorPubKey}
+	validator := p2p.Peer{IP: "3", Port: "5", PubKey: validatorPubKey}
 
 	consensus := NewConsensus("1", "2", "0", []p2p.Peer{leader, validator}, leader)
 	consensus.blockHash = [32]byte{}
