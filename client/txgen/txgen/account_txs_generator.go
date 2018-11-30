@@ -9,6 +9,7 @@ import (
 	"github.com/harmony-one/harmony/node"
 )
 
+// TxGenSettings is the settings for TX generation.
 type TxGenSettings struct {
 	NumOfAddress      int
 	CrossShard        bool
@@ -16,6 +17,7 @@ type TxGenSettings struct {
 	CrossShardRatio   int
 }
 
+// GenerateSimulatedTransactionsAccount generates simulated transaction for account model.
 func GenerateSimulatedTransactionsAccount(shardID int, dataNodes []*node.Node, setting TxGenSettings) (types.Transactions, types.Transactions) {
 	_ = setting // TODO: take use of settings
 	node := dataNodes[shardID]

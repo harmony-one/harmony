@@ -17,9 +17,8 @@ func (IDC *BeaconChain) BeaconChainHandler(conn net.Conn) {
 	if err != nil {
 		IDC.log.Error("Read p2p data failed")
 		return
-	} else {
-		IDC.log.Info("received connection")
 	}
+	IDC.log.Info("received connection")
 	msgCategory, err := proto.GetMessageCategory(content)
 	if err != nil {
 		IDC.log.Error("Read message category failed", "err", err)
