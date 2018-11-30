@@ -50,6 +50,8 @@ const (
 const (
 	// TimeToSleepForSyncing is the time waiting for node transformed into NodeDoingConsensus
 	TimeToSleepForSyncing = time.Second * 30
+	waitBeforeJoinShard   = time.Second * 3
+	timeOutToJoinShard    = time.Minute * 10
 )
 
 // NetworkNode ...
@@ -349,7 +351,7 @@ func (node *Node) AddPeers(peers []*p2p.Peer) int {
 // JoinShard helps a new node to join a shard.
 func (node *Node) JoinShard(leader p2p.Peer) {
 	// try to join the shard, with 10 minutes time-out
-	backoff := p2p.NewExpBackoff(3*time.Second, 10*time.Minute, 2)
+	backoff := p2p.NewExpBackoff(waitBeforeJoinShard, timeOutToJoinShard, 2)
 
 	for node.State == NodeWaitToJoin {
 		backoff.Sleep()
