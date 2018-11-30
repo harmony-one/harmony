@@ -1,3 +1,4 @@
+// package state ...
 // Copyright 2014 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
@@ -18,6 +19,7 @@
 package state
 
 import (
+	"github.com/harmony-one/harmony/core/state"
 	"errors"
 	"fmt"
 	"math/big"
@@ -52,7 +54,7 @@ func (n *proofList) Put(key []byte, value []byte) error {
 	return nil
 }
 
-// StateDBs within the ethereum protocol are used to store anything
+// StateDB within the ethereum protocol are used to store anything
 // within the merkle trie. StateDBs take care of caching and storing
 // nested states. It's the general query interface to retrieve:
 // * Contracts
@@ -86,12 +88,12 @@ type StateDB struct {
 	// Snapshot and RevertToSnapshot.
 	journal        *journal
 	validRevisions []revision
-	nextRevisionId int
+	nextRevisionID int
 
 	lock sync.Mutex
 }
 
-// Create a new state from a given trie.
+// New creates a new state from a given trie.
 func New(root common.Hash, db Database) (*StateDB, error) {
 	tr, err := db.OpenTrie(root)
 	if err != nil {
@@ -109,114 +111,118 @@ func New(root common.Hash, db Database) (*StateDB, error) {
 }
 
 // setError remembers the first non-nil error it is called with.
-func (self *StateDB) setError(err error) {
-	if self.dbErr == nil {
-		self.dbErr = err
+func (stateDB *StateDB) setError(err error) {
+	if stateDB.dbErr == nil {
+		stateDB.dbErr = err
 	}
 }
 
-func (self *StateDB) Error() error {
-	return self.dbErr
+func (stateDB *StateDB) Error() error {
+	return stateDB.dbErr
 }
 
 // Reset clears out all ephemeral state objects from the state db, but keeps
 // the underlying state trie to avoid reloading data for the next operations.
-func (self *StateDB) Reset(root common.Hash) error {
-	tr, err := self.db.OpenTrie(root)
+func (stateDB *StateDB) Reset(root common.Hash) error {
+	tr, err := stateDB.db.OpenTrie(root)
 	if err != nil {
 		return err
 	}
-	self.trie = tr
-	self.stateObjects = make(map[common.Address]*stateObject)
-	self.stateObjectsDirty = make(map[common.Address]struct{})
-	self.thash = common.Hash{}
-	self.bhash = common.Hash{}
-	self.txIndex = 0
-	self.logs = make(map[common.Hash][]*types.Log)
-	self.logSize = 0
-	self.preimages = make(map[common.Hash][]byte)
-	self.clearJournalAndRefund()
+	stateDB.trie = tr
+	stateDB.stateObjects = make(map[common.Address]*stateObject)
+	stateDB.stateObjectsDirty = make(map[common.Address]struct{})
+	stateDB.thash = common.Hash{}
+	stateDB.bhash = common.Hash{}
+	stateDB.txIndex = 0
+	stateDB.logs = make(map[common.Hash][]*types.Log)
+	stateDB.logSize = 0
+	stateDB.preimages = make(map[common.Hash][]byte)
+	stateDB.clearJournalAndRefund()
 	return nil
 }
 
-func (self *StateDB) AddLog(log *types.Log) {
-	self.journal.append(addLogChange{txhash: self.thash})
+// AddLog adds logs into stateDB
+func (stateDB *StateDB) AddLog(log *types.Log) {
+	stateDB.journal.append(addLogChange{txhash: stateDB.thash})
 
-	log.TxHash = self.thash
-	log.BlockHash = self.bhash
-	log.TxIndex = uint(self.txIndex)
-	log.Index = self.logSize
-	self.logs[self.thash] = append(self.logs[self.thash], log)
-	self.logSize++
+	log.TxHash = stateDB.thash
+	log.BlockHash = stateDB.bhash
+	log.TxIndex = uint(stateDB.txIndex)
+	log.Index = stateDB.logSize
+	stateDB.logs[stateDB.thash] = append(stateDB.logs[stateDB.thash], log)
+	stateDB.logSize++
 }
 
-func (self *StateDB) GetLogs(hash common.Hash) []*types.Log {
-	return self.logs[hash]
+// GetLogs gets logs from stateDB given a hash
+func (stateDB *StateDB) GetLogs(hash common.Hash) []*types.Log {
+	return stateDB.logs[hash]
 }
 
-func (self *StateDB) Logs() []*types.Log {
+// Logs returns a list of Log.
+func (stateDB *StateDB) Logs() []*types.Log {
 	var logs []*types.Log
-	for _, lgs := range self.logs {
+	for _, lgs := range stateDB.logs {
 		logs = append(logs, lgs...)
 	}
 	return logs
 }
 
 // AddPreimage records a SHA3 preimage seen by the VM.
-func (self *StateDB) AddPreimage(hash common.Hash, preimage []byte) {
-	if _, ok := self.preimages[hash]; !ok {
-		self.journal.append(addPreimageChange{hash: hash})
+func (stateDB *StateDB) AddPreimage(hash common.Hash, preimage []byte) {
+	if _, ok := stateDB.preimages[hash]; !ok {
+		stateDB.journal.append(addPreimageChange{hash: hash})
 		pi := make([]byte, len(preimage))
 		copy(pi, preimage)
-		self.preimages[hash] = pi
+		stateDB.preimages[hash] = pi
 	}
 }
 
 // Preimages returns a list of SHA3 preimages that have been submitted.
-func (self *StateDB) Preimages() map[common.Hash][]byte {
-	return self.preimages
+func (stateDB *StateDB) Preimages() map[common.Hash][]byte {
+	return stateDB.preimages
 }
 
 // AddRefund adds gas to the refund counter
-func (self *StateDB) AddRefund(gas uint64) {
-	self.journal.append(refundChange{prev: self.refund})
-	self.refund += gas
+func (stateDB *StateDB) AddRefund(gas uint64) {
+	stateDB.journal.append(refundChange{prev: stateDB.refund})
+	stateDB.refund += gas
 }
 
 // SubRefund removes gas from the refund counter.
 // This method will panic if the refund counter goes below zero
-func (self *StateDB) SubRefund(gas uint64) {
-	self.journal.append(refundChange{prev: self.refund})
-	if gas > self.refund {
+func (stateDB *StateDB) SubRefund(gas uint64) {
+	stateDB.journal.append(refundChange{prev: stateDB.refund})
+	if gas > stateDB.refund {
 		panic("Refund counter below zero")
 	}
-	self.refund -= gas
+	stateDB.refund -= gas
 }
 
 // Exist reports whether the given account address exists in the state.
 // Notably this also returns true for suicided accounts.
-func (self *StateDB) Exist(addr common.Address) bool {
-	return self.getStateObject(addr) != nil
+func (stateDB *StateDB) Exist(addr common.Address) bool {
+	return stateDB.getStateObject(addr) != nil
 }
 
 // Empty returns whether the state object is either non-existent
 // or empty according to the EIP161 specification (balance = nonce = code = 0)
-func (self *StateDB) Empty(addr common.Address) bool {
-	so := self.getStateObject(addr)
+func (stateDB *StateDB) Empty(addr common.Address) bool {
+	so := stateDB.getStateObject(addr)
 	return so == nil || so.empty()
 }
 
-// Retrieve the balance from the given address or 0 if object not found
-func (self *StateDB) GetBalance(addr common.Address) *big.Int {
-	stateObject := self.getStateObject(addr)
+// GetBalance retrieves the balance from the given address or 0 if object not found
+func (stateDB *StateDB) GetBalance(addr common.Address) *big.Int {
+	stateObject := stateDB.getStateObject(addr)
 	if stateObject != nil {
 		return stateObject.Balance()
 	}
 	return common.Big0
 }
 
-func (self *StateDB) GetNonce(addr common.Address) uint64 {
-	stateObject := self.getStateObject(addr)
+// GetNonce returns the nonce of the given address.
+func (stateDB *StateDB) GetNonce(addr common.Address) uint64 {
+	stateObject := stateDB.getStateObject(addr)
 	if stateObject != nil {
 		return stateObject.Nonce()
 	}
@@ -224,31 +230,34 @@ func (self *StateDB) GetNonce(addr common.Address) uint64 {
 	return 0
 }
 
-func (self *StateDB) GetCode(addr common.Address) []byte {
-	stateObject := self.getStateObject(addr)
+// GetCode returns code of a given address.
+func (stateDB *StateDB) GetCode(addr common.Address) []byte {
+	stateObject := stateDB.getStateObject(addr)
 	if stateObject != nil {
-		return stateObject.Code(self.db)
+		return stateObject.Code(stateDB.db)
 	}
 	return nil
 }
 
-func (self *StateDB) GetCodeSize(addr common.Address) int {
-	stateObject := self.getStateObject(addr)
+// GetCodeSize returns code size of a given address in stateDB.
+func (stateDB *StateDB) GetCodeSize(addr common.Address) int {
+	stateObject := stateDB.getStateObject(addr)
 	if stateObject == nil {
 		return 0
 	}
 	if stateObject.code != nil {
 		return len(stateObject.code)
 	}
-	size, err := self.db.ContractCodeSize(stateObject.addrHash, common.BytesToHash(stateObject.CodeHash()))
+	size, err := stateDB.db.ContractCodeSize(stateObject.addrHash, common.BytesToHash(stateObject.CodeHash()))
 	if err != nil {
-		self.setError(err)
+		stateDB.setError(err)
 	}
 	return size
 }
 
-func (self *StateDB) GetCodeHash(addr common.Address) common.Hash {
-	stateObject := self.getStateObject(addr)
+// GetCodeHash returns code hash of a given address.
+func (stateDB *StateDB) GetCodeHash(addr common.Address) common.Hash {
+	stateObject := stateDB.getStateObject(addr)
 	if stateObject == nil {
 		return common.Hash{}
 	}
@@ -256,25 +265,25 @@ func (self *StateDB) GetCodeHash(addr common.Address) common.Hash {
 }
 
 // GetState retrieves a value from the given account's storage trie.
-func (self *StateDB) GetState(addr common.Address, hash common.Hash) common.Hash {
-	stateObject := self.getStateObject(addr)
+func (stateDB *StateDB) GetState(addr common.Address, hash common.Hash) common.Hash {
+	stateObject := stateDB.getStateObject(addr)
 	if stateObject != nil {
-		return stateObject.GetState(self.db, hash)
+		return stateObject.GetState(stateDB.db, hash)
 	}
 	return common.Hash{}
 }
 
 // GetProof returns the MerkleProof for a given Account
-func (self *StateDB) GetProof(a common.Address) ([][]byte, error) {
+func (stateDB *StateDB) GetProof(a common.Address) ([][]byte, error) {
 	var proof proofList
-	err := self.trie.Prove(crypto.Keccak256(a.Bytes()), 0, &proof)
+	err := stateDB.trie.Prove(crypto.Keccak256(a.Bytes()), 0, &proof)
 	return [][]byte(proof), err
 }
 
-// GetProof returns the StorageProof for given key
-func (self *StateDB) GetStorageProof(a common.Address, key common.Hash) ([][]byte, error) {
+// GetStorageProof returns the StorageProof for given key
+func (stateDB *StateDB) GetStorageProof(a common.Address, key common.Hash) ([][]byte, error) {
 	var proof proofList
-	trie := self.StorageTrie(a)
+	trie := stateDB.StorageTrie(a)
 	if trie == nil {
 		return proof, errors.New("storage trie for requested address does not exist")
 	}
@@ -283,32 +292,33 @@ func (self *StateDB) GetStorageProof(a common.Address, key common.Hash) ([][]byt
 }
 
 // GetCommittedState retrieves a value from the given account's committed storage trie.
-func (self *StateDB) GetCommittedState(addr common.Address, hash common.Hash) common.Hash {
-	stateObject := self.getStateObject(addr)
+func (stateDB *StateDB) GetCommittedState(addr common.Address, hash common.Hash) common.Hash {
+	stateObject := stateDB.getStateObject(addr)
 	if stateObject != nil {
-		return stateObject.GetCommittedState(self.db, hash)
+		return stateObject.GetCommittedState(stateDB.db, hash)
 	}
 	return common.Hash{}
 }
 
 // Database retrieves the low level database supporting the lower level trie ops.
-func (self *StateDB) Database() Database {
-	return self.db
+func (stateDB *StateDB) Database() Database {
+	return stateDB.db
 }
 
 // StorageTrie returns the storage trie of an account.
 // The return value is a copy and is nil for non-existent accounts.
-func (self *StateDB) StorageTrie(addr common.Address) Trie {
-	stateObject := self.getStateObject(addr)
+func (stateDB *StateDB) StorageTrie(addr common.Address) Trie {
+	stateObject := stateDB.getStateObject(addr)
 	if stateObject == nil {
 		return nil
 	}
-	cpy := stateObject.deepCopy(self)
-	return cpy.updateTrie(self.db)
+	cpy := stateObject.deepCopy(stateDB)
+	return cpy.updateTrie(stateDB.db)
 }
 
-func (self *StateDB) HasSuicided(addr common.Address) bool {
-	stateObject := self.getStateObject(addr)
+// HasSuicided checks if the state object of the given addr is suicided.
+func (stateDB *StateDB) HasSuicided(addr common.Address) bool {
+	stateObject := stateDB.getStateObject(addr)
 	if stateObject != nil {
 		return stateObject.suicided
 	}
@@ -320,46 +330,50 @@ func (self *StateDB) HasSuicided(addr common.Address) bool {
  */
 
 // AddBalance adds amount to the account associated with addr.
-func (self *StateDB) AddBalance(addr common.Address, amount *big.Int) {
-	stateObject := self.GetOrNewStateObject(addr)
+func (stateDB *StateDB) AddBalance(addr common.Address, amount *big.Int) {
+	stateObject := stateDB.GetOrNewStateObject(addr)
 	if stateObject != nil {
 		stateObject.AddBalance(amount)
 	}
 }
 
 // SubBalance subtracts amount from the account associated with addr.
-func (self *StateDB) SubBalance(addr common.Address, amount *big.Int) {
-	stateObject := self.GetOrNewStateObject(addr)
+func (stateDB *StateDB) SubBalance(addr common.Address, amount *big.Int) {
+	stateObject := stateDB.GetOrNewStateObject(addr)
 	if stateObject != nil {
 		stateObject.SubBalance(amount)
 	}
 }
 
-func (self *StateDB) SetBalance(addr common.Address, amount *big.Int) {
-	stateObject := self.GetOrNewStateObject(addr)
+// SetBalance sets balance of an address.
+func (stateDB *StateDB) SetBalance(addr common.Address, amount *big.Int) {
+	stateObject := stateDB.GetOrNewStateObject(addr)
 	if stateObject != nil {
 		stateObject.SetBalance(amount)
 	}
 }
 
-func (self *StateDB) SetNonce(addr common.Address, nonce uint64) {
-	stateObject := self.GetOrNewStateObject(addr)
+// SetNonce sets nonce of a given address.
+func (stateDB *StateDB) SetNonce(addr common.Address, nonce uint64) {
+	stateObject := stateDB.GetOrNewStateObject(addr)
 	if stateObject != nil {
 		stateObject.SetNonce(nonce)
 	}
 }
 
-func (self *StateDB) SetCode(addr common.Address, code []byte) {
-	stateObject := self.GetOrNewStateObject(addr)
+// SetCode sets code of a given address.
+func (stateDB *StateDB) SetCode(addr common.Address, code []byte) {
+	stateObject := stateDB.GetOrNewStateObject(addr)
 	if stateObject != nil {
 		stateObject.SetCode(crypto.Keccak256Hash(code), code)
 	}
 }
 
-func (self *StateDB) SetState(addr common.Address, key, value common.Hash) {
-	stateObject := self.GetOrNewStateObject(addr)
+// SetState sets hash value of a given address.
+func (stateDB *StateDB) SetState(addr common.Address, key, value common.Hash) {
+	stateObject := stateDB.GetOrNewStateObject(addr)
 	if stateObject != nil {
-		stateObject.SetState(self.db, key, value)
+		stateObject.SetState(stateDB.db, key, value)
 	}
 }
 
@@ -368,12 +382,12 @@ func (self *StateDB) SetState(addr common.Address, key, value common.Hash) {
 //
 // The account's state object is still available until the state is committed,
 // getStateObject will return a non-nil account after Suicide.
-func (self *StateDB) Suicide(addr common.Address) bool {
-	stateObject := self.getStateObject(addr)
+func (stateDB *StateDB) Suicide(addr common.Address) bool {
+	stateObject := stateDB.getStateObject(addr)
 	if stateObject == nil {
 		return false
 	}
-	self.journal.append(suicideChange{
+	stateDB.journal.append(suicideChange{
 		account:     &addr,
 		prev:        stateObject.suicided,
 		prevbalance: new(big.Int).Set(stateObject.Balance()),
@@ -389,26 +403,26 @@ func (self *StateDB) Suicide(addr common.Address) bool {
 //
 
 // updateStateObject writes the given object to the trie.
-func (self *StateDB) updateStateObject(stateObject *stateObject) {
+func (stateDB *StateDB) updateStateObject(stateObject *stateObject) {
 	addr := stateObject.Address()
 	data, err := rlp.EncodeToBytes(stateObject)
 	if err != nil {
 		panic(fmt.Errorf("can't encode object at %x: %v", addr[:], err))
 	}
-	self.setError(self.trie.TryUpdate(addr[:], data))
+	stateDB.setError(stateDB.trie.TryUpdate(addr[:], data))
 }
 
 // deleteStateObject removes the given object from the state trie.
-func (self *StateDB) deleteStateObject(stateObject *stateObject) {
+func (stateDB *StateDB) deleteStateObject(stateObject *stateObject) {
 	stateObject.deleted = true
 	addr := stateObject.Address()
-	self.setError(self.trie.TryDelete(addr[:]))
+	stateDB.setError(stateDB.trie.TryDelete(addr[:]))
 }
 
 // Retrieve a state object given by the address. Returns nil if not found.
-func (self *StateDB) getStateObject(addr common.Address) (stateObject *stateObject) {
+func (stateDB *StateDB) getStateObject(addr common.Address) (stateObject *stateObject) {
 	// Prefer 'live' objects.
-	if obj := self.stateObjects[addr]; obj != nil {
+	if obj := stateDB.stateObjects[addr]; obj != nil {
 		if obj.deleted {
 			return nil
 		}
@@ -416,9 +430,9 @@ func (self *StateDB) getStateObject(addr common.Address) (stateObject *stateObje
 	}
 
 	// Load the object from the database.
-	enc, err := self.trie.TryGet(addr[:])
+	enc, err := stateDB.trie.TryGet(addr[:])
 	if len(enc) == 0 {
-		self.setError(err)
+		stateDB.setError(err)
 		return nil
 	}
 	var data Account
@@ -427,36 +441,36 @@ func (self *StateDB) getStateObject(addr common.Address) (stateObject *stateObje
 		return nil
 	}
 	// Insert into the live set.
-	obj := newObject(self, addr, data)
-	self.setStateObject(obj)
+	obj := newObject(stateDB, addr, data)
+	stateDB.setStateObject(obj)
 	return obj
 }
 
-func (self *StateDB) setStateObject(object *stateObject) {
-	self.stateObjects[object.Address()] = object
+func (stateDB *StateDB) setStateObject(object *stateObject) {
+	stateDB.stateObjects[object.Address()] = object
 }
 
-// Retrieve a state object or create a new state object if nil.
-func (self *StateDB) GetOrNewStateObject(addr common.Address) *stateObject {
-	stateObject := self.getStateObject(addr)
+// GetOrNewStateObject retrieves a state object or create a new state object if nil.
+func (stateDB *StateDB) GetOrNewStateObject(addr common.Address) *StateObject {
+	stateObject := stateDB.getStateObject(addr)
 	if stateObject == nil || stateObject.deleted {
-		stateObject, _ = self.createObject(addr)
+		stateObject, _ = stateDB.createObject(addr)
 	}
 	return stateObject
 }
 
 // createObject creates a new state object. If there is an existing account with
 // the given address, it is overwritten and returned as the second return value.
-func (self *StateDB) createObject(addr common.Address) (newobj, prev *stateObject) {
-	prev = self.getStateObject(addr)
-	newobj = newObject(self, addr, Account{})
+func (stateDB *StateDB) createObject(addr common.Address) (newobj, prev *stateObject) {
+	prev = stateDB.getStateObject(addr)
+	newobj = newObject(stateDB, addr, Account{})
 	newobj.setNonce(0) // sets the object to dirty
 	if prev == nil {
-		self.journal.append(createObjectChange{account: &addr})
+		stateDB.journal.append(createObjectChange{account: &addr})
 	} else {
-		self.journal.append(resetObjectChange{prev: prev})
+		stateDB.journal.append(resetObjectChange{prev: prev})
 	}
-	self.setStateObject(newobj)
+	stateDB.setStateObject(newobj)
 	return newobj, prev
 }
 
@@ -470,21 +484,22 @@ func (self *StateDB) createObject(addr common.Address) (newobj, prev *stateObjec
 //   2. tx_create(sha(account ++ nonce)) (note that this gets the address of 1)
 //
 // Carrying over the balance ensures that Ether doesn't disappear.
-func (self *StateDB) CreateAccount(addr common.Address) {
-	new, prev := self.createObject(addr)
+func (stateDB *StateDB) CreateAccount(addr common.Address) {
+	new, prev := stateDB.createObject(addr)
 	if prev != nil {
 		new.setBalance(prev.data.Balance)
 	}
 }
 
-func (db *StateDB) ForEachStorage(addr common.Address, cb func(key, value common.Hash) bool) {
-	so := db.getStateObject(addr)
+// ForEachStorage runs a function on every item in state DB.
+func (stateDB *StateDB) ForEachStorage(addr common.Address, cb func(key, value common.Hash) bool) {
+	so := stateDB.getStateObject(addr)
 	if so == nil {
 		return
 	}
-	it := trie.NewIterator(so.getTrie(db.db).NodeIterator(nil))
+	it := trie.NewIterator(so.getTrie(stateDB.db).NodeIterator(nil))
 	for it.Next() {
-		key := common.BytesToHash(db.trie.GetKey(it.Key))
+		key := common.BytesToHash(stateDB.trie.GetKey(it.Key))
 		if value, dirty := so.dirtyStorage[key]; dirty {
 			cb(key, value)
 			continue
@@ -495,29 +510,29 @@ func (db *StateDB) ForEachStorage(addr common.Address, cb func(key, value common
 
 // Copy creates a deep, independent copy of the state.
 // Snapshots of the copied state cannot be applied to the copy.
-func (self *StateDB) Copy() *StateDB {
-	self.lock.Lock()
-	defer self.lock.Unlock()
+func (stateDB *StateDB) Copy() *StateDB {
+	stateDB.lock.Lock()
+	defer stateDB.lock.Unlock()
 
 	// Copy all the basic fields, initialize the memory ones
 	state := &StateDB{
-		db:                self.db,
-		trie:              self.db.CopyTrie(self.trie),
-		stateObjects:      make(map[common.Address]*stateObject, len(self.journal.dirties)),
-		stateObjectsDirty: make(map[common.Address]struct{}, len(self.journal.dirties)),
-		refund:            self.refund,
-		logs:              make(map[common.Hash][]*types.Log, len(self.logs)),
-		logSize:           self.logSize,
+		db:                stateDB.db,
+		trie:              stateDB.db.CopyTrie(stateDB.trie),
+		stateObjects:      make(map[common.Address]*stateObject, len(stateDB.journal.dirties)),
+		stateObjectsDirty: make(map[common.Address]struct{}, len(stateDB.journal.dirties)),
+		refund:            stateDB.refund,
+		logs:              make(map[common.Hash][]*types.Log, len(stateDB.logs)),
+		logSize:           stateDB.logSize,
 		preimages:         make(map[common.Hash][]byte),
 		journal:           newJournal(),
 	}
 	// Copy the dirty states, logs, and preimages
-	for addr := range self.journal.dirties {
+	for addr := range stateDB.journal.dirties {
 		// As documented [here](https://github.com/ethereum/go-ethereum/pull/16485#issuecomment-380438527),
 		// and in the Finalise-method, there is a case where an object is in the journal but not
 		// in the stateObjects: OOG after touch on ripeMD prior to Byzantium. Thus, we need to check for
 		// nil
-		if object, exist := self.stateObjects[addr]; exist {
+		if object, exist := stateDB.stateObjects[addr]; exist {
 			state.stateObjects[addr] = object.deepCopy(state)
 			state.stateObjectsDirty[addr] = struct{}{}
 		}
@@ -525,13 +540,13 @@ func (self *StateDB) Copy() *StateDB {
 	// Above, we don't copy the actual journal. This means that if the copy is copied, the
 	// loop above will be a no-op, since the copy's journal is empty.
 	// Thus, here we iterate over stateObjects, to enable copies of copies
-	for addr := range self.stateObjectsDirty {
+	for addr := range stateDB.stateObjectsDirty {
 		if _, exist := state.stateObjects[addr]; !exist {
-			state.stateObjects[addr] = self.stateObjects[addr].deepCopy(state)
+			state.stateObjects[addr] = stateDB.stateObjects[addr].deepCopy(state)
 			state.stateObjectsDirty[addr] = struct{}{}
 		}
 	}
-	for hash, logs := range self.logs {
+	for hash, logs := range stateDB.logs {
 		cpy := make([]*types.Log, len(logs))
 		for i, l := range logs {
 			cpy[i] = new(types.Log)
@@ -539,46 +554,46 @@ func (self *StateDB) Copy() *StateDB {
 		}
 		state.logs[hash] = cpy
 	}
-	for hash, preimage := range self.preimages {
+	for hash, preimage := range stateDB.preimages {
 		state.preimages[hash] = preimage
 	}
 	return state
 }
 
 // Snapshot returns an identifier for the current revision of the state.
-func (self *StateDB) Snapshot() int {
-	id := self.nextRevisionId
-	self.nextRevisionId++
-	self.validRevisions = append(self.validRevisions, revision{id, self.journal.length()})
+func (stateDB *StateDB) Snapshot() int {
+	id := stateDB.nextRevisionID
+	stateDB.nextRevisionID++
+	stateDB.validRevisions = append(stateDB.validRevisions, revision{id, stateDB.journal.length()})
 	return id
 }
 
 // RevertToSnapshot reverts all state changes made since the given revision.
-func (self *StateDB) RevertToSnapshot(revid int) {
+func (stateDB *StateDB) RevertToSnapshot(revid int) {
 	// Find the snapshot in the stack of valid snapshots.
-	idx := sort.Search(len(self.validRevisions), func(i int) bool {
-		return self.validRevisions[i].id >= revid
+	idx := sort.Search(len(stateDB.validRevisions), func(i int) bool {
+		return stateDB.validRevisions[i].id >= revid
 	})
-	if idx == len(self.validRevisions) || self.validRevisions[idx].id != revid {
+	if idx == len(stateDB.validRevisions) || stateDB.validRevisions[idx].id != revid {
 		panic(fmt.Errorf("revision id %v cannot be reverted", revid))
 	}
-	snapshot := self.validRevisions[idx].journalIndex
+	snapshot := stateDB.validRevisions[idx].journalIndex
 
 	// Replay the journal to undo changes and remove invalidated snapshots
-	self.journal.revert(self, snapshot)
-	self.validRevisions = self.validRevisions[:idx]
+	stateDB.journal.revert(stateDB, snapshot)
+	stateDB.validRevisions = stateDB.validRevisions[:idx]
 }
 
 // GetRefund returns the current value of the refund counter.
-func (self *StateDB) GetRefund() uint64 {
-	return self.refund
+func (stateDB *StateDB) GetRefund() uint64 {
+	return stateDB.refund
 }
 
 // Finalise finalises the state by removing the self destructed objects
 // and clears the journal as well as the refunds.
-func (s *StateDB) Finalise(deleteEmptyObjects bool) {
-	for addr := range s.journal.dirties {
-		stateObject, exist := s.stateObjects[addr]
+func (stateDB *StateDB) Finalise(deleteEmptyObjects bool) {
+	for addr := range stateDB.journal.dirties {
+		stateObject, exist := stateDB.stateObjects[addr]
 		if !exist {
 			// ripeMD is 'touched' at block 1714175, in tx 0x1237f737031e40bcde4a8b7e717b2d15e3ecadfe49bb1bbc71ee9deb09c6fcf2
 			// That tx goes out of gas, and although the notion of 'touched' does not exist there, the
@@ -604,27 +619,27 @@ func (s *StateDB) Finalise(deleteEmptyObjects bool) {
 // IntermediateRoot computes the current root hash of the state trie.
 // It is called in between transactions to get the root hash that
 // goes into transaction receipts.
-func (s *StateDB) IntermediateRoot(deleteEmptyObjects bool) common.Hash {
+func (stateDB *StateDB) IntermediateRoot(deleteEmptyObjects bool) common.Hash {
 	s.Finalise(deleteEmptyObjects)
 	return s.trie.Hash()
 }
 
 // Prepare sets the current transaction hash and index and block hash which is
 // used when the EVM emits new state logs.
-func (self *StateDB) Prepare(thash, bhash common.Hash, ti int) {
-	self.thash = thash
-	self.bhash = bhash
-	self.txIndex = ti
+func (stateDB *StateDB) Prepare(thash, bhash common.Hash, ti int) {
+	stateDB.thash = thash
+	stateDB.bhash = bhash
+	stateDB.txIndex = ti
 }
 
-func (s *StateDB) clearJournalAndRefund() {
+func (stateDB *StateDB) clearJournalAndRefund() {
 	s.journal = newJournal()
 	s.validRevisions = s.validRevisions[:0]
 	s.refund = 0
 }
 
 // Commit writes the state to the underlying in-memory trie database.
-func (s *StateDB) Commit(deleteEmptyObjects bool) (root common.Hash, err error) {
+func (stateDB *StateDB) Commit(deleteEmptyObjects bool) (root common.Hash, err error) {
 	defer s.clearJournalAndRefund()
 
 	for addr := range s.journal.dirties {
