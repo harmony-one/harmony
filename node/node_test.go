@@ -148,20 +148,12 @@ func exitServer() {
 }
 
 // func TestPingPongHandler(test *testing.T) {
-<<<<<<< HEAD
-// 	leader := p2p.Peer{Ip: "127.0.0.1", Port: "8881"}
-// 	// validator := p2p.Peer{Ip: "127.0.0.1", Port: "9991"}
-// 	consensus := consensus.New("127.0.0.1", "8881", "0", []p2p.Peer{leader}, leader)
-
-=======
 // 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8881"}
-// 	consensus := consensus.NewConsensus("127.0.0.1", "8881", "0", []p2p.Peer{leader}, leader)
->>>>>>> 8cddd1548aa2057a4d17d149addc5f579146fddd
+// 	// validator := p2p.Peer{IP: "127.0.0.1", Port: "9991"}
+// 	consensus := consensus.New("127.0.0.1", "8881", "0", []p2p.Peer{leader}, leader)
 // 	node := New(consensus, nil)
-
 // 	//	go sendPingMessage(leader)
 // 	go sendPongMessage(leader)
 // 	go exitServer()
-
 // 	node.StartServer("8881")
 // }

@@ -13,7 +13,7 @@ func TestNewMerkleNode(t *testing.T) {
 		[]byte("node3"),
 	}
 
-	fmt.Println("TEting")
+	fmt.Println("Testing")
 	// Level 1
 
 	n1 := NewMerkleNode(nil, nil, data[0])
