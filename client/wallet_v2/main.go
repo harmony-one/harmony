@@ -244,6 +244,7 @@ func getShardIDToLeaderMap() map[uint32]p2p.Peer {
 	return shardIDLeaderMap
 }
 
+// CreateWalletServerNode creates wallet server node.
 func CreateWalletServerNode() *node.Node {
 	configr := client_config.NewConfig()
 	var shardIDLeaderMap map[uint32]p2p.Peer
@@ -256,13 +257,13 @@ func CreateWalletServerNode() *node.Node {
 		shardIDLeaderMap = getShardIDToLeaderMap()
 		clientPeer = &p2p.Peer{Port: "127.0.0.1", IP: "1234"}
 	}
-	walletNode := node.New(nil, nil)
+	walletNode := node.New(nil, nil, *clientPeer)
 	walletNode.Client = client.NewClient(&shardIDLeaderMap)
 	walletNode.ClientPeer = clientPeer
 	return walletNode
 }
 
-// Issue the transaction to the Harmony network
+// ExecuteTransaction issues the transaction to the Harmony network
 func ExecuteTransaction(tx blockchain.Transaction, walletNode *node.Node) error {
 	if tx.IsCrossShard() {
 		walletNode.Client.PendingCrossTxsMutex.Lock()
@@ -292,7 +293,7 @@ func ExecuteTransaction(tx blockchain.Transaction, walletNode *node.Node) error 
 	}
 }
 
-// Fetch utxos of specified address from the Harmony network
+// FetchUtxos fetches utxos of specified address from the Harmony network
 func FetchUtxos(addresses [][20]byte, walletNode *node.Node) (map[uint32]blockchain.UtxoMap, error) {
 	fmt.Println("Fetching account balance...")
 	walletNode.Client.ShardUtxoMap = make(map[uint32]blockchain.UtxoMap)
@@ -316,6 +317,7 @@ func FetchUtxos(addresses [][20]byte, walletNode *node.Node) (map[uint32]blockch
 	}
 }
 
+// PrintUtxoBalance prints UTXO balance.
 func PrintUtxoBalance(shardUtxoMap map[uint32]blockchain.UtxoMap) {
 	addressBalance := make(map[[20]byte]int)
 	for _, utxoMap := range shardUtxoMap {
@@ -338,7 +340,7 @@ func PrintUtxoBalance(shardUtxoMap map[uint32]blockchain.UtxoMap) {
 	}
 }
 
-// Read the addresses stored in local keystore
+// ReadAddresses reads the addresses stored in local keystore
 func ReadAddresses() [][20]byte {
 	priKeys := ReadPrivateKeys()
 	addresses := [][20]byte{}
@@ -348,7 +350,7 @@ func ReadAddresses() [][20]byte {
 	return addresses
 }
 
-// Store the specified private key in local keystore
+// StorePrivateKey stores the specified private key in local keystore
 func StorePrivateKey(priKey []byte) {
 	for _, address := range ReadAddresses() {
 		if address == pki.GetAddressFromPrivateKey(crypto.Ed25519Curve.Scalar().SetBytes(priKey)) {
@@ -369,12 +371,12 @@ func StorePrivateKey(priKey []byte) {
 	f.Close()
 }
 
-// Delete all data in the local keystore
+// ClearKeystore deletes all data in the local keystore
 func ClearKeystore() {
 	ioutil.WriteFile("keystore", []byte{}, 0644)
 }
 
-// Read all the private key stored in local keystore
+// ReadPrivateKeys reads all the private key stored in local keystore
 func ReadPrivateKeys() []kyber.Scalar {
 	keys, err := ioutil.ReadFile("keystore")
 	if err != nil {

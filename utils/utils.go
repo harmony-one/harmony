@@ -25,27 +25,23 @@ func ConvertFixedDataIntoByteArray(data interface{}) []byte {
 }
 
 // TODO(minhdoan): this is probably a hack, probably needs some strong non-collision hash.
-func GetUniqueIdFromPeer(peer p2p.Peer) uint16 {
+// GetUniqueIDFromPeer --
+func GetUniqueIDFromPeer(peer p2p.Peer) uint16 {
+	return GetUniqueIDFromIPPort(peer.IP, peer.Port)
+}
+
+// GetUniqueIDFromIPPort --
+func GetUniqueIDFromIPPort(ip, port string) uint16 {
 	reg, err := regexp.Compile("[^0-9]+")
 	if err != nil {
 		log.Panic("Regex Compilation Failed", "err", err)
 	}
-	socketId := reg.ReplaceAllString(peer.IP+peer.Port, "") // A integer Id formed by unique IP/PORT pair
-	value, _ := strconv.Atoi(socketId)
+	socketID := reg.ReplaceAllString(ip+port, "") // A integer Id formed by unique IP/PORT pair
+	value, _ := strconv.Atoi(socketID)
 	return uint16(value)
 }
 
-func GetUniqueIdFromIPPort(ip, port string) uint16 {
-	reg, err := regexp.Compile("[^0-9]+")
-	if err != nil {
-		log.Panic("Regex Compilation Failed", "err", err)
-	}
-	socketId := reg.ReplaceAllString(ip+port, "") // A integer Id formed by unique IP/PORT pair
-	value, _ := strconv.Atoi(socketId)
-	return uint16(value)
-}
-
-// RunCmd Runs command `name` with arguments `args`
+// RunCmd runs command `name` with arguments `args`
 func RunCmd(name string, args ...string) error {
 	cmd := exec.Command(name, args...)
 	if err := cmd.Start(); err != nil {
@@ -64,8 +60,9 @@ func RunCmd(name string, args ...string) error {
 	return nil
 }
 
+// GenKey generates a key given ip and port.
 func GenKey(ip, port string) (kyber.Scalar, kyber.Point) {
-	priKey := crypto.Ed25519Curve.Scalar().SetInt64(int64(GetUniqueIdFromIPPort(ip, port))) // TODO: figure out why using a random hash value doesn't work for private key (schnorr)
+	priKey := crypto.Ed25519Curve.Scalar().SetInt64(int64(GetUniqueIDFromIPPort(ip, port))) // TODO: figure out why using a random hash value doesn't work for private key (schnorr)
 	pubKey := pki.GetPublicKeyFromScalar(priKey)
 
 	return priKey, pubKey

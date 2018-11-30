@@ -1,6 +1,9 @@
 package worker
 
 import (
+	"math/big"
+	"time"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/consensus"
@@ -8,8 +11,6 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	"math/big"
-	"time"
 )
 
 // environment is the worker's current environment and holds all of the current state information.
@@ -22,7 +23,7 @@ type environment struct {
 	receipts []*types.Receipt
 }
 
-// worker is the main object which takes care of submitting new work to consensus engine
+// Worker is the main object which takes care of submitting new work to consensus engine
 // and gathering the sealing result.
 type Worker struct {
 	config  *params.ChainConfig
@@ -49,6 +50,7 @@ func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	return receipt.Logs, nil
 }
 
+// CommitTransactions commits transactions.
 func (w *Worker) CommitTransactions(txs []*types.Transaction, coinbase common.Address) error {
 	snap := w.current.state.Snapshot()
 
@@ -66,6 +68,7 @@ func (w *Worker) CommitTransactions(txs []*types.Transaction, coinbase common.Ad
 	return nil
 }
 
+// UpdateCurrent updates ...
 func (w *Worker) UpdateCurrent() error {
 	parent := w.chain.CurrentBlock()
 	num := parent.Number()
@@ -95,10 +98,12 @@ func (w *Worker) makeCurrent(parent *types.Block, header *types.Header) error {
 	return nil
 }
 
+// GetCurrentState ...
 func (w *Worker) GetCurrentState() *state.StateDB {
 	return w.current.state
 }
 
+// Commit ...
 func (w *Worker) Commit() (*types.Block, error) {
 	s := w.current.state.Copy()
 	block, err := w.engine.Finalize(w.chain, w.current.header, s, w.current.txs, w.current.receipts)
@@ -108,6 +113,7 @@ func (w *Worker) Commit() (*types.Block, error) {
 	return block, nil
 }
 
+// New ...
 func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus.Engine) *Worker {
 	worker := &Worker{
 		config: config,

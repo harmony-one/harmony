@@ -168,7 +168,7 @@ func main() {
 	}
 
 	// Consensus object.
-	consensus := consensus.NewConsensus(*ip, *port, shardID, peers, leader)
+	consensus := consensus.New(selfPeer, shardID, peers, leader)
 	consensus.MinPeers = *minPeers
 
 	// Start Profiler for leader if profile argument is on
@@ -183,7 +183,7 @@ func main() {
 	// Set logger to attack model.
 	attack.GetInstance().SetLogger(consensus.Log)
 	// Current node.
-	currentNode := node.New(consensus, ldb)
+	currentNode := node.New(consensus, ldb, selfPeer)
 	// Add self peer.
 	currentNode.SelfPeer = selfPeer
 	// Add sync node configuration.
@@ -224,9 +224,7 @@ func main() {
 		}
 	} else {
 		if *peerDisvoery {
-			go func() {
-				currentNode.JoinShard(leader)
-			}()
+			go currentNode.JoinShard(leader)
 		}
 	}
 

@@ -111,7 +111,7 @@ func LeftPadBytes(slice []byte, l int) []byte {
 	return padded
 }
 
-// Parse the string representation of hex into 32 byte array
+// Get32BytesFromString parses the string representation of hex into 32 byte array
 func Get32BytesFromString(hashString string) ([32]byte, error) {
 	bytes, err := hex.DecodeString(hashString)
 	if err != nil {
