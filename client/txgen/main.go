@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/client/txgen/txgen"
 	"github.com/harmony-one/harmony/core/types"
-
 	"github.com/harmony-one/harmony/p2pv2"
 
 	"github.com/harmony-one/harmony/blockchain"
@@ -89,14 +88,14 @@ func main() {
 
 	// Client/txgenerator server node setup
 	clientPeer := config.GetClientPeer()
-	consensusObj := consensus.NewConsensus(clientPeer.Ip, clientPeer.Port, "0", nil, p2p.Peer{})
+	consensusObj := consensus.NewConsensus(clientPeer.IP, clientPeer.Port, "0", nil, p2p.Peer{})
 	clientNode := node.New(consensusObj, nil)
 	// Add self peer.
 	// TODO(ricl): setting self peer should be moved into consensus / node New!
 	clientNode.SelfPeer = *clientPeer
 
 	if clientPeer != nil {
-		p2pv2.InitHost(clientPeer.Ip, clientPeer.Port) // TODO: this should be moved into client node.
+		p2pv2.InitHost(clientPeer.IP, clientPeer.Port) // TODO: this should be moved into client node.
 		clientNode.Client = client.NewClient(&shardIDLeaderMap)
 
 		// This func is used to update the client's utxopool when new blocks are received from the leaders
@@ -104,21 +103,26 @@ func main() {
 			log.Debug("Received new block from leader", "len", len(blocks))
 			for _, block := range blocks {
 				for _, node := range nodes {
-					if node.Consensus.ShardID == block.ShardID {
-						log.Debug("Adding block from leader", "shardID", block.ShardID)
+					shardID := block.ShardID
+
+					accountBlock := new(types.Block)
+					err := rlp.DecodeBytes(block.AccountBlock, accountBlock)
+					if err == nil {
+						shardID = accountBlock.ShardId()
+					}
+					if node.Consensus.ShardID == shardID {
+						log.Debug("Adding block from leader", "shardID", shardID)
 						// Add it to blockchain
 						node.AddNewBlock(block)
 						utxoPoolMutex.Lock()
 						node.UpdateUtxoAndState(block)
 						utxoPoolMutex.Unlock()
 
-						accountBlock := new(types.Block)
-						err := rlp.DecodeBytes(block.AccountBlock, accountBlock)
-						fmt.Println("RECEIVED NEW BLOCK ", len(accountBlock.Transactions()))
 						if err != nil {
 							log.Error("Failed decoding the block with RLP")
 						} else {
-							err = node.Worker.CommitTransactions(accountBlock.Transactions(), accountBlock.Coinbase())
+							fmt.Println("RECEIVED NEW BLOCK ", len(accountBlock.Transactions()))
+							node.AddNewBlockAccount(accountBlock)
 							node.Worker.UpdateCurrent()
 							if err != nil {
 								log.Debug("Failed to add new block to worker", "Error", err)
@@ -159,7 +163,7 @@ func main() {
 
 			utxoPoolMutex.Lock()
 			log.Warn("STARTING TX GEN", "gomaxprocs", runtime.GOMAXPROCS(0))
-			for shardID, _ := range shardIDLeaderMap { // Generate simulated transactions
+			for shardID := range shardIDLeaderMap { // Generate simulated transactions
 				go func(shardID uint32) {
 					txs, _ := txgen.GenerateSimulatedTransactionsAccount(int(shardID), nodes, setting)
 
@@ -200,7 +204,7 @@ func main() {
 
 			utxoPoolMutex.Lock()
 			log.Warn("STARTING TX GEN", "gomaxprocs", runtime.GOMAXPROCS(0))
-			for shardID, _ := range shardIDLeaderMap { // Generate simulated transactions
+			for shardID := range shardIDLeaderMap { // Generate simulated transactions
 				go func(shardID uint32) {
 					txs, crossTxs := txgen.GenerateSimulatedTransactions(subsetCounter, *numSubset, int(shardID), nodes, setting)
 
@@ -217,7 +221,7 @@ func main() {
 					// Put txs into corresponding shards
 					shardIDTxsMap[shardID] = append(shardIDTxsMap[shardID], txs...)
 					for _, crossTx := range crossTxs {
-						for curShardID, _ := range client.GetInputShardIDsOfCrossShardTx(crossTx) {
+						for curShardID := range client.GetInputShardIDsOfCrossShardTx(crossTx) {
 							shardIDTxsMap[curShardID] = append(shardIDTxsMap[curShardID], crossTx)
 						}
 					}
@@ -248,12 +252,14 @@ func main() {
 	time.Sleep(3000 * time.Millisecond)
 }
 
+// SendTxsToLeader sends txs to leader.
 func SendTxsToLeader(leader p2p.Peer, txs []*blockchain.Transaction) {
 	log.Debug("[Generator] Sending txs to...", "leader", leader, "numTxs", len(txs))
 	msg := proto_node.ConstructTransactionListMessage(txs)
 	p2p.SendMessage(leader, msg)
 }
 
+// SendTxsToLeaderAccount sends txs to leader account.
 func SendTxsToLeaderAccount(leader p2p.Peer, txs types.Transactions) {
 	log.Debug("[Generator] Sending account-based txs to...", "leader", leader, "numTxs", len(txs))
 	msg := proto_node.ConstructTransactionListMessageAccount(txs)

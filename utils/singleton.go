@@ -7,22 +7,25 @@ import (
 	"sync/atomic"
 )
 
-type UniqueValidatorId struct {
-	uniqueId uint32
+// UniqueValidatorID defines the structure of unique validator ID
+type UniqueValidatorID struct {
+	uniqueID uint32
 }
 
-var instance *UniqueValidatorId
+var instance *UniqueValidatorID
 var once sync.Once
 
-func GetUniqueValidatorIdInstance() *UniqueValidatorId {
+// GetUniqueValidatorIDInstance returns a singleton instance
+func GetUniqueValidatorIDInstance() *UniqueValidatorID {
 	once.Do(func() {
-		instance = &UniqueValidatorId{
-			uniqueId: 0,
+		instance = &UniqueValidatorID{
+			uniqueID: 0,
 		}
 	})
 	return instance
 }
 
-func (s *UniqueValidatorId) GetUniqueId() uint32 {
-	return atomic.AddUint32(&s.uniqueId, 1)
+// GetUniqueID returns a unique ID and increment the internal variable
+func (s *UniqueValidatorID) GetUniqueID() uint32 {
+	return atomic.AddUint32(&s.uniqueID, 1)
 }

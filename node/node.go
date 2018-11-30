@@ -8,6 +8,8 @@ import (
 	"math/big"
 	"math/rand"
 	"net"
+	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -26,7 +28,6 @@ import (
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2pv2"
-	proto_identity "github.com/harmony-one/harmony/proto/identity"
 	proto_node "github.com/harmony-one/harmony/proto/node"
 	"github.com/harmony-one/harmony/syncing/downloader"
 	downloader_pb "github.com/harmony-one/harmony/syncing/downloader/proto"
@@ -74,8 +75,7 @@ type Node struct {
 	crossTxToReturnMutex   sync.Mutex
 	ClientPeer             *p2p.Peer      // The peer for the benchmark tx generator client, used for leaders to return proof-of-accept
 	Client                 *client.Client // The presence of a client object means this node will also act as a client
-	IsWaiting              bool
-	SelfPeer               p2p.Peer // TODO(minhdoan): it could be duplicated with Self below whose is Alok work.
+	SelfPeer               p2p.Peer       // TODO(minhdoan): it could be duplicated with Self below whose is Alok work.
 	IDCPeer                p2p.Peer
 
 	SyncNode  bool             // TODO(minhdoan): Remove it later.
@@ -160,7 +160,7 @@ func (node *Node) StartServer(port string) {
 		//node.log.Debug("Starting server", "node", node, "port", port)
 		node.listenOnPort(port)
 	} else {
-		p2pv2.InitHost(node.SelfPeer.Ip, port)
+		p2pv2.InitHost(node.SelfPeer.IP, port)
 		p2pv2.BindHandler(node.NodeHandlerV1)
 		// Hang forever
 		<-make(chan struct{})
@@ -222,14 +222,6 @@ func (node *Node) countNumTransactionsInBlockchainAccount() int {
 		curBlock = node.Chain.GetBlockByHash(curBlock.ParentHash())
 	}
 	return count
-}
-
-//ConnectBeaconChain connects to identity chain
-func (node *Node) ConnectBeaconChain() {
-	Nnode := &NetworkNode{SelfPeer: node.SelfPeer, IDCPeer: node.IDCPeer}
-	msg := node.SerializeNode(Nnode)
-	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Register, msg)
-	p2p.SendMessage(node.IDCPeer, msgToSend)
 }
 
 // SerializeNode serializes the node
@@ -302,9 +294,12 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 		}
 
 		database := hdb.NewMemDatabase()
+		chainConfig := params.TestChainConfig
+		chainConfig.ChainID = big.NewInt(int64(node.Consensus.ShardID)) // Use ChainId as piggybacked ShardId
 		gspec := core.Genesis{
-			Config: params.TestChainConfig,
-			Alloc:  genesisAloc,
+			Config:  chainConfig,
+			Alloc:   genesisAloc,
+			ShardId: uint32(node.Consensus.ShardID),
 		}
 
 		_ = gspec.MustCommit(database)
@@ -371,8 +366,12 @@ func (node *Node) InitSyncingServer() {
 
 // StartSyncingServer starts syncing server.
 func (node *Node) StartSyncingServer() {
-	// Handles returned grpcServer??
-	node.downloaderServer.Start(node.SelfPeer.Ip, downloader.DefaultDownloadPort)
+	if port, err := strconv.Atoi(node.SelfPeer.Port); err == nil {
+		node.downloaderServer.Start(node.SelfPeer.IP, fmt.Sprintf("%d", port-1000))
+	} else {
+		node.log.Error("Wrong port format provided")
+		os.Exit(1)
+	}
 }
 
 // CalculateResponse implements DownloadInterface on Node object.

@@ -88,7 +88,7 @@ type Consensus struct {
 
 	Log log.Logger
 
-	uniqueIDInstance *utils.UniqueValidatorId
+	uniqueIDInstance *utils.UniqueValidatorID
 }
 
 // BlockConsensusStatus used to keep track of the consensus status of multiple blocks received so far
@@ -108,7 +108,7 @@ type BlockConsensusStatus struct {
 func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Consensus {
 	consensus := Consensus{}
 
-	if leader.Port == port && leader.Ip == ip {
+	if leader.Port == port && leader.IP == ip {
 		consensus.IsLeader = true
 	} else {
 		consensus.IsLeader = false
@@ -121,7 +121,7 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 
 	consensus.leader = leader
 	for _, peer := range peers {
-		consensus.validators.Store(utils.GetUniqueIdFromPeer(peer), peer)
+		consensus.validators.Store(utils.GetUniqueIDFromPeer(peer), peer)
 	}
 
 	// Initialize cosign bitmap
@@ -146,7 +146,7 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 
 	// For now use socket address as 16 byte Id
 	// TODO: populate with correct Id
-	consensus.nodeID = utils.GetUniqueIdFromPeer(p2p.Peer{Ip: ip, Port: port})
+	consensus.nodeID = utils.GetUniqueIDFromPeer(p2p.Peer{IP: ip, Port: port})
 
 	// Set private key for myself so that I can sign messages.
 	consensus.priKey = crypto.Ed25519Curve.Scalar().SetInt64(int64(consensus.nodeID))
@@ -173,7 +173,7 @@ func NewConsensus(ip, port, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 	}
 
 	consensus.Log = log.New()
-	consensus.uniqueIDInstance = utils.GetUniqueValidatorIdInstance()
+	consensus.uniqueIDInstance = utils.GetUniqueValidatorIDInstance()
 
 	return &consensus
 }
@@ -239,12 +239,12 @@ func (consensus *Consensus) AddPeers(peers []p2p.Peer) int {
 	count := 0
 
 	for _, peer := range peers {
-		_, ok := consensus.validators.Load(utils.GetUniqueIdFromPeer(peer))
+		_, ok := consensus.validators.Load(utils.GetUniqueIDFromPeer(peer))
 		if !ok {
 			if peer.ValidatorID == -1 {
-				peer.ValidatorID = int(consensus.uniqueIDInstance.GetUniqueId())
+				peer.ValidatorID = int(consensus.uniqueIDInstance.GetUniqueID())
 			}
-			consensus.validators.Store(utils.GetUniqueIdFromPeer(peer), peer)
+			consensus.validators.Store(utils.GetUniqueIDFromPeer(peer), peer)
 			consensus.PublicKeys = append(consensus.PublicKeys, peer.PubKey)
 		}
 		count++
@@ -275,7 +275,7 @@ func (consensus *Consensus) DebugPrintValidators() {
 	consensus.validators.Range(func(k, v interface{}) bool {
 		if p, ok := v.(p2p.Peer); ok {
 			str2 := fmt.Sprintf("%s", p.PubKey)
-			consensus.Log.Debug("validator:", "IP", p.Ip, "Port", p.Port, "VID", p.ValidatorID, "Key", str2)
+			consensus.Log.Debug("validator:", "IP", p.IP, "Port", p.Port, "VID", p.ValidatorID, "Key", str2)
 			count++
 			return true
 		}

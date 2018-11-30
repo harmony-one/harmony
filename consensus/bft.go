@@ -9,9 +9,11 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 )
 
+// Bft is the struct for Bft protocol.
 type Bft struct {
 }
 
+// NewFaker returns Bft.
 func NewFaker() *Bft {
 	return &Bft{}
 }
@@ -90,7 +92,6 @@ func (bft *Bft) SealHash(header *types.Header) (hash common.Hash) {
 
 	rlp.Encode(hasher, []interface{}{
 		header.ParentHash,
-		header.UncleHash,
 		header.Coinbase,
 		header.Root,
 		header.TxHash,
@@ -107,6 +108,7 @@ func (bft *Bft) SealHash(header *types.Header) (hash common.Hash) {
 	return hash
 }
 
+// Seal ...
 func (bft *Bft) Seal(chain ChainReader, block *types.Block, results chan<- *types.Block, stop <-chan struct{}) error {
 	return nil
 }

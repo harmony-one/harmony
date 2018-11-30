@@ -7,6 +7,7 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 )
 
+// ConfigEntry is the config entry.
 type ConfigEntry struct {
 	IP          string
 	Port        string
@@ -24,6 +25,8 @@ func (config ConfigEntry) String() string {
 	return fmt.Sprintf("idc: %v:%v", config.IP, config.Port)
 }
 
+// New return new ConfigEntry.
+// TODO: This should be change because this package is discovery and New here implies New Discovery.
 func New(priK kyber.Scalar, pubK kyber.Point) *ConfigEntry {
 	var config ConfigEntry
 	config.priK = priK
@@ -34,6 +37,7 @@ func New(priK kyber.Scalar, pubK kyber.Point) *ConfigEntry {
 	return &config
 }
 
+// StartClientMode starts client mode.
 func (config *ConfigEntry) StartClientMode(idcIP, idcPort string) error {
 	config.IP = "myip"
 	config.Port = "myport"
@@ -45,18 +49,22 @@ func (config *ConfigEntry) StartClientMode(idcIP, idcPort string) error {
 	return nil
 }
 
+// GetShardID ...
 func (config *ConfigEntry) GetShardID() string {
 	return config.ShardID
 }
 
+// GetPeers ...
 func (config *ConfigEntry) GetPeers() []p2p.Peer {
 	return config.peers
 }
 
+// GetLeader ...
 func (config *ConfigEntry) GetLeader() p2p.Peer {
 	return config.leader
 }
 
+// GetSelfPeer ...
 func (config *ConfigEntry) GetSelfPeer() p2p.Peer {
 	return config.self
 }

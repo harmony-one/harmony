@@ -146,7 +146,7 @@ func main() {
 	selfPeer.PubKey = pubKey
 
 	var role string
-	if leader.Ip == *ip && leader.Port == *port {
+	if leader.IP == *ip && leader.Port == *port {
 		role = "leader"
 	} else {
 		role = "validator"
@@ -224,9 +224,7 @@ func main() {
 		}
 	} else {
 		if *peerDisvoery {
-			go func() {
-				currentNode.JoinShard(leader)
-			}()
+			go currentNode.JoinShard(leader)
 		}
 	}
 
