@@ -8,28 +8,31 @@ import (
 	"github.com/harmony-one/harmony/proto"
 )
 
-// The specific types of message under Client category
-type ClientMessageType byte
+// MessageType is the specific types of message under Client category
+type MessageType byte
 
+// Message type supported by client
 const (
-	Transaction ClientMessageType = iota
+	Transaction MessageType = iota
 	// TODO: add more types
 )
 
-// The types of messages used for Client/Transaction
+// TransactionMessageType defines the types of messages used for Client/Transaction
 type TransactionMessageType int
 
+// The proof of accept or reject returned by the leader to the client tnat issued cross shard transactions
 const (
-	ProofOfLock TransactionMessageType = iota // The proof of accept or reject returned by the leader to the client tnat issued cross shard transactions.
+	ProofOfLock TransactionMessageType = iota
 	UtxoResponse
 )
 
+// FetchUtxoResponseMessage is the data structure of UTXO map
 type FetchUtxoResponseMessage struct {
 	UtxoMap blockchain.UtxoMap
 	ShardID uint32
 }
 
-// [leader] Constructs the proof of accept or reject message that will be sent to client
+// ConstructProofOfAcceptOrRejectMessage constructs the proof of accept or reject message that will be sent to client
 func ConstructProofOfAcceptOrRejectMessage(proofs []blockchain.CrossShardTxProof) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Client)})
 	byteBuffer.WriteByte(byte(Transaction))
@@ -40,7 +43,7 @@ func ConstructProofOfAcceptOrRejectMessage(proofs []blockchain.CrossShardTxProof
 	return byteBuffer.Bytes()
 }
 
-// Constructs the response message to fetch utxo message
+// ConstructFetchUtxoResponseMessage constructs the response message to fetch utxo message
 func ConstructFetchUtxoResponseMessage(utxoMap *blockchain.UtxoMap, shardID uint32) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Client)})
 	byteBuffer.WriteByte(byte(Transaction))

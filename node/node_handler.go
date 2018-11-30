@@ -75,7 +75,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 
 	switch msgCategory {
 	case proto.Identity:
-		actionType := proto_identity.IdentityMessageType(msgType)
+		actionType := proto_identity.IDMessageType(msgType)
 		switch actionType {
 		case proto_identity.Identity:
 			messageType := proto_identity.MessageType(msgPayload[0])
@@ -90,7 +90,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 			}
 		}
 	case proto.Consensus:
-		actionType := consensus.ConsensusMessageType(msgType)
+		actionType := consensus.ConMessageType(msgType)
 		switch actionType {
 		case consensus.Consensus:
 			if consensusObj.IsLeader {
@@ -189,7 +189,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 			node.pongMessageHandler(msgPayload)
 		}
 	case proto.Client:
-		actionType := client.ClientMessageType(msgType)
+		actionType := client.MessageType(msgType)
 		node.log.Info("NET: received message: Client/Transaction")
 		switch actionType {
 		case client.Transaction:
