@@ -58,6 +58,8 @@ func TestSerializeDeserializeRandomInfo(t *testing.T) {
 	rrn := ResponseRandomNumber{NumberOfShards: 5, NumberOfNodesAdded: 10, Leaders: leaders}
 	serializedrrn := SerializeRandomInfo(rrn)
 	deserializedrrn := DeserializeRandomInfo(serializedrrn)
+	fmt.Println(rrn)
+	fmt.Println(deserializedrrn)
 	if !reflect.DeepEqual(rrn, deserializedrrn) {
 		t.Fatalf("serializin g and deserializing random response does not lead to original randominfo")
 	}

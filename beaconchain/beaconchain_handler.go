@@ -15,7 +15,7 @@ func (bc *BeaconChain) BeaconChainHandler(conn net.Conn) {
 		bc.log.Error("Read p2p data failed")
 		return
 	}
-	bc.log.Info("received connection")
+	bc.log.Info("received connection", "connectionIp", conn.RemoteAddr())
 	msgCategory, err := proto.GetMessageCategory(content)
 	if err != nil {
 		bc.log.Error("Read message category failed", "err", err)

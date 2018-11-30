@@ -55,7 +55,7 @@ func SerializeRandomInfo(response ResponseRandomNumber) []byte {
 }
 
 // DeserializeNode deserializes the node
-func DeserializeRandomInfo(d []byte) *ResponseRandomNumber {
+func DeserializeRandomInfo(d []byte) ResponseRandomNumber {
 	var wn ResponseRandomNumber
 	r := bytes.NewBuffer(d)
 	decoder := gob.NewDecoder(r)
@@ -63,5 +63,5 @@ func DeserializeRandomInfo(d []byte) *ResponseRandomNumber {
 	if err != nil {
 		log.Crit("Could not de-serialize random number information")
 	}
-	return &wn
+	return wn
 }
