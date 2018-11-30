@@ -245,7 +245,13 @@ func (consensus *Consensus) AddPeers(peers []p2p.Peer) int {
 				peer.ValidatorID = int(consensus.uniqueIDInstance.GetUniqueId())
 			}
 			consensus.validators.Store(utils.GetUniqueIdFromPeer(peer), peer)
+			fmt.Println("I am on CONSENSUS ADDPEERS 1")
+			fmt.Println(consensus.PublicKeys)
 			consensus.PublicKeys = append(consensus.PublicKeys, peer.PubKey)
+			fmt.Println("I am on CONSENSUS ADDPEERS 2")
+			fmt.Println(peer.PubKey)
+			fmt.Println(consensus.PublicKeys)
+			fmt.Println("I am on CONSENSUS ADDPEERS 3 ------")
 		}
 		count++
 	}

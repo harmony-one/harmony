@@ -31,8 +31,8 @@ type NewNode struct {
 	isLeader    bool
 	Self        p2p.Peer
 	peers       []p2p.Peer
-	PubK        kyber.Scalar
-	priK        kyber.Point
+	PubK        kyber.Point
+	priK        kyber.Scalar
 	log         log.Logger
 	SetInfo     bool
 	Service     *Service
@@ -40,11 +40,11 @@ type NewNode struct {
 
 //NewNode
 func New(ip string, port string) *NewNode {
-	pubKey, priKey := utils.GenKey(ip, port)
+	priKey, pubKey := utils.GenKey(ip, port)
 	var node NewNode
 	node.PubK = pubKey
 	node.priK = priKey
-	node.Self = p2p.Peer{Ip: ip, Port: port}
+	node.Self = p2p.Peer{Ip: ip, Port: port, PubKey: pubKey}
 	node.log = log.New()
 	node.SetInfo = false
 	return &node
@@ -122,7 +122,8 @@ func (node *NewNode) ConnectBeaconChain(BCPeer p2p.Peer) {
 	if err != nil {
 		node.log.Error("Could not Marshall public key into binary")
 	}
-	nodeInfo := &bcconn.NodeInfo{Self: node.Self, PubK: pubk}
+	p := p2p.Peer{Ip: node.Self.Ip, Port: node.Self.Port}
+	nodeInfo := &bcconn.NodeInfo{Self: p, PubK: pubk}
 	msg := bcconn.SerializeNodeInfo(nodeInfo)
 	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Register, msg)
 	gotShardInfo := false
@@ -155,7 +156,7 @@ func (node *NewNode) processShardInfo(msgPayload []byte) bool {
 	leaders := leadersInfo.Leaders
 	shardNum, isLeader := utils.AllocateShard(leadersInfo.NumberOfNodesAdded, leadersInfo.NumberOfShards)
 	leaderNode := leaders[shardNum-1] //0 indexing.
-	node.leader = leaderNode.Self
+	node.leader = leaderNode.Self     //Does not have public key.
 	node.isLeader = isLeader
 	node.ShardID = shardNum
 	node.SetInfo = true

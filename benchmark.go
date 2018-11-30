@@ -126,6 +126,7 @@ func main() {
 		selfPeer = candidateNode.GetSelfPeer()
 		clientPeer = candidateNode.GetClientPeer()
 		service.Stop()
+		selfPeer.PubKey = candidateNode.PubK
 
 	} else {
 		distributionConfig := utils.NewDistributionConfig()
@@ -133,13 +134,12 @@ func main() {
 		shardID = distributionConfig.GetShardID(*ip, *port)
 		leader = distributionConfig.GetLeader(shardID)
 		selfPeer = distributionConfig.GetSelfPeer(*ip, *port, shardID)
-
+		_, pubKey := utils.GenKey(*ip, *port)
+		selfPeer.PubKey = pubKey
 		// Create client peer.
 		clientPeer = distributionConfig.GetClientPeer()
 	}
 	fmt.Println(peers, leader, selfPeer, clientPeer, logFolder, minPeers)
-
-	//selfPeer.PubKey = pubKey
 
 	var role string
 	if leader.Ip == *ip && leader.Port == *port {

@@ -286,6 +286,8 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 func (node *Node) AddPeers(peers []p2p.Peer) int {
 	count := 0
 	for _, p := range peers {
+		fmt.Println("I am in add peers")
+		fmt.Println(p)
 		key := fmt.Sprintf("%v", p.PubKey)
 		_, ok := node.Neighbors.Load(key)
 		if !ok {
@@ -294,9 +296,11 @@ func (node *Node) AddPeers(peers []p2p.Peer) int {
 		}
 	}
 
-	if count > 0 {
-		node.Consensus.AddPeers(peers)
-	}
+	//if count > 0 {
+	fmt.Println("I am in add peers")
+	fmt.Println(count)
+	node.Consensus.AddPeers(peers)
+	//}
 	return count
 }
 
