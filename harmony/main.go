@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -53,7 +53,7 @@ func main() {
 		gspec    = core.Genesis{
 			Config:  chainConfig,
 			Alloc:   core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
-			ShardId: 10,
+			ShardID: 10,
 		}
 	)
 
@@ -75,18 +75,18 @@ func main() {
 	if n > 0 {
 		blocks, _ := core.GenerateChain(chainConfig, genesis, consensus.NewFaker(), database, n, func(i int, gen *core.BlockGen) {
 			gen.SetCoinbase(testBankAddress)
-			gen.SetShardId(types.EncodeShardId(10))
+			gen.SetShardID(types.EncodeShardID(10))
 			gen.AddTx(pendingTxs[i])
 		})
 		if _, err := chain.InsertChain(blocks); err != nil {
-			fmt.Errorf("failed to insert origin chain: %v", err)
+			log.Fatal(err)
 		}
 	}
 
 	txs := make([]*types.Transaction, 100)
 	worker := worker.New(params.TestChainConfig, chain, consensus.NewFaker())
 	nonce := worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(testBankKey.PublicKey))
-	for i, _ := range txs {
+	for i := range txs {
 		randomUserKey, _ := crypto.GenerateKey()
 		randomUserAddress := crypto.PubkeyToAddress(randomUserKey.PublicKey)
 		tx, _ := types.SignTx(types.NewTransaction(nonce+uint64(i), randomUserAddress, 0, big.NewInt(1000), params.TxGas, nil, nil), types.HomesteadSigner{}, testBankKey)

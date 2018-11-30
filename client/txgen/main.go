@@ -61,11 +61,11 @@ func main() {
 	shardIDLeaderMap := config.GetShardIDToLeaderMap()
 
 	// Do cross shard tx if there are more than one shard
-	setting := txgen.TxGenSettings{
-		10000,
-		len(shardIDLeaderMap) > 1,
-		*maxNumTxsPerBatch,
-		*crossShardRatio,
+	setting := txgen.Settings{
+		NumOfAddress:      10000,
+		CrossShard:        len(shardIDLeaderMap) > 1,
+		MaxNumTxsPerBatch: *maxNumTxsPerBatch,
+		CrossShardRatio:   *crossShardRatio,
 	}
 
 	// TODO(Richard): refactor this chuck to a single method
@@ -105,7 +105,7 @@ func main() {
 					accountBlock := new(types.Block)
 					err := rlp.DecodeBytes(block.AccountBlock, accountBlock)
 					if err == nil {
-						shardID = accountBlock.ShardId()
+						shardID = accountBlock.ShardID()
 					}
 					if node.Consensus.ShardID == shardID {
 						log.Debug("Adding block from leader", "shardID", shardID)

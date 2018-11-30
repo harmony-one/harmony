@@ -10,6 +10,7 @@ import (
 	pb "github.com/harmony-one/harmony/syncing/downloader/proto"
 )
 
+// Constants for downloader server.
 const (
 	DefaultDownloadPort = "6666"
 )

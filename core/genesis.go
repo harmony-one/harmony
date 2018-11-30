@@ -45,7 +45,7 @@ var errGenesisNoConfig = errors.New("genesis has no chain configuration")
 type Genesis struct {
 	Config     *params.ChainConfig `json:"config"`
 	Nonce      uint64              `json:"nonce"`
-	ShardId    uint32              `json:"shardId"`
+	ShardID    uint32              `json:"shardId"`
 	Timestamp  uint64              `json:"timestamp"`
 	ExtraData  []byte              `json:"extraData"`
 	GasLimit   uint64              `json:"gasLimit"   gencodec:"required"`
@@ -235,7 +235,7 @@ func (g *Genesis) ToBlock(db hdb.Database) *types.Block {
 	head := &types.Header{
 		Number:     new(big.Int).SetUint64(g.Number),
 		Nonce:      types.EncodeNonce(g.Nonce),
-		ShardId:    types.EncodeShardId(g.ShardId),
+		ShardID:    types.EncodeShardID(g.ShardID),
 		Time:       new(big.Int).SetUint64(g.Timestamp),
 		ParentHash: g.ParentHash,
 		Extra:      g.ExtraData,

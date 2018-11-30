@@ -45,7 +45,7 @@ type Transaction struct {
 
 type txdata struct {
 	AccountNonce uint64          `json:"nonce"    gencodec:"required"`
-	ShardId      uint32          `json:"shardId"  gencodec:"required"`
+	ShardID      uint32          `json:"shardId"  gencodec:"required"`
 	Price        *big.Int        `json:"gasPrice" gencodec:"required"`
 	GasLimit     uint64          `json:"gas"      gencodec:"required"`
 	Recipient    *common.Address `json:"to"       rlp:"nil"` // nil means contract creation
@@ -87,7 +87,7 @@ func newTransaction(nonce uint64, to *common.Address, shardId uint32, amount *bi
 	d := txdata{
 		AccountNonce: nonce,
 		Recipient:    to,
-		ShardId:      shardId,
+		ShardID:      shardId,
 		Payload:      data,
 		Amount:       new(big.Int),
 		GasLimit:     gasLimit,

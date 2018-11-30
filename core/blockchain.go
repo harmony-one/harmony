@@ -348,8 +348,8 @@ func (bc *BlockChain) FastSyncCommitHead(hash common.Hash) error {
 	return nil
 }
 
-// ShardId returns the shard Id of the blockchain.
-func (bc *BlockChain) ShardId() uint32 {
+// ShardID returns the shard Id of the blockchain.
+func (bc *BlockChain) ShardID() uint32 {
 	return uint32(bc.chainConfig.ChainID.Int64())
 }
 
