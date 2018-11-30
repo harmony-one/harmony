@@ -223,7 +223,7 @@ func main() {
 
 func getShardIDToLeaderMap() map[uint32]p2p.Peer {
 	// TODO(ricl): Later use data.harmony.one for API.
-	str, _ := client.DownloadUrlAsString("https://s3-us-west-2.amazonaws.com/unique-bucket-bin/leaders.txt")
+	str, _ := client.DownloadURLAsString("https://s3-us-west-2.amazonaws.com/unique-bucket-bin/leaders.txt")
 	lines := strings.Split(str, "\n")
 	shardIDLeaderMap := map[uint32]p2p.Peer{}
 	log.Print(lines)
