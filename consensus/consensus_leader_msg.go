@@ -35,6 +35,7 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 	signature := consensus.signMessage(buffer.Bytes())
 	buffer.Write(signature)
 
+	consensus.Log.Info("New Announce", "NodeID", consensus.nodeID, "bitmap", consensus.bitmap)
 	return proto_consensus.ConstructConsensusMessage(proto_consensus.Announce, buffer.Bytes())
 }
 
@@ -85,6 +86,7 @@ func (consensus *Consensus) constructChallengeMessage(msgTypeToSend proto_consen
 	signature := consensus.signMessage(buffer.Bytes())
 	buffer.Write(signature)
 
+	consensus.Log.Info("New Challenge", "NodeID", consensus.nodeID, "bitmap", consensus.bitmap)
 	return proto_consensus.ConstructConsensusMessage(msgTypeToSend, buffer.Bytes()), challengeScalar, aggCommitment
 }
 
@@ -115,6 +117,7 @@ func (consensus *Consensus) constructCollectiveSigMessage(collectiveSig [64]byte
 	signature := consensus.signMessage(buffer.Bytes())
 	buffer.Write(signature)
 
+	consensus.Log.Info("New CollectiveSig", "NodeID", consensus.nodeID, "bitmap", consensus.bitmap)
 	return proto_consensus.ConstructConsensusMessage(proto_consensus.CollectiveSig, buffer.Bytes())
 }
 
