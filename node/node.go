@@ -294,12 +294,12 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 		}
 
 		_ = gspec.MustCommit(database)
-		chain, _ := core.NewBlockChain(database, nil, gspec.Config, bft.NewFaker(), vm.Config{}, nil)
+		chain, _ := core.NewBlockChain(database, nil, gspec.Config, node.Consensus, vm.Config{}, nil)
 
 		node.Chain = chain
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, params.TestChainConfig, chain)
 		node.BlockChannelAccount = make(chan *types.Block)
-		node.Worker = worker.New(params.TestChainConfig, chain, bft.NewFaker())
+		node.Worker = worker.New(params.TestChainConfig, chain, node.Consensus)
 	}
 	// Logger
 	node.log = log.New()
