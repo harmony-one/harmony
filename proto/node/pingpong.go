@@ -31,11 +31,13 @@ type nodeInfo struct {
 	ValidatorID int
 }
 
+// PingMessageType defines the data structure of the Ping message
 type PingMessageType struct {
 	Version uint16 // version of the protocol
 	Node    nodeInfo
 }
 
+// PongMessageType defines the data structure of the Pong message
 type PongMessageType struct {
 	Version uint16 // version of the protocol
 	Peers   []nodeInfo
@@ -51,11 +53,12 @@ func (p PongMessageType) String() string {
 	return str
 }
 
+// NewPingMessage creates a new Ping message based on the p2p.Peer input
 func NewPingMessage(peer p2p.Peer) *PingMessageType {
 	ping := new(PingMessageType)
 
 	var err error
-	ping.Version = PROTOCOL_VERSION
+	ping.Version = ProtocolVersion
 	ping.Node.IP = peer.Ip
 	ping.Node.Port = peer.Port
 	ping.Node.ValidatorID = peer.ValidatorID
@@ -69,11 +72,12 @@ func NewPingMessage(peer p2p.Peer) *PingMessageType {
 	return ping
 }
 
+// NewPongMessage creates a new Pong message based on a list of p2p.Peer and a list of publicKeys
 func NewPongMessage(peers []p2p.Peer, pubKeys []kyber.Point) *PongMessageType {
 	pong := new(PongMessageType)
 	pong.PubKeys = make([][]byte, 0)
 
-	pong.Version = PROTOCOL_VERSION
+	pong.Version = ProtocolVersion
 	pong.Peers = make([]nodeInfo, 0)
 
 	var err error
@@ -103,7 +107,7 @@ func NewPongMessage(peers []p2p.Peer, pubKeys []kyber.Point) *PongMessageType {
 	return pong
 }
 
-// Deserialize Ping Message
+// GetPingMessage deserializes the Ping Message from a list of byte
 func GetPingMessage(payload []byte) (*PingMessageType, error) {
 	ping := new(PingMessageType)
 
@@ -118,7 +122,7 @@ func GetPingMessage(payload []byte) (*PingMessageType, error) {
 	return ping, nil
 }
 
-// Deserialize Pong Message
+// GetPongMessage deserializes the Pong Message from a list of byte
 func GetPongMessage(payload []byte) (*PongMessageType, error) {
 	pong := new(PongMessageType)
 	pong.Peers = make([]nodeInfo, 0)
@@ -136,12 +140,12 @@ func GetPongMessage(payload []byte) (*PongMessageType, error) {
 }
 
 // ConstructPingMessage contructs ping message from node to leader
-func (ping PingMessageType) ConstructPingMessage() []byte {
+func (p PingMessageType) ConstructPingMessage() []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
 	byteBuffer.WriteByte(byte(PING))
 
 	encoder := gob.NewEncoder(byteBuffer)
-	err := encoder.Encode(ping)
+	err := encoder.Encode(p)
 	if err != nil {
 		log.Panic("Can't serialize Ping message", "error:", err)
 		return nil
@@ -150,12 +154,12 @@ func (ping PingMessageType) ConstructPingMessage() []byte {
 }
 
 // ConstructPongMessage contructs pong message from leader to node
-func (pong PongMessageType) ConstructPongMessage() []byte {
+func (p PongMessageType) ConstructPongMessage() []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
 	byteBuffer.WriteByte(byte(PONG))
 
 	encoder := gob.NewEncoder(byteBuffer)
-	err := encoder.Encode(pong)
+	err := encoder.Encode(p)
 	if err != nil {
 		log.Panic("Can't serialize Pong message", "error:", err)
 		return nil

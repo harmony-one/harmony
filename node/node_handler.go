@@ -103,7 +103,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 			}
 		}
 	case proto.Node:
-		actionType := proto_node.NodeMessageType(msgType)
+		actionType := proto_node.MessageType(msgType)
 		switch actionType {
 		case proto_node.Transaction:
 			node.log.Info("NET: received message: Node/Transaction")
@@ -242,7 +242,7 @@ FOR_LOOP:
 		}
 
 		msgType, err := proto.GetMessageType(content)
-		actionType := proto_node.NodeMessageType(msgType)
+		actionType := proto_node.MessageType(msgType)
 		if err != nil || actionType != proto_node.BlockchainSync {
 			node.log.Error("Failed in reading message type from syncing node", err)
 			return
