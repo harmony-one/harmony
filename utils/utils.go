@@ -30,12 +30,12 @@ func GetUniqueIdFromPeer(peer p2p.Peer) uint16 {
 	if err != nil {
 		log.Panic("Regex Compilation Failed", "err", err)
 	}
-	socketId := reg.ReplaceAllString(peer.Ip+peer.Port, "") // A integer Id formed by unique IP/PORT pair
+	socketId := reg.ReplaceAllString(peer.IP+peer.Port, "") // A integer Id formed by unique IP/PORT pair
 	value, _ := strconv.Atoi(socketId)
 	return uint16(value)
 }
 
-func GetUniqueIdFromIpPort(ip, port string) uint16 {
+func GetUniqueIdFromIPPort(ip, port string) uint16 {
 	reg, err := regexp.Compile("[^0-9]+")
 	if err != nil {
 		log.Panic("Regex Compilation Failed", "err", err)
@@ -65,7 +65,7 @@ func RunCmd(name string, args ...string) error {
 }
 
 func GenKey(ip, port string) (kyber.Scalar, kyber.Point) {
-	priKey := crypto.Ed25519Curve.Scalar().SetInt64(int64(GetUniqueIdFromIpPort(ip, port))) // TODO: figure out why using a random hash value doesn't work for private key (schnorr)
+	priKey := crypto.Ed25519Curve.Scalar().SetInt64(int64(GetUniqueIdFromIPPort(ip, port))) // TODO: figure out why using a random hash value doesn't work for private key (schnorr)
 	pubKey := pki.GetPublicKeyFromScalar(priKey)
 
 	return priKey, pubKey

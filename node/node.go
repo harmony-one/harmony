@@ -358,7 +358,7 @@ func (node *Node) InitSyncingServer() {
 // StartSyncingServer starts syncing server.
 func (node *Node) StartSyncingServer() {
 	if port, err := strconv.Atoi(node.SelfPeer.Port); err == nil {
-		node.downloaderServer.Start(node.SelfPeer.Ip, fmt.Sprintf("%d", port-1000))
+		node.downloaderServer.Start(node.SelfPeer.IP, fmt.Sprintf("%d", port-1000))
 	} else {
 		node.log.Error("Wrong port format provided")
 		os.Exit(1)
