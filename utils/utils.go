@@ -24,8 +24,8 @@ func ConvertFixedDataIntoByteArray(data interface{}) []byte {
 	return buff.Bytes()
 }
 
+// GetUniqueIDFromPeer ...
 // TODO(minhdoan): this is probably a hack, probably needs some strong non-collision hash.
-// GetUniqueIDFromPeer --
 func GetUniqueIDFromPeer(peer p2p.Peer) uint16 {
 	return GetUniqueIDFromIPPort(peer.IP, peer.Port)
 }

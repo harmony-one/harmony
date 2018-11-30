@@ -46,7 +46,7 @@ type TxInfo struct {
 // Returns:
 //     all single-shard txs
 //     all cross-shard txs
-func GenerateSimulatedTransactions(subsetID, numSubset int, shardID int, dataNodes []*node.Node, setting TxGenSettings) ([]*blockchain.Transaction, []*blockchain.Transaction) {
+func GenerateSimulatedTransactions(subsetID, numSubset int, shardID int, dataNodes []*node.Node, setting Settings) ([]*blockchain.Transaction, []*blockchain.Transaction) {
 	/*
 	  UTXO map structure:
 	     address - [
@@ -115,7 +115,7 @@ UTXOLOOP:
 	return txInfo.txs, txInfo.crossTxs
 }
 
-func generateCrossShardTx(txInfo *TxInfo, setting TxGenSettings) {
+func generateCrossShardTx(txInfo *TxInfo, setting Settings) {
 	nodeShardID := txInfo.dataNodes[txInfo.shardID].Consensus.ShardID
 	crossShardID := nodeShardID
 	// a random shard to spend money to
@@ -190,7 +190,7 @@ func generateCrossShardTx(txInfo *TxInfo, setting TxGenSettings) {
 	txInfo.txCount++
 }
 
-func generateSingleShardTx(txInfo *TxInfo, setting TxGenSettings) {
+func generateSingleShardTx(txInfo *TxInfo, setting Settings) {
 	nodeShardID := txInfo.dataNodes[txInfo.shardID].Consensus.ShardID
 	// Add the utxo as new tx input
 	txin := blockchain.NewTXInput(blockchain.NewOutPoint(&txInfo.id, txInfo.index), txInfo.address, nodeShardID)

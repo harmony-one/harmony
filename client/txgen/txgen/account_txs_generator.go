@@ -9,8 +9,8 @@ import (
 	"github.com/harmony-one/harmony/node"
 )
 
-// TxGenSettings is the settings for TX generation.
-type TxGenSettings struct {
+// Settings is the settings for TX generation.
+type Settings struct {
 	NumOfAddress      int
 	CrossShard        bool
 	MaxNumTxsPerBatch int
@@ -18,7 +18,7 @@ type TxGenSettings struct {
 }
 
 // GenerateSimulatedTransactionsAccount generates simulated transaction for account model.
-func GenerateSimulatedTransactionsAccount(shardID int, dataNodes []*node.Node, setting TxGenSettings) (types.Transactions, types.Transactions) {
+func GenerateSimulatedTransactionsAccount(shardID int, dataNodes []*node.Node, setting Settings) (types.Transactions, types.Transactions) {
 	_ = setting // TODO: take use of settings
 	node := dataNodes[shardID]
 	txs := make([]*types.Transaction, 1000)
