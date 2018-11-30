@@ -117,7 +117,7 @@ func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer) {
 	}
 	for id := range ss.syncConfig.peers {
 		ss.syncConfig.peers[id] = &SyncPeerConfig{
-			ip:   peers[id].Ip,
+			ip:   peers[id].IP,
 			port: peers[id].Port,
 		}
 	}

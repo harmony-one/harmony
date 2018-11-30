@@ -139,7 +139,7 @@ func TestSyncing(t *testing.T) {
 	bc := &bc.Blockchain{}
 	peers := make([]p2p.Peer, len(fakeNodes))
 	for i := range peers {
-		peers[i].Ip = fakeNodes[i].ip
+		peers[i].IP = fakeNodes[i].ip
 		peers[i].Port = fakeNodes[i].port
 	}
 

@@ -14,15 +14,17 @@ import (
 	"github.com/harmony-one/harmony/proto"
 )
 
-// NodeMessageType is to indicate the specific type of message under Node category
-type NodeMessageType byte
+// MessageType is to indicate the specific type of message under Node category
+type MessageType byte
 
+// ProtocolVersion is a constant defined as the version of the Harmony protocol
 const (
-	PROTOCOL_VERSION = 1
+	ProtocolVersion = 1
 )
 
+// Constant of the top level Message Type exchanged among nodes
 const (
-	Transaction NodeMessageType = iota
+	Transaction MessageType = iota
 	Block
 	Client
 	Control
@@ -40,6 +42,7 @@ type BlockchainSyncMessage struct {
 // BlockchainSyncMessageType represents BlockchainSyncMessageType type.
 type BlockchainSyncMessageType int
 
+// Constant of blockchain sync-up message subtype
 const (
 	Done BlockchainSyncMessageType = iota
 	GetLastBlockHashes
@@ -49,27 +52,30 @@ const (
 // TransactionMessageType representa the types of messages used for Node/Transaction
 type TransactionMessageType int
 
+// Constant of transaction message subtype
 const (
 	Send TransactionMessageType = iota
 	Request
 	Unlock
 )
 
-// BlockMessageType represents the types of messages used for Node/Block
+// BlockMessageType represents the type of messages used for Node/Block
 type BlockMessageType int
 
+// Block sync message subtype
 const (
 	Sync BlockMessageType = iota
 )
 
-// The types of messages used for Node/Block
+// ClientMessageType defines the type of messages used for Node/Block
 type ClientMessageType int
 
+// Constant of the client message subtype
 const (
 	LookupUtxo ClientMessageType = iota
 )
 
-// The types of messages used for Node/Control
+// ControlMessageType is the type of messages used for Node/Control
 type ControlMessageType int
 
 // ControlMessageType
