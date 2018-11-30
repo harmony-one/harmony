@@ -325,13 +325,13 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase, selfPeer p2p.Peer) *Node
 }
 
 // AddPeers adds neighbors nodes
-func (node *Node) AddPeers(peers []p2p.Peer) int {
+func (node *Node) AddPeers(peers []*p2p.Peer) int {
 	count := 0
 	for _, p := range peers {
 		key := fmt.Sprintf("%v", p.PubKey)
 		_, ok := node.Neighbors.Load(key)
 		if !ok {
-			node.Neighbors.Store(key, p)
+			node.Neighbors.Store(key, *p)
 			count++
 			continue
 		}
