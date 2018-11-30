@@ -345,7 +345,7 @@ func (node *Node) AddPeers(peers []p2p.Peer) int {
 // JoinShard helps a new node to join a shard.
 func (node *Node) JoinShard(leader p2p.Peer) {
 	// try to join the shard, with 10 minutes time-out
-	backoff := p2p.NewExpBackoff(1*time.Second, 10*time.Minute, 2)
+	backoff := p2p.NewExpBackoff(3*time.Second, 10*time.Minute, 2)
 
 	for node.State == NodeWaitToJoin {
 		backoff.Sleep()

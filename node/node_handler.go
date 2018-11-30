@@ -531,9 +531,13 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 	}
 
 	// Add to Node's peer list
-	node.AddPeers([]p2p.Peer{*peer})
+	count := node.AddPeers([]p2p.Peer{*peer})
 
-	// Send a Pong message back
+	// Send a Pong message back only when new peer added
+	if count == 0 {
+		return count
+	}
+
 	peers := node.Consensus.GetValidatorPeers()
 	pong := proto_node.NewPongMessage(peers, node.Consensus.PublicKeys)
 	buffer := pong.ConstructPongMessage()
