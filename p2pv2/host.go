@@ -23,8 +23,8 @@ var (
 )
 
 const (
-	// BatchSize The batch size in which we return data
-	BatchSize = 1 << 16
+	// BatchSizeInByte The batch size in byte (64MB) in which we return data
+	BatchSizeInByte = 1 << 16
 	// ProtocolID The ID of protocol used in stream handling.
 	ProtocolID = "/harmony/0.0.1"
 )
@@ -54,7 +54,7 @@ func BindHandler(handler net.StreamHandler) {
 
 // Send a p2p message sending function with signature compatible to p2pv1.
 func Send(ip, port string, message []byte) error {
-	addr := fmt.Sprintf("/ip4/127.0.0.1/tcp/%s", port)
+	addr := fmt.Sprintf("/ip4/%s/tcp/%s", ip, port)
 	targetAddr, err := multiaddr.NewMultiaddr(addr)
 
 	priv := addrToPrivKey(addr)
@@ -109,15 +109,15 @@ func ReadData(s net.Stream) ([]byte, error) {
 	bytesToRead := binary.BigEndian.Uint32(fourBytes)
 	//log.Printf("The content size is %d bytes.", bytesToRead)
 
-	// Read the content in chunk of 16 * 1024 bytes
-	tmpBuf := make([]byte, BatchSize)
+	// Read the content in chunk of size `BatchSizeInByte`
+	tmpBuf := make([]byte, BatchSizeInByte)
 ILOOP:
 	for {
 		// TODO(ricl): is this necessary? If yes, figure out how to make it work
 		// timeoutDuration := 10 * time.Second
 		// s.SetReadDeadline(time.Now().Add(timeoutDuration))
-		if bytesToRead < BatchSize {
-			// Read the last number of bytes less than 1024
+		if bytesToRead < BatchSizeInByte {
+			// Read the last number of bytes less than `BatchSizeInByte`
 			tmpBuf = make([]byte, bytesToRead)
 		}
 		n, err := rw.Read(tmpBuf)
