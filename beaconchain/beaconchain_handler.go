@@ -10,7 +10,7 @@ import (
 	proto_identity "github.com/harmony-one/harmony/proto/identity"
 )
 
-//BeaconChainHandler handles registration of new Identities
+// BeaconChainHandler handles registration of new Identities
 // This could have been its seperate package like consensus, but am avoiding creating a lot of packages.
 func (IDC *BeaconChain) BeaconChainHandler(conn net.Conn) {
 	content, err := p2p.ReadMessageContent(conn)

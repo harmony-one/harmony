@@ -29,7 +29,7 @@ type BeaconChain struct {
 	NumberOfLeadersAdded int
 }
 
-//Init
+// New return BeaconChain.
 func New(filename string) *BeaconChain {
 	idc := BeaconChain{}
 	//idc.NumberOfShards = readConfigFile(filename)
@@ -49,7 +49,7 @@ func generateIDCKeys() kyber.Point {
 	return pubkey
 }
 
-//AcceptConnections welcomes new connections
+// AcceptConnections welcomes new connections
 func (IDC *BeaconChain) AcceptConnections(b []byte) {
 	NewNode := node.DeserializeNode(b)
 	fmt.Println(NewNode)
@@ -62,10 +62,11 @@ func (IDC *BeaconChain) registerNode(Node *node.Node) {
 	return
 }
 
-func (IDC *BeaconChain) CommunicatePublicKeyToNode(Peer p2p.Peer) {
+// CommunicatePublicKeyToNode communicates public key to node.
+func (IDC *BeaconChain) CommunicatePublicKeyToNode(peer p2p.Peer) {
 	pbkey := pki.GetBytesFromPublicKey(IDC.PubKey)
 	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Acknowledge, pbkey[:])
-	p2p.SendMessage(Peer, msgToSend)
+	p2p.SendMessage(peer, msgToSend)
 }
 
 //StartServer a server and process the request by a handler.
