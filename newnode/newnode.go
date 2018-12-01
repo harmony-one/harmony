@@ -12,7 +12,6 @@ import (
 	"github.com/harmony-one/harmony/bcconn"
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/log"
-
 	"github.com/harmony-one/harmony/p2p"
 	proto_identity "github.com/harmony-one/harmony/proto/identity"
 	"github.com/harmony-one/harmony/utils"
@@ -57,7 +56,7 @@ type registerResponseRandomNumber struct {
 	Leaders            []*bcconn.NodeInfo
 }
 
-// Make a new Service.
+// NewService
 func (node *NewNode) NewService(ip, port string) *Service {
 	laddr, err := net.ResolveTCPAddr("tcp", ip+":"+port)
 	if nil != err {
@@ -78,7 +77,7 @@ func (node *NewNode) NewService(ip, port string) *Service {
 	return node.Service
 }
 
-// Accept connections and spawn a goroutine to serve each one.  Stop listening
+// Serve Accept connections and spawn a goroutine to serve each one.  Stop listening
 // if anything is received on the service's channel.
 func (node *NewNode) Serve(listener *net.TCPListener) {
 	defer node.Service.waitGroup.Done()
@@ -185,6 +184,8 @@ func (node *NewNode) GetLeader() p2p.Peer {
 func (node *NewNode) GetClientPeer() *p2p.Peer {
 	return nil
 }
+
+//GetSelfPeer
 func (node *NewNode) GetSelfPeer() p2p.Peer {
 	return node.Self
 }

@@ -18,7 +18,7 @@ type ResponseRandomNumber struct {
 	Leaders            []*NodeInfo
 }
 
-//SerializeNode
+//SerializeNodeInfo
 func SerializeNodeInfo(nodeinfo *NodeInfo) []byte {
 	var result bytes.Buffer
 	encoder := gob.NewEncoder(&result)
@@ -29,7 +29,7 @@ func SerializeNodeInfo(nodeinfo *NodeInfo) []byte {
 	return result.Bytes()
 }
 
-// DeserializeNode deserializes the node
+// DeserializeNodeInfo deserializes the node
 func DeserializeNodeInfo(d []byte) *NodeInfo {
 	var wn NodeInfo
 	r := bytes.NewBuffer(d)
@@ -41,7 +41,7 @@ func DeserializeNodeInfo(d []byte) *NodeInfo {
 	return &wn
 }
 
-//SerializeNode
+//SerializeRandomInfo
 func SerializeRandomInfo(response ResponseRandomNumber) []byte {
 	//Needs to escape the serialization of unexported fields
 	var result bytes.Buffer
@@ -54,7 +54,7 @@ func SerializeRandomInfo(response ResponseRandomNumber) []byte {
 	return result.Bytes()
 }
 
-// DeserializeNode deserializes the node
+// DeserializeRandomInfo deserializes the node
 func DeserializeRandomInfo(d []byte) ResponseRandomNumber {
 	var wn ResponseRandomNumber
 	r := bytes.NewBuffer(d)
