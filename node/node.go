@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -29,6 +30,7 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2pv2"
 	proto_node "github.com/harmony-one/harmony/proto/node"
+	"github.com/harmony-one/harmony/syncing"
 	"github.com/harmony-one/harmony/syncing/downloader"
 	downloader_pb "github.com/harmony-one/harmony/syncing/downloader/proto"
 )
@@ -44,6 +46,12 @@ const (
 	NodeOffline                     // Node is offline
 	NodeDoingConsensus              // Node is already doing consensus
 	NodeLeader                      // Node is the leader of some shard.
+)
+
+// Constants related to doing syncing.
+const (
+	NotDoingSyncing uint32 = iota
+	DoingSyncing
 )
 
 const (
@@ -77,7 +85,6 @@ type Node struct {
 	SelfPeer               p2p.Peer       // TODO(minhdoan): it could be duplicated with Self below whose is Alok work.
 	IDCPeer                p2p.Peer
 
-	SyncNode  bool             // TODO(minhdoan): Remove it later.
 	chain     *core.BlockChain // Account Model
 	Neighbors sync.Map         // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
 	State     State            // State of the Node
@@ -92,6 +99,8 @@ type Node struct {
 
 	// Syncing component.
 	downloaderServer *downloader.Server
+	stateSync        *syncing.StateSync
+	syncingState     uint32
 
 	// Test only
 	TestBankKeys []*ecdsa.PrivateKey
@@ -150,10 +159,6 @@ func (node *Node) getTransactionsForNewBlockAccount(maxNumTxs int) (types.Transa
 
 // StartServer starts a server and process the request by a handler.
 func (node *Node) StartServer(port string) {
-	if node.SyncNode {
-		// Disable this temporarily.
-		// node.blockchain = syncing.StartBlockSyncing(node.Consensus.GetValidatorPeers())
-	}
 	if p2p.Version == 1 {
 		fmt.Println("going to start server on port:", port)
 		//node.log.Debug("Starting server", "node", node, "port", port)
@@ -320,12 +325,23 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase, selfPeer p2p.Peer) *Node
 		node.State = NodeInit
 	}
 
+	// Setup initial state of syncing.
+	node.syncingState = NotDoingSyncing
+
 	return &node
 }
 
 // DoSyncing starts syncing.
 func (node *Node) DoSyncing() {
-
+	// If this node is currently doing sync, another call for syncing will be returned immediately.
+	if !atomic.CompareAndSwapUint32(&node.syncingState, NotDoingSyncing, DoingSyncing) {
+		return
+	}
+	defer atomic.StoreUint32(&node.syncingState, NotDoingSyncing)
+	if node.stateSync != nil {
+		node.stateSync = syncing.GetStateSync()
+	}
+	node.stateSync.StartStateSync(node.GetPeers(), node.blockchain)
 }
 
 // AddPeers adds neighbors nodes

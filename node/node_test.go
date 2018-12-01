@@ -65,7 +65,7 @@ func TestGetPeers(t *testing.T) {
 	node.Neighbors.Store("minh", peer)
 	node.Neighbors.Store("mark", peer2)
 	res := node.GetPeers()
-	if len(res) != 2 || res[0] != peer || res[1] != peer2 {
+	if len(res) != 2 || !((res[0] == peer && res[1] == peer2) || (res[1] == peer && res[0] == peer2)) {
 		t.Error("GetPeers should return list of {peer, peer2}")
 	}
 }
