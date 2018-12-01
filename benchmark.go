@@ -93,7 +93,7 @@ func main() {
 	//This IP belongs to jenkins.harmony.one
 	idcIP := flag.String("idc", "127.0.0.1", "IP of the identity chain")
 	idcPort := flag.String("idc_port", "8081", "port of the identity chain")
-	peerDiscovery := flag.Bool("peer_discovery", true, "Enable Peer Discovery")
+	peerDiscovery := flag.Bool("peer_discovery", false, "Enable Peer Discovery")
 
 	//Leader needs to have a minimal number of peers to start consensus
 	minPeers := flag.Int("min_peers", 100, "Minimal number of Peers in shard")
