@@ -48,8 +48,10 @@ import (
 )
 
 var (
+	// blockInsertTimer
 	blockInsertTimer = metrics.NewRegisteredTimer("chain/inserts", nil)
 
+	// ErrNoGenesis is the error when there is no genesis.
 	ErrNoGenesis = errors.New("Genesis not found in chain")
 )
 
@@ -189,6 +191,7 @@ func NewBlockChain(db hdb.Database, cacheConfig *CacheConfig, chainConfig *param
 	return bc, nil
 }
 
+// ValidateNewBlock validates new block.
 func (bc *BlockChain) ValidateNewBlock(block *types.Block, address common.Address) error {
 	state, err := state.New(bc.CurrentBlock().Root(), bc.stateCache)
 
@@ -734,6 +737,7 @@ func (bc *BlockChain) procFutureBlocks() {
 // WriteStatus status of write
 type WriteStatus byte
 
+// Constants for WriteStatus
 const (
 	NonStatTy WriteStatus = iota
 	CanonStatTy

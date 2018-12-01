@@ -103,36 +103,39 @@ type Signer interface {
 	Equal(Signer) bool
 }
 
-// EIP155Transaction implements Signer using the EIP155 rules.
+// EIP155Signer implements Signer using the EIP155 rules.
 type EIP155Signer struct {
-	chainId, chainIdMul *big.Int
+	chainID, chainIDMul *big.Int
 }
 
-func NewEIP155Signer(chainId *big.Int) EIP155Signer {
-	if chainId == nil {
-		chainId = new(big.Int)
+// NewEIP155Signer creates a EIP155Signer given chainID.
+func NewEIP155Signer(chainID *big.Int) EIP155Signer {
+	if chainID == nil {
+		chainID = new(big.Int)
 	}
 	return EIP155Signer{
-		chainId:    chainId,
-		chainIdMul: new(big.Int).Mul(chainId, big.NewInt(2)),
+		chainID:    chainID,
+		chainIDMul: new(big.Int).Mul(chainID, big.NewInt(2)),
 	}
 }
 
+// Equal checks if the given EIP155Signer is equal to another Signer.
 func (s EIP155Signer) Equal(s2 Signer) bool {
 	eip155, ok := s2.(EIP155Signer)
-	return ok && eip155.chainId.Cmp(s.chainId) == 0
+	return ok && eip155.chainID.Cmp(s.chainID) == 0
 }
 
 var big8 = big.NewInt(8)
 
+// Sender returns the sender address of the given signer.
 func (s EIP155Signer) Sender(tx *Transaction) (common.Address, error) {
 	if !tx.Protected() {
 		return HomesteadSigner{}.Sender(tx)
 	}
-	if tx.ChainID().Cmp(s.chainId) != 0 {
+	if tx.ChainID().Cmp(s.chainID) != 0 {
 		return common.Address{}, ErrInvalidChainID
 	}
-	V := new(big.Int).Sub(tx.data.V, s.chainIdMul)
+	V := new(big.Int).Sub(tx.data.V, s.chainIDMul)
 	V.Sub(V, big8)
 	return recoverPlain(s.Hash(tx), tx.data.R, tx.data.S, V, true)
 }
@@ -144,9 +147,9 @@ func (s EIP155Signer) SignatureValues(tx *Transaction, sig []byte) (R, S, V *big
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	if s.chainId.Sign() != 0 {
+	if s.chainID.Sign() != 0 {
 		V = big.NewInt(int64(sig[64] + 35))
-		V.Add(V, s.chainIdMul)
+		V.Add(V, s.chainIDMul)
 	}
 	return R, S, V, nil
 }
@@ -161,15 +164,16 @@ func (s EIP155Signer) Hash(tx *Transaction) common.Hash {
 		tx.data.Recipient,
 		tx.data.Amount,
 		tx.data.Payload,
-		s.chainId, uint(0), uint(0),
+		s.chainID, uint(0), uint(0),
 	})
 }
 
-// HomesteadTransaction implements TransactionInterface using the
+// HomesteadSigner implements TransactionInterface using the
 // homestead rules.
 type HomesteadSigner struct{ FrontierSigner }
 
-func (s HomesteadSigner) Equal(s2 Signer) bool {
+// Equal checks if it is equal to s2 signer.
+func (hs HomesteadSigner) Equal(s2 Signer) bool {
 	_, ok := s2.(HomesteadSigner)
 	return ok
 }
@@ -180,13 +184,16 @@ func (hs HomesteadSigner) SignatureValues(tx *Transaction, sig []byte) (r, s, v 
 	return hs.FrontierSigner.SignatureValues(tx, sig)
 }
 
+// Sender returns the address of the sender.
 func (hs HomesteadSigner) Sender(tx *Transaction) (common.Address, error) {
 	return recoverPlain(hs.Hash(tx), tx.data.R, tx.data.S, tx.data.V, true)
 }
 
+// FrontierSigner ...
 type FrontierSigner struct{}
 
-func (s FrontierSigner) Equal(s2 Signer) bool {
+// Equal checks if the s2 signer is equal to the given signer.
+func (fs FrontierSigner) Equal(s2 Signer) bool {
 	_, ok := s2.(FrontierSigner)
 	return ok
 }
@@ -216,6 +223,7 @@ func (fs FrontierSigner) Hash(tx *Transaction) common.Hash {
 	})
 }
 
+// Sender returns the sender address of the given transaction.
 func (fs FrontierSigner) Sender(tx *Transaction) (common.Address, error) {
 	return recoverPlain(fs.Hash(tx), tx.data.R, tx.data.S, tx.data.V, false)
 }

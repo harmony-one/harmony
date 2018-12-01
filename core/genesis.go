@@ -64,6 +64,7 @@ type Genesis struct {
 // GenesisAlloc specifies the initial state that is part of the genesis block.
 type GenesisAlloc map[common.Address]GenesisAccount
 
+// UnmarshalJSON is to deserialize the data into GenesisAlloc.
 func (ga *GenesisAlloc) UnmarshalJSON(data []byte) error {
 	m := make(map[common.UnprefixedAddress]GenesisAccount)
 	if err := json.Unmarshal(data, &m); err != nil {

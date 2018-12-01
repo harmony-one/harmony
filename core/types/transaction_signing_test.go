@@ -56,8 +56,8 @@ func TestEIP155ChainID(t *testing.T) {
 		t.Fatal("expected tx to be protected")
 	}
 
-	if tx.ChainID().Cmp(signer.chainId) != 0 {
-		t.Error("expected chainId to be", signer.chainId, "got", tx.ChainID())
+	if tx.ChainID().Cmp(signer.chainID) != 0 {
+		t.Error("expected chainID to be", signer.chainID, "got", tx.ChainID())
 	}
 
 	tx = NewTransaction(0, addr, 0, new(big.Int), 0, new(big.Int), nil)

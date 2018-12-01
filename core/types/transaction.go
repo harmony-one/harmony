@@ -281,6 +281,7 @@ func (tx *Transaction) Cost() *big.Int {
 	return total
 }
 
+// RawSignatureValues return raw signature values.
 func (tx *Transaction) RawSignatureValues() (*big.Int, *big.Int, *big.Int) {
 	return tx.data.V, tx.data.R, tx.data.S
 }
@@ -335,10 +336,12 @@ func (s TxByPrice) Len() int           { return len(s) }
 func (s TxByPrice) Less(i, j int) bool { return s[i].data.Price.Cmp(s[j].data.Price) > 0 }
 func (s TxByPrice) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
+// Push pushes a transaction.
 func (s *TxByPrice) Push(x interface{}) {
 	*s = append(*s, x.(*Transaction))
 }
 
+// Pop pops a transaction.
 func (s *TxByPrice) Pop() interface{} {
 	old := *s
 	n := len(old)
@@ -423,6 +426,7 @@ type Message struct {
 	checkNonce bool
 }
 
+// NewMessage returns new message.
 func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte, checkNonce bool) Message {
 	return Message{
 		from:       from,
