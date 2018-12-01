@@ -8,17 +8,20 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 )
 
-type NodeInfo struct { //TODO: to be merged with Leo's key.
+//NodeInfo struct exists to share information on the node
+type NodeInfo struct { //TODO: to be merged with Leo's nodeinfo.
 	Self p2p.Peer
 	PubK []byte
 }
+
+//ResponseRandomNumber struct for exchanging random information
 type ResponseRandomNumber struct {
 	NumberOfShards     int
 	NumberOfNodesAdded int
 	Leaders            []*NodeInfo
 }
 
-//SerializeNodeInfo
+// SerializeNodeInfo is for serializing nodeinfo
 func SerializeNodeInfo(nodeinfo *NodeInfo) []byte {
 	var result bytes.Buffer
 	encoder := gob.NewEncoder(&result)
@@ -29,7 +32,7 @@ func SerializeNodeInfo(nodeinfo *NodeInfo) []byte {
 	return result.Bytes()
 }
 
-// DeserializeNodeInfo deserializes the node
+// DeserializeNodeInfo deserializes the nodeinfo
 func DeserializeNodeInfo(d []byte) *NodeInfo {
 	var wn NodeInfo
 	r := bytes.NewBuffer(d)
@@ -41,7 +44,7 @@ func DeserializeNodeInfo(d []byte) *NodeInfo {
 	return &wn
 }
 
-//SerializeRandomInfo
+// SerializeRandomInfo serializes random number informations
 func SerializeRandomInfo(response ResponseRandomNumber) []byte {
 	//Needs to escape the serialization of unexported fields
 	var result bytes.Buffer
@@ -54,7 +57,7 @@ func SerializeRandomInfo(response ResponseRandomNumber) []byte {
 	return result.Bytes()
 }
 
-// DeserializeRandomInfo deserializes the node
+// DeserializeRandomInfo deserializes the random informations
 func DeserializeRandomInfo(d []byte) ResponseRandomNumber {
 	var wn ResponseRandomNumber
 	r := bytes.NewBuffer(d)

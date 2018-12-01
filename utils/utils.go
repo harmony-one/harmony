@@ -74,19 +74,15 @@ func AllocateShard(numnode, numshards int) (int, bool) {
 	if numshards == 1 {
 		if numnode == 1 {
 			return 1, true
-		} else {
-			return 1, false
 		}
+		return 1, false
 	}
-	if numnode <= numshards {
-		return numnode, true
-	} else {
+	if numnode > numshards {
 		shardnum := numnode % numshards
 		if shardnum == 0 {
 			return numshards, false
-		} else {
-			return shardnum, false
 		}
-
+		return shardnum, false
 	}
+	return numnode, true
 }

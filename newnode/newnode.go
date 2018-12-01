@@ -17,12 +17,13 @@ import (
 	"github.com/harmony-one/harmony/utils"
 )
 
-// An uninteresting service.
+// Service is the server for listening.
 type Service struct {
 	ch        chan bool
 	waitGroup *sync.WaitGroup
 }
 
+//NewNode is ther struct for a candidate node
 type NewNode struct {
 	Role        string
 	ShardID     int
@@ -38,7 +39,7 @@ type NewNode struct {
 	Service     *Service
 }
 
-//NewNode
+// New candidatenode initialization
 func New(ip string, port string) *NewNode {
 	priKey, pubKey := utils.GenKey(ip, port)
 	var node NewNode
@@ -56,7 +57,7 @@ type registerResponseRandomNumber struct {
 	Leaders            []*bcconn.NodeInfo
 }
 
-// NewService
+// NewService starts a newservice in the candidate node
 func (node *NewNode) NewService(ip, port string) *Service {
 	laddr, err := net.ResolveTCPAddr("tcp", ip+":"+port)
 	if nil != err {
@@ -67,7 +68,6 @@ func (node *NewNode) NewService(ip, port string) *Service {
 		node.log.Crit("cannot start a listener for new node", err)
 	}
 	node.log.Debug("listening on", "address", laddr.String())
-
 	node.Service = &Service{
 		ch:        make(chan bool),
 		waitGroup: &sync.WaitGroup{},
@@ -115,7 +115,7 @@ func (node NewNode) String() string {
 	return fmt.Sprintf("idc: %v:%v and node infi %v", node.Self.IP, node.Self.Port, node.SetInfo)
 }
 
-//ConnectBeaconChain connects to beacon chain
+// ConnectBeaconChain connects to beacon chain
 func (node *NewNode) ConnectBeaconChain(BCPeer p2p.Peer) {
 	node.log.Info("connecting to beacon chain now ...")
 	pubk, err := node.PubK.MarshalBinary()
@@ -128,7 +128,7 @@ func (node *NewNode) ConnectBeaconChain(BCPeer p2p.Peer) {
 	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Register, msg)
 	gotShardInfo := false
 	timeout := time.After(300 * time.Second)
-	tick := time.Tick(1 * time.Second)
+	tick := time.Tick(5 * time.Second)
 checkLoop:
 	for {
 		select {
@@ -150,14 +150,12 @@ checkLoop:
 	}
 }
 
-//ProcessShardInfo
+// ProcessShardInfo
 func (node *NewNode) processShardInfo(msgPayload []byte) bool {
 	leadersInfo := bcconn.DeserializeRandomInfo(msgPayload)
 	leaders := leadersInfo.Leaders
 	shardNum, isLeader := utils.AllocateShard(leadersInfo.NumberOfNodesAdded, leadersInfo.NumberOfShards)
 	leaderNode := leaders[shardNum-1] //0 indexing.
-	//node.leader = leaderNode.Self     //Does not have public key.
-
 	leaderPeer := p2p.Peer{IP: leaderNode.Self.IP, Port: leaderNode.Self.Port}
 	leaderPeer.PubKey = crypto.Ed25519Curve.Point()
 	err := leaderPeer.PubKey.UnmarshalBinary(leaderNode.PubK[:])
@@ -166,26 +164,28 @@ func (node *NewNode) processShardInfo(msgPayload []byte) bool {
 	}
 	node.leader = leaderPeer
 	node.isLeader = isLeader
-	node.ShardID = shardNum
+	node.ShardID = shardNum - 1 //0 indexing.
 	node.SetInfo = true
 	node.log.Info("Shard information obtained ..")
 	return true
 }
 
+// GetShardID gives shardid of node
 func (node *NewNode) GetShardID() string {
 	return strconv.Itoa(node.ShardID)
 }
 
+// GetLeader gives the leader of the node
 func (node *NewNode) GetLeader() p2p.Peer {
-
 	return node.leader
 }
 
+// GetClientPeer gives the client of the node
 func (node *NewNode) GetClientPeer() *p2p.Peer {
 	return nil
 }
 
-//GetSelfPeer
+// GetSelfPeer gives the peer part of the node's own struct
 func (node *NewNode) GetSelfPeer() p2p.Peer {
 	return node.Self
 }

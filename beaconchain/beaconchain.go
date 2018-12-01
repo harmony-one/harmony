@@ -30,7 +30,7 @@ type BeaconChain struct {
 	Port               string
 }
 
-//Init
+//New beaconchain initialization
 func New(numShards int, ip, port string) *BeaconChain {
 	bc := BeaconChain{}
 	bc.log = log.New()
@@ -58,16 +58,6 @@ func (bc *BeaconChain) AcceptConnections(b []byte) {
 	if isLeader {
 		bc.Leaders = append(bc.Leaders, Node)
 	}
-	/**
-
-	**IMPORTANT**
-
-	Note that public key is not in kyber.Scalar form it is in byte form.
-	Use following conversion to get back the actual key
-	//peer.PubKey = crypto.Ed25519Curve.Point()
-	//err = peer.PubKey.UnmarshalBinary(p.PubKey[:])
-
-	**/
 	response := bcconn.ResponseRandomNumber{NumberOfShards: bc.NumberOfShards, NumberOfNodesAdded: bc.NumberOfNodesAdded, Leaders: bc.Leaders}
 	msg := bcconn.SerializeRandomInfo(response)
 	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Acknowledge, msg)

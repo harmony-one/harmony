@@ -76,7 +76,7 @@ func loggingInit(logFolder, role, ip, port string, onlyLogTps bool) {
 
 func main() {
 	accountModel := flag.Bool("account_model", true, "Whether to use account model")
-	//TODO: use http://getmyipaddress.org/ or http://www.get-myip.com/ to retrieve my IP address
+	// TODO: use http://getmyipaddress.org/ or http://www.get-myip.com/ to retrieve my IP address
 
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9000", "port of the node.")
@@ -95,7 +95,7 @@ func main() {
 	idcPort := flag.String("idc_port", "8081", "port of the identity chain")
 	peerDiscovery := flag.Bool("peer_discovery", true, "Enable Peer Discovery")
 
-	// // Leader needs to have a minimal number of peers to start consensus
+	//Leader needs to have a minimal number of peers to start consensus
 	minPeers := flag.Int("min_peers", 100, "Minimal number of Peers in shard")
 
 	flag.Parse()
@@ -135,11 +135,13 @@ func main() {
 		leader = distributionConfig.GetLeader(shardID)
 		selfPeer = distributionConfig.GetSelfPeer(*ip, *port, shardID)
 		_, pubKey := utils.GenKey(*ip, *port)
+		peers = distributionConfig.GetPeers(*ip, *port, shardID)
 		selfPeer.PubKey = pubKey
 		// Create client peer.
 		clientPeer = distributionConfig.GetClientPeer()
 	}
-	fmt.Println(peers, leader, selfPeer, clientPeer, *logFolder, *minPeers)
+
+	fmt.Println(peers, leader, selfPeer, clientPeer, *logFolder, *minPeers) //TODO: to be replaced by a logger later: ak, rl
 
 	var role string
 	if leader.IP == *ip && leader.Port == *port {
