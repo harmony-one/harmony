@@ -80,14 +80,12 @@ func BroadcastMessageFromLeader(peers []Peer, msg []byte) {
 	// TODO(minhdoan): Enable back for multicast.
 	peers = SelectMyPeers(peers, 1, MaxBroadCast)
 	BroadcastMessage(peers, msg)
-	log.Info("Done sending from leader")
 }
 
 // BroadcastMessageFromValidator sends the message to a list of peers from a validator.
 func BroadcastMessageFromValidator(selfPeer Peer, peers []Peer, msg []byte) {
 	peers = SelectMyPeers(peers, selfPeer.ValidatorID*MaxBroadCast+1, (selfPeer.ValidatorID+1)*MaxBroadCast)
 	BroadcastMessage(peers, msg)
-	log.Info("Done sending from validator")
 }
 
 // ConstructP2pMessage constructs the p2p message as [messageType, contentSize, content]

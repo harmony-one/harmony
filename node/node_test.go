@@ -61,15 +61,15 @@ func TestAddPeers(test *testing.T) {
 	priKey2 := crypto.Ed25519Curve.Scalar().SetInt64(int64(999))
 	pubKey2 := pki.GetPublicKeyFromScalar(priKey2)
 
-	peers1 := []p2p.Peer{
-		{
+	peers1 := []*p2p.Peer{
+		&p2p.Peer{
 			IP:          "127.0.0.1",
 			Port:        "8888",
 			PubKey:      pubKey1,
 			Ready:       true,
 			ValidatorID: 1,
 		},
-		{
+		&p2p.Peer{
 			IP:          "127.0.0.1",
 			Port:        "9999",
 			PubKey:      pubKey2,
@@ -147,13 +147,13 @@ func exitServer() {
 	os.Exit(0)
 }
 
-// func TestPingPongHandler(test *testing.T) {
-// 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8881"}
-// 	// validator := p2p.Peer{IP: "127.0.0.1", Port: "9991"}
-// 	consensus := consensus.New("127.0.0.1", "8881", "0", []p2p.Peer{leader}, leader)
-// 	node := New(consensus, nil)
-// 	//	go sendPingMessage(leader)
-// 	go sendPongMessage(leader)
-// 	go exitServer()
-// 	node.StartServer("8881")
-// }
+func TestPingPongHandler(test *testing.T) {
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "8881"}
+	//   validator := p2p.Peer{IP: "127.0.0.1", Port: "9991"}
+	consensus := consensus.New(leader, "0", []p2p.Peer{leader}, leader)
+	node := New(consensus, nil, leader)
+	//go sendPingMessage(leader)
+	go sendPongMessage(leader)
+	go exitServer()
+	node.StartServer("8881")
+}

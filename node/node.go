@@ -48,6 +48,8 @@ const (
 const (
 	// TimeToSleepForSyncing is the time waiting for node transformed into NodeDoingConsensus
 	TimeToSleepForSyncing = time.Second * 30
+	waitBeforeJoinShard   = time.Second * 3
+	timeOutToJoinShard    = time.Minute * 10
 )
 
 // NetworkNode ...
@@ -295,14 +297,18 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase, selfPeer p2p.Peer) *Node
 }
 
 // AddPeers adds neighbors nodes
-func (node *Node) AddPeers(peers []p2p.Peer) int {
+func (node *Node) AddPeers(peers []*p2p.Peer) int {
 	count := 0
 	for _, p := range peers {
 		key := fmt.Sprintf("%v", p.PubKey)
 		_, ok := node.Neighbors.Load(key)
 		if !ok {
-			node.Neighbors.Store(key, p)
+			node.Neighbors.Store(key, *p)
 			count++
+			continue
+		}
+		if node.SelfPeer.ValidatorID == -1 && p.IP == node.SelfPeer.IP && p.Port == node.SelfPeer.Port {
+			node.SelfPeer.ValidatorID = p.ValidatorID
 		}
 	}
 
@@ -315,7 +321,7 @@ func (node *Node) AddPeers(peers []p2p.Peer) int {
 // JoinShard helps a new node to join a shard.
 func (node *Node) JoinShard(leader p2p.Peer) {
 	// try to join the shard, with 10 minutes time-out
-	backoff := p2p.NewExpBackoff(1*time.Second, 10*time.Minute, 2)
+	backoff := p2p.NewExpBackoff(waitBeforeJoinShard, timeOutToJoinShard, 2)
 
 	for node.State == NodeWaitToJoin {
 		backoff.Sleep()
