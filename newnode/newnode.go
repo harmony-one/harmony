@@ -45,7 +45,7 @@ func New(ip string, port string) *NewNode {
 	var node NewNode
 	node.PubK = pubKey
 	node.priK = priKey
-	node.Self = p2p.Peer{IP: ip, Port: port, PubKey: pubKey}
+	node.Self = p2p.Peer{IP: ip, Port: port, PubKey: pubKey, ValidatorID: -1}
 	node.log = log.New()
 	node.SetInfo = false
 	return &node
