@@ -29,7 +29,7 @@ import (
 
 // Constants for transaction signing.
 var (
-	ErrInvalidChainId = errors.New("invalid chain id for signer")
+	ErrInvalidChainID = errors.New("invalid chain id for signer")
 )
 
 // sigCache is used to cache the derived sender and contains
@@ -129,8 +129,8 @@ func (s EIP155Signer) Sender(tx *Transaction) (common.Address, error) {
 	if !tx.Protected() {
 		return HomesteadSigner{}.Sender(tx)
 	}
-	if tx.ChainId().Cmp(s.chainId) != 0 {
-		return common.Address{}, ErrInvalidChainId
+	if tx.ChainID().Cmp(s.chainId) != 0 {
+		return common.Address{}, ErrInvalidChainID
 	}
 	V := new(big.Int).Sub(tx.data.V, s.chainIdMul)
 	V.Sub(V, big8)
@@ -247,8 +247,8 @@ func recoverPlain(sighash common.Hash, R, S, Vb *big.Int, homestead bool) (commo
 	return addr, nil
 }
 
-// deriveChainId derives the chain id from the given v parameter
-func deriveChainId(v *big.Int) *big.Int {
+// deriveChainID derives the chain id from the given v parameter
+func deriveChainID(v *big.Int) *big.Int {
 	if v.BitLen() <= 64 {
 		v := v.Uint64()
 		if v == 27 || v == 28 {

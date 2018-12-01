@@ -297,7 +297,7 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase, selfPeer p2p.Peer) *Node
 
 		database := hdb.NewMemDatabase()
 		chainConfig := params.TestChainConfig
-		chainConfig.ChainID = big.NewInt(int64(node.Consensus.ShardID)) // Use ChainId as piggybacked ShardID
+		chainConfig.ChainID = big.NewInt(int64(node.Consensus.ShardID)) // Use ChainID as piggybacked ShardID
 		gspec := core.Genesis{
 			Config:  chainConfig,
 			Alloc:   genesisAloc,
