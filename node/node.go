@@ -141,14 +141,14 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int) ([]*blockchain.Trans
 // Note the pending transaction list will then contain the rest of the txs
 func (node *Node) getTransactionsForNewBlockAccount(maxNumTxs int) (types.Transactions, []*blockchain.CrossShardTxAndProof) {
 	node.pendingTxMutexAccount.Lock()
-	selected, unselected, invalid, crossShardTxs := node.pendingTransactionsAccount, types.Transactions{}, types.Transactions{}, []*blockchain.CrossShardTxAndProof{}
+	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(node.pendingTransactionsAccount, maxNumTxs)
 	_ = invalid // invalid txs are discard
 
 	node.log.Debug("Invalid transactions discarded", "number", len(invalid))
 	node.pendingTransactionsAccount = unselected
 	node.log.Debug("Remaining pending transactions", "number", len(node.pendingTransactionsAccount))
 	node.pendingTxMutexAccount.Unlock()
-	return selected, crossShardTxs //TODO: replace cross-shard proofs for account model
+	return selected, nil //TODO: replace cross-shard proofs for account model
 }
 
 // StartServer starts a server and process the request by a handler.
@@ -305,12 +305,12 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase, selfPeer p2p.Peer) *Node
 		}
 
 		_ = gspec.MustCommit(database)
-		chain, _ := core.NewBlockChain(database, nil, gspec.Config, bft.NewFaker(), vm.Config{}, nil)
+		chain, _ := core.NewBlockChain(database, nil, gspec.Config, node.Consensus, vm.Config{}, nil)
 
 		node.Chain = chain
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, params.TestChainConfig, chain)
 		node.BlockChannelAccount = make(chan *types.Block)
-		node.Worker = worker.New(params.TestChainConfig, chain, bft.NewFaker())
+		node.Worker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(selfPeer.PubKey))
 	}
 
 	node.SelfPeer = selfPeer
