@@ -9,22 +9,13 @@ import (
 )
 
 // BeaconChainHandler handles registration of new Identities
-<<<<<<< HEAD
 func (bc *BeaconChain) BeaconChainHandler(conn net.Conn) {
-=======
-// This could have been its seperate package like consensus, but am avoiding creating a lot of packages.
-func (IDC *BeaconChain) BeaconChainHandler(conn net.Conn) {
->>>>>>> e11d4c2b72b0f56ca12650c4c1d74863a6e40506
 	content, err := p2p.ReadMessageContent(conn)
 	if err != nil {
 		bc.log.Error("Read p2p data failed")
 		return
 	}
-<<<<<<< HEAD
 	bc.log.Info("received connection", "connectionIp", conn.RemoteAddr())
-=======
-	IDC.log.Info("received connection")
->>>>>>> e11d4c2b72b0f56ca12650c4c1d74863a6e40506
 	msgCategory, err := proto.GetMessageCategory(content)
 	if err != nil {
 		bc.log.Error("Read message category failed", "err", err)

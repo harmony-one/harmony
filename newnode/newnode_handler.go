@@ -43,7 +43,7 @@ func (node *NewNode) NodeHandler(conn net.Conn) {
 	}
 	switch msgCategory {
 	case proto.Identity:
-		actionType := proto_identity.IdentityMessageType(msgType)
+		actionType := proto_identity.IDMessageType(msgType)
 		switch actionType {
 		case proto_identity.Identity:
 			idMsgType, err := proto_identity.GetIdentityMessageType(msgPayload)

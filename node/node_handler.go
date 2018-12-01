@@ -532,12 +532,8 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 
 	// Add to Node's peer list
 	node.AddPeers([]p2p.Peer{*peer})
-	fmt.Println("Peer in ping message handler")
-	fmt.Println(*peer)
 	// Send a Pong message back
 	peers := node.Consensus.GetValidatorPeers()
-	fmt.Println("PeerS in ping message handler")
-	fmt.Println(peers)
 	pong := proto_node.NewPongMessage(peers, node.Consensus.PublicKeys)
 	buffer := pong.ConstructPongMessage()
 

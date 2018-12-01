@@ -118,7 +118,7 @@ func main() {
 	//Use Peer Discovery to get shard/leader/peer/...
 	if *peerDiscovery {
 		candidateNode := pkg_newnode.New(*ip, *port)
-		BCPeer := p2p.Peer{Ip: *idcIP, Port: *idcPort}
+		BCPeer := p2p.Peer{IP: *idcIP, Port: *idcPort}
 		service := candidateNode.NewService(*ip, *port)
 		candidateNode.ConnectBeaconChain(BCPeer)
 		shardID = candidateNode.GetShardID()
@@ -163,11 +163,7 @@ func main() {
 	}
 
 	// Consensus object.
-<<<<<<< HEAD
-	consensus := consensus.NewConsensus(*ip, *port, shardID, peers, leader) //
-=======
 	consensus := consensus.New(selfPeer, shardID, peers, leader)
->>>>>>> e11d4c2b72b0f56ca12650c4c1d74863a6e40506
 	consensus.MinPeers = *minPeers
 
 	// Start Profiler for leader if profile argument is on
@@ -222,15 +218,8 @@ func main() {
 			}()
 		}
 	} else {
-<<<<<<< HEAD
 		if *peerDiscovery {
-			go func() {
-				currentNode.JoinShard(leader)
-			}()
-=======
-		if *peerDisvoery {
 			go currentNode.JoinShard(leader)
->>>>>>> e11d4c2b72b0f56ca12650c4c1d74863a6e40506
 		}
 	}
 

@@ -45,7 +45,7 @@ func New(ip string, port string) *NewNode {
 	var node NewNode
 	node.PubK = pubKey
 	node.priK = priKey
-	node.Self = p2p.Peer{Ip: ip, Port: port, PubKey: pubKey}
+	node.Self = p2p.Peer{IP: ip, Port: port, PubKey: pubKey}
 	node.log = log.New()
 	node.SetInfo = false
 	return &node
@@ -113,7 +113,7 @@ func (s *Service) Stop() {
 }
 
 func (node NewNode) String() string {
-	return fmt.Sprintf("idc: %v:%v and node infi %v", node.Self.Ip, node.Self.Port, node.SetInfo)
+	return fmt.Sprintf("idc: %v:%v and node infi %v", node.Self.IP, node.Self.Port, node.SetInfo)
 }
 
 //ConnectBeaconChain connects to beacon chain
@@ -123,7 +123,7 @@ func (node *NewNode) ConnectBeaconChain(BCPeer p2p.Peer) {
 	if err != nil {
 		node.log.Error("Could not Marshall public key into binary")
 	}
-	p := p2p.Peer{Ip: node.Self.Ip, Port: node.Self.Port}
+	p := p2p.Peer{IP: node.Self.IP, Port: node.Self.Port}
 	nodeInfo := &bcconn.NodeInfo{Self: p, PubK: pubk}
 	msg := bcconn.SerializeNodeInfo(nodeInfo)
 	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Register, msg)
@@ -159,7 +159,7 @@ func (node *NewNode) processShardInfo(msgPayload []byte) bool {
 	leaderNode := leaders[shardNum-1] //0 indexing.
 	//node.leader = leaderNode.Self     //Does not have public key.
 
-	leaderPeer := p2p.Peer{Ip: leaderNode.Self.Ip, Port: leaderNode.Self.Port}
+	leaderPeer := p2p.Peer{IP: leaderNode.Self.IP, Port: leaderNode.Self.Port}
 	leaderPeer.PubKey = crypto.Ed25519Curve.Point()
 	err := leaderPeer.PubKey.UnmarshalBinary(leaderNode.PubK[:])
 	if err != nil {
