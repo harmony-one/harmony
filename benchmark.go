@@ -224,7 +224,7 @@ func main() {
 		if *peerDisvoery {
 			go currentNode.JoinShard(leader)
 		} else {
-			node.State = node.NodeDoingConsensus
+			currentNode.State = node.NodeDoingConsensus
 		}
 	}
 
