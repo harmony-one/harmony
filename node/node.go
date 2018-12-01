@@ -57,6 +57,8 @@ const (
 const (
 	// TimeToSleepForSyncing is the time waiting for node transformed into NodeDoingConsensus
 	TimeToSleepForSyncing = time.Second * 30
+	// SyncingPortDifference is the difference between the node port and the syncing port.
+	SyncingPortDifference = 1000
 )
 
 // NetworkNode ...
@@ -341,7 +343,7 @@ func (node *Node) DoSyncing() {
 	if node.stateSync != nil {
 		node.stateSync = syncing.GetStateSync()
 	}
-	node.stateSync.StartStateSync(node.GetPeers(), node.blockchain)
+	node.stateSync.StartStateSync(node.GetSyncingPeers(), node.blockchain)
 }
 
 // AddPeers adds neighbors nodes
@@ -362,13 +364,26 @@ func (node *Node) AddPeers(peers []p2p.Peer) int {
 	return count
 }
 
-// GetPeers returns list of peers.
-func (node *Node) GetPeers() []p2p.Peer {
+// GetSyncingPort returns the syncing port.
+func GetSyncingPort(nodePort string) string {
+	if port, err := strconv.Atoi(nodePort); err == nil {
+		return fmt.Sprintf("%d", port-SyncingPortDifference)
+	}
+	os.Exit(1)
+	return ""
+}
+
+// GetSyncingPeers returns list of peers.
+func (node *Node) GetSyncingPeers() []p2p.Peer {
 	res := []p2p.Peer{}
 	node.Neighbors.Range(func(k, v interface{}) bool {
 		res = append(res, v.(p2p.Peer))
 		return true
 	})
+
+	for i := range res {
+		res[i].Port = GetSyncingPort(res[i].Port)
+	}
 	return res
 }
 
@@ -400,12 +415,7 @@ func (node *Node) InitSyncingServer() {
 
 // StartSyncingServer starts syncing server.
 func (node *Node) StartSyncingServer() {
-	if port, err := strconv.Atoi(node.SelfPeer.Port); err == nil {
-		node.downloaderServer.Start(node.SelfPeer.IP, fmt.Sprintf("%d", port-1000))
-	} else {
-		node.log.Error("Wrong port format provided")
-		os.Exit(1)
-	}
+	node.downloaderServer.Start(node.SelfPeer.IP, GetSyncingPort(node.SelfPeer.Port))
 }
 
 // CalculateResponse implements DownloadInterface on Node object.

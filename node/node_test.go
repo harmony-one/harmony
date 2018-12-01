@@ -54,19 +54,22 @@ func TestCountNumTransactionsInBlockchain(t *testing.T) {
 	}
 }
 
-func TestGetPeers(t *testing.T) {
+func TestGetSyncingPeers(t *testing.T) {
 	leader := p2p.Peer{IP: "1", Port: "2"}
 	validator := p2p.Peer{IP: "3", Port: "5"}
 	consensus := consensus.New(leader, "0", []p2p.Peer{leader, validator}, leader)
 
 	node := New(consensus, nil, leader)
-	peer := p2p.Peer{IP: "1.1.1.1"}
-	peer2 := p2p.Peer{IP: "2.1.1.1"}
+	peer := p2p.Peer{IP: "1.1.1.1", Port: "2000"}
+	peer2 := p2p.Peer{IP: "2.1.1.1", Port: "2000"}
 	node.Neighbors.Store("minh", peer)
 	node.Neighbors.Store("mark", peer2)
-	res := node.GetPeers()
-	if len(res) != 2 || !((res[0] == peer && res[1] == peer2) || (res[1] == peer && res[0] == peer2)) {
-		t.Error("GetPeers should return list of {peer, peer2}")
+	res := node.GetSyncingPeers()
+	if len(res) != 2 || !((res[0].IP == peer.IP && res[1].IP == peer2.IP) || (res[1].IP == peer.IP && res[0].IP == peer2.IP)) {
+		t.Error("GetSyncingPeers should return list of {peer, peer2}")
+	}
+	if len(res) != 2 || res[0].Port != "1000" || res[1].Port != "1000" {
+		t.Error("Syncing ports should be 1000")
 	}
 }
 
