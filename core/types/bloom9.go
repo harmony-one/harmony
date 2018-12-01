@@ -68,14 +68,17 @@ func (b Bloom) Big() *big.Int {
 	return new(big.Int).SetBytes(b[:])
 }
 
+// Bytes returns bytes of Bloom.
 func (b Bloom) Bytes() []byte {
 	return b[:]
 }
 
+// Test tests if an input may belong to the bloom.
 func (b Bloom) Test(test *big.Int) bool {
 	return BloomLookup(b, test)
 }
 
+// TestBytes tests if the input represented by test []byte may belong to the bloom.
 func (b Bloom) TestBytes(test []byte) bool {
 	return b.Test(new(big.Int).SetBytes(test))
 
@@ -91,6 +94,7 @@ func (b *Bloom) UnmarshalText(input []byte) error {
 	return hexutil.UnmarshalFixedText("Bloom", input, b[:])
 }
 
+// CreateBloom creates a Bloom given the receipts.
 func CreateBloom(receipts Receipts) Bloom {
 	bin := new(big.Int)
 	for _, receipt := range receipts {
@@ -100,6 +104,7 @@ func CreateBloom(receipts Receipts) Bloom {
 	return BytesToBloom(bin.Bytes())
 }
 
+// LogsBloom ...
 func LogsBloom(logs []*Log) *big.Int {
 	bin := new(big.Int)
 	for _, log := range logs {
@@ -126,8 +131,10 @@ func bloom9(b []byte) *big.Int {
 	return r
 }
 
+// Bloom9 type.
 var Bloom9 = bloom9
 
+// BloomLookup checks if a topic may belong to the Bloom.
 func BloomLookup(bin Bloom, topic bytesBacked) bool {
 	bloom := bin.Big()
 	cmp := bloom9(topic.Bytes())
