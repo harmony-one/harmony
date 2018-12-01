@@ -13,7 +13,7 @@ func TestSerializeDeserializeNodeInfo(t *testing.T) {
 	var ip, port string
 	ip = "127.0.0.1"
 	port = "8080"
-	self := p2p.Peer{Ip: ip, Port: port}
+	self := p2p.Peer{IP: ip, Port: port}
 	_, pk := utils.GenKey(ip, port)
 	pkb, err := pk.MarshalBinary()
 	if err != nil {
@@ -33,7 +33,7 @@ func TestSerializeDeserializeRandomInfo(t *testing.T) {
 
 	ip = "127.0.0.1"
 	port = "8080"
-	self := p2p.Peer{Ip: ip, Port: port}
+	self := p2p.Peer{IP: ip, Port: port}
 	_, pk := utils.GenKey(ip, port)
 	pkb, err := pk.MarshalBinary()
 	if err != nil {
@@ -43,7 +43,7 @@ func TestSerializeDeserializeRandomInfo(t *testing.T) {
 
 	ip = "127.0.0.1"
 	port = "9080"
-	self2 := p2p.Peer{Ip: ip, Port: port}
+	self2 := p2p.Peer{IP: ip, Port: port}
 	_, pk2 := utils.GenKey(ip, port)
 	pkb2, err := pk2.MarshalBinary()
 	if err != nil {

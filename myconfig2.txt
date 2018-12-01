@@ -4,4 +4,6 @@
 127.0.0.1 9300 validator 0
 127.0.0.1 9301 validator 0
 127.0.0.1 9302 validator 0
+127.0.0.1 9303 validator 0
+127.0.0.1 9304 validator 0
 127.0.0.1 9999 client 0

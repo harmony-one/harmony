@@ -516,7 +516,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 		node.log.Error("Can't get Ping Message")
 		return -1
 	}
-	//	node.log.Info("Ping", "Msg", ping)
+	node.log.Info("Ping", "Msg", ping)
 
 	peer := new(p2p.Peer)
 	peer.IP = ping.Node.IP
@@ -550,7 +550,7 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		node.log.Error("Can't get Pong Message")
 		return -1
 	}
-	// node.log.Info("Pong", "Msg", pong)
+	node.log.Info("Pong", "Msg", pong)
 	// TODO (lc) state syncing, and wait for all public keys
 	node.State = NodeJoinedShard
 
