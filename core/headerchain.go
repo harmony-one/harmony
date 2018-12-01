@@ -204,6 +204,7 @@ func (hc *HeaderChain) WriteHeader(header *types.Header) (status WriteStatus, er
 // header writes should be protected by the parent chain mutex individually.
 type WhCallback func(*types.Header) error
 
+// ValidateHeaderChain validates header chain.
 func (hc *HeaderChain) ValidateHeaderChain(chain []*types.Header, checkFreq int) (int, error) {
 	// Do a sanity check that the provided chain is actually ordered and linked
 	for i := 1; i < len(chain); i++ {
@@ -330,9 +331,8 @@ func (hc *HeaderChain) GetAncestor(hash common.Hash, number, ancestor uint64, ma
 		// in this case it is cheaper to just read the header
 		if header := hc.GetHeader(hash, number); header != nil {
 			return header.ParentHash, number - 1
-		} else {
-			return common.Hash{}, 0
 		}
+		return common.Hash{}, 0
 	}
 	for ancestor != 0 {
 		if rawdb.ReadCanonicalHash(hc.chainDb, number) == hash {

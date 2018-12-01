@@ -22,6 +22,7 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 )
 
+// NewEnv returns new EVM.
 func NewEnv(cfg *Config) *vm.EVM {
 	context := vm.Context{
 		CanTransfer: core.CanTransfer,

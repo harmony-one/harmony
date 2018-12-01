@@ -104,6 +104,7 @@ var (
 // TxStatus is the current status of a transaction as seen by the pool.
 type TxStatus uint
 
+// Constants for TxStatus.
 const (
 	TxStatusUnknown TxStatus = iota
 	TxStatusQueued

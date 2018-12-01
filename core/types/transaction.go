@@ -31,10 +31,12 @@ import (
 
 //go:generate gencodec -type txdata -field-override txdataMarshaling -out gen_tx_json.go
 
+// Errors constants for Transaction.
 var (
 	ErrInvalidSig = errors.New("invalid transaction v, r, s values")
 )
 
+// Transaction struct.
 type Transaction struct {
 	data txdata
 	// caches
@@ -45,7 +47,7 @@ type Transaction struct {
 
 type txdata struct {
 	AccountNonce uint64          `json:"nonce"    gencodec:"required"`
-	ShardID      uint32          `json:"shardId"  gencodec:"required"`
+	ShardID      uint32          `json:"shardID"  gencodec:"required"`
 	Price        *big.Int        `json:"gasPrice" gencodec:"required"`
 	GasLimit     uint64          `json:"gas"      gencodec:"required"`
 	Recipient    *common.Address `json:"to"       rlp:"nil"` // nil means contract creation
@@ -72,22 +74,24 @@ type txdataMarshaling struct {
 	S            *hexutil.Big
 }
 
-func NewTransaction(nonce uint64, to common.Address, shardId uint32, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte) *Transaction {
-	return newTransaction(nonce, &to, shardId, amount, gasLimit, gasPrice, data)
+// NewTransaction returns new transaction.
+func NewTransaction(nonce uint64, to common.Address, shardID uint32, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte) *Transaction {
+	return newTransaction(nonce, &to, shardID, amount, gasLimit, gasPrice, data)
 }
 
-func NewContractCreation(nonce uint64, shardId uint32, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte) *Transaction {
-	return newTransaction(nonce, nil, shardId, amount, gasLimit, gasPrice, data)
+// NewContractCreation returns contract transaction.
+func NewContractCreation(nonce uint64, shardID uint32, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte) *Transaction {
+	return newTransaction(nonce, nil, shardID, amount, gasLimit, gasPrice, data)
 }
 
-func newTransaction(nonce uint64, to *common.Address, shardId uint32, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte) *Transaction {
+func newTransaction(nonce uint64, to *common.Address, shardID uint32, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte) *Transaction {
 	if len(data) > 0 {
 		data = common.CopyBytes(data)
 	}
 	d := txdata{
 		AccountNonce: nonce,
 		Recipient:    to,
-		ShardID:      shardId,
+		ShardID:      shardID,
 		Payload:      data,
 		Amount:       new(big.Int),
 		GasLimit:     gasLimit,
@@ -106,9 +110,9 @@ func newTransaction(nonce uint64, to *common.Address, shardId uint32, amount *bi
 	return &Transaction{data: d}
 }
 
-// ChainId returns which chain id this transaction was signed for (if at all)
-func (tx *Transaction) ChainId() *big.Int {
-	return deriveChainId(tx.data.V)
+// ChainID returns which chain id this transaction was signed for (if at all)
+func (tx *Transaction) ChainID() *big.Int {
+	return deriveChainID(tx.data.V)
 }
 
 // Protected returns whether the transaction is protected from replay protection.
@@ -160,7 +164,7 @@ func (tx *Transaction) UnmarshalJSON(input []byte) error {
 	if withSignature {
 		var V byte
 		if isProtectedV(dec.V) {
-			chainID := deriveChainId(dec.V).Uint64()
+			chainID := deriveChainID(dec.V).Uint64()
 			V = byte(dec.V.Uint64() - 35 - 2*chainID)
 		} else {
 			V = byte(dec.V.Uint64() - 27)
@@ -174,12 +178,35 @@ func (tx *Transaction) UnmarshalJSON(input []byte) error {
 	return nil
 }
 
-func (tx *Transaction) Data() []byte       { return common.CopyBytes(tx.data.Payload) }
-func (tx *Transaction) Gas() uint64        { return tx.data.GasLimit }
-func (tx *Transaction) GasPrice() *big.Int { return new(big.Int).Set(tx.data.Price) }
-func (tx *Transaction) Value() *big.Int    { return new(big.Int).Set(tx.data.Amount) }
-func (tx *Transaction) Nonce() uint64      { return tx.data.AccountNonce }
-func (tx *Transaction) CheckNonce() bool   { return true }
+// Data returns data payload of Transaction.
+func (tx *Transaction) Data() []byte {
+	return common.CopyBytes(tx.data.Payload)
+}
+
+// Gas returns gas of Transaction.
+func (tx *Transaction) Gas() uint64 {
+	return tx.data.GasLimit
+}
+
+// GasPrice returns gas price of Transaction.
+func (tx *Transaction) GasPrice() *big.Int {
+	return new(big.Int).Set(tx.data.Price)
+}
+
+// Value returns data payload of Transaction.
+func (tx *Transaction) Value() *big.Int {
+	return new(big.Int).Set(tx.data.Amount)
+}
+
+// Nonce returns account nonce from Transaction.
+func (tx *Transaction) Nonce() uint64 {
+	return tx.data.AccountNonce
+}
+
+// CheckNonce returns check nonce from Transaction.
+func (tx *Transaction) CheckNonce() bool {
+	return true
+}
 
 // To returns the recipient address of the transaction.
 // It returns nil if the transaction is a contract creation.
@@ -254,6 +281,7 @@ func (tx *Transaction) Cost() *big.Int {
 	return total
 }
 
+// RawSignatureValues return raw signature values.
 func (tx *Transaction) RawSignatureValues() (*big.Int, *big.Int, *big.Int) {
 	return tx.data.V, tx.data.R, tx.data.S
 }
@@ -308,10 +336,12 @@ func (s TxByPrice) Len() int           { return len(s) }
 func (s TxByPrice) Less(i, j int) bool { return s[i].data.Price.Cmp(s[j].data.Price) > 0 }
 func (s TxByPrice) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
+// Push pushes a transaction.
 func (s *TxByPrice) Push(x interface{}) {
 	*s = append(*s, x.(*Transaction))
 }
 
+// Pop pops a transaction.
 func (s *TxByPrice) Pop() interface{} {
 	old := *s
 	n := len(old)
@@ -396,6 +426,7 @@ type Message struct {
 	checkNonce bool
 }
 
+// NewMessage returns new message.
 func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte, checkNonce bool) Message {
 	return Message{
 		from:       from,
@@ -409,11 +440,42 @@ func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *b
 	}
 }
 
-func (m Message) From() common.Address { return m.from }
-func (m Message) To() *common.Address  { return m.to }
-func (m Message) GasPrice() *big.Int   { return m.gasPrice }
-func (m Message) Value() *big.Int      { return m.amount }
-func (m Message) Gas() uint64          { return m.gasLimit }
-func (m Message) Nonce() uint64        { return m.nonce }
-func (m Message) Data() []byte         { return m.data }
-func (m Message) CheckNonce() bool     { return m.checkNonce }
+// From returns from address from Message.
+func (m Message) From() common.Address {
+	return m.from
+}
+
+// To returns to address from Message.
+func (m Message) To() *common.Address {
+	return m.to
+}
+
+// GasPrice returns gas price from Message.
+func (m Message) GasPrice() *big.Int {
+	return m.gasPrice
+}
+
+// Value returns the value amount from Message.
+func (m Message) Value() *big.Int {
+	return m.amount
+}
+
+// Gas returns gas limit of the Message.
+func (m Message) Gas() uint64 {
+	return m.gasLimit
+}
+
+// Nonce returns Nonce of the Message.
+func (m Message) Nonce() uint64 {
+	return m.nonce
+}
+
+// Data return data of the Message.
+func (m Message) Data() []byte {
+	return m.data
+}
+
+// CheckNonce returns checkNonce of Message.
+func (m Message) CheckNonce() bool {
+	return m.checkNonce
+}

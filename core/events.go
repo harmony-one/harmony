@@ -35,14 +35,17 @@ type NewMinedBlockEvent struct{ Block *types.Block }
 // RemovedLogsEvent is posted when a reorg happens
 type RemovedLogsEvent struct{ Logs []*types.Log }
 
+// ChainEvent is the struct of chain event.
 type ChainEvent struct {
 	Block *types.Block
 	Hash  common.Hash
 	Logs  []*types.Log
 }
 
+// ChainSideEvent is chain side event.
 type ChainSideEvent struct {
 	Block *types.Block
 }
 
+// ChainHeadEvent is the struct of chain head event.
 type ChainHeadEvent struct{ Block *types.Block }
