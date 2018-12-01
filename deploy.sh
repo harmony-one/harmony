@@ -73,7 +73,8 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
   IFS=' ' read ip port mode shardID <<< $line
 	#echo $ip $port $mode
   if [ "$mode" != "client" ]; then
-    ./bin/benchmark -ip $ip -port $port -config_file $config -log_folder $log_folder $DB $PEER -min_peers $MIN &
+    ./bin/benchmark -ip $ip -port $port -log_folder $log_folder $DB $PEER -min_peers $MIN &
+    sleep 10
   fi
 done < $config
 
