@@ -8,7 +8,7 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 )
 
-type NodeInfo struct {
+type NodeInfo struct { //TODO: to be merged with Leo's key.
 	Self p2p.Peer
 	PubK []byte
 }

@@ -163,7 +163,7 @@ func main() {
 	}
 
 	// Consensus object.
-	consensus := consensus.NewConsensus(*ip, *port, shardID, peers, leader)
+	consensus := consensus.NewConsensus(*ip, *port, shardID, peers, leader) //
 	consensus.MinPeers = *minPeers
 
 	// Start Profiler for leader if profile argument is on

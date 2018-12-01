@@ -51,11 +51,7 @@ func generateIDCKeys() kyber.Point {
 
 //AcceptConnections welcomes new connections
 func (bc *BeaconChain) AcceptConnections(b []byte) {
-	NewNodeInfo := bcconn.DeserializeNodeInfo(b)
-	bc.registerNode(NewNodeInfo)
-}
-
-func (bc *BeaconChain) registerNode(Node *bcconn.NodeInfo) {
+	Node := bcconn.DeserializeNodeInfo(b)
 	bc.log.Info("Obtained node information, updating local information")
 	bc.NumberOfNodesAdded = bc.NumberOfNodesAdded + 1
 	_, isLeader := utils.AllocateShard(bc.NumberOfNodesAdded, bc.NumberOfShards)

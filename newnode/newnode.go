@@ -10,6 +10,7 @@ import (
 
 	"github.com/dedis/kyber"
 	"github.com/harmony-one/harmony/bcconn"
+	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/log"
 
 	"github.com/harmony-one/harmony/p2p"
@@ -156,7 +157,15 @@ func (node *NewNode) processShardInfo(msgPayload []byte) bool {
 	leaders := leadersInfo.Leaders
 	shardNum, isLeader := utils.AllocateShard(leadersInfo.NumberOfNodesAdded, leadersInfo.NumberOfShards)
 	leaderNode := leaders[shardNum-1] //0 indexing.
-	node.leader = leaderNode.Self     //Does not have public key.
+	//node.leader = leaderNode.Self     //Does not have public key.
+
+	leaderPeer := p2p.Peer{Ip: leaderNode.Self.Ip, Port: leaderNode.Self.Port}
+	leaderPeer.PubKey = crypto.Ed25519Curve.Point()
+	err := leaderPeer.PubKey.UnmarshalBinary(leaderNode.PubK[:])
+	if err != nil {
+		node.log.Info("Could not unmarshall leaders public key from binary to kyber.point")
+	}
+	node.leader = leaderPeer
 	node.isLeader = isLeader
 	node.ShardID = shardNum
 	node.SetInfo = true
@@ -169,6 +178,7 @@ func (node *NewNode) GetShardID() string {
 }
 
 func (node *NewNode) GetLeader() p2p.Peer {
+
 	return node.leader
 }
 
