@@ -179,6 +179,7 @@ func New(selfPeer p2p.Peer, ShardID string, peers []p2p.Peer, leader p2p.Peer) *
 	consensus.Log = log.New()
 	consensus.uniqueIDInstance = utils.GetUniqueValidatorIDInstance()
 
+	//	consensus.Log.Info("New Consensus", "IP", ip, "Port", port, "NodeID", consensus.nodeID, "priKey", consensus.priKey, "pubKey", consensus.pubKey)
 	return &consensus
 }
 
@@ -239,16 +240,16 @@ func (consensus *Consensus) String() string {
 
 // AddPeers will add new peers into the validator map of the consensus
 // and add the public keys
-func (consensus *Consensus) AddPeers(peers []p2p.Peer) int {
+func (consensus *Consensus) AddPeers(peers []*p2p.Peer) int {
 	count := 0
 
 	for _, peer := range peers {
-		_, ok := consensus.validators.Load(utils.GetUniqueIDFromPeer(peer))
+		_, ok := consensus.validators.Load(utils.GetUniqueIDFromPeer(*peer))
 		if !ok {
 			if peer.ValidatorID == -1 {
 				peer.ValidatorID = int(consensus.uniqueIDInstance.GetUniqueID())
 			}
-			consensus.validators.Store(utils.GetUniqueIDFromPeer(peer), peer)
+			consensus.validators.Store(utils.GetUniqueIDFromPeer(*peer), *peer)
 			consensus.PublicKeys = append(consensus.PublicKeys, peer.PubKey)
 		}
 		count++
@@ -400,4 +401,9 @@ func (consensus *Consensus) Prepare(chain ChainReader, header *types.Header) err
 // included uncles. The coinbase of each uncle block is also rewarded.
 func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header *types.Header) {
 	// TODO: implement mining rewards
+}
+
+// GetNodeID returns the nodeID
+func (consensus *Consensus) GetNodeID() uint16 {
+	return consensus.nodeID
 }

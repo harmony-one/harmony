@@ -43,7 +43,7 @@ func (consensus *Consensus) ProcessMessageValidator(message []byte) {
 
 // Processes the announce message sent from the leader
 func (consensus *Consensus) processAnnounceMessage(payload []byte) {
-	consensus.Log.Info("Received Announce Message", "Size", len(payload))
+	consensus.Log.Info("Received Announce Message", "Size", len(payload), "nodeID", consensus.nodeID)
 	//#### Read payload data
 	offset := 0
 	// 4 byte consensus id
@@ -239,9 +239,10 @@ func (consensus *Consensus) processChallengeMessage(payload []byte, targetState 
 
 	response, err := crypto.Response(crypto.Ed25519Curve, consensus.priKey, consensus.secret[consensusID], receivedChallenge)
 	if err != nil {
-		log.Warn("Failed to generate response", "err", err)
+		log.Warn("validator failed to generate response", "err", err, "priKey", consensus.priKey, "nodeID", consensus.nodeID, "secret", consensus.secret[consensusID])
 		return
 	}
+
 	msgTypeToSend := proto_consensus.Response
 	if targetState == FinalResponseDone {
 		msgTypeToSend = proto_consensus.FinalResponse
@@ -340,7 +341,7 @@ func (consensus *Consensus) processCollectiveSigMessage(payload []byte) {
 	// Verify collective signature
 	err := crypto.Verify(crypto.Ed25519Curve, consensus.PublicKeys, payload[:36], append(collectiveSig, bitmap...), crypto.NewThresholdPolicy((2*len(consensus.PublicKeys)/3)+1))
 	if err != nil {
-		consensus.Log.Warn("Failed to verify the collective sig message", "consensusID", consensusID, "err", err)
+		consensus.Log.Warn("Failed to verify the collective sig message", "consensusID", consensusID, "err", err, "bitmap", bitmap, "NodeID", consensus.nodeID, "#PK", len(consensus.PublicKeys))
 		return
 	}
 
