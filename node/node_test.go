@@ -152,7 +152,8 @@ func exitServer() {
 }
 
 func TestPingPongHandler(test *testing.T) {
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "8881"}
+	_, pubKey := utils.GenKey("127.0.0.1", "8881")
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "8881", PubKey: pubKey}
 	//   validator := p2p.Peer{IP: "127.0.0.1", Port: "9991"}
 	consensus := consensus.New(leader, "0", []p2p.Peer{leader}, leader)
 	node := New(consensus, nil, leader)
