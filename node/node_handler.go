@@ -557,9 +557,6 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		node.log.Error("Can't get Pong Message")
 		return -1
 	}
-	// node.log.Info("Pong", "Msg", pong)
-	// TODO (lc) state syncing, and wait for all public keys
-	node.State = NodeJoinedShard
 
 	peers := make([]p2p.Peer, 0)
 
@@ -597,6 +594,9 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		}
 		publicKeys = append(publicKeys, key)
 	}
+
+	node.State = NodeJoinedShard
+	go node.DoSyncing()
 
 	return node.Consensus.UpdatePublicKeys(publicKeys)
 }
