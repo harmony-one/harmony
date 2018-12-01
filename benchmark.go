@@ -142,7 +142,7 @@ func main() {
 	fmt.Println(peers, leader, selfPeer, clientPeer, logFolder, minPeers)
 
 	var role string
-	if leader.Ip == *ip && leader.Port == *port {
+	if leader.IP == *ip && leader.Port == *port {
 		role = "leader"
 	} else {
 		role = "validator"
@@ -163,7 +163,11 @@ func main() {
 	}
 
 	// Consensus object.
+<<<<<<< HEAD
 	consensus := consensus.NewConsensus(*ip, *port, shardID, peers, leader) //
+=======
+	consensus := consensus.New(selfPeer, shardID, peers, leader)
+>>>>>>> e11d4c2b72b0f56ca12650c4c1d74863a6e40506
 	consensus.MinPeers = *minPeers
 
 	// Start Profiler for leader if profile argument is on
@@ -178,7 +182,7 @@ func main() {
 	// Set logger to attack model.
 	attack.GetInstance().SetLogger(consensus.Log)
 	// Current node.
-	currentNode := node.New(consensus, ldb)
+	currentNode := node.New(consensus, ldb, selfPeer)
 	// Add self peer.
 	currentNode.SelfPeer = selfPeer
 	// Add sync node configuration.
@@ -218,10 +222,15 @@ func main() {
 			}()
 		}
 	} else {
+<<<<<<< HEAD
 		if *peerDiscovery {
 			go func() {
 				currentNode.JoinShard(leader)
 			}()
+=======
+		if *peerDisvoery {
+			go currentNode.JoinShard(leader)
+>>>>>>> e11d4c2b72b0f56ca12650c4c1d74863a6e40506
 		}
 	}
 

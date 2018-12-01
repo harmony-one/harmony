@@ -16,7 +16,7 @@ var (
 	priKey1 = crypto.Ed25519Curve.Scalar().SetInt64(int64(333))
 	pubKey1 = pki.GetPublicKeyFromScalar(priKey1)
 	p1      = p2p.Peer{
-		Ip:          "127.0.0.1",
+		IP:          "127.0.0.1",
 		Port:        "9999",
 		ValidatorID: -1,
 		PubKey:      pubKey1,
@@ -28,14 +28,14 @@ var (
 
 	p2 = []p2p.Peer{
 		{
-			Ip:          "127.0.0.1",
+			IP:          "127.0.0.1",
 			Port:        "8888",
 			PubKey:      pubKey1,
 			Ready:       true,
 			ValidatorID: -1,
 		},
 		{
-			Ip:          "127.0.0.1",
+			IP:          "127.0.0.1",
 			Port:        "9999",
 			PubKey:      pubKey2,
 			Ready:       false,

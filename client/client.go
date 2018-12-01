@@ -13,7 +13,7 @@ import (
 	client_proto "github.com/harmony-one/harmony/proto/client"
 )
 
-// A client represents a node (e.g. a wallet) which  sends transactions and receives responses from the harmony network
+// Client represents a node (e.g. a wallet) which  sends transactions and receives responses from the harmony network
 type Client struct {
 	PendingCrossTxs      map[[32]byte]*blockchain.Transaction // Map of TxId to pending cross shard txs. Pending means the proof-of-accept/rejects are not complete
 	PendingCrossTxsMutex sync.Mutex                           // Mutex for the pending txs list
@@ -25,7 +25,7 @@ type Client struct {
 	log               log.Logger // Log utility
 }
 
-// The message handler for Client/Transaction messages.
+// TransactionMessageHandler is the message handler for Client/Transaction messages.
 func (client *Client) TransactionMessageHandler(msgPayload []byte) {
 	messageType := client_proto.TransactionMessageType(msgPayload[0])
 	switch messageType {
@@ -52,6 +52,7 @@ func (client *Client) TransactionMessageHandler(msgPayload []byte) {
 	}
 }
 
+// handleProofOfLockMessage handles the followings:
 // Client once receives a list of proofs from a leader, for each proof:
 // 1) retreive the pending cross shard transaction
 // 2) add the proof to the transaction
@@ -123,7 +124,7 @@ func (client *Client) sendCrossShardTxUnlockMessage(txsToSend []*blockchain.Tran
 	}
 }
 
-// Create a new Client
+// NewClient creates a new Client
 func NewClient(leaders *map[uint32]p2p.Peer) *Client {
 	client := Client{}
 	client.PendingCrossTxs = make(map[[32]byte]*blockchain.Transaction)
@@ -134,18 +135,20 @@ func NewClient(leaders *map[uint32]p2p.Peer) *Client {
 	return &client
 }
 
+// BuildOutputShardTransactionMap builds output shard transaction map.
 func BuildOutputShardTransactionMap(txs []*blockchain.Transaction) map[uint32][]*blockchain.Transaction {
 	txsShardMap := make(map[uint32][]*blockchain.Transaction)
 
 	// Put txs into corresponding output shards
 	for _, crossTx := range txs {
-		for curShardID, _ := range GetOutputShardIDsOfCrossShardTx(crossTx) {
+		for curShardID := range GetOutputShardIDsOfCrossShardTx(crossTx) {
 			txsShardMap[curShardID] = append(txsShardMap[curShardID], crossTx)
 		}
 	}
 	return txsShardMap
 }
 
+// GetInputShardIDsOfCrossShardTx gets input shardID.
 func GetInputShardIDsOfCrossShardTx(crossTx *blockchain.Transaction) map[uint32]bool {
 	shardIDs := map[uint32]bool{}
 	for _, txInput := range crossTx.TxInput {
@@ -154,6 +157,7 @@ func GetInputShardIDsOfCrossShardTx(crossTx *blockchain.Transaction) map[uint32]
 	return shardIDs
 }
 
+// GetOutputShardIDsOfCrossShardTx gets output shard ids.
 func GetOutputShardIDsOfCrossShardTx(crossTx *blockchain.Transaction) map[uint32]bool {
 	shardIDs := map[uint32]bool{}
 	for _, txOutput := range crossTx.TxOutput {
@@ -162,6 +166,7 @@ func GetOutputShardIDsOfCrossShardTx(crossTx *blockchain.Transaction) map[uint32
 	return shardIDs
 }
 
+// GetLeaders returns leader peers.
 func (client *Client) GetLeaders() []p2p.Peer {
 	leaders := []p2p.Peer{}
 	for _, leader := range *client.Leaders {

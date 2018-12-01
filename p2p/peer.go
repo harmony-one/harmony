@@ -9,13 +9,14 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/log"
+	"github.com/harmony-one/harmony/p2pv2"
 
 	"github.com/dedis/kyber"
 )
 
 // Peer is the object for a p2p peer (node)
 type Peer struct {
-	Ip          string      // Ip address of the peer
+	IP          string      // IP address of the peer
 	Port        string      // Port number of the peer
 	PubKey      kyber.Point // Public key of the peer
 	Ready       bool        // Ready is true if the peer is ready to join consensus.
@@ -23,13 +24,19 @@ type Peer struct {
 	// TODO(minhdoan, rj): use this Ready to not send/broadcast to this peer if it wasn't available.
 }
 
+// MaxBroadCast is the maximum number of neighbors to broadcast
 const MaxBroadCast = 20
+
+// Version The version number of p2p library
+// 1 - Direct socket connection
+// 2 - libp2p
+const Version = 1
 
 // SendMessage sends the message to the peer
 func SendMessage(peer Peer, msg []byte) {
 	// Construct normal p2p message
 	content := ConstructP2pMessage(byte(0), msg)
-	go send(peer.Ip, peer.Port, content)
+	go send(peer.IP, peer.Port, content)
 }
 
 // BroadcastMessage sends the message to a list of peers
@@ -45,7 +52,7 @@ func BroadcastMessage(peers []Peer, msg []byte) {
 	start := time.Now()
 	for _, peer := range peers {
 		peerCopy := peer
-		go send(peerCopy.Ip, peerCopy.Port, content)
+		go send(peerCopy.IP, peerCopy.Port, content)
 	}
 	log.Info("Broadcasting Done", "time spent(s)", time.Since(start).Seconds())
 
@@ -56,6 +63,8 @@ func BroadcastMessage(peers []Peer, msg []byte) {
 	}
 }
 
+// SelectMyPeers chooses a list of peers based on the range of ValidatorID
+// This is a quick hack of the current p2p networking model
 func SelectMyPeers(peers []Peer, min int, max int) []Peer {
 	res := []Peer{}
 	for _, peer := range peers {
@@ -66,7 +75,7 @@ func SelectMyPeers(peers []Peer, min int, max int) []Peer {
 	return res
 }
 
-// BroadcastMessage sends the message to a list of peers from a leader.
+// BroadcastMessageFromLeader sends the message to a list of peers from a leader.
 func BroadcastMessageFromLeader(peers []Peer, msg []byte) {
 	// TODO(minhdoan): Enable back for multicast.
 	peers = SelectMyPeers(peers, 1, MaxBroadCast)
@@ -74,7 +83,7 @@ func BroadcastMessageFromLeader(peers []Peer, msg []byte) {
 	log.Info("Done sending from leader")
 }
 
-// BroadcastMessage sends the message to a list of peers from a validator.
+// BroadcastMessageFromValidator sends the message to a list of peers from a validator.
 func BroadcastMessageFromValidator(selfPeer Peer, peers []Peer, msg []byte) {
 	peers = SelectMyPeers(peers, selfPeer.ValidatorID*MaxBroadCast+1, (selfPeer.ValidatorID+1)*MaxBroadCast)
 	BroadcastMessage(peers, msg)
@@ -133,7 +142,13 @@ func send(ip, port string, message []byte) {
 	backoff := NewExpBackoff(250*time.Millisecond, 10*time.Second, 2)
 
 	for trial := 0; trial < 10; trial++ {
-		err := sendWithSocketClient(ip, port, message)
+		var err error
+		if Version == 1 {
+			// TODO(ricl): remove sendWithSocketClient related code.
+			err = sendWithSocketClient(ip, port, message)
+		} else {
+			err = p2pv2.Send(ip, port, message)
+		}
 		if err == nil {
 			if trial > 0 {
 				log.Warn("retry sendWithSocketClient", "rety", trial)
@@ -147,6 +162,7 @@ func send(ip, port string, message []byte) {
 	log.Error("gave up sending a message", "addr", net.JoinHostPort(ip, port))
 }
 
+// DialWithSocketClient joins host port and establishes connection
 func DialWithSocketClient(ip, port string) (conn net.Conn, err error) {
 	//log.Printf("Sending message to ip %s and port %s\n", ip, port)
 	addr := net.JoinHostPort(ip, port)

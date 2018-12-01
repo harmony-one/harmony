@@ -10,9 +10,12 @@ import (
 	"github.com/harmony-one/harmony/crypto/pki"
 )
 
+// AddressToIntPriKeyMap is the map from address to private key.
 var AddressToIntPriKeyMap map[[20]byte]int // For convenience, we use int as the secret seed for generating private key
+// AddressToIntPriKeyMapLock is the lock of AddressToIntPriKeyMap.
 var AddressToIntPriKeyMapLock sync.Mutex
 
+// InitLookUpIntPriKeyMap inits AddressToIntPriKeyMap.
 func InitLookUpIntPriKeyMap() {
 	if AddressToIntPriKeyMap == nil {
 		AddressToIntPriKeyMapLock.Lock()
@@ -24,12 +27,14 @@ func InitLookUpIntPriKeyMap() {
 	}
 }
 
+// LookUpIntPriKey looks up private key by address.
 func LookUpIntPriKey(address [20]byte) (int, bool) {
 	value, ok := AddressToIntPriKeyMap[address]
 	return value, ok
 }
 
-func DownloadUrlAsString(url string) (string, error) {
+// DownloadURLAsString downloads url as string.
+func DownloadURLAsString(url string) (string, error) {
 	response, err := http.Get(url)
 	buf := bytes.NewBufferString("")
 	if err != nil {

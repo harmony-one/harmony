@@ -30,6 +30,7 @@ type BeaconChain struct {
 	Port               string
 }
 
+<<<<<<< HEAD
 //Init
 func New(numShards int, ip, port string) *BeaconChain {
 	bc := BeaconChain{}
@@ -40,6 +41,20 @@ func New(numShards int, ip, port string) *BeaconChain {
 	bc.Port = port
 	bc.IP = ip
 	return &bc
+=======
+// New return BeaconChain.
+func New(filename string) *BeaconChain {
+	idc := BeaconChain{}
+	//idc.NumberOfShards = readConfigFile(filename)
+	idc.log = log.New()
+	idc.NumberOfShards = 2
+	idc.PubKey = generateIDCKeys()
+	return &idc
+}
+
+func readConfigFile(filename string) int {
+	return 2
+>>>>>>> e11d4c2b72b0f56ca12650c4c1d74863a6e40506
 }
 
 func generateIDCKeys() kyber.Point {
@@ -49,6 +64,7 @@ func generateIDCKeys() kyber.Point {
 	return pubkey
 }
 
+<<<<<<< HEAD
 //AcceptConnections welcomes new connections
 func (bc *BeaconChain) AcceptConnections(b []byte) {
 	Node := bcconn.DeserializeNodeInfo(b)
@@ -59,13 +75,29 @@ func (bc *BeaconChain) AcceptConnections(b []byte) {
 		bc.Leaders = append(bc.Leaders, Node)
 	}
 	/**
+=======
+// AcceptConnections welcomes new connections
+func (IDC *BeaconChain) AcceptConnections(b []byte) {
+	NewNode := node.DeserializeNode(b)
+	fmt.Println(NewNode)
+}
+>>>>>>> e11d4c2b72b0f56ca12650c4c1d74863a6e40506
 
 	**IMPORTANT**
 
+<<<<<<< HEAD
 	Note that public key is not in kyber.Scalar form it is in byte form.
 	Use following conversion to get back the actual key
 	//peer.PubKey = crypto.Ed25519Curve.Point()
 	//err = peer.PubKey.UnmarshalBinary(p.PubKey[:])
+=======
+// CommunicatePublicKeyToNode communicates public key to node.
+func (IDC *BeaconChain) CommunicatePublicKeyToNode(peer p2p.Peer) {
+	pbkey := pki.GetBytesFromPublicKey(IDC.PubKey)
+	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Acknowledge, pbkey[:])
+	p2p.SendMessage(peer, msgToSend)
+}
+>>>>>>> e11d4c2b72b0f56ca12650c4c1d74863a6e40506
 
 	**/
 	response := bcconn.ResponseRandomNumber{NumberOfShards: bc.NumberOfShards, NumberOfNodesAdded: bc.NumberOfNodesAdded, Leaders: bc.Leaders}

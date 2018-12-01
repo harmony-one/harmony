@@ -36,7 +36,7 @@ func (config *Config) GetValidators() []p2p.Peer {
 		if entry.Role != "validator" {
 			continue
 		}
-		peer := p2p.Peer{Port: entry.Port, Ip: entry.IP}
+		peer := p2p.Peer{Port: entry.Port, IP: entry.IP}
 		peerList = append(peerList, peer)
 	}
 	return peerList
@@ -49,7 +49,7 @@ func (config *Config) GetShardIDToLeaderMap() map[uint32]p2p.Peer {
 		if entry.Role == "leader" {
 			val, err := strconv.Atoi(entry.ShardID)
 			if err == nil {
-				shardIDLeaderMap[uint32(val)] = p2p.Peer{Ip: entry.IP, Port: entry.Port}
+				shardIDLeaderMap[uint32(val)] = p2p.Peer{IP: entry.IP, Port: entry.Port}
 			} else {
 				log.Print("[Generator] Error parsing the shard Id ", entry.ShardID)
 			}
@@ -64,7 +64,7 @@ func (config *Config) GetClientPeer() *p2p.Peer {
 		if entry.Role != "client" {
 			continue
 		}
-		peer := p2p.Peer{Port: entry.Port, Ip: entry.IP}
+		peer := p2p.Peer{Port: entry.Port, IP: entry.IP}
 		return &peer
 	}
 	return nil
