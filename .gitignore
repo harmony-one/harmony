@@ -31,3 +31,6 @@ keystore
 
 # Cscope files
 cscope.*
+
+# local runtime logs
+tmp_log
