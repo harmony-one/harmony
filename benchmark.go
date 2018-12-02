@@ -141,7 +141,7 @@ func main() {
 		clientPeer = distributionConfig.GetClientPeer()
 	}
 
-	fmt.Println(peers, leader, selfPeer, clientPeer, *logFolder, *minPeers) //TODO: to be replaced by a logger later: ak, rl
+	// fmt.Println(peers, leader, selfPeer, clientPeer, *logFolder, *minPeers) //TODO: to be replaced by a logger later: ak, rl
 
 	var role string
 	if leader.IP == *ip && leader.Port == *port {
@@ -181,8 +181,6 @@ func main() {
 	attack.GetInstance().SetLogger(consensus.Log)
 	// Current node.
 	currentNode := node.New(consensus, ldb, selfPeer)
-	// Add self peer.
-	currentNode.SelfPeer = selfPeer
 	// Add sync node configuration.
 	currentNode.SyncNode = *syncNode
 	// If there is a client configured in the node list.
@@ -226,5 +224,5 @@ func main() {
 	}
 
 	go currentNode.SupportSyncing()
-	currentNode.StartServer(*port)
+	currentNode.StartServer()
 }

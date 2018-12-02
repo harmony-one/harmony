@@ -2,18 +2,16 @@ package node
 
 import (
 	"fmt"
-	"github.com/harmony-one/harmony/utils"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/crypto/pki"
-
-	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/p2p"
-
 	proto_node "github.com/harmony-one/harmony/proto/node"
+	"github.com/harmony-one/harmony/utils"
 )
 
 func TestNewNewNode(test *testing.T) {
@@ -160,5 +158,5 @@ func TestPingPongHandler(test *testing.T) {
 	//go sendPingMessage(leader)
 	go sendPongMessage(leader)
 	go exitServer()
-	node.StartServer("8881")
+	node.StartServer()
 }

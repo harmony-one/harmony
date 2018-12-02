@@ -93,7 +93,7 @@ func main() {
 			fmt.Println("Private key imported...")
 		case "showBalance":
 			walletNode := CreateWalletServerNode()
-			go walletNode.StartServer(walletNode.ClientPeer.Port)
+			go walletNode.StartServer()
 
 			shardUtxoMap, err := FetchUtxos(ReadAddresses(), walletNode)
 			if err != nil {
@@ -163,7 +163,7 @@ func main() {
 
 		// Start client server
 		walletNode := CreateWalletServerNode()
-		go walletNode.StartServer(walletNode.ClientPeer.Port)
+		go walletNode.StartServer()
 
 		shardUtxoMap, err := FetchUtxos([][20]byte{senderAddressBytes}, walletNode)
 		if err != nil {

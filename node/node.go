@@ -152,17 +152,16 @@ func (node *Node) getTransactionsForNewBlockAccount(maxNumTxs int) (types.Transa
 }
 
 // StartServer starts a server and process the request by a handler.
-func (node *Node) StartServer(port string) {
+func (node *Node) StartServer() {
 	if node.SyncNode {
 		// Disable this temporarily.
 		// node.blockchain = syncing.StartBlockSyncing(node.Consensus.GetValidatorPeers())
 	}
 	if p2p.Version == 1 {
-		fmt.Println("going to start server on port:", port)
-		//node.log.Debug("Starting server", "node", node, "port", port)
-		node.listenOnPort(port)
+		node.log.Debug("Starting server", "node", node, "ip", node.SelfPeer.IP, "port", node.SelfPeer.Port)
+		node.listenOnPort(node.SelfPeer.Port)
 	} else {
-		p2pv2.InitHost(node.SelfPeer.IP, port)
+		p2pv2.InitHost(node.SelfPeer.IP, node.SelfPeer.Port)
 		p2pv2.BindHandler(node.NodeHandlerV1)
 		// Hang forever
 		<-make(chan struct{})
