@@ -141,7 +141,7 @@ func main() {
 		clientPeer = distributionConfig.GetClientPeer()
 	}
 
-	fmt.Println(peers, leader, selfPeer, clientPeer, *logFolder, *minPeers) //TODO: to be replaced by a logger later: ak, rl
+	// fmt.Println(peers, leader, selfPeer, clientPeer, *logFolder, *minPeers) //TODO: to be replaced by a logger later: ak, rl
 
 	var role string
 	if leader.IP == *ip && leader.Port == *port {
