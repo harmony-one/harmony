@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"github.com/harmony-one/harmony/log"
 	"math/big"
 	"time"
 
@@ -30,10 +31,39 @@ type Worker struct {
 	chain   *core.BlockChain
 	current *environment // An environment for current running cycle.
 
-	engine consensus.Engine
+	coinbase common.Address
+	engine   consensus.Engine
 
 	gasFloor uint64
 	gasCeil  uint64
+}
+
+func (w *Worker) SelectTransactionsForNewBlock(txs types.Transactions, maxNumTxs int) (types.Transactions, types.Transactions, types.Transactions) {
+	if w.current.gasPool == nil {
+		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit)
+	}
+	selected := types.Transactions{}
+	unselected := types.Transactions{}
+	invalid := types.Transactions{}
+	for _, tx := range txs {
+		snap := w.current.state.Snapshot()
+		_, err := w.commitTransaction(tx, w.coinbase)
+		if len(selected) > maxNumTxs {
+			unselected = append(unselected, tx)
+		} else {
+			if err != nil {
+				w.current.state.RevertToSnapshot(snap)
+				invalid = append(invalid, tx)
+			} else {
+				selected = append(selected, tx)
+			}
+		}
+	}
+	err := w.UpdateCurrent()
+	if err != nil {
+		log.Debug("Failed updating worker's state", "Error", err)
+	}
+	return selected, unselected, invalid
 }
 
 func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
@@ -51,14 +81,13 @@ func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 }
 
 // CommitTransactions commits transactions.
-func (w *Worker) CommitTransactions(txs []*types.Transaction, coinbase common.Address) error {
-	snap := w.current.state.Snapshot()
-
+func (w *Worker) CommitTransactions(txs types.Transactions) error {
 	if w.current.gasPool == nil {
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit)
 	}
 	for _, tx := range txs {
-		_, err := w.commitTransaction(tx, coinbase)
+		snap := w.current.state.Snapshot()
+		_, err := w.commitTransaction(tx, w.coinbase)
 		if err != nil {
 			w.current.state.RevertToSnapshot(snap)
 			return err
@@ -114,7 +143,7 @@ func (w *Worker) Commit() (*types.Block, error) {
 }
 
 // New ...
-func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus.Engine) *Worker {
+func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus.Engine, coinbase common.Address) *Worker {
 	worker := &Worker{
 		config: config,
 		chain:  chain,
@@ -122,6 +151,7 @@ func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus.En
 	}
 	worker.gasFloor = 0
 	worker.gasCeil = 1000000000000000
+	worker.coinbase = coinbase
 
 	parent := worker.chain.CurrentBlock()
 	num := parent.Number()

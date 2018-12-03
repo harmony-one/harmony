@@ -206,6 +206,11 @@ func (node *Node) NodeHandler(conn net.Conn) {
 	default:
 		node.log.Error("Unknown", "MsgCateory:", msgCategory)
 	}
+
+	// Post processing after receiving messsages.
+	if node.State == NodeJoinedShard {
+		go node.DoSyncing()
+	}
 }
 
 func (node *Node) transactionMessageHandler(msgPayload []byte) {
@@ -346,21 +351,13 @@ func (node *Node) WaitForConsensusReadyAccount(readySignal chan struct{}) {
 				if len(node.pendingTransactionsAccount) >= 1000 {
 					// Normal tx block consensus
 					selectedTxs, _ := node.getTransactionsForNewBlockAccount(MaxNumberOfTransactionsPerBlock)
-					err := node.Worker.UpdateCurrent()
+					node.Worker.CommitTransactions(selectedTxs)
+					block, err := node.Worker.Commit()
 					if err != nil {
-						node.log.Debug("Failed updating worker's state", "Error", err)
-					}
-					err = node.Worker.CommitTransactions(selectedTxs, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey))
-					if err == nil {
-						block, err := node.Worker.Commit()
-						if err != nil {
-							node.log.Debug("Failed commiting new block", "Error", err)
-						} else {
-							newBlock = block
-							break
-						}
+						node.log.Debug("Failed commiting new block", "Error", err)
 					} else {
-						node.log.Debug("Failed to create new block", "Error", err)
+						newBlock = block
+						break
 					}
 				}
 				// If not enough transactions to run Consensus,
@@ -544,17 +541,26 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 		return -1
 	}
 
-	// Add to Node's peer list
-	node.AddPeers([]p2p.Peer{*peer})
+	// Add to Node's peer list anyway
+	node.AddPeers([]*p2p.Peer{peer})
 
-	// Send a Pong message back
 	peers := node.Consensus.GetValidatorPeers()
 	pong := proto_node.NewPongMessage(peers, node.Consensus.PublicKeys)
 	buffer := pong.ConstructPongMessage()
 
-	for _, p := range peers {
-		p2p.SendMessage(p, buffer)
-	}
+	// Send a Pong message directly to the sender
+	// This is necessary because the sender will need to get a ValidatorID
+	// Just broadcast won't work, some validators won't receive the latest
+	// PublicKeys as we rely on a valid ValidatorID to do broadcast.
+	// This is very buggy, but we will move to libp2p, hope the problem will
+	// be resolved then.
+	// However, I disable it for now as we are sending redundant PONG messages
+	// to all validators.  This may not be needed. But it maybe add back.
+	//   p2p.SendMessage(*peer, buffer)
+
+	// Broadcast the message to all validators, as publicKeys is updated
+	// FIXME: HAR-89 use a separate nodefind/neighbor message
+	p2p.BroadcastMessageFromLeader(peers, buffer)
 
 	return len(peers)
 }
@@ -566,7 +572,7 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		return -1
 	}
 
-	peers := make([]p2p.Peer, 0)
+	peers := make([]*p2p.Peer, 0)
 
 	for _, p := range pong.Peers {
 		peer := new(p2p.Peer)
@@ -580,7 +586,7 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 			node.log.Error("UnmarshalBinary Failed", "error", err)
 			continue
 		}
-		peers = append(peers, *peer)
+		peers = append(peers, peer)
 	}
 
 	if len(peers) > 0 {
@@ -604,7 +610,6 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 	}
 
 	node.State = NodeJoinedShard
-	go node.DoSyncing()
 
 	return node.Consensus.UpdatePublicKeys(publicKeys)
 }

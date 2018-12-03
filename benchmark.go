@@ -12,8 +12,8 @@ import (
 	"github.com/harmony-one/harmony/attack"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/db"
-	"github.com/harmony-one/harmony/discovery"
 	"github.com/harmony-one/harmony/log"
+	pkg_newnode "github.com/harmony-one/harmony/newnode"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/profiler"
@@ -73,9 +73,11 @@ func loggingInit(logFolder, role, ip, port string, onlyLogTps bool) {
 	log.Root().SetHandler(h)
 
 }
+
 func main() {
 	accountModel := flag.Bool("account_model", true, "Whether to use account model")
 	// TODO: use http://getmyipaddress.org/ or http://www.get-myip.com/ to retrieve my IP address
+
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9000", "port of the node.")
 	configFile := flag.String("config_file", "config.txt", "file containing all ip addresses")
@@ -87,12 +89,12 @@ func main() {
 	versionFlag := flag.Bool("version", false, "Output version info")
 	onlyLogTps := flag.Bool("only_log_tps", false, "Only log TPS if true")
 
-	// This IP belongs to jenkins.harmony.one
-	idcIP := flag.String("idc", "54.183.5.66", "IP of the identity chain")
-	idcPort := flag.String("idc_port", "8080", "port of the identity chain")
-	peerDisvoery := flag.Bool("peer_discovery", false, "Enable Peer Discovery")
+	//This IP belongs to jenkins.harmony.one
+	idcIP := flag.String("idc", "127.0.0.1", "IP of the identity chain")
+	idcPort := flag.String("idc_port", "8081", "port of the identity chain")
+	peerDiscovery := flag.Bool("peer_discovery", false, "Enable Peer Discovery")
 
-	// Leader needs to have a minimal number of peers to start consensus
+	//Leader needs to have a minimal number of peers to start consensus
 	minPeers := flag.Int("min_peers", 100, "Minimal number of Peers in shard")
 
 	flag.Parse()
@@ -112,37 +114,33 @@ func main() {
 	var leader p2p.Peer
 	var selfPeer p2p.Peer
 	var clientPeer *p2p.Peer
-	// Use Peer Discovery to get shard/leader/peer/...
-	priKey, pubKey := utils.GenKey(*ip, *port)
-	if *peerDisvoery {
-		// Contact Identity Chain
-		// This is a blocking call
-		// Assume @ak has get it working
-		// TODO: this has to work with @ak's fix
-		discoveryConfig := discovery.New(priKey, pubKey)
+	//Use Peer Discovery to get shard/leader/peer/...
+	if *peerDiscovery {
+		candidateNode := pkg_newnode.New(*ip, *port)
+		BCPeer := p2p.Peer{IP: *idcIP, Port: *idcPort}
+		service := candidateNode.NewService(*ip, *port)
+		candidateNode.ConnectBeaconChain(BCPeer)
+		shardID = candidateNode.GetShardID()
+		leader = candidateNode.GetLeader()
+		selfPeer = candidateNode.GetSelfPeer()
+		clientPeer = candidateNode.GetClientPeer()
+		service.Stop()
+		selfPeer.PubKey = candidateNode.PubK
 
-		err := discoveryConfig.StartClientMode(*idcIP, *idcPort)
-		if err != nil {
-			fmt.Println("Unable to start peer discovery! ", err)
-			os.Exit(1)
-		}
-
-		shardID = discoveryConfig.GetShardID()
-		leader = discoveryConfig.GetLeader()
-		peers = discoveryConfig.GetPeers()
-		selfPeer = discoveryConfig.GetSelfPeer()
 	} else {
 		distributionConfig := utils.NewDistributionConfig()
 		distributionConfig.ReadConfigFile(*configFile)
 		shardID = distributionConfig.GetShardID(*ip, *port)
-		peers = distributionConfig.GetPeers(*ip, *port, shardID)
 		leader = distributionConfig.GetLeader(shardID)
 		selfPeer = distributionConfig.GetSelfPeer(*ip, *port, shardID)
-
+		_, pubKey := utils.GenKey(*ip, *port)
+		peers = distributionConfig.GetPeers(*ip, *port, shardID)
+		selfPeer.PubKey = pubKey
 		// Create client peer.
 		clientPeer = distributionConfig.GetClientPeer()
 	}
-	selfPeer.PubKey = pubKey
+
+	// fmt.Println(peers, leader, selfPeer, clientPeer, *logFolder, *minPeers) //TODO: to be replaced by a logger later: ak, rl
 
 	var role string
 	if leader.IP == *ip && leader.Port == *port {
@@ -155,7 +153,6 @@ func main() {
 		// Attack determination.
 		attack.GetInstance().SetAttackEnabled(attackDetermination(*attackedMode))
 	}
-
 	// Init logging.
 	loggingInit(*logFolder, role, *ip, *port, *onlyLogTps)
 
@@ -221,7 +218,7 @@ func main() {
 			}()
 		}
 	} else {
-		if *peerDisvoery {
+		if *peerDiscovery {
 			go currentNode.JoinShard(leader)
 		} else {
 			currentNode.State = node.NodeDoingConsensus

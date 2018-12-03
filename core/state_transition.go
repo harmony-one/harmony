@@ -33,7 +33,7 @@ var (
 )
 
 /*
-The State Transitioning Model
+StateTransition is the State Transitioning Model which is described as follows:
 
 A state transition is a change made when a transaction is applied to the current world state
 The state transitioning model does all the necessary work to work out a valid new state root.

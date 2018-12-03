@@ -1,4 +1,4 @@
-package beaconchain
+package newnode
 
 import (
 	"net"
@@ -8,32 +8,37 @@ import (
 	proto_identity "github.com/harmony-one/harmony/proto/identity"
 )
 
-// BeaconChainHandler handles registration of new Identities
-func (bc *BeaconChain) BeaconChainHandler(conn net.Conn) {
+// NodeHandler handles a new incoming connection.
+func (node *NewNode) NodeHandler(conn net.Conn) {
+	defer conn.Close()
+	defer node.Service.waitGroup.Done()
 	content, err := p2p.ReadMessageContent(conn)
+
 	if err != nil {
-		bc.log.Error("Read p2p data failed")
+		node.log.Error("Read p2p data failed", "err", err, "node", node)
 		return
 	}
-	bc.log.Info("received connection", "connectionIp", conn.RemoteAddr())
+
 	msgCategory, err := proto.GetMessageCategory(content)
 	if err != nil {
-		bc.log.Error("Read message category failed", "err", err)
+		node.log.Error("Read node type failed", "err", err, "node", node)
 		return
 	}
+
 	msgType, err := proto.GetMessageType(content)
 	if err != nil {
-		bc.log.Error("Read action type failed")
+		node.log.Error("Read action type failed", "err", err, "node", node)
 		return
 	}
+
 	msgPayload, err := proto.GetMessagePayload(content)
 	if err != nil {
-		bc.log.Error("Read message payload failed")
+		node.log.Error("Read message payload failed", "err", err, "node", node)
 		return
 	}
 	identityMsgPayload, err := proto_identity.GetIdentityMessagePayload(msgPayload)
 	if err != nil {
-		bc.log.Error("Read message payload failed")
+		node.log.Error("Read message payload failed")
 		return
 	}
 	switch msgCategory {
@@ -41,21 +46,18 @@ func (bc *BeaconChain) BeaconChainHandler(conn net.Conn) {
 		actionType := proto_identity.IDMessageType(msgType)
 		switch actionType {
 		case proto_identity.Identity:
-			bc.log.Info("Message category is of the type identity protocol, which is correct!")
 			idMsgType, err := proto_identity.GetIdentityMessageType(msgPayload)
 			if err != nil {
-				bc.log.Error("Error finding the identity message type")
+				node.log.Error("Error finding the identity message type", err)
 			}
 			switch idMsgType {
-			case proto_identity.Register:
-				bc.log.Info("Identity Message Type is of the type Register")
-				bc.AcceptConnections(identityMsgPayload)
+			case proto_identity.Acknowledge:
+				node.processShardInfo(identityMsgPayload)
 			default:
-				panic("Unrecognized identity message type")
+				panic("The identity message type is wrong/missing and newnode does not handle this identity message type")
 			}
 		default:
-			panic("Unrecognized message category")
+			panic("The msgCategory is wrong/missing and newnode does not handle this protocol message type")
 		}
-
 	}
 }

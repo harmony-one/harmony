@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/harmony-one/harmony/utils"
 	"os"
 	"path"
 	"runtime"
@@ -77,15 +78,17 @@ func main() {
 
 	// Nodes containing utxopools to mirror the shards' data in the network
 	nodes := []*node.Node{}
+	clientPeer := config.GetClientPeer()
 	for shardID := range shardIDLeaderMap {
-		node := node.New(&consensus.Consensus{ShardID: shardID}, nil, p2p.Peer{})
+		_, pubKey := utils.GenKey(clientPeer.IP, clientPeer.Port)
+		clientPeer.PubKey = pubKey
+		node := node.New(&consensus.Consensus{ShardID: shardID}, nil, *clientPeer)
 		// Assign many fake addresses so we have enough address to play with at first
 		node.AddTestingAddresses(setting.NumOfAddress)
 		nodes = append(nodes, node)
 	}
 
 	// Client/txgenerator server node setup
-	clientPeer := config.GetClientPeer()
 	consensusObj := consensus.New(*clientPeer, "0", nil, p2p.Peer{})
 	clientNode := node.New(consensusObj, nil, *clientPeer)
 

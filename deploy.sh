@@ -61,6 +61,7 @@ fi
 # Also it's recommended to use `go build` for testing the whole exe. 
 go build -o bin/benchmark
 go build -o bin/txgen client/txgen/main.go
+go build -o bin/beacon runbeacon/run-beacon.go
 
 # Create a tmp folder for logs
 t=`date +"%Y%m%d-%H%M%S"`
@@ -68,15 +69,28 @@ log_folder="tmp_log/log-$t"
 
 mkdir -p $log_folder
 
+if [ -n "$PEER" ]; then
+   ./bin/beacon > $log_folder/beacon.log 2>&1 &
+   sleep 1 #wait or beachchain up
+fi
+
 # Start nodes
 while IFS='' read -r line || [[ -n "$line" ]]; do
   IFS=' ' read ip port mode shardID <<< $line
 	#echo $ip $port $mode
   if [ "$mode" != "client" ]; then
-    ./bin/benchmark -ip $ip -port $port -config_file $config -log_folder $log_folder $DB $PEER -min_peers $MIN &
+    if [ -z "$PEER" ]; then
+      ./bin/benchmark -ip $ip -port $port -config_file $config -log_folder $log_folder $DB -min_peers $MIN &
+    else
+      ./bin/benchmark -ip $ip -port $port -log_folder $log_folder $DB $PEER -min_peers $MIN &
+      sleep 1
+    fi
   fi
 done < $config
 
 if [ "$TXGEN" == "true" ]; then
   ./bin/txgen -config_file $config -log_folder $log_folder -duration $DURATION
 fi
+
+# Kill nodes if any
+./kill_node.sh

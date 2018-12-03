@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/harmony-one/harmony/utils"
+
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/crypto/pki"
 
@@ -16,7 +18,8 @@ import (
 )
 
 func TestNewNewNode(t *testing.T) {
-	leader := p2p.Peer{IP: "1", Port: "2"}
+	_, pubKey := utils.GenKey("1", "2")
+	leader := p2p.Peer{IP: "1", Port: "2", PubKey: pubKey}
 	validator := p2p.Peer{IP: "3", Port: "5"}
 	consensus := consensus.New(leader, "0", []p2p.Peer{leader, validator}, leader)
 
@@ -43,7 +46,8 @@ func TestNewNewNode(t *testing.T) {
 }
 
 func TestCountNumTransactionsInBlockchain(t *testing.T) {
-	leader := p2p.Peer{IP: "1", Port: "2"}
+	_, pubKey := utils.GenKey("1", "2")
+	leader := p2p.Peer{IP: "1", Port: "2", PubKey: pubKey}
 	validator := p2p.Peer{IP: "3", Port: "5"}
 	consensus := consensus.New(leader, "0", []p2p.Peer{leader, validator}, leader)
 
@@ -55,7 +59,8 @@ func TestCountNumTransactionsInBlockchain(t *testing.T) {
 }
 
 func TestGetSyncingPeers(t *testing.T) {
-	leader := p2p.Peer{IP: "1", Port: "2"}
+	_, pubKey := utils.GenKey("1", "2")
+	leader := p2p.Peer{IP: "1", Port: "2", PubKey: pubKey}
 	validator := p2p.Peer{IP: "3", Port: "5"}
 	consensus := consensus.New(leader, "0", []p2p.Peer{leader, validator}, leader)
 
@@ -80,15 +85,15 @@ func TestAddPeers(t *testing.T) {
 	priKey2 := crypto.Ed25519Curve.Scalar().SetInt64(int64(999))
 	pubKey2 := pki.GetPublicKeyFromScalar(priKey2)
 
-	peers1 := []p2p.Peer{
-		{
+	peers1 := []*p2p.Peer{
+		&p2p.Peer{
 			IP:          "127.0.0.1",
 			Port:        "8888",
 			PubKey:      pubKey1,
 			Ready:       true,
 			ValidatorID: 1,
 		},
-		{
+		&p2p.Peer{
 			IP:          "127.0.0.1",
 			Port:        "9999",
 			PubKey:      pubKey2,
@@ -96,7 +101,8 @@ func TestAddPeers(t *testing.T) {
 			ValidatorID: 2,
 		},
 	}
-	leader := p2p.Peer{IP: "1", Port: "2"}
+	_, pubKey := utils.GenKey("1", "2")
+	leader := p2p.Peer{IP: "1", Port: "2", PubKey: pubKey}
 	validator := p2p.Peer{IP: "3", Port: "5"}
 	consensus := consensus.New(leader, "0", []p2p.Peer{leader, validator}, leader)
 
@@ -166,13 +172,14 @@ func exitServer() {
 	os.Exit(0)
 }
 
-// func TestPingPongHandler(test *testing.T) {
-// 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8881"}
-// 	// validator := p2p.Peer{IP: "127.0.0.1", Port: "9991"}
-// 	consensus := consensus.New("127.0.0.1", "8881", "0", []p2p.Peer{leader}, leader)
-// 	node := New(consensus, nil)
-// 	//	go sendPingMessage(leader)
-// 	go sendPongMessage(leader)
-// 	go exitServer()
-// 	node.StartServer("8881")
-// }
+func TestPingPongHandler(test *testing.T) {
+	_, pubKey := utils.GenKey("127.0.0.1", "8881")
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "8881", PubKey: pubKey}
+	//   validator := p2p.Peer{IP: "127.0.0.1", Port: "9991"}
+	consensus := consensus.New(leader, "0", []p2p.Peer{leader}, leader)
+	node := New(consensus, nil, leader)
+	//go sendPingMessage(leader)
+	go sendPongMessage(leader)
+	go exitServer()
+	node.StartServer("8881")
+}

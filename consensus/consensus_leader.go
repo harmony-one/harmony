@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"encoding/hex"
 	"errors"
+	"strconv"
 	"time"
 
 	"github.com/ethereum/go-ethereum/rlp"
@@ -39,11 +40,12 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) 
 		if !consensus.HasEnoughValidators() {
 			consensus.Log.Debug("Not enough validators", "# Validators", len(consensus.PublicKeys))
 			time.Sleep(waitForEnoughValidators * time.Millisecond)
+			continue
 		}
 
 		// TODO: think about potential race condition
 		startTime = time.Now()
-		consensus.Log.Debug("STARTING CONSENSUS", "consensus", consensus, "startTime", startTime)
+		consensus.Log.Debug("STARTING CONSENSUS", "consensus", consensus, "startTime", startTime, "publicKeys", len(consensus.PublicKeys))
 		for consensus.state == Finished {
 			// time.Sleep(500 * time.Millisecond)
 			consensus.ResetState()
@@ -63,10 +65,11 @@ func (consensus *Consensus) WaitForNewBlockAccount(blockChannel chan *types.Bloc
 		if !consensus.HasEnoughValidators() {
 			consensus.Log.Debug("Not enough validators", "# Validators", len(consensus.PublicKeys))
 			time.Sleep(waitForEnoughValidators * time.Millisecond)
+			continue
 		}
 
 		startTime = time.Now()
-		consensus.Log.Debug("STARTING CONSENSUS", "consensus", consensus, "startTime", startTime)
+		consensus.Log.Debug("STARTING CONSENSUS", "consensus", consensus, "startTime", startTime, "publicKeys", len(consensus.PublicKeys))
 		for consensus.state == Finished {
 			// time.Sleep(500 * time.Millisecond)
 			data, err := rlp.EncodeToBytes(newBlock)
@@ -222,13 +225,13 @@ func (consensus *Consensus) processCommitMessage(payload []byte, targetState Sta
 		point := crypto.Ed25519Curve.Point()
 		point.UnmarshalBinary(commitment)
 		(*commitments)[validatorID] = point
-		consensus.Log.Debug("Received new commit message", "num", len(*commitments), "validatorID", validatorID)
+		consensus.Log.Debug("Received new commit message", "num", len(*commitments), "validatorID", validatorID, "PublicKeys", len(consensus.PublicKeys))
 		// Set the bitmap indicate this validate signed. TODO: figure out how to resolve the inconsistency of validators from commit and response messages
 		bitmap.SetKey(value.PubKey, true)
 	}
 
 	if !shouldProcess {
-		consensus.Log.Debug("Received new commit message", "validatorID", validatorID)
+		consensus.Log.Debug("Received additional new commit message", "validatorID", validatorID)
 		return
 	}
 
@@ -278,7 +281,7 @@ func (consensus *Consensus) responseByLeader(challenge kyber.Scalar, firstRound 
 			consensus.finalBitmap.SetKey(consensus.pubKey, true)
 		}
 	} else {
-		log.Warn("Failed to generate response", "err", err)
+		log.Warn("leader failed to generate response", "err", err)
 	}
 }
 
@@ -362,18 +365,18 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState S
 		responseScalar.UnmarshalBinary(response)
 		err := consensus.verifyResponse(commitments, responseScalar, validatorID)
 		if err != nil {
-			consensus.Log.Warn("Failed to verify the response", "error", err)
+			consensus.Log.Warn("leader failed to verify the response", "error", err, "VID", strconv.Itoa(int(validatorID)))
 			shouldProcess = false
 		} else {
 			(*responses)[validatorID] = responseScalar
-			consensus.Log.Debug("Received new response message", "num", len(*responses), "validatorID", validatorID)
+			consensus.Log.Debug("Received new response message", "num", len(*responses), "validatorID", strconv.Itoa(int(validatorID)))
 			// Set the bitmap indicate this validate signed. TODO: figure out how to resolve the inconsistency of validators from commit and response messages
 			bitmap.SetKey(value.PubKey, true)
 		}
 	}
 
 	if !shouldProcess {
-		consensus.Log.Debug("Received new response message", "validatorID", validatorID)
+		consensus.Log.Debug("Received new response message", "validatorID", strconv.Itoa(int(validatorID)))
 		return
 	}
 

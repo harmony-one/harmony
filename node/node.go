@@ -55,10 +55,9 @@ const (
 )
 
 const (
-	// TimeToSleepForSyncing is the time waiting for node transformed into NodeDoingConsensus
-	TimeToSleepForSyncing = time.Second * 30
-	// SyncingPortDifference is the difference between the node port and the syncing port.
-	SyncingPortDifference = 1000
+	syncingPortDifference = 1000
+	waitBeforeJoinShard   = time.Second * 3
+	timeOutToJoinShard    = time.Minute * 10
 )
 
 // NetworkNode ...
@@ -149,14 +148,14 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int) ([]*blockchain.Trans
 // Note the pending transaction list will then contain the rest of the txs
 func (node *Node) getTransactionsForNewBlockAccount(maxNumTxs int) (types.Transactions, []*blockchain.CrossShardTxAndProof) {
 	node.pendingTxMutexAccount.Lock()
-	selected, unselected, invalid, crossShardTxs := node.pendingTransactionsAccount, types.Transactions{}, types.Transactions{}, []*blockchain.CrossShardTxAndProof{}
+	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(node.pendingTransactionsAccount, maxNumTxs)
 	_ = invalid // invalid txs are discard
 
 	node.log.Debug("Invalid transactions discarded", "number", len(invalid))
 	node.pendingTransactionsAccount = unselected
 	node.log.Debug("Remaining pending transactions", "number", len(node.pendingTransactionsAccount))
 	node.pendingTxMutexAccount.Unlock()
-	return selected, crossShardTxs //TODO: replace cross-shard proofs for account model
+	return selected, nil //TODO: replace cross-shard proofs for account model
 }
 
 // StartServer starts a server and process the request by a handler.
@@ -301,7 +300,7 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase, selfPeer p2p.Peer) *Node
 
 		database := hdb.NewMemDatabase()
 		chainConfig := params.TestChainConfig
-		chainConfig.ChainID = big.NewInt(int64(node.Consensus.ShardID)) // Use ChainId as piggybacked ShardID
+		chainConfig.ChainID = big.NewInt(int64(node.Consensus.ShardID)) // Use ChainID as piggybacked ShardID
 		gspec := core.Genesis{
 			Config:  chainConfig,
 			Alloc:   genesisAloc,
@@ -309,12 +308,12 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase, selfPeer p2p.Peer) *Node
 		}
 
 		_ = gspec.MustCommit(database)
-		chain, _ := core.NewBlockChain(database, nil, gspec.Config, bft.NewFaker(), vm.Config{}, nil)
+		chain, _ := core.NewBlockChain(database, nil, gspec.Config, node.Consensus, vm.Config{}, nil)
 
 		node.Chain = chain
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, params.TestChainConfig, chain)
 		node.BlockChannelAccount = make(chan *types.Block)
-		node.Worker = worker.New(params.TestChainConfig, chain, bft.NewFaker())
+		node.Worker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(selfPeer.PubKey))
 	}
 
 	node.SelfPeer = selfPeer
@@ -347,14 +346,18 @@ func (node *Node) DoSyncing() {
 }
 
 // AddPeers adds neighbors nodes
-func (node *Node) AddPeers(peers []p2p.Peer) int {
+func (node *Node) AddPeers(peers []*p2p.Peer) int {
 	count := 0
 	for _, p := range peers {
 		key := fmt.Sprintf("%v", p.PubKey)
 		_, ok := node.Neighbors.Load(key)
 		if !ok {
-			node.Neighbors.Store(key, p)
+			node.Neighbors.Store(key, *p)
 			count++
+			continue
+		}
+		if node.SelfPeer.ValidatorID == -1 && p.IP == node.SelfPeer.IP && p.Port == node.SelfPeer.Port {
+			node.SelfPeer.ValidatorID = p.ValidatorID
 		}
 	}
 
@@ -367,7 +370,7 @@ func (node *Node) AddPeers(peers []p2p.Peer) int {
 // GetSyncingPort returns the syncing port.
 func GetSyncingPort(nodePort string) string {
 	if port, err := strconv.Atoi(nodePort); err == nil {
-		return fmt.Sprintf("%d", port-SyncingPortDifference)
+		return fmt.Sprintf("%d", port-syncingPortDifference)
 	}
 	os.Exit(1)
 	return ""
@@ -390,7 +393,7 @@ func (node *Node) GetSyncingPeers() []p2p.Peer {
 // JoinShard helps a new node to join a shard.
 func (node *Node) JoinShard(leader p2p.Peer) {
 	// try to join the shard, with 10 minutes time-out
-	backoff := p2p.NewExpBackoff(1*time.Second, 10*time.Minute, 2)
+	backoff := p2p.NewExpBackoff(waitBeforeJoinShard, timeOutToJoinShard, 2)
 
 	for node.State == NodeWaitToJoin {
 		backoff.Sleep()

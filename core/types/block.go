@@ -75,8 +75,6 @@ func (n *BlockNonce) UnmarshalText(input []byte) error {
 	return hexutil.UnmarshalFixedText("BlockNonce", input, n[:])
 }
 
-//go:generate gencodec -type Header -field-override headerMarshaling -out gen_header_json.go
-
 // Header represents a block header in the Ethereum blockchain.
 type Header struct {
 	ParentHash  common.Hash    `json:"parentHash"       gencodec:"required"`
@@ -93,7 +91,7 @@ type Header struct {
 	Extra       []byte         `json:"extraData"        gencodec:"required"`
 	MixDigest   common.Hash    `json:"mixHash"          gencodec:"required"`
 	Nonce       BlockNonce     `json:"nonce"            gencodec:"required"`
-	ShardID     ShardID        `json:"shardId"          gencodec:"required"`
+	ShardID     ShardID        `json:"shardID"          gencodec:"required"`
 }
 
 // field type overrides for gencodec
@@ -302,7 +300,7 @@ func (b *Block) GasUsed() uint64 { return b.header.GasUsed }
 // Difficulty is the header difficulty.
 func (b *Block) Difficulty() *big.Int { return new(big.Int).Set(b.header.Difficulty) }
 
-// TIme is header time.
+// Time is header time.
 func (b *Block) Time() *big.Int { return new(big.Int).Set(b.header.Time) }
 
 // NumberU64 is the header number in uint64.
@@ -315,15 +313,30 @@ func (b *Block) MixDigest() common.Hash { return b.header.MixDigest }
 func (b *Block) Nonce() uint64 { return binary.BigEndian.Uint64(b.header.Nonce[:]) }
 
 // ShardID is the header ShardID
-func (b *Block) ShardID() uint32          { return binary.BigEndian.Uint32(b.header.ShardID[:]) }
-func (b *Block) Bloom() Bloom             { return b.header.Bloom }
-func (b *Block) Coinbase() common.Address { return b.header.Coinbase }
-func (b *Block) Root() common.Hash        { return b.header.Root }
-func (b *Block) ParentHash() common.Hash  { return b.header.ParentHash }
-func (b *Block) TxHash() common.Hash      { return b.header.TxHash }
-func (b *Block) ReceiptHash() common.Hash { return b.header.ReceiptHash }
-func (b *Block) Extra() []byte            { return common.CopyBytes(b.header.Extra) }
+func (b *Block) ShardID() uint32 { return binary.BigEndian.Uint32(b.header.ShardID[:]) }
 
+// Bloom returns header bloom.
+func (b *Block) Bloom() Bloom { return b.header.Bloom }
+
+// Coinbase returns header coinbase.
+func (b *Block) Coinbase() common.Address { return b.header.Coinbase }
+
+// Root returns header root.
+func (b *Block) Root() common.Hash { return b.header.Root }
+
+// ParentHash return header parent hash.
+func (b *Block) ParentHash() common.Hash { return b.header.ParentHash }
+
+// TxHash returns header tx hash.
+func (b *Block) TxHash() common.Hash { return b.header.TxHash }
+
+// ReceiptHash returns header receipt hash.
+func (b *Block) ReceiptHash() common.Hash { return b.header.ReceiptHash }
+
+// Extra returns header extra.
+func (b *Block) Extra() []byte { return common.CopyBytes(b.header.Extra) }
+
+// Header returns a copy of Header.
 func (b *Block) Header() *Header { return CopyHeader(b.header) }
 
 // Body returns the non-header content of the block.
@@ -348,6 +361,7 @@ func (c *writeCounter) Write(b []byte) (int, error) {
 	return len(b), nil
 }
 
+// CalcUncleHash returns rlp hash of uncles.
 func CalcUncleHash(uncles []*Header) common.Hash {
 	return rlpHash(uncles)
 }
@@ -410,15 +424,21 @@ type blockSorter struct {
 }
 
 // Len returns len of the blocks.
-func (self blockSorter) Len() int { return len(self.blocks) }
+func (s blockSorter) Len() int {
+	return len(s.blocks)
+}
 
 // Swap swaps block i and block j.
-func (self blockSorter) Swap(i, j int) {
-	self.blocks[i], self.blocks[j] = self.blocks[j], self.blocks[i]
+func (s blockSorter) Swap(i, j int) {
+	s.blocks[i], s.blocks[j] = s.blocks[j], s.blocks[i]
 }
 
 // Less checks if block i is less than block j.
-func (self blockSorter) Less(i, j int) bool { return self.by(self.blocks[i], self.blocks[j]) }
+func (s blockSorter) Less(i, j int) bool {
+	return s.by(s.blocks[i], s.blocks[j])
+}
 
 // Number checks if block b1 is less than block b2.
-func Number(b1, b2 *Block) bool { return b1.header.Number.Cmp(b2.header.Number) < 0 }
+func Number(b1, b2 *Block) bool {
+	return b1.header.Number.Cmp(b2.header.Number) < 0
+}
