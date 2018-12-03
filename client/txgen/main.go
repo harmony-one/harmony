@@ -13,10 +13,12 @@ import (
 	"github.com/harmony-one/harmony/blockchain"
 	"github.com/harmony-one/harmony/client"
 	client_config "github.com/harmony-one/harmony/client/config"
+
 	"github.com/harmony-one/harmony/client/txgen/txgen"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/log"
+	"github.com/harmony-one/harmony/newnode"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	proto_node "github.com/harmony-one/harmony/proto/node"
@@ -37,6 +39,9 @@ func printVersion(me string) {
 }
 
 func main() {
+	ip := flag.String("ip", "127.0.0.1", "IP of the node")
+	port := flag.String("port", "9999", "port of the node.")
+
 	accountModel := flag.Bool("account_model", true, "Whether to use account model")
 	configFile := flag.String("config_file", "local_config.txt", "file containing all ip addresses and config")
 	maxNumTxsPerBatch := flag.Int("max_num_txs_per_batch", 20000, "number of transactions to send per message")
@@ -45,6 +50,11 @@ func main() {
 	duration := flag.Int("duration", 10, "duration of the tx generation in second. If it's negative, the experiment runs forever.")
 	versionFlag := flag.Bool("version", false, "Output version info")
 	crossShardRatio := flag.Int("cross_shard_ratio", 30, "The percentage of cross shard transactions.")
+
+	idcIP := flag.String("idc", "127.0.0.1", "IP of the identity chain")
+	idcPort := flag.String("idc_port", "8081", "port of the identity chain")
+	peerDiscovery := flag.Bool("peer_discovery", false, "Enable Peer Discovery")
+
 	flag.Parse()
 
 	if *versionFlag {
@@ -54,10 +64,37 @@ func main() {
 	// Add GOMAXPROCS to achieve max performance.
 	runtime.GOMAXPROCS(1024)
 
-	// Read the configs
-	config := client_config.NewConfig()
-	config.ReadConfigFile(*configFile)
-	shardIDLeaderMap := config.GetShardIDToLeaderMap()
+	var clientPeer *p2p.Peer
+	var peers []p2p.Peer
+	var shardIDLeaderMap map[uint32]p2p.Peer
+	var config *client_config.Config
+
+	if *peerDiscovery {
+
+		candidateNode := newnode.New(*ip, *port)
+		BCPeer := p2p.Peer{IP: *idcIP, Port: *idcPort}
+		service := candidateNode.NewService(*ip, *port)
+		candidateNode.ConnectBeaconChain(BCPeer)
+		peers = nil
+
+		service.Stop()
+
+		clientPeer = &p2p.Peer{IP: *ip, Port: *port}
+		_, pubKey := utils.GenKey(clientPeer.IP, clientPeer.Port)
+		clientPeer.PubKey = pubKey
+
+		shardIDLeaderMap = candidateNode.Leaders
+
+	} else {
+		// Read the configs
+		config = client_config.NewConfig()
+		config.ReadConfigFile(*configFile)
+		shardIDLeaderMap = config.GetShardIDToLeaderMap()
+		clientPeer = config.GetClientPeer()
+		_, pubKey := utils.GenKey(clientPeer.IP, clientPeer.Port)
+		clientPeer.PubKey = pubKey
+	}
+	debugPrintShardIDLeaderMap(shardIDLeaderMap)
 
 	// Do cross shard tx if there are more than one shard
 	setting := txgen.Settings{
@@ -78,10 +115,7 @@ func main() {
 
 	// Nodes containing utxopools to mirror the shards' data in the network
 	nodes := []*node.Node{}
-	clientPeer := config.GetClientPeer()
 	for shardID := range shardIDLeaderMap {
-		_, pubKey := utils.GenKey(clientPeer.IP, clientPeer.Port)
-		clientPeer.PubKey = pubKey
 		node := node.New(&consensus.Consensus{ShardID: shardID}, nil, *clientPeer)
 		// Assign many fake addresses so we have enough address to play with at first
 		node.AddTestingAddresses(setting.NumOfAddress)
@@ -244,7 +278,11 @@ func main() {
 
 	// Send a stop message to stop the nodes at the end
 	msg := proto_node.ConstructStopMessage()
-	peers := append(config.GetValidators(), clientNode.Client.GetLeaders()...)
+	if *peerDiscovery {
+		peers = clientNode.Consensus.GetValidatorPeers()
+	} else {
+		peers = append(config.GetValidators(), clientNode.Client.GetLeaders()...)
+	}
 	p2p.BroadcastMessage(peers, msg)
 	time.Sleep(3000 * time.Millisecond)
 }
@@ -261,4 +299,10 @@ func SendTxsToLeaderAccount(leader p2p.Peer, txs types.Transactions) {
 	log.Debug("[Generator] Sending account-based txs to...", "leader", leader, "numTxs", len(txs))
 	msg := proto_node.ConstructTransactionListMessageAccount(txs)
 	p2p.SendMessage(leader, msg)
+}
+
+func debugPrintShardIDLeaderMap(leaderMap map[uint32]p2p.Peer) {
+	for k, v := range leaderMap {
+		log.Debug("Leader", "ShardID", k, "Leader", v)
+	}
 }
