@@ -2,6 +2,15 @@
 
 set -eo pipefail
 
+function cleanup() {
+   for pid in `/bin/ps -fu $USER| grep "benchmark\|txgen\|soldier\|commander\|profiler\|beacon" | grep -v "grep" | grep -v "vi" | awk '{print $2}'`;
+   do
+       echo 'Killed process: '$pid
+       kill -9 $pid 2> /dev/null
+   done
+}
+
+trap cleanup SIGINT SIGTERM
 
 function usage {
    local ME=$(basename $0)
@@ -51,14 +60,16 @@ if [ -z "$config" ]; then
    usage
 fi
 
+
 # Kill nodes if any
-./kill_node.sh
+cleanup
 
 # Since `go run` will generate a temporary exe every time,
 # On windows, your system will pop up a network security dialog for each instance
 # and you won't be able to turn it off. With `go build` generating one
 # exe, the dialog will only pop up once at the very first time.
 # Also it's recommended to use `go build` for testing the whole exe. 
+echo "compiling ..."
 go build -o bin/benchmark
 go build -o bin/txgen client/txgen/main.go
 go build -o bin/beacon runbeacon/run-beacon.go
@@ -70,6 +81,7 @@ log_folder="tmp_log/log-$t"
 mkdir -p $log_folder
 
 if [ -n "$PEER" ]; then
+   echo "launching beacon chain ..."
    ./bin/beacon > $log_folder/beacon.log 2>&1 &
    sleep 1 #wait or beachchain up
 fi
@@ -88,9 +100,13 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
   fi
 done < $config
 
+echo "launching txgen ..."
 if [ "$TXGEN" == "true" ]; then
-  ./bin/txgen -config_file $config -log_folder $log_folder -duration $DURATION
+   if [ -z "$PEER" ]; then
+      ./bin/txgen -config_file $config -log_folder $log_folder -duration $DURATION
+   else
+      ./bin/txgen -log_folder $log_folder -duration $DURATION $PEER
+   fi
 fi
 
-# Kill nodes if any
-./kill_node.sh
+cleanup
