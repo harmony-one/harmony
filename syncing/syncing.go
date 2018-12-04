@@ -309,7 +309,6 @@ func (ss *StateSync) downloadBlocks(bc *blockchain.Blockchain) {
 	Log.Info("syncing: Finished downloadBlocks.")
 }
 
-// StartStateSync starts state sync.
 func (ss *StateSync) StartStateSync(peers []p2p.Peer, bc *blockchain.Blockchain) bool {
 	// Creates sync config.
 	ss.CreateSyncConfig(peers)
