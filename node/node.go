@@ -411,6 +411,9 @@ func (node *Node) JoinShard(leader p2p.Peer) {
 	for node.State == NodeWaitToJoin {
 		backoff.Sleep()
 		ping := proto_node.NewPingMessage(node.SelfPeer)
+		if node.Client != nil { // assume this is the client node
+			ping.Node.Role = proto_node.ClientRole
+		}
 		buffer := ping.ConstructPingMessage()
 
 		// Talk to leader.
