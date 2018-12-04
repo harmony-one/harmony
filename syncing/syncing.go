@@ -265,6 +265,7 @@ func (ss *StateSync) generateStateSyncTaskQueue(bc *blockchain.Blockchain) {
 			for id, blockHash := range configPeer.blockHashes {
 				if bc.Blocks[id] == nil || !reflect.DeepEqual(bc.Blocks[id].Hash[:], blockHash) {
 					ss.stateSyncTaskQueue.Put(SyncBlockTask{index: id, blockHash: blockHash})
+					// TODO(minhdoan): Check error
 				}
 			}
 			break
