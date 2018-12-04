@@ -6,6 +6,7 @@ install:
   - cd $HOME/gopath/src
   - cd github.com/harmony-one/harmony
   - go get -t -v ./...
+  - go get -u golang.org/x/lint/golint
   - go get gopkg.in/check.v1
   - ./.travis.gofmt.sh
   - go build -v ./...
