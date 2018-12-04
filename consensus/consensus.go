@@ -299,6 +299,7 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []kyber.Point) int {
 	return len(consensus.PublicKeys)
 }
 
+// NewFaker returns a faker consensus.
 func NewFaker() *Consensus {
 	return &Consensus{}
 }
@@ -386,11 +387,14 @@ func (consensus *Consensus) SealHash(header *types.Header) (hash common.Hash) {
 	return hash
 }
 
+// Seal is to seal final block.
 func (consensus *Consensus) Seal(chain ChainReader, block *types.Block, results chan<- *types.Block, stop <-chan struct{}) error {
 	// TODO: implement final block sealing
 	return nil
 }
 
+// Prepare is to prepare ...
+// TODO(RJ): fix it.
 func (consensus *Consensus) Prepare(chain ChainReader, header *types.Header) error {
 	// TODO: implement prepare method
 	return nil

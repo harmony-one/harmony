@@ -1,9 +1,10 @@
 package worker
 
 import (
-	"github.com/harmony-one/harmony/log"
 	"math/big"
 	"time"
+
+	"github.com/harmony-one/harmony/log"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/params"
@@ -38,6 +39,7 @@ type Worker struct {
 	gasCeil  uint64
 }
 
+// SelectTransactionsForNewBlock selects transactions for new block.
 func (w *Worker) SelectTransactionsForNewBlock(txs types.Transactions, maxNumTxs int) (types.Transactions, types.Transactions, types.Transactions) {
 	if w.current.gasPool == nil {
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit)
