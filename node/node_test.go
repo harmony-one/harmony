@@ -70,10 +70,10 @@ func TestGetSyncingPeers(t *testing.T) {
 	node.Neighbors.Store("minh", peer)
 	node.Neighbors.Store("mark", peer2)
 	res := node.GetSyncingPeers()
-	if len(res) != 2 || !((res[0].IP == peer.IP && res[1].IP == peer2.IP) || (res[1].IP == peer.IP && res[0].IP == peer2.IP)) {
+	if len(res) != 1 || !(res[0].IP == peer.IP || res[0].IP == peer2.IP) {
 		t.Error("GetSyncingPeers should return list of {peer, peer2}")
 	}
-	if len(res) != 2 || res[0].Port != "1000" || res[1].Port != "1000" {
+	if len(res) != 1 || res[0].Port != "1000" {
 		t.Error("Syncing ports should be 1000")
 	}
 }
@@ -166,8 +166,8 @@ func sendPongMessage(leader p2p.Peer) {
 }
 
 func exitServer() {
-	fmt.Println("wait 15 seconds to terminate the process ...")
-	time.Sleep(15 * time.Second)
+	fmt.Println("wait 5 seconds to terminate the process ...")
+	time.Sleep(5 * time.Second)
 
 	os.Exit(0)
 }

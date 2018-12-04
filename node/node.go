@@ -385,11 +385,15 @@ func GetSyncingPort(nodePort string) string {
 }
 
 // GetSyncingPeers returns list of peers.
+// Right now, the list length is only 1 for testing.
+// TODO(mihdoan): fix it later.
 func (node *Node) GetSyncingPeers() []p2p.Peer {
 	res := []p2p.Peer{}
 	node.Neighbors.Range(func(k, v interface{}) bool {
 		node.log.Debug("GetSyncingPeers-Range: ", "k", k, "v", v)
-		res = append(res, v.(p2p.Peer))
+		if len(res) == 0 {
+			res = append(res, v.(p2p.Peer))
+		}
 		return true
 	})
 
