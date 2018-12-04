@@ -29,6 +29,7 @@ type SyncPeerConfig struct {
 	blockHashes [][]byte
 }
 
+// Log is the temporary log for syncing.
 var Log = log.New()
 
 // SyncBlockTask is the task struct to sync a specific block.
