@@ -71,7 +71,6 @@ func loggingInit(logFolder, role, ip, port string, onlyLogTps bool) {
 		h = log.MatchFilterHandler("msg", "TPS Report", h)
 	}
 	log.Root().SetHandler(h)
-
 }
 
 func main() {

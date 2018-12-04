@@ -90,11 +90,9 @@ func (node *Node) NodeHandler(conn net.Conn) {
 			}
 		}
 	case proto.Consensus:
-		if !(node.State == NodeDoingConsensus || node.State == NodeLeader || node.State == NodeJoinedShard) {
-			return
-		}
-		if node.State == NodeJoinedShard {
-			node.DoSyncing()
+		if !(node.State == NodeDoingConsensus || node.State == NodeLeader || node.State == NodeReadyForConsensus) {
+			node.log.Info("This node with ", "peer", node.SelfPeer, "can not join consensus because they are either not noding consensus or not a leader", nil)
+			break
 		}
 		actionType := consensus.ConMessageType(msgType)
 		switch actionType {
@@ -105,6 +103,8 @@ func (node *Node) NodeHandler(conn net.Conn) {
 			} else {
 				node.log.Info("NET: received message: Consensus/Validator")
 				consensusObj.ProcessMessageValidator(msgPayload)
+				// TODO(minhdoan): add logic to check if the current blockchain is not sync with other consensus
+				// we should switch to other state rather than DoingConsensus.
 			}
 		}
 	case proto.Node:
@@ -208,7 +208,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 	}
 
 	// Post processing after receiving messsages.
-	if node.State == NodeJoinedShard {
+	if node.State == NodeJoinedShard || node.State == NodeReadyForConsensus {
 		go node.DoSyncing()
 	}
 }

@@ -40,12 +40,13 @@ type State byte
 
 // All constants except the NodeLeader below are for validators only.
 const (
-	NodeInit           State = iota // Node just started, before contacting BeaconChain
-	NodeWaitToJoin                  // Node contacted BeaconChain, wait to join Shard
-	NodeJoinedShard                 // Node joined Shard, ready for consensus
-	NodeOffline                     // Node is offline
-	NodeDoingConsensus              // Node is already doing consensus
-	NodeLeader                      // Node is the leader of some shard.
+	NodeInit              State = iota // Node just started, before contacting BeaconChain
+	NodeWaitToJoin                     // Node contacted BeaconChain, wait to join Shard
+	NodeJoinedShard                    // Node joined Shard, ready for consensus
+	NodeOffline                        // Node is offline
+	NodeReadyForConsensus              // Node is ready for doing consensus
+	NodeDoingConsensus                 // Node is already doing consensus
+	NodeLeader                         // Node is the leader of some shard.
 )
 
 // Constants related to doing syncing.
@@ -339,10 +340,15 @@ func (node *Node) DoSyncing() {
 		return
 	}
 	defer atomic.StoreUint32(&node.syncingState, NotDoingSyncing)
-	if node.stateSync != nil {
+	if node.stateSync == nil {
 		node.stateSync = syncing.GetStateSync()
 	}
-	node.stateSync.StartStateSync(node.GetSyncingPeers(), node.blockchain)
+	if node.stateSync.StartStateSync(node.GetSyncingPeers(), node.blockchain) {
+		node.log.Debug("DoSyncing: successfully sync")
+		node.State = NodeReadyForConsensus
+	} else {
+		node.log.Debug("DoSyncing: failed to sync")
+	}
 }
 
 // AddPeers adds neighbors nodes
@@ -380,6 +386,7 @@ func GetSyncingPort(nodePort string) string {
 func (node *Node) GetSyncingPeers() []p2p.Peer {
 	res := []p2p.Peer{}
 	node.Neighbors.Range(func(k, v interface{}) bool {
+		node.log.Debug("GetSyncingPeers-Range: ", "k", k, "v", v)
 		res = append(res, v.(p2p.Peer))
 		return true
 	})
@@ -387,6 +394,7 @@ func (node *Node) GetSyncingPeers() []p2p.Peer {
 	for i := range res {
 		res[i].Port = GetSyncingPort(res[i].Port)
 	}
+	node.log.Debug("GetSyncingPeers: ", "res", res)
 	return res
 }
 
@@ -418,6 +426,8 @@ func (node *Node) InitSyncingServer() {
 
 // StartSyncingServer starts syncing server.
 func (node *Node) StartSyncingServer() {
+	port := GetSyncingPort(node.SelfPeer.Port)
+	node.log.Info("support_sycning: StartSyncingServer on port:", "port", port)
 	node.downloaderServer.Start(node.SelfPeer.IP, GetSyncingPort(node.SelfPeer.Port))
 }
 
