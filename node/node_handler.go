@@ -90,6 +90,10 @@ func (node *Node) NodeHandler(conn net.Conn) {
 			}
 		}
 	case proto.Consensus:
+		if !(node.State == NodeDoingConsensus || node.State == NodeLeader || node.State == NodeReadyForConsensus) {
+			node.log.Info("This node with ", "peer", node.SelfPeer, "can not join consensus because they are either not noding consensus or not a leader", nil)
+			break
+		}
 		actionType := consensus.ConMessageType(msgType)
 		switch actionType {
 		case consensus.Consensus:
@@ -99,6 +103,8 @@ func (node *Node) NodeHandler(conn net.Conn) {
 			} else {
 				node.log.Info("NET: received message: Consensus/Validator")
 				consensusObj.ProcessMessageValidator(msgPayload)
+				// TODO(minhdoan): add logic to check if the current blockchain is not sync with other consensus
+				// we should switch to other state rather than DoingConsensus.
 			}
 		}
 	case proto.Node:
@@ -199,6 +205,11 @@ func (node *Node) NodeHandler(conn net.Conn) {
 		}
 	default:
 		node.log.Error("Unknown", "MsgCateory:", msgCategory)
+	}
+
+	// Post processing after receiving messsages.
+	if node.State == NodeJoinedShard || node.State == NodeReadyForConsensus {
+		go node.DoSyncing()
 	}
 }
 
@@ -389,18 +400,26 @@ func (node *Node) BroadcastNewBlock(newBlock *blockchain.Block) {
 
 // VerifyNewBlock is called by consensus participants to verify the block they are running consensus on
 func (node *Node) VerifyNewBlock(newBlock *blockchain.Block) bool {
+	// TODO: just a reminder for syncing. we need to check if the new block is fit with the current blockchain.
+	// The current blockchain can be in the progress of being synced.
+	var verified bool
 	if newBlock.AccountBlock != nil {
 		accountBlock := new(types.Block)
 		err := rlp.DecodeBytes(newBlock.AccountBlock, accountBlock)
 		if err != nil {
 			node.log.Error("Failed decoding the block with RLP")
 		}
-		return node.VerifyNewBlockAccount(accountBlock)
+		verified = node.VerifyNewBlockAccount(accountBlock)
+	} else if newBlock.IsStateBlock() {
+		verified = node.UtxoPool.VerifyStateBlock(newBlock)
+	} else {
+		verified = node.UtxoPool.VerifyTransactions(newBlock.Transactions)
 	}
-	if newBlock.IsStateBlock() {
-		return node.UtxoPool.VerifyStateBlock(newBlock)
+	if verified {
+		// Change the syncing state.
+		node.State = NodeDoingConsensus
 	}
-	return node.UtxoPool.VerifyTransactions(newBlock.Transactions)
+	return verified
 }
 
 // VerifyNewBlockAccount is called by consensus participants to verify the block (account model) they are running consensus on
@@ -552,9 +571,6 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		node.log.Error("Can't get Pong Message")
 		return -1
 	}
-	// node.log.Info("Pong", "Msg", pong)
-	// TODO (lc) state syncing, and wait for all public keys
-	node.State = NodeJoinedShard
 
 	peers := make([]*p2p.Peer, 0)
 
@@ -592,6 +608,8 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		}
 		publicKeys = append(publicKeys, key)
 	}
+
+	node.State = NodeJoinedShard
 
 	return node.Consensus.UpdatePublicKeys(publicKeys)
 }

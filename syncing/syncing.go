@@ -9,13 +9,16 @@ import (
 
 	"github.com/Workiva/go-datastructures/queue"
 	"github.com/harmony-one/harmony/blockchain"
+	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/syncing/downloader"
 )
 
 // Constants for syncing.
 const (
-	ConsensusRatio = float64(0.66)
+	ConsensusRatio                        = float64(0.66)
+	SleepTimeAfterNonConsensusBlockHashes = time.Second * 30
+	TimesToFail                           = 5
 )
 
 // SyncPeerConfig is peer config to sync.
@@ -25,6 +28,8 @@ type SyncPeerConfig struct {
 	client      *downloader.Client
 	blockHashes [][]byte
 }
+
+var Log = log.New()
 
 // SyncBlockTask is the task struct to sync a specific block.
 type SyncBlockTask struct {
@@ -111,7 +116,10 @@ func (ss *StateSync) ProcessStateSyncFromPeers(peers []p2p.Peer, bc *blockchain.
 
 // CreateSyncConfig creates SyncConfig for StateSync object.
 func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer) {
+	Log.Debug("CreateSyncConfig: len of peers", "len", len(peers))
+	Log.Debug("CreateSyncConfig: len of peers", "peers", peers)
 	ss.peerNumber = len(peers)
+	Log.Debug("CreateSyncConfig: hello")
 	ss.syncConfig = &SyncConfig{
 		peers: make([]*SyncPeerConfig, ss.peerNumber),
 	}
@@ -120,7 +128,9 @@ func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer) {
 			ip:   peers[id].IP,
 			port: peers[id].Port,
 		}
+		Log.Debug("CreateSyncConfig: peer port to connect", "port", peers[id].Port)
 	}
+	Log.Info("syncing: Finished creating SyncConfig.")
 }
 
 // MakeConnectionToPeers makes grpc connection to all peers.
@@ -136,6 +146,7 @@ func (ss *StateSync) MakeConnectionToPeers() {
 	}
 	wg.Wait()
 	ss.CleanUpNilPeers()
+	Log.Info("syncing: Finished making connection to peers.")
 }
 
 // CleanUpNilPeers cleans up peer with nil client and recalculate activePeerNumber.
@@ -211,7 +222,8 @@ func (ss *StateSync) GetBlockHashesConsensusAndCleanUp() bool {
 }
 
 // GetConsensusHashes gets all hashes needed to download.
-func (ss *StateSync) GetConsensusHashes() {
+func (ss *StateSync) GetConsensusHashes() bool {
+	count := 0
 	for {
 		var wg sync.WaitGroup
 		wg.Add(ss.activePeerNumber)
@@ -230,7 +242,15 @@ func (ss *StateSync) GetConsensusHashes() {
 		if ss.GetBlockHashesConsensusAndCleanUp() {
 			break
 		}
+		if count > TimesToFail {
+			Log.Info("GetConsensusHashes: reached # of times to failed")
+			return false
+		}
+		count++
+		time.Sleep(SleepTimeAfterNonConsensusBlockHashes)
 	}
+	Log.Info("syncing: Finished getting consensus block hashes.")
+	return true
 }
 
 // getConsensusHashes gets all hashes needed to download.
@@ -249,6 +269,7 @@ func (ss *StateSync) generateStateSyncTaskQueue(bc *blockchain.Blockchain) {
 			break
 		}
 	}
+	Log.Info("syncing: Finished generateStateSyncTaskQueue.")
 }
 
 // downloadBlocks downloads blocks from state sync task queue.
@@ -283,26 +304,23 @@ func (ss *StateSync) downloadBlocks(bc *blockchain.Blockchain) {
 		}(ss.syncConfig.peers[i], ss.stateSyncTaskQueue, bc)
 	}
 	wg.Wait()
+	Log.Info("syncing: Finished downloadBlocks.")
 }
 
 // StartStateSync starts state sync.
-func (ss *StateSync) StartStateSync(peers []p2p.Peer, bc *blockchain.Blockchain) {
+func (ss *StateSync) StartStateSync(peers []p2p.Peer, bc *blockchain.Blockchain) bool {
 	// Creates sync config.
 	ss.CreateSyncConfig(peers)
 	// Makes connections to peers.
 	ss.MakeConnectionToPeers()
-	for {
-		// Gets consensus hashes.
-		ss.GetConsensusHashes()
-
-		// Generates state-sync task queue.
-		ss.generateStateSyncTaskQueue(bc)
-
-		// Download blocks.
-		if ss.stateSyncTaskQueue.Len() > 0 {
-			ss.downloadBlocks(bc)
-		} else {
-			break
-		}
+	// Gets consensus hashes.
+	if !ss.GetConsensusHashes() {
+		return false
 	}
+	ss.generateStateSyncTaskQueue(bc)
+	// Download blocks.
+	if ss.stateSyncTaskQueue.Len() > 0 {
+		ss.downloadBlocks(bc)
+	}
+	return true
 }

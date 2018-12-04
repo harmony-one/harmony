@@ -71,7 +71,6 @@ func loggingInit(logFolder, role, ip, port string, onlyLogTps bool) {
 		h = log.MatchFilterHandler("msg", "TPS Report", h)
 	}
 	log.Root().SetHandler(h)
-
 }
 
 func main() {
@@ -87,7 +86,6 @@ func main() {
 	profile := flag.Bool("profile", false, "Turn on profiling (CPU, Memory).")
 	metricsReportURL := flag.String("metrics_report_url", "", "If set, reports metrics to this URL.")
 	versionFlag := flag.Bool("version", false, "Output version info")
-	syncNode := flag.Bool("sync_node", false, "Whether this node is a new node joining blockchain and it needs to get synced before joining consensus.")
 	onlyLogTps := flag.Bool("only_log_tps", false, "Only log TPS if true")
 
 	//This IP belongs to jenkins.harmony.one
@@ -181,8 +179,8 @@ func main() {
 	attack.GetInstance().SetLogger(consensus.Log)
 	// Current node.
 	currentNode := node.New(consensus, ldb, selfPeer)
-	// Add sync node configuration.
-	currentNode.SyncNode = *syncNode
+	// Add self peer.
+	currentNode.SelfPeer = selfPeer
 	// If there is a client configured in the node list.
 	if clientPeer != nil {
 		currentNode.ClientPeer = clientPeer
@@ -198,6 +196,7 @@ func main() {
 	currentNode.State = node.NodeWaitToJoin
 
 	if consensus.IsLeader {
+		currentNode.State = node.NodeLeader
 		if *accountModel {
 			// Let consensus run
 			go func() {
@@ -220,6 +219,8 @@ func main() {
 	} else {
 		if *peerDiscovery {
 			go currentNode.JoinShard(leader)
+		} else {
+			currentNode.State = node.NodeDoingConsensus
 		}
 	}
 

@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -29,6 +30,7 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2pv2"
 	proto_node "github.com/harmony-one/harmony/proto/node"
+	"github.com/harmony-one/harmony/syncing"
 	"github.com/harmony-one/harmony/syncing/downloader"
 	downloader_pb "github.com/harmony-one/harmony/syncing/downloader/proto"
 )
@@ -42,14 +44,19 @@ const (
 	NodeWaitToJoin                     // Node contacted BeaconChain, wait to join Shard
 	NodeJoinedShard                    // Node joined Shard, ready for consensus
 	NodeOffline                        // Node is offline
-	NodeReadyForConsensus              // Node is ready to do consensus
+	NodeReadyForConsensus              // Node is ready for doing consensus
 	NodeDoingConsensus                 // Node is already doing consensus
 	NodeLeader                         // Node is the leader of some shard.
 )
 
+// Constants related to doing syncing.
 const (
-	// TimeToSleepForSyncing is the time waiting for node transformed into NodeDoingConsensus
-	TimeToSleepForSyncing = time.Second * 30
+	NotDoingSyncing uint32 = iota
+	DoingSyncing
+)
+
+const (
+	syncingPortDifference = 1000
 	waitBeforeJoinShard   = time.Second * 3
 	timeOutToJoinShard    = time.Minute * 10
 )
@@ -80,7 +87,6 @@ type Node struct {
 	SelfPeer               p2p.Peer       // TODO(minhdoan): it could be duplicated with Self below whose is Alok work.
 	IDCPeer                p2p.Peer
 
-	SyncNode  bool             // TODO(minhdoan): Remove it later.
 	chain     *core.BlockChain // Account Model
 	Neighbors sync.Map         // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
 	State     State            // State of the Node
@@ -95,6 +101,8 @@ type Node struct {
 
 	// Syncing component.
 	downloaderServer *downloader.Server
+	stateSync        *syncing.StateSync
+	syncingState     uint32
 
 	// Test only
 	TestBankKeys []*ecdsa.PrivateKey
@@ -153,10 +161,6 @@ func (node *Node) getTransactionsForNewBlockAccount(maxNumTxs int) (types.Transa
 
 // StartServer starts a server and process the request by a handler.
 func (node *Node) StartServer() {
-	if node.SyncNode {
-		// Disable this temporarily.
-		// node.blockchain = syncing.StartBlockSyncing(node.Consensus.GetValidatorPeers())
-	}
 	if p2p.Version == 1 {
 		node.log.Debug("Starting server", "node", node, "ip", node.SelfPeer.IP, "port", node.SelfPeer.Port)
 		node.listenOnPort(node.SelfPeer.Port)
@@ -322,7 +326,30 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase, selfPeer p2p.Peer) *Node
 		node.State = NodeInit
 	}
 
+	// Setup initial state of syncing.
+	node.syncingState = NotDoingSyncing
+
 	return &node
+}
+
+// DoSyncing starts syncing.
+func (node *Node) DoSyncing() {
+	// If this node is currently doing sync, another call for syncing will be returned immediately.
+	if !atomic.CompareAndSwapUint32(&node.syncingState, NotDoingSyncing, DoingSyncing) {
+		return
+	}
+	defer atomic.StoreUint32(&node.syncingState, NotDoingSyncing)
+	if node.stateSync == nil {
+		node.stateSync = syncing.GetStateSync()
+	}
+	if node.stateSync.StartStateSync(node.GetSyncingPeers(), node.blockchain) {
+		node.log.Debug("DoSyncing: successfully sync")
+		if node.State == NodeJoinedShard {
+			node.State = NodeReadyForConsensus
+		}
+	} else {
+		node.log.Debug("DoSyncing: failed to sync")
+	}
 }
 
 // AddPeers adds neighbors nodes
@@ -345,6 +372,35 @@ func (node *Node) AddPeers(peers []*p2p.Peer) int {
 		node.Consensus.AddPeers(peers)
 	}
 	return count
+}
+
+// GetSyncingPort returns the syncing port.
+func GetSyncingPort(nodePort string) string {
+	if port, err := strconv.Atoi(nodePort); err == nil {
+		return fmt.Sprintf("%d", port-syncingPortDifference)
+	}
+	os.Exit(1)
+	return ""
+}
+
+// GetSyncingPeers returns list of peers.
+// Right now, the list length is only 1 for testing.
+// TODO(mihdoan): fix it later.
+func (node *Node) GetSyncingPeers() []p2p.Peer {
+	res := []p2p.Peer{}
+	node.Neighbors.Range(func(k, v interface{}) bool {
+		node.log.Debug("GetSyncingPeers-Range: ", "k", k, "v", v)
+		if len(res) == 0 {
+			res = append(res, v.(p2p.Peer))
+		}
+		return true
+	})
+
+	for i := range res {
+		res[i].Port = GetSyncingPort(res[i].Port)
+	}
+	node.log.Debug("GetSyncingPeers: ", "res", res)
+	return res
 }
 
 // JoinShard helps a new node to join a shard.
@@ -375,12 +431,9 @@ func (node *Node) InitSyncingServer() {
 
 // StartSyncingServer starts syncing server.
 func (node *Node) StartSyncingServer() {
-	if port, err := strconv.Atoi(node.SelfPeer.Port); err == nil {
-		node.downloaderServer.Start(node.SelfPeer.IP, fmt.Sprintf("%d", port-1000))
-	} else {
-		node.log.Error("Wrong port format provided")
-		os.Exit(1)
-	}
+	port := GetSyncingPort(node.SelfPeer.Port)
+	node.log.Info("support_sycning: StartSyncingServer on port:", "port", port)
+	node.downloaderServer.Start(node.SelfPeer.IP, GetSyncingPort(node.SelfPeer.Port))
 }
 
 // CalculateResponse implements DownloadInterface on Node object.

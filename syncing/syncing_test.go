@@ -181,7 +181,7 @@ func TestSyncingIncludingBadNode(t *testing.T) {
 		peers[i].Port = fakeNodes[i].port
 	}
 
-	stateSync.StartStateSync(peers, bc)
+	assert.True(t, stateSync.StartStateSync(peers, bc), "should return true")
 
 	for i := range bc.Blocks {
 		if !reflect.DeepEqual(bc.Blocks[i], fakeNodes[0].bc.Blocks[i]) {

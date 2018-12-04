@@ -76,9 +76,9 @@ func main() {
 	)
 	log.Root().SetHandler(h)
 
-	clientPeer := config.GetClientPeer()
 	// Nodes containing utxopools to mirror the shards' data in the network
 	nodes := []*node.Node{}
+	clientPeer := config.GetClientPeer()
 	for shardID := range shardIDLeaderMap {
 		_, pubKey := utils.GenKey(clientPeer.IP, clientPeer.Port)
 		clientPeer.PubKey = pubKey
@@ -90,7 +90,7 @@ func main() {
 
 	// Client/txgenerator server node setup
 	if clientPeer == nil {
-		log.Error("Client Peer is nil!")
+		panic("Client Peer is nil!")
 	}
 	consensusObj := consensus.New(*clientPeer, "0", nil, p2p.Peer{})
 	clientNode := node.New(consensusObj, nil, *clientPeer)
@@ -136,9 +136,7 @@ func main() {
 	clientNode.Client.UpdateBlocks = updateBlocksFunc
 
 	// Start the client server to listen to leader's message
-	go func() {
-		clientNode.StartServer()
-	}()
+	go clientNode.StartServer()
 
 	// Transaction generation process
 	time.Sleep(10 * time.Second) // wait for nodes to be ready

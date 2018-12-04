@@ -3,7 +3,6 @@ package node
 import (
 	"bytes"
 	"encoding/gob"
-	"fmt"
 	"log"
 
 	"github.com/ethereum/go-ethereum/rlp"
@@ -161,7 +160,7 @@ func ConstructTransactionListMessageAccount(transactions types.Transactions) []b
 
 	txs, err := rlp.EncodeToBytes(transactions)
 	if err != nil {
-		fmt.Errorf("ERROR RLP %s", err)
+		log.Fatal(err)
 		return []byte{} // TODO(RJ): better handle of the error
 	}
 	byteBuffer.Write(txs)
