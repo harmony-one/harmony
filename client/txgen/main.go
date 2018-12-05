@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/harmony-one/harmony/utils"
 	"os"
 	"path"
 	"runtime"
@@ -21,6 +20,7 @@ import (
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	proto_node "github.com/harmony-one/harmony/proto/node"
+	"github.com/harmony-one/harmony/utils"
 )
 
 var (
@@ -89,56 +89,55 @@ func main() {
 	}
 
 	// Client/txgenerator server node setup
+	if clientPeer == nil {
+		panic("Client Peer is nil!")
+	}
 	consensusObj := consensus.New(*clientPeer, "0", nil, p2p.Peer{})
 	clientNode := node.New(consensusObj, nil, *clientPeer)
 
-	if clientPeer != nil {
-		//p2pv2.InitHost(clientPeer.IP, clientPeer.Port) // TODO: this should be moved into client node.
-		clientNode.Client = client.NewClient(&shardIDLeaderMap)
+	clientNode.Client = client.NewClient(&shardIDLeaderMap)
 
-		// This func is used to update the client's utxopool when new blocks are received from the leaders
-		updateBlocksFunc := func(blocks []*blockchain.Block) {
-			log.Debug("Received new block from leader", "len", len(blocks))
-			for _, block := range blocks {
-				for _, node := range nodes {
-					shardID := block.ShardID
+	// This func is used to update the client's utxopool when new blocks are received from the leaders
+	updateBlocksFunc := func(blocks []*blockchain.Block) {
+		log.Debug("Received new block from leader", "len", len(blocks))
+		for _, block := range blocks {
+			for _, node := range nodes {
+				shardID := block.ShardID
 
-					accountBlock := new(types.Block)
-					err := rlp.DecodeBytes(block.AccountBlock, accountBlock)
-					if err == nil {
-						shardID = accountBlock.ShardID()
-					}
-					if node.Consensus.ShardID == shardID {
-						log.Debug("Adding block from leader", "shardID", shardID)
-						// Add it to blockchain
-						node.AddNewBlock(block)
-						utxoPoolMutex.Lock()
-						node.UpdateUtxoAndState(block)
-						utxoPoolMutex.Unlock()
+				accountBlock := new(types.Block)
+				err := rlp.DecodeBytes(block.AccountBlock, accountBlock)
+				if err == nil {
+					shardID = accountBlock.ShardID()
+				}
+				if node.Consensus.ShardID == shardID {
+					log.Debug("Adding block from leader", "shardID", shardID)
+					// Add it to blockchain
+					node.AddNewBlock(block)
+					utxoPoolMutex.Lock()
+					node.UpdateUtxoAndState(block)
+					utxoPoolMutex.Unlock()
 
-						if err != nil {
-							log.Error("Failed decoding the block with RLP")
-						} else {
-							fmt.Println("RECEIVED NEW BLOCK ", len(accountBlock.Transactions()))
-							node.AddNewBlockAccount(accountBlock)
-							node.Worker.UpdateCurrent()
-							if err != nil {
-								log.Debug("Failed to add new block to worker", "Error", err)
-							}
-						}
+					if err != nil {
+						log.Error("Failed decoding the block with RLP")
 					} else {
-						continue
+						fmt.Println("RECEIVED NEW BLOCK ", len(accountBlock.Transactions()))
+						node.AddNewBlockAccount(accountBlock)
+						node.Worker.UpdateCurrent()
+						if err != nil {
+							log.Debug("Failed to add new block to worker", "Error", err)
+						}
 					}
+				} else {
+					continue
 				}
 			}
 		}
-		clientNode.Client.UpdateBlocks = updateBlocksFunc
-
-		// Start the client server to listen to leader's message
-		go func() {
-			clientNode.StartServer(clientPeer.Port)
-		}()
 	}
+	clientNode.Client.UpdateBlocks = updateBlocksFunc
+
+	// Start the client server to listen to leader's message
+	go clientNode.StartServer()
+
 	// Transaction generation process
 	time.Sleep(10 * time.Second) // wait for nodes to be ready
 	start := time.Now()
