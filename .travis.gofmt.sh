@@ -1,5 +1,10 @@
 #!/bin/bash
 
+if [ $(golint ./... | wc | awk '{print $1}') -gt 2 ]; then
+    echo "Go code is not formatted:"
+    gofmt -d .
+    exit 1
+fi
 if [ -n "$(gofmt -l .)" ]; then
     echo "Go code is not formatted:"
     gofmt -d .

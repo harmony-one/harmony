@@ -90,10 +90,10 @@ func (node *Node) NodeHandler(conn net.Conn) {
 			}
 		}
 	case proto.Consensus:
-		if !(node.State == NodeDoingConsensus || node.State == NodeLeader || node.State == NodeReadyForConsensus) {
-			node.log.Info("This node with ", "peer", node.SelfPeer, "can not join consensus because they are either not noding consensus or not a leader", nil)
-			break
-		}
+		// if !(node.State == NodeDoingConsensus || node.State == NodeLeader || node.State == NodeReadyForConsensus) {
+		// 	node.log.Info("This node with ", "peer", node.SelfPeer, "can not join consensus because they are either not noding consensus or not a leader", nil)
+		// 	break
+		// }
 		actionType := consensus.ConMessageType(msgType)
 		switch actionType {
 		case consensus.Consensus:
@@ -208,9 +208,9 @@ func (node *Node) NodeHandler(conn net.Conn) {
 	}
 
 	// Post processing after receiving messsages.
-	if node.State == NodeJoinedShard || node.State == NodeReadyForConsensus {
-		go node.DoSyncing()
-	}
+	// if node.State == NodeJoinedShard || node.State == NodeReadyForConsensus {
+	// 	go node.DoSyncing()
+	// }
 }
 
 func (node *Node) transactionMessageHandler(msgPayload []byte) {

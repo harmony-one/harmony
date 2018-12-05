@@ -74,7 +74,6 @@ func (consensus *Consensus) WaitForNewBlockAccount(blockChannel chan *types.Bloc
 			// time.Sleep(500 * time.Millisecond)
 			data, err := rlp.EncodeToBytes(newBlock)
 			if err == nil {
-				consensus.Log.Debug("Sample tx", "tx", newBlock.Transactions()[0])
 				consensus.ResetState()
 				consensus.startConsensus(&blockchain.Block{Hash: newBlock.Hash(), AccountBlock: data})
 			} else {
