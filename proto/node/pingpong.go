@@ -21,6 +21,25 @@ import (
 	"github.com/harmony-one/harmony/proto"
 )
 
+// RoleType defines the role of the node
+type RoleType int
+
+// Type of roles of a node
+const (
+	ValidatorRole RoleType = iota
+	ClientRole
+)
+
+func (r RoleType) String() string {
+	switch r {
+	case ValidatorRole:
+		return "Validator"
+	case ClientRole:
+		return "Client"
+	}
+	return "Unknown"
+}
+
 // refer to Peer struct in p2p/peer.go
 // this is basically a simplified version of Peer
 // for network transportation
@@ -29,6 +48,7 @@ type nodeInfo struct {
 	Port        string
 	PubKey      []byte
 	ValidatorID int
+	Role        RoleType
 }
 
 // PingMessageType defines the data structure of the Ping message
@@ -45,7 +65,7 @@ type PongMessageType struct {
 }
 
 func (p PingMessageType) String() string {
-	return fmt.Sprintf("ping:%v=>%v:%v:%v/%v", p.Version, p.Node.IP, p.Node.Port, p.Node.ValidatorID, p.Node.PubKey)
+	return fmt.Sprintf("ping:%v/%v=>%v:%v:%v/%v", p.Node.Role, p.Version, p.Node.IP, p.Node.Port, p.Node.ValidatorID, p.Node.PubKey)
 }
 
 func (p PongMessageType) String() string {
@@ -63,6 +83,7 @@ func NewPingMessage(peer p2p.Peer) *PingMessageType {
 	ping.Node.Port = peer.Port
 	ping.Node.ValidatorID = peer.ValidatorID
 	ping.Node.PubKey, err = peer.PubKey.MarshalBinary()
+	ping.Node.Role = ValidatorRole
 
 	if err != nil {
 		fmt.Printf("Error Marshal PubKey: %v", err)

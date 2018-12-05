@@ -31,7 +31,7 @@ type NewNode struct {
 	leader      p2p.Peer
 	isLeader    bool
 	Self        p2p.Peer
-	peers       []p2p.Peer
+	Leaders     map[uint32]p2p.Peer
 	PubK        kyber.Point
 	priK        kyber.Scalar
 	log         log.Logger
@@ -48,6 +48,7 @@ func New(ip string, port string) *NewNode {
 	node.Self = p2p.Peer{IP: ip, Port: port, PubKey: pubKey, ValidatorID: -1}
 	node.log = log.New()
 	node.SetInfo = false
+	node.Leaders = map[uint32]p2p.Peer{}
 	return &node
 }
 
@@ -155,14 +156,17 @@ func (node *NewNode) processShardInfo(msgPayload []byte) bool {
 	leadersInfo := bcconn.DeserializeRandomInfo(msgPayload)
 	leaders := leadersInfo.Leaders
 	shardNum, isLeader := utils.AllocateShard(leadersInfo.NumberOfNodesAdded, leadersInfo.NumberOfShards)
-	leaderNode := leaders[shardNum-1] //0 indexing.
-	leaderPeer := p2p.Peer{IP: leaderNode.Self.IP, Port: leaderNode.Self.Port}
-	leaderPeer.PubKey = crypto.Ed25519Curve.Point()
-	err := leaderPeer.PubKey.UnmarshalBinary(leaderNode.PubK[:])
-	if err != nil {
-		node.log.Info("Could not unmarshall leaders public key from binary to kyber.point")
+	for n, v := range leaders {
+		leaderPeer := p2p.Peer{IP: v.Self.IP, Port: v.Self.Port}
+		leaderPeer.PubKey = crypto.Ed25519Curve.Point()
+		err := leaderPeer.PubKey.UnmarshalBinary(v.PubK[:])
+		if err != nil {
+			node.log.Error("Could not unmarshall leaders public key from binary to kyber.point")
+		}
+		node.Leaders[uint32(n)] = leaderPeer
 	}
-	node.leader = leaderPeer
+
+	node.leader = node.Leaders[uint32(shardNum-1)]
 	node.isLeader = isLeader
 	node.ShardID = shardNum - 1 //0 indexing.
 	node.SetInfo = true

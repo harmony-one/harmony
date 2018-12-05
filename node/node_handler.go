@@ -541,6 +541,12 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 		return -1
 	}
 
+	if ping.Node.Role == proto_node.ClientRole {
+		node.log.Info("Add Client Peer to Node", "Node", node.Consensus.GetNodeID(), "Client", peer)
+		node.ClientPeer = peer
+		return 0
+	}
+
 	// Add to Node's peer list anyway
 	node.AddPeers([]*p2p.Peer{peer})
 
@@ -610,6 +616,8 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 	}
 
 	node.State = NodeJoinedShard
+	// Notify JoinShard to stop sending Ping messages
+	node.StopPing <- 1
 
 	return node.Consensus.UpdatePublicKeys(publicKeys)
 }
