@@ -106,6 +106,9 @@ type Node struct {
 
 	// Test only
 	TestBankKeys []*ecdsa.PrivateKey
+
+	// Channel to stop sending ping message
+	StopPing chan int
 }
 
 // Add new crossTx and proofs to the list of crossTx that needs to be sent back to client
@@ -328,6 +331,7 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase, selfPeer p2p.Peer) *Node
 
 	// Setup initial state of syncing.
 	node.syncingState = NotDoingSyncing
+	node.StopPing = make(chan int)
 
 	return &node
 }
@@ -405,19 +409,30 @@ func (node *Node) GetSyncingPeers() []p2p.Peer {
 
 // JoinShard helps a new node to join a shard.
 func (node *Node) JoinShard(leader p2p.Peer) {
-	// try to join the shard, with 10 minutes time-out
-	backoff := p2p.NewExpBackoff(waitBeforeJoinShard, timeOutToJoinShard, 2)
+	// try to join the shard, send ping message every 1 second, with a 10 minutes time-out
+	tick := time.NewTicker(1 * time.Second)
+	timeout := time.NewTicker(10 * time.Minute)
+	defer tick.Stop()
+	defer timeout.Stop()
 
-	for node.State == NodeWaitToJoin {
-		backoff.Sleep()
-		ping := proto_node.NewPingMessage(node.SelfPeer)
-		if node.Client != nil { // assume this is the client node
-			ping.Node.Role = proto_node.ClientRole
+	for {
+		select {
+		case <-tick.C:
+			ping := proto_node.NewPingMessage(node.SelfPeer)
+			if node.Client != nil { // assume this is the client node
+				ping.Node.Role = proto_node.ClientRole
+			}
+			buffer := ping.ConstructPingMessage()
+
+			// Talk to leader.
+			p2p.SendMessage(leader, buffer)
+		case <-timeout.C:
+			node.log.Info("JoinShard timeout")
+			return
+		case <-node.StopPing:
+			node.log.Info("Stopping JoinShard")
+			return
 		}
-		buffer := ping.ConstructPingMessage()
-
-		// Talk to leader.
-		p2p.SendMessage(leader, buffer)
 	}
 }
 

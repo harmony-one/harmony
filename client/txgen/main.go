@@ -166,22 +166,20 @@ func main() {
 				}
 			}
 		}
-		clientNode.Client.UpdateBlocks = updateBlocksFunc
-
-		// Start the client server to listen to leader's message
-		go clientNode.StartServer()
-
-		for _, leader := range shardIDLeaderMap {
-			log.Debug("Client Join Shard", "leader", leader)
-			clientNode.State = node.NodeWaitToJoin
-			go clientNode.JoinShard(leader)
-			// wait for 3 seconds for client to send ping message to leader
-			time.Sleep(3 * time.Second)
-			// change the state of the client node will terminate the goroutine of JoinShard
-			clientNode.State = node.NodeJoinedShard
-		}
 	}
 	clientNode.Client.UpdateBlocks = updateBlocksFunc
+
+	// Start the client server to listen to leader's message
+	go clientNode.StartServer()
+
+	for _, leader := range shardIDLeaderMap {
+		log.Debug("Client Join Shard", "leader", leader)
+		go clientNode.JoinShard(leader)
+		// wait for 3 seconds for client to send ping message to leader
+		time.Sleep(3 * time.Second)
+		clientNode.StopPing <- 1
+		clientNode.State = node.NodeJoinedShard
+	}
 
 	// Transaction generation process
 	time.Sleep(10 * time.Second) // wait for nodes to be ready
