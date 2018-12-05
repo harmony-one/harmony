@@ -346,6 +346,7 @@ func (node *Node) DoSyncing() {
 	if node.stateSync.StartStateSync(node.GetSyncingPeers(), node.blockchain) {
 		node.log.Debug("DoSyncing: successfully sync")
 		if node.State == NodeJoinedShard {
+			node.log.Debug("Node State changed to NodeJoinedShard")
 			node.State = NodeReadyForConsensus
 		}
 	} else {

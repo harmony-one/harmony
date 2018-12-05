@@ -259,7 +259,6 @@ func (ss *StateSync) generateStateSyncTaskQueue(bc *blockchain.Blockchain) {
 	ss.stateSyncTaskQueue = queue.New(0)
 	for _, configPeer := range ss.syncConfig.peers {
 		if configPeer.client != nil {
-
 			ss.blockHeight = len(configPeer.blockHashes)
 			bc.Blocks = append(bc.Blocks, make([]*blockchain.Block, ss.blockHeight-len(bc.Blocks))...)
 			for id, blockHash := range configPeer.blockHashes {
@@ -271,7 +270,7 @@ func (ss *StateSync) generateStateSyncTaskQueue(bc *blockchain.Blockchain) {
 			break
 		}
 	}
-	Log.Info("syncing: Finished generateStateSyncTaskQueue.")
+	Log.Info("syncing: Finished generateStateSyncTaskQueue.", "queue size", ss.stateSyncTaskQueue.Len())
 }
 
 // downloadBlocks downloads blocks from state sync task queue.
