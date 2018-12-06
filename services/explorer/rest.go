@@ -17,6 +17,7 @@ const (
 // Service is the struct for explorer service.
 type Service struct {
 	people []Person
+	router *mux.Router
 }
 
 // Init is to do init for ExplorerService.
@@ -27,13 +28,17 @@ func (s *Service) Init() {
 
 // Run is to run serving explorer.
 func (s *Service) Run() {
+	// Init address.
 	addr := net.JoinHostPort("", ExplorerServicePort)
-	router := mux.NewRouter()
-	router.HandleFunc("/people", s.GetPeopleEndpoint).Methods("GET")
-	router.HandleFunc("/people/{id}", s.GetPersonEndpoint).Methods("GET")
-	router.HandleFunc("/people/{id}", s.CreatePersonEndpoint).Methods("POST")
-	router.HandleFunc("/people/{id}", s.DeletePersonEndpoint).Methods("DELETE")
-	log.Fatal(http.ListenAndServe(addr, router))
+
+	// Set up router
+	s.router = mux.NewRouter()
+	s.router.HandleFunc("/people", s.GetPeopleEndpoint).Methods("GET")
+	s.router.HandleFunc("/people/{id}", s.GetPersonEndpoint).Methods("GET")
+	s.router.HandleFunc("/people/{id}", s.CreatePersonEndpoint).Methods("POST")
+	s.router.HandleFunc("/people/{id}", s.DeletePersonEndpoint).Methods("DELETE")
+	// Do serving now.
+	go log.Fatal(http.ListenAndServe(addr, s.router))
 }
 
 // Person is fake struct for testing.
