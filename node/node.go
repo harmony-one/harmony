@@ -56,7 +56,7 @@ const (
 )
 
 const (
-	syncingPortDifference = 1000
+	syncingPortDifference = 3000
 	waitBeforeJoinShard   = time.Second * 3
 	timeOutToJoinShard    = time.Minute * 10
 )
