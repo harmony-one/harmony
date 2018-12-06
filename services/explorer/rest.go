@@ -1,25 +1,40 @@
-package main
+package explorer
 
 import (
 	"encoding/json"
 	"log"
+	"net"
 	"net/http"
 
 	"github.com/gorilla/mux"
 )
 
-// ExplorerService is the struct for explorer service.
-type ExplorerService struct {
+// Constants for explorer service.
+const (
+	ExplorerServicePort = "5000"
+)
+
+// Service is the struct for explorer service.
+type Service struct {
+	people []Person
 }
 
 // Init is to do init for ExplorerService.
-func (es *ExplorerService) Init() {
-
+func (s *Service) Init() {
+	s.people = append(s.people, Person{ID: "1", Firstname: "John", Lastname: "Doe", Address: &Address{City: "City X", State: "State X"}})
+	s.people = append(s.people, Person{ID: "2", Firstname: "Koko", Lastname: "Doe", Address: &Address{City: "City Z", State: "State Y"}})
 }
 
-// ParentHash  *common.Hash    `json:"parentHash"       gencodec:"required"`
-// Coinbase    *common.Address `json:"miner"            gencodec:"required"`
-// Root        *common.Hash    `json:"stateRoot"        gencodec:"required"`
+// Run is to run serving explorer.
+func (s *Service) Run() {
+	addr := net.JoinHostPort("", ExplorerServicePort)
+	router := mux.NewRouter()
+	router.HandleFunc("/people", s.GetPeopleEndpoint).Methods("GET")
+	router.HandleFunc("/people/{id}", s.GetPersonEndpoint).Methods("GET")
+	router.HandleFunc("/people/{id}", s.CreatePersonEndpoint).Methods("POST")
+	router.HandleFunc("/people/{id}", s.DeletePersonEndpoint).Methods("DELETE")
+	log.Fatal(http.ListenAndServe(addr, router))
+}
 
 // Person is fake struct for testing.
 type Person struct {
@@ -35,12 +50,10 @@ type Address struct {
 	State string `json:"state,omitempty"`
 }
 
-var people []Person
-
 // GetPersonEndpoint is the specific person end point.
-func GetPersonEndpoint(w http.ResponseWriter, r *http.Request) {
+func (s *Service) GetPersonEndpoint(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
-	for _, item := range people {
+	for _, item := range s.people {
 		if item.ID == params["id"] {
 			json.NewEncoder(w).Encode(item)
 			return
@@ -50,39 +63,28 @@ func GetPersonEndpoint(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetPeopleEndpoint is the people end point.
-func GetPeopleEndpoint(w http.ResponseWriter, r *http.Request) {
-	json.NewEncoder(w).Encode(people)
+func (s *Service) GetPeopleEndpoint(w http.ResponseWriter, r *http.Request) {
+	json.NewEncoder(w).Encode(s.people)
 }
 
 // CreatePersonEndpoint is post people/{id} end point.
-func CreatePersonEndpoint(w http.ResponseWriter, r *http.Request) {
+func (s *Service) CreatePersonEndpoint(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	var person Person
 	_ = json.NewDecoder(r.Body).Decode(&person)
 	person.ID = params["id"]
-	people = append(people, person)
-	json.NewEncoder(w).Encode(people)
+	s.people = append(s.people, person)
+	json.NewEncoder(w).Encode(s.people)
 }
 
 // DeletePersonEndpoint is delete people/{id} end point.
-func DeletePersonEndpoint(w http.ResponseWriter, r *http.Request) {
+func (s *Service) DeletePersonEndpoint(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
-	for index, item := range people {
+	for index, item := range s.people {
 		if item.ID == params["id"] {
-			people = append(people[:index], people[index+1:]...)
+			s.people = append(s.people[:index], s.people[index+1:]...)
 			break
 		}
-		json.NewEncoder(w).Encode(people)
+		json.NewEncoder(w).Encode(s.people)
 	}
-}
-
-func main() {
-	router := mux.NewRouter()
-	people = append(people, Person{ID: "1", Firstname: "John", Lastname: "Doe", Address: &Address{City: "City X", State: "State X"}})
-	people = append(people, Person{ID: "2", Firstname: "Koko", Lastname: "Doe", Address: &Address{City: "City Z", State: "State Y"}})
-	router.HandleFunc("/people", GetPeopleEndpoint).Methods("GET")
-	router.HandleFunc("/people/{id}", GetPersonEndpoint).Methods("GET")
-	router.HandleFunc("/people/{id}", CreatePersonEndpoint).Methods("POST")
-	router.HandleFunc("/people/{id}", DeletePersonEndpoint).Methods("DELETE")
-	log.Fatal(http.ListenAndServe(":8000", router))
 }
