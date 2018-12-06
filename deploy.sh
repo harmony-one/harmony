@@ -24,6 +24,7 @@ USAGE: $ME [OPTIONS] config_file_name
    -t             toggle txgen (default: $TXGEN)
    -D duration    txgen run duration (default: $DURATION)
    -m min_peers   minimal number of peers to start consensus (default: $MIN)
+   -s shards      number of shards (default: $SHARDS)
 
 This script will build all the binaries and start benchmark and txgen based on the configuration file.
 
@@ -41,8 +42,9 @@ DB=
 TXGEN=true
 DURATION=90
 MIN=5
+SHARDS=2
 
-while getopts "hpdtD:m:" option; do
+while getopts "hpdtD:m:s:" option; do
    case $option in
       h) usage ;;
       p) PEER='-peer_discovery' ;;
@@ -50,6 +52,7 @@ while getopts "hpdtD:m:" option; do
       t) TXGEN=false ;;
       D) DURATION=$OPTARG ;;
       m) MIN=$OPTARG ;;
+      s) SHARDS=$OPTARG ;;
    esac
 done
 
@@ -82,7 +85,7 @@ mkdir -p $log_folder
 
 if [ -n "$PEER" ]; then
    echo "launching beacon chain ..."
-   ./bin/beacon > $log_folder/beacon.log 2>&1 &
+   ./bin/beacon -numShards $SHARDS > $log_folder/beacon.log 2>&1 &
    sleep 1 #wait or beachchain up
 fi
 
