@@ -2,7 +2,7 @@
 declare -A SRC
 SRC[benchmark]=benchmark.go
 SRC[txgen]=client/txgen/main.go
-SRC[beacon]=runbeacon/run-beacon.go
+SRC[beacon]=beaconchain/main/main.go
 
 BINDIR=bin
 BUCKET=unique-bucket-bin
