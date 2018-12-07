@@ -35,14 +35,14 @@ func New(numShards int, ip, port string) *BeaconChain {
 	bc := BeaconChain{}
 	bc.log = log.New()
 	bc.NumberOfShards = numShards
-	bc.PubKey = generateIDCKeys()
+	bc.PubKey = generateBCKey()
 	bc.NumberOfNodesAdded = 0
 	bc.Port = port
 	bc.IP = ip
 	return &bc
 }
 
-func generateIDCKeys() kyber.Point {
+func generateBCKey() kyber.Point {
 	r := rand.Intn(1000)
 	priKey := pki.GetPrivateKeyFromInt(r)
 	pubkey := pki.GetPublicKeyFromPrivateKey(priKey)
@@ -67,9 +67,7 @@ func (bc *BeaconChain) AcceptConnections(b []byte) {
 //StartServer a server and process the request by a handler.
 func (bc *BeaconChain) StartServer() {
 	bc.log.Info("Starting Beaconchain server ...")
-	ip := bc.IP
-	port := bc.Port
-	addr := net.JoinHostPort(ip, port)
+	addr := net.JoinHostPort(bc.IP, bc.Port)
 	listen, err := net.Listen("tcp", addr)
 	if err != nil {
 		bc.log.Crit("Socket listen port failed")
