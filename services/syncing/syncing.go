@@ -11,7 +11,7 @@ import (
 	"github.com/harmony-one/harmony/blockchain"
 	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/syncing/downloader"
+	"github.com/harmony-one/harmony/services/syncing/downloader"
 )
 
 // Constants for syncing.

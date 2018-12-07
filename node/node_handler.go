@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	"net"
 	"os"
 	"strconv"
 	"time"
@@ -16,6 +15,7 @@ import (
 	hmy_crypto "github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/proto"
 	"github.com/harmony-one/harmony/proto/client"
 	"github.com/harmony-one/harmony/proto/consensus"
@@ -34,17 +34,17 @@ const (
 
 // MaybeBroadcastAsValidator returns if the node is a validator node.
 func (node *Node) MaybeBroadcastAsValidator(content []byte) {
-	if node.SelfPeer.ValidatorID > 0 && node.SelfPeer.ValidatorID <= p2p.MaxBroadCast {
-		go p2p.BroadcastMessageFromValidator(node.SelfPeer, node.Consensus.GetValidatorPeers(), content)
+	if node.SelfPeer.ValidatorID > 0 && node.SelfPeer.ValidatorID <= host.MaxBroadCast {
+		go host.BroadcastMessageFromValidator(node.host, node.SelfPeer, node.Consensus.GetValidatorPeers(), content)
 	}
 }
 
-// NodeHandler handles a new incoming connection.
-func (node *Node) NodeHandler(conn net.Conn) {
-	defer conn.Close()
+// StreamHandler handles a new incoming connection.
+func (node *Node) StreamHandler(s p2p.Stream) {
+	defer s.Close()
 
 	// Read p2p message payload
-	content, err := p2p.ReadMessageContent(conn)
+	content, err := p2p.ReadMessageContent(s)
 
 	if err != nil {
 		node.log.Error("Read p2p data failed", "err", err, "node", node)
@@ -137,7 +137,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 
 				utxoMap := node.UtxoPool.GetUtxoMapByAddresses(fetchUtxoMessage.Addresses)
 
-				p2p.SendMessage(fetchUtxoMessage.Sender, client.ConstructFetchUtxoResponseMessage(&utxoMap, node.UtxoPool.ShardID))
+				node.SendMessage(fetchUtxoMessage.Sender, client.ConstructFetchUtxoResponseMessage(&utxoMap, node.UtxoPool.ShardID))
 			}
 		case proto_node.Control:
 			node.log.Info("NET: received message: Node/Control")
@@ -204,7 +204,7 @@ func (node *Node) NodeHandler(conn net.Conn) {
 			}
 		}
 	default:
-		node.log.Error("Unknown", "MsgCateory:", msgCategory)
+		node.log.Error("Unknown", "MsgCategory", msgCategory)
 	}
 
 	// Post processing after receiving messsages.
@@ -385,7 +385,7 @@ func (node *Node) SendBackProofOfAcceptOrReject() {
 		node.crossTxToReturnMutex.Unlock()
 
 		node.log.Debug("SENDING PROOF TO CLIENT", "proofs", len(proofs))
-		p2p.SendMessage(*node.ClientPeer, client.ConstructProofOfAcceptOrRejectMessage(proofs))
+		node.SendMessage(*node.ClientPeer, client.ConstructProofOfAcceptOrRejectMessage(proofs))
 	}
 }
 
@@ -394,7 +394,7 @@ func (node *Node) SendBackProofOfAcceptOrReject() {
 func (node *Node) BroadcastNewBlock(newBlock *blockchain.Block) {
 	if node.ClientPeer != nil {
 		node.log.Debug("NET: SENDING NEW BLOCK TO CLIENT")
-		p2p.SendMessage(*node.ClientPeer, proto_node.ConstructBlocksSyncMessage([]blockchain.Block{*newBlock}))
+		node.SendMessage(*node.ClientPeer, proto_node.ConstructBlocksSyncMessage([]blockchain.Block{*newBlock}))
 	}
 }
 
@@ -566,7 +566,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 
 	// Broadcast the message to all validators, as publicKeys is updated
 	// FIXME: HAR-89 use a separate nodefind/neighbor message
-	p2p.BroadcastMessageFromLeader(peers, buffer)
+	host.BroadcastMessageFromLeader(node.GetHost(), peers, buffer)
 
 	return len(peers)
 }

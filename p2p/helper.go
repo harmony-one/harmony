@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"io"
 	"log"
-	"net"
 	"time"
 )
 
@@ -28,13 +27,13 @@ content (n bytes) - actual message content
 const BatchSizeInByte = 1 << 16
 
 // ReadMessageContent reads the message type and content size, and return the actual content.
-func ReadMessageContent(conn net.Conn) ([]byte, error) {
+func ReadMessageContent(s Stream) ([]byte, error) {
 	var (
 		contentBuf = bytes.NewBuffer([]byte{})
-		r          = bufio.NewReader(conn)
+		r          = bufio.NewReader(s)
 	)
 	timeoutDuration := 1 * time.Second
-	conn.SetReadDeadline(time.Now().Add(timeoutDuration))
+	s.SetReadDeadline(time.Now().Add(timeoutDuration))
 	//// Read 1 byte for message type
 	_, err := r.ReadByte()
 	switch err {
@@ -67,7 +66,7 @@ func ReadMessageContent(conn net.Conn) ([]byte, error) {
 ILOOP:
 	for {
 		timeoutDuration := 10 * time.Second
-		conn.SetReadDeadline(time.Now().Add(timeoutDuration))
+		s.SetReadDeadline(time.Now().Add(timeoutDuration))
 		if bytesToRead < BatchSizeInByte {
 			// Read the last number of bytes less than 1024
 			tmpBuf = make([]byte, bytesToRead)
@@ -90,26 +89,4 @@ ILOOP:
 		}
 	}
 	return contentBuf.Bytes(), nil
-}
-
-// CreateMessage create a general message. FIXME: this is not used
-func CreateMessage(msgType byte, data []byte) []byte {
-	buffer := bytes.NewBuffer([]byte{})
-
-	buffer.WriteByte(msgType)
-
-	fourBytes := make([]byte, 4)
-	binary.BigEndian.PutUint32(fourBytes, uint32(len(data)))
-	buffer.Write(fourBytes)
-
-	buffer.Write(data)
-	return buffer.Bytes()
-}
-
-// SendMessageContent send message over net connection. FIXME: this is not used
-func SendMessageContent(conn net.Conn, data []byte) {
-	msgToSend := CreateMessage(byte(1), data)
-	w := bufio.NewWriter(conn)
-	w.Write(msgToSend)
-	w.Flush()
 }

@@ -7,9 +7,9 @@ import (
 	bc "github.com/harmony-one/harmony/blockchain"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/syncing"
-	"github.com/harmony-one/harmony/syncing/downloader"
-	pb "github.com/harmony-one/harmony/syncing/downloader/proto"
+	"github.com/harmony-one/harmony/services/syncing"
+	"github.com/harmony-one/harmony/services/syncing/downloader"
+	pb "github.com/harmony-one/harmony/services/syncing/downloader/proto"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 )

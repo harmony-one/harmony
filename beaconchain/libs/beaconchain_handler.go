@@ -1,21 +1,18 @@
 package beaconchain
 
 import (
-	"net"
-
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/proto"
 	proto_identity "github.com/harmony-one/harmony/proto/identity"
 )
 
 // BeaconChainHandler handles registration of new Identities
-func (bc *BeaconChain) BeaconChainHandler(conn net.Conn) {
-	content, err := p2p.ReadMessageContent(conn)
+func (bc *BeaconChain) BeaconChainHandler(s p2p.Stream) {
+	content, err := p2p.ReadMessageContent(s)
 	if err != nil {
 		bc.log.Error("Read p2p data failed")
 		return
 	}
-	bc.log.Info("received connection", "connectionIp", conn.RemoteAddr())
 	msgCategory, err := proto.GetMessageCategory(content)
 	if err != nil {
 		bc.log.Error("Read message category failed", "err", err)

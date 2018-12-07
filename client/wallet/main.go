@@ -9,6 +9,8 @@ import (
 	"log"
 	"strings"
 
+	"github.com/harmony-one/harmony/p2p/p2pimpl"
+
 	"io"
 	"io/ioutil"
 	math_rand "math/rand"
@@ -257,9 +259,9 @@ func CreateWalletServerNode() *node.Node {
 		shardIDLeaderMap = getShardIDToLeaderMap()
 		clientPeer = &p2p.Peer{Port: "127.0.0.1", IP: "1234"}
 	}
-	walletNode := node.New(nil, nil, *clientPeer) // TODO(ricl): shouldn't the selfPeer for client being clientPeer??
-	walletNode.Client = client.NewClient(&shardIDLeaderMap)
-	walletNode.ClientPeer = clientPeer
+	host := p2pimpl.NewHost(*clientPeer)
+	walletNode := node.New(host, nil, nil)
+	walletNode.Client = client.NewClient(walletNode.GetHost(), &shardIDLeaderMap)
 	return walletNode
 }
 
@@ -272,7 +274,7 @@ func ExecuteTransaction(tx blockchain.Transaction, walletNode *node.Node) error 
 	}
 
 	msg := proto_node.ConstructTransactionListMessage([]*blockchain.Transaction{&tx})
-	p2p.BroadcastMessage(walletNode.Client.GetLeaders(), msg)
+	walletNode.BroadcastMessage(walletNode.Client.GetLeaders(), msg)
 
 	doneSignal := make(chan int)
 	go func() {
@@ -297,7 +299,7 @@ func ExecuteTransaction(tx blockchain.Transaction, walletNode *node.Node) error 
 func FetchUtxos(addresses [][20]byte, walletNode *node.Node) (map[uint32]blockchain.UtxoMap, error) {
 	fmt.Println("Fetching account balance...")
 	walletNode.Client.ShardUtxoMap = make(map[uint32]blockchain.UtxoMap)
-	p2p.BroadcastMessage(walletNode.Client.GetLeaders(), proto_node.ConstructFetchUtxoMessage(*walletNode.ClientPeer, addresses))
+	walletNode.BroadcastMessage(walletNode.Client.GetLeaders(), proto_node.ConstructFetchUtxoMessage(*walletNode.ClientPeer, addresses))
 
 	doneSignal := make(chan int)
 	go func() {
