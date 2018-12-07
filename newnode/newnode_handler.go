@@ -1,7 +1,7 @@
 package newnode
 
 import (
-	"net"
+	"time"
 
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/proto"
@@ -9,11 +9,11 @@ import (
 )
 
 // NodeHandler handles a new incoming connection.
-func (node *NewNode) NodeHandler(conn net.Conn) {
-	defer conn.Close()
-	defer node.Service.waitGroup.Done()
-	content, err := p2p.ReadMessageContent(conn)
-
+func (node *NewNode) NodeHandler(s p2p.Stream) {
+	defer s.Close()
+	defer node.host.Close()
+	s.SetReadDeadline(time.Now().Add(1 * time.Second)) // This deadline is for 1 second to accept new connections.
+	content, err := p2p.ReadMessageContent(s)
 	if err != nil {
 		node.log.Error("Read p2p data failed", "err", err, "node", node)
 		return

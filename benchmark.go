@@ -9,6 +9,8 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/harmony-one/harmony/p2p/p2pimpl"
+
 	"github.com/harmony-one/harmony/attack"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/db"
@@ -117,13 +119,11 @@ func main() {
 	if *peerDiscovery {
 		candidateNode := pkg_newnode.New(*ip, *port)
 		BCPeer := p2p.Peer{IP: *idcIP, Port: *idcPort}
-		service := candidateNode.NewService(*ip, *port)
-		candidateNode.ConnectBeaconChain(BCPeer)
+		candidateNode.ContactBeaconChain(BCPeer)
 		shardID = candidateNode.GetShardID()
 		leader = candidateNode.GetLeader()
 		selfPeer = candidateNode.GetSelfPeer()
 		clientPeer = candidateNode.GetClientPeer()
-		service.Stop()
 		selfPeer.PubKey = candidateNode.PubK
 
 	} else {
@@ -162,8 +162,9 @@ func main() {
 		ldb, _ = InitLDBDatabase(*ip, *port)
 	}
 
+	host := p2pimpl.NewHost(selfPeer)
 	// Consensus object.
-	consensus := consensus.New(selfPeer, shardID, peers, leader)
+	consensus := consensus.New(host, shardID, peers, leader)
 	consensus.MinPeers = *minPeers
 
 	// Start Profiler for leader if profile argument is on
@@ -178,9 +179,7 @@ func main() {
 	// Set logger to attack model.
 	attack.GetInstance().SetLogger(consensus.Log)
 	// Current node.
-	currentNode := node.New(consensus, ldb, selfPeer)
-	// Add self peer.
-	currentNode.SelfPeer = selfPeer
+	currentNode := node.New(host, consensus, ldb)
 	// If there is a client configured in the node list.
 	if clientPeer != nil {
 		currentNode.ClientPeer = clientPeer

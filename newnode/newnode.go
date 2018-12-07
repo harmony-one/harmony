@@ -2,26 +2,21 @@ package newnode
 
 import (
 	"fmt"
-	"net"
 	"os"
 	"strconv"
-	"sync"
 	"time"
+
+	"github.com/harmony-one/harmony/p2p/p2pimpl"
 
 	"github.com/dedis/kyber"
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/proto/bcconn"
 	proto_identity "github.com/harmony-one/harmony/proto/identity"
 	"github.com/harmony-one/harmony/utils"
 )
-
-// Service is the server for listening.
-type Service struct {
-	ch        chan bool
-	waitGroup *sync.WaitGroup
-}
 
 //NewNode is ther struct for a candidate node
 type NewNode struct {
@@ -36,7 +31,7 @@ type NewNode struct {
 	priK        kyber.Scalar
 	log         log.Logger
 	SetInfo     bool
-	Service     *Service
+	host        host.Host
 }
 
 // New candidatenode initialization
@@ -48,6 +43,7 @@ func New(ip string, port string) *NewNode {
 	node.Self = p2p.Peer{IP: ip, Port: port, PubKey: pubKey, ValidatorID: -1}
 	node.log = log.New()
 	node.SetInfo = false
+	node.host = p2pimpl.NewHost(node.Self)
 	node.Leaders = map[uint32]p2p.Peer{}
 	return &node
 }
@@ -58,66 +54,18 @@ type registerResponseRandomNumber struct {
 	Leaders            []*bcconn.NodeInfo
 }
 
-// NewService starts a newservice in the candidate node
-func (node *NewNode) NewService(ip, port string) *Service {
-	laddr, err := net.ResolveTCPAddr("tcp", ip+":"+port)
-	if nil != err {
-		node.log.Crit("cannot resolve the tcp address of the new node", err)
-	}
-	listener, err := net.ListenTCP("tcp", laddr)
-	if nil != err {
-		node.log.Crit("cannot start a listener for new node", err)
-	}
-	node.log.Debug("listening on", "address", laddr.String())
-	node.Service = &Service{
-		ch:        make(chan bool),
-		waitGroup: &sync.WaitGroup{},
-	}
-	node.Service.waitGroup.Add(1)
-	go node.Serve(listener)
-	return node.Service
-}
-
-// Serve Accept connections and spawn a goroutine to serve each one.  Stop listening
-// if anything is received on the service's channel.
-func (node *NewNode) Serve(listener *net.TCPListener) {
-	defer node.Service.waitGroup.Done()
-	for {
-		select {
-		case <-node.Service.ch:
-			node.log.Debug("stopping listening on", "address", listener.Addr())
-			listener.Close()
-			node.log.Debug("stopped listening")
-			return
-		default:
-		}
-		listener.SetDeadline(time.Now().Add(1e9)) // This deadline is for 1 second to accept new connections.
-		conn, err := listener.AcceptTCP()
-		if nil != err {
-			if opErr, ok := err.(*net.OpError); ok && opErr.Timeout() {
-				continue
-			}
-			node.log.Error(err.Error())
-
-		}
-		node.Service.waitGroup.Add(1)
-		go node.NodeHandler(conn)
-	}
-}
-
-// Stop the service by closing the service's channel.  Block until the service
-// is really stopped.
-func (s *Service) Stop() {
-	close(s.ch)
-	s.waitGroup.Wait()
+// ContactBeaconChain starts a newservice in the candidate node
+func (node *NewNode) ContactBeaconChain(BCPeer p2p.Peer) {
+	go node.host.BindHandlerAndServe(node.NodeHandler)
+	node.requestBeaconChain(BCPeer)
 }
 
 func (node NewNode) String() string {
-	return fmt.Sprintf("idc: %v:%v and node infi %v", node.Self.IP, node.Self.Port, node.SetInfo)
+	return fmt.Sprintf("idc: %v:%v and node info %v", node.Self.IP, node.Self.Port, node.SetInfo)
 }
 
-// ConnectBeaconChain connects to beacon chain
-func (node *NewNode) ConnectBeaconChain(BCPeer p2p.Peer) {
+// RequestBeaconChain requests beacon chain for identity data
+func (node *NewNode) requestBeaconChain(BCPeer p2p.Peer) {
 	node.log.Info("connecting to beacon chain now ...")
 	pubk, err := node.PubK.MarshalBinary()
 	if err != nil {
@@ -141,7 +89,7 @@ checkLoop:
 				gotShardInfo = true
 				break checkLoop
 			} else {
-				p2p.SendMessage(BCPeer, msgToSend)
+				host.SendMessage(node.host, BCPeer, msgToSend)
 			}
 		}
 	}

@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"sync"
 
+	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/proto/node"
 
 	"github.com/harmony-one/harmony/blockchain"
@@ -23,6 +24,9 @@ type Client struct {
 	ShardUtxoMap      map[uint32]blockchain.UtxoMap
 	ShardUtxoMapMutex sync.Mutex // Mutex for the UTXO maps
 	log               log.Logger // Log utility
+
+	// The p2p host used to send/receive p2p messages
+	host host.Host
 }
 
 // TransactionMessageHandler is the message handler for Client/Transaction messages.
@@ -120,16 +124,16 @@ func (client *Client) handleFetchUtxoResponseMessage(utxoResponse client_proto.F
 
 func (client *Client) sendCrossShardTxUnlockMessage(txsToSend []*blockchain.Transaction) {
 	for shardID, txs := range BuildOutputShardTransactionMap(txsToSend) {
-		p2p.SendMessage((*client.Leaders)[shardID], node.ConstructUnlockToCommitOrAbortMessage(txs))
+		host.SendMessage(client.host, (*client.Leaders)[shardID], node.ConstructUnlockToCommitOrAbortMessage(txs))
 	}
 }
 
 // NewClient creates a new Client
-func NewClient(leaders *map[uint32]p2p.Peer) *Client {
+func NewClient(host host.Host, leaders *map[uint32]p2p.Peer) *Client {
 	client := Client{}
 	client.PendingCrossTxs = make(map[[32]byte]*blockchain.Transaction)
 	client.Leaders = leaders
-
+	client.host = host
 	// Logger
 	client.log = log.New()
 	return &client

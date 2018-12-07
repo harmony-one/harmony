@@ -10,7 +10,6 @@ import (
 	"github.com/harmony-one/harmony/blockchain"
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/log"
-	"github.com/harmony-one/harmony/p2p"
 	proto_consensus "github.com/harmony-one/harmony/proto/consensus"
 	"github.com/harmony-one/harmony/utils"
 )
@@ -130,7 +129,7 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	// Store the commitment secret
 	consensus.secret[consensusID] = secret
 
-	p2p.SendMessage(consensus.leader, msgToSend)
+	consensus.SendMessage(consensus.leader, msgToSend)
 	// consensus.Log.Warn("Sending Commit to leader", "state", targetState)
 
 	// Set state to CommitDone
@@ -249,7 +248,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte, targetState 
 	}
 	msgToSend := consensus.constructResponseMessage(msgTypeToSend, response)
 
-	p2p.SendMessage(consensus.leader, msgToSend)
+	consensus.SendMessage(consensus.leader, msgToSend)
 	// consensus.Log.Warn("Sending Response to leader", "state", targetState)
 	// Set state to target state (ResponseDone, FinalResponseDone)
 	consensus.state = targetState
@@ -367,7 +366,7 @@ func (consensus *Consensus) processCollectiveSigMessage(payload []byte) {
 	// Store the commitment secret
 	consensus.secret[consensusID] = secret
 
-	p2p.SendMessage(consensus.leader, msgToSend)
+	consensus.SendMessage(consensus.leader, msgToSend)
 
 	// Set state to CommitDone
 	consensus.state = FinalCommitDone

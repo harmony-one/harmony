@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
-	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -28,7 +27,7 @@ import (
 	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/p2pv2"
+	"github.com/harmony-one/harmony/p2p/host"
 	proto_node "github.com/harmony-one/harmony/proto/node"
 	"github.com/harmony-one/harmony/syncing"
 	"github.com/harmony-one/harmony/syncing/downloader"
@@ -106,6 +105,8 @@ type Node struct {
 
 	// Test only
 	TestBankKeys []*ecdsa.PrivateKey
+	// The p2p host used to send/receive p2p messages
+	host host.Host
 
 	// Channel to stop sending ping message
 	StopPing chan int
@@ -164,47 +165,13 @@ func (node *Node) getTransactionsForNewBlockAccount(maxNumTxs int) (types.Transa
 
 // StartServer starts a server and process the request by a handler.
 func (node *Node) StartServer() {
-	if p2p.Version == 1 {
-		node.log.Debug("Starting server", "node", node, "ip", node.SelfPeer.IP, "port", node.SelfPeer.Port)
-		node.listenOnPort(node.SelfPeer.Port)
-	} else {
-		p2pv2.InitHost(node.SelfPeer.IP, node.SelfPeer.Port)
-		p2pv2.BindHandler(node.NodeHandlerV1)
-		// Hang forever
-		<-make(chan struct{})
-	}
+	node.host.BindHandlerAndServe(node.StreamHandler)
 }
 
 // SetLog sets log for Node.
 func (node *Node) SetLog() *Node {
 	node.log = log.New()
 	return node
-}
-
-// Version 0 p2p. Going to be deprecated.
-func (node *Node) listenOnPort(port string) {
-	addr := net.JoinHostPort("", port)
-	listen, err := net.Listen("tcp4", addr)
-	if err != nil {
-		node.log.Error("Socket listen port failed", "addr", addr, "err", err)
-		return
-	}
-	if listen == nil {
-		node.log.Error("Listen returned nil", "addr", addr)
-		return
-	}
-	defer listen.Close()
-	backoff := p2p.NewExpBackoff(250*time.Millisecond, 15*time.Second, 2.0)
-	for {
-		conn, err := listen.Accept()
-		if err != nil {
-			node.log.Error("Error listening on port.", "port", port,
-				"err", err)
-			backoff.Sleep()
-			continue
-		}
-		go node.NodeHandler(conn)
-	}
 }
 
 func (node *Node) String() string {
@@ -261,10 +228,15 @@ func DeserializeNode(d []byte) *NetworkNode {
 }
 
 // New creates a new node.
-func New(consensus *bft.Consensus, db *hdb.LDBDatabase, selfPeer p2p.Peer) *Node {
+func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 	node := Node{}
 
-	if consensus != nil {
+	if host != nil {
+		node.host = host
+		node.SelfPeer = host.GetSelfPeer()
+	}
+
+	if host != nil && consensus != nil {
 		// Consensus and associated channel to communicate blocks
 		node.Consensus = consensus
 		node.BlockChannel = make(chan blockchain.Block)
@@ -316,10 +288,8 @@ func New(consensus *bft.Consensus, db *hdb.LDBDatabase, selfPeer p2p.Peer) *Node
 		node.Chain = chain
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, params.TestChainConfig, chain)
 		node.BlockChannelAccount = make(chan *types.Block)
-		node.Worker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(selfPeer.PubKey))
+		node.Worker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey))
 	}
-
-	node.SelfPeer = selfPeer
 
 	// Logger
 	node.log = log.New()
@@ -425,7 +395,7 @@ func (node *Node) JoinShard(leader p2p.Peer) {
 			buffer := ping.ConstructPingMessage()
 
 			// Talk to leader.
-			p2p.SendMessage(leader, buffer)
+			node.SendMessage(leader, buffer)
 		case <-timeout.C:
 			node.log.Info("JoinShard timeout")
 			return

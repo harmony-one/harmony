@@ -1,4 +1,4 @@
-package p2pv2
+package hostv2
 
 import (
 	"bufio"

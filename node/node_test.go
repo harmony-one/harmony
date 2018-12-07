@@ -10,6 +10,7 @@ import (
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/p2p/p2pimpl"
 	proto_node "github.com/harmony-one/harmony/proto/node"
 	"github.com/harmony-one/harmony/utils"
 )
@@ -18,9 +19,9 @@ func TestNewNewNode(t *testing.T) {
 	_, pubKey := utils.GenKey("1", "2")
 	leader := p2p.Peer{IP: "1", Port: "2", PubKey: pubKey}
 	validator := p2p.Peer{IP: "3", Port: "5"}
-	consensus := consensus.New(leader, "0", []p2p.Peer{leader, validator}, leader)
-
-	node := New(consensus, nil, leader)
+	host := p2pimpl.NewHost(leader)
+	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader)
+	node := New(host, consensus, nil)
 	if node.Consensus == nil {
 		t.Error("Consensus is not initialized for the node")
 	}
@@ -46,9 +47,10 @@ func TestCountNumTransactionsInBlockchain(t *testing.T) {
 	_, pubKey := utils.GenKey("1", "2")
 	leader := p2p.Peer{IP: "1", Port: "2", PubKey: pubKey}
 	validator := p2p.Peer{IP: "3", Port: "5"}
-	consensus := consensus.New(leader, "0", []p2p.Peer{leader, validator}, leader)
+	host := p2pimpl.NewHost(leader)
+	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader)
 
-	node := New(consensus, nil, leader)
+	node := New(host, consensus, nil)
 	node.AddTestingAddresses(1000)
 	if node.countNumTransactionsInBlockchain() != 1001 {
 		t.Error("Count of transactions in the blockchain is incorrect")
@@ -59,9 +61,10 @@ func TestGetSyncingPeers(t *testing.T) {
 	_, pubKey := utils.GenKey("1", "2")
 	leader := p2p.Peer{IP: "1", Port: "2", PubKey: pubKey}
 	validator := p2p.Peer{IP: "3", Port: "5"}
-	consensus := consensus.New(leader, "0", []p2p.Peer{leader, validator}, leader)
+	host := p2pimpl.NewHost(leader)
+	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader)
 
-	node := New(consensus, nil, leader)
+	node := New(host, consensus, nil)
 	peer := p2p.Peer{IP: "1.1.1.1", Port: "2000"}
 	peer2 := p2p.Peer{IP: "2.1.1.1", Port: "2000"}
 	node.Neighbors.Store("minh", peer)
@@ -101,9 +104,10 @@ func TestAddPeers(t *testing.T) {
 	_, pubKey := utils.GenKey("1", "2")
 	leader := p2p.Peer{IP: "1", Port: "2", PubKey: pubKey}
 	validator := p2p.Peer{IP: "3", Port: "5"}
-	consensus := consensus.New(leader, "0", []p2p.Peer{leader, validator}, leader)
+	host := p2pimpl.NewHost(leader)
+	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader)
 
-	node := New(consensus, nil, leader)
+	node := New(host, consensus, nil)
 	r1 := node.AddPeers(peers1)
 	e1 := 2
 	if r1 != e1 {
@@ -116,7 +120,7 @@ func TestAddPeers(t *testing.T) {
 	}
 }
 
-func sendPingMessage(leader p2p.Peer) {
+func sendPingMessage(node *Node, leader p2p.Peer) {
 	priKey1 := crypto.Ed25519Curve.Scalar().SetInt64(int64(333))
 	pubKey1 := pki.GetPublicKeyFromScalar(priKey1)
 
@@ -132,11 +136,11 @@ func sendPingMessage(leader p2p.Peer) {
 	fmt.Println("waiting for 5 seconds ...")
 	time.Sleep(5 * time.Second)
 
-	p2p.SendMessage(leader, buf1)
+	node.SendMessage(leader, buf1)
 	fmt.Println("sent ping message ...")
 }
 
-func sendPongMessage(leader p2p.Peer) {
+func sendPongMessage(node *Node, leader p2p.Peer) {
 	priKey1 := crypto.Ed25519Curve.Scalar().SetInt64(int64(333))
 	pubKey1 := pki.GetPublicKeyFromScalar(priKey1)
 	p1 := p2p.Peer{
@@ -158,7 +162,7 @@ func sendPongMessage(leader p2p.Peer) {
 	fmt.Println("waiting for 10 seconds ...")
 	time.Sleep(10 * time.Second)
 
-	p2p.SendMessage(leader, buf1)
+	node.SendMessage(leader, buf1)
 	fmt.Println("sent pong message ...")
 }
 
@@ -173,10 +177,11 @@ func TestPingPongHandler(test *testing.T) {
 	_, pubKey := utils.GenKey("127.0.0.1", "8881")
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8881", PubKey: pubKey}
 	//   validator := p2p.Peer{IP: "127.0.0.1", Port: "9991"}
-	consensus := consensus.New(leader, "0", []p2p.Peer{leader}, leader)
-	node := New(consensus, nil, leader)
+	host := p2pimpl.NewHost(leader)
+	consensus := consensus.New(host, "0", []p2p.Peer{leader}, leader)
+	node := New(host, consensus, nil)
 	//go sendPingMessage(leader)
-	go sendPongMessage(leader)
+	go sendPongMessage(node, leader)
 	go exitServer()
 	node.StartServer()
 }
