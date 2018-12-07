@@ -61,7 +61,7 @@ func (node *NewNode) ContactBeaconChain(BCPeer p2p.Peer) {
 }
 
 func (node NewNode) String() string {
-	return fmt.Sprintf("idc: %v:%v and node info %v", node.Self.IP, node.Self.Port, node.SetInfo)
+	return fmt.Sprintf("bc: %v:%v and node info %v", node.Self.IP, node.Self.Port, node.SetInfo)
 }
 
 // RequestBeaconChain requests beacon chain for identity data

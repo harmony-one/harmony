@@ -22,7 +22,7 @@ type ConfigEntry struct {
 }
 
 func (config ConfigEntry) String() string {
-	return fmt.Sprintf("idc: %v:%v", config.IP, config.Port)
+	return fmt.Sprintf("bc: %v:%v", config.IP, config.Port)
 }
 
 // New return new ConfigEntry.
@@ -38,14 +38,14 @@ func New(priK kyber.Scalar, pubK kyber.Point) *ConfigEntry {
 }
 
 // StartClientMode starts client mode.
-func (config *ConfigEntry) StartClientMode(idcIP, idcPort string) error {
+func (config *ConfigEntry) StartClientMode(bcIP, bcPort string) error {
 	config.IP = "myip"
 	config.Port = "myport"
 
-	fmt.Printf("idc ip/port: %v/%v\n", idcIP, idcPort)
+	fmt.Printf("bc ip/port: %v/%v\n", bcIP, bcPort)
 
 	// ...
-	// TODO: connect to idc, and wait unless acknowledge
+	// TODO: connect to bc, and wait unless acknowledge
 	return nil
 }
 
