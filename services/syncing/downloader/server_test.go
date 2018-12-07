@@ -6,8 +6,8 @@ import (
 
 	bc "github.com/harmony-one/harmony/blockchain"
 	"github.com/harmony-one/harmony/crypto/pki"
-	"github.com/harmony-one/harmony/syncing/downloader"
-	pb "github.com/harmony-one/harmony/syncing/downloader/proto"
+	"github.com/harmony-one/harmony/services/syncing/downloader"
+	pb "github.com/harmony-one/harmony/services/syncing/downloader/proto"
 )
 
 const (
