@@ -4,12 +4,14 @@ import (
 	"testing"
 
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/p2p/p2pimpl"
 )
 
 func TestNew(test *testing.T) {
 	leader := p2p.Peer{IP: "1", Port: "2"}
 	validator := p2p.Peer{IP: "3", Port: "5"}
-	consensus := New(leader, "0", []p2p.Peer{leader, validator}, leader)
+	host := p2pimpl.NewHost(leader)
+	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader)
 	if consensus.consensusID != 0 {
 		test.Errorf("Consensus Id is initialized to the wrong value: %d", consensus.consensusID)
 	}

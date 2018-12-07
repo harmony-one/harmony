@@ -7,6 +7,7 @@ import (
 	"path"
 
 	"github.com/harmony-one/harmony/beaconchain"
+	"github.com/harmony-one/harmony/log"
 )
 
 var (
@@ -32,6 +33,9 @@ func main() {
 	if *versionFlag {
 		printVersion(os.Args[0])
 	}
+
+	h := log.StdoutHandler
+	log.Root().SetHandler(h)
 
 	bc := beaconchain.New(*numShards, *ip, *port)
 	bc.StartServer()

@@ -19,6 +19,7 @@ import (
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/utils"
 )
 
@@ -95,6 +96,9 @@ type Consensus struct {
 	Log log.Logger
 
 	uniqueIDInstance *utils.UniqueValidatorID
+
+	// The p2p host used to send/receive p2p messages
+	host host.Host
 }
 
 // BlockConsensusStatus used to keep track of the consensus status of multiple blocks received so far
@@ -109,9 +113,11 @@ type BlockConsensusStatus struct {
 }
 
 // New creates a new Consensus object
-func New(selfPeer p2p.Peer, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Consensus {
+func New(host host.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Consensus {
 	consensus := Consensus{}
+	consensus.host = host
 
+	selfPeer := host.GetSelfPeer()
 	if leader.Port == selfPeer.Port && leader.IP == selfPeer.IP {
 		consensus.IsLeader = true
 	} else {
@@ -410,4 +416,9 @@ func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header 
 // GetNodeID returns the nodeID
 func (consensus *Consensus) GetNodeID() uint16 {
 	return consensus.nodeID
+}
+
+// SendMessage sends message thru p2p host to peer.
+func (consensus *Consensus) SendMessage(peer p2p.Peer, message []byte) {
+	host.SendMessage(consensus.host, peer, message)
 }

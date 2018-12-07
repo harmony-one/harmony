@@ -11,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/p2p/host"
 
 	"github.com/harmony-one/harmony/profiler"
 
@@ -133,7 +134,7 @@ func (consensus *Consensus) startConsensus(newBlock *blockchain.Block) {
 
 	consensus.Log.Debug("Stop encoding block")
 	msgToSend := consensus.constructAnnounceMessage()
-	p2p.BroadcastMessageFromLeader(consensus.GetValidatorPeers(), msgToSend)
+	host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend)
 	// Set state to AnnounceDone
 	consensus.state = AnnounceDone
 	consensus.commitByLeader(true)
@@ -260,7 +261,7 @@ func (consensus *Consensus) processCommitMessage(payload []byte, targetState Sta
 		consensus.responseByLeader(challengeScalar, targetState == ChallengeDone)
 
 		// Broadcast challenge message
-		p2p.BroadcastMessageFromLeader(consensus.GetValidatorPeers(), msgToSend)
+		host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend)
 
 		// Set state to targetState (ChallengeDone or FinalChallengeDone)
 		consensus.state = targetState
@@ -417,7 +418,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState S
 				// Start the second round of Cosi
 				msgToSend := consensus.constructCollectiveSigMessage(collectiveSig, bitmap)
 
-				p2p.BroadcastMessageFromLeader(consensus.GetValidatorPeers(), msgToSend)
+				host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend)
 				consensus.commitByLeader(false)
 			} else {
 				consensus.Log.Debug("Consensus reached with signatures.", "numOfSignatures", len(*responses))

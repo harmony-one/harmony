@@ -21,6 +21,7 @@ import (
 	"github.com/harmony-one/harmony/newnode"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/p2p/p2pimpl"
 	proto_node "github.com/harmony-one/harmony/proto/node"
 	"github.com/harmony-one/harmony/utils"
 )
@@ -70,21 +71,15 @@ func main() {
 	var config *client_config.Config
 
 	if *peerDiscovery {
-
 		candidateNode := newnode.New(*ip, *port)
 		BCPeer := p2p.Peer{IP: *idcIP, Port: *idcPort}
-		service := candidateNode.NewService(*ip, *port)
-		candidateNode.ConnectBeaconChain(BCPeer)
+		candidateNode.ContactBeaconChain(BCPeer)
 		peers = nil
-
-		service.Stop()
-
 		clientPeer = &p2p.Peer{IP: *ip, Port: *port}
 		_, pubKey := utils.GenKey(clientPeer.IP, clientPeer.Port)
 		clientPeer.PubKey = pubKey
 
 		shardIDLeaderMap = candidateNode.Leaders
-
 	} else {
 		// Read the configs
 		config = client_config.NewConfig()
@@ -93,6 +88,9 @@ func main() {
 		clientPeer = config.GetClientPeer()
 		_, pubKey := utils.GenKey(clientPeer.IP, clientPeer.Port)
 		clientPeer.PubKey = pubKey
+	}
+	if clientPeer == nil {
+		panic("Client Peer is nil!")
 	}
 	debugPrintShardIDLeaderMap(shardIDLeaderMap)
 
@@ -116,20 +114,20 @@ func main() {
 	// Nodes containing utxopools to mirror the shards' data in the network
 	nodes := []*node.Node{}
 	for shardID := range shardIDLeaderMap {
-		node := node.New(&consensus.Consensus{ShardID: shardID}, nil, *clientPeer)
+		_, pubKey := utils.GenKey(clientPeer.IP, clientPeer.Port)
+		clientPeer.PubKey = pubKey
+		host := p2pimpl.NewHost(*clientPeer)
+		node := node.New(host, &consensus.Consensus{ShardID: shardID}, nil)
 		// Assign many fake addresses so we have enough address to play with at first
 		node.AddTestingAddresses(setting.NumOfAddress)
 		nodes = append(nodes, node)
 	}
 
 	// Client/txgenerator server node setup
-	if clientPeer == nil {
-		panic("Client Peer is nil!")
-	}
-	consensusObj := consensus.New(*clientPeer, "0", nil, p2p.Peer{})
-	clientNode := node.New(consensusObj, nil, *clientPeer)
-
-	clientNode.Client = client.NewClient(&shardIDLeaderMap)
+	host := p2pimpl.NewHost(*clientPeer)
+	consensusObj := consensus.New(host, "0", nil, p2p.Peer{})
+	clientNode := node.New(host, consensusObj, nil)
+	clientNode.Client = client.NewClient(clientNode.GetHost(), &shardIDLeaderMap)
 
 	// This func is used to update the client's utxopool when new blocks are received from the leaders
 	updateBlocksFunc := func(blocks []*blockchain.Block) {
@@ -222,7 +220,7 @@ func main() {
 			lock.Lock()
 			for shardID, txs := range shardIDTxsMap { // Send the txs to corresponding shards
 				go func(shardID uint32, txs types.Transactions) {
-					SendTxsToLeaderAccount(shardIDLeaderMap[shardID], txs)
+					SendTxsToLeaderAccount(clientNode, shardIDLeaderMap[shardID], txs)
 				}(shardID, txs)
 			}
 			lock.Unlock()
@@ -275,7 +273,7 @@ func main() {
 			lock.Lock()
 			for shardID, txs := range shardIDTxsMap { // Send the txs to corresponding shards
 				go func(shardID uint32, txs []*blockchain.Transaction) {
-					SendTxsToLeader(shardIDLeaderMap[shardID], txs)
+					SendTxsToLeader(clientNode, shardIDLeaderMap[shardID], txs)
 				}(shardID, txs)
 			}
 			lock.Unlock()
@@ -292,22 +290,22 @@ func main() {
 	} else {
 		peers = append(config.GetValidators(), clientNode.Client.GetLeaders()...)
 	}
-	p2p.BroadcastMessage(peers, msg)
+	clientNode.BroadcastMessage(peers, msg)
 	time.Sleep(3000 * time.Millisecond)
 }
 
 // SendTxsToLeader sends txs to leader.
-func SendTxsToLeader(leader p2p.Peer, txs []*blockchain.Transaction) {
+func SendTxsToLeader(clientNode *node.Node, leader p2p.Peer, txs []*blockchain.Transaction) {
 	log.Debug("[Generator] Sending txs to...", "leader", leader, "numTxs", len(txs))
 	msg := proto_node.ConstructTransactionListMessage(txs)
-	p2p.SendMessage(leader, msg)
+	clientNode.SendMessage(leader, msg)
 }
 
 // SendTxsToLeaderAccount sends txs to leader account.
-func SendTxsToLeaderAccount(leader p2p.Peer, txs types.Transactions) {
+func SendTxsToLeaderAccount(clientNode *node.Node, leader p2p.Peer, txs types.Transactions) {
 	log.Debug("[Generator] Sending account-based txs to...", "leader", leader, "numTxs", len(txs))
 	msg := proto_node.ConstructTransactionListMessageAccount(txs)
-	p2p.SendMessage(leader, msg)
+	clientNode.SendMessage(leader, msg)
 }
 
 func debugPrintShardIDLeaderMap(leaderMap map[uint32]p2p.Peer) {
