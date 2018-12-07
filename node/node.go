@@ -29,9 +29,9 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 	proto_node "github.com/harmony-one/harmony/proto/node"
-	"github.com/harmony-one/harmony/syncing"
-	"github.com/harmony-one/harmony/syncing/downloader"
-	downloader_pb "github.com/harmony-one/harmony/syncing/downloader/proto"
+	"github.com/harmony-one/harmony/services/syncing"
+	"github.com/harmony-one/harmony/services/syncing/downloader"
+	downloader_pb "github.com/harmony-one/harmony/services/syncing/downloader/proto"
 )
 
 // State is a state of a node.
