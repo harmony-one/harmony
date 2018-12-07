@@ -75,7 +75,7 @@ cleanup
 echo "compiling ..."
 go build -o bin/benchmark
 go build -o bin/txgen client/txgen/main.go
-go build -o bin/beacon runbeacon/run-beacon.go
+go build -o bin/beacon beaconchain/main/main.go
 
 # Create a tmp folder for logs
 t=`date +"%Y%m%d-%H%M%S"`
