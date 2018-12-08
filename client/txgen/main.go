@@ -175,7 +175,7 @@ func main() {
 		go clientNode.JoinShard(leader)
 		// wait for 3 seconds for client to send ping message to leader
 		time.Sleep(3 * time.Second)
-		clientNode.StopPing <- 1
+		clientNode.StopPing <- struct{}{}
 		clientNode.State = node.NodeJoinedShard
 	}
 
