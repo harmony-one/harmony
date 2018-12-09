@@ -13,14 +13,14 @@ import (
 type HostV1 struct {
 	self     p2p.Peer
 	listener net.Listener
-	quit     chan bool
+	quit     chan struct{}
 }
 
 // New creates a HostV1
 func New(self p2p.Peer) *HostV1 {
 	h := &HostV1{
 		self: self,
-		quit: make(chan bool, 1),
+		quit: make(chan struct{}, 1),
 	}
 	return h
 }
@@ -46,12 +46,13 @@ func (host *HostV1) BindHandlerAndServe(handler p2p.StreamHandler) {
 	}
 	backoff := p2p.NewExpBackoff(250*time.Millisecond, 15*time.Second, 2.0)
 	for { // Keep listening
+		conn, err := host.listener.Accept()
 		select {
 		case <-host.quit:
+			// If we've already received quit signal, simply ignore the error and return
 			return
 		default:
 			{
-				conn, err := host.listener.Accept()
 				if err != nil {
 					log.Error("Error listening on port.", "port", port,
 						"err", err)
@@ -94,6 +95,6 @@ func (host *HostV1) SendMessage(peer p2p.Peer, message []byte) (err error) {
 
 // Close closes the host
 func (host *HostV1) Close() error {
-	host.quit <- true
+	host.quit <- struct{}{}
 	return host.listener.Close()
 }
