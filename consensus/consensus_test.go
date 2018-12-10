@@ -5,6 +5,7 @@ import (
 
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
+	"github.com/harmony-one/harmony/utils"
 )
 
 func TestNew(test *testing.T) {
@@ -24,7 +25,39 @@ func TestNew(test *testing.T) {
 		test.Error("Consensus ReadySignal should be initialized")
 	}
 
+	if consensus.OfflinePeers == nil {
+		test.Error("Consensus OfflinePeers should be initialized")
+	}
+
 	if consensus.leader != leader {
 		test.Error("Consensus Leader is set to wrong Peer")
+	}
+}
+
+func TestRemovePeers(t *testing.T) {
+	_, pk1 := utils.GenKey("1", "1")
+	_, pk2 := utils.GenKey("2", "2")
+	_, pk3 := utils.GenKey("3", "3")
+	_, pk4 := utils.GenKey("4", "4")
+	_, pk5 := utils.GenKey("5", "5")
+
+	p1 := p2p.Peer{IP: "1", Port: "1", PubKey: pk1}
+	p2 := p2p.Peer{IP: "2", Port: "2", PubKey: pk2}
+	p3 := p2p.Peer{IP: "3", Port: "3", PubKey: pk3}
+	p4 := p2p.Peer{IP: "4", Port: "4", PubKey: pk4}
+
+	peers := []p2p.Peer{p1, p2, p3, p4}
+
+	peerRemove := []p2p.Peer{p1, p2}
+
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "9000", PubKey: pk5}
+	host := p2pimpl.NewHost(leader)
+	consensus := New(host, "0", peers, leader)
+
+	//	consensus.DebugPrintPublicKeys()
+	f := consensus.RemovePeers(peerRemove)
+	if f == 0 {
+		t.Errorf("consensus.RemovePeers return false")
+		consensus.DebugPrintPublicKeys()
 	}
 }

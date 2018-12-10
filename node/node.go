@@ -48,6 +48,26 @@ const (
 	NodeLeader                         // Node is the leader of some shard.
 )
 
+func (state State) String() string {
+	switch state {
+	case NodeInit:
+		return "NodeInit"
+	case NodeWaitToJoin:
+		return "NodeWaitToJoin"
+	case NodeJoinedShard:
+		return "NodeJoinedShard"
+	case NodeOffline:
+		return "NodeOffline"
+	case NodeReadyForConsensus:
+		return "NodeReadyForConsensus"
+	case NodeDoingConsensus:
+		return "NodeDoingConsensus"
+	case NodeLeader:
+		return "NodeLeader"
+	}
+	return "Unknown"
+}
+
 // Constants related to doing syncing.
 const (
 	NotDoingSyncing uint32 = iota

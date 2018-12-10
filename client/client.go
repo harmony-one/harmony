@@ -124,7 +124,7 @@ func (client *Client) handleFetchUtxoResponseMessage(utxoResponse client_proto.F
 
 func (client *Client) sendCrossShardTxUnlockMessage(txsToSend []*blockchain.Transaction) {
 	for shardID, txs := range BuildOutputShardTransactionMap(txsToSend) {
-		host.SendMessage(client.host, (*client.Leaders)[shardID], node.ConstructUnlockToCommitOrAbortMessage(txs))
+		host.SendMessage(client.host, (*client.Leaders)[shardID], node.ConstructUnlockToCommitOrAbortMessage(txs), nil)
 	}
 }
 

@@ -38,6 +38,11 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) 
 	for { // keep waiting for new blocks
 		newBlock := <-blockChannel
 
+		c := consensus.RemovePeers(consensus.OfflinePeerList)
+		if c > 0 {
+			consensus.Log.Debug("WaitForNewBlock", "removed peers", c)
+		}
+
 		if !consensus.HasEnoughValidators() {
 			consensus.Log.Debug("Not enough validators", "# Validators", len(consensus.PublicKeys))
 			time.Sleep(waitForEnoughValidators * time.Millisecond)
@@ -62,6 +67,11 @@ func (consensus *Consensus) WaitForNewBlockAccount(blockChannel chan *types.Bloc
 	for { // keep waiting for new blocks
 		newBlock := <-blockChannel
 		// TODO: think about potential race condition
+
+		c := consensus.RemovePeers(consensus.OfflinePeerList)
+		if c > 0 {
+			consensus.Log.Debug("WaitForNewBlock", "removed peers", c)
+		}
 
 		if !consensus.HasEnoughValidators() {
 			consensus.Log.Debug("Not enough validators", "# Validators", len(consensus.PublicKeys))
@@ -134,7 +144,7 @@ func (consensus *Consensus) startConsensus(newBlock *blockchain.Block) {
 
 	consensus.Log.Debug("Stop encoding block")
 	msgToSend := consensus.constructAnnounceMessage()
-	host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend)
+	host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
 	// Set state to AnnounceDone
 	consensus.state = AnnounceDone
 	consensus.commitByLeader(true)
@@ -261,7 +271,7 @@ func (consensus *Consensus) processCommitMessage(payload []byte, targetState Sta
 		consensus.responseByLeader(challengeScalar, targetState == ChallengeDone)
 
 		// Broadcast challenge message
-		host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend)
+		host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
 
 		// Set state to targetState (ChallengeDone or FinalChallengeDone)
 		consensus.state = targetState
@@ -418,7 +428,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState S
 				// Start the second round of Cosi
 				msgToSend := consensus.constructCollectiveSigMessage(collectiveSig, bitmap)
 
-				host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend)
+				host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
 				consensus.commitByLeader(false)
 			} else {
 				consensus.Log.Debug("Consensus reached with signatures.", "numOfSignatures", len(*responses))

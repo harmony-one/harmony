@@ -1,6 +1,7 @@
 package hostv1
 
 import (
+	"fmt"
 	"io"
 	"net"
 	"time"
@@ -71,18 +72,17 @@ func (host *HostV1) BindHandlerAndServe(handler p2p.StreamHandler) {
 func (host *HostV1) SendMessage(peer p2p.Peer, message []byte) (err error) {
 	addr := net.JoinHostPort(peer.IP, peer.Port)
 	conn, err := net.Dial("tcp", addr)
-	// log.Debug("Dial from local to remote", "localID", net.JoinHostPort(host.self.IP, host.self.Port), "local", conn.LocalAddr(), "remote", addr)
 
 	if err != nil {
-		log.Warn("Dial() failed", "from", net.JoinHostPort(host.self.IP, host.self.Port), "to", addr, "error", err)
-		return
+		log.Warn("HostV1 SendMessage Dial() failed", "from", net.JoinHostPort(host.self.IP, host.self.Port), "to", addr, "error", err)
+		return fmt.Errorf("Dail Failed")
 	}
 	defer conn.Close()
 
 	nw, err := conn.Write(message)
 	if err != nil {
 		log.Warn("Write() failed", "addr", conn.RemoteAddr(), "error", err)
-		return
+		return fmt.Errorf("Write Failed")
 	}
 	if nw < len(message) {
 		log.Warn("Write() returned short count",
@@ -91,7 +91,7 @@ func (host *HostV1) SendMessage(peer p2p.Peer, message []byte) (err error) {
 	}
 
 	// No ack (reply) message from the receiver for now.
-	return
+	return nil
 }
 
 // Close closes the host
