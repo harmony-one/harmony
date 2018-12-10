@@ -148,7 +148,6 @@ func main() {
 	fmt.Println(state.GetBalance(contractAddress))
 	fmt.Println(state.GetCodeHash(contractAddress))
 
-
 	callData := "0x27c78c4200000000000000000000000024182601fe6e2e5da0b831496cc0489b7173b44f"
 	callEnc := common.FromHex(callData)
 	tx, _ = types.SignTx(types.NewTransaction(nonce+uint64(11), contractAddress, 0, big.NewInt(0), params.TxGasContractCreation*10, nil, callEnc), types.HomesteadSigner{}, testBankKey)
