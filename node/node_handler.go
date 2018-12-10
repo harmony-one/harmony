@@ -617,7 +617,7 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 
 	node.State = NodeJoinedShard
 	// Notify JoinShard to stop sending Ping messages
-	node.StopPing <- 1
+	node.StopPing <- struct{}{}
 
 	return node.Consensus.UpdatePublicKeys(publicKeys)
 }

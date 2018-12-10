@@ -109,7 +109,7 @@ type Node struct {
 	host host.Host
 
 	// Channel to stop sending ping message
-	StopPing chan int
+	StopPing chan struct{}
 }
 
 // Add new crossTx and proofs to the list of crossTx that needs to be sent back to client
@@ -301,7 +301,7 @@ func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 
 	// Setup initial state of syncing.
 	node.syncingState = NotDoingSyncing
-	node.StopPing = make(chan int)
+	node.StopPing = make(chan struct{})
 
 	return &node
 }

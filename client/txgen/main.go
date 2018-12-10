@@ -52,8 +52,8 @@ func main() {
 	versionFlag := flag.Bool("version", false, "Output version info")
 	crossShardRatio := flag.Int("cross_shard_ratio", 30, "The percentage of cross shard transactions.")
 
-	idcIP := flag.String("idc", "127.0.0.1", "IP of the identity chain")
-	idcPort := flag.String("idc_port", "8081", "port of the identity chain")
+	bcIP := flag.String("bc", "127.0.0.1", "IP of the identity chain")
+	bcPort := flag.String("bc_port", "8081", "port of the identity chain")
 	peerDiscovery := flag.Bool("peer_discovery", false, "Enable Peer Discovery")
 
 	flag.Parse()
@@ -72,7 +72,7 @@ func main() {
 
 	if *peerDiscovery {
 		candidateNode := newnode.New(*ip, *port)
-		BCPeer := p2p.Peer{IP: *idcIP, Port: *idcPort}
+		BCPeer := p2p.Peer{IP: *bcIP, Port: *bcPort}
 		candidateNode.ContactBeaconChain(BCPeer)
 		peers = nil
 		clientPeer = &p2p.Peer{IP: *ip, Port: *port}
@@ -175,7 +175,7 @@ func main() {
 		go clientNode.JoinShard(leader)
 		// wait for 3 seconds for client to send ping message to leader
 		time.Sleep(3 * time.Second)
-		clientNode.StopPing <- 1
+		clientNode.StopPing <- struct{}{}
 		clientNode.State = node.NodeJoinedShard
 	}
 

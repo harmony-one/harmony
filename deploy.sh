@@ -37,7 +37,7 @@ EOU
    exit 0
 }
 
-PEER=
+PEER=-peer_discovery
 DB=
 TXGEN=true
 DURATION=90
