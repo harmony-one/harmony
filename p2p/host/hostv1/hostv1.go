@@ -50,6 +50,7 @@ func (host *HostV1) BindHandlerAndServe(handler p2p.StreamHandler) {
 		select {
 		case <-host.quit:
 			// If we've already received quit signal, simply ignore the error and return
+			log.Info("Quit host", "addr", net.JoinHostPort(host.self.IP, host.self.Port))
 			return
 		default:
 			{
