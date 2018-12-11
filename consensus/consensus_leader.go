@@ -114,6 +114,7 @@ func (consensus *Consensus) ProcessMessageLeader(message []byte) {
 }
 
 // processStartConsensusMessage is the handler for message which triggers consensus process.
+// TODO(minh): clean-up. this function is never called.
 func (consensus *Consensus) processStartConsensusMessage(payload []byte) {
 	// TODO: remove these method after testnet
 	tx := blockchain.NewCoinbaseTX([20]byte{0}, "y", 0)

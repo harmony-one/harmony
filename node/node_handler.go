@@ -310,7 +310,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
 
 							node.transactionInConsensus = selectedTxs
 							node.CrossTxsInConsensus = crossShardTxAndProofs
-							newBlock = blockchain.NewBlock(selectedTxs, node.blockchain.GetLatestBlock().Hash, node.Consensus.ShardID)
+							newBlock = blockchain.NewBlock(selectedTxs, node.blockchain.GetLatestBlock().Hash, node.Consensus.ShardID, false)
 							break
 						}
 					}
