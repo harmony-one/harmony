@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"github.com/ethereum/go-ethereum/common"
 	"log"
 	"math/big"
 
@@ -18,7 +20,7 @@ var (
 	// Test accounts
 	testBankKey, _  = crypto.GenerateKey()
 	testBankAddress = crypto.PubkeyToAddress(testBankKey.PublicKey)
-	testBankFunds   = big.NewInt(1000000000000000000)
+	testBankFunds   = big.NewInt(8000000000000000000)
 
 	testUserKey, _  = crypto.GenerateKey()
 	testUserAddress = crypto.PubkeyToAddress(testUserKey.PublicKey)
@@ -83,7 +85,7 @@ func main() {
 		}
 	}
 
-	txs := make([]*types.Transaction, 100)
+	txs := make([]*types.Transaction, 10)
 	worker := worker.New(params.TestChainConfig, chain, consensus.NewFaker(), crypto.PubkeyToAddress(testBankKey.PublicKey))
 	nonce := worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(testBankKey.PublicKey))
 	for i := range txs {
@@ -93,5 +95,72 @@ func main() {
 		txs[i] = tx
 	}
 
-	worker.CommitTransactions(txs)
+	// Add a contract deployment transaction
+	//pragma solidity >=0.4.22 <0.6.0;
+	//
+	//contract Faucet {
+	//	mapping(address => bool) processed;
+	//	uint quota = 0.5 ether;
+	//	address owner;
+	//	constructor() public payable {
+	//	owner = msg.sender;
+	//}
+	//	function request(address payable requestor) public {
+	//	require(msg.sender == owner);
+	//	require(quota <= address(this).balance);
+	//	require(!processed[requestor]);
+	//	processed[requestor] = true;
+	//	requestor.transfer(quota);
+	//}
+	//	function money() public view returns(uint) {
+	//	return address(this).balance;
+	//}
+	//}
+	contractData := "0x60806040526706f05b59d3b2000060015560028054600160a060020a031916331790556101aa806100316000396000f3fe608060405260043610610045577c0100000000000000000000000000000000000000000000000000000000600035046327c78c42811461004a5780634ddd108a1461008c575b600080fd5b34801561005657600080fd5b5061008a6004803603602081101561006d57600080fd5b503573ffffffffffffffffffffffffffffffffffffffff166100b3565b005b34801561009857600080fd5b506100a1610179565b60408051918252519081900360200190f35b60025473ffffffffffffffffffffffffffffffffffffffff1633146100d757600080fd5b600154303110156100e757600080fd5b73ffffffffffffffffffffffffffffffffffffffff811660009081526020819052604090205460ff161561011a57600080fd5b73ffffffffffffffffffffffffffffffffffffffff8116600081815260208190526040808220805460ff1916600190811790915554905181156108fc0292818181858888f19350505050158015610175573d6000803e3d6000fd5b5050565b30319056fea165627a7a72305820fc2f7280f3590bd63f7b13a34411e0086c18e5a947b4437759ee79fbc566782f0029"
+	_ = contractData
+	dataEnc := common.FromHex(contractData)
+
+	tx, _ := types.SignTx(types.NewContractCreation(nonce+uint64(10), 0, big.NewInt(7000000000000000000), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, testBankKey)
+	// Figure out the contract address which is determined by sender.address and nonce
+	contractAddress := crypto.CreateAddress(testBankAddress, nonce+uint64(10))
+
+	state := worker.GetCurrentState()
+	// Before the contract is deployed the code is empty
+	fmt.Println(state.GetCodeHash(contractAddress))
+
+	txs = append(txs, tx)
+	err := worker.CommitTransactions(txs)
+	if err != nil {
+		fmt.Println(err)
+	}
+	block, _ := worker.Commit()
+	_, err = chain.InsertChain(types.Blocks{block})
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(contractAddress)
+
+	receipts := worker.GetCurrentReceipts()
+	fmt.Println(receipts[len(receipts)-1].ContractAddress)
+	fmt.Println(receipts[len(receipts)-1])
+	fmt.Println(state.GetNonce(testBankAddress))
+	fmt.Println(state.GetNonce(contractAddress))
+	fmt.Println(state.GetBalance(contractAddress))
+	fmt.Println(state.GetCodeHash(contractAddress))
+
+	callData := "0x27c78c4200000000000000000000000024182601fe6e2e5da0b831496cc0489b7173b44f"
+	callEnc := common.FromHex(callData)
+	tx, _ = types.SignTx(types.NewTransaction(nonce+uint64(11), contractAddress, 0, big.NewInt(0), params.TxGasContractCreation*10, nil, callEnc), types.HomesteadSigner{}, testBankKey)
+
+	err = worker.CommitTransactions(types.Transactions{tx})
+
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(receipts[len(receipts)-1].ContractAddress)
+	fmt.Println(receipts[len(receipts)-1])
+	fmt.Println(state.GetNonce(testBankAddress))
+	fmt.Println(state.GetNonce(contractAddress))
+	fmt.Println(state.GetBalance(contractAddress))
+	fmt.Println(state.GetCodeHash(contractAddress))
 }
