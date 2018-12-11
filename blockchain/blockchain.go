@@ -195,7 +195,7 @@ func (bc *Blockchain) NewUTXOTransaction(priKey kyber.Scalar, from, to [20]byte,
 func (bc *Blockchain) AddNewUserTransfer(utxoPool *UTXOPool, priKey kyber.Scalar, from, to [20]byte, amount int, shardID uint32) bool {
 	tx := bc.NewUTXOTransaction(priKey, from, to, amount, shardID)
 	if tx != nil {
-		newBlock := NewBlock([]*Transaction{tx}, bc.Blocks[len(bc.Blocks)-1].Hash, shardID)
+		newBlock := NewBlock([]*Transaction{tx}, bc.Blocks[len(bc.Blocks)-1].Hash, shardID, false)
 		if bc.VerifyNewBlockAndUpdate(utxoPool, newBlock) {
 			return true
 		}

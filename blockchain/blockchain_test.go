@@ -84,7 +84,7 @@ func TestVerifyNewBlock(t *testing.T) {
 	if tx == nil {
 		t.Error("failed to create a new transaction.")
 	}
-	newBlock := NewBlock([]*Transaction{tx}, bc.Blocks[len(bc.Blocks)-1].Hash, 0)
+	newBlock := NewBlock([]*Transaction{tx}, bc.Blocks[len(bc.Blocks)-1].Hash, 0, false)
 
 	if !bc.VerifyNewBlockAndUpdate(utxoPool, newBlock) {
 		t.Error("failed to add a new valid block.")
