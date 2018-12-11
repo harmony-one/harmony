@@ -3,7 +3,6 @@ package syncing
 import (
 	"bytes"
 	"reflect"
-	"sort"
 	"sync"
 	"time"
 
@@ -44,8 +43,8 @@ type SyncConfig struct {
 }
 
 // GetStateSync returns the implementation of StateSyncInterface interface.
-func GetStateSync() *StateSync {
-	return &StateSync{}
+func GetStateSync(port string) *StateSync {
+	return &StateSync{port: port}
 }
 
 // StateSync is the struct that implements StateSyncInterface.
@@ -55,6 +54,7 @@ type StateSync struct {
 	blockHeight        int
 	syncConfig         *SyncConfig
 	stateSyncTaskQueue *queue.Queue
+	port               string
 }
 
 // CreateTestSyncPeerConfig used for testing.
@@ -129,7 +129,7 @@ func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer) {
 			ip:   peers[id].IP,
 			port: peers[id].Port,
 		}
-		Log.Debug("CreateSyncConfig: peer port to connect", "port", peers[id].Port)
+		Log.Debug("CreateSyncConfig: peer port to connect", "myport", ss.port, "port", peers[id].Port)
 	}
 	Log.Info("syncing: Finished creating SyncConfig.")
 }
@@ -147,7 +147,7 @@ func (ss *StateSync) MakeConnectionToPeers() {
 	}
 	wg.Wait()
 	ss.CleanUpNilPeers()
-	Log.Info("syncing: Finished making connection to peers.")
+	Log.Info("syncing: Finished making connection to peers.", "myport", ss.port)
 }
 
 // CleanUpNilPeers cleans up peer with nil client and recalculate activePeerNumber.
@@ -209,17 +209,19 @@ func (syncConfig *SyncConfig) CleanUpPeers(maxFirstID int) {
 
 // GetBlockHashesConsensusAndCleanUp chesk if all consensus hashes are equal.
 func (ss *StateSync) GetBlockHashesConsensusAndCleanUp() bool {
+	// TODO(minhdoan): Fix this logic later.
+	return true
 	// Sort all peers by the blockHashes.
-	sort.Slice(ss.syncConfig.peers, func(i, j int) bool {
-		return CompareSyncPeerConfigByblockHashes(ss.syncConfig.peers[i], ss.syncConfig.peers[j]) == -1
-	})
-	maxFirstID, maxCount := ss.syncConfig.GetHowManyMaxConsensus()
-	if float64(maxCount) >= ConsensusRatio*float64(ss.activePeerNumber) {
-		ss.syncConfig.CleanUpPeers(maxFirstID)
-		ss.CleanUpNilPeers()
-		return true
-	}
-	return false
+	// sort.Slice(ss.syncConfig.peers, func(i, j int) bool {
+	// 	return CompareSyncPeerConfigByblockHashes(ss.syncConfig.peers[i], ss.syncConfig.peers[j]) == -1
+	// })
+	// maxFirstID, maxCount := ss.syncConfig.GetHowManyMaxConsensus()
+	// if float64(maxCount) >= ConsensusRatio*float64(ss.activePeerNumber) {
+	// 	ss.syncConfig.CleanUpPeers(maxFirstID)
+	// 	ss.CleanUpNilPeers()
+	// 	return true
+	// }
+	// return false
 }
 
 // GetConsensusHashes gets all hashes needed to download.
@@ -229,8 +231,10 @@ func (ss *StateSync) GetConsensusHashes() bool {
 		var wg sync.WaitGroup
 		wg.Add(ss.activePeerNumber)
 
+		Log.Info("GetConsensusHashes", "peer length", len(ss.syncConfig.peers), "activePeer", ss.activePeerNumber)
 		for id := range ss.syncConfig.peers {
 			if ss.syncConfig.peers[id].client == nil {
+				Log.Info("GetConsensusHashes - client is nil")
 				continue
 			}
 			go func(peerConfig *SyncPeerConfig) {
@@ -240,7 +244,9 @@ func (ss *StateSync) GetConsensusHashes() bool {
 			}(ss.syncConfig.peers[id])
 		}
 		wg.Wait()
+		Log.Info("GetConsensusHashes checking hash consensus")
 		if ss.GetBlockHashesConsensusAndCleanUp() {
+			Log.Info("GetConsensusHashes got consensus", "myport", ss.port)
 			break
 		}
 		if count > TimesToFail {
@@ -271,7 +277,7 @@ func (ss *StateSync) generateStateSyncTaskQueue(bc *blockchain.Blockchain) {
 			break
 		}
 	}
-	Log.Info("syncing: Finished generateStateSyncTaskQueue.")
+	Log.Info("syncing: Finished generateStateSyncTaskQueue.", "myport", ss.port, "task length", ss.stateSyncTaskQueue.Len())
 }
 
 // downloadBlocks downloads blocks from state sync task queue.
@@ -306,7 +312,7 @@ func (ss *StateSync) downloadBlocks(bc *blockchain.Blockchain) {
 		}(ss.syncConfig.peers[i], ss.stateSyncTaskQueue, bc)
 	}
 	wg.Wait()
-	Log.Info("syncing: Finished downloadBlocks.")
+	Log.Info("syncing: Finished downloadBlocks.", "myport", ss.port)
 }
 
 // StartStateSync starts state sync.
@@ -317,6 +323,7 @@ func (ss *StateSync) StartStateSync(peers []p2p.Peer, bc *blockchain.Blockchain)
 	ss.MakeConnectionToPeers()
 	// Gets consensus hashes.
 	if !ss.GetConsensusHashes() {
+		Log.Info("failed to get consensus hash", "myport", ss.port)
 		return false
 	}
 	ss.generateStateSyncTaskQueue(bc)

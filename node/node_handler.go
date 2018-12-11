@@ -90,10 +90,10 @@ func (node *Node) StreamHandler(s p2p.Stream) {
 			}
 		}
 	case proto.Consensus:
-		// if !(node.State == NodeDoingConsensus || node.State == NodeLeader || node.State == NodeReadyForConsensus) {
-		// 	node.log.Info("This node with ", "peer", node.SelfPeer, "can not join consensus because they are either not noding consensus or not a leader", nil)
-		// 	break
-		// }
+		if !(node.State == NodeDoingConsensus || node.State == NodeLeader || node.State == NodeReadyForConsensus) {
+			node.log.Info("This node with ", "peer", node.SelfPeer, "can not join consensus because they are either not noding consensus or not a leader", nil)
+			break
+		}
 		actionType := consensus.ConMessageType(msgType)
 		switch actionType {
 		case consensus.Consensus:
@@ -208,9 +208,9 @@ func (node *Node) StreamHandler(s p2p.Stream) {
 	}
 
 	// Post processing after receiving messsages.
-	// if node.State == NodeJoinedShard || node.State == NodeReadyForConsensus {
-	// 	go node.DoSyncing()
-	// }
+	if node.State == NodeJoinedShard || node.State == NodeReadyForConsensus {
+		go node.DoSyncing()
+	}
 }
 
 func (node *Node) transactionMessageHandler(msgPayload []byte) {
@@ -583,6 +583,10 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 	peers := make([]*p2p.Peer, 0)
 
 	for _, p := range pong.Peers {
+		// Filter peer which is equal to node.SelfPeer.
+		if p.IP == node.SelfPeer.IP && p.Port == node.SelfPeer.Port {
+			continue
+		}
 		peer := new(p2p.Peer)
 		peer.IP = p.IP
 		peer.Port = p.Port
@@ -599,6 +603,7 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 
 	if len(peers) > 0 {
 		node.AddPeers(peers)
+		node.log.Info("peer neighbors", "myport", node.SelfPeer.Port, "peers", *peers[0])
 	}
 
 	// Reset Validator PublicKeys every time we receive PONG message from Leader

@@ -267,6 +267,9 @@ func (node *Node) AddSmartContractsToPendingTransactions() {
 func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 	node := Node{}
 
+	// Logger
+	node.log = log.New()
+
 	if host != nil {
 		node.host = host
 		node.SelfPeer = host.GetSelfPeer()
@@ -285,6 +288,8 @@ func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 		coinbaseTx := blockchain.NewCoinbaseTX(pki.GetAddressFromInt(1), "0", node.Consensus.ShardID)
 		genesisBlock.Blocks = append(genesisBlock.Blocks, blockchain.NewGenesisBlock(coinbaseTx, node.Consensus.ShardID))
 		node.blockchain = genesisBlock
+
+		node.log.Info("genesis block", "hash", genesisBlock.Blocks[0].Hash)
 
 		// UTXO pool from Genesis block
 		node.UtxoPool = blockchain.CreateUTXOPoolFromGenesisBlock(node.blockchain.Blocks[0])
@@ -335,8 +340,6 @@ func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 		node.AddSmartContractsToPendingTransactions()
 	}
 
-	// Logger
-	node.log = log.New()
 	if consensus.IsLeader {
 		node.State = NodeLeader
 	} else {
@@ -360,12 +363,14 @@ func (node *Node) DoSyncing() {
 		return
 	}
 	defer atomic.StoreUint32(&node.syncingState, NotDoingSyncing)
+	syncingPeers := node.GetSyncingPeers()
 	if node.stateSync == nil {
-		node.stateSync = syncing.GetStateSync()
+		node.stateSync = syncing.GetStateSync(node.SelfPeer.Port)
 	}
-	if node.stateSync.StartStateSync(node.GetSyncingPeers(), node.blockchain) {
-		node.log.Debug("DoSyncing: successfully sync")
+	if len(syncingPeers) == 0 || node.stateSync.StartStateSync(syncingPeers, node.blockchain) {
+		node.log.Debug("DoSyncing: successfully sync", "length of syncing peers", len(syncingPeers))
 		if node.State == NodeJoinedShard {
+			node.log.Info("moved to NodeReadyForConsensus")
 			node.State = NodeReadyForConsensus
 		}
 	} else {
