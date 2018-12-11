@@ -25,10 +25,6 @@ func TestNew(test *testing.T) {
 		test.Error("Consensus ReadySignal should be initialized")
 	}
 
-	if consensus.OfflinePeers == nil {
-		test.Error("Consensus OfflinePeers should be initialized")
-	}
-
 	if consensus.leader != leader {
 		test.Error("Consensus Leader is set to wrong Peer")
 	}

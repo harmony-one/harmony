@@ -194,8 +194,7 @@ func New(host host.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Con
 	consensus.Log = log.New()
 	consensus.uniqueIDInstance = utils.GetUniqueValidatorIDInstance()
 
-	consensus.OfflinePeers = make(chan p2p.Peer)
-	go consensus.RemovePeersHandler()
+	consensus.OfflinePeerList = make([]p2p.Peer, 0)
 
 	//	consensus.Log.Info("New Consensus", "IP", ip, "Port", port, "NodeID", consensus.nodeID, "priKey", consensus.priKey, "pubKey", consensus.pubKey)
 	return &consensus
@@ -330,17 +329,6 @@ func (consensus *Consensus) RemovePeers(peers []p2p.Peer) int {
 	}
 
 	return count2
-}
-
-// RemovePeersHandler is a goroutine to wait on the OfflinePeers channel
-// and remove the peers from validator list
-func (consensus *Consensus) RemovePeersHandler() {
-	for {
-		select {
-		case p := <-consensus.OfflinePeers:
-			consensus.OfflinePeerList = append(consensus.OfflinePeerList, p)
-		}
-	}
 }
 
 // DebugPrintPublicKeys print all the PublicKeys in string format in Consensus
