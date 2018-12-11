@@ -51,7 +51,7 @@ EOU
 
 PEER=-peer_discovery
 DB=
-TXGEN=true
+TXGEN=false
 DURATION=90
 MIN=5
 SHARDS=2
@@ -62,7 +62,7 @@ while getopts "hpdtD:m:s:k:" option; do
       h) usage ;;
       p) PEER='-peer_discovery' ;;
       d) DB='-db_supported' ;;
-      t) TXGEN=false ;;
+      t) TXGEN=$OPTARG ;;
       D) DURATION=$OPTARG ;;
       m) MIN=$OPTARG ;;
       s) SHARDS=$OPTARG ;;
@@ -122,6 +122,7 @@ done < $config
 
 echo "launching txgen ..."
 if [ "$TXGEN" == "true" ]; then
+   echo "launching txgen ..."
    if [ -z "$PEER" ]; then
       ./bin/txgen -config_file $config -log_folder $log_folder -duration $DURATION
    else
@@ -129,4 +130,4 @@ if [ "$TXGEN" == "true" ]; then
    fi
 fi
 
-cleanup
+# cleanup

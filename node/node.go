@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"encoding/gob"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"math/rand"
@@ -305,6 +306,7 @@ func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 			testBankKey, _ := ecdsa.GenerateKey(crypto.S256(), reader)
 			testBankAddress := crypto.PubkeyToAddress(testBankKey.PublicKey)
 			testBankFunds := big.NewInt(8000000000000000000)
+			fmt.Println(hex.EncodeToString(crypto.FromECDSA(testBankKey)))
 			genesisAloc[testBankAddress] = core.GenesisAccount{Balance: testBankFunds}
 			node.TestBankKeys = append(node.TestBankKeys, testBankKey)
 		}
@@ -337,7 +339,7 @@ func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 
 	// Logger
 	node.log = log.New()
-	if consensus.IsLeader {
+	if consensus != nil && consensus.IsLeader {
 		node.State = NodeLeader
 	} else {
 		node.State = NodeInit
