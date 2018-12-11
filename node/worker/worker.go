@@ -134,6 +134,11 @@ func (w *Worker) GetCurrentState() *state.StateDB {
 	return w.current.state
 }
 
+// GetCurrentReceipts ...
+func (w *Worker) GetCurrentReceipts() []*types.Receipt {
+	return w.current.receipts
+}
+
 // Commit ...
 func (w *Worker) Commit() (*types.Block, error) {
 	s := w.current.state.Copy()
