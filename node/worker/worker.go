@@ -134,7 +134,7 @@ func (w *Worker) GetCurrentState() *state.StateDB {
 	return w.current.state
 }
 
-// GetCurrentState ...
+// GetCurrentReceipts ...
 func (w *Worker) GetCurrentReceipts() []*types.Receipt {
 	return w.current.receipts
 }
