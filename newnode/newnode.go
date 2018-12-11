@@ -89,7 +89,7 @@ checkLoop:
 				gotShardInfo = true
 				break checkLoop
 			} else {
-				host.SendMessage(node.host, BCPeer, msgToSend)
+				host.SendMessage(node.host, BCPeer, msgToSend, nil)
 			}
 		}
 	}

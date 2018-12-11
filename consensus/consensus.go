@@ -3,6 +3,7 @@ package consensus // consensus
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
 	"sync"
 
@@ -21,6 +22,8 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/utils"
+
+	proto_node "github.com/harmony-one/harmony/proto/node"
 )
 
 // Consensus data containing all info related to one round of consensus process
@@ -99,6 +102,12 @@ type Consensus struct {
 
 	// The p2p host used to send/receive p2p messages
 	host host.Host
+
+	// Signal channel for lost validators
+	OfflinePeers chan p2p.Peer
+
+	// List of offline Peers
+	OfflinePeerList []p2p.Peer
 }
 
 // BlockConsensusStatus used to keep track of the consensus status of multiple blocks received so far
@@ -185,6 +194,8 @@ func New(host host.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Con
 	consensus.Log = log.New()
 	consensus.uniqueIDInstance = utils.GetUniqueValidatorIDInstance()
 
+	consensus.OfflinePeerList = make([]p2p.Peer, 0)
+
 	//	consensus.Log.Info("New Consensus", "IP", ip, "Port", port, "NodeID", consensus.nodeID, "priKey", consensus.priKey, "pubKey", consensus.pubKey)
 	return &consensus
 }
@@ -230,6 +241,9 @@ func (consensus *Consensus) ResetState() {
 	consensus.aggregatedCommitment = nil
 	consensus.aggregatedFinalCommitment = nil
 	consensus.secret = map[uint32]kyber.Scalar{}
+
+	// Clear the OfflinePeersList again
+	consensus.OfflinePeerList = make([]p2p.Peer, 0)
 }
 
 // Returns a string representation of this consensus
@@ -256,18 +270,65 @@ func (consensus *Consensus) AddPeers(peers []*p2p.Peer) int {
 				peer.ValidatorID = int(consensus.uniqueIDInstance.GetUniqueID())
 			}
 			consensus.validators.Store(utils.GetUniqueIDFromPeer(*peer), *peer)
+			consensus.pubKeyLock.Lock()
 			consensus.PublicKeys = append(consensus.PublicKeys, peer.PubKey)
+			consensus.pubKeyLock.Unlock()
 		}
 		count++
 	}
 	return count
 }
 
-// RemovePeers will remove the peers from the validator list and PublicKeys
+// RemovePeers will remove the peer from the validator list and PublicKeys
 // It will be called when leader/node lost connection to peers
 func (consensus *Consensus) RemovePeers(peers []p2p.Peer) int {
-	// TODO (lc) we need to have a corresponding RemovePeers function
-	return 0
+	// early return as most of the cases no peers to remove
+	if len(peers) == 0 {
+		return 0
+	}
+
+	count := 0
+	count2 := 0
+	newList := append(consensus.PublicKeys[:0:0], consensus.PublicKeys...)
+
+	for _, peer := range peers {
+		consensus.validators.Range(func(k, v interface{}) bool {
+			if p, ok := v.(p2p.Peer); ok {
+				// We are using peer.IP and peer.Port to identify the unique peer
+				// FIXME (lc): use a generic way to identify a peer
+				if p.IP == peer.IP && p.Port == peer.Port {
+					consensus.validators.Delete(k)
+					count++
+				}
+				return true
+			}
+			return false
+		})
+
+		for i, pp := range newList {
+			// Not Found the pubkey, if found pubkey, ignore it
+			if reflect.DeepEqual(peer.PubKey, pp) {
+				//				consensus.Log.Debug("RemovePeers", "i", i, "pp", pp, "peer.PubKey", peer.PubKey)
+				newList = append(newList[:i], newList[i+1:]...)
+				count2++
+			}
+		}
+	}
+
+	if count2 > 0 {
+		consensus.UpdatePublicKeys(newList)
+
+		// Send out Pong messages to everyone in the shard to keep the publickeys in sync
+		// Or the shard won't be able to reach consensus if public keys are mismatch
+
+		validators := consensus.GetValidatorPeers()
+		pong := proto_node.NewPongMessage(validators, consensus.PublicKeys)
+		buffer := pong.ConstructPongMessage()
+
+		host.BroadcastMessageFromLeader(consensus.host, validators, buffer, consensus.OfflinePeers)
+	}
+
+	return count2
 }
 
 // DebugPrintPublicKeys print all the PublicKeys in string format in Consensus
@@ -420,5 +481,5 @@ func (consensus *Consensus) GetNodeID() uint16 {
 
 // SendMessage sends message thru p2p host to peer.
 func (consensus *Consensus) SendMessage(peer p2p.Peer, message []byte) {
-	host.SendMessage(consensus.host, peer, message)
+	host.SendMessage(consensus.host, peer, message, nil)
 }

@@ -63,7 +63,7 @@ func (bc *BeaconChain) AcceptConnections(b []byte) {
 	response := bcconn.ResponseRandomNumber{NumberOfShards: bc.NumberOfShards, NumberOfNodesAdded: bc.NumberOfNodesAdded, Leaders: bc.Leaders}
 	msg := bcconn.SerializeRandomInfo(response)
 	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Acknowledge, msg)
-	host.SendMessage(bc.host, Node.Self, msgToSend)
+	host.SendMessage(bc.host, Node.Self, msgToSend, nil)
 }
 
 //StartServer a server and process the request by a handler.

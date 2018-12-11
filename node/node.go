@@ -49,6 +49,26 @@ const (
 	NodeLeader                         // Node is the leader of some shard.
 )
 
+func (state State) String() string {
+	switch state {
+	case NodeInit:
+		return "NodeInit"
+	case NodeWaitToJoin:
+		return "NodeWaitToJoin"
+	case NodeJoinedShard:
+		return "NodeJoinedShard"
+	case NodeOffline:
+		return "NodeOffline"
+	case NodeReadyForConsensus:
+		return "NodeReadyForConsensus"
+	case NodeDoingConsensus:
+		return "NodeDoingConsensus"
+	case NodeLeader:
+		return "NodeLeader"
+	}
+	return "Unknown"
+}
+
 // Constants related to doing syncing.
 const (
 	NotDoingSyncing uint32 = iota
@@ -112,6 +132,9 @@ type Node struct {
 
 	// Channel to stop sending ping message
 	StopPing chan struct{}
+
+	// Signal channel for lost validators
+	OfflinePeers chan p2p.Peer
 }
 
 // Add new crossTx and proofs to the list of crossTx that needs to be sent back to client
@@ -324,6 +347,9 @@ func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 	node.syncingState = NotDoingSyncing
 	node.StopPing = make(chan struct{})
 
+	node.OfflinePeers = make(chan p2p.Peer)
+	go node.RemovePeersHandler()
+
 	return &node
 }
 
@@ -459,4 +485,15 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 		}
 	}
 	return response, nil
+}
+
+// RemovePeersHandler is a goroutine to wait on the OfflinePeers channel
+// and remove the peers from validator list
+func (node *Node) RemovePeersHandler() {
+	for {
+		select {
+		case p := <-node.OfflinePeers:
+			node.Consensus.OfflinePeerList = append(node.Consensus.OfflinePeerList, p)
+		}
+	}
 }

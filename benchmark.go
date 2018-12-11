@@ -180,6 +180,8 @@ func main() {
 	attack.GetInstance().SetLogger(consensus.Log)
 	// Current node.
 	currentNode := node.New(host, consensus, ldb)
+	currentNode.Consensus.OfflinePeers = currentNode.OfflinePeers
+
 	// If there is a client configured in the node list.
 	if clientPeer != nil {
 		currentNode.ClientPeer = clientPeer
