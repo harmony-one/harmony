@@ -22,8 +22,8 @@ type Service struct {
 
 // Init is to do init for ExplorerService.
 func (s *Service) Init() {
-	s.people = append(s.people, Person{ID: "1", Firstname: "John", Lastname: "Doe", Address: &Address{City: "City X", State: "State X"}})
-	s.people = append(s.people, Person{ID: "2", Firstname: "Koko", Lastname: "Doe", Address: &Address{City: "City Z", State: "State Y"}})
+	// s.people = append(s.people, Person{ID: "1", Firstname: "John", Lastname: "Doe", Address: &Address{City: "City X", State: "State X"}})
+	// s.people = append(s.people, Person{ID: "2", Firstname: "Koko", Lastname: "Doe", Address: &Address{City: "City Z", State: "State Y"}})
 }
 
 // Run is to run serving explorer.
@@ -50,10 +50,10 @@ type Person struct {
 }
 
 // Address is fake struct for testing.
-type Address struct {
-	City  string `json:"city,omitempty"`
-	State string `json:"state,omitempty"`
-}
+// type Address struct {
+// 	City  string `json:"city,omitempty"`
+// 	State string `json:"state,omitempty"`
+// }
 
 // GetPersonEndpoint is the specific person end point.
 func (s *Service) GetPersonEndpoint(w http.ResponseWriter, r *http.Request) {
