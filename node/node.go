@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/blockchain"
@@ -105,6 +106,7 @@ type Node struct {
 
 	// Test only
 	TestBankKeys []*ecdsa.PrivateKey
+	ContractKeys []*ecdsa.PrivateKey
 	// The p2p host used to send/receive p2p messages
 	host host.Host
 
@@ -375,6 +377,14 @@ func (node *Node) GetSyncingPeers() []p2p.Peer {
 	}
 	node.log.Debug("GetSyncingPeers: ", "res", res)
 	return res
+}
+
+// func (node)
+func (node *Node) CallFaucetContract(contractAddress common.Address, walletAddress common.Address) {
+	var nonce uint64
+	nonce = 0
+	tx, _ := types.SignTx(types.NewTransaction(nonce, contractAddress, node.Consensus.ShardID, big.NewInt(7000000000000000000), params.TxGasContractCreation*10, nil, nil), types.HomesteadSigner{}, node.ContractKeys[0])
+	node.pendingTransactionsAccount = append(node.pendingTransactionsAccount, tx)
 }
 
 // JoinShard helps a new node to join a shard.
