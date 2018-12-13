@@ -260,9 +260,7 @@ func (node *Node) AddSmartContractsToPendingTransactions() {
 	dataEnc := common.FromHex(contractData)
 	// Unsigned transaction to avoid the case of transaction address.
 	mycontracttx, _ := types.SignTx(types.NewContractCreation(uint64(0), 0, big.NewInt(1000000), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, priKey)
-	var txs types.Transactions
-	txs[0] = mycontracttx
-	node.addPendingTransactionsAccount(txs)
+	node.addPendingTransactionsAccount(types.Transactions{mycontracttx})
 
 }
 
@@ -435,9 +433,7 @@ func (node *Node) CallFaucetContract(contractAddress common.Address, walletAddre
 	contractData := callingFunction + walletAddress.Hex()
 	dataEnc := common.FromHex(contractData)
 	tx, _ := types.SignTx(types.NewTransaction(nonce, contractAddress, node.Consensus.ShardID, big.NewInt(7000000000000000000), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, node.ContractKeys[0])
-	var txs types.Transactions
-	txs[0] = tx
-	node.addPendingTransactionsAccount(txs)
+	node.addPendingTransactionsAccount(types.Transactions{tx})
 }
 
 // JoinShard helps a new node to join a shard.
