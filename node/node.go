@@ -261,7 +261,6 @@ func (node *Node) AddSmartContractsToPendingTransactions() {
 	// Unsigned transaction to avoid the case of transaction address.
 	mycontracttx, _ := types.SignTx(types.NewContractCreation(uint64(0), 0, big.NewInt(1000000), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, priKey)
 	node.addPendingTransactionsAccount(types.Transactions{mycontracttx})
-
 }
 
 // New creates a new node.
