@@ -426,8 +426,7 @@ func (node *Node) GetSyncingPeers() []p2p.Peer {
 
 //CallFaucetContract invokes the faucet contract to give the walletAddress initial money
 func (node *Node) CallFaucetContract(contractAddress common.Address, walletAddress common.Address) {
-	var nonce uint64
-	nonce = 0
+	nonce := node.Worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(node.ContractKeys[0]))
 	callingFunction := "0x27c78c42000000000000000000000000"
 	contractData := callingFunction + walletAddress.Hex()
 	dataEnc := common.FromHex(contractData)
