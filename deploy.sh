@@ -62,7 +62,7 @@ while getopts "hpdtD:m:s:k:" option; do
       h) usage ;;
       p) PEER='-peer_discovery' ;;
       d) DB='-db_supported' ;;
-      t) TXGEN=false ;;
+      t) TXGEN=$OPTARG ;;
       D) DURATION=$OPTARG ;;
       m) MIN=$OPTARG ;;
       s) SHARDS=$OPTARG ;;
@@ -120,8 +120,9 @@ done < $config
 # Emulate node offline
 (sleep 45; killnode $KILLPORT) &
 
-echo "launching txgen ..."
+echo "launching txgen ..."Z
 if [ "$TXGEN" == "true" ]; then
+   echo "launching txgen ..."
    if [ -z "$PEER" ]; then
       ./bin/txgen -config_file $config -log_folder $log_folder -duration $DURATION
    else

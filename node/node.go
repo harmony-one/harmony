@@ -5,6 +5,8 @@ import (
 	"crypto/ecdsa"
 	"encoding/gob"
 	"fmt"
+	"github.com/harmony-one/harmony/client"
+	clientService "github.com/harmony-one/harmony/client/service"
 	"math/big"
 	"math/rand"
 	"os"
@@ -18,7 +20,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/blockchain"
-	"github.com/harmony-one/harmony/client"
 	bft "github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -79,6 +80,7 @@ const (
 	syncingPortDifference = 3000
 	waitBeforeJoinShard   = time.Second * 3
 	timeOutToJoinShard    = time.Minute * 10
+	clientServicePort     = "1841"
 )
 
 // NetworkNode ...
@@ -118,6 +120,9 @@ type Node struct {
 	TxPool                     *core.TxPool
 	BlockChannelAccount        chan *types.Block // The channel to receive new blocks from Node
 	Worker                     *worker.Worker
+
+	// Client server (for wallet requests)
+	clientServer *clientService.Server
 
 	// Syncing component.
 	downloaderServer *downloader.Server
@@ -272,6 +277,9 @@ func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 		node.SelfPeer = host.GetSelfPeer()
 	}
 
+	// Logger
+	node.log = log.New()
+
 	if host != nil && consensus != nil {
 		// Consensus and associated channel to communicate blocks
 		node.Consensus = consensus
@@ -305,6 +313,8 @@ func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 			testBankKey, _ := ecdsa.GenerateKey(crypto.S256(), reader)
 			testBankAddress := crypto.PubkeyToAddress(testBankKey.PublicKey)
 			testBankFunds := big.NewInt(8000000000000000000)
+			//fmt.Println(crypto.PubkeyToAddress(testBankKey.PublicKey).Hex())
+			//fmt.Println(hex.EncodeToString(crypto.FromECDSA(testBankKey)))
 			genesisAloc[testBankAddress] = core.GenesisAccount{Balance: testBankFunds}
 			node.TestBankKeys = append(node.TestBankKeys, testBankKey)
 		}
@@ -335,9 +345,7 @@ func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 		node.AddSmartContractsToPendingTransactions()
 	}
 
-	// Logger
-	node.log = log.New()
-	if consensus.IsLeader {
+	if consensus != nil && consensus.IsLeader {
 		node.State = NodeLeader
 	} else {
 		node.State = NodeInit
@@ -461,6 +469,27 @@ func (node *Node) JoinShard(leader p2p.Peer) {
 			return
 		}
 	}
+}
+
+// SupportClient initializes and starts the client service
+func (node *Node) SupportClient() {
+	node.InitClientServer()
+	node.StartClientServer()
+}
+
+// InitClientServer initializes client server.
+func (node *Node) InitClientServer() {
+	state, err := node.Chain.State()
+	if err != nil {
+		log.Error("Failed fetching state from blockchain")
+	}
+	node.clientServer = clientService.NewServer(state)
+}
+
+// StartClientServer starts client server.
+func (node *Node) StartClientServer() {
+	node.log.Info("support_client: StartClientServer on port:", "port", clientServicePort)
+	node.clientServer.Start(node.SelfPeer.IP, clientServicePort)
 }
 
 // SupportSyncing keeps sleeping until it's doing consensus or it's a leader.
