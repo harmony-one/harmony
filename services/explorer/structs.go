@@ -7,6 +7,7 @@ package explorer
 // Data ...
 type Data struct {
 	Blocks  []Block `json:"blocks"`
+	Block   Block2  `json:"block"`
 	Address Address `json:"address"`
 }
 
@@ -29,9 +30,18 @@ type Transaction struct {
 
 // Block ...
 type Block struct {
-	Height     int           `json:"height"`
+	ID        string `json:"id"`
+	Height    string `json:"height"`
+	Timestamp string `json:"timestamp"`
+	TXCount   string `json:"txCount"`
+	Size      string `json:"size"`
+}
+
+// Block2 ...
+type Block2 struct {
+	Height     string        `json:"height"`
 	Hash       string        `json:"hash"`
-	TXCount    int           `json:"txCount"`
+	TXCount    string        `json:"txCount"`
 	Timestamp  string        `json:"timestamp"`
 	MerkleRoot string        `json:"merkleRoot"`
 	PrevBlock  RefBlock      `json:"prevBlock"`
@@ -44,5 +54,5 @@ type Block struct {
 // RefBlock ...
 type RefBlock struct {
 	ID     string `json:"id"`
-	Height int    `json:"height"`
+	Height string `json:"height"`
 }
