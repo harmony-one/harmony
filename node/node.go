@@ -260,7 +260,10 @@ func (node *Node) AddSmartContractsToPendingTransactions() {
 	dataEnc := common.FromHex(contractData)
 	// Unsigned transaction to avoid the case of transaction address.
 	mycontracttx, _ := types.SignTx(types.NewContractCreation(uint64(0), 0, big.NewInt(1000000), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, priKey)
-	node.pendingTransactionsAccount = append(node.pendingTransactionsAccount, mycontracttx)
+	var txs types.Transactions
+	txs[0] = mycontracttx
+	node.addPendingTransactionsAccount(txs)
+
 }
 
 // New creates a new node.
@@ -424,7 +427,7 @@ func (node *Node) GetSyncingPeers() []p2p.Peer {
 	return res
 }
 
-// func (node)
+//CallFaucetContract invokes the faucet contract to give the walletAddress initial money
 func (node *Node) CallFaucetContract(contractAddress common.Address, walletAddress common.Address) {
 	var nonce uint64
 	nonce = 0
@@ -435,7 +438,6 @@ func (node *Node) CallFaucetContract(contractAddress common.Address, walletAddre
 	var txs types.Transactions
 	txs[0] = tx
 	node.addPendingTransactionsAccount(txs)
-	node.pendingTransactionsAccount = append(node.pendingTransactionsAccount, tx)
 }
 
 // JoinShard helps a new node to join a shard.
