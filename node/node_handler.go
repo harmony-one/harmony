@@ -310,7 +310,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
 
 							node.transactionInConsensus = selectedTxs
 							node.CrossTxsInConsensus = crossShardTxAndProofs
-							newBlock = blockchain.NewBlock(selectedTxs, node.blockchain.GetLatestBlock().Hash, node.Consensus.ShardID)
+							newBlock = blockchain.NewBlock(selectedTxs, node.blockchain.GetLatestBlock().Hash, node.Consensus.ShardID, false)
 							break
 						}
 					}
@@ -566,7 +566,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 
 	// Broadcast the message to all validators, as publicKeys is updated
 	// FIXME: HAR-89 use a separate nodefind/neighbor message
-	host.BroadcastMessageFromLeader(node.GetHost(), peers, buffer)
+	host.BroadcastMessageFromLeader(node.GetHost(), peers, buffer, node.Consensus.OfflinePeers)
 
 	return len(peers)
 }
@@ -577,6 +577,8 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		node.log.Error("Can't get Pong Message")
 		return -1
 	}
+
+	//	node.log.Debug("pongMessageHandler", "pong", pong, "nodeID", node.Consensus.GetNodeID())
 
 	peers := make([]*p2p.Peer, 0)
 
@@ -615,9 +617,13 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		publicKeys = append(publicKeys, key)
 	}
 
-	node.State = NodeJoinedShard
-	// Notify JoinShard to stop sending Ping messages
-	node.StopPing <- struct{}{}
+	if node.State == NodeWaitToJoin {
+		node.State = NodeJoinedShard
+		// Notify JoinShard to stop sending Ping messages
+		if node.StopPing != nil {
+			node.StopPing <- struct{}{}
+		}
+	}
 
 	return node.Consensus.UpdatePublicKeys(publicKeys)
 }

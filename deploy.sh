@@ -10,6 +10,17 @@ function cleanup() {
    done
 }
 
+function killnode() {
+   local port=$1
+
+   if [ -n "port" ]; then
+      pid=$(/bin/ps -fu $USER | grep "benchmark" | grep "$port" | awk '{print $2}')
+      echo "killing node with port: $port"
+      kill -9 $pid 2> /dev/null
+      echo "node with port: $port is killed"
+   fi
+}
+
 trap cleanup SIGINT SIGTERM
 
 function usage {
@@ -25,6 +36,7 @@ USAGE: $ME [OPTIONS] config_file_name
    -D duration    txgen run duration (default: $DURATION)
    -m min_peers   minimal number of peers to start consensus (default: $MIN)
    -s shards      number of shards (default: $SHARDS)
+   -k nodeport    kill the node with specified port number (default: $KILLPORT)
 
 This script will build all the binaries and start benchmark and txgen based on the configuration file.
 
@@ -43,8 +55,9 @@ TXGEN=true
 DURATION=90
 MIN=5
 SHARDS=2
+KILLPORT=9004
 
-while getopts "hpdtD:m:s:" option; do
+while getopts "hpdtD:m:s:k:" option; do
    case $option in
       h) usage ;;
       p) PEER='-peer_discovery' ;;
@@ -53,6 +66,7 @@ while getopts "hpdtD:m:s:" option; do
       D) DURATION=$OPTARG ;;
       m) MIN=$OPTARG ;;
       s) SHARDS=$OPTARG ;;
+      k) KILLPORT=$OPTARG ;;
    esac
 done
 
@@ -102,6 +116,9 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
     fi
   fi
 done < $config
+
+# Emulate node offline
+(sleep 45; killnode $KILLPORT) &
 
 echo "launching txgen ..."
 if [ "$TXGEN" == "true" ]; then

@@ -12,6 +12,11 @@ import (
 	"github.com/harmony-one/harmony/utils"
 )
 
+const (
+	// TimeStampForGenesisBlock is the constant timestamp for the genesis block.
+	TimeStampForGenesisBlock = 0
+)
+
 // Block is a block in the blockchain that contains block headers, transactions and signature etc.
 type Block struct {
 	// Header
@@ -115,14 +120,18 @@ func (b *Block) CalculateBlockHash() []byte {
 }
 
 // NewBlock creates and returns a new block.
-func NewBlock(transactions []*Transaction, prevBlockHash [32]byte, shardID uint32) *Block {
+func NewBlock(transactions []*Transaction, prevBlockHash [32]byte, shardID uint32, isGenesisBlock bool) *Block {
 	numTxs := int32(len(transactions))
 	var txIDs [][32]byte
 
 	for _, tx := range transactions {
 		txIDs = append(txIDs, tx.ID)
 	}
-	block := &Block{Timestamp: time.Now().Unix(), PrevBlockHash: prevBlockHash, NumTransactions: numTxs, TransactionIds: txIDs, Transactions: transactions, ShardID: shardID, Hash: [32]byte{}}
+	timestamp := time.Now().Unix()
+	if isGenesisBlock {
+		timestamp = TimeStampForGenesisBlock
+	}
+	block := &Block{Timestamp: timestamp, PrevBlockHash: prevBlockHash, NumTransactions: numTxs, TransactionIds: txIDs, Transactions: transactions, ShardID: shardID, Hash: [32]byte{}}
 	copy(block.Hash[:], block.CalculateBlockHash()[:])
 
 	return block
@@ -130,7 +139,7 @@ func NewBlock(transactions []*Transaction, prevBlockHash [32]byte, shardID uint3
 
 // NewGenesisBlock creates and returns genesis Block.
 func NewGenesisBlock(coinbase *Transaction, shardID uint32) *Block {
-	return NewBlock([]*Transaction{coinbase}, [32]byte{}, shardID)
+	return NewBlock([]*Transaction{coinbase}, [32]byte{}, shardID, true)
 }
 
 // NewStateBlock creates and returns a state Block based on utxo pool.
@@ -157,7 +166,7 @@ func NewStateBlock(utxoPool *UTXOPool, numBlocks, numTxs int32) *Block {
 			stateTransactions = append(stateTransactions, stateTransaction)
 		}
 	}
-	newBlock := NewBlock(stateTransactions, [32]byte{}, utxoPool.ShardID)
+	newBlock := NewBlock(stateTransactions, [32]byte{}, utxoPool.ShardID, false)
 	newBlock.State = &State{NumBlocks: numBlocks, NumTransactions: numTxs}
 	return newBlock
 }
