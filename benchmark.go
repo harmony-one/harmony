@@ -226,5 +226,9 @@ func main() {
 	}
 
 	go currentNode.SupportSyncing()
+	if consensus.IsLeader {
+		fmt.Println("I AM LEADER>.............")
+		go currentNode.SupportClient()
+	}
 	currentNode.StartServer()
 }

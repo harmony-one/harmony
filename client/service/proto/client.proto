@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package client;
+
+// Client is the service used for any client-facing requests.
+service ClientService {
+  rpc FetchAccountState(FetchAccountStateRequest) returns (FetchAccountStateResponse) {}
+}
+
+// FetchAccountStateRequest is the request to fetch an account's balance and nonce.
+message FetchAccountStateRequest {
+  // The account address
+  bytes address = 1;
+}
+
+// FetchAccountStateResponse is the response of FetchAccountStateRequest.
+message FetchAccountStateResponse {
+  // The balance of the account (big.Int)
+  bytes balance = 1;
+  // The nonce of the account
+  uint64 nonce = 2;
+}

@@ -1,24 +1,22 @@
 package main
 
 import (
+	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/ethereum/go-ethereum/common"
+	crypto2 "github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/params"
+	client2 "github.com/harmony-one/harmony/client/service"
 	"log"
+	"math/big"
 	"strings"
 
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 
-	"io"
-	"io/ioutil"
-	math_rand "math/rand"
-	"os"
-	"strconv"
-	"time"
-
-	"github.com/dedis/kyber"
 	"github.com/harmony-one/harmony/blockchain"
 	"github.com/harmony-one/harmony/client"
 	client_config "github.com/harmony-one/harmony/client/config"
@@ -27,7 +25,11 @@ import (
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	proto_node "github.com/harmony-one/harmony/proto/node"
-	"github.com/harmony-one/harmony/utils"
+	"io"
+	"io/ioutil"
+	"os"
+	"strconv"
+	"time"
 )
 
 func main() {
@@ -72,7 +74,7 @@ func main() {
 			fmt.Printf("New account created:\nAddress: {%x}\n", address)
 		case "list":
 			for i, address := range ReadAddresses() {
-				fmt.Printf("Account %d:\n  {%x}\n", i+1, address)
+				fmt.Printf("Account %d:\n  {%s}\n", i+1, address.Hex())
 			}
 		case "clearAll":
 			ClearKeystore()
@@ -95,13 +97,11 @@ func main() {
 			fmt.Println("Private key imported...")
 		case "showBalance":
 			walletNode := CreateWalletServerNode()
-			go walletNode.StartServer()
 
-			shardUtxoMap, err := FetchUtxos(ReadAddresses(), walletNode)
-			if err != nil {
-				fmt.Println(err)
+			for _, address := range ReadAddresses() {
+				fmt.Printf("Account %s:\n  %d ether \n", address.Hex(), FetchBalance(address, walletNode).Uint64()/params.Ether)
+
 			}
-			PrintUtxoBalance(shardUtxoMap)
 		case "test":
 			// Testing code
 			priKey := pki.GetPrivateKeyScalarFromInt(444)
@@ -161,62 +161,9 @@ func main() {
 		copy(trimmedReceiverAddress[:], receiverAddress[:20])
 
 		senderPriKey := priKeys[senderIndex]
-		senderAddressBytes := pki.GetAddressFromPrivateKey(senderPriKey)
+		_ = senderPriKey
 
-		// Start client server
-		walletNode := CreateWalletServerNode()
-		go walletNode.StartServer()
-
-		shardUtxoMap, err := FetchUtxos([][20]byte{senderAddressBytes}, walletNode)
-		if err != nil {
-			fmt.Printf("Failed to fetch utxos: %s\n", err)
-		}
-
-		cummulativeBalance := 0
-		txInputs := []blockchain.TXInput{}
-	LOOP:
-		for shardID, utxoMap := range shardUtxoMap {
-			for txID, vout2AmountMap := range utxoMap[senderAddressBytes] {
-				txIDBytes, err := utils.Get32BytesFromString(txID)
-				if err != nil {
-					fmt.Println("Failed to parse txID")
-					continue
-				}
-				for voutIndex, utxoAmount := range vout2AmountMap {
-					cummulativeBalance += utxoAmount
-					txIn := blockchain.NewTXInput(blockchain.NewOutPoint(&txIDBytes, voutIndex), senderAddressBytes, shardID)
-					txInputs = append(txInputs, *txIn)
-					if cummulativeBalance >= amount {
-						break LOOP
-					}
-				}
-			}
-		}
-		txout := blockchain.TXOutput{Amount: amount, Address: trimmedReceiverAddress, ShardID: uint32(math_rand.Intn(len(shardUtxoMap)))}
-
-		txOutputs := []blockchain.TXOutput{txout}
-		if cummulativeBalance > amount {
-			changeTxOut := blockchain.TXOutput{Amount: cummulativeBalance - amount, Address: senderAddressBytes, ShardID: uint32(math_rand.Intn(len(shardUtxoMap)))}
-			txOutputs = append(txOutputs, changeTxOut)
-		}
-
-		tx := blockchain.Transaction{ID: [32]byte{}, PublicKey: pki.GetBytesFromPublicKey(pki.GetPublicKeyFromScalar(senderPriKey)), TxInput: txInputs, TxOutput: txOutputs, Proofs: nil}
-		tx.SetID() // TODO(RJ): figure out the correct way to set Tx ID.
-		tx.Sign(senderPriKey)
-
-		pubKey := crypto.Ed25519Curve.Point()
-		err = pubKey.UnmarshalBinary(tx.PublicKey[:])
-		if err != nil {
-			fmt.Println("Failed to deserialize public key", "error", err)
-		}
-
-		err = ExecuteTransaction(tx, walletNode)
-
-		if err != nil {
-			fmt.Println(err)
-		} else {
-			fmt.Println("Transaction submitted successfully")
-		}
+		// TODO: implement account transaction logic
 	default:
 		flag.PrintDefaults()
 		os.Exit(1)
@@ -252,7 +199,7 @@ func CreateWalletServerNode() *node.Node {
 	var shardIDLeaderMap map[uint32]p2p.Peer
 	var clientPeer *p2p.Peer
 	if true {
-		configr.ReadConfigFile("local_config2.txt")
+		configr.ReadConfigFile("local_config1.txt")
 		shardIDLeaderMap = configr.GetShardIDToLeaderMap()
 		clientPeer = configr.GetClientPeer()
 	} else {
@@ -295,6 +242,24 @@ func ExecuteTransaction(tx blockchain.Transaction, walletNode *node.Node) error 
 	}
 }
 
+// FetchBalance fetches account balance of specified address from the Harmony network
+func FetchBalance(address common.Address, walletNode *node.Node) *big.Int {
+	fmt.Println("Fetching account balance...")
+	clients := []*client2.Client{}
+	for _, leader := range *walletNode.Client.Leaders {
+		clients = append(clients, client2.NewClient(leader.IP, "1841"))
+	}
+
+	balance := big.NewInt(0)
+	for _, client := range clients {
+		response := client.GetBalance(address)
+		theirBalance := big.NewInt(0)
+		theirBalance.SetBytes(response.Balance)
+		balance.Add(balance, theirBalance)
+	}
+	return balance
+}
+
 // FetchUtxos fetches utxos of specified address from the Harmony network
 func FetchUtxos(addresses [][20]byte, walletNode *node.Node) (map[uint32]blockchain.UtxoMap, error) {
 	fmt.Println("Fetching account balance...")
@@ -319,43 +284,24 @@ func FetchUtxos(addresses [][20]byte, walletNode *node.Node) (map[uint32]blockch
 	}
 }
 
-// PrintUtxoBalance prints utxo balance.
-func PrintUtxoBalance(shardUtxoMap map[uint32]blockchain.UtxoMap) {
-	addressBalance := make(map[[20]byte]int)
-	for _, utxoMap := range shardUtxoMap {
-		for address, txHash2Vout2AmountMap := range utxoMap {
-			for _, vout2AmountMap := range txHash2Vout2AmountMap {
-				for _, amount := range vout2AmountMap {
-					value, ok := addressBalance[address]
-					if ok {
-						addressBalance[address] = value + amount
-					} else {
-						addressBalance[address] = amount
-					}
-				}
-			}
-		}
-	}
-	for address, balance := range addressBalance {
-		fmt.Printf("Address: {%x}\n", address)
-		fmt.Printf("Balance: %d\n", balance)
-	}
-}
-
 // ReadAddresses reads the addresses stored in local keystore
-func ReadAddresses() [][20]byte {
+func ReadAddresses() []common.Address {
 	priKeys := ReadPrivateKeys()
-	addresses := [][20]byte{}
+	addresses := []common.Address{}
 	for _, key := range priKeys {
-		addresses = append(addresses, pki.GetAddressFromPrivateKey(key))
+		addresses = append(addresses, crypto2.PubkeyToAddress(key.PublicKey))
 	}
 	return addresses
 }
 
 // StorePrivateKey stores the specified private key in local keystore
 func StorePrivateKey(priKey []byte) {
+	privateKey, err := crypto2.ToECDSA(priKey)
+	if err != nil {
+		panic("Failed to deserialize private key")
+	}
 	for _, address := range ReadAddresses() {
-		if address == pki.GetAddressFromPrivateKey(crypto.Ed25519Curve.Scalar().SetBytes(priKey)) {
+		if address == crypto2.PubkeyToAddress(privateKey.PublicKey) {
 			fmt.Println("The key already exists in the keystore")
 			return
 		}
@@ -379,16 +325,19 @@ func ClearKeystore() {
 }
 
 // ReadPrivateKeys reads all the private key stored in local keystore
-func ReadPrivateKeys() []kyber.Scalar {
+func ReadPrivateKeys() []*ecdsa.PrivateKey {
 	keys, err := ioutil.ReadFile("keystore")
 	if err != nil {
-		return []kyber.Scalar{}
+		return []*ecdsa.PrivateKey{}
 	}
-	keyScalars := []kyber.Scalar{}
+	priKeys := []*ecdsa.PrivateKey{}
 	for i := 0; i < len(keys); i += 32 {
-		priKey := crypto.Ed25519Curve.Scalar()
-		priKey.UnmarshalBinary(keys[i : i+32])
-		keyScalars = append(keyScalars, priKey)
+		priKey, err := crypto2.ToECDSA(keys[i : i+32])
+		if err != nil {
+			fmt.Println("Failed deserializing key data: ", keys[i:i+32])
+			continue
+		}
+		priKeys = append(priKeys, priKey)
 	}
-	return keyScalars
+	return priKeys
 }
