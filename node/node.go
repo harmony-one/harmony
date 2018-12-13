@@ -428,7 +428,13 @@ func (node *Node) GetSyncingPeers() []p2p.Peer {
 func (node *Node) CallFaucetContract(contractAddress common.Address, walletAddress common.Address) {
 	var nonce uint64
 	nonce = 0
-	tx, _ := types.SignTx(types.NewTransaction(nonce, contractAddress, node.Consensus.ShardID, big.NewInt(7000000000000000000), params.TxGasContractCreation*10, nil, nil), types.HomesteadSigner{}, node.ContractKeys[0])
+	callingFunction := "0x27c78c42000000000000000000000000"
+	contractData := callingFunction + walletAddress.Hex()
+	dataEnc := common.FromHex(contractData)
+	tx, _ := types.SignTx(types.NewTransaction(nonce, contractAddress, node.Consensus.ShardID, big.NewInt(7000000000000000000), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, node.ContractKeys[0])
+	var txs types.Transactions
+	txs[0] = tx
+	node.addPendingTransactionsAccount(txs)
 	node.pendingTransactionsAccount = append(node.pendingTransactionsAccount, tx)
 }
 
