@@ -51,7 +51,7 @@ EOU
 
 PEER=-peer_discovery
 DB=
-TXGEN=false
+TXGEN=true
 DURATION=90
 MIN=5
 SHARDS=2
@@ -120,7 +120,7 @@ done < $config
 # Emulate node offline
 (sleep 45; killnode $KILLPORT) &
 
-echo "launching txgen ..."
+echo "launching txgen ..."Z
 if [ "$TXGEN" == "true" ]; then
    echo "launching txgen ..."
    if [ -z "$PEER" ]; then
@@ -130,4 +130,4 @@ if [ "$TXGEN" == "true" ]; then
    fi
 fi
 
-# cleanup
+cleanup
