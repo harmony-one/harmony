@@ -5,8 +5,6 @@ import (
 	"crypto/ecdsa"
 	"encoding/gob"
 	"fmt"
-	"github.com/harmony-one/harmony/client"
-	clientService "github.com/harmony-one/harmony/client/service"
 	"math/big"
 	"math/rand"
 	"os"
@@ -15,6 +13,9 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/harmony-one/harmony/client"
+	clientService "github.com/harmony-one/harmony/client/service"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -163,7 +164,7 @@ func (node *Node) addPendingTransactionsAccount(newTxs types.Transactions) {
 	node.pendingTxMutexAccount.Lock()
 	node.pendingTransactionsAccount = append(node.pendingTransactionsAccount, newTxs...)
 	node.pendingTxMutexAccount.Unlock()
-	node.log.Debug("Got more transactions (account model)", "num", len(newTxs), "totalPending", len(node.pendingTransactionsAccount), "node", node)
+	node.log.Debug("Got more transactions (account model)", "num", len(newTxs), "totalPending", len(node.pendingTransactionsAccount))
 }
 
 // Take out a subset of valid transactions from the pending transaction list
