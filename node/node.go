@@ -81,7 +81,8 @@ const (
 	syncingPortDifference = 3000
 	waitBeforeJoinShard   = time.Second * 3
 	timeOutToJoinShard    = time.Minute * 10
-	clientServicePort     = "1841"
+	// ClientServicePortDiff is the positive port diff for client service
+	ClientServicePortDiff = 5555
 )
 
 // NetworkNode ...
@@ -343,7 +344,7 @@ func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 		node.BlockChannelAccount = make(chan *types.Block)
 		node.Worker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey))
 		//Initialize the pending transactions with smart contract transactions
-		node.AddSmartContractsToPendingTransactions()
+		//node.AddSmartContractsToPendingTransactions()
 	}
 
 	if consensus != nil && consensus.IsLeader {
@@ -480,17 +481,14 @@ func (node *Node) SupportClient() {
 
 // InitClientServer initializes client server.
 func (node *Node) InitClientServer() {
-	state, err := node.Chain.State()
-	if err != nil {
-		log.Error("Failed fetching state from blockchain")
-	}
-	node.clientServer = clientService.NewServer(state)
+	node.clientServer = clientService.NewServer(node.Chain.State)
 }
 
 // StartClientServer starts client server.
 func (node *Node) StartClientServer() {
-	node.log.Info("support_client: StartClientServer on port:", "port", clientServicePort)
-	node.clientServer.Start(node.SelfPeer.IP, clientServicePort)
+	port, _ := strconv.Atoi(node.SelfPeer.Port)
+	node.log.Info("support_client: StartClientServer on port:", "port", port+ClientServicePortDiff)
+	node.clientServer.Start(node.SelfPeer.IP, strconv.Itoa(port+ClientServicePortDiff))
 }
 
 // SupportSyncing keeps sleeping until it's doing consensus or it's a leader.

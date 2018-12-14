@@ -80,7 +80,7 @@ func (consensus *Consensus) WaitForNewBlockAccount(blockChannel chan *types.Bloc
 		}
 
 		startTime = time.Now()
-		consensus.Log.Debug("STARTING CONSENSUS", "consensus", consensus, "startTime", startTime, "publicKeys", len(consensus.PublicKeys))
+		consensus.Log.Debug("STARTING CONSENSUS", "numTxs", len(newBlock.Transactions()), "consensus", consensus, "startTime", startTime, "publicKeys", len(consensus.PublicKeys))
 		for consensus.state == Finished {
 			// time.Sleep(500 * time.Millisecond)
 			data, err := rlp.EncodeToBytes(newBlock)

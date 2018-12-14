@@ -348,7 +348,8 @@ func (node *Node) WaitForConsensusReadyAccount(readySignal chan struct{}) {
 
 		if !retry {
 			for {
-				if len(node.pendingTransactionsAccount) >= 1000 {
+				node.log.Debug("Num Pending Txs", "Num", len(node.pendingTransactionsAccount))
+				if len(node.pendingTransactionsAccount) >= 1 {
 					// Normal tx block consensus
 					selectedTxs, _ := node.getTransactionsForNewBlockAccount(MaxNumberOfTransactionsPerBlock)
 					node.Worker.CommitTransactions(selectedTxs)
@@ -478,9 +479,6 @@ func (node *Node) AddNewBlockAccount(newBlock *types.Block) {
 	num, err := node.Chain.InsertChain([]*types.Block{newBlock})
 	if err != nil {
 		node.log.Debug("Error adding to chain", "numBlocks", num, "Error", err)
-		if node.Consensus != nil {
-			fmt.Println("SHARD ID", node.Consensus.ShardID)
-		}
 	}
 }
 
@@ -514,11 +512,6 @@ func (node *Node) UpdateUtxoAndState(newBlock *blockchain.Block) {
 	}
 	// Clear transaction-in-Consensus list
 	node.transactionInConsensus = []*blockchain.Transaction{}
-	if node.Consensus.IsLeader {
-		node.log.Info("TX in New BLOCK", "num", len(newBlock.Transactions), "ShardID", node.UtxoPool.ShardID, "IsStateBlock", newBlock.IsStateBlock())
-		node.log.Info("LEADER CURRENT UTXO", "num", node.UtxoPool.CountNumOfUtxos(), "ShardID", node.UtxoPool.ShardID)
-		node.log.Info("LEADER LOCKED UTXO", "num", node.UtxoPool.CountNumOfLockedUtxos(), "ShardID", node.UtxoPool.ShardID)
-	}
 }
 
 func (node *Node) pingMessageHandler(msgPayload []byte) int {

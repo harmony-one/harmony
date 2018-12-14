@@ -56,6 +56,7 @@ func (w *Worker) SelectTransactionsForNewBlock(txs types.Transactions, maxNumTxs
 			if err != nil {
 				w.current.state.RevertToSnapshot(snap)
 				invalid = append(invalid, tx)
+				log.Debug("Invalid transaction", "Error", err)
 			} else {
 				selected = append(selected, tx)
 			}
