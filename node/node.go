@@ -80,8 +80,8 @@ const (
 	syncingPortDifference = 3000
 	waitBeforeJoinShard   = time.Second * 3
 	timeOutToJoinShard    = time.Minute * 10
-	// ClientServicePort is the port for client service
-	ClientServicePort = "18411"
+	// ClientServicePortDiff is the positive port diff for client service
+	ClientServicePortDiff = 5555
 )
 
 // NetworkNode ...
@@ -485,8 +485,9 @@ func (node *Node) InitClientServer() {
 
 // StartClientServer starts client server.
 func (node *Node) StartClientServer() {
-	node.log.Info("support_client: StartClientServer on port:", "port", ClientServicePort)
-	node.clientServer.Start(node.SelfPeer.IP, ClientServicePort)
+	port, _ := strconv.Atoi(node.SelfPeer.Port)
+	node.log.Info("support_client: StartClientServer on port:", "port", port + ClientServicePortDiff)
+	node.clientServer.Start(node.SelfPeer.IP, strconv.Itoa(port + ClientServicePortDiff))
 }
 
 // SupportSyncing keeps sleeping until it's doing consensus or it's a leader.
