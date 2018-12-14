@@ -40,7 +40,6 @@ func (client *Client) Close() {
 
 // GetBalance gets block hashes from all the peers by calling grpc request.
 func (client *Client) GetBalance(address common.Address) *proto.FetchAccountStateResponse {
-	log.Println("Getting balance from address: ", address.Hex())
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	request := &proto.FetchAccountStateRequest{Address: address.Bytes()}

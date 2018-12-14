@@ -11,6 +11,7 @@ import (
 	crypto2 "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	client2 "github.com/harmony-one/harmony/client/service"
+	"github.com/harmony-one/harmony/core/types"
 	"log"
 	"math/big"
 	"strings"
@@ -20,8 +21,6 @@ import (
 	"github.com/harmony-one/harmony/blockchain"
 	"github.com/harmony-one/harmony/client"
 	client_config "github.com/harmony-one/harmony/client/config"
-	"github.com/harmony-one/harmony/crypto"
-	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	proto_node "github.com/harmony-one/harmony/proto/node"
@@ -32,6 +31,12 @@ import (
 	"time"
 )
 
+// AccountState includes the state of an account
+type AccountState struct {
+	balance *big.Int
+	nonce   uint64
+}
+
 func main() {
 	// Account subcommands
 	accountImportCommand := flag.NewFlagSet("import", flag.ExitOnError)
@@ -39,79 +44,78 @@ func main() {
 
 	// Transfer subcommands
 	transferCommand := flag.NewFlagSet("transfer", flag.ExitOnError)
-	transferSenderPtr := transferCommand.String("sender", "0", "Specify the sender account address or index")
-	transferReceiverPtr := transferCommand.String("receiver", "", "Specify the receiver account")
+	transferSenderPtr := transferCommand.String("from", "0", "Specify the sender account address or index")
+	transferReceiverPtr := transferCommand.String("to", "", "Specify the receiver account")
 	transferAmountPtr := transferCommand.Int("amount", 0, "Specify the amount to transfer")
 
 	// Verify that a subcommand has been provided
 	// os.Arg[0] is the main command
 	// os.Arg[1] will be the subcommand
 	if len(os.Args) < 2 {
-		fmt.Println("account or transfer subcommand is required")
+		fmt.Println("Usage:")
+		fmt.Println("    wallet <action> <params>")
+		fmt.Println("Actions:")
+		fmt.Println("    1. new           - Generates a new account and store the private key locally")
+		fmt.Println("    2. list          - Lists all accounts in local keystore")
+		fmt.Println("    3. removeAll     - Removes all accounts in local keystore")
+		fmt.Println("    4. import        - Imports a new account by private key")
+		fmt.Println("        --privateKey     - the private key to import")
+		fmt.Println("    5. balances      - Shows the balances of all accounts")
+		fmt.Println("    6. transfer")
+		fmt.Println("        --from           - The sender account's address or index in the local keystore")
+		fmt.Println("        --to             - The receiver account's address")
+		fmt.Println("        --amount         - The amount of token to transfer")
 		os.Exit(1)
 	}
 
 	// Switch on the subcommand
 	switch os.Args[1] {
-	case "account":
-		switch os.Args[2] {
-		case "new":
-			randomBytes := [32]byte{}
-			_, err := io.ReadFull(rand.Reader, randomBytes[:])
+	case "new":
+		randomBytes := [32]byte{}
+		_, err := io.ReadFull(rand.Reader, randomBytes[:])
 
-			if err != nil {
-				fmt.Println("Failed to create a new private key...")
-				return
-			}
-			priKey := crypto.Ed25519Curve.Scalar().SetBytes(randomBytes[:])
-			priKeyBytes, err := priKey.MarshalBinary()
-			if err != nil {
-				panic("Failed to serialize the private key")
-			}
-			pubKey := pki.GetPublicKeyFromScalar(priKey)
-			address := pki.GetAddressFromPublicKey(pubKey)
-			StorePrivateKey(priKeyBytes)
-			fmt.Printf("New account created:\nAddress: {%x}\n", address)
-		case "list":
-			for i, address := range ReadAddresses() {
-				fmt.Printf("Account %d:\n  {%s}\n", i+1, address.Hex())
-			}
-		case "clearAll":
-			ClearKeystore()
-			fmt.Println("All existing accounts deleted...")
-		case "import":
-			accountImportCommand.Parse(os.Args[3:])
-			priKey := *accountImportPtr
-			if priKey == "" {
-				fmt.Println("Error: --privateKey is required")
-				return
-			}
-			if !accountImportCommand.Parsed() {
-				fmt.Println("Failed to parse flags")
-			}
-			priKeyBytes, err := hex.DecodeString(priKey)
-			if err != nil {
-				panic("Failed to parse the private key into bytes")
-			}
-			StorePrivateKey(priKeyBytes)
-			fmt.Println("Private key imported...")
-		case "showBalance":
-			walletNode := CreateWalletServerNode()
+		if err != nil {
+			fmt.Println("Failed to get randomness for the private key...")
+			return
+		}
+		priKey, err := crypto2.GenerateKey()
+		if err != nil {
+			panic("Failed to generate the private key")
+		}
+		StorePrivateKey(crypto2.FromECDSA(priKey))
+		fmt.Printf("New account created with address:\n    {%s}\n", crypto2.PubkeyToAddress(priKey.PublicKey).Hex())
+		fmt.Printf("Please keep a copy of the private key:\n    {%s}\n", hex.EncodeToString(crypto2.FromECDSA(priKey)))
+	case "list":
+		for i, address := range ReadAddresses() {
+			fmt.Printf("Account %d:\n  {%s}\n", i, address.Hex())
+		}
+	case "removeAll":
+		ClearKeystore()
+		fmt.Println("All existing accounts deleted...")
+	case "import":
+		accountImportCommand.Parse(os.Args[3:])
+		priKey := *accountImportPtr
+		if priKey == "" {
+			fmt.Println("Error: --privateKey is required")
+			return
+		}
+		if !accountImportCommand.Parsed() {
+			fmt.Println("Failed to parse flags")
+		}
+		priKeyBytes, err := hex.DecodeString(priKey)
+		if err != nil {
+			panic("Failed to parse the private key into bytes")
+		}
+		StorePrivateKey(priKeyBytes)
+		fmt.Println("Private key imported...")
+	case "balances":
+		walletNode := CreateWalletNode()
 
-			for _, address := range ReadAddresses() {
-				fmt.Printf("Account %s:\n  %d ether \n", address.Hex(), FetchBalance(address, walletNode).Uint64()/params.Ether)
-
+		for i, address := range ReadAddresses() {
+			fmt.Printf("Account %d: %s:\n", i, address.Hex())
+			for shardID, balanceNonce := range FetchBalance(address, walletNode) {
+				fmt.Printf("    Balance in Shard %d:  %.2f \n", shardID, float32(balanceNonce.balance.Uint64()/params.Ether))
 			}
-		case "test":
-			// Testing code
-			priKey := pki.GetPrivateKeyScalarFromInt(444)
-			address := pki.GetAddressFromPrivateKey(priKey)
-			priKeyBytes, err := priKey.MarshalBinary()
-			if err != nil {
-				panic("Failed to deserialize private key scalar.")
-			}
-			fmt.Printf("Private Key :\n {%x}\n", priKeyBytes)
-			fmt.Printf("Address :\n {%x}\n", address)
 		}
 	case "transfer":
 		transferCommand.Parse(os.Args[2:])
@@ -131,39 +135,44 @@ func main() {
 			return
 		}
 		senderIndex, err := strconv.Atoi(sender)
-		senderAddress := ""
 		addresses := ReadAddresses()
 		if err != nil {
 			senderIndex = -1
 			for i, address := range addresses {
-				if fmt.Sprintf("%x", address) == senderAddress {
+				if address.Hex() == sender {
 					senderIndex = i
 					break
 				}
 			}
 			if senderIndex == -1 {
-				fmt.Println("The specified sender account is not imported yet.")
+				fmt.Println("The specified sender account does not exist in the wallet.")
 				break
 			}
 		}
+
 		if senderIndex >= len(priKeys) {
 			fmt.Println("Sender account index out of bounds.")
 			return
 		}
-		receiverAddress, err := hex.DecodeString(receiver)
-		if err != nil || len(receiverAddress) != 20 {
-			fmt.Println("The receiver address is not a valid.")
+
+		receiverAddress := common.HexToAddress(receiver)
+		if len(receiverAddress) != 20 {
+			fmt.Println("The receiver address is not valid.")
 			return
 		}
 
 		// Generate transaction
-		trimmedReceiverAddress := [20]byte{}
-		copy(trimmedReceiverAddress[:], receiverAddress[:20])
-
 		senderPriKey := priKeys[senderIndex]
-		_ = senderPriKey
+		senderAddress := addresses[senderIndex]
+		walletNode := CreateWalletNode()
+		shardIDToAccountState := FetchBalance(senderAddress, walletNode)
 
-		// TODO: implement account transaction logic
+		if shardIDToAccountState[0].balance.Uint64()/params.Ether < uint64(amount) {
+			fmt.Printf("Balance is not enough for the transfer: %d harmony token\n", shardIDToAccountState[0].balance.Uint64()/params.Ether)
+			return
+		}
+		tx, _ := types.SignTx(types.NewTransaction(shardIDToAccountState[0].nonce, receiverAddress, 0, big.NewInt(int64(amount*params.Ether)), params.TxGas, nil, nil), types.HomesteadSigner{}, senderPriKey)
+		SubmitTransaction(tx, walletNode)
 	default:
 		flag.PrintDefaults()
 		os.Exit(1)
@@ -193,8 +202,8 @@ func getShardIDToLeaderMap() map[uint32]p2p.Peer {
 	return shardIDLeaderMap
 }
 
-// CreateWalletServerNode creates wallet server node.
-func CreateWalletServerNode() *node.Node {
+// CreateWalletNode creates wallet server node.
+func CreateWalletNode() *node.Node {
 	configr := client_config.NewConfig()
 	var shardIDLeaderMap map[uint32]p2p.Peer
 	var clientPeer *p2p.Peer
@@ -206,63 +215,37 @@ func CreateWalletServerNode() *node.Node {
 		shardIDLeaderMap = getShardIDToLeaderMap()
 		clientPeer = &p2p.Peer{Port: "127.0.0.1", IP: "1234"}
 	}
+
 	host := p2pimpl.NewHost(*clientPeer)
 	walletNode := node.New(host, nil, nil)
 	walletNode.Client = client.NewClient(walletNode.GetHost(), &shardIDLeaderMap)
 	return walletNode
 }
 
-// ExecuteTransaction issues the transaction to the Harmony network
-func ExecuteTransaction(tx blockchain.Transaction, walletNode *node.Node) error {
-	if tx.IsCrossShard() {
-		walletNode.Client.PendingCrossTxsMutex.Lock()
-		walletNode.Client.PendingCrossTxs[tx.ID] = &tx
-		walletNode.Client.PendingCrossTxsMutex.Unlock()
-	}
-
-	msg := proto_node.ConstructTransactionListMessage([]*blockchain.Transaction{&tx})
+// SubmitTransaction submits the transaction to the Harmony network
+func SubmitTransaction(tx *types.Transaction, walletNode *node.Node) error {
+	msg := proto_node.ConstructTransactionListMessageAccount(types.Transactions{tx})
 	walletNode.BroadcastMessage(walletNode.Client.GetLeaders(), msg)
-
-	doneSignal := make(chan int)
-	go func() {
-		for {
-			if len(walletNode.Client.PendingCrossTxs) == 0 {
-				doneSignal <- 0
-				break
-			}
-		}
-	}()
-
-	select {
-	case <-doneSignal:
-		time.Sleep(100 * time.Millisecond)
-		return nil
-	case <-time.After(5 * time.Second):
-		return errors.New("Cross-shard Transaction processing timed out")
-	}
+	time.Sleep(300 * time.Millisecond)
+	return nil
 }
 
 // FetchBalance fetches account balance of specified address from the Harmony network
-func FetchBalance(address common.Address, walletNode *node.Node) *big.Int {
-	fmt.Println("Fetching account balance...")
-	clients := []*client2.Client{}
-	for _, leader := range *walletNode.Client.Leaders {
-		clients = append(clients, client2.NewClient(leader.IP, "1841"))
+func FetchBalance(address common.Address, walletNode *node.Node) map[uint32]AccountState {
+	result := make(map[uint32]AccountState)
+	for shardID, leader := range *walletNode.Client.Leaders {
+		client := client2.NewClient(leader.IP, node.ClientServicePort)
+		response := client.GetBalance(address)
+		balance := big.NewInt(0)
+		balance.SetBytes(response.Balance)
+		result[shardID] = AccountState{balance, response.Nonce}
 	}
 
-	balance := big.NewInt(0)
-	for _, client := range clients {
-		response := client.GetBalance(address)
-		theirBalance := big.NewInt(0)
-		theirBalance.SetBytes(response.Balance)
-		balance.Add(balance, theirBalance)
-	}
-	return balance
+	return result
 }
 
 // FetchUtxos fetches utxos of specified address from the Harmony network
 func FetchUtxos(addresses [][20]byte, walletNode *node.Node) (map[uint32]blockchain.UtxoMap, error) {
-	fmt.Println("Fetching account balance...")
 	walletNode.Client.ShardUtxoMap = make(map[uint32]blockchain.UtxoMap)
 	walletNode.BroadcastMessage(walletNode.Client.GetLeaders(), proto_node.ConstructFetchUtxoMessage(*walletNode.ClientPeer, addresses))
 
