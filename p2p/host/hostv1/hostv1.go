@@ -34,7 +34,7 @@ func (host *HostV1) GetSelfPeer() p2p.Peer {
 // BindHandlerAndServe Version 0 p2p. Going to be deprecated.
 func (host *HostV1) BindHandlerAndServe(handler p2p.StreamHandler) {
 	port := host.self.Port
-	addr := net.JoinHostPort(host.self.IP, port)
+	addr := net.JoinHostPort("", port)
 	var err error
 	host.listener, err = net.Listen("tcp4", addr)
 	if err != nil {
