@@ -170,13 +170,15 @@ func main() {
 	// Start the client server to listen to leader's message
 	go clientNode.StartServer()
 
-	for _, leader := range shardIDLeaderMap {
-		log.Debug("Client Join Shard", "leader", leader)
-		go clientNode.JoinShard(leader)
-		// wait for 3 seconds for client to send ping message to leader
-		time.Sleep(3 * time.Second)
-		clientNode.StopPing <- struct{}{}
-		clientNode.State = node.NodeJoinedShard
+	if *peerDiscovery {
+		for _, leader := range shardIDLeaderMap {
+			log.Debug("Client Join Shard", "leader", leader)
+			go clientNode.JoinShard(leader)
+			// wait for 3 seconds for client to send ping message to leader
+			time.Sleep(3 * time.Second)
+			clientNode.StopPing <- struct{}{}
+			clientNode.State = node.NodeJoinedShard
+		}
 	}
 
 	// Transaction generation process
