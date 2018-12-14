@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-// Client is the client model for downloader package.
+// Client is the client model for client service.
 type Client struct {
 	clientServiceClient proto.ClientServiceClient
 	opts                []grpc.DialOption
@@ -38,7 +38,7 @@ func (client *Client) Close() {
 	client.conn.Close()
 }
 
-// GetBalance gets block hashes from all the peers by calling grpc request.
+// GetBalance gets account balance from the client service.
 func (client *Client) GetBalance(address common.Address) *proto.FetchAccountStateResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

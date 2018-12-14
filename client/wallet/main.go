@@ -10,17 +10,17 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	crypto2 "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
+	libs "github.com/harmony-one/harmony/beaconchain/libs"
+	"github.com/harmony-one/harmony/beaconchain/rpc"
 	client2 "github.com/harmony-one/harmony/client/service"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/p2p/p2pimpl"
 	"log"
 	"math/big"
 	"strings"
 
-	"github.com/harmony-one/harmony/p2p/p2pimpl"
-
 	"github.com/harmony-one/harmony/blockchain"
 	"github.com/harmony-one/harmony/client"
-	client_config "github.com/harmony-one/harmony/client/config"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	proto_node "github.com/harmony-one/harmony/proto/node"
@@ -46,7 +46,7 @@ func main() {
 	transferCommand := flag.NewFlagSet("transfer", flag.ExitOnError)
 	transferSenderPtr := transferCommand.String("from", "0", "Specify the sender account address or index")
 	transferReceiverPtr := transferCommand.String("to", "", "Specify the receiver account")
-	transferAmountPtr := transferCommand.Int("amount", 0, "Specify the amount to transfer")
+	transferAmountPtr := transferCommand.Float64("amount", 0, "Specify the amount to transfer")
 
 	// Verify that a subcommand has been provided
 	// os.Arg[0] is the main command
@@ -114,7 +114,7 @@ func main() {
 		for i, address := range ReadAddresses() {
 			fmt.Printf("Account %d: %s:\n", i, address.Hex())
 			for shardID, balanceNonce := range FetchBalance(address, walletNode) {
-				fmt.Printf("    Balance in Shard %d:  %.2f \n", shardID, float32(balanceNonce.balance.Uint64()/params.Ether))
+				fmt.Printf("    Balance in Shard %d:  %.6f \n", shardID, float32(balanceNonce.balance.Uint64())/params.Ether)
 			}
 		}
 	case "transfer":
@@ -167,10 +167,11 @@ func main() {
 		walletNode := CreateWalletNode()
 		shardIDToAccountState := FetchBalance(senderAddress, walletNode)
 
-		if shardIDToAccountState[0].balance.Uint64()/params.Ether < uint64(amount) {
-			fmt.Printf("Balance is not enough for the transfer: %d harmony token\n", shardIDToAccountState[0].balance.Uint64()/params.Ether)
+		if float64(shardIDToAccountState[0].balance.Uint64())/params.Ether < amount {
+			fmt.Printf("Balance is not enough for the transfer, current balance is %.6f\n", float64(shardIDToAccountState[0].balance.Uint64())/params.Ether)
 			return
 		}
+		fmt.Println(big.NewInt(int64(amount * params.Ether)))
 		tx, _ := types.SignTx(types.NewTransaction(shardIDToAccountState[0].nonce, receiverAddress, 0, big.NewInt(int64(amount*params.Ether)), params.TxGas, nil, nil), types.HomesteadSigner{}, senderPriKey)
 		SubmitTransaction(tx, walletNode)
 	default:
@@ -204,19 +205,17 @@ func getShardIDToLeaderMap() map[uint32]p2p.Peer {
 
 // CreateWalletNode creates wallet server node.
 func CreateWalletNode() *node.Node {
-	configr := client_config.NewConfig()
-	var shardIDLeaderMap map[uint32]p2p.Peer
-	var clientPeer *p2p.Peer
-	if true {
-		configr.ReadConfigFile("local_config1.txt")
-		shardIDLeaderMap = configr.GetShardIDToLeaderMap()
-		clientPeer = configr.GetClientPeer()
-	} else {
-		shardIDLeaderMap = getShardIDToLeaderMap()
-		clientPeer = &p2p.Peer{Port: "127.0.0.1", IP: "1234"}
+	shardIDLeaderMap := make(map[uint32]p2p.Peer)
+
+	port, _ := strconv.Atoi("8081")
+	bcClient := beaconchain.NewClient("127.0.0.1", strconv.Itoa(port+libs.BeaconchainServicePortDiff))
+	response := bcClient.GetLeaders()
+
+	for _, leader := range response.Leaders {
+		shardIDLeaderMap[leader.ShardId] = p2p.Peer{IP: leader.Ip, Port: leader.Port}
 	}
 
-	host := p2pimpl.NewHost(*clientPeer)
+	host := p2pimpl.NewHost(p2p.Peer{})
 	walletNode := node.New(host, nil, nil)
 	walletNode.Client = client.NewClient(walletNode.GetHost(), &shardIDLeaderMap)
 	return walletNode

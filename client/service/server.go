@@ -12,7 +12,7 @@ import (
 	proto "github.com/harmony-one/harmony/client/service/proto"
 )
 
-// Server is the Server struct for downloader package.
+// Server is the Server struct for client service package.
 type Server struct {
 	stateReader func() (*state.StateDB, error)
 }

@@ -38,5 +38,7 @@ func main() {
 	log.Root().SetHandler(h)
 
 	bc := beaconchain.New(*numShards, *ip, *port)
+	go bc.SupportRPC()
+
 	bc.StartServer()
 }
