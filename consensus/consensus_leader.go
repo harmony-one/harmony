@@ -449,7 +449,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState S
 
 				consensus.reportMetrics(blockHeaderObj)
 				// Dump new block into level db.
-				explorer.GetStorageInstance().Dump(blockHeaderObj.AccountBlock, consensus.consensusID)
+				explorer.GetStorageInstance(consensus.leader.IP, consensus.leader.Port).Dump(blockHeaderObj.AccountBlock, consensus.consensusID)
 				// Claim new consensus reached.
 				consensus.Log.Debug("Consensus reached with signatures.", "numOfSignatures", len(*responses))
 				// Reset state to Finished, and clear other data.

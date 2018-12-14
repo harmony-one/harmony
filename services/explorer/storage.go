@@ -19,9 +19,10 @@ type Storage struct {
 }
 
 // GetStorageInstance returns attack model by using singleton pattern.
-func GetStorageInstance() *Storage {
+func GetStorageInstance(ip, port string) *Storage {
 	once.Do(func() {
 		storage = &Storage{}
+		storage.Init(ip, port)
 	})
 	return storage
 }
@@ -51,14 +52,29 @@ func (storage *Storage) Dump(accountBlock []byte, height uint32) {
 	// Store block.
 	storage.db.Put([]byte(fmt.Sprintf("b_%d", height)), accountBlock)
 
+	// Store block info.
+	blockInfo := BlockInfo{
+		ID:        block.Hash().Hex(),
+		Height:    string(height),
+		Timestamp: string(block.Time().Int64()),
+		TXCount:   string(block.Transactions().Len()),
+		Size:      block.Size().String(),
+	}
+
+	if data, err := rlp.EncodeToBytes(blockInfo); err == nil {
+		storage.db.Put([]byte(fmt.Sprintf("bi_%d", height)), data)
+	} else {
+		fmt.Println("EncodeRLP blockInfo error")
+		os.Exit(1)
+	}
+
 	// Store txs
 	for _, tx := range block.Transactions() {
 		if data, err := rlp.EncodeToBytes(tx); err == nil {
 			storage.db.Put([]byte(fmt.Sprintf("tx_%s", tx.Hash().Hex())), data)
 		} else {
-			fmt.Println("EncodeRLP error")
+			fmt.Println("EncodeRLP transaction error")
 			os.Exit(1)
 		}
 	}
-
 }
