@@ -233,7 +233,8 @@ func SubmitTransaction(tx *types.Transaction, walletNode *node.Node) error {
 func FetchBalance(address common.Address, walletNode *node.Node) map[uint32]AccountState {
 	result := make(map[uint32]AccountState)
 	for shardID, leader := range *walletNode.Client.Leaders {
-		client := client2.NewClient(leader.IP, node.ClientServicePort)
+		port, _ := strconv.Atoi(leader.Port)
+		client := client2.NewClient(leader.IP, strconv.Itoa(port+node.ClientServicePortDiff))
 		response := client.GetBalance(address)
 		balance := big.NewInt(0)
 		balance.SetBytes(response.Balance)

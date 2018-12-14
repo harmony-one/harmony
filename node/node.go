@@ -486,8 +486,8 @@ func (node *Node) InitClientServer() {
 // StartClientServer starts client server.
 func (node *Node) StartClientServer() {
 	port, _ := strconv.Atoi(node.SelfPeer.Port)
-	node.log.Info("support_client: StartClientServer on port:", "port", port + ClientServicePortDiff)
-	node.clientServer.Start(node.SelfPeer.IP, strconv.Itoa(port + ClientServicePortDiff))
+	node.log.Info("support_client: StartClientServer on port:", "port", port+ClientServicePortDiff)
+	node.clientServer.Start(node.SelfPeer.IP, strconv.Itoa(port+ClientServicePortDiff))
 }
 
 // SupportSyncing keeps sleeping until it's doing consensus or it's a leader.
