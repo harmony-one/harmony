@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/p2p/host"
+	"github.com/harmony-one/harmony/services/explorer"
 
 	"github.com/harmony-one/harmony/profiler"
 
@@ -432,12 +433,6 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState S
 				host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
 				consensus.commitByLeader(false)
 			} else {
-				consensus.Log.Debug("Consensus reached with signatures.", "numOfSignatures", len(*responses))
-				// Reset state to Finished, and clear other data.
-				consensus.ResetState()
-				consensus.consensusID++
-				consensus.Log.Debug("HOORAY!!! CONSENSUS REACHED!!!", "consensusID", consensus.consensusID)
-
 				// TODO: reconstruct the whole block from header and transactions
 				// For now, we used the stored whole block already stored in consensus.blockHeader
 				txDecoder := gob.NewDecoder(bytes.NewReader(consensus.blockHeader))
@@ -453,6 +448,15 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState S
 				consensus.OnConsensusDone(&blockHeaderObj)
 
 				consensus.reportMetrics(blockHeaderObj)
+				// Dump new block into level db.
+				explorer.GetStorageInstance().Dump(blockHeaderObj.AccountBlock, consensus.consensusID)
+				// Claim new consensus reached.
+				consensus.Log.Debug("Consensus reached with signatures.", "numOfSignatures", len(*responses))
+				// Reset state to Finished, and clear other data.
+				consensus.ResetState()
+				consensus.consensusID++
+				consensus.Log.Debug("HOORAY!!! CONSENSUS REACHED!!!", "consensusID", consensus.consensusID)
+
 				// Send signal to Node so the new block can be added and new round of consensus can be triggered
 				consensus.ReadySignal <- struct{}{}
 			}
