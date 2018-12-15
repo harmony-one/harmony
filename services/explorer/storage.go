@@ -110,7 +110,6 @@ func (storage *Storage) Dump(accountBlock []byte, height uint32) {
 	for _, tx := range block.Transactions() {
 		if data, err := rlp.EncodeToBytes(tx); err == nil {
 			key := GetTXKey(tx.Hash().Hex())
-			fmt.Println("tx hash ", key)
 			storage.db.Put([]byte(key), data)
 		} else {
 			fmt.Println("EncodeRLP transaction error")

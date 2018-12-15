@@ -159,7 +159,6 @@ func (node *Node) addPendingTransactions(newTxs []*blockchain.Transaction) {
 	node.pendingTxMutex.Lock()
 	node.pendingTransactions = append(node.pendingTransactions, newTxs...)
 	node.pendingTxMutex.Unlock()
-	node.log.Debug("Got more transactions", "num", len(newTxs), "totalPending", len(node.pendingTransactions), "node", node)
 }
 
 // Add new transactions to the pending transaction list
@@ -307,8 +306,8 @@ func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 			testBankAddress := crypto.PubkeyToAddress(testBankKey.PublicKey)
 			testBankFunds := big.NewInt(1000)
 			testBankFunds = testBankFunds.Mul(testBankFunds, big.NewInt(params.Ether))
-			fmt.Println(crypto.PubkeyToAddress(testBankKey.PublicKey).Hex())
-			fmt.Println(hex.EncodeToString(crypto.FromECDSA(testBankKey)))
+			// fmt.Println(crypto.PubkeyToAddress(testBankKey.PublicKey).Hex())
+			// fmt.Println(hex.EncodeToString(crypto.FromECDSA(testBankKey)))
 			genesisAloc[testBankAddress] = core.GenesisAccount{Balance: testBankFunds}
 			node.TestBankKeys = append(node.TestBankKeys, testBankKey)
 		}
