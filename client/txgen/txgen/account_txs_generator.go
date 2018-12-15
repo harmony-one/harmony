@@ -28,7 +28,7 @@ func GenerateSimulatedTransactionsAccount(shardID int, dataNodes []*node.Node, s
 		for j := 0; j < 1; j++ {
 			randomUserAddress := crypto.PubkeyToAddress(node.TestBankKeys[rand.Intn(100)].PublicKey)
 			randAmount := rand.Float32()
-			tx, _ := types.SignTx(types.NewTransaction(baseNonce+uint64(j), randomUserAddress, uint32(shardID), big.NewInt(int64(params.Ether * randAmount)), params.TxGas, nil, nil), types.HomesteadSigner{}, node.TestBankKeys[i])
+			tx, _ := types.SignTx(types.NewTransaction(baseNonce+uint64(j), randomUserAddress, uint32(shardID), big.NewInt(int64(params.Ether*randAmount)), params.TxGas, nil, nil), types.HomesteadSigner{}, node.TestBankKeys[i])
 			txs[i*1+j] = tx
 		}
 	}
