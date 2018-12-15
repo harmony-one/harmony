@@ -33,7 +33,7 @@ func GetExplorerPort(nodePort string) string {
 	if port, err := strconv.Atoi(nodePort); err == nil {
 		return fmt.Sprintf("%d", port-explorerPortDifference)
 	}
-	os.Exit(1)
+	fmt.Println("error on parsing.")
 	return ""
 }
 
