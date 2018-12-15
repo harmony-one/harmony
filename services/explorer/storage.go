@@ -117,6 +117,7 @@ func (storage *Storage) Dump(accountBlock []byte, height uint32) {
 			From:      tx.To().Hex(),
 			To:        tx.To().Hex(),
 			Value:     strconv.Itoa(int(tx.Value().Int64())),
+			Bytes:     strconv.Itoa(int(tx.Size())),
 		}
 		if data, err := rlp.EncodeToBytes(explorerTransaction); err == nil {
 			key := GetTXKey(tx.Hash().Hex())
