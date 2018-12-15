@@ -228,6 +228,7 @@ func main() {
 	go currentNode.SupportSyncing()
 	if consensus.IsLeader {
 		go currentNode.SupportClient()
+		go currentNode.SupportExplorer()
 	}
 	currentNode.StartServer()
 }
