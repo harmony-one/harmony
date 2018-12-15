@@ -333,6 +333,7 @@ func (node *Node) WaitForConsensusReadyAccount(readySignal chan struct{}) {
 	node.log.Debug("Waiting for Consensus ready", "node", node)
 	time.Sleep(15 * time.Second)
 
+	firstTime := true
 	var newBlock *types.Block
 	timeoutCount := 0
 	for { // keep waiting for Consensus ready
@@ -349,7 +350,12 @@ func (node *Node) WaitForConsensusReadyAccount(readySignal chan struct{}) {
 
 		if !retry {
 			for {
-				if len(node.pendingTransactionsAccount) >= 1 {
+				threshold := 1
+				if firstTime {
+					threshold = 2
+					firstTime = false
+				}
+				if len(node.pendingTransactionsAccount) >= threshold {
 					// Normal tx block consensus
 					selectedTxs, _ := node.getTransactionsForNewBlockAccount(MaxNumberOfTransactionsPerBlock)
 					node.Worker.CommitTransactions(selectedTxs)
