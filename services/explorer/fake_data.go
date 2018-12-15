@@ -37,7 +37,5 @@ func ReadFakeData() Data {
 		os.Exit(1)
 	}
 
-	fmt.Println("block:", data.Block)
-	fmt.Println("blocks:", data.Blocks)
 	return data
 }
