@@ -14,7 +14,7 @@ type Data struct {
 
 // Address ...
 type Address struct {
-	Hash    string        `json:"hash"`
+	ID      string        `json:"id"`
 	Balance float64       `json:"balance"`
 	TXCount int           `json:"txCount"`
 	TXs     []Transaction `json:"txs"`
@@ -41,12 +41,11 @@ type BlockInfo struct {
 // Block ...
 type Block struct {
 	Height     string        `json:"height"`
-	Hash       string        `json:"hash"`
+	ID         string        `json:"id"`
 	TXCount    string        `json:"txCount"`
 	Timestamp  string        `json:"timestamp"`
 	MerkleRoot string        `json:"merkleRoot"`
 	PrevBlock  RefBlock      `json:"prevBlock"`
-	Bits       string        `json:"bits"`
 	Bytes      string        `json:"bytes"`
 	NextBlock  RefBlock      `json:"nextBlock"`
 	TXs        []Transaction `json:"txs"`

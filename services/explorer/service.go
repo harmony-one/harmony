@@ -198,11 +198,12 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		block := &Block{
-			Height:     string(id + fromInt - 1),
-			Hash:       accountBlock.Hash().Hex(),
-			TXCount:    string(accountBlock.Transactions().Len()),
-			Timestamp:  GetTime(accountBlock.Time().Int64()),
+			Height:     strconv.Itoa(id + fromInt - 1),
+			ID:         accountBlock.Hash().Hex(),
+			TXCount:    strconv.Itoa(accountBlock.Transactions().Len()),
+			Timestamp:  strconv.Itoa(int(accountBlock.Time().Int64())),
 			MerkleRoot: accountBlock.Hash().Hex(),
+			Bytes:      strconv.Itoa(int(accountBlock.Size())),
 		}
 		// Populate transactions
 		for _, tx := range accountBlock.Transactions() {
@@ -216,7 +217,7 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 		} else {
 			block.PrevBlock = RefBlock{
 				ID:     accountBlocks[id-1].Hash().Hex(),
-				Height: string(id + fromInt - 2),
+				Height: strconv.Itoa(id + fromInt - 2),
 			}
 		}
 		if accountBlocks[id+1] == nil {
@@ -227,7 +228,7 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 		} else {
 			block.NextBlock = RefBlock{
 				ID:     accountBlocks[id+1].Hash().Hex(),
-				Height: string(id + fromInt),
+				Height: strconv.Itoa(id + fromInt),
 			}
 		}
 		data.Blocks = append(data.Blocks, block)
