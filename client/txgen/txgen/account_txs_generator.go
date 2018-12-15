@@ -2,6 +2,7 @@ package txgen
 
 import (
 	"math/big"
+	"math/rand"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
@@ -25,10 +26,9 @@ func GenerateSimulatedTransactionsAccount(shardID int, dataNodes []*node.Node, s
 	for i := 0; i < 100; i++ {
 		baseNonce := node.Worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(node.TestBankKeys[i].PublicKey))
 		for j := 0; j < 1; j++ {
-			randomUserKey, _ := crypto.GenerateKey()
-			randomUserAddress := crypto.PubkeyToAddress(randomUserKey.PublicKey)
-
-			tx, _ := types.SignTx(types.NewTransaction(baseNonce+uint64(j), randomUserAddress, uint32(shardID), big.NewInt(1000), params.TxGas, nil, nil), types.HomesteadSigner{}, node.TestBankKeys[i])
+			randomUserAddress := crypto.PubkeyToAddress(node.TestBankKeys[rand.Intn(100)].PublicKey)
+			randAmount := rand.Float32()
+			tx, _ := types.SignTx(types.NewTransaction(baseNonce+uint64(j), randomUserAddress, uint32(shardID), big.NewInt(int64(params.Ether * randAmount)), params.TxGas, nil, nil), types.HomesteadSigner{}, node.TestBankKeys[i])
 			txs[i*1+j] = tx
 		}
 	}
