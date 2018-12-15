@@ -143,9 +143,7 @@ func main() {
 			for i, address := range ReadAddresses() {
 				fmt.Printf("Account %d: %s:\n", i, address.Hex())
 				for shardID, balanceNonce := range FetchBalance(address, walletNode) {
-					balance := balanceNonce.balance
-					balance = balance.Div(balance, big.NewInt(params.GWei))
-					fmt.Printf("    Balance in Shard %d:  %.6f \n", shardID, float32(balanceNonce.balance.Uint64())/params.GWei)
+					fmt.Printf("    Balance in Shard %d:  %s \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance))
 				}
 			}
 		} else {
@@ -153,7 +151,7 @@ func main() {
 			for shardID, balanceNonce := range FetchBalance(address, walletNode) {
 				balance := balanceNonce.balance
 				balance = balance.Div(balance, big.NewInt(params.GWei))
-				fmt.Printf("    Balance in Shard %d:  %.6f \n", shardID, float32(balanceNonce.balance.Uint64())/params.GWei)
+				fmt.Printf("    Balance in Shard %d:  %s \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance))
 			}
 		}
 	case "getFreeToken":
@@ -241,6 +239,45 @@ func main() {
 	}
 }
 
+func convertBalanceIntoReadableFormat(balance *big.Int) string {
+	balance = balance.Div(balance, big.NewInt(params.GWei))
+	strBalance := fmt.Sprintf("%d", balance.Uint64())
+
+	bytes := []byte(strBalance)
+	hasDecimal := false
+	for i := 0; i < 11; i++ {
+		if len(bytes)-1-i < 0 {
+			bytes = append([]byte{'0'}, bytes...)
+		}
+		if bytes[len(bytes)-1-i] != '0' && i < 9 {
+			hasDecimal = true
+		}
+		if i == 9 {
+			newBytes := append([]byte{'.'}, bytes[len(bytes)-i:]...)
+			bytes = append(bytes[:len(bytes)-i], newBytes...)
+		}
+	}
+	zerosToRemove := 0
+	for i := 0; i < len(bytes); i++ {
+		if hasDecimal {
+			if bytes[len(bytes)-1-i] == '0' {
+				bytes = bytes[:len(bytes)-1-i]
+				i--
+			} else {
+				break
+			}
+		} else {
+			if zerosToRemove < 5 {
+				bytes = bytes[:len(bytes)-1-i]
+				i--
+				zerosToRemove++
+			} else {
+				break
+			}
+		}
+	}
+	return string(bytes)
+}
 func getShardIDToLeaderMap() map[uint32]p2p.Peer {
 	// TODO(ricl): Later use data.harmony.one for API.
 	str, _ := client.DownloadURLAsString("https://s3-us-west-2.amazonaws.com/unique-bucket-bin/leaders.txt")
@@ -314,9 +351,9 @@ func GetFreeToken(address common.Address, walletNode *node.Node) {
 		client := client2.NewClient(leader.IP, strconv.Itoa(port+node.ClientServicePortDiff))
 		response := client.GetFreeToken(address)
 
-		txId := common.Hash{}
-		txId.SetBytes(response.TxId)
-		fmt.Printf("Transaction Id requesting free token in shard %d: %s\n", int(shardID), txId.Hex())
+		txID := common.Hash{}
+		txID.SetBytes(response.TxId)
+		fmt.Printf("Transaction Id requesting free token in shard %d: %s\n", int(shardID), txID.Hex())
 	}
 }
 
