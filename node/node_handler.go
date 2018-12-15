@@ -331,6 +331,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
 // WaitForConsensusReadyAccount ...
 func (node *Node) WaitForConsensusReadyAccount(readySignal chan struct{}) {
 	node.log.Debug("Waiting for Consensus ready", "node", node)
+	time.Sleep(10 * time.Second)
 
 	var newBlock *types.Block
 	timeoutCount := 0

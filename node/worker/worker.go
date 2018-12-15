@@ -37,6 +37,8 @@ type Worker struct {
 
 	gasFloor uint64
 	gasCeil  uint64
+
+	shardID uint32
 }
 
 // SelectTransactionsForNewBlock selects transactions for new block.
@@ -48,6 +50,9 @@ func (w *Worker) SelectTransactionsForNewBlock(txs types.Transactions, maxNumTxs
 	unselected := types.Transactions{}
 	invalid := types.Transactions{}
 	for _, tx := range txs {
+		if tx.ShardID() != w.shardID {
+			invalid = append(invalid, tx)
+		}
 		snap := w.current.state.Snapshot()
 		_, err := w.commitTransaction(tx, w.coinbase)
 		if len(selected) > maxNumTxs {
@@ -151,7 +156,7 @@ func (w *Worker) Commit() (*types.Block, error) {
 }
 
 // New ...
-func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus.Engine, coinbase common.Address) *Worker {
+func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus.Engine, coinbase common.Address, shardID uint32) *Worker {
 	worker := &Worker{
 		config: config,
 		chain:  chain,
@@ -160,6 +165,7 @@ func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus.En
 	worker.gasFloor = 0
 	worker.gasCeil = 1000000000000000
 	worker.coinbase = coinbase
+	worker.shardID = shardID
 
 	parent := worker.chain.CurrentBlock()
 	num := parent.Number()

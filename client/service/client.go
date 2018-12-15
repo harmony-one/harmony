@@ -49,3 +49,15 @@ func (client *Client) GetBalance(address common.Address) *proto.FetchAccountStat
 	}
 	return response
 }
+
+// GetFreeToken requests free token from the faucet contract.
+func (client *Client) GetFreeToken(address common.Address) *proto.GetFreeTokenResponse {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	request := &proto.GetFreeTokenRequest{Address: address.Bytes()}
+	response, err := client.clientServiceClient.GetFreeToken(ctx, request)
+	if err != nil {
+		log.Fatalf("Error getting free token: %s", err)
+	}
+	return response
+}
