@@ -90,7 +90,7 @@ func (storage *Storage) Dump(accountBlock []byte, height uint32) {
 	blockInfo := BlockInfo{
 		ID:        block.Hash().Hex(),
 		Height:    string(height),
-		Timestamp: strconv.Itoa(int(block.Time().Int64())),
+		Timestamp: strconv.Itoa(int(block.Time().Int64() * 1000)),
 		TXCount:   string(block.Transactions().Len()),
 		Size:      block.Size().String(),
 	}
@@ -113,7 +113,7 @@ func (storage *Storage) Dump(accountBlock []byte, height uint32) {
 		}
 		explorerTransaction := Transaction{
 			ID:        tx.Hash().Hex(),
-			Timestamp: strconv.Itoa(int(block.Time().Int64())),
+			Timestamp: strconv.Itoa(int(block.Time().Int64() * 1000)),
 			From:      tx.To().Hex(),
 			To:        tx.To().Hex(),
 			Value:     strconv.Itoa(int(tx.Value().Int64())),

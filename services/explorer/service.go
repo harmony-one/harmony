@@ -148,7 +148,7 @@ func GetTransaction(tx *types.Transaction, accountBlock *types.Block) *Transacti
 	}
 	return &Transaction{
 		ID:        tx.Hash().Hex(),
-		Timestamp: strconv.Itoa(int(accountBlock.Time().Int64())),
+		Timestamp: strconv.Itoa(int(accountBlock.Time().Int64() * 1000)),
 		From:      tx.To().Hex(),
 		To:        tx.To().Hex(),
 		Value:     strconv.Itoa(int(tx.GasPrice().Int64())),
@@ -195,7 +195,7 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 			Height:     strconv.Itoa(id + fromInt - 1),
 			ID:         accountBlock.Hash().Hex(),
 			TXCount:    strconv.Itoa(accountBlock.Transactions().Len()),
-			Timestamp:  strconv.Itoa(int(accountBlock.Time().Int64())),
+			Timestamp:  strconv.Itoa(int(accountBlock.Time().Int64() * 1000)),
 			MerkleRoot: accountBlock.Hash().Hex(),
 			Bytes:      strconv.Itoa(int(accountBlock.Size())),
 		}
