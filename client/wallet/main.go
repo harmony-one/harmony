@@ -27,9 +27,22 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path"
 	"strconv"
 	"time"
 )
+
+var (
+	version string
+	builtBy string
+	builtAt string
+	commit  string
+)
+
+func printVersion(me string) {
+	fmt.Fprintf(os.Stderr, "Harmony (C) 2018. %v, version %v-%v (%v %v)\n", path.Base(me), version, commit, builtBy, builtAt)
+	os.Exit(0)
+}
 
 // AccountState includes the state of an account
 type AccountState struct {
@@ -81,6 +94,8 @@ func main() {
 
 	// Switch on the subcommand
 	switch os.Args[1] {
+	case "-version":
+		printVersion(os.Args[0])
 	case "new":
 		randomBytes := [32]byte{}
 		_, err := io.ReadFull(rand.Reader, randomBytes[:])
