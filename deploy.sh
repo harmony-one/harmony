@@ -112,7 +112,7 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
       ./bin/benchmark -ip $ip -port $port -config_file $config -log_folder $log_folder $DB -min_peers $MIN &
     else
       ./bin/benchmark -ip $ip -port $port -log_folder $log_folder $DB $PEER -min_peers $MIN &
-      sleep 1
+      sleep 0.5
     fi
   fi
 done < $config

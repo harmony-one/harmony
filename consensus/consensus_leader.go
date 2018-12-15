@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	waitForEnoughValidators = 300
+	waitForEnoughValidators = 1000
 )
 
 var (
@@ -43,10 +43,9 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) 
 			consensus.Log.Debug("WaitForNewBlock", "removed peers", c)
 		}
 
-		if !consensus.HasEnoughValidators() {
+		for !consensus.HasEnoughValidators() {
 			consensus.Log.Debug("Not enough validators", "# Validators", len(consensus.PublicKeys))
 			time.Sleep(waitForEnoughValidators * time.Millisecond)
-			continue
 		}
 
 		// TODO: think about potential race condition
@@ -73,10 +72,9 @@ func (consensus *Consensus) WaitForNewBlockAccount(blockChannel chan *types.Bloc
 			consensus.Log.Debug("WaitForNewBlock", "removed peers", c)
 		}
 
-		if !consensus.HasEnoughValidators() {
+		for !consensus.HasEnoughValidators() {
 			consensus.Log.Debug("Not enough validators", "# Validators", len(consensus.PublicKeys))
 			time.Sleep(waitForEnoughValidators * time.Millisecond)
-			continue
 		}
 
 		startTime = time.Now()

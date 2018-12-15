@@ -61,7 +61,11 @@ func (bc *BeaconChain) StartRPCServer() {
 
 // GetShardLeaderMap returns the map from shard id to leader.
 func (bc *BeaconChain) GetShardLeaderMap() map[int]*bcconn.NodeInfo {
-	return bc.ShardLeaderMap
+	result := make(map[int]*bcconn.NodeInfo)
+	for i, leader := range bc.Leaders {
+		result[i] = leader
+	}
+	return result
 }
 
 //New beaconchain initialization
@@ -93,7 +97,6 @@ func (bc *BeaconChain) AcceptConnections(b []byte) {
 	_, isLeader := utils.AllocateShard(bc.NumberOfNodesAdded, bc.NumberOfShards)
 	if isLeader {
 		bc.Leaders = append(bc.Leaders, Node)
-		bc.ShardLeaderMap[bc.NumberOfNodesAdded-1] = Node
 	}
 	response := bcconn.ResponseRandomNumber{NumberOfShards: bc.NumberOfShards, NumberOfNodesAdded: bc.NumberOfNodesAdded, Leaders: bc.Leaders}
 	msg := bcconn.SerializeRandomInfo(response)

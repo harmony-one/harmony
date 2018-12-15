@@ -47,6 +47,13 @@ func main() {
 	transferSenderPtr := transferCommand.String("from", "0", "Specify the sender account address or index")
 	transferReceiverPtr := transferCommand.String("to", "", "Specify the receiver account")
 	transferAmountPtr := transferCommand.Float64("amount", 0, "Specify the amount to transfer")
+	transferShardIDPtr := transferCommand.Int("shardID", -1, "Specify the shard ID for the transfer")
+
+	freeTokenCommand := flag.NewFlagSet("getFreeToken", flag.ExitOnError)
+	freeTokenAddressPtr := freeTokenCommand.String("address", "", "Specify the account address to receive the free token")
+
+	balanceCommand := flag.NewFlagSet("getFreeToken", flag.ExitOnError)
+	balanceAddressPtr := balanceCommand.String("address", "", "Specify the account address to check balance for")
 
 	// Verify that a subcommand has been provided
 	// os.Arg[0] is the main command
@@ -60,11 +67,15 @@ func main() {
 		fmt.Println("    3. removeAll     - Removes all accounts in local keystore")
 		fmt.Println("    4. import        - Imports a new account by private key")
 		fmt.Println("        --privateKey     - the private key to import")
-		fmt.Println("    5. balances      - Shows the balances of all accounts")
-		fmt.Println("    6. transfer")
+		fmt.Println("    5. balances      - Shows the balances of all addresses or specific address")
+		fmt.Println("        --address        - The address to check balance for")
+		fmt.Println("    6. getFreeToken  - Gets free token on each shard")
+		fmt.Println("        --address        - The free token receiver account's address")
+		fmt.Println("    7. transfer")
 		fmt.Println("        --from           - The sender account's address or index in the local keystore")
 		fmt.Println("        --to             - The receiver account's address")
 		fmt.Println("        --amount         - The amount of token to transfer")
+		fmt.Println("        --shardId        - The shard Id for the transfer")
 		os.Exit(1)
 	}
 
@@ -86,14 +97,15 @@ func main() {
 		fmt.Printf("New account created with address:\n    {%s}\n", crypto2.PubkeyToAddress(priKey.PublicKey).Hex())
 		fmt.Printf("Please keep a copy of the private key:\n    {%s}\n", hex.EncodeToString(crypto2.FromECDSA(priKey)))
 	case "list":
-		for i, address := range ReadAddresses() {
-			fmt.Printf("Account %d:\n  {%s}\n", i, address.Hex())
+		for i, key := range ReadPrivateKeys() {
+			fmt.Printf("Account %d:\n  {%s}\n", i, crypto2.PubkeyToAddress(key.PublicKey).Hex())
+			fmt.Printf("    PrivateKey: {%s}\n", hex.EncodeToString(key.D.Bytes()))
 		}
 	case "removeAll":
 		ClearKeystore()
 		fmt.Println("All existing accounts deleted...")
 	case "import":
-		accountImportCommand.Parse(os.Args[3:])
+		accountImportCommand.Parse(os.Args[2:])
 		priKey := *accountImportPtr
 		if priKey == "" {
 			fmt.Println("Error: --privateKey is required")
@@ -109,14 +121,37 @@ func main() {
 		StorePrivateKey(priKeyBytes)
 		fmt.Println("Private key imported...")
 	case "balances":
+		balanceCommand.Parse(os.Args[2:])
 		walletNode := CreateWalletNode()
 
-		for i, address := range ReadAddresses() {
-			fmt.Printf("Account %d: %s:\n", i, address.Hex())
+		if *balanceAddressPtr == "" {
+			for i, address := range ReadAddresses() {
+				fmt.Printf("Account %d: %s:\n", i, address.Hex())
+				for shardID, balanceNonce := range FetchBalance(address, walletNode) {
+					balance := balanceNonce.balance
+					balance = balance.Div(balance, big.NewInt(params.GWei))
+					fmt.Printf("    Balance in Shard %d:  %.6f \n", shardID, float32(balanceNonce.balance.Uint64())/params.GWei)
+				}
+			}
+		} else {
+			address := common.HexToAddress(*freeTokenAddressPtr)
 			for shardID, balanceNonce := range FetchBalance(address, walletNode) {
-				fmt.Printf("    Balance in Shard %d:  %.6f \n", shardID, float32(balanceNonce.balance.Uint64())/params.Ether)
+				balance := balanceNonce.balance
+				balance = balance.Div(balance, big.NewInt(params.GWei))
+				fmt.Printf("    Balance in Shard %d:  %.6f \n", shardID, float32(balanceNonce.balance.Uint64())/params.GWei)
 			}
 		}
+	case "getFreeToken":
+		freeTokenCommand.Parse(os.Args[2:])
+		walletNode := CreateWalletNode()
+
+		if *freeTokenAddressPtr == "" {
+			fmt.Println("Error: --address is required")
+			return
+		}
+		address := common.HexToAddress(*freeTokenAddressPtr)
+
+		GetFreeToken(address, walletNode)
 	case "transfer":
 		transferCommand.Parse(os.Args[2:])
 		if !transferCommand.Parsed() {
@@ -125,9 +160,15 @@ func main() {
 		sender := *transferSenderPtr
 		receiver := *transferReceiverPtr
 		amount := *transferAmountPtr
+		shardID := *transferShardIDPtr
 
+		if shardID == -1 {
+			fmt.Println("Please specify the shard ID for the transfer (e.g. --shardID=0)")
+			return
+		}
 		if amount <= 0 {
 			fmt.Println("Please specify positive amount to transfer")
+			return
 		}
 		priKeys := ReadPrivateKeys()
 		if len(priKeys) == 0 {
@@ -167,14 +208,19 @@ func main() {
 		walletNode := CreateWalletNode()
 		shardIDToAccountState := FetchBalance(senderAddress, walletNode)
 
-		if float64(shardIDToAccountState[0].balance.Uint64())/params.Ether < amount {
-			fmt.Printf("Balance is not enough for the transfer, current balance is %.6f\n", float64(shardIDToAccountState[0].balance.Uint64())/params.Ether)
+		balance := shardIDToAccountState[uint32(shardID)].balance
+		balance = balance.Div(balance, big.NewInt(params.GWei))
+		if amount > float64(balance.Uint64())/params.GWei {
+			fmt.Printf("Balance is not enough for the transfer, current balance is %.6f\n", float64(balance.Uint64())/params.GWei)
 			return
 		}
-		fmt.Println(big.NewInt(int64(amount * params.Ether)))
-		tx, _ := types.SignTx(types.NewTransaction(shardIDToAccountState[0].nonce, receiverAddress, 0, big.NewInt(int64(amount*params.Ether)), params.TxGas, nil, nil), types.HomesteadSigner{}, senderPriKey)
-		SubmitTransaction(tx, walletNode)
+
+		amountBigInt := big.NewInt(int64(amount * params.GWei))
+		amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(params.GWei))
+		tx, _ := types.SignTx(types.NewTransaction(shardIDToAccountState[uint32(shardID)].nonce, receiverAddress, uint32(shardID), amountBigInt, params.TxGas, nil, nil), types.HomesteadSigner{}, senderPriKey)
+		SubmitTransaction(tx, walletNode, uint32(shardID))
 	default:
+		fmt.Printf("Unknown action: %s\n", os.Args[1])
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
@@ -222,9 +268,11 @@ func CreateWalletNode() *node.Node {
 }
 
 // SubmitTransaction submits the transaction to the Harmony network
-func SubmitTransaction(tx *types.Transaction, walletNode *node.Node) error {
+func SubmitTransaction(tx *types.Transaction, walletNode *node.Node, shardID uint32) error {
 	msg := proto_node.ConstructTransactionListMessageAccount(types.Transactions{tx})
-	walletNode.BroadcastMessage(walletNode.Client.GetLeaders(), msg)
+	leader := (*walletNode.Client.Leaders)[shardID]
+	walletNode.SendMessage(leader, msg)
+	fmt.Printf("Transaction Id for shard %d: %s\n", int(shardID), common.BytesToAddress(tx.Hash().Bytes()).Hex())
 	time.Sleep(300 * time.Millisecond)
 	return nil
 }
@@ -242,6 +290,16 @@ func FetchBalance(address common.Address, walletNode *node.Node) map[uint32]Acco
 	}
 
 	return result
+}
+
+// GetFreeToken requests for token test token on each shard
+func GetFreeToken(address common.Address, walletNode *node.Node) {
+	for shardID, leader := range *walletNode.Client.Leaders {
+		port, _ := strconv.Atoi(leader.Port)
+		client := client2.NewClient(leader.IP, strconv.Itoa(port+node.ClientServicePortDiff))
+		response := client.GetFreeToken(address)
+		fmt.Printf("Transaction Id requesting free token in shard %d: %s\n", int(shardID), common.BytesToAddress(response.TxId).Hex())
+	}
 }
 
 // FetchUtxos fetches utxos of specified address from the Harmony network
