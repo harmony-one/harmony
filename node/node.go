@@ -15,6 +15,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/harmony-one/harmony/services/explorer"
+
 	"github.com/harmony-one/harmony/client"
 	clientService "github.com/harmony-one/harmony/client/service"
 
@@ -487,6 +489,16 @@ func (node *Node) JoinShard(leader p2p.Peer) {
 			return
 		}
 	}
+}
+
+// SupportExplorer initializes and starts the explorer service
+func (node *Node) SupportExplorer() {
+	explorerService := &explorer.Service{
+		IP:   node.SelfPeer.IP,
+		Port: node.SelfPeer.Port,
+	}
+	explorerService.Init(true)
+	explorerService.Run()
 }
 
 // SupportClient initializes and starts the client service

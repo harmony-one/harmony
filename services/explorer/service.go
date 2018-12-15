@@ -29,8 +29,8 @@ type Service struct {
 }
 
 // Init is to do init for ExplorerService.
-func (s *Service) Init() {
-	s.storage = GetStorageInstance(s.IP, s.Port, false)
+func (s *Service) Init(remove bool) {
+	s.storage = GetStorageInstance(s.IP, s.Port, remove)
 }
 
 // Run is to run serving explorer.
