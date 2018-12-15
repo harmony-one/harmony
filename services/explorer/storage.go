@@ -90,7 +90,7 @@ func (storage *Storage) Dump(accountBlock []byte, height uint32) {
 	blockInfo := BlockInfo{
 		ID:        block.Hash().Hex(),
 		Height:    string(height),
-		Timestamp: string(block.Time().Int64()),
+		Timestamp: strconv.Itoa(int(block.Time().Int64())),
 		TXCount:   string(block.Transactions().Len()),
 		Size:      block.Size().String(),
 	}

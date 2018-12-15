@@ -148,7 +148,7 @@ func GetTransaction(tx *types.Transaction, accountBlock *types.Block) Transactio
 	}
 	return Transaction{
 		ID:        tx.Hash().Hex(),
-		Timestamp: strconv.Itoa(int(accountBlock.Size())),
+		Timestamp: strconv.Itoa(int(accountBlock.Time().Int64())),
 		From:      tx.To().Hex(),
 		To:        tx.To().Hex(),
 		Value:     strconv.Itoa(int(tx.GasPrice().Int64())),
