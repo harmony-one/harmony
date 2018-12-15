@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"time"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/gorilla/mux"
@@ -140,11 +139,6 @@ func (s *Service) GetAccountBlocks(from, to int) []*types.Block {
 		blocks = append(blocks, block)
 	}
 	return blocks
-}
-
-// GetTime ...
-func GetTime(timestamp int64) string {
-	return time.Unix(timestamp, 0).String()
 }
 
 // GetTransaction ...
