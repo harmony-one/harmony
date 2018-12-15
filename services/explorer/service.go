@@ -17,7 +17,7 @@ import (
 
 // Constants for explorer service.
 const (
-	ExplorerServicePort = "10000"
+	explorerPortDifference = 4000
 )
 
 // Service is the struct for explorer service.
@@ -28,6 +28,15 @@ type Service struct {
 	storage *Storage
 }
 
+// GetExplorerPort ...
+func GetExplorerPort(nodePort string) string {
+	if port, err := strconv.Atoi(nodePort); err == nil {
+		return fmt.Sprintf("%d", port-explorerPortDifference)
+	}
+	os.Exit(1)
+	return ""
+}
+
 // Init is to do init for ExplorerService.
 func (s *Service) Init(remove bool) {
 	s.storage = GetStorageInstance(s.IP, s.Port, remove)
@@ -36,7 +45,7 @@ func (s *Service) Init(remove bool) {
 // Run is to run serving explorer.
 func (s *Service) Run() {
 	// Init address.
-	addr := net.JoinHostPort("", ExplorerServicePort)
+	addr := net.JoinHostPort("", GetExplorerPort(s.Port))
 
 	// Set up router
 	s.router = mux.NewRouter()
@@ -49,8 +58,8 @@ func (s *Service) Run() {
 	s.router.Path("/tx").Queries("id", "{[0-9A-Fa-f]*?}").HandlerFunc(s.GetExplorerTransaction).Methods("GET")
 	s.router.Path("/tx").HandlerFunc(s.GetExplorerTransaction)
 	// Do serving now.
-	fmt.Println("Listening to:", ExplorerServicePort)
-	go log.Fatal(http.ListenAndServe(addr, s.router))
+	fmt.Println("Listening to:", GetExplorerPort(s.Port))
+	log.Fatal(http.ListenAndServe(addr, s.router))
 }
 
 // GetExplorerBlockInfo ...
