@@ -21,15 +21,15 @@ type Settings struct {
 func GenerateSimulatedTransactionsAccount(shardID int, dataNodes []*node.Node, setting Settings) (types.Transactions, types.Transactions) {
 	_ = setting // TODO: take use of settings
 	node := dataNodes[shardID]
-	txs := make([]*types.Transaction, 1000)
+	txs := make([]*types.Transaction, 100)
 	for i := 0; i < 100; i++ {
 		baseNonce := node.Worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(node.TestBankKeys[i].PublicKey))
-		for j := 0; j < 10; j++ {
+		for j := 0; j < 1; j++ {
 			randomUserKey, _ := crypto.GenerateKey()
 			randomUserAddress := crypto.PubkeyToAddress(randomUserKey.PublicKey)
 
 			tx, _ := types.SignTx(types.NewTransaction(baseNonce+uint64(j), randomUserAddress, uint32(shardID), big.NewInt(1000), params.TxGas, nil, nil), types.HomesteadSigner{}, node.TestBankKeys[i])
-			txs[i*10+j] = tx
+			txs[i*1+j] = tx
 		}
 	}
 	return txs, nil

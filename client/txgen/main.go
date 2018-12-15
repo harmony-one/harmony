@@ -218,7 +218,7 @@ func main() {
 			lock.Unlock()
 
 			subsetCounter++
-			time.Sleep(10000 * time.Millisecond)
+			time.Sleep(60000 * time.Millisecond)
 		}
 	} else {
 		for {
