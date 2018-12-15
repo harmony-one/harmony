@@ -331,7 +331,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
 // WaitForConsensusReadyAccount ...
 func (node *Node) WaitForConsensusReadyAccount(readySignal chan struct{}) {
 	node.log.Debug("Waiting for Consensus ready", "node", node)
-	time.Sleep(10 * time.Second)
+	time.Sleep(15 * time.Second)
 
 	var newBlock *types.Block
 	timeoutCount := 0
@@ -349,7 +349,6 @@ func (node *Node) WaitForConsensusReadyAccount(readySignal chan struct{}) {
 
 		if !retry {
 			for {
-				node.log.Debug("Num Pending Txs", "Num", len(node.pendingTransactionsAccount))
 				if len(node.pendingTransactionsAccount) >= 1 {
 					// Normal tx block consensus
 					selectedTxs, _ := node.getTransactionsForNewBlockAccount(MaxNumberOfTransactionsPerBlock)
@@ -438,36 +437,30 @@ func (node *Node) VerifyNewBlockAccount(newBlock *types.Block) bool {
 // 1. add the new block to blockchain
 // 2. [leader] move cross shard tx and proof to the list where they wait to be sent to the client
 func (node *Node) PostConsensusProcessing(newBlock *blockchain.Block) {
-	if newBlock.IsStateBlock() {
-		// Clear out old tx blocks and put state block as genesis
-		if node.db != nil {
-			node.log.Info("Deleting old blocks.")
-			for i := 1; i <= len(node.blockchain.Blocks); i++ {
-				blockchain.Delete(node.db, strconv.Itoa(i))
-			}
-		}
-		node.blockchain.Blocks = []*blockchain.Block{}
-	}
+	//if newBlock.IsStateBlock() {
+	//	// Clear out old tx blocks and put state block as genesis
+	//	if node.db != nil {
+	//		node.log.Info("Deleting old blocks.")
+	//		for i := 1; i <= len(node.blockchain.Blocks); i++ {
+	//			blockchain.Delete(node.db, strconv.Itoa(i))
+	//		}
+	//	}
+	//	node.blockchain.Blocks = []*blockchain.Block{}
+	//}
 
 	if node.Consensus.IsLeader {
 		// Move crossTx-in-consensus into the list to be returned to client
-		for _, crossTxAndProof := range node.CrossTxsInConsensus {
-			crossTxAndProof.Proof.BlockHash = newBlock.Hash
-			// TODO: fill in the signature proofs
-		}
-		if len(node.CrossTxsInConsensus) != 0 {
-			node.addCrossTxsToReturn(node.CrossTxsInConsensus)
-			node.CrossTxsInConsensus = []*blockchain.CrossShardTxAndProof{}
-		}
-
-		node.SendBackProofOfAcceptOrReject()
+		//for _, crossTxAndProof := range node.CrossTxsInConsensus {
+		//	crossTxAndProof.Proof.BlockHash = newBlock.Hash
+		//	// TODO: fill in the signature proofs
+		//}
+		//if len(node.CrossTxsInConsensus) != 0 {
+		//	node.addCrossTxsToReturn(node.CrossTxsInConsensus)
+		//	node.CrossTxsInConsensus = []*blockchain.CrossShardTxAndProof{}
+		//}
+		//
+		//node.SendBackProofOfAcceptOrReject()
 		node.BroadcastNewBlock(newBlock)
-	}
-
-	accountBlock := new(types.Block)
-	err := rlp.DecodeBytes(newBlock.AccountBlock, accountBlock)
-	if err != nil {
-		node.log.Error("Failed decoding the block with RLP")
 	}
 
 	node.AddNewBlock(newBlock)
@@ -486,7 +479,7 @@ func (node *Node) AddNewBlockAccount(newBlock *types.Block) {
 // AddNewBlock is usedd to add new block into the utxo-based blockchain.
 func (node *Node) AddNewBlock(newBlock *blockchain.Block) {
 	// Add it to blockchain
-	node.blockchain.Blocks = append(node.blockchain.Blocks, newBlock)
+	// node.blockchain.Blocks = append(node.blockchain.Blocks, newBlock)
 	// Store it into leveldb.
 	if node.db != nil {
 		node.log.Info("Writing new block into disk.")
