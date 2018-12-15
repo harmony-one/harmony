@@ -287,7 +287,7 @@ func SubmitTransaction(tx *types.Transaction, walletNode *node.Node, shardID uin
 	msg := proto_node.ConstructTransactionListMessageAccount(types.Transactions{tx})
 	leader := (*walletNode.Client.Leaders)[shardID]
 	walletNode.SendMessage(leader, msg)
-	fmt.Printf("Transaction Id for shard %d: %s\n", int(shardID), common.BytesToAddress(tx.Hash().Bytes()).Hex())
+	fmt.Printf("Transaction Id for shard %d: %s\n", int(shardID), tx.Hash().Hex())
 	time.Sleep(300 * time.Millisecond)
 	return nil
 }
@@ -313,7 +313,10 @@ func GetFreeToken(address common.Address, walletNode *node.Node) {
 		port, _ := strconv.Atoi(leader.Port)
 		client := client2.NewClient(leader.IP, strconv.Itoa(port+node.ClientServicePortDiff))
 		response := client.GetFreeToken(address)
-		fmt.Printf("Transaction Id requesting free token in shard %d: %s\n", int(shardID), common.BytesToAddress(response.TxId).Hex())
+
+		txId := common.Hash{}
+		txId.SetBytes(response.TxId)
+		fmt.Printf("Transaction Id requesting free token in shard %d: %s\n", int(shardID), txId.Hex())
 	}
 }
 
