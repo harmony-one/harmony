@@ -308,8 +308,6 @@ func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 			testBankAddress := crypto.PubkeyToAddress(testBankKey.PublicKey)
 			testBankFunds := big.NewInt(1000)
 			testBankFunds = testBankFunds.Mul(testBankFunds, big.NewInt(params.Ether))
-			// fmt.Println(crypto.PubkeyToAddress(testBankKey.PublicKey).Hex())
-			// fmt.Println(hex.EncodeToString(crypto.FromECDSA(testBankKey)))
 			genesisAloc[testBankAddress] = core.GenesisAccount{Balance: testBankFunds}
 			node.TestBankKeys = append(node.TestBankKeys, testBankKey)
 		}
@@ -441,7 +439,6 @@ func (node *Node) AddSmartContractsToPendingTransactions() {
 	mycontracttx, _ := types.SignTx(types.NewContractCreation(uint64(0), node.Consensus.ShardID, contractFunds, params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, priKey)
 	node.ContractAddresses = append(node.ContractAddresses, crypto.CreateAddress(crypto.PubkeyToAddress(priKey.PublicKey), uint64(0)))
 
-	fmt.Println(node.ContractAddresses[0].Hex())
 	node.addPendingTransactionsAccount(types.Transactions{mycontracttx})
 }
 
