@@ -268,8 +268,8 @@ func getShardIDToLeaderMap() map[uint32]p2p.Peer {
 func CreateWalletNode() *node.Node {
 	shardIDLeaderMap := make(map[uint32]p2p.Peer)
 
-	port, _ := strconv.Atoi("8081")
-	bcClient := beaconchain.NewClient("127.0.0.1", strconv.Itoa(port+libs.BeaconchainServicePortDiff))
+	port, _ := strconv.Atoi("9999")
+	bcClient := beaconchain.NewClient("54.183.5.66", strconv.Itoa(port+libs.BeaconchainServicePortDiff))
 	response := bcClient.GetLeaders()
 
 	for _, leader := range response.Leaders {
