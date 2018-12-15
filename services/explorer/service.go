@@ -46,7 +46,7 @@ func (s *Service) Run() {
 	s.router.Path("/blocks").Queries("from", "{[0-9]*?}", "to", "{[0-9]*?}").HandlerFunc(s.GetExplorerBlocks).Methods("GET")
 	s.router.Path("/blocks").HandlerFunc(s.GetExplorerBlocks)
 
-	s.router.Path("/tx").Queries("id", "{[0-9A-Fa-f]*?}").HandlerFunc(s.GetExplorerTransaction).Methods("GET")
+	s.router.Path("/tx").Queries("id", "{[0-9A-Fa-fx]*?}").HandlerFunc(s.GetExplorerTransaction).Methods("GET")
 	s.router.Path("/tx").HandlerFunc(s.GetExplorerTransaction)
 	// Do serving now.
 	fmt.Println("Listening to:", ExplorerServicePort)
