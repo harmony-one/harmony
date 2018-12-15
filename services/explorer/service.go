@@ -142,11 +142,11 @@ func (s *Service) GetAccountBlocks(from, to int) []*types.Block {
 }
 
 // GetTransaction ...
-func GetTransaction(tx *types.Transaction, accountBlock *types.Block) Transaction {
+func GetTransaction(tx *types.Transaction, accountBlock *types.Block) *Transaction {
 	if tx.To() == nil {
-		return Transaction{}
+		return nil
 	}
-	return Transaction{
+	return &Transaction{
 		ID:        tx.Hash().Hex(),
 		Timestamp: strconv.Itoa(int(accountBlock.Time().Int64())),
 		From:      tx.To().Hex(),
@@ -201,7 +201,10 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 		}
 		// Populate transactions
 		for _, tx := range accountBlock.Transactions() {
-			block.TXs = append(block.TXs, GetTransaction(tx, accountBlock))
+			transaction := GetTransaction(tx, accountBlock)
+			if transaction != nil {
+				block.TXs = append(block.TXs, transaction)
+			}
 		}
 		if accountBlocks[id-1] == nil {
 			block.PrevBlock = RefBlock{

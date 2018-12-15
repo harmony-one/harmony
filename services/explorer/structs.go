@@ -41,15 +41,15 @@ type BlockInfo struct {
 
 // Block ...
 type Block struct {
-	Height     string        `json:"height"`
-	ID         string        `json:"id"`
-	TXCount    string        `json:"txCount"`
-	Timestamp  string        `json:"timestamp"`
-	MerkleRoot string        `json:"merkleRoot"`
-	PrevBlock  RefBlock      `json:"prevBlock"`
-	Bytes      string        `json:"bytes"`
-	NextBlock  RefBlock      `json:"nextBlock"`
-	TXs        []Transaction `json:"txs"`
+	Height     string         `json:"height"`
+	ID         string         `json:"id"`
+	TXCount    string         `json:"txCount"`
+	Timestamp  string         `json:"timestamp"`
+	MerkleRoot string         `json:"merkleRoot"`
+	PrevBlock  RefBlock       `json:"prevBlock"`
+	Bytes      string         `json:"bytes"`
+	NextBlock  RefBlock       `json:"nextBlock"`
+	TXs        []*Transaction `json:"txs"`
 }
 
 // RefBlock ...
