@@ -104,7 +104,6 @@ func (s *Service) PopulateBlockInfo(from, to int) []*BlockInfo {
 			os.Exit(1)
 		}
 		blocks = append(blocks, block)
-		fmt.Println("rlp decode successfully ")
 	}
 	return blocks
 }
@@ -118,23 +117,18 @@ func (s *Service) GetAccountBlocks(from, to int) []*types.Block {
 			continue
 		}
 		key := GetBlockKey(i)
-		fmt.Println("getting blockinfo with key ", key)
+		fmt.Println("getting block with key ", key)
 		data, err := storage.db.Get([]byte(key))
 		if err != nil {
-			if i > to {
-				blocks = append(blocks, nil)
-				continue
-			}
-			fmt.Println("Error on getting from db")
-			os.Exit(1)
+			blocks = append(blocks, nil)
+			continue
 		}
 		block := new(types.Block)
 		if rlp.DecodeBytes(data, block) != nil {
-			fmt.Println("RLP Decoding error")
+			fmt.Println("RLP Block decoding error")
 			os.Exit(1)
 		}
 		blocks = append(blocks, block)
-		fmt.Println("rlp decode successfully ")
 	}
 	return blocks
 }
@@ -146,6 +140,9 @@ func GetTime(timestamp int64) string {
 
 // GetTransaction ...
 func GetTransaction(tx *types.Transaction) Transaction {
+	if tx.To() == nil {
+		return Transaction{}
+	}
 	return Transaction{
 		ID: tx.Hash().Hex(),
 		// Timestamp: GetTime(accountBlock.Time().Int64()),
@@ -188,7 +185,7 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 
 	accountBlocks := s.GetAccountBlocks(fromInt, toInt)
 	for id, accountBlock := range accountBlocks {
-		if id == 0 || id == len(accountBlocks)-1 {
+		if id == 0 || id == len(accountBlocks)-1 || accountBlock == nil {
 			continue
 		}
 		block := &Block{
@@ -242,13 +239,13 @@ func (s *Service) GetExplorerTransaction(w http.ResponseWriter, r *http.Request)
 	db := s.storage.GetDB()
 	bytes, err := db.Get([]byte(GetTXKey(id)))
 	if err != nil {
-		fmt.Println("Error on getting from db")
-		os.Exit(1)
+		json.NewEncoder(w).Encode(data.TX)
+		return
 	}
 	tx := new(types.Transaction)
 	if rlp.DecodeBytes(bytes, tx) != nil {
-		fmt.Println("RLP Decoding error")
-		os.Exit(1)
+		json.NewEncoder(w).Encode(data.TX)
+		return
 	}
 	data.TX = GetTransaction(tx)
 	json.NewEncoder(w).Encode(data.TX)
