@@ -26,7 +26,7 @@ type Transaction struct {
 	Timestamp string `json:"timestamp"`
 	From      string `json:"from"`
 	To        string `json:"to"`
-	Value     int64  `json:"value"`
+	Value     string `json:"value"`
 }
 
 // BlockInfo ...

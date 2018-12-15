@@ -148,17 +148,16 @@ func GetTime(timestamp int64) string {
 }
 
 // GetTransaction ...
-func GetTransaction(tx *types.Transaction) Transaction {
+func GetTransaction(tx *types.Transaction, accountBlock *types.Block) Transaction {
 	if tx.To() == nil {
 		return Transaction{}
 	}
 	return Transaction{
-		ID: tx.Hash().Hex(),
-		// Timestamp: GetTime(accountBlock.Time().Int64()),
-		Timestamp: GetTime(3422343),
+		ID:        tx.Hash().Hex(),
+		Timestamp: strconv.Itoa(int(accountBlock.Size())),
 		From:      tx.To().Hex(),
 		To:        tx.To().Hex(),
-		Value:     tx.GasPrice().Int64(), // TODO(minh): fix it
+		Value:     strconv.Itoa(int(tx.GasPrice().Int64())),
 	}
 }
 
@@ -207,7 +206,7 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 		}
 		// Populate transactions
 		for _, tx := range accountBlock.Transactions() {
-			block.TXs = append(block.TXs, GetTransaction(tx))
+			block.TXs = append(block.TXs, GetTransaction(tx, accountBlock))
 		}
 		if accountBlocks[id-1] == nil {
 			block.PrevBlock = RefBlock{
@@ -252,11 +251,11 @@ func (s *Service) GetExplorerTransaction(w http.ResponseWriter, r *http.Request)
 		json.NewEncoder(w).Encode(data.TX)
 		return
 	}
-	tx := new(types.Transaction)
+	tx := new(Transaction)
 	if rlp.DecodeBytes(bytes, tx) != nil {
 		json.NewEncoder(w).Encode(data.TX)
 		return
 	}
-	data.TX = GetTransaction(tx)
+	data.TX = *tx
 	json.NewEncoder(w).Encode(data.TX)
 }

@@ -108,7 +108,17 @@ func (storage *Storage) Dump(accountBlock []byte, height uint32) {
 	// Store txs
 	fmt.Println("# of txs ", len(block.Transactions()))
 	for _, tx := range block.Transactions() {
-		if data, err := rlp.EncodeToBytes(tx); err == nil {
+		if tx.To() == nil {
+			continue
+		}
+		explorerTransaction := Transaction{
+			ID:        tx.Hash().Hex(),
+			Timestamp: strconv.Itoa(int(block.Time().Int64())),
+			From:      tx.To().Hex(),
+			To:        tx.To().Hex(),
+			Value:     strconv.Itoa(int(tx.Value().Int64())),
+		}
+		if data, err := rlp.EncodeToBytes(explorerTransaction); err == nil {
 			key := GetTXKey(tx.Hash().Hex())
 			storage.db.Put([]byte(key), data)
 		} else {
