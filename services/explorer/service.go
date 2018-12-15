@@ -152,6 +152,7 @@ func GetTransaction(tx *types.Transaction, accountBlock *types.Block) Transactio
 		From:      tx.To().Hex(),
 		To:        tx.To().Hex(),
 		Value:     strconv.Itoa(int(tx.GasPrice().Int64())),
+		Bytes:     strconv.Itoa(int(tx.Size())),
 	}
 }
 
