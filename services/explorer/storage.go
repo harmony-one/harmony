@@ -17,11 +17,17 @@ const (
 	BlockInfoPrefix = "bi"
 	BlockPrefix     = "b"
 	TXPrefix        = "tx"
+	AddressPrefix   = "ad"
 )
 
 // GetBlockInfoKey ...
 func GetBlockInfoKey(id int) string {
 	return fmt.Sprintf("%s_%d", BlockInfoPrefix, id)
+}
+
+// GetAddressKey ...
+func GetAddressKey(address string) string {
+	return fmt.Sprintf("%s_%s", AddressPrefix, address)
 }
 
 // GetBlockKey ...
@@ -111,20 +117,51 @@ func (storage *Storage) Dump(accountBlock []byte, height uint32) {
 		if tx.To() == nil {
 			continue
 		}
-		explorerTransaction := Transaction{
-			ID:        tx.Hash().Hex(),
-			Timestamp: strconv.Itoa(int(block.Time().Int64() * 1000)),
-			From:      tx.To().Hex(),
-			To:        tx.To().Hex(),
-			Value:     strconv.Itoa(int(tx.Value().Int64())),
-			Bytes:     strconv.Itoa(int(tx.Size())),
-		}
-		if data, err := rlp.EncodeToBytes(explorerTransaction); err == nil {
-			key := GetTXKey(tx.Hash().Hex())
-			storage.db.Put([]byte(key), data)
-		} else {
-			fmt.Println("EncodeRLP transaction error")
-			os.Exit(1)
-		}
+
+		storage.UpdateTxStorage(block, tx)
+		storage.UpdateAddressStorage(tx)
 	}
+}
+
+// UpdateTxStorage ...
+func (storage *Storage) UpdateTxStorage(block *types.Block, tx *types.Transaction) {
+	explorerTransaction := Transaction{
+		ID:        tx.Hash().Hex(),
+		Timestamp: strconv.Itoa(int(block.Time().Int64() * 1000)),
+		From:      tx.To().Hex(),
+		To:        tx.To().Hex(),
+		Value:     strconv.Itoa(int(tx.Value().Int64())),
+		Bytes:     strconv.Itoa(int(tx.Size())),
+	}
+	if data, err := rlp.EncodeToBytes(explorerTransaction); err == nil {
+		key := GetTXKey(tx.Hash().Hex())
+		storage.db.Put([]byte(key), data)
+	} else {
+		fmt.Println("EncodeRLP transaction error")
+		os.Exit(1)
+	}
+}
+
+// UpdateAddressStorage ...
+func (storage *Storage) UpdateAddressStorage(tx *types.Transaction) {
+	toAddress := tx.To().Hex()
+	key := GetAddressKey(toAddress)
+	txID := tx.Hash().Hex()
+
+	if data, err := storage.db.Get([]byte(key)); err == nil {
+		var txIDs []string
+		err = rlp.DecodeBytes(data, txIDs)
+		if err == nil {
+			txIDs = append(txIDs, txID)
+			storage.PutArrayOfString(key, txIDs)
+		}
+	} else {
+		storage.PutArrayOfString(key, []string{tx.Hash().Hex()})
+	}
+}
+
+// PutArrayOfString ...
+func (storage *Storage) PutArrayOfString(key string, arr []string) {
+	encoded, _ := rlp.EncodeToBytes(arr)
+	storage.db.Put([]byte(key), encoded)
 }
