@@ -329,8 +329,8 @@ func SubmitTransaction(tx *types.Transaction, walletNode *node.Node, shardID uin
 }
 
 // FetchBalance fetches account balance of specified address from the Harmony network
-func FetchBalance(address common.Address, walletNode *node.Node) map[uint32]AccountState {
-	result := make(map[uint32]AccountState)
+func FetchBalance(address common.Address, walletNode *node.Node) []AccountState {
+	result := make([]AccountState, len(*walletNode.Client.Leaders))
 	for shardID, leader := range *walletNode.Client.Leaders {
 		port, _ := strconv.Atoi(leader.Port)
 		client := client2.NewClient(leader.IP, strconv.Itoa(port+node.ClientServicePortDiff))
