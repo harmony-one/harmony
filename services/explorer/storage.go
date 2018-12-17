@@ -118,21 +118,22 @@ func (storage *Storage) Dump(accountBlock []byte, height uint32) {
 			continue
 		}
 
-		storage.UpdateTxStorage(block, tx)
-		storage.UpdateAddressStorage(tx)
+		explorerTransaction := Transaction{
+			ID:        tx.Hash().Hex(),
+			Timestamp: strconv.Itoa(int(block.Time().Int64() * 1000)),
+			From:      tx.To().Hex(),
+			To:        tx.To().Hex(),
+			Value:     strconv.Itoa(int(tx.Value().Int64())),
+			Bytes:     strconv.Itoa(int(tx.Size())),
+		}
+
+		storage.UpdateTxStorage(explorerTransaction, tx)
+		storage.UpdateAddressStorage(explorerTransaction, tx)
 	}
 }
 
 // UpdateTxStorage ...
-func (storage *Storage) UpdateTxStorage(block *types.Block, tx *types.Transaction) {
-	explorerTransaction := Transaction{
-		ID:        tx.Hash().Hex(),
-		Timestamp: strconv.Itoa(int(block.Time().Int64() * 1000)),
-		From:      tx.To().Hex(),
-		To:        tx.To().Hex(),
-		Value:     strconv.Itoa(int(tx.Value().Int64())),
-		Bytes:     strconv.Itoa(int(tx.Size())),
-	}
+func (storage *Storage) UpdateTxStorage(explorerTransaction Transaction, tx *types.Transaction) {
 	if data, err := rlp.EncodeToBytes(explorerTransaction); err == nil {
 		key := GetTXKey(tx.Hash().Hex())
 		storage.db.Put([]byte(key), data)
@@ -143,25 +144,23 @@ func (storage *Storage) UpdateTxStorage(block *types.Block, tx *types.Transactio
 }
 
 // UpdateAddressStorage ...
-func (storage *Storage) UpdateAddressStorage(tx *types.Transaction) {
+func (storage *Storage) UpdateAddressStorage(explorerTransaction Transaction, tx *types.Transaction) {
 	toAddress := tx.To().Hex()
 	key := GetAddressKey(toAddress)
-	txID := tx.Hash().Hex()
 
+	var addressAccount Address
 	if data, err := storage.db.Get([]byte(key)); err == nil {
-		var txIDs []string
-		err = rlp.DecodeBytes(data, txIDs)
+		err = rlp.DecodeBytes(data, addressAccount)
 		if err == nil {
-			txIDs = append(txIDs, txID)
-			storage.PutArrayOfString(key, txIDs)
+			addressAccount.Balance += float64(tx.Value().Int64())
+			addressAccount.TXCount++
 		}
 	} else {
-		storage.PutArrayOfString(key, []string{tx.Hash().Hex()})
+		addressAccount.Balance = float64(tx.Value().Int64())
+		addressAccount.TXCount = 1
 	}
-}
-
-// PutArrayOfString ...
-func (storage *Storage) PutArrayOfString(key string, arr []string) {
-	encoded, _ := rlp.EncodeToBytes(arr)
+	addressAccount.ID = toAddress
+	addressAccount.TXs = append(addressAccount.TXs, explorerTransaction)
+	encoded, _ := rlp.EncodeToBytes(addressAccount)
 	storage.db.Put([]byte(key), encoded)
 }

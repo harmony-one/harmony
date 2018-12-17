@@ -257,3 +257,28 @@ func (s *Service) GetExplorerTransaction(w http.ResponseWriter, r *http.Request)
 	data.TX = *tx
 	json.NewEncoder(w).Encode(data.TX)
 }
+
+// GetExplorerAddress ...
+func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	id := r.FormValue("id")
+
+	data := &Data{}
+	if id == "" {
+		json.NewEncoder(w).Encode(data.TX)
+		return
+	}
+	db := s.storage.GetDB()
+	bytes, err := db.Get([]byte(GetTXKey(id)))
+	if err != nil {
+		json.NewEncoder(w).Encode(data.TX)
+		return
+	}
+	tx := new(Transaction)
+	if rlp.DecodeBytes(bytes, tx) != nil {
+		json.NewEncoder(w).Encode(data.TX)
+		return
+	}
+	data.TX = *tx
+	json.NewEncoder(w).Encode(data.TX)
+}
