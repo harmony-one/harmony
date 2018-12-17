@@ -111,7 +111,7 @@ function upload_wallet
    esac
 
    $AWSCLI s3 cp $BINDIR/wallet s3://$PUBBUCKET/$DEST
-   $AWSCLI s3api pub-object-acl --bucket $PUBBUCKET/$DEST --key $DEST --acl public-read
+   $AWSCLI s3api pub-object-acl --bucket $PUBBUCKET --key $DEST --acl public-read
 }
 
 ################################ MAIN FUNCTION ##############################
