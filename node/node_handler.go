@@ -337,42 +337,37 @@ func (node *Node) WaitForConsensusReadyAccount(readySignal chan struct{}) {
 	var newBlock *types.Block
 	timeoutCount := 0
 	for { // keep waiting for Consensus ready
-		retry := false
 		select {
 		case <-readySignal:
 			time.Sleep(100 * time.Millisecond) // Delay a bit so validator is catched up.
 		case <-time.After(200 * time.Second):
-			retry = true
 			node.Consensus.ResetState()
 			timeoutCount++
 			node.log.Debug("Consensus timeout, retry!", "count", timeoutCount, "node", node)
 		}
 
-		if !retry {
-			for {
-				threshold := 1
-				if firstTime {
-					threshold = 2
-					firstTime = false
-				}
-				if len(node.pendingTransactionsAccount) >= threshold {
-					// Normal tx block consensus
-					selectedTxs, _ := node.getTransactionsForNewBlockAccount(MaxNumberOfTransactionsPerBlock)
-					node.Worker.CommitTransactions(selectedTxs)
-					block, err := node.Worker.Commit()
-					if err != nil {
-						node.log.Debug("Failed commiting new block", "Error", err)
-					} else {
-						newBlock = block
-						break
-					}
-				}
-				// If not enough transactions to run Consensus,
-				// periodically check whether we have enough transactions to package into block.
-				time.Sleep(1 * time.Second)
+		for {
+			threshold := 1
+			if firstTime {
+				threshold = 2
+				firstTime = false
 			}
+			if len(node.pendingTransactionsAccount) >= threshold {
+				// Normal tx block consensus
+				selectedTxs, _ := node.getTransactionsForNewBlockAccount(MaxNumberOfTransactionsPerBlock)
+				node.Worker.CommitTransactions(selectedTxs)
+				block, err := node.Worker.Commit()
+				if err != nil {
+					node.log.Debug("Failed commiting new block", "Error", err)
+				} else {
+					newBlock = block
+					break
+				}
+			}
+			// If not enough transactions to run Consensus,
+			// periodically check whether we have enough transactions to package into block.
+			time.Sleep(1 * time.Second)
 		}
-
 		// Send the new block to Consensus so it can be confirmed.
 		if newBlock != nil {
 			node.BlockChannelAccount <- newBlock

@@ -398,8 +398,12 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState S
 		return
 	}
 
-	if len(*responses) >= ((len(consensus.PublicKeys)*2)/3+1) && consensus.state != targetState {
-		if len(*responses) >= ((len(consensus.PublicKeys)*2)/3+1) && consensus.state != targetState {
+	threshold := 2
+	if targetState == Finished {
+		threshold = 1
+	}
+	if len(*responses) >= ((len(consensus.PublicKeys)*threshold)/3+1) && consensus.state != targetState {
+		if len(*responses) >= ((len(consensus.PublicKeys)*threshold)/3+1) && consensus.state != targetState {
 			consensus.Log.Debug("Enough responses received with signatures", "num", len(*responses), "state", consensus.state)
 			// Aggregate responses
 			responseScalars := []kyber.Scalar{}
@@ -463,6 +467,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState S
 				consensus.consensusID++
 				consensus.Log.Debug("HOORAY!!! CONSENSUS REACHED!!!", "consensusID", consensus.consensusID)
 
+				time.Sleep(500 * time.Millisecond)
 				// Send signal to Node so the new block can be added and new round of consensus can be triggered
 				consensus.ReadySignal <- struct{}{}
 			}
