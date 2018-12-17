@@ -147,10 +147,9 @@ func main() {
 				}
 			}
 		} else {
-			address := common.HexToAddress(*freeTokenAddressPtr)
+			address := common.HexToAddress(*balanceAddressPtr)
+			fmt.Printf("Account: %s:\n", address.Hex())
 			for shardID, balanceNonce := range FetchBalance(address, walletNode) {
-				balance := balanceNonce.balance
-				balance = balance.Div(balance, big.NewInt(params.GWei))
 				fmt.Printf("    Balance in Shard %d:  %s \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance))
 			}
 		}
