@@ -7,6 +7,7 @@ SRC[wallet]=client/wallet/main.go
 
 BINDIR=bin
 BUCKET=unique-bucket-bin
+PUBBUCKET=pub.harmony.one
 GOOS=linux
 GOARCH=amd64
 FOLDER=/${WHOAMI:-$USER}
@@ -37,6 +38,7 @@ OPTIONS:
 ACTION:
    build       build binaries only (default action)
    upload      upload binaries to s3
+   pubwallet   upload wallet to public bucket (bucket: $PUBBUCKET)
 
 EXAMPLES:
 
@@ -87,6 +89,31 @@ function upload
    [ -e $BINDIR/md5sum.txt ] && $AWSCLI s3 cp $BINDIR/md5sum.txt s3://${BUCKET}$FOLDER/md5sum.txt --acl public-read
 }
 
+function upload_wallet
+{
+   AWSCLI=aws
+
+   if [ -n "$PROFILE" ]; then
+      AWSCLI+=" --profile $PROFILE"
+   fi
+
+
+   OS=$(uname -s)
+
+   case "$OS" in
+      "Linux")
+         DEST=wallet/wallet ;;
+      "Darwin")
+         DEST=wallet.osx/wallet ;;
+      *)
+         echo "Unsupported OS: $OS"
+         return ;;
+   esac
+
+   $AWSCLI s3 cp $BINDIR/wallet s3://$PUBBUCKET/$DEST
+   $AWSCLI s3api put-object-acl --bucket $PUBBUCKET --key $DEST --acl public-read
+}
+
 ################################ MAIN FUNCTION ##############################
 while getopts "hp:a:o:b:f:r" option; do
    case $option in
@@ -109,5 +136,6 @@ ACTION=${1:-build}
 case "$ACTION" in
    "build") build_only ;;
    "upload") upload ;;
+   "pubwallet") upload_wallet ;;
    *) usage ;;
 esac
