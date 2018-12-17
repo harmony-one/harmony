@@ -166,6 +166,10 @@ func (consensus *Consensus) commitByLeader(firstRound bool) {
 
 // processCommitMessage processes the commit message sent from validators
 func (consensus *Consensus) processCommitMessage(payload []byte, targetState State) {
+	if len(payload) < 4+32+2+32+64 {
+		consensus.Log.Debug("Received malformed message %x", payload)
+		return
+	}
 	// Read payload data
 	offset := 0
 	// 4 byte consensus id
@@ -297,6 +301,10 @@ func (consensus *Consensus) responseByLeader(challenge kyber.Scalar, firstRound 
 
 // Processes the response message sent from validators
 func (consensus *Consensus) processResponseMessage(payload []byte, targetState State) {
+	if len(payload) < 4+32+2+32+64 {
+		consensus.Log.Debug("Received malformed message %x", payload)
+		return
+	}
 	//#### Read payload data
 	offset := 0
 	// 4 byte consensus id

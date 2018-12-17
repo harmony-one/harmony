@@ -131,6 +131,10 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 
 // Processes the challenge message sent from the leader
 func (consensus *Consensus) processChallengeMessage(payload []byte, targetState State) {
+	if len(payload) < 4+32+2+33+33+32+64 {
+		consensus.Log.Debug("Received malformed message %x", payload)
+		return
+	}
 	//#### Read payload data
 	offset := 0
 	// 4 byte consensus id
@@ -276,6 +280,10 @@ func (consensus *Consensus) processChallengeMessage(payload []byte, targetState 
 
 // Processes the collective signature message sent from the leader
 func (consensus *Consensus) processCollectiveSigMessage(payload []byte) {
+	if len(payload) < 4+32+2+64+64 {
+		consensus.Log.Debug("Received malformed message %x", payload)
+		return
+	}
 	//#### Read payload data
 	offset := 0
 	// 4 byte consensus id
