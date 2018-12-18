@@ -117,14 +117,7 @@ func (storage *Storage) Dump(accountBlock []byte, height uint32) {
 			continue
 		}
 
-		explorerTransaction := Transaction{
-			ID:        tx.Hash().Hex(),
-			Timestamp: strconv.Itoa(int(block.Time().Int64() * 1000)),
-			From:      tx.To().Hex(),
-			To:        tx.To().Hex(),
-			Value:     strconv.Itoa(int(tx.Value().Int64())),
-			Bytes:     strconv.Itoa(int(tx.Size())),
-		}
+		explorerTransaction := GetTransaction(tx, block)
 
 		storage.UpdateTXStorage(explorerTransaction, tx)
 		storage.UpdateAddressStorage(explorerTransaction, tx)
@@ -132,7 +125,7 @@ func (storage *Storage) Dump(accountBlock []byte, height uint32) {
 }
 
 // UpdateTXStorage ...
-func (storage *Storage) UpdateTXStorage(explorerTransaction Transaction, tx *types.Transaction) {
+func (storage *Storage) UpdateTXStorage(explorerTransaction *Transaction, tx *types.Transaction) {
 	if data, err := rlp.EncodeToBytes(explorerTransaction); err == nil {
 		key := GetTXKey(tx.Hash().Hex())
 		storage.db.Put([]byte(key), data)
@@ -142,7 +135,7 @@ func (storage *Storage) UpdateTXStorage(explorerTransaction Transaction, tx *typ
 }
 
 // UpdateAddressStorage ...
-func (storage *Storage) UpdateAddressStorage(explorerTransaction Transaction, tx *types.Transaction) {
+func (storage *Storage) UpdateAddressStorage(explorerTransaction *Transaction, tx *types.Transaction) {
 	toAddress := tx.To().Hex()
 	key := GetAddressKey(toAddress)
 

@@ -107,21 +107,6 @@ func (s *Service) GetAccountBlocks(from, to int) []*types.Block {
 	return blocks
 }
 
-// GetTransaction ...
-func GetTransaction(tx *types.Transaction, accountBlock *types.Block) *Transaction {
-	if tx.To() == nil {
-		return nil
-	}
-	return &Transaction{
-		ID:        tx.Hash().Hex(),
-		Timestamp: strconv.Itoa(int(accountBlock.Time().Int64() * 1000)),
-		From:      tx.To().Hex(),
-		To:        tx.To().Hex(),
-		Value:     strconv.Itoa(int(tx.GasPrice().Int64())),
-		Bytes:     strconv.Itoa(int(tx.Size())),
-	}
-}
-
 // GetExplorerBlocks ...
 func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")

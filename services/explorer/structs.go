@@ -1,6 +1,11 @@
 package explorer
 
-import "math/big"
+import (
+	"math/big"
+	"strconv"
+
+	"github.com/harmony-one/harmony/core/types"
+)
 
 /*
  * All the code here is work of progress for the sprint.
@@ -16,20 +21,20 @@ type Data struct {
 
 // Address ...
 type Address struct {
-	ID      string        `json:"id"`
-	Balance *big.Int      `json:"balance"`
-	TXCount string        `json:"txCount"`
-	TXs     []Transaction `json:"txs"`
+	ID      string         `json:"id"`
+	Balance *big.Int       `json:"balance"`
+	TXCount string         `json:"txCount"`
+	TXs     []*Transaction `json:"txs"`
 }
 
 // Transaction ...
 type Transaction struct {
-	ID        string `json:"id"`
-	Timestamp string `json:"timestamp"`
-	From      string `json:"from"`
-	To        string `json:"to"`
-	Value     string `json:"value"`
-	Bytes     string `json:"bytes"`
+	ID        string   `json:"id"`
+	Timestamp string   `json:"timestamp"`
+	From      string   `json:"from"`
+	To        string   `json:"to"`
+	Value     *big.Int `json:"value"`
+	Bytes     string   `json:"bytes"`
 }
 
 // BlockInfo ...
@@ -58,4 +63,23 @@ type Block struct {
 type RefBlock struct {
 	ID     string `json:"id"`
 	Height string `json:"height"`
+}
+
+// GetTransaction ...
+func GetTransaction(tx *types.Transaction, accountBlock *types.Block) *Transaction {
+	if tx.To() == nil {
+		return nil
+	}
+	msg, err := tx.AsMessage(types.HomesteadSigner{})
+	if err != nil {
+		Log.Error("Error when parsing tx into message")
+	}
+	return &Transaction{
+		ID:        tx.Hash().Hex(),
+		Timestamp: strconv.Itoa(int(accountBlock.Time().Int64() * 1000)),
+		From:      msg.From().Hex(),
+		To:        msg.To().Hex(),
+		Value:     msg.Value(),
+		Bytes:     strconv.Itoa(int(tx.Size())),
+	}
 }
