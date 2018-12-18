@@ -1,10 +1,11 @@
 package beaconchain
 
 import (
-	"github.com/harmony-one/harmony/beaconchain/rpc"
 	"math/rand"
 	"strconv"
 	"sync"
+
+	"github.com/harmony-one/harmony/beaconchain/rpc"
 
 	"github.com/dedis/kyber"
 	"github.com/harmony-one/harmony/crypto/pki"
@@ -20,9 +21,8 @@ import (
 var mutex sync.Mutex
 var identityPerBlock = 100000
 
-<<<<<<< HEAD
-//BeaconChainInfo is to
-type BeaconChainInfo struct {
+//BCInfo is to
+type BCInfo struct {
 	Leaders            []*bcconn.NodeInfo
 	ShardLeaderMap     map[int]*bcconn.NodeInfo
 	NumberOfShards     int
@@ -30,10 +30,9 @@ type BeaconChainInfo struct {
 	IP                 string
 	Port               string
 }
-=======
+
 // BeaconchainServicePortDiff is the positive port diff from beacon chain's self port
 const BeaconchainServicePortDiff = 4444
->>>>>>> a8b8ba05e34f0d3274cf897d3f4ef8fec79d2dfb
 
 // BeaconChain (Blockchain) keeps Identities per epoch, currently centralized!
 type BeaconChain struct {
@@ -122,7 +121,7 @@ func (bc *BeaconChain) StartServer() {
 	bc.host.BindHandlerAndServe(bc.BeaconChainHandler)
 }
 
-//SavesBeaconChainInfo to disk
+//SaveBeaconChainInfo to disk
 func SaveBeaconChainInfo(path string, bc *BeaconChain) error {
 	bci := BCtoBCI(bc)
 	err := utils.Save(path, bci)
@@ -131,20 +130,20 @@ func SaveBeaconChainInfo(path string, bc *BeaconChain) error {
 
 //LoadBeaconChainInfo from disk
 func LoadBeaconChainInfo(path string) (*BeaconChain, error) {
-	bci := &BeaconChainInfo{}
+	bci := &BCInfo{}
 	err := utils.Load(path, bci)
 	bc := BCItoBC(bci)
 	return bc, err
 }
 
 //BCtoBCI converts beaconchain into beaconchaininfo
-func BCtoBCI(bc *BeaconChain) *BeaconChainInfo {
-	bci := &BeaconChainInfo{Leaders: bc.Leaders, ShardLeaderMap: bc.ShardLeaderMap, NumberOfShards: bc.NumberOfShards, NumberOfNodesAdded: bc.NumberOfNodesAdded, IP: bc.IP, Port: bc.Port}
+func BCtoBCI(bc *BeaconChain) *BCInfo {
+	bci := &BCInfo{Leaders: bc.Leaders, ShardLeaderMap: bc.ShardLeaderMap, NumberOfShards: bc.NumberOfShards, NumberOfNodesAdded: bc.NumberOfNodesAdded, IP: bc.IP, Port: bc.Port}
 	return bci
 }
 
-//BCItoBC
-func BCItoBC(bci *BeaconChainInfo) *BeaconChain {
+//BCItoBC converts beconchaininfo to beaconchain
+func BCItoBC(bci *BCInfo) *BeaconChain {
 	bc := &BeaconChain{Leaders: bci.Leaders, ShardLeaderMap: bci.ShardLeaderMap, NumberOfShards: bci.NumberOfShards, NumberOfNodesAdded: bci.NumberOfNodesAdded, IP: bci.IP, Port: bci.Port}
 	return bc
 }
