@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/db"
+	"github.com/harmony-one/harmony/log"
 )
 
 // Constants for storage.
@@ -19,6 +20,9 @@ const (
 	TXPrefix        = "tx"
 	AddressPrefix   = "ad"
 )
+
+// Log is the temporary log for storage.
+var Log = log.New()
 
 // GetBlockInfoKey ...
 func GetBlockInfoKey(id int) string {
@@ -64,12 +68,11 @@ func (storage *Storage) Init(ip, port string, remove bool) {
 	if remove {
 		var err = os.RemoveAll(dbFileName)
 		if err != nil {
-			fmt.Println(err.Error())
+			Log.Error(err.Error())
 		}
 	}
 	if storage.db, err = db.NewLDBDatabase(dbFileName, 0, 0); err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
+		Log.Error(err.Error())
 	}
 }
 
@@ -103,16 +106,12 @@ func (storage *Storage) Dump(accountBlock []byte, height uint32) {
 
 	if data, err := rlp.EncodeToBytes(blockInfo); err == nil {
 		key := GetBlockInfoKey(int(height))
-		fmt.Println("store blockinfo with key ", key)
-		fmt.Println("data to store ", data)
 		storage.db.Put([]byte(key), data)
 	} else {
-		fmt.Println("EncodeRLP blockInfo error")
-		os.Exit(1)
+		Log.Error("EncodeRLP blockInfo error")
 	}
 
 	// Store txs
-	fmt.Println("# of txs ", len(block.Transactions()))
 	for _, tx := range block.Transactions() {
 		if tx.To() == nil {
 			continue
@@ -127,19 +126,18 @@ func (storage *Storage) Dump(accountBlock []byte, height uint32) {
 			Bytes:     strconv.Itoa(int(tx.Size())),
 		}
 
-		storage.UpdateTxStorage(explorerTransaction, tx)
+		storage.UpdateTXStorage(explorerTransaction, tx)
 		storage.UpdateAddressStorage(explorerTransaction, tx)
 	}
 }
 
-// UpdateTxStorage ...
-func (storage *Storage) UpdateTxStorage(explorerTransaction Transaction, tx *types.Transaction) {
+// UpdateTXStorage ...
+func (storage *Storage) UpdateTXStorage(explorerTransaction Transaction, tx *types.Transaction) {
 	if data, err := rlp.EncodeToBytes(explorerTransaction); err == nil {
 		key := GetTXKey(tx.Hash().Hex())
 		storage.db.Put([]byte(key), data)
 	} else {
-		fmt.Println("EncodeRLP transaction error")
-		os.Exit(1)
+		Log.Error("EncodeRLP transaction error")
 	}
 }
 
@@ -148,29 +146,23 @@ func (storage *Storage) UpdateAddressStorage(explorerTransaction Transaction, tx
 	toAddress := tx.To().Hex()
 	key := GetAddressKey(toAddress)
 
-	fmt.Println("dumping address", toAddress, key)
-
-	var addressAccount Address
+	var address Address
 	if data, err := storage.db.Get([]byte(key)); err == nil {
-		fmt.Println("the key existed")
-		err = rlp.DecodeBytes(data, addressAccount)
+		err = rlp.DecodeBytes(data, address)
 		if err == nil {
-			addressAccount.Balance.Add(addressAccount.Balance, tx.Value())
-			txCount, _ := strconv.Atoi(addressAccount.TXCount)
-			addressAccount.TXCount = strconv.Itoa(txCount + 1)
+			address.Balance.Add(address.Balance, tx.Value())
+			txCount, _ := strconv.Atoi(address.TXCount)
+			address.TXCount = strconv.Itoa(txCount + 1)
 		}
 	} else {
-		fmt.Println("the key not existed")
-		addressAccount.Balance = tx.Value()
-		addressAccount.TXCount = "1"
+		address.Balance = tx.Value()
+		address.TXCount = "1"
 	}
-	addressAccount.ID = toAddress
-	addressAccount.TXs = append(addressAccount.TXs, explorerTransaction)
-	fmt.Println("trying to encode it")
-	if encoded, err := rlp.EncodeToBytes(addressAccount); err == nil {
-		fmt.Println("store addressAccount with length ", len(encoded))
+	address.ID = toAddress
+	address.TXs = append(address.TXs, explorerTransaction)
+	if encoded, err := rlp.EncodeToBytes(address); err == nil {
 		storage.db.Put([]byte(key), encoded)
 	} else {
-		fmt.Println("err when encoding ", err)
+		Log.Error("Can not encode address account.")
 	}
 }
