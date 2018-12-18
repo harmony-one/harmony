@@ -18,6 +18,16 @@ import (
 var mutex sync.Mutex
 var identityPerBlock = 100000
 
+//BeaconChainInfo is to
+type BeaconChainInfo struct {
+	Leaders            []*bcconn.NodeInfo
+	ShardLeaderMap     map[int]*bcconn.NodeInfo
+	NumberOfShards     int
+	NumberOfNodesAdded int
+	IP                 string
+	Port               string
+}
+
 // BeaconChain (Blockchain) keeps Identities per epoch, currently centralized!
 type BeaconChain struct {
 	Leaders            []*bcconn.NodeInfo
@@ -61,6 +71,7 @@ func (bc *BeaconChain) AcceptConnections(b []byte) {
 		bc.Leaders = append(bc.Leaders, Node)
 	}
 	response := bcconn.ResponseRandomNumber{NumberOfShards: bc.NumberOfShards, NumberOfNodesAdded: bc.NumberOfNodesAdded, Leaders: bc.Leaders}
+	SaveBeaconChainInfo("bc.json", bc)
 	msg := bcconn.SerializeRandomInfo(response)
 	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Acknowledge, msg)
 	host.SendMessage(bc.host, Node.Self, msgToSend, nil)
@@ -69,4 +80,31 @@ func (bc *BeaconChain) AcceptConnections(b []byte) {
 //StartServer a server and process the request by a handler.
 func (bc *BeaconChain) StartServer() {
 	bc.host.BindHandlerAndServe(bc.BeaconChainHandler)
+}
+
+//SavesBeaconChainInfo to disk
+func SaveBeaconChainInfo(path string, bc *BeaconChain) error {
+	bci := BCtoBCI(bc)
+	err := utils.Save(path, bci)
+	return err
+}
+
+//LoadBeaconChainInfo from disk
+func LoadBeaconChainInfo(path string) (*BeaconChain, error) {
+	bci := &BeaconChainInfo{}
+	err := utils.Load(path, bci)
+	bc := BCItoBC(bci)
+	return bc, err
+}
+
+//BCtoBCI converts beaconchain into beaconchaininfo
+func BCtoBCI(bc *BeaconChain) *BeaconChainInfo {
+	bci := &BeaconChainInfo{Leaders: bc.Leaders, ShardLeaderMap: bc.ShardLeaderMap, NumberOfShards: bc.NumberOfShards, NumberOfNodesAdded: bc.NumberOfNodesAdded, IP: bc.IP, Port: bc.Port}
+	return bci
+}
+
+//BCItoBC
+func BCItoBC(bci *BeaconChainInfo) *BeaconChain {
+	bc := &BeaconChain{Leaders: bci.Leaders, ShardLeaderMap: bci.ShardLeaderMap, NumberOfShards: bci.NumberOfShards, NumberOfNodesAdded: bci.NumberOfNodesAdded, IP: bci.IP, Port: bci.Port}
+	return bc
 }
