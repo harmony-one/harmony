@@ -1,5 +1,7 @@
 package explorer
 
+import "math/big"
+
 /*
  * All the code here is work of progress for the sprint.
  */
@@ -15,8 +17,8 @@ type Data struct {
 // Address ...
 type Address struct {
 	ID      string        `json:"id"`
-	Balance float64       `json:"balance"`
-	TXCount int           `json:"txCount"`
+	Balance *big.Int      `json:"balance"`
+	TXCount string        `json:"txCount"`
 	TXs     []Transaction `json:"txs"`
 }
 
