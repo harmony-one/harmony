@@ -120,7 +120,7 @@ func (storage *Storage) Dump(accountBlock []byte, height uint32) {
 		explorerTransaction := GetTransaction(tx, block)
 
 		storage.UpdateTXStorage(explorerTransaction, tx)
-		storage.UpdateAddressStorage(explorerTransaction, tx)
+		storage.UpdateAddress(explorerTransaction, tx)
 	}
 }
 
@@ -134,10 +134,15 @@ func (storage *Storage) UpdateTXStorage(explorerTransaction *Transaction, tx *ty
 	}
 }
 
-// UpdateAddressStorage ...
-func (storage *Storage) UpdateAddressStorage(explorerTransaction *Transaction, tx *types.Transaction) {
-	toAddress := tx.To().Hex()
-	key := GetAddressKey(toAddress)
+// UpdateAddress ...
+func (storage *Storage) UpdateAddress(explorerTransaction *Transaction, tx *types.Transaction) {
+	storage.UpdateAddressStorage(explorerTransaction.To, explorerTransaction, tx)
+	storage.UpdateAddressStorage(explorerTransaction.From, explorerTransaction, tx)
+}
+
+// UpdateAddressStorage updates specific adr address.
+func (storage *Storage) UpdateAddressStorage(adr string, explorerTransaction *Transaction, tx *types.Transaction) {
+	key := GetAddressKey(adr)
 
 	var address Address
 	if data, err := storage.db.Get([]byte(key)); err == nil {
@@ -151,7 +156,7 @@ func (storage *Storage) UpdateAddressStorage(explorerTransaction *Transaction, t
 		address.Balance = tx.Value()
 		address.TXCount = "1"
 	}
-	address.ID = toAddress
+	address.ID = adr
 	address.TXs = append(address.TXs, explorerTransaction)
 	if encoded, err := rlp.EncodeToBytes(address); err == nil {
 		storage.db.Put([]byte(key), encoded)
