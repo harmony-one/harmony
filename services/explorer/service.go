@@ -56,44 +56,14 @@ func (s *Service) Run() {
 
 	s.router.Path("/tx").Queries("id", "{[0-9A-Fa-fx]*?}").HandlerFunc(s.GetExplorerTransaction).Methods("GET")
 	s.router.Path("/tx").HandlerFunc(s.GetExplorerTransaction)
+
+	s.router.Path("/address").Queries("id", "{[0-9A-Fa-fx]*?}").HandlerFunc(s.GetExplorerAddress).Methods("GET")
+	s.router.Path("/address").HandlerFunc(s.GetExplorerAddress)
+
 	// Do serving now.
 	fmt.Println("Listening to:", GetExplorerPort(s.Port))
 	log.Fatal(http.ListenAndServe(addr, s.router))
 }
-
-// GetExplorerBlockInfo ...
-// func (s *Service) GetExplorerBlockInfo(w http.ResponseWriter, r *http.Request) {
-// 	w.Header().Set("Content-Type", "application/json")
-// 	from := r.FormValue("from")
-// 	to := r.FormValue("to")
-
-// 	data := &Data{
-// 		Blocks: []*BlockInfo{},
-// 	}
-// 	if from == "" {
-// 		json.NewEncoder(w).Encode(data.Blocks)
-// 		return
-// 	}
-// 	db := s.storage.GetDB()
-// 	fromInt, err := strconv.Atoi(from)
-// 	var toInt int
-// 	if to == "" {
-// 		bytes, err := db.Get([]byte(BlockHeightKey))
-// 		if err == nil {
-// 			toInt, err = strconv.Atoi(string(bytes))
-// 		}
-// 	} else {
-// 		toInt, err = strconv.Atoi(to)
-// 	}
-// 	fmt.Println("from", fromInt, "to", toInt)
-// 	if err != nil {
-// 		json.NewEncoder(w).Encode(data.Blocks)
-// 		return
-// 	}
-
-// 	data.Blocks = s.PopulateBlockInfo(fromInt, toInt)
-// 	json.NewEncoder(w).Encode(data.Blocks)
-// }
 
 // PopulateBlockInfo ...
 func (s *Service) PopulateBlockInfo(from, to int) []*BlockInfo {
@@ -262,23 +232,29 @@ func (s *Service) GetExplorerTransaction(w http.ResponseWriter, r *http.Request)
 func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	id := r.FormValue("id")
+	key := GetAddressKey(id)
+
+	fmt.Println("Trying to access id=", id, key)
 
 	data := &Data{}
 	if id == "" {
-		json.NewEncoder(w).Encode(data.TX)
+		json.NewEncoder(w).Encode(data.Address)
 		return
 	}
 	db := s.storage.GetDB()
-	bytes, err := db.Get([]byte(GetTXKey(id)))
+	bytes, err := db.Get([]byte(key))
 	if err != nil {
-		json.NewEncoder(w).Encode(data.TX)
+		json.NewEncoder(w).Encode(data.Address)
 		return
 	}
-	tx := new(Transaction)
-	if rlp.DecodeBytes(bytes, tx) != nil {
-		json.NewEncoder(w).Encode(data.TX)
+	fmt.Println("retreieve from the key", len(bytes))
+	var addressAccount Address
+	if err = rlp.DecodeBytes(bytes, &addressAccount); err != nil {
+		fmt.Println(err)
+		json.NewEncoder(w).Encode(data.Address)
 		return
 	}
-	data.TX = *tx
-	json.NewEncoder(w).Encode(data.TX)
+	fmt.Println("convert address", id)
+	data.Address = addressAccount
+	json.NewEncoder(w).Encode(data.Address)
 }

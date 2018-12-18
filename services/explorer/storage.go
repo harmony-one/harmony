@@ -148,19 +148,29 @@ func (storage *Storage) UpdateAddressStorage(explorerTransaction Transaction, tx
 	toAddress := tx.To().Hex()
 	key := GetAddressKey(toAddress)
 
+	fmt.Println("dumping address", toAddress, key)
+
 	var addressAccount Address
 	if data, err := storage.db.Get([]byte(key)); err == nil {
+		fmt.Println("the key existed")
 		err = rlp.DecodeBytes(data, addressAccount)
 		if err == nil {
-			addressAccount.Balance += float64(tx.Value().Int64())
-			addressAccount.TXCount++
+			addressAccount.Balance.Add(addressAccount.Balance, tx.Value())
+			txCount, _ := strconv.Atoi(addressAccount.TXCount)
+			addressAccount.TXCount = strconv.Itoa(txCount + 1)
 		}
 	} else {
-		addressAccount.Balance = float64(tx.Value().Int64())
-		addressAccount.TXCount = 1
+		fmt.Println("the key not existed")
+		addressAccount.Balance = tx.Value()
+		addressAccount.TXCount = "1"
 	}
 	addressAccount.ID = toAddress
 	addressAccount.TXs = append(addressAccount.TXs, explorerTransaction)
-	encoded, _ := rlp.EncodeToBytes(addressAccount)
-	storage.db.Put([]byte(key), encoded)
+	fmt.Println("trying to encode it")
+	if encoded, err := rlp.EncodeToBytes(addressAccount); err == nil {
+		fmt.Println("store addressAccount with length ", len(encoded))
+		storage.db.Put([]byte(key), encoded)
+	} else {
+		fmt.Println("err when encoding ", err)
+	}
 }
