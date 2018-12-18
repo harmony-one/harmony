@@ -31,6 +31,7 @@ USAGE: $ME [OPTIONS] config_file_name
 
    -h             print this help message
    -p             use peer discovery (default: $PEER)
+   -P             do not use peer discovery
    -d             enable db support (default: $DB)
    -t             toggle txgen (default: $TXGEN)
    -D duration    txgen run duration (default: $DURATION)
@@ -57,10 +58,11 @@ MIN=5
 SHARDS=2
 KILLPORT=9004
 
-while getopts "hpdtD:m:s:k:" option; do
+while getopts "hpdtD:m:s:k:P" option; do
    case $option in
       h) usage ;;
       p) PEER='-peer_discovery' ;;
+      P) PEER= ;;
       d) DB='-db_supported' ;;
       t) TXGEN=$OPTARG ;;
       D) DURATION=$OPTARG ;;
@@ -112,7 +114,7 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
       ./bin/benchmark -ip $ip -port $port -config_file $config -log_folder $log_folder $DB -min_peers $MIN &
     else
       ./bin/benchmark -ip $ip -port $port -log_folder $log_folder $DB $PEER -min_peers $MIN &
-      sleep 1
+      sleep 0.5
     fi
   fi
 done < $config

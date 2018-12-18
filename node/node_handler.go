@@ -331,41 +331,43 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
 // WaitForConsensusReadyAccount ...
 func (node *Node) WaitForConsensusReadyAccount(readySignal chan struct{}) {
 	node.log.Debug("Waiting for Consensus ready", "node", node)
+	time.Sleep(15 * time.Second)
 
+	firstTime := true
 	var newBlock *types.Block
 	timeoutCount := 0
 	for { // keep waiting for Consensus ready
-		retry := false
 		select {
 		case <-readySignal:
 			time.Sleep(100 * time.Millisecond) // Delay a bit so validator is catched up.
 		case <-time.After(200 * time.Second):
-			retry = true
 			node.Consensus.ResetState()
 			timeoutCount++
 			node.log.Debug("Consensus timeout, retry!", "count", timeoutCount, "node", node)
 		}
 
-		if !retry {
-			for {
-				if len(node.pendingTransactionsAccount) >= 1000 {
-					// Normal tx block consensus
-					selectedTxs, _ := node.getTransactionsForNewBlockAccount(MaxNumberOfTransactionsPerBlock)
-					node.Worker.CommitTransactions(selectedTxs)
-					block, err := node.Worker.Commit()
-					if err != nil {
-						node.log.Debug("Failed commiting new block", "Error", err)
-					} else {
-						newBlock = block
-						break
-					}
-				}
-				// If not enough transactions to run Consensus,
-				// periodically check whether we have enough transactions to package into block.
-				time.Sleep(1 * time.Second)
+		for {
+			threshold := 1
+			if firstTime {
+				threshold = 2
+				firstTime = false
 			}
+			if len(node.pendingTransactionsAccount) >= threshold {
+				// Normal tx block consensus
+				selectedTxs, _ := node.getTransactionsForNewBlockAccount(MaxNumberOfTransactionsPerBlock)
+				node.Worker.CommitTransactions(selectedTxs)
+				block, err := node.Worker.Commit()
+				if err != nil {
+					node.log.Debug("Failed commiting new block", "Error", err)
+				} else {
+					newBlock = block
+					break
+				}
+			}
+			// If not enough transactions to run Consensus,
+			// periodically check whether we have enough transactions to package into block.
+			time.Sleep(1 * time.Second)
 		}
-
 		// Send the new block to Consensus so it can be confirmed.
 		if newBlock != nil {
 			node.BlockChannelAccount <- newBlock
@@ -436,36 +438,30 @@ func (node *Node) VerifyNewBlockAccount(newBlock *types.Block) bool {
 // 1. add the new block to blockchain
 // 2. [leader] move cross shard tx and proof to the list where they wait to be sent to the client
 func (node *Node) PostConsensusProcessing(newBlock *blockchain.Block) {
-	if newBlock.IsStateBlock() {
-		// Clear out old tx blocks and put state block as genesis
-		if node.db != nil {
-			node.log.Info("Deleting old blocks.")
-			for i := 1; i <= len(node.blockchain.Blocks); i++ {
-				blockchain.Delete(node.db, strconv.Itoa(i))
-			}
-		}
-		node.blockchain.Blocks = []*blockchain.Block{}
-	}
+	//if newBlock.IsStateBlock() {
+	//	// Clear out old tx blocks and put state block as genesis
+	//	if node.db != nil {
+	//		node.log.Info("Deleting old blocks.")
+	//		for i := 1; i <= len(node.blockchain.Blocks); i++ {
+	//			blockchain.Delete(node.db, strconv.Itoa(i))
+	//		}
+	//	}
+	//	node.blockchain.Blocks = []*blockchain.Block{}
+	//}
 
 	if node.Consensus.IsLeader {
 		// Move crossTx-in-consensus into the list to be returned to client
-		for _, crossTxAndProof := range node.CrossTxsInConsensus {
-			crossTxAndProof.Proof.BlockHash = newBlock.Hash
-			// TODO: fill in the signature proofs
-		}
-		if len(node.CrossTxsInConsensus) != 0 {
-			node.addCrossTxsToReturn(node.CrossTxsInConsensus)
-			node.CrossTxsInConsensus = []*blockchain.CrossShardTxAndProof{}
-		}
-
-		node.SendBackProofOfAcceptOrReject()
+		//for _, crossTxAndProof := range node.CrossTxsInConsensus {
+		//	crossTxAndProof.Proof.BlockHash = newBlock.Hash
+		//	// TODO: fill in the signature proofs
+		//}
+		//if len(node.CrossTxsInConsensus) != 0 {
+		//	node.addCrossTxsToReturn(node.CrossTxsInConsensus)
+		//	node.CrossTxsInConsensus = []*blockchain.CrossShardTxAndProof{}
+		//}
+		//
+		//node.SendBackProofOfAcceptOrReject()
 		node.BroadcastNewBlock(newBlock)
-	}
-
-	accountBlock := new(types.Block)
-	err := rlp.DecodeBytes(newBlock.AccountBlock, accountBlock)
-	if err != nil {
-		node.log.Error("Failed decoding the block with RLP")
 	}
 
 	node.AddNewBlock(newBlock)
@@ -478,16 +474,13 @@ func (node *Node) AddNewBlockAccount(newBlock *types.Block) {
 	num, err := node.Chain.InsertChain([]*types.Block{newBlock})
 	if err != nil {
 		node.log.Debug("Error adding to chain", "numBlocks", num, "Error", err)
-		if node.Consensus != nil {
-			fmt.Println("SHARD ID", node.Consensus.ShardID)
-		}
 	}
 }
 
 // AddNewBlock is usedd to add new block into the utxo-based blockchain.
 func (node *Node) AddNewBlock(newBlock *blockchain.Block) {
 	// Add it to blockchain
-	node.blockchain.Blocks = append(node.blockchain.Blocks, newBlock)
+	// node.blockchain.Blocks = append(node.blockchain.Blocks, newBlock)
 	// Store it into leveldb.
 	if node.db != nil {
 		node.log.Info("Writing new block into disk.")
@@ -514,11 +507,6 @@ func (node *Node) UpdateUtxoAndState(newBlock *blockchain.Block) {
 	}
 	// Clear transaction-in-Consensus list
 	node.transactionInConsensus = []*blockchain.Transaction{}
-	if node.Consensus.IsLeader {
-		node.log.Info("TX in New BLOCK", "num", len(newBlock.Transactions), "ShardID", node.UtxoPool.ShardID, "IsStateBlock", newBlock.IsStateBlock())
-		node.log.Info("LEADER CURRENT UTXO", "num", node.UtxoPool.CountNumOfUtxos(), "ShardID", node.UtxoPool.ShardID)
-		node.log.Info("LEADER LOCKED UTXO", "num", node.UtxoPool.CountNumOfLockedUtxos(), "ShardID", node.UtxoPool.ShardID)
-	}
 }
 
 func (node *Node) pingMessageHandler(msgPayload []byte) int {

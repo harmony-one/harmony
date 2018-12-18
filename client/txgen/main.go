@@ -131,7 +131,6 @@ func main() {
 
 	// This func is used to update the client's utxopool when new blocks are received from the leaders
 	updateBlocksFunc := func(blocks []*blockchain.Block) {
-		log.Debug("Received new block from leader", "len", len(blocks))
 		for _, block := range blocks {
 			for _, node := range nodes {
 				shardID := block.ShardID
@@ -142,23 +141,14 @@ func main() {
 					shardID = accountBlock.ShardID()
 				}
 				if node.Consensus.ShardID == shardID {
-					log.Debug("Adding block from leader", "shardID", shardID)
 					// Add it to blockchain
+					log.Info("Current Block", "hash", node.Chain.CurrentBlock().Hash().Hex())
+					log.Info("Adding block from leader", "txNum", len(accountBlock.Transactions()), "shardID", shardID, "preHash", accountBlock.ParentHash().Hex())
 					node.AddNewBlock(block)
 					utxoPoolMutex.Lock()
 					node.UpdateUtxoAndState(block)
+					node.Worker.UpdateCurrent()
 					utxoPoolMutex.Unlock()
-
-					if err != nil {
-						log.Error("Failed decoding the block with RLP")
-					} else {
-						fmt.Println("RECEIVED NEW BLOCK ", len(accountBlock.Transactions()))
-						node.AddNewBlockAccount(accountBlock)
-						node.Worker.UpdateCurrent()
-						if err != nil {
-							log.Debug("Failed to add new block to worker", "Error", err)
-						}
-					}
 				} else {
 					continue
 				}
@@ -170,17 +160,19 @@ func main() {
 	// Start the client server to listen to leader's message
 	go clientNode.StartServer()
 
-	for _, leader := range shardIDLeaderMap {
-		log.Debug("Client Join Shard", "leader", leader)
-		go clientNode.JoinShard(leader)
-		// wait for 3 seconds for client to send ping message to leader
-		time.Sleep(3 * time.Second)
-		clientNode.StopPing <- struct{}{}
-		clientNode.State = node.NodeJoinedShard
+	if *peerDiscovery {
+		for _, leader := range shardIDLeaderMap {
+			log.Debug("Client Join Shard", "leader", leader)
+			go clientNode.JoinShard(leader)
+			// wait for 3 seconds for client to send ping message to leader
+			time.Sleep(3 * time.Second)
+			clientNode.StopPing <- struct{}{}
+			clientNode.State = node.NodeJoinedShard
+		}
 	}
 
 	// Transaction generation process
-	time.Sleep(10 * time.Second) // wait for nodes to be ready
+	time.Sleep(5 * time.Second) // wait for nodes to be ready
 	start := time.Now()
 	totalTime := float64(*duration)
 
@@ -226,7 +218,7 @@ func main() {
 			lock.Unlock()
 
 			subsetCounter++
-			time.Sleep(10000 * time.Millisecond)
+			time.Sleep(60000 * time.Millisecond)
 		}
 	} else {
 		for {

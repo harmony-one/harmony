@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/gob"
-
 	"github.com/dedis/kyber/sign/schnorr"
 	"github.com/harmony-one/harmony/attack"
 	"github.com/harmony-one/harmony/blockchain"
@@ -102,12 +101,6 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 		return
 	}
 
-	// check consensus Id
-	if consensusID != consensus.consensusID {
-		consensus.Log.Warn("Received message with wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
-		return
-	}
-
 	// check block hash
 	if blockHeaderObj.AccountBlock != nil {
 		// TODO: deal with block hash of account model
@@ -138,6 +131,10 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 
 // Processes the challenge message sent from the leader
 func (consensus *Consensus) processChallengeMessage(payload []byte, targetState State) {
+	if len(payload) < 4+32+2+33+33+32+64 {
+		consensus.Log.Debug("Received malformed message %x", payload)
+		return
+	}
 	//#### Read payload data
 	offset := 0
 	// 4 byte consensus id
@@ -201,16 +198,6 @@ func (consensus *Consensus) processChallengeMessage(payload []byte, targetState 
 		return
 	}
 
-	// check consensus Id
-	if consensusID != consensus.consensusID {
-		consensus.Log.Warn("Received message with wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
-		if _, ok := consensus.blocksReceived[consensus.consensusID]; !ok {
-			return
-		}
-		consensus.Log.Warn("ROLLING UP", "consensus", consensus)
-		// If I received previous block (which haven't been processed. I will roll up to current block if everything checks.
-	}
-
 	aggCommitment := crypto.Ed25519Curve.Point()
 	aggCommitment.UnmarshalBinary(aggreCommit[:32]) // TODO: figure out whether it's 33 bytes or 32 bytes
 	aggKey := crypto.Ed25519Curve.Point()
@@ -263,7 +250,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte, targetState 
 
 				consensus.blockHash = [32]byte{}
 				delete(consensus.secret, consensusID)
-				consensus.consensusID++ // roll up one by one, until the next block is not received yet.
+				consensus.consensusID = consensusID + 1 // roll up one by one, until the next block is not received yet.
 
 				// TODO: think about when validators know about the consensus is reached.
 				// For now, the blockchain is updated right here.
@@ -293,6 +280,10 @@ func (consensus *Consensus) processChallengeMessage(payload []byte, targetState 
 
 // Processes the collective signature message sent from the leader
 func (consensus *Consensus) processCollectiveSigMessage(payload []byte) {
+	if len(payload) < 4+32+2+64+64 {
+		consensus.Log.Debug("Received malformed message %x", payload)
+		return
+	}
 	//#### Read payload data
 	offset := 0
 	// 4 byte consensus id

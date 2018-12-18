@@ -4,9 +4,8 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"encoding/gob"
+	"encoding/hex"
 	"fmt"
-	"github.com/harmony-one/harmony/client"
-	clientService "github.com/harmony-one/harmony/client/service"
 	"math/big"
 	"math/rand"
 	"os"
@@ -15,6 +14,11 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/harmony-one/harmony/services/explorer"
+
+	"github.com/harmony-one/harmony/client"
+	clientService "github.com/harmony-one/harmony/client/service"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -80,7 +84,8 @@ const (
 	syncingPortDifference = 3000
 	waitBeforeJoinShard   = time.Second * 3
 	timeOutToJoinShard    = time.Minute * 10
-	clientServicePort     = "1841"
+	// ClientServicePortDiff is the positive port diff for client service
+	ClientServicePortDiff = 5555
 )
 
 // NetworkNode ...
@@ -130,8 +135,9 @@ type Node struct {
 	syncingState     uint32
 
 	// Test only
-	TestBankKeys []*ecdsa.PrivateKey
-	ContractKeys []*ecdsa.PrivateKey
+	TestBankKeys      []*ecdsa.PrivateKey
+	ContractKeys      []*ecdsa.PrivateKey
+	ContractAddresses []common.Address
 	// The p2p host used to send/receive p2p messages
 	host host.Host
 
@@ -155,7 +161,6 @@ func (node *Node) addPendingTransactions(newTxs []*blockchain.Transaction) {
 	node.pendingTxMutex.Lock()
 	node.pendingTransactions = append(node.pendingTransactions, newTxs...)
 	node.pendingTxMutex.Unlock()
-	node.log.Debug("Got more transactions", "num", len(newTxs), "totalPending", len(node.pendingTransactions), "node", node)
 }
 
 // Add new transactions to the pending transaction list
@@ -163,7 +168,7 @@ func (node *Node) addPendingTransactionsAccount(newTxs types.Transactions) {
 	node.pendingTxMutexAccount.Lock()
 	node.pendingTransactionsAccount = append(node.pendingTransactionsAccount, newTxs...)
 	node.pendingTxMutexAccount.Unlock()
-	node.log.Debug("Got more transactions (account model)", "num", len(newTxs), "totalPending", len(node.pendingTransactionsAccount), "node", node)
+	node.log.Debug("Got more transactions (account model)", "num", len(newTxs), "totalPending", len(node.pendingTransactionsAccount))
 }
 
 // Take out a subset of valid transactions from the pending transaction list
@@ -257,17 +262,6 @@ func DeserializeNode(d []byte) *NetworkNode {
 	return &wn
 }
 
-//AddSmartContractsToPendingTransactions adds the faucet contract the genesis block.
-func (node *Node) AddSmartContractsToPendingTransactions() {
-	// Add a contract deployment transactionv
-	priKey := node.ContractKeys[0]
-	contractData := "0x608060405234801561001057600080fd5b506040516020806104c08339810180604052602081101561003057600080fd5b505160008054600160a060020a0319163317808255600160a060020a031681526001602081905260409091205560ff811661006c600282610073565b50506100bd565b8154818355818111156100975760008381526020902061009791810190830161009c565b505050565b6100ba91905b808211156100b657600081556001016100a2565b5090565b90565b6103f4806100cc6000396000f3fe60806040526004361061005b577c010000000000000000000000000000000000000000000000000000000060003504635c19a95c8114610060578063609ff1bd146100955780639e7b8d61146100c0578063b3f98adc146100f3575b600080fd5b34801561006c57600080fd5b506100936004803603602081101561008357600080fd5b5035600160a060020a0316610120565b005b3480156100a157600080fd5b506100aa610280565b6040805160ff9092168252519081900360200190f35b3480156100cc57600080fd5b50610093600480360360208110156100e357600080fd5b5035600160a060020a03166102eb565b3480156100ff57600080fd5b506100936004803603602081101561011657600080fd5b503560ff16610348565b3360009081526001602081905260409091209081015460ff1615610144575061027d565b5b600160a060020a0382811660009081526001602081905260409091200154620100009004161580159061019c5750600160a060020a0382811660009081526001602081905260409091200154620100009004163314155b156101ce57600160a060020a039182166000908152600160208190526040909120015462010000900490911690610145565b600160a060020a0382163314156101e5575061027d565b6001818101805460ff1916821775ffffffffffffffffffffffffffffffffffffffff0000191662010000600160a060020a0386169081029190911790915560009081526020829052604090209081015460ff16156102725781546001820154600280549091610100900460ff1690811061025b57fe5b60009182526020909120018054909101905561027a565b815481540181555b50505b50565b600080805b60025460ff821610156102e6578160028260ff168154811015156102a557fe5b906000526020600020016000015411156102de576002805460ff83169081106102ca57fe5b906000526020600020016000015491508092505b600101610285565b505090565b600054600160a060020a0316331415806103215750600160a060020a0381166000908152600160208190526040909120015460ff165b1561032b5761027d565b600160a060020a0316600090815260016020819052604090912055565b3360009081526001602081905260409091209081015460ff1680610371575060025460ff831610155b1561037c575061027d565b6001818101805460ff191690911761ff00191661010060ff8516908102919091179091558154600280549192909181106103b257fe5b600091825260209091200180549091019055505056fea165627a7a72305820164189ef302b4648e01e22456b0a725191604cb63ee472f230ef6a2d17d702f900290000000000000000000000000000000000000000000000000000000000000002"
-	dataEnc := common.FromHex(contractData)
-	// Unsigned transaction to avoid the case of transaction address.
-	mycontracttx, _ := types.SignTx(types.NewContractCreation(uint64(0), 0, big.NewInt(1000000), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, priKey)
-	node.addPendingTransactionsAccount(types.Transactions{mycontracttx})
-}
-
 // New creates a new node.
 func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 	node := Node{}
@@ -312,16 +306,16 @@ func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 		for i := 0; i < 100; i++ {
 			testBankKey, _ := ecdsa.GenerateKey(crypto.S256(), reader)
 			testBankAddress := crypto.PubkeyToAddress(testBankKey.PublicKey)
-			testBankFunds := big.NewInt(8000000000000000000)
-			//fmt.Println(crypto.PubkeyToAddress(testBankKey.PublicKey).Hex())
-			//fmt.Println(hex.EncodeToString(crypto.FromECDSA(testBankKey)))
+			testBankFunds := big.NewInt(1000)
+			testBankFunds = testBankFunds.Mul(testBankFunds, big.NewInt(params.Ether))
 			genesisAloc[testBankAddress] = core.GenesisAccount{Balance: testBankFunds}
 			node.TestBankKeys = append(node.TestBankKeys, testBankKey)
 		}
 
 		contractKey, _ := ecdsa.GenerateKey(crypto.S256(), reader)
 		contractAddress := crypto.PubkeyToAddress(contractKey.PublicKey)
-		contractFunds := big.NewInt(8000000000000000000)
+		contractFunds := big.NewInt(9000000)
+		contractFunds = contractFunds.Mul(contractFunds, big.NewInt(params.Ether))
 		genesisAloc[contractAddress] = core.GenesisAccount{Balance: contractFunds}
 		node.ContractKeys = append(node.ContractKeys, contractKey)
 
@@ -340,8 +334,8 @@ func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 		//This one is not used --- RJ.
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, params.TestChainConfig, chain)
 		node.BlockChannelAccount = make(chan *types.Block)
-		node.Worker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey))
-		//Initialize the pending transactions with smart contract transactions
+		node.Worker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey), node.Consensus.ShardID)
+
 		node.AddSmartContractsToPendingTransactions()
 	}
 
@@ -432,14 +426,36 @@ func (node *Node) GetSyncingPeers() []p2p.Peer {
 	return res
 }
 
-//CallFaucetContract invokes the faucet contract to give the walletAddress initial money
-func (node *Node) CallFaucetContract(contractAddress common.Address, walletAddress common.Address) {
-	nonce := node.Worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(node.ContractKeys[0].PublicKey))
-	callingFunction := "0x27c78c42000000000000000000000000"
-	contractData := callingFunction + walletAddress.Hex()
+//AddSmartContractsToPendingTransactions adds the faucet contract the genesis block.
+func (node *Node) AddSmartContractsToPendingTransactions() {
+	// Add a contract deployment transactionv
+	priKey := node.ContractKeys[0]
+	contractData := "0x6080604052678ac7230489e8000060015560028054600160a060020a031916331790556101aa806100316000396000f3fe608060405260043610610045577c0100000000000000000000000000000000000000000000000000000000600035046327c78c42811461004a5780634ddd108a1461008c575b600080fd5b34801561005657600080fd5b5061008a6004803603602081101561006d57600080fd5b503573ffffffffffffffffffffffffffffffffffffffff166100b3565b005b34801561009857600080fd5b506100a1610179565b60408051918252519081900360200190f35b60025473ffffffffffffffffffffffffffffffffffffffff1633146100d757600080fd5b600154303110156100e757600080fd5b73ffffffffffffffffffffffffffffffffffffffff811660009081526020819052604090205460ff161561011a57600080fd5b73ffffffffffffffffffffffffffffffffffffffff8116600081815260208190526040808220805460ff1916600190811790915554905181156108fc0292818181858888f19350505050158015610175573d6000803e3d6000fd5b5050565b30319056fea165627a7a723058203e799228fee2fa7c5d15e71c04267a0cc2687c5eff3b48b98f21f355e1064ab30029"
 	dataEnc := common.FromHex(contractData)
-	tx, _ := types.SignTx(types.NewTransaction(nonce, contractAddress, node.Consensus.ShardID, big.NewInt(7000000000000000000), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, node.ContractKeys[0])
+	// Unsigned transaction to avoid the case of transaction address.
+
+	contractFunds := big.NewInt(8000000)
+	contractFunds = contractFunds.Mul(contractFunds, big.NewInt(params.Ether))
+	mycontracttx, _ := types.SignTx(types.NewContractCreation(uint64(0), node.Consensus.ShardID, contractFunds, params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, priKey)
+	node.ContractAddresses = append(node.ContractAddresses, crypto.CreateAddress(crypto.PubkeyToAddress(priKey.PublicKey), uint64(0)))
+
+	node.addPendingTransactionsAccount(types.Transactions{mycontracttx})
+}
+
+//CallFaucetContract invokes the faucet contract to give the walletAddress initial money
+func (node *Node) CallFaucetContract(walletAddress common.Address) common.Hash {
+	state, err := node.Chain.State()
+	if err != nil {
+		log.Error("Failed to get chain state", "Error", err)
+	}
+	nonce := state.GetNonce(crypto.PubkeyToAddress(node.ContractKeys[0].PublicKey))
+	callingFunction := "0x27c78c42000000000000000000000000"
+	contractData := callingFunction + hex.EncodeToString(walletAddress.Bytes())
+	dataEnc := common.FromHex(contractData)
+	tx, _ := types.SignTx(types.NewTransaction(nonce, node.ContractAddresses[0], node.Consensus.ShardID, big.NewInt(0), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, node.ContractKeys[0])
+
 	node.addPendingTransactionsAccount(types.Transactions{tx})
+	return tx.Hash()
 }
 
 // JoinShard helps a new node to join a shard.
@@ -477,19 +493,26 @@ func (node *Node) SupportClient() {
 	node.StartClientServer()
 }
 
+// SupportExplorer initializes and starts the client service
+func (node *Node) SupportExplorer() {
+	es := explorer.Service{
+		IP:   node.SelfPeer.IP,
+		Port: node.SelfPeer.Port,
+	}
+	es.Init(true)
+	es.Run()
+}
+
 // InitClientServer initializes client server.
 func (node *Node) InitClientServer() {
-	state, err := node.Chain.State()
-	if err != nil {
-		log.Error("Failed fetching state from blockchain")
-	}
-	node.clientServer = clientService.NewServer(state)
+	node.clientServer = clientService.NewServer(node.Chain.State, node.CallFaucetContract)
 }
 
 // StartClientServer starts client server.
 func (node *Node) StartClientServer() {
-	node.log.Info("support_client: StartClientServer on port:", "port", clientServicePort)
-	node.clientServer.Start(node.SelfPeer.IP, clientServicePort)
+	port, _ := strconv.Atoi(node.SelfPeer.Port)
+	node.log.Info("support_client: StartClientServer on port:", "port", port+ClientServicePortDiff)
+	node.clientServer.Start(node.SelfPeer.IP, strconv.Itoa(port+ClientServicePortDiff))
 }
 
 // SupportSyncing keeps sleeping until it's doing consensus or it's a leader.

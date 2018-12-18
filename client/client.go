@@ -178,3 +178,12 @@ func (client *Client) GetLeaders() []p2p.Peer {
 	}
 	return leaders
 }
+
+//// GetLeaders returns leader peers.
+//func (client *Client) GetShardLeader(uint32 shardID) p2p.Peer {
+//	leaders := []p2p.Peer{}
+//	for _, leader := range *client.Leaders {
+//		leaders = append(leaders, leader)
+//	}
+//	return leaders
+//}

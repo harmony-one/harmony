@@ -1,7 +1,9 @@
 package beaconchain
 
 import (
+	"github.com/harmony-one/harmony/beaconchain/rpc"
 	"math/rand"
+	"strconv"
 	"sync"
 
 	"github.com/dedis/kyber"
@@ -18,6 +20,7 @@ import (
 var mutex sync.Mutex
 var identityPerBlock = 100000
 
+<<<<<<< HEAD
 //BeaconChainInfo is to
 type BeaconChainInfo struct {
 	Leaders            []*bcconn.NodeInfo
@@ -27,6 +30,10 @@ type BeaconChainInfo struct {
 	IP                 string
 	Port               string
 }
+=======
+// BeaconchainServicePortDiff is the positive port diff from beacon chain's self port
+const BeaconchainServicePortDiff = 4444
+>>>>>>> a8b8ba05e34f0d3274cf897d3f4ef8fec79d2dfb
 
 // BeaconChain (Blockchain) keeps Identities per epoch, currently centralized!
 type BeaconChain struct {
@@ -39,6 +46,38 @@ type BeaconChain struct {
 	IP                 string
 	Port               string
 	host               host.Host
+
+	rpcServer *beaconchain.Server
+}
+
+// SupportRPC initializes and starts the rpc service
+func (bc *BeaconChain) SupportRPC() {
+	bc.InitRPCServer()
+	bc.StartRPCServer()
+}
+
+// InitRPCServer initializes Rpc server.
+func (bc *BeaconChain) InitRPCServer() {
+	bc.rpcServer = beaconchain.NewServer(bc.GetShardLeaderMap)
+}
+
+// StartRPCServer starts Rpc server.
+func (bc *BeaconChain) StartRPCServer() {
+	port, err := strconv.Atoi(bc.Port)
+	if err != nil {
+		port = 0
+	}
+	bc.log.Info("support_client: StartRpcServer on port:", "port", strconv.Itoa(port+BeaconchainServicePortDiff))
+	bc.rpcServer.Start(bc.IP, strconv.Itoa(port+BeaconchainServicePortDiff))
+}
+
+// GetShardLeaderMap returns the map from shard id to leader.
+func (bc *BeaconChain) GetShardLeaderMap() map[int]*bcconn.NodeInfo {
+	result := make(map[int]*bcconn.NodeInfo)
+	for i, leader := range bc.Leaders {
+		result[i] = leader
+	}
+	return result
 }
 
 //New beaconchain initialization
@@ -48,6 +87,7 @@ func New(numShards int, ip, port string) *BeaconChain {
 	bc.NumberOfShards = numShards
 	bc.PubKey = generateBCKey()
 	bc.NumberOfNodesAdded = 0
+	bc.ShardLeaderMap = make(map[int]*bcconn.NodeInfo)
 	bc.Port = port
 	bc.IP = ip
 	bc.host = p2pimpl.NewHost(p2p.Peer{IP: ip, Port: port})

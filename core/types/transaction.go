@@ -115,6 +115,11 @@ func (tx *Transaction) ChainID() *big.Int {
 	return deriveChainID(tx.data.V)
 }
 
+// ShardID returns which shard id this transaction was signed for (if at all)
+func (tx *Transaction) ShardID() uint32 {
+	return tx.data.ShardID
+}
+
 // Protected returns whether the transaction is protected from replay protection.
 func (tx *Transaction) Protected() bool {
 	return isProtectedV(tx.data.V)

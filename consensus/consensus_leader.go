@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/p2p/host"
+	"github.com/harmony-one/harmony/services/explorer"
 
 	"github.com/harmony-one/harmony/profiler"
 
@@ -25,7 +26,7 @@ import (
 )
 
 const (
-	waitForEnoughValidators = 300
+	waitForEnoughValidators = 1000
 )
 
 var (
@@ -43,10 +44,9 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) 
 			consensus.Log.Debug("WaitForNewBlock", "removed peers", c)
 		}
 
-		if !consensus.HasEnoughValidators() {
+		for !consensus.HasEnoughValidators() {
 			consensus.Log.Debug("Not enough validators", "# Validators", len(consensus.PublicKeys))
 			time.Sleep(waitForEnoughValidators * time.Millisecond)
-			continue
 		}
 
 		// TODO: think about potential race condition
@@ -73,14 +73,13 @@ func (consensus *Consensus) WaitForNewBlockAccount(blockChannel chan *types.Bloc
 			consensus.Log.Debug("WaitForNewBlock", "removed peers", c)
 		}
 
-		if !consensus.HasEnoughValidators() {
+		for !consensus.HasEnoughValidators() {
 			consensus.Log.Debug("Not enough validators", "# Validators", len(consensus.PublicKeys))
 			time.Sleep(waitForEnoughValidators * time.Millisecond)
-			continue
 		}
 
 		startTime = time.Now()
-		consensus.Log.Debug("STARTING CONSENSUS", "consensus", consensus, "startTime", startTime, "publicKeys", len(consensus.PublicKeys))
+		consensus.Log.Debug("STARTING CONSENSUS", "numTxs", len(newBlock.Transactions()), "consensus", consensus, "startTime", startTime, "publicKeys", len(consensus.PublicKeys))
 		for consensus.state == Finished {
 			// time.Sleep(500 * time.Millisecond)
 			data, err := rlp.EncodeToBytes(newBlock)
@@ -167,6 +166,10 @@ func (consensus *Consensus) commitByLeader(firstRound bool) {
 
 // processCommitMessage processes the commit message sent from validators
 func (consensus *Consensus) processCommitMessage(payload []byte, targetState State) {
+	if len(payload) < 4+32+2+32+64 {
+		consensus.Log.Debug("Received malformed message %x", payload)
+		return
+	}
 	// Read payload data
 	offset := 0
 	// 4 byte consensus id
@@ -298,6 +301,10 @@ func (consensus *Consensus) responseByLeader(challenge kyber.Scalar, firstRound 
 
 // Processes the response message sent from validators
 func (consensus *Consensus) processResponseMessage(payload []byte, targetState State) {
+	if len(payload) < 4+32+2+32+64 {
+		consensus.Log.Debug("Received malformed message %x", payload)
+		return
+	}
 	//#### Read payload data
 	offset := 0
 	// 4 byte consensus id
@@ -391,8 +398,12 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState S
 		return
 	}
 
-	if len(*responses) >= ((len(consensus.PublicKeys)*2)/3+1) && consensus.state != targetState {
-		if len(*responses) >= ((len(consensus.PublicKeys)*2)/3+1) && consensus.state != targetState {
+	threshold := 2
+	if targetState == Finished {
+		threshold = 1
+	}
+	if len(*responses) >= ((len(consensus.PublicKeys)*threshold)/3+1) && consensus.state != targetState {
+		if len(*responses) >= ((len(consensus.PublicKeys)*threshold)/3+1) && consensus.state != targetState {
 			consensus.Log.Debug("Enough responses received with signatures", "num", len(*responses), "state", consensus.state)
 			// Aggregate responses
 			responseScalars := []kyber.Scalar{}
@@ -432,12 +443,6 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState S
 				host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
 				consensus.commitByLeader(false)
 			} else {
-				consensus.Log.Debug("Consensus reached with signatures.", "numOfSignatures", len(*responses))
-				// Reset state to Finished, and clear other data.
-				consensus.ResetState()
-				consensus.consensusID++
-				consensus.Log.Debug("HOORAY!!! CONSENSUS REACHED!!!", "consensusID", consensus.consensusID)
-
 				// TODO: reconstruct the whole block from header and transactions
 				// For now, we used the stored whole block already stored in consensus.blockHeader
 				txDecoder := gob.NewDecoder(bytes.NewReader(consensus.blockHeader))
@@ -453,6 +458,16 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState S
 				consensus.OnConsensusDone(&blockHeaderObj)
 
 				consensus.reportMetrics(blockHeaderObj)
+				// Dump new block into level db.
+				explorer.GetStorageInstance(consensus.leader.IP, consensus.leader.Port, true).Dump(blockHeaderObj.AccountBlock, consensus.consensusID)
+				// Claim new consensus reached.
+				consensus.Log.Debug("Consensus reached with signatures.", "numOfSignatures", len(*responses))
+				// Reset state to Finished, and clear other data.
+				consensus.ResetState()
+				consensus.consensusID++
+				consensus.Log.Debug("HOORAY!!! CONSENSUS REACHED!!!", "consensusID", consensus.consensusID)
+
+				time.Sleep(500 * time.Millisecond)
 				// Send signal to Node so the new block can be added and new round of consensus can be triggered
 				consensus.ReadySignal <- struct{}{}
 			}

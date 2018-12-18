@@ -67,6 +67,8 @@ func GetUniqueIDFromIPPort(ip, port string) uint16 {
 // RunCmd runs command `name` with arguments `args`
 func RunCmd(name string, args ...string) error {
 	cmd := exec.Command(name, args...)
+	stderrBytes := &bytes.Buffer{}
+	cmd.Stderr = stderrBytes
 	if err := cmd.Start(); err != nil {
 		log.Fatal(err)
 		return err
@@ -76,6 +78,7 @@ func RunCmd(name string, args ...string) error {
 	go func() {
 		if err := cmd.Wait(); err != nil {
 			log.Printf("Command finished with error: %v", err)
+			log.Printf("Stderr: %v", string(stderrBytes.Bytes()))
 		} else {
 			log.Printf("Command finished successfully")
 		}

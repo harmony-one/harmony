@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"log"
@@ -86,7 +87,7 @@ func main() {
 	}
 
 	txs := make([]*types.Transaction, 10)
-	worker := worker.New(params.TestChainConfig, chain, consensus.NewFaker(), crypto.PubkeyToAddress(testBankKey.PublicKey))
+	worker := worker.New(params.TestChainConfig, chain, consensus.NewFaker(), crypto.PubkeyToAddress(testBankKey.PublicKey), 0)
 	nonce := worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(testBankKey.PublicKey))
 	for i := range txs {
 		randomUserKey, _ := crypto.GenerateKey()
@@ -116,7 +117,7 @@ func main() {
 	//	return address(this).balance;
 	//}
 	//}
-	contractData := "0x60806040526706f05b59d3b2000060015560028054600160a060020a031916331790556101aa806100316000396000f3fe608060405260043610610045577c0100000000000000000000000000000000000000000000000000000000600035046327c78c42811461004a5780634ddd108a1461008c575b600080fd5b34801561005657600080fd5b5061008a6004803603602081101561006d57600080fd5b503573ffffffffffffffffffffffffffffffffffffffff166100b3565b005b34801561009857600080fd5b506100a1610179565b60408051918252519081900360200190f35b60025473ffffffffffffffffffffffffffffffffffffffff1633146100d757600080fd5b600154303110156100e757600080fd5b73ffffffffffffffffffffffffffffffffffffffff811660009081526020819052604090205460ff161561011a57600080fd5b73ffffffffffffffffffffffffffffffffffffffff8116600081815260208190526040808220805460ff1916600190811790915554905181156108fc0292818181858888f19350505050158015610175573d6000803e3d6000fd5b5050565b30319056fea165627a7a72305820fc2f7280f3590bd63f7b13a34411e0086c18e5a947b4437759ee79fbc566782f0029"
+	contractData := "0x60806040526802b5e3af16b188000060015560028054600160a060020a031916331790556101aa806100326000396000f3fe608060405260043610610045577c0100000000000000000000000000000000000000000000000000000000600035046327c78c42811461004a5780634ddd108a1461008c575b600080fd5b34801561005657600080fd5b5061008a6004803603602081101561006d57600080fd5b503573ffffffffffffffffffffffffffffffffffffffff166100b3565b005b34801561009857600080fd5b506100a1610179565b60408051918252519081900360200190f35b60025473ffffffffffffffffffffffffffffffffffffffff1633146100d757600080fd5b600154303110156100e757600080fd5b73ffffffffffffffffffffffffffffffffffffffff811660009081526020819052604090205460ff161561011a57600080fd5b73ffffffffffffffffffffffffffffffffffffffff8116600081815260208190526040808220805460ff1916600190811790915554905181156108fc0292818181858888f19350505050158015610175573d6000803e3d6000fd5b5050565b30319056fea165627a7a7230582003d799bcee73e96e0f40ca432d9c3d2aa9c00a1eba8d00877114a0d7234790ce0029"
 	_ = contractData
 	dataEnc := common.FromHex(contractData)
 
@@ -140,15 +141,19 @@ func main() {
 	}
 	fmt.Println(contractAddress)
 
+	var address common.Address
+	bytes, err := hex.DecodeString("ac51b997a3a17fa18e46baceb32fcab9acc93917")
+	address.SetBytes(bytes)
 	receipts := worker.GetCurrentReceipts()
 	fmt.Println(receipts[len(receipts)-1].ContractAddress)
 	fmt.Println(receipts[len(receipts)-1])
 	fmt.Println(state.GetNonce(testBankAddress))
-	fmt.Println(state.GetNonce(contractAddress))
+	fmt.Println(testBankKey)
 	fmt.Println(state.GetBalance(contractAddress))
+	fmt.Println(state.GetBalance(address))
 	fmt.Println(state.GetCodeHash(contractAddress))
 
-	callData := "0x27c78c4200000000000000000000000024182601fe6e2e5da0b831496cc0489b7173b44f"
+	callData := "0x27c78c42000000000000000000000000ac51b997a3a17fa18e46baceb32fcab9acc93917" //24182601fe6e2e5da0b831496cc0489b7173b44f"
 	callEnc := common.FromHex(callData)
 	tx, _ = types.SignTx(types.NewTransaction(nonce+uint64(11), contractAddress, 0, big.NewInt(0), params.TxGasContractCreation*10, nil, callEnc), types.HomesteadSigner{}, testBankKey)
 
@@ -160,7 +165,7 @@ func main() {
 	fmt.Println(receipts[len(receipts)-1].ContractAddress)
 	fmt.Println(receipts[len(receipts)-1])
 	fmt.Println(state.GetNonce(testBankAddress))
-	fmt.Println(state.GetNonce(contractAddress))
 	fmt.Println(state.GetBalance(contractAddress))
+	fmt.Println(state.GetBalance(address))
 	fmt.Println(state.GetCodeHash(contractAddress))
 }

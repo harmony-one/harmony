@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package beaconchain;
+
+// BeaconChainService is the service used for any beacon chain requests.
+service BeaconChainService {
+  rpc FetchLeaders(FetchLeadersRequest) returns (FetchLeadersResponse) {}
+}
+
+// FetchLeadersRequest is the request to fetch the current leaders.
+message FetchLeadersRequest {
+}
+
+// FetchLeadersResponse is the response of FetchLeadersRequest.
+message FetchLeadersResponse {
+  message Leader {
+      string ip = 1;
+      string port = 2;
+      uint32 shardId = 3;
+  }
+  repeated Leader leaders = 1;
+}

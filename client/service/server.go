@@ -12,14 +12,10 @@ import (
 	proto "github.com/harmony-one/harmony/client/service/proto"
 )
 
-// Constants for downloader server.
-const (
-	DefaultDownloadPort = "6666"
-)
-
-// Server is the Server struct for downloader package.
+// Server is the Server struct for client service package.
 type Server struct {
-	state *state.StateDB
+	stateReader        func() (*state.StateDB, error)
+	callFaucetContract func(common.Address) common.Hash
 }
 
 // FetchAccountState implements the FetchAccountState interface to return account state.
@@ -27,7 +23,19 @@ func (s *Server) FetchAccountState(ctx context.Context, request *proto.FetchAcco
 	var address common.Address
 	address.SetBytes(request.Address)
 	log.Println("Returning FetchAccountStateResponse for address: ", address.Hex())
-	return &proto.FetchAccountStateResponse{Balance: s.state.GetBalance(address).Bytes(), Nonce: s.state.GetNonce(address)}, nil
+	state, err := s.stateReader()
+	if err != nil {
+		return nil, err
+	}
+	return &proto.FetchAccountStateResponse{Balance: state.GetBalance(address).Bytes(), Nonce: state.GetNonce(address)}, nil
+}
+
+// GetFreeToken implements the GetFreeToken interface to request free token.
+func (s *Server) GetFreeToken(ctx context.Context, request *proto.GetFreeTokenRequest) (*proto.GetFreeTokenResponse, error) {
+	var address common.Address
+	address.SetBytes(request.Address)
+	log.Println("Returning GetFreeTokenResponse for address: ", address.Hex())
+	return &proto.GetFreeTokenResponse{TxId: s.callFaucetContract(address).Bytes()}, nil
 }
 
 // Start starts the Server on given ip and port.
@@ -46,7 +54,7 @@ func (s *Server) Start(ip, port string) (*grpc.Server, error) {
 }
 
 // NewServer creates new Server which implements ClientServiceServer interface.
-func NewServer(state *state.StateDB) *Server {
-	s := &Server{state}
+func NewServer(stateReader func() (*state.StateDB, error), callFaucetContract func(common.Address) common.Hash) *Server {
+	s := &Server{stateReader: stateReader, callFaucetContract: callFaucetContract}
 	return s
 }
