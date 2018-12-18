@@ -233,19 +233,18 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 
 	data := &Data{}
 	if id == "" {
-		json.NewEncoder(w).Encode(data.Address)
+		json.NewEncoder(w).Encode(nil)
 		return
 	}
 	db := s.storage.GetDB()
 	bytes, err := db.Get([]byte(key))
 	if err != nil {
-		json.NewEncoder(w).Encode(data.Address)
+		json.NewEncoder(w).Encode(nil)
 		return
 	}
 	var address Address
 	if err = rlp.DecodeBytes(bytes, &address); err != nil {
-		fmt.Println(err)
-		json.NewEncoder(w).Encode(data.Address)
+		json.NewEncoder(w).Encode(nil)
 		return
 	}
 	data.Address = address
