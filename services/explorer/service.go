@@ -32,7 +32,7 @@ func GetExplorerPort(nodePort string) string {
 	if port, err := strconv.Atoi(nodePort); err == nil {
 		return fmt.Sprintf("%d", port-explorerPortDifference)
 	}
-	fmt.Println("error on parsing.")
+	Log.Error("error on parsing.")
 	return ""
 }
 
@@ -48,9 +48,6 @@ func (s *Service) Run() {
 
 	// Set up router
 	s.router = mux.NewRouter()
-	// s.router.Path("/block_info").Queries("from", "{[0-9]*?}", "to", "{[0-9]*?}").HandlerFunc(s.GetExplorerBlockInfo).Methods("GET")
-	// s.router.Path("/block_info").HandlerFunc(s.GetExplorerBlockInfo)
-
 	s.router.Path("/blocks").Queries("from", "{[0-9]*?}", "to", "{[0-9]*?}").HandlerFunc(s.GetExplorerBlocks).Methods("GET")
 	s.router.Path("/blocks").HandlerFunc(s.GetExplorerBlocks)
 
@@ -73,12 +70,12 @@ func (s *Service) PopulateBlockInfo(from, to int) []*BlockInfo {
 		fmt.Println("getting blockinfo with key ", key)
 		data, err := storage.db.Get([]byte(key))
 		if err != nil {
-			fmt.Println("Error on getting from db")
+			Log.Error("Error on getting from db")
 			os.Exit(1)
 		}
 		block := new(BlockInfo)
 		if rlp.DecodeBytes(data, block) != nil {
-			fmt.Println("RLP Decoding error")
+			Log.Error("Error on getting from db")
 			os.Exit(1)
 		}
 		blocks = append(blocks, block)
@@ -95,7 +92,6 @@ func (s *Service) GetAccountBlocks(from, to int) []*types.Block {
 			continue
 		}
 		key := GetBlockKey(i)
-		fmt.Println("getting block with key ", key)
 		data, err := storage.db.Get([]byte(key))
 		if err != nil {
 			blocks = append(blocks, nil)
@@ -103,7 +99,7 @@ func (s *Service) GetAccountBlocks(from, to int) []*types.Block {
 		}
 		block := new(types.Block)
 		if rlp.DecodeBytes(data, block) != nil {
-			fmt.Println("RLP Block decoding error")
+			Log.Error("Error on getting from db")
 			os.Exit(1)
 		}
 		blocks = append(blocks, block)
@@ -150,7 +146,6 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 	} else {
 		toInt, err = strconv.Atoi(to)
 	}
-	fmt.Println("from", fromInt, "to", toInt)
 	if err != nil {
 		json.NewEncoder(w).Encode(data.Blocks)
 		return
@@ -247,14 +242,12 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(data.Address)
 		return
 	}
-	fmt.Println("retreieve from the key", len(bytes))
-	var addressAccount Address
-	if err = rlp.DecodeBytes(bytes, &addressAccount); err != nil {
+	var address Address
+	if err = rlp.DecodeBytes(bytes, &address); err != nil {
 		fmt.Println(err)
 		json.NewEncoder(w).Encode(data.Address)
 		return
 	}
-	fmt.Println("convert address", id)
-	data.Address = addressAccount
+	data.Address = address
 	json.NewEncoder(w).Encode(data.Address)
 }
