@@ -149,12 +149,9 @@ func (storage *Storage) UpdateAddressStorage(adr string, explorerTransaction *Tr
 		err = rlp.DecodeBytes(data, address)
 		if err == nil {
 			address.Balance.Add(address.Balance, tx.Value())
-			txCount, _ := strconv.Atoi(address.TXCount)
-			address.TXCount = strconv.Itoa(txCount + 1)
 		}
 	} else {
 		address.Balance = tx.Value()
-		address.TXCount = "1"
 	}
 	address.ID = adr
 	address.TXs = append(address.TXs, explorerTransaction)

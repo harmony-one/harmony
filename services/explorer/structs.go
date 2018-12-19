@@ -23,7 +23,6 @@ type Data struct {
 type Address struct {
 	ID      string         `json:"id"`
 	Balance *big.Int       `json:"balance"`
-	TXCount string         `json:"txCount"`
 	TXs     []*Transaction `json:"txs"`
 }
 
