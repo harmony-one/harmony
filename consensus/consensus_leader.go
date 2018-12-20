@@ -144,10 +144,10 @@ func (consensus *Consensus) startConsensus(newBlock *blockchain.Block) {
 
 	consensus.Log.Debug("Stop encoding block")
 	msgToSend := consensus.constructAnnounceMessage()
-	host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
 	// Set state to AnnounceDone
 	consensus.state = AnnounceDone
 	consensus.commitByLeader(true)
+	host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
 }
 
 // commitByLeader commits to the message itself before receiving others commits
@@ -156,6 +156,8 @@ func (consensus *Consensus) commitByLeader(firstRound bool) {
 	secret, commitment := crypto.Commit(crypto.Ed25519Curve)
 	consensus.secret[consensus.consensusID] = secret
 	if firstRound {
+		consensus.mutex.Lock()
+		defer consensus.mutex.Unlock()
 		(*consensus.commitments)[consensus.nodeID] = commitment
 		consensus.bitmap.SetKey(consensus.pubKey, true)
 	} else {
@@ -257,6 +259,7 @@ func (consensus *Consensus) processCommitMessage(payload []byte, targetState Sta
 		if targetState == FinalChallengeDone {
 			msgTypeToSend = proto_consensus.FinalChallenge
 		}
+
 		msgToSend, challengeScalar, aggCommitment := consensus.constructChallengeMessage(msgTypeToSend)
 		bytes, err := challengeScalar.MarshalBinary()
 		if err != nil {
