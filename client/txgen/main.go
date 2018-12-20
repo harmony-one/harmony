@@ -130,7 +130,7 @@ func main() {
 	// This func is used to update the client's utxopool when new blocks are received from the leaders
 	readySignal := make(chan uint32)
 	go func() {
-		for i, _ := range shardIDLeaderMap {
+		for i := range shardIDLeaderMap {
 			readySignal <- i
 		}
 	}()
