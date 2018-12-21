@@ -2,13 +2,14 @@ package syncing
 
 import (
 	"bytes"
+	"github.com/harmony-one/harmony/core"
+	"github.com/simple-rules/harmony-benchmark/blockchain"
 	"reflect"
 	"sort"
 	"sync"
 	"time"
 
 	"github.com/Workiva/go-datastructures/queue"
-	"github.com/harmony-one/harmony/blockchain"
 	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/services/syncing/downloader"
@@ -105,7 +106,7 @@ func (peerConfig *SyncPeerConfig) GetBlocks(hashes [][]byte) ([][]byte, error) {
 }
 
 // ProcessStateSyncFromPeers used to do state sync.
-func (ss *StateSync) ProcessStateSyncFromPeers(peers []p2p.Peer, bc *blockchain.Blockchain) (chan struct{}, error) {
+func (ss *StateSync) ProcessStateSyncFromPeers(peers []p2p.Peer, bc *core.BlockChain) (chan struct{}, error) {
 	// TODO: Validate peers.
 	done := make(chan struct{})
 	go func() {
@@ -255,19 +256,20 @@ func (ss *StateSync) GetConsensusHashes() bool {
 }
 
 // getConsensusHashes gets all hashes needed to download.
-func (ss *StateSync) generateStateSyncTaskQueue(bc *blockchain.Blockchain) {
+func (ss *StateSync) generateStateSyncTaskQueue(bc *core.BlockChain) {
 	ss.stateSyncTaskQueue = queue.New(0)
 	for _, configPeer := range ss.syncConfig.peers {
 		if configPeer.client != nil {
 
 			ss.blockHeight = len(configPeer.blockHashes)
-			bc.Blocks = append(bc.Blocks, make([]*blockchain.Block, ss.blockHeight-len(bc.Blocks))...)
-			for id, blockHash := range configPeer.blockHashes {
-				if bc.Blocks[id] == nil || !reflect.DeepEqual(bc.Blocks[id].Hash[:], blockHash) {
-					ss.stateSyncTaskQueue.Put(SyncBlockTask{index: id, blockHash: blockHash})
-					// TODO(minhdoan): Check error
-				}
-			}
+			// TODO (minh) rework the syncing for account model.
+			//bc.Blocks = append(bc.Blocks, make([]*blockchain.Block, ss.blockHeight-len(bc.Blocks))...)
+			//for id, blockHash := range configPeer.blockHashes {
+			//	if bc.Blocks[id] == nil || !reflect.DeepEqual(bc.Blocks[id].Hash[:], blockHash) {
+			//		ss.stateSyncTaskQueue.Put(SyncBlockTask{index: id, blockHash: blockHash})
+			//		// TODO(minhdoan): Check error
+			//	}
+			//}
 			break
 		}
 	}
@@ -275,7 +277,7 @@ func (ss *StateSync) generateStateSyncTaskQueue(bc *blockchain.Blockchain) {
 }
 
 // downloadBlocks downloads blocks from state sync task queue.
-func (ss *StateSync) downloadBlocks(bc *blockchain.Blockchain) {
+func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 	// Initialize blockchain
 	var wg sync.WaitGroup
 	wg.Add(ss.activePeerNumber)
@@ -283,7 +285,7 @@ func (ss *StateSync) downloadBlocks(bc *blockchain.Blockchain) {
 		if ss.syncConfig.peers[i].client == nil {
 			continue
 		}
-		go func(peerConfig *SyncPeerConfig, stateSyncTaskQueue *queue.Queue, bc *blockchain.Blockchain) {
+		go func(peerConfig *SyncPeerConfig, stateSyncTaskQueue *queue.Queue, bc *core.BlockChain) {
 			defer wg.Done()
 			for !stateSyncTaskQueue.Empty() {
 				task, err := stateSyncTaskQueue.Poll(1, time.Millisecond)
@@ -292,11 +294,13 @@ func (ss *StateSync) downloadBlocks(bc *blockchain.Blockchain) {
 				}
 				syncTask := task[0].(SyncBlockTask)
 				for {
-					id := syncTask.index
+					//id := syncTask.index
 					payload, err := peerConfig.GetBlocks([][]byte{syncTask.blockHash})
 					if err == nil {
 						// As of now, only send and ask for one block.
-						bc.Blocks[id], err = blockchain.DeserializeBlock(payload[0])
+						// TODO (minh) rework the syncing for account model.
+						//bc.Blocks[id], err = blockchain.DeserializeBlock(payload[0])
+						_, err = blockchain.DeserializeBlock(payload[0])
 						if err == nil {
 							break
 						}
@@ -310,7 +314,7 @@ func (ss *StateSync) downloadBlocks(bc *blockchain.Blockchain) {
 }
 
 // StartStateSync starts state sync.
-func (ss *StateSync) StartStateSync(peers []p2p.Peer, bc *blockchain.Blockchain) bool {
+func (ss *StateSync) StartStateSync(peers []p2p.Peer, bc *core.BlockChain) bool {
 	// Creates sync config.
 	ss.CreateSyncConfig(peers)
 	// Makes connections to peers.

@@ -4,7 +4,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/hex"
-	"errors"
 	"flag"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
@@ -19,7 +18,6 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/harmony-one/harmony/blockchain"
 	"github.com/harmony-one/harmony/client"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
@@ -353,29 +351,6 @@ func GetFreeToken(address common.Address, walletNode *node.Node) {
 		txID := common.Hash{}
 		txID.SetBytes(response.TxId)
 		fmt.Printf("Transaction Id requesting free token in shard %d: %s\n", int(shardID), txID.Hex())
-	}
-}
-
-// FetchUtxos fetches utxos of specified address from the Harmony network
-func FetchUtxos(addresses [][20]byte, walletNode *node.Node) (map[uint32]blockchain.UtxoMap, error) {
-	walletNode.Client.ShardUtxoMap = make(map[uint32]blockchain.UtxoMap)
-	walletNode.BroadcastMessage(walletNode.Client.GetLeaders(), proto_node.ConstructFetchUtxoMessage(*walletNode.ClientPeer, addresses))
-
-	doneSignal := make(chan int)
-	go func() {
-		for {
-			if len(walletNode.Client.ShardUtxoMap) == len(*walletNode.Client.Leaders) {
-				doneSignal <- 0
-				break
-			}
-		}
-	}()
-
-	select {
-	case <-doneSignal:
-		return walletNode.Client.ShardUtxoMap, nil
-	case <-time.After(3 * time.Second):
-		return nil, errors.New("Utxo fetch timed out")
 	}
 }
 

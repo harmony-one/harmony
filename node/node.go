@@ -6,8 +6,8 @@ import (
 	"encoding/gob"
 	"encoding/hex"
 	"fmt"
+	"github.com/ethereum/go-ethereum/rlp"
 	"math/big"
-	"math/rand"
 	"os"
 	"strconv"
 	"strings"
@@ -23,7 +23,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/harmony-one/harmony/blockchain"
 	bft "github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -97,16 +96,13 @@ type NetworkNode struct {
 // Node represents a program (machine) participating in the network
 // TODO(minhdoan, rj): consider using BlockChannel *chan blockchain.Block for efficiency.
 type Node struct {
-	Consensus              *bft.Consensus                     // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
-	BlockChannel           chan blockchain.Block              // The channel to receive new blocks from Node
-	pendingTransactions    []*blockchain.Transaction          // All the transactions received but not yet processed for Consensus
-	transactionInConsensus []*blockchain.Transaction          // The transactions selected into the new block and under Consensus process
-	blockchain             *blockchain.Blockchain             // The blockchain for the shard where this node belongs
-	db                     *hdb.LDBDatabase                   // LevelDB to store blockchain.
-	UtxoPool               *blockchain.UTXOPool               // The corresponding UTXO pool of the current blockchain
-	CrossTxsInConsensus    []*blockchain.CrossShardTxAndProof // The cross shard txs that is under consensus, the proof is not filled yet.
-	CrossTxsToReturn       []*blockchain.CrossShardTxAndProof // The cross shard txs and proof that needs to be sent back to the user client.
-	log                    log.Logger                         // Log utility
+	Consensus              *bft.Consensus       // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
+	BlockChannel           chan *types.Block    // The channel to receive new blocks from Node
+	pendingTransactions    types.Transactions   // All the transactions received but not yet processed for Consensus
+	transactionInConsensus []*types.Transaction // The transactions selected into the new block and under Consensus process
+	blockchain             *core.BlockChain     // The blockchain for the shard where this node belongs
+	db                     *hdb.LDBDatabase     // LevelDB to store blockchain.
+	log                    log.Logger           // Log utility
 	pendingTxMutex         sync.Mutex
 	crossTxToReturnMutex   sync.Mutex
 	ClientPeer             *p2p.Peer      // The peer for the benchmark tx generator client, used for leaders to return proof-of-accept
@@ -114,17 +110,11 @@ type Node struct {
 	SelfPeer               p2p.Peer       // TODO(minhdoan): it could be duplicated with Self below whose is Alok work.
 	IDCPeer                p2p.Peer
 
-	chain     *core.BlockChain // Account Model
-	Neighbors sync.Map         // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
-	State     State            // State of the Node
+	Neighbors sync.Map // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
+	State     State    // State of the Node
 
-	// Account Model
-	pendingTransactionsAccount types.Transactions // TODO: replace with txPool
-	pendingTxMutexAccount      sync.Mutex
-	Chain                      *core.BlockChain
-	TxPool                     *core.TxPool
-	BlockChannelAccount        chan *types.Block // The channel to receive new blocks from Node
-	Worker                     *worker.Worker
+	TxPool *core.TxPool
+	Worker *worker.Worker
 
 	// Client server (for wallet requests)
 	clientServer *clientService.Server
@@ -148,54 +138,31 @@ type Node struct {
 	OfflinePeers chan p2p.Peer
 }
 
-// Add new crossTx and proofs to the list of crossTx that needs to be sent back to client
-func (node *Node) addCrossTxsToReturn(crossTxs []*blockchain.CrossShardTxAndProof) {
-	node.crossTxToReturnMutex.Lock()
-	node.CrossTxsToReturn = append(node.CrossTxsToReturn, crossTxs...)
-	node.crossTxToReturnMutex.Unlock()
-	node.log.Debug("Got more cross transactions to return", "num", len(crossTxs), len(node.pendingTransactions), "node", node)
+// Blockchain returns the blockchain from node
+func (node *Node) Blockchain() *core.BlockChain {
+	return node.blockchain
 }
 
 // Add new transactions to the pending transaction list
-func (node *Node) addPendingTransactions(newTxs []*blockchain.Transaction) {
+func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 	node.pendingTxMutex.Lock()
 	node.pendingTransactions = append(node.pendingTransactions, newTxs...)
 	node.pendingTxMutex.Unlock()
-}
-
-// Add new transactions to the pending transaction list
-func (node *Node) addPendingTransactionsAccount(newTxs types.Transactions) {
-	node.pendingTxMutexAccount.Lock()
-	node.pendingTransactionsAccount = append(node.pendingTransactionsAccount, newTxs...)
-	node.pendingTxMutexAccount.Unlock()
-	node.log.Debug("Got more transactions (account model)", "num", len(newTxs), "totalPending", len(node.pendingTransactionsAccount))
+	node.log.Debug("Got more transactions", "num", len(newTxs), "totalPending", len(node.pendingTransactions))
 }
 
 // Take out a subset of valid transactions from the pending transaction list
 // Note the pending transaction list will then contain the rest of the txs
-func (node *Node) getTransactionsForNewBlock(maxNumTxs int) ([]*blockchain.Transaction, []*blockchain.CrossShardTxAndProof) {
+func (node *Node) getTransactionsForNewBlock(maxNumTxs int) types.Transactions {
 	node.pendingTxMutex.Lock()
-	selected, unselected, invalid, crossShardTxs := node.UtxoPool.SelectTransactionsForNewBlock(node.pendingTransactions, maxNumTxs)
+	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(node.pendingTransactions, maxNumTxs)
 	_ = invalid // invalid txs are discard
 
 	node.log.Debug("Invalid transactions discarded", "number", len(invalid))
 	node.pendingTransactions = unselected
+	node.log.Debug("Remaining pending transactions", "number", len(node.pendingTransactions))
 	node.pendingTxMutex.Unlock()
-	return selected, crossShardTxs
-}
-
-// Take out a subset of valid transactions from the pending transaction list
-// Note the pending transaction list will then contain the rest of the txs
-func (node *Node) getTransactionsForNewBlockAccount(maxNumTxs int) (types.Transactions, []*blockchain.CrossShardTxAndProof) {
-	node.pendingTxMutexAccount.Lock()
-	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(node.pendingTransactionsAccount, maxNumTxs)
-	_ = invalid // invalid txs are discard
-
-	node.log.Debug("Invalid transactions discarded", "number", len(invalid))
-	node.pendingTransactionsAccount = unselected
-	node.log.Debug("Remaining pending transactions", "number", len(node.pendingTransactionsAccount))
-	node.pendingTxMutexAccount.Unlock()
-	return selected, nil //TODO: replace cross-shard proofs for account model
+	return selected
 }
 
 // StartServer starts a server and process the request by a handler.
@@ -217,19 +184,8 @@ func (node *Node) String() string {
 // Currently used for stats reporting purpose
 func (node *Node) countNumTransactionsInBlockchain() int {
 	count := 0
-	for _, block := range node.blockchain.Blocks {
-		count += len(block.Transactions)
-	}
-	return count
-}
-
-// Count the total number of transactions in the blockchain
-// Currently used for stats reporting purpose
-func (node *Node) countNumTransactionsInBlockchainAccount() int {
-	count := 0
-	for curBlock := node.Chain.CurrentBlock(); curBlock != nil; {
-		count += len(curBlock.Transactions())
-		curBlock = node.Chain.GetBlockByHash(curBlock.ParentHash())
+	for block := node.blockchain.CurrentBlock(); block != nil; block = node.blockchain.GetBlockByHash(block.Header().ParentHash) {
+		count += len(block.Transactions())
 	}
 	return count
 }
@@ -277,46 +233,17 @@ func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 	if host != nil && consensus != nil {
 		// Consensus and associated channel to communicate blocks
 		node.Consensus = consensus
-		node.BlockChannel = make(chan blockchain.Block)
-
-		// Genesis Block
-		// TODO(minh): Use or implement new function in blockchain package for this.
-		genesisBlock := &blockchain.Blockchain{}
-		genesisBlock.Blocks = make([]*blockchain.Block, 0)
-		// TODO(RJ): use miner's address as coinbase address
-		coinbaseTx := blockchain.NewCoinbaseTX(pki.GetAddressFromInt(1), "0", node.Consensus.ShardID)
-		genesisBlock.Blocks = append(genesisBlock.Blocks, blockchain.NewGenesisBlock(coinbaseTx, node.Consensus.ShardID))
-		node.blockchain = genesisBlock
-
-		// UTXO pool from Genesis block
-		node.UtxoPool = blockchain.CreateUTXOPoolFromGenesisBlock(node.blockchain.Blocks[0])
 
 		// Initialize level db.
 		node.db = db
 
-		// (account model)
-		rand.Seed(0)
-		len := 1000000
-		bytes := make([]byte, len)
-		for i := 0; i < len; i++ {
-			bytes[i] = byte(rand.Intn(100))
-		}
-		reader := strings.NewReader(string(bytes))
-		genesisAloc := make(core.GenesisAlloc)
-		for i := 0; i < 100; i++ {
-			testBankKey, _ := ecdsa.GenerateKey(crypto.S256(), reader)
-			testBankAddress := crypto.PubkeyToAddress(testBankKey.PublicKey)
-			testBankFunds := big.NewInt(1000)
-			testBankFunds = testBankFunds.Mul(testBankFunds, big.NewInt(params.Ether))
-			genesisAloc[testBankAddress] = core.GenesisAccount{Balance: testBankFunds}
-			node.TestBankKeys = append(node.TestBankKeys, testBankKey)
-		}
-
-		contractKey, _ := ecdsa.GenerateKey(crypto.S256(), reader)
+		// Initialize genesis block and blockchain
+		genesisAlloc := node.CreateGenesisAllocWithTestingAddresses(100)
+		contractKey, _ := ecdsa.GenerateKey(crypto.S256(), strings.NewReader("Test contract key string blablablablablablablablablablablablablablablablabl"))
 		contractAddress := crypto.PubkeyToAddress(contractKey.PublicKey)
 		contractFunds := big.NewInt(9000000)
 		contractFunds = contractFunds.Mul(contractFunds, big.NewInt(params.Ether))
-		genesisAloc[contractAddress] = core.GenesisAccount{Balance: contractFunds}
+		genesisAlloc[contractAddress] = core.GenesisAccount{Balance: contractFunds}
 		node.ContractKeys = append(node.ContractKeys, contractKey)
 
 		database := hdb.NewMemDatabase()
@@ -324,16 +251,15 @@ func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 		chainConfig.ChainID = big.NewInt(int64(node.Consensus.ShardID)) // Use ChainID as piggybacked ShardID
 		gspec := core.Genesis{
 			Config:  chainConfig,
-			Alloc:   genesisAloc,
+			Alloc:   genesisAlloc,
 			ShardID: uint32(node.Consensus.ShardID),
 		}
 
 		_ = gspec.MustCommit(database)
 		chain, _ := core.NewBlockChain(database, nil, gspec.Config, node.Consensus, vm.Config{}, nil)
-		node.Chain = chain
-		//This one is not used --- RJ.
+		node.blockchain = chain
+		node.BlockChannel = make(chan *types.Block)
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, params.TestChainConfig, chain)
-		node.BlockChannelAccount = make(chan *types.Block)
 		node.Worker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey), node.Consensus.ShardID)
 
 		node.AddSmartContractsToPendingTransactions()
@@ -439,12 +365,12 @@ func (node *Node) AddSmartContractsToPendingTransactions() {
 	mycontracttx, _ := types.SignTx(types.NewContractCreation(uint64(0), node.Consensus.ShardID, contractFunds, params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, priKey)
 	node.ContractAddresses = append(node.ContractAddresses, crypto.CreateAddress(crypto.PubkeyToAddress(priKey.PublicKey), uint64(0)))
 
-	node.addPendingTransactionsAccount(types.Transactions{mycontracttx})
+	node.addPendingTransactions(types.Transactions{mycontracttx})
 }
 
 //CallFaucetContract invokes the faucet contract to give the walletAddress initial money
 func (node *Node) CallFaucetContract(walletAddress common.Address) common.Hash {
-	state, err := node.Chain.State()
+	state, err := node.blockchain.State()
 	if err != nil {
 		log.Error("Failed to get chain state", "Error", err)
 	}
@@ -454,7 +380,7 @@ func (node *Node) CallFaucetContract(walletAddress common.Address) common.Hash {
 	dataEnc := common.FromHex(contractData)
 	tx, _ := types.SignTx(types.NewTransaction(nonce, node.ContractAddresses[0], node.Consensus.ShardID, big.NewInt(0), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, node.ContractKeys[0])
 
-	node.addPendingTransactionsAccount(types.Transactions{tx})
+	node.addPendingTransactions(types.Transactions{tx})
 	return tx.Hash()
 }
 
@@ -505,7 +431,7 @@ func (node *Node) SupportExplorer() {
 
 // InitClientServer initializes client server.
 func (node *Node) InitClientServer() {
-	node.clientServer = clientService.NewServer(node.Chain.State, node.CallFaucetContract)
+	node.clientServer = clientService.NewServer(node.blockchain.State, node.CallFaucetContract)
 }
 
 // StartClientServer starts client server.
@@ -537,13 +463,20 @@ func (node *Node) StartSyncingServer() {
 func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*downloader_pb.DownloaderResponse, error) {
 	response := &downloader_pb.DownloaderResponse{}
 	if request.Type == downloader_pb.DownloaderRequest_HEADER {
-		for _, block := range node.blockchain.Blocks {
-			response.Payload = append(response.Payload, block.Hash[:])
+
+		for block := node.blockchain.CurrentBlock(); block != nil; block = node.blockchain.GetBlockByHash(block.Header().ParentHash) {
+			blockHash := block.Hash()
+			response.Payload = append(response.Payload, blockHash[:])
 		}
 	} else {
-		for i := range request.Hashes {
-			block := node.blockchain.FindBlock(request.Hashes[i])
-			response.Payload = append(response.Payload, block.Serialize())
+		for _, bytes := range request.Hashes {
+			var hash common.Hash
+			hash.SetBytes(bytes)
+			block := node.blockchain.GetBlockByHash(hash)
+			encodedBlock, err := rlp.EncodeToBytes(block)
+			if err != nil {
+				response.Payload = append(response.Payload, encodedBlock)
+			}
 		}
 	}
 	return response, nil

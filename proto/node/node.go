@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
 
-	"github.com/harmony-one/harmony/blockchain"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/proto"
 )
@@ -66,14 +65,6 @@ const (
 	Sync BlockMessageType = iota
 )
 
-// ClientMessageType defines the type of messages used for Node/Block
-type ClientMessageType int
-
-// Constant of the client message subtype
-const (
-	LookupUtxo ClientMessageType = iota
-)
-
 // ControlMessageType is the type of messages used for Node/Control
 type ControlMessageType int
 
@@ -108,48 +99,6 @@ func DeserializeBlockchainSyncMessage(d []byte) (*BlockchainSyncMessage, error) 
 		log.Panic(err)
 	}
 	return &blockchainSyncMessage, err
-}
-
-// ConstructUnlockToCommitOrAbortMessage constructs the unlock to commit or abort message that will be sent to leaders.
-// This is for client.
-func ConstructUnlockToCommitOrAbortMessage(txsAndProofs []*blockchain.Transaction) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
-	byteBuffer.WriteByte(byte(Transaction))
-	byteBuffer.WriteByte(byte(Unlock))
-	encoder := gob.NewEncoder(byteBuffer)
-	encoder.Encode(txsAndProofs)
-	return byteBuffer.Bytes()
-}
-
-// ConstructFetchUtxoMessage constructs the fetch utxo message that will be sent to Harmony network.
-// this is for client.
-func ConstructFetchUtxoMessage(sender p2p.Peer, addresses [][20]byte) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
-	byteBuffer.WriteByte(byte(Client))
-	byteBuffer.WriteByte(byte(LookupUtxo))
-
-	encoder := gob.NewEncoder(byteBuffer)
-	encoder.Encode(FetchUtxoMessage{Addresses: addresses, Sender: sender})
-
-	return byteBuffer.Bytes()
-}
-
-// ConstructTransactionListMessage constructs serialized transactions
-func ConstructTransactionListMessage(transactions []*blockchain.Transaction) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
-	byteBuffer.WriteByte(byte(Transaction))
-	byteBuffer.WriteByte(byte(Send))
-	encoder := gob.NewEncoder(byteBuffer)
-	// Copy over the tx data
-	txs := make([]blockchain.Transaction, len(transactions))
-	for i := range txs {
-		txs[i] = *transactions[i]
-	}
-	err := encoder.Encode(txs)
-	if err != nil {
-		return []byte{} // TODO(RJ): better handle of the error
-	}
-	return byteBuffer.Bytes()
 }
 
 // ConstructTransactionListMessageAccount constructs serialized transactions in account model
@@ -187,12 +136,12 @@ func ConstructStopMessage() []byte {
 }
 
 // ConstructBlocksSyncMessage constructs blocks sync message to send blocks to other nodes
-func ConstructBlocksSyncMessage(blocks []blockchain.Block) []byte {
+func ConstructBlocksSyncMessage(blocks []*types.Block) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
 	byteBuffer.WriteByte(byte(Block))
 	byteBuffer.WriteByte(byte(Sync))
-	encoder := gob.NewEncoder(byteBuffer)
 
-	encoder.Encode(blocks)
+	blocksData, _ := rlp.EncodeToBytes(blocks)
+	byteBuffer.Write(blocksData)
 	return byteBuffer.Bytes()
 }
