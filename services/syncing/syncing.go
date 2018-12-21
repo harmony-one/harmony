@@ -3,7 +3,6 @@ package syncing
 import (
 	"bytes"
 	"github.com/harmony-one/harmony/core"
-	"github.com/simple-rules/harmony-benchmark/blockchain"
 	"reflect"
 	"sort"
 	"sync"
@@ -295,12 +294,12 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 				syncTask := task[0].(SyncBlockTask)
 				for {
 					//id := syncTask.index
-					payload, err := peerConfig.GetBlocks([][]byte{syncTask.blockHash})
+					_, err := peerConfig.GetBlocks([][]byte{syncTask.blockHash})
 					if err == nil {
 						// As of now, only send and ask for one block.
 						// TODO (minh) rework the syncing for account model.
 						//bc.Blocks[id], err = blockchain.DeserializeBlock(payload[0])
-						_, err = blockchain.DeserializeBlock(payload[0])
+						//_, err = blockchain.DeserializeBlock(payload[0])
 						if err == nil {
 							break
 						}
