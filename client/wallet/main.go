@@ -218,7 +218,12 @@ func main() {
 		walletNode := CreateWalletNode()
 		shardIDToAccountState := FetchBalance(senderAddress, walletNode)
 
-		balance := shardIDToAccountState[uint32(shardID)].balance
+		state, ok := shardIDToAccountState[uint32(shardID)]
+		if !ok {
+			fmt.Printf("Failed connecting to the shard %d\n", shardID)
+			return
+		}
+		balance := state.balance
 		balance = balance.Div(balance, big.NewInt(params.GWei))
 		if amount > float64(balance.Uint64())/params.GWei {
 			fmt.Printf("Balance is not enough for the transfer, current balance is %.6f\n", float64(balance.Uint64())/params.GWei)
@@ -227,7 +232,7 @@ func main() {
 
 		amountBigInt := big.NewInt(int64(amount * params.GWei))
 		amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(params.GWei))
-		tx, _ := types.SignTx(types.NewTransaction(shardIDToAccountState[uint32(shardID)].nonce, receiverAddress, uint32(shardID), amountBigInt, params.TxGas, nil, nil), types.HomesteadSigner{}, senderPriKey)
+		tx, _ := types.SignTx(types.NewTransaction(state.nonce, receiverAddress, uint32(shardID), amountBigInt, params.TxGas, nil, nil), types.HomesteadSigner{}, senderPriKey)
 		SubmitTransaction(tx, walletNode, uint32(shardID))
 	default:
 		fmt.Printf("Unknown action: %s\n", os.Args[1])
@@ -327,8 +332,8 @@ func SubmitTransaction(tx *types.Transaction, walletNode *node.Node, shardID uin
 }
 
 // FetchBalance fetches account balance of specified address from the Harmony network
-func FetchBalance(address common.Address, walletNode *node.Node) []AccountState {
-	result := make([]AccountState, len(*walletNode.Client.Leaders))
+func FetchBalance(address common.Address, walletNode *node.Node) map[uint32]AccountState {
+	result := make(map[uint32]AccountState)
 	for shardID, leader := range *walletNode.Client.Leaders {
 		port, _ := strconv.Atoi(leader.Port)
 		client := client2.NewClient(leader.IP, strconv.Itoa(port+node.ClientServicePortDiff))
