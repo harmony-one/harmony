@@ -221,6 +221,7 @@ func main() {
 		state, ok := shardIDToAccountState[uint32(shardID)]
 		if !ok {
 			fmt.Printf("Failed connecting to the shard %d\n", shardID)
+			return
 		}
 		balance := state.balance
 		balance = balance.Div(balance, big.NewInt(params.GWei))
