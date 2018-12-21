@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/harmony/blockchain"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto"
@@ -91,10 +90,10 @@ type Consensus struct {
 	// Signal channel for starting a new consensus process
 	ReadySignal chan struct{}
 	// The verifier func passed from Node object
-	BlockVerifier func(*blockchain.Block) bool
+	BlockVerifier func(*types.Block) bool
 	// The post-consensus processing func passed from Node object
 	// Called when consensus on a new block is done
-	OnConsensusDone func(*blockchain.Block)
+	OnConsensusDone func(*types.Block)
 
 	Log log.Logger
 

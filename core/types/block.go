@@ -92,6 +92,9 @@ type Header struct {
 	MixDigest   common.Hash    `json:"mixHash"          gencodec:"required"`
 	Nonce       BlockNonce     `json:"nonce"            gencodec:"required"`
 	ShardID     ShardID        `json:"shardID"          gencodec:"required"`
+	Bitmap      []byte         `json:"bitmap"           gencodec:"required"` // Contains which validator signed the block.
+	Signature   [66]byte       `json:"signature"        gencodec:"required"` // Schnorr collective signature.
+	// TODO(RJ): add epoch info
 }
 
 // field type overrides for gencodec

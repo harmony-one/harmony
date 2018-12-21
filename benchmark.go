@@ -76,9 +76,7 @@ func loggingInit(logFolder, role, ip, port string, onlyLogTps bool) {
 }
 
 func main() {
-	accountModel := flag.Bool("account_model", true, "Whether to use account model")
 	// TODO: use http://getmyipaddress.org/ or http://www.get-myip.com/ to retrieve my IP address
-
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9000", "port of the node.")
 	configFile := flag.String("config_file", "config.txt", "file containing all ip addresses")
@@ -191,32 +189,18 @@ func main() {
 	consensus.BlockVerifier = currentNode.VerifyNewBlock
 	consensus.OnConsensusDone = currentNode.PostConsensusProcessing
 
-	// Temporary testing code, to be removed.
-	currentNode.AddTestingAddresses(10000)
-
 	currentNode.State = node.NodeWaitToJoin
 
 	if consensus.IsLeader {
 		currentNode.State = node.NodeLeader
-		if *accountModel {
-			// Let consensus run
-			go func() {
-				consensus.WaitForNewBlockAccount(currentNode.BlockChannelAccount)
-			}()
-			// Node waiting for consensus readiness to create new block
-			go func() {
-				currentNode.WaitForConsensusReadyAccount(consensus.ReadySignal)
-			}()
-		} else {
-			// Let consensus run
-			go func() {
-				consensus.WaitForNewBlock(currentNode.BlockChannel)
-			}()
-			// Node waiting for consensus readiness to create new block
-			go func() {
-				currentNode.WaitForConsensusReady(consensus.ReadySignal)
-			}()
-		}
+		// Let consensus run
+		go func() {
+			consensus.WaitForNewBlock(currentNode.BlockChannel)
+		}()
+		// Node waiting for consensus readiness to create new block
+		go func() {
+			currentNode.WaitForConsensusReady(consensus.ReadySignal)
+		}()
 	} else {
 		if *peerDiscovery {
 			go currentNode.JoinShard(leader)

@@ -3,13 +3,12 @@ package consensus
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/gob"
 	"encoding/hex"
 	"errors"
+	"github.com/ethereum/go-ethereum/rlp"
 	"strconv"
 	"time"
 
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/services/explorer"
@@ -18,7 +17,6 @@ import (
 
 	"github.com/dedis/kyber"
 	"github.com/dedis/kyber/sign/schnorr"
-	"github.com/harmony-one/harmony/blockchain"
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/p2p"
@@ -34,35 +32,7 @@ var (
 )
 
 // WaitForNewBlock waits for the next new block to run consensus on
-func (consensus *Consensus) WaitForNewBlock(blockChannel chan blockchain.Block) {
-	consensus.Log.Debug("Waiting for block", "consensus", consensus)
-	for { // keep waiting for new blocks
-		newBlock := <-blockChannel
-
-		c := consensus.RemovePeers(consensus.OfflinePeerList)
-		if c > 0 {
-			consensus.Log.Debug("WaitForNewBlock", "removed peers", c)
-		}
-
-		for !consensus.HasEnoughValidators() {
-			consensus.Log.Debug("Not enough validators", "# Validators", len(consensus.PublicKeys))
-			time.Sleep(waitForEnoughValidators * time.Millisecond)
-		}
-
-		// TODO: think about potential race condition
-		startTime = time.Now()
-		consensus.Log.Debug("STARTING CONSENSUS", "consensus", consensus, "startTime", startTime, "publicKeys", len(consensus.PublicKeys))
-		for consensus.state == Finished {
-			// time.Sleep(500 * time.Millisecond)
-			consensus.ResetState()
-			consensus.startConsensus(&newBlock)
-			break
-		}
-	}
-}
-
-// WaitForNewBlockAccount waits for the next new block to run consensus on
-func (consensus *Consensus) WaitForNewBlockAccount(blockChannel chan *types.Block) {
+func (consensus *Consensus) WaitForNewBlock(blockChannel chan *types.Block) {
 	consensus.Log.Debug("Waiting for block", "consensus", consensus)
 	for { // keep waiting for new blocks
 		newBlock := <-blockChannel
@@ -82,13 +52,8 @@ func (consensus *Consensus) WaitForNewBlockAccount(blockChannel chan *types.Bloc
 		consensus.Log.Debug("STARTING CONSENSUS", "numTxs", len(newBlock.Transactions()), "consensus", consensus, "startTime", startTime, "publicKeys", len(consensus.PublicKeys))
 		for consensus.state == Finished {
 			// time.Sleep(500 * time.Millisecond)
-			data, err := rlp.EncodeToBytes(newBlock)
-			if err == nil {
-				consensus.ResetState()
-				consensus.startConsensus(&blockchain.Block{Hash: newBlock.Hash(), AccountBlock: data})
-			} else {
-				consensus.Log.Error("Failed encoding the block with RLP")
-			}
+			consensus.ResetState()
+			consensus.startConsensus(newBlock)
 			break
 		}
 	}
@@ -107,8 +72,6 @@ func (consensus *Consensus) ProcessMessageLeader(message []byte) {
 	}
 
 	switch msgType {
-	case proto_consensus.StartConsensus:
-		consensus.processStartConsensusMessage(payload)
 	case proto_consensus.Commit:
 		consensus.processCommitMessage(payload, ChallengeDone)
 	case proto_consensus.Response:
@@ -122,25 +85,20 @@ func (consensus *Consensus) ProcessMessageLeader(message []byte) {
 	}
 }
 
-// processStartConsensusMessage is the handler for message which triggers consensus process.
-// TODO(minh): clean-up. this function is never called.
-func (consensus *Consensus) processStartConsensusMessage(payload []byte) {
-	// TODO: remove these method after testnet
-	tx := blockchain.NewCoinbaseTX([20]byte{0}, "y", 0)
-	consensus.startConsensus(blockchain.NewGenesisBlock(tx, 0))
-}
-
 // startConsensus starts a new consensus for a block by broadcast a announce message to the validators
-func (consensus *Consensus) startConsensus(newBlock *blockchain.Block) {
+func (consensus *Consensus) startConsensus(newBlock *types.Block) {
 	// Copy over block hash and block header data
-	copy(consensus.blockHash[:], newBlock.Hash[:])
+	blockHash := newBlock.Hash()
+	copy(consensus.blockHash[:], blockHash[:])
 
 	consensus.Log.Debug("Start encoding block")
 	// prepare message and broadcast to validators
-	byteBuffer := bytes.NewBuffer([]byte{})
-	encoder := gob.NewEncoder(byteBuffer)
-	encoder.Encode(newBlock)
-	consensus.blockHeader = byteBuffer.Bytes()
+	encodedBlock, err := rlp.EncodeToBytes(newBlock)
+	if err != nil {
+		consensus.Log.Debug("Failed encoding block")
+		return
+	}
+	consensus.blockHeader = encodedBlock
 
 	consensus.Log.Debug("Stop encoding block")
 	msgToSend := consensus.constructAnnounceMessage()
@@ -448,21 +406,20 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState S
 			} else {
 				// TODO: reconstruct the whole block from header and transactions
 				// For now, we used the stored whole block already stored in consensus.blockHeader
-				txDecoder := gob.NewDecoder(bytes.NewReader(consensus.blockHeader))
-				var blockHeaderObj blockchain.Block
-				err = txDecoder.Decode(&blockHeaderObj)
+				var blockHeaderObj types.Block
+				err = rlp.DecodeBytes(consensus.blockHeader, &blockHeaderObj)
 				if err != nil {
 					consensus.Log.Debug("failed to construct the new block after consensus")
 				}
 
 				// Sign the block
-				copy(blockHeaderObj.Signature[:], collectiveSig[:])
-				copy(blockHeaderObj.Bitmap[:], bitmap)
+				copy(blockHeaderObj.Header().Signature[:], collectiveSig[:])
+				copy(blockHeaderObj.Header().Bitmap[:], bitmap)
 				consensus.OnConsensusDone(&blockHeaderObj)
 
 				consensus.reportMetrics(blockHeaderObj)
 				// Dump new block into level db.
-				explorer.GetStorageInstance(consensus.leader.IP, consensus.leader.Port, true).Dump(blockHeaderObj.AccountBlock, consensus.consensusID)
+				explorer.GetStorageInstance(consensus.leader.IP, consensus.leader.Port, true).Dump(&blockHeaderObj, consensus.consensusID)
 				// Claim new consensus reached.
 				consensus.Log.Debug("Consensus reached with signatures.", "numOfSignatures", len(*responses))
 				// Reset state to Finished, and clear other data.
@@ -501,19 +458,10 @@ func (consensus *Consensus) verifyResponse(commitments *map[uint16]kyber.Point, 
 	return nil
 }
 
-func (consensus *Consensus) reportMetrics(block blockchain.Block) {
-	if block.IsStateBlock() { // Skip state block stats
-		return
-	}
-
+func (consensus *Consensus) reportMetrics(block types.Block) {
 	endTime := time.Now()
 	timeElapsed := endTime.Sub(startTime)
-	numOfTxs := int(block.NumTransactions)
-	if block.AccountBlock != nil {
-		accountBlock := new(types.Block)
-		rlp.DecodeBytes(block.AccountBlock, accountBlock)
-		numOfTxs = len(accountBlock.Transactions())
-	}
+	numOfTxs := len(block.Transactions())
 	tps := float64(numOfTxs) / timeElapsed.Seconds()
 	consensus.Log.Info("TPS Report",
 		"numOfTXs", numOfTxs,
@@ -530,8 +478,9 @@ func (consensus *Consensus) reportMetrics(block blockchain.Block) {
 	}
 
 	txHashes := []string{}
-	for i, end := 0, len(block.TransactionIds); i < 3 && i < end; i++ {
-		txHashes = append(txHashes, hex.EncodeToString(block.TransactionIds[end-1-i][:]))
+	for i, end := 0, len(block.Transactions()); i < 3 && i < end; i++ {
+		txHash := block.Transactions()[end-1-i].Hash()
+		txHashes = append(txHashes, hex.EncodeToString(txHash[:]))
 	}
 	metrics := map[string]interface{}{
 		"key":             consensus.pubKey.String(),

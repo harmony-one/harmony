@@ -30,30 +30,8 @@ func TestNewNewNode(t *testing.T) {
 		t.Error("Blockchain is not initialized for the node")
 	}
 
-	if len(node.blockchain.Blocks) != 1 {
+	if node.blockchain.CurrentBlock() == nil {
 		t.Error("Genesis block is not initialized for the node")
-	}
-
-	if len(node.blockchain.Blocks[0].Transactions) != 1 {
-		t.Error("Coinbase TX is not initialized for the node")
-	}
-
-	if node.UtxoPool == nil {
-		t.Error("Utxo pool is not initialized for the node")
-	}
-}
-
-func TestCountNumTransactionsInBlockchain(t *testing.T) {
-	_, pubKey := utils.GenKey("1", "2")
-	leader := p2p.Peer{IP: "1", Port: "2", PubKey: pubKey}
-	validator := p2p.Peer{IP: "3", Port: "5"}
-	host := p2pimpl.NewHost(leader)
-	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader)
-
-	node := New(host, consensus, nil)
-	node.AddTestingAddresses(1000)
-	if node.countNumTransactionsInBlockchain() != 1001 {
-		t.Error("Count of transactions in the blockchain is incorrect")
 	}
 }
 

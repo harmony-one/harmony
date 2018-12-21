@@ -3,10 +3,10 @@ package consensus
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/gob"
 	"github.com/dedis/kyber/sign/schnorr"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/attack"
-	"github.com/harmony-one/harmony/blockchain"
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/log"
 	proto_consensus "github.com/harmony-one/harmony/proto/consensus"
@@ -83,11 +83,10 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	}
 
 	// check block header is valid
-	txDecoder := gob.NewDecoder(bytes.NewReader(blockHeader))
-	var blockHeaderObj blockchain.Block // TODO: separate header from block. Right now, this blockHeader data is actually the whole block
-	err := txDecoder.Decode(&blockHeaderObj)
+	var blockHeaderObj types.Block // TODO: separate header from block. Right now, this blockHeader data is actually the whole block
+	err := rlp.DecodeBytes(blockHeader, &blockHeaderObj)
 	if err != nil {
-		consensus.Log.Warn("Unparseable block header data", "consensus", consensus)
+		consensus.Log.Warn("Unparseable block header data", "error", err)
 		return
 	}
 	consensus.blockHeader = blockHeader // TODO: think about remove this field and use blocksReceived instead
@@ -102,14 +101,10 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	}
 
 	// check block hash
-	if blockHeaderObj.AccountBlock != nil {
-		// TODO: deal with block hash of account model
-	} else {
-		// TODO: totally switch to account model.
-		if !bytes.Equal(blockHash[:], blockHeaderObj.CalculateBlockHash()[:]) || !bytes.Equal(blockHeaderObj.Hash[:], blockHeaderObj.CalculateBlockHash()[:]) {
-			consensus.Log.Warn("Block hash doesn't match", "consensus", consensus)
-			return
-		}
+	hash := blockHeaderObj.Hash()
+	if !bytes.Equal(blockHash[:], hash[:]) {
+		consensus.Log.Warn("Block hash doesn't match", "consensus", consensus)
+		return
 	}
 
 	// check block data (transactions
@@ -257,9 +252,12 @@ func (consensus *Consensus) processChallengeMessage(payload []byte, targetState 
 
 				// TODO: reconstruct the whole block from header and transactions
 				// For now, we used the stored whole block in consensus.blockHeader
-				txDecoder := gob.NewDecoder(bytes.NewReader(val.blockHeader))
-				var blockHeaderObj blockchain.Block
-				err := txDecoder.Decode(&blockHeaderObj)
+				var blockHeaderObj types.Block // TODO: separate header from block. Right now, this blockHeader data is actually the whole block
+				err := rlp.DecodeBytes(val.blockHeader, &blockHeaderObj)
+				if err != nil {
+					consensus.Log.Warn("Unparseable block header data", "error", err)
+					return
+				}
 				if err != nil {
 					consensus.Log.Debug("failed to construct the new block after consensus")
 				}
@@ -268,7 +266,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte, targetState 
 					consensus.Log.Debug("[WARNING] Block content is not verified successfully", "consensusID", consensus.consensusID)
 					return
 				}
-				consensus.Log.Info("Finished Response. Adding block to chain", "numTx", len(blockHeaderObj.Transactions))
+				consensus.Log.Info("Finished Response. Adding block to chain", "numTx", len(blockHeaderObj.Transactions()))
 				consensus.OnConsensusDone(&blockHeaderObj)
 			} else {
 				break

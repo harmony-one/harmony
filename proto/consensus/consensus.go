@@ -94,7 +94,6 @@ const (
 	FinalCommit
 	FinalChallenge
 	FinalResponse
-	StartConsensus
 )
 
 // Returns string name for the MessageType enum
@@ -108,10 +107,9 @@ func (msgType MessageType) String() string {
 		"FinalCommit",
 		"FinalChallenge",
 		"FinalResponse",
-		"StartConsensus",
 	}
 
-	if msgType < Announce || msgType > StartConsensus {
+	if msgType < Announce || msgType > FinalResponse {
 		return "Unknown"
 	}
 	return names[msgType]

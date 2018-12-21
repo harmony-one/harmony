@@ -82,18 +82,21 @@ func (storage *Storage) GetDB() *db.LDBDatabase {
 }
 
 // Dump extracts information from block and index them into lvdb for explorer.
-func (storage *Storage) Dump(accountBlock []byte, height uint32) {
-	fmt.Println("Dumping block ", height)
-	if accountBlock == nil {
+func (storage *Storage) Dump(block *types.Block, height uint32) {
+	Log.Info("Dumping block ", "block height", height)
+	if block == nil {
 		return
 	}
 	// Update block height.
 	storage.db.Put([]byte(BlockHeightKey), []byte(strconv.Itoa(int(height))))
 
 	// Store block.
-	block := new(types.Block)
-	rlp.DecodeBytes(accountBlock, block)
-	storage.db.Put([]byte(GetBlockKey(int(height))), accountBlock)
+	blockData, err := rlp.EncodeToBytes(block)
+	if err == nil {
+		storage.db.Put([]byte(GetBlockKey(int(height))), blockData)
+	} else {
+		Log.Debug("Failed to serialize block ", "error", err)
+	}
 
 	// Store block info.
 	blockInfo := BlockInfo{
