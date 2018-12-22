@@ -48,10 +48,10 @@ func (bc *BeaconChain) BeaconChainHandler(s p2p.Stream) {
 				bc.log.Info("Identity Message Type is of the type Register")
 				bc.AcceptConnections(identityMsgPayload)
 			default:
-				panic("Unrecognized identity message type")
+				bc.log.Error("Unrecognized identity message type", "type", idMsgType)
 			}
 		default:
-			panic("Unrecognized message category")
+			bc.log.Error("Unrecognized message category", "actionType", actionType)
 		}
 
 	}
