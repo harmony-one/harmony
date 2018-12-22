@@ -232,13 +232,15 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
 			if len(node.pendingTransactions) >= threshold {
 				// Normal tx block consensus
 				selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
-				node.Worker.CommitTransactions(selectedTxs)
-				block, err := node.Worker.Commit()
-				if err != nil {
-					node.log.Debug("Failed commiting new block", "Error", err)
-				} else {
-					newBlock = block
-					break
+				if len(selectedTxs) != 0 {
+					node.Worker.CommitTransactions(selectedTxs)
+					block, err := node.Worker.Commit()
+					if err != nil {
+						node.log.Debug("Failed commiting new block", "Error", err)
+					} else {
+						newBlock = block
+						break
+					}
 				}
 			}
 			// If not enough transactions to run Consensus,

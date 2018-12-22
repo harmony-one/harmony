@@ -29,8 +29,8 @@ import (
 type Consensus struct {
 	state State
 	// Commits collected from validators. A map from node Id to its commitment
-	commitments               *map[uint16]kyber.Point
-	finalCommitments          *map[uint16]kyber.Point
+	commitments               *map[uint32]kyber.Point
+	finalCommitments          *map[uint32]kyber.Point
 	aggregatedCommitment      kyber.Point
 	aggregatedFinalCommitment kyber.Point
 	bitmap                    *crypto.Mask
@@ -41,8 +41,8 @@ type Consensus struct {
 	finalChallenge [32]byte
 
 	// Responses collected from validators
-	responses      *map[uint16]kyber.Scalar
-	finalResponses *map[uint16]kyber.Scalar
+	responses      *map[uint32]kyber.Scalar
+	finalResponses *map[uint32]kyber.Scalar
 	// map of nodeID to validator Peer object
 	// FIXME: should use PubKey of p2p.Peer as the hashkey
 	// However, we have assumed uint16 in consensus/consensus_leader.go:136
@@ -66,7 +66,7 @@ type Consensus struct {
 	// Whether I am leader. False means I am validator
 	IsLeader bool
 	// Leader or validator Id - 2 byte
-	nodeID uint16
+	nodeID uint32
 	// Consensus Id (View Id) - 4 byte
 	consensusID uint32
 	// Blockhash - 32 byte
@@ -132,10 +132,10 @@ func New(host host.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Con
 		consensus.IsLeader = false
 	}
 
-	consensus.commitments = &map[uint16]kyber.Point{}
-	consensus.finalCommitments = &map[uint16]kyber.Point{}
-	consensus.responses = &map[uint16]kyber.Scalar{}
-	consensus.finalResponses = &map[uint16]kyber.Scalar{}
+	consensus.commitments = &map[uint32]kyber.Point{}
+	consensus.finalCommitments = &map[uint32]kyber.Point{}
+	consensus.responses = &map[uint32]kyber.Scalar{}
+	consensus.finalResponses = &map[uint32]kyber.Scalar{}
 
 	consensus.leader = leader
 	for _, peer := range peers {
@@ -225,10 +225,10 @@ func (consensus *Consensus) GetValidatorPeers() []p2p.Peer {
 // ResetState resets the state of the consensus
 func (consensus *Consensus) ResetState() {
 	consensus.state = Finished
-	consensus.commitments = &map[uint16]kyber.Point{}
-	consensus.finalCommitments = &map[uint16]kyber.Point{}
-	consensus.responses = &map[uint16]kyber.Scalar{}
-	consensus.finalResponses = &map[uint16]kyber.Scalar{}
+	consensus.commitments = &map[uint32]kyber.Point{}
+	consensus.finalCommitments = &map[uint32]kyber.Point{}
+	consensus.responses = &map[uint32]kyber.Scalar{}
+	consensus.finalResponses = &map[uint32]kyber.Scalar{}
 
 	mask, _ := crypto.NewMask(crypto.Ed25519Curve, consensus.PublicKeys, consensus.leader.PubKey)
 	finalMask, _ := crypto.NewMask(crypto.Ed25519Curve, consensus.PublicKeys, consensus.leader.PubKey)
@@ -474,7 +474,7 @@ func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header 
 }
 
 // GetNodeID returns the nodeID
-func (consensus *Consensus) GetNodeID() uint16 {
+func (consensus *Consensus) GetNodeID() uint32 {
 	return consensus.nodeID
 }
 
