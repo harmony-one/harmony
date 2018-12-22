@@ -1,65 +1,79 @@
 package consensus
 
 import (
-	"bytes"
-	"encoding/binary"
-
 	"github.com/dedis/kyber"
+	consensus2 "github.com/harmony-one/harmony/consensus/proto"
 	"github.com/harmony-one/harmony/crypto"
 	proto_consensus "github.com/harmony-one/harmony/proto/consensus"
 )
 
 // Construct the commit message to send to leader (assumption the consensus data is already verified)
 func (consensus *Consensus) constructCommitMessage(msgType proto_consensus.MessageType) (secret kyber.Scalar, commitMsg []byte) {
-	buffer := bytes.NewBuffer([]byte{})
+	message := consensus2.Message{}
 
 	// 4 byte consensus id
-	fourBytes := make([]byte, 4)
-	binary.BigEndian.PutUint32(fourBytes, consensus.consensusID)
-	buffer.Write(fourBytes)
+	message.ConsensusId = consensus.consensusID
 
 	// 32 byte block hash
-	buffer.Write(consensus.blockHash[:])
+	message.BlockHash = consensus.blockHash[:]
 
-	// 2 byte validator id
-	twoBytes := make([]byte, 2)
-	binary.BigEndian.PutUint16(twoBytes, consensus.nodeID)
-	buffer.Write(twoBytes)
+	// 4 byte sender id
+	message.SenderId = uint32(consensus.nodeID)
 
 	// 32 byte of commit (TODO: figure out why it's different than Zilliqa's ECPoint which takes 33 bytes: https://crypto.stackexchange.com/questions/51703/how-to-convert-from-curve25519-33-byte-to-32-byte-representation)
 	secret, commitment := crypto.Commit(crypto.Ed25519Curve)
-	commitment.MarshalTo(buffer)
+	bytes, err := commitment.MarshalBinary()
+	if err != nil {
+		consensus.Log.Debug("Failed to marshal commit", "error", err)
+	}
+	message.Payload = bytes
 
+	marshaledMessage, err := message.XXX_Marshal([]byte{}, true)
+	if err != nil {
+		consensus.Log.Debug("Failed to marshal Announce message", "error", err)
+	}
 	// 64 byte of signature on previous data
-	signature := consensus.signMessage(buffer.Bytes())
-	buffer.Write(signature)
+	signature := consensus.signMessage(marshaledMessage)
+	message.Signature = signature
 
-	return secret, proto_consensus.ConstructConsensusMessage(msgType, buffer.Bytes())
+	marshaledMessage, err = message.XXX_Marshal([]byte{}, true)
+	if err != nil {
+		consensus.Log.Debug("Failed to marshal Announce message", "error", err)
+	}
+
+	return secret, proto_consensus.ConstructConsensusMessage(msgType, marshaledMessage)
 }
 
 // Construct the response message to send to leader (assumption the consensus data is already verified)
 func (consensus *Consensus) constructResponseMessage(msgType proto_consensus.MessageType, response kyber.Scalar) []byte {
-	buffer := bytes.NewBuffer([]byte{})
+	message := consensus2.Message{}
 
 	// 4 byte consensus id
-	fourBytes := make([]byte, 4)
-	binary.BigEndian.PutUint32(fourBytes, consensus.consensusID)
-	buffer.Write(fourBytes)
+	message.ConsensusId = consensus.consensusID
 
 	// 32 byte block hash
-	buffer.Write(consensus.blockHash[:32])
+	message.BlockHash = consensus.blockHash[:]
 
-	// 2 byte validator id
-	twoBytes := make([]byte, 2)
-	binary.BigEndian.PutUint16(twoBytes, consensus.nodeID)
-	buffer.Write(twoBytes)
+	// 4 byte sender id
+	message.SenderId = uint32(consensus.nodeID)
 
-	// 32 byte of response
-	response.MarshalTo(buffer)
+	bytes, err := response.MarshalBinary()
+	if err != nil {
+		consensus.Log.Debug("Failed to marshal response", "error", err)
+	}
+	message.Payload = bytes
 
+	marshaledMessage, err := message.XXX_Marshal([]byte{}, true)
+	if err != nil {
+		consensus.Log.Debug("Failed to marshal Announce message", "error", err)
+	}
 	// 64 byte of signature on previous data
-	signature := consensus.signMessage(buffer.Bytes())
-	buffer.Write(signature)
+	signature := consensus.signMessage(marshaledMessage)
+	message.Signature = signature
 
-	return proto_consensus.ConstructConsensusMessage(msgType, buffer.Bytes())
+	marshaledMessage, err = message.XXX_Marshal([]byte{}, true)
+	if err != nil {
+		consensus.Log.Debug("Failed to marshal Announce message", "error", err)
+	}
+	return proto_consensus.ConstructConsensusMessage(msgType, marshaledMessage)
 }

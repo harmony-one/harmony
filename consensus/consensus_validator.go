@@ -2,10 +2,10 @@ package consensus
 
 import (
 	"bytes"
-	"encoding/binary"
 	"github.com/dedis/kyber/sign/schnorr"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/attack"
+	consensus2 "github.com/harmony-one/harmony/consensus/proto"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/log"
@@ -42,29 +42,15 @@ func (consensus *Consensus) ProcessMessageValidator(message []byte) {
 // Processes the announce message sent from the leader
 func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	consensus.Log.Info("Received Announce Message", "Size", len(payload), "nodeID", consensus.nodeID)
-	//#### Read payload data
-	offset := 0
-	// 4 byte consensus id
-	consensusID := binary.BigEndian.Uint32(payload[offset : offset+4])
-	offset += 4
 
-	// 32 byte block hash
-	blockHash := payload[offset : offset+32]
-	offset += 32
+	message := consensus2.Message{}
+	message.XXX_Unmarshal(payload)
 
-	// 2 byte leader id
-	leaderID := binary.BigEndian.Uint16(payload[offset : offset+2])
-	offset += 2
-
-	// n byte of message to cosign
-	n := len(payload) - offset - 64 // the number means 64 signature
-	blockHeader := payload[offset : offset+n]
-	offset += n
-
-	// 64 byte of signature on previous data
-	signature := payload[offset : offset+64]
-	offset += 64
-	//#### END: Read payload data
+	consensusID := message.ConsensusId
+	blockHash := message.BlockHash
+	leaderID := message.SenderId
+	blockHeader := message.Payload
+	signature := message.Signature
 
 	copy(consensus.blockHash[:], blockHash[:])
 
@@ -77,14 +63,19 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	}
 
 	// Verify signature
-	if schnorr.Verify(crypto.Ed25519Curve, consensus.leader.PubKey, payload[:offset-64], signature) != nil {
+	message.Signature = nil
+	messageBytes, err := message.XXX_Marshal([]byte{}, true)
+	if err != nil {
+		consensus.Log.Warn("Failed to marshal the announce message", "error", err)
+	}
+	if schnorr.Verify(crypto.Ed25519Curve, consensus.leader.PubKey, messageBytes, signature) != nil {
 		consensus.Log.Warn("Received message with invalid signature", "leaderKey", consensus.leader.PubKey, "consensus", consensus)
 		return
 	}
 
 	// check block header is valid
 	var blockHeaderObj types.Block // TODO: separate header from block. Right now, this blockHeader data is actually the whole block
-	err := rlp.DecodeBytes(blockHeader, &blockHeaderObj)
+	err = rlp.DecodeBytes(blockHeader, &blockHeaderObj)
 	if err != nil {
 		consensus.Log.Warn("Unparseable block header data", "error", err)
 		return
@@ -126,40 +117,29 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 
 // Processes the challenge message sent from the leader
 func (consensus *Consensus) processChallengeMessage(payload []byte, targetState State) {
-	if len(payload) < 4+32+2+33+33+32+64 {
-		consensus.Log.Debug("Received malformed message %x", payload)
-		return
-	}
+	consensus.Log.Info("Received Challenge Message", "Size", len(payload), "nodeID", consensus.nodeID)
+	message := consensus2.Message{}
+	message.XXX_Unmarshal(payload)
+
+	consensusID := message.ConsensusId
+	blockHash := message.BlockHash
+	leaderID := message.SenderId
+	messagePayload := message.Payload
+	signature := message.Signature
+
 	//#### Read payload data
 	offset := 0
-	// 4 byte consensus id
-	consensusID := binary.BigEndian.Uint32(payload[offset : offset+4])
-	offset += 4
-
-	// 32 byte block hash
-	blockHash := payload[offset : offset+32]
-	offset += 32
-
-	// 2 byte leader id
-	leaderID := binary.BigEndian.Uint16(payload[offset : offset+2])
-	offset += 2
-
 	// 33 byte of aggregated commit
-	aggreCommit := payload[offset : offset+33]
+	aggreCommit := messagePayload[offset : offset+33]
 	offset += 33
 
 	// 33 byte of aggregated key
-	aggreKey := payload[offset : offset+33]
+	aggreKey := messagePayload[offset : offset+33]
 	offset += 33
 
 	// 32 byte of challenge
-	challenge := payload[offset : offset+32]
+	challenge := messagePayload[offset : offset+32]
 	offset += 32
-
-	// 64 byte of signature on previous data
-	signature := payload[offset : offset+64]
-	offset += 64
-	//#### END: Read payload data
 
 	// Update readyByConsensus for attack.
 	attack.GetInstance().UpdateConsensusReady(consensusID)
@@ -167,13 +147,18 @@ func (consensus *Consensus) processChallengeMessage(payload []byte, targetState 
 	// Verify block data and the aggregated signatures
 	// check leader Id
 	myLeaderID := utils.GetUniqueIDFromPeer(consensus.leader)
-	if leaderID != myLeaderID {
+	if uint32(leaderID) != myLeaderID {
 		consensus.Log.Warn("Received message from wrong leader", "myLeaderID", myLeaderID, "receivedLeaderId", leaderID, "consensus", consensus)
 		return
 	}
 
 	// Verify signature
-	if schnorr.Verify(crypto.Ed25519Curve, consensus.leader.PubKey, payload[:offset-64], signature) != nil {
+	message.Signature = nil
+	messageBytes, err := message.XXX_Marshal([]byte{}, true)
+	if err != nil {
+		consensus.Log.Warn("Failed to marshal the announce message", "error", err)
+	}
+	if schnorr.Verify(crypto.Ed25519Curve, consensus.leader.PubKey, messageBytes, signature) != nil {
 		consensus.Log.Warn("Received message with invalid signature", "leaderKey", consensus.leader.PubKey, "consensus", consensus)
 		return
 	}
@@ -198,7 +183,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte, targetState 
 	aggKey := crypto.Ed25519Curve.Point()
 	aggKey.UnmarshalBinary(aggreKey[:32])
 
-	reconstructedChallenge, err := crypto.Challenge(crypto.Ed25519Curve, aggCommitment, aggKey, payload[:36]) // Only consensus Id and block hash
+	reconstructedChallenge, err := crypto.Challenge(crypto.Ed25519Curve, aggCommitment, aggKey, blockHash)
 
 	if err != nil {
 		log.Error("Failed to reconstruct the challenge from commits and keys")
@@ -278,56 +263,41 @@ func (consensus *Consensus) processChallengeMessage(payload []byte, targetState 
 
 // Processes the collective signature message sent from the leader
 func (consensus *Consensus) processCollectiveSigMessage(payload []byte) {
-	if len(payload) < 4+32+2+64+64 {
-		consensus.Log.Debug("Received malformed message %x", payload)
-		return
-	}
+	message := consensus2.Message{}
+	message.XXX_Unmarshal(payload)
+
+	consensusID := message.ConsensusId
+	blockHash := message.BlockHash
+	leaderID := message.SenderId
+	messagePayload := message.Payload
+	signature := message.Signature
+
 	//#### Read payload data
-	offset := 0
-	// 4 byte consensus id
-	consensusID := binary.BigEndian.Uint32(payload[offset : offset+4])
-	offset += 4
-
-	// 32 byte block hash
-	blockHash := payload[offset : offset+32]
-	offset += 32
-
-	// 2 byte leader id
-	leaderID := binary.BigEndian.Uint16(payload[offset : offset+2])
-	offset += 2
-
-	// 64 byte of collective signature
-	collectiveSig := payload[offset : offset+64]
-	offset += 64
-
-	// N byte of bitmap
-	n := len(payload) - offset - 64 // the number means 64 signature
-	bitmap := payload[offset : offset+n]
-	offset += n
-
-	// 64 byte of signature on previous data
-	signature := payload[offset : offset+64]
-	offset += 64
+	collectiveSig := messagePayload[0:64]
+	bitmap := messagePayload[64:]
 	//#### END: Read payload data
-
-	copy(consensus.blockHash[:], blockHash[:])
 
 	// Verify block data
 	// check leader Id
 	myLeaderID := utils.GetUniqueIDFromPeer(consensus.leader)
-	if leaderID != myLeaderID {
+	if uint32(leaderID) != myLeaderID {
 		consensus.Log.Warn("Received message from wrong leader", "myLeaderID", myLeaderID, "receivedLeaderId", leaderID, "consensus", consensus)
 		return
 	}
 
 	// Verify signature
-	if schnorr.Verify(crypto.Ed25519Curve, consensus.leader.PubKey, payload[:offset-64], signature) != nil {
+	message.Signature = nil
+	messageBytes, err := message.XXX_Marshal([]byte{}, true)
+	if err != nil {
+		consensus.Log.Warn("Failed to marshal the announce message", "error", err)
+	}
+	if schnorr.Verify(crypto.Ed25519Curve, consensus.leader.PubKey, messageBytes, signature) != nil {
 		consensus.Log.Warn("Received message with invalid signature", "leaderKey", consensus.leader.PubKey, "consensus", consensus)
 		return
 	}
 
 	// Verify collective signature
-	err := crypto.Verify(crypto.Ed25519Curve, consensus.PublicKeys, payload[:36], append(collectiveSig, bitmap...), crypto.NewThresholdPolicy((2*len(consensus.PublicKeys)/3)+1))
+	err = crypto.Verify(crypto.Ed25519Curve, consensus.PublicKeys, blockHash, append(collectiveSig, bitmap...), crypto.NewThresholdPolicy((2*len(consensus.PublicKeys)/3)+1))
 	if err != nil {
 		consensus.Log.Warn("Failed to verify the collective sig message", "consensusID", consensusID, "err", err, "bitmap", bitmap, "NodeID", consensus.nodeID, "#PK", len(consensus.PublicKeys))
 		return

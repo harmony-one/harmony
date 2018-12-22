@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"bytes"
-	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -13,6 +12,7 @@ import (
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/services/explorer"
 
+	consensus2 "github.com/harmony-one/harmony/consensus/proto"
 	"github.com/harmony-one/harmony/profiler"
 
 	"github.com/dedis/kyber"
@@ -126,31 +126,14 @@ func (consensus *Consensus) commitByLeader(firstRound bool) {
 
 // processCommitMessage processes the commit message sent from validators
 func (consensus *Consensus) processCommitMessage(payload []byte, targetState State) {
-	if len(payload) < 4+32+2+32+64 {
-		consensus.Log.Debug("Received malformed message %x", payload)
-		return
-	}
-	// Read payload data
-	offset := 0
-	// 4 byte consensus id
-	consensusID := binary.BigEndian.Uint32(payload[offset : offset+4])
-	offset += 4
+	message := consensus2.Message{}
+	message.XXX_Unmarshal(payload)
 
-	// 32 byte block hash
-	blockHash := payload[offset : offset+32]
-	offset += 32
-
-	// 2 byte validator id
-	validatorID := binary.BigEndian.Uint16(payload[offset : offset+2])
-	offset += 2
-
-	// 32 byte commit
-	commitment := payload[offset : offset+32]
-	offset += 32
-
-	// 64 byte of signature on all above data
-	signature := payload[offset : offset+64]
-	offset += 64
+	consensusID := message.ConsensusId
+	blockHash := message.BlockHash
+	validatorID := message.SenderId
+	commitment := message.Payload
+	signature := message.Signature
 
 	// Verify signature
 	v, ok := consensus.validators.Load(validatorID)
@@ -164,7 +147,12 @@ func (consensus *Consensus) processCommitMessage(payload []byte, targetState Sta
 		return
 	}
 
-	if schnorr.Verify(crypto.Ed25519Curve, value.PubKey, payload[:offset-64], signature) != nil {
+	message.Signature = nil
+	messageBytes, err := message.XXX_Marshal([]byte{}, true)
+	if err != nil {
+		consensus.Log.Warn("Failed to marshal the announce message", "error", err)
+	}
+	if schnorr.Verify(crypto.Ed25519Curve, value.PubKey, messageBytes, signature) != nil {
 		consensus.Log.Warn("Received message with invalid signature", "validatorKey", consensus.leader.PubKey, "consensus", consensus)
 		return
 	}
@@ -262,32 +250,14 @@ func (consensus *Consensus) responseByLeader(challenge kyber.Scalar, firstRound 
 
 // Processes the response message sent from validators
 func (consensus *Consensus) processResponseMessage(payload []byte, targetState State) {
-	if len(payload) < 4+32+2+32+64 {
-		consensus.Log.Debug("Received malformed message %x", payload)
-		return
-	}
-	//#### Read payload data
-	offset := 0
-	// 4 byte consensus id
-	consensusID := binary.BigEndian.Uint32(payload[offset : offset+4])
-	offset += 4
+	message := consensus2.Message{}
+	message.XXX_Unmarshal(payload)
 
-	// 32 byte block hash
-	blockHash := payload[offset : offset+32]
-	offset += 32
-
-	// 2 byte validator id
-	validatorID := binary.BigEndian.Uint16(payload[offset : offset+2])
-	offset += 2
-
-	// 32 byte response
-	response := payload[offset : offset+32]
-	offset += 32
-
-	// 64 byte of signature on previous data
-	signature := payload[offset : offset+64]
-	offset += 64
-	//#### END: Read payload data
+	consensusID := message.ConsensusId
+	blockHash := message.BlockHash
+	validatorID := message.SenderId
+	response := message.Payload
+	signature := message.Signature
 
 	shouldProcess := true
 	consensus.mutex.Lock()
@@ -315,8 +285,12 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState S
 		consensus.Log.Warn("Invalid validator", "validatorID", validatorID, "consensus", consensus)
 		return
 	}
-
-	if schnorr.Verify(crypto.Ed25519Curve, value.PubKey, payload[:offset-64], signature) != nil {
+	message.Signature = nil
+	messageBytes, err := message.XXX_Marshal([]byte{}, true)
+	if err != nil {
+		consensus.Log.Warn("Failed to marshal the announce message", "error", err)
+	}
+	if schnorr.Verify(crypto.Ed25519Curve, value.PubKey, messageBytes, signature) != nil {
 		consensus.Log.Warn("Received message with invalid signature", "validatorKey", consensus.leader.PubKey, "consensus", consensus)
 		return
 	}
@@ -435,7 +409,7 @@ func (consensus *Consensus) processResponseMessage(payload []byte, targetState S
 	}
 }
 
-func (consensus *Consensus) verifyResponse(commitments *map[uint16]kyber.Point, response kyber.Scalar, validatorID uint16) error {
+func (consensus *Consensus) verifyResponse(commitments *map[uint32]kyber.Point, response kyber.Scalar, validatorID uint32) error {
 	if response.Equal(crypto.Ed25519Curve.Scalar()) {
 		return errors.New("response is zero valued")
 	}
