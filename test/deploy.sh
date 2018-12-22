@@ -1,5 +1,7 @@
 #!/bin/bash
 
+ROOT=$(dirname $0)/..
+
 set -eo pipefail
 
 function cleanup() {
@@ -83,10 +85,12 @@ cleanup
 # and you won't be able to turn it off. With `go build` generating one
 # exe, the dialog will only pop up once at the very first time.
 # Also it's recommended to use `go build` for testing the whole exe. 
+pushd $ROOT
 echo "compiling ..."
 go build -o bin/benchmark
 go build -o bin/txgen client/txgen/main.go
 go build -o bin/beacon beaconchain/main/main.go
+popd
 
 # Create a tmp folder for logs
 t=`date +"%Y%m%d-%H%M%S"`
@@ -95,7 +99,7 @@ log_folder="tmp_log/log-$t"
 mkdir -p $log_folder
 
 echo "launching beacon chain ..."
-./bin/beacon -numShards $SHARDS > $log_folder/beacon.log 2>&1 &
+$ROOT/bin/beacon -numShards $SHARDS > $log_folder/beacon.log 2>&1 &
 sleep 1 #wait or beachchain up
 
 # Start nodes
@@ -103,7 +107,7 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
   IFS=' ' read ip port mode shardID <<< $line
 	#echo $ip $port $mode
   if [ "$mode" != "client" ]; then
-      ./bin/benchmark -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN &
+      $ROOT/bin/benchmark -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN &
       sleep 0.5
   fi
 done < $config
@@ -114,7 +118,7 @@ done < $config
 echo "launching txgen ..."Z
 if [ "$TXGEN" == "true" ]; then
    echo "launching txgen ..."
-   ./bin/txgen -log_folder $log_folder -duration $DURATION
+   $ROOT/bin/txgen -log_folder $log_folder -duration $DURATION
 fi
 
 cleanup
