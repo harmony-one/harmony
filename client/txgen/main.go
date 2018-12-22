@@ -10,8 +10,6 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/client"
-	client_config "github.com/harmony-one/harmony/client/config"
-
 	"github.com/harmony-one/harmony/client/txgen/txgen"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core/types"
@@ -41,7 +39,6 @@ func main() {
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9999", "port of the node.")
 
-	configFile := flag.String("config_file", "local_config.txt", "file containing all ip addresses and config")
 	maxNumTxsPerBatch := flag.Int("max_num_txs_per_batch", 20000, "number of transactions to send per message")
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	duration := flag.Int("duration", 10, "duration of the tx generation in second. If it's negative, the experiment runs forever.")
@@ -50,7 +47,6 @@ func main() {
 
 	bcIP := flag.String("bc", "127.0.0.1", "IP of the identity chain")
 	bcPort := flag.String("bc_port", "8081", "port of the identity chain")
-	peerDiscovery := flag.Bool("peer_discovery", false, "Enable Peer Discovery")
 
 	flag.Parse()
 
@@ -63,26 +59,16 @@ func main() {
 
 	var clientPeer *p2p.Peer
 	var shardIDLeaderMap map[uint32]p2p.Peer
-	var config *client_config.Config
 
-	if *peerDiscovery {
-		candidateNode := newnode.New(*ip, *port)
-		BCPeer := p2p.Peer{IP: *bcIP, Port: *bcPort}
-		candidateNode.ContactBeaconChain(BCPeer)
-		clientPeer = &p2p.Peer{IP: *ip, Port: *port}
-		_, pubKey := utils.GenKey(clientPeer.IP, clientPeer.Port)
-		clientPeer.PubKey = pubKey
+	candidateNode := newnode.New(*ip, *port)
+	BCPeer := p2p.Peer{IP: *bcIP, Port: *bcPort}
+	candidateNode.ContactBeaconChain(BCPeer)
+	clientPeer = &p2p.Peer{IP: *ip, Port: *port}
+	_, pubKey := utils.GenKey(clientPeer.IP, clientPeer.Port)
+	clientPeer.PubKey = pubKey
 
-		shardIDLeaderMap = candidateNode.Leaders
-	} else {
-		// Read the configs
-		config = client_config.NewConfig()
-		config.ReadConfigFile(*configFile)
-		shardIDLeaderMap = config.GetShardIDToLeaderMap()
-		clientPeer = config.GetClientPeer()
-		_, pubKey := utils.GenKey(clientPeer.IP, clientPeer.Port)
-		clientPeer.PubKey = pubKey
-	}
+	shardIDLeaderMap = candidateNode.Leaders
+
 	if clientPeer == nil {
 		panic("Client Peer is nil!")
 	}
@@ -155,15 +141,13 @@ func main() {
 	// Start the client server to listen to leader's message
 	go clientNode.StartServer()
 
-	if *peerDiscovery {
-		for _, leader := range shardIDLeaderMap {
-			log.Debug("Client Join Shard", "leader", leader)
-			go clientNode.JoinShard(leader)
-			// wait for 3 seconds for client to send ping message to leader
-			time.Sleep(3 * time.Second)
-			clientNode.StopPing <- struct{}{}
-			clientNode.State = node.NodeJoinedShard
-		}
+	for _, leader := range shardIDLeaderMap {
+		log.Debug("Client Join Shard", "leader", leader)
+		go clientNode.JoinShard(leader)
+		// wait for 3 seconds for client to send ping message to leader
+		time.Sleep(3 * time.Second)
+		clientNode.StopPing <- struct{}{}
+		clientNode.State = node.NodeJoinedShard
 	}
 
 	// Transaction generation process
