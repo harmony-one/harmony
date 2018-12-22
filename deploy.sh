@@ -30,8 +30,6 @@ function usage {
 USAGE: $ME [OPTIONS] config_file_name
 
    -h             print this help message
-   -p             use peer discovery (default: $PEER)
-   -P             do not use peer discovery
    -d             enable db support (default: $DB)
    -t             toggle txgen (default: $TXGEN)
    -D duration    txgen run duration (default: $DURATION)
@@ -50,7 +48,6 @@ EOU
    exit 0
 }
 
-PEER=-peer_discovery
 DB=
 TXGEN=true
 DURATION=90
@@ -58,11 +55,9 @@ MIN=5
 SHARDS=2
 KILLPORT=9004
 
-while getopts "hpdtD:m:s:k:P" option; do
+while getopts "hdtD:m:s:k:" option; do
    case $option in
       h) usage ;;
-      p) PEER='-peer_discovery' ;;
-      P) PEER= ;;
       d) DB='-db_supported' ;;
       t) TXGEN=$OPTARG ;;
       D) DURATION=$OPTARG ;;
@@ -99,23 +94,17 @@ log_folder="tmp_log/log-$t"
 
 mkdir -p $log_folder
 
-if [ -n "$PEER" ]; then
-   echo "launching beacon chain ..."
-   ./bin/beacon -numShards $SHARDS > $log_folder/beacon.log 2>&1 &
-   sleep 1 #wait or beachchain up
-fi
+echo "launching beacon chain ..."
+./bin/beacon -numShards $SHARDS > $log_folder/beacon.log 2>&1 &
+sleep 1 #wait or beachchain up
 
 # Start nodes
 while IFS='' read -r line || [[ -n "$line" ]]; do
   IFS=' ' read ip port mode shardID <<< $line
 	#echo $ip $port $mode
   if [ "$mode" != "client" ]; then
-    if [ -z "$PEER" ]; then
-      ./bin/benchmark -ip $ip -port $port -config_file $config -log_folder $log_folder $DB -min_peers $MIN &
-    else
-      ./bin/benchmark -ip $ip -port $port -log_folder $log_folder $DB $PEER -min_peers $MIN &
+      ./bin/benchmark -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN &
       sleep 0.5
-    fi
   fi
 done < $config
 
@@ -125,11 +114,7 @@ done < $config
 echo "launching txgen ..."Z
 if [ "$TXGEN" == "true" ]; then
    echo "launching txgen ..."
-   if [ -z "$PEER" ]; then
-      ./bin/txgen -config_file $config -log_folder $log_folder -duration $DURATION
-   else
-      ./bin/txgen -log_folder $log_folder -duration $DURATION $PEER
-   fi
+   ./bin/txgen -log_folder $log_folder -duration $DURATION
 fi
 
 cleanup

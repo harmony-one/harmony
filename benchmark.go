@@ -19,7 +19,6 @@ import (
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/profiler"
-	"github.com/harmony-one/harmony/utils"
 )
 
 var (
@@ -79,7 +78,6 @@ func main() {
 	// TODO: use http://getmyipaddress.org/ or http://www.get-myip.com/ to retrieve my IP address
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9000", "port of the node.")
-	configFile := flag.String("config_file", "config.txt", "file containing all ip addresses")
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	attackedMode := flag.Int("attacked_mode", 0, "0 means not attacked, 1 means attacked, 2 means being open to be selected as attacked")
 	dbSupported := flag.Bool("db_supported", false, "false means not db_supported, true means db_supported")
@@ -91,7 +89,6 @@ func main() {
 	//This IP belongs to jenkins.harmony.one
 	bcIP := flag.String("bc", "127.0.0.1", "IP of the identity chain")
 	bcPort := flag.String("bc_port", "8081", "port of the identity chain")
-	peerDiscovery := flag.Bool("peer_discovery", true, "Enable Peer Discovery")
 
 	//Leader needs to have a minimal number of peers to start consensus
 	minPeers := flag.Int("min_peers", 100, "Minimal number of Peers in shard")
@@ -114,28 +111,14 @@ func main() {
 	var selfPeer p2p.Peer
 	var clientPeer *p2p.Peer
 	//Use Peer Discovery to get shard/leader/peer/...
-	if *peerDiscovery {
-		candidateNode := pkg_newnode.New(*ip, *port)
-		BCPeer := p2p.Peer{IP: *bcIP, Port: *bcPort}
-		candidateNode.ContactBeaconChain(BCPeer)
-		shardID = candidateNode.GetShardID()
-		leader = candidateNode.GetLeader()
-		selfPeer = candidateNode.GetSelfPeer()
-		clientPeer = candidateNode.GetClientPeer()
-		selfPeer.PubKey = candidateNode.PubK
-
-	} else {
-		distributionConfig := utils.NewDistributionConfig()
-		distributionConfig.ReadConfigFile(*configFile)
-		shardID = distributionConfig.GetShardID(*ip, *port)
-		leader = distributionConfig.GetLeader(shardID)
-		selfPeer = distributionConfig.GetSelfPeer(*ip, *port, shardID)
-		_, pubKey := utils.GenKey(*ip, *port)
-		peers = distributionConfig.GetPeers(*ip, *port, shardID)
-		selfPeer.PubKey = pubKey
-		// Create client peer.
-		clientPeer = distributionConfig.GetClientPeer()
-	}
+	candidateNode := pkg_newnode.New(*ip, *port)
+	BCPeer := p2p.Peer{IP: *bcIP, Port: *bcPort}
+	candidateNode.ContactBeaconChain(BCPeer)
+	shardID = candidateNode.GetShardID()
+	leader = candidateNode.GetLeader()
+	selfPeer = candidateNode.GetSelfPeer()
+	clientPeer = candidateNode.GetClientPeer()
+	selfPeer.PubKey = candidateNode.PubK
 
 	// fmt.Println(peers, leader, selfPeer, clientPeer, *logFolder, *minPeers) //TODO: to be replaced by a logger later: ak, rl
 
@@ -202,11 +185,7 @@ func main() {
 			currentNode.WaitForConsensusReady(consensus.ReadySignal)
 		}()
 	} else {
-		if *peerDiscovery {
-			go currentNode.JoinShard(leader)
-		} else {
-			currentNode.State = node.NodeDoingConsensus
-		}
+		go currentNode.JoinShard(leader)
 	}
 
 	go currentNode.SupportSyncing()
