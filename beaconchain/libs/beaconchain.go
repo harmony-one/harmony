@@ -92,7 +92,7 @@ func generateBCKey() kyber.Point {
 //AcceptConnections welcomes new connections
 func (bc *BeaconChain) AcceptConnections(b []byte) {
 	Node := bcconn.DeserializeNodeInfo(b)
-	bc.log.Info("Obtained node information, updating local information")
+	bc.log.Info("New Node Connection", "IP", Node.Self.IP, "Port", Node.Self.Port)
 	bc.NumberOfNodesAdded = bc.NumberOfNodesAdded + 1
 	_, isLeader := utils.AllocateShard(bc.NumberOfNodesAdded, bc.NumberOfShards)
 	if isLeader {
@@ -101,6 +101,7 @@ func (bc *BeaconChain) AcceptConnections(b []byte) {
 	response := bcconn.ResponseRandomNumber{NumberOfShards: bc.NumberOfShards, NumberOfNodesAdded: bc.NumberOfNodesAdded, Leaders: bc.Leaders}
 	msg := bcconn.SerializeRandomInfo(response)
 	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Acknowledge, msg)
+	bc.log.Info("Sent Out Msg", "# Nodes", response.NumberOfNodesAdded)
 	host.SendMessage(bc.host, Node.Self, msgToSend, nil)
 }
 
