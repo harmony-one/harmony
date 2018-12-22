@@ -17,10 +17,9 @@ func TestConstructAnnounceMessage(test *testing.T) {
 	host := p2pimpl.NewHost(leader)
 	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader)
 	consensus.blockHash = [32]byte{}
-	header := consensus.blockHeader
 	msg := consensus.constructAnnounceMessage()
 
-	if len(msg) != 1+1+1+4+32+2+64+len(header) {
+	if len(msg) != 105 {
 		test.Errorf("Annouce message is not constructed in the correct size: %d", len(msg))
 	}
 }
@@ -47,7 +46,7 @@ func TestConstructChallengeMessage(test *testing.T) {
 
 	msg, _, _ := consensus.constructChallengeMessage(consensus_proto.Challenge)
 
-	if len(msg) != 1+1+1+4+32+2+33+33+32+64 {
-		test.Errorf("Annouce message is not constructed in the correct size: %d", len(msg))
+	if len(msg) != 205 {
+		test.Errorf("Challenge message is not constructed in the correct size: %d", len(msg))
 	}
 }
