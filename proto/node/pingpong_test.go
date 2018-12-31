@@ -8,7 +8,7 @@ import (
 	"github.com/dedis/kyber"
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/crypto/pki"
-	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony-public/pkg/p2p"
 	"github.com/harmony-one/harmony/proto"
 )
 

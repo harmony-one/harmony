@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/log"
-	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony-public/pkg/p2p"
 )
 
 // SendMessage is to connect a socket given a port and send the given message.

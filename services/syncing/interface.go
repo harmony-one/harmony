@@ -2,7 +2,7 @@ package syncing
 
 import (
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony-public/pkg/p2p"
 )
 
 // StateSyncInterface is the interface to do state-sync.

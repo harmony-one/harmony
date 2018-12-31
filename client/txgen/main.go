@@ -16,8 +16,8 @@ import (
 	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/newnode"
 	"github.com/harmony-one/harmony/node"
-	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/p2p/p2pimpl"
+	"github.com/harmony-one/harmony-public/pkg/p2p"
+	"github.com/harmony-one/harmony-public/pkg/p2p/p2pimpl"
 	proto_node "github.com/harmony-one/harmony/proto/node"
 	"github.com/harmony-one/harmony/utils"
 )

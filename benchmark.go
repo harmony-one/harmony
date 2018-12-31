@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/harmony-one/harmony/p2p/p2pimpl"
+	"github.com/harmony-one/harmony-public/pkg/p2p/p2pimpl"
 
 	"github.com/harmony-one/harmony/attack"
 	"github.com/harmony-one/harmony/consensus"
@@ -17,7 +17,7 @@ import (
 	"github.com/harmony-one/harmony/log"
 	pkg_newnode "github.com/harmony-one/harmony/newnode"
 	"github.com/harmony-one/harmony/node"
-	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony-public/pkg/p2p"
 	"github.com/harmony-one/harmony/profiler"
 )
 

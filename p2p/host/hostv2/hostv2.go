@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/harmony-one/harmony/log"
-	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony-public/pkg/p2p"
 	libp2p "github.com/libp2p/go-libp2p"
 	libp2phost "github.com/libp2p/go-libp2p-host"
 	net "github.com/libp2p/go-libp2p-net"

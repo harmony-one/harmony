@@ -17,7 +17,7 @@ import (
 	"log"
 
 	"github.com/dedis/kyber"
-	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony-public/pkg/p2p"
 	"github.com/harmony-one/harmony/proto"
 )
 

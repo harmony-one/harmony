@@ -1,7 +1,7 @@
 package host
 
 import (
-	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony-public/pkg/p2p"
 )
 
 // Host is the client + server in p2p network.

@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony-public/pkg/p2p"
 )
 
 // Entry is a single config of a node.

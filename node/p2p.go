@@ -1,8 +1,8 @@
 package node
 
 import (
-	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/p2p/host"
+	"github.com/harmony-one/harmony-public/pkg/p2p"
+	"github.com/harmony-one/harmony-public/pkg/p2p/host"
 )
 
 // SendMessage sends data to ip, port

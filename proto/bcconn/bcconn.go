@@ -5,7 +5,7 @@ import (
 	"encoding/gob"
 
 	"github.com/harmony-one/harmony/log"
-	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony-public/pkg/p2p"
 )
 
 //NodeInfo struct exists to share information on the node

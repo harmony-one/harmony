@@ -9,8 +9,8 @@ import (
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/crypto/pki"
-	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/p2p/p2pimpl"
+	"github.com/harmony-one/harmony-public/pkg/p2p"
+	"github.com/harmony-one/harmony-public/pkg/p2p/p2pimpl"
 	proto_node "github.com/harmony-one/harmony/proto/node"
 	"github.com/harmony-one/harmony/utils"
 )

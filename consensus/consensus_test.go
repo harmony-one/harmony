@@ -3,8 +3,8 @@ package consensus
 import (
 	"testing"
 
-	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/p2p/p2pimpl"
+	"github.com/harmony-one/harmony-public/pkg/p2p"
+	"github.com/harmony-one/harmony-public/pkg/p2p/p2pimpl"
 	"github.com/harmony-one/harmony/utils"
 )
 

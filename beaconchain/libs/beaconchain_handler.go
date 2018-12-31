@@ -1,7 +1,7 @@
 package beaconchain
 
 import (
-	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony-public/pkg/p2p"
 	"github.com/harmony-one/harmony/proto"
 	proto_identity "github.com/harmony-one/harmony/proto/identity"
 )

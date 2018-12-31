@@ -3,8 +3,8 @@ package client
 import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/log"
-	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/p2p/host"
+	"github.com/harmony-one/harmony-public/pkg/p2p"
+	"github.com/harmony-one/harmony-public/pkg/p2p/host"
 )
 
 // Client represents a node (e.g. a wallet) which  sends transactions and receives responses from the harmony network

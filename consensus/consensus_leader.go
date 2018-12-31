@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/p2p/host"
+	"github.com/harmony-one/harmony-public/pkg/p2p/host"
 	"github.com/harmony-one/harmony/services/explorer"
 
 	consensus2 "github.com/harmony-one/harmony/consensus/proto"
@@ -19,7 +19,7 @@ import (
 	"github.com/dedis/kyber/sign/schnorr"
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/log"
-	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony-public/pkg/p2p"
 	proto_consensus "github.com/harmony-one/harmony/proto/consensus"
 )
 

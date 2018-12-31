@@ -1,10 +1,10 @@
 package p2pimpl
 
 import (
-	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/p2p/host"
-	"github.com/harmony-one/harmony/p2p/host/hostv1"
-	"github.com/harmony-one/harmony/p2p/host/hostv2"
+	"github.com/harmony-one/harmony-public/pkg/p2p"
+	"github.com/harmony-one/harmony-public/pkg/p2p/host"
+	"github.com/harmony-one/harmony-public/pkg/p2p/host/hostv1"
+	"github.com/harmony-one/harmony-public/pkg/p2p/host/hostv2"
 )
 
 // Version The version number of p2p library
