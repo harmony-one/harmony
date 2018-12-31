@@ -35,6 +35,8 @@ func printVersion(me string) {
 	os.Exit(0)
 }
 
+// The main entrance for the transaction generator program which simulate transactions and send to the network for
+// processing.
 func main() {
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9999", "port of the node.")
@@ -154,8 +156,6 @@ func main() {
 	time.Sleep(5 * time.Second) // wait for nodes to be ready
 	start := time.Now()
 	totalTime := float64(*duration)
-
-	client.InitLookUpIntPriKeyMap()
 
 	for {
 		t := time.Now()

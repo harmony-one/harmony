@@ -11,19 +11,16 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	libs "github.com/harmony-one/harmony/beaconchain/libs"
 	"github.com/harmony-one/harmony/beaconchain/rpc"
+	"github.com/harmony-one/harmony/client"
 	client2 "github.com/harmony-one/harmony/client/service"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/p2p/p2pimpl"
-	"log"
-	"math/big"
-	"strings"
-
-	"github.com/harmony-one/harmony/client"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/p2p/p2pimpl"
 	proto_node "github.com/harmony-one/harmony/proto/node"
 	"io"
 	"io/ioutil"
+	"math/big"
 	"os"
 	"path"
 	"strconv"
@@ -42,12 +39,14 @@ func printVersion(me string) {
 	os.Exit(0)
 }
 
-// AccountState includes the state of an account
+// AccountState includes the balance and nonce of an account
 type AccountState struct {
 	balance *big.Int
 	nonce   uint64
 }
 
+// The main wallet program entrance. Note the this wallet program is for demo-purpose only. It does not implement
+// the secure storage of keys.
 func main() {
 	// Account subcommands
 	accountImportCommand := flag.NewFlagSet("import", flag.ExitOnError)
@@ -279,28 +278,6 @@ func convertBalanceIntoReadableFormat(balance *big.Int) string {
 		}
 	}
 	return string(bytes)
-}
-func getShardIDToLeaderMap() map[uint32]p2p.Peer {
-	// TODO(ricl): Later use data.harmony.one for API.
-	str, _ := client.DownloadURLAsString("https://s3-us-west-2.amazonaws.com/unique-bucket-bin/leaders.txt")
-	lines := strings.Split(str, "\n")
-	shardIDLeaderMap := map[uint32]p2p.Peer{}
-	log.Print(lines)
-	for _, line := range lines {
-		if line == "" {
-			continue
-		}
-		parts := strings.Split(line, " ")
-
-		shardID := parts[3]
-		id, err := strconv.Atoi(shardID)
-		if err == nil {
-			shardIDLeaderMap[uint32(id)] = p2p.Peer{IP: parts[0], Port: parts[1]}
-		} else {
-			log.Print("[Generator] Error parsing the shard Id ", shardID)
-		}
-	}
-	return shardIDLeaderMap
 }
 
 // CreateWalletNode creates wallet server node.
