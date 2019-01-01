@@ -3,9 +3,10 @@ package beaconchain
 import (
 	"context"
 	"fmt"
-	proto "github.com/harmony-one/harmony/beaconchain/rpc/proto"
 	"log"
 	"time"
+
+	proto "github.com/harmony-one/harmony/api/beaconchain"
 
 	"google.golang.org/grpc"
 )

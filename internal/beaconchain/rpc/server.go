@@ -2,13 +2,14 @@ package beaconchain
 
 import (
 	"context"
-	"github.com/harmony-one/harmony/proto/bcconn"
 	"log"
 	"net"
 
+	"github.com/harmony-one/harmony/proto/bcconn"
+
 	"google.golang.org/grpc"
 
-	proto "github.com/harmony-one/harmony/beaconchain/rpc/proto"
+	proto "github.com/harmony-one/harmony/api/beaconchain"
 )
 
 // Server is the Server struct for beacon chain package.
