@@ -2,12 +2,13 @@ package consensus
 
 import (
 	"bytes"
+
 	"github.com/dedis/kyber/sign/schnorr"
 	"github.com/ethereum/go-ethereum/rlp"
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"
-	"github.com/harmony-one/harmony/attack"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto"
+	"github.com/harmony-one/harmony/internal/attack"
 	"github.com/harmony-one/harmony/log"
 	proto_consensus "github.com/harmony-one/harmony/proto/consensus"
 	"github.com/harmony-one/harmony/utils"
