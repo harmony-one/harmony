@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/harmony-one/harmony/beaconchain/rpc"
-
 	"github.com/dedis/kyber"
+
+	"github.com/harmony-one/harmony/beaconchain/rpc"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/log"
