@@ -1,20 +1,21 @@
 package beaconchain
 
 import (
-	"github.com/harmony-one/harmony/beaconchain/rpc"
 	"math/rand"
 	"strconv"
 	"sync"
 
 	"github.com/dedis/kyber"
+
+	"github.com/harmony-one/harmony/beaconchain/rpc"
 	"github.com/harmony-one/harmony/crypto/pki"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 	"github.com/harmony-one/harmony/proto/bcconn"
 	proto_identity "github.com/harmony-one/harmony/proto/identity"
-	"github.com/harmony-one/harmony/utils"
 )
 
 var mutex sync.Mutex
