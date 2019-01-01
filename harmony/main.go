@@ -3,17 +3,17 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/ethereum/go-ethereum/common"
 	"log"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	"github.com/harmony-one/harmony/db"
+	"github.com/harmony-one/harmony/internal/db"
 	"github.com/harmony-one/harmony/node/worker"
 )
 

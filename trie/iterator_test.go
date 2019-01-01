@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	hdb "github.com/harmony-one/harmony/db"
+	hdb "github.com/harmony-one/harmony/internal/db"
 )
 
 func TestIterator(t *testing.T) {

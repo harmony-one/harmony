@@ -21,7 +21,7 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/db"
+	"github.com/harmony-one/harmony/internal/db"
 	"github.com/harmony-one/harmony/trie"
 	lru "github.com/hashicorp/golang-lru"
 )

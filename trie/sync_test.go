@@ -20,9 +20,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/harmony-one/harmony/db"
-
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/internal/db"
 )
 
 // makeTestTrie create a sample test trie to test node-wise reconstruction.
