@@ -4,12 +4,13 @@ import (
 	"github.com/dedis/kyber"
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/crypto"
-	proto_consensus "github.com/harmony-one/harmony/proto/consensus"
+	"github.com/harmony-one/harmony/proto"
 )
 
 // Construct the commit message to send to leader (assumption the consensus data is already verified)
-func (consensus *Consensus) constructCommitMessage(msgType proto_consensus.MessageType) (secret kyber.Scalar, commitMsg []byte) {
+func (consensus *Consensus) constructCommitMessage(msgType consensus_proto.MessageType) (secret kyber.Scalar, commitMsg []byte) {
 	message := consensus_proto.Message{}
+	message.Type = msgType
 
 	// 4 byte consensus id
 	message.ConsensusId = consensus.consensusID
@@ -41,12 +42,13 @@ func (consensus *Consensus) constructCommitMessage(msgType proto_consensus.Messa
 		consensus.Log.Debug("Failed to marshal Announce message", "error", err)
 	}
 
-	return secret, proto_consensus.ConstructConsensusMessage(msgType, marshaledMessage)
+	return secret, proto.ConstructConsensusMessage(marshaledMessage)
 }
 
 // Construct the response message to send to leader (assumption the consensus data is already verified)
-func (consensus *Consensus) constructResponseMessage(msgType proto_consensus.MessageType, response kyber.Scalar) []byte {
+func (consensus *Consensus) constructResponseMessage(msgType consensus_proto.MessageType, response kyber.Scalar) []byte {
 	message := consensus_proto.Message{}
+	message.Type = msgType
 
 	// 4 byte consensus id
 	message.ConsensusId = consensus.consensusID
@@ -75,5 +77,5 @@ func (consensus *Consensus) constructResponseMessage(msgType proto_consensus.Mes
 	if err != nil {
 		consensus.Log.Debug("Failed to marshal Announce message", "error", err)
 	}
-	return proto_consensus.ConstructConsensusMessage(msgType, marshaledMessage)
+	return proto.ConstructConsensusMessage(marshaledMessage)
 }

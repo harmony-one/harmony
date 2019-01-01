@@ -1,6 +1,7 @@
 package proto
 
 import (
+	"bytes"
 	"errors"
 )
 
@@ -61,4 +62,19 @@ func GetMessagePayload(message []byte) ([]byte, error) {
 		return []byte{}, errors.New("failed to get message payload: no data available")
 	}
 	return message[MessageCategoryBytes+MessageTypeBytes:], nil
+}
+
+// GetConsensusMessagePayload gets the consensus message payload from the p2p message content
+func GetConsensusMessagePayload(message []byte) ([]byte, error) {
+	if len(message) < MessageCategoryBytes {
+		return []byte{}, errors.New("failed to get message payload: no data available")
+	}
+	return message[MessageCategoryBytes:], nil
+}
+
+// ConstructConsensusMessage creates a message with the payload and returns as byte array.
+func ConstructConsensusMessage(payload []byte) []byte {
+	byteBuffer := bytes.NewBuffer([]byte{byte(Consensus)})
+	byteBuffer.Write(payload)
+	return byteBuffer.Bytes()
 }

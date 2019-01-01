@@ -15,7 +15,6 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/proto"
-	"github.com/harmony-one/harmony/proto/consensus"
 	proto_identity "github.com/harmony-one/harmony/proto/identity"
 	proto_node "github.com/harmony-one/harmony/proto/node"
 )
@@ -87,22 +86,15 @@ func (node *Node) StreamHandler(s p2p.Stream) {
 			}
 		}
 	case proto.Consensus:
-		// if !(node.State == NodeDoingConsensus || node.State == NodeLeader || node.State == NodeReadyForConsensus) {
-		// 	node.log.Info("This node with ", "peer", node.SelfPeer, "can not join consensus because they are either not noding consensus or not a leader", nil)
-		// 	break
-		// }
-		actionType := consensus.ConMessageType(msgType)
-		switch actionType {
-		case consensus.Consensus:
-			if consensusObj.IsLeader {
-				node.log.Info("NET: received message: Consensus/Leader")
-				consensusObj.ProcessMessageLeader(msgPayload)
-			} else {
-				node.log.Info("NET: received message: Consensus/Validator")
-				consensusObj.ProcessMessageValidator(msgPayload)
-				// TODO(minhdoan): add logic to check if the current blockchain is not sync with other consensus
-				// we should switch to other state rather than DoingConsensus.
-			}
+		msgPayload, _ := proto.GetConsensusMessagePayload(content)
+		if consensusObj.IsLeader {
+			node.log.Info("NET: received message: Consensus/Leader")
+			consensusObj.ProcessMessageLeader(msgPayload)
+		} else {
+			node.log.Info("NET: received message: Consensus/Validator")
+			consensusObj.ProcessMessageValidator(msgPayload)
+			// TODO(minhdoan): add logic to check if the current blockchain is not sync with other consensus
+			// we should switch to other state rather than DoingConsensus.
 		}
 	case proto.Node:
 		actionType := proto_node.MessageType(msgType)

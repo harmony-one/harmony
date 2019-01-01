@@ -10,42 +10,35 @@ import (
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/internal/attack"
 	"github.com/harmony-one/harmony/log"
-	proto_consensus "github.com/harmony-one/harmony/proto/consensus"
 	"github.com/harmony-one/harmony/utils"
 )
 
 // ProcessMessageValidator dispatches validator's consensus message.
-func (consensus *Consensus) ProcessMessageValidator(message []byte) {
-	msgType, err := proto_consensus.GetConsensusMessageType(message)
+func (consensus *Consensus) ProcessMessageValidator(payload []byte) {
+	message := consensus_proto.Message{}
+	err := message.XXX_Unmarshal(payload)
+
 	if err != nil {
-		consensus.Log.Error("Failed to get consensus message type", "err", err, "consensus", consensus)
+		consensus.Log.Error("Failed to unmarshal message payload.", "err", err, "consensus", consensus)
 	}
 
-	payload, err := proto_consensus.GetConsensusMessagePayload(message)
-	if err != nil {
-		consensus.Log.Error("Failed to get consensus message payload", "err", err, "consensus", consensus)
-	}
-
-	switch msgType {
-	case proto_consensus.Announce:
-		consensus.processAnnounceMessage(payload)
-	case proto_consensus.Challenge:
-		consensus.processChallengeMessage(payload, ResponseDone)
-	case proto_consensus.FinalChallenge:
-		consensus.processChallengeMessage(payload, FinalResponseDone)
-	case proto_consensus.CollectiveSig:
-		consensus.processCollectiveSigMessage(payload)
+	switch message.Type {
+	case consensus_proto.MessageType_ANNOUNCE:
+		consensus.processAnnounceMessage(message)
+	case consensus_proto.MessageType_CHALLENGE:
+		consensus.processChallengeMessage(message, ResponseDone)
+	case consensus_proto.MessageType_FINAL_CHALLENGE:
+		consensus.processChallengeMessage(message, FinalResponseDone)
+	case consensus_proto.MessageType_COLLECTIVE_SIG:
+		consensus.processCollectiveSigMessage(message)
 	default:
-		consensus.Log.Error("Unexpected message type", "msgType", msgType, "consensus", consensus)
+		consensus.Log.Error("Unexpected message type", "msgType", message.Type, "consensus", consensus)
 	}
 }
 
 // Processes the announce message sent from the leader
-func (consensus *Consensus) processAnnounceMessage(payload []byte) {
-	consensus.Log.Info("Received Announce Message", "Size", len(payload), "nodeID", consensus.nodeID)
-
-	message := consensus_proto.Message{}
-	message.XXX_Unmarshal(payload)
+func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Message) {
+	consensus.Log.Info("Received Announce Message", "nodeID", consensus.nodeID)
 
 	consensusID := message.ConsensusId
 	blockHash := message.BlockHash
@@ -105,7 +98,7 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 		return
 	}
 
-	secret, msgToSend := consensus.constructCommitMessage(proto_consensus.Commit)
+	secret, msgToSend := consensus.constructCommitMessage(consensus_proto.MessageType_COMMIT)
 	// Store the commitment secret
 	consensus.secret[consensusID] = secret
 
@@ -117,10 +110,8 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 }
 
 // Processes the challenge message sent from the leader
-func (consensus *Consensus) processChallengeMessage(payload []byte, targetState State) {
-	consensus.Log.Info("Received Challenge Message", "Size", len(payload), "nodeID", consensus.nodeID)
-	message := consensus_proto.Message{}
-	message.XXX_Unmarshal(payload)
+func (consensus *Consensus) processChallengeMessage(message consensus_proto.Message, targetState State) {
+	consensus.Log.Info("Received Challenge Message", "nodeID", consensus.nodeID)
 
 	consensusID := message.ConsensusId
 	blockHash := message.BlockHash
@@ -210,9 +201,9 @@ func (consensus *Consensus) processChallengeMessage(payload []byte, targetState 
 		return
 	}
 
-	msgTypeToSend := proto_consensus.Response
+	msgTypeToSend := consensus_proto.MessageType_RESPONSE
 	if targetState == FinalResponseDone {
-		msgTypeToSend = proto_consensus.FinalResponse
+		msgTypeToSend = consensus_proto.MessageType_FINAL_RESPONSE
 	}
 	msgToSend := consensus.constructResponseMessage(msgTypeToSend, response)
 
@@ -263,10 +254,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte, targetState 
 }
 
 // Processes the collective signature message sent from the leader
-func (consensus *Consensus) processCollectiveSigMessage(payload []byte) {
-	message := consensus_proto.Message{}
-	message.XXX_Unmarshal(payload)
-
+func (consensus *Consensus) processCollectiveSigMessage(message consensus_proto.Message) {
 	consensusID := message.ConsensusId
 	blockHash := message.BlockHash
 	leaderID := message.SenderId
@@ -322,7 +310,7 @@ func (consensus *Consensus) processCollectiveSigMessage(payload []byte) {
 		return
 	}
 
-	secret, msgToSend := consensus.constructCommitMessage(proto_consensus.FinalCommit)
+	secret, msgToSend := consensus.constructCommitMessage(consensus_proto.MessageType_FINAL_COMMIT)
 	// Store the commitment secret
 	consensus.secret[consensusID] = secret
 
