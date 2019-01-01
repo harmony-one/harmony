@@ -5,9 +5,9 @@ import (
 
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 
+	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/p2p"
-	consensus_proto "github.com/harmony-one/harmony/proto/consensus"
 )
 
 func TestConstructCommitMessage(test *testing.T) {
@@ -16,7 +16,7 @@ func TestConstructCommitMessage(test *testing.T) {
 	host := p2pimpl.NewHost(leader)
 	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader)
 	consensus.blockHash = [32]byte{}
-	_, msg := consensus.constructCommitMessage(consensus_proto.Commit)
+	_, msg := consensus.constructCommitMessage(consensus_proto.MessageType_COMMIT)
 
 	if len(msg) != 139 {
 		test.Errorf("Commit message is not constructed in the correct size: %d", len(msg))
@@ -29,7 +29,7 @@ func TestConstructResponseMessage(test *testing.T) {
 	host := p2pimpl.NewHost(leader)
 	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader)
 	consensus.blockHash = [32]byte{}
-	msg := consensus.constructResponseMessage(consensus_proto.Response, crypto.Ed25519Curve.Scalar())
+	msg := consensus.constructResponseMessage(consensus_proto.MessageType_RESPONSE, crypto.Ed25519Curve.Scalar())
 
 	if len(msg) != 139 {
 		test.Errorf("Response message is not constructed in the correct size: %d", len(msg))

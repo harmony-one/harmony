@@ -6,12 +6,13 @@ import (
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/log"
-	proto_consensus "github.com/harmony-one/harmony/proto/consensus"
+	"github.com/harmony-one/harmony/proto"
 )
 
 // Constructs the announce message
 func (consensus *Consensus) constructAnnounceMessage() []byte {
 	message := consensus_proto.Message{}
+	message.Type = consensus_proto.MessageType_ANNOUNCE
 
 	// 4 byte consensus id
 	message.ConsensusId = consensus.consensusID
@@ -38,12 +39,13 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 		consensus.Log.Debug("Failed to marshal Announce message", "error", err)
 	}
 	consensus.Log.Info("New Announce", "NodeID", consensus.nodeID, "bitmap", consensus.bitmap)
-	return proto_consensus.ConstructConsensusMessage(proto_consensus.Announce, marshaledMessage)
+	return proto.ConstructConsensusMessage(marshaledMessage)
 }
 
 // Construct the challenge message, returning challenge message in bytes, challenge scalar and aggregated commmitment point.
-func (consensus *Consensus) constructChallengeMessage(msgTypeToSend proto_consensus.MessageType) ([]byte, kyber.Scalar, kyber.Point) {
+func (consensus *Consensus) constructChallengeMessage(msgType consensus_proto.MessageType) ([]byte, kyber.Scalar, kyber.Point) {
 	message := consensus_proto.Message{}
+	message.Type = msgType
 
 	// 4 byte consensus id
 	message.ConsensusId = consensus.consensusID
@@ -59,7 +61,7 @@ func (consensus *Consensus) constructChallengeMessage(msgTypeToSend proto_consen
 
 	commitmentsMap := consensus.commitments // msgType == Challenge
 	bitmap := consensus.bitmap
-	if msgTypeToSend == proto_consensus.FinalChallenge {
+	if msgType == consensus_proto.MessageType_FINAL_CHALLENGE {
 		commitmentsMap = consensus.finalCommitments
 		bitmap = consensus.finalBitmap
 	}
@@ -99,12 +101,13 @@ func (consensus *Consensus) constructChallengeMessage(msgTypeToSend proto_consen
 		consensus.Log.Debug("Failed to marshal Challenge message", "error", err)
 	}
 	consensus.Log.Info("New Challenge", "NodeID", consensus.nodeID, "bitmap", consensus.bitmap)
-	return proto_consensus.ConstructConsensusMessage(msgTypeToSend, marshaledMessage), challengeScalar, aggCommitment
+	return proto.ConstructConsensusMessage(marshaledMessage), challengeScalar, aggCommitment
 }
 
 // Construct the collective signature message
 func (consensus *Consensus) constructCollectiveSigMessage(collectiveSig [64]byte, bitmap []byte) []byte {
 	message := consensus_proto.Message{}
+	message.Type = consensus_proto.MessageType_COLLECTIVE_SIG
 
 	// 4 byte consensus id
 	message.ConsensusId = consensus.consensusID
@@ -140,7 +143,7 @@ func (consensus *Consensus) constructCollectiveSigMessage(collectiveSig [64]byte
 		consensus.Log.Debug("Failed to marshal Challenge message", "error", err)
 	}
 	consensus.Log.Info("New CollectiveSig", "NodeID", consensus.nodeID, "bitmap", consensus.bitmap)
-	return proto_consensus.ConstructConsensusMessage(proto_consensus.CollectiveSig, marshaledMessage)
+	return proto.ConstructConsensusMessage(marshaledMessage)
 }
 
 func getAggregatedCommit(commitments []kyber.Point) (commitment kyber.Point, bytes []byte) {
