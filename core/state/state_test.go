@@ -21,10 +21,9 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/harmony-one/harmony/internal/db"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/harmony-one/harmony/internal/db"
 	checker "gopkg.in/check.v1"
 )
 

@@ -14,16 +14,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ethereum/go-ethereum/rlp"
-
-	"github.com/harmony-one/harmony/services/explorer"
-
-	"github.com/harmony-one/harmony/client"
-	clientService "github.com/harmony-one/harmony/client/service"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/client"
+	clientService "github.com/harmony-one/harmony/client/service"
 	bft "github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -35,6 +31,7 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 	proto_node "github.com/harmony-one/harmony/proto/node"
+	"github.com/harmony-one/harmony/services/explorer"
 	"github.com/harmony-one/harmony/services/syncing"
 	"github.com/harmony-one/harmony/services/syncing/downloader"
 	downloader_pb "github.com/harmony-one/harmony/services/syncing/downloader/proto"
