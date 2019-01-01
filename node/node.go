@@ -91,22 +91,23 @@ type NetworkNode struct {
 	IDCPeer  p2p.Peer
 }
 
-// Node represents a program (machine) participating in the network
-// TODO(minhdoan, rj): consider using BlockChannel *chan blockchain.Block for efficiency.
+// Node represents a protocol-participating node in the network
 type Node struct {
 	Consensus              *bft.Consensus       // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
 	BlockChannel           chan *types.Block    // The channel to receive new blocks from Node
 	pendingTransactions    types.Transactions   // All the transactions received but not yet processed for Consensus
 	transactionInConsensus []*types.Transaction // The transactions selected into the new block and under Consensus process
-	blockchain             *core.BlockChain     // The blockchain for the shard where this node belongs
-	db                     *hdb.LDBDatabase     // LevelDB to store blockchain.
-	log                    log.Logger           // Log utility
 	pendingTxMutex         sync.Mutex
-	crossTxToReturnMutex   sync.Mutex
-	ClientPeer             *p2p.Peer      // The peer for the benchmark tx generator client, used for leaders to return proof-of-accept
-	Client                 *client.Client // The presence of a client object means this node will also act as a client
-	SelfPeer               p2p.Peer       // TODO(minhdoan): it could be duplicated with Self below whose is Alok work.
-	IDCPeer                p2p.Peer
+
+	blockchain *core.BlockChain // The blockchain for the shard where this node belongs
+	db         *hdb.LDBDatabase // LevelDB to store blockchain.
+
+	log log.Logger // Log utility
+
+	ClientPeer *p2p.Peer      // The peer for the benchmark tx generator client, used for leaders to return proof-of-accept
+	Client     *client.Client // The presence of a client object means this node will also act as a client
+	SelfPeer   p2p.Peer       // TODO(minhdoan): it could be duplicated with Self below whose is Alok work.
+	IDCPeer    p2p.Peer
 
 	Neighbors sync.Map // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
 	State     State    // State of the Node
@@ -122,10 +123,6 @@ type Node struct {
 	stateSync        *syncing.StateSync
 	syncingState     uint32
 
-	// Test only
-	TestBankKeys      []*ecdsa.PrivateKey
-	ContractKeys      []*ecdsa.PrivateKey
-	ContractAddresses []common.Address
 	// The p2p host used to send/receive p2p messages
 	host host.Host
 
@@ -134,6 +131,11 @@ type Node struct {
 
 	// Signal channel for lost validators
 	OfflinePeers chan p2p.Peer
+
+	// For test only
+	TestBankKeys      []*ecdsa.PrivateKey
+	ContractKeys      []*ecdsa.PrivateKey
+	ContractAddresses []common.Address
 }
 
 // Blockchain returns the blockchain from node
@@ -163,19 +165,9 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int) types.Transactions {
 	return selected
 }
 
-// StartServer starts a server and process the request by a handler.
+// StartServer starts a server and process the requests by a handler.
 func (node *Node) StartServer() {
 	node.host.BindHandlerAndServe(node.StreamHandler)
-}
-
-// SetLog sets log for Node.
-func (node *Node) SetLog() *Node {
-	node.log = log.New()
-	return node
-}
-
-func (node *Node) String() string {
-	return node.Consensus.String()
 }
 
 // Count the total number of transactions in the blockchain
@@ -237,7 +229,7 @@ func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 
 		// Initialize genesis block and blockchain
 		genesisAlloc := node.CreateGenesisAllocWithTestingAddresses(100)
-		contractKey, _ := ecdsa.GenerateKey(crypto.S256(), strings.NewReader("Test contract key string blablablablablablablablablablablablablablablablabl"))
+		contractKey, _ := ecdsa.GenerateKey(crypto.S256(), strings.NewReader("Test contract key string stream that is fixed so that generated test key are deterministic every time"))
 		contractAddress := crypto.PubkeyToAddress(contractKey.PublicKey)
 		contractFunds := big.NewInt(9000000)
 		contractFunds = contractFunds.Mul(contractFunds, big.NewInt(params.Ether))
@@ -332,7 +324,6 @@ func GetSyncingPort(nodePort string) string {
 
 // GetSyncingPeers returns list of peers.
 // Right now, the list length is only 1 for testing.
-// TODO(mihdoan): fix it later.
 func (node *Node) GetSyncingPeers() []p2p.Peer {
 	res := []p2p.Peer{}
 	node.Neighbors.Range(func(k, v interface{}) bool {
