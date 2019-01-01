@@ -27,8 +27,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	hdb "github.com/harmony-one/harmony/internal/db"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/common/prque"
@@ -43,6 +41,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	hdb "github.com/harmony-one/harmony/internal/db"
 	"github.com/harmony-one/harmony/trie"
 	"github.com/hashicorp/golang-lru"
 )
