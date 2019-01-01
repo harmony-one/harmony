@@ -26,7 +26,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/rlp"
-	hdb "github.com/harmony-one/harmony/db"
+	hdb "github.com/harmony-one/harmony/internal/db"
 )
 
 var (

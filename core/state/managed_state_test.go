@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/db"
+	"github.com/harmony-one/harmony/internal/db"
 )
 
 var addr = common.BytesToAddress([]byte("test"))

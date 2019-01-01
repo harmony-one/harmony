@@ -5,10 +5,10 @@ import (
 
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 
+	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/p2p"
-	consensus_proto "github.com/harmony-one/harmony/proto/consensus"
 )
 
 func TestConstructAnnounceMessage(test *testing.T) {
@@ -44,7 +44,7 @@ func TestConstructChallengeMessage(test *testing.T) {
 	consensus.bitmap.SetKey(leaderPubKey, true)
 	consensus.bitmap.SetKey(validatorPubKey, true)
 
-	msg, _, _ := consensus.constructChallengeMessage(consensus_proto.Challenge)
+	msg, _, _ := consensus.constructChallengeMessage(consensus_proto.MessageType_CHALLENGE)
 
 	if len(msg) != 205 {
 		test.Errorf("Challenge message is not constructed in the correct size: %d", len(msg))

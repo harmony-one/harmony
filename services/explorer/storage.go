@@ -8,7 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/db"
+	"github.com/harmony-one/harmony/internal/db"
 	"github.com/harmony-one/harmony/log"
 )
 
