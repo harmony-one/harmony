@@ -208,14 +208,13 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
 		}
 
 		for {
-			node.log.Debug("Start creating new block")
 			// threshold and firstTime are for the test-only built-in smart contract tx. TODO: remove in production
 			threshold := 1
 			if firstTime {
 				threshold = 2
 				firstTime = false
 			}
-
+			node.log.Debug("STARTING BLOCK", "threshold", threshold, "pendingTransactions", len(node.pendingTransactions))
 			if len(node.pendingTransactions) >= threshold {
 				// Normal tx block consensus
 				selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
