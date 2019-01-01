@@ -3,9 +3,9 @@ package consensus
 import (
 	"testing"
 
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
-	"github.com/harmony-one/harmony/utils"
 )
 
 func TestNew(test *testing.T) {
