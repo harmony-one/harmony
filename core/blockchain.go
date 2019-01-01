@@ -27,7 +27,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	hdb "github.com/harmony-one/harmony/db"
+	hdb "github.com/harmony-one/harmony/internal/db"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/mclock"

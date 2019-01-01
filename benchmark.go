@@ -12,8 +12,8 @@ import (
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 
 	"github.com/harmony-one/harmony/consensus"
-	"github.com/harmony-one/harmony/db"
 	"github.com/harmony-one/harmony/internal/attack"
+	"github.com/harmony-one/harmony/internal/db"
 	"github.com/harmony-one/harmony/log"
 	pkg_newnode "github.com/harmony-one/harmony/newnode"
 	"github.com/harmony-one/harmony/node"
