@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/utils"
 )
 
 func TestSerializeDeserializeNodeInfo(t *testing.T) {

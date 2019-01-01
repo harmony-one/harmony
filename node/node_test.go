@@ -9,10 +9,10 @@ import (
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/crypto/pki"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 	proto_node "github.com/harmony-one/harmony/proto/node"
-	"github.com/harmony-one/harmony/utils"
 )
 
 func TestNewNewNode(t *testing.T) {

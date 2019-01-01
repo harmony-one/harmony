@@ -22,7 +22,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/internal/db"
-	"github.com/harmony-one/harmony/trie"
+	"github.com/harmony-one/harmony/internal/trie"
 	lru "github.com/hashicorp/golang-lru"
 )
 

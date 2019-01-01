@@ -13,13 +13,13 @@ import (
 	"github.com/harmony-one/harmony/client/txgen/txgen"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/newnode"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 	proto_node "github.com/harmony-one/harmony/proto/node"
-	"github.com/harmony-one/harmony/utils"
 )
 
 var (
