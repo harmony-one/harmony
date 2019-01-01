@@ -1,10 +1,6 @@
 package consensus
 
 // State is the consensus state enum for both leader and validator
-// States for leader:
-//     Finished, AnnounceDone, ChallengeDone
-// States for validator:
-//     Finished, CommitDone, ResponseDone
 type State int
 
 // Followings are the set of states of validators or leaders during consensus.
