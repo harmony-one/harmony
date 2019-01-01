@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"github.com/dedis/kyber/sign/schnorr"
 	"github.com/ethereum/go-ethereum/rlp"
+	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/attack"
-	consensus2 "github.com/harmony-one/harmony/consensus/proto"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/log"
@@ -43,7 +43,7 @@ func (consensus *Consensus) ProcessMessageValidator(message []byte) {
 func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 	consensus.Log.Info("Received Announce Message", "Size", len(payload), "nodeID", consensus.nodeID)
 
-	message := consensus2.Message{}
+	message := consensus_proto.Message{}
 	message.XXX_Unmarshal(payload)
 
 	consensusID := message.ConsensusId
@@ -118,7 +118,7 @@ func (consensus *Consensus) processAnnounceMessage(payload []byte) {
 // Processes the challenge message sent from the leader
 func (consensus *Consensus) processChallengeMessage(payload []byte, targetState State) {
 	consensus.Log.Info("Received Challenge Message", "Size", len(payload), "nodeID", consensus.nodeID)
-	message := consensus2.Message{}
+	message := consensus_proto.Message{}
 	message.XXX_Unmarshal(payload)
 
 	consensusID := message.ConsensusId
@@ -263,7 +263,7 @@ func (consensus *Consensus) processChallengeMessage(payload []byte, targetState 
 
 // Processes the collective signature message sent from the leader
 func (consensus *Consensus) processCollectiveSigMessage(payload []byte) {
-	message := consensus2.Message{}
+	message := consensus_proto.Message{}
 	message.XXX_Unmarshal(payload)
 
 	consensusID := message.ConsensusId

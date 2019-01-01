@@ -12,7 +12,7 @@ import (
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/services/explorer"
 
-	consensus2 "github.com/harmony-one/harmony/consensus/proto"
+	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/profiler"
 
 	"github.com/dedis/kyber"
@@ -126,7 +126,7 @@ func (consensus *Consensus) commitByLeader(firstRound bool) {
 
 // processCommitMessage processes the commit message sent from validators
 func (consensus *Consensus) processCommitMessage(payload []byte, targetState State) {
-	message := consensus2.Message{}
+	message := consensus_proto.Message{}
 	message.XXX_Unmarshal(payload)
 
 	consensusID := message.ConsensusId
@@ -250,7 +250,7 @@ func (consensus *Consensus) responseByLeader(challenge kyber.Scalar, firstRound 
 
 // Processes the response message sent from validators
 func (consensus *Consensus) processResponseMessage(payload []byte, targetState State) {
-	message := consensus2.Message{}
+	message := consensus_proto.Message{}
 	message.XXX_Unmarshal(payload)
 
 	consensusID := message.ConsensusId

@@ -3,7 +3,7 @@ package consensus
 import (
 	"bytes"
 	"github.com/dedis/kyber"
-	consensus2 "github.com/harmony-one/harmony/consensus/proto"
+	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/log"
 	proto_consensus "github.com/harmony-one/harmony/proto/consensus"
@@ -11,7 +11,7 @@ import (
 
 // Constructs the announce message
 func (consensus *Consensus) constructAnnounceMessage() []byte {
-	message := consensus2.Message{}
+	message := consensus_proto.Message{}
 
 	// 4 byte consensus id
 	message.ConsensusId = consensus.consensusID
@@ -43,7 +43,7 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 
 // Construct the challenge message, returning challenge message in bytes, challenge scalar and aggregated commmitment point.
 func (consensus *Consensus) constructChallengeMessage(msgTypeToSend proto_consensus.MessageType) ([]byte, kyber.Scalar, kyber.Point) {
-	message := consensus2.Message{}
+	message := consensus_proto.Message{}
 
 	// 4 byte consensus id
 	message.ConsensusId = consensus.consensusID
@@ -104,7 +104,7 @@ func (consensus *Consensus) constructChallengeMessage(msgTypeToSend proto_consen
 
 // Construct the collective signature message
 func (consensus *Consensus) constructCollectiveSigMessage(collectiveSig [64]byte, bitmap []byte) []byte {
-	message := consensus2.Message{}
+	message := consensus_proto.Message{}
 
 	// 4 byte consensus id
 	message.ConsensusId = consensus.consensusID
