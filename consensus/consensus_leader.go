@@ -94,7 +94,7 @@ func (consensus *Consensus) startConsensus(newBlock *types.Block) {
 		consensus.Log.Debug("Failed encoding block")
 		return
 	}
-	consensus.blockHeader = encodedBlock
+	consensus.block = encodedBlock
 
 	consensus.Log.Debug("Stop encoding block")
 	msgToSend := consensus.constructAnnounceMessage()
@@ -370,27 +370,29 @@ func (consensus *Consensus) processResponseMessage(message consensus_proto.Messa
 			} else {
 				// TODO: reconstruct the whole block from header and transactions
 				// For now, we used the stored whole block already stored in consensus.blockHeader
-				var blockHeaderObj types.Block
-				err = rlp.DecodeBytes(consensus.blockHeader, &blockHeaderObj)
+				var blockObj types.Block
+				err = rlp.DecodeBytes(consensus.block, &blockObj)
 				if err != nil {
 					consensus.Log.Debug("failed to construct the new block after consensus")
 				}
 
 				// Sign the block
-				copy(blockHeaderObj.Header().Signature[:], collectiveSig[:])
-				copy(blockHeaderObj.Header().Bitmap[:], bitmap)
-				consensus.OnConsensusDone(&blockHeaderObj)
+				copy(blockObj.Header().Signature[:], collectiveSig[:])
+				copy(blockObj.Header().Bitmap[:], bitmap)
+				consensus.OnConsensusDone(&blockObj)
 
-				consensus.reportMetrics(blockHeaderObj)
+				consensus.reportMetrics(blockObj)
+
 				// Dump new block into level db.
-				explorer.GetStorageInstance(consensus.leader.IP, consensus.leader.Port, true).Dump(&blockHeaderObj, consensus.consensusID)
-				// Claim new consensus reached.
-				consensus.Log.Debug("Consensus reached with signatures.", "numOfSignatures", len(*responses))
+				explorer.GetStorageInstance(consensus.leader.IP, consensus.leader.Port, true).Dump(&blockObj, consensus.consensusID)
+
 				// Reset state to Finished, and clear other data.
 				consensus.ResetState()
 				consensus.consensusID++
-				consensus.Log.Debug("HOORAY!!! CONSENSUS REACHED!!!", "consensusID", consensus.consensusID)
 
+				consensus.Log.Debug("HOORAY!!! CONSENSUS REACHED!!!", "consensusID", consensus.consensusID, "numOfSignatures", len(*responses))
+
+				// TODO: remove this temporary delay
 				time.Sleep(500 * time.Millisecond)
 				// Send signal to Node so the new block can be added and new round of consensus can be triggered
 				consensus.ReadySignal <- struct{}{}

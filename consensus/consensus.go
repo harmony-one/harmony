@@ -65,14 +65,14 @@ type Consensus struct {
 
 	// Whether I am leader. False means I am validator
 	IsLeader bool
-	// Leader or validator Id - 2 byte
+	// Leader or validator Id - 4 byte
 	nodeID uint32
 	// Consensus Id (View Id) - 4 byte
 	consensusID uint32
 	// Blockhash - 32 byte
 	blockHash [32]byte
-	// BlockHeader to run consensus on
-	blockHeader []byte
+	// Block to run consensus on
+	block []byte
 	// Array of block hashes.
 	blockHashes [][32]byte
 	// Shard Id which this node belongs to
@@ -257,7 +257,7 @@ func (consensus *Consensus) String() string {
 		duty, consensus.priKey.String(), consensus.ShardID, consensus.nodeID, consensus.state)
 }
 
-// AddPeers will add new peers into the validator map of the consensus
+// AddPeers adds new peers into the validator map of the consensus
 // and add the public keys
 func (consensus *Consensus) AddPeers(peers []*p2p.Peer) int {
 	count := 0

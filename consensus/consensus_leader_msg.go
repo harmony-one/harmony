@@ -24,7 +24,7 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 	message.SenderId = uint32(consensus.nodeID)
 
 	// n byte of block header
-	message.Payload = consensus.blockHeader
+	message.Payload = consensus.block
 
 	marshaledMessage, err := message.XXX_Marshal([]byte{}, true)
 	if err != nil {
