@@ -9,8 +9,8 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/internal/attack"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/log"
-	"github.com/harmony-one/harmony/utils"
 )
 
 // ProcessMessageValidator dispatches validator's consensus message.
