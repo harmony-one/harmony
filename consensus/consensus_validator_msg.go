@@ -21,7 +21,7 @@ func (consensus *Consensus) constructCommitMessage(msgType consensus_proto.Messa
 	// 4 byte sender id
 	message.SenderId = uint32(consensus.nodeID)
 
-	// 32 byte of commit (TODO: figure out why it's different than Zilliqa's ECPoint which takes 33 bytes: https://crypto.stackexchange.com/questions/51703/how-to-convert-from-curve25519-33-byte-to-32-byte-representation)
+	// 32 byte of commit
 	secret, commitment := crypto.Commit(crypto.Ed25519Curve)
 	bytes, err := commitment.MarshalBinary()
 	if err != nil {

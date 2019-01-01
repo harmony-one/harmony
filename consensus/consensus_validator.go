@@ -43,7 +43,7 @@ func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Messa
 	consensusID := message.ConsensusId
 	blockHash := message.BlockHash
 	leaderID := message.SenderId
-	blockHeader := message.Payload
+	block := message.Payload
 	signature := message.Signature
 
 	copy(consensus.blockHash[:], blockHash[:])
@@ -68,15 +68,17 @@ func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Messa
 	}
 
 	// check block header is valid
-	var blockObj types.Block // TODO: separate header from block. Right now, this blockHeader data is actually the whole block
-	err = rlp.DecodeBytes(blockHeader, &blockObj)
+	var blockObj types.Block
+	err = rlp.DecodeBytes(block, &blockObj)
 	if err != nil {
 		consensus.Log.Warn("Unparseable block header data", "error", err)
 		return
 	}
-	consensus.block = blockHeader // TODO: think about remove this field and use blocksReceived instead
+	consensus.block = block
+
+	// Add block to received block cache
 	consensus.mutex.Lock()
-	consensus.blocksReceived[consensusID] = &BlockConsensusStatus{blockHeader, consensus.state}
+	consensus.blocksReceived[consensusID] = &BlockConsensusStatus{block, consensus.state}
 	consensus.mutex.Unlock()
 
 	// Add attack model of IncorrectResponse.
@@ -98,8 +100,8 @@ func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Messa
 		return
 	}
 
+	// Commit and store the commit
 	secret, msgToSend := consensus.constructCommitMessage(consensus_proto.MessageType_COMMIT)
-	// Store the commitment secret
 	consensus.secret[consensusID] = secret
 
 	consensus.SendMessage(consensus.leader, msgToSend)
@@ -120,6 +122,7 @@ func (consensus *Consensus) processChallengeMessage(message consensus_proto.Mess
 	signature := message.Signature
 
 	//#### Read payload data
+	// TODO: use BLS-based multi-sig
 	offset := 0
 	// 33 byte of aggregated commit
 	aggreCommit := messagePayload[offset : offset+33]
@@ -171,7 +174,7 @@ func (consensus *Consensus) processChallengeMessage(message consensus_proto.Mess
 	}
 
 	aggCommitment := crypto.Ed25519Curve.Point()
-	aggCommitment.UnmarshalBinary(aggreCommit[:32]) // TODO: figure out whether it's 33 bytes or 32 bytes
+	aggCommitment.UnmarshalBinary(aggreCommit[:32])
 	aggKey := crypto.Ed25519Curve.Point()
 	aggKey.UnmarshalBinary(aggreKey[:32])
 
@@ -224,11 +227,8 @@ func (consensus *Consensus) processChallengeMessage(message consensus_proto.Mess
 				delete(consensus.secret, consensusID)
 				consensus.consensusID = consensusID + 1 // roll up one by one, until the next block is not received yet.
 
-				// TODO: think about when validators know about the consensus is reached.
-				// For now, the blockchain is updated right here.
-
 				var blockObj types.Block
-				err := rlp.DecodeBytes(val.blockHeader, &blockObj)
+				err := rlp.DecodeBytes(val.block, &blockObj)
 				if err != nil {
 					consensus.Log.Warn("Unparseable block header data", "error", err)
 					return

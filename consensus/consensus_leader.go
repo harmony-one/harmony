@@ -97,13 +97,14 @@ func (consensus *Consensus) startConsensus(newBlock *types.Block) {
 
 	consensus.Log.Debug("Stop encoding block")
 	msgToSend := consensus.constructAnnounceMessage()
+
 	// Set state to AnnounceDone
 	consensus.state = AnnounceDone
 	consensus.commitByLeader(true)
 	host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
 }
 
-// commitByLeader commits to the message itself before receiving others commits
+// commitByLeader commits to the message by leader himself before receiving others commits
 func (consensus *Consensus) commitByLeader(firstRound bool) {
 	// Generate leader's own commitment
 	secret, commitment := crypto.Commit(crypto.Ed25519Curve)
@@ -180,7 +181,7 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 		point.UnmarshalBinary(commitment)
 		(*commitments)[validatorID] = point
 		consensus.Log.Debug("Received new commit message", "num", len(*commitments), "validatorID", validatorID, "PublicKeys", len(consensus.PublicKeys))
-		// Set the bitmap indicate this validate signed. TODO: figure out how to resolve the inconsistency of validators from commit and response messages
+		// Set the bitmap indicate this validate signed.
 		bitmap.SetKey(value.PubKey, true)
 	}
 
@@ -312,7 +313,7 @@ func (consensus *Consensus) processResponseMessage(message consensus_proto.Messa
 		} else {
 			(*responses)[validatorID] = responseScalar
 			consensus.Log.Debug("Received new response message", "num", len(*responses), "validatorID", strconv.Itoa(int(validatorID)))
-			// Set the bitmap indicate this validate signed. TODO: figure out how to resolve the inconsistency of validators from commit and response messages
+			// Set the bitmap indicate this validate signed.
 			bitmap.SetKey(value.PubKey, true)
 		}
 	}
@@ -367,8 +368,6 @@ func (consensus *Consensus) processResponseMessage(message consensus_proto.Messa
 				host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
 				consensus.commitByLeader(false)
 			} else {
-				// TODO: reconstruct the whole block from header and transactions
-				// For now, we used the stored whole block already stored in consensus.blockHeader
 				var blockObj types.Block
 				err = rlp.DecodeBytes(consensus.block, &blockObj)
 				if err != nil {
@@ -408,18 +407,6 @@ func (consensus *Consensus) verifyResponse(commitments *map[uint32]kyber.Point, 
 	if !ok {
 		return errors.New("no commit is received for the validator")
 	}
-	// TODO(RJ): enable the actual check
-	//challenge := crypto.Ed25519Curve.Scalar()
-	//challenge.UnmarshalBinary(consensus.challenge[:])
-	//
-	//// compute Q = sG + r*pubKey
-	//sG := crypto.Ed25519Curve.Point().Mul(response, nil)
-	//r_pubKey := crypto.Ed25519Curve.Point().Mul(challenge, consensus.validators[validatorID].PubKey)
-	//Q := crypto.Ed25519Curve.Point().Add(sG, r_pubKey)
-	//
-	//if !Q.Equal(commit) {
-	//	return errors.New("recreated commit doesn't match the received one")
-	//}
 	return nil
 }
 

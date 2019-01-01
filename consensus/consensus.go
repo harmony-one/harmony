@@ -25,10 +25,12 @@ import (
 	proto_node "github.com/harmony-one/harmony/proto/node"
 )
 
-// Consensus data containing all info related to one round of consensus process
+// Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
+	// The current state of the consensus
 	state State
-	// Commits collected from validators. A map from node Id to its commitment
+
+	// Commits collected from validators.
 	commitments               *map[uint32]kyber.Point
 	finalCommitments          *map[uint32]kyber.Point
 	aggregatedCommitment      kyber.Point
@@ -36,25 +38,25 @@ type Consensus struct {
 	bitmap                    *crypto.Mask
 	finalBitmap               *crypto.Mask
 
-	// Challenges
+	// Challenges for the validators
 	challenge      [32]byte
 	finalChallenge [32]byte
 
 	// Responses collected from validators
 	responses      *map[uint32]kyber.Scalar
 	finalResponses *map[uint32]kyber.Scalar
+
 	// map of nodeID to validator Peer object
 	// FIXME: should use PubKey of p2p.Peer as the hashkey
-	// However, we have assumed uint16 in consensus/consensus_leader.go:136
-	// we won't change it now
 	validators sync.Map // key is uint16, value is p2p.Peer
 
 	// Minimal number of peers in the shard
 	// If the number of validators is less than minPeers, the consensus won't start
 	MinPeers int
 
-	// Leader
+	// Leader's address
 	leader p2p.Peer
+
 	// Public keys of the committee including leader and validators
 	PublicKeys []kyber.Point
 	pubKeyLock sync.Mutex
@@ -116,8 +118,8 @@ type Consensus struct {
 // should be stored in this temporary structure. In case the round N-1 finishes, it can catch
 // up to the latest state of round N by using this structure.
 type BlockConsensusStatus struct {
-	blockHeader []byte // the block header of the block which the consensus is running on
-	state       State  // the latest state of the consensus
+	block []byte // the block data
+	state State  // the latest state of the consensus
 }
 
 // New creates a new Consensus object
@@ -162,8 +164,8 @@ func New(host host.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Con
 
 	consensus.secret = map[uint32]kyber.Scalar{}
 
-	// For now use socket address as 16 byte Id
-	// TODO: populate with correct Id
+	// For now use socket address as ID
+	// TODO: populate Id derived from address
 	consensus.nodeID = utils.GetUniqueIDFromPeer(selfPeer)
 
 	// Set private key for myself so that I can sign messages.
@@ -192,13 +194,19 @@ func New(host host.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Con
 
 	consensus.Log = log.New()
 	consensus.uniqueIDInstance = utils.GetUniqueValidatorIDInstance()
-
 	consensus.OfflinePeerList = make([]p2p.Peer, 0)
 
 	//	consensus.Log.Info("New Consensus", "IP", ip, "Port", port, "NodeID", consensus.nodeID, "priKey", consensus.priKey, "pubKey", consensus.pubKey)
 	return &consensus
 }
 
+// Author returns the author of the block header.
+func (consensus *Consensus) Author(header *types.Header) (common.Address, error) {
+	// TODO: implement this
+	return common.Address{}, nil
+}
+
+// TODO: switch to BLS-based signature
 func (consensus *Consensus) signMessage(message []byte) []byte {
 	signature, err := schnorr.Sign(crypto.Ed25519Curve, consensus.priKey, message)
 	if err != nil {
@@ -370,15 +378,10 @@ func NewFaker() *Consensus {
 	return &Consensus{}
 }
 
-// Author implements Engine, returning the header's coinbase as the
-// proof-of-work verified author of the block.
-func (consensus *Consensus) Author(header *types.Header) (common.Address, error) {
-	return header.Coinbase, nil
-}
-
 // VerifyHeader checks whether a header conforms to the consensus rules of the
 // stock bft engine.
 func (consensus *Consensus) VerifyHeader(chain ChainReader, header *types.Header, seal bool) error {
+	// TODO: implement this
 	return nil
 }
 
