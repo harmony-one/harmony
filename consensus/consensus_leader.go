@@ -4,22 +4,21 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
-	"github.com/ethereum/go-ethereum/rlp"
 	"strconv"
 	"time"
 
-	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/p2p/host"
-	"github.com/harmony-one/harmony/services/explorer"
-
-	consensus_proto "github.com/harmony-one/harmony/api/consensus"
-	"github.com/harmony-one/harmony/profiler"
-
 	"github.com/dedis/kyber"
 	"github.com/dedis/kyber/sign/schnorr"
+	"github.com/ethereum/go-ethereum/rlp"
+
+	consensus_proto "github.com/harmony-one/harmony/api/consensus"
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto"
+	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/p2p/host"
+	"github.com/harmony-one/harmony/services/explorer"
 )
 
 const (
