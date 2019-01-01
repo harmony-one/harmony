@@ -2,14 +2,14 @@ package consensus
 
 import (
 	"github.com/dedis/kyber"
-	consensus2 "github.com/harmony-one/harmony/consensus/proto"
+	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/crypto"
 	proto_consensus "github.com/harmony-one/harmony/proto/consensus"
 )
 
 // Construct the commit message to send to leader (assumption the consensus data is already verified)
 func (consensus *Consensus) constructCommitMessage(msgType proto_consensus.MessageType) (secret kyber.Scalar, commitMsg []byte) {
-	message := consensus2.Message{}
+	message := consensus_proto.Message{}
 
 	// 4 byte consensus id
 	message.ConsensusId = consensus.consensusID
@@ -46,7 +46,7 @@ func (consensus *Consensus) constructCommitMessage(msgType proto_consensus.Messa
 
 // Construct the response message to send to leader (assumption the consensus data is already verified)
 func (consensus *Consensus) constructResponseMessage(msgType proto_consensus.MessageType, response kyber.Scalar) []byte {
-	message := consensus2.Message{}
+	message := consensus_proto.Message{}
 
 	// 4 byte consensus id
 	message.ConsensusId = consensus.consensusID
