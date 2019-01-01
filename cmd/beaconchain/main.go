@@ -6,7 +6,7 @@ import (
 	"os"
 	"path"
 
-	beaconchain "github.com/harmony-one/harmony/beaconchain/libs"
+	beaconchain "github.com/harmony-one/harmony/internal/beaconchain/libs"
 	"github.com/harmony-one/harmony/log"
 )
 
