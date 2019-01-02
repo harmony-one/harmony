@@ -22,7 +22,7 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 
-	proto_node "github.com/harmony-one/harmony/proto/node"
+	proto_node "github.com/harmony-one/harmony/api/proto/node"
 )
 
 // Consensus is the main struct with all states and data related to consensus process.

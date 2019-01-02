@@ -5,7 +5,7 @@ import (
 	"log"
 	"net"
 
-	"github.com/harmony-one/harmony/proto/bcconn"
+	"github.com/harmony-one/harmony/api/proto/bcconn"
 
 	"google.golang.org/grpc"
 

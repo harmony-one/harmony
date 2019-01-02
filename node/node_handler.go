@@ -3,20 +3,21 @@ package node
 import (
 	"bytes"
 	"fmt"
-	"github.com/ethereum/go-ethereum/common"
 	"os"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/dedis/kyber"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/api/proto"
+	proto_identity "github.com/harmony-one/harmony/api/proto/identity"
+	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/core/types"
 	hmy_crypto "github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
-	"github.com/harmony-one/harmony/proto"
-	proto_identity "github.com/harmony-one/harmony/proto/identity"
-	proto_node "github.com/harmony-one/harmony/proto/node"
 )
 
 const (
