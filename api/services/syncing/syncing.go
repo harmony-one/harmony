@@ -2,16 +2,17 @@ package syncing
 
 import (
 	"bytes"
-	"github.com/harmony-one/harmony/core"
 	"reflect"
 	"sort"
 	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/core"
+
 	"github.com/Workiva/go-datastructures/queue"
+	"github.com/harmony-one/harmony/api/services/syncing/downloader"
 	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/services/syncing/downloader"
 )
 
 // Constants for syncing.

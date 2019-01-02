@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"bytes"
+
 	"github.com/dedis/kyber"
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/crypto"
