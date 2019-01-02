@@ -105,7 +105,7 @@ func (w *Worker) CommitTransactions(txs types.Transactions) error {
 	return nil
 }
 
-// UpdateCurrent updates ...
+// UpdateCurrent updates the current environment with the current state and header.
 func (w *Worker) UpdateCurrent() error {
 	parent := w.chain.CurrentBlock()
 	num := parent.Number()
@@ -135,17 +135,17 @@ func (w *Worker) makeCurrent(parent *types.Block, header *types.Header) error {
 	return nil
 }
 
-// GetCurrentState ...
+// GetCurrentState gets the current state.
 func (w *Worker) GetCurrentState() *state.StateDB {
 	return w.current.state
 }
 
-// GetCurrentReceipts ...
+// GetCurrentReceipts get the receipts generated starting from the last state.
 func (w *Worker) GetCurrentReceipts() []*types.Receipt {
 	return w.current.receipts
 }
 
-// Commit ...
+// Commit generate a new block for the new txs.
 func (w *Worker) Commit() (*types.Block, error) {
 	s := w.current.state.Copy()
 	block, err := w.engine.Finalize(w.chain, w.current.header, s, w.current.txs, w.current.receipts)
@@ -155,7 +155,7 @@ func (w *Worker) Commit() (*types.Block, error) {
 	return block, nil
 }
 
-// New ...
+// New create a new worker object.
 func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus.Engine, coinbase common.Address, shardID uint32) *Worker {
 	worker := &Worker{
 		config: config,
