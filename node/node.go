@@ -19,6 +19,10 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
+	"github.com/harmony-one/harmony/api/services/explorer"
+	"github.com/harmony-one/harmony/api/services/syncing"
+	"github.com/harmony-one/harmony/api/services/syncing/downloader"
+	downloader_pb "github.com/harmony-one/harmony/api/services/syncing/downloader/proto"
 	"github.com/harmony-one/harmony/client"
 	clientService "github.com/harmony-one/harmony/client/service"
 	bft "github.com/harmony-one/harmony/consensus"
@@ -31,10 +35,6 @@ import (
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
-	"github.com/harmony-one/harmony/services/explorer"
-	"github.com/harmony-one/harmony/services/syncing"
-	"github.com/harmony-one/harmony/services/syncing/downloader"
-	downloader_pb "github.com/harmony-one/harmony/services/syncing/downloader/proto"
 )
 
 // State is a state of a node.
