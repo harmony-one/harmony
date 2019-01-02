@@ -1,9 +1,9 @@
 package beaconchain
 
 import (
+	"github.com/harmony-one/harmony/api/proto"
+	proto_identity "github.com/harmony-one/harmony/api/proto/identity"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/proto"
-	proto_identity "github.com/harmony-one/harmony/proto/identity"
 )
 
 // BeaconChainHandler handles registration of new Identities

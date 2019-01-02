@@ -17,8 +17,8 @@ import (
 	"log"
 
 	"github.com/dedis/kyber"
+	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/proto"
 )
 
 // RoleType defines the role of the node

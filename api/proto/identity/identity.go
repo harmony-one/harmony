@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"errors"
 
-	"github.com/harmony-one/harmony/proto"
+	"github.com/harmony-one/harmony/api/proto"
 )
 
 // IdentityMessageTypeBytes is the number of bytes consensus message type occupies

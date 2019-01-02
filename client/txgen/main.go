@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/client"
 	"github.com/harmony-one/harmony/client/txgen/txgen"
 	"github.com/harmony-one/harmony/consensus"
@@ -19,7 +20,6 @@ import (
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
-	proto_node "github.com/harmony-one/harmony/proto/node"
 )
 
 var (

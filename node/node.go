@@ -22,6 +22,7 @@ import (
 	"github.com/harmony-one/harmony/api/services/syncing"
 	"github.com/harmony-one/harmony/api/services/syncing/downloader"
 	downloader_pb "github.com/harmony-one/harmony/api/services/syncing/downloader/proto"
+	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/client"
 	clientService "github.com/harmony-one/harmony/client/service"
 	bft "github.com/harmony-one/harmony/consensus"
@@ -34,7 +35,14 @@ import (
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
+<<<<<<< HEAD
 	proto_node "github.com/harmony-one/harmony/proto/node"
+=======
+	"github.com/harmony-one/harmony/services/explorer"
+	"github.com/harmony-one/harmony/services/syncing"
+	"github.com/harmony-one/harmony/services/syncing/downloader"
+	downloader_pb "github.com/harmony-one/harmony/services/syncing/downloader/proto"
+>>>>>>> 9c6e45f5c4d73f8c07cfacbd939ffea8f54b87f1
 )
 
 // State is a state of a node.
