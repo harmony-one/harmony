@@ -21,22 +21,19 @@ import (
 )
 
 const (
-	// MinNumberOfTransactionsPerBlock is the min number of transaction per a block.
-	MinNumberOfTransactionsPerBlock = 6000
 	// MaxNumberOfTransactionsPerBlock is the max number of transaction per a block.
 	MaxNumberOfTransactionsPerBlock = 8000
-	// NumBlocksBeforeStateBlock is the number of blocks allowed before generating state block
-	NumBlocksBeforeStateBlock = 1000
 )
 
 // MaybeBroadcastAsValidator returns if the node is a validator node.
 func (node *Node) MaybeBroadcastAsValidator(content []byte) {
+	// TODO: this is tree broadcasting. this needs to be removed later. Actually the whole logic needs to be replaced by p2p.
 	if node.SelfPeer.ValidatorID > 0 && node.SelfPeer.ValidatorID <= host.MaxBroadCast {
 		go host.BroadcastMessageFromValidator(node.host, node.SelfPeer, node.Consensus.GetValidatorPeers(), content)
 	}
 }
 
-// StreamHandler handles a new incoming connection.
+// StreamHandler handles a new incoming network message.
 func (node *Node) StreamHandler(s p2p.Stream) {
 	defer s.Close()
 
@@ -47,7 +44,6 @@ func (node *Node) StreamHandler(s p2p.Stream) {
 		node.log.Error("Read p2p data failed", "err", err, "node", node)
 		return
 	}
-	// TODO: this is tree broadcasting. this needs to be removed later. Actually the whole logic needs to be replaced by p2p.
 	node.MaybeBroadcastAsValidator(content)
 
 	consensusObj := node.Consensus
@@ -89,10 +85,10 @@ func (node *Node) StreamHandler(s p2p.Stream) {
 	case proto.Consensus:
 		msgPayload, _ := proto.GetConsensusMessagePayload(content)
 		if consensusObj.IsLeader {
-			node.log.Info("NET: received message: Consensus/Leader")
+			node.log.Info("NET: Leader received message:", "messageCategory", msgCategory, "messageType", msgType)
 			consensusObj.ProcessMessageLeader(msgPayload)
 		} else {
-			node.log.Info("NET: received message: Consensus/Validator")
+			node.log.Info("NET: Validator received message:", "messageCategory", msgCategory, "messageType", msgType)
 			consensusObj.ProcessMessageValidator(msgPayload)
 			// TODO(minhdoan): add logic to check if the current blockchain is not sync with other consensus
 			// we should switch to other state rather than DoingConsensus.
@@ -154,11 +150,6 @@ func (node *Node) StreamHandler(s p2p.Stream) {
 	default:
 		node.log.Error("Unknown", "MsgCategory", msgCategory)
 	}
-
-	// Post processing after receiving messsages.
-	// if node.State == NodeJoinedShard || node.State == NodeReadyForConsensus {
-	// 	go node.DoSyncing()
-	// }
 }
 
 func (node *Node) transactionMessageHandler(msgPayload []byte) {
@@ -200,15 +191,16 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 // WaitForConsensusReady listen for the readiness signal from consensus and generate new block for consensus.
 func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
 	node.log.Debug("Waiting for Consensus ready", "node", node)
-	time.Sleep(15 * time.Second)
+	time.Sleep(15 * time.Second) // Wait for other nodes to be ready (test-only)
 
 	firstTime := true
 	var newBlock *types.Block
 	timeoutCount := 0
-	for { // keep waiting for Consensus ready
+	for {
+		// keep waiting for Consensus ready
 		select {
 		case <-readySignal:
-			time.Sleep(100 * time.Millisecond) // Delay a bit so validator is catched up.
+			time.Sleep(100 * time.Millisecond) // Delay a bit so validator is catched up (test-only).
 		case <-time.After(200 * time.Second):
 			node.Consensus.ResetState()
 			timeoutCount++
@@ -216,12 +208,14 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
 		}
 
 		for {
-			node.log.Debug("STARTING BLOCK")
+			node.log.Debug("Start creating new block")
+			// threshold and firstTime are for the test-only built-in smart contract tx. TODO: remove in production
 			threshold := 1
 			if firstTime {
 				threshold = 2
 				firstTime = false
 			}
+
 			if len(node.pendingTransactions) >= threshold {
 				// Normal tx block consensus
 				selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
@@ -251,7 +245,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
 // NOTE: For now, just send to the client (basically not broadcasting)
 func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 	if node.ClientPeer != nil {
-		node.log.Debug("NET: SENDING NEW BLOCK TO CLIENT", "client", node.ClientPeer)
+		node.log.Debug("Sending new block to client", "client", node.ClientPeer)
 		node.SendMessage(*node.ClientPeer, proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock}))
 	}
 }
@@ -268,7 +262,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) bool {
 
 // PostConsensusProcessing is called by consensus participants, after consensus is done, to:
 // 1. add the new block to blockchain
-// 2. [leader] move cross shard tx and proof to the list where they wait to be sent to the client
+// 2. [leader] send new block to the client
 func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 	if node.Consensus.IsLeader {
 		node.BroadcastNewBlock(newBlock)
@@ -279,9 +273,9 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 
 // AddNewBlock is usedd to add new block into the blockchain.
 func (node *Node) AddNewBlock(newBlock *types.Block) {
-	num, err := node.blockchain.InsertChain([]*types.Block{newBlock})
+	blockNum, err := node.blockchain.InsertChain([]*types.Block{newBlock})
 	if err != nil {
-		node.log.Debug("Error adding to chain", "numBlocks", num, "Error", err)
+		node.log.Debug("Error adding new block to blockchain", "blockNum", blockNum, "Error", err)
 	}
 }
 

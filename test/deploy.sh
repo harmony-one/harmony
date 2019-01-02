@@ -89,7 +89,7 @@ pushd $ROOT
 echo "compiling ..."
 go build -o bin/benchmark
 go build -o bin/txgen client/txgen/main.go
-go build -o bin/beacon beaconchain/main/main.go
+go build -o bin/beacon cmd/beaconchain/main.go
 popd
 
 # Create a tmp folder for logs

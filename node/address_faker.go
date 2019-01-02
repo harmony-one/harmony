@@ -12,7 +12,7 @@ import (
 
 // CreateGenesisAllocWithTestingAddresses create the genesis block allocation that contains deterministically
 // generated testing addressess with tokens.
-// TODO: Consider to remove it later when moving to production.a
+// TODO: Remove it later when moving to production.
 func (node *Node) CreateGenesisAllocWithTestingAddresses(numAddress int) core.GenesisAlloc {
 	rand.Seed(0)
 	len := 1000000
