@@ -1,6 +1,6 @@
 package main
 
-import "github.com/harmony-one/harmony/services/explorer"
+import "github.com/harmony-one/harmony/api/services/explorer"
 
 func main() {
 	service := &explorer.Service{

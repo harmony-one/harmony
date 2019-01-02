@@ -10,7 +10,6 @@
 
 ## Dev Environment Setup
 
-
 ```
 export GOPATH=$HOME/<path_of_your_choice>
 
