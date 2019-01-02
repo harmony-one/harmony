@@ -1,0 +1,1 @@
+The main.go is only used for testing the blockchain apis and smart contract codes.
