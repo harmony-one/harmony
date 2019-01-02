@@ -3,9 +3,9 @@ package newnode
 import (
 	"time"
 
+	"github.com/harmony-one/harmony/api/proto"
+	proto_identity "github.com/harmony-one/harmony/api/proto/identity"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/proto"
-	proto_identity "github.com/harmony-one/harmony/proto/identity"
 )
 
 // NodeHandler handles a new incoming connection.

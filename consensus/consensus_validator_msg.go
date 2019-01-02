@@ -3,8 +3,8 @@ package consensus
 import (
 	"github.com/dedis/kyber"
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"
+	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/crypto"
-	"github.com/harmony-one/harmony/proto"
 )
 
 // Construct the commit message to send to leader (assumption the consensus data is already verified)

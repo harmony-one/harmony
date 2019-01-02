@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	crypto2 "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
+	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/client"
 	client2 "github.com/harmony-one/harmony/client/service"
 	"github.com/harmony-one/harmony/core/types"
@@ -25,7 +26,6 @@ import (
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
-	proto_node "github.com/harmony-one/harmony/proto/node"
 )
 
 var (
