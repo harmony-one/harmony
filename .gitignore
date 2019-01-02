@@ -37,3 +37,4 @@ tmp_log
 
 # RLP encoding
 *.rlp
+**/*.rlp
