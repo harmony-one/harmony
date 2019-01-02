@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
+	"github.com/harmony-one/harmony/log"
 	"io"
-	"log"
 	"time"
 )
 
@@ -38,12 +38,12 @@ func ReadMessageContent(s Stream) ([]byte, error) {
 	_, err := r.ReadByte()
 	switch err {
 	case io.EOF:
-		log.Printf("Error reading the p2p message type field: %s", err)
+		log.Error("Error reading the p2p message type field", "msg", err)
 		return contentBuf.Bytes(), err
 	case nil:
 		//log.Printf("Received p2p message type: %x\n", msgType)
 	default:
-		log.Printf("Error reading the p2p message type field: %s", err)
+		log.Error("Error reading the p2p message type field", "msg", err)
 		return contentBuf.Bytes(), err
 	}
 	// TODO: check on msgType and take actions accordingly
@@ -51,10 +51,10 @@ func ReadMessageContent(s Stream) ([]byte, error) {
 	fourBytes := make([]byte, 4)
 	n, err := r.Read(fourBytes)
 	if err != nil {
-		log.Printf("Error reading the p2p message size field")
+		log.Error("Error reading the p2p message size field")
 		return contentBuf.Bytes(), err
 	} else if n < len(fourBytes) {
-		log.Printf("Failed reading the p2p message size field: only read %d bytes", n)
+		log.Error("Failed reading the p2p message size field: only read", "Num of bytes", n)
 		return contentBuf.Bytes(), err
 	}
 	//log.Print(fourBytes)
@@ -76,7 +76,7 @@ ILOOP:
 		switch err {
 		case io.EOF:
 			// TODO: should we return error here, or just ignore it?
-			log.Printf("EOF reached while reading p2p message")
+			log.Error("EOF reached while reading p2p message")
 			break ILOOP
 		case nil:
 			bytesToRead -= uint32(n) // TODO: think about avoid the casting in every loop
@@ -84,7 +84,7 @@ ILOOP:
 				break ILOOP
 			}
 		default:
-			log.Printf("Error reading p2p message")
+			log.Error("Error reading p2p message")
 			return []byte{}, err
 		}
 	}
