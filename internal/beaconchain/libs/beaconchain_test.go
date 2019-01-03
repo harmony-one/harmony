@@ -5,8 +5,20 @@ import (
 	"strconv"
 	"testing"
 
-	proto "github.com/harmony-one/harmony/api/beaconchain"
+	"github.com/harmony-one/harmony/api/proto/bcconn"
 	beaconchain "github.com/harmony-one/harmony/internal/beaconchain/rpc"
+	"github.com/harmony-one/harmony/p2p"
+)
+
+var (
+	leader1 = &bcconn.NodeInfo{Self: p2p.Peer{IP: "127.0.0.1", Port: "1"}}
+	leader2 = &bcconn.NodeInfo{Self: p2p.Peer{IP: "127.0.0.1", Port: "2"}}
+	leaders = []*bcconn.NodeInfo{&bcconn.NodeInfo{Self: p2p.Peer{IP: "127.0.0.1", Port: "1"}},
+		&bcconn.NodeInfo{Self: p2p.Peer{IP: "127.0.0.1", Port: "2"}}}
+	shardLeaderMap = map[int]*bcconn.NodeInfo{
+		0: leader1,
+		1: leader2,
+	}
 )
 
 func TestNewNode(t *testing.T) {
@@ -29,19 +41,34 @@ func TestNewNode(t *testing.T) {
 	}
 }
 
+func TestShardLeaderMap(t *testing.T) {
+	var ip string
+	ip = "127.0.0.1"
+	beaconport := "8080"
+	numshards := 1
+	bc := New(numshards, ip, beaconport)
+	bc.Leaders = leaders
+	if !reflect.DeepEqual(bc.GetShardLeaderMap(), shardLeaderMap) {
+		t.Error("The function GetShardLeaderMap doesn't work well")
+	}
+
+}
+
 func TestFetchLeaders(t *testing.T) {
 	var ip string
 	ip = "127.0.0.1"
 	beaconport := "8080"
 	numshards := 1
 	bc := New(numshards, ip, beaconport)
-	bc.SupportRPC()
+	bc.Leaders = leaders
+	bc.rpcServer = beaconchain.NewServer(bc.GetShardLeaderMap)
+	bc.StartRPCServer()
 	port, _ := strconv.Atoi(beaconport)
 	bcClient := beaconchain.NewClient("127.0.0.1", strconv.Itoa(port+BeaconchainServicePortDiff))
 	response := bcClient.GetLeaders()
-	expresponse := &proto.FetchLeadersResponse{}
-	if !reflect.DeepEqual(response, expresponse) {
-		t.Error("was expexting a empty leaders array")
+	retleaders := response.GetLeaders()
+	if !(retleaders[0].GetIp() == leaders[0].Self.IP || retleaders[0].GetPort() == leaders[0].Self.Port || retleaders[1].GetPort() == leaders[1].Self.Port) {
+		t.Error("Fetch leaders response is not as expected")
 	}
 
 }
