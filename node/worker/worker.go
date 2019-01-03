@@ -162,8 +162,8 @@ func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus.En
 		chain:  chain,
 		engine: engine,
 	}
-	worker.gasFloor = 0
-	worker.gasCeil = 1000000000000000
+	worker.gasFloor = 500000000000000000
+	worker.gasCeil = 1000000000000000000
 	worker.coinbase = coinbase
 	worker.shardID = shardID
 
