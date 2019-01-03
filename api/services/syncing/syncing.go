@@ -30,6 +30,7 @@ type SyncPeerConfig struct {
 	blockHashes [][]byte
 }
 
+// GetClient returns client pointer of downloader.Client
 func (s *SyncPeerConfig) GetClient() *downloader.Client {
 	return s.client
 }
