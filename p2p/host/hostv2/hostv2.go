@@ -35,10 +35,9 @@ func (host *HostV2) Peerstore() peerstore.Peerstore {
 
 // New creates a host for p2p communication
 func New(self p2p.Peer) *HostV2 {
-	addr := fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", self.Port)
-	sourceAddr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%s", self.IP, self.Port))
+	sourceAddr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", self.Port))
 	catchError(err)
-	priv := addrToPrivKey(addr)
+	priv := addrToPrivKey(fmt.Sprintf("/ip4/%s/tcp/%s", self.IP, self.Port))
 	p2pHost, err := libp2p.New(context.Background(),
 		libp2p.ListenAddrs(sourceAddr),
 		libp2p.Identity(priv),
@@ -47,7 +46,7 @@ func New(self p2p.Peer) *HostV2 {
 		// libp2p.EnableRelay; libp2p.Routing;
 	)
 	catchError(err)
-	log.Debug("Host is up!", "port", self.Port, "id", p2pHost.ID().Pretty(), "addrs", sourceAddr)
+	log.Debug("Host is up!", "port", self.Port, "id", p2pHost.ID().Pretty(), "addr", sourceAddr)
 	h := &HostV2{
 		h:    p2pHost,
 		self: self,
