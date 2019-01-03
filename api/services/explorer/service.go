@@ -27,7 +27,7 @@ type Service struct {
 	storage *Storage
 }
 
-// GetExplorerPort ...
+// GetExplorerPort returns the port serving explorer dashboard. This port is explorerPortDifference less than the node port.
 func GetExplorerPort(nodePort string) string {
 	if port, err := strconv.Atoi(nodePort); err == nil {
 		return fmt.Sprintf("%d", port-explorerPortDifference)
@@ -36,7 +36,7 @@ func GetExplorerPort(nodePort string) string {
 	return ""
 }
 
-// Init is to do init for ExplorerService.
+// Init is to initialize for ExplorerService.
 func (s *Service) Init(remove bool) {
 	s.storage = GetStorageInstance(s.IP, s.Port, remove)
 }
@@ -46,14 +46,16 @@ func (s *Service) Run() {
 	// Init address.
 	addr := net.JoinHostPort("", GetExplorerPort(s.Port))
 
-	// Set up router
 	s.router = mux.NewRouter()
+	// Set up router for blocks.
 	s.router.Path("/blocks").Queries("from", "{[0-9]*?}", "to", "{[0-9]*?}").HandlerFunc(s.GetExplorerBlocks).Methods("GET")
 	s.router.Path("/blocks").HandlerFunc(s.GetExplorerBlocks)
 
+	// Set up router for tx.
 	s.router.Path("/tx").Queries("id", "{[0-9A-Fa-fx]*?}").HandlerFunc(s.GetExplorerTransaction).Methods("GET")
 	s.router.Path("/tx").HandlerFunc(s.GetExplorerTransaction)
 
+	// Set up router for address.
 	s.router.Path("/address").Queries("id", "{[0-9A-Fa-fx]*?}").HandlerFunc(s.GetExplorerAddress).Methods("GET")
 	s.router.Path("/address").HandlerFunc(s.GetExplorerAddress)
 
@@ -62,28 +64,7 @@ func (s *Service) Run() {
 	log.Fatal(http.ListenAndServe(addr, s.router))
 }
 
-// PopulateBlockInfo ...
-func (s *Service) PopulateBlockInfo(from, to int) []*BlockInfo {
-	blocks := []*BlockInfo{}
-	for i := from; i <= to; i++ {
-		key := GetBlockInfoKey(i)
-		fmt.Println("getting blockinfo with key ", key)
-		data, err := storage.db.Get([]byte(key))
-		if err != nil {
-			Log.Error("Error on getting from db")
-			os.Exit(1)
-		}
-		block := new(BlockInfo)
-		if rlp.DecodeBytes(data, block) != nil {
-			Log.Error("Error on getting from db")
-			os.Exit(1)
-		}
-		blocks = append(blocks, block)
-	}
-	return blocks
-}
-
-// GetAccountBlocks ...
+// GetAccountBlocks returns a list of types.Block to server blocks end-point.
 func (s *Service) GetAccountBlocks(from, to int) []*types.Block {
 	blocks := []*types.Block{}
 	for i := from - 1; i <= to+1; i++ {
@@ -107,7 +88,7 @@ func (s *Service) GetAccountBlocks(from, to int) []*types.Block {
 	return blocks
 }
 
-// GetExplorerBlocks ...
+// GetExplorerBlocks serves end-point /blocks
 func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	from := r.FormValue("from")
@@ -183,7 +164,7 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(data.Blocks)
 }
 
-// GetExplorerTransaction ...
+// GetExplorerTransaction servers /tx end-point.
 func (s *Service) GetExplorerTransaction(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	id := r.FormValue("id")
@@ -208,13 +189,11 @@ func (s *Service) GetExplorerTransaction(w http.ResponseWriter, r *http.Request)
 	json.NewEncoder(w).Encode(data.TX)
 }
 
-// GetExplorerAddress ...
+// GetExplorerAddress serves /address end-point.
 func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	id := r.FormValue("id")
 	key := GetAddressKey(id)
-
-	fmt.Println("Trying to access id=", id, key)
 
 	data := &Data{}
 	if id == "" {
