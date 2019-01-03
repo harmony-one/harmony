@@ -36,15 +36,6 @@ type Transaction struct {
 	Bytes     string   `json:"bytes"`
 }
 
-// BlockInfo ...
-type BlockInfo struct {
-	ID        string `json:"id"`
-	Height    string `json:"height"`
-	Timestamp string `json:"timestamp"`
-	TXCount   string `json:"txCount"`
-	Size      string `json:"size"`
-}
-
 // Block ...
 type Block struct {
 	Height     string         `json:"height"`

@@ -98,22 +98,6 @@ func (storage *Storage) Dump(block *types.Block, height uint32) {
 		Log.Debug("Failed to serialize block ", "error", err)
 	}
 
-	// Store block info.
-	blockInfo := BlockInfo{
-		ID:        block.Hash().Hex(),
-		Height:    string(height),
-		Timestamp: strconv.Itoa(int(block.Time().Int64() * 1000)),
-		TXCount:   string(block.Transactions().Len()),
-		Size:      block.Size().String(),
-	}
-
-	if data, err := rlp.EncodeToBytes(blockInfo); err == nil {
-		key := GetBlockInfoKey(int(height))
-		storage.db.Put([]byte(key), data)
-	} else {
-		Log.Error("EncodeRLP blockInfo error")
-	}
-
 	// Store txs
 	for _, tx := range block.Transactions() {
 		if tx.To() == nil {
@@ -121,7 +105,6 @@ func (storage *Storage) Dump(block *types.Block, height uint32) {
 		}
 
 		explorerTransaction := GetTransaction(tx, block)
-
 		storage.UpdateTXStorage(explorerTransaction, tx)
 		storage.UpdateAddress(explorerTransaction, tx)
 	}
