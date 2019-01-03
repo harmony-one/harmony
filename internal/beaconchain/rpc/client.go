@@ -49,3 +49,15 @@ func (client *Client) GetLeaders() *proto.FetchLeadersResponse {
 	}
 	return response
 }
+
+// GetHello gets a hello greeting from beaconchain service
+func (client *Client) GetHello() *proto.HelloResponse {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	request := &proto.HelloRequest{}
+	response, err := client.beaconChainServiceClient.SayHello(ctx, request)
+	if err != nil {
+		log.Fatalf("Error fetching leaders from beacon chain: %s", err)
+	}
+	return response
+}

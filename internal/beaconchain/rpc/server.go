@@ -29,6 +29,12 @@ func (s *Server) FetchLeaders(ctx context.Context, request *proto.FetchLeadersRe
 	return &proto.FetchLeadersResponse{Leaders: leaders}, nil
 }
 
+//SayHello helps test whether the RPC server is running.
+func (s *Server) SayHello(ctx context.Context, request *proto.HelloRequest) (*proto.HelloResponse, error) {
+	log.Println("Returning a Hello")
+	return &proto.HelloResponse{Message: "hello"}, nil
+}
+
 // Start starts the Server on given ip and port.
 func (s *Server) Start(ip, port string) (*grpc.Server, error) {
 	// TODO(minhdoan): Currently not using ip. Fix it later.

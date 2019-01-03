@@ -5,6 +5,7 @@ package beaconchain;
 // BeaconChainService is the service used for any beacon chain requests.
 service BeaconChainService {
   rpc FetchLeaders(FetchLeadersRequest) returns (FetchLeadersResponse) {}
+  rpc SayHello(HelloRequest) returns (HelloResponse) {}
 }
 
 // FetchLeadersRequest is the request to fetch the current leaders.
@@ -19,4 +20,13 @@ message FetchLeadersResponse {
       uint32 shardId = 3;
   }
   repeated Leader leaders = 1;
+}
+
+//HelloRequest is to request hello beaconchain
+message HelloRequest {
+}
+
+//HelloResponse is a response "hello" from beaconchain
+message HelloResponse {
+  string message = 1;
 }
