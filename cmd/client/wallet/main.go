@@ -17,9 +17,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	crypto2 "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/harmony-one/harmony/api/client"
+	clientService "github.com/harmony-one/harmony/api/client/service"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
-	"github.com/harmony-one/harmony/client"
-	client2 "github.com/harmony-one/harmony/client/service"
 	"github.com/harmony-one/harmony/core/types"
 	libs "github.com/harmony-one/harmony/internal/beaconchain/libs"
 	"github.com/harmony-one/harmony/internal/beaconchain/rpc"
@@ -314,7 +314,7 @@ func FetchBalance(address common.Address, walletNode *node.Node) map[uint32]Acco
 	result := make(map[uint32]AccountState)
 	for shardID, leader := range *walletNode.Client.Leaders {
 		port, _ := strconv.Atoi(leader.Port)
-		client := client2.NewClient(leader.IP, strconv.Itoa(port+node.ClientServicePortDiff))
+		client := clientService.NewClient(leader.IP, strconv.Itoa(port+node.ClientServicePortDiff))
 		response := client.GetBalance(address)
 		balance := big.NewInt(0)
 		balance.SetBytes(response.Balance)
@@ -328,7 +328,7 @@ func FetchBalance(address common.Address, walletNode *node.Node) map[uint32]Acco
 func GetFreeToken(address common.Address, walletNode *node.Node) {
 	for shardID, leader := range *walletNode.Client.Leaders {
 		port, _ := strconv.Atoi(leader.Port)
-		client := client2.NewClient(leader.IP, strconv.Itoa(port+node.ClientServicePortDiff))
+		client := clientService.NewClient(leader.IP, strconv.Itoa(port+node.ClientServicePortDiff))
 		response := client.GetFreeToken(address)
 
 		txID := common.Hash{}

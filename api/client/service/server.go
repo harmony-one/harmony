@@ -9,7 +9,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	proto "github.com/harmony-one/harmony/client/service/proto"
+	proto "github.com/harmony-one/harmony/api/client/service/proto"
 )
 
 // Server is the Server struct for client service package.

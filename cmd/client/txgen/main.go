@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/api/client"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
-	"github.com/harmony-one/harmony/client"
-	"github.com/harmony-one/harmony/client/txgen/txgen"
+	"github.com/harmony-one/harmony/cmd/client/txgen/txgen"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/newnode"
