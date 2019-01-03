@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	"net"
 	"time"
 
 	"github.com/dedis/kyber"
@@ -26,3 +27,5 @@ type Peer struct {
 	ValidatorID int         // -1 is the default value, means not assigned any validator ID in the shard
 	// TODO(minhdoan, rj): use this Ready to not send/broadcast to this peer if it wasn't available.
 }
+
+func (p Peer) String() string { return net.JoinHostPort(p.IP, p.Port) }

@@ -35,8 +35,8 @@ func (host *HostV2) Peerstore() peerstore.Peerstore {
 
 // New creates a host for p2p communication
 func New(self p2p.Peer) *HostV2 {
-	addr := fmt.Sprintf("/ip4/%s/tcp/%s", self.IP, self.Port)
-	sourceAddr, err := multiaddr.NewMultiaddr(addr)
+	addr := fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", self.Port)
+	sourceAddr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%s", self.IP, self.Port))
 	catchError(err)
 	priv := addrToPrivKey(addr)
 	p2pHost, err := libp2p.New(context.Background(),
@@ -78,7 +78,10 @@ func (host *HostV2) SendMessage(p p2p.Peer, message []byte) error {
 	peerID, _ := peer.IDFromPrivateKey(priv)
 	host.Peerstore().AddAddrs(peerID, []multiaddr.Multiaddr{targetAddr}, peerstore.PermanentAddrTTL)
 	s, err := host.h.NewStream(context.Background(), peerID, ProtocolID)
-	catchError(err)
+	if err != nil {
+		log.Error("Failed to send message", "from", host.self, "to", p, "error", err)
+		return err
+	}
 
 	// Create a buffered stream so that read and writes are non blocking.
 	w := bufio.NewWriter(bufio.NewWriter(s))
