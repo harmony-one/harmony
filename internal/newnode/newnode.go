@@ -1,6 +1,7 @@
 package newnode
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -55,9 +56,9 @@ type registerResponseRandomNumber struct {
 }
 
 // ContactBeaconChain starts a newservice in the candidate node
-func (node *NewNode) ContactBeaconChain(BCPeer p2p.Peer) {
+func (node *NewNode) ContactBeaconChain(BCPeer p2p.Peer) error {
 	go node.host.BindHandlerAndServe(node.NodeHandler)
-	node.requestBeaconChain(BCPeer)
+	return node.requestBeaconChain(BCPeer)
 }
 
 func (node NewNode) String() string {
@@ -65,7 +66,7 @@ func (node NewNode) String() string {
 }
 
 // RequestBeaconChain requests beacon chain for identity data
-func (node *NewNode) requestBeaconChain(BCPeer p2p.Peer) {
+func (node *NewNode) requestBeaconChain(BCPeer p2p.Peer) (err error) {
 	node.log.Info("connecting to beacon chain now ...")
 	pubk, err := node.PubK.MarshalBinary()
 	if err != nil {
@@ -94,9 +95,11 @@ checkLoop:
 		}
 	}
 	if !gotShardInfo {
+		err = errors.New("could not create connection")
 		node.log.Crit("Could not get sharding info after 5 minutes")
 		os.Exit(1)
 	}
+	return
 }
 
 // ProcessShardInfo
