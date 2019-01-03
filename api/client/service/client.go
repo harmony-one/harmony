@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
-	proto "github.com/harmony-one/harmony/client/service/proto"
+	proto "github.com/harmony-one/harmony/api/client/service/proto"
 	"log"
 	"time"
 
