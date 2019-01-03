@@ -3,7 +3,7 @@ declare -A SRC
 SRC[benchmark]=benchmark.go
 SRC[txgen]=cmd/client/txgen/main.go
 SRC[beacon]=cmd/beaconchain/main.go
-SRC[wallet]=client/wallet/main.go
+SRC[wallet]=cmd/client/wallet/main.go
 
 BINDIR=bin
 BUCKET=unique-bucket-bin
