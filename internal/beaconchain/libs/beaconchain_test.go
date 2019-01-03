@@ -11,10 +11,9 @@ import (
 )
 
 var (
-	leader1 = &bcconn.NodeInfo{Self: p2p.Peer{IP: "127.0.0.1", Port: "1"}}
-	leader2 = &bcconn.NodeInfo{Self: p2p.Peer{IP: "127.0.0.1", Port: "2"}}
-	leaders = []*bcconn.NodeInfo{&bcconn.NodeInfo{Self: p2p.Peer{IP: "127.0.0.1", Port: "1"}},
-		&bcconn.NodeInfo{Self: p2p.Peer{IP: "127.0.0.1", Port: "2"}}}
+	leader1        = &bcconn.NodeInfo{Self: p2p.Peer{IP: "127.0.0.1", Port: "1"}}
+	leader2        = &bcconn.NodeInfo{Self: p2p.Peer{IP: "127.0.0.1", Port: "2"}}
+	leaders        = []*bcconn.NodeInfo{leader1, leader2}
 	shardLeaderMap = map[int]*bcconn.NodeInfo{
 		0: leader1,
 		1: leader2,
