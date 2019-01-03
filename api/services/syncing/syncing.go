@@ -31,8 +31,8 @@ type SyncPeerConfig struct {
 }
 
 // GetClient returns client pointer of downloader.Client
-func (s *SyncPeerConfig) GetClient() *downloader.Client {
-	return s.client
+func (peerConfig *SyncPeerConfig) GetClient() *downloader.Client {
+	return peerConfig.client
 }
 
 // Log is the temporary log for syncing.
