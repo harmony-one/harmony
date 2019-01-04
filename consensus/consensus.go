@@ -10,7 +10,6 @@ import (
 	"github.com/dedis/kyber"
 	"github.com/dedis/kyber/sign/schnorr"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/state"
@@ -21,6 +20,7 @@ import (
 	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
+	"golang.org/x/crypto/sha3"
 
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 )
@@ -436,7 +436,7 @@ func (consensus *Consensus) Finalize(chain ChainReader, header *types.Header, st
 
 // SealHash returns the hash of a block prior to it being sealed.
 func (consensus *Consensus) SealHash(header *types.Header) (hash common.Hash) {
-	hasher := sha3.NewKeccak256()
+	hasher := sha3.NewLegacyKeccak256()
 
 	rlp.Encode(hasher, []interface{}{
 		header.ParentHash,
