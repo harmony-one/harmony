@@ -1,0 +1,1 @@
+The wallet program is the demo wallet which talks to Harmony devnet for various kinds of operations. For detail, please compile and execute ./bin/wallet.
