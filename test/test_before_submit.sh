@@ -1,6 +1,6 @@
 #!/bin/bash
 
-DIRROOT=$(dirname $0)
+DIRROOT=$(dirname $0)/..
 OS=$(uname -s)
 
 go test ./...
