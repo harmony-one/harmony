@@ -15,7 +15,7 @@ import (
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 )
 
-func TestNewNeNode(t *testing.T) {
+func TestNewNode(t *testing.T) {
 	_, pubKey := utils.GenKey("1", "2")
 	leader := p2p.Peer{IP: "1", Port: "2", PubKey: pubKey}
 	validator := p2p.Peer{IP: "3", Port: "5"}
