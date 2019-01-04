@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"log"
-	"os/exec"
 	"regexp"
 	"strconv"
 
@@ -39,28 +38,6 @@ func GetUniqueIDFromIPPort(ip, port string) uint32 {
 	socketID := reg.ReplaceAllString(ip+port, "") // A integer Id formed by unique IP/PORT pair
 	value, _ := strconv.Atoi(socketID)
 	return uint32(value)
-}
-
-// RunCmd runs command `name` with arguments `args`
-func RunCmd(name string, args ...string) error {
-	cmd := exec.Command(name, args...)
-	stderrBytes := &bytes.Buffer{}
-	cmd.Stderr = stderrBytes
-	if err := cmd.Start(); err != nil {
-		log.Fatal(err)
-		return err
-	}
-
-	log.Println("Command running", name, args)
-	go func() {
-		if err := cmd.Wait(); err != nil {
-			log.Printf("Command finished with error: %v", err)
-			log.Printf("Stderr: %v", string(stderrBytes.Bytes()))
-		} else {
-			log.Printf("Command finished successfully")
-		}
-	}()
-	return nil
 }
 
 // GenKey generates a key given ip and port.
