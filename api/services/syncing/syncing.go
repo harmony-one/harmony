@@ -30,6 +30,11 @@ type SyncPeerConfig struct {
 	blockHashes [][]byte
 }
 
+// GetClient returns client pointer of downloader.Client
+func (peerConfig *SyncPeerConfig) GetClient() *downloader.Client {
+	return peerConfig.client
+}
+
 // Log is the temporary log for syncing.
 var Log = log.New()
 
