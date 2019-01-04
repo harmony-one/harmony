@@ -23,6 +23,7 @@ var (
 )
 
 func TestNewWorker(t *testing.T) {
+	// Setup a new blockchain with genesis block containing test token on test address
 	var (
 		database = db.NewMemDatabase()
 		gspec    = core.Genesis{
@@ -36,6 +37,7 @@ func TestNewWorker(t *testing.T) {
 	_ = genesis
 	chain, _ := core.NewBlockChain(database, nil, gspec.Config, consensus.NewFaker(), vm.Config{}, nil)
 
+	// Create a new worker
 	worker := New(params.TestChainConfig, chain, consensus.NewFaker(), testBankAddress, 0)
 
 	if worker.GetCurrentState().GetBalance(crypto.PubkeyToAddress(testBankKey.PublicKey)).Cmp(testBankFunds) != 0 {
@@ -44,6 +46,7 @@ func TestNewWorker(t *testing.T) {
 }
 
 func TestCommitTransactions(t *testing.T) {
+	// Setup a new blockchain with genesis block containing test token on test address
 	var (
 		database = db.NewMemDatabase()
 		gspec    = core.Genesis{
@@ -53,15 +56,18 @@ func TestCommitTransactions(t *testing.T) {
 		}
 	)
 
-	genesis := gspec.MustCommit(database)
-	_ = genesis
+	gspec.MustCommit(database)
 	chain, _ := core.NewBlockChain(database, nil, gspec.Config, consensus.NewFaker(), vm.Config{}, nil)
 
+	// Create a new worker
 	worker := New(params.TestChainConfig, chain, consensus.NewFaker(), testBankAddress, 0)
 
+	// Generate a test tx
 	baseNonce := worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(testBankKey.PublicKey))
 	randAmount := rand.Float32()
 	tx, _ := types.SignTx(types.NewTransaction(baseNonce, testBankAddress, uint32(0), big.NewInt(int64(params.Ether*randAmount)), params.TxGas, nil, nil), types.HomesteadSigner{}, testBankKey)
+
+	// Commit the tx to the worker
 	err := worker.CommitTransactions(types.Transactions{tx})
 	if err != nil {
 		t.Error(err)
