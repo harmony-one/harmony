@@ -5,7 +5,7 @@
 
 ## Coding Guidelines
 
-* In general, we should follow [effective_go](https://golang.org/doc/effective_go.html)
+* In general, we follow [effective_go](https://golang.org/doc/effective_go.html)
 * Code must adhere to the official [Go formatting guidelines](https://golang.org/doc/effective_go.html#formatting) (i.e. uses [gofmt](https://golang.org/cmd/gofmt/)).
 * Code must be documented adhering to the official Go [commentary](https://golang.org/doc/effective_go.html#commentary) guidelines.
 
@@ -15,26 +15,22 @@
 ```
 export GOPATH=$HOME/<path_of_your_choice>
 
-mkdir -p $HOME/<path_of_your_choice>/src
+mkdir -p $HOME/<path_of_your_choice>/src/github.com/harmony-one
 
-cd $HOME/<path_of_your_choice>/src
+cd $HOME/<path_of_your_choice>/src/github.com/harmony-one
 
 git clone git@github.com:harmony-one/harmony.git
 
-cd harmony-benchmark
+cd harmony
 
 go get ./...
 ```
+
 ## Usage
 
-### Running local test without db
+### Running local test
 ```
-./deploy.sh local_config.txt
-```
-
-### Running local test with db
-```
-./deploy.sh local_config.txt 1
+./test/deploy.sh ./test/configs/local_config1.txt
 ```
 
 ## Testing
