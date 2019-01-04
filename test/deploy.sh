@@ -115,7 +115,7 @@ done < $config
 # Emulate node offline
 (sleep 45; killnode $KILLPORT) &
 
-echo "launching txgen ..."Z
+echo "launching txgen ..."
 if [ "$TXGEN" == "true" ]; then
    echo "launching txgen ..."
    $ROOT/bin/txgen -log_folder $log_folder -duration $DURATION
