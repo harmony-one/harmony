@@ -87,3 +87,20 @@ func TestNoPrefixShortHexOddLength(t *testing.T) {
 		t.Errorf("Expected %x got %x", expected, result)
 	}
 }
+
+func TestCopyBytes(t *testing.T) {
+	expected := []byte{1, 2, 3}
+	result := CopyBytes(expected)
+	if !bytes.Equal(expected, result) {
+		t.Errorf("Expected %x got %x", expected, result)
+	}
+	expected[0] = 0
+	if result[0] == 0 {
+		t.Errorf("should not be 0")
+	}
+}
+
+// hasHexPrefix validates str begins with '0x' or '0X'.
+func hasHexPrefix(str string) bool {
+	return len(str) >= 2 && str[0] == '0' && (str[1] == 'x' || str[1] == 'X')
+}
