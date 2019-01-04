@@ -99,8 +99,3 @@ func TestCopyBytes(t *testing.T) {
 		t.Errorf("should not be 0")
 	}
 }
-
-// hasHexPrefix validates str begins with '0x' or '0X'.
-func hasHexPrefix(str string) bool {
-	return len(str) >= 2 && str[0] == '0' && (str[1] == 'x' || str[1] == 'X')
-}
