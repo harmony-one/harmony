@@ -1,66 +1,77 @@
-package node
+package worker
 
 import (
-	"github.com/golang/mock/gomock"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/consensus"
-	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/p2p/p2pimpl"
+	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/internal/db"
+	"math/big"
+	"math/rand"
 	"testing"
 )
 
-func TestNodeStreamHandler(t *testing.T) {
-	_, pubKey := utils.GenKey("1", "2")
-	leader := p2p.Peer{IP: "1", Port: "2", PubKey: pubKey}
-	validator := p2p.Peer{IP: "3", Port: "5"}
-	host := p2pimpl.NewHost(leader)
-	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader)
-	node := New(host, consensus, nil)
+var (
+	// Test accounts
+	testBankKey, _  = crypto.GenerateKey()
+	testBankAddress = crypto.PubkeyToAddress(testBankKey.PublicKey)
+	testBankFunds   = big.NewInt(8000000000000000000)
 
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	chainConfig = params.TestChainConfig
+)
 
-	m := p2p.NewMockStream(ctrl)
+func TestNewWorker(t *testing.T) {
+	var (
+		database = db.NewMemDatabase()
+		gspec    = core.Genesis{
+			Config:  chainConfig,
+			Alloc:   core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
+			ShardID: 10,
+		}
+	)
 
-	m.EXPECT().Read(gomock.Any()).AnyTimes()
-	m.EXPECT().SetReadDeadline(gomock.Any())
-	m.EXPECT().Close()
+	genesis := gspec.MustCommit(database)
+	_ = genesis
+	chain, _ := core.NewBlockChain(database, nil, gspec.Config, consensus.NewFaker(), vm.Config{}, nil)
 
-	node.StreamHandler(m)
-}
+	worker := New(params.TestChainConfig, chain, consensus.NewFaker(), testBankAddress, 0)
 
-func TestAddNewBlock(t *testing.T) {
-	_, pubKey := utils.GenKey("1", "2")
-	leader := p2p.Peer{IP: "1", Port: "2", PubKey: pubKey}
-	validator := p2p.Peer{IP: "3", Port: "5"}
-	host := p2pimpl.NewHost(leader)
-	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader)
-	node := New(host, consensus, nil)
-
-	selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
-	node.Worker.CommitTransactions(selectedTxs)
-	block, _ := node.Worker.Commit()
-
-	node.AddNewBlock(block)
-
-	if node.blockchain.CurrentBlock().NumberU64() != 1 {
-		t.Error("New block is not added successfully")
+	if worker.GetCurrentState().GetBalance(crypto.PubkeyToAddress(testBankKey.PublicKey)).Cmp(testBankFunds) != 0 {
+		t.Error("Worker state is not setup correctly")
 	}
 }
 
-func TestVerifyNewBlock(t *testing.T) {
-	_, pubKey := utils.GenKey("1", "2")
-	leader := p2p.Peer{IP: "1", Port: "2", PubKey: pubKey}
-	validator := p2p.Peer{IP: "3", Port: "5"}
-	host := p2pimpl.NewHost(leader)
-	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader)
-	node := New(host, consensus, nil)
+func TestCommitTransactions(t *testing.T) {
+	var (
+		database = db.NewMemDatabase()
+		gspec    = core.Genesis{
+			Config:  chainConfig,
+			Alloc:   core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
+			ShardID: 10,
+		}
+	)
 
-	selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
-	node.Worker.CommitTransactions(selectedTxs)
-	block, _ := node.Worker.Commit()
+	genesis := gspec.MustCommit(database)
+	_ = genesis
+	chain, _ := core.NewBlockChain(database, nil, gspec.Config, consensus.NewFaker(), vm.Config{}, nil)
 
-	if !node.VerifyNewBlock(block) {
-		t.Error("New block is not verified successfully")
+	worker := New(params.TestChainConfig, chain, consensus.NewFaker(), testBankAddress, 0)
+
+	baseNonce := worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(testBankKey.PublicKey))
+	randAmount := rand.Float32()
+	tx, _ := types.SignTx(types.NewTransaction(baseNonce, testBankAddress, uint32(0), big.NewInt(int64(params.Ether*randAmount)), params.TxGas, nil, nil), types.HomesteadSigner{}, testBankKey)
+	err := worker.CommitTransactions(types.Transactions{tx})
+	if err != nil {
+		t.Error(err)
+	}
+
+	if len(worker.GetCurrentReceipts()) == 0 {
+		t.Error("No receipt is created for new transactions")
+	}
+
+	if len(worker.current.txs) != 1 {
+		t.Error("Transaction is not committed")
 	}
 }
