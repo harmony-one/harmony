@@ -2,6 +2,7 @@ package node
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -57,8 +58,6 @@ func TestString(test *testing.T) {
 	r1 := fmt.Sprintf("%v", *ping1)
 	if strings.Compare(r1, e1) != 0 {
 		test.Errorf("expect: %v, got: %v", e1, r1)
-	} else {
-		fmt.Println(r1)
 	}
 
 	ping1.Node.Role = ClientRole
@@ -66,8 +65,6 @@ func TestString(test *testing.T) {
 	r3 := fmt.Sprintf("%v", *ping1)
 	if strings.Compare(r3, e3) != 0 {
 		test.Errorf("expect: %v, got: %v", e3, r3)
-	} else {
-		fmt.Println(r3)
 	}
 
 	pong1 := NewPongMessage(p2, pubKeys)
@@ -75,22 +72,12 @@ func TestString(test *testing.T) {
 
 	if !strings.HasPrefix(r2, e2) {
 		test.Errorf("expect: %v, got: %v", e2, r2)
-	} else {
-		fmt.Println(r2)
 	}
 }
 
 func TestSerialize(test *testing.T) {
 	ping1 := NewPingMessage(p1)
 	buf1 = ping1.ConstructPingMessage()
-	fmt.Printf("buf ping: %v\n", buf1)
-
-	pong1 := NewPongMessage(p2, pubKeys)
-	buf2 = pong1.ConstructPongMessage()
-	fmt.Printf("buf pong: %v\n", buf2)
-}
-
-func TestDeserialize(test *testing.T) {
 	msg1, err := proto.GetMessagePayload(buf1)
 	if err != nil {
 		test.Error("GetMessagePayload Failed!")
@@ -99,13 +86,20 @@ func TestDeserialize(test *testing.T) {
 	if err != nil {
 		test.Error("Ping failed!")
 	}
-	fmt.Println(ping)
+	if !reflect.DeepEqual(ping, ping1) {
+		test.Error("Serialize/Deserialze Ping Message Failed")
+	}
+
+	pong1 := NewPongMessage(p2, pubKeys)
+	buf2 = pong1.ConstructPongMessage()
 
 	msg2, err := proto.GetMessagePayload(buf2)
 	pong, err := GetPongMessage(msg2)
 	if err != nil {
 		test.Error("Pong failed!")
 	}
-	fmt.Println(pong)
 
+	if !reflect.DeepEqual(pong, pong1) {
+		test.Error("Serialize/Deserialze Pong Message Failed")
+	}
 }
