@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"log"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
 
@@ -34,7 +35,7 @@ const (
 // BlockchainSyncMessage is a struct for blockchain sync message.
 type BlockchainSyncMessage struct {
 	BlockHeight int
-	BlockHashes [][32]byte
+	BlockHashes []common.Hash
 }
 
 // BlockchainSyncMessageType represents BlockchainSyncMessageType type.
