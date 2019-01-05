@@ -8,6 +8,7 @@ import (
 	"github.com/harmony-one/harmony/api/proto/bcconn"
 	beaconchain "github.com/harmony-one/harmony/internal/beaconchain/rpc"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -70,4 +71,42 @@ func TestFetchLeaders(t *testing.T) {
 		t.Error("Fetch leaders response is not as expected")
 	}
 
+}
+
+func TestAcceptNodeInfo(t *testing.T) {
+	var ip string
+	ip = "127.0.0.1"
+	beaconport := "8080"
+	numshards := 1
+	bc := New(numshards, ip, beaconport)
+	b := bcconn.SerializeNodeInfo(leader1)
+	node := bc.AcceptNodeInfo(b)
+	if !reflect.DeepEqual(node, leader1) {
+		t.Error("Beaconchain is unable to deserialize incoming node info")
+	}
+	if len(bc.Leaders) != 1 {
+		t.Error("Beaconchain was unable to update the leader array")
+	}
+
+}
+
+func TestRespondRandomness(t *testing.T) {
+	var ip string
+	ip = "127.0.0.1"
+	beaconport := "8080"
+	numshards := 1
+	bc := New(numshards, ip, beaconport)
+	bc.RespondRandomness(leader1)
+	assert.Equal(t, RandomInfoSent, bc.state)
+}
+
+func TestAcceptConnections(t *testing.T) {
+	var ip string
+	ip = "127.0.0.1"
+	beaconport := "8080"
+	numshards := 1
+	bc := New(numshards, ip, beaconport)
+	b := bcconn.SerializeNodeInfo(leader1)
+	bc.AcceptConnections(b)
+	assert.Equal(t, RandomInfoSent, bc.state)
 }

@@ -18,6 +18,8 @@ import (
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 )
 
+type BCState int
+
 var mutex sync.Mutex
 var identityPerBlock = 100000
 
@@ -35,9 +37,15 @@ type BeaconChain struct {
 	IP                 string
 	Port               string
 	host               host.Host
-
-	rpcServer *beaconchain.Server
+	state              BCState
+	rpcServer          *beaconchain.Server
 }
+
+// Followings are the set of states of that beaconchain can be in.
+const (
+	NodeInfoReceived BCState = iota
+	RandomInfoSent
+)
 
 // SupportRPC initializes and starts the rpc service
 func (bc *BeaconChain) SupportRPC() {
@@ -90,8 +98,8 @@ func generateBCKey() kyber.Point {
 	return pubkey
 }
 
-//AcceptConnections welcomes new connections
-func (bc *BeaconChain) AcceptConnections(b []byte) {
+//AcceptNodeInfo deserializes node information received via beaconchain handler
+func (bc *BeaconChain) AcceptNodeInfo(b []byte) *bcconn.NodeInfo {
 	Node := bcconn.DeserializeNodeInfo(b)
 	bc.log.Info("New Node Connection", "IP", Node.Self.IP, "Port", Node.Self.Port)
 	bc.NumberOfNodesAdded = bc.NumberOfNodesAdded + 1
@@ -99,11 +107,24 @@ func (bc *BeaconChain) AcceptConnections(b []byte) {
 	if isLeader {
 		bc.Leaders = append(bc.Leaders, Node)
 	}
+	bc.state = NodeInfoReceived
+	return Node
+}
+
+//RespondRandomness sends a randomness beacon to the node inorder for it process what shard it will be in
+func (bc *BeaconChain) RespondRandomness(Node *bcconn.NodeInfo) {
 	response := bcconn.ResponseRandomNumber{NumberOfShards: bc.NumberOfShards, NumberOfNodesAdded: bc.NumberOfNodesAdded, Leaders: bc.Leaders}
 	msg := bcconn.SerializeRandomInfo(response)
 	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Acknowledge, msg)
 	bc.log.Info("Sent Out Msg", "# Nodes", response.NumberOfNodesAdded)
 	host.SendMessage(bc.host, Node.Self, msgToSend, nil)
+	bc.state = RandomInfoSent
+}
+
+//AcceptConnections welcomes new connections
+func (bc *BeaconChain) AcceptConnections(b []byte) {
+	node := bc.AcceptNodeInfo(b)
+	bc.RespondRandomness(node)
 }
 
 //StartServer a server and process the request by a handler.
