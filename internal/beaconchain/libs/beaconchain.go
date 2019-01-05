@@ -18,6 +18,7 @@ import (
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 )
 
+//BCState keeps track of the state the beaconchain is in
 type BCState int
 
 var mutex sync.Mutex
