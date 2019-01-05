@@ -1,12 +1,12 @@
 package host
 
 import (
-	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/p2p/host/hostv2"
-	"log"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/p2p/host/hostv2"
 )
 
 func TestSendMessage(test *testing.T) {
@@ -18,7 +18,6 @@ func TestSendMessage(test *testing.T) {
 	go host2.BindHandlerAndServe(handler)
 	SendMessage(host1, peer2, msg, nil)
 	time.Sleep(3 * time.Second)
-
 }
 
 func handler(s p2p.Stream) {
@@ -26,13 +25,10 @@ func handler(s p2p.Stream) {
 	content, err := p2p.ReadMessageContent(s)
 	if err != nil {
 		panic("Read p2p data failed")
-		return
 	}
-	log.Printf("received: %v", content)
 	golden := []byte{0x00, 0x01, 0x02, 0x03, 0x04}
 
 	if !reflect.DeepEqual(content, golden) {
 		panic("received message not equal original message")
 	}
-
 }
