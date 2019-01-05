@@ -37,10 +37,8 @@ func (host *HostV2) Peerstore() peerstore.Peerstore {
 func New(self p2p.Peer) *HostV2 {
 	sourceAddr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", self.Port))
 	catchError(err)
-	priv := addrToPrivKey(fmt.Sprintf("/ip4/%s/tcp/%s", self.IP, self.Port))
 	p2pHost, err := libp2p.New(context.Background(),
 		libp2p.ListenAddrs(sourceAddr),
-		libp2p.Identity(priv),
 		libp2p.NoSecurity, // The security (signature generation and verification) is, for now, taken care by ourselves.
 		// TODO(ricl): Other features to probe
 		// libp2p.EnableRelay; libp2p.Routing;
@@ -73,8 +71,7 @@ func (host *HostV2) SendMessage(p p2p.Peer, message []byte) error {
 	addr := fmt.Sprintf("/ip4/%s/tcp/%s", p.IP, p.Port)
 	targetAddr, err := multiaddr.NewMultiaddr(addr)
 
-	priv := addrToPrivKey(addr)
-	peerID, _ := peer.IDFromPrivateKey(priv)
+	peerID := peer.ID(addr)
 	host.Peerstore().AddAddrs(peerID, []multiaddr.Multiaddr{targetAddr}, peerstore.PermanentAddrTTL)
 	s, err := host.h.NewStream(context.Background(), peerID, ProtocolID)
 	if err != nil {
