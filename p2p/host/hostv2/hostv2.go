@@ -83,7 +83,7 @@ func (host *HostV2) SendMessage(p p2p.Peer, message []byte) error {
 	}
 
 	// Create a buffered stream so that read and writes are non blocking.
-	w := bufio.NewWriter(bufio.NewWriter(s))
+	w := bufio.NewWriter(s)
 
 	// Create a thread to read and write data.
 	go writeData(w, message)
