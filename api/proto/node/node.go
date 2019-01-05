@@ -10,7 +10,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 
 	"github.com/harmony-one/harmony/api/proto"
-	"github.com/harmony-one/harmony/p2p"
 )
 
 // MessageType is to indicate the specific type of message under Node category
@@ -73,12 +72,6 @@ type ControlMessageType int
 const (
 	STOP ControlMessageType = iota
 )
-
-// FetchUtxoMessage is the wrapper struct FetchUtxoMessage sent from client wallet.
-type FetchUtxoMessage struct {
-	Addresses [][20]byte
-	Sender    p2p.Peer
-}
 
 // SerializeBlockchainSyncMessage serializes BlockchainSyncMessage.
 func SerializeBlockchainSyncMessage(blockchainSyncMessage *BlockchainSyncMessage) []byte {

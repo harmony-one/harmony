@@ -27,7 +27,7 @@ const (
 
 // MaybeBroadcastAsValidator returns if the node is a validator node.
 func (node *Node) MaybeBroadcastAsValidator(content []byte) {
-	// TODO: this is tree broadcasting. this needs to be removed later. Actually the whole logic needs to be replaced by p2p.
+	// TODO: this is tree-based broadcasting. this needs to be replaced by p2p gossiping.
 	if node.SelfPeer.ValidatorID > 0 && node.SelfPeer.ValidatorID <= host.MaxBroadCast {
 		go host.BroadcastMessageFromValidator(node.host, node.SelfPeer, node.Consensus.GetValidatorPeers(), content)
 	}
@@ -75,8 +75,6 @@ func (node *Node) StreamHandler(s p2p.Stream) {
 			switch messageType {
 			case proto_identity.Register:
 				fmt.Println("received a identity message")
-				// TODO(ak): fix it.
-				// node.processPOWMessage(msgPayload)
 				node.log.Info("NET: received message: IDENTITY/REGISTER")
 			default:
 				node.log.Error("Announce message should be sent to IdentityChain")

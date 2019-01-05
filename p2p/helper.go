@@ -57,36 +57,16 @@ func ReadMessageContent(s Stream) ([]byte, error) {
 		log.Error("Failed reading the p2p message size field: only read", "Num of bytes", n)
 		return contentBuf.Bytes(), err
 	}
-	//log.Print(fourBytes)
-	// Number of bytes for the message content
-	bytesToRead := binary.BigEndian.Uint32(fourBytes)
-	//log.Printf("The content size is %d bytes.", bytesToRead)
-	//// Read the content in chunk of 16 * 1024 bytes
-	tmpBuf := make([]byte, BatchSizeInByte)
-ILOOP:
-	for {
-		timeoutDuration := 10 * time.Second
-		s.SetReadDeadline(time.Now().Add(timeoutDuration))
-		if bytesToRead < BatchSizeInByte {
-			// Read the last number of bytes less than 1024
-			tmpBuf = make([]byte, bytesToRead)
-		}
-		n, err := r.Read(tmpBuf)
-		contentBuf.Write(tmpBuf[:n])
-		switch err {
-		case io.EOF:
-			// TODO: should we return error here, or just ignore it?
-			log.Error("EOF reached while reading p2p message")
-			break ILOOP
-		case nil:
-			bytesToRead -= uint32(n) // TODO: think about avoid the casting in every loop
-			if bytesToRead <= 0 {
-				break ILOOP
-			}
-		default:
-			log.Error("Error reading p2p message")
-			return []byte{}, err
-		}
+
+	contentLength := int(binary.BigEndian.Uint32(fourBytes))
+	tmpBuf := make([]byte, contentLength)
+	timeoutDuration = 20 * time.Second
+	s.SetReadDeadline(time.Now().Add(timeoutDuration))
+	m, err := io.ReadFull(r, tmpBuf)
+	if err != nil || m < contentLength {
+		log.Error("Read %v bytes, we need %v bytes", m, contentLength)
+		return []byte{}, err
 	}
+	contentBuf.Write(tmpBuf)
 	return contentBuf.Bytes(), nil
 }

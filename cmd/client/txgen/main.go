@@ -23,11 +23,11 @@ import (
 )
 
 var (
-	version       string
-	builtBy       string
-	builtAt       string
-	commit        string
-	utxoPoolMutex sync.Mutex
+	version    string
+	builtBy    string
+	builtAt    string
+	commit     string
+	stateMutex sync.Mutex
 )
 
 func printVersion(me string) {
@@ -93,7 +93,7 @@ func main() {
 	)
 	log.Root().SetHandler(h)
 
-	// Nodes containing utxopools to mirror the shards' data in the network
+	// Nodes containing blockchain data to mirror the shards' data in the network
 	nodes := []*node.Node{}
 	for shardID := range shardIDLeaderMap {
 		_, pubKey := utils.GenKey(clientPeer.IP, clientPeer.Port)
@@ -110,15 +110,15 @@ func main() {
 	clientNode := node.New(host, consensusObj, nil)
 	clientNode.Client = client.NewClient(clientNode.GetHost(), &shardIDLeaderMap)
 
-	// This func is used to update the client's utxopool when new blocks are received from the leaders
 	readySignal := make(chan uint32)
 	go func() {
 		for i := range shardIDLeaderMap {
 			readySignal <- i
 		}
 	}()
+	// This func is used to update the client's blockchain when new blocks are received from the leaders
 	updateBlocksFunc := func(blocks []*types.Block) {
-		log.Info("RECEIVED BLOCK", "block", blocks)
+		log.Info("[Txgen] Received new block", "block", blocks)
 		for _, block := range blocks {
 			for _, node := range nodes {
 				shardID := block.ShardID()
@@ -128,9 +128,9 @@ func main() {
 					log.Info("Current Block", "hash", node.Blockchain().CurrentBlock().Hash().Hex())
 					log.Info("Adding block from leader", "txNum", len(block.Transactions()), "shardID", shardID, "preHash", block.ParentHash().Hex())
 					node.AddNewBlock(block)
-					utxoPoolMutex.Lock()
+					stateMutex.Lock()
 					node.Worker.UpdateCurrent()
-					utxoPoolMutex.Unlock()
+					stateMutex.Unlock()
 					readySignal <- shardID
 				} else {
 					continue
@@ -168,17 +168,15 @@ func main() {
 			shardIDTxsMap := make(map[uint32]types.Transactions)
 			lock := sync.Mutex{}
 
-			utxoPoolMutex.Lock()
+			stateMutex.Lock()
 			log.Warn("STARTING TX GEN", "gomaxprocs", runtime.GOMAXPROCS(0))
 			txs, _ := txgen.GenerateSimulatedTransactionsAccount(int(shardID), nodes, setting)
-
-			// TODO: Put cross shard tx into a pending list waiting for proofs from leaders
 
 			lock.Lock()
 			// Put txs into corresponding shards
 			shardIDTxsMap[shardID] = append(shardIDTxsMap[shardID], txs...)
 			lock.Unlock()
-			utxoPoolMutex.Unlock()
+			stateMutex.Unlock()
 
 			lock.Lock()
 			for shardID, txs := range shardIDTxsMap { // Send the txs to corresponding shards
