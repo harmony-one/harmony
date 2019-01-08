@@ -34,6 +34,7 @@ func (s *UniqueValidatorID) GetUniqueID() uint32 {
 	return atomic.AddUint32(&s.uniqueID, 1)
 }
 
+// GetLogInstance returns logging singleton.
 func GetLogInstance() log.Logger {
 	onceForLog.Do(func() {
 		logInstance = log.New()
