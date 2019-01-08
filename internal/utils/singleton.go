@@ -14,19 +14,19 @@ type UniqueValidatorID struct {
 	uniqueID uint32
 }
 
-var instance *UniqueValidatorID
+var validatorIDInstance *UniqueValidatorID
 var logInstance log.Logger
-var once sync.Once
+var onceForUniqueValidatorID sync.Once
 var onceForLog sync.Once
 
 // GetUniqueValidatorIDInstance returns a singleton instance
 func GetUniqueValidatorIDInstance() *UniqueValidatorID {
-	once.Do(func() {
-		instance = &UniqueValidatorID{
+	onceForUniqueValidatorID.Do(func() {
+		validatorIDInstance = &UniqueValidatorID{
 			uniqueID: 0,
 		}
 	})
-	return instance
+	return validatorIDInstance
 }
 
 // GetUniqueID returns a unique ID and increment the internal variable
