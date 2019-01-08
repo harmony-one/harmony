@@ -1,8 +1,8 @@
 package beaconchain
 
 import (
-	"fmt"
 	"log"
+	"os"
 	"reflect"
 	"strconv"
 	"testing"
@@ -131,8 +131,5 @@ func TestSaveBC(t *testing.T) {
 	if !reflect.DeepEqual(bc, bc2) {
 		t.Error("beacon chain info objects are not same")
 	}
-	//os.Remove("test.json")
-	fmt.Println(bc2)
-	fmt.Println(bc)
-
+	os.Remove("test.json")
 }
