@@ -3,15 +3,38 @@ package utils
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
+	"fmt"
+	"io"
 	"log"
+	"os"
 	"regexp"
 	"strconv"
+	"sync"
 
 	"github.com/dedis/kyber"
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/p2p"
 )
+
+var lock sync.Mutex
+
+// Unmarshal is a function that unmarshals the data from the
+// reader into the specified value.
+var Unmarshal = func(r io.Reader, v interface{}) error {
+	return json.NewDecoder(r).Decode(v)
+}
+
+// Marshal is a function that marshals the object into an
+// io.Reader.
+var Marshal = func(v interface{}) (io.Reader, error) {
+	b, err := json.MarshalIndent(v, "", "\t")
+	if err != nil {
+		return nil, err
+	}
+	return bytes.NewReader(b), nil
+}
 
 // ConvertFixedDataIntoByteArray converts an empty interface data to a byte array
 func ConvertFixedDataIntoByteArray(data interface{}) []byte {
@@ -65,4 +88,36 @@ func AllocateShard(numOfAddedNodes, numOfShards int) (int, bool) {
 		return shardNum, false
 	}
 	return numOfAddedNodes, true
+}
+
+// Save saves a representation of v to the file at path.
+func Save(path string, v interface{}) error {
+	lock.Lock()
+	defer lock.Unlock()
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	r, err := Marshal(v)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(f, r)
+	return err
+}
+
+// Load loads the file at path into v.
+func Load(path string, v interface{}) error {
+	lock.Lock()
+	defer lock.Unlock()
+	f, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Println("File does not exist")
+		}
+		return err
+	}
+	defer f.Close()
+	return Unmarshal(f, v)
 }
