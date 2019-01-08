@@ -114,10 +114,12 @@ func (bc *BeaconChain) AcceptNodeInfo(b []byte) *bcconn.NodeInfo {
 	Node := bcconn.DeserializeNodeInfo(b)
 	bc.log.Info("New Node Connection", "IP", Node.Self.IP, "Port", Node.Self.Port)
 	bc.NumberOfNodesAdded = bc.NumberOfNodesAdded + 1
-	_, isLeader := utils.AllocateShard(bc.NumberOfNodesAdded, bc.NumberOfShards)
+	shardNum, isLeader := utils.AllocateShard(bc.NumberOfNodesAdded, bc.NumberOfShards)
 	if isLeader {
 		bc.Leaders = append(bc.Leaders, Node)
+		bc.ShardLeaderMap[shardNum] = Node
 	}
+	go SaveBeaconChainInfo("bc_config.json", bc)
 	bc.state = NodeInfoReceived
 	return Node
 }

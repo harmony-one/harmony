@@ -27,7 +27,7 @@ func main() {
 	ip := flag.String("ip", "127.0.0.1", "ip on which beaconchain listens")
 	port := flag.String("port", "8081", "port on which beaconchain listens")
 	versionFlag := flag.Bool("version", false, "Output version info")
-	resetFlag := flag.String("path", "bc_config.json", "path to file")
+	resetFlag := flag.String("path", "", "path to file")
 	flag.Parse()
 
 	if *versionFlag {
