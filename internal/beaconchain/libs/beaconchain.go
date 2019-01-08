@@ -27,6 +27,16 @@ var identityPerBlock = 100000
 // BeaconchainServicePortDiff is the positive port diff from beacon chain's self port
 const BeaconchainServicePortDiff = 4444
 
+//BCInfo is the information that needs to be stored on the disk in order to allow for a restart.
+type BCInfo struct {
+	Leaders            []*bcconn.NodeInfo
+	ShardLeaderMap     map[int]*bcconn.NodeInfo
+	NumberOfShards     int
+	NumberOfNodesAdded int
+	IP                 string
+	Port               string
+}
+
 // BeaconChain (Blockchain) keeps Identities per epoch, currently centralized!
 type BeaconChain struct {
 	Leaders            []*bcconn.NodeInfo
@@ -131,4 +141,31 @@ func (bc *BeaconChain) AcceptConnections(b []byte) {
 //StartServer a server and process the request by a handler.
 func (bc *BeaconChain) StartServer() {
 	bc.host.BindHandlerAndServe(bc.BeaconChainHandler)
+}
+
+//SaveBeaconChainInfo to disk
+func SaveBeaconChainInfo(path string, bc *BeaconChain) error {
+	bci := BCtoBCI(bc)
+	err := utils.Save(path, bci)
+	return err
+}
+
+//LoadBeaconChainInfo from disk
+func LoadBeaconChainInfo(path string) (*BeaconChain, error) {
+	bci := &BCInfo{}
+	err := utils.Load(path, bci)
+	bc := BCItoBC(bci)
+	return bc, err
+}
+
+// BCtoBCI converts beaconchain into beaconchaininfo
+func BCtoBCI(bc *BeaconChain) *BCInfo {
+	bci := &BCInfo{Leaders: bc.Leaders, ShardLeaderMap: bc.ShardLeaderMap, NumberOfShards: bc.NumberOfShards, NumberOfNodesAdded: bc.NumberOfNodesAdded, IP: bc.IP, Port: bc.Port}
+	return bci
+}
+
+//BCItoBC converts beconchaininfo to beaconchain
+func BCItoBC(bci *BCInfo) *BeaconChain {
+	bc := &BeaconChain{Leaders: bci.Leaders, ShardLeaderMap: bci.ShardLeaderMap, NumberOfShards: bci.NumberOfShards, NumberOfNodesAdded: bci.NumberOfNodesAdded, IP: bci.IP, Port: bci.Port}
+	return bc
 }
