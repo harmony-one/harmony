@@ -2,6 +2,7 @@ package beaconchain
 
 import (
 	"math/rand"
+	"os"
 	"strconv"
 	"sync"
 
@@ -27,11 +28,22 @@ var identityPerBlock = 100000
 // BeaconchainServicePortDiff is the positive port diff from beacon chain's self port
 const BeaconchainServicePortDiff = 4444
 
+//BCInfo is the information that needs to be stored on the disk in order to allow for a restart.
+type BCInfo struct {
+	Leaders            []*bcconn.NodeInfo       `json:"leaders"`
+	ShardLeaderMap     map[int]*bcconn.NodeInfo `json:"shardleadermap"`
+	NumberOfShards     int                      `json:"numshards"`
+	NumberOfNodesAdded int                      `json:"numnodesadded"`
+	IP                 string                   `json:"ip"`
+	Port               string                   `json:"port"`
+}
+
 // BeaconChain (Blockchain) keeps Identities per epoch, currently centralized!
 type BeaconChain struct {
 	Leaders            []*bcconn.NodeInfo
 	log                log.Logger
 	ShardLeaderMap     map[int]*bcconn.NodeInfo
+	ShardNodeMap       map[int]*bcconn.NodeInfo
 	PubKey             kyber.Point
 	NumberOfShards     int
 	NumberOfNodesAdded int
@@ -39,8 +51,11 @@ type BeaconChain struct {
 	Port               string
 	host               host.Host
 	state              BCState
+	saveFile           string
 	rpcServer          *beaconchain.Server
 }
+
+var SaveFile string
 
 // Followings are the set of states of that beaconchain can be in.
 const (
@@ -104,10 +119,12 @@ func (bc *BeaconChain) AcceptNodeInfo(b []byte) *bcconn.NodeInfo {
 	Node := bcconn.DeserializeNodeInfo(b)
 	bc.log.Info("New Node Connection", "IP", Node.Self.IP, "Port", Node.Self.Port)
 	bc.NumberOfNodesAdded = bc.NumberOfNodesAdded + 1
-	_, isLeader := utils.AllocateShard(bc.NumberOfNodesAdded, bc.NumberOfShards)
+	shardNum, isLeader := utils.AllocateShard(bc.NumberOfNodesAdded, bc.NumberOfShards)
 	if isLeader {
 		bc.Leaders = append(bc.Leaders, Node)
+		bc.ShardLeaderMap[shardNum] = Node
 	}
+	go SaveBeaconChainInfo(SaveFile, bc)
 	bc.state = NodeInfoReceived
 	return Node
 }
@@ -131,4 +148,43 @@ func (bc *BeaconChain) AcceptConnections(b []byte) {
 //StartServer a server and process the request by a handler.
 func (bc *BeaconChain) StartServer() {
 	bc.host.BindHandlerAndServe(bc.BeaconChainHandler)
+}
+
+//SaveBeaconChainInfo to disk
+func SaveBeaconChainInfo(filePath string, bc *BeaconChain) error {
+	bci := BCtoBCI(bc)
+	err := utils.Save(filePath, bci)
+	return err
+}
+
+//LoadBeaconChainInfo from disk
+func LoadBeaconChainInfo(path string) (*BeaconChain, error) {
+	bci := &BCInfo{}
+	var err error
+	if _, err := os.Stat(path); err != nil {
+		return nil, err
+	}
+	err = utils.Load(path, bci)
+	var bc *BeaconChain
+	if err != nil {
+		return nil, err
+	}
+	bc = BCItoBC(bci)
+	return bc, err
+}
+
+// BCtoBCI converts beaconchain into beaconchaininfo
+func BCtoBCI(bc *BeaconChain) *BCInfo {
+	bci := &BCInfo{Leaders: bc.Leaders, ShardLeaderMap: bc.ShardLeaderMap, NumberOfShards: bc.NumberOfShards, NumberOfNodesAdded: bc.NumberOfNodesAdded, IP: bc.IP, Port: bc.Port}
+	return bci
+}
+
+//BCItoBC converts beconchaininfo to beaconchain
+func BCItoBC(bci *BCInfo) *BeaconChain {
+	bc := &BeaconChain{Leaders: bci.Leaders, ShardLeaderMap: bci.ShardLeaderMap, NumberOfShards: bci.NumberOfShards, NumberOfNodesAdded: bci.NumberOfNodesAdded, IP: bci.IP, Port: bci.Port}
+	return bc
+}
+
+func SetSaveFile(path string) {
+	SaveFile = path
 }
