@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/gorilla/mux"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // Constants for explorer service.
@@ -32,7 +33,7 @@ func GetExplorerPort(nodePort string) string {
 	if port, err := strconv.Atoi(nodePort); err == nil {
 		return fmt.Sprintf("%d", port-explorerPortDifference)
 	}
-	Log.Error("error on parsing.")
+	utils.GetLogInstance().Error("error on parsing.")
 	return ""
 }
 
@@ -60,7 +61,7 @@ func (s *Service) Run() {
 	s.router.Path("/address").HandlerFunc(s.GetExplorerAddress)
 
 	// Do serving now.
-	fmt.Println("Listening to:", GetExplorerPort(s.Port))
+	utils.GetLogInstance().Info("Listening to ", "port: ", GetExplorerPort(s.Port))
 	log.Fatal(http.ListenAndServe(addr, s.router))
 }
 
@@ -80,7 +81,8 @@ func (s *Service) GetAccountBlocks(from, to int) []*types.Block {
 		}
 		block := new(types.Block)
 		if rlp.DecodeBytes(data, block) != nil {
-			Log.Error("Error on getting from db")
+
+			utils.GetLogInstance().Error("Error on getting from db")
 			os.Exit(1)
 		}
 		blocks = append(blocks, block)
