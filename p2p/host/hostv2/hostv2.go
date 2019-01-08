@@ -9,6 +9,7 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	libp2p "github.com/libp2p/go-libp2p"
 	libp2phost "github.com/libp2p/go-libp2p-host"
+	libp2pdht "github.com/libp2p/go-libp2p-kad-dht"
 	net "github.com/libp2p/go-libp2p-net"
 	peer "github.com/libp2p/go-libp2p-peer"
 	peerstore "github.com/libp2p/go-libp2p-peerstore"
@@ -24,8 +25,10 @@ const (
 
 // HostV2 is the version 2 p2p host
 type HostV2 struct {
-	h    libp2phost.Host
-	self p2p.Peer
+	h                libp2phost.Host
+	self             p2p.Peer
+	dht              *libp2pdht.IpfsDHT
+	rendezvousString string
 }
 
 // Peerstore returns the peer store
@@ -62,6 +65,7 @@ func (host *HostV2) BindHandlerAndServe(handler p2p.StreamHandler) {
 	host.h.SetStreamHandler(ProtocolID, func(s net.Stream) {
 		handler(s)
 	})
+	host.setupDiscovery()
 	// Hang forever
 	<-make(chan struct{})
 }
