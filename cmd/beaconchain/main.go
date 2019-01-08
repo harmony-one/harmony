@@ -28,6 +28,7 @@ func main() {
 	port := flag.String("port", "8081", "port on which beaconchain listens")
 	versionFlag := flag.Bool("version", false, "Output version info")
 	resetFlag := flag.String("path", "", "path to file")
+
 	flag.Parse()
 
 	if *versionFlag {
