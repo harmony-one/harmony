@@ -15,6 +15,7 @@ RACE=
 
 if [ "$(uname -s)" == "Darwin" ]; then
    MD5='md5 -r'
+   GOOS=darwin
 else
    MD5=md5sum
 fi
