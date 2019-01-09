@@ -37,16 +37,17 @@ func main() {
 
 	h := log.StdoutHandler
 	log.Root().SetHandler(h)
+	var bc *beaconchain.BeaconChain
+	var err error
+
 	if *resetFlag != "" {
-		bc, err := beaconchain.LoadBeaconChainInfo(*resetFlag)
+		bc, err = beaconchain.LoadBeaconChainInfo(*resetFlag)
 		if err != nil {
 			fmt.Println("Could not reset beaconchain from file")
 		}
-		go bc.SupportRPC()
-		bc.StartServer()
 	} else {
-		bc := beaconchain.New(*numShards, *ip, *port)
-		go bc.SupportRPC()
-		bc.StartServer()
+		bc = beaconchain.New(*numShards, *ip, *port)
 	}
+	go bc.SupportRPC()
+	bc.StartServer()
 }
