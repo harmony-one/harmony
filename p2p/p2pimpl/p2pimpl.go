@@ -10,7 +10,7 @@ import (
 // Version The version number of p2p library
 // 1 - Direct socket connection
 // 2 - libp2p
-const Version = 2
+const Version = 1
 
 // NewHost starts the host
 func NewHost(peer p2p.Peer) host.Host {
