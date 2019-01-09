@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # Check golint.
-if [ $(golint ./... | wc | awk '{print $1}') -gt 2 ]; then
+if [ $(golint ./... | wc -l) -gt 2 ]; then
     echo "Go code is not formatted:"
     gofmt -d .
     exit 1
 fi
 # Run deploy.sh and count how many times HOORAY appearing in the output. If it does not produce enough the submission may cause the consensus.
-if [ $(./test/deploy.sh ./test/configs/local_config1.txt 2>&1  | grep "HOORAY" | wc | awk '{print $1}') -lt 10 ]; then
+if [ $(./test/deploy.sh ./test/configs/local_config1.txt 2>&1  | grep "HOORAY" | wc -l) -lt 10 ]; then
     echo "The code did not produce enough consensus."
     exit 1
 fi
