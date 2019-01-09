@@ -49,3 +49,29 @@ Make sure you the following command and make sure everything passes golint.
 ./lint_before_submit.sh
 ```
 
+## Development Status
+
+### Features Done
+
+* Basic consensus protocol with O(n) complexity
+* Basic validator server
+* P2p network connection and unicast
+* Account model and support for Solidity
+* Simple wallet program
+* Mock beacon chain with static sharding
+* Information disposal algorithm using erasure encoding (to be integrated)
+* Blockchain explorer with performance report and transaction lookup
+* Transaction generator for loadtesting
+
+### Features To Be Implemented
+
+* Full beacon chain with multiple validators
+* Resharding
+* Staking on beacon chain
+* Fast state synchronization
+* Distributed randomness generation with VRF and VDF
+* Kademlia routing
+* P2p network and gossiping
+* Full protocol of consensus with BLS multi-sig and view-change protocol
+* Integration with WASM
+* Cross-shard transaction
