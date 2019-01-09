@@ -7,7 +7,7 @@ if [ $(golint ./... | wc -l) -gt 2 ]; then
     exit 1
 fi
 # Run deploy.sh and count how many times HOORAY appearing in the output. If it does not produce enough the submission may cause the consensus.
-if [ $(./test/deploy.sh ./test/configs/local_config1.txt 2>&1  | grep "HOORAY" | wc -l) -lt 10 ]; then
+if [ $(./test/deploy.sh -D 30 ./test/configs/local_config1.txt 2>&1  | grep "HOORAY" | wc -l) -lt 10 ]; then
     echo "The code did not produce enough consensus."
     exit 1
 fi
