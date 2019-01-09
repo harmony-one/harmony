@@ -4,6 +4,16 @@ ROOT=$(dirname $0)/..
 
 set -eo pipefail
 
+function check_result() {
+   find $log_folder -name leader-*.log > $log_folder/all-leaders.txt
+   find $log_folder -name validator-*.log > $log_folder/all-validators.txt
+
+   echo ====== RESULTS ======
+   results=$($ROOT/test/cal_tps.sh $log_folder/all-leaders.txt $log_folder/all-validators.txt)
+   echo $results | tee -a $LOG_FILE
+   echo $results > $log_folder/tps.log
+}
+
 function cleanup() {
    for pid in `/bin/ps -fu $USER| grep "harmony\|txgen\|soldier\|commander\|profiler\|beacon" | grep -v "grep" | grep -v "vi" | awk '{print $2}'`;
    do
@@ -100,9 +110,10 @@ t=`date +"%Y%m%d-%H%M%S"`
 log_folder="tmp_log/log-$t"
 
 mkdir -p $log_folder
+LOG_FILE=$log_folder/r.log
 
 echo "launching beacon chain ..."
-$DRYRUN $ROOT/bin/beacon -numShards $SHARDS > $log_folder/beacon.log 2>&1 &
+$DRYRUN $ROOT/bin/beacon -numShards $SHARDS > $log_folder/beacon.log 2>&1 | tee -a $LOG_FILE &
 sleep 1 #waiting for beaconchain
 
 # Start nodes
@@ -110,7 +121,7 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
   IFS=' ' read ip port mode shardID <<< $line
 	#echo $ip $port $mode
   if [ "$mode" != "client" ]; then
-      $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN &
+      $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN 2>&1 | tee -a $LOG_FILE &
       sleep 0.5
   fi
 done < $config
@@ -123,8 +134,9 @@ if [ "$TXGEN" == "true" ]; then
    line=$(grep client $config)
    IFS=' ' read ip port mode shardID <<< $line
    if [ "$mode" == "client" ]; then
-      $DRYRUN $ROOT/bin/txgen -log_folder $log_folder -duration $DURATION -ip $ip -port $port
+      $DRYRUN $ROOT/bin/txgen -log_folder $log_folder -duration $DURATION -ip $ip -port $port 2>&1 | tee -a $LOG_FILE
    fi
 fi
 
 cleanup
+check_result
