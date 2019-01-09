@@ -12,7 +12,7 @@
 
 ## Dev Environment Setup
 
-```
+```bash
 export GOPATH=$HOME/<path_of_your_choice>
 
 mkdir -p $HOME/<path_of_your_choice>/src/github.com/harmony-one
@@ -27,9 +27,16 @@ go get ./...
 ```
 
 ## Usage
+You may build the benchmark.go locally and run local test.
+
+Some of our scripts require bash 4.x support, please [install bash 4.x](http://tldrdevnotes.com/bash-upgrade-3-4-macos) on MacOS X.
 
 ### Running local test
-```
+The deploy.sh script creates a local environment of Harmony blockchain devnet based on the configuration file.
+The configuration file configures number of nodes and their IP/Port.
+The script starts one local beacon chain node, the blockchain nodes, and run a transactional generator program which generates and sends simulated trnsactions to the local blockchain.
+
+```bash
 ./test/deploy.sh ./test/configs/local_config1.txt
 ```
 
@@ -37,16 +44,45 @@ go get ./...
 
 Make sure you the following command and make sure everything passed before submitting your code.
 
-```
-./test_before_submit.sh
+```bash
+./test/test_before_submit.sh
 ```
 
-## Linting
+## Pull Request (PR)
 
-Make sure you the following command and make sure everything passes golint.
+This [github document](https://help.github.com/articles/creating-a-pull-request/) provides some guidance on how to create a pull request in github.
 
-```
-./lint_before_submit.sh
+### PR requirement
+To pursue engineering excellence, we have insisted on the highest stardard on the quality of each PR.
+
+* For each PR, please run [golint](https://github.com/golang/lint), [gofmt](https://golang.org/cmd/gofmt/), to fix the basic issues/warnings.
+* Make sure you understand [How to Write a Git Commit Message](https://chris.beams.io/posts/git-commit/).
+* Add a [Test] section in every PR detailing on your test process and results. If the test log is too long, please include a link to [gist](https://gist.github.com/) and add the link to the PR.
+
+### Typical workflow example
+The best practice is to reorder and squash your local commits before the PR submission to create an atomic and self-contained PR.
+This [book chapter](https://git-scm.com/book/en/v2/Git-Tools-Rewriting-History) provides detailed explanation and guidance on how to rewrite the local git history.
+
+For exampple, a typical workflow is like the following.
+```bash
+# assuming you are working on a fix of bug1, and use a local branch called "fixes_of_bug1".
+
+git clone https://github.com/harmony-one/harmony
+cd harmony
+
+# create a local branch to keep track of the origin/master
+git branch fixes_of_bug1 origin/master
+git checkout fixes_of_bug_1
+
+# make changes, build, test locally, commit changes locally
+# don't forget to squash or rearrange your commits using "git rebase -i"
+git rebase -i origin/master
+
+# rebase your change on the top of the tree
+git pull --rebase
+
+# push your branch and create a PR
+git push origin fixes_of_bug_1:pr_fixes_of_bug_1
 ```
 
 ## Development Status
