@@ -1,6 +1,7 @@
 # Harmony
 [![Build Status](https://travis-ci.com/harmony-one/harmony.svg?token=DnoYvYiTAk7pqTo9XsTi&branch=master)](https://travis-ci.com/harmony-one/harmony)
 <a href='https://github.com/jpoles1/gopherbadger' target='_blank'>![gopherbadger-tag-do-not-edit](https://img.shields.io/badge/Go%20Coverage-45%25-brightgreen.svg?longCache=true&style=flat)</a>
+<a href="https://discord.gg/dKbK6M">![Discord](https://img.shields.io/discord/532383335348043777.svg)</a>
 
 
 ## Coding Guidelines
