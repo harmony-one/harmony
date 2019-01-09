@@ -61,7 +61,7 @@ func (s *Service) Run() {
 	s.router.Path("/address").HandlerFunc(s.GetExplorerAddress)
 
 	// Do serving now.
-	utils.GetLogInstance().Info("Listening to ", "port: ", GetExplorerPort(s.Port))
+	utils.GetLogInstance().Info("Listening on ", "port: ", GetExplorerPort(s.Port))
 	log.Fatal(http.ListenAndServe(addr, s.router))
 }
 
@@ -81,7 +81,6 @@ func (s *Service) GetAccountBlocks(from, to int) []*types.Block {
 		}
 		block := new(types.Block)
 		if rlp.DecodeBytes(data, block) != nil {
-
 			utils.GetLogInstance().Error("Error on getting from db")
 			os.Exit(1)
 		}
