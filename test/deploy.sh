@@ -1,7 +1,9 @@
 #!/bin/bash
 
 ROOT=$(dirname $0)/..
+USER=$(whoami)
 
+set -x
 set -eo pipefail
 
 function check_result() {
