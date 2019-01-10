@@ -8,10 +8,10 @@ install:
   - go get -t -v ./...
   - go get -u golang.org/x/lint/golint
   - go get gopkg.in/check.v1
-  - ./script/gofmt.sh
+  - ./scripts/gofmt.sh
   - go build -v ./...
 script:
-  - ./script/gofmt.sh
+  - ./scripts/gofmt.sh
 notifications:
   slack:
     harmonyone:gggCd1QQopsQAW8JYgBWiH7M
