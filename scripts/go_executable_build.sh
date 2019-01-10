@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 declare -A SRC
-SRC[benchmark]=benchmark.go
+SRC[harmony]=cmd/harmony.go
 SRC[txgen]=cmd/client/txgen/main.go
 SRC[beacon]=cmd/beaconchain/main.go
 SRC[wallet]=cmd/client/wallet/main.go
@@ -15,6 +15,7 @@ RACE=
 
 if [ "$(uname -s)" == "Darwin" ]; then
    MD5='md5 -r'
+   GOOS=darwin
 else
    MD5=md5sum
 fi
@@ -63,6 +64,7 @@ function build_only
    BUILTBY=${USER}@
 
    for bin in "${!SRC[@]}"; do
+      echo "building ${SRC[$bin]}"
       env GOOS=$GOOS GOARCH=$GOARCH go build -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE ${SRC[$bin]}
       if [ "$(uname -s)" == "Linux" ]; then
          $BINDIR/$bin -version

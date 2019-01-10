@@ -27,6 +27,31 @@ cd harmony
 go get ./...
 ```
 
+## Build
+
+Harmony server / main node:
+```
+go build -o bin/harmony cmd/harmony.go
+```
+
+Beacon node:
+```
+go build -o bin/beacon cmd/beaconchain/main.go
+```
+
+Wallet:
+```
+go build -o bin/wallet cmd/client/wallet/main.go
+```
+
+Tx Generator:
+```
+go build -o bin/txgen cmd/client/txgen/main.go
+```
+
+You can also run the script `./script/go_executable_build.sh` to build all the executables.
+The script use associated arrays that requiere bash v4 (MacOS has a bash v3 installed by default). You can follow instruction [here](https://clubmate.fi/upgrade-to-bash-4-in-mac-os-x/)
+
 ## Usage
 You may build the benchmark.go locally and run local test.
 
