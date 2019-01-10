@@ -50,7 +50,7 @@ go build -o bin/txgen cmd/client/txgen/main.go
 ```
 
 You can also run the script `./script/go_executable_build.sh` to build all the executables.
-The script use associated arrays that requiere bash v4 (MacOS has a bash v3 installed by default). You can follow instruction from https://clubmate.fi/upgrade-to-bash-4-in-mac-os-x/
+The script use associated arrays that requiere bash v4 (MacOS has a bash v3 installed by default). You can follow instruction [here](https://clubmate.fi/upgrade-to-bash-4-in-mac-os-x/)
 
 ## Usage
 You may build the benchmark.go locally and run local test.
