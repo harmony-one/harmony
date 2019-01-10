@@ -27,7 +27,7 @@ func main() {
 	ip := flag.String("ip", "127.0.0.1", "ip on which beaconchain listens")
 	port := flag.String("port", "8081", "port on which beaconchain listens")
 	versionFlag := flag.Bool("version", false, "Output version info")
-	resetFlag := flag.String("path", "", "path to file")
+	resetFlag := flag.String("path", "bc_config.json", "path to file")
 
 	flag.Parse()
 
@@ -38,15 +38,15 @@ func main() {
 	h := log.StdoutHandler
 	log.Root().SetHandler(h)
 	var bc *beaconchain.BeaconChain
-	var err error
-
-	if *resetFlag != "" {
+	if _, err := os.Stat(*resetFlag); err == nil {
 		bc, err = beaconchain.LoadBeaconChainInfo(*resetFlag)
 		if err != nil {
-			fmt.Println("Could not reset beaconchain from file")
+			fmt.Println("Could not load beaconchain from file")
 		}
 	} else {
-		bc = beaconchain.New(*numShards, *ip, *port)
+		fmt.Printf("File does not exist\n")
+		bc.SaveFile = *resetFlag
+		bc = beaconchain.New(*numShards, *ip, *port, *resetFlag)
 	}
 	go bc.SupportRPC()
 	bc.StartServer()

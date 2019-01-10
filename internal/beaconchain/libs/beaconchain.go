@@ -29,12 +29,12 @@ const BeaconchainServicePortDiff = 4444
 
 //BCInfo is the information that needs to be stored on the disk in order to allow for a restart.
 type BCInfo struct {
-	Leaders            []*bcconn.NodeInfo
-	ShardLeaderMap     map[int]*bcconn.NodeInfo
-	NumberOfShards     int
-	NumberOfNodesAdded int
-	IP                 string
-	Port               string
+	Leaders            []*bcconn.NodeInfo       `json:"leaders"`
+	ShardLeaderMap     map[int]*bcconn.NodeInfo `json:"shardleadermap"`
+	NumberOfShards     int                      `json:"numshards"`
+	NumberOfNodesAdded int                      `json:"numnodesadded"`
+	IP                 string                   `json:"ip"`
+	Port               string                   `json:"port"`
 }
 
 // BeaconChain (Blockchain) keeps Identities per epoch, currently centralized!
@@ -42,6 +42,7 @@ type BeaconChain struct {
 	Leaders            []*bcconn.NodeInfo
 	log                log.Logger
 	ShardLeaderMap     map[int]*bcconn.NodeInfo
+	ShardNodeMap       map[int]*bcconn.NodeInfo
 	PubKey             kyber.Point
 	NumberOfShards     int
 	NumberOfNodesAdded int
@@ -49,8 +50,11 @@ type BeaconChain struct {
 	Port               string
 	host               host.Host
 	state              BCState
+	saveFile           string
 	rpcServer          *beaconchain.Server
 }
+
+var SaveFile string
 
 // Followings are the set of states of that beaconchain can be in.
 const (
@@ -89,6 +93,21 @@ func (bc *BeaconChain) GetShardLeaderMap() map[int]*bcconn.NodeInfo {
 }
 
 //New beaconchain initialization
+func NewWithSave(numShards int, ip, port, resetFile string) *BeaconChain {
+	bc := BeaconChain{}
+	bc.log = log.New()
+	bc.NumberOfShards = numShards
+	bc.PubKey = generateBCKey()
+	bc.NumberOfNodesAdded = 0
+	bc.ShardLeaderMap = make(map[int]*bcconn.NodeInfo)
+	bc.Port = port
+	bc.IP = ip
+	bc.host = p2pimpl.NewHost(p2p.Peer{IP: ip, Port: port})
+	bc.saveFile = resetFile
+	return &bc
+}
+
+//New beaconchain initialization
 func New(numShards int, ip, port string) *BeaconChain {
 	bc := BeaconChain{}
 	bc.log = log.New()
@@ -119,7 +138,7 @@ func (bc *BeaconChain) AcceptNodeInfo(b []byte) *bcconn.NodeInfo {
 		bc.Leaders = append(bc.Leaders, Node)
 		bc.ShardLeaderMap[shardNum] = Node
 	}
-	go SaveBeaconChainInfo("bc_config.json", bc)
+	go SaveBeaconChainInfo(SaveFile, bc)
 	bc.state = NodeInfoReceived
 	return Node
 }
@@ -146,9 +165,9 @@ func (bc *BeaconChain) StartServer() {
 }
 
 //SaveBeaconChainInfo to disk
-func SaveBeaconChainInfo(path string, bc *BeaconChain) error {
+func SaveBeaconChainInfo(filePath string, bc *BeaconChain) error {
 	bci := BCtoBCI(bc)
-	err := utils.Save(path, bci)
+	err := utils.Save(filePath, bci)
 	return err
 }
 
