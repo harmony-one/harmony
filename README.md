@@ -50,12 +50,11 @@ go build -o bin/txgen cmd/client/txgen/main.go
 ```
 
 You can also run the script `./script/go_executable_build.sh` to build all the executables.
-The script use associated arrays that requiere bash v4 (MacOS has a bash v3 installed by default). You can follow instruction [here](https://clubmate.fi/upgrade-to-bash-4-in-mac-os-x/)
-
-## Usage
-You may build the benchmark.go locally and run local test.
 
 Some of our scripts require bash 4.x support, please [install bash 4.x](http://tldrdevnotes.com/bash-upgrade-3-4-macos) on MacOS X.
+
+## Usage
+You may build the src/harmony.go locally and run local test.
 
 ### Running local test
 The deploy.sh script creates a local environment of Harmony blockchain devnet based on the configuration file.
