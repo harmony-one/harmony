@@ -2,7 +2,7 @@ version: 0.0
 os: linux
 files:
   - source: /
-    destination: /home/ec2-user/projects/src/harmony-benchmark
+    destination: /home/ec2-user/projects/src/harmony
 hooks:
   BeforeInstall:
     - location: aws-scripts/say_hello.sh
