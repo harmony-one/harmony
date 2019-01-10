@@ -6,7 +6,7 @@ OS=$(uname -s)
 go test ./...
 
 pushd $DIRROOT
-./.travis.gofmt.sh
+./scripts/.travis_checker.sh
 
 case $OS in
    Darwin)
