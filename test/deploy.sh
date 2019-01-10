@@ -5,7 +5,7 @@ ROOT=$(dirname $0)/..
 set -eo pipefail
 
 function cleanup() {
-   for pid in `/bin/ps -fu $USER| grep "benchmark\|txgen\|soldier\|commander\|profiler\|beacon" | grep -v "grep" | grep -v "vi" | awk '{print $2}'`;
+   for pid in `/bin/ps -fu $USER| grep "harmony\|txgen\|soldier\|commander\|profiler\|beacon" | grep -v "grep" | grep -v "vi" | awk '{print $2}'`;
    do
        echo 'Killed process: '$pid
        kill -9 $pid 2> /dev/null
@@ -16,7 +16,7 @@ function killnode() {
    local port=$1
 
    if [ -n "port" ]; then
-      pid=$(/bin/ps -fu $USER | grep "benchmark" | grep "$port" | awk '{print $2}')
+      pid=$(/bin/ps -fu $USER | grep "harmony" | grep "$port" | awk '{print $2}')
       echo "killing node with port: $port"
       kill -9 $pid 2> /dev/null
       echo "node with port: $port is killed"
@@ -39,7 +39,7 @@ USAGE: $ME [OPTIONS] config_file_name
    -s shards      number of shards (default: $SHARDS)
    -k nodeport    kill the node with specified port number (default: $KILLPORT)
 
-This script will build all the binaries and start benchmark and txgen based on the configuration file.
+This script will build all the binaries and start harmony and txgen based on the configuration file.
 
 EXAMPLES:
 
@@ -87,7 +87,7 @@ cleanup
 # Also it's recommended to use `go build` for testing the whole exe. 
 pushd $ROOT
 echo "compiling ..."
-go build -o bin/benchmark
+go build -o bin/harmony cmd/harmony.go
 go build -o bin/txgen cmd/client/txgen/main.go
 go build -o bin/beacon cmd/beaconchain/main.go
 popd
@@ -100,14 +100,14 @@ mkdir -p $log_folder
 
 echo "launching beacon chain ..."
 $ROOT/bin/beacon -numShards $SHARDS > $log_folder/beacon.log 2>&1 &
-sleep 1 #wait or beachchain up
+sleep 1 #waiting for beaconchain
 
 # Start nodes
 while IFS='' read -r line || [[ -n "$line" ]]; do
   IFS=' ' read ip port mode shardID <<< $line
 	#echo $ip $port $mode
   if [ "$mode" != "client" ]; then
-      $ROOT/bin/benchmark -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN &
+      $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN &
       sleep 0.5
   fi
 done < $config
