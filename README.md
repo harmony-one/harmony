@@ -66,6 +66,12 @@ Make sure you the following command and make sure everything passed before submi
 ./test/test_before_submit.sh
 ```
 
+## License
+
+Harmony is licensed under the MIT License.  See [`LICENSE`](LICENSE) file for
+the terms and conditions.
+
+
 ## Contributing To Harmony
 
 See [`CONTRIBUTING`](CONTRIBUTING.md) for details.
