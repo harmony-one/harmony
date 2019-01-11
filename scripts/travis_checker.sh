@@ -6,11 +6,13 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 if [ $(golint ./... | wc | awk '{print $1}') -gt 2 ]; then
+    echo "Go lint failed"
     echo "Go code is not formatted:"
     gofmt -d .
     exit 1
 fi
 if [ -n "$(gofmt -l .)" ]; then
+    echo "Go fmt failed"
     echo "Go code is not formatted:"
     gofmt -d .
     exit 1
