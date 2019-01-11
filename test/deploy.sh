@@ -1,9 +1,11 @@
 #!/bin/bash
 
 ROOT=$(dirname $0)/..
-USER=$(whoami)
+if [ -z $USER ]; then
+   USER=$(whoami)
+fi
 
-set -x
+# set -x
 set -eo pipefail
 
 function check_result() {
