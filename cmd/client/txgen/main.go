@@ -66,8 +66,6 @@ func main() {
 	BCPeer := p2p.Peer{IP: *bcIP, Port: *bcPort}
 	candidateNode.ContactBeaconChain(BCPeer)
 	clientPeer = &p2p.Peer{IP: *ip, Port: *port}
-	_, pubKey := utils.GenKey(clientPeer.IP, clientPeer.Port)
-	clientPeer.PubKey = pubKey
 
 	shardIDLeaderMap = candidateNode.Leaders
 
@@ -95,17 +93,16 @@ func main() {
 
 	// Nodes containing blockchain data to mirror the shards' data in the network
 	nodes := []*node.Node{}
+	_, pubKey := utils.GenKey(clientPeer.IP, clientPeer.Port)
+	clientPeer.PubKey = pubKey
+	host := p2pimpl.NewHost(*clientPeer)
 	for shardID := range shardIDLeaderMap {
-		_, pubKey := utils.GenKey(clientPeer.IP, clientPeer.Port)
-		clientPeer.PubKey = pubKey
-		host := p2pimpl.NewHost(*clientPeer)
 		node := node.New(host, &consensus.Consensus{ShardID: shardID}, nil)
 		// Assign many fake addresses so we have enough address to play with at first
 		nodes = append(nodes, node)
 	}
 
 	// Client/txgenerator server node setup
-	host := p2pimpl.NewHost(*clientPeer)
 	consensusObj := consensus.New(host, "0", nil, p2p.Peer{})
 	clientNode := node.New(host, consensusObj, nil)
 	clientNode.Client = client.NewClient(clientNode.GetHost(), &shardIDLeaderMap)
