@@ -2,10 +2,11 @@ package client
 
 import (
 	"context"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/core/state"
 	"log"
 	"net"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/core/state"
 
 	"google.golang.org/grpc"
 

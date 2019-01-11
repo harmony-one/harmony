@@ -6,8 +6,8 @@ import (
 	"os"
 	"path"
 
+	"github.com/ethereum/go-ethereum/log"
 	beaconchain "github.com/harmony-one/harmony/internal/beaconchain/libs"
-	"github.com/harmony-one/harmony/log"
 )
 
 var (

@@ -9,12 +9,12 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/internal/attack"
-	"github.com/harmony-one/harmony/internal/db"
 	pkg_newnode "github.com/harmony-one/harmony/internal/newnode"
 	"github.com/harmony-one/harmony/internal/profiler"
-	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
@@ -45,14 +45,14 @@ func attackDetermination(attackedMode int) bool {
 }
 
 // InitLDBDatabase initializes a LDBDatabase.
-func InitLDBDatabase(ip string, port string) (*db.LDBDatabase, error) {
+func InitLDBDatabase(ip string, port string) (*ethdb.LDBDatabase, error) {
 	// TODO(minhdoan): Refactor this.
 	dbFileName := "/tmp/harmony_" + ip + port + ".dat"
 	var err = os.RemoveAll(dbFileName)
 	if err != nil {
 		fmt.Println(err.Error())
 	}
-	return db.NewLDBDatabase(dbFileName, 0, 0)
+	return ethdb.NewLDBDatabase(dbFileName, 0, 0)
 }
 
 func printVersion(me string) {
@@ -136,7 +136,7 @@ func main() {
 	loggingInit(*logFolder, role, *ip, *port, *onlyLogTps)
 
 	// Initialize leveldb if dbSupported.
-	var ldb *db.LDBDatabase
+	var ldb *ethdb.LDBDatabase
 
 	if *dbSupported {
 		ldb, _ = InitLDBDatabase(*ip, *port)

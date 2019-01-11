@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/db"
-	"github.com/harmony-one/harmony/log"
 )
 
 // Constants for storage.
@@ -49,7 +49,7 @@ var once sync.Once
 
 // Storage dump the block info into leveldb.
 type Storage struct {
-	db *db.LDBDatabase
+	db *ethdb.LDBDatabase
 }
 
 // GetStorageInstance returns attack model by using singleton pattern.
@@ -71,13 +71,13 @@ func (storage *Storage) Init(ip, port string, remove bool) {
 			Log.Error(err.Error())
 		}
 	}
-	if storage.db, err = db.NewLDBDatabase(dbFileName, 0, 0); err != nil {
+	if storage.db, err = ethdb.NewLDBDatabase(dbFileName, 0, 0); err != nil {
 		Log.Error(err.Error())
 	}
 }
 
 // GetDB returns the LDBDatabase of the storage.
-func (storage *Storage) GetDB() *db.LDBDatabase {
+func (storage *Storage) GetDB() *ethdb.LDBDatabase {
 	return storage.db
 }
 

@@ -1,16 +1,17 @@
 package worker
 
 import (
+	"math/big"
+	"math/rand"
+	"testing"
+
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	"github.com/harmony-one/harmony/internal/db"
-	"math/big"
-	"math/rand"
-	"testing"
 )
 
 var (
@@ -25,7 +26,7 @@ var (
 func TestNewWorker(t *testing.T) {
 	// Setup a new blockchain with genesis block containing test token on test address
 	var (
-		database = db.NewMemDatabase()
+		database = ethdb.NewMemDatabase()
 		gspec    = core.Genesis{
 			Config:  chainConfig,
 			Alloc:   core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
@@ -48,7 +49,7 @@ func TestNewWorker(t *testing.T) {
 func TestCommitTransactions(t *testing.T) {
 	// Setup a new blockchain with genesis block containing test token on test address
 	var (
-		database = db.NewMemDatabase()
+		database = ethdb.NewMemDatabase()
 		gspec    = core.Genesis{
 			Config:  chainConfig,
 			Alloc:   core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},

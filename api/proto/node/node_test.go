@@ -3,10 +3,10 @@ package node
 import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
-	hdb "github.com/harmony-one/harmony/internal/db"
 
 	//	"fmt"
 	"math/big"
@@ -75,7 +75,7 @@ func TestConstructStopMessage(t *testing.T) {
 
 func TestConstructBlocksSyncMessage(t *testing.T) {
 
-	db := hdb.NewMemDatabase()
+	db := ethdb.NewMemDatabase()
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(db))
 
 	root := statedb.IntermediateRoot(false)

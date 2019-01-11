@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/harmony-one/harmony/log"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 // Constants used for attack model.

@@ -3,7 +3,7 @@ package attack
 import (
 	"testing"
 
-	"github.com/harmony-one/harmony/log"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/stretchr/testify/assert"
 )
 

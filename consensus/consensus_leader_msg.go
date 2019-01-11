@@ -4,10 +4,10 @@ import (
 	"bytes"
 
 	"github.com/dedis/kyber"
+	"github.com/ethereum/go-ethereum/log"
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/crypto"
-	"github.com/harmony-one/harmony/log"
 )
 
 // Constructs the announce message
