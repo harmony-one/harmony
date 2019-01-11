@@ -71,6 +71,10 @@ Make sure you the following command and make sure everything passed before submi
 Harmony is licensed under the MIT License.  See [`LICENSE`](LICENSE) file for
 the terms and conditions.
 
+Also please see [our Fiduciary License Agreement](FLA.md) if you are
+contributing to the project.  By your submission of your contribution to us, you
+and we mutually agree to the terms and conditions of the agreement.
+
 
 ## Contributing To Harmony
 
