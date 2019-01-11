@@ -105,7 +105,7 @@ func (node *Node) StreamHandler(s p2p.Stream) {
 				var blocks []*types.Block
 				err := rlp.DecodeBytes(msgPayload[1:], &blocks) // skip the Sync messge type
 				if err != nil {
-					node.log.Info("NET: received message: Node/Block", "error", err)
+					node.log.Error("block sync", "error", err)
 				} else {
 					if node.Client != nil && node.Client.UpdateBlocks != nil && blocks != nil {
 						node.Client.UpdateBlocks(blocks)
@@ -240,6 +240,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
 
 // BroadcastNewBlock is called by consensus leader to sync new blocks with other clients/nodes.
 // NOTE: For now, just send to the client (basically not broadcasting)
+// TODO (lc): broadcast the new blocks to new nodes doing state sync
 func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 	if node.ClientPeer != nil {
 		node.log.Debug("Sending new block to client", "client", node.ClientPeer)
@@ -273,6 +274,8 @@ func (node *Node) AddNewBlock(newBlock *types.Block) {
 	blockNum, err := node.blockchain.InsertChain([]*types.Block{newBlock})
 	if err != nil {
 		node.log.Debug("Error adding new block to blockchain", "blockNum", blockNum, "Error", err)
+	} else {
+		node.log.Info("adding new block to blockchain", "blockNum", blockNum)
 	}
 }
 

@@ -44,7 +44,7 @@ func New(self p2p.Peer) *HostV2 {
 		// libp2p.EnableRelay; libp2p.Routing;
 	)
 	catchError(err)
-	log.Debug("Host is up!", "port", self.Port, "id", p2pHost.ID().Pretty(), "addr", sourceAddr)
+	log.Debug("HostV2 is up!", "port", self.Port, "id", p2pHost.ID().Pretty(), "addr", sourceAddr)
 	h := &HostV2{
 		h:    p2pHost,
 		self: self,
@@ -70,7 +70,7 @@ func (host *HostV2) BindHandlerAndServe(handler p2p.StreamHandler) {
 func (host *HostV2) SendMessage(p p2p.Peer, message []byte) error {
 	addr := fmt.Sprintf("/ip4/%s/tcp/%s", p.IP, p.Port)
 	targetAddr, err := multiaddr.NewMultiaddr(addr)
-
+	catchError(err)
 	peerID := peer.ID(addr)
 	host.Peerstore().AddAddrs(peerID, []multiaddr.Multiaddr{targetAddr}, peerstore.PermanentAddrTTL)
 	s, err := host.h.NewStream(context.Background(), peerID, ProtocolID)

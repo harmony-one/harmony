@@ -104,7 +104,7 @@ type Node struct {
 
 	log log.Logger // Log utility
 
-	ClientPeer *p2p.Peer      // The peer for the benchmark tx generator client, used for leaders to return proof-of-accept
+	ClientPeer *p2p.Peer      // The peer for the harmony tx generator client, used for leaders to return proof-of-accept
 	Client     *client.Client // The presence of a client object means this node will also act as a client
 	SelfPeer   p2p.Peer       // TODO(minhdoan): it could be duplicated with Self below whose is Alok work.
 	IDCPeer    p2p.Peer

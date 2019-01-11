@@ -12,14 +12,14 @@ import (
 )
 
 func TestConstructAnnounceMessage(test *testing.T) {
-	leader := p2p.Peer{IP: "1", Port: "2"}
-	validator := p2p.Peer{IP: "3", Port: "5"}
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "19999"}
+	validator := p2p.Peer{IP: "127.0.0.1", Port: "55555"}
 	host := p2pimpl.NewHost(leader)
 	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader)
 	consensus.blockHash = [32]byte{}
 	msg := consensus.constructAnnounceMessage()
 
-	if len(msg) != 105 {
+	if len(msg) != 109 {
 		test.Errorf("Annouce message is not constructed in the correct size: %d", len(msg))
 	}
 }
@@ -29,13 +29,13 @@ func TestConstructChallengeMessage(test *testing.T) {
 	priKeyInBytes := crypto.HashSha256("12")
 	leaderPriKey.UnmarshalBinary(priKeyInBytes[:])
 	leaderPubKey := pki.GetPublicKeyFromScalar(leaderPriKey)
-	leader := p2p.Peer{IP: "1", Port: "2", PubKey: leaderPubKey}
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "6000", PubKey: leaderPubKey}
 
 	validatorPriKey := crypto.Ed25519Curve.Scalar()
 	priKeyInBytes = crypto.HashSha256("12")
 	validatorPriKey.UnmarshalBinary(priKeyInBytes[:])
 	validatorPubKey := pki.GetPublicKeyFromScalar(leaderPriKey)
-	validator := p2p.Peer{IP: "3", Port: "5", PubKey: validatorPubKey}
+	validator := p2p.Peer{IP: "127.0.0.1", Port: "5555", PubKey: validatorPubKey}
 	host := p2pimpl.NewHost(leader)
 	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader)
 	consensus.blockHash = [32]byte{}
@@ -46,7 +46,7 @@ func TestConstructChallengeMessage(test *testing.T) {
 
 	msg, _, _ := consensus.constructChallengeMessage(consensus_proto.MessageType_CHALLENGE)
 
-	if len(msg) != 205 {
+	if len(msg) != 209 {
 		test.Errorf("Challenge message is not constructed in the correct size: %d", len(msg))
 	}
 }
