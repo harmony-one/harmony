@@ -34,7 +34,7 @@ func main() {
 		printVersion(os.Args[0])
 	}
 
-	h := log.StdoutHandler
+	h := log.StreamHandler(os.Stdout, log.TerminalFormat(false))
 	log.Root().SetHandler(h)
 
 	bc := beaconchain.New(*numShards, *ip, *port)

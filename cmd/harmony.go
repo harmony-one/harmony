@@ -64,7 +64,7 @@ func loggingInit(logFolder, role, ip, port string, onlyLogTps bool) {
 	// Setup a logger to stdout and log file.
 	logFileName := fmt.Sprintf("./%v/%s-%v-%v.log", logFolder, role, ip, port)
 	h := log.MultiHandler(
-		log.StdoutHandler,
+		log.StreamHandler(os.Stdout, log.TerminalFormat(false)),
 		log.Must.FileHandler(logFileName, log.JSONFormat()), // Log to file
 	)
 	if onlyLogTps {

@@ -88,7 +88,7 @@ func main() {
 	// Setup a logger to stdout and log file.
 	logFileName := fmt.Sprintf("./%v/txgen.log", *logFolder)
 	h := log.MultiHandler(
-		log.StdoutHandler,
+		log.StreamHandler(os.Stdout, log.TerminalFormat(false)),
 		log.Must.FileHandler(logFileName, log.LogfmtFormat()), // Log to file
 	)
 	log.Root().SetHandler(h)
