@@ -54,6 +54,7 @@ type BeaconChain struct {
 	rpcServer          *beaconchain.Server
 }
 
+//SaveFile is to store the file in which beaconchain info will be stored.
 var SaveFile string
 
 // Followings are the set of states of that beaconchain can be in.
@@ -184,6 +185,7 @@ func BCItoBC(bci *BCInfo) *BeaconChain {
 	return bc
 }
 
+//SetSaveFile sets the filepath where beaconchain will be saved
 func SetSaveFile(path string) {
 	SaveFile = path
 }
