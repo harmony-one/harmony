@@ -43,7 +43,6 @@ type BeaconChain struct {
 	Leaders            []*bcconn.NodeInfo
 	log                log.Logger
 	ShardLeaderMap     map[int]*bcconn.NodeInfo
-	ShardNodeMap       map[int]*bcconn.NodeInfo
 	PubKey             kyber.Point
 	NumberOfShards     int
 	NumberOfNodesAdded int
