@@ -66,8 +66,6 @@ func main() {
 	BCPeer := p2p.Peer{IP: *bcIP, Port: *bcPort}
 	candidateNode.ContactBeaconChain(BCPeer)
 	clientPeer = &p2p.Peer{IP: *ip, Port: *port}
-	_, pubKey := utils.GenKey(clientPeer.IP, clientPeer.Port)
-	clientPeer.PubKey = pubKey
 
 	shardIDLeaderMap = candidateNode.Leaders
 
@@ -95,7 +93,7 @@ func main() {
 
 	// Nodes containing blockchain data to mirror the shards' data in the network
 	nodes := []*node.Node{}
-	_, pubKey = utils.GenKey(clientPeer.IP, clientPeer.Port)
+	_, pubKey := utils.GenKey(clientPeer.IP, clientPeer.Port)
 	clientPeer.PubKey = pubKey
 	host := p2pimpl.NewHost(*clientPeer)
 	for shardID := range shardIDLeaderMap {
