@@ -48,30 +48,30 @@ work of authorship, any other author of the Contribution should also sign this
 
 ## 1. Definitions
 
-*"You"* means the individual Copyright owner who Submits a Contribution to Us.
+**"You"** means the individual Copyright owner who Submits a Contribution to Us.
 
-*"Contribution"* means any original work of authorship, including any original
-modifications or additions to an existing work of authorship, Submitted by You
-to Us, in which You own the Copyright.
+**"Contribution"** means any original work of authorship, including any
+original modifications or additions to an existing work of authorship,
+Submitted by You to Us, in which You own the Copyright.
 
-*"Copyright"* means all rights protecting works of authorship, including
+**"Copyright"** means all rights protecting works of authorship, including
 copyright, moral and neighboring rights, as appropriate, for the full term of
 their existence.
 
-*"Material"* means the software or documentation made available by Us to third
-parties.  When this Agreement covers more than one software project, the
+**"Material"** means the software or documentation made available by Us to
+third parties.  When this Agreement covers more than one software project, the
 Material means the software or documentation to which the Contribution was
 Submitted.  After You Submit the Contribution, it may be included in the
 Material.
 
-*"Submit"* means any act by which a Contribution is transferred to Us by You by
-means of tangible or intangible media, including but not limited to electronic
-mailing lists, source code control systems, and issue tracking systems that are
-managed by, or on behalf of, Us, but excluding any transfer that is
-conspicuously marked or otherwise designated in writing by You as "Not a
-Contribution."
+**"Submit"** means any act by which a Contribution is transferred to Us by You
+by means of tangible or intangible media, including but not limited to
+electronic mailing lists, source code control systems, and issue tracking
+systems that are managed by, or on behalf of, Us, but excluding any transfer
+that is conspicuously marked or otherwise designated in writing by You as "Not
+a Contribution."
 
-*"Documentation"* means any non-software portion of a Contribution.
+**"Documentation"** means any non-software portion of a Contribution.
 
 ## 2. License grant
 
