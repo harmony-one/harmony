@@ -27,7 +27,7 @@ var (
 	commit  string
 )
 
-// Constants used by the benchmark.
+// Constants used by the harmony.
 const (
 	AttackProbability = 20
 )

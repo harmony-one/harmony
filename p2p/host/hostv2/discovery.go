@@ -12,7 +12,7 @@ import (
 )
 
 var bootstrapPeersString = []string{
-	"/ip4/127.0.0.1/tcp/3000/ipfs/QmcWJ2WV8WJVhtt1w2cZ7iryC8vRL7QxDm3P9vGNFFfg8F", // Copy the Addr of a chat node
+	"/ip4/127.0.0.1/tcp/3000/ipfs/QmStdwSAjkMCQLgwuMFGuHhFNWYjFDMW5eu3wTNacPsLK5", // Copy the Addr of a chat node
 }
 var bootstrapPeers []maddr.Multiaddr
 

@@ -25,8 +25,8 @@ func TestNewNode(t *testing.T) {
 func TestBeaconChainConnect(t *testing.T) {
 	var ip, beaconport, nodeport string
 	ip = "127.0.0.1"
-	beaconport = "8080"
-	nodeport = "8081"
+	beaconport = "9080"
+	nodeport = "9081"
 	nnode := New(ip, nodeport)
 	bc := beaconchain.New(1, ip, beaconport)
 	go bc.StartServer()
@@ -35,5 +35,4 @@ func TestBeaconChainConnect(t *testing.T) {
 	if err != nil {
 		t.Error("could not read from connection")
 	}
-
 }

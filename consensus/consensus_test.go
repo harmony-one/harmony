@@ -9,8 +9,8 @@ import (
 )
 
 func TestNew(test *testing.T) {
-	leader := p2p.Peer{IP: "1", Port: "2"}
-	validator := p2p.Peer{IP: "3", Port: "5"}
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902"}
+	validator := p2p.Peer{IP: "127.0.0.1", Port: "9905"}
 	host := p2pimpl.NewHost(leader)
 	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader)
 	if consensus.consensusID != 0 {
@@ -37,10 +37,10 @@ func TestRemovePeers(t *testing.T) {
 	_, pk4 := utils.GenKey("4", "4")
 	_, pk5 := utils.GenKey("5", "5")
 
-	p1 := p2p.Peer{IP: "1", Port: "1", PubKey: pk1}
-	p2 := p2p.Peer{IP: "2", Port: "2", PubKey: pk2}
-	p3 := p2p.Peer{IP: "3", Port: "3", PubKey: pk3}
-	p4 := p2p.Peer{IP: "4", Port: "4", PubKey: pk4}
+	p1 := p2p.Peer{IP: "127.0.0.1", Port: "19901", PubKey: pk1}
+	p2 := p2p.Peer{IP: "127.0.0.1", Port: "19902", PubKey: pk2}
+	p3 := p2p.Peer{IP: "127.0.0.1", Port: "19903", PubKey: pk3}
+	p4 := p2p.Peer{IP: "127.0.0.1", Port: "19904", PubKey: pk4}
 
 	peers := []p2p.Peer{p1, p2, p3, p4}
 

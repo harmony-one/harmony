@@ -20,14 +20,14 @@ func TestProcessMessageValidatorAnnounce(test *testing.T) {
 	ctrl := gomock.NewController(test)
 	defer ctrl.Finish()
 
-	leader := p2p.Peer{IP: "1", Port: "2"}
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "9982"}
 	_, leader.PubKey = utils.GenKey(leader.IP, leader.Port)
 
-	validator1 := p2p.Peer{IP: "3", Port: "4", ValidatorID: 1}
+	validator1 := p2p.Peer{IP: "127.0.0.1", Port: "9984", ValidatorID: 1}
 	_, validator1.PubKey = utils.GenKey(validator1.IP, validator1.Port)
-	validator2 := p2p.Peer{IP: "5", Port: "6", ValidatorID: 2}
+	validator2 := p2p.Peer{IP: "127.0.0.1", Port: "9986", ValidatorID: 2}
 	_, validator2.PubKey = utils.GenKey(validator2.IP, validator2.Port)
-	validator3 := p2p.Peer{IP: "7", Port: "8", ValidatorID: 3}
+	validator3 := p2p.Peer{IP: "127.0.0.1", Port: "9988", ValidatorID: 3}
 	_, validator3.PubKey = utils.GenKey(validator3.IP, validator3.Port)
 
 	m := mock_host.NewMockHost(ctrl)
@@ -69,14 +69,14 @@ func TestProcessMessageValidatorChallenge(test *testing.T) {
 	ctrl := gomock.NewController(test)
 	defer ctrl.Finish()
 
-	leader := p2p.Peer{IP: "1", Port: "2"}
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "7782"}
 	_, leader.PubKey = utils.GenKey(leader.IP, leader.Port)
 
-	validator1 := p2p.Peer{IP: "3", Port: "4", ValidatorID: 1}
+	validator1 := p2p.Peer{IP: "127.0.0.1", Port: "7784", ValidatorID: 1}
 	_, validator1.PubKey = utils.GenKey(validator1.IP, validator1.Port)
-	validator2 := p2p.Peer{IP: "5", Port: "6", ValidatorID: 2}
+	validator2 := p2p.Peer{IP: "127.0.0.1", Port: "7786", ValidatorID: 2}
 	_, validator2.PubKey = utils.GenKey(validator2.IP, validator2.Port)
-	validator3 := p2p.Peer{IP: "7", Port: "8", ValidatorID: 3}
+	validator3 := p2p.Peer{IP: "127.0.0.1", Port: "7788", ValidatorID: 3}
 	_, validator3.PubKey = utils.GenKey(validator3.IP, validator3.Port)
 
 	m := mock_host.NewMockHost(ctrl)
