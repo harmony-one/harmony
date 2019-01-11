@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -22,13 +21,13 @@ var lock sync.Mutex
 
 // Unmarshal is a function that unmarshals the data from the
 // reader into the specified value.
-var Unmarshal = func(r io.Reader, v interface{}) error {
+func Unmarshal(r io.Reader, v interface{}) error {
 	return json.NewDecoder(r).Decode(v)
 }
 
 // Marshal is a function that marshals the object into an
 // io.Reader.
-var Marshal = func(v interface{}) (io.Reader, error) {
+func Marshal(v interface{}) (io.Reader, error) {
 	b, err := json.MarshalIndent(v, "", "\t")
 	if err != nil {
 		return nil, err
@@ -114,9 +113,8 @@ func Load(path string, v interface{}) error {
 	f, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			fmt.Println("File does not exist")
+			return err
 		}
-		return err
 	}
 	defer f.Close()
 	return Unmarshal(f, v)

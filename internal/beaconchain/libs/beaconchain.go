@@ -2,6 +2,7 @@ package beaconchain
 
 import (
 	"math/rand"
+	"os"
 	"strconv"
 	"sync"
 
@@ -93,21 +94,6 @@ func (bc *BeaconChain) GetShardLeaderMap() map[int]*bcconn.NodeInfo {
 }
 
 //New beaconchain initialization
-func NewWithSave(numShards int, ip, port, resetFile string) *BeaconChain {
-	bc := BeaconChain{}
-	bc.log = log.New()
-	bc.NumberOfShards = numShards
-	bc.PubKey = generateBCKey()
-	bc.NumberOfNodesAdded = 0
-	bc.ShardLeaderMap = make(map[int]*bcconn.NodeInfo)
-	bc.Port = port
-	bc.IP = ip
-	bc.host = p2pimpl.NewHost(p2p.Peer{IP: ip, Port: port})
-	bc.saveFile = resetFile
-	return &bc
-}
-
-//New beaconchain initialization
 func New(numShards int, ip, port string) *BeaconChain {
 	bc := BeaconChain{}
 	bc.log = log.New()
@@ -174,8 +160,16 @@ func SaveBeaconChainInfo(filePath string, bc *BeaconChain) error {
 //LoadBeaconChainInfo from disk
 func LoadBeaconChainInfo(path string) (*BeaconChain, error) {
 	bci := &BCInfo{}
-	err := utils.Load(path, bci)
-	bc := BCItoBC(bci)
+	var err error
+	if _, err := os.Stat(path); err != nil {
+		return nil, err
+	}
+	err = utils.Load(path, bci)
+	var bc *BeaconChain
+	if err != nil {
+		return nil, err
+	}
+	bc = BCItoBC(bci)
 	return bc, err
 }
 
@@ -189,4 +183,8 @@ func BCtoBCI(bc *BeaconChain) *BCInfo {
 func BCItoBC(bci *BCInfo) *BeaconChain {
 	bc := &BeaconChain{Leaders: bci.Leaders, ShardLeaderMap: bci.ShardLeaderMap, NumberOfShards: bci.NumberOfShards, NumberOfNodesAdded: bci.NumberOfNodesAdded, IP: bci.IP, Port: bci.Port}
 	return bc
+}
+
+func SetSaveFile(path string) {
+	SaveFile = path
 }

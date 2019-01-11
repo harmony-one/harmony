@@ -133,3 +133,11 @@ func TestSaveBC(t *testing.T) {
 	}
 	os.Remove("test.json")
 }
+
+func TestSaveFile(t *testing.T) {
+	filepath := "test"
+	SetSaveFile(filepath)
+	if !reflect.DeepEqual(filepath, SaveFile) {
+		t.Error("Could not set savefile")
+	}
+}

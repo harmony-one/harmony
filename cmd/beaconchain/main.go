@@ -41,12 +41,12 @@ func main() {
 	if _, err := os.Stat(*resetFlag); err == nil {
 		bc, err = beaconchain.LoadBeaconChainInfo(*resetFlag)
 		if err != nil {
-			fmt.Println("Could not load beaconchain from file")
+			fmt.Fprintf(os.Stderr, "Could not reset beaconchain from file: %+v\n", err)
 		}
 	} else {
-		fmt.Printf("File does not exist\n")
-		bc.SaveFile = *resetFlag
-		bc = beaconchain.New(*numShards, *ip, *port, *resetFlag)
+		fmt.Printf("Starting new beaconchain\n")
+		beaconchain.SetSaveFile(*resetFlag)
+		bc = beaconchain.New(*numShards, *ip, *port)
 	}
 	go bc.SupportRPC()
 	bc.StartServer()
