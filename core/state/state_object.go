@@ -283,6 +283,7 @@ func (s *Object) SubBalance(amount *big.Int) {
 	s.SetBalance(new(big.Int).Sub(s.Balance(), amount))
 }
 
+// SetBalance sets the account balance to the given amount.
 func (s *Object) SetBalance(amount *big.Int) {
 	s.db.journal.append(balanceChange{
 		account: &s.address,
@@ -295,7 +296,8 @@ func (s *Object) setBalance(amount *big.Int) {
 	s.data.Balance = amount
 }
 
-// Return the gas back to the origin. Used by the Virtual machine or Closures
+// ReturnGas returns the gas back to the origin.
+// Used by the Virtual machine or Closures
 func (s *Object) ReturnGas(gas *big.Int) {}
 
 func (s *Object) deepCopy(db *DB) *Object {
@@ -316,7 +318,7 @@ func (s *Object) deepCopy(db *DB) *Object {
 // Attribute accessors
 //
 
-// Returns the address of the contract/account
+// Address returns the address of the contract/account.
 func (s *Object) Address() common.Address {
 	return s.address
 }
@@ -337,6 +339,7 @@ func (s *Object) Code(db Database) []byte {
 	return code
 }
 
+// SetCode sets the object's contract code to the given code.
 func (s *Object) SetCode(codeHash common.Hash, code []byte) {
 	prevcode := s.Code(s.db.db)
 	s.db.journal.append(codeChange{
@@ -353,6 +356,7 @@ func (s *Object) setCode(codeHash common.Hash, code []byte) {
 	s.dirtyCode = true
 }
 
+// SetNonce sets the account's nonce to the given nonce value.
 func (s *Object) SetNonce(nonce uint64) {
 	s.db.journal.append(nonceChange{
 		account: &s.address,
@@ -365,19 +369,22 @@ func (s *Object) setNonce(nonce uint64) {
 	s.data.Nonce = nonce
 }
 
+// CodeHash returns the hash of the account's contract code.
 func (s *Object) CodeHash() []byte {
 	return s.data.CodeHash
 }
 
+// Balance returns the account balance.
 func (s *Object) Balance() *big.Int {
 	return s.data.Balance
 }
 
+// Nonce returns the account nonce.
 func (s *Object) Nonce() uint64 {
 	return s.data.Nonce
 }
 
-// Never called, but must be present to allow Object to be used
+// Value is never called, but must be present to allow Object to be used
 // as a vm.Account interface that also satisfies the vm.ContractRef
 // interface. Interfaces are awesome.
 func (s *Object) Value() *big.Int {
