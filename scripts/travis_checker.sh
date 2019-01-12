@@ -45,15 +45,11 @@ else
 	ok=false
 fi
 
-echo "Running golint..."
-golint_output="${tmpdir}/golint_output.txt"
-if xargs golint -set_exit_status < "${go_dirs}" > "${golint_output}" 2>&1
-then
-	echo "golint passed."
-else
+if [ $(golint ./... | wc | awk '{print $1}') -gt 2 ]; then
 	echo "golint FAILED!"
-	print_file "${golint_output}" "golint"
 	ok=false
+else
+	echo "golint passed."
 fi
 
 echo "Running gofmt..."
