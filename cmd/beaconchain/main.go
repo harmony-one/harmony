@@ -6,8 +6,8 @@ import (
 	"os"
 	"path"
 
+	"github.com/ethereum/go-ethereum/log"
 	beaconchain "github.com/harmony-one/harmony/internal/beaconchain/libs"
-	"github.com/harmony-one/harmony/log"
 )
 
 var (
@@ -34,7 +34,7 @@ func main() {
 		printVersion(os.Args[0])
 	}
 
-	h := log.StdoutHandler
+	h := log.StreamHandler(os.Stdout, log.TerminalFormat(false))
 	log.Root().SetHandler(h)
 	var bc *beaconchain.BeaconChain
 

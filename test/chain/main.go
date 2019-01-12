@@ -8,12 +8,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	"github.com/harmony-one/harmony/internal/db"
 	"github.com/harmony-one/harmony/node/worker"
 )
 
@@ -45,14 +45,14 @@ func init() {
 }
 
 type testWorkerBackend struct {
-	db     db.Database
+	db     ethdb.Database
 	txPool *core.TxPool
 	chain  *core.BlockChain
 }
 
 func main() {
 	var (
-		database = db.NewMemDatabase()
+		database = ethdb.NewMemDatabase()
 		gspec    = core.Genesis{
 			Config:  chainConfig,
 			Alloc:   core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},

@@ -4,13 +4,13 @@ import (
 	"bytes"
 
 	"github.com/dedis/kyber/sign/schnorr"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/internal/attack"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/log"
 )
 
 // ProcessMessageValidator dispatches validator's consensus message.

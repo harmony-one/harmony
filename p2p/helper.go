@@ -4,9 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
-	"github.com/harmony-one/harmony/log"
 	"io"
 	"time"
+
+	"github.com/ethereum/go-ethereum/log"
 )
 
 /*

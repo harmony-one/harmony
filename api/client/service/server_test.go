@@ -2,18 +2,19 @@ package client
 
 import (
 	"bytes"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/harmony-one/harmony/api/client/service/proto"
-	"github.com/harmony-one/harmony/core/state"
 	"math/big"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
+	client "github.com/harmony-one/harmony/api/client/service/proto"
+	"github.com/harmony-one/harmony/core/state"
+
+	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/vm"
-	"github.com/harmony-one/harmony/internal/db"
 )
 
 var (
@@ -48,7 +49,7 @@ func TestGetFreeToken(test *testing.T) {
 
 func TestFetchAccountState(test *testing.T) {
 	var (
-		database = db.NewMemDatabase()
+		database = ethdb.NewMemDatabase()
 		gspec    = core.Genesis{
 			Config:  chainConfig,
 			Alloc:   core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},

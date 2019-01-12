@@ -16,13 +16,14 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	crypto2 "github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/api/client"
 	clientService "github.com/harmony-one/harmony/api/client/service"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/core/types"
 	libs "github.com/harmony-one/harmony/internal/beaconchain/libs"
-	"github.com/harmony-one/harmony/internal/beaconchain/rpc"
+	beaconchain "github.com/harmony-one/harmony/internal/beaconchain/rpc"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
@@ -49,6 +50,9 @@ type AccountState struct {
 // The main wallet program entrance. Note the this wallet program is for demo-purpose only. It does not implement
 // the secure storage of keys.
 func main() {
+	h := log.StreamHandler(os.Stdout, log.TerminalFormat(false))
+	log.Root().SetHandler(h)
+
 	// Account subcommands
 	accountImportCommand := flag.NewFlagSet("import", flag.ExitOnError)
 	accountImportPtr := accountImportCommand.String("privateKey", "", "Specify the private key to import")

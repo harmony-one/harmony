@@ -11,12 +11,12 @@ import (
 	"github.com/dedis/kyber/sign/schnorr"
 	"github.com/ethereum/go-ethereum/rlp"
 
+	"github.com/ethereum/go-ethereum/log"
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/api/services/explorer"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/internal/profiler"
-	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 )

@@ -1,8 +1,8 @@
 package client
 
 import (
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 )
