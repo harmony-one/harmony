@@ -146,7 +146,7 @@ func main() {
 		// wait for 3 seconds for client to send ping message to leader
 		time.Sleep(3 * time.Second)
 		clientNode.StopPing <- struct{}{}
-		clientNode.State = node.NodeJoinedShard
+		clientNode.State = node.NodeNotSync
 	}
 
 	// Transaction generation process

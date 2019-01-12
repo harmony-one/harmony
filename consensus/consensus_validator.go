@@ -74,6 +74,15 @@ func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Messa
 		consensus.Log.Warn("Unparseable block header data", "error", err)
 		return
 	}
+
+	// send consensus block to state syncing
+	select {
+	case consensus.ConsensusBlock <- &blockObj:
+		consensus.Log.Info("consensus block sent to state sync, block hash ", blockObj.Hash())
+	default:
+		consensus.Log.Warn("consensus block unable to sent to state sync, block hash ", blockObj.Hash())
+	}
+
 	consensus.block = block
 
 	// Add block to received block cache

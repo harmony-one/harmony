@@ -376,7 +376,7 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 	}
 
 	if node.State == NodeWaitToJoin {
-		node.State = NodeJoinedShard
+		node.State = NodeNotSync
 		// Notify JoinShard to stop sending Ping messages
 		if node.StopPing != nil {
 			node.StopPing <- struct{}{}

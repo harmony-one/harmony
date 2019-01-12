@@ -97,6 +97,9 @@ type Consensus struct {
 	// Called when consensus on a new block is done
 	OnConsensusDone func(*types.Block)
 
+	// channel for sending current consensus block to state syncing
+	ConsensusBlock chan *types.Block
+
 	Log log.Logger
 
 	uniqueIDInstance *utils.UniqueValidatorID

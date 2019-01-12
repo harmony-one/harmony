@@ -44,7 +44,7 @@ type State byte
 const (
 	NodeInit              State = iota // Node just started, before contacting BeaconChain
 	NodeWaitToJoin                     // Node contacted BeaconChain, wait to join Shard
-	NodeJoinedShard                    // Node joined Shard, ready for consensus
+	NodeNotSync                        // Node out of sync, might be just joined Shard or offline for a period of time
 	NodeOffline                        // Node is offline
 	NodeReadyForConsensus              // Node is ready for doing consensus
 	NodeDoingConsensus                 // Node is already doing consensus
@@ -57,8 +57,8 @@ func (state State) String() string {
 		return "NodeInit"
 	case NodeWaitToJoin:
 		return "NodeWaitToJoin"
-	case NodeJoinedShard:
-		return "NodeJoinedShard"
+	case NodeNotSync:
+		return "NodeNotSync"
 	case NodeOffline:
 		return "NodeOffline"
 	case NodeReadyForConsensus:
@@ -109,8 +109,9 @@ type Node struct {
 	SelfPeer   p2p.Peer       // TODO(minhdoan): it could be duplicated with Self below whose is Alok work.
 	IDCPeer    p2p.Peer
 
-	Neighbors sync.Map // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
-	State     State    // State of the Node
+	Neighbors  sync.Map   // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
+	State      State      // State of the Node
+	stateMutex sync.Mutex // mutex for change node state
 
 	TxPool *core.TxPool
 	Worker *worker.Worker
@@ -264,6 +265,7 @@ func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 	// Setup initial state of syncing.
 	node.syncingState = NotDoingSyncing
 	node.StopPing = make(chan struct{})
+	node.Consensus.ConsensusBlock = make(chan *types.Block)
 
 	node.OfflinePeers = make(chan p2p.Peer)
 	go node.RemovePeersHandler()
@@ -271,8 +273,29 @@ func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 	return &node
 }
 
-// DoSyncing starts syncing.
+// IsOutOfSync checks whether the node is out of sync by comparing latest block with consensus block
+func (node *Node) IsOutOfSync(consensusBlock *types.Block) bool {
+	currentBlock := node.blockchain.CurrentBlock()
+	latestHash := currentBlock.Hash()
+	parentHash := consensusBlock.ParentHash()
+	consensusHash := consensusBlock.Hash()
+	// in general this case should not happen
+	if bytes.Compare(latestHash[:], consensusHash[:]) == 0 {
+		return false
+	}
+	if bytes.Compare(latestHash[:], parentHash[:]) == 0 {
+		return false
+	}
+	return true
+}
+
+// DoSyncing wait for check status and starts syncing if out of sync
 func (node *Node) DoSyncing() {
+	consensusBlock := <-node.Consensus.ConsensusBlock
+	if !node.IsOutOfSync(consensusBlock) {
+		return
+	}
+
 	// If this node is currently doing sync, another call for syncing will be returned immediately.
 	if !atomic.CompareAndSwapUint32(&node.syncingState, NotDoingSyncing, DoingSyncing) {
 		return
@@ -283,8 +306,10 @@ func (node *Node) DoSyncing() {
 	}
 	if node.stateSync.StartStateSync(node.GetSyncingPeers(), node.blockchain) {
 		node.log.Debug("DoSyncing: successfully sync")
-		if node.State == NodeJoinedShard {
+		if node.State == NodeNotSync {
+			node.stateMutex.Lock()
 			node.State = NodeReadyForConsensus
+			node.stateMutex.Unlock()
 		}
 	} else {
 		node.log.Debug("DoSyncing: failed to sync")
@@ -434,6 +459,7 @@ func (node *Node) StartClientServer() {
 func (node *Node) SupportSyncing() {
 	node.InitSyncingServer()
 	node.StartSyncingServer()
+	go node.DoSyncing()
 }
 
 // InitSyncingServer starts downloader server.
