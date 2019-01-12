@@ -45,9 +45,9 @@ else
 	ok=false
 fi
 
-echo $(golint ./... | wc | awk '{print $1}')
+echo $(golint ./... | wc -l)
 
-if [ $(golint ./... | wc | awk '{print $1}') -gt 2 ]; then
+if [ $(golint ./... | wc -l) -gt 2 ]; then
 	echo "golint FAILED!"
 	ok=false
 else
