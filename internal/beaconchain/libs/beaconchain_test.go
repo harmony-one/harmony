@@ -26,7 +26,7 @@ var (
 func TestNewNode(t *testing.T) {
 	var ip, port string
 	ip = "127.0.0.1"
-	port = "8080"
+	port = "7523"
 	numshards := 2
 	bc := New(numshards, ip, port)
 
@@ -46,7 +46,7 @@ func TestNewNode(t *testing.T) {
 func TestShardLeaderMap(t *testing.T) {
 	var ip string
 	ip = "127.0.0.1"
-	beaconport := "8080"
+	beaconport := "7523"
 	numshards := 1
 	bc := New(numshards, ip, beaconport)
 	bc.BCInfo.Leaders = leaders
@@ -59,7 +59,7 @@ func TestShardLeaderMap(t *testing.T) {
 func TestFetchLeaders(t *testing.T) {
 	var ip string
 	ip = "127.0.0.1"
-	beaconport := "8080"
+	beaconport := "7523"
 	numshards := 1
 	bc := New(numshards, ip, beaconport)
 	bc.BCInfo.Leaders = leaders
@@ -78,7 +78,7 @@ func TestFetchLeaders(t *testing.T) {
 func TestAcceptNodeInfo(t *testing.T) {
 	var ip string
 	ip = "127.0.0.1"
-	beaconport := "8080"
+	beaconport := "7523"
 	numshards := 1
 	bc := New(numshards, ip, beaconport)
 	b := bcconn.SerializeNodeInfo(leader1)
@@ -95,7 +95,7 @@ func TestAcceptNodeInfo(t *testing.T) {
 func TestRespondRandomness(t *testing.T) {
 	var ip string
 	ip = "127.0.0.1"
-	beaconport := "8080"
+	beaconport := "7523"
 	numshards := 1
 	bc := New(numshards, ip, beaconport)
 	bc.RespondRandomness(leader1)
@@ -105,7 +105,7 @@ func TestRespondRandomness(t *testing.T) {
 func TestAcceptConnections(t *testing.T) {
 	var ip string
 	ip = "127.0.0.1"
-	beaconport := "8080"
+	beaconport := "7523"
 	numshards := 1
 	bc := New(numshards, ip, beaconport)
 	b := bcconn.SerializeNodeInfo(leader1)
@@ -114,10 +114,9 @@ func TestAcceptConnections(t *testing.T) {
 }
 
 func TestSaveBC(t *testing.T) {
-
 	var ip, port string
 	ip = "127.0.0.1"
-	port = "8080"
+	port = "7523"
 	numshards := 2
 	bci := &BCInfo{IP: ip, Port: port, NumberOfShards: numshards}
 	bc := &BeaconChain{BCInfo: *bci}

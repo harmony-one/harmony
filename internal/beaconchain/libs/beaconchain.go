@@ -31,9 +31,9 @@ const BeaconchainServicePortDiff = 4444
 //BCInfo is the information that needs to be stored on the disk in order to allow for a restart.
 type BCInfo struct {
 	Leaders            []*bcconn.NodeInfo       `json:"leaders"`
-	ShardLeaderMap     map[int]*bcconn.NodeInfo `json:"shardleadermap"`
-	NumberOfShards     int                      `json:"numshards"`
-	NumberOfNodesAdded int                      `json:"numnodesadded"`
+	ShardLeaderMap     map[int]*bcconn.NodeInfo `json:"shardLeaderMap"`
+	NumberOfShards     int                      `json:"numShards"`
+	NumberOfNodesAdded int                      `json:"numNodesAdded"`
 	IP                 string                   `json:"ip"`
 	Port               string                   `json:"port"`
 }
