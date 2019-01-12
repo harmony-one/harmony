@@ -29,7 +29,7 @@ import (
 
 type StateSuite struct {
 	db    *ethdb.MemDatabase
-	state *StateDB
+	state *DB
 }
 
 var _ = checker.Suite(&StateSuite{})
