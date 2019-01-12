@@ -58,7 +58,7 @@ fi
 
 echo "Running gofmt..."
 gofmt_output="${tmpdir}/gofmt_output.txt"
-xargs gofmt -d < "${go_files}" > "${gofmt_output}" 2>&1
+xargs gofmt -d -e < "${go_files}" > "${gofmt_output}" 2>&1
 if [ -s "${gofmt_output}" ]
 then
 	echo "gofmt FAILED!"
