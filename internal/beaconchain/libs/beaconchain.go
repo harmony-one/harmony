@@ -40,18 +40,13 @@ type BCInfo struct {
 
 // BeaconChain (Blockchain) keeps Identities per epoch, currently centralized!
 type BeaconChain struct {
-	Leaders            []*bcconn.NodeInfo
-	log                log.Logger
-	ShardLeaderMap     map[int]*bcconn.NodeInfo
-	PubKey             kyber.Point
-	NumberOfShards     int
-	NumberOfNodesAdded int
-	IP                 string
-	Port               string
-	host               host.Host
-	state              BCState
-	saveFile           string
-	rpcServer          *beaconchain.Server
+	BCInfo         BCInfo
+	log            log.Logger
+	ShardLeaderMap map[int]*bcconn.NodeInfo
+	PubKey         kyber.Point
+	host           host.Host
+	state          BCState
+	rpcServer      *beaconchain.Server
 }
 
 //SaveFile is to store the file in which beaconchain info will be stored.
@@ -76,18 +71,18 @@ func (bc *BeaconChain) InitRPCServer() {
 
 // StartRPCServer starts Rpc server.
 func (bc *BeaconChain) StartRPCServer() {
-	port, err := strconv.Atoi(bc.Port)
+	port, err := strconv.Atoi(bc.BCInfo.Port)
 	if err != nil {
 		port = 0
 	}
 	bc.log.Info("support_client: StartRpcServer on port:", "port", strconv.Itoa(port+BeaconchainServicePortDiff))
-	bc.rpcServer.Start(bc.IP, strconv.Itoa(port+BeaconchainServicePortDiff))
+	bc.rpcServer.Start(bc.BCInfo.IP, strconv.Itoa(port+BeaconchainServicePortDiff))
 }
 
 // GetShardLeaderMap returns the map from shard id to leader.
 func (bc *BeaconChain) GetShardLeaderMap() map[int]*bcconn.NodeInfo {
 	result := make(map[int]*bcconn.NodeInfo)
-	for i, leader := range bc.Leaders {
+	for i, leader := range bc.BCInfo.Leaders {
 		result[i] = leader
 	}
 	return result
@@ -97,13 +92,13 @@ func (bc *BeaconChain) GetShardLeaderMap() map[int]*bcconn.NodeInfo {
 func New(numShards int, ip, port string) *BeaconChain {
 	bc := BeaconChain{}
 	bc.log = log.New()
-	bc.NumberOfShards = numShards
 	bc.PubKey = generateBCKey()
-	bc.NumberOfNodesAdded = 0
-	bc.ShardLeaderMap = make(map[int]*bcconn.NodeInfo)
-	bc.Port = port
-	bc.IP = ip
 	bc.host = p2pimpl.NewHost(p2p.Peer{IP: ip, Port: port})
+	bcinfo := &BCInfo{NumberOfShards: numShards, NumberOfNodesAdded: 0,
+		IP:             ip,
+		Port:           port,
+		ShardLeaderMap: make(map[int]*bcconn.NodeInfo)}
+	bc.BCInfo = *bcinfo
 	return &bc
 }
 
@@ -118,11 +113,11 @@ func generateBCKey() kyber.Point {
 func (bc *BeaconChain) AcceptNodeInfo(b []byte) *bcconn.NodeInfo {
 	Node := bcconn.DeserializeNodeInfo(b)
 	bc.log.Info("New Node Connection", "IP", Node.Self.IP, "Port", Node.Self.Port)
-	bc.NumberOfNodesAdded = bc.NumberOfNodesAdded + 1
-	shardNum, isLeader := utils.AllocateShard(bc.NumberOfNodesAdded, bc.NumberOfShards)
+	bc.BCInfo.NumberOfNodesAdded = bc.BCInfo.NumberOfNodesAdded + 1
+	shardNum, isLeader := utils.AllocateShard(bc.BCInfo.NumberOfNodesAdded, bc.BCInfo.NumberOfShards)
 	if isLeader {
-		bc.Leaders = append(bc.Leaders, Node)
-		bc.ShardLeaderMap[shardNum] = Node
+		bc.BCInfo.Leaders = append(bc.BCInfo.Leaders, Node)
+		bc.BCInfo.ShardLeaderMap[shardNum] = Node
 	}
 	go SaveBeaconChainInfo(SaveFile, bc)
 	bc.state = NodeInfoReceived
@@ -131,7 +126,8 @@ func (bc *BeaconChain) AcceptNodeInfo(b []byte) *bcconn.NodeInfo {
 
 //RespondRandomness sends a randomness beacon to the node inorder for it process what shard it will be in
 func (bc *BeaconChain) RespondRandomness(Node *bcconn.NodeInfo) {
-	response := bcconn.ResponseRandomNumber{NumberOfShards: bc.NumberOfShards, NumberOfNodesAdded: bc.NumberOfNodesAdded, Leaders: bc.Leaders}
+	bci := bc.BCInfo
+	response := bcconn.ResponseRandomNumber{NumberOfShards: bci.NumberOfShards, NumberOfNodesAdded: bci.NumberOfNodesAdded, Leaders: bci.Leaders}
 	msg := bcconn.SerializeRandomInfo(response)
 	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Acknowledge, msg)
 	bc.log.Info("Sent Out Msg", "# Nodes", response.NumberOfNodesAdded)
@@ -175,13 +171,13 @@ func LoadBeaconChainInfo(path string) (*BeaconChain, error) {
 
 // BCtoBCI converts beaconchain into beaconchaininfo
 func BCtoBCI(bc *BeaconChain) *BCInfo {
-	bci := &BCInfo{Leaders: bc.Leaders, ShardLeaderMap: bc.ShardLeaderMap, NumberOfShards: bc.NumberOfShards, NumberOfNodesAdded: bc.NumberOfNodesAdded, IP: bc.IP, Port: bc.Port}
+	bci := &BCInfo{Leaders: bc.BCInfo.Leaders, ShardLeaderMap: bc.BCInfo.ShardLeaderMap, NumberOfShards: bc.BCInfo.NumberOfShards, NumberOfNodesAdded: bc.BCInfo.NumberOfNodesAdded, IP: bc.BCInfo.IP, Port: bc.BCInfo.Port}
 	return bci
 }
 
 //BCItoBC converts beconchaininfo to beaconchain
 func BCItoBC(bci *BCInfo) *BeaconChain {
-	bc := &BeaconChain{Leaders: bci.Leaders, ShardLeaderMap: bci.ShardLeaderMap, NumberOfShards: bci.NumberOfShards, NumberOfNodesAdded: bci.NumberOfNodesAdded, IP: bci.IP, Port: bci.Port}
+	bc := &BeaconChain{BCInfo: *bci}
 	return bc
 }
 

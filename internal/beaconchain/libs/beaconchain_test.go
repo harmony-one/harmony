@@ -34,11 +34,11 @@ func TestNewNode(t *testing.T) {
 		t.Error("beacon chain public key not initialized")
 	}
 
-	if bc.NumberOfNodesAdded != 0 {
+	if bc.BCInfo.NumberOfNodesAdded != 0 {
 		t.Error("beacon chain number of nodes starting with is not zero! (should be zero)")
 	}
 
-	if bc.NumberOfShards != numshards {
+	if bc.BCInfo.NumberOfShards != numshards {
 		t.Error("beacon chain number of shards not initialized to given number of desired shards")
 	}
 }
@@ -49,7 +49,7 @@ func TestShardLeaderMap(t *testing.T) {
 	beaconport := "8080"
 	numshards := 1
 	bc := New(numshards, ip, beaconport)
-	bc.Leaders = leaders
+	bc.BCInfo.Leaders = leaders
 	if !reflect.DeepEqual(bc.GetShardLeaderMap(), shardLeaderMap) {
 		t.Error("The function GetShardLeaderMap doesn't work well")
 	}
@@ -62,7 +62,7 @@ func TestFetchLeaders(t *testing.T) {
 	beaconport := "8080"
 	numshards := 1
 	bc := New(numshards, ip, beaconport)
-	bc.Leaders = leaders
+	bc.BCInfo.Leaders = leaders
 	bc.rpcServer = beaconchain.NewServer(bc.GetShardLeaderMap)
 	bc.StartRPCServer()
 	port, _ := strconv.Atoi(beaconport)
@@ -86,7 +86,7 @@ func TestAcceptNodeInfo(t *testing.T) {
 	if !reflect.DeepEqual(node, leader1) {
 		t.Error("Beaconchain is unable to deserialize incoming node info")
 	}
-	if len(bc.Leaders) != 1 {
+	if len(bc.BCInfo.Leaders) != 1 {
 		t.Error("Beaconchain was unable to update the leader array")
 	}
 
@@ -119,7 +119,8 @@ func TestSaveBC(t *testing.T) {
 	ip = "127.0.0.1"
 	port = "8080"
 	numshards := 2
-	bc := &BeaconChain{IP: ip, Port: port, NumberOfShards: numshards}
+	bci := &BCInfo{IP: ip, Port: port, NumberOfShards: numshards}
+	bc := &BeaconChain{BCInfo: *bci}
 	err := SaveBeaconChainInfo("test.json", bc)
 	if err != nil {
 		log.Fatalln(err)

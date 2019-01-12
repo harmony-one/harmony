@@ -37,6 +37,7 @@ func main() {
 	h := log.StdoutHandler
 	log.Root().SetHandler(h)
 	var bc *beaconchain.BeaconChain
+
 	if _, err := os.Stat(*resetFlag); err == nil {
 		bc, err = beaconchain.LoadBeaconChainInfo(*resetFlag)
 		if err != nil {
