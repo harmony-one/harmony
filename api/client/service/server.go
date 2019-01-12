@@ -15,7 +15,7 @@ import (
 
 // Server is the Server struct for client service package.
 type Server struct {
-	stateReader        func() (*state.StateDB, error)
+	stateReader        func() (*state.DB, error)
 	callFaucetContract func(common.Address) common.Hash
 }
 
@@ -55,7 +55,7 @@ func (s *Server) Start(ip, port string) (*grpc.Server, error) {
 }
 
 // NewServer creates new Server which implements ClientServiceServer interface.
-func NewServer(stateReader func() (*state.StateDB, error), callFaucetContract func(common.Address) common.Hash) *Server {
+func NewServer(stateReader func() (*state.DB, error), callFaucetContract func(common.Address) common.Hash) *Server {
 	s := &Server{stateReader: stateReader, callFaucetContract: callFaucetContract}
 	return s
 }

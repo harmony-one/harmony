@@ -17,8 +17,8 @@ import (
 
 // environment is the worker's current environment and holds all of the current state information.
 type environment struct {
-	state   *state.StateDB // apply state changes here
-	gasPool *core.GasPool  // available gas used to pack transactions
+	state   *state.DB     // apply state changes here
+	gasPool *core.GasPool // available gas used to pack transactions
 
 	header   *types.Header
 	txs      []*types.Transaction
@@ -136,7 +136,7 @@ func (w *Worker) makeCurrent(parent *types.Block, header *types.Header) error {
 }
 
 // GetCurrentState gets the current state.
-func (w *Worker) GetCurrentState() *state.StateDB {
+func (w *Worker) GetCurrentState() *state.DB {
 	return w.current.state
 }
 

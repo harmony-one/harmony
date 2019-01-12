@@ -23,8 +23,8 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 )
 
-// StateDB is an EVM database for full state querying.
-type StateDB interface {
+// DB is an EVM database for full state querying.
+type DB interface {
 	CreateAccount(common.Address)
 
 	SubBalance(common.Address, *big.Int)
