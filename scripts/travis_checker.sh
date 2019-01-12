@@ -11,6 +11,7 @@ if [ $(golint ./... | wc | awk '{print $1}') -gt 2 ]; then
     exit 1
 fi
 if [ -n "$(gofmt -l .)" ]; then
+    echo "go fmt error"
     echo "Go code is not formatted:"
     gofmt -d .
     exit 1
