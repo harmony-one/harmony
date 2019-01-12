@@ -182,6 +182,8 @@ func main() {
 				}(shardID, txs)
 			}
 			lock.Unlock()
+		case <-time.After(2 * time.Second):
+			log.Warn("No new block is received so far")
 		}
 	}
 
