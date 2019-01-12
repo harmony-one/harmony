@@ -45,7 +45,7 @@ func init() {
 }
 
 type testBlockChain struct {
-	statedb       *state.StateDB
+	statedb       *state.DB
 	gasLimit      uint64
 	chainHeadFeed *event.Feed
 }
@@ -60,7 +60,7 @@ func (bc *testBlockChain) GetBlock(hash common.Hash, number uint64) *types.Block
 	return bc.CurrentBlock()
 }
 
-func (bc *testBlockChain) StateAt(common.Hash) (*state.StateDB, error) {
+func (bc *testBlockChain) StateAt(common.Hash) (*state.DB, error) {
 	return bc.statedb, nil
 }
 
@@ -157,7 +157,7 @@ type testChain struct {
 // testChain.State() is used multiple times to reset the pending state.
 // when simulate is true it will create a state that indicates
 // that tx0 and tx1 are included in the chain.
-func (c *testChain) State() (*state.StateDB, error) {
+func (c *testChain) State() (*state.DB, error) {
 	// delay "state change" by one. The tx pool fetches the
 	// state multiple times and by delaying it a bit we simulate
 	// a state change between those fetches.

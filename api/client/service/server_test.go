@@ -29,7 +29,7 @@ var (
 func TestGetFreeToken(test *testing.T) {
 	hash := common.Hash{}
 	hash.SetBytes([]byte("hello"))
-	server := NewServer(func() (*state.StateDB, error) {
+	server := NewServer(func() (*state.DB, error) {
 		return nil, nil
 	}, func(common.Address) common.Hash {
 		return hash
@@ -63,7 +63,7 @@ func TestFetchAccountState(test *testing.T) {
 
 	hash := common.Hash{}
 	hash.SetBytes([]byte("hello"))
-	server := NewServer(func() (*state.StateDB, error) {
+	server := NewServer(func() (*state.DB, error) {
 		return chain.State()
 	}, func(common.Address) common.Hash {
 		return hash
