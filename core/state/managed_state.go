@@ -23,7 +23,7 @@ import (
 )
 
 type account struct {
-	stateObject *stateObject
+	stateObject *Object
 	nstart      uint64
 	nonces      []bool
 }
@@ -138,6 +138,6 @@ func (ms *ManagedState) getAccount(addr common.Address) *account {
 	return ms.accounts[addr]
 }
 
-func newAccount(so *stateObject) *account {
+func newAccount(so *Object) *account {
 	return &account{so, so.Nonce(), nil}
 }

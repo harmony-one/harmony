@@ -62,7 +62,7 @@ type DB struct {
 	trie Trie
 
 	// This map holds 'live' objects, which will get modified while processing a state transition.
-	stateObjects      map[common.Address]*stateObject
+	stateObjects      map[common.Address]*Object
 	stateObjectsDirty map[common.Address]struct{}
 
 	// DB error.
@@ -100,7 +100,7 @@ func New(root common.Hash, db Database) (*DB, error) {
 	return &DB{
 		db:                db,
 		trie:              tr,
-		stateObjects:      make(map[common.Address]*stateObject),
+		stateObjects:      make(map[common.Address]*Object),
 		stateObjectsDirty: make(map[common.Address]struct{}),
 		logs:              make(map[common.Hash][]*types.Log),
 		preimages:         make(map[common.Hash][]byte),
@@ -127,7 +127,7 @@ func (stateDB *DB) Reset(root common.Hash) error {
 		return err
 	}
 	stateDB.trie = tr
-	stateDB.stateObjects = make(map[common.Address]*stateObject)
+	stateDB.stateObjects = make(map[common.Address]*Object)
 	stateDB.stateObjectsDirty = make(map[common.Address]struct{})
 	stateDB.thash = common.Hash{}
 	stateDB.bhash = common.Hash{}
@@ -401,7 +401,7 @@ func (stateDB *DB) Suicide(addr common.Address) bool {
 //
 
 // updateStateObject writes the given object to the trie.
-func (stateDB *DB) updateStateObject(stateObject *stateObject) {
+func (stateDB *DB) updateStateObject(stateObject *Object) {
 	addr := stateObject.Address()
 	data, err := rlp.EncodeToBytes(stateObject)
 	if err != nil {
@@ -411,14 +411,14 @@ func (stateDB *DB) updateStateObject(stateObject *stateObject) {
 }
 
 // deleteStateObject removes the given object from the state trie.
-func (stateDB *DB) deleteStateObject(stateObject *stateObject) {
+func (stateDB *DB) deleteStateObject(stateObject *Object) {
 	stateObject.deleted = true
 	addr := stateObject.Address()
 	stateDB.setError(stateDB.trie.TryDelete(addr[:]))
 }
 
 // Retrieve a state object given by the address. Returns nil if not found.
-func (stateDB *DB) getStateObject(addr common.Address) (stateObject *stateObject) {
+func (stateDB *DB) getStateObject(addr common.Address) (stateObject *Object) {
 	// Prefer 'live' objects.
 	if obj := stateDB.stateObjects[addr]; obj != nil {
 		if obj.deleted {
@@ -444,12 +444,12 @@ func (stateDB *DB) getStateObject(addr common.Address) (stateObject *stateObject
 	return obj
 }
 
-func (stateDB *DB) setStateObject(object *stateObject) {
+func (stateDB *DB) setStateObject(object *Object) {
 	stateDB.stateObjects[object.Address()] = object
 }
 
 // GetOrNewStateObject retrieves a state object or create a new state object if nil.
-func (stateDB *DB) GetOrNewStateObject(addr common.Address) *stateObject {
+func (stateDB *DB) GetOrNewStateObject(addr common.Address) *Object {
 	stateObject := stateDB.getStateObject(addr)
 	if stateObject == nil || stateObject.deleted {
 		stateObject, _ = stateDB.createObject(addr)
@@ -459,7 +459,7 @@ func (stateDB *DB) GetOrNewStateObject(addr common.Address) *stateObject {
 
 // createObject creates a new state object. If there is an existing account with
 // the given address, it is overwritten and returned as the second return value.
-func (stateDB *DB) createObject(addr common.Address) (newobj, prev *stateObject) {
+func (stateDB *DB) createObject(addr common.Address) (newobj, prev *Object) {
 	prev = stateDB.getStateObject(addr)
 	newobj = newObject(stateDB, addr, Account{})
 	newobj.setNonce(0) // sets the object to dirty
@@ -516,7 +516,7 @@ func (stateDB *DB) Copy() *DB {
 	state := &DB{
 		db:                stateDB.db,
 		trie:              stateDB.db.CopyTrie(stateDB.trie),
-		stateObjects:      make(map[common.Address]*stateObject, len(stateDB.journal.dirties)),
+		stateObjects:      make(map[common.Address]*Object, len(stateDB.journal.dirties)),
 		stateObjectsDirty: make(map[common.Address]struct{}, len(stateDB.journal.dirties)),
 		refund:            stateDB.refund,
 		logs:              make(map[common.Hash][]*types.Log, len(stateDB.logs)),
