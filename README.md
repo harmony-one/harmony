@@ -18,6 +18,9 @@ git clone git@github.com:harmony-one/harmony.git
 cd harmony
 
 go get ./...
+
+git submodule update --init --recursive
+
 ```
 
 ## Build
