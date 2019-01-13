@@ -6,8 +6,8 @@ import (
 	"os"
 	"path"
 
+	"github.com/ethereum/go-ethereum/log"
 	beaconchain "github.com/harmony-one/harmony/internal/beaconchain/libs"
-	"github.com/harmony-one/harmony/log"
 )
 
 var (
@@ -27,18 +27,27 @@ func main() {
 	ip := flag.String("ip", "127.0.0.1", "ip on which beaconchain listens")
 	port := flag.String("port", "8081", "port on which beaconchain listens")
 	versionFlag := flag.Bool("version", false, "Output version info")
-
+	resetFlag := flag.String("path", "bc_config.json", "path to file")
 	flag.Parse()
 
 	if *versionFlag {
 		printVersion(os.Args[0])
 	}
 
-	h := log.StdoutHandler
+	h := log.StreamHandler(os.Stdout, log.TerminalFormat(false))
 	log.Root().SetHandler(h)
+	var bc *beaconchain.BeaconChain
 
-	bc := beaconchain.New(*numShards, *ip, *port)
+	if _, err := os.Stat(*resetFlag); err == nil {
+		bc, err = beaconchain.LoadBeaconChainInfo(*resetFlag)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Could not reset beaconchain from file: %+v\n", err)
+		}
+	} else {
+		fmt.Printf("Starting new beaconchain\n")
+		beaconchain.SetSaveFile(*resetFlag)
+		bc = beaconchain.New(*numShards, *ip, *port)
+	}
 	go bc.SupportRPC()
-
 	bc.StartServer()
 }

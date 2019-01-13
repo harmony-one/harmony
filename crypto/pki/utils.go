@@ -2,9 +2,10 @@ package pki
 
 import (
 	"crypto/sha256"
+
 	"github.com/dedis/kyber"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/crypto"
-	"github.com/harmony-one/harmony/log"
 )
 
 // GetAddressFromPublicKey returns address given a public key.

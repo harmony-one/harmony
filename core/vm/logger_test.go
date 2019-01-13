@@ -43,7 +43,7 @@ func (d *dummyContractRef) SetNonce(uint64)            {}
 func (d *dummyContractRef) Balance() *big.Int          { return new(big.Int) }
 
 type dummyStatedb struct {
-	state.StateDB
+	state.DB
 }
 
 // GetRefund ...

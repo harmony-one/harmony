@@ -12,7 +12,8 @@ message DownloaderRequest {
   enum RequestType {
     HEADER = 0;
     BLOCK = 1;
-    UNKOWN = 2;
+    REGISTER = 2;
+    UNKOWN = 3;
   }
  
   // Request type.
@@ -20,10 +21,17 @@ message DownloaderRequest {
 
   // The hashes of the blocks we want to download.
   repeated bytes hashes = 2;
+  bytes reqHash = 3;
 }
 
 // DownloaderResponse is the generic response of DownloaderRequest.
 message DownloaderResponse {
+    enum RegisterResponseType {
+        SUCCESS = 0;
+        FAIL = 1;
+    }
   // payload of Block.
   repeated bytes payload = 1;
+  // response of registration request
+  RegisterResponseType type = 2;
 }

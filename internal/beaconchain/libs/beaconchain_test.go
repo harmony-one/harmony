@@ -1,6 +1,8 @@
 package beaconchain
 
 import (
+	"log"
+	"os"
 	"reflect"
 	"strconv"
 	"testing"
@@ -24,7 +26,7 @@ var (
 func TestNewNode(t *testing.T) {
 	var ip, port string
 	ip = "127.0.0.1"
-	port = "8080"
+	port = "7523"
 	numshards := 2
 	bc := New(numshards, ip, port)
 
@@ -32,11 +34,11 @@ func TestNewNode(t *testing.T) {
 		t.Error("beacon chain public key not initialized")
 	}
 
-	if bc.NumberOfNodesAdded != 0 {
+	if bc.BCInfo.NumberOfNodesAdded != 0 {
 		t.Error("beacon chain number of nodes starting with is not zero! (should be zero)")
 	}
 
-	if bc.NumberOfShards != numshards {
+	if bc.BCInfo.NumberOfShards != numshards {
 		t.Error("beacon chain number of shards not initialized to given number of desired shards")
 	}
 }
@@ -44,10 +46,10 @@ func TestNewNode(t *testing.T) {
 func TestShardLeaderMap(t *testing.T) {
 	var ip string
 	ip = "127.0.0.1"
-	beaconport := "8080"
+	beaconport := "7523"
 	numshards := 1
 	bc := New(numshards, ip, beaconport)
-	bc.Leaders = leaders
+	bc.BCInfo.Leaders = leaders
 	if !reflect.DeepEqual(bc.GetShardLeaderMap(), shardLeaderMap) {
 		t.Error("The function GetShardLeaderMap doesn't work well")
 	}
@@ -57,10 +59,10 @@ func TestShardLeaderMap(t *testing.T) {
 func TestFetchLeaders(t *testing.T) {
 	var ip string
 	ip = "127.0.0.1"
-	beaconport := "8080"
+	beaconport := "7523"
 	numshards := 1
 	bc := New(numshards, ip, beaconport)
-	bc.Leaders = leaders
+	bc.BCInfo.Leaders = leaders
 	bc.rpcServer = beaconchain.NewServer(bc.GetShardLeaderMap)
 	bc.StartRPCServer()
 	port, _ := strconv.Atoi(beaconport)
@@ -76,7 +78,7 @@ func TestFetchLeaders(t *testing.T) {
 func TestAcceptNodeInfo(t *testing.T) {
 	var ip string
 	ip = "127.0.0.1"
-	beaconport := "8080"
+	beaconport := "7523"
 	numshards := 1
 	bc := New(numshards, ip, beaconport)
 	b := bcconn.SerializeNodeInfo(leader1)
@@ -84,7 +86,7 @@ func TestAcceptNodeInfo(t *testing.T) {
 	if !reflect.DeepEqual(node, leader1) {
 		t.Error("Beaconchain is unable to deserialize incoming node info")
 	}
-	if len(bc.Leaders) != 1 {
+	if len(bc.BCInfo.Leaders) != 1 {
 		t.Error("Beaconchain was unable to update the leader array")
 	}
 
@@ -93,7 +95,7 @@ func TestAcceptNodeInfo(t *testing.T) {
 func TestRespondRandomness(t *testing.T) {
 	var ip string
 	ip = "127.0.0.1"
-	beaconport := "8080"
+	beaconport := "7523"
 	numshards := 1
 	bc := New(numshards, ip, beaconport)
 	bc.RespondRandomness(leader1)
@@ -103,10 +105,39 @@ func TestRespondRandomness(t *testing.T) {
 func TestAcceptConnections(t *testing.T) {
 	var ip string
 	ip = "127.0.0.1"
-	beaconport := "8080"
+	beaconport := "7523"
 	numshards := 1
 	bc := New(numshards, ip, beaconport)
 	b := bcconn.SerializeNodeInfo(leader1)
 	bc.AcceptConnections(b)
 	assert.Equal(t, RandomInfoSent, bc.state)
+}
+
+func TestSaveBC(t *testing.T) {
+	var ip, port string
+	ip = "127.0.0.1"
+	port = "7523"
+	numshards := 2
+	bci := &BCInfo{IP: ip, Port: port, NumberOfShards: numshards}
+	bc := &BeaconChain{BCInfo: *bci}
+	err := SaveBeaconChainInfo("test.json", bc)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	bc2, err2 := LoadBeaconChainInfo("test.json")
+	if err2 != nil {
+		log.Fatalln(err2)
+	}
+	if !reflect.DeepEqual(bc, bc2) {
+		t.Error("beacon chain info objects are not same")
+	}
+	os.Remove("test.json")
+}
+
+func TestSaveFile(t *testing.T) {
+	filepath := "test"
+	SetSaveFile(filepath)
+	if !reflect.DeepEqual(filepath, SaveFile) {
+		t.Error("Could not set savefile")
+	}
 }

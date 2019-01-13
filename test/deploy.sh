@@ -22,6 +22,8 @@ function cleanup() {
        echo 'Killed process: '$pid
        $DRYRUN kill -9 $pid 2> /dev/null
    done
+   # Remove bc_config.json before starting experiment.
+   rm -f bc_config.json
 }
 
 function killnode() {
@@ -65,7 +67,7 @@ EOU
 
 DB=
 TXGEN=true
-DURATION=90
+DURATION=900
 MIN=5
 SHARDS=2
 KILLPORT=9004

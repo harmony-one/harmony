@@ -5,14 +5,15 @@ import (
 	"log"
 	"net"
 
-	"google.golang.org/grpc"
-
 	pb "github.com/harmony-one/harmony/api/services/syncing/downloader/proto"
+	"google.golang.org/grpc"
 )
 
 // Constants for downloader server.
 const (
-	DefaultDownloadPort = "6666"
+	DefaultDownloadPort      = "6666"
+	RegisterFail        byte = 0x00
+	RegisterSuccess     byte = 0x01
 )
 
 // Server is the Server struct for downloader package.

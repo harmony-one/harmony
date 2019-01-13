@@ -10,8 +10,9 @@ import (
 	"github.com/harmony-one/harmony/core"
 
 	"github.com/Workiva/go-datastructures/queue"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/api/services/syncing/downloader"
-	"github.com/harmony-one/harmony/log"
+	pb "github.com/harmony-one/harmony/api/services/syncing/downloader/proto"
 	"github.com/harmony-one/harmony/p2p"
 )
 
@@ -20,6 +21,7 @@ const (
 	ConsensusRatio                        = float64(0.66)
 	SleepTimeAfterNonConsensusBlockHashes = time.Second * 30
 	TimesToFail                           = 5
+	RegistrationNumber                    = 3
 )
 
 // SyncPeerConfig is peer config to sync.
@@ -126,7 +128,6 @@ func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer) {
 	Log.Debug("CreateSyncConfig: len of peers", "len", len(peers))
 	Log.Debug("CreateSyncConfig: len of peers", "peers", peers)
 	ss.peerNumber = len(peers)
-	Log.Debug("CreateSyncConfig: hello")
 	ss.syncConfig = &SyncConfig{
 		peers: make([]*SyncPeerConfig, ss.peerNumber),
 	}
@@ -135,9 +136,9 @@ func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer) {
 			ip:   peers[id].IP,
 			port: peers[id].Port,
 		}
-		Log.Debug("CreateSyncConfig: peer port to connect", "port", peers[id].Port)
+		Log.Debug("[sync] CreateSyncConfig: peer port to connect", "port", peers[id].Port)
 	}
-	Log.Info("syncing: Finished creating SyncConfig.")
+	Log.Info("[sync] syncing: Finished creating SyncConfig.")
 }
 
 // MakeConnectionToPeers makes grpc connection to all peers.
@@ -315,7 +316,7 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 		}(ss.syncConfig.peers[i], ss.stateSyncTaskQueue, bc)
 	}
 	wg.Wait()
-	Log.Info("syncing: Finished downloadBlocks.")
+	Log.Info("[sync] Finished downloadBlocks.")
 }
 
 // StartStateSync starts state sync.
@@ -324,14 +325,64 @@ func (ss *StateSync) StartStateSync(peers []p2p.Peer, bc *core.BlockChain) bool 
 	ss.CreateSyncConfig(peers)
 	// Makes connections to peers.
 	ss.MakeConnectionToPeers()
+	numRegistered := ss.RegisterNodeInfo()
+	Log.Info("[sync] waiting for broadcast from peers", "numRegistered", numRegistered)
+
 	// Gets consensus hashes.
-	if !ss.GetConsensusHashes() {
-		return false
-	}
-	ss.generateStateSyncTaskQueue(bc)
+	//	if !ss.GetConsensusHashes() {
+	//		return false
+	//	}
+	//ss.generateStateSyncTaskQueue(bc)
 	// Download blocks.
-	if ss.stateSyncTaskQueue.Len() > 0 {
-		ss.downloadBlocks(bc)
-	}
+	//if ss.stateSyncTaskQueue.Len() > 0 {
+	//		ss.downloadBlocks(bc)
+	//	}
 	return true
+}
+
+func (peerConfig *SyncPeerConfig) registerToBroadcast(peerHash []byte) error {
+	response := peerConfig.client.Register(peerHash)
+	if response.Type == pb.DownloaderResponse_FAIL {
+		Log.Debug("[sync] register to broadcast fail")
+		return ErrRegistrationFail
+	} else if response.Type == pb.DownloaderResponse_SUCCESS {
+		Log.Debug("[sync] register to broadcast success")
+		return nil
+	}
+	Log.Debug("[sync] register to broadcast fail")
+	return ErrRegistrationFail
+}
+
+// RegisterNodeInfo will register node to peers to accept future new block broadcasting
+// return number of successfull registration
+func (ss *StateSync) RegisterNodeInfo() int {
+	registrationNumber := RegistrationNumber
+	count := 0
+	if registrationNumber > ss.activePeerNumber {
+		registrationNumber = ss.activePeerNumber
+	}
+	Log.Debug("[sync]", "registrationNumber", registrationNumber, "activePeerNumber", ss.activePeerNumber)
+	for id := range ss.syncConfig.peers {
+		peerConfig := ss.syncConfig.peers[id]
+		if count >= registrationNumber {
+			break
+		}
+		if peerConfig.client == nil {
+			continue
+		}
+		peerHash := getPeerInfo(peerConfig.ip, peerConfig.port)
+		Log.Debug("[sync] registering to peer", "ip", peerConfig.ip, "port", peerConfig.port, "peerHash", peerHash)
+		err := peerConfig.registerToBroadcast(peerHash)
+		if err != nil {
+			Log.Debug("[sync] register FAILED to peer", "ip", peerConfig.ip, "port", peerConfig.port, "peerHash", peerHash)
+			continue
+		}
+		count++
+	}
+	return count
+}
+
+func getPeerInfo(ip string, port string) []byte {
+	peerStr := ip + ":" + port
+	return []byte(peerStr)
 }

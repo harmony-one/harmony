@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/api/client"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/cmd/client/txgen/txgen"
@@ -16,7 +17,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/newnode"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
@@ -86,7 +86,7 @@ func main() {
 	// Setup a logger to stdout and log file.
 	logFileName := fmt.Sprintf("./%v/txgen.log", *logFolder)
 	h := log.MultiHandler(
-		log.StdoutHandler,
+		log.StreamHandler(os.Stdout, log.TerminalFormat(false)),
 		log.Must.FileHandler(logFileName, log.LogfmtFormat()), // Log to file
 	)
 	log.Root().SetHandler(h)
@@ -146,7 +146,7 @@ func main() {
 		// wait for 3 seconds for client to send ping message to leader
 		time.Sleep(3 * time.Second)
 		clientNode.StopPing <- struct{}{}
-		clientNode.State = node.NodeNotSync
+		clientNode.State = node.NodeReadyForConsensus
 	}
 
 	// Transaction generation process
@@ -182,6 +182,8 @@ func main() {
 				}(shardID, txs)
 			}
 			lock.Unlock()
+		case <-time.After(2 * time.Second):
+			log.Warn("No new block is received so far")
 		}
 	}
 

@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/harmony-one/harmony/log"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/p2p"
 )
 

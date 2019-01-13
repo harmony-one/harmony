@@ -16,6 +16,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/api/client"
@@ -30,8 +32,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/crypto/pki"
-	hdb "github.com/harmony-one/harmony/internal/db"
-	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
@@ -99,8 +99,8 @@ type Node struct {
 	transactionInConsensus []*types.Transaction // The transactions selected into the new block and under Consensus process
 	pendingTxMutex         sync.Mutex
 
-	blockchain *core.BlockChain // The blockchain for the shard where this node belongs
-	db         *hdb.LDBDatabase // LevelDB to store blockchain.
+	blockchain *core.BlockChain   // The blockchain for the shard where this node belongs
+	db         *ethdb.LDBDatabase // LevelDB to store blockchain.
 
 	log log.Logger // Log utility
 
@@ -120,9 +120,10 @@ type Node struct {
 	clientServer *clientService.Server
 
 	// Syncing component.
-	downloaderServer *downloader.Server
-	stateSync        *syncing.StateSync
-	syncingState     uint32
+	downloaderServer       *downloader.Server
+	stateSync              *syncing.StateSync
+	syncingState           uint32
+	peerRegistrationRecord map[string]int64 // record registration time (unixtime) of peers begin in syncing
 
 	// The p2p host used to send/receive p2p messages
 	host host.Host
@@ -210,7 +211,7 @@ func DeserializeNode(d []byte) *NetworkNode {
 }
 
 // New creates a new node.
-func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
+func New(host host.Host, consensus *bft.Consensus, db *ethdb.LDBDatabase) *Node {
 	node := Node{}
 
 	if host != nil {
@@ -237,7 +238,7 @@ func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 		genesisAlloc[contractAddress] = core.GenesisAccount{Balance: contractFunds}
 		node.ContractKeys = append(node.ContractKeys, contractKey)
 
-		database := hdb.NewMemDatabase()
+		database := ethdb.NewMemDatabase()
 		chainConfig := params.TestChainConfig
 		chainConfig.ChainID = big.NewInt(int64(node.Consensus.ShardID)) // Use ChainID as piggybacked ShardID
 		gspec := core.Genesis{
@@ -266,6 +267,7 @@ func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 	node.syncingState = NotDoingSyncing
 	node.StopPing = make(chan struct{})
 	node.Consensus.ConsensusBlock = make(chan *types.Block)
+	node.peerRegistrationRecord = make(map[string]int64)
 
 	node.OfflinePeers = make(chan p2p.Peer)
 	go node.RemovePeersHandler()
@@ -286,33 +288,41 @@ func (node *Node) IsOutOfSync(consensusBlock *types.Block) bool {
 	if bytes.Compare(latestHash[:], parentHash[:]) == 0 {
 		return false
 	}
+	node.log.Debug("node is out of sync")
+	node.stateMutex.Lock()
+	node.State = NodeNotSync
+	node.stateMutex.Unlock()
 	return true
 }
 
 // DoSyncing wait for check status and starts syncing if out of sync
 func (node *Node) DoSyncing() {
-	consensusBlock := <-node.Consensus.ConsensusBlock
-	if !node.IsOutOfSync(consensusBlock) {
-		return
-	}
-
-	// If this node is currently doing sync, another call for syncing will be returned immediately.
-	if !atomic.CompareAndSwapUint32(&node.syncingState, NotDoingSyncing, DoingSyncing) {
-		return
-	}
-	defer atomic.StoreUint32(&node.syncingState, NotDoingSyncing)
-	if node.stateSync == nil {
-		node.stateSync = syncing.GetStateSync()
-	}
-	if node.stateSync.StartStateSync(node.GetSyncingPeers(), node.blockchain) {
-		node.log.Debug("DoSyncing: successfully sync")
-		if node.State == NodeNotSync {
-			node.stateMutex.Lock()
-			node.State = NodeReadyForConsensus
-			node.stateMutex.Unlock()
+	for {
+		// TODO: add consensusBlock if it's already in sync
+		consensusBlock := <-node.Consensus.ConsensusBlock
+		node.log.Debug("[sync] consensus block received", "blockHash", consensusBlock.Hash())
+		if !node.IsOutOfSync(consensusBlock) {
+			continue
 		}
-	} else {
-		node.log.Debug("DoSyncing: failed to sync")
+
+		// If this node is currently doing sync, another call for syncing will be returned immediately.
+		if !atomic.CompareAndSwapUint32(&node.syncingState, NotDoingSyncing, DoingSyncing) {
+			continue
+		}
+		defer atomic.StoreUint32(&node.syncingState, NotDoingSyncing)
+		if node.stateSync == nil {
+			node.stateSync = syncing.GetStateSync()
+		}
+		if node.stateSync.StartStateSync(node.GetSyncingPeers(), node.blockchain) {
+			node.log.Debug("DoSyncing: successfully sync")
+			if node.State == NodeNotSync {
+				node.stateMutex.Lock()
+				node.State = NodeReadyForConsensus
+				node.stateMutex.Unlock()
+			}
+		} else {
+			node.log.Debug("DoSyncing: failed to sync")
+		}
 	}
 }
 
@@ -353,9 +363,7 @@ func (node *Node) GetSyncingPeers() []p2p.Peer {
 	res := []p2p.Peer{}
 	node.Neighbors.Range(func(k, v interface{}) bool {
 		node.log.Debug("GetSyncingPeers-Range: ", "k", k, "v", v)
-		if len(res) == 0 {
-			res = append(res, v.(p2p.Peer))
-		}
+		res = append(res, v.(p2p.Peer))
 		return true
 	})
 
@@ -477,13 +485,13 @@ func (node *Node) StartSyncingServer() {
 // CalculateResponse implements DownloadInterface on Node object.
 func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*downloader_pb.DownloaderResponse, error) {
 	response := &downloader_pb.DownloaderResponse{}
-	if request.Type == downloader_pb.DownloaderRequest_HEADER {
-
+	switch request.Type {
+	case downloader_pb.DownloaderRequest_HEADER:
 		for block := node.blockchain.CurrentBlock(); block != nil; block = node.blockchain.GetBlockByHash(block.Header().ParentHash) {
 			blockHash := block.Hash()
 			response.Payload = append(response.Payload, blockHash[:])
 		}
-	} else {
+	case downloader_pb.DownloaderRequest_BLOCK:
 		for _, bytes := range request.Hashes {
 			var hash common.Hash
 			hash.SetBytes(bytes)
@@ -492,6 +500,19 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 			if err != nil {
 				response.Payload = append(response.Payload, encodedBlock)
 			}
+		}
+	case downloader_pb.DownloaderRequest_REGISTER:
+		peerInfoStr := string(request.ReqHash)
+		node.log.Debug("[sync]", "peerInfoStr", peerInfoStr)
+		if _, ok := node.peerRegistrationRecord[peerInfoStr]; ok {
+			response.Type = downloader_pb.DownloaderResponse_FAIL
+			return response, nil
+		} else if len(node.peerRegistrationRecord) >= 10 {
+			response.Type = downloader_pb.DownloaderResponse_FAIL
+			return response, nil
+		} else {
+			node.peerRegistrationRecord[peerInfoStr] = time.Now().UnixNano()
+			response.Type = downloader_pb.DownloaderResponse_SUCCESS
 		}
 	}
 	return response, nil

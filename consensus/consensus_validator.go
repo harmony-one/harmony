@@ -4,13 +4,13 @@ import (
 	"bytes"
 
 	"github.com/dedis/kyber/sign/schnorr"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/internal/attack"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/log"
 )
 
 // ProcessMessageValidator dispatches validator's consensus message.
@@ -78,9 +78,9 @@ func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Messa
 	// send consensus block to state syncing
 	select {
 	case consensus.ConsensusBlock <- &blockObj:
-		consensus.Log.Info("consensus block sent to state sync, block hash ", blockObj.Hash())
+		consensus.Log.Info("consensus block sent to state sync", "blockHash", blockObj.Hash())
 	default:
-		consensus.Log.Warn("consensus block unable to sent to state sync, block hash ", blockObj.Hash())
+		consensus.Log.Warn("consensus block unable to sent to state sync", "blockHash", blockObj.Hash())
 	}
 
 	consensus.block = block

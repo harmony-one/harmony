@@ -1,0 +1,50 @@
+{
+	"leaders": [
+		{
+			"Self": {
+				"IP": "127.0.0.1",
+				"Port": "9000",
+				"PubKey": null,
+				"Ready": false,
+				"ValidatorID": 0
+			},
+			"PubK": "MGIvXJGKotnb8myyOqmiauiZBgA3ERlUR5MkpAM/b9w="
+		},
+		{
+			"Self": {
+				"IP": "127.0.0.1",
+				"Port": "9001",
+				"PubKey": null,
+				"Ready": false,
+				"ValidatorID": 0
+			},
+			"PubK": "o39tOjc/jAzCGlq4mwUCWi4gJ3AumqsrLerJ8JJtzUY="
+		}
+	],
+	"shardLeaderMap": {
+		"1": {
+			"Self": {
+				"IP": "127.0.0.1",
+				"Port": "9000",
+				"PubKey": null,
+				"Ready": false,
+				"ValidatorID": 0
+			},
+			"PubK": "MGIvXJGKotnb8myyOqmiauiZBgA3ERlUR5MkpAM/b9w="
+		},
+		"2": {
+			"Self": {
+				"IP": "127.0.0.1",
+				"Port": "9001",
+				"PubKey": null,
+				"Ready": false,
+				"ValidatorID": 0
+			},
+			"PubK": "o39tOjc/jAzCGlq4mwUCWi4gJ3AumqsrLerJ8JJtzUY="
+		}
+	},
+	"numShards": 2,
+	"numNodesAdded": 13,
+	"ip": "127.0.0.1",
+	"port": "8081"
+}
