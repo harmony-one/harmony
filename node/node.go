@@ -16,6 +16,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/api/client"
@@ -30,8 +32,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/crypto/pki"
-	hdb "github.com/harmony-one/harmony/internal/db"
-	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
@@ -99,8 +99,8 @@ type Node struct {
 	transactionInConsensus []*types.Transaction // The transactions selected into the new block and under Consensus process
 	pendingTxMutex         sync.Mutex
 
-	blockchain *core.BlockChain // The blockchain for the shard where this node belongs
-	db         *hdb.LDBDatabase // LevelDB to store blockchain.
+	blockchain *core.BlockChain   // The blockchain for the shard where this node belongs
+	db         *ethdb.LDBDatabase // LevelDB to store blockchain.
 
 	log log.Logger // Log utility
 
@@ -210,7 +210,7 @@ func DeserializeNode(d []byte) *NetworkNode {
 }
 
 // New creates a new node.
-func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
+func New(host host.Host, consensus *bft.Consensus, db *ethdb.LDBDatabase) *Node {
 	node := Node{}
 
 	if host != nil {
@@ -237,7 +237,7 @@ func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 		genesisAlloc[contractAddress] = core.GenesisAccount{Balance: contractFunds}
 		node.ContractKeys = append(node.ContractKeys, contractKey)
 
-		database := hdb.NewMemDatabase()
+		database := ethdb.NewMemDatabase()
 		chainConfig := params.TestChainConfig
 		chainConfig.ChainID = big.NewInt(int64(node.Consensus.ShardID)) // Use ChainID as piggybacked ShardID
 		gspec := core.Genesis{

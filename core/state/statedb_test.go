@@ -31,15 +31,15 @@ import (
 	check "gopkg.in/check.v1"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/db"
 )
 
 // Tests that updating a state trie does not leak any database writes prior to
 // actually committing the state.
 func TestUpdateLeaks(t *testing.T) {
 	// Create an empty state database
-	db := db.NewMemDatabase()
+	db := ethdb.NewMemDatabase()
 	state, _ := New(common.Hash{}, NewDatabase(db))
 
 	// Update it with some accounts
@@ -66,12 +66,12 @@ func TestUpdateLeaks(t *testing.T) {
 // only the one right before the commit.
 func TestIntermediateLeaks(t *testing.T) {
 	// Create two state databases, one transitioning to the final state, the other final from the beginning
-	transDb := db.NewMemDatabase()
-	finalDb := db.NewMemDatabase()
+	transDb := ethdb.NewMemDatabase()
+	finalDb := ethdb.NewMemDatabase()
 	transState, _ := New(common.Hash{}, NewDatabase(transDb))
 	finalState, _ := New(common.Hash{}, NewDatabase(finalDb))
 
-	modify := func(state *StateDB, addr common.Address, i, tweak byte) {
+	modify := func(state *DB, addr common.Address, i, tweak byte) {
 		state.SetBalance(addr, big.NewInt(int64(11*i)+int64(tweak)))
 		state.SetNonce(addr, uint64(42*i+tweak))
 		if i%2 == 0 {
@@ -122,7 +122,7 @@ func TestIntermediateLeaks(t *testing.T) {
 // https://github.com/ethereum/go-ethereum/pull/15549.
 func TestCopy(t *testing.T) {
 	// Create a random state test to copy and modify "independently"
-	orig, _ := New(common.Hash{}, NewDatabase(db.NewMemDatabase()))
+	orig, _ := New(common.Hash{}, NewDatabase(ethdb.NewMemDatabase()))
 
 	for i := byte(0); i < 255; i++ {
 		obj := orig.GetOrNewStateObject(common.BytesToAddress([]byte{i}))
@@ -178,7 +178,7 @@ func TestSnapshotRandom(t *testing.T) {
 	}
 }
 
-// A snapshotTest checks that reverting StateDB snapshots properly undoes all changes
+// A snapshotTest checks that reverting DB snapshots properly undoes all changes
 // captured by the snapshot. Instances of this test with pseudorandom content are created
 // by Generate.
 //
@@ -198,7 +198,7 @@ type snapshotTest struct {
 
 type testAction struct {
 	name   string
-	fn     func(testAction, *StateDB)
+	fn     func(testAction, *DB)
 	args   []int64
 	noAddr bool
 }
@@ -208,28 +208,28 @@ func newTestAction(addr common.Address, r *rand.Rand) testAction {
 	actions := []testAction{
 		{
 			name: "SetBalance",
-			fn: func(a testAction, s *StateDB) {
+			fn: func(a testAction, s *DB) {
 				s.SetBalance(addr, big.NewInt(a.args[0]))
 			},
 			args: make([]int64, 1),
 		},
 		{
 			name: "AddBalance",
-			fn: func(a testAction, s *StateDB) {
+			fn: func(a testAction, s *DB) {
 				s.AddBalance(addr, big.NewInt(a.args[0]))
 			},
 			args: make([]int64, 1),
 		},
 		{
 			name: "SetNonce",
-			fn: func(a testAction, s *StateDB) {
+			fn: func(a testAction, s *DB) {
 				s.SetNonce(addr, uint64(a.args[0]))
 			},
 			args: make([]int64, 1),
 		},
 		{
 			name: "SetState",
-			fn: func(a testAction, s *StateDB) {
+			fn: func(a testAction, s *DB) {
 				var key, val common.Hash
 				binary.BigEndian.PutUint16(key[:], uint16(a.args[0]))
 				binary.BigEndian.PutUint16(val[:], uint16(a.args[1]))
@@ -239,7 +239,7 @@ func newTestAction(addr common.Address, r *rand.Rand) testAction {
 		},
 		{
 			name: "SetCode",
-			fn: func(a testAction, s *StateDB) {
+			fn: func(a testAction, s *DB) {
 				code := make([]byte, 16)
 				binary.BigEndian.PutUint64(code, uint64(a.args[0]))
 				binary.BigEndian.PutUint64(code[8:], uint64(a.args[1]))
@@ -249,19 +249,19 @@ func newTestAction(addr common.Address, r *rand.Rand) testAction {
 		},
 		{
 			name: "CreateAccount",
-			fn: func(a testAction, s *StateDB) {
+			fn: func(a testAction, s *DB) {
 				s.CreateAccount(addr)
 			},
 		},
 		{
 			name: "Suicide",
-			fn: func(a testAction, s *StateDB) {
+			fn: func(a testAction, s *DB) {
 				s.Suicide(addr)
 			},
 		},
 		{
 			name: "AddRefund",
-			fn: func(a testAction, s *StateDB) {
+			fn: func(a testAction, s *DB) {
 				s.AddRefund(uint64(a.args[0]))
 			},
 			args:   make([]int64, 1),
@@ -269,7 +269,7 @@ func newTestAction(addr common.Address, r *rand.Rand) testAction {
 		},
 		{
 			name: "AddLog",
-			fn: func(a testAction, s *StateDB) {
+			fn: func(a testAction, s *DB) {
 				data := make([]byte, 2)
 				binary.BigEndian.PutUint16(data, uint16(a.args[0]))
 				s.AddLog(&types.Log{Address: addr, Data: data})
@@ -333,7 +333,7 @@ func (test *snapshotTest) String() string {
 func (test *snapshotTest) run() bool {
 	// Run all actions and create snapshots.
 	var (
-		state, _     = New(common.Hash{}, NewDatabase(db.NewMemDatabase()))
+		state, _     = New(common.Hash{}, NewDatabase(ethdb.NewMemDatabase()))
 		snapshotRevs = make([]int, len(test.snapshots))
 		sindex       = 0
 	)
@@ -361,7 +361,7 @@ func (test *snapshotTest) run() bool {
 }
 
 // checkEqual checks that methods of state and checkstate return the same values.
-func (test *snapshotTest) checkEqual(state, checkstate *StateDB) error {
+func (test *snapshotTest) checkEqual(state, checkstate *DB) error {
 	for _, addr := range test.addrs {
 		var err error
 		checkeq := func(op string, a, b interface{}) bool {
@@ -424,7 +424,7 @@ func (s *StateSuite) TestTouchDelete(c *check.C) {
 // TestCopyOfCopy tests that modified objects are carried over to the copy, and the copy of the copy.
 // See https://github.com/ethereum/go-ethereum/pull/15225#issuecomment-380191512
 func TestCopyOfCopy(t *testing.T) {
-	sdb, _ := New(common.Hash{}, NewDatabase(db.NewMemDatabase()))
+	sdb, _ := New(common.Hash{}, NewDatabase(ethdb.NewMemDatabase()))
 	addr := common.HexToAddress("aaaa")
 	sdb.SetBalance(addr, big.NewInt(42))
 

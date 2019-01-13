@@ -22,6 +22,8 @@ function cleanup() {
        echo 'Killed process: '$pid
        $DRYRUN kill -9 $pid 2> /dev/null
    done
+   # Remove bc_config.json before starting experiment.
+   rm -f bc_config.json
 }
 
 function killnode() {

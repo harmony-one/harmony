@@ -2,12 +2,13 @@ package node
 
 import (
 	"crypto/ecdsa"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/params"
-	"github.com/harmony-one/harmony/core"
 	"math/big"
 	"math/rand"
 	"strings"
+
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/params"
+	"github.com/harmony-one/harmony/core"
 )
 
 // CreateGenesisAllocWithTestingAddresses create the genesis block allocation that contains deterministically

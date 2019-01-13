@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/harmony-one/harmony/log"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/p2p"
 	libp2p "github.com/libp2p/go-libp2p"
 	libp2phost "github.com/libp2p/go-libp2p-host"
