@@ -18,6 +18,9 @@ import (
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
+
+	peerstore "github.com/libp2p/go-libp2p-peerstore"
+	multiaddr "github.com/multiformats/go-multiaddr"
 )
 
 var (
@@ -88,6 +91,7 @@ func main() {
 	//This IP belongs to jenkins.harmony.one
 	bcIP := flag.String("bc", "127.0.0.1", "IP of the identity chain")
 	bcPort := flag.String("bc_port", "8081", "port of the identity chain")
+	bcAddr := flag.String("bc_addr", "", "MultiAddr of the identity chain")
 
 	//Leader needs to have a minimal number of peers to start consensus
 	minPeers := flag.Int("min_peers", 100, "Minimal number of Peers in shard")
@@ -109,10 +113,31 @@ func main() {
 	var leader p2p.Peer
 	var selfPeer p2p.Peer
 	var clientPeer *p2p.Peer
+	var BCPeer *p2p.Peer
+
+	if *bcAddr != "" {
+		// Turn the destination into a multiaddr.
+		maddr, err := multiaddr.NewMultiaddr(*bcAddr)
+		if err != nil {
+			panic(err)
+		}
+
+		// Extract the peer ID from the multiaddr.
+		info, err := peerstore.InfoFromP2pAddr(maddr)
+		if err != nil {
+			panic(err)
+		}
+
+		BCPeer = &p2p.Peer{IP: *bcIP, Port: *bcPort, Addrs: info.Addrs, PeerID: info.ID}
+	} else {
+		BCPeer = &p2p.Peer{IP: *bcIP, Port: *bcPort}
+	}
+
 	//Use Peer Discovery to get shard/leader/peer/...
 	candidateNode := pkg_newnode.New(*ip, *port)
-	BCPeer := p2p.Peer{IP: *bcIP, Port: *bcPort}
-	candidateNode.ContactBeaconChain(BCPeer)
+	candidateNode.AddPeer(BCPeer)
+	candidateNode.ContactBeaconChain(*BCPeer)
+
 	shardID = candidateNode.GetShardID()
 	leader = candidateNode.GetLeader()
 	selfPeer = candidateNode.GetSelfPeer()
