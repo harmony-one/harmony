@@ -379,6 +379,12 @@ func (consensus *Consensus) processResponseMessage(message consensus_proto.Messa
 				copy(blockObj.Header().Bitmap[:], bitmap)
 				consensus.OnConsensusDone(&blockObj)
 
+				select {
+				case consensus.VerifiedNewBlock <- &blockObj:
+				default:
+					consensus.Log.Info("[sync] consensus verified block send to chan failed", "blockHash", blockObj.Hash())
+				}
+
 				consensus.reportMetrics(blockObj)
 
 				// Dump new block into level db.

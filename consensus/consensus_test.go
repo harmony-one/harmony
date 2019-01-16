@@ -57,3 +57,20 @@ func TestRemovePeers(t *testing.T) {
 		consensus.DebugPrintPublicKeys()
 	}
 }
+
+func TestGetPeerFromID(t *testing.T) {
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902"}
+	validator := p2p.Peer{IP: "127.0.0.1", Port: "9905"}
+	host := p2pimpl.NewHost(leader)
+	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader)
+	leaderID := utils.GetUniqueIDFromIPPort(leader.IP, leader.Port)
+	validatorID := utils.GetUniqueIDFromIPPort(validator.IP, validator.Port)
+	l, _ := consensus.GetPeerFromID(leaderID)
+	v, _ := consensus.GetPeerFromID(validatorID)
+	if l.IP != leader.IP || l.Port != leader.Port {
+		t.Errorf("leader IP not equal")
+	}
+	if v.IP != validator.IP || v.Port != validator.Port {
+		t.Errorf("validator IP not equal")
+	}
+}

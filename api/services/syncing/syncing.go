@@ -2,17 +2,20 @@ package syncing
 
 import (
 	"bytes"
+	"encoding/binary"
 	"reflect"
 	"sort"
 	"sync"
 	"time"
 
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/internal/utils"
 
 	"github.com/Workiva/go-datastructures/queue"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/api/services/syncing/downloader"
 	pb "github.com/harmony-one/harmony/api/services/syncing/downloader/proto"
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/p2p"
 )
 
@@ -30,6 +33,8 @@ type SyncPeerConfig struct {
 	port        string
 	client      *downloader.Client
 	blockHashes [][]byte
+	newBlocks   []*types.Block
+	mux         sync.Mutex
 }
 
 // GetClient returns client pointer of downloader.Client
@@ -52,17 +57,39 @@ type SyncConfig struct {
 }
 
 // GetStateSync returns the implementation of StateSyncInterface interface.
-func GetStateSync() *StateSync {
-	return &StateSync{}
+func CreateStateSync(ip string, port string) *StateSync {
+	stateSync := &StateSync{}
+	stateSync.selfip = ip
+	stateSync.selfport = port
+	return stateSync
 }
 
 // StateSync is the struct that implements StateSyncInterface.
 type StateSync struct {
+	selfip             string
+	selfport           string
 	peerNumber         int
 	activePeerNumber   int
 	blockHeight        int
 	syncConfig         *SyncConfig
 	stateSyncTaskQueue *queue.Queue
+}
+
+// AddNewBlock will add newly received block into state syncing queue
+func (ss *StateSync) AddNewBlock(peerHash []byte, block *types.Block) {
+	Log.Debug("[sync] adding new block from peer", "peerHash", peerHash, "blockHash", block.Hash())
+	for _, pc := range ss.syncConfig.peers {
+		pid := utils.GetUniqueIDFromIPPort(pc.ip, pc.port)
+		ph := make([]byte, 4)
+		binary.BigEndian.PutUint32(ph, pid)
+		if bytes.Compare(ph, peerHash) != 0 {
+			continue
+		}
+		pc.mux.Lock()
+		pc.newBlocks = append(pc.newBlocks, block)
+		pc.mux.Unlock()
+		Log.Debug("[sync] new block added")
+	}
 }
 
 // CreateTestSyncPeerConfig used for testing.
@@ -362,6 +389,9 @@ func (ss *StateSync) RegisterNodeInfo() int {
 		registrationNumber = ss.activePeerNumber
 	}
 	Log.Debug("[sync]", "registrationNumber", registrationNumber, "activePeerNumber", ss.activePeerNumber)
+	peerID := utils.GetUniqueIDFromIPPort(ss.selfip, ss.selfport)
+	peerHash := make([]byte, 4)
+	binary.BigEndian.PutUint32(peerHash[:], peerID)
 	for id := range ss.syncConfig.peers {
 		peerConfig := ss.syncConfig.peers[id]
 		if count >= registrationNumber {
@@ -370,7 +400,6 @@ func (ss *StateSync) RegisterNodeInfo() int {
 		if peerConfig.client == nil {
 			continue
 		}
-		peerHash := getPeerInfo(peerConfig.ip, peerConfig.port)
 		Log.Debug("[sync] registering to peer", "ip", peerConfig.ip, "port", peerConfig.port, "peerHash", peerHash)
 		err := peerConfig.registerToBroadcast(peerHash)
 		if err != nil {

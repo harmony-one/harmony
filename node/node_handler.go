@@ -83,7 +83,6 @@ func (node *Node) StreamHandler(s p2p.Stream) {
 	case proto.Consensus:
 		// skip doing consensus if node not in sync
 		if node.State == NodeNotSync {
-			node.log.Debug("[sync] skip consensus, node out of sync")
 			return
 		}
 		msgPayload, _ := proto.GetConsensusMessagePayload(content)
