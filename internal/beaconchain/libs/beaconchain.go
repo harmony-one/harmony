@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/api/proto/bcconn"
 	proto_identity "github.com/harmony-one/harmony/api/proto/identity"
+	"github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/internal/beaconchain/rpc"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -30,23 +31,24 @@ const BeaconchainServicePortDiff = 4444
 
 //BCInfo is the information that needs to be stored on the disk in order to allow for a restart.
 type BCInfo struct {
-	Leaders            []*bcconn.NodeInfo       `json:"leaders"`
-	ShardLeaderMap     map[int]*bcconn.NodeInfo `json:"shardLeaderMap"`
-	NumberOfShards     int                      `json:"numShards"`
-	NumberOfNodesAdded int                      `json:"numNodesAdded"`
-	IP                 string                   `json:"ip"`
-	Port               string                   `json:"port"`
+	Leaders            []*node.Info       `json:"leaders"`
+	ShardLeaderMap     map[int]*node.Info `json:"shardLeaderMap"`
+	NumberOfShards     int                `json:"numShards"`
+	NumberOfNodesAdded int                `json:"numNodesAdded"`
+	IP                 string             `json:"ip"`
+	Port               string             `json:"port"`
 }
 
 // BeaconChain (Blockchain) keeps Identities per epoch, currently centralized!
 type BeaconChain struct {
 	BCInfo         BCInfo
 	log            log.Logger
-	ShardLeaderMap map[int]*bcconn.NodeInfo
+	ShardLeaderMap map[int]*node.Info
 	PubKey         kyber.Point
 	host           host.Host
 	state          BCState
 	rpcServer      *beaconchain.Server
+	Peer           p2p.Peer
 }
 
 //SaveFile is to store the file in which beaconchain info will be stored.
@@ -80,8 +82,8 @@ func (bc *BeaconChain) StartRPCServer() {
 }
 
 // GetShardLeaderMap returns the map from shard id to leader.
-func (bc *BeaconChain) GetShardLeaderMap() map[int]*bcconn.NodeInfo {
-	result := make(map[int]*bcconn.NodeInfo)
+func (bc *BeaconChain) GetShardLeaderMap() map[int]*node.Info {
+	result := make(map[int]*node.Info)
 	for i, leader := range bc.BCInfo.Leaders {
 		result[i] = leader
 	}
@@ -97,7 +99,7 @@ func New(numShards int, ip, port string) *BeaconChain {
 	bcinfo := &BCInfo{NumberOfShards: numShards, NumberOfNodesAdded: 0,
 		IP:             ip,
 		Port:           port,
-		ShardLeaderMap: make(map[int]*bcconn.NodeInfo)}
+		ShardLeaderMap: make(map[int]*node.Info)}
 	bc.BCInfo = *bcinfo
 	return &bc
 }
@@ -110,9 +112,11 @@ func generateBCKey() kyber.Point {
 }
 
 //AcceptNodeInfo deserializes node information received via beaconchain handler
-func (bc *BeaconChain) AcceptNodeInfo(b []byte) *bcconn.NodeInfo {
+func (bc *BeaconChain) AcceptNodeInfo(b []byte) *node.Info {
 	Node := bcconn.DeserializeNodeInfo(b)
-	bc.log.Info("New Node Connection", "IP", Node.Self.IP, "Port", Node.Self.Port)
+	bc.log.Info("New Node Connection", "IP", Node.IP, "Port", Node.Port)
+	bc.Peer = p2p.Peer{IP: Node.IP, Port: Node.Port}
+	bc.host.AddPeer(&bc.Peer)
 	bc.BCInfo.NumberOfNodesAdded = bc.BCInfo.NumberOfNodesAdded + 1
 	shardNum, isLeader := utils.AllocateShard(bc.BCInfo.NumberOfNodesAdded, bc.BCInfo.NumberOfShards)
 	if isLeader {
@@ -125,13 +129,13 @@ func (bc *BeaconChain) AcceptNodeInfo(b []byte) *bcconn.NodeInfo {
 }
 
 //RespondRandomness sends a randomness beacon to the node inorder for it process what shard it will be in
-func (bc *BeaconChain) RespondRandomness(Node *bcconn.NodeInfo) {
+func (bc *BeaconChain) RespondRandomness(Node *node.Info) {
 	bci := bc.BCInfo
 	response := bcconn.ResponseRandomNumber{NumberOfShards: bci.NumberOfShards, NumberOfNodesAdded: bci.NumberOfNodesAdded, Leaders: bci.Leaders}
 	msg := bcconn.SerializeRandomInfo(response)
 	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Acknowledge, msg)
 	bc.log.Info("Sent Out Msg", "# Nodes", response.NumberOfNodesAdded)
-	host.SendMessage(bc.host, Node.Self, msgToSend, nil)
+	host.SendMessage(bc.host, bc.Peer, msgToSend, nil)
 	bc.state = RandomInfoSent
 }
 
