@@ -17,6 +17,11 @@ type HostV1 struct {
 	quit     chan struct{}
 }
 
+// AddPeer gets self peer
+func (host *HostV1) AddPeer(p *p2p.Peer) error {
+	return nil
+}
+
 // New creates a HostV1
 func New(self p2p.Peer) *HostV1 {
 	h := &HostV1{
@@ -29,6 +34,11 @@ func New(self p2p.Peer) *HostV1 {
 // GetSelfPeer gets self peer
 func (host *HostV1) GetSelfPeer() p2p.Peer {
 	return host.self
+}
+
+// GetID return ID
+func (host *HostV1) GetID() string {
+   return fmt.Sprintf("%s:%s", host.self.IP, host.self.Port)
 }
 
 // BindHandlerAndServe Version 0 p2p. Going to be deprecated.

@@ -185,3 +185,8 @@ func BCItoBC(bci *BCInfo) *BeaconChain {
 func SetSaveFile(path string) {
 	SaveFile = path
 }
+
+//GetID return ID.Pretty
+func (bc *BeaconChain) GetID() string {
+	return bc.host.GetID()
+}

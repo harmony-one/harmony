@@ -10,4 +10,6 @@ type Host interface {
 	SendMessage(p2p.Peer, []byte) error
 	BindHandlerAndServe(handler p2p.StreamHandler)
 	Close() error
+	AddPeer(*p2p.Peer) error
+	GetID() string
 }

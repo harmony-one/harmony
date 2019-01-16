@@ -144,3 +144,8 @@ func (node *NewNode) GetClientPeer() *p2p.Peer {
 func (node *NewNode) GetSelfPeer() p2p.Peer {
 	return node.Self
 }
+
+// AddPeer add new peer for newnode
+func (node *NewNode) AddPeer(p *p2p.Peer) error {
+	return node.host.AddPeer(p)
+}
