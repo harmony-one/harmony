@@ -40,10 +40,10 @@ func (r RoleType) String() string {
 	return "Unknown"
 }
 
-// refer to Peer struct in p2p/peer.go
+// Info refers to Peer struct in p2p/peer.go
 // this is basically a simplified version of Peer
 // for network transportation
-type nodeInfo struct {
+type Info struct {
 	IP          string
 	Port        string
 	PubKey      []byte
@@ -54,13 +54,13 @@ type nodeInfo struct {
 // PingMessageType defines the data structure of the Ping message
 type PingMessageType struct {
 	Version uint16 // version of the protocol
-	Node    nodeInfo
+	Node    Info
 }
 
 // PongMessageType defines the data structure of the Pong message
 type PongMessageType struct {
 	Version uint16 // version of the protocol
-	Peers   []nodeInfo
+	Peers   []Info
 	PubKeys [][]byte // list of publickKeys, has to be identical among all validators/leaders
 }
 
@@ -99,11 +99,11 @@ func NewPongMessage(peers []p2p.Peer, pubKeys []kyber.Point) *PongMessageType {
 	pong.PubKeys = make([][]byte, 0)
 
 	pong.Version = ProtocolVersion
-	pong.Peers = make([]nodeInfo, 0)
+	pong.Peers = make([]Info, 0)
 
 	var err error
 	for _, p := range peers {
-		n := nodeInfo{}
+		n := Info{}
 		n.IP = p.IP
 		n.Port = p.Port
 		n.ValidatorID = p.ValidatorID
@@ -146,7 +146,7 @@ func GetPingMessage(payload []byte) (*PingMessageType, error) {
 // GetPongMessage deserializes the Pong Message from a list of byte
 func GetPongMessage(payload []byte) (*PongMessageType, error) {
 	pong := new(PongMessageType)
-	pong.Peers = make([]nodeInfo, 0)
+	pong.Peers = make([]Info, 0)
 	pong.PubKeys = make([][]byte, 0)
 
 	r := bytes.NewBuffer(payload)
