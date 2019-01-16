@@ -1,4 +1,5 @@
 #!/bin/bash
+# sync test
 
 ROOT=$(dirname $0)/..
 ip=127.0.0.1

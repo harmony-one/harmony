@@ -11,9 +11,7 @@ import (
 
 // Constants for downloader server.
 const (
-	DefaultDownloadPort      = "6666"
-	RegisterFail        byte = 0x00
-	RegisterSuccess     byte = 0x01
+	DefaultDownloadPort = "6666"
 )
 
 // Server is the Server struct for downloader package.

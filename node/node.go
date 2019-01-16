@@ -511,7 +511,9 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 			response.Type = downloader_pb.DownloaderResponse_FAIL
 			return response, nil
 		} else {
+			node.stateMutex.Lock()
 			node.peerRegistrationRecord[peerInfoStr] = time.Now().UnixNano()
+			node.stateMutex.Unlock()
 			response.Type = downloader_pb.DownloaderResponse_SUCCESS
 		}
 	}
