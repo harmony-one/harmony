@@ -5,7 +5,7 @@ import (
 	"log"
 	"net"
 
-	"github.com/harmony-one/harmony/api/proto/bcconn"
+	"github.com/harmony-one/harmony/api/proto/node"
 
 	"google.golang.org/grpc"
 
@@ -14,7 +14,7 @@ import (
 
 // Server is the Server struct for beacon chain package.
 type Server struct {
-	shardLeaderMap func() map[int]*bcconn.NodeInfo
+	shardLeaderMap func() map[int]*node.Info
 }
 
 // FetchLeaders implements the FetchLeaders interface to return current leaders.
@@ -23,7 +23,7 @@ func (s *Server) FetchLeaders(ctx context.Context, request *proto.FetchLeadersRe
 
 	leaders := []*proto.FetchLeadersResponse_Leader{}
 	for shardID, leader := range s.shardLeaderMap() {
-		leaders = append(leaders, &proto.FetchLeadersResponse_Leader{Ip: leader.Self.IP, Port: leader.Self.Port, ShardId: uint32(shardID)})
+		leaders = append(leaders, &proto.FetchLeadersResponse_Leader{Ip: leader.IP, Port: leader.Port, ShardId: uint32(shardID)})
 	}
 	log.Println(leaders)
 	return &proto.FetchLeadersResponse{Leaders: leaders}, nil
@@ -45,7 +45,7 @@ func (s *Server) Start(ip, port string) (*grpc.Server, error) {
 }
 
 // NewServer creates new Server which implements BeaconChainServiceServer interface.
-func NewServer(shardLeaderMap func() map[int]*bcconn.NodeInfo) *Server {
+func NewServer(shardLeaderMap func() map[int]*node.Info) *Server {
 	s := &Server{shardLeaderMap}
 	return s
 }

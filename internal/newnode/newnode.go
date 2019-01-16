@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/api/proto/bcconn"
 	proto_identity "github.com/harmony-one/harmony/api/proto/identity"
+	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -52,7 +53,7 @@ func New(ip string, port string) *NewNode {
 type registerResponseRandomNumber struct {
 	NumberOfShards     int
 	NumberOfNodesAdded int
-	Leaders            []*bcconn.NodeInfo
+	Leaders            []*proto_node.Info
 }
 
 // ContactBeaconChain starts a newservice in the candidate node
@@ -72,8 +73,7 @@ func (node *NewNode) requestBeaconChain(BCPeer p2p.Peer) (err error) {
 	if err != nil {
 		node.log.Error("Could not Marshall public key into binary")
 	}
-	p := p2p.Peer{IP: node.Self.IP, Port: node.Self.Port}
-	nodeInfo := &bcconn.NodeInfo{Self: p, PubK: pubk}
+	nodeInfo := &proto_node.Info{IP: node.Self.IP, Port: node.Self.Port, PubKey: pubk}
 	msg := bcconn.SerializeNodeInfo(nodeInfo)
 	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Register, msg)
 	gotShardInfo := false
@@ -108,9 +108,9 @@ func (node *NewNode) processShardInfo(msgPayload []byte) bool {
 	leaders := leadersInfo.Leaders
 	shardNum, isLeader := utils.AllocateShard(leadersInfo.NumberOfNodesAdded, leadersInfo.NumberOfShards)
 	for n, v := range leaders {
-		leaderPeer := p2p.Peer{IP: v.Self.IP, Port: v.Self.Port}
+		leaderPeer := p2p.Peer{IP: v.IP, Port: v.Port}
 		leaderPeer.PubKey = crypto.Ed25519Curve.Point()
-		err := leaderPeer.PubKey.UnmarshalBinary(v.PubK[:])
+		err := leaderPeer.PubKey.UnmarshalBinary(v.PubKey[:])
 		if err != nil {
 			node.log.Error("Could not unmarshall leaders public key from binary to kyber.point")
 		}
