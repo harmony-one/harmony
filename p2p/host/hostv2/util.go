@@ -19,9 +19,17 @@ func writeData(w *bufio.Writer, data []byte) {
 	w.Flush()
 }
 
+func stringToAddr(addrString string) (addr maddr.Multiaddr, err error) {
+	addr, err = maddr.NewMultiaddr(addrString)
+	if err != nil {
+		return nil, err
+	}
+	return addr, nil
+}
+
 func stringsToAddrs(addrStrings []string) (maddrs []maddr.Multiaddr, err error) {
 	for _, addrString := range addrStrings {
-		addr, err := maddr.NewMultiaddr(addrString)
+		addr, err := stringToAddr(addrString)
 		if err != nil {
 			return maddrs, err
 		}

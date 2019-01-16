@@ -29,6 +29,7 @@ type HostV2 struct {
 	self             p2p.Peer
 	dht              *libp2pdht.IpfsDHT
 	rendezvousString string
+	bootNodes        []multiaddr.Multiaddr
 }
 
 // Peerstore returns the peer store
@@ -47,10 +48,11 @@ func New(self p2p.Peer) *HostV2 {
 		// libp2p.EnableRelay; libp2p.Routing;
 	)
 	catchError(err)
-	log.Debug("HostV2 is up!", "port", self.Port, "id", p2pHost.ID().Pretty(), "addr", sourceAddr)
+	log.Debug("HostV2 is up!", "maddr", sourceAddr.String()+"/ipfs/"+p2pHost.ID().Pretty())
 	h := &HostV2{
-		h:    p2pHost,
-		self: self,
+		h:         p2pHost,
+		self:      self,
+		bootNodes: bootstrapPeers,
 	}
 	return h
 }
@@ -62,12 +64,22 @@ func (host *HostV2) GetSelfPeer() p2p.Peer {
 
 // BindHandlerAndServe bind a streamHandler to the harmony protocol.
 func (host *HostV2) BindHandlerAndServe(handler p2p.StreamHandler) {
+	// host.h.SetStreamHandler(ProtocolID, func(s net.Stream) {
+	// 	log.Debug("Got stream")
+	// 	handler(s)
+	// })
+	host.setupDiscovery()
+	log.Debug("after set")
+	// Hang forever
+	// <-make(chan struct{})
+}
+
+// BindHandler -
+func (host *HostV2) BindHandler(handler p2p.StreamHandler) {
 	host.h.SetStreamHandler(ProtocolID, func(s net.Stream) {
+		log.Debug("Got stream!!")
 		handler(s)
 	})
-	host.setupDiscovery()
-	// Hang forever
-	<-make(chan struct{})
 }
 
 // SendMessage a p2p message sending function with signature compatible to p2pv1.
@@ -91,7 +103,34 @@ func (host *HostV2) SendMessage(p p2p.Peer, message []byte) error {
 	return nil
 }
 
+// SendMessageToPeer -
+func (host *HostV2) SendMessageToPeer(peerID peer.ID, msg string) error {
+	s, err := host.h.NewStream(context.Background(), peerID, ProtocolID)
+	if err != nil {
+		log.Error("Failed to send message", "from", host.self, "to", peerID, "error", err)
+		return err
+	}
+
+	// Create a buffered stream so that read and writes are non blocking.
+	w := bufio.NewWriter(s)
+
+	_, err = w.WriteString(msg + "\n")
+	w.Flush()
+	catchError(err)
+	return nil
+}
+
 // Close closes the host
 func (host *HostV2) Close() error {
 	return host.h.Close()
+}
+
+// Broadcast -
+func (host *HostV2) Broadcast() {
+	msg := fmt.Sprintf("Ping from %s", host.h.Addrs())
+	for _, peer := range host.Peerstore().Peers() {
+		err := host.SendMessageToPeer(peer, msg)
+		catchError(err)
+		// log.Debug("ping", "peer", peer, "addr", host.Peerstore().Addrs(peer), "msg", msg)
+	}
 }
