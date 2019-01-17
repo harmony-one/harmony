@@ -41,3 +41,6 @@ tmp_log
 
 # Others
 *.png
+
+# beacon chain data
+bc_config.json
