@@ -1,6 +1,7 @@
 package beaconchain
 
 import (
+	"fmt"
 	"math/rand"
 	"os"
 	"strconv"
@@ -18,6 +19,8 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
+	peer "github.com/libp2p/go-libp2p-peer"
+	multiaddr "github.com/multiformats/go-multiaddr"
 )
 
 //BCState keeps track of the state the beaconchain is in
@@ -115,8 +118,16 @@ func generateBCKey() kyber.Point {
 func (bc *BeaconChain) AcceptNodeInfo(b []byte) *node.Info {
 	Node := bcconn.DeserializeNodeInfo(b)
 	bc.log.Info("New Node Connection", "IP", Node.IP, "Port", Node.Port)
-	bc.Peer = p2p.Peer{IP: Node.IP, Port: Node.Port}
+	bc.Peer = p2p.Peer{IP: Node.IP, Port: Node.Port, PeerID: Node.PeerID}
+	addr := fmt.Sprintf("/ip4/%s/tcp/%s", Node.IP, Node.Port)
+	targetAddr, err := multiaddr.NewMultiaddr(addr)
+	if err != nil {
+		log.Error("AcceptNodeInfo NewMultiaddr error", "error", err)
+		return nil
+	}
+	bc.Peer.Addrs = append(bc.Peer.Addrs, targetAddr)
 	bc.host.AddPeer(&bc.Peer)
+
 	bc.BCInfo.NumberOfNodesAdded = bc.BCInfo.NumberOfNodesAdded + 1
 	shardNum, isLeader := utils.AllocateShard(bc.BCInfo.NumberOfNodesAdded, bc.BCInfo.NumberOfShards)
 	if isLeader {
@@ -190,7 +201,7 @@ func SetSaveFile(path string) {
 	SaveFile = path
 }
 
-//GetID return ID.Pretty
-func (bc *BeaconChain) GetID() string {
+//GetID return ID
+func (bc *BeaconChain) GetID() peer.ID {
 	return bc.host.GetID()
 }

@@ -45,22 +45,25 @@ func (host *HostV2) AddPeer(p *p2p.Peer) error {
 		return err
 	}
 
-	_, pubKey, err := utils.GenKeyP2P(p.IP, p.Port)
-	if err != nil {
-		log.Error("AddPeer GenKey error", "error", err)
-		return err
+	if p.PeerID == "" {
+		_, pubKey, err := utils.GenKeyP2PRand()
+		if err != nil {
+			log.Error("AddPeer GenKey error", "error", err)
+			return err
+		}
+
+		peerID, err := peer.IDFromPublicKey(pubKey)
+		if err != nil {
+			log.Error("AddPeer IDFromPublicKey error", "error", err)
+			return err
+		}
+
+		p.PeerID = peerID
 	}
 
-	peerID, err := peer.IDFromPublicKey(pubKey)
-	if err != nil {
-		log.Error("AddPeer IDFromPublicKey error", "error", err)
-		return err
-	}
-
-	p.PeerID = peerID
 	p.Addrs = append(p.Addrs, targetAddr)
 
-	host.Peerstore().AddAddrs(peerID, p.Addrs, peerstore.PermanentAddrTTL)
+	host.Peerstore().AddAddrs(p.PeerID, p.Addrs, peerstore.PermanentAddrTTL)
 
 	return nil
 }
@@ -75,7 +78,7 @@ func New(self p2p.Peer) *HostV2 {
 	sourceAddr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", self.Port))
 	catchError(err)
 
-	priKey, pubKey, err := utils.GenKeyP2P(self.IP, self.Port)
+	priKey, pubKey, err := utils.GenKeyP2PRand()
 	catchError(err)
 
 	p2pHost, err := libp2p.New(context.Background(),
@@ -99,8 +102,8 @@ func New(self p2p.Peer) *HostV2 {
 }
 
 // GetID returns ID.Pretty
-func (host *HostV2) GetID() string {
-	return host.h.ID().Pretty()
+func (host *HostV2) GetID() peer.ID {
+	return host.h.ID()
 }
 
 // GetSelfPeer gets self peer

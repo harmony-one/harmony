@@ -18,6 +18,8 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
+
+	multiaddr "github.com/multiformats/go-multiaddr"
 )
 
 //NewNode is ther struct for a candidate node
@@ -73,7 +75,7 @@ func (node *NewNode) requestBeaconChain(BCPeer p2p.Peer) (err error) {
 	if err != nil {
 		node.log.Error("Could not Marshall public key into binary")
 	}
-	nodeInfo := &proto_node.Info{IP: node.Self.IP, Port: node.Self.Port, PubKey: pubk}
+	nodeInfo := &proto_node.Info{IP: node.Self.IP, Port: node.Self.Port, PubKey: pubk, PeerID: node.host.GetID()}
 	msg := bcconn.SerializeNodeInfo(nodeInfo)
 	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Register, msg)
 	gotShardInfo := false
@@ -108,14 +110,23 @@ func (node *NewNode) processShardInfo(msgPayload []byte) bool {
 	leaders := leadersInfo.Leaders
 	shardNum, isLeader := utils.AllocateShard(leadersInfo.NumberOfNodesAdded, leadersInfo.NumberOfShards)
 	for n, v := range leaders {
-		leaderPeer := p2p.Peer{IP: v.IP, Port: v.Port}
-		leaderPeer.PubKey = crypto.Ed25519Curve.Point()
-		err := leaderPeer.PubKey.UnmarshalBinary(v.PubKey[:])
-		if err != nil {
-			node.log.Error("Could not unmarshall leaders public key from binary to kyber.point")
-		}
-		node.Leaders[uint32(n)] = leaderPeer
-	}
+		leaderPeer := p2p.Peer{IP: v.IP, Port: v.Port, PeerID: v.PeerID}
+
+      addr := fmt.Sprintf("/ip4/%s/tcp/%s", leaderPeer.IP, leaderPeer.Port)
+      targetAddr, err := multiaddr.NewMultiaddr(addr)
+      if err != nil {
+         log.Error("processShardInfo NewMultiaddr error", "error", err)
+         return false
+      }
+      leaderPeer.Addrs = append(leaderPeer.Addrs, targetAddr)
+
+      leaderPeer.PubKey = crypto.Ed25519Curve.Point()
+      err = leaderPeer.PubKey.UnmarshalBinary(v.PubKey[:])
+      if err != nil {
+         node.log.Error("Could not unmarshall leaders public key from binary to kyber.point")
+      }
+      node.Leaders[uint32(n)] = leaderPeer
+   }
 
 	node.leader = node.Leaders[uint32(shardNum-1)]
 	node.isLeader = isLeader

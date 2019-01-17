@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/p2p"
+	peer "github.com/libp2p/go-libp2p-peer"
 )
 
 // HostV1 is the version 1 p2p host, using direct socket call.
@@ -37,8 +38,8 @@ func (host *HostV1) GetSelfPeer() p2p.Peer {
 }
 
 // GetID return ID
-func (host *HostV1) GetID() string {
-   return fmt.Sprintf("%s:%s", host.self.IP, host.self.Port)
+func (host *HostV1) GetID() peer.ID {
+	return peer.ID(fmt.Sprintf("%s:%s", host.self.IP, host.self.Port))
 }
 
 // BindHandlerAndServe Version 0 p2p. Going to be deprecated.

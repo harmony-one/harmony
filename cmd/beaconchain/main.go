@@ -49,7 +49,7 @@ func main() {
 		bc = beaconchain.New(*numShards, *ip, *port)
 	}
 
-	fmt.Printf("Beacon Chain Started: /ip4/%s/tcp/%v/p2p/%s\n", *ip, *port, bc.GetID())
+	fmt.Printf("Beacon Chain Started: /ip4/%s/tcp/%v/ipfs/%s\n", *ip, *port, bc.GetID().Pretty())
 
 	go bc.SupportRPC()
 	bc.StartServer()

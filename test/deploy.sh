@@ -119,7 +119,7 @@ LOG_FILE=$log_folder/r.log
 echo "launching beacon chain ..."
 $DRYRUN $ROOT/bin/beacon -numShards $SHARDS > $log_folder/beacon.log 2>&1 | tee -a $LOG_FILE &
 sleep 1 #waiting for beaconchain
-MA=$(grep "Beacon Chain Started" $LOG_FILE | awk -F: ' { print $2 } '
+MA=$(grep "Beacon Chain Started" $log_folder/beacon.log | awk -F: ' { print $2 } ')
 
 if [ -n "$MA" ]; then
    HMY_OPT="-bc_addr $MA"

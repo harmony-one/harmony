@@ -168,6 +168,8 @@ func main() {
 	}
 
 	host := p2pimpl.NewHost(selfPeer)
+	host.AddPeer(&leader)
+
 	// Consensus object.
 	consensus := consensus.New(host, shardID, peers, leader)
 	consensus.MinPeers = *minPeers

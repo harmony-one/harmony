@@ -19,6 +19,8 @@ import (
 	"github.com/dedis/kyber"
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/p2p"
+
+	peer "github.com/libp2p/go-libp2p-peer"
 )
 
 // RoleType defines the role of the node
@@ -49,6 +51,7 @@ type Info struct {
 	PubKey      []byte
 	ValidatorID int
 	Role        RoleType
+	PeerID      peer.ID // Peerstore ID
 }
 
 // PingMessageType defines the data structure of the Ping message

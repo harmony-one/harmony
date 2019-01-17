@@ -79,6 +79,11 @@ func GenKeyP2P(ip, port string) (p2p_crypto.PrivKey, p2p_crypto.PubKey, error) {
 	return p2p_crypto.GenerateKeyPairWithReader(p2p_crypto.RSA, 2048, r)
 }
 
+// GenKeyP2PRand generates a pair of RSA keys used in libp2p host, using random seed
+func GenKeyP2PRand() (p2p_crypto.PrivKey, p2p_crypto.PubKey, error) {
+	return p2p_crypto.GenerateKeyPair(p2p_crypto.RSA, 2048)
+}
+
 // AllocateShard uses the number of current nodes and number of shards
 // to return the shardNum a new node belongs to, it also tells whether the node is a leader
 func AllocateShard(numOfAddedNodes, numOfShards int) (int, bool) {
