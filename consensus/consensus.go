@@ -97,8 +97,10 @@ type Consensus struct {
 	// Called when consensus on a new block is done
 	OnConsensusDone func(*types.Block)
 
-	// channel for sending current consensus block to state syncing
+	// current consensus block to check if out of sync
 	ConsensusBlock chan *types.Block
+	// verified block to state sync broadcast
+	VerifiedNewBlock chan *types.Block
 
 	Log log.Logger
 
@@ -482,6 +484,18 @@ func accumulateRewards(config *params.ChainConfig, state *state.DB, header *type
 // GetNodeID returns the nodeID
 func (consensus *Consensus) GetNodeID() uint32 {
 	return consensus.nodeID
+}
+
+func (consensus *Consensus) GetPeerFromID(peerID uint32) (p2p.Peer, bool) {
+	v, ok := consensus.validators.Load(peerID)
+	if !ok {
+		return p2p.Peer{}, false
+	}
+	value, ok := v.(p2p.Peer)
+	if !ok {
+		return p2p.Peer{}, false
+	}
+	return value, true
 }
 
 // SendMessage sends message thru p2p host to peer.

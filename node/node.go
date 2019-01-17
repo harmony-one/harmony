@@ -3,6 +3,7 @@ package node
 import (
 	"bytes"
 	"crypto/ecdsa"
+	"encoding/binary"
 	"encoding/gob"
 	"encoding/hex"
 	"fmt"
@@ -32,6 +33,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/crypto/pki"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
@@ -78,12 +80,19 @@ const (
 )
 
 const (
-	syncingPortDifference = 3000
-	waitBeforeJoinShard   = time.Second * 3
-	timeOutToJoinShard    = time.Minute * 10
+	waitBeforeJoinShard = time.Second * 3
+	timeOutToJoinShard  = time.Minute * 10
 	// ClientServicePortDiff is the positive port diff for client service
-	ClientServicePortDiff = 5555
+	ClientServicePortDiff       = 5555
+	maxBroadcastNodes           = 10                  // broadcast at most maxBroadcastNodes peers that need in sync
+	broadcastTimeout      int64 = 3 * 60 * 1000000000 // 3 mins
 )
+
+// use to push new block to outofsync node
+type syncConfig struct {
+	timestamp int64
+	client    *downloader.Client
+}
 
 // NetworkNode ...
 type NetworkNode struct {
@@ -120,9 +129,10 @@ type Node struct {
 	clientServer *clientService.Server
 
 	// Syncing component.
-	downloaderServer *downloader.Server
-	stateSync        *syncing.StateSync
-	syncingState     uint32
+	downloaderServer       *downloader.Server
+	stateSync              *syncing.StateSync
+	syncingState           uint32
+	peerRegistrationRecord map[uint32]*syncConfig // record registration time (unixtime) of peers begin in syncing
 
 	// The p2p host used to send/receive p2p messages
 	host host.Host
@@ -266,6 +276,8 @@ func New(host host.Host, consensus *bft.Consensus, db *ethdb.LDBDatabase) *Node 
 	node.syncingState = NotDoingSyncing
 	node.StopPing = make(chan struct{})
 	node.Consensus.ConsensusBlock = make(chan *types.Block)
+	node.Consensus.VerifiedNewBlock = make(chan *types.Block)
+	node.peerRegistrationRecord = make(map[uint32]*syncConfig)
 
 	node.OfflinePeers = make(chan p2p.Peer)
 	go node.RemovePeersHandler()
@@ -286,33 +298,40 @@ func (node *Node) IsOutOfSync(consensusBlock *types.Block) bool {
 	if bytes.Compare(latestHash[:], parentHash[:]) == 0 {
 		return false
 	}
+	node.log.Debug("node is out of sync")
+	node.stateMutex.Lock()
+	node.State = NodeNotSync
+	node.stateMutex.Unlock()
 	return true
 }
 
 // DoSyncing wait for check status and starts syncing if out of sync
 func (node *Node) DoSyncing() {
-	consensusBlock := <-node.Consensus.ConsensusBlock
-	if !node.IsOutOfSync(consensusBlock) {
-		return
-	}
-
-	// If this node is currently doing sync, another call for syncing will be returned immediately.
-	if !atomic.CompareAndSwapUint32(&node.syncingState, NotDoingSyncing, DoingSyncing) {
-		return
-	}
-	defer atomic.StoreUint32(&node.syncingState, NotDoingSyncing)
-	if node.stateSync == nil {
-		node.stateSync = syncing.GetStateSync()
-	}
-	if node.stateSync.StartStateSync(node.GetSyncingPeers(), node.blockchain) {
-		node.log.Debug("DoSyncing: successfully sync")
-		if node.State == NodeNotSync {
-			node.stateMutex.Lock()
-			node.State = NodeReadyForConsensus
-			node.stateMutex.Unlock()
+	for {
+		// TODO: add consensusBlock if it's already in sync
+		consensusBlock := <-node.Consensus.ConsensusBlock
+		if !node.IsOutOfSync(consensusBlock) {
+			continue
 		}
-	} else {
-		node.log.Debug("DoSyncing: failed to sync")
+
+		// If this node is currently doing sync, another call for syncing will be returned immediately.
+		if !atomic.CompareAndSwapUint32(&node.syncingState, NotDoingSyncing, DoingSyncing) {
+			continue
+		}
+		defer atomic.StoreUint32(&node.syncingState, NotDoingSyncing)
+		if node.stateSync == nil {
+			node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port)
+		}
+		if node.stateSync.StartStateSync(node.GetSyncingPeers(), node.blockchain) {
+			node.log.Debug("DoSyncing: successfully sync")
+			if node.State == NodeNotSync {
+				node.stateMutex.Lock()
+				node.State = NodeReadyForConsensus
+				node.stateMutex.Unlock()
+			}
+		} else {
+			node.log.Debug("DoSyncing: failed to sync")
+		}
 	}
 }
 
@@ -341,7 +360,7 @@ func (node *Node) AddPeers(peers []*p2p.Peer) int {
 // GetSyncingPort returns the syncing port.
 func GetSyncingPort(nodePort string) string {
 	if port, err := strconv.Atoi(nodePort); err == nil {
-		return fmt.Sprintf("%d", port-syncingPortDifference)
+		return fmt.Sprintf("%d", port-syncing.SyncingPortDifference)
 	}
 	os.Exit(1)
 	return ""
@@ -353,9 +372,7 @@ func (node *Node) GetSyncingPeers() []p2p.Peer {
 	res := []p2p.Peer{}
 	node.Neighbors.Range(func(k, v interface{}) bool {
 		node.log.Debug("GetSyncingPeers-Range: ", "k", k, "v", v)
-		if len(res) == 0 {
-			res = append(res, v.(p2p.Peer))
-		}
+		res = append(res, v.(p2p.Peer))
 		return true
 	})
 
@@ -460,6 +477,7 @@ func (node *Node) SupportSyncing() {
 	node.InitSyncingServer()
 	node.StartSyncingServer()
 	go node.DoSyncing()
+	go node.SendNewBlockToUnsync()
 }
 
 // InitSyncingServer starts downloader server.
@@ -477,24 +495,99 @@ func (node *Node) StartSyncingServer() {
 // CalculateResponse implements DownloadInterface on Node object.
 func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*downloader_pb.DownloaderResponse, error) {
 	response := &downloader_pb.DownloaderResponse{}
-	if request.Type == downloader_pb.DownloaderRequest_HEADER {
-
+	node.log.Debug("[sync] request type", "type", request.Type)
+	switch request.Type {
+	case downloader_pb.DownloaderRequest_HEADER:
 		for block := node.blockchain.CurrentBlock(); block != nil; block = node.blockchain.GetBlockByHash(block.Header().ParentHash) {
 			blockHash := block.Hash()
 			response.Payload = append(response.Payload, blockHash[:])
 		}
-	} else {
+	case downloader_pb.DownloaderRequest_BLOCK:
 		for _, bytes := range request.Hashes {
 			var hash common.Hash
 			hash.SetBytes(bytes)
 			block := node.blockchain.GetBlockByHash(hash)
 			encodedBlock, err := rlp.EncodeToBytes(block)
-			if err != nil {
+			if err == nil {
 				response.Payload = append(response.Payload, encodedBlock)
 			}
 		}
+	case downloader_pb.DownloaderRequest_NEWBLOCK:
+		if node.State != NodeNotSync {
+			node.log.Debug("[sync] state not in NodeNotSync", "state", node.State.String())
+			response.Type = downloader_pb.DownloaderResponse_INSYNC
+			return response, nil
+		}
+		var blockObj types.Block
+		err := rlp.DecodeBytes(request.BlockHash, &blockObj)
+		if err != nil {
+			node.log.Warn("[sync] unable to decode received new block")
+			return response, err
+		}
+		node.stateSync.AddNewBlock(request.PeerHash, &blockObj)
+
+	case downloader_pb.DownloaderRequest_REGISTER:
+		peerID := binary.BigEndian.Uint32(request.PeerHash)
+		if _, ok := node.peerRegistrationRecord[peerID]; ok {
+			response.Type = downloader_pb.DownloaderResponse_FAIL
+			return response, nil
+		} else if len(node.peerRegistrationRecord) >= maxBroadcastNodes {
+			response.Type = downloader_pb.DownloaderResponse_FAIL
+			return response, nil
+		} else {
+			peer, ok := node.Consensus.GetPeerFromID(peerID)
+			if !ok {
+				node.log.Warn("[sync] unable to get peer from peerID", "peerID", peerID)
+			}
+			client := downloader.ClientSetup(peer.IP, GetSyncingPort(peer.Port))
+			if client == nil {
+				node.log.Warn("[sync] unable to setup client")
+				return response, nil
+			}
+			node.log.Debug("[sync] client setup correctly", "client", client)
+			config := &syncConfig{timestamp: time.Now().UnixNano(), client: client}
+			node.stateMutex.Lock()
+			node.peerRegistrationRecord[peerID] = config
+			node.stateMutex.Unlock()
+			node.log.Debug("[sync] register peerID success", "peerID", peerID)
+			response.Type = downloader_pb.DownloaderResponse_SUCCESS
+		}
 	}
 	return response, nil
+}
+
+func (node *Node) SendNewBlockToUnsync() {
+	for {
+		block := <-node.Consensus.VerifiedNewBlock
+		blockHash, err := rlp.EncodeToBytes(block)
+		if err != nil {
+			node.log.Warn("[sync] unable to encode block to hashes")
+			continue
+		}
+		node.log.Debug("peerRegistration Record", "number", len(node.peerRegistrationRecord))
+
+		// really need to have a unique id independent of ip/port
+		selfPeerID := utils.GetUniqueIDFromIPPort(node.SelfPeer.IP, node.SelfPeer.Port)
+		peerHash := make([]byte, 4)
+		binary.BigEndian.PutUint32(peerHash, selfPeerID)
+		for peerID, config := range node.peerRegistrationRecord {
+			elapseTime := time.Now().UnixNano() - config.timestamp
+			if elapseTime > broadcastTimeout {
+				node.log.Warn("[sync] SendNewBlockToUnsync to peer timeout", "peerID", peerID)
+				node.stateMutex.Lock()
+				delete(node.peerRegistrationRecord, peerID)
+				node.stateMutex.Unlock()
+				continue
+			}
+			response := config.client.PushNewBlock(peerHash, blockHash)
+			node.log.Debug("[sync] SendNewBlockToUnSync", "response", response)
+			if response.Type == downloader_pb.DownloaderResponse_INSYNC {
+				node.stateMutex.Lock()
+				delete(node.peerRegistrationRecord, peerID)
+				node.stateMutex.Unlock()
+			}
+		}
+	}
 }
 
 // RemovePeersHandler is a goroutine to wait on the OfflinePeers channel

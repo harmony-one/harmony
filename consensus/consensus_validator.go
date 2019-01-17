@@ -76,11 +76,12 @@ func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Messa
 	}
 
 	// send consensus block to state syncing
+	// TODO (chao): avoid malicious leader to send wrong block
 	select {
 	case consensus.ConsensusBlock <- &blockObj:
-		consensus.Log.Info("consensus block sent to state sync, block hash ", blockObj.Hash())
+		consensus.Log.Info("consensus block sent to state sync", "blockHash", blockObj.Hash())
 	default:
-		consensus.Log.Warn("consensus block unable to sent to state sync, block hash ", blockObj.Hash())
+		consensus.Log.Warn("consensus block unable to sent to state sync", "blockHash", blockObj.Hash())
 	}
 
 	consensus.block = block
@@ -252,6 +253,14 @@ func (consensus *Consensus) processChallengeMessage(message consensus_proto.Mess
 				}
 				consensus.Log.Info("Finished Response. Adding block to chain", "numTx", len(blockObj.Transactions()))
 				consensus.OnConsensusDone(&blockObj)
+
+				select {
+				case consensus.VerifiedNewBlock <- &blockObj:
+				default:
+					consensus.Log.Info("[sync] consensus verified block send to chan failed", "blockHash", blockObj.Hash())
+					continue
+				}
+
 			} else {
 				break
 			}

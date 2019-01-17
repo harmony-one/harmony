@@ -2,16 +2,23 @@ package syncing
 
 import (
 	"bytes"
+	"encoding/binary"
+	"fmt"
+	"os"
 	"reflect"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/internal/utils"
 
 	"github.com/Workiva/go-datastructures/queue"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/api/services/syncing/downloader"
+	pb "github.com/harmony-one/harmony/api/services/syncing/downloader/proto"
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/p2p"
 )
 
@@ -20,6 +27,8 @@ const (
 	ConsensusRatio                        = float64(0.66)
 	SleepTimeAfterNonConsensusBlockHashes = time.Second * 30
 	TimesToFail                           = 5
+	RegistrationNumber                    = 3
+	SyncingPortDifference                 = 3000
 )
 
 // SyncPeerConfig is peer config to sync.
@@ -28,6 +37,8 @@ type SyncPeerConfig struct {
 	port        string
 	client      *downloader.Client
 	blockHashes [][]byte
+	newBlocks   []*types.Block
+	mux         sync.Mutex
 }
 
 // GetClient returns client pointer of downloader.Client
@@ -50,17 +61,51 @@ type SyncConfig struct {
 }
 
 // GetStateSync returns the implementation of StateSyncInterface interface.
-func GetStateSync() *StateSync {
-	return &StateSync{}
+func CreateStateSync(ip string, port string) *StateSync {
+	stateSync := &StateSync{}
+	stateSync.selfip = ip
+	stateSync.selfport = port
+	return stateSync
 }
 
 // StateSync is the struct that implements StateSyncInterface.
 type StateSync struct {
+	selfip             string
+	selfport           string
 	peerNumber         int
 	activePeerNumber   int
 	blockHeight        int
 	syncConfig         *SyncConfig
 	stateSyncTaskQueue *queue.Queue
+}
+
+// GetServicePort returns the service port from syncing port
+// TODO: really need use a unique ID instead of ip/port
+func GetServicePort(nodePort string) string {
+	if port, err := strconv.Atoi(nodePort); err == nil {
+		return fmt.Sprintf("%d", port+SyncingPortDifference)
+	}
+	os.Exit(1)
+	return ""
+}
+
+// AddNewBlock will add newly received block into state syncing queue
+func (ss *StateSync) AddNewBlock(peerHash []byte, block *types.Block) {
+	Log.Debug("[sync] adding new block from peer", "peerHash", peerHash, "blockHash", block.Hash())
+	for _, pc := range ss.syncConfig.peers {
+		pid := utils.GetUniqueIDFromIPPort(pc.ip, GetServicePort(pc.port))
+		ph := make([]byte, 4)
+		binary.BigEndian.PutUint32(ph, pid)
+		log.Debug("check ss.syncConfig.peers", "ip", pc.ip, "port", pc.port, "hash", ph)
+		log.Debug("input hash", "hash", peerHash)
+		if bytes.Compare(ph, peerHash) != 0 {
+			continue
+		}
+		pc.mux.Lock()
+		pc.newBlocks = append(pc.newBlocks, block)
+		pc.mux.Unlock()
+		Log.Debug("[sync] new block added")
+	}
 }
 
 // CreateTestSyncPeerConfig used for testing.
@@ -126,7 +171,6 @@ func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer) {
 	Log.Debug("CreateSyncConfig: len of peers", "len", len(peers))
 	Log.Debug("CreateSyncConfig: len of peers", "peers", peers)
 	ss.peerNumber = len(peers)
-	Log.Debug("CreateSyncConfig: hello")
 	ss.syncConfig = &SyncConfig{
 		peers: make([]*SyncPeerConfig, ss.peerNumber),
 	}
@@ -135,9 +179,9 @@ func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer) {
 			ip:   peers[id].IP,
 			port: peers[id].Port,
 		}
-		Log.Debug("CreateSyncConfig: peer port to connect", "port", peers[id].Port)
+		Log.Debug("[sync] CreateSyncConfig: peer port to connect", "port", peers[id].Port)
 	}
-	Log.Info("syncing: Finished creating SyncConfig.")
+	Log.Info("[sync] syncing: Finished creating SyncConfig.")
 }
 
 // MakeConnectionToPeers makes grpc connection to all peers.
@@ -315,7 +359,7 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 		}(ss.syncConfig.peers[i], ss.stateSyncTaskQueue, bc)
 	}
 	wg.Wait()
-	Log.Info("syncing: Finished downloadBlocks.")
+	Log.Info("[sync] Finished downloadBlocks.")
 }
 
 // StartStateSync starts state sync.
@@ -324,14 +368,68 @@ func (ss *StateSync) StartStateSync(peers []p2p.Peer, bc *core.BlockChain) bool 
 	ss.CreateSyncConfig(peers)
 	// Makes connections to peers.
 	ss.MakeConnectionToPeers()
+	numRegistered := ss.RegisterNodeInfo()
+	Log.Info("[sync] waiting for broadcast from peers", "numRegistered", numRegistered)
+
 	// Gets consensus hashes.
-	if !ss.GetConsensusHashes() {
-		return false
-	}
-	ss.generateStateSyncTaskQueue(bc)
+	//	if !ss.GetConsensusHashes() {
+	//		return false
+	//	}
+	//ss.generateStateSyncTaskQueue(bc)
 	// Download blocks.
-	if ss.stateSyncTaskQueue.Len() > 0 {
-		ss.downloadBlocks(bc)
+	//if ss.stateSyncTaskQueue.Len() > 0 {
+	//		ss.downloadBlocks(bc)
+	//	}
+
+	// TODO: change to true afterfinish implementation
+	return false
+}
+
+func (peerConfig *SyncPeerConfig) registerToBroadcast(peerHash []byte) error {
+	response := peerConfig.client.Register(peerHash)
+	if response.Type == pb.DownloaderResponse_FAIL {
+		Log.Debug("[sync] register to broadcast fail")
+		return ErrRegistrationFail
+	} else if response.Type == pb.DownloaderResponse_SUCCESS {
+		Log.Debug("[sync] register to broadcast success")
+		return nil
 	}
-	return true
+	Log.Debug("[sync] register to broadcast fail")
+	return ErrRegistrationFail
+}
+
+// RegisterNodeInfo will register node to peers to accept future new block broadcasting
+// return number of successfull registration
+func (ss *StateSync) RegisterNodeInfo() int {
+	registrationNumber := RegistrationNumber
+	count := 0
+	if registrationNumber > ss.activePeerNumber {
+		registrationNumber = ss.activePeerNumber
+	}
+	Log.Debug("[sync]", "registrationNumber", registrationNumber, "activePeerNumber", ss.activePeerNumber)
+	peerID := utils.GetUniqueIDFromIPPort(ss.selfip, ss.selfport)
+	peerHash := make([]byte, 4)
+	binary.BigEndian.PutUint32(peerHash[:], peerID)
+	for id := range ss.syncConfig.peers {
+		peerConfig := ss.syncConfig.peers[id]
+		if count >= registrationNumber {
+			break
+		}
+		if peerConfig.client == nil {
+			continue
+		}
+		Log.Debug("[sync] registering to peer", "ip", peerConfig.ip, "port", peerConfig.port, "peerHash", peerHash)
+		err := peerConfig.registerToBroadcast(peerHash)
+		if err != nil {
+			Log.Debug("[sync] register FAILED to peer", "ip", peerConfig.ip, "port", peerConfig.port, "peerHash", peerHash)
+			continue
+		}
+		count++
+	}
+	return count
+}
+
+func getPeerInfo(ip string, port string) []byte {
+	peerStr := ip + ":" + port
+	return []byte(peerStr)
 }

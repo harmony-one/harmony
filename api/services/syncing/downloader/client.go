@@ -65,3 +65,35 @@ func (client *Client) GetBlocks(hashes [][]byte) *pb.DownloaderResponse {
 	}
 	return response
 }
+
+// Register will register node's ip/port information to peers receive newly created blocks in future
+// hash is the bytes of "ip:port" string representation
+func (client *Client) Register(hash []byte) *pb.DownloaderResponse {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_REGISTER}
+	request.PeerHash = make([]byte, len(hash))
+	copy(request.PeerHash, hash)
+	response, err := client.dlClient.Query(ctx, request)
+	if err != nil {
+		log.Fatalf("Error")
+	}
+	return response
+}
+
+func (client *Client) PushNewBlock(peerHash []byte, blockHash []byte) *pb.DownloaderResponse {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_NEWBLOCK}
+	request.BlockHash = make([]byte, len(blockHash))
+	copy(request.BlockHash, blockHash)
+	request.PeerHash = make([]byte, len(peerHash))
+	copy(request.PeerHash, peerHash)
+
+	response, err := client.dlClient.Query(ctx, request)
+	log.Printf("[sync] response from pushnewblock", "response", response)
+	if err != nil {
+		log.Printf("[sync] unable to send new block to unsync node with error: %v", err)
+	}
+	return response
+}
