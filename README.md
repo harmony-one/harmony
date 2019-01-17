@@ -63,7 +63,7 @@ The script starts one local beacon chain node, the blockchain nodes, and run a t
 
 ## Testing
 
-Make sure you the following command and make sure everything passed before submitting your code.
+Make sure you use the following command and make sure everything passed before submitting your code.
 
 ```bash
 ./test/test_before_submit.sh
@@ -105,7 +105,7 @@ See [`CONTRIBUTING`](CONTRIBUTING.md) for details.
 * Fast state synchronization
 * Distributed randomness generation with VRF and VDF
 * Kademlia routing
-* P2p network and gossiping
+* P2P network and gossiping
 * Full protocol of consensus with BLS multi-sig and view-change protocol
 * Integration with WASM
 * Cross-shard transaction
