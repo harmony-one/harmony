@@ -63,7 +63,7 @@ The script starts one local beacon chain node, the blockchain nodes, and run a t
 
 ## Testing
 
-Make sure you the following command and make sure everything passed before submitting your code.
+Make sure you run the following command and everything passed before submitting your code.
 
 ```bash
 ./test/test_before_submit.sh
