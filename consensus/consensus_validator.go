@@ -21,7 +21,6 @@ func (consensus *Consensus) ProcessMessageValidator(payload []byte) {
 	if err != nil {
 		consensus.Log.Error("Failed to unmarshal message payload.", "err", err, "consensus", consensus)
 	}
-
 	switch message.Type {
 	case consensus_proto.MessageType_ANNOUNCE:
 		consensus.processAnnounceMessage(message)

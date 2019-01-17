@@ -14,7 +14,7 @@ message DownloaderRequest {
     BLOCK = 1;
     NEWBLOCK = 2;
     REGISTER = 3;
-    UNKOWN = 4;
+    REGISTERTIMEOUT = 4;
   }
  
   // Request type.

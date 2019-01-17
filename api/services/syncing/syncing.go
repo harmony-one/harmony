@@ -92,19 +92,17 @@ func GetServicePort(nodePort string) string {
 // AddNewBlock will add newly received block into state syncing queue
 func (ss *StateSync) AddNewBlock(peerHash []byte, block *types.Block) {
 	Log.Debug("[sync] adding new block from peer", "peerHash", peerHash, "blockHash", block.Hash())
-	for _, pc := range ss.syncConfig.peers {
+	for i, pc := range ss.syncConfig.peers {
 		pid := utils.GetUniqueIDFromIPPort(pc.ip, GetServicePort(pc.port))
 		ph := make([]byte, 4)
 		binary.BigEndian.PutUint32(ph, pid)
-		log.Debug("check ss.syncConfig.peers", "ip", pc.ip, "port", pc.port, "hash", ph)
-		log.Debug("input hash", "hash", peerHash)
 		if bytes.Compare(ph, peerHash) != 0 {
 			continue
 		}
 		pc.mux.Lock()
 		pc.newBlocks = append(pc.newBlocks, block)
 		pc.mux.Unlock()
-		Log.Debug("[sync] new block added")
+		Log.Debug("[sync] new block added, total blocks", "total", len(ss.syncConfig.peers[i].newBlocks))
 	}
 }
 
@@ -387,7 +385,7 @@ func (ss *StateSync) StartStateSync(peers []p2p.Peer, bc *core.BlockChain) bool 
 
 func (peerConfig *SyncPeerConfig) registerToBroadcast(peerHash []byte) error {
 	response := peerConfig.client.Register(peerHash)
-	if response.Type == pb.DownloaderResponse_FAIL {
+	if response == nil || response.Type == pb.DownloaderResponse_FAIL {
 		Log.Debug("[sync] register to broadcast fail")
 		return ErrRegistrationFail
 	} else if response.Type == pb.DownloaderResponse_SUCCESS {
@@ -401,15 +399,14 @@ func (peerConfig *SyncPeerConfig) registerToBroadcast(peerHash []byte) error {
 // RegisterNodeInfo will register node to peers to accept future new block broadcasting
 // return number of successfull registration
 func (ss *StateSync) RegisterNodeInfo() int {
+	ss.CleanUpNilPeers()
 	registrationNumber := RegistrationNumber
-	count := 0
-	if registrationNumber > ss.activePeerNumber {
-		registrationNumber = ss.activePeerNumber
-	}
 	Log.Debug("[sync]", "registrationNumber", registrationNumber, "activePeerNumber", ss.activePeerNumber)
 	peerID := utils.GetUniqueIDFromIPPort(ss.selfip, ss.selfport)
 	peerHash := make([]byte, 4)
 	binary.BigEndian.PutUint32(peerHash[:], peerID)
+
+	count := 0
 	for id := range ss.syncConfig.peers {
 		peerConfig := ss.syncConfig.peers[id]
 		if count >= registrationNumber {

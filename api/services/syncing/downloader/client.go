@@ -76,12 +76,12 @@ func (client *Client) Register(hash []byte) *pb.DownloaderResponse {
 	copy(request.PeerHash, hash)
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
-		log.Fatalf("Error")
+		log.Printf("[sync] client.go:Register error", "code", err)
 	}
 	return response
 }
 
-func (client *Client) PushNewBlock(peerHash []byte, blockHash []byte) *pb.DownloaderResponse {
+func (client *Client) PushNewBlock(peerHash []byte, blockHash []byte, timeout bool) *pb.DownloaderResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_NEWBLOCK}
@@ -89,6 +89,10 @@ func (client *Client) PushNewBlock(peerHash []byte, blockHash []byte) *pb.Downlo
 	copy(request.BlockHash, blockHash)
 	request.PeerHash = make([]byte, len(peerHash))
 	copy(request.PeerHash, peerHash)
+
+	if timeout {
+		request.Type = pb.DownloaderRequest_REGISTERTIMEOUT
+	}
 
 	response, err := client.dlClient.Query(ctx, request)
 	log.Printf("[sync] response from pushnewblock", "response", response)

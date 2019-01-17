@@ -81,10 +81,6 @@ func (node *Node) StreamHandler(s p2p.Stream) {
 			}
 		}
 	case proto.Consensus:
-		// skip doing consensus if node not in sync
-		if node.State == NodeNotSync {
-			return
-		}
 		msgPayload, _ := proto.GetConsensusMessagePayload(content)
 		if consensusObj.IsLeader {
 			node.log.Info("NET: Leader received message:", "messageCategory", msgCategory, "messageType", msgType)

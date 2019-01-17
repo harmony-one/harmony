@@ -298,20 +298,23 @@ func (node *Node) IsOutOfSync(consensusBlock *types.Block) bool {
 	if bytes.Compare(latestHash[:], parentHash[:]) == 0 {
 		return false
 	}
-	node.log.Debug("node is out of sync")
-	node.stateMutex.Lock()
-	node.State = NodeNotSync
-	node.stateMutex.Unlock()
 	return true
 }
 
 // DoSyncing wait for check status and starts syncing if out of sync
 func (node *Node) DoSyncing() {
 	for {
-		// TODO: add consensusBlock if it's already in sync
 		consensusBlock := <-node.Consensus.ConsensusBlock
 		if !node.IsOutOfSync(consensusBlock) {
+			node.stateMutex.Lock()
+			node.State = NodeReadyForConsensus
+			node.stateMutex.Unlock()
 			continue
+		} else {
+			node.log.Debug("node is out of sync")
+			node.stateMutex.Lock()
+			node.State = NodeNotSync
+			node.stateMutex.Unlock()
 		}
 
 		// If this node is currently doing sync, another call for syncing will be returned immediately.
@@ -495,7 +498,7 @@ func (node *Node) StartSyncingServer() {
 // CalculateResponse implements DownloadInterface on Node object.
 func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*downloader_pb.DownloaderResponse, error) {
 	response := &downloader_pb.DownloaderResponse{}
-	node.log.Debug("[sync] request type", "type", request.Type)
+	node.log.Debug("[sync] CalculateResponse request type", "type", request.Type)
 	switch request.Type {
 	case downloader_pb.DownloaderRequest_HEADER:
 		for block := node.blockchain.CurrentBlock(); block != nil; block = node.blockchain.GetBlockByHash(block.Header().ParentHash) {
@@ -552,6 +555,11 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 			node.log.Debug("[sync] register peerID success", "peerID", peerID)
 			response.Type = downloader_pb.DownloaderResponse_SUCCESS
 		}
+	case downloader_pb.DownloaderRequest_REGISTERTIMEOUT:
+		if node.State == NodeNotSync {
+			count := node.stateSync.RegisterNodeInfo()
+			node.log.Debug("[sync] extra node registered", "number", count)
+		}
 	}
 	return response, nil
 }
@@ -564,23 +572,26 @@ func (node *Node) SendNewBlockToUnsync() {
 			node.log.Warn("[sync] unable to encode block to hashes")
 			continue
 		}
-		node.log.Debug("peerRegistration Record", "number", len(node.peerRegistrationRecord))
 
 		// really need to have a unique id independent of ip/port
 		selfPeerID := utils.GetUniqueIDFromIPPort(node.SelfPeer.IP, node.SelfPeer.Port)
 		peerHash := make([]byte, 4)
 		binary.BigEndian.PutUint32(peerHash, selfPeerID)
+		node.log.Debug("[sync] peerRegistration Record", "peerHash", peerHash, "number", len(node.peerRegistrationRecord))
+
 		for peerID, config := range node.peerRegistrationRecord {
 			elapseTime := time.Now().UnixNano() - config.timestamp
 			if elapseTime > broadcastTimeout {
 				node.log.Warn("[sync] SendNewBlockToUnsync to peer timeout", "peerID", peerID)
+				// send last time and delete
+				config.client.PushNewBlock(peerHash, blockHash, true)
 				node.stateMutex.Lock()
 				delete(node.peerRegistrationRecord, peerID)
 				node.stateMutex.Unlock()
 				continue
 			}
-			response := config.client.PushNewBlock(peerHash, blockHash)
-			node.log.Debug("[sync] SendNewBlockToUnSync", "response", response)
+			response := config.client.PushNewBlock(peerHash, blockHash, false)
+			node.log.Debug("[sync] SendNewBlockToUnSync from", "peerHash", peerHash)
 			if response.Type == downloader_pb.DownloaderResponse_INSYNC {
 				node.stateMutex.Lock()
 				delete(node.peerRegistrationRecord, peerID)
