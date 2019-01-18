@@ -11,6 +11,7 @@ import (
 	libp2p "github.com/libp2p/go-libp2p"
 	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
 	libp2phost "github.com/libp2p/go-libp2p-host"
+	libp2pdht "github.com/libp2p/go-libp2p-kad-dht"
 	net "github.com/libp2p/go-libp2p-net"
 	peer "github.com/libp2p/go-libp2p-peer"
 	peerstore "github.com/libp2p/go-libp2p-peerstore"
@@ -26,10 +27,18 @@ const (
 
 // HostV2 is the version 2 p2p host
 type HostV2 struct {
-	h      libp2phost.Host
-	self   p2p.Peer
-	priKey p2p_crypto.PrivKey
-	pubKey p2p_crypto.PubKey
+	h                libp2phost.Host
+	self             p2p.Peer
+	priKey           p2p_crypto.PrivKey
+	pubKey           p2p_crypto.PubKey
+	dht              *libp2pdht.IpfsDHT
+	rendezvousString string
+	bootNodes        []multiaddr.Multiaddr
+}
+
+func (host *HostV2) getMultiAddr() string {
+	p := host.GetSelfPeer()
+	return fmt.Sprintf("/ip4/%s/tcp/%s/ipfs/%s", p.IP, p.Port, host.h.ID().Pretty())
 }
 
 // AddPeer add p2p.Peer into Peerstore
@@ -90,7 +99,6 @@ func New(self p2p.Peer) *HostV2 {
 	)
 
 	catchError(err)
-	log.Debug("HostV2 is up!", "port", self.Port, "id", p2pHost.ID().Pretty(), "addr", sourceAddr)
 
 	h := &HostV2{
 		h:      p2pHost,
@@ -98,6 +106,7 @@ func New(self p2p.Peer) *HostV2 {
 		priKey: priKey,
 		pubKey: pubKey,
 	}
+	log.Debug("HostV2 is up!", "addr", h.getMultiAddr())
 
 	return h
 }
@@ -114,22 +123,12 @@ func (host *HostV2) GetSelfPeer() p2p.Peer {
 
 // BindHandlerAndServe bind a streamHandler to the harmony protocol.
 func (host *HostV2) BindHandlerAndServe(handler p2p.StreamHandler) {
-	// host.h.SetStreamHandler(ProtocolID, func(s net.Stream) {
-	// 	log.Debug("Got stream")
-	// 	handler(s)
-	// })
-	host.setupDiscovery()
-	log.Debug("after set")
-	// Hang forever
-	// <-make(chan struct{})
-}
-
-// BindHandler -
-func (host *HostV2) BindHandler(handler p2p.StreamHandler) {
 	host.h.SetStreamHandler(ProtocolID, func(s net.Stream) {
-		log.Debug("Got stream!!")
 		handler(s)
 	})
+	host.startDiscovery()
+	// Hang forever
+	<-make(chan struct{})
 }
 
 // SendMessage a p2p message sending function with signature compatible to p2pv1.
@@ -146,7 +145,12 @@ func (host *HostV2) SendMessage(p p2p.Peer, message []byte) error {
 	return nil
 }
 
-// SendMessageToPeer -
+// Close closes the host
+func (host *HostV2) Close() error {
+	return host.h.Close()
+}
+
+// SendMessageToPeer for test only
 func (host *HostV2) SendMessageToPeer(peerID peer.ID, msg string) error {
 	s, err := host.h.NewStream(context.Background(), peerID, ProtocolID)
 	if err != nil {
@@ -163,17 +167,14 @@ func (host *HostV2) SendMessageToPeer(peerID peer.ID, msg string) error {
 	return nil
 }
 
-// Close closes the host
-func (host *HostV2) Close() error {
-	return host.h.Close()
-}
-
-// Broadcast -
+// Broadcast for test only
 func (host *HostV2) Broadcast() {
 	msg := fmt.Sprintf("Ping from %s", host.h.Addrs())
-	for _, peer := range host.Peerstore().Peers() {
-		err := host.SendMessageToPeer(peer, msg)
+	for _, peerID := range host.Peerstore().Peers() {
+		if peerID == host.h.ID() {
+			continue
+		}
+		err := host.SendMessageToPeer(peerID, msg)
 		catchError(err)
-		// log.Debug("ping", "peer", peer, "addr", host.Peerstore().Addrs(peer), "msg", msg)
 	}
 }
