@@ -19,6 +19,8 @@ import (
 	"github.com/dedis/kyber"
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/p2p"
+
+	peer "github.com/libp2p/go-libp2p-peer"
 )
 
 // RoleType defines the role of the node
@@ -49,6 +51,7 @@ type Info struct {
 	PubKey      []byte
 	ValidatorID int
 	Role        RoleType
+	PeerID      peer.ID // Peerstore ID
 }
 
 // PingMessageType defines the data structure of the Ping message
@@ -81,6 +84,7 @@ func NewPingMessage(peer p2p.Peer) *PingMessageType {
 	ping.Version = ProtocolVersion
 	ping.Node.IP = peer.IP
 	ping.Node.Port = peer.Port
+	ping.Node.PeerID = peer.PeerID
 	ping.Node.ValidatorID = peer.ValidatorID
 	ping.Node.PubKey, err = peer.PubKey.MarshalBinary()
 	ping.Node.Role = ValidatorRole
@@ -107,6 +111,7 @@ func NewPongMessage(peers []p2p.Peer, pubKeys []kyber.Point) *PongMessageType {
 		n.IP = p.IP
 		n.Port = p.Port
 		n.ValidatorID = p.ValidatorID
+		n.PeerID = p.PeerID
 		n.PubKey, err = p.PubKey.MarshalBinary()
 		if err != nil {
 			fmt.Printf("Error Marshal PubKey: %v", err)

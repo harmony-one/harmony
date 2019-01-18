@@ -300,6 +300,7 @@ func (node *Node) AddPeers(peers []*p2p.Peer) int {
 		if !ok {
 			node.Neighbors.Store(key, *p)
 			count++
+			node.host.AddPeer(p)
 			continue
 		}
 		if node.SelfPeer.ValidatorID == -1 && p.IP == node.SelfPeer.IP && p.Port == node.SelfPeer.Port {

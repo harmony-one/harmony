@@ -290,6 +290,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 	peer := new(p2p.Peer)
 	peer.IP = ping.Node.IP
 	peer.Port = ping.Node.Port
+	peer.PeerID = ping.Node.PeerID
 	peer.ValidatorID = ping.Node.ValidatorID
 
 	peer.PubKey = hmy_crypto.Ed25519Curve.Point()
@@ -345,6 +346,7 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		peer.IP = p.IP
 		peer.Port = p.Port
 		peer.ValidatorID = p.ValidatorID
+		peer.PeerID = p.PeerID
 
 		peer.PubKey = hmy_crypto.Ed25519Curve.Point()
 		err = peer.PubKey.UnmarshalBinary(p.PubKey[:])
