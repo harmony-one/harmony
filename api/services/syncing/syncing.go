@@ -13,9 +13,12 @@ import (
 
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/node/worker"
 
 	"github.com/Workiva/go-datastructures/queue"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/api/services/syncing/downloader"
 	pb "github.com/harmony-one/harmony/api/services/syncing/downloader/proto"
 	"github.com/harmony-one/harmony/core/types"
@@ -36,8 +39,8 @@ type SyncPeerConfig struct {
 	ip          string
 	port        string
 	client      *downloader.Client
-	blockHashes [][]byte
-	newBlocks   []*types.Block
+	blockHashes [][]byte       // block hashes before node doing sync
+	newBlocks   []*types.Block // blocks after node doing sync
 	mux         sync.Mutex
 }
 
@@ -65,6 +68,7 @@ func CreateStateSync(ip string, port string) *StateSync {
 	stateSync := &StateSync{}
 	stateSync.selfip = ip
 	stateSync.selfport = port
+	stateSync.commonBlocks = make(map[int]*types.Block)
 	return stateSync
 }
 
@@ -74,9 +78,10 @@ type StateSync struct {
 	selfport           string
 	peerNumber         int
 	activePeerNumber   int
-	blockHeight        int
+	commonBlocks       map[int]*types.Block
 	syncConfig         *SyncConfig
 	stateSyncTaskQueue *queue.Queue
+	syncMux            sync.Mutex
 }
 
 // GetServicePort returns the service port from syncing port
@@ -91,7 +96,6 @@ func GetServicePort(nodePort string) string {
 
 // AddNewBlock will add newly received block into state syncing queue
 func (ss *StateSync) AddNewBlock(peerHash []byte, block *types.Block) {
-	Log.Debug("[sync] adding new block from peer", "peerHash", peerHash, "blockHash", block.Hash())
 	for i, pc := range ss.syncConfig.peers {
 		pid := utils.GetUniqueIDFromIPPort(pc.ip, GetServicePort(pc.port))
 		ph := make([]byte, 4)
@@ -102,7 +106,7 @@ func (ss *StateSync) AddNewBlock(peerHash []byte, block *types.Block) {
 		pc.mux.Lock()
 		pc.newBlocks = append(pc.newBlocks, block)
 		pc.mux.Unlock()
-		Log.Debug("[sync] new block added, total blocks", "total", len(ss.syncConfig.peers[i].newBlocks))
+		Log.Debug("[sync] new block [pre]added", "total", len(ss.syncConfig.peers[i].newBlocks), "blockHeight", block.NumberU64())
 	}
 }
 
@@ -130,38 +134,16 @@ func CompareSyncPeerConfigByblockHashes(a *SyncPeerConfig, b *SyncPeerConfig) in
 	return 0
 }
 
-// GetBlockHashes gets block hashes by calling grpc request to the corresponding peer.
-func (peerConfig *SyncPeerConfig) GetBlockHashes() error {
-	if peerConfig.client == nil {
-		return ErrSyncPeerConfigClientNotReady
-	}
-	response := peerConfig.client.GetBlockHashes()
-	peerConfig.blockHashes = make([][]byte, len(response.Payload))
-	for i := range response.Payload {
-		peerConfig.blockHashes[i] = make([]byte, len(response.Payload[i]))
-		copy(peerConfig.blockHashes[i], response.Payload[i])
-	}
-	return nil
-}
-
 // GetBlocks gets blocks by calling grpc request to the corresponding peer.
 func (peerConfig *SyncPeerConfig) GetBlocks(hashes [][]byte) ([][]byte, error) {
 	if peerConfig.client == nil {
 		return nil, ErrSyncPeerConfigClientNotReady
 	}
 	response := peerConfig.client.GetBlocks(hashes)
+	if response == nil {
+		return nil, ErrGetBlock
+	}
 	return response.Payload, nil
-}
-
-// ProcessStateSyncFromPeers used to do state sync.
-func (ss *StateSync) ProcessStateSyncFromPeers(peers []p2p.Peer, bc *core.BlockChain) (chan struct{}, error) {
-	// TODO: Validate peers.
-	done := make(chan struct{})
-	go func() {
-		ss.StartStateSync(peers, bc)
-		done <- struct{}{}
-	}()
-	return done, nil
 }
 
 // CreateSyncConfig creates SyncConfig for StateSync object.
@@ -271,19 +253,21 @@ func (ss *StateSync) GetBlockHashesConsensusAndCleanUp() bool {
 }
 
 // GetConsensusHashes gets all hashes needed to download.
-func (ss *StateSync) GetConsensusHashes() bool {
+func (ss *StateSync) GetConsensusHashes(startHash []byte) bool {
 	count := 0
 	for {
 		var wg sync.WaitGroup
-		wg.Add(ss.activePeerNumber)
-
 		for id := range ss.syncConfig.peers {
 			if ss.syncConfig.peers[id].client == nil {
 				continue
 			}
+			wg.Add(1)
 			go func(peerConfig *SyncPeerConfig) {
 				defer wg.Done()
-				response := peerConfig.client.GetBlockHashes()
+				response := peerConfig.client.GetBlockHashes(startHash)
+				if response == nil {
+					return
+				}
 				peerConfig.blockHashes = response.Payload
 			}(ss.syncConfig.peers[id])
 		}
@@ -302,25 +286,17 @@ func (ss *StateSync) GetConsensusHashes() bool {
 	return true
 }
 
-// getConsensusHashes gets all hashes needed to download.
 func (ss *StateSync) generateStateSyncTaskQueue(bc *core.BlockChain) {
 	ss.stateSyncTaskQueue = queue.New(0)
 	for _, configPeer := range ss.syncConfig.peers {
 		if configPeer.client != nil {
-
-			ss.blockHeight = len(configPeer.blockHashes)
-			// TODO (minh) rework the syncing for account model.
-			//bc.Blocks = append(bc.Blocks, make([]*blockchain.Block, ss.blockHeight-len(bc.Blocks))...)
-			//for id, blockHash := range configPeer.blockHashes {
-			//	if bc.Blocks[id] == nil || !reflect.DeepEqual(bc.Blocks[id].Hash[:], blockHash) {
-			//		ss.stateSyncTaskQueue.Put(SyncBlockTask{index: id, blockHash: blockHash})
-			//		// TODO(minhdoan): Check error
-			//	}
-			//}
+			for id, blockHash := range configPeer.blockHashes {
+				ss.stateSyncTaskQueue.Put(SyncBlockTask{index: id, blockHash: blockHash})
+			}
 			break
 		}
 	}
-	Log.Info("syncing: Finished generateStateSyncTaskQueue.")
+	Log.Info("syncing: Finished generateStateSyncTaskQueue", "length", ss.stateSyncTaskQueue.Len())
 }
 
 // downloadBlocks downloads blocks from state sync task queue.
@@ -328,6 +304,7 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 	// Initialize blockchain
 	var wg sync.WaitGroup
 	wg.Add(ss.activePeerNumber)
+	count := 0
 	for i := range ss.syncConfig.peers {
 		if ss.syncConfig.peers[i].client == nil {
 			continue
@@ -335,24 +312,39 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 		go func(peerConfig *SyncPeerConfig, stateSyncTaskQueue *queue.Queue, bc *core.BlockChain) {
 			defer wg.Done()
 			for !stateSyncTaskQueue.Empty() {
-				task, err := stateSyncTaskQueue.Poll(1, time.Millisecond)
+				task, err := ss.stateSyncTaskQueue.Poll(1, time.Millisecond)
 				if err == queue.ErrTimeout {
+					Log.Debug("[sync] ss.stateSyncTaskQueue poll timeout", "error", err)
 					break
 				}
 				syncTask := task[0].(SyncBlockTask)
-				for {
-					//id := syncTask.index
-					_, err := peerConfig.GetBlocks([][]byte{syncTask.blockHash})
-					if err == nil {
-						// As of now, only send and ask for one block.
-						// TODO (minh) rework the syncing for account model.
-						//bc.Blocks[id], err = blockchain.DeserializeBlock(payload[0])
-						//_, err = blockchain.DeserializeBlock(payload[0])
-						if err == nil {
-							break
-						}
+				//id := syncTask.index
+				payload, err := peerConfig.GetBlocks([][]byte{syncTask.blockHash})
+				if err != nil {
+					count++
+					Log.Debug("[sync] GetBlocks failed", "failNumber", count)
+					if count > TimesToFail {
+						break
 					}
+					ss.stateSyncTaskQueue.Put(syncTask)
+					continue
 				}
+
+				var blockObj types.Block
+				// currently only send one block a time
+				err = rlp.DecodeBytes(payload[0], &blockObj)
+				if err != nil {
+					count++
+					Log.Debug("[sync] downloadBlocks: failed to DecodeBytes from received new block")
+					if count > TimesToFail {
+						break
+					}
+					ss.stateSyncTaskQueue.Put(syncTask)
+					continue
+				}
+				ss.syncMux.Lock()
+				ss.commonBlocks[syncTask.index] = &blockObj
+				ss.syncMux.Unlock()
 			}
 		}(ss.syncConfig.peers[i], ss.stateSyncTaskQueue, bc)
 	}
@@ -360,8 +352,124 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 	Log.Info("[sync] Finished downloadBlocks.")
 }
 
+func CompareBlockByHash(a *types.Block, b *types.Block) int {
+	ha := a.Hash()
+	hb := b.Hash()
+	return bytes.Compare(ha[:], hb[:])
+}
+
+func GetHowManyMaxConsensus(blocks []*types.Block) (int, int) {
+	// As all peers are sorted by their blockHashes, all equal blockHashes should come together and consecutively.
+	curCount := 0
+	curFirstID := -1
+	maxCount := 0
+	maxFirstID := -1
+	for i := range blocks {
+		if curFirstID == -1 || CompareBlockByHash(blocks[curFirstID], blocks[i]) != 0 {
+			curCount = 1
+			curFirstID = i
+		} else {
+			curCount++
+		}
+		if curCount > maxCount {
+			maxCount = curCount
+			maxFirstID = curFirstID
+		}
+	}
+	return maxFirstID, maxCount
+}
+
+func (ss *StateSync) getMaxConsensusBlockFromParentHash(parentHash common.Hash) *types.Block {
+	candidateBlocks := []*types.Block{}
+	ss.syncMux.Lock()
+	for id := range ss.syncConfig.peers {
+		peerConfig := ss.syncConfig.peers[id]
+		for _, block := range peerConfig.newBlocks {
+			ph := block.ParentHash()
+			if bytes.Compare(ph[:], parentHash[:]) == 0 {
+				candidateBlocks = append(candidateBlocks, block)
+				break
+			}
+		}
+	}
+	ss.syncMux.Unlock()
+	if len(candidateBlocks) == 0 {
+		return nil
+	}
+	// Sort by blockHashes.
+	sort.Slice(candidateBlocks, func(i, j int) bool {
+		return CompareBlockByHash(candidateBlocks[i], candidateBlocks[j]) == -1
+	})
+	maxFirstID, maxCount := GetHowManyMaxConsensus(candidateBlocks)
+	Log.Debug("[sync] Find block with matching parenthash", "parentHash", parentHash, "hash", candidateBlocks[maxFirstID].Hash(), "maxCount", maxCount)
+	return candidateBlocks[maxFirstID]
+}
+
+func (ss *StateSync) getBlockFromParentHash(parentHash common.Hash) *types.Block {
+	for _, block := range ss.commonBlocks {
+		ph := block.ParentHash()
+		if bytes.Compare(ph[:], parentHash[:]) == 0 {
+			return block
+		}
+	}
+	return nil
+}
+
+func (ss *StateSync) updateBlockAndStatus(block *types.Block, bc *core.BlockChain, worker *worker.Worker) bool {
+	Log.Info("[sync] Current Block", "blockHex", bc.CurrentBlock().Hash().Hex())
+	_, err := bc.InsertChain([]*types.Block{block})
+	if err != nil {
+		Log.Debug("Error adding new block to blockchain", "Error", err)
+		return false
+	}
+	Log.Info("[sync] new block [POST]added to blockchain", "blockHeight", bc.CurrentBlock().NumberU64(), "blockHex", bc.CurrentBlock().Hash().Hex(), "parentHex", bc.CurrentBlock().ParentHash().Hex())
+	ss.syncMux.Lock()
+	worker.UpdateCurrent()
+	ss.syncMux.Unlock()
+	return true
+}
+
+// generateNewState will construct most recent state from downloaded blocks
+func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker) {
+	// update blocks created before node start sync
+	parentHash := bc.CurrentBlock().Hash()
+	for {
+		block := ss.getBlockFromParentHash(parentHash)
+		if block == nil {
+			break
+		}
+		ok := ss.updateBlockAndStatus(block, bc, worker)
+		if !ok {
+			break
+		}
+		parentHash = block.Hash()
+	}
+	ss.syncMux.Lock()
+	ss.commonBlocks = make(map[int]*types.Block)
+	ss.syncMux.Unlock()
+
+	// update blocks after node start sync
+	parentHash = bc.CurrentBlock().Hash()
+	for {
+		block := ss.getMaxConsensusBlockFromParentHash(parentHash)
+		if block == nil {
+			break
+		}
+		ok := ss.updateBlockAndStatus(block, bc, worker)
+		if !ok {
+			break
+		}
+		parentHash = block.Hash()
+	}
+	ss.syncMux.Lock()
+	for id := range ss.syncConfig.peers {
+		ss.syncConfig.peers[id].newBlocks = []*types.Block{}
+	}
+	ss.syncMux.Unlock()
+}
+
 // StartStateSync starts state sync.
-func (ss *StateSync) StartStateSync(peers []p2p.Peer, bc *core.BlockChain) bool {
+func (ss *StateSync) StartStateSync(startHash []byte, peers []p2p.Peer, bc *core.BlockChain, worker *worker.Worker) {
 	// Creates sync config.
 	ss.CreateSyncConfig(peers)
 	// Makes connections to peers.
@@ -370,29 +478,26 @@ func (ss *StateSync) StartStateSync(peers []p2p.Peer, bc *core.BlockChain) bool 
 	Log.Info("[sync] waiting for broadcast from peers", "numRegistered", numRegistered)
 
 	// Gets consensus hashes.
-	//	if !ss.GetConsensusHashes() {
-	//		return false
-	//	}
-	//ss.generateStateSyncTaskQueue(bc)
+	if !ss.GetConsensusHashes(startHash) {
+		Log.Debug("[sync] StartStateSync unable to reach consensus on ss.GetConsensusHashes")
+		return
+	}
+	Log.Debug("[sync] StartStateSync reach consensus on ss.GetConsensusHashes")
+	ss.generateStateSyncTaskQueue(bc)
 	// Download blocks.
-	//if ss.stateSyncTaskQueue.Len() > 0 {
-	//		ss.downloadBlocks(bc)
-	//	}
-
-	// TODO: change to true afterfinish implementation
-	return false
+	if ss.stateSyncTaskQueue.Len() > 0 {
+		ss.downloadBlocks(bc)
+	}
+	ss.generateNewState(bc, worker)
 }
 
 func (peerConfig *SyncPeerConfig) registerToBroadcast(peerHash []byte) error {
 	response := peerConfig.client.Register(peerHash)
 	if response == nil || response.Type == pb.DownloaderResponse_FAIL {
-		Log.Debug("[sync] register to broadcast fail")
 		return ErrRegistrationFail
 	} else if response.Type == pb.DownloaderResponse_SUCCESS {
-		Log.Debug("[sync] register to broadcast success")
 		return nil
 	}
-	Log.Debug("[sync] register to broadcast fail")
 	return ErrRegistrationFail
 }
 
@@ -415,18 +520,13 @@ func (ss *StateSync) RegisterNodeInfo() int {
 		if peerConfig.client == nil {
 			continue
 		}
-		Log.Debug("[sync] registering to peer", "ip", peerConfig.ip, "port", peerConfig.port, "peerHash", peerHash)
 		err := peerConfig.registerToBroadcast(peerHash)
 		if err != nil {
-			Log.Debug("[sync] register FAILED to peer", "ip", peerConfig.ip, "port", peerConfig.port, "peerHash", peerHash)
+			Log.Debug("[sync] register failed to peer", "ip", peerConfig.ip, "port", peerConfig.port, "peerHash", peerHash)
 			continue
 		}
+		Log.Debug("[sync] register success", "ip", peerConfig.ip, "port", peerConfig.port)
 		count++
 	}
 	return count
-}
-
-func getPeerInfo(ip string, port string) []byte {
-	peerStr := ip + ":" + port
-	return []byte(peerStr)
 }

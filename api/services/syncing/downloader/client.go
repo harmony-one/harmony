@@ -38,13 +38,14 @@ func (client *Client) Close() {
 }
 
 // GetBlockHashes gets block hashes from all the peers by calling grpc request.
-func (client *Client) GetBlockHashes() *pb.DownloaderResponse {
+func (client *Client) GetBlockHashes(startHash []byte) *pb.DownloaderResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_HEADER}
+	request.BlockHash = startHash
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
-		log.Fatalf("Error")
+		log.Printf("[sync] downloader/client.go:GetBlockHashes query failed")
 	}
 	return response
 }
@@ -61,7 +62,7 @@ func (client *Client) GetBlocks(hashes [][]byte) *pb.DownloaderResponse {
 	}
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
-		log.Fatalf("Error")
+		log.Printf("[sync] downloader/client.go:GetBlocks query failed")
 	}
 	return response
 }

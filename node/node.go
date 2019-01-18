@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -306,35 +305,26 @@ func (node *Node) DoSyncing() {
 	for {
 		consensusBlock := <-node.Consensus.ConsensusBlock
 		if !node.IsOutOfSync(consensusBlock) {
+			if node.State == NodeNotSync {
+				node.log.Info("[sync] Node is now INSYNC!")
+				node.stateSync = nil
+			}
 			node.stateMutex.Lock()
 			node.State = NodeReadyForConsensus
 			node.stateMutex.Unlock()
 			continue
 		} else {
-			node.log.Debug("node is out of sync")
+			node.log.Debug("[sync] node is out of sync")
 			node.stateMutex.Lock()
 			node.State = NodeNotSync
 			node.stateMutex.Unlock()
 		}
 
-		// If this node is currently doing sync, another call for syncing will be returned immediately.
-		if !atomic.CompareAndSwapUint32(&node.syncingState, NotDoingSyncing, DoingSyncing) {
-			continue
-		}
-		defer atomic.StoreUint32(&node.syncingState, NotDoingSyncing)
 		if node.stateSync == nil {
 			node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port)
 		}
-		if node.stateSync.StartStateSync(node.GetSyncingPeers(), node.blockchain) {
-			node.log.Debug("DoSyncing: successfully sync")
-			if node.State == NodeNotSync {
-				node.stateMutex.Lock()
-				node.State = NodeReadyForConsensus
-				node.stateMutex.Unlock()
-			}
-		} else {
-			node.log.Debug("DoSyncing: failed to sync")
-		}
+		startHash := node.blockchain.CurrentBlock().Hash()
+		node.stateSync.StartStateSync(startHash[:], node.GetSyncingPeers(), node.blockchain, node.Worker)
 	}
 }
 
@@ -370,11 +360,9 @@ func GetSyncingPort(nodePort string) string {
 }
 
 // GetSyncingPeers returns list of peers.
-// Right now, the list length is only 1 for testing.
 func (node *Node) GetSyncingPeers() []p2p.Peer {
 	res := []p2p.Peer{}
 	node.Neighbors.Range(func(k, v interface{}) bool {
-		node.log.Debug("GetSyncingPeers-Range: ", "k", k, "v", v)
 		res = append(res, v.(p2p.Peer))
 		return true
 	})
@@ -498,11 +486,21 @@ func (node *Node) StartSyncingServer() {
 // CalculateResponse implements DownloadInterface on Node object.
 func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*downloader_pb.DownloaderResponse, error) {
 	response := &downloader_pb.DownloaderResponse{}
-	node.log.Debug("[sync] CalculateResponse request type", "type", request.Type)
 	switch request.Type {
 	case downloader_pb.DownloaderRequest_HEADER:
+		node.log.Debug("[sync] CalculateResponse DownloaderRequest_HEADER", "request.BlockHash", request.BlockHash)
+		var startHeaderHash []byte
+		if request.BlockHash == nil {
+			tmp := node.blockchain.Genesis().Hash()
+			startHeaderHash = tmp[:]
+		} else {
+			startHeaderHash = request.BlockHash
+		}
 		for block := node.blockchain.CurrentBlock(); block != nil; block = node.blockchain.GetBlockByHash(block.Header().ParentHash) {
 			blockHash := block.Hash()
+			if bytes.Compare(blockHash[:], startHeaderHash) == 0 {
+				break
+			}
 			response.Payload = append(response.Payload, blockHash[:])
 		}
 	case downloader_pb.DownloaderRequest_BLOCK:
