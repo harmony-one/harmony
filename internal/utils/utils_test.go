@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/harmony-one/harmony/p2p"
+	crypto "github.com/libp2p/go-libp2p-crypto"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -45,6 +46,35 @@ func TestAllocateShard(t *testing.T) {
 // Test for GenKey
 func TestGenKey(t *testing.T) {
 	GenKey("3.3.3.3", "3456")
+}
+
+// Test for GenKeyP2P
+func TestGenKeyP2P(t *testing.T) {
+	pi, pb, err := GenKeyP2P("127.0.0.1", "8888")
+	if err != nil {
+		t.Errorf("GenKeyP2p Error: %v", err)
+	}
+	kpi, _ := crypto.MarshalPrivateKey(pi)
+	kpb, _ := crypto.MarshalPublicKey(pb)
+	if len(kpi) != 1198 {
+		t.Errorf("Length of Private Key Error: %v, expected 1198", len(kpi))
+	}
+	if len(kpb) != 299 {
+		t.Errorf("Length of Public Key Error: %v, expected 299", len(kpb))
+	}
+}
+
+// Test for GenKeyP2PRand, noted the length of private key can be random
+// thus we don't test it here.
+func TestGenKeyP2PRand(t *testing.T) {
+	_, pb, err := GenKeyP2PRand()
+	if err != nil {
+		t.Errorf("GenKeyP2PRand Error: %v", err)
+	}
+	kpb, _ := crypto.MarshalPublicKey(pb)
+	if len(kpb) != 299 {
+		t.Errorf("Length of Public Key Error: %v, expected 299", len(kpb))
+	}
 }
 
 // Test for GetUniqueIDFromPeer
