@@ -298,7 +298,8 @@ func CreateWalletNode() *node.Node {
 	}
 
 	// dummy host for wallet
-	host := p2pimpl.NewHost(p2p.Peer{IP: "127.0.0.1", Port: "6789"})
+	self := p2p.Peer{IP: "127.0.0.1", Port: "6789"}
+	host, _ := p2pimpl.NewHost(&self)
 	walletNode := node.New(host, nil, nil)
 	walletNode.Client = client.NewClient(walletNode.GetHost(), &shardIDLeaderMap)
 	return walletNode

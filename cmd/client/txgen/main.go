@@ -16,10 +16,12 @@ import (
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/newnode"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
+
+	peerstore "github.com/libp2p/go-libp2p-peerstore"
+	multiaddr "github.com/multiformats/go-multiaddr"
 )
 
 var (
@@ -50,6 +52,8 @@ func main() {
 	bcIP := flag.String("bc", "127.0.0.1", "IP of the identity chain")
 	bcPort := flag.String("bc_port", "8081", "port of the identity chain")
 
+	bcAddr := flag.String("bc_addr", "", "MultiAddr of the identity chain")
+
 	flag.Parse()
 
 	if *versionFlag {
@@ -59,19 +63,35 @@ func main() {
 	// Add GOMAXPROCS to achieve max performance.
 	runtime.GOMAXPROCS(1024)
 
-	var clientPeer *p2p.Peer
+	var BCPeer *p2p.Peer
 	var shardIDLeaderMap map[uint32]p2p.Peer
 
+	if *bcAddr != "" {
+		// Turn the destination into a multiaddr.
+		maddr, err := multiaddr.NewMultiaddr(*bcAddr)
+		if err != nil {
+			panic(err)
+		}
+
+		// Extract the peer ID from the multiaddr.
+		info, err := peerstore.InfoFromP2pAddr(maddr)
+		if err != nil {
+			panic(err)
+		}
+
+		BCPeer = &p2p.Peer{IP: *bcIP, Port: *bcPort, Addrs: info.Addrs, PeerID: info.ID}
+	} else {
+		BCPeer = &p2p.Peer{IP: *bcIP, Port: *bcPort}
+	}
+
 	candidateNode := newnode.New(*ip, *port)
-	BCPeer := p2p.Peer{IP: *bcIP, Port: *bcPort}
-	candidateNode.ContactBeaconChain(BCPeer)
-	clientPeer = &p2p.Peer{IP: *ip, Port: *port}
+	candidateNode.AddPeer(BCPeer)
+	candidateNode.ContactBeaconChain(*BCPeer)
+	selfPeer := candidateNode.GetSelfPeer()
+	selfPeer.PubKey = candidateNode.PubK
 
 	shardIDLeaderMap = candidateNode.Leaders
 
-	if clientPeer == nil {
-		panic("Client Peer is nil!")
-	}
 	debugPrintShardIDLeaderMap(shardIDLeaderMap)
 
 	// Do cross shard tx if there are more than one shard
@@ -93,9 +113,10 @@ func main() {
 
 	// Nodes containing blockchain data to mirror the shards' data in the network
 	nodes := []*node.Node{}
-	_, pubKey := utils.GenKey(clientPeer.IP, clientPeer.Port)
-	clientPeer.PubKey = pubKey
-	host := p2pimpl.NewHost(*clientPeer)
+	host, err := p2pimpl.NewHost(&selfPeer)
+	if err != nil {
+		panic("unable to new host in txgen")
+	}
 	for shardID := range shardIDLeaderMap {
 		node := node.New(host, &consensus.Consensus{ShardID: shardID}, nil)
 		// Assign many fake addresses so we have enough address to play with at first
@@ -142,6 +163,7 @@ func main() {
 
 	for _, leader := range shardIDLeaderMap {
 		log.Debug("Client Join Shard", "leader", leader)
+		clientNode.GetHost().AddPeer(&leader)
 		go clientNode.JoinShard(leader)
 		// wait for 3 seconds for client to send ping message to leader
 		time.Sleep(3 * time.Second)
