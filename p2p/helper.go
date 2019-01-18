@@ -4,9 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
-	"github.com/harmony-one/harmony/log"
 	"io"
 	"time"
+
+	"github.com/ethereum/go-ethereum/log"
 )
 
 /*
@@ -38,7 +39,7 @@ func ReadMessageContent(s Stream) ([]byte, error) {
 	_, err := r.ReadByte()
 	switch err {
 	case io.EOF:
-		log.Error("Error reading the p2p message type field", "msg", err)
+		log.Error("Error reading the p2p message type field", "io.EOF", err)
 		return contentBuf.Bytes(), err
 	case nil:
 		//log.Printf("Received p2p message type: %x\n", msgType)

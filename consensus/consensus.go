@@ -10,6 +10,7 @@ import (
 	"github.com/dedis/kyber"
 	"github.com/dedis/kyber/sign/schnorr"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/state"
@@ -17,7 +18,6 @@ import (
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 	"golang.org/x/crypto/sha3"
@@ -426,7 +426,7 @@ func (consensus *Consensus) VerifySeal(chain ChainReader, header *types.Header) 
 
 // Finalize implements consensus.Engine, accumulating the block and uncle rewards,
 // setting the final state and assembling the block.
-func (consensus *Consensus) Finalize(chain ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, receipts []*types.Receipt) (*types.Block, error) {
+func (consensus *Consensus) Finalize(chain ChainReader, header *types.Header, state *state.DB, txs []*types.Transaction, receipts []*types.Receipt) (*types.Block, error) {
 	// Accumulate any block and uncle rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
 	accumulateRewards(chain.Config(), state, header)
@@ -472,7 +472,7 @@ func (consensus *Consensus) Prepare(chain ChainReader, header *types.Header) err
 // AccumulateRewards credits the coinbase of the given block with the mining
 // reward. The total reward consists of the static block reward and rewards for
 // included uncles. The coinbase of each uncle block is also rewarded.
-func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header *types.Header) {
+func accumulateRewards(config *params.ChainConfig, state *state.DB, header *types.Header) {
 	// TODO: implement mining rewards
 }
 

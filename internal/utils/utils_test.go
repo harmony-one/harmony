@@ -47,6 +47,14 @@ func TestGenKey(t *testing.T) {
 	GenKey("3.3.3.3", "3456")
 }
 
+// Test for GenKeyP2P
+func TestGenKeyP2P(t *testing.T) {
+	_, _, err := GenKeyP2P("127.0.0.1", "8888")
+	if err != nil {
+		t.Errorf("GenKeyP2p Error: %v", err)
+	}
+}
+
 // Test for GetUniqueIDFromPeer
 func TestGetUniqueIDFromPeer(t *testing.T) {
 	peer := p2p.Peer{IP: "1.1.1.1", Port: "123"}

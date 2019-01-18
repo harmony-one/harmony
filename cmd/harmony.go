@@ -9,15 +9,18 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/internal/attack"
-	"github.com/harmony-one/harmony/internal/db"
 	pkg_newnode "github.com/harmony-one/harmony/internal/newnode"
 	"github.com/harmony-one/harmony/internal/profiler"
-	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
+
+	peerstore "github.com/libp2p/go-libp2p-peerstore"
+	multiaddr "github.com/multiformats/go-multiaddr"
 )
 
 var (
@@ -45,14 +48,14 @@ func attackDetermination(attackedMode int) bool {
 }
 
 // InitLDBDatabase initializes a LDBDatabase.
-func InitLDBDatabase(ip string, port string) (*db.LDBDatabase, error) {
+func InitLDBDatabase(ip string, port string) (*ethdb.LDBDatabase, error) {
 	// TODO(minhdoan): Refactor this.
 	dbFileName := "/tmp/harmony_" + ip + port + ".dat"
 	var err = os.RemoveAll(dbFileName)
 	if err != nil {
 		fmt.Println(err.Error())
 	}
-	return db.NewLDBDatabase(dbFileName, 0, 0)
+	return ethdb.NewLDBDatabase(dbFileName, 0, 0)
 }
 
 func printVersion(me string) {
@@ -64,7 +67,7 @@ func loggingInit(logFolder, role, ip, port string, onlyLogTps bool) {
 	// Setup a logger to stdout and log file.
 	logFileName := fmt.Sprintf("./%v/%s-%v-%v.log", logFolder, role, ip, port)
 	h := log.MultiHandler(
-		log.StdoutHandler,
+		log.StreamHandler(os.Stdout, log.TerminalFormat(false)),
 		log.Must.FileHandler(logFileName, log.JSONFormat()), // Log to file
 	)
 	if onlyLogTps {
@@ -88,6 +91,7 @@ func main() {
 	//This IP belongs to jenkins.harmony.one
 	bcIP := flag.String("bc", "127.0.0.1", "IP of the identity chain")
 	bcPort := flag.String("bc_port", "8081", "port of the identity chain")
+	bcAddr := flag.String("bc_addr", "", "MultiAddr of the identity chain")
 
 	//Leader needs to have a minimal number of peers to start consensus
 	minPeers := flag.Int("min_peers", 100, "Minimal number of Peers in shard")
@@ -109,10 +113,31 @@ func main() {
 	var leader p2p.Peer
 	var selfPeer p2p.Peer
 	var clientPeer *p2p.Peer
+	var BCPeer *p2p.Peer
+
+	if *bcAddr != "" {
+		// Turn the destination into a multiaddr.
+		maddr, err := multiaddr.NewMultiaddr(*bcAddr)
+		if err != nil {
+			panic(err)
+		}
+
+		// Extract the peer ID from the multiaddr.
+		info, err := peerstore.InfoFromP2pAddr(maddr)
+		if err != nil {
+			panic(err)
+		}
+
+		BCPeer = &p2p.Peer{IP: *bcIP, Port: *bcPort, Addrs: info.Addrs, PeerID: info.ID}
+	} else {
+		BCPeer = &p2p.Peer{IP: *bcIP, Port: *bcPort}
+	}
+
 	//Use Peer Discovery to get shard/leader/peer/...
 	candidateNode := pkg_newnode.New(*ip, *port)
-	BCPeer := p2p.Peer{IP: *bcIP, Port: *bcPort}
-	candidateNode.ContactBeaconChain(BCPeer)
+	candidateNode.AddPeer(BCPeer)
+	candidateNode.ContactBeaconChain(*BCPeer)
+
 	shardID = candidateNode.GetShardID()
 	leader = candidateNode.GetLeader()
 	selfPeer = candidateNode.GetSelfPeer()
@@ -136,13 +161,15 @@ func main() {
 	loggingInit(*logFolder, role, *ip, *port, *onlyLogTps)
 
 	// Initialize leveldb if dbSupported.
-	var ldb *db.LDBDatabase
+	var ldb *ethdb.LDBDatabase
 
 	if *dbSupported {
 		ldb, _ = InitLDBDatabase(*ip, *port)
 	}
 
 	host := p2pimpl.NewHost(selfPeer)
+	host.AddPeer(&leader)
+
 	// Consensus object.
 	consensus := consensus.New(host, shardID, peers, leader)
 	consensus.MinPeers = *minPeers

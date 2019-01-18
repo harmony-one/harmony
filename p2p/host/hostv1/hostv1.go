@@ -6,8 +6,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/harmony-one/harmony/log"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/p2p"
+	peer "github.com/libp2p/go-libp2p-peer"
 )
 
 // HostV1 is the version 1 p2p host, using direct socket call.
@@ -15,6 +16,11 @@ type HostV1 struct {
 	self     p2p.Peer
 	listener net.Listener
 	quit     chan struct{}
+}
+
+// AddPeer gets self peer
+func (host *HostV1) AddPeer(p *p2p.Peer) error {
+	return nil
 }
 
 // New creates a HostV1
@@ -29,6 +35,11 @@ func New(self p2p.Peer) *HostV1 {
 // GetSelfPeer gets self peer
 func (host *HostV1) GetSelfPeer() p2p.Peer {
 	return host.self
+}
+
+// GetID return ID
+func (host *HostV1) GetID() peer.ID {
+	return peer.ID(fmt.Sprintf("%s:%s", host.self.IP, host.self.Port))
 }
 
 // BindHandlerAndServe Version 0 p2p. Going to be deprecated.

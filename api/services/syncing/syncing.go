@@ -10,8 +10,8 @@ import (
 	"github.com/harmony-one/harmony/core"
 
 	"github.com/Workiva/go-datastructures/queue"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/api/services/syncing/downloader"
-	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/p2p"
 )
 

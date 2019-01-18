@@ -3,7 +3,7 @@ package hostv2
 import (
 	"bufio"
 
-	"github.com/harmony-one/harmony/log"
+	"github.com/ethereum/go-ethereum/log"
 	maddr "github.com/multiformats/go-multiaddr"
 )
 
