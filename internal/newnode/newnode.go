@@ -34,7 +34,7 @@ type NewNode struct {
 	PubK        kyber.Point
 	priK        kyber.Scalar
 	log         log.Logger
-	SetInfo     bool
+	SetInfo     chan bool
 	host        host.Host
 }
 
@@ -47,7 +47,7 @@ func New(ip string, port string) *NewNode {
 	node.priK = priKey
 	node.Self = p2p.Peer{IP: ip, Port: port, PubKey: pubKey, ValidatorID: -1}
 	node.log = log.New()
-	node.SetInfo = false
+	node.SetInfo = make(chan bool)
 	node.host, err = p2pimpl.NewHost(&node.Self)
 	if err != nil {
 		node.log.Error("failed to create new host", "msg", err)
@@ -70,7 +70,7 @@ func (node *NewNode) ContactBeaconChain(BCPeer p2p.Peer) error {
 }
 
 func (node NewNode) String() string {
-	return fmt.Sprintf("bc: %v:%v and node info %v", node.Self.IP, node.Self.Port, node.SetInfo)
+	return fmt.Sprintf("bc: %v:%v => %v", node.Self.IP, node.Self.Port, node.Self.PeerID)
 }
 
 // RequestBeaconChain requests beacon chain for identity data
@@ -84,8 +84,8 @@ func (node *NewNode) requestBeaconChain(BCPeer p2p.Peer) (err error) {
 	msg := bcconn.SerializeNodeInfo(nodeInfo)
 	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Register, msg)
 	gotShardInfo := false
-	timeout := time.After(300 * time.Second)
-	tick := time.Tick(5 * time.Second)
+	timeout := time.After(120 * time.Second)
+	tick := time.Tick(3 * time.Second)
 checkLoop:
 	for {
 		select {
@@ -93,18 +93,21 @@ checkLoop:
 			gotShardInfo = false
 			break checkLoop
 		case <-tick:
-			if node.SetInfo {
-				gotShardInfo = true
-				break checkLoop
-			} else {
+			select {
+			case setinfo := <-node.SetInfo:
+				if setinfo {
+					gotShardInfo = true
+					break checkLoop
+				}
+			default:
 				host.SendMessage(node.host, BCPeer, msgToSend, nil)
 			}
 		}
 	}
 	if !gotShardInfo {
 		err = errors.New("could not create connection")
-		node.log.Crit("Could not get sharding info after 5 minutes")
-		os.Exit(1)
+		node.log.Crit("Could not get sharding info after 2 minutes")
+		os.Exit(10)
 	}
 	return
 }
@@ -136,7 +139,7 @@ func (node *NewNode) processShardInfo(msgPayload []byte) bool {
 	node.leader = node.Leaders[uint32(shardNum-1)]
 	node.isLeader = isLeader
 	node.ShardID = shardNum - 1 //0 indexing.
-	node.SetInfo = true
+	node.SetInfo <- true
 	node.log.Info("Shard information obtained ..")
 	return true
 }

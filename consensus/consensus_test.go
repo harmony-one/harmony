@@ -11,7 +11,7 @@ import (
 func TestNew(test *testing.T) {
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902"}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "9905"}
-	host := p2pimpl.NewHost(leader)
+	host, _ := p2pimpl.NewHost(&leader)
 	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader)
 	if consensus.consensusID != 0 {
 		test.Errorf("Consensus Id is initialized to the wrong value: %d", consensus.consensusID)
@@ -25,7 +25,7 @@ func TestNew(test *testing.T) {
 		test.Error("Consensus ReadySignal should be initialized")
 	}
 
-	if consensus.leader != leader {
+	if consensus.leader.IP != leader.IP || consensus.leader.Port != leader.Port {
 		test.Error("Consensus Leader is set to wrong Peer")
 	}
 }
@@ -47,7 +47,7 @@ func TestRemovePeers(t *testing.T) {
 	peerRemove := []p2p.Peer{p1, p2}
 
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "9000", PubKey: pk5}
-	host := p2pimpl.NewHost(leader)
+	host, _ := p2pimpl.NewHost(&leader)
 	consensus := New(host, "0", peers, leader)
 
 	//	consensus.DebugPrintPublicKeys()

@@ -48,17 +48,14 @@ func TestGenKey(t *testing.T) {
 	GenKey("3.3.3.3", "3456")
 }
 
-// Test for GenKeyP2P
+// Test for GenKeyP2P, noted the length of private key can be random
+// thus we don't test it here.
 func TestGenKeyP2P(t *testing.T) {
-	pi, pb, err := GenKeyP2P("127.0.0.1", "8888")
+	_, pb, err := GenKeyP2P("127.0.0.1", "8888")
 	if err != nil {
 		t.Errorf("GenKeyP2p Error: %v", err)
 	}
-	kpi, _ := crypto.MarshalPrivateKey(pi)
 	kpb, _ := crypto.MarshalPublicKey(pb)
-	if len(kpi) != 1198 {
-		t.Errorf("Length of Private Key Error: %v, expected 1198", len(kpi))
-	}
 	if len(kpb) != 299 {
 		t.Errorf("Length of Public Key Error: %v, expected 299", len(kpb))
 	}

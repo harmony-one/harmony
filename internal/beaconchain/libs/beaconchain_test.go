@@ -8,16 +8,16 @@ import (
 	"testing"
 
 	"github.com/harmony-one/harmony/api/proto/bcconn"
+	"github.com/harmony-one/harmony/api/proto/node"
 	beaconchain "github.com/harmony-one/harmony/internal/beaconchain/rpc"
-	"github.com/harmony-one/harmony/p2p"
 	"github.com/stretchr/testify/assert"
 )
 
 var (
-	leader1        = &bcconn.NodeInfo{Self: p2p.Peer{IP: "127.0.0.1", Port: "1"}}
-	leader2        = &bcconn.NodeInfo{Self: p2p.Peer{IP: "127.0.0.1", Port: "2"}}
-	leaders        = []*bcconn.NodeInfo{leader1, leader2}
-	shardLeaderMap = map[int]*bcconn.NodeInfo{
+	leader1        = &node.Info{IP: "127.0.0.1", Port: "9981"}
+	leader2        = &node.Info{IP: "127.0.0.1", Port: "9982"}
+	leaders        = []*node.Info{leader1, leader2}
+	shardLeaderMap = map[int]*node.Info{
 		0: leader1,
 		1: leader2,
 	}
@@ -69,7 +69,7 @@ func TestFetchLeaders(t *testing.T) {
 	bcClient := beaconchain.NewClient("127.0.0.1", strconv.Itoa(port+BeaconchainServicePortDiff))
 	response := bcClient.GetLeaders()
 	retleaders := response.GetLeaders()
-	if !(retleaders[0].GetIp() == leaders[0].Self.IP || retleaders[0].GetPort() == leaders[0].Self.Port || retleaders[1].GetPort() == leaders[1].Self.Port) {
+	if !(retleaders[0].GetIp() == leaders[0].IP || retleaders[0].GetPort() == leaders[0].Port || retleaders[1].GetPort() == leaders[1].Port) {
 		t.Error("Fetch leaders response is not as expected")
 	}
 
