@@ -37,7 +37,7 @@ go_dirs="${tmpdir}/go_dirs.txt"
 dirnames < "${go_files}" | sort -u -t/ > "${go_dirs}"
 
 echo "Running go test..."
-if go test ./...
+if go test -v -count=1 ./...
 then
 	echo "go test succeeded."
 else
