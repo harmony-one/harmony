@@ -165,6 +165,7 @@ func main() {
 		log.Debug("Client Join Shard", "leader", leader)
 		clientNode.GetHost().AddPeer(&leader)
 		go clientNode.JoinShard(leader)
+		clientNode.State = node.NodeReadyForConsensus
 	}
 	// wait for 1 seconds for client to send ping message to leader
 	time.Sleep(time.Second)

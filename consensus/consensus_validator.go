@@ -21,7 +21,6 @@ func (consensus *Consensus) ProcessMessageValidator(payload []byte) {
 	if err != nil {
 		consensus.Log.Error("Failed to unmarshal message payload.", "err", err, "consensus", consensus)
 	}
-
 	switch message.Type {
 	case consensus_proto.MessageType_ANNOUNCE:
 		consensus.processAnnounceMessage(message)
@@ -74,6 +73,16 @@ func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Messa
 		consensus.Log.Warn("Unparseable block header data", "error", err)
 		return
 	}
+
+	// send consensus block to state syncing
+	// TODO (chao): avoid malicious leader to send wrong block
+	select {
+	case consensus.ConsensusBlock <- &blockObj:
+		consensus.Log.Info("consensus block sent to state sync", "blockHash", blockObj.Hash())
+	default:
+		consensus.Log.Warn("consensus block unable to sent to state sync", "blockHash", blockObj.Hash())
+	}
+
 	consensus.block = block
 
 	// Add block to received block cache
@@ -243,6 +252,14 @@ func (consensus *Consensus) processChallengeMessage(message consensus_proto.Mess
 				}
 				consensus.Log.Info("Finished Response. Adding block to chain", "numTx", len(blockObj.Transactions()))
 				consensus.OnConsensusDone(&blockObj)
+
+				select {
+				case consensus.VerifiedNewBlock <- &blockObj:
+				default:
+					consensus.Log.Info("[sync] consensus verified block send to chan failed", "blockHash", blockObj.Hash())
+					continue
+				}
+
 			} else {
 				break
 			}
