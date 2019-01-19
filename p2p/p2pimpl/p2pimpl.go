@@ -11,7 +11,7 @@ import (
 
 	"github.com/harmony-one/harmony/internal/utils"
 	peer "github.com/libp2p/go-libp2p-peer"
-	multiaddr "github.com/multiformats/go-multiaddr"
+	ma "github.com/multiformats/go-multiaddr"
 )
 
 // Version The version number of p2p library
@@ -29,13 +29,13 @@ func NewHost(self *p2p.Peer) (host.Host, error) {
 		return h, nil
 	}
 
-	selfAddr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", self.Port))
+	selfAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", self.Port))
 	if err != nil {
 		return nil, err
 	}
 	self.Addrs = append(self.Addrs, selfAddr)
 
-	// TODO (leo), change to GenKeyP2PRand() to generate random key. Right now, the key is predicable as the
+	// TODO (leo), change to GenKeyP2PRand() to generate random key. Right now, the key is predictable as the
 	// seed is fixed.
 	priKey, pubKey, err := utils.GenKeyP2P(self.IP, self.Port)
 	if err != nil {
@@ -51,7 +51,7 @@ func NewHost(self *p2p.Peer) (host.Host, error) {
 	self.PeerID = peerID
 	h := hostv2.New(*self, priKey)
 
-	fmt.Printf("NewHost => self:%s, PeerID: %v\n", net.JoinHostPort(self.IP, self.Port), self.PeerID)
+	utils.GetLogInstance().Info("NewHost", "self", net.JoinHostPort(self.IP, self.Port), "PeerID", self.PeerID)
 
 	return h, nil
 }

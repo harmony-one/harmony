@@ -84,7 +84,7 @@ func (node *NewNode) requestBeaconChain(BCPeer p2p.Peer) (err error) {
 	msg := bcconn.SerializeNodeInfo(nodeInfo)
 	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Register, msg)
 	gotShardInfo := false
-	timeout := time.After(120 * time.Second)
+	timeout := time.After(2 * time.Minute)
 	tick := time.Tick(3 * time.Second)
 checkLoop:
 	for {

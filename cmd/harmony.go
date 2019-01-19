@@ -172,9 +172,6 @@ func main() {
 		panic("unable to new host in harmony")
 	}
 
-	fmt.Printf("[Harmony] selfPeer: %v\n", selfPeer)
-	fmt.Printf("[Harmony] leader: %v\n", leader)
-
 	host.AddPeer(&leader)
 
 	// Consensus object.

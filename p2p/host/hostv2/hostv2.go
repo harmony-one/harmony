@@ -38,7 +38,7 @@ func (host *HostV2) AddPeer(p *p2p.Peer) error {
 
 	if p.PeerID == "" {
 		log.Error("AddPeer PeerID is EMPTY")
-		return nil
+		return fmt.Errorf("AddPeer error: peerID is empty")
 	}
 
 	// reconstruct the multiaddress based on ip/port
@@ -53,7 +53,7 @@ func (host *HostV2) AddPeer(p *p2p.Peer) error {
 	p.Addrs = append(p.Addrs, targetAddr)
 
 	host.Peerstore().AddAddrs(p.PeerID, p.Addrs, peerstore.PermanentAddrTTL)
-	fmt.Printf("AddPeer add to peerstore: %v\n", *p)
+	log.Info("AddPeer add to peerstore", "peer", *p)
 
 	return nil
 }

@@ -14,7 +14,10 @@ import (
 func TestConstructAnnounceMessage(test *testing.T) {
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "19999"}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "55555"}
-	host, _ := p2pimpl.NewHost(&leader)
+	host, err := p2pimpl.NewHost(&leader)
+	if err != nil {
+		test.Fatalf("new host failed: %v", err)
+	}
 	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader)
 	consensus.blockHash = [32]byte{}
 	msg := consensus.constructAnnounceMessage()
@@ -36,7 +39,10 @@ func TestConstructChallengeMessage(test *testing.T) {
 	validatorPriKey.UnmarshalBinary(priKeyInBytes[:])
 	validatorPubKey := pki.GetPublicKeyFromScalar(leaderPriKey)
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "5555", PubKey: validatorPubKey}
-	host, _ := p2pimpl.NewHost(&leader)
+	host, err := p2pimpl.NewHost(&leader)
+	if err != nil {
+		test.Fatalf("new host failed: %v", err)
+	}
 	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader)
 	consensus.blockHash = [32]byte{}
 	(*consensus.commitments)[0] = leaderPubKey

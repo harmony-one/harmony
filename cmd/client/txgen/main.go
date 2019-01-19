@@ -63,7 +63,7 @@ func main() {
 	// Add GOMAXPROCS to achieve max performance.
 	runtime.GOMAXPROCS(1024)
 
-	var BCPeer *p2p.Peer
+	var bcPeer *p2p.Peer
 	var shardIDLeaderMap map[uint32]p2p.Peer
 
 	if *bcAddr != "" {
@@ -79,14 +79,14 @@ func main() {
 			panic(err)
 		}
 
-		BCPeer = &p2p.Peer{IP: *bcIP, Port: *bcPort, Addrs: info.Addrs, PeerID: info.ID}
+		bcPeer = &p2p.Peer{IP: *bcIP, Port: *bcPort, Addrs: info.Addrs, PeerID: info.ID}
 	} else {
-		BCPeer = &p2p.Peer{IP: *bcIP, Port: *bcPort}
+		bcPeer = &p2p.Peer{IP: *bcIP, Port: *bcPort}
 	}
 
 	candidateNode := newnode.New(*ip, *port)
-	candidateNode.AddPeer(BCPeer)
-	candidateNode.ContactBeaconChain(*BCPeer)
+	candidateNode.AddPeer(bcPeer)
+	candidateNode.ContactBeaconChain(*bcPeer)
 	selfPeer := candidateNode.GetSelfPeer()
 	selfPeer.PubKey = candidateNode.PubK
 
