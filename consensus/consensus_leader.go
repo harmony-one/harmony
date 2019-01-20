@@ -385,6 +385,13 @@ func (consensus *Consensus) processResponseMessage(message consensus_proto.Messa
 					consensus.Log.Info("[sync] consensus verified block send to chan failed", "blockHash", blockObj.Hash())
 				}
 
+				for _, pubKey := range consensus.bitmap.GetPubKeyFromMask() {
+					consensus.Log.Info("[chao] bitmap", "height", blockObj.NumberU64(), "pubkey", pubKey)
+				}
+				for _, pubKey := range consensus.finalBitmap.GetPubKeyFromMask() {
+					consensus.Log.Info("[chao] finalBitmap", "height", blockObj.NumberU64(), "pubkey", pubKey)
+				}
+
 				consensus.reportMetrics(blockObj)
 
 				// Dump new block into level db.

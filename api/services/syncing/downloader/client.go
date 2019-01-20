@@ -24,7 +24,7 @@ func ClientSetup(ip, port string) *Client {
 	var err error
 	client.conn, err = grpc.Dial(fmt.Sprintf("%s:%s", ip, port), client.opts...)
 	if err != nil {
-		log.Fatalf("fail to dial: %v", err)
+		log.Printf("client.go:ClientSetup fail to dial: %v", err)
 		return nil
 	}
 
@@ -34,7 +34,10 @@ func ClientSetup(ip, port string) *Client {
 
 // Close closes the Client.
 func (client *Client) Close() {
-	client.conn.Close()
+	err := client.conn.Close()
+	if err != nil {
+		log.Printf("unable to close connection %v with error %v ", client.conn, err)
+	}
 }
 
 // GetBlockHashes gets block hashes from all the peers by calling grpc request.
@@ -45,7 +48,7 @@ func (client *Client) GetBlockHashes(startHash []byte) *pb.DownloaderResponse {
 	request.BlockHash = startHash
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
-		log.Printf("[sync] downloader/client.go:GetBlockHashes query failed")
+		log.Printf("[sync] downloader/client.go:GetBlockHashes query failed with error %v", err)
 	}
 	return response
 }
@@ -62,7 +65,7 @@ func (client *Client) GetBlocks(hashes [][]byte) *pb.DownloaderResponse {
 	}
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
-		log.Printf("[sync] downloader/client.go:GetBlocks query failed")
+		log.Printf("[sync] downloader/client.go:GetBlocks query failed with error %v", err)
 	}
 	return response
 }
@@ -77,7 +80,7 @@ func (client *Client) Register(hash []byte) *pb.DownloaderResponse {
 	copy(request.PeerHash, hash)
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
-		log.Printf("[sync] client.go:Register error", "code", err)
+		log.Printf("[sync] client.go:Register failed with code %v", err)
 	}
 	return response
 }

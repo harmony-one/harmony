@@ -74,23 +74,12 @@ func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Messa
 		return
 	}
 
-	// send consensus block to state syncing
-	// TODO (chao): avoid malicious leader to send wrong block
-	select {
-	case consensus.ConsensusBlock <- &blockObj:
-		consensus.Log.Info("consensus block sent to state sync", "blockHash", blockObj.Hash())
-	default:
-		consensus.Log.Warn("consensus block unable to sent to state sync", "blockHash", blockObj.Hash())
-	}
-
 	consensus.block = block
 
 	// Add block to received block cache
 	consensus.mutex.Lock()
 	consensus.blocksReceived[consensusID] = &BlockConsensusStatus{block, consensus.state}
 	consensus.mutex.Unlock()
-
-	// Add attack model of IncorrectResponse.
 	if attack.GetInstance().IncorrectResponse() {
 		consensus.Log.Warn("IncorrectResponse attacked")
 		return
@@ -314,10 +303,10 @@ func (consensus *Consensus) processCollectiveSigMessage(message consensus_proto.
 	}
 
 	// check consensus Id
-	if consensusID != consensus.consensusID {
-		consensus.Log.Warn("Received message with wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
-		return
-	}
+	//if consensusID != consensus.consensusID {
+	//consensus.Log.Warn("Received message with wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
+	//return
+	//}
 
 	// check block hash
 	if !bytes.Equal(blockHash[:], consensus.blockHash[:]) {

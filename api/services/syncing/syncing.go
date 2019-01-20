@@ -30,7 +30,7 @@ const (
 	ConsensusRatio                        = float64(0.66)
 	SleepTimeAfterNonConsensusBlockHashes = time.Second * 30
 	TimesToFail                           = 5
-	RegistrationNumber                    = 3
+	RegistrationNumber                    = 1
 	SyncingPortDifference                 = 3000
 )
 
@@ -69,6 +69,7 @@ func CreateStateSync(ip string, port string) *StateSync {
 	stateSync.selfip = ip
 	stateSync.selfport = port
 	stateSync.commonBlocks = make(map[int]*types.Block)
+	stateSync.lastMileBlocks = []*types.Block{}
 	return stateSync
 }
 
@@ -79,9 +80,23 @@ type StateSync struct {
 	peerNumber         int
 	activePeerNumber   int
 	commonBlocks       map[int]*types.Block
+	lastMileBlocks     []*types.Block // last mile blocks to catch up with the consensus
 	syncConfig         *SyncConfig
 	stateSyncTaskQueue *queue.Queue
 	syncMux            sync.Mutex
+}
+
+func (ss *StateSync) AddLastMileBlock(block *types.Block) {
+	ss.lastMileBlocks = append(ss.lastMileBlocks, block)
+}
+
+// CloseConnections close grpc  connections for state sync clients
+func (ss *StateSync) CloseConnections() {
+	for _, pc := range ss.syncConfig.peers {
+		if pc.client != nil {
+			pc.client.Close()
+		}
+	}
 }
 
 // GetServicePort returns the service port from syncing port
@@ -405,8 +420,18 @@ func (ss *StateSync) getMaxConsensusBlockFromParentHash(parentHash common.Hash) 
 	return candidateBlocks[maxFirstID]
 }
 
-func (ss *StateSync) getBlockFromParentHash(parentHash common.Hash) *types.Block {
+func (ss *StateSync) getBlockFromOldBlocksByParentHash(parentHash common.Hash) *types.Block {
 	for _, block := range ss.commonBlocks {
+		ph := block.ParentHash()
+		if bytes.Compare(ph[:], parentHash[:]) == 0 {
+			return block
+		}
+	}
+	return nil
+}
+
+func (ss *StateSync) getBlockFromLastMileBlocksByParentHash(parentHash common.Hash) *types.Block {
+	for _, block := range ss.lastMileBlocks {
 		ph := block.ParentHash()
 		if bytes.Compare(ph[:], parentHash[:]) == 0 {
 			return block
@@ -434,7 +459,7 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 	// update blocks created before node start sync
 	parentHash := bc.CurrentBlock().Hash()
 	for {
-		block := ss.getBlockFromParentHash(parentHash)
+		block := ss.getBlockFromOldBlocksByParentHash(parentHash)
 		if block == nil {
 			break
 		}
@@ -466,17 +491,25 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 		ss.syncConfig.peers[id].newBlocks = []*types.Block{}
 	}
 	ss.syncMux.Unlock()
+
+	// update last mile blocks if any
+	parentHash = bc.CurrentBlock().Hash()
+	for {
+		block := ss.getBlockFromLastMileBlocksByParentHash(parentHash)
+		if block == nil {
+			break
+		}
+		ok := ss.updateBlockAndStatus(block, bc, worker)
+		if !ok {
+			break
+		}
+		parentHash = block.Hash()
+	}
 }
 
 // StartStateSync starts state sync.
-func (ss *StateSync) StartStateSync(startHash []byte, peers []p2p.Peer, bc *core.BlockChain, worker *worker.Worker) {
-	// Creates sync config.
-	ss.CreateSyncConfig(peers)
-	// Makes connections to peers.
-	ss.MakeConnectionToPeers()
-	numRegistered := ss.RegisterNodeInfo()
-	Log.Info("[sync] waiting for broadcast from peers", "numRegistered", numRegistered)
-
+func (ss *StateSync) StartStateSync(startHash []byte, bc *core.BlockChain, worker *worker.Worker) {
+	ss.RegisterNodeInfo()
 	// Gets consensus hashes.
 	if !ss.GetConsensusHashes(startHash) {
 		Log.Debug("[sync] StartStateSync unable to reach consensus on ss.GetConsensusHashes")

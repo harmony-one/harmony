@@ -67,9 +67,9 @@ EOU
 
 DB=
 TXGEN=true
-DURATION=90
+DURATION=900
 MIN=5
-SHARDS=2
+SHARDS=1
 KILLPORT=9004
 DRYRUN=
 
@@ -136,7 +136,7 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
 done < $config
 
 # Emulate node offline
-(sleep 45; killnode $KILLPORT) &
+# (sleep 45; killnode $KILLPORT) &
 
 if [ "$TXGEN" == "true" ]; then
    echo "launching txgen ..."

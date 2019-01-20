@@ -286,16 +286,14 @@ func New(host host.Host, consensus *bft.Consensus, db *ethdb.LDBDatabase) *Node 
 
 // IsOutOfSync checks whether the node is out of sync by comparing latest block with consensus block
 func (node *Node) IsOutOfSync(consensusBlock *types.Block) bool {
-	currentBlock := node.blockchain.CurrentBlock()
-	latestHash := currentBlock.Hash()
-	parentHash := consensusBlock.ParentHash()
-	consensusHash := consensusBlock.Hash()
-	// in general this case should not happen
-	if bytes.Compare(latestHash[:], consensusHash[:]) == 0 {
+	myHeight := node.blockchain.CurrentBlock().NumberU64()
+	newHeight := consensusBlock.NumberU64()
+	if newHeight-myHeight <= 2 {
 		return false
 	}
-	if bytes.Compare(latestHash[:], parentHash[:]) == 0 {
-		return false
+	// cache latest blocks for last mile catch up
+	if newHeight-myHeight <= 4 && node.stateSync != nil {
+		node.stateSync.AddLastMileBlock(consensusBlock)
 	}
 	return true
 }
@@ -307,6 +305,7 @@ func (node *Node) DoSyncing() {
 		if !node.IsOutOfSync(consensusBlock) {
 			if node.State == NodeNotSync {
 				node.log.Info("[sync] Node is now INSYNC!")
+				node.stateSync.CloseConnections()
 				node.stateSync = nil
 			}
 			node.stateMutex.Lock()
@@ -322,9 +321,11 @@ func (node *Node) DoSyncing() {
 
 		if node.stateSync == nil {
 			node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port)
+			node.stateSync.CreateSyncConfig(node.GetSyncingPeers())
+			node.stateSync.MakeConnectionToPeers()
 		}
 		startHash := node.blockchain.CurrentBlock().Hash()
-		node.stateSync.StartStateSync(startHash[:], node.GetSyncingPeers(), node.blockchain, node.Worker)
+		node.stateSync.StartStateSync(startHash[:], node.blockchain, node.Worker)
 	}
 }
 
@@ -585,6 +586,7 @@ func (node *Node) SendNewBlockToUnsync() {
 				// send last time and delete
 				config.client.PushNewBlock(peerHash, blockHash, true)
 				node.stateMutex.Lock()
+				node.peerRegistrationRecord[peerID].client.Close()
 				delete(node.peerRegistrationRecord, peerID)
 				node.stateMutex.Unlock()
 				continue
@@ -593,6 +595,7 @@ func (node *Node) SendNewBlockToUnsync() {
 			node.log.Debug("[sync] SendNewBlockToUnSync from", "peerHash", peerHash)
 			if response.Type == downloader_pb.DownloaderResponse_INSYNC {
 				node.stateMutex.Lock()
+				node.peerRegistrationRecord[peerID].client.Close()
 				delete(node.peerRegistrationRecord, peerID)
 				node.stateMutex.Unlock()
 			}
