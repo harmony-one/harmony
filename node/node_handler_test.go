@@ -13,7 +13,7 @@ func TestNodeStreamHandler(t *testing.T) {
 	_, pubKey := utils.GenKey("1", "2")
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", PubKey: pubKey}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "8885"}
-	host := p2pimpl.NewHost(leader)
+	host, _ := p2pimpl.NewHost(&leader)
 	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader)
 	node := New(host, consensus, nil)
 
@@ -33,7 +33,7 @@ func TestAddNewBlock(t *testing.T) {
 	_, pubKey := utils.GenKey("1", "2")
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "9882", PubKey: pubKey}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "9885"}
-	host := p2pimpl.NewHost(leader)
+	host, _ := p2pimpl.NewHost(&leader)
 	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader)
 	node := New(host, consensus, nil)
 
@@ -52,7 +52,7 @@ func TestVerifyNewBlock(t *testing.T) {
 	_, pubKey := utils.GenKey("1", "2")
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", PubKey: pubKey}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "8885"}
-	host := p2pimpl.NewHost(leader)
+	host, _ := p2pimpl.NewHost(&leader)
 	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader)
 	node := New(host, consensus, nil)
 

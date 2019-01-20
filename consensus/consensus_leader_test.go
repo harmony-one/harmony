@@ -38,17 +38,20 @@ func TestProcessMessageLeaderCommit(test *testing.T) {
 	consensusLeader := New(m, "0", []p2p.Peer{validator1, validator2, validator3}, leader)
 	consensusLeader.blockHash = [32]byte{}
 
-	consensusValidator1 := New(p2pimpl.NewHost(validator1), "0", []p2p.Peer{validator1, validator2, validator3}, leader)
+	host1, _ := p2pimpl.NewHost(&validator1)
+	consensusValidator1 := New(host1, "0", []p2p.Peer{validator1, validator2, validator3}, leader)
 	consensusValidator1.blockHash = [32]byte{}
 	_, msg := consensusValidator1.constructCommitMessage(consensus_proto.MessageType_COMMIT)
 	consensusLeader.ProcessMessageLeader(msg[1:])
 
-	consensusValidator2 := New(p2pimpl.NewHost(validator2), "0", []p2p.Peer{validator1, validator2, validator3}, leader)
+	host2, _ := p2pimpl.NewHost(&validator2)
+	consensusValidator2 := New(host2, "0", []p2p.Peer{validator1, validator2, validator3}, leader)
 	consensusValidator2.blockHash = [32]byte{}
 	_, msg = consensusValidator2.constructCommitMessage(consensus_proto.MessageType_COMMIT)
 	consensusLeader.ProcessMessageLeader(msg[1:])
 
-	consensusValidator3 := New(p2pimpl.NewHost(validator3), "0", []p2p.Peer{validator1, validator2, validator3}, leader)
+	host3, _ := p2pimpl.NewHost(&validator3)
+	consensusValidator3 := New(host3, "0", []p2p.Peer{validator1, validator2, validator3}, leader)
 	consensusValidator3.blockHash = [32]byte{}
 	_, msg = consensusValidator3.constructCommitMessage(consensus_proto.MessageType_COMMIT)
 	consensusLeader.ProcessMessageLeader(msg[1:])
@@ -81,17 +84,20 @@ func TestProcessMessageLeaderResponse(test *testing.T) {
 	consensusLeader := New(m, "0", []p2p.Peer{validator1, validator2, validator3}, leader)
 	consensusLeader.blockHash = [32]byte{}
 
-	consensusValidator1 := New(p2pimpl.NewHost(validator1), "0", []p2p.Peer{validator1, validator2, validator3}, leader)
+	host1, _ := p2pimpl.NewHost(&validator1)
+	consensusValidator1 := New(host1, "0", []p2p.Peer{validator1, validator2, validator3}, leader)
 	consensusValidator1.blockHash = [32]byte{}
 	_, msg := consensusValidator1.constructCommitMessage(consensus_proto.MessageType_COMMIT)
 	consensusLeader.ProcessMessageLeader(msg[1:])
 
-	consensusValidator2 := New(p2pimpl.NewHost(validator2), "0", []p2p.Peer{validator1, validator2, validator3}, leader)
+	host2, _ := p2pimpl.NewHost(&validator2)
+	consensusValidator2 := New(host2, "0", []p2p.Peer{validator1, validator2, validator3}, leader)
 	consensusValidator2.blockHash = [32]byte{}
 	_, msg = consensusValidator2.constructCommitMessage(consensus_proto.MessageType_COMMIT)
 	consensusLeader.ProcessMessageLeader(msg[1:])
 
-	consensusValidator3 := New(p2pimpl.NewHost(validator3), "0", []p2p.Peer{validator1, validator2, validator3}, leader)
+	host3, _ := p2pimpl.NewHost(&validator3)
+	consensusValidator3 := New(host3, "0", []p2p.Peer{validator1, validator2, validator3}, leader)
 	consensusValidator3.blockHash = [32]byte{}
 	_, msg = consensusValidator3.constructCommitMessage(consensus_proto.MessageType_COMMIT)
 	consensusLeader.ProcessMessageLeader(msg[1:])

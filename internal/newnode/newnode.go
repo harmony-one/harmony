@@ -12,11 +12,14 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/api/proto/bcconn"
 	proto_identity "github.com/harmony-one/harmony/api/proto/identity"
+	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
+
+	multiaddr "github.com/multiformats/go-multiaddr"
 )
 
 //NewNode is ther struct for a candidate node
@@ -31,7 +34,7 @@ type NewNode struct {
 	PubK        kyber.Point
 	priK        kyber.Scalar
 	log         log.Logger
-	SetInfo     bool
+	SetInfo     chan bool
 	host        host.Host
 }
 
@@ -39,12 +42,17 @@ type NewNode struct {
 func New(ip string, port string) *NewNode {
 	priKey, pubKey := utils.GenKey(ip, port)
 	var node NewNode
+	var err error
 	node.PubK = pubKey
 	node.priK = priKey
 	node.Self = p2p.Peer{IP: ip, Port: port, PubKey: pubKey, ValidatorID: -1}
 	node.log = log.New()
-	node.SetInfo = false
-	node.host = p2pimpl.NewHost(node.Self)
+	node.SetInfo = make(chan bool)
+	node.host, err = p2pimpl.NewHost(&node.Self)
+	if err != nil {
+		node.log.Error("failed to create new host", "msg", err)
+		return nil
+	}
 	node.Leaders = map[uint32]p2p.Peer{}
 	return &node
 }
@@ -52,7 +60,7 @@ func New(ip string, port string) *NewNode {
 type registerResponseRandomNumber struct {
 	NumberOfShards     int
 	NumberOfNodesAdded int
-	Leaders            []*bcconn.NodeInfo
+	Leaders            []*proto_node.Info
 }
 
 // ContactBeaconChain starts a newservice in the candidate node
@@ -62,7 +70,7 @@ func (node *NewNode) ContactBeaconChain(BCPeer p2p.Peer) error {
 }
 
 func (node NewNode) String() string {
-	return fmt.Sprintf("bc: %v:%v and node info %v", node.Self.IP, node.Self.Port, node.SetInfo)
+	return fmt.Sprintf("bc: %v:%v => %v", node.Self.IP, node.Self.Port, node.Self.PeerID)
 }
 
 // RequestBeaconChain requests beacon chain for identity data
@@ -72,13 +80,12 @@ func (node *NewNode) requestBeaconChain(BCPeer p2p.Peer) (err error) {
 	if err != nil {
 		node.log.Error("Could not Marshall public key into binary")
 	}
-	p := p2p.Peer{IP: node.Self.IP, Port: node.Self.Port}
-	nodeInfo := &bcconn.NodeInfo{Self: p, PubK: pubk}
+	nodeInfo := &proto_node.Info{IP: node.Self.IP, Port: node.Self.Port, PubKey: pubk, PeerID: node.host.GetID()}
 	msg := bcconn.SerializeNodeInfo(nodeInfo)
 	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Register, msg)
 	gotShardInfo := false
-	timeout := time.After(300 * time.Second)
-	tick := time.Tick(5 * time.Second)
+	timeout := time.After(2 * time.Minute)
+	tick := time.Tick(3 * time.Second)
 checkLoop:
 	for {
 		select {
@@ -86,18 +93,21 @@ checkLoop:
 			gotShardInfo = false
 			break checkLoop
 		case <-tick:
-			if node.SetInfo {
-				gotShardInfo = true
-				break checkLoop
-			} else {
+			select {
+			case setinfo := <-node.SetInfo:
+				if setinfo {
+					gotShardInfo = true
+					break checkLoop
+				}
+			default:
 				host.SendMessage(node.host, BCPeer, msgToSend, nil)
 			}
 		}
 	}
 	if !gotShardInfo {
 		err = errors.New("could not create connection")
-		node.log.Crit("Could not get sharding info after 5 minutes")
-		os.Exit(1)
+		node.log.Crit("Could not get sharding info after 2 minutes")
+		os.Exit(10)
 	}
 	return
 }
@@ -108,9 +118,18 @@ func (node *NewNode) processShardInfo(msgPayload []byte) bool {
 	leaders := leadersInfo.Leaders
 	shardNum, isLeader := utils.AllocateShard(leadersInfo.NumberOfNodesAdded, leadersInfo.NumberOfShards)
 	for n, v := range leaders {
-		leaderPeer := p2p.Peer{IP: v.Self.IP, Port: v.Self.Port}
+		leaderPeer := p2p.Peer{IP: v.IP, Port: v.Port, PeerID: v.PeerID}
+
+		addr := fmt.Sprintf("/ip4/%s/tcp/%s", leaderPeer.IP, leaderPeer.Port)
+		targetAddr, err := multiaddr.NewMultiaddr(addr)
+		if err != nil {
+			log.Error("processShardInfo NewMultiaddr error", "error", err)
+			return false
+		}
+		leaderPeer.Addrs = append(leaderPeer.Addrs, targetAddr)
+
 		leaderPeer.PubKey = crypto.Ed25519Curve.Point()
-		err := leaderPeer.PubKey.UnmarshalBinary(v.PubK[:])
+		err = leaderPeer.PubKey.UnmarshalBinary(v.PubKey[:])
 		if err != nil {
 			node.log.Error("Could not unmarshall leaders public key from binary to kyber.point")
 		}
@@ -120,7 +139,7 @@ func (node *NewNode) processShardInfo(msgPayload []byte) bool {
 	node.leader = node.Leaders[uint32(shardNum-1)]
 	node.isLeader = isLeader
 	node.ShardID = shardNum - 1 //0 indexing.
-	node.SetInfo = true
+	node.SetInfo <- true
 	node.log.Info("Shard information obtained ..")
 	return true
 }
@@ -143,4 +162,9 @@ func (node *NewNode) GetClientPeer() *p2p.Peer {
 // GetSelfPeer gives the peer part of the node's own struct
 func (node *NewNode) GetSelfPeer() p2p.Peer {
 	return node.Self
+}
+
+// AddPeer add new peer for newnode
+func (node *NewNode) AddPeer(p *p2p.Peer) error {
+	return node.host.AddPeer(p)
 }

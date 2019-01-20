@@ -48,6 +48,9 @@ func main() {
 		beaconchain.SetSaveFile(*resetFlag)
 		bc = beaconchain.New(*numShards, *ip, *port)
 	}
+
+	fmt.Printf("Beacon Chain Started: /ip4/%s/tcp/%v/ipfs/%s\n", *ip, *port, bc.GetID().Pretty())
+
 	go bc.SupportRPC()
 	bc.StartServer()
 }

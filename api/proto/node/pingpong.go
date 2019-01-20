@@ -19,6 +19,8 @@ import (
 	"github.com/dedis/kyber"
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/p2p"
+
+	peer "github.com/libp2p/go-libp2p-peer"
 )
 
 // RoleType defines the role of the node
@@ -40,27 +42,28 @@ func (r RoleType) String() string {
 	return "Unknown"
 }
 
-// refer to Peer struct in p2p/peer.go
+// Info refers to Peer struct in p2p/peer.go
 // this is basically a simplified version of Peer
 // for network transportation
-type nodeInfo struct {
+type Info struct {
 	IP          string
 	Port        string
 	PubKey      []byte
 	ValidatorID int
 	Role        RoleType
+	PeerID      peer.ID // Peerstore ID
 }
 
 // PingMessageType defines the data structure of the Ping message
 type PingMessageType struct {
 	Version uint16 // version of the protocol
-	Node    nodeInfo
+	Node    Info
 }
 
 // PongMessageType defines the data structure of the Pong message
 type PongMessageType struct {
 	Version uint16 // version of the protocol
-	Peers   []nodeInfo
+	Peers   []Info
 	PubKeys [][]byte // list of publickKeys, has to be identical among all validators/leaders
 }
 
@@ -81,6 +84,7 @@ func NewPingMessage(peer p2p.Peer) *PingMessageType {
 	ping.Version = ProtocolVersion
 	ping.Node.IP = peer.IP
 	ping.Node.Port = peer.Port
+	ping.Node.PeerID = peer.PeerID
 	ping.Node.ValidatorID = peer.ValidatorID
 	ping.Node.PubKey, err = peer.PubKey.MarshalBinary()
 	ping.Node.Role = ValidatorRole
@@ -99,14 +103,15 @@ func NewPongMessage(peers []p2p.Peer, pubKeys []kyber.Point) *PongMessageType {
 	pong.PubKeys = make([][]byte, 0)
 
 	pong.Version = ProtocolVersion
-	pong.Peers = make([]nodeInfo, 0)
+	pong.Peers = make([]Info, 0)
 
 	var err error
 	for _, p := range peers {
-		n := nodeInfo{}
+		n := Info{}
 		n.IP = p.IP
 		n.Port = p.Port
 		n.ValidatorID = p.ValidatorID
+		n.PeerID = p.PeerID
 		n.PubKey, err = p.PubKey.MarshalBinary()
 		if err != nil {
 			fmt.Printf("Error Marshal PubKey: %v", err)
@@ -146,7 +151,7 @@ func GetPingMessage(payload []byte) (*PingMessageType, error) {
 // GetPongMessage deserializes the Pong Message from a list of byte
 func GetPongMessage(payload []byte) (*PongMessageType, error) {
 	pong := new(PongMessageType)
-	pong.Peers = make([]nodeInfo, 0)
+	pong.Peers = make([]Info, 0)
 	pong.PubKeys = make([][]byte, 0)
 
 	r := bytes.NewBuffer(payload)

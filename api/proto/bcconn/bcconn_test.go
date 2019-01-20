@@ -5,21 +5,20 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/p2p"
 )
 
 func TestSerializeDeserializeNodeInfo(t *testing.T) {
 	var ip, port string
 	ip = "127.0.0.1"
 	port = "8080"
-	self := p2p.Peer{IP: ip, Port: port}
 	_, pk := utils.GenKey(ip, port)
 	pkb, err := pk.MarshalBinary()
 	if err != nil {
 		fmt.Println("problem marshalling binary from public key")
 	}
-	nodeInfo := &NodeInfo{Self: self, PubK: pkb}
+	nodeInfo := &node.Info{IP: ip, Port: port, PubKey: pkb}
 	serializedNI := SerializeNodeInfo(nodeInfo)
 	deserializedNI := DeserializeNodeInfo(serializedNI)
 	if !reflect.DeepEqual(nodeInfo, deserializedNI) {
@@ -33,25 +32,23 @@ func TestSerializeDeserializeRandomInfo(t *testing.T) {
 
 	ip = "127.0.0.1"
 	port = "8080"
-	self := p2p.Peer{IP: ip, Port: port}
 	_, pk := utils.GenKey(ip, port)
 	pkb, err := pk.MarshalBinary()
 	if err != nil {
 		fmt.Println("problem marshalling binary from public key")
 	}
-	nodeInfo1 := &NodeInfo{Self: self, PubK: pkb}
+	nodeInfo1 := &node.Info{IP: ip, Port: port, PubKey: pkb}
 
 	ip = "127.0.0.1"
 	port = "9080"
-	self2 := p2p.Peer{IP: ip, Port: port}
 	_, pk2 := utils.GenKey(ip, port)
 	pkb2, err := pk2.MarshalBinary()
 	if err != nil {
 		fmt.Println("problem marshalling binary from public key")
 	}
-	nodeInfo2 := &NodeInfo{Self: self2, PubK: pkb2}
+	nodeInfo2 := &node.Info{IP: ip, Port: port, PubKey: pkb2}
 
-	leaders := make([]*NodeInfo, 2)
+	leaders := make([]*node.Info, 2)
 	leaders[0] = nodeInfo1
 	leaders[1] = nodeInfo2
 

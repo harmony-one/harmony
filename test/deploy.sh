@@ -119,13 +119,18 @@ LOG_FILE=$log_folder/r.log
 echo "launching beacon chain ..."
 $DRYRUN $ROOT/bin/beacon -numShards $SHARDS > $log_folder/beacon.log 2>&1 | tee -a $LOG_FILE &
 sleep 1 #waiting for beaconchain
+MA=$(grep "Beacon Chain Started" $log_folder/beacon.log | awk -F: ' { print $2 } ')
+
+if [ -n "$MA" ]; then
+   HMY_OPT="-bc_addr $MA"
+fi
 
 # Start nodes
 while IFS='' read -r line || [[ -n "$line" ]]; do
   IFS=' ' read ip port mode shardID <<< $line
 	#echo $ip $port $mode
   if [ "$mode" != "client" ]; then
-      $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN 2>&1 | tee -a $LOG_FILE &
+      $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT 2>&1 | tee -a $LOG_FILE &
       sleep 0.5
   fi
 done < $config
@@ -138,7 +143,7 @@ if [ "$TXGEN" == "true" ]; then
    line=$(grep client $config)
    IFS=' ' read ip port mode shardID <<< $line
    if [ "$mode" == "client" ]; then
-      $DRYRUN $ROOT/bin/txgen -log_folder $log_folder -duration $DURATION -ip $ip -port $port 2>&1 | tee -a $LOG_FILE
+      $DRYRUN $ROOT/bin/txgen -log_folder $log_folder -duration $DURATION -ip $ip -port $port $HMY_OPT 2>&1 | tee -a $LOG_FILE
    fi
 fi
 

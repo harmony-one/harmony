@@ -5,24 +5,19 @@ import (
 	"encoding/gob"
 
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/harmony-one/harmony/p2p"
-)
 
-//NodeInfo struct exists to share information on the node
-type NodeInfo struct { //TODO: to be merged with Leo's nodeinfo.
-	Self p2p.Peer
-	PubK []byte
-}
+	"github.com/harmony-one/harmony/api/proto/node"
+)
 
 //ResponseRandomNumber struct for exchanging random information
 type ResponseRandomNumber struct {
 	NumberOfShards     int
 	NumberOfNodesAdded int
-	Leaders            []*NodeInfo
+	Leaders            []*node.Info
 }
 
 // SerializeNodeInfo is for serializing nodeinfo
-func SerializeNodeInfo(nodeinfo *NodeInfo) []byte {
+func SerializeNodeInfo(nodeinfo *node.Info) []byte {
 	var result bytes.Buffer
 	encoder := gob.NewEncoder(&result)
 	err := encoder.Encode(nodeinfo)
@@ -33,8 +28,8 @@ func SerializeNodeInfo(nodeinfo *NodeInfo) []byte {
 }
 
 // DeserializeNodeInfo deserializes the nodeinfo
-func DeserializeNodeInfo(d []byte) *NodeInfo {
-	var wn NodeInfo
+func DeserializeNodeInfo(d []byte) *node.Info {
+	var wn node.Info
 	r := bytes.NewBuffer(d)
 	decoder := gob.NewDecoder(r)
 	err := decoder.Decode(&wn)

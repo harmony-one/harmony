@@ -7,6 +7,7 @@ package mock
 import (
 	gomock "github.com/golang/mock/gomock"
 	p2p "github.com/harmony-one/harmony/p2p"
+	peer "github.com/libp2p/go-libp2p-peer"
 	reflect "reflect"
 )
 
@@ -77,4 +78,28 @@ func (m *MockHost) Close() error {
 // Close indicates an expected call of Close
 func (mr *MockHostMockRecorder) Close() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockHost)(nil).Close))
+}
+
+// AddPeer mocks base method
+func (m *MockHost) AddPeer(arg0 *p2p.Peer) error {
+	ret := m.ctrl.Call(m, "AddPeer", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AddPeer indicates an expected call of AddPeer
+func (mr *MockHostMockRecorder) AddPeer(arg0 interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddPeer", reflect.TypeOf((*MockHost)(nil).AddPeer), arg0)
+}
+
+// GetID mocks base method
+func (m *MockHost) GetID() peer.ID {
+	ret := m.ctrl.Call(m, "GetID")
+	ret0, _ := ret[0].(peer.ID)
+	return ret0
+}
+
+// GetID indicates an expected call of GetID
+func (mr *MockHostMockRecorder) GetID() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetID", reflect.TypeOf((*MockHost)(nil).GetID))
 }

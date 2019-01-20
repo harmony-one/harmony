@@ -6,10 +6,13 @@ import (
 	"encoding/json"
 	"io"
 	"log"
+	mrand "math/rand"
 	"os"
 	"regexp"
 	"strconv"
 	"sync"
+
+	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
 
 	"github.com/dedis/kyber"
 	"github.com/harmony-one/harmony/crypto"
@@ -68,6 +71,17 @@ func GenKey(ip, port string) (kyber.Scalar, kyber.Point) {
 	pubKey := pki.GetPublicKeyFromScalar(priKey)
 
 	return priKey, pubKey
+}
+
+// GenKeyP2P generates a pair of RSA keys used in libp2p host
+func GenKeyP2P(ip, port string) (p2p_crypto.PrivKey, p2p_crypto.PubKey, error) {
+	r := mrand.New(mrand.NewSource(int64(GetUniqueIDFromIPPort(ip, port))))
+	return p2p_crypto.GenerateKeyPairWithReader(p2p_crypto.RSA, 2048, r)
+}
+
+// GenKeyP2PRand generates a pair of RSA keys used in libp2p host, using random seed
+func GenKeyP2PRand() (p2p_crypto.PrivKey, p2p_crypto.PubKey, error) {
+	return p2p_crypto.GenerateKeyPair(p2p_crypto.RSA, 2048)
 }
 
 // AllocateShard uses the number of current nodes and number of shards
