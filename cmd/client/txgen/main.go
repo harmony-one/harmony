@@ -165,14 +165,14 @@ func main() {
 		log.Debug("Client Join Shard", "leader", leader)
 		clientNode.GetHost().AddPeer(&leader)
 		go clientNode.JoinShard(leader)
-		// wait for 3 seconds for client to send ping message to leader
-		time.Sleep(3 * time.Second)
-		clientNode.StopPing <- struct{}{}
-		clientNode.State = node.NodeJoinedShard
 	}
+	// wait for 1 seconds for client to send ping message to leader
+	time.Sleep(time.Second)
+	clientNode.StopPing <- struct{}{}
+	clientNode.State = node.NodeJoinedShard
 
 	// Transaction generation process
-	time.Sleep(5 * time.Second) // wait for nodes to be ready
+	time.Sleep(2 * time.Second) // wait for nodes to be ready
 	start := time.Now()
 	totalTime := float64(*duration)
 
