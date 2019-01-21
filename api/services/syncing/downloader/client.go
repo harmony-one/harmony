@@ -85,6 +85,7 @@ func (client *Client) Register(hash []byte) *pb.DownloaderResponse {
 	return response
 }
 
+// PushNewBlock will send the lastest verified blow to registered nodes
 func (client *Client) PushNewBlock(peerHash []byte, blockHash []byte, timeout bool) *pb.DownloaderResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -99,7 +100,6 @@ func (client *Client) PushNewBlock(peerHash []byte, blockHash []byte, timeout bo
 	}
 
 	response, err := client.dlClient.Query(ctx, request)
-	log.Printf("[sync] response from pushnewblock", "response", response)
 	if err != nil {
 		log.Printf("[sync] unable to send new block to unsync node with error: %v", err)
 	}

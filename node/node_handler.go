@@ -257,7 +257,6 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) bool {
 		// send consensus block to state syncing
 		select {
 		case node.Consensus.ConsensusBlock <- newBlock:
-			//node.log.Info("consensus block sent to state sync", "height", newBlock.NumberU64(), "blockHash", newBlock.Hash().Hex())
 		default:
 			node.log.Warn("consensus block unable to sent to state sync", "height", newBlock.NumberU64(), "blockHash", newBlock.Hash().Hex())
 		}

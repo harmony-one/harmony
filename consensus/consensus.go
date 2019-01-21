@@ -487,6 +487,7 @@ func (consensus *Consensus) GetNodeID() uint32 {
 	return consensus.nodeID
 }
 
+// GetPeerFromID will get peer from peerID
 func (consensus *Consensus) GetPeerFromID(peerID uint32) (p2p.Peer, bool) {
 	v, ok := consensus.validators.Load(peerID)
 	if !ok {

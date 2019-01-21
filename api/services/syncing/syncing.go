@@ -30,7 +30,7 @@ const (
 	ConsensusRatio                        = float64(0.66)
 	SleepTimeAfterNonConsensusBlockHashes = time.Second * 30
 	TimesToFail                           = 5
-	RegistrationNumber                    = 1
+	RegistrationNumber                    = 3
 	SyncingPortDifference                 = 3000
 )
 
@@ -63,7 +63,7 @@ type SyncConfig struct {
 	peers []*SyncPeerConfig
 }
 
-// GetStateSync returns the implementation of StateSyncInterface interface.
+// CreateStateSync returns the implementation of StateSyncInterface interface.
 func CreateStateSync(ip string, port string) *StateSync {
 	stateSync := &StateSync{}
 	stateSync.selfip = ip
@@ -86,6 +86,7 @@ type StateSync struct {
 	syncMux            sync.Mutex
 }
 
+// AddLastMileBlock add the lastest a few block into queue for syncing
 func (ss *StateSync) AddLastMileBlock(block *types.Block) {
 	ss.lastMileBlocks = append(ss.lastMileBlocks, block)
 }
@@ -367,12 +368,14 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 	Log.Info("[sync] Finished downloadBlocks.")
 }
 
+// CompareBlockByHash compares two block by hash, it will be used in sort the blocks
 func CompareBlockByHash(a *types.Block, b *types.Block) int {
 	ha := a.Hash()
 	hb := b.Hash()
 	return bytes.Compare(ha[:], hb[:])
 }
 
+// GetHowManyMaxConsensus will get the most common blocks and the first such blockID
 func GetHowManyMaxConsensus(blocks []*types.Block) (int, int) {
 	// As all peers are sorted by their blockHashes, all equal blockHashes should come together and consecutively.
 	curCount := 0

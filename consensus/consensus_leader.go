@@ -176,6 +176,7 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 	if len((*commitments)) >= ((len(consensus.PublicKeys)*2)/3 + 1) {
 		shouldProcess = false
 	}
+
 	if shouldProcess {
 		point := crypto.Ed25519Curve.Point()
 		point.UnmarshalBinary(commitment)
@@ -385,12 +386,13 @@ func (consensus *Consensus) processResponseMessage(message consensus_proto.Messa
 					consensus.Log.Info("[sync] consensus verified block send to chan failed", "blockHash", blockObj.Hash())
 				}
 
-				for _, pubKey := range consensus.bitmap.GetPubKeyFromMask() {
-					consensus.Log.Info("[chao] bitmap", "height", blockObj.NumberU64(), "pubkey", pubKey)
-				}
-				for _, pubKey := range consensus.finalBitmap.GetPubKeyFromMask() {
-					consensus.Log.Info("[chao] finalBitmap", "height", blockObj.NumberU64(), "pubkey", pubKey)
-				}
+				consensus.Log.Info("[sync] one bit bitmap", "pubkey", consensus.bitmap.GetPubKeyFromMask(true), "height", blockObj.NumberU64())
+				consensus.Log.Info("------------------------------------")
+				consensus.Log.Info("[sync] zero bit bitmap", "pubkey", consensus.bitmap.GetPubKeyFromMask(false), "height", blockObj.NumberU64())
+				consensus.Log.Info("------------------------------------")
+				consensus.Log.Info("[sync] one bit finalBitmap", "pubkey", consensus.finalBitmap.GetPubKeyFromMask(true), "height", blockObj.NumberU64())
+				consensus.Log.Info("------------------------------------")
+				consensus.Log.Info("[sync] zero bit finalBitmap", "pubkey", consensus.finalBitmap.GetPubKeyFromMask(false), "height", blockObj.NumberU64())
 
 				consensus.reportMetrics(blockObj)
 

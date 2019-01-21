@@ -288,6 +288,7 @@ func New(host host.Host, consensus *bft.Consensus, db *ethdb.LDBDatabase) *Node 
 func (node *Node) IsOutOfSync(consensusBlock *types.Block) bool {
 	myHeight := node.blockchain.CurrentBlock().NumberU64()
 	newHeight := consensusBlock.NumberU64()
+	node.log.Debug("[sync]", "myHeight", myHeight, "newHeight", newHeight)
 	if newHeight-myHeight <= 2 {
 		return false
 	}
@@ -301,31 +302,40 @@ func (node *Node) IsOutOfSync(consensusBlock *types.Block) bool {
 // DoSyncing wait for check status and starts syncing if out of sync
 func (node *Node) DoSyncing() {
 	for {
-		consensusBlock := <-node.Consensus.ConsensusBlock
-		if !node.IsOutOfSync(consensusBlock) {
-			if node.State == NodeNotSync {
-				node.log.Info("[sync] Node is now INSYNC!")
-				node.stateSync.CloseConnections()
-				node.stateSync = nil
-			}
+		select {
+		// in current implementation logic, timeout means in sync
+		case <-time.After(5 * time.Second):
 			node.stateMutex.Lock()
+			node.log.Info("[sync] Node is now INSYNC!")
 			node.State = NodeReadyForConsensus
 			node.stateMutex.Unlock()
 			continue
-		} else {
-			node.log.Debug("[sync] node is out of sync")
-			node.stateMutex.Lock()
-			node.State = NodeNotSync
-			node.stateMutex.Unlock()
-		}
+		case consensusBlock := <-node.Consensus.ConsensusBlock:
+			if !node.IsOutOfSync(consensusBlock) {
+				if node.State == NodeNotSync {
+					node.log.Info("[sync] Node is now INSYNC!")
+					node.stateSync.CloseConnections()
+					node.stateSync = nil
+				}
+				node.stateMutex.Lock()
+				node.State = NodeReadyForConsensus
+				node.stateMutex.Unlock()
+				continue
+			} else {
+				node.log.Debug("[sync] node is out of sync")
+				node.stateMutex.Lock()
+				node.State = NodeNotSync
+				node.stateMutex.Unlock()
+			}
 
-		if node.stateSync == nil {
-			node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port)
-			node.stateSync.CreateSyncConfig(node.GetSyncingPeers())
-			node.stateSync.MakeConnectionToPeers()
+			if node.stateSync == nil {
+				node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port)
+				node.stateSync.CreateSyncConfig(node.GetSyncingPeers())
+				node.stateSync.MakeConnectionToPeers()
+			}
+			startHash := node.blockchain.CurrentBlock().Hash()
+			node.stateSync.StartStateSync(startHash[:], node.blockchain, node.Worker)
 		}
-		startHash := node.blockchain.CurrentBlock().Hash()
-		node.stateSync.StartStateSync(startHash[:], node.blockchain, node.Worker)
 	}
 }
 
@@ -369,10 +379,15 @@ func (node *Node) GetSyncingPeers() []p2p.Peer {
 		return true
 	})
 
+	removeID := -1
 	for i := range res {
+		if res[i].Port == node.SelfPeer.Port {
+			removeID = i
+		}
 		res[i].Port = GetSyncingPort(res[i].Port)
 	}
-	node.log.Debug("GetSyncingPeers: ", "res", res)
+	res = append(res[:removeID], res[removeID+1:]...)
+	node.log.Debug("GetSyncingPeers: ", "res", res, "self", node.SelfPeer)
 	return res
 }
 
@@ -517,7 +532,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 		}
 	case downloader_pb.DownloaderRequest_NEWBLOCK:
 		if node.State != NodeNotSync {
-			node.log.Debug("[sync] state not in NodeNotSync", "state", node.State.String())
+			node.log.Debug("[sync] new block received, but state is", "state", node.State.String())
 			response.Type = downloader_pb.DownloaderResponse_INSYNC
 			return response, nil
 		}
@@ -564,6 +579,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 	return response, nil
 }
 
+// SendNewBlockToUnsync send latest verified block to unsync, registered nodes
 func (node *Node) SendNewBlockToUnsync() {
 	for {
 		block := <-node.Consensus.VerifiedNewBlock
@@ -592,7 +608,6 @@ func (node *Node) SendNewBlockToUnsync() {
 				continue
 			}
 			response := config.client.PushNewBlock(peerHash, blockHash, false)
-			node.log.Debug("[sync] SendNewBlockToUnSync from", "peerHash", peerHash)
 			if response.Type == downloader_pb.DownloaderResponse_INSYNC {
 				node.stateMutex.Lock()
 				node.peerRegistrationRecord[peerID].client.Close()

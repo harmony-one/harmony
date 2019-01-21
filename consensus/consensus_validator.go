@@ -303,10 +303,12 @@ func (consensus *Consensus) processCollectiveSigMessage(message consensus_proto.
 	}
 
 	// check consensus Id
-	//if consensusID != consensus.consensusID {
-	//consensus.Log.Warn("Received message with wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
-	//return
-	//}
+	if consensusID != consensus.consensusID {
+		// hack for new node state syncing
+		consensus.consensusID = consensusID
+		//consensus.Log.Warn("Received message with wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
+		return
+	}
 
 	// check block hash
 	if !bytes.Equal(blockHash[:], consensus.blockHash[:]) {

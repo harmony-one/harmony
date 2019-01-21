@@ -316,13 +316,20 @@ func (m *Mask) SetBit(i int, enable bool) error {
 	return nil
 }
 
-func (m *Mask) GetPubKeyFromMask() []kyber.Point {
+// GetPubKeyFromMask will return pubkeys which masked either zero or one depending on the flag
+func (m *Mask) GetPubKeyFromMask(flag bool) []kyber.Point {
 	pubKeys := []kyber.Point{}
 	for i := range m.publics {
 		byt := i >> 3
 		msk := byte(1) << uint(i&7)
-		if (m.mask[byt] & msk) != 0 {
-			pubKeys = append(pubKeys, m.publics[i])
+		if flag == true {
+			if (m.mask[byt] & msk) != 0 {
+				pubKeys = append(pubKeys, m.publics[i])
+			}
+		} else {
+			if (m.mask[byt] & msk) == 0 {
+				pubKeys = append(pubKeys, m.publics[i])
+			}
 		}
 	}
 	return pubKeys
