@@ -12,7 +12,9 @@ assignees: ''
 
 ## Current Design
 
-<!-- Describe how the current version of relevant code works. -->
+<!-- Describe how the current version of relevant code works.
+     Refer to specific files/lines or specific packages/methods where
+     applicable. -->
 
 ## Problems
 
