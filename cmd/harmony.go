@@ -15,10 +15,10 @@ import (
 	"github.com/harmony-one/harmony/internal/attack"
 	pkg_newnode "github.com/harmony-one/harmony/internal/newnode"
 	"github.com/harmony-one/harmony/internal/profiler"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
-
 	peerstore "github.com/libp2p/go-libp2p-peerstore"
 	multiaddr "github.com/multiformats/go-multiaddr"
 )
@@ -82,7 +82,7 @@ func main() {
 	port := flag.String("port", "9000", "port of the node.")
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	attackedMode := flag.Int("attacked_mode", 0, "0 means not attacked, 1 means attacked, 2 means being open to be selected as attacked")
-	dbSupported := flag.Bool("db_supported", false, "false means not db_supported, true means db_supported")
+	dbSupported := flag.Bool("db_supported", true, "false means not db_supported, true means db_supported")
 	profile := flag.Bool("profile", false, "Turn on profiling (CPU, Memory).")
 	metricsReportURL := flag.String("metrics_report_url", "", "If set, reports metrics to this URL.")
 	versionFlag := flag.Bool("version", false, "Output version info")
@@ -101,6 +101,9 @@ func main() {
 	if *versionFlag {
 		printVersion(os.Args[0])
 	}
+
+	// Logging setup
+	utils.SetPortAndIP(*port, *ip)
 
 	// Add GOMAXPROCS to achieve max performance.
 	runtime.GOMAXPROCS(1024)
