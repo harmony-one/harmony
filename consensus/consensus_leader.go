@@ -383,16 +383,8 @@ func (consensus *Consensus) processResponseMessage(message consensus_proto.Messa
 				select {
 				case consensus.VerifiedNewBlock <- &blockObj:
 				default:
-					consensus.Log.Info("[sync] consensus verified block send to chan failed", "blockHash", blockObj.Hash())
+					consensus.Log.Info("[SYNC] consensus verified block send to chan failed", "blockHash", blockObj.Hash())
 				}
-
-				consensus.Log.Info("[sync] one bit bitmap", "pubkey", consensus.bitmap.GetPubKeyFromMask(true), "height", blockObj.NumberU64())
-				consensus.Log.Info("------------------------------------")
-				consensus.Log.Info("[sync] zero bit bitmap", "pubkey", consensus.bitmap.GetPubKeyFromMask(false), "height", blockObj.NumberU64())
-				consensus.Log.Info("------------------------------------")
-				consensus.Log.Info("[sync] one bit finalBitmap", "pubkey", consensus.finalBitmap.GetPubKeyFromMask(true), "height", blockObj.NumberU64())
-				consensus.Log.Info("------------------------------------")
-				consensus.Log.Info("[sync] zero bit finalBitmap", "pubkey", consensus.finalBitmap.GetPubKeyFromMask(false), "height", blockObj.NumberU64())
 
 				consensus.reportMetrics(blockObj)
 

@@ -170,7 +170,7 @@ func main() {
 	// wait for 1 seconds for client to send ping message to leader
 	time.Sleep(time.Second)
 	clientNode.StopPing <- struct{}{}
-	clientNode.State = node.NodeJoinedShard
+	clientNode.State = node.NodeReadyForConsensus
 
 	// Transaction generation process
 	time.Sleep(2 * time.Second) // wait for nodes to be ready

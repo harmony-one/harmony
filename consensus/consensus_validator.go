@@ -80,6 +80,8 @@ func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Messa
 	consensus.mutex.Lock()
 	consensus.blocksReceived[consensusID] = &BlockConsensusStatus{block, consensus.state}
 	consensus.mutex.Unlock()
+
+	// Add attack model of IncorrectResponse
 	if attack.GetInstance().IncorrectResponse() {
 		consensus.Log.Warn("IncorrectResponse attacked")
 		return
@@ -245,7 +247,7 @@ func (consensus *Consensus) processChallengeMessage(message consensus_proto.Mess
 				select {
 				case consensus.VerifiedNewBlock <- &blockObj:
 				default:
-					consensus.Log.Info("[sync] consensus verified block send to chan failed", "blockHash", blockObj.Hash())
+					consensus.Log.Info("[SYNC] consensus verified block send to chan failed", "blockHash", blockObj.Hash())
 					continue
 				}
 
@@ -305,8 +307,8 @@ func (consensus *Consensus) processCollectiveSigMessage(message consensus_proto.
 	// check consensus Id
 	if consensusID != consensus.consensusID {
 		// hack for new node state syncing
+		consensus.Log.Warn("Received message with wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
 		consensus.consensusID = consensusID
-		//consensus.Log.Warn("Received message with wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
 		return
 	}
 

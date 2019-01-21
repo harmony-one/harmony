@@ -45,7 +45,7 @@ type State byte
 const (
 	NodeInit              State = iota // Node just started, before contacting BeaconChain
 	NodeWaitToJoin                     // Node contacted BeaconChain, wait to join Shard
-	NodeNotSync                        // Node out of sync, might be just joined Shard or offline for a period of time
+	NodeNotInSync                      // Node out of sync, might be just joined Shard or offline for a period of time
 	NodeOffline                        // Node is offline
 	NodeReadyForConsensus              // Node is ready for doing consensus
 	NodeDoingConsensus                 // Node is already doing consensus
@@ -58,8 +58,8 @@ func (state State) String() string {
 		return "NodeInit"
 	case NodeWaitToJoin:
 		return "NodeWaitToJoin"
-	case NodeNotSync:
-		return "NodeNotSync"
+	case NodeNotInSync:
+		return "NodeNotInSync"
 	case NodeOffline:
 		return "NodeOffline"
 	case NodeReadyForConsensus:
@@ -74,8 +74,8 @@ func (state State) String() string {
 
 // Constants related to doing syncing.
 const (
-	NotDoingSyncing uint32 = iota
-	DoingSyncing
+	lastMileThreshold = 4
+	inSyncThreshold   = 2
 )
 
 const (
@@ -130,7 +130,6 @@ type Node struct {
 	// Syncing component.
 	downloaderServer       *downloader.Server
 	stateSync              *syncing.StateSync
-	syncingState           uint32
 	peerRegistrationRecord map[uint32]*syncConfig // record registration time (unixtime) of peers begin in syncing
 
 	// The p2p host used to send/receive p2p messages
@@ -272,7 +271,6 @@ func New(host host.Host, consensus *bft.Consensus, db *ethdb.LDBDatabase) *Node 
 	}
 
 	// Setup initial state of syncing.
-	node.syncingState = NotDoingSyncing
 	node.StopPing = make(chan struct{})
 	node.Consensus.ConsensusBlock = make(chan *types.Block)
 	node.Consensus.VerifiedNewBlock = make(chan *types.Block)
@@ -288,12 +286,12 @@ func New(host host.Host, consensus *bft.Consensus, db *ethdb.LDBDatabase) *Node 
 func (node *Node) IsOutOfSync(consensusBlock *types.Block) bool {
 	myHeight := node.blockchain.CurrentBlock().NumberU64()
 	newHeight := consensusBlock.NumberU64()
-	node.log.Debug("[sync]", "myHeight", myHeight, "newHeight", newHeight)
-	if newHeight-myHeight <= 2 {
+	node.log.Debug("[SYNC]", "myHeight", myHeight, "newHeight", newHeight)
+	if newHeight-myHeight <= inSyncThreshold {
 		return false
 	}
 	// cache latest blocks for last mile catch up
-	if newHeight-myHeight <= 4 && node.stateSync != nil {
+	if newHeight-myHeight <= lastMileThreshold && node.stateSync != nil {
 		node.stateSync.AddLastMileBlock(consensusBlock)
 	}
 	return true
@@ -306,14 +304,14 @@ func (node *Node) DoSyncing() {
 		// in current implementation logic, timeout means in sync
 		case <-time.After(5 * time.Second):
 			node.stateMutex.Lock()
-			node.log.Info("[sync] Node is now INSYNC!")
+			node.log.Info("[SYNC] Node is now IN SYNC!")
 			node.State = NodeReadyForConsensus
 			node.stateMutex.Unlock()
 			continue
 		case consensusBlock := <-node.Consensus.ConsensusBlock:
 			if !node.IsOutOfSync(consensusBlock) {
-				if node.State == NodeNotSync {
-					node.log.Info("[sync] Node is now INSYNC!")
+				if node.State == NodeNotInSync {
+					node.log.Info("[SYNC] Node is now IN SYNC!")
 					node.stateSync.CloseConnections()
 					node.stateSync = nil
 				}
@@ -322,9 +320,9 @@ func (node *Node) DoSyncing() {
 				node.stateMutex.Unlock()
 				continue
 			} else {
-				node.log.Debug("[sync] node is out of sync")
+				node.log.Debug("[SYNC] node is out of sync")
 				node.stateMutex.Lock()
-				node.State = NodeNotSync
+				node.State = NodeNotInSync
 				node.stateMutex.Unlock()
 			}
 
@@ -505,7 +503,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 	response := &downloader_pb.DownloaderResponse{}
 	switch request.Type {
 	case downloader_pb.DownloaderRequest_HEADER:
-		node.log.Debug("[sync] CalculateResponse DownloaderRequest_HEADER", "request.BlockHash", request.BlockHash)
+		node.log.Debug("[SYNC] CalculateResponse DownloaderRequest_HEADER", "request.BlockHash", request.BlockHash)
 		var startHeaderHash []byte
 		if request.BlockHash == nil {
 			tmp := node.blockchain.Genesis().Hash()
@@ -531,15 +529,15 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 			}
 		}
 	case downloader_pb.DownloaderRequest_NEWBLOCK:
-		if node.State != NodeNotSync {
-			node.log.Debug("[sync] new block received, but state is", "state", node.State.String())
+		if node.State != NodeNotInSync {
+			node.log.Debug("[SYNC] new block received, but state is", "state", node.State.String())
 			response.Type = downloader_pb.DownloaderResponse_INSYNC
 			return response, nil
 		}
 		var blockObj types.Block
 		err := rlp.DecodeBytes(request.BlockHash, &blockObj)
 		if err != nil {
-			node.log.Warn("[sync] unable to decode received new block")
+			node.log.Warn("[SYNC] unable to decode received new block")
 			return response, err
 		}
 		node.stateSync.AddNewBlock(request.PeerHash, &blockObj)
@@ -555,25 +553,25 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 		} else {
 			peer, ok := node.Consensus.GetPeerFromID(peerID)
 			if !ok {
-				node.log.Warn("[sync] unable to get peer from peerID", "peerID", peerID)
+				node.log.Warn("[SYNC] unable to get peer from peerID", "peerID", peerID)
 			}
 			client := downloader.ClientSetup(peer.IP, GetSyncingPort(peer.Port))
 			if client == nil {
-				node.log.Warn("[sync] unable to setup client")
+				node.log.Warn("[SYNC] unable to setup client")
 				return response, nil
 			}
-			node.log.Debug("[sync] client setup correctly", "client", client)
+			node.log.Debug("[SYNC] client setup correctly", "client", client)
 			config := &syncConfig{timestamp: time.Now().UnixNano(), client: client}
 			node.stateMutex.Lock()
 			node.peerRegistrationRecord[peerID] = config
 			node.stateMutex.Unlock()
-			node.log.Debug("[sync] register peerID success", "peerID", peerID)
+			node.log.Debug("[SYNC] register peerID success", "peerID", peerID)
 			response.Type = downloader_pb.DownloaderResponse_SUCCESS
 		}
 	case downloader_pb.DownloaderRequest_REGISTERTIMEOUT:
-		if node.State == NodeNotSync {
+		if node.State == NodeNotInSync {
 			count := node.stateSync.RegisterNodeInfo()
-			node.log.Debug("[sync] extra node registered", "number", count)
+			node.log.Debug("[SYNC] extra node registered", "number", count)
 		}
 	}
 	return response, nil
@@ -585,29 +583,27 @@ func (node *Node) SendNewBlockToUnsync() {
 		block := <-node.Consensus.VerifiedNewBlock
 		blockHash, err := rlp.EncodeToBytes(block)
 		if err != nil {
-			node.log.Warn("[sync] unable to encode block to hashes")
+			node.log.Warn("[SYNC] unable to encode block to hashes")
 			continue
 		}
 
 		// really need to have a unique id independent of ip/port
 		selfPeerID := utils.GetUniqueIDFromIPPort(node.SelfPeer.IP, node.SelfPeer.Port)
-		peerHash := make([]byte, 4)
-		binary.BigEndian.PutUint32(peerHash, selfPeerID)
-		node.log.Debug("[sync] peerRegistration Record", "peerHash", peerHash, "number", len(node.peerRegistrationRecord))
+		node.log.Debug("[SYNC] peerRegistration Record", "peerID", selfPeerID, "number", len(node.peerRegistrationRecord))
 
 		for peerID, config := range node.peerRegistrationRecord {
 			elapseTime := time.Now().UnixNano() - config.timestamp
 			if elapseTime > broadcastTimeout {
-				node.log.Warn("[sync] SendNewBlockToUnsync to peer timeout", "peerID", peerID)
+				node.log.Warn("[SYNC] SendNewBlockToUnsync to peer timeout", "peerID", peerID)
 				// send last time and delete
-				config.client.PushNewBlock(peerHash, blockHash, true)
+				config.client.PushNewBlock(selfPeerID, blockHash, true)
 				node.stateMutex.Lock()
 				node.peerRegistrationRecord[peerID].client.Close()
 				delete(node.peerRegistrationRecord, peerID)
 				node.stateMutex.Unlock()
 				continue
 			}
-			response := config.client.PushNewBlock(peerHash, blockHash, false)
+			response := config.client.PushNewBlock(selfPeerID, blockHash, false)
 			if response.Type == downloader_pb.DownloaderResponse_INSYNC {
 				node.stateMutex.Lock()
 				node.peerRegistrationRecord[peerID].client.Close()

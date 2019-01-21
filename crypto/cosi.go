@@ -317,6 +317,7 @@ func (m *Mask) SetBit(i int, enable bool) error {
 }
 
 // GetPubKeyFromMask will return pubkeys which masked either zero or one depending on the flag
+// it is used to show which signers are signed or not in the cosign message
 func (m *Mask) GetPubKeyFromMask(flag bool) []kyber.Point {
 	pubKeys := []kyber.Point{}
 	for i := range m.publics {

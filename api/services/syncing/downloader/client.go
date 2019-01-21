@@ -2,12 +2,14 @@ package downloader
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"log"
 	"time"
 
-	pb "github.com/harmony-one/harmony/api/services/syncing/downloader/proto"
 	"google.golang.org/grpc"
+
+	pb "github.com/harmony-one/harmony/api/services/syncing/downloader/proto"
 )
 
 // Client is the client model for downloader package.
@@ -44,11 +46,10 @@ func (client *Client) Close() {
 func (client *Client) GetBlockHashes(startHash []byte) *pb.DownloaderResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_HEADER}
-	request.BlockHash = startHash
+	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_HEADER, BlockHash: startHash}
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
-		log.Printf("[sync] downloader/client.go:GetBlockHashes query failed with error %v", err)
+		log.Printf("[SYNC] GetBlockHashes query failed with error %v", err)
 	}
 	return response
 }
@@ -65,7 +66,7 @@ func (client *Client) GetBlocks(hashes [][]byte) *pb.DownloaderResponse {
 	}
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
-		log.Printf("[sync] downloader/client.go:GetBlocks query failed with error %v", err)
+		log.Printf("[SYNC] downloader/client.go:GetBlocks query failed with error %v", err)
 	}
 	return response
 }
@@ -80,15 +81,18 @@ func (client *Client) Register(hash []byte) *pb.DownloaderResponse {
 	copy(request.PeerHash, hash)
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
-		log.Printf("[sync] client.go:Register failed with code %v", err)
+		log.Printf("[SYNC] client.go:Register failed with code %v", err)
 	}
 	return response
 }
 
 // PushNewBlock will send the lastest verified blow to registered nodes
-func (client *Client) PushNewBlock(peerHash []byte, blockHash []byte, timeout bool) *pb.DownloaderResponse {
+func (client *Client) PushNewBlock(peerID uint32, blockHash []byte, timeout bool) *pb.DownloaderResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
+	peerHash := make([]byte, 4)
+	binary.BigEndian.PutUint32(peerHash, peerID)
 	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_NEWBLOCK}
 	request.BlockHash = make([]byte, len(blockHash))
 	copy(request.BlockHash, blockHash)
@@ -101,7 +105,7 @@ func (client *Client) PushNewBlock(peerHash []byte, blockHash []byte, timeout bo
 
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
-		log.Printf("[sync] unable to send new block to unsync node with error: %v", err)
+		log.Printf("[SYNC] unable to send new block to unsync node with error: %v", err)
 	}
 	return response
 }

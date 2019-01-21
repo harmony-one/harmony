@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"os"
 	"reflect"
 	"sort"
 	"strconv"
@@ -106,7 +105,7 @@ func GetServicePort(nodePort string) string {
 	if port, err := strconv.Atoi(nodePort); err == nil {
 		return fmt.Sprintf("%d", port+SyncingPortDifference)
 	}
-	os.Exit(1)
+	Log.Warn("unable to get service port")
 	return ""
 }
 
@@ -122,7 +121,7 @@ func (ss *StateSync) AddNewBlock(peerHash []byte, block *types.Block) {
 		pc.mux.Lock()
 		pc.newBlocks = append(pc.newBlocks, block)
 		pc.mux.Unlock()
-		Log.Debug("[sync] new block [pre]added", "total", len(ss.syncConfig.peers[i].newBlocks), "blockHeight", block.NumberU64())
+		Log.Debug("[SYNC] new block received", "total", len(ss.syncConfig.peers[i].newBlocks), "blockHeight", block.NumberU64())
 	}
 }
 
@@ -175,9 +174,9 @@ func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer) {
 			ip:   peers[id].IP,
 			port: peers[id].Port,
 		}
-		Log.Debug("[sync] CreateSyncConfig: peer port to connect", "port", peers[id].Port)
+		Log.Debug("[SYNC] CreateSyncConfig: peer port to connect", "port", peers[id].Port)
 	}
-	Log.Info("[sync] syncing: Finished creating SyncConfig.")
+	Log.Info("[SYNC] syncing: Finished creating SyncConfig.")
 }
 
 // MakeConnectionToPeers makes grpc connection to all peers.
@@ -330,7 +329,7 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 			for !stateSyncTaskQueue.Empty() {
 				task, err := ss.stateSyncTaskQueue.Poll(1, time.Millisecond)
 				if err == queue.ErrTimeout {
-					Log.Debug("[sync] ss.stateSyncTaskQueue poll timeout", "error", err)
+					Log.Debug("[SYNC] ss.stateSyncTaskQueue poll timeout", "error", err)
 					break
 				}
 				syncTask := task[0].(SyncBlockTask)
@@ -338,7 +337,7 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 				payload, err := peerConfig.GetBlocks([][]byte{syncTask.blockHash})
 				if err != nil {
 					count++
-					Log.Debug("[sync] GetBlocks failed", "failNumber", count)
+					Log.Debug("[SYNC] GetBlocks failed", "failNumber", count)
 					if count > TimesToFail {
 						break
 					}
@@ -351,7 +350,7 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 				err = rlp.DecodeBytes(payload[0], &blockObj)
 				if err != nil {
 					count++
-					Log.Debug("[sync] downloadBlocks: failed to DecodeBytes from received new block")
+					Log.Debug("[SYNC] downloadBlocks: failed to DecodeBytes from received new block")
 					if count > TimesToFail {
 						break
 					}
@@ -365,7 +364,7 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 		}(ss.syncConfig.peers[i], ss.stateSyncTaskQueue, bc)
 	}
 	wg.Wait()
-	Log.Info("[sync] Finished downloadBlocks.")
+	Log.Info("[SYNC] Finished downloadBlocks.")
 }
 
 // CompareBlockByHash compares two block by hash, it will be used in sort the blocks
@@ -419,7 +418,7 @@ func (ss *StateSync) getMaxConsensusBlockFromParentHash(parentHash common.Hash) 
 		return CompareBlockByHash(candidateBlocks[i], candidateBlocks[j]) == -1
 	})
 	maxFirstID, maxCount := GetHowManyMaxConsensus(candidateBlocks)
-	Log.Debug("[sync] Find block with matching parenthash", "parentHash", parentHash, "hash", candidateBlocks[maxFirstID].Hash(), "maxCount", maxCount)
+	Log.Debug("[SYNC] Find block with matching parenthash", "parentHash", parentHash, "hash", candidateBlocks[maxFirstID].Hash(), "maxCount", maxCount)
 	return candidateBlocks[maxFirstID]
 }
 
@@ -444,13 +443,13 @@ func (ss *StateSync) getBlockFromLastMileBlocksByParentHash(parentHash common.Ha
 }
 
 func (ss *StateSync) updateBlockAndStatus(block *types.Block, bc *core.BlockChain, worker *worker.Worker) bool {
-	Log.Info("[sync] Current Block", "blockHex", bc.CurrentBlock().Hash().Hex())
+	Log.Info("[SYNC] Current Block", "blockHex", bc.CurrentBlock().Hash().Hex())
 	_, err := bc.InsertChain([]*types.Block{block})
 	if err != nil {
 		Log.Debug("Error adding new block to blockchain", "Error", err)
 		return false
 	}
-	Log.Info("[sync] new block [POST]added to blockchain", "blockHeight", bc.CurrentBlock().NumberU64(), "blockHex", bc.CurrentBlock().Hash().Hex(), "parentHex", bc.CurrentBlock().ParentHash().Hex())
+	Log.Info("[SYNC] new block added to blockchain", "blockHeight", bc.CurrentBlock().NumberU64(), "blockHex", bc.CurrentBlock().Hash().Hex(), "parentHex", bc.CurrentBlock().ParentHash().Hex())
 	ss.syncMux.Lock()
 	worker.UpdateCurrent()
 	ss.syncMux.Unlock()
@@ -515,10 +514,10 @@ func (ss *StateSync) StartStateSync(startHash []byte, bc *core.BlockChain, worke
 	ss.RegisterNodeInfo()
 	// Gets consensus hashes.
 	if !ss.GetConsensusHashes(startHash) {
-		Log.Debug("[sync] StartStateSync unable to reach consensus on ss.GetConsensusHashes")
+		Log.Debug("[SYNC] StartStateSync unable to reach consensus on ss.GetConsensusHashes")
 		return
 	}
-	Log.Debug("[sync] StartStateSync reach consensus on ss.GetConsensusHashes")
+	Log.Debug("[SYNC] StartStateSync reach consensus on ss.GetConsensusHashes")
 	ss.generateStateSyncTaskQueue(bc)
 	// Download blocks.
 	if ss.stateSyncTaskQueue.Len() > 0 {
@@ -542,7 +541,7 @@ func (peerConfig *SyncPeerConfig) registerToBroadcast(peerHash []byte) error {
 func (ss *StateSync) RegisterNodeInfo() int {
 	ss.CleanUpNilPeers()
 	registrationNumber := RegistrationNumber
-	Log.Debug("[sync]", "registrationNumber", registrationNumber, "activePeerNumber", ss.activePeerNumber)
+	Log.Debug("[SYNC] node registration to peers", "registrationNumber", registrationNumber, "activePeerNumber", ss.activePeerNumber)
 	peerID := utils.GetUniqueIDFromIPPort(ss.selfip, ss.selfport)
 	peerHash := make([]byte, 4)
 	binary.BigEndian.PutUint32(peerHash[:], peerID)
@@ -558,10 +557,10 @@ func (ss *StateSync) RegisterNodeInfo() int {
 		}
 		err := peerConfig.registerToBroadcast(peerHash)
 		if err != nil {
-			Log.Debug("[sync] register failed to peer", "ip", peerConfig.ip, "port", peerConfig.port, "peerHash", peerHash)
+			Log.Debug("[SYNC] register failed to peer", "ip", peerConfig.ip, "port", peerConfig.port, "peerHash", peerHash)
 			continue
 		}
-		Log.Debug("[sync] register success", "ip", peerConfig.ip, "port", peerConfig.port)
+		Log.Debug("[SYNC] register success", "ip", peerConfig.ip, "port", peerConfig.port)
 		count++
 	}
 	return count
