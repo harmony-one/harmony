@@ -34,7 +34,6 @@ import (
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/p2p/host"
 )
 
 // State is a state of a node.
@@ -124,7 +123,7 @@ type Node struct {
 	syncingState     uint32
 
 	// The p2p host used to send/receive p2p messages
-	host host.Host
+	host p2p.Host
 
 	// Channel to stop sending ping message
 	StopPing chan struct{}
@@ -209,7 +208,7 @@ func DeserializeNode(d []byte) *NetworkNode {
 }
 
 // New creates a new node.
-func New(host host.Host, consensus *bft.Consensus, db *ethdb.LDBDatabase) *Node {
+func New(host p2p.Host, consensus *bft.Consensus, db *ethdb.LDBDatabase) *Node {
 	node := Node{}
 
 	if host != nil {

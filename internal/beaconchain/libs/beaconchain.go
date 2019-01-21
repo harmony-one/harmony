@@ -46,7 +46,7 @@ type BeaconChain struct {
 	log            log.Logger
 	ShardLeaderMap map[int]*node.Info
 	PubKey         kyber.Point
-	host           host.Host
+	host           p2p.Host
 	state          BCState
 	rpcServer      *beaconchain.Server
 	Peer           p2p.Peer

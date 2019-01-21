@@ -13,14 +13,14 @@ import (
 
 // SendMessage is to connect a socket given a port and send the given message.
 // TODO(minhdoan, rj): need to check if a peer is reachable or not.
-func SendMessage(host Host, p p2p.Peer, message []byte, lostPeer chan p2p.Peer) {
+func SendMessage(host p2p.Host, p p2p.Peer, message []byte, lostPeer chan p2p.Peer) {
 	// Construct normal p2p message
 	content := ConstructP2pMessage(byte(0), message)
 	go send(host, p, content, lostPeer)
 }
 
 // BroadcastMessage sends the message to a list of peers
-func BroadcastMessage(h Host, peers []p2p.Peer, msg []byte, lostPeer chan p2p.Peer) {
+func BroadcastMessage(h p2p.Host, peers []p2p.Peer, msg []byte, lostPeer chan p2p.Peer) {
 	if len(peers) == 0 {
 		return
 	}
@@ -44,7 +44,7 @@ func BroadcastMessage(h Host, peers []p2p.Peer, msg []byte, lostPeer chan p2p.Pe
 }
 
 // BroadcastMessageFromLeader sends the message to a list of peers from a leader.
-func BroadcastMessageFromLeader(h Host, peers []p2p.Peer, msg []byte, lostPeer chan p2p.Peer) {
+func BroadcastMessageFromLeader(h p2p.Host, peers []p2p.Peer, msg []byte, lostPeer chan p2p.Peer) {
 	// TODO(minhdoan): Enable back for multicast.
 	peers = SelectMyPeers(peers, 1, MaxBroadCast)
 	BroadcastMessage(h, peers, msg, lostPeer)
@@ -66,7 +66,7 @@ func ConstructP2pMessage(msgType byte, content []byte) []byte {
 }
 
 // BroadcastMessageFromValidator sends the message to a list of peers from a validator.
-func BroadcastMessageFromValidator(h Host, selfPeer p2p.Peer, peers []p2p.Peer, msg []byte) {
+func BroadcastMessageFromValidator(h p2p.Host, selfPeer p2p.Peer, peers []p2p.Peer, msg []byte) {
 	peers = SelectMyPeers(peers, selfPeer.ValidatorID*MaxBroadCast+1, (selfPeer.ValidatorID+1)*MaxBroadCast)
 	BroadcastMessage(h, peers, msg, nil)
 }
@@ -87,7 +87,7 @@ func SelectMyPeers(peers []p2p.Peer, min int, max int) []p2p.Peer {
 }
 
 // Send a message to another node with given port.
-func send(h Host, peer p2p.Peer, message []byte, lostPeer chan p2p.Peer) {
+func send(h p2p.Host, peer p2p.Peer, message []byte, lostPeer chan p2p.Peer) {
 	// Add attack code here.
 	//attack.GetInstance().Run()
 	backoff := p2p.NewExpBackoff(150*time.Millisecond, 5*time.Second, 2)

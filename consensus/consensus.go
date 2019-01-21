@@ -102,7 +102,7 @@ type Consensus struct {
 	uniqueIDInstance *utils.UniqueValidatorID
 
 	// The p2p host used to send/receive p2p messages
-	host host.Host
+	host p2p.Host
 
 	// Signal channel for lost validators
 	OfflinePeers chan p2p.Peer
@@ -123,7 +123,7 @@ type BlockConsensusStatus struct {
 }
 
 // New creates a new Consensus object
-func New(host host.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Consensus {
+func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Consensus {
 	consensus := Consensus{}
 	consensus.host = host
 
