@@ -5,6 +5,9 @@
 * In general, we follow [effective_go](https://golang.org/doc/effective_go.html)
 * Code must adhere to the official [Go formatting guidelines](https://golang.org/doc/effective_go.html#formatting) (i.e. uses [gofmt](https://golang.org/cmd/gofmt/)).
 * Code must be documented adhering to the official Go [commentary](https://golang.org/doc/effective_go.html#commentary) guidelines.
+* Exclude generated source files from the repository, and instead use [`go
+  generate`](https://blog.golang.org/generate) to re-generate them.  See
+  examples in files returned by the `git grep '//go:generate'` command.
 
 ## Pull Request (PR)
 
