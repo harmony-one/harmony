@@ -1,12 +1,13 @@
 package node
 
 import (
+	"testing"
+
 	"github.com/golang/mock/gomock"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
-	"testing"
 )
 
 func TestNodeStreamHandler(t *testing.T) {
@@ -15,7 +16,7 @@ func TestNodeStreamHandler(t *testing.T) {
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "8885"}
 	host, _ := p2pimpl.NewHost(&leader)
 	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader)
-	node := New(host, consensus, nil)
+	node := TransitionToFullNode(host, consensus, nil)
 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -35,7 +36,7 @@ func TestAddNewBlock(t *testing.T) {
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "9885"}
 	host, _ := p2pimpl.NewHost(&leader)
 	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader)
-	node := New(host, consensus, nil)
+	node := TransitionToFullNode(host, consensus, nil)
 
 	selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
 	node.Worker.CommitTransactions(selectedTxs)
@@ -54,7 +55,7 @@ func TestVerifyNewBlock(t *testing.T) {
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "8885"}
 	host, _ := p2pimpl.NewHost(&leader)
 	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader)
-	node := New(host, consensus, nil)
+	node := TransitionToFullNode(host, consensus, nil)
 
 	selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
 	node.Worker.CommitTransactions(selectedTxs)

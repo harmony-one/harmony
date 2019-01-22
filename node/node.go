@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/gob"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/big"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/dedis/kyber"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -22,6 +24,8 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/api/client"
 	clientService "github.com/harmony-one/harmony/api/client/service"
+	"github.com/harmony-one/harmony/api/proto/bcconn"
+	proto_identity "github.com/harmony-one/harmony/api/proto/identity"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/api/services/explorer"
 	"github.com/harmony-one/harmony/api/services/syncing"
@@ -31,10 +35,13 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	harmony_crypto "github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/crypto/pki"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
+	multiaddr "github.com/multiformats/go-multiaddr"
 )
 
 // State is a state of a node.
@@ -132,10 +139,132 @@ type Node struct {
 	// Signal channel for lost validators
 	OfflinePeers chan p2p.Peer
 
+	//new node joining info
+	ShardID  int
+	leader   p2p.Peer
+	nodeID   uint32
+	SetInfo  chan bool
+	Leaders  map[uint32]p2p.Peer
+	isLeader bool
+
+	// private/public keys of current node
+	priKey kyber.Scalar
+	pubKey kyber.Point
+
 	// For test only
 	TestBankKeys      []*ecdsa.PrivateKey
 	ContractKeys      []*ecdsa.PrivateKey
 	ContractAddresses []common.Address
+}
+
+// GetShardID gives shardid of node
+func (node *Node) GetShardID() string {
+	return strconv.Itoa(node.ShardID)
+}
+
+// GetLeader gives the leader of the node
+func (node *Node) GetLeader() p2p.Peer {
+	return node.leader
+}
+
+// GetClientPeer gives the client of the node
+func (node *Node) GetClientPeer() *p2p.Peer {
+	return nil
+}
+
+// GetSelfPeer gives the peer part of the node's own struct
+func (node *Node) GetSelfPeer() p2p.Peer {
+	return node.SelfPeer
+}
+
+// AddPeer add new peer for newnode
+func (node *Node) AddPeer(p *p2p.Peer) error {
+	return node.host.AddPeer(p)
+}
+
+// makePublicKeys initializes keys for the node
+func (node *Node) makePublicKeys() {
+
+}
+
+// RequestBeaconChain requests beacon chain for identity data
+func (node *Node) requestBeaconChain(BCPeer p2p.Peer) (err error) {
+	node.log.Info("connecting to beacon chain now ...")
+	pubk, err := node.priKey.MarshalBinary()
+	if err != nil {
+		node.log.Error("Could not Marshall public key into binary")
+	}
+	nodeInfo := &proto_node.Info{IP: node.SelfPeer.IP, Port: node.SelfPeer.Port, PubKey: pubk, PeerID: node.host.GetID()}
+	msg := bcconn.SerializeNodeInfo(nodeInfo)
+	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Register, msg)
+	gotShardInfo := false
+	timeout := time.After(2 * time.Minute)
+	tick := time.Tick(3 * time.Second)
+checkLoop:
+	for {
+		select {
+		case <-timeout:
+			gotShardInfo = false
+			break checkLoop
+		case <-tick:
+			select {
+			case setinfo := <-node.SetInfo:
+				if setinfo {
+					gotShardInfo = true
+					break checkLoop
+				}
+			default:
+				host.SendMessage(node.host, BCPeer, msgToSend, nil)
+			}
+		}
+	}
+	if !gotShardInfo {
+		err = errors.New("could not create connection")
+		node.log.Crit("Could not get sharding info after 2 minutes")
+		os.Exit(10)
+	}
+	return
+}
+
+// ProcessShardInfo
+func (node *Node) processShardInfo(msgPayload []byte) bool {
+	leadersInfo := bcconn.DeserializeRandomInfo(msgPayload)
+	leaders := leadersInfo.Leaders
+	shardNum, isLeader := utils.AllocateShard(leadersInfo.NumberOfNodesAdded, leadersInfo.NumberOfShards)
+	for n, v := range leaders {
+		leaderPeer := p2p.Peer{IP: v.IP, Port: v.Port, PeerID: v.PeerID}
+
+		addr := fmt.Sprintf("/ip4/%s/tcp/%s", leaderPeer.IP, leaderPeer.Port)
+		targetAddr, err := multiaddr.NewMultiaddr(addr)
+		if err != nil {
+			log.Error("processShardInfo NewMultiaddr error", "error", err)
+			return false
+		}
+		leaderPeer.Addrs = append(leaderPeer.Addrs, targetAddr)
+
+		leaderPeer.PubKey = harmony_crypto.Ed25519Curve.Point()
+		err = leaderPeer.PubKey.UnmarshalBinary(v.PubKey[:])
+		if err != nil {
+			node.log.Error("Could not unmarshall leaders public key from binary to kyber.point")
+		}
+		node.Leaders[uint32(n)] = leaderPeer
+	}
+
+	node.leader = node.Leaders[uint32(shardNum-1)]
+	node.isLeader = isLeader
+	node.ShardID = shardNum - 1 //0 indexi ng.
+	node.SetInfo <- true
+	node.log.Info("Shard information obtained ..")
+	return true
+}
+
+// ContactBeaconChain starts a newservice in the candidate node
+func (node *Node) ContactBeaconChain(BCPeer p2p.Peer) error {
+	//p2p will handle the propogation of message.
+	//At the moment this is mocked.
+	node.ShardID = 1
+	node.leader = p2p.Peer{IP: "0.0.0.0", Port: "7234"}
+	return nil
 }
 
 // Blockchain returns the blockchain from node
@@ -208,8 +337,18 @@ func DeserializeNode(d []byte) *NetworkNode {
 	return &wn
 }
 
-// New creates a new node.
-func New(host host.Host, consensus *bft.Consensus, db *ethdb.LDBDatabase) *Node {
+//New creates a new node
+func New(IP, port string) {
+	node := Node{}
+	node.SelfPeer = p2p.Peer{IP: IP, Port: port}
+	node.nodeID = utils.GetUniqueIDFromPeer(node.SelfPeer)
+	node.priKey = harmony_crypto.Ed25519Curve.Scalar().SetInt64(int64(node.nodeID))
+	node.pubKey = pki.GetPublicKeyFromScalar(node.priKey)
+	node.SetInfo = make(chan bool)
+}
+
+//TransitionToFullNode transitions a initialized node into a f
+func TransitionToFullNode(host host.Host, consensus *bft.Consensus, db *ethdb.LDBDatabase) *Node {
 	node := Node{}
 
 	if host != nil {

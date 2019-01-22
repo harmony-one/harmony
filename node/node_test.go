@@ -21,7 +21,7 @@ func TestNewNode(t *testing.T) {
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "8885"}
 	host, _ := p2pimpl.NewHost(&leader)
 	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader)
-	node := New(host, consensus, nil)
+	node := TransitionToFullNode(host, consensus, nil)
 	if node.Consensus == nil {
 		t.Error("Consensus is not initialized for the node")
 	}
@@ -42,7 +42,7 @@ func TestGetSyncingPeers(t *testing.T) {
 	host, _ := p2pimpl.NewHost(&leader)
 	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader)
 
-	node := New(host, consensus, nil)
+	node := TransitionToFullNode(host, consensus, nil)
 	peer := p2p.Peer{IP: "127.0.0.1", Port: "8000"}
 	peer2 := p2p.Peer{IP: "127.0.0.1", Port: "8001"}
 	node.Neighbors.Store("minh", peer)
@@ -85,7 +85,7 @@ func TestAddPeers(t *testing.T) {
 	host, _ := p2pimpl.NewHost(&leader)
 	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader)
 
-	node := New(host, consensus, nil)
+	node := TransitionToFullNode(host, consensus, nil)
 	r1 := node.AddPeers(peers1)
 	e1 := 2
 	if r1 != e1 {
@@ -157,7 +157,7 @@ func TestPingPongHandler(test *testing.T) {
 	//   validator := p2p.Peer{IP: "127.0.0.1", Port: "9991"}
 	host, _ := p2pimpl.NewHost(&leader)
 	consensus := consensus.New(host, "0", []p2p.Peer{leader}, leader)
-	node := New(host, consensus, nil)
+	node := TransitionToFullNode(host, consensus, nil)
 	//go sendPingMessage(leader)
 	go sendPongMessage(node, leader)
 	go exitServer()

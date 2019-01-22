@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/internal/attack"
-	pkg_newnode "github.com/harmony-one/harmony/internal/newnode"
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
@@ -134,7 +133,8 @@ func main() {
 	}
 
 	//Use Peer Discovery to get shard/leader/peer/...
-	candidateNode := pkg_newnode.New(*ip, *port)
+
+	candidateNode := node.New{IP: *ip, Port: *port}
 	candidateNode.AddPeer(BCPeer)
 	candidateNode.ContactBeaconChain(*BCPeer)
 
@@ -142,7 +142,6 @@ func main() {
 	leader = candidateNode.GetLeader()
 	selfPeer = candidateNode.GetSelfPeer()
 	clientPeer = candidateNode.GetClientPeer()
-	selfPeer.PubKey = candidateNode.PubK
 
 	// fmt.Println(peers, leader, selfPeer, clientPeer, *logFolder, *minPeers) //TODO: to be replaced by a logger later: ak, rl
 
@@ -190,7 +189,10 @@ func main() {
 	// Set logger to attack model.
 	attack.GetInstance().SetLogger(consensus.Log)
 	// Current node.
-	currentNode := node.New(host, consensus, ldb)
+
+	//Transitition to full node
+
+	currentNode := candidateNode.TransitionToFullNode(host, consensus, ldb)
 	currentNode.Consensus.OfflinePeers = currentNode.OfflinePeers
 
 	// If there is a client configured in the node list.
