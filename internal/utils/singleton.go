@@ -9,6 +9,18 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
+// Global Port and IP for logging.
+var (
+	Port string
+	IP   string
+)
+
+// SetPortAndIP used to print out loggings of node with Port and IP.
+func SetPortAndIP(port, ip string) {
+	Port = port
+	IP = ip
+}
+
 // UniqueValidatorID defines the structure of unique validator ID
 type UniqueValidatorID struct {
 	uniqueID uint32
@@ -37,7 +49,7 @@ func (s *UniqueValidatorID) GetUniqueID() uint32 {
 // GetLogInstance returns logging singleton.
 func GetLogInstance() log.Logger {
 	onceForLog.Do(func() {
-		logInstance = log.New()
+		logInstance = log.New("port", Port, "ip", IP)
 	})
 	return logInstance
 }

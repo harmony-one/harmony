@@ -316,6 +316,26 @@ func (m *Mask) SetBit(i int, enable bool) error {
 	return nil
 }
 
+// GetPubKeyFromMask will return pubkeys which masked either zero or one depending on the flag
+// it is used to show which signers are signed or not in the cosign message
+func (m *Mask) GetPubKeyFromMask(flag bool) []kyber.Point {
+	pubKeys := []kyber.Point{}
+	for i := range m.publics {
+		byt := i >> 3
+		msk := byte(1) << uint(i&7)
+		if flag == true {
+			if (m.mask[byt] & msk) != 0 {
+				pubKeys = append(pubKeys, m.publics[i])
+			}
+		} else {
+			if (m.mask[byt] & msk) == 0 {
+				pubKeys = append(pubKeys, m.publics[i])
+			}
+		}
+	}
+	return pubKeys
+}
+
 // IndexEnabled checks whether the given index is enabled in the mask or not.
 func (m *Mask) IndexEnabled(i int) (bool, error) {
 	if i >= len(m.publics) {

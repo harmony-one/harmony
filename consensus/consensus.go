@@ -97,12 +97,17 @@ type Consensus struct {
 	// Called when consensus on a new block is done
 	OnConsensusDone func(*types.Block)
 
+	// current consensus block to check if out of sync
+	ConsensusBlock chan *types.Block
+	// verified block to state sync broadcast
+	VerifiedNewBlock chan *types.Block
+
 	Log log.Logger
 
 	uniqueIDInstance *utils.UniqueValidatorID
 
 	// The p2p host used to send/receive p2p messages
-	host host.Host
+	host p2p.Host
 
 	// Signal channel for lost validators
 	OfflinePeers chan p2p.Peer
@@ -123,7 +128,7 @@ type BlockConsensusStatus struct {
 }
 
 // New creates a new Consensus object
-func New(host host.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Consensus {
+func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Consensus {
 	consensus := Consensus{}
 	consensus.host = host
 
@@ -280,6 +285,7 @@ func (consensus *Consensus) AddPeers(peers []*p2p.Peer) int {
 			consensus.pubKeyLock.Lock()
 			consensus.PublicKeys = append(consensus.PublicKeys, peer.PubKey)
 			consensus.pubKeyLock.Unlock()
+			consensus.Log.Debug("[SYNC] new peer added", "pubKey", peer.PubKey, "ip", peer.IP, "port", peer.Port)
 		}
 		count++
 	}
@@ -479,6 +485,19 @@ func accumulateRewards(config *params.ChainConfig, state *state.DB, header *type
 // GetNodeID returns the nodeID
 func (consensus *Consensus) GetNodeID() uint32 {
 	return consensus.nodeID
+}
+
+// GetPeerFromID will get peer from peerID, bool value in return true means success and false means fail
+func (consensus *Consensus) GetPeerFromID(peerID uint32) (p2p.Peer, bool) {
+	v, ok := consensus.validators.Load(peerID)
+	if !ok {
+		return p2p.Peer{}, false
+	}
+	value, ok := v.(p2p.Peer)
+	if !ok {
+		return p2p.Peer{}, false
+	}
+	return value, true
 }
 
 // SendMessage sends message thru p2p host to peer.

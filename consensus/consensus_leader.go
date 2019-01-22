@@ -176,6 +176,7 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 	if len((*commitments)) >= ((len(consensus.PublicKeys)*2)/3 + 1) {
 		shouldProcess = false
 	}
+
 	if shouldProcess {
 		point := crypto.Ed25519Curve.Point()
 		point.UnmarshalBinary(commitment)
@@ -378,6 +379,12 @@ func (consensus *Consensus) processResponseMessage(message consensus_proto.Messa
 				copy(blockObj.Header().Signature[:], collectiveSig[:])
 				copy(blockObj.Header().Bitmap[:], bitmap)
 				consensus.OnConsensusDone(&blockObj)
+
+				select {
+				case consensus.VerifiedNewBlock <- &blockObj:
+				default:
+					consensus.Log.Info("[SYNC] consensus verified block send to chan failed", "blockHash", blockObj.Hash())
+				}
 
 				consensus.reportMetrics(blockObj)
 
