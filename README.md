@@ -5,6 +5,10 @@
 [![Coverage Status](https://coveralls.io/repos/github/harmony-one/harmony/badge.svg?branch=master)](https://coveralls.io/github/harmony-one/harmony?branch=master)
 
 
+## Prerequisites
+
+* `protoc` from [Google Protocol Buffers](https://github.com/protocolbuffers/protobuf)
+
 ## Dev Environment Setup
 
 ```bash
@@ -19,6 +23,8 @@ git clone git@github.com:harmony-one/harmony.git
 cd harmony
 
 go get ./...
+
+go generate ./api/...
 
 git submodule update --init --recursive
 
