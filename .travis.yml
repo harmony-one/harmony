@@ -8,7 +8,7 @@ install:
   - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$GOPATH/src/github.com/harmony-one/bls/lib
   - cd $HOME/gopath/src
   - cd github.com/harmony-one
-  - git clone git@github.com:harmony-one/mcl.git
+  - git clone https://github.com/harmony-one/mcl.git
   - cd mcl
   - make test
   - cd ../harmony
