@@ -49,8 +49,7 @@ func attackDetermination(attackedMode int) bool {
 
 // InitLDBDatabase initializes a LDBDatabase.
 func InitLDBDatabase(ip string, port string) (*ethdb.LDBDatabase, error) {
-	// TODO(minhdoan): Refactor this.
-	dbFileName := "/tmp/harmony_" + ip + port + ".dat"
+	dbFileName := fmt.Sprintf("./db/harmony_%s_%s", ip, port)
 	var err = os.RemoveAll(dbFileName)
 	if err != nil {
 		fmt.Println(err.Error())
