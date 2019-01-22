@@ -35,7 +35,6 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/p2p/host"
 )
 
 // State is a state of a node.
@@ -133,7 +132,7 @@ type Node struct {
 	peerRegistrationRecord map[uint32]*syncConfig // record registration time (unixtime) of peers begin in syncing
 
 	// The p2p host used to send/receive p2p messages
-	host host.Host
+	host p2p.Host
 
 	// Channel to stop sending ping message
 	StopPing chan struct{}
@@ -218,7 +217,7 @@ func DeserializeNode(d []byte) *NetworkNode {
 }
 
 // New creates a new node.
-func New(host host.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
+func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 	node := Node{}
 
 	if host != nil {

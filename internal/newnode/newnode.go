@@ -35,7 +35,7 @@ type NewNode struct {
 	priK        kyber.Scalar
 	log         log.Logger
 	SetInfo     chan bool
-	host        host.Host
+	host        p2p.Host
 }
 
 // New candidatenode initialization
