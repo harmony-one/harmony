@@ -8,6 +8,7 @@
 ## Prerequisites
 
 * `protoc` from [Google Protocol Buffers](https://github.com/protocolbuffers/protobuf)
+* `mockgen` from [GoMock](https://github.com/golang/mock)
 
 ## Dev Environment Setup
 
@@ -24,7 +25,7 @@ cd harmony
 
 go get ./...
 
-go generate ./api/...
+go generate ./api/... ./p2p/...
 
 git submodule update --init --recursive
 

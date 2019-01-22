@@ -47,3 +47,6 @@ bc_config.json
 
 # protobuf-generated files
 *.pb.go
+
+# GoMock-generated files
+mock_*.go
