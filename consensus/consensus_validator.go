@@ -21,7 +21,6 @@ func (consensus *Consensus) ProcessMessageValidator(payload []byte) {
 	if err != nil {
 		consensus.Log.Error("Failed to unmarshal message payload.", "err", err, "consensus", consensus)
 	}
-
 	switch message.Type {
 	case consensus_proto.MessageType_ANNOUNCE:
 		consensus.processAnnounceMessage(message)
@@ -74,6 +73,7 @@ func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Messa
 		consensus.Log.Warn("Unparseable block header data", "error", err)
 		return
 	}
+
 	consensus.block = block
 
 	// Add block to received block cache
@@ -81,7 +81,7 @@ func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Messa
 	consensus.blocksReceived[consensusID] = &BlockConsensusStatus{block, consensus.state}
 	consensus.mutex.Unlock()
 
-	// Add attack model of IncorrectResponse.
+	// Add attack model of IncorrectResponse
 	if attack.GetInstance().IncorrectResponse() {
 		consensus.Log.Warn("IncorrectResponse attacked")
 		return
@@ -243,6 +243,14 @@ func (consensus *Consensus) processChallengeMessage(message consensus_proto.Mess
 				}
 				consensus.Log.Info("Finished Response. Adding block to chain", "numTx", len(blockObj.Transactions()))
 				consensus.OnConsensusDone(&blockObj)
+
+				select {
+				case consensus.VerifiedNewBlock <- &blockObj:
+				default:
+					consensus.Log.Info("[SYNC] consensus verified block send to chan failed", "blockHash", blockObj.Hash())
+					continue
+				}
+
 			} else {
 				break
 			}
@@ -298,7 +306,9 @@ func (consensus *Consensus) processCollectiveSigMessage(message consensus_proto.
 
 	// check consensus Id
 	if consensusID != consensus.consensusID {
+		// hack for new node state syncing
 		consensus.Log.Warn("Received message with wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
+		consensus.consensusID = consensusID
 		return
 	}
 
