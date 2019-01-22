@@ -14,10 +14,10 @@ import (
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/internal/attack"
 	"github.com/harmony-one/harmony/internal/profiler"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
-
 	peerstore "github.com/libp2p/go-libp2p-peerstore"
 	multiaddr "github.com/multiformats/go-multiaddr"
 )
@@ -47,12 +47,13 @@ func attackDetermination(attackedMode int) bool {
 }
 
 // InitLDBDatabase initializes a LDBDatabase.
-func InitLDBDatabase(ip string, port string) (*ethdb.LDBDatabase, error) {
-	// TODO(minhdoan): Refactor this.
-	dbFileName := "/tmp/harmony_" + ip + port + ".dat"
-	var err = os.RemoveAll(dbFileName)
-	if err != nil {
-		fmt.Println(err.Error())
+func InitLDBDatabase(ip string, port string, freshDB bool) (*ethdb.LDBDatabase, error) {
+	dbFileName := fmt.Sprintf("./db/harmony_%s_%s", ip, port)
+	if freshDB {
+		var err = os.RemoveAll(dbFileName)
+		if err != nil {
+			fmt.Println(err.Error())
+		}
 	}
 	return ethdb.NewLDBDatabase(dbFileName, 0, 0)
 }
@@ -81,7 +82,8 @@ func main() {
 	port := flag.String("port", "9000", "port of the node.")
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	attackedMode := flag.Int("attacked_mode", 0, "0 means not attacked, 1 means attacked, 2 means being open to be selected as attacked")
-	dbSupported := flag.Bool("db_supported", false, "false means not db_supported, true means db_supported")
+	dbSupported := flag.Bool("db_supported", true, "false means not db_supported, true means db_supported")
+	freshDB := flag.Bool("fresh_db", false, "true means the existing disk based db will be removed")
 	profile := flag.Bool("profile", false, "Turn on profiling (CPU, Memory).")
 	metricsReportURL := flag.String("metrics_report_url", "", "If set, reports metrics to this URL.")
 	versionFlag := flag.Bool("version", false, "Output version info")
@@ -100,6 +102,9 @@ func main() {
 	if *versionFlag {
 		printVersion(os.Args[0])
 	}
+
+	// Logging setup
+	utils.SetPortAndIP(*port, *ip)
 
 	// Add GOMAXPROCS to achieve max performance.
 	runtime.GOMAXPROCS(1024)
@@ -163,7 +168,7 @@ func main() {
 	var ldb *ethdb.LDBDatabase
 
 	if *dbSupported {
-		ldb, _ = InitLDBDatabase(*ip, *port)
+		ldb, _ = InitLDBDatabase(*ip, *port, *freshDB)
 	}
 
 	host, err := p2pimpl.NewHost(&selfPeer)

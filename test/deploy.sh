@@ -24,6 +24,7 @@ function cleanup() {
    done
    # Remove bc_config.json before starting experiment.
    rm -f bc_config.json
+   rm -rf ./db/harmony_*
 }
 
 function killnode() {
@@ -53,6 +54,7 @@ USAGE: $ME [OPTIONS] config_file_name
    -s shards      number of shards (default: $SHARDS)
    -k nodeport    kill the node with specified port number (default: $KILLPORT)
    -n             dryrun mode (default: $DRYRUN)
+   -S             enable sync test (default: $SYNC)
 
 This script will build all the binaries and start harmony and txgen based on the configuration file.
 
@@ -71,9 +73,10 @@ DURATION=90
 MIN=5
 SHARDS=2
 KILLPORT=9004
+SYNC=false
 DRYRUN=
 
-while getopts "hdtD:m:s:k:n" option; do
+while getopts "hdtD:m:s:k:nS" option; do
    case $option in
       h) usage ;;
       d) DB='-db_supported' ;;
@@ -83,6 +86,7 @@ while getopts "hdtD:m:s:k:n" option; do
       s) SHARDS=$OPTARG ;;
       k) KILLPORT=$OPTARG ;;
       n) DRYRUN=echo ;;
+      S) SYNC=true ;;
    esac
 done
 
@@ -93,6 +97,10 @@ if [ -z "$config" ]; then
    usage
 fi
 
+if [ "$SYNC" == "true" ]; then
+    DURATION=300
+    SHARDS=1
+fi
 
 # Kill nodes if any
 cleanup
@@ -129,23 +137,41 @@ fi
 while IFS='' read -r line || [[ -n "$line" ]]; do
   IFS=' ' read ip port mode shardID <<< $line
 	#echo $ip $port $mode
-  if [ "$mode" != "client" ]; then
+  if [[ "$mode" == "leader" || "$mode" == "validator" ]]; then
       $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT 2>&1 | tee -a $LOG_FILE &
       sleep 0.5
   fi
 done < $config
 
 # Emulate node offline
-(sleep 45; killnode $KILLPORT) &
+if [ "$SYNC" == "false" ]; then
+ (sleep 45; killnode $KILLPORT) &
+fi
 
 if [ "$TXGEN" == "true" ]; then
    echo "launching txgen ..."
    line=$(grep client $config)
    IFS=' ' read ip port mode shardID <<< $line
    if [ "$mode" == "client" ]; then
-      $DRYRUN $ROOT/bin/txgen -log_folder $log_folder -duration $DURATION -ip $ip -port $port $HMY_OPT 2>&1 | tee -a $LOG_FILE
+      $DRYRUN $ROOT/bin/txgen -log_folder $log_folder -duration $DURATION -ip $ip -port $port $HMY_OPT 2>&1 | tee -a $LOG_FILE &
    fi
 fi
+
+# sleep enough time before consensus reached then add new node for state syncing
+if [ "$SYNC" == "true" ]; then
+    sleep 45
+    echo "launching new node..."
+    while IFS='' read -r line || [[ -n "$line" ]]; do
+      IFS=' ' read ip port mode shardID <<< $line
+    	echo launching newnode $ip $port $mode
+        if [ "$mode" == "newnode" ]; then
+          $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT 2>&1 | tee -a $LOG_FILE &
+          sleep 25
+        fi
+    done < $config
+fi
+
+wait
 
 cleanup
 check_result

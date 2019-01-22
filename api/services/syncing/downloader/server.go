@@ -5,9 +5,8 @@ import (
 	"log"
 	"net"
 
-	"google.golang.org/grpc"
-
 	pb "github.com/harmony-one/harmony/api/services/syncing/downloader/proto"
+	"google.golang.org/grpc"
 )
 
 // Constants for downloader server.
