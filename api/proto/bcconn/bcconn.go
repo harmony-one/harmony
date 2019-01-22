@@ -24,6 +24,7 @@ func SerializeNodeInfo(nodeinfo *node.Info) []byte {
 	if err != nil {
 		log.Error("Could not serialize node info", err)
 	}
+	log.Debug("SerializeNodeInfo", "IP", nodeinfo.IP, "Port", nodeinfo.Port, "PeerID", nodeinfo.PeerID)
 	return result.Bytes()
 }
 
@@ -36,6 +37,7 @@ func DeserializeNodeInfo(d []byte) *node.Info {
 	if err != nil {
 		log.Error("Could not de-serialize node info", err)
 	}
+	log.Debug("DeserializeNodeInfo", "IP", wn.IP, "Port", wn.Port, "PeerID", wn.PeerID)
 	return &wn
 }
 

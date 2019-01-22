@@ -133,13 +133,18 @@ if [ -n "$MA" ]; then
    HMY_OPT="-bc_addr $MA"
 fi
 
+NUM_NN=0
+
 # Start nodes
 while IFS='' read -r line || [[ -n "$line" ]]; do
   IFS=' ' read ip port mode shardID <<< $line
-	#echo $ip $port $mode
   if [[ "$mode" == "leader" || "$mode" == "validator" ]]; then
-      $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT 2>&1 | tee -a $LOG_FILE &
-      sleep 0.5
+     $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT 2>&1 | tee -a $LOG_FILE &
+     sleep 0.5
+  fi
+  if [[ "$mode" == "newnode" && "$SYNC" == "true" ]]; then
+     (( NUM_NN += 35 ))
+     (sleep $NUM_NN; $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT 2>&1 | tee -a $LOG_FILE ) &
   fi
 done < $config
 
@@ -149,29 +154,17 @@ if [ "$SYNC" == "false" ]; then
 fi
 
 if [ "$TXGEN" == "true" ]; then
-   echo "launching txgen ..."
+   echo "launching txgen ... wait"
+   sleep 2
    line=$(grep client $config)
    IFS=' ' read ip port mode shardID <<< $line
    if [ "$mode" == "client" ]; then
-      $DRYRUN $ROOT/bin/txgen -log_folder $log_folder -duration $DURATION -ip $ip -port $port $HMY_OPT 2>&1 | tee -a $LOG_FILE &
+      $DRYRUN $ROOT/bin/txgen -log_folder $log_folder -duration $DURATION -ip $ip -port $port $HMY_OPT 2>&1 | tee -a $LOG_FILE
    fi
 fi
 
-# sleep enough time before consensus reached then add new node for state syncing
-if [ "$SYNC" == "true" ]; then
-    sleep 45
-    echo "launching new node..."
-    while IFS='' read -r line || [[ -n "$line" ]]; do
-      IFS=' ' read ip port mode shardID <<< $line
-    	echo launching newnode $ip $port $mode
-        if [ "$mode" == "newnode" ]; then
-          $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT 2>&1 | tee -a $LOG_FILE &
-          sleep 25
-        fi
-    done < $config
-fi
-
-wait
+# save bc_config.json
+cp -f bc_config.json $log_folder
 
 cleanup
 check_result

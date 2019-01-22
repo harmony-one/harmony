@@ -44,3 +44,6 @@ tmp_log
 
 # beacon chain data
 bc_config.json
+
+# leveldb local storage
+db/

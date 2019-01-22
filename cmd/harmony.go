@@ -149,7 +149,7 @@ func main() {
 	clientPeer = candidateNode.GetClientPeer()
 	selfPeer.PubKey = candidateNode.PubK
 
-	// fmt.Println(peers, leader, selfPeer, clientPeer, *logFolder, *minPeers) //TODO: to be replaced by a logger later: ak, rl
+	fmt.Printf("NodeInfo => leader: %v, self: %v\n", leader, selfPeer)
 
 	var role string
 	if leader.IP == *ip && leader.Port == *port {
@@ -158,12 +158,13 @@ func main() {
 		role = "validator"
 	}
 
+	// Init logging.
+	loggingInit(*logFolder, role, *ip, *port, *onlyLogTps)
+
 	if role == "validator" {
 		// Attack determination.
 		attack.GetInstance().SetAttackEnabled(attackDetermination(*attackedMode))
 	}
-	// Init logging.
-	loggingInit(*logFolder, role, *ip, *port, *onlyLogTps)
 
 	// Initialize leveldb if dbSupported.
 	var ldb *ethdb.LDBDatabase

@@ -139,6 +139,9 @@ func (bc *BeaconChain) RespondRandomness(Node *node.Info) {
 	msg := bcconn.SerializeRandomInfo(response)
 	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Acknowledge, msg)
 	bc.log.Info("Sent Out Msg", "# Nodes", response.NumberOfNodesAdded)
+	for i, n := range response.Leaders {
+		bc.log.Info("Sent Out Msg", "leader", i, "nodeInfo", n.PeerID)
+	}
 	host.SendMessage(bc.host, bc.Peer, msgToSend, nil)
 	bc.state = RandomInfoSent
 }
