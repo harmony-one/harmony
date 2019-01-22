@@ -304,7 +304,6 @@ func (node *Node) DoSyncing() {
 		// in current implementation logic, timeout means in sync
 		case <-time.After(5 * time.Second):
 			node.stateMutex.Lock()
-			node.log.Info("[SYNC] Node is now IN SYNC!")
 			node.State = NodeReadyForConsensus
 			node.stateMutex.Unlock()
 			continue
