@@ -24,6 +24,7 @@ function cleanup() {
    done
    # Remove bc_config.json before starting experiment.
    rm -f bc_config.json
+   rm -rf ./db/harmony_*
 }
 
 function killnode() {

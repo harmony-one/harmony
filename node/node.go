@@ -208,7 +208,7 @@ func DeserializeNode(d []byte) *NetworkNode {
 }
 
 // New creates a new node.
-func New(host p2p.Host, consensus *bft.Consensus, db *ethdb.LDBDatabase) *Node {
+func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 	node := Node{}
 
 	if host != nil {
@@ -217,14 +217,11 @@ func New(host p2p.Host, consensus *bft.Consensus, db *ethdb.LDBDatabase) *Node {
 	}
 
 	// Logger
-	node.log = log.New()
+	node.log = log.New("IP", host.GetSelfPeer().IP, "Port", host.GetSelfPeer().Port)
 
 	if host != nil && consensus != nil {
 		// Consensus and associated channel to communicate blocks
 		node.Consensus = consensus
-
-		// Initialize level db.
-		node.db = db
 
 		// Initialize genesis block and blockchain
 		genesisAlloc := node.CreateGenesisAllocWithTestingAddresses(100)
@@ -235,7 +232,11 @@ func New(host p2p.Host, consensus *bft.Consensus, db *ethdb.LDBDatabase) *Node {
 		genesisAlloc[contractAddress] = core.GenesisAccount{Balance: contractFunds}
 		node.ContractKeys = append(node.ContractKeys, contractKey)
 
-		database := ethdb.NewMemDatabase()
+		database := db
+		if database == nil {
+			database = ethdb.NewMemDatabase()
+		}
+
 		chainConfig := params.TestChainConfig
 		chainConfig.ChainID = big.NewInt(int64(node.Consensus.ShardID)) // Use ChainID as piggybacked ShardID
 		gspec := core.Genesis{
