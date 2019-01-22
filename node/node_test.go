@@ -39,7 +39,11 @@ func TestGetSyncingPeers(t *testing.T) {
 	_, pubKey := utils.GenKey("1", "2")
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", PubKey: pubKey}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "8885"}
-	host, _ := p2pimpl.NewHost(&leader)
+	host, err := p2pimpl.NewHost(&leader)
+	if err != nil {
+		t.Fatalf("newhost failure: %v", err)
+	}
+
 	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader)
 
 	node := New(host, consensus, nil)
@@ -48,10 +52,10 @@ func TestGetSyncingPeers(t *testing.T) {
 	node.Neighbors.Store("minh", peer)
 	node.Neighbors.Store("mark", peer2)
 	res := node.GetSyncingPeers()
-	if len(res) != 1 || !(res[0].IP == peer.IP || res[0].IP == peer2.IP) {
+	if len(res) == 0 || !(res[0].IP == peer.IP || res[0].IP == peer2.IP) {
 		t.Error("GetSyncingPeers should return list of {peer, peer2}")
 	}
-	if len(res) != 1 || (res[0].Port != "5000" && res[0].Port != "5001") {
+	if len(res) == 0 || (res[0].Port != "5000" && res[0].Port != "5001") {
 		t.Errorf("Syncing ports should be 5000, got %v", res[0].Port)
 	}
 }

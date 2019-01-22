@@ -262,6 +262,8 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 		node.Worker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey), node.Consensus.ShardID)
 
 		node.AddSmartContractsToPendingTransactions()
+		node.Consensus.ConsensusBlock = make(chan *types.Block)
+		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 	}
 
 	if consensus != nil && consensus.IsLeader {
@@ -272,8 +274,6 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 
 	// Setup initial state of syncing.
 	node.StopPing = make(chan struct{})
-	node.Consensus.ConsensusBlock = make(chan *types.Block)
-	node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 	node.peerRegistrationRecord = make(map[uint32]*syncConfig)
 
 	node.OfflinePeers = make(chan p2p.Peer)
@@ -384,7 +384,9 @@ func (node *Node) GetSyncingPeers() []p2p.Peer {
 		}
 		res[i].Port = GetSyncingPort(res[i].Port)
 	}
-	res = append(res[:removeID], res[removeID+1:]...)
+	if removeID != -1 {
+		res = append(res[:removeID], res[removeID+1:]...)
+	}
 	node.log.Debug("GetSyncingPeers: ", "res", res, "self", node.SelfPeer)
 	return res
 }

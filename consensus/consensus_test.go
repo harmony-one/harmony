@@ -61,7 +61,10 @@ func TestRemovePeers(t *testing.T) {
 func TestGetPeerFromID(t *testing.T) {
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902"}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "9905"}
-	host := p2pimpl.NewHost(leader)
+	host, err := p2pimpl.NewHost(&leader)
+	if err != nil {
+		t.Fatalf("newhost failure: %v", err)
+	}
 	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader)
 	leaderID := utils.GetUniqueIDFromIPPort(leader.IP, leader.Port)
 	validatorID := utils.GetUniqueIDFromIPPort(validator.IP, validator.Port)
