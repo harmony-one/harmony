@@ -225,7 +225,6 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 	if db == nil {
 		utils.GetLogInstance().Error("db should be initialized")
 		os.Exit(1)
-		// db = ethdb.NewMemDatabase()
 	}
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(db))
 	for addr, account := range g.Alloc {
