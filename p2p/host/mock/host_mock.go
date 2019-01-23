@@ -5,10 +5,11 @@
 package mock
 
 import (
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	p2p "github.com/harmony-one/harmony/p2p"
 	peer "github.com/libp2p/go-libp2p-peer"
-	reflect "reflect"
 )
 
 // MockHost is a mock of Host interface
