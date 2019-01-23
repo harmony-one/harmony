@@ -114,7 +114,6 @@ func (host *HostV2) SendMessage(p p2p.Peer, message []byte) error {
 		return err
 	}
 
-	defer s.Close()
 	s.Write(message)
 
 	return nil

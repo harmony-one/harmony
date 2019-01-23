@@ -46,9 +46,10 @@ func New(ip string, port string) *NewNode {
 	node.PubK = pubKey
 	node.priK = priKey
 	node.Self = p2p.Peer{IP: ip, Port: port, PubKey: pubKey, ValidatorID: -1}
-	node.log = log.New()
+	node.log = utils.GetLogInstance()
 	node.SetInfo = make(chan bool)
 	node.host, err = p2pimpl.NewHost(&node.Self)
+	node.log.Info("NewNode New", "Self", node.Self)
 	if err != nil {
 		node.log.Error("failed to create new host", "msg", err)
 		return nil
@@ -80,7 +81,7 @@ func (node *NewNode) requestBeaconChain(BCPeer p2p.Peer) (err error) {
 	if err != nil {
 		node.log.Error("Could not Marshall public key into binary")
 	}
-	nodeInfo := &proto_node.Info{IP: node.Self.IP, Port: node.Self.Port, PubKey: pubk, PeerID: node.host.GetID()}
+	nodeInfo := &proto_node.Info{IP: node.Self.IP, Port: node.Self.Port, PubKey: pubk, PeerID: node.Self.PeerID}
 	msg := bcconn.SerializeNodeInfo(nodeInfo)
 	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Register, msg)
 	gotShardInfo := false
