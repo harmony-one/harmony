@@ -9,9 +9,9 @@ import (
 
 	"github.com/dedis/kyber"
 	"github.com/dedis/kyber/sign/schnorr"
-	"github.com/ethereum/go-ethereum/rlp"
-
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/rlp"
+	protobuf "github.com/golang/protobuf/proto"
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/api/services/explorer"
 	"github.com/harmony-one/harmony/core/types"
@@ -141,7 +141,7 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 	}
 
 	message.Signature = nil
-	messageBytes, err := message.XXX_Marshal([]byte{}, true)
+	messageBytes, err := protobuf.Marshal(&message)
 	if err != nil {
 		consensus.Log.Warn("Failed to marshal the announce message", "error", err)
 	}
@@ -277,7 +277,7 @@ func (consensus *Consensus) processResponseMessage(message consensus_proto.Messa
 		return
 	}
 	message.Signature = nil
-	messageBytes, err := message.XXX_Marshal([]byte{}, true)
+	messageBytes, err := protobuf.Marshal(&message)
 	if err != nil {
 		consensus.Log.Warn("Failed to marshal the announce message", "error", err)
 	}

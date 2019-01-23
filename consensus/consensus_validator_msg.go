@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"github.com/dedis/kyber"
+	protobuf "github.com/golang/protobuf/proto"
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/crypto"
@@ -29,7 +30,7 @@ func (consensus *Consensus) constructCommitMessage(msgType consensus_proto.Messa
 	}
 	message.Payload = bytes
 
-	marshaledMessage, err := message.XXX_Marshal([]byte{}, true)
+	marshaledMessage, err := protobuf.Marshal(&message)
 	if err != nil {
 		consensus.Log.Debug("Failed to marshal Announce message", "error", err)
 	}
@@ -37,7 +38,7 @@ func (consensus *Consensus) constructCommitMessage(msgType consensus_proto.Messa
 	signature := consensus.signMessage(marshaledMessage)
 	message.Signature = signature
 
-	marshaledMessage, err = message.XXX_Marshal([]byte{}, true)
+	marshaledMessage, err = protobuf.Marshal(&message)
 	if err != nil {
 		consensus.Log.Debug("Failed to marshal Announce message", "error", err)
 	}
@@ -65,7 +66,7 @@ func (consensus *Consensus) constructResponseMessage(msgType consensus_proto.Mes
 	}
 	message.Payload = bytes
 
-	marshaledMessage, err := message.XXX_Marshal([]byte{}, true)
+	marshaledMessage, err := protobuf.Marshal(&message)
 	if err != nil {
 		consensus.Log.Debug("Failed to marshal Announce message", "error", err)
 	}
@@ -73,7 +74,7 @@ func (consensus *Consensus) constructResponseMessage(msgType consensus_proto.Mes
 	signature := consensus.signMessage(marshaledMessage)
 	message.Signature = signature
 
-	marshaledMessage, err = message.XXX_Marshal([]byte{}, true)
+	marshaledMessage, err = protobuf.Marshal(&message)
 	if err != nil {
 		consensus.Log.Debug("Failed to marshal Announce message", "error", err)
 	}

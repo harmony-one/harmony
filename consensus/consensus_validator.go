@@ -6,6 +6,7 @@ import (
 	"github.com/dedis/kyber/sign/schnorr"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
+	protobuf "github.com/golang/protobuf/proto"
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto"
@@ -16,7 +17,7 @@ import (
 // ProcessMessageValidator dispatches validator's consensus message.
 func (consensus *Consensus) ProcessMessageValidator(payload []byte) {
 	message := consensus_proto.Message{}
-	err := message.XXX_Unmarshal(payload)
+	err := protobuf.Unmarshal(payload, &message)
 
 	if err != nil {
 		consensus.Log.Error("Failed to unmarshal message payload.", "err", err, "consensus", consensus)
@@ -57,7 +58,7 @@ func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Messa
 
 	// Verify signature
 	message.Signature = nil
-	messageBytes, err := message.XXX_Marshal([]byte{}, true)
+	messageBytes, err := protobuf.Marshal(&message)
 	if err != nil {
 		consensus.Log.Warn("Failed to marshal the announce message", "error", err)
 	}
@@ -149,7 +150,7 @@ func (consensus *Consensus) processChallengeMessage(message consensus_proto.Mess
 
 	// Verify signature
 	message.Signature = nil
-	messageBytes, err := message.XXX_Marshal([]byte{}, true)
+	messageBytes, err := protobuf.Marshal(&message)
 	if err != nil {
 		consensus.Log.Warn("Failed to marshal the announce message", "error", err)
 	}
@@ -282,7 +283,7 @@ func (consensus *Consensus) processCollectiveSigMessage(message consensus_proto.
 
 	// Verify signature
 	message.Signature = nil
-	messageBytes, err := message.XXX_Marshal([]byte{}, true)
+	messageBytes, err := protobuf.Marshal(&message)
 	if err != nil {
 		consensus.Log.Warn("Failed to marshal the announce message", "error", err)
 	}
