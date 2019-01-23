@@ -9,13 +9,8 @@ install:
   - cd $HOME/gopath/src
   - cd github.com/harmony-one
   - git clone https://github.com/harmony-one/mcl.git
-  - cd mcl
-  - make test
-  - cd ..
   - git clone https://github.com/harmony-one/bls.git
-  - cd bls
-  - make test
-  - cd ../harmony
+  - cd harmony
   - go get -t -v ./...
   - go get -u golang.org/x/lint/golint
   - go get gopkg.in/check.v1
