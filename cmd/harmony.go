@@ -149,7 +149,7 @@ func main() {
 	clientPeer = candidateNode.GetClientPeer()
 	selfPeer.PubKey = candidateNode.PubK
 
-	// fmt.Println(peers, leader, selfPeer, clientPeer, *logFolder, *minPeers) //TODO: to be replaced by a logger later: ak, rl
+	fmt.Println("Harmnoy", leader, selfPeer)
 
 	var role string
 	if leader.IP == *ip && leader.Port == *port {

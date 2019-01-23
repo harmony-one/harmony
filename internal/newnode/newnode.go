@@ -49,7 +49,7 @@ func New(ip string, port string) *NewNode {
 	node.log = utils.GetLogInstance()
 	node.SetInfo = make(chan bool)
 	node.host, err = p2pimpl.NewHost(&node.Self)
-	node.log.Info("NewNode New", "Self", node.Self)
+	fmt.Printf("NewNode Self: %v\n", node.Self)
 	if err != nil {
 		node.log.Error("failed to create new host", "msg", err)
 		return nil
