@@ -5,6 +5,7 @@ import (
 
 	"github.com/dedis/kyber"
 	"github.com/ethereum/go-ethereum/log"
+	protobuf "github.com/golang/protobuf/proto"
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/crypto"
@@ -27,7 +28,7 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 	// n byte of block header
 	message.Payload = consensus.block
 
-	marshaledMessage, err := message.XXX_Marshal([]byte{}, true)
+	marshaledMessage, err := protobuf.Marshal(&message)
 	if err != nil {
 		consensus.Log.Debug("Failed to marshal Announce message", "error", err)
 	}
@@ -35,7 +36,7 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 	signature := consensus.signMessage(marshaledMessage)
 	message.Signature = signature
 
-	marshaledMessage, err = message.XXX_Marshal([]byte{}, true)
+	marshaledMessage, err = protobuf.Marshal(&message)
 	if err != nil {
 		consensus.Log.Debug("Failed to marshal Announce message", "error", err)
 	}
@@ -89,7 +90,7 @@ func (consensus *Consensus) constructChallengeMessage(msgType consensus_proto.Me
 	message.Payload = buffer.Bytes()
 	//// END Payload
 
-	marshaledMessage, err := message.XXX_Marshal([]byte{}, true)
+	marshaledMessage, err := protobuf.Marshal(&message)
 	if err != nil {
 		consensus.Log.Debug("Failed to marshal Challenge message", "error", err)
 	}
@@ -97,7 +98,7 @@ func (consensus *Consensus) constructChallengeMessage(msgType consensus_proto.Me
 	signature := consensus.signMessage(marshaledMessage)
 	message.Signature = signature
 
-	marshaledMessage, err = message.XXX_Marshal([]byte{}, true)
+	marshaledMessage, err = protobuf.Marshal(&message)
 	if err != nil {
 		consensus.Log.Debug("Failed to marshal Challenge message", "error", err)
 	}
@@ -131,7 +132,7 @@ func (consensus *Consensus) constructCollectiveSigMessage(collectiveSig [64]byte
 	message.Payload = buffer.Bytes()
 	//// END Payload
 
-	marshaledMessage, err := message.XXX_Marshal([]byte{}, true)
+	marshaledMessage, err := protobuf.Marshal(&message)
 	if err != nil {
 		consensus.Log.Debug("Failed to marshal Challenge message", "error", err)
 	}
@@ -139,7 +140,7 @@ func (consensus *Consensus) constructCollectiveSigMessage(collectiveSig [64]byte
 	signature := consensus.signMessage(marshaledMessage)
 	message.Signature = signature
 
-	marshaledMessage, err = message.XXX_Marshal([]byte{}, true)
+	marshaledMessage, err = protobuf.Marshal(&message)
 	if err != nil {
 		consensus.Log.Debug("Failed to marshal Challenge message", "error", err)
 	}
