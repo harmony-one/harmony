@@ -1,7 +1,6 @@
 package p2pimpl
 
 import (
-	"fmt"
 	"net"
 
 	"github.com/harmony-one/harmony/p2p"
@@ -10,7 +9,6 @@ import (
 
 	"github.com/harmony-one/harmony/internal/utils"
 	peer "github.com/libp2p/go-libp2p-peer"
-	ma "github.com/multiformats/go-multiaddr"
 )
 
 // Version The version number of p2p library
@@ -27,12 +25,6 @@ func NewHost(self *p2p.Peer) (p2p.Host, error) {
 		h := hostv1.New(self)
 		return h, nil
 	}
-
-	selfAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", self.Port))
-	if err != nil {
-		return nil, err
-	}
-	self.Addrs = append(self.Addrs, selfAddr)
 
 	// TODO (leo), change to GenKeyP2PRand() to generate random key. Right now, the key is predictable as the
 	// seed is fixed.
