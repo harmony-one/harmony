@@ -119,6 +119,7 @@ func main() {
 	var selfPeer p2p.Peer
 	var clientPeer *p2p.Peer
 	var BCPeer *p2p.Peer
+	priKey, _, err := utils.GenKeyP2P(*ip, *port)
 
 	if *bcAddr != "" {
 		// Turn the destination into a multiaddr.
@@ -139,7 +140,7 @@ func main() {
 	}
 
 	//Use Peer Discovery to get shard/leader/peer/...
-	candidateNode := pkg_newnode.New(*ip, *port)
+	candidateNode := pkg_newnode.New(*ip, *port, priKey)
 	candidateNode.AddPeer(BCPeer)
 	candidateNode.ContactBeaconChain(*BCPeer)
 
@@ -172,7 +173,7 @@ func main() {
 		ldb, _ = InitLDBDatabase(*ip, *port, *freshDB)
 	}
 
-	host, err := p2pimpl.NewHost(&selfPeer)
+	host, err := p2pimpl.NewHost(&selfPeer, priKey)
 	if err != nil {
 		panic("unable to new host in harmony")
 	}

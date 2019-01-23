@@ -16,6 +16,7 @@ import (
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/newnode"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
@@ -65,6 +66,7 @@ func main() {
 
 	var bcPeer *p2p.Peer
 	var shardIDLeaderMap map[uint32]p2p.Peer
+	priKey, _, err := utils.GenKeyP2P(*ip, *port)
 
 	if *bcAddr != "" {
 		// Turn the destination into a multiaddr.
@@ -84,7 +86,7 @@ func main() {
 		bcPeer = &p2p.Peer{IP: *bcIP, Port: *bcPort}
 	}
 
-	candidateNode := newnode.New(*ip, *port)
+	candidateNode := newnode.New(*ip, *port, priKey)
 	candidateNode.AddPeer(bcPeer)
 	candidateNode.ContactBeaconChain(*bcPeer)
 	selfPeer := candidateNode.GetSelfPeer()
@@ -113,7 +115,7 @@ func main() {
 
 	// Nodes containing blockchain data to mirror the shards' data in the network
 	nodes := []*node.Node{}
-	host, err := p2pimpl.NewHost(&selfPeer)
+	host, err := p2pimpl.NewHost(&selfPeer, priKey)
 	if err != nil {
 		panic("unable to new host in txgen")
 	}

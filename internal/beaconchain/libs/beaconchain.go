@@ -18,6 +18,7 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
+	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
 	peer "github.com/libp2p/go-libp2p-peer"
 )
 
@@ -93,12 +94,12 @@ func (bc *BeaconChain) GetShardLeaderMap() map[int]*node.Info {
 }
 
 //New beaconchain initialization
-func New(numShards int, ip, port string) *BeaconChain {
+func New(numShards int, ip, port string, key p2p_crypto.PrivKey) *BeaconChain {
 	bc := BeaconChain{}
 	bc.log = log.New()
 	bc.PubKey = generateBCKey()
 	bc.Self = p2p.Peer{IP: ip, Port: port}
-	bc.host, _ = p2pimpl.NewHost(&bc.Self)
+	bc.host, _ = p2pimpl.NewHost(&bc.Self, key)
 	bcinfo := &BCInfo{NumberOfShards: numShards, NumberOfNodesAdded: 0,
 		IP:             ip,
 		Port:           port,
