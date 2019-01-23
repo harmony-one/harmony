@@ -10,11 +10,11 @@ install:
   - cd github.com/harmony-one
   - git clone https://github.com/harmony-one/mcl.git
   - cd mcl
-  - make test_ci
+  - make test_ci DEBUG=1 -j3
   - cd ..
   - git clone https://github.com/harmony-one/bls.git
   - cd bls
-  - make test_ci
+  - make test_ci DISABLE_THREAD_TEST=1
   - cd harmony
   - go get -t -v ./...
   - go get -u golang.org/x/lint/golint
