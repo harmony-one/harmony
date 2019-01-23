@@ -1,7 +1,6 @@
 package main
 
 import (
-   "fmt"
    "github.com/harmony-one/bls/ffi/go/bls"
    "log"
    "time"
