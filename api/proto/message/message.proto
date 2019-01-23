@@ -1,0 +1,33 @@
+syntax = "proto3";
+package message;
+
+enum MessageType {
+  UNKNOWN = 0;
+  NEWNODE_BOOTNODE = 1;
+  BOOTNODE_NEWNODE = 2;
+  NEWNODE_BEACON = 3;
+  BEACON_NEWNODE = 4;
+}
+
+// This is universal message for all communication protocols.
+// There are different Requests for different message types.
+// As we introduce a new type of message just add a new MessageType and new type of request in Message.
+//
+// The request field will be either one of the structure corresponding to the MessageType type.
+message Message {
+    MessageType type = 1;
+    oneof request {
+        NewNodeBootNodeRequest newnode_bootnode_request = 2;
+        BootNodeNewNodeRequest bootnode_newnode_request = 3;
+    }
+}
+
+// Message of NewNode talking to BootNode.
+message NewNodeBootNodeRequest {
+}
+
+// Message of BootNode talking to NewNode.
+message BootNodeNewNodeRequest {
+}
+
+// TODO(minhdoan): refactor and introduce consensus message as one of possible Message.request.
