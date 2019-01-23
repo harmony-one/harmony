@@ -12,7 +12,7 @@ import (
 	net "github.com/libp2p/go-libp2p-net"
 	peer "github.com/libp2p/go-libp2p-peer"
 	peerstore "github.com/libp2p/go-libp2p-peerstore"
-	multiaddr "github.com/multiformats/go-multiaddr"
+	ma "github.com/multiformats/go-multiaddr"
 )
 
 const (
@@ -44,7 +44,7 @@ func (host *HostV2) AddPeer(p *p2p.Peer) error {
 	// reconstruct the multiaddress based on ip/port
 	// PeerID has to be known for the ip/port
 	addr := fmt.Sprintf("/ip4/%s/tcp/%s", p.IP, p.Port)
-	targetAddr, err := multiaddr.NewMultiaddr(addr)
+	targetAddr, err := ma.NewMultiaddr(addr)
 	if err != nil {
 		log.Error("AddPeer NewMultiaddr error", "error", err)
 		return err
@@ -64,23 +64,29 @@ func (host *HostV2) Peerstore() peerstore.Peerstore {
 }
 
 // New creates a host for p2p communication
-func New(self p2p.Peer, priKey p2p_crypto.PrivKey) *HostV2 {
-
+func New(self *p2p.Peer, priKey p2p_crypto.PrivKey) *HostV2 {
+	listenAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", self.Port))
+	if err != nil {
+		log.Error("New MA Error", "IP", self.IP, "Port", self.Port)
+		return nil
+	}
 	// TODO (leo), use the [0] of Addrs for now, need to find a reliable way of using listenAddr
 	p2pHost, err := libp2p.New(context.Background(),
-		libp2p.ListenAddrs(self.Addrs[0]),
+		libp2p.ListenAddrs(listenAddr),
 		libp2p.Identity(priKey),
 		// TODO(ricl): Other features to probe
 		// libp2p.EnableRelay; libp2p.Routing;
 	)
 
+	self.PeerID = p2pHost.ID()
+
 	catchError(err)
-	log.Debug("HostV2 is up!", "port", self.Port, "id", p2pHost.ID().Pretty(), "addr", self.Addrs)
+	log.Debug("HostV2 is up!", "port", self.Port, "id", p2pHost.ID().Pretty(), "addr", listenAddr)
 
 	// has to save the private key for host
 	h := &HostV2{
 		h:      p2pHost,
-		self:   self,
+		self:   *self,
 		priKey: priKey,
 	}
 

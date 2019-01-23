@@ -24,6 +24,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	libs "github.com/harmony-one/harmony/internal/beaconchain/libs"
 	beaconchain "github.com/harmony-one/harmony/internal/beaconchain/rpc"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
@@ -299,7 +300,8 @@ func CreateWalletNode() *node.Node {
 
 	// dummy host for wallet
 	self := p2p.Peer{IP: "127.0.0.1", Port: "6789"}
-	host, _ := p2pimpl.NewHost(&self)
+	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "6789")
+	host, _ := p2pimpl.NewHost(&self, priKey)
 	walletNode := node.New(host, nil, nil)
 	walletNode.Client = client.NewClient(walletNode.GetHost(), &shardIDLeaderMap)
 	return walletNode
