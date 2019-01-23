@@ -19,7 +19,11 @@ func TestNewNode(t *testing.T) {
 	_, pubKey := utils.GenKey("1", "2")
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", PubKey: pubKey}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "8885"}
-	host, _ := p2pimpl.NewHost(&leader)
+	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
+	host, err := p2pimpl.NewHost(&leader, priKey)
+	if err != nil {
+		t.Fatalf("newhost failure: %v", err)
+	}
 	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader)
 	node := New(host, consensus, nil)
 	if node.Consensus == nil {
@@ -39,7 +43,8 @@ func TestGetSyncingPeers(t *testing.T) {
 	_, pubKey := utils.GenKey("1", "2")
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", PubKey: pubKey}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "8885"}
-	host, err := p2pimpl.NewHost(&leader)
+	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
+	host, err := p2pimpl.NewHost(&leader, priKey)
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
@@ -86,7 +91,11 @@ func TestAddPeers(t *testing.T) {
 	_, pubKey := utils.GenKey("1", "2")
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8982", PubKey: pubKey}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "8985"}
-	host, _ := p2pimpl.NewHost(&leader)
+	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
+	host, err := p2pimpl.NewHost(&leader, priKey)
+	if err != nil {
+		t.Fatalf("newhost failure: %v", err)
+	}
 	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader)
 
 	node := New(host, consensus, nil)
@@ -155,11 +164,15 @@ func exitServer() {
 	os.Exit(0)
 }
 
-func TestPingPongHandler(test *testing.T) {
+func TestPingPongHandler(t *testing.T) {
 	_, pubKey := utils.GenKey("127.0.0.1", "8881")
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8881", PubKey: pubKey}
 	//   validator := p2p.Peer{IP: "127.0.0.1", Port: "9991"}
-	host, _ := p2pimpl.NewHost(&leader)
+	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
+	host, err := p2pimpl.NewHost(&leader, priKey)
+	if err != nil {
+		t.Fatalf("newhost failure: %v", err)
+	}
 	consensus := consensus.New(host, "0", []p2p.Peer{leader}, leader)
 	node := New(host, consensus, nil)
 	//go sendPingMessage(leader)
