@@ -54,6 +54,10 @@ type Info struct {
 	PeerID      peer.ID // Peerstore ID
 }
 
+func (info Info) String() string {
+	return fmt.Sprintf("Info:%v/%v=>%v/%v", info.IP, info.Port, info.ValidatorID, info.PeerID)
+}
+
 // PingMessageType defines the data structure of the Ping message
 type PingMessageType struct {
 	Version uint16 // version of the protocol

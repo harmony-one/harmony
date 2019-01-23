@@ -3,6 +3,7 @@ package bcconn
 import (
 	"bytes"
 	"encoding/gob"
+	"fmt"
 
 	"github.com/ethereum/go-ethereum/log"
 
@@ -19,6 +20,8 @@ type ResponseRandomNumber struct {
 // SerializeNodeInfo is for serializing nodeinfo
 func SerializeNodeInfo(nodeinfo *node.Info) []byte {
 	var result bytes.Buffer
+	fmt.Printf("SerializeNodeInfo: %s\n", *nodeinfo)
+
 	encoder := gob.NewEncoder(&result)
 	err := encoder.Encode(nodeinfo)
 	if err != nil {
@@ -36,6 +39,7 @@ func DeserializeNodeInfo(d []byte) *node.Info {
 	if err != nil {
 		log.Error("Could not de-serialize node info", err)
 	}
+	fmt.Printf("DeserializeNodeInfo: %s\n", wn)
 	return &wn
 }
 
