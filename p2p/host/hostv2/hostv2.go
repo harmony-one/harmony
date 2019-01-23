@@ -9,10 +9,11 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	libp2p "github.com/libp2p/go-libp2p"
 	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
-	libp2phost "github.com/libp2p/go-libp2p-host"
+	p2p_host "github.com/libp2p/go-libp2p-host"
 	net "github.com/libp2p/go-libp2p-net"
 	peer "github.com/libp2p/go-libp2p-peer"
 	peerstore "github.com/libp2p/go-libp2p-peerstore"
+	p2p_config "github.com/libp2p/go-libp2p/config"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
@@ -25,7 +26,7 @@ const (
 
 // HostV2 is the version 2 p2p host
 type HostV2 struct {
-	h      libp2phost.Host
+	h      p2p_host.Host
 	self   p2p.Peer
 	priKey p2p_crypto.PrivKey
 }
@@ -65,23 +66,19 @@ func (host *HostV2) Peerstore() peerstore.Peerstore {
 }
 
 // New creates a host for p2p communication
-func New(self *p2p.Peer, priKey p2p_crypto.PrivKey) *HostV2 {
+func New(self *p2p.Peer, priKey p2p_crypto.PrivKey, opts ...p2p_config.Option) *HostV2 {
 	listenAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", self.Port))
 	if err != nil {
 		log.Error("New MA Error", "IP", self.IP, "Port", self.Port)
 		return nil
 	}
-	// TODO (leo), use the [0] of Addrs for now, need to find a reliable way of using listenAddr
 	p2pHost, err := libp2p.New(context.Background(),
-		libp2p.ListenAddrs(listenAddr),
-		libp2p.Identity(priKey),
-		// TODO(ricl): Other features to probe
-		// libp2p.EnableRelay; libp2p.Routing;
+		append(opts, libp2p.ListenAddrs(listenAddr), libp2p.Identity(priKey))...,
 	)
+	catchError(err)
 
 	self.PeerID = p2pHost.ID()
 
-	catchError(err)
 	log.Debug("HostV2 is up!", "port", self.Port, "id", p2pHost.ID().Pretty(), "addr", listenAddr)
 
 	// has to save the private key for host
