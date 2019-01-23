@@ -10,6 +10,7 @@ import (
 	"github.com/harmony-one/harmony/api/proto/bcconn"
 	"github.com/harmony-one/harmony/api/proto/node"
 	beaconchain "github.com/harmony-one/harmony/internal/beaconchain/rpc"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -28,7 +29,8 @@ func TestNewNode(t *testing.T) {
 	ip = "127.0.0.1"
 	port = "7523"
 	numshards := 2
-	bc := New(numshards, ip, port)
+	priKey, _, _ := utils.GenKeyP2P(ip, port)
+	bc := New(numshards, ip, port, priKey)
 
 	if bc.PubKey == nil {
 		t.Error("beacon chain public key not initialized")
@@ -48,7 +50,8 @@ func TestShardLeaderMap(t *testing.T) {
 	ip = "127.0.0.1"
 	beaconport := "7523"
 	numshards := 1
-	bc := New(numshards, ip, beaconport)
+	priKey, _, _ := utils.GenKeyP2P(ip, beaconport)
+	bc := New(numshards, ip, beaconport, priKey)
 	bc.BCInfo.Leaders = leaders
 	if !reflect.DeepEqual(bc.GetShardLeaderMap(), shardLeaderMap) {
 		t.Error("The function GetShardLeaderMap doesn't work well")
@@ -61,7 +64,8 @@ func TestFetchLeaders(t *testing.T) {
 	ip = "127.0.0.1"
 	beaconport := "7523"
 	numshards := 1
-	bc := New(numshards, ip, beaconport)
+	priKey, _, _ := utils.GenKeyP2P(ip, beaconport)
+	bc := New(numshards, ip, beaconport, priKey)
 	bc.BCInfo.Leaders = leaders
 	bc.rpcServer = beaconchain.NewServer(bc.GetShardLeaderMap)
 	bc.StartRPCServer()
@@ -80,7 +84,8 @@ func TestAcceptNodeInfo(t *testing.T) {
 	ip = "127.0.0.1"
 	beaconport := "7523"
 	numshards := 1
-	bc := New(numshards, ip, beaconport)
+	priKey, _, _ := utils.GenKeyP2P(ip, beaconport)
+	bc := New(numshards, ip, beaconport, priKey)
 	b := bcconn.SerializeNodeInfo(leader1)
 	node := bc.AcceptNodeInfo(b)
 	if !reflect.DeepEqual(node, leader1) {
@@ -97,7 +102,8 @@ func TestRespondRandomness(t *testing.T) {
 	ip = "127.0.0.1"
 	beaconport := "7523"
 	numshards := 1
-	bc := New(numshards, ip, beaconport)
+	priKey, _, _ := utils.GenKeyP2P(ip, beaconport)
+	bc := New(numshards, ip, beaconport, priKey)
 	bc.RespondRandomness(leader1)
 	assert.Equal(t, RandomInfoSent, bc.state)
 }
@@ -107,7 +113,8 @@ func TestAcceptConnections(t *testing.T) {
 	ip = "127.0.0.1"
 	beaconport := "7523"
 	numshards := 1
-	bc := New(numshards, ip, beaconport)
+	priKey, _, _ := utils.GenKeyP2P(ip, beaconport)
+	bc := New(numshards, ip, beaconport, priKey)
 	b := bcconn.SerializeNodeInfo(leader1)
 	bc.AcceptConnections(b)
 	assert.Equal(t, RandomInfoSent, bc.state)

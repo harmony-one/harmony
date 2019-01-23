@@ -8,15 +8,17 @@ import (
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/crypto/pki"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 )
 
 func TestConstructAnnounceMessage(test *testing.T) {
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "19999"}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "55555"}
-	host, err := p2pimpl.NewHost(&leader)
+	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
+	host, err := p2pimpl.NewHost(&leader, priKey)
 	if err != nil {
-		test.Fatalf("new host failed: %v", err)
+		test.Fatalf("newhost failure: %v", err)
 	}
 	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader)
 	consensus.blockHash = [32]byte{}
@@ -39,9 +41,10 @@ func TestConstructChallengeMessage(test *testing.T) {
 	validatorPriKey.UnmarshalBinary(priKeyInBytes[:])
 	validatorPubKey := pki.GetPublicKeyFromScalar(leaderPriKey)
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "5555", PubKey: validatorPubKey}
-	host, err := p2pimpl.NewHost(&leader)
+	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
+	host, err := p2pimpl.NewHost(&leader, priKey)
 	if err != nil {
-		test.Fatalf("new host failed: %v", err)
+		test.Fatalf("newhost failure: %v", err)
 	}
 	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader)
 	consensus.blockHash = [32]byte{}

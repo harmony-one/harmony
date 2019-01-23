@@ -6,6 +6,7 @@ import (
 	"time"
 
 	beaconchain "github.com/harmony-one/harmony/internal/beaconchain/libs"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	peerstore "github.com/libp2p/go-libp2p-peerstore"
 	multiaddr "github.com/multiformats/go-multiaddr"
@@ -15,7 +16,8 @@ func TestNewNode(t *testing.T) {
 	var ip, port string
 	ip = "127.0.0.1"
 	port = "8088"
-	nnode := New(ip, port)
+	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "8088")
+	nnode := New(ip, port, priKey)
 
 	if nnode.PubK == nil {
 		t.Error("new node public key not initialized")
@@ -29,8 +31,12 @@ func TestBeaconChainConnect(t *testing.T) {
 	beaconport = "8081"
 	nodeport = "9081"
 
-	nnode := New(ip, nodeport)
-	bc := beaconchain.New(1, ip, beaconport)
+	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9081")
+	nnode := New(ip, nodeport, priKey)
+
+	priKey, _, _ = utils.GenKeyP2P("127.0.0.1", "8081")
+	bc := beaconchain.New(1, ip, beaconport, priKey)
+
 	bcma = fmt.Sprintf("/ip4/%s/tcp/%s/ipfs/%s", bc.Self.IP, bc.Self.Port, bc.GetID().Pretty())
 
 	go bc.StartServer()
