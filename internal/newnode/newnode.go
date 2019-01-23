@@ -19,6 +19,7 @@ import (
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 
+	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
 	multiaddr "github.com/multiformats/go-multiaddr"
 )
 
@@ -39,7 +40,7 @@ type NewNode struct {
 }
 
 // New candidatenode initialization
-func New(ip string, port string) *NewNode {
+func New(ip string, port string, nodePk p2p_crypto.PrivKey) *NewNode {
 	priKey, pubKey := utils.GenKey(ip, port)
 	var node NewNode
 	var err error
@@ -48,8 +49,7 @@ func New(ip string, port string) *NewNode {
 	node.Self = p2p.Peer{IP: ip, Port: port, PubKey: pubKey, ValidatorID: -1}
 	node.log = utils.GetLogInstance()
 	node.SetInfo = make(chan bool)
-	node.host, err = p2pimpl.NewHost(&node.Self)
-	node.log.Info("NewNode New", "Self", node.Self)
+	node.host, err = p2pimpl.NewHost(&node.Self, nodePk)
 	if err != nil {
 		node.log.Error("failed to create new host", "msg", err)
 		return nil
@@ -81,6 +81,7 @@ func (node *NewNode) requestBeaconChain(BCPeer p2p.Peer) (err error) {
 	if err != nil {
 		node.log.Error("Could not Marshall public key into binary")
 	}
+	fmt.Printf("[New Node]: %v\n", *node)
 	nodeInfo := &proto_node.Info{IP: node.Self.IP, Port: node.Self.Port, PubKey: pubk, PeerID: node.Self.PeerID}
 	msg := bcconn.SerializeNodeInfo(nodeInfo)
 	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Register, msg)
