@@ -1,6 +1,6 @@
 language: go
 go:
-  - master
+  - stable
 install:
   - export GOPATH=$HOME/gopath
   - export CGO_CPPFLAGS="-I$GOPATH/src/github.com/harmony-one/bls/include -I$GOPATH/src/github.com/harmony-one/mcl/include"
