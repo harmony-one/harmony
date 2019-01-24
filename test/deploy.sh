@@ -2,6 +2,7 @@
 
 ROOT=$(dirname $0)/..
 USER=$(whoami)
+source ~/.bash_profile
 
 set -x
 set -eo pipefail

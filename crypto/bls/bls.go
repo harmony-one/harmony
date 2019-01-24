@@ -6,9 +6,18 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 )
 
+// AggregateSig aggregates all the BLS signature into a single multi-signature.
+func AggregateSig(sigs []*bls.Sign) *bls.Sign {
+	var aggregatedSig bls.Sign
+	for _, sig := range sigs {
+		aggregatedSig.Add(sig)
+	}
+	return &aggregatedSig
+}
+
 // Mask represents a cosigning participation bitmask.
 type Mask struct {
-	mask            []byte
+	Bitmap          []byte
 	publics         []*bls.PublicKey
 	AggregatePublic *bls.PublicKey
 }
@@ -21,7 +30,7 @@ func NewMask(publics []*bls.PublicKey, myKey *bls.PublicKey) (*Mask, error) {
 	m := &Mask{
 		publics: publics,
 	}
-	m.mask = make([]byte, m.Len())
+	m.Bitmap = make([]byte, m.Len())
 	m.AggregatePublic = &bls.PublicKey{}
 	if myKey != nil {
 		found := false
@@ -41,12 +50,12 @@ func NewMask(publics []*bls.PublicKey, myKey *bls.PublicKey) (*Mask, error) {
 
 // Mask returns a copy of the participation bitmask.
 func (m *Mask) Mask() []byte {
-	clone := make([]byte, len(m.mask))
-	copy(clone[:], m.mask)
+	clone := make([]byte, len(m.Bitmap))
+	copy(clone[:], m.Bitmap)
 	return clone
 }
 
-// Len returns the mask length in bytes.
+// Len returns the Bitmap length in bytes.
 func (m *Mask) Len() int {
 	return (len(m.publics) + 7) >> 3
 }
@@ -56,17 +65,17 @@ func (m *Mask) Len() int {
 // cosigners 0-7, bits 0-7 of byte 1 correspond to cosigners 8-15, etc.
 func (m *Mask) SetMask(mask []byte) error {
 	if m.Len() != len(mask) {
-		return fmt.Errorf("mismatching mask lengths")
+		return fmt.Errorf("mismatching Bitmap lengths")
 	}
 	for i := range m.publics {
 		byt := i >> 3
 		msk := byte(1) << uint(i&7)
-		if ((m.mask[byt] & msk) == 0) && ((mask[byt] & msk) != 0) {
-			m.mask[byt] ^= msk // flip bit in mask from 0 to 1
+		if ((m.Bitmap[byt] & msk) == 0) && ((mask[byt] & msk) != 0) {
+			m.Bitmap[byt] ^= msk // flip bit in Bitmap from 0 to 1
 			m.AggregatePublic.Add(m.publics[i])
 		}
-		if ((m.mask[byt] & msk) != 0) && ((mask[byt] & msk) == 0) {
-			m.mask[byt] ^= msk // flip bit in mask from 1 to 0
+		if ((m.Bitmap[byt] & msk) != 0) && ((mask[byt] & msk) == 0) {
+			m.Bitmap[byt] ^= msk // flip bit in Bitmap from 1 to 0
 			m.AggregatePublic.Sub(m.publics[i])
 		}
 	}
@@ -74,19 +83,19 @@ func (m *Mask) SetMask(mask []byte) error {
 }
 
 // SetBit enables (enable: true) or disables (enable: false) the bit
-// in the participation mask of the given cosigner.
+// in the participation Bitmap of the given cosigner.
 func (m *Mask) SetBit(i int, enable bool) error {
 	if i >= len(m.publics) {
 		return errors.New("index out of range")
 	}
 	byt := i >> 3
 	msk := byte(1) << uint(i&7)
-	if ((m.mask[byt] & msk) == 0) && enable {
-		m.mask[byt] ^= msk // flip bit in mask from 0 to 1
+	if ((m.Bitmap[byt] & msk) == 0) && enable {
+		m.Bitmap[byt] ^= msk // flip bit in Bitmap from 0 to 1
 		m.AggregatePublic.Add(m.publics[i])
 	}
-	if ((m.mask[byt] & msk) != 0) && !enable {
-		m.mask[byt] ^= msk // flip bit in mask from 1 to 0
+	if ((m.Bitmap[byt] & msk) != 0) && !enable {
+		m.Bitmap[byt] ^= msk // flip bit in Bitmap from 1 to 0
 		m.AggregatePublic.Sub(m.publics[i])
 	}
 	return nil
@@ -100,11 +109,11 @@ func (m *Mask) GetPubKeyFromMask(flag bool) []*bls.PublicKey {
 		byt := i >> 3
 		msk := byte(1) << uint(i&7)
 		if flag == true {
-			if (m.mask[byt] & msk) != 0 {
+			if (m.Bitmap[byt] & msk) != 0 {
 				pubKeys = append(pubKeys, m.publics[i])
 			}
 		} else {
-			if (m.mask[byt] & msk) == 0 {
+			if (m.Bitmap[byt] & msk) == 0 {
 				pubKeys = append(pubKeys, m.publics[i])
 			}
 		}
@@ -112,18 +121,18 @@ func (m *Mask) GetPubKeyFromMask(flag bool) []*bls.PublicKey {
 	return pubKeys
 }
 
-// IndexEnabled checks whether the given index is enabled in the mask or not.
+// IndexEnabled checks whether the given index is enabled in the Bitmap or not.
 func (m *Mask) IndexEnabled(i int) (bool, error) {
 	if i >= len(m.publics) {
 		return false, errors.New("index out of range")
 	}
 	byt := i >> 3
 	msk := byte(1) << uint(i&7)
-	return ((m.mask[byt] & msk) != 0), nil
+	return ((m.Bitmap[byt] & msk) != 0), nil
 }
 
 // KeyEnabled checks whether the index, corresponding to the given key, is
-// enabled in the mask or not.
+// enabled in the Bitmap or not.
 func (m *Mask) KeyEnabled(public *bls.PublicKey) (bool, error) {
 	for i, key := range m.publics {
 		if key.IsEqual(public) {
@@ -133,7 +142,7 @@ func (m *Mask) KeyEnabled(public *bls.PublicKey) (bool, error) {
 	return false, errors.New("key not found")
 }
 
-// SetKey set the bit in the mask for the given cosigner
+// SetKey set the bit in the Bitmap for the given cosigner
 func (m *Mask) SetKey(public *bls.PublicKey, enable bool) error {
 	for i, key := range m.publics {
 		if key.IsEqual(public) {
@@ -144,14 +153,14 @@ func (m *Mask) SetKey(public *bls.PublicKey, enable bool) error {
 }
 
 // CountEnabled returns the number of enabled nodes in the CoSi participation
-// mask.
+// Bitmap.
 func (m *Mask) CountEnabled() int {
 	// hw is hamming weight
 	hw := 0
 	for i := range m.publics {
 		byt := i >> 3
 		msk := byte(1) << uint(i&7)
-		if (m.mask[byt] & msk) != 0 {
+		if (m.Bitmap[byt] & msk) != 0 {
 			hw++
 		}
 	}
@@ -166,7 +175,7 @@ func (m *Mask) CountTotal() int {
 // AggregateMasks computes the bitwise OR of the two given participation masks.
 func AggregateMasks(a, b []byte) ([]byte, error) {
 	if len(a) != len(b) {
-		return nil, errors.New("mismatching mask lengths")
+		return nil, errors.New("mismatching Bitmap lengths")
 	}
 	m := make([]byte, len(a))
 	for i := range m {

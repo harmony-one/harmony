@@ -2,21 +2,22 @@
 package consensus // consensus
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
+	"encoding/hex"
 	"fmt"
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"reflect"
 	"strconv"
 	"sync"
 
-	"github.com/dedis/kyber"
-	"github.com/dedis/kyber/sign/schnorr"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/crypto"
-	"github.com/harmony-one/harmony/crypto/pki"
+	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
@@ -31,20 +32,12 @@ type Consensus struct {
 	state State
 
 	// Commits collected from validators.
-	commitments               *map[uint32]kyber.Point
-	finalCommitments          *map[uint32]kyber.Point
-	aggregatedCommitment      kyber.Point
-	aggregatedFinalCommitment kyber.Point
-	bitmap                    *crypto.Mask
-	finalBitmap               *crypto.Mask
-
-	// Challenges for the validators
-	challenge      [32]byte
-	finalChallenge [32]byte
-
-	// Responses collected from validators
-	responses      *map[uint32]kyber.Scalar
-	finalResponses *map[uint32]kyber.Scalar
+	prepareSigs          *map[uint32]*bls.Sign
+	commitSigs           *map[uint32]*bls.Sign
+	aggregatedPrepareSig *bls.Sign
+	aggregatedCommitSig  *bls.Sign
+	prepareBitmap        *bls_cosi.Mask
+	commitBitmap         *bls_cosi.Mask
 
 	// map of nodeID to validator Peer object
 	// FIXME: should use PubKey of p2p.Peer as the hashkey
@@ -58,12 +51,12 @@ type Consensus struct {
 	leader p2p.Peer
 
 	// Public keys of the committee including leader and validators
-	PublicKeys []kyber.Point
+	PublicKeys []*bls.PublicKey
 	pubKeyLock sync.Mutex
 
 	// private/public keys of current node
-	priKey kyber.Scalar
-	pubKey kyber.Point
+	priKey *bls.SecretKey
+	pubKey *bls.PublicKey
 
 	// Whether I am leader. False means I am validator
 	IsLeader bool
@@ -86,8 +79,6 @@ type Consensus struct {
 	// Validator specific fields
 	// Blocks received but not done with consensus yet
 	blocksReceived map[uint32]*BlockConsensusStatus
-	// Commitment secret
-	secret map[uint32]kyber.Scalar
 
 	// Signal channel for starting a new consensus process
 	ReadySignal chan struct{}
@@ -139,43 +130,43 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Cons
 		consensus.IsLeader = false
 	}
 
-	consensus.commitments = &map[uint32]kyber.Point{}
-	consensus.finalCommitments = &map[uint32]kyber.Point{}
-	consensus.responses = &map[uint32]kyber.Scalar{}
-	consensus.finalResponses = &map[uint32]kyber.Scalar{}
-
 	consensus.leader = leader
 	for _, peer := range peers {
 		consensus.validators.Store(utils.GetUniqueIDFromPeer(peer), peer)
 	}
 
+	consensus.prepareSigs = &map[uint32]*bls.Sign{}
+	consensus.commitSigs = &map[uint32]*bls.Sign{}
+
 	// Initialize cosign bitmap
-	allPublicKeys := make([]kyber.Point, 0)
+	allPublicKeys := make([]*bls.PublicKey, 0)
 	for _, validatorPeer := range peers {
 		allPublicKeys = append(allPublicKeys, validatorPeer.PubKey)
 	}
 	allPublicKeys = append(allPublicKeys, leader.PubKey)
-	mask, err := crypto.NewMask(crypto.Ed25519Curve, allPublicKeys, consensus.leader.PubKey)
-	if err != nil {
-		panic("Failed to create mask")
-	}
-	finalMask, err := crypto.NewMask(crypto.Ed25519Curve, allPublicKeys, consensus.leader.PubKey)
-	if err != nil {
-		panic("Failed to create final mask")
-	}
-	consensus.PublicKeys = allPublicKeys
-	consensus.bitmap = mask
-	consensus.finalBitmap = finalMask
 
-	consensus.secret = map[uint32]kyber.Scalar{}
+	consensus.PublicKeys = allPublicKeys
+
+	prepareBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.PubKey)
+	commitBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.PubKey)
+	consensus.prepareBitmap = prepareBitmap
+	consensus.commitBitmap = commitBitmap
+
+	consensus.aggregatedPrepareSig = nil
+	consensus.aggregatedCommitSig = nil
 
 	// For now use socket address as ID
 	// TODO: populate Id derived from address
 	consensus.nodeID = utils.GetUniqueIDFromPeer(selfPeer)
 
 	// Set private key for myself so that I can sign messages.
-	consensus.priKey = crypto.Ed25519Curve.Scalar().SetInt64(int64(consensus.nodeID))
-	consensus.pubKey = pki.GetPublicKeyFromScalar(consensus.priKey)
+	nodeIDBytes := make([]byte, 32)
+	binary.LittleEndian.PutUint32(nodeIDBytes, consensus.nodeID)
+	privateKey := bls.SecretKey{}
+	err := privateKey.SetLittleEndian(nodeIDBytes)
+	consensus.priKey = &privateKey
+	consensus.pubKey = privateKey.GetPublicKey()
+
 	consensus.consensusID = 0 // or view Id in the original pbft paper
 
 	myShardID, err := strconv.Atoi(ShardID)
@@ -211,13 +202,11 @@ func (consensus *Consensus) Author(header *types.Header) (common.Address, error)
 	return common.Address{}, nil
 }
 
-// TODO: switch to BLS-based signature
+// Sign on the hash of the message
 func (consensus *Consensus) signMessage(message []byte) []byte {
-	signature, err := schnorr.Sign(crypto.Ed25519Curve, consensus.priKey, message)
-	if err != nil {
-		panic("Failed to sign message with Schnorr signature.")
-	}
-	return signature
+	hash := sha256.Sum256(message)
+	signature := consensus.priKey.SignHash(hash[:])
+	return signature.Serialize()
 }
 
 // GetValidatorPeers returns list of validator peers.
@@ -235,24 +224,37 @@ func (consensus *Consensus) GetValidatorPeers() []p2p.Peer {
 	return validatorPeers
 }
 
+// GetPrepareSigsArray returns the signatures for prepare as a array
+func (consensus *Consensus) GetPrepareSigsArray() []*bls.Sign {
+	sigs := []*bls.Sign{}
+	for _, sig := range *consensus.prepareSigs {
+		sigs = append(sigs, sig)
+	}
+	return sigs
+}
+
+// GetCommitSigsArray returns the signatures for commit as a array
+func (consensus *Consensus) GetCommitSigsArray() []*bls.Sign {
+	sigs := []*bls.Sign{}
+	for _, sig := range *consensus.commitSigs {
+		sigs = append(sigs, sig)
+	}
+	return sigs
+}
+
 // ResetState resets the state of the consensus
 func (consensus *Consensus) ResetState() {
 	consensus.state = Finished
-	consensus.commitments = &map[uint32]kyber.Point{}
-	consensus.finalCommitments = &map[uint32]kyber.Point{}
-	consensus.responses = &map[uint32]kyber.Scalar{}
-	consensus.finalResponses = &map[uint32]kyber.Scalar{}
+	consensus.prepareSigs = &map[uint32]*bls.Sign{}
+	consensus.commitSigs = &map[uint32]*bls.Sign{}
 
-	mask, _ := crypto.NewMask(crypto.Ed25519Curve, consensus.PublicKeys, consensus.leader.PubKey)
-	finalMask, _ := crypto.NewMask(crypto.Ed25519Curve, consensus.PublicKeys, consensus.leader.PubKey)
-	consensus.bitmap = mask
-	consensus.finalBitmap = finalMask
-	consensus.bitmap.SetMask([]byte{})
-	consensus.finalBitmap.SetMask([]byte{})
+	prepareBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.PubKey)
+	commitBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.PubKey)
+	consensus.prepareBitmap = prepareBitmap
+	consensus.commitBitmap = commitBitmap
 
-	consensus.aggregatedCommitment = nil
-	consensus.aggregatedFinalCommitment = nil
-	consensus.secret = map[uint32]kyber.Scalar{}
+	consensus.aggregatedPrepareSig = nil
+	consensus.aggregatedCommitSig = nil
 
 	// Clear the OfflinePeersList again
 	consensus.OfflinePeerList = make([]p2p.Peer, 0)
@@ -266,8 +268,8 @@ func (consensus *Consensus) String() string {
 	} else {
 		duty = "VLD" // validator
 	}
-	return fmt.Sprintf("[duty:%s, priKey:%s, ShardID:%v, nodeID:%v, state:%s]",
-		duty, consensus.priKey.String(), consensus.ShardID, consensus.nodeID, consensus.state)
+	return fmt.Sprintf("[duty:%s, pubKey:%s, ShardID:%v, nodeID:%v, state:%s]",
+		duty, hex.EncodeToString(consensus.pubKey.Serialize()), consensus.ShardID, consensus.nodeID, consensus.state)
 }
 
 // AddPeers adds new peers into the validator map of the consensus
@@ -347,7 +349,7 @@ func (consensus *Consensus) RemovePeers(peers []p2p.Peer) int {
 // DebugPrintPublicKeys print all the PublicKeys in string format in Consensus
 func (consensus *Consensus) DebugPrintPublicKeys() {
 	for _, k := range consensus.PublicKeys {
-		str := fmt.Sprintf("%s", k)
+		str := fmt.Sprintf("%s", hex.EncodeToString(k.Serialize()))
 		consensus.Log.Debug("pk:", "string", str)
 	}
 
@@ -359,7 +361,7 @@ func (consensus *Consensus) DebugPrintValidators() {
 	count := 0
 	consensus.validators.Range(func(k, v interface{}) bool {
 		if p, ok := v.(p2p.Peer); ok {
-			str2 := fmt.Sprintf("%s", p.PubKey)
+			str2 := fmt.Sprintf("%s", p.PubKey.Serialize())
 			consensus.Log.Debug("validator:", "IP", p.IP, "Port", p.Port, "VID", p.ValidatorID, "Key", str2)
 			count++
 			return true
@@ -370,7 +372,7 @@ func (consensus *Consensus) DebugPrintValidators() {
 }
 
 // UpdatePublicKeys updates the PublicKeys variable, protected by a mutex
-func (consensus *Consensus) UpdatePublicKeys(pubKeys []kyber.Point) int {
+func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int {
 	consensus.pubKeyLock.Lock()
 	//	consensus.PublicKeys = make([]kyber.Point, len(pubKeys))
 	consensus.PublicKeys = append(pubKeys[:0:0], pubKeys...)

@@ -12,6 +12,7 @@ GOOS=linux
 GOARCH=amd64
 FOLDER=/${WHOAMI:-$USER}
 RACE=
+source ~/.bash_profile
 
 if [ "$(uname -s)" == "Darwin" ]; then
    MD5='md5 -r'

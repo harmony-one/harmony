@@ -33,8 +33,10 @@ dirnames() {
 		-e 's:^\./::'
 }
 
+
 go_dirs="${tmpdir}/go_dirs.txt"
 dirnames < "${go_files}" | sort -u -t/ > "${go_dirs}"
+source ~/.bash_profile
 
 echo "Running go test..."
 if go test -v -count=1 ./...

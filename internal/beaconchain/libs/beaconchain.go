@@ -1,12 +1,11 @@
 package beaconchain
 
 import (
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"math/rand"
 	"os"
 	"strconv"
 	"sync"
-
-	"github.com/dedis/kyber"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/api/proto/bcconn"
@@ -46,7 +45,7 @@ type BeaconChain struct {
 	BCInfo         BCInfo
 	log            log.Logger
 	ShardLeaderMap map[int]*node.Info
-	PubKey         kyber.Point
+	PubKey         *bls.PublicKey
 	host           p2p.Host
 	state          BCState
 	rpcServer      *beaconchain.Server
@@ -108,10 +107,10 @@ func New(numShards int, ip, port string, key p2p_crypto.PrivKey) *BeaconChain {
 	return &bc
 }
 
-func generateBCKey() kyber.Point {
+func generateBCKey() *bls.PublicKey {
 	r := rand.Intn(1000)
-	priKey := pki.GetPrivateKeyFromInt(r)
-	pubkey := pki.GetPublicKeyFromPrivateKey(priKey)
+	priKey := pki.GetBLSPrivateKeyFromInt(r)
+	pubkey := priKey.GetPublicKey()
 	return pubkey
 }
 
