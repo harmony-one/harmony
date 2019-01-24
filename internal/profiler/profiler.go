@@ -8,14 +8,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/shirou/gopsutil/process"
 )
 
 // Profiler is the profiler data structure.
 type Profiler struct {
-	// parameters
-	logger           log.Logger
 	pid              int32
 	shardID          string
 	MetricsReportURL string
@@ -36,8 +34,7 @@ func GetProfiler() *Profiler {
 }
 
 // Config configurates Profiler.
-func (profiler *Profiler) Config(logger log.Logger, shardID string, metricsReportURL string) {
-	profiler.logger = logger
+func (profiler *Profiler) Config(shardID string, metricsReportURL string) {
 	profiler.pid = int32(os.Getpid())
 	profiler.shardID = shardID
 	profiler.MetricsReportURL = metricsReportURL
@@ -49,7 +46,7 @@ func (profiler *Profiler) LogMemory() {
 		// log mem usage
 		info, _ := profiler.proc.MemoryInfo()
 		memMap, _ := profiler.proc.MemoryMaps(false)
-		profiler.logger.Info("Mem Report", "info", info, "map", memMap, "shardID", profiler.shardID)
+		utils.GetLogInstance().Info("Mem Report", "info", info, "map", memMap, "shardID", profiler.shardID)
 
 		time.Sleep(3 * time.Second)
 	}
@@ -61,7 +58,7 @@ func (profiler *Profiler) LogCPU() {
 		// log cpu usage
 		percent, _ := profiler.proc.CPUPercent()
 		times, _ := profiler.proc.Times()
-		profiler.logger.Info("CPU Report", "percent", percent, "times", times, "shardID", profiler.shardID)
+		utils.GetLogInstance().Info("CPU Report", "percent", percent, "times", times, "shardID", profiler.shardID)
 
 		time.Sleep(3 * time.Second)
 	}

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // Constants used for attack model.
@@ -34,7 +34,6 @@ type Model struct {
 	attackType                Type
 	ConsensusIDThreshold      uint32
 	readyByConsensusThreshold bool
-	log                       log.Logger // Log utility
 }
 
 var attackModel *Model
@@ -64,11 +63,6 @@ func (attack *Model) SetAttackEnabled(AttackEnabled bool) {
 	}
 }
 
-// SetLogger sets the logger for doing logging.
-func (attack *Model) SetLogger(log log.Logger) {
-	attack.log = log
-}
-
 // Run runs enabled attacks.
 func (attack *Model) Run() {
 	attack.NodeKilledByItSelf()
@@ -82,7 +76,7 @@ func (attack *Model) NodeKilledByItSelf() {
 	}
 
 	if rand.Intn(HitRate) == 0 {
-		attack.log.Debug("******************Killing myself******************", "PID: ", os.Getpid())
+		utils.GetLogInstance().Debug("******************Killing myself******************", "PID: ", os.Getpid())
 		os.Exit(1)
 	}
 }
@@ -93,7 +87,7 @@ func (attack *Model) DelayResponse() {
 		return
 	}
 	if rand.Intn(HitRate) == 0 {
-		attack.log.Debug("******************Model: DelayResponse******************", "PID: ", os.Getpid())
+		utils.GetLogInstance().Debug("******************Model: DelayResponse******************", "PID: ", os.Getpid())
 		time.Sleep(DelayResponseDuration)
 	}
 }
@@ -104,7 +98,7 @@ func (attack *Model) IncorrectResponse() bool {
 		return false
 	}
 	if rand.Intn(HitRate) == 0 {
-		attack.log.Debug("******************Model: IncorrectResponse******************", "PID: ", os.Getpid())
+		utils.GetLogInstance().Debug("******************Model: IncorrectResponse******************", "PID: ", os.Getpid())
 		return true
 	}
 	return false
