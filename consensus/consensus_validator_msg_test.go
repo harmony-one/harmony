@@ -7,13 +7,18 @@ import (
 
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/crypto"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 )
 
 func TestConstructCommitMessage(test *testing.T) {
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "9992"}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "9995"}
-	host, _ := p2pimpl.NewHost(&leader)
+	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
+	host, err := p2pimpl.NewHost(&leader, priKey)
+	if err != nil {
+		test.Fatalf("newhost failure: %v", err)
+	}
 	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader)
 	consensus.blockHash = [32]byte{}
 	_, msg := consensus.constructCommitMessage(consensus_proto.MessageType_COMMIT)
@@ -26,7 +31,11 @@ func TestConstructCommitMessage(test *testing.T) {
 func TestConstructResponseMessage(test *testing.T) {
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902"}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "9905"}
-	host, _ := p2pimpl.NewHost(&leader)
+	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
+	host, err := p2pimpl.NewHost(&leader, priKey)
+	if err != nil {
+		test.Fatalf("newhost failure: %v", err)
+	}
 	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader)
 	consensus.blockHash = [32]byte{}
 	msg := consensus.constructResponseMessage(consensus_proto.MessageType_RESPONSE, crypto.Ed25519Curve.Scalar())

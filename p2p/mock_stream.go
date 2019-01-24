@@ -5,9 +5,10 @@
 package p2p
 
 import (
-	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
 	time "time"
+
+	gomock "github.com/golang/mock/gomock"
 )
 
 // MockStream is a mock of Stream interface

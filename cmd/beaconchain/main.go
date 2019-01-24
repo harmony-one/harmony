@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	beaconchain "github.com/harmony-one/harmony/internal/beaconchain/libs"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 var (
@@ -46,7 +47,9 @@ func main() {
 	} else {
 		fmt.Printf("Starting new beaconchain\n")
 		beaconchain.SetSaveFile(*resetFlag)
-		bc = beaconchain.New(*numShards, *ip, *port)
+
+		priKey, _, _ := utils.GenKeyP2P(*ip, *port)
+		bc = beaconchain.New(*numShards, *ip, *port, priKey)
 	}
 
 	fmt.Printf("Beacon Chain Started: /ip4/%s/tcp/%v/ipfs/%s\n", *ip, *port, bc.GetID().Pretty())

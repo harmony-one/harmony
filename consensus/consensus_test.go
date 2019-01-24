@@ -11,7 +11,11 @@ import (
 func TestNew(test *testing.T) {
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902"}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "9905"}
-	host, _ := p2pimpl.NewHost(&leader)
+	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
+	host, err := p2pimpl.NewHost(&leader, priKey)
+	if err != nil {
+		test.Fatalf("newhost failure: %v", err)
+	}
 	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader)
 	if consensus.consensusID != 0 {
 		test.Errorf("Consensus Id is initialized to the wrong value: %d", consensus.consensusID)
@@ -47,7 +51,11 @@ func TestRemovePeers(t *testing.T) {
 	peerRemove := []p2p.Peer{p1, p2}
 
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "9000", PubKey: pk5}
-	host, _ := p2pimpl.NewHost(&leader)
+	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
+	host, err := p2pimpl.NewHost(&leader, priKey)
+	if err != nil {
+		t.Fatalf("newhost failure: %v", err)
+	}
 	consensus := New(host, "0", peers, leader)
 
 	//	consensus.DebugPrintPublicKeys()
@@ -61,7 +69,8 @@ func TestRemovePeers(t *testing.T) {
 func TestGetPeerFromID(t *testing.T) {
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902"}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "9905"}
-	host, err := p2pimpl.NewHost(&leader)
+	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
+	host, err := p2pimpl.NewHost(&leader, priKey)
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}

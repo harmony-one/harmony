@@ -1,7 +1,6 @@
 package p2pimpl
 
 import (
-	"fmt"
 	"net"
 
 	"github.com/harmony-one/harmony/p2p"
@@ -9,8 +8,7 @@ import (
 	"github.com/harmony-one/harmony/p2p/host/hostv2"
 
 	"github.com/harmony-one/harmony/internal/utils"
-	peer "github.com/libp2p/go-libp2p-peer"
-	ma "github.com/multiformats/go-multiaddr"
+	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
 )
 
 // Version The version number of p2p library
@@ -22,33 +20,13 @@ const Version = 2
 // for hostv2, it generates multiaddress, keypair and add PeerID to peer, add priKey to host
 // TODO (leo) the PriKey of the host has to be persistent in disk, so that we don't need to regenerate it
 // on the same host if the node software restarted. The peerstore has to be persistent as well.
-func NewHost(self *p2p.Peer) (p2p.Host, error) {
+func NewHost(self *p2p.Peer, key p2p_crypto.PrivKey) (p2p.Host, error) {
 	if Version == 1 {
 		h := hostv1.New(self)
 		return h, nil
 	}
 
-	selfAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", self.Port))
-	if err != nil {
-		return nil, err
-	}
-	self.Addrs = append(self.Addrs, selfAddr)
-
-	// TODO (leo), change to GenKeyP2PRand() to generate random key. Right now, the key is predictable as the
-	// seed is fixed.
-	priKey, pubKey, err := utils.GenKeyP2P(self.IP, self.Port)
-	if err != nil {
-		return nil, err
-	}
-
-	peerID, err := peer.IDFromPublicKey(pubKey)
-
-	if err != nil {
-		return nil, err
-	}
-
-	self.PeerID = peerID
-	h := hostv2.New(*self, priKey)
+	h := hostv2.New(self, key)
 
 	utils.GetLogInstance().Info("NewHost", "self", net.JoinHostPort(self.IP, self.Port), "PeerID", self.PeerID)
 
