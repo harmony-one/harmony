@@ -28,6 +28,7 @@ import (
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
+	peer "github.com/libp2p/go-libp2p-peer"
 )
 
 var (
@@ -295,7 +296,7 @@ func CreateWalletNode() *node.Node {
 	response := bcClient.GetLeaders()
 
 	for _, leader := range response.Leaders {
-		shardIDLeaderMap[leader.ShardId] = p2p.Peer{IP: leader.Ip, Port: leader.Port}
+		shardIDLeaderMap[leader.ShardId] = p2p.Peer{IP: leader.Ip, Port: leader.Port, PeerID: peer.ID(leader.PeerID)}
 	}
 
 	// dummy host for wallet
