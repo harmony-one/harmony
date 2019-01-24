@@ -296,7 +296,11 @@ func CreateWalletNode() *node.Node {
 	response := bcClient.GetLeaders()
 
 	for _, leader := range response.Leaders {
-		shardIDLeaderMap[leader.ShardId] = p2p.Peer{IP: leader.Ip, Port: leader.Port, PeerID: peer.ID(leader.PeerID)}
+		peerID, err := peer.IDB58Decode(leader.PeerID)
+		if err != nil {
+			panic(err)
+		}
+		shardIDLeaderMap[leader.ShardId] = p2p.Peer{IP: leader.Ip, Port: leader.Port, PeerID: peerID}
 	}
 
 	// dummy host for wallet
