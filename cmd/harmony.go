@@ -187,14 +187,12 @@ func main() {
 	// Start Profiler for leader if profile argument is on
 	if role == "leader" && (*profile || *metricsReportURL != "") {
 		prof := profiler.GetProfiler()
-		prof.Config(consensus.Log, shardID, *metricsReportURL)
+		prof.Config(shardID, *metricsReportURL)
 		if *profile {
 			prof.Start()
 		}
 	}
 
-	// Set logger to attack model.
-	attack.GetInstance().SetLogger(consensus.Log)
 	// Current node.
 	currentNode := node.New(host, consensus, ldb)
 	currentNode.Consensus.OfflinePeers = currentNode.OfflinePeers
