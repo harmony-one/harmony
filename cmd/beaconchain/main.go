@@ -48,7 +48,7 @@ func main() {
 		fmt.Printf("Starting new beaconchain\n")
 		beaconchain.SetSaveFile(*resetFlag)
 
-		priKey, _, _ := utils.GenKeyP2P(*ip, *port)
+		priKey, _, _ := utils.GenKeyP2PRand()
 		bc = beaconchain.New(*numShards, *ip, *port, priKey)
 	}
 

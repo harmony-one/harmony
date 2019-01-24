@@ -119,7 +119,7 @@ func main() {
 	var selfPeer p2p.Peer
 	var clientPeer *p2p.Peer
 	var BCPeer *p2p.Peer
-	priKey, _, err := utils.GenKeyP2P(*ip, *port)
+	priKey, _, err := utils.GenKeyP2PRand()
 
 	if *bcAddr != "" {
 		// Turn the destination into a multiaddr.
