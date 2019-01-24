@@ -16,6 +16,7 @@ var (
 )
 
 // SetPortAndIP used to print out loggings of node with Port and IP.
+// Every instance (node, txgen, etc..) needs to set this for logging.
 func SetPortAndIP(port, ip string) {
 	Port = port
 	IP = ip
