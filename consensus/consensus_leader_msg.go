@@ -9,6 +9,7 @@ import (
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/crypto"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // Constructs the announce message
@@ -30,7 +31,7 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 
 	marshaledMessage, err := protobuf.Marshal(&message)
 	if err != nil {
-		consensus.Log.Debug("Failed to marshal Announce message", "error", err)
+		utils.GetLogInstance().Debug("Failed to marshal Announce message", "error", err)
 	}
 	// 64 byte of signature on previous data
 	signature := consensus.signMessage(marshaledMessage)
@@ -38,9 +39,9 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 
 	marshaledMessage, err = protobuf.Marshal(&message)
 	if err != nil {
-		consensus.Log.Debug("Failed to marshal Announce message", "error", err)
+		utils.GetLogInstance().Debug("Failed to marshal Announce message", "error", err)
 	}
-	consensus.Log.Info("New Announce", "NodeID", consensus.nodeID, "bitmap", consensus.bitmap)
+	utils.GetLogInstance().Info("New Announce", "NodeID", consensus.nodeID, "bitmap", consensus.bitmap)
 	return proto.ConstructConsensusMessage(marshaledMessage)
 }
 
@@ -92,7 +93,7 @@ func (consensus *Consensus) constructChallengeMessage(msgType consensus_proto.Me
 
 	marshaledMessage, err := protobuf.Marshal(&message)
 	if err != nil {
-		consensus.Log.Debug("Failed to marshal Challenge message", "error", err)
+		utils.GetLogInstance().Debug("Failed to marshal Challenge message", "error", err)
 	}
 	// 64 byte of signature on previous data
 	signature := consensus.signMessage(marshaledMessage)
@@ -100,9 +101,9 @@ func (consensus *Consensus) constructChallengeMessage(msgType consensus_proto.Me
 
 	marshaledMessage, err = protobuf.Marshal(&message)
 	if err != nil {
-		consensus.Log.Debug("Failed to marshal Challenge message", "error", err)
+		utils.GetLogInstance().Debug("Failed to marshal Challenge message", "error", err)
 	}
-	consensus.Log.Info("New Challenge", "NodeID", consensus.nodeID, "bitmap", consensus.bitmap)
+	utils.GetLogInstance().Info("New Challenge", "NodeID", consensus.nodeID, "bitmap", consensus.bitmap)
 	return proto.ConstructConsensusMessage(marshaledMessage), challengeScalar, aggCommitment
 }
 
@@ -134,7 +135,7 @@ func (consensus *Consensus) constructCollectiveSigMessage(collectiveSig [64]byte
 
 	marshaledMessage, err := protobuf.Marshal(&message)
 	if err != nil {
-		consensus.Log.Debug("Failed to marshal Challenge message", "error", err)
+		utils.GetLogInstance().Debug("Failed to marshal Challenge message", "error", err)
 	}
 	// 64 byte of signature on previous data
 	signature := consensus.signMessage(marshaledMessage)
@@ -142,9 +143,9 @@ func (consensus *Consensus) constructCollectiveSigMessage(collectiveSig [64]byte
 
 	marshaledMessage, err = protobuf.Marshal(&message)
 	if err != nil {
-		consensus.Log.Debug("Failed to marshal Challenge message", "error", err)
+		utils.GetLogInstance().Debug("Failed to marshal Challenge message", "error", err)
 	}
-	consensus.Log.Info("New CollectiveSig", "NodeID", consensus.nodeID, "bitmap", consensus.bitmap)
+	utils.GetLogInstance().Info("New CollectiveSig", "NodeID", consensus.nodeID, "bitmap", consensus.bitmap)
 	return proto.ConstructConsensusMessage(marshaledMessage)
 }
 

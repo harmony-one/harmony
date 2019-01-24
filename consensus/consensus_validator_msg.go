@@ -6,6 +6,7 @@ import (
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/crypto"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // Construct the commit message to send to leader (assumption the consensus data is already verified)
@@ -26,13 +27,13 @@ func (consensus *Consensus) constructCommitMessage(msgType consensus_proto.Messa
 	secret, commitment := crypto.Commit(crypto.Ed25519Curve)
 	bytes, err := commitment.MarshalBinary()
 	if err != nil {
-		consensus.Log.Debug("Failed to marshal commit", "error", err)
+		utils.GetLogInstance().Debug("Failed to marshal commit", "error", err)
 	}
 	message.Payload = bytes
 
 	marshaledMessage, err := protobuf.Marshal(&message)
 	if err != nil {
-		consensus.Log.Debug("Failed to marshal Announce message", "error", err)
+		utils.GetLogInstance().Debug("Failed to marshal Announce message", "error", err)
 	}
 	// 64 byte of signature on previous data
 	signature := consensus.signMessage(marshaledMessage)
@@ -40,7 +41,7 @@ func (consensus *Consensus) constructCommitMessage(msgType consensus_proto.Messa
 
 	marshaledMessage, err = protobuf.Marshal(&message)
 	if err != nil {
-		consensus.Log.Debug("Failed to marshal Announce message", "error", err)
+		utils.GetLogInstance().Debug("Failed to marshal Announce message", "error", err)
 	}
 
 	return secret, proto.ConstructConsensusMessage(marshaledMessage)
@@ -62,13 +63,13 @@ func (consensus *Consensus) constructResponseMessage(msgType consensus_proto.Mes
 
 	bytes, err := response.MarshalBinary()
 	if err != nil {
-		consensus.Log.Debug("Failed to marshal response", "error", err)
+		utils.GetLogInstance().Debug("Failed to marshal response", "error", err)
 	}
 	message.Payload = bytes
 
 	marshaledMessage, err := protobuf.Marshal(&message)
 	if err != nil {
-		consensus.Log.Debug("Failed to marshal Announce message", "error", err)
+		utils.GetLogInstance().Debug("Failed to marshal Announce message", "error", err)
 	}
 	// 64 byte of signature on previous data
 	signature := consensus.signMessage(marshaledMessage)
@@ -76,7 +77,7 @@ func (consensus *Consensus) constructResponseMessage(msgType consensus_proto.Mes
 
 	marshaledMessage, err = protobuf.Marshal(&message)
 	if err != nil {
-		consensus.Log.Debug("Failed to marshal Announce message", "error", err)
+		utils.GetLogInstance().Debug("Failed to marshal Announce message", "error", err)
 	}
 	return proto.ConstructConsensusMessage(marshaledMessage)
 }
