@@ -80,24 +80,25 @@ func (host *HostV1) BindHandlerAndServe(handler p2p.StreamHandler) {
 }
 
 // SendMessage sends message to peer
-func (host *HostV1) SendMessage(peer p2p.Peer, message []byte) (err error) {
+func (host *HostV1) SendMessage(peer p2p.Peer, message []byte) error {
+	logger := log.New("from", host.self, "to", peer, "PeerID", peer.PeerID)
 	addr := net.JoinHostPort(peer.IP, peer.Port)
 	conn, err := net.Dial("tcp", addr)
-
 	if err != nil {
-		log.Warn("HostV1 SendMessage Dial() failed", "from", net.JoinHostPort(host.self.IP, host.self.Port), "to", addr, "error", err)
-		return fmt.Errorf("Dail Failed")
+		logger.Warn("Dial() failed", "address", addr, "error", err)
+		return fmt.Errorf("Dial(%s) failed: %v", addr, err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			logger.Warn("Close() failed", "error", err)
+		}
+	}()
 
-	nw, err := conn.Write(message)
-	if err != nil {
-		log.Warn("Write() failed", "addr", conn.RemoteAddr(), "error", err)
-		return fmt.Errorf("Write Failed")
-	}
-	if nw < len(message) {
-		log.Warn("Write() returned short count",
-			"addr", conn.RemoteAddr(), "actual", nw, "expected", len(message))
+	if nw, err := conn.Write(message); err != nil {
+		logger.Warn("Write() failed", "error", err)
+		return fmt.Errorf("Write() failed: %v", err)
+	} else if nw < len(message) {
+		logger.Warn("Short Write()", "actual", nw, "expected", len(message))
 		return io.ErrShortWrite
 	}
 

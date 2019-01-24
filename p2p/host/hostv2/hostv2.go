@@ -3,6 +3,7 @@ package hostv2
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/p2p"
@@ -108,13 +109,21 @@ func (host *HostV2) BindHandlerAndServe(handler p2p.StreamHandler) {
 
 // SendMessage a p2p message sending function with signature compatible to p2pv1.
 func (host *HostV2) SendMessage(p p2p.Peer, message []byte) error {
+	logger := log.New("from", host.self, "to", p, "PeerID", p.PeerID)
 	s, err := host.h.NewStream(context.Background(), p.PeerID, ProtocolID)
 	if err != nil {
-		log.Error("Failed to send message", "from", host.self, "to", p, "error", err, "PeerID", p.PeerID)
-		return err
+		logger.Error("NewStream() failed", "peerID", p.PeerID,
+			"protocolID", ProtocolID, "error", err)
+		return fmt.Errorf("NewStream(%v, %v) failed: %v", p.PeerID,
+			ProtocolID, err)
 	}
-
-	s.Write(message)
+	if nw, err := s.Write(message); err != nil {
+		logger.Error("Write() failed", "error", err)
+		return fmt.Errorf("Write() failed: %v", err)
+	} else if nw < len(message) {
+		logger.Error("Short Write()", "expected", len(message), "actual", nw)
+		return io.ErrShortWrite
+	}
 
 	return nil
 }

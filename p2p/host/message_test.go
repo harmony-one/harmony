@@ -32,7 +32,9 @@ func TestSendMessage(test *testing.T) {
 	host2 := hostv2.New(peer2, priKey2)
 
 	msg := []byte{0x00, 0x01, 0x02, 0x03, 0x04}
-	host1.AddPeer(&peer2)
+	if err := host1.AddPeer(&peer2); err != nil {
+		test.Fatalf("cannot add peer2 to host1: %v", err)
+	}
 
 	go host2.BindHandlerAndServe(handler)
 	SendMessage(host1, peer2, msg, nil)
@@ -40,7 +42,11 @@ func TestSendMessage(test *testing.T) {
 }
 
 func handler(s p2p.Stream) {
-	defer s.Close()
+	defer func() {
+		if err := s.Close(); err != nil {
+			panic(fmt.Sprintf("Close(%v) failed: %v", s, err))
+		}
+	}()
 	content, err := p2p.ReadMessageContent(s)
 	if err != nil {
 		panic("Read p2p data failed")

@@ -1,7 +1,6 @@
 package host
 
 import (
-	"bytes"
 	"encoding/binary"
 	"net"
 	"runtime"
@@ -52,17 +51,11 @@ func BroadcastMessageFromLeader(h p2p.Host, peers []p2p.Peer, msg []byte, lostPe
 
 // ConstructP2pMessage constructs the p2p message as [messageType, contentSize, content]
 func ConstructP2pMessage(msgType byte, content []byte) []byte {
-
-	firstByte := byte(17)        // messageType 0x11
-	sizeBytes := make([]byte, 4) // contentSize
-
-	binary.BigEndian.PutUint32(sizeBytes, uint32(len(content)))
-
-	byteBuffer := bytes.NewBuffer([]byte{})
-	byteBuffer.WriteByte(firstByte)
-	byteBuffer.Write(sizeBytes)
-	byteBuffer.Write(content)
-	return byteBuffer.Bytes()
+	message := make([]byte, 5+len(content))
+	message[0] = 17 // messageType 0x11
+	binary.BigEndian.PutUint32(message[1:5], uint32(len(content)))
+	copy(message[5:], content)
+	return message
 }
 
 // BroadcastMessageFromValidator sends the message to a list of peers from a validator.
@@ -93,9 +86,7 @@ func send(h p2p.Host, peer p2p.Peer, message []byte, lostPeer chan p2p.Peer) {
 	backoff := p2p.NewExpBackoff(150*time.Millisecond, 5*time.Second, 2)
 
 	for trial := 0; trial < 10; trial++ {
-		var err error
-		err = h.SendMessage(peer, message)
-		if err == nil {
+		if err := h.SendMessage(peer, message); err == nil {
 			if trial > 0 {
 				log.Warn("retry send", "rety", trial)
 			}
