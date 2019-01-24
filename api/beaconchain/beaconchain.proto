@@ -17,6 +17,7 @@ message FetchLeadersResponse {
       string ip = 1;
       string port = 2;
       uint32 shardId = 3;
+      string peerID = 4;
   }
   repeated Leader leaders = 1;
 }
