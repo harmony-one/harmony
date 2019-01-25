@@ -6,15 +6,15 @@ import (
 	"os"
 	"time"
 
+	"github.com/harmony-one/bls/ffi/go/bls"
+
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/dedis/kyber"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/api/proto"
 	proto_identity "github.com/harmony-one/harmony/api/proto/identity"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/core/types"
-	hmy_crypto "github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -303,8 +303,8 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 	peer.PeerID = ping.Node.PeerID
 	peer.ValidatorID = ping.Node.ValidatorID
 
-	peer.PubKey = hmy_crypto.Ed25519Curve.Point()
-	err = peer.PubKey.UnmarshalBinary(ping.Node.PubKey[:])
+	peer.PubKey = &bls.PublicKey{}
+	err = peer.PubKey.Deserialize(ping.Node.PubKey[:])
 	if err != nil {
 		utils.GetLogInstance().Error("UnmarshalBinary Failed", "error", err)
 		return -1
@@ -358,8 +358,8 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		peer.ValidatorID = p.ValidatorID
 		peer.PeerID = p.PeerID
 
-		peer.PubKey = hmy_crypto.Ed25519Curve.Point()
-		err = peer.PubKey.UnmarshalBinary(p.PubKey[:])
+		peer.PubKey = &bls.PublicKey{}
+		err = peer.PubKey.Deserialize(p.PubKey[:])
 		if err != nil {
 			utils.GetLogInstance().Error("UnmarshalBinary Failed", "error", err)
 			continue
@@ -374,17 +374,17 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 	// Reset Validator PublicKeys every time we receive PONG message from Leader
 	// The PublicKeys has to be idential across the shard on every node
 	// TODO (lc): we need to handle RemovePeer situation
-	publicKeys := make([]kyber.Point, 0)
+	publicKeys := make([]*bls.PublicKey, 0)
 
 	// Create the the PubKey from the []byte sent from leader
 	for _, k := range pong.PubKeys {
-		key := hmy_crypto.Ed25519Curve.Point()
-		err = key.UnmarshalBinary(k[:])
+		key := bls.PublicKey{}
+		err = key.Deserialize(k[:])
 		if err != nil {
 			utils.GetLogInstance().Error("UnmarshalBinary Failed PubKeys", "error", err)
 			continue
 		}
-		publicKeys = append(publicKeys, key)
+		publicKeys = append(publicKeys, &key)
 	}
 
 	if node.State == NodeWaitToJoin {

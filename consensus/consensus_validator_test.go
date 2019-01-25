@@ -22,14 +22,14 @@ func TestProcessMessageValidatorAnnounce(test *testing.T) {
 	defer ctrl.Finish()
 
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "9982"}
-	_, leader.PubKey = utils.GenKey(leader.IP, leader.Port)
+	_, leader.PubKey = utils.GenKeyBLS(leader.IP, leader.Port)
 
 	validator1 := p2p.Peer{IP: "127.0.0.1", Port: "9984", ValidatorID: 1}
-	_, validator1.PubKey = utils.GenKey(validator1.IP, validator1.Port)
+	_, validator1.PubKey = utils.GenKeyBLS(validator1.IP, validator1.Port)
 	validator2 := p2p.Peer{IP: "127.0.0.1", Port: "9986", ValidatorID: 2}
-	_, validator2.PubKey = utils.GenKey(validator2.IP, validator2.Port)
+	_, validator2.PubKey = utils.GenKeyBLS(validator2.IP, validator2.Port)
 	validator3 := p2p.Peer{IP: "127.0.0.1", Port: "9988", ValidatorID: 3}
-	_, validator3.PubKey = utils.GenKey(validator3.IP, validator3.Port)
+	_, validator3.PubKey = utils.GenKeyBLS(validator3.IP, validator3.Port)
 
 	m := mock_host.NewMockHost(ctrl)
 	// Asserts that the first and only call to Bar() is passed 99.
@@ -66,24 +66,24 @@ func TestProcessMessageValidatorAnnounce(test *testing.T) {
 	copy(consensusValidator1.blockHash[:], hashBytes[:])
 	consensusValidator1.processAnnounceMessage(message)
 
-	assert.Equal(test, CommitDone, consensusValidator1.state)
+	assert.Equal(test, PrepareDone, consensusValidator1.state)
 
 	time.Sleep(1 * time.Second)
 }
 
-func TestProcessMessageValidatorChallenge(test *testing.T) {
+func TestProcessMessageValidatorPrepared(test *testing.T) {
 	ctrl := gomock.NewController(test)
 	defer ctrl.Finish()
 
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "7782"}
-	_, leader.PubKey = utils.GenKey(leader.IP, leader.Port)
+	_, leader.PubKey = utils.GenKeyBLS(leader.IP, leader.Port)
 
 	validator1 := p2p.Peer{IP: "127.0.0.1", Port: "7784", ValidatorID: 1}
-	_, validator1.PubKey = utils.GenKey(validator1.IP, validator1.Port)
+	_, validator1.PubKey = utils.GenKeyBLS(validator1.IP, validator1.Port)
 	validator2 := p2p.Peer{IP: "127.0.0.1", Port: "7786", ValidatorID: 2}
-	_, validator2.PubKey = utils.GenKey(validator2.IP, validator2.Port)
+	_, validator2.PubKey = utils.GenKeyBLS(validator2.IP, validator2.Port)
 	validator3 := p2p.Peer{IP: "127.0.0.1", Port: "7788", ValidatorID: 3}
-	_, validator3.PubKey = utils.GenKey(validator3.IP, validator3.Port)
+	_, validator3.PubKey = utils.GenKeyBLS(validator3.IP, validator3.Port)
 
 	m := mock_host.NewMockHost(ctrl)
 	// Asserts that the first and only call to Bar() is passed 99.
@@ -103,8 +103,8 @@ func TestProcessMessageValidatorChallenge(test *testing.T) {
 
 	copy(consensusLeader.blockHash[:], hashBytes[:])
 
-	commitMsg := consensusLeader.constructAnnounceMessage()
-	challengeMsg, _, _ := consensusLeader.constructChallengeMessage(consensus_proto.MessageType_CHALLENGE)
+	announceMsg := consensusLeader.constructAnnounceMessage()
+	preparedMsg, _ := consensusLeader.constructPreparedMessage()
 
 	if err != nil {
 		test.Errorf("Failed to unmarshal message payload")
@@ -116,15 +116,15 @@ func TestProcessMessageValidatorChallenge(test *testing.T) {
 	}
 
 	message := consensus_proto.Message{}
-	err = message.XXX_Unmarshal(commitMsg[1:])
+	err = message.XXX_Unmarshal(announceMsg[1:])
 	copy(consensusValidator1.blockHash[:], hashBytes[:])
 	consensusValidator1.processAnnounceMessage(message)
 
 	message = consensus_proto.Message{}
-	err = message.XXX_Unmarshal(challengeMsg[1:])
-	consensusValidator1.processChallengeMessage(message, ResponseDone)
+	err = message.XXX_Unmarshal(preparedMsg[1:])
+	consensusValidator1.processPreparedMessage(message)
 
-	assert.Equal(test, ResponseDone, consensusValidator1.state)
+	assert.Equal(test, CommitDone, consensusValidator1.state)
 
 	time.Sleep(1 * time.Second)
 }

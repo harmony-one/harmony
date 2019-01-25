@@ -6,27 +6,25 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dedis/kyber"
+	"github.com/harmony-one/bls/ffi/go/bls"
+
 	"github.com/harmony-one/harmony/api/proto"
-	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/p2p"
 )
 
 var (
-	priKey1 = crypto.Ed25519Curve.Scalar().SetInt64(int64(333))
-	pubKey1 = pki.GetPublicKeyFromScalar(priKey1)
+	pubKey1 = pki.GetBLSPrivateKeyFromInt(333).GetPublicKey()
 	p1      = p2p.Peer{
 		IP:          "127.0.0.1",
 		Port:        "9999",
 		ValidatorID: -1,
 		PubKey:      pubKey1,
 	}
-	e1 = "ping:Validator/1=>127.0.0.1:9999:-1/[90 217 28 68 64 211 160 232 61 244 159 244 160 36 61 161 237 242 236 45 147 118 237 88 234 122 198 188 157 116 90 228]"
-	e3 = "ping:Client/1=>127.0.0.1:9999:-1/[90 217 28 68 64 211 160 232 61 244 159 244 160 36 61 161 237 242 236 45 147 118 237 88 234 122 198 188 157 116 90 228]"
+	e1 = "ping:Validator/1=>127.0.0.1:9999:-1/[120 1 130 197 30 202 78 236 84 249 5 230 132 208 242 242 246 63 100 123 96 11 211 228 4 56 64 94 57 133 3 226 254 222 231 160 178 81 252 205 40 28 45 2 90 74 207 15 68 86 138 68 143 176 221 161 108 105 133 6 64 121 92 25 134 255 9 209 156 209 119 187 13 160 23 147 240 24 196 152 100 20 163 51 118 45 100 26 179 227 184 166 147 113 50 139]"
+	e3 = "ping:Client/1=>127.0.0.1:9999:-1/[120 1 130 197 30 202 78 236 84 249 5 230 132 208 242 242 246 63 100 123 96 11 211 228 4 56 64 94 57 133 3 226 254 222 231 160 178 81 252 205 40 28 45 2 90 74 207 15 68 86 138 68 143 176 221 161 108 105 133 6 64 121 92 25 134 255 9 209 156 209 119 187 13 160 23 147 240 24 196 152 100 20 163 51 118 45 100 26 179 227 184 166 147 113 50 139]"
 
-	priKey2 = crypto.Ed25519Curve.Scalar().SetInt64(int64(999))
-	pubKey2 = pki.GetPublicKeyFromScalar(priKey2)
+	pubKey2 = pki.GetBLSPrivateKeyFromInt(999).GetPublicKey()
 
 	p2 = []p2p.Peer{
 		{
@@ -46,7 +44,7 @@ var (
 	}
 	e2 = "pong:1=>length:2"
 
-	pubKeys = []kyber.Point{pubKey1, pubKey2}
+	pubKeys = []*bls.PublicKey{pubKey1, pubKey2}
 
 	buf1 []byte
 	buf2 []byte

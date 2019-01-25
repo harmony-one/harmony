@@ -16,7 +16,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/dedis/kyber"
+	"github.com/harmony-one/bls/ffi/go/bls"
+
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/p2p"
 
@@ -84,25 +85,19 @@ func (p PongMessageType) String() string {
 func NewPingMessage(peer p2p.Peer) *PingMessageType {
 	ping := new(PingMessageType)
 
-	var err error
 	ping.Version = ProtocolVersion
 	ping.Node.IP = peer.IP
 	ping.Node.Port = peer.Port
 	ping.Node.PeerID = peer.PeerID
 	ping.Node.ValidatorID = peer.ValidatorID
-	ping.Node.PubKey, err = peer.PubKey.MarshalBinary()
+	ping.Node.PubKey = peer.PubKey.Serialize()
 	ping.Node.Role = ValidatorRole
-
-	if err != nil {
-		fmt.Printf("Error Marshal PubKey: %v", err)
-		return nil
-	}
 
 	return ping
 }
 
 // NewPongMessage creates a new Pong message based on a list of p2p.Peer and a list of publicKeys
-func NewPongMessage(peers []p2p.Peer, pubKeys []kyber.Point) *PongMessageType {
+func NewPongMessage(peers []p2p.Peer, pubKeys []*bls.PublicKey) *PongMessageType {
 	pong := new(PongMessageType)
 	pong.PubKeys = make([][]byte, 0)
 
@@ -116,7 +111,7 @@ func NewPongMessage(peers []p2p.Peer, pubKeys []kyber.Point) *PongMessageType {
 		n.Port = p.Port
 		n.ValidatorID = p.ValidatorID
 		n.PeerID = p.PeerID
-		n.PubKey, err = p.PubKey.MarshalBinary()
+		n.PubKey = p.PubKey.Serialize()
 		if err != nil {
 			fmt.Printf("Error Marshal PubKey: %v", err)
 			continue
@@ -125,11 +120,7 @@ func NewPongMessage(peers []p2p.Peer, pubKeys []kyber.Point) *PongMessageType {
 	}
 
 	for _, p := range pubKeys {
-		key, err := p.MarshalBinary()
-		if err != nil {
-			fmt.Printf("Error Marshal PublicKeys: %v", err)
-			continue
-		}
+		key := p.Serialize()
 
 		pong.PubKeys = append(pong.PubKeys, key)
 	}
