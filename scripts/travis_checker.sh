@@ -12,7 +12,7 @@ print_file() {
 	echo "--- END ${2} ---"
 }
 
-unset -v ok tmpdir go_files go_dirs gofmt_output golint_output
+unset -v ok tmpdir go_files go_dirs goimports_output golint_output
 ok=true
 tmpdir=
 trap 'case "${tmpdir}" in ?*) rm -rf "${tmpdir}";; esac' EXIT
@@ -56,16 +56,16 @@ else
 	ok=false
 fi
 
-echo "Running gofmt..."
-gofmt_output="${tmpdir}/gofmt_output.txt"
-xargs gofmt -d -e < "${go_files}" > "${gofmt_output}" 2>&1
-if [ -s "${gofmt_output}" ]
+echo "Running goimports..."
+goimports_output="${tmpdir}/goimports_output.txt"
+xargs goimports -d -e < "${go_files}" > "${goimports_output}" 2>&1
+if [ -s "${goimports_output}" ]
 then
-	echo "gofmt FAILED!"
-	print_file "${gofmt_output}" "gofmt"
+	echo "goimports FAILED!"
+	print_file "${goimports_output}" "goimports"
 	ok=false
 else
-	echo "gofmt passed."
+	echo "goimports passed."
 fi
 
 if ! ${ok}
