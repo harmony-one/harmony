@@ -12,8 +12,16 @@ print_file() {
 	echo "--- END ${2} ---"
 }
 
-unset -v ok tmpdir go_files go_dirs goimports_output golint_output
+unset -v ok tmpdir go_files go_dirs goimports_output golint_output progdir
 ok=true
+
+case "${0}" in
+*/*) progdir="${0%/*}";;
+*) progdir=.;;
+esac
+PATH="${PATH+"${PATH}:"}${progdir}"
+export PATH
+
 tmpdir=
 trap 'case "${tmpdir}" in ?*) rm -rf "${tmpdir}";; esac' EXIT
 tmpdir=$(mktemp -d)
