@@ -7,7 +7,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
-// ActionType ...
+// ActionType is the input for Service Manager to operate.
 type ActionType byte
 
 // Constants for Action Type.
@@ -58,7 +58,7 @@ type Action struct {
 	params      map[string]interface{}
 }
 
-// ServiceInterface ...
+// ServiceInterface is the collection of functions any service needs to implement.
 type ServiceInterface interface {
 	Start()
 	Stop()
@@ -69,7 +69,7 @@ type ServiceStore struct {
 	services map[Type]ServiceInterface
 }
 
-// Register ...
+// Register new service to service store.
 func (ss *ServiceStore) Register(t Type, service ServiceInterface) {
 	if ss.services == nil {
 		ss.services = make(map[Type]ServiceInterface)
@@ -88,19 +88,17 @@ func (node *Node) RegisterService(t Type, service ServiceInterface) {
 	node.serviceStore.Register(t, service)
 }
 
-// RegisterServices ...
+// RegisterServices registers all service for a node with its role.
 func (node *Node) RegisterServices() {
 	node.serviceStore = &ServiceStore{services: make(map[Type]ServiceInterface)}
-	// services := node.serviceStore
-	// services.Register(SupportSyncing, node.SupportSyncing)
 }
 
-// SendAction ...
+// SendAction sends action to action channel which is observed by service manager.
 func (node *Node) SendAction(action *Action) {
 	node.actionChannel <- action
 }
 
-// TakeAction ...
+// TakeAction is how service manager handles the action.
 func (node *Node) TakeAction(action *Action) {
 	if node.serviceStore == nil {
 		utils.GetLogInstance().Error("Service store is not initialized.")
@@ -118,7 +116,7 @@ func (node *Node) TakeAction(action *Action) {
 	}
 }
 
-// StartServiceManager ...
+// StartServiceManager starts service manager.
 func (node *Node) StartServiceManager() chan *Action {
 	ch := make(chan *Action)
 	go func() {
