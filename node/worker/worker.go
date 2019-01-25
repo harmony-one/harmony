@@ -13,6 +13,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // environment is the worker's current environment and holds all of the current state information.
@@ -39,6 +40,37 @@ type Worker struct {
 	gasCeil  uint64
 
 	shardID uint32
+}
+
+// SelectStakeTransactionsForNewBlock selects transactions for new block.
+func (w *Worker) SelectStakeTransactionsForNewBlock(txs types.Transactions, maxNumTxs int) (types.Transactions, types.Transactions, types.Transactions) {
+	if w.current.gasPool == nil {
+		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit)
+	}
+	selected := types.Transactions{}
+	unselected := types.Transactions{}
+	invalid := types.Transactions{}
+	for _, tx := range txs {
+		if tx.ShardID() == 0 && *tx.Recipient() == utils.BeaconChainAddress {
+			selected = append(selected, tx)
+		}
+		snap := w.current.state.Snapshot()
+		_, err := w.commitTransaction(tx, w.coinbase)
+		if len(selected) > maxNumTxs {
+			unselected = append(unselected, tx)
+		} else {
+			if err != nil {
+				w.current.state.RevertToSnapshot(snap)
+				invalid = append(invalid, tx)
+				log.Debug("Invalid transaction", "Error", err)
+			}
+		}
+	}
+	err := w.UpdateCurrent()
+	if err != nil {
+		log.Debug("Failed updating worker's state", "Error", err)
+	}
+	return selected, unselected, invalid
 }
 
 // SelectTransactionsForNewBlock selects transactions for new block.

@@ -2,9 +2,9 @@ package utils
 
 import (
 	"bytes"
+	"crypto/ecdsa"
 	"encoding/binary"
 	"encoding/json"
-	"github.com/harmony-one/bls/ffi/go/bls"
 	"io"
 	"log"
 	mrand "math/rand"
@@ -13,15 +13,26 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/harmony-one/bls/ffi/go/bls"
+
+	"strings"
+	"sync"
+
 	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
 
 	"github.com/dedis/kyber"
+	eth_crypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/p2p"
 )
 
-var lock sync.Mutex
+var (
+	lock     sync.Mutex
+	key, err = ecdsa.GenerateKey(eth_crypto.S256(), strings.NewReader("Beaconchain Dummy Address"))
+	//BeaconChainAddress is available across all packages. Make it constant.
+	BeaconChainAddress = eth_crypto.PubkeyToAddress(key.PublicKey)
+)
 
 // Unmarshal is a function that unmarshals the data from the
 // reader into the specified value.

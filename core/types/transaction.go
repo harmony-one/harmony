@@ -27,6 +27,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 //go:generate gencodec -type txdata -field-override txdataMarshaling -out gen_tx_json.go
@@ -84,6 +85,12 @@ func NewContractCreation(nonce uint64, shardID uint32, amount *big.Int, gasLimit
 	return newTransaction(nonce, nil, shardID, amount, gasLimit, gasPrice, data)
 }
 
+// NewStakeTransaction constructs a stake transaction.
+// Currently a stake transaction is sent to a constant beaconchain address and the shard id is 0.
+func NewStakeTransaction(nonce uint64, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte) *Transaction {
+	return newTransaction(nonce, &utils.BeaconChainAddress, 0, amount, gasLimit, gasPrice, data)
+}
+
 func newTransaction(nonce uint64, to *common.Address, shardID uint32, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte) *Transaction {
 	if len(data) > 0 {
 		data = common.CopyBytes(data)
@@ -118,6 +125,11 @@ func (tx *Transaction) ChainID() *big.Int {
 // ShardID returns which shard id this transaction was signed for (if at all)
 func (tx *Transaction) ShardID() uint32 {
 	return tx.data.ShardID
+}
+
+// Recipient returns the receipient of this transaction
+func (tx *Transaction) Recipient() *common.Address {
+	return tx.data.Recipient
 }
 
 // Protected returns whether the transaction is protected from replay protection.
