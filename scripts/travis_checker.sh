@@ -1,6 +1,6 @@
 #!/bin/bash
 
-unset -v ok tmpdir go_dirs goimports_output golint_output progdir
+unset -v ok tmpdir goimports_output golint_output progdir
 ok=true
 
 case "${0}" in
@@ -14,10 +14,6 @@ tmpdir=
 trap 'case "${tmpdir}" in ?*) rm -rf "${tmpdir}";; esac' EXIT
 tmpdir=$(mktemp -d)
 
-
-go_dirs="${tmpdir}/go_dirs.txt"
-"${progdir}/list_harmony_go_files.sh" | "${progdir}/dirnames.sh" | sort -u -t/ > "${go_dirs}"
-
 echo "Running go test..."
 if go test -v -count=1 ./...
 then
@@ -29,7 +25,7 @@ fi
 
 echo "Running golint..."
 golint_output="${tmpdir}/golint_output.txt"
-if xargs golint -set_exit_status < "${go_dirs}" > "${golint_output}" 2>&1
+if "${progdir}/golint.sh" -set_exit_status > "${golint_output}" 2>&1
 then
 	echo "golint passed."
 else
