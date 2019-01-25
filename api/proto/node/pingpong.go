@@ -14,12 +14,11 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	"github.com/harmony-one/bls/ffi/go/bls"
 	"log"
 
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/p2p"
-
 	"github.com/libp2p/go-libp2p-peer"
 )
 

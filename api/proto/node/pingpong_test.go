@@ -2,11 +2,11 @@ package node
 
 import (
 	"fmt"
-	"github.com/harmony-one/bls/ffi/go/bls"
 	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/p2p"

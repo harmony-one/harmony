@@ -2,9 +2,9 @@ package p2p
 
 import (
 	"fmt"
-	"github.com/harmony-one/bls/ffi/go/bls"
 	"net"
 
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/libp2p/go-libp2p-peer"
 	"github.com/multiformats/go-multiaddr"
 )
