@@ -1,6 +1,6 @@
 #!/bin/bash
 
-unset -v ok tmpdir go_files go_dirs goimports_output golint_output progdir
+unset -v ok tmpdir go_dirs goimports_output golint_output progdir
 ok=true
 
 case "${0}" in
@@ -14,11 +14,9 @@ tmpdir=
 trap 'case "${tmpdir}" in ?*) rm -rf "${tmpdir}";; esac' EXIT
 tmpdir=$(mktemp -d)
 
-go_files="${tmpdir}/go_files.txt"
-"${progdir}/list_harmony_go_files.sh" > "${go_files}"
 
 go_dirs="${tmpdir}/go_dirs.txt"
-"${progdir}/dirnames.sh" < "${go_files}" | sort -u -t/ > "${go_dirs}"
+"${progdir}/list_harmony_go_files.sh" | "${progdir}/dirnames.sh" | sort -u -t/ > "${go_dirs}"
 
 echo "Running go test..."
 if go test -v -count=1 ./...
@@ -42,7 +40,7 @@ fi
 
 echo "Running goimports..."
 goimports_output="${tmpdir}/goimports_output.txt"
-xargs goimports -d -e < "${go_files}" > "${goimports_output}" 2>&1
+"${progdir}/goimports.sh" -d -e > "${goimports_output}" 2>&1
 if [ -s "${goimports_output}" ]
 then
 	echo "goimports FAILED!"
