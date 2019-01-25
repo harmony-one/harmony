@@ -17,20 +17,8 @@ tmpdir=$(mktemp -d)
 go_files="${tmpdir}/go_files.txt"
 "${progdir}/list_harmony_go_files.sh" > "${go_files}"
 
-# Print dirname of each relative pathname from stdin (one per line).
-dirnames() {
-	# pathname	dirname
-	# ----------------------
-	# a/b/c.go	a/b
-	# c.go		.
-	sed \
-		-e 's:^:./:' \
-		-e 's:/[^/]*$::' \
-		-e 's:^\./::'
-}
-
 go_dirs="${tmpdir}/go_dirs.txt"
-dirnames < "${go_files}" | sort -u -t/ > "${go_dirs}"
+"${progdir}/dirnames.sh" < "${go_files}" | sort -u -t/ > "${go_dirs}"
 
 echo "Running go test..."
 if go test -v -count=1 ./...
