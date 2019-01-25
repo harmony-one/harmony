@@ -28,7 +28,7 @@ const (
 	Done
 )
 
-func (t Type) String() string {
+func (t ServiceType) String() string {
 	switch t {
 	case SupportClient:
 		return "SupportClient"
@@ -54,7 +54,7 @@ const (
 // Action is type of service action.
 type Action struct {
 	action      ActionType
-	serviceType Type
+	serviceType ServiceType
 	params      map[string]interface{}
 }
 
@@ -66,13 +66,13 @@ type ServiceInterface interface {
 
 // ServiceStore stores all services for service manager.
 type ServiceStore struct {
-	services map[Type]ServiceInterface
+	services map[ServiceType]ServiceInterface
 }
 
 // Register new service to service store.
-func (ss *ServiceStore) Register(t Type, service ServiceInterface) {
+func (ss *ServiceStore) Register(t ServiceType, service ServiceInterface) {
 	if ss.services == nil {
-		ss.services = make(map[Type]ServiceInterface)
+		ss.services = make(map[ServiceType]ServiceInterface)
 	}
 	ss.services[t] = service
 }
@@ -84,13 +84,13 @@ func (node *Node) Start() {
 }
 
 // RegisterService is used for testing.
-func (node *Node) RegisterService(t Type, service ServiceInterface) {
+func (node *Node) RegisterService(t ServiceType, service ServiceInterface) {
 	node.serviceStore.Register(t, service)
 }
 
 // RegisterServices registers all service for a node with its role.
 func (node *Node) RegisterServices() {
-	node.serviceStore = &ServiceStore{services: make(map[Type]ServiceInterface)}
+	node.serviceStore = &ServiceStore{services: make(map[ServiceType]ServiceInterface)}
 }
 
 // SendAction sends action to action channel which is observed by service manager.
