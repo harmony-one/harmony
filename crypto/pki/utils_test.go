@@ -2,11 +2,12 @@ package pki
 
 import (
 	"encoding/binary"
-	"github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/crypto"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/crypto"
 )
 
 func TestGetAddressFromPublicKey(test *testing.T) {
