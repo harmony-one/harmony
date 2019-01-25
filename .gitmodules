@@ -5,3 +5,6 @@
 [submodule "vendor/github.com/golang/protobuf"]
 	path = vendor/github.com/golang/protobuf
 	url = https://github.com/golang/protobuf
+[submodule "vendor/github.com/dedis/kyber"]
+	path = vendor/github.com/dedis/kyber
+	url = https://github.com/dedis/kyber
