@@ -600,7 +600,7 @@ func (node *Node) SendNewBlockToUnsync() {
 				continue
 			}
 			response := config.client.PushNewBlock(selfPeerID, blockHash, false)
-			if response.Type == downloader_pb.DownloaderResponse_INSYNC {
+			if response != nil && response.Type == downloader_pb.DownloaderResponse_INSYNC {
 				node.stateMutex.Lock()
 				node.peerRegistrationRecord[peerID].client.Close()
 				delete(node.peerRegistrationRecord, peerID)
