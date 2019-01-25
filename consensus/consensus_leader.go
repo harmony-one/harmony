@@ -183,7 +183,7 @@ func (consensus *Consensus) processPrepareMessage(message consensus_proto.Messag
 		// Broadcast prepared message
 		host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
 
-		// Set state to targetState (ChallengeDone or FinalChallengeDone)
+		// Set state to targetState
 		consensus.state = targetState
 	}
 }
@@ -264,9 +264,8 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 		return
 	}
 
-	threshold := 2
-	targetState := CommitDone
-	if len(*commitSigs) >= ((len(consensus.PublicKeys)*threshold)/3+1) && consensus.state != targetState {
+	targetState := CommittedDone
+	if len(*commitSigs) >= ((len(consensus.PublicKeys)*2)/3+1) && consensus.state != targetState {
 		utils.GetLogInstance().Info("Enough commits received!", "num", len(*commitSigs), "state", consensus.state)
 
 		// Construct committed message
@@ -275,9 +274,6 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 
 		// Broadcast committed message
 		host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
-
-		// Set state to CollectiveSigDone or Finished
-		consensus.state = targetState
 
 		var blockObj types.Block
 		err = rlp.DecodeBytes(consensus.block, &blockObj)
@@ -312,7 +308,6 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 		time.Sleep(500 * time.Millisecond)
 		// Send signal to Node so the new block can be added and new round of consensus can be triggered
 		consensus.ReadySignal <- struct{}{}
-		consensus.state = Finished
 	}
 }
 
