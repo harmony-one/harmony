@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"github.com/harmony-one/bls/ffi/go/bls"
 	"reflect"
 	"strconv"
 	"sync"
@@ -14,6 +13,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/bls/ffi/go/bls"
+	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
@@ -21,8 +22,6 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 	"golang.org/x/crypto/sha3"
-
-	proto_node "github.com/harmony-one/harmony/api/proto/node"
 )
 
 // Consensus is the main struct with all states and data related to consensus process.
