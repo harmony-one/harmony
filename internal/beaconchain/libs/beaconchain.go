@@ -12,7 +12,7 @@ import (
 	proto_identity "github.com/harmony-one/harmony/api/proto/identity"
 	"github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/crypto/pki"
-	"github.com/harmony-one/harmony/internal/beaconchain/rpc"
+	beaconchain "github.com/harmony-one/harmony/internal/beaconchain/rpc"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
