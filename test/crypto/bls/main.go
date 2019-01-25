@@ -13,7 +13,6 @@ func main() {
 
 	startTime := time.Now()
 	for i := 0; i < 1000; i++ {
-		bls.Init(bls.BLS12_381)
 		var sec bls.SecretKey
 		sec.SetByCSPRNG()
 		if i == 0 {
