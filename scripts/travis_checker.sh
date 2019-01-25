@@ -33,6 +33,11 @@ dirnames() {
 		-e 's:^\./::'
 }
 
+HMY_PATH=$GOPATH/src/github.com/harmony-one
+export CGO_CFLAGS="-I$HMY_PATH/bls/include -I$HMY_PATH/mcl/include"
+export CGO_LDFLAGS="-L$HMY_PATH/bls/lib"
+export LD_LIBRARY_PATH=$HMY_PATH/bls/lib:$HMY_PATH/mcl/lib
+
 go_dirs="${tmpdir}/go_dirs.txt"
 dirnames < "${go_files}" | sort -u -t/ > "${go_dirs}"
 
