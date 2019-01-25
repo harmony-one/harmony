@@ -2,13 +2,11 @@ package consensus
 
 import (
 	"bytes"
-
-	"github.com/dedis/kyber"
-	"github.com/ethereum/go-ethereum/log"
 	protobuf "github.com/golang/protobuf/proto"
+	"github.com/harmony-one/bls/ffi/go/bls"
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/api/proto"
-	"github.com/harmony-one/harmony/crypto"
+	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -41,14 +39,14 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 	if err != nil {
 		utils.GetLogInstance().Debug("Failed to marshal Announce message", "error", err)
 	}
-	utils.GetLogInstance().Info("New Announce", "NodeID", consensus.nodeID, "bitmap", consensus.bitmap)
+	utils.GetLogInstance().Info("New Announce", "NodeID", consensus.nodeID)
 	return proto.ConstructConsensusMessage(marshaledMessage)
 }
 
-// Construct the challenge message, returning challenge message in bytes, challenge scalar and aggregated commmitment point.
-func (consensus *Consensus) constructChallengeMessage(msgType consensus_proto.MessageType) ([]byte, kyber.Scalar, kyber.Point) {
+// Construct the prepared message, returning prepared message in bytes.
+func (consensus *Consensus) constructPreparedMessage() ([]byte, *bls.Sign) {
 	message := consensus_proto.Message{}
-	message.Type = msgType
+	message.Type = consensus_proto.MessageType_PREPARED
 
 	// 4 byte consensus id
 	message.ConsensusId = consensus.consensusID
@@ -62,56 +60,37 @@ func (consensus *Consensus) constructChallengeMessage(msgType consensus_proto.Me
 	//// Payload
 	buffer := bytes.NewBuffer([]byte{})
 
-	commitmentsMap := consensus.commitments // msgType == Challenge
-	bitmap := consensus.bitmap
-	if msgType == consensus_proto.MessageType_FINAL_CHALLENGE {
-		commitmentsMap = consensus.finalCommitments
-		bitmap = consensus.finalBitmap
-	}
+	// 48 bytes aggregated signature
+	aggSig := bls_cosi.AggregateSig(consensus.GetPrepareSigsArray())
+	buffer.Write(aggSig.Serialize())
 
-	// 33 byte aggregated commit
-	commitments := make([]kyber.Point, 0)
-	for _, val := range *commitmentsMap {
-		commitments = append(commitments, val)
-	}
-	aggCommitment, aggCommitmentBytes := getAggregatedCommit(commitments)
-	buffer.Write(aggCommitmentBytes)
-
-	// 33 byte aggregated key
-	buffer.Write(getAggregatedKey(bitmap))
-
-	// 32 byte challenge
-	challengeScalar := getChallenge(aggCommitment, bitmap.AggregatePublic, message.BlockHash)
-	bytes, err := challengeScalar.MarshalBinary()
-	if err != nil {
-		log.Error("Failed to serialize challenge")
-	}
-	buffer.Write(bytes)
+	// Bitmap
+	buffer.Write(consensus.prepareBitmap.Bitmap)
 
 	message.Payload = buffer.Bytes()
 	//// END Payload
 
+	// TODO: use custom serialization method rather than protobuf
 	marshaledMessage, err := protobuf.Marshal(&message)
 	if err != nil {
-		utils.GetLogInstance().Debug("Failed to marshal Challenge message", "error", err)
+		utils.GetLogInstance().Debug("Failed to marshal Prepared message", "error", err)
 	}
-	// 64 byte of signature on previous data
+	// 48 byte of signature on previous data
 	signature := consensus.signMessage(marshaledMessage)
 	message.Signature = signature
 
 	marshaledMessage, err = protobuf.Marshal(&message)
 	if err != nil {
-		utils.GetLogInstance().Debug("Failed to marshal Challenge message", "error", err)
+		utils.GetLogInstance().Debug("Failed to marshal Prepared message", "error", err)
 	}
-	utils.GetLogInstance().Info("New Challenge", "NodeID", consensus.nodeID, "bitmap", consensus.bitmap)
-	return proto.ConstructConsensusMessage(marshaledMessage), challengeScalar, aggCommitment
+	utils.GetLogInstance().Info("New Prepared Message", "NodeID", consensus.nodeID, "bitmap", consensus.prepareBitmap)
+	return proto.ConstructConsensusMessage(marshaledMessage), aggSig
 }
 
-// Construct the collective signature message
-func (consensus *Consensus) constructCollectiveSigMessage(collectiveSig [64]byte, bitmap []byte) []byte {
+// Construct the committed message, returning committed message in bytes.
+func (consensus *Consensus) constructCommittedMessage() ([]byte, *bls.Sign) {
 	message := consensus_proto.Message{}
-	message.Type = consensus_proto.MessageType_COLLECTIVE_SIG
-
+	message.Type = consensus_proto.MessageType_COMMITTED
 	// 4 byte consensus id
 	message.ConsensusId = consensus.consensusID
 
@@ -124,52 +103,29 @@ func (consensus *Consensus) constructCollectiveSigMessage(collectiveSig [64]byte
 	//// Payload
 	buffer := bytes.NewBuffer([]byte{})
 
-	// 64 byte collective signature
-	buffer.Write(collectiveSig[:])
+	// 48 bytes aggregated signature
+	aggSig := bls_cosi.AggregateSig(consensus.GetCommitSigsArray())
+	buffer.Write(aggSig.Serialize())
 
-	// N byte bitmap
-	buffer.Write(bitmap)
+	// Bitmap
+	buffer.Write(consensus.commitBitmap.Bitmap)
 
 	message.Payload = buffer.Bytes()
 	//// END Payload
 
+	// TODO: use custom serialization method rather than protobuf
 	marshaledMessage, err := protobuf.Marshal(&message)
 	if err != nil {
-		utils.GetLogInstance().Debug("Failed to marshal Challenge message", "error", err)
+		utils.GetLogInstance().Debug("Failed to marshal Committed message", "error", err)
 	}
-	// 64 byte of signature on previous data
+	// 48 byte of signature on previous data
 	signature := consensus.signMessage(marshaledMessage)
 	message.Signature = signature
 
 	marshaledMessage, err = protobuf.Marshal(&message)
 	if err != nil {
-		utils.GetLogInstance().Debug("Failed to marshal Challenge message", "error", err)
+		utils.GetLogInstance().Debug("Failed to marshal Committed message", "error", err)
 	}
-	utils.GetLogInstance().Info("New CollectiveSig", "NodeID", consensus.nodeID, "bitmap", consensus.bitmap)
-	return proto.ConstructConsensusMessage(marshaledMessage)
-}
-
-func getAggregatedCommit(commitments []kyber.Point) (commitment kyber.Point, bytes []byte) {
-	aggCommitment := crypto.AggregateCommitmentsOnly(crypto.Ed25519Curve, commitments)
-	bytes, err := aggCommitment.MarshalBinary()
-	if err != nil {
-		panic("Failed to deserialize the aggregated commitment")
-	}
-	return aggCommitment, append(bytes[:], byte(0))
-}
-
-func getAggregatedKey(bitmap *crypto.Mask) []byte {
-	bytes, err := bitmap.AggregatePublic.MarshalBinary()
-	if err != nil {
-		panic("Failed to deserialize the aggregated key")
-	}
-	return append(bytes[:], byte(0))
-}
-
-func getChallenge(aggCommitment, aggKey kyber.Point, message []byte) kyber.Scalar {
-	challenge, err := crypto.Challenge(crypto.Ed25519Curve, aggCommitment, aggKey, message)
-	if err != nil {
-		log.Error("Failed to generate challenge")
-	}
-	return challenge
+	utils.GetLogInstance().Info("New Prepared Message", "NodeID", consensus.nodeID, "bitmap", consensus.commitBitmap)
+	return proto.ConstructConsensusMessage(marshaledMessage), aggSig
 }

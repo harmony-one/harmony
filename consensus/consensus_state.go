@@ -7,13 +7,10 @@ type State int
 const (
 	Finished State = iota
 	AnnounceDone
+	PrepareDone
+	PreparedDone
 	CommitDone
-	ChallengeDone
-	ResponseDone
-	CollectiveSigDone
-	FinalCommitDone
-	FinalChallengeDone
-	FinalResponseDone
+	CommittedDone
 )
 
 // Returns string name for the State enum
@@ -21,15 +18,12 @@ func (state State) String() string {
 	names := [...]string{
 		"Finished",
 		"AnnounceDone",
+		"PrepareDone",
+		"PreparedDone",
 		"CommitDone",
-		"ChallengeDone",
-		"ResponseDone",
-		"CollectiveSigDone",
-		"FinalCommitDone",
-		"FinalChallengeDone",
-		"FinalResponseDone"}
+		"CommittedDone"}
 
-	if state < Finished || state > FinalResponseDone {
+	if state < Finished || state > CommittedDone {
 		return "Unknown"
 	}
 	return names[state]

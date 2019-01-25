@@ -2,11 +2,11 @@ package p2p
 
 import (
 	"fmt"
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"net"
 
-	"github.com/dedis/kyber"
-	peer "github.com/libp2p/go-libp2p-peer"
-	multiaddr "github.com/multiformats/go-multiaddr"
+	"github.com/libp2p/go-libp2p-peer"
+	"github.com/multiformats/go-multiaddr"
 )
 
 // StreamHandler handles incoming p2p message.
@@ -16,7 +16,7 @@ type StreamHandler func(Stream)
 type Peer struct {
 	IP          string                // IP address of the peer
 	Port        string                // Port number of the peer
-	PubKey      kyber.Point           // Public key of the peer, used for consensus signing
+	PubKey      *bls.PublicKey        // Public key of the peer, used for consensus signing
 	Ready       bool                  // Ready is true if the peer is ready to join consensus. (FIXME: deprecated)
 	ValidatorID int                   // -1 is the default value, means not assigned any validator ID in the shard
 	Addrs       []multiaddr.Multiaddr // MultiAddress of the peer
