@@ -138,6 +138,10 @@ type Node struct {
 	// Signal channel for lost validators
 	OfflinePeers chan p2p.Peer
 
+	// Action Channel
+	actionChannel chan *Action
+	serviceStore  *ServiceStore
+
 	// For test only
 	TestBankKeys      []*ecdsa.PrivateKey
 	ContractKeys      []*ecdsa.PrivateKey
