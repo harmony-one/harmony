@@ -16,6 +16,7 @@ func (s *SupportSyncingTest) Stop() {
 	fmt.Println("SupportSyncingTest stopping")
 }
 
+// Test TakeAction.
 func TestTakeAction(t *testing.T) {
 	node := &Node{}
 	node.Start()
