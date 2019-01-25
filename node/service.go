@@ -21,7 +21,7 @@ type Type byte
 
 // Constants for Type.
 const (
-	SyncingSupport Type = iota
+	SupportSyncing Type = iota
 	SupportClient
 	SupportExplorer
 	Test
@@ -32,7 +32,7 @@ func (t Type) String() string {
 	switch t {
 	case SupportClient:
 		return "SupportClient"
-	case SyncingSupport:
+	case SupportSyncing:
 		return "SyncingSupport"
 	case SupportExplorer:
 		return "SupportExplorer"
@@ -69,9 +69,30 @@ type ServiceStore struct {
 	services map[Type]ServiceInterface
 }
 
+// Register ...
+func (ss *ServiceStore) Register(t Type, service ServiceInterface) {
+	if ss.services == nil {
+		ss.services = make(map[Type]ServiceInterface)
+	}
+	ss.services[t] = service
+}
+
 // Start node.
 func (node *Node) Start() {
+	node.RegisterServices()
 	node.actionChannel = node.StartServiceManager()
+}
+
+// RegisterService is used for testing.
+func (node *Node) RegisterService(t Type, service ServiceInterface) {
+	node.serviceStore.Register(t, service)
+}
+
+// RegisterServices ...
+func (node *Node) RegisterServices() {
+	node.serviceStore = &ServiceStore{services: make(map[Type]ServiceInterface)}
+	// services := node.serviceStore
+	// services.Register(SupportSyncing, node.SupportSyncing)
 }
 
 // SendAction ...
