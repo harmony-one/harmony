@@ -11,6 +11,7 @@ import (
 	"github.com/dedis/kyber/sign/schnorr"
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
+
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/api/services/explorer"
 	"github.com/harmony-one/harmony/core/types"

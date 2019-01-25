@@ -1,9 +1,10 @@
 package main
 
 import (
-	"github.com/harmony-one/bls/ffi/go/bls"
 	"log"
 	"time"
+
+	"github.com/harmony-one/bls/ffi/go/bls"
 )
 
 func main() {

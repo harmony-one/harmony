@@ -1,12 +1,13 @@
 package node
 
 import (
+	"testing"
+
 	"github.com/golang/mock/gomock"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
-	"testing"
 )
 
 func TestNodeStreamHandler(t *testing.T) {
