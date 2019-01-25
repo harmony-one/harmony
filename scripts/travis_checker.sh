@@ -1,17 +1,5 @@
 #!/bin/bash
 
-# Print a file surrounded by BEGIN/END preamble, e.g.:
-#
-#	--- BEGIN a.out output ---
-#	Hello world
-#	--- END a.out output ---
-#
-print_file() {
-	echo "--- BEGIN ${2} ---"
-	cat "${1}"
-	echo "--- END ${2} ---"
-}
-
 unset -v ok tmpdir go_files go_dirs goimports_output golint_output progdir
 ok=true
 
@@ -60,7 +48,7 @@ then
 	echo "golint passed."
 else
 	echo "golint FAILED!"
-	print_file "${golint_output}" "golint"
+	"${progdir}/print_file.sh" "${golint_output}" "golint"
 	ok=false
 fi
 
@@ -70,7 +58,7 @@ xargs goimports -d -e < "${go_files}" > "${goimports_output}" 2>&1
 if [ -s "${goimports_output}" ]
 then
 	echo "goimports FAILED!"
-	print_file "${goimports_output}" "goimports"
+	"${progdir}/print_file.sh" "${goimports_output}" "goimports"
 	ok=false
 else
 	echo "goimports passed."
