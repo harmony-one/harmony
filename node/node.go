@@ -109,8 +109,6 @@ type Node struct {
 	blockchain *core.BlockChain   // The blockchain for the shard where this node belongs
 	db         *ethdb.LDBDatabase // LevelDB to store blockchain.
 
-	log log.Logger // Log utility
-
 	ClientPeer *p2p.Peer      // The peer for the harmony tx generator client, used for leaders to return proof-of-accept
 	Client     *client.Client // The presence of a client object means this node will also act as a client
 	SelfPeer   p2p.Peer       // TODO(minhdoan): it could be duplicated with Self below whose is Alok work.
@@ -156,7 +154,7 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 	node.pendingTxMutex.Lock()
 	node.pendingTransactions = append(node.pendingTransactions, newTxs...)
 	node.pendingTxMutex.Unlock()
-	node.log.Debug("Got more transactions", "num", len(newTxs), "totalPending", len(node.pendingTransactions))
+	utils.GetLogInstance().Debug("Got more transactions", "num", len(newTxs), "totalPending", len(node.pendingTransactions))
 }
 
 // Take out a subset of valid transactions from the pending transaction list
@@ -166,9 +164,9 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int) types.Transactions {
 	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(node.pendingTransactions, maxNumTxs)
 	_ = invalid // invalid txs are discard
 
-	node.log.Debug("Invalid transactions discarded", "number", len(invalid))
+	utils.GetLogInstance().Debug("Invalid transactions discarded", "number", len(invalid))
 	node.pendingTransactions = unselected
-	node.log.Debug("Remaining pending transactions", "number", len(node.pendingTransactions))
+	utils.GetLogInstance().Debug("Remaining pending transactions", "number", len(node.pendingTransactions))
 	node.pendingTxMutex.Unlock()
 	return selected
 }
@@ -198,7 +196,7 @@ func (node *Node) SerializeNode(nnode *NetworkNode) []byte {
 	if err != nil {
 		fmt.Println("Could not serialize node")
 		fmt.Println("ERROR", err)
-		//node.log.Error("Could not serialize node")
+		//utils.GetLogInstance().Error("Could not serialize node")
 	}
 
 	return result.Bytes()
@@ -224,9 +222,6 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 		node.host = host
 		node.SelfPeer = host.GetSelfPeer()
 	}
-
-	// Logger
-	node.log = log.New("IP", host.GetSelfPeer().IP, "Port", host.GetSelfPeer().Port)
 
 	if host != nil && consensus != nil {
 		// Consensus and associated channel to communicate blocks
@@ -286,7 +281,7 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 func (node *Node) IsOutOfSync(consensusBlock *types.Block) bool {
 	myHeight := node.blockchain.CurrentBlock().NumberU64()
 	newHeight := consensusBlock.NumberU64()
-	node.log.Debug("[SYNC]", "myHeight", myHeight, "newHeight", newHeight)
+	utils.GetLogInstance().Debug("[SYNC]", "myHeight", myHeight, "newHeight", newHeight)
 	if newHeight-myHeight <= inSyncThreshold {
 		return false
 	}
@@ -310,7 +305,7 @@ func (node *Node) DoSyncing() {
 		case consensusBlock := <-node.Consensus.ConsensusBlock:
 			if !node.IsOutOfSync(consensusBlock) {
 				if node.State == NodeNotInSync {
-					node.log.Info("[SYNC] Node is now IN SYNC!")
+					utils.GetLogInstance().Info("[SYNC] Node is now IN SYNC!")
 					node.stateSync.CloseConnections()
 					node.stateSync = nil
 				}
@@ -319,7 +314,7 @@ func (node *Node) DoSyncing() {
 				node.stateMutex.Unlock()
 				continue
 			} else {
-				node.log.Debug("[SYNC] node is out of sync")
+				utils.GetLogInstance().Debug("[SYNC] node is out of sync")
 				node.stateMutex.Lock()
 				node.State = NodeNotInSync
 				node.stateMutex.Unlock()
@@ -386,7 +381,7 @@ func (node *Node) GetSyncingPeers() []p2p.Peer {
 	if removeID != -1 {
 		res = append(res[:removeID], res[removeID+1:]...)
 	}
-	node.log.Debug("GetSyncingPeers: ", "res", res, "self", node.SelfPeer)
+	utils.GetLogInstance().Debug("GetSyncingPeers: ", "res", res, "self", node.SelfPeer)
 	return res
 }
 
@@ -442,10 +437,10 @@ func (node *Node) JoinShard(leader p2p.Peer) {
 			// Talk to leader.
 			node.SendMessage(leader, buffer)
 		case <-timeout.C:
-			node.log.Info("JoinShard timeout")
+			utils.GetLogInstance().Info("JoinShard timeout")
 			return
 		case <-node.StopPing:
-			node.log.Info("Stopping JoinShard")
+			utils.GetLogInstance().Info("Stopping JoinShard")
 			return
 		}
 	}
@@ -475,7 +470,7 @@ func (node *Node) InitClientServer() {
 // StartClientServer starts client server.
 func (node *Node) StartClientServer() {
 	port, _ := strconv.Atoi(node.SelfPeer.Port)
-	node.log.Info("support_client: StartClientServer on port:", "port", port+ClientServicePortDiff)
+	utils.GetLogInstance().Info("support_client: StartClientServer on port:", "port", port+ClientServicePortDiff)
 	node.clientServer.Start(node.SelfPeer.IP, strconv.Itoa(port+ClientServicePortDiff))
 }
 
@@ -495,7 +490,7 @@ func (node *Node) InitSyncingServer() {
 // StartSyncingServer starts syncing server.
 func (node *Node) StartSyncingServer() {
 	port := GetSyncingPort(node.SelfPeer.Port)
-	node.log.Info("support_sycning: StartSyncingServer on port:", "port", port)
+	utils.GetLogInstance().Info("support_sycning: StartSyncingServer on port:", "port", port)
 	node.downloaderServer.Start(node.SelfPeer.IP, GetSyncingPort(node.SelfPeer.Port))
 }
 
@@ -504,7 +499,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 	response := &downloader_pb.DownloaderResponse{}
 	switch request.Type {
 	case downloader_pb.DownloaderRequest_HEADER:
-		node.log.Debug("[SYNC] CalculateResponse DownloaderRequest_HEADER", "request.BlockHash", request.BlockHash)
+		utils.GetLogInstance().Debug("[SYNC] CalculateResponse DownloaderRequest_HEADER", "request.BlockHash", request.BlockHash)
 		var startHeaderHash []byte
 		if request.BlockHash == nil {
 			tmp := node.blockchain.Genesis().Hash()
@@ -531,14 +526,14 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 		}
 	case downloader_pb.DownloaderRequest_NEWBLOCK:
 		if node.State != NodeNotInSync {
-			node.log.Debug("[SYNC] new block received, but state is", "state", node.State.String())
+			utils.GetLogInstance().Debug("[SYNC] new block received, but state is", "state", node.State.String())
 			response.Type = downloader_pb.DownloaderResponse_INSYNC
 			return response, nil
 		}
 		var blockObj types.Block
 		err := rlp.DecodeBytes(request.BlockHash, &blockObj)
 		if err != nil {
-			node.log.Warn("[SYNC] unable to decode received new block")
+			utils.GetLogInstance().Warn("[SYNC] unable to decode received new block")
 			return response, err
 		}
 		node.stateSync.AddNewBlock(request.PeerHash, &blockObj)
@@ -554,25 +549,25 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 		} else {
 			peer, ok := node.Consensus.GetPeerFromID(peerID)
 			if !ok {
-				node.log.Warn("[SYNC] unable to get peer from peerID", "peerID", peerID)
+				utils.GetLogInstance().Warn("[SYNC] unable to get peer from peerID", "peerID", peerID)
 			}
 			client := downloader.ClientSetup(peer.IP, GetSyncingPort(peer.Port))
 			if client == nil {
-				node.log.Warn("[SYNC] unable to setup client")
+				utils.GetLogInstance().Warn("[SYNC] unable to setup client")
 				return response, nil
 			}
-			node.log.Debug("[SYNC] client setup correctly", "client", client)
+			utils.GetLogInstance().Debug("[SYNC] client setup correctly", "client", client)
 			config := &syncConfig{timestamp: time.Now().UnixNano(), client: client}
 			node.stateMutex.Lock()
 			node.peerRegistrationRecord[peerID] = config
 			node.stateMutex.Unlock()
-			node.log.Debug("[SYNC] register peerID success", "peerID", peerID)
+			utils.GetLogInstance().Debug("[SYNC] register peerID success", "peerID", peerID)
 			response.Type = downloader_pb.DownloaderResponse_SUCCESS
 		}
 	case downloader_pb.DownloaderRequest_REGISTERTIMEOUT:
 		if node.State == NodeNotInSync {
 			count := node.stateSync.RegisterNodeInfo()
-			node.log.Debug("[SYNC] extra node registered", "number", count)
+			utils.GetLogInstance().Debug("[SYNC] extra node registered", "number", count)
 		}
 	}
 	return response, nil
@@ -584,18 +579,18 @@ func (node *Node) SendNewBlockToUnsync() {
 		block := <-node.Consensus.VerifiedNewBlock
 		blockHash, err := rlp.EncodeToBytes(block)
 		if err != nil {
-			node.log.Warn("[SYNC] unable to encode block to hashes")
+			utils.GetLogInstance().Warn("[SYNC] unable to encode block to hashes")
 			continue
 		}
 
 		// really need to have a unique id independent of ip/port
 		selfPeerID := utils.GetUniqueIDFromIPPort(node.SelfPeer.IP, node.SelfPeer.Port)
-		node.log.Debug("[SYNC] peerRegistration Record", "peerID", selfPeerID, "number", len(node.peerRegistrationRecord))
+		utils.GetLogInstance().Debug("[SYNC] peerRegistration Record", "peerID", selfPeerID, "number", len(node.peerRegistrationRecord))
 
 		for peerID, config := range node.peerRegistrationRecord {
 			elapseTime := time.Now().UnixNano() - config.timestamp
 			if elapseTime > broadcastTimeout {
-				node.log.Warn("[SYNC] SendNewBlockToUnsync to peer timeout", "peerID", peerID)
+				utils.GetLogInstance().Warn("[SYNC] SendNewBlockToUnsync to peer timeout", "peerID", peerID)
 				// send last time and delete
 				config.client.PushNewBlock(selfPeerID, blockHash, true)
 				node.stateMutex.Lock()

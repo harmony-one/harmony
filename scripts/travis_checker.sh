@@ -36,7 +36,20 @@ dirnames() {
 
 go_dirs="${tmpdir}/go_dirs.txt"
 dirnames < "${go_files}" | sort -u -t/ > "${go_dirs}"
-source ~/.bash_profile
+
+export CGO_CFLAGS="-I$PWD/../bls/include -I$PWD/../mcl/include"
+export CGO_LDFLAGS="-L$PWD/../bls/lib"
+export LD_LIBRARY_PATH=$PWD/../bls/lib:$PWD/../mcl/lib
+
+OS=$(uname -s)
+case $OS in
+   Darwin)
+      export CGO_CFLAGS="-I$PWD/../bls/include -I$PWD/../mcl/include -I/usr/local/opt/openssl/include"
+      export CGO_LDFLAGS="-L$PWD/../bls/lib -L/usr/local/opt/openssl/lib"
+      export LD_LIBRARY_PATH=$PWD/../bls/lib:$PWD/../mcl/lib:/usr/local/opt/openssl/lib
+      export DYLD_LIBRARY_PATH=$LD_LIBRARY_PATH
+      ;;
+esac
 
 echo "Running go test..."
 if go test -v -count=1 ./...

@@ -4,6 +4,7 @@ import (
 	protobuf "github.com/golang/protobuf/proto"
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/api/proto"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // Construct the prepare message to send to leader (assumption the consensus data is already verified)
@@ -28,7 +29,7 @@ func (consensus *Consensus) constructPrepareMessage() []byte {
 
 	marshaledMessage, err := protobuf.Marshal(&message)
 	if err != nil {
-		consensus.Log.Debug("Failed to marshal Prepare message", "error", err)
+		utils.GetLogInstance().Debug("Failed to marshal Prepare message", "error", err)
 	}
 	// 64 byte of signature on previous data
 	signature := consensus.signMessage(marshaledMessage)
@@ -36,7 +37,7 @@ func (consensus *Consensus) constructPrepareMessage() []byte {
 
 	marshaledMessage, err = protobuf.Marshal(&message)
 	if err != nil {
-		consensus.Log.Debug("Failed to marshal Prepare message", "error", err)
+		utils.GetLogInstance().Debug("Failed to marshal Prepare message", "error", err)
 	}
 
 	return proto.ConstructConsensusMessage(marshaledMessage)
@@ -65,7 +66,7 @@ func (consensus *Consensus) constructCommitMessage() []byte {
 
 	marshaledMessage, err := protobuf.Marshal(&message)
 	if err != nil {
-		consensus.Log.Debug("Failed to marshal Commit message", "error", err)
+		utils.GetLogInstance().Debug("Failed to marshal Commit message", "error", err)
 	}
 	// 64 byte of signature on previous data
 	signature := consensus.signMessage(marshaledMessage)
@@ -73,7 +74,7 @@ func (consensus *Consensus) constructCommitMessage() []byte {
 
 	marshaledMessage, err = protobuf.Marshal(&message)
 	if err != nil {
-		consensus.Log.Debug("Failed to marshal Commit message", "error", err)
+		utils.GetLogInstance().Debug("Failed to marshal Commit message", "error", err)
 	}
 
 	return proto.ConstructConsensusMessage(marshaledMessage)

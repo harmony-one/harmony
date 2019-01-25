@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/api/proto/bcconn"
 	proto_identity "github.com/harmony-one/harmony/api/proto/identity"
 	"github.com/harmony-one/harmony/api/proto/node"
@@ -43,7 +42,6 @@ type BCInfo struct {
 // BeaconChain (Blockchain) keeps Identities per epoch, currently centralized!
 type BeaconChain struct {
 	BCInfo         BCInfo
-	log            log.Logger
 	ShardLeaderMap map[int]*node.Info
 	PubKey         *bls.PublicKey
 	host           p2p.Host
@@ -79,7 +77,7 @@ func (bc *BeaconChain) StartRPCServer() {
 	if err != nil {
 		port = 0
 	}
-	bc.log.Info("support_client: StartRpcServer on port:", "port", strconv.Itoa(port+BeaconchainServicePortDiff))
+	utils.GetLogInstance().Info("support_client: StartRpcServer on port:", "port", strconv.Itoa(port+BeaconchainServicePortDiff))
 	bc.rpcServer.Start(bc.BCInfo.IP, strconv.Itoa(port+BeaconchainServicePortDiff))
 }
 
@@ -95,7 +93,6 @@ func (bc *BeaconChain) GetShardLeaderMap() map[int]*node.Info {
 //New beaconchain initialization
 func New(numShards int, ip, port string, key p2p_crypto.PrivKey) *BeaconChain {
 	bc := BeaconChain{}
-	bc.log = log.New()
 	bc.PubKey = generateBCKey()
 	bc.Self = p2p.Peer{IP: ip, Port: port}
 	bc.host, _ = p2pimpl.NewHost(&bc.Self, key)
@@ -117,7 +114,7 @@ func generateBCKey() *bls.PublicKey {
 //AcceptNodeInfo deserializes node information received via beaconchain handler
 func (bc *BeaconChain) AcceptNodeInfo(b []byte) *node.Info {
 	Node := bcconn.DeserializeNodeInfo(b)
-	bc.log.Info("New Node Connection", "IP", Node.IP, "Port", Node.Port, "PeerID", Node.PeerID)
+	utils.GetLogInstance().Info("New Node Connection", "IP", Node.IP, "Port", Node.Port, "PeerID", Node.PeerID)
 	bc.Peer = p2p.Peer{IP: Node.IP, Port: Node.Port, PeerID: Node.PeerID}
 	bc.host.AddPeer(&bc.Peer)
 
@@ -138,9 +135,9 @@ func (bc *BeaconChain) RespondRandomness(Node *node.Info) {
 	response := bcconn.ResponseRandomNumber{NumberOfShards: bci.NumberOfShards, NumberOfNodesAdded: bci.NumberOfNodesAdded, Leaders: bci.Leaders}
 	msg := bcconn.SerializeRandomInfo(response)
 	msgToSend := proto_identity.ConstructIdentityMessage(proto_identity.Acknowledge, msg)
-	bc.log.Info("Sent Out Msg", "# Nodes", response.NumberOfNodesAdded)
+	utils.GetLogInstance().Info("Sent Out Msg", "# Nodes", response.NumberOfNodesAdded)
 	for i, n := range response.Leaders {
-		bc.log.Info("Sent Out Msg", "leader", i, "nodeInfo", n.PeerID)
+		utils.GetLogInstance().Info("Sent Out Msg", "leader", i, "nodeInfo", n.PeerID)
 	}
 	host.SendMessage(bc.host, bc.Peer, msgToSend, nil)
 	bc.state = RandomInfoSent

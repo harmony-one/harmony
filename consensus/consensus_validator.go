@@ -17,7 +17,7 @@ func (consensus *Consensus) ProcessMessageValidator(payload []byte) {
 	err := protobuf.Unmarshal(payload, &message)
 
 	if err != nil {
-		consensus.Log.Error("Failed to unmarshal message payload.", "err", err, "consensus", consensus)
+		utils.GetLogInstance().Error("Failed to unmarshal message payload.", "err", err, "consensus", consensus)
 	}
 	switch message.Type {
 	case consensus_proto.MessageType_ANNOUNCE:
@@ -27,13 +27,13 @@ func (consensus *Consensus) ProcessMessageValidator(payload []byte) {
 	case consensus_proto.MessageType_COMMITTED:
 		consensus.processCommittedMessage(message)
 	default:
-		consensus.Log.Error("Unexpected message type", "msgType", message.Type, "consensus", consensus)
+		utils.GetLogInstance().Error("Unexpected message type", "msgType", message.Type, "consensus", consensus)
 	}
 }
 
 // Processes the announce message sent from the leader
 func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Message) {
-	consensus.Log.Info("Received Announce Message", "nodeID", consensus.nodeID)
+	utils.GetLogInstance().Info("Received Announce Message", "nodeID", consensus.nodeID)
 
 	consensusID := message.ConsensusId
 	blockHash := message.BlockHash
@@ -47,7 +47,7 @@ func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Messa
 	// check leader Id
 	myLeaderID := utils.GetUniqueIDFromPeer(consensus.leader)
 	if leaderID != myLeaderID {
-		consensus.Log.Warn("Received message from wrong leader", "myLeaderID", myLeaderID, "receivedLeaderId", leaderID, "consensus", consensus)
+		utils.GetLogInstance().Warn("Received message from wrong leader", "myLeaderID", myLeaderID, "receivedLeaderId", leaderID, "consensus", consensus)
 		return
 	}
 
@@ -55,7 +55,7 @@ func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Messa
 	message.Signature = nil
 	messageBytes, err := protobuf.Marshal(&message)
 	if err != nil {
-		consensus.Log.Warn("Failed to marshal the announce message", "error", err)
+		utils.GetLogInstance().Warn("Failed to marshal the announce message", "error", err)
 	}
 	_ = signature
 	_ = messageBytes
@@ -69,7 +69,7 @@ func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Messa
 	var blockObj types.Block
 	err = rlp.DecodeBytes(block, &blockObj)
 	if err != nil {
-		consensus.Log.Warn("Unparseable block header data", "error", err)
+		utils.GetLogInstance().Warn("Unparseable block header data", "error", err)
 		return
 	}
 
@@ -82,20 +82,20 @@ func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Messa
 
 	// Add attack model of IncorrectResponse
 	if attack.GetInstance().IncorrectResponse() {
-		consensus.Log.Warn("IncorrectResponse attacked")
+		utils.GetLogInstance().Warn("IncorrectResponse attacked")
 		return
 	}
 
 	// check block hash
 	hash := blockObj.Hash()
 	if !bytes.Equal(blockHash[:], hash[:]) {
-		consensus.Log.Warn("Block hash doesn't match", "consensus", consensus)
+		utils.GetLogInstance().Warn("Block hash doesn't match", "consensus", consensus)
 		return
 	}
 
 	// check block data (transactions
 	if !consensus.BlockVerifier(&blockObj) {
-		consensus.Log.Warn("Block content is not verified successfully", "consensus", consensus)
+		utils.GetLogInstance().Warn("Block content is not verified successfully", "consensus", consensus)
 		return
 	}
 
@@ -103,7 +103,7 @@ func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Messa
 	msgToSend := consensus.constructPrepareMessage()
 
 	consensus.SendMessage(consensus.leader, msgToSend)
-	// consensus.Log.Warn("Sending Commit to leader", "state", targetState)
+	// utils.GetLogInstance().Warn("Sending Commit to leader", "state", targetState)
 
 	// Set state to CommitDone
 	consensus.state = PrepareDone
@@ -111,7 +111,7 @@ func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Messa
 
 // Processes the prepared message sent from the leader
 func (consensus *Consensus) processPreparedMessage(message consensus_proto.Message) {
-	consensus.Log.Info("Received Prepared Message", "nodeID", consensus.nodeID)
+	utils.GetLogInstance().Info("Received Prepared Message", "nodeID", consensus.nodeID)
 
 	consensusID := message.ConsensusId
 	blockHash := message.BlockHash
@@ -135,7 +135,7 @@ func (consensus *Consensus) processPreparedMessage(message consensus_proto.Messa
 	// check leader Id
 	myLeaderID := utils.GetUniqueIDFromPeer(consensus.leader)
 	if uint32(leaderID) != myLeaderID {
-		consensus.Log.Warn("Received message from wrong leader", "myLeaderID", myLeaderID, "receivedLeaderId", leaderID, "consensus", consensus)
+		utils.GetLogInstance().Warn("Received message from wrong leader", "myLeaderID", myLeaderID, "receivedLeaderId", leaderID, "consensus", consensus)
 		return
 	}
 
@@ -143,7 +143,7 @@ func (consensus *Consensus) processPreparedMessage(message consensus_proto.Messa
 	message.Signature = nil
 	messageBytes, err := protobuf.Marshal(&message)
 	if err != nil {
-		consensus.Log.Warn("Failed to marshal the announce message", "error", err)
+		utils.GetLogInstance().Warn("Failed to marshal the announce message", "error", err)
 	}
 	_ = signature
 	_ = messageBytes
@@ -155,7 +155,7 @@ func (consensus *Consensus) processPreparedMessage(message consensus_proto.Messa
 
 	// Add attack model of IncorrectResponse.
 	if attack.GetInstance().IncorrectResponse() {
-		consensus.Log.Warn("IncorrectResponse attacked")
+		utils.GetLogInstance().Warn("IncorrectResponse attacked")
 		return
 	}
 
@@ -164,7 +164,7 @@ func (consensus *Consensus) processPreparedMessage(message consensus_proto.Messa
 
 	// check block hash
 	if !bytes.Equal(blockHash[:], consensus.blockHash[:]) {
-		consensus.Log.Warn("Block hash doesn't match", "consensus", consensus)
+		utils.GetLogInstance().Warn("Block hash doesn't match", "consensus", consensus)
 		return
 	}
 
@@ -182,7 +182,7 @@ func (consensus *Consensus) processPreparedMessage(message consensus_proto.Messa
 
 // Processes the committed message sent from the leader
 func (consensus *Consensus) processCommittedMessage(message consensus_proto.Message) {
-	consensus.Log.Info("Received Prepared Message", "nodeID", consensus.nodeID)
+	utils.GetLogInstance().Warn("Received Prepared Message", "nodeID", consensus.nodeID)
 
 	consensusID := message.ConsensusId
 	blockHash := message.BlockHash
@@ -206,7 +206,7 @@ func (consensus *Consensus) processCommittedMessage(message consensus_proto.Mess
 	// check leader Id
 	myLeaderID := utils.GetUniqueIDFromPeer(consensus.leader)
 	if uint32(leaderID) != myLeaderID {
-		consensus.Log.Warn("Received message from wrong leader", "myLeaderID", myLeaderID, "receivedLeaderId", leaderID, "consensus", consensus)
+		utils.GetLogInstance().Warn("Received message from wrong leader", "myLeaderID", myLeaderID, "receivedLeaderId", leaderID, "consensus", consensus)
 		return
 	}
 
@@ -214,7 +214,7 @@ func (consensus *Consensus) processCommittedMessage(message consensus_proto.Mess
 	message.Signature = nil
 	messageBytes, err := protobuf.Marshal(&message)
 	if err != nil {
-		consensus.Log.Warn("Failed to marshal the announce message", "error", err)
+		utils.GetLogInstance().Warn("Failed to marshal the announce message", "error", err)
 	}
 	_ = signature
 	_ = messageBytes
@@ -226,16 +226,23 @@ func (consensus *Consensus) processCommittedMessage(message consensus_proto.Mess
 
 	// Add attack model of IncorrectResponse.
 	if attack.GetInstance().IncorrectResponse() {
-		consensus.Log.Warn("IncorrectResponse attacked")
+		utils.GetLogInstance().Warn("IncorrectResponse attacked")
 		return
 	}
 
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
+	// check consensus Id
+	if consensusID != consensus.consensusID {
+		// hack for new node state syncing
+		utils.GetLogInstance().Warn("Received message with wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
+		consensus.consensusID = consensusID
+		return
+	}
 
 	// check block hash
 	if !bytes.Equal(blockHash[:], consensus.blockHash[:]) {
-		consensus.Log.Warn("Block hash doesn't match", "consensus", consensus)
+		utils.GetLogInstance().Warn("Block hash doesn't match", "consensus", consensus)
 		return
 	}
 
@@ -263,24 +270,24 @@ func (consensus *Consensus) processCommittedMessage(message consensus_proto.Mess
 			var blockObj types.Block
 			err := rlp.DecodeBytes(val.block, &blockObj)
 			if err != nil {
-				consensus.Log.Warn("Unparseable block header data", "error", err)
+				utils.GetLogInstance().Warn("Unparseable block header data", "error", err)
 				return
 			}
 			if err != nil {
-				consensus.Log.Debug("failed to construct the new block after consensus")
+				utils.GetLogInstance().Debug("failed to construct the new block after consensus")
 			}
 			// check block data (transactions
 			if !consensus.BlockVerifier(&blockObj) {
-				consensus.Log.Debug("[WARNING] Block content is not verified successfully", "consensusID", consensus.consensusID)
+				utils.GetLogInstance().Debug("[WARNING] Block content is not verified successfully", "consensusID", consensus.consensusID)
 				return
 			}
-			consensus.Log.Info("Finished Response. Adding block to chain", "numTx", len(blockObj.Transactions()))
+			utils.GetLogInstance().Info("Finished Response. Adding block to chain", "numTx", len(blockObj.Transactions()))
 			consensus.OnConsensusDone(&blockObj)
 
 			select {
 			case consensus.VerifiedNewBlock <- &blockObj:
 			default:
-				consensus.Log.Info("[SYNC] consensus verified block send to chan failed", "blockHash", blockObj.Hash())
+				utils.GetLogInstance().Info("[SYNC] consensus verified block send to chan failed", "blockHash", blockObj.Hash())
 				continue
 			}
 

@@ -12,7 +12,6 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/state"
@@ -92,8 +91,6 @@ type Consensus struct {
 	ConsensusBlock chan *types.Block
 	// verified block to state sync broadcast
 	VerifiedNewBlock chan *types.Block
-
-	Log log.Logger
 
 	uniqueIDInstance *utils.UniqueValidatorID
 
@@ -188,7 +185,6 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Cons
 		}()
 	}
 
-	consensus.Log = log.New()
 	consensus.uniqueIDInstance = utils.GetUniqueValidatorIDInstance()
 	consensus.OfflinePeerList = make([]p2p.Peer, 0)
 
@@ -287,7 +283,7 @@ func (consensus *Consensus) AddPeers(peers []*p2p.Peer) int {
 			consensus.pubKeyLock.Lock()
 			consensus.PublicKeys = append(consensus.PublicKeys, peer.PubKey)
 			consensus.pubKeyLock.Unlock()
-			consensus.Log.Debug("[SYNC] new peer added", "pubKey", peer.PubKey, "ip", peer.IP, "port", peer.Port)
+			utils.GetLogInstance().Debug("[SYNC] new peer added", "pubKey", peer.PubKey, "ip", peer.IP, "port", peer.Port)
 		}
 		count++
 	}
@@ -350,10 +346,10 @@ func (consensus *Consensus) RemovePeers(peers []p2p.Peer) int {
 func (consensus *Consensus) DebugPrintPublicKeys() {
 	for _, k := range consensus.PublicKeys {
 		str := fmt.Sprintf("%s", hex.EncodeToString(k.Serialize()))
-		consensus.Log.Debug("pk:", "string", str)
+		utils.GetLogInstance().Debug("pk:", "string", str)
 	}
 
-	consensus.Log.Debug("PublicKeys:", "#", len(consensus.PublicKeys))
+	utils.GetLogInstance().Debug("PublicKeys:", "#", len(consensus.PublicKeys))
 }
 
 // DebugPrintValidators print all validator ip/port/key in string format in Consensus
@@ -362,13 +358,13 @@ func (consensus *Consensus) DebugPrintValidators() {
 	consensus.validators.Range(func(k, v interface{}) bool {
 		if p, ok := v.(p2p.Peer); ok {
 			str2 := fmt.Sprintf("%s", p.PubKey.Serialize())
-			consensus.Log.Debug("validator:", "IP", p.IP, "Port", p.Port, "VID", p.ValidatorID, "Key", str2)
+			utils.GetLogInstance().Debug("validator:", "IP", p.IP, "Port", p.Port, "VID", p.ValidatorID, "Key", str2)
 			count++
 			return true
 		}
 		return false
 	})
-	consensus.Log.Debug("Validators", "#", count)
+	utils.GetLogInstance().Debug("Validators", "#", count)
 }
 
 // UpdatePublicKeys updates the PublicKeys variable, protected by a mutex
