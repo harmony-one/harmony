@@ -140,6 +140,7 @@ type Node struct {
 
 	// Action Channel
 	actionChannel chan *Action
+	serviceStore  *ServiceStore
 
 	// For test only
 	TestBankKeys      []*ecdsa.PrivateKey
