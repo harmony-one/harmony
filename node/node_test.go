@@ -73,14 +73,12 @@ func TestAddPeers(t *testing.T) {
 			IP:          "127.0.0.1",
 			Port:        "8888",
 			PubKey:      pubKey1,
-			Ready:       true,
 			ValidatorID: 1,
 		},
 		&p2p.Peer{
 			IP:          "127.0.0.1",
 			Port:        "9999",
 			PubKey:      pubKey2,
-			Ready:       false,
 			ValidatorID: 2,
 		},
 	}
