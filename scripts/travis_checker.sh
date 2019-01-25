@@ -19,7 +19,12 @@ trap 'case "${tmpdir}" in ?*) rm -rf "${tmpdir}";; esac' EXIT
 tmpdir=$(mktemp -d)
 
 go_files="${tmpdir}/go_files.txt"
-git ls-files '*.go' | grep -v '^vendor/' > "${go_files}"
+git ls-files '*.go' | grep -v \
+	-e '^vendor/' \
+	-e '\.pb\.go$' \
+	-e '/mock_stream\.go' \
+	-e '/host_mock\.go' \
+	-e '/gen_[^/]*\.go' > "${go_files}"
 
 # Print dirname of each relative pathname from stdin (one per line).
 dirnames() {
