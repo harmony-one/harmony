@@ -16,12 +16,12 @@ const (
 	Stop
 )
 
-// Type is service type.
-type Type byte
+// ServiceType is service type.
+type ServiceType byte
 
 // Constants for Type.
 const (
-	SupportSyncing Type = iota
+	SupportSyncing ServiceType = iota
 	SupportClient
 	SupportExplorer
 	Test
