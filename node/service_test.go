@@ -12,9 +12,9 @@ func TestTakeAction(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		select {
 		case <-time.After(WaitForStatusUpdate):
-			node.SendAction(&Action{t: SyncingActionTest})
+			node.SendAction(&Action{action: Start, serviceType: SyncingSupport})
 		}
 	}
 
-	node.SendAction(&Action{t: Done})
+	node.SendAction(&Action{serviceType: Done})
 }
