@@ -5,13 +5,10 @@ package consensus;
 enum MessageType {
   UNKNOWN = 0;
   ANNOUNCE = 1;
-  COMMIT = 2;
-  CHALLENGE = 3;
-  RESPONSE = 4;
-  COLLECTIVE_SIG = 5;
-  FINAL_COMMIT = 6;
-  FINAL_CHALLENGE = 7;
-  FINAL_RESPONSE = 8;
+  PREPARE = 2;
+  PREPARED = 3;
+  COMMIT = 4;
+  COMMITTED = 5;
 }
 
 message Message {

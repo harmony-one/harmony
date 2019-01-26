@@ -4,15 +4,34 @@
 <a href="https://discord.gg/kdf8a6T">![Discord](https://img.shields.io/discord/532383335348043777.svg)</a>
 [![Coverage Status](https://coveralls.io/repos/github/harmony-one/harmony/badge.svg?branch=master)](https://coveralls.io/github/harmony-one/harmony?branch=master)
 
+## Installation Requirements
+GMP and OpenSSL
+```bash
+brew install gmp
+brew install openssl
+```
 
 ## Dev Environment Setup
 
 ```bash
 export GOPATH=$HOME/<path_of_your_choice>
+export CGO_CFLAGS="-I$GOPATH/src/github.com/harmony-one/bls/include -I$GOPATH/src/github.com/harmony-one/mcl/include -I/usr/local/opt/openssl/include"
+export CGO_LDFLAGS="-L$GOPATH/src/github.com/harmony-one/bls/lib -L/usr/local/opt/openssl/lib"
+export LD_LIBRARY_PATH=$GOPATH/src/github.com/harmony-one/bls/lib:$GOPATH/src/github.com/harmony-one/mcl/lib:/usr/local/opt/openssl/lib
+export LIBRARY_PATH=$LD_LIBRARY_PATH
+export DYLD_LIBRARY_PATH=$LD_LIBRARY_PATH
 
 mkdir -p $HOME/<path_of_your_choice>/src/github.com/harmony-one
 
 cd $HOME/<path_of_your_choice>/src/github.com/harmony-one
+
+git clone git@github.com:harmony-one/mcl.git
+
+cd mcl && make -j4 && cd ..
+
+git clone git@github.com:harmony-one/bls.git
+
+cd bls && make -j4 && cd ..
 
 git clone git@github.com:harmony-one/harmony.git
 

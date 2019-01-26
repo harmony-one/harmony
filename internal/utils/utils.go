@@ -12,15 +12,19 @@ import (
 	"strconv"
 	"sync"
 
-	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
-
 	"github.com/dedis/kyber"
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/p2p"
+	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
 )
 
 var lock sync.Mutex
+
+func init() {
+	bls.Init(bls.BLS12_381)
+}
 
 // Unmarshal is a function that unmarshals the data from the
 // reader into the specified value.
@@ -69,6 +73,21 @@ func GetUniqueIDFromIPPort(ip, port string) uint32 {
 func GenKey(ip, port string) (kyber.Scalar, kyber.Point) {
 	priKey := crypto.Ed25519Curve.Scalar().SetInt64(int64(GetUniqueIDFromIPPort(ip, port))) // TODO: figure out why using a random hash value doesn't work for private key (schnorr)
 	pubKey := pki.GetPublicKeyFromScalar(priKey)
+
+	return priKey, pubKey
+}
+
+// GenKeyBLS generates a bls key pair given ip and port.
+func GenKeyBLS(ip, port string) (*bls.SecretKey, *bls.PublicKey) {
+	nodeIDBytes := make([]byte, 32)
+	binary.LittleEndian.PutUint32(nodeIDBytes, GetUniqueIDFromIPPort(ip, port))
+	privateKey := bls.SecretKey{}
+	err := privateKey.SetLittleEndian(nodeIDBytes)
+	if err != nil {
+		log.Print("failed to set private key", err)
+	}
+	priKey := &privateKey
+	pubKey := privateKey.GetPublicKey()
 
 	return priKey, pubKey
 }

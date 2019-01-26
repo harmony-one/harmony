@@ -8,7 +8,6 @@ import (
 
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/consensus"
-	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -16,7 +15,7 @@ import (
 )
 
 func TestNewNode(t *testing.T) {
-	_, pubKey := utils.GenKey("1", "2")
+	_, pubKey := utils.GenKeyBLS("1", "2")
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", PubKey: pubKey}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "8885"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
@@ -40,7 +39,7 @@ func TestNewNode(t *testing.T) {
 }
 
 func TestGetSyncingPeers(t *testing.T) {
-	_, pubKey := utils.GenKey("1", "2")
+	_, pubKey := utils.GenKeyBLS("1", "2")
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", PubKey: pubKey}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "8885"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
@@ -66,11 +65,8 @@ func TestGetSyncingPeers(t *testing.T) {
 }
 
 func TestAddPeers(t *testing.T) {
-	priKey1 := crypto.Ed25519Curve.Scalar().SetInt64(int64(333))
-	pubKey1 := pki.GetPublicKeyFromScalar(priKey1)
-
-	priKey2 := crypto.Ed25519Curve.Scalar().SetInt64(int64(999))
-	pubKey2 := pki.GetPublicKeyFromScalar(priKey2)
+	pubKey1 := pki.GetBLSPrivateKeyFromInt(333).GetPublicKey()
+	pubKey2 := pki.GetBLSPrivateKeyFromInt(444).GetPublicKey()
 
 	peers1 := []*p2p.Peer{
 		&p2p.Peer{
@@ -86,7 +82,7 @@ func TestAddPeers(t *testing.T) {
 			ValidatorID: 2,
 		},
 	}
-	_, pubKey := utils.GenKey("1", "2")
+	_, pubKey := utils.GenKeyBLS("1", "2")
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8982", PubKey: pubKey}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "8985"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
@@ -110,8 +106,7 @@ func TestAddPeers(t *testing.T) {
 }
 
 func sendPingMessage(node *Node, leader p2p.Peer) {
-	priKey1 := crypto.Ed25519Curve.Scalar().SetInt64(int64(333))
-	pubKey1 := pki.GetPublicKeyFromScalar(priKey1)
+	pubKey1 := pki.GetBLSPrivateKeyFromInt(333).GetPublicKey()
 
 	p1 := p2p.Peer{
 		IP:     "127.0.0.1",
@@ -130,15 +125,13 @@ func sendPingMessage(node *Node, leader p2p.Peer) {
 }
 
 func sendPongMessage(node *Node, leader p2p.Peer) {
-	priKey1 := crypto.Ed25519Curve.Scalar().SetInt64(int64(333))
-	pubKey1 := pki.GetPublicKeyFromScalar(priKey1)
+	pubKey1 := pki.GetBLSPrivateKeyFromInt(333).GetPublicKey()
+	pubKey2 := pki.GetBLSPrivateKeyFromInt(444).GetPublicKey()
 	p1 := p2p.Peer{
 		IP:     "127.0.0.1",
 		Port:   "9998",
 		PubKey: pubKey1,
 	}
-	priKey2 := crypto.Ed25519Curve.Scalar().SetInt64(int64(999))
-	pubKey2 := pki.GetPublicKeyFromScalar(priKey2)
 	p2 := p2p.Peer{
 		IP:     "127.0.0.1",
 		Port:   "9999",
@@ -163,7 +156,7 @@ func exitServer() {
 }
 
 func TestPingPongHandler(t *testing.T) {
-	_, pubKey := utils.GenKey("127.0.0.1", "8881")
+	_, pubKey := utils.GenKeyBLS("127.0.0.1", "8881")
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8881", PubKey: pubKey}
 	//   validator := p2p.Peer{IP: "127.0.0.1", Port: "9991"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")

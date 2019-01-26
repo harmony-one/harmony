@@ -7,13 +7,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/dedis/kyber"
-
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto/bcconn"
 	proto_identity "github.com/harmony-one/harmony/api/proto/identity"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
-	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
@@ -32,8 +30,8 @@ type NewNode struct {
 	isLeader    bool
 	Self        p2p.Peer
 	Leaders     map[uint32]p2p.Peer
-	PubK        kyber.Point
-	priK        kyber.Scalar
+	PubK        *bls.PublicKey
+	priK        *bls.SecretKey
 	log         log.Logger
 	SetInfo     chan bool
 	host        p2p.Host
@@ -41,7 +39,7 @@ type NewNode struct {
 
 // New candidatenode initialization
 func New(ip string, port string, nodePk p2p_crypto.PrivKey) *NewNode {
-	priKey, pubKey := utils.GenKey(ip, port)
+	priKey, pubKey := utils.GenKeyBLS(ip, port)
 	var node NewNode
 	var err error
 	node.PubK = pubKey
@@ -77,7 +75,7 @@ func (node NewNode) String() string {
 // RequestBeaconChain requests beacon chain for identity data
 func (node *NewNode) requestBeaconChain(BCPeer p2p.Peer) (err error) {
 	node.log.Info("connecting to beacon chain now ...")
-	pubk, err := node.PubK.MarshalBinary()
+	pubk := node.PubK.Serialize()
 	if err != nil {
 		node.log.Error("Could not Marshall public key into binary")
 	}
@@ -130,8 +128,8 @@ func (node *NewNode) processShardInfo(msgPayload []byte) bool {
 		}
 		leaderPeer.Addrs = append(leaderPeer.Addrs, targetAddr)
 
-		leaderPeer.PubKey = crypto.Ed25519Curve.Point()
-		err = leaderPeer.PubKey.UnmarshalBinary(v.PubKey[:])
+		leaderPeer.PubKey = &bls.PublicKey{}
+		err = leaderPeer.PubKey.Deserialize(v.PubKey[:])
 		if err != nil {
 			node.log.Error("Could not unmarshall leaders public key from binary to kyber.point")
 		}
