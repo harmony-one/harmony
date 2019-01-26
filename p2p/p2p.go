@@ -5,8 +5,8 @@ import (
 	"net"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
-
 	peer "github.com/libp2p/go-libp2p-peer"
+	multiaddr "github.com/multiformats/go-multiaddr"
 )
 
 // StreamHandler handles incoming p2p message.

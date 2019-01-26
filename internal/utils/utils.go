@@ -12,8 +12,6 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/harmony-one/bls/ffi/go/bls"
-
 	"github.com/dedis/kyber"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/crypto"

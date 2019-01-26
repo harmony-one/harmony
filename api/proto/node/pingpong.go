@@ -17,10 +17,6 @@ import (
 	"log"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
-
-	"github.com/harmony-one/harmony/api/proto"
-	"github.com/harmony-one/harmony/p2p"
-
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/p2p"
 	peer "github.com/libp2p/go-libp2p-peer"

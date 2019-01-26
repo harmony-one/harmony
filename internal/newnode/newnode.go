@@ -7,8 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/harmony-one/bls/ffi/go/bls"
-
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto/bcconn"

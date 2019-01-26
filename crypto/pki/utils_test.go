@@ -8,8 +8,6 @@ import (
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/crypto"
-
-	"github.com/harmony-one/harmony/crypto"
 )
 
 func TestGetAddressFromPublicKey(test *testing.T) {

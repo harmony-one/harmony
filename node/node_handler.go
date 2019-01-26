@@ -6,8 +6,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/harmony-one/bls/ffi/go/bls"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"

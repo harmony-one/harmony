@@ -9,8 +9,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/harmony-one/bls/ffi/go/bls"
-
-	"github.com/harmony-one/bls/ffi/go/bls"
 )
 
 func init() {
