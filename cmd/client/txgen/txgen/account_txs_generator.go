@@ -18,6 +18,22 @@ type Settings struct {
 	CrossShardRatio   int
 }
 
+// GenerateSimulatedStakeTransactionsAccount generates simulated stake transaction for account model.
+func GenerateSimulatedStakeTransactionsAccount(dataNodes []*node.Node, setting Settings) (types.Transactions, types.Transactions) {
+	_ = setting // TODO: take use of settings
+	node := dataNodes[0]
+	txs := make([]*types.Transaction, 100)
+	for i := 0; i < 100; i++ {
+		baseNonce := node.Worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(node.TestBankKeys[i].PublicKey))
+		for j := 0; j < 1; j++ {
+			randAmount := rand.Float32()
+			tx, _ := types.SignTx(types.NewStakeTransaction(baseNonce+uint64(j), big.NewInt(int64(params.Ether*randAmount)), params.TxGas, nil, nil), types.HomesteadSigner{}, node.TestBankKeys[i])
+			txs[i*1+j] = tx
+		}
+	}
+	return txs, nil
+}
+
 // GenerateSimulatedTransactionsAccount generates simulated transaction for account model.
 func GenerateSimulatedTransactionsAccount(shardID int, dataNodes []*node.Node, setting Settings) (types.Transactions, types.Transactions) {
 	_ = setting // TODO: take use of settings

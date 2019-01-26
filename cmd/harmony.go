@@ -89,6 +89,7 @@ func main() {
 	metricsReportURL := flag.String("metrics_report_url", "", "If set, reports metrics to this URL.")
 	versionFlag := flag.Bool("version", false, "Output version info")
 	onlyLogTps := flag.Bool("only_log_tps", false, "Only log TPS if true")
+	isBeacon := flag.Bool("is_beacon_node", false, "True if node is a beaconchain node")
 
 	//This IP belongs to jenkins.harmony.one
 	bcIP := flag.String("bc", "127.0.0.1", "IP of the identity chain")
@@ -196,6 +197,7 @@ func main() {
 	// Current node.
 	currentNode := node.New(host, consensus, ldb)
 	currentNode.Consensus.OfflinePeers = currentNode.OfflinePeers
+	node.isBeacon = *isBeacon //Should we push this flag down to consensus
 
 	// If there is a client configured in the node list.
 	if clientPeer != nil {

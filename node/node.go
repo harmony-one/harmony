@@ -165,24 +165,14 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 // Note the pending transaction list will then contain the rest of the txs
 func (node *Node) getTransactionsForNewBlock(maxNumTxs int) types.Transactions {
 	node.pendingTxMutex.Lock()
-	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(node.pendingTransactions, maxNumTxs)
+	if node.IsBeacon {
+		selected, unselected, invalid := node.Worker.SelectStakeTransactionsForNewBlock(node.pendingTransactions, maxNumTxs)
+	} else {
+		selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(node.pendingTransactions, maxNumTxs)
+	}
 	_ = invalid // invalid txs are discard
 
 	utils.GetLogInstance().Debug("Invalid transactions discarded", "number", len(invalid))
-	node.pendingTransactions = unselected
-	utils.GetLogInstance().Debug("Remaining pending transactions", "number", len(node.pendingTransactions))
-	node.pendingTxMutex.Unlock()
-	return selected
-}
-
-// Take out a subset of valid stake transactions from the pending transaction list
-// Note the pending transaction list will then contain the rest of the txs
-func (node *Node) getStakeTransactionsForNewBlock(maxNumTxs int) types.Transactions {
-	node.pendingTxMutex.Lock()
-	selected, unselected, invalid := node.Worker.SelectStakeTransactionsForNewBlock(node.pendingTransactions, maxNumTxs)
-	_ = invalid // invalid txs are discard
-
-	utils.GetLogInstance().Debug("Invalid stake transactions discarded", "number", len(invalid))
 	node.pendingTransactions = unselected
 	utils.GetLogInstance().Debug("Remaining pending transactions", "number", len(node.pendingTransactions))
 	node.pendingTxMutex.Unlock()
