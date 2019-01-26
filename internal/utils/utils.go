@@ -24,6 +24,10 @@ import (
 
 var lock sync.Mutex
 
+func init() {
+	bls.Init(bls.BLS12_381)
+}
+
 // Unmarshal is a function that unmarshals the data from the
 // reader into the specified value.
 func Unmarshal(r io.Reader, v interface{}) error {

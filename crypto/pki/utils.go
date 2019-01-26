@@ -4,12 +4,14 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 
-	"github.com/harmony-one/bls/ffi/go/bls"
-
 	"github.com/dedis/kyber"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/crypto"
 )
+
+func init() {
+	bls.Init(bls.BLS12_381)
+}
 
 // GetAddressFromPublicKey returns address given a public key.
 func GetAddressFromPublicKey(pubKey *bls.PublicKey) [20]byte {

@@ -20,7 +20,6 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 	peerstore "github.com/libp2p/go-libp2p-peerstore"
-	multiaddr "github.com/multiformats/go-multiaddr"
 )
 
 var (

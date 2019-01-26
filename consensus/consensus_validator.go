@@ -105,7 +105,7 @@ func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Messa
 	consensus.SendMessage(consensus.leader, msgToSend)
 	// utils.GetLogInstance().Warn("Sending Commit to leader", "state", targetState)
 
-	// Set state to CommitDone
+	// Set state to PrepareDone
 	consensus.state = PrepareDone
 }
 
@@ -255,7 +255,7 @@ func (consensus *Consensus) processCommittedMessage(message consensus_proto.Mess
 
 	consensus.SendMessage(consensus.leader, msgToSend)
 
-	consensus.state = PrepareDone
+	consensus.state = CommittedDone
 
 	// TODO: the block catch up logic is a temporary workaround for full failure node catchup. Implement the full node catchup logic
 	// The logic is to roll up to the latest blocks one by one to try catching up with the leader.
@@ -283,6 +283,7 @@ func (consensus *Consensus) processCommittedMessage(message consensus_proto.Mess
 			}
 			utils.GetLogInstance().Info("Finished Response. Adding block to chain", "numTx", len(blockObj.Transactions()))
 			consensus.OnConsensusDone(&blockObj)
+			consensus.state = Finished
 
 			select {
 			case consensus.VerifiedNewBlock <- &blockObj:
@@ -290,7 +291,6 @@ func (consensus *Consensus) processCommittedMessage(message consensus_proto.Mess
 				utils.GetLogInstance().Info("[SYNC] consensus verified block send to chan failed", "blockHash", blockObj.Hash())
 				continue
 			}
-
 		} else {
 			break
 		}
