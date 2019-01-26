@@ -2,7 +2,7 @@
 
 unset -v gopath
 gopath=$(go env GOPATH)
-HMY_PATH="${gopath}/src/github.com/harmony-one"
+HMY_PATH="${gopath%%:*}/src/github.com/harmony-one"
 export CGO_CFLAGS="-I$HMY_PATH/bls/include -I$HMY_PATH/mcl/include"
 export CGO_LDFLAGS="-L$HMY_PATH/bls/lib"
 export LD_LIBRARY_PATH=$HMY_PATH/bls/lib:$HMY_PATH/mcl/lib
