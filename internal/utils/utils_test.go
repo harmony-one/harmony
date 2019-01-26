@@ -48,6 +48,14 @@ func TestGenKey(t *testing.T) {
 	GenKey("3.3.3.3", "3456")
 }
 
+// Test for GenKeyBLS
+func TestGenKeyBLS(t *testing.T) {
+	priKey, pubKey := GenKeyBLS("3.3.3.3", "3456")
+	if priKey == nil || pubKey == nil {
+		t.Error("Failed to create keys for BLS sig")
+	}
+}
+
 // Test for GenKeyP2P, noted the length of private key can be random
 // thus we don't test it here.
 func TestGenKeyP2P(t *testing.T) {
