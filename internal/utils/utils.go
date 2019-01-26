@@ -11,20 +11,16 @@ import (
 	"os"
 	"regexp"
 	"strconv"
-	"sync"
-
-	"github.com/harmony-one/bls/ffi/go/bls"
-
 	"strings"
 	"sync"
 
-	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
-
 	"github.com/dedis/kyber"
 	eth_crypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/p2p"
+	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
 )
 
 var (
