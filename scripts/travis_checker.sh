@@ -1,55 +1,20 @@
 #!/bin/bash
 
-# Print a file surrounded by BEGIN/END preamble, e.g.:
-#
-#	--- BEGIN a.out output ---
-#	Hello world
-#	--- END a.out output ---
-#
-print_file() {
-	echo "--- BEGIN ${2} ---"
-	cat "${1}"
-	echo "--- END ${2} ---"
-}
-
-unset -v ok tmpdir go_files go_dirs gofmt_output golint_output
+unset -v ok tmpdir goimports_output golint_output progdir
 ok=true
+
+case "${0}" in
+*/*) progdir="${0%/*}";;
+*) progdir=.;;
+esac
+PATH="${PATH+"${PATH}:"}${progdir}"
+export PATH
+
 tmpdir=
 trap 'case "${tmpdir}" in ?*) rm -rf "${tmpdir}";; esac' EXIT
 tmpdir=$(mktemp -d)
 
-go_files="${tmpdir}/go_files.txt"
-git ls-files '*.go' | grep -v '^vendor/' > "${go_files}"
-
-# Print dirname of each relative pathname from stdin (one per line).
-dirnames() {
-	# pathname	dirname
-	# ----------------------
-	# a/b/c.go	a/b
-	# c.go		.
-	sed \
-		-e 's:^:./:' \
-		-e 's:/[^/]*$::' \
-		-e 's:^\./::'
-}
-
-go_dirs="${tmpdir}/go_dirs.txt"
-dirnames < "${go_files}" | sort -u -t/ > "${go_dirs}"
-
-HMY_PATH=$GOPATH/src/github.com/harmony-one
-export CGO_CFLAGS="-I$HMY_PATH/bls/include -I$HMY_PATH/mcl/include"
-export CGO_LDFLAGS="-L$HMY_PATH/bls/lib"
-export LD_LIBRARY_PATH=$HMY_PATH/bls/lib:$HMY_PATH/mcl/lib
-
-OS=$(uname -s)
-case $OS in
-   Darwin)
-      export CGO_CFLAGS="-I$HMY_PATH/bls/include -I$HMY_PATH/mcl/include -I/usr/local/opt/openssl/include"
-      export CGO_LDFLAGS="-L$HMY_PATH/bls/lib -L/usr/local/opt/openssl/lib"
-      export LD_LIBRARY_PATH=$HMY_PATH/bls/lib:$HMY_PATH/mcl/lib:/usr/local/opt/openssl/lib
-      export DYLD_LIBRARY_PATH=$LD_LIBRARY_PATH
-      ;;
-esac
+. "${progdir}/setup_bls_build_flags.sh"
 
 echo "Running go test..."
 if go test -v -count=1 ./...
@@ -62,25 +27,25 @@ fi
 
 echo "Running golint..."
 golint_output="${tmpdir}/golint_output.txt"
-if xargs golint -set_exit_status < "${go_dirs}" > "${golint_output}" 2>&1
+if "${progdir}/golint.sh" -set_exit_status > "${golint_output}" 2>&1
 then
 	echo "golint passed."
 else
 	echo "golint FAILED!"
-	print_file "${golint_output}" "golint"
+	"${progdir}/print_file.sh" "${golint_output}" "golint"
 	ok=false
 fi
 
-echo "Running gofmt..."
-gofmt_output="${tmpdir}/gofmt_output.txt"
-xargs gofmt -d -e < "${go_files}" > "${gofmt_output}" 2>&1
-if [ -s "${gofmt_output}" ]
+echo "Running goimports..."
+goimports_output="${tmpdir}/goimports_output.txt"
+"${progdir}/goimports.sh" -d -e > "${goimports_output}" 2>&1
+if [ -s "${goimports_output}" ]
 then
-	echo "gofmt FAILED!"
-	print_file "${gofmt_output}" "gofmt"
+	echo "goimports FAILED!"
+	"${progdir}/print_file.sh" "${goimports_output}" "goimports"
 	ok=false
 else
-	echo "gofmt passed."
+	echo "goimports passed."
 fi
 
 if ! ${ok}

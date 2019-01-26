@@ -19,7 +19,7 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/libp2p/go-libp2p-peer"
+	peer "github.com/libp2p/go-libp2p-peer"
 )
 
 // RoleType defines the role of the node
