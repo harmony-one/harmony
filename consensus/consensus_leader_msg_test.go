@@ -1,8 +1,9 @@
 package consensus
 
 import (
-	"github.com/harmony-one/harmony/internal/utils"
 	"testing"
+
+	"github.com/harmony-one/harmony/internal/utils"
 
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 

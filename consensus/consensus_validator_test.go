@@ -2,13 +2,14 @@ package consensus
 
 import (
 	"encoding/hex"
+	"testing"
+	"time"
+
 	"github.com/golang/mock/gomock"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	mock_host "github.com/harmony-one/harmony/p2p/host/mock"
 	"github.com/stretchr/testify/assert"
-	"testing"
-	"time"
 
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 

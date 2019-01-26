@@ -3,15 +3,17 @@ package consensus
 import (
 	"fmt"
 
+	"testing"
+	"time"
+
 	"crypto/sha256"
+
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/golang/mock/gomock"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	mock_host "github.com/harmony-one/harmony/p2p/host/mock"
 	"github.com/stretchr/testify/assert"
-	"testing"
-	"time"
 
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 

@@ -1,14 +1,15 @@
 package main
 
 import (
+	"testing"
+	"time"
+
 	"github.com/golang/mock/gomock"
 	"github.com/harmony-one/harmony/api/client"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	mock_host "github.com/harmony-one/harmony/p2p/host/mock"
-	"testing"
-	"time"
 )
 
 func TestCreateWalletNode(test *testing.T) {
