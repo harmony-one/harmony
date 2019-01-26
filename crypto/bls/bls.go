@@ -7,6 +7,10 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 )
 
+func init() {
+	bls.Init(bls.BLS12_381)
+}
+
 // AggregateSig aggregates all the BLS signature into a single multi-signature.
 func AggregateSig(sigs []*bls.Sign) *bls.Sign {
 	var aggregatedSig bls.Sign
