@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"bytes"
+
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"

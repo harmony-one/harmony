@@ -3,9 +3,9 @@ package pki
 import (
 	"crypto/sha256"
 	"encoding/binary"
-	"github.com/harmony-one/bls/ffi/go/bls"
 
 	"github.com/dedis/kyber"
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/crypto"
 )
 

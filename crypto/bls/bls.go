@@ -3,6 +3,7 @@ package bls
 import (
 	"errors"
 	"fmt"
+
 	"github.com/harmony-one/bls/ffi/go/bls"
 )
 

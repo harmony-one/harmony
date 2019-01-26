@@ -4,10 +4,11 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/hex"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/harmony-one/bls/ffi/go/bls"
 	"log"
 	"time"
+
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/harmony-one/bls/ffi/go/bls"
 )
 
 func main() {

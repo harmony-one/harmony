@@ -3,12 +3,12 @@ package newnode
 import (
 	"errors"
 	"fmt"
-	"github.com/harmony-one/bls/ffi/go/bls"
 	"os"
 	"strconv"
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto/bcconn"
 	proto_identity "github.com/harmony-one/harmony/api/proto/identity"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
