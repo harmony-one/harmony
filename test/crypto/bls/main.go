@@ -10,6 +10,10 @@ import (
 	"time"
 )
 
+func init() {
+	bls.Init(bls.BLS12_381)
+}
+
 func main() {
 	m := "message to sign"
 	var aggSig *bls.Sign

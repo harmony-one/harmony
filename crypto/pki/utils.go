@@ -9,6 +9,10 @@ import (
 	"github.com/harmony-one/harmony/crypto"
 )
 
+func init() {
+	bls.Init(bls.BLS12_381)
+}
+
 // GetAddressFromPublicKey returns address given a public key.
 func GetAddressFromPublicKey(pubKey *bls.PublicKey) [20]byte {
 	bytes := pubKey.Serialize()
