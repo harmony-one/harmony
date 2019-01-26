@@ -6,6 +6,7 @@
 
 # Executables
 harmony
+main
 *.pyc
 *.exe
 *.out
