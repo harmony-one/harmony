@@ -21,6 +21,10 @@ esac
 
 . "${progdir}/setup_bls_build_flags.sh"
 
+declare -A LIB
+LIB[libbls384.so]=${BLS_DIR}/lib/libbls384.so
+LIB[libmcl.so]=${MCL_DIR}/lib/libmcl.so
+
 if [ "$(uname -s)" == "Darwin" ]; then
    MD5='md5 -r'
    GOOS=darwin
@@ -96,6 +100,15 @@ function upload
    for bin in "${!SRC[@]}"; do
       [ -e $BINDIR/$bin ] && $AWSCLI s3 cp $BINDIR/$bin s3://${BUCKET}$FOLDER/$bin --acl public-read
    done
+
+   for lib in "${!LIB[@]}"; do
+      if [ -e ${LIB[$lib]} ]; then
+         $AWSCLI s3 cp ${LIB[$lib]} s3://${BUCKET}$FOLDER/$lib --acl public-read
+      else
+         echo "!! MISSING $lib !!"
+      fi
+   done
+
    [ -e $BINDIR/md5sum.txt ] && $AWSCLI s3 cp $BINDIR/md5sum.txt s3://${BUCKET}$FOLDER/md5sum.txt --acl public-read
 }
 
