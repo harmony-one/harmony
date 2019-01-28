@@ -289,6 +289,8 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 
 		utils.GetLogInstance().Debug("HOORAY!!! CONSENSUS REACHED!!!", "consensusID", consensus.consensusID, "numOfSignatures", len(*commitSigs))
 
+		// TODO: remove this temporary delay
+		time.Sleep(500 * time.Millisecond)
 		// Send signal to Node so the new block can be added and new round of consensus can be triggered
 		consensus.ReadySignal <- struct{}{}
 	}
