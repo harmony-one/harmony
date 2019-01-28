@@ -194,6 +194,7 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Cons
 	return &consensus
 }
 
+// Verify the signature of the message are valid from the signer's public key.
 func verifyMessageSig(signerPubKey *bls.PublicKey, message consensus_proto.Message) error {
 	signature := message.Signature
 	message.Signature = nil
