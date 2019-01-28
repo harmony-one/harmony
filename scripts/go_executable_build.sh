@@ -4,6 +4,7 @@ SRC[harmony]=cmd/harmony.go
 SRC[txgen]=cmd/client/txgen/main.go
 SRC[beacon]=cmd/beaconchain/main.go
 SRC[wallet]=cmd/client/wallet/main.go
+SRC[bootnode]=cmd/bootnode/main.go
 
 BINDIR=bin
 BUCKET=unique-bucket-bin
