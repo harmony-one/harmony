@@ -48,3 +48,6 @@ bc_config.json
 
 # leveldb local storage
 db/
+
+# bootnode keystore
+.bnkey
