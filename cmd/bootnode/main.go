@@ -13,7 +13,6 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 	libp2p "github.com/libp2p/go-libp2p"
-	crypto "github.com/libp2p/go-libp2p-crypto"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
@@ -23,10 +22,6 @@ var (
 	builtAt string
 	commit  string
 )
-
-type privKey struct {
-	Key string `json:"key"`
-}
 
 func printVersion(me string) {
 	fmt.Fprintf(os.Stderr, "Harmony (C) 2019. %v, version %v-%v (%v %v)\n", path.Base(me), version, commit, builtBy, builtAt)
@@ -73,7 +68,7 @@ func main() {
 	opts := []libp2p.Option{
 		libp2p.ListenAddrs(listen),
 	}
-	privKey, err := loadKey(*keyFile)
+	privKey, err := utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
 		panic(err)
 	}
@@ -86,38 +81,4 @@ func main() {
 	}
 
 	log.Info("bootnode", "BN_MA", fmt.Sprintf("/ipv/%s/tcp/%s/p2p/%s", *ip, *port, host.GetID().Pretty()))
-}
-
-// saveKey save private key to keyfile
-func saveKey(keyfile string, key crypto.PrivKey) (err error) {
-	str, err := utils.SavePrivateKey(key)
-	if err != nil {
-		return
-	}
-
-	keyStruct := privKey{Key: str}
-
-	err = utils.Save(keyfile, &keyStruct)
-	return
-}
-
-// loadKey load private key from keyfile
-func loadKey(keyfile string) (key crypto.PrivKey, err error) {
-	var keyStruct privKey
-	err = utils.Load(keyfile, &keyStruct)
-	if err != nil {
-		log.Warn("No priviate key can be loaded from file", "keyfile", keyfile)
-		log.Warn("Using random private key")
-		key, _, err = utils.GenKeyP2PRand()
-		if err != nil {
-			panic(err)
-		}
-		err = saveKey(keyfile, key)
-		if err != nil {
-			log.Warn("bootnode", "failed to save key to keyfile", err)
-		}
-		return key, nil
-	}
-	key, err = utils.LoadPrivateKey(keyStruct.Key)
-	return key, err
 }
