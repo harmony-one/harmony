@@ -53,6 +53,9 @@ ACTION:
    upload      upload binaries to s3
    pubwallet   upload wallet to public bucket (bucket: $PUBBUCKET)
 
+   harmony|txgen|bootnode|wallet|beacon
+               only build the specified binary
+
 EXAMPLES:
 
 # build linux binaries only by default
@@ -75,14 +78,18 @@ function build_only
    BUILTAT=$(date +%FT%T%z)
    BUILTBY=${USER}@
 
+   local build=$1
+
    for bin in "${!SRC[@]}"; do
-      echo "building ${SRC[$bin]}"
-      env GOOS=$GOOS GOARCH=$GOARCH go build -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE ${SRC[$bin]}
-      if [ "$(uname -s)" == "Linux" ]; then
-         $BINDIR/$bin -version
-      fi
-      if [ "$(uname -s)" == "Darwin" -a "$GOOS" == "darwin" ]; then
-         $BINDIR/$bin -version
+      if [[ -z "$build" || "$bin" == "$build" ]]; then
+         echo "building ${SRC[$bin]}"
+         env GOOS=$GOOS GOARCH=$GOARCH go build -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE ${SRC[$bin]}
+         if [ "$(uname -s)" == "Linux" ]; then
+            $BINDIR/$bin -version
+         fi
+         if [ "$(uname -s)" == "Darwin" -a "$GOOS" == "darwin" ]; then
+            $BINDIR/$bin -version
+         fi
       fi
    done
 
@@ -160,5 +167,6 @@ case "$ACTION" in
    "build") build_only ;;
    "upload") upload ;;
    "pubwallet") upload_wallet ;;
+   "harmony"|"wallet"|"txgen"|"bootnode"|"beacon") build_only $ACTION ;;
    *) usage ;;
 esac
