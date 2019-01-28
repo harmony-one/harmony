@@ -106,7 +106,7 @@ func TestSaveLoadPrivateKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to generate p2p key: %v", err)
 	}
-	str, err := SavePrivateKey(&pk)
+	str, err := SavePrivateKey(pk)
 	if err != nil {
 		t.Fatalf("failed to save private key: %v", err)
 	}
@@ -116,10 +116,10 @@ func TestSaveLoadPrivateKey(t *testing.T) {
 		t.Fatalf("failed to load key: %v", err)
 	}
 
-	if !crypto.KeyEqual(pk, *pk1) {
+	if !crypto.KeyEqual(pk, pk1) {
 		t.Errorf("loaded key is not right")
 		b1, _ := pk.Bytes()
-		b2, _ := (*pk1).Bytes()
+		b2, _ := pk1.Bytes()
 		t.Errorf("expecting pk: %v\n", b1)
 		t.Errorf("got pk1: %v\n", b2)
 	}

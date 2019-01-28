@@ -156,7 +156,7 @@ func Load(path string, v interface{}) error {
 }
 
 // LoadPrivateKey parses the key string in base64 format and return PrivKey
-func LoadPrivateKey(key string) (*p2p_crypto.PrivKey, error) {
+func LoadPrivateKey(key string) (p2p_crypto.PrivKey, error) {
 	if key != "" {
 		k1, err := p2p_crypto.ConfigDecodeKey(key)
 		if err != nil {
@@ -166,15 +166,15 @@ func LoadPrivateKey(key string) (*p2p_crypto.PrivKey, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal private key: %v", err)
 		}
-		return &priKey, nil
+		return priKey, nil
 	}
 	return nil, fmt.Errorf("empty key string")
 }
 
 // SavePrivateKey convert the PrivKey to base64 format and return string
-func SavePrivateKey(key *p2p_crypto.PrivKey) (string, error) {
+func SavePrivateKey(key p2p_crypto.PrivKey) (string, error) {
 	if key != nil {
-		b, err := p2p_crypto.MarshalPrivateKey(*key)
+		b, err := p2p_crypto.MarshalPrivateKey(key)
 		if err != nil {
 			return "", fmt.Errorf("failed to marshal private key: %v", err)
 		}
