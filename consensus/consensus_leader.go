@@ -93,7 +93,10 @@ func (consensus *Consensus) startConsensus(newBlock *types.Block) {
 
 	// Set state to AnnounceDone
 	consensus.state = AnnounceDone
-	// TODO: sign for leader itself
+
+	// Leader sign the multi-sig itself
+	(*consensus.prepareSigs)[consensus.nodeID] = consensus.priKey.SignHash(consensus.blockHash[:])
+
 	host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
 }
 
@@ -179,6 +182,10 @@ func (consensus *Consensus) processPrepareMessage(message consensus_proto.Messag
 		// Construct prepared message
 		msgToSend, aggSig := consensus.constructPreparedMessage()
 		consensus.aggregatedPrepareSig = aggSig
+
+		// Leader sign the multi-sig itself
+		// TODO: sign on the prepared multi-sig, rather than the block hash
+		(*consensus.commitSigs)[consensus.nodeID] = consensus.priKey.SignHash(consensus.blockHash[:])
 
 		// Broadcast prepared message
 		host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)

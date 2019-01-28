@@ -24,7 +24,7 @@ func (consensus *Consensus) constructPrepareMessage() []byte {
 	// 48 byte of bls signature
 	sign := consensus.priKey.SignHash(message.BlockHash)
 	if sign != nil {
-		message.Payload = consensus.priKey.SignHash(message.BlockHash).Serialize()
+		message.Payload = sign.Serialize()
 	}
 
 	marshaledMessage, err := protobuf.Marshal(&message)
@@ -61,7 +61,7 @@ func (consensus *Consensus) constructCommitMessage() []byte {
 	// TODO: sign on the prepared message hash, rather than the block hash
 	sign := consensus.priKey.SignHash(message.BlockHash)
 	if sign != nil {
-		message.Payload = consensus.priKey.SignHash(message.BlockHash).Serialize()
+		message.Payload = sign.Serialize()
 	}
 
 	marshaledMessage, err := protobuf.Marshal(&message)
