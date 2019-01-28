@@ -84,3 +84,43 @@ func TestGetUniqueIDFromPeer(t *testing.T) {
 func TestGetUniqueIDFromIPPort(t *testing.T) {
 	assert.Equal(t, GetUniqueIDFromIPPort("1.1.1.1", "123"), uint32(1111123), "should be equal to 1111123")
 }
+
+var (
+	savedKey = "CAASqQkwggSlAgEAAoIBAQCwKJVWOIbfLXNKxK8VetvHS7eEOtC8VJ/GoyeWsaaGVknLyDGYkvWYpeYpu5hsKYfq6yPPBOjKqx0Oz0uKxclys7RcM/cLiGr9x86XaHH80YYAN7MDLyzS9QVlCFjkWoDh2xFUWgTmLgpGaLmi4vO1GTAdbtymO8CI499E2+hz2O4E1xOARum+vH+Y+kXML6ap2982KOEHXMwsCjLyymdL+/hsu3VzmTpxIfpSGnlJHoacwlMuTWIyj1J9Z5pMRLoPOwK6xFCgY5p4/CC20VcCJQal6BtEh4tQciwxFZlZ4eUsVc3JIw096NcJ0wx6Jz5qGXJjOy2bJaKHuLSUmqxXAgMBAAECggEAcOzTLr5110OvkNKc2kwz74JeVmnNva0R76hPjI69jYhrLjNbd89dmUlgTohvoYbOFo4+GkuvX5xpuECy0HcSOHFywViemcoNrDoV+YF+8O7v09vg6b2oImPn3WiIc3qA/EgOx+AdG+GPvKsNtZl/WSyYZ4XV9MqBFj/dtKq0TO5Ga8Pg0H/NTYu4clQuqu4pw5dHoXXfhXfrLGZpsXPhAlOV96mNKIiRK3c7Lj4so6g29W3XFgOgw1oYuzpMlv95airHnKiwMWty3wwQ+orL+A7WiSi1Kt2d9kZQ5RTJwchwc241fv+7+aL0lfzzCxmoDo17967aaPeSGASzUFAL4QKBgQDG2LJzw7VR89UbfFH4Yaw7J6Ll0bppDD+TwBtA8jtRTykL9kOpS3aTt2nNDv9YYGKlqIF+186MuQ6dOIA7J67hXWRH78nF95XhhlpWrphAa5udNHgF6QCGe617MJDVFUgXNkcJPzvSHxuBz8h5Z7mP5ArA9g/DkBMBVnY8h5jYtQKBgQDiynyiiYzaeLugqzeRDy3QdH5fJjIQXwCNfCHmCQ5NmHj7XB9jVf8nAWzekuwqrANaCLj3N8rELOC9uAcuSh7ymB9/4mZ251M3jjF5Q+RTF1xN4EubE2mFdAz3ITGiUt7d5w0tgpVjq5e+zyCs6Hn+6GWk5B8wqwC4cp0YcymUWwKBgQDDwG4lAsRMclMX5NI5R8Yq0gFOZ6Iwaetow5TQ4eY9TEWnTf8b+Xs5PjV8tkfvs6tJU9JvkXn4FPHrGsU59v31RGBFZSzoo6y8QOxMK0MdIBIot490mgV3XufQv2XFL1cx6rARzVtRpmgI6gl8Yv1NRvzDKzknl3zuMzTgr8hrhQKBgQDNlqWZanvnaN8d7Vh4BXyQpaoRczybHqQPnmHUeI0gxoGVy5Mgp8qff2lD84hnvntjWNjkMw16/PvWwEayLbsUS9byRTiBvX3wtNQgi+0lbd3dMuEW+WgE9Ij0VoD6F4m1O0j04pWuPtVWwclrNWuyKtZJvgqQQdRrYGsMyQj+VQKBgQCC15mFp1nh3/KfB07JU3w7pcqalvq5ZrkZDK9NrgwXNoXMWxgQ/2BfoX2rETM2HbfCIN5rLSt2paElkxIn8fF2NV/e4Hdk3WMfd0OFhMZ4hJCscx2DukMSW2qJ4sp97RudplsK9eW0y8OIhY1UF8eME9bOdWD0bU10QiMNwVzOWQ=="
+)
+
+// Test for SavePrivateKey function
+func TestSavePrivateKey(t *testing.T) {
+	pk, _, err := GenKeyP2P("127.0.0.1", "8888")
+	if err != nil {
+		t.Fatalf("failed to generate p2p key: %v", err)
+	}
+	str, err := SavePrivateKey(&pk)
+	if err != nil {
+		t.Fatalf("failed to save private key: %v", err)
+	}
+	if str != savedKey {
+		t.Errorf("key is not right")
+		t.Errorf("got: %s", str)
+		t.Errorf("expecting: %s", savedKey)
+	}
+}
+
+// Test for LoadPrivateKey function
+func TestLoadPrivateKey(t *testing.T) {
+	pk, _, err := GenKeyP2P("127.0.0.1", "8888")
+	if err != nil {
+		t.Fatalf("failed to generate p2p key: %v", err)
+	}
+	pk1, err := LoadPrivateKey(savedKey)
+	if err != nil {
+		t.Fatalf("failed to load key: %v", err)
+	}
+	if !crypto.KeyEqual(pk, *pk1) {
+		t.Errorf("loaded key is not right")
+		b1, _ := pk.Bytes()
+		b2, _ := (*pk1).Bytes()
+		t.Errorf("expecting pk: %v\n", b1)
+		t.Errorf("got pk1: %v\n", b2)
+	}
+}
