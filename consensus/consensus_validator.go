@@ -3,6 +3,8 @@ package consensus
 import (
 	"bytes"
 
+	"github.com/harmony-one/bls/ffi/go/bls"
+
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"
@@ -216,13 +218,16 @@ func (consensus *Consensus) processCommittedMessage(message consensus_proto.Mess
 	if err != nil {
 		utils.GetLogInstance().Warn("Failed to marshal the announce message", "error", err)
 	}
-	_ = signature
-	_ = messageBytes
-	// TODO: verify message signature
-	//if schnorr.Verify(crypto.Ed25519Curve, consensus.leader.PubKey, messageBytes, signature) != nil {
-	//	consensus.Log.Warn("Received message with invalid signature", "leaderKey", consensus.leader.PubKey, "consensus", consensus)
-	//	return
-	//}
+
+	msgSig := bls.Sign{}
+	err = msgSig.Deserialize(signature)
+	if err != nil {
+		utils.GetLogInstance().Warn("Failed to deserialize message signature", "leader ID", leaderID)
+	}
+	if msgSig.VerifyHash(consensus.leader.PubKey, messageBytes) {
+		utils.GetLogInstance().Warn("Received message with invalid signature", "leader ID", leaderID)
+		return
+	}
 
 	// Add attack model of IncorrectResponse.
 	if attack.GetInstance().IncorrectResponse() {

@@ -125,13 +125,16 @@ func (consensus *Consensus) processPrepareMessage(message consensus_proto.Messag
 	if err != nil {
 		utils.GetLogInstance().Warn("Failed to marshal the prepare message", "error", err)
 	}
-	_ = messageBytes
-	_ = signature
-	// TODO: verify message signature
-	//if schnorr.Verify(crypto.Ed25519Curve, value.PubKey, messageBytes, signature) != nil {
-	//	consensus.Log.Warn("Received message with invalid signature", "validatorKey", consensus.leader.PubKey, "consensus", consensus)
-	//	return
-	//}
+
+	msgSig := bls.Sign{}
+	err = msgSig.Deserialize(signature)
+	if err != nil {
+		utils.GetLogInstance().Warn("Failed to deserialize message signature", "validator ID", validatorID)
+	}
+	if msgSig.VerifyHash(value.PubKey, messageBytes) {
+		utils.GetLogInstance().Warn("Received message with invalid signature", "validator ID", validatorID)
+		return
+	}
 
 	// check consensus Id
 	consensus.mutex.Lock()
@@ -210,11 +213,11 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 	// check consensus Id
 	if consensusID != consensus.consensusID {
 		shouldProcess = false
-		utils.GetLogInstance().Warn("Received Response with wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
+		utils.GetLogInstance().Warn("Received Commit with wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
 	}
 
 	if !bytes.Equal(blockHash, consensus.blockHash[:]) {
-		utils.GetLogInstance().Warn("Received Response with wrong blockHash", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
+		utils.GetLogInstance().Warn("Received Commit with wrong blockHash", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
 		return
 	}
 
@@ -234,13 +237,16 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 	if err != nil {
 		utils.GetLogInstance().Warn("Failed to marshal the commit message", "error", err)
 	}
-	_ = messageBytes
-	_ = signature
-	// TODO: verify message signature
-	//if schnorr.Verify(crypto.Ed25519Curve, value.PubKey, messageBytes, signature) != nil {
-	//	consensus.Log.Warn("Received message with invalid signature", "validatorKey", consensus.leader.PubKey, "consensus", consensus)
-	//	return
-	//}
+
+	msgSig := bls.Sign{}
+	err = msgSig.Deserialize(signature)
+	if err != nil {
+		utils.GetLogInstance().Warn("Failed to deserialize message signature", "validator ID", validatorID)
+	}
+	if msgSig.VerifyHash(value.PubKey, messageBytes) {
+		utils.GetLogInstance().Warn("Received message with invalid signature", "validator ID", validatorID)
+		return
+	}
 
 	commitSigs := consensus.commitSigs
 	commitBitmap := consensus.commitBitmap
@@ -311,8 +317,6 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 
 		utils.GetLogInstance().Debug("HOORAY!!! CONSENSUS REACHED!!!", "consensusID", consensus.consensusID, "numOfSignatures", len(*commitSigs))
 
-		// TODO: remove this temporary delay
-		time.Sleep(500 * time.Millisecond)
 		// Send signal to Node so the new block can be added and new round of consensus can be triggered
 		consensus.ReadySignal <- struct{}{}
 	}
