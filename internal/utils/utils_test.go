@@ -99,3 +99,28 @@ func TestGetUniqueIDFromPeer(t *testing.T) {
 func TestGetUniqueIDFromIPPort(t *testing.T) {
 	assert.Equal(t, GetUniqueIDFromIPPort("1.1.1.1", "123"), uint32(1111123), "should be equal to 1111123")
 }
+
+// Test for SavePrivateKey/LoadPrivateKey functions
+func TestSaveLoadPrivateKey(t *testing.T) {
+	pk, _, err := GenKeyP2P("127.0.0.1", "8888")
+	if err != nil {
+		t.Fatalf("failed to generate p2p key: %v", err)
+	}
+	str, err := SavePrivateKey(pk)
+	if err != nil {
+		t.Fatalf("failed to save private key: %v", err)
+	}
+
+	pk1, err := LoadPrivateKey(str)
+	if err != nil {
+		t.Fatalf("failed to load key: %v", err)
+	}
+
+	if !crypto.KeyEqual(pk, pk1) {
+		t.Errorf("loaded key is not right")
+		b1, _ := pk.Bytes()
+		b2, _ := pk1.Bytes()
+		t.Errorf("expecting pk: %v\n", b1)
+		t.Errorf("got pk1: %v\n", b2)
+	}
+}
