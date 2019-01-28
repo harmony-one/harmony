@@ -13,7 +13,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
+	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
@@ -190,6 +192,25 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Cons
 
 	//	consensus.Log.Info("New Consensus", "IP", ip, "Port", port, "NodeID", consensus.nodeID, "priKey", consensus.priKey, "pubKey", consensus.pubKey)
 	return &consensus
+}
+
+func verifyMessageSig(signerPubKey *bls.PublicKey, message consensus_proto.Message) error {
+	signature := message.Signature
+	message.Signature = nil
+	messageBytes, err := protobuf.Marshal(&message)
+	if err != nil {
+		return err
+	}
+
+	msgSig := bls.Sign{}
+	err = msgSig.Deserialize(signature)
+	if err != nil {
+		return err
+	}
+	if msgSig.VerifyHash(signerPubKey, messageBytes) {
+		return err
+	}
+	return nil
 }
 
 // Author returns the author of the block header.

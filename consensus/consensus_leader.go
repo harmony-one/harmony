@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/rlp"
-	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/api/services/explorer"
@@ -106,7 +105,6 @@ func (consensus *Consensus) processPrepareMessage(message consensus_proto.Messag
 	blockHash := message.BlockHash
 	validatorID := message.SenderId
 	prepareSig := message.Payload
-	signature := message.Signature
 
 	// Verify signature
 	v, ok := consensus.validators.Load(validatorID)
@@ -120,21 +118,8 @@ func (consensus *Consensus) processPrepareMessage(message consensus_proto.Messag
 		return
 	}
 
-	message.Signature = nil
-	messageBytes, err := protobuf.Marshal(&message)
-	if err != nil {
-		utils.GetLogInstance().Warn("Failed to marshal the prepare message", "error", err)
-	}
-
-	msgSig := bls.Sign{}
-	err = msgSig.Deserialize(signature)
-	if err != nil {
-		utils.GetLogInstance().Warn("Failed to deserialize message signature", "validator ID", validatorID)
-	}
-	if msgSig.VerifyHash(value.PubKey, messageBytes) {
-		utils.GetLogInstance().Warn("Received message with invalid signature", "validator ID", validatorID)
-		return
-	}
+	// Verify message signature
+	verifyMessageSig(value.PubKey, message)
 
 	// check consensus Id
 	consensus.mutex.Lock()
@@ -204,7 +189,6 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 	blockHash := message.BlockHash
 	validatorID := message.SenderId
 	commitSig := message.Payload
-	signature := message.Signature
 
 	shouldProcess := true
 	consensus.mutex.Lock()
@@ -232,21 +216,9 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 		utils.GetLogInstance().Warn("Invalid validator", "validatorID", validatorID, "consensus", consensus)
 		return
 	}
-	message.Signature = nil
-	messageBytes, err := protobuf.Marshal(&message)
-	if err != nil {
-		utils.GetLogInstance().Warn("Failed to marshal the commit message", "error", err)
-	}
 
-	msgSig := bls.Sign{}
-	err = msgSig.Deserialize(signature)
-	if err != nil {
-		utils.GetLogInstance().Warn("Failed to deserialize message signature", "validator ID", validatorID)
-	}
-	if msgSig.VerifyHash(value.PubKey, messageBytes) {
-		utils.GetLogInstance().Warn("Received message with invalid signature", "validator ID", validatorID)
-		return
-	}
+	// Verify message signature
+	verifyMessageSig(value.PubKey, message)
 
 	commitSigs := consensus.commitSigs
 	commitBitmap := consensus.commitBitmap
@@ -289,7 +261,7 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 		host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
 
 		var blockObj types.Block
-		err = rlp.DecodeBytes(consensus.block, &blockObj)
+		err := rlp.DecodeBytes(consensus.block, &blockObj)
 		if err != nil {
 			utils.GetLogInstance().Debug("failed to construct the new block after consensus")
 		}
