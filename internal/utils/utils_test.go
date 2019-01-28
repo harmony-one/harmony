@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"bytes"
+	"encoding/hex"
 	"testing"
 
 	"github.com/harmony-one/harmony/p2p"
@@ -53,6 +55,11 @@ func TestGenKeyBLS(t *testing.T) {
 	priKey, pubKey := GenKeyBLS("3.3.3.3", "3456")
 	if priKey == nil || pubKey == nil {
 		t.Error("Failed to create keys for BLS sig")
+	}
+	pubKeyBytes, _ := hex.DecodeString("ca6247713431a59cbadfe282b36cb13746b6e5c5db6e5972a10a83adffdf23f8aab246229cb3050e061e1024aa9b6518e200dd9663a8c855e596f1007150aa0672e6f40d073947aa027e8ffe8e89d894ca3916f80fdb350f4b8643f6ff99510c")
+
+	if bytes.Compare(pubKey.Serialize(), pubKeyBytes) != 0 {
+		t.Errorf("Unexpected public key: %s", hex.EncodeToString(pubKey.Serialize()))
 	}
 }
 

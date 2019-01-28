@@ -7,6 +7,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
+// Test the basic functionality of a BLS multi-sig mask.
 func TestNewMask(test *testing.T) {
 	_, pubKey1 := utils.GenKeyBLS("127.0.0.1", "5555")
 	_, pubKey2 := utils.GenKeyBLS("127.0.0.1", "6666")
