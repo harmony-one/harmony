@@ -85,6 +85,7 @@ func GenKeyBLS(ip, port string) (*bls.SecretKey, *bls.PublicKey) {
 	err := privateKey.SetLittleEndian(nodeIDBytes)
 	if err != nil {
 		log.Print("failed to set private key", err)
+		return nil, nil
 	}
 	priKey := &privateKey
 	pubKey := privateKey.GetPublicKey()
