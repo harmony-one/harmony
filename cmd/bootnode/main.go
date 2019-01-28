@@ -3,7 +3,6 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -11,6 +10,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/p2p/p2pimpl"
 	libp2p "github.com/libp2p/go-libp2p"
 	crypto "github.com/libp2p/go-libp2p-crypto"
 	ma "github.com/multiformats/go-multiaddr"
@@ -77,14 +78,14 @@ func main() {
 		panic(err)
 	}
 
-	opts = append(opts, libp2p.Identity(privKey))
+	var selfPeer = p2p.Peer{IP: *ip, Port: *port}
 
-	host, err := libp2p.New(context.Background(), opts...)
+	host, err := p2pimpl.NewHost(&selfPeer, privKey, opts...)
 	if err != nil {
 		panic(err)
 	}
 
-	log.Info("bootnode", "BN_MA", fmt.Sprintf("/ipv/%s/tcp/%s/p2p/%s", *ip, *port, host.ID().Pretty()))
+	log.Info("bootnode", "BN_MA", fmt.Sprintf("/ipv/%s/tcp/%s/p2p/%s", *ip, *port, host.GetID().Pretty()))
 }
 
 // saveKey save private key to keyfile
