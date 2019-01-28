@@ -1,9 +1,10 @@
 package bls
 
 import (
+	"testing"
+
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/internal/utils"
-	"testing"
 )
 
 func TestNewMask(test *testing.T) {
