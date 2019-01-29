@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/internal/attack"
-	pkg_newnode "github.com/harmony-one/harmony/internal/newnode"
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node"
@@ -89,11 +88,12 @@ func main() {
 	metricsReportURL := flag.String("metrics_report_url", "", "If set, reports metrics to this URL.")
 	versionFlag := flag.Bool("version", false, "Output version info")
 	onlyLogTps := flag.Bool("only_log_tps", false, "Only log TPS if true")
+	isBeacon := flag.Bool("is_beacon_node", false, "True if node is a beaconchain node")
 
 	//This IP belongs to jenkins.harmony.one
-	bcIP := flag.String("bc", "127.0.0.1", "IP of the identity chain")
-	bcPort := flag.String("bc_port", "8081", "port of the identity chain")
-	bcAddr := flag.String("bc_addr", "", "MultiAddr of the identity chain")
+	bootNodeIP := flag.String("bc", "127.0.0.1", "IP of the identity chain")
+	bootNodePort := flag.String("bc_port", "8081", "port of the identity chain")
+	bootNodeAddr := flag.String("bc_addr", "", "MultiAddr of the identity chain")
 
 	//Leader needs to have a minimal number of peers to start consensus
 	minPeers := flag.Int("min_peers", 100, "Minimal number of Peers in shard")
@@ -118,8 +118,18 @@ func main() {
 	var leader p2p.Peer
 	var selfPeer p2p.Peer
 	var clientPeer *p2p.Peer
-	var BCPeer *p2p.Peer
+	var BootNodePeer *p2p.Peer
 	priKey, _, err := utils.GenKeyP2P(*ip, *port)
+	var ldb *ethdb.LDBDatabase
+
+	if *dbSupported {
+		ldb, _ = InitLDBDatabase(*ip, *port, *freshDB)
+	}
+
+	host, err := p2pimpl.NewHost(&selfPeer, priKey)
+	if err != nil {
+		panic("unable to new host in harmony")
+	}
 
 	if *bcAddr != "" {
 		// Turn the destination into a multiaddr.
@@ -134,98 +144,110 @@ func main() {
 			panic(err)
 		}
 
-		BCPeer = &p2p.Peer{IP: *bcIP, Port: *bcPort, Addrs: info.Addrs, PeerID: info.ID}
+		BootNodePeer = &p2p.Peer{IP: *bootNodeIP, Port: *bootNodePort, Addrs: info.Addrs, PeerID: info.ID}
 	} else {
-		BCPeer = &p2p.Peer{IP: *bcIP, Port: *bcPort}
+		BootNodePeer = &p2p.Peer{IP: *bootNodeIP, Port: *bootNodePort}
 	}
 
 	//Use Peer Discovery to get shard/leader/peer/...
-	candidateNode := pkg_newnode.New(*ip, *port, priKey)
-	candidateNode.AddPeer(BCPeer)
-	candidateNode.ContactBeaconChain(*BCPeer)
-
-	shardID = candidateNode.GetShardID()
-	leader = candidateNode.GetLeader()
-	selfPeer = candidateNode.GetSelfPeer()
-	clientPeer = candidateNode.GetClientPeer()
-	selfPeer.PubKey = candidateNode.PubK
-
-	fmt.Println("Harmnoy", leader, selfPeer)
-
-	var role string
-	if leader.IP == *ip && leader.Port == *port {
-		role = "leader"
-	} else {
-		role = "validator"
-	}
-
-	if role == "validator" {
-		// Attack determination.
-		attack.GetInstance().SetAttackEnabled(attackDetermination(*attackedMode))
-	}
-	// Init logging.
-	loggingInit(*logFolder, role, *ip, *port, *onlyLogTps)
-
-	// Initialize leveldb if dbSupported.
-	var ldb *ethdb.LDBDatabase
-
-	if *dbSupported {
-		ldb, _ = InitLDBDatabase(*ip, *port, *freshDB)
-	}
-
-	host, err := p2pimpl.NewHost(&selfPeer, priKey)
-	if err != nil {
-		panic("unable to new host in harmony")
-	}
-
-	host.AddPeer(&leader)
-
-	// Consensus object.
-	consensus := consensus.New(host, shardID, peers, leader)
-	consensus.MinPeers = *minPeers
-
-	// Start Profiler for leader if profile argument is on
-	if role == "leader" && (*profile || *metricsReportURL != "") {
-		prof := profiler.GetProfiler()
-		prof.Config(shardID, *metricsReportURL)
-		if *profile {
-			prof.Start()
+	candidateNode := node.New{IP: *ip, Port: *port}
+	nodePeers := candidateNode.ContactBootNode(*BootNodePeer)
+	candidateNode.AddPeers(BootNodePeer) //AddPeers is like AddPeer, just adds a list.
+	currentNode.isBeacon = *isBeacon
+	if *isBeacon {
+		beaconConsensus = beaconservice.NewConsensus() //Interface to be decided.
+		currentNode := candidateNode.TransitionToFullBeaconNode(host, beaconConsensus, ldb)
+		if beaconConsensus.IsLeader {
+			currentNode.State = node.NodeLeader
+			// Let consensus run
+			go func() {
+				beaconConsensus.WaitForNewBlock(currentNode.BlockChannel)
+			}()
+			// Node waiting for consensus readiness to create new block
+			go func() {
+				currentNode.WaitForConsensusReady(beaconConsensus.ReadySignal)
+			}()
+		} else {
+			go currentNode.JoinShard(leader)
 		}
-	}
-
-	// Current node.
-	currentNode := node.New(host, consensus, ldb)
-	currentNode.Consensus.OfflinePeers = currentNode.OfflinePeers
-
-	// If there is a client configured in the node list.
-	if clientPeer != nil {
-		currentNode.ClientPeer = clientPeer
-	}
-
-	// Assign closure functions to the consensus object
-	consensus.BlockVerifier = currentNode.VerifyNewBlock
-	consensus.OnConsensusDone = currentNode.PostConsensusProcessing
-
-	currentNode.State = node.NodeWaitToJoin
-
-	if consensus.IsLeader {
-		currentNode.State = node.NodeLeader
-		// Let consensus run
-		go func() {
-			consensus.WaitForNewBlock(currentNode.BlockChannel)
-		}()
-		// Node waiting for consensus readiness to create new block
-		go func() {
-			currentNode.WaitForConsensusReady(consensus.ReadySignal)
-		}()
 	} else {
-		go currentNode.JoinShard(leader)
-	}
+		candidateNode.SendStakeTransaction() //Interface to be decided.
+		candidateNode.State = node.NodeWaitToJoin
+		candidateNode.WaitToJoinOnEpoch() //Wait until the beaconchain signals acceptance of stake AND gives new shard.
 
-	go currentNode.SupportSyncing()
-	if consensus.IsLeader {
-		go currentNode.SupportClient()
-		go currentNode.SupportExplorer()
+		shardID = candidateNode.GetShardID()
+		leader = candidateNode.GetLeader()
+		selfPeer = candidateNode.GetSelfPeer()
+		clientPeer = candidateNode.GetClientPeer()
+		selfPeer.PubKey = candidateNode.PubK
+
+		fmt.Println("Harmnoy", leader, selfPeer)
+
+		var role string
+		if leader.IP == *ip && leader.Port == *port {
+			role = "leader"
+		} else {
+			role = "validator"
+		}
+
+		if role == "validator" {
+			// Attack determination.
+			attack.GetInstance().SetAttackEnabled(attackDetermination(*attackedMode))
+		}
+		// Init logging.
+		loggingInit(*logFolder, role, *ip, *port, *onlyLogTps)
+
+		// Initialize leveldb if dbSupported.
+
+		host.AddPeer(&leader)
+
+		// Consensus object.
+
+		consensus := consensus.New(host, shardID, peers, leader)
+		consensus.MinPeers = *minPeers
+
+		// Start Profiler for leader if profile argument is on
+		if role == "leader" && (*profile || *metricsReportURL != "") {
+			prof := profiler.GetProfiler()
+			prof.Config(shardID, *metricsReportURL)
+			if *profile {
+				prof.Start()
+			}
+		}
+
+		// Current node.
+		currentNode := candidateNode.TransitionToFullNode(host, consensus, ldb)
+		currentNode.Consensus.OfflinePeers = currentNode.OfflinePeers
+
+		// If there is a client configured in the node list.
+		if clientPeer != nil {
+			currentNode.ClientPeer = clientPeer
+		}
+
+		// Assign closure functions to the consensus object
+		consensus.BlockVerifier = currentNode.VerifyNewBlock
+		consensus.OnConsensusDone = currentNode.PostConsensusProcessing
+
+		if consensus.IsLeader {
+			currentNode.State = node.NodeLeader
+			// Let consensus run
+			go func() {
+				consensus.WaitForNewBlock(currentNode.BlockChannel)
+			}()
+			// Node waiting for consensus readiness to create new block
+			go func() {
+				currentNode.WaitForConsensusReady(consensus.ReadySignal)
+			}()
+		} else {
+			go currentNode.JoinShard(leader)
+		}
+
+		go currentNode.SupportSyncing()
+		if consensus.IsLeader {
+			go currentNode.SupportClient()
+			go currentNode.SupportExplorer()
+		}
+
 	}
 	currentNode.StartServer()
 }
