@@ -76,7 +76,7 @@ func main() {
 		panic(err)
 	}
 
-	log.Info("bootnode", "BN_MA", fmt.Sprintf("/ipv/%s/tcp/%s/p2p/%s", *ip, *port, host.GetID().Pretty()))
+	log.Info("bootnode", "BN_MA", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, host.GetID().Pretty()))
 
 	dataStore := dsync.MutexWrap(ds.NewMapDatastore())
 	dht := kaddht.NewDHT(context.Background(), host.GetP2PHost(), dataStore)
