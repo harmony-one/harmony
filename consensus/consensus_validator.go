@@ -39,7 +39,6 @@ func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Messa
 	blockHash := message.BlockHash
 	leaderID := message.SenderId
 	block := message.Payload
-	signature := message.Signature
 
 	copy(consensus.blockHash[:], blockHash[:])
 
@@ -51,19 +50,12 @@ func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Messa
 		return
 	}
 
-	// Verify signature
-	message.Signature = nil
-	messageBytes, err := protobuf.Marshal(&message)
+	// Verify message signature
+	err := verifyMessageSig(consensus.leader.PubKey, message)
 	if err != nil {
-		utils.GetLogInstance().Warn("Failed to marshal the announce message", "error", err)
+		utils.GetLogInstance().Warn("Failed to verify the message signature", "Error", err, "leader ID", leaderID)
+		return
 	}
-	_ = signature
-	_ = messageBytes
-	// TODO: verify message signature
-	//if schnorr.Verify(crypto.Ed25519Curve, consensus.leader.PubKey, messageBytes, signature) != nil {
-	//	consensus.Log.Warn("Received message with invalid signature", "leaderKey", consensus.leader.PubKey, "consensus", consensus)
-	//	return
-	//}
 
 	// check block header is valid
 	var blockObj types.Block
@@ -117,7 +109,6 @@ func (consensus *Consensus) processPreparedMessage(message consensus_proto.Messa
 	blockHash := message.BlockHash
 	leaderID := message.SenderId
 	messagePayload := message.Payload
-	signature := message.Signature
 
 	//#### Read payload data
 	offset := 0
@@ -139,19 +130,12 @@ func (consensus *Consensus) processPreparedMessage(message consensus_proto.Messa
 		return
 	}
 
-	// Verify signature
-	message.Signature = nil
-	messageBytes, err := protobuf.Marshal(&message)
+	// Verify message signature
+	err := verifyMessageSig(consensus.leader.PubKey, message)
 	if err != nil {
-		utils.GetLogInstance().Warn("Failed to marshal the announce message", "error", err)
+		utils.GetLogInstance().Warn("Failed to verify the message signature", "Error", err, "leader ID", leaderID)
+		return
 	}
-	_ = signature
-	_ = messageBytes
-	// TODO: verify message signature
-	//if schnorr.Verify(crypto.Ed25519Curve, consensus.leader.PubKey, messageBytes, signature) != nil {
-	//	consensus.Log.Warn("Received message with invalid signature", "leaderKey", consensus.leader.PubKey, "consensus", consensus)
-	//	return
-	//}
 
 	// Add attack model of IncorrectResponse.
 	if attack.GetInstance().IncorrectResponse() {
@@ -188,7 +172,6 @@ func (consensus *Consensus) processCommittedMessage(message consensus_proto.Mess
 	blockHash := message.BlockHash
 	leaderID := message.SenderId
 	messagePayload := message.Payload
-	signature := message.Signature
 
 	//#### Read payload data
 	offset := 0
@@ -210,19 +193,12 @@ func (consensus *Consensus) processCommittedMessage(message consensus_proto.Mess
 		return
 	}
 
-	// Verify signature
-	message.Signature = nil
-	messageBytes, err := protobuf.Marshal(&message)
+	// Verify message signature
+	err := verifyMessageSig(consensus.leader.PubKey, message)
 	if err != nil {
-		utils.GetLogInstance().Warn("Failed to marshal the announce message", "error", err)
+		utils.GetLogInstance().Warn("Failed to verify the message signature", "Error", err, "leader ID", leaderID)
+		return
 	}
-	_ = signature
-	_ = messageBytes
-	// TODO: verify message signature
-	//if schnorr.Verify(crypto.Ed25519Curve, consensus.leader.PubKey, messageBytes, signature) != nil {
-	//	consensus.Log.Warn("Received message with invalid signature", "leaderKey", consensus.leader.PubKey, "consensus", consensus)
-	//	return
-	//}
 
 	// Add attack model of IncorrectResponse.
 	if attack.GetInstance().IncorrectResponse() {

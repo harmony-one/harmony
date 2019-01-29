@@ -57,7 +57,7 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan *types.Block) {
 // ProcessMessageLeader dispatches consensus message for the leader.
 func (consensus *Consensus) ProcessMessageLeader(payload []byte) {
 	message := consensus_proto.Message{}
-	err := message.XXX_Unmarshal(payload)
+	err := protobuf.Unmarshal(payload, &message)
 
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to unmarshal message payload.", "err", err, "consensus", consensus)
@@ -93,7 +93,10 @@ func (consensus *Consensus) startConsensus(newBlock *types.Block) {
 
 	// Set state to AnnounceDone
 	consensus.state = AnnounceDone
-	// TODO: sign for leader itself
+
+	// Leader sign the multi-sig itself
+	(*consensus.prepareSigs)[consensus.nodeID] = consensus.priKey.SignHash(consensus.blockHash[:])
+
 	host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
 }
 
@@ -103,7 +106,6 @@ func (consensus *Consensus) processPrepareMessage(message consensus_proto.Messag
 	blockHash := message.BlockHash
 	validatorID := message.SenderId
 	prepareSig := message.Payload
-	signature := message.Signature
 
 	// Verify signature
 	v, ok := consensus.validators.Load(validatorID)
@@ -117,18 +119,12 @@ func (consensus *Consensus) processPrepareMessage(message consensus_proto.Messag
 		return
 	}
 
-	message.Signature = nil
-	messageBytes, err := protobuf.Marshal(&message)
+	// Verify message signature
+	err := verifyMessageSig(value.PubKey, message)
 	if err != nil {
-		utils.GetLogInstance().Warn("Failed to marshal the prepare message", "error", err)
+		utils.GetLogInstance().Warn("Failed to verify the message signature", "Error", err, "validatorID", validatorID)
+		return
 	}
-	_ = messageBytes
-	_ = signature
-	// TODO: verify message signature
-	//if schnorr.Verify(crypto.Ed25519Curve, value.PubKey, messageBytes, signature) != nil {
-	//	consensus.Log.Warn("Received message with invalid signature", "validatorKey", consensus.leader.PubKey, "consensus", consensus)
-	//	return
-	//}
 
 	// check consensus Id
 	consensus.mutex.Lock()
@@ -180,6 +176,10 @@ func (consensus *Consensus) processPrepareMessage(message consensus_proto.Messag
 		msgToSend, aggSig := consensus.constructPreparedMessage()
 		consensus.aggregatedPrepareSig = aggSig
 
+		// Leader sign the multi-sig itself
+		// TODO: sign on the prepared multi-sig, rather than the block hash
+		(*consensus.commitSigs)[consensus.nodeID] = consensus.priKey.SignHash(consensus.blockHash[:])
+
 		// Broadcast prepared message
 		host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
 
@@ -194,7 +194,6 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 	blockHash := message.BlockHash
 	validatorID := message.SenderId
 	commitSig := message.Payload
-	signature := message.Signature
 
 	shouldProcess := true
 	consensus.mutex.Lock()
@@ -203,11 +202,11 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 	// check consensus Id
 	if consensusID != consensus.consensusID {
 		shouldProcess = false
-		utils.GetLogInstance().Warn("Received Response with wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
+		utils.GetLogInstance().Warn("Received Commit with wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
 	}
 
 	if !bytes.Equal(blockHash, consensus.blockHash[:]) {
-		utils.GetLogInstance().Warn("Received Response with wrong blockHash", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
+		utils.GetLogInstance().Warn("Received Commit with wrong blockHash", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
 		return
 	}
 
@@ -222,18 +221,13 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 		utils.GetLogInstance().Warn("Invalid validator", "validatorID", validatorID, "consensus", consensus)
 		return
 	}
-	message.Signature = nil
-	messageBytes, err := protobuf.Marshal(&message)
+
+	// Verify message signature
+	err := verifyMessageSig(value.PubKey, message)
 	if err != nil {
-		utils.GetLogInstance().Warn("Failed to marshal the commit message", "error", err)
+		utils.GetLogInstance().Warn("Failed to verify the message signature", "Error", err, "validatorID", validatorID)
+		return
 	}
-	_ = messageBytes
-	_ = signature
-	// TODO: verify message signature
-	//if schnorr.Verify(crypto.Ed25519Curve, value.PubKey, messageBytes, signature) != nil {
-	//	consensus.Log.Warn("Received message with invalid signature", "validatorKey", consensus.leader.PubKey, "consensus", consensus)
-	//	return
-	//}
 
 	commitSigs := consensus.commitSigs
 	commitBitmap := consensus.commitBitmap
@@ -276,7 +270,7 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 		host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
 
 		var blockObj types.Block
-		err = rlp.DecodeBytes(consensus.block, &blockObj)
+		err := rlp.DecodeBytes(consensus.block, &blockObj)
 		if err != nil {
 			utils.GetLogInstance().Debug("failed to construct the new block after consensus")
 		}
