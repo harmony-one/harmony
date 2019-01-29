@@ -196,6 +196,11 @@ func main() {
 	// Current node.
 	currentNode := node.New(host, consensus, ldb)
 	currentNode.Consensus.OfflinePeers = currentNode.OfflinePeers
+	if role == "leader" {
+		currentNode.Role = node.ShardLeader
+	} else {
+		currentNode.Role = node.ShardValidator
+	}
 
 	// If there is a client configured in the node list.
 	if clientPeer != nil {
@@ -225,7 +230,7 @@ func main() {
 	go currentNode.SupportSyncing()
 	if consensus.IsLeader {
 		go currentNode.SupportClient()
-		go currentNode.SupportExplorer()
 	}
+	currentNode.AddAndRunServices()
 	currentNode.StartServer()
 }

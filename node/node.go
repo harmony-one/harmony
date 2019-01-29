@@ -52,6 +52,18 @@ const (
 	NodeLeader                         // Node is the leader of some shard.
 )
 
+// Role defines a role of a node.
+type Role byte
+
+// All constants for different node roles.
+const (
+	Unknown Role = iota
+	ShardLeader
+	ShardValidator
+	BeaconLeader
+	BeaconValidator
+)
+
 func (state State) String() string {
 	switch state {
 	case NodeInit:
@@ -142,6 +154,9 @@ type Node struct {
 	// Action Channel
 	actionChannel chan *Action
 	serviceStore  *ServiceStore
+
+	// Node Role.
+	Role Role
 
 	// For test only
 	TestBankKeys      []*ecdsa.PrivateKey
@@ -308,6 +323,7 @@ func (node *Node) DoSyncing() {
 			node.stateMutex.Unlock()
 			continue
 		case consensusBlock := <-node.Consensus.ConsensusBlock:
+			// never reached from chao
 			if !node.IsOutOfSync(consensusBlock) {
 				if node.State == NodeNotInSync {
 					utils.GetLogInstance().Info("[SYNC] Node is now IN SYNC!")
@@ -457,16 +473,6 @@ func (node *Node) SupportClient() {
 	node.StartClientServer()
 }
 
-// SupportExplorer initializes and starts the client service
-func (node *Node) SupportExplorer() {
-	es := explorer.Service{
-		IP:   node.SelfPeer.IP,
-		Port: node.SelfPeer.Port,
-	}
-	es.Init(true)
-	es.Run()
-}
-
 // InitClientServer initializes client server.
 func (node *Node) InitClientServer() {
 	node.clientServer = clientService.NewServer(node.blockchain.State, node.CallFaucetContract)
@@ -483,6 +489,7 @@ func (node *Node) StartClientServer() {
 func (node *Node) SupportSyncing() {
 	node.InitSyncingServer()
 	node.StartSyncingServer()
+
 	go node.DoSyncing()
 	go node.SendNewBlockToUnsync()
 }
@@ -494,8 +501,7 @@ func (node *Node) InitSyncingServer() {
 
 // StartSyncingServer starts syncing server.
 func (node *Node) StartSyncingServer() {
-	port := GetSyncingPort(node.SelfPeer.Port)
-	utils.GetLogInstance().Info("support_sycning: StartSyncingServer on port:", "port", port)
+	utils.GetLogInstance().Info("support_sycning: StartSyncingServer")
 	node.downloaderServer.Start(node.SelfPeer.IP, GetSyncingPort(node.SelfPeer.Port))
 }
 
@@ -623,5 +629,19 @@ func (node *Node) RemovePeersHandler() {
 		case p := <-node.OfflinePeers:
 			node.Consensus.OfflinePeerList = append(node.Consensus.OfflinePeerList, p)
 		}
+	}
+}
+
+// AddAndRunServices manually adds certain services and start them.
+func (node *Node) AddAndRunServices() {
+	node.SetupServiceManager()
+
+	switch node.Role {
+	case ShardLeader:
+		// Add and run explorer.
+		node.RegisterService(SupportExplorer, explorer.New(&node.SelfPeer))
+		node.actionChannel <- &Action{action: Start, serviceType: SupportExplorer}
+	case Unknown:
+		utils.GetLogInstance().Info("Running node services")
 	}
 }

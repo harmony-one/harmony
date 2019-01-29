@@ -48,7 +48,7 @@ func (t ServiceType) String() string {
 // Constants for timing.
 const (
 	// WaitForStatusUpdate is the delay time to update new status. Currently set 1 second for development. Should be 30 minutes for production.
-	WaitForStatusUpdate = time.Second * 1
+	WaitForStatusUpdate = time.Minute * 1
 )
 
 // Action is type of service action.
@@ -88,7 +88,7 @@ func (node *Node) RegisterService(t ServiceType, service ServiceInterface) {
 	node.serviceStore.Register(t, service)
 }
 
-// RegisterServices registers all service for a node with its role.
+// InitServiceMap initializes service map.
 func (node *Node) InitServiceMap() {
 	node.serviceStore = &ServiceStore{services: make(map[ServiceType]ServiceInterface)}
 }
