@@ -3,6 +3,7 @@ package utils
 import (
 	"bytes"
 	"encoding/hex"
+	"os"
 	"testing"
 
 	"github.com/harmony-one/harmony/p2p"
@@ -123,4 +124,41 @@ func TestSaveLoadPrivateKey(t *testing.T) {
 		t.Errorf("expecting pk: %v\n", b1)
 		t.Errorf("got pk1: %v\n", b2)
 	}
+}
+
+func TestSaveLoadKeyFile(t *testing.T) {
+	filename := "/tmp/keystore"
+	nonexist := "/tmp/please_ignore_the_non-exist_file"
+
+	key, _, err := GenKeyP2PRand()
+	if err != nil {
+		t.Fatalf("failed to generate random p2p key: %v", err)
+	}
+
+	err = SaveKeyToFile(filename, key)
+	if err != nil {
+		t.Fatalf("failed to save key to file: %v", err)
+	}
+
+	key1, err := LoadKeyFromFile(filename)
+	if err != nil {
+		t.Fatalf("failed to load key from file (%s): %v", filename, err)
+	}
+
+	if !crypto.KeyEqual(key, key1) {
+		t.Fatalf("loaded key is not equal to the saved one")
+	}
+
+	key2, err := LoadKeyFromFile(nonexist)
+
+	if err != nil {
+		t.Fatalf("failed to load key from non-exist file: %v", err)
+	}
+
+	if crypto.KeyEqual(key1, key2) {
+		t.Fatalf("new random key can't equal to existing one, something is wrong!")
+	}
+
+	os.Remove(filename)
+	os.Remove(nonexist)
 }

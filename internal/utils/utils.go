@@ -23,6 +23,11 @@ import (
 
 var lock sync.Mutex
 
+// PrivKeyStore is used to persist private key to/from file
+type PrivKeyStore struct {
+	Key string `json:"key"`
+}
+
 func init() {
 	bls.Init(bls.BLS12_381)
 }
@@ -182,4 +187,40 @@ func SavePrivateKey(key p2p_crypto.PrivKey) (string, error) {
 		return str, nil
 	}
 	return "", fmt.Errorf("key is nil")
+}
+
+// SaveKeyToFile save private key to keyfile
+func SaveKeyToFile(keyfile string, key p2p_crypto.PrivKey) (err error) {
+	str, err := SavePrivateKey(key)
+	if err != nil {
+		return
+	}
+
+	keyStruct := PrivKeyStore{Key: str}
+
+	err = Save(keyfile, &keyStruct)
+	return
+}
+
+// LoadKeyFromFile load private key from keyfile
+// If the private key is not loadable or no file, it will generate
+// a new random private key
+func LoadKeyFromFile(keyfile string) (key p2p_crypto.PrivKey, err error) {
+	var keyStruct PrivKeyStore
+	err = Load(keyfile, &keyStruct)
+	if err != nil {
+		log.Print("No priviate key can be loaded from file", "keyfile", keyfile)
+		log.Print("Using random private key")
+		key, _, err = GenKeyP2PRand()
+		if err != nil {
+			log.Panic("LoadKeyFromFile", "GenKeyP2PRand Error", err)
+		}
+		err = SaveKeyToFile(keyfile, key)
+		if err != nil {
+			log.Print("LoadKeyFromFile", "failed to save key to keyfile", err)
+		}
+		return key, nil
+	}
+	key, err = LoadPrivateKey(keyStruct.Key)
+	return key, err
 }
