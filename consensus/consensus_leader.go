@@ -273,7 +273,7 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 
 		// Construct committed message
 		msgToSend, aggSig := consensus.constructCommittedMessage()
-		consensus.aggregatedPrepareSig = aggSig
+		consensus.aggregatedCommitSig = aggSig
 
 		// Broadcast committed message
 		host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
