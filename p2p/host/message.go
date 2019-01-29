@@ -106,7 +106,6 @@ func send(h p2p.Host, peer p2p.Peer, message []byte, lostPeer chan p2p.Peer) {
 
 // DialWithSocketClient joins host port and establishes connection
 func DialWithSocketClient(ip, port string) (conn net.Conn, err error) {
-	//log.Printf("Sending message to ip %s and port %s\n", ip, port)
 	addr := net.JoinHostPort(ip, port)
 	conn, err = net.Dial("tcp", addr)
 	return
