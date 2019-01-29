@@ -135,3 +135,8 @@ func (host *HostV2) SendMessage(p p2p.Peer, message []byte) error {
 func (host *HostV2) Close() error {
 	return host.h.Close()
 }
+
+// GetP2PHost returns the p2p.Host
+func (host *HostV2) GetP2PHost() p2p_host.Host {
+	return host.h
+}

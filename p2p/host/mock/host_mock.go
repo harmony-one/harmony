@@ -9,6 +9,7 @@ import (
 
 	gomock "github.com/golang/mock/gomock"
 	p2p "github.com/harmony-one/harmony/p2p"
+	p2p_host "github.com/libp2p/go-libp2p-host"
 	peer "github.com/libp2p/go-libp2p-peer"
 )
 
@@ -103,4 +104,16 @@ func (m *MockHost) GetID() peer.ID {
 // GetID indicates an expected call of GetID
 func (mr *MockHostMockRecorder) GetID() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetID", reflect.TypeOf((*MockHost)(nil).GetID))
+}
+
+// GetP2PHost mocks base method
+func (m *MockHost) GetP2PHost() p2p_host.Host {
+	ret := m.ctrl.Call(m, "GetP2PHost")
+	ret0, _ := ret[0].(p2p_host.Host)
+	return ret0
+}
+
+// GetP2PHost indicates an expected call of GetP2PHost
+func (mr *MockHostMockRecorder) GetP2PHost() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetP2PHost", reflect.TypeOf((*MockHost)(nil).GetP2PHost))
 }
