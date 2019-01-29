@@ -6,7 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	clientService "github.com/harmony-one/harmony/api/client/service"
 	"github.com/harmony-one/harmony/core/state"
-	"github.com/harmony-one/harmony/internal/utils"
+	"google.golang.org/grpc"
 )
 
 const (
@@ -16,40 +16,24 @@ const (
 
 // SupportClient ...
 type SupportClient struct {
-	server *clientService.Server
-	port   string
+	server     *clientService.Server
+	grpcServer *grpc.Server
+	ip         string
+	port       string
 }
 
 // NewSupportClient ...
-func NewSupportClient(stateReader func() (*state.DB, error), callFaucetContract func(common.Address) common.Hash, nodePort string) *SupportClient {
+func NewSupportClient(stateReader func() (*state.DB, error), callFaucetContract func(common.Address) common.Hash, ip, nodePort string) *SupportClient {
 	port, _ := strconv.Atoi(nodePort)
-	return &SupportClient{server: clientService.NewServer(stateReader, callFaucetContract), port: strconv.Itoa(port + ClientServicePortDiff)}
+	return &SupportClient{server: clientService.NewServer(stateReader, callFaucetContract), ip: ip, port: strconv.Itoa(port + ClientServicePortDiff)}
 }
 
 // Start ...
 func (sc *SupportClient) Start() {
-	sc.server.Start(sc.ip, sc.port)
+	sc.grpcServer, _ = sc.server.Start(sc.ip, sc.port)
 }
 
 // Stop ...
 func (sc *SupportClient) Stop() {
-
-}
-
-// SupportClient initializes and starts the client service
-func (node *Node) SupportClient() {
-	node.InitClientServer()
-	node.StartClientServer()
-}
-
-// InitClientServer initializes client server.
-func (node *Node) InitClientServer() {
-	node.clientServer = clientService.NewServer(node.blockchain.State, node.CallFaucetContract)
-}
-
-// StartClientServer starts client server.
-func (node *Node) StartClientServer() {
-	port, _ := strconv.Atoi(node.SelfPeer.Port)
-	utils.GetLogInstance().Info("support_client: StartClientServer on port:", "port", port+ClientServicePortDiff)
-	node.clientServer.Start(node.SelfPeer.IP, strconv.Itoa(port+ClientServicePortDiff))
+	sc.grpcServer.Stop()
 }
