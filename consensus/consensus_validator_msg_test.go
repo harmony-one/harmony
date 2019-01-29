@@ -36,9 +36,9 @@ func TestConstructCommitMessage(test *testing.T) {
 	}
 	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader)
 	consensus.blockHash = [32]byte{}
-	msg := consensus.constructCommitMessage()
+	msg := consensus.constructCommitMessage([]byte("random string"))
 
-	if len(msg) != 93 {
+	if len(msg) != 143 {
 		test.Errorf("Commit message is not constructed in the correct size: %d", len(msg))
 	}
 }

@@ -104,6 +104,8 @@ func TestProcessMessageValidatorPrepared(test *testing.T) {
 	copy(consensusLeader.blockHash[:], hashBytes[:])
 
 	announceMsg := consensusLeader.constructAnnounceMessage()
+	(*consensusLeader.prepareSigs)[consensusLeader.nodeID] = consensusLeader.priKey.SignHash(consensusLeader.blockHash[:])
+
 	preparedMsg, _ := consensusLeader.constructPreparedMessage()
 
 	if err != nil {

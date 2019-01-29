@@ -3,6 +3,9 @@ package consensus
 import (
 	"bytes"
 
+	"github.com/harmony-one/bls/ffi/go/bls"
+	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"
@@ -152,12 +155,22 @@ func (consensus *Consensus) processPreparedMessage(message consensus_proto.Messa
 		return
 	}
 
-	_ = multiSig
-	_ = bitmap
-	// TODO: verify multi signature
+	deserializedMultiSig := bls.Sign{}
+	err = deserializedMultiSig.Deserialize(multiSig)
+	if err != nil {
+		utils.GetLogInstance().Warn("Failed to deserialize the multi signature", "Error", err, "leader ID", leaderID)
+		return
+	}
+	mask, err := bls_cosi.NewMask(consensus.PublicKeys, nil)
+	mask.SetMask(bitmap)
+	if !deserializedMultiSig.VerifyHash(mask.AggregatePublic, blockHash) || err != nil {
+		utils.GetLogInstance().Warn("Failed to verify the multi signature", "Error", err, "leader ID", leaderID)
+		return
+	}
+	multiSigAndBitmap := append(multiSig, bitmap...)
 
 	// Construct and send the commit message
-	msgToSend := consensus.constructCommitMessage()
+	msgToSend := consensus.constructCommitMessage(multiSigAndBitmap)
 
 	consensus.SendMessage(consensus.leader, msgToSend)
 
@@ -225,11 +238,6 @@ func (consensus *Consensus) processCommittedMessage(message consensus_proto.Mess
 	_ = multiSig
 	_ = bitmap
 	// TODO: verify multi signature
-
-	// Construct and send the prepare message
-	msgToSend := consensus.constructPrepareMessage()
-
-	consensus.SendMessage(consensus.leader, msgToSend)
 
 	consensus.state = CommittedDone
 

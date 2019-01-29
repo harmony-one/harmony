@@ -13,6 +13,7 @@ import (
 	protobuf "github.com/golang/protobuf/proto"
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/core/types"
+	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 	mock_host "github.com/harmony-one/harmony/p2p/host/mock"
 	"github.com/stretchr/testify/assert"
@@ -159,6 +160,10 @@ func TestProcessMessageLeaderCommit(test *testing.T) {
 	consensusLeader.blockHash = blockHash
 	consensusLeader.OnConsensusDone = func(newBlock *types.Block) {}
 	consensusLeader.block, _ = rlp.EncodeToBytes(types.NewBlock(&types.Header{}, nil, nil))
+	(*consensusLeader.prepareSigs)[consensusLeader.nodeID] = consensusLeader.priKey.SignHash(consensusLeader.blockHash[:])
+
+	aggSig := bls_cosi.AggregateSig(consensusLeader.GetPrepareSigsArray())
+	multiSigAndBitmap := append(aggSig.Serialize(), consensusLeader.prepareBitmap.Bitmap...)
 
 	consensusValidators := make([]*Consensus, 3)
 
@@ -169,7 +174,7 @@ func TestProcessMessageLeaderCommit(test *testing.T) {
 	for i := 0; i < 3; i++ {
 		consensusValidators[i] = New(hosts[i], "0", validators, leader)
 		consensusValidators[i].blockHash = blockHash
-		msg := consensusValidators[i].constructCommitMessage()
+		msg := consensusValidators[i].constructCommitMessage(multiSigAndBitmap)
 		consensusLeader.ProcessMessageLeader(msg[1:])
 	}
 
