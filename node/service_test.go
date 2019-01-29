@@ -19,7 +19,7 @@ func (s *SupportSyncingTest) Stop() {
 // Test TakeAction.
 func TestTakeAction(t *testing.T) {
 	node := &Node{}
-	node.Start()
+	node.SetupServiceManager()
 	node.RegisterService(SupportSyncing, &SupportSyncingTest{})
 
 	for i := 0; i < 2; i++ {

@@ -77,9 +77,9 @@ func (ss *ServiceStore) Register(t ServiceType, service ServiceInterface) {
 	ss.services[t] = service
 }
 
-// Start node.
-func (node *Node) Start() {
-	node.RegisterServices()
+// SetupServiceManager inits service map and start service manager.
+func (node *Node) SetupServiceManager() {
+	node.InitServiceMap()
 	node.actionChannel = node.StartServiceManager()
 }
 
@@ -89,7 +89,7 @@ func (node *Node) RegisterService(t ServiceType, service ServiceInterface) {
 }
 
 // RegisterServices registers all service for a node with its role.
-func (node *Node) RegisterServices() {
+func (node *Node) InitServiceMap() {
 	node.serviceStore = &ServiceStore{services: make(map[ServiceType]ServiceInterface)}
 }
 
