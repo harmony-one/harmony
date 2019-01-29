@@ -4,12 +4,11 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"log"
 	"time"
 
-	"google.golang.org/grpc"
-
 	pb "github.com/harmony-one/harmony/api/services/syncing/downloader/proto"
+	"github.com/harmony-one/harmony/internal/utils"
+	"google.golang.org/grpc"
 )
 
 // Client is the client model for downloader package.
@@ -26,7 +25,7 @@ func ClientSetup(ip, port string) *Client {
 	var err error
 	client.conn, err = grpc.Dial(fmt.Sprintf("%s:%s", ip, port), client.opts...)
 	if err != nil {
-		log.Printf("client.go:ClientSetup fail to dial: %v", err)
+		utils.GetLogInstance().Info("client.go:ClientSetup fail to dial: ", "error", err)
 		return nil
 	}
 
@@ -38,7 +37,7 @@ func ClientSetup(ip, port string) *Client {
 func (client *Client) Close() {
 	err := client.conn.Close()
 	if err != nil {
-		log.Printf("unable to close connection %v with error %v ", client.conn, err)
+		utils.GetLogInstance().Info("unable to close connection ")
 	}
 }
 
@@ -49,7 +48,7 @@ func (client *Client) GetBlockHashes(startHash []byte) *pb.DownloaderResponse {
 	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_HEADER, BlockHash: startHash}
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
-		log.Printf("[SYNC] GetBlockHashes query failed with error %v", err)
+		utils.GetLogInstance().Info("[SYNC] GetBlockHashes query failed", "error", err)
 	}
 	return response
 }
@@ -66,7 +65,7 @@ func (client *Client) GetBlocks(hashes [][]byte) *pb.DownloaderResponse {
 	}
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
-		log.Printf("[SYNC] downloader/client.go:GetBlocks query failed with error %v", err)
+		utils.GetLogInstance().Info("[SYNC] downloader/client.go:GetBlocks query failed.", "error", err)
 	}
 	return response
 }
@@ -81,7 +80,7 @@ func (client *Client) Register(hash []byte) *pb.DownloaderResponse {
 	copy(request.PeerHash, hash)
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
-		log.Printf("[SYNC] client.go:Register failed with code %v", err)
+		utils.GetLogInstance().Info("[SYNC] client.go:Register failed.", "error", err)
 	}
 	return response
 }
@@ -105,7 +104,7 @@ func (client *Client) PushNewBlock(peerID uint32, blockHash []byte, timeout bool
 
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
-		log.Printf("[SYNC] unable to send new block to unsync node with error: %v", err)
+		utils.GetLogInstance().Info("[SYNC] unable to send new block to unsync node", "error", err)
 	}
 	return response
 }
