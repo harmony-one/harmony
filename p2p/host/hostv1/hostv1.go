@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/p2p"
+	p2p_host "github.com/libp2p/go-libp2p-host"
 	peer "github.com/libp2p/go-libp2p-peer"
 )
 
@@ -110,4 +111,9 @@ func (host *HostV1) SendMessage(peer p2p.Peer, message []byte) error {
 func (host *HostV1) Close() error {
 	host.quit <- struct{}{}
 	return host.listener.Close()
+}
+
+// GetP2PHost returns nothing
+func (host *HostV1) GetP2PHost() p2p_host.Host {
+	return nil
 }
