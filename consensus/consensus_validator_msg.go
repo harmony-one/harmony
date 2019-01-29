@@ -44,7 +44,7 @@ func (consensus *Consensus) constructPrepareMessage() []byte {
 }
 
 // Construct the commit message to send to leader (assumption the consensus data is already verified)
-func (consensus *Consensus) constructCommitMessage() []byte {
+func (consensus *Consensus) constructCommitMessage(multiSigAndBitmap []byte) []byte {
 	message := consensus_proto.Message{}
 	message.Type = consensus_proto.MessageType_COMMIT
 
@@ -58,8 +58,7 @@ func (consensus *Consensus) constructCommitMessage() []byte {
 	message.SenderId = uint32(consensus.nodeID)
 
 	// 48 byte of bls signature
-	// TODO: sign on the prepared message hash, rather than the block hash
-	sign := consensus.priKey.SignHash(message.BlockHash)
+	sign := consensus.priKey.SignHash(multiSigAndBitmap)
 	if sign != nil {
 		message.Payload = sign.Serialize()
 	}
