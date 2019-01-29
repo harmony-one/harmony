@@ -1,9 +1,9 @@
 package explorer
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -13,6 +13,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/p2p"
 )
 
 // Constants for explorer service.
@@ -26,6 +27,30 @@ type Service struct {
 	IP      string
 	Port    string
 	storage *Storage
+	server  *http.Server
+}
+
+// New returns explorer service.
+func New(selfPeer *p2p.Peer) *Service {
+	return &Service{
+		IP:   selfPeer.IP,
+		Port: selfPeer.Port,
+	}
+}
+
+// Start starts explorer service.
+func (s *Service) Start() {
+	s.Init(true)
+	s.server = s.Run()
+}
+
+// Stop shutdowns explorer service.
+func (s *Service) Stop() {
+	if err := s.server.Shutdown(context.Background()); err != nil {
+		utils.GetLogInstance().Error("Error when shutting down explorer server", "error", err)
+	} else {
+		utils.GetLogInstance().Error("Shutting down explorer server successufully")
+	}
 }
 
 // GetExplorerPort returns the port serving explorer dashboard. This port is explorerPortDifference less than the node port.
@@ -43,7 +68,7 @@ func (s *Service) Init(remove bool) {
 }
 
 // Run is to run serving explorer.
-func (s *Service) Run() {
+func (s *Service) Run() *http.Server {
 	// Init address.
 	addr := net.JoinHostPort("", GetExplorerPort(s.Port))
 
@@ -62,7 +87,9 @@ func (s *Service) Run() {
 
 	// Do serving now.
 	utils.GetLogInstance().Info("Listening on ", "port: ", GetExplorerPort(s.Port))
-	log.Fatal(http.ListenAndServe(addr, s.router))
+	server := &http.Server{Addr: addr, Handler: s.router}
+	go server.ListenAndServe()
+	return server
 }
 
 // GetAccountBlocks returns a list of types.Block to server blocks end-point.
