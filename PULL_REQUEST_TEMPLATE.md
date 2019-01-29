@@ -11,8 +11,9 @@
 * Before
 * After
 
-#### Test Logs
+#### Test/Run Logs
 
-<!-- links to the test log, or copy&paste part of the log -->
+<!-- links to the test/run log, or copy&paste part of the log if it is too long -->
+<!-- or you may just create a [gist](https://gist.github.com/) and link the gist here -->
 
 ## TODO
