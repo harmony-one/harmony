@@ -23,7 +23,7 @@ func (s *Server) FetchLeaders(ctx context.Context, request *proto.FetchLeadersRe
 
 	leaders := []*proto.FetchLeadersResponse_Leader{}
 	for shardID, leader := range s.shardLeaderMap() {
-		leaders = append(leaders, &proto.FetchLeadersResponse_Leader{Ip: leader.IP, Port: leader.Port, ShardId: uint32(shardID)})
+		leaders = append(leaders, &proto.FetchLeadersResponse_Leader{Ip: leader.IP, Port: leader.Port, ShardId: uint32(shardID), PeerID: leader.PeerID.Pretty()})
 	}
 	log.Println(leaders)
 	return &proto.FetchLeadersResponse{Leaders: leaders}, nil

@@ -28,6 +28,7 @@ import (
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
+	peer "github.com/libp2p/go-libp2p-peer"
 )
 
 var (
@@ -294,14 +295,24 @@ func CreateWalletNode() *node.Node {
 	bcClient := beaconchain.NewClient("54.183.5.66", strconv.Itoa(port+libs.BeaconchainServicePortDiff))
 	response := bcClient.GetLeaders()
 
-	for _, leader := range response.Leaders {
-		shardIDLeaderMap[leader.ShardId] = p2p.Peer{IP: leader.Ip, Port: leader.Port}
-	}
-
 	// dummy host for wallet
 	self := p2p.Peer{IP: "127.0.0.1", Port: "6789"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "6789")
-	host, _ := p2pimpl.NewHost(&self, priKey)
+	host, err := p2pimpl.NewHost(&self, priKey)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, leader := range response.Leaders {
+		peerID, err := peer.IDB58Decode(leader.PeerID)
+		if err != nil {
+			panic(err)
+		}
+		leaderPeer := p2p.Peer{IP: leader.Ip, Port: leader.Port, PeerID: peerID}
+		shardIDLeaderMap[leader.ShardId] = leaderPeer
+		host.AddPeer(&leaderPeer)
+	}
+
 	walletNode := node.New(host, nil, nil)
 	walletNode.Client = client.NewClient(walletNode.GetHost(), &shardIDLeaderMap)
 	return walletNode

@@ -7,9 +7,11 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/harmony-one/harmony/api/client"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	mock_host "github.com/harmony-one/harmony/p2p/host/mock"
+	peer "github.com/libp2p/go-libp2p-peer"
 )
 
 func TestCreateWalletNode(test *testing.T) {
@@ -30,7 +32,9 @@ func TestSubmitTransaction(test *testing.T) {
 	m.EXPECT().SendMessage(gomock.Any(), gomock.Any()).Times(1)
 
 	walletNode := node.New(m, nil, nil)
-	walletNode.Client = client.NewClient(walletNode.GetHost(), &map[uint32]p2p.Peer{0: p2p.Peer{IP: "1", Port: "2"}})
+	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9990")
+	peerID, _ := peer.IDFromPrivateKey(priKey)
+	walletNode.Client = client.NewClient(walletNode.GetHost(), &map[uint32]p2p.Peer{0: p2p.Peer{IP: "127.0.0.1", Port: "9990", PeerID: peerID}})
 
 	SubmitTransaction(&types.Transaction{}, walletNode, 0)
 
