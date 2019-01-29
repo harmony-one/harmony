@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -12,8 +13,11 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
-	libp2p "github.com/libp2p/go-libp2p"
-	ma "github.com/multiformats/go-multiaddr"
+
+	ds "github.com/ipfs/go-datastore"
+	dsync "github.com/ipfs/go-datastore/sync"
+
+	kaddht "github.com/libp2p/go-libp2p-kad-dht"
 )
 
 var (
@@ -60,14 +64,6 @@ func main() {
 	// Init logging.
 	loggingInit(*logFolder, *ip, *port)
 
-	listen, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", *port))
-	if err != nil {
-		panic(err)
-	}
-
-	opts := []libp2p.Option{
-		libp2p.ListenAddrs(listen),
-	}
 	privKey, err := utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
 		panic(err)
@@ -75,10 +71,20 @@ func main() {
 
 	var selfPeer = p2p.Peer{IP: *ip, Port: *port}
 
-	host, err := p2pimpl.NewHost(&selfPeer, privKey, opts...)
+	host, err := p2pimpl.NewHost(&selfPeer, privKey)
 	if err != nil {
 		panic(err)
 	}
 
 	log.Info("bootnode", "BN_MA", fmt.Sprintf("/ipv/%s/tcp/%s/p2p/%s", *ip, *port, host.GetID().Pretty()))
+
+	dataStore := dsync.MutexWrap(ds.NewMapDatastore())
+	dht := kaddht.NewDHT(context.Background(), host.GetP2PHost(), dataStore)
+
+	if err := dht.Bootstrap(context.Background()); err != nil {
+		log.Error("failed to bootstrap DHT")
+		panic(err)
+	}
+
+	select {}
 }
