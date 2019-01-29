@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -208,8 +209,9 @@ func verifyMessageSig(signerPubKey *bls.PublicKey, message consensus_proto.Messa
 	if err != nil {
 		return err
 	}
-	if msgSig.VerifyHash(signerPubKey, messageBytes) {
-		return err
+	msgHash := sha256.Sum256(messageBytes)
+	if !msgSig.VerifyHash(signerPubKey, msgHash[:]) {
+		return errors.New("failed to verify the signature")
 	}
 	return nil
 }

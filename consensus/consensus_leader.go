@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/rlp"
+	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/api/services/explorer"
@@ -56,7 +57,7 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan *types.Block) {
 // ProcessMessageLeader dispatches consensus message for the leader.
 func (consensus *Consensus) ProcessMessageLeader(payload []byte) {
 	message := consensus_proto.Message{}
-	err := message.XXX_Unmarshal(payload)
+	err := protobuf.Unmarshal(payload, &message)
 
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to unmarshal message payload.", "err", err, "consensus", consensus)
@@ -119,7 +120,11 @@ func (consensus *Consensus) processPrepareMessage(message consensus_proto.Messag
 	}
 
 	// Verify message signature
-	verifyMessageSig(value.PubKey, message)
+	err := verifyMessageSig(value.PubKey, message)
+	if err != nil {
+		utils.GetLogInstance().Warn("Failed to verify the message signature", "Error", err, "validatorID", validatorID)
+		return
+	}
 
 	// check consensus Id
 	consensus.mutex.Lock()
@@ -218,7 +223,11 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 	}
 
 	// Verify message signature
-	verifyMessageSig(value.PubKey, message)
+	err := verifyMessageSig(value.PubKey, message)
+	if err != nil {
+		utils.GetLogInstance().Warn("Failed to verify the message signature", "Error", err, "validatorID", validatorID)
+		return
+	}
 
 	commitSigs := consensus.commitSigs
 	commitBitmap := consensus.commitBitmap

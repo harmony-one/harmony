@@ -51,11 +51,15 @@ func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Messa
 	}
 
 	// Verify message signature
-	verifyMessageSig(consensus.leader.PubKey, message)
+	err := verifyMessageSig(consensus.leader.PubKey, message)
+	if err != nil {
+		utils.GetLogInstance().Warn("Failed to verify the message signature", "Error", err, "leader ID", leaderID)
+		return
+	}
 
 	// check block header is valid
 	var blockObj types.Block
-	err := rlp.DecodeBytes(block, &blockObj)
+	err = rlp.DecodeBytes(block, &blockObj)
 	if err != nil {
 		utils.GetLogInstance().Warn("Unparseable block header data", "error", err)
 		return
@@ -127,7 +131,11 @@ func (consensus *Consensus) processPreparedMessage(message consensus_proto.Messa
 	}
 
 	// Verify message signature
-	verifyMessageSig(consensus.leader.PubKey, message)
+	err := verifyMessageSig(consensus.leader.PubKey, message)
+	if err != nil {
+		utils.GetLogInstance().Warn("Failed to verify the message signature", "Error", err, "leader ID", leaderID)
+		return
+	}
 
 	// Add attack model of IncorrectResponse.
 	if attack.GetInstance().IncorrectResponse() {
@@ -186,7 +194,11 @@ func (consensus *Consensus) processCommittedMessage(message consensus_proto.Mess
 	}
 
 	// Verify message signature
-	verifyMessageSig(consensus.leader.PubKey, message)
+	err := verifyMessageSig(consensus.leader.PubKey, message)
+	if err != nil {
+		utils.GetLogInstance().Warn("Failed to verify the message signature", "Error", err, "leader ID", leaderID)
+		return
+	}
 
 	// Add attack model of IncorrectResponse.
 	if attack.GetInstance().IncorrectResponse() {
