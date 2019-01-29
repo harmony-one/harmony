@@ -150,8 +150,6 @@ func main() {
 	clientPeer = candidateNode.GetClientPeer()
 	selfPeer.PubKey = candidateNode.PubK
 
-	fmt.Println("Harmnoy", leader, selfPeer)
-
 	var role string
 	if leader.IP == *ip && leader.Port == *port {
 		role = "leader"
