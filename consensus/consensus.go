@@ -229,6 +229,20 @@ func (consensus *Consensus) signMessage(message []byte) []byte {
 	return signature.Serialize()
 }
 
+// Sign on the consensus message signature field.
+func (consensus *Consensus) signConsensusMessage(message *consensus_proto.Message) error {
+	message.Signature = nil
+	// TODO: use custom serialization method rather than protobuf
+	marshaledMessage, err := protobuf.Marshal(message)
+	if err != nil {
+		return err
+	}
+	// 64 byte of signature on previous data
+	signature := consensus.signMessage(marshaledMessage)
+	message.Signature = signature
+	return nil
+}
+
 // GetValidatorPeers returns list of validator peers.
 func (consensus *Consensus) GetValidatorPeers() []p2p.Peer {
 	validatorPeers := make([]p2p.Peer, 0)

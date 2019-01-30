@@ -46,11 +46,13 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan *types.Block) {
 
 		startTime = time.Now()
 		utils.GetLogInstance().Debug("STARTING CONSENSUS", "numTxs", len(newBlock.Transactions()), "consensus", consensus, "startTime", startTime, "publicKeys", len(consensus.PublicKeys))
-		for consensus.state == Finished {
-			// time.Sleep(500 * time.Millisecond)
-			consensus.ResetState()
-			consensus.startConsensus(newBlock)
-			break
+		for { // Wait until last consensus is finished
+			if consensus.state == Finished {
+				consensus.ResetState()
+				consensus.startConsensus(newBlock)
+				break
+			}
+			time.Sleep(500 * time.Millisecond)
 		}
 	}
 }
