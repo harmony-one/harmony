@@ -54,5 +54,5 @@ then
 	exit 1
 fi
 
-echo "All checks passed. :-)"
+echo "All Checks Passed!!! :-)"
 exit 0

@@ -158,15 +158,18 @@ func (consensus *Consensus) processPreparedMessage(message consensus_proto.Messa
 	deserializedMultiSig := bls.Sign{}
 	err = deserializedMultiSig.Deserialize(multiSig)
 	if err != nil {
-		utils.GetLogInstance().Warn("Failed to deserialize the multi signature", "Error", err, "leader ID", leaderID)
+		utils.GetLogInstance().Warn("Failed to deserialize the multi signature for prepare phase", "Error", err, "leader ID", leaderID)
 		return
 	}
 	mask, err := bls_cosi.NewMask(consensus.PublicKeys, nil)
 	mask.SetMask(bitmap)
 	if !deserializedMultiSig.VerifyHash(mask.AggregatePublic, blockHash) || err != nil {
-		utils.GetLogInstance().Warn("Failed to verify the multi signature", "Error", err, "leader ID", leaderID)
+		utils.GetLogInstance().Warn("Failed to verify the multi signature for prepare phase", "Error", err, "leader ID", leaderID)
 		return
 	}
+	consensus.aggregatedPrepareSig = &deserializedMultiSig
+	consensus.prepareBitmap = mask
+
 	multiSigAndBitmap := append(multiSig, bitmap...)
 
 	// Construct and send the commit message
@@ -235,9 +238,20 @@ func (consensus *Consensus) processCommittedMessage(message consensus_proto.Mess
 		return
 	}
 
-	_ = multiSig
-	_ = bitmap
-	// TODO: verify multi signature
+	deserializedMultiSig := bls.Sign{}
+	err = deserializedMultiSig.Deserialize(multiSig)
+	if err != nil {
+		utils.GetLogInstance().Warn("Failed to deserialize the multi signature for commit phase", "Error", err, "leader ID", leaderID)
+		return
+	}
+	mask, err := bls_cosi.NewMask(consensus.PublicKeys, nil)
+	mask.SetMask(bitmap)
+
+	prepareMultiSigAndBitmap := append(consensus.aggregatedPrepareSig.Serialize(), consensus.prepareBitmap.Bitmap...)
+	if !deserializedMultiSig.VerifyHash(mask.AggregatePublic, prepareMultiSigAndBitmap) || err != nil {
+		utils.GetLogInstance().Warn("Failed to verify the multi signature for commit phase", "Error", err, "leader ID", leaderID)
+		return
+	}
 
 	consensus.state = CommittedDone
 
@@ -267,7 +281,7 @@ func (consensus *Consensus) processCommittedMessage(message consensus_proto.Mess
 			}
 			utils.GetLogInstance().Info("Finished Response. Adding block to chain", "numTx", len(blockObj.Transactions()))
 			consensus.OnConsensusDone(&blockObj)
-			consensus.state = Finished
+			consensus.ResetState()
 
 			select {
 			case consensus.VerifiedNewBlock <- &blockObj:
