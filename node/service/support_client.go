@@ -28,12 +28,12 @@ func NewSupportClient(stateReader func() (*state.DB, error), callFaucetContract 
 	return &SupportClient{server: clientService.NewServer(stateReader, callFaucetContract), ip: ip, port: strconv.Itoa(port + ClientServicePortDiff)}
 }
 
-// Start ...
-func (sc *SupportClient) Start() {
+// StartService ...
+func (sc *SupportClient) StartService() {
 	sc.grpcServer, _ = sc.server.Start(sc.ip, sc.port)
 }
 
-// Stop ...
-func (sc *SupportClient) Stop() {
+// StopService ...
+func (sc *SupportClient) StopService() {
 	sc.grpcServer.Stop()
 }

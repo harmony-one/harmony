@@ -8,11 +8,11 @@ import (
 
 type SupportSyncingTest struct{}
 
-func (s *SupportSyncingTest) Start() {
+func (s *SupportSyncingTest) StartService() {
 	fmt.Println("SupportSyncingTest starting")
 }
 
-func (s *SupportSyncingTest) Stop() {
+func (s *SupportSyncingTest) StopService() {
 	fmt.Println("SupportSyncingTest stopping")
 }
 

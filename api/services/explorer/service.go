@@ -38,15 +38,15 @@ func New(selfPeer *p2p.Peer) *Service {
 	}
 }
 
-// Start starts explorer service.
-func (s *Service) Start() {
+// StartService starts explorer service.
+func (s *Service) StartService() {
 	utils.GetLogInstance().Info("Starting explorer service.")
 	s.Init(true)
 	s.server = s.Run()
 }
 
-// Stop shutdowns explorer service.
-func (s *Service) Stop() {
+// StopService shutdowns explorer service.
+func (s *Service) StopService() {
 	utils.GetLogInstance().Info("Shutting down explorer service.")
 	if err := s.server.Shutdown(context.Background()); err != nil {
 		utils.GetLogInstance().Error("Error when shutting down explorer server", "error", err)
