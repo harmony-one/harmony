@@ -166,7 +166,6 @@ func main() {
 
 	// Initialize leveldb if dbSupported.
 	var ldb *ethdb.LDBDatabase
-
 	if *dbSupported {
 		ldb, _ = InitLDBDatabase(*ip, *port, *freshDB)
 	}
@@ -214,9 +213,7 @@ func main() {
 	if consensus.IsLeader {
 		currentNode.State = node.NodeLeader
 		// Let consensus run
-		go func() {
-			consensus.WaitForNewBlock(currentNode.BlockChannel)
-		}()
+		consensus.WaitForNewBlock(currentNode.BlockChannel, nil, nil)
 		// Node waiting for consensus readiness to create new block
 		go func() {
 			currentNode.WaitForConsensusReady(consensus.ReadySignal)

@@ -632,15 +632,28 @@ func (node *Node) RemovePeersHandler() {
 	}
 }
 
+// ServiceManagerSetup setups service store.
+func (node *Node) ServiceManagerSetup() {
+	node.serviceStore = &ServiceStore{}
+}
+
 // AddAndRunServices manually adds certain services and start them.
 func (node *Node) AddAndRunServices() {
 	node.SetupServiceManager()
+	// TODO: add it later
+	// node.AddCommonServices()
 
 	switch node.Role {
 	case ShardLeader:
 		// Add and run explorer.
 		node.RegisterService(SupportExplorer, explorer.New(&node.SelfPeer))
 		node.actionChannel <- &Action{action: Start, serviceType: SupportExplorer}
+
+		// node.RegisterService(Consensus, service.NewConsensusService(node.BlockChannel, node.Consensus))
+		// node.actionChannel <- &Action{action: Start, serviceType: Consensus}
+
+		// node.RegisterService(SupportClient, service.NewSupportClient(node.blockchain.State, node.CallFaucetContract, node.SelfPeer.IP, node.SelfPeer.Port))
+		// node.actionChannel <- &Action{action: Start, serviceType: SupportClient}
 	case Unknown:
 		utils.GetLogInstance().Info("Running node services")
 	}
