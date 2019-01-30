@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"bytes"
 	"encoding/hex"
 	"strconv"
 	"time"
@@ -15,7 +14,6 @@ import (
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 )
 
@@ -46,11 +44,13 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan *types.Block) {
 
 		startTime = time.Now()
 		utils.GetLogInstance().Debug("STARTING CONSENSUS", "numTxs", len(newBlock.Transactions()), "consensus", consensus, "startTime", startTime, "publicKeys", len(consensus.PublicKeys))
-		for consensus.state == Finished {
-			// time.Sleep(500 * time.Millisecond)
-			consensus.ResetState()
-			consensus.startConsensus(newBlock)
-			break
+		for { // Wait until last consensus is finished
+			if consensus.state == Finished {
+				consensus.ResetState()
+				consensus.startConsensus(newBlock)
+				break
+			}
+			time.Sleep(500 * time.Millisecond)
 		}
 	}
 }
@@ -103,48 +103,24 @@ func (consensus *Consensus) startConsensus(newBlock *types.Block) {
 
 // processPrepareMessage processes the prepare message sent from validators
 func (consensus *Consensus) processPrepareMessage(message consensus_proto.Message) {
-	consensusID := message.ConsensusId
-	blockHash := message.BlockHash
 	validatorID := message.SenderId
 	prepareSig := message.Payload
-
-	// Verify signature
-	v, ok := consensus.validators.Load(validatorID)
-	if !ok {
-		utils.GetLogInstance().Warn("Received message from unrecognized validator", "validatorID", validatorID, "consensus", consensus)
-		return
-	}
-	value, ok := v.(p2p.Peer)
-	if !ok {
-		utils.GetLogInstance().Warn("Invalid validator", "validatorID", validatorID, "consensus", consensus)
-		return
-	}
-
-	// Verify message signature
-	err := verifyMessageSig(value.PubKey, message)
-	if err != nil {
-		utils.GetLogInstance().Warn("Failed to verify the message signature", "Error", err, "validatorID", validatorID)
-		return
-	}
-
-	// check consensus Id
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-	if consensusID != consensus.consensusID {
-		utils.GetLogInstance().Warn("Received Commit with wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
-		return
-	}
-
-	if !bytes.Equal(blockHash, consensus.blockHash[:]) {
-		utils.GetLogInstance().Warn("Received Commit with wrong blockHash", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
-		return
-	}
 
 	prepareSigs := consensus.prepareSigs
 	prepareBitmap := consensus.prepareBitmap
 
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+
+	validatorPeer := consensus.getValidatorPeerByID(validatorID)
+
+	if !consensus.checkConsensusMessage(message, validatorPeer.PubKey) {
+		utils.GetLogInstance().Debug("Failed to check the validator message", "validatorID", validatorID)
+		return
+	}
+
 	// proceed only when the message is not received before
-	_, ok = (*prepareSigs)[validatorID]
+	_, ok := (*prepareSigs)[validatorID]
 	if ok {
 		utils.GetLogInstance().Debug("Already received prepare message from the validator", "validatorID", validatorID)
 		return
@@ -157,13 +133,13 @@ func (consensus *Consensus) processPrepareMessage(message consensus_proto.Messag
 
 	// Check BLS signature for the multi-sig
 	var sign bls.Sign
-	err = sign.Deserialize(prepareSig)
+	err := sign.Deserialize(prepareSig)
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to deserialize bls signature", "validatorID", validatorID)
 		return
 	}
 
-	if !sign.VerifyHash(value.PubKey, consensus.blockHash[:]) {
+	if !sign.VerifyHash(validatorPeer.PubKey, consensus.blockHash[:]) {
 		utils.GetLogInstance().Error("Received invalid BLS signature", "validatorID", validatorID)
 		return
 	}
@@ -172,7 +148,7 @@ func (consensus *Consensus) processPrepareMessage(message consensus_proto.Messag
 	utils.GetLogInstance().Debug("Received new prepare signature", "numReceivedSoFar", len(*prepareSigs), "validatorID", validatorID, "PublicKeys", len(consensus.PublicKeys))
 
 	// Set the bitmap indicate this validate signed.
-	prepareBitmap.SetKey(value.PubKey, true)
+	prepareBitmap.SetKey(validatorPeer.PubKey, true)
 
 	targetState := PreparedDone
 	if len((*prepareSigs)) >= ((len(consensus.PublicKeys)*2)/3+1) && consensus.state < targetState {
@@ -196,41 +172,16 @@ func (consensus *Consensus) processPrepareMessage(message consensus_proto.Messag
 
 // Processes the commit message sent from validators
 func (consensus *Consensus) processCommitMessage(message consensus_proto.Message) {
-	consensusID := message.ConsensusId
-	blockHash := message.BlockHash
 	validatorID := message.SenderId
 	commitSig := message.Payload
 
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
-	// check consensus Id
-	if consensusID != consensus.consensusID {
-		utils.GetLogInstance().Warn("Received Commit with wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
-		return
-	}
+	validatorPeer := consensus.getValidatorPeerByID(validatorID)
 
-	if !bytes.Equal(blockHash, consensus.blockHash[:]) {
-		utils.GetLogInstance().Warn("Received Commit with wrong blockHash", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
-		return
-	}
-
-	// Verify signature
-	v, ok := consensus.validators.Load(validatorID)
-	if !ok {
-		utils.GetLogInstance().Warn("Received message from unrecognized validator", "validatorID", validatorID, "consensus", consensus)
-		return
-	}
-	value, ok := v.(p2p.Peer)
-	if !ok {
-		utils.GetLogInstance().Warn("Invalid validator", "validatorID", validatorID, "consensus", consensus)
-		return
-	}
-
-	// Verify message signature
-	err := verifyMessageSig(value.PubKey, message)
-	if err != nil {
-		utils.GetLogInstance().Warn("Failed to verify the message signature", "Error", err, "validatorID", validatorID)
+	if !consensus.checkConsensusMessage(message, validatorPeer.PubKey) {
+		utils.GetLogInstance().Debug("Failed to check the validator message", "validatorID", validatorID)
 		return
 	}
 
@@ -238,7 +189,7 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 	commitBitmap := consensus.commitBitmap
 
 	// proceed only when the message is not received before
-	_, ok = (*commitSigs)[validatorID]
+	_, ok := (*commitSigs)[validatorID]
 	if ok {
 		utils.GetLogInstance().Debug("Already received commit message from the validator", "validatorID", validatorID)
 		return
@@ -249,7 +200,7 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 	}
 
 	var sign bls.Sign
-	err = sign.Deserialize(commitSig)
+	err := sign.Deserialize(commitSig)
 	if err != nil {
 		utils.GetLogInstance().Debug("Failed to deserialize bls signature", "validatorID", validatorID)
 		return
@@ -257,7 +208,7 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 
 	// Verify the signature on prepare multi-sig and bitmap is correct
 	aggSig := bls_cosi.AggregateSig(consensus.GetPrepareSigsArray())
-	if !sign.VerifyHash(value.PubKey, append(aggSig.Serialize(), consensus.prepareBitmap.Bitmap...)) {
+	if !sign.VerifyHash(validatorPeer.PubKey, append(aggSig.Serialize(), consensus.prepareBitmap.Bitmap...)) {
 		utils.GetLogInstance().Error("Received invalid BLS signature", "validatorID", validatorID)
 		return
 	}
@@ -265,7 +216,7 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 	(*commitSigs)[validatorID] = &sign
 	utils.GetLogInstance().Debug("Received new commit message", "numReceivedSoFar", len(*commitSigs), "validatorID", strconv.Itoa(int(validatorID)))
 	// Set the bitmap indicate this validate signed.
-	commitBitmap.SetKey(value.PubKey, true)
+	commitBitmap.SetKey(validatorPeer.PubKey, true)
 
 	targetState := CommittedDone
 	if len(*commitSigs) >= ((len(consensus.PublicKeys)*2)/3+1) && consensus.state != targetState {

@@ -2,6 +2,7 @@
 package consensus // consensus
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
@@ -195,6 +196,46 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Cons
 	return &consensus
 }
 
+// Checks the basic meta of a consensus message.
+func (consensus *Consensus) checkConsensusMessage(message consensus_proto.Message, publicKey *bls.PublicKey) bool {
+	consensusID := message.ConsensusId
+	blockHash := message.BlockHash
+
+	// Verify message signature
+	err := verifyMessageSig(publicKey, message)
+	if err != nil {
+		utils.GetLogInstance().Warn("Failed to verify the message signature", "Error", err)
+		return false
+	}
+
+	// check consensus Id
+	if consensusID != consensus.consensusID {
+		utils.GetLogInstance().Warn("Wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
+		return false
+	}
+
+	if !bytes.Equal(blockHash, consensus.blockHash[:]) {
+		utils.GetLogInstance().Warn("Wrong blockHash", "consensus", consensus)
+		return false
+	}
+	return true
+}
+
+// Gets the validator peer based on validator ID.
+func (consensus *Consensus) getValidatorPeerByID(validatorID uint32) *p2p.Peer {
+	v, ok := consensus.validators.Load(validatorID)
+	if !ok {
+		utils.GetLogInstance().Warn("Unrecognized validator", "validatorID", validatorID, "consensus", consensus)
+		return nil
+	}
+	value, ok := v.(p2p.Peer)
+	if !ok {
+		utils.GetLogInstance().Warn("Invalid validator", "validatorID", validatorID, "consensus", consensus)
+		return nil
+	}
+	return &value
+}
+
 // Verify the signature of the message are valid from the signer's public key.
 func verifyMessageSig(signerPubKey *bls.PublicKey, message consensus_proto.Message) error {
 	signature := message.Signature
@@ -227,6 +268,20 @@ func (consensus *Consensus) signMessage(message []byte) []byte {
 	hash := sha256.Sum256(message)
 	signature := consensus.priKey.SignHash(hash[:])
 	return signature.Serialize()
+}
+
+// Sign on the consensus message signature field.
+func (consensus *Consensus) signConsensusMessage(message *consensus_proto.Message) error {
+	message.Signature = nil
+	// TODO: use custom serialization method rather than protobuf
+	marshaledMessage, err := protobuf.Marshal(message)
+	if err != nil {
+		return err
+	}
+	// 64 byte of signature on previous data
+	signature := consensus.signMessage(marshaledMessage)
+	message.Signature = signature
+	return nil
 }
 
 // GetValidatorPeers returns list of validator peers.

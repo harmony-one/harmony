@@ -26,21 +26,17 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 	message.SenderId = uint32(consensus.nodeID)
 
 	// n byte of block header
-	message.Payload = consensus.block
+	message.Payload = consensus.block // TODO: send only block header in the announce phase.
+
+	err := consensus.signConsensusMessage(&message)
+	if err != nil {
+		utils.GetLogInstance().Debug("Failed to sign the Announce message", "error", err)
+	}
 
 	marshaledMessage, err := protobuf.Marshal(&message)
 	if err != nil {
-		utils.GetLogInstance().Debug("Failed to marshal Announce message", "error", err)
+		utils.GetLogInstance().Debug("Failed to marshal the Announce message", "error", err)
 	}
-	// 64 byte of signature on previous data
-	signature := consensus.signMessage(marshaledMessage)
-	message.Signature = signature
-
-	marshaledMessage, err = protobuf.Marshal(&message)
-	if err != nil {
-		utils.GetLogInstance().Debug("Failed to marshal Announce message", "error", err)
-	}
-	utils.GetLogInstance().Info("New Announce", "NodeID", consensus.nodeID)
 	return proto.ConstructConsensusMessage(marshaledMessage)
 }
 
@@ -71,20 +67,15 @@ func (consensus *Consensus) constructPreparedMessage() ([]byte, *bls.Sign) {
 	message.Payload = buffer.Bytes()
 	//// END Payload
 
-	// TODO: use custom serialization method rather than protobuf
+	err := consensus.signConsensusMessage(&message)
+	if err != nil {
+		utils.GetLogInstance().Debug("Failed to sign the Prepared message", "error", err)
+	}
+
 	marshaledMessage, err := protobuf.Marshal(&message)
 	if err != nil {
-		utils.GetLogInstance().Debug("Failed to marshal Prepared message", "error", err)
+		utils.GetLogInstance().Debug("Failed to marshal the Prepared message", "error", err)
 	}
-	// 48 byte of signature on previous data
-	signature := consensus.signMessage(marshaledMessage)
-	message.Signature = signature
-
-	marshaledMessage, err = protobuf.Marshal(&message)
-	if err != nil {
-		utils.GetLogInstance().Debug("Failed to marshal Prepared message", "error", err)
-	}
-	utils.GetLogInstance().Info("New Prepared Message", "NodeID", consensus.nodeID, "bitmap", consensus.prepareBitmap)
 	return proto.ConstructConsensusMessage(marshaledMessage), aggSig
 }
 
@@ -114,19 +105,14 @@ func (consensus *Consensus) constructCommittedMessage() ([]byte, *bls.Sign) {
 	message.Payload = buffer.Bytes()
 	//// END Payload
 
-	// TODO: use custom serialization method rather than protobuf
+	err := consensus.signConsensusMessage(&message)
+	if err != nil {
+		utils.GetLogInstance().Debug("Failed to sign the Committed message", "error", err)
+	}
+
 	marshaledMessage, err := protobuf.Marshal(&message)
 	if err != nil {
-		utils.GetLogInstance().Debug("Failed to marshal Committed message", "error", err)
+		utils.GetLogInstance().Debug("Failed to marshal the Committed message", "error", err)
 	}
-	// 48 byte of signature on previous data
-	signature := consensus.signMessage(marshaledMessage)
-	message.Signature = signature
-
-	marshaledMessage, err = protobuf.Marshal(&message)
-	if err != nil {
-		utils.GetLogInstance().Debug("Failed to marshal Committed message", "error", err)
-	}
-	utils.GetLogInstance().Info("New Prepared Message", "NodeID", consensus.nodeID, "bitmap", consensus.commitBitmap)
 	return proto.ConstructConsensusMessage(marshaledMessage), aggSig
 }
