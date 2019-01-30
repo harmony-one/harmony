@@ -581,3 +581,29 @@ func (consensus *Consensus) GetPeerFromID(peerID uint32) (p2p.Peer, bool) {
 func (consensus *Consensus) SendMessage(peer p2p.Peer, message []byte) {
 	host.SendMessage(consensus.host, peer, message, nil)
 }
+
+// Populates the common basic fields for all consensus message.
+func (consensus *Consensus) populateMessageFields(message *consensus_proto.Message) {
+	// 4 byte consensus id
+	message.ConsensusId = consensus.consensusID
+
+	// 32 byte block hash
+	message.BlockHash = consensus.blockHash[:]
+
+	// 4 byte sender id
+	message.SenderId = uint32(consensus.nodeID)
+}
+
+// Signs the consensus message and returns the marshaled message.
+func (consensus *Consensus) signAndMarshalConsensusMessage(message *consensus_proto.Message) ([]byte, error) {
+	err := consensus.signConsensusMessage(message)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	marshaledMessage, err := protobuf.Marshal(message)
+	if err != nil {
+		return []byte{}, err
+	}
+	return marshaledMessage, nil
+}

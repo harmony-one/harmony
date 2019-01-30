@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	protobuf "github.com/golang/protobuf/proto"
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -12,14 +11,7 @@ func (consensus *Consensus) constructPrepareMessage() []byte {
 	message := consensus_proto.Message{}
 	message.Type = consensus_proto.MessageType_PREPARE
 
-	// 4 byte consensus id
-	message.ConsensusId = consensus.consensusID
-
-	// 32 byte block hash
-	message.BlockHash = consensus.blockHash[:]
-
-	// 4 byte sender id
-	message.SenderId = uint32(consensus.nodeID)
+	consensus.populateMessageFields(&message)
 
 	// 48 byte of bls signature
 	sign := consensus.priKey.SignHash(message.BlockHash)
@@ -27,16 +19,10 @@ func (consensus *Consensus) constructPrepareMessage() []byte {
 		message.Payload = sign.Serialize()
 	}
 
-	err := consensus.signConsensusMessage(&message)
+	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(&message)
 	if err != nil {
-		utils.GetLogInstance().Debug("Failed to sign the Prepare message", "error", err)
+		utils.GetLogInstance().Error("Failed to sign and marshal the Prepare message", "error", err)
 	}
-
-	marshaledMessage, err := protobuf.Marshal(&message)
-	if err != nil {
-		utils.GetLogInstance().Debug("Failed to marshal Prepare message", "error", err)
-	}
-
 	return proto.ConstructConsensusMessage(marshaledMessage)
 }
 
@@ -45,14 +31,7 @@ func (consensus *Consensus) constructCommitMessage(multiSigAndBitmap []byte) []b
 	message := consensus_proto.Message{}
 	message.Type = consensus_proto.MessageType_COMMIT
 
-	// 4 byte consensus id
-	message.ConsensusId = consensus.consensusID
-
-	// 32 byte block hash
-	message.BlockHash = consensus.blockHash[:]
-
-	// 4 byte sender id
-	message.SenderId = uint32(consensus.nodeID)
+	consensus.populateMessageFields(&message)
 
 	// 48 byte of bls signature
 	sign := consensus.priKey.SignHash(multiSigAndBitmap)
@@ -60,15 +39,9 @@ func (consensus *Consensus) constructCommitMessage(multiSigAndBitmap []byte) []b
 		message.Payload = sign.Serialize()
 	}
 
-	err := consensus.signConsensusMessage(&message)
+	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(&message)
 	if err != nil {
-		utils.GetLogInstance().Debug("Failed to sign the Commit message", "error", err)
+		utils.GetLogInstance().Error("Failed to sign and marshal the Commit message", "error", err)
 	}
-
-	marshaledMessage, err := protobuf.Marshal(&message)
-	if err != nil {
-		utils.GetLogInstance().Debug("Failed to marshal Commit message", "error", err)
-	}
-
 	return proto.ConstructConsensusMessage(marshaledMessage)
 }

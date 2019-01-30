@@ -1,8 +1,10 @@
 package consensus
 
 import (
+	"bytes"
 	"testing"
 
+	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
@@ -84,5 +86,56 @@ func TestGetPeerFromID(t *testing.T) {
 	}
 	if v.IP != validator.IP || v.Port != validator.Port {
 		t.Errorf("validator IP not equal")
+	}
+}
+
+func TestPopulateMessageFields(t *testing.T) {
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902"}
+	validator := p2p.Peer{IP: "127.0.0.1", Port: "9905"}
+	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
+	host, err := p2pimpl.NewHost(&leader, priKey)
+	if err != nil {
+		t.Fatalf("newhost failure: %v", err)
+	}
+	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader)
+	consensus.consensusID = 2
+	consensus.blockHash = blockHash
+	consensus.nodeID = 3
+
+	msg := consensus_proto.Message{}
+	consensus.populateMessageFields(&msg)
+
+	if msg.ConsensusId != 2 {
+		t.Errorf("Consensus ID is not populated correctly")
+	}
+	if !bytes.Equal(msg.BlockHash[:], blockHash[:]) {
+		t.Errorf("Block hash is not populated correctly")
+	}
+	if msg.SenderId != 3 {
+		t.Errorf("Sender ID is not populated correctly")
+	}
+}
+
+func TestSignAndMarshalConsensusMessage(t *testing.T) {
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902"}
+	validator := p2p.Peer{IP: "127.0.0.1", Port: "9905"}
+	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
+	host, err := p2pimpl.NewHost(&leader, priKey)
+	if err != nil {
+		t.Fatalf("newhost failure: %v", err)
+	}
+	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader)
+	consensus.consensusID = 2
+	consensus.blockHash = blockHash
+	consensus.nodeID = 3
+
+	msg := consensus_proto.Message{}
+	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(&msg)
+
+	if err != nil || len(marshaledMessage) == 0 {
+		t.Errorf("Failed to sign and marshal the message: %s", err)
+	}
+	if len(msg.Signature) == 0 {
+		t.Error("No signature is signed on the consensus message.")
 	}
 }
