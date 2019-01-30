@@ -89,7 +89,7 @@ func TestGetPeerFromID(t *testing.T) {
 	}
 }
 
-func TestPopulateBasicFields(t *testing.T) {
+func TestPopulateMessageFields(t *testing.T) {
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902"}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "9905"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
@@ -103,7 +103,7 @@ func TestPopulateBasicFields(t *testing.T) {
 	consensus.nodeID = 3
 
 	msg := consensus_proto.Message{}
-	consensus.populateBasicFields(&msg)
+	consensus.populateMessageFields(&msg)
 
 	if msg.ConsensusId != 2 {
 		t.Errorf("Consensus ID is not populated correctly")

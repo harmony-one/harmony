@@ -583,7 +583,7 @@ func (consensus *Consensus) SendMessage(peer p2p.Peer, message []byte) {
 }
 
 // Populates the common basic fields for all consensus message.
-func (consensus *Consensus) populateBasicFields(message *consensus_proto.Message) {
+func (consensus *Consensus) populateMessageFields(message *consensus_proto.Message) {
 	// 4 byte consensus id
 	message.ConsensusId = consensus.consensusID
 

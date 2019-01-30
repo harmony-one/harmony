@@ -15,7 +15,7 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 	message := consensus_proto.Message{}
 	message.Type = consensus_proto.MessageType_ANNOUNCE
 
-	consensus.populateBasicFields(&message)
+	consensus.populateMessageFields(&message)
 
 	// n byte of block header
 	message.Payload = consensus.block // TODO: send only block header in the announce phase.
@@ -32,7 +32,7 @@ func (consensus *Consensus) constructPreparedMessage() ([]byte, *bls.Sign) {
 	message := consensus_proto.Message{}
 	message.Type = consensus_proto.MessageType_PREPARED
 
-	consensus.populateBasicFields(&message)
+	consensus.populateMessageFields(&message)
 
 	//// Payload
 	buffer := bytes.NewBuffer([]byte{})
@@ -59,7 +59,7 @@ func (consensus *Consensus) constructCommittedMessage() ([]byte, *bls.Sign) {
 	message := consensus_proto.Message{}
 	message.Type = consensus_proto.MessageType_COMMITTED
 
-	consensus.populateBasicFields(&message)
+	consensus.populateMessageFields(&message)
 
 	//// Payload
 	buffer := bytes.NewBuffer([]byte{})
