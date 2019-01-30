@@ -2,6 +2,7 @@
 package consensus // consensus
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
@@ -193,6 +194,46 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Cons
 
 	//	consensus.Log.Info("New Consensus", "IP", ip, "Port", port, "NodeID", consensus.nodeID, "priKey", consensus.priKey, "pubKey", consensus.pubKey)
 	return &consensus
+}
+
+// Checks the basic meta of a consensus message.
+func (consensus *Consensus) checkConsensusMessage(message consensus_proto.Message, publicKey *bls.PublicKey) bool {
+	consensusID := message.ConsensusId
+	blockHash := message.BlockHash
+
+	// Verify message signature
+	err := verifyMessageSig(publicKey, message)
+	if err != nil {
+		utils.GetLogInstance().Warn("Failed to verify the message signature", "Error", err)
+		return false
+	}
+
+	// check consensus Id
+	if consensusID != consensus.consensusID {
+		utils.GetLogInstance().Warn("Wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
+		return false
+	}
+
+	if !bytes.Equal(blockHash, consensus.blockHash[:]) {
+		utils.GetLogInstance().Warn("Wrong blockHash", "consensus", consensus)
+		return false
+	}
+	return true
+}
+
+// Gets the validator peer based on validator ID.
+func (consensus *Consensus) getValidatorPeerByID(validatorID uint32) *p2p.Peer {
+	v, ok := consensus.validators.Load(validatorID)
+	if !ok {
+		utils.GetLogInstance().Warn("Unrecognized validator", "validatorID", validatorID, "consensus", consensus)
+		return nil
+	}
+	value, ok := v.(p2p.Peer)
+	if !ok {
+		utils.GetLogInstance().Warn("Invalid validator", "validatorID", validatorID, "consensus", consensus)
+		return nil
+	}
+	return &value
 }
 
 // Verify the signature of the message are valid from the signer's public key.

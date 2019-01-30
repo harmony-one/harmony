@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"bytes"
 	"encoding/hex"
 	"strconv"
 	"time"
@@ -15,7 +14,6 @@ import (
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 )
 
@@ -116,7 +114,7 @@ func (consensus *Consensus) processPrepareMessage(message consensus_proto.Messag
 
 	validatorPeer := consensus.getValidatorPeerByID(validatorID)
 
-	if !consensus.checkValidatorMessage(message, validatorPeer.PubKey) {
+	if !consensus.checkConsensusMessage(message, validatorPeer.PubKey) {
 		utils.GetLogInstance().Debug("Failed to check the validator message", "validatorID", validatorID)
 		return
 	}
@@ -172,47 +170,6 @@ func (consensus *Consensus) processPrepareMessage(message consensus_proto.Messag
 	}
 }
 
-// Checks the basic meta of a message from validator.
-func (consensus *Consensus) checkValidatorMessage(message consensus_proto.Message, publicKey *bls.PublicKey) bool {
-	consensusID := message.ConsensusId
-	blockHash := message.BlockHash
-	validatorID := message.SenderId
-
-	// Verify message signature
-	err := verifyMessageSig(publicKey, message)
-	if err != nil {
-		utils.GetLogInstance().Warn("Failed to verify the message signature", "Error", err, "validatorID", validatorID)
-		return false
-	}
-
-	// check consensus Id
-	if consensusID != consensus.consensusID {
-		utils.GetLogInstance().Warn("Received Commit with wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
-		return false
-	}
-
-	if !bytes.Equal(blockHash, consensus.blockHash[:]) {
-		utils.GetLogInstance().Warn("Received Commit with wrong blockHash", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
-		return false
-	}
-	return true
-}
-
-// Gets the validator peer based on validator ID.
-func (consensus *Consensus) getValidatorPeerByID(validatorID uint32) *p2p.Peer {
-	v, ok := consensus.validators.Load(validatorID)
-	if !ok {
-		utils.GetLogInstance().Warn("Unrecognized validator", "validatorID", validatorID, "consensus", consensus)
-		return nil
-	}
-	value, ok := v.(p2p.Peer)
-	if !ok {
-		utils.GetLogInstance().Warn("Invalid validator", "validatorID", validatorID, "consensus", consensus)
-		return nil
-	}
-	return &value
-}
-
 // Processes the commit message sent from validators
 func (consensus *Consensus) processCommitMessage(message consensus_proto.Message) {
 	validatorID := message.SenderId
@@ -223,7 +180,7 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 
 	validatorPeer := consensus.getValidatorPeerByID(validatorID)
 
-	if !consensus.checkValidatorMessage(message, validatorPeer.PubKey) {
+	if !consensus.checkConsensusMessage(message, validatorPeer.PubKey) {
 		utils.GetLogInstance().Debug("Failed to check the validator message", "validatorID", validatorID)
 		return
 	}

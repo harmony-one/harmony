@@ -1,8 +1,6 @@
 package consensus
 
 import (
-	"bytes"
-
 	"github.com/harmony-one/bls/ffi/go/bls"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 
@@ -40,29 +38,18 @@ func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Messa
 
 	consensusID := message.ConsensusId
 	blockHash := message.BlockHash
-	leaderID := message.SenderId
 	block := message.Payload
 
 	copy(consensus.blockHash[:], blockHash[:])
 
-	// Verify block data
-	// check leader Id
-	myLeaderID := utils.GetUniqueIDFromPeer(consensus.leader)
-	if leaderID != myLeaderID {
-		utils.GetLogInstance().Warn("Received message from wrong leader", "myLeaderID", myLeaderID, "receivedLeaderId", leaderID, "consensus", consensus)
-		return
-	}
-
-	// Verify message signature
-	err := verifyMessageSig(consensus.leader.PubKey, message)
-	if err != nil {
-		utils.GetLogInstance().Warn("Failed to verify the message signature", "Error", err, "leader ID", leaderID)
+	if !consensus.checkConsensusMessage(message, consensus.leader.PubKey) {
+		utils.GetLogInstance().Debug("Failed to check the leader message")
 		return
 	}
 
 	// check block header is valid
 	var blockObj types.Block
-	err = rlp.DecodeBytes(block, &blockObj)
+	err := rlp.DecodeBytes(block, &blockObj)
 	if err != nil {
 		utils.GetLogInstance().Warn("Unparseable block header data", "error", err)
 		return
@@ -78,13 +65,6 @@ func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Messa
 	// Add attack model of IncorrectResponse
 	if attack.GetInstance().IncorrectResponse() {
 		utils.GetLogInstance().Warn("IncorrectResponse attacked")
-		return
-	}
-
-	// check block hash
-	hash := blockObj.Hash()
-	if !bytes.Equal(blockHash[:], hash[:]) {
-		utils.GetLogInstance().Warn("Block hash doesn't match", "consensus", consensus)
 		return
 	}
 
@@ -125,18 +105,8 @@ func (consensus *Consensus) processPreparedMessage(message consensus_proto.Messa
 	// Update readyByConsensus for attack.
 	attack.GetInstance().UpdateConsensusReady(consensusID)
 
-	// Verify block data and the aggregated signatures
-	// check leader Id
-	myLeaderID := utils.GetUniqueIDFromPeer(consensus.leader)
-	if uint32(leaderID) != myLeaderID {
-		utils.GetLogInstance().Warn("Received message from wrong leader", "myLeaderID", myLeaderID, "receivedLeaderId", leaderID, "consensus", consensus)
-		return
-	}
-
-	// Verify message signature
-	err := verifyMessageSig(consensus.leader.PubKey, message)
-	if err != nil {
-		utils.GetLogInstance().Warn("Failed to verify the message signature", "Error", err, "leader ID", leaderID)
+	if !consensus.checkConsensusMessage(message, consensus.leader.PubKey) {
+		utils.GetLogInstance().Debug("Failed to check the leader message")
 		return
 	}
 
@@ -149,14 +119,8 @@ func (consensus *Consensus) processPreparedMessage(message consensus_proto.Messa
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
-	// check block hash
-	if !bytes.Equal(blockHash[:], consensus.blockHash[:]) {
-		utils.GetLogInstance().Warn("Block hash doesn't match", "consensus", consensus)
-		return
-	}
-
 	deserializedMultiSig := bls.Sign{}
-	err = deserializedMultiSig.Deserialize(multiSig)
+	err := deserializedMultiSig.Deserialize(multiSig)
 	if err != nil {
 		utils.GetLogInstance().Warn("Failed to deserialize the multi signature for prepare phase", "Error", err, "leader ID", leaderID)
 		return
@@ -185,7 +149,6 @@ func (consensus *Consensus) processCommittedMessage(message consensus_proto.Mess
 	utils.GetLogInstance().Warn("Received Prepared Message", "nodeID", consensus.nodeID)
 
 	consensusID := message.ConsensusId
-	blockHash := message.BlockHash
 	leaderID := message.SenderId
 	messagePayload := message.Payload
 
@@ -201,18 +164,8 @@ func (consensus *Consensus) processCommittedMessage(message consensus_proto.Mess
 	// Update readyByConsensus for attack.
 	attack.GetInstance().UpdateConsensusReady(consensusID)
 
-	// Verify block data and the aggregated signatures
-	// check leader Id
-	myLeaderID := utils.GetUniqueIDFromPeer(consensus.leader)
-	if uint32(leaderID) != myLeaderID {
-		utils.GetLogInstance().Warn("Received message from wrong leader", "myLeaderID", myLeaderID, "receivedLeaderId", leaderID, "consensus", consensus)
-		return
-	}
-
-	// Verify message signature
-	err := verifyMessageSig(consensus.leader.PubKey, message)
-	if err != nil {
-		utils.GetLogInstance().Warn("Failed to verify the message signature", "Error", err, "leader ID", leaderID)
+	if !consensus.checkConsensusMessage(message, consensus.leader.PubKey) {
+		utils.GetLogInstance().Debug("Failed to check the leader message")
 		return
 	}
 
@@ -232,14 +185,8 @@ func (consensus *Consensus) processCommittedMessage(message consensus_proto.Mess
 		return
 	}
 
-	// check block hash
-	if !bytes.Equal(blockHash[:], consensus.blockHash[:]) {
-		utils.GetLogInstance().Warn("Block hash doesn't match", "consensus", consensus)
-		return
-	}
-
 	deserializedMultiSig := bls.Sign{}
-	err = deserializedMultiSig.Deserialize(multiSig)
+	err := deserializedMultiSig.Deserialize(multiSig)
 	if err != nil {
 		utils.GetLogInstance().Warn("Failed to deserialize the multi signature for commit phase", "Error", err, "leader ID", leaderID)
 		return
