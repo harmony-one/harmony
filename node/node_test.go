@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	proto_node "github.com/harmony-one/harmony/api/proto/node"
+	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -114,7 +114,7 @@ func sendPingMessage(node *Node, leader p2p.Peer) {
 		PubKey: pubKey1,
 	}
 
-	ping1 := proto_node.NewPingMessage(p1)
+	ping1 := proto_discovery.NewPingMessage(p1)
 	buf1 := ping1.ConstructPingMessage()
 
 	fmt.Println("waiting for 5 seconds ...")
@@ -138,7 +138,7 @@ func sendPongMessage(node *Node, leader p2p.Peer) {
 		PubKey: pubKey2,
 	}
 
-	pong1 := proto_node.NewPongMessage([]p2p.Peer{p1, p2}, nil)
+	pong1 := proto_discovery.NewPongMessage([]p2p.Peer{p1, p2}, nil)
 	buf1 := pong1.ConstructPongMessage()
 
 	fmt.Println("waiting for 10 seconds ...")

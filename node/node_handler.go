@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
+	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	proto_identity "github.com/harmony-one/harmony/api/proto/identity"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/core/types"
@@ -288,7 +289,7 @@ func (node *Node) AddNewBlock(newBlock *types.Block) {
 }
 
 func (node *Node) pingMessageHandler(msgPayload []byte) int {
-	ping, err := proto_node.GetPingMessage(msgPayload)
+	ping, err := proto_discovery.GetPingMessage(msgPayload)
 	if err != nil {
 		utils.GetLogInstance().Error("Can't get Ping Message")
 		return -1
@@ -318,7 +319,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 	node.AddPeers([]*p2p.Peer{peer})
 
 	peers := node.Consensus.GetValidatorPeers()
-	pong := proto_node.NewPongMessage(peers, node.Consensus.PublicKeys)
+	pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys)
 	buffer := pong.ConstructPongMessage()
 
 	// Send a Pong message directly to the sender
@@ -339,7 +340,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 }
 
 func (node *Node) pongMessageHandler(msgPayload []byte) int {
-	pong, err := proto_node.GetPongMessage(msgPayload)
+	pong, err := proto_discovery.GetPongMessage(msgPayload)
 	if err != nil {
 		utils.GetLogInstance().Error("Can't get Pong Message")
 		return -1

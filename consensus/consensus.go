@@ -26,7 +26,7 @@ import (
 	"github.com/harmony-one/harmony/p2p/host"
 	"golang.org/x/crypto/sha3"
 
-	proto_node "github.com/harmony-one/harmony/api/proto/node"
+	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 )
 
 // Consensus is the main struct with all states and data related to consensus process.
@@ -412,7 +412,7 @@ func (consensus *Consensus) RemovePeers(peers []p2p.Peer) int {
 		// Or the shard won't be able to reach consensus if public keys are mismatch
 
 		validators := consensus.GetValidatorPeers()
-		pong := proto_node.NewPongMessage(validators, consensus.PublicKeys)
+		pong := proto_discovery.NewPongMessage(validators, consensus.PublicKeys)
 		buffer := pong.ConstructPongMessage()
 
 		host.BroadcastMessageFromLeader(consensus.host, validators, buffer, consensus.OfflinePeers)

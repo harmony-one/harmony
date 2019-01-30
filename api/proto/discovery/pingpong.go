@@ -1,5 +1,5 @@
 /*
-Package proto/node implements the communication protocol among nodes.
+Package proto/discovery implements the discovery ping/pong protocol among nodes.
 
 pingpong.go adds support of ping/pong messages.
 
@@ -8,7 +8,7 @@ pong: peer responds to ping messages, sending all pubkeys known by peer
 
 */
 
-package node
+package discovery
 
 import (
 	"bytes"
@@ -18,55 +18,20 @@ import (
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
+	"github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/p2p"
-	peer "github.com/libp2p/go-libp2p-peer"
 )
-
-// RoleType defines the role of the node
-type RoleType int
-
-// Type of roles of a node
-const (
-	ValidatorRole RoleType = iota
-	ClientRole
-)
-
-func (r RoleType) String() string {
-	switch r {
-	case ValidatorRole:
-		return "Validator"
-	case ClientRole:
-		return "Client"
-	}
-	return "Unknown"
-}
-
-// Info refers to Peer struct in p2p/peer.go
-// this is basically a simplified version of Peer
-// for network transportation
-type Info struct {
-	IP          string
-	Port        string
-	PubKey      []byte
-	ValidatorID int
-	Role        RoleType
-	PeerID      peer.ID // Peerstore ID
-}
-
-func (info Info) String() string {
-	return fmt.Sprintf("Info:%v/%v=>%v/%v", info.IP, info.Port, info.ValidatorID, info.PeerID)
-}
 
 // PingMessageType defines the data structure of the Ping message
 type PingMessageType struct {
 	Version uint16 // version of the protocol
-	Node    Info
+	Node    node.Info
 }
 
 // PongMessageType defines the data structure of the Pong message
 type PongMessageType struct {
 	Version uint16 // version of the protocol
-	Peers   []Info
+	Peers   []node.Info
 	PubKeys [][]byte // list of publickKeys, has to be identical among all validators/leaders
 }
 
@@ -83,13 +48,13 @@ func (p PongMessageType) String() string {
 func NewPingMessage(peer p2p.Peer) *PingMessageType {
 	ping := new(PingMessageType)
 
-	ping.Version = ProtocolVersion
+	ping.Version = proto.ProtocolVersion
 	ping.Node.IP = peer.IP
 	ping.Node.Port = peer.Port
 	ping.Node.PeerID = peer.PeerID
 	ping.Node.ValidatorID = peer.ValidatorID
 	ping.Node.PubKey = peer.PubKey.Serialize()
-	ping.Node.Role = ValidatorRole
+	ping.Node.Role = node.ValidatorRole
 
 	return ping
 }
@@ -99,12 +64,12 @@ func NewPongMessage(peers []p2p.Peer, pubKeys []*bls.PublicKey) *PongMessageType
 	pong := new(PongMessageType)
 	pong.PubKeys = make([][]byte, 0)
 
-	pong.Version = ProtocolVersion
-	pong.Peers = make([]Info, 0)
+	pong.Version = proto.ProtocolVersion
+	pong.Peers = make([]node.Info, 0)
 
 	var err error
 	for _, p := range peers {
-		n := Info{}
+		n := node.Info{}
 		n.IP = p.IP
 		n.Port = p.Port
 		n.ValidatorID = p.ValidatorID
@@ -144,7 +109,7 @@ func GetPingMessage(payload []byte) (*PingMessageType, error) {
 // GetPongMessage deserializes the Pong Message from a list of byte
 func GetPongMessage(payload []byte) (*PongMessageType, error) {
 	pong := new(PongMessageType)
-	pong.Peers = make([]Info, 0)
+	pong.Peers = make([]node.Info, 0)
 	pong.PubKeys = make([][]byte, 0)
 
 	r := bytes.NewBuffer(payload)
@@ -161,7 +126,7 @@ func GetPongMessage(payload []byte) (*PongMessageType, error) {
 // ConstructPingMessage contructs ping message from node to leader
 func (p PingMessageType) ConstructPingMessage() []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
-	byteBuffer.WriteByte(byte(PING))
+	byteBuffer.WriteByte(byte(node.PING))
 
 	encoder := gob.NewEncoder(byteBuffer)
 	err := encoder.Encode(p)
@@ -175,7 +140,7 @@ func (p PingMessageType) ConstructPingMessage() []byte {
 // ConstructPongMessage contructs pong message from leader to node
 func (p PongMessageType) ConstructPongMessage() []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
-	byteBuffer.WriteByte(byte(PONG))
+	byteBuffer.WriteByte(byte(node.PONG))
 
 	encoder := gob.NewEncoder(byteBuffer)
 	err := encoder.Encode(p)

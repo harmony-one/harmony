@@ -22,6 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/api/client"
 	clientService "github.com/harmony-one/harmony/api/client/service"
+	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/api/services/explorer"
 	"github.com/harmony-one/harmony/api/services/syncing"
@@ -432,7 +433,7 @@ func (node *Node) JoinShard(leader p2p.Peer) {
 	for {
 		select {
 		case <-tick.C:
-			ping := proto_node.NewPingMessage(node.SelfPeer)
+			ping := proto_discovery.NewPingMessage(node.SelfPeer)
 			if node.Client != nil { // assume this is the client node
 				ping.Node.Role = proto_node.ClientRole
 			}
