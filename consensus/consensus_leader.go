@@ -26,33 +26,41 @@ var (
 )
 
 // WaitForNewBlock waits for the next new block to run consensus on
-func (consensus *Consensus) WaitForNewBlock(blockChannel chan *types.Block) {
+func (consensus *Consensus) WaitForNewBlock(blockChannel chan *types.Block, stopChan chan struct{}, stoppedChan chan struct{}) {
 	utils.GetLogInstance().Debug("Waiting for block", "consensus", consensus)
-	for { // keep waiting for new blocks
-		newBlock := <-blockChannel
-		// TODO: think about potential race condition
+	go func() {
+		defer close(stoppedChan)
+		for { // keep waiting for new blocks
+			select {
+			default:
+				newBlock := <-blockChannel
+				// TODO: think about potential race condition
 
-		c := consensus.RemovePeers(consensus.OfflinePeerList)
-		if c > 0 {
-			utils.GetLogInstance().Debug("WaitForNewBlock", "removed peers", c)
-		}
+				c := consensus.RemovePeers(consensus.OfflinePeerList)
+				if c > 0 {
+					utils.GetLogInstance().Debug("WaitForNewBlock", "removed peers", c)
+				}
 
-		for !consensus.HasEnoughValidators() {
-			utils.GetLogInstance().Debug("Not enough validators", "# Validators", len(consensus.PublicKeys))
-			time.Sleep(waitForEnoughValidators * time.Millisecond)
-		}
+				for !consensus.HasEnoughValidators() {
+					utils.GetLogInstance().Debug("Not enough validators", "# Validators", len(consensus.PublicKeys))
+					time.Sleep(waitForEnoughValidators * time.Millisecond)
+				}
 
-		startTime = time.Now()
-		utils.GetLogInstance().Debug("STARTING CONSENSUS", "numTxs", len(newBlock.Transactions()), "consensus", consensus, "startTime", startTime, "publicKeys", len(consensus.PublicKeys))
-		for { // Wait until last consensus is finished
-			if consensus.state == Finished {
-				consensus.ResetState()
-				consensus.startConsensus(newBlock)
-				break
+				startTime = time.Now()
+				utils.GetLogInstance().Debug("STARTING CONSENSUS", "numTxs", len(newBlock.Transactions()), "consensus", consensus, "startTime", startTime, "publicKeys", len(consensus.PublicKeys))
+				for { // Wait until last consensus is finished
+					if consensus.state == Finished {
+						consensus.ResetState()
+						consensus.startConsensus(newBlock)
+						break
+					}
+					time.Sleep(500 * time.Millisecond)
+				}
+			case <-stopChan:
+				return
 			}
-			time.Sleep(500 * time.Millisecond)
 		}
-	}
+	}()
 }
 
 // ProcessMessageLeader dispatches consensus message for the leader.
