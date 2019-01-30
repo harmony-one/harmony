@@ -41,6 +41,7 @@ func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Messa
 	block := message.Payload
 
 	copy(consensus.blockHash[:], blockHash[:])
+	consensus.block = block
 
 	if !consensus.checkConsensusMessage(message, consensus.leader.PubKey) {
 		utils.GetLogInstance().Debug("Failed to check the leader message")
@@ -55,8 +56,6 @@ func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Messa
 		return
 	}
 
-	consensus.block = block
-
 	// Add block to received block cache
 	consensus.mutex.Lock()
 	consensus.blocksReceived[consensusID] = &BlockConsensusStatus{block, consensus.state}
@@ -68,7 +67,7 @@ func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Messa
 		return
 	}
 
-	// check block data (transactions
+	// check block data transactions
 	if !consensus.BlockVerifier(&blockObj) {
 		utils.GetLogInstance().Warn("Block content is not verified successfully", "consensus", consensus)
 		return
@@ -76,11 +75,8 @@ func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Messa
 
 	// Construct and send prepare message
 	msgToSend := consensus.constructPrepareMessage()
-
 	consensus.SendMessage(consensus.leader, msgToSend)
-	// utils.GetLogInstance().Warn("Sending Commit to leader", "state", targetState)
 
-	// Set state to PrepareDone
 	consensus.state = PrepareDone
 }
 
@@ -101,6 +97,7 @@ func (consensus *Consensus) processPreparedMessage(message consensus_proto.Messa
 
 	// bitmap
 	bitmap := messagePayload[offset:]
+	//#### END Read payload data
 
 	// Update readyByConsensus for attack.
 	attack.GetInstance().UpdateConsensusReady(consensusID)
@@ -119,6 +116,7 @@ func (consensus *Consensus) processPreparedMessage(message consensus_proto.Messa
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
+	// Verify the multi-sig for prepare phase
 	deserializedMultiSig := bls.Sign{}
 	err := deserializedMultiSig.Deserialize(multiSig)
 	if err != nil {
@@ -134,11 +132,9 @@ func (consensus *Consensus) processPreparedMessage(message consensus_proto.Messa
 	consensus.aggregatedPrepareSig = &deserializedMultiSig
 	consensus.prepareBitmap = mask
 
-	multiSigAndBitmap := append(multiSig, bitmap...)
-
 	// Construct and send the commit message
+	multiSigAndBitmap := append(multiSig, bitmap...)
 	msgToSend := consensus.constructCommitMessage(multiSigAndBitmap)
-
 	consensus.SendMessage(consensus.leader, msgToSend)
 
 	consensus.state = CommitDone
@@ -146,7 +142,7 @@ func (consensus *Consensus) processPreparedMessage(message consensus_proto.Messa
 
 // Processes the committed message sent from the leader
 func (consensus *Consensus) processCommittedMessage(message consensus_proto.Message) {
-	utils.GetLogInstance().Warn("Received Prepared Message", "nodeID", consensus.nodeID)
+	utils.GetLogInstance().Warn("Received Committed Message", "nodeID", consensus.nodeID)
 
 	consensusID := message.ConsensusId
 	leaderID := message.SenderId
@@ -160,6 +156,7 @@ func (consensus *Consensus) processCommittedMessage(message consensus_proto.Mess
 
 	// bitmap
 	bitmap := messagePayload[offset:]
+	//#### END Read payload data
 
 	// Update readyByConsensus for attack.
 	attack.GetInstance().UpdateConsensusReady(consensusID)
@@ -177,14 +174,8 @@ func (consensus *Consensus) processCommittedMessage(message consensus_proto.Mess
 
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
-	// check consensus Id
-	if consensusID != consensus.consensusID {
-		// hack for new node state syncing
-		utils.GetLogInstance().Warn("Received message with wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
-		consensus.consensusID = consensusID
-		return
-	}
 
+	// Verify the multi-sig for commit phase
 	deserializedMultiSig := bls.Sign{}
 	err := deserializedMultiSig.Deserialize(multiSig)
 	if err != nil {
@@ -193,15 +184,15 @@ func (consensus *Consensus) processCommittedMessage(message consensus_proto.Mess
 	}
 	mask, err := bls_cosi.NewMask(consensus.PublicKeys, nil)
 	mask.SetMask(bitmap)
-
 	prepareMultiSigAndBitmap := append(consensus.aggregatedPrepareSig.Serialize(), consensus.prepareBitmap.Bitmap...)
 	if !deserializedMultiSig.VerifyHash(mask.AggregatePublic, prepareMultiSigAndBitmap) || err != nil {
 		utils.GetLogInstance().Warn("Failed to verify the multi signature for commit phase", "Error", err, "leader ID", leaderID)
 		return
 	}
+	consensus.aggregatedCommitSig = &deserializedMultiSig
+	consensus.commitBitmap = mask
 
 	consensus.state = CommittedDone
-
 	// TODO: the block catch up logic is a temporary workaround for full failure node catchup. Implement the full node catchup logic
 	// The logic is to roll up to the latest blocks one by one to try catching up with the leader.
 	for {
@@ -226,7 +217,13 @@ func (consensus *Consensus) processCommittedMessage(message consensus_proto.Mess
 				utils.GetLogInstance().Debug("[WARNING] Block content is not verified successfully", "consensusID", consensus.consensusID)
 				return
 			}
-			utils.GetLogInstance().Info("Finished Response. Adding block to chain", "numTx", len(blockObj.Transactions()))
+
+			// Put the signatures into the block
+			copy(blockObj.Header().PrepareSignature[:], consensus.aggregatedPrepareSig.Serialize()[:])
+			copy(blockObj.Header().PrepareBitmap[:], consensus.prepareBitmap.Bitmap)
+			copy(blockObj.Header().CommitSignature[:], consensus.aggregatedCommitSig.Serialize()[:])
+			copy(blockObj.Header().CommitBitmap[:], consensus.commitBitmap.Bitmap)
+			utils.GetLogInstance().Info("Adding block to chain", "numTx", len(blockObj.Transactions()))
 			consensus.OnConsensusDone(&blockObj)
 			consensus.ResetState()
 

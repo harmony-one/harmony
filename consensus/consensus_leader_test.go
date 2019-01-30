@@ -164,6 +164,7 @@ func TestProcessMessageLeaderCommit(test *testing.T) {
 
 	aggSig := bls_cosi.AggregateSig(consensusLeader.GetPrepareSigsArray())
 	multiSigAndBitmap := append(aggSig.Serialize(), consensusLeader.prepareBitmap.Bitmap...)
+	consensusLeader.aggregatedPrepareSig = aggSig
 
 	consensusValidators := make([]*Consensus, 3)
 

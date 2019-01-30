@@ -263,6 +263,12 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 		node.AddSmartContractsToPendingTransactions()
 		node.Consensus.ConsensusBlock = make(chan *types.Block)
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
+
+		fmt.Println("LALALALALALALA")
+		bytess, _ := rlp.EncodeToBytes(chain.CurrentBlock())
+		fmt.Println(hex.EncodeToString(bytess))
+		bytess, _ = rlp.EncodeToBytes(chain.CurrentBlock().Hash())
+		fmt.Println(hex.EncodeToString(bytess))
 	}
 
 	if consensus != nil && consensus.IsLeader {

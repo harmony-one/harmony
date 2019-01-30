@@ -88,8 +88,8 @@ func (consensus *Consensus) startConsensus(newBlock *types.Block) {
 		return
 	}
 	consensus.block = encodedBlock
-
 	utils.GetLogInstance().Debug("Stop encoding block")
+
 	msgToSend := consensus.constructAnnounceMessage()
 
 	// Set state to AnnounceDone
@@ -144,29 +144,25 @@ func (consensus *Consensus) processPrepareMessage(message consensus_proto.Messag
 		return
 	}
 
-	(*prepareSigs)[validatorID] = &sign
 	utils.GetLogInstance().Debug("Received new prepare signature", "numReceivedSoFar", len(*prepareSigs), "validatorID", validatorID, "PublicKeys", len(consensus.PublicKeys))
-
-	// Set the bitmap indicate this validate signed.
-	prepareBitmap.SetKey(validatorPeer.PubKey, true)
+	(*prepareSigs)[validatorID] = &sign
+	prepareBitmap.SetKey(validatorPeer.PubKey, true) // Set the bitmap indicating that this validator signed.
 
 	targetState := PreparedDone
 	if len((*prepareSigs)) >= ((len(consensus.PublicKeys)*2)/3+1) && consensus.state < targetState {
 		utils.GetLogInstance().Debug("Enough prepares received with signatures", "num", len(*prepareSigs), "state", consensus.state)
 
-		// Construct prepared message
+		// Construct and broadcast prepared message
 		msgToSend, aggSig := consensus.constructPreparedMessage()
 		consensus.aggregatedPrepareSig = aggSig
-
-		// Leader sign the multi-sig and bitmap
-		multiSigAndBitmap := append(aggSig.Serialize(), prepareBitmap.Bitmap...)
-		(*consensus.commitSigs)[consensus.nodeID] = consensus.priKey.SignHash(multiSigAndBitmap)
-
-		// Broadcast prepared message
 		host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
 
 		// Set state to targetState
 		consensus.state = targetState
+
+		// Leader sign the multi-sig and bitmap (for commit phase)
+		multiSigAndBitmap := append(aggSig.Serialize(), prepareBitmap.Bitmap...)
+		(*consensus.commitSigs)[consensus.nodeID] = consensus.priKey.SignHash(multiSigAndBitmap)
 	}
 }
 
@@ -194,39 +190,37 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 		utils.GetLogInstance().Debug("Already received commit message from the validator", "validatorID", validatorID)
 		return
 	}
+
 	if len((*commitSigs)) >= ((len(consensus.PublicKeys)*2)/3 + 1) {
 		utils.GetLogInstance().Debug("Received additional new commit message", "validatorID", strconv.Itoa(int(validatorID)))
 		return
 	}
 
+	// Verify the signature on prepare multi-sig and bitmap is correct
 	var sign bls.Sign
 	err := sign.Deserialize(commitSig)
 	if err != nil {
 		utils.GetLogInstance().Debug("Failed to deserialize bls signature", "validatorID", validatorID)
 		return
 	}
-
-	// Verify the signature on prepare multi-sig and bitmap is correct
 	aggSig := bls_cosi.AggregateSig(consensus.GetPrepareSigsArray())
 	if !sign.VerifyHash(validatorPeer.PubKey, append(aggSig.Serialize(), consensus.prepareBitmap.Bitmap...)) {
 		utils.GetLogInstance().Error("Received invalid BLS signature", "validatorID", validatorID)
 		return
 	}
 
-	(*commitSigs)[validatorID] = &sign
 	utils.GetLogInstance().Debug("Received new commit message", "numReceivedSoFar", len(*commitSigs), "validatorID", strconv.Itoa(int(validatorID)))
-	// Set the bitmap indicate this validate signed.
+	(*commitSigs)[validatorID] = &sign
+	// Set the bitmap indicating that this validator signed.
 	commitBitmap.SetKey(validatorPeer.PubKey, true)
 
 	targetState := CommittedDone
 	if len(*commitSigs) >= ((len(consensus.PublicKeys)*2)/3+1) && consensus.state != targetState {
 		utils.GetLogInstance().Info("Enough commits received!", "num", len(*commitSigs), "state", consensus.state)
 
-		// Construct committed message
+		// Construct and broadcast committed message
 		msgToSend, aggSig := consensus.constructCommittedMessage()
 		consensus.aggregatedCommitSig = aggSig
-
-		// Broadcast committed message
 		host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
 
 		var blockObj types.Block
@@ -236,8 +230,11 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 		}
 
 		// Sign the block
-		copy(blockObj.Header().Signature[:], aggSig.Serialize()[:])
-		copy(blockObj.Header().Bitmap[:], commitBitmap.Bitmap)
+		copy(blockObj.Header().PrepareSignature[:], consensus.aggregatedPrepareSig.Serialize()[:])
+		copy(blockObj.Header().PrepareBitmap[:], consensus.prepareBitmap.Bitmap)
+		copy(blockObj.Header().CommitSignature[:], consensus.aggregatedCommitSig.Serialize()[:])
+		copy(blockObj.Header().CommitBitmap[:], consensus.commitBitmap.Bitmap)
+
 		consensus.OnConsensusDone(&blockObj)
 		consensus.state = targetState
 

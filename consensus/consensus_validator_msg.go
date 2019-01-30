@@ -26,7 +26,7 @@ func (consensus *Consensus) constructPrepareMessage() []byte {
 	return proto.ConstructConsensusMessage(marshaledMessage)
 }
 
-// Construct the commit message to send to leader (assumption the consensus data is already verified)
+// Construct the commit message which contains the signature on the multi-sig of prepare phase.
 func (consensus *Consensus) constructCommitMessage(multiSigAndBitmap []byte) []byte {
 	message := consensus_proto.Message{}
 	message.Type = consensus_proto.MessageType_COMMIT
