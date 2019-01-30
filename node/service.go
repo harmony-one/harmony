@@ -24,6 +24,7 @@ const (
 	SupportSyncing ServiceType = iota
 	SupportClient
 	SupportExplorer
+	Consensus
 	Test
 	Done
 )
@@ -36,6 +37,8 @@ func (t ServiceType) String() string {
 		return "SyncingSupport"
 	case SupportExplorer:
 		return "SupportExplorer"
+	case Consensus:
+		return "Consensus"
 	case Test:
 		return "Test"
 	case Done:
@@ -60,8 +63,8 @@ type Action struct {
 
 // ServiceInterface is the collection of functions any service needs to implement.
 type ServiceInterface interface {
-	Start()
-	Stop()
+	StartService()
+	StopService()
 }
 
 // ServiceStore stores all services for service manager.
@@ -108,10 +111,10 @@ func (node *Node) TakeAction(action *Action) {
 		switch action.action {
 		case Start:
 			fmt.Printf("Start %s\n", action.serviceType)
-			service.Start()
+			service.StartService()
 		case Stop:
 			fmt.Printf("Stop %s\n", action.serviceType)
-			service.Stop()
+			service.StopService()
 		}
 	}
 }
