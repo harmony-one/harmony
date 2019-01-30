@@ -15,11 +15,17 @@ Each service needs to implement minimal interace behavior like Start, Stop so th
 ```
 // ServiceInterface is the collection of functions any service needs to implement.
 type ServiceInterface interface {
-	Start()
-	Stop()
+	StartService()
+	StopService()
 }
 
 ```
+
+### Creating a service.
+
+To create a service, you need to have an struct which implements above interface function `StartService`, `StopService`.
+
+Since different services may have different ways to be created you may need to have a method `NewServiceABC` for service ABC with its own hooked params which returns the service object.
 
 ### Action
 
