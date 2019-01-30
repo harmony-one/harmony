@@ -593,3 +593,17 @@ func (consensus *Consensus) populateBasicFields(message *consensus_proto.Message
 	// 4 byte sender id
 	message.SenderId = uint32(consensus.nodeID)
 }
+
+// Signs the consensus message and returns the marshaled message.
+func (consensus *Consensus) signAndMarshalConsensusMessage(message *consensus_proto.Message) ([]byte, error) {
+	err := consensus.signConsensusMessage(message)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	marshaledMessage, err := protobuf.Marshal(message)
+	if err != nil {
+		return []byte{}, err
+	}
+	return marshaledMessage, nil
+}

@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	protobuf "github.com/golang/protobuf/proto"
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -20,16 +19,10 @@ func (consensus *Consensus) constructPrepareMessage() []byte {
 		message.Payload = sign.Serialize()
 	}
 
-	err := consensus.signConsensusMessage(&message)
+	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(&message)
 	if err != nil {
-		utils.GetLogInstance().Debug("Failed to sign the Prepare message", "error", err)
+		utils.GetLogInstance().Error("Failed to sign and marshal the Prepare message", "error", err)
 	}
-
-	marshaledMessage, err := protobuf.Marshal(&message)
-	if err != nil {
-		utils.GetLogInstance().Debug("Failed to marshal Prepare message", "error", err)
-	}
-
 	return proto.ConstructConsensusMessage(marshaledMessage)
 }
 
@@ -46,15 +39,9 @@ func (consensus *Consensus) constructCommitMessage(multiSigAndBitmap []byte) []b
 		message.Payload = sign.Serialize()
 	}
 
-	err := consensus.signConsensusMessage(&message)
+	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(&message)
 	if err != nil {
-		utils.GetLogInstance().Debug("Failed to sign the Commit message", "error", err)
+		utils.GetLogInstance().Error("Failed to sign and marshal the Commit message", "error", err)
 	}
-
-	marshaledMessage, err := protobuf.Marshal(&message)
-	if err != nil {
-		utils.GetLogInstance().Debug("Failed to marshal Commit message", "error", err)
-	}
-
 	return proto.ConstructConsensusMessage(marshaledMessage)
 }

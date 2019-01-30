@@ -115,3 +115,27 @@ func TestPopulateBasicFields(t *testing.T) {
 		t.Errorf("Sender ID is not populated correctly")
 	}
 }
+
+func TestSignAndMarshalConsensusMessage(t *testing.T) {
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902"}
+	validator := p2p.Peer{IP: "127.0.0.1", Port: "9905"}
+	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
+	host, err := p2pimpl.NewHost(&leader, priKey)
+	if err != nil {
+		t.Fatalf("newhost failure: %v", err)
+	}
+	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader)
+	consensus.consensusID = 2
+	consensus.blockHash = blockHash
+	consensus.nodeID = 3
+
+	msg := consensus_proto.Message{}
+	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(&msg)
+
+	if err != nil || len(marshaledMessage) == 0 {
+		t.Errorf("Failed to sign and marshal the message: %s", err)
+	}
+	if len(msg.Signature) == 0 {
+		t.Error("No signature is signed on the consensus message.")
+	}
+}
