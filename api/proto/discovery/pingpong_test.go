@@ -1,4 +1,4 @@
-package node
+package discovery
 
 import (
 	"fmt"
@@ -8,6 +8,7 @@ import (
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
+	"github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/p2p"
 )
@@ -55,7 +56,7 @@ func TestString(test *testing.T) {
 		test.Errorf("expect: %v, got: %v", e1, r1)
 	}
 
-	ping1.Node.Role = ClientRole
+	ping1.Node.Role = node.ClientRole
 
 	r3 := fmt.Sprintf("%v", *ping1)
 	if strings.Compare(r3, e3) != 0 {

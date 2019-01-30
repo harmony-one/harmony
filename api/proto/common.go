@@ -34,11 +34,14 @@ const (
 	// TODO: add more types
 )
 
-// MessageCategoryBytes is the number of bytes message category takes
-const MessageCategoryBytes = 1
-
-// MessageTypeBytes is the number of bytes message type takes
-const MessageTypeBytes = 1
+const (
+	// ProtocolVersion is a constant defined as the version of the Harmony protocol
+	ProtocolVersion = 1
+	// MessageCategoryBytes is the number of bytes message category takes
+	MessageCategoryBytes = 1
+	// MessageTypeBytes is the number of bytes message type takes
+	MessageTypeBytes = 1
+)
 
 // GetMessageCategory gets the message category from the p2p message content
 func GetMessageCategory(message []byte) (MessageCategory, error) {
