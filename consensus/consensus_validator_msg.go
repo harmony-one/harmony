@@ -12,14 +12,7 @@ func (consensus *Consensus) constructPrepareMessage() []byte {
 	message := consensus_proto.Message{}
 	message.Type = consensus_proto.MessageType_PREPARE
 
-	// 4 byte consensus id
-	message.ConsensusId = consensus.consensusID
-
-	// 32 byte block hash
-	message.BlockHash = consensus.blockHash[:]
-
-	// 4 byte sender id
-	message.SenderId = uint32(consensus.nodeID)
+	consensus.populateBasicFields(&message)
 
 	// 48 byte of bls signature
 	sign := consensus.priKey.SignHash(message.BlockHash)
@@ -45,14 +38,7 @@ func (consensus *Consensus) constructCommitMessage(multiSigAndBitmap []byte) []b
 	message := consensus_proto.Message{}
 	message.Type = consensus_proto.MessageType_COMMIT
 
-	// 4 byte consensus id
-	message.ConsensusId = consensus.consensusID
-
-	// 32 byte block hash
-	message.BlockHash = consensus.blockHash[:]
-
-	// 4 byte sender id
-	message.SenderId = uint32(consensus.nodeID)
+	consensus.populateBasicFields(&message)
 
 	// 48 byte of bls signature
 	sign := consensus.priKey.SignHash(multiSigAndBitmap)

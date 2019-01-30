@@ -581,3 +581,15 @@ func (consensus *Consensus) GetPeerFromID(peerID uint32) (p2p.Peer, bool) {
 func (consensus *Consensus) SendMessage(peer p2p.Peer, message []byte) {
 	host.SendMessage(consensus.host, peer, message, nil)
 }
+
+// Populates the common basic fields for all consensus message.
+func (consensus *Consensus) populateBasicFields(message *consensus_proto.Message) {
+	// 4 byte consensus id
+	message.ConsensusId = consensus.consensusID
+
+	// 32 byte block hash
+	message.BlockHash = consensus.blockHash[:]
+
+	// 4 byte sender id
+	message.SenderId = uint32(consensus.nodeID)
+}

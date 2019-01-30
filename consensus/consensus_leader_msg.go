@@ -16,14 +16,7 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 	message := consensus_proto.Message{}
 	message.Type = consensus_proto.MessageType_ANNOUNCE
 
-	// 4 byte consensus id
-	message.ConsensusId = consensus.consensusID
-
-	// 32 byte block hash
-	message.BlockHash = consensus.blockHash[:]
-
-	// 4 byte sender id
-	message.SenderId = uint32(consensus.nodeID)
+	consensus.populateBasicFields(&message)
 
 	// n byte of block header
 	message.Payload = consensus.block // TODO: send only block header in the announce phase.
@@ -45,14 +38,7 @@ func (consensus *Consensus) constructPreparedMessage() ([]byte, *bls.Sign) {
 	message := consensus_proto.Message{}
 	message.Type = consensus_proto.MessageType_PREPARED
 
-	// 4 byte consensus id
-	message.ConsensusId = consensus.consensusID
-
-	// 32 byte block hash
-	message.BlockHash = consensus.blockHash[:]
-
-	// 4 byte sender id
-	message.SenderId = uint32(consensus.nodeID)
+	consensus.populateBasicFields(&message)
 
 	//// Payload
 	buffer := bytes.NewBuffer([]byte{})
@@ -83,14 +69,8 @@ func (consensus *Consensus) constructPreparedMessage() ([]byte, *bls.Sign) {
 func (consensus *Consensus) constructCommittedMessage() ([]byte, *bls.Sign) {
 	message := consensus_proto.Message{}
 	message.Type = consensus_proto.MessageType_COMMITTED
-	// 4 byte consensus id
-	message.ConsensusId = consensus.consensusID
 
-	// 32 byte block hash
-	message.BlockHash = consensus.blockHash[:]
-
-	// 4 byte sender id
-	message.SenderId = uint32(consensus.nodeID)
+	consensus.populateBasicFields(&message)
 
 	//// Payload
 	buffer := bytes.NewBuffer([]byte{})
