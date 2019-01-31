@@ -1,4 +1,4 @@
-package roleconv
+package rconversion
 
 import (
 	"github.com/harmony-one/harmony/internal/utils"
