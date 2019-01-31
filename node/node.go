@@ -24,6 +24,8 @@ import (
 	clientService "github.com/harmony-one/harmony/api/client/service"
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
+	service_manager "github.com/harmony-one/harmony/api/service"
+	consensus_service "github.com/harmony-one/harmony/api/service/consensus"
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
@@ -34,7 +36,6 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/node/service"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
 )
@@ -63,6 +64,7 @@ const (
 	ShardValidator
 	BeaconLeader
 	BeaconValidator
+	NewNode
 )
 
 func (state State) String() string {
@@ -152,12 +154,11 @@ type Node struct {
 	// Signal channel for lost validators
 	OfflinePeers chan p2p.Peer
 
-	// Action Channel
-	actionChannel chan *Action
-	serviceStore  *ServiceStore
-
 	// Node Role.
 	Role Role
+
+	// Service manager.
+	serviceManager *service_manager.Manager
 
 	// For test only
 	TestBankKeys      []*ecdsa.PrivateKey
@@ -633,29 +634,53 @@ func (node *Node) RemovePeersHandler() {
 	}
 }
 
-// ServiceManagerSetup setups service store.
-func (node *Node) ServiceManagerSetup() {
-	node.serviceStore = &ServiceStore{}
+func (node *Node) setupForShardLeader() {
+	// Register explorer service.
+	node.serviceManager.RegisterService(service_manager.SupportExplorer, explorer.New(&node.SelfPeer))
+	// Register consensus service.
+	node.serviceManager.RegisterService(service_manager.Consensus, consensus_service.NewService(node.BlockChannel, node.Consensus))
 }
 
-// AddAndRunServices manually adds certain services and start them.
-func (node *Node) AddAndRunServices() {
-	node.SetupServiceManager()
-	// TODO: add it later
-	// node.AddCommonServices()
+func (node *Node) setupForShardValidator() {
+}
 
+func (node *Node) setupForBeaconLeader() {
+}
+
+func (node *Node) setupForBeaconValidator() {
+}
+
+func (node *Node) setupForNewNode() {
+}
+
+// ServiceManagerSetup setups service store.
+func (node *Node) ServiceManagerSetup() {
+	node.serviceManager = &service_manager.Manager{}
 	switch node.Role {
 	case ShardLeader:
-		// Add and run explorer.
-		node.RegisterService(SupportExplorer, explorer.New(&node.SelfPeer))
-		node.actionChannel <- &Action{action: Start, serviceType: SupportExplorer}
+		node.setupForShardLeader()
+	case ShardValidator:
+		node.setupForShardValidator()
+	case BeaconLeader:
+		node.setupForBeaconLeader()
+	case BeaconValidator:
+		node.setupForBeaconValidator()
+	case NewNode:
+		node.setupForNewNode()
+	}
+}
 
-		node.RegisterService(Consensus, service.NewConsensusService(node.BlockChannel, node.Consensus))
-		node.actionChannel <- &Action{action: Start, serviceType: Consensus}
-
-		// node.RegisterService(SupportClient, service.NewSupportClient(node.blockchain.State, node.CallFaucetContract, node.SelfPeer.IP, node.SelfPeer.Port))
-		// node.actionChannel <- &Action{action: Start, serviceType: SupportClient}
-	case Unknown:
-		utils.GetLogInstance().Info("Running node services")
+// RunServices runs registered services.
+func (node *Node) RunServices() {
+	if node.serviceManager == nil {
+		utils.GetLogInstance().Info("Service manager is not set up yet.")
+		return
+	}
+	for serviceType := range node.serviceManager.GetServices() {
+		action := &service_manager.Action{
+			Action:      service_manager.Start,
+			ServiceType: serviceType,
+		}
+		node.serviceManager.TakeAction(action)
 	}
 }
