@@ -53,7 +53,7 @@ func (t Type) String() string {
 
 // Constants for timing.
 const (
-	// WaitForStatusUpdate is the delay time to update new statum. Currently set 1 second for development. Should be 30 minutes for production.
+	// WaitForStatusUpdate is the delay time to update new status. Currently set 1 second for development. Should be 30 minutes for production.
 	WaitForStatusUpdate = time.Minute * 1
 )
 
