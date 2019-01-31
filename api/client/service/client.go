@@ -3,10 +3,11 @@ package client
 import (
 	"context"
 	"fmt"
-	"github.com/ethereum/go-ethereum/common"
-	proto "github.com/harmony-one/harmony/api/client/service/proto"
 	"log"
 	"time"
+
+	"github.com/ethereum/go-ethereum/common"
+	proto "github.com/harmony-one/harmony/api/client/service/proto"
 
 	"google.golang.org/grpc"
 )

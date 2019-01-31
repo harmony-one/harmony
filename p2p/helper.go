@@ -2,11 +2,11 @@ package p2p
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/binary"
-	"github.com/harmony-one/harmony/log"
 	"io"
 	"time"
+
+	"github.com/ethereum/go-ethereum/log"
 )
 
 /*
@@ -27,46 +27,39 @@ content (n bytes) - actual message content
 const BatchSizeInByte = 1 << 16
 
 // ReadMessageContent reads the message type and content size, and return the actual content.
-func ReadMessageContent(s Stream) ([]byte, error) {
+func ReadMessageContent(s Stream) (content []byte, err error) {
 	var (
-		contentBuf = bytes.NewBuffer([]byte{})
-		r          = bufio.NewReader(s)
+		r = bufio.NewReader(s)
 	)
 	timeoutDuration := 1 * time.Second
-	s.SetReadDeadline(time.Now().Add(timeoutDuration))
+	if err = s.SetReadDeadline(time.Now().Add(timeoutDuration)); err != nil {
+		log.Error("cannot reset deadline for message header read", "error", err)
+		return
+	}
 	//// Read 1 byte for message type
-	_, err := r.ReadByte()
-	switch err {
-	case io.EOF:
-		log.Error("Error reading the p2p message type field", "msg", err)
-		return contentBuf.Bytes(), err
-	case nil:
-		//log.Printf("Received p2p message type: %x\n", msgType)
-	default:
-		log.Error("Error reading the p2p message type field", "msg", err)
-		return contentBuf.Bytes(), err
+	if _, err = r.ReadByte(); err != nil {
+		log.Error("failed to read p2p message type field", "error", err)
+		return
 	}
 	// TODO: check on msgType and take actions accordingly
 	//// Read 4 bytes for message size
 	fourBytes := make([]byte, 4)
-	n, err := r.Read(fourBytes)
-	if err != nil {
-		log.Error("Error reading the p2p message size field")
-		return contentBuf.Bytes(), err
-	} else if n < len(fourBytes) {
-		log.Error("Failed reading the p2p message size field: only read", "Num of bytes", n)
-		return contentBuf.Bytes(), err
+	if _, err = io.ReadFull(r, fourBytes); err != nil {
+		log.Error("failed to read p2p message size field", "error", err)
+		return
 	}
 
 	contentLength := int(binary.BigEndian.Uint32(fourBytes))
-	tmpBuf := make([]byte, contentLength)
+	contentBuf := make([]byte, contentLength)
 	timeoutDuration = 20 * time.Second
-	s.SetReadDeadline(time.Now().Add(timeoutDuration))
-	m, err := io.ReadFull(r, tmpBuf)
-	if err != nil || m < contentLength {
-		log.Error("Read %v bytes, we need %v bytes", m, contentLength)
-		return []byte{}, err
+	if err = s.SetReadDeadline(time.Now().Add(timeoutDuration)); err != nil {
+		log.Error("cannot reset deadline for message content read", "error", err)
+		return
 	}
-	contentBuf.Write(tmpBuf)
-	return contentBuf.Bytes(), nil
+	if _, err = io.ReadFull(r, contentBuf); err != nil {
+		log.Error("failed to read p2p message contents", "error", err)
+		return
+	}
+	content = contentBuf
+	return
 }

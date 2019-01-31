@@ -6,9 +6,8 @@ import (
 	"testing"
 	"time"
 
-	proto_node "github.com/harmony-one/harmony/api/proto/node"
+	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	"github.com/harmony-one/harmony/consensus"
-	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -16,10 +15,14 @@ import (
 )
 
 func TestNewNode(t *testing.T) {
-	_, pubKey := utils.GenKey("1", "2")
-	leader := p2p.Peer{IP: "1", Port: "2", PubKey: pubKey}
-	validator := p2p.Peer{IP: "3", Port: "5"}
-	host := p2pimpl.NewHost(leader)
+	_, pubKey := utils.GenKeyBLS("1", "2")
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", PubKey: pubKey}
+	validator := p2p.Peer{IP: "127.0.0.1", Port: "8885"}
+	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
+	host, err := p2pimpl.NewHost(&leader, priKey)
+	if err != nil {
+		t.Fatalf("newhost failure: %v", err)
+	}
 	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader)
 	node := New(host, consensus, nil)
 	if node.Consensus == nil {
@@ -36,53 +39,57 @@ func TestNewNode(t *testing.T) {
 }
 
 func TestGetSyncingPeers(t *testing.T) {
-	_, pubKey := utils.GenKey("1", "2")
-	leader := p2p.Peer{IP: "1", Port: "2", PubKey: pubKey}
-	validator := p2p.Peer{IP: "3", Port: "5"}
-	host := p2pimpl.NewHost(leader)
+	_, pubKey := utils.GenKeyBLS("1", "2")
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", PubKey: pubKey}
+	validator := p2p.Peer{IP: "127.0.0.1", Port: "8885"}
+	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
+	host, err := p2pimpl.NewHost(&leader, priKey)
+	if err != nil {
+		t.Fatalf("newhost failure: %v", err)
+	}
+
 	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader)
 
 	node := New(host, consensus, nil)
-	peer := p2p.Peer{IP: "1.1.1.1", Port: "2000"}
-	peer2 := p2p.Peer{IP: "2.1.1.1", Port: "2000"}
+	peer := p2p.Peer{IP: "127.0.0.1", Port: "8000"}
+	peer2 := p2p.Peer{IP: "127.0.0.1", Port: "8001"}
 	node.Neighbors.Store("minh", peer)
 	node.Neighbors.Store("mark", peer2)
 	res := node.GetSyncingPeers()
-	if len(res) != 1 || !(res[0].IP == peer.IP || res[0].IP == peer2.IP) {
+	if len(res) == 0 || !(res[0].IP == peer.IP || res[0].IP == peer2.IP) {
 		t.Error("GetSyncingPeers should return list of {peer, peer2}")
 	}
-	if len(res) != 1 || res[0].Port != "1000" {
-		t.Error("Syncing ports should be 1000")
+	if len(res) == 0 || (res[0].Port != "5000" && res[0].Port != "5001") {
+		t.Errorf("Syncing ports should be 5000, got %v", res[0].Port)
 	}
 }
 
 func TestAddPeers(t *testing.T) {
-	priKey1 := crypto.Ed25519Curve.Scalar().SetInt64(int64(333))
-	pubKey1 := pki.GetPublicKeyFromScalar(priKey1)
-
-	priKey2 := crypto.Ed25519Curve.Scalar().SetInt64(int64(999))
-	pubKey2 := pki.GetPublicKeyFromScalar(priKey2)
+	pubKey1 := pki.GetBLSPrivateKeyFromInt(333).GetPublicKey()
+	pubKey2 := pki.GetBLSPrivateKeyFromInt(444).GetPublicKey()
 
 	peers1 := []*p2p.Peer{
 		&p2p.Peer{
 			IP:          "127.0.0.1",
 			Port:        "8888",
 			PubKey:      pubKey1,
-			Ready:       true,
 			ValidatorID: 1,
 		},
 		&p2p.Peer{
 			IP:          "127.0.0.1",
 			Port:        "9999",
 			PubKey:      pubKey2,
-			Ready:       false,
 			ValidatorID: 2,
 		},
 	}
-	_, pubKey := utils.GenKey("1", "2")
-	leader := p2p.Peer{IP: "1", Port: "2", PubKey: pubKey}
-	validator := p2p.Peer{IP: "3", Port: "5"}
-	host := p2pimpl.NewHost(leader)
+	_, pubKey := utils.GenKeyBLS("1", "2")
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "8982", PubKey: pubKey}
+	validator := p2p.Peer{IP: "127.0.0.1", Port: "8985"}
+	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
+	host, err := p2pimpl.NewHost(&leader, priKey)
+	if err != nil {
+		t.Fatalf("newhost failure: %v", err)
+	}
 	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader)
 
 	node := New(host, consensus, nil)
@@ -99,8 +106,7 @@ func TestAddPeers(t *testing.T) {
 }
 
 func sendPingMessage(node *Node, leader p2p.Peer) {
-	priKey1 := crypto.Ed25519Curve.Scalar().SetInt64(int64(333))
-	pubKey1 := pki.GetPublicKeyFromScalar(priKey1)
+	pubKey1 := pki.GetBLSPrivateKeyFromInt(333).GetPublicKey()
 
 	p1 := p2p.Peer{
 		IP:     "127.0.0.1",
@@ -108,7 +114,7 @@ func sendPingMessage(node *Node, leader p2p.Peer) {
 		PubKey: pubKey1,
 	}
 
-	ping1 := proto_node.NewPingMessage(p1)
+	ping1 := proto_discovery.NewPingMessage(p1)
 	buf1 := ping1.ConstructPingMessage()
 
 	fmt.Println("waiting for 5 seconds ...")
@@ -119,22 +125,20 @@ func sendPingMessage(node *Node, leader p2p.Peer) {
 }
 
 func sendPongMessage(node *Node, leader p2p.Peer) {
-	priKey1 := crypto.Ed25519Curve.Scalar().SetInt64(int64(333))
-	pubKey1 := pki.GetPublicKeyFromScalar(priKey1)
+	pubKey1 := pki.GetBLSPrivateKeyFromInt(333).GetPublicKey()
+	pubKey2 := pki.GetBLSPrivateKeyFromInt(444).GetPublicKey()
 	p1 := p2p.Peer{
 		IP:     "127.0.0.1",
 		Port:   "9998",
 		PubKey: pubKey1,
 	}
-	priKey2 := crypto.Ed25519Curve.Scalar().SetInt64(int64(999))
-	pubKey2 := pki.GetPublicKeyFromScalar(priKey2)
 	p2 := p2p.Peer{
 		IP:     "127.0.0.1",
 		Port:   "9999",
 		PubKey: pubKey2,
 	}
 
-	pong1 := proto_node.NewPongMessage([]p2p.Peer{p1, p2}, nil)
+	pong1 := proto_discovery.NewPongMessage([]p2p.Peer{p1, p2}, nil)
 	buf1 := pong1.ConstructPongMessage()
 
 	fmt.Println("waiting for 10 seconds ...")
@@ -151,11 +155,15 @@ func exitServer() {
 	os.Exit(0)
 }
 
-func TestPingPongHandler(test *testing.T) {
-	_, pubKey := utils.GenKey("127.0.0.1", "8881")
+func TestPingPongHandler(t *testing.T) {
+	_, pubKey := utils.GenKeyBLS("127.0.0.1", "8881")
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8881", PubKey: pubKey}
 	//   validator := p2p.Peer{IP: "127.0.0.1", Port: "9991"}
-	host := p2pimpl.NewHost(leader)
+	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
+	host, err := p2pimpl.NewHost(&leader, priKey)
+	if err != nil {
+		t.Fatalf("newhost failure: %v", err)
+	}
 	consensus := consensus.New(host, "0", []p2p.Peer{leader}, leader)
 	node := New(host, consensus, nil)
 	//go sendPingMessage(leader)

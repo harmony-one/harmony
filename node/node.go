@@ -3,6 +3,7 @@ package node
 import (
 	"bytes"
 	"crypto/ecdsa"
+	"encoding/binary"
 	"encoding/gob"
 	"encoding/hex"
 	"fmt"
@@ -11,15 +12,17 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/api/client"
 	clientService "github.com/harmony-one/harmony/api/client/service"
+	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/api/services/explorer"
 	"github.com/harmony-one/harmony/api/services/syncing"
@@ -30,11 +33,10 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/crypto/pki"
-	hdb "github.com/harmony-one/harmony/internal/db"
-	"github.com/harmony-one/harmony/log"
+	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/node/service"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/p2p/host"
 )
 
 // State is a state of a node.
@@ -44,11 +46,23 @@ type State byte
 const (
 	NodeInit              State = iota // Node just started, before contacting BeaconChain
 	NodeWaitToJoin                     // Node contacted BeaconChain, wait to join Shard
-	NodeJoinedShard                    // Node joined Shard, ready for consensus
+	NodeNotInSync                      // Node out of sync, might be just joined Shard or offline for a period of time
 	NodeOffline                        // Node is offline
 	NodeReadyForConsensus              // Node is ready for doing consensus
 	NodeDoingConsensus                 // Node is already doing consensus
 	NodeLeader                         // Node is the leader of some shard.
+)
+
+// Role defines a role of a node.
+type Role byte
+
+// All constants for different node roles.
+const (
+	Unknown Role = iota
+	ShardLeader
+	ShardValidator
+	BeaconLeader
+	BeaconValidator
 )
 
 func (state State) String() string {
@@ -57,8 +71,8 @@ func (state State) String() string {
 		return "NodeInit"
 	case NodeWaitToJoin:
 		return "NodeWaitToJoin"
-	case NodeJoinedShard:
-		return "NodeJoinedShard"
+	case NodeNotInSync:
+		return "NodeNotInSync"
 	case NodeOffline:
 		return "NodeOffline"
 	case NodeReadyForConsensus:
@@ -73,17 +87,24 @@ func (state State) String() string {
 
 // Constants related to doing syncing.
 const (
-	NotDoingSyncing uint32 = iota
-	DoingSyncing
+	lastMileThreshold = 4
+	inSyncThreshold   = 2
 )
 
 const (
-	syncingPortDifference = 3000
-	waitBeforeJoinShard   = time.Second * 3
-	timeOutToJoinShard    = time.Minute * 10
+	waitBeforeJoinShard = time.Second * 3
+	timeOutToJoinShard  = time.Minute * 10
 	// ClientServicePortDiff is the positive port diff for client service
-	ClientServicePortDiff = 5555
+	ClientServicePortDiff       = 5555
+	maxBroadcastNodes           = 10                  // broadcast at most maxBroadcastNodes peers that need in sync
+	broadcastTimeout      int64 = 3 * 60 * 1000000000 // 3 mins
 )
+
+// use to push new block to outofsync node
+type syncConfig struct {
+	timestamp int64
+	client    *downloader.Client
+}
 
 // NetworkNode ...
 type NetworkNode struct {
@@ -99,18 +120,17 @@ type Node struct {
 	transactionInConsensus []*types.Transaction // The transactions selected into the new block and under Consensus process
 	pendingTxMutex         sync.Mutex
 
-	blockchain *core.BlockChain // The blockchain for the shard where this node belongs
-	db         *hdb.LDBDatabase // LevelDB to store blockchain.
+	blockchain *core.BlockChain   // The blockchain for the shard where this node belongs
+	db         *ethdb.LDBDatabase // LevelDB to store blockchain.
 
-	log log.Logger // Log utility
-
-	ClientPeer *p2p.Peer      // The peer for the benchmark tx generator client, used for leaders to return proof-of-accept
+	ClientPeer *p2p.Peer      // The peer for the harmony tx generator client, used for leaders to return proof-of-accept
 	Client     *client.Client // The presence of a client object means this node will also act as a client
 	SelfPeer   p2p.Peer       // TODO(minhdoan): it could be duplicated with Self below whose is Alok work.
 	IDCPeer    p2p.Peer
 
-	Neighbors sync.Map // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
-	State     State    // State of the Node
+	Neighbors  sync.Map   // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
+	State      State      // State of the Node
+	stateMutex sync.Mutex // mutex for change node state
 
 	TxPool *core.TxPool
 	Worker *worker.Worker
@@ -119,18 +139,25 @@ type Node struct {
 	clientServer *clientService.Server
 
 	// Syncing component.
-	downloaderServer *downloader.Server
-	stateSync        *syncing.StateSync
-	syncingState     uint32
+	downloaderServer       *downloader.Server
+	stateSync              *syncing.StateSync
+	peerRegistrationRecord map[uint32]*syncConfig // record registration time (unixtime) of peers begin in syncing
 
 	// The p2p host used to send/receive p2p messages
-	host host.Host
+	host p2p.Host
 
 	// Channel to stop sending ping message
 	StopPing chan struct{}
 
 	// Signal channel for lost validators
 	OfflinePeers chan p2p.Peer
+
+	// Action Channel
+	actionChannel chan *Action
+	serviceStore  *ServiceStore
+
+	// Node Role.
+	Role Role
 
 	// For test only
 	TestBankKeys      []*ecdsa.PrivateKey
@@ -148,7 +175,7 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 	node.pendingTxMutex.Lock()
 	node.pendingTransactions = append(node.pendingTransactions, newTxs...)
 	node.pendingTxMutex.Unlock()
-	node.log.Debug("Got more transactions", "num", len(newTxs), "totalPending", len(node.pendingTransactions))
+	utils.GetLogInstance().Debug("Got more transactions", "num", len(newTxs), "totalPending", len(node.pendingTransactions))
 }
 
 // Take out a subset of valid transactions from the pending transaction list
@@ -158,9 +185,9 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int) types.Transactions {
 	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(node.pendingTransactions, maxNumTxs)
 	_ = invalid // invalid txs are discard
 
-	node.log.Debug("Invalid transactions discarded", "number", len(invalid))
+	utils.GetLogInstance().Debug("Invalid transactions discarded", "number", len(invalid))
 	node.pendingTransactions = unselected
-	node.log.Debug("Remaining pending transactions", "number", len(node.pendingTransactions))
+	utils.GetLogInstance().Debug("Remaining pending transactions", "number", len(node.pendingTransactions))
 	node.pendingTxMutex.Unlock()
 	return selected
 }
@@ -190,7 +217,7 @@ func (node *Node) SerializeNode(nnode *NetworkNode) []byte {
 	if err != nil {
 		fmt.Println("Could not serialize node")
 		fmt.Println("ERROR", err)
-		//node.log.Error("Could not serialize node")
+		//utils.GetLogInstance().Error("Could not serialize node")
 	}
 
 	return result.Bytes()
@@ -209,7 +236,7 @@ func DeserializeNode(d []byte) *NetworkNode {
 }
 
 // New creates a new node.
-func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
+func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 	node := Node{}
 
 	if host != nil {
@@ -217,15 +244,9 @@ func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 		node.SelfPeer = host.GetSelfPeer()
 	}
 
-	// Logger
-	node.log = log.New()
-
 	if host != nil && consensus != nil {
 		// Consensus and associated channel to communicate blocks
 		node.Consensus = consensus
-
-		// Initialize level db.
-		node.db = db
 
 		// Initialize genesis block and blockchain
 		genesisAlloc := node.CreateGenesisAllocWithTestingAddresses(100)
@@ -236,7 +257,11 @@ func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 		genesisAlloc[contractAddress] = core.GenesisAccount{Balance: contractFunds}
 		node.ContractKeys = append(node.ContractKeys, contractKey)
 
-		database := hdb.NewMemDatabase()
+		database := db
+		if database == nil {
+			database = ethdb.NewMemDatabase()
+		}
+
 		chainConfig := params.TestChainConfig
 		chainConfig.ChainID = big.NewInt(int64(node.Consensus.ShardID)) // Use ChainID as piggybacked ShardID
 		gspec := core.Genesis{
@@ -253,6 +278,8 @@ func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 		node.Worker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey), node.Consensus.ShardID)
 
 		node.AddSmartContractsToPendingTransactions()
+		node.Consensus.ConsensusBlock = make(chan *types.Block)
+		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 	}
 
 	if consensus != nil && consensus.IsLeader {
@@ -262,8 +289,8 @@ func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 	}
 
 	// Setup initial state of syncing.
-	node.syncingState = NotDoingSyncing
 	node.StopPing = make(chan struct{})
+	node.peerRegistrationRecord = make(map[uint32]*syncConfig)
 
 	node.OfflinePeers = make(chan p2p.Peer)
 	go node.RemovePeersHandler()
@@ -271,23 +298,58 @@ func New(host host.Host, consensus *bft.Consensus, db *hdb.LDBDatabase) *Node {
 	return &node
 }
 
-// DoSyncing starts syncing.
+// IsOutOfSync checks whether the node is out of sync by comparing latest block with consensus block
+func (node *Node) IsOutOfSync(consensusBlock *types.Block) bool {
+	myHeight := node.blockchain.CurrentBlock().NumberU64()
+	newHeight := consensusBlock.NumberU64()
+	utils.GetLogInstance().Debug("[SYNC]", "myHeight", myHeight, "newHeight", newHeight)
+	if newHeight-myHeight <= inSyncThreshold {
+		return false
+	}
+	// cache latest blocks for last mile catch up
+	if newHeight-myHeight <= lastMileThreshold && node.stateSync != nil {
+		node.stateSync.AddLastMileBlock(consensusBlock)
+	}
+	return true
+}
+
+// DoSyncing wait for check status and starts syncing if out of sync
 func (node *Node) DoSyncing() {
-	// If this node is currently doing sync, another call for syncing will be returned immediately.
-	if !atomic.CompareAndSwapUint32(&node.syncingState, NotDoingSyncing, DoingSyncing) {
-		return
-	}
-	defer atomic.StoreUint32(&node.syncingState, NotDoingSyncing)
-	if node.stateSync == nil {
-		node.stateSync = syncing.GetStateSync()
-	}
-	if node.stateSync.StartStateSync(node.GetSyncingPeers(), node.blockchain) {
-		node.log.Debug("DoSyncing: successfully sync")
-		if node.State == NodeJoinedShard {
+	for {
+		select {
+		// in current implementation logic, timeout means in sync
+		case <-time.After(5 * time.Second):
+			node.stateMutex.Lock()
 			node.State = NodeReadyForConsensus
+			node.stateMutex.Unlock()
+			continue
+		case consensusBlock := <-node.Consensus.ConsensusBlock:
+			// never reached from chao
+			if !node.IsOutOfSync(consensusBlock) {
+				if node.State == NodeNotInSync {
+					utils.GetLogInstance().Info("[SYNC] Node is now IN SYNC!")
+					node.stateSync.CloseConnections()
+					node.stateSync = nil
+				}
+				node.stateMutex.Lock()
+				node.State = NodeReadyForConsensus
+				node.stateMutex.Unlock()
+				continue
+			} else {
+				utils.GetLogInstance().Debug("[SYNC] node is out of sync")
+				node.stateMutex.Lock()
+				node.State = NodeNotInSync
+				node.stateMutex.Unlock()
+			}
+
+			if node.stateSync == nil {
+				node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port)
+				node.stateSync.CreateSyncConfig(node.GetSyncingPeers())
+				node.stateSync.MakeConnectionToPeers()
+			}
+			startHash := node.blockchain.CurrentBlock().Hash()
+			node.stateSync.StartStateSync(startHash[:], node.blockchain, node.Worker)
 		}
-	} else {
-		node.log.Debug("DoSyncing: failed to sync")
 	}
 }
 
@@ -300,6 +362,7 @@ func (node *Node) AddPeers(peers []*p2p.Peer) int {
 		if !ok {
 			node.Neighbors.Store(key, *p)
 			count++
+			node.host.AddPeer(p)
 			continue
 		}
 		if node.SelfPeer.ValidatorID == -1 && p.IP == node.SelfPeer.IP && p.Port == node.SelfPeer.Port {
@@ -316,28 +379,31 @@ func (node *Node) AddPeers(peers []*p2p.Peer) int {
 // GetSyncingPort returns the syncing port.
 func GetSyncingPort(nodePort string) string {
 	if port, err := strconv.Atoi(nodePort); err == nil {
-		return fmt.Sprintf("%d", port-syncingPortDifference)
+		return fmt.Sprintf("%d", port-syncing.SyncingPortDifference)
 	}
 	os.Exit(1)
 	return ""
 }
 
 // GetSyncingPeers returns list of peers.
-// Right now, the list length is only 1 for testing.
 func (node *Node) GetSyncingPeers() []p2p.Peer {
 	res := []p2p.Peer{}
 	node.Neighbors.Range(func(k, v interface{}) bool {
-		node.log.Debug("GetSyncingPeers-Range: ", "k", k, "v", v)
-		if len(res) == 0 {
-			res = append(res, v.(p2p.Peer))
-		}
+		res = append(res, v.(p2p.Peer))
 		return true
 	})
 
+	removeID := -1
 	for i := range res {
+		if res[i].Port == node.SelfPeer.Port {
+			removeID = i
+		}
 		res[i].Port = GetSyncingPort(res[i].Port)
 	}
-	node.log.Debug("GetSyncingPeers: ", "res", res)
+	if removeID != -1 {
+		res = append(res[:removeID], res[removeID+1:]...)
+	}
+	utils.GetLogInstance().Debug("GetSyncingPeers: ", "res", res, "self", node.SelfPeer)
 	return res
 }
 
@@ -384,7 +450,7 @@ func (node *Node) JoinShard(leader p2p.Peer) {
 	for {
 		select {
 		case <-tick.C:
-			ping := proto_node.NewPingMessage(node.SelfPeer)
+			ping := proto_discovery.NewPingMessage(node.SelfPeer)
 			if node.Client != nil { // assume this is the client node
 				ping.Node.Role = proto_node.ClientRole
 			}
@@ -393,10 +459,10 @@ func (node *Node) JoinShard(leader p2p.Peer) {
 			// Talk to leader.
 			node.SendMessage(leader, buffer)
 		case <-timeout.C:
-			node.log.Info("JoinShard timeout")
+			utils.GetLogInstance().Info("JoinShard timeout")
 			return
 		case <-node.StopPing:
-			node.log.Info("Stopping JoinShard")
+			utils.GetLogInstance().Info("Stopping JoinShard")
 			return
 		}
 	}
@@ -408,16 +474,6 @@ func (node *Node) SupportClient() {
 	node.StartClientServer()
 }
 
-// SupportExplorer initializes and starts the client service
-func (node *Node) SupportExplorer() {
-	es := explorer.Service{
-		IP:   node.SelfPeer.IP,
-		Port: node.SelfPeer.Port,
-	}
-	es.Init(true)
-	es.Run()
-}
-
 // InitClientServer initializes client server.
 func (node *Node) InitClientServer() {
 	node.clientServer = clientService.NewServer(node.blockchain.State, node.CallFaucetContract)
@@ -426,7 +482,7 @@ func (node *Node) InitClientServer() {
 // StartClientServer starts client server.
 func (node *Node) StartClientServer() {
 	port, _ := strconv.Atoi(node.SelfPeer.Port)
-	node.log.Info("support_client: StartClientServer on port:", "port", port+ClientServicePortDiff)
+	utils.GetLogInstance().Info("support_client: StartClientServer on port:", "port", port+ClientServicePortDiff)
 	node.clientServer.Start(node.SelfPeer.IP, strconv.Itoa(port+ClientServicePortDiff))
 }
 
@@ -434,6 +490,9 @@ func (node *Node) StartClientServer() {
 func (node *Node) SupportSyncing() {
 	node.InitSyncingServer()
 	node.StartSyncingServer()
+
+	go node.DoSyncing()
+	go node.SendNewBlockToUnsync()
 }
 
 // InitSyncingServer starts downloader server.
@@ -443,32 +502,124 @@ func (node *Node) InitSyncingServer() {
 
 // StartSyncingServer starts syncing server.
 func (node *Node) StartSyncingServer() {
-	port := GetSyncingPort(node.SelfPeer.Port)
-	node.log.Info("support_sycning: StartSyncingServer on port:", "port", port)
+	utils.GetLogInstance().Info("support_sycning: StartSyncingServer")
 	node.downloaderServer.Start(node.SelfPeer.IP, GetSyncingPort(node.SelfPeer.Port))
 }
 
 // CalculateResponse implements DownloadInterface on Node object.
 func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*downloader_pb.DownloaderResponse, error) {
 	response := &downloader_pb.DownloaderResponse{}
-	if request.Type == downloader_pb.DownloaderRequest_HEADER {
-
+	switch request.Type {
+	case downloader_pb.DownloaderRequest_HEADER:
+		utils.GetLogInstance().Debug("[SYNC] CalculateResponse DownloaderRequest_HEADER", "request.BlockHash", request.BlockHash)
+		var startHeaderHash []byte
+		if request.BlockHash == nil {
+			tmp := node.blockchain.Genesis().Hash()
+			startHeaderHash = tmp[:]
+		} else {
+			startHeaderHash = request.BlockHash
+		}
 		for block := node.blockchain.CurrentBlock(); block != nil; block = node.blockchain.GetBlockByHash(block.Header().ParentHash) {
 			blockHash := block.Hash()
+			if bytes.Compare(blockHash[:], startHeaderHash) == 0 {
+				break
+			}
 			response.Payload = append(response.Payload, blockHash[:])
 		}
-	} else {
+	case downloader_pb.DownloaderRequest_BLOCK:
 		for _, bytes := range request.Hashes {
 			var hash common.Hash
 			hash.SetBytes(bytes)
 			block := node.blockchain.GetBlockByHash(hash)
 			encodedBlock, err := rlp.EncodeToBytes(block)
-			if err != nil {
+			if err == nil {
 				response.Payload = append(response.Payload, encodedBlock)
 			}
 		}
+	case downloader_pb.DownloaderRequest_NEWBLOCK:
+		if node.State != NodeNotInSync {
+			utils.GetLogInstance().Debug("[SYNC] new block received, but state is", "state", node.State.String())
+			response.Type = downloader_pb.DownloaderResponse_INSYNC
+			return response, nil
+		}
+		var blockObj types.Block
+		err := rlp.DecodeBytes(request.BlockHash, &blockObj)
+		if err != nil {
+			utils.GetLogInstance().Warn("[SYNC] unable to decode received new block")
+			return response, err
+		}
+		node.stateSync.AddNewBlock(request.PeerHash, &blockObj)
+
+	case downloader_pb.DownloaderRequest_REGISTER:
+		peerID := binary.BigEndian.Uint32(request.PeerHash)
+		if _, ok := node.peerRegistrationRecord[peerID]; ok {
+			response.Type = downloader_pb.DownloaderResponse_FAIL
+			return response, nil
+		} else if len(node.peerRegistrationRecord) >= maxBroadcastNodes {
+			response.Type = downloader_pb.DownloaderResponse_FAIL
+			return response, nil
+		} else {
+			peer, ok := node.Consensus.GetPeerFromID(peerID)
+			if !ok {
+				utils.GetLogInstance().Warn("[SYNC] unable to get peer from peerID", "peerID", peerID)
+			}
+			client := downloader.ClientSetup(peer.IP, GetSyncingPort(peer.Port))
+			if client == nil {
+				utils.GetLogInstance().Warn("[SYNC] unable to setup client")
+				return response, nil
+			}
+			utils.GetLogInstance().Debug("[SYNC] client setup correctly", "client", client)
+			config := &syncConfig{timestamp: time.Now().UnixNano(), client: client}
+			node.stateMutex.Lock()
+			node.peerRegistrationRecord[peerID] = config
+			node.stateMutex.Unlock()
+			utils.GetLogInstance().Debug("[SYNC] register peerID success", "peerID", peerID)
+			response.Type = downloader_pb.DownloaderResponse_SUCCESS
+		}
+	case downloader_pb.DownloaderRequest_REGISTERTIMEOUT:
+		if node.State == NodeNotInSync {
+			count := node.stateSync.RegisterNodeInfo()
+			utils.GetLogInstance().Debug("[SYNC] extra node registered", "number", count)
+		}
 	}
 	return response, nil
+}
+
+// SendNewBlockToUnsync send latest verified block to unsync, registered nodes
+func (node *Node) SendNewBlockToUnsync() {
+	for {
+		block := <-node.Consensus.VerifiedNewBlock
+		blockHash, err := rlp.EncodeToBytes(block)
+		if err != nil {
+			utils.GetLogInstance().Warn("[SYNC] unable to encode block to hashes")
+			continue
+		}
+
+		// really need to have a unique id independent of ip/port
+		selfPeerID := utils.GetUniqueIDFromIPPort(node.SelfPeer.IP, node.SelfPeer.Port)
+		utils.GetLogInstance().Debug("[SYNC] peerRegistration Record", "peerID", selfPeerID, "number", len(node.peerRegistrationRecord))
+
+		for peerID, config := range node.peerRegistrationRecord {
+			elapseTime := time.Now().UnixNano() - config.timestamp
+			if elapseTime > broadcastTimeout {
+				utils.GetLogInstance().Warn("[SYNC] SendNewBlockToUnsync to peer timeout", "peerID", peerID)
+				// send last time and delete
+				config.client.PushNewBlock(selfPeerID, blockHash, true)
+				node.stateMutex.Lock()
+				node.peerRegistrationRecord[peerID].client.Close()
+				delete(node.peerRegistrationRecord, peerID)
+				node.stateMutex.Unlock()
+				continue
+			}
+			response := config.client.PushNewBlock(selfPeerID, blockHash, false)
+			if response != nil && response.Type == downloader_pb.DownloaderResponse_INSYNC {
+				node.stateMutex.Lock()
+				node.peerRegistrationRecord[peerID].client.Close()
+				delete(node.peerRegistrationRecord, peerID)
+				node.stateMutex.Unlock()
+			}
+		}
+	}
 }
 
 // RemovePeersHandler is a goroutine to wait on the OfflinePeers channel
@@ -479,5 +630,32 @@ func (node *Node) RemovePeersHandler() {
 		case p := <-node.OfflinePeers:
 			node.Consensus.OfflinePeerList = append(node.Consensus.OfflinePeerList, p)
 		}
+	}
+}
+
+// ServiceManagerSetup setups service store.
+func (node *Node) ServiceManagerSetup() {
+	node.serviceStore = &ServiceStore{}
+}
+
+// AddAndRunServices manually adds certain services and start them.
+func (node *Node) AddAndRunServices() {
+	node.SetupServiceManager()
+	// TODO: add it later
+	// node.AddCommonServices()
+
+	switch node.Role {
+	case ShardLeader:
+		// Add and run explorer.
+		node.RegisterService(SupportExplorer, explorer.New(&node.SelfPeer))
+		node.actionChannel <- &Action{action: Start, serviceType: SupportExplorer}
+
+		node.RegisterService(Consensus, service.NewConsensusService(node.BlockChannel, node.Consensus))
+		node.actionChannel <- &Action{action: Start, serviceType: Consensus}
+
+		// node.RegisterService(SupportClient, service.NewSupportClient(node.blockchain.State, node.CallFaucetContract, node.SelfPeer.IP, node.SelfPeer.Port))
+		// node.actionChannel <- &Action{action: Start, serviceType: SupportClient}
+	case Unknown:
+		utils.GetLogInstance().Info("Running node services")
 	}
 }

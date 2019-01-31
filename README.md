@@ -1,51 +1,131 @@
-# Harmony Benchmark
+# Harmony
 [![Build Status](https://travis-ci.com/harmony-one/harmony.svg?token=DnoYvYiTAk7pqTo9XsTi&branch=master)](https://travis-ci.com/harmony-one/harmony)
-<a href='https://github.com/jpoles1/gopherbadger' target='_blank'>![gopherbadger-tag-do-not-edit](https://img.shields.io/badge/Go%20Coverage-39%25-brightgreen.svg?longCache=true&style=flat)</a>
+<a href='https://github.com/jpoles1/gopherbadger' target='_blank'>![gopherbadger-tag-do-not-edit](https://img.shields.io/badge/Go%20Coverage-45%25-brightgreen.svg?longCache=true&style=flat)</a>
+<a href="https://discord.gg/kdf8a6T">![Discord](https://img.shields.io/discord/532383335348043777.svg)</a>
+[![Coverage Status](https://coveralls.io/repos/github/harmony-one/harmony/badge.svg?branch=master)](https://coveralls.io/github/harmony-one/harmony?branch=master)
 
-
-## Coding Guidelines
-
-* In general, we follow [effective_go](https://golang.org/doc/effective_go.html)
-* Code must adhere to the official [Go formatting guidelines](https://golang.org/doc/effective_go.html#formatting) (i.e. uses [gofmt](https://golang.org/cmd/gofmt/)).
-* Code must be documented adhering to the official Go [commentary](https://golang.org/doc/effective_go.html#commentary) guidelines.
-
+## Installation Requirements
+GMP and OpenSSL
+```bash
+brew install gmp
+brew install openssl
+```
 
 ## Dev Environment Setup
 
-```
+```bash
 export GOPATH=$HOME/<path_of_your_choice>
+export CGO_CFLAGS="-I$GOPATH/src/github.com/harmony-one/bls/include -I$GOPATH/src/github.com/harmony-one/mcl/include -I/usr/local/opt/openssl/include"
+export CGO_LDFLAGS="-L$GOPATH/src/github.com/harmony-one/bls/lib -L/usr/local/opt/openssl/lib"
+export LD_LIBRARY_PATH=$GOPATH/src/github.com/harmony-one/bls/lib:$GOPATH/src/github.com/harmony-one/mcl/lib:/usr/local/opt/openssl/lib
+export LIBRARY_PATH=$LD_LIBRARY_PATH
+export DYLD_LIBRARY_PATH=$LD_LIBRARY_PATH
 
 mkdir -p $HOME/<path_of_your_choice>/src/github.com/harmony-one
 
 cd $HOME/<path_of_your_choice>/src/github.com/harmony-one
+
+git clone git@github.com:harmony-one/mcl.git
+
+cd mcl && make -j4 && cd ..
+
+git clone git@github.com:harmony-one/bls.git
+
+cd bls && make -j4 && cd ..
 
 git clone git@github.com:harmony-one/harmony.git
 
 cd harmony
 
 go get ./...
+
+git submodule update --init --recursive
+
 ```
+
+## Build
+
+Harmony server / main node:
+```
+go build -o bin/harmony cmd/harmony.go
+```
+
+Beacon node:
+```
+go build -o bin/beacon cmd/beaconchain/main.go
+```
+
+Wallet:
+```
+go build -o bin/wallet cmd/client/wallet/main.go
+```
+
+Tx Generator:
+```
+go build -o bin/txgen cmd/client/txgen/main.go
+```
+
+You can also run the script `./scripts/go_executable_build.sh` to build all the executables.
+
+Some of our scripts require bash 4.x support, please [install bash 4.x](http://tldrdevnotes.com/bash-upgrade-3-4-macos) on MacOS X.
 
 ## Usage
+You may build the src/harmony.go locally and run local test.
 
 ### Running local test
-```
+The deploy.sh script creates a local environment of Harmony blockchain devnet based on the configuration file.
+The configuration file configures number of nodes and their IP/Port.
+The script starts one local beacon chain node, the blockchain nodes, and run a transactional generator program which generates and sends simulated transactions to the local blockchain.
+
+```bash
 ./test/deploy.sh ./test/configs/local_config1.txt
 ```
 
 ## Testing
 
-Make sure you the following command and make sure everything passed before submitting your code.
+Make sure you use the following command and make sure everything passed before submitting your code.
 
-```
-./test_before_submit.sh
-```
-
-## Linting
-
-Make sure you the following command and make sure everything passes golint.
-
-```
-./lint_before_submit.sh
+```bash
+./test/test_before_submit.sh
 ```
 
+## License
+
+Harmony is licensed under the MIT License.  See [`LICENSE`](LICENSE) file for
+the terms and conditions.
+
+Also please see [our Fiduciary License Agreement](FLA.md) if you are
+contributing to the project.  By your submission of your contribution to us, you
+and we mutually agree to the terms and conditions of the agreement.
+
+
+## Contributing To Harmony
+
+See [`CONTRIBUTING`](CONTRIBUTING.md) for details.
+
+## Development Status
+
+### Features Done
+
+* Basic consensus protocol with O(n) complexity
+* Basic validator server
+* P2p network connection and unicast
+* Account model and support for Solidity
+* Simple wallet program
+* Mock beacon chain with static sharding
+* Information disposal algorithm using erasure encoding (to be integrated)
+* Blockchain explorer with performance report and transaction lookup
+* Transaction generator for loadtesting
+
+### Features To Be Implemented
+
+* Full beacon chain with multiple validators
+* Resharding
+* Staking on beacon chain
+* Fast state synchronization
+* Distributed randomness generation with VRF and VDF
+* Kademlia routing
+* P2P network and gossiping
+* Full protocol of consensus with BLS multi-sig and view-change protocol
+* Integration with WASM
+* Cross-shard transaction

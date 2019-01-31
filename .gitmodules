@@ -1,0 +1,10 @@
+[submodule "vendor/github.com/ethereum/go-ethereum"]
+	path = vendor/github.com/ethereum/go-ethereum
+	url = https://github.com/harmony-one/go-ethereum
+	branch = master
+[submodule "vendor/github.com/golang/protobuf"]
+	path = vendor/github.com/golang/protobuf
+	url = https://github.com/golang/protobuf
+[submodule "vendor/github.com/dedis/kyber"]
+	path = vendor/github.com/dedis/kyber
+	url = https://github.com/dedis/kyber

@@ -1,26 +1,25 @@
 package host
 
 import (
-	"bytes"
 	"encoding/binary"
 	"net"
 	"runtime"
 	"time"
 
-	"github.com/harmony-one/harmony/log"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/p2p"
 )
 
 // SendMessage is to connect a socket given a port and send the given message.
 // TODO(minhdoan, rj): need to check if a peer is reachable or not.
-func SendMessage(host Host, p p2p.Peer, message []byte, lostPeer chan p2p.Peer) {
+func SendMessage(host p2p.Host, p p2p.Peer, message []byte, lostPeer chan p2p.Peer) {
 	// Construct normal p2p message
 	content := ConstructP2pMessage(byte(0), message)
 	go send(host, p, content, lostPeer)
 }
 
 // BroadcastMessage sends the message to a list of peers
-func BroadcastMessage(h Host, peers []p2p.Peer, msg []byte, lostPeer chan p2p.Peer) {
+func BroadcastMessage(h p2p.Host, peers []p2p.Peer, msg []byte, lostPeer chan p2p.Peer) {
 	if len(peers) == 0 {
 		return
 	}
@@ -44,7 +43,7 @@ func BroadcastMessage(h Host, peers []p2p.Peer, msg []byte, lostPeer chan p2p.Pe
 }
 
 // BroadcastMessageFromLeader sends the message to a list of peers from a leader.
-func BroadcastMessageFromLeader(h Host, peers []p2p.Peer, msg []byte, lostPeer chan p2p.Peer) {
+func BroadcastMessageFromLeader(h p2p.Host, peers []p2p.Peer, msg []byte, lostPeer chan p2p.Peer) {
 	// TODO(minhdoan): Enable back for multicast.
 	peers = SelectMyPeers(peers, 1, MaxBroadCast)
 	BroadcastMessage(h, peers, msg, lostPeer)
@@ -52,21 +51,15 @@ func BroadcastMessageFromLeader(h Host, peers []p2p.Peer, msg []byte, lostPeer c
 
 // ConstructP2pMessage constructs the p2p message as [messageType, contentSize, content]
 func ConstructP2pMessage(msgType byte, content []byte) []byte {
-
-	firstByte := byte(17)        // messageType 0x11
-	sizeBytes := make([]byte, 4) // contentSize
-
-	binary.BigEndian.PutUint32(sizeBytes, uint32(len(content)))
-
-	byteBuffer := bytes.NewBuffer([]byte{})
-	byteBuffer.WriteByte(firstByte)
-	byteBuffer.Write(sizeBytes)
-	byteBuffer.Write(content)
-	return byteBuffer.Bytes()
+	message := make([]byte, 5+len(content))
+	message[0] = 17 // messageType 0x11
+	binary.BigEndian.PutUint32(message[1:5], uint32(len(content)))
+	copy(message[5:], content)
+	return message
 }
 
 // BroadcastMessageFromValidator sends the message to a list of peers from a validator.
-func BroadcastMessageFromValidator(h Host, selfPeer p2p.Peer, peers []p2p.Peer, msg []byte) {
+func BroadcastMessageFromValidator(h p2p.Host, selfPeer p2p.Peer, peers []p2p.Peer, msg []byte) {
 	peers = SelectMyPeers(peers, selfPeer.ValidatorID*MaxBroadCast+1, (selfPeer.ValidatorID+1)*MaxBroadCast)
 	BroadcastMessage(h, peers, msg, nil)
 }
@@ -87,15 +80,13 @@ func SelectMyPeers(peers []p2p.Peer, min int, max int) []p2p.Peer {
 }
 
 // Send a message to another node with given port.
-func send(h Host, peer p2p.Peer, message []byte, lostPeer chan p2p.Peer) {
+func send(h p2p.Host, peer p2p.Peer, message []byte, lostPeer chan p2p.Peer) {
 	// Add attack code here.
 	//attack.GetInstance().Run()
 	backoff := p2p.NewExpBackoff(150*time.Millisecond, 5*time.Second, 2)
 
 	for trial := 0; trial < 10; trial++ {
-		var err error
-		err = h.SendMessage(peer, message)
-		if err == nil {
+		if err := h.SendMessage(peer, message); err == nil {
 			if trial > 0 {
 				log.Warn("retry send", "rety", trial)
 			}
@@ -115,7 +106,6 @@ func send(h Host, peer p2p.Peer, message []byte, lostPeer chan p2p.Peer) {
 
 // DialWithSocketClient joins host port and establishes connection
 func DialWithSocketClient(ip, port string) (conn net.Conn, err error) {
-	//log.Printf("Sending message to ip %s and port %s\n", ip, port)
 	addr := net.JoinHostPort(ip, port)
 	conn, err = net.Dial("tcp", addr)
 	return

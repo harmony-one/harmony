@@ -1,24 +1,41 @@
 #!/bin/bash
 
 ROOT=$(dirname $0)/..
+USER=$(whoami)
 
+. "${ROOT}/scripts/setup_bls_build_flags.sh"
+
+set -x
 set -eo pipefail
 
+function check_result() {
+   find $log_folder -name leader-*.log > $log_folder/all-leaders.txt
+   find $log_folder -name validator-*.log > $log_folder/all-validators.txt
+
+   echo ====== RESULTS ======
+   results=$($ROOT/test/cal_tps.sh $log_folder/all-leaders.txt $log_folder/all-validators.txt)
+   echo $results | tee -a $LOG_FILE
+   echo $results > $log_folder/tps.log
+}
+
 function cleanup() {
-   for pid in `/bin/ps -fu $USER| grep "benchmark\|txgen\|soldier\|commander\|profiler\|beacon" | grep -v "grep" | grep -v "vi" | awk '{print $2}'`;
+   for pid in `/bin/ps -fu $USER| grep "harmony\|txgen\|soldier\|commander\|profiler\|beacon" | grep -v "grep" | grep -v "vi" | awk '{print $2}'`;
    do
        echo 'Killed process: '$pid
-       kill -9 $pid 2> /dev/null
+       $DRYRUN kill -9 $pid 2> /dev/null
    done
+   # Remove bc_config.json before starting experiment.
+   rm -f bc_config.json
+   rm -rf ./db/harmony_*
 }
 
 function killnode() {
    local port=$1
 
    if [ -n "port" ]; then
-      pid=$(/bin/ps -fu $USER | grep "benchmark" | grep "$port" | awk '{print $2}')
+      pid=$(/bin/ps -fu $USER | grep "harmony" | grep "$port" | awk '{print $2}')
       echo "killing node with port: $port"
-      kill -9 $pid 2> /dev/null
+      $DRYRUN kill -9 $pid 2> /dev/null
       echo "node with port: $port is killed"
    fi
 }
@@ -38,8 +55,10 @@ USAGE: $ME [OPTIONS] config_file_name
    -m min_peers   minimal number of peers to start consensus (default: $MIN)
    -s shards      number of shards (default: $SHARDS)
    -k nodeport    kill the node with specified port number (default: $KILLPORT)
+   -n             dryrun mode (default: $DRYRUN)
+   -S             enable sync test (default: $SYNC)
 
-This script will build all the binaries and start benchmark and txgen based on the configuration file.
+This script will build all the binaries and start harmony and txgen based on the configuration file.
 
 EXAMPLES:
 
@@ -56,8 +75,10 @@ DURATION=90
 MIN=5
 SHARDS=2
 KILLPORT=9004
+SYNC=false
+DRYRUN=
 
-while getopts "hdtD:m:s:k:" option; do
+while getopts "hdtD:m:s:k:nS" option; do
    case $option in
       h) usage ;;
       d) DB='-db_supported' ;;
@@ -66,6 +87,8 @@ while getopts "hdtD:m:s:k:" option; do
       m) MIN=$OPTARG ;;
       s) SHARDS=$OPTARG ;;
       k) KILLPORT=$OPTARG ;;
+      n) DRYRUN=echo ;;
+      S) SYNC=true ;;
    esac
 done
 
@@ -76,6 +99,10 @@ if [ -z "$config" ]; then
    usage
 fi
 
+if [ "$SYNC" == "true" ]; then
+    DURATION=300
+    SHARDS=1
+fi
 
 # Kill nodes if any
 cleanup
@@ -87,7 +114,7 @@ cleanup
 # Also it's recommended to use `go build` for testing the whole exe. 
 pushd $ROOT
 echo "compiling ..."
-go build -o bin/benchmark
+go build -o bin/harmony cmd/harmony.go
 go build -o bin/txgen cmd/client/txgen/main.go
 go build -o bin/beacon cmd/beaconchain/main.go
 popd
@@ -97,28 +124,49 @@ t=`date +"%Y%m%d-%H%M%S"`
 log_folder="tmp_log/log-$t"
 
 mkdir -p $log_folder
+LOG_FILE=$log_folder/r.log
 
 echo "launching beacon chain ..."
-$ROOT/bin/beacon -numShards $SHARDS > $log_folder/beacon.log 2>&1 &
-sleep 1 #wait or beachchain up
+$DRYRUN $ROOT/bin/beacon -numShards $SHARDS > $log_folder/beacon.log 2>&1 | tee -a $LOG_FILE &
+sleep 1 #waiting for beaconchain
+MA=$(grep "Beacon Chain Started" $log_folder/beacon.log | awk -F: ' { print $2 } ')
+
+if [ -n "$MA" ]; then
+   HMY_OPT="-bc_addr $MA"
+fi
+
+NUM_NN=0
 
 # Start nodes
 while IFS='' read -r line || [[ -n "$line" ]]; do
   IFS=' ' read ip port mode shardID <<< $line
-	#echo $ip $port $mode
-  if [ "$mode" != "client" ]; then
-      $ROOT/bin/benchmark -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN &
-      sleep 0.5
+  if [[ "$mode" == "leader" || "$mode" == "validator" ]]; then
+     $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT 2>&1 | tee -a $LOG_FILE &
+     sleep 0.5
+  fi
+  if [[ "$mode" == "newnode" && "$SYNC" == "true" ]]; then
+     (( NUM_NN += 35 ))
+     (sleep $NUM_NN; $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT 2>&1 | tee -a $LOG_FILE ) &
   fi
 done < $config
 
 # Emulate node offline
-(sleep 45; killnode $KILLPORT) &
-
-echo "launching txgen ..."
-if [ "$TXGEN" == "true" ]; then
-   echo "launching txgen ..."
-   $ROOT/bin/txgen -log_folder $log_folder -duration $DURATION
+if [ "$SYNC" == "false" ]; then
+ (sleep 45; killnode $KILLPORT) &
 fi
 
+if [ "$TXGEN" == "true" ]; then
+   echo "launching txgen ... wait"
+   sleep 2
+   line=$(grep client $config)
+   IFS=' ' read ip port mode shardID <<< $line
+   if [ "$mode" == "client" ]; then
+      $DRYRUN $ROOT/bin/txgen -log_folder $log_folder -duration $DURATION -ip $ip -port $port $HMY_OPT 2>&1 | tee -a $LOG_FILE
+   fi
+fi
+
+# save bc_config.json
+cp -f bc_config.json $log_folder
+
 cleanup
+check_result

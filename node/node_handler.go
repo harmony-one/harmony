@@ -7,15 +7,15 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-
-	"github.com/dedis/kyber"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
+	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	proto_identity "github.com/harmony-one/harmony/api/proto/identity"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/core/types"
-	hmy_crypto "github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/crypto/pki"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 )
@@ -41,7 +41,7 @@ func (node *Node) StreamHandler(s p2p.Stream) {
 	content, err := p2p.ReadMessageContent(s)
 
 	if err != nil {
-		node.log.Error("Read p2p data failed", "err", err, "node", node)
+		utils.GetLogInstance().Error("Read p2p data failed", "err", err, "node", node)
 		return
 	}
 	node.MaybeBroadcastAsValidator(content)
@@ -50,19 +50,19 @@ func (node *Node) StreamHandler(s p2p.Stream) {
 
 	msgCategory, err := proto.GetMessageCategory(content)
 	if err != nil {
-		node.log.Error("Read node type failed", "err", err, "node", node)
+		utils.GetLogInstance().Error("Read node type failed", "err", err, "node", node)
 		return
 	}
 
 	msgType, err := proto.GetMessageType(content)
 	if err != nil {
-		node.log.Error("Read action type failed", "err", err, "node", node)
+		utils.GetLogInstance().Error("Read action type failed", "err", err, "node", node)
 		return
 	}
 
 	msgPayload, err := proto.GetMessagePayload(content)
 	if err != nil {
-		node.log.Error("Read message payload failed", "err", err, "node", node)
+		utils.GetLogInstance().Error("Read message payload failed", "err", err, "node", node)
 		return
 	}
 
@@ -75,18 +75,18 @@ func (node *Node) StreamHandler(s p2p.Stream) {
 			switch messageType {
 			case proto_identity.Register:
 				fmt.Println("received a identity message")
-				node.log.Info("NET: received message: IDENTITY/REGISTER")
+				utils.GetLogInstance().Info("NET: received message: IDENTITY/REGISTER")
 			default:
-				node.log.Error("Announce message should be sent to IdentityChain")
+				utils.GetLogInstance().Error("Announce message should be sent to IdentityChain")
 			}
 		}
 	case proto.Consensus:
 		msgPayload, _ := proto.GetConsensusMessagePayload(content)
 		if consensusObj.IsLeader {
-			node.log.Info("NET: Leader received message:", "messageCategory", msgCategory, "messageType", msgType)
+			utils.GetLogInstance().Info("NET: Leader received message:", "messageCategory", msgCategory, "messageType", msgType)
 			consensusObj.ProcessMessageLeader(msgPayload)
 		} else {
-			node.log.Info("NET: Validator received message:", "messageCategory", msgCategory, "messageType", msgType)
+			utils.GetLogInstance().Info("NET: Validator received message:", "messageCategory", msgCategory, "messageType", msgType)
 			consensusObj.ProcessMessageValidator(msgPayload)
 			// TODO(minhdoan): add logic to check if the current blockchain is not sync with other consensus
 			// we should switch to other state rather than DoingConsensus.
@@ -95,17 +95,17 @@ func (node *Node) StreamHandler(s p2p.Stream) {
 		actionType := proto_node.MessageType(msgType)
 		switch actionType {
 		case proto_node.Transaction:
-			node.log.Info("NET: received message: Node/Transaction")
+			utils.GetLogInstance().Info("NET: received message: Node/Transaction")
 			node.transactionMessageHandler(msgPayload)
 		case proto_node.Block:
-			node.log.Info("NET: received message: Node/Block")
+			utils.GetLogInstance().Info("NET: received message: Node/Block")
 			blockMsgType := proto_node.BlockMessageType(msgPayload[0])
 			switch blockMsgType {
 			case proto_node.Sync:
 				var blocks []*types.Block
 				err := rlp.DecodeBytes(msgPayload[1:], &blocks) // skip the Sync messge type
 				if err != nil {
-					node.log.Info("NET: received message: Node/Block", "error", err)
+					utils.GetLogInstance().Error("block sync", "error", err)
 				} else {
 					if node.Client != nil && node.Client.UpdateBlocks != nil && blocks != nil {
 						node.Client.UpdateBlocks(blocks)
@@ -113,10 +113,10 @@ func (node *Node) StreamHandler(s p2p.Stream) {
 				}
 			}
 		case proto_node.Control:
-			node.log.Info("NET: received message: Node/Control")
+			utils.GetLogInstance().Info("NET: received message: Node/Control")
 			controlType := msgPayload[0]
 			if proto_node.ControlMessageType(controlType) == proto_node.STOP {
-				node.log.Debug("Stopping Node", "node", node, "numBlocks", node.blockchain.CurrentBlock().NumberU64(), "numTxsProcessed", node.countNumTransactionsInBlockchain())
+				utils.GetLogInstance().Debug("Stopping Node", "node", node, "numBlocks", node.blockchain.CurrentBlock().NumberU64(), "numTxsProcessed", node.countNumTransactionsInBlockchain())
 
 				var avgBlockSizeInBytes common.StorageSize
 				txCount := 0
@@ -136,7 +136,7 @@ func (node *Node) StreamHandler(s p2p.Stream) {
 					avgTxSize = avgTxSize / txCount
 				}
 
-				node.log.Debug("Blockchain Report", "totalNumBlocks", blockCount, "avgBlockSizeInCurrentEpoch", avgBlockSizeInBytes, "totalNumTxs", txCount, "avgTxSzieInCurrentEpoch", avgTxSize)
+				utils.GetLogInstance().Debug("Blockchain Report", "totalNumBlocks", blockCount, "avgBlockSizeInCurrentEpoch", avgBlockSizeInBytes, "totalNumTxs", txCount, "avgTxSzieInCurrentEpoch", avgTxSize)
 
 				os.Exit(0)
 			}
@@ -146,7 +146,7 @@ func (node *Node) StreamHandler(s p2p.Stream) {
 			node.pongMessageHandler(msgPayload)
 		}
 	default:
-		node.log.Error("Unknown", "MsgCategory", msgCategory)
+		utils.GetLogInstance().Error("Unknown", "MsgCategory", msgCategory)
 	}
 }
 
@@ -158,7 +158,7 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 		txs := types.Transactions{}
 		err := rlp.Decode(bytes.NewReader(msgPayload[1:]), &txs) // skip the Send messge type
 		if err != nil {
-			node.log.Error("Failed to deserialize transaction list", "error", err)
+			utils.GetLogInstance().Error("Failed to deserialize transaction list", "error", err)
 		}
 		node.addPendingTransactions(txs)
 
@@ -188,7 +188,7 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 
 // WaitForConsensusReady listen for the readiness signal from consensus and generate new block for consensus.
 func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
-	node.log.Debug("Waiting for Consensus ready", "node", node)
+	utils.GetLogInstance().Debug("Waiting for Consensus ready", "node", node)
 	time.Sleep(15 * time.Second) // Wait for other nodes to be ready (test-only)
 
 	firstTime := true
@@ -202,7 +202,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
 		case <-time.After(200 * time.Second):
 			node.Consensus.ResetState()
 			timeoutCount++
-			node.log.Debug("Consensus timeout, retry!", "count", timeoutCount, "node", node)
+			utils.GetLogInstance().Debug("Consensus timeout, retry!", "count", timeoutCount, "node", node)
 		}
 
 		for {
@@ -212,7 +212,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
 				threshold = 2
 				firstTime = false
 			}
-			node.log.Debug("STARTING BLOCK", "threshold", threshold, "pendingTransactions", len(node.pendingTransactions))
+			utils.GetLogInstance().Debug("STARTING BLOCK", "threshold", threshold, "pendingTransactions", len(node.pendingTransactions))
 			if len(node.pendingTransactions) >= threshold {
 				// Normal tx block consensus
 				selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
@@ -220,7 +220,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
 					node.Worker.CommitTransactions(selectedTxs)
 					block, err := node.Worker.Commit()
 					if err != nil {
-						node.log.Debug("Failed commiting new block", "Error", err)
+						utils.GetLogInstance().Debug("Failed commiting new block", "Error", err)
 					} else {
 						newBlock = block
 						break
@@ -240,9 +240,10 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
 
 // BroadcastNewBlock is called by consensus leader to sync new blocks with other clients/nodes.
 // NOTE: For now, just send to the client (basically not broadcasting)
+// TODO (lc): broadcast the new blocks to new nodes doing state sync
 func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 	if node.ClientPeer != nil {
-		node.log.Debug("Sending new block to client", "client", node.ClientPeer)
+		utils.GetLogInstance().Debug("Sending new block to client", "client", node.ClientPeer)
 		node.SendMessage(*node.ClientPeer, proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock}))
 	}
 }
@@ -251,9 +252,18 @@ func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 func (node *Node) VerifyNewBlock(newBlock *types.Block) bool {
 	err := node.blockchain.ValidateNewBlock(newBlock, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey))
 	if err != nil {
-		node.log.Debug("Failed verifying new block", "Error", err, "tx", newBlock.Transactions()[0])
+		utils.GetLogInstance().Debug("Failed verifying new block", "Error", err, "tx", newBlock.Transactions()[0])
+
+		// send consensus block to state syncing
+		select {
+		case node.Consensus.ConsensusBlock <- newBlock:
+		default:
+			utils.GetLogInstance().Warn("consensus block unable to sent to state sync", "height", newBlock.NumberU64(), "blockHash", newBlock.Hash().Hex())
+		}
+
 		return false
 	}
+
 	return true
 }
 
@@ -272,32 +282,35 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 func (node *Node) AddNewBlock(newBlock *types.Block) {
 	blockNum, err := node.blockchain.InsertChain([]*types.Block{newBlock})
 	if err != nil {
-		node.log.Debug("Error adding new block to blockchain", "blockNum", blockNum, "Error", err)
+		utils.GetLogInstance().Debug("Error adding new block to blockchain", "blockNum", blockNum, "Error", err)
+	} else {
+		utils.GetLogInstance().Info("adding new block to blockchain", "blockNum", blockNum)
 	}
 }
 
 func (node *Node) pingMessageHandler(msgPayload []byte) int {
-	ping, err := proto_node.GetPingMessage(msgPayload)
+	ping, err := proto_discovery.GetPingMessage(msgPayload)
 	if err != nil {
-		node.log.Error("Can't get Ping Message")
+		utils.GetLogInstance().Error("Can't get Ping Message")
 		return -1
 	}
-	//	node.log.Info("Ping", "Msg", ping)
+	//	utils.GetLogInstance().Info("Ping", "Msg", ping)
 
 	peer := new(p2p.Peer)
 	peer.IP = ping.Node.IP
 	peer.Port = ping.Node.Port
+	peer.PeerID = ping.Node.PeerID
 	peer.ValidatorID = ping.Node.ValidatorID
 
-	peer.PubKey = hmy_crypto.Ed25519Curve.Point()
-	err = peer.PubKey.UnmarshalBinary(ping.Node.PubKey[:])
+	peer.PubKey = &bls.PublicKey{}
+	err = peer.PubKey.Deserialize(ping.Node.PubKey[:])
 	if err != nil {
-		node.log.Error("UnmarshalBinary Failed", "error", err)
+		utils.GetLogInstance().Error("UnmarshalBinary Failed", "error", err)
 		return -1
 	}
 
 	if ping.Node.Role == proto_node.ClientRole {
-		node.log.Info("Add Client Peer to Node", "Node", node.Consensus.GetNodeID(), "Client", peer)
+		utils.GetLogInstance().Info("Add Client Peer to Node", "Node", node.Consensus.GetNodeID(), "Client", peer)
 		node.ClientPeer = peer
 		return 0
 	}
@@ -306,7 +319,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 	node.AddPeers([]*p2p.Peer{peer})
 
 	peers := node.Consensus.GetValidatorPeers()
-	pong := proto_node.NewPongMessage(peers, node.Consensus.PublicKeys)
+	pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys)
 	buffer := pong.ConstructPongMessage()
 
 	// Send a Pong message directly to the sender
@@ -327,13 +340,13 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 }
 
 func (node *Node) pongMessageHandler(msgPayload []byte) int {
-	pong, err := proto_node.GetPongMessage(msgPayload)
+	pong, err := proto_discovery.GetPongMessage(msgPayload)
 	if err != nil {
-		node.log.Error("Can't get Pong Message")
+		utils.GetLogInstance().Error("Can't get Pong Message")
 		return -1
 	}
 
-	//	node.log.Debug("pongMessageHandler", "pong", pong, "nodeID", node.Consensus.GetNodeID())
+	//	utils.GetLogInstance().Debug("pongMessageHandler", "pong", pong, "nodeID", node.Consensus.GetNodeID())
 
 	peers := make([]*p2p.Peer, 0)
 
@@ -342,11 +355,12 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		peer.IP = p.IP
 		peer.Port = p.Port
 		peer.ValidatorID = p.ValidatorID
+		peer.PeerID = p.PeerID
 
-		peer.PubKey = hmy_crypto.Ed25519Curve.Point()
-		err = peer.PubKey.UnmarshalBinary(p.PubKey[:])
+		peer.PubKey = &bls.PublicKey{}
+		err = peer.PubKey.Deserialize(p.PubKey[:])
 		if err != nil {
-			node.log.Error("UnmarshalBinary Failed", "error", err)
+			utils.GetLogInstance().Error("UnmarshalBinary Failed", "error", err)
 			continue
 		}
 		peers = append(peers, peer)
@@ -359,21 +373,21 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 	// Reset Validator PublicKeys every time we receive PONG message from Leader
 	// The PublicKeys has to be idential across the shard on every node
 	// TODO (lc): we need to handle RemovePeer situation
-	publicKeys := make([]kyber.Point, 0)
+	publicKeys := make([]*bls.PublicKey, 0)
 
 	// Create the the PubKey from the []byte sent from leader
 	for _, k := range pong.PubKeys {
-		key := hmy_crypto.Ed25519Curve.Point()
-		err = key.UnmarshalBinary(k[:])
+		key := bls.PublicKey{}
+		err = key.Deserialize(k[:])
 		if err != nil {
-			node.log.Error("UnmarshalBinary Failed PubKeys", "error", err)
+			utils.GetLogInstance().Error("UnmarshalBinary Failed PubKeys", "error", err)
 			continue
 		}
-		publicKeys = append(publicKeys, key)
+		publicKeys = append(publicKeys, &key)
 	}
 
 	if node.State == NodeWaitToJoin {
-		node.State = NodeJoinedShard
+		node.State = NodeReadyForConsensus
 		// Notify JoinShard to stop sending Ping messages
 		if node.StopPing != nil {
 			node.StopPing <- struct{}{}

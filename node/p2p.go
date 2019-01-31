@@ -16,6 +16,6 @@ func (node *Node) BroadcastMessage(peers []p2p.Peer, data []byte) {
 }
 
 // GetHost returns the p2p host
-func (node *Node) GetHost() host.Host {
+func (node *Node) GetHost() p2p.Host {
 	return node.host
 }

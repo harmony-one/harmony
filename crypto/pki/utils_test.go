@@ -1,19 +1,23 @@
 package pki
 
 import (
-	"github.com/harmony-one/harmony/crypto"
+	"encoding/binary"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/crypto"
 )
 
 func TestGetAddressFromPublicKey(test *testing.T) {
-	suite := crypto.Ed25519Curve
 	t := time.Now().UnixNano()
-	scalar := suite.Scalar().SetInt64(t)
-	pubKey := GetPublicKeyFromScalar(scalar)
-	addr1 := GetAddressFromPublicKey(pubKey)
-	addr2 := GetAddressFromPrivateKey(scalar)
+	priKey := [32]byte{}
+	binary.LittleEndian.PutUint32(priKey[:], uint32(t))
+	var privateKey bls.SecretKey
+	privateKey.SetLittleEndian(priKey[:])
+	addr1 := GetAddressFromPublicKey(privateKey.GetPublicKey())
+	addr2 := GetAddressFromPrivateKey(&privateKey)
 	if !reflect.DeepEqual(addr1, addr2) {
 		test.Error("two public address should be equal")
 	}

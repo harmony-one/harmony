@@ -3,6 +3,7 @@ package node
 import (
 	"bytes"
 	"encoding/gob"
+	"fmt"
 	"log"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -10,15 +11,11 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 
 	"github.com/harmony-one/harmony/api/proto"
+	peer "github.com/libp2p/go-libp2p-peer"
 )
 
 // MessageType is to indicate the specific type of message under Node category
 type MessageType byte
-
-// ProtocolVersion is a constant defined as the version of the Harmony protocol
-const (
-	ProtocolVersion = 1
-)
 
 // Constant of the top level Message Type exchanged among nodes
 const (
@@ -56,6 +53,41 @@ const (
 	Request
 	Unlock
 )
+
+// RoleType defines the role of the node
+type RoleType int
+
+// Type of roles of a node
+const (
+	ValidatorRole RoleType = iota
+	ClientRole
+)
+
+func (r RoleType) String() string {
+	switch r {
+	case ValidatorRole:
+		return "Validator"
+	case ClientRole:
+		return "Client"
+	}
+	return "Unknown"
+}
+
+// Info refers to Peer struct in p2p/peer.go
+// this is basically a simplified version of Peer
+// for network transportation
+type Info struct {
+	IP          string
+	Port        string
+	PubKey      []byte
+	ValidatorID int
+	Role        RoleType
+	PeerID      peer.ID // Peerstore ID
+}
+
+func (info Info) String() string {
+	return fmt.Sprintf("Info:%v/%v=>%v/%v", info.IP, info.Port, info.ValidatorID, info.PeerID)
+}
 
 // BlockMessageType represents the type of messages used for Node/Block
 type BlockMessageType int

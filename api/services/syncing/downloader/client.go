@@ -2,11 +2,12 @@ package downloader
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
-	"log"
 	"time"
 
 	pb "github.com/harmony-one/harmony/api/services/syncing/downloader/proto"
+	"github.com/harmony-one/harmony/internal/utils"
 	"google.golang.org/grpc"
 )
 
@@ -24,7 +25,7 @@ func ClientSetup(ip, port string) *Client {
 	var err error
 	client.conn, err = grpc.Dial(fmt.Sprintf("%s:%s", ip, port), client.opts...)
 	if err != nil {
-		log.Fatalf("fail to dial: %v", err)
+		utils.GetLogInstance().Info("client.go:ClientSetup fail to dial: ", "error", err)
 		return nil
 	}
 
@@ -34,17 +35,20 @@ func ClientSetup(ip, port string) *Client {
 
 // Close closes the Client.
 func (client *Client) Close() {
-	client.conn.Close()
+	err := client.conn.Close()
+	if err != nil {
+		utils.GetLogInstance().Info("unable to close connection ")
+	}
 }
 
 // GetBlockHashes gets block hashes from all the peers by calling grpc request.
-func (client *Client) GetBlockHashes() *pb.DownloaderResponse {
+func (client *Client) GetBlockHashes(startHash []byte) *pb.DownloaderResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_HEADER}
+	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_HEADER, BlockHash: startHash}
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
-		log.Fatalf("Error")
+		utils.GetLogInstance().Info("[SYNC] GetBlockHashes query failed", "error", err)
 	}
 	return response
 }
@@ -61,7 +65,46 @@ func (client *Client) GetBlocks(hashes [][]byte) *pb.DownloaderResponse {
 	}
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
-		log.Fatalf("Error")
+		utils.GetLogInstance().Info("[SYNC] downloader/client.go:GetBlocks query failed.", "error", err)
+	}
+	return response
+}
+
+// Register will register node's ip/port information to peers receive newly created blocks in future
+// hash is the bytes of "ip:port" string representation
+func (client *Client) Register(hash []byte) *pb.DownloaderResponse {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_REGISTER}
+	request.PeerHash = make([]byte, len(hash))
+	copy(request.PeerHash, hash)
+	response, err := client.dlClient.Query(ctx, request)
+	if err != nil {
+		utils.GetLogInstance().Info("[SYNC] client.go:Register failed.", "error", err)
+	}
+	return response
+}
+
+// PushNewBlock will send the lastest verified blow to registered nodes
+func (client *Client) PushNewBlock(peerID uint32, blockHash []byte, timeout bool) *pb.DownloaderResponse {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	peerHash := make([]byte, 4)
+	binary.BigEndian.PutUint32(peerHash, peerID)
+	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_NEWBLOCK}
+	request.BlockHash = make([]byte, len(blockHash))
+	copy(request.BlockHash, blockHash)
+	request.PeerHash = make([]byte, len(peerHash))
+	copy(request.PeerHash, peerHash)
+
+	if timeout {
+		request.Type = pb.DownloaderRequest_REGISTERTIMEOUT
+	}
+
+	response, err := client.dlClient.Query(ctx, request)
+	if err != nil {
+		utils.GetLogInstance().Info("[SYNC] unable to send new block to unsync node", "error", err)
 	}
 	return response
 }

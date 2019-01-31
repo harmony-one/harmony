@@ -1,10 +1,9 @@
 package client
 
 import (
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/p2p/host"
 )
 
 // Client represents a node (e.g. a wallet) which  sends transactions and receives responses from the harmony network
@@ -15,11 +14,11 @@ type Client struct {
 	log log.Logger // Log utility
 
 	// The p2p host used to send/receive p2p messages
-	host host.Host
+	host p2p.Host
 }
 
 // NewClient creates a new Client
-func NewClient(host host.Host, leaders *map[uint32]p2p.Peer) *Client {
+func NewClient(host p2p.Host, leaders *map[uint32]p2p.Peer) *Client {
 	client := Client{}
 	client.Leaders = leaders
 	client.host = host

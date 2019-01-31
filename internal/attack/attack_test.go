@@ -3,7 +3,6 @@ package attack
 import (
 	"testing"
 
-	"github.com/harmony-one/harmony/log"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,7 +16,6 @@ func TestIncorrectResponse(t *testing.T) {
 // Simple test for UpdateConsensusReady
 func TestUpdateConsensusReady(t *testing.T) {
 	model := GetInstance()
-	model.SetLogger(log.New())
 	model.NodeKilledByItSelf()
 
 	model.UpdateConsensusReady(model.ConsensusIDThreshold - 1)

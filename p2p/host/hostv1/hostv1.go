@@ -6,8 +6,10 @@ import (
 	"net"
 	"time"
 
-	"github.com/harmony-one/harmony/log"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/p2p"
+	p2p_host "github.com/libp2p/go-libp2p-host"
+	peer "github.com/libp2p/go-libp2p-peer"
 )
 
 // HostV1 is the version 1 p2p host, using direct socket call.
@@ -17,10 +19,15 @@ type HostV1 struct {
 	quit     chan struct{}
 }
 
+// AddPeer do nothing
+func (host *HostV1) AddPeer(p *p2p.Peer) error {
+	return nil
+}
+
 // New creates a HostV1
-func New(self p2p.Peer) *HostV1 {
+func New(self *p2p.Peer) *HostV1 {
 	h := &HostV1{
-		self: self,
+		self: *self,
 		quit: make(chan struct{}, 1),
 	}
 	return h
@@ -29,6 +36,11 @@ func New(self p2p.Peer) *HostV1 {
 // GetSelfPeer gets self peer
 func (host *HostV1) GetSelfPeer() p2p.Peer {
 	return host.self
+}
+
+// GetID return ID
+func (host *HostV1) GetID() peer.ID {
+	return peer.ID(fmt.Sprintf("%s:%s", host.self.IP, host.self.Port))
 }
 
 // BindHandlerAndServe Version 0 p2p. Going to be deprecated.
@@ -69,24 +81,25 @@ func (host *HostV1) BindHandlerAndServe(handler p2p.StreamHandler) {
 }
 
 // SendMessage sends message to peer
-func (host *HostV1) SendMessage(peer p2p.Peer, message []byte) (err error) {
+func (host *HostV1) SendMessage(peer p2p.Peer, message []byte) error {
+	logger := log.New("from", host.self, "to", peer, "PeerID", peer.PeerID)
 	addr := net.JoinHostPort(peer.IP, peer.Port)
 	conn, err := net.Dial("tcp", addr)
-
 	if err != nil {
-		log.Warn("HostV1 SendMessage Dial() failed", "from", net.JoinHostPort(host.self.IP, host.self.Port), "to", addr, "error", err)
-		return fmt.Errorf("Dail Failed")
+		logger.Warn("Dial() failed", "address", addr, "error", err)
+		return fmt.Errorf("Dial(%s) failed: %v", addr, err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			logger.Warn("Close() failed", "error", err)
+		}
+	}()
 
-	nw, err := conn.Write(message)
-	if err != nil {
-		log.Warn("Write() failed", "addr", conn.RemoteAddr(), "error", err)
-		return fmt.Errorf("Write Failed")
-	}
-	if nw < len(message) {
-		log.Warn("Write() returned short count",
-			"addr", conn.RemoteAddr(), "actual", nw, "expected", len(message))
+	if nw, err := conn.Write(message); err != nil {
+		logger.Warn("Write() failed", "error", err)
+		return fmt.Errorf("Write() failed: %v", err)
+	} else if nw < len(message) {
+		logger.Warn("Short Write()", "actual", nw, "expected", len(message))
 		return io.ErrShortWrite
 	}
 
@@ -98,4 +111,9 @@ func (host *HostV1) SendMessage(peer p2p.Peer, message []byte) (err error) {
 func (host *HostV1) Close() error {
 	host.quit <- struct{}{}
 	return host.listener.Close()
+}
+
+// GetP2PHost returns nothing
+func (host *HostV1) GetP2PHost() p2p_host.Host {
+	return nil
 }

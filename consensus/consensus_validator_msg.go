@@ -1,81 +1,47 @@
 package consensus
 
 import (
-	"github.com/dedis/kyber"
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/api/proto"
-	"github.com/harmony-one/harmony/crypto"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
-// Construct the commit message to send to leader (assumption the consensus data is already verified)
-func (consensus *Consensus) constructCommitMessage(msgType consensus_proto.MessageType) (secret kyber.Scalar, commitMsg []byte) {
+// Construct the prepare message to send to leader (assumption the consensus data is already verified)
+func (consensus *Consensus) constructPrepareMessage() []byte {
 	message := consensus_proto.Message{}
-	message.Type = msgType
+	message.Type = consensus_proto.MessageType_PREPARE
 
-	// 4 byte consensus id
-	message.ConsensusId = consensus.consensusID
+	consensus.populateMessageFields(&message)
 
-	// 32 byte block hash
-	message.BlockHash = consensus.blockHash[:]
-
-	// 4 byte sender id
-	message.SenderId = uint32(consensus.nodeID)
-
-	// 32 byte of commit
-	secret, commitment := crypto.Commit(crypto.Ed25519Curve)
-	bytes, err := commitment.MarshalBinary()
-	if err != nil {
-		consensus.Log.Debug("Failed to marshal commit", "error", err)
-	}
-	message.Payload = bytes
-
-	marshaledMessage, err := message.XXX_Marshal([]byte{}, true)
-	if err != nil {
-		consensus.Log.Debug("Failed to marshal Announce message", "error", err)
-	}
-	// 64 byte of signature on previous data
-	signature := consensus.signMessage(marshaledMessage)
-	message.Signature = signature
-
-	marshaledMessage, err = message.XXX_Marshal([]byte{}, true)
-	if err != nil {
-		consensus.Log.Debug("Failed to marshal Announce message", "error", err)
+	// 48 byte of bls signature
+	sign := consensus.priKey.SignHash(message.BlockHash)
+	if sign != nil {
+		message.Payload = sign.Serialize()
 	}
 
-	return secret, proto.ConstructConsensusMessage(marshaledMessage)
+	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(&message)
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to sign and marshal the Prepare message", "error", err)
+	}
+	return proto.ConstructConsensusMessage(marshaledMessage)
 }
 
-// Construct the response message to send to leader (assumption the consensus data is already verified)
-func (consensus *Consensus) constructResponseMessage(msgType consensus_proto.MessageType, response kyber.Scalar) []byte {
+// Construct the commit message which contains the signature on the multi-sig of prepare phase.
+func (consensus *Consensus) constructCommitMessage(multiSigAndBitmap []byte) []byte {
 	message := consensus_proto.Message{}
-	message.Type = msgType
+	message.Type = consensus_proto.MessageType_COMMIT
 
-	// 4 byte consensus id
-	message.ConsensusId = consensus.consensusID
+	consensus.populateMessageFields(&message)
 
-	// 32 byte block hash
-	message.BlockHash = consensus.blockHash[:]
-
-	// 4 byte sender id
-	message.SenderId = uint32(consensus.nodeID)
-
-	bytes, err := response.MarshalBinary()
-	if err != nil {
-		consensus.Log.Debug("Failed to marshal response", "error", err)
+	// 48 byte of bls signature
+	sign := consensus.priKey.SignHash(multiSigAndBitmap)
+	if sign != nil {
+		message.Payload = sign.Serialize()
 	}
-	message.Payload = bytes
 
-	marshaledMessage, err := message.XXX_Marshal([]byte{}, true)
+	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(&message)
 	if err != nil {
-		consensus.Log.Debug("Failed to marshal Announce message", "error", err)
-	}
-	// 64 byte of signature on previous data
-	signature := consensus.signMessage(marshaledMessage)
-	message.Signature = signature
-
-	marshaledMessage, err = message.XXX_Marshal([]byte{}, true)
-	if err != nil {
-		consensus.Log.Debug("Failed to marshal Announce message", "error", err)
+		utils.GetLogInstance().Error("Failed to sign and marshal the Commit message", "error", err)
 	}
 	return proto.ConstructConsensusMessage(marshaledMessage)
 }

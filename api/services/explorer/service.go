@@ -1,9 +1,9 @@
 package explorer
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -12,6 +12,8 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/gorilla/mux"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/p2p"
 )
 
 // Constants for explorer service.
@@ -25,6 +27,32 @@ type Service struct {
 	IP      string
 	Port    string
 	storage *Storage
+	server  *http.Server
+}
+
+// New returns explorer service.
+func New(selfPeer *p2p.Peer) *Service {
+	return &Service{
+		IP:   selfPeer.IP,
+		Port: selfPeer.Port,
+	}
+}
+
+// StartService starts explorer service.
+func (s *Service) StartService() {
+	utils.GetLogInstance().Info("Starting explorer service.")
+	s.Init(true)
+	s.server = s.Run()
+}
+
+// StopService shutdowns explorer service.
+func (s *Service) StopService() {
+	utils.GetLogInstance().Info("Shutting down explorer service.")
+	if err := s.server.Shutdown(context.Background()); err != nil {
+		utils.GetLogInstance().Error("Error when shutting down explorer server", "error", err)
+	} else {
+		utils.GetLogInstance().Error("Shutting down explorer server successufully")
+	}
 }
 
 // GetExplorerPort returns the port serving explorer dashboard. This port is explorerPortDifference less than the node port.
@@ -32,7 +60,7 @@ func GetExplorerPort(nodePort string) string {
 	if port, err := strconv.Atoi(nodePort); err == nil {
 		return fmt.Sprintf("%d", port-explorerPortDifference)
 	}
-	Log.Error("error on parsing.")
+	utils.GetLogInstance().Error("error on parsing.")
 	return ""
 }
 
@@ -42,7 +70,7 @@ func (s *Service) Init(remove bool) {
 }
 
 // Run is to run serving explorer.
-func (s *Service) Run() {
+func (s *Service) Run() *http.Server {
 	// Init address.
 	addr := net.JoinHostPort("", GetExplorerPort(s.Port))
 
@@ -60,8 +88,10 @@ func (s *Service) Run() {
 	s.router.Path("/address").HandlerFunc(s.GetExplorerAddress)
 
 	// Do serving now.
-	fmt.Println("Listening to:", GetExplorerPort(s.Port))
-	log.Fatal(http.ListenAndServe(addr, s.router))
+	utils.GetLogInstance().Info("Listening on ", "port: ", GetExplorerPort(s.Port))
+	server := &http.Server{Addr: addr, Handler: s.router}
+	go server.ListenAndServe()
+	return server
 }
 
 // GetAccountBlocks returns a list of types.Block to server blocks end-point.
@@ -80,7 +110,7 @@ func (s *Service) GetAccountBlocks(from, to int) []*types.Block {
 		}
 		block := new(types.Block)
 		if rlp.DecodeBytes(data, block) != nil {
-			Log.Error("Error on getting from db")
+			utils.GetLogInstance().Error("Error on getting from db")
 			os.Exit(1)
 		}
 		blocks = append(blocks, block)

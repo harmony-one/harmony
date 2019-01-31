@@ -2,17 +2,20 @@ package pki
 
 import (
 	"crypto/sha256"
+	"encoding/binary"
+
 	"github.com/dedis/kyber"
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/crypto"
-	"github.com/harmony-one/harmony/log"
 )
 
+func init() {
+	bls.Init(bls.BLS12_381)
+}
+
 // GetAddressFromPublicKey returns address given a public key.
-func GetAddressFromPublicKey(pubKey kyber.Point) [20]byte {
-	bytes, err := pubKey.MarshalBinary()
-	if err != nil {
-		log.Error("Failed to serialize challenge")
-	}
+func GetAddressFromPublicKey(pubKey *bls.PublicKey) [20]byte {
+	bytes := pubKey.Serialize()
 	address := [20]byte{}
 	hash := sha256.Sum256(bytes)
 	copy(address[:], hash[12:])
@@ -20,23 +23,37 @@ func GetAddressFromPublicKey(pubKey kyber.Point) [20]byte {
 }
 
 // GetAddressFromPrivateKey returns address given a private key.
-func GetAddressFromPrivateKey(priKey kyber.Scalar) [20]byte {
-	return GetAddressFromPublicKey(GetPublicKeyFromScalar(priKey))
+func GetAddressFromPrivateKey(priKey *bls.SecretKey) [20]byte {
+	return GetAddressFromPublicKey(priKey.GetPublicKey())
 }
 
 // GetAddressFromPrivateKeyBytes returns address from private key in bytes.
 func GetAddressFromPrivateKeyBytes(priKey [32]byte) [20]byte {
-	return GetAddressFromPublicKey(GetPublicKeyFromScalar(crypto.Ed25519Curve.Scalar().SetBytes(priKey[:])))
+	var privateKey bls.SecretKey
+	privateKey.SetLittleEndian(priKey[:])
+
+	return GetAddressFromPublicKey(privateKey.GetPublicKey())
 }
 
 // GetAddressFromInt is the temporary helper function for benchmark use
 func GetAddressFromInt(value int) [20]byte {
-	return GetAddressFromPublicKey(GetPublicKeyFromScalar(GetPrivateKeyScalarFromInt(value)))
+	priKey := [32]byte{}
+	binary.LittleEndian.PutUint32(priKey[:], uint32(value))
+	return GetAddressFromPrivateKeyBytes(priKey)
 }
 
 // GetPrivateKeyScalarFromInt return private key scalar.
 func GetPrivateKeyScalarFromInt(value int) kyber.Scalar {
 	return crypto.Ed25519Curve.Scalar().SetInt64(int64(value))
+}
+
+// GetBLSPrivateKeyFromInt returns bls private key
+func GetBLSPrivateKeyFromInt(value int) *bls.SecretKey {
+	priKey := [32]byte{}
+	binary.LittleEndian.PutUint32(priKey[:], uint32(value))
+	var privateKey bls.SecretKey
+	privateKey.SetLittleEndian(priKey[:])
+	return &privateKey
 }
 
 // GetPrivateKeyFromInt returns private key in bytes given an interger.

@@ -5,7 +5,8 @@
 .vscode
 
 # Executables
-harmony-benchmark
+harmony
+main
 *.pyc
 *.exe
 *.out
@@ -41,3 +42,12 @@ tmp_log
 
 # Others
 *.png
+
+# beacon chain data
+bc_config.json
+
+# leveldb local storage
+db/
+
+# bootnode keystore
+.bnkey
