@@ -74,41 +74,41 @@ type Store struct {
 }
 
 // Register new service to service store.
-func (ss *Store) Register(t Type, service Interface) {
-	if ss.services == nil {
-		ss.services = make(map[Type]Interface)
+func (s *Store) Register(t Type, service Interface) {
+	if s.services == nil {
+		s.services = make(map[Type]Interface)
 	}
-	ss.services[t] = service
+	s.services[t] = service
 }
 
 // SetupServiceManager inits service map and start service manager.
-func (ss *Store) SetupServiceManager() {
-	ss.InitServiceMap()
-	ss.actionChannel = ss.StartServiceManager()
+func (s *Store) SetupServiceManager() {
+	s.InitServiceMap()
+	s.actionChannel = s.StartServiceManager()
 }
 
 // RegisterService is used for testing.
-func (ss *Store) RegisterService(t Type, service Interface) {
-	ss.Register(t, service)
+func (s *Store) RegisterService(t Type, service Interface) {
+	s.Register(t, service)
 }
 
 // InitServiceMap initializes service map.
-func (ss *Store) InitServiceMap() {
-	ss.services = make(map[Type]Interface)
+func (s *Store) InitServiceMap() {
+	s.services = make(map[Type]Interface)
 }
 
 // SendAction sends action to action channel which is observed by service manager.
-func (ss *Store) SendAction(action *Action) {
-	ss.actionChannel <- action
+func (s *Store) SendAction(action *Action) {
+	s.actionChannel <- action
 }
 
 // TakeAction is how service manager handles the action.
-func (ss *Store) TakeAction(action *Action) {
-	if ss.services == nil {
+func (s *Store) TakeAction(action *Action) {
+	if s.services == nil {
 		utils.GetLogInstance().Error("Service store is not initialized.")
 		return
 	}
-	if service, ok := ss.services[action.serviceType]; ok {
+	if service, ok := s.services[action.serviceType]; ok {
 		switch action.action {
 		case Start:
 			fmt.Printf("Start %s\n", action.serviceType)
@@ -121,13 +121,13 @@ func (ss *Store) TakeAction(action *Action) {
 }
 
 // StartServiceManager starts service manager.
-func (ss *Store) StartServiceManager() chan *Action {
+func (s *Store) StartServiceManager() chan *Action {
 	ch := make(chan *Action)
 	go func() {
 		for {
 			select {
 			case action := <-ch:
-				ss.TakeAction(action)
+				s.TakeAction(action)
 				if action.serviceType == Done {
 					return
 				}
