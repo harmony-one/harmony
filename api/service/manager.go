@@ -22,7 +22,7 @@ type Type byte
 // Constants for Type.
 const (
 	SupportSyncing Type = iota
-	SupportClient
+	ClientSupport
 	SupportExplorer
 	Consensus
 	BlockProposal
@@ -33,8 +33,8 @@ const (
 
 func (t Type) String() string {
 	switch t {
-	case SupportClient:
-		return "SupportClient"
+	case ClientSupport:
+		return "ClientSupport"
 	case SupportSyncing:
 		return "SyncingSupport"
 	case SupportExplorer:
