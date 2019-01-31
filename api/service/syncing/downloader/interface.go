@@ -1,7 +1,7 @@
 package downloader
 
 import (
-	pb "github.com/harmony-one/harmony/api/services/syncing/downloader/proto"
+	pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
 )
 
 // DownloadInterface is the interface for downloader package.

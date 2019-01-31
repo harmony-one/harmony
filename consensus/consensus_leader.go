@@ -9,7 +9,7 @@ import (
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"
-	"github.com/harmony-one/harmony/api/services/explorer"
+	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/profiler"
