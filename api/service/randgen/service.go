@@ -1,4 +1,4 @@
-package rgen
+package randgen
 
 import (
 	"github.com/harmony-one/harmony/internal/utils"
