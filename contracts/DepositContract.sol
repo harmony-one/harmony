@@ -10,7 +10,7 @@ contract DepositContract {
   event LogUpdateStake(address indexed nodeAddress, uint index,  uint stake);
   event LogDeleteNode(address indexed nodeAddress, uint index);
   
-  function isNode(address nodeAddress) public constant returns(bool isIndeed) 
+  function isNodeAddress(address nodeAddress) public constant returns(bool isIndeed) 
   {
     if(nodeAddressList.length == 0) return false;
     return (nodeAddressList[Indices[nodeAddress]] == nodeAddress);
