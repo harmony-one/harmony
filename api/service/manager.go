@@ -26,6 +26,7 @@ const (
 	SupportExplorer
 	Consensus
 	BlockProposal
+	PeerDiscovery
 	Test
 	Done
 )
@@ -42,6 +43,8 @@ func (t Type) String() string {
 		return "Consensus"
 	case BlockProposal:
 		return "BlockProposal"
+	case PeerDiscovery:
+		return "PeerDiscovery"
 	case Test:
 		return "Test"
 	case Done:
