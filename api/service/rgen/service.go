@@ -1,35 +1,35 @@
-package service
+package rgen
 
 import (
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
-// RandomGeneration is the consensus service.
-type RandomGeneration struct {
+// Service is the random generation service.
+type Service struct {
 	stopChan    chan struct{}
 	stoppedChan chan struct{}
 }
 
-// NewRandomGeneration returns random generation service.
-func NewRandomGeneration() *RandomGeneration {
-	return &RandomGeneration{}
+// NewService returns random generation service.
+func NewService() *Service {
+	return &Service{}
 }
 
 // StartService starts random generation service.
-func (cs *RandomGeneration) StartService() {
-	cs.stopChan = make(chan struct{})
-	cs.stoppedChan = make(chan struct{})
+func (s *Service) StartService() {
+	s.stopChan = make(chan struct{})
+	s.stoppedChan = make(chan struct{})
 
-	cs.Init()
-	cs.Run(cs.stopChan, cs.stoppedChan)
+	s.Init()
+	s.Run(s.stopChan, s.stoppedChan)
 }
 
 // Init initializes random generation.
-func (cs *RandomGeneration) Init() {
+func (s *Service) Init() {
 }
 
 // Run runs random generation.
-func (cs *RandomGeneration) Run(stopChan chan struct{}, stoppedChan chan struct{}) {
+func (s *Service) Run(stopChan chan struct{}, stoppedChan chan struct{}) {
 	go func() {
 		defer close(stoppedChan)
 		for {
@@ -37,7 +37,7 @@ func (cs *RandomGeneration) Run(stopChan chan struct{}, stoppedChan chan struct{
 			default:
 				utils.GetLogInstance().Info("Running random generation")
 				// Write some logic here.
-				cs.DoRandomGeneration()
+				s.DoRandomGeneration()
 			case <-stopChan:
 				return
 			}
@@ -46,14 +46,14 @@ func (cs *RandomGeneration) Run(stopChan chan struct{}, stoppedChan chan struct{
 }
 
 // DoRandomGeneration does random generation.
-func (cs *RandomGeneration) DoRandomGeneration() {
+func (s *Service) DoRandomGeneration() {
 
 }
 
 // StopService stops random generation service.
-func (cs *RandomGeneration) StopService() {
+func (s *Service) StopService() {
 	utils.GetLogInstance().Info("Stopping random generation service.")
-	cs.stopChan <- struct{}{}
-	<-cs.stoppedChan
+	s.stopChan <- struct{}{}
+	<-s.stoppedChan
 	utils.GetLogInstance().Info("Random generation stopped.")
 }
