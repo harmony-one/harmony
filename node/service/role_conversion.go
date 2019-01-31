@@ -16,26 +16,28 @@ func NewRoleConversion() *RoleConversion {
 }
 
 // StartService starts role conversion service.
-func (cs *RoleConversion) StartService() {
-	cs.stopChan = make(chan struct{})
-	cs.stoppedChan = make(chan struct{})
+func (rc *RoleConversion) StartService() {
+	rc.stopChan = make(chan struct{})
+	rc.stoppedChan = make(chan struct{})
 
-	cs.Init()
-	cs.Run(cs.stopChan, cs.stoppedChan)
+	rc.Init()
+	rc.Run(rc.stopChan, rc.stoppedChan)
 }
 
 // Init initializes role conversion service.
-func (cs *RoleConversion) Init() {
+func (rc *RoleConversion) Init() {
 }
 
 // Run runs role conversion.
-func (cs *RoleConversion) Run(stopChan chan struct{}, stoppedChan chan struct{}) {
+func (rc *RoleConversion) Run(stopChan chan struct{}, stoppedChan chan struct{}) {
 	go func() {
 		defer close(stoppedChan)
 		for {
 			select {
 			default:
 				utils.GetLogInstance().Info("Running role conversion")
+				// TODO: Write some logic here.
+				rc.DoRoleConversion()
 			case <-stopChan:
 				return
 			}
@@ -43,10 +45,14 @@ func (cs *RoleConversion) Run(stopChan chan struct{}, stoppedChan chan struct{})
 	}()
 }
 
+// DoRoleConversion does role conversion.
+func (rc *RoleConversion) DoRoleConversion() {
+}
+
 // StopService stops role conversion service.
-func (cs *RoleConversion) StopService() {
+func (rc *RoleConversion) StopService() {
 	utils.GetLogInstance().Info("Stopping role conversion service.")
-	cs.stopChan <- struct{}{}
-	<-cs.stoppedChan
+	rc.stopChan <- struct{}{}
+	<-rc.stoppedChan
 	utils.GetLogInstance().Info("Role conversion stopped.")
 }
