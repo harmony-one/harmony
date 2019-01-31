@@ -216,9 +216,6 @@ func main() {
 	}
 
 	go currentNode.SupportSyncing()
-	if consensus.IsLeader {
-		// go currentNode.SupportClient()
-	}
 	currentNode.ServiceManagerSetup()
 	currentNode.RunServices()
 	currentNode.StartServer()
