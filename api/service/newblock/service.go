@@ -6,13 +6,15 @@ import (
 
 // Service is the new block service.
 type Service struct {
-	stopChan    chan struct{}
-	stoppedChan chan struct{}
+	stopChan              chan struct{}
+	stoppedChan           chan struct{}
+	readySignal           chan struct{}
+	waitForConsensusReady func(readySignal chan struct{}, stopChan chan struct{}, stoppedChan chan struct{})
 }
 
 // NewService returns new block service.
-func NewService() *Service {
-	return &Service{}
+func NewService(readySignal chan struct{}, waitForConsensusReady func(readySignal chan struct{}, stopChan chan struct{}, stoppedChan chan struct{})) *Service {
+	return &Service{readySignal: readySignal, waitForConsensusReady: waitForConsensusReady}
 }
 
 // StartService starts new block service.
@@ -30,23 +32,7 @@ func (s *Service) Init() {
 
 // Run runs new block.
 func (s *Service) Run(stopChan chan struct{}, stoppedChan chan struct{}) {
-	go func() {
-		defer close(stoppedChan)
-		for {
-			select {
-			default:
-				utils.GetLogInstance().Info("Running new block")
-				// TODO: Write some logic here.
-				s.DoService()
-			case <-stopChan:
-				return
-			}
-		}
-	}()
-}
-
-// DoService does new block.
-func (s *Service) DoService() {
+	s.waitForConsensusReady(s.readySignal, s.stopChan, s.stoppedChan)
 }
 
 // StopService stops new block service.
