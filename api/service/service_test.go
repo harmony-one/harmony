@@ -1,4 +1,4 @@
-package node
+package service
 
 import (
 	"fmt"
@@ -18,16 +18,16 @@ func (s *SupportSyncingTest) StopService() {
 
 // Test TakeAction.
 func TestTakeAction(t *testing.T) {
-	node := &Node{}
-	node.SetupServiceManager()
-	node.RegisterService(SupportSyncing, &SupportSyncingTest{})
+	store := &Store{}
+	store.SetupServiceManager()
+	store.RegisterService(SupportSyncing, &SupportSyncingTest{})
 
 	for i := 0; i < 2; i++ {
 		select {
 		case <-time.After(WaitForStatusUpdate):
-			node.SendAction(&Action{action: Start, serviceType: SupportSyncing})
+			store.SendAction(&Action{action: Start, serviceType: SupportSyncing})
 		}
 	}
 
-	node.SendAction(&Action{serviceType: Done})
+	store.SendAction(&Action{serviceType: Done})
 }
