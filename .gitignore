@@ -57,3 +57,6 @@ db/
 
 # vendor directory
 vendor
+
+# node_modules
+node_modules/
