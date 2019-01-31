@@ -48,12 +48,7 @@ func TestAllocateShard(t *testing.T) {
 
 // Test for GenKey
 func TestGenKey(t *testing.T) {
-	GenKey("3.3.3.3", "3456")
-}
-
-// Test for GenKeyBLS
-func TestGenKeyBLS(t *testing.T) {
-	priKey, pubKey := GenKeyBLS("3.3.3.3", "3456")
+	priKey, pubKey := GenKey("3.3.3.3", "3456")
 	if priKey == nil || pubKey == nil {
 		t.Error("Failed to create keys for BLS sig")
 	}

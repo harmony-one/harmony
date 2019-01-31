@@ -449,7 +449,6 @@ func (consensus *Consensus) DebugPrintValidators() {
 // UpdatePublicKeys updates the PublicKeys variable, protected by a mutex
 func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int {
 	consensus.pubKeyLock.Lock()
-	//	consensus.PublicKeys = make([]kyber.Point, len(pubKeys))
 	consensus.PublicKeys = append(pubKeys[:0:0], pubKeys...)
 	consensus.pubKeyLock.Unlock()
 

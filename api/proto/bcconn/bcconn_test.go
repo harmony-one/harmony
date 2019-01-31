@@ -13,7 +13,7 @@ func TestSerializeDeserializeNodeInfo(t *testing.T) {
 	var ip, port string
 	ip = "127.0.0.1"
 	port = "8080"
-	_, pk := utils.GenKeyBLS(ip, port)
+	_, pk := utils.GenKey(ip, port)
 	pkb := pk.Serialize()
 	nodeInfo := &node.Info{IP: ip, Port: port, PubKey: pkb}
 	serializedNI := SerializeNodeInfo(nodeInfo)
@@ -29,13 +29,13 @@ func TestSerializeDeserializeRandomInfo(t *testing.T) {
 
 	ip = "127.0.0.1"
 	port = "8080"
-	_, pk := utils.GenKeyBLS(ip, port)
+	_, pk := utils.GenKey(ip, port)
 	pkb := pk.Serialize()
 	nodeInfo1 := &node.Info{IP: ip, Port: port, PubKey: pkb}
 
 	ip = "127.0.0.1"
 	port = "9080"
-	_, pk2 := utils.GenKeyBLS(ip, port)
+	_, pk2 := utils.GenKey(ip, port)
 	pkb2 := pk2.Serialize()
 	nodeInfo2 := &node.Info{IP: ip, Port: port, PubKey: pkb2}
 

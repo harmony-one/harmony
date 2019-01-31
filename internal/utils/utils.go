@@ -13,10 +13,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/dedis/kyber"
 	"github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/crypto"
-	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/p2p"
 	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
 )
@@ -75,16 +72,8 @@ func GetUniqueIDFromIPPort(ip, port string) uint32 {
 	return uint32(value)
 }
 
-// GenKey generates a key given ip and port.
-func GenKey(ip, port string) (kyber.Scalar, kyber.Point) {
-	priKey := crypto.Ed25519Curve.Scalar().SetInt64(int64(GetUniqueIDFromIPPort(ip, port))) // TODO: figure out why using a random hash value doesn't work for private key (schnorr)
-	pubKey := pki.GetPublicKeyFromScalar(priKey)
-
-	return priKey, pubKey
-}
-
-// GenKeyBLS generates a bls key pair given ip and port.
-func GenKeyBLS(ip, port string) (*bls.SecretKey, *bls.PublicKey) {
+// GenKey generates a bls key pair given ip and port.
+func GenKey(ip, port string) (*bls.SecretKey, *bls.PublicKey) {
 	nodeIDBytes := make([]byte, 32)
 	binary.LittleEndian.PutUint32(nodeIDBytes, GetUniqueIDFromIPPort(ip, port))
 	privateKey := bls.SecretKey{}

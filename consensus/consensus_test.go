@@ -37,11 +37,11 @@ func TestNew(test *testing.T) {
 }
 
 func TestRemovePeers(t *testing.T) {
-	_, pk1 := utils.GenKeyBLS("1", "1")
-	_, pk2 := utils.GenKeyBLS("2", "2")
-	_, pk3 := utils.GenKeyBLS("3", "3")
-	_, pk4 := utils.GenKeyBLS("4", "4")
-	_, pk5 := utils.GenKeyBLS("5", "5")
+	_, pk1 := utils.GenKey("1", "1")
+	_, pk2 := utils.GenKey("2", "2")
+	_, pk3 := utils.GenKey("3", "3")
+	_, pk4 := utils.GenKey("4", "4")
+	_, pk5 := utils.GenKey("5", "5")
 
 	p1 := p2p.Peer{IP: "127.0.0.1", Port: "19901", PubKey: pk1}
 	p2 := p2p.Peer{IP: "127.0.0.1", Port: "19902", PubKey: pk2}
