@@ -1,4 +1,4 @@
-package node
+package service
 
 import (
 	"fmt"
@@ -16,12 +16,12 @@ const (
 	Stop
 )
 
-// ServiceType is service type.
-type ServiceType byte
+// Type is service type.
+type Type byte
 
 // Constants for Type.
 const (
-	SupportSyncing ServiceType = iota
+	SupportSyncing Type = iota
 	SupportClient
 	SupportExplorer
 	Consensus
@@ -29,7 +29,7 @@ const (
 	Done
 )
 
-func (t ServiceType) String() string {
+func (t Type) String() string {
 	switch t {
 	case SupportClient:
 		return "SupportClient"
@@ -57,57 +57,58 @@ const (
 // Action is type of service action.
 type Action struct {
 	action      ActionType
-	serviceType ServiceType
+	serviceType Type
 	params      map[string]interface{}
 }
 
-// ServiceInterface is the collection of functions any service needs to implement.
-type ServiceInterface interface {
+// Interface is the collection of functions any service needs to implement.
+type Interface interface {
 	StartService()
 	StopService()
 }
 
-// ServiceStore stores all services for service manager.
-type ServiceStore struct {
-	services map[ServiceType]ServiceInterface
+// Store stores all services for service manager.
+type Store struct {
+	services      map[Type]Interface
+	actionChannel chan *Action
 }
 
 // Register new service to service store.
-func (ss *ServiceStore) Register(t ServiceType, service ServiceInterface) {
+func (ss *Store) Register(t Type, service Interface) {
 	if ss.services == nil {
-		ss.services = make(map[ServiceType]ServiceInterface)
+		ss.services = make(map[Type]Interface)
 	}
 	ss.services[t] = service
 }
 
 // SetupServiceManager inits service map and start service manager.
-func (node *Node) SetupServiceManager() {
-	node.InitServiceMap()
-	node.actionChannel = node.StartServiceManager()
+func (ss *Store) SetupServiceManager() {
+	ss.InitServiceMap()
+	ss.actionChannel = ss.StartServiceManager()
 }
 
 // RegisterService is used for testing.
-func (node *Node) RegisterService(t ServiceType, service ServiceInterface) {
-	node.serviceStore.Register(t, service)
+func (ss *Store) RegisterService(t Type, service Interface) {
+	ss.Register(t, service)
 }
 
 // InitServiceMap initializes service map.
-func (node *Node) InitServiceMap() {
-	node.serviceStore = &ServiceStore{services: make(map[ServiceType]ServiceInterface)}
+func (ss *Store) InitServiceMap() {
+	ss.services = make(map[Type]Interface)
 }
 
 // SendAction sends action to action channel which is observed by service manager.
-func (node *Node) SendAction(action *Action) {
-	node.actionChannel <- action
+func (ss *Store) SendAction(action *Action) {
+	ss.actionChannel <- action
 }
 
 // TakeAction is how service manager handles the action.
-func (node *Node) TakeAction(action *Action) {
-	if node.serviceStore == nil {
+func (ss *Store) TakeAction(action *Action) {
+	if ss.services == nil {
 		utils.GetLogInstance().Error("Service store is not initialized.")
 		return
 	}
-	if service, ok := node.serviceStore.services[action.serviceType]; ok {
+	if service, ok := ss.services[action.serviceType]; ok {
 		switch action.action {
 		case Start:
 			fmt.Printf("Start %s\n", action.serviceType)
@@ -120,13 +121,13 @@ func (node *Node) TakeAction(action *Action) {
 }
 
 // StartServiceManager starts service manager.
-func (node *Node) StartServiceManager() chan *Action {
+func (ss *Store) StartServiceManager() chan *Action {
 	ch := make(chan *Action)
 	go func() {
 		for {
 			select {
 			case action := <-ch:
-				node.TakeAction(action)
+				ss.TakeAction(action)
 				if action.serviceType == Done {
 					return
 				}
