@@ -211,10 +211,6 @@ func main() {
 
 	if consensus.IsLeader {
 		currentNode.State = node.NodeLeader
-		// Node waiting for consensus readiness to create new block
-		go func() {
-			currentNode.WaitForConsensusReady(consensus.ReadySignal)
-		}()
 	} else {
 		go currentNode.JoinShard(leader)
 	}

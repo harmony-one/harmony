@@ -27,6 +27,7 @@ import (
 	service_manager "github.com/harmony-one/harmony/api/service"
 	consensus_service "github.com/harmony-one/harmony/api/service/consensus"
 	"github.com/harmony-one/harmony/api/service/explorer"
+	newblock "github.com/harmony-one/harmony/api/service/newblock"
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
 	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
@@ -639,6 +640,8 @@ func (node *Node) setupForShardLeader() {
 	node.serviceManager.RegisterService(service_manager.SupportExplorer, explorer.New(&node.SelfPeer))
 	// Register consensus service.
 	node.serviceManager.RegisterService(service_manager.Consensus, consensus_service.NewService(node.BlockChannel, node.Consensus))
+	// Register new block service.
+	node.serviceManager.RegisterService(service_manager.NewBlock, newblock.NewService(node.Consensus.ReadySignal, node.WaitForConsensusReady))
 }
 
 func (node *Node) setupForShardValidator() {
