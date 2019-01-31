@@ -1,4 +1,4 @@
-package newblock
+package blockproposal
 
 import (
 	"github.com/harmony-one/harmony/internal/utils"
