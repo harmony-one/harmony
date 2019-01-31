@@ -34,6 +34,7 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/node/service"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
 )
@@ -649,8 +650,8 @@ func (node *Node) AddAndRunServices() {
 		node.RegisterService(SupportExplorer, explorer.New(&node.SelfPeer))
 		node.actionChannel <- &Action{action: Start, serviceType: SupportExplorer}
 
-		// node.RegisterService(Consensus, service.NewConsensusService(node.BlockChannel, node.Consensus))
-		// node.actionChannel <- &Action{action: Start, serviceType: Consensus}
+		node.RegisterService(Consensus, service.NewConsensusService(node.BlockChannel, node.Consensus))
+		node.actionChannel <- &Action{action: Start, serviceType: Consensus}
 
 		// node.RegisterService(SupportClient, service.NewSupportClient(node.blockchain.State, node.CallFaucetContract, node.SelfPeer.IP, node.SelfPeer.Port))
 		// node.actionChannel <- &Action{action: Start, serviceType: SupportClient}
