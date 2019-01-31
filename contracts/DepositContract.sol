@@ -1,4 +1,4 @@
-pragma solidity ^0.4.22;
+pragma solidity >=0.4.22;
 
 contract DepositContract {
 
@@ -10,7 +10,7 @@ contract DepositContract {
   event LogUpdateStake(address indexed nodeAddress, uint index,  uint stake);
   event LogDeleteNode(address indexed nodeAddress, uint index);
   
-  function isNodeAddress(address nodeAddress) public constant returns(bool isIndeed) 
+  function isNodeAddress(address nodeAddress) public view returns(bool isIndeed) 
   {
     if(nodeAddressList.length == 0) return false;
     return (nodeAddressList[Indices[nodeAddress]] == nodeAddress);
@@ -59,16 +59,15 @@ function deposit() public payable returns(uint index)
   }
 
 
-  function getNodeCount() public constant returns(uint count)
+  function getNodeCount() public view returns(uint count)
   {
     return nodeAddressList.length;
   }
 
-  function getStakedNodeList() public constant returns(address[] stakedNodeList)
-  {
-
+ function getStakedNodeList() public view returns(address[] memory stakedNodeList)
+ {
     return nodeAddressList;
-  }
+}
 
 
 
