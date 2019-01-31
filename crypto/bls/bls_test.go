@@ -9,9 +9,9 @@ import (
 
 // Test the basic functionality of a BLS multi-sig mask.
 func TestNewMask(test *testing.T) {
-	_, pubKey1 := utils.GenKeyBLS("127.0.0.1", "5555")
-	_, pubKey2 := utils.GenKeyBLS("127.0.0.1", "6666")
-	_, pubKey3 := utils.GenKeyBLS("127.0.0.1", "7777")
+	_, pubKey1 := utils.GenKey("127.0.0.1", "5555")
+	_, pubKey2 := utils.GenKey("127.0.0.1", "6666")
+	_, pubKey3 := utils.GenKey("127.0.0.1", "7777")
 
 	mask, err := NewMask([]*bls.PublicKey{pubKey1, pubKey2, pubKey3}, pubKey1)
 

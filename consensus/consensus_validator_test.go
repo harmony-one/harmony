@@ -23,14 +23,14 @@ func TestProcessMessageValidatorAnnounce(test *testing.T) {
 	defer ctrl.Finish()
 
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "9982"}
-	_, leader.PubKey = utils.GenKeyBLS(leader.IP, leader.Port)
+	_, leader.PubKey = utils.GenKey(leader.IP, leader.Port)
 
 	validator1 := p2p.Peer{IP: "127.0.0.1", Port: "9984", ValidatorID: 1}
-	_, validator1.PubKey = utils.GenKeyBLS(validator1.IP, validator1.Port)
+	_, validator1.PubKey = utils.GenKey(validator1.IP, validator1.Port)
 	validator2 := p2p.Peer{IP: "127.0.0.1", Port: "9986", ValidatorID: 2}
-	_, validator2.PubKey = utils.GenKeyBLS(validator2.IP, validator2.Port)
+	_, validator2.PubKey = utils.GenKey(validator2.IP, validator2.Port)
 	validator3 := p2p.Peer{IP: "127.0.0.1", Port: "9988", ValidatorID: 3}
-	_, validator3.PubKey = utils.GenKeyBLS(validator3.IP, validator3.Port)
+	_, validator3.PubKey = utils.GenKey(validator3.IP, validator3.Port)
 
 	m := mock_host.NewMockHost(ctrl)
 	// Asserts that the first and only call to Bar() is passed 99.
@@ -77,14 +77,14 @@ func TestProcessMessageValidatorPrepared(test *testing.T) {
 	defer ctrl.Finish()
 
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "7782"}
-	_, leader.PubKey = utils.GenKeyBLS(leader.IP, leader.Port)
+	_, leader.PubKey = utils.GenKey(leader.IP, leader.Port)
 
 	validator1 := p2p.Peer{IP: "127.0.0.1", Port: "7784", ValidatorID: 1}
-	_, validator1.PubKey = utils.GenKeyBLS(validator1.IP, validator1.Port)
+	_, validator1.PubKey = utils.GenKey(validator1.IP, validator1.Port)
 	validator2 := p2p.Peer{IP: "127.0.0.1", Port: "7786", ValidatorID: 2}
-	_, validator2.PubKey = utils.GenKeyBLS(validator2.IP, validator2.Port)
+	_, validator2.PubKey = utils.GenKey(validator2.IP, validator2.Port)
 	validator3 := p2p.Peer{IP: "127.0.0.1", Port: "7788", ValidatorID: 3}
-	_, validator3.PubKey = utils.GenKeyBLS(validator3.IP, validator3.Port)
+	_, validator3.PubKey = utils.GenKey(validator3.IP, validator3.Port)
 
 	m := mock_host.NewMockHost(ctrl)
 	// Asserts that the first and only call to Bar() is passed 99.
@@ -137,14 +137,14 @@ func TestProcessMessageValidatorCommitted(test *testing.T) {
 	defer ctrl.Finish()
 
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "7782"}
-	_, leader.PubKey = utils.GenKeyBLS(leader.IP, leader.Port)
+	_, leader.PubKey = utils.GenKey(leader.IP, leader.Port)
 
 	validator1 := p2p.Peer{IP: "127.0.0.1", Port: "7784", ValidatorID: 1}
-	_, validator1.PubKey = utils.GenKeyBLS(validator1.IP, validator1.Port)
+	_, validator1.PubKey = utils.GenKey(validator1.IP, validator1.Port)
 	validator2 := p2p.Peer{IP: "127.0.0.1", Port: "7786", ValidatorID: 2}
-	_, validator2.PubKey = utils.GenKeyBLS(validator2.IP, validator2.Port)
+	_, validator2.PubKey = utils.GenKey(validator2.IP, validator2.Port)
 	validator3 := p2p.Peer{IP: "127.0.0.1", Port: "7788", ValidatorID: 3}
-	_, validator3.PubKey = utils.GenKeyBLS(validator3.IP, validator3.Port)
+	_, validator3.PubKey = utils.GenKey(validator3.IP, validator3.Port)
 
 	m := mock_host.NewMockHost(ctrl)
 	// Asserts that the first and only call to Bar() is passed 99.

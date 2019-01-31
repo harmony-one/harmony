@@ -4,9 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 
-	"github.com/dedis/kyber"
 	"github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/crypto"
 )
 
 func init() {
@@ -42,11 +40,6 @@ func GetAddressFromInt(value int) [20]byte {
 	return GetAddressFromPrivateKeyBytes(priKey)
 }
 
-// GetPrivateKeyScalarFromInt return private key scalar.
-func GetPrivateKeyScalarFromInt(value int) kyber.Scalar {
-	return crypto.Ed25519Curve.Scalar().SetInt64(int64(value))
-}
-
 // GetBLSPrivateKeyFromInt returns bls private key
 func GetBLSPrivateKeyFromInt(value int) *bls.SecretKey {
 	priKey := [32]byte{}
@@ -54,37 +47,4 @@ func GetBLSPrivateKeyFromInt(value int) *bls.SecretKey {
 	var privateKey bls.SecretKey
 	privateKey.SetLittleEndian(priKey[:])
 	return &privateKey
-}
-
-// GetPrivateKeyFromInt returns private key in bytes given an interger.
-func GetPrivateKeyFromInt(value int) [32]byte {
-	priKey, err := crypto.Ed25519Curve.Scalar().SetInt64(int64(value)).MarshalBinary()
-	priKeyBytes := [32]byte{}
-	if err == nil {
-		copy(priKeyBytes[:], priKey[:])
-	}
-	return priKeyBytes
-}
-
-// GetPublicKeyFromPrivateKey return public key from private key.
-func GetPublicKeyFromPrivateKey(priKey [32]byte) kyber.Point {
-	suite := crypto.Ed25519Curve
-	scalar := suite.Scalar()
-	scalar.UnmarshalBinary(priKey[:])
-	return suite.Point().Mul(scalar, nil)
-}
-
-// GetPublicKeyFromScalar is the same as GetPublicKeyFromPrivateKey, but it directly works on kyber.Scalar object.
-func GetPublicKeyFromScalar(priKey kyber.Scalar) kyber.Point {
-	return crypto.Ed25519Curve.Point().Mul(priKey, nil)
-}
-
-// GetBytesFromPublicKey converts public key point to bytes
-func GetBytesFromPublicKey(pubKey kyber.Point) [32]byte {
-	bytes, err := pubKey.MarshalBinary()
-	result := [32]byte{}
-	if err == nil {
-		copy(result[:], bytes)
-	}
-	return result
 }

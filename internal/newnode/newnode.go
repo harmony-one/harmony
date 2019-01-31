@@ -39,7 +39,7 @@ type NewNode struct {
 
 // New candidatenode initialization
 func New(ip string, port string, nodePk p2p_crypto.PrivKey) *NewNode {
-	priKey, pubKey := utils.GenKeyBLS(ip, port)
+	priKey, pubKey := utils.GenKey(ip, port)
 	var node NewNode
 	var err error
 	node.PubK = pubKey
@@ -131,7 +131,7 @@ func (node *NewNode) processShardInfo(msgPayload []byte) bool {
 		leaderPeer.PubKey = &bls.PublicKey{}
 		err = leaderPeer.PubKey.Deserialize(v.PubKey[:])
 		if err != nil {
-			node.log.Error("Could not unmarshall leaders public key from binary to kyber.point")
+			node.log.Error("Could not unmarshall leaders public key from binary")
 		}
 		node.Leaders[uint32(n)] = leaderPeer
 	}

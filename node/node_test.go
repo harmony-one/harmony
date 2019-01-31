@@ -15,7 +15,7 @@ import (
 )
 
 func TestNewNode(t *testing.T) {
-	_, pubKey := utils.GenKeyBLS("1", "2")
+	_, pubKey := utils.GenKey("1", "2")
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", PubKey: pubKey}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "8885"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
@@ -39,7 +39,7 @@ func TestNewNode(t *testing.T) {
 }
 
 func TestGetSyncingPeers(t *testing.T) {
-	_, pubKey := utils.GenKeyBLS("1", "2")
+	_, pubKey := utils.GenKey("1", "2")
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", PubKey: pubKey}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "8885"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
@@ -82,7 +82,7 @@ func TestAddPeers(t *testing.T) {
 			ValidatorID: 2,
 		},
 	}
-	_, pubKey := utils.GenKeyBLS("1", "2")
+	_, pubKey := utils.GenKey("1", "2")
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8982", PubKey: pubKey}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "8985"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
@@ -156,7 +156,7 @@ func exitServer() {
 }
 
 func TestPingPongHandler(t *testing.T) {
-	_, pubKey := utils.GenKeyBLS("127.0.0.1", "8881")
+	_, pubKey := utils.GenKey("127.0.0.1", "8881")
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8881", PubKey: pubKey}
 	//   validator := p2p.Peer{IP: "127.0.0.1", Port: "9991"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
