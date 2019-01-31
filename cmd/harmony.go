@@ -212,8 +212,6 @@ func main() {
 
 	if consensus.IsLeader {
 		currentNode.State = node.NodeLeader
-		// Let consensus run
-		consensus.WaitForNewBlock(currentNode.BlockChannel, nil, nil)
 		// Node waiting for consensus readiness to create new block
 		go func() {
 			currentNode.WaitForConsensusReady(consensus.ReadySignal)
