@@ -56,8 +56,8 @@ const (
 
 // Action is type of service action.
 type Action struct {
-	action      ActionType
-	serviceType Type
+	Action      ActionType
+	ServiceType Type
 	params      map[string]interface{}
 }
 
@@ -73,7 +73,12 @@ type Manager struct {
 	actionChannel chan *Action
 }
 
-// Register new service to service store.
+// GetServices returns all registered services.
+func (m *Manager) GetServices() map[Type]Interface {
+	return m.services
+}
+
+// Register registers new service to service store.
 func (m *Manager) Register(t Type, service Interface) {
 	if m.services == nil {
 		m.services = make(map[Type]Interface)
@@ -108,13 +113,13 @@ func (m *Manager) TakeAction(action *Action) {
 		utils.GetLogInstance().Error("Service store is not initialized.")
 		return
 	}
-	if service, ok := m.services[action.serviceType]; ok {
-		switch action.action {
+	if service, ok := m.services[action.ServiceType]; ok {
+		switch action.Action {
 		case Start:
-			fmt.Printf("Start %s\n", action.serviceType)
+			fmt.Printf("Start %s\n", action.ServiceType)
 			service.StartService()
 		case Stop:
-			fmt.Printf("Stop %s\n", action.serviceType)
+			fmt.Printf("Stop %s\n", action.ServiceType)
 			service.StopService()
 		}
 	}
@@ -128,7 +133,7 @@ func (m *Manager) StartServiceManager() chan *Action {
 			select {
 			case action := <-ch:
 				m.TakeAction(action)
-				if action.serviceType == Done {
+				if action.ServiceType == Done {
 					return
 				}
 			case <-time.After(WaitForStatusUpdate):

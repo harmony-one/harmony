@@ -207,7 +207,6 @@ func main() {
 	// Assign closure functions to the consensus object
 	consensus.BlockVerifier = currentNode.VerifyNewBlock
 	consensus.OnConsensusDone = currentNode.PostConsensusProcessing
-
 	currentNode.State = node.NodeWaitToJoin
 
 	if consensus.IsLeader {
@@ -224,6 +223,7 @@ func main() {
 	if consensus.IsLeader {
 		go currentNode.SupportClient()
 	}
-	currentNode.AddAndRunServices()
+	currentNode.ServiceManagerSetup()
+	currentNode.RunServices()
 	currentNode.StartServer()
 }
