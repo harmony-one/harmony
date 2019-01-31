@@ -25,7 +25,7 @@ const (
 	SupportClient
 	SupportExplorer
 	Consensus
-	NewBlock
+	BlockProposal
 	Test
 	Done
 )
@@ -40,8 +40,8 @@ func (t Type) String() string {
 		return "SupportExplorer"
 	case Consensus:
 		return "Consensus"
-	case NewBlock:
-		return "NewBlock"
+	case BlockProposal:
+		return "BlockProposal"
 	case Test:
 		return "Test"
 	case Done:

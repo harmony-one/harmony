@@ -641,7 +641,7 @@ func (node *Node) setupForShardLeader() {
 	// Register consensus service.
 	node.serviceManager.RegisterService(service_manager.Consensus, consensus_service.NewService(node.BlockChannel, node.Consensus))
 	// Register new block service.
-	node.serviceManager.RegisterService(service_manager.NewBlock, newblock.NewService(node.Consensus.ReadySignal, node.WaitForConsensusReady))
+	node.serviceManager.RegisterService(service_manager.BlockProposal, newblock.NewService(node.Consensus.ReadySignal, node.WaitForConsensusReady))
 }
 
 func (node *Node) setupForShardValidator() {
