@@ -18,8 +18,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/harmony/api/services/syncing/downloader"
-	pb "github.com/harmony-one/harmony/api/services/syncing/downloader/proto"
+	"github.com/harmony-one/harmony/api/service/syncing/downloader"
+	pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/p2p"
 )

@@ -3,7 +3,7 @@ package syncing
 import (
 	"testing"
 
-	"github.com/harmony-one/harmony/api/services/syncing/downloader"
+	"github.com/harmony-one/harmony/api/service/syncing/downloader"
 	"github.com/stretchr/testify/assert"
 )
 

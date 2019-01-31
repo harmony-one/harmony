@@ -5,7 +5,7 @@ import (
 	"log"
 	"net"
 
-	pb "github.com/harmony-one/harmony/api/services/syncing/downloader/proto"
+	pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
 	"google.golang.org/grpc"
 )
 

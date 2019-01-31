@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	pb "github.com/harmony-one/harmony/api/services/syncing/downloader/proto"
+	pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
 	"github.com/harmony-one/harmony/internal/utils"
 	"google.golang.org/grpc"
 )
