@@ -36,11 +36,18 @@ func (cs *RandomGeneration) Run(stopChan chan struct{}, stoppedChan chan struct{
 			select {
 			default:
 				utils.GetLogInstance().Info("Running random generation")
+				// Write some logic here.
+				cs.DoRandomGeneration()
 			case <-stopChan:
 				return
 			}
 		}
 	}()
+}
+
+// DoRandomGeneration does random generation.
+func (cs *RandomGeneration) DoRandomGeneration() {
+
 }
 
 // StopService stops random generation service.
