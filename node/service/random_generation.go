@@ -48,5 +48,5 @@ func (cs *RandomGeneration) StopService() {
 	utils.GetLogInstance().Info("Stopping random generation service.")
 	cs.stopChan <- struct{}{}
 	<-cs.stoppedChan
-	utils.GetLogInstance().Info("Consensus random generation stopped.")
+	utils.GetLogInstance().Info("Random generation stopped.")
 }
