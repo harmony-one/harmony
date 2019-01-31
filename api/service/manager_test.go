@@ -18,16 +18,16 @@ func (s *SupportSyncingTest) StopService() {
 
 // Test TakeAction.
 func TestTakeAction(t *testing.T) {
-	store := &Store{}
-	store.SetupServiceManager()
-	store.RegisterService(SupportSyncing, &SupportSyncingTest{})
+	m := &Manager{}
+	m.SetupServiceManager()
+	m.RegisterService(SupportSyncing, &SupportSyncingTest{})
 
 	for i := 0; i < 2; i++ {
 		select {
 		case <-time.After(WaitForStatusUpdate):
-			store.SendAction(&Action{action: Start, serviceType: SupportSyncing})
+			m.SendAction(&Action{action: Start, serviceType: SupportSyncing})
 		}
 	}
 
-	store.SendAction(&Action{serviceType: Done})
+	m.SendAction(&Action{serviceType: Done})
 }
