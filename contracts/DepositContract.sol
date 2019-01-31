@@ -18,7 +18,7 @@ contract DepositContract {
 
 function deposit() public payable returns(uint index)
   {
-    if(isNode(msg.sender)) {
+    if(isNodeAddress(msg.sender)) {
     	Stakes[msg.sender] += msg.value;
     	emit LogUpdateStake(msg.sender, Indices[msg.sender], Stakes[msg.sender]);
    		return Indices[msg.sender];
