@@ -2,10 +2,10 @@ package discovery
 
 import (
 	"context"
-	"io"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/log"
+	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 
@@ -26,8 +26,6 @@ type Service struct {
 	Host       p2p.Host
 	DHT        *libp2pdht.IpfsDHT
 	Rendezvous string
-	reader     io.Reader
-	writer     io.Writer
 	ctx        context.Context
 }
 
@@ -75,9 +73,11 @@ func (s *Service) StartService() {
 		if peer.ID == s.Host.GetP2PHost().ID() {
 			continue
 		}
-		log.Debug("Found peer", "adding peer", peer)
+		log.Debug("Found Peer", "peer", peer.ID, "addr", peer.Addrs)
 		p := p2p.Peer{PeerID: peer.ID, Addrs: peer.Addrs}
 		s.Host.AddPeer(&p)
+		// TODO: stop ping if pinged before
+		s.pingPeer(p)
 	}
 
 	select {}
@@ -115,4 +115,12 @@ func (s *Service) Init() error {
 	wg.Wait()
 
 	return nil
+}
+
+func (s *Service) pingPeer(peer p2p.Peer) {
+	ping := proto_discovery.NewPingMessage(s.Host.GetSelfPeer())
+	buffer := ping.ConstructPingMessage()
+	log.Debug("Sending Ping Message to", "peer", peer)
+	s.Host.SendMessage(peer, buffer)
+	log.Debug("Sent Ping Message to", "peer", peer)
 }
