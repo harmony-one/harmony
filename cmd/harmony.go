@@ -13,14 +13,11 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/internal/attack"
-	pkg_newnode "github.com/harmony-one/harmony/internal/newnode"
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
-	peerstore "github.com/libp2p/go-libp2p-peerstore"
-	multiaddr "github.com/multiformats/go-multiaddr"
 )
 
 var (
@@ -89,14 +86,16 @@ func main() {
 	metricsReportURL := flag.String("metrics_report_url", "", "If set, reports metrics to this URL.")
 	versionFlag := flag.Bool("version", false, "Output version info")
 	onlyLogTps := flag.Bool("only_log_tps", false, "Only log TPS if true")
-
-	//This IP belongs to jenkins.harmony.one
-	bcIP := flag.String("bc", "127.0.0.1", "IP of the identity chain")
-	bcPort := flag.String("bc_port", "8081", "port of the identity chain")
-	bcAddr := flag.String("bc_addr", "", "MultiAddr of the identity chain")
-
-	//Leader needs to have a minimal number of peers to start consensus
+	// Leader needs to have a minimal number of peers to start consensus
 	minPeers := flag.Int("min_peers", 100, "Minimal number of Peers in shard")
+	// Key file to store the private key
+	keyFile := flag.String("key", "./.hmykey", "the private key file of the bootnode")
+	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress")
+
+	// The initial shard ID (TODO: leo) this is a workaround for initial blockchain bootstrap
+	shardID := flag.String("shardID", "0", "the shardID. 0 is beacon chain")
+	// This node is a leader node. (TODO: leo) this is also a workaround for initial blockchain bootstrap
+	isLeader := flag.Bool("leader", false, "false means the node is not a shard leader")
 
 	flag.Parse()
 
@@ -104,8 +103,33 @@ func main() {
 		printVersion(os.Args[0])
 	}
 
+	var peers []p2p.Peer
+	var leader p2p.Peer
+	var clientPeer *p2p.Peer
+	var selfPeer = p2p.Peer{IP: *ip, Port: *port}
+	_, selfPeer.PubKey = utils.GenKey(*ip, *port)
+
+	// Initialize leveldb if dbSupported.
+	var ldb *ethdb.LDBDatabase
+
 	// Logging setup
 	utils.SetPortAndIP(*port, *ip)
+
+	// set leader to be selfPeer if isLeader
+	if *isLeader {
+		leader = selfPeer
+		loggingInit(*logFolder, "leader", *ip, *port, *onlyLogTps)
+	} else {
+		loggingInit(*logFolder, "validator", *ip, *port, *onlyLogTps)
+	}
+
+	if len(utils.BootNodes) == 0 {
+		bootNodeAddrs, err := utils.StringsToAddrs(utils.DefaultBootNodeAddrStrings)
+		if err != nil {
+			panic(err)
+		}
+		utils.BootNodes = bootNodeAddrs
+	}
 
 	// Add GOMAXPROCS to achieve max performance.
 	runtime.GOMAXPROCS(1024)
@@ -113,78 +137,35 @@ func main() {
 	// Set up randomization seed.
 	rand.Seed(int64(time.Now().Nanosecond()))
 
-	var shardID string
-	var peers []p2p.Peer
-	var leader p2p.Peer
-	var selfPeer p2p.Peer
-	var clientPeer *p2p.Peer
-	var BCPeer *p2p.Peer
-	priKey, _, err := utils.GenKeyP2P(*ip, *port)
-
-	if *bcAddr != "" {
-		// Turn the destination into a multiaddr.
-		maddr, err := multiaddr.NewMultiaddr(*bcAddr)
-		if err != nil {
-			panic(err)
-		}
-
-		// Extract the peer ID from the multiaddr.
-		info, err := peerstore.InfoFromP2pAddr(maddr)
-		if err != nil {
-			panic(err)
-		}
-
-		BCPeer = &p2p.Peer{IP: *bcIP, Port: *bcPort, Addrs: info.Addrs, PeerID: info.ID}
-	} else {
-		BCPeer = &p2p.Peer{IP: *bcIP, Port: *bcPort}
-	}
-
-	//Use Peer Discovery to get shard/leader/peer/...
-	candidateNode := pkg_newnode.New(*ip, *port, priKey)
-	candidateNode.AddPeer(BCPeer)
-	candidateNode.ContactBeaconChain(*BCPeer)
-
-	shardID = candidateNode.GetShardID()
-	leader = candidateNode.GetLeader()
-	selfPeer = candidateNode.GetSelfPeer()
-	clientPeer = candidateNode.GetClientPeer()
-	selfPeer.PubKey = candidateNode.PubK
-
-	var role string
-	if leader.IP == *ip && leader.Port == *port {
-		role = "leader"
-	} else {
-		role = "validator"
-	}
-
-	if role == "validator" {
+	if !*isLeader {
 		// Attack determination.
 		attack.GetInstance().SetAttackEnabled(attackDetermination(*attackedMode))
 	}
-	// Init logging.
-	loggingInit(*logFolder, role, *ip, *port, *onlyLogTps)
 
-	// Initialize leveldb if dbSupported.
-	var ldb *ethdb.LDBDatabase
 	if *dbSupported {
 		ldb, _ = InitLDBDatabase(*ip, *port, *freshDB)
 	}
 
-	host, err := p2pimpl.NewHost(&selfPeer, priKey)
+	privKey, err := utils.LoadKeyFromFile(*keyFile)
+	if err != nil {
+		panic(err)
+	}
+
+	host, err := p2pimpl.NewHost(&selfPeer, privKey)
 	if err != nil {
 		panic("unable to new host in harmony")
 	}
 
-	host.AddPeer(&leader)
+	log.Info("HARMONY", "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, host.GetID().Pretty()))
 
 	// Consensus object.
-	consensus := consensus.New(host, shardID, peers, leader)
+	consensus := consensus.New(host, *shardID, peers, leader)
 	consensus.MinPeers = *minPeers
 
 	// Start Profiler for leader if profile argument is on
-	if role == "leader" && (*profile || *metricsReportURL != "") {
+	if *isLeader && (*profile || *metricsReportURL != "") {
 		prof := profiler.GetProfiler()
-		prof.Config(shardID, *metricsReportURL)
+		prof.Config(*shardID, *metricsReportURL)
 		if *profile {
 			prof.Start()
 		}
@@ -193,7 +174,8 @@ func main() {
 	// Current node.
 	currentNode := node.New(host, consensus, ldb)
 	currentNode.Consensus.OfflinePeers = currentNode.OfflinePeers
-	if role == "leader" {
+
+	if *isLeader {
 		currentNode.Role = node.ShardLeader
 	} else {
 		currentNode.Role = node.ShardValidator
@@ -210,13 +192,23 @@ func main() {
 	currentNode.State = node.NodeWaitToJoin
 
 	if consensus.IsLeader {
+		log.Info("I AM A LEADER", "peer", selfPeer)
 		currentNode.State = node.NodeLeader
 	} else {
-		go currentNode.JoinShard(leader)
+		// go currentNode.JoinShard(leader)
 	}
 
 	go currentNode.SupportSyncing()
+	if consensus.IsLeader {
+		go currentNode.SupportClient()
+	}
+
+	log.Info("ServiceManagerSetup")
 	currentNode.ServiceManagerSetup()
+
+	log.Info("RunServices")
 	currentNode.RunServices()
+
+	log.Info("StartServer")
 	currentNode.StartServer()
 }
