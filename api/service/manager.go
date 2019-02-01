@@ -44,6 +44,8 @@ func (t Type) String() string {
 		return "BlockProposal"
 	case Test:
 		return "Test"
+	case Staking:
+		return "Staking"
 	case Done:
 		return "Done"
 	default:
