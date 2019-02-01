@@ -28,6 +28,7 @@ import (
 	blockproposal "github.com/harmony-one/harmony/api/service/blockproposal"
 	"github.com/harmony-one/harmony/api/service/clientsupport"
 	consensus_service "github.com/harmony-one/harmony/api/service/consensus"
+	"github.com/harmony-one/harmony/api/service/discovery"
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/api/service/networkinfo"
 	"github.com/harmony-one/harmony/api/service/staking"
@@ -674,9 +675,13 @@ func (node *Node) setupForShardLeader() {
 	node.serviceManager.RegisterService(service_manager.BlockProposal, blockproposal.NewService(node.Consensus.ReadySignal, node.WaitForConsensusReady))
 	// Register client support service.
 	node.serviceManager.RegisterService(service_manager.ClientSupport, clientsupport.NewService(node.blockchain.State, node.CallFaucetContract, node.SelfPeer.IP, node.SelfPeer.Port))
+	// Register peer discovery service.
+	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, fmt.Sprintf("%v", node.Consensus.ShardID)))
 }
 
 func (node *Node) setupForShardValidator() {
+	// Register peer discovery service.
+	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, fmt.Sprintf("%v", node.Consensus.ShardID)))
 }
 
 func (node *Node) setupForBeaconLeader() {
