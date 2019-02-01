@@ -200,17 +200,8 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) bool {
 	err := node.blockchain.ValidateNewBlock(newBlock, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey))
 	if err != nil {
 		utils.GetLogInstance().Debug("Failed verifying new block", "Error", err, "tx", newBlock.Transactions()[0])
-
-		// send consensus block to state syncing
-		select {
-		case node.Consensus.ConsensusBlock <- newBlock:
-		default:
-			utils.GetLogInstance().Warn("consensus block unable to sent to state sync", "height", newBlock.NumberU64(), "blockHash", newBlock.Hash().Hex())
-		}
-
 		return false
 	}
-
 	return true
 }
 

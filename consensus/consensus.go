@@ -92,7 +92,7 @@ type Consensus struct {
 	OnConsensusDone func(*types.Block)
 
 	// current consensus block to check if out of sync
-	ConsensusBlock chan *types.Block
+	ConsensusBlock chan *BFTBlockInfo
 	// verified block to state sync broadcast
 	VerifiedNewBlock chan *types.Block
 
@@ -108,6 +108,13 @@ type Consensus struct {
 	OfflinePeerList []p2p.Peer
 }
 
+// BFTBlockInfo send the latest block that was in BFT consensus process as well as its consensusID to state syncing
+// consensusID is necessary to make sure the out of sync node can enter the correct view
+type BFTBlockInfo struct {
+	Block       *types.Block
+	ConsensusID uint32
+}
+
 // BlockConsensusStatus used to keep track of the consensus status of multiple blocks received so far
 // This is mainly used in the case that this node is lagging behind and needs to catch up.
 // For example, the consensus moved to round N and this node received message(N).
@@ -117,6 +124,16 @@ type Consensus struct {
 type BlockConsensusStatus struct {
 	block []byte // the block data
 	state State  // the latest state of the consensus
+}
+
+// UpdateConsensusID is used to update latest consensusID for nodes that out of sync
+func (consensus *Consensus) UpdateConsensusID(consensusID uint32) {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+	if consensus.consensusID < consensusID {
+		utils.GetLogInstance().Debug("update consensusID", "myConsensusID", consensus.consensusID, "newConsensusID", consensusID)
+		consensus.consensusID = consensusID
+	}
 }
 
 // New creates a new Consensus object
@@ -197,7 +214,8 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Cons
 }
 
 // Checks the basic meta of a consensus message.
-func (consensus *Consensus) checkConsensusMessage(message consensus_proto.Message, publicKey *bls.PublicKey) bool {
+//
+func (consensus *Consensus) checkConsensusMessage(message consensus_proto.Message, publicKey *bls.PublicKey) error {
 	consensusID := message.ConsensusId
 	blockHash := message.BlockHash
 
@@ -205,20 +223,20 @@ func (consensus *Consensus) checkConsensusMessage(message consensus_proto.Messag
 	err := verifyMessageSig(publicKey, message)
 	if err != nil {
 		utils.GetLogInstance().Warn("Failed to verify the message signature", "Error", err)
-		return false
+		return ErrInvalidConsensusMessage
 	}
 
 	// check consensus Id
 	if consensusID != consensus.consensusID {
 		utils.GetLogInstance().Warn("Wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
-		return false
+		return ErrConsensusIDNotMatch
 	}
 
 	if !bytes.Equal(blockHash, consensus.blockHash[:]) {
 		utils.GetLogInstance().Warn("Wrong blockHash", "consensus", consensus)
-		return false
+		return ErrInvalidConsensusMessage
 	}
-	return true
+	return nil
 }
 
 // Gets the validator peer based on validator ID.

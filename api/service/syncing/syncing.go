@@ -87,6 +87,8 @@ type StateSync struct {
 
 // AddLastMileBlock add the lastest a few block into queue for syncing
 func (ss *StateSync) AddLastMileBlock(block *types.Block) {
+	ss.syncMux.Lock()
+	defer ss.syncMux.Unlock()
 	ss.lastMileBlocks = append(ss.lastMileBlocks, block)
 }
 
