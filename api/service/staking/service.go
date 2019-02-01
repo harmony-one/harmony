@@ -1,7 +1,7 @@
 package staking
 
 import (
-	"github.com/harmony-benchmark/log"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 )
 
@@ -12,7 +12,7 @@ type Service struct {
 
 //StartService starts the staking service.
 func (s *Service) StartService() {
-	log.Info("Starting staking service.")
+	utils.GetLogInstance().Info("Starting staking service.")
 }
 
 func (s *Service) createStakingTransaction() {
@@ -21,5 +21,5 @@ func (s *Service) createStakingTransaction() {
 
 // StopService shutdowns staking service.
 func (s *Service) StopService() {
-	log.Info("Shutting down staking service.")
+	utils.GetLogInstance().Info("Shutting down staking service.")
 }
