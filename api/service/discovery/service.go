@@ -27,6 +27,7 @@ type Service struct {
 	DHT        *libp2pdht.IpfsDHT
 	Rendezvous string
 	ctx        context.Context
+	peerChan   <-chan peerstore.PeerInfo
 }
 
 // New returns discovery service.
@@ -44,6 +45,7 @@ func New(h p2p.Host, r string) *Service {
 		DHT:        dht,
 		Rendezvous: r,
 		ctx:        ctx,
+		peerChan:   make(<-chan peerstore.PeerInfo),
 	}
 }
 
@@ -63,29 +65,30 @@ func (s *Service) StartService() {
 	log.Debug("Successfully announced!")
 
 	log.Debug("Searching for other peers...")
-	peerChan, err := routingDiscovery.FindPeers(s.ctx, s.Rendezvous)
+	s.peerChan, err = routingDiscovery.FindPeers(s.ctx, s.Rendezvous)
 	if err != nil {
 		log.Error("FindPeers", "error", err)
 	}
-
-	for peer := range peerChan {
-		// skip myself
-		if peer.ID == s.Host.GetP2PHost().ID() {
-			continue
-		}
-		log.Debug("Found Peer", "peer", peer.ID, "addr", peer.Addrs)
-		p := p2p.Peer{PeerID: peer.ID, Addrs: peer.Addrs}
-		s.Host.AddPeer(&p)
-		// TODO: stop ping if pinged before
-		s.pingPeer(p)
-	}
-
-	select {}
 }
 
 // StopService shutdowns discovery service.
 func (s *Service) StopService() {
 	log.Info("Shutting down discovery service.")
+}
+
+func (s *Service) foundPeers() {
+	select {
+	case peer := <-s.peerChan:
+		if peer.ID != s.Host.GetP2PHost().ID() {
+			log.Debug("Found Peer", "peer", peer.ID, "addr", peer.Addrs)
+			if len(peer.ID) > 0 {
+				p := p2p.Peer{PeerID: peer.ID, Addrs: peer.Addrs}
+				s.Host.AddPeer(&p)
+				// TODO: stop ping if pinged before
+				s.pingPeer(p)
+			}
+		}
+	}
 }
 
 // Init is to initialize for discoveryService.
@@ -113,6 +116,8 @@ func (s *Service) Init() error {
 		}()
 	}
 	wg.Wait()
+
+	go s.foundPeers()
 
 	return nil
 }
