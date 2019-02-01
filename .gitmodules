@@ -5,3 +5,6 @@
 [submodule "vendor/github.com/golang/protobuf"]
 	path = vendor/github.com/golang/protobuf
 	url = https://github.com/golang/protobuf
+[submodule "vendor/github.com/libp2p/go-libp2p-kad-dht"]
+	path = vendor/github.com/libp2p/go-libp2p-kad-dht
+	url = https://github.com/libp2p/go-libp2p-kad-dht
