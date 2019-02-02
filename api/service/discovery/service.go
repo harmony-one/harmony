@@ -8,6 +8,7 @@ import (
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/p2p/host"
 
 	peerstore "github.com/libp2p/go-libp2p-peerstore"
 
@@ -77,11 +78,11 @@ func (s *Service) StopService() {
 }
 
 func (s *Service) foundPeers() {
-	select {
-	case peer := <-s.peerChan:
-		if peer.ID != s.Host.GetP2PHost().ID() {
-			log.Debug("Found Peer", "peer", peer.ID, "addr", peer.Addrs)
-			if len(peer.ID) > 0 {
+	for {
+		select {
+		case peer := <-s.peerChan:
+			if peer.ID != s.Host.GetP2PHost().ID() && len(peer.ID) > 0 {
+				log.Debug("Found Peer", "peer", peer.ID, "addr", peer.Addrs, "len", len(peer.ID))
 				p := p2p.Peer{PeerID: peer.ID, Addrs: peer.Addrs}
 				s.Host.AddPeer(&p)
 				// TODO: stop ping if pinged before
@@ -126,6 +127,7 @@ func (s *Service) pingPeer(peer p2p.Peer) {
 	ping := proto_discovery.NewPingMessage(s.Host.GetSelfPeer())
 	buffer := ping.ConstructPingMessage()
 	log.Debug("Sending Ping Message to", "peer", peer)
-	s.Host.SendMessage(peer, buffer)
+	content := host.ConstructP2pMessage(byte(0), buffer)
+	s.Host.SendMessage(peer, content)
 	log.Debug("Sent Ping Message to", "peer", peer)
 }
