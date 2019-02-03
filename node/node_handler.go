@@ -261,6 +261,14 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 	// Add to Node's peer list anyway
 	node.AddPeers([]*p2p.Peer{peer})
 
+   return 1
+
+   // TODO: (leo) leader needs to broadcast all the public keys to all validators in the shard
+   // our current consensus algorithm requires all validators have the same set, same order of public keys
+   // in the shard. So the authorative list should come from leader anyway.
+   // Maybe we can reuse the pong message for this purpose.
+
+/*
 	peers := node.Consensus.GetValidatorPeers()
 	pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys)
 	buffer := pong.ConstructPongMessage()
@@ -280,6 +288,8 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 	host.BroadcastMessageFromLeader(node.GetHost(), peers, buffer, node.Consensus.OfflinePeers)
 
 	return len(peers)
+*/
+
 }
 
 func (node *Node) pongMessageHandler(msgPayload []byte) int {
