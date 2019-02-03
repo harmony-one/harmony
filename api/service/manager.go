@@ -1,7 +1,6 @@
 package service
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/harmony-one/harmony/internal/utils"
@@ -26,6 +25,7 @@ const (
 	SupportExplorer
 	Consensus
 	NetworkInfo
+	Staking
 	BlockProposal
 	PeerDiscovery
 	Test
@@ -42,6 +42,10 @@ func (t Type) String() string {
 		return "SupportExplorer"
 	case Consensus:
 		return "Consensus"
+	case Staking:
+		return "Staking"
+	case NetworkInfo:
+		return "NetworkInfo"
 	case BlockProposal:
 		return "BlockProposal"
 	case PeerDiscovery:
@@ -123,10 +127,10 @@ func (m *Manager) TakeAction(action *Action) {
 	if service, ok := m.services[action.ServiceType]; ok {
 		switch action.Action {
 		case Start:
-			fmt.Printf("Start %s\n", action.ServiceType)
+			utils.GetLogInstance().Info("Starting ", "service", action.ServiceType)
 			service.StartService()
 		case Stop:
-			fmt.Printf("Stop %s\n", action.ServiceType)
+			utils.GetLogInstance().Info("Stopping ", "service", action.ServiceType)
 			service.StopService()
 		}
 	}
