@@ -26,6 +26,7 @@ import (
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	service_manager "github.com/harmony-one/harmony/api/service"
 	blockproposal "github.com/harmony-one/harmony/api/service/blockproposal"
+	"github.com/harmony-one/harmony/api/service/clientsupport"
 	consensus_service "github.com/harmony-one/harmony/api/service/consensus"
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/api/service/syncing"
@@ -91,7 +92,7 @@ func (state State) String() string {
 // Constants related to doing syncing.
 const (
 	lastMileThreshold = 4
-	inSyncThreshold   = 2
+	inSyncThreshold   = 1
 )
 
 const (
@@ -278,12 +279,11 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 		node.BlockChannel = make(chan *types.Block)
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, params.TestChainConfig, chain)
 		node.Worker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey), node.Consensus.ShardID)
-
 		node.AddFaucetContractToPendingTransactions()
 		if node.Role == BeaconLeader {
 			node.AddDepositContractToPendingTransactions()
 		}
-		node.Consensus.ConsensusBlock = make(chan *types.Block)
+		node.Consensus.ConsensusBlock = make(chan *bft.BFTBlockInfo)
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 	}
 
@@ -304,11 +304,16 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 }
 
 // IsOutOfSync checks whether the node is out of sync by comparing latest block with consensus block
-func (node *Node) IsOutOfSync(consensusBlock *types.Block) bool {
+func (node *Node) IsOutOfSync(consensusBlockInfo *bft.BFTBlockInfo) bool {
+	consensusBlock := consensusBlockInfo.Block
+	consensusID := consensusBlockInfo.ConsensusID
+
 	myHeight := node.blockchain.CurrentBlock().NumberU64()
 	newHeight := consensusBlock.NumberU64()
 	utils.GetLogInstance().Debug("[SYNC]", "myHeight", myHeight, "newHeight", newHeight)
 	if newHeight-myHeight <= inSyncThreshold {
+		node.stateSync.AddLastMileBlock(consensusBlock)
+		node.Consensus.UpdateConsensusID(consensusID + 1)
 		return false
 	}
 	// cache latest blocks for last mile catch up
@@ -324,21 +329,24 @@ func (node *Node) DoSyncing() {
 		select {
 		// in current implementation logic, timeout means in sync
 		case <-time.After(5 * time.Second):
+			//myHeight := node.blockchain.CurrentBlock().NumberU64()
+			//utils.GetLogInstance().Debug("[SYNC]", "currentHeight", myHeight)
 			node.stateMutex.Lock()
 			node.State = NodeReadyForConsensus
 			node.stateMutex.Unlock()
 			continue
-		case consensusBlock := <-node.Consensus.ConsensusBlock:
-			// never reached from chao
-			if !node.IsOutOfSync(consensusBlock) {
+		case consensusBlockInfo := <-node.Consensus.ConsensusBlock:
+			if !node.IsOutOfSync(consensusBlockInfo) {
 				if node.State == NodeNotInSync {
 					utils.GetLogInstance().Info("[SYNC] Node is now IN SYNC!")
-					node.stateSync.CloseConnections()
-					node.stateSync = nil
 				}
 				node.stateMutex.Lock()
 				node.State = NodeReadyForConsensus
 				node.stateMutex.Unlock()
+				// wait for last mile block finish; think a better way
+				time.Sleep(200 * time.Millisecond)
+				node.stateSync.CloseConnections()
+				node.stateSync = nil
 				continue
 			} else {
 				utils.GetLogInstance().Debug("[SYNC] node is out of sync")
@@ -662,6 +670,8 @@ func (node *Node) setupForShardLeader() {
 	node.serviceManager.RegisterService(service_manager.Consensus, consensus_service.NewService(node.BlockChannel, node.Consensus))
 	// Register new block service.
 	node.serviceManager.RegisterService(service_manager.BlockProposal, blockproposal.NewService(node.Consensus.ReadySignal, node.WaitForConsensusReady))
+	// Register client support service.
+	node.serviceManager.RegisterService(service_manager.ClientSupport, clientsupport.NewService(node.blockchain.State, node.CallFaucetContract, node.SelfPeer.IP, node.SelfPeer.Port))
 }
 
 func (node *Node) setupForShardValidator() {
