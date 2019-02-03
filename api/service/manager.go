@@ -149,3 +149,14 @@ func (m *Manager) StartServiceManager() chan *Action {
 	}()
 	return ch
 }
+
+// RunServices starts registered services.
+func (m *Manager) RunServices() {
+	if m.services == nil {
+		utils.GetLogInstance().Info("Service mapping is not set up yet.")
+		return
+	}
+	for serviceType := range m.services {
+		m.TakeAction(&Action{Action: Start, ServiceType: serviceType})
+	}
+}

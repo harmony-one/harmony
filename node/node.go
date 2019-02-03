@@ -659,12 +659,24 @@ func (node *Node) setupForShardValidator() {
 }
 
 func (node *Node) setupForBeaconLeader() {
+	// Register consensus service.
+	node.serviceManager.RegisterService(service_manager.Consensus, consensus_service.NewService(node.BlockChannel, node.Consensus))
+	// Register new block service.
+	node.serviceManager.RegisterService(service_manager.BlockProposal, blockproposal.NewService(node.Consensus.ReadySignal, node.WaitForConsensusReady))
+	// Register client support service.
+	node.serviceManager.RegisterService(service_manager.ClientSupport, clientsupport.NewService(node.blockchain.State, node.CallFaucetContract, node.SelfPeer.IP, node.SelfPeer.Port))
 }
 
 func (node *Node) setupForBeaconValidator() {
 }
 
 func (node *Node) setupForNewNode() {
+	// Register consensus service.
+	node.serviceManager.RegisterService(service_manager.Consensus, consensus_service.NewService(node.BlockChannel, node.Consensus))
+	// Register new block service.
+	node.serviceManager.RegisterService(service_manager.BlockProposal, blockproposal.NewService(node.Consensus.ReadySignal, node.WaitForConsensusReady))
+	// Register client support service.
+	node.serviceManager.RegisterService(service_manager.ClientSupport, clientsupport.NewService(node.blockchain.State, node.CallFaucetContract, node.SelfPeer.IP, node.SelfPeer.Port))
 }
 
 // ServiceManagerSetup setups service store.
@@ -690,11 +702,5 @@ func (node *Node) RunServices() {
 		utils.GetLogInstance().Info("Service manager is not set up yet.")
 		return
 	}
-	for serviceType := range node.serviceManager.GetServices() {
-		action := &service_manager.Action{
-			Action:      service_manager.Start,
-			ServiceType: serviceType,
-		}
-		node.serviceManager.TakeAction(action)
-	}
+	node.serviceManager.RunServices()
 }
