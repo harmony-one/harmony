@@ -25,6 +25,7 @@ const (
 	ClientSupport
 	SupportExplorer
 	Consensus
+	NetworkInfo
 	BlockProposal
 	PeerDiscovery
 	Test
