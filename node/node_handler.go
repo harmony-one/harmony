@@ -43,6 +43,11 @@ func (node *Node) StreamHandler(s p2p.Stream) {
 		utils.GetLogInstance().Error("Read p2p data failed", "err", err, "node", node)
 		return
 	}
+	node.messageHandler(content)
+}
+
+// messageHandler parses the message and dispatch the actions
+func (node *Node) messageHandler(content []byte) {
 	node.MaybeBroadcastAsValidator(content)
 
 	consensusObj := node.Consensus
