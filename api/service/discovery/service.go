@@ -90,6 +90,7 @@ func (s *Service) contactP2pPeers() {
 				p := p2p.Peer{PeerID: peer.ID, Addrs: peer.Addrs}
 				s.Host.AddPeer(&p)
 				// TODO: stop ping if pinged before
+				// TODO: call staking servcie here if it is a new node
 				s.pingPeer(p)
 			}
 		case <-s.stopChan:

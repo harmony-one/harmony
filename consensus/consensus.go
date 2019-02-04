@@ -64,6 +64,9 @@ type Consensus struct {
 
 	// Whether I am leader. False means I am validator
 	IsLeader bool
+	// Whether I am a in beacon chain shard. False means I am in a regular shard.
+	IsBeacon bool
+
 	// Leader or validator Id - 4 byte
 	nodeID uint32
 	// Consensus Id (View Id) - 4 byte
@@ -151,6 +154,12 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Cons
 		consensus.IsLeader = true
 	} else {
 		consensus.IsLeader = false
+	}
+
+	if ShardID == "0" {
+		consensus.IsBeacon = true
+	} else {
+		consensus.IsBeacon = false
 	}
 
 	consensus.leader = leader
