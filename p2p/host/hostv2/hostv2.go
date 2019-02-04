@@ -13,6 +13,7 @@ import (
 	net "github.com/libp2p/go-libp2p-net"
 	peer "github.com/libp2p/go-libp2p-peer"
 	peerstore "github.com/libp2p/go-libp2p-peerstore"
+	protocol "github.com/libp2p/go-libp2p-protocol"
 	p2p_config "github.com/libp2p/go-libp2p/config"
 	ma "github.com/multiformats/go-multiaddr"
 )
@@ -103,7 +104,7 @@ func (host *HostV2) GetSelfPeer() p2p.Peer {
 
 // BindHandlerAndServe bind a streamHandler to the harmony protocol.
 func (host *HostV2) BindHandlerAndServe(handler p2p.StreamHandler) {
-	host.h.SetStreamHandler(ProtocolID, func(s net.Stream) {
+	host.h.SetStreamHandler(protocol.ID(ProtocolID), func(s net.Stream) {
 		handler(s)
 	})
 	// Hang forever
@@ -113,7 +114,8 @@ func (host *HostV2) BindHandlerAndServe(handler p2p.StreamHandler) {
 // SendMessage a p2p message sending function with signature compatible to p2pv1.
 func (host *HostV2) SendMessage(p p2p.Peer, message []byte) error {
 	logger := log.New("from", host.self, "to", p, "PeerID", p.PeerID)
-	s, err := host.h.NewStream(context.Background(), p.PeerID, ProtocolID)
+	host.Peerstore().AddProtocols(p.PeerID, ProtocolID)
+	s, err := host.h.NewStream(context.Background(), p.PeerID, protocol.ID(ProtocolID))
 	if err != nil {
 		logger.Error("NewStream() failed", "peerID", p.PeerID,
 			"protocolID", ProtocolID, "error", err)

@@ -34,4 +34,10 @@ var (
 	// ErrInvalidNumber is returned if a block's number doesn't equal it's parent's
 	// plus one.
 	ErrInvalidNumber = errors.New("invalid block number")
+
+	// ErrConsensusIDNotMatch is returned if the current consensusID is not equal message's consensusID
+	ErrConsensusIDNotMatch = errors.New("consensusID not match")
+
+	// ErrInvalidConsensusMessage is returned is the consensus message received is invalid
+	ErrInvalidConsensusMessage = errors.New("invalid consensus message")
 )

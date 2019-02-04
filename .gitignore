@@ -51,3 +51,12 @@ db/
 
 # bootnode keystore
 .bnkey
+
+# harmony node keystore
+.hmykey
+
+# vendor directory
+vendor
+
+# node_modules
+node_modules/
