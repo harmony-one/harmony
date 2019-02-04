@@ -678,12 +678,24 @@ func (node *Node) setupForShardValidator() {
 }
 
 func (node *Node) setupForBeaconLeader() {
+	// Register consensus service.
+	node.serviceManager.RegisterService(service_manager.Consensus, consensus_service.NewService(node.BlockChannel, node.Consensus))
+	// Register new block service.
+	node.serviceManager.RegisterService(service_manager.BlockProposal, blockproposal.NewService(node.Consensus.ReadySignal, node.WaitForConsensusReady))
+	// Register client support service.
+	node.serviceManager.RegisterService(service_manager.ClientSupport, clientsupport.NewService(node.blockchain.State, node.CallFaucetContract, node.SelfPeer.IP, node.SelfPeer.Port))
 }
 
 func (node *Node) setupForBeaconValidator() {
 }
 
 func (node *Node) setupForNewNode() {
+	// Register consensus service.
+	node.serviceManager.RegisterService(service_manager.Consensus, consensus_service.NewService(node.BlockChannel, node.Consensus))
+	// Register new block service.
+	node.serviceManager.RegisterService(service_manager.BlockProposal, blockproposal.NewService(node.Consensus.ReadySignal, node.WaitForConsensusReady))
+	// Register client support service.
+	node.serviceManager.RegisterService(service_manager.ClientSupport, clientsupport.NewService(node.blockchain.State, node.CallFaucetContract, node.SelfPeer.IP, node.SelfPeer.Port))
 }
 
 // ServiceManagerSetup setups service store.
