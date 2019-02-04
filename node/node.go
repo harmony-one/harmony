@@ -30,6 +30,7 @@ import (
 	consensus_service "github.com/harmony-one/harmony/api/service/consensus"
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/api/service/networkinfo"
+	"github.com/harmony-one/harmony/api/service/staking"
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
 	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
@@ -692,7 +693,10 @@ func (node *Node) setupForBeaconValidator() {
 
 func (node *Node) setupForNewNode() {
 	chanPeer := make(chan *p2p.Peer)
+	// Add network info serivce.
 	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.NewService(chanPeer))
+	// Add staking service.
+	node.serviceManager.RegisterService(service_manager.Staking, staking.NewService(chanPeer))
 }
 
 // ServiceManagerSetup setups service store.
