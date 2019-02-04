@@ -47,10 +47,10 @@ func (t Type) String() string {
 		return "BlockProposal"
 	case NetworkInfo:
 		return "NetworkInfo"
-	case PeerDiscovery:
-		return "PeerDiscovery"
 	case Staking:
 		return "Staking"
+	case PeerDiscovery:
+		return "PeerDiscovery"
 	case Test:
 		return "Test"
 	case Done:

@@ -5,21 +5,59 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 )
 
-// Service is the struct for staking service.
+// Service is the role conversion service.
 type Service struct {
-	Host p2p.Host
+	stopChan    chan struct{}
+	stoppedChan chan struct{}
+	peerChan    chan *p2p.Peer
 }
 
-//StartService starts the staking service.
+// NewService returns role conversion service.
+func NewService(peerChan chan *p2p.Peer) *Service {
+	return &Service{
+		stopChan:    make(chan struct{}),
+		stoppedChan: make(chan struct{}),
+		peerChan:    peerChan,
+	}
+}
+
+// StartService starts role conversion service.
 func (s *Service) StartService() {
-	utils.GetLogInstance().Info("Starting staking service.")
+	s.Init()
+	s.Run()
 }
 
-func (s *Service) createStakingTransaction() {
-	//creates staking transaction.
+// Init initializes role conversion service.
+func (s *Service) Init() {
 }
 
-// StopService shutdowns staking service.
+// Run runs role conversion.
+func (s *Service) Run() {
+	// Wait until peer info of beacon chain is ready.
+	peer := <-s.peerChan
+	go func() {
+		defer close(s.stoppedChan)
+		for {
+			select {
+			default:
+				utils.GetLogInstance().Info("Running role conversion")
+				// TODO: Write some logic here.
+				s.DoService(peer)
+			case <-s.stopChan:
+				return
+			}
+		}
+	}()
+}
+
+// DoService does role conversion.
+func (s *Service) DoService(peer *p2p.Peer) {
+}
+
+// StopService stops role conversion service.
 func (s *Service) StopService() {
-	utils.GetLogInstance().Info("Shutting down staking service.")
+	utils.GetLogInstance().Info("Stopping role conversion service.")
+	s.stopChan <- struct{}{}
+	<-s.stoppedChan
+	utils.GetLogInstance().Info("Role conversion stopped.")
 }
