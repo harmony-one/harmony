@@ -709,11 +709,5 @@ func (node *Node) RunServices() {
 		utils.GetLogInstance().Info("Service manager is not set up yet.")
 		return
 	}
-	for serviceType := range node.serviceManager.GetServices() {
-		action := &service_manager.Action{
-			Action:      service_manager.Start,
-			ServiceType: serviceType,
-		}
-		node.serviceManager.TakeAction(action)
-	}
+	node.serviceManager.RunServices()
 }

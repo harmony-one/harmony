@@ -152,3 +152,14 @@ func (m *Manager) StartServiceManager() chan *Action {
 	}()
 	return ch
 }
+
+// RunServices run registered services.
+func (m *Manager) RunServices() {
+	for serviceType := range m.services {
+		action := &Action{
+			Action:      Start,
+			ServiceType: serviceType,
+		}
+		m.TakeAction(action)
+	}
+}
