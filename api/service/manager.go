@@ -27,6 +27,7 @@ const (
 	Consensus
 	BlockProposal
 	PeerDiscovery
+	Staking
 	Test
 	Done
 )
@@ -45,10 +46,10 @@ func (t Type) String() string {
 		return "BlockProposal"
 	case PeerDiscovery:
 		return "PeerDiscovery"
-	case Test:
-		return "Test"
 	case Staking:
 		return "Staking"
+	case Test:
+		return "Test"
 	case Done:
 		return "Done"
 	default:
