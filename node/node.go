@@ -2,6 +2,7 @@ package node
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"encoding/binary"
 	"encoding/gob"
@@ -43,6 +44,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 )
 
 // State is a state of a node.
@@ -152,6 +154,12 @@ type Node struct {
 
 	// The p2p host used to send/receive p2p messages
 	host p2p.Host
+
+	// The pubsub structure to communicate with peers
+	Pubsub *pubsub.PubSub
+
+	// Subscriptions of the node
+	Subscriptions []*pubsub.Subscription
 
 	// Channel to stop sending ping message
 	StopPing chan struct{}
@@ -288,6 +296,14 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 		}
 		node.Consensus.ConsensusBlock = make(chan *bft.BFTBlockInfo)
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
+
+		var err error
+		node.Pubsub, err = pubsub.NewFloodSub(context.Background(), node.host.GetP2PHost())
+		if err != nil {
+			utils.GetLogInstance().Error("[NODE]", "NewPubSub Error", err)
+		}
+		subch, err := node.Pubsub.Subscribe("beacon")
+		node.Subscriptions = append(node.Subscriptions, subch)
 	}
 
 	if consensus != nil && consensus.IsLeader {
