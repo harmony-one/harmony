@@ -27,6 +27,7 @@ import (
 	"golang.org/x/crypto/sha3"
 
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
+	proto_node "github.com/harmony-one/harmony/api/proto/node"
 )
 
 // Consensus is the main struct with all states and data related to consensus process.
@@ -106,6 +107,10 @@ type Consensus struct {
 
 	// List of offline Peers
 	OfflinePeerList []p2p.Peer
+
+	//List of nodes related to beaconchain funcs
+	WaitingNodes []proto_node.Info
+	ActiveNodes  []proto_node.Info
 }
 
 // BFTBlockInfo send the latest block that was in BFT consensus process as well as its consensusID to state syncing
