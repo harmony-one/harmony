@@ -29,6 +29,7 @@ type Service struct {
 	Rendezvous string
 	ctx        context.Context
 	peerChan   <-chan peerstore.PeerInfo
+	stopChan   chan struct{}
 }
 
 // New returns discovery service.
@@ -47,6 +48,7 @@ func New(h p2p.Host, r string) *Service {
 		Rendezvous: r,
 		ctx:        ctx,
 		peerChan:   make(<-chan peerstore.PeerInfo),
+		stopChan:   make(chan struct{}),
 	}
 }
 
@@ -75,9 +77,11 @@ func (s *Service) StartService() {
 // StopService shutdowns discovery service.
 func (s *Service) StopService() {
 	log.Info("Shutting down discovery service.")
+	s.stopChan <- struct{}{}
+	log.Info("discovery service stopped.")
 }
 
-func (s *Service) foundPeers() {
+func (s *Service) contactP2pPeers() {
 	for {
 		select {
 		case peer := <-s.peerChan:
@@ -88,6 +92,8 @@ func (s *Service) foundPeers() {
 				// TODO: stop ping if pinged before
 				s.pingPeer(p)
 			}
+		case <-s.stopChan:
+			return
 		}
 	}
 }
@@ -118,7 +124,7 @@ func (s *Service) Init() error {
 	}
 	wg.Wait()
 
-	go s.foundPeers()
+	go s.contactP2pPeers()
 
 	return nil
 }
