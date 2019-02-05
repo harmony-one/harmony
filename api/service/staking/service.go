@@ -12,8 +12,8 @@ type Service struct {
 	peerChan    chan *p2p.Peer
 }
 
-// NewService returns role conversion service.
-func NewService(peerChan chan *p2p.Peer) *Service {
+// New returns role conversion service.
+func New(peerChan chan *p2p.Peer) *Service {
 	return &Service{
 		stopChan:    make(chan struct{}),
 		stoppedChan: make(chan struct{}),

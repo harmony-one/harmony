@@ -12,8 +12,8 @@ type Service struct {
 	waitForConsensusReady func(readySignal chan struct{}, stopChan chan struct{}, stoppedChan chan struct{})
 }
 
-// NewService returns new block service.
-func NewService(readySignal chan struct{}, waitForConsensusReady func(readySignal chan struct{}, stopChan chan struct{}, stoppedChan chan struct{})) *Service {
+// New returns new block service.
+func New(readySignal chan struct{}, waitForConsensusReady func(readySignal chan struct{}, stopChan chan struct{}, stoppedChan chan struct{})) *Service {
 	return &Service{readySignal: readySignal, waitForConsensusReady: waitForConsensusReady}
 }
 

@@ -10,8 +10,8 @@ type Service struct {
 	stoppedChan chan struct{}
 }
 
-// NewService returns random generation service.
-func NewService() *Service {
+// New returns random generation service.
+func New() *Service {
 	return &Service{}
 }
 

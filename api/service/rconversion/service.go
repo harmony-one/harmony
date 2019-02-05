@@ -10,8 +10,8 @@ type Service struct {
 	stoppedChan chan struct{}
 }
 
-// NewService returns role conversion service.
-func NewService() *Service {
+// New returns role conversion service.
+func New() *Service {
 	return &Service{}
 }
 
