@@ -80,7 +80,11 @@ func (s *Service) StopService() {
 func (s *Service) foundPeers() {
 	for {
 		select {
-		case peer := <-s.peerChan:
+		case peer, ok := <-s.peerChan:
+			if !ok {
+				log.Debug("end of info", "peer", peer.ID)
+				return
+			}
 			if peer.ID != s.Host.GetP2PHost().ID() && len(peer.ID) > 0 {
 				log.Debug("Found Peer", "peer", peer.ID, "addr", peer.Addrs, "len", len(peer.ID))
 				p := p2p.Peer{PeerID: peer.ID, Addrs: peer.Addrs}
