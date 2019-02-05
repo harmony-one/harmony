@@ -14,8 +14,8 @@ type Service struct {
 	stoppedChan  chan struct{}
 }
 
-// NewService returns consensus service.
-func NewService(blockChannel chan *types.Block, consensus *consensus.Consensus) *Service {
+// New returns consensus service.
+func New(blockChannel chan *types.Block, consensus *consensus.Consensus) *Service {
 	return &Service{blockChannel: blockChannel, consensus: consensus}
 }
 

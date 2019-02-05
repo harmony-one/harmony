@@ -669,11 +669,11 @@ func (node *Node) setupForShardLeader() {
 	// Register explorer service.
 	node.serviceManager.RegisterService(service_manager.SupportExplorer, explorer.New(&node.SelfPeer))
 	// Register consensus service.
-	node.serviceManager.RegisterService(service_manager.Consensus, consensus_service.NewService(node.BlockChannel, node.Consensus))
+	node.serviceManager.RegisterService(service_manager.Consensus, consensus_service.New(node.BlockChannel, node.Consensus))
 	// Register new block service.
-	node.serviceManager.RegisterService(service_manager.BlockProposal, blockproposal.NewService(node.Consensus.ReadySignal, node.WaitForConsensusReady))
+	node.serviceManager.RegisterService(service_manager.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReady))
 	// Register client support service.
-	node.serviceManager.RegisterService(service_manager.ClientSupport, clientsupport.NewService(node.blockchain.State, node.CallFaucetContract, node.SelfPeer.IP, node.SelfPeer.Port))
+	node.serviceManager.RegisterService(service_manager.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.SelfPeer.IP, node.SelfPeer.Port))
 }
 
 func (node *Node) setupForShardValidator() {
@@ -681,11 +681,11 @@ func (node *Node) setupForShardValidator() {
 
 func (node *Node) setupForBeaconLeader() {
 	// Register consensus service.
-	node.serviceManager.RegisterService(service_manager.Consensus, consensus_service.NewService(node.BlockChannel, node.Consensus))
+	node.serviceManager.RegisterService(service_manager.Consensus, consensus_service.New(node.BlockChannel, node.Consensus))
 	// Register new block service.
-	node.serviceManager.RegisterService(service_manager.BlockProposal, blockproposal.NewService(node.Consensus.ReadySignal, node.WaitForConsensusReady))
+	node.serviceManager.RegisterService(service_manager.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReady))
 	// Register client support service.
-	node.serviceManager.RegisterService(service_manager.ClientSupport, clientsupport.NewService(node.blockchain.State, node.CallFaucetContract, node.SelfPeer.IP, node.SelfPeer.Port))
+	node.serviceManager.RegisterService(service_manager.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.SelfPeer.IP, node.SelfPeer.Port))
 }
 
 func (node *Node) setupForBeaconValidator() {
@@ -694,9 +694,9 @@ func (node *Node) setupForBeaconValidator() {
 func (node *Node) setupForNewNode() {
 	chanPeer := make(chan *p2p.Peer)
 	// Add network info serivce.
-	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.NewService(chanPeer))
+	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(chanPeer))
 	// Add staking service.
-	node.serviceManager.RegisterService(service_manager.Staking, staking.NewService(chanPeer))
+	node.serviceManager.RegisterService(service_manager.Staking, staking.New(chanPeer))
 }
 
 // ServiceManagerSetup setups service store.
