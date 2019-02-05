@@ -106,9 +106,6 @@ const (
 	broadcastTimeout      int64 = 3 * 60 * 1000000000 // 3 mins
 )
 
-//These variables should read from somewhere else.
-var ()
-
 // use to push new block to outofsync node
 type syncConfig struct {
 	timestamp int64
