@@ -14,7 +14,7 @@ const (
 	ClientServicePortDiff = 5555
 )
 
-// Service ...
+// Service is the client support service.
 type Service struct {
 	server     *clientService.Server
 	grpcServer *grpc.Server

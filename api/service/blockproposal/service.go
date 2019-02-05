@@ -4,7 +4,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
-// Service is the new block service.
+// Service is a block proposal service.
 type Service struct {
 	stopChan              chan struct{}
 	stoppedChan           chan struct{}
@@ -12,12 +12,12 @@ type Service struct {
 	waitForConsensusReady func(readySignal chan struct{}, stopChan chan struct{}, stoppedChan chan struct{})
 }
 
-// New returns new block service.
+// New returns a block proposal service.
 func New(readySignal chan struct{}, waitForConsensusReady func(readySignal chan struct{}, stopChan chan struct{}, stoppedChan chan struct{})) *Service {
 	return &Service{readySignal: readySignal, waitForConsensusReady: waitForConsensusReady}
 }
 
-// StartService starts new block service.
+// StartService starts block proposal service.
 func (s *Service) StartService() {
 	s.stopChan = make(chan struct{})
 	s.stoppedChan = make(chan struct{})
@@ -26,18 +26,18 @@ func (s *Service) StartService() {
 	s.Run(s.stopChan, s.stoppedChan)
 }
 
-// Init initializes new block service.
+// Init initializes block proposal service.
 func (s *Service) Init() {
 }
 
-// Run runs new block.
+// Run runs block proposal.
 func (s *Service) Run(stopChan chan struct{}, stoppedChan chan struct{}) {
 	s.waitForConsensusReady(s.readySignal, s.stopChan, s.stoppedChan)
 }
 
-// StopService stops new block service.
+// StopService stops block proposal service.
 func (s *Service) StopService() {
-	utils.GetLogInstance().Info("Stopping new block service.")
+	utils.GetLogInstance().Info("Stopping block proposal service.")
 	s.stopChan <- struct{}{}
 	<-s.stoppedChan
 	utils.GetLogInstance().Info("Role conversion stopped.")
