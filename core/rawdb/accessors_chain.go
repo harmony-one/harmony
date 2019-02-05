@@ -373,3 +373,28 @@ func FindCommonAncestor(db DatabaseReader, a, b *types.Header) *types.Header {
 	}
 	return a
 }
+
+// ReadShardState retrieves sharding state
+func ReadShardState(db DatabaseReader, hash common.Hash, number uint64) types.ShardState {
+	data, _ := db.Get(shardStateKey(number, hash))
+	if len(data) == 0 {
+		return nil
+	}
+	shardState := types.ShardState{}
+	if err := rlp.DecodeBytes(data, &shardState); err != nil {
+		log.Error("Fail to decode sharding state", "hash", hash, "number", number, "err", err)
+		return nil
+	}
+	return shardState
+}
+
+// WriteShardState stores sharding state into database
+func WriteShardState(db DatabaseWriter, hash common.Hash, number uint64, shardState types.ShardState) {
+	data, err := rlp.EncodeToBytes(shardState)
+	if err != nil {
+		log.Crit("Failed to encode sharding state", "err", err)
+	}
+	if err := db.Put(shardStateKey(number, hash), data); err != nil {
+		log.Crit("Failed to store sharding state", "err", err)
+	}
+}
