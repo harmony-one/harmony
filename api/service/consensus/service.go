@@ -19,14 +19,14 @@ func New(blockChannel chan *types.Block, consensus *consensus.Consensus) *Servic
 	return &Service{blockChannel: blockChannel, consensus: consensus}
 }
 
-// StartService starts service.
+// StartService starts consensus service.
 func (s *Service) StartService() {
 	s.stopChan = make(chan struct{})
 	s.stoppedChan = make(chan struct{})
 	s.consensus.WaitForNewBlock(s.blockChannel, s.stopChan, s.stoppedChan)
 }
 
-// StopService stops service.
+// StopService stops consensus service.
 func (s *Service) StopService() {
 	utils.GetLogInstance().Info("Stopping consensus service.")
 	s.stopChan <- struct{}{}
