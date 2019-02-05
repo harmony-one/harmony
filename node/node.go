@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"encoding/binary"
-	"encoding/gob"
 	"encoding/hex"
 	"fmt"
 	"math/big"
@@ -113,12 +112,6 @@ type syncConfig struct {
 	client    *downloader.Client
 }
 
-// NetworkNode ...
-type NetworkNode struct {
-	SelfPeer p2p.Peer
-	IDCPeer  p2p.Peer
-}
-
 // Node represents a protocol-participating node in the network
 type Node struct {
 	Consensus              *bft.Consensus       // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
@@ -133,7 +126,7 @@ type Node struct {
 	ClientPeer *p2p.Peer      // The peer for the harmony tx generator client, used for leaders to return proof-of-accept
 	Client     *client.Client // The presence of a client object means this node will also act as a client
 	SelfPeer   p2p.Peer       // TODO(minhdoan): it could be duplicated with Self below whose is Alok work.
-	IDCPeer    p2p.Peer
+	BCPeers    []p2p.Peer     // list of Beacon Chain Peers.  This is needed by all nodes.
 
 	Neighbors  sync.Map   // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
 	State      State      // State of the Node
@@ -211,34 +204,6 @@ func (node *Node) countNumTransactionsInBlockchain() int {
 		count += len(block.Transactions())
 	}
 	return count
-}
-
-// SerializeNode serializes the node
-// https://stackoverflow.com/questions/12854125/how-do-i-dump-the-struct-into-the-byte-array-without-reflection/12854659#12854659
-func (node *Node) SerializeNode(nnode *NetworkNode) []byte {
-	//Needs to escape the serialization of unexported fields
-	var result bytes.Buffer
-	encoder := gob.NewEncoder(&result)
-	err := encoder.Encode(nnode)
-	if err != nil {
-		fmt.Println("Could not serialize node")
-		fmt.Println("ERROR", err)
-		//utils.GetLogInstance().Error("Could not serialize node")
-	}
-
-	return result.Bytes()
-}
-
-// DeserializeNode deserializes the node
-func DeserializeNode(d []byte) *NetworkNode {
-	var wn NetworkNode
-	r := bytes.NewBuffer(d)
-	decoder := gob.NewDecoder(r)
-	err := decoder.Decode(&wn)
-	if err != nil {
-		log.Error("Could not de-serialize node 1")
-	}
-	return &wn
 }
 
 // New creates a new node.
