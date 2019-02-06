@@ -57,3 +57,14 @@ The new node are connected to the two P2P overlay networks.
 Harmony utilizes libp2p as the underlying networking layer for peer discovery and p2p network transportation.
 It is still a crucial task to understand the protocol messages and how the libp2p handles the messages.
 We may need to fork the libp2p to fit our requirement during the development.
+
+## Two Stages of Peer Discovery
+Harmony uses two stages of peer discovery mechanism to form the overlay of p2p networks.
+The first stage is to connect to beacon chain to stake and get the shard information.
+The second stage is to create the real p2p network within the shard afterwards.
+New nodes will always keep the connection to some beacon chain nodes for further communication.
+The current implementation works like the following.
+* beacon chain nodes bootstrap by contacting bootnodes using discovery rendezvous string "0". Then the beacon chain is formed.
+* new nodes contact bootnodes using rendezvous string "0" to connect to beacon chain nodes.
+* new nodes use pubsub to stake in beacon chain, and get shard information from beacon chain after the randomness and resharding algorithm.
+* new nodes use the new shardID as the rendezvous string to connect to bootnodes again to form new p2p network at the shard level.
