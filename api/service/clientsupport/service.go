@@ -14,7 +14,7 @@ const (
 	ClientServicePortDiff = 5555
 )
 
-// Service ...
+// Service is the client support service.
 type Service struct {
 	server     *clientService.Server
 	grpcServer *grpc.Server
@@ -22,8 +22,8 @@ type Service struct {
 	port       string
 }
 
-// NewService returns new client support service.
-func NewService(stateReader func() (*state.DB, error), callFaucetContract func(common.Address) common.Hash, ip, nodePort string) *Service {
+// New returns new client support service.
+func New(stateReader func() (*state.DB, error), callFaucetContract func(common.Address) common.Hash, ip, nodePort string) *Service {
 	port, _ := strconv.Atoi(nodePort)
 	return &Service{server: clientService.NewServer(stateReader, callFaucetContract), ip: ip, port: strconv.Itoa(port + ClientServicePortDiff)}
 }

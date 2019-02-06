@@ -95,28 +95,7 @@ func main() {
 		tx, _ := types.SignTx(types.NewTransaction(nonce+uint64(i), randomUserAddress, 0, big.NewInt(1000), params.TxGas, nil, nil), types.HomesteadSigner{}, testBankKey)
 		txs[i] = tx
 	}
-
-	// Add a contract deployment transaction
-	//pragma solidity >=0.4.22 <0.6.0;
-	//
-	//contract Faucet {
-	//	mapping(address => bool) processed;
-	//	uint quota = 0.5 ether;
-	//	address owner;
-	//	constructor() public payable {
-	//	owner = msg.sender;
-	//}
-	//	function request(address payable requestor) public {
-	//	require(msg.sender == owner);
-	//	require(quota <= address(this).balance);
-	//	require(!processed[requestor]);
-	//	processed[requestor] = true;
-	//	requestor.transfer(quota);
-	//}
-	//	function money() public view returns(uint) {
-	//	return address(this).balance;
-	//}
-	//}
+	//Add a contract deployment transaction.
 	contractData := "0x60806040526802b5e3af16b188000060015560028054600160a060020a031916331790556101aa806100326000396000f3fe608060405260043610610045577c0100000000000000000000000000000000000000000000000000000000600035046327c78c42811461004a5780634ddd108a1461008c575b600080fd5b34801561005657600080fd5b5061008a6004803603602081101561006d57600080fd5b503573ffffffffffffffffffffffffffffffffffffffff166100b3565b005b34801561009857600080fd5b506100a1610179565b60408051918252519081900360200190f35b60025473ffffffffffffffffffffffffffffffffffffffff1633146100d757600080fd5b600154303110156100e757600080fd5b73ffffffffffffffffffffffffffffffffffffffff811660009081526020819052604090205460ff161561011a57600080fd5b73ffffffffffffffffffffffffffffffffffffffff8116600081815260208190526040808220805460ff1916600190811790915554905181156108fc0292818181858888f19350505050158015610175573d6000803e3d6000fd5b5050565b30319056fea165627a7a7230582003d799bcee73e96e0f40ca432d9c3d2aa9c00a1eba8d00877114a0d7234790ce0029"
 	_ = contractData
 	dataEnc := common.FromHex(contractData)
