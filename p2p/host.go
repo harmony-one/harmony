@@ -5,6 +5,8 @@ import (
 	peer "github.com/libp2p/go-libp2p-peer"
 )
 
+//go:generate mockgen -source host.go -destination=host/mock/host_mock.go
+
 // Host is the client + server in p2p network.
 type Host interface {
 	GetSelfPeer() Peer
