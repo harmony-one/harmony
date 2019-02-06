@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"io"
 
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
-
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/p2p"
 	libp2p "github.com/libp2p/go-libp2p"
@@ -16,6 +14,7 @@ import (
 	peer "github.com/libp2p/go-libp2p-peer"
 	peerstore "github.com/libp2p/go-libp2p-peerstore"
 	protocol "github.com/libp2p/go-libp2p-protocol"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	p2p_config "github.com/libp2p/go-libp2p/config"
 	ma "github.com/multiformats/go-multiaddr"
 )
@@ -27,10 +26,16 @@ const (
 	ProtocolID = "/harmony/0.0.1"
 )
 
+// PubSub captures the pubsub interface we expect from libp2p.
+type PubSub interface {
+	Publish(topic string, data []byte) error
+	Subscribe(topic string, opts ...pubsub.SubOpt) (*pubsub.Subscription, error)
+}
+
 // HostV2 is the version 2 p2p host
 type HostV2 struct {
 	h      p2p_host.Host
-	pubsub *pubsub.PubSub
+	pubsub PubSub
 	self   p2p.Peer
 	priKey p2p_crypto.PrivKey
 }
@@ -47,9 +52,15 @@ func (host *HostV2) SendMessageToGroups(groups []p2p.GroupID, msg []byte) error 
 	return error
 }
 
+// Subscription captures the subscription interface
+type Subscription interface {
+	Next(ctx context.Context) (*pubsub.Message, error)
+	Cancel()
+}
+
 // GroupReceiver is a multicast group receiver implementation.
 type GroupReceiver struct {
-	sub *pubsub.Subscription
+	sub Subscription
 }
 
 // Close closes this receiver.
