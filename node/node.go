@@ -164,10 +164,6 @@ type Node struct {
 	// Service manager.
 	serviceManager *service_manager.Manager
 
-	// TxnPriKey
-	TxnPriKey   *ecdsa.PrivateKey
-	nodeAddress common.Address
-
 	// For test only
 	TestBankKeys      []*ecdsa.PrivateKey
 	ContractKeys      []*ecdsa.PrivateKey
@@ -256,10 +252,6 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 	if host != nil && consensus != nil {
 		// Consensus and associated channel to communicate blocks
 		node.Consensus = consensus
-
-		//Generate node txns public key
-		node.TxnPriKey, _ = ecdsa.GenerateKey(crypto.S256(), strings.NewReader(node.SelfPeer.IP))
-		node.nodeAddress = crypto.PubkeyToAddress(node.TxnPriKey.PublicKey)
 
 		// Initialize genesis block and blockchain
 		genesisAlloc := node.CreateGenesisAllocWithTestingAddresses(100)
@@ -442,8 +434,10 @@ func (node *Node) CreateStakingDepositTransaction(stake int) (*types.Transaction
 	}
 	nonce := state.GetNonce(crypto.PubkeyToAddress(DepositContractPriKey.PublicKey))
 	callingFunction := "0xd0e30db0"
-	dataEnc := common.FromHex(callingFunction) //Deposit Does not take a argument, stake is transferred via amount.
-	tx, err := types.SignTx(types.NewTransaction(nonce, DepositContractAddress, node.Consensus.ShardID, big.NewInt(int64(stake)), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, node.TxnPriKey)
+	dataEnc := common.FromHex(callingFunction)                                                                    //Deposit Does not take a argument, stake is transferred via amount.
+	DepositContractPriKey, _ := ecdsa.GenerateKey(crypto.S256(), strings.NewReader("Deposit Smart Contract Key")) //DepositContractPriKey is pk for contract
+	DepositContractPriKey, _ := ecdsa.GenerateKey(crypto.S256(), strings.NewReader("Deposit Smart Contract Key")) //DepositContractPriKey is pk for contract
+	tx, err := types.SignTx(types.NewTransaction(nonce, DepositContractAddress, node.Consensus.ShardID, big.NewInt(int64(stake)), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, DepositContractPriKey)
 	return tx, err
 }
 
@@ -475,7 +469,7 @@ func (node *Node) AddFaucetContractToPendingTransactions() {
 
 	contractFunds := big.NewInt(8000000)
 	contractFunds = contractFunds.Mul(contractFunds, big.NewInt(params.Ether))
-	mycontracttx, _ := types.SignTx(types.NewContractCreation(uint64(0), node.Consensus.ShardID, contractFunds, params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, priKey)
+	mycontracttx, _ := types.SignTx(types.NewContractCreation(uint64(0), node.Consensus.ShardID, contractFunds, params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, DepositContractPriKey)
 	node.ContractAddresses = append(node.ContractAddresses, crypto.CreateAddress(crypto.PubkeyToAddress(priKey.PublicKey), uint64(0)))
 
 	node.addPendingTransactions(types.Transactions{mycontracttx})
@@ -512,7 +506,7 @@ func (node *Node) CallFaucetContract(walletAddress common.Address) common.Hash {
 	callingFunction := "0x27c78c42000000000000000000000000"
 	contractData := callingFunction + hex.EncodeToString(walletAddress.Bytes())
 	dataEnc := common.FromHex(contractData)
-	tx, _ := types.SignTx(types.NewTransaction(nonce, node.ContractAddresses[0], node.Consensus.ShardID, big.NewInt(0), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, node.ContractKeys[0])
+	tx, _ := types.SignTx(types.NewTransaction(nonce, node.ContractAddresses[0], node.Consensus.ShardID, big.NewInt(0), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, DepositContractPriKey)
 
 	node.addPendingTransactions(types.Transactions{tx})
 	return tx.Hash()
