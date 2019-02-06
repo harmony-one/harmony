@@ -164,6 +164,10 @@ type Node struct {
 	// Service manager.
 	serviceManager *service_manager.Manager
 
+	// TxnPriKey
+	TxnPriKey   *ecdsa.PrivateKey
+	nodeAddress common.Address
+
 	// For test only
 	TestBankKeys      []*ecdsa.PrivateKey
 	ContractKeys      []*ecdsa.PrivateKey
@@ -252,6 +256,10 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 	if host != nil && consensus != nil {
 		// Consensus and associated channel to communicate blocks
 		node.Consensus = consensus
+
+		//Generate node txns public key
+		node.TxnPriKey, _ = ecdsa.GenerateKey(crypto.S256(), strings.NewReader(node.SelfPeer.IP))
+		node.nodeAddress = crypto.PubkeyToAddress(node.TxnPriKey.PublicKey)
 
 		// Initialize genesis block and blockchain
 		genesisAlloc := node.CreateGenesisAllocWithTestingAddresses(100)
@@ -435,7 +443,7 @@ func (node *Node) CreateStakingDepositTransaction(stake int) (*types.Transaction
 	nonce := state.GetNonce(crypto.PubkeyToAddress(DepositContractPriKey.PublicKey))
 	callingFunction := "0xd0e30db0"
 	dataEnc := common.FromHex(callingFunction) //Deposit Does not take a argument, stake is transferred via amount.
-	tx, err := types.SignTx(types.NewTransaction(nonce, DepositContractAddress, node.Consensus.ShardID, big.NewInt(int64(stake)), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, node.ContractKeys[0])
+	tx, err := types.SignTx(types.NewTransaction(nonce, DepositContractAddress, node.Consensus.ShardID, big.NewInt(int64(stake)), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, node.TxnPriKey)
 	return tx, err
 }
 
@@ -453,7 +461,7 @@ func (node *Node) CreateStakingWithdrawTransaction(stake int) (*types.Transactio
 	callingFunction := "0x2e1a7d4d"
 	contractData := callingFunction + hex.EncodeToString([]byte(strconv.Itoa(stake)))
 	dataEnc := common.FromHex(contractData)
-	tx, err := types.SignTx(types.NewTransaction(nonce, DepositContractAddress, node.Consensus.ShardID, big.NewInt(0), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, node.ContractKeys[0])
+	tx, err := types.SignTx(types.NewTransaction(nonce, DepositContractAddress, node.Consensus.ShardID, big.NewInt(0), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, node.TxnPriKey)
 	return tx, err
 }
 
