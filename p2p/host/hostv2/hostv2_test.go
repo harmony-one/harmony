@@ -54,7 +54,7 @@ func TestGroupReceiver_Close(t *testing.T) {
 	defer mc.Finish()
 	sub := mock.NewMockSubscription(mc)
 	sub.EXPECT().Cancel()
-	receiver := GroupReceiver{sub: sub}
+	receiver := GroupReceiverImpl{sub: sub}
 	if err := receiver.Close(); err != nil {
 		t.Errorf("expected no error but got %v", err)
 	}
@@ -75,7 +75,7 @@ func TestGroupReceiver_Receive(t *testing.T) {
 		sub.EXPECT().Next(ctx).Return(pubsubMessage("DEF", []byte{4, 5, 6}), nil),
 		sub.EXPECT().Next(ctx).Return(nil, errors.New("FIAL")),
 	)
-	receiver := GroupReceiver{sub: sub}
+	receiver := GroupReceiverImpl{sub: sub}
 	verify := func(sender peer.ID, msg []byte, shouldError bool) {
 		gotMsg, gotSender, err := receiver.Receive(ctx)
 		if (err != nil) != shouldError {
@@ -106,8 +106,8 @@ func TestHostV2_GroupReceiver(t *testing.T) {
 		pubsub.EXPECT().Subscribe("ABC").Return(sub, nil)
 		host := &HostV2{pubsub: pubsub}
 		gotReceiver, err := host.GroupReceiver("ABC")
-		if r, ok := gotReceiver.(*GroupReceiver); !ok {
-			t.Errorf("expected a hostv2 GroupReceiver; got %v", gotReceiver)
+		if r, ok := gotReceiver.(*GroupReceiverImpl); !ok {
+			t.Errorf("expected a hostv2 GroupReceiverImpl; got %v", gotReceiver)
 		} else if r.sub != sub {
 			t.Errorf("unexpected subscriber %v", r.sub)
 		}
@@ -123,7 +123,7 @@ func TestHostV2_GroupReceiver(t *testing.T) {
 		host := &HostV2{pubsub: pubsub}
 		gotReceiver, err := host.GroupReceiver("ABC")
 		if gotReceiver != nil {
-			t.Errorf("expected a nil hostv2 GroupReceiver; got %v", gotReceiver)
+			t.Errorf("expected a nil hostv2 GroupReceiverImpl; got %v", gotReceiver)
 		}
 		if err == nil {
 			t.Error("expected an error; got none")

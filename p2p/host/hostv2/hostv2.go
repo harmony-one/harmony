@@ -58,20 +58,20 @@ type Subscription interface {
 	Cancel()
 }
 
-// GroupReceiver is a multicast group receiver implementation.
-type GroupReceiver struct {
+// GroupReceiverImpl is a multicast group receiver implementation.
+type GroupReceiverImpl struct {
 	sub Subscription
 }
 
 // Close closes this receiver.
-func (r *GroupReceiver) Close() error {
+func (r *GroupReceiverImpl) Close() error {
 	r.sub.Cancel()
 	r.sub = nil
 	return nil
 }
 
 // Receive receives a message.
-func (r *GroupReceiver) Receive(ctx context.Context) (
+func (r *GroupReceiverImpl) Receive(ctx context.Context) (
 	msg []byte, sender peer.ID, err error,
 ) {
 	m, err := r.sub.Next(ctx)
@@ -91,7 +91,7 @@ func (host *HostV2) GroupReceiver(group p2p.GroupID) (
 	if err != nil {
 		return nil, err
 	}
-	return &GroupReceiver{sub: sub}, nil
+	return &GroupReceiverImpl{sub: sub}, nil
 }
 
 // AddPeer add p2p.Peer into Peerstore
