@@ -49,28 +49,30 @@ type AccountState struct {
 	nonce   uint64
 }
 
+var (
+	// Account subcommands
+	accountImportCommand = flag.NewFlagSet("import", flag.ExitOnError)
+	accountImportPtr     = accountImportCommand.String("privateKey", "", "Specify the private key to import")
+
+	// Transfer subcommands
+	transferCommand     = flag.NewFlagSet("transfer", flag.ExitOnError)
+	transferSenderPtr   = transferCommand.String("from", "0", "Specify the sender account address or index")
+	transferReceiverPtr = transferCommand.String("to", "", "Specify the receiver account")
+	transferAmountPtr   = transferCommand.Float64("amount", 0, "Specify the amount to transfer")
+	transferShardIDPtr  = transferCommand.Int("shardID", -1, "Specify the shard ID for the transfer")
+
+	freeTokenCommand    = flag.NewFlagSet("getFreeToken", flag.ExitOnError)
+	freeTokenAddressPtr = freeTokenCommand.String("address", "", "Specify the account address to receive the free token")
+
+	balanceCommand    = flag.NewFlagSet("getFreeToken", flag.ExitOnError)
+	balanceAddressPtr = balanceCommand.String("address", "", "Specify the account address to check balance for")
+)
+
 // The main wallet program entrance. Note the this wallet program is for demo-purpose only. It does not implement
 // the secure storage of keys.
 func main() {
 	h := log.StreamHandler(os.Stdout, log.TerminalFormat(false))
 	log.Root().SetHandler(h)
-
-	// Account subcommands
-	accountImportCommand := flag.NewFlagSet("import", flag.ExitOnError)
-	accountImportPtr := accountImportCommand.String("privateKey", "", "Specify the private key to import")
-
-	// Transfer subcommands
-	transferCommand := flag.NewFlagSet("transfer", flag.ExitOnError)
-	transferSenderPtr := transferCommand.String("from", "0", "Specify the sender account address or index")
-	transferReceiverPtr := transferCommand.String("to", "", "Specify the receiver account")
-	transferAmountPtr := transferCommand.Float64("amount", 0, "Specify the amount to transfer")
-	transferShardIDPtr := transferCommand.Int("shardID", -1, "Specify the shard ID for the transfer")
-
-	freeTokenCommand := flag.NewFlagSet("getFreeToken", flag.ExitOnError)
-	freeTokenAddressPtr := freeTokenCommand.String("address", "", "Specify the account address to receive the free token")
-
-	balanceCommand := flag.NewFlagSet("getFreeToken", flag.ExitOnError)
-	balanceAddressPtr := balanceCommand.String("address", "", "Specify the account address to check balance for")
 
 	// Verify that a subcommand has been provided
 	// os.Arg[0] is the main command
@@ -101,150 +103,174 @@ func main() {
 	case "-version":
 		printVersion(os.Args[0])
 	case "new":
-		randomBytes := [32]byte{}
-		_, err := io.ReadFull(rand.Reader, randomBytes[:])
-
-		if err != nil {
-			fmt.Println("Failed to get randomness for the private key...")
-			return
-		}
-		priKey, err := crypto2.GenerateKey()
-		if err != nil {
-			panic("Failed to generate the private key")
-		}
-		StorePrivateKey(crypto2.FromECDSA(priKey))
-		fmt.Printf("New account created with address:\n    {%s}\n", crypto2.PubkeyToAddress(priKey.PublicKey).Hex())
-		fmt.Printf("Please keep a copy of the private key:\n    {%s}\n", hex.EncodeToString(crypto2.FromECDSA(priKey)))
+		processNewCommnad()
 	case "list":
-		for i, key := range ReadPrivateKeys() {
-			fmt.Printf("Account %d:\n  {%s}\n", i, crypto2.PubkeyToAddress(key.PublicKey).Hex())
-			fmt.Printf("    PrivateKey: {%s}\n", hex.EncodeToString(key.D.Bytes()))
-		}
+		processListCommand()
 	case "removeAll":
 		ClearKeystore()
 		fmt.Println("All existing accounts deleted...")
 	case "import":
-		accountImportCommand.Parse(os.Args[2:])
-		priKey := *accountImportPtr
-		if priKey == "" {
-			fmt.Println("Error: --privateKey is required")
-			return
-		}
-		if !accountImportCommand.Parsed() {
-			fmt.Println("Failed to parse flags")
-		}
-		priKeyBytes, err := hex.DecodeString(priKey)
-		if err != nil {
-			panic("Failed to parse the private key into bytes")
-		}
-		StorePrivateKey(priKeyBytes)
-		fmt.Println("Private key imported...")
+		processImportCommnad()
 	case "balances":
-		balanceCommand.Parse(os.Args[2:])
-		walletNode := CreateWalletNode()
-
-		if *balanceAddressPtr == "" {
-			for i, address := range ReadAddresses() {
-				fmt.Printf("Account %d: %s:\n", i, address.Hex())
-				for shardID, balanceNonce := range FetchBalance(address, walletNode) {
-					fmt.Printf("    Balance in Shard %d:  %s \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance))
-				}
-			}
-		} else {
-			address := common.HexToAddress(*balanceAddressPtr)
-			fmt.Printf("Account: %s:\n", address.Hex())
-			for shardID, balanceNonce := range FetchBalance(address, walletNode) {
-				fmt.Printf("    Balance in Shard %d:  %s \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance))
-			}
-		}
+		processBalancesCommand()
 	case "getFreeToken":
-		freeTokenCommand.Parse(os.Args[2:])
-		walletNode := CreateWalletNode()
-
-		if *freeTokenAddressPtr == "" {
-			fmt.Println("Error: --address is required")
-			return
-		}
-		address := common.HexToAddress(*freeTokenAddressPtr)
-
-		GetFreeToken(address, walletNode)
+		processGetFreeToken()
 	case "transfer":
-		transferCommand.Parse(os.Args[2:])
-		if !transferCommand.Parsed() {
-			fmt.Println("Failed to parse flags")
-		}
-		sender := *transferSenderPtr
-		receiver := *transferReceiverPtr
-		amount := *transferAmountPtr
-		shardID := *transferShardIDPtr
-
-		if shardID == -1 {
-			fmt.Println("Please specify the shard ID for the transfer (e.g. --shardID=0)")
-			return
-		}
-		if amount <= 0 {
-			fmt.Println("Please specify positive amount to transfer")
-			return
-		}
-		priKeys := ReadPrivateKeys()
-		if len(priKeys) == 0 {
-			fmt.Println("No imported account to use.")
-			return
-		}
-		senderIndex, err := strconv.Atoi(sender)
-		addresses := ReadAddresses()
-		if err != nil {
-			senderIndex = -1
-			for i, address := range addresses {
-				if address.Hex() == sender {
-					senderIndex = i
-					break
-				}
-			}
-			if senderIndex == -1 {
-				fmt.Println("The specified sender account does not exist in the wallet.")
-				break
-			}
-		}
-
-		if senderIndex >= len(priKeys) {
-			fmt.Println("Sender account index out of bounds.")
-			return
-		}
-
-		receiverAddress := common.HexToAddress(receiver)
-		if len(receiverAddress) != 20 {
-			fmt.Println("The receiver address is not valid.")
-			return
-		}
-
-		// Generate transaction
-		senderPriKey := priKeys[senderIndex]
-		senderAddress := addresses[senderIndex]
-		walletNode := CreateWalletNode()
-		shardIDToAccountState := FetchBalance(senderAddress, walletNode)
-
-		state, ok := shardIDToAccountState[uint32(shardID)]
-		if !ok {
-			fmt.Printf("Failed connecting to the shard %d\n", shardID)
-			return
-		}
-		balance := state.balance
-		balance = balance.Div(balance, big.NewInt(params.GWei))
-		if amount > float64(balance.Uint64())/params.GWei {
-			fmt.Printf("Balance is not enough for the transfer, current balance is %.6f\n", float64(balance.Uint64())/params.GWei)
-			return
-		}
-
-		amountBigInt := big.NewInt(int64(amount * params.GWei))
-		amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(params.GWei))
-		tx, _ := types.SignTx(types.NewTransaction(state.nonce, receiverAddress, uint32(shardID), amountBigInt, params.TxGas, nil, nil), types.HomesteadSigner{}, senderPriKey)
-		SubmitTransaction(tx, walletNode, uint32(shardID))
+		processTransferCommand()
 	default:
 		fmt.Printf("Unknown action: %s\n", os.Args[1])
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
+}
+
+func processNewCommnad() {
+	randomBytes := [32]byte{}
+	_, err := io.ReadFull(rand.Reader, randomBytes[:])
+
+	if err != nil {
+		fmt.Println("Failed to get randomness for the private key...")
+		return
+	}
+	priKey, err := crypto2.GenerateKey()
+	if err != nil {
+		panic("Failed to generate the private key")
+	}
+	StorePrivateKey(crypto2.FromECDSA(priKey))
+	fmt.Printf("New account created with address:\n    {%s}\n", crypto2.PubkeyToAddress(priKey.PublicKey).Hex())
+	fmt.Printf("Please keep a copy of the private key:\n    {%s}\n", hex.EncodeToString(crypto2.FromECDSA(priKey)))
+}
+
+func processListCommand() {
+	for i, key := range ReadPrivateKeys() {
+		fmt.Printf("Account %d:\n  {%s}\n", i, crypto2.PubkeyToAddress(key.PublicKey).Hex())
+		fmt.Printf("    PrivateKey: {%s}\n", hex.EncodeToString(key.D.Bytes()))
+	}
+}
+
+func processImportCommnad() {
+	accountImportCommand.Parse(os.Args[2:])
+	priKey := *accountImportPtr
+	if priKey == "" {
+		fmt.Println("Error: --privateKey is required")
+		return
+	}
+	if !accountImportCommand.Parsed() {
+		fmt.Println("Failed to parse flags")
+	}
+	priKeyBytes, err := hex.DecodeString(priKey)
+	if err != nil {
+		panic("Failed to parse the private key into bytes")
+	}
+	StorePrivateKey(priKeyBytes)
+	fmt.Println("Private key imported...")
+}
+
+func processBalancesCommand() {
+	balanceCommand.Parse(os.Args[2:])
+	walletNode := CreateWalletNode()
+
+	if *balanceAddressPtr == "" {
+		for i, address := range ReadAddresses() {
+			fmt.Printf("Account %d: %s:\n", i, address.Hex())
+			for shardID, balanceNonce := range FetchBalance(address, walletNode) {
+				fmt.Printf("    Balance in Shard %d:  %s \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance))
+			}
+		}
+	} else {
+		address := common.HexToAddress(*balanceAddressPtr)
+		fmt.Printf("Account: %s:\n", address.Hex())
+		for shardID, balanceNonce := range FetchBalance(address, walletNode) {
+			fmt.Printf("    Balance in Shard %d:  %s \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance))
+		}
+	}
+}
+
+func processGetFreeToken() {
+	freeTokenCommand.Parse(os.Args[2:])
+	walletNode := CreateWalletNode()
+
+	if *freeTokenAddressPtr == "" {
+		fmt.Println("Error: --address is required")
+		return
+	}
+	address := common.HexToAddress(*freeTokenAddressPtr)
+
+	GetFreeToken(address, walletNode)
+}
+
+func processTransferCommand() {
+	transferCommand.Parse(os.Args[2:])
+	if !transferCommand.Parsed() {
+		fmt.Println("Failed to parse flags")
+	}
+	sender := *transferSenderPtr
+	receiver := *transferReceiverPtr
+	amount := *transferAmountPtr
+	shardID := *transferShardIDPtr
+
+	if shardID == -1 {
+		fmt.Println("Please specify the shard ID for the transfer (e.g. --shardID=0)")
+		return
+	}
+	if amount <= 0 {
+		fmt.Println("Please specify positive amount to transfer")
+		return
+	}
+	priKeys := ReadPrivateKeys()
+	if len(priKeys) == 0 {
+		fmt.Println("No imported account to use.")
+		return
+	}
+	senderIndex, err := strconv.Atoi(sender)
+	addresses := ReadAddresses()
+	if err != nil {
+		senderIndex = -1
+		for i, address := range addresses {
+			if address.Hex() == sender {
+				senderIndex = i
+				break
+			}
+		}
+		if senderIndex == -1 {
+			fmt.Println("The specified sender account does not exist in the wallet.")
+			return
+		}
+	}
+
+	if senderIndex >= len(priKeys) {
+		fmt.Println("Sender account index out of bounds.")
+		return
+	}
+
+	receiverAddress := common.HexToAddress(receiver)
+	if len(receiverAddress) != 20 {
+		fmt.Println("The receiver address is not valid.")
+		return
+	}
+
+	// Generate transaction
+	senderPriKey := priKeys[senderIndex]
+	senderAddress := addresses[senderIndex]
+	walletNode := CreateWalletNode()
+	shardIDToAccountState := FetchBalance(senderAddress, walletNode)
+
+	state, ok := shardIDToAccountState[uint32(shardID)]
+	if !ok {
+		fmt.Printf("Failed connecting to the shard %d\n", shardID)
+		return
+	}
+	balance := state.balance
+	balance = balance.Div(balance, big.NewInt(params.GWei))
+	if amount > float64(balance.Uint64())/params.GWei {
+		fmt.Printf("Balance is not enough for the transfer, current balance is %.6f\n", float64(balance.Uint64())/params.GWei)
+		return
+	}
+
+	amountBigInt := big.NewInt(int64(amount * params.GWei))
+	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(params.GWei))
+	tx, _ := types.SignTx(types.NewTransaction(state.nonce, receiverAddress, uint32(shardID), amountBigInt, params.TxGas, nil, nil), types.HomesteadSigner{}, senderPriKey)
+	SubmitTransaction(tx, walletNode, uint32(shardID))
 }
 
 func convertBalanceIntoReadableFormat(balance *big.Int) string {
@@ -339,7 +365,6 @@ func FetchBalance(address common.Address, walletNode *node.Node) map[uint32]Acco
 		balance.SetBytes(response.Balance)
 		result[shardID] = AccountState{balance, response.Nonce}
 	}
-
 	return result
 }
 
