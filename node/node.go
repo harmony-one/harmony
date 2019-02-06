@@ -28,6 +28,7 @@ import (
 	blockproposal "github.com/harmony-one/harmony/api/service/blockproposal"
 	"github.com/harmony-one/harmony/api/service/clientsupport"
 	consensus_service "github.com/harmony-one/harmony/api/service/consensus"
+	"github.com/harmony-one/harmony/api/service/discovery"
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/api/service/networkinfo"
 	"github.com/harmony-one/harmony/api/service/staking"
@@ -692,11 +693,16 @@ func (node *Node) setupForBeaconValidator() {
 }
 
 func (node *Node) setupForNewNode() {
-	chanPeer := make(chan *p2p.Peer)
-	// Add network info serivce.
-	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(chanPeer))
-	// Add staking service.
-	node.serviceManager.RegisterService(service_manager.Staking, staking.New(chanPeer))
+	chanPeer := make(chan p2p.Peer)
+	stakingPeer := make(chan p2p.Peer)
+
+	// Register staking service.
+	node.serviceManager.RegisterService(service_manager.Staking, staking.NewService(stakingPeer))
+	// Register peer discovery service.
+	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, fmt.Sprintf("%v", node.Consensus.ShardID), chanPeer, stakingPeer))
+	// Register networkinfo service.
+	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.NewService(node.host, fmt.Sprintf("%v", node.Consensus.ShardID), chanPeer))
+
 }
 
 // ServiceManagerSetup setups service store.
