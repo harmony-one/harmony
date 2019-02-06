@@ -1,6 +1,7 @@
 package staking
 
 import (
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 )
@@ -9,11 +10,11 @@ import (
 type Service struct {
 	stopChan    chan struct{}
 	stoppedChan chan struct{}
-	peerChan    chan *p2p.Peer
+	peerChan    <-chan p2p.Peer
 }
 
-// New returns staking service.
-func New(peerChan chan *p2p.Peer) *Service {
+// NewService returns staking service.
+func NewService(peerChan <-chan p2p.Peer) *Service {
 	return &Service{
 		stopChan:    make(chan struct{}),
 		stoppedChan: make(chan struct{}),
@@ -23,6 +24,7 @@ func New(peerChan chan *p2p.Peer) *Service {
 
 // StartService starts staking service.
 func (s *Service) StartService() {
+	log.Info("Start Staking Service")
 	s.Init()
 	s.Run()
 }
@@ -34,15 +36,14 @@ func (s *Service) Init() {
 // Run runs staking.
 func (s *Service) Run() {
 	// Wait until peer info of beacon chain is ready.
-	peer := <-s.peerChan
 	go func() {
 		defer close(s.stoppedChan)
 		for {
 			select {
-			default:
-				utils.GetLogInstance().Info("Running staking")
+			case peer := <-s.peerChan:
+				utils.GetLogInstance().Info("Running role conversion")
 				// TODO: Write some logic here.
-				s.DoService(peer)
+				s.DoService(&peer)
 			case <-s.stopChan:
 				return
 			}
@@ -52,6 +53,7 @@ func (s *Service) Run() {
 
 // DoService does staking.
 func (s *Service) DoService(peer *p2p.Peer) {
+	utils.GetLogInstance().Info("Staking with Peer")
 }
 
 // StopService stops staking service.
