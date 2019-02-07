@@ -285,8 +285,6 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 		node.BlockChannel = make(chan *types.Block)
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, params.TestChainConfig, chain)
 		node.Worker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey), node.Consensus.ShardID)
-		node.AccountKey, _ = ecdsa.GenerateKey(crypto.S256(), strings.NewReader(node.SelfPeer.IP+node.SelfPeer.Port))
-		node.FundMyAccount()
 		node.AddFaucetContractToPendingTransactions()
 		if node.Role == BeaconLeader {
 			node.AddDepositContractToPendingTransactions()
@@ -761,13 +759,4 @@ func (node *Node) RunServices() {
 		return
 	}
 	node.serviceManager.RunServices()
-}
-
-//FundMyAccount creates node key and address and funds them.
-func (node *Node) FundMyAccount() common.Address {
-	//Fund the Account with the AccountKey == node.AccountKey
-	// Return the address of the account.
-	fmt.Println(node.AccountKey)
-	var address common.Address
-	return address
 }
