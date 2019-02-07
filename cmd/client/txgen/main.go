@@ -54,6 +54,13 @@ func main() {
 
 	bcAddr := flag.String("bc_addr", "", "MultiAddr of the identity chain")
 
+	// Key file to store the private key
+	keyFile := flag.String("key", "./.txgenkey", "the private key file of the txgen")
+	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress")
+
+	// LibP2P peer discovery integration test
+	libp2pPD := flag.Bool("libp2p_pd", false, "enable libp2p based peer discovery")
+
 	flag.Parse()
 
 	if *versionFlag {
@@ -65,7 +72,10 @@ func main() {
 
 	var bcPeer *p2p.Peer
 	var shardIDLeaderMap map[uint32]p2p.Peer
-	priKey, _, err := utils.GenKeyP2P(*ip, *port)
+	priKey, err := utils.LoadKeyFromFile(*keyFile)
+	if err != nil {
+		panic(err)
+	}
 
 	if *bcAddr != "" {
 		// Turn the destination into a multiaddr.
@@ -165,12 +175,22 @@ func main() {
 	for _, leader := range shardIDLeaderMap {
 		log.Debug("Client Join Shard", "leader", leader)
 		clientNode.GetHost().AddPeer(&leader)
-		go clientNode.JoinShard(leader)
+		if *libp2pPD {
+			clientNode.Role = node.NewNode
+		} else {
+			go clientNode.JoinShard(leader)
+		}
 		clientNode.State = node.NodeReadyForConsensus
 	}
-	// wait for 1 seconds for client to send ping message to leader
-	time.Sleep(time.Second)
-	clientNode.StopPing <- struct{}{}
+	if *libp2pPD {
+		clientNode.ServiceManagerSetup()
+		clientNode.RunServices()
+		clientNode.StartServer()
+	} else {
+		// wait for 1 seconds for client to send ping message to leader
+		time.Sleep(time.Second)
+		clientNode.StopPing <- struct{}{}
+	}
 	clientNode.State = node.NodeReadyForConsensus
 
 	// Transaction generation process

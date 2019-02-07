@@ -99,7 +99,7 @@ func main() {
 	minPeers := flag.Int("min_peers", 100, "Minimal number of Peers in shard")
 
 	// Key file to store the private key
-	keyFile := flag.String("key", "./.hmykey", "the private key file of the bootnode")
+	keyFile := flag.String("key", "./.hmykey", "the private key file of the harmony node")
 	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress")
 
 	// LibP2P peer discovery integration test
