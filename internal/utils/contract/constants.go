@@ -1,4 +1,4 @@
-package node
+package contract
 
 // DeployAccount is the accounts used for development.
 type DeployAccount struct {
