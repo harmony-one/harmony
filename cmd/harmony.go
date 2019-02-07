@@ -98,6 +98,13 @@ func main() {
 	//Leader needs to have a minimal number of peers to start consensus
 	minPeers := flag.Int("min_peers", 100, "Minimal number of Peers in shard")
 
+	// Key file to store the private key
+	keyFile := flag.String("key", "./.hmykey", "the private key file of the bootnode")
+	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress")
+
+	// LibP2P peer discovery integration test
+	libp2pPD := flag.Bool("libp2p_pd", false, "enable libp2p based peer discovery")
+
 	flag.Parse()
 
 	if *versionFlag {
@@ -113,13 +120,24 @@ func main() {
 	// Set up randomization seed.
 	rand.Seed(int64(time.Now().Nanosecond()))
 
+	if len(utils.BootNodes) == 0 {
+		bootNodeAddrs, err := utils.StringsToAddrs(utils.DefaultBootNodeAddrStrings)
+		if err != nil {
+			panic(err)
+		}
+		utils.BootNodes = bootNodeAddrs
+	}
+
 	var shardID string
 	var peers []p2p.Peer
 	var leader p2p.Peer
 	var selfPeer p2p.Peer
 	var clientPeer *p2p.Peer
 	var BCPeer *p2p.Peer
-	priKey, _, err := utils.GenKeyP2P(*ip, *port)
+	priKey, err := utils.LoadKeyFromFile(*keyFile)
+	if err != nil {
+		panic(err)
+	}
 
 	if *bcAddr != "" {
 		// Turn the destination into a multiaddr.
@@ -175,6 +193,8 @@ func main() {
 		panic("unable to new host in harmony")
 	}
 
+	log.Info("HARMONY", "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, host.GetID().Pretty()))
+
 	host.AddPeer(&leader)
 
 	// Consensus object.
@@ -209,10 +229,14 @@ func main() {
 	consensus.OnConsensusDone = currentNode.PostConsensusProcessing
 	currentNode.State = node.NodeWaitToJoin
 
-	if consensus.IsLeader {
-		currentNode.State = node.NodeLeader
+	if *libp2pPD {
+		currentNode.Role = node.NewNode
 	} else {
-		go currentNode.JoinShard(leader)
+		if consensus.IsLeader {
+			currentNode.State = node.NodeLeader
+		} else {
+			go currentNode.JoinShard(leader)
+		}
 	}
 
 	go currentNode.SupportSyncing()

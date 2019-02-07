@@ -83,12 +83,13 @@ function build_only
 
    for bin in "${!SRC[@]}"; do
       if [[ -z "$build" || "$bin" == "$build" ]]; then
+         rm -f $BINDIR/$bin
          echo "building ${SRC[$bin]}"
          env GOOS=$GOOS GOARCH=$GOARCH go build -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE ${SRC[$bin]}
          if [ "$(uname -s)" == "Linux" ]; then
             $BINDIR/$bin -version
          fi
-         if [ "$(uname -s)" == "Darwin" -a "$GOOS" == "darwin" ]; then
+         if [ "$(uname -s)" == "Darwin" -a "$GOOS" == "darwin" -a -e $BINDIR/$bin ]; then
             $BINDIR/$bin -version
          fi
       fi
