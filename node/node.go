@@ -662,11 +662,11 @@ func (node *Node) setupForNewNode() {
 	stakingPeer := make(chan p2p.Peer)
 
 	// Register staking service.
-	node.serviceManager.RegisterService(service_manager.Staking, staking.NewService(stakingPeer))
+	node.serviceManager.RegisterService(service_manager.Staking, staking.New(stakingPeer))
 	// Register peer discovery service.
 	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, fmt.Sprintf("%v", node.Consensus.ShardID), chanPeer, stakingPeer))
 	// Register networkinfo service.
-	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.NewService(node.host, fmt.Sprintf("%v", node.Consensus.ShardID), chanPeer))
+	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, fmt.Sprintf("%v", node.Consensus.ShardID), chanPeer))
 
 }
 

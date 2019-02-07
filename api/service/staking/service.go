@@ -13,8 +13,8 @@ type Service struct {
 	peerChan    <-chan p2p.Peer
 }
 
-// NewService returns staking service.
-func NewService(peerChan <-chan p2p.Peer) *Service {
+// New returns staking service.
+func New(peerChan <-chan p2p.Peer) *Service {
 	return &Service{
 		stopChan:    make(chan struct{}),
 		stoppedChan: make(chan struct{}),
