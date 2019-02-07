@@ -64,7 +64,7 @@ func main() {
 	// Init logging.
 	loggingInit(*logFolder, *ip, *port)
 
-	privKey, err := utils.LoadKeyFromFile(*keyFile)
+	privKey, _, err := utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
 		panic(err)
 	}

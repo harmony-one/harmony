@@ -150,19 +150,20 @@ func Load(path string, v interface{}) error {
 }
 
 // LoadPrivateKey parses the key string in base64 format and return PrivKey
-func LoadPrivateKey(key string) (p2p_crypto.PrivKey, error) {
+func LoadPrivateKey(key string) (p2p_crypto.PrivKey, p2p_crypto.PubKey, error) {
 	if key != "" {
 		k1, err := p2p_crypto.ConfigDecodeKey(key)
 		if err != nil {
-			return nil, fmt.Errorf("failed to decode key: %v", err)
+			return nil, nil, fmt.Errorf("failed to decode key: %v", err)
 		}
 		priKey, err := p2p_crypto.UnmarshalPrivateKey(k1)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal private key: %v", err)
+			return nil, nil, fmt.Errorf("failed to unmarshal private key: %v", err)
 		}
-		return priKey, nil
+		pubKey := priKey.GetPublic()
+		return priKey, pubKey, nil
 	}
-	return nil, fmt.Errorf("empty key string")
+	return nil, nil, fmt.Errorf("empty key string")
 }
 
 // SavePrivateKey convert the PrivKey to base64 format and return string
@@ -194,13 +195,13 @@ func SaveKeyToFile(keyfile string, key p2p_crypto.PrivKey) (err error) {
 // LoadKeyFromFile load private key from keyfile
 // If the private key is not loadable or no file, it will generate
 // a new random private key
-func LoadKeyFromFile(keyfile string) (key p2p_crypto.PrivKey, err error) {
+func LoadKeyFromFile(keyfile string) (key p2p_crypto.PrivKey, pk p2p_crypto.PubKey, err error) {
 	var keyStruct PrivKeyStore
 	err = Load(keyfile, &keyStruct)
 	if err != nil {
 		log.Print("No priviate key can be loaded from file", "keyfile", keyfile)
 		log.Print("Using random private key")
-		key, _, err = GenKeyP2PRand()
+		key, pk, err = GenKeyP2PRand()
 		if err != nil {
 			log.Panic("LoadKeyFromFile", "GenKeyP2PRand Error", err)
 		}
@@ -208,8 +209,8 @@ func LoadKeyFromFile(keyfile string) (key p2p_crypto.PrivKey, err error) {
 		if err != nil {
 			log.Print("LoadKeyFromFile", "failed to save key to keyfile", err)
 		}
-		return key, nil
+		return key, pk, nil
 	}
-	key, err = LoadPrivateKey(keyStruct.Key)
-	return key, err
+	key, pk, err = LoadPrivateKey(keyStruct.Key)
+	return key, pk, err
 }
