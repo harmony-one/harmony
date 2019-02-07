@@ -85,5 +85,7 @@ func (s *Service) pingPeer(peer p2p.Peer) {
 	content := host.ConstructP2pMessage(byte(0), buffer)
 	s.Host.SendMessage(peer, content)
 	log.Debug("Sent Ping Message to", "peer", peer)
-	s.stakingChan <- peer
+	if s.stakingChan != nil {
+		s.stakingChan <- peer
+	}
 }
