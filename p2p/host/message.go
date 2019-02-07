@@ -83,10 +83,12 @@ func SelectMyPeers(peers []p2p.Peer, min int, max int) []p2p.Peer {
 func send(h p2p.Host, peer p2p.Peer, message []byte, lostPeer chan p2p.Peer) {
 	// Add attack code here.
 	//attack.GetInstance().Run()
-	backoff := p2p.NewExpBackoff(150*time.Millisecond, 5*time.Second, 2)
+	backoff := p2p.NewExpBackoff(250*time.Millisecond, 5*time.Second, 2)
 
-	for trial := 0; trial < 10; trial++ {
-		if err := h.SendMessage(peer, message); err == nil {
+	for trial := 0; trial < 3; trial++ {
+		err := h.SendMessage(peer, message)
+		// No need to retry if new stream error or no error
+		if err == nil || err == p2p.ErrNewStream {
 			if trial > 0 {
 				log.Warn("retry send", "rety", trial)
 			}
