@@ -17,7 +17,6 @@ enum MessageType {
 // The request field will be either one of the structure corresponding to the MessageType type.
 message Message {
     MessageType type = 1;
-    string signature = 2;
     oneof request {
         StakingRequest staking = 3;
     }
@@ -33,7 +32,6 @@ message BootNodeNewNodeRequest {
 
 // Staking Request from new node to beacon node.
 message StakingRequest {
-  string address = 1;
-  int64 amount = 2;
-  string public_key = 4;
+  bytes transaction = 1;
+  string node_id = 2;
 }

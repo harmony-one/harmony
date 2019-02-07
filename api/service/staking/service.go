@@ -4,7 +4,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/internal/utils/contract"
 	"github.com/harmony-one/harmony/p2p"
 )
 
@@ -65,13 +64,11 @@ func (s *Service) createStakingMessage() *message.Message {
 	// TODO(minhdoan): Add signature and public key.
 	// To add public we need to assign a fake account to new node initially.
 	return &message.Message{
-		Type:      message.MessageType_NEWNODE_BEACON_STAKING,
-		Signature: "",
+		Type: message.MessageType_NEWNODE_BEACON_STAKING,
 		Request: &message.Message_Staking{
 			Staking: &message.StakingRequest{
-				Address:   contract.FakeAccounts[0].Address,
-				Amount:    1000,
-				PublicKey: "",
+				Transaction: []byte{},
+				NodeId:      "",
 			},
 		},
 	}

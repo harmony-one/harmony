@@ -246,7 +246,7 @@ func main() {
 		if consensus.IsLeader {
 			currentNode.State = node.NodeLeader
 		} else {
-			go currentNode.JoinShard(leader)
+			// go currentNode.JoinShard(leader)
 		}
 	}
 
