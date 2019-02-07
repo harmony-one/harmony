@@ -95,6 +95,7 @@ const (
 	inSyncThreshold   = 1
 )
 
+// TotalInitFund is the initial total fund to the faucet.
 const TotalInitFund = 9000000
 
 const (
