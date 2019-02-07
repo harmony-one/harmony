@@ -646,6 +646,13 @@ func (node *Node) setupForShardValidator() {
 }
 
 func (node *Node) setupForBeaconLeader() {
+	chanPeer := make(chan p2p.Peer)
+
+	// Register peer discovery service. "0" is the beacon shard ID. No need to do staking for beacon chain node.
+	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, "0", chanPeer, nil))
+	// Register networkinfo service. "0" is the beacon shard ID
+	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, "0", chanPeer))
+
 	// Register consensus service.
 	node.serviceManager.RegisterService(service_manager.Consensus, consensus_service.New(node.BlockChannel, node.Consensus))
 	// Register new block service.
@@ -655,6 +662,12 @@ func (node *Node) setupForBeaconLeader() {
 }
 
 func (node *Node) setupForBeaconValidator() {
+	chanPeer := make(chan p2p.Peer)
+
+	// Register peer discovery service. "0" is the beacon shard ID. No need to do staking for beacon chain node.
+	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, "0", chanPeer, nil))
+	// Register networkinfo service. "0" is the beacon shard ID
+	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, "0", chanPeer))
 }
 
 func (node *Node) setupForNewNode() {
@@ -663,11 +676,12 @@ func (node *Node) setupForNewNode() {
 
 	// Register staking service.
 	node.serviceManager.RegisterService(service_manager.Staking, staking.New(stakingPeer))
-	// Register peer discovery service.
-	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, fmt.Sprintf("%v", node.Consensus.ShardID), chanPeer, stakingPeer))
-	// Register networkinfo service.
-	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, fmt.Sprintf("%v", node.Consensus.ShardID), chanPeer))
+	// Register peer discovery service. "0" is the beacon shard ID
+	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, "0", chanPeer, stakingPeer))
+	// Register networkinfo service. "0" is the beacon shard ID
+	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, "0", chanPeer))
 
+	// TODO: how to restart networkinfo and discovery service after receiving shard id info from beacon chain?
 }
 
 // ServiceManagerSetup setups service store.
