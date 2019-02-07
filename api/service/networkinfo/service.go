@@ -30,8 +30,8 @@ type Service struct {
 	discovery   *libp2pdis.RoutingDiscovery
 }
 
-// NewService returns role conversion service.
-func NewService(h p2p.Host, rendezvous string, peerChan chan p2p.Peer) *Service {
+// New returns role conversion service.
+func New(h p2p.Host, rendezvous string, peerChan chan p2p.Peer) *Service {
 	timeout := 30 * time.Minute
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	dht, err := libp2pdht.New(ctx, h.GetP2PHost())
