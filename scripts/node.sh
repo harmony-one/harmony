@@ -44,6 +44,6 @@ BC_MA=/ip4/54.183.5.66/tcp/9999/ipfs/QmdQVypu6NSm7m8bNZj5EJCnjPhXR8QyRmDnDBidxGa
 fuser -k -n tcp $NODE_PORT
 
 # Run Harmony Node
-nohup ./harmony -bc_addr $BC_MA -ip $PUB_IP -port $NODE_PORT > harmony-${PUB_IP}.log 2>&1
+nohup ./harmony -bc_addr $BC_MA -ip $PUB_IP -port $NODE_PORT > harmony-${PUB_IP}.log 2>&1 &
 
 tail -f harmony-${PUB_IP}.log
