@@ -95,6 +95,8 @@ const (
 	inSyncThreshold   = 1
 )
 
+const TotalInitFund = 9000000
+
 const (
 	waitBeforeJoinShard = time.Second * 3
 	timeOutToJoinShard  = time.Minute * 10
@@ -221,7 +223,7 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 		genesisAlloc := node.CreateGenesisAllocWithTestingAddresses(100)
 		contractKey, _ := ecdsa.GenerateKey(crypto.S256(), strings.NewReader("Test contract key string stream that is fixed so that generated test key are deterministic every time"))
 		contractAddress := crypto.PubkeyToAddress(contractKey.PublicKey)
-		contractFunds := big.NewInt(9000000)
+		contractFunds := big.NewInt(TotalInitFund)
 		contractFunds = contractFunds.Mul(contractFunds, big.NewInt(params.Ether))
 		genesisAlloc[contractAddress] = core.GenesisAccount{Balance: contractFunds}
 		node.ContractKeys = append(node.ContractKeys, contractKey)
@@ -248,6 +250,7 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 		node.AddFaucetContractToPendingTransactions()
 		if node.Role == BeaconLeader {
 			node.AddStakingContractToPendingTransactions()
+			node.DepositToFakeAccounts()
 		}
 		node.Consensus.ConsensusBlock = make(chan *bft.BFTBlockInfo)
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
