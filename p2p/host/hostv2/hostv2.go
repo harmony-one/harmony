@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/p2p"
+
 	libp2p "github.com/libp2p/go-libp2p"
 	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
 	p2p_host "github.com/libp2p/go-libp2p-host"
@@ -186,12 +187,12 @@ func (host *HostV2) SendMessage(p p2p.Peer, message []byte) error {
 	if err != nil {
 		logger.Error("NewStream() failed", "peerID", p.PeerID,
 			"protocolID", ProtocolID, "error", err)
-		return fmt.Errorf("NewStream(%v, %v) failed: %v", p.PeerID,
-			ProtocolID, err)
+		return p2p.ErrNewStream
 	}
 	if nw, err := s.Write(message); err != nil {
-		logger.Error("Write() failed", "error", err)
-		return fmt.Errorf("Write() failed: %v", err)
+		logger.Error("Write() failed", "peerID", p.PeerID,
+			"protocolID", ProtocolID, "error", err)
+		return p2p.ErrMsgWrite
 	} else if nw < len(message) {
 		logger.Error("Short Write()", "expected", len(message), "actual", nw)
 		return io.ErrShortWrite

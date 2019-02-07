@@ -105,6 +105,9 @@ func main() {
 	// LibP2P peer discovery integration test
 	libp2pPD := flag.Bool("libp2p_pd", false, "enable libp2p based peer discovery")
 
+	// isBeacon indicates this node is a beacon chain node
+	isBeacon := flag.Bool("is_beacon", false, "true means this node is a beacon chain node")
+
 	flag.Parse()
 
 	if *versionFlag {
@@ -214,9 +217,17 @@ func main() {
 	currentNode := node.New(host, consensus, ldb)
 	currentNode.Consensus.OfflinePeers = currentNode.OfflinePeers
 	if role == "leader" {
-		currentNode.Role = node.ShardLeader
+		if *isBeacon {
+			currentNode.Role = node.BeaconLeader
+		} else {
+			currentNode.Role = node.ShardLeader
+		}
 	} else {
-		currentNode.Role = node.ShardValidator
+		if *isBeacon {
+			currentNode.Role = node.BeaconValidator
+		} else {
+			currentNode.Role = node.ShardValidator
+		}
 	}
 
 	// If there is a client configured in the node list.
