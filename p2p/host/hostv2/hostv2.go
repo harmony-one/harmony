@@ -190,7 +190,8 @@ func (host *HostV2) SendMessage(p p2p.Peer, message []byte) error {
 		return p2p.ErrNewStream
 	}
 	if nw, err := s.Write(message); err != nil {
-		logger.Error("Write() failed", "error", err)
+		logger.Error("Write() failed", "peerID", p.PeerID,
+			"protocolID", ProtocolID, "error", err)
 		return p2p.ErrMsgWrite
 	} else if nw < len(message) {
 		logger.Error("Short Write()", "expected", len(message), "actual", nw)
