@@ -99,7 +99,7 @@ func main() {
 	case "list":
 		processListCommand()
 	case "removeAll":
-		ClearKeystore()
+		clearKeystore()
 		fmt.Println("All existing accounts deleted...")
 	case "import":
 		processImportCommnad()
@@ -128,13 +128,13 @@ func processNewCommnad() {
 	if err != nil {
 		panic("Failed to generate the private key")
 	}
-	StorePrivateKey(crypto2.FromECDSA(priKey))
+	storePrivateKey(crypto2.FromECDSA(priKey))
 	fmt.Printf("New account created with address:\n    {%s}\n", crypto2.PubkeyToAddress(priKey.PublicKey).Hex())
 	fmt.Printf("Please keep a copy of the private key:\n    {%s}\n", hex.EncodeToString(crypto2.FromECDSA(priKey)))
 }
 
 func processListCommand() {
-	for i, key := range ReadPrivateKeys() {
+	for i, key := range readPrivateKeys() {
 		fmt.Printf("Account %d:\n  {%s}\n", i, crypto2.PubkeyToAddress(key.PublicKey).Hex())
 		fmt.Printf("    PrivateKey: {%s}\n", hex.EncodeToString(key.D.Bytes()))
 	}
@@ -154,7 +154,7 @@ func processImportCommnad() {
 	if err != nil {
 		panic("Failed to parse the private key into bytes")
 	}
-	StorePrivateKey(priKeyBytes)
+	storePrivateKey(priKeyBytes)
 	fmt.Println("Private key imported...")
 }
 
@@ -166,14 +166,14 @@ func processBalancesCommand() {
 		for i, address := range ReadAddresses() {
 			fmt.Printf("Account %d: %s:\n", i, address.Hex())
 			for shardID, balanceNonce := range FetchBalance(address, walletNode) {
-				fmt.Printf("    Balance in Shard %d:  %s \n", shardID, ConvertBalanceIntoReadableFormat(balanceNonce.balance))
+				fmt.Printf("    Balance in Shard %d:  %s \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance))
 			}
 		}
 	} else {
 		address := common.HexToAddress(*balanceAddressPtr)
 		fmt.Printf("Account: %s:\n", address.Hex())
 		for shardID, balanceNonce := range FetchBalance(address, walletNode) {
-			fmt.Printf("    Balance in Shard %d:  %s \n", shardID, ConvertBalanceIntoReadableFormat(balanceNonce.balance))
+			fmt.Printf("    Balance in Shard %d:  %s \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance))
 		}
 	}
 }
@@ -209,7 +209,7 @@ func processTransferCommand() {
 		fmt.Println("Please specify positive amount to transfer")
 		return
 	}
-	priKeys := ReadPrivateKeys()
+	priKeys := readPrivateKeys()
 	if len(priKeys) == 0 {
 		fmt.Println("No imported account to use.")
 		return
@@ -265,7 +265,7 @@ func processTransferCommand() {
 	lib.SubmitTransaction(tx, walletNode, uint32(shardID))
 }
 
-func ConvertBalanceIntoReadableFormat(balance *big.Int) string {
+func convertBalanceIntoReadableFormat(balance *big.Int) string {
 	balance = balance.Div(balance, big.NewInt(params.GWei))
 	strBalance := fmt.Sprintf("%d", balance.Uint64())
 
@@ -334,7 +334,7 @@ func GetFreeToken(address common.Address, walletNode *node.Node) {
 
 // ReadAddresses reads the addresses stored in local keystore
 func ReadAddresses() []common.Address {
-	priKeys := ReadPrivateKeys()
+	priKeys := readPrivateKeys()
 	addresses := []common.Address{}
 	for _, key := range priKeys {
 		addresses = append(addresses, crypto2.PubkeyToAddress(key.PublicKey))
@@ -342,8 +342,8 @@ func ReadAddresses() []common.Address {
 	return addresses
 }
 
-// StorePrivateKey stores the specified private key in local keystore
-func StorePrivateKey(priKey []byte) {
+// storePrivateKey stores the specified private key in local keystore
+func storePrivateKey(priKey []byte) {
 	privateKey, err := crypto2.ToECDSA(priKey)
 	if err != nil {
 		panic("Failed to deserialize private key")
@@ -367,12 +367,13 @@ func StorePrivateKey(priKey []byte) {
 	f.Close()
 }
 
-func ClearKeystore() {
+// clearKeystore deletes all data in the local keystore
+func clearKeystore() {
 	ioutil.WriteFile("keystore", []byte{}, 0644)
 }
 
-// ReadPrivateKeys reads all the private key stored in local keystore
-func ReadPrivateKeys() []*ecdsa.PrivateKey {
+// readPrivateKeys reads all the private key stored in local keystore
+func readPrivateKeys() []*ecdsa.PrivateKey {
 	keys, err := ioutil.ReadFile("keystore")
 	if err != nil {
 		return []*ecdsa.PrivateKey{}
