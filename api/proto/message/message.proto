@@ -7,6 +7,7 @@ enum MessageType {
   BOOTNODE_NEWNODE = 2;
   NEWNODE_BEACON = 3;
   BEACON_NEWNODE = 4;
+  NEWNODE_BEACON_STAKING = 5;
 }
 
 // This is universal message for all communication protocols.
@@ -16,9 +17,9 @@ enum MessageType {
 // The request field will be either one of the structure corresponding to the MessageType type.
 message Message {
     MessageType type = 1;
+    string signature = 2;
     oneof request {
-        NewNodeBootNodeRequest newnode_bootnode_request = 2;
-        BootNodeNewNodeRequest bootnode_newnode_request = 3;
+        StakingRequest staking = 3;
     }
 }
 
@@ -30,4 +31,9 @@ message NewNodeBootNodeRequest {
 message BootNodeNewNodeRequest {
 }
 
-// TODO(minhdoan): refactor and introduce consensus message as one of possible Message.request.
+// Staking Request from new node to beacon node.
+message StakingRequest {
+  string address = 1;
+  int64 amount = 2;
+  string public_key = 4;
+}

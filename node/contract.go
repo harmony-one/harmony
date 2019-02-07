@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/utils/contract"
 )
 
 const (
@@ -75,7 +76,7 @@ func (node *Node) createSendingMoneyTransaction(walletAddress common.Address) co
 
 // DepositToFakeAccounts invokes the faucet contract to give the walletAddress initial money
 func (node *Node) DepositToFakeAccounts() {
-	for _, deployAccount := range FakeAccounts {
+	for _, deployAccount := range contract.FakeAccounts {
 		address := common.HexToAddress(deployAccount.Address)
 		node.createSendingMoneyTransaction(address)
 	}
