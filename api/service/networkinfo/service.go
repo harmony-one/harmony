@@ -10,12 +10,9 @@ import (
 
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/prometheus/common/log"
-
-	peerstore "github.com/libp2p/go-libp2p-peerstore"
-
 	libp2pdis "github.com/libp2p/go-libp2p-discovery"
 	libp2pdht "github.com/libp2p/go-libp2p-kad-dht"
+	peerstore "github.com/libp2p/go-libp2p-peerstore"
 	manet "github.com/multiformats/go-multiaddr-net"
 )
 
@@ -63,11 +60,11 @@ func (s *Service) StartService() {
 
 // Init initializes role conversion service.
 func (s *Service) Init() error {
-	log.Info("Init networkinfo service")
+	utils.GetLogInstance().Info("Init networkinfo service")
 
 	// Bootstrap the DHT. In the default configuration, this spawns a Background
 	// thread that will refresh the peer table every five minutes.
-	log.Debug("Bootstrapping the DHT")
+	utils.GetLogInstance().Debug("Bootstrapping the DHT")
 	if err := s.dht.Bootstrap(s.ctx); err != nil {
 		return fmt.Errorf("error bootstrap dht")
 	}
@@ -79,19 +76,19 @@ func (s *Service) Init() error {
 		go func() {
 			defer wg.Done()
 			if err := s.Host.GetP2PHost().Connect(s.ctx, *peerinfo); err != nil {
-				log.Warn("can't connect to bootnode", "error", err)
+				utils.GetLogInstance().Warn("can't connect to bootnode", "error", err)
 			} else {
-				log.Info("connected to bootnode", "node", *peerinfo)
+				utils.GetLogInstance().Info("connected to bootnode", "node", *peerinfo)
 			}
 		}()
 	}
 	wg.Wait()
 
 	// We use a rendezvous point "shardID" to announce our location.
-	log.Info("Announcing ourselves...")
+	utils.GetLogInstance().Info("Announcing ourselves...")
 	s.discovery = libp2pdis.NewRoutingDiscovery(s.dht)
 	libp2pdis.Advertise(s.ctx, s.discovery, s.Rendezvous)
-	log.Info("Successfully announced!")
+	utils.GetLogInstance().Info("Successfully announced!")
 
 	go s.DoService()
 
@@ -104,7 +101,7 @@ func (s *Service) Run() {
 	var err error
 	s.peerInfo, err = s.discovery.FindPeers(s.ctx, s.Rendezvous)
 	if err != nil {
-		log.Error("FindPeers", "error", err)
+		utils.GetLogInstance().Error("FindPeers", "error", err)
 	}
 }
 
@@ -114,11 +111,11 @@ func (s *Service) DoService() {
 		select {
 		case peer, ok := <-s.peerInfo:
 			if !ok {
-				log.Debug("no more peer info", "peer", peer.ID)
+				utils.GetLogInstance().Debug("no more peer info", "peer", peer.ID)
 				return
 			}
 			if peer.ID != s.Host.GetP2PHost().ID() && len(peer.ID) > 0 {
-				log.Info("Found Peer", "peer", peer.ID, "addr", peer.Addrs)
+				utils.GetLogInstance().Info("Found Peer", "peer", peer.ID, "addr", peer.Addrs)
 				ip := "127.0.0.1"
 				var port string
 				for _, addr := range peer.Addrs {
@@ -134,7 +131,7 @@ func (s *Service) DoService() {
 					}
 				}
 				p := p2p.Peer{IP: ip, Port: port, PeerID: peer.ID, Addrs: peer.Addrs}
-				log.Info("Notify peerChan", "peer", p)
+				utils.GetLogInstance().Info("Notify peerChan", "peer", p)
 				s.peerChan <- p
 			}
 		case <-s.ctx.Done():
