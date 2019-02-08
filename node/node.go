@@ -159,6 +159,10 @@ type Node struct {
 	// Service manager.
 	serviceManager *service_manager.Manager
 
+	//Node Account
+	AccountKey *ecdsa.PrivateKey
+	Address    common.Address
+
 	// For test only
 	TestBankKeys      []*ecdsa.PrivateKey
 	ContractKeys      []*ecdsa.PrivateKey
