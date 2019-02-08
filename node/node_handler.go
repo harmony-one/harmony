@@ -261,25 +261,28 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 	// Add to Node's peer list anyway
 	node.AddPeers([]*p2p.Peer{peer})
 
-	peers := node.Consensus.GetValidatorPeers()
-	pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys)
-	buffer := pong.ConstructPongMessage()
+	if node.Consensus.IsLeader {
+		peers := node.Consensus.GetValidatorPeers()
+		pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys)
+		buffer := pong.ConstructPongMessage()
 
-	// Send a Pong message directly to the sender
-	// This is necessary because the sender will need to get a ValidatorID
-	// Just broadcast won't work, some validators won't receive the latest
-	// PublicKeys as we rely on a valid ValidatorID to do broadcast.
-	// This is very buggy, but we will move to libp2p, hope the problem will
-	// be resolved then.
-	// However, I disable it for now as we are sending redundant PONG messages
-	// to all validators.  This may not be needed. But it maybe add back.
-	//   p2p.SendMessage(*peer, buffer)
+		// Send a Pong message directly to the sender
+		// This is necessary because the sender will need to get a ValidatorID
+		// Just broadcast won't work, some validators won't receive the latest
+		// PublicKeys as we rely on a valid ValidatorID to do broadcast.
+		// This is very buggy, but we will move to libp2p, hope the problem will
+		// be resolved then.
+		// However, I disable it for now as we are sending redundant PONG messages
+		// to all validators.  This may not be needed. But it maybe add back.
+		//   p2p.SendMessage(*peer, buffer)
 
-	// Broadcast the message to all validators, as publicKeys is updated
-	// FIXME: HAR-89 use a separate nodefind/neighbor message
-	host.BroadcastMessageFromLeader(node.GetHost(), peers, buffer, node.Consensus.OfflinePeers)
+		// Broadcast the message to all validators, as publicKeys is updated
+		// FIXME: HAR-89 use a separate nodefind/neighbor message
+		host.BroadcastMessageFromLeader(node.GetHost(), peers, buffer, node.Consensus.OfflinePeers)
+		utils.GetLogInstance().Info("PingMsgHandler send pong message")
+	}
 
-	return len(peers)
+	return 1
 }
 
 func (node *Node) pongMessageHandler(msgPayload []byte) int {

@@ -134,7 +134,7 @@ func main() {
 		utils.BootNodes = bootNodeAddrs
 	}
 
-	var shardID string
+	var shardID = "0"
 	var peers []p2p.Peer
 	var leader p2p.Peer
 	var selfPeer p2p.Peer
@@ -196,6 +196,7 @@ func main() {
 	} else {
 		if *isLeader {
 			role = "leader"
+			leader = selfPeer
 		} else {
 			role = "validator"
 		}
@@ -219,6 +220,7 @@ func main() {
 	host.AddPeer(&leader)
 
 	// Consensus object.
+	// TODO: consensus object shouldn't start here
 	consensus := consensus.New(host, shardID, peers, leader)
 	consensus.MinPeers = *minPeers
 
