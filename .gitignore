@@ -60,3 +60,6 @@ vendor
 
 # node_modules
 node_modules/
+
+# txgen node keystore
+.txgenkey

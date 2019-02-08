@@ -1,19 +1,10 @@
 package discovery
 
 import (
-	"context"
-	"sync"
-
 	"github.com/ethereum/go-ethereum/log"
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
-
-	peerstore "github.com/libp2p/go-libp2p-peerstore"
-
-	libp2pdis "github.com/libp2p/go-libp2p-discovery"
-	libp2pdht "github.com/libp2p/go-libp2p-kad-dht"
 )
 
 // Constants for discovery service.
@@ -24,107 +15,67 @@ const (
 
 // Service is the struct for discovery service.
 type Service struct {
-	Host       p2p.Host
-	DHT        *libp2pdht.IpfsDHT
-	Rendezvous string
-	ctx        context.Context
-	peerChan   <-chan peerstore.PeerInfo
+	Host        p2p.Host
+	Rendezvous  string
+	peerChan    chan p2p.Peer
+	stakingChan chan p2p.Peer
+	stopChan    chan struct{}
 }
 
 // New returns discovery service.
 // h is the p2p host
 // r is the rendezvous string, we use shardID to start (TODO: leo, build two overlays of network)
-func New(h p2p.Host, r string) *Service {
-	ctx := context.Background()
-	dht, err := libp2pdht.New(ctx, h.GetP2PHost())
-	if err != nil {
-		panic(err)
-	}
-
+func New(h p2p.Host, r string, peerChan chan p2p.Peer, stakingChan chan p2p.Peer) *Service {
 	return &Service{
-		Host:       h,
-		DHT:        dht,
-		Rendezvous: r,
-		ctx:        ctx,
-		peerChan:   make(<-chan peerstore.PeerInfo),
+		Host:        h,
+		Rendezvous:  r,
+		peerChan:    peerChan,
+		stakingChan: stakingChan,
+		stopChan:    make(chan struct{}),
 	}
 }
 
 // StartService starts discovery service.
 func (s *Service) StartService() {
 	log.Info("Starting discovery service.")
-	err := s.Init()
-	if err != nil {
-		log.Error("StartService Aborted", "Error", err)
-		return
-	}
-
-	// We use a rendezvous point "shardID" to announce our location.
-	log.Info("Announcing ourselves...")
-	routingDiscovery := libp2pdis.NewRoutingDiscovery(s.DHT)
-	libp2pdis.Advertise(s.ctx, routingDiscovery, s.Rendezvous)
-	log.Debug("Successfully announced!")
-
-	log.Debug("Searching for other peers...")
-	s.peerChan, err = routingDiscovery.FindPeers(s.ctx, s.Rendezvous)
-	if err != nil {
-		log.Error("FindPeers", "error", err)
-	}
+	s.Init()
+	s.Run()
 }
 
 // StopService shutdowns discovery service.
 func (s *Service) StopService() {
 	log.Info("Shutting down discovery service.")
+	s.stopChan <- struct{}{}
+	log.Info("discovery service stopped.")
 }
 
-func (s *Service) foundPeers() {
+// Run is the main function of the service
+func (s *Service) Run() {
+	go s.contactP2pPeers()
+}
+
+func (s *Service) contactP2pPeers() {
 	for {
 		select {
 		case peer, ok := <-s.peerChan:
 			if !ok {
-				log.Debug("end of info", "peer", peer.ID)
+				log.Debug("end of info", "peer", peer.PeerID)
 				return
 			}
-			if peer.ID != s.Host.GetP2PHost().ID() && len(peer.ID) > 0 {
-				log.Debug("Found Peer", "peer", peer.ID, "addr", peer.Addrs, "len", len(peer.ID))
-				p := p2p.Peer{PeerID: peer.ID, Addrs: peer.Addrs}
-				s.Host.AddPeer(&p)
-				// TODO: stop ping if pinged before
-				s.pingPeer(p)
-			}
+			log.Debug("[DISCOVERY]", "peer", peer)
+			s.Host.AddPeer(&peer)
+			// TODO: stop ping if pinged before
+			// TODO: call staking servcie here if it is a new node
+			s.pingPeer(peer)
+		case <-s.stopChan:
+			return
 		}
 	}
 }
 
 // Init is to initialize for discoveryService.
-func (s *Service) Init() error {
+func (s *Service) Init() {
 	log.Info("Init discovery service")
-
-	// Bootstrap the DHT. In the default configuration, this spawns a Background
-	// thread that will refresh the peer table every five minutes.
-	log.Debug("Bootstrapping the DHT")
-	if err := s.DHT.Bootstrap(s.ctx); err != nil {
-		return ErrDHTBootstrap
-	}
-
-	var wg sync.WaitGroup
-	for _, peerAddr := range utils.BootNodes {
-		peerinfo, _ := peerstore.InfoFromP2pAddr(peerAddr)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			if err := s.Host.GetP2PHost().Connect(s.ctx, *peerinfo); err != nil {
-				log.Warn("can't connect to bootnode", "error", err)
-			} else {
-				log.Info("connected to bootnode", "node", *peerinfo)
-			}
-		}()
-	}
-	wg.Wait()
-
-	go s.foundPeers()
-
-	return nil
 }
 
 func (s *Service) pingPeer(peer p2p.Peer) {
@@ -134,4 +85,7 @@ func (s *Service) pingPeer(peer p2p.Peer) {
 	content := host.ConstructP2pMessage(byte(0), buffer)
 	s.Host.SendMessage(peer, content)
 	log.Debug("Sent Ping Message to", "peer", peer)
+	if s.stakingChan != nil {
+		s.stakingChan <- peer
+	}
 }

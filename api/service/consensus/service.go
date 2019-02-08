@@ -14,19 +14,19 @@ type Service struct {
 	stoppedChan  chan struct{}
 }
 
-// NewService returns consensus service.
-func NewService(blockChannel chan *types.Block, consensus *consensus.Consensus) *Service {
+// New returns consensus service.
+func New(blockChannel chan *types.Block, consensus *consensus.Consensus) *Service {
 	return &Service{blockChannel: blockChannel, consensus: consensus}
 }
 
-// StartService starts service.
+// StartService starts consensus service.
 func (s *Service) StartService() {
 	s.stopChan = make(chan struct{})
 	s.stoppedChan = make(chan struct{})
 	s.consensus.WaitForNewBlock(s.blockChannel, s.stopChan, s.stoppedChan)
 }
 
-// StopService stops service.
+// StopService stops consensus service.
 func (s *Service) StopService() {
 	utils.GetLogInstance().Info("Stopping consensus service.")
 	s.stopChan <- struct{}{}

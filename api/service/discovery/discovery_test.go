@@ -23,7 +23,7 @@ func TestDiscoveryService(t *testing.T) {
 		t.Fatalf("unable to new host in harmony: %v", err)
 	}
 
-	service = New(host, "rendezvous")
+	service = New(host, "rendezvous", nil, nil)
 
 	if service == nil {
 		t.Fatalf("unable to create new discovery service")
