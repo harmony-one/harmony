@@ -77,12 +77,14 @@ type testWorkerBackend struct {
 
 func main() {
 	fmt.Println("--------- Setting up faucet txns ---------")
+
+	//** COULD WE UNDERSTAND THESE SETUP FUNCTIONS.
 	var (
 		database = ethdb.NewMemDatabase()
 		gspec    = core.Genesis{
 			Config:  chainConfig,
 			Alloc:   core.GenesisAlloc{FaucetAddress: {Balance: FaucetInitFunds}},
-			ShardID: 10,
+			ShardID: 0,
 		}
 	)
 
@@ -104,7 +106,7 @@ func main() {
 	if n > 0 {
 		blocks, _ := core.GenerateChain(chainConfig, genesis, consensus.NewFaker(), database, n, func(i int, gen *core.BlockGen) {
 			gen.SetCoinbase(FaucetAddress)
-			gen.SetShardID(types.EncodeShardID(10))
+			gen.SetShardID(types.EncodeShardID(0))
 			gen.AddTx(pendingTxs[i])
 		})
 		if _, err := chain.InsertChain(blocks); err != nil {
@@ -116,28 +118,35 @@ func main() {
 
 	NumTxns := 3
 
-	txs := make([]*types.Transaction, NumTxns)
+	var txs []*types.Transaction
 	fworker := pkgworker.New(params.TestChainConfig, chain, consensus.NewFaker(), crypto.PubkeyToAddress(FaucetPriKey.PublicKey), 0)
 	nonce := fworker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(FaucetPriKey.PublicKey))
-	// var randomUserKey []*ecdsa.PrivateKey
+
+	dataEnc := common.FromHex(FaucetContractBinary)
+	ftx, _ := types.SignTx(types.NewContractCreation(nonce, 0, big.NewInt(7000000000000000000), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, FaucetPriKey)
+	// Figure out the contract address which is determined by sender.address and nonce
+	FaucetContractAddress := crypto.CreateAddress(FaucetAddress, nonce)
+	state := fworker.GetCurrentState()
+	txs = append(txs, ftx)
+
+	nonce = fworker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(FaucetPriKey.PublicKey))
 	var AllRandomUserAddress []common.Address
 	var AllRandomUserKey []*ecdsa.PrivateKey
-	for i := range txs {
+
+	//**** WHY DO WE DO THESE TRANSACTIONS? THOUGH THEY ARE THE ONLY ONES THAT FUND THESE ACCOUNTS?
+	for i := 0; i < 3; i++ {
 		randomUserKey, _ := crypto.GenerateKey()
 		randomUserAddress := crypto.PubkeyToAddress(randomUserKey.PublicKey)
 		amount := i*1000 + 37 //Put different amount in each  account.
-		tx, _ := types.SignTx(types.NewTransaction(nonce+uint64(i), randomUserAddress, 0, big.NewInt(int64(amount)), params.TxGas, nil, nil), types.HomesteadSigner{}, FaucetPriKey)
+		tx, _ := types.SignTx(types.NewTransaction(nonce+uint64(i+1), randomUserAddress, 0, big.NewInt(int64(amount)), params.TxGas, nil, nil), types.HomesteadSigner{}, FaucetPriKey)
 		AllRandomUserAddress = append(AllRandomUserAddress, randomUserAddress)
 		AllRandomUserKey = append(AllRandomUserKey, randomUserKey)
-		txs[i] = tx
+		txs = append(txs, tx)
 	}
-	dataEnc := common.FromHex(FaucetContractBinary)
-	ftx, _ := types.SignTx(types.NewContractCreation(nonce+uint64(NumTxns), 0, big.NewInt(7000000000000000000), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, FaucetPriKey)
-	// Figure out the contract address which is determined by sender.address and nonce
-	FaucetContractAddress := crypto.CreateAddress(FaucetAddress, nonce+uint64(NumTxns))
-	state := fworker.GetCurrentState()
-	txs = append(txs, ftx)
+
+	//****
 	// Before the contract is deployed the code is empty
+
 	fmt.Println(state.GetCodeHash(FaucetContractAddress))
 	err := fworker.CommitTransactions(txs)
 
