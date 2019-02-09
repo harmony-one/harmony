@@ -40,22 +40,6 @@ func (node *Node) AddStakingContractToPendingTransactions() {
 	node.addPendingTransactions(types.Transactions{mycontracttx})
 }
 
-// CreateStakingDepositTransaction creates a new deposit staking transaction
-func (node *Node) CreateStakingDepositTransaction(stake int) (*types.Transaction, error) {
-	//These should be read from somewhere.
-	DepositContractPriKey, _ := ecdsa.GenerateKey(crypto.S256(), strings.NewReader("Deposit Smart Contract Key")) //DepositContractPriKey is pk for contract
-	DepositContractAddress := crypto.PubkeyToAddress(DepositContractPriKey.PublicKey)                             //DepositContractAddress is the address for the contract
-	state, err := node.blockchain.State()
-	if err != nil {
-		log.Error("Failed to get chain state", "Error", err)
-	}
-	nonce := state.GetNonce(crypto.PubkeyToAddress(DepositContractPriKey.PublicKey))
-	callingFunction := "0xd0e30db0"
-	dataEnc := common.FromHex(callingFunction) //Deposit Does not take a argument, stake is transferred via amount.
-	tx, err := types.SignTx(types.NewTransaction(nonce, DepositContractAddress, node.Consensus.ShardID, big.NewInt(int64(stake)), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, node.AccountKey)
-	return tx, err
-}
-
 //CreateStakingWithdrawTransaction creates a new withdraw stake transaction
 func (node *Node) CreateStakingWithdrawTransaction(stake int) (*types.Transaction, error) {
 	//These should be read from somewhere.
