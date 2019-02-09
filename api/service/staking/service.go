@@ -4,6 +4,8 @@ import (
 	"crypto/ecdsa"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/params"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
@@ -81,15 +83,13 @@ func (s *Service) getAccountState(beaconPeer p2p.Peer) *proto.FetchAccountStateR
 func (s *Service) createStakingMessage(beaconPeer p2p.Peer) *message.Message {
 	accountState := s.getAccountState(beaconPeer)
 	toAddress := common.HexToAddress("0x4592d8f8d7b001e72cb26a73e4fa1806a51ac79d")
-	gasLimit := uint64(0)
-	gasPrice := big.NewInt(0)
 	tx := types.NewTransaction(
 		accountState.Nonce,
 		toAddress,
 		0, // beacon chain.
 		new(big.Int).SetBytes(accountState.Balance),
-		gasLimit,
-		gasPrice,
+		params.CallValueTransferGas*2,           // hard-code
+		big.NewInt(int64(params.Sha256BaseGas)), // pick some predefined gas price.
 		nil)
 
 	if signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, s.accountKey); err == nil {
