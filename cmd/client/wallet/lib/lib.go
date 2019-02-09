@@ -44,14 +44,14 @@ func CreateWalletNode() *node.Node {
 	}
 
 	walletNode := node.New(host, nil, nil)
-	walletNode.Client = client.NewClient(walletNode.GetHost(), &shardIDLeaderMap)
+	walletNode.Client = client.NewClient(walletNode.GetHost(), shardIDLeaderMap)
 	return walletNode
 }
 
 // SubmitTransaction submits the transaction to the Harmony network
 func SubmitTransaction(tx *types.Transaction, walletNode *node.Node, shardID uint32) error {
 	msg := proto_node.ConstructTransactionListMessageAccount(types.Transactions{tx})
-	leader := (*walletNode.Client.Leaders)[shardID]
+	leader := walletNode.Client.Leaders[shardID]
 	walletNode.SendMessage(leader, msg)
 	fmt.Printf("Transaction Id for shard %d: %s\n", int(shardID), tx.Hash().Hex())
 	time.Sleep(300 * time.Millisecond)

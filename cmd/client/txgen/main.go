@@ -137,7 +137,7 @@ func main() {
 	// Client/txgenerator server node setup
 	consensusObj := consensus.New(host, "0", nil, p2p.Peer{})
 	clientNode := node.New(host, consensusObj, nil)
-	clientNode.Client = client.NewClient(clientNode.GetHost(), &shardIDLeaderMap)
+	clientNode.Client = client.NewClient(clientNode.GetHost(), shardIDLeaderMap)
 
 	readySignal := make(chan uint32)
 	go func() {

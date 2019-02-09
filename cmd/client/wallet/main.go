@@ -308,7 +308,7 @@ func convertBalanceIntoReadableFormat(balance *big.Int) string {
 // FetchBalance fetches account balance of specified address from the Harmony network
 func FetchBalance(address common.Address, walletNode *node.Node) map[uint32]AccountState {
 	result := make(map[uint32]AccountState)
-	for shardID, leader := range *walletNode.Client.Leaders {
+	for shardID, leader := range walletNode.Client.Leaders {
 		port, _ := strconv.Atoi(leader.Port)
 		client := clientService.NewClient(leader.IP, strconv.Itoa(port+node.ClientServicePortDiff))
 		response := client.GetBalance(address)
@@ -321,7 +321,7 @@ func FetchBalance(address common.Address, walletNode *node.Node) map[uint32]Acco
 
 // GetFreeToken requests for token test token on each shard
 func GetFreeToken(address common.Address, walletNode *node.Node) {
-	for shardID, leader := range *walletNode.Client.Leaders {
+	for shardID, leader := range walletNode.Client.Leaders {
 		port, _ := strconv.Atoi(leader.Port)
 		client := clientService.NewClient(leader.IP, strconv.Itoa(port+node.ClientServicePortDiff))
 		response := client.GetFreeToken(address)
