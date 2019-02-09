@@ -61,7 +61,8 @@ func (node *Node) ReceiveGroupMessage() {
 		if sender != node.host.GetID() {
 			utils.GetLogInstance().Info("[PUBSUB]", "msg size", len(msg), "sender", sender)
 			if err == nil {
-				node.messageHandler(msg)
+				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
+				node.messageHandler(msg[5:])
 			}
 		}
 	}
@@ -69,6 +70,8 @@ func (node *Node) ReceiveGroupMessage() {
 
 // messageHandler parses the message and dispatch the actions
 func (node *Node) messageHandler(content []byte) {
+	utils.GetLogInstance().Info("[msgHandler]", "msg size", len(content))
+
 	node.MaybeBroadcastAsValidator(content)
 
 	consensusObj := node.Consensus
