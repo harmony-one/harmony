@@ -15,7 +15,7 @@ const (
 
 // Service is the struct for discovery service.
 type Service struct {
-	Host        p2p.Host
+	host        p2p.Host
 	Rendezvous  string
 	peerChan    chan p2p.Peer
 	stakingChan chan p2p.Peer
@@ -27,7 +27,7 @@ type Service struct {
 // r is the rendezvous string, we use shardID to start (TODO: leo, build two overlays of network)
 func New(h p2p.Host, r string, peerChan chan p2p.Peer, stakingChan chan p2p.Peer) *Service {
 	return &Service{
-		Host:        h,
+		host:        h,
 		Rendezvous:  r,
 		peerChan:    peerChan,
 		stakingChan: stakingChan,
@@ -63,7 +63,7 @@ func (s *Service) contactP2pPeers() {
 				return
 			}
 			log.Debug("[DISCOVERY]", "peer", peer)
-			s.Host.AddPeer(&peer)
+			s.host.AddPeer(&peer)
 			// TODO: stop ping if pinged before
 			// TODO: call staking servcie here if it is a new node
 			s.pingPeer(peer)
@@ -79,12 +79,18 @@ func (s *Service) Init() {
 }
 
 func (s *Service) pingPeer(peer p2p.Peer) {
-	ping := proto_discovery.NewPingMessage(s.Host.GetSelfPeer())
+	ping := proto_discovery.NewPingMessage(s.host.GetSelfPeer())
 	buffer := ping.ConstructPingMessage()
 	log.Debug("Sending Ping Message to", "peer", peer)
 	content := host.ConstructP2pMessage(byte(0), buffer)
-	s.Host.SendMessage(peer, content)
-	log.Debug("Sent Ping Message to", "peer", peer)
+	//	s.host.SendMessage(peer, content)
+	//   log.Debug("Sent Ping Message via unicast to", "peer", peer)
+	err := s.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, content)
+	if err != nil {
+		log.Error("Failed to send ping message", "group", p2p.GroupIDBeacon)
+	} else {
+		log.Debug("Sent Ping Message via group send to", "peer", peer)
+	}
 	if s.stakingChan != nil {
 		s.stakingChan <- peer
 	}

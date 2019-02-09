@@ -236,15 +236,17 @@ func main() {
 	// Current node.
 	currentNode := node.New(host, consensus, ldb)
 	currentNode.Consensus.OfflinePeers = currentNode.OfflinePeers
-	if role == "leader" {
-		if *isBeacon {
+	currentNode.Role = node.NewNode
+
+	if *isBeacon {
+		if role == "leader" {
 			currentNode.Role = node.BeaconLeader
 		} else {
-			currentNode.Role = node.ShardLeader
+			currentNode.Role = node.BeaconValidator
 		}
 	} else {
-		if *isBeacon {
-			currentNode.Role = node.BeaconValidator
+		if role == "leader" {
+			currentNode.Role = node.ShardLeader
 		} else {
 			currentNode.Role = node.ShardValidator
 		}
@@ -260,9 +262,7 @@ func main() {
 	consensus.OnConsensusDone = currentNode.PostConsensusProcessing
 	currentNode.State = node.NodeWaitToJoin
 
-	if *libp2pPD {
-		currentNode.Role = node.NewNode
-	} else {
+	if !*libp2pPD {
 		if consensus.IsLeader {
 			currentNode.State = node.NodeLeader
 		} else {
