@@ -135,7 +135,7 @@ func (node *Node) messageHandler(content []byte) {
 					blockCount++
 				}
 
-				if blockCount != 0 {
+				if blockCount != 0 && txCount != 0 {
 					avgBlockSizeInBytes = avgBlockSizeInBytes / common.StorageSize(blockCount)
 					avgTxSize = avgTxSize / txCount
 				}
