@@ -423,24 +423,6 @@ func (node *Node) JoinShard(leader p2p.Peer) {
 	}
 }
 
-// SupportClient initializes and starts the client service
-func (node *Node) SupportClient() {
-	node.InitClientServer()
-	node.StartClientServer()
-}
-
-// InitClientServer initializes client server.
-func (node *Node) InitClientServer() {
-	node.clientServer = clientService.NewServer(node.blockchain.State, node.CallFaucetContract)
-}
-
-// StartClientServer starts client server.
-func (node *Node) StartClientServer() {
-	port, _ := strconv.Atoi(node.SelfPeer.Port)
-	utils.GetLogInstance().Info("support_client: StartClientServer on port:", "port", port+ClientServicePortDiff)
-	node.clientServer.Start(node.SelfPeer.IP, strconv.Itoa(port+ClientServicePortDiff))
-}
-
 // SupportSyncing keeps sleeping until it's doing consensus or it's a leader.
 func (node *Node) SupportSyncing() {
 	node.InitSyncingServer()
