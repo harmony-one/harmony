@@ -105,7 +105,7 @@ func TestProcessMessageValidatorPrepared(test *testing.T) {
 	copy(consensusLeader.blockHash[:], hashBytes[:])
 
 	announceMsg := consensusLeader.constructAnnounceMessage()
-	(*consensusLeader.prepareSigs)[consensusLeader.nodeID] = consensusLeader.priKey.SignHash(consensusLeader.blockHash[:])
+	consensusLeader.prepareSigs[consensusLeader.nodeID] = consensusLeader.priKey.SignHash(consensusLeader.blockHash[:])
 
 	preparedMsg, _ := consensusLeader.constructPreparedMessage()
 
@@ -165,13 +165,13 @@ func TestProcessMessageValidatorCommitted(test *testing.T) {
 	copy(consensusLeader.blockHash[:], hashBytes[:])
 
 	announceMsg := consensusLeader.constructAnnounceMessage()
-	(*consensusLeader.prepareSigs)[consensusLeader.nodeID] = consensusLeader.priKey.SignHash(consensusLeader.blockHash[:])
+	consensusLeader.prepareSigs[consensusLeader.nodeID] = consensusLeader.priKey.SignHash(consensusLeader.blockHash[:])
 
 	preparedMsg, _ := consensusLeader.constructPreparedMessage()
 	aggSig := bls_cosi.AggregateSig(consensusLeader.GetPrepareSigsArray())
 	multiSigAndBitmap := append(aggSig.Serialize(), consensusLeader.prepareBitmap.Bitmap...)
 
-	(*consensusLeader.commitSigs)[consensusLeader.nodeID] = consensusLeader.priKey.SignHash(multiSigAndBitmap)
+	consensusLeader.commitSigs[consensusLeader.nodeID] = consensusLeader.priKey.SignHash(multiSigAndBitmap)
 	committedMsg, _ := consensusLeader.constructCommittedMessage()
 
 	if err != nil {

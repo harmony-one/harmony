@@ -105,7 +105,7 @@ func (consensus *Consensus) startConsensus(newBlock *types.Block) {
 	consensus.state = AnnounceDone
 
 	// Leader sign the block hash itself
-	(*consensus.prepareSigs)[consensus.nodeID] = consensus.priKey.SignHash(consensus.blockHash[:])
+	consensus.prepareSigs[consensus.nodeID] = consensus.priKey.SignHash(consensus.blockHash[:])
 
 	host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
 }
@@ -129,13 +129,13 @@ func (consensus *Consensus) processPrepareMessage(message consensus_proto.Messag
 	}
 
 	// proceed only when the message is not received before
-	_, ok := (*prepareSigs)[validatorID]
+	_, ok := prepareSigs[validatorID]
 	if ok {
 		utils.GetLogInstance().Debug("Already received prepare message from the validator", "validatorID", validatorID)
 		return
 	}
 
-	if len((*prepareSigs)) >= ((len(consensus.PublicKeys)*2)/3 + 1) {
+	if len(prepareSigs) >= ((len(consensus.PublicKeys)*2)/3 + 1) {
 		utils.GetLogInstance().Debug("Received additional new prepare message", "validatorID", validatorID)
 		return
 	}
@@ -153,13 +153,13 @@ func (consensus *Consensus) processPrepareMessage(message consensus_proto.Messag
 		return
 	}
 
-	utils.GetLogInstance().Debug("Received new prepare signature", "numReceivedSoFar", len(*prepareSigs), "validatorID", validatorID, "PublicKeys", len(consensus.PublicKeys))
-	(*prepareSigs)[validatorID] = &sign
+	utils.GetLogInstance().Debug("Received new prepare signature", "numReceivedSoFar", len(prepareSigs), "validatorID", validatorID, "PublicKeys", len(consensus.PublicKeys))
+	prepareSigs[validatorID] = &sign
 	prepareBitmap.SetKey(validatorPeer.PubKey, true) // Set the bitmap indicating that this validator signed.
 
 	targetState := PreparedDone
-	if len((*prepareSigs)) >= ((len(consensus.PublicKeys)*2)/3+1) && consensus.state < targetState {
-		utils.GetLogInstance().Debug("Enough prepares received with signatures", "num", len(*prepareSigs), "state", consensus.state)
+	if len(prepareSigs) >= ((len(consensus.PublicKeys)*2)/3+1) && consensus.state < targetState {
+		utils.GetLogInstance().Debug("Enough prepares received with signatures", "num", len(prepareSigs), "state", consensus.state)
 
 		// Construct and broadcast prepared message
 		msgToSend, aggSig := consensus.constructPreparedMessage()
@@ -171,7 +171,7 @@ func (consensus *Consensus) processPrepareMessage(message consensus_proto.Messag
 
 		// Leader sign the multi-sig and bitmap (for commit phase)
 		multiSigAndBitmap := append(aggSig.Serialize(), prepareBitmap.Bitmap...)
-		(*consensus.commitSigs)[consensus.nodeID] = consensus.priKey.SignHash(multiSigAndBitmap)
+		consensus.commitSigs[consensus.nodeID] = consensus.priKey.SignHash(multiSigAndBitmap)
 	}
 }
 
@@ -194,13 +194,13 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 	commitBitmap := consensus.commitBitmap
 
 	// proceed only when the message is not received before
-	_, ok := (*commitSigs)[validatorID]
+	_, ok := commitSigs[validatorID]
 	if ok {
 		utils.GetLogInstance().Debug("Already received commit message from the validator", "validatorID", validatorID)
 		return
 	}
 
-	if len((*commitSigs)) >= ((len(consensus.PublicKeys)*2)/3 + 1) {
+	if len((commitSigs)) >= ((len(consensus.PublicKeys)*2)/3 + 1) {
 		utils.GetLogInstance().Debug("Received additional new commit message", "validatorID", strconv.Itoa(int(validatorID)))
 		return
 	}
@@ -218,14 +218,14 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 		return
 	}
 
-	utils.GetLogInstance().Debug("Received new commit message", "numReceivedSoFar", len(*commitSigs), "validatorID", strconv.Itoa(int(validatorID)))
-	(*commitSigs)[validatorID] = &sign
+	utils.GetLogInstance().Debug("Received new commit message", "numReceivedSoFar", len(commitSigs), "validatorID", strconv.Itoa(int(validatorID)))
+	commitSigs[validatorID] = &sign
 	// Set the bitmap indicating that this validator signed.
 	commitBitmap.SetKey(validatorPeer.PubKey, true)
 
 	targetState := CommittedDone
-	if len(*commitSigs) >= ((len(consensus.PublicKeys)*2)/3+1) && consensus.state != targetState {
-		utils.GetLogInstance().Info("Enough commits received!", "num", len(*commitSigs), "state", consensus.state)
+	if len(commitSigs) >= ((len(consensus.PublicKeys)*2)/3+1) && consensus.state != targetState {
+		utils.GetLogInstance().Info("Enough commits received!", "num", len(commitSigs), "state", consensus.state)
 
 		// Construct and broadcast committed message
 		msgToSend, aggSig := consensus.constructCommittedMessage()
@@ -262,7 +262,7 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 		consensus.ResetState()
 		consensus.consensusID++
 
-		utils.GetLogInstance().Debug("HOORAY!!! CONSENSUS REACHED!!!", "consensusID", consensus.consensusID, "numOfSignatures", len(*commitSigs))
+		utils.GetLogInstance().Debug("HOORAY!!! CONSENSUS REACHED!!!", "consensusID", consensus.consensusID, "numOfSignatures", len(commitSigs))
 
 		// TODO: remove this temporary delay
 		time.Sleep(500 * time.Millisecond)
