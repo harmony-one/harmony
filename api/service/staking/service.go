@@ -1,8 +1,15 @@
 package staking
 
 import (
+	"crypto/ecdsa"
+	"math/big"
+
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
+	client "github.com/harmony-one/harmony/api/client/service"
+	proto "github.com/harmony-one/harmony/api/client/service/proto"
 	"github.com/harmony-one/harmony/api/proto/message"
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 )
@@ -12,14 +19,17 @@ type Service struct {
 	stopChan    chan struct{}
 	stoppedChan chan struct{}
 	peerChan    <-chan p2p.Peer
+	account     common.Address
+	AccountKey  *ecdsa.PrivateKey
 }
 
 // New returns staking service.
-func New(peerChan <-chan p2p.Peer) *Service {
+func New(account common.Address, peerChan <-chan p2p.Peer) *Service {
 	return &Service{
 		stopChan:    make(chan struct{}),
 		stoppedChan: make(chan struct{}),
 		peerChan:    peerChan,
+		account:     account,
 	}
 }
 
@@ -44,7 +54,7 @@ func (s *Service) Run() {
 			case peer := <-s.peerChan:
 				utils.GetLogInstance().Info("Running role conversion")
 				// TODO: Write some logic here.
-				s.DoService(&peer)
+				s.DoService(peer)
 			case <-s.stopChan:
 				return
 			}
@@ -53,24 +63,46 @@ func (s *Service) Run() {
 }
 
 // DoService does staking.
-func (s *Service) DoService(peer *p2p.Peer) {
+func (s *Service) DoService(peer p2p.Peer) {
 	utils.GetLogInstance().Info("Staking with Peer")
 
 	// TODO(minhdoan): How to use the p2p or pubsub to send Staking Message to beacon chain.
 	// See below of how to create a staking message.
 }
 
-func (s *Service) createStakingMessage() *message.Message {
-	// TODO(minhdoan): Add signature and public key.
-	// To add public we need to assign a fake account to new node initially.
-	return &message.Message{
-		Type: message.MessageType_NEWNODE_BEACON_STAKING,
-		Request: &message.Message_Staking{
-			Staking: &message.StakingRequest{
-				Transaction: []byte{},
-				NodeId:      "",
+func (s *Service) getAccountState(beaconPeer p2p.Peer) *proto.FetchAccountStateResponse {
+	client := client.NewClient(beaconPeer.IP, beaconPeer.Port)
+	defer client.Close()
+	return client.GetBalance(s.account)
+}
+
+func (s *Service) createStakingMessage(beaconPeer p2p.Peer) *message.Message {
+	accountState := s.getAccountState(beaconPeer)
+	toAddress := common.HexToAddress("0x4592d8f8d7b001e72cb26a73e4fa1806a51ac79d")
+	gasLimit := uint64(0)
+	gasPrice := big.NewInt(0)
+	tx := types.NewTransaction(
+		accountState.Nonce,
+		toAddress,
+		0, // beacon chain.
+		new(big.Int).SetBytes(accountState.Balance),
+		gasLimit,
+		gasPrice,
+		nil)
+
+	if signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, s.AccountKey); err == nil {
+		ts := types.Transactions{signedTx}
+		return &message.Message{
+			Type: message.MessageType_NEWNODE_BEACON_STAKING,
+			Request: &message.Message_Staking{
+				Staking: &message.StakingRequest{
+					Transaction: ts.GetRlp(0),
+					NodeId:      "",
+				},
 			},
-		},
+		}
+	} else {
+		return nil
 	}
 }
 
