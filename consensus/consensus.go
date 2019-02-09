@@ -36,8 +36,8 @@ type Consensus struct {
 	state State
 
 	// Commits collected from validators.
-	prepareSigs          *map[uint32]*bls.Sign
-	commitSigs           *map[uint32]*bls.Sign
+	prepareSigs          map[uint32]*bls.Sign
+	commitSigs           map[uint32]*bls.Sign
 	aggregatedPrepareSig *bls.Sign
 	aggregatedCommitSig  *bls.Sign
 	prepareBitmap        *bls_cosi.Mask
@@ -158,8 +158,8 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Cons
 		consensus.validators.Store(utils.GetUniqueIDFromPeer(peer), peer)
 	}
 
-	consensus.prepareSigs = &map[uint32]*bls.Sign{}
-	consensus.commitSigs = &map[uint32]*bls.Sign{}
+	consensus.prepareSigs = map[uint32]*bls.Sign{}
+	consensus.commitSigs = map[uint32]*bls.Sign{}
 
 	// Initialize cosign bitmap
 	allPublicKeys := make([]*bls.PublicKey, 0)
@@ -325,7 +325,7 @@ func (consensus *Consensus) GetValidatorPeers() []p2p.Peer {
 // GetPrepareSigsArray returns the signatures for prepare as a array
 func (consensus *Consensus) GetPrepareSigsArray() []*bls.Sign {
 	sigs := []*bls.Sign{}
-	for _, sig := range *consensus.prepareSigs {
+	for _, sig := range consensus.prepareSigs {
 		sigs = append(sigs, sig)
 	}
 	return sigs
@@ -334,7 +334,7 @@ func (consensus *Consensus) GetPrepareSigsArray() []*bls.Sign {
 // GetCommitSigsArray returns the signatures for commit as a array
 func (consensus *Consensus) GetCommitSigsArray() []*bls.Sign {
 	sigs := []*bls.Sign{}
-	for _, sig := range *consensus.commitSigs {
+	for _, sig := range consensus.commitSigs {
 		sigs = append(sigs, sig)
 	}
 	return sigs
@@ -343,8 +343,8 @@ func (consensus *Consensus) GetCommitSigsArray() []*bls.Sign {
 // ResetState resets the state of the consensus
 func (consensus *Consensus) ResetState() {
 	consensus.state = Finished
-	consensus.prepareSigs = &map[uint32]*bls.Sign{}
-	consensus.commitSigs = &map[uint32]*bls.Sign{}
+	consensus.prepareSigs = map[uint32]*bls.Sign{}
+	consensus.commitSigs = map[uint32]*bls.Sign{}
 
 	prepareBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.PubKey)
 	commitBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.PubKey)

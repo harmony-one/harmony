@@ -43,8 +43,8 @@ func TestConstructPreparedMessage(test *testing.T) {
 	consensus.blockHash = [32]byte{}
 
 	message := "test string"
-	(*consensus.prepareSigs)[0] = leaderPriKey.Sign(message)
-	(*consensus.prepareSigs)[1] = validatorPriKey.Sign(message)
+	consensus.prepareSigs[0] = leaderPriKey.Sign(message)
+	consensus.prepareSigs[1] = validatorPriKey.Sign(message)
 	consensus.prepareBitmap.SetKey(leaderPubKey, true)
 	consensus.prepareBitmap.SetKey(validatorPubKey, true)
 

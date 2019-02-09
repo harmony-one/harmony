@@ -160,7 +160,7 @@ func TestProcessMessageLeaderCommit(test *testing.T) {
 	consensusLeader.blockHash = blockHash
 	consensusLeader.OnConsensusDone = func(newBlock *types.Block) {}
 	consensusLeader.block, _ = rlp.EncodeToBytes(types.NewBlock(&types.Header{}, nil, nil))
-	(*consensusLeader.prepareSigs)[consensusLeader.nodeID] = consensusLeader.priKey.SignHash(consensusLeader.blockHash[:])
+	consensusLeader.prepareSigs[consensusLeader.nodeID] = consensusLeader.priKey.SignHash(consensusLeader.blockHash[:])
 
 	aggSig := bls_cosi.AggregateSig(consensusLeader.GetPrepareSigsArray())
 	multiSigAndBitmap := append(aggSig.Serialize(), consensusLeader.prepareBitmap.Bitmap...)
