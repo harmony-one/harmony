@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	client "github.com/harmony-one/harmony/api/client/service"
 	proto "github.com/harmony-one/harmony/api/client/service/proto"
@@ -15,21 +16,22 @@ import (
 )
 
 // Service is the staking service.
+// Service requires private key here which is not a right design.
+// In stead in the right design, the end-user who runs mining needs to provide signed tx to this service.
 type Service struct {
 	stopChan    chan struct{}
 	stoppedChan chan struct{}
 	peerChan    <-chan p2p.Peer
-	account     common.Address
-	AccountKey  *ecdsa.PrivateKey
+	accountKey  *ecdsa.PrivateKey
 }
 
 // New returns staking service.
-func New(account common.Address, peerChan <-chan p2p.Peer) *Service {
+func New(accountKey *ecdsa.PrivateKey, peerChan <-chan p2p.Peer) *Service {
 	return &Service{
 		stopChan:    make(chan struct{}),
 		stoppedChan: make(chan struct{}),
 		peerChan:    peerChan,
-		account:     account,
+		accountKey:  accountKey,
 	}
 }
 
@@ -73,7 +75,7 @@ func (s *Service) DoService(peer p2p.Peer) {
 func (s *Service) getAccountState(beaconPeer p2p.Peer) *proto.FetchAccountStateResponse {
 	client := client.NewClient(beaconPeer.IP, beaconPeer.Port)
 	defer client.Close()
-	return client.GetBalance(s.account)
+	return client.GetBalance(crypto.PubkeyToAddress(s.accountKey.PublicKey))
 }
 
 func (s *Service) createStakingMessage(beaconPeer p2p.Peer) *message.Message {
@@ -90,7 +92,7 @@ func (s *Service) createStakingMessage(beaconPeer p2p.Peer) *message.Message {
 		gasPrice,
 		nil)
 
-	if signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, s.AccountKey); err == nil {
+	if signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, s.accountKey); err == nil {
 		ts := types.Transactions{signedTx}
 		return &message.Message{
 			Type: message.MessageType_NEWNODE_BEACON_STAKING,
@@ -101,9 +103,8 @@ func (s *Service) createStakingMessage(beaconPeer p2p.Peer) *message.Message {
 				},
 			},
 		}
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // StopService stops staking service.
