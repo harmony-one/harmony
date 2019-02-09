@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/ecdsa"
 	"fmt"
 	"log"
 	"math/big"
@@ -13,7 +14,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	"github.com/harmony-one/harmony/node/worker"
+	pkgworker "github.com/harmony-one/harmony/node/worker"
 )
 
 const (
@@ -116,38 +117,41 @@ func main() {
 	NumTxns := 3
 
 	txs := make([]*types.Transaction, NumTxns)
-	worker := worker.New(params.TestChainConfig, chain, consensus.NewFaker(), crypto.PubkeyToAddress(FaucetPriKey.PublicKey), 0)
-	nonce := worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(FaucetPriKey.PublicKey))
+	fworker := pkgworker.New(params.TestChainConfig, chain, consensus.NewFaker(), crypto.PubkeyToAddress(FaucetPriKey.PublicKey), 0)
+	nonce := fworker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(FaucetPriKey.PublicKey))
 	// var randomUserKey []*ecdsa.PrivateKey
 	var AllRandomUserAddress []common.Address
+	var AllRandomUserKey []*ecdsa.PrivateKey
 	for i := range txs {
 		randomUserKey, _ := crypto.GenerateKey()
 		randomUserAddress := crypto.PubkeyToAddress(randomUserKey.PublicKey)
-		amount := i*1000 + 17 //Put different amount in each  account.
+		amount := i*1000 + 37 //Put different amount in each  account.
 		tx, _ := types.SignTx(types.NewTransaction(nonce+uint64(i), randomUserAddress, 0, big.NewInt(int64(amount)), params.TxGas, nil, nil), types.HomesteadSigner{}, FaucetPriKey)
 		AllRandomUserAddress = append(AllRandomUserAddress, randomUserAddress)
+		AllRandomUserKey = append(AllRandomUserKey, randomUserKey)
 		txs[i] = tx
 	}
 	dataEnc := common.FromHex(FaucetContractBinary)
 	ftx, _ := types.SignTx(types.NewContractCreation(nonce+uint64(NumTxns), 0, big.NewInt(7000000000000000000), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, FaucetPriKey)
 	// Figure out the contract address which is determined by sender.address and nonce
 	FaucetContractAddress := crypto.CreateAddress(FaucetAddress, nonce+uint64(NumTxns))
-	state := worker.GetCurrentState()
+	state := fworker.GetCurrentState()
 	txs = append(txs, ftx)
 	// Before the contract is deployed the code is empty
 	fmt.Println(state.GetCodeHash(FaucetContractAddress))
-	err := worker.CommitTransactions(txs)
+	err := fworker.CommitTransactions(txs)
 
 	if err != nil {
 		fmt.Println(err)
 	}
-	block, _ := worker.Commit()
+	block, _ := fworker.Commit()
 	_, err = chain.InsertChain(types.Blocks{block})
 	if err != nil {
 		fmt.Println(err)
 	}
 
-	receipts := worker.GetCurrentReceipts()
+	receipts := fworker.GetCurrentReceipts()
+	state = fworker.GetCurrentState()
 	fmt.Println(receipts[len(receipts)-1].ContractAddress)
 	fmt.Println(receipts[len(receipts)-1])
 	fmt.Println("Faucet Address")
@@ -165,7 +169,7 @@ func main() {
 	callEnc := common.FromHex(callData)
 	callfaucettx, _ := types.SignTx(types.NewTransaction(nonce+uint64(NumTxns+1), FaucetContractAddress, 0, big.NewInt(0), params.TxGasContractCreation*10, nil, callEnc), types.HomesteadSigner{}, FaucetPriKey)
 
-	err = worker.CommitTransactions(types.Transactions{callfaucettx})
+	err = fworker.CommitTransactions(types.Transactions{callfaucettx})
 
 	if err != nil {
 		fmt.Println(err)
@@ -174,13 +178,13 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 	}
-	block, _ = worker.Commit()
+	block, _ = fworker.Commit()
 	_, err = chain.InsertChain(types.Blocks{block})
 	if err != nil {
 		fmt.Println(err)
 	}
 
-	receipts = worker.GetCurrentReceipts()
+	receipts = fworker.GetCurrentReceipts()
 	fmt.Println(receipts[len(receipts)-1].ContractAddress)
 	fmt.Println(receipts[len(receipts)-1])
 	fmt.Println(state.GetNonce(FaucetAddress))
@@ -196,56 +200,46 @@ func main() {
 	fmt.Println("--------- Now Setting up Staking Contract ---------")
 	// //Add a staking contract deployment transaction.
 
-	// NumTxns = 3
+	NumTxns = 3
 
-	// txs = make([]*types.Transaction, NumTxns)
-	// worker = worker.New(params.TestChainConfig, chain, consensus.NewFaker(), crypto.PubkeyToAddress(StakingPriKey.PublicKey), 0)
-	// nonce = worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(StakingPriKey.PublicKey))
-	// var stakingtxns []*types.Transaction
-	// dataEnc = common.FromHex(StakingContractBinary)
-	// stx, _ := types.SignTx(types.NewContractCreation(nonce, 0, big.NewInt(7000000000000000000), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, StakingPriKey)
+	txs = make([]*types.Transaction, NumTxns)
+	worker := pkgworker.New(params.TestChainConfig, chain, consensus.NewFaker(), crypto.PubkeyToAddress(StakingPriKey.PublicKey), 0)
+	nonce = worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(StakingPriKey.PublicKey))
+	dataEnc = common.FromHex(StakingContractBinary)
+	stx, _ := types.SignTx(types.NewContractCreation(nonce, 0, big.NewInt(7000000000000000000), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, StakingPriKey)
 	// // // Figure out the contract address which is determined by sender.address and nonce
-	// StakeContractAddress := crypto.CreateAddress(StakingAddress, nonce+uint64(0))
-	// state = worker.GetCurrentState()
-	// // // Before the contract is deployed the code is empty
-	// fmt.Println(state.GetCodeHash(StakeContractAddress))
-	// stakingtxns = append(stakingtxns, stx)
-	// err := worker.CommitTransactions(pendingTxs)
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
-	// block, _ := worker.Commit()
-	// _, err = chain.InsertChain(types.Blocks{block})
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
-	// fmt.Println(contractAddress)
+	StakeContractAddress := crypto.CreateAddress(StakingAddress, nonce+uint64(0))
+	state = worker.GetCurrentState()
 
-	// var address common.Address
-	// bytes, err := hex.DecodeString("ac51b997a3a17fa18e46baceb32fcab9acc93917")
-	// address.SetBytes(bytes)
-	// receipts := worker.GetCurrentReceipts()
-	// fmt.Println(receipts[len(receipts)-1].ContractAddress)
-	// fmt.Println(receipts[len(receipts)-1])
-	// fmt.Println(state.GetNonce(testBankAddress))
-	// fmt.Println(FaucetPriKey)
-	// fmt.Println(state.GetBalance(contractAddress))
-	// fmt.Println(state.GetBalance(address))
-	// fmt.Println(state.GetCodeHash(contractAddress))
+	var stakingtxns []*types.Transaction
+	stakingtxns = append(stakingtxns, stx)
+	for i := 0; i <= 2; i++ {
+		stake := i*10 + 17
+		callingFunction := "0xd0e30db0"
+		dataEnc := common.FromHex(callingFunction) //Deposit Does not take a argument, stake is transferred via amount.
+		tx, _ := types.SignTx(types.NewTransaction(nonce+uint64(i), StakeContractAddress, 0, big.NewInt(int64(stake)), params.TxGas, nil, dataEnc), types.HomesteadSigner{}, AllRandomUserKey[i])
+		stakingtxns = append(stakingtxns, tx)
+	}
 
-	// callData := "0x27c78c42000000000000000000000000ac51b997a3a17fa18e46baceb32fcab9acc93917" //24182601fe6e2e5da0b831496cc0489b7173b44f"
-	// callEnc := common.FromHex(callData)
-	// tx, _ = types.SignTx(types.NewTransaction(nonce+uint64(11), contractAddress, 0, big.NewInt(0), params.TxGasContractCreation*10, nil, callEnc), types.HomesteadSigner{}, FaucetPriKey)
+	fmt.Println(state.GetCodeHash(StakeContractAddress))
 
-	// err = worker.CommitTransactions(types.Transactions{tx})
+	err = worker.CommitTransactions(stakingtxns)
+	if err != nil {
+		fmt.Println(err)
+	}
+	block, _ = worker.Commit()
+	_, err = chain.InsertChain(types.Blocks{block})
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(StakeContractAddress)
+	state = worker.GetCurrentState()
+	receipts = worker.GetCurrentReceipts()
 
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
-	// fmt.Println(receipts[len(receipts)-1].ContractAddress)
-	// fmt.Println(receipts[len(receipts)-1])
-	// fmt.Println(state.GetNonce(testBankAddress))
-	// fmt.Println(state.GetBalance(contractAddress))
-	// fmt.Println(state.GetBalance(address))
-	// fmt.Println(state.GetCodeHash(contractAddress))
+	fmt.Println(receipts)
+	fmt.Println(state.GetNonce(StakingAddress))
+	fmt.Println(state.GetBalance(AllRandomUserAddress[0]))
+	fmt.Println(state.GetBalance(AllRandomUserAddress[1]))
+	fmt.Println(state.GetBalance(AllRandomUserAddress[2]))
+	fmt.Println(state.GetCodeHash(StakeContractAddress))
 }
