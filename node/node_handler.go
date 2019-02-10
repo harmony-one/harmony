@@ -261,7 +261,6 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 		utils.GetLogInstance().Error("Can't get Ping Message")
 		return -1
 	}
-	utils.GetLogInstance().Debug("Ping", "Msg", ping)
 
 	peer := new(p2p.Peer)
 	peer.IP = ping.Node.IP
@@ -275,6 +274,11 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 		utils.GetLogInstance().Error("UnmarshalBinary Failed", "error", err)
 		return -1
 	}
+
+	utils.GetLogInstance().Debug("PingMsgHandler", "incoming peer", peer)
+
+	// add to incoming peer list
+	node.host.AddIncomingPeer(*peer)
 
 	if ping.Node.Role == proto_node.ClientRole {
 		utils.GetLogInstance().Info("Add Client Peer to Node", "Node", node.Consensus.GetNodeID(), "Client", peer)
@@ -302,8 +306,19 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 
 		// Broadcast the message to all validators, as publicKeys is updated
 		// FIXME: HAR-89 use a separate nodefind/neighbor message
-		host.BroadcastMessageFromLeader(node.GetHost(), peers, buffer, node.Consensus.OfflinePeers)
-		utils.GetLogInstance().Info("PingMsgHandler send pong message")
+
+		if node.UseLibP2P {
+			content := host.ConstructP2pMessage(byte(0), buffer)
+			err := node.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, content)
+			if err != nil {
+				utils.GetLogInstance().Error("[PONG] failed to send pong message", "group", p2p.GroupIDBeacon)
+			} else {
+				utils.GetLogInstance().Debug("[PONG] sent Pong Message via group send", "group", p2p.GroupIDBeacon)
+			}
+		} else {
+			host.BroadcastMessageFromLeader(node.GetHost(), peers, buffer, node.Consensus.OfflinePeers)
+			utils.GetLogInstance().Info("PingMsgHandler send pong message")
+		}
 	}
 
 	return 1
@@ -316,7 +331,7 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		return -1
 	}
 
-	//	utils.GetLogInstance().Debug("pongMessageHandler", "pong", pong, "nodeID", node.Consensus.GetNodeID())
+	utils.GetLogInstance().Debug("pongMessageHandler", "pong", pong, "nodeID", node.Consensus.GetNodeID())
 
 	peers := make([]*p2p.Peer, 0)
 

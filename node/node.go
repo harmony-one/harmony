@@ -129,6 +129,7 @@ type Node struct {
 	SelfPeer   p2p.Peer       // TODO(minhdoan): it could be duplicated with Self below whose is Alok work.
 	BCPeers    []p2p.Peer     // list of Beacon Chain Peers.  This is needed by all nodes.
 
+	// TODO: Neighbors should store only neighbor nodes in the same shard
 	Neighbors  sync.Map   // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
 	State      State      // State of the Node
 	stateMutex sync.Mutex // mutex for change node state
@@ -170,6 +171,10 @@ type Node struct {
 
 	// Group Message Receiver
 	groupReceiver p2p.GroupReceiver
+
+	// fully integrate with libp2p for networking
+	// FIXME: this is temporary hack until we can fully replace the old one
+	UseLibP2P bool
 }
 
 // Blockchain returns the blockchain from node

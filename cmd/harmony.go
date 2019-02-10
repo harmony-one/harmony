@@ -268,6 +268,8 @@ func main() {
 		} else {
 			go currentNode.JoinShard(leader)
 		}
+	} else {
+		currentNode.UseLibP2P = true
 	}
 
 	go currentNode.SupportSyncing()

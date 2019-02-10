@@ -39,6 +39,9 @@ type HostV2 struct {
 	pubsub PubSub
 	self   p2p.Peer
 	priKey p2p_crypto.PrivKey
+
+	incomingPeers []p2p.Peer // list of incoming Peers. TODO: fixed number incoming
+	outgoingPeers []p2p.Peer // list of outgoing Peers. TODO: fixed number of outgoing
 }
 
 // SendMessageToGroups sends a message to one or more multicast groups.
@@ -122,6 +125,16 @@ func (host *HostV2) AddPeer(p *p2p.Peer) error {
 	log.Info("AddPeer add to peerstore", "peer", *p)
 
 	return nil
+}
+
+// AddIncomingPeer add peer to incoming peer list
+func (host *HostV2) AddIncomingPeer(peer p2p.Peer) {
+	host.incomingPeers = append(host.incomingPeers, peer)
+}
+
+// AddOutgoingPeer add peer to outgoing peer list
+func (host *HostV2) AddOutgoingPeer(peer p2p.Peer) {
+	host.outgoingPeers = append(host.outgoingPeers, peer)
 }
 
 // Peerstore returns the peer store

@@ -64,6 +64,8 @@ func (s *Service) contactP2pPeers() {
 			}
 			log.Debug("[DISCOVERY]", "peer", peer)
 			s.host.AddPeer(&peer)
+			// Add to outgoing peer list
+			s.host.AddOutgoingPeer(peer)
 			// TODO: stop ping if pinged before
 			// TODO: call staking servcie here if it is a new node
 			s.pingPeer(peer)

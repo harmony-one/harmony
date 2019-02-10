@@ -17,6 +17,9 @@ type Host interface {
 	GetID() peer.ID
 	GetP2PHost() p2p_host.Host
 
+	AddIncomingPeer(Peer)
+	AddOutgoingPeer(Peer)
+
 	// SendMessageToGroups sends a message to one or more multicast groups.
 	SendMessageToGroups(groups []GroupID, msg []byte) error
 
