@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 
 	libp2p "github.com/libp2p/go-libp2p"
@@ -25,6 +27,10 @@ const (
 	BatchSizeInByte = 1 << 16
 	// ProtocolID The ID of protocol used in stream handling.
 	ProtocolID = "/harmony/0.0.1"
+
+	// Constants for discovery service.
+	numIncoming = 128
+	numOutgoing = 16
 )
 
 // PubSub captures the pubsub interface we expect from libp2p.
@@ -222,4 +228,31 @@ func (host *HostV2) Close() error {
 // GetP2PHost returns the p2p.Host
 func (host *HostV2) GetP2PHost() p2p_host.Host {
 	return host.h
+}
+
+// ConnectHostPeer connects to peer host
+func (host *HostV2) ConnectHostPeer(peer p2p.Peer) {
+	ctx := context.Background()
+	addr := fmt.Sprintf("/ip4/%s/tcp/%s/ipfs/%s", peer.IP, peer.Port, peer.PeerID.Pretty())
+	peerAddr, err := ma.NewMultiaddr(addr)
+	if err != nil {
+		utils.GetLogInstance().Error("ConnectHostPeer", "new ma error", err, "peer", peer)
+		return
+	}
+	peerInfo, err := peerstore.InfoFromP2pAddr(peerAddr)
+	if err != nil {
+		utils.GetLogInstance().Error("ConnectHostPeer", "new peerinfo error", err, "peer", peer)
+		return
+	}
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := host.h.Connect(ctx, *peerInfo); err != nil {
+			utils.GetLogInstance().Warn("can't connect to peer", "error", err, "peer", peer)
+		} else {
+			utils.GetLogInstance().Info("connected to peer host", "node", *peerInfo)
+		}
+	}()
+	wg.Wait()
 }

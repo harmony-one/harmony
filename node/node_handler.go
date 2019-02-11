@@ -277,6 +277,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 
 	// add to incoming peer list
 	node.host.AddIncomingPeer(*peer)
+	node.host.ConnectHostPeer(*peer)
 
 	if ping.Node.Role == proto_node.ClientRole {
 		utils.GetLogInstance().Info("Add Client Peer to Node", "Node", node.Consensus.GetNodeID(), "Client", peer)
@@ -329,8 +330,6 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		return -1
 	}
 
-	utils.GetLogInstance().Debug("[pongMessageHandler]", "received msg", len(msgPayload))
-
 	peers := make([]*p2p.Peer, 0)
 
 	for _, p := range pong.Peers {
@@ -348,6 +347,8 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		}
 		peers = append(peers, peer)
 	}
+
+	utils.GetLogInstance().Debug("[pongMessageHandler]", "received msg #peers", len(peers))
 
 	if len(peers) > 0 {
 		node.AddPeers(peers)
@@ -368,6 +369,8 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		}
 		publicKeys = append(publicKeys, &key)
 	}
+
+	utils.GetLogInstance().Debug("[pongMessageHandler]", "received msg #keys", len(publicKeys))
 
 	if node.State == NodeWaitToJoin {
 		node.State = NodeReadyForConsensus

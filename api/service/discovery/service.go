@@ -7,12 +7,6 @@ import (
 	"github.com/harmony-one/harmony/p2p/host"
 )
 
-// Constants for discovery service.
-const (
-	numIncoming = 128
-	numOutgoing = 16
-)
-
 // Service is the struct for discovery service.
 type Service struct {
 	host        p2p.Host

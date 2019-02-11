@@ -206,7 +206,11 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int) types.Transactions {
 
 // StartServer starts a server and process the requests by a handler.
 func (node *Node) StartServer() {
-	node.host.BindHandlerAndServe(node.StreamHandler)
+	if node.UseLibP2P {
+		select {}
+	} else {
+		node.host.BindHandlerAndServe(node.StreamHandler)
+	}
 }
 
 // Count the total number of transactions in the blockchain

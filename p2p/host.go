@@ -19,6 +19,7 @@ type Host interface {
 
 	AddIncomingPeer(Peer)
 	AddOutgoingPeer(Peer)
+	ConnectHostPeer(Peer)
 
 	// SendMessageToGroups sends a message to one or more multicast groups.
 	SendMessageToGroups(groups []GroupID, msg []byte) error
