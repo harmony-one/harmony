@@ -45,6 +45,7 @@ type HostV2 struct {
 	pubsub PubSub
 	self   p2p.Peer
 	priKey p2p_crypto.PrivKey
+	lock   sync.Mutex
 
 	incomingPeers []p2p.Peer // list of incoming Peers. TODO: fixed number incoming
 	outgoingPeers []p2p.Peer // list of outgoing Peers. TODO: fixed number of outgoing
@@ -161,7 +162,8 @@ func New(self *p2p.Peer, priKey p2p_crypto.PrivKey, opts ...p2p_config.Option) *
 		append(opts, libp2p.ListenAddrs(listenAddr), libp2p.Identity(priKey))...,
 	)
 	catchError(err)
-	pubsub, err := pubsub.NewGossipSub(ctx, p2pHost)
+	//	pubsub, err := pubsub.NewGossipSub(ctx, p2pHost)
+	pubsub, err := pubsub.NewFloodSub(ctx, p2pHost)
 	catchError(err)
 
 	self.PeerID = p2pHost.ID()
@@ -244,15 +246,11 @@ func (host *HostV2) ConnectHostPeer(peer p2p.Peer) {
 		utils.GetLogInstance().Error("ConnectHostPeer", "new peerinfo error", err, "peer", peer)
 		return
 	}
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		if err := host.h.Connect(ctx, *peerInfo); err != nil {
-			utils.GetLogInstance().Warn("can't connect to peer", "error", err, "peer", peer)
-		} else {
-			utils.GetLogInstance().Info("connected to peer host", "node", *peerInfo)
-		}
-	}()
-	wg.Wait()
+	host.lock.Lock()
+	defer host.lock.Unlock()
+	if err := host.h.Connect(ctx, *peerInfo); err != nil {
+		utils.GetLogInstance().Warn("can't connect to peer", "error", err, "peer", peer)
+	} else {
+		utils.GetLogInstance().Info("connected to peer host", "node", *peerInfo)
+	}
 }

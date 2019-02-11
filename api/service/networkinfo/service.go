@@ -28,6 +28,7 @@ type Service struct {
 	peerChan    chan p2p.Peer
 	peerInfo    <-chan peerstore.PeerInfo
 	discovery   *libp2pdis.RoutingDiscovery
+	lock        sync.Mutex
 }
 
 // New returns role conversion service.
@@ -116,17 +117,14 @@ func (s *Service) DoService() {
 			}
 			if peer.ID != s.Host.GetP2PHost().ID() && len(peer.ID) > 0 {
 				utils.GetLogInstance().Info("Found Peer", "peer", peer.ID, "addr", peer.Addrs, "my ID", s.Host.GetP2PHost().ID())
-				var wg sync.WaitGroup
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					if err := s.Host.GetP2PHost().Connect(s.ctx, peer); err != nil {
-						utils.GetLogInstance().Warn("can't connect to peer node", "error", err)
-					} else {
-						utils.GetLogInstance().Info("connected to peer node", "peer", peer)
-					}
-				}()
-				wg.Wait()
+				s.lock.Lock()
+				if err := s.Host.GetP2PHost().Connect(s.ctx, peer); err != nil {
+					utils.GetLogInstance().Warn("can't connect to peer node", "error", err)
+				} else {
+					utils.GetLogInstance().Info("connected to peer node", "peer", peer)
+				}
+				s.lock.Unlock()
+				// figure out the public ip/port
 				ip := "127.0.0.1"
 				var port string
 				for _, addr := range peer.Addrs {
