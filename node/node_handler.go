@@ -59,7 +59,7 @@ func (node *Node) ReceiveGroupMessage() {
 		}
 		msg, sender, err := node.groupReceiver.Receive(ctx)
 		if sender != node.host.GetID() {
-			utils.GetLogInstance().Info("[PUBSUB]", "msg size", len(msg), "sender", sender)
+			utils.GetLogInstance().Info("[PUBSUB]", "received group msg", len(msg), "sender", sender)
 			if err == nil {
 				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
 				node.messageHandler(msg[5:])
@@ -70,8 +70,6 @@ func (node *Node) ReceiveGroupMessage() {
 
 // messageHandler parses the message and dispatch the actions
 func (node *Node) messageHandler(content []byte) {
-	utils.GetLogInstance().Info("[msgHandler]", "msg size", len(content))
-
 	node.MaybeBroadcastAsValidator(content)
 
 	consensusObj := node.Consensus
@@ -275,7 +273,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 		return -1
 	}
 
-	utils.GetLogInstance().Debug("PingMsgHandler", "incoming peer", peer)
+	utils.GetLogInstance().Debug("[pingMessageHandler]", "incoming peer", peer)
 
 	// add to incoming peer list
 	node.host.AddIncomingPeer(*peer)
@@ -331,7 +329,7 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		return -1
 	}
 
-	utils.GetLogInstance().Debug("pongMessageHandler", "pong", pong, "nodeID", node.Consensus.GetNodeID())
+	utils.GetLogInstance().Debug("[pongMessageHandler]", "received msg", len(msgPayload))
 
 	peers := make([]*p2p.Peer, 0)
 

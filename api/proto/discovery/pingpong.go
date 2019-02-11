@@ -19,6 +19,7 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/api/proto/node"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 )
 
@@ -87,6 +88,8 @@ func NewPongMessage(peers []p2p.Peer, pubKeys []*bls.PublicKey) *PongMessageType
 
 		pong.PubKeys = append(pong.PubKeys, key)
 	}
+
+	utils.GetLogInstance().Info("[pong message]", "keys", len(pong.PubKeys), "peers", len(pong.Peers))
 
 	return pong
 }

@@ -62,10 +62,10 @@ func (s *Service) contactP2pPeers() {
 				log.Debug("end of info", "peer", peer.PeerID)
 				return
 			}
-			log.Debug("[DISCOVERY]", "peer", peer)
 			s.host.AddPeer(&peer)
 			// Add to outgoing peer list
 			s.host.AddOutgoingPeer(peer)
+			log.Debug("[DISCOVERY]", "add outgoing peer", peer)
 			// TODO: stop ping if pinged before
 			// TODO: call staking servcie here if it is a new node
 			s.pingPeer(peer)
@@ -83,7 +83,6 @@ func (s *Service) Init() {
 func (s *Service) pingPeer(peer p2p.Peer) {
 	ping := proto_discovery.NewPingMessage(s.host.GetSelfPeer())
 	buffer := ping.ConstructPingMessage()
-	log.Debug("Sending Ping Message to", "peer", peer)
 	content := host.ConstructP2pMessage(byte(0), buffer)
 	//	s.host.SendMessage(peer, content)
 	//   log.Debug("Sent Ping Message via unicast to", "peer", peer)
@@ -91,7 +90,7 @@ func (s *Service) pingPeer(peer p2p.Peer) {
 	if err != nil {
 		log.Error("Failed to send ping message", "group", p2p.GroupIDBeacon)
 	} else {
-		log.Debug("Sent Ping Message via group send to", "peer", peer)
+		log.Debug("[PING] sent Ping Message via group send to", "peer", peer)
 	}
 	if s.stakingChan != nil {
 		s.stakingChan <- peer
