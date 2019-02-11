@@ -2,8 +2,10 @@ package node
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -43,7 +45,27 @@ func (node *Node) StreamHandler(s p2p.Stream) {
 		utils.GetLogInstance().Error("Read p2p data failed", "err", err, "node", node)
 		return
 	}
+
 	node.messageHandler(content)
+}
+
+// ReceiveGroupMessage use libp2p pubsub mechanism to receive broadcast messages
+func (node *Node) ReceiveGroupMessage() {
+	ctx := context.Background()
+	for {
+		if node.groupReceiver == nil {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+		msg, sender, err := node.groupReceiver.Receive(ctx)
+		if sender != node.host.GetID() {
+			utils.GetLogInstance().Info("[PUBSUB]", "received group msg", len(msg), "sender", sender)
+			if err == nil {
+				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
+				node.messageHandler(msg[5:])
+			}
+		}
+	}
 }
 
 // messageHandler parses the message and dispatch the actions
@@ -237,7 +259,6 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 		utils.GetLogInstance().Error("Can't get Ping Message")
 		return -1
 	}
-	//	utils.GetLogInstance().Info("Ping", "Msg", ping)
 
 	peer := new(p2p.Peer)
 	peer.IP = ping.Node.IP
@@ -252,6 +273,12 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 		return -1
 	}
 
+	utils.GetLogInstance().Debug("[pingMessageHandler]", "incoming peer", peer)
+
+	// add to incoming peer list
+	node.host.AddIncomingPeer(*peer)
+	node.host.ConnectHostPeer(*peer)
+
 	if ping.Node.Role == proto_node.ClientRole {
 		utils.GetLogInstance().Info("Add Client Peer to Node", "Node", node.Consensus.GetNodeID(), "Client", peer)
 		node.ClientPeer = peer
@@ -261,25 +288,39 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 	// Add to Node's peer list anyway
 	node.AddPeers([]*p2p.Peer{peer})
 
-	peers := node.Consensus.GetValidatorPeers()
-	pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys)
-	buffer := pong.ConstructPongMessage()
+	if node.Consensus.IsLeader {
+		peers := node.Consensus.GetValidatorPeers()
+		pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys)
+		buffer := pong.ConstructPongMessage()
 
-	// Send a Pong message directly to the sender
-	// This is necessary because the sender will need to get a ValidatorID
-	// Just broadcast won't work, some validators won't receive the latest
-	// PublicKeys as we rely on a valid ValidatorID to do broadcast.
-	// This is very buggy, but we will move to libp2p, hope the problem will
-	// be resolved then.
-	// However, I disable it for now as we are sending redundant PONG messages
-	// to all validators.  This may not be needed. But it maybe add back.
-	//   p2p.SendMessage(*peer, buffer)
+		// Send a Pong message directly to the sender
+		// This is necessary because the sender will need to get a ValidatorID
+		// Just broadcast won't work, some validators won't receive the latest
+		// PublicKeys as we rely on a valid ValidatorID to do broadcast.
+		// This is very buggy, but we will move to libp2p, hope the problem will
+		// be resolved then.
+		// However, I disable it for now as we are sending redundant PONG messages
+		// to all validators.  This may not be needed. But it maybe add back.
+		//   p2p.SendMessage(*peer, buffer)
 
-	// Broadcast the message to all validators, as publicKeys is updated
-	// FIXME: HAR-89 use a separate nodefind/neighbor message
-	host.BroadcastMessageFromLeader(node.GetHost(), peers, buffer, node.Consensus.OfflinePeers)
+		// Broadcast the message to all validators, as publicKeys is updated
+		// FIXME: HAR-89 use a separate nodefind/neighbor message
 
-	return len(peers)
+		if node.UseLibP2P {
+			content := host.ConstructP2pMessage(byte(0), buffer)
+			err := node.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, content)
+			if err != nil {
+				utils.GetLogInstance().Error("[PONG] failed to send pong message", "group", p2p.GroupIDBeacon)
+			} else {
+				utils.GetLogInstance().Debug("[PONG] sent Pong Message via group send", "group", p2p.GroupIDBeacon)
+			}
+		} else {
+			host.BroadcastMessageFromLeader(node.GetHost(), peers, buffer, node.Consensus.OfflinePeers)
+			utils.GetLogInstance().Info("PingMsgHandler send pong message")
+		}
+	}
+
+	return 1
 }
 
 func (node *Node) pongMessageHandler(msgPayload []byte) int {
@@ -288,8 +329,6 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		utils.GetLogInstance().Error("Can't get Pong Message")
 		return -1
 	}
-
-	//	utils.GetLogInstance().Debug("pongMessageHandler", "pong", pong, "nodeID", node.Consensus.GetNodeID())
 
 	peers := make([]*p2p.Peer, 0)
 
@@ -308,6 +347,8 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		}
 		peers = append(peers, peer)
 	}
+
+	utils.GetLogInstance().Debug("[pongMessageHandler]", "received msg #peers", len(peers))
 
 	if len(peers) > 0 {
 		node.AddPeers(peers)
@@ -328,6 +369,8 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		}
 		publicKeys = append(publicKeys, &key)
 	}
+
+	utils.GetLogInstance().Debug("[pongMessageHandler]", "received msg #keys", len(publicKeys))
 
 	if node.State == NodeWaitToJoin {
 		node.State = NodeReadyForConsensus

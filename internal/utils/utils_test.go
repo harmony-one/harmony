@@ -107,7 +107,7 @@ func TestSaveLoadPrivateKey(t *testing.T) {
 		t.Fatalf("failed to save private key: %v", err)
 	}
 
-	pk1, err := LoadPrivateKey(str)
+	pk1, _, err := LoadPrivateKey(str)
 	if err != nil {
 		t.Fatalf("failed to load key: %v", err)
 	}
@@ -135,7 +135,7 @@ func TestSaveLoadKeyFile(t *testing.T) {
 		t.Fatalf("failed to save key to file: %v", err)
 	}
 
-	key1, err := LoadKeyFromFile(filename)
+	key1, _, err := LoadKeyFromFile(filename)
 	if err != nil {
 		t.Fatalf("failed to load key from file (%s): %v", filename, err)
 	}
@@ -144,7 +144,7 @@ func TestSaveLoadKeyFile(t *testing.T) {
 		t.Fatalf("loaded key is not equal to the saved one")
 	}
 
-	key2, err := LoadKeyFromFile(nonexist)
+	key2, _, err := LoadKeyFromFile(nonexist)
 
 	if err != nil {
 		t.Fatalf("failed to load key from non-exist file: %v", err)
