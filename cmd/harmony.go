@@ -11,6 +11,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
+	net "github.com/libp2p/go-libp2p-net"
+	peerstore "github.com/libp2p/go-libp2p-peerstore"
+	multiaddr "github.com/multiformats/go-multiaddr"
+
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/internal/attack"
 	pkg_newnode "github.com/harmony-one/harmony/internal/newnode"
@@ -19,8 +23,6 @@ import (
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
-	peerstore "github.com/libp2p/go-libp2p-peerstore"
-	multiaddr "github.com/multiformats/go-multiaddr"
 )
 
 var (
@@ -77,6 +79,50 @@ func loggingInit(logFolder, role, ip, port string, onlyLogTps bool) {
 	log.Root().SetHandler(h)
 }
 
+type connLogger struct{}
+
+func (connLogger) Listen(net net.Network, ma multiaddr.Multiaddr) {
+	log.Debug("[CONNECTIONS] Listener starting", "net", net, "addr", ma)
+}
+
+func (connLogger) ListenClose(net net.Network, ma multiaddr.Multiaddr) {
+	log.Debug("[CONNECTIONS] Listener closing", "net", net, "addr", ma)
+}
+
+func (connLogger) Connected(net net.Network, conn net.Conn) {
+	log.Debug("[CONNECTIONS] Connected", "net", net,
+		"localPeer", conn.LocalPeer(), "localAddr", conn.LocalMultiaddr(),
+		"remotePeer", conn.RemotePeer(), "remoteAddr", conn.RemoteMultiaddr(),
+	)
+}
+
+func (connLogger) Disconnected(net net.Network, conn net.Conn) {
+	log.Debug("[CONNECTIONS] Disconnected", "net", net,
+		"localPeer", conn.LocalPeer(), "localAddr", conn.LocalMultiaddr(),
+		"remotePeer", conn.RemotePeer(), "remoteAddr", conn.RemoteMultiaddr(),
+	)
+}
+
+func (connLogger) OpenedStream(net net.Network, stream net.Stream) {
+	conn := stream.Conn()
+	log.Debug("[CONNECTIONS] Stream opened", "net", net,
+		"localPeer", conn.LocalPeer(), "localAddr", conn.LocalMultiaddr(),
+		"remotePeer", conn.RemotePeer(), "remoteAddr", conn.RemoteMultiaddr(),
+		"protocol", stream.Protocol(),
+	)
+}
+
+func (connLogger) ClosedStream(net net.Network, stream net.Stream) {
+	conn := stream.Conn()
+	log.Debug("[CONNECTIONS] Stream closed", "net", net,
+		"localPeer", conn.LocalPeer(), "localAddr", conn.LocalMultiaddr(),
+		"remotePeer", conn.RemotePeer(), "remoteAddr", conn.RemoteMultiaddr(),
+		"protocol", stream.Protocol(),
+	)
+}
+
+var theConnLogger connLogger
+
 func main() {
 	// TODO: use http://getmyipaddress.org/ or http://www.get-myip.com/ to retrieve my IP address
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
@@ -110,6 +156,9 @@ func main() {
 
 	// isLeader indicates this node is a beacon chain leader node during the bootstrap process
 	isLeader := flag.Bool("is_leader", false, "true means this node is a beacon chain leader node")
+
+	// logConn logs incoming/outgoing connections
+	logConn := flag.Bool("log_conn", false, "log incoming/outgoing connections")
 
 	flag.Parse()
 
@@ -211,6 +260,9 @@ func main() {
 	}
 
 	host, err := p2pimpl.NewHost(&selfPeer, nodePriKey)
+	if *logConn {
+		host.GetP2PHost().Network().Notify(theConnLogger)
+	}
 	if err != nil {
 		panic("unable to new host in harmony")
 	}
