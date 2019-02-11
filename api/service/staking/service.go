@@ -21,19 +21,21 @@ import (
 // Service requires private key here which is not a right design.
 // In stead in the right design, the end-user who runs mining needs to provide signed tx to this service.
 type Service struct {
-	stopChan    chan struct{}
-	stoppedChan chan struct{}
-	peerChan    <-chan p2p.Peer
-	accountKey  *ecdsa.PrivateKey
+	stopChan      chan struct{}
+	stoppedChan   chan struct{}
+	peerChan      <-chan p2p.Peer
+	accountKey    *ecdsa.PrivateKey
+	stakingAmount int64
 }
 
 // New returns staking service.
-func New(accountKey *ecdsa.PrivateKey, peerChan <-chan p2p.Peer) *Service {
+func New(accountKey *ecdsa.PrivateKey, stakingAmount int64, peerChan <-chan p2p.Peer) *Service {
 	return &Service{
-		stopChan:    make(chan struct{}),
-		stoppedChan: make(chan struct{}),
-		peerChan:    peerChan,
-		accountKey:  accountKey,
+		stopChan:      make(chan struct{}),
+		stoppedChan:   make(chan struct{}),
+		peerChan:      peerChan,
+		accountKey:    accountKey,
+		stakingAmount: stakingAmount,
 	}
 }
 
@@ -87,7 +89,7 @@ func (s *Service) createStakingMessage(beaconPeer p2p.Peer) *message.Message {
 		accountState.Nonce,
 		toAddress,
 		0, // beacon chain.
-		new(big.Int).SetBytes(accountState.Balance),
+		big.NewInt(s.stakingAmount),
 		params.CallValueTransferGas*2,           // hard-code
 		big.NewInt(int64(params.Sha256BaseGas)), // pick some predefined gas price.
 		nil)

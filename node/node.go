@@ -614,7 +614,7 @@ func (node *Node) setupForNewNode() {
 	stakingPeer := make(chan p2p.Peer)
 
 	// Register staking service.
-	node.serviceManager.RegisterService(service_manager.Staking, staking.New(node.AccountKey, stakingPeer))
+	node.serviceManager.RegisterService(service_manager.Staking, staking.New(node.AccountKey, 0, stakingPeer))
 	// Register peer discovery service. "0" is the beacon shard ID
 	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, "0", chanPeer, stakingPeer))
 	// Register networkinfo service. "0" is the beacon shard ID
