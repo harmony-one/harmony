@@ -1,7 +1,10 @@
 package drand
 
 import (
+	protobuf "github.com/golang/protobuf/proto"
+	drand_proto "github.com/harmony-one/harmony/api/drand"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p/host"
 )
 
@@ -32,7 +35,59 @@ func (dRand *DRand) init(epochBlock *types.Block) {
 	msgToSend := dRand.constructInitMessage()
 
 	// Leader commit vrf itself
-	(*dRand.vrfs)[dRand.nodeID], _ = dRand.vrf()
+	rand, proof := dRand.vrf(dRand.blockHash)
+
+	(*dRand.vrfs)[dRand.nodeID] = append(rand[:], proof...)
 
 	host.BroadcastMessageFromLeader(dRand.host, dRand.GetValidatorPeers(), msgToSend, nil)
+}
+
+// ProcessMessageLeader dispatches messages for the leader to corresponding processors.
+func (dRand *DRand) ProcessMessageLeader(payload []byte) {
+	message := drand_proto.Message{}
+	err := protobuf.Unmarshal(payload, &message)
+
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to unmarshal message payload.", "err", err, "dRand", dRand)
+	}
+
+	switch message.Type {
+	case drand_proto.MessageType_COMMIT:
+		dRand.processCommitMessage(message)
+	default:
+		utils.GetLogInstance().Error("Unexpected message type", "msgType", message.Type, "dRand", dRand)
+	}
+}
+
+// ProcessMessageValidator dispatches validator's consensus message.
+func (dRand *DRand) processCommitMessage(message drand_proto.Message) {
+	if message.Type != drand_proto.MessageType_COMMIT {
+		utils.GetLogInstance().Error("Wrong message type received", "expected", drand_proto.MessageType_COMMIT, "got", message.Type)
+		return
+	}
+
+	// Verify message signature
+	err := verifyMessageSig(dRand.leader.PubKey, message)
+	if err != nil {
+		utils.GetLogInstance().Warn("Failed to verify the message signature", "Error", err)
+		return
+	}
+
+	rand := message.Payload[:32]
+	proof := message.Payload[32:]
+	_ = rand
+	_ = proof
+	// TODO: check the validity of the vrf commit
+
+	validatorID := message.SenderId
+	validatorPeer := dRand.getValidatorPeerByID(validatorID)
+	vrfs := dRand.vrfs
+	utils.GetLogInstance().Debug("Received new prepare signature", "numReceivedSoFar", len((*vrfs)), "validatorID", validatorID, "PublicKeys", len(dRand.PublicKeys))
+
+	(*vrfs)[validatorID] = message.Payload
+	dRand.bitmap.SetKey(validatorPeer.PubKey, true) // Set the bitmap indicating that this validator signed.
+
+	if len((*vrfs)) >= ((len(dRand.PublicKeys))/3 + 1) {
+		// Construct pRand and initiate consensus on it
+	}
 }

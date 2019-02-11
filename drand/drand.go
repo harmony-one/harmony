@@ -3,6 +3,7 @@ package drand
 import (
 	"crypto/sha256"
 	"encoding/binary"
+	"errors"
 	"strconv"
 	"sync"
 
@@ -16,7 +17,7 @@ import (
 
 // DRand is the main struct which contains state for the distributed randomness protocol.
 type DRand struct {
-	vrfs   *map[uint32][32]byte
+	vrfs   *map[uint32][]byte
 	bitmap *bls_cosi.Mask
 	pRand  *[32]byte
 	rand   *[32]byte
@@ -68,7 +69,7 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *DRan
 		dRand.validators.Store(utils.GetUniqueIDFromPeer(peer), peer)
 	}
 
-	dRand.vrfs = &map[uint32][32]byte{}
+	dRand.vrfs = &map[uint32][]byte{}
 
 	// Initialize cosign bitmap
 	allPublicKeys := make([]*bls.PublicKey, 0)
@@ -136,7 +137,7 @@ func (dRand *DRand) signAndMarshalDRandMessage(message *drand_proto.Message) ([]
 	return marshaledMessage, nil
 }
 
-func (dRand *DRand) vrf() (rand [32]byte, proof []byte) {
+func (dRand *DRand) vrf(blockHash [32]byte) (rand [32]byte, proof []byte) {
 	// TODO: implement vrf
 	return [32]byte{}, []byte{}
 }
@@ -154,4 +155,40 @@ func (dRand *DRand) GetValidatorPeers() []p2p.Peer {
 	})
 
 	return validatorPeers
+}
+
+// Verify the signature of the message are valid from the signer's public key.
+func verifyMessageSig(signerPubKey *bls.PublicKey, message drand_proto.Message) error {
+	signature := message.Signature
+	message.Signature = nil
+	messageBytes, err := protobuf.Marshal(&message)
+	if err != nil {
+		return err
+	}
+
+	msgSig := bls.Sign{}
+	err = msgSig.Deserialize(signature)
+	if err != nil {
+		return err
+	}
+	msgHash := sha256.Sum256(messageBytes)
+	if !msgSig.VerifyHash(signerPubKey, msgHash[:]) {
+		return errors.New("failed to verify the signature")
+	}
+	return nil
+}
+
+// Gets the validator peer based on validator ID.
+func (dRand *DRand) getValidatorPeerByID(validatorID uint32) *p2p.Peer {
+	v, ok := dRand.validators.Load(validatorID)
+	if !ok {
+		utils.GetLogInstance().Warn("Unrecognized validator", "validatorID", validatorID, "dRand", dRand)
+		return nil
+	}
+	value, ok := v.(p2p.Peer)
+	if !ok {
+		utils.GetLogInstance().Warn("Invalid validator", "validatorID", validatorID, "dRand", dRand)
+		return nil
+	}
+	return &value
 }
