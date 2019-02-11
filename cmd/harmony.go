@@ -275,5 +275,8 @@ func main() {
 	go currentNode.SupportSyncing()
 	currentNode.ServiceManagerSetup()
 	currentNode.RunServices()
-	currentNode.StartServer()
+
+	if !*libp2pPD {
+		currentNode.StartServer()
+	}
 }
