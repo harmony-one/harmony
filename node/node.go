@@ -570,6 +570,44 @@ func (node *Node) RemovePeersHandler() {
 	}
 }
 
+
+// This function will be used by the beaconLeader
+// GetNewStakedNodes gives a list of all nodes that have deposited transaction
+func (node *Node) GetNewStakedNodes()  ([]common.Address) {
+	BlocksPerEpoch := 5 //Hardcoded, will take value from core.Blockchain later.
+	currentHeight := node.blockchain.CurrentBlock().NumberU64()
+	if currentHeight > BlocksPerEpoch {
+		prevBlock := currentHeight - BlocksPerEpoch
+	} else {
+		prevBlock := 0
+	}
+	return node.getNewStakedNodesFromBlockNumToBlockNum(prevBlock,currentHeight)
+}
+
+// This function will be used by the beaconLeader
+//GetNewStakedNodesFromBlockNumToBlockNum gives a list of all nodes that have deposited transaction
+func (node *Node) getNewStakedNodesFromBlockNumToBlockNum (prevBlockNum, toCurrentBlock uint64)  ([]common.Address) {
+	Blockchain := node.Blockchain()
+	signerType  := types.HomesteadSigner{}
+	newNodesMap = make(map[common.Address]int)
+	var newNodes []common.Address
+	for i := prevBlockNum,; i < toCurrentBlock + 1; i++ {
+		block = Blockchain.GetBlockByNumber(from)
+		txns = block.Transactions(),
+		for txn := range txns {
+			if txn.Value() > 0 {  //If value >0 means its a staking deposit transaction
+				newSender := types.Sender(signerType,txn)
+				_, isPresent := newNodesMap[newSender]
+				if !isPresent {
+					newNodesMap[newSender] = 1
+					newNodes := append(newNodes, newSender)
+				}
+			}
+ 		}
+	}
+	return newNodes
+}
+
 func (node *Node) setupForShardLeader() {
 	// Register explorer service.
 	node.serviceManager.RegisterService(service_manager.SupportExplorer, explorer.New(&node.SelfPeer))
