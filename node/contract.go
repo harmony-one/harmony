@@ -36,7 +36,7 @@ func (node *Node) AddStakingContractToPendingTransactions() {
 	dataEnc := common.FromHex(StakingContractBinary)
 	// Unsigned transaction to avoid the case of transaction address.
 	mycontracttx, _ := types.SignTx(types.NewContractCreation(uint64(0), node.Consensus.ShardID, contractFunds, params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, priKey)
-	node.ContractAddresses = append(node.ContractAddresses, crypto.CreateAddress(contractAddress, uint64(0)))
+	node.StakingContractAddress = crypto.CreateAddress(contractAddress, uint64(0))
 	node.addPendingTransactions(types.Transactions{mycontracttx})
 }
 

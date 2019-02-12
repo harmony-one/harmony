@@ -160,9 +160,9 @@ type Node struct {
 	serviceManager *service_manager.Manager
 
 	//Staked Accounts and Contract
-	CurrentStakes        map[common.Address]int64
-	StakeContractAddress common.Address
-	WithdrawStakeFunc    []byte
+	CurrentStakes          map[common.Address]int64
+	StakingContractAddress common.Address
+	WithdrawStakeFunc      []byte
 
 	//Node Account
 	AccountKey *ecdsa.PrivateKey
@@ -261,6 +261,9 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 		if node.Role == BeaconLeader {
 			node.AddStakingContractToPendingTransactions()
 			node.DepositToFakeAccounts()
+		}
+		if node.Role == BeaconLeader || node.Role == BeaconValidator {
+			node.CurrentStakes = make(map[common.Address]int64)
 		}
 		node.Consensus.ConsensusBlock = make(chan *bft.BFTBlockInfo)
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
@@ -585,7 +588,7 @@ func (node *Node) UpdateStakingList(block *types.Block) error {
 		currentSender, _ := types.Sender(signerType, txn)
 		_, isPresent := node.CurrentStakes[currentSender]
 		toAddress := txn.To()
-		if *toAddress != node.StakeContractAddress { //Not a address aimed at the staking contract.
+		if *toAddress != node.StakingContractAddress { //Not a address aimed at the staking contract.
 			continue
 		}
 		if value > int64(0) { //If value >0 means its a staking deposit transaction
@@ -617,7 +620,7 @@ func (node *Node) UpdateStakingList(block *types.Block) error {
 
 func decodeStakeCall(getData []byte) int64 {
 	value := new(big.Int)
-	value.SetBytes(getData[4:])
+	value.SetBytes(getData[4:]) //Escape the method call.
 	return value.Int64()
 }
 func (node *Node) setupForShardLeader() {

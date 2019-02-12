@@ -106,10 +106,6 @@ type Consensus struct {
 
 	// List of offline Peers
 	OfflinePeerList []p2p.Peer
-
-	//List of nodes related to beaconchain funcs
-	WaitingNodes []common.Address
-	ActiveNodes  []common.Address
 }
 
 // BFTBlockInfo send the latest block that was in BFT consensus process as well as its consensusID to state syncing
