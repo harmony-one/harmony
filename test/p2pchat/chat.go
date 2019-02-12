@@ -21,6 +21,7 @@ import (
 
 var logger = log.Logger("rendezvous")
 
+// Harmony MIT License
 func writePubsub(ps *pubsub.PubSub) {
 	stdReader := bufio.NewReader(os.Stdin)
 	for {
@@ -30,6 +31,7 @@ func writePubsub(ps *pubsub.PubSub) {
 	}
 }
 
+// Harmony MIT License
 func readPubsub(sub *pubsub.Subscription) {
 	ctx := context.Background()
 	for {
@@ -121,10 +123,23 @@ func main() {
 		panic(err)
 	}
 
-	ps, err := pubsub.NewFloodSub(ctx, host)
+	var ps *pubsub.PubSub
+
+	switch config.PubSubImpl {
+	case "gossip":
+		ps, err = pubsub.NewGossipSub(ctx, host)
+	case "flood":
+		ps, err = pubsub.NewFloodSub(ctx, host)
+	default:
+		logger.Error("Unsupported Pubsub implementation")
+		return
+	}
+
 	if err != nil {
 		fmt.Printf("pubsub error: %v", err)
+		panic(err)
 	}
+
 	sub, err := ps.Subscribe("pubsubtestchannel")
 
 	go writePubsub(ps)

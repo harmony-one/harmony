@@ -50,6 +50,7 @@ type Config struct {
 	BootstrapPeers   addrList
 	ListenAddresses  addrList
 	ProtocolID       string
+	PubSubImpl       string
 }
 
 // ParseFlags ...
@@ -60,6 +61,7 @@ func ParseFlags() (Config, error) {
 	flag.Var(&config.BootstrapPeers, "peer", "Adds a peer multiaddress to the bootstrap list")
 	flag.Var(&config.ListenAddresses, "listen", "Adds a multiaddress to the listen list")
 	flag.StringVar(&config.ProtocolID, "pid", "/chat/1.1.0", "Sets a protocol id for stream headers")
+	flag.StringVar(&config.PubSubImpl, "pubsub", "gossip", "Set the pubsub implementation: gossip, flood")
 	flag.Parse()
 
 	if len(config.BootstrapPeers) == 0 {
