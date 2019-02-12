@@ -62,3 +62,15 @@ func (client *Client) GetFreeToken(address common.Address) *proto.GetFreeTokenRe
 	}
 	return response
 }
+
+// GetStakingContractInfo gets necessary info for staking.
+func (client *Client) GetStakingContractInfo(address common.Address) *proto.StakingContractInfoResponse {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	request := &proto.StakingContractInfoRequest{Address: address.Bytes()}
+	response, err := client.clientServiceClient.GetStakingContractInfo(ctx, request)
+	if err != nil {
+		log.Fatalf("Error getting free token: %s", err)
+	}
+	return response
+}
