@@ -159,6 +159,11 @@ type Node struct {
 	// Service manager.
 	serviceManager *service_manager.Manager
 
+	//Staked Accounts and Contract
+	CurrentStakes        map[common.Address]int64
+	StakeContractAddress common.Address
+	WithdrawStakeFunc    []byte
+
 	//Node Account
 	AccountKey *ecdsa.PrivateKey
 	Address    common.Address
@@ -570,44 +575,51 @@ func (node *Node) RemovePeersHandler() {
 	}
 }
 
-
-// This function will be used by the beaconLeader
-// GetNewStakedNodes gives a list of all nodes that have deposited transaction
-func (node *Node) GetNewStakedNodes()  ([]common.Address) {
-	BlocksPerEpoch := 5 //Hardcoded, will take value from core.Blockchain later.
-	currentHeight := node.blockchain.CurrentBlock().NumberU64()
-	if currentHeight > BlocksPerEpoch {
-		prevBlock := currentHeight - BlocksPerEpoch
-	} else {
-		prevBlock := 0
-	}
-	return node.getNewStakedNodesFromBlockNumToBlockNum(prevBlock,currentHeight)
-}
-
-// This function will be used by the beaconLeader
-//GetNewStakedNodesFromBlockNumToBlockNum gives a list of all nodes that have deposited transaction
-func (node *Node) getNewStakedNodesFromBlockNumToBlockNum (prevBlockNum, toCurrentBlock uint64)  ([]common.Address) {
-	Blockchain := node.Blockchain()
-	signerType  := types.HomesteadSigner{}
-	newNodesMap = make(map[common.Address]int)
-	var newNodes []common.Address
-	for i := prevBlockNum,; i < toCurrentBlock + 1; i++ {
-		block = Blockchain.GetBlockByNumber(from)
-		txns = block.Transactions(),
-		for txn := range txns {
-			if txn.Value() > 0 {  //If value >0 means its a staking deposit transaction
-				newSender := types.Sender(signerType,txn)
-				_, isPresent := newNodesMap[newSender]
-				if !isPresent {
-					newNodesMap[newSender] = 1
-					newNodes := append(newNodes, newSender)
-				}
+//UpdateStakingList updates the stakes of every node.
+func (node *Node) UpdateStakingList(block *types.Block) error {
+	signerType := types.HomesteadSigner{}
+	txns := block.Transactions()
+	for i := range txns {
+		txn := txns[i]
+		value := txn.Value().Int64()
+		currentSender, _ := types.Sender(signerType, txn)
+		_, isPresent := node.CurrentStakes[currentSender]
+		toAddress := txn.To()
+		if *toAddress != node.StakeContractAddress { //Not a address aimed at the staking contract.
+			continue
+		}
+		if value > int64(0) { //If value >0 means its a staking deposit transaction
+			if isPresent {
+				//This means this node has increaserd its stake
+				node.CurrentStakes[currentSender] += value
+			} else {
+				node.CurrentStakes[currentSender] = value
 			}
- 		}
+		} else { //This means node has withdrawn stake.
+			getData := txn.Data()
+			value := decodeStakeCall(getData) //Value being withdrawn
+			if isPresent {
+				//This means this node has increaserd its stake
+				if node.CurrentStakes[currentSender] > value {
+					node.CurrentStakes[currentSender] -= value
+				} else if node.CurrentStakes[currentSender] == value {
+					delete(node.CurrentStakes, currentSender)
+				} else {
+					continue //Overdraft protection.
+				}
+			} else {
+				node.CurrentStakes[currentSender] = value
+			}
+		}
 	}
-	return newNodes
+	return nil
 }
 
+func decodeStakeCall(getData []byte) int64 {
+	value := new(big.Int)
+	value.SetBytes(getData[4:])
+	return value.Int64()
+}
 func (node *Node) setupForShardLeader() {
 	// Register explorer service.
 	node.serviceManager.RegisterService(service_manager.SupportExplorer, explorer.New(&node.SelfPeer))
