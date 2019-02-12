@@ -585,6 +585,11 @@ func (node *Node) RemovePeersHandler() {
 	}
 }
 
+func (node *Node) getDeployedStakingContract() common.Address {
+	// TODO(ak): Please populate here
+	return common.Address{}
+}
+
 func (node *Node) setupForShardLeader() {
 	// Register explorer service.
 	node.serviceManager.RegisterService(service_manager.SupportExplorer, explorer.New(&node.SelfPeer))
@@ -593,7 +598,7 @@ func (node *Node) setupForShardLeader() {
 	// Register new block service.
 	node.serviceManager.RegisterService(service_manager.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReady))
 	// Register client support service.
-	node.serviceManager.RegisterService(service_manager.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.SelfPeer.IP, node.SelfPeer.Port))
+	node.serviceManager.RegisterService(service_manager.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
 }
 
 func (node *Node) setupForShardValidator() {
@@ -619,7 +624,7 @@ func (node *Node) setupForBeaconLeader() {
 	// Register new block service.
 	node.serviceManager.RegisterService(service_manager.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReady))
 	// Register client support service.
-	node.serviceManager.RegisterService(service_manager.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.SelfPeer.IP, node.SelfPeer.Port))
+	node.serviceManager.RegisterService(service_manager.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
 }
 
 func (node *Node) setupForBeaconValidator() {
