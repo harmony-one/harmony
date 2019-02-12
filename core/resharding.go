@@ -25,6 +25,7 @@ type ShardingState struct {
 // Suppose there are N shards, the first N/2 larger shards are called active committees
 // the rest N/2 smaller committees are called inactive committees
 // actually they are all just normal shards
+// TODO: sort the committee weighted by total staking instead of shard size
 func (ss *ShardingState) sortCommitteeBySize() {
 	sort.Slice(ss.shardState, func(i, j int) bool {
 		return len(ss.shardState[i].NodeList) > len(ss.shardState[j].NodeList)
@@ -68,8 +69,8 @@ func (ss *ShardingState) cuckooResharding(percent float64) {
 // UpdateShardState will first add new nodes into shards, then use cuckoo rule to reshard to get new shard state
 func (ss *ShardingState) UpdateShardState(newNodeList []types.NodeID, percent float64) {
 	rand.Seed(ss.rnd)
-	ss.cuckooResharding(percent)
 	ss.assignNewNodes(newNodeList)
+	ss.cuckooResharding(percent)
 }
 
 // Shuffle will shuffle the list with result uniquely determined by seed, assuming there is no repeat items in the list
