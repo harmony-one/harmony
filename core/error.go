@@ -32,4 +32,7 @@ var (
 	// ErrNonceTooHigh is returned if the nonce of a transaction is higher than the
 	// next one expected based on the local chain.
 	ErrNonceTooHigh = errors.New("nonce too high")
+
+	// ErrShardStateNotMatch is returned if the calculated shardState hash not equal that in the block header
+	ErrShardStateNotMatch = errors.New("shard state root hash not match")
 )

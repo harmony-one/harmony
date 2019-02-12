@@ -97,7 +97,9 @@ type Header struct {
 	PrepareBitmap    []byte   `json:"bitmap"           gencodec:"required"` // Contains which validator signed
 	CommitSignature  [48]byte `json:"signature"        gencodec:"required"`
 	CommitBitmap     []byte   `json:"bitmap"           gencodec:"required"` // Contains which validator signed
-	// TODO(RJ): add epoch info
+
+	RandSeed       uint64      `json:"randomSeed"`
+	ShardStateHash common.Hash `json:"shardStateRoot"`
 }
 
 // field type overrides for gencodec
@@ -447,4 +449,14 @@ func (s blockSorter) Less(i, j int) bool {
 // Number checks if block b1 is less than block b2.
 func Number(b1, b2 *Block) bool {
 	return b1.header.Number.Cmp(b2.header.Number) < 0
+}
+
+// AddRandSeed add random seed into block header
+func (b *Block) AddRandSeed(randSeed int64) {
+	b.header.RandSeed = uint64(randSeed)
+}
+
+// AddShardStateHash add shardStateHash into block header
+func (b *Block) AddShardStateHash(shardStateHash common.Hash) {
+	b.header.ShardStateHash = shardStateHash
 }

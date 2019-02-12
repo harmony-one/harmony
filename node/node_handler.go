@@ -229,6 +229,11 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) bool {
 		utils.GetLogInstance().Debug("Failed verifying new block", "Error", err, "tx", newBlock.Transactions()[0])
 		return false
 	}
+
+	err = node.blockchain.ValidateNewShardState(newBlock)
+	if err != nil {
+		utils.GetLogInstance().Debug("Failed to verify new sharding state", "err", err)
+	}
 	return true
 }
 
@@ -246,11 +251,14 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 // AddNewBlock is usedd to add new block into the blockchain.
 func (node *Node) AddNewBlock(newBlock *types.Block) {
 	blockNum, err := node.blockchain.InsertChain([]*types.Block{newBlock})
+
 	if err != nil {
 		utils.GetLogInstance().Debug("Error adding new block to blockchain", "blockNum", blockNum, "Error", err)
 	} else {
 		utils.GetLogInstance().Info("adding new block to blockchain", "blockNum", blockNum)
 	}
+	// only insert new shardstate when newBlock is epoch block
+	node.blockchain.InsertNewShardState(newBlock)
 }
 
 func (node *Node) pingMessageHandler(msgPayload []byte) int {
