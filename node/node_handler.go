@@ -324,7 +324,8 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 	// Add to Node's peer list anyway
 	node.AddPeers([]*p2p.Peer{peer})
 
-	if node.Consensus.IsLeader {
+	// This is the old way of broadcasting pong message
+	if node.Consensus.IsLeader && !node.UseLibP2P {
 		peers := node.Consensus.GetValidatorPeers()
 		pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys)
 		buffer := pong.ConstructPongMessage()
@@ -342,21 +343,55 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 		// Broadcast the message to all validators, as publicKeys is updated
 		// FIXME: HAR-89 use a separate nodefind/neighbor message
 
-		if node.UseLibP2P {
-			content := host.ConstructP2pMessage(byte(0), buffer)
-			err := node.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, content)
-			if err != nil {
-				utils.GetLogInstance().Error("[PONG] failed to send pong message", "group", p2p.GroupIDBeacon)
-			} else {
-				utils.GetLogInstance().Debug("[PONG] sent Pong Message via group send", "group", p2p.GroupIDBeacon)
-			}
-		} else {
-			host.BroadcastMessageFromLeader(node.GetHost(), peers, buffer, node.Consensus.OfflinePeers)
-			utils.GetLogInstance().Info("PingMsgHandler send pong message")
-		}
+		host.BroadcastMessageFromLeader(node.GetHost(), peers, buffer, node.Consensus.OfflinePeers)
+		utils.GetLogInstance().Info("PingMsgHandler send pong message")
 	}
 
 	return 1
+}
+
+// SendPongMessage is the a goroutine to periodcally send pong message to all peers
+func (node *Node) SendPongMessage() {
+	tick := time.NewTicker(10 * time.Second)
+	numPeers := len(node.Consensus.GetValidatorPeers())
+	numPubKeys := len(node.Consensus.PublicKeys)
+	sentMessage := false
+
+	// Send Pong Message only when there is change on the number of peers
+	for {
+		select {
+		case <-tick.C:
+			peers := node.Consensus.GetValidatorPeers()
+			numPeersNow := len(peers)
+			numPubKeysNow := len(node.Consensus.PublicKeys)
+
+			// no peers, wait for another tick
+			if numPeersNow == 0 || numPubKeysNow == 0 {
+				continue
+			}
+			// new peers added
+			if numPubKeysNow != numPubKeys || numPeersNow != numPeers {
+				sentMessage = false
+			} else {
+				// stable number of peers/pubkeys, sent the pong message
+				if !sentMessage {
+					pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys)
+					buffer := pong.ConstructPongMessage()
+					content := host.ConstructP2pMessage(byte(0), buffer)
+					err := node.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, content)
+					if err != nil {
+						utils.GetLogInstance().Error("[PONG] failed to send pong message", "group", p2p.GroupIDBeacon)
+						continue
+					} else {
+						utils.GetLogInstance().Info("[PONG] sent pong message to", "group", p2p.GroupIDBeacon)
+					}
+					sentMessage = true
+				}
+			}
+			numPeers = numPeersNow
+			numPubKeys = numPubKeysNow
+		}
+	}
 }
 
 func (node *Node) pongMessageHandler(msgPayload []byte) int {
