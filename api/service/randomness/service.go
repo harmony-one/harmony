@@ -28,6 +28,11 @@ func (s *Service) StartService() {
 
 // Init initializes randomness generation.
 func (s *Service) Init() {
+	for {
+		newBlock := <-s.DRand.ConfirmedBlockChannel
+		_ = newBlock
+		// TODO: process newBlock
+	}
 }
 
 // Run runs randomness generation.

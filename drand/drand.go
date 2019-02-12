@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/harmony-one/harmony/core/types"
+
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	drand_proto "github.com/harmony-one/harmony/api/drand"
@@ -17,10 +19,11 @@ import (
 
 // DRand is the main struct which contains state for the distributed randomness protocol.
 type DRand struct {
-	vrfs   *map[uint32][]byte
-	bitmap *bls_cosi.Mask
-	pRand  *[32]byte
-	rand   *[32]byte
+	vrfs                  *map[uint32][]byte
+	bitmap                *bls_cosi.Mask
+	pRand                 *[32]byte
+	rand                  *[32]byte
+	ConfirmedBlockChannel chan *types.Block // Channel for confirmed blocks
 
 	// map of nodeID to validator Peer object
 	// FIXME: should use PubKey of p2p.Peer as the hashkey
@@ -53,9 +56,13 @@ type DRand struct {
 }
 
 // New creates a new dRand object
-func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *DRand {
+func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer, confirmedBlockChannel chan *types.Block) *DRand {
 	dRand := DRand{}
 	dRand.host = host
+
+	if confirmedBlockChannel != nil {
+		dRand.ConfirmedBlockChannel = confirmedBlockChannel
+	}
 
 	selfPeer := host.GetSelfPeer()
 	if leader.Port == selfPeer.Port && leader.IP == selfPeer.IP {

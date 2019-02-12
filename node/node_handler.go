@@ -241,6 +241,12 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 	}
 
 	node.AddNewBlock(newBlock)
+
+	if node.Role == BeaconLeader && node.DRand != nil {
+		go func() {
+			node.ConfirmedBlockChannel <- newBlock
+		}()
+	}
 }
 
 // AddNewBlock is usedd to add new block into the blockchain.

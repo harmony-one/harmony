@@ -119,7 +119,8 @@ type syncConfig struct {
 // Node represents a protocol-participating node in the network
 type Node struct {
 	Consensus              *bft.Consensus       // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
-	BlockChannel           chan *types.Block    // The channel to receive new blocks from Node
+	BlockChannel           chan *types.Block    // The channel to send newly proposed blocks
+	ConfirmedBlockChannel  chan *types.Block    // The channel to send confirmed blocks
 	pendingTransactions    types.Transactions   // All the transactions received but not yet processed for Consensus
 	transactionInConsensus []*types.Transaction // The transactions selected into the new block and under Consensus process
 	pendingTxMutex         sync.Mutex
@@ -266,6 +267,7 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 		chain, _ := core.NewBlockChain(database, nil, gspec.Config, node.Consensus, vm.Config{}, nil)
 		node.blockchain = chain
 		node.BlockChannel = make(chan *types.Block)
+		node.ConfirmedBlockChannel = make(chan *types.Block)
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, params.TestChainConfig, chain)
 		node.Worker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey), node.Consensus.ShardID)
 		node.AddFaucetContractToPendingTransactions()

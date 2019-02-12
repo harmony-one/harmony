@@ -16,7 +16,7 @@ func TestConstructInitMessage(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	dRand := New(host, "0", []p2p.Peer{leader, validator}, leader)
+	dRand := New(host, "0", []p2p.Peer{leader, validator}, leader, nil)
 	dRand.blockHash = [32]byte{}
 	msg := dRand.constructInitMessage()
 

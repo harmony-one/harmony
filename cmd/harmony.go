@@ -248,7 +248,7 @@ func main() {
 		}
 
 		// Add randomness protocol
-		dRand := drand.New(host, shardID, peers, leader)
+		dRand := drand.New(host, shardID, peers, leader, currentNode.ConfirmedBlockChannel)
 		currentNode.DRand = dRand
 	} else {
 		if role == "leader" {
