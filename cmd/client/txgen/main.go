@@ -72,7 +72,7 @@ func main() {
 
 	var bcPeer *p2p.Peer
 	var shardIDLeaderMap map[uint32]p2p.Peer
-	priKey, err := utils.LoadKeyFromFile(*keyFile)
+	priKey, _, err := utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
 		panic(err)
 	}

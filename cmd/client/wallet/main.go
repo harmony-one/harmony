@@ -129,14 +129,14 @@ func processNewCommnad() {
 		panic("Failed to generate the private key")
 	}
 	storePrivateKey(crypto2.FromECDSA(priKey))
-	fmt.Printf("New account created with address:\n    {%s}\n", crypto2.PubkeyToAddress(priKey.PublicKey).Hex())
-	fmt.Printf("Please keep a copy of the private key:\n    {%s}\n", hex.EncodeToString(crypto2.FromECDSA(priKey)))
+	fmt.Printf("New account created with address:{%s}\n", crypto2.PubkeyToAddress(priKey.PublicKey).Hex())
+	fmt.Printf("Please keep a copy of the private key:{%s}\n", hex.EncodeToString(crypto2.FromECDSA(priKey)))
 }
 
 func processListCommand() {
 	for i, key := range readPrivateKeys() {
-		fmt.Printf("Account %d:\n  {%s}\n", i, crypto2.PubkeyToAddress(key.PublicKey).Hex())
-		fmt.Printf("    PrivateKey: {%s}\n", hex.EncodeToString(key.D.Bytes()))
+		fmt.Printf("Account %d:{%s}\n", i, crypto2.PubkeyToAddress(key.PublicKey).Hex())
+		fmt.Printf("    PrivateKey:{%s}\n", hex.EncodeToString(key.D.Bytes()))
 	}
 }
 

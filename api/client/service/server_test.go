@@ -33,7 +33,7 @@ func TestGetFreeToken(test *testing.T) {
 		return nil, nil
 	}, func(common.Address) common.Hash {
 		return hash
-	})
+	}, nil)
 
 	testBankKey, _ := crypto.GenerateKey()
 	testBankAddress := crypto.PubkeyToAddress(testBankKey.PublicKey)
@@ -67,7 +67,7 @@ func TestFetchAccountState(test *testing.T) {
 		return chain.State()
 	}, func(common.Address) common.Hash {
 		return hash
-	})
+	}, nil)
 
 	response, err := server.FetchAccountState(nil, &client.FetchAccountStateRequest{Address: testBankAddress.Bytes()})
 
