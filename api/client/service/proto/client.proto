@@ -44,7 +44,7 @@ message StakingContractInfoRequest {
 // StakingContractInfoResponse is the response of GetStakingContractInfo.
 message StakingContractInfoResponse {
   // Contract address.
-  string conctract_address = 1;
+  string contract_address = 1;
   // The balance of the staking account.
   bytes balance = 2;
   // The nonce of the staking account.

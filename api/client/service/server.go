@@ -47,9 +47,9 @@ func (s *Server) GetStakingContractInfo(ctx context.Context, request *proto.Stak
 		return nil, err
 	}
 	return &proto.StakingContractInfoResponse{
-		ConctractAddress: s.getDeployedStakingContractAddress().Hex(),
-		Balance:          state.GetBalance(address).Bytes(),
-		Nonce:            state.GetNonce(address),
+		ContractAddress: s.getDeployedStakingContractAddress().Hex(),
+		Balance:         state.GetBalance(address).Bytes(),
+		Nonce:           state.GetNonce(address),
 	}, nil
 }
 
