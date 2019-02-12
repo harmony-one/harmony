@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/drand"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -28,6 +30,7 @@ import (
 	"github.com/harmony-one/harmony/api/service/discovery"
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/api/service/networkinfo"
+	randomness_service "github.com/harmony-one/harmony/api/service/randomness"
 	"github.com/harmony-one/harmony/api/service/staking"
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
@@ -120,6 +123,7 @@ type Node struct {
 	pendingTransactions    types.Transactions   // All the transactions received but not yet processed for Consensus
 	transactionInConsensus []*types.Transaction // The transactions selected into the new block and under Consensus process
 	pendingTxMutex         sync.Mutex
+	DRand                  *drand.DRand // The instance for distributed randomness protocol
 
 	blockchain *core.BlockChain   // The blockchain for the shard where this node belongs
 	db         *ethdb.LDBDatabase // LevelDB to store blockchain.
@@ -620,6 +624,8 @@ func (node *Node) setupForBeaconLeader() {
 	node.serviceManager.RegisterService(service_manager.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReady))
 	// Register client support service.
 	node.serviceManager.RegisterService(service_manager.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.SelfPeer.IP, node.SelfPeer.Port))
+	// Register randomness service
+	node.serviceManager.RegisterService(service_manager.Randomness, randomness_service.New(node.DRand))
 }
 
 func (node *Node) setupForBeaconValidator() {

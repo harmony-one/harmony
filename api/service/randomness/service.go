@@ -1,21 +1,23 @@
-package randgen
+package randomness
 
 import (
+	"github.com/harmony-one/harmony/drand"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
-// Service is the random generation service.
+// Service is the randomness generation service.
 type Service struct {
 	stopChan    chan struct{}
 	stoppedChan chan struct{}
+	DRand       *drand.DRand
 }
 
-// New returns random generation service.
-func New() *Service {
-	return &Service{}
+// New returns randomness generation service.
+func New(dRand *drand.DRand) *Service {
+	return &Service{DRand: dRand}
 }
 
-// StartService starts random generation service.
+// StartService starts randomness generation service.
 func (s *Service) StartService() {
 	s.stopChan = make(chan struct{})
 	s.stoppedChan = make(chan struct{})
@@ -24,11 +26,11 @@ func (s *Service) StartService() {
 	s.Run(s.stopChan, s.stoppedChan)
 }
 
-// Init initializes random generation.
+// Init initializes randomness generation.
 func (s *Service) Init() {
 }
 
-// Run runs random generation.
+// Run runs randomness generation.
 func (s *Service) Run(stopChan chan struct{}, stoppedChan chan struct{}) {
 	go func() {
 		defer close(stoppedChan)
@@ -45,12 +47,12 @@ func (s *Service) Run(stopChan chan struct{}, stoppedChan chan struct{}) {
 	}()
 }
 
-// DoRandomGeneration does random generation.
+// DoRandomGeneration does rarandomnessndom generation.
 func (s *Service) DoRandomGeneration() {
 
 }
 
-// StopService stops random generation service.
+// StopService stops randomness generation service.
 func (s *Service) StopService() {
 	utils.GetLogInstance().Info("Stopping random generation service.")
 	s.stopChan <- struct{}{}

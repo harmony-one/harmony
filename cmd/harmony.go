@@ -9,6 +9,8 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/harmony-one/harmony/drand"
+
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/consensus"
@@ -244,6 +246,10 @@ func main() {
 		} else {
 			currentNode.Role = node.BeaconValidator
 		}
+
+		// Add randomness protocol
+		dRand := drand.New(host, shardID, peers, leader)
+		currentNode.DRand = dRand
 	} else {
 		if role == "leader" {
 			currentNode.Role = node.ShardLeader
