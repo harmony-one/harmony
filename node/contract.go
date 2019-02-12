@@ -36,7 +36,8 @@ func (node *Node) AddStakingContractToPendingTransactions() {
 	dataEnc := common.FromHex(StakingContractBinary)
 	// Unsigned transaction to avoid the case of transaction address.
 	mycontracttx, _ := types.SignTx(types.NewContractCreation(uint64(0), node.Consensus.ShardID, contractFunds, params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, priKey)
-	node.StakingContractAddress = crypto.CreateAddress(contractAddress, uint64(0))
+	//node.StakingContractAddress = crypto.CreateAddress(contractAddress, uint64(0))
+	node.StakingContractAddress = node.getDeployedStakingContract(mycontracttx, contractAddress)
 	node.addPendingTransactions(types.Transactions{mycontracttx})
 }
 
@@ -50,8 +51,6 @@ func (node *Node) CreateStakingWithdrawTransaction(stake string) (*types.Transac
 		log.Error("Failed to get chain state", "Error", err)
 	}
 	nonce := state.GetNonce(crypto.PubkeyToAddress(DepositContractPriKey.PublicKey))
-	//callingFunction := "0x2e1a7d4d"
-
 	//Following: https://github.com/miguelmota/ethereum-development-with-go-book/blob/master/code/transfer_tokens.go
 	withdrawFnSignature := []byte("withdraw(uint)")
 	hash := sha3.NewLegacyKeccak256()

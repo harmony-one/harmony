@@ -160,7 +160,7 @@ type Node struct {
 	serviceManager *service_manager.Manager
 
 	//Staked Accounts and Contract
-	CurrentStakes          map[common.Address]int64
+	CurrentStakes          map[common.Address]int64 //This will save the latest information about staked nodes.
 	StakingContractAddress common.Address
 	WithdrawStakeFunc      []byte
 
@@ -259,7 +259,7 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 		node.Worker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey), node.Consensus.ShardID)
 		node.AddFaucetContractToPendingTransactions()
 		if node.Role == BeaconLeader {
-			node.AddStakingContractToPendingTransactions()
+			node.AddStakingContractToPendingTransactions() //This will save the latest information about staked nodes in current staked
 			node.DepositToFakeAccounts()
 		}
 		if node.Role == BeaconLeader || node.Role == BeaconValidator {
@@ -289,7 +289,7 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 //(Refer: https://solidity.readthedocs.io/en/v0.5.3/introduction-to-smart-contracts.html#index-8)
 // Then we can (re)create the deployed address. Trivially, this is 0 for us.
 // The deployed contract address can also be obtained via the receipt of the contract creating transaction.
-func (node *Node) getDeployedStakingContract(mycontracttx types.Transaction, contractAddress common.Address) common.Address {
+func (node *Node) getDeployedStakingContract(mycontracttx *types.Transaction, contractAddress common.Address) common.Address {
 	//Ideally we send the transaction to
 
 	//Correct Way 1:
