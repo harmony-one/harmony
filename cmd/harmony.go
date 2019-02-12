@@ -269,6 +269,9 @@ func main() {
 			go currentNode.JoinShard(leader)
 		}
 	} else {
+		if consensus.IsLeader {
+			go currentNode.SendPongMessage()
+		}
 		currentNode.UseLibP2P = true
 	}
 
