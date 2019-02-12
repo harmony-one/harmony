@@ -642,6 +642,8 @@ func (node *Node) setupForBeaconValidator() {
 	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, "0", chanPeer, nil))
 	// Register networkinfo service. "0" is the beacon shard ID
 	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, "0", chanPeer))
+	// Register randomness service
+	node.serviceManager.RegisterService(service_manager.Randomness, randomness_service.New(node.DRand))
 }
 
 func (node *Node) setupForNewNode() {
