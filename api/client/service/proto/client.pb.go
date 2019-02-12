@@ -195,32 +195,139 @@ func (m *GetFreeTokenResponse) GetTxId() []byte {
 	return nil
 }
 
+// StakingContractInfoRequest is the request to necessary info for stkaing.
+type StakingContractInfoRequest struct {
+	// The account address
+	Address              []byte   `protobuf:"bytes,1,opt,name=address,proto3" json:"address,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *StakingContractInfoRequest) Reset()         { *m = StakingContractInfoRequest{} }
+func (m *StakingContractInfoRequest) String() string { return proto.CompactTextString(m) }
+func (*StakingContractInfoRequest) ProtoMessage()    {}
+func (*StakingContractInfoRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_014de31d7ac8c57c, []int{4}
+}
+
+func (m *StakingContractInfoRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_StakingContractInfoRequest.Unmarshal(m, b)
+}
+func (m *StakingContractInfoRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_StakingContractInfoRequest.Marshal(b, m, deterministic)
+}
+func (m *StakingContractInfoRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_StakingContractInfoRequest.Merge(m, src)
+}
+func (m *StakingContractInfoRequest) XXX_Size() int {
+	return xxx_messageInfo_StakingContractInfoRequest.Size(m)
+}
+func (m *StakingContractInfoRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_StakingContractInfoRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_StakingContractInfoRequest proto.InternalMessageInfo
+
+func (m *StakingContractInfoRequest) GetAddress() []byte {
+	if m != nil {
+		return m.Address
+	}
+	return nil
+}
+
+// StakingContractInfoResponse is the response of GetStakingContractInfo.
+type StakingContractInfoResponse struct {
+	// Contract address.
+	ConctractAddress string `protobuf:"bytes,1,opt,name=conctract_address,json=conctractAddress,proto3" json:"conctract_address,omitempty"`
+	// The balance of the staking account.
+	Balance []byte `protobuf:"bytes,2,opt,name=balance,proto3" json:"balance,omitempty"`
+	// The nonce of the staking account.
+	Nonce                uint64   `protobuf:"varint,3,opt,name=nonce,proto3" json:"nonce,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *StakingContractInfoResponse) Reset()         { *m = StakingContractInfoResponse{} }
+func (m *StakingContractInfoResponse) String() string { return proto.CompactTextString(m) }
+func (*StakingContractInfoResponse) ProtoMessage()    {}
+func (*StakingContractInfoResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_014de31d7ac8c57c, []int{5}
+}
+
+func (m *StakingContractInfoResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_StakingContractInfoResponse.Unmarshal(m, b)
+}
+func (m *StakingContractInfoResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_StakingContractInfoResponse.Marshal(b, m, deterministic)
+}
+func (m *StakingContractInfoResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_StakingContractInfoResponse.Merge(m, src)
+}
+func (m *StakingContractInfoResponse) XXX_Size() int {
+	return xxx_messageInfo_StakingContractInfoResponse.Size(m)
+}
+func (m *StakingContractInfoResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_StakingContractInfoResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_StakingContractInfoResponse proto.InternalMessageInfo
+
+func (m *StakingContractInfoResponse) GetConctractAddress() string {
+	if m != nil {
+		return m.ConctractAddress
+	}
+	return ""
+}
+
+func (m *StakingContractInfoResponse) GetBalance() []byte {
+	if m != nil {
+		return m.Balance
+	}
+	return nil
+}
+
+func (m *StakingContractInfoResponse) GetNonce() uint64 {
+	if m != nil {
+		return m.Nonce
+	}
+	return 0
+}
+
 func init() {
 	proto.RegisterType((*FetchAccountStateRequest)(nil), "client.FetchAccountStateRequest")
 	proto.RegisterType((*FetchAccountStateResponse)(nil), "client.FetchAccountStateResponse")
 	proto.RegisterType((*GetFreeTokenRequest)(nil), "client.GetFreeTokenRequest")
 	proto.RegisterType((*GetFreeTokenResponse)(nil), "client.GetFreeTokenResponse")
+	proto.RegisterType((*StakingContractInfoRequest)(nil), "client.StakingContractInfoRequest")
+	proto.RegisterType((*StakingContractInfoResponse)(nil), "client.StakingContractInfoResponse")
 }
 
 func init() { proto.RegisterFile("client.proto", fileDescriptor_014de31d7ac8c57c) }
 
 var fileDescriptor_014de31d7ac8c57c = []byte{
-	// 229 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xe2, 0x49, 0xce, 0xc9, 0x4c,
-	0xcd, 0x2b, 0xd1, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0x62, 0x83, 0xf0, 0x94, 0x4c, 0xb8, 0x24,
-	0xdc, 0x52, 0x4b, 0x92, 0x33, 0x1c, 0x93, 0x93, 0xf3, 0x4b, 0xf3, 0x4a, 0x82, 0x4b, 0x12, 0x4b,
-	0x52, 0x83, 0x52, 0x0b, 0x4b, 0x53, 0x8b, 0x4b, 0x84, 0x24, 0xb8, 0xd8, 0x13, 0x53, 0x52, 0x8a,
-	0x52, 0x8b, 0x8b, 0x25, 0x18, 0x15, 0x18, 0x35, 0x78, 0x82, 0x60, 0x5c, 0x25, 0x6f, 0x2e, 0x49,
-	0x2c, 0xba, 0x8a, 0x0b, 0xf2, 0xf3, 0x8a, 0x53, 0x41, 0xda, 0x92, 0x12, 0x73, 0x12, 0xf3, 0x92,
-	0x53, 0x61, 0xda, 0xa0, 0x5c, 0x21, 0x11, 0x2e, 0xd6, 0xbc, 0x7c, 0x90, 0x38, 0x93, 0x02, 0xa3,
-	0x06, 0x4b, 0x10, 0x84, 0xa3, 0xa4, 0xcf, 0x25, 0xec, 0x9e, 0x5a, 0xe2, 0x56, 0x94, 0x9a, 0x1a,
-	0x92, 0x9f, 0x9d, 0x9a, 0x47, 0xd8, 0x76, 0x2d, 0x2e, 0x11, 0x54, 0x0d, 0x50, 0x8b, 0x85, 0xb8,
-	0x58, 0x4a, 0x2a, 0x3c, 0x53, 0xa0, 0xca, 0xc1, 0x6c, 0xa3, 0x1d, 0x8c, 0x5c, 0xbc, 0xce, 0x60,
-	0xaf, 0x06, 0xa7, 0x16, 0x95, 0x65, 0x26, 0xa7, 0x0a, 0x45, 0x71, 0x09, 0x62, 0xb8, 0x5d, 0x48,
-	0x41, 0x0f, 0x1a, 0x3a, 0xb8, 0x02, 0x43, 0x4a, 0x11, 0x8f, 0x0a, 0x88, 0xfd, 0x4a, 0x0c, 0x42,
-	0xde, 0x5c, 0x3c, 0xc8, 0x2e, 0x13, 0x92, 0x86, 0x69, 0xc2, 0xe2, 0x41, 0x29, 0x19, 0xec, 0x92,
-	0x30, 0xc3, 0x92, 0xd8, 0xc0, 0x31, 0x65, 0x0c, 0x08, 0x00, 0x00, 0xff, 0xff, 0xc6, 0xd9, 0x35,
-	0x0c, 0xb9, 0x01, 0x00, 0x00,
+	// 305 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x84, 0x92, 0x4f, 0x4b, 0xc3, 0x40,
+	0x10, 0xc5, 0x6d, 0xac, 0x15, 0x87, 0x08, 0x76, 0x2d, 0x12, 0x53, 0x0f, 0x71, 0xbd, 0x14, 0x85,
+	0x0a, 0x2a, 0xde, 0x4b, 0xa1, 0xa5, 0xf4, 0x96, 0x78, 0xf2, 0x22, 0xdb, 0xcd, 0xa8, 0xa1, 0x65,
+	0xb6, 0x26, 0x53, 0x11, 0xbf, 0x8b, 0xdf, 0x55, 0x9a, 0x3f, 0x25, 0x62, 0xd2, 0xde, 0xf2, 0x76,
+	0xe6, 0xb7, 0x8f, 0xbc, 0xb7, 0x60, 0xeb, 0x45, 0x84, 0xc4, 0xfd, 0x65, 0x6c, 0xd8, 0x88, 0x56,
+	0xa6, 0xe4, 0x03, 0x38, 0x23, 0x64, 0xfd, 0x3e, 0xd0, 0xda, 0xac, 0x88, 0x03, 0x56, 0x8c, 0x3e,
+	0x7e, 0xac, 0x30, 0x61, 0xe1, 0xc0, 0xa1, 0x0a, 0xc3, 0x18, 0x93, 0xc4, 0x69, 0x78, 0x8d, 0x9e,
+	0xed, 0x17, 0x52, 0x4e, 0xe1, 0xbc, 0x82, 0x4a, 0x96, 0x86, 0x12, 0x5c, 0x63, 0x33, 0xb5, 0x50,
+	0xa4, 0xb1, 0xc0, 0x72, 0x29, 0x3a, 0x70, 0x40, 0x66, 0x7d, 0x6e, 0x79, 0x8d, 0x5e, 0xd3, 0xcf,
+	0x84, 0xbc, 0x85, 0xd3, 0x31, 0xf2, 0x28, 0x46, 0x7c, 0x32, 0x73, 0xa4, 0xdd, 0xee, 0xd7, 0xd0,
+	0xf9, 0x0b, 0xe4, 0xc6, 0x02, 0x9a, 0xfc, 0x35, 0x09, 0xf3, 0xf5, 0xf4, 0x5b, 0x3e, 0x82, 0x1b,
+	0xb0, 0x9a, 0x47, 0xf4, 0x36, 0x34, 0xc4, 0xb1, 0xd2, 0x3c, 0xa1, 0x57, 0xb3, 0xdb, 0xe3, 0x1b,
+	0xba, 0x95, 0x5c, 0x6e, 0x75, 0x03, 0x6d, 0x6d, 0x48, 0xa7, 0x83, 0x97, 0xf2, 0x15, 0x47, 0xfe,
+	0xc9, 0x66, 0x30, 0xc8, 0xce, 0xcb, 0x81, 0x58, 0x35, 0x81, 0xec, 0x97, 0x02, 0xb9, 0xfb, 0xb1,
+	0xe0, 0x78, 0x98, 0xd6, 0x13, 0x60, 0xfc, 0x19, 0x69, 0x14, 0xcf, 0xd0, 0xfe, 0x97, 0xb7, 0xf0,
+	0xfa, 0x79, 0xa3, 0x75, 0x05, 0xba, 0x97, 0x5b, 0x36, 0xb2, 0x1f, 0x91, 0x7b, 0x62, 0x0a, 0x76,
+	0x39, 0x4d, 0xd1, 0x2d, 0xa0, 0x8a, 0x52, 0xdc, 0x8b, 0xea, 0xe1, 0xe6, 0x32, 0x0d, 0x67, 0x63,
+	0xe4, 0x8a, 0xe4, 0x84, 0x2c, 0xc8, 0xfa, 0x3a, 0xdc, 0xab, 0xad, 0x3b, 0x85, 0xc9, 0xac, 0x95,
+	0x3e, 0xe1, 0xfb, 0xdf, 0x00, 0x00, 0x00, 0xff, 0xff, 0xa2, 0x16, 0x0e, 0x6f, 0xd2, 0x02, 0x00,
+	0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -237,6 +344,7 @@ const _ = grpc.SupportPackageIsVersion4
 type ClientServiceClient interface {
 	FetchAccountState(ctx context.Context, in *FetchAccountStateRequest, opts ...grpc.CallOption) (*FetchAccountStateResponse, error)
 	GetFreeToken(ctx context.Context, in *GetFreeTokenRequest, opts ...grpc.CallOption) (*GetFreeTokenResponse, error)
+	GetStakingContractInfo(ctx context.Context, in *StakingContractInfoRequest, opts ...grpc.CallOption) (*StakingContractInfoResponse, error)
 }
 
 type clientServiceClient struct {
@@ -265,10 +373,20 @@ func (c *clientServiceClient) GetFreeToken(ctx context.Context, in *GetFreeToken
 	return out, nil
 }
 
+func (c *clientServiceClient) GetStakingContractInfo(ctx context.Context, in *StakingContractInfoRequest, opts ...grpc.CallOption) (*StakingContractInfoResponse, error) {
+	out := new(StakingContractInfoResponse)
+	err := c.cc.Invoke(ctx, "/client.ClientService/GetStakingContractInfo", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ClientServiceServer is the server API for ClientService service.
 type ClientServiceServer interface {
 	FetchAccountState(context.Context, *FetchAccountStateRequest) (*FetchAccountStateResponse, error)
 	GetFreeToken(context.Context, *GetFreeTokenRequest) (*GetFreeTokenResponse, error)
+	GetStakingContractInfo(context.Context, *StakingContractInfoRequest) (*StakingContractInfoResponse, error)
 }
 
 func RegisterClientServiceServer(s *grpc.Server, srv ClientServiceServer) {
@@ -311,6 +429,24 @@ func _ClientService_GetFreeToken_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ClientService_GetStakingContractInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StakingContractInfoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ClientServiceServer).GetStakingContractInfo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/client.ClientService/GetStakingContractInfo",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ClientServiceServer).GetStakingContractInfo(ctx, req.(*StakingContractInfoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _ClientService_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "client.ClientService",
 	HandlerType: (*ClientServiceServer)(nil),
@@ -322,6 +458,10 @@ var _ClientService_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetFreeToken",
 			Handler:    _ClientService_GetFreeToken_Handler,
+		},
+		{
+			MethodName: "GetStakingContractInfo",
+			Handler:    _ClientService_GetStakingContractInfo_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
