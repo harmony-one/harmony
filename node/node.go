@@ -286,8 +286,9 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 }
 
 func (node *Node) getDeployedStakingContractAddress() common.Address {
-	retrun node.StakingContractAddress
+	return node.StakingContractAddress
 }
+
 //In order to get the deployed contract address of a contract, we need to find the nonce of the address that created it.
 //(Refer: https://solidity.readthedocs.io/en/v0.5.3/introduction-to-smart-contracts.html#index-8)
 // Then we can (re)create the deployed address. Trivially, this is 0 for us.
