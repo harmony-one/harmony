@@ -23,9 +23,15 @@ type Service struct {
 }
 
 // New returns new client support service.
-func New(stateReader func() (*state.DB, error), callFaucetContract func(common.Address) common.Hash, ip, nodePort string) *Service {
+func New(stateReader func() (*state.DB, error),
+	callFaucetContract func(common.Address) common.Hash,
+	getDeployedStakingContract func() common.Address,
+	ip, nodePort string) *Service {
 	port, _ := strconv.Atoi(nodePort)
-	return &Service{server: clientService.NewServer(stateReader, callFaucetContract), ip: ip, port: strconv.Itoa(port + ClientServicePortDiff)}
+	return &Service{
+		server: clientService.NewServer(stateReader, callFaucetContract, getDeployedStakingContract),
+		ip:     ip,
+		port:   strconv.Itoa(port + ClientServicePortDiff)}
 }
 
 // StartService starts client support service.

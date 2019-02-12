@@ -4,11 +4,10 @@ import (
 	"crypto/ecdsa"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/params"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/params"
 	client "github.com/harmony-one/harmony/api/client/service"
 	proto "github.com/harmony-one/harmony/api/client/service/proto"
 	"github.com/harmony-one/harmony/api/proto/message"
@@ -76,17 +75,17 @@ func (s *Service) DoService(peer p2p.Peer) {
 	// See below of how to create a staking message.
 }
 
-func (s *Service) getAccountState(beaconPeer p2p.Peer) *proto.FetchAccountStateResponse {
+func (s *Service) getStakingInfo(beaconPeer p2p.Peer) *proto.StakingContractInfoResponse {
 	client := client.NewClient(beaconPeer.IP, beaconPeer.Port)
 	defer client.Close()
-	return client.GetBalance(crypto.PubkeyToAddress(s.accountKey.PublicKey))
+	return client.GetStakingContractInfo(crypto.PubkeyToAddress(s.accountKey.PublicKey))
 }
 
 func (s *Service) createStakingMessage(beaconPeer p2p.Peer) *message.Message {
-	accountState := s.getAccountState(beaconPeer)
-	toAddress := common.HexToAddress("0x4592d8f8d7b001e72cb26a73e4fa1806a51ac79d")
+	stakingInfo := s.getStakingInfo(beaconPeer)
+	toAddress := common.HexToAddress(stakingInfo.ContractAddress)
 	tx := types.NewTransaction(
-		accountState.Nonce,
+		stakingInfo.Nonce,
 		toAddress,
 		0, // beacon chain.
 		big.NewInt(s.stakingAmount),

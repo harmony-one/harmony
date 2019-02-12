@@ -28,22 +28,18 @@ func (s *Service) StartService() {
 
 // Init initializes randomness generation.
 func (s *Service) Init() {
-	for {
-		newBlock := <-s.DRand.ConfirmedBlockChannel
-		_ = newBlock
-		// TODO: process newBlock
-	}
 }
 
 // Run runs randomness generation.
 func (s *Service) Run(stopChan chan struct{}, stoppedChan chan struct{}) {
+	utils.GetLogInstance().Info("Running random generation")
 	go func() {
 		defer close(stoppedChan)
 		for {
 			select {
-			default:
-				utils.GetLogInstance().Info("Running random generation")
-				// Write some logic here.
+			case newBlock := <-s.DRand.ConfirmedBlockChannel:
+				_ = newBlock
+				utils.GetLogInstance().Debug("[RAND] Received New Block")
 				s.DoRandomGeneration()
 			case <-stopChan:
 				return

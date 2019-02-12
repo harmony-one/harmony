@@ -165,6 +165,11 @@ type Node struct {
 	// Service manager.
 	serviceManager *service_manager.Manager
 
+	//Staked Accounts and Contract
+	CurrentStakes          map[common.Address]int64 //This will save the latest information about staked nodes.
+	StakingContractAddress common.Address
+	WithdrawStakeFunc      []byte
+
 	//Node Account
 	AccountKey *ecdsa.PrivateKey
 	Address    common.Address
@@ -272,8 +277,11 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 		node.Worker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey), node.Consensus.ShardID)
 		node.AddFaucetContractToPendingTransactions()
 		if node.Role == BeaconLeader {
-			node.AddStakingContractToPendingTransactions()
+			node.AddStakingContractToPendingTransactions() //This will save the latest information about staked nodes in current staked
 			node.DepositToFakeAccounts()
+		}
+		if node.Role == BeaconLeader || node.Role == BeaconValidator {
+			node.CurrentStakes = make(map[common.Address]int64)
 		}
 		node.Consensus.ConsensusBlock = make(chan *bft.BFTBlockInfo)
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
@@ -296,6 +304,30 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 	go node.ReceiveGroupMessage()
 
 	return &node
+}
+
+func (node *Node) getDeployedStakingContract() common.Address {
+	return node.StakingContractAddress
+}
+
+//In order to get the deployed contract address of a contract, we need to find the nonce of the address that created it.
+//(Refer: https://solidity.readthedocs.io/en/v0.5.3/introduction-to-smart-contracts.html#index-8)
+// Then we can (re)create the deployed address. Trivially, this is 0 for us.
+// The deployed contract address can also be obtained via the receipt of the contract creating transaction.
+func (node *Node) generateDeployedStakingContractAddress(mycontracttx *types.Transaction, contractAddress common.Address) common.Address {
+	//Ideally we send the transaction to
+
+	//Correct Way 1:
+	//node.SendTx(mycontracttx)
+	//receipts := node.worker.GetCurrentReceipts()
+	//deployedcontractaddress = recepits[len(receipts)-1].ContractAddress //get the address from the receipt
+
+	//Correct Way 2:
+	//nonce := GetNonce(contractAddress)
+	//deployedAddress := crypto.CreateAddress(contractAddress, uint64(nonce))
+	//deployedcontractaddress = recepits[len(receipts)-1].ContractAddress //get the address from the receipt
+	nonce := 0
+	return crypto.CreateAddress(contractAddress, uint64(nonce))
 }
 
 // IsOutOfSync checks whether the node is out of sync by comparing latest block with consensus block
@@ -332,14 +364,14 @@ func (node *Node) DoSyncing() {
 			continue
 		case consensusBlockInfo := <-node.Consensus.ConsensusBlock:
 			if !node.IsOutOfSync(consensusBlockInfo) {
+				startHash := node.blockchain.CurrentBlock().Hash()
+				node.stateSync.StartStateSync(startHash[:], node.blockchain, node.Worker)
 				if node.State == NodeNotInSync {
 					utils.GetLogInstance().Info("[SYNC] Node is now IN SYNC!")
 				}
 				node.stateMutex.Lock()
 				node.State = NodeReadyForConsensus
 				node.stateMutex.Unlock()
-				// wait for last mile block finish; think a better way
-				time.Sleep(200 * time.Millisecond)
 				node.stateSync.CloseConnections()
 				node.stateSync = nil
 				continue
@@ -591,6 +623,53 @@ func (node *Node) RemovePeersHandler() {
 	}
 }
 
+//UpdateStakingList updates the stakes of every node.
+func (node *Node) UpdateStakingList(block *types.Block) error {
+	signerType := types.HomesteadSigner{}
+	txns := block.Transactions()
+	for i := range txns {
+		txn := txns[i]
+		value := txn.Value().Int64()
+		currentSender, _ := types.Sender(signerType, txn)
+		_, isPresent := node.CurrentStakes[currentSender]
+		toAddress := txn.To()
+		if *toAddress != node.StakingContractAddress { //Not a address aimed at the staking contract.
+			continue
+		}
+		//This should be based on a switch case on function signature.
+		//TODO (ak) https://github.com/harmony-one/harmony/issues/430
+		if value > int64(0) { //If value >0 means its a staking deposit transaction
+			if isPresent {
+				//This means this node has increaserd its stake
+				node.CurrentStakes[currentSender] += value
+			} else {
+				node.CurrentStakes[currentSender] = value
+			}
+		} else { //This means node has withdrawn stake.
+			getData := txn.Data()
+			value := decodeStakeCall(getData) //Value being withdrawn
+			if isPresent {
+				//This means this node has increaserd its stake
+				if node.CurrentStakes[currentSender] > value {
+					node.CurrentStakes[currentSender] -= value
+				} else if node.CurrentStakes[currentSender] == value {
+					delete(node.CurrentStakes, currentSender)
+				} else {
+					continue //Overdraft protection.
+				}
+			} else {
+				node.CurrentStakes[currentSender] = value
+			}
+		}
+	}
+	return nil
+}
+
+func decodeStakeCall(getData []byte) int64 {
+	value := new(big.Int)
+	value.SetBytes(getData[4:]) //Escape the method call.
+	return value.Int64()
+}
 func (node *Node) setupForShardLeader() {
 	// Register explorer service.
 	node.serviceManager.RegisterService(service_manager.SupportExplorer, explorer.New(&node.SelfPeer))
@@ -599,7 +678,7 @@ func (node *Node) setupForShardLeader() {
 	// Register new block service.
 	node.serviceManager.RegisterService(service_manager.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReady))
 	// Register client support service.
-	node.serviceManager.RegisterService(service_manager.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.SelfPeer.IP, node.SelfPeer.Port))
+	node.serviceManager.RegisterService(service_manager.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
 }
 
 func (node *Node) setupForShardValidator() {
@@ -625,9 +704,10 @@ func (node *Node) setupForBeaconLeader() {
 	// Register new block service.
 	node.serviceManager.RegisterService(service_manager.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReady))
 	// Register client support service.
-	node.serviceManager.RegisterService(service_manager.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.SelfPeer.IP, node.SelfPeer.Port))
+	node.serviceManager.RegisterService(service_manager.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
 	// Register randomness service
 	node.serviceManager.RegisterService(service_manager.Randomness, randomness_service.New(node.DRand))
+
 }
 
 func (node *Node) setupForBeaconValidator() {

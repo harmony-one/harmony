@@ -4,7 +4,6 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"math/big"
-	"strconv"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -13,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils/contract"
+	"golang.org/x/crypto/sha3"
 )
 
 // Constants related to smart contract.
@@ -36,12 +36,13 @@ func (node *Node) AddStakingContractToPendingTransactions() {
 	dataEnc := common.FromHex(StakingContractBinary)
 	// Unsigned transaction to avoid the case of transaction address.
 	mycontracttx, _ := types.SignTx(types.NewContractCreation(uint64(0), node.Consensus.ShardID, contractFunds, params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, priKey)
-	node.ContractAddresses = append(node.ContractAddresses, crypto.CreateAddress(contractAddress, uint64(0)))
+	//node.StakingContractAddress = crypto.CreateAddress(contractAddress, uint64(0))
+	node.StakingContractAddress = node.generateDeployedStakingContractAddress(mycontracttx, contractAddress)
 	node.addPendingTransactions(types.Transactions{mycontracttx})
 }
 
 //CreateStakingWithdrawTransaction creates a new withdraw stake transaction
-func (node *Node) CreateStakingWithdrawTransaction(stake int) (*types.Transaction, error) {
+func (node *Node) CreateStakingWithdrawTransaction(stake string) (*types.Transaction, error) {
 	//These should be read from somewhere.
 	DepositContractPriKey, _ := ecdsa.GenerateKey(crypto.S256(), strings.NewReader("Deposit Smart Contract Key")) //DepositContractPriKey is pk for contract
 	DepositContractAddress := crypto.PubkeyToAddress(DepositContractPriKey.PublicKey)                             //DepositContractAddress is the address for the contract
@@ -50,9 +51,19 @@ func (node *Node) CreateStakingWithdrawTransaction(stake int) (*types.Transactio
 		log.Error("Failed to get chain state", "Error", err)
 	}
 	nonce := state.GetNonce(crypto.PubkeyToAddress(DepositContractPriKey.PublicKey))
-	callingFunction := "0x2e1a7d4d"
-	contractData := callingFunction + hex.EncodeToString([]byte(strconv.Itoa(stake)))
-	dataEnc := common.FromHex(contractData)
+	//Following: https://github.com/miguelmota/ethereum-development-with-go-book/blob/master/code/transfer_tokens.go
+	withdrawFnSignature := []byte("withdraw(uint)")
+	hash := sha3.NewLegacyKeccak256()
+	hash.Write(withdrawFnSignature)
+	methodID := hash.Sum(nil)[:4]
+
+	amount := new(big.Int)
+	amount.SetString(stake, 10)
+	paddedAmount := common.LeftPadBytes(amount.Bytes(), 32)
+
+	var dataEnc []byte
+	dataEnc = append(dataEnc, methodID...)
+	dataEnc = append(dataEnc, paddedAmount...)
 	tx, err := types.SignTx(types.NewTransaction(nonce, DepositContractAddress, node.Consensus.ShardID, big.NewInt(0), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, node.AccountKey)
 	return tx, err
 }
