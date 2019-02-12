@@ -326,14 +326,14 @@ func (node *Node) DoSyncing() {
 			continue
 		case consensusBlockInfo := <-node.Consensus.ConsensusBlock:
 			if !node.IsOutOfSync(consensusBlockInfo) {
+				startHash := node.blockchain.CurrentBlock().Hash()
+				node.stateSync.StartStateSync(startHash[:], node.blockchain, node.Worker)
 				if node.State == NodeNotInSync {
 					utils.GetLogInstance().Info("[SYNC] Node is now IN SYNC!")
 				}
 				node.stateMutex.Lock()
 				node.State = NodeReadyForConsensus
 				node.stateMutex.Unlock()
-				// wait for last mile block finish; think a better way
-				time.Sleep(200 * time.Millisecond)
 				node.stateSync.CloseConnections()
 				node.stateSync = nil
 				continue
