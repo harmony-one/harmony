@@ -11,6 +11,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
+	peerstore "github.com/libp2p/go-libp2p-peerstore"
+	multiaddr "github.com/multiformats/go-multiaddr"
+
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/internal/attack"
 	pkg_newnode "github.com/harmony-one/harmony/internal/newnode"
@@ -19,8 +22,6 @@ import (
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
-	peerstore "github.com/libp2p/go-libp2p-peerstore"
-	multiaddr "github.com/multiformats/go-multiaddr"
 )
 
 var (
@@ -110,6 +111,9 @@ func main() {
 
 	// isLeader indicates this node is a beacon chain leader node during the bootstrap process
 	isLeader := flag.Bool("is_leader", false, "true means this node is a beacon chain leader node")
+
+	// logConn logs incoming/outgoing connections
+	logConn := flag.Bool("log_conn", false, "log incoming/outgoing connections")
 
 	flag.Parse()
 
@@ -211,6 +215,9 @@ func main() {
 	}
 
 	host, err := p2pimpl.NewHost(&selfPeer, nodePriKey)
+	if *logConn {
+		host.GetP2PHost().Network().Notify(utils.ConnLogger)
+	}
 	if err != nil {
 		panic("unable to new host in harmony")
 	}
