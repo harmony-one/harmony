@@ -46,7 +46,7 @@ func (node *Node) StreamHandler(s p2p.Stream) {
 		return
 	}
 
-	node.messageHandler(content)
+	node.messageHandler(content, "")
 }
 
 // ReceiveGroupMessage use libp2p pubsub mechanism to receive broadcast messages
@@ -62,14 +62,14 @@ func (node *Node) ReceiveGroupMessage() {
 			utils.GetLogInstance().Info("[PUBSUB]", "received group msg", len(msg), "sender", sender)
 			if err == nil {
 				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
-				node.messageHandler(msg[5:])
+				node.messageHandler(msg[5:], string(sender))
 			}
 		}
 	}
 }
 
 // messageHandler parses the message and dispatch the actions
-func (node *Node) messageHandler(content []byte) {
+func (node *Node) messageHandler(content []byte, sender string) {
 	node.MaybeBroadcastAsValidator(content)
 
 	consensusObj := node.Consensus
@@ -167,7 +167,7 @@ func (node *Node) messageHandler(content []byte) {
 				os.Exit(0)
 			}
 		case proto_node.PING:
-			node.pingMessageHandler(msgPayload)
+			node.pingMessageHandler(msgPayload, sender)
 		case proto_node.PONG:
 			node.pongMessageHandler(msgPayload)
 		}
@@ -253,7 +253,17 @@ func (node *Node) AddNewBlock(newBlock *types.Block) {
 	}
 }
 
-func (node *Node) pingMessageHandler(msgPayload []byte) int {
+func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
+	if sender != "" {
+		_, ok := node.duplicatedPing[sender]
+		if !ok {
+			node.duplicatedPing[sender] = true
+		} else {
+			// duplicated ping message return
+			return 0
+		}
+	}
+
 	ping, err := proto_discovery.GetPingMessage(msgPayload)
 	if err != nil {
 		utils.GetLogInstance().Error("Can't get Ping Message")
