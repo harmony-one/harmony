@@ -300,7 +300,7 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 	return &node
 }
 
-func (node *Node) getDeployedStakingContractAddress() common.Address {
+func (node *Node) getDeployedStakingContract() common.Address {
 	return node.StakingContractAddress
 }
 
