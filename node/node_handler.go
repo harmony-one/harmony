@@ -241,10 +241,12 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) bool {
 // 1. add the new block to blockchain
 // 2. [leader] send new block to the client
 func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
+	if node.Role == BeaconLeader || node.Role == BeaconValidator {
+		node.UpdateStakingList(newBlock)
+	}
 	if node.Consensus.IsLeader {
 		node.BroadcastNewBlock(newBlock)
 	}
-
 	node.AddNewBlock(newBlock)
 }
 
