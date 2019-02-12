@@ -285,11 +285,14 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 	return &node
 }
 
+func (node *Node) getDeployedStakingContractAddress() common.Address {
+	retrun node.StakingContractAddress
+}
 //In order to get the deployed contract address of a contract, we need to find the nonce of the address that created it.
 //(Refer: https://solidity.readthedocs.io/en/v0.5.3/introduction-to-smart-contracts.html#index-8)
 // Then we can (re)create the deployed address. Trivially, this is 0 for us.
 // The deployed contract address can also be obtained via the receipt of the contract creating transaction.
-func (node *Node) getDeployedStakingContract(mycontracttx *types.Transaction, contractAddress common.Address) common.Address {
+func (node *Node) generateDeployedStakingContractAddress(mycontracttx *types.Transaction, contractAddress common.Address) common.Address {
 	//Ideally we send the transaction to
 
 	//Correct Way 1:
@@ -611,6 +614,8 @@ func (node *Node) UpdateStakingList(block *types.Block) error {
 		if *toAddress != node.StakingContractAddress { //Not a address aimed at the staking contract.
 			continue
 		}
+		//This should be based on a switch case on function signature.
+		//TODO (ak) https://github.com/harmony-one/harmony/issues/430
 		if value > int64(0) { //If value >0 means its a staking deposit transaction
 			if isPresent {
 				//This means this node has increaserd its stake
