@@ -182,10 +182,6 @@ type Node struct {
 	// Group Message Receiver
 	groupReceiver p2p.GroupReceiver
 
-	// fully integrate with libp2p for networking
-	// FIXME: this is temporary hack until we can fully replace the old one
-	UseLibP2P bool
-
 	// Duplicated Ping Message Received
 	duplicatedPing map[string]bool
 }
@@ -219,7 +215,7 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int) types.Transactions {
 
 // StartServer starts a server and process the requests by a handler.
 func (node *Node) StartServer() {
-	if node.UseLibP2P {
+	if utils.UseLibP2P {
 		select {}
 	} else {
 		node.host.BindHandlerAndServe(node.StreamHandler)

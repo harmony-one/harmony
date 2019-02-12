@@ -59,7 +59,7 @@ func (node *Node) ReceiveGroupMessage() {
 		}
 		msg, sender, err := node.groupReceiver.Receive(ctx)
 		if sender != node.host.GetID() {
-			utils.GetLogInstance().Info("[PUBSUB]", "received group msg", len(msg), "sender", sender)
+			//			utils.GetLogInstance().Info("[PUBSUB]", "received group msg", len(msg), "sender", sender)
 			if err == nil {
 				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
 				node.messageHandler(msg[5:], string(sender))
@@ -229,7 +229,11 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 	if node.ClientPeer != nil {
 		utils.GetLogInstance().Debug("Sending new block to client", "client", node.ClientPeer)
-		node.SendMessage(*node.ClientPeer, proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock}))
+		if utils.UseLibP2P {
+			node.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock}))
+		} else {
+			node.SendMessage(*node.ClientPeer, proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock}))
+		}
 	}
 }
 
@@ -325,7 +329,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 	node.AddPeers([]*p2p.Peer{peer})
 
 	// This is the old way of broadcasting pong message
-	if node.Consensus.IsLeader && !node.UseLibP2P {
+	if node.Consensus.IsLeader && !utils.UseLibP2P {
 		peers := node.Consensus.GetValidatorPeers()
 		pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys)
 		buffer := pong.ConstructPongMessage()
