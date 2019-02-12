@@ -7,15 +7,16 @@ import (
 )
 
 // Constructs the init message
-func (drand *DRand) constructInitMessage() []byte {
+func (drand *DRand) constructCommitMessage(vrf [32]byte, proof []byte) []byte {
 	message := drand_proto.Message{}
-	message.Type = drand_proto.MessageType_INIT
+	message.Type = drand_proto.MessageType_COMMIT
 
 	message.BlockHash = drand.blockHash[:]
-	// Don't need the payload in init message
+	message.Payload = append(vrf[:], proof...)
+
 	marshaledMessage, err := drand.signAndMarshalDRandMessage(&message)
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to sign and marshal the init message", "error", err)
+		utils.GetLogInstance().Error("Failed to sign and marshal the commit message", "error", err)
 	}
 	return proto.ConstructDRandMessage(marshaledMessage)
 }

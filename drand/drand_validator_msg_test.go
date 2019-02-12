@@ -8,7 +8,7 @@ import (
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 )
 
-func TestConstructInitMessage(test *testing.T) {
+func TestConstructCommitMessage(test *testing.T) {
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "19999"}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "55555"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
@@ -18,9 +18,9 @@ func TestConstructInitMessage(test *testing.T) {
 	}
 	dRand := New(host, "0", []p2p.Peer{leader, validator}, leader)
 	dRand.blockHash = [32]byte{}
-	msg := dRand.constructInitMessage()
+	msg := dRand.constructCommitMessage([32]byte{}, []byte{})
 
-	if len(msg) != 87 {
-		test.Errorf("Init message is not constructed in the correct size: %d", len(msg))
+	if len(msg) != 121 {
+		test.Errorf("Commit message is not constructed in the correct size: %d", len(msg))
 	}
 }

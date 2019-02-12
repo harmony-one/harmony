@@ -218,8 +218,7 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Cons
 	return &consensus
 }
 
-// Checks the basic meta of a consensus message.
-//
+// Checks the basic meta of a consensus message, including the signature.
 func (consensus *Consensus) checkConsensusMessage(message consensus_proto.Message, publicKey *bls.PublicKey) error {
 	consensusID := message.ConsensusId
 	blockHash := message.BlockHash
