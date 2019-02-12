@@ -11,7 +11,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
-	net "github.com/libp2p/go-libp2p-net"
 	peerstore "github.com/libp2p/go-libp2p-peerstore"
 	multiaddr "github.com/multiformats/go-multiaddr"
 
@@ -78,50 +77,6 @@ func loggingInit(logFolder, role, ip, port string, onlyLogTps bool) {
 	}
 	log.Root().SetHandler(h)
 }
-
-type connLogger struct{}
-
-func (connLogger) Listen(net net.Network, ma multiaddr.Multiaddr) {
-	log.Debug("[CONNECTIONS] Listener starting", "net", net, "addr", ma)
-}
-
-func (connLogger) ListenClose(net net.Network, ma multiaddr.Multiaddr) {
-	log.Debug("[CONNECTIONS] Listener closing", "net", net, "addr", ma)
-}
-
-func (connLogger) Connected(net net.Network, conn net.Conn) {
-	log.Debug("[CONNECTIONS] Connected", "net", net,
-		"localPeer", conn.LocalPeer(), "localAddr", conn.LocalMultiaddr(),
-		"remotePeer", conn.RemotePeer(), "remoteAddr", conn.RemoteMultiaddr(),
-	)
-}
-
-func (connLogger) Disconnected(net net.Network, conn net.Conn) {
-	log.Debug("[CONNECTIONS] Disconnected", "net", net,
-		"localPeer", conn.LocalPeer(), "localAddr", conn.LocalMultiaddr(),
-		"remotePeer", conn.RemotePeer(), "remoteAddr", conn.RemoteMultiaddr(),
-	)
-}
-
-func (connLogger) OpenedStream(net net.Network, stream net.Stream) {
-	conn := stream.Conn()
-	log.Debug("[CONNECTIONS] Stream opened", "net", net,
-		"localPeer", conn.LocalPeer(), "localAddr", conn.LocalMultiaddr(),
-		"remotePeer", conn.RemotePeer(), "remoteAddr", conn.RemoteMultiaddr(),
-		"protocol", stream.Protocol(),
-	)
-}
-
-func (connLogger) ClosedStream(net net.Network, stream net.Stream) {
-	conn := stream.Conn()
-	log.Debug("[CONNECTIONS] Stream closed", "net", net,
-		"localPeer", conn.LocalPeer(), "localAddr", conn.LocalMultiaddr(),
-		"remotePeer", conn.RemotePeer(), "remoteAddr", conn.RemoteMultiaddr(),
-		"protocol", stream.Protocol(),
-	)
-}
-
-var theConnLogger connLogger
 
 func main() {
 	// TODO: use http://getmyipaddress.org/ or http://www.get-myip.com/ to retrieve my IP address
@@ -261,7 +216,7 @@ func main() {
 
 	host, err := p2pimpl.NewHost(&selfPeer, nodePriKey)
 	if *logConn {
-		host.GetP2PHost().Network().Notify(theConnLogger)
+		host.GetP2PHost().Network().Notify(utils.ConnLogger)
 	}
 	if err != nil {
 		panic("unable to new host in harmony")
