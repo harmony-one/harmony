@@ -71,7 +71,7 @@ func (node *Node) ReceiveGroupMessage() {
 
 // messageHandler parses the message and dispatch the actions
 func (node *Node) messageHandler(content []byte, sender string) {
-	node.MaybeBroadcastAsValidator(content)
+	//	node.MaybeBroadcastAsValidator(content)
 
 	consensusObj := node.Consensus
 
@@ -314,11 +314,13 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 		return -1
 	}
 
-	utils.GetLogInstance().Debug("[pingMessageHandler]", "incoming peer", peer)
+	//	utils.GetLogInstance().Debug("[pingMessageHandler]", "incoming peer", peer)
 
 	// add to incoming peer list
 	node.host.AddIncomingPeer(*peer)
-	node.host.ConnectHostPeer(*peer)
+	if utils.UseLibP2P {
+		node.host.ConnectHostPeer(*peer)
+	}
 
 	if ping.Node.Role == proto_node.ClientRole {
 		utils.GetLogInstance().Info("Add Client Peer to Node", "Node", node.Consensus.GetNodeID(), "Client", peer)
@@ -349,7 +351,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 		// FIXME: HAR-89 use a separate nodefind/neighbor message
 
 		host.BroadcastMessageFromLeader(node.GetHost(), peers, buffer, node.Consensus.OfflinePeers)
-		utils.GetLogInstance().Info("PingMsgHandler send pong message")
+		//		utils.GetLogInstance().Info("PingMsgHandler send pong message")
 	}
 
 	return 1
@@ -391,6 +393,8 @@ func (node *Node) SendPongMessage() {
 						utils.GetLogInstance().Info("[PONG] sent pong message to", "group", p2p.GroupIDBeacon)
 					}
 					sentMessage = true
+					// stop sending ping message
+					node.serviceManager.TakeAction(&service.Action{Action: service.Stop, ServiceType: service.PeerDiscovery})
 				}
 			}
 			numPeers = numPeersNow
@@ -424,8 +428,6 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		peers = append(peers, peer)
 	}
 
-	utils.GetLogInstance().Debug("[pongMessageHandler]", "received msg #peers", len(peers))
-
 	if len(peers) > 0 {
 		node.AddPeers(peers)
 	}
@@ -446,7 +448,7 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		publicKeys = append(publicKeys, &key)
 	}
 
-	utils.GetLogInstance().Debug("[pongMessageHandler]", "received msg #keys", len(publicKeys))
+	utils.GetLogInstance().Debug("[pongMessageHandler]", "#keys", len(publicKeys), "#peers", len(peers))
 
 	if node.State == NodeWaitToJoin {
 		node.State = NodeReadyForConsensus

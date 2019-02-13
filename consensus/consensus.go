@@ -379,7 +379,7 @@ func (consensus *Consensus) AddPeers(peers []*p2p.Peer) int {
 			consensus.pubKeyLock.Lock()
 			consensus.PublicKeys = append(consensus.PublicKeys, peer.PubKey)
 			consensus.pubKeyLock.Unlock()
-			utils.GetLogInstance().Debug("[SYNC]", "new peer added", peer)
+			//			utils.GetLogInstance().Debug("[SYNC]", "new peer added", peer)
 		}
 		count++
 	}
