@@ -6,28 +6,28 @@ import (
 	"testing"
 	"time"
 
+	libp2p_peer "github.com/libp2p/go-libp2p-peer"
+	ma "github.com/multiformats/go-multiaddr"
+
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
-
-	peer "github.com/libp2p/go-libp2p-peer"
-	multiaddr "github.com/multiformats/go-multiaddr"
 )
 
 func TestSendMessage(test *testing.T) {
 	peer1 := p2p.Peer{IP: "127.0.0.1", Port: "9000"}
-	selfAddr1, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", peer1.Port))
+	selfAddr1, _ := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", peer1.Port))
 	peer1.Addrs = append(peer1.Addrs, selfAddr1)
 	priKey1, pubKey1, _ := utils.GenKeyP2P(peer1.IP, peer1.Port)
-	peerID1, _ := peer.IDFromPublicKey(pubKey1)
+	peerID1, _ := libp2p_peer.IDFromPublicKey(pubKey1)
 	peer1.PeerID = peerID1
 	host1, _ := p2pimpl.NewHost(&peer1, priKey1)
 
 	peer2 := p2p.Peer{IP: "127.0.0.1", Port: "9001"}
-	selfAddr2, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", peer2.Port))
+	selfAddr2, _ := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", peer2.Port))
 	peer2.Addrs = append(peer2.Addrs, selfAddr2)
 	priKey2, pubKey2, _ := utils.GenKeyP2P(peer2.IP, peer2.Port)
-	peerID2, _ := peer.IDFromPublicKey(pubKey2)
+	peerID2, _ := libp2p_peer.IDFromPublicKey(pubKey2)
 	peer2.PeerID = peerID2
 	host2, _ := p2pimpl.NewHost(&peer2, priKey2)
 

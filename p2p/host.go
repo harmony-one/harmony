@@ -1,8 +1,8 @@
 package p2p
 
 import (
-	p2p_host "github.com/libp2p/go-libp2p-host"
-	peer "github.com/libp2p/go-libp2p-peer"
+	libp2p_host "github.com/libp2p/go-libp2p-host"
+	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 )
 
 //go:generate mockgen -source host.go -destination=host/mock/host_mock.go
@@ -14,8 +14,8 @@ type Host interface {
 	BindHandlerAndServe(handler StreamHandler)
 	Close() error
 	AddPeer(*Peer) error
-	GetID() peer.ID
-	GetP2PHost() p2p_host.Host
+	GetID() libp2p_peer.ID
+	GetP2PHost() libp2p_host.Host
 
 	AddIncomingPeer(Peer)
 	AddOutgoingPeer(Peer)

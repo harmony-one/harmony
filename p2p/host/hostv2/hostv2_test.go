@@ -7,11 +7,12 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/harmony-one/harmony/p2p"
-	mock "github.com/harmony-one/harmony/p2p/host/hostv2/mock"
-	peer "github.com/libp2p/go-libp2p-peer"
+	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	libp2p_pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
+
+	"github.com/harmony-one/harmony/p2p"
+	mock "github.com/harmony-one/harmony/p2p/host/hostv2/mock"
 )
 
 func TestHostV2_SendMessageToGroups(t *testing.T) {
@@ -58,7 +59,7 @@ func TestGroupReceiver_Close(t *testing.T) {
 	}
 }
 
-func pubsubMessage(from peer.ID, data []byte) *libp2p_pubsub.Message {
+func pubsubMessage(from libp2p_peer.ID, data []byte) *libp2p_pubsub.Message {
 	m := libp2p_pubsub_pb.Message{From: []byte(from), Data: data}
 	return &libp2p_pubsub.Message{Message: &m}
 }
@@ -74,7 +75,7 @@ func TestGroupReceiver_Receive(t *testing.T) {
 		sub.EXPECT().Next(ctx).Return(nil, errors.New("FIAL")),
 	)
 	receiver := GroupReceiverImpl{sub: sub}
-	verify := func(sender peer.ID, msg []byte, shouldError bool) {
+	verify := func(sender libp2p_peer.ID, msg []byte, shouldError bool) {
 		gotMsg, gotSender, err := receiver.Receive(ctx)
 		if (err != nil) != shouldError {
 			if shouldError {

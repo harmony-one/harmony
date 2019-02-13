@@ -13,12 +13,12 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 
 	libp2p "github.com/libp2p/go-libp2p"
-	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
-	p2p_host "github.com/libp2p/go-libp2p-host"
-	net "github.com/libp2p/go-libp2p-net"
-	peer "github.com/libp2p/go-libp2p-peer"
-	peerstore "github.com/libp2p/go-libp2p-peerstore"
-	protocol "github.com/libp2p/go-libp2p-protocol"
+	libp2p_crypto "github.com/libp2p/go-libp2p-crypto"
+	libp2p_host "github.com/libp2p/go-libp2p-host"
+	libp2p_net "github.com/libp2p/go-libp2p-net"
+	libp2p_peer "github.com/libp2p/go-libp2p-peer"
+	libp2p_peerstore "github.com/libp2p/go-libp2p-peerstore"
+	libp2p_protocol "github.com/libp2p/go-libp2p-protocol"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	ma "github.com/multiformats/go-multiaddr"
 )
@@ -42,10 +42,10 @@ type pubsub interface {
 
 // HostV2 is the version 2 p2p host
 type HostV2 struct {
-	h      p2p_host.Host
+	h      libp2p_host.Host
 	pubsub pubsub
 	self   p2p.Peer
-	priKey p2p_crypto.PrivKey
+	priKey libp2p_crypto.PrivKey
 	lock   sync.Mutex
 
 	incomingPeers []p2p.Peer // list of incoming Peers. TODO: fixed number incoming
@@ -84,12 +84,12 @@ func (r *GroupReceiverImpl) Close() error {
 
 // Receive receives a message.
 func (r *GroupReceiverImpl) Receive(ctx context.Context) (
-	msg []byte, sender peer.ID, err error,
+	msg []byte, sender libp2p_peer.ID, err error,
 ) {
 	m, err := r.sub.Next(ctx)
 	if err == nil {
 		msg = m.Data
-		sender = peer.ID(m.From)
+		sender = libp2p_peer.ID(m.From)
 	}
 	return msg, sender, err
 }
@@ -109,7 +109,7 @@ func (host *HostV2) GroupReceiver(group p2p.GroupID) (
 // AddPeer add p2p.Peer into Peerstore
 func (host *HostV2) AddPeer(p *p2p.Peer) error {
 	if p.PeerID != "" && len(p.Addrs) != 0 {
-		host.Peerstore().AddAddrs(p.PeerID, p.Addrs, peerstore.PermanentAddrTTL)
+		host.Peerstore().AddAddrs(p.PeerID, p.Addrs, libp2p_peerstore.PermanentAddrTTL)
 		return nil
 	}
 
@@ -129,8 +129,8 @@ func (host *HostV2) AddPeer(p *p2p.Peer) error {
 
 	p.Addrs = append(p.Addrs, targetAddr)
 
-	host.Peerstore().AddAddrs(p.PeerID, p.Addrs, peerstore.PermanentAddrTTL)
-	log.Info("AddPeer add to peerstore", "peer", *p)
+	host.Peerstore().AddAddrs(p.PeerID, p.Addrs, libp2p_peerstore.PermanentAddrTTL)
+	log.Info("AddPeer add to libp2p_peerstore", "peer", *p)
 
 	return nil
 }
@@ -146,12 +146,12 @@ func (host *HostV2) AddOutgoingPeer(peer p2p.Peer) {
 }
 
 // Peerstore returns the peer store
-func (host *HostV2) Peerstore() peerstore.Peerstore {
+func (host *HostV2) Peerstore() libp2p_peerstore.Peerstore {
 	return host.h.Peerstore()
 }
 
 // New creates a host for p2p communication
-func New(self *p2p.Peer, priKey p2p_crypto.PrivKey) *HostV2 {
+func New(self *p2p.Peer, priKey libp2p_crypto.PrivKey) *HostV2 {
 	listenAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", self.Port))
 	if err != nil {
 		log.Error("New MA Error", "IP", self.IP, "Port", self.Port)
@@ -183,7 +183,7 @@ func New(self *p2p.Peer, priKey p2p_crypto.PrivKey) *HostV2 {
 }
 
 // GetID returns ID.Pretty
-func (host *HostV2) GetID() peer.ID {
+func (host *HostV2) GetID() libp2p_peer.ID {
 	return host.h.ID()
 }
 
@@ -194,7 +194,7 @@ func (host *HostV2) GetSelfPeer() p2p.Peer {
 
 // BindHandlerAndServe bind a streamHandler to the harmony protocol.
 func (host *HostV2) BindHandlerAndServe(handler p2p.StreamHandler) {
-	host.h.SetStreamHandler(protocol.ID(ProtocolID), func(s net.Stream) {
+	host.h.SetStreamHandler(libp2p_protocol.ID(ProtocolID), func(s libp2p_net.Stream) {
 		handler(s)
 	})
 	// Hang forever
@@ -205,7 +205,7 @@ func (host *HostV2) BindHandlerAndServe(handler p2p.StreamHandler) {
 func (host *HostV2) SendMessage(p p2p.Peer, message []byte) error {
 	logger := log.New("from", host.self, "to", p, "PeerID", p.PeerID)
 	host.Peerstore().AddProtocols(p.PeerID, ProtocolID)
-	s, err := host.h.NewStream(context.Background(), p.PeerID, protocol.ID(ProtocolID))
+	s, err := host.h.NewStream(context.Background(), p.PeerID, libp2p_protocol.ID(ProtocolID))
 	if err != nil {
 		logger.Error("NewStream() failed", "peerID", p.PeerID,
 			"protocolID", ProtocolID, "error", err)
@@ -229,7 +229,7 @@ func (host *HostV2) Close() error {
 }
 
 // GetP2PHost returns the p2p.Host
-func (host *HostV2) GetP2PHost() p2p_host.Host {
+func (host *HostV2) GetP2PHost() libp2p_host.Host {
 	return host.h
 }
 
@@ -242,7 +242,7 @@ func (host *HostV2) ConnectHostPeer(peer p2p.Peer) {
 		utils.GetLogInstance().Error("ConnectHostPeer", "new ma error", err, "peer", peer)
 		return
 	}
-	peerInfo, err := peerstore.InfoFromP2pAddr(peerAddr)
+	peerInfo, err := libp2p_peerstore.InfoFromP2pAddr(peerAddr)
 	if err != nil {
 		utils.GetLogInstance().Error("ConnectHostPeer", "new peerinfo error", err, "peer", peer)
 		return
