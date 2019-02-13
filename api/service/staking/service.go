@@ -3,11 +3,13 @@ package staking
 import (
 	"crypto/ecdsa"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
+	pb "github.com/golang/protobuf/proto"
 	client "github.com/harmony-one/harmony/api/client/service"
 	proto "github.com/harmony-one/harmony/api/client/service/proto"
 	"github.com/harmony-one/harmony/api/proto/message"
@@ -16,25 +18,40 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 )
 
+type State byte
+
+const (
+	NOT_STAKED_YET State = iota
+	STAKED
+	REJECTED
+	APPROVED
+	TRANSFORMED
+)
+
 // Service is the staking service.
 // Service requires private key here which is not a right design.
 // In stead in the right design, the end-user who runs mining needs to provide signed tx to this service.
 type Service struct {
+	host          p2p.Host
 	stopChan      chan struct{}
 	stoppedChan   chan struct{}
 	peerChan      <-chan p2p.Peer
+	messageChan   <-chan *message.Message
 	accountKey    *ecdsa.PrivateKey
 	stakingAmount int64
+	state         State
 }
 
 // New returns staking service.
-func New(accountKey *ecdsa.PrivateKey, stakingAmount int64, peerChan <-chan p2p.Peer) *Service {
+func New(accountKey *ecdsa.PrivateKey, stakingAmount int64, peerChan <-chan p2p.Peer, messageChan <-chan *message.Message) *Service {
 	return &Service{
 		stopChan:      make(chan struct{}),
 		stoppedChan:   make(chan struct{}),
 		peerChan:      peerChan,
 		accountKey:    accountKey,
 		stakingAmount: stakingAmount,
+		messageChan:   messageChan,
+		state:         NOT_STAKED_YET,
 	}
 }
 
@@ -57,7 +74,7 @@ func (s *Service) Run() {
 		for {
 			select {
 			case peer := <-s.peerChan:
-				utils.GetLogInstance().Info("Running role conversion")
+				utils.GetLogInstance().Info("Running staking service")
 				// TODO: Write some logic here.
 				s.DoService(peer)
 			case <-s.stopChan:
@@ -71,8 +88,47 @@ func (s *Service) Run() {
 func (s *Service) DoService(peer p2p.Peer) {
 	utils.GetLogInstance().Info("Staking with Peer")
 
-	// TODO(minhdoan): How to use the p2p or pubsub to send Staking Message to beacon chain.
-	// See below of how to create a staking message.
+	stakingMessage := s.createStakingMessage(peer)
+	s.state = STAKED
+	if data, err := pb.Marshal(stakingMessage); err == nil {
+		// Send a staking transaction to beacon chain.
+		if err = s.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, data); err != nil {
+			utils.GetLogInstance().Error("Error when sending staking message")
+			return
+		}
+		tick := time.NewTicker(5 * time.Second)
+		for {
+			select {
+			// Retry sending the staking transaction if it does not get back any response.
+			case <-tick.C:
+				if err = s.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, data); err != nil {
+					utils.GetLogInstance().Error("Error when sending staking message")
+					return
+				}
+			case msg := <-s.messageChan:
+				if isStateResultMessage(msg) {
+					if s.stakeApproved(msg) {
+						s.state = APPROVED
+						// TODO(minhdoan): Should send a signal to another service.
+					} else {
+						s.state = REJECTED
+						// TODO(minhdoan): what's next?
+						return
+					}
+				}
+			}
+		}
+	} else {
+		utils.GetLogInstance().Error("Error when creating staking message")
+	}
+}
+
+func isStateResultMessage(msg *message.Message) bool {
+	return true
+}
+
+func (s *Service) stakeApproved(msg *message.Message) bool {
+	return true
 }
 
 func (s *Service) getStakingInfo(beaconPeer p2p.Peer) *proto.StakingContractInfoResponse {
