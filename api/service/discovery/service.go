@@ -48,10 +48,14 @@ func (s *Service) StopService() {
 // Run is the main function of the service
 func (s *Service) Run() {
 	go s.contactP2pPeers()
-	go s.pingPeer()
+	//	go s.pingPeer()
 }
 
 func (s *Service) contactP2pPeers() {
+	tick := time.NewTicker(5 * time.Second)
+	ping := proto_discovery.NewPingMessage(s.host.GetSelfPeer())
+	buffer := ping.ConstructPingMessage()
+	content := host.ConstructP2pMessage(byte(0), buffer)
 	for {
 		select {
 		case peer, ok := <-s.peerChan:
@@ -69,7 +73,13 @@ func (s *Service) contactP2pPeers() {
 				s.stakingChan <- peer
 			}
 		case <-s.stopChan:
+			log.Debug("[DISCOVERY] stop")
 			return
+		case <-tick.C:
+			err := s.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, content)
+			if err != nil {
+				log.Error("Failed to send ping message", "group", p2p.GroupIDBeacon)
+			}
 		}
 	}
 }
@@ -92,6 +102,9 @@ func (s *Service) pingPeer() {
 			if err != nil {
 				log.Error("Failed to send ping message", "group", p2p.GroupIDBeacon)
 			}
+		case <-s.stopChan:
+			log.Info("Stop sending ping message")
+			return
 		}
 	}
 	//	s.host.SendMessage(peer, content)

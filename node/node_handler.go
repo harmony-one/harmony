@@ -14,6 +14,7 @@ import (
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	proto_identity "github.com/harmony-one/harmony/api/proto/identity"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
+	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -455,5 +456,7 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		}
 	}
 
+	// Stop discovery service after received pong message
+	node.serviceManager.TakeAction(&service.Action{Action: service.Stop, ServiceType: service.PeerDiscovery})
 	return node.Consensus.UpdatePublicKeys(publicKeys)
 }
