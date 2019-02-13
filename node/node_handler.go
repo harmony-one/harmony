@@ -277,8 +277,6 @@ func (node *Node) AddNewBlock(newBlock *types.Block) {
 	} else {
 		utils.GetLogInstance().Info("adding new block to blockchain", "blockNum", blockNum)
 	}
-	// only insert new shardstate when newBlock is epoch block
-	node.blockchain.InsertNewShardState(newBlock)
 }
 
 func (node *Node) pingMessageHandler(msgPayload []byte) int {
