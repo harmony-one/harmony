@@ -18,14 +18,15 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 )
 
+// State is the state of staking service.
 type State byte
 
+// Constants for State
 const (
-	NOT_STAKED_YET State = iota
-	STAKED
-	REJECTED
-	APPROVED
-	TRANSFORMED
+	NotStatedYet State = iota
+	Staked
+	Rejected
+	Approved
 )
 
 // Service is the staking service.
@@ -43,15 +44,16 @@ type Service struct {
 }
 
 // New returns staking service.
-func New(accountKey *ecdsa.PrivateKey, stakingAmount int64, peerChan <-chan p2p.Peer, messageChan <-chan *message.Message) *Service {
+func New(host p2p.Host, accountKey *ecdsa.PrivateKey, stakingAmount int64, peerChan <-chan p2p.Peer, messageChan <-chan *message.Message) *Service {
 	return &Service{
+		host:          host,
 		stopChan:      make(chan struct{}),
 		stoppedChan:   make(chan struct{}),
 		peerChan:      peerChan,
 		accountKey:    accountKey,
 		stakingAmount: stakingAmount,
 		messageChan:   messageChan,
-		state:         NOT_STAKED_YET,
+		state:         NotStatedYet,
 	}
 }
 
@@ -89,7 +91,7 @@ func (s *Service) DoService(peer p2p.Peer) {
 	utils.GetLogInstance().Info("Staking with Peer")
 
 	stakingMessage := s.createStakingMessage(peer)
-	s.state = STAKED
+	s.state = Staked
 	if data, err := pb.Marshal(stakingMessage); err == nil {
 		// Send a staking transaction to beacon chain.
 		if err = s.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, data); err != nil {
@@ -108,10 +110,10 @@ func (s *Service) DoService(peer p2p.Peer) {
 			case msg := <-s.messageChan:
 				if isStateResultMessage(msg) {
 					if s.stakeApproved(msg) {
-						s.state = APPROVED
+						s.state = Approved
 						// TODO(minhdoan): Should send a signal to another service.
 					} else {
-						s.state = REJECTED
+						s.state = Rejected
 						// TODO(minhdoan): what's next?
 						return
 					}
@@ -123,10 +125,12 @@ func (s *Service) DoService(peer p2p.Peer) {
 	}
 }
 
+// TODO(minhdoan): Will implement this logic when introducing the result message from beacon chain.
 func isStateResultMessage(msg *message.Message) bool {
 	return true
 }
 
+// TODO(minhdoan): Will implement this logic when introducing the result message from beacon chain.
 func (s *Service) stakeApproved(msg *message.Message) bool {
 	return true
 }
