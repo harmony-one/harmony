@@ -3,6 +3,7 @@ package drand
 import (
 	protobuf "github.com/golang/protobuf/proto"
 	drand_proto "github.com/harmony-one/harmony/api/drand"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p/host"
@@ -17,6 +18,9 @@ func (dRand *DRand) WaitForEpochBlock(blockChannel chan *types.Block, stopChan c
 			default:
 				// keep waiting for epoch block
 				newBlock := <-blockChannel
+				if newBlock.NumberU64()%core.BlocksPerEpoch == 0 {
+
+				}
 				dRand.init(newBlock)
 			case <-stopChan:
 				return

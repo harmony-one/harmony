@@ -261,6 +261,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 	node.AddNewBlock(newBlock)
 
 	// TODO: enable drand only for beacon chain
+	// ConfirmedBlockChannel which is listened by drand leader who will initiate DRG if its a epoch block (first block of a epoch)
 	if node.DRand != nil {
 		go func() {
 			node.ConfirmedBlockChannel <- newBlock
