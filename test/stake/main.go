@@ -2,13 +2,11 @@ package main
 
 import (
 	"crypto/ecdsa"
-	"encoding/hex"
 	"fmt"
 	"log"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -22,7 +20,7 @@ import (
 
 const (
 	//StakingContractBinary is binary for staking contract.
-	StakingContractBinary = "0x608060405234801561001057600080fd5b50610b51806100206000396000f3fe608060405260043610610072576000357c01000000000000000000000000000000000000000000000000000000009004806325ca4c9c146100775780632e1a7d4d146100e05780634c1b64cb1461012f578063a98e4e7714610194578063d0e30db0146101bf578063e27fd057146101dd575b600080fd5b34801561008357600080fd5b506100c66004803603602081101561009a57600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff169060200190929190505050610249565b604051808215151515815260200191505060405180910390f35b3480156100ec57600080fd5b506101196004803603602081101561010357600080fd5b8101908080359060200190929190505050610310565b6040518082815260200191505060405180910390f35b34801561013b57600080fd5b5061017e6004803603602081101561015257600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff1690602001909291905050506104cb565b6040518082815260200191505060405180910390f35b3480156101a057600080fd5b506101a96106f3565b6040518082815260200191505060405180910390f35b6101c7610700565b6040518082815260200191505060405180910390f35b3480156101e957600080fd5b506101f2610a46565b6040518080602001828103825283818151815260200191508051906020019060200280838360005b8381101561023557808201518184015260208101905061021a565b505050509050019250505060405180910390f35b6000806002805490501415610261576000905061030b565b8173ffffffffffffffffffffffffffffffffffffffff166002600160008573ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020548154811015156102c657fe5b9060005260206000200160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff161490505b919050565b60008060003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020548211151561048457816000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020600082825403925050819055503373ffffffffffffffffffffffffffffffffffffffff166108fc839081150290604051600060405180830381858888f193505050501580156103eb573d6000803e3d6000fd5b5060008060003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002054141561043e5761043c336104cb565b505b6000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205490506104c6565b6000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205490505b919050565b600080600160008473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205490506000600260016002805490500381548110151561052957fe5b9060005260206000200160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1690508060028381548110151561056657fe5b9060005260206000200160006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555081600160008373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000208190555060028054809190600190036106079190610ad4565b508373ffffffffffffffffffffffffffffffffffffffff167e1fab73a76dc2de66330e055b1c1e3319c77b736bb4478cc706497f318a4ad7836040518082815260200191505060405180910390a28073ffffffffffffffffffffffffffffffffffffffff167f6095abd20e12b7e743432b409b7879ac77a0b927f89ae330f59c15b32dce0b69836000808573ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002054604051808381526020018281526020019250505060405180910390a28192505050919050565b6000600280549050905090565b600061070b33610249565b1561087657346000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020600082825401925050819055503373ffffffffffffffffffffffffffffffffffffffff167f6095abd20e12b7e743432b409b7879ac77a0b927f89ae330f59c15b32dce0b69600160003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020546000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002054604051808381526020018281526020019250505060405180910390a2600160003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020549050610a43565b346000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002081905550600160023390806001815401808255809150509060018203906000526020600020016000909192909190916101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555003600160003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020819055503373ffffffffffffffffffffffffffffffffffffffff167fd2ad617bb539c9a6219058035b15d87478e478eb0f74164eae890a0c70fa3f40600160003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020546000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002054604051808381526020018281526020019250505060405180910390a260016002805490500390505b90565b60606002805480602002602001604051908101604052809291908181526020018280548015610aca57602002820191906000526020600020905b8160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019060010190808311610a80575b5050505050905090565b815481835581811115610afb57818360005260206000209182019101610afa9190610b00565b5b505050565b610b2291905b80821115610b1e576000816000905550600101610b06565b5090565b9056fea165627a7a72305820fa89951d66063c6124f04e670f75f9cc22053e977fbd5bc8ca805e9fb0266cfb0029"
+	StakingContractBinary = "0x608060405234801561001057600080fd5b506103f7806100206000396000f3fe608060405260043610610067576000357c01000000000000000000000000000000000000000000000000000000009004806317437a2c1461006c5780632e1a7d4d146100975780638da5cb5b146100e6578063b69ef8a81461013d578063d0e30db014610168575b600080fd5b34801561007857600080fd5b50610081610186565b6040518082815260200191505060405180910390f35b3480156100a357600080fd5b506100d0600480360360208110156100ba57600080fd5b81019080803590602001909291905050506101a5565b6040518082815260200191505060405180910390f35b3480156100f257600080fd5b506100fb6102cd565b604051808273ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200191505060405180910390f35b34801561014957600080fd5b506101526102f3565b6040518082815260200191505060405180910390f35b610170610339565b6040518082815260200191505060405180910390f35b60003073ffffffffffffffffffffffffffffffffffffffff1631905090565b60008060003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002054821115156102c757816000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020600082825403925050819055503373ffffffffffffffffffffffffffffffffffffffff166108fc839081150290604051600060405180830381858888f19350505050158015610280573d6000803e3d6000fd5b506000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205490506102c8565b5b919050565b600160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1681565b60008060003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002054905090565b6000346000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020600082825401925050819055506000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205490509056fea165627a7a723058204acf95662eb95006df1e0b8ba32316211039c7872bc6eb99d12689c1624143d80029"
 	//FaucetContractBinary is binary for faucet contract.
 	FaucetContractBinary = "0x60806040526706f05b59d3b2000060015560028054600160a060020a031916331790556101aa806100316000396000f3fe608060405260043610610045577c0100000000000000000000000000000000000000000000000000000000600035046327c78c42811461004a578063b69ef8a81461008c575b600080fd5b34801561005657600080fd5b5061008a6004803603602081101561006d57600080fd5b503573ffffffffffffffffffffffffffffffffffffffff166100b3565b005b34801561009857600080fd5b506100a1610179565b60408051918252519081900360200190f35b60025473ffffffffffffffffffffffffffffffffffffffff1633146100d757600080fd5b600154303110156100e757600080fd5b73ffffffffffffffffffffffffffffffffffffffff811660009081526020819052604090205460ff161561011a57600080fd5b73ffffffffffffffffffffffffffffffffffffffff8116600081815260208190526040808220805460ff1916600190811790915554905181156108fc0292818181858888f19350505050158015610175573d6000803e3d6000fd5b5050565b30319056fea165627a7a723058206b894c1f3badf3b26a7a2768ab8141b1e6fa1c1ddc4622f4f44a7d5041edc9350029"
 )
@@ -79,9 +77,10 @@ type testWorkerBackend struct {
 }
 
 func main() {
+	fmt.Println()
 	fmt.Println("--------- Funding addresses for Faucet Contract Call ---------")
+	fmt.Println()
 
-	//** COULD WE UNDERSTAND THESE SETUP FUNCTIONS.
 	var (
 		database = ethdb.NewMemDatabase()
 		gspec    = core.Genesis{
@@ -137,7 +136,7 @@ func main() {
 		AllRandomUserKey = append(AllRandomUserKey, randomUserKey)
 		txs = append(txs, tx)
 	}
-	amount := 50000
+	amount := 720000
 	tx, _ := types.SignTx(types.NewTransaction(nonce+uint64(4), StakingAddress, 0, big.NewInt(int64(amount)), params.TxGas, nil, nil), types.HomesteadSigner{}, FaucetPriKey)
 	txs = append(txs, tx)
 	err := contractworker.CommitTransactions(txs)
@@ -158,10 +157,12 @@ func main() {
 	fmt.Println(state.GetBalance(AllRandomUserAddress[0]))
 	fmt.Println("staking address balance")
 	fmt.Println(state.GetBalance(StakingAddress))
-
+	fmt.Println()
 	fmt.Println("--------- Funding addresses for Faucet Contract Call DONE ---------")
+	fmt.Println()
 	// Send Faucet Contract Transaction ///
 	fmt.Println("--------- Now Setting up Faucet Contract Call ---------")
+	fmt.Println()
 
 	paddedAddress := common.LeftPadBytes(AllRandomUserAddress[0].Bytes(), 32)
 	transferFnSignature := []byte("request(address)")
@@ -187,24 +188,28 @@ func main() {
 		fmt.Println(err)
 	}
 	state = contractworker.GetCurrentState()
-	fmt.Println("Balances AFTERcall of faucet contract")
+	fmt.Println("Balances AFTER CALL of faucet contract")
 	fmt.Println("contract balance:")
 	fmt.Println(state.GetBalance(FaucetContractAddress))
 	fmt.Println("user address balance")
 	fmt.Println(state.GetBalance(AllRandomUserAddress[0]))
 	fmt.Println("staking address balance")
 	fmt.Println(state.GetBalance(StakingAddress))
-
+	fmt.Println()
 	fmt.Println("--------- Faucet Contract Call DONE ---------")
+	fmt.Println()
 	fmt.Println("--------- ************************** ---------")
+	fmt.Println()
 	fmt.Println("--------- Now Setting up Staking Contract ---------")
-
+	fmt.Println()
 	//worker := pkgworker.New(params.TestChainConfig, chain, consensus.NewFaker(), crypto.PubkeyToAddress(StakingPriKey.PublicKey), 0)
 	var stakingtxns []*types.Transaction
 
 	state = contractworker.GetCurrentState()
 	fmt.Println("Before Staking Balances")
+	fmt.Println("user address balance")
 	fmt.Println(state.GetBalance(AllRandomUserAddress[0]))
+	fmt.Println("The balances for 2 more users:")
 	fmt.Println(state.GetBalance(AllRandomUserAddress[1]))
 	fmt.Println(state.GetBalance(AllRandomUserAddress[2]))
 
@@ -218,23 +223,28 @@ func main() {
 	state = contractworker.GetCurrentState()
 	fmt.Println("stake contract balance :")
 	fmt.Println(state.GetBalance(StakeContractAddress))
+	fmt.Println("stake address balance :")
+	fmt.Println(state.GetBalance(StakingAddress))
 
 	depositFnSignature := []byte("deposit()")
 	hash = sha3.NewKeccak256()
 	hash.Write(depositFnSignature)
 	methodID := hash.Sum(nil)[:4]
-	fmt.Println(hexutil.Encode(methodID))
 
 	var callEncl []byte
 	callEncl = append(callEncl, methodID...)
-
+	stake := 100000
+	fmt.Println()
+	fmt.Println("--------- Staking Contract added to txns ---------")
+	fmt.Println()
+	fmt.Printf("-- Now Staking with stake: %d --\n", stake)
+	fmt.Println()
 	for i := 0; i <= 2; i++ {
-		stake := 100000
+
 		//Deposit Does not take a argument, stake is transferred via amount.
 		tx, _ := types.SignTx(types.NewTransaction(0, StakeContractAddress, 0, big.NewInt(int64(stake)), params.TxGas*5, nil, callEncl), types.HomesteadSigner{}, AllRandomUserKey[i])
 		stakingtxns = append(stakingtxns, tx)
 	}
-
 	err = contractworker.CommitTransactions(stakingtxns)
 
 	if err != nil {
@@ -249,25 +259,27 @@ func main() {
 	// fmt.Println(receipts[len(receipts)-4].ContractAddress)
 	state = contractworker.GetCurrentState()
 
-	fmt.Println("After Staking Balances (should be less by 1000)")
+	fmt.Printf("After Staking Balances (should be less by %d)\n", stake)
+	fmt.Println("user address balance")
 	fmt.Println(state.GetBalance(AllRandomUserAddress[0]))
+	fmt.Println("The balances for 2 more users:")
 	fmt.Println(state.GetBalance(AllRandomUserAddress[1]))
 	fmt.Println(state.GetBalance(AllRandomUserAddress[2]))
 	fmt.Println("faucet contract balance (unchanged):")
 	fmt.Println(state.GetBalance(FaucetContractAddress))
 	fmt.Println("stake contract balance :")
 	fmt.Println(state.GetBalance(StakeContractAddress))
-
+	fmt.Println("stake address balance :")
+	fmt.Println(state.GetBalance(StakingAddress))
+	fmt.Println()
 	fmt.Println("--------- Now Setting up Withdrawing Stakes ---------")
-
-	withdraw := "5000"
 
 	withdrawFnSignature := []byte("withdraw(uint256)")
 	hash = sha3.NewKeccak256()
 	hash.Write(withdrawFnSignature)
 	methodID = hash.Sum(nil)[:4]
-	fmt.Println(hex.EncodeToString(methodID))
 
+	withdraw := "5000"
 	withdrawstake := new(big.Int)
 	withdrawstake.SetString(withdraw, 10)
 	paddedAmount := common.LeftPadBytes(withdrawstake.Bytes(), 32)
@@ -276,8 +288,11 @@ func main() {
 	dataEncl = append(dataEncl, methodID...)
 	dataEncl = append(dataEncl, paddedAmount...)
 
-	fmt.Println(hexutil.Encode(dataEncl))
 	var withdrawstakingtxns []*types.Transaction
+
+	fmt.Println()
+	fmt.Printf("-- Withdrawing Stake by amount: %s --\n", withdraw)
+	fmt.Println()
 
 	for i := 0; i <= 2; i++ {
 		cnonce := contractworker.GetCurrentState().GetNonce(AllRandomUserAddress[i])
@@ -297,12 +312,14 @@ func main() {
 		fmt.Println(err)
 	}
 	state = contractworker.GetCurrentState()
-	fmt.Println("Withdraw Staking Balances (should be up by 500)")
+	fmt.Printf("Withdraw Staking Balances (should be up by %s)\n", withdraw)
 	fmt.Println(state.GetBalance(AllRandomUserAddress[0]))
 	fmt.Println(state.GetBalance(AllRandomUserAddress[1]))
 	fmt.Println(state.GetBalance(AllRandomUserAddress[2]))
 	fmt.Println("faucet contract balance (unchanged):")
 	fmt.Println(state.GetBalance(FaucetContractAddress))
-	fmt.Println("stake contract balance :")
+	fmt.Printf("stake contract balance (should downup by %s)\n", withdraw)
 	fmt.Println(state.GetBalance(StakeContractAddress))
+	fmt.Println("stake address balance :")
+	fmt.Println(state.GetBalance(StakingAddress))
 }
