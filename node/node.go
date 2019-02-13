@@ -679,7 +679,7 @@ func (node *Node) setupForShardValidator() {
 }
 
 func (node *Node) setupForBeaconLeader() {
-	chanPeer := make(chan p2p.Peer)
+	chanPeer := make(chan *p2p.Peer)
 
 	var err error
 	node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeacon)
@@ -702,7 +702,7 @@ func (node *Node) setupForBeaconLeader() {
 }
 
 func (node *Node) setupForBeaconValidator() {
-	chanPeer := make(chan p2p.Peer)
+	chanPeer := make(chan *p2p.Peer)
 
 	var err error
 	node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeacon)
@@ -718,8 +718,8 @@ func (node *Node) setupForBeaconValidator() {
 }
 
 func (node *Node) setupForNewNode() {
-	chanPeer := make(chan p2p.Peer)
-	stakingPeer := make(chan p2p.Peer)
+	chanPeer := make(chan *p2p.Peer)
+	stakingPeer := make(chan *p2p.Peer)
 
 	var err error
 	node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeacon)

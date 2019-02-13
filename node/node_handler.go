@@ -286,8 +286,8 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 	utils.GetLogInstance().Debug("[pingMessageHandler]", "incoming peer", peer)
 
 	// add to incoming peer list
-	node.host.AddIncomingPeer(*peer)
-	node.host.ConnectHostPeer(*peer)
+	node.host.AddIncomingPeer(peer)
+	node.host.ConnectHostPeer(peer)
 
 	if ping.Node.Role == proto_node.ClientRole {
 		utils.GetLogInstance().Info("Add Client Peer to Node", "Node", node.Consensus.GetNodeID(), "Client", peer)

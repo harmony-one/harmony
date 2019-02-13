@@ -11,15 +11,15 @@ import (
 type Service struct {
 	host        p2p.Host
 	Rendezvous  string
-	peerChan    chan p2p.Peer
-	stakingChan chan p2p.Peer
+	peerChan    chan *p2p.Peer
+	stakingChan chan *p2p.Peer
 	stopChan    chan struct{}
 }
 
 // New returns discovery service.
 // h is the p2p host
 // r is the rendezvous string, we use shardID to start (TODO: leo, build two overlays of network)
-func New(h p2p.Host, r string, peerChan chan p2p.Peer, stakingChan chan p2p.Peer) *Service {
+func New(h p2p.Host, r string, peerChan chan *p2p.Peer, stakingChan chan *p2p.Peer) *Service {
 	return &Service{
 		host:        h,
 		Rendezvous:  r,
@@ -56,7 +56,7 @@ func (s *Service) contactP2pPeers() {
 				log.Debug("end of info", "peer", peer.PeerID)
 				return
 			}
-			s.host.AddPeer(&peer)
+			s.host.AddPeer(peer)
 			// Add to outgoing peer list
 			s.host.AddOutgoingPeer(peer)
 			log.Debug("[DISCOVERY]", "add outgoing peer", peer)
@@ -74,7 +74,7 @@ func (s *Service) Init() {
 	log.Info("Init discovery service")
 }
 
-func (s *Service) pingPeer(peer p2p.Peer) {
+func (s *Service) pingPeer(peer *p2p.Peer) {
 	ping := proto_discovery.NewPingMessage(s.host.GetSelfPeer())
 	buffer := ping.ConstructPingMessage()
 	content := host.ConstructP2pMessage(byte(0), buffer)

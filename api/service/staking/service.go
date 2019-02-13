@@ -22,13 +22,13 @@ import (
 type Service struct {
 	stopChan      chan struct{}
 	stoppedChan   chan struct{}
-	peerChan      <-chan p2p.Peer
+	peerChan      <-chan *p2p.Peer
 	accountKey    *ecdsa.PrivateKey
 	stakingAmount int64
 }
 
 // New returns staking service.
-func New(accountKey *ecdsa.PrivateKey, stakingAmount int64, peerChan <-chan p2p.Peer) *Service {
+func New(accountKey *ecdsa.PrivateKey, stakingAmount int64, peerChan <-chan *p2p.Peer) *Service {
 	return &Service{
 		stopChan:      make(chan struct{}),
 		stoppedChan:   make(chan struct{}),
@@ -68,20 +68,20 @@ func (s *Service) Run() {
 }
 
 // DoService does staking.
-func (s *Service) DoService(peer p2p.Peer) {
+func (s *Service) DoService(peer *p2p.Peer) {
 	utils.GetLogInstance().Info("Staking with Peer")
 
 	// TODO(minhdoan): How to use the p2p or pubsub to send Staking Message to beacon chain.
 	// See below of how to create a staking message.
 }
 
-func (s *Service) getStakingInfo(beaconPeer p2p.Peer) *proto.StakingContractInfoResponse {
+func (s *Service) getStakingInfo(beaconPeer *p2p.Peer) *proto.StakingContractInfoResponse {
 	client := client.NewClient(beaconPeer.IP, beaconPeer.Port)
 	defer client.Close()
 	return client.GetStakingContractInfo(crypto.PubkeyToAddress(s.accountKey.PublicKey))
 }
 
-func (s *Service) createStakingMessage(beaconPeer p2p.Peer) *message.Message {
+func (s *Service) createStakingMessage(beaconPeer *p2p.Peer) *message.Message {
 	stakingInfo := s.getStakingInfo(beaconPeer)
 	toAddress := common.HexToAddress(stakingInfo.ContractAddress)
 	tx := types.NewTransaction(

@@ -25,14 +25,14 @@ type Service struct {
 	cancel      context.CancelFunc
 	stopChan    chan struct{}
 	stoppedChan chan struct{}
-	peerChan    chan p2p.Peer
+	peerChan    chan *p2p.Peer
 	peerInfo    <-chan peerstore.PeerInfo
 	discovery   *libp2pdis.RoutingDiscovery
 	lock        sync.Mutex
 }
 
 // New returns role conversion service.
-func New(h p2p.Host, rendezvous string, peerChan chan p2p.Peer) *Service {
+func New(h p2p.Host, rendezvous string, peerChan chan *p2p.Peer) *Service {
 	timeout := 30 * time.Minute
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	dht, err := libp2pdht.New(ctx, h.GetP2PHost())
@@ -139,7 +139,7 @@ func (s *Service) DoService() {
 						break
 					}
 				}
-				p := p2p.Peer{IP: ip, Port: port, PeerID: peer.ID, Addrs: peer.Addrs}
+				p := &p2p.Peer{IP: ip, Port: port, PeerID: peer.ID, Addrs: peer.Addrs}
 				utils.GetLogInstance().Info("Notify peerChan", "peer", p)
 				s.peerChan <- p
 			}

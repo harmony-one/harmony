@@ -47,8 +47,8 @@ type HostV2 struct {
 	priKey p2p_crypto.PrivKey
 	lock   sync.Mutex
 
-	incomingPeers []p2p.Peer // list of incoming Peers. TODO: fixed number incoming
-	outgoingPeers []p2p.Peer // list of outgoing Peers. TODO: fixed number of outgoing
+	incomingPeers []*p2p.Peer // list of incoming Peers. TODO: fixed number incoming
+	outgoingPeers []*p2p.Peer // list of outgoing Peers. TODO: fixed number of outgoing
 }
 
 // SendMessageToGroups sends a message to one or more multicast groups.
@@ -135,12 +135,12 @@ func (host *HostV2) AddPeer(p *p2p.Peer) error {
 }
 
 // AddIncomingPeer add peer to incoming peer list
-func (host *HostV2) AddIncomingPeer(peer p2p.Peer) {
+func (host *HostV2) AddIncomingPeer(peer *p2p.Peer) {
 	host.incomingPeers = append(host.incomingPeers, peer)
 }
 
 // AddOutgoingPeer add peer to outgoing peer list
-func (host *HostV2) AddOutgoingPeer(peer p2p.Peer) {
+func (host *HostV2) AddOutgoingPeer(peer *p2p.Peer) {
 	host.outgoingPeers = append(host.outgoingPeers, peer)
 }
 
@@ -233,7 +233,7 @@ func (host *HostV2) GetP2PHost() p2p_host.Host {
 }
 
 // ConnectHostPeer connects to peer host
-func (host *HostV2) ConnectHostPeer(peer p2p.Peer) {
+func (host *HostV2) ConnectHostPeer(peer *p2p.Peer) {
 	ctx := context.Background()
 	addr := fmt.Sprintf("/ip4/%s/tcp/%s/ipfs/%s", peer.IP, peer.Port, peer.PeerID.Pretty())
 	peerAddr, err := ma.NewMultiaddr(addr)

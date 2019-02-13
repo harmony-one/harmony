@@ -144,7 +144,7 @@ func (mr *MockHostMockRecorder) GroupReceiver(arg0 interface{}) *gomock.Call {
 }
 
 // AddIncomingPeer mocks base method
-func (m *MockHost) AddIncomingPeer(peer p2p.Peer) {
+func (m *MockHost) AddIncomingPeer(peer *p2p.Peer) {
 	m.ctrl.Call(m, "AddIncomingPeer", peer)
 }
 
@@ -154,7 +154,7 @@ func (mr *MockHostMockRecorder) AddIncomingPeer(groups, msg interface{}) *gomock
 }
 
 // AddOutgoingPeer mocks base method
-func (m *MockHost) AddOutgoingPeer(peer p2p.Peer) {
+func (m *MockHost) AddOutgoingPeer(peer *p2p.Peer) {
 	m.ctrl.Call(m, "AddOutgoingPeer", peer)
 }
 
@@ -164,7 +164,7 @@ func (mr *MockHostMockRecorder) AddOutgoingPeer(groups, msg interface{}) *gomock
 }
 
 // ConnectHostPeer mocks base method
-func (m *MockHost) ConnectHostPeer(peer p2p.Peer) {
+func (m *MockHost) ConnectHostPeer(peer *p2p.Peer) {
 	m.ctrl.Call(m, "ConnectHostPeer", peer)
 }
 
