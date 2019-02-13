@@ -64,6 +64,29 @@ func (mr *MockpubsubMockRecorder) Subscribe(topic interface{}, opts ...interface
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Subscribe", reflect.TypeOf((*Mockpubsub)(nil).Subscribe), varargs...)
 }
 
+// Mockdiscovery is a mock of discovery interface
+type Mockdiscovery struct {
+	ctrl     *gomock.Controller
+	recorder *MockdiscoveryMockRecorder
+}
+
+// MockdiscoveryMockRecorder is the mock recorder for Mockdiscovery
+type MockdiscoveryMockRecorder struct {
+	mock *Mockdiscovery
+}
+
+// NewMockdiscovery creates a new mock instance
+func NewMockdiscovery(ctrl *gomock.Controller) *Mockdiscovery {
+	mock := &Mockdiscovery{ctrl: ctrl}
+	mock.recorder = &MockdiscoveryMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use
+func (m *Mockdiscovery) EXPECT() *MockdiscoveryMockRecorder {
+	return m.recorder
+}
+
 // Mocksubscription is a mock of subscription interface
 type Mocksubscription struct {
 	ctrl     *gomock.Controller

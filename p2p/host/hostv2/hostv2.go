@@ -9,19 +9,20 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/log"
-
-	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/p2p"
-
 	libp2p "github.com/libp2p/go-libp2p"
 	libp2p_crypto "github.com/libp2p/go-libp2p-crypto"
+	libp2p_discovery "github.com/libp2p/go-libp2p-discovery"
 	libp2p_host "github.com/libp2p/go-libp2p-host"
+	libp2p_kad_dht "github.com/libp2p/go-libp2p-kad-dht"
 	libp2p_net "github.com/libp2p/go-libp2p-net"
 	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 	libp2p_peerstore "github.com/libp2p/go-libp2p-peerstore"
 	libp2p_protocol "github.com/libp2p/go-libp2p-protocol"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	ma "github.com/multiformats/go-multiaddr"
+
+	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/p2p"
 )
 
 const (
@@ -41,9 +42,15 @@ type pubsub interface {
 	Subscribe(topic string, opts ...libp2p_pubsub.SubOpt) (*libp2p_pubsub.Subscription, error)
 }
 
+// discovery captures the discovery interface we expect from libp2p.
+type discovery interface {
+	// TODO ek – populate with methods we use
+}
+
 // HostV2 is the version 2 p2p host
 type HostV2 struct {
 	h      libp2p_host.Host
+	disc   discovery
 	pubsub pubsub
 	self   p2p.Peer
 	priKey libp2p_crypto.PrivKey
@@ -171,12 +178,16 @@ func New(self *p2p.Peer, priKey libp2p_crypto.PrivKey) *HostV2 {
 	pubsub, err := libp2p_pubsub.NewGossipSub(ctx, p2pHost)
 	// pubsub, err := libp2p_pubsub.NewFloodSub(ctx, p2pHost)
 	catchError(err)
+	dht, err := libp2p_kad_dht.New(ctx, p2pHost)
+	catchError(err)
+	disc := libp2p_discovery.NewRoutingDiscovery(dht)
 
 	self.PeerID = p2pHost.ID()
 
 	// has to save the private key for host
 	h := &HostV2{
 		h:      p2pHost,
+		disc:   disc,
 		pubsub: pubsub,
 		self:   *self,
 		priKey: priKey,
