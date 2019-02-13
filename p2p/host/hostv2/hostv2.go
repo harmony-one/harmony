@@ -17,7 +17,7 @@ import (
 	peer "github.com/libp2p/go-libp2p-peer"
 	peerstore "github.com/libp2p/go-libp2p-peerstore"
 	protocol "github.com/libp2p/go-libp2p-protocol"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
@@ -35,7 +35,7 @@ const (
 // PubSub captures the pubsub interface we expect from libp2p.
 type PubSub interface {
 	Publish(topic string, data []byte) error
-	Subscribe(topic string, opts ...pubsub.SubOpt) (*pubsub.Subscription, error)
+	Subscribe(topic string, opts ...libp2p_pubsub.SubOpt) (*libp2p_pubsub.Subscription, error)
 }
 
 // HostV2 is the version 2 p2p host
@@ -64,7 +64,7 @@ func (host *HostV2) SendMessageToGroups(groups []p2p.GroupID, msg []byte) error 
 
 // Subscription captures the subscription interface
 type Subscription interface {
-	Next(ctx context.Context) (*pubsub.Message, error)
+	Next(ctx context.Context) (*libp2p_pubsub.Message, error)
 	Cancel()
 }
 
@@ -161,8 +161,8 @@ func New(self *p2p.Peer, priKey p2p_crypto.PrivKey) *HostV2 {
 		libp2p.ListenAddrs(listenAddr), libp2p.Identity(priKey),
 	)
 	catchError(err)
-	pubsub, err := pubsub.NewGossipSub(ctx, p2pHost)
-	// pubsub, err := pubsub.NewFloodSub(ctx, p2pHost)
+	pubsub, err := libp2p_pubsub.NewGossipSub(ctx, p2pHost)
+	// pubsub, err := libp2p_pubsub.NewFloodSub(ctx, p2pHost)
 	catchError(err)
 
 	self.PeerID = p2pHost.ID()
