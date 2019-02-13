@@ -17,7 +17,7 @@ func (dRand *DRand) ProcessMessageValidator(payload []byte) {
 	}
 
 	switch message.Type {
-	case drand_proto.MessageType_COMMIT:
+	case drand_proto.MessageType_INIT:
 		dRand.processInitMessage(message)
 	default:
 		utils.GetLogInstance().Error("Unexpected message type", "msgType", message.Type, "dRand", dRand)

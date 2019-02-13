@@ -136,7 +136,7 @@ func (consensus *Consensus) processPrepareMessage(message consensus_proto.Messag
 	}
 
 	if len(prepareSigs) >= ((len(consensus.PublicKeys)*2)/3 + 1) {
-		utils.GetLogInstance().Debug("Received additional new prepare message", "validatorID", validatorID)
+		utils.GetLogInstance().Debug("Received additional prepare message", "validatorID", validatorID)
 		return
 	}
 
@@ -244,7 +244,6 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 		copy(blockObj.Header().CommitSignature[:], consensus.aggregatedCommitSig.Serialize()[:])
 		copy(blockObj.Header().CommitBitmap[:], consensus.commitBitmap.Bitmap)
 
-		consensus.OnConsensusDone(&blockObj)
 		consensus.state = targetState
 
 		select {
@@ -262,6 +261,7 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 		consensus.ResetState()
 		consensus.consensusID++
 
+		consensus.OnConsensusDone(&blockObj)
 		utils.GetLogInstance().Debug("HOORAY!!! CONSENSUS REACHED!!!", "consensusID", consensus.consensusID, "numOfSignatures", len(commitSigs))
 
 		// TODO: remove this temporary delay

@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/harmony-one/harmony/drand"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
@@ -97,8 +99,10 @@ func TestAddPeers(t *testing.T) {
 		t.Fatalf("newhost failure: %v", err)
 	}
 	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader)
+	dRand := drand.New(host, "0", []p2p.Peer{leader, validator}, leader, nil)
 
 	node := New(host, consensus, nil)
+	node.DRand = dRand
 	r1 := node.AddPeers(peers1)
 	e1 := 2
 	if r1 != e1 {

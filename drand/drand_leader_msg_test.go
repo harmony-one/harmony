@@ -16,11 +16,11 @@ func TestConstructInitMessage(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	dRand := New(host, "0", []p2p.Peer{leader, validator}, leader)
+	dRand := New(host, "0", []p2p.Peer{leader, validator}, leader, nil)
 	dRand.blockHash = [32]byte{}
 	msg := dRand.constructInitMessage()
 
-	if len(msg) != 87 {
+	if len(msg) != 93 {
 		test.Errorf("Init message is not constructed in the correct size: %d", len(msg))
 	}
 }

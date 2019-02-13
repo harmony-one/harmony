@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/drand"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -28,6 +30,7 @@ import (
 	"github.com/harmony-one/harmony/api/service/discovery"
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/api/service/networkinfo"
+	randomness_service "github.com/harmony-one/harmony/api/service/randomness"
 	"github.com/harmony-one/harmony/api/service/staking"
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
@@ -116,10 +119,12 @@ type syncConfig struct {
 // Node represents a protocol-participating node in the network
 type Node struct {
 	Consensus              *bft.Consensus       // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
-	BlockChannel           chan *types.Block    // The channel to receive new blocks from Node
+	BlockChannel           chan *types.Block    // The channel to send newly proposed blocks
+	ConfirmedBlockChannel  chan *types.Block    // The channel to send confirmed blocks
 	pendingTransactions    types.Transactions   // All the transactions received but not yet processed for Consensus
 	transactionInConsensus []*types.Transaction // The transactions selected into the new block and under Consensus process
 	pendingTxMutex         sync.Mutex
+	DRand                  *drand.DRand // The instance for distributed randomness protocol
 
 	blockchain *core.BlockChain   // The blockchain for the shard where this node belongs
 	db         *ethdb.LDBDatabase // LevelDB to store blockchain.
@@ -267,6 +272,7 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 		chain, _ := core.NewBlockChain(database, nil, gspec.Config, node.Consensus, vm.Config{}, nil)
 		node.blockchain = chain
 		node.BlockChannel = make(chan *types.Block)
+		node.ConfirmedBlockChannel = make(chan *types.Block)
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, params.TestChainConfig, chain)
 		node.Worker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey), node.Consensus.ShardID)
 		node.AddFaucetContractToPendingTransactions()
@@ -406,6 +412,8 @@ func (node *Node) AddPeers(peers []*p2p.Peer) int {
 
 	if count > 0 {
 		node.Consensus.AddPeers(peers)
+		// TODO: make peers into a context object shared by consensus and drand
+		node.DRand.AddPeers(peers)
 	}
 	return count
 }
@@ -673,6 +681,8 @@ func (node *Node) setupForShardLeader() {
 	node.serviceManager.RegisterService(service_manager.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReady))
 	// Register client support service.
 	node.serviceManager.RegisterService(service_manager.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
+	// Register randomness service
+	node.serviceManager.RegisterService(service_manager.Randomness, randomness_service.New(node.DRand))
 }
 
 func (node *Node) setupForShardValidator() {
@@ -699,6 +709,9 @@ func (node *Node) setupForBeaconLeader() {
 	node.serviceManager.RegisterService(service_manager.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReady))
 	// Register client support service.
 	node.serviceManager.RegisterService(service_manager.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
+	// Register randomness service
+	node.serviceManager.RegisterService(service_manager.Randomness, randomness_service.New(node.DRand))
+
 }
 
 func (node *Node) setupForBeaconValidator() {
@@ -715,6 +728,8 @@ func (node *Node) setupForBeaconValidator() {
 	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, "0", chanPeer, nil))
 	// Register networkinfo service. "0" is the beacon shard ID
 	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, "0", chanPeer))
+	// Register randomness service
+	node.serviceManager.RegisterService(service_manager.Randomness, randomness_service.New(node.DRand))
 }
 
 func (node *Node) setupForNewNode() {
