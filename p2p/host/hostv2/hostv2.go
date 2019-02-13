@@ -32,8 +32,8 @@ const (
 	numOutgoing = 16
 )
 
-// PubSub captures the pubsub interface we expect from libp2p.
-type PubSub interface {
+// pubsub captures the pubsub interface we expect from libp2p.
+type pubsub interface {
 	Publish(topic string, data []byte) error
 	Subscribe(topic string, opts ...libp2p_pubsub.SubOpt) (*libp2p_pubsub.Subscription, error)
 }
@@ -41,7 +41,7 @@ type PubSub interface {
 // HostV2 is the version 2 p2p host
 type HostV2 struct {
 	h      p2p_host.Host
-	pubsub PubSub
+	pubsub pubsub
 	self   p2p.Peer
 	priKey p2p_crypto.PrivKey
 	lock   sync.Mutex
@@ -62,15 +62,15 @@ func (host *HostV2) SendMessageToGroups(groups []p2p.GroupID, msg []byte) error 
 	return error
 }
 
-// Subscription captures the subscription interface
-type Subscription interface {
+// subscription captures the subscription interface we expect from libp2p.
+type subscription interface {
 	Next(ctx context.Context) (*libp2p_pubsub.Message, error)
 	Cancel()
 }
 
 // GroupReceiverImpl is a multicast group receiver implementation.
 type GroupReceiverImpl struct {
-	sub Subscription
+	sub subscription
 }
 
 // Close closes this receiver.
