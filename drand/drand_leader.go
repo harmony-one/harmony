@@ -18,10 +18,9 @@ func (dRand *DRand) WaitForEpochBlock(blockChannel chan *types.Block, stopChan c
 			default:
 				// keep waiting for epoch block
 				newBlock := <-blockChannel
-				if newBlock.NumberU64()%core.BlocksPerEpoch == 0 {
-
+				if core.IsEpochLastBlock(newBlock) {
+					dRand.init(newBlock)
 				}
-				dRand.init(newBlock)
 			case <-stopChan:
 				return
 			}
@@ -100,5 +99,14 @@ func (dRand *DRand) processCommitMessage(message drand_proto.Message) {
 		// Construct pRand and initiate consensus on it
 		utils.GetLogInstance().Debug("Received enough randomness commit", "numReceivedSoFar", len((*vrfs)), "validatorID", validatorID, "PublicKeys", len(dRand.PublicKeys))
 		// TODO: communicate the pRand to consensus
+
+		pRnd := [32]byte{}
+		// Bitwise XOR on all the submitted vrfs
+		for _, vrf := range *vrfs {
+			for i := 0; i < len(pRnd); i++ {
+				pRnd[i] = pRnd[i] ^ vrf[i]
+			}
+		}
+		dRand.PRndChannel <- append(pRnd[:], dRand.bitmap.Bitmap...)
 	}
 }

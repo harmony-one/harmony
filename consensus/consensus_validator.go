@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"
+	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/attack"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -74,7 +75,7 @@ func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Messa
 
 	if err := consensus.checkConsensusMessage(message, consensus.leader.PubKey); err != nil {
 		utils.GetLogInstance().Debug("Failed to check the leader message")
-		if err == ErrConsensusIDNotMatch {
+		if err == consensus_engine.ErrConsensusIDNotMatch {
 			utils.GetLogInstance().Debug("sending bft block to state syncing")
 			consensus.sendBFTBlockToStateSyncing(consensusID)
 		}

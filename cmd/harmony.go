@@ -266,6 +266,7 @@ func main() {
 	// TODO: enable drand only for beacon chain
 	// TODO: put this in a better place other than main.
 	dRand := drand.New(host, shardID, peers, leader, currentNode.ConfirmedBlockChannel)
+	currentNode.Consensus.RegisterPRndChannel(dRand.PRndChannel)
 	currentNode.DRand = dRand
 
 	// If there is a client configured in the node list.

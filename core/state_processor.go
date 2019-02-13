@@ -20,7 +20,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/harmony-one/harmony/consensus"
+	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
@@ -31,13 +31,13 @@ import (
 //
 // StateProcessor implements Processor.
 type StateProcessor struct {
-	config *params.ChainConfig // Chain configuration options
-	bc     *BlockChain         // Canonical block chain
-	engine consensus.Engine    // Consensus engine used for block rewards
+	config *params.ChainConfig     // Chain configuration options
+	bc     *BlockChain             // Canonical block chain
+	engine consensus_engine.Engine // Consensus engine used for block rewards
 }
 
 // NewStateProcessor initialises a new StateProcessor.
-func NewStateProcessor(config *params.ChainConfig, bc *BlockChain, engine consensus.Engine) *StateProcessor {
+func NewStateProcessor(config *params.ChainConfig, bc *BlockChain, engine consensus_engine.Engine) *StateProcessor {
 	return &StateProcessor{
 		config: config,
 		bc:     bc,

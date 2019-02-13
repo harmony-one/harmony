@@ -38,7 +38,7 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
-	"github.com/harmony-one/harmony/consensus"
+	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -135,7 +135,7 @@ type BlockChain struct {
 	procInterrupt int32          // interrupt signaler for block processing
 	wg            sync.WaitGroup // chain processing wait group for shutting down
 
-	engine    consensus.Engine
+	engine    consensus_engine.Engine
 	processor Processor // block processor interface
 	validator Validator // block and state validator interface
 	vmConfig  vm.Config
@@ -147,7 +147,7 @@ type BlockChain struct {
 // NewBlockChain returns a fully initialised block chain using information
 // available in the database. It initialises the default Ethereum Validator and
 // Processor.
-func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig, engine consensus.Engine, vmConfig vm.Config, shouldPreserve func(block *types.Block) bool) (*BlockChain, error) {
+func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig, engine consensus_engine.Engine, vmConfig vm.Config, shouldPreserve func(block *types.Block) bool) (*BlockChain, error) {
 	if cacheConfig == nil {
 		cacheConfig = &CacheConfig{
 			TrieNodeLimit: 256 * 1024 * 1024,
@@ -221,6 +221,22 @@ func (bc *BlockChain) ValidateNewBlock(block *types.Block, address common.Addres
 		return err
 	}
 	return nil
+}
+
+// IsEpochBlock returns whether this block is the first block of an epoch.
+func IsEpochBlock(block *types.Block) bool {
+	if block.NumberU64()%BlocksPerEpoch == 0 {
+		return true
+	}
+	return false
+}
+
+// IsEpochLastBlock returns whether this block is the last block of an epoch.
+func IsEpochLastBlock(block *types.Block) bool {
+	if block.NumberU64()%BlocksPerEpoch == BlocksPerEpoch-1 {
+		return true
+	}
+	return false
 }
 
 func (bc *BlockChain) getProcInterrupt() bool {
@@ -931,7 +947,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 	// Calculate the total difficulty of the block
 	ptd := bc.GetTd(block.ParentHash(), block.NumberU64()-1)
 	if ptd == nil {
-		return NonStatTy, consensus.ErrUnknownAncestor
+		return NonStatTy, consensus_engine.ErrUnknownAncestor
 	}
 	// Make sure no inconsistent state is leaked during insertion
 	bc.mu.Lock()
@@ -1135,7 +1151,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 				continue
 			}
 
-		case err == consensus.ErrFutureBlock:
+		case err == consensus_engine.ErrFutureBlock:
 			// Allow up to MaxFuture second in the future blocks. If this limit is exceeded
 			// the chain is discarded and processed at a later time if given.
 			max := big.NewInt(time.Now().Unix() + maxTimeFutureBlocks)
@@ -1146,12 +1162,12 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 			stats.queued++
 			continue
 
-		case err == consensus.ErrUnknownAncestor && bc.futureBlocks.Contains(block.ParentHash()):
+		case err == consensus_engine.ErrUnknownAncestor && bc.futureBlocks.Contains(block.ParentHash()):
 			bc.futureBlocks.Add(block.Hash(), block)
 			stats.queued++
 			continue
 
-		case err == consensus.ErrPrunedAncestor:
+		case err == consensus_engine.ErrPrunedAncestor:
 			// Block competing with the canonical chain, store in the db, but don't process
 			// until the competitor TD goes above the canonical TD
 			currentBlock := bc.CurrentBlock()
@@ -1611,7 +1627,7 @@ func (bc *BlockChain) GetHeaderByNumber(number uint64) *types.Header {
 func (bc *BlockChain) Config() *params.ChainConfig { return bc.chainConfig }
 
 // Engine retrieves the blockchain's consensus engine.
-func (bc *BlockChain) Engine() consensus.Engine { return bc.engine }
+func (bc *BlockChain) Engine() consensus_engine.Engine { return bc.engine }
 
 // SubscribeRemovedLogsEvent registers a subscription of RemovedLogsEvent.
 func (bc *BlockChain) SubscribeRemovedLogsEvent(ch chan<- RemovedLogsEvent) event.Subscription {

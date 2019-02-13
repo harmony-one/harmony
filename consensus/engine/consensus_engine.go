@@ -1,4 +1,4 @@
-package consensus
+package engine
 
 import (
 	"github.com/ethereum/go-ethereum/common"
