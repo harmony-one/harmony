@@ -68,7 +68,7 @@ func TestGroupReceiver_Receive(t *testing.T) {
 	mc := gomock.NewController(t)
 	defer mc.Finish()
 	sub := mock.NewMocksubscription(mc)
-	ctx, _ := context.WithCancel(context.Background())
+	ctx := context.Background()
 	gomock.InOrder(
 		sub.EXPECT().Next(ctx).Return(pubsubMessage("ABC", []byte{1, 2, 3}), nil),
 		sub.EXPECT().Next(ctx).Return(pubsubMessage("DEF", []byte{4, 5, 6}), nil),

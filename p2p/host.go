@@ -17,8 +17,8 @@ type Host interface {
 	GetID() libp2p_peer.ID
 	GetP2PHost() libp2p_host.Host
 
-	AddIncomingPeer(Peer)
-	AddOutgoingPeer(Peer)
+	//AddIncomingPeer(Peer)
+	//AddOutgoingPeer(Peer)
 	ConnectHostPeer(Peer)
 
 	// SendMessageToGroups sends a message to one or more multicast groups.

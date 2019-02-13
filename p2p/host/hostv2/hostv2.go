@@ -30,8 +30,8 @@ const (
 	ProtocolID = "/harmony/0.0.1"
 
 	// Constants for discovery service.
-	numIncoming = 128
-	numOutgoing = 16
+	//numIncoming = 128
+	//numOutgoing = 16
 )
 
 // pubsub captures the pubsub interface we expect from libp2p.
@@ -48,8 +48,8 @@ type HostV2 struct {
 	priKey libp2p_crypto.PrivKey
 	lock   sync.Mutex
 
-	incomingPeers []p2p.Peer // list of incoming Peers. TODO: fixed number incoming
-	outgoingPeers []p2p.Peer // list of outgoing Peers. TODO: fixed number of outgoing
+	//incomingPeers []p2p.Peer // list of incoming Peers. TODO: fixed number incoming
+	//outgoingPeers []p2p.Peer // list of outgoing Peers. TODO: fixed number of outgoing
 }
 
 // SendMessageToGroups sends a message to one or more multicast groups.
@@ -135,15 +135,15 @@ func (host *HostV2) AddPeer(p *p2p.Peer) error {
 	return nil
 }
 
-// AddIncomingPeer add peer to incoming peer list
-func (host *HostV2) AddIncomingPeer(peer p2p.Peer) {
-	host.incomingPeers = append(host.incomingPeers, peer)
-}
-
-// AddOutgoingPeer add peer to outgoing peer list
-func (host *HostV2) AddOutgoingPeer(peer p2p.Peer) {
-	host.outgoingPeers = append(host.outgoingPeers, peer)
-}
+//// AddIncomingPeer add peer to incoming peer list
+//func (host *HostV2) AddIncomingPeer(peer p2p.Peer) {
+//	host.incomingPeers = append(host.incomingPeers, peer)
+//}
+//
+//// AddOutgoingPeer add peer to outgoing peer list
+//func (host *HostV2) AddOutgoingPeer(peer p2p.Peer) {
+//	host.outgoingPeers = append(host.outgoingPeers, peer)
+//}
 
 // Peerstore returns the peer store
 func (host *HostV2) Peerstore() libp2p_peerstore.Peerstore {
@@ -204,7 +204,11 @@ func (host *HostV2) BindHandlerAndServe(handler p2p.StreamHandler) {
 // SendMessage a p2p message sending function with signature compatible to p2pv1.
 func (host *HostV2) SendMessage(p p2p.Peer, message []byte) error {
 	logger := log.New("from", host.self, "to", p, "PeerID", p.PeerID)
-	host.Peerstore().AddProtocols(p.PeerID, ProtocolID)
+	err := host.Peerstore().AddProtocols(p.PeerID, ProtocolID)
+	if err != nil {
+		logger.Error("AddProtocols() failed", "error", err)
+		return p2p.ErrAddProtocols
+	}
 	s, err := host.h.NewStream(context.Background(), p.PeerID, libp2p_protocol.ID(ProtocolID))
 	if err != nil {
 		logger.Error("NewStream() failed", "peerID", p.PeerID,
