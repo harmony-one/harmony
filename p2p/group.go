@@ -22,6 +22,12 @@ func (id GroupID) String() string {
 	return fmt.Sprintf("%x", string(id))
 }
 
+// Const of group ID
+const (
+	GroupIDBeacon GroupID = "harmony/0.0.1/beacon"
+	GroupIDGlobal GroupID = "harmony/0.0.1/global"
+)
+
 // GroupReceiver is a multicast group message receiver interface.
 type GroupReceiver interface {
 	// Close closes this receiver.

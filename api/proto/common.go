@@ -31,6 +31,7 @@ const (
 	Node
 	Client
 	Identity
+	DRand
 	// TODO: add more types
 )
 
@@ -78,6 +79,13 @@ func GetConsensusMessagePayload(message []byte) ([]byte, error) {
 // ConstructConsensusMessage creates a message with the payload and returns as byte array.
 func ConstructConsensusMessage(payload []byte) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(Consensus)})
+	byteBuffer.Write(payload)
+	return byteBuffer.Bytes()
+}
+
+// ConstructDRandMessage creates a message with the payload and returns as byte array.
+func ConstructDRandMessage(payload []byte) []byte {
+	byteBuffer := bytes.NewBuffer([]byte{byte(DRand)})
 	byteBuffer.Write(payload)
 	return byteBuffer.Bytes()
 }

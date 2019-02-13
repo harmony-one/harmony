@@ -3,6 +3,7 @@ package node
 import (
 	"time"
 
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 )
@@ -49,6 +50,8 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 						if err != nil {
 							utils.GetLogInstance().Debug("Failed commiting new block", "Error", err)
 						} else {
+							// add new shard state if it's epoch block
+							node.addNewShardState(block)
 							newBlock = block
 							break
 						}
@@ -64,4 +67,34 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 			}
 		}
 	}()
+}
+
+func (node *Node) addNewShardState(block *types.Block) {
+	shardState := node.blockchain.GetNewShardState(block)
+	if shardState != nil {
+		shardHash := shardState.Hash()
+		utils.GetLogInstance().Debug("[resharding] adding new shard state", "shardHash", shardHash)
+		for _, c := range shardState {
+			utils.GetLogInstance().Debug("new shard information", "shardID", c.ShardID, "NodeList", c.NodeList)
+		}
+		block.AddShardStateHash(shardHash)
+	}
+}
+
+func (node *Node) addNewRandSeed(block *types.Block) {
+	blockNumber := block.NumberU64()
+	if !core.CheckEpochBlock(blockNumber) {
+		return
+	}
+
+	var rnd int64
+	epoch := core.GetEpochFromBlockNumber(blockNumber)
+	if epoch == 1 {
+		rnd = core.InitialSeed
+	} else {
+		number := core.GetPreviousEpochBlockNumber(blockNumber)
+		oldrnd := node.blockchain.GetRandSeedByNumber(number)
+		rnd = core.FakeGenRandSeed(oldrnd)
+	}
+	block.AddRandSeed(rnd)
 }

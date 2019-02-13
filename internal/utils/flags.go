@@ -48,6 +48,7 @@ func StringsToAddrs(addrStrings []string) (maddrs []ma.Multiaddr, err error) {
 
 // DefaultBootNodeAddrStrings is a list of Harmony bootnodes address. Used to find other peers in the network.
 var DefaultBootNodeAddrStrings = []string{
+	// FIXME: (leo) this is a bootnode I used for local test, change it to long running ones later
 	"/ip4/127.0.0.1/tcp/9876/p2p/QmayB8NwxmfGE4Usb4H61M8uwbfc7LRbmXb3ChseJgbVuf",
 }
 

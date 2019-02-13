@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 
 	libp2p "github.com/libp2p/go-libp2p"
@@ -25,6 +27,10 @@ const (
 	BatchSizeInByte = 1 << 16
 	// ProtocolID The ID of protocol used in stream handling.
 	ProtocolID = "/harmony/0.0.1"
+
+	// Constants for discovery service.
+	numIncoming = 128
+	numOutgoing = 16
 )
 
 // PubSub captures the pubsub interface we expect from libp2p.
@@ -39,6 +45,10 @@ type HostV2 struct {
 	pubsub PubSub
 	self   p2p.Peer
 	priKey p2p_crypto.PrivKey
+	lock   sync.Mutex
+
+	incomingPeers []p2p.Peer // list of incoming Peers. TODO: fixed number incoming
+	outgoingPeers []p2p.Peer // list of outgoing Peers. TODO: fixed number of outgoing
 }
 
 // SendMessageToGroups sends a message to one or more multicast groups.
@@ -124,6 +134,16 @@ func (host *HostV2) AddPeer(p *p2p.Peer) error {
 	return nil
 }
 
+// AddIncomingPeer add peer to incoming peer list
+func (host *HostV2) AddIncomingPeer(peer p2p.Peer) {
+	host.incomingPeers = append(host.incomingPeers, peer)
+}
+
+// AddOutgoingPeer add peer to outgoing peer list
+func (host *HostV2) AddOutgoingPeer(peer p2p.Peer) {
+	host.outgoingPeers = append(host.outgoingPeers, peer)
+}
+
 // Peerstore returns the peer store
 func (host *HostV2) Peerstore() peerstore.Peerstore {
 	return host.h.Peerstore()
@@ -142,7 +162,8 @@ func New(self *p2p.Peer, priKey p2p_crypto.PrivKey, opts ...p2p_config.Option) *
 		append(opts, libp2p.ListenAddrs(listenAddr), libp2p.Identity(priKey))...,
 	)
 	catchError(err)
-	pubsub, err := pubsub.NewGossipSub(ctx, p2pHost)
+	//	pubsub, err := pubsub.NewGossipSub(ctx, p2pHost)
+	pubsub, err := pubsub.NewFloodSub(ctx, p2pHost)
 	catchError(err)
 
 	self.PeerID = p2pHost.ID()
@@ -209,4 +230,27 @@ func (host *HostV2) Close() error {
 // GetP2PHost returns the p2p.Host
 func (host *HostV2) GetP2PHost() p2p_host.Host {
 	return host.h
+}
+
+// ConnectHostPeer connects to peer host
+func (host *HostV2) ConnectHostPeer(peer p2p.Peer) {
+	ctx := context.Background()
+	addr := fmt.Sprintf("/ip4/%s/tcp/%s/ipfs/%s", peer.IP, peer.Port, peer.PeerID.Pretty())
+	peerAddr, err := ma.NewMultiaddr(addr)
+	if err != nil {
+		utils.GetLogInstance().Error("ConnectHostPeer", "new ma error", err, "peer", peer)
+		return
+	}
+	peerInfo, err := peerstore.InfoFromP2pAddr(peerAddr)
+	if err != nil {
+		utils.GetLogInstance().Error("ConnectHostPeer", "new peerinfo error", err, "peer", peer)
+		return
+	}
+	host.lock.Lock()
+	defer host.lock.Unlock()
+	if err := host.h.Connect(ctx, *peerInfo); err != nil {
+		utils.GetLogInstance().Warn("can't connect to peer", "error", err, "peer", peer)
+	} else {
+		utils.GetLogInstance().Info("connected to peer host", "node", *peerInfo)
+	}
 }

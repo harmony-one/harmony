@@ -84,7 +84,7 @@ while getopts "hdtD:m:s:k:nSP" option; do
    case $option in
       h) usage ;;
       d) DB='-db_supported' ;;
-      t) TXGEN=$OPTARG ;;
+      t) TXGEN=false ;;
       D) DURATION=$OPTARG ;;
       m) MIN=$OPTARG ;;
       s) SHARDS=$OPTARG ;;
@@ -130,28 +130,23 @@ log_folder="tmp_log/log-$t"
 mkdir -p $log_folder
 LOG_FILE=$log_folder/r.log
 
-echo "launching beacon chain ..."
-$DRYRUN $ROOT/bin/beacon -numShards $SHARDS > $log_folder/beacon.log 2>&1 | tee -a $LOG_FILE &
-sleep 1 #waiting for beaconchain
-BC_MA=$(grep "Beacon Chain Started" $log_folder/beacon.log | awk -F: ' { print $2 } ')
-
-echo "launching boot node ..."
-$DRYRUN $ROOT/bin/bootnode > $log_folder/bootnode.log 2>&1 | tee -a $LOG_FILE &
-sleep 1
-BN_MA=$(grep "BN_MA" $log_folder/bootnode.log | awk -F\= ' { print $2 } ')
-
 HMY_OPT=
 HMY_OPT2=
-if [ -n "$BC_MA" ]; then
+
+if [ "$P2P" == "false" ]; then
+   echo "launching beacon chain ..."
+   $DRYRUN $ROOT/bin/beacon -numShards $SHARDS > $log_folder/beacon.log 2>&1 | tee -a $LOG_FILE &
+   sleep 1 #waiting for beaconchain
+   BC_MA=$(grep "Beacon Chain Started" $log_folder/beacon.log | awk -F: ' { print $2 } ')
    HMY_OPT=" -bc_addr $BC_MA"
-fi
-
-if [ -n "$BN_MA" ]; then
+else
+   echo "launching boot node ..."
+   $DRYRUN $ROOT/bin/bootnode > $log_folder/bootnode.log 2>&1 | tee -a $LOG_FILE &
+   sleep 1
+   BN_MA=$(grep "BN_MA" $log_folder/bootnode.log | awk -F\= ' { print $2 } ')
    HMY_OPT2=" -bootnodes $BN_MA"
-fi
-
-if [ "$P2P" == "true" ]; then
-   HMY_OPT2+=" -libp2p_pd"
+   HMY_OPT2+=" -libp2p_pd -is_beacon"
+   TXGEN=false
 fi
 
 NUM_NN=0
@@ -159,10 +154,13 @@ NUM_NN=0
 # Start nodes
 while IFS='' read -r line || [[ -n "$line" ]]; do
   IFS=' ' read ip port mode shardID <<< $line
-  if [[ "$mode" == "leader" || "$mode" == "validator" ]]; then
-     $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT $HMY_OPT2 -key /tmp/$ip-$port.key 2>&1 | tee -a $LOG_FILE &
-     sleep 0.5
+  if [ "$mode" == "leader" ]; then
+     $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT $HMY_OPT2 -key /tmp/$ip-$port.key -is_leader 2>&1 | tee -a $LOG_FILE &
   fi
+  if [ "$mode" == "validator" ]; then
+     $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT $HMY_OPT2 -key /tmp/$ip-$port.key 2>&1 | tee -a $LOG_FILE &
+  fi
+  sleep 0.5
   if [[ "$mode" == "newnode" && "$SYNC" == "true" ]]; then
      (( NUM_NN += 35 ))
      (sleep $NUM_NN; $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT $HMY_OPT2 -key /tmp/$ip-$port.key 2>&1 | tee -a $LOG_FILE ) &
@@ -182,10 +180,12 @@ if [ "$TXGEN" == "true" ]; then
    if [ "$mode" == "client" ]; then
       $DRYRUN $ROOT/bin/txgen -log_folder $log_folder -duration $DURATION -ip $ip -port $port $HMY_OPT 2>&1 | tee -a $LOG_FILE
    fi
+else
+   sleep $DURATION
 fi
 
 # save bc_config.json
-cp -f bc_config.json $log_folder
+[ -e bc_config.json ] && cp -f bc_config.json $log_folder
 
 cleanup
 check_result

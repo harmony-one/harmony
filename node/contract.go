@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils/contract"
+	"golang.org/x/crypto/sha3"
 )
 
 // Constants related to smart contract.
@@ -35,7 +36,8 @@ func (node *Node) AddStakingContractToPendingTransactions() {
 	dataEnc := common.FromHex(StakingContractBinary)
 	// Unsigned transaction to avoid the case of transaction address.
 	mycontracttx, _ := types.SignTx(types.NewContractCreation(uint64(0), node.Consensus.ShardID, contractFunds, params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, priKey)
-	node.ContractAddresses = append(node.ContractAddresses, crypto.CreateAddress(contractAddress, uint64(0)))
+	//node.StakingContractAddress = crypto.CreateAddress(contractAddress, uint64(0))
+	node.StakingContractAddress = node.generateDeployedStakingContractAddress(mycontracttx, contractAddress)
 	node.addPendingTransactions(types.Transactions{mycontracttx})
 }
 
@@ -49,6 +51,7 @@ func (node *Node) CreateStakingWithdrawTransaction(stake string) (*types.Transac
 		log.Error("Failed to get chain state", "Error", err)
 	}
 	nonce := state.GetNonce(crypto.PubkeyToAddress(DepositContractPriKey.PublicKey))
+<<<<<<< HEAD
 
 	withdrawFnSignature := []byte("withdraw(uint256)")
 	hash = sha3.NewKeccak256()
@@ -64,6 +67,21 @@ func (node *Node) CreateStakingWithdrawTransaction(stake string) (*types.Transac
 	dataEncl = append(dataEncl, methodID...)
 	dataEncl = append(dataEncl, paddedAmount...)
 
+=======
+	//Following: https://github.com/miguelmota/ethereum-development-with-go-book/blob/master/code/transfer_tokens.go
+	withdrawFnSignature := []byte("withdraw(uint)")
+	hash := sha3.NewLegacyKeccak256()
+	hash.Write(withdrawFnSignature)
+	methodID := hash.Sum(nil)[:4]
+
+	amount := new(big.Int)
+	amount.SetString(stake, 10)
+	paddedAmount := common.LeftPadBytes(amount.Bytes(), 32)
+
+	var dataEnc []byte
+	dataEnc = append(dataEnc, methodID...)
+	dataEnc = append(dataEnc, paddedAmount...)
+>>>>>>> 32037247d07b8dfb435122485913384942d4855d
 	tx, err := types.SignTx(types.NewTransaction(nonce, DepositContractAddress, node.Consensus.ShardID, big.NewInt(0), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, node.AccountKey)
 	return tx, err
 }

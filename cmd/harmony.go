@@ -11,6 +11,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
+	peerstore "github.com/libp2p/go-libp2p-peerstore"
+	multiaddr "github.com/multiformats/go-multiaddr"
+
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/internal/attack"
 	pkg_newnode "github.com/harmony-one/harmony/internal/newnode"
@@ -19,8 +22,6 @@ import (
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
-	peerstore "github.com/libp2p/go-libp2p-peerstore"
-	multiaddr "github.com/multiformats/go-multiaddr"
 )
 
 var (
@@ -108,6 +109,12 @@ func main() {
 	// isBeacon indicates this node is a beacon chain node
 	isBeacon := flag.Bool("is_beacon", false, "true means this node is a beacon chain node")
 
+	// isLeader indicates this node is a beacon chain leader node during the bootstrap process
+	isLeader := flag.Bool("is_leader", false, "true means this node is a beacon chain leader node")
+
+	// logConn logs incoming/outgoing connections
+	logConn := flag.Bool("log_conn", false, "log incoming/outgoing connections")
+
 	flag.Parse()
 
 	if *versionFlag {
@@ -131,56 +138,72 @@ func main() {
 		utils.BootNodes = bootNodeAddrs
 	}
 
-	var shardID string
+	var shardID = "0"
 	var peers []p2p.Peer
 	var leader p2p.Peer
 	var selfPeer p2p.Peer
 	var clientPeer *p2p.Peer
 	var BCPeer *p2p.Peer
-	priKey, err := utils.LoadKeyFromFile(*keyFile)
+	var role string
+
+	nodePriKey, _, err := utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
 		panic(err)
 	}
 
-	if *bcAddr != "" {
-		// Turn the destination into a multiaddr.
-		maddr, err := multiaddr.NewMultiaddr(*bcAddr)
-		if err != nil {
-			panic(err)
+	peerPriKey, peerPubKey := utils.GenKey(*ip, *port)
+	if peerPriKey == nil || peerPubKey == nil {
+		panic(fmt.Errorf("generate key error"))
+	}
+	selfPeer = p2p.Peer{IP: *ip, Port: *port, ValidatorID: -1, PubKey: peerPubKey}
+
+	if !*libp2pPD {
+		if *bcAddr != "" {
+			// Turn the destination into a multiaddr.
+			maddr, err := multiaddr.NewMultiaddr(*bcAddr)
+			if err != nil {
+				panic(err)
+			}
+
+			// Extract the peer ID from the multiaddr.
+			info, err := peerstore.InfoFromP2pAddr(maddr)
+			if err != nil {
+				panic(err)
+			}
+
+			BCPeer = &p2p.Peer{IP: *bcIP, Port: *bcPort, Addrs: info.Addrs, PeerID: info.ID}
+		} else {
+			BCPeer = &p2p.Peer{IP: *bcIP, Port: *bcPort}
 		}
 
-		// Extract the peer ID from the multiaddr.
-		info, err := peerstore.InfoFromP2pAddr(maddr)
-		if err != nil {
-			panic(err)
+		//Use Peer Discovery to get shard/leader/peer/...
+		candidateNode := pkg_newnode.New(*ip, *port, nodePriKey)
+		candidateNode.AddPeer(BCPeer)
+		candidateNode.ContactBeaconChain(*BCPeer)
+
+		shardID = candidateNode.GetShardID()
+		leader = candidateNode.GetLeader()
+		selfPeer = candidateNode.GetSelfPeer()
+		clientPeer = candidateNode.GetClientPeer()
+		selfPeer.PubKey = candidateNode.PubK
+
+		if leader.IP == *ip && leader.Port == *port {
+			role = "leader"
+		} else {
+			role = "validator"
 		}
 
-		BCPeer = &p2p.Peer{IP: *bcIP, Port: *bcPort, Addrs: info.Addrs, PeerID: info.ID}
+		if role == "validator" {
+			// Attack determination.
+			attack.GetInstance().SetAttackEnabled(attackDetermination(*attackedMode))
+		}
 	} else {
-		BCPeer = &p2p.Peer{IP: *bcIP, Port: *bcPort}
-	}
-
-	//Use Peer Discovery to get shard/leader/peer/...
-	candidateNode := pkg_newnode.New(*ip, *port, priKey)
-	candidateNode.AddPeer(BCPeer)
-	candidateNode.ContactBeaconChain(*BCPeer)
-
-	shardID = candidateNode.GetShardID()
-	leader = candidateNode.GetLeader()
-	selfPeer = candidateNode.GetSelfPeer()
-	clientPeer = candidateNode.GetClientPeer()
-	selfPeer.PubKey = candidateNode.PubK
-
-	var role string
-	if leader.IP == *ip && leader.Port == *port {
-		role = "leader"
-	} else {
-		role = "validator"
-	}
-
-	if role == "validator" {
-		// Attack determination.
-		attack.GetInstance().SetAttackEnabled(attackDetermination(*attackedMode))
+		if *isLeader {
+			role = "leader"
+			leader = selfPeer
+		} else {
+			role = "validator"
+		}
 	}
 	// Init logging.
 	loggingInit(*logFolder, role, *ip, *port, *onlyLogTps)
@@ -191,7 +214,10 @@ func main() {
 		ldb, _ = InitLDBDatabase(*ip, *port, *freshDB)
 	}
 
-	host, err := p2pimpl.NewHost(&selfPeer, priKey)
+	host, err := p2pimpl.NewHost(&selfPeer, nodePriKey)
+	if *logConn {
+		host.GetP2PHost().Network().Notify(utils.ConnLogger)
+	}
 	if err != nil {
 		panic("unable to new host in harmony")
 	}
@@ -201,6 +227,7 @@ func main() {
 	host.AddPeer(&leader)
 
 	// Consensus object.
+	// TODO: consensus object shouldn't start here
 	consensus := consensus.New(host, shardID, peers, leader)
 	consensus.MinPeers = *minPeers
 
@@ -216,15 +243,17 @@ func main() {
 	// Current node.
 	currentNode := node.New(host, consensus, ldb)
 	currentNode.Consensus.OfflinePeers = currentNode.OfflinePeers
-	if role == "leader" {
-		if *isBeacon {
+	currentNode.Role = node.NewNode
+
+	if *isBeacon {
+		if role == "leader" {
 			currentNode.Role = node.BeaconLeader
 		} else {
-			currentNode.Role = node.ShardLeader
+			currentNode.Role = node.BeaconValidator
 		}
 	} else {
-		if *isBeacon {
-			currentNode.Role = node.BeaconValidator
+		if role == "leader" {
+			currentNode.Role = node.ShardLeader
 		} else {
 			currentNode.Role = node.ShardValidator
 		}
@@ -240,14 +269,14 @@ func main() {
 	consensus.OnConsensusDone = currentNode.PostConsensusProcessing
 	currentNode.State = node.NodeWaitToJoin
 
-	if *libp2pPD {
-		currentNode.Role = node.NewNode
-	} else {
+	if !*libp2pPD {
 		if consensus.IsLeader {
 			currentNode.State = node.NodeLeader
 		} else {
 			go currentNode.JoinShard(leader)
 		}
+	} else {
+		currentNode.UseLibP2P = true
 	}
 
 	go currentNode.SupportSyncing()
