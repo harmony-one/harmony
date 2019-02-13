@@ -18,7 +18,6 @@ import (
 	peerstore "github.com/libp2p/go-libp2p-peerstore"
 	protocol "github.com/libp2p/go-libp2p-protocol"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	p2p_config "github.com/libp2p/go-libp2p/config"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
@@ -150,7 +149,7 @@ func (host *HostV2) Peerstore() peerstore.Peerstore {
 }
 
 // New creates a host for p2p communication
-func New(self *p2p.Peer, priKey p2p_crypto.PrivKey, opts ...p2p_config.Option) *HostV2 {
+func New(self *p2p.Peer, priKey p2p_crypto.PrivKey) *HostV2 {
 	listenAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", self.Port))
 	if err != nil {
 		log.Error("New MA Error", "IP", self.IP, "Port", self.Port)
@@ -159,7 +158,7 @@ func New(self *p2p.Peer, priKey p2p_crypto.PrivKey, opts ...p2p_config.Option) *
 	// TODO – use WithCancel for orderly host teardown (which we don't have yet)
 	ctx := context.Background()
 	p2pHost, err := libp2p.New(ctx,
-		append(opts, libp2p.ListenAddrs(listenAddr), libp2p.Identity(priKey))...,
+		libp2p.ListenAddrs(listenAddr), libp2p.Identity(priKey),
 	)
 	catchError(err)
 	pubsub, err := pubsub.NewGossipSub(ctx, p2pHost)
