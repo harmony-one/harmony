@@ -31,6 +31,7 @@ import (
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/api/service/networkinfo"
 	randomness_service "github.com/harmony-one/harmony/api/service/randomness"
+	"github.com/harmony-one/harmony/api/service/staking"
 
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
@@ -682,9 +683,8 @@ func (node *Node) setupForNewNode() {
 	nodeConfig, chanPeer := node.initNodeConfiguration()
 
 	// Register staking service.
-	// node.serviceManager.RegisterService(service_manager.Staking, staking.New(node.AccountKey, 0, stakingPeer))
-	// TODO: (leo) no need to start discovery service for new node until we received the sharding info
-	// Register peer discovery service.
+	node.serviceManager.RegisterService(service_manager.Staking, staking.New(node.AccountKey, 0, stakingPeer, nil))
+	// Register peer discovery service. "0" is the beacon shard ID
 	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
 	// Register networkinfo service. "0" is the beacon shard ID
 	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
