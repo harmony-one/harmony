@@ -34,6 +34,7 @@ type DRand struct {
 
 	// Public keys of the committee including leader and validators
 	PublicKeys []*bls.PublicKey
+	pubKeyLock sync.Mutex
 
 	// private/public keys of current node
 	priKey *bls.SecretKey
@@ -112,6 +113,24 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer, confi
 	dRand.ShardID = uint32(myShardID)
 
 	return &dRand
+}
+
+// AddPeers adds new peers into the validator map of the consensus
+// and add the public keys
+func (dRand *DRand) AddPeers(peers []*p2p.Peer) int {
+	count := 0
+
+	for _, peer := range peers {
+		_, ok := dRand.validators.Load(utils.GetUniqueIDFromPeer(*peer))
+		if !ok {
+			dRand.validators.Store(utils.GetUniqueIDFromPeer(*peer), *peer)
+			dRand.pubKeyLock.Lock()
+			dRand.PublicKeys = append(dRand.PublicKeys, peer.PubKey)
+			dRand.pubKeyLock.Unlock()
+		}
+		count++
+	}
+	return count
 }
 
 // Sign on the drand message signature field.
@@ -198,4 +217,14 @@ func (dRand *DRand) getValidatorPeerByID(validatorID uint32) *p2p.Peer {
 		return nil
 	}
 	return &value
+}
+
+// ResetState resets the state of the randomness protocol
+func (dRand *DRand) ResetState() {
+	dRand.vrfs = &map[uint32][]byte{}
+
+	bitmap, _ := bls_cosi.NewMask(dRand.PublicKeys, dRand.leader.PubKey)
+	dRand.bitmap = bitmap
+	dRand.pRand = nil
+	dRand.rand = nil
 }

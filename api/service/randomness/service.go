@@ -21,36 +21,7 @@ func New(dRand *drand.DRand) *Service {
 func (s *Service) StartService() {
 	s.stopChan = make(chan struct{})
 	s.stoppedChan = make(chan struct{})
-
-	s.Init()
-	s.Run(s.stopChan, s.stoppedChan)
-}
-
-// Init initializes randomness generation.
-func (s *Service) Init() {
-}
-
-// Run runs randomness generation.
-func (s *Service) Run(stopChan chan struct{}, stoppedChan chan struct{}) {
-	utils.GetLogInstance().Info("Running random generation")
-	go func() {
-		defer close(stoppedChan)
-		for {
-			select {
-			case newBlock := <-s.DRand.ConfirmedBlockChannel:
-				_ = newBlock
-				utils.GetLogInstance().Debug("[RAND] Received New Block")
-				s.DoRandomGeneration()
-			case <-stopChan:
-				return
-			}
-		}
-	}()
-}
-
-// DoRandomGeneration does rarandomnessndom generation.
-func (s *Service) DoRandomGeneration() {
-
+	s.DRand.WaitForEpochBlock(s.DRand.ConfirmedBlockChannel, s.stopChan, s.stoppedChan)
 }
 
 // StopService stops randomness generation service.

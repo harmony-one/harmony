@@ -20,7 +20,7 @@ func TestConstructCommitMessage(test *testing.T) {
 	dRand.blockHash = [32]byte{}
 	msg := dRand.constructCommitMessage([32]byte{}, []byte{})
 
-	if len(msg) != 121 {
+	if len(msg) != 127 {
 		test.Errorf("Commit message is not constructed in the correct size: %d", len(msg))
 	}
 }

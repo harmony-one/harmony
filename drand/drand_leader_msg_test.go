@@ -20,7 +20,7 @@ func TestConstructInitMessage(test *testing.T) {
 	dRand.blockHash = [32]byte{}
 	msg := dRand.constructInitMessage()
 
-	if len(msg) != 87 {
+	if len(msg) != 93 {
 		test.Errorf("Init message is not constructed in the correct size: %d", len(msg))
 	}
 }

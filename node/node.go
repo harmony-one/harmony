@@ -412,6 +412,8 @@ func (node *Node) AddPeers(peers []*p2p.Peer) int {
 
 	if count > 0 {
 		node.Consensus.AddPeers(peers)
+		// TODO: make peers into a context object shared by consensus and drand
+		node.DRand.AddPeers(peers)
 	}
 	return count
 }
@@ -679,6 +681,8 @@ func (node *Node) setupForShardLeader() {
 	node.serviceManager.RegisterService(service_manager.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReady))
 	// Register client support service.
 	node.serviceManager.RegisterService(service_manager.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
+	// Register randomness service
+	node.serviceManager.RegisterService(service_manager.Randomness, randomness_service.New(node.DRand))
 }
 
 func (node *Node) setupForShardValidator() {

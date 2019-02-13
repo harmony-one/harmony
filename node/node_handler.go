@@ -117,6 +117,17 @@ func (node *Node) messageHandler(content []byte) {
 			// TODO(minhdoan): add logic to check if the current blockchain is not sync with other consensus
 			// we should switch to other state rather than DoingConsensus.
 		}
+	case proto.DRand:
+		msgPayload, _ := proto.GetDRandMessagePayload(content)
+		if node.DRand != nil {
+			if node.DRand.IsLeader {
+				utils.GetLogInstance().Info("NET: DRand Leader received message:", "messageCategory", msgCategory, "messageType", msgType)
+				node.DRand.ProcessMessageLeader(msgPayload)
+			} else {
+				utils.GetLogInstance().Info("NET: DRand Validator received message:", "messageCategory", msgCategory, "messageType", msgType)
+				node.DRand.ProcessMessageValidator(msgPayload)
+			}
+		}
 	case proto.Node:
 		actionType := proto_node.MessageType(msgType)
 		switch actionType {
@@ -249,7 +260,8 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 	}
 	node.AddNewBlock(newBlock)
 
-	if node.Role == BeaconLeader && node.DRand != nil {
+	// TODO: enable drand only for beacon chain
+	if node.DRand != nil {
 		go func() {
 			node.ConfirmedBlockChannel <- newBlock
 		}()

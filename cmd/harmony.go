@@ -254,9 +254,6 @@ func main() {
 			currentNode.Role = node.BeaconValidator
 		}
 
-		// Add randomness protocol
-		dRand := drand.New(host, shardID, peers, leader, currentNode.ConfirmedBlockChannel)
-		currentNode.DRand = dRand
 	} else {
 		if role == "leader" {
 			currentNode.Role = node.ShardLeader
@@ -264,6 +261,11 @@ func main() {
 			currentNode.Role = node.ShardValidator
 		}
 	}
+
+	// Add randomness protocol
+	// TODO: enable drand only for beacon chain
+	dRand := drand.New(host, shardID, peers, leader, currentNode.ConfirmedBlockChannel)
+	currentNode.DRand = dRand
 
 	// If there is a client configured in the node list.
 	if clientPeer != nil {

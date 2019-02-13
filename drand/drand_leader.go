@@ -15,10 +15,8 @@ func (dRand *DRand) WaitForEpochBlock(blockChannel chan *types.Block, stopChan c
 		for {
 			select {
 			default:
-				// keep waiting for new blocks
+				// keep waiting for epoch block
 				newBlock := <-blockChannel
-				// TODO: think about potential race condition
-
 				dRand.init(newBlock)
 			case <-stopChan:
 				return
@@ -28,6 +26,8 @@ func (dRand *DRand) WaitForEpochBlock(blockChannel chan *types.Block, stopChan c
 }
 
 func (dRand *DRand) init(epochBlock *types.Block) {
+	utils.GetLogInstance().Debug("INITING DRAND")
+	dRand.ResetState()
 	// Copy over block hash and block header data
 	blockHash := epochBlock.Hash()
 	copy(dRand.blockHash[:], blockHash[:])
@@ -66,8 +66,16 @@ func (dRand *DRand) processCommitMessage(message drand_proto.Message) {
 		return
 	}
 
+	validatorID := message.SenderId
+	validatorPeer := dRand.getValidatorPeerByID(validatorID)
+	vrfs := dRand.vrfs
+	if len((*vrfs)) >= ((len(dRand.PublicKeys))/3 + 1) {
+		utils.GetLogInstance().Debug("Received additional randomness commit message", "validatorID", validatorID)
+		return
+	}
+
 	// Verify message signature
-	err := verifyMessageSig(dRand.leader.PubKey, message)
+	err := verifyMessageSig(validatorPeer.PubKey, message)
 	if err != nil {
 		utils.GetLogInstance().Warn("Failed to verify the message signature", "Error", err)
 		return
@@ -79,15 +87,14 @@ func (dRand *DRand) processCommitMessage(message drand_proto.Message) {
 	_ = proof
 	// TODO: check the validity of the vrf commit
 
-	validatorID := message.SenderId
-	validatorPeer := dRand.getValidatorPeerByID(validatorID)
-	vrfs := dRand.vrfs
-	utils.GetLogInstance().Debug("Received new prepare signature", "numReceivedSoFar", len((*vrfs)), "validatorID", validatorID, "PublicKeys", len(dRand.PublicKeys))
+	utils.GetLogInstance().Debug("Received new commit", "numReceivedSoFar", len((*vrfs)), "validatorID", validatorID, "PublicKeys", len(dRand.PublicKeys))
 
 	(*vrfs)[validatorID] = message.Payload
 	dRand.bitmap.SetKey(validatorPeer.PubKey, true) // Set the bitmap indicating that this validator signed.
 
 	if len((*vrfs)) >= ((len(dRand.PublicKeys))/3 + 1) {
 		// Construct pRand and initiate consensus on it
+		utils.GetLogInstance().Debug("Received enough randomness commit", "numReceivedSoFar", len((*vrfs)), "validatorID", validatorID, "PublicKeys", len(dRand.PublicKeys))
+		// TODO: communicate the pRand to consensus
 	}
 }
