@@ -3,6 +3,7 @@ package consensus
 import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/p2p"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
@@ -103,7 +104,11 @@ func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Messa
 
 	// Construct and send prepare message
 	msgToSend := consensus.constructPrepareMessage()
-	consensus.SendMessage(consensus.leader, msgToSend)
+	if utils.UseLibP2P {
+		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, msgToSend)
+	} else {
+		consensus.SendMessage(consensus.leader, msgToSend)
+	}
 
 	consensus.state = PrepareDone
 }
@@ -163,7 +168,11 @@ func (consensus *Consensus) processPreparedMessage(message consensus_proto.Messa
 	// Construct and send the commit message
 	multiSigAndBitmap := append(multiSig, bitmap...)
 	msgToSend := consensus.constructCommitMessage(multiSigAndBitmap)
-	consensus.SendMessage(consensus.leader, msgToSend)
+	if utils.UseLibP2P {
+		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, msgToSend)
+	} else {
+		consensus.SendMessage(consensus.leader, msgToSend)
+	}
 
 	consensus.state = CommitDone
 }

@@ -432,7 +432,11 @@ func (consensus *Consensus) RemovePeers(peers []p2p.Peer) int {
 		pong := proto_discovery.NewPongMessage(validators, consensus.PublicKeys)
 		buffer := pong.ConstructPongMessage()
 
-		host.BroadcastMessageFromLeader(consensus.host, validators, buffer, consensus.OfflinePeers)
+		if utils.UseLibP2P {
+			consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, buffer)
+		} else {
+			host.BroadcastMessageFromLeader(consensus.host, validators, buffer, consensus.OfflinePeers)
+		}
 	}
 
 	return count2

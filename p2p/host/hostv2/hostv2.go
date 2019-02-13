@@ -162,8 +162,8 @@ func New(self *p2p.Peer, priKey p2p_crypto.PrivKey, opts ...p2p_config.Option) *
 		append(opts, libp2p.ListenAddrs(listenAddr), libp2p.Identity(priKey))...,
 	)
 	catchError(err)
-	//	pubsub, err := pubsub.NewGossipSub(ctx, p2pHost)
-	pubsub, err := pubsub.NewFloodSub(ctx, p2pHost)
+	pubsub, err := pubsub.NewGossipSub(ctx, p2pHost)
+	// pubsub, err := pubsub.NewFloodSub(ctx, p2pHost)
 	catchError(err)
 
 	self.PeerID = p2pHost.ID()

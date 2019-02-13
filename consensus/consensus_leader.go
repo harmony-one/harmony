@@ -14,6 +14,7 @@ import (
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 )
 
@@ -107,7 +108,11 @@ func (consensus *Consensus) startConsensus(newBlock *types.Block) {
 	// Leader sign the block hash itself
 	consensus.prepareSigs[consensus.nodeID] = consensus.priKey.SignHash(consensus.blockHash[:])
 
-	host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
+	if utils.UseLibP2P {
+		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, msgToSend)
+	} else {
+		host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
+	}
 }
 
 // processPrepareMessage processes the prepare message sent from validators
@@ -164,7 +169,12 @@ func (consensus *Consensus) processPrepareMessage(message consensus_proto.Messag
 		// Construct and broadcast prepared message
 		msgToSend, aggSig := consensus.constructPreparedMessage()
 		consensus.aggregatedPrepareSig = aggSig
-		host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
+
+		if utils.UseLibP2P {
+			consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, msgToSend)
+		} else {
+			host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
+		}
 
 		// Set state to targetState
 		consensus.state = targetState
@@ -230,7 +240,12 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 		// Construct and broadcast committed message
 		msgToSend, aggSig := consensus.constructCommittedMessage()
 		consensus.aggregatedCommitSig = aggSig
-		host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
+
+		if utils.UseLibP2P {
+			consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, msgToSend)
+		} else {
+			host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
+		}
 
 		var blockObj types.Block
 		err := rlp.DecodeBytes(consensus.block, &blockObj)
