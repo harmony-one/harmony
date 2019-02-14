@@ -94,10 +94,14 @@ Make sure you use the following command and make sure everything passed before s
 Harmony is licensed under the MIT License.  See [`LICENSE`](LICENSE) file for
 the terms and conditions.
 
+Harmony includes third-party open source code.  In general, a source subtree
+with a `LICENSE` or `COPYRIGHT` file is from a third party, and our
+modifications thereto are licensed under the same third-party open source
+license.
+
 Also please see [our Fiduciary License Agreement](FLA.md) if you are
 contributing to the project.  By your submission of your contribution to us, you
 and we mutually agree to the terms and conditions of the agreement.
-
 
 ## Contributing To Harmony
 
