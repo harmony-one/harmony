@@ -135,7 +135,6 @@ func (node *Node) messageHandler(content []byte, sender string) {
 			utils.GetLogInstance().Info("NET: Leader received message:", "messageCategory", msgCategory)
 			consensusObj.ProcessMessageLeader(msgPayload)
 		} else {
-<<<<<<< HEAD
 			utils.GetLogInstance().Info("NET: Validator received message:", "messageCategory", msgCategory)
 			consensusObj.ProcessMessageValidator(msgPayload)
 			// TODO(minhdoan): add logic to check if the current blockchain is not sync with other consensus
