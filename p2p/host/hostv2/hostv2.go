@@ -48,6 +48,9 @@ type discovery interface {
 	Advertise(
 		ctx context.Context, ns string, opts ...libp2p_discovery.Option,
 	) (time.Duration, error)
+	FindPeers(
+		ctx context.Context, ns string, opts ...libp2p_discovery.Option,
+	) (<-chan libp2p_peerstore.PeerInfo, error)
 }
 
 // discoveryPackage is the freestanding function interface we expect from the
@@ -298,6 +301,40 @@ func (host *HostV2) BindHandlerAndServe(handler p2p.StreamHandler) {
 	<-make(chan struct{})
 }
 
+func (host *HostV2) ensurePeerAddrs(peerID libp2p_peer.ID) error {
+	ctx := context.TODO()
+	logger := host.logger.New("peerID", peerID)
+	ps := host.Peerstore()
+	pi := ps.PeerInfo(peerID)
+	if len(pi.Addrs) > 0 {
+		return nil
+	}
+	// TODO ek – dedup lookups
+	logger.Info("initiating lookup")
+	peerInfos, err := host.disc.FindPeers(ctx, string(peerID))
+	if err != nil {
+		logger.Error("FindPeers() failed", "error", err)
+		return p2p.ErrFindPeers
+	}
+	for peerInfo := range peerInfos {
+		if peerInfo.ID != peerID {
+			panic(fmt.Sprintf("returned peer ID %v != requested peer ID %v",
+				peerInfo.ID, peerID))
+		}
+		if len(peerInfo.Addrs) > 0 {
+			logger.Info("found peers", "addresses", peerInfo.Addrs)
+		}
+		// TODO ek – should lifetime be configurable?
+		ps.AddAddrs(peerInfo.ID, peerInfo.Addrs, 1*time.Hour)
+	}
+	pi = ps.PeerInfo(peerID)
+	if len(pi.Addrs) == 0 {
+		logger.Error("FindPeers() returned no addresses")
+		return p2p.ErrPeerNotFound
+	}
+	return nil
+}
+
 // SendMessage a p2p message sending function with signature compatible to p2pv1.
 func (host *HostV2) SendMessage(p p2p.Peer, message []byte) error {
 	logger := host.logger.New("from", host.self, "to", p, "PeerID", p.PeerID)
@@ -305,6 +342,15 @@ func (host *HostV2) SendMessage(p p2p.Peer, message []byte) error {
 	if err != nil {
 		logger.Error("AddProtocols() failed", "error", err)
 		return p2p.ErrAddProtocols
+	}
+	for { // TODO ek – should retries be finite?
+		if err := host.ensurePeerAddrs(p.PeerID); err == nil {
+			break
+		}
+		delay := 5 * time.Second
+		logger.Warn("cannot find peer addresses, sleeping",
+			"error", err, "delay", delay)
+		time.Sleep(delay)
 	}
 	s, err := host.h.NewStream(context.Background(), p.PeerID, libp2p_protocol.ID(ProtocolID))
 	if err != nil {
