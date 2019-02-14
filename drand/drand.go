@@ -23,7 +23,8 @@ type DRand struct {
 	bitmap                *bls_cosi.Mask
 	pRand                 *[32]byte
 	rand                  *[32]byte
-	ConfirmedBlockChannel chan *types.Block // Channel for confirmed blocks
+	ConfirmedBlockChannel chan *types.Block // Channel to receive confirmed blocks
+	PRndChannel           chan []byte       // Channel to send pRnd (preimage of randomness resulting from combined vrf randomnesses) to consensus. The first 32 bytes are randomness, the rest is for bitmap.
 
 	// map of nodeID to validator Peer object
 	// FIXME: should use PubKey of p2p.Peer as the hashkey
@@ -64,6 +65,8 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer, confi
 	if confirmedBlockChannel != nil {
 		dRand.ConfirmedBlockChannel = confirmedBlockChannel
 	}
+
+	dRand.PRndChannel = make(chan []byte)
 
 	selfPeer := host.GetSelfPeer()
 	if leader.Port == selfPeer.Port && leader.IP == selfPeer.IP {

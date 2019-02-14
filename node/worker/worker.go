@@ -8,7 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/harmony-one/harmony/consensus"
+	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -33,7 +33,7 @@ type Worker struct {
 	current *environment // An environment for current running cycle.
 
 	coinbase common.Address
-	engine   consensus.Engine
+	engine   consensus_engine.Engine
 
 	gasFloor uint64
 	gasCeil  uint64
@@ -156,7 +156,7 @@ func (w *Worker) Commit() (*types.Block, error) {
 }
 
 // New create a new worker object.
-func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus.Engine, coinbase common.Address, shardID uint32) *Worker {
+func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus_engine.Engine, coinbase common.Address, shardID uint32) *Worker {
 	worker := &Worker{
 		config: config,
 		chain:  chain,

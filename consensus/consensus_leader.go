@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/harmony-one/harmony/core"
+
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -48,6 +50,19 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan *types.Block, stop
 					time.Sleep(waitForEnoughValidators * time.Millisecond)
 				}
 
+				if core.IsEpochBlock(newBlock) {
+					// Receive pRnd from DRG protocol
+					utils.GetLogInstance().Debug("[DRG] Waiting for pRnd")
+					pRndAndBitmap := <-consensus.PRndChannel
+					utils.GetLogInstance().Debug("[DRG] GOT pRnd", "pRnd", pRndAndBitmap)
+					pRnd := pRndAndBitmap[:32]
+					bitmap := pRndAndBitmap[32:]
+					vrfBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.PubKey)
+					vrfBitmap.SetMask(bitmap)
+
+					// TODO: check validity of pRnd
+					_ = pRnd
+				}
 				startTime = time.Now()
 				utils.GetLogInstance().Debug("STARTING CONSENSUS", "numTxs", len(newBlock.Transactions()), "consensus", consensus, "startTime", startTime, "publicKeys", len(consensus.PublicKeys))
 				for { // Wait until last consensus is finished
