@@ -6,10 +6,18 @@
 
 ## Installation Requirements
 GMP and OpenSSL
+
+##### MacOS
 ```bash
 brew install gmp
 brew install openssl
 ```
+
+##### Ubuntu
+```bash
+sudo apt-get install make g++ libgmp-dev
+```
+
 
 ## Dev Environment Setup
 
