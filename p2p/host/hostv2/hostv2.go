@@ -67,9 +67,15 @@ func (realDiscoveryPackage) Advertise(
 
 var realDiscPkg realDiscoveryPackage
 
+// dht is the Kademlia DHT interface we expect from libp2p.
+type dht interface {
+	Bootstrap(ctx context.Context) error
+}
+
 // HostV2 is the version 2 p2p host
 type HostV2 struct {
 	h       libp2p_host.Host
+	dht     dht
 	discPkg discoveryPackage
 	disc    discovery
 	pubsub  pubsub
@@ -222,6 +228,7 @@ func New(self *p2p.Peer, priKey libp2p_crypto.PrivKey) *HostV2 {
 	// has to save the private key for host
 	h := &HostV2{
 		h:         p2pHost,
+		dht:       dht,
 		discPkg:   realDiscPkg,
 		disc:      disc,
 		pubsub:    pubsub,
@@ -231,11 +238,30 @@ func New(self *p2p.Peer, priKey libp2p_crypto.PrivKey) *HostV2 {
 		finishing: make(chan struct{}),
 	}
 	h.runBackground(h.advertiseSelf)
+	h.runBackground(h.bootstrapDHT)
 
 	h.logger.Debug("HostV2 is up!",
 		"port", self.Port, "id", p2pHost.ID().Pretty(), "addr", listenAddr)
 
 	return h
+}
+
+func (host *HostV2) bootstrapDHT() {
+	host.logger.Debug("bootstrapDHT: starting bootstrap")
+	ctx, cancel := context.WithCancel(context.Background())
+	if err := host.dht.Bootstrap(ctx); err != nil {
+		host.logger.Error("failed to bootstrap DHT", "error", err)
+		return
+	}
+	host.logger.Debug("bootstrapDHT: waiting for host to close")
+	for {
+		_, ok := <-host.finishing
+		if !ok {
+			break
+		}
+	}
+	cancel()
+	host.logger.Debug("bootstrapDHT: finished")
 }
 
 func (host *HostV2) advertiseSelf() {
