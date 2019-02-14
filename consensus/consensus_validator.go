@@ -42,7 +42,7 @@ func (consensus *Consensus) IsValidatorMessage(message *msg_pb.Message) bool {
 }
 
 // ProcessMessageValidator dispatches validator's consensus message.
-func (consensus *Consensus) NewProcessMessageValidator(payload []byte) {
+func (consensus *Consensus) ProcessMessageValidator(payload []byte) {
 	message := &msg_pb.Message{}
 	err := protobuf.Unmarshal(payload, message)
 	if err != nil {
