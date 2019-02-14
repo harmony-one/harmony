@@ -1,6 +1,8 @@
 package discovery
 
 import (
+	"time"
+
 	"github.com/ethereum/go-ethereum/log"
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	"github.com/harmony-one/harmony/p2p"
@@ -46,9 +48,14 @@ func (s *Service) StopService() {
 // Run is the main function of the service
 func (s *Service) Run() {
 	go s.contactP2pPeers()
+	//	go s.pingPeer()
 }
 
 func (s *Service) contactP2pPeers() {
+	tick := time.NewTicker(5 * time.Second)
+	ping := proto_discovery.NewPingMessage(s.host.GetSelfPeer())
+	buffer := ping.ConstructPingMessage()
+	content := host.ConstructP2pMessage(byte(0), buffer)
 	for {
 		select {
 		case peer, ok := <-s.peerChan:
@@ -62,9 +69,17 @@ func (s *Service) contactP2pPeers() {
 			log.Debug("[DISCOVERY]", "add outgoing peer", peer)
 			// TODO: stop ping if pinged before
 			// TODO: call staking servcie here if it is a new node
-			s.pingPeer(peer)
+			if s.stakingChan != nil {
+				s.stakingChan <- peer
+			}
 		case <-s.stopChan:
+			log.Debug("[DISCOVERY] stop")
 			return
+		case <-tick.C:
+			err := s.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, content)
+			if err != nil {
+				log.Error("Failed to send ping message", "group", p2p.GroupIDBeacon)
+			}
 		}
 	}
 }
@@ -74,19 +89,24 @@ func (s *Service) Init() {
 	log.Info("Init discovery service")
 }
 
-func (s *Service) pingPeer(peer p2p.Peer) {
+func (s *Service) pingPeer() {
+	tick := time.NewTicker(5 * time.Second)
 	ping := proto_discovery.NewPingMessage(s.host.GetSelfPeer())
 	buffer := ping.ConstructPingMessage()
 	content := host.ConstructP2pMessage(byte(0), buffer)
+
+	for {
+		select {
+		case <-tick.C:
+			err := s.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, content)
+			if err != nil {
+				log.Error("Failed to send ping message", "group", p2p.GroupIDBeacon)
+			}
+		case <-s.stopChan:
+			log.Info("Stop sending ping message")
+			return
+		}
+	}
 	//	s.host.SendMessage(peer, content)
 	//   log.Debug("Sent Ping Message via unicast to", "peer", peer)
-	err := s.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, content)
-	if err != nil {
-		log.Error("Failed to send ping message", "group", p2p.GroupIDBeacon)
-	} else {
-		log.Debug("[PING] sent Ping Message via group send to", "peer", peer)
-	}
-	if s.stakingChan != nil {
-		s.stakingChan <- peer
-	}
 }

@@ -379,7 +379,7 @@ func (consensus *Consensus) AddPeers(peers []*p2p.Peer) int {
 			consensus.pubKeyLock.Lock()
 			consensus.PublicKeys = append(consensus.PublicKeys, peer.PubKey)
 			consensus.pubKeyLock.Unlock()
-			utils.GetLogInstance().Debug("[SYNC]", "new peer added", peer)
+			//			utils.GetLogInstance().Debug("[SYNC]", "new peer added", peer)
 		}
 		count++
 	}
@@ -432,7 +432,11 @@ func (consensus *Consensus) RemovePeers(peers []p2p.Peer) int {
 		pong := proto_discovery.NewPongMessage(validators, consensus.PublicKeys)
 		buffer := pong.ConstructPongMessage()
 
-		host.BroadcastMessageFromLeader(consensus.host, validators, buffer, consensus.OfflinePeers)
+		if utils.UseLibP2P {
+			consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, buffer)
+		} else {
+			host.BroadcastMessageFromLeader(consensus.host, validators, buffer, consensus.OfflinePeers)
+		}
 	}
 
 	return count2
