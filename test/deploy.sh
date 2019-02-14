@@ -76,7 +76,7 @@ DURATION=90
 MIN=2
 SHARDS=2
 KILLPORT=9004
-SYNC=false
+SYNC=true
 DRYRUN=
 P2P=false
 
@@ -103,8 +103,7 @@ if [ -z "$config" ]; then
 fi
 
 if [ "$SYNC" == "true" ]; then
-    DURATION=300
-    SHARDS=1
+    DURATION=600
 fi
 
 # Kill nodes if any

@@ -56,3 +56,12 @@ echo $NUM_SHARDS shards, $NUM_CONSENSUS consensus, $SUM total TPS, $NUM_VALIDATO
 for t in "${!TPS[@]}"; do
    echo $t, ${TPS[$t]}
 done
+
+
+FILES=$(cat $VALIDATORS) 
+for i in $FILES; do
+    peer=`echo $i | cut -f 5 -d - | cut -f 1 -d .`
+    num=`grep "Inserted new block" $i | tail -n 1 | cut -f 6 -d , | grep -Eo [0-9]+`
+    echo "peerID": $peer, "numOfConsensus": $num
+done
+

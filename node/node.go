@@ -561,9 +561,11 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 		peerID := binary.BigEndian.Uint32(request.PeerHash)
 		if _, ok := node.peerRegistrationRecord[peerID]; ok {
 			response.Type = downloader_pb.DownloaderResponse_FAIL
+			utils.GetLogInstance().Warn("[SYNC] peerRegistration record already exists", "peerID", peerID)
 			return response, nil
 		} else if len(node.peerRegistrationRecord) >= maxBroadcastNodes {
 			response.Type = downloader_pb.DownloaderResponse_FAIL
+			utils.GetLogInstance().Warn("[SYNC] maximum registration limit exceeds", "peerID", peerID)
 			return response, nil
 		} else {
 			peer, ok := node.Consensus.GetPeerFromID(peerID)
@@ -572,10 +574,9 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 			}
 			client := downloader.ClientSetup(peer.IP, GetSyncingPort(peer.Port))
 			if client == nil {
-				utils.GetLogInstance().Warn("[SYNC] unable to setup client")
+				utils.GetLogInstance().Warn("[SYNC] unable to setup client for peerID", "peerID", peerID)
 				return response, nil
 			}
-			utils.GetLogInstance().Debug("[SYNC] client setup correctly", "client", client)
 			config := &syncConfig{timestamp: time.Now().UnixNano(), client: client}
 			node.stateMutex.Lock()
 			node.peerRegistrationRecord[peerID] = config
