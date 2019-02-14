@@ -245,12 +245,12 @@ func TestUpdateStakingWithdrawal(t *testing.T) {
 	Address := crypto.PubkeyToAddress(node.AccountKey.PublicKey)
 	node.CurrentStakes[Address] = int64(1010)
 
-	withdrawFnSignature := []byte("withdraw(uint)")
+	withdrawFnSignature := []byte("withdraw(uint256)")
 	hash := sha3.NewLegacyKeccak256()
 	hash.Write(withdrawFnSignature)
 	methodID := hash.Sum(nil)[:4]
 
-	stake := "1000"
+	stake := "10"
 	amount := new(big.Int)
 	amount.SetString(stake, 10)
 	paddedAmount := common.LeftPadBytes(amount.Bytes(), 32)
@@ -269,7 +269,7 @@ func TestUpdateStakingWithdrawal(t *testing.T) {
 	if !ok {
 		t.Error("The correct address was not present")
 	}
-	if value != 10 {
+	if value != int64(1000) {
 		t.Error("The correct stake value was not subtracted")
 	}
 

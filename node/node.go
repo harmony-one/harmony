@@ -15,6 +15,7 @@ import (
 	"github.com/harmony-one/harmony/drand"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
@@ -31,6 +32,7 @@ import (
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/api/service/networkinfo"
 	randomness_service "github.com/harmony-one/harmony/api/service/randomness"
+
 	"github.com/harmony-one/harmony/api/service/staking"
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
@@ -273,6 +275,7 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 		node.blockchain = chain
 		node.BlockChannel = make(chan *types.Block)
 		node.ConfirmedBlockChannel = make(chan *types.Block)
+
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, params.TestChainConfig, chain)
 		node.Worker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey), node.Consensus.ShardID)
 		node.AddFaucetContractToPendingTransactions()
@@ -631,27 +634,27 @@ func (node *Node) UpdateStakingList(block *types.Block) error {
 	txns := block.Transactions()
 	for i := range txns {
 		txn := txns[i]
-		value := txn.Value().Int64()
-		currentSender, _ := types.Sender(signerType, txn)
-		_, isPresent := node.CurrentStakes[currentSender]
 		toAddress := txn.To()
 		if *toAddress != node.StakingContractAddress { //Not a address aimed at the staking contract.
 			continue
 		}
-		//This should be based on a switch case on function signature.
-		//TODO (ak) https://github.com/harmony-one/harmony/issues/430
-		if value > int64(0) { //If value >0 means its a staking deposit transaction
+		currentSender, _ := types.Sender(signerType, txn)
+		_, isPresent := node.CurrentStakes[currentSender]
+		data := txn.Data()
+		switch funcSignature := decodeFuncSign(data); funcSignature {
+		case "0xd0e30db0": //deposit
+			amount := txn.Value()
+			value := amount.Int64()
 			if isPresent {
-				//This means this node has increaserd its stake
+				//This means the node has increased its stake.
 				node.CurrentStakes[currentSender] += value
 			} else {
+				//This means its a new node that is staking the first time.
 				node.CurrentStakes[currentSender] = value
 			}
-		} else { //This means node has withdrawn stake.
-			getData := txn.Data()
-			value := decodeStakeCall(getData) //Value being withdrawn
+		case "0x2e1a7d4d": //withdaw
+			value := decodeStakeCall(data)
 			if isPresent {
-				//This means this node has increaserd its stake
 				if node.CurrentStakes[currentSender] > value {
 					node.CurrentStakes[currentSender] -= value
 				} else if node.CurrentStakes[currentSender] == value {
@@ -660,8 +663,10 @@ func (node *Node) UpdateStakingList(block *types.Block) error {
 					continue //Overdraft protection.
 				}
 			} else {
-				node.CurrentStakes[currentSender] = value
+				continue //no-op: a node that is not staked cannot withdraw stake.
 			}
+		default:
+			continue //no-op if its not deposit or withdaw
 		}
 	}
 	return nil
@@ -672,6 +677,12 @@ func decodeStakeCall(getData []byte) int64 {
 	value.SetBytes(getData[4:]) //Escape the method call.
 	return value.Int64()
 }
+
+func decodeFuncSign(data []byte) string {
+	funcSign := hexutil.Encode(data[:4])
+	return funcSign
+}
+
 func (node *Node) setupForShardLeader() {
 	// Register explorer service.
 	node.serviceManager.RegisterService(service_manager.SupportExplorer, explorer.New(&node.SelfPeer))

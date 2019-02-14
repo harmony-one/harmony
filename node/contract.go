@@ -8,7 +8,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/core/types"
@@ -51,37 +50,21 @@ func (node *Node) CreateStakingWithdrawTransaction(stake string) (*types.Transac
 		log.Error("Failed to get chain state", "Error", err)
 	}
 	nonce := state.GetNonce(crypto.PubkeyToAddress(DepositContractPriKey.PublicKey))
-<<<<<<< HEAD
 
 	withdrawFnSignature := []byte("withdraw(uint256)")
-	hash = sha3.NewKeccak256()
+	hash := sha3.NewLegacyKeccak256()
 	hash.Write(withdrawFnSignature)
-	methodID = hash.Sum(nil)[:4]
+	methodID := hash.Sum(nil)[:4]
 
 	withdraw := stake
 	withdrawstake := new(big.Int)
 	withdrawstake.SetString(withdraw, 10)
 	paddedAmount := common.LeftPadBytes(withdrawstake.Bytes(), 32)
 
-	var dataEncl []byte
-	dataEncl = append(dataEncl, methodID...)
-	dataEncl = append(dataEncl, paddedAmount...)
-
-=======
-	//Following: https://github.com/miguelmota/ethereum-development-with-go-book/blob/master/code/transfer_tokens.go
-	withdrawFnSignature := []byte("withdraw(uint)")
-	hash := sha3.NewLegacyKeccak256()
-	hash.Write(withdrawFnSignature)
-	methodID := hash.Sum(nil)[:4]
-
-	amount := new(big.Int)
-	amount.SetString(stake, 10)
-	paddedAmount := common.LeftPadBytes(amount.Bytes(), 32)
-
 	var dataEnc []byte
 	dataEnc = append(dataEnc, methodID...)
 	dataEnc = append(dataEnc, paddedAmount...)
->>>>>>> 32037247d07b8dfb435122485913384942d4855d
+
 	tx, err := types.SignTx(types.NewTransaction(nonce, DepositContractAddress, node.Consensus.ShardID, big.NewInt(0), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, node.AccountKey)
 	return tx, err
 }
