@@ -94,6 +94,7 @@ func (node *Node) messageHandler(content []byte) {
 
 	switch msgCategory {
 	case proto.Identity:
+		"Will use this to handle accepting transactions"
 		actionType := proto_identity.IDMessageType(msgType)
 		switch actionType {
 		case proto_identity.Identity:
