@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	consensus_proto "github.com/harmony-one/harmony/api/consensus"
+	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
@@ -102,16 +102,21 @@ func TestPopulateMessageFields(t *testing.T) {
 	consensus.blockHash = blockHash
 	consensus.nodeID = 3
 
-	msg := consensus_proto.Message{}
-	consensus.populateMessageFields(&msg)
+	msg := &msg_pb.Message{
+		Request: &msg_pb.Message_Consensus{
+			Consensus: &msg_pb.ConsensusRequest{},
+		},
+	}
+	consensusMsg := msg.GetConsensus()
+	consensus.populateMessageFields(consensusMsg)
 
-	if msg.ConsensusId != 2 {
+	if consensusMsg.ConsensusId != 2 {
 		t.Errorf("Consensus ID is not populated correctly")
 	}
-	if !bytes.Equal(msg.BlockHash[:], blockHash[:]) {
+	if !bytes.Equal(consensusMsg.BlockHash[:], blockHash[:]) {
 		t.Errorf("Block hash is not populated correctly")
 	}
-	if msg.SenderId != 3 {
+	if consensusMsg.SenderId != 3 {
 		t.Errorf("Sender ID is not populated correctly")
 	}
 }
@@ -129,8 +134,8 @@ func TestSignAndMarshalConsensusMessage(t *testing.T) {
 	consensus.blockHash = blockHash
 	consensus.nodeID = 3
 
-	msg := consensus_proto.Message{}
-	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(&msg)
+	msg := &msg_pb.Message{}
+	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(msg)
 
 	if err != nil || len(marshaledMessage) == 0 {
 		t.Errorf("Failed to sign and marshal the message: %s", err)

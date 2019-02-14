@@ -5,6 +5,7 @@ import (
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/attack"
@@ -194,7 +195,6 @@ func (consensus *Consensus) processCommittedMessage(message *msg_pb.Message) {
 	utils.GetLogInstance().Warn("Received Committed Message", "nodeID", consensus.nodeID)
 
 	consensusMsg := message.GetConsensus()
-
 	consensusID := consensusMsg.ConsensusId
 	leaderID := consensusMsg.SenderId
 	messagePayload := consensusMsg.Payload
