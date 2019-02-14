@@ -16,6 +16,8 @@ brew install openssl
 ##### Ubuntu
 ```bash
 sudo apt-get install make g++ libgmp-dev
+# install newest stable go from snap
+sudo snap install --classic go
 ```
 
 
