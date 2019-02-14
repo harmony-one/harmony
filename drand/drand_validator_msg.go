@@ -14,7 +14,9 @@ func (dRand *DRand) constructCommitMessage(vrf [32]byte, proof []byte) []byte {
 
 	message.BlockHash = dRand.blockHash[:]
 	message.Payload = append(vrf[:], proof...)
-
+	// Adding the public key into payload so leader can verify the vrf
+	// TODO: change the curve to follow the same curve with consensus, so the public key doesn't need to be attached.
+	message.Payload = append(message.Payload, (*dRand.vrfPubKey).Serialize()...)
 	marshaledMessage, err := dRand.signAndMarshalDRandMessage(&message)
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to sign and marshal the commit message", "error", err)

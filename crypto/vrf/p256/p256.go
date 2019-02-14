@@ -37,8 +37,8 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/google/keytransparency/core/crypto/vrf"
 	"github.com/google/trillian/crypto/keys"
+	"github.com/harmony-one/harmony/crypto/vrf"
 
 	"github.com/golang/protobuf/proto"
 )
@@ -65,6 +65,17 @@ type PublicKey struct {
 // PrivateKey holds a private VRF key.
 type PrivateKey struct {
 	*ecdsa.PrivateKey
+}
+
+// Serialize serialize the public key into bytes
+func (pk *PublicKey) Serialize() []byte {
+	return append(pk.PublicKey.X.Bytes(), pk.PublicKey.Y.Bytes()...)
+}
+
+// Deserialize de-serialize bytes into public key
+func (pk *PublicKey) Deserialize(data []byte) {
+	pk.X.SetBytes(data[:len(data)/2])
+	pk.Y.SetBytes(data[len(data)/2:])
 }
 
 // GenerateKey generates a fresh keypair for this VRF
