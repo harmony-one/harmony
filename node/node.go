@@ -118,6 +118,13 @@ type syncConfig struct {
 	client    *downloader.Client
 }
 
+//constants related to staking
+const (
+	depositFuncSignature  = "0xd0e30db0"
+	withdrawFuncSignature = "0x2e1a7d4d"
+	funcSingatureBytes    = 4
+)
+
 // Node represents a protocol-participating node in the network
 type Node struct {
 	Consensus              *bft.Consensus       // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
@@ -642,7 +649,7 @@ func (node *Node) UpdateStakingList(block *types.Block) error {
 		_, isPresent := node.CurrentStakes[currentSender]
 		data := txn.Data()
 		switch funcSignature := decodeFuncSign(data); funcSignature {
-		case "0xd0e30db0": //deposit
+		case depositFuncSignature: //deposit, currently: 0xd0e30db0
 			amount := txn.Value()
 			value := amount.Int64()
 			if isPresent {
@@ -652,7 +659,7 @@ func (node *Node) UpdateStakingList(block *types.Block) error {
 				//This means its a new node that is staking the first time.
 				node.CurrentStakes[currentSender] = value
 			}
-		case "0x2e1a7d4d": //withdaw
+		case withdrawFuncSignature: //withdaw, currently: 0x2e1a7d4d
 			value := decodeStakeCall(data)
 			if isPresent {
 				if node.CurrentStakes[currentSender] > value {
@@ -674,12 +681,12 @@ func (node *Node) UpdateStakingList(block *types.Block) error {
 
 func decodeStakeCall(getData []byte) int64 {
 	value := new(big.Int)
-	value.SetBytes(getData[4:]) //Escape the method call.
+	value.SetBytes(getData[funcSingatureBytes:]) //Escape the method call.
 	return value.Int64()
 }
 
 func decodeFuncSign(data []byte) string {
-	funcSign := hexutil.Encode(data[:4])
+	funcSign := hexutil.Encode(data[:funcSingatureBytes])
 	return funcSign
 }
 
