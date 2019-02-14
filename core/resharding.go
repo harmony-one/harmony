@@ -94,11 +94,6 @@ func GetEpochFromBlockNumber(blockNumber uint64) uint64 {
 	return blockNumber / uint64(BlocksPerEpoch)
 }
 
-// CheckEpochBlock check whethere a given block number is the one to store epoch information
-func CheckEpochBlock(blockNumber uint64) bool {
-	return blockNumber%uint64(BlocksPerEpoch) == 0
-}
-
 // GetPreviousEpochBlockNumber gets the epoch block number of previous epoch
 func GetPreviousEpochBlockNumber(blockNumber uint64) uint64 {
 	epoch := GetEpochFromBlockNumber(blockNumber)

@@ -225,18 +225,12 @@ func (bc *BlockChain) ValidateNewBlock(block *types.Block, address common.Addres
 
 // IsEpochBlock returns whether this block is the first block of an epoch.
 func IsEpochBlock(block *types.Block) bool {
-	if block.NumberU64()%BlocksPerEpoch == 0 {
-		return true
-	}
-	return false
+	return block.NumberU64()%BlocksPerEpoch == 0
 }
 
 // IsEpochLastBlock returns whether this block is the last block of an epoch.
 func IsEpochLastBlock(block *types.Block) bool {
-	if block.NumberU64()%BlocksPerEpoch == BlocksPerEpoch-1 {
-		return true
-	}
-	return false
+	return block.NumberU64()%BlocksPerEpoch == BlocksPerEpoch-1
 }
 
 func (bc *BlockChain) getProcInterrupt() bool {
@@ -1699,11 +1693,11 @@ func (bc *BlockChain) GetRandSeedByNumber(number uint64) int64 {
 // epoch block is where the new shard state stored
 func (bc *BlockChain) GetNewShardState(block *types.Block) types.ShardState {
 	hash := block.Hash()
-	number := block.NumberU64()
 	// just ignore non-epoch block
-	if !CheckEpochBlock(number) {
+	if !IsEpochBlock(block) {
 		return nil
 	}
+	number := block.NumberU64()
 	shardState := bc.GetShardState(hash, number)
 	if shardState == nil {
 		epoch := GetEpochFromBlockNumber(number)
