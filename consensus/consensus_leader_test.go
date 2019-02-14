@@ -1,26 +1,22 @@
 package consensus
 
 import (
+	"crypto/sha256"
 	"fmt"
-
 	"testing"
 	"time"
-
-	"crypto/sha256"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/golang/mock/gomock"
 	protobuf "github.com/golang/protobuf/proto"
-	consensus_proto "github.com/harmony-one/harmony/api/consensus"
+	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
-	mock_host "github.com/harmony-one/harmony/p2p/host/mock"
-	"github.com/stretchr/testify/assert"
-
-	"github.com/harmony-one/harmony/p2p/p2pimpl"
-
 	"github.com/harmony-one/harmony/p2p"
+	mock_host "github.com/harmony-one/harmony/p2p/host/mock"
+	"github.com/harmony-one/harmony/p2p/p2pimpl"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -65,7 +61,7 @@ func TestProcessMessageLeaderPrepare(test *testing.T) {
 		consensusValidators[i] = New(hosts[i], "0", validators, leader)
 		consensusValidators[i].blockHash = blockHash
 		msg := consensusValidators[i].constructPrepareMessage()
-		consensusLeader.ProcessMessageLeader(msg[1:])
+		consensusLeader.ProcessMessageLeader(msg)
 	}
 
 	assert.Equal(test, PreparedDone, consensusLeader.state)
@@ -109,14 +105,18 @@ func TestProcessMessageLeaderPrepareInvalidSignature(test *testing.T) {
 
 		consensusValidators[i] = New(hosts[i], "0", validators, leader)
 		consensusValidators[i].blockHash = blockHash
-		msg := consensusValidators[i].constructPrepareMessage()
+		msgBytes := consensusValidators[i].constructPrepareMessage()
 
-		message := consensus_proto.Message{}
-		protobuf.Unmarshal(msg[1:], &message)
+		message := &msg_pb.Message{}
+		if err = protobuf.Unmarshal(msgBytes, message); err != nil {
+			test.Error("Error when unmarshalling")
+		}
 		// Put invalid signature
 		message.Signature = consensusValidators[i].signMessage([]byte("random string"))
-		msg, _ = protobuf.Marshal(&message)
-		consensusLeader.ProcessMessageLeader(msg[1:])
+		if msgBytes, err = protobuf.Marshal(message); err != nil {
+			test.Error("Error when marshalling")
+		}
+		consensusLeader.ProcessMessageLeader(msgBytes)
 	}
 
 	assert.Equal(test, Finished, consensusLeader.state)
@@ -176,7 +176,7 @@ func TestProcessMessageLeaderCommit(test *testing.T) {
 		consensusValidators[i] = New(hosts[i], "0", validators, leader)
 		consensusValidators[i].blockHash = blockHash
 		msg := consensusValidators[i].constructCommitMessage(multiSigAndBitmap)
-		consensusLeader.ProcessMessageLeader(msg[1:])
+		consensusLeader.ProcessMessageLeader(msg)
 	}
 
 	assert.Equal(test, Finished, consensusLeader.state)

@@ -3,10 +3,11 @@ package consensus
 import (
 	"testing"
 
-	"github.com/harmony-one/harmony/p2p/p2pimpl"
-
+	protobuf "github.com/golang/protobuf/proto"
+	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/p2p/p2pimpl"
 )
 
 func TestConstructPrepareMessage(test *testing.T) {
@@ -19,10 +20,15 @@ func TestConstructPrepareMessage(test *testing.T) {
 	}
 	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader)
 	consensus.blockHash = [32]byte{}
-	msg := consensus.constructPrepareMessage()
+	msgBytes := consensus.constructPrepareMessage()
 
-	if len(msg) != 93 {
-		test.Errorf("Prepare message is not constructed in the correct size: %d", len(msg))
+	msg := &msg_pb.Message{}
+	if err := protobuf.Unmarshal(msgBytes, msg); err != nil {
+		test.Error("Can not parse the message", err)
+	} else {
+		if msg.GetConsensus() == nil || !consensus.IsValidatorMessage(msg) {
+			test.Error("Wrong message")
+		}
 	}
 }
 
@@ -38,7 +44,8 @@ func TestConstructCommitMessage(test *testing.T) {
 	consensus.blockHash = [32]byte{}
 	msg := consensus.constructCommitMessage([]byte("random string"))
 
-	if len(msg) != 143 {
-		test.Errorf("Commit message is not constructed in the correct size: %d", len(msg))
+	message := &msg_pb.Message{}
+	if err = protobuf.Unmarshal(msg, message); err != nil {
+		test.Errorf("Error when unmarshalling a message")
 	}
 }
