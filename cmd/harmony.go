@@ -9,6 +9,8 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/harmony-one/harmony/drand"
+
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	peerstore "github.com/libp2p/go-libp2p-peerstore"
@@ -251,6 +253,7 @@ func main() {
 		} else {
 			currentNode.Role = node.BeaconValidator
 		}
+
 	} else {
 		if role == "leader" {
 			currentNode.Role = node.ShardLeader
@@ -258,6 +261,11 @@ func main() {
 			currentNode.Role = node.ShardValidator
 		}
 	}
+
+	// Add randomness protocol
+	// TODO: enable drand only for beacon chain
+	dRand := drand.New(host, shardID, peers, leader, currentNode.ConfirmedBlockChannel)
+	currentNode.DRand = dRand
 
 	// If there is a client configured in the node list.
 	if clientPeer != nil {

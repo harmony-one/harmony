@@ -76,6 +76,14 @@ func GetConsensusMessagePayload(message []byte) ([]byte, error) {
 	return message[MessageCategoryBytes:], nil
 }
 
+// GetDRandMessagePayload gets the randomness message payload from the p2p message content
+func GetDRandMessagePayload(message []byte) ([]byte, error) {
+	if len(message) < MessageCategoryBytes {
+		return []byte{}, errors.New("failed to get message payload: no data available")
+	}
+	return message[MessageCategoryBytes:], nil
+}
+
 // ConstructConsensusMessage creates a message with the payload and returns as byte array.
 func ConstructConsensusMessage(payload []byte) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(Consensus)})
