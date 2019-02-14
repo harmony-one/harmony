@@ -42,6 +42,8 @@ var (
 	}
 	e2 = "pong:1=>length:2"
 
+	leaderPubKey = pki.GetBLSPrivateKeyFromInt(888).GetPublicKey()
+
 	pubKeys = []*bls.PublicKey{pubKey1, pubKey2}
 
 	buf1 []byte
@@ -63,7 +65,7 @@ func TestString(test *testing.T) {
 		test.Errorf("expect: %v, got: %v", e3, r3)
 	}
 
-	pong1 := NewPongMessage(p2, pubKeys)
+	pong1 := NewPongMessage(p2, pubKeys, leaderPubKey)
 	r2 := fmt.Sprintf("%v", *pong1)
 
 	if !strings.HasPrefix(r2, e2) {
@@ -86,7 +88,7 @@ func TestSerialize(test *testing.T) {
 		test.Error("Serialize/Deserialze Ping Message Failed")
 	}
 
-	pong1 := NewPongMessage(p2, pubKeys)
+	pong1 := NewPongMessage(p2, pubKeys, leaderPubKey)
 	buf2 = pong1.ConstructPongMessage()
 
 	msg2, err := proto.GetMessagePayload(buf2)
