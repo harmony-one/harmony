@@ -1,13 +1,28 @@
 syntax = "proto3";
 package message;
 
+// ReceiverType indicates who is the receiver of this message.
+enum ReceiverType {
+  NEWNODE = 0;
+  LEADER = 1;
+  VALIDATOR = 2;
+  CLIENT = 3;
+}
+
+// ServiceType indicates which service used to generate this message.
+enum ServiceType {
+  CONSENSUS = 0;
+  STAKING = 1;
+}
+
+// MessageType indicates what is the type of this message.
 enum MessageType {
-  UNKNOWN = 0;
-  NEWNODE_BOOTNODE = 1;
-  BOOTNODE_NEWNODE = 2;
-  NEWNODE_BEACON = 3;
-  BEACON_NEWNODE = 4;
-  NEWNODE_BEACON_STAKING = 5;
+  NEWNODE_BEACON_STAKING = 0;
+  ANNOUNCE = 1;
+  PREPARE = 2;
+  PREPARED = 3;
+  COMMIT = 4;
+  COMMITTED = 5;
 }
 
 // This is universal message for all communication protocols.
@@ -16,22 +31,27 @@ enum MessageType {
 //
 // The request field will be either one of the structure corresponding to the MessageType type.
 message Message {
-    MessageType type = 1;
-    oneof request {
-        StakingRequest staking = 3;
-    }
-}
-
-// Message of NewNode talking to BootNode.
-message NewNodeBootNodeRequest {
-}
-
-// Message of BootNode talking to NewNode.
-message BootNodeNewNodeRequest {
+  ReceiverType receiver_type = 1;
+  ServiceType service_type = 2;
+  MessageType type = 3;
+  bytes signature = 4;
+  oneof request {
+      StakingRequest staking = 5;
+      ConsensusRequest consensus = 6;
+  }
 }
 
 // Staking Request from new node to beacon node.
 message StakingRequest {
   bytes transaction = 1;
   string node_id = 2;
+}
+
+// Consensus request.
+// TODO: Will organize more later.
+message ConsensusRequest {
+  uint32 consensus_id = 1;
+  bytes block_hash = 2;
+  uint32 sender_id = 3;
+  bytes payload = 4;
 }

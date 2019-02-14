@@ -1,25 +1,32 @@
 package consensus
 
 import (
-	consensus_proto "github.com/harmony-one/harmony/api/consensus"
 	"github.com/harmony-one/harmony/api/proto"
+	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // Construct the prepare message to send to leader (assumption the consensus data is already verified)
 func (consensus *Consensus) constructPrepareMessage() []byte {
-	message := consensus_proto.Message{}
-	message.Type = consensus_proto.MessageType_PREPARE
-
-	consensus.populateMessageFields(&message)
-
-	// 48 byte of bls signature
-	sign := consensus.priKey.SignHash(message.BlockHash)
-	if sign != nil {
-		message.Payload = sign.Serialize()
+	message := &msg_pb.Message{
+		ReceiverType: msg_pb.ReceiverType_VALIDATOR,
+		ServiceType:  msg_pb.ServiceType_CONSENSUS,
+		Type:         msg_pb.MessageType_PREPARE,
+		Request: &msg_pb.Message_Consensus{
+			Consensus: &msg_pb.ConsensusRequest{},
+		},
 	}
 
-	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(&message)
+	consensusMsg := message.GetConsensus()
+	consensus.populateMessageFields(consensusMsg)
+
+	// 48 byte of bls signature
+	sign := consensus.priKey.SignHash(consensusMsg.BlockHash)
+	if sign != nil {
+		consensusMsg.Payload = sign.Serialize()
+	}
+
+	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to sign and marshal the Prepare message", "error", err)
 	}
@@ -28,18 +35,25 @@ func (consensus *Consensus) constructPrepareMessage() []byte {
 
 // Construct the commit message which contains the signature on the multi-sig of prepare phase.
 func (consensus *Consensus) constructCommitMessage(multiSigAndBitmap []byte) []byte {
-	message := consensus_proto.Message{}
-	message.Type = consensus_proto.MessageType_COMMIT
+	message := &msg_pb.Message{
+		ReceiverType: msg_pb.ReceiverType_VALIDATOR,
+		ServiceType:  msg_pb.ServiceType_CONSENSUS,
+		Type:         msg_pb.MessageType_COMMIT,
+		Request: &msg_pb.Message_Consensus{
+			Consensus: &msg_pb.ConsensusRequest{},
+		},
+	}
 
-	consensus.populateMessageFields(&message)
+	consensusMsg := message.GetConsensus()
+	consensus.populateMessageFields(consensusMsg)
 
 	// 48 byte of bls signature
 	sign := consensus.priKey.SignHash(multiSigAndBitmap)
 	if sign != nil {
-		message.Payload = sign.Serialize()
+		consensusMsg.Payload = sign.Serialize()
 	}
 
-	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(&message)
+	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to sign and marshal the Commit message", "error", err)
 	}

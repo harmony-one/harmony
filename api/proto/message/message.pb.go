@@ -20,33 +20,92 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
+// ReceiverType indicates who is the receiver of this message.
+type ReceiverType int32
+
+const (
+	ReceiverType_NEWNODE   ReceiverType = 0
+	ReceiverType_LEADER    ReceiverType = 1
+	ReceiverType_VALIDATOR ReceiverType = 2
+	ReceiverType_CLIENT    ReceiverType = 3
+)
+
+var ReceiverType_name = map[int32]string{
+	0: "NEWNODE",
+	1: "LEADER",
+	2: "VALIDATOR",
+	3: "CLIENT",
+}
+
+var ReceiverType_value = map[string]int32{
+	"NEWNODE":   0,
+	"LEADER":    1,
+	"VALIDATOR": 2,
+	"CLIENT":    3,
+}
+
+func (x ReceiverType) String() string {
+	return proto.EnumName(ReceiverType_name, int32(x))
+}
+
+func (ReceiverType) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor_33c57e4bae7b9afd, []int{0}
+}
+
+// ServiceType indicates which service used to generate this message.
+type ServiceType int32
+
+const (
+	ServiceType_CONSENSUS ServiceType = 0
+	ServiceType_STAKING   ServiceType = 1
+)
+
+var ServiceType_name = map[int32]string{
+	0: "CONSENSUS",
+	1: "STAKING",
+}
+
+var ServiceType_value = map[string]int32{
+	"CONSENSUS": 0,
+	"STAKING":   1,
+}
+
+func (x ServiceType) String() string {
+	return proto.EnumName(ServiceType_name, int32(x))
+}
+
+func (ServiceType) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor_33c57e4bae7b9afd, []int{1}
+}
+
+// MessageType indicates what is the type of this message.
 type MessageType int32
 
 const (
-	MessageType_UNKNOWN                MessageType = 0
-	MessageType_NEWNODE_BOOTNODE       MessageType = 1
-	MessageType_BOOTNODE_NEWNODE       MessageType = 2
-	MessageType_NEWNODE_BEACON         MessageType = 3
-	MessageType_BEACON_NEWNODE         MessageType = 4
-	MessageType_NEWNODE_BEACON_STAKING MessageType = 5
+	MessageType_NEWNODE_BEACON_STAKING MessageType = 0
+	MessageType_ANNOUNCE               MessageType = 1
+	MessageType_PREPARE                MessageType = 2
+	MessageType_PREPARED               MessageType = 3
+	MessageType_COMMIT                 MessageType = 4
+	MessageType_COMMITTED              MessageType = 5
 )
 
 var MessageType_name = map[int32]string{
-	0: "UNKNOWN",
-	1: "NEWNODE_BOOTNODE",
-	2: "BOOTNODE_NEWNODE",
-	3: "NEWNODE_BEACON",
-	4: "BEACON_NEWNODE",
-	5: "NEWNODE_BEACON_STAKING",
+	0: "NEWNODE_BEACON_STAKING",
+	1: "ANNOUNCE",
+	2: "PREPARE",
+	3: "PREPARED",
+	4: "COMMIT",
+	5: "COMMITTED",
 }
 
 var MessageType_value = map[string]int32{
-	"UNKNOWN":                0,
-	"NEWNODE_BOOTNODE":       1,
-	"BOOTNODE_NEWNODE":       2,
-	"NEWNODE_BEACON":         3,
-	"BEACON_NEWNODE":         4,
-	"NEWNODE_BEACON_STAKING": 5,
+	"NEWNODE_BEACON_STAKING": 0,
+	"ANNOUNCE":               1,
+	"PREPARE":                2,
+	"PREPARED":               3,
+	"COMMIT":                 4,
+	"COMMITTED":              5,
 }
 
 func (x MessageType) String() string {
@@ -54,7 +113,7 @@ func (x MessageType) String() string {
 }
 
 func (MessageType) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptor_33c57e4bae7b9afd, []int{0}
+	return fileDescriptor_33c57e4bae7b9afd, []int{2}
 }
 
 // This is universal message for all communication protocols.
@@ -63,9 +122,13 @@ func (MessageType) EnumDescriptor() ([]byte, []int) {
 //
 // The request field will be either one of the structure corresponding to the MessageType type.
 type Message struct {
-	Type MessageType `protobuf:"varint,1,opt,name=type,proto3,enum=message.MessageType" json:"type,omitempty"`
+	ReceiverType ReceiverType `protobuf:"varint,1,opt,name=receiver_type,json=receiverType,proto3,enum=message.ReceiverType" json:"receiver_type,omitempty"`
+	ServiceType  ServiceType  `protobuf:"varint,2,opt,name=service_type,json=serviceType,proto3,enum=message.ServiceType" json:"service_type,omitempty"`
+	Type         MessageType  `protobuf:"varint,3,opt,name=type,proto3,enum=message.MessageType" json:"type,omitempty"`
+	Signature    []byte       `protobuf:"bytes,4,opt,name=signature,proto3" json:"signature,omitempty"`
 	// Types that are valid to be assigned to Request:
 	//	*Message_Staking
+	//	*Message_Consensus
 	Request              isMessage_Request `protobuf_oneof:"request"`
 	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
 	XXX_unrecognized     []byte            `json:"-"`
@@ -97,11 +160,32 @@ func (m *Message) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_Message proto.InternalMessageInfo
 
+func (m *Message) GetReceiverType() ReceiverType {
+	if m != nil {
+		return m.ReceiverType
+	}
+	return ReceiverType_NEWNODE
+}
+
+func (m *Message) GetServiceType() ServiceType {
+	if m != nil {
+		return m.ServiceType
+	}
+	return ServiceType_CONSENSUS
+}
+
 func (m *Message) GetType() MessageType {
 	if m != nil {
 		return m.Type
 	}
-	return MessageType_UNKNOWN
+	return MessageType_NEWNODE_BEACON_STAKING
+}
+
+func (m *Message) GetSignature() []byte {
+	if m != nil {
+		return m.Signature
+	}
+	return nil
 }
 
 type isMessage_Request interface {
@@ -109,10 +193,16 @@ type isMessage_Request interface {
 }
 
 type Message_Staking struct {
-	Staking *StakingRequest `protobuf:"bytes,3,opt,name=staking,proto3,oneof"`
+	Staking *StakingRequest `protobuf:"bytes,5,opt,name=staking,proto3,oneof"`
+}
+
+type Message_Consensus struct {
+	Consensus *ConsensusRequest `protobuf:"bytes,6,opt,name=consensus,proto3,oneof"`
 }
 
 func (*Message_Staking) isMessage_Request() {}
+
+func (*Message_Consensus) isMessage_Request() {}
 
 func (m *Message) GetRequest() isMessage_Request {
 	if m != nil {
@@ -128,76 +218,20 @@ func (m *Message) GetStaking() *StakingRequest {
 	return nil
 }
 
+func (m *Message) GetConsensus() *ConsensusRequest {
+	if x, ok := m.GetRequest().(*Message_Consensus); ok {
+		return x.Consensus
+	}
+	return nil
+}
+
 // XXX_OneofWrappers is for the internal use of the proto package.
 func (*Message) XXX_OneofWrappers() []interface{} {
 	return []interface{}{
 		(*Message_Staking)(nil),
+		(*Message_Consensus)(nil),
 	}
 }
-
-// Message of NewNode talking to BootNode.
-type NewNodeBootNodeRequest struct {
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *NewNodeBootNodeRequest) Reset()         { *m = NewNodeBootNodeRequest{} }
-func (m *NewNodeBootNodeRequest) String() string { return proto.CompactTextString(m) }
-func (*NewNodeBootNodeRequest) ProtoMessage()    {}
-func (*NewNodeBootNodeRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_33c57e4bae7b9afd, []int{1}
-}
-
-func (m *NewNodeBootNodeRequest) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_NewNodeBootNodeRequest.Unmarshal(m, b)
-}
-func (m *NewNodeBootNodeRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_NewNodeBootNodeRequest.Marshal(b, m, deterministic)
-}
-func (m *NewNodeBootNodeRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NewNodeBootNodeRequest.Merge(m, src)
-}
-func (m *NewNodeBootNodeRequest) XXX_Size() int {
-	return xxx_messageInfo_NewNodeBootNodeRequest.Size(m)
-}
-func (m *NewNodeBootNodeRequest) XXX_DiscardUnknown() {
-	xxx_messageInfo_NewNodeBootNodeRequest.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_NewNodeBootNodeRequest proto.InternalMessageInfo
-
-// Message of BootNode talking to NewNode.
-type BootNodeNewNodeRequest struct {
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *BootNodeNewNodeRequest) Reset()         { *m = BootNodeNewNodeRequest{} }
-func (m *BootNodeNewNodeRequest) String() string { return proto.CompactTextString(m) }
-func (*BootNodeNewNodeRequest) ProtoMessage()    {}
-func (*BootNodeNewNodeRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_33c57e4bae7b9afd, []int{2}
-}
-
-func (m *BootNodeNewNodeRequest) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_BootNodeNewNodeRequest.Unmarshal(m, b)
-}
-func (m *BootNodeNewNodeRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_BootNodeNewNodeRequest.Marshal(b, m, deterministic)
-}
-func (m *BootNodeNewNodeRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_BootNodeNewNodeRequest.Merge(m, src)
-}
-func (m *BootNodeNewNodeRequest) XXX_Size() int {
-	return xxx_messageInfo_BootNodeNewNodeRequest.Size(m)
-}
-func (m *BootNodeNewNodeRequest) XXX_DiscardUnknown() {
-	xxx_messageInfo_BootNodeNewNodeRequest.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_BootNodeNewNodeRequest proto.InternalMessageInfo
 
 // Staking Request from new node to beacon node.
 type StakingRequest struct {
@@ -212,7 +246,7 @@ func (m *StakingRequest) Reset()         { *m = StakingRequest{} }
 func (m *StakingRequest) String() string { return proto.CompactTextString(m) }
 func (*StakingRequest) ProtoMessage()    {}
 func (*StakingRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_33c57e4bae7b9afd, []int{3}
+	return fileDescriptor_33c57e4bae7b9afd, []int{1}
 }
 
 func (m *StakingRequest) XXX_Unmarshal(b []byte) error {
@@ -247,34 +281,112 @@ func (m *StakingRequest) GetNodeId() string {
 	return ""
 }
 
+// Consensus request.
+// TODO: Will organize more later.
+type ConsensusRequest struct {
+	ConsensusId          uint32   `protobuf:"varint,1,opt,name=consensus_id,json=consensusId,proto3" json:"consensus_id,omitempty"`
+	BlockHash            []byte   `protobuf:"bytes,2,opt,name=block_hash,json=blockHash,proto3" json:"block_hash,omitempty"`
+	SenderId             uint32   `protobuf:"varint,3,opt,name=sender_id,json=senderId,proto3" json:"sender_id,omitempty"`
+	Payload              []byte   `protobuf:"bytes,4,opt,name=payload,proto3" json:"payload,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *ConsensusRequest) Reset()         { *m = ConsensusRequest{} }
+func (m *ConsensusRequest) String() string { return proto.CompactTextString(m) }
+func (*ConsensusRequest) ProtoMessage()    {}
+func (*ConsensusRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_33c57e4bae7b9afd, []int{2}
+}
+
+func (m *ConsensusRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_ConsensusRequest.Unmarshal(m, b)
+}
+func (m *ConsensusRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_ConsensusRequest.Marshal(b, m, deterministic)
+}
+func (m *ConsensusRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ConsensusRequest.Merge(m, src)
+}
+func (m *ConsensusRequest) XXX_Size() int {
+	return xxx_messageInfo_ConsensusRequest.Size(m)
+}
+func (m *ConsensusRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_ConsensusRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ConsensusRequest proto.InternalMessageInfo
+
+func (m *ConsensusRequest) GetConsensusId() uint32 {
+	if m != nil {
+		return m.ConsensusId
+	}
+	return 0
+}
+
+func (m *ConsensusRequest) GetBlockHash() []byte {
+	if m != nil {
+		return m.BlockHash
+	}
+	return nil
+}
+
+func (m *ConsensusRequest) GetSenderId() uint32 {
+	if m != nil {
+		return m.SenderId
+	}
+	return 0
+}
+
+func (m *ConsensusRequest) GetPayload() []byte {
+	if m != nil {
+		return m.Payload
+	}
+	return nil
+}
+
 func init() {
+	proto.RegisterEnum("message.ReceiverType", ReceiverType_name, ReceiverType_value)
+	proto.RegisterEnum("message.ServiceType", ServiceType_name, ServiceType_value)
 	proto.RegisterEnum("message.MessageType", MessageType_name, MessageType_value)
 	proto.RegisterType((*Message)(nil), "message.Message")
-	proto.RegisterType((*NewNodeBootNodeRequest)(nil), "message.NewNodeBootNodeRequest")
-	proto.RegisterType((*BootNodeNewNodeRequest)(nil), "message.BootNodeNewNodeRequest")
 	proto.RegisterType((*StakingRequest)(nil), "message.StakingRequest")
+	proto.RegisterType((*ConsensusRequest)(nil), "message.ConsensusRequest")
 }
 
 func init() { proto.RegisterFile("message.proto", fileDescriptor_33c57e4bae7b9afd) }
 
 var fileDescriptor_33c57e4bae7b9afd = []byte{
-	// 276 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x54, 0x91, 0x4f, 0x6b, 0xc2, 0x30,
-	0x18, 0xc6, 0x8d, 0x3a, 0x83, 0x6f, 0xb7, 0x12, 0x82, 0x68, 0xd9, 0xa9, 0x78, 0x2a, 0x3b, 0x78,
-	0xd0, 0x4f, 0x60, 0xb7, 0xb2, 0x49, 0x59, 0x0a, 0xb1, 0xc3, 0x63, 0xe9, 0xd6, 0x20, 0x65, 0xac,
-	0xe9, 0x9a, 0x8c, 0xe1, 0x57, 0xd8, 0xa7, 0x1e, 0xfd, 0x93, 0xaa, 0xa7, 0xbc, 0xcf, 0xef, 0xf9,
-	0x25, 0x24, 0x04, 0xee, 0xbe, 0x84, 0x52, 0xe9, 0x51, 0xac, 0xca, 0x4a, 0x6a, 0x49, 0x71, 0x17,
-	0x97, 0x0a, 0xf0, 0x6b, 0x3b, 0x52, 0x0f, 0xc6, 0xfa, 0x54, 0x0a, 0x07, 0xb9, 0xc8, 0xb3, 0xd7,
-	0xb3, 0x95, 0xd9, 0xd1, 0xf5, 0xf1, 0xa9, 0x14, 0xbc, 0x31, 0xe8, 0x06, 0xb0, 0xd2, 0xe9, 0x67,
-	0x5e, 0x1c, 0x9d, 0x91, 0x8b, 0x3c, 0x6b, 0xbd, 0xe8, 0xe5, 0x7d, 0xcb, 0xb9, 0xf8, 0xfe, 0x11,
-	0x4a, 0xbf, 0x0c, 0xb8, 0x31, 0xfd, 0x29, 0xe0, 0xaa, 0xa5, 0x4b, 0x07, 0xe6, 0x4c, 0xfc, 0x32,
-	0x99, 0x09, 0x5f, 0x4a, 0x5d, 0xaf, 0xfc, 0xdc, 0x18, 0xd4, 0x19, 0xa6, 0x09, 0xc1, 0xbe, 0x3e,
-	0x9b, 0xba, 0x60, 0xe9, 0x2a, 0x2d, 0x54, 0xfa, 0xa1, 0x73, 0x59, 0x34, 0xd7, 0xbe, 0xe5, 0x97,
-	0x88, 0x2e, 0x00, 0x17, 0x32, 0x13, 0x49, 0x9e, 0x39, 0x43, 0x17, 0x79, 0x53, 0x3e, 0xa9, 0xe3,
-	0x2e, 0x7b, 0xf8, 0x43, 0x60, 0x5d, 0x3c, 0x8b, 0x5a, 0x80, 0xdf, 0x58, 0xc8, 0xa2, 0x03, 0x23,
-	0x03, 0x3a, 0x03, 0xc2, 0x82, 0x03, 0x8b, 0x9e, 0x82, 0xc4, 0x8f, 0xa2, 0xb8, 0x1e, 0x08, 0xaa,
-	0xa9, 0x49, 0x49, 0x57, 0x93, 0x21, 0xa5, 0x60, 0xf7, 0x6e, 0xb0, 0x7d, 0x8c, 0x18, 0x19, 0xd5,
-	0xac, 0x9d, 0x7b, 0x6f, 0x4c, 0xef, 0x61, 0x7e, 0xed, 0x25, 0xfb, 0x78, 0x1b, 0xee, 0xd8, 0x33,
-	0xb9, 0x79, 0x9f, 0x34, 0x5f, 0xb2, 0xf9, 0x0f, 0x00, 0x00, 0xff, 0xff, 0x1b, 0xd6, 0xe4, 0x08,
-	0xa3, 0x01, 0x00, 0x00,
+	// 477 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x5c, 0x93, 0xcf, 0x6e, 0x9b, 0x40,
+	0x10, 0xc6, 0x8d, 0xed, 0x98, 0x30, 0xe0, 0x68, 0xb5, 0x6a, 0x1b, 0xf7, 0x9f, 0xe4, 0xfa, 0xe4,
+	0xfa, 0x90, 0x43, 0x72, 0xa8, 0xda, 0x1b, 0xb6, 0x57, 0x0d, 0x8a, 0xbd, 0x44, 0x0b, 0x69, 0x8f,
+	0x88, 0xc0, 0xca, 0x46, 0x49, 0xc0, 0x65, 0x71, 0x24, 0x3f, 0x43, 0x9f, 0xaa, 0x6f, 0x56, 0xed,
+	0x02, 0x86, 0xe4, 0xc6, 0xf7, 0xcd, 0xfc, 0xe6, 0x5b, 0xcd, 0x08, 0x18, 0x3e, 0x71, 0x21, 0xc2,
+	0x0d, 0xbf, 0xd8, 0xe5, 0x59, 0x91, 0x61, 0xbd, 0x92, 0x93, 0x7f, 0x5d, 0xd0, 0xd7, 0xe5, 0x37,
+	0xfe, 0x01, 0xc3, 0x9c, 0x47, 0x3c, 0x79, 0xe6, 0x79, 0x50, 0x1c, 0x76, 0x7c, 0xa4, 0x8d, 0xb5,
+	0xe9, 0xd9, 0xe5, 0xdb, 0x8b, 0x9a, 0x65, 0x55, 0xd5, 0x3f, 0xec, 0x38, 0xb3, 0xf2, 0x96, 0xc2,
+	0xdf, 0xc0, 0x12, 0x3c, 0x7f, 0x4e, 0x22, 0x5e, 0xa2, 0x5d, 0x85, 0xbe, 0x39, 0xa2, 0x5e, 0x59,
+	0x54, 0xa4, 0x29, 0x1a, 0x81, 0xa7, 0xd0, 0x57, 0x40, 0xef, 0x15, 0x50, 0x3d, 0x4a, 0x01, 0xaa,
+	0x03, 0x7f, 0x02, 0x43, 0x24, 0x9b, 0x34, 0x2c, 0xf6, 0x39, 0x1f, 0xf5, 0xc7, 0xda, 0xd4, 0x62,
+	0x8d, 0x81, 0xaf, 0x40, 0x17, 0x45, 0xf8, 0x90, 0xa4, 0x9b, 0xd1, 0xc9, 0x58, 0x9b, 0x9a, 0x97,
+	0xe7, 0x4d, 0x76, 0xe9, 0x33, 0xfe, 0x67, 0xcf, 0x45, 0x71, 0xdd, 0x61, 0x75, 0x27, 0xfe, 0x0e,
+	0x46, 0x94, 0xa5, 0x82, 0xa7, 0x62, 0x2f, 0x46, 0x03, 0x85, 0xbd, 0x3f, 0x62, 0x8b, 0xba, 0xd2,
+	0x80, 0x4d, 0xf7, 0xdc, 0x00, 0x3d, 0x2f, 0xfd, 0xc9, 0x0d, 0x9c, 0xbd, 0x8c, 0xc0, 0x63, 0x30,
+	0x8b, 0x3c, 0x4c, 0x45, 0x18, 0x15, 0x49, 0x96, 0xaa, 0x3d, 0x5a, 0xac, 0x6d, 0xe1, 0x73, 0xd0,
+	0xd3, 0x2c, 0xe6, 0x41, 0x12, 0xab, 0x55, 0x19, 0x6c, 0x20, 0xa5, 0x13, 0x4f, 0xfe, 0x6a, 0x80,
+	0x5e, 0x27, 0xe3, 0x2f, 0x60, 0x1d, 0x93, 0x25, 0x22, 0x07, 0x0e, 0x99, 0x79, 0xf4, 0x9c, 0x18,
+	0x7f, 0x06, 0xb8, 0x7f, 0xcc, 0xa2, 0x87, 0x60, 0x1b, 0x8a, 0xad, 0x9a, 0x69, 0x31, 0x43, 0x39,
+	0xd7, 0xa1, 0xd8, 0xe2, 0x8f, 0x60, 0x08, 0x9e, 0xc6, 0x3c, 0x97, 0x78, 0x4f, 0xe1, 0xa7, 0xa5,
+	0xe1, 0xc4, 0x78, 0x04, 0xfa, 0x2e, 0x3c, 0x3c, 0x66, 0x61, 0x5c, 0xed, 0xb5, 0x96, 0xb3, 0x39,
+	0x58, 0xed, 0xa3, 0x63, 0x13, 0x74, 0x4a, 0x7e, 0x53, 0x77, 0x49, 0x50, 0x07, 0x03, 0x0c, 0x56,
+	0xc4, 0x5e, 0x12, 0x86, 0x34, 0x3c, 0x04, 0xe3, 0x97, 0xbd, 0x72, 0x96, 0xb6, 0xef, 0x32, 0xd4,
+	0x95, 0xa5, 0xc5, 0xca, 0x21, 0xd4, 0x47, 0xbd, 0xd9, 0x57, 0x30, 0x5b, 0xd7, 0x97, 0x9d, 0x0b,
+	0x97, 0x7a, 0x84, 0x7a, 0x77, 0x1e, 0xea, 0xc8, 0x89, 0x9e, 0x6f, 0xdf, 0x38, 0xf4, 0x27, 0xd2,
+	0x66, 0x4f, 0x60, 0xb6, 0xee, 0x8e, 0x3f, 0xc0, 0xbb, 0x2a, 0x2d, 0x98, 0x13, 0x7b, 0xe1, 0xd2,
+	0xa0, 0x6e, 0xed, 0x60, 0x0b, 0x4e, 0x6d, 0x4a, 0xdd, 0x3b, 0xba, 0x20, 0x48, 0x93, 0x53, 0x6e,
+	0x19, 0xb9, 0xb5, 0x19, 0x41, 0x5d, 0x59, 0xaa, 0xc4, 0x12, 0xf5, 0xd4, 0x53, 0xdc, 0xf5, 0xda,
+	0xf1, 0x51, 0xbf, 0xcc, 0x96, 0xdf, 0x3e, 0x59, 0xa2, 0x93, 0xfb, 0x81, 0xfa, 0x19, 0xae, 0xfe,
+	0x07, 0x00, 0x00, 0xff, 0xff, 0x7d, 0xa5, 0x0e, 0x87, 0x1d, 0x03, 0x00, 0x00,
 }
