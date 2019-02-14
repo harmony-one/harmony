@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/log"
 	libp2p "github.com/libp2p/go-libp2p"
@@ -44,17 +45,37 @@ type pubsub interface {
 
 // discovery captures the discovery interface we expect from libp2p.
 type discovery interface {
-	// TODO ek – populate with methods we use
+	Advertise(
+		ctx context.Context, ns string, opts ...libp2p_discovery.Option,
+	) (time.Duration, error)
 }
+
+// discoveryPackage is the freestanding function interface we expect from the
+// libp2p_discovery package.
+type discoveryPackage interface {
+	Advertise(ctx context.Context, a libp2p_discovery.Advertiser, ns string)
+}
+
+// realDiscoveryPackage is the real implementation of discoveryPackage.
+type realDiscoveryPackage struct{}
+
+func (realDiscoveryPackage) Advertise(
+	ctx context.Context, a libp2p_discovery.Advertiser, ns string,
+) {
+	libp2p_discovery.Advertise(ctx, a, ns)
+}
+
+var realDiscPkg realDiscoveryPackage
 
 // HostV2 is the version 2 p2p host
 type HostV2 struct {
-	h      libp2p_host.Host
-	disc   discovery
-	pubsub pubsub
-	self   p2p.Peer
-	priKey libp2p_crypto.PrivKey
-	lock   sync.Mutex
+	h       libp2p_host.Host
+	discPkg discoveryPackage
+	disc    discovery
+	pubsub  pubsub
+	self    p2p.Peer
+	priKey  libp2p_crypto.PrivKey
+	lock    sync.Mutex
 
 	// background goroutine support
 	finishing  chan struct{}  // goroutines exit if this is closed
@@ -201,6 +222,7 @@ func New(self *p2p.Peer, priKey libp2p_crypto.PrivKey) *HostV2 {
 	// has to save the private key for host
 	h := &HostV2{
 		h:         p2pHost,
+		discPkg:   realDiscPkg,
 		disc:      disc,
 		pubsub:    pubsub,
 		self:      *self,
@@ -208,11 +230,27 @@ func New(self *p2p.Peer, priKey libp2p_crypto.PrivKey) *HostV2 {
 		logger:    logger.New("hostID", p2pHost.ID().Pretty()),
 		finishing: make(chan struct{}),
 	}
+	h.runBackground(h.advertiseSelf)
 
 	h.logger.Debug("HostV2 is up!",
 		"port", self.Port, "id", p2pHost.ID().Pretty(), "addr", listenAddr)
 
 	return h
+}
+
+func (host *HostV2) advertiseSelf() {
+	host.logger.Debug("advertiseSelf: advertising myself")
+	ctx, cancel := context.WithCancel(context.Background())
+	host.discPkg.Advertise(ctx, host.disc, string(host.GetID()))
+	host.logger.Debug("advertiseSelf: waiting for host to close")
+	for {
+		_, ok := <-host.finishing
+		if !ok {
+			break
+		}
+	}
+	cancel()
+	host.logger.Debug("advertiseSelf: finished")
 }
 
 // GetID returns ID.Pretty
@@ -264,7 +302,12 @@ func (host *HostV2) SendMessage(p p2p.Peer, message []byte) error {
 func (host *HostV2) Close() error {
 	close(host.finishing)
 	host.goroutines.Wait()
-	return host.h.Close()
+	err := host.h.Close()
+	if err != nil {
+		host.logger.Warn("hostv2.HostV2.Close: libp2p host close failed",
+			"error", err)
+	}
+	return err
 }
 
 // GetP2PHost returns the p2p.Host
