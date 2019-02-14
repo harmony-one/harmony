@@ -685,8 +685,9 @@ func decodeStakeCall(getData []byte) int64 {
 	return value.Int64()
 }
 
+//gets the function signature from data.
 func decodeFuncSign(data []byte) string {
-	funcSign := hexutil.Encode(data[:funcSingatureBytes])
+	funcSign := hexutil.Encode(data[:funcSingatureBytes]) //The function signature is first 4 bytes of data in ethereum
 	return funcSign
 }
 
