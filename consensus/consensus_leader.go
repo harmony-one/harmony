@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
-	consensus_proto "github.com/harmony-one/harmony/api/consensus"
+	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
@@ -106,17 +106,17 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan *types.Block, stop
 
 // ProcessMessageLeader dispatches consensus message for the leader.
 func (consensus *Consensus) ProcessMessageLeader(payload []byte) {
-	message := consensus_proto.Message{}
-	err := protobuf.Unmarshal(payload, &message)
+	message := &msg_pb.Message{}
+	err := protobuf.Unmarshal(payload, message)
 
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to unmarshal message payload.", "err", err, "consensus", consensus)
 	}
 
 	switch message.Type {
-	case consensus_proto.MessageType_PREPARE:
+	case msg_pb.MessageType_PREPARE:
 		consensus.processPrepareMessage(message)
-	case consensus_proto.MessageType_COMMIT:
+	case msg_pb.MessageType_COMMIT:
 		consensus.processCommitMessage(message)
 	default:
 		utils.GetLogInstance().Error("Unexpected message type", "msgType", message.Type, "consensus", consensus)
@@ -147,18 +147,16 @@ func (consensus *Consensus) startConsensus(newBlock *types.Block) {
 	// Leader sign the block hash itself
 	consensus.prepareSigs[consensus.nodeID] = consensus.priKey.SignHash(consensus.blockHash[:])
 
-	if utils.UseLibP2P {
-		// Construct broadcast p2p message
-		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
-	} else {
-		host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
-	}
+	// TODO(leo): add pubsub/gossip here.
+	host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
 }
 
 // processPrepareMessage processes the prepare message sent from validators
-func (consensus *Consensus) processPrepareMessage(message consensus_proto.Message) {
-	validatorID := message.SenderId
-	prepareSig := message.Payload
+func (consensus *Consensus) processPrepareMessage(message *msg_pb.Message) {
+	consensusMsg := message.GetConsensus()
+
+	validatorID := consensusMsg.SenderId
+	prepareSig := consensusMsg.Payload
 
 	prepareSigs := consensus.prepareSigs
 	prepareBitmap := consensus.prepareBitmap
@@ -231,9 +229,11 @@ func (consensus *Consensus) processPrepareMessage(message consensus_proto.Messag
 }
 
 // Processes the commit message sent from validators
-func (consensus *Consensus) processCommitMessage(message consensus_proto.Message) {
-	validatorID := message.SenderId
-	commitSig := message.Payload
+func (consensus *Consensus) processCommitMessage(message *msg_pb.Message) {
+	consensusMsg := message.GetConsensus()
+
+	validatorID := consensusMsg.SenderId
+	commitSig := consensusMsg.Payload
 
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()

@@ -1,18 +1,16 @@
 package consensus
 
 import (
-	"github.com/harmony-one/bls/ffi/go/bls"
-	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/p2p/host"
-
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
-	consensus_proto "github.com/harmony-one/harmony/api/consensus"
-	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/bls/ffi/go/bls"
+	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
+	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/attack"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/p2p/host"
 )
 
 // sendBFTBlockToStateSyncing will send the latest BFT consensus block to state syncing checkingjjkkkkkkkkkkkkkkkjnjk
@@ -39,20 +37,28 @@ func (consensus *Consensus) sendBFTBlockToStateSyncing(consensusID uint32) {
 	return
 }
 
-// ProcessMessageValidator dispatches validator's consensus message.
-func (consensus *Consensus) ProcessMessageValidator(payload []byte) {
-	message := consensus_proto.Message{}
-	err := protobuf.Unmarshal(payload, &message)
+func (consensus *Consensus) IsValidatorMessage(message *msg_pb.Message) bool {
+	return message.ReceiverType == msg_pb.ReceiverType_VALIDATOR && message.ServiceType == msg_pb.ServiceType_CONSENSUS
+}
 
+// ProcessMessageValidator dispatches validator's consensus message.
+func (consensus *Consensus) NewProcessMessageValidator(payload []byte) {
+	message := &msg_pb.Message{}
+	err := protobuf.Unmarshal(payload, message)
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to unmarshal message payload.", "err", err, "consensus", consensus)
 	}
+
+	if !consensus.IsValidatorMessage(message) {
+		return
+	}
+
 	switch message.Type {
-	case consensus_proto.MessageType_ANNOUNCE:
+	case msg_pb.MessageType_ANNOUNCE:
 		consensus.processAnnounceMessage(message)
-	case consensus_proto.MessageType_PREPARED:
+	case msg_pb.MessageType_PREPARED:
 		consensus.processPreparedMessage(message)
-	case consensus_proto.MessageType_COMMITTED:
+	case msg_pb.MessageType_COMMITTED:
 		consensus.processCommittedMessage(message)
 	default:
 		utils.GetLogInstance().Error("Unexpected message type", "msgType", message.Type, "consensus", consensus)
@@ -60,12 +66,14 @@ func (consensus *Consensus) ProcessMessageValidator(payload []byte) {
 }
 
 // Processes the announce message sent from the leader
-func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Message) {
+func (consensus *Consensus) processAnnounceMessage(message *msg_pb.Message) {
 	utils.GetLogInstance().Info("Received Announce Message", "nodeID", consensus.nodeID)
 
-	consensusID := message.ConsensusId
-	blockHash := message.BlockHash
-	block := message.Payload
+	consensusMsg := message.GetConsensus()
+
+	consensusID := consensusMsg.ConsensusId
+	blockHash := consensusMsg.BlockHash
+	block := consensusMsg.Payload
 
 	// Add block to received block cache
 	consensus.mutex.Lock()
@@ -116,13 +124,15 @@ func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Messa
 }
 
 // Processes the prepared message sent from the leader
-func (consensus *Consensus) processPreparedMessage(message consensus_proto.Message) {
+func (consensus *Consensus) processPreparedMessage(message *msg_pb.Message) {
 	utils.GetLogInstance().Info("Received Prepared Message", "nodeID", consensus.nodeID)
 
-	consensusID := message.ConsensusId
-	blockHash := message.BlockHash
-	leaderID := message.SenderId
-	messagePayload := message.Payload
+	consensusMsg := message.GetConsensus()
+
+	consensusID := consensusMsg.ConsensusId
+	blockHash := consensusMsg.BlockHash
+	leaderID := consensusMsg.SenderId
+	messagePayload := consensusMsg.Payload
 
 	//#### Read payload data
 	offset := 0
@@ -180,12 +190,14 @@ func (consensus *Consensus) processPreparedMessage(message consensus_proto.Messa
 }
 
 // Processes the committed message sent from the leader
-func (consensus *Consensus) processCommittedMessage(message consensus_proto.Message) {
+func (consensus *Consensus) processCommittedMessage(message *msg_pb.Message) {
 	utils.GetLogInstance().Warn("Received Committed Message", "nodeID", consensus.nodeID)
 
-	consensusID := message.ConsensusId
-	leaderID := message.SenderId
-	messagePayload := message.Payload
+	consensusMsg := message.GetConsensus()
+
+	consensusID := consensusMsg.ConsensusId
+	leaderID := consensusMsg.SenderId
+	messagePayload := consensusMsg.Payload
 
 	//#### Read payload data
 	offset := 0

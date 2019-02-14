@@ -17,7 +17,8 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
-	consensus_proto "github.com/harmony-one/harmony/api/consensus"
+	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
+	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -26,8 +27,6 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 	"golang.org/x/crypto/sha3"
-
-	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 )
 
 // Consensus is the main struct with all states and data related to consensus process.
@@ -254,9 +253,10 @@ func (consensus *Consensus) RegisterRndChannel(rndChannel chan [64]byte) {
 }
 
 // Checks the basic meta of a consensus message, including the signature.
-func (consensus *Consensus) checkConsensusMessage(message consensus_proto.Message, publicKey *bls.PublicKey) error {
-	consensusID := message.ConsensusId
-	blockHash := message.BlockHash
+func (consensus *Consensus) checkConsensusMessage(message *msg_pb.Message, publicKey *bls.PublicKey) error {
+	consensusMsg := message.GetConsensus()
+	consensusID := consensusMsg.ConsensusId
+	blockHash := consensusMsg.BlockHash
 
 	utils.GetLogInstance().Warn("checkConsensusMessage", "publicKey", publicKey)
 	// Verify message signature
@@ -295,10 +295,10 @@ func (consensus *Consensus) getValidatorPeerByID(validatorID uint32) *p2p.Peer {
 }
 
 // Verify the signature of the message are valid from the signer's public key.
-func verifyMessageSig(signerPubKey *bls.PublicKey, message consensus_proto.Message) error {
+func verifyMessageSig(signerPubKey *bls.PublicKey, message *msg_pb.Message) error {
 	signature := message.Signature
 	message.Signature = nil
-	messageBytes, err := protobuf.Marshal(&message)
+	messageBytes, err := protobuf.Marshal(message)
 	if err != nil {
 		return err
 	}
@@ -330,7 +330,7 @@ func (consensus *Consensus) signMessage(message []byte) []byte {
 }
 
 // Sign on the consensus message signature field.
-func (consensus *Consensus) signConsensusMessage(message *consensus_proto.Message) error {
+func (consensus *Consensus) signConsensusMessage(message *msg_pb.Message) error {
 	message.Signature = nil
 	// TODO: use custom serialization method rather than protobuf
 	marshaledMessage, err := protobuf.Marshal(message)
@@ -645,19 +645,20 @@ func (consensus *Consensus) SendMessage(peer p2p.Peer, message []byte) {
 }
 
 // Populates the common basic fields for all consensus message.
-func (consensus *Consensus) populateMessageFields(message *consensus_proto.Message) {
+func (consensus *Consensus) populateMessageFields(request *msg_pb.ConsensusRequest) {
+	// TODO(minhdoan): Maybe look into refactor this.
 	// 4 byte consensus id
-	message.ConsensusId = consensus.consensusID
+	request.ConsensusId = consensus.consensusID
 
 	// 32 byte block hash
-	message.BlockHash = consensus.blockHash[:]
+	request.BlockHash = consensus.blockHash[:]
 
 	// 4 byte sender id
-	message.SenderId = uint32(consensus.nodeID)
+	request.SenderId = uint32(consensus.nodeID)
 }
 
 // Signs the consensus message and returns the marshaled message.
-func (consensus *Consensus) signAndMarshalConsensusMessage(message *consensus_proto.Message) ([]byte, error) {
+func (consensus *Consensus) signAndMarshalConsensusMessage(message *msg_pb.Message) ([]byte, error) {
 	err := consensus.signConsensusMessage(message)
 	if err != nil {
 		return []byte{}, err
