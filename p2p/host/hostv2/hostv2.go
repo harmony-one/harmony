@@ -56,11 +56,25 @@ type HostV2 struct {
 	priKey libp2p_crypto.PrivKey
 	lock   sync.Mutex
 
+	// background goroutine support
+	finishing  chan struct{}  // goroutines exit if this is closed
+	goroutines sync.WaitGroup // each goroutine holds one ref
+
 	//incomingPeers []p2p.Peer // list of incoming Peers. TODO: fixed number incoming
 	//outgoingPeers []p2p.Peer // list of outgoing Peers. TODO: fixed number of outgoing
 
 	// logger
 	logger log.Logger
+}
+
+func (host *HostV2) runBackground(bodies ...func()) {
+	host.goroutines.Add(len(bodies))
+	for _, body := range bodies {
+		go func(f func()) {
+			defer host.goroutines.Done()
+			f()
+		}(body)
+	}
 }
 
 // SendMessageToGroups sends a message to one or more multicast groups.
@@ -186,12 +200,13 @@ func New(self *p2p.Peer, priKey libp2p_crypto.PrivKey) *HostV2 {
 
 	// has to save the private key for host
 	h := &HostV2{
-		h:      p2pHost,
-		disc:   disc,
-		pubsub: pubsub,
-		self:   *self,
-		priKey: priKey,
-		logger: logger.New("hostID", p2pHost.ID().Pretty()),
+		h:         p2pHost,
+		disc:      disc,
+		pubsub:    pubsub,
+		self:      *self,
+		priKey:    priKey,
+		logger:    logger.New("hostID", p2pHost.ID().Pretty()),
+		finishing: make(chan struct{}),
 	}
 
 	h.logger.Debug("HostV2 is up!",
@@ -247,6 +262,8 @@ func (host *HostV2) SendMessage(p p2p.Peer, message []byte) error {
 
 // Close closes the host
 func (host *HostV2) Close() error {
+	close(host.finishing)
+	host.goroutines.Wait()
 	return host.h.Close()
 }
 
