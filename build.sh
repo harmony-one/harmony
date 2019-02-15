@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+# fail on errors
+set -e
+
+
 ROOT=$(dirname $(readlink -f "$0"))
 export GOPATH=${ROOT}/.build
 
@@ -15,14 +19,20 @@ LIBRARY_PATH=$LD_LIBRARY_PATH
 DYLD_FALLBACK_LIBRARY_PATH=$LD_LIBRARY_PATH
 
 MCL=$GOPATH/src/github.com/harmony-one/mcl
-git clone https://github.com/harmony-one/mcl.git $MCL
-(cd $MCL && make -j4)
-echo "Done compiling mcl."
+echo "... building mcl"
+if [ ! -d "$MCL" ]; then
+    git clone https://github.com/harmony-one/mcl.git $MCL
+    (cd $MCL && make -j4)
+fi
 
 BLS=$GOPATH/src/github.com/harmony-one/bls
-git clone https://github.com/harmony-one/bls.git $BLS
-(cd $BLS && make -j4)
-echo "Done compiling BLS."
+echo "... building BLS"
+if [ ! -d "$BLS" ]; then
+    git clone https://github.com/harmony-one/bls.git $BLS
+    (cd $BLS && make -j4)
+fi
 
+
+echo "... building Harmony"
 go get -v ./...
 
