@@ -36,7 +36,7 @@ jobs:
     script:
     - ./scripts/travis_checker.sh
 
-  - name: New build script
+  - stage: New build script
     script:
       - go version && go env
       - echo "GO111MODULE=$GO111MODULE"
