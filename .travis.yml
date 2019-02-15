@@ -45,5 +45,8 @@ after_failure:
 jobs:
   include:
   - stage: New build script
+    os:
+      - linux
+      - osx
     script: ./build.sh
 
