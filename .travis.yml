@@ -1,6 +1,4 @@
 language: go
-go:
-  - stable
 go_import_path: github.com/harmony-one/harmony
 install:
   - env GO111MODULE=on
