@@ -5,29 +5,35 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
+	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
+
+	"github.com/harmony-one/harmony/api/service"
 )
 
 // Service is the struct for discovery service.
 type Service struct {
-	host        p2p.Host
-	Rendezvous  string
-	peerChan    chan p2p.Peer
-	stakingChan chan p2p.Peer
-	stopChan    chan struct{}
+	host       p2p.Host
+	peerChan   chan p2p.Peer
+	stopChan   chan struct{}
+	actionChan chan p2p.GroupAction
+	config     service.NodeConfig
+	actions    map[p2p.GroupID]p2p.ActionType
 }
 
 // New returns discovery service.
 // h is the p2p host
-// r is the rendezvous string, we use shardID to start (TODO: leo, build two overlays of network)
-func New(h p2p.Host, r string, peerChan chan p2p.Peer, stakingChan chan p2p.Peer) *Service {
+// config is the node config
+// (TODO: leo, build two overlays of network)
+func New(h p2p.Host, config service.NodeConfig, peerChan chan p2p.Peer, actionChan chan p2p.GroupAction) *Service {
 	return &Service{
-		host:        h,
-		Rendezvous:  r,
-		peerChan:    peerChan,
-		stakingChan: stakingChan,
-		stopChan:    make(chan struct{}),
+		host:       h,
+		peerChan:   peerChan,
+		stopChan:   make(chan struct{}),
+		actionChan: actionChan,
+		config:     config,
+		actions:    make(map[p2p.GroupID]p2p.ActionType),
 	}
 }
 
@@ -48,37 +54,61 @@ func (s *Service) StopService() {
 // Run is the main function of the service
 func (s *Service) Run() {
 	go s.contactP2pPeers()
-	//	go s.pingPeer()
 }
 
 func (s *Service) contactP2pPeers() {
 	tick := time.NewTicker(5 * time.Second)
-	ping := proto_discovery.NewPingMessage(s.host.GetSelfPeer())
-	buffer := ping.ConstructPingMessage()
-	content := host.ConstructP2pMessage(byte(0), buffer)
+
+	pingMsg := proto_discovery.NewPingMessage(s.host.GetSelfPeer())
+	regMsgBuf := host.ConstructP2pMessage(byte(0), pingMsg.ConstructPingMessage())
+
+	pingMsg.Node.Role = proto_node.ClientRole
+	clientMsgBuf := host.ConstructP2pMessage(byte(0), pingMsg.ConstructPingMessage())
+
 	for {
 		select {
 		case peer, ok := <-s.peerChan:
 			if !ok {
 				log.Debug("end of info", "peer", peer.PeerID)
-				return
+				break
 			}
 			s.host.AddPeer(&peer)
 			// Add to outgoing peer list
 			//s.host.AddOutgoingPeer(peer)
 			log.Debug("[DISCOVERY]", "add outgoing peer", peer)
-			// TODO: stop ping if pinged before
-			// TODO: call staking servcie here if it is a new node
-			if s.stakingChan != nil {
-				s.stakingChan <- peer
-			}
 		case <-s.stopChan:
-			log.Debug("[DISCOVERY] stop")
+			log.Debug("[DISCOVERY] stop pinging ...")
 			return
+		case action := <-s.actionChan:
+			s.config.Actions[action.Name] = action.Action
 		case <-tick.C:
-			err := s.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, content)
-			if err != nil {
-				log.Error("Failed to send ping message", "group", p2p.GroupIDBeacon)
+			var err error
+			for g, a := range s.config.Actions {
+				if a == p2p.ActionStart || a == p2p.ActionResume {
+					if g == p2p.GroupIDBeacon {
+						if s.config.IsBeacon {
+							// beacon chain node
+							err = s.host.SendMessageToGroups([]p2p.GroupID{s.config.Beacon}, regMsgBuf)
+						} else {
+							// non-beacon chain node, reg as client node
+							err = s.host.SendMessageToGroups([]p2p.GroupID{s.config.Beacon}, clientMsgBuf)
+						}
+					} else {
+						if s.config.Group == p2p.GroupIDUnknown {
+							continue
+						}
+						if s.config.IsClient {
+							// client node of reg shard, such as wallet/txgen
+							err = s.host.SendMessageToGroups([]p2p.GroupID{s.config.Group}, clientMsgBuf)
+						} else {
+							// regular node of a shard
+							err = s.host.SendMessageToGroups([]p2p.GroupID{s.config.Group}, regMsgBuf)
+						}
+					}
+				}
+				if err != nil {
+					log.Error("Failed to send ping message", "group", s.config.Beacon)
+				}
 			}
 		}
 	}
@@ -87,26 +117,4 @@ func (s *Service) contactP2pPeers() {
 // Init is to initialize for discoveryService.
 func (s *Service) Init() {
 	log.Info("Init discovery service")
-}
-
-func (s *Service) pingPeer() {
-	tick := time.NewTicker(5 * time.Second)
-	ping := proto_discovery.NewPingMessage(s.host.GetSelfPeer())
-	buffer := ping.ConstructPingMessage()
-	content := host.ConstructP2pMessage(byte(0), buffer)
-
-	for {
-		select {
-		case <-tick.C:
-			err := s.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, content)
-			if err != nil {
-				log.Error("Failed to send ping message", "group", p2p.GroupIDBeacon)
-			}
-		case <-s.stopChan:
-			log.Info("Stop sending ping message")
-			return
-		}
-	}
-	//	s.host.SendMessage(peer, content)
-	//   log.Debug("Sent Ping Message via unicast to", "peer", peer)
 }

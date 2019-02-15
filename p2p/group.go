@@ -24,9 +24,28 @@ func (id GroupID) String() string {
 
 // Const of group ID
 const (
-	GroupIDBeacon GroupID = "harmony/0.0.1/beacon"
-	GroupIDGlobal GroupID = "harmony/0.0.1/global"
+	GroupIDBeacon  GroupID = "harmony/0.0.1/beacon"
+	GroupIDGlobal  GroupID = "harmony/0.0.1/global"
+	GroupIDUnknown GroupID = "B1acKh0lE"
 )
+
+// ActionType lists action on group
+type ActionType uint
+
+// Const of different Action type
+const (
+	ActionStart ActionType = iota
+	ActionPause
+	ActionResume
+	ActionStop
+	ActionUnknown
+)
+
+// GroupAction specify action on corresponding group
+type GroupAction struct {
+	Name   GroupID
+	Action ActionType
+}
 
 // GroupReceiver is a multicast group message receiver interface.
 type GroupReceiver interface {
