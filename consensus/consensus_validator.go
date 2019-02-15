@@ -38,6 +38,7 @@ func (consensus *Consensus) sendBFTBlockToStateSyncing(consensusID uint32) {
 	return
 }
 
+// IsValidatorMessage checks if a message is to be sent to a validator.
 func (consensus *Consensus) IsValidatorMessage(message *msg_pb.Message) bool {
 	return message.ReceiverType == msg_pb.ReceiverType_VALIDATOR && message.ServiceType == msg_pb.ServiceType_CONSENSUS
 }
