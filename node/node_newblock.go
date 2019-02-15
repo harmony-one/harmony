@@ -86,7 +86,7 @@ func (node *Node) addNewRandSeed(block *types.Block) {
 		return
 	}
 
-	var rnd int64
+	var rnd uint32
 	blockNumber := block.NumberU64()
 	epoch := core.GetEpochFromBlockNumber(blockNumber)
 	if epoch == 1 {

@@ -10,13 +10,13 @@ import (
 
 const (
 	// InitialSeed is the initial random seed, a magic number to answer everything, remove later
-	InitialSeed int64 = 42
+	InitialSeed uint32 = 42
 )
 
 // ShardingState is data structure hold the sharding state
 type ShardingState struct {
 	epoch      uint64 // current epoch
-	rnd        int64  // random seed for resharding
+	rnd        uint32 // random seed for resharding
 	numShards  int
 	shardState types.ShardState
 }
@@ -68,7 +68,7 @@ func (ss *ShardingState) cuckooResharding(percent float64) {
 
 // UpdateShardState will first add new nodes into shards, then use cuckoo rule to reshard to get new shard state
 func (ss *ShardingState) UpdateShardState(newNodeList []types.NodeID, percent float64) {
-	rand.Seed(ss.rnd)
+	rand.Seed(int64(ss.rnd))
 	ss.assignNewNodes(newNodeList)
 	ss.cuckooResharding(percent)
 }
@@ -120,7 +120,7 @@ func CalculateNewShardState(bc *BlockChain, epoch uint64) types.ShardState {
 		return fakeGetInitShardState()
 	}
 	ss := GetShardingStateFromBlockChain(bc, epoch-1)
-	newNodeList := fakeNewNodeList(ss.rnd)
+	newNodeList := fakeNewNodeList(int64(ss.rnd))
 	percent := ss.calculateKickoutRate(newNodeList)
 	ss.UpdateShardState(newNodeList, percent)
 	return ss.shardState
@@ -135,14 +135,14 @@ func (ss *ShardingState) calculateKickoutRate(newNodeList []types.NodeID) float6
 }
 
 // FakeGenRandSeed generate random seed based on previous rnd seed; remove later after VRF implemented
-func FakeGenRandSeed(seed int64) int64 {
-	rand.Seed(seed)
-	return rand.Int63()
+func FakeGenRandSeed(seed uint32) uint32 {
+	rand.Seed(int64(seed))
+	return rand.Uint32()
 }
 
 // remove later after bootstrap codes ready
 func fakeGetInitShardState() types.ShardState {
-	rand.Seed(InitialSeed)
+	rand.Seed(int64(InitialSeed))
 	shardState := types.ShardState{}
 	for i := 0; i < 6; i++ {
 		sid := uint32(i)
