@@ -48,5 +48,6 @@ jobs:
       - osx
     script:
       - go version && go env
+      - echo "GO111MODULES=$GO111MODULES"
       - ./build.sh
 
