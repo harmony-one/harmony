@@ -4,20 +4,36 @@ unset -v opt OPTIND OPTARG version platform destdir
 version=
 platform=
 destdir=/usr/local
-while getopts :V:P:d: opt
+usage() {
+	case $# in
+	[1-9]*) echo "$@" >&2;;
+	esac
+	cat <<- ENDEND
+		usage: install_protoc.sh [-P platform] [-d destdir] -V version
+		options:
+		-V version	protobuf version
+		-P platform	fetch and use given platform (default: autodetect)
+		-d destdir	install into the given dir (default: /usr/local)
+		-h		print this help
+	ENDEND
+	exit 64
+}
+
+while getopts :V:P:d:h opt
 do
 	case "${opt}" in
 	V) version="${OPTARG}";;
 	P) platform="${OPTARG}";;
 	d) destdir="${OPTARG}";;
-	"?") echo "unrecognized option -${OPTARG}" >&2; exit 64;;
-	":") echo "missing argument for -${OPTARG}" >&2; exit 64;;
+	h) usage;;
+	"?") usage "unrecognized option -${OPTARG}";;
+	":") usage "missing argument for -${OPTARG}";;
 	*) echo "unhandled option -${OPTARG}" >&2; exit 70;;
 	esac
 done
 shift $((${OPTIND} - 1))
 case "${version}" in
-"") echo "protobuf version (-V) not specified" >&2; exit 64;;
+"") usage "protobuf version (-V) not specified";;
 esac
 case "${platform}" in
 "")
