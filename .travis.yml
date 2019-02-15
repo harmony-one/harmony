@@ -42,12 +42,14 @@ after_failure:
 
 jobs:
   include:
-  - stage: New build script
-    os:
-      - linux
-      - osx
+  - os: linux
     script:
       - go version && go env
-      - echo "GO111MODULES=$GO111MODULES"
+      - echo "GO111MODULE=$GO111MODULE"
+      - ./build.sh
+  - os: osx
+    script:
+      - go version && go env
+      - echo "GO111MODULE=$GO111MODULE"
       - ./build.sh
 
