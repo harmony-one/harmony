@@ -1,11 +1,11 @@
-language: go
 os:
   - linux
   - osx
 
 jobs:
   include:
-  - go_import_path: github.com/harmony-one/harmony
+  - language: go
+    go_import_path: github.com/harmony-one/harmony
     install:
     - env GO111MODULE=on
     - export GOPATH=$HOME/gopath
@@ -48,6 +48,7 @@ jobs:
       - ./send.sh success $WEBHOOK_URL
 
   - stage: New build script
+    language: go
     script:
       - go version && go env
       - echo "GO111MODULE=$GO111MODULE"
