@@ -197,6 +197,9 @@ type Node struct {
 
 	// Duplicated Ping Message Received
 	duplicatedPing map[string]bool
+
+	// Channel to notify consensus service to really start consensus
+	startConsensus chan struct{}
 }
 
 // Blockchain returns the blockchain from node
@@ -317,6 +320,8 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 	go node.ReceiveGroupMessage()
 
 	node.duplicatedPing = make(map[string]bool)
+
+	node.startConsensus = make(chan struct{})
 
 	return &node
 }
@@ -720,7 +725,7 @@ func (node *Node) setupForShardLeader() {
 	// Register explorer service.
 	node.serviceManager.RegisterService(service_manager.SupportExplorer, explorer.New(&node.SelfPeer))
 	// Register consensus service.
-	node.serviceManager.RegisterService(service_manager.Consensus, consensus_service.New(node.BlockChannel, node.Consensus))
+	node.serviceManager.RegisterService(service_manager.Consensus, consensus_service.New(node.BlockChannel, node.Consensus, node.startConsensus))
 	// Register new block service.
 	node.serviceManager.RegisterService(service_manager.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReady))
 	// Register client support service.
@@ -762,7 +767,7 @@ func (node *Node) setupForBeaconLeader() {
 	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, "0", chanPeer))
 
 	// Register consensus service.
-	node.serviceManager.RegisterService(service_manager.Consensus, consensus_service.New(node.BlockChannel, node.Consensus))
+	node.serviceManager.RegisterService(service_manager.Consensus, consensus_service.New(node.BlockChannel, node.Consensus, node.startConsensus))
 	// Register new block service.
 	node.serviceManager.RegisterService(service_manager.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReady))
 	// Register client support service.

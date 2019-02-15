@@ -396,6 +396,7 @@ func (node *Node) SendPongMessage() {
 					sentMessage = true
 					// stop sending ping message
 					node.serviceManager.TakeAction(&service.Action{Action: service.Stop, ServiceType: service.PeerDiscovery})
+					node.startConsensus <- struct{}{}
 				}
 			}
 			numPeers = numPeersNow
