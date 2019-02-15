@@ -35,6 +35,20 @@ jobs:
     - go build -v ./...
     script:
     - ./scripts/travis_checker.sh
+    # notify after failures separately for each os
+    after_failure:
+      - wget https://raw.githubusercontent.com/DiscordHooks/travis-ci-discord-webhook/master/send.sh
+      - chmod +x send.sh
+      - ./send.sh failure $WEBHOOK_URL
+
+  - stage: Notify success
+    notifications:
+      slack: harmonyone:gggCd1QQopsQAW8JYgBWiH7M
+    # notify about success only once
+    script:
+      - wget https://raw.githubusercontent.com/DiscordHooks/travis-ci-discord-webhook/master/send.sh
+      - chmod +x send.sh
+      - ./send.sh success $WEBHOOK_URL
 
   - stage: New build script
     script:
@@ -43,14 +57,4 @@ jobs:
       - ./build.sh
 
 
-notifications:
-  slack: harmonyone:gggCd1QQopsQAW8JYgBWiH7M
-after_success:
-  - wget https://raw.githubusercontent.com/DiscordHooks/travis-ci-discord-webhook/master/send.sh
-  - chmod +x send.sh
-  - ./send.sh success $WEBHOOK_URL
-after_failure:
-  - wget https://raw.githubusercontent.com/DiscordHooks/travis-ci-discord-webhook/master/send.sh
-  - chmod +x send.sh
-  - ./send.sh failure $WEBHOOK_URL
 
