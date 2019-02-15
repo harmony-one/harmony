@@ -6,6 +6,7 @@
 
 # Executables
 harmony
+main
 *.pyc
 *.exe
 *.out
@@ -47,3 +48,18 @@ bc_config.json
 
 # leveldb local storage
 db/
+
+# bootnode keystore
+.bnkey
+
+# harmony node keystore
+.hmykey
+
+# vendor directory
+vendor
+
+# node_modules
+node_modules/
+
+# txgen node keystore
+.txgenkey

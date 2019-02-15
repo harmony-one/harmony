@@ -2,26 +2,32 @@
 package consensus // consensus
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/binary"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
 	"sync"
 
-	"github.com/dedis/kyber"
-	"github.com/dedis/kyber/sign/schnorr"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
+	protobuf "github.com/golang/protobuf/proto"
+	"github.com/harmony-one/bls/ffi/go/bls"
+	consensus_proto "github.com/harmony-one/harmony/api/consensus"
+	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/crypto"
-	"github.com/harmony-one/harmony/crypto/pki"
+	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 	"golang.org/x/crypto/sha3"
 
-	proto_node "github.com/harmony-one/harmony/api/proto/node"
+	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 )
 
 // Consensus is the main struct with all states and data related to consensus process.
@@ -30,20 +36,12 @@ type Consensus struct {
 	state State
 
 	// Commits collected from validators.
-	commitments               *map[uint32]kyber.Point
-	finalCommitments          *map[uint32]kyber.Point
-	aggregatedCommitment      kyber.Point
-	aggregatedFinalCommitment kyber.Point
-	bitmap                    *crypto.Mask
-	finalBitmap               *crypto.Mask
-
-	// Challenges for the validators
-	challenge      [32]byte
-	finalChallenge [32]byte
-
-	// Responses collected from validators
-	responses      *map[uint32]kyber.Scalar
-	finalResponses *map[uint32]kyber.Scalar
+	prepareSigs          map[uint32]*bls.Sign
+	commitSigs           map[uint32]*bls.Sign
+	aggregatedPrepareSig *bls.Sign
+	aggregatedCommitSig  *bls.Sign
+	prepareBitmap        *bls_cosi.Mask
+	commitBitmap         *bls_cosi.Mask
 
 	// map of nodeID to validator Peer object
 	// FIXME: should use PubKey of p2p.Peer as the hashkey
@@ -57,12 +55,12 @@ type Consensus struct {
 	leader p2p.Peer
 
 	// Public keys of the committee including leader and validators
-	PublicKeys []kyber.Point
+	PublicKeys []*bls.PublicKey
 	pubKeyLock sync.Mutex
 
 	// private/public keys of current node
-	priKey kyber.Scalar
-	pubKey kyber.Point
+	priKey *bls.SecretKey
+	pubKey *bls.PublicKey
 
 	// Whether I am leader. False means I am validator
 	IsLeader bool
@@ -85,8 +83,6 @@ type Consensus struct {
 	// Validator specific fields
 	// Blocks received but not done with consensus yet
 	blocksReceived map[uint32]*BlockConsensusStatus
-	// Commitment secret
-	secret map[uint32]kyber.Scalar
 
 	// Signal channel for starting a new consensus process
 	ReadySignal chan struct{}
@@ -97,9 +93,12 @@ type Consensus struct {
 	OnConsensusDone func(*types.Block)
 
 	// current consensus block to check if out of sync
-	ConsensusBlock chan *types.Block
+	ConsensusBlock chan *BFTBlockInfo
 	// verified block to state sync broadcast
 	VerifiedNewBlock chan *types.Block
+
+	// Channel for DRG protocol to send pRnd (preimage of randomness resulting from combined vrf randomnesses) to consensus. The first 32 bytes are randomness, the rest is for bitmap.
+	PRndChannel chan []byte
 
 	uniqueIDInstance *utils.UniqueValidatorID
 
@@ -113,6 +112,13 @@ type Consensus struct {
 	OfflinePeerList []p2p.Peer
 }
 
+// BFTBlockInfo send the latest block that was in BFT consensus process as well as its consensusID to state syncing
+// consensusID is necessary to make sure the out of sync node can enter the correct view
+type BFTBlockInfo struct {
+	Block       *types.Block
+	ConsensusID uint32
+}
+
 // BlockConsensusStatus used to keep track of the consensus status of multiple blocks received so far
 // This is mainly used in the case that this node is lagging behind and needs to catch up.
 // For example, the consensus moved to round N and this node received message(N).
@@ -122,6 +128,16 @@ type Consensus struct {
 type BlockConsensusStatus struct {
 	block []byte // the block data
 	state State  // the latest state of the consensus
+}
+
+// UpdateConsensusID is used to update latest consensusID for nodes that out of sync
+func (consensus *Consensus) UpdateConsensusID(consensusID uint32) {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+	if consensus.consensusID < consensusID {
+		utils.GetLogInstance().Debug("update consensusID", "myConsensusID", consensus.consensusID, "newConsensusID", consensusID)
+		consensus.consensusID = consensusID
+	}
 }
 
 // New creates a new Consensus object
@@ -136,43 +152,43 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Cons
 		consensus.IsLeader = false
 	}
 
-	consensus.commitments = &map[uint32]kyber.Point{}
-	consensus.finalCommitments = &map[uint32]kyber.Point{}
-	consensus.responses = &map[uint32]kyber.Scalar{}
-	consensus.finalResponses = &map[uint32]kyber.Scalar{}
-
 	consensus.leader = leader
 	for _, peer := range peers {
 		consensus.validators.Store(utils.GetUniqueIDFromPeer(peer), peer)
 	}
 
+	consensus.prepareSigs = map[uint32]*bls.Sign{}
+	consensus.commitSigs = map[uint32]*bls.Sign{}
+
 	// Initialize cosign bitmap
-	allPublicKeys := make([]kyber.Point, 0)
+	allPublicKeys := make([]*bls.PublicKey, 0)
 	for _, validatorPeer := range peers {
 		allPublicKeys = append(allPublicKeys, validatorPeer.PubKey)
 	}
 	allPublicKeys = append(allPublicKeys, leader.PubKey)
-	mask, err := crypto.NewMask(crypto.Ed25519Curve, allPublicKeys, consensus.leader.PubKey)
-	if err != nil {
-		panic("Failed to create mask")
-	}
-	finalMask, err := crypto.NewMask(crypto.Ed25519Curve, allPublicKeys, consensus.leader.PubKey)
-	if err != nil {
-		panic("Failed to create final mask")
-	}
-	consensus.PublicKeys = allPublicKeys
-	consensus.bitmap = mask
-	consensus.finalBitmap = finalMask
 
-	consensus.secret = map[uint32]kyber.Scalar{}
+	consensus.PublicKeys = allPublicKeys
+
+	prepareBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.PubKey)
+	commitBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.PubKey)
+	consensus.prepareBitmap = prepareBitmap
+	consensus.commitBitmap = commitBitmap
+
+	consensus.aggregatedPrepareSig = nil
+	consensus.aggregatedCommitSig = nil
 
 	// For now use socket address as ID
 	// TODO: populate Id derived from address
 	consensus.nodeID = utils.GetUniqueIDFromPeer(selfPeer)
 
 	// Set private key for myself so that I can sign messages.
-	consensus.priKey = crypto.Ed25519Curve.Scalar().SetInt64(int64(consensus.nodeID))
-	consensus.pubKey = pki.GetPublicKeyFromScalar(consensus.priKey)
+	nodeIDBytes := make([]byte, 32)
+	binary.LittleEndian.PutUint32(nodeIDBytes, consensus.nodeID)
+	privateKey := bls.SecretKey{}
+	err := privateKey.SetLittleEndian(nodeIDBytes)
+	consensus.priKey = &privateKey
+	consensus.pubKey = privateKey.GetPublicKey()
+
 	consensus.consensusID = 0 // or view Id in the original pbft paper
 
 	myShardID, err := strconv.Atoi(ShardID)
@@ -201,19 +217,97 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Cons
 	return &consensus
 }
 
+// RegisterPRndChannel registers the channel for receiving randomness preimage from DRG protocol
+func (consensus *Consensus) RegisterPRndChannel(pRndChannel chan []byte) {
+	consensus.PRndChannel = pRndChannel
+}
+
+// Checks the basic meta of a consensus message, including the signature.
+func (consensus *Consensus) checkConsensusMessage(message consensus_proto.Message, publicKey *bls.PublicKey) error {
+	consensusID := message.ConsensusId
+	blockHash := message.BlockHash
+
+	// Verify message signature
+	err := verifyMessageSig(publicKey, message)
+	if err != nil {
+		utils.GetLogInstance().Warn("Failed to verify the message signature", "Error", err)
+		return consensus_engine.ErrInvalidConsensusMessage
+	}
+
+	// check consensus Id
+	if consensusID != consensus.consensusID {
+		utils.GetLogInstance().Warn("Wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
+		return consensus_engine.ErrConsensusIDNotMatch
+	}
+
+	if !bytes.Equal(blockHash, consensus.blockHash[:]) {
+		utils.GetLogInstance().Warn("Wrong blockHash", "consensus", consensus)
+		return consensus_engine.ErrInvalidConsensusMessage
+	}
+	return nil
+}
+
+// Gets the validator peer based on validator ID.
+func (consensus *Consensus) getValidatorPeerByID(validatorID uint32) *p2p.Peer {
+	v, ok := consensus.validators.Load(validatorID)
+	if !ok {
+		utils.GetLogInstance().Warn("Unrecognized validator", "validatorID", validatorID, "consensus", consensus)
+		return nil
+	}
+	value, ok := v.(p2p.Peer)
+	if !ok {
+		utils.GetLogInstance().Warn("Invalid validator", "validatorID", validatorID, "consensus", consensus)
+		return nil
+	}
+	return &value
+}
+
+// Verify the signature of the message are valid from the signer's public key.
+func verifyMessageSig(signerPubKey *bls.PublicKey, message consensus_proto.Message) error {
+	signature := message.Signature
+	message.Signature = nil
+	messageBytes, err := protobuf.Marshal(&message)
+	if err != nil {
+		return err
+	}
+
+	msgSig := bls.Sign{}
+	err = msgSig.Deserialize(signature)
+	if err != nil {
+		return err
+	}
+	msgHash := sha256.Sum256(messageBytes)
+	if !msgSig.VerifyHash(signerPubKey, msgHash[:]) {
+		return errors.New("failed to verify the signature")
+	}
+	return nil
+}
+
 // Author returns the author of the block header.
 func (consensus *Consensus) Author(header *types.Header) (common.Address, error) {
 	// TODO: implement this
 	return common.Address{}, nil
 }
 
-// TODO: switch to BLS-based signature
+// Sign on the hash of the message
 func (consensus *Consensus) signMessage(message []byte) []byte {
-	signature, err := schnorr.Sign(crypto.Ed25519Curve, consensus.priKey, message)
+	hash := sha256.Sum256(message)
+	signature := consensus.priKey.SignHash(hash[:])
+	return signature.Serialize()
+}
+
+// Sign on the consensus message signature field.
+func (consensus *Consensus) signConsensusMessage(message *consensus_proto.Message) error {
+	message.Signature = nil
+	// TODO: use custom serialization method rather than protobuf
+	marshaledMessage, err := protobuf.Marshal(message)
 	if err != nil {
-		panic("Failed to sign message with Schnorr signature.")
+		return err
 	}
-	return signature
+	// 64 byte of signature on previous data
+	signature := consensus.signMessage(marshaledMessage)
+	message.Signature = signature
+	return nil
 }
 
 // GetValidatorPeers returns list of validator peers.
@@ -231,24 +325,37 @@ func (consensus *Consensus) GetValidatorPeers() []p2p.Peer {
 	return validatorPeers
 }
 
+// GetPrepareSigsArray returns the signatures for prepare as a array
+func (consensus *Consensus) GetPrepareSigsArray() []*bls.Sign {
+	sigs := []*bls.Sign{}
+	for _, sig := range consensus.prepareSigs {
+		sigs = append(sigs, sig)
+	}
+	return sigs
+}
+
+// GetCommitSigsArray returns the signatures for commit as a array
+func (consensus *Consensus) GetCommitSigsArray() []*bls.Sign {
+	sigs := []*bls.Sign{}
+	for _, sig := range consensus.commitSigs {
+		sigs = append(sigs, sig)
+	}
+	return sigs
+}
+
 // ResetState resets the state of the consensus
 func (consensus *Consensus) ResetState() {
 	consensus.state = Finished
-	consensus.commitments = &map[uint32]kyber.Point{}
-	consensus.finalCommitments = &map[uint32]kyber.Point{}
-	consensus.responses = &map[uint32]kyber.Scalar{}
-	consensus.finalResponses = &map[uint32]kyber.Scalar{}
+	consensus.prepareSigs = map[uint32]*bls.Sign{}
+	consensus.commitSigs = map[uint32]*bls.Sign{}
 
-	mask, _ := crypto.NewMask(crypto.Ed25519Curve, consensus.PublicKeys, consensus.leader.PubKey)
-	finalMask, _ := crypto.NewMask(crypto.Ed25519Curve, consensus.PublicKeys, consensus.leader.PubKey)
-	consensus.bitmap = mask
-	consensus.finalBitmap = finalMask
-	consensus.bitmap.SetMask([]byte{})
-	consensus.finalBitmap.SetMask([]byte{})
+	prepareBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.PubKey)
+	commitBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.PubKey)
+	consensus.prepareBitmap = prepareBitmap
+	consensus.commitBitmap = commitBitmap
 
-	consensus.aggregatedCommitment = nil
-	consensus.aggregatedFinalCommitment = nil
-	consensus.secret = map[uint32]kyber.Scalar{}
+	consensus.aggregatedPrepareSig = nil
+	consensus.aggregatedCommitSig = nil
 
 	// Clear the OfflinePeersList again
 	consensus.OfflinePeerList = make([]p2p.Peer, 0)
@@ -262,8 +369,8 @@ func (consensus *Consensus) String() string {
 	} else {
 		duty = "VLD" // validator
 	}
-	return fmt.Sprintf("[duty:%s, priKey:%s, ShardID:%v, nodeID:%v, state:%s]",
-		duty, consensus.priKey.String(), consensus.ShardID, consensus.nodeID, consensus.state)
+	return fmt.Sprintf("[duty:%s, pubKey:%s, ShardID:%v, nodeID:%v, state:%s]",
+		duty, hex.EncodeToString(consensus.pubKey.Serialize()), consensus.ShardID, consensus.nodeID, consensus.state)
 }
 
 // AddPeers adds new peers into the validator map of the consensus
@@ -281,7 +388,7 @@ func (consensus *Consensus) AddPeers(peers []*p2p.Peer) int {
 			consensus.pubKeyLock.Lock()
 			consensus.PublicKeys = append(consensus.PublicKeys, peer.PubKey)
 			consensus.pubKeyLock.Unlock()
-			utils.GetLogInstance().Debug("[SYNC] new peer added", "pubKey", peer.PubKey, "ip", peer.IP, "port", peer.Port)
+			//			utils.GetLogInstance().Debug("[SYNC]", "new peer added", peer)
 		}
 		count++
 	}
@@ -331,10 +438,14 @@ func (consensus *Consensus) RemovePeers(peers []p2p.Peer) int {
 		// Or the shard won't be able to reach consensus if public keys are mismatch
 
 		validators := consensus.GetValidatorPeers()
-		pong := proto_node.NewPongMessage(validators, consensus.PublicKeys)
+		pong := proto_discovery.NewPongMessage(validators, consensus.PublicKeys)
 		buffer := pong.ConstructPongMessage()
 
-		host.BroadcastMessageFromLeader(consensus.host, validators, buffer, consensus.OfflinePeers)
+		if utils.UseLibP2P {
+			consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, buffer)
+		} else {
+			host.BroadcastMessageFromLeader(consensus.host, validators, buffer, consensus.OfflinePeers)
+		}
 	}
 
 	return count2
@@ -343,7 +454,7 @@ func (consensus *Consensus) RemovePeers(peers []p2p.Peer) int {
 // DebugPrintPublicKeys print all the PublicKeys in string format in Consensus
 func (consensus *Consensus) DebugPrintPublicKeys() {
 	for _, k := range consensus.PublicKeys {
-		str := fmt.Sprintf("%s", k)
+		str := fmt.Sprintf("%s", hex.EncodeToString(k.Serialize()))
 		utils.GetLogInstance().Debug("pk:", "string", str)
 	}
 
@@ -355,7 +466,7 @@ func (consensus *Consensus) DebugPrintValidators() {
 	count := 0
 	consensus.validators.Range(func(k, v interface{}) bool {
 		if p, ok := v.(p2p.Peer); ok {
-			str2 := fmt.Sprintf("%s", p.PubKey)
+			str2 := fmt.Sprintf("%s", p.PubKey.Serialize())
 			utils.GetLogInstance().Debug("validator:", "IP", p.IP, "Port", p.Port, "VID", p.ValidatorID, "Key", str2)
 			count++
 			return true
@@ -366,9 +477,8 @@ func (consensus *Consensus) DebugPrintValidators() {
 }
 
 // UpdatePublicKeys updates the PublicKeys variable, protected by a mutex
-func (consensus *Consensus) UpdatePublicKeys(pubKeys []kyber.Point) int {
+func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int {
 	consensus.pubKeyLock.Lock()
-	//	consensus.PublicKeys = make([]kyber.Point, len(pubKeys))
 	consensus.PublicKeys = append(pubKeys[:0:0], pubKeys...)
 	consensus.pubKeyLock.Unlock()
 
@@ -382,7 +492,7 @@ func NewFaker() *Consensus {
 
 // VerifyHeader checks whether a header conforms to the consensus rules of the
 // stock bft engine.
-func (consensus *Consensus) VerifyHeader(chain ChainReader, header *types.Header, seal bool) error {
+func (consensus *Consensus) VerifyHeader(chain consensus_engine.ChainReader, header *types.Header, seal bool) error {
 	// TODO: implement this
 	return nil
 }
@@ -390,7 +500,7 @@ func (consensus *Consensus) VerifyHeader(chain ChainReader, header *types.Header
 // VerifyHeaders is similar to VerifyHeader, but verifies a batch of headers
 // concurrently. The method returns a quit channel to abort the operations and
 // a results channel to retrieve the async verifications.
-func (consensus *Consensus) VerifyHeaders(chain ChainReader, headers []*types.Header, seals []bool) (chan<- struct{}, <-chan error) {
+func (consensus *Consensus) VerifyHeaders(chain consensus_engine.ChainReader, headers []*types.Header, seals []bool) (chan<- struct{}, <-chan error) {
 	abort, results := make(chan struct{}), make(chan error, len(headers))
 	for i := 0; i < len(headers); i++ {
 		results <- nil
@@ -398,7 +508,7 @@ func (consensus *Consensus) VerifyHeaders(chain ChainReader, headers []*types.He
 	return abort, results
 }
 
-func (consensus *Consensus) verifyHeaderWorker(chain ChainReader, headers []*types.Header, seals []bool, index int) error {
+func (consensus *Consensus) verifyHeaderWorker(chain consensus_engine.ChainReader, headers []*types.Header, seals []bool, index int) error {
 	var parent *types.Header
 	if index == 0 {
 		parent = chain.GetHeader(headers[0].ParentHash, headers[0].Number.Uint64()-1)
@@ -406,7 +516,7 @@ func (consensus *Consensus) verifyHeaderWorker(chain ChainReader, headers []*typ
 		parent = headers[index-1]
 	}
 	if parent == nil {
-		return ErrUnknownAncestor
+		return consensus_engine.ErrUnknownAncestor
 	}
 	if chain.GetHeader(headers[index].Hash(), headers[index].Number.Uint64()) != nil {
 		return nil // known block
@@ -416,19 +526,19 @@ func (consensus *Consensus) verifyHeaderWorker(chain ChainReader, headers []*typ
 
 // verifyHeader checks whether a header conforms to the consensus rules of the
 // stock bft engine.
-func (consensus *Consensus) verifyHeader(chain ChainReader, header, parent *types.Header, uncle bool, seal bool) error {
+func (consensus *Consensus) verifyHeader(chain consensus_engine.ChainReader, header, parent *types.Header, uncle bool, seal bool) error {
 	return nil
 }
 
 // VerifySeal implements consensus.Engine, checking whether the given block satisfies
 // the PoW difficulty requirements.
-func (consensus *Consensus) VerifySeal(chain ChainReader, header *types.Header) error {
+func (consensus *Consensus) VerifySeal(chain consensus_engine.ChainReader, header *types.Header) error {
 	return nil
 }
 
 // Finalize implements consensus.Engine, accumulating the block and uncle rewards,
 // setting the final state and assembling the block.
-func (consensus *Consensus) Finalize(chain ChainReader, header *types.Header, state *state.DB, txs []*types.Transaction, receipts []*types.Receipt) (*types.Block, error) {
+func (consensus *Consensus) Finalize(chain consensus_engine.ChainReader, header *types.Header, state *state.DB, txs []*types.Transaction, receipts []*types.Receipt) (*types.Block, error) {
 	// Accumulate any block and uncle rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
 	accumulateRewards(chain.Config(), state, header)
@@ -459,14 +569,14 @@ func (consensus *Consensus) SealHash(header *types.Header) (hash common.Hash) {
 }
 
 // Seal is to seal final block.
-func (consensus *Consensus) Seal(chain ChainReader, block *types.Block, results chan<- *types.Block, stop <-chan struct{}) error {
+func (consensus *Consensus) Seal(chain consensus_engine.ChainReader, block *types.Block, results chan<- *types.Block, stop <-chan struct{}) error {
 	// TODO: implement final block sealing
 	return nil
 }
 
 // Prepare is to prepare ...
 // TODO(RJ): fix it.
-func (consensus *Consensus) Prepare(chain ChainReader, header *types.Header) error {
+func (consensus *Consensus) Prepare(chain consensus_engine.ChainReader, header *types.Header) error {
 	// TODO: implement prepare method
 	return nil
 }
@@ -499,4 +609,30 @@ func (consensus *Consensus) GetPeerFromID(peerID uint32) (p2p.Peer, bool) {
 // SendMessage sends message thru p2p host to peer.
 func (consensus *Consensus) SendMessage(peer p2p.Peer, message []byte) {
 	host.SendMessage(consensus.host, peer, message, nil)
+}
+
+// Populates the common basic fields for all consensus message.
+func (consensus *Consensus) populateMessageFields(message *consensus_proto.Message) {
+	// 4 byte consensus id
+	message.ConsensusId = consensus.consensusID
+
+	// 32 byte block hash
+	message.BlockHash = consensus.blockHash[:]
+
+	// 4 byte sender id
+	message.SenderId = uint32(consensus.nodeID)
+}
+
+// Signs the consensus message and returns the marshaled message.
+func (consensus *Consensus) signAndMarshalConsensusMessage(message *consensus_proto.Message) ([]byte, error) {
+	err := consensus.signConsensusMessage(message)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	marshaledMessage, err := protobuf.Marshal(message)
+	if err != nil {
+		return []byte{}, err
+	}
+	return marshaledMessage, nil
 }

@@ -1,20 +1,19 @@
 package consensus
 
 import (
-	"bytes"
 	"encoding/hex"
-	"errors"
 	"strconv"
 	"time"
 
-	"github.com/dedis/kyber"
-	"github.com/dedis/kyber/sign/schnorr"
+	"github.com/harmony-one/harmony/core"
+
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
+	"github.com/harmony-one/bls/ffi/go/bls"
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"
-	"github.com/harmony-one/harmony/api/services/explorer"
+	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/crypto"
+	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -30,51 +29,71 @@ var (
 )
 
 // WaitForNewBlock waits for the next new block to run consensus on
-func (consensus *Consensus) WaitForNewBlock(blockChannel chan *types.Block) {
-	utils.GetLogInstance().Debug("Waiting for block", "consensus", consensus)
-	for { // keep waiting for new blocks
-		newBlock := <-blockChannel
-		// TODO: think about potential race condition
+func (consensus *Consensus) WaitForNewBlock(blockChannel chan *types.Block, stopChan chan struct{}, stoppedChan chan struct{}) {
+	go func() {
+		defer close(stoppedChan)
+		for {
+			select {
+			default:
+				utils.GetLogInstance().Debug("Waiting for block", "consensus", consensus)
+				// keep waiting for new blocks
+				newBlock := <-blockChannel
+				// TODO: think about potential race condition
 
-		c := consensus.RemovePeers(consensus.OfflinePeerList)
-		if c > 0 {
-			utils.GetLogInstance().Debug("WaitForNewBlock", "removed peers", c)
-		}
+				c := consensus.RemovePeers(consensus.OfflinePeerList)
+				if c > 0 {
+					utils.GetLogInstance().Debug("WaitForNewBlock", "removed peers", c)
+				}
 
-		for !consensus.HasEnoughValidators() {
-			utils.GetLogInstance().Debug("Not enough validators", "# Validators", len(consensus.PublicKeys))
-			time.Sleep(waitForEnoughValidators * time.Millisecond)
-		}
+				for !consensus.HasEnoughValidators() {
+					utils.GetLogInstance().Debug("Not enough validators", "# Validators", len(consensus.PublicKeys))
+					time.Sleep(waitForEnoughValidators * time.Millisecond)
+				}
 
-		startTime = time.Now()
-		utils.GetLogInstance().Debug("STARTING CONSENSUS", "numTxs", len(newBlock.Transactions()), "consensus", consensus, "startTime", startTime, "publicKeys", len(consensus.PublicKeys))
-		for consensus.state == Finished {
-			// time.Sleep(500 * time.Millisecond)
-			consensus.ResetState()
-			consensus.startConsensus(newBlock)
-			break
+				if core.IsEpochBlock(newBlock) {
+					// Receive pRnd from DRG protocol
+					utils.GetLogInstance().Debug("[DRG] Waiting for pRnd")
+					pRndAndBitmap := <-consensus.PRndChannel
+					utils.GetLogInstance().Debug("[DRG] GOT pRnd", "pRnd", pRndAndBitmap)
+					pRnd := pRndAndBitmap[:32]
+					bitmap := pRndAndBitmap[32:]
+					vrfBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.PubKey)
+					vrfBitmap.SetMask(bitmap)
+
+					// TODO: check validity of pRnd
+					_ = pRnd
+				}
+				startTime = time.Now()
+				utils.GetLogInstance().Debug("STARTING CONSENSUS", "numTxs", len(newBlock.Transactions()), "consensus", consensus, "startTime", startTime, "publicKeys", len(consensus.PublicKeys))
+				for { // Wait until last consensus is finished
+					if consensus.state == Finished {
+						consensus.ResetState()
+						consensus.startConsensus(newBlock)
+						break
+					}
+					time.Sleep(500 * time.Millisecond)
+				}
+			case <-stopChan:
+				return
+			}
 		}
-	}
+	}()
 }
 
 // ProcessMessageLeader dispatches consensus message for the leader.
 func (consensus *Consensus) ProcessMessageLeader(payload []byte) {
 	message := consensus_proto.Message{}
-	err := message.XXX_Unmarshal(payload)
+	err := protobuf.Unmarshal(payload, &message)
 
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to unmarshal message payload.", "err", err, "consensus", consensus)
 	}
 
 	switch message.Type {
+	case consensus_proto.MessageType_PREPARE:
+		consensus.processPrepareMessage(message)
 	case consensus_proto.MessageType_COMMIT:
-		consensus.processCommitMessage(message, ChallengeDone)
-	case consensus_proto.MessageType_RESPONSE:
-		consensus.processResponseMessage(message, CollectiveSigDone)
-	case consensus_proto.MessageType_FINAL_COMMIT:
-		consensus.processCommitMessage(message, FinalChallengeDone)
-	case consensus_proto.MessageType_FINAL_RESPONSE:
-		consensus.processResponseMessage(message, Finished)
+		consensus.processCommitMessage(message)
 	default:
 		utils.GetLogInstance().Error("Unexpected message type", "msgType", message.Type, "consensus", consensus)
 	}
@@ -94,327 +113,193 @@ func (consensus *Consensus) startConsensus(newBlock *types.Block) {
 		return
 	}
 	consensus.block = encodedBlock
-
 	utils.GetLogInstance().Debug("Stop encoding block")
+
 	msgToSend := consensus.constructAnnounceMessage()
 
 	// Set state to AnnounceDone
 	consensus.state = AnnounceDone
-	consensus.commitByLeader(true)
-	host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
-}
 
-// commitByLeader commits to the message by leader himself before receiving others commits
-func (consensus *Consensus) commitByLeader(firstRound bool) {
-	// Generate leader's own commitment
-	secret, commitment := crypto.Commit(crypto.Ed25519Curve)
-	consensus.secret[consensus.consensusID] = secret
-	if firstRound {
-		consensus.mutex.Lock()
-		defer consensus.mutex.Unlock()
-		(*consensus.commitments)[consensus.nodeID] = commitment
-		consensus.bitmap.SetKey(consensus.pubKey, true)
+	// Leader sign the block hash itself
+	consensus.prepareSigs[consensus.nodeID] = consensus.priKey.SignHash(consensus.blockHash[:])
+
+	if utils.UseLibP2P {
+		// Construct broadcast p2p message
+		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
 	} else {
-		(*consensus.finalCommitments)[consensus.nodeID] = commitment
-		consensus.finalBitmap.SetKey(consensus.pubKey, true)
-	}
-}
-
-// processCommitMessage processes the commit message sent from validators
-func (consensus *Consensus) processCommitMessage(message consensus_proto.Message, targetState State) {
-	consensusID := message.ConsensusId
-	blockHash := message.BlockHash
-	validatorID := message.SenderId
-	commitment := message.Payload
-	signature := message.Signature
-
-	// Verify signature
-	v, ok := consensus.validators.Load(validatorID)
-	if !ok {
-		utils.GetLogInstance().Warn("Received message from unrecognized validator", "validatorID", validatorID, "consensus", consensus)
-		return
-	}
-	value, ok := v.(p2p.Peer)
-	if !ok {
-		utils.GetLogInstance().Warn("Invalid validator", "validatorID", validatorID, "consensus", consensus)
-		return
-	}
-
-	message.Signature = nil
-	messageBytes, err := protobuf.Marshal(&message)
-	if err != nil {
-		utils.GetLogInstance().Warn("Failed to marshal the announce message", "error", err)
-	}
-	if schnorr.Verify(crypto.Ed25519Curve, value.PubKey, messageBytes, signature) != nil {
-		utils.GetLogInstance().Warn("Received message with invalid signature", "validatorKey", consensus.leader.PubKey, "consensus", consensus)
-		return
-	}
-
-	// check consensus Id
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-	if consensusID != consensus.consensusID {
-		utils.GetLogInstance().Warn("Received Commit with wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
-		return
-	}
-
-	if !bytes.Equal(blockHash, consensus.blockHash[:]) {
-		utils.GetLogInstance().Warn("Received Commit with wrong blockHash", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
-		return
-	}
-
-	commitments := consensus.commitments // targetState == ChallengeDone
-	bitmap := consensus.bitmap
-	if targetState == FinalChallengeDone {
-		commitments = consensus.finalCommitments
-		bitmap = consensus.finalBitmap
-	}
-
-	// proceed only when the message is not received before
-	_, ok = (*commitments)[validatorID]
-	shouldProcess := !ok
-	if len((*commitments)) >= ((len(consensus.PublicKeys)*2)/3 + 1) {
-		shouldProcess = false
-	}
-
-	if shouldProcess {
-		point := crypto.Ed25519Curve.Point()
-		point.UnmarshalBinary(commitment)
-		(*commitments)[validatorID] = point
-		utils.GetLogInstance().Debug("Received new commit message", "num", len(*commitments), "validatorID", validatorID, "PublicKeys", len(consensus.PublicKeys))
-		// Set the bitmap indicate this validate signed.
-		bitmap.SetKey(value.PubKey, true)
-	}
-
-	if !shouldProcess {
-		utils.GetLogInstance().Debug("Received additional new commit message", "validatorID", validatorID)
-		return
-	}
-
-	if len((*commitments)) >= ((len(consensus.PublicKeys)*2)/3+1) && consensus.state < targetState {
-		utils.GetLogInstance().Debug("Enough commitments received with signatures", "num", len(*commitments), "state", consensus.state)
-
-		// Broadcast challenge
-		msgTypeToSend := consensus_proto.MessageType_CHALLENGE // targetState == ChallengeDone
-		if targetState == FinalChallengeDone {
-			msgTypeToSend = consensus_proto.MessageType_FINAL_CHALLENGE
-		}
-
-		msgToSend, challengeScalar, aggCommitment := consensus.constructChallengeMessage(msgTypeToSend)
-		bytes, err := challengeScalar.MarshalBinary()
-		if err != nil {
-			utils.GetLogInstance().Error("Failed to serialize challenge")
-		}
-
-		if msgTypeToSend == consensus_proto.MessageType_CHALLENGE {
-			copy(consensus.challenge[:], bytes)
-			consensus.aggregatedCommitment = aggCommitment
-		} else if msgTypeToSend == consensus_proto.MessageType_FINAL_CHALLENGE {
-			copy(consensus.finalChallenge[:], bytes)
-			consensus.aggregatedFinalCommitment = aggCommitment
-		}
-
-		// Add leader's response
-		consensus.responseByLeader(challengeScalar, targetState == ChallengeDone)
-
-		// Broadcast challenge message
 		host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
-
-		// Set state to targetState (ChallengeDone or FinalChallengeDone)
-		consensus.state = targetState
 	}
 }
 
-// Leader commit to the message itself before receiving others commits
-func (consensus *Consensus) responseByLeader(challenge kyber.Scalar, firstRound bool) {
-	// Generate leader's own commitment
-	response, err := crypto.Response(crypto.Ed25519Curve, consensus.priKey, consensus.secret[consensus.consensusID], challenge)
-	if err == nil {
-		if firstRound {
-			(*consensus.responses)[consensus.nodeID] = response
-			consensus.bitmap.SetKey(consensus.pubKey, true)
-		} else {
-			(*consensus.finalResponses)[consensus.nodeID] = response
-			consensus.finalBitmap.SetKey(consensus.pubKey, true)
-		}
-	} else {
-		utils.GetLogInstance().Warn("leader failed to generate response", "err", err)
-	}
-}
-
-// Processes the response message sent from validators
-func (consensus *Consensus) processResponseMessage(message consensus_proto.Message, targetState State) {
-	consensusID := message.ConsensusId
-	blockHash := message.BlockHash
+// processPrepareMessage processes the prepare message sent from validators
+func (consensus *Consensus) processPrepareMessage(message consensus_proto.Message) {
 	validatorID := message.SenderId
-	response := message.Payload
-	signature := message.Signature
+	prepareSig := message.Payload
 
-	shouldProcess := true
+	prepareSigs := consensus.prepareSigs
+	prepareBitmap := consensus.prepareBitmap
+
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
-	// check consensus Id
-	if consensusID != consensus.consensusID {
-		shouldProcess = false
-		utils.GetLogInstance().Warn("Received Response with wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
-	}
+	validatorPeer := consensus.getValidatorPeerByID(validatorID)
 
-	if !bytes.Equal(blockHash, consensus.blockHash[:]) {
-		utils.GetLogInstance().Warn("Received Response with wrong blockHash", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
+	if err := consensus.checkConsensusMessage(message, validatorPeer.PubKey); err != nil {
+		utils.GetLogInstance().Debug("Failed to check the validator message", "validatorID", validatorID)
 		return
-	}
-
-	// Verify signature
-	v, ok := consensus.validators.Load(validatorID)
-	if !ok {
-		utils.GetLogInstance().Warn("Received message from unrecognized validator", "validatorID", validatorID, "consensus", consensus)
-		return
-	}
-	value, ok := v.(p2p.Peer)
-	if !ok {
-		utils.GetLogInstance().Warn("Invalid validator", "validatorID", validatorID, "consensus", consensus)
-		return
-	}
-	message.Signature = nil
-	messageBytes, err := protobuf.Marshal(&message)
-	if err != nil {
-		utils.GetLogInstance().Warn("Failed to marshal the announce message", "error", err)
-	}
-	if schnorr.Verify(crypto.Ed25519Curve, value.PubKey, messageBytes, signature) != nil {
-		utils.GetLogInstance().Warn("Received message with invalid signature", "validatorKey", consensus.leader.PubKey, "consensus", consensus)
-		return
-	}
-
-	commitments := consensus.commitments // targetState == CollectiveSigDone
-	responses := consensus.responses
-	bitmap := consensus.bitmap
-	if targetState == Finished {
-		commitments = consensus.finalCommitments
-		responses = consensus.finalResponses
-		bitmap = consensus.finalBitmap
 	}
 
 	// proceed only when the message is not received before
-	_, ok = (*responses)[validatorID]
-	shouldProcess = shouldProcess && !ok
-
-	if len((*responses)) >= ((len(consensus.PublicKeys)*2)/3 + 1) {
-		shouldProcess = false
-	}
-
-	if shouldProcess {
-		// verify the response matches the received commit
-		responseScalar := crypto.Ed25519Curve.Scalar()
-		responseScalar.UnmarshalBinary(response)
-		err := consensus.verifyResponse(commitments, responseScalar, validatorID)
-		if err != nil {
-			utils.GetLogInstance().Warn("leader failed to verify the response", "error", err, "VID", strconv.Itoa(int(validatorID)))
-			shouldProcess = false
-		} else {
-			(*responses)[validatorID] = responseScalar
-			utils.GetLogInstance().Debug("Received new response message", "num", len(*responses), "validatorID", strconv.Itoa(int(validatorID)))
-			// Set the bitmap indicate this validate signed.
-			bitmap.SetKey(value.PubKey, true)
-		}
-	}
-
-	if !shouldProcess {
-		utils.GetLogInstance().Debug("Received new response message", "validatorID", strconv.Itoa(int(validatorID)))
+	_, ok := prepareSigs[validatorID]
+	if ok {
+		utils.GetLogInstance().Debug("Already received prepare message from the validator", "validatorID", validatorID)
 		return
 	}
 
-	threshold := 2
-	if targetState == Finished {
-		threshold = 1
+	if len(prepareSigs) >= ((len(consensus.PublicKeys)*2)/3 + 1) {
+		utils.GetLogInstance().Debug("Received additional prepare message", "validatorID", validatorID)
+		return
 	}
-	if len(*responses) >= ((len(consensus.PublicKeys)*threshold)/3+1) && consensus.state != targetState {
-		if len(*responses) >= ((len(consensus.PublicKeys)*threshold)/3+1) && consensus.state != targetState {
-			utils.GetLogInstance().Debug("Enough responses received with signatures", "num", len(*responses), "state", consensus.state)
-			// Aggregate responses
-			responseScalars := []kyber.Scalar{}
-			for _, val := range *responses {
-				responseScalars = append(responseScalars, val)
-			}
 
-			aggregatedResponse, err := crypto.AggregateResponses(crypto.Ed25519Curve, responseScalars)
-			if err != nil {
-				utils.GetLogInstance().Error("Failed to aggregate responses")
-				return
-			}
-			aggregatedCommitment := consensus.aggregatedCommitment
-			if targetState == Finished {
-				aggregatedCommitment = consensus.aggregatedFinalCommitment
-			}
+	// Check BLS signature for the multi-sig
+	var sign bls.Sign
+	err := sign.Deserialize(prepareSig)
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to deserialize bls signature", "validatorID", validatorID)
+		return
+	}
 
-			collectiveSigAndBitmap, err := crypto.Sign(crypto.Ed25519Curve, aggregatedCommitment, aggregatedResponse, bitmap)
+	if !sign.VerifyHash(validatorPeer.PubKey, consensus.blockHash[:]) {
+		utils.GetLogInstance().Error("Received invalid BLS signature", "validatorID", validatorID)
+		return
+	}
 
-			if err != nil {
-				utils.GetLogInstance().Error("Failed to create collective signature")
-				return
-			}
-			utils.GetLogInstance().Info("CollectiveSig and Bitmap created.", "size", len(collectiveSigAndBitmap))
+	utils.GetLogInstance().Debug("Received new prepare signature", "numReceivedSoFar", len(prepareSigs), "validatorID", validatorID, "PublicKeys", len(consensus.PublicKeys))
+	prepareSigs[validatorID] = &sign
+	prepareBitmap.SetKey(validatorPeer.PubKey, true) // Set the bitmap indicating that this validator signed.
 
-			collectiveSig := [64]byte{}
-			copy(collectiveSig[:], collectiveSigAndBitmap[:64])
-			bitmap := collectiveSigAndBitmap[64:]
+	targetState := PreparedDone
+	if len(prepareSigs) >= ((len(consensus.PublicKeys)*2)/3+1) && consensus.state < targetState {
+		utils.GetLogInstance().Debug("Enough prepares received with signatures", "num", len(prepareSigs), "state", consensus.state)
 
-			// Set state to CollectiveSigDone or Finished
-			consensus.state = targetState
+		// Construct and broadcast prepared message
+		msgToSend, aggSig := consensus.constructPreparedMessage()
+		consensus.aggregatedPrepareSig = aggSig
 
-			if consensus.state != Finished {
-				// Start the second round of Cosi
-				msgToSend := consensus.constructCollectiveSigMessage(collectiveSig, bitmap)
-
-				host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
-				consensus.commitByLeader(false)
-			} else {
-				var blockObj types.Block
-				err = rlp.DecodeBytes(consensus.block, &blockObj)
-				if err != nil {
-					utils.GetLogInstance().Debug("failed to construct the new block after consensus")
-				}
-
-				// Sign the block
-				copy(blockObj.Header().Signature[:], collectiveSig[:])
-				copy(blockObj.Header().Bitmap[:], bitmap)
-				consensus.OnConsensusDone(&blockObj)
-
-				select {
-				case consensus.VerifiedNewBlock <- &blockObj:
-				default:
-					utils.GetLogInstance().Info("[SYNC] consensus verified block send to chan failed", "blockHash", blockObj.Hash())
-				}
-
-				consensus.reportMetrics(blockObj)
-
-				// Dump new block into level db.
-				explorer.GetStorageInstance(consensus.leader.IP, consensus.leader.Port, true).Dump(&blockObj, consensus.consensusID)
-
-				// Reset state to Finished, and clear other data.
-				consensus.ResetState()
-				consensus.consensusID++
-
-				utils.GetLogInstance().Debug("HOORAY!!! CONSENSUS REACHED!!!", "consensusID", consensus.consensusID, "numOfSignatures", len(*responses))
-
-				// TODO: remove this temporary delay
-				time.Sleep(500 * time.Millisecond)
-				// Send signal to Node so the new block can be added and new round of consensus can be triggered
-				consensus.ReadySignal <- struct{}{}
-			}
+		if utils.UseLibP2P {
+			consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
+		} else {
+			host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
 		}
+
+		// Set state to targetState
+		consensus.state = targetState
+
+		// Leader sign the multi-sig and bitmap (for commit phase)
+		multiSigAndBitmap := append(aggSig.Serialize(), prepareBitmap.Bitmap...)
+		consensus.commitSigs[consensus.nodeID] = consensus.priKey.SignHash(multiSigAndBitmap)
 	}
 }
 
-func (consensus *Consensus) verifyResponse(commitments *map[uint32]kyber.Point, response kyber.Scalar, validatorID uint32) error {
-	if response.Equal(crypto.Ed25519Curve.Scalar()) {
-		return errors.New("response is zero valued")
+// Processes the commit message sent from validators
+func (consensus *Consensus) processCommitMessage(message consensus_proto.Message) {
+	validatorID := message.SenderId
+	commitSig := message.Payload
+
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+
+	validatorPeer := consensus.getValidatorPeerByID(validatorID)
+
+	if err := consensus.checkConsensusMessage(message, validatorPeer.PubKey); err != nil {
+		utils.GetLogInstance().Debug("Failed to check the validator message", "validatorID", validatorID)
+		return
 	}
-	_, ok := (*commitments)[validatorID]
-	if !ok {
-		return errors.New("no commit is received for the validator")
+
+	commitSigs := consensus.commitSigs
+	commitBitmap := consensus.commitBitmap
+
+	// proceed only when the message is not received before
+	_, ok := commitSigs[validatorID]
+	if ok {
+		utils.GetLogInstance().Debug("Already received commit message from the validator", "validatorID", validatorID)
+		return
 	}
-	return nil
+
+	if len((commitSigs)) >= ((len(consensus.PublicKeys)*2)/3 + 1) {
+		utils.GetLogInstance().Debug("Received additional new commit message", "validatorID", strconv.Itoa(int(validatorID)))
+		return
+	}
+
+	// Verify the signature on prepare multi-sig and bitmap is correct
+	var sign bls.Sign
+	err := sign.Deserialize(commitSig)
+	if err != nil {
+		utils.GetLogInstance().Debug("Failed to deserialize bls signature", "validatorID", validatorID)
+		return
+	}
+	aggSig := bls_cosi.AggregateSig(consensus.GetPrepareSigsArray())
+	if !sign.VerifyHash(validatorPeer.PubKey, append(aggSig.Serialize(), consensus.prepareBitmap.Bitmap...)) {
+		utils.GetLogInstance().Error("Received invalid BLS signature", "validatorID", validatorID)
+		return
+	}
+
+	utils.GetLogInstance().Debug("Received new commit message", "numReceivedSoFar", len(commitSigs), "validatorID", strconv.Itoa(int(validatorID)))
+	commitSigs[validatorID] = &sign
+	// Set the bitmap indicating that this validator signed.
+	commitBitmap.SetKey(validatorPeer.PubKey, true)
+
+	targetState := CommittedDone
+	if len(commitSigs) >= ((len(consensus.PublicKeys)*2)/3+1) && consensus.state != targetState {
+		utils.GetLogInstance().Info("Enough commits received!", "num", len(commitSigs), "state", consensus.state)
+
+		// Construct and broadcast committed message
+		msgToSend, aggSig := consensus.constructCommittedMessage()
+		consensus.aggregatedCommitSig = aggSig
+
+		if utils.UseLibP2P {
+			consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
+		} else {
+			host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
+		}
+
+		var blockObj types.Block
+		err := rlp.DecodeBytes(consensus.block, &blockObj)
+		if err != nil {
+			utils.GetLogInstance().Debug("failed to construct the new block after consensus")
+		}
+
+		// Sign the block
+		copy(blockObj.Header().PrepareSignature[:], consensus.aggregatedPrepareSig.Serialize()[:])
+		copy(blockObj.Header().PrepareBitmap[:], consensus.prepareBitmap.Bitmap)
+		copy(blockObj.Header().CommitSignature[:], consensus.aggregatedCommitSig.Serialize()[:])
+		copy(blockObj.Header().CommitBitmap[:], consensus.commitBitmap.Bitmap)
+
+		consensus.state = targetState
+
+		select {
+		case consensus.VerifiedNewBlock <- &blockObj:
+		default:
+			utils.GetLogInstance().Info("[SYNC] consensus verified block send to chan failed", "blockHash", blockObj.Hash())
+		}
+
+		consensus.reportMetrics(blockObj)
+
+		// Dump new block into level db.
+		explorer.GetStorageInstance(consensus.leader.IP, consensus.leader.Port, true).Dump(&blockObj, consensus.consensusID)
+
+		// Reset state to Finished, and clear other data.
+		consensus.ResetState()
+		consensus.consensusID++
+
+		consensus.OnConsensusDone(&blockObj)
+		utils.GetLogInstance().Debug("HOORAY!!! CONSENSUS REACHED!!!", "consensusID", consensus.consensusID, "numOfSignatures", len(commitSigs))
+
+		// TODO: remove this temporary delay
+		time.Sleep(500 * time.Millisecond)
+		// Send signal to Node so the new block can be added and new round of consensus can be triggered
+		consensus.ReadySignal <- struct{}{}
+	}
 }
 
 func (consensus *Consensus) reportMetrics(block types.Block) {
@@ -442,7 +327,7 @@ func (consensus *Consensus) reportMetrics(block types.Block) {
 		txHashes = append(txHashes, hex.EncodeToString(txHash[:]))
 	}
 	metrics := map[string]interface{}{
-		"key":             consensus.pubKey.String(),
+		"key":             hex.EncodeToString(consensus.pubKey.Serialize()),
 		"tps":             tps,
 		"txCount":         numOfTxs,
 		"nodeCount":       len(consensus.PublicKeys) + 1,

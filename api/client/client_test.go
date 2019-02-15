@@ -14,7 +14,7 @@ func TestClient(t *testing.T) {
 			Port: "90",
 		},
 	}
-	client := NewClient(nil, &leaders)
+	client := NewClient(nil, leaders)
 
 	leadersGot := client.GetLeaders()
 

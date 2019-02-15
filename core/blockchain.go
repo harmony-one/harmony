@@ -38,11 +38,12 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
-	"github.com/harmony-one/harmony/consensus"
+	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/internal/utils"
 	lru "github.com/hashicorp/golang-lru"
 )
 
@@ -62,6 +63,12 @@ const (
 	maxTimeFutureBlocks = 30
 	badBlockLimit       = 10
 	triesInMemory       = 128
+	shardCacheLimit     = 2
+
+	// BlocksPerEpoch is the number of blocks in one epoch
+	// currently set to small number for testing
+	// in future, this need to be adjusted dynamically instead of constant
+	BlocksPerEpoch = 5
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	BlockChainVersion = 3
@@ -114,12 +121,13 @@ type BlockChain struct {
 	currentBlock     atomic.Value // Current head of the block chain
 	currentFastBlock atomic.Value // Current head of the fast-sync chain (may be above the block chain!)
 
-	stateCache    state.Database // State database to reuse between imports (contains state cache)
-	bodyCache     *lru.Cache     // Cache for the most recent block bodies
-	bodyRLPCache  *lru.Cache     // Cache for the most recent block bodies in RLP encoded format
-	receiptsCache *lru.Cache     // Cache for the most recent receipts per block
-	blockCache    *lru.Cache     // Cache for the most recent entire blocks
-	futureBlocks  *lru.Cache     // future blocks are blocks added for later processing
+	stateCache      state.Database // State database to reuse between imports (contains state cache)
+	bodyCache       *lru.Cache     // Cache for the most recent block bodies
+	bodyRLPCache    *lru.Cache     // Cache for the most recent block bodies in RLP encoded format
+	receiptsCache   *lru.Cache     // Cache for the most recent receipts per block
+	blockCache      *lru.Cache     // Cache for the most recent entire blocks
+	futureBlocks    *lru.Cache     // future blocks are blocks added for later processing
+	shardStateCache *lru.Cache
 
 	quit    chan struct{} // blockchain quit channel
 	running int32         // running must be called atomically
@@ -127,7 +135,7 @@ type BlockChain struct {
 	procInterrupt int32          // interrupt signaler for block processing
 	wg            sync.WaitGroup // chain processing wait group for shutting down
 
-	engine    consensus.Engine
+	engine    consensus_engine.Engine
 	processor Processor // block processor interface
 	validator Validator // block and state validator interface
 	vmConfig  vm.Config
@@ -139,7 +147,7 @@ type BlockChain struct {
 // NewBlockChain returns a fully initialised block chain using information
 // available in the database. It initialises the default Ethereum Validator and
 // Processor.
-func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig, engine consensus.Engine, vmConfig vm.Config, shouldPreserve func(block *types.Block) bool) (*BlockChain, error) {
+func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig, engine consensus_engine.Engine, vmConfig vm.Config, shouldPreserve func(block *types.Block) bool) (*BlockChain, error) {
 	if cacheConfig == nil {
 		cacheConfig = &CacheConfig{
 			TrieNodeLimit: 256 * 1024 * 1024,
@@ -152,23 +160,25 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	blockCache, _ := lru.New(blockCacheLimit)
 	futureBlocks, _ := lru.New(maxFutureBlocks)
 	badBlocks, _ := lru.New(badBlockLimit)
+	shardCache, _ := lru.New(shardCacheLimit)
 
 	bc := &BlockChain{
-		chainConfig:    chainConfig,
-		cacheConfig:    cacheConfig,
-		db:             db,
-		triegc:         prque.New(nil),
-		stateCache:     state.NewDatabase(db),
-		quit:           make(chan struct{}),
-		shouldPreserve: shouldPreserve,
-		bodyCache:      bodyCache,
-		bodyRLPCache:   bodyRLPCache,
-		receiptsCache:  receiptsCache,
-		blockCache:     blockCache,
-		futureBlocks:   futureBlocks,
-		engine:         engine,
-		vmConfig:       vmConfig,
-		badBlocks:      badBlocks,
+		chainConfig:     chainConfig,
+		cacheConfig:     cacheConfig,
+		db:              db,
+		triegc:          prque.New(nil),
+		stateCache:      state.NewDatabase(db),
+		quit:            make(chan struct{}),
+		shouldPreserve:  shouldPreserve,
+		bodyCache:       bodyCache,
+		bodyRLPCache:    bodyRLPCache,
+		receiptsCache:   receiptsCache,
+		blockCache:      blockCache,
+		futureBlocks:    futureBlocks,
+		shardStateCache: shardCache,
+		engine:          engine,
+		vmConfig:        vmConfig,
+		badBlocks:       badBlocks,
 	}
 	bc.SetValidator(NewBlockValidator(chainConfig, bc, engine))
 	bc.SetProcessor(NewStateProcessor(chainConfig, bc, engine))
@@ -211,6 +221,16 @@ func (bc *BlockChain) ValidateNewBlock(block *types.Block, address common.Addres
 		return err
 	}
 	return nil
+}
+
+// IsEpochBlock returns whether this block is the first block of an epoch.
+func IsEpochBlock(block *types.Block) bool {
+	return block.NumberU64()%BlocksPerEpoch == 0
+}
+
+// IsEpochLastBlock returns whether this block is the last block of an epoch.
+func IsEpochLastBlock(block *types.Block) bool {
+	return block.NumberU64()%BlocksPerEpoch == BlocksPerEpoch-1
 }
 
 func (bc *BlockChain) getProcInterrupt() bool {
@@ -299,6 +319,7 @@ func (bc *BlockChain) SetHead(head uint64) error {
 	bc.receiptsCache.Purge()
 	bc.blockCache.Purge()
 	bc.futureBlocks.Purge()
+	bc.shardStateCache.Purge()
 
 	// Rewind the block chain, ensuring we don't end up with a stateless head block
 	if currentBlock := bc.CurrentBlock(); currentBlock != nil && currentHeader.Number.Uint64() < currentBlock.NumberU64() {
@@ -920,7 +941,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 	// Calculate the total difficulty of the block
 	ptd := bc.GetTd(block.ParentHash(), block.NumberU64()-1)
 	if ptd == nil {
-		return NonStatTy, consensus.ErrUnknownAncestor
+		return NonStatTy, consensus_engine.ErrUnknownAncestor
 	}
 	// Make sure no inconsistent state is leaked during insertion
 	bc.mu.Lock()
@@ -1124,7 +1145,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 				continue
 			}
 
-		case err == consensus.ErrFutureBlock:
+		case err == consensus_engine.ErrFutureBlock:
 			// Allow up to MaxFuture second in the future blocks. If this limit is exceeded
 			// the chain is discarded and processed at a later time if given.
 			max := big.NewInt(time.Now().Unix() + maxTimeFutureBlocks)
@@ -1135,12 +1156,12 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 			stats.queued++
 			continue
 
-		case err == consensus.ErrUnknownAncestor && bc.futureBlocks.Contains(block.ParentHash()):
+		case err == consensus_engine.ErrUnknownAncestor && bc.futureBlocks.Contains(block.ParentHash()):
 			bc.futureBlocks.Add(block.Hash(), block)
 			stats.queued++
 			continue
 
-		case err == consensus.ErrPrunedAncestor:
+		case err == consensus_engine.ErrPrunedAncestor:
 			// Block competing with the canonical chain, store in the db, but don't process
 			// until the competitor TD goes above the canonical TD
 			currentBlock := bc.CurrentBlock()
@@ -1233,11 +1254,15 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 
 		cache, _ := bc.stateCache.TrieDB().Size()
 		stats.report(chain, i, cache)
+
+		// only insert new shardstate when block is epoch block
+		bc.InsertNewShardState(block)
 	}
 	// Append a single chain head event if we've progressed the chain
 	if lastCanon != nil && bc.CurrentBlock().Hash() == lastCanon.Hash() {
 		events = append(events, ChainHeadEvent{lastCanon})
 	}
+
 	return 0, events, coalescedLogs, nil
 }
 
@@ -1600,7 +1625,7 @@ func (bc *BlockChain) GetHeaderByNumber(number uint64) *types.Header {
 func (bc *BlockChain) Config() *params.ChainConfig { return bc.chainConfig }
 
 // Engine retrieves the blockchain's consensus engine.
-func (bc *BlockChain) Engine() consensus.Engine { return bc.engine }
+func (bc *BlockChain) Engine() consensus_engine.Engine { return bc.engine }
 
 // SubscribeRemovedLogsEvent registers a subscription of RemovedLogsEvent.
 func (bc *BlockChain) SubscribeRemovedLogsEvent(ch chan<- RemovedLogsEvent) event.Subscription {
@@ -1625,4 +1650,91 @@ func (bc *BlockChain) SubscribeChainSideEvent(ch chan<- ChainSideEvent) event.Su
 // SubscribeLogsEvent registers a subscription of []*types.Log.
 func (bc *BlockChain) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription {
 	return bc.scope.Track(bc.logsFeed.Subscribe(ch))
+}
+
+// GetShardState retrives sharding state given block hash and block number
+func (bc *BlockChain) GetShardState(hash common.Hash, number uint64) types.ShardState {
+	if cached, ok := bc.shardStateCache.Get(hash); ok {
+		shardState := cached.(types.ShardState)
+		return shardState
+	}
+	shardState := rawdb.ReadShardState(bc.db, hash, number)
+	if shardState == nil {
+		return nil
+	}
+	bc.shardStateCache.Add(hash, shardState)
+	return shardState
+}
+
+// GetShardStateByNumber retrieves sharding state given the block number
+func (bc *BlockChain) GetShardStateByNumber(number uint64) types.ShardState {
+	hash := rawdb.ReadCanonicalHash(bc.db, number)
+	if hash == (common.Hash{}) {
+		return nil
+	}
+	return bc.GetShardState(hash, number)
+}
+
+// GetShardStateByHash retrieves the shard state given the blockhash, return nil if not exist
+func (bc *BlockChain) GetShardStateByHash(hash common.Hash) types.ShardState {
+	number := bc.hc.GetBlockNumber(hash)
+	if number == nil {
+		return nil
+	}
+	return bc.GetShardState(hash, *number)
+}
+
+// GetRandSeedByNumber retrieves the rand seed given the block number, return 0 if not exist
+func (bc *BlockChain) GetRandSeedByNumber(number uint64) int64 {
+	header := bc.GetHeaderByNumber(number)
+	if header == nil {
+		return 0
+	}
+	return int64(header.RandSeed)
+}
+
+// GetNewShardState will calculate (if not exist) and get the new shard state for epoch block or nil if block is not epoch block
+// epoch block is where the new shard state stored
+func (bc *BlockChain) GetNewShardState(block *types.Block) types.ShardState {
+	hash := block.Hash()
+	// just ignore non-epoch block
+	if !IsEpochBlock(block) {
+		return nil
+	}
+	number := block.NumberU64()
+	shardState := bc.GetShardState(hash, number)
+	if shardState == nil {
+		epoch := GetEpochFromBlockNumber(number)
+		shardState = CalculateNewShardState(bc, epoch)
+		bc.shardStateCache.Add(hash, shardState)
+	}
+	return shardState
+}
+
+// ValidateNewShardState validate whether the new shard state root matches
+func (bc *BlockChain) ValidateNewShardState(block *types.Block) error {
+	shardState := bc.GetNewShardState(block)
+	if shardState == nil {
+		return nil
+	}
+	if shardState.Hash() != block.Header().ShardStateHash {
+		return ErrShardStateNotMatch
+	}
+	utils.GetLogInstance().Debug("[resharding] validate new shard state success", "shardStateHash", shardState.Hash())
+	return nil
+}
+
+// InsertNewShardState insert new shard state into epoch block
+func (bc *BlockChain) InsertNewShardState(block *types.Block) {
+	shardState := bc.GetNewShardState(block)
+	if shardState == nil {
+		return
+	}
+	hash := block.Hash()
+	number := block.NumberU64()
+	rawdb.WriteShardState(bc.db, hash, number, shardState)
+	utils.GetLogInstance().Debug("[resharding] save new shard state success", "shardStateHash", shardState.Hash())
+	for _, c := range shardState {
+		utils.GetLogInstance().Debug("[resharding] new shard information", "shardID", c.ShardID, "NodeList", c.NodeList)
+	}
 }

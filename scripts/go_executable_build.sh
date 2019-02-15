@@ -4,6 +4,7 @@ SRC[harmony]=cmd/harmony.go
 SRC[txgen]=cmd/client/txgen/main.go
 SRC[beacon]=cmd/beaconchain/main.go
 SRC[wallet]=cmd/client/wallet/main.go
+SRC[bootnode]=cmd/bootnode/main.go
 
 BINDIR=bin
 BUCKET=unique-bucket-bin
@@ -12,6 +13,18 @@ GOOS=linux
 GOARCH=amd64
 FOLDER=/${WHOAMI:-$USER}
 RACE=
+
+unset -v progdir
+case "${0}" in
+*/*) progdir="${0%/*}";;
+*) progdir=.;;
+esac
+
+. "${progdir}/setup_bls_build_flags.sh"
+
+declare -A LIB
+LIB[libbls384.so]=${BLS_DIR}/lib/libbls384.so
+LIB[libmcl.so]=${MCL_DIR}/lib/libmcl.so
 
 if [ "$(uname -s)" == "Darwin" ]; then
    MD5='md5 -r'
@@ -41,6 +54,9 @@ ACTION:
    upload      upload binaries to s3
    pubwallet   upload wallet to public bucket (bucket: $PUBBUCKET)
 
+   harmony|txgen|bootnode|wallet|beacon
+               only build the specified binary
+
 EXAMPLES:
 
 # build linux binaries only by default
@@ -63,14 +79,19 @@ function build_only
    BUILTAT=$(date +%FT%T%z)
    BUILTBY=${USER}@
 
+   local build=$1
+
    for bin in "${!SRC[@]}"; do
-      echo "building ${SRC[$bin]}"
-      env GOOS=$GOOS GOARCH=$GOARCH go build -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE ${SRC[$bin]}
-      if [ "$(uname -s)" == "Linux" ]; then
-         $BINDIR/$bin -version
-      fi
-      if [ "$(uname -s)" == "Darwin" -a "$GOOS" == "darwin" ]; then
-         $BINDIR/$bin -version
+      if [[ -z "$build" || "$bin" == "$build" ]]; then
+         rm -f $BINDIR/$bin
+         echo "building ${SRC[$bin]}"
+         env GOOS=$GOOS GOARCH=$GOARCH go build -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE ${SRC[$bin]}
+         if [ "$(uname -s)" == "Linux" ]; then
+            $BINDIR/$bin -version
+         fi
+         if [ "$(uname -s)" == "Darwin" -a "$GOOS" == "darwin" -a -e $BINDIR/$bin ]; then
+            $BINDIR/$bin -version
+         fi
       fi
    done
 
@@ -88,6 +109,15 @@ function upload
    for bin in "${!SRC[@]}"; do
       [ -e $BINDIR/$bin ] && $AWSCLI s3 cp $BINDIR/$bin s3://${BUCKET}$FOLDER/$bin --acl public-read
    done
+
+   for lib in "${!LIB[@]}"; do
+      if [ -e ${LIB[$lib]} ]; then
+         $AWSCLI s3 cp ${LIB[$lib]} s3://${BUCKET}$FOLDER/$lib --acl public-read
+      else
+         echo "!! MISSING $lib !!"
+      fi
+   done
+
    [ -e $BINDIR/md5sum.txt ] && $AWSCLI s3 cp $BINDIR/md5sum.txt s3://${BUCKET}$FOLDER/md5sum.txt --acl public-read
 }
 
@@ -139,5 +169,6 @@ case "$ACTION" in
    "build") build_only ;;
    "upload") upload ;;
    "pubwallet") upload_wallet ;;
+   "harmony"|"wallet"|"txgen"|"bootnode"|"beacon") build_only $ACTION ;;
    *) usage ;;
 esac

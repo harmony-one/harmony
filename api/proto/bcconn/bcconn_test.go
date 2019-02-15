@@ -14,10 +14,7 @@ func TestSerializeDeserializeNodeInfo(t *testing.T) {
 	ip = "127.0.0.1"
 	port = "8080"
 	_, pk := utils.GenKey(ip, port)
-	pkb, err := pk.MarshalBinary()
-	if err != nil {
-		fmt.Println("problem marshalling binary from public key")
-	}
+	pkb := pk.Serialize()
 	nodeInfo := &node.Info{IP: ip, Port: port, PubKey: pkb}
 	serializedNI := SerializeNodeInfo(nodeInfo)
 	deserializedNI := DeserializeNodeInfo(serializedNI)
@@ -33,19 +30,13 @@ func TestSerializeDeserializeRandomInfo(t *testing.T) {
 	ip = "127.0.0.1"
 	port = "8080"
 	_, pk := utils.GenKey(ip, port)
-	pkb, err := pk.MarshalBinary()
-	if err != nil {
-		fmt.Println("problem marshalling binary from public key")
-	}
+	pkb := pk.Serialize()
 	nodeInfo1 := &node.Info{IP: ip, Port: port, PubKey: pkb}
 
 	ip = "127.0.0.1"
 	port = "9080"
 	_, pk2 := utils.GenKey(ip, port)
-	pkb2, err := pk2.MarshalBinary()
-	if err != nil {
-		fmt.Println("problem marshalling binary from public key")
-	}
+	pkb2 := pk2.Serialize()
 	nodeInfo2 := &node.Info{IP: ip, Port: port, PubKey: pkb2}
 
 	leaders := make([]*node.Info, 2)

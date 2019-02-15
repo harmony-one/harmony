@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"encoding/binary"
-	"encoding/gob"
-	"encoding/hex"
 	"fmt"
 	"math/big"
 	"os"
@@ -14,19 +12,29 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/drand"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/api/client"
 	clientService "github.com/harmony-one/harmony/api/client/service"
+	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
-	"github.com/harmony-one/harmony/api/services/explorer"
-	"github.com/harmony-one/harmony/api/services/syncing"
-	"github.com/harmony-one/harmony/api/services/syncing/downloader"
-	downloader_pb "github.com/harmony-one/harmony/api/services/syncing/downloader/proto"
+	service_manager "github.com/harmony-one/harmony/api/service"
+	blockproposal "github.com/harmony-one/harmony/api/service/blockproposal"
+	"github.com/harmony-one/harmony/api/service/clientsupport"
+	consensus_service "github.com/harmony-one/harmony/api/service/consensus"
+	"github.com/harmony-one/harmony/api/service/discovery"
+	"github.com/harmony-one/harmony/api/service/explorer"
+	"github.com/harmony-one/harmony/api/service/networkinfo"
+	randomness_service "github.com/harmony-one/harmony/api/service/randomness"
+	"github.com/harmony-one/harmony/api/service/staking"
+	"github.com/harmony-one/harmony/api/service/syncing"
+	"github.com/harmony-one/harmony/api/service/syncing/downloader"
+	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
 	bft "github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -49,6 +57,19 @@ const (
 	NodeReadyForConsensus              // Node is ready for doing consensus
 	NodeDoingConsensus                 // Node is already doing consensus
 	NodeLeader                         // Node is the leader of some shard.
+)
+
+// Role defines a role of a node.
+type Role byte
+
+// All constants for different node roles.
+const (
+	Unknown Role = iota
+	ShardLeader
+	ShardValidator
+	BeaconLeader
+	BeaconValidator
+	NewNode
 )
 
 func (state State) String() string {
@@ -74,8 +95,11 @@ func (state State) String() string {
 // Constants related to doing syncing.
 const (
 	lastMileThreshold = 4
-	inSyncThreshold   = 2
+	inSyncThreshold   = 1
 )
+
+// TotalInitFund is the initial total fund to the faucet.
+const TotalInitFund = 9000000
 
 const (
 	waitBeforeJoinShard = time.Second * 3
@@ -92,19 +116,15 @@ type syncConfig struct {
 	client    *downloader.Client
 }
 
-// NetworkNode ...
-type NetworkNode struct {
-	SelfPeer p2p.Peer
-	IDCPeer  p2p.Peer
-}
-
 // Node represents a protocol-participating node in the network
 type Node struct {
 	Consensus              *bft.Consensus       // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
-	BlockChannel           chan *types.Block    // The channel to receive new blocks from Node
+	BlockChannel           chan *types.Block    // The channel to send newly proposed blocks
+	ConfirmedBlockChannel  chan *types.Block    // The channel to send confirmed blocks
 	pendingTransactions    types.Transactions   // All the transactions received but not yet processed for Consensus
 	transactionInConsensus []*types.Transaction // The transactions selected into the new block and under Consensus process
 	pendingTxMutex         sync.Mutex
+	DRand                  *drand.DRand // The instance for distributed randomness protocol
 
 	blockchain *core.BlockChain   // The blockchain for the shard where this node belongs
 	db         *ethdb.LDBDatabase // LevelDB to store blockchain.
@@ -112,8 +132,9 @@ type Node struct {
 	ClientPeer *p2p.Peer      // The peer for the harmony tx generator client, used for leaders to return proof-of-accept
 	Client     *client.Client // The presence of a client object means this node will also act as a client
 	SelfPeer   p2p.Peer       // TODO(minhdoan): it could be duplicated with Self below whose is Alok work.
-	IDCPeer    p2p.Peer
+	BCPeers    []p2p.Peer     // list of Beacon Chain Peers.  This is needed by all nodes.
 
+	// TODO: Neighbors should store only neighbor nodes in the same shard
 	Neighbors  sync.Map   // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
 	State      State      // State of the Node
 	stateMutex sync.Mutex // mutex for change node state
@@ -138,10 +159,31 @@ type Node struct {
 	// Signal channel for lost validators
 	OfflinePeers chan p2p.Peer
 
+	// Node Role.
+	Role Role
+
+	// Service manager.
+	serviceManager *service_manager.Manager
+
+	//Staked Accounts and Contract
+	CurrentStakes          map[common.Address]int64 //This will save the latest information about staked nodes.
+	StakingContractAddress common.Address
+	WithdrawStakeFunc      []byte
+
+	//Node Account
+	AccountKey *ecdsa.PrivateKey
+	Address    common.Address
+
 	// For test only
 	TestBankKeys      []*ecdsa.PrivateKey
 	ContractKeys      []*ecdsa.PrivateKey
 	ContractAddresses []common.Address
+
+	// Group Message Receiver
+	groupReceiver p2p.GroupReceiver
+
+	// Duplicated Ping Message Received
+	duplicatedPing map[string]bool
 }
 
 // Blockchain returns the blockchain from node
@@ -173,7 +215,11 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int) types.Transactions {
 
 // StartServer starts a server and process the requests by a handler.
 func (node *Node) StartServer() {
-	node.host.BindHandlerAndServe(node.StreamHandler)
+	if utils.UseLibP2P {
+		select {}
+	} else {
+		node.host.BindHandlerAndServe(node.StreamHandler)
+	}
 }
 
 // Count the total number of transactions in the blockchain
@@ -184,34 +230,6 @@ func (node *Node) countNumTransactionsInBlockchain() int {
 		count += len(block.Transactions())
 	}
 	return count
-}
-
-// SerializeNode serializes the node
-// https://stackoverflow.com/questions/12854125/how-do-i-dump-the-struct-into-the-byte-array-without-reflection/12854659#12854659
-func (node *Node) SerializeNode(nnode *NetworkNode) []byte {
-	//Needs to escape the serialization of unexported fields
-	var result bytes.Buffer
-	encoder := gob.NewEncoder(&result)
-	err := encoder.Encode(nnode)
-	if err != nil {
-		fmt.Println("Could not serialize node")
-		fmt.Println("ERROR", err)
-		//utils.GetLogInstance().Error("Could not serialize node")
-	}
-
-	return result.Bytes()
-}
-
-// DeserializeNode deserializes the node
-func DeserializeNode(d []byte) *NetworkNode {
-	var wn NetworkNode
-	r := bytes.NewBuffer(d)
-	decoder := gob.NewDecoder(r)
-	err := decoder.Decode(&wn)
-	if err != nil {
-		log.Error("Could not de-serialize node 1")
-	}
-	return &wn
 }
 
 // New creates a new node.
@@ -231,7 +249,7 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 		genesisAlloc := node.CreateGenesisAllocWithTestingAddresses(100)
 		contractKey, _ := ecdsa.GenerateKey(crypto.S256(), strings.NewReader("Test contract key string stream that is fixed so that generated test key are deterministic every time"))
 		contractAddress := crypto.PubkeyToAddress(contractKey.PublicKey)
-		contractFunds := big.NewInt(9000000)
+		contractFunds := big.NewInt(TotalInitFund)
 		contractFunds = contractFunds.Mul(contractFunds, big.NewInt(params.Ether))
 		genesisAlloc[contractAddress] = core.GenesisAccount{Balance: contractFunds}
 		node.ContractKeys = append(node.ContractKeys, contractKey)
@@ -253,11 +271,18 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 		chain, _ := core.NewBlockChain(database, nil, gspec.Config, node.Consensus, vm.Config{}, nil)
 		node.blockchain = chain
 		node.BlockChannel = make(chan *types.Block)
+		node.ConfirmedBlockChannel = make(chan *types.Block)
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, params.TestChainConfig, chain)
 		node.Worker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey), node.Consensus.ShardID)
-
-		node.AddSmartContractsToPendingTransactions()
-		node.Consensus.ConsensusBlock = make(chan *types.Block)
+		node.AddFaucetContractToPendingTransactions()
+		if node.Role == BeaconLeader {
+			node.AddStakingContractToPendingTransactions() //This will save the latest information about staked nodes in current staked
+			node.DepositToFakeAccounts()
+		}
+		if node.Role == BeaconLeader || node.Role == BeaconValidator {
+			node.CurrentStakes = make(map[common.Address]int64)
+		}
+		node.Consensus.ConsensusBlock = make(chan *bft.BFTBlockInfo)
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 	}
 
@@ -274,15 +299,49 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 	node.OfflinePeers = make(chan p2p.Peer)
 	go node.RemovePeersHandler()
 
+	// start the goroutine to receive group message
+	go node.ReceiveGroupMessage()
+
+	node.duplicatedPing = make(map[string]bool)
+
 	return &node
 }
 
+func (node *Node) getDeployedStakingContract() common.Address {
+	return node.StakingContractAddress
+}
+
+//In order to get the deployed contract address of a contract, we need to find the nonce of the address that created it.
+//(Refer: https://solidity.readthedocs.io/en/v0.5.3/introduction-to-smart-contracts.html#index-8)
+// Then we can (re)create the deployed address. Trivially, this is 0 for us.
+// The deployed contract address can also be obtained via the receipt of the contract creating transaction.
+func (node *Node) generateDeployedStakingContractAddress(mycontracttx *types.Transaction, contractAddress common.Address) common.Address {
+	//Ideally we send the transaction to
+
+	//Correct Way 1:
+	//node.SendTx(mycontracttx)
+	//receipts := node.worker.GetCurrentReceipts()
+	//deployedcontractaddress = recepits[len(receipts)-1].ContractAddress //get the address from the receipt
+
+	//Correct Way 2:
+	//nonce := GetNonce(contractAddress)
+	//deployedAddress := crypto.CreateAddress(contractAddress, uint64(nonce))
+	//deployedcontractaddress = recepits[len(receipts)-1].ContractAddress //get the address from the receipt
+	nonce := 0
+	return crypto.CreateAddress(contractAddress, uint64(nonce))
+}
+
 // IsOutOfSync checks whether the node is out of sync by comparing latest block with consensus block
-func (node *Node) IsOutOfSync(consensusBlock *types.Block) bool {
+func (node *Node) IsOutOfSync(consensusBlockInfo *bft.BFTBlockInfo) bool {
+	consensusBlock := consensusBlockInfo.Block
+	consensusID := consensusBlockInfo.ConsensusID
+
 	myHeight := node.blockchain.CurrentBlock().NumberU64()
 	newHeight := consensusBlock.NumberU64()
 	utils.GetLogInstance().Debug("[SYNC]", "myHeight", myHeight, "newHeight", newHeight)
 	if newHeight-myHeight <= inSyncThreshold {
+		node.stateSync.AddLastMileBlock(consensusBlock)
+		node.Consensus.UpdateConsensusID(consensusID + 1)
 		return false
 	}
 	// cache latest blocks for last mile catch up
@@ -298,20 +357,24 @@ func (node *Node) DoSyncing() {
 		select {
 		// in current implementation logic, timeout means in sync
 		case <-time.After(5 * time.Second):
+			//myHeight := node.blockchain.CurrentBlock().NumberU64()
+			//utils.GetLogInstance().Debug("[SYNC]", "currentHeight", myHeight)
 			node.stateMutex.Lock()
 			node.State = NodeReadyForConsensus
 			node.stateMutex.Unlock()
 			continue
-		case consensusBlock := <-node.Consensus.ConsensusBlock:
-			if !node.IsOutOfSync(consensusBlock) {
+		case consensusBlockInfo := <-node.Consensus.ConsensusBlock:
+			if !node.IsOutOfSync(consensusBlockInfo) {
+				startHash := node.blockchain.CurrentBlock().Hash()
+				node.stateSync.StartStateSync(startHash[:], node.blockchain, node.Worker)
 				if node.State == NodeNotInSync {
 					utils.GetLogInstance().Info("[SYNC] Node is now IN SYNC!")
-					node.stateSync.CloseConnections()
-					node.stateSync = nil
 				}
 				node.stateMutex.Lock()
 				node.State = NodeReadyForConsensus
 				node.stateMutex.Unlock()
+				node.stateSync.CloseConnections()
+				node.stateSync = nil
 				continue
 			} else {
 				utils.GetLogInstance().Debug("[SYNC] node is out of sync")
@@ -350,6 +413,8 @@ func (node *Node) AddPeers(peers []*p2p.Peer) int {
 
 	if count > 0 {
 		node.Consensus.AddPeers(peers)
+		// TODO: make peers into a context object shared by consensus and drand
+		node.DRand.AddPeers(peers)
 	}
 	return count
 }
@@ -385,38 +450,6 @@ func (node *Node) GetSyncingPeers() []p2p.Peer {
 	return res
 }
 
-//AddSmartContractsToPendingTransactions adds the faucet contract the genesis block.
-func (node *Node) AddSmartContractsToPendingTransactions() {
-	// Add a contract deployment transactionv
-	priKey := node.ContractKeys[0]
-	contractData := "0x6080604052678ac7230489e8000060015560028054600160a060020a031916331790556101aa806100316000396000f3fe608060405260043610610045577c0100000000000000000000000000000000000000000000000000000000600035046327c78c42811461004a5780634ddd108a1461008c575b600080fd5b34801561005657600080fd5b5061008a6004803603602081101561006d57600080fd5b503573ffffffffffffffffffffffffffffffffffffffff166100b3565b005b34801561009857600080fd5b506100a1610179565b60408051918252519081900360200190f35b60025473ffffffffffffffffffffffffffffffffffffffff1633146100d757600080fd5b600154303110156100e757600080fd5b73ffffffffffffffffffffffffffffffffffffffff811660009081526020819052604090205460ff161561011a57600080fd5b73ffffffffffffffffffffffffffffffffffffffff8116600081815260208190526040808220805460ff1916600190811790915554905181156108fc0292818181858888f19350505050158015610175573d6000803e3d6000fd5b5050565b30319056fea165627a7a723058203e799228fee2fa7c5d15e71c04267a0cc2687c5eff3b48b98f21f355e1064ab30029"
-	dataEnc := common.FromHex(contractData)
-	// Unsigned transaction to avoid the case of transaction address.
-
-	contractFunds := big.NewInt(8000000)
-	contractFunds = contractFunds.Mul(contractFunds, big.NewInt(params.Ether))
-	mycontracttx, _ := types.SignTx(types.NewContractCreation(uint64(0), node.Consensus.ShardID, contractFunds, params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, priKey)
-	node.ContractAddresses = append(node.ContractAddresses, crypto.CreateAddress(crypto.PubkeyToAddress(priKey.PublicKey), uint64(0)))
-
-	node.addPendingTransactions(types.Transactions{mycontracttx})
-}
-
-//CallFaucetContract invokes the faucet contract to give the walletAddress initial money
-func (node *Node) CallFaucetContract(walletAddress common.Address) common.Hash {
-	state, err := node.blockchain.State()
-	if err != nil {
-		log.Error("Failed to get chain state", "Error", err)
-	}
-	nonce := state.GetNonce(crypto.PubkeyToAddress(node.ContractKeys[0].PublicKey))
-	callingFunction := "0x27c78c42000000000000000000000000"
-	contractData := callingFunction + hex.EncodeToString(walletAddress.Bytes())
-	dataEnc := common.FromHex(contractData)
-	tx, _ := types.SignTx(types.NewTransaction(nonce, node.ContractAddresses[0], node.Consensus.ShardID, big.NewInt(0), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, node.ContractKeys[0])
-
-	node.addPendingTransactions(types.Transactions{tx})
-	return tx.Hash()
-}
-
 // JoinShard helps a new node to join a shard.
 func (node *Node) JoinShard(leader p2p.Peer) {
 	// try to join the shard, send ping message every 1 second, with a 10 minutes time-out
@@ -428,7 +461,7 @@ func (node *Node) JoinShard(leader p2p.Peer) {
 	for {
 		select {
 		case <-tick.C:
-			ping := proto_node.NewPingMessage(node.SelfPeer)
+			ping := proto_discovery.NewPingMessage(node.SelfPeer)
 			if node.Client != nil { // assume this is the client node
 				ping.Node.Role = proto_node.ClientRole
 			}
@@ -446,38 +479,11 @@ func (node *Node) JoinShard(leader p2p.Peer) {
 	}
 }
 
-// SupportClient initializes and starts the client service
-func (node *Node) SupportClient() {
-	node.InitClientServer()
-	node.StartClientServer()
-}
-
-// SupportExplorer initializes and starts the client service
-func (node *Node) SupportExplorer() {
-	es := explorer.Service{
-		IP:   node.SelfPeer.IP,
-		Port: node.SelfPeer.Port,
-	}
-	es.Init(true)
-	es.Run()
-}
-
-// InitClientServer initializes client server.
-func (node *Node) InitClientServer() {
-	node.clientServer = clientService.NewServer(node.blockchain.State, node.CallFaucetContract)
-}
-
-// StartClientServer starts client server.
-func (node *Node) StartClientServer() {
-	port, _ := strconv.Atoi(node.SelfPeer.Port)
-	utils.GetLogInstance().Info("support_client: StartClientServer on port:", "port", port+ClientServicePortDiff)
-	node.clientServer.Start(node.SelfPeer.IP, strconv.Itoa(port+ClientServicePortDiff))
-}
-
 // SupportSyncing keeps sleeping until it's doing consensus or it's a leader.
 func (node *Node) SupportSyncing() {
 	node.InitSyncingServer()
 	node.StartSyncingServer()
+
 	go node.DoSyncing()
 	go node.SendNewBlockToUnsync()
 }
@@ -489,8 +495,7 @@ func (node *Node) InitSyncingServer() {
 
 // StartSyncingServer starts syncing server.
 func (node *Node) StartSyncingServer() {
-	port := GetSyncingPort(node.SelfPeer.Port)
-	utils.GetLogInstance().Info("support_sycning: StartSyncingServer on port:", "port", port)
+	utils.GetLogInstance().Info("support_sycning: StartSyncingServer")
 	node.downloaderServer.Start(node.SelfPeer.IP, GetSyncingPort(node.SelfPeer.Port))
 }
 
@@ -600,7 +605,7 @@ func (node *Node) SendNewBlockToUnsync() {
 				continue
 			}
 			response := config.client.PushNewBlock(selfPeerID, blockHash, false)
-			if response.Type == downloader_pb.DownloaderResponse_INSYNC {
+			if response != nil && response.Type == downloader_pb.DownloaderResponse_INSYNC {
 				node.stateMutex.Lock()
 				node.peerRegistrationRecord[peerID].client.Close()
 				delete(node.peerRegistrationRecord, peerID)
@@ -619,4 +624,158 @@ func (node *Node) RemovePeersHandler() {
 			node.Consensus.OfflinePeerList = append(node.Consensus.OfflinePeerList, p)
 		}
 	}
+}
+
+//UpdateStakingList updates the stakes of every node.
+func (node *Node) UpdateStakingList(block *types.Block) error {
+	signerType := types.HomesteadSigner{}
+	txns := block.Transactions()
+	for i := range txns {
+		txn := txns[i]
+		value := txn.Value().Int64()
+		currentSender, _ := types.Sender(signerType, txn)
+		_, isPresent := node.CurrentStakes[currentSender]
+		toAddress := txn.To()
+		if *toAddress != node.StakingContractAddress { //Not a address aimed at the staking contract.
+			continue
+		}
+		//This should be based on a switch case on function signature.
+		//TODO (ak) https://github.com/harmony-one/harmony/issues/430
+		if value > int64(0) { //If value >0 means its a staking deposit transaction
+			if isPresent {
+				//This means this node has increaserd its stake
+				node.CurrentStakes[currentSender] += value
+			} else {
+				node.CurrentStakes[currentSender] = value
+			}
+		} else { //This means node has withdrawn stake.
+			getData := txn.Data()
+			value := decodeStakeCall(getData) //Value being withdrawn
+			if isPresent {
+				//This means this node has increaserd its stake
+				if node.CurrentStakes[currentSender] > value {
+					node.CurrentStakes[currentSender] -= value
+				} else if node.CurrentStakes[currentSender] == value {
+					delete(node.CurrentStakes, currentSender)
+				} else {
+					continue //Overdraft protection.
+				}
+			} else {
+				node.CurrentStakes[currentSender] = value
+			}
+		}
+	}
+	return nil
+}
+
+func decodeStakeCall(getData []byte) int64 {
+	value := new(big.Int)
+	value.SetBytes(getData[4:]) //Escape the method call.
+	return value.Int64()
+}
+func (node *Node) setupForShardLeader() {
+	// Register explorer service.
+	node.serviceManager.RegisterService(service_manager.SupportExplorer, explorer.New(&node.SelfPeer))
+	// Register consensus service.
+	node.serviceManager.RegisterService(service_manager.Consensus, consensus_service.New(node.BlockChannel, node.Consensus))
+	// Register new block service.
+	node.serviceManager.RegisterService(service_manager.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReady))
+	// Register client support service.
+	node.serviceManager.RegisterService(service_manager.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
+	// Register randomness service
+	node.serviceManager.RegisterService(service_manager.Randomness, randomness_service.New(node.DRand))
+}
+
+func (node *Node) setupForShardValidator() {
+}
+
+func (node *Node) setupForBeaconLeader() {
+	chanPeer := make(chan p2p.Peer)
+
+	var err error
+	node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeacon)
+	if err != nil {
+		utils.GetLogInstance().Error("create group receiver error", "msg", err)
+		return
+	}
+
+	// Register peer discovery service. "0" is the beacon shard ID. No need to do staking for beacon chain node.
+	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, "0", chanPeer, nil))
+	// Register networkinfo service. "0" is the beacon shard ID
+	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, "0", chanPeer))
+
+	// Register consensus service.
+	node.serviceManager.RegisterService(service_manager.Consensus, consensus_service.New(node.BlockChannel, node.Consensus))
+	// Register new block service.
+	node.serviceManager.RegisterService(service_manager.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReady))
+	// Register client support service.
+	node.serviceManager.RegisterService(service_manager.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
+	// Register randomness service
+	node.serviceManager.RegisterService(service_manager.Randomness, randomness_service.New(node.DRand))
+
+}
+
+func (node *Node) setupForBeaconValidator() {
+	chanPeer := make(chan p2p.Peer)
+
+	var err error
+	node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeacon)
+	if err != nil {
+		utils.GetLogInstance().Error("create group receiver error", "msg", err)
+		return
+	}
+
+	// Register peer discovery service. "0" is the beacon shard ID. No need to do staking for beacon chain node.
+	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, "0", chanPeer, nil))
+	// Register networkinfo service. "0" is the beacon shard ID
+	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, "0", chanPeer))
+	// Register randomness service
+	node.serviceManager.RegisterService(service_manager.Randomness, randomness_service.New(node.DRand))
+}
+
+func (node *Node) setupForNewNode() {
+	chanPeer := make(chan p2p.Peer)
+	stakingPeer := make(chan p2p.Peer)
+
+	var err error
+	node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeacon)
+	if err != nil {
+		utils.GetLogInstance().Error("create group receiver error", "msg", err)
+		return
+	}
+
+	// Register staking service.
+	node.serviceManager.RegisterService(service_manager.Staking, staking.New(node.AccountKey, 0, stakingPeer))
+	// Register peer discovery service. "0" is the beacon shard ID
+	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, "0", chanPeer, stakingPeer))
+	// Register networkinfo service. "0" is the beacon shard ID
+	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, "0", chanPeer))
+
+	// TODO: how to restart networkinfo and discovery service after receiving shard id info from beacon chain?
+}
+
+// ServiceManagerSetup setups service store.
+func (node *Node) ServiceManagerSetup() {
+	node.serviceManager = &service_manager.Manager{}
+	switch node.Role {
+	case ShardLeader:
+		node.setupForShardLeader()
+	case ShardValidator:
+		node.setupForShardValidator()
+	case BeaconLeader:
+		node.setupForBeaconLeader()
+	case BeaconValidator:
+		node.setupForBeaconValidator()
+	case NewNode:
+		node.setupForNewNode()
+	}
+}
+
+// RunServices runs registered services.
+func (node *Node) RunServices() {
+	if node.serviceManager == nil {
+		utils.GetLogInstance().Info("Service manager is not set up yet.")
+		return
+	}
+	node.serviceManager.RunServices()
 }

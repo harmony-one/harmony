@@ -31,14 +31,18 @@ const (
 	Node
 	Client
 	Identity
+	DRand
 	// TODO: add more types
 )
 
-// MessageCategoryBytes is the number of bytes message category takes
-const MessageCategoryBytes = 1
-
-// MessageTypeBytes is the number of bytes message type takes
-const MessageTypeBytes = 1
+const (
+	// ProtocolVersion is a constant defined as the version of the Harmony protocol
+	ProtocolVersion = 1
+	// MessageCategoryBytes is the number of bytes message category takes
+	MessageCategoryBytes = 1
+	// MessageTypeBytes is the number of bytes message type takes
+	MessageTypeBytes = 1
+)
 
 // GetMessageCategory gets the message category from the p2p message content
 func GetMessageCategory(message []byte) (MessageCategory, error) {
@@ -72,9 +76,24 @@ func GetConsensusMessagePayload(message []byte) ([]byte, error) {
 	return message[MessageCategoryBytes:], nil
 }
 
+// GetDRandMessagePayload gets the randomness message payload from the p2p message content
+func GetDRandMessagePayload(message []byte) ([]byte, error) {
+	if len(message) < MessageCategoryBytes {
+		return []byte{}, errors.New("failed to get message payload: no data available")
+	}
+	return message[MessageCategoryBytes:], nil
+}
+
 // ConstructConsensusMessage creates a message with the payload and returns as byte array.
 func ConstructConsensusMessage(payload []byte) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(Consensus)})
+	byteBuffer.Write(payload)
+	return byteBuffer.Bytes()
+}
+
+// ConstructDRandMessage creates a message with the payload and returns as byte array.
+func ConstructDRandMessage(payload []byte) []byte {
+	byteBuffer := bytes.NewBuffer([]byte{byte(DRand)})
 	byteBuffer.Write(payload)
 	return byteBuffer.Bytes()
 }

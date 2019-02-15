@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	mrand "math/rand"
@@ -12,15 +13,21 @@ import (
 	"strconv"
 	"sync"
 
-	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
-
-	"github.com/dedis/kyber"
-	"github.com/harmony-one/harmony/crypto"
-	"github.com/harmony-one/harmony/crypto/pki"
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/p2p"
+	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
 )
 
 var lock sync.Mutex
+
+// PrivKeyStore is used to persist private key to/from file
+type PrivKeyStore struct {
+	Key string `json:"key"`
+}
+
+func init() {
+	bls.Init(bls.BLS12_381)
+}
 
 // Unmarshal is a function that unmarshals the data from the
 // reader into the specified value.
@@ -65,10 +72,18 @@ func GetUniqueIDFromIPPort(ip, port string) uint32 {
 	return uint32(value)
 }
 
-// GenKey generates a key given ip and port.
-func GenKey(ip, port string) (kyber.Scalar, kyber.Point) {
-	priKey := crypto.Ed25519Curve.Scalar().SetInt64(int64(GetUniqueIDFromIPPort(ip, port))) // TODO: figure out why using a random hash value doesn't work for private key (schnorr)
-	pubKey := pki.GetPublicKeyFromScalar(priKey)
+// GenKey generates a bls key pair given ip and port.
+func GenKey(ip, port string) (*bls.SecretKey, *bls.PublicKey) {
+	nodeIDBytes := make([]byte, 32)
+	binary.LittleEndian.PutUint32(nodeIDBytes, GetUniqueIDFromIPPort(ip, port))
+	privateKey := bls.SecretKey{}
+	err := privateKey.SetLittleEndian(nodeIDBytes)
+	if err != nil {
+		log.Print("failed to set private key", err)
+		return nil, nil
+	}
+	priKey := &privateKey
+	pubKey := privateKey.GetPublicKey()
 
 	return priKey, pubKey
 }
@@ -132,4 +147,70 @@ func Load(path string, v interface{}) error {
 	}
 	defer f.Close()
 	return Unmarshal(f, v)
+}
+
+// LoadPrivateKey parses the key string in base64 format and return PrivKey
+func LoadPrivateKey(key string) (p2p_crypto.PrivKey, p2p_crypto.PubKey, error) {
+	if key != "" {
+		k1, err := p2p_crypto.ConfigDecodeKey(key)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to decode key: %v", err)
+		}
+		priKey, err := p2p_crypto.UnmarshalPrivateKey(k1)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to unmarshal private key: %v", err)
+		}
+		pubKey := priKey.GetPublic()
+		return priKey, pubKey, nil
+	}
+	return nil, nil, fmt.Errorf("empty key string")
+}
+
+// SavePrivateKey convert the PrivKey to base64 format and return string
+func SavePrivateKey(key p2p_crypto.PrivKey) (string, error) {
+	if key != nil {
+		b, err := p2p_crypto.MarshalPrivateKey(key)
+		if err != nil {
+			return "", fmt.Errorf("failed to marshal private key: %v", err)
+		}
+		str := p2p_crypto.ConfigEncodeKey(b)
+		return str, nil
+	}
+	return "", fmt.Errorf("key is nil")
+}
+
+// SaveKeyToFile save private key to keyfile
+func SaveKeyToFile(keyfile string, key p2p_crypto.PrivKey) (err error) {
+	str, err := SavePrivateKey(key)
+	if err != nil {
+		return
+	}
+
+	keyStruct := PrivKeyStore{Key: str}
+
+	err = Save(keyfile, &keyStruct)
+	return
+}
+
+// LoadKeyFromFile load private key from keyfile
+// If the private key is not loadable or no file, it will generate
+// a new random private key
+func LoadKeyFromFile(keyfile string) (key p2p_crypto.PrivKey, pk p2p_crypto.PubKey, err error) {
+	var keyStruct PrivKeyStore
+	err = Load(keyfile, &keyStruct)
+	if err != nil {
+		log.Print("No priviate key can be loaded from file", "keyfile", keyfile)
+		log.Print("Using random private key")
+		key, pk, err = GenKeyP2PRand()
+		if err != nil {
+			log.Panic("LoadKeyFromFile", "GenKeyP2PRand Error", err)
+		}
+		err = SaveKeyToFile(keyfile, key)
+		if err != nil {
+			log.Print("LoadKeyFromFile", "failed to save key to keyfile", err)
+		}
+		return key, pk, nil
+	}
+	key, pk, err = LoadPrivateKey(keyStruct.Key)
+	return key, pk, err
 }

@@ -2,19 +2,20 @@ package node
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-
-	"github.com/dedis/kyber"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
+	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	proto_identity "github.com/harmony-one/harmony/api/proto/identity"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
+	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/core/types"
-	hmy_crypto "github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -45,7 +46,32 @@ func (node *Node) StreamHandler(s p2p.Stream) {
 		utils.GetLogInstance().Error("Read p2p data failed", "err", err, "node", node)
 		return
 	}
-	node.MaybeBroadcastAsValidator(content)
+
+	node.messageHandler(content, "")
+}
+
+// ReceiveGroupMessage use libp2p pubsub mechanism to receive broadcast messages
+func (node *Node) ReceiveGroupMessage() {
+	ctx := context.Background()
+	for {
+		if node.groupReceiver == nil {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+		msg, sender, err := node.groupReceiver.Receive(ctx)
+		if sender != node.host.GetID() {
+			//			utils.GetLogInstance().Info("[PUBSUB]", "received group msg", len(msg), "sender", sender)
+			if err == nil {
+				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
+				node.messageHandler(msg[5:], string(sender))
+			}
+		}
+	}
+}
+
+// messageHandler parses the message and dispatch the actions
+func (node *Node) messageHandler(content []byte, sender string) {
+	//	node.MaybeBroadcastAsValidator(content)
 
 	consensusObj := node.Consensus
 
@@ -92,6 +118,17 @@ func (node *Node) StreamHandler(s p2p.Stream) {
 			// TODO(minhdoan): add logic to check if the current blockchain is not sync with other consensus
 			// we should switch to other state rather than DoingConsensus.
 		}
+	case proto.DRand:
+		msgPayload, _ := proto.GetDRandMessagePayload(content)
+		if node.DRand != nil {
+			if node.DRand.IsLeader {
+				utils.GetLogInstance().Info("NET: DRand Leader received message:", "messageCategory", msgCategory, "messageType", msgType)
+				node.DRand.ProcessMessageLeader(msgPayload)
+			} else {
+				utils.GetLogInstance().Info("NET: DRand Validator received message:", "messageCategory", msgCategory, "messageType", msgType)
+				node.DRand.ProcessMessageValidator(msgPayload)
+			}
+		}
 	case proto.Node:
 		actionType := proto_node.MessageType(msgType)
 		switch actionType {
@@ -132,7 +169,7 @@ func (node *Node) StreamHandler(s p2p.Stream) {
 					blockCount++
 				}
 
-				if blockCount != 0 {
+				if blockCount != 0 && txCount != 0 {
 					avgBlockSizeInBytes = avgBlockSizeInBytes / common.StorageSize(blockCount)
 					avgTxSize = avgTxSize / txCount
 				}
@@ -142,7 +179,7 @@ func (node *Node) StreamHandler(s p2p.Stream) {
 				os.Exit(0)
 			}
 		case proto_node.PING:
-			node.pingMessageHandler(msgPayload)
+			node.pingMessageHandler(msgPayload, sender)
 		case proto_node.PONG:
 			node.pongMessageHandler(msgPayload)
 		}
@@ -187,65 +224,17 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 	}
 }
 
-// WaitForConsensusReady listen for the readiness signal from consensus and generate new block for consensus.
-func (node *Node) WaitForConsensusReady(readySignal chan struct{}) {
-	utils.GetLogInstance().Debug("Waiting for Consensus ready", "node", node)
-	time.Sleep(15 * time.Second) // Wait for other nodes to be ready (test-only)
-
-	firstTime := true
-	var newBlock *types.Block
-	timeoutCount := 0
-	for {
-		// keep waiting for Consensus ready
-		select {
-		case <-readySignal:
-			time.Sleep(100 * time.Millisecond) // Delay a bit so validator is catched up (test-only).
-		case <-time.After(200 * time.Second):
-			node.Consensus.ResetState()
-			timeoutCount++
-			utils.GetLogInstance().Debug("Consensus timeout, retry!", "count", timeoutCount, "node", node)
-		}
-
-		for {
-			// threshold and firstTime are for the test-only built-in smart contract tx. TODO: remove in production
-			threshold := 1
-			if firstTime {
-				threshold = 2
-				firstTime = false
-			}
-			utils.GetLogInstance().Debug("STARTING BLOCK", "threshold", threshold, "pendingTransactions", len(node.pendingTransactions))
-			if len(node.pendingTransactions) >= threshold {
-				// Normal tx block consensus
-				selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
-				if len(selectedTxs) != 0 {
-					node.Worker.CommitTransactions(selectedTxs)
-					block, err := node.Worker.Commit()
-					if err != nil {
-						utils.GetLogInstance().Debug("Failed commiting new block", "Error", err)
-					} else {
-						newBlock = block
-						break
-					}
-				}
-			}
-			// If not enough transactions to run Consensus,
-			// periodically check whether we have enough transactions to package into block.
-			time.Sleep(1 * time.Second)
-		}
-		// Send the new block to Consensus so it can be confirmed.
-		if newBlock != nil {
-			node.BlockChannel <- newBlock
-		}
-	}
-}
-
 // BroadcastNewBlock is called by consensus leader to sync new blocks with other clients/nodes.
 // NOTE: For now, just send to the client (basically not broadcasting)
 // TODO (lc): broadcast the new blocks to new nodes doing state sync
 func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 	if node.ClientPeer != nil {
 		utils.GetLogInstance().Debug("Sending new block to client", "client", node.ClientPeer)
-		node.SendMessage(*node.ClientPeer, proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock}))
+		if utils.UseLibP2P {
+			node.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock}))
+		} else {
+			node.SendMessage(*node.ClientPeer, proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock}))
+		}
 	}
 }
 
@@ -254,17 +243,13 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) bool {
 	err := node.blockchain.ValidateNewBlock(newBlock, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey))
 	if err != nil {
 		utils.GetLogInstance().Debug("Failed verifying new block", "Error", err, "tx", newBlock.Transactions()[0])
-
-		// send consensus block to state syncing
-		select {
-		case node.Consensus.ConsensusBlock <- newBlock:
-		default:
-			utils.GetLogInstance().Warn("consensus block unable to sent to state sync", "height", newBlock.NumberU64(), "blockHash", newBlock.Hash().Hex())
-		}
-
 		return false
 	}
 
+	err = node.blockchain.ValidateNewShardState(newBlock)
+	if err != nil {
+		utils.GetLogInstance().Debug("Failed to verify new sharding state", "err", err)
+	}
 	return true
 }
 
@@ -272,16 +257,27 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) bool {
 // 1. add the new block to blockchain
 // 2. [leader] send new block to the client
 func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
+	if node.Role == BeaconLeader || node.Role == BeaconValidator {
+		node.UpdateStakingList(newBlock)
+	}
 	if node.Consensus.IsLeader {
 		node.BroadcastNewBlock(newBlock)
 	}
-
 	node.AddNewBlock(newBlock)
+
+	// TODO: enable drand only for beacon chain
+	// ConfirmedBlockChannel which is listened by drand leader who will initiate DRG if its a epoch block (first block of a epoch)
+	if node.DRand != nil {
+		go func() {
+			node.ConfirmedBlockChannel <- newBlock
+		}()
+	}
 }
 
 // AddNewBlock is usedd to add new block into the blockchain.
 func (node *Node) AddNewBlock(newBlock *types.Block) {
 	blockNum, err := node.blockchain.InsertChain([]*types.Block{newBlock})
+
 	if err != nil {
 		utils.GetLogInstance().Debug("Error adding new block to blockchain", "blockNum", blockNum, "Error", err)
 	} else {
@@ -289,13 +285,22 @@ func (node *Node) AddNewBlock(newBlock *types.Block) {
 	}
 }
 
-func (node *Node) pingMessageHandler(msgPayload []byte) int {
-	ping, err := proto_node.GetPingMessage(msgPayload)
+func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
+	if sender != "" {
+		_, ok := node.duplicatedPing[sender]
+		if !ok {
+			node.duplicatedPing[sender] = true
+		} else {
+			// duplicated ping message return
+			return 0
+		}
+	}
+
+	ping, err := proto_discovery.GetPingMessage(msgPayload)
 	if err != nil {
 		utils.GetLogInstance().Error("Can't get Ping Message")
 		return -1
 	}
-	//	utils.GetLogInstance().Info("Ping", "Msg", ping)
 
 	peer := new(p2p.Peer)
 	peer.IP = ping.Node.IP
@@ -303,11 +308,19 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 	peer.PeerID = ping.Node.PeerID
 	peer.ValidatorID = ping.Node.ValidatorID
 
-	peer.PubKey = hmy_crypto.Ed25519Curve.Point()
-	err = peer.PubKey.UnmarshalBinary(ping.Node.PubKey[:])
+	peer.PubKey = &bls.PublicKey{}
+	err = peer.PubKey.Deserialize(ping.Node.PubKey[:])
 	if err != nil {
 		utils.GetLogInstance().Error("UnmarshalBinary Failed", "error", err)
 		return -1
+	}
+
+	//	utils.GetLogInstance().Debug("[pingMessageHandler]", "incoming peer", peer)
+
+	// add to incoming peer list
+	node.host.AddIncomingPeer(*peer)
+	if utils.UseLibP2P {
+		node.host.ConnectHostPeer(*peer)
 	}
 
 	if ping.Node.Role == proto_node.ClientRole {
@@ -319,35 +332,84 @@ func (node *Node) pingMessageHandler(msgPayload []byte) int {
 	// Add to Node's peer list anyway
 	node.AddPeers([]*p2p.Peer{peer})
 
-	peers := node.Consensus.GetValidatorPeers()
-	pong := proto_node.NewPongMessage(peers, node.Consensus.PublicKeys)
-	buffer := pong.ConstructPongMessage()
+	// This is the old way of broadcasting pong message
+	if node.Consensus.IsLeader && !utils.UseLibP2P {
+		peers := node.Consensus.GetValidatorPeers()
+		pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys)
+		buffer := pong.ConstructPongMessage()
 
-	// Send a Pong message directly to the sender
-	// This is necessary because the sender will need to get a ValidatorID
-	// Just broadcast won't work, some validators won't receive the latest
-	// PublicKeys as we rely on a valid ValidatorID to do broadcast.
-	// This is very buggy, but we will move to libp2p, hope the problem will
-	// be resolved then.
-	// However, I disable it for now as we are sending redundant PONG messages
-	// to all validators.  This may not be needed. But it maybe add back.
-	//   p2p.SendMessage(*peer, buffer)
+		// Send a Pong message directly to the sender
+		// This is necessary because the sender will need to get a ValidatorID
+		// Just broadcast won't work, some validators won't receive the latest
+		// PublicKeys as we rely on a valid ValidatorID to do broadcast.
+		// This is very buggy, but we will move to libp2p, hope the problem will
+		// be resolved then.
+		// However, I disable it for now as we are sending redundant PONG messages
+		// to all validators.  This may not be needed. But it maybe add back.
+		//   p2p.SendMessage(*peer, buffer)
 
-	// Broadcast the message to all validators, as publicKeys is updated
-	// FIXME: HAR-89 use a separate nodefind/neighbor message
-	host.BroadcastMessageFromLeader(node.GetHost(), peers, buffer, node.Consensus.OfflinePeers)
+		// Broadcast the message to all validators, as publicKeys is updated
+		// FIXME: HAR-89 use a separate nodefind/neighbor message
 
-	return len(peers)
+		host.BroadcastMessageFromLeader(node.GetHost(), peers, buffer, node.Consensus.OfflinePeers)
+		//		utils.GetLogInstance().Info("PingMsgHandler send pong message")
+	}
+
+	return 1
+}
+
+// SendPongMessage is the a goroutine to periodcally send pong message to all peers
+func (node *Node) SendPongMessage() {
+	tick := time.NewTicker(10 * time.Second)
+	numPeers := len(node.Consensus.GetValidatorPeers())
+	numPubKeys := len(node.Consensus.PublicKeys)
+	sentMessage := false
+
+	// Send Pong Message only when there is change on the number of peers
+	for {
+		select {
+		case <-tick.C:
+			peers := node.Consensus.GetValidatorPeers()
+			numPeersNow := len(peers)
+			numPubKeysNow := len(node.Consensus.PublicKeys)
+
+			// no peers, wait for another tick
+			if numPeersNow == 0 || numPubKeysNow == 0 {
+				continue
+			}
+			// new peers added
+			if numPubKeysNow != numPubKeys || numPeersNow != numPeers {
+				sentMessage = false
+			} else {
+				// stable number of peers/pubkeys, sent the pong message
+				if !sentMessage {
+					pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys)
+					buffer := pong.ConstructPongMessage()
+					content := host.ConstructP2pMessage(byte(0), buffer)
+					err := node.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, content)
+					if err != nil {
+						utils.GetLogInstance().Error("[PONG] failed to send pong message", "group", p2p.GroupIDBeacon)
+						continue
+					} else {
+						utils.GetLogInstance().Info("[PONG] sent pong message to", "group", p2p.GroupIDBeacon)
+					}
+					sentMessage = true
+					// stop sending ping message
+					node.serviceManager.TakeAction(&service.Action{Action: service.Stop, ServiceType: service.PeerDiscovery})
+				}
+			}
+			numPeers = numPeersNow
+			numPubKeys = numPubKeysNow
+		}
+	}
 }
 
 func (node *Node) pongMessageHandler(msgPayload []byte) int {
-	pong, err := proto_node.GetPongMessage(msgPayload)
+	pong, err := proto_discovery.GetPongMessage(msgPayload)
 	if err != nil {
 		utils.GetLogInstance().Error("Can't get Pong Message")
 		return -1
 	}
-
-	//	utils.GetLogInstance().Debug("pongMessageHandler", "pong", pong, "nodeID", node.Consensus.GetNodeID())
 
 	peers := make([]*p2p.Peer, 0)
 
@@ -358,8 +420,8 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		peer.ValidatorID = p.ValidatorID
 		peer.PeerID = p.PeerID
 
-		peer.PubKey = hmy_crypto.Ed25519Curve.Point()
-		err = peer.PubKey.UnmarshalBinary(p.PubKey[:])
+		peer.PubKey = &bls.PublicKey{}
+		err = peer.PubKey.Deserialize(p.PubKey[:])
 		if err != nil {
 			utils.GetLogInstance().Error("UnmarshalBinary Failed", "error", err)
 			continue
@@ -374,18 +436,20 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 	// Reset Validator PublicKeys every time we receive PONG message from Leader
 	// The PublicKeys has to be idential across the shard on every node
 	// TODO (lc): we need to handle RemovePeer situation
-	publicKeys := make([]kyber.Point, 0)
+	publicKeys := make([]*bls.PublicKey, 0)
 
 	// Create the the PubKey from the []byte sent from leader
 	for _, k := range pong.PubKeys {
-		key := hmy_crypto.Ed25519Curve.Point()
-		err = key.UnmarshalBinary(k[:])
+		key := bls.PublicKey{}
+		err = key.Deserialize(k[:])
 		if err != nil {
 			utils.GetLogInstance().Error("UnmarshalBinary Failed PubKeys", "error", err)
 			continue
 		}
-		publicKeys = append(publicKeys, key)
+		publicKeys = append(publicKeys, &key)
 	}
+
+	utils.GetLogInstance().Debug("[pongMessageHandler]", "#keys", len(publicKeys), "#peers", len(peers))
 
 	if node.State == NodeWaitToJoin {
 		node.State = NodeReadyForConsensus
@@ -395,5 +459,7 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		}
 	}
 
+	// Stop discovery service after received pong message
+	node.serviceManager.TakeAction(&service.Action{Action: service.Stop, ServiceType: service.PeerDiscovery})
 	return node.Consensus.UpdatePublicKeys(publicKeys)
 }
