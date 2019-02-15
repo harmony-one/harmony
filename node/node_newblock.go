@@ -82,12 +82,12 @@ func (node *Node) addNewShardState(block *types.Block) {
 }
 
 func (node *Node) addNewRandSeed(block *types.Block) {
-	blockNumber := block.NumberU64()
-	if !core.CheckEpochBlock(blockNumber) {
+	if !core.IsEpochBlock(block) {
 		return
 	}
 
 	var rnd int64
+	blockNumber := block.NumberU64()
 	epoch := core.GetEpochFromBlockNumber(blockNumber)
 	if epoch == 1 {
 		rnd = core.InitialSeed

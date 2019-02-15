@@ -13,6 +13,10 @@ import (
 var (
 	Port string
 	IP   string
+	// Global Variable to use libp2p for networking
+	// FIXME: this is a temporary hack, once we totally switch to libp2p
+	// this variable shouldn't be used
+	UseLibP2P bool
 )
 
 // SetPortAndIP used to print out loggings of node with Port and IP.

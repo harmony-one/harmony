@@ -18,6 +18,7 @@ import (
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	consensus_proto "github.com/harmony-one/harmony/api/consensus"
+	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
@@ -95,6 +96,9 @@ type Consensus struct {
 	ConsensusBlock chan *BFTBlockInfo
 	// verified block to state sync broadcast
 	VerifiedNewBlock chan *types.Block
+
+	// Channel for DRG protocol to send pRnd (preimage of randomness resulting from combined vrf randomnesses) to consensus. The first 32 bytes are randomness, the rest is for bitmap.
+	PRndChannel chan []byte
 
 	uniqueIDInstance *utils.UniqueValidatorID
 
@@ -213,6 +217,11 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Cons
 	return &consensus
 }
 
+// RegisterPRndChannel registers the channel for receiving randomness preimage from DRG protocol
+func (consensus *Consensus) RegisterPRndChannel(pRndChannel chan []byte) {
+	consensus.PRndChannel = pRndChannel
+}
+
 // Checks the basic meta of a consensus message, including the signature.
 func (consensus *Consensus) checkConsensusMessage(message consensus_proto.Message, publicKey *bls.PublicKey) error {
 	consensusID := message.ConsensusId
@@ -222,18 +231,18 @@ func (consensus *Consensus) checkConsensusMessage(message consensus_proto.Messag
 	err := verifyMessageSig(publicKey, message)
 	if err != nil {
 		utils.GetLogInstance().Warn("Failed to verify the message signature", "Error", err)
-		return ErrInvalidConsensusMessage
+		return consensus_engine.ErrInvalidConsensusMessage
 	}
 
 	// check consensus Id
 	if consensusID != consensus.consensusID {
 		utils.GetLogInstance().Warn("Wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
-		return ErrConsensusIDNotMatch
+		return consensus_engine.ErrConsensusIDNotMatch
 	}
 
 	if !bytes.Equal(blockHash, consensus.blockHash[:]) {
 		utils.GetLogInstance().Warn("Wrong blockHash", "consensus", consensus)
-		return ErrInvalidConsensusMessage
+		return consensus_engine.ErrInvalidConsensusMessage
 	}
 	return nil
 }
@@ -379,7 +388,7 @@ func (consensus *Consensus) AddPeers(peers []*p2p.Peer) int {
 			consensus.pubKeyLock.Lock()
 			consensus.PublicKeys = append(consensus.PublicKeys, peer.PubKey)
 			consensus.pubKeyLock.Unlock()
-			utils.GetLogInstance().Debug("[SYNC]", "new peer added", peer)
+			//			utils.GetLogInstance().Debug("[SYNC]", "new peer added", peer)
 		}
 		count++
 	}
@@ -432,7 +441,11 @@ func (consensus *Consensus) RemovePeers(peers []p2p.Peer) int {
 		pong := proto_discovery.NewPongMessage(validators, consensus.PublicKeys)
 		buffer := pong.ConstructPongMessage()
 
-		host.BroadcastMessageFromLeader(consensus.host, validators, buffer, consensus.OfflinePeers)
+		if utils.UseLibP2P {
+			consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, buffer)
+		} else {
+			host.BroadcastMessageFromLeader(consensus.host, validators, buffer, consensus.OfflinePeers)
+		}
 	}
 
 	return count2
@@ -479,7 +492,7 @@ func NewFaker() *Consensus {
 
 // VerifyHeader checks whether a header conforms to the consensus rules of the
 // stock bft engine.
-func (consensus *Consensus) VerifyHeader(chain ChainReader, header *types.Header, seal bool) error {
+func (consensus *Consensus) VerifyHeader(chain consensus_engine.ChainReader, header *types.Header, seal bool) error {
 	// TODO: implement this
 	return nil
 }
@@ -487,7 +500,7 @@ func (consensus *Consensus) VerifyHeader(chain ChainReader, header *types.Header
 // VerifyHeaders is similar to VerifyHeader, but verifies a batch of headers
 // concurrently. The method returns a quit channel to abort the operations and
 // a results channel to retrieve the async verifications.
-func (consensus *Consensus) VerifyHeaders(chain ChainReader, headers []*types.Header, seals []bool) (chan<- struct{}, <-chan error) {
+func (consensus *Consensus) VerifyHeaders(chain consensus_engine.ChainReader, headers []*types.Header, seals []bool) (chan<- struct{}, <-chan error) {
 	abort, results := make(chan struct{}), make(chan error, len(headers))
 	for i := 0; i < len(headers); i++ {
 		results <- nil
@@ -495,7 +508,7 @@ func (consensus *Consensus) VerifyHeaders(chain ChainReader, headers []*types.He
 	return abort, results
 }
 
-func (consensus *Consensus) verifyHeaderWorker(chain ChainReader, headers []*types.Header, seals []bool, index int) error {
+func (consensus *Consensus) verifyHeaderWorker(chain consensus_engine.ChainReader, headers []*types.Header, seals []bool, index int) error {
 	var parent *types.Header
 	if index == 0 {
 		parent = chain.GetHeader(headers[0].ParentHash, headers[0].Number.Uint64()-1)
@@ -503,7 +516,7 @@ func (consensus *Consensus) verifyHeaderWorker(chain ChainReader, headers []*typ
 		parent = headers[index-1]
 	}
 	if parent == nil {
-		return ErrUnknownAncestor
+		return consensus_engine.ErrUnknownAncestor
 	}
 	if chain.GetHeader(headers[index].Hash(), headers[index].Number.Uint64()) != nil {
 		return nil // known block
@@ -513,19 +526,19 @@ func (consensus *Consensus) verifyHeaderWorker(chain ChainReader, headers []*typ
 
 // verifyHeader checks whether a header conforms to the consensus rules of the
 // stock bft engine.
-func (consensus *Consensus) verifyHeader(chain ChainReader, header, parent *types.Header, uncle bool, seal bool) error {
+func (consensus *Consensus) verifyHeader(chain consensus_engine.ChainReader, header, parent *types.Header, uncle bool, seal bool) error {
 	return nil
 }
 
 // VerifySeal implements consensus.Engine, checking whether the given block satisfies
 // the PoW difficulty requirements.
-func (consensus *Consensus) VerifySeal(chain ChainReader, header *types.Header) error {
+func (consensus *Consensus) VerifySeal(chain consensus_engine.ChainReader, header *types.Header) error {
 	return nil
 }
 
 // Finalize implements consensus.Engine, accumulating the block and uncle rewards,
 // setting the final state and assembling the block.
-func (consensus *Consensus) Finalize(chain ChainReader, header *types.Header, state *state.DB, txs []*types.Transaction, receipts []*types.Receipt) (*types.Block, error) {
+func (consensus *Consensus) Finalize(chain consensus_engine.ChainReader, header *types.Header, state *state.DB, txs []*types.Transaction, receipts []*types.Receipt) (*types.Block, error) {
 	// Accumulate any block and uncle rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
 	accumulateRewards(chain.Config(), state, header)
@@ -556,14 +569,14 @@ func (consensus *Consensus) SealHash(header *types.Header) (hash common.Hash) {
 }
 
 // Seal is to seal final block.
-func (consensus *Consensus) Seal(chain ChainReader, block *types.Block, results chan<- *types.Block, stop <-chan struct{}) error {
+func (consensus *Consensus) Seal(chain consensus_engine.ChainReader, block *types.Block, results chan<- *types.Block, stop <-chan struct{}) error {
 	// TODO: implement final block sealing
 	return nil
 }
 
 // Prepare is to prepare ...
 // TODO(RJ): fix it.
-func (consensus *Consensus) Prepare(chain ChainReader, header *types.Header) error {
+func (consensus *Consensus) Prepare(chain consensus_engine.ChainReader, header *types.Header) error {
 	// TODO: implement prepare method
 	return nil
 }

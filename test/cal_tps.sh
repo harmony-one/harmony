@@ -31,6 +31,8 @@ fi
 NUM_SHARDS=${#FILES[@]}
 SUM=0
 NUM_CONSENSUS=0
+NUM_TOTAL_NODES=$( expr $NUM_SHARDS + $NUM_VALIDATORS )
+NUM_SIGS=0
 
 declare -A TPS
 
@@ -43,12 +45,14 @@ for f in "${FILES[@]}"; do
    else
       avg_tps=0
    fi
+   num_sigs=$(grep numOfSignatures $f | tail -1 | cut -f 5 -d , | cut -f 2 -d :)
    TPS[$leader]="$num_consensus, $avg_tps"
    NUM_CONSENSUS=$(expr $NUM_CONSENSUS + $num_consensus )
    SUM=$( expr $SUM + $avg_tps_int )
+   NUM_SIGS=$( expr $NUM_SIGS + $num_sigs)
 done
 
-echo $NUM_SHARDS shards, $NUM_CONSENSUS consensus, $SUM total TPS, $NUM_VALIDATORS nodes
+echo $NUM_SHARDS shards, $NUM_CONSENSUS consensus, $SUM total TPS, $NUM_VALIDATORS nodes, $NUM_TOTAL_NODES total nodes, $NUM_SIGS total signatures
 for t in "${!TPS[@]}"; do
    echo $t, ${TPS[$t]}
 done

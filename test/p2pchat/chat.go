@@ -8,8 +8,8 @@ import (
 	"os"
 	"sync"
 
-	"github.com/ipfs/go-log"
-	"github.com/libp2p/go-libp2p"
+	log "github.com/ipfs/go-log"
+	libp2p "github.com/libp2p/go-libp2p"
 	discovery "github.com/libp2p/go-libp2p-discovery"
 	libp2pdht "github.com/libp2p/go-libp2p-kad-dht"
 	peer "github.com/libp2p/go-libp2p-peer"

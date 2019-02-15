@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/harmony-one/harmony/consensus"
+	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 )
@@ -30,13 +30,13 @@ import (
 //
 // BlockValidator implements Validator.
 type BlockValidator struct {
-	config *params.ChainConfig // Chain configuration options
-	bc     *BlockChain         // Canonical block chain
-	engine consensus.Engine    // Consensus engine used for validating
+	config *params.ChainConfig     // Chain configuration options
+	bc     *BlockChain             // Canonical block chain
+	engine consensus_engine.Engine // Consensus engine used for validating
 }
 
 // NewBlockValidator returns a new block validator which is safe for re-use
-func NewBlockValidator(config *params.ChainConfig, blockchain *BlockChain, engine consensus.Engine) *BlockValidator {
+func NewBlockValidator(config *params.ChainConfig, blockchain *BlockChain, engine consensus_engine.Engine) *BlockValidator {
 	validator := &BlockValidator{
 		config: config,
 		engine: engine,
@@ -55,9 +55,9 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 	}
 	if !v.bc.HasBlockAndState(block.ParentHash(), block.NumberU64()-1) {
 		if !v.bc.HasBlock(block.ParentHash(), block.NumberU64()-1) {
-			return consensus.ErrUnknownAncestor
+			return consensus_engine.ErrUnknownAncestor
 		}
-		return consensus.ErrPrunedAncestor
+		return consensus_engine.ErrPrunedAncestor
 	}
 	// Header validity is known at this point, check the uncles and transactions
 	header := block.Header()

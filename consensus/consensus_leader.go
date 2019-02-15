@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/harmony-one/harmony/core"
+
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -14,6 +16,7 @@ import (
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 )
 
@@ -47,6 +50,19 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan *types.Block, stop
 					time.Sleep(waitForEnoughValidators * time.Millisecond)
 				}
 
+				if core.IsEpochBlock(newBlock) {
+					// Receive pRnd from DRG protocol
+					utils.GetLogInstance().Debug("[DRG] Waiting for pRnd")
+					pRndAndBitmap := <-consensus.PRndChannel
+					utils.GetLogInstance().Debug("[DRG] GOT pRnd", "pRnd", pRndAndBitmap)
+					pRnd := pRndAndBitmap[:32]
+					bitmap := pRndAndBitmap[32:]
+					vrfBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.PubKey)
+					vrfBitmap.SetMask(bitmap)
+
+					// TODO: check validity of pRnd
+					_ = pRnd
+				}
 				startTime = time.Now()
 				utils.GetLogInstance().Debug("STARTING CONSENSUS", "numTxs", len(newBlock.Transactions()), "consensus", consensus, "startTime", startTime, "publicKeys", len(consensus.PublicKeys))
 				for { // Wait until last consensus is finished
@@ -107,7 +123,12 @@ func (consensus *Consensus) startConsensus(newBlock *types.Block) {
 	// Leader sign the block hash itself
 	consensus.prepareSigs[consensus.nodeID] = consensus.priKey.SignHash(consensus.blockHash[:])
 
-	host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
+	if utils.UseLibP2P {
+		// Construct broadcast p2p message
+		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
+	} else {
+		host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
+	}
 }
 
 // processPrepareMessage processes the prepare message sent from validators
@@ -164,7 +185,12 @@ func (consensus *Consensus) processPrepareMessage(message consensus_proto.Messag
 		// Construct and broadcast prepared message
 		msgToSend, aggSig := consensus.constructPreparedMessage()
 		consensus.aggregatedPrepareSig = aggSig
-		host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
+
+		if utils.UseLibP2P {
+			consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
+		} else {
+			host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
+		}
 
 		// Set state to targetState
 		consensus.state = targetState
@@ -230,7 +256,12 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 		// Construct and broadcast committed message
 		msgToSend, aggSig := consensus.constructCommittedMessage()
 		consensus.aggregatedCommitSig = aggSig
-		host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
+
+		if utils.UseLibP2P {
+			consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
+		} else {
+			host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
+		}
 
 		var blockObj types.Block
 		err := rlp.DecodeBytes(consensus.block, &blockObj)
