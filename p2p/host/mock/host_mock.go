@@ -5,12 +5,11 @@
 package mock_p2p
 
 import (
-	reflect "reflect"
-
 	gomock "github.com/golang/mock/gomock"
 	p2p "github.com/harmony-one/harmony/p2p"
 	go_libp2p_host "github.com/libp2p/go-libp2p-host"
 	go_libp2p_peer "github.com/libp2p/go-libp2p-peer"
+	reflect "reflect"
 )
 
 // MockHost is a mock of Host interface
@@ -118,6 +117,16 @@ func (mr *MockHostMockRecorder) GetP2PHost() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetP2PHost", reflect.TypeOf((*MockHost)(nil).GetP2PHost))
 }
 
+// ConnectHostPeer mocks base method
+func (m *MockHost) ConnectHostPeer(arg0 p2p.Peer) {
+	m.ctrl.Call(m, "ConnectHostPeer", arg0)
+}
+
+// ConnectHostPeer indicates an expected call of ConnectHostPeer
+func (mr *MockHostMockRecorder) ConnectHostPeer(arg0 interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConnectHostPeer", reflect.TypeOf((*MockHost)(nil).ConnectHostPeer), arg0)
+}
+
 // SendMessageToGroups mocks base method
 func (m *MockHost) SendMessageToGroups(groups []p2p.GroupID, msg []byte) error {
 	ret := m.ctrl.Call(m, "SendMessageToGroups", groups, msg)
@@ -141,34 +150,4 @@ func (m *MockHost) GroupReceiver(arg0 p2p.GroupID) (p2p.GroupReceiver, error) {
 // GroupReceiver indicates an expected call of GroupReceiver
 func (mr *MockHostMockRecorder) GroupReceiver(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GroupReceiver", reflect.TypeOf((*MockHost)(nil).GroupReceiver), arg0)
-}
-
-// AddIncomingPeer mocks base method
-func (m *MockHost) AddIncomingPeer(peer p2p.Peer) {
-	m.ctrl.Call(m, "AddIncomingPeer", peer)
-}
-
-// AddIncomingPeer indicates an expected call of AddIncomingPeer
-func (mr *MockHostMockRecorder) AddIncomingPeer(groups, msg interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddIncomingPeer", reflect.TypeOf((*MockHost)(nil).AddIncomingPeer), groups, msg)
-}
-
-// AddOutgoingPeer mocks base method
-func (m *MockHost) AddOutgoingPeer(peer p2p.Peer) {
-	m.ctrl.Call(m, "AddOutgoingPeer", peer)
-}
-
-// AddOutgoingPeer indicates an expected call of AddOutgoingPeer
-func (mr *MockHostMockRecorder) AddOutgoingPeer(groups, msg interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddOutgoingPeer", reflect.TypeOf((*MockHost)(nil).AddOutgoingPeer), groups, msg)
-}
-
-// ConnectHostPeer mocks base method
-func (m *MockHost) ConnectHostPeer(peer p2p.Peer) {
-	m.ctrl.Call(m, "ConnectHostPeer", peer)
-}
-
-// ConnectHostPeer indicates an expected call of ConnectHostPeer
-func (mr *MockHostMockRecorder) ConnectHostPeer(groups, msg interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConnectHostPeer", reflect.TypeOf((*MockHost)(nil).ConnectHostPeer), groups, msg)
 }
