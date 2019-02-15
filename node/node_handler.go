@@ -246,6 +246,9 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) bool {
 		return false
 	}
 
+	// TODO: verify the vrf randomness
+	_ = newBlock.Header().RandPreimage
+
 	err = node.blockchain.ValidateNewShardState(newBlock)
 	if err != nil {
 		utils.GetLogInstance().Debug("Failed to verify new sharding state", "err", err)

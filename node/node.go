@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"os"
@@ -296,6 +297,9 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 		if node.Role == BeaconLeader || node.Role == BeaconValidator {
 			node.CurrentStakes = make(map[common.Address]int64)
 		}
+		bytes, _ := rlp.EncodeToBytes(chain.GetBlockByNumber(0))
+		utils.GetLogInstance().Debug("TESTTEST", "block", hex.EncodeToString(bytes))
+		utils.GetLogInstance().Debug("Received", "blockHash", chain.GetBlockByNumber(0).Hash().Hex())
 		node.Consensus.ConsensusBlock = make(chan *bft.BFTBlockInfo)
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 	}
