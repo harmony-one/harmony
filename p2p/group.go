@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	peer "github.com/libp2p/go-libp2p-peer"
+	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 )
 
 // GroupID is a multicast group ID.
@@ -34,5 +34,5 @@ type GroupReceiver interface {
 	io.Closer
 
 	// Receive a message.
-	Receive(ctx context.Context) (msg []byte, sender peer.ID, err error)
+	Receive(ctx context.Context) (msg []byte, sender libp2p_peer.ID, err error)
 }

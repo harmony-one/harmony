@@ -318,7 +318,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 	//	utils.GetLogInstance().Debug("[pingMessageHandler]", "incoming peer", peer)
 
 	// add to incoming peer list
-	node.host.AddIncomingPeer(*peer)
+	//node.host.AddIncomingPeer(*peer)
 	if utils.UseLibP2P {
 		node.host.ConnectHostPeer(*peer)
 	}

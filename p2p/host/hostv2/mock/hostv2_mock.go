@@ -11,43 +11,43 @@ import (
 	reflect "reflect"
 )
 
-// MockPubSub is a mock of PubSub interface
-type MockPubSub struct {
+// Mockpubsub is a mock of pubsub interface
+type Mockpubsub struct {
 	ctrl     *gomock.Controller
-	recorder *MockPubSubMockRecorder
+	recorder *MockpubsubMockRecorder
 }
 
-// MockPubSubMockRecorder is the mock recorder for MockPubSub
-type MockPubSubMockRecorder struct {
-	mock *MockPubSub
+// MockpubsubMockRecorder is the mock recorder for Mockpubsub
+type MockpubsubMockRecorder struct {
+	mock *Mockpubsub
 }
 
-// NewMockPubSub creates a new mock instance
-func NewMockPubSub(ctrl *gomock.Controller) *MockPubSub {
-	mock := &MockPubSub{ctrl: ctrl}
-	mock.recorder = &MockPubSubMockRecorder{mock}
+// NewMockpubsub creates a new mock instance
+func NewMockpubsub(ctrl *gomock.Controller) *Mockpubsub {
+	mock := &Mockpubsub{ctrl: ctrl}
+	mock.recorder = &MockpubsubMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use
-func (m *MockPubSub) EXPECT() *MockPubSubMockRecorder {
+func (m *Mockpubsub) EXPECT() *MockpubsubMockRecorder {
 	return m.recorder
 }
 
 // Publish mocks base method
-func (m *MockPubSub) Publish(topic string, data []byte) error {
+func (m *Mockpubsub) Publish(topic string, data []byte) error {
 	ret := m.ctrl.Call(m, "Publish", topic, data)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Publish indicates an expected call of Publish
-func (mr *MockPubSubMockRecorder) Publish(topic, data interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Publish", reflect.TypeOf((*MockPubSub)(nil).Publish), topic, data)
+func (mr *MockpubsubMockRecorder) Publish(topic, data interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Publish", reflect.TypeOf((*Mockpubsub)(nil).Publish), topic, data)
 }
 
 // Subscribe mocks base method
-func (m *MockPubSub) Subscribe(topic string, opts ...go_libp2p_pubsub.SubOpt) (*go_libp2p_pubsub.Subscription, error) {
+func (m *Mockpubsub) Subscribe(topic string, opts ...go_libp2p_pubsub.SubOpt) (*go_libp2p_pubsub.Subscription, error) {
 	varargs := []interface{}{topic}
 	for _, a := range opts {
 		varargs = append(varargs, a)
@@ -59,36 +59,36 @@ func (m *MockPubSub) Subscribe(topic string, opts ...go_libp2p_pubsub.SubOpt) (*
 }
 
 // Subscribe indicates an expected call of Subscribe
-func (mr *MockPubSubMockRecorder) Subscribe(topic interface{}, opts ...interface{}) *gomock.Call {
+func (mr *MockpubsubMockRecorder) Subscribe(topic interface{}, opts ...interface{}) *gomock.Call {
 	varargs := append([]interface{}{topic}, opts...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Subscribe", reflect.TypeOf((*MockPubSub)(nil).Subscribe), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Subscribe", reflect.TypeOf((*Mockpubsub)(nil).Subscribe), varargs...)
 }
 
-// MockSubscription is a mock of Subscription interface
-type MockSubscription struct {
+// Mocksubscription is a mock of subscription interface
+type Mocksubscription struct {
 	ctrl     *gomock.Controller
-	recorder *MockSubscriptionMockRecorder
+	recorder *MocksubscriptionMockRecorder
 }
 
-// MockSubscriptionMockRecorder is the mock recorder for MockSubscription
-type MockSubscriptionMockRecorder struct {
-	mock *MockSubscription
+// MocksubscriptionMockRecorder is the mock recorder for Mocksubscription
+type MocksubscriptionMockRecorder struct {
+	mock *Mocksubscription
 }
 
-// NewMockSubscription creates a new mock instance
-func NewMockSubscription(ctrl *gomock.Controller) *MockSubscription {
-	mock := &MockSubscription{ctrl: ctrl}
-	mock.recorder = &MockSubscriptionMockRecorder{mock}
+// NewMocksubscription creates a new mock instance
+func NewMocksubscription(ctrl *gomock.Controller) *Mocksubscription {
+	mock := &Mocksubscription{ctrl: ctrl}
+	mock.recorder = &MocksubscriptionMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use
-func (m *MockSubscription) EXPECT() *MockSubscriptionMockRecorder {
+func (m *Mocksubscription) EXPECT() *MocksubscriptionMockRecorder {
 	return m.recorder
 }
 
 // Next mocks base method
-func (m *MockSubscription) Next(ctx context.Context) (*go_libp2p_pubsub.Message, error) {
+func (m *Mocksubscription) Next(ctx context.Context) (*go_libp2p_pubsub.Message, error) {
 	ret := m.ctrl.Call(m, "Next", ctx)
 	ret0, _ := ret[0].(*go_libp2p_pubsub.Message)
 	ret1, _ := ret[1].(error)
@@ -96,16 +96,16 @@ func (m *MockSubscription) Next(ctx context.Context) (*go_libp2p_pubsub.Message,
 }
 
 // Next indicates an expected call of Next
-func (mr *MockSubscriptionMockRecorder) Next(ctx interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Next", reflect.TypeOf((*MockSubscription)(nil).Next), ctx)
+func (mr *MocksubscriptionMockRecorder) Next(ctx interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Next", reflect.TypeOf((*Mocksubscription)(nil).Next), ctx)
 }
 
 // Cancel mocks base method
-func (m *MockSubscription) Cancel() {
+func (m *Mocksubscription) Cancel() {
 	m.ctrl.Call(m, "Cancel")
 }
 
 // Cancel indicates an expected call of Cancel
-func (mr *MockSubscriptionMockRecorder) Cancel() *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Cancel", reflect.TypeOf((*MockSubscription)(nil).Cancel))
+func (mr *MocksubscriptionMockRecorder) Cancel() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Cancel", reflect.TypeOf((*Mocksubscription)(nil).Cancel))
 }
