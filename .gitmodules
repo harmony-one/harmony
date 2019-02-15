@@ -5,3 +5,15 @@
 [submodule "vendor/github.com/libp2p/go-libp2p-kad-dht"]
 	path = vendor/github.com/libp2p/go-libp2p-kad-dht
 	url = https://github.com/libp2p/go-libp2p-kad-dht
+[submodule "vendor/github.com/google/keytransparency"]
+	path = vendor/github.com/google/keytransparency
+	url = https://github.com/google/keytransparency
+[submodule "vendor/github.com/google/trillian"]
+	path = vendor/github.com/google/trillian
+	url = https://github.com/google/trillian
+[submodule "keytransparency"]
+	path = keytransparency
+	url = git@github.com:google/keytransparency.git
+[submodule "trillian"]
+	path = trillian
+	url = git@github.com:google/trillian.git
