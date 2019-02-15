@@ -7,6 +7,9 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/harmony-one/harmony/crypto/vrf"
+	"github.com/harmony-one/harmony/crypto/vrf/p256"
+
 	"github.com/harmony-one/harmony/core/types"
 
 	protobuf "github.com/golang/protobuf/proto"
@@ -26,6 +29,9 @@ type DRand struct {
 	ConfirmedBlockChannel chan *types.Block // Channel to receive confirmed blocks
 	PRndChannel           chan []byte       // Channel to send pRnd (preimage of randomness resulting from combined vrf randomnesses) to consensus. The first 32 bytes are randomness, the rest is for bitmap.
 
+	// global consensus mutex
+	mutex sync.Mutex
+
 	// map of nodeID to validator Peer object
 	// FIXME: should use PubKey of p2p.Peer as the hashkey
 	validators sync.Map // key is uint16, value is p2p.Peer
@@ -40,6 +46,10 @@ type DRand struct {
 	// private/public keys of current node
 	priKey *bls.SecretKey
 	pubKey *bls.PublicKey
+	// VRF private and public key
+	// TODO: directly use signature signing key (BLS) for vrf
+	vrfPriKey *vrf.PrivateKey
+	vrfPubKey *vrf.PublicKey
 
 	// Whether I am leader. False means I am validator
 	IsLeader bool
@@ -109,6 +119,11 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer, confi
 	dRand.priKey = &privateKey
 	dRand.pubKey = privateKey.GetPublicKey()
 
+	// VRF keys
+	priKey, pubKey := p256.GenerateKey()
+	dRand.vrfPriKey = &priKey
+	dRand.vrfPubKey = &pubKey
+
 	myShardID, err := strconv.Atoi(ShardID)
 	if err != nil {
 		panic("Unparseable shard Id" + ShardID)
@@ -167,8 +182,8 @@ func (dRand *DRand) signAndMarshalDRandMessage(message *drand_proto.Message) ([]
 }
 
 func (dRand *DRand) vrf(blockHash [32]byte) (rand [32]byte, proof []byte) {
-	// TODO: implement vrf
-	return [32]byte{}, []byte{}
+	rand, proof = (*dRand.vrfPriKey).Evaluate(blockHash[:])
+	return
 }
 
 // GetValidatorPeers returns list of validator peers.

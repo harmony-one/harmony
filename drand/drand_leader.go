@@ -1,10 +1,13 @@
 package drand
 
 import (
+	"bytes"
+
 	protobuf "github.com/golang/protobuf/proto"
 	drand_proto "github.com/harmony-one/harmony/api/drand"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/crypto/vrf/p256"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p/host"
 )
@@ -69,6 +72,9 @@ func (dRand *DRand) processCommitMessage(message drand_proto.Message) {
 		return
 	}
 
+	dRand.mutex.Lock()
+	defer dRand.mutex.Unlock()
+
 	validatorID := message.SenderId
 	validatorPeer := dRand.getValidatorPeerByID(validatorID)
 	vrfs := dRand.vrfs
@@ -85,10 +91,17 @@ func (dRand *DRand) processCommitMessage(message drand_proto.Message) {
 	}
 
 	rand := message.Payload[:32]
-	proof := message.Payload[32:]
-	_ = rand
-	_ = proof
-	// TODO: check the validity of the vrf commit
+	proof := message.Payload[32 : len(message.Payload)-64]
+	pubKeyBytes := message.Payload[len(message.Payload)-64:]
+	_, pubKey := p256.GenerateKey()
+	pubKey.Deserialize(pubKeyBytes)
+
+	expectedRand, err := pubKey.ProofToHash(dRand.blockHash[:], proof)
+
+	if err != nil || !bytes.Equal(expectedRand[:], rand) {
+		utils.GetLogInstance().Error("Failed to verify the VRF", "error", err, "validatorID", validatorID, "expectedRand", expectedRand, "receivedRand", rand)
+		return
+	}
 
 	utils.GetLogInstance().Debug("Received new commit", "numReceivedSoFar", len((*vrfs)), "validatorID", validatorID, "PublicKeys", len(dRand.PublicKeys))
 
@@ -98,7 +111,6 @@ func (dRand *DRand) processCommitMessage(message drand_proto.Message) {
 	if len((*vrfs)) >= ((len(dRand.PublicKeys))/3 + 1) {
 		// Construct pRand and initiate consensus on it
 		utils.GetLogInstance().Debug("Received enough randomness commit", "numReceivedSoFar", len((*vrfs)), "validatorID", validatorID, "PublicKeys", len(dRand.PublicKeys))
-		// TODO: communicate the pRand to consensus
 
 		pRnd := [32]byte{}
 		// Bitwise XOR on all the submitted vrfs

@@ -37,4 +37,8 @@ type PrivateKey interface {
 type PublicKey interface {
 	// ProofToHash verifies the NP-proof supplied by Proof and outputs Index.
 	ProofToHash(m, proof []byte) (index [32]byte, err error)
+	// Serialize serialize the public key into bytes
+	Serialize() []byte
+	// Deserialize de-serialize bytes into public key
+	Deserialize([]byte)
 }
