@@ -41,8 +41,6 @@ jobs:
       - ./send.sh failure $WEBHOOK_URL
 
   - stage: Notify success
-    notifications:
-      slack: harmonyone:gggCd1QQopsQAW8JYgBWiH7M
     # notify about success only once
     script:
       - wget https://raw.githubusercontent.com/DiscordHooks/travis-ci-discord-webhook/master/send.sh
