@@ -48,6 +48,23 @@ else
 	echo "goimports passed."
 fi
 
+echo "Running go generate..."
+gogenerate_status_before="${tmpdir}/gogenerate_status_before.txt"
+gogenerate_status_after="${tmpdir}/gogenerate_status_after.txt"
+gogenerate_status_diff="${tmpdir}/gogenerate_status.diff"
+git status --porcelain=v2 > "${gogenerate_status_before}"
+"${progdir}/gogenerate.sh"
+git status --porcelain=v2 > "${gogenerate_status_after}"
+if diff -u "${gogenerate_status_before}" "${gogenerate_status_after}" \
+	> "${gogenerate_status_diff}"
+then
+	echo "go generate succeeded; all generated files seem up to date."
+else
+	echo "go generate changed working tree contents!"
+	"${progdir}/print_file.sh" "${gogenerate_status_diff}" "git status diff"
+	ok=false
+fi
+
 if ! ${ok}
 then
 	echo "Some checks failed; see output above."
