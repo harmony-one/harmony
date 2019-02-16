@@ -222,6 +222,11 @@ func (host *HostV2) SendMessage(p p2p.Peer, message []byte) error {
 			"protocolID", ProtocolID, "error", err)
 		return p2p.ErrNewStream
 	}
+	defer func() {
+		if err := s.Close(); err != nil {
+			logger.Warn("cannot close stream", "error", err)
+		}
+	}()
 	if nw, err := s.Write(message); err != nil {
 		logger.Error("Write() failed", "peerID", p.PeerID,
 			"protocolID", ProtocolID, "error", err)
