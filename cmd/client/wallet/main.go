@@ -53,10 +53,10 @@ var (
 	transferAmountPtr   = transferCommand.Float64("amount", 0, "Specify the amount to transfer")
 	transferShardIDPtr  = transferCommand.Int("shardID", -1, "Specify the shard ID for the transfer")
 
-	freeTokenCommand    = flag.NewFlagSet("GetFreeToken", flag.ExitOnError)
+	freeTokenCommand    = flag.NewFlagSet("getFreeToken", flag.ExitOnError)
 	freeTokenAddressPtr = freeTokenCommand.String("address", "", "Specify the account address to receive the free token")
 
-	balanceCommand    = flag.NewFlagSet("GetFreeToken", flag.ExitOnError)
+	balanceCommand    = flag.NewFlagSet("getFreeToken", flag.ExitOnError)
 	balanceAddressPtr = balanceCommand.String("address", "", "Specify the account address to check balance for")
 )
 
@@ -80,13 +80,13 @@ func main() {
 		fmt.Println("        --privateKey     - the private key to import")
 		fmt.Println("    5. balances      - Shows the balances of all addresses or specific address")
 		fmt.Println("        --address        - The address to check balance for")
-		fmt.Println("    6. GetFreeToken  - Gets free token on each shard")
+		fmt.Println("    6. getFreeToken  - Gets free token on each shard")
 		fmt.Println("        --address        - The free token receiver account's address")
 		fmt.Println("    7. transfer")
 		fmt.Println("        --from           - The sender account's address or index in the local keystore")
 		fmt.Println("        --to             - The receiver account's address")
 		fmt.Println("        --amount         - The amount of token to transfer")
-		fmt.Println("        --shardId        - The shard Id for the transfer")
+		fmt.Println("        --shardID        - The shard Id for the transfer")
 		os.Exit(1)
 	}
 
@@ -105,7 +105,7 @@ func main() {
 		processImportCommnad()
 	case "balances":
 		processBalancesCommand()
-	case "GetFreeToken":
+	case "getFreeToken":
 		processGetFreeToken()
 	case "transfer":
 		processTransferCommand()
