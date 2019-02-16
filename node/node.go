@@ -654,7 +654,7 @@ func (node *Node) UpdateStakingList(block *types.Block) error {
 	for i := range txns {
 		txn := txns[i]
 		toAddress := txn.To()
-		if *toAddress != node.StakingContractAddress { //Not a address aimed at the staking contract.
+		if toAddress != nil && *toAddress != node.StakingContractAddress { //Not a address aimed at the staking contract.
 			continue
 		}
 		currentSender, _ := types.Sender(signerType, txn)

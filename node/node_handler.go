@@ -258,6 +258,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) bool {
 // 2. [leader] send new block to the client
 func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 	if node.Role == BeaconLeader || node.Role == BeaconValidator {
+		utils.GetLogInstance().Info("PostConsensusProcessing", "newBlock", newBlock)
 		node.UpdateStakingList(newBlock)
 	}
 	if node.Consensus.IsLeader {
