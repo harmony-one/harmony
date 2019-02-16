@@ -46,7 +46,7 @@ func GetIdentityMessageType(message []byte) (MessageType, error) {
 	if len(message) < 1 {
 		return 0, errors.New("failed to get identity message type: no data available")
 	}
-	return MessageType(message[2]), nil
+	return MessageType(message[0]), nil
 }
 
 // GetIdentityMessagePayload message payload from the identity message

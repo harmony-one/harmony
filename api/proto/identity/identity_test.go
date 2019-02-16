@@ -3,11 +3,14 @@ package identity
 import (
 	"strings"
 	"testing"
+
+	"github.com/harmony-one/harmony/api/proto"
 )
 
 func TestRegisterIdentityMessage(t *testing.T) {
 	registerIdentityMessage := ConstructIdentityMessage(Register, []byte("registerIdentityMessage"))
-	messageType, err := GetIdentityMessageType(registerIdentityMessage)
+	msgPayload, err := proto.GetMessagePayload(registerIdentityMessage)
+	messageType, err := GetIdentityMessageType(msgPayload)
 	if err != nil {
 		t.Errorf("Error thrown in geting message type")
 	}
@@ -18,7 +21,8 @@ func TestRegisterIdentityMessage(t *testing.T) {
 
 func TestAcknowledgeIdentityMessage(t *testing.T) {
 	registerAcknowledgeMessage := ConstructIdentityMessage(Acknowledge, []byte("acknowledgeIdentityMsgPayload"))
-	messageType, err := GetIdentityMessageType(registerAcknowledgeMessage)
+	msgPayload, err := proto.GetMessagePayload(registerAcknowledgeMessage)
+	messageType, err := GetIdentityMessageType(msgPayload)
 	if err != nil {
 		t.Errorf("Error thrown in geting message type")
 	}
@@ -29,6 +33,11 @@ func TestAcknowledgeIdentityMessage(t *testing.T) {
 
 func TestInvalidIdentityMessage(t *testing.T) {
 	registerInvalidMessage := ConstructIdentityMessage(3, []byte("acknowledgeIdentityMsgPayload"))
+	registerInvalidMessagePayload, err := GetIdentityMessagePayload(registerInvalidMessage)
+	if err != nil {
+		t.Errorf("Error thrown in geting message type from invalid message")
+	}
+	_ = registerInvalidMessagePayload
 	messageType, err := GetIdentityMessageType(registerInvalidMessage)
 	if err != nil {
 		t.Errorf("Error thrown in geting message type from invalid message")
