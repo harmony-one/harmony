@@ -231,7 +231,7 @@ func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 	if node.ClientPeer != nil {
 		utils.GetLogInstance().Debug("Sending new block to client", "client", node.ClientPeer)
 		if utils.UseLibP2P {
-			node.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock}))
+			node.host.SendMessageToGroups([]p2p.GroupID{node.MyShardGroupID}, proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock}))
 		} else {
 			node.SendMessage(*node.ClientPeer, proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock}))
 		}
@@ -387,12 +387,12 @@ func (node *Node) SendPongMessage() {
 					pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys, node.Consensus.Leader.PubKey)
 					buffer := pong.ConstructPongMessage()
 					content := host.ConstructP2pMessage(byte(0), buffer)
-					err := node.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, content)
+					err := node.host.SendMessageToGroups([]p2p.GroupID{node.MyShardGroupID}, content)
 					if err != nil {
-						utils.GetLogInstance().Error("[PONG] failed to send pong message", "group", p2p.GroupIDBeacon)
+						utils.GetLogInstance().Error("[PONG] failed to send pong message", "group", node.MyShardGroupID)
 						continue
 					} else {
-						utils.GetLogInstance().Info("[PONG] sent pong message to", "group", p2p.GroupIDBeacon)
+						utils.GetLogInstance().Info("[PONG] sent pong message to", "group", node.MyShardGroupID)
 					}
 					sentMessage = true
 					// stop sending ping message
@@ -468,6 +468,9 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 	}
 
 	// Stop discovery service after received pong message
-	node.serviceManager.TakeAction(&service.Action{Action: service.Stop, ServiceType: service.PeerDiscovery})
+	data := make(map[string]interface{})
+	data["peer"] = p2p.GroupAction{Name: node.MyShardGroupID, Action: p2p.ActionPause}
+
+	node.serviceManager.TakeAction(&service.Action{Action: service.Notify, ServiceType: service.PeerDiscovery, Params: data})
 	return node.Consensus.UpdatePublicKeys(publicKeys)
 }

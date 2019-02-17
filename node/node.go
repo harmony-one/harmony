@@ -201,6 +201,9 @@ type Node struct {
 
 	// Channel to notify consensus service to really start consensus
 	startConsensus chan struct{}
+
+	// My GroupID
+	MyShardGroupID p2p.GroupID
 }
 
 // Blockchain returns the blockchain from node
@@ -731,7 +734,7 @@ func (node *Node) setupForShardLeader() {
 	// Register peer discovery service. No need to do staking for beacon chain node.
 	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
 	// Register networkinfo service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, "0", chanPeer))
+	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
 
 	// Register explorer service.
 	node.serviceManager.RegisterService(service_manager.SupportExplorer, explorer.New(&node.SelfPeer))
@@ -766,7 +769,7 @@ func (node *Node) setupForShardValidator() {
 	// Register peer discovery service. "0" is the beacon shard ID. No need to do staking for beacon chain node.
 	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
 	// Register networkinfo service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, "0", chanPeer))
+	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
 
 }
 
@@ -855,7 +858,7 @@ func (node *Node) setupForNewNode() {
 	// Register peer discovery service. "0" is the beacon shard ID
 	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
 	// Register networkinfo service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, "0", chanPeer))
+	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
 
 	// TODO: how to restart networkinfo and discovery service after receiving shard id info from beacon chain?
 }
