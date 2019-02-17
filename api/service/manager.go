@@ -14,6 +14,7 @@ type ActionType byte
 const (
 	Start ActionType = iota
 	Stop
+	Notify
 )
 
 // Type is service type.
@@ -73,13 +74,14 @@ const (
 type Action struct {
 	Action      ActionType
 	ServiceType Type
-	params      map[string]interface{}
+	Params      map[string]interface{}
 }
 
 // Interface is the collection of functions any service needs to implement.
 type Interface interface {
 	StartService()
 	StopService()
+	NotifyService(map[string]interface{})
 }
 
 // Manager stores all services for service manager.
@@ -136,6 +138,9 @@ func (m *Manager) TakeAction(action *Action) {
 		case Stop:
 			fmt.Printf("Stop %s\n", action.ServiceType)
 			service.StopService()
+		case Notify:
+			fmt.Printf("Pause %s\n", action.ServiceType)
+			service.NotifyService(action.Params)
 		}
 	}
 }

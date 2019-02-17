@@ -34,3 +34,8 @@ func (s *Service) StopService() {
 	<-s.stoppedChan
 	utils.GetLogInstance().Info("Consensus service stopped.")
 }
+
+// NotifyService notify service
+func (s *Service) NotifyService(params map[string]interface{}) {
+	return
+}

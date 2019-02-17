@@ -19,7 +19,7 @@ import (
 // Service is the network info service.
 type Service struct {
 	Host        p2p.Host
-	Rendezvous  string
+	Rendezvous  p2p.GroupID
 	dht         *libp2pdht.IpfsDHT
 	ctx         context.Context
 	cancel      context.CancelFunc
@@ -31,7 +31,7 @@ type Service struct {
 }
 
 // New returns role conversion service.
-func New(h p2p.Host, rendezvous string, peerChan chan p2p.Peer) *Service {
+func New(h p2p.Host, rendezvous p2p.GroupID, peerChan chan p2p.Peer) *Service {
 	timeout := 30 * time.Minute
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	dht, err := libp2pdht.New(ctx, h.GetP2PHost())
@@ -86,7 +86,7 @@ func (s *Service) Init() error {
 	// We use a rendezvous point "shardID" to announce our location.
 	utils.GetLogInstance().Info("Announcing ourselves...")
 	s.discovery = libp2pdis.NewRoutingDiscovery(s.dht)
-	libp2pdis.Advertise(s.ctx, s.discovery, s.Rendezvous)
+	libp2pdis.Advertise(s.ctx, s.discovery, string(s.Rendezvous))
 	utils.GetLogInstance().Info("Successfully announced!")
 
 	return nil
@@ -96,7 +96,7 @@ func (s *Service) Init() error {
 func (s *Service) Run() {
 	defer close(s.stoppedChan)
 	var err error
-	s.peerInfo, err = s.discovery.FindPeers(s.ctx, s.Rendezvous)
+	s.peerInfo, err = s.discovery.FindPeers(s.ctx, string(s.Rendezvous))
 	if err != nil {
 		utils.GetLogInstance().Error("FindPeers", "error", err)
 	}
@@ -149,4 +149,9 @@ func (s *Service) StopService() {
 	s.stopChan <- struct{}{}
 	<-s.stoppedChan
 	utils.GetLogInstance().Info("Network info service stopped.")
+}
+
+// NotifyService notify service
+func (s *Service) NotifyService(params map[string]interface{}) {
+	return
 }

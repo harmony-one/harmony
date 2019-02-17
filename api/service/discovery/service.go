@@ -3,9 +3,9 @@ package discovery
 import (
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 
@@ -26,12 +26,12 @@ type Service struct {
 // h is the p2p host
 // config is the node config
 // (TODO: leo, build two overlays of network)
-func New(h p2p.Host, config service.NodeConfig, peerChan chan p2p.Peer, actionChan chan p2p.GroupAction) *Service {
+func New(h p2p.Host, config service.NodeConfig, peerChan chan p2p.Peer) *Service {
 	return &Service{
 		host:       h,
 		peerChan:   peerChan,
 		stopChan:   make(chan struct{}),
-		actionChan: actionChan,
+		actionChan: make(chan p2p.GroupAction),
 		config:     config,
 		actions:    make(map[p2p.GroupID]p2p.ActionType),
 	}
@@ -39,16 +39,29 @@ func New(h p2p.Host, config service.NodeConfig, peerChan chan p2p.Peer, actionCh
 
 // StartService starts discovery service.
 func (s *Service) StartService() {
-	log.Info("Starting discovery service.")
+	utils.GetLogInstance().Info("Starting discovery service.")
 	s.Init()
 	s.Run()
 }
 
 // StopService shutdowns discovery service.
 func (s *Service) StopService() {
-	log.Info("Shutting down discovery service.")
+	utils.GetLogInstance().Info("Shutting down discovery service.")
 	s.stopChan <- struct{}{}
-	log.Info("discovery service stopped.")
+	utils.GetLogInstance().Info("discovery service stopped.")
+}
+
+// NotifyService receives notification from service manager
+func (s *Service) NotifyService(params map[string]interface{}) {
+	data := params["peer"]
+	action, ok := data.(p2p.GroupAction)
+	if !ok {
+		utils.GetLogInstance().Error("Wrong data type passed to NotifyService")
+		return
+	}
+
+	utils.GetLogInstance().Info("[DISCOVERY]", "got notified", action)
+	s.actionChan <- action
 }
 
 // Run is the main function of the service
@@ -69,15 +82,15 @@ func (s *Service) contactP2pPeers() {
 		select {
 		case peer, ok := <-s.peerChan:
 			if !ok {
-				log.Debug("end of info", "peer", peer.PeerID)
+				utils.GetLogInstance().Debug("end of info", "peer", peer.PeerID)
 				break
 			}
 			s.host.AddPeer(&peer)
 			// Add to outgoing peer list
 			//s.host.AddOutgoingPeer(peer)
-			log.Debug("[DISCOVERY]", "add outgoing peer", peer)
+			utils.GetLogInstance().Debug("[DISCOVERY]", "add outgoing peer", peer)
 		case <-s.stopChan:
-			log.Debug("[DISCOVERY] stop pinging ...")
+			utils.GetLogInstance().Debug("[DISCOVERY] stop pinging ...")
 			return
 		case action := <-s.actionChan:
 			s.config.Actions[action.Name] = action.Action
@@ -107,7 +120,7 @@ func (s *Service) contactP2pPeers() {
 					}
 				}
 				if err != nil {
-					log.Error("Failed to send ping message", "group", s.config.Beacon)
+					utils.GetLogInstance().Error("Failed to send ping message", "group", s.config.Beacon)
 				}
 			}
 		}
@@ -116,5 +129,5 @@ func (s *Service) contactP2pPeers() {
 
 // Init is to initialize for discoveryService.
 func (s *Service) Init() {
-	log.Info("Init discovery service")
+	utils.GetLogInstance().Info("Init discovery service")
 }
