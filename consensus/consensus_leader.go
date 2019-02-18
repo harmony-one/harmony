@@ -147,6 +147,11 @@ func (consensus *Consensus) processPrepareMessage(message consensus_proto.Messag
 
 	validatorPeer := consensus.getValidatorPeerByID(validatorID)
 
+	if validatorPeer == nil {
+		utils.GetLogInstance().Error("Invalid validator", "validatorID", validatorID)
+		return
+	}
+
 	if err := consensus.checkConsensusMessage(message, validatorPeer.PubKey); err != nil {
 		utils.GetLogInstance().Debug("Failed to check the validator message", "validatorID", validatorID)
 		return
@@ -213,6 +218,11 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 	defer consensus.mutex.Unlock()
 
 	validatorPeer := consensus.getValidatorPeerByID(validatorID)
+
+	if validatorPeer == nil {
+		utils.GetLogInstance().Error("Invalid validator", "validatorID", validatorID)
+		return
+	}
 
 	if err := consensus.checkConsensusMessage(message, validatorPeer.PubKey); err != nil {
 		utils.GetLogInstance().Debug("Failed to check the validator message", "validatorID", validatorID)
