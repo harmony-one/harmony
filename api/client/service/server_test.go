@@ -3,11 +3,13 @@ package client
 import (
 	"bytes"
 	"math/big"
+	"strings"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	client "github.com/harmony-one/harmony/api/client/service/proto"
+	proto "github.com/harmony-one/harmony/api/client/service/proto"
 	"github.com/harmony-one/harmony/core/state"
 
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -81,5 +83,50 @@ func TestFetchAccountState(test *testing.T) {
 
 	if response.Nonce != 0 {
 		test.Errorf("Wrong nonce is returned")
+	}
+}
+
+func TestGetStakingContractInfo(test *testing.T) {
+	var (
+		database = ethdb.NewMemDatabase()
+		gspec    = core.Genesis{
+			Config:  chainConfig,
+			Alloc:   core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
+			ShardID: 10,
+		}
+	)
+
+	genesis := gspec.MustCommit(database)
+	_ = genesis
+	chain, _ := core.NewBlockChain(database, nil, gspec.Config, consensus.NewFaker(), vm.Config{}, nil)
+
+	hash := common.Hash{}
+	hash.SetBytes([]byte("hello"))
+	deployedStakingContractAddress := common.Address{}
+	deployedStakingContractAddress.SetBytes([]byte("stakingContractAddress"))
+	server := NewServer(func() (*state.DB, error) {
+		return chain.State()
+	}, func(common.Address) common.Hash {
+		return hash
+	}, func() common.Address {
+		return deployedStakingContractAddress
+	})
+
+	response, err := server.GetStakingContractInfo(nil, &proto.StakingContractInfoRequest{Address: testBankAddress.Bytes()})
+
+	if bytes.Compare(response.Balance, testBankFunds.Bytes()) != 0 {
+		test.Errorf("Wrong balance is returned")
+	}
+
+	if strings.Compare(response.ContractAddress, deployedStakingContractAddress.String()) != 0 {
+		test.Errorf("Wrong ContractAddress is returned")
+	}
+
+	if response.Nonce != 0 {
+		test.Errorf("Wrong nonce is returned")
+	}
+
+	if err != nil {
+		test.Errorf("Failed to get free token")
 	}
 }
