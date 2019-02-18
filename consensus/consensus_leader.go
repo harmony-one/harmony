@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"encoding/binary"
 	"encoding/hex"
 	"strconv"
 	"time"
@@ -61,7 +62,7 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan *types.Block, stop
 					vrfBitmap.SetMask(bitmap)
 
 					// TODO: check validity of pRnd
-					_ = pRnd
+					newBlock.AddRandPreimage(binary.BigEndian.Uint32(pRnd))
 				}
 				startTime = time.Now()
 				utils.GetLogInstance().Debug("STARTING CONSENSUS", "numTxs", len(newBlock.Transactions()), "consensus", consensus, "startTime", startTime, "publicKeys", len(consensus.PublicKeys))
