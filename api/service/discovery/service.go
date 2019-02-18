@@ -97,7 +97,15 @@ func (s *Service) contactP2pPeers() {
 		case <-tick.C:
 			var err error
 			for g, a := range s.config.Actions {
-				if a == p2p.ActionStart || a == p2p.ActionResume {
+				if a == p2p.ActionPause {
+					// Recived Pause Message, to reduce the frequency of ping message to every 1 minute
+					// TODO (leo) use different timer tick for different group, mainly differentiate beacon and regular shards
+					// beacon ping could be less frequent than regular shard
+					tick.Stop()
+					tick = time.NewTicker(1 * time.Minute)
+				}
+
+				if a == p2p.ActionStart || a == p2p.ActionResume || a == p2p.ActionPause {
 					if g == p2p.GroupIDBeacon {
 						if s.config.IsBeacon {
 							// beacon chain node
@@ -107,6 +115,7 @@ func (s *Service) contactP2pPeers() {
 							err = s.host.SendMessageToGroups([]p2p.GroupID{s.config.Beacon}, clientMsgBuf)
 						}
 					} else {
+						// The following logical will be used for 2nd stage peer discovery process
 						if s.config.Group == p2p.GroupIDUnknown {
 							continue
 						}
@@ -118,9 +127,11 @@ func (s *Service) contactP2pPeers() {
 							err = s.host.SendMessageToGroups([]p2p.GroupID{s.config.Group}, regMsgBuf)
 						}
 					}
-				}
-				if err != nil {
-					utils.GetLogInstance().Error("Failed to send ping message", "group", s.config.Beacon)
+					if err != nil {
+						utils.GetLogInstance().Error("Failed to send ping message", "group", g)
+					} else {
+						utils.GetLogInstance().Info("[DISCOVERY]", "Sent Ping Message", g)
+					}
 				}
 			}
 		}

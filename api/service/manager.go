@@ -139,7 +139,7 @@ func (m *Manager) TakeAction(action *Action) {
 			fmt.Printf("Stop %s\n", action.ServiceType)
 			service.StopService()
 		case Notify:
-			fmt.Printf("Pause %s\n", action.ServiceType)
+			fmt.Printf("Notify %s\n", action.ServiceType)
 			service.NotifyService(action.Params)
 		}
 	}
