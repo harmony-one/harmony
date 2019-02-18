@@ -23,14 +23,16 @@ esac
 . "${progdir}/setup_bls_build_flags.sh"
 
 declare -A LIB
-LIB[libbls384.so]=${BLS_DIR}/lib/libbls384.so
-LIB[libmcl.so]=${MCL_DIR}/lib/libmcl.so
 
 if [ "$(uname -s)" == "Darwin" ]; then
    MD5='md5 -r'
    GOOS=darwin
+   LIB[libbls384.dylib]=${BLS_DIR}/lib/libbls384.dylib
+   LIB[libmcl.dylib]=${MCL_DIR}/lib/libmcl.dylib
 else
    MD5=md5sum
+   LIB[libbls384.so]=${BLS_DIR}/lib/libbls384.so
+   LIB[libmcl.so]=${MCL_DIR}/lib/libmcl.so
 fi
 
 function usage
@@ -134,9 +136,11 @@ function upload_wallet
 
    case "$OS" in
       "Linux")
-         DEST=wallet/wallet ;;
+         DEST=wallet/wallet
+         DESTDIR=wallet ;;
       "Darwin")
-         DEST=wallet.osx/wallet ;;
+         DEST=wallet.osx/wallet
+         DESTDIR=wallet.osx ;;
       *)
          echo "Unsupported OS: $OS"
          return ;;
@@ -144,6 +148,16 @@ function upload_wallet
 
    $AWSCLI s3 cp $BINDIR/wallet s3://$PUBBUCKET/$DEST
    $AWSCLI s3api put-object-acl --bucket $PUBBUCKET --key $DEST --acl public-read
+
+   for lib in "${!LIB[@]}"; do
+      if [ -e ${LIB[$lib]} ]; then
+         $AWSCLI s3 cp ${LIB[$lib]} s3://${PUBBUCKET}/$DESTDIR/$lib --acl public-read
+      else
+         echo "!! MISSING $lib !!"
+      fi
+   done
+
+
 }
 
 ################################ MAIN FUNCTION ##############################
