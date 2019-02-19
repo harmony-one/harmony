@@ -2,6 +2,10 @@ package drand
 
 import (
 	"bytes"
+	"encoding/binary"
+	"fmt"
+
+	"github.com/harmony-one/harmony/crypto/vdf"
 
 	protobuf "github.com/golang/protobuf/proto"
 	drand_proto "github.com/harmony-one/harmony/api/drand"
@@ -10,6 +14,10 @@ import (
 	"github.com/harmony-one/harmony/crypto/vrf/p256"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p/host"
+)
+
+const (
+	vdfDifficulty = 10000000
 )
 
 // WaitForEpochBlock waits for the first epoch block to run DRG on
@@ -23,6 +31,26 @@ func (dRand *DRand) WaitForEpochBlock(blockChannel chan *types.Block, stopChan c
 				newBlock := <-blockChannel
 				if core.IsEpochLastBlock(newBlock) {
 					dRand.init(newBlock)
+				}
+				if core.IsEpochBlock(newBlock) && newBlock.Header().RandPreimage != 0 {
+					// The epoch block should contain the randomness preimage pRnd
+					go func() {
+						input := [32]byte{}
+						binary.BigEndian.PutUint32(input[:], newBlock.Header().RandPreimage)
+
+						vdf := vdf.New(vdfDifficulty, input)
+						outputChannel := vdf.GetOutputChannel()
+						vdf.Execute()
+						output := <-outputChannel
+						rndBytes := [64]byte{}
+						copy(rndBytes[:32], output[:])
+						fmt.Println("TESTTEST")
+						fmt.Println(rndBytes)
+						blockHash := newBlock.Hash()
+						copy(rndBytes[32:], blockHash[:])
+						fmt.Println(rndBytes)
+						dRand.RndChannel <- rndBytes
+					}()
 				}
 			case <-stopChan:
 				return

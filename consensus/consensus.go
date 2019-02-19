@@ -99,6 +99,8 @@ type Consensus struct {
 
 	// Channel for DRG protocol to send pRnd (preimage of randomness resulting from combined vrf randomnesses) to consensus. The first 32 bytes are randomness, the rest is for bitmap.
 	PRndChannel chan []byte
+	// Channel for DRG protocol to send the final randomness to consensus. The first 32 bytes are the randomness and the last 32 bytes are the hash of the block where the corresponding pRnd was generated
+	RndChannel chan [64]byte
 
 	uniqueIDInstance *utils.UniqueValidatorID
 
@@ -220,6 +222,11 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Cons
 // RegisterPRndChannel registers the channel for receiving randomness preimage from DRG protocol
 func (consensus *Consensus) RegisterPRndChannel(pRndChannel chan []byte) {
 	consensus.PRndChannel = pRndChannel
+}
+
+// RegisterRndChannel registers the channel for receiving final randomness from DRG protocol
+func (consensus *Consensus) RegisterRndChannel(rndChannel chan [64]byte) {
+	consensus.RndChannel = rndChannel
 }
 
 // Checks the basic meta of a consensus message, including the signature.

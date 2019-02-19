@@ -15,6 +15,20 @@ type VDF struct {
 	finished   bool
 }
 
+// New create a new instance of VDF.
+func New(difficulty int, input [32]byte) *VDF {
+	return &VDF{
+		difficulty: difficulty,
+		input:      input,
+		outputChan: make(chan [32]byte),
+	}
+}
+
+// GetOutputChannel returns the vdf output channel.
+func (vdf *VDF) GetOutputChannel() chan [32]byte {
+	return vdf.outputChan
+}
+
 // Execute runs the VDF until it's finished and put the result into output channel.
 func (vdf *VDF) Execute() {
 	vdf.finished = false

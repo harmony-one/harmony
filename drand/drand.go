@@ -28,6 +28,7 @@ type DRand struct {
 	rand                  *[32]byte
 	ConfirmedBlockChannel chan *types.Block // Channel to receive confirmed blocks
 	PRndChannel           chan []byte       // Channel to send pRnd (preimage of randomness resulting from combined vrf randomnesses) to consensus. The first 32 bytes are randomness, the rest is for bitmap.
+	RndChannel            chan [64]byte     // Channel for DRG protocol to send the final randomness to consensus. The first 32 bytes are the randomness and the last 32 bytes are the hash of the block where the corresponding pRnd was generated
 
 	// global consensus mutex
 	mutex sync.Mutex
@@ -77,6 +78,7 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer, confi
 	}
 
 	dRand.PRndChannel = make(chan []byte)
+	dRand.RndChannel = make(chan [64]byte)
 
 	selfPeer := host.GetSelfPeer()
 	if leader.Port == selfPeer.Port && leader.IP == selfPeer.IP {
