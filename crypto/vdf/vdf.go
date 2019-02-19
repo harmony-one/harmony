@@ -11,14 +11,28 @@ type VDF struct {
 	difficulty int
 	input      [32]byte
 	output     [32]byte
-	finished   chan [32]byte
+	outputChan chan [32]byte
+	finished   bool
 }
 
-func (vdf *VDF) execute() {
+// Execute runs the VDF until it's finished and put the result into output channel.
+func (vdf *VDF) Execute() {
+	vdf.finished = false
 	tempResult := vdf.input
 	for i := 0; i < vdf.difficulty; i++ {
 		tempResult = sha3.Sum256(tempResult[:])
 	}
 	vdf.output = tempResult
-	vdf.finished <- vdf.output
+	vdf.outputChan <- vdf.output
+	vdf.finished = true
+}
+
+// IsFinished returns whether the vdf execution is finished or not.
+func (vdf *VDF) IsFinished() bool {
+	return vdf.finished
+}
+
+// GetOutput returns the vdf output, which can be bytes of 0s is the vdf is not finished.
+func (vdf *VDF) GetOutput() [32]byte {
+	return vdf.output
 }
