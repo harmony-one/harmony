@@ -31,13 +31,17 @@ var (
 
 // WaitForNewBlock waits for the next new block to run consensus on
 func (consensus *Consensus) WaitForNewBlock(blockChannel chan *types.Block, stopChan chan struct{}, stoppedChan chan struct{}, startChannel chan struct{}) {
+	first := true
 	go func() {
 		defer close(stoppedChan)
 		for {
 			select {
 			default:
-				// got the signal to start consensus
-				_ = <-startChannel
+				if first {
+					// got the signal to start consensus
+					_ = <-startChannel
+					first = false
+				}
 
 				utils.GetLogInstance().Debug("Waiting for block", "consensus", consensus)
 				// keep waiting for new blocks

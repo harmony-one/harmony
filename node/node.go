@@ -235,7 +235,7 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int) types.Transactions {
 
 	utils.GetLogInstance().Debug("Invalid transactions discarded", "number", len(invalid))
 	node.pendingTransactions = unselected
-	utils.GetLogInstance().Debug("Remaining pending transactions", "number", len(node.pendingTransactions))
+	utils.GetLogInstance().Debug("Remaining pending transactions", "number", len(node.pendingTransactions), "selected", len(selected))
 	node.pendingTxMutex.Unlock()
 	return selected
 }
@@ -859,7 +859,7 @@ func (node *Node) setupForBeaconValidator() {
 }
 
 func (node *Node) setupForNewNode() {
-	chanPeer := make(chan p2p.Peer)
+	//	chanPeer := make(chan p2p.Peer)
 	//	stakingPeer := make(chan p2p.Peer)
 
 	nodeConfig := service.NodeConfig{
@@ -884,7 +884,7 @@ func (node *Node) setupForNewNode() {
 	// Register peer discovery service. "0" is the beacon shard ID
 	// node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
 	// Register networkinfo service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
+	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, nil))
 
 	// TODO: how to restart networkinfo and discovery service after receiving shard id info from beacon chain?
 }
