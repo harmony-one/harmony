@@ -82,9 +82,7 @@ func main() {
 		utils.BootNodes = bootNodeAddrs
 	}
 
-	var shardIDLeaderMap map[uint32]p2p.Peer = make(map[uint32]p2p.Peer)
-	shardIDLeaderMap[0] = p2p.Peer{}
-
+	var shardIDLeaderMap map[uint32]p2p.Peer
 	nodePriKey, _, err := utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
 		panic(err)
@@ -127,6 +125,8 @@ func main() {
 
 		debugPrintShardIDLeaderMap(shardIDLeaderMap)
 	} else {
+		shardIDLeaderMap = make(map[uint32]p2p.Peer)
+		shardIDLeaderMap[0] = p2p.Peer{}
 		utils.UseLibP2P = true
 	}
 

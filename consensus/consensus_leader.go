@@ -37,7 +37,7 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan *types.Block, stop
 		for {
 			select {
 			default:
-				if first {
+				if first && startChannel != nil {
 					// got the signal to start consensus
 					_ = <-startChannel
 					first = false
