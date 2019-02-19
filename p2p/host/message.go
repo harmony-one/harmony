@@ -27,7 +27,7 @@ func BroadcastMessage(h p2p.Host, peers []p2p.Peer, msg []byte, lostPeer chan p2
 	length := len(content)
 
 	//	log.Info("Start Broadcasting", "gomaxprocs", runtime.GOMAXPROCS(0), "Size", length)
-	start := time.Now()
+	//	start := time.Now()
 	for _, peer := range peers {
 		peerCopy := peer
 		go send(h, peerCopy, content, lostPeer)
