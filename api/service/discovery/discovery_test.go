@@ -3,15 +3,16 @@ package discovery
 import (
 	"testing"
 
+	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 )
 
 var (
-	ip      = "127.0.0.1"
-	port    = "7099"
-	service *Service
+	ip       = "127.0.0.1"
+	port     = "7099"
+	dService *Service
 )
 
 func TestDiscoveryService(t *testing.T) {
@@ -23,9 +24,11 @@ func TestDiscoveryService(t *testing.T) {
 		t.Fatalf("unable to new host in harmony: %v", err)
 	}
 
-	service = New(host, "rendezvous", nil, nil)
+	config := service.NodeConfig{}
 
-	if service == nil {
+	dService = New(host, config, nil)
+
+	if dService == nil {
 		t.Fatalf("unable to create new discovery service")
 	}
 }

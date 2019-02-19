@@ -12,18 +12,19 @@ type Service struct {
 	consensus    *consensus.Consensus
 	stopChan     chan struct{}
 	stoppedChan  chan struct{}
+	startChan    chan struct{}
 }
 
 // New returns consensus service.
-func New(blockChannel chan *types.Block, consensus *consensus.Consensus) *Service {
-	return &Service{blockChannel: blockChannel, consensus: consensus}
+func New(blockChannel chan *types.Block, consensus *consensus.Consensus, startChan chan struct{}) *Service {
+	return &Service{blockChannel: blockChannel, consensus: consensus, startChan: startChan}
 }
 
 // StartService starts consensus service.
 func (s *Service) StartService() {
 	s.stopChan = make(chan struct{})
 	s.stoppedChan = make(chan struct{})
-	s.consensus.WaitForNewBlock(s.blockChannel, s.stopChan, s.stoppedChan)
+	s.consensus.WaitForNewBlock(s.blockChannel, s.stopChan, s.stoppedChan, s.startChan)
 }
 
 // StopService stops consensus service.
@@ -32,4 +33,9 @@ func (s *Service) StopService() {
 	s.stopChan <- struct{}{}
 	<-s.stoppedChan
 	utils.GetLogInstance().Info("Consensus service stopped.")
+}
+
+// NotifyService notify service
+func (s *Service) NotifyService(params map[string]interface{}) {
+	return
 }

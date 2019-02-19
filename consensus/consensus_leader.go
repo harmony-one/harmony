@@ -30,12 +30,15 @@ var (
 )
 
 // WaitForNewBlock waits for the next new block to run consensus on
-func (consensus *Consensus) WaitForNewBlock(blockChannel chan *types.Block, stopChan chan struct{}, stoppedChan chan struct{}) {
+func (consensus *Consensus) WaitForNewBlock(blockChannel chan *types.Block, stopChan chan struct{}, stoppedChan chan struct{}, startChannel chan struct{}) {
 	go func() {
 		defer close(stoppedChan)
 		for {
 			select {
 			default:
+				// got the signal to start consensus
+				_ = <-startChannel
+
 				utils.GetLogInstance().Debug("Waiting for block", "consensus", consensus)
 				// keep waiting for new blocks
 				newBlock := <-blockChannel
@@ -58,7 +61,7 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan *types.Block, stop
 					utils.GetLogInstance().Debug("[DRG] GOT pRnd", "pRnd", pRndAndBitmap)
 					pRnd := pRndAndBitmap[:32]
 					bitmap := pRndAndBitmap[32:]
-					vrfBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.PubKey)
+					vrfBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.Leader.PubKey)
 					vrfBitmap.SetMask(bitmap)
 
 					// TODO: check validity of pRnd
@@ -145,6 +148,11 @@ func (consensus *Consensus) processPrepareMessage(message consensus_proto.Messag
 
 	validatorPeer := consensus.getValidatorPeerByID(validatorID)
 
+	if validatorPeer == nil {
+		utils.GetLogInstance().Error("Invalid validator", "validatorID", validatorID)
+		return
+	}
+
 	if err := consensus.checkConsensusMessage(message, validatorPeer.PubKey); err != nil {
 		utils.GetLogInstance().Debug("Failed to check the validator message", "validatorID", validatorID)
 		return
@@ -211,6 +219,11 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 	defer consensus.mutex.Unlock()
 
 	validatorPeer := consensus.getValidatorPeerByID(validatorID)
+
+	if validatorPeer == nil {
+		utils.GetLogInstance().Error("Invalid validator", "validatorID", validatorID)
+		return
+	}
 
 	if err := consensus.checkConsensusMessage(message, validatorPeer.PubKey); err != nil {
 		utils.GetLogInstance().Debug("Failed to check the validator message", "validatorID", validatorID)
@@ -287,7 +300,7 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 		consensus.reportMetrics(blockObj)
 
 		// Dump new block into level db.
-		explorer.GetStorageInstance(consensus.leader.IP, consensus.leader.Port, true).Dump(&blockObj, consensus.consensusID)
+		explorer.GetStorageInstance(consensus.Leader.IP, consensus.Leader.Port, true).Dump(&blockObj, consensus.consensusID)
 
 		// Reset state to Finished, and clear other data.
 		consensus.ResetState()

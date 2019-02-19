@@ -3,7 +3,6 @@ package host
 import (
 	"encoding/binary"
 	"net"
-	"runtime"
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -27,13 +26,13 @@ func BroadcastMessage(h p2p.Host, peers []p2p.Peer, msg []byte, lostPeer chan p2
 	content := ConstructP2pMessage(byte(17), msg)
 	length := len(content)
 
-	log.Info("Start Broadcasting", "gomaxprocs", runtime.GOMAXPROCS(0), "Size", length)
-	start := time.Now()
+	//	log.Info("Start Broadcasting", "gomaxprocs", runtime.GOMAXPROCS(0), "Size", length)
+	//	start := time.Now()
 	for _, peer := range peers {
 		peerCopy := peer
 		go send(h, peerCopy, content, lostPeer)
 	}
-	log.Info("Broadcasting Done", "time spent(s)", time.Since(start).Seconds())
+	//	log.Info("Broadcasting Done", "time spent(s)", time.Since(start).Seconds())
 
 	// Keep track of block propagation time
 	// Assume 1M message is for block propagation
