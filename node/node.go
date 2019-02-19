@@ -9,7 +9,6 @@ import (
 	"math/big"
 	"os"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -41,7 +40,6 @@ import (
 	bft "github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
@@ -100,9 +98,6 @@ const (
 	lastMileThreshold = 4
 	inSyncThreshold   = 1
 )
-
-// TotalInitFund is the initial total fund to the faucet.
-const TotalInitFund = 9000000
 
 const (
 	waitBeforeJoinShard = time.Second * 3
@@ -272,41 +267,23 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 		// Consensus and associated channel to communicate blocks
 		node.Consensus = consensus
 
-		// Initialize genesis block and blockchain
-		genesisAlloc := node.CreateGenesisAllocWithTestingAddresses(100)
-		contractKey, _ := ecdsa.GenerateKey(crypto.S256(), strings.NewReader("Test contract key string stream that is fixed so that generated test key are deterministic every time"))
-		contractAddress := crypto.PubkeyToAddress(contractKey.PublicKey)
-		contractFunds := big.NewInt(TotalInitFund)
-		contractFunds = contractFunds.Mul(contractFunds, big.NewInt(params.Ether))
-		genesisAlloc[contractAddress] = core.GenesisAccount{Balance: contractFunds}
-		node.ContractKeys = append(node.ContractKeys, contractKey)
-
+		// Init db.
 		database := db
 		if database == nil {
 			database = ethdb.NewMemDatabase()
 		}
 
-		chainConfig := params.TestChainConfig
-		chainConfig.ChainID = big.NewInt(int64(node.Consensus.ShardID)) // Use ChainID as piggybacked ShardID
-		gspec := core.Genesis{
-			Config:  chainConfig,
-			Alloc:   genesisAlloc,
-			ShardID: uint32(node.Consensus.ShardID),
+		chain, err := node.GenesisSetup(database)
+		if err != nil {
+			utils.GetLogInstance().Error("Error when doing genesis setup")
+			os.Exit(1)
 		}
-
-		_ = gspec.MustCommit(database)
-		chain, _ := core.NewBlockChain(database, nil, gspec.Config, node.Consensus, vm.Config{}, nil)
 		node.blockchain = chain
 		node.BlockChannel = make(chan *types.Block)
 		node.ConfirmedBlockChannel = make(chan *types.Block)
 
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, params.TestChainConfig, chain)
 		node.Worker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey), node.Consensus.ShardID)
-		node.AddFaucetContractToPendingTransactions()
-		if node.Role == BeaconLeader {
-			node.AddStakingContractToPendingTransactions() //This will save the latest information about staked nodes in current staked
-			node.DepositToFakeAccounts()
-		}
 		if node.Role == BeaconLeader || node.Role == BeaconValidator {
 			node.CurrentStakes = make(map[common.Address]int64)
 		}
