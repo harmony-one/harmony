@@ -19,7 +19,6 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/api/proto/node"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 )
 
@@ -31,9 +30,10 @@ type PingMessageType struct {
 
 // PongMessageType defines the data structure of the Pong message
 type PongMessageType struct {
-	Version uint16 // version of the protocol
-	Peers   []node.Info
-	PubKeys [][]byte // list of publickKeys, has to be identical among all validators/leaders
+	Version      uint16 // version of the protocol
+	Peers        []node.Info
+	PubKeys      [][]byte // list of publickKeys, has to be identical among all validators/leaders
+	LeaderPubKey []byte   // public key of shard leader
 }
 
 func (p PingMessageType) String() string {
@@ -41,7 +41,7 @@ func (p PingMessageType) String() string {
 }
 
 func (p PongMessageType) String() string {
-	str := fmt.Sprintf("pong:%v=>length:%v, keys:%v\n", p.Version, len(p.Peers), len(p.PubKeys))
+	str := fmt.Sprintf("pong:%v=>length:%v, keys:%v, leader:%v\n", p.Version, len(p.Peers), len(p.PubKeys), len(p.LeaderPubKey))
 	return str
 }
 
@@ -61,7 +61,7 @@ func NewPingMessage(peer p2p.Peer) *PingMessageType {
 }
 
 // NewPongMessage creates a new Pong message based on a list of p2p.Peer and a list of publicKeys
-func NewPongMessage(peers []p2p.Peer, pubKeys []*bls.PublicKey) *PongMessageType {
+func NewPongMessage(peers []p2p.Peer, pubKeys []*bls.PublicKey, leaderKey *bls.PublicKey) *PongMessageType {
 	pong := new(PongMessageType)
 	pong.PubKeys = make([][]byte, 0)
 
@@ -89,7 +89,8 @@ func NewPongMessage(peers []p2p.Peer, pubKeys []*bls.PublicKey) *PongMessageType
 		pong.PubKeys = append(pong.PubKeys, key)
 	}
 
-	utils.GetLogInstance().Info("[pong message]", "keys", len(pong.PubKeys), "peers", len(pong.Peers))
+	pong.LeaderPubKey = leaderKey.Serialize()
+	//	utils.GetLogInstance().Info("[pong message]", "keys", len(pong.PubKeys), "peers", len(pong.Peers), "leader", len(pong.LeaderPubKey))
 
 	return pong
 }

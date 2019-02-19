@@ -244,3 +244,8 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 	data.Address = address
 	json.NewEncoder(w).Encode(data.Address)
 }
+
+// NotifyService notify service
+func (s *Service) NotifyService(params map[string]interface{}) {
+	return
+}

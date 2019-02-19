@@ -255,13 +255,14 @@ func main() {
 		} else {
 			currentNode.Role = node.BeaconValidator
 		}
-
+		currentNode.MyShardGroupID = p2p.GroupIDBeacon
 	} else {
 		if role == "leader" {
 			currentNode.Role = node.ShardLeader
 		} else {
 			currentNode.Role = node.ShardValidator
 		}
+		currentNode.MyShardGroupID = p2p.GroupIDUnknown
 	}
 
 	// Add randomness protocol

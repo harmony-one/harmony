@@ -31,7 +31,7 @@ func TestNew(test *testing.T) {
 		test.Error("Consensus ReadySignal should be initialized")
 	}
 
-	if consensus.leader.IP != leader.IP || consensus.leader.Port != leader.Port {
+	if consensus.Leader.IP != leader.IP || consensus.Leader.Port != leader.Port {
 		test.Error("Consensus Leader is set to wrong Peer")
 	}
 }

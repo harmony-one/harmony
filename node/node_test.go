@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/drand"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -148,7 +149,10 @@ func sendPongMessage(node *Node, leader p2p.Peer) {
 		PubKey: pubKey2,
 	}
 
-	pong1 := proto_discovery.NewPongMessage([]p2p.Peer{p1, p2}, nil)
+	pubKeys := []*bls.PublicKey{pubKey1, pubKey2}
+	leaderPubKey := pki.GetBLSPrivateKeyFromInt(888).GetPublicKey()
+
+	pong1 := proto_discovery.NewPongMessage([]p2p.Peer{p1, p2}, pubKeys, leaderPubKey)
 	buf1 := pong1.ConstructPongMessage()
 
 	fmt.Println("waiting for 10 seconds ...")

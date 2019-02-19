@@ -43,3 +43,8 @@ func (sc *Service) StartService() {
 func (sc *Service) StopService() {
 	sc.grpcServer.Stop()
 }
+
+// NotifyService notify service
+func (sc *Service) NotifyService(params map[string]interface{}) {
+	return
+}

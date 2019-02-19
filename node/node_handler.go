@@ -231,7 +231,7 @@ func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 	if node.ClientPeer != nil {
 		utils.GetLogInstance().Debug("Sending new block to client", "client", node.ClientPeer)
 		if utils.UseLibP2P {
-			node.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock}))
+			node.host.SendMessageToGroups([]p2p.GroupID{node.MyShardGroupID}, proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock}))
 		} else {
 			node.SendMessage(*node.ClientPeer, proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock}))
 		}
@@ -261,6 +261,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) bool {
 // 2. [leader] send new block to the client
 func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 	if node.Role == BeaconLeader || node.Role == BeaconValidator {
+		utils.GetLogInstance().Info("PostConsensusProcessing", "newBlock", newBlock)
 		node.UpdateStakingList(newBlock)
 	}
 	if node.Consensus.IsLeader {
@@ -338,7 +339,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 	// This is the old way of broadcasting pong message
 	if node.Consensus.IsLeader && !utils.UseLibP2P {
 		peers := node.Consensus.GetValidatorPeers()
-		pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys)
+		pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys, node.Consensus.Leader.PubKey)
 		buffer := pong.ConstructPongMessage()
 
 		// Send a Pong message directly to the sender
@@ -386,19 +387,20 @@ func (node *Node) SendPongMessage() {
 			} else {
 				// stable number of peers/pubkeys, sent the pong message
 				if !sentMessage {
-					pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys)
+					pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys, node.Consensus.Leader.PubKey)
 					buffer := pong.ConstructPongMessage()
 					content := host.ConstructP2pMessage(byte(0), buffer)
-					err := node.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, content)
+					err := node.host.SendMessageToGroups([]p2p.GroupID{node.MyShardGroupID}, content)
 					if err != nil {
-						utils.GetLogInstance().Error("[PONG] failed to send pong message", "group", p2p.GroupIDBeacon)
+						utils.GetLogInstance().Error("[PONG] failed to send pong message", "group", node.MyShardGroupID)
 						continue
 					} else {
-						utils.GetLogInstance().Info("[PONG] sent pong message to", "group", p2p.GroupIDBeacon)
+						utils.GetLogInstance().Info("[PONG] sent pong message to", "group", node.MyShardGroupID)
 					}
 					sentMessage = true
 					// stop sending ping message
 					node.serviceManager.TakeAction(&service.Action{Action: service.Stop, ServiceType: service.PeerDiscovery})
+					node.startConsensus <- struct{}{}
 				}
 			}
 			numPeers = numPeersNow
@@ -436,6 +438,12 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		node.AddPeers(peers)
 	}
 
+	node.Consensus.Leader.PubKey = &bls.PublicKey{}
+	err = node.Consensus.Leader.PubKey.Deserialize(pong.LeaderPubKey)
+	if err != nil {
+		utils.GetLogInstance().Error("Unmarshal Leader PubKey Failed", "error", err)
+	}
+
 	// Reset Validator PublicKeys every time we receive PONG message from Leader
 	// The PublicKeys has to be idential across the shard on every node
 	// TODO (lc): we need to handle RemovePeer situation
@@ -452,7 +460,7 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		publicKeys = append(publicKeys, &key)
 	}
 
-	utils.GetLogInstance().Debug("[pongMessageHandler]", "#keys", len(publicKeys), "#peers", len(peers))
+	//	utils.GetLogInstance().Debug("[pongMessageHandler]", "#keys", len(publicKeys), "#peers", len(peers))
 
 	if node.State == NodeWaitToJoin {
 		node.State = NodeReadyForConsensus
@@ -463,6 +471,9 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 	}
 
 	// Stop discovery service after received pong message
-	node.serviceManager.TakeAction(&service.Action{Action: service.Stop, ServiceType: service.PeerDiscovery})
+	data := make(map[string]interface{})
+	data["peer"] = p2p.GroupAction{Name: node.MyShardGroupID, Action: p2p.ActionPause}
+
+	node.serviceManager.TakeAction(&service.Action{Action: service.Notify, ServiceType: service.PeerDiscovery, Params: data})
 	return node.Consensus.UpdatePublicKeys(publicKeys)
 }

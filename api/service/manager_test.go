@@ -16,6 +16,10 @@ func (s *SupportSyncingTest) StopService() {
 	fmt.Println("SupportSyncingTest stopping")
 }
 
+func (s *SupportSyncingTest) NotifyService(data map[string]interface{}) {
+	fmt.Println("SupportSyncingTest being notified")
+}
+
 // Test TakeAction.
 func TestTakeAction(t *testing.T) {
 	m := &Manager{}

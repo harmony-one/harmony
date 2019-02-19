@@ -25,6 +25,7 @@ import (
 	clientService "github.com/harmony-one/harmony/api/client/service"
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
+	"github.com/harmony-one/harmony/api/service"
 	service_manager "github.com/harmony-one/harmony/api/service"
 	blockproposal "github.com/harmony-one/harmony/api/service/blockproposal"
 	"github.com/harmony-one/harmony/api/service/clientsupport"
@@ -198,6 +199,12 @@ type Node struct {
 
 	// Duplicated Ping Message Received
 	duplicatedPing map[string]bool
+
+	// Channel to notify consensus service to really start consensus
+	startConsensus chan struct{}
+
+	// My GroupID
+	MyShardGroupID p2p.GroupID
 }
 
 // Blockchain returns the blockchain from node
@@ -321,6 +328,8 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 	go node.ReceiveGroupMessage()
 
 	node.duplicatedPing = make(map[string]bool)
+
+	node.startConsensus = make(chan struct{})
 
 	return &node
 }
@@ -652,7 +661,7 @@ func (node *Node) UpdateStakingList(block *types.Block) error {
 	for i := range txns {
 		txn := txns[i]
 		toAddress := txn.To()
-		if *toAddress != node.StakingContractAddress { //Not a address aimed at the staking contract.
+		if toAddress != nil && *toAddress != node.StakingContractAddress { //Not a address aimed at the staking contract.
 			continue
 		}
 		currentSender, _ := types.Sender(signerType, txn)
@@ -708,10 +717,33 @@ func decodeFuncSign(data []byte) string {
 }
 
 func (node *Node) setupForShardLeader() {
+	chanPeer := make(chan p2p.Peer)
+
+	nodeConfig := service.NodeConfig{
+		IsBeacon: false,
+		IsClient: false,
+		Beacon:   p2p.GroupIDBeacon,
+		Group:    p2p.GroupIDUnknown,
+		Actions:  make(map[p2p.GroupID]p2p.ActionType),
+	}
+	nodeConfig.Actions[p2p.GroupIDBeacon] = p2p.ActionStart
+
+	var err error
+	node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeacon)
+	if err != nil {
+		utils.GetLogInstance().Error("create group receiver error", "msg", err)
+		return
+	}
+
+	// Register peer discovery service. No need to do staking for beacon chain node.
+	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
+	// Register networkinfo service. "0" is the beacon shard ID
+	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
+
 	// Register explorer service.
 	node.serviceManager.RegisterService(service_manager.SupportExplorer, explorer.New(&node.SelfPeer))
 	// Register consensus service.
-	node.serviceManager.RegisterService(service_manager.Consensus, consensus_service.New(node.BlockChannel, node.Consensus))
+	node.serviceManager.RegisterService(service_manager.Consensus, consensus_service.New(node.BlockChannel, node.Consensus, node.startConsensus))
 	// Register new block service.
 	node.serviceManager.RegisterService(service_manager.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReady))
 	// Register client support service.
@@ -721,10 +753,15 @@ func (node *Node) setupForShardLeader() {
 }
 
 func (node *Node) setupForShardValidator() {
-}
-
-func (node *Node) setupForBeaconLeader() {
 	chanPeer := make(chan p2p.Peer)
+	nodeConfig := service.NodeConfig{
+		IsBeacon: false,
+		IsClient: false,
+		Beacon:   p2p.GroupIDBeacon,
+		Group:    p2p.GroupIDUnknown,
+		Actions:  make(map[p2p.GroupID]p2p.ActionType),
+	}
+	nodeConfig.Actions[p2p.GroupIDBeacon] = p2p.ActionStart
 
 	var err error
 	node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeacon)
@@ -734,12 +771,37 @@ func (node *Node) setupForBeaconLeader() {
 	}
 
 	// Register peer discovery service. "0" is the beacon shard ID. No need to do staking for beacon chain node.
-	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, "0", chanPeer, nil))
+	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
 	// Register networkinfo service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, "0", chanPeer))
+	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
+
+}
+
+func (node *Node) setupForBeaconLeader() {
+	chanPeer := make(chan p2p.Peer)
+	nodeConfig := service.NodeConfig{
+		IsBeacon: true,
+		IsClient: false,
+		Beacon:   p2p.GroupIDBeacon,
+		Group:    p2p.GroupIDUnknown,
+		Actions:  make(map[p2p.GroupID]p2p.ActionType),
+	}
+	nodeConfig.Actions[p2p.GroupIDBeacon] = p2p.ActionStart
+
+	var err error
+	node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeacon)
+	if err != nil {
+		utils.GetLogInstance().Error("create group receiver error", "msg", err)
+		return
+	}
+
+	// Register peer discovery service. No need to do staking for beacon chain node.
+	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
+	// Register networkinfo service.
+	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
 
 	// Register consensus service.
-	node.serviceManager.RegisterService(service_manager.Consensus, consensus_service.New(node.BlockChannel, node.Consensus))
+	node.serviceManager.RegisterService(service_manager.Consensus, consensus_service.New(node.BlockChannel, node.Consensus, node.startConsensus))
 	// Register new block service.
 	node.serviceManager.RegisterService(service_manager.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReady))
 	// Register client support service.
@@ -751,6 +813,14 @@ func (node *Node) setupForBeaconLeader() {
 
 func (node *Node) setupForBeaconValidator() {
 	chanPeer := make(chan p2p.Peer)
+	nodeConfig := service.NodeConfig{
+		IsBeacon: true,
+		IsClient: false,
+		Beacon:   p2p.GroupIDBeacon,
+		Group:    p2p.GroupIDUnknown,
+		Actions:  make(map[p2p.GroupID]p2p.ActionType),
+	}
+	nodeConfig.Actions[p2p.GroupIDBeacon] = p2p.ActionStart
 
 	var err error
 	node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeacon)
@@ -759,10 +829,10 @@ func (node *Node) setupForBeaconValidator() {
 		return
 	}
 
-	// Register peer discovery service. "0" is the beacon shard ID. No need to do staking for beacon chain node.
-	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, "0", chanPeer, nil))
-	// Register networkinfo service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, "0", chanPeer))
+	// Register peer discovery service. No need to do staking for beacon chain node.
+	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
+	// Register networkinfo service.
+	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
 	// Register randomness service
 	node.serviceManager.RegisterService(service_manager.Randomness, randomness_service.New(node.DRand))
 }
@@ -770,6 +840,15 @@ func (node *Node) setupForBeaconValidator() {
 func (node *Node) setupForNewNode() {
 	chanPeer := make(chan p2p.Peer)
 	stakingPeer := make(chan p2p.Peer)
+
+	nodeConfig := service.NodeConfig{
+		IsBeacon: false,
+		IsClient: false,
+		Beacon:   p2p.GroupIDBeacon,
+		Group:    p2p.GroupIDUnknown,
+		Actions:  make(map[p2p.GroupID]p2p.ActionType),
+	}
+	nodeConfig.Actions[p2p.GroupIDBeacon] = p2p.ActionStart
 
 	var err error
 	node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeacon)
@@ -781,9 +860,9 @@ func (node *Node) setupForNewNode() {
 	// Register staking service.
 	node.serviceManager.RegisterService(service_manager.Staking, staking.New(node.AccountKey, 0, stakingPeer))
 	// Register peer discovery service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, "0", chanPeer, stakingPeer))
+	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
 	// Register networkinfo service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, "0", chanPeer))
+	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
 
 	// TODO: how to restart networkinfo and discovery service after receiving shard id info from beacon chain?
 }
