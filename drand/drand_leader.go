@@ -9,6 +9,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/vrf/p256"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 )
 
@@ -45,7 +46,11 @@ func (dRand *DRand) init(epochBlock *types.Block) {
 
 	(*dRand.vrfs)[dRand.nodeID] = append(rand[:], proof...)
 
-	host.BroadcastMessageFromLeader(dRand.host, dRand.GetValidatorPeers(), msgToSend, nil)
+	if utils.UseLibP2P {
+		dRand.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
+	} else {
+		host.BroadcastMessageFromLeader(dRand.host, dRand.GetValidatorPeers(), msgToSend, nil)
+	}
 }
 
 // ProcessMessageLeader dispatches messages for the leader to corresponding processors.
