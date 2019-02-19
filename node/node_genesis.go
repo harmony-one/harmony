@@ -14,15 +14,16 @@ import (
 )
 
 const (
-	// Number of fake address.
+	// FakeAddressNumber is the number of fake address.
 	FakeAddressNumber = 100
 	// TotalInitFund is the initial total fund to the faucet.
 	TotalInitFund = 9000000
 )
 
-func (node *Node) GenesisSetup(db ethdb.Database) (*core.BlockChain, error) {
+// GenesisBlockSetup setups a genesis blockchain.
+func (node *Node) GenesisBlockSetup(db ethdb.Database) (*core.BlockChain, error) {
 	// Initialize genesis block and blockchain
-	genesisAlloc := node.CreateGenesisAllocWithTestingAddresses(100)
+	genesisAlloc := node.CreateGenesisAllocWithTestingAddresses(FakeAddressNumber)
 	contractKey, _ := ecdsa.GenerateKey(crypto.S256(), strings.NewReader("Test contract key string stream that is fixed so that generated test key are deterministic every time"))
 	contractAddress := crypto.PubkeyToAddress(contractKey.PublicKey)
 	contractFunds := big.NewInt(TotalInitFund)

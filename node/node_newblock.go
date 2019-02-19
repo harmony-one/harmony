@@ -8,6 +8,12 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
+// Constants of lower bound limit of a new block.
+const (
+	DefaultThreshold   = 10
+	FirstTimeThreshold = 2
+)
+
 // WaitForConsensusReady listen for the readiness signal from consensus and generate new block for consensus.
 func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan struct{}, stoppedChan chan struct{}) {
 	go func() {
@@ -34,10 +40,11 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 			}
 
 			for {
-				// threshold and firstTime are for the test-only built-in smart contract tx. TODO: remove in production
-				threshold := 1
+				// threshold and firstTime are for the test-only built-in smart contract tx.
+				// TODO: remove in production
+				threshold := DefaultThreshold
 				if firstTime {
-					threshold = 2
+					threshold = FirstTimeThreshold
 					firstTime = false
 				}
 				utils.GetLogInstance().Debug("STARTING BLOCK", "threshold", threshold, "pendingTransactions", len(node.pendingTransactions))

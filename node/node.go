@@ -273,7 +273,7 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 			database = ethdb.NewMemDatabase()
 		}
 
-		chain, err := node.GenesisSetup(database)
+		chain, err := node.GenesisBlockSetup(database)
 		if err != nil {
 			utils.GetLogInstance().Error("Error when doing genesis setup")
 			os.Exit(1)
