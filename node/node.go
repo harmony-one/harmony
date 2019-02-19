@@ -35,7 +35,6 @@ import (
 	"github.com/harmony-one/harmony/api/service/networkinfo"
 	randomness_service "github.com/harmony-one/harmony/api/service/randomness"
 
-	"github.com/harmony-one/harmony/api/service/staking"
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
 	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
@@ -197,6 +196,10 @@ type Node struct {
 	// Group Message Receiver
 	groupReceiver p2p.GroupReceiver
 
+	// Client Message Receiver to handle light client messages
+	// Beacon leader needs to use this receiver to talk to new node
+	clientReceiver p2p.GroupReceiver
+
 	// Duplicated Ping Message Received
 	duplicatedPing map[string]bool
 
@@ -205,6 +208,9 @@ type Node struct {
 
 	// My GroupID
 	MyShardGroupID p2p.GroupID
+
+	// My ShardClient GroupID
+	MyClientGroupID p2p.GroupID
 }
 
 // Blockchain returns the blockchain from node
@@ -326,6 +332,11 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 
 	// start the goroutine to receive group message
 	go node.ReceiveGroupMessage()
+
+	// only start the goroutine for leader
+	if consensus.IsLeader {
+		go node.ReceiveClientGroupMessage()
+	}
 
 	node.duplicatedPing = make(map[string]bool)
 
@@ -794,6 +805,11 @@ func (node *Node) setupForBeaconLeader() {
 		utils.GetLogInstance().Error("create group receiver error", "msg", err)
 		return
 	}
+	node.clientReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
+	if err != nil {
+		utils.GetLogInstance().Error("create client receiver error", "msg", err)
+		return
+	}
 
 	// Register peer discovery service. No need to do staking for beacon chain node.
 	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
@@ -828,6 +844,11 @@ func (node *Node) setupForBeaconValidator() {
 		utils.GetLogInstance().Error("create group receiver error", "msg", err)
 		return
 	}
+	node.clientReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
+	if err != nil {
+		utils.GetLogInstance().Error("create client receiver error", "msg", err)
+		return
+	}
 
 	// Register peer discovery service. No need to do staking for beacon chain node.
 	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
@@ -839,7 +860,7 @@ func (node *Node) setupForBeaconValidator() {
 
 func (node *Node) setupForNewNode() {
 	chanPeer := make(chan p2p.Peer)
-	stakingPeer := make(chan p2p.Peer)
+	//	stakingPeer := make(chan p2p.Peer)
 
 	nodeConfig := service.NodeConfig{
 		IsBeacon: false,
@@ -851,16 +872,17 @@ func (node *Node) setupForNewNode() {
 	nodeConfig.Actions[p2p.GroupIDBeacon] = p2p.ActionStart
 
 	var err error
-	node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeacon)
+	node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
 	if err != nil {
 		utils.GetLogInstance().Error("create group receiver error", "msg", err)
 		return
 	}
 
 	// Register staking service.
-	node.serviceManager.RegisterService(service_manager.Staking, staking.New(node.AccountKey, 0, stakingPeer))
+	// node.serviceManager.RegisterService(service_manager.Staking, staking.New(node.AccountKey, 0, stakingPeer))
+	// TODO: (leo) no need to start discovery service for new node until we received the sharding info
 	// Register peer discovery service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
+	// node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
 	// Register networkinfo service. "0" is the beacon shard ID
 	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
 
