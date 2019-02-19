@@ -35,7 +35,7 @@ func (dRand *DRand) processInitMessage(message drand_proto.Message) {
 	blockHash := message.BlockHash
 
 	// Verify message signature
-	err := verifyMessageSig(dRand.leader.PubKey, message)
+	err := verifyMessageSig(dRand.Leader.PubKey, message)
 	if err != nil {
 		utils.GetLogInstance().Warn("Failed to verify the message signature", "Error", err)
 		return
@@ -52,6 +52,6 @@ func (dRand *DRand) processInitMessage(message drand_proto.Message) {
 	if utils.UseLibP2P {
 		dRand.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
 	} else {
-		host.SendMessage(dRand.host, dRand.leader, msgToSend, nil)
+		host.SendMessage(dRand.host, dRand.Leader, msgToSend, nil)
 	}
 }

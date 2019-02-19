@@ -460,7 +460,12 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 	node.Consensus.Leader.PubKey = &bls.PublicKey{}
 	err = node.Consensus.Leader.PubKey.Deserialize(pong.LeaderPubKey)
 	if err != nil {
-		utils.GetLogInstance().Error("Unmarshal Leader PubKey Failed", "error", err)
+		utils.GetLogInstance().Error("Unmarshal Consensus Leader PubKey Failed", "error", err)
+	}
+	node.DRand.Leader.PubKey = &bls.PublicKey{}
+	err = node.DRand.Leader.PubKey.Deserialize(pong.LeaderPubKey)
+	if err != nil {
+		utils.GetLogInstance().Error("Unmarshal DRand Leader PubKey Failed", "error", err)
 	}
 
 	// Reset Validator PublicKeys every time we receive PONG message from Leader
