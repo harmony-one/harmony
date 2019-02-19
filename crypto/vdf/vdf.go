@@ -1,4 +1,4 @@
-// Note this is a proof-of-concept implementation of a delay function
+// Package vdf is a proof-of-concept implementation of a delay function
 // and the security properties are not guaranteed.
 // A more secure implementation of the VDF by Wesolowski (https://eprint.iacr.org/2018/623.pdf)
 // will be done soon.
@@ -6,6 +6,7 @@ package vdf
 
 import "golang.org/x/crypto/sha3"
 
+// VDF is the struct holding necessary state for a hash chain delay function.
 type VDF struct {
 	difficulty int
 	input      [32]byte
