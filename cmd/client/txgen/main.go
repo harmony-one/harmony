@@ -197,7 +197,7 @@ func main() {
 
 	for _, leader := range shardIDLeaderMap {
 		if *libp2pPD {
-			clientNode.Role = node.NewNode
+			clientNode.Role = node.ClientNode
 		} else {
 			clientNode.GetHost().AddPeer(&leader)
 			utils.GetLogInstance().Debug("Client Join Shard", "leader", leader)

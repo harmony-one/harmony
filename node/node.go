@@ -800,25 +800,9 @@ func (node *Node) setupForBeaconValidator() {
 }
 
 func (node *Node) setupForClientNode() {
-	chanPeer := make(chan p2p.Peer)
+	nodeConfig, chanPeer := node.initNodeConfiguration()
 
-	nodeConfig := service.NodeConfig{
-		IsBeacon: false,
-		IsClient: false,
-		Beacon:   p2p.GroupIDBeacon,
-		Group:    p2p.GroupIDUnknown,
-		Actions:  make(map[p2p.GroupID]p2p.ActionType),
-	}
-	nodeConfig.Actions[p2p.GroupIDBeacon] = p2p.ActionStart
-
-	var err error
-	node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeacon)
-	if err != nil {
-		utils.GetLogInstance().Error("create group receiver error", "msg", err)
-		return
-	}
-
-	// Register peer discovery service. "0" is the beacon shard ID
+	// Discovery service.
 	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
 	// Register networkinfo service. "0" is the beacon shard ID
 	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))

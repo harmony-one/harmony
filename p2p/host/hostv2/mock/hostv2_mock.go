@@ -36,6 +36,7 @@ func (m *Mockpubsub) EXPECT() *MockpubsubMockRecorder {
 
 // Publish mocks base method
 func (m *Mockpubsub) Publish(topic string, data []byte) error {
+	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Publish", topic, data)
 	ret0, _ := ret[0].(error)
 	return ret0
@@ -43,11 +44,13 @@ func (m *Mockpubsub) Publish(topic string, data []byte) error {
 
 // Publish indicates an expected call of Publish
 func (mr *MockpubsubMockRecorder) Publish(topic, data interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Publish", reflect.TypeOf((*Mockpubsub)(nil).Publish), topic, data)
 }
 
 // Subscribe mocks base method
 func (m *Mockpubsub) Subscribe(topic string, opts ...go_libp2p_pubsub.SubOpt) (*go_libp2p_pubsub.Subscription, error) {
+	m.ctrl.T.Helper()
 	varargs := []interface{}{topic}
 	for _, a := range opts {
 		varargs = append(varargs, a)
@@ -60,6 +63,7 @@ func (m *Mockpubsub) Subscribe(topic string, opts ...go_libp2p_pubsub.SubOpt) (*
 
 // Subscribe indicates an expected call of Subscribe
 func (mr *MockpubsubMockRecorder) Subscribe(topic interface{}, opts ...interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{topic}, opts...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Subscribe", reflect.TypeOf((*Mockpubsub)(nil).Subscribe), varargs...)
 }
@@ -89,6 +93,7 @@ func (m *Mocksubscription) EXPECT() *MocksubscriptionMockRecorder {
 
 // Next mocks base method
 func (m *Mocksubscription) Next(ctx context.Context) (*go_libp2p_pubsub.Message, error) {
+	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Next", ctx)
 	ret0, _ := ret[0].(*go_libp2p_pubsub.Message)
 	ret1, _ := ret[1].(error)
@@ -97,15 +102,18 @@ func (m *Mocksubscription) Next(ctx context.Context) (*go_libp2p_pubsub.Message,
 
 // Next indicates an expected call of Next
 func (mr *MocksubscriptionMockRecorder) Next(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Next", reflect.TypeOf((*Mocksubscription)(nil).Next), ctx)
 }
 
 // Cancel mocks base method
 func (m *Mocksubscription) Cancel() {
+	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Cancel")
 }
 
 // Cancel indicates an expected call of Cancel
 func (mr *MocksubscriptionMockRecorder) Cancel() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Cancel", reflect.TypeOf((*Mocksubscription)(nil).Cancel))
 }

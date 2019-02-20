@@ -35,6 +35,7 @@ func (m *MockStream) EXPECT() *MockStreamMockRecorder {
 
 // Read mocks base method
 func (m *MockStream) Read(arg0 []byte) (int, error) {
+	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Read", arg0)
 	ret0, _ := ret[0].(int)
 	ret1, _ := ret[1].(error)
@@ -43,11 +44,13 @@ func (m *MockStream) Read(arg0 []byte) (int, error) {
 
 // Read indicates an expected call of Read
 func (mr *MockStreamMockRecorder) Read(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Read", reflect.TypeOf((*MockStream)(nil).Read), arg0)
 }
 
 // Write mocks base method
 func (m *MockStream) Write(arg0 []byte) (int, error) {
+	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Write", arg0)
 	ret0, _ := ret[0].(int)
 	ret1, _ := ret[1].(error)
@@ -56,11 +59,13 @@ func (m *MockStream) Write(arg0 []byte) (int, error) {
 
 // Write indicates an expected call of Write
 func (mr *MockStreamMockRecorder) Write(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Write", reflect.TypeOf((*MockStream)(nil).Write), arg0)
 }
 
 // Close mocks base method
 func (m *MockStream) Close() error {
+	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Close")
 	ret0, _ := ret[0].(error)
 	return ret0
@@ -68,11 +73,13 @@ func (m *MockStream) Close() error {
 
 // Close indicates an expected call of Close
 func (mr *MockStreamMockRecorder) Close() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockStream)(nil).Close))
 }
 
 // SetReadDeadline mocks base method
 func (m *MockStream) SetReadDeadline(arg0 time.Time) error {
+	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SetReadDeadline", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
@@ -80,5 +87,6 @@ func (m *MockStream) SetReadDeadline(arg0 time.Time) error {
 
 // SetReadDeadline indicates an expected call of SetReadDeadline
 func (mr *MockStreamMockRecorder) SetReadDeadline(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetReadDeadline", reflect.TypeOf((*MockStream)(nil).SetReadDeadline), arg0)
 }
