@@ -4,22 +4,23 @@ import (
 	"time"
 
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
+	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
+	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
-
-	"github.com/harmony-one/harmony/api/service"
 )
 
 // Service is the struct for discovery service.
 type Service struct {
-	host       p2p.Host
-	peerChan   chan p2p.Peer
-	stopChan   chan struct{}
-	actionChan chan p2p.GroupAction
-	config     service.NodeConfig
-	actions    map[p2p.GroupID]p2p.ActionType
+	host        p2p.Host
+	peerChan    chan p2p.Peer
+	stopChan    chan struct{}
+	actionChan  chan p2p.GroupAction
+	config      service.NodeConfig
+	actions     map[p2p.GroupID]p2p.ActionType
+	messageChan chan *msg_pb.Message
 }
 
 // New returns discovery service.
@@ -141,4 +142,9 @@ func (s *Service) contactP2pPeers() {
 // Init is to initialize for discoveryService.
 func (s *Service) Init() {
 	utils.GetLogInstance().Info("Init discovery service")
+}
+
+// SetMessageChan sets up message channel to service.
+func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {
+	s.messageChan = messageChan
 }

@@ -1,6 +1,7 @@
 package blockproposal
 
 import (
+	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -9,6 +10,7 @@ type Service struct {
 	stopChan              chan struct{}
 	stoppedChan           chan struct{}
 	readySignal           chan struct{}
+	messageChan           chan *msg_pb.Message
 	waitForConsensusReady func(readySignal chan struct{}, stopChan chan struct{}, stoppedChan chan struct{})
 }
 
@@ -46,4 +48,9 @@ func (s *Service) StopService() {
 // NotifyService notify service
 func (s *Service) NotifyService(params map[string]interface{}) {
 	return
+}
+
+// SetMessageChan sets up message channel to service.
+func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {
+	s.messageChan = messageChan
 }

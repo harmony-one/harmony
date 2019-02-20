@@ -11,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/gorilla/mux"
+	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -23,11 +24,12 @@ const (
 
 // Service is the struct for explorer service.
 type Service struct {
-	router  *mux.Router
-	IP      string
-	Port    string
-	storage *Storage
-	server  *http.Server
+	router      *mux.Router
+	IP          string
+	Port        string
+	storage     *Storage
+	server      *http.Server
+	messageChan chan *msg_pb.Message
 }
 
 // New returns explorer service.
@@ -248,4 +250,9 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 // NotifyService notify service
 func (s *Service) NotifyService(params map[string]interface{}) {
 	return
+}
+
+// SetMessageChan sets up message channel to service.
+func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {
+	s.messageChan = messageChan
 }
