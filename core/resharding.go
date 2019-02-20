@@ -1,6 +1,7 @@
 package core
 
 import (
+	"math"
 	"math/rand"
 	"sort"
 	"strconv"
@@ -129,9 +130,14 @@ func CalculateNewShardState(bc *BlockChain, epoch uint64) types.ShardState {
 // calculateKickoutRate calculates the cuckoo rule kick out rate in order to make committee balanced
 func (ss *ShardingState) calculateKickoutRate(newNodeList []types.NodeID) float64 {
 	numActiveCommittees := ss.numShards / 2
-	newNodesPerShard := len(newNodeList) / numActiveCommittees
+	newNodesPerShard := math.Ceil(float64(len(newNodeList)) / float64(numActiveCommittees))
 	ss.sortCommitteeBySize()
-	return float64(newNodesPerShard) / float64(len(ss.shardState[numActiveCommittees].NodeList))
+	L := len(ss.shardState[0].NodeList)
+	if L == 0 {
+		return 0.0
+	}
+	rate := newNodesPerShard / float64(L)
+	return math.Min(rate, 1.0)
 }
 
 // FakeGenRandSeed generate random seed based on previous rnd seed; remove later after VRF implemented

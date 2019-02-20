@@ -69,6 +69,26 @@ func (node *Node) ReceiveGroupMessage() {
 	}
 }
 
+// ReceiveClientGroupMessage use libp2p pubsub mechanism to receive broadcast messages for client
+func (node *Node) ReceiveClientGroupMessage() {
+	ctx := context.Background()
+	for {
+		if node.clientReceiver == nil {
+			// check less frequent on client messages
+			time.Sleep(1000 * time.Millisecond)
+			continue
+		}
+		msg, sender, err := node.clientReceiver.Receive(ctx)
+		if sender != node.host.GetID() {
+			utils.GetLogInstance().Info("[CLIENT]", "received group msg", len(msg), "sender", sender)
+			if err == nil {
+				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
+				node.messageHandler(msg[5:], string(sender))
+			}
+		}
+	}
+}
+
 // messageHandler parses the message and dispatch the actions
 func (node *Node) messageHandler(content []byte, sender string) {
 	//	node.MaybeBroadcastAsValidator(content)
@@ -231,7 +251,7 @@ func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 	if node.ClientPeer != nil {
 		utils.GetLogInstance().Debug("Sending new block to client", "client", node.ClientPeer)
 		if utils.UseLibP2P {
-			node.host.SendMessageToGroups([]p2p.GroupID{node.MyShardGroupID}, proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock}))
+			node.host.SendMessageToGroups([]p2p.GroupID{node.MyClientGroupID}, host.ConstructP2pMessage(byte(0), proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock})))
 		} else {
 			node.SendMessage(*node.ClientPeer, proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock}))
 		}
@@ -389,8 +409,7 @@ func (node *Node) SendPongMessage() {
 				if !sentMessage {
 					pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys, node.Consensus.Leader.PubKey)
 					buffer := pong.ConstructPongMessage()
-					content := host.ConstructP2pMessage(byte(0), buffer)
-					err := node.host.SendMessageToGroups([]p2p.GroupID{node.MyShardGroupID}, content)
+					err := node.host.SendMessageToGroups([]p2p.GroupID{node.MyShardGroupID}, host.ConstructP2pMessage(byte(0), buffer))
 					if err != nil {
 						utils.GetLogInstance().Error("[PONG] failed to send pong message", "group", node.MyShardGroupID)
 						continue
@@ -441,7 +460,12 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 	node.Consensus.Leader.PubKey = &bls.PublicKey{}
 	err = node.Consensus.Leader.PubKey.Deserialize(pong.LeaderPubKey)
 	if err != nil {
-		utils.GetLogInstance().Error("Unmarshal Leader PubKey Failed", "error", err)
+		utils.GetLogInstance().Error("Unmarshal Consensus Leader PubKey Failed", "error", err)
+	}
+	node.DRand.Leader.PubKey = &bls.PublicKey{}
+	err = node.DRand.Leader.PubKey.Deserialize(pong.LeaderPubKey)
+	if err != nil {
+		utils.GetLogInstance().Error("Unmarshal DRand Leader PubKey Failed", "error", err)
 	}
 
 	// Reset Validator PublicKeys every time we receive PONG message from Leader

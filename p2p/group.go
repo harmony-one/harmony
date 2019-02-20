@@ -24,9 +24,10 @@ func (id GroupID) String() string {
 
 // Const of group ID
 const (
-	GroupIDBeacon  GroupID = "harmony/0.0.1/beacon"
-	GroupIDGlobal  GroupID = "harmony/0.0.1/global"
-	GroupIDUnknown GroupID = "B1acKh0lE"
+	GroupIDBeacon       GroupID = "harmony/0.0.1/beacon"
+	GroupIDBeaconClient GroupID = "harmony/0.0.1/beacon/client"
+	GroupIDGlobal       GroupID = "harmony/0.0.1/global"
+	GroupIDUnknown      GroupID = "B1acKh0lE"
 )
 
 // ActionType lists action on group

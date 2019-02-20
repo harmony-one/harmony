@@ -133,7 +133,9 @@ func (s *Service) DoService() {
 				}
 				p := p2p.Peer{IP: ip, Port: port, PeerID: peer.ID, Addrs: peer.Addrs}
 				utils.GetLogInstance().Info("Notify peerChan", "peer", p)
-				s.peerChan <- p
+				if s.peerChan != nil {
+					s.peerChan <- p
+				}
 			}
 		case <-s.stopChan:
 			return

@@ -73,7 +73,7 @@ EOU
 DB=
 TXGEN=true
 DURATION=90
-MIN=2
+MIN=5
 SHARDS=2
 KILLPORT=9004
 SYNC=true
@@ -103,7 +103,7 @@ if [ -z "$config" ]; then
 fi
 
 if [ "$SYNC" == "true" ]; then
-    DURATION=600
+    DURATION=300
 fi
 
 # Kill nodes if any
@@ -131,6 +131,7 @@ LOG_FILE=$log_folder/r.log
 
 HMY_OPT=
 HMY_OPT2=
+HMY_OPT3=
 
 if [ "$P2P" == "false" ]; then
    echo "launching beacon chain ..."
@@ -144,8 +145,8 @@ else
    sleep 1
    BN_MA=$(grep "BN_MA" $log_folder/bootnode.log | awk -F\= ' { print $2 } ')
    HMY_OPT2=" -bootnodes $BN_MA"
-   HMY_OPT2+=" -libp2p_pd -is_beacon"
-   TXGEN=false
+   HMY_OPT2+=" -libp2p_pd"
+   HMY_OPT3=" -is_beacon"
 fi
 
 NUM_NN=0
@@ -154,15 +155,15 @@ NUM_NN=0
 while IFS='' read -r line || [[ -n "$line" ]]; do
   IFS=' ' read ip port mode shardID <<< $line
   if [ "$mode" == "leader" ]; then
-     $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT $HMY_OPT2 -key /tmp/$ip-$port.key -is_leader 2>&1 | tee -a $LOG_FILE &
+     $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key -is_leader 2>&1 | tee -a $LOG_FILE &
   fi
   if [ "$mode" == "validator" ]; then
-     $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT $HMY_OPT2 -key /tmp/$ip-$port.key 2>&1 | tee -a $LOG_FILE &
+     $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key 2>&1 | tee -a $LOG_FILE &
   fi
   sleep 0.5
   if [[ "$mode" == "newnode" && "$SYNC" == "true" ]]; then
      (( NUM_NN += 35 ))
-     (sleep $NUM_NN; $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT $HMY_OPT2 -key /tmp/$ip-$port.key 2>&1 | tee -a $LOG_FILE ) &
+     (sleep $NUM_NN; $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key 2>&1 | tee -a $LOG_FILE ) &
   fi
 done < $config
 
@@ -177,7 +178,7 @@ if [ "$TXGEN" == "true" ]; then
    line=$(grep client $config)
    IFS=' ' read ip port mode shardID <<< $line
    if [ "$mode" == "client" ]; then
-      $DRYRUN $ROOT/bin/txgen -log_folder $log_folder -duration $DURATION -ip $ip -port $port $HMY_OPT 2>&1 | tee -a $LOG_FILE
+      $DRYRUN $ROOT/bin/txgen -log_folder $log_folder -duration $DURATION -ip $ip -port $port $HMY_OPT $HMY_OPT2 2>&1 | tee -a $LOG_FILE
    fi
 else
    sleep $DURATION

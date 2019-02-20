@@ -13,6 +13,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/vrf/p256"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 )
 
@@ -76,7 +77,11 @@ func (dRand *DRand) init(epochBlock *types.Block) {
 
 	(*dRand.vrfs)[dRand.nodeID] = append(rand[:], proof...)
 
-	host.BroadcastMessageFromLeader(dRand.host, dRand.GetValidatorPeers(), msgToSend, nil)
+	if utils.UseLibP2P {
+		dRand.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
+	} else {
+		host.BroadcastMessageFromLeader(dRand.host, dRand.GetValidatorPeers(), msgToSend, nil)
+	}
 }
 
 // ProcessMessageLeader dispatches messages for the leader to corresponding processors.
@@ -117,7 +122,7 @@ func (dRand *DRand) processCommitMessage(message drand_proto.Message) {
 	// Verify message signature
 	err := verifyMessageSig(validatorPeer.PubKey, message)
 	if err != nil {
-		utils.GetLogInstance().Warn("Failed to verify the message signature", "Error", err)
+		utils.GetLogInstance().Warn("[DRAND] failed to verify the message signature", "Error", err, "PubKey", validatorPeer.PubKey)
 		return
 	}
 
@@ -130,18 +135,18 @@ func (dRand *DRand) processCommitMessage(message drand_proto.Message) {
 	expectedRand, err := pubKey.ProofToHash(dRand.blockHash[:], proof)
 
 	if err != nil || !bytes.Equal(expectedRand[:], rand) {
-		utils.GetLogInstance().Error("Failed to verify the VRF", "error", err, "validatorID", validatorID, "expectedRand", expectedRand, "receivedRand", rand)
+		utils.GetLogInstance().Error("[DRAND] Failed to verify the VRF", "error", err, "validatorID", validatorID, "expectedRand", expectedRand, "receivedRand", rand)
 		return
 	}
 
-	utils.GetLogInstance().Debug("Received new commit", "numReceivedSoFar", len((*vrfs)), "validatorID", validatorID, "PublicKeys", len(dRand.PublicKeys))
+	utils.GetLogInstance().Debug("Received new VRF commit", "numReceivedSoFar", len((*vrfs)), "validatorID", validatorID, "PublicKeys", len(dRand.PublicKeys))
 
 	(*vrfs)[validatorID] = message.Payload
 	dRand.bitmap.SetKey(validatorPeer.PubKey, true) // Set the bitmap indicating that this validator signed.
 
 	if len((*vrfs)) >= ((len(dRand.PublicKeys))/3 + 1) {
 		// Construct pRand and initiate consensus on it
-		utils.GetLogInstance().Debug("Received enough randomness commit", "numReceivedSoFar", len((*vrfs)), "validatorID", validatorID, "PublicKeys", len(dRand.PublicKeys))
+		utils.GetLogInstance().Debug("[DRAND] {BINGO} Received enough randomness commit", "numReceivedSoFar", len((*vrfs)), "validatorID", validatorID, "PublicKeys", len(dRand.PublicKeys))
 
 		pRnd := [32]byte{}
 		// Bitwise XOR on all the submitted vrfs

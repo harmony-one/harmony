@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"math/big"
 	"os"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -34,14 +32,12 @@ import (
 	"github.com/harmony-one/harmony/api/service/networkinfo"
 	randomness_service "github.com/harmony-one/harmony/api/service/randomness"
 
-	"github.com/harmony-one/harmony/api/service/staking"
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
 	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
 	bft "github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
@@ -73,6 +69,7 @@ const (
 	BeaconLeader
 	BeaconValidator
 	NewNode
+	ClientNode
 )
 
 func (state State) String() string {
@@ -100,9 +97,6 @@ const (
 	lastMileThreshold = 4
 	inSyncThreshold   = 1
 )
-
-// TotalInitFund is the initial total fund to the faucet.
-const TotalInitFund = 9000000
 
 const (
 	waitBeforeJoinShard = time.Second * 3
@@ -196,6 +190,10 @@ type Node struct {
 	// Group Message Receiver
 	groupReceiver p2p.GroupReceiver
 
+	// Client Message Receiver to handle light client messages
+	// Beacon leader needs to use this receiver to talk to new node
+	clientReceiver p2p.GroupReceiver
+
 	// Duplicated Ping Message Received
 	duplicatedPing map[string]bool
 
@@ -204,6 +202,9 @@ type Node struct {
 
 	// My GroupID
 	MyShardGroupID p2p.GroupID
+
+	// My ShardClient GroupID
+	MyClientGroupID p2p.GroupID
 }
 
 // Blockchain returns the blockchain from node
@@ -228,7 +229,7 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int) types.Transactions {
 
 	utils.GetLogInstance().Debug("Invalid transactions discarded", "number", len(invalid))
 	node.pendingTransactions = unselected
-	utils.GetLogInstance().Debug("Remaining pending transactions", "number", len(node.pendingTransactions))
+	utils.GetLogInstance().Debug("Remaining pending transactions", "number", len(node.pendingTransactions), "selected", len(selected))
 	node.pendingTxMutex.Unlock()
 	return selected
 }
@@ -265,41 +266,23 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 		// Consensus and associated channel to communicate blocks
 		node.Consensus = consensus
 
-		// Initialize genesis block and blockchain
-		genesisAlloc := node.CreateGenesisAllocWithTestingAddresses(100)
-		contractKey, _ := ecdsa.GenerateKey(crypto.S256(), strings.NewReader("Test contract key string stream that is fixed so that generated test key are deterministic every time"))
-		contractAddress := crypto.PubkeyToAddress(contractKey.PublicKey)
-		contractFunds := big.NewInt(TotalInitFund)
-		contractFunds = contractFunds.Mul(contractFunds, big.NewInt(params.Ether))
-		genesisAlloc[contractAddress] = core.GenesisAccount{Balance: contractFunds}
-		node.ContractKeys = append(node.ContractKeys, contractKey)
-
+		// Init db.
 		database := db
 		if database == nil {
 			database = ethdb.NewMemDatabase()
 		}
 
-		chainConfig := params.TestChainConfig
-		chainConfig.ChainID = big.NewInt(int64(node.Consensus.ShardID)) // Use ChainID as piggybacked ShardID
-		gspec := core.Genesis{
-			Config:  chainConfig,
-			Alloc:   genesisAlloc,
-			ShardID: uint32(node.Consensus.ShardID),
+		chain, err := node.GenesisBlockSetup(database)
+		if err != nil {
+			utils.GetLogInstance().Error("Error when doing genesis setup")
+			os.Exit(1)
 		}
-
-		_ = gspec.MustCommit(database)
-		chain, _ := core.NewBlockChain(database, nil, gspec.Config, node.Consensus, vm.Config{}, nil)
 		node.blockchain = chain
 		node.BlockChannel = make(chan *types.Block)
 		node.ConfirmedBlockChannel = make(chan *types.Block)
 
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, params.TestChainConfig, chain)
 		node.Worker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey), node.Consensus.ShardID)
-		node.AddFaucetContractToPendingTransactions()
-		if node.Role == BeaconLeader {
-			node.AddStakingContractToPendingTransactions() //This will save the latest information about staked nodes in current staked
-			node.DepositToFakeAccounts()
-		}
 		if node.Role == BeaconLeader || node.Role == BeaconValidator {
 			node.CurrentStakes = make(map[common.Address]int64)
 		}
@@ -310,6 +293,7 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 
 	if consensus != nil && consensus.IsLeader {
 		node.State = NodeLeader
+		go node.ReceiveClientGroupMessage()
 	} else {
 		node.State = NodeInit
 	}
@@ -326,7 +310,11 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 
 	node.duplicatedPing = make(map[string]bool)
 
-	node.startConsensus = make(chan struct{})
+	if utils.UseLibP2P {
+		node.startConsensus = make(chan struct{})
+	} else {
+		node.startConsensus = nil
+	}
 
 	return &node
 }
@@ -375,49 +363,6 @@ func (node *Node) IsOutOfSync(consensusBlockInfo *bft.BFTBlockInfo) bool {
 	return true
 }
 
-// DoSyncing wait for check status and starts syncing if out of sync
-func (node *Node) DoSyncing() {
-	for {
-		select {
-		// in current implementation logic, timeout means in sync
-		case <-time.After(5 * time.Second):
-			//myHeight := node.blockchain.CurrentBlock().NumberU64()
-			//utils.GetLogInstance().Debug("[SYNC]", "currentHeight", myHeight)
-			node.stateMutex.Lock()
-			node.State = NodeReadyForConsensus
-			node.stateMutex.Unlock()
-			continue
-		case consensusBlockInfo := <-node.Consensus.ConsensusBlock:
-			if !node.IsOutOfSync(consensusBlockInfo) {
-				startHash := node.blockchain.CurrentBlock().Hash()
-				node.stateSync.StartStateSync(startHash[:], node.blockchain, node.Worker)
-				if node.State == NodeNotInSync {
-					utils.GetLogInstance().Info("[SYNC] Node is now IN SYNC!")
-				}
-				node.stateMutex.Lock()
-				node.State = NodeReadyForConsensus
-				node.stateMutex.Unlock()
-				node.stateSync.CloseConnections()
-				node.stateSync = nil
-				continue
-			} else {
-				utils.GetLogInstance().Debug("[SYNC] node is out of sync")
-				node.stateMutex.Lock()
-				node.State = NodeNotInSync
-				node.stateMutex.Unlock()
-			}
-
-			if node.stateSync == nil {
-				node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port)
-				node.stateSync.CreateSyncConfig(node.GetSyncingPeers())
-				node.stateSync.MakeConnectionToPeers()
-			}
-			startHash := node.blockchain.CurrentBlock().Hash()
-			node.stateSync.StartStateSync(startHash[:], node.blockchain, node.Worker)
-		}
-	}
-}
-
 // AddPeers adds neighbors nodes
 func (node *Node) AddPeers(peers []*p2p.Peer) int {
 	count := 0
@@ -441,37 +386,6 @@ func (node *Node) AddPeers(peers []*p2p.Peer) int {
 		node.DRand.AddPeers(peers)
 	}
 	return count
-}
-
-// GetSyncingPort returns the syncing port.
-func GetSyncingPort(nodePort string) string {
-	if port, err := strconv.Atoi(nodePort); err == nil {
-		return fmt.Sprintf("%d", port-syncing.SyncingPortDifference)
-	}
-	os.Exit(1)
-	return ""
-}
-
-// GetSyncingPeers returns list of peers.
-func (node *Node) GetSyncingPeers() []p2p.Peer {
-	res := []p2p.Peer{}
-	node.Neighbors.Range(func(k, v interface{}) bool {
-		res = append(res, v.(p2p.Peer))
-		return true
-	})
-
-	removeID := -1
-	for i := range res {
-		if res[i].Port == node.SelfPeer.Port {
-			removeID = i
-		}
-		res[i].Port = GetSyncingPort(res[i].Port)
-	}
-	if removeID != -1 {
-		res = append(res[:removeID], res[removeID+1:]...)
-	}
-	utils.GetLogInstance().Debug("GetSyncingPeers: ", "res", res, "self", node.SelfPeer)
-	return res
 }
 
 // JoinShard helps a new node to join a shard.
@@ -501,26 +415,6 @@ func (node *Node) JoinShard(leader p2p.Peer) {
 			return
 		}
 	}
-}
-
-// SupportSyncing keeps sleeping until it's doing consensus or it's a leader.
-func (node *Node) SupportSyncing() {
-	node.InitSyncingServer()
-	node.StartSyncingServer()
-
-	go node.DoSyncing()
-	go node.SendNewBlockToUnsync()
-}
-
-// InitSyncingServer starts downloader server.
-func (node *Node) InitSyncingServer() {
-	node.downloaderServer = downloader.NewServer(node)
-}
-
-// StartSyncingServer starts syncing server.
-func (node *Node) StartSyncingServer() {
-	utils.GetLogInstance().Info("support_sycning: StartSyncingServer")
-	node.downloaderServer.Start(node.SelfPeer.IP, GetSyncingPort(node.SelfPeer.Port))
 }
 
 // CalculateResponse implements DownloadInterface on Node object.
@@ -603,43 +497,6 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 	return response, nil
 }
 
-// SendNewBlockToUnsync send latest verified block to unsync, registered nodes
-func (node *Node) SendNewBlockToUnsync() {
-	for {
-		block := <-node.Consensus.VerifiedNewBlock
-		blockHash, err := rlp.EncodeToBytes(block)
-		if err != nil {
-			utils.GetLogInstance().Warn("[SYNC] unable to encode block to hashes")
-			continue
-		}
-
-		// really need to have a unique id independent of ip/port
-		selfPeerID := utils.GetUniqueIDFromIPPort(node.SelfPeer.IP, node.SelfPeer.Port)
-		utils.GetLogInstance().Debug("[SYNC] peerRegistration Record", "peerID", selfPeerID, "number", len(node.peerRegistrationRecord))
-
-		for peerID, config := range node.peerRegistrationRecord {
-			elapseTime := time.Now().UnixNano() - config.timestamp
-			if elapseTime > broadcastTimeout {
-				utils.GetLogInstance().Warn("[SYNC] SendNewBlockToUnsync to peer timeout", "peerID", peerID)
-				// send last time and delete
-				config.client.PushNewBlock(selfPeerID, blockHash, true)
-				node.stateMutex.Lock()
-				node.peerRegistrationRecord[peerID].client.Close()
-				delete(node.peerRegistrationRecord, peerID)
-				node.stateMutex.Unlock()
-				continue
-			}
-			response := config.client.PushNewBlock(selfPeerID, blockHash, false)
-			if response != nil && response.Type == downloader_pb.DownloaderResponse_INSYNC {
-				node.stateMutex.Lock()
-				node.peerRegistrationRecord[peerID].client.Close()
-				delete(node.peerRegistrationRecord, peerID)
-				node.stateMutex.Unlock()
-			}
-		}
-	}
-}
-
 // RemovePeersHandler is a goroutine to wait on the OfflinePeers channel
 // and remove the peers from validator list
 func (node *Node) RemovePeersHandler() {
@@ -713,24 +570,57 @@ func decodeFuncSign(data []byte) string {
 	return funcSign
 }
 
-func (node *Node) setupForShardLeader() {
+func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 	chanPeer := make(chan p2p.Peer)
 
 	nodeConfig := service.NodeConfig{
 		IsBeacon: false,
-		IsClient: false,
+		IsClient: true,
 		Beacon:   p2p.GroupIDBeacon,
 		Group:    p2p.GroupIDUnknown,
 		Actions:  make(map[p2p.GroupID]p2p.ActionType),
 	}
-	nodeConfig.Actions[p2p.GroupIDBeacon] = p2p.ActionStart
+	nodeConfig.Actions[p2p.GroupIDBeaconClient] = p2p.ActionStart
+
+	var err error
+	node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
+	if err != nil {
+		utils.GetLogInstance().Error("create group receiver error", "msg", err)
+	}
+
+	return nodeConfig, chanPeer
+}
+
+func (node *Node) initBeaconNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
+	chanPeer := make(chan p2p.Peer)
+
+	nodeConfig := service.NodeConfig{
+		IsBeacon: true,
+		IsClient: true,
+		Beacon:   p2p.GroupIDBeacon,
+		Group:    p2p.GroupIDUnknown,
+		Actions:  make(map[p2p.GroupID]p2p.ActionType),
+	}
+	nodeConfig.Actions[p2p.GroupIDBeaconClient] = p2p.ActionStart
 
 	var err error
 	node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeacon)
 	if err != nil {
 		utils.GetLogInstance().Error("create group receiver error", "msg", err)
-		return
 	}
+
+	// All beacon chain node will subscribe to BeaconClient topic
+	node.clientReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
+	if err != nil {
+		utils.GetLogInstance().Error("create client receiver error", "msg", err)
+	}
+	node.MyClientGroupID = p2p.GroupIDBeaconClient
+
+	return nodeConfig, chanPeer
+}
+
+func (node *Node) setupForShardLeader() {
+	nodeConfig, chanPeer := node.initNodeConfiguration()
 
 	// Register peer discovery service. No need to do staking for beacon chain node.
 	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
@@ -750,47 +640,16 @@ func (node *Node) setupForShardLeader() {
 }
 
 func (node *Node) setupForShardValidator() {
-	chanPeer := make(chan p2p.Peer)
-	nodeConfig := service.NodeConfig{
-		IsBeacon: false,
-		IsClient: false,
-		Beacon:   p2p.GroupIDBeacon,
-		Group:    p2p.GroupIDUnknown,
-		Actions:  make(map[p2p.GroupID]p2p.ActionType),
-	}
-	nodeConfig.Actions[p2p.GroupIDBeacon] = p2p.ActionStart
-
-	var err error
-	node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeacon)
-	if err != nil {
-		utils.GetLogInstance().Error("create group receiver error", "msg", err)
-		return
-	}
+	nodeConfig, chanPeer := node.initNodeConfiguration()
 
 	// Register peer discovery service. "0" is the beacon shard ID. No need to do staking for beacon chain node.
 	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
 	// Register networkinfo service. "0" is the beacon shard ID
 	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
-
 }
 
 func (node *Node) setupForBeaconLeader() {
-	chanPeer := make(chan p2p.Peer)
-	nodeConfig := service.NodeConfig{
-		IsBeacon: true,
-		IsClient: false,
-		Beacon:   p2p.GroupIDBeacon,
-		Group:    p2p.GroupIDUnknown,
-		Actions:  make(map[p2p.GroupID]p2p.ActionType),
-	}
-	nodeConfig.Actions[p2p.GroupIDBeacon] = p2p.ActionStart
-
-	var err error
-	node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeacon)
-	if err != nil {
-		utils.GetLogInstance().Error("create group receiver error", "msg", err)
-		return
-	}
+	nodeConfig, chanPeer := node.initBeaconNodeConfiguration()
 
 	// Register peer discovery service. No need to do staking for beacon chain node.
 	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
@@ -805,26 +664,10 @@ func (node *Node) setupForBeaconLeader() {
 	node.serviceManager.RegisterService(service_manager.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
 	// Register randomness service
 	node.serviceManager.RegisterService(service_manager.Randomness, randomness_service.New(node.DRand))
-
 }
 
 func (node *Node) setupForBeaconValidator() {
-	chanPeer := make(chan p2p.Peer)
-	nodeConfig := service.NodeConfig{
-		IsBeacon: true,
-		IsClient: false,
-		Beacon:   p2p.GroupIDBeacon,
-		Group:    p2p.GroupIDUnknown,
-		Actions:  make(map[p2p.GroupID]p2p.ActionType),
-	}
-	nodeConfig.Actions[p2p.GroupIDBeacon] = p2p.ActionStart
-
-	var err error
-	node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeacon)
-	if err != nil {
-		utils.GetLogInstance().Error("create group receiver error", "msg", err)
-		return
-	}
+	nodeConfig, chanPeer := node.initBeaconNodeConfiguration()
 
 	// Register peer discovery service. No need to do staking for beacon chain node.
 	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
@@ -835,33 +678,26 @@ func (node *Node) setupForBeaconValidator() {
 }
 
 func (node *Node) setupForNewNode() {
-	chanPeer := make(chan p2p.Peer)
-	stakingPeer := make(chan p2p.Peer)
-
-	nodeConfig := service.NodeConfig{
-		IsBeacon: false,
-		IsClient: false,
-		Beacon:   p2p.GroupIDBeacon,
-		Group:    p2p.GroupIDUnknown,
-		Actions:  make(map[p2p.GroupID]p2p.ActionType),
-	}
-	nodeConfig.Actions[p2p.GroupIDBeacon] = p2p.ActionStart
-
-	var err error
-	node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeacon)
-	if err != nil {
-		utils.GetLogInstance().Error("create group receiver error", "msg", err)
-		return
-	}
+	nodeConfig, chanPeer := node.initNodeConfiguration()
 
 	// Register staking service.
-	node.serviceManager.RegisterService(service_manager.Staking, staking.New(node.AccountKey, 0, stakingPeer))
-	// Register peer discovery service. "0" is the beacon shard ID
+	// node.serviceManager.RegisterService(service_manager.Staking, staking.New(node.AccountKey, 0, stakingPeer))
+	// TODO: (leo) no need to start discovery service for new node until we received the sharding info
+	// Register peer discovery service.
 	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
 	// Register networkinfo service. "0" is the beacon shard ID
 	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
 
 	// TODO: how to restart networkinfo and discovery service after receiving shard id info from beacon chain?
+}
+
+func (node *Node) setupForClientNode() {
+	nodeConfig, chanPeer := node.initNodeConfiguration()
+
+	// Register peer discovery service.
+	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
+	// Register networkinfo service. "0" is the beacon shard ID
+	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
 }
 
 // ServiceManagerSetup setups service store.
@@ -878,6 +714,8 @@ func (node *Node) ServiceManagerSetup() {
 		node.setupForBeaconValidator()
 	case NewNode:
 		node.setupForNewNode()
+	case ClientNode:
+		node.setupForClientNode()
 	}
 }
 
