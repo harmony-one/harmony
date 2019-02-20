@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/binary"
 	"math"
 	"math/rand"
 	"sort"
@@ -17,7 +18,7 @@ const (
 // ShardingState is data structure hold the sharding state
 type ShardingState struct {
 	epoch      uint64 // current epoch
-	rnd        uint32 // random seed for resharding
+	rnd        uint64 // random seed for resharding
 	numShards  int
 	shardState types.ShardState
 }
@@ -109,9 +110,11 @@ func GetPreviousEpochBlockNumber(blockNumber uint64) uint64 {
 func GetShardingStateFromBlockChain(bc *BlockChain, epoch uint64) *ShardingState {
 	number := GetBlockNumberFromEpoch(epoch)
 	shardState := bc.GetShardStateByNumber(number)
-	rnd := bc.GetRandSeedByNumber(number)
 
-	return &ShardingState{epoch: epoch, rnd: rnd, shardState: shardState, numShards: len(shardState)}
+	rndSeedBytes := bc.GetRandSeedByNumber(number)
+	rndSeed := binary.BigEndian.Uint64(rndSeedBytes[:])
+
+	return &ShardingState{epoch: epoch, rnd: rndSeed, shardState: shardState, numShards: len(shardState)}
 }
 
 // CalculateNewShardState get sharding state from previous epoch and calcualte sharding state for new epoch

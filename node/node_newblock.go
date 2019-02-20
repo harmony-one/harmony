@@ -3,7 +3,6 @@ package node
 import (
 	"time"
 
-	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 )
@@ -86,22 +85,4 @@ func (node *Node) addNewShardState(block *types.Block) {
 		}
 		block.AddShardStateHash(shardHash)
 	}
-}
-
-func (node *Node) addNewRandSeed(block *types.Block) {
-	if !core.IsEpochBlock(block) {
-		return
-	}
-
-	var rnd uint32
-	blockNumber := block.NumberU64()
-	epoch := core.GetEpochFromBlockNumber(blockNumber)
-	if epoch == 1 {
-		rnd = core.InitialSeed
-	} else {
-		number := core.GetPreviousEpochBlockNumber(blockNumber)
-		oldrnd := node.blockchain.GetRandSeedByNumber(number)
-		rnd = core.FakeGenRandSeed(oldrnd)
-	}
-	block.AddRandSeed(rnd)
 }

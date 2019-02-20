@@ -98,8 +98,8 @@ type Header struct {
 	CommitSignature  [48]byte `json:"signature"        gencodec:"required"`
 	CommitBitmap     []byte   `json:"bitmap"           gencodec:"required"` // Contains which validator signed
 
-	RandPreimage   uint32      `json:"randPreimage"`
-	RandSeed       uint32      `json:"randSeed"`
+	RandPreimage   [32]byte    `json:"randPreimage"`
+	RandSeed       [32]byte    `json:"randSeed"`
 	ShardStateHash common.Hash `json:"shardStateRoot"`
 }
 
@@ -453,12 +453,12 @@ func Number(b1, b2 *Block) bool {
 }
 
 // AddRandSeed add random seed into block header
-func (b *Block) AddRandSeed(randSeed uint32) {
+func (b *Block) AddRandSeed(randSeed [32]byte) {
 	b.header.RandSeed = randSeed
 }
 
 // AddRandPreimage add randomness preimage into block header
-func (b *Block) AddRandPreimage(pRnd uint32) {
+func (b *Block) AddRandPreimage(pRnd [32]byte) {
 	b.header.RandPreimage = pRnd
 }
 
