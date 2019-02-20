@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"math/big"
 	"os"
@@ -282,11 +281,6 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 		node.BlockChannel = make(chan *types.Block)
 		node.ConfirmedBlockChannel = make(chan *types.Block)
 
-		bytes, _ := rlp.EncodeToBytes(chain.GetBlockByNumber(0))
-		fmt.Println("TestTest")
-		fmt.Println(hex.EncodeToString(bytes))
-		hash := chain.GetBlockByNumber(0).Hash()
-		fmt.Println(hex.EncodeToString(hash[:]))
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, params.TestChainConfig, chain)
 		node.Worker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey), node.Consensus.ShardID)
 		if node.Role == BeaconLeader || node.Role == BeaconValidator {
