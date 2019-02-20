@@ -71,6 +71,7 @@ const (
 	BeaconLeader
 	BeaconValidator
 	NewNode
+	ClientNode
 )
 
 func (state State) String() string {
@@ -726,10 +727,23 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 }
 
 func (node *Node) initBeaconNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
-	nodeConfig, chanPeer := node.initNodeConfiguration()
-	nodeConfig.IsBeacon = true
+	chanPeer := make(chan p2p.Peer)
+
+	nodeConfig := service.NodeConfig{
+		IsBeacon: true,
+		IsClient: true,
+		Beacon:   p2p.GroupIDBeacon,
+		Group:    p2p.GroupIDUnknown,
+		Actions:  make(map[p2p.GroupID]p2p.ActionType),
+	}
+	nodeConfig.Actions[p2p.GroupIDBeaconClient] = p2p.ActionStart
 
 	var err error
+	node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeacon)
+	if err != nil {
+		utils.GetLogInstance().Error("create group receiver error", "msg", err)
+	}
+
 	// All beacon chain node will subscribe to BeaconClient topic
 	node.clientReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
 	if err != nil {
@@ -812,6 +826,15 @@ func (node *Node) setupForNewNode() {
 	// TODO: how to restart networkinfo and discovery service after receiving shard id info from beacon chain?
 }
 
+func (node *Node) setupForClientNode() {
+	nodeConfig, chanPeer := node.initNodeConfiguration()
+
+	// Register peer discovery service.
+	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
+	// Register networkinfo service. "0" is the beacon shard ID
+	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
+}
+
 // ServiceManagerSetup setups service store.
 func (node *Node) ServiceManagerSetup() {
 	node.serviceManager = &service_manager.Manager{}
@@ -826,6 +849,8 @@ func (node *Node) ServiceManagerSetup() {
 		node.setupForBeaconValidator()
 	case NewNode:
 		node.setupForNewNode()
+	case ClientNode:
+		node.setupForClientNode()
 	}
 }
 
