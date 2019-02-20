@@ -65,7 +65,7 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan *types.Block, stop
 					newBlock.AddRandPreimage(binary.BigEndian.Uint32(pRnd))
 				}
 				rnd, blockHash, err := consensus.GetNextRnd()
-				if err != nil {
+				if err == nil {
 					// Verify the randomness
 					_ = blockHash
 					utils.GetLogInstance().Info("Adding randomness into new block", "rnd", rnd)
