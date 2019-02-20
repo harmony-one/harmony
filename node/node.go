@@ -134,8 +134,9 @@ type Node struct {
 	pendingTxMutex         sync.Mutex
 	DRand                  *drand.DRand // The instance for distributed randomness protocol
 
-	blockchain *core.BlockChain   // The blockchain for the shard where this node belongs
-	db         *ethdb.LDBDatabase // LevelDB to store blockchain.
+	blockchain  *core.BlockChain   // The blockchain for the shard where this node belongs
+	beaconChain *core.BlockChain   // The blockchain for beacon chain.
+	db          *ethdb.LDBDatabase // LevelDB to store blockchain.
 
 	ClientPeer *p2p.Peer      // The peer for the harmony tx generator client, used for leaders to return proof-of-accept
 	Client     *client.Client // The presence of a client object means this node will also act as a client
