@@ -3,7 +3,7 @@ package drand
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
+	"time"
 
 	"github.com/harmony-one/harmony/crypto/vdf"
 
@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	vdfDifficulty = 10000000
+	vdfDifficulty = 1000000
 )
 
 // WaitForEpochBlock waits for the first epoch block to run DRG on
@@ -40,15 +40,18 @@ func (dRand *DRand) WaitForEpochBlock(blockChannel chan *types.Block, stopChan c
 
 						vdf := vdf.New(vdfDifficulty, input)
 						outputChannel := vdf.GetOutputChannel()
+						start := time.Now()
 						vdf.Execute()
+						duration := time.Now().Sub(start)
+						utils.GetLogInstance().Info("VDF computation finished", "time spent", duration.String())
 						output := <-outputChannel
-						rndBytes := [64]byte{}
+
+						rndBytes := [64]byte{} // The first 32 bytes are the randomness and the last 32 bytes are the hash of the block where the corresponding pRnd was generated
 						copy(rndBytes[:32], output[:])
-						fmt.Println("TESTTEST")
-						fmt.Println(rndBytes)
+
 						blockHash := newBlock.Hash()
 						copy(rndBytes[32:], blockHash[:])
-						fmt.Println(rndBytes)
+
 						dRand.RndChannel <- rndBytes
 					}()
 				}

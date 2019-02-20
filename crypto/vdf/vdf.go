@@ -37,7 +37,9 @@ func (vdf *VDF) Execute() {
 		tempResult = sha3.Sum256(tempResult[:])
 	}
 	vdf.output = tempResult
-	vdf.outputChan <- vdf.output
+	go func() {
+		vdf.outputChan <- vdf.output
+	}()
 	vdf.finished = true
 }
 

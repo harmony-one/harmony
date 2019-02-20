@@ -36,9 +36,6 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan *types.Block, stop
 		for {
 			select {
 			default:
-				// got the signal to start consensus
-				_ = <-startChannel
-
 				utils.GetLogInstance().Debug("Waiting for block", "consensus", consensus)
 				// keep waiting for new blocks
 				newBlock := <-blockChannel
