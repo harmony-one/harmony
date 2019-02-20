@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -80,6 +82,7 @@ type Action struct {
 // Interface is the collection of functions any service needs to implement.
 type Interface interface {
 	StartService()
+	SetMessageChan(msgChan chan *msg_pb.Message)
 	StopService()
 	NotifyService(map[string]interface{})
 }
@@ -172,5 +175,14 @@ func (m *Manager) RunServices() {
 			ServiceType: serviceType,
 		}
 		m.TakeAction(action)
+	}
+}
+
+// SetupServiceMessageChan sets up message channel to services.
+func (m *Manager) SetupServiceMessageChan(mapServiceTypeChan map[service.Type]chan *msg_pb.Message) {
+	for serviceType, service := range m.services {
+		// TODO(minhdoan): for performance, consider buffered channel.
+		mapServiceTypeChan[serviceType] = make(chan *msg_pb.Message)
+		service.SetMessageChan(mapServiceTypeChan[serviceType])
 	}
 }

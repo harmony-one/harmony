@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	clientService "github.com/harmony-one/harmony/api/client/service"
+	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/state"
 	"google.golang.org/grpc"
 )
@@ -16,10 +17,11 @@ const (
 
 // Service is the client support service.
 type Service struct {
-	server     *clientService.Server
-	grpcServer *grpc.Server
-	ip         string
-	port       string
+	server      *clientService.Server
+	grpcServer  *grpc.Server
+	ip          string
+	port        string
+	messageChan chan *msg_pb.Message
 }
 
 // New returns new client support service.
@@ -35,13 +37,18 @@ func New(stateReader func() (*state.DB, error),
 }
 
 // StartService starts client support service.
-func (sc *Service) StartService() {
-	sc.grpcServer, _ = sc.server.Start(sc.ip, sc.port)
+func (s *Service) StartService() {
+	s.grpcServer, _ = s.server.Start(s.ip, s.port)
 }
 
 // StopService stops client support service.
-func (sc *Service) StopService() {
-	sc.grpcServer.Stop()
+func (s *Service) StopService() {
+	s.grpcServer.Stop()
+}
+
+// SetMessageChan sets up message channel to service.
+func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {
+	s.messageChan = messageChan
 }
 
 // NotifyService notify service

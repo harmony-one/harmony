@@ -14,6 +14,7 @@ import (
 	proto_common "github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core"
+	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -41,6 +42,7 @@ type Service struct {
 	stakingAmount int64
 	state         State
 	beaconChain   *core.BlockChain
+	messageChan   chan *msg_pb.Message
 }
 
 // New returns staking service.
@@ -182,4 +184,8 @@ func (s *Service) StopService() {
 // NotifyService notify service
 func (s *Service) NotifyService(params map[string]interface{}) {
 	return
+
+	// SetMessageChan sets up message channel to service.
+func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {
+	s.messageChan = messageChan
 }

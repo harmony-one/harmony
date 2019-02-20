@@ -10,8 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/harmony-one/harmony/drand"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -21,6 +19,7 @@ import (
 	"github.com/harmony-one/harmony/api/client"
 	clientService "github.com/harmony-one/harmony/api/client/service"
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
+	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/api/service"
 	service_manager "github.com/harmony-one/harmony/api/service"
@@ -40,6 +39,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/pki"
+	"github.com/harmony-one/harmony/drand"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
@@ -207,6 +207,9 @@ type Node struct {
 
 	// My ShardClient GroupID
 	MyClientGroupID p2p.GroupID
+
+	// map of service type to its message channel.
+	serviceMessageChan map[service.Type]chan *msg_pb.Message
 }
 
 // Blockchain returns the blockchain from node
@@ -719,6 +722,7 @@ func (node *Node) AddBeaconChainDatabase(db ethdb.Database) {
 // ServiceManagerSetup setups service store.
 func (node *Node) ServiceManagerSetup() {
 	node.serviceManager = &service_manager.Manager{}
+	node.serviceMessageChan = make(map[service.Type]chan *msg_pb.Message)
 	switch node.Role {
 	case ShardLeader:
 		node.setupForShardLeader()
@@ -733,6 +737,7 @@ func (node *Node) ServiceManagerSetup() {
 	case ClientNode:
 		node.setupForClientNode()
 	}
+	node.serviceManager.SetupServiceMessageChan(node.serviceMessageChan)
 }
 
 // RunServices runs registered services.

@@ -1,6 +1,7 @@
 package rconversion
 
 import (
+	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -8,6 +9,7 @@ import (
 type Service struct {
 	stopChan    chan struct{}
 	stoppedChan chan struct{}
+	messageChan chan *msg_pb.Message
 }
 
 // New returns role conversion service.
@@ -60,4 +62,9 @@ func (s *Service) StopService() {
 // NotifyService notify service
 func (s *Service) NotifyService(params map[string]interface{}) {
 	return
+}
+
+// SetMessageChan sets up message channel to service.
+func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {
+	s.messageChan = messageChan
 }
