@@ -73,6 +73,7 @@ const (
 	BeaconLeader
 	BeaconValidator
 	NewNode
+	ClientNode
 )
 
 func (state State) String() string {
@@ -848,6 +849,15 @@ func (node *Node) setupForNewNode() {
 	// TODO: how to restart networkinfo and discovery service after receiving shard id info from beacon chain?
 }
 
+func (node *Node) setupForClientNode() {
+	nodeConfig, chanPeer := node.initNodeConfiguration()
+
+	// Register peer discovery service.
+	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
+	// Register networkinfo service. "0" is the beacon shard ID
+	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
+}
+
 // ServiceManagerSetup setups service store.
 func (node *Node) ServiceManagerSetup() {
 	node.serviceManager = &service_manager.Manager{}
@@ -862,6 +872,8 @@ func (node *Node) ServiceManagerSetup() {
 		node.setupForBeaconValidator()
 	case NewNode:
 		node.setupForNewNode()
+	case ClientNode:
+		node.setupForClientNode()
 	}
 }
 

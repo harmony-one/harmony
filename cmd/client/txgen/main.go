@@ -196,9 +196,7 @@ func main() {
 	clientNode.Client.UpdateBlocks = updateBlocksFunc
 
 	for _, leader := range shardIDLeaderMap {
-		if *libp2pPD {
-			clientNode.Role = node.NewNode
-		} else {
+		if !*libp2pPD {
 			clientNode.GetHost().AddPeer(&leader)
 			utils.GetLogInstance().Debug("Client Join Shard", "leader", leader)
 			go clientNode.JoinShard(leader)
@@ -207,6 +205,7 @@ func main() {
 	}
 
 	if *libp2pPD {
+		clientNode.Role = node.ClientNode
 		clientNode.ServiceManagerSetup()
 		clientNode.RunServices()
 		go clientNode.StartServer()
