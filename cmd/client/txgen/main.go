@@ -125,6 +125,7 @@ func main() {
 
 		debugPrintShardIDLeaderMap(shardIDLeaderMap)
 	} else {
+		// Init with LibP2P enabled, FIXME: (leochen) right now we support only one shard
 		shardIDLeaderMap = make(map[uint32]p2p.Peer)
 		shardIDLeaderMap[0] = p2p.Peer{}
 		utils.UseLibP2P = true

@@ -727,24 +727,44 @@ func decodeFuncSign(data []byte) string {
 	return funcSign
 }
 
-func (node *Node) setupForShardLeader() {
+func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 	chanPeer := make(chan p2p.Peer)
 
 	nodeConfig := service.NodeConfig{
 		IsBeacon: false,
-		IsClient: false,
+		IsClient: true,
 		Beacon:   p2p.GroupIDBeacon,
 		Group:    p2p.GroupIDUnknown,
 		Actions:  make(map[p2p.GroupID]p2p.ActionType),
 	}
-	nodeConfig.Actions[p2p.GroupIDBeacon] = p2p.ActionStart
+	nodeConfig.Actions[p2p.GroupIDBeaconClient] = p2p.ActionStart
 
 	var err error
-	node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeacon)
+	node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
 	if err != nil {
 		utils.GetLogInstance().Error("create group receiver error", "msg", err)
-		return
 	}
+
+	return nodeConfig, chanPeer
+}
+
+func (node *Node) initBeaconNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
+	nodeConfig, chanPeer := node.initNodeConfiguration()
+	nodeConfig.IsBeacon = true
+
+	var err error
+	// All beacon chain node will subscribe to BeaconClient topic
+	node.clientReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
+	if err != nil {
+		utils.GetLogInstance().Error("create client receiver error", "msg", err)
+	}
+	node.MyClientGroupID = p2p.GroupIDBeaconClient
+
+	return nodeConfig, chanPeer
+}
+
+func (node *Node) setupForShardLeader() {
+	nodeConfig, chanPeer := node.initNodeConfiguration()
 
 	// Register peer discovery service. No need to do staking for beacon chain node.
 	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
@@ -764,53 +784,16 @@ func (node *Node) setupForShardLeader() {
 }
 
 func (node *Node) setupForShardValidator() {
-	chanPeer := make(chan p2p.Peer)
-	nodeConfig := service.NodeConfig{
-		IsBeacon: false,
-		IsClient: false,
-		Beacon:   p2p.GroupIDBeacon,
-		Group:    p2p.GroupIDUnknown,
-		Actions:  make(map[p2p.GroupID]p2p.ActionType),
-	}
-	nodeConfig.Actions[p2p.GroupIDBeacon] = p2p.ActionStart
-
-	var err error
-	node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeacon)
-	if err != nil {
-		utils.GetLogInstance().Error("create group receiver error", "msg", err)
-		return
-	}
+	nodeConfig, chanPeer := node.initNodeConfiguration()
 
 	// Register peer discovery service. "0" is the beacon shard ID. No need to do staking for beacon chain node.
 	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
 	// Register networkinfo service. "0" is the beacon shard ID
 	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
-
 }
 
 func (node *Node) setupForBeaconLeader() {
-	chanPeer := make(chan p2p.Peer)
-	nodeConfig := service.NodeConfig{
-		IsBeacon: true,
-		IsClient: false,
-		Beacon:   p2p.GroupIDBeacon,
-		Group:    p2p.GroupIDUnknown,
-		Actions:  make(map[p2p.GroupID]p2p.ActionType),
-	}
-	nodeConfig.Actions[p2p.GroupIDBeacon] = p2p.ActionStart
-
-	var err error
-	node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeacon)
-	if err != nil {
-		utils.GetLogInstance().Error("create group receiver error", "msg", err)
-		return
-	}
-	node.clientReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
-	if err != nil {
-		utils.GetLogInstance().Error("create client receiver error", "msg", err)
-		return
-	}
-	node.MyClientGroupID = p2p.GroupIDBeaconClient
+	nodeConfig, chanPeer := node.initBeaconNodeConfiguration()
 
 	// Register peer discovery service. No need to do staking for beacon chain node.
 	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
@@ -825,32 +808,10 @@ func (node *Node) setupForBeaconLeader() {
 	node.serviceManager.RegisterService(service_manager.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
 	// Register randomness service
 	node.serviceManager.RegisterService(service_manager.Randomness, randomness_service.New(node.DRand))
-
 }
 
 func (node *Node) setupForBeaconValidator() {
-	chanPeer := make(chan p2p.Peer)
-	nodeConfig := service.NodeConfig{
-		IsBeacon: true,
-		IsClient: false,
-		Beacon:   p2p.GroupIDBeacon,
-		Group:    p2p.GroupIDUnknown,
-		Actions:  make(map[p2p.GroupID]p2p.ActionType),
-	}
-	nodeConfig.Actions[p2p.GroupIDBeacon] = p2p.ActionStart
-
-	var err error
-	node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeacon)
-	if err != nil {
-		utils.GetLogInstance().Error("create group receiver error", "msg", err)
-		return
-	}
-	node.clientReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
-	if err != nil {
-		utils.GetLogInstance().Error("create client receiver error", "msg", err)
-		return
-	}
-	node.MyClientGroupID = p2p.GroupIDBeaconClient
+	nodeConfig, chanPeer := node.initBeaconNodeConfiguration()
 
 	// Register peer discovery service. No need to do staking for beacon chain node.
 	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
@@ -861,25 +822,7 @@ func (node *Node) setupForBeaconValidator() {
 }
 
 func (node *Node) setupForNewNode() {
-	chanPeer := make(chan p2p.Peer)
-	//	stakingPeer := make(chan p2p.Peer)
-
-	// all new node start as client of beacon chain
-	nodeConfig := service.NodeConfig{
-		IsBeacon: false,
-		IsClient: true,
-		Beacon:   p2p.GroupIDBeaconClient,
-		Group:    p2p.GroupIDUnknown,
-		Actions:  make(map[p2p.GroupID]p2p.ActionType),
-	}
-	nodeConfig.Actions[p2p.GroupIDBeaconClient] = p2p.ActionStart
-
-	var err error
-	node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
-	if err != nil {
-		utils.GetLogInstance().Error("create group receiver error", "msg", err)
-		return
-	}
+	nodeConfig, chanPeer := node.initNodeConfiguration()
 
 	// Register staking service.
 	// node.serviceManager.RegisterService(service_manager.Staking, staking.New(node.AccountKey, 0, stakingPeer))

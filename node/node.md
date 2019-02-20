@@ -43,3 +43,17 @@ type Action struct {
 ### Resharding
 
 Service Manager is very handy to transform a node role from validator to leader or anything else. All we need to do is to stop all current services and start all services of the new role.
+
+### LibP2P Integration
+
+We have enabled libp2p based gossiping using pubsub. Nodes no longer send messages to individual nodes.
+All message communication is via SendMessageToGroups function.
+
+* Beacon chain nodes need to subscribe to TWO topics
+** one is beacon chain topic itself: GroupIDBeacon
+** another one is beacon client topic: GroupIDBeaconClient. Only Beacon Chain leader needs to send to this topic.
+
+* Every new node other than beacon chain nodes needs to subscribe to THREE topic. This also include txgen program.
+** one is beacon chain client topic => It is used to send staking transaction, and receive beacon chain blocks to determine the sharding info and randomness
+** one is shard consensus itself => It is used for within shard consensus, pingpong messages
+** one is client of the shard => It is used to receive tx from client, and send block back to client like txgen. Only shard Leader needs to send to this topic.

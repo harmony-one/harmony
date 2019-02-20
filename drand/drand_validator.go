@@ -37,7 +37,7 @@ func (dRand *DRand) processInitMessage(message drand_proto.Message) {
 	// Verify message signature
 	err := verifyMessageSig(dRand.Leader.PubKey, message)
 	if err != nil {
-		utils.GetLogInstance().Warn("Failed to verify the message signature", "Error", err)
+		utils.GetLogInstance().Warn("Failed to verify the message signature", "Error", err, "Leader.PubKey", dRand.Leader.PubKey)
 		return
 	}
 
