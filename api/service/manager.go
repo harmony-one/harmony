@@ -5,7 +5,6 @@ import (
 	"time"
 
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
-	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -179,7 +178,7 @@ func (m *Manager) RunServices() {
 }
 
 // SetupServiceMessageChan sets up message channel to services.
-func (m *Manager) SetupServiceMessageChan(mapServiceTypeChan map[service.Type]chan *msg_pb.Message) {
+func (m *Manager) SetupServiceMessageChan(mapServiceTypeChan map[Type]chan *msg_pb.Message) {
 	for serviceType, service := range m.services {
 		// TODO(minhdoan): for performance, consider buffered channel.
 		mapServiceTypeChan[serviceType] = make(chan *msg_pb.Message)
