@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	vdfDifficulty = 1000000
+	vdfDifficulty = 5000000 // This takes about 20s to finish the vdf
 )
 
 // WaitForEpochBlock waits for the first epoch block to run DRG on

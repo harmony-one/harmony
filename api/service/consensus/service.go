@@ -25,6 +25,7 @@ func (s *Service) StartService() {
 	s.stopChan = make(chan struct{})
 	s.stoppedChan = make(chan struct{})
 	s.consensus.WaitForNewBlock(s.blockChannel, s.stopChan, s.stoppedChan, s.startChan)
+	s.consensus.WaitForNewRandomness()
 }
 
 // StopService stops consensus service.
