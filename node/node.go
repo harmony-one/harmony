@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"math/big"
 	"os"
@@ -25,7 +24,7 @@ import (
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/api/service"
 	service_manager "github.com/harmony-one/harmony/api/service"
-	blockproposal "github.com/harmony-one/harmony/api/service/blockproposal"
+	"github.com/harmony-one/harmony/api/service/blockproposal"
 	"github.com/harmony-one/harmony/api/service/clientsupport"
 	consensus_service "github.com/harmony-one/harmony/api/service/consensus"
 	"github.com/harmony-one/harmony/api/service/discovery"
@@ -287,8 +286,6 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 		if node.Role == BeaconLeader || node.Role == BeaconValidator {
 			node.CurrentStakes = make(map[common.Address]int64)
 		}
-		bytes, _ := rlp.EncodeToBytes(chain.GetBlockByNumber(0))
-		utils.GetLogInstance().Debug("TESTTEST", "block", hex.EncodeToString(bytes))
 		utils.GetLogInstance().Debug("Received", "blockHash", chain.GetBlockByNumber(0).Hash().Hex())
 		node.Consensus.ConsensusBlock = make(chan *bft.BFTBlockInfo)
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)

@@ -99,6 +99,9 @@ type Consensus struct {
 
 	// Channel for DRG protocol to send pRnd (preimage of randomness resulting from combined vrf randomnesses) to consensus. The first 32 bytes are randomness, the rest is for bitmap.
 	PRndChannel chan []byte
+	// Channel for DRG protocol to send the final randomness to consensus. The first 32 bytes are the randomness and the last 32 bytes are the hash of the block where the corresponding pRnd was generated
+	RndChannel  chan [64]byte
+	pendingRnds [][64]byte // A list of pending randomness
 
 	uniqueIDInstance *utils.UniqueValidatorID
 
@@ -138,6 +141,29 @@ func (consensus *Consensus) UpdateConsensusID(consensusID uint32) {
 		utils.GetLogInstance().Debug("update consensusID", "myConsensusID", consensus.consensusID, "newConsensusID", consensusID)
 		consensus.consensusID = consensusID
 	}
+}
+
+// WaitForNewRandomness listens to the RndChannel to receive new VDF randomness.
+func (consensus *Consensus) WaitForNewRandomness() {
+	go func() {
+		for {
+			vdfOutput := <-consensus.RndChannel
+			consensus.pendingRnds = append(consensus.pendingRnds, vdfOutput)
+		}
+	}()
+}
+
+// GetNextRnd returns the oldest available randomness along with the hash of the block there randomness preimage is committed.
+func (consensus *Consensus) GetNextRnd() ([32]byte, [32]byte, error) {
+	if len(consensus.pendingRnds) == 0 {
+		return [32]byte{}, [32]byte{}, errors.New("No available randomness")
+	}
+	vdfOutput := consensus.pendingRnds[0]
+	rnd := [32]byte{}
+	blockHash := [32]byte{}
+	copy(rnd[:], vdfOutput[:32])
+	copy(blockHash[:], vdfOutput[32:])
+	return rnd, blockHash, nil
 }
 
 // New creates a new Consensus object
@@ -220,6 +246,11 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Cons
 // RegisterPRndChannel registers the channel for receiving randomness preimage from DRG protocol
 func (consensus *Consensus) RegisterPRndChannel(pRndChannel chan []byte) {
 	consensus.PRndChannel = pRndChannel
+}
+
+// RegisterRndChannel registers the channel for receiving final randomness from DRG protocol
+func (consensus *Consensus) RegisterRndChannel(rndChannel chan [64]byte) {
+	consensus.RndChannel = rndChannel
 }
 
 // Checks the basic meta of a consensus message, including the signature.

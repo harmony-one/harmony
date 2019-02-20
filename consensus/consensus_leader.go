@@ -78,6 +78,15 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan *types.Block, stop
 					// TODO: check validity of pRnd
 					newBlock.AddRandPreimage(binary.BigEndian.Uint32(pRnd))
 				}
+				rnd, blockHash, err := consensus.GetNextRnd()
+				if err == nil {
+					// Verify the randomness
+					_ = blockHash
+					utils.GetLogInstance().Info("Adding randomness into new block", "rnd", rnd)
+					newBlock.AddRandSeed(binary.BigEndian.Uint32(rnd[:]))
+				} else {
+					utils.GetLogInstance().Info("Failed to get randomness", "error", err)
+				}
 				startTime = time.Now()
 				utils.GetLogInstance().Debug("STARTING CONSENSUS", "numTxs", len(newBlock.Transactions()), "consensus", consensus, "startTime", startTime, "publicKeys", len(consensus.PublicKeys))
 				for { // Wait until last consensus is finished
