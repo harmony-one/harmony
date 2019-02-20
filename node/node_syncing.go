@@ -1,5 +1,9 @@
+package node
 
 import (
+	"fmt"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/ethereum/go-ethereum/rlp"
@@ -7,7 +11,39 @@ import (
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
 	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/p2p"
 )
+
+// GetSyncingPort returns the syncing port.
+func GetSyncingPort(nodePort string) string {
+	if port, err := strconv.Atoi(nodePort); err == nil {
+		return fmt.Sprintf("%d", port-syncing.SyncingPortDifference)
+	}
+	os.Exit(1)
+	return ""
+}
+
+// GetSyncingPeers returns list of peers.
+func (node *Node) GetSyncingPeers() []p2p.Peer {
+	res := []p2p.Peer{}
+	node.Neighbors.Range(func(k, v interface{}) bool {
+		res = append(res, v.(p2p.Peer))
+		return true
+	})
+
+	removeID := -1
+	for i := range res {
+		if res[i].Port == node.SelfPeer.Port {
+			removeID = i
+		}
+		res[i].Port = GetSyncingPort(res[i].Port)
+	}
+	if removeID != -1 {
+		res = append(res[:removeID], res[removeID+1:]...)
+	}
+	utils.GetLogInstance().Debug("GetSyncingPeers: ", "res", res, "self", node.SelfPeer)
+	return res
+}
 
 // DoSyncing wait for check status and starts syncing if out of sync
 func (node *Node) DoSyncing() {
