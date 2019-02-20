@@ -106,7 +106,7 @@ func (s *Service) contactP2pPeers() {
 				}
 
 				if a == p2p.ActionStart || a == p2p.ActionResume || a == p2p.ActionPause {
-					if g == p2p.GroupIDBeacon {
+					if g == p2p.GroupIDBeacon || g == p2p.GroupIDBeaconClient {
 						if s.config.IsBeacon {
 							// beacon chain node
 							err = s.host.SendMessageToGroups([]p2p.GroupID{s.config.Beacon}, regMsgBuf)

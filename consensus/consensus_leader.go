@@ -31,13 +31,24 @@ var (
 
 // WaitForNewBlock waits for the next new block to run consensus on
 func (consensus *Consensus) WaitForNewBlock(blockChannel chan *types.Block, stopChan chan struct{}, stoppedChan chan struct{}, startChannel chan struct{}) {
+	// gensis block is the first block to be processed.
+	// But we shouldn't start consensus yet, as we need to wait for all validators
+	// received the leader's pub key which will be propogated via Pong message.
+	// After we started the first consensus, we will go back to normal case to wait
+	// for new blocks.
+	// The signal to start the first consensus right now is the sending of Pong message (SendPongMessage function in node/node_handler.go
+	// but it can be changed to other conditions later
+	first := true
 	go func() {
 		defer close(stoppedChan)
 		for {
 			select {
 			default:
-				// got the signal to start consensus
-				_ = <-startChannel
+				if first && startChannel != nil {
+					// got the signal to start consensus
+					_ = <-startChannel
+					first = false
+				}
 
 				utils.GetLogInstance().Debug("Waiting for block", "consensus", consensus)
 				// keep waiting for new blocks
