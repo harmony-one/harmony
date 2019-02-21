@@ -34,6 +34,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 				node.Consensus.ResetState()
 				timeoutCount++
 				utils.GetLogInstance().Debug("Consensus timeout, retry!", "count", timeoutCount, "node", node)
+				// FIXME: retry is not working, there is no retry logic here. It will only wait for new transaction.
 			case <-stopChan:
 				return
 			}
