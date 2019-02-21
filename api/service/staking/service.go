@@ -9,7 +9,9 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
+	protobuf "github.com/golang/protobuf/proto"
 	proto "github.com/harmony-one/harmony/api/client/service/proto"
+	"github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -61,6 +63,7 @@ func (s *Service) Run() {
 	go func() {
 		defer close(s.stoppedChan)
 		// Do service first time and after that doing it every 5 minutes.
+		// The reason we have to do it in every x minutes because of beacon chain syncing.
 		s.DoService()
 		for {
 			select {
@@ -115,6 +118,26 @@ func (s *Service) getStakingInfo() *proto.StakingContractInfoResponse {
 	}
 }
 
+// Constructs the staking message
+func constructStakingMessage(ts types.Transactions) []byte {
+	msg := &message.Message{
+		Type: message.MessageType_NEWNODE_BEACON_STAKING,
+		Request: &message.Message_Staking{
+			Staking: &message.StakingRequest{
+				Transaction: ts.GetRlp(0),
+				NodeId:      "",
+			},
+		},
+	}
+	if data, err := protobuf.Marshal(msg); err == nil {
+		return data
+	} else {
+		utils.GetLogInstance().Error("Error when creating staking message")
+		return nil
+	}
+
+}
+
 func (s *Service) createStakingMessage() []byte {
 	stakingInfo := s.getStakingInfo()
 	toAddress := common.HexToAddress(stakingInfo.ContractAddress)
@@ -128,18 +151,8 @@ func (s *Service) createStakingMessage() []byte {
 		nil)
 
 	if signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, s.accountKey); err == nil {
-		_ = types.Transactions{signedTx}
-
-		// TODO(minhdoan): Use the new message protocol later.
-		// return &message.Message{
-		// 	Type: message.MessageType_NEWNODE_BEACON_STAKING,
-		// 	Request: &message.Message_Staking{
-		// 		Staking: &message.StakingRequest{
-		// 			Transaction: ts.GetRlp(0),
-		// 			NodeId:      "",
-		// 		},
-		// 	},
-		// }
+		ts := types.Transactions{signedTx}
+		return constructStakingMessage(ts)
 	}
 	return nil
 }

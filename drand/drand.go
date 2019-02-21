@@ -7,15 +7,13 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/harmony-one/harmony/crypto/vrf"
-	"github.com/harmony-one/harmony/crypto/vrf/p256"
-
-	"github.com/harmony-one/harmony/core/types"
-
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	drand_proto "github.com/harmony-one/harmony/api/drand"
+	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/crypto/vrf"
+	"github.com/harmony-one/harmony/crypto/vrf/p256"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 )
