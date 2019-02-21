@@ -1,5 +1,57 @@
 #!/bin/bash
 
+function killnode() {
+   local port=$1
+
+   if [ -n "port" ]; then
+      pid=$(/bin/ps -fu $USER | grep "harmony" | grep "$port" | awk '{print $2}')
+      echo "killing node with port: $port"
+      $DRYRUN kill -9 $pid 2> /dev/null
+      echo "node with port: $port is killed"
+   fi
+}
+
+# https://www.linuxjournal.com/content/validating-ip-address-bash-script
+function valid_ip()
+{
+    local  ip=$1
+    local  stat=1
+
+    if [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+        OIFS=$IFS
+        IFS='.'
+        ip=($ip)
+        IFS=$OIFS
+        [[ ${ip[0]} -le 255 && ${ip[1]} -le 255 \
+            && ${ip[2]} -le 255 && ${ip[3]} -le 255 ]]
+        stat=$?
+    fi
+    return $stat
+}
+
+function setup_env
+{
+# setup environment variables, may not be nessary
+   sysctl -w net.core.somaxconn=1024
+   sysctl -w net.core.netdev_max_backlog=65536
+   sysctl -w net.ipv4.tcp_tw_reuse=1
+   sysctl -w net.ipv4.tcp_rmem='4096 65536 16777216'
+   sysctl -w net.ipv4.tcp_wmem='4096 65536 16777216'
+   sysctl -w net.ipv4.tcp_mem='65536 131072 262144'
+
+   echo "* soft     nproc          65535" | sudo tee -a /etc/security/limits.conf
+   echo "* hard     nproc          65535" | sudo tee -a /etc/security/limits.conf
+   echo "* soft     nofile         65535" | sudo tee -a /etc/security/limits.conf
+   echo "* hard     nofile         65535" | sudo tee -a /etc/security/limits.conf
+   echo "root soft     nproc          65535" | sudo tee -a /etc/security/limits.conf
+   echo "root hard     nproc          65535" | sudo tee -a /etc/security/limits.conf
+   echo "root soft     nofile         65535" | sudo tee -a /etc/security/limits.conf
+   echo "root hard     nofile         65535" | sudo tee -a /etc/security/limits.conf
+   echo "session required pam_limits.so" | sudo tee -a /etc/pam.d/common-session
+}
+
+killnode
+
 mkdir -p latest
 BUCKET=pub.harmony.one
 OS=$(uname -s)
@@ -8,12 +60,12 @@ REL=20190216
 if [ "$OS" == "Darwin" ]; then
    FOLDER=release/$REL/darwin-x86_64/
    BIN=( harmony libbls384.dylib libcrypto.1.0.0.dylib libgmp.10.dylib libgmpxx.4.dylib libmcl.dylib )
-   export DYLD_FALLBACK_LIBRARY_PATH=.
+   export DYLD_FALLBACK_LIBRARY_PATH=$(pwd)
 fi
 if [ "$OS" == "Linux" ]; then
    FOLDER=release/$REL/linux-x86_64/
    BIN=( harmony libbls384.so libcrypto.so.10 libgmp.so.10 libgmpxx.so.4 libmcl.so )
-   export LD_LIBRARY_PATH=.
+   export LD_LIBRARY_PATH=$(pwd)
 fi
 
 # download all the binaries
@@ -22,39 +74,41 @@ for bin in "${BIN[@]}"; do
 done
 chmod +x harmony
 
-# setup environment variables, may not be nessary
-sysctl -w net.core.somaxconn=1024
-sysctl -w net.core.netdev_max_backlog=65536
-sysctl -w net.ipv4.tcp_tw_reuse=1
-sysctl -w net.ipv4.tcp_rmem='4096 65536 16777216'
-sysctl -w net.ipv4.tcp_wmem='4096 65536 16777216'
-sysctl -w net.ipv4.tcp_mem='65536 131072 262144'
-
-echo "* soft     nproc          65535" | sudo tee -a /etc/security/limits.conf
-echo "* hard     nproc          65535" | sudo tee -a /etc/security/limits.conf
-echo "* soft     nofile         65535" | sudo tee -a /etc/security/limits.conf
-echo "* hard     nofile         65535" | sudo tee -a /etc/security/limits.conf
-echo "root soft     nproc          65535" | sudo tee -a /etc/security/limits.conf
-echo "root hard     nproc          65535" | sudo tee -a /etc/security/limits.conf
-echo "root soft     nofile         65535" | sudo tee -a /etc/security/limits.conf
-echo "root hard     nofile         65535" | sudo tee -a /etc/security/limits.conf
-echo "session required pam_limits.so" | sudo tee -a /etc/pam.d/common-session
-
-IS_AWS=$(curl -s -I http://169.254.169.254/latest/meta-data/instance-type -o /dev/null -w "%{http_code}")
-if [ "$IS_AWS" != "200" ]; then
+if [ "$OS" == "Linux" ]; then
+   IS_AWS=$(curl -m 5 -s -I http://169.254.169.254/latest/meta-data/instance-type -o /dev/null -w "%{http_code}")
+   if [ "$IS_AWS" != "200" ]; then
 # NOT AWS, Assuming Azure
-   PUB_IP=$(curl -H Metadata:true "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/publicIpAddress?api-version=2017-04-02&format=text")
+      PUB_IP=$(curl -m 5 -H Metadata:true "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/publicIpAddress?api-version=2017-04-02&format=text")
+   else
+      PUB_IP=$(curl -m 5 http://169.254.169.254/latest/meta-data/public-ipv4)
+   fi
+   setup_env
+# Kill existing soldier/node
+   fuser -k -n tcp $NODE_PORT
 else
-   PUB_IP=$(curl http://169.254.169.254/latest/meta-data/public-ipv4)
+   # use dig to find out my public IP
+   # https://unix.stackexchange.com/questions/22615/how-can-i-get-my-external-ip-address-in-a-shell-script
+   PUB_IP=$(dig @resolver1.opendns.com ANY myip.opendns.com +short)
+fi
+
+if valid_ip $PUB_IP; then
+	echo MYIP = $PUB_IP
+else
+	echo NO valid public IP found
+	exit 1
 fi
 
 NODE_PORT=9000
 BC_MA=/ip4/54.183.5.66/tcp/9999/ipfs/QmW4PoKvtkBn1CiBjjERXm3QGGohvo3Bn26vJGSgrvdJc4
 
-# Kill existing soldier/node
-fuser -k -n tcp $NODE_PORT
-
+if [ "$OS" == "Linux" ]; then
 # Run Harmony Node
-nohup ./harmony -bc_addr $BC_MA -ip $PUB_IP -port $NODE_PORT > harmony-${PUB_IP}.log 2>&1 &
+   nohup ./harmony -bc_addr $BC_MA -ip $PUB_IP -port $NODE_PORT > harmony-${PUB_IP}.log 2>&1 &
+else
+   ./harmony -bc_addr $BC_MA -ip $PUB_IP -port $NODE_PORT > harmony-${PUB_IP}.log 2>&1 &
+fi
 
-tail -f harmony-${PUB_IP}.log
+echo Please run the following command to inspect the log
+echo "tail -f harmony-${PUB_IP}.log"
+
+trap killnode SIGINT SIGTERM
