@@ -1,17 +1,28 @@
 #!/bin/bash
 
 mkdir -p latest
-
 BUCKET=pub.harmony.one
-FOLDER=release/20190124/linux-x86_64/
+OS=$(uname -s)
+REL=20190216
 
-BIN=( harmony )
+if [ "$OS" == "Darwin" ]; then
+   FOLDER=release/$REL/darwin-x86_64/
+   BIN=( harmony libbls384.dylib libcrypto.1.0.0.dylib libgmp.10.dylib libgmpxx.4.dylib libmcl.dylib )
+   export DYLD_FALLBACK_LIBRARY_PATH=.
+fi
+if [ "$OS" == "Linux" ]; then
+   FOLDER=release/$REL/linux-x86_64/
+   BIN=( harmony libbls384.so libcrypto.so.10 libgmp.so.10 libgmpxx.so.4 libmcl.so )
+   export LD_LIBRARY_PATH=.
+fi
 
+# download all the binaries
 for bin in "${BIN[@]}"; do
    curl http://${BUCKET}.s3.amazonaws.com/${FOLDER}${bin} -o ${bin}
-   chmod +x ${bin}
 done
+chmod +x harmony
 
+# setup environment variables, may not be nessary
 sysctl -w net.core.somaxconn=1024
 sysctl -w net.core.netdev_max_backlog=65536
 sysctl -w net.ipv4.tcp_tw_reuse=1
@@ -38,7 +49,7 @@ else
 fi
 
 NODE_PORT=9000
-BC_MA=/ip4/54.183.5.66/tcp/9999/ipfs/QmdQVypu6NSm7m8bNZj5EJCnjPhXR8QyRmDnDBidxGaHWi
+BC_MA=/ip4/54.183.5.66/tcp/9999/ipfs/QmW4PoKvtkBn1CiBjjERXm3QGGohvo3Bn26vJGSgrvdJc4
 
 # Kill existing soldier/node
 fuser -k -n tcp $NODE_PORT
