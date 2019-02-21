@@ -1685,19 +1685,19 @@ func (bc *BlockChain) GetShardStateByHash(hash common.Hash) types.ShardState {
 }
 
 // GetRandSeedByNumber retrieves the rand seed given the block number, return 0 if not exist
-func (bc *BlockChain) GetRandSeedByNumber(number uint64) uint32 {
+func (bc *BlockChain) GetRandSeedByNumber(number uint64) [32]byte {
 	header := bc.GetHeaderByNumber(number)
 	if header == nil {
-		return 0
+		return [32]byte{}
 	}
 	return header.RandSeed
 }
 
 // GetRandPreimageByNumber retrieves the randomness preimage given the block number, return 0 if not exist
-func (bc *BlockChain) GetRandPreimageByNumber(number uint64) uint32 {
+func (bc *BlockChain) GetRandPreimageByNumber(number uint64) [32]byte {
 	header := bc.GetHeaderByNumber(number)
 	if header == nil {
-		return 0
+		return [32]byte{}
 	}
 	return header.RandPreimage
 }

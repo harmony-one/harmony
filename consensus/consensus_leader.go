@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"encoding/binary"
 	"encoding/hex"
 	"strconv"
 	"time"
@@ -70,20 +69,21 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan *types.Block, stop
 					utils.GetLogInstance().Debug("[DRG] Waiting for pRnd")
 					pRndAndBitmap := <-consensus.PRndChannel
 					utils.GetLogInstance().Debug("[DRG] GOT pRnd", "pRnd", pRndAndBitmap)
-					pRnd := pRndAndBitmap[:32]
+					pRnd := [32]byte{}
+					copy(pRnd[:], pRndAndBitmap[:32])
 					bitmap := pRndAndBitmap[32:]
 					vrfBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.Leader.PubKey)
 					vrfBitmap.SetMask(bitmap)
 
 					// TODO: check validity of pRnd
-					newBlock.AddRandPreimage(binary.BigEndian.Uint32(pRnd))
+					newBlock.AddRandPreimage(pRnd)
 				}
 				rnd, blockHash, err := consensus.GetNextRnd()
 				if err == nil {
 					// Verify the randomness
 					_ = blockHash
 					utils.GetLogInstance().Info("Adding randomness into new block", "rnd", rnd)
-					newBlock.AddRandSeed(binary.BigEndian.Uint32(rnd[:]))
+					newBlock.AddRandSeed(rnd)
 				} else {
 					utils.GetLogInstance().Info("Failed to get randomness", "error", err)
 				}
