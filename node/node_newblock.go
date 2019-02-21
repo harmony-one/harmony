@@ -9,7 +9,7 @@ import (
 
 // Constants of lower bound limit of a new block.
 const (
-	DefaultThreshold   = 10
+	DefaultThreshold   = 1
 	FirstTimeThreshold = 2
 )
 
