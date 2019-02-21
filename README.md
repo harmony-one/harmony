@@ -13,6 +13,8 @@ brew install openssl
 
 ## Dev Environment Setup
 
+The required go version is: **go1.11**
+
 ```bash
 export GOPATH=$HOME/<path_of_your_choice>
 export CGO_CFLAGS="-I$GOPATH/src/github.com/harmony-one/bls/include -I$GOPATH/src/github.com/harmony-one/mcl/include -I/usr/local/opt/openssl/include"
