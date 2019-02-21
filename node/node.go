@@ -701,6 +701,21 @@ func (node *Node) setupForClientNode() {
 	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
 }
 
+// AddBeaconChainDatabase adds database support for beaconchain blocks on normal sharding nodes (not BeaconChain node)
+func (node *Node) AddBeaconChainDatabase(db ethdb.Database) {
+	database := db
+	if database == nil {
+		database = ethdb.NewMemDatabase()
+	}
+	// TODO (chao) currently we use the same genesis block as normal shard
+	chain, err := node.GenesisBlockSetup(database)
+	if err != nil {
+		utils.GetLogInstance().Error("Error when doing genesis setup")
+		os.Exit(1)
+	}
+	node.beaconChain = chain
+}
+
 // ServiceManagerSetup setups service store.
 func (node *Node) ServiceManagerSetup() {
 	node.serviceManager = &service_manager.Manager{}
