@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	protobuf "github.com/golang/protobuf/proto"
 	proto "github.com/harmony-one/harmony/api/client/service/proto"
+	proto_common "github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -144,7 +145,7 @@ func constructStakingMessage(ts types.Transactions) []byte {
 	return nil
 }
 
-func (s *Service) createStakingMessage() []byte {
+func (s *Service) createRawStakingMessage() []byte {
 	stakingInfo := s.getStakingInfo()
 	toAddress := common.HexToAddress(stakingInfo.ContractAddress)
 	tx := types.NewTransaction(
@@ -159,6 +160,13 @@ func (s *Service) createStakingMessage() []byte {
 	if signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, s.accountKey); err == nil {
 		ts := types.Transactions{signedTx}
 		return constructStakingMessage(ts)
+	}
+	return nil
+}
+
+func (s *Service) createStakingMessage() []byte {
+	if msg := s.createRawStakingMessage(); msg != nil {
+		return proto_common.ConstructStakingMessage(msg)
 	}
 	return nil
 }

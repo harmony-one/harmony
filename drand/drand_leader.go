@@ -4,12 +4,11 @@ import (
 	"bytes"
 	"time"
 
-	"github.com/harmony-one/harmony/crypto/vdf"
-
 	protobuf "github.com/golang/protobuf/proto"
 	drand_proto "github.com/harmony-one/harmony/api/drand"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/crypto/vdf"
 	"github.com/harmony-one/harmony/crypto/vrf/p256"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
