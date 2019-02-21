@@ -9,10 +9,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
+	pb "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	proto_identity "github.com/harmony-one/harmony/api/proto/identity"
+	"github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/core/types"
@@ -149,6 +151,13 @@ func (node *Node) messageHandler(content []byte, sender string) {
 				node.DRand.ProcessMessageValidator(msgPayload)
 			}
 		}
+	case proto.Staking:
+		msgPayload, _ := proto.GetStakingMessagePayload(content)
+		// Only beacon leader processes staking txn
+		if node.Role != BeaconLeader {
+			return
+		}
+		node.addStakingTxnIntoPendingTxns(msgPayload)
 	case proto.Node:
 		actionType := proto_node.MessageType(msgType)
 		switch actionType {
@@ -205,6 +214,22 @@ func (node *Node) messageHandler(content []byte, sender string) {
 		}
 	default:
 		utils.GetLogInstance().Error("Unknown", "MsgCategory", msgCategory)
+	}
+}
+
+func (node *Node) addStakingTxnIntoPendingTxns(msgPayload []byte) {
+	msg := &message.Message{}
+	err := pb.Unmarshal(msgPayload, msg)
+	if err == nil {
+		stakingRequest := msg.GetStaking()
+		txs := types.Transactions{}
+		if err = rlp.DecodeBytes(stakingRequest.Transaction, txs); err == nil {
+			node.addPendingTransactions(txs)
+		} else {
+			utils.GetLogInstance().Error("Failed to unmarshal staking transaction list", "error", err)
+		}
+	} else {
+		utils.GetLogInstance().Error("Failed to unmarshal staking msg payload", "error", err)
 	}
 }
 
@@ -280,10 +305,10 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) bool {
 // 1. add the new block to blockchain
 // 2. [leader] send new block to the client
 func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
-	if node.Role == BeaconLeader || node.Role == BeaconValidator {
-		utils.GetLogInstance().Info("PostConsensusProcessing", "newBlock", newBlock)
-		node.UpdateStakingList(newBlock)
-	}
+	// if node.Role == BeaconLeader || node.Role == BeaconValidator {
+	// 	utils.GetLogInstance().Info("PostConsensusProcessing")
+	// 	node.UpdateStakingList(newBlock)
+	// }
 	if node.Consensus.IsLeader {
 		node.BroadcastNewBlock(newBlock)
 	}
