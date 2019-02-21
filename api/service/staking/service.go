@@ -16,10 +16,13 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/p2p/host"
 )
 
 const (
-	WaitTime               = 5 * time.Second
+	// WaitTime is the delay time for resending staking transaction if the previous transaction did not get approved.
+	WaitTime = 5 * time.Second
+	// StakingContractAddress is the staking deployed contract address
 	StakingContractAddress = "TODO(minhdoan): Create a PR to generate staking contract address"
 )
 
@@ -68,7 +71,7 @@ func (s *Service) Run() {
 		for {
 			select {
 			case <-tick.C:
-				if s.Staked() {
+				if s.IsStaked() {
 					return
 				}
 				s.DoService()
@@ -79,16 +82,21 @@ func (s *Service) Run() {
 	}()
 }
 
-func (s *Service) Staked() bool {
+// IsStaked checks if the txn gets accepted and approved in the beacon chain.
+func (s *Service) IsStaked() bool {
 	return false
 }
 
 // DoService does staking.
 func (s *Service) DoService() {
 	utils.GetLogInstance().Info("Trying to send a staking transaction.")
+	if s.beaconChain == nil {
+		utils.GetLogInstance().Info("Can not send a staking transaction because of nil beacon chain.")
+		return
+	}
 
 	if msg := s.createStakingMessage(); msg != nil {
-		s.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, msg)
+		s.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msg))
 	} else {
 		utils.GetLogInstance().Error("Can not create staking transaction")
 	}
@@ -131,11 +139,9 @@ func constructStakingMessage(ts types.Transactions) []byte {
 	}
 	if data, err := protobuf.Marshal(msg); err == nil {
 		return data
-	} else {
-		utils.GetLogInstance().Error("Error when creating staking message")
-		return nil
 	}
-
+	utils.GetLogInstance().Error("Error when creating staking message")
+	return nil
 }
 
 func (s *Service) createStakingMessage() []byte {
