@@ -50,9 +50,14 @@ func attackDetermination(attackedMode int) bool {
 	return false
 }
 
-// InitLDBDatabase initializes a LDBDatabase.
-func InitLDBDatabase(ip string, port string, freshDB bool) (*ethdb.LDBDatabase, error) {
-	dbFileName := fmt.Sprintf("./db/harmony_%s_%s", ip, port)
+// InitLDBDatabase initializes a LDBDatabase. isBeacon=true will return the beacon chain database for normal shard nodes
+func InitLDBDatabase(ip string, port string, freshDB bool, isBeacon bool) (*ethdb.LDBDatabase, error) {
+	var dbFileName string
+	if isBeacon {
+		dbFileName = fmt.Sprintf("./db/harmony_beacon_%s_%s", ip, port)
+	} else {
+		dbFileName = fmt.Sprintf("./db/harmony_%s_%s", ip, port)
+	}
 	if freshDB {
 		var err = os.RemoveAll(dbFileName)
 		if err != nil {
@@ -215,7 +220,7 @@ func main() {
 	// Initialize leveldb if dbSupported.
 	var ldb *ethdb.LDBDatabase
 	if *dbSupported {
-		ldb, _ = InitLDBDatabase(*ip, *port, *freshDB)
+		ldb, _ = InitLDBDatabase(*ip, *port, *freshDB, false)
 	}
 
 	host, err := p2pimpl.NewHost(&selfPeer, nodePriKey)
@@ -257,6 +262,12 @@ func main() {
 		}
 		currentNode.MyShardGroupID = p2p.GroupIDBeacon
 	} else {
+		var beacondb ethdb.Database
+		if *dbSupported {
+			beacondb, _ = InitLDBDatabase(*ip, *port, *freshDB, true)
+		}
+		currentNode.AddBeaconChainDatabase(beacondb)
+
 		if role == "leader" {
 			currentNode.Role = node.ShardLeader
 		} else {
