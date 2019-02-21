@@ -9,25 +9,20 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
-	pb "github.com/golang/protobuf/proto"
-	client "github.com/harmony-one/harmony/api/client/service"
 	proto "github.com/harmony-one/harmony/api/client/service/proto"
-	"github.com/harmony-one/harmony/api/proto/message"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 )
 
+const (
+	WaitTime               = 5 * time.Second
+	StakingContractAddress = "TODO(minhdoan): Create a PR to generate staking contract address"
+)
+
 // State is the state of staking service.
 type State byte
-
-// Constants for State
-const (
-	NotStatedYet State = iota
-	Staked
-	Rejected
-	Approved
-)
 
 // Service is the staking service.
 // Service requires private key here which is not a right design.
@@ -36,49 +31,44 @@ type Service struct {
 	host          p2p.Host
 	stopChan      chan struct{}
 	stoppedChan   chan struct{}
-	peerChan      <-chan p2p.Peer
-	messageChan   <-chan *message.Message
 	accountKey    *ecdsa.PrivateKey
 	stakingAmount int64
 	state         State
+	beaconChain   *core.BlockChain
 }
 
 // New returns staking service.
-func New(host p2p.Host, accountKey *ecdsa.PrivateKey, stakingAmount int64, peerChan <-chan p2p.Peer, messageChan <-chan *message.Message) *Service {
+func New(host p2p.Host, accountKey *ecdsa.PrivateKey, stakingAmount int64, beaconChain *core.BlockChain) *Service {
 	return &Service{
 		host:          host,
 		stopChan:      make(chan struct{}),
 		stoppedChan:   make(chan struct{}),
-		peerChan:      peerChan,
 		accountKey:    accountKey,
 		stakingAmount: stakingAmount,
-		messageChan:   messageChan,
-		state:         NotStatedYet,
+		beaconChain:   beaconChain,
 	}
 }
 
 // StartService starts staking service.
 func (s *Service) StartService() {
 	log.Info("Start Staking Service")
-	s.Init()
 	s.Run()
-}
-
-// Init initializes staking service.
-func (s *Service) Init() {
 }
 
 // Run runs staking.
 func (s *Service) Run() {
-	// Wait until peer info of beacon chain is ready.
+	tick := time.NewTicker(WaitTime)
 	go func() {
 		defer close(s.stoppedChan)
+		// Do service first time and after that doing it every 5 minutes.
+		s.DoService()
 		for {
 			select {
-			case peer := <-s.peerChan:
-				utils.GetLogInstance().Info("Running staking service")
-				// TODO: Write some logic here.
-				s.DoService(peer)
+			case <-tick.C:
+				if s.Staked() {
+					return
+				}
+				s.DoService()
 			case <-s.stopChan:
 				return
 			}
@@ -86,63 +76,47 @@ func (s *Service) Run() {
 	}()
 }
 
-// DoService does staking.
-func (s *Service) DoService(peer p2p.Peer) {
-	utils.GetLogInstance().Info("Staking with Peer")
+func (s *Service) Staked() bool {
+	return false
+}
 
-	stakingMessage := s.createStakingMessage(peer)
-	s.state = Staked
-	if data, err := pb.Marshal(stakingMessage); err == nil {
-		// Send a staking transaction to beacon chain.
-		if err = s.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, data); err != nil {
-			utils.GetLogInstance().Error("Error when sending staking message")
-			return
-		}
-		tick := time.NewTicker(5 * time.Second)
-		for {
-			select {
-			// Retry sending the staking transaction if it does not get back any response.
-			case <-tick.C:
-				if err = s.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, data); err != nil {
-					utils.GetLogInstance().Error("Error when sending staking message")
-					return
-				}
-			case msg := <-s.messageChan:
-				if isStateResultMessage(msg) {
-					if s.stakeApproved(msg) {
-						s.state = Approved
-						// TODO(minhdoan): Should send a signal to another service.
-					} else {
-						s.state = Rejected
-						// TODO(minhdoan): what's next?
-						return
-					}
-				}
-			}
-		}
+// DoService does staking.
+func (s *Service) DoService() {
+	utils.GetLogInstance().Info("Trying to send a staking transaction.")
+
+	if msg := s.createStakingMessage(); msg != nil {
+		s.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, msg)
 	} else {
-		utils.GetLogInstance().Error("Error when creating staking message")
+		utils.GetLogInstance().Error("Can not create staking transaction")
 	}
 }
 
-// TODO(minhdoan): Will implement this logic when introducing the result message from beacon chain.
-func isStateResultMessage(msg *message.Message) bool {
-	return true
+func (s *Service) getStakingInfo() *proto.StakingContractInfoResponse {
+	address := crypto.PubkeyToAddress(s.accountKey.PublicKey)
+	state, err := s.beaconChain.State()
+	if err != nil {
+		utils.GetLogInstance().Error("error to get beacon chain state when getting staking info")
+		return nil
+	}
+	balance := state.GetBalance(address)
+	if balance == common.Big0 {
+		utils.GetLogInstance().Error("account balance empty when getting staking info")
+		return nil
+	}
+	nonce := state.GetNonce(address)
+	if nonce == 0 {
+		utils.GetLogInstance().Error("nonce zero when getting staking info")
+		return nil
+	}
+	return &proto.StakingContractInfoResponse{
+		ContractAddress: StakingContractAddress,
+		Balance:         balance.Bytes(),
+		Nonce:           nonce,
+	}
 }
 
-// TODO(minhdoan): Will implement this logic when introducing the result message from beacon chain.
-func (s *Service) stakeApproved(msg *message.Message) bool {
-	return true
-}
-
-func (s *Service) getStakingInfo(beaconPeer p2p.Peer) *proto.StakingContractInfoResponse {
-	client := client.NewClient(beaconPeer.IP, beaconPeer.Port)
-	defer client.Close()
-	return client.GetStakingContractInfo(crypto.PubkeyToAddress(s.accountKey.PublicKey))
-}
-
-func (s *Service) createStakingMessage(beaconPeer p2p.Peer) *message.Message {
-	stakingInfo := s.getStakingInfo(beaconPeer)
+func (s *Service) createStakingMessage() []byte {
+	stakingInfo := s.getStakingInfo()
 	toAddress := common.HexToAddress(stakingInfo.ContractAddress)
 	tx := types.NewTransaction(
 		stakingInfo.Nonce,
@@ -154,16 +128,18 @@ func (s *Service) createStakingMessage(beaconPeer p2p.Peer) *message.Message {
 		nil)
 
 	if signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, s.accountKey); err == nil {
-		ts := types.Transactions{signedTx}
-		return &message.Message{
-			Type: message.MessageType_NEWNODE_BEACON_STAKING,
-			Request: &message.Message_Staking{
-				Staking: &message.StakingRequest{
-					Transaction: ts.GetRlp(0),
-					NodeId:      "",
-				},
-			},
-		}
+		_ = types.Transactions{signedTx}
+
+		// TODO(minhdoan): Use the new message protocol later.
+		// return &message.Message{
+		// 	Type: message.MessageType_NEWNODE_BEACON_STAKING,
+		// 	Request: &message.Message_Staking{
+		// 		Staking: &message.StakingRequest{
+		// 			Transaction: ts.GetRlp(0),
+		// 			NodeId:      "",
+		// 		},
+		// 	},
+		// }
 	}
 	return nil
 }
