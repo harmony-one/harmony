@@ -13,8 +13,8 @@ import (
 	proto "github.com/harmony-one/harmony/api/client/service/proto"
 	proto_common "github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/api/proto/message"
-	"github.com/harmony-one/harmony/core"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -184,8 +184,9 @@ func (s *Service) StopService() {
 // NotifyService notify service
 func (s *Service) NotifyService(params map[string]interface{}) {
 	return
+}
 
-	// SetMessageChan sets up message channel to service.
+// SetMessageChan sets up message channel to service.
 func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {
 	s.messageChan = messageChan
 }
