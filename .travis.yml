@@ -1,13 +1,12 @@
 language: go
-go_import_path: github.com/harmony-one/harmony
-install:
 os:
   - linux
   - osx
 
 jobs:
   include:
-  - install:
+  - go_import_path: github.com/harmony-one/harmony
+    install:
     - env GO111MODULE=on
     - export GOPATH=$HOME/gopath
     - export CGO_CPPFLAGS="-I$GOPATH/src/github.com/harmony-one/bls/include -I$GOPATH/src/github.com/harmony-one/mcl/include"
