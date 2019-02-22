@@ -141,7 +141,7 @@ if [ "$P2P" == "false" ]; then
    HMY_OPT=" -bc_addr $BC_MA"
 else
    echo "launching boot node ..."
-   $DRYRUN $ROOT/bin/bootnode > $log_folder/bootnode.log 2>&1 | tee -a $LOG_FILE &
+   $DRYRUN $ROOT/bin/bootnode -port 19876 > $log_folder/bootnode.log 2>&1 | tee -a $LOG_FILE &
    sleep 1
    BN_MA=$(grep "BN_MA" $log_folder/bootnode.log | awk -F\= ' { print $2 } ')
    HMY_OPT2=" -bootnodes $BN_MA"
