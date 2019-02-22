@@ -222,6 +222,9 @@ func main() {
 	time.Sleep(5 * time.Second) // wait for nodes to be ready
 	start := time.Now()
 	totalTime := float64(*duration)
+	retry := false
+	var txs types.Transactions
+	shardIDTxsMap := make(map[uint32]types.Transactions)
 
 	for {
 		t := time.Now()
@@ -229,14 +232,23 @@ func main() {
 			utils.GetLogInstance().Debug("Generator timer ended.", "duration", (int(t.Sub(start))), "startTime", start, "totalTime", totalTime)
 			break
 		}
+		lock := sync.Mutex{}
+		if retry {
+			lock.Lock()
+			utils.GetLogInstance().Warn("RETTY TX GEN")
+			for shardID, txs := range shardIDTxsMap { // Send the txs to corresponding shards
+				go func(shardID uint32, txs types.Transactions) {
+					SendTxsToLeader(clientNode, shardIDLeaderMap[shardID], txs)
+				}(shardID, txs)
+			}
+			lock.Unlock()
+			retry = false
+		}
 		select {
 		case shardID := <-readySignal:
-			shardIDTxsMap := make(map[uint32]types.Transactions)
-			lock := sync.Mutex{}
-
 			stateMutex.Lock()
-			utils.GetLogInstance().Warn("STARTING TX GEN", "gomaxprocs", runtime.GOMAXPROCS(0))
-			txs, _ := txgen.GenerateSimulatedTransactionsAccount(int(shardID), nodes, setting)
+			utils.GetLogInstance().Warn("STARTING TX GEN")
+			txs, _ = txgen.GenerateSimulatedTransactionsAccount(int(shardID), nodes, setting)
 
 			lock.Lock()
 			// Put txs into corresponding shards
@@ -253,6 +265,7 @@ func main() {
 			lock.Unlock()
 		case <-time.After(10 * time.Second):
 			utils.GetLogInstance().Warn("No new block is received so far")
+			retry = true
 		}
 	}
 
