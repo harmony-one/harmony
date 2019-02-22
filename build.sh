@@ -12,11 +12,7 @@ git submodule update --init --recursive
 echo "Building in .build/ subdir"
 echo "GOPATH=$GOPATH"
 
-CGO_CFLAGS="-I$GOPATH/src/github.com/harmony-one/bls/include -I$GOPATH/src/github.com/harmony-one/mcl/include -I/usr/local/opt/openssl/include"
-CGO_LDFLAGS="-L$GOPATH/src/github.com/harmony-one/bls/lib -L/usr/local/opt/openssl/lib"
-LD_LIBRARY_PATH=$GOPATH/src/github.com/harmony-one/bls/lib:$GOPATH/src/github.com/harmony-one/mcl/lib:/usr/local/opt/openssl/lib
-LIBRARY_PATH=$LD_LIBRARY_PATH
-DYLD_FALLBACK_LIBRARY_PATH=$LD_LIBRARY_PATH
+source ./scripts/setup_bls_build_flags.sh
 
 MCL=$GOPATH/src/github.com/harmony-one/mcl
 echo "... building mcl"
