@@ -21,7 +21,7 @@ import (
 	multiaddr "github.com/multiformats/go-multiaddr"
 )
 
-//NewNode is ther struct for a candidate node
+//NewNode is the struct for a candidate node
 type NewNode struct {
 	Role        string
 	ShardID     int
@@ -37,7 +37,7 @@ type NewNode struct {
 	host        p2p.Host
 }
 
-// New candidatenode initialization
+// New candidate node initialization
 func New(ip string, port string, nodePk p2p_crypto.PrivKey) *NewNode {
 	priKey, pubKey := utils.GenKey(ip, port)
 	var node NewNode
