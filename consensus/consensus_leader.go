@@ -72,7 +72,7 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan *types.Block, stop
 					pRnd := [32]byte{}
 					copy(pRnd[:], pRndAndBitmap[:32])
 					bitmap := pRndAndBitmap[32:]
-					vrfBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.Leader.PubKey)
+					vrfBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.PubKey)
 					vrfBitmap.SetMask(bitmap)
 
 					// TODO: check validity of pRnd
@@ -320,7 +320,7 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 		consensus.reportMetrics(blockObj)
 
 		// Dump new block into level db.
-		explorer.GetStorageInstance(consensus.Leader.IP, consensus.Leader.Port, true).Dump(&blockObj, consensus.consensusID)
+		explorer.GetStorageInstance(consensus.leader.IP, consensus.leader.Port, true).Dump(&blockObj, consensus.consensusID)
 
 		// Reset state to Finished, and clear other data.
 		consensus.ResetState()

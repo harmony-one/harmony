@@ -363,7 +363,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 	// This is the old way of broadcasting pong message
 	if node.Consensus.IsLeader && !utils.UseLibP2P {
 		peers := node.Consensus.GetValidatorPeers()
-		pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys, node.Consensus.Leader.PubKey)
+		pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys, node.Consensus.GetLeaderPubKey())
 		buffer := pong.ConstructPongMessage()
 
 		// Send a Pong message directly to the sender
@@ -411,7 +411,7 @@ func (node *Node) SendPongMessage() {
 			} else {
 				// stable number of peers/pubkeys, sent the pong message
 				if !sentMessage {
-					pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys, node.Consensus.Leader.PubKey)
+					pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys, node.Consensus.GetLeaderPubKey())
 					buffer := pong.ConstructPongMessage()
 					err := node.host.SendMessageToGroups([]p2p.GroupID{node.MyShardGroupID}, host.ConstructP2pMessage(byte(0), buffer))
 					if err != nil {
@@ -461,13 +461,13 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		node.AddPeers(peers)
 	}
 
-	node.Consensus.Leader.PubKey = &bls.PublicKey{}
-	err = node.Consensus.Leader.PubKey.Deserialize(pong.LeaderPubKey)
+	err = node.Consensus.SetLeaderPubKey(pong.LeaderPubKey)
 	if err != nil {
 		utils.GetLogInstance().Error("Unmarshal Consensus Leader PubKey Failed", "error", err)
 	}
-	node.DRand.Leader.PubKey = &bls.PublicKey{}
-	err = node.DRand.Leader.PubKey.Deserialize(pong.LeaderPubKey)
+	err = node.DRand.SetLeaderPubKey(pong.LeaderPubKey)
+
+	err = node.DRand.SetLeaderPubKey(pong.LeaderPubKey)
 	if err != nil {
 		utils.GetLogInstance().Error("Unmarshal DRand Leader PubKey Failed", "error", err)
 	}
