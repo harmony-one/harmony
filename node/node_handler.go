@@ -482,6 +482,7 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		node.AddPeers(peers)
 	}
 
+	utils.GetLogInstance().Debug("[pongMessageHandler]", "LeaderPubKey", pong.LeaderPubKey)
 	err = node.Consensus.SetLeaderPubKey(pong.LeaderPubKey)
 	if err != nil {
 		utils.GetLogInstance().Error("Unmarshal Consensus Leader PubKey Failed", "error", err)

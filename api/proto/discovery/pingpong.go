@@ -19,6 +19,7 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/api/proto/node"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 )
 
@@ -90,7 +91,7 @@ func NewPongMessage(peers []p2p.Peer, pubKeys []*bls.PublicKey, leaderKey *bls.P
 	}
 
 	pong.LeaderPubKey = leaderKey.Serialize()
-	//	utils.GetLogInstance().Info("[pong message]", "keys", len(pong.PubKeys), "peers", len(pong.Peers), "leader", len(pong.LeaderPubKey))
+	utils.GetLogInstance().Info("[pong message]", "keys", len(pong.PubKeys), "peers", len(pong.Peers), "leader", len(pong.LeaderPubKey), "Serialized Key", pong.LeaderPubKey)
 
 	return pong
 }
