@@ -3,12 +3,8 @@ os:
   - linux
   - osx
 
-jobs:
-  include:
-  - language: go
-    os: linux
-    go_import_path: github.com/harmony-one/harmony
-    install:
+go_import_path: github.com/harmony-one/harmony
+install:
     - env GO111MODULE=on
     - export GOPATH=$HOME/gopath
     - export CGO_CPPFLAGS="-I$GOPATH/src/github.com/harmony-one/bls/include -I$GOPATH/src/github.com/harmony-one/mcl/include"
@@ -34,14 +30,16 @@ jobs:
     - ./scripts/install_protoc.sh -V 3.6.1
     - ./scripts/travis_checker.sh
     - go build -v ./...
-    script:
+script:
     - ./scripts/travis_checker.sh
     # notify after failures separately for each os
-    after_failure:
+after_failure:
       - wget https://raw.githubusercontent.com/DiscordHooks/travis-ci-discord-webhook/master/send.sh
       - chmod +x send.sh
       - ./send.sh failure $WEBHOOK_URL
 
+jobs:
+  include:
   - stage: Notify success
     # notify about success only once
     script:
