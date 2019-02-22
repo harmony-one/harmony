@@ -94,9 +94,9 @@ func main() {
 	onlyLogTps := flag.Bool("only_log_tps", false, "Only log TPS if true")
 
 	//This IP belongs to jenkins.harmony.one
-	bcIP := flag.String("bc", "127.0.0.1", "IP of the identity chain")
-	bcPort := flag.String("bc_port", "8081", "port of the identity chain")
-	bcAddr := flag.String("bc_addr", "", "MultiAddr of the identity chain")
+	bcIP := flag.String("bc", "127.0.0.1", "IP of the beacon chain")
+	bcPort := flag.String("bc_port", "8081", "port of the beacon chain")
+	bcAddr := flag.String("bc_addr", "", "MultiAddr of the beacon chain")
 
 	//Leader needs to have a minimal number of peers to start consensus
 	minPeers := flag.Int("min_peers", 100, "Minimal number of Peers in shard")
@@ -178,7 +178,7 @@ func main() {
 			BCPeer = &p2p.Peer{IP: *bcIP, Port: *bcPort}
 		}
 
-		//Use Peer Discovery to get shard/leader/peer/...
+		// Use Peer Discovery to get shard/leader/peer/...
 		candidateNode := pkg_newnode.New(*ip, *port, nodePriKey)
 		candidateNode.AddPeer(BCPeer)
 		candidateNode.ContactBeaconChain(*BCPeer)

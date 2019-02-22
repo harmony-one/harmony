@@ -14,7 +14,7 @@ contract DepositContract {
             stakes[msg.sender] -= withdrawAmount;
             msg.sender.transfer(withdrawAmount);
             return stakes[msg.sender];  //Overdraft protection, no money is withdrawn!
-        }        
+        }
     }
 
     function balance() public view returns (uint) {
