@@ -22,12 +22,7 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/api/service"
-<<<<<<< HEAD
-	service_manager "github.com/harmony-one/harmony/api/service"
-	"github.com/harmony-one/harmony/api/service/blockproposal"
-=======
 	blockproposal "github.com/harmony-one/harmony/api/service/blockproposal"
->>>>>>> fix import and add mock gen code
 	"github.com/harmony-one/harmony/api/service/clientsupport"
 	consensus_service "github.com/harmony-one/harmony/api/service/consensus"
 	"github.com/harmony-one/harmony/api/service/discovery"
@@ -35,7 +30,6 @@ import (
 	"github.com/harmony-one/harmony/api/service/networkinfo"
 	randomness_service "github.com/harmony-one/harmony/api/service/randomness"
 	"github.com/harmony-one/harmony/api/service/staking"
-
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
 	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
@@ -660,50 +654,27 @@ func (node *Node) setupForShardValidator() {
 func (node *Node) setupForBeaconLeader() {
 	nodeConfig, chanPeer := node.initBeaconNodeConfiguration()
 
-<<<<<<< HEAD
 	// Register peer discovery service. No need to do staking for beacon chain node.
-	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
+	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
 	// Register networkinfo service.
-	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
-
+	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
 	// Register consensus service.
-	node.serviceManager.RegisterService(service_manager.Consensus, consensus_service.New(node.BlockChannel, node.Consensus, node.startConsensus))
-=======
-	// Register peer discovery service. "0" is the beacon shard ID. No need to do staking for beacon chain node.
-	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, "0", chanPeer, nil))
-	// Register networkinfo service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, "0", chanPeer))
-
-	// Register consensus service.
-	node.serviceManager.RegisterService(service.Consensus, consensus_service.New(node.BlockChannel, node.Consensus))
->>>>>>> fix import and add mock gen code
+	node.serviceManager.RegisterService(service.Consensus, consensus_service.New(node.BlockChannel, node.Consensus, node.startConsensus))
 	// Register new block service.
 	node.serviceManager.RegisterService(service.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReady))
 	// Register client support service.
 	node.serviceManager.RegisterService(service.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
 	// Register randomness service
-<<<<<<< HEAD
-	node.serviceManager.RegisterService(service_manager.Randomness, randomness_service.New(node.DRand))
-=======
 	node.serviceManager.RegisterService(service.Randomness, randomness_service.New(node.DRand))
-
->>>>>>> fix import and add mock gen code
 }
 
 func (node *Node) setupForBeaconValidator() {
 	nodeConfig, chanPeer := node.initBeaconNodeConfiguration()
 
-<<<<<<< HEAD
 	// Register peer discovery service. No need to do staking for beacon chain node.
-	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
+	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
 	// Register networkinfo service.
-	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
-=======
-	// Register peer discovery service. "0" is the beacon shard ID. No need to do staking for beacon chain node.
-	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, "0", chanPeer, nil))
-	// Register networkinfo service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, "0", chanPeer))
->>>>>>> fix import and add mock gen code
+	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
 	// Register randomness service
 	node.serviceManager.RegisterService(service.Randomness, randomness_service.New(node.DRand))
 }
@@ -712,19 +683,11 @@ func (node *Node) setupForNewNode() {
 	nodeConfig, chanPeer := node.initNodeConfiguration()
 
 	// Register staking service.
-<<<<<<< HEAD
-	node.serviceManager.RegisterService(service_manager.Staking, staking.New(node.host, node.AccountKey, 0, node.beaconChain))
+	node.serviceManager.RegisterService(service.Staking, staking.New(node.host, node.AccountKey, 0, node.beaconChain))
 	// Register peer discovery service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
+	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
 	// Register networkinfo service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
-=======
-	node.serviceManager.RegisterService(service.Staking, staking.New(node.AccountKey, 0, stakingPeer))
-	// Register peer discovery service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, "0", chanPeer, stakingPeer))
-	// Register networkinfo service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, "0", chanPeer))
->>>>>>> fix import and add mock gen code
+	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
 
 	// TODO: how to restart networkinfo and discovery service after receiving shard id info from beacon chain?
 }
