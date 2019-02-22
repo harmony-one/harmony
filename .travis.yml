@@ -48,7 +48,8 @@ jobs:
       - ./send.sh success $WEBHOOK_URL
 
   - stage: New build script
-    language: go
+    # skips install step from default job above
+    install: skip
     script:
       - go version && go env
       - echo "GO111MODULE=$GO111MODULE"
