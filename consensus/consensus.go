@@ -258,7 +258,7 @@ func (consensus *Consensus) checkConsensusMessage(message consensus_proto.Messag
 	consensusID := message.ConsensusId
 	blockHash := message.BlockHash
 
-	utils.GetLogInstance().Warn("checkConsensusMessage", "publicKey", publicKey)
+	utils.GetLogInstance().Warn("checkConsensusMessage", "consensusID", consensusID, "blockHash", blockHash)
 	// Verify message signature
 	err := verifyMessageSig(publicKey, message)
 	if err != nil {
@@ -309,7 +309,7 @@ func verifyMessageSig(signerPubKey *bls.PublicKey, message consensus_proto.Messa
 		return err
 	}
 	msgHash := sha256.Sum256(messageBytes)
-	utils.GetLogInstance().Debug("verifyMessageSig", "signerPubKey", signerPubKey, "msgHash", msgHash)
+	utils.GetLogInstance().Debug("verifyMessageSig")
 	if !msgSig.VerifyHash(signerPubKey, msgHash[:]) {
 		return errors.New("failed to verify the signature")
 	}
