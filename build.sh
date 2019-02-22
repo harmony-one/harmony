@@ -4,7 +4,9 @@
 set -e
 
 
-ROOT=$(dirname $(readlink -f "$0"))
+#ROOT=$(dirname $(readlink -f "$0"))
+# OS X compatible way of getting script's dir
+ROOT=$(cd "$(dirname "$0")"; pwd)
 export GOPATH=${ROOT}/.build
 
 git submodule update --init --recursive
