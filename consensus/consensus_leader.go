@@ -148,6 +148,7 @@ func (consensus *Consensus) startConsensus(newBlock *types.Block) {
 	consensus.prepareSigs[consensus.nodeID] = consensus.priKey.SignHash(consensus.blockHash[:])
 
 	if utils.UseLibP2P {
+		utils.GetLogInstance().Warn("[Leader] Sent Announce Message")
 		// Construct broadcast p2p message
 		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
 	} else {
@@ -216,6 +217,7 @@ func (consensus *Consensus) processPrepareMessage(message consensus_proto.Messag
 		consensus.aggregatedPrepareSig = aggSig
 
 		if utils.UseLibP2P {
+			utils.GetLogInstance().Warn("[Leader] Sent Prepare Message")
 			consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
 		} else {
 			host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
@@ -292,6 +294,7 @@ func (consensus *Consensus) processCommitMessage(message consensus_proto.Message
 		consensus.aggregatedCommitSig = aggSig
 
 		if utils.UseLibP2P {
+			utils.GetLogInstance().Warn("[Leader] Sent Commit Message")
 			consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
 		} else {
 			host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)

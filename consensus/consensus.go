@@ -239,7 +239,7 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Cons
 	consensus.uniqueIDInstance = utils.GetUniqueValidatorIDInstance()
 	consensus.OfflinePeerList = make([]p2p.Peer, 0)
 
-	//	consensus.Log.Info("New Consensus", "IP", ip, "Port", port, "NodeID", consensus.nodeID, "priKey", consensus.priKey, "pubKey", consensus.pubKey)
+	utils.GetLogInstance().Debug("New Consensus", "leader.PubKey", consensus.leader.PubKey)
 	return &consensus
 }
 

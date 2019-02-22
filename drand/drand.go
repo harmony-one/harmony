@@ -130,6 +130,7 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer, confi
 	}
 	dRand.ShardID = uint32(myShardID)
 
+	utils.GetLogInstance().Debug("New DRand", "leader.PubKey", dRand.leader.PubKey)
 	return &dRand
 }
 

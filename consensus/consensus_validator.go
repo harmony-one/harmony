@@ -113,6 +113,7 @@ func (consensus *Consensus) processAnnounceMessage(message consensus_proto.Messa
 	// Construct and send prepare message
 	msgToSend := consensus.constructPrepareMessage()
 	if utils.UseLibP2P {
+		utils.GetLogInstance().Warn("[Validator] Sent Prepare Message")
 		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
 	} else {
 		consensus.SendMessage(consensus.leader, msgToSend)
@@ -177,6 +178,7 @@ func (consensus *Consensus) processPreparedMessage(message consensus_proto.Messa
 	multiSigAndBitmap := append(multiSig, bitmap...)
 	msgToSend := consensus.constructCommitMessage(multiSigAndBitmap)
 	if utils.UseLibP2P {
+		utils.GetLogInstance().Warn("[Validator] Sent Commit Message")
 		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
 	} else {
 		consensus.SendMessage(consensus.leader, msgToSend)
