@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/internal/utils"
 )
@@ -29,7 +30,7 @@ func (consensus *Consensus) constructPrepareMessage() []byte {
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to sign and marshal the Prepare message", "error", err)
 	}
-	return marshaledMessage
+	return proto.ConstructConsensusMessage(marshaledMessage)
 }
 
 // Construct the commit message which contains the signature on the multi-sig of prepare phase.
@@ -56,5 +57,5 @@ func (consensus *Consensus) constructCommitMessage(multiSigAndBitmap []byte) []b
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to sign and marshal the Commit message", "error", err)
 	}
-	return marshaledMessage
+	return proto.ConstructConsensusMessage(marshaledMessage)
 }

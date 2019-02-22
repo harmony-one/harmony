@@ -4,6 +4,7 @@ import (
 	"bytes"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -28,7 +29,7 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to sign and marshal the Announce message", "error", err)
 	}
-	return marshaledMessage
+	return proto.ConstructConsensusMessage(marshaledMessage)
 }
 
 // Construct the prepared message, returning prepared message in bytes.
@@ -62,7 +63,7 @@ func (consensus *Consensus) constructPreparedMessage() ([]byte, *bls.Sign) {
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to sign and marshal the Prepared message", "error", err)
 	}
-	return marshaledMessage, aggSig
+	return proto.ConstructConsensusMessage(marshaledMessage), aggSig
 }
 
 // Construct the committed message, returning committed message in bytes.
@@ -96,5 +97,5 @@ func (consensus *Consensus) constructCommittedMessage() ([]byte, *bls.Sign) {
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to sign and marshal the Committed message", "error", err)
 	}
-	return marshaledMessage, aggSig
+	return proto.ConstructConsensusMessage(marshaledMessage), aggSig
 }
