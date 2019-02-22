@@ -296,7 +296,7 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 
 	if consensus != nil && consensus.IsLeader {
 		node.State = NodeLeader
-		go node.ReceiveClientGroupMessage()
+		go node.ReceiveGroupMessage(node.clientReceiver)
 	} else {
 		node.State = NodeInit
 	}
@@ -309,7 +309,7 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 	go node.RemovePeersHandler()
 
 	// start the goroutine to receive group message
-	go node.ReceiveGroupMessage()
+	go node.ReceiveGroupMessage(node.groupReceiver)
 
 	node.duplicatedPing = make(map[string]bool)
 
