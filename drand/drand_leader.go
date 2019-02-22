@@ -75,6 +75,7 @@ func (dRand *DRand) init(epochBlock *types.Block) {
 	(*dRand.vrfs)[dRand.nodeID] = append(rand[:], proof...)
 
 	if utils.UseLibP2P {
+		utils.GetLogInstance().Info("[DRG] sent init", "msg", msgToSend, "leader.PubKey", dRand.leader.PubKey)
 		dRand.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
 	} else {
 		host.BroadcastMessageFromLeader(dRand.host, dRand.GetValidatorPeers(), msgToSend, nil)
