@@ -13,27 +13,8 @@ import (
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+	peer "github.com/libp2p/go-libp2p-peer"
 )
-
-// IsOutOfSync checks whether the node is out of sync by comparing latest block with consensus block
-func (node *Node) IsOutOfSync(consensusBlockInfo *consensus.BFTBlockInfo) bool {
-	consensusBlock := consensusBlockInfo.Block
-	consensusID := consensusBlockInfo.ConsensusID
-
-	myHeight := node.blockchain.CurrentBlock().NumberU64()
-	newHeight := consensusBlock.NumberU64()
-	utils.GetLogInstance().Debug("[SYNC]", "myHeight", myHeight, "newHeight", newHeight)
-	if newHeight-myHeight <= inSyncThreshold {
-		node.stateSync.AddLastMileBlock(consensusBlock)
-		node.Consensus.UpdateConsensusID(consensusID + 1)
-		return false
-	}
-	// cache latest blocks for last mile catch up
-	if newHeight-myHeight <= lastMileThreshold && node.stateSync != nil {
-		node.stateSync.AddLastMileBlock(consensusBlock)
-	}
-	return true
-}
 
 // GetSyncingPort returns the syncing port.
 func GetSyncingPort(nodePort string) string {
@@ -42,6 +23,24 @@ func GetSyncingPort(nodePort string) string {
 	}
 	os.Exit(1)
 	return ""
+}
+
+// (TODO) temporary, remove it later
+func getPeerFromIPandPort(ip, port string) p2p.Peer {
+	priKey, _, _ := utils.GenKeyP2P(ip, port)
+	peerID, _ := peer.IDFromPrivateKey(priKey)
+	return p2p.Peer{IP: ip, Port: port, PeerID: peerID}
+}
+
+// GetBeaconSyncingPeers returns a list of peers for beaconchain syncing
+// TODO: currently hard coded
+func (node *Node) GetBeaconSyncingPeers() []p2p.Peer {
+	p1 := getPeerFromIPandPort("127.0.0.1", "6001")
+	p2 := getPeerFromIPandPort("127.0.0.1", "6002")
+	p3 := getPeerFromIPandPort("127.0.0.1", "6003")
+	p4 := getPeerFromIPandPort("127.0.0.1", "6004")
+	p5 := getPeerFromIPandPort("127.0.0.1", "6005")
+	return []p2p.Peer{p1, p2, p3, p4, p5}
 }
 
 // GetSyncingPeers returns list of peers.
@@ -66,6 +65,43 @@ func (node *Node) GetSyncingPeers() []p2p.Peer {
 	return res
 }
 
+// DoBeaconSyncing update received beaconchain blocks and downloads missing beacon chain blocks
+func (node *Node) DoBeaconSyncing() {
+	for {
+		select {
+		case beaconBlock := <-node.BeaconBlockChannel:
+			if node.beaconSync == nil {
+				node.beaconSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port)
+				node.beaconSync.CreateSyncConfig(node.GetBeaconSyncingPeers())
+				node.beaconSync.MakeConnectionToPeers()
+			}
+			startHash := node.beaconChain.CurrentBlock().Hash()
+			node.beaconSync.AddLastMileBlock(beaconBlock)
+			node.beaconSync.StartStateSync(startHash[:], node.beaconChain, node.BeaconWorker, true)
+		}
+	}
+}
+
+// IsOutOfSync checks whether the node is out of sync by comparing latest block with consensus block
+func (node *Node) IsOutOfSync(consensusBlockInfo *consensus.BFTBlockInfo) bool {
+	consensusBlock := consensusBlockInfo.Block
+	consensusID := consensusBlockInfo.ConsensusID
+
+	myHeight := node.blockchain.CurrentBlock().NumberU64()
+	newHeight := consensusBlock.NumberU64()
+	utils.GetLogInstance().Debug("[SYNC]", "myHeight", myHeight, "newHeight", newHeight)
+	if newHeight-myHeight <= inSyncThreshold {
+		node.stateSync.AddLastMileBlock(consensusBlock)
+		node.Consensus.UpdateConsensusID(consensusID + 1)
+		return false
+	}
+	// cache latest blocks for last mile catch up
+	if newHeight-myHeight <= lastMileThreshold && node.stateSync != nil {
+		node.stateSync.AddLastMileBlock(consensusBlock)
+	}
+	return true
+}
+
 // DoSyncing wait for check status and starts syncing if out of sync
 func (node *Node) DoSyncing() {
 	for {
@@ -81,7 +117,7 @@ func (node *Node) DoSyncing() {
 		case consensusBlockInfo := <-node.Consensus.ConsensusBlock:
 			if !node.IsOutOfSync(consensusBlockInfo) {
 				startHash := node.blockchain.CurrentBlock().Hash()
-				node.stateSync.StartStateSync(startHash[:], node.blockchain, node.Worker)
+				node.stateSync.StartStateSync(startHash[:], node.blockchain, node.Worker, false)
 				if node.State == NodeNotInSync {
 					utils.GetLogInstance().Info("[SYNC] Node is now IN SYNC!")
 				}
@@ -104,7 +140,7 @@ func (node *Node) DoSyncing() {
 				node.stateSync.MakeConnectionToPeers()
 			}
 			startHash := node.blockchain.CurrentBlock().Hash()
-			node.stateSync.StartStateSync(startHash[:], node.blockchain, node.Worker)
+			node.stateSync.StartStateSync(startHash[:], node.blockchain, node.Worker, false)
 		}
 	}
 }
@@ -115,6 +151,7 @@ func (node *Node) SupportSyncing() {
 	node.StartSyncingServer()
 
 	go node.DoSyncing()
+	go node.DoBeaconSyncing()
 	go node.SendNewBlockToUnsync()
 }
 
