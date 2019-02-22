@@ -439,7 +439,7 @@ func (node *Node) SendPongMessage() {
 						utils.GetLogInstance().Error("[PONG] failed to send pong message", "group", node.MyShardGroupID)
 						continue
 					} else {
-						utils.GetLogInstance().Info("[PONG] sent pong message to", "group", node.MyShardGroupID)
+						utils.GetLogInstance().Info("[PONG] sent pong message to", "group", node.MyShardGroupID, "Leader.PubKey", node.Consensus.GetLeaderPubKey())
 					}
 					sentMessage = true
 					// stop sending ping message
@@ -492,6 +492,8 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 	if err != nil {
 		utils.GetLogInstance().Error("Unmarshal DRand Leader PubKey Failed", "error", err)
 	}
+	utils.GetLogInstance().Debug("[PONG]", "LeaderPubKey", pong.LeaderPubKey)
+	utils.GetLogInstance().Debug("[PONG]", "LeaderPubKey", node.Consensus.GetLeaderPubKey())
 
 	// Reset Validator PublicKeys every time we receive PONG message from Leader
 	// The PublicKeys has to be idential across the shard on every node

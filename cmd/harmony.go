@@ -163,6 +163,7 @@ func main() {
 		panic(fmt.Errorf("generate key error"))
 	}
 	selfPeer = p2p.Peer{IP: *ip, Port: *port, ValidatorID: -1, PubKey: peerPubKey}
+	fmt.Printf("Harmony: selfPeer.PubKey %v", selfPeer.PubKey)
 
 	if !*libp2pPD {
 		if *bcAddr != "" {

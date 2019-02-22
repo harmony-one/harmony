@@ -41,8 +41,9 @@ func (dRand *DRand) WaitForEpochBlock(blockChannel chan *types.Block, stopChan c
 						start := time.Now()
 						vdf.Execute()
 						duration := time.Now().Sub(start)
-						utils.GetLogInstance().Info("VDF computation finished", "time spent", duration.String())
+						utils.GetLogInstance().Debug("VDF computation finished", "time spent", duration.String())
 						output := <-outputChannel
+						utils.GetLogInstance().Debug("WaitForEpochBlock", "output", output)
 
 						rndBytes := [64]byte{} // The first 32 bytes are the randomness and the last 32 bytes are the hash of the block where the corresponding pRnd was generated
 						copy(rndBytes[:32], output[:])
@@ -63,19 +64,22 @@ func (dRand *DRand) WaitForEpochBlock(blockChannel chan *types.Block, stopChan c
 func (dRand *DRand) init(epochBlock *types.Block) {
 	utils.GetLogInstance().Debug("INITING DRAND")
 	dRand.ResetState()
+	utils.GetLogInstance().Debug("after reset")
 	// Copy over block hash and block header data
 	blockHash := epochBlock.Hash()
 	copy(dRand.blockHash[:], blockHash[:])
 
 	msgToSend := dRand.constructInitMessage()
+	utils.GetLogInstance().Debug("construct init message", "msg", msgToSend)
 
 	// Leader commit vrf itself
 	rand, proof := dRand.vrf(dRand.blockHash)
 
+	utils.GetLogInstance().Debug("vrf", "rand", rand)
 	(*dRand.vrfs)[dRand.nodeID] = append(rand[:], proof...)
 
 	if utils.UseLibP2P {
-		utils.GetLogInstance().Info("[DRG] sent init", "msg", msgToSend, "leader.PubKey", dRand.leader.PubKey)
+		utils.GetLogInstance().Debug("[DRG] sent init", "msg", msgToSend, "leader.PubKey", dRand.leader.PubKey)
 		dRand.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
 	} else {
 		host.BroadcastMessageFromLeader(dRand.host, dRand.GetValidatorPeers(), msgToSend, nil)
@@ -94,6 +98,8 @@ func (dRand *DRand) ProcessMessageLeader(payload []byte) {
 	switch message.Type {
 	case drand_proto.MessageType_COMMIT:
 		dRand.processCommitMessage(message)
+	case drand_proto.MessageType_INIT:
+		// ignore the INIT message, that's for validator
 	default:
 		utils.GetLogInstance().Error("[DRG] Unexpected message type", "msgType", message.Type, "dRand", dRand)
 	}
