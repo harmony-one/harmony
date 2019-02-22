@@ -218,7 +218,8 @@ func verifyMessageSig(signerPubKey *bls.PublicKey, message drand_proto.Message) 
 	}
 	msgHash := sha256.Sum256(messageBytes)
 	if !msgSig.VerifyHash(signerPubKey, msgHash[:]) {
-		return errors.New("failed to verify the signature")
+		utils.GetLogInstance().Error("[DRG] verifyMessageSig", "signerPubKey", signerPubKey, "msgHash", msgHash)
+		return errors.New("[DRG] failed to verify the signature")
 	}
 	return nil
 }

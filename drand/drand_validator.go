@@ -14,21 +14,21 @@ func (dRand *DRand) ProcessMessageValidator(payload []byte) {
 	err := protobuf.Unmarshal(payload, &message)
 
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to unmarshal message payload.", "err", err, "dRand", dRand)
+		utils.GetLogInstance().Error("[DRG] Failed to unmarshal message payload.", "err", err, "dRand", dRand)
 	}
 
 	switch message.Type {
 	case drand_proto.MessageType_INIT:
 		dRand.processInitMessage(message)
 	default:
-		utils.GetLogInstance().Error("Unexpected message type", "msgType", message.Type, "dRand", dRand)
+		utils.GetLogInstance().Error("[DRG] Unexpected message type", "msgType", message.Type, "dRand", dRand)
 	}
 }
 
 // ProcessMessageValidator dispatches validator's consensus message.
 func (dRand *DRand) processInitMessage(message drand_proto.Message) {
 	if message.Type != drand_proto.MessageType_INIT {
-		utils.GetLogInstance().Error("Wrong message type received", "expected", drand_proto.MessageType_INIT, "got", message.Type)
+		utils.GetLogInstance().Error("[DRG] Wrong message type received", "expected", drand_proto.MessageType_INIT, "got", message.Type)
 		return
 	}
 
@@ -37,7 +37,7 @@ func (dRand *DRand) processInitMessage(message drand_proto.Message) {
 	// Verify message signature
 	err := verifyMessageSig(dRand.Leader.PubKey, message)
 	if err != nil {
-		utils.GetLogInstance().Warn("Failed to verify the message signature", "Error", err, "Leader.PubKey", dRand.Leader.PubKey)
+		utils.GetLogInstance().Warn("[DRG] Failed to verify the message signature", "Error", err, "Leader.PubKey", dRand.Leader.PubKey)
 		return
 	}
 

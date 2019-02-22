@@ -87,21 +87,21 @@ func (dRand *DRand) ProcessMessageLeader(payload []byte) {
 	err := protobuf.Unmarshal(payload, &message)
 
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to unmarshal message payload.", "err", err, "dRand", dRand)
+		utils.GetLogInstance().Error("[DRG] Failed to unmarshal message payload.", "err", err, "dRand", dRand)
 	}
 
 	switch message.Type {
 	case drand_proto.MessageType_COMMIT:
 		dRand.processCommitMessage(message)
 	default:
-		utils.GetLogInstance().Error("Unexpected message type", "msgType", message.Type, "dRand", dRand)
+		utils.GetLogInstance().Error("[DRG] Unexpected message type", "msgType", message.Type, "dRand", dRand)
 	}
 }
 
 // ProcessMessageValidator dispatches validator's consensus message.
 func (dRand *DRand) processCommitMessage(message drand_proto.Message) {
 	if message.Type != drand_proto.MessageType_COMMIT {
-		utils.GetLogInstance().Error("Wrong message type received", "expected", drand_proto.MessageType_COMMIT, "got", message.Type)
+		utils.GetLogInstance().Error("[DRG] Wrong message type received", "expected", drand_proto.MessageType_COMMIT, "got", message.Type)
 		return
 	}
 
@@ -112,7 +112,7 @@ func (dRand *DRand) processCommitMessage(message drand_proto.Message) {
 	validatorPeer := dRand.getValidatorPeerByID(validatorID)
 	vrfs := dRand.vrfs
 	if len((*vrfs)) >= ((len(dRand.PublicKeys))/3 + 1) {
-		utils.GetLogInstance().Debug("Received additional randomness commit message", "validatorID", validatorID)
+		utils.GetLogInstance().Debug("[DRG] Received additional randomness commit message", "validatorID", validatorID)
 		return
 	}
 
