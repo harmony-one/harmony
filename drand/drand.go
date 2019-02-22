@@ -36,7 +36,7 @@ type DRand struct {
 	validators sync.Map // key is uint16, value is p2p.Peer
 
 	// Leader's address
-	Leader p2p.Peer
+	leader p2p.Peer
 
 	// Public keys of the committee including leader and validators
 	PublicKeys []*bls.PublicKey
@@ -85,7 +85,7 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer, confi
 		dRand.IsLeader = false
 	}
 
-	dRand.Leader = leader
+	dRand.leader = leader
 	for _, peer := range peers {
 		dRand.validators.Store(utils.GetUniqueIDFromPeer(peer), peer)
 	}
@@ -101,7 +101,7 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer, confi
 
 	dRand.PublicKeys = allPublicKeys
 
-	bitmap, _ := bls_cosi.NewMask(dRand.PublicKeys, dRand.Leader.PubKey)
+	bitmap, _ := bls_cosi.NewMask(dRand.PublicKeys, dRand.leader.PubKey)
 	dRand.bitmap = bitmap
 
 	dRand.pRand = nil
@@ -242,8 +242,14 @@ func (dRand *DRand) getValidatorPeerByID(validatorID uint32) *p2p.Peer {
 func (dRand *DRand) ResetState() {
 	dRand.vrfs = &map[uint32][]byte{}
 
-	bitmap, _ := bls_cosi.NewMask(dRand.PublicKeys, dRand.Leader.PubKey)
+	bitmap, _ := bls_cosi.NewMask(dRand.PublicKeys, dRand.leader.PubKey)
 	dRand.bitmap = bitmap
 	dRand.pRand = nil
 	dRand.rand = nil
+}
+
+// SetLeaderPubKey deserialize the public key of drand leader
+func (dRand *DRand) SetLeaderPubKey(k []byte) error {
+	dRand.leader.PubKey = &bls.PublicKey{}
+	return dRand.leader.PubKey.Deserialize(k)
 }

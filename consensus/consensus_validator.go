@@ -91,7 +91,7 @@ func (consensus *Consensus) processAnnounceMessage(message *msg_pb.Message) {
 	copy(consensus.blockHash[:], blockHash[:])
 	consensus.block = block
 
-	if err := consensus.checkConsensusMessage(message, consensus.Leader.PubKey); err != nil {
+	if err := consensus.checkConsensusMessage(message, consensus.leader.PubKey); err != nil {
 		utils.GetLogInstance().Debug("Failed to check the leader message")
 		if err == consensus_engine.ErrConsensusIDNotMatch {
 			utils.GetLogInstance().Debug("sending bft block to state syncing")
@@ -125,7 +125,7 @@ func (consensus *Consensus) processAnnounceMessage(message *msg_pb.Message) {
 	if utils.UseLibP2P {
 		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
 	} else {
-		consensus.SendMessage(consensus.Leader, msgToSend)
+		consensus.SendMessage(consensus.leader, msgToSend)
 	}
 
 	consensus.state = PrepareDone
@@ -155,7 +155,7 @@ func (consensus *Consensus) processPreparedMessage(message *msg_pb.Message) {
 	// Update readyByConsensus for attack.
 	attack.GetInstance().UpdateConsensusReady(consensusID)
 
-	if err := consensus.checkConsensusMessage(message, consensus.Leader.PubKey); err != nil {
+	if err := consensus.checkConsensusMessage(message, consensus.leader.PubKey); err != nil {
 		utils.GetLogInstance().Debug("processPreparedMessage error", "error", err)
 		return
 	}
@@ -191,7 +191,7 @@ func (consensus *Consensus) processPreparedMessage(message *msg_pb.Message) {
 	if utils.UseLibP2P {
 		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
 	} else {
-		consensus.SendMessage(consensus.Leader, msgToSend)
+		consensus.SendMessage(consensus.leader, msgToSend)
 	}
 
 	consensus.state = CommitDone
@@ -219,7 +219,7 @@ func (consensus *Consensus) processCommittedMessage(message *msg_pb.Message) {
 	// Update readyByConsensus for attack.
 	attack.GetInstance().UpdateConsensusReady(consensusID)
 
-	if err := consensus.checkConsensusMessage(message, consensus.Leader.PubKey); err != nil {
+	if err := consensus.checkConsensusMessage(message, consensus.leader.PubKey); err != nil {
 		utils.GetLogInstance().Debug("processCommittedMessage error", "error", err)
 		return
 	}
