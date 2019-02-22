@@ -53,14 +53,32 @@ func (node *Node) StreamHandler(s p2p.Stream) {
 }
 
 // ReceiveGroupMessage use libp2p pubsub mechanism to receive broadcast messages
-func (node *Node) ReceiveGroupMessage(receiver p2p.GroupReceiver) {
+func (node *Node) ReceiveGroupMessage() {
 	ctx := context.Background()
 	for {
-		if receiver == nil {
+		if node.groupReceiver == nil {
 			time.Sleep(100 * time.Millisecond)
 			continue
 		}
-		msg, sender, err := receiver.Receive(ctx)
+		msg, sender, err := node.groupReceiver.Receive(ctx)
+		if sender != node.host.GetID() {
+			if err == nil {
+				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
+				node.messageHandler(msg[5:], string(sender))
+			}
+		}
+	}
+}
+
+// ReceiveClientGroupMessage use libp2p pubsub mechanism to receive broadcast messages from client.
+func (node *Node) ReceiveClientGroupMessage() {
+	ctx := context.Background()
+	for {
+		if node.clientReceiver == nil {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+		msg, sender, err := node.clientReceiver.Receive(ctx)
 		if sender != node.host.GetID() {
 			if err == nil {
 				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
