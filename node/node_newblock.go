@@ -30,7 +30,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 			select {
 			case <-readySignal:
 				time.Sleep(100 * time.Millisecond) // Delay a bit so validator is catched up (test-only).
-			case <-time.After(200 * time.Second):
+			case <-time.After(300 * time.Second):
 				node.Consensus.ResetState()
 				timeoutCount++
 				utils.GetLogInstance().Debug("Consensus timeout, retry!", "count", timeoutCount, "node", node)
