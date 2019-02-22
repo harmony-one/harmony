@@ -626,9 +626,9 @@ func (node *Node) setupForShardLeader() {
 	nodeConfig, chanPeer := node.initNodeConfiguration()
 
 	// Register peer discovery service. No need to do staking for beacon chain node.
-	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
+	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
 	// Register networkinfo service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
+	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
 
 	// Register explorer service.
 	node.serviceManager.RegisterService(service.SupportExplorer, explorer.New(&node.SelfPeer))
@@ -646,9 +646,9 @@ func (node *Node) setupForShardValidator() {
 	nodeConfig, chanPeer := node.initNodeConfiguration()
 
 	// Register peer discovery service. "0" is the beacon shard ID. No need to do staking for beacon chain node.
-	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
+	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
 	// Register networkinfo service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
+	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
 }
 
 func (node *Node) setupForBeaconLeader() {
@@ -696,9 +696,9 @@ func (node *Node) setupForClientNode() {
 	nodeConfig, chanPeer := node.initNodeConfiguration()
 
 	// Register peer discovery service.
-	node.serviceManager.RegisterService(service_manager.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
+	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
 	// Register networkinfo service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service_manager.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
+	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
 }
 
 // AddBeaconChainDatabase adds database support for beaconchain blocks on normal sharding nodes (not BeaconChain node)

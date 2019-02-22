@@ -52,6 +52,6 @@ func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {
 }
 
 // NotifyService notify service
-func (sc *Service) NotifyService(params map[string]interface{}) {
+func (s *Service) NotifyService(params map[string]interface{}) {
 	return
 }
