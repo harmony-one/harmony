@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	protobuf "github.com/golang/protobuf/proto"
+	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -23,7 +24,9 @@ func TestConstructAnnounceMessage(test *testing.T) {
 
 	message := &msg_pb.Message{}
 	msgBytes := consensus.constructAnnounceMessage()
-	if err := protobuf.Unmarshal(msgBytes, message); err != nil {
+	msgPayload, _ := proto.GetConsensusMessagePayload(msgBytes)
+
+	if err := protobuf.Unmarshal(msgPayload, message); err != nil {
 		test.Errorf("Error when creating announce message")
 	}
 	if message.Type != msg_pb.MessageType_ANNOUNCE {
@@ -52,9 +55,10 @@ func TestConstructPreparedMessage(test *testing.T) {
 	consensus.prepareBitmap.SetKey(validatorPubKey, true)
 
 	msgBytes, _ := consensus.constructPreparedMessage()
+	msgPayload, _ := proto.GetConsensusMessagePayload(msgBytes)
 
 	msg := &msg_pb.Message{}
-	if err = protobuf.Unmarshal(msgBytes, msg); err != nil {
+	if err = protobuf.Unmarshal(msgPayload, msg); err != nil {
 		test.Errorf("Error when creating prepared message")
 	}
 	if msg.Type != msg_pb.MessageType_PREPARED {

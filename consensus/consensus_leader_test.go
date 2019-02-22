@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/golang/mock/gomock"
 	protobuf "github.com/golang/protobuf/proto"
+	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
@@ -61,7 +62,8 @@ func TestProcessMessageLeaderPrepare(test *testing.T) {
 		consensusValidators[i] = New(hosts[i], "0", validators, leader)
 		consensusValidators[i].blockHash = blockHash
 		msg := consensusValidators[i].constructPrepareMessage()
-		consensusLeader.ProcessMessageLeader(msg)
+		msgPayload, _ := proto.GetConsensusMessagePayload(msg)
+		consensusLeader.ProcessMessageLeader(msgPayload)
 	}
 
 	assert.Equal(test, PreparedDone, consensusLeader.state)
@@ -106,9 +108,10 @@ func TestProcessMessageLeaderPrepareInvalidSignature(test *testing.T) {
 		consensusValidators[i] = New(hosts[i], "0", validators, leader)
 		consensusValidators[i].blockHash = blockHash
 		msgBytes := consensusValidators[i].constructPrepareMessage()
+		msgPayload, _ := proto.GetConsensusMessagePayload(msgBytes)
 
 		message := &msg_pb.Message{}
-		if err = protobuf.Unmarshal(msgBytes, message); err != nil {
+		if err = protobuf.Unmarshal(msgPayload, message); err != nil {
 			test.Error("Error when unmarshalling")
 		}
 		// Put invalid signature
@@ -120,7 +123,6 @@ func TestProcessMessageLeaderPrepareInvalidSignature(test *testing.T) {
 	}
 
 	assert.Equal(test, Finished, consensusLeader.state)
-
 	time.Sleep(1 * time.Second)
 }
 

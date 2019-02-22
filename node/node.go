@@ -98,8 +98,6 @@ const (
 )
 
 const (
-	waitBeforeJoinShard = time.Second * 3
-	timeOutToJoinShard  = time.Minute * 10
 	// ClientServicePortDiff is the positive port diff for client service
 	ClientServicePortDiff       = 5555
 	maxBroadcastNodes           = 10                  // broadcast at most maxBroadcastNodes peers that need in sync
