@@ -36,3 +36,21 @@ func TestNewMask(test *testing.T) {
 		test.Error("Should have a total of 3 keys")
 	}
 }
+
+func TestNewMaskWithAbsentPublicKey(test *testing.T) {
+	_, pubKey1 := utils.GenKey("127.0.0.1", "5555")
+	_, pubKey2 := utils.GenKey("127.0.0.1", "6666")
+	_, pubKey3 := utils.GenKey("127.0.0.1", "7777")
+	_, pubKey4 := utils.GenKey("127.0.0.1", "8190")
+
+	mask, err := NewMask([]*bls.PublicKey{pubKey1, pubKey2, pubKey3}, pubKey4)
+
+	if err == nil {
+		test.Errorf("Failed to create a new Mask: %s", err)
+	}
+
+	if mask != nil {
+		test.Errorf("Expected failure to create a new mask")
+	}
+
+}
