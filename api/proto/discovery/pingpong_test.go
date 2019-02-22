@@ -97,7 +97,17 @@ func TestSerialize(test *testing.T) {
 		test.Error("Pong failed!")
 	}
 
+	leaderPubKey2 := &bls.PublicKey{}
+	leaderPubKey2.Deserialize(pong.LeaderPubKey)
+
 	if !reflect.DeepEqual(pong, pong1) {
 		test.Error("Serialize/Deserialze Pong Message Failed")
 	}
+
+	if !reflect.DeepEqual(leaderPubKey, leaderPubKey2) {
+		test.Error("Serialize/Deserialze Leader Pub Key Failed")
+      test.Errorf("Original Key: %v", leaderPubKey)
+      test.Errorf("New Key: %v", leaderPubKey2)
+	}
+
 }
