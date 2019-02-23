@@ -40,6 +40,26 @@ func (node *Node) AddStakingContractToPendingTransactions() {
 	node.addPendingTransactions(types.Transactions{mycontracttx})
 }
 
+//In order to get the deployed contract address of a contract, we need to find the nonce of the address that created it.
+//(Refer: https://solidity.readthedocs.io/en/v0.5.3/introduction-to-smart-contracts.html#index-8)
+// Then we can (re)create the deployed address. Trivially, this is 0 for us.
+// The deployed contract address can also be obtained via the receipt of the contract creating transaction.
+func (node *Node) generateDeployedStakingContractAddress(mycontracttx *types.Transaction, contractAddress common.Address) common.Address {
+	//Ideally we send the transaction to
+
+	//Correct Way 1:
+	//node.SendTx(mycontracttx)
+	//receipts := node.worker.GetCurrentReceipts()
+	//deployedcontractaddress = recepits[len(receipts)-1].ContractAddress //get the address from the receipt
+
+	//Correct Way 2:
+	//nonce := GetNonce(contractAddress)
+	//deployedAddress := crypto.CreateAddress(contractAddress, uint64(nonce))
+	//deployedcontractaddress = recepits[len(receipts)-1].ContractAddress //get the address from the receipt
+	nonce := 0
+	return crypto.CreateAddress(contractAddress, uint64(nonce))
+}
+
 //CreateStakingWithdrawTransaction creates a new withdraw stake transaction
 func (node *Node) CreateStakingWithdrawTransaction(stake string) (*types.Transaction, error) {
 	//These should be read from somewhere.
