@@ -50,10 +50,6 @@ Harmony server / main node:
 go build -o bin/harmony cmd/harmony.go
 ```
 
-Beacon node:
-```
-go build -o bin/beacon cmd/beaconchain/main.go
-```
 
 Wallet:
 ```
