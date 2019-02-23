@@ -177,11 +177,14 @@ func TestProcessMessageLeaderCommit(test *testing.T) {
 	for i := 0; i < 3; i++ {
 		consensusValidators[i] = New(hosts[i], "0", validators, leader)
 		consensusValidators[i].blockHash = blockHash
-		msg := consensusValidators[i].constructCommitMessage(multiSigAndBitmap)
+		payload := consensusValidators[i].constructCommitMessage(multiSigAndBitmap)
+		msg, err := proto.GetConsensusMessagePayload(payload)
+		if err != nil {
+			test.Error("Error when getting consensus message", "error", err)
+		}
 		consensusLeader.ProcessMessageLeader(msg)
 	}
 
 	assert.Equal(test, Finished, consensusLeader.state)
-
 	time.Sleep(1 * time.Second)
 }

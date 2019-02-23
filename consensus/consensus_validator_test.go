@@ -7,6 +7,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	protobuf "github.com/golang/protobuf/proto"
+	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
@@ -50,6 +51,10 @@ func TestProcessMessageValidatorAnnounce(test *testing.T) {
 	copy(consensusLeader.blockHash[:], hashBytes[:])
 
 	msgBytes := consensusLeader.constructAnnounceMessage()
+	msgBytes, err = proto.GetConsensusMessagePayload(msgBytes)
+	if err != nil {
+		test.Errorf("Failed to get consensus message")
+	}
 
 	message := &msg_pb.Message{}
 	if err = protobuf.Unmarshal(msgBytes, message); err != nil {
@@ -109,6 +114,16 @@ func TestProcessMessageValidatorPrepared(test *testing.T) {
 	consensusValidator1 := New(m, "0", []p2p.Peer{validator1, validator2, validator3}, leader)
 	consensusValidator1.BlockVerifier = func(block *types.Block) bool {
 		return true
+	}
+
+	// Get actual consensus messages.
+	announceMsg, err = proto.GetConsensusMessagePayload(announceMsg)
+	if err != nil {
+		test.Errorf("Failed to get consensus message")
+	}
+	preparedMsg, err = proto.GetConsensusMessagePayload(preparedMsg)
+	if err != nil {
+		test.Errorf("Failed to get consensus message")
 	}
 
 	message := &msg_pb.Message{}
@@ -171,6 +186,20 @@ func TestProcessMessageValidatorCommitted(test *testing.T) {
 
 	consensusLeader.commitSigs[consensusLeader.nodeID] = consensusLeader.priKey.SignHash(multiSigAndBitmap)
 	committedMsg, _ := consensusLeader.constructCommittedMessage()
+
+	// Get actual consensus messages.
+	announceMsg, err = proto.GetConsensusMessagePayload(announceMsg)
+	if err != nil {
+		test.Errorf("Failed to get consensus message")
+	}
+	preparedMsg, err = proto.GetConsensusMessagePayload(preparedMsg)
+	if err != nil {
+		test.Errorf("Failed to get consensus message")
+	}
+	committedMsg, err = proto.GetConsensusMessagePayload(committedMsg)
+	if err != nil {
+		test.Errorf("Failed to get consensus message")
+	}
 
 	consensusValidator1 := New(m, "0", []p2p.Peer{validator1, validator2, validator3}, leader)
 	consensusValidator1.BlockVerifier = func(block *types.Block) bool {
