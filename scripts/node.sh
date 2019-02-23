@@ -68,11 +68,18 @@ if [ "$OS" == "Linux" ]; then
    export LD_LIBRARY_PATH=$(pwd)
 fi
 
+# clean up old files
+for bin in "${BIN[@]}"; do
+   rm -f ${bin}
+done
+
 # download all the binaries
 for bin in "${BIN[@]}"; do
    curl http://${BUCKET}.s3.amazonaws.com/${FOLDER}${bin} -o ${bin}
 done
 chmod +x harmony
+
+NODE_PORT=9000
 
 if [ "$OS" == "Linux" ]; then
    IS_AWS=$(curl -m 5 -s -I http://169.254.169.254/latest/meta-data/instance-type -o /dev/null -w "%{http_code}")
@@ -94,12 +101,11 @@ fi
 if valid_ip $PUB_IP; then
 	echo MYIP = $PUB_IP
 else
-	echo NO valid public IP found
+	echo NO valid public IP found: $PUB_IP
 	exit 1
 fi
 
-NODE_PORT=9000
-BC_MA=/ip4/54.183.5.66/tcp/9999/ipfs/QmW4PoKvtkBn1CiBjjERXm3QGGohvo3Bn26vJGSgrvdJc4
+BC_MA=/ip4/54.183.5.66/tcp/9999/ipfs/QmdQVypu6NSm7m8bNZj5EJCnjPhXR8QyRmDnDBidxGaHWi
 
 if [ "$OS" == "Linux" ]; then
 # Run Harmony Node
