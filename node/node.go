@@ -32,7 +32,7 @@ import (
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
 	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
-	bft "github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/pki"
@@ -122,7 +122,7 @@ const (
 
 // Node represents a protocol-participating node in the network
 type Node struct {
-	Consensus              *bft.Consensus       // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
+	Consensus              *consensus.Consensus // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
 	BlockChannel           chan *types.Block    // The channel to send newly proposed blocks
 	ConfirmedBlockChannel  chan *types.Block    // The channel to send confirmed blocks
 	pendingTransactions    types.Transactions   // All the transactions received but not yet processed for Consensus
@@ -254,7 +254,7 @@ func (node *Node) countNumTransactionsInBlockchain() int {
 }
 
 // New creates a new node.
-func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
+func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database) *Node {
 	node := Node{}
 
 	if host != nil {
@@ -262,9 +262,9 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 		node.SelfPeer = host.GetSelfPeer()
 	}
 
-	if host != nil && consensus != nil {
+	if host != nil && consensusObj != nil {
 		// Consensus and associated channel to communicate blocks
-		node.Consensus = consensus
+		node.Consensus = consensusObj
 
 		// Init db.
 		database := db
@@ -287,11 +287,11 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 			node.CurrentStakes = make(map[common.Address]int64)
 		}
 		utils.GetLogInstance().Debug("Received", "blockHash", chain.GetBlockByNumber(0).Hash().Hex())
-		node.Consensus.ConsensusBlock = make(chan *bft.BFTBlockInfo)
+		node.Consensus.ConsensusBlock = make(chan *consensus.BFTBlockInfo)
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 	}
 
-	if consensus != nil && consensus.IsLeader {
+	if consensusObj != nil && consensusObj.IsLeader {
 		node.State = NodeLeader
 		go node.ReceiveClientGroupMessage()
 	} else {
@@ -317,30 +317,6 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 	}
 
 	return &node
-}
-
-func (node *Node) getDeployedStakingContract() common.Address {
-	return node.StakingContractAddress
-}
-
-// IsOutOfSync checks whether the node is out of sync by comparing latest block with consensus block
-func (node *Node) IsOutOfSync(consensusBlockInfo *bft.BFTBlockInfo) bool {
-	consensusBlock := consensusBlockInfo.Block
-	consensusID := consensusBlockInfo.ConsensusID
-
-	myHeight := node.blockchain.CurrentBlock().NumberU64()
-	newHeight := consensusBlock.NumberU64()
-	utils.GetLogInstance().Debug("[SYNC]", "myHeight", myHeight, "newHeight", newHeight)
-	if newHeight-myHeight <= inSyncThreshold {
-		node.stateSync.AddLastMileBlock(consensusBlock)
-		node.Consensus.UpdateConsensusID(consensusID + 1)
-		return false
-	}
-	// cache latest blocks for last mile catch up
-	if newHeight-myHeight <= lastMileThreshold && node.stateSync != nil {
-		node.stateSync.AddLastMileBlock(consensusBlock)
-	}
-	return true
 }
 
 // AddPeers adds neighbors nodes
