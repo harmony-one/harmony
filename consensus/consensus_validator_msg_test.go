@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	protobuf "github.com/golang/protobuf/proto"
+	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -21,12 +22,16 @@ func TestConstructPrepareMessage(test *testing.T) {
 	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader)
 	consensus.blockHash = [32]byte{}
 	msgBytes := consensus.constructPrepareMessage()
+	msgBytes, err = proto.GetConsensusMessagePayload(msgBytes)
+	if err != nil {
+		test.Error("Error when getting consensus message", "error", err)
+	}
 
 	msg := &msg_pb.Message{}
 	if err := protobuf.Unmarshal(msgBytes, msg); err != nil {
 		test.Error("Can not parse the message", err)
 	} else {
-		if msg.GetConsensus() == nil || !consensus.IsValidatorMessage(msg) {
+		if msg.GetConsensus() == nil {
 			test.Error("Wrong message")
 		}
 	}
@@ -43,6 +48,10 @@ func TestConstructCommitMessage(test *testing.T) {
 	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader)
 	consensus.blockHash = [32]byte{}
 	msg := consensus.constructCommitMessage([]byte("random string"))
+	msg, err = proto.GetConsensusMessagePayload(msg)
+	if err != nil {
+		test.Errorf("Failed to get consensus message")
+	}
 
 	message := &msg_pb.Message{}
 	if err = protobuf.Unmarshal(msg, message); err != nil {
