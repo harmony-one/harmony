@@ -42,6 +42,7 @@ func (dRand *DRand) processInitMessage(message drand_proto.Message) {
 		utils.GetLogInstance().Warn("[DRG] Failed to verify the message signature", "Error", err)
 		return
 	}
+	utils.GetLogInstance().Debug("[DRG] verify the message signature Succeeded")
 
 	// TODO: check the blockHash is the block hash of last block of last epoch.
 	copy(dRand.blockHash[:], blockHash[:])

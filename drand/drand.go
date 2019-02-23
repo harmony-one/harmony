@@ -253,3 +253,12 @@ func (dRand *DRand) SetLeaderPubKey(k []byte) error {
 	dRand.leader.PubKey = &bls.PublicKey{}
 	return dRand.leader.PubKey.Deserialize(k)
 }
+
+// UpdatePublicKeys updates the PublicKeys variable, protected by a mutex
+func (dRand *DRand) UpdatePublicKeys(pubKeys []*bls.PublicKey) int {
+	dRand.pubKeyLock.Lock()
+	dRand.PublicKeys = append(pubKeys[:0:0], pubKeys...)
+	dRand.pubKeyLock.Unlock()
+
+	return len(dRand.PublicKeys)
+}

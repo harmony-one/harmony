@@ -487,8 +487,6 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		utils.GetLogInstance().Error("Unmarshal Consensus Leader PubKey Failed", "error", err)
 	}
 	err = node.DRand.SetLeaderPubKey(pong.LeaderPubKey)
-
-	err = node.DRand.SetLeaderPubKey(pong.LeaderPubKey)
 	if err != nil {
 		utils.GetLogInstance().Error("Unmarshal DRand Leader PubKey Failed", "error", err)
 	}
@@ -524,5 +522,5 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 	data["peer"] = p2p.GroupAction{Name: node.MyShardGroupID, Action: p2p.ActionPause}
 
 	node.serviceManager.TakeAction(&service.Action{Action: service.Notify, ServiceType: service.PeerDiscovery, Params: data})
-	return node.Consensus.UpdatePublicKeys(publicKeys)
+	return node.Consensus.UpdatePublicKeys(publicKeys) + node.DRand.UpdatePublicKeys(publicKeys)
 }
