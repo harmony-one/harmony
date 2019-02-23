@@ -146,8 +146,12 @@ func (consensus *Consensus) startConsensus(newBlock *types.Block) {
 	// Leader sign the block hash itself
 	consensus.prepareSigs[consensus.nodeID] = consensus.priKey.SignHash(consensus.blockHash[:])
 
-	// TODO(leo): add pubsub/gossip here.
-	host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
+	if utils.UseLibP2P {
+		// Construct broadcast p2p message
+		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
+	} else {
+		host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
+	}
 }
 
 // processPrepareMessage processes the prepare message sent from validators
