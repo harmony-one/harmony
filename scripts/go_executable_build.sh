@@ -5,7 +5,6 @@ export GO111MODULE=on
 declare -A SRC
 SRC[harmony]=cmd/harmony.go
 SRC[txgen]=cmd/client/txgen/main.go
-SRC[beacon]=cmd/beaconchain/main.go
 SRC[wallet]=cmd/client/wallet/main.go
 SRC[bootnode]=cmd/bootnode/main.go
 
@@ -59,7 +58,7 @@ ACTION:
    upload      upload binaries to s3
    pubwallet   upload wallet to public bucket (bucket: $PUBBUCKET)
 
-   harmony|txgen|bootnode|wallet|beacon
+   harmony|txgen|bootnode|wallet
                only build the specified binary
 
 EXAMPLES:
@@ -186,6 +185,6 @@ case "$ACTION" in
    "build") build_only ;;
    "upload") upload ;;
    "pubwallet") upload_wallet ;;
-   "harmony"|"wallet"|"txgen"|"bootnode"|"beacon") build_only $ACTION ;;
+   "harmony"|"wallet"|"txgen"|"bootnode") build_only $ACTION ;;
    *) usage ;;
 esac
