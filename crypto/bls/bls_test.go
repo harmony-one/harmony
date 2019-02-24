@@ -232,10 +232,16 @@ func TestSetMask(test *testing.T) {
 	mask, _ := NewMask([]*bls.PublicKey{pubKey1, pubKey2}, pubKey1)
 
 	_ = mask
-	left := []byte{3}
-	mask.SetMask(left)
+	maskBytes := []byte{3}
+	mask.SetMask(maskBytes)
 
 	if mask.CountEnabled() != 2 {
 		test.Error("Count of Enabled nodes doesn't match")
+	}
+
+	newMaskBytes := []byte{3, 2}
+
+	if err := mask.SetMask(newMaskBytes); err == nil {
+		test.Error("Expected mismatching Bitmap lengths")
 	}
 }
