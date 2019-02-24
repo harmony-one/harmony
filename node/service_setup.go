@@ -71,8 +71,6 @@ func (node *Node) setupForBeaconValidator() {
 	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
 	// Register networkinfo service.
 	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
-	// Register randomness service
-	node.serviceManager.RegisterService(service.Randomness, randomness.New(node.DRand))
 }
 
 func (node *Node) setupForNewNode() {
