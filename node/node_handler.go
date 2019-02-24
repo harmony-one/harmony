@@ -132,10 +132,10 @@ func (node *Node) messageHandler(content []byte, sender string) {
 	case proto.Consensus:
 		msgPayload, _ := proto.GetConsensusMessagePayload(content)
 		if consensusObj.IsLeader {
-			utils.GetLogInstance().Info("NET: Leader received message:", "messageCategory", msgCategory)
+			utils.GetLogInstance().Info("NET: Leader received consensus message")
 			consensusObj.ProcessMessageLeader(msgPayload)
 		} else {
-			utils.GetLogInstance().Info("NET: Validator received message:", "messageCategory", msgCategory)
+			utils.GetLogInstance().Info("NET: Validator received consensus message")
 			consensusObj.ProcessMessageValidator(msgPayload)
 			// TODO(minhdoan): add logic to check if the current blockchain is not sync with other consensus
 			// we should switch to other state rather than DoingConsensus.
@@ -144,10 +144,10 @@ func (node *Node) messageHandler(content []byte, sender string) {
 		msgPayload, _ := proto.GetDRandMessagePayload(content)
 		if node.DRand != nil {
 			if node.DRand.IsLeader {
-				utils.GetLogInstance().Info("NET: DRand Leader received message:", "messageCategory", msgCategory)
+				utils.GetLogInstance().Info("NET: DRand Leader received message")
 				node.DRand.ProcessMessageLeader(msgPayload)
 			} else {
-				utils.GetLogInstance().Info("NET: DRand Validator received message:", "messageCategory", msgCategory)
+				utils.GetLogInstance().Info("NET: DRand Validator received message")
 				node.DRand.ProcessMessageValidator(msgPayload)
 			}
 		}
@@ -169,6 +169,7 @@ func (node *Node) messageHandler(content []byte, sender string) {
 			blockMsgType := proto_node.BlockMessageType(msgPayload[0])
 			switch blockMsgType {
 			case proto_node.Sync:
+				utils.GetLogInstance().Info("NET: received message: Node/Sync")
 				var blocks []*types.Block
 				err := rlp.DecodeBytes(msgPayload[1:], &blocks) // skip the Sync messge type
 				if err != nil {

@@ -258,7 +258,6 @@ func (consensus *Consensus) checkConsensusMessage(message *msg_pb.Message, publi
 	consensusID := consensusMsg.ConsensusId
 	blockHash := consensusMsg.BlockHash
 
-	utils.GetLogInstance().Warn("checkConsensusMessage", "consensusID", consensusID, "blockHash", blockHash)
 	// Verify message signature
 	err := verifyMessageSig(publicKey, message)
 	if err != nil {
@@ -655,6 +654,8 @@ func (consensus *Consensus) populateMessageFields(request *msg_pb.ConsensusReque
 
 	// 4 byte sender id
 	request.SenderId = uint32(consensus.nodeID)
+
+	utils.GetLogInstance().Debug("[populateMessageFields]", "myConsensusID", consensus.consensusID, "SenderId", request.SenderId)
 }
 
 // Signs the consensus message and returns the marshaled message.
