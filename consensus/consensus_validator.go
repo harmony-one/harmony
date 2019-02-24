@@ -62,8 +62,8 @@ func (consensus *Consensus) ProcessMessageValidator(payload []byte) {
 		consensus.processPreparedMessage(message)
 	case msg_pb.MessageType_COMMITTED:
 		consensus.processCommittedMessage(message)
-	case consensus_proto.MessageType_PREPARE:
-	case consensus_proto.MessageType_COMMIT:
+	case msg_pb.MessageType_PREPARE:
+	case msg_pb.MessageType_COMMIT:
 		// ignore consensus message that is only meant to sent to leader
 		// since we use pubsub, the relay node will also receive those message
 		// but we should just ignore them
