@@ -410,7 +410,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 
 // SendPongMessage is the a goroutine to periodcally send pong message to all peers
 func (node *Node) SendPongMessage() {
-	tick := time.NewTicker(10 * time.Second)
+	tick := time.NewTicker(3 * time.Second)
 	numPeers := len(node.Consensus.GetValidatorPeers())
 	numPubKeys := len(node.Consensus.PublicKeys)
 	sentMessage := false
@@ -508,7 +508,7 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		publicKeys = append(publicKeys, &key)
 	}
 
-	//	utils.GetLogInstance().Debug("[pongMessageHandler]", "#keys", len(publicKeys), "#peers", len(peers))
+	utils.GetLogInstance().Debug("[pongMessageHandler]", "#keys", len(publicKeys), "#peers", len(peers))
 
 	if node.State == NodeWaitToJoin {
 		node.State = NodeReadyForConsensus
