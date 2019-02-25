@@ -7,6 +7,17 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 )
 
+//constants related to staking
+//The first four bytes of the call data for a function call specifies the function to be called.
+//It is the first (left, high-order in big-endian) four bytes of the Keccak-256 (SHA-3)
+//Refer: https://solidity.readthedocs.io/en/develop/abi-spec.html
+
+const (
+	depositFuncSignature  = "0xd0e30db0"
+	withdrawFuncSignature = "0x2e1a7d4d"
+	funcSingatureBytes    = 4
+)
+
 // UpdateStakingList updates the stakes of every node.
 // TODO: read directly from smart contract, or at least check the receipt also for incompleted transaction.
 func (node *Node) UpdateStakingList(block *types.Block) error {

@@ -99,17 +99,6 @@ type syncConfig struct {
 	client    *downloader.Client
 }
 
-//constants related to staking
-//The first four bytes of the call data for a function call specifies the function to be called.
-//It is the first (left, high-order in big-endian) four bytes of the Keccak-256 (SHA-3)
-//Refer: https://solidity.readthedocs.io/en/develop/abi-spec.html
-
-const (
-	depositFuncSignature  = "0xd0e30db0"
-	withdrawFuncSignature = "0x2e1a7d4d"
-	funcSingatureBytes    = 4
-)
-
 // Node represents a protocol-participating node in the network
 type Node struct {
 	Consensus              *consensus.Consensus // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
