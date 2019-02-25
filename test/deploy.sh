@@ -118,7 +118,6 @@ pushd $ROOT
 echo "compiling ..."
 go build -o bin/harmony cmd/harmony.go
 go build -o bin/txgen cmd/client/txgen/main.go
-go build -o bin/beacon cmd/beaconchain/main.go
 go build -o bin/bootnode cmd/bootnode/main.go
 popd
 
