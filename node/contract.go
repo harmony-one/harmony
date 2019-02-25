@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils/contract"
+	contract_constants "github.com/harmony-one/harmony/internal/utils/contract"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -27,7 +28,7 @@ const (
 func (node *Node) AddStakingContractToPendingTransactions() {
 	// Add a contract deployment transaction
 	//Generate contract key and associate funds with the smart contract
-	priKey, _ := ecdsa.GenerateKey(crypto.S256(), strings.NewReader("Deposit Smart Contract Key"))
+	priKey := contract_constants.GenesisBeaconAccountPriKey
 	contractAddress := crypto.PubkeyToAddress(priKey.PublicKey)
 	//Initially the smart contract should have minimal funds.
 	contractFunds := big.NewInt(0)
