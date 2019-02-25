@@ -1,5 +1,10 @@
 package contract
 
+import (
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
+)
+
 // DeployAccount is the accounts used for development.
 type DeployAccount struct {
 	Address string
@@ -7,9 +12,18 @@ type DeployAccount struct {
 	Public  string
 }
 
+// GenesisBeaconAccount is the account which creates contract account.
+var GenesisBeaconAccount = DeployAccount{
+	Address: "0x4e464afF0aB44780fC9A008AC890047BcbDf376f",
+	Private: "b167c74da42202fc2093f8e2ed8171b4ad67d095595ac655fc56df236cad9714",
+	Public:  "0x4e464afF0aB44780fC9A008AC890047BcbDf376f",
+}
+
+// DeployedContractAddress is the deployed contract address of the staking smart contract in beacon chain.
+var DeployedContractAddress = crypto.CreateAddress(common.HexToAddress(GenesisBeaconAccount.Address), uint64(0))
+
 // FakeAccounts is the accounts only used for development purpose.
 var FakeAccounts = [...]DeployAccount{
-	{Address: "0x4e464afF0aB44780fC9A008AC890047BcbDf376f", Private: "b167c74da42202fc2093f8e2ed8171b4ad67d095595ac655fc56df236cad9714", Public: "0x4e464afF0aB44780fC9A008AC890047BcbDf376f"},
 	{Address: "0xE2bD4413172C98d5094B94de1A8AC6a383d68b84", Private: "e401343197a852f361e38ce6b46c99f1d6d1f80499864c6ae7effee42b46ab6b", Public: "0xE2bD4413172C98d5094B94de1A8AC6a383d68b84"},
 	{Address: "0x183418934Fd8A97c98E086151317B2df6259b8A8", Private: "a7d764439a7619f703c97ee2a2cf0be2cd62ad4c9deebd5423d6f28de417b907", Public: "0x183418934Fd8A97c98E086151317B2df6259b8A8"},
 	{Address: "0x9df0e70D4cb3E9beC0548D8Ac56F46596D1BcdB6", Private: "4e3f7c819a15249d2824834cd7ce20fe24d6eab8eb39ac63b78cb3713362cf78", Public: "0x9df0e70D4cb3E9beC0548D8Ac56F46596D1BcdB6"},

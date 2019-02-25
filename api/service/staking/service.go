@@ -2,6 +2,7 @@ package staking
 
 import (
 	"crypto/ecdsa"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
+	contract_constants "github.com/harmony-one/harmony/internal/utils/contract"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 )
@@ -133,7 +135,7 @@ func (s *Service) getFakeStakingInfo() *proto.StakingContractInfoResponse {
 	balance := big.NewInt(params.Ether)
 	nonce := uint64(0)
 	return &proto.StakingContractInfoResponse{
-		ContractAddress: StakingContractAddress,
+		ContractAddress: fmt.Sprintf("%s", contract_constants.DeployedContractAddress),
 		Balance:         balance.Bytes(),
 		Nonce:           nonce,
 	}
