@@ -5,13 +5,11 @@ import (
 	"crypto/ecdsa"
 	"encoding/binary"
 	"fmt"
-	"math/big"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -100,17 +98,6 @@ type syncConfig struct {
 	timestamp int64
 	client    *downloader.Client
 }
-
-//constants related to staking
-//The first four bytes of the call data for a function call specifies the function to be called.
-//It is the first (left, high-order in big-endian) four bytes of the Keccak-256 (SHA-3)
-//Refer: https://solidity.readthedocs.io/en/develop/abi-spec.html
-
-const (
-	depositFuncSignature  = "0xd0e30db0"
-	withdrawFuncSignature = "0x2e1a7d4d"
-	funcSingatureBytes    = 4
-)
 
 // Node represents a protocol-participating node in the network
 type Node struct {
@@ -454,68 +441,6 @@ func (node *Node) RemovePeersHandler() {
 			node.Consensus.OfflinePeerList = append(node.Consensus.OfflinePeerList, p)
 		}
 	}
-}
-
-//UpdateStakingList updates the stakes of every node.
-func (node *Node) UpdateStakingList(block *types.Block) error {
-	signerType := types.HomesteadSigner{}
-	txns := block.Transactions()
-	for i := range txns {
-		txn := txns[i]
-		toAddress := txn.To()
-		if toAddress != nil && *toAddress != node.StakingContractAddress { //Not a address aimed at the staking contract.
-			continue
-		}
-		currentSender, _ := types.Sender(signerType, txn)
-		_, isPresent := node.CurrentStakes[currentSender]
-		data := txn.Data()
-		switch funcSignature := decodeFuncSign(data); funcSignature {
-		case depositFuncSignature: //deposit, currently: 0xd0e30db0
-			amount := txn.Value()
-			value := amount.Int64()
-			if isPresent {
-				//This means the node has increased its stake.
-				node.CurrentStakes[currentSender] += value
-			} else {
-				//This means its a new node that is staking the first time.
-				node.CurrentStakes[currentSender] = value
-			}
-		case withdrawFuncSignature: //withdaw, currently: 0x2e1a7d4d
-			value := decodeStakeCall(data)
-			if isPresent {
-				if node.CurrentStakes[currentSender] > value {
-					node.CurrentStakes[currentSender] -= value
-				} else if node.CurrentStakes[currentSender] == value {
-					delete(node.CurrentStakes, currentSender)
-				} else {
-					continue //Overdraft protection.
-				}
-			} else {
-				continue //no-op: a node that is not staked cannot withdraw stake.
-			}
-		default:
-			continue //no-op if its not deposit or withdaw
-		}
-	}
-	return nil
-}
-
-//The first four bytes of the call data for a function call specifies the function to be called.
-//It is the first (left, high-order in big-endian) four bytes of the Keccak-256 (SHA-3)
-//Refer: https://solidity.readthedocs.io/en/develop/abi-spec.html
-func decodeStakeCall(getData []byte) int64 {
-	value := new(big.Int)
-	value.SetBytes(getData[funcSingatureBytes:]) //Escape the method call.
-	return value.Int64()
-}
-
-//The first four bytes of the call data for a function call specifies the function to be called.
-//It is the first (left, high-order in big-endian) four bytes of the Keccak-256 (SHA-3)
-//Refer: https://solidity.readthedocs.io/en/develop/abi-spec.html
-//gets the function signature from data.
-func decodeFuncSign(data []byte) string {
-	funcSign := hexutil.Encode(data[:funcSingatureBytes]) //The function signature is first 4 bytes of data in ethereum
-	return funcSign
 }
 
 func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
