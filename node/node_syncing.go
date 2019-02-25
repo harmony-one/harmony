@@ -10,9 +10,30 @@ import (
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
 	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
+	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 )
+
+// IsOutOfSync checks whether the node is out of sync by comparing latest block with consensus block
+func (node *Node) IsOutOfSync(consensusBlockInfo *consensus.BFTBlockInfo) bool {
+	consensusBlock := consensusBlockInfo.Block
+	consensusID := consensusBlockInfo.ConsensusID
+
+	myHeight := node.blockchain.CurrentBlock().NumberU64()
+	newHeight := consensusBlock.NumberU64()
+	utils.GetLogInstance().Debug("[SYNC]", "myHeight", myHeight, "newHeight", newHeight)
+	if newHeight-myHeight <= inSyncThreshold {
+		node.stateSync.AddLastMileBlock(consensusBlock)
+		node.Consensus.UpdateConsensusID(consensusID + 1)
+		return false
+	}
+	// cache latest blocks for last mile catch up
+	if newHeight-myHeight <= lastMileThreshold && node.stateSync != nil {
+		node.stateSync.AddLastMileBlock(consensusBlock)
+	}
+	return true
+}
 
 // GetSyncingPort returns the syncing port.
 func GetSyncingPort(nodePort string) string {

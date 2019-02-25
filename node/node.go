@@ -12,7 +12,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -22,18 +21,10 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/api/service"
-	blockproposal "github.com/harmony-one/harmony/api/service/blockproposal"
-	"github.com/harmony-one/harmony/api/service/clientsupport"
-	consensus_service "github.com/harmony-one/harmony/api/service/consensus"
-	"github.com/harmony-one/harmony/api/service/discovery"
-	"github.com/harmony-one/harmony/api/service/explorer"
-	"github.com/harmony-one/harmony/api/service/networkinfo"
-	randomness_service "github.com/harmony-one/harmony/api/service/randomness"
-	"github.com/harmony-one/harmony/api/service/staking"
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
 	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
-	bft "github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/pki"
@@ -123,7 +114,7 @@ const (
 
 // Node represents a protocol-participating node in the network
 type Node struct {
-	Consensus              *bft.Consensus       // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
+	Consensus              *consensus.Consensus // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
 	BlockChannel           chan *types.Block    // The channel to send newly proposed blocks
 	ConfirmedBlockChannel  chan *types.Block    // The channel to send confirmed blocks
 	pendingTransactions    types.Transactions   // All the transactions received but not yet processed for Consensus
@@ -255,7 +246,7 @@ func (node *Node) countNumTransactionsInBlockchain() int {
 }
 
 // New creates a new node.
-func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
+func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database) *Node {
 	node := Node{}
 
 	if host != nil {
@@ -263,9 +254,9 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 		node.SelfPeer = host.GetSelfPeer()
 	}
 
-	if host != nil && consensus != nil {
+	if host != nil && consensusObj != nil {
 		// Consensus and associated channel to communicate blocks
-		node.Consensus = consensus
+		node.Consensus = consensusObj
 
 		// Init db.
 		database := db
@@ -288,11 +279,11 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 			node.CurrentStakes = make(map[common.Address]int64)
 		}
 		utils.GetLogInstance().Debug("Received", "blockHash", chain.GetBlockByNumber(0).Hash().Hex())
-		node.Consensus.ConsensusBlock = make(chan *bft.BFTBlockInfo)
+		node.Consensus.ConsensusBlock = make(chan *consensus.BFTBlockInfo)
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 	}
 
-	if consensus != nil && consensus.IsLeader {
+	if consensusObj != nil && consensusObj.IsLeader {
 		node.State = NodeLeader
 		go node.ReceiveClientGroupMessage()
 	} else {
@@ -318,50 +309,6 @@ func New(host p2p.Host, consensus *bft.Consensus, db ethdb.Database) *Node {
 	}
 
 	return &node
-}
-
-func (node *Node) getDeployedStakingContract() common.Address {
-	return node.StakingContractAddress
-}
-
-//In order to get the deployed contract address of a contract, we need to find the nonce of the address that created it.
-//(Refer: https://solidity.readthedocs.io/en/v0.5.3/introduction-to-smart-contracts.html#index-8)
-// Then we can (re)create the deployed address. Trivially, this is 0 for us.
-// The deployed contract address can also be obtained via the receipt of the contract creating transaction.
-func (node *Node) generateDeployedStakingContractAddress(mycontracttx *types.Transaction, contractAddress common.Address) common.Address {
-	//Ideally we send the transaction to
-
-	//Correct Way 1:
-	//node.SendTx(mycontracttx)
-	//receipts := node.worker.GetCurrentReceipts()
-	//deployedcontractaddress = recepits[len(receipts)-1].ContractAddress //get the address from the receipt
-
-	//Correct Way 2:
-	//nonce := GetNonce(contractAddress)
-	//deployedAddress := crypto.CreateAddress(contractAddress, uint64(nonce))
-	//deployedcontractaddress = recepits[len(receipts)-1].ContractAddress //get the address from the receipt
-	nonce := 0
-	return crypto.CreateAddress(contractAddress, uint64(nonce))
-}
-
-// IsOutOfSync checks whether the node is out of sync by comparing latest block with consensus block
-func (node *Node) IsOutOfSync(consensusBlockInfo *bft.BFTBlockInfo) bool {
-	consensusBlock := consensusBlockInfo.Block
-	consensusID := consensusBlockInfo.ConsensusID
-
-	myHeight := node.blockchain.CurrentBlock().NumberU64()
-	newHeight := consensusBlock.NumberU64()
-	utils.GetLogInstance().Debug("[SYNC]", "myHeight", myHeight, "newHeight", newHeight)
-	if newHeight-myHeight <= inSyncThreshold {
-		node.stateSync.AddLastMileBlock(consensusBlock)
-		node.Consensus.UpdateConsensusID(consensusID + 1)
-		return false
-	}
-	// cache latest blocks for last mile catch up
-	if newHeight-myHeight <= lastMileThreshold && node.stateSync != nil {
-		node.stateSync.AddLastMileBlock(consensusBlock)
-	}
-	return true
 }
 
 // AddPeers adds neighbors nodes
@@ -618,128 +565,4 @@ func (node *Node) initBeaconNodeConfiguration() (service.NodeConfig, chan p2p.Pe
 	node.MyClientGroupID = p2p.GroupIDBeaconClient
 
 	return nodeConfig, chanPeer
-}
-
-func (node *Node) setupForShardLeader() {
-	nodeConfig, chanPeer := node.initNodeConfiguration()
-
-	// Register peer discovery service. No need to do staking for beacon chain node.
-	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
-	// Register networkinfo service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
-
-	// Register explorer service.
-	node.serviceManager.RegisterService(service.SupportExplorer, explorer.New(&node.SelfPeer))
-	// Register consensus service.
-	node.serviceManager.RegisterService(service.Consensus, consensus_service.New(node.BlockChannel, node.Consensus, node.startConsensus))
-	// Register new block service.
-	node.serviceManager.RegisterService(service.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReady))
-	// Register client support service.
-	node.serviceManager.RegisterService(service.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
-	// Register randomness service
-	node.serviceManager.RegisterService(service.Randomness, randomness_service.New(node.DRand))
-}
-
-func (node *Node) setupForShardValidator() {
-	nodeConfig, chanPeer := node.initNodeConfiguration()
-
-	// Register peer discovery service. "0" is the beacon shard ID. No need to do staking for beacon chain node.
-	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
-	// Register networkinfo service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
-}
-
-func (node *Node) setupForBeaconLeader() {
-	nodeConfig, chanPeer := node.initBeaconNodeConfiguration()
-
-	// Register peer discovery service. No need to do staking for beacon chain node.
-	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
-	// Register networkinfo service.
-	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
-	// Register consensus service.
-	node.serviceManager.RegisterService(service.Consensus, consensus_service.New(node.BlockChannel, node.Consensus, node.startConsensus))
-	// Register new block service.
-	node.serviceManager.RegisterService(service.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReady))
-	// Register client support service.
-	node.serviceManager.RegisterService(service.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
-	// Register randomness service
-	node.serviceManager.RegisterService(service.Randomness, randomness_service.New(node.DRand))
-}
-
-func (node *Node) setupForBeaconValidator() {
-	nodeConfig, chanPeer := node.initBeaconNodeConfiguration()
-
-	// Register peer discovery service. No need to do staking for beacon chain node.
-	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
-	// Register networkinfo service.
-	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
-	// Register randomness service
-	node.serviceManager.RegisterService(service.Randomness, randomness_service.New(node.DRand))
-}
-
-func (node *Node) setupForNewNode() {
-	nodeConfig, chanPeer := node.initNodeConfiguration()
-
-	// Register staking service.
-	node.serviceManager.RegisterService(service.Staking, staking.New(node.host, node.AccountKey, 0, node.beaconChain))
-	// Register peer discovery service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
-	// Register networkinfo service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
-
-	// TODO: how to restart networkinfo and discovery service after receiving shard id info from beacon chain?
-}
-
-func (node *Node) setupForClientNode() {
-	nodeConfig, chanPeer := node.initNodeConfiguration()
-
-	// Register peer discovery service.
-	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
-	// Register networkinfo service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
-}
-
-// AddBeaconChainDatabase adds database support for beaconchain blocks on normal sharding nodes (not BeaconChain node)
-func (node *Node) AddBeaconChainDatabase(db ethdb.Database) {
-	database := db
-	if database == nil {
-		database = ethdb.NewMemDatabase()
-	}
-	// TODO (chao) currently we use the same genesis block as normal shard
-	chain, err := node.GenesisBlockSetup(database)
-	if err != nil {
-		utils.GetLogInstance().Error("Error when doing genesis setup")
-		os.Exit(1)
-	}
-	node.beaconChain = chain
-}
-
-// ServiceManagerSetup setups service store.
-func (node *Node) ServiceManagerSetup() {
-	node.serviceManager = &service.Manager{}
-	node.serviceMessageChan = make(map[service.Type]chan *msg_pb.Message)
-	switch node.Role {
-	case ShardLeader:
-		node.setupForShardLeader()
-	case ShardValidator:
-		node.setupForShardValidator()
-	case BeaconLeader:
-		node.setupForBeaconLeader()
-	case BeaconValidator:
-		node.setupForBeaconValidator()
-	case NewNode:
-		node.setupForNewNode()
-	case ClientNode:
-		node.setupForClientNode()
-	}
-	node.serviceManager.SetupServiceMessageChan(node.serviceMessageChan)
-}
-
-// RunServices runs registered services.
-func (node *Node) RunServices() {
-	if node.serviceManager == nil {
-		utils.GetLogInstance().Info("Service manager is not set up yet.")
-		return
-	}
-	node.serviceManager.RunServices()
 }
