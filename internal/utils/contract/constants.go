@@ -1,7 +1,9 @@
 package contract
 
 import (
-	"github.com/ethereum/go-ethereum/common"
+	"crypto/ecdsa"
+	"strings"
+
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -12,15 +14,22 @@ type DeployAccount struct {
 	Public  string
 }
 
-// GenesisBeaconAccount is the account which creates contract account.
-var GenesisBeaconAccount = DeployAccount{
-	Address: "0x4e464afF0aB44780fC9A008AC890047BcbDf376f",
-	Private: "b167c74da42202fc2093f8e2ed8171b4ad67d095595ac655fc56df236cad9714",
-	Public:  "0x4e464afF0aB44780fC9A008AC890047BcbDf376f",
+// // GenesisBeaconAccount is the account which creates contract account.
+// var GenesisBeaconAccount = DeployAccount{
+// 	Address: "0x4e464afF0aB44780fC9A008AC890047BcbDf376f",
+// 	Private: "b167c74da42202fc2093f8e2ed8171b4ad67d095595ac655fc56df236cad9714",
+// 	Public:  "0x4e464afF0aB44780fC9A008AC890047BcbDf376f",
+// }
+
+func BeaconAccountPriKey() *ecdsa.PrivateKey {
+	prikey, _ := ecdsa.GenerateKey(crypto.S256(), strings.NewReader("Deposit Smart Contract Key"))
+	return prikey
 }
 
+var GenesisBeaconAccountPriKey = BeaconAccountPriKey()
+
 // DeployedContractAddress is the deployed contract address of the staking smart contract in beacon chain.
-var DeployedContractAddress = crypto.CreateAddress(common.HexToAddress(GenesisBeaconAccount.Address), uint64(0))
+var DeployedContractAddress = crypto.CreateAddress(crypto.PubkeyToAddress(GenesisBeaconAccountPriKey.PublicKey), uint64(0))
 
 // FakeAccounts is the accounts only used for development purpose.
 var FakeAccounts = [...]DeployAccount{
