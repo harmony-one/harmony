@@ -129,6 +129,16 @@ func (s *Service) getStakingInfo() *proto.StakingContractInfoResponse {
 	}
 }
 
+func (s *Service) getFakeStakingInfo() *proto.StakingContractInfoResponse {
+	balance := big.NewInt(params.Ether)
+	nonce := uint64(0)
+	return &proto.StakingContractInfoResponse{
+		ContractAddress: StakingContractAddress,
+		Balance:         balance.Bytes(),
+		Nonce:           nonce,
+	}
+}
+
 // Constructs the staking message
 func constructStakingMessage(ts types.Transactions) []byte {
 	msg := &message.Message{
@@ -148,7 +158,8 @@ func constructStakingMessage(ts types.Transactions) []byte {
 }
 
 func (s *Service) createRawStakingMessage() []byte {
-	stakingInfo := s.getStakingInfo()
+	// TODO(minhdoan): Enable getStakingInfo back after testing.
+	stakingInfo := s.getFakeStakingInfo()
 	toAddress := common.HexToAddress(stakingInfo.ContractAddress)
 	tx := types.NewTransaction(
 		stakingInfo.Nonce,
