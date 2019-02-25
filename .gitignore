@@ -60,7 +60,6 @@ vendor
 
 # node_modules
 node_modules/
-go.sum
 
 # txgen node keystore
 .txgenkey
