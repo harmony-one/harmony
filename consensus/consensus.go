@@ -51,7 +51,7 @@ type Consensus struct {
 	MinPeers int
 
 	// Leader's address
-	Leader p2p.Peer
+	leader p2p.Peer
 
 	// Public keys of the committee including leader and validators
 	PublicKeys []*bls.PublicKey
@@ -177,7 +177,7 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Cons
 		consensus.IsLeader = false
 	}
 
-	consensus.Leader = leader
+	consensus.leader = leader
 	for _, peer := range peers {
 		consensus.validators.Store(utils.GetUniqueIDFromPeer(peer), peer)
 	}
@@ -194,8 +194,8 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Cons
 
 	consensus.PublicKeys = allPublicKeys
 
-	prepareBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.Leader.PubKey)
-	commitBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.Leader.PubKey)
+	prepareBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.PubKey)
+	commitBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.PubKey)
 	consensus.prepareBitmap = prepareBitmap
 	consensus.commitBitmap = commitBitmap
 
@@ -258,7 +258,6 @@ func (consensus *Consensus) checkConsensusMessage(message *msg_pb.Message, publi
 	consensusID := consensusMsg.ConsensusId
 	blockHash := consensusMsg.BlockHash
 
-	utils.GetLogInstance().Warn("checkConsensusMessage", "publicKey", publicKey)
 	// Verify message signature
 	err := verifyMessageSig(publicKey, message)
 	if err != nil {
@@ -309,7 +308,7 @@ func verifyMessageSig(signerPubKey *bls.PublicKey, message *msg_pb.Message) erro
 		return err
 	}
 	msgHash := sha256.Sum256(messageBytes)
-	utils.GetLogInstance().Debug("verifyMessageSig", "signerPubKey", signerPubKey, "msgHash", msgHash)
+	utils.GetLogInstance().Debug("verifyMessageSig")
 	if !msgSig.VerifyHash(signerPubKey, msgHash[:]) {
 		return errors.New("failed to verify the signature")
 	}
@@ -382,8 +381,8 @@ func (consensus *Consensus) ResetState() {
 	consensus.prepareSigs = map[uint32]*bls.Sign{}
 	consensus.commitSigs = map[uint32]*bls.Sign{}
 
-	prepareBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.Leader.PubKey)
-	commitBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.Leader.PubKey)
+	prepareBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.PubKey)
+	commitBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.PubKey)
 	consensus.prepareBitmap = prepareBitmap
 	consensus.commitBitmap = commitBitmap
 
@@ -471,7 +470,7 @@ func (consensus *Consensus) RemovePeers(peers []p2p.Peer) int {
 		// Or the shard won't be able to reach consensus if public keys are mismatch
 
 		validators := consensus.GetValidatorPeers()
-		pong := proto_discovery.NewPongMessage(validators, consensus.PublicKeys, consensus.Leader.PubKey)
+		pong := proto_discovery.NewPongMessage(validators, consensus.PublicKeys, consensus.leader.PubKey)
 		buffer := pong.ConstructPongMessage()
 
 		if utils.UseLibP2P {
@@ -655,6 +654,8 @@ func (consensus *Consensus) populateMessageFields(request *msg_pb.ConsensusReque
 
 	// 4 byte sender id
 	request.SenderId = uint32(consensus.nodeID)
+
+	utils.GetLogInstance().Debug("[populateMessageFields]", "myConsensusID", consensus.consensusID, "SenderId", request.SenderId)
 }
 
 // Signs the consensus message and returns the marshaled message.
@@ -669,4 +670,15 @@ func (consensus *Consensus) signAndMarshalConsensusMessage(message *msg_pb.Messa
 		return []byte{}, err
 	}
 	return marshaledMessage, nil
+}
+
+// SetLeaderPubKey deserialize the public key of consensus leader
+func (consensus *Consensus) SetLeaderPubKey(k []byte) error {
+	consensus.leader.PubKey = &bls.PublicKey{}
+	return consensus.leader.PubKey.Deserialize(k)
+}
+
+// GetLeaderPubKey returns the public key of consensus leader
+func (consensus *Consensus) GetLeaderPubKey() *bls.PublicKey {
+	return consensus.leader.PubKey
 }

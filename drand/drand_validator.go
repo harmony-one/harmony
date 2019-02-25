@@ -20,6 +20,8 @@ func (dRand *DRand) ProcessMessageValidator(payload []byte) {
 	switch message.Type {
 	case drand_proto.MessageType_INIT:
 		dRand.processInitMessage(message)
+	case drand_proto.MessageType_COMMIT:
+		// do nothing on the COMMIT message, as it is intended to send to leader
 	default:
 		utils.GetLogInstance().Error("Unexpected message type", "msgType", message.Type, "dRand", dRand)
 	}
@@ -35,11 +37,12 @@ func (dRand *DRand) processInitMessage(message drand_proto.Message) {
 	blockHash := message.BlockHash
 
 	// Verify message signature
-	err := verifyMessageSig(dRand.Leader.PubKey, message)
+	err := verifyMessageSig(dRand.leader.PubKey, message)
 	if err != nil {
-		utils.GetLogInstance().Warn("Failed to verify the message signature", "Error", err, "Leader.PubKey", dRand.Leader.PubKey)
+		utils.GetLogInstance().Warn("[DRG] Failed to verify the message signature", "Error", err)
 		return
 	}
+	utils.GetLogInstance().Debug("[DRG] verify the message signature Succeeded")
 
 	// TODO: check the blockHash is the block hash of last block of last epoch.
 	copy(dRand.blockHash[:], blockHash[:])
@@ -52,6 +55,6 @@ func (dRand *DRand) processInitMessage(message drand_proto.Message) {
 	if utils.UseLibP2P {
 		dRand.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
 	} else {
-		host.SendMessage(dRand.host, dRand.Leader, msgToSend, nil)
+		host.SendMessage(dRand.host, dRand.leader, msgToSend, nil)
 	}
 }

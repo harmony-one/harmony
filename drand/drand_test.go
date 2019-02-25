@@ -16,7 +16,7 @@ func TestNew(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	dRand := New(host, "0", []p2p.Peer{leader, validator}, leader, nil)
+	dRand := New(host, "0", []p2p.Peer{leader, validator}, leader, nil, true)
 
 	if !dRand.IsLeader {
 		test.Error("dRand should belong to a leader")

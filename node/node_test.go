@@ -94,7 +94,7 @@ func TestAddPeers(t *testing.T) {
 		t.Fatalf("newhost failure: %v", err)
 	}
 	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader)
-	dRand := drand.New(host, "0", []p2p.Peer{leader, validator}, leader, nil)
+	dRand := drand.New(host, "0", []p2p.Peer{leader, validator}, leader, nil, true)
 
 	node := New(host, consensus, nil)
 	node.DRand = dRand

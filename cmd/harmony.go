@@ -279,7 +279,7 @@ func main() {
 	// Add randomness protocol
 	// TODO: enable drand only for beacon chain
 	// TODO: put this in a better place other than main.
-	dRand := drand.New(host, shardID, peers, leader, currentNode.ConfirmedBlockChannel)
+	dRand := drand.New(host, shardID, peers, leader, currentNode.ConfirmedBlockChannel, *isLeader)
 	currentNode.Consensus.RegisterPRndChannel(dRand.PRndChannel)
 	currentNode.Consensus.RegisterRndChannel(dRand.RndChannel)
 	currentNode.DRand = dRand

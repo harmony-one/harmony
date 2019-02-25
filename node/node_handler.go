@@ -132,10 +132,10 @@ func (node *Node) messageHandler(content []byte, sender string) {
 	case proto.Consensus:
 		msgPayload, _ := proto.GetConsensusMessagePayload(content)
 		if consensusObj.IsLeader {
-			utils.GetLogInstance().Info("NET: Leader received message:", "messageCategory", msgCategory)
+			utils.GetLogInstance().Info("NET: Leader received consensus message")
 			consensusObj.ProcessMessageLeader(msgPayload)
 		} else {
-			utils.GetLogInstance().Info("NET: Validator received message:", "messageCategory", msgCategory)
+			utils.GetLogInstance().Info("NET: Validator received consensus message")
 			consensusObj.ProcessMessageValidator(msgPayload)
 			// TODO(minhdoan): add logic to check if the current blockchain is not sync with other consensus
 			// we should switch to other state rather than DoingConsensus.
@@ -144,10 +144,10 @@ func (node *Node) messageHandler(content []byte, sender string) {
 		msgPayload, _ := proto.GetDRandMessagePayload(content)
 		if node.DRand != nil {
 			if node.DRand.IsLeader {
-				utils.GetLogInstance().Info("NET: DRand Leader received message:", "messageCategory", msgCategory)
+				utils.GetLogInstance().Info("NET: DRand Leader received message")
 				node.DRand.ProcessMessageLeader(msgPayload)
 			} else {
-				utils.GetLogInstance().Info("NET: DRand Validator received message:", "messageCategory", msgCategory)
+				utils.GetLogInstance().Info("NET: DRand Validator received message")
 				node.DRand.ProcessMessageValidator(msgPayload)
 			}
 		}
@@ -169,6 +169,7 @@ func (node *Node) messageHandler(content []byte, sender string) {
 			blockMsgType := proto_node.BlockMessageType(msgPayload[0])
 			switch blockMsgType {
 			case proto_node.Sync:
+				utils.GetLogInstance().Info("NET: received message: Node/Sync")
 				var blocks []*types.Block
 				err := rlp.DecodeBytes(msgPayload[1:], &blocks) // skip the Sync messge type
 				if err != nil {
@@ -384,7 +385,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 	// This is the old way of broadcasting pong message
 	if node.Consensus.IsLeader && !utils.UseLibP2P {
 		peers := node.Consensus.GetValidatorPeers()
-		pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys, node.Consensus.Leader.PubKey)
+		pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys, node.Consensus.GetLeaderPubKey())
 		buffer := pong.ConstructPongMessage()
 
 		// Send a Pong message directly to the sender
@@ -409,7 +410,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 
 // SendPongMessage is the a goroutine to periodcally send pong message to all peers
 func (node *Node) SendPongMessage() {
-	tick := time.NewTicker(10 * time.Second)
+	tick := time.NewTicker(3 * time.Second)
 	numPeers := len(node.Consensus.GetValidatorPeers())
 	numPubKeys := len(node.Consensus.PublicKeys)
 	sentMessage := false
@@ -432,7 +433,7 @@ func (node *Node) SendPongMessage() {
 			} else {
 				// stable number of peers/pubkeys, sent the pong message
 				if !sentMessage {
-					pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys, node.Consensus.Leader.PubKey)
+					pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys, node.Consensus.GetLeaderPubKey())
 					buffer := pong.ConstructPongMessage()
 					err := node.host.SendMessageToGroups([]p2p.GroupID{node.MyShardGroupID}, host.ConstructP2pMessage(byte(0), buffer))
 					if err != nil {
@@ -482,13 +483,11 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		node.AddPeers(peers)
 	}
 
-	node.Consensus.Leader.PubKey = &bls.PublicKey{}
-	err = node.Consensus.Leader.PubKey.Deserialize(pong.LeaderPubKey)
+	err = node.Consensus.SetLeaderPubKey(pong.LeaderPubKey)
 	if err != nil {
 		utils.GetLogInstance().Error("Unmarshal Consensus Leader PubKey Failed", "error", err)
 	}
-	node.DRand.Leader.PubKey = &bls.PublicKey{}
-	err = node.DRand.Leader.PubKey.Deserialize(pong.LeaderPubKey)
+	err = node.DRand.SetLeaderPubKey(pong.LeaderPubKey)
 	if err != nil {
 		utils.GetLogInstance().Error("Unmarshal DRand Leader PubKey Failed", "error", err)
 	}
@@ -509,7 +508,7 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		publicKeys = append(publicKeys, &key)
 	}
 
-	//	utils.GetLogInstance().Debug("[pongMessageHandler]", "#keys", len(publicKeys), "#peers", len(peers))
+	utils.GetLogInstance().Debug("[pongMessageHandler]", "#keys", len(publicKeys), "#peers", len(peers))
 
 	if node.State == NodeWaitToJoin {
 		node.State = NodeReadyForConsensus
@@ -524,5 +523,5 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 	data["peer"] = p2p.GroupAction{Name: node.MyShardGroupID, Action: p2p.ActionPause}
 
 	node.serviceManager.TakeAction(&service.Action{Action: service.Notify, ServiceType: service.PeerDiscovery, Params: data})
-	return node.Consensus.UpdatePublicKeys(publicKeys)
+	return node.Consensus.UpdatePublicKeys(publicKeys) + node.DRand.UpdatePublicKeys(publicKeys)
 }
