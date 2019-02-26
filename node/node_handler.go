@@ -343,9 +343,9 @@ func (node *Node) AddNewBlock(newBlock *types.Block) {
 
 func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 	if sender != "" {
-		_, ok := node.duplicatedPing[sender]
+		_, ok := node.duplicatedPing.Load(sender)
 		if !ok {
-			node.duplicatedPing[sender] = true
+			node.duplicatedPing.Store(sender, true)
 		} else {
 			// duplicated ping message return
 			return 0
