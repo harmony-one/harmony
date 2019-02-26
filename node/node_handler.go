@@ -65,7 +65,7 @@ func (node *Node) ReceiveGroupMessage() {
 			//			utils.GetLogInstance().Info("[PUBSUB]", "received group msg", len(msg), "sender", sender)
 			if err == nil {
 				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
-				node.messageHandler(msg[5:], string(sender))
+				go node.messageHandler(msg[5:], string(sender))
 			}
 		}
 	}
@@ -85,7 +85,7 @@ func (node *Node) ReceiveClientGroupMessage() {
 			utils.GetLogInstance().Info("[CLIENT]", "received group msg", len(msg), "sender", sender)
 			if err == nil {
 				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
-				node.messageHandler(msg[5:], string(sender))
+				go node.messageHandler(msg[5:], string(sender))
 			}
 		}
 	}
