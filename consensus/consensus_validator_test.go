@@ -36,7 +36,7 @@ func TestProcessMessageValidatorAnnounce(test *testing.T) {
 	// Asserts that the first and only call to Bar() is passed 99.
 	// Anything else will fail.
 	m.EXPECT().GetSelfPeer().Return(leader)
-	m.EXPECT().SendMessage(gomock.Any(), gomock.Any()).Times(1)
+	m.EXPECT().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, gomock.Any())
 
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2pimpl.NewHost(&leader, priKey)
@@ -92,7 +92,7 @@ func TestProcessMessageValidatorPrepared(test *testing.T) {
 	// Asserts that the first and only call to Bar() is passed 99.
 	// Anything else will fail.
 	m.EXPECT().GetSelfPeer().Return(leader)
-	m.EXPECT().SendMessage(gomock.Any(), gomock.Any()).Times(2)
+	m.EXPECT().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, gomock.Any()).Times(2)
 
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2pimpl.NewHost(&leader, priKey)
@@ -162,7 +162,7 @@ func TestProcessMessageValidatorCommitted(test *testing.T) {
 	// Asserts that the first and only call to Bar() is passed 99.
 	// Anything else will fail.
 	m.EXPECT().GetSelfPeer().Return(leader)
-	m.EXPECT().SendMessage(gomock.Any(), gomock.Any()).Times(2)
+	m.EXPECT().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, gomock.Any()).Times(2)
 
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2pimpl.NewHost(&leader, priKey)

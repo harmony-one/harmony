@@ -29,7 +29,6 @@ func TestSubmitTransaction(test *testing.T) {
 	m := mock_host.NewMockHost(ctrl)
 
 	m.EXPECT().GetSelfPeer().AnyTimes()
-	m.EXPECT().SendMessage(gomock.Any(), gomock.Any()).Times(1)
 
 	walletNode := node.New(m, nil, nil)
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9990")

@@ -15,14 +15,11 @@ import (
 	"github.com/harmony-one/harmony/cmd/client/txgen/txgen"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/newnode"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	p2p_host "github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
-	peerstore "github.com/libp2p/go-libp2p-peerstore"
-	multiaddr "github.com/multiformats/go-multiaddr"
 )
 
 var (
@@ -50,17 +47,9 @@ func main() {
 	versionFlag := flag.Bool("version", false, "Output version info")
 	crossShardRatio := flag.Int("cross_shard_ratio", 30, "The percentage of cross shard transactions.")
 
-	bcIP := flag.String("bc", "127.0.0.1", "IP of the identity chain")
-	bcPort := flag.String("bc_port", "8081", "port of the identity chain")
-
-	bcAddr := flag.String("bc_addr", "", "MultiAddr of the identity chain")
-
 	// Key file to store the private key
 	keyFile := flag.String("key", "./.txgenkey", "the private key file of the txgen")
 	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress")
-
-	// LibP2P peer discovery integration test
-	libp2pPD := flag.Bool("libp2p_pd", false, "enable libp2p based peer discovery")
 
 	flag.Parse()
 
@@ -95,41 +84,9 @@ func main() {
 
 	selfPeer := p2p.Peer{IP: *ip, Port: *port, ValidatorID: -1, PubKey: peerPubKey}
 
-	if !*libp2pPD {
-		var bcPeer *p2p.Peer
-		if *bcAddr != "" {
-			// Turn the destination into a multiaddr.
-			maddr, err := multiaddr.NewMultiaddr(*bcAddr)
-			if err != nil {
-				panic(err)
-			}
-
-			// Extract the peer ID from the multiaddr.
-			info, err := peerstore.InfoFromP2pAddr(maddr)
-			if err != nil {
-				panic(err)
-			}
-
-			bcPeer = &p2p.Peer{IP: *bcIP, Port: *bcPort, Addrs: info.Addrs, PeerID: info.ID}
-		} else {
-			bcPeer = &p2p.Peer{IP: *bcIP, Port: *bcPort}
-		}
-
-		candidateNode := newnode.New(*ip, *port, nodePriKey)
-		candidateNode.AddPeer(bcPeer)
-		candidateNode.ContactBeaconChain(*bcPeer)
-		selfPeer := candidateNode.GetSelfPeer()
-		selfPeer.PubKey = candidateNode.PubK
-
-		shardIDLeaderMap = candidateNode.Leaders
-
-		debugPrintShardIDLeaderMap(shardIDLeaderMap)
-	} else {
-		// Init with LibP2P enabled, FIXME: (leochen) right now we support only one shard
-		shardIDLeaderMap = make(map[uint32]p2p.Peer)
-		shardIDLeaderMap[0] = p2p.Peer{}
-		utils.UseLibP2P = true
-	}
+	// Init with LibP2P enabled, FIXME: (leochen) right now we support only one shard
+	shardIDLeaderMap = make(map[uint32]p2p.Peer)
+	shardIDLeaderMap[0] = p2p.Peer{}
 
 	// Do cross shard tx if there are more than one shard
 	setting := txgen.Settings{
@@ -195,27 +152,14 @@ func main() {
 	}
 	clientNode.Client.UpdateBlocks = updateBlocksFunc
 
-	for _, leader := range shardIDLeaderMap {
-		if !*libp2pPD {
-			clientNode.GetHost().AddPeer(&leader)
-			utils.GetLogInstance().Debug("Client Join Shard", "leader", leader)
-			go clientNode.JoinShard(leader)
-		}
-		clientNode.State = node.NodeReadyForConsensus
-	}
+	clientNode.Role = node.ClientNode
+	clientNode.ServiceManagerSetup()
+	clientNode.RunServices()
 
-	if *libp2pPD {
-		clientNode.Role = node.ClientNode
-		clientNode.ServiceManagerSetup()
-		clientNode.RunServices()
-		go clientNode.StartServer()
-	} else {
-		// Start the client server to listen to leader's message
-		go clientNode.StartServer()
-		// wait for 1 seconds for client to send ping message to leader
-		time.Sleep(time.Second)
-		clientNode.StopPing <- struct{}{}
-	}
+	// Start the client server to listen to leader's message
+	go clientNode.StartServer()
+	// wait for 1 seconds for client to send ping message to leader
+	time.Sleep(time.Second)
 	clientNode.State = node.NodeReadyForConsensus
 
 	// Transaction generation process
@@ -258,23 +202,17 @@ func main() {
 
 	// Send a stop message to stop the nodes at the end
 	msg := proto_node.ConstructStopMessage()
-	if utils.UseLibP2P {
-		clientNode.GetHost().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeaconClient}, p2p_host.ConstructP2pMessage(byte(0), msg))
-	} else {
-		clientNode.BroadcastMessage(clientNode.Client.GetLeaders(), msg)
-	}
-	time.Sleep(3000 * time.Millisecond)
+	clientNode.GetHost().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeaconClient}, p2p_host.ConstructP2pMessage(byte(0), msg))
+	clientNode.GetHost().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, p2p_host.ConstructP2pMessage(byte(0), msg))
+
+	time.Sleep(3 * time.Second)
 }
 
 // SendTxsToLeader sends txs to leader account.
 func SendTxsToLeader(clientNode *node.Node, leader p2p.Peer, txs types.Transactions) {
 	utils.GetLogInstance().Debug("[Generator] Sending account-based txs to...", "leader", leader, "numTxs", len(txs))
 	msg := proto_node.ConstructTransactionListMessageAccount(txs)
-	if utils.UseLibP2P {
-		clientNode.GetHost().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeaconClient}, p2p_host.ConstructP2pMessage(byte(0), msg))
-	} else {
-		clientNode.SendMessage(leader, msg)
-	}
+	clientNode.GetHost().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeaconClient}, p2p_host.ConstructP2pMessage(byte(0), msg))
 }
 
 func debugPrintShardIDLeaderMap(leaderMap map[uint32]p2p.Peer) {

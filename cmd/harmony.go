@@ -101,9 +101,6 @@ func main() {
 	keyFile := flag.String("key", "./.hmykey", "the private key file of the harmony node")
 	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress")
 
-	// LibP2P peer discovery integration test
-	libp2pPD := flag.Bool("libp2p_pd", false, "enable libp2p based peer discovery")
-
 	// isBeacon indicates this node is a beacon chain node
 	isBeacon := flag.Bool("is_beacon", false, "true means this node is a beacon chain node")
 
@@ -165,7 +162,6 @@ func main() {
 	} else {
 		role = "validator"
 	}
-	utils.UseLibP2P = true
 
 	// Init logging.
 	loggingInit(*logFolder, role, *ip, *port, *onlyLogTps)
@@ -250,16 +246,8 @@ func main() {
 	consensus.OnConsensusDone = currentNode.PostConsensusProcessing
 	currentNode.State = node.NodeWaitToJoin
 
-	if !*libp2pPD {
-		if consensus.IsLeader {
-			currentNode.State = node.NodeLeader
-		} else {
-			go currentNode.JoinShard(leader)
-		}
-	} else {
-		if consensus.IsLeader {
-			go currentNode.SendPongMessage()
-		}
+	if consensus.IsLeader {
+		go currentNode.SendPongMessage()
 	}
 
 	go currentNode.SupportSyncing()

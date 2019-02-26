@@ -1,3 +1,0 @@
-The beaconchain package currently is a centralized service that allocates every potential new node (uses newnode package) a specific shard. 
-If N is the number of shards, supplied as a parameter at bootup, then first N joining nodes are assigned to be the leaders of those N shards.  The nodes that come after that  are then assigned shards based on their order of entry.
-In the future, the generation of randomness would be decentralized. Such randomness would be provided to a new node once its PoS has been verified and then the node would be able to calculate its own shard automatically.

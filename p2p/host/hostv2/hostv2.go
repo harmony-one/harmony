@@ -5,7 +5,6 @@ package hostv2
 import (
 	"context"
 	"fmt"
-	"io"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -16,10 +15,8 @@ import (
 	libp2p "github.com/libp2p/go-libp2p"
 	libp2p_crypto "github.com/libp2p/go-libp2p-crypto"
 	libp2p_host "github.com/libp2p/go-libp2p-host"
-	libp2p_net "github.com/libp2p/go-libp2p-net"
 	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 	libp2p_peerstore "github.com/libp2p/go-libp2p-peerstore"
-	libp2p_protocol "github.com/libp2p/go-libp2p-protocol"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	ma "github.com/multiformats/go-multiaddr"
 )
@@ -197,46 +194,6 @@ func (host *HostV2) GetID() libp2p_peer.ID {
 // GetSelfPeer gets self peer
 func (host *HostV2) GetSelfPeer() p2p.Peer {
 	return host.self
-}
-
-// BindHandlerAndServe bind a streamHandler to the harmony protocol.
-func (host *HostV2) BindHandlerAndServe(handler p2p.StreamHandler) {
-	host.h.SetStreamHandler(libp2p_protocol.ID(ProtocolID), func(s libp2p_net.Stream) {
-		handler(s)
-	})
-	// Hang forever
-	<-make(chan struct{})
-}
-
-// SendMessage a p2p message sending function with signature compatible to p2pv1.
-func (host *HostV2) SendMessage(p p2p.Peer, message []byte) error {
-	logger := host.logger.New("from", host.self, "to", p, "PeerID", p.PeerID)
-	err := host.Peerstore().AddProtocols(p.PeerID, ProtocolID)
-	if err != nil {
-		logger.Error("AddProtocols() failed", "error", err)
-		return p2p.ErrAddProtocols
-	}
-	s, err := host.h.NewStream(context.Background(), p.PeerID, libp2p_protocol.ID(ProtocolID))
-	if err != nil {
-		logger.Error("NewStream() failed", "peerID", p.PeerID,
-			"protocolID", ProtocolID, "error", err)
-		return p2p.ErrNewStream
-	}
-	defer func() {
-		if err := s.Close(); err != nil {
-			logger.Warn("cannot close stream", "error", err)
-		}
-	}()
-	if nw, err := s.Write(message); err != nil {
-		logger.Error("Write() failed", "peerID", p.PeerID,
-			"protocolID", ProtocolID, "error", err)
-		return p2p.ErrMsgWrite
-	} else if nw < len(message) {
-		logger.Error("Short Write()", "expected", len(message), "actual", nw)
-		return io.ErrShortWrite
-	}
-
-	return nil
 }
 
 // Close closes the host
