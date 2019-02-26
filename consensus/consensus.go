@@ -308,7 +308,6 @@ func verifyMessageSig(signerPubKey *bls.PublicKey, message *msg_pb.Message) erro
 		return err
 	}
 	msgHash := sha256.Sum256(messageBytes)
-	utils.GetLogInstance().Debug("verifyMessageSig")
 	if !msgSig.VerifyHash(signerPubKey, msgHash[:]) {
 		return errors.New("failed to verify the signature")
 	}

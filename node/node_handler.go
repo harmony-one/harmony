@@ -132,10 +132,10 @@ func (node *Node) messageHandler(content []byte, sender string) {
 	case proto.Consensus:
 		msgPayload, _ := proto.GetConsensusMessagePayload(content)
 		if consensusObj.IsLeader {
-			utils.GetLogInstance().Info("NET: Leader received consensus message")
+			//			utils.GetLogInstance().Info("NET: Leader received consensus message")
 			consensusObj.ProcessMessageLeader(msgPayload)
 		} else {
-			utils.GetLogInstance().Info("NET: Validator received consensus message")
+			//			utils.GetLogInstance().Info("NET: Validator received consensus message")
 			consensusObj.ProcessMessageValidator(msgPayload)
 			// TODO(minhdoan): add logic to check if the current blockchain is not sync with other consensus
 			// we should switch to other state rather than DoingConsensus.
@@ -144,10 +144,10 @@ func (node *Node) messageHandler(content []byte, sender string) {
 		msgPayload, _ := proto.GetDRandMessagePayload(content)
 		if node.DRand != nil {
 			if node.DRand.IsLeader {
-				utils.GetLogInstance().Info("NET: DRand Leader received message")
+				//				utils.GetLogInstance().Info("NET: DRand Leader received message")
 				node.DRand.ProcessMessageLeader(msgPayload)
 			} else {
-				utils.GetLogInstance().Info("NET: DRand Validator received message")
+				//				utils.GetLogInstance().Info("NET: DRand Validator received message")
 				node.DRand.ProcessMessageValidator(msgPayload)
 			}
 		}
