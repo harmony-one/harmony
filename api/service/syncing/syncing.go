@@ -173,7 +173,7 @@ func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer) {
 		}
 		utils.GetLogInstance().Debug("[SYNC] CreateSyncConfig: peer port to connect", "port", peers[id].Port)
 	}
-	utils.GetLogInstance().Info("[SYNC] syncing: Finished creating SyncConfig.")
+	utils.GetLogInstance().Info("[SYNC] Finished creating SyncConfig.")
 }
 
 // MakeConnectionToPeers makes grpc connection to all peers.
@@ -189,7 +189,7 @@ func (ss *StateSync) MakeConnectionToPeers() {
 	}
 	wg.Wait()
 	ss.CleanUpNilPeers()
-	utils.GetLogInstance().Info("syncing: Finished making connection to peers.")
+	utils.GetLogInstance().Info("[SYNC] Finished making connection to peers.")
 }
 
 // CleanUpNilPeers cleans up peer with nil client and recalculate activePeerNumber.
@@ -200,6 +200,7 @@ func (ss *StateSync) CleanUpNilPeers() {
 			ss.activePeerNumber++
 		}
 	}
+	utils.GetLogInstance().Info("[SYNC] clean up inactive peers", "activeNumber", ss.activePeerNumber)
 }
 
 // GetHowManyMaxConsensus returns max number of consensus nodes and the first ID of consensus group.
@@ -256,6 +257,7 @@ func (ss *StateSync) GetBlockHashesConsensusAndCleanUp() bool {
 		return CompareSyncPeerConfigByblockHashes(ss.syncConfig.peers[i], ss.syncConfig.peers[j]) == -1
 	})
 	maxFirstID, maxCount := ss.syncConfig.GetHowManyMaxConsensus()
+	utils.GetLogInstance().Info("[SYNC] block consensus hashes", "maxFirstID", maxFirstID, "maxCount", maxCount)
 	if float64(maxCount) >= ConsensusRatio*float64(ss.activePeerNumber) {
 		ss.syncConfig.CleanUpPeers(maxFirstID)
 		ss.CleanUpNilPeers()
@@ -288,7 +290,7 @@ func (ss *StateSync) GetConsensusHashes(startHash []byte) bool {
 			break
 		}
 		if count > TimesToFail {
-			utils.GetLogInstance().Info("GetConsensusHashes: reached # of times to failed")
+			utils.GetLogInstance().Info("GetConsensusHashes: reached retry limit")
 			return false
 		}
 		count++
@@ -506,9 +508,11 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 	}
 }
 
-// StartStateSync starts state sync.
-func (ss *StateSync) StartStateSync(startHash []byte, bc *core.BlockChain, worker *worker.Worker) {
-	ss.RegisterNodeInfo()
+// StartStateSync starts state sync. isBeacon=true means it's the non-beacon node sync beaconchain block
+func (ss *StateSync) StartStateSync(startHash []byte, bc *core.BlockChain, worker *worker.Worker, isBeacon bool) {
+	if !isBeacon {
+		ss.RegisterNodeInfo()
+	}
 	// Gets consensus hashes.
 	if !ss.GetConsensusHashes(startHash) {
 		utils.GetLogInstance().Debug("[SYNC] StartStateSync unable to reach consensus on ss.GetConsensusHashes")

@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/params"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/blockproposal"
@@ -14,7 +15,9 @@ import (
 	"github.com/harmony-one/harmony/api/service/networkinfo"
 	"github.com/harmony-one/harmony/api/service/randomness"
 	"github.com/harmony-one/harmony/api/service/staking"
+	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
 )
 
@@ -108,6 +111,7 @@ func (node *Node) AddBeaconChainDatabase(db ethdb.Database) {
 		os.Exit(1)
 	}
 	node.beaconChain = chain
+	node.BeaconWorker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey), node.Consensus.ShardID)
 }
 
 // ServiceManagerSetup setups service store.

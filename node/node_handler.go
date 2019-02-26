@@ -171,10 +171,16 @@ func (node *Node) messageHandler(content []byte, sender string) {
 			case proto_node.Sync:
 				utils.GetLogInstance().Info("NET: received message: Node/Sync")
 				var blocks []*types.Block
-				err := rlp.DecodeBytes(msgPayload[1:], &blocks) // skip the Sync messge type
+				err := rlp.DecodeBytes(msgPayload[1:], &blocks)
 				if err != nil {
 					utils.GetLogInstance().Error("block sync", "error", err)
 				} else {
+					// for non-beaconchain node, subscribe to beacon block broadcast
+					if proto_node.BlockMessageType(msgPayload[0]) == proto_node.Sync && node.Role != BeaconValidator && node.Role != BeaconLeader && node.Role != ClientNode {
+						for _, block := range blocks {
+							node.BeaconBlockChannel <- block
+						}
+					}
 					if node.Client != nil && node.Client.UpdateBlocks != nil && blocks != nil {
 						node.Client.UpdateBlocks(blocks)
 					}

@@ -104,6 +104,7 @@ type Node struct {
 	Consensus              *consensus.Consensus // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
 	BlockChannel           chan *types.Block    // The channel to send newly proposed blocks
 	ConfirmedBlockChannel  chan *types.Block    // The channel to send confirmed blocks
+	BeaconBlockChannel     chan *types.Block    // The channel to send beacon blocks for non-beaconchain nodes
 	pendingTransactions    types.Transactions   // All the transactions received but not yet processed for Consensus
 	transactionInConsensus []*types.Transaction // The transactions selected into the new block and under Consensus process
 	pendingTxMutex         sync.Mutex
@@ -123,8 +124,9 @@ type Node struct {
 	State      State      // State of the Node
 	stateMutex sync.Mutex // mutex for change node state
 
-	TxPool *core.TxPool
-	Worker *worker.Worker
+	TxPool       *core.TxPool
+	Worker       *worker.Worker
+	BeaconWorker *worker.Worker // worker for beacon chain
 
 	// Client server (for wallet requests)
 	clientServer *clientService.Server
@@ -132,6 +134,7 @@ type Node struct {
 	// Syncing component.
 	downloaderServer       *downloader.Server
 	stateSync              *syncing.StateSync
+	beaconSync             *syncing.StateSync
 	peerRegistrationRecord map[uint32]*syncConfig // record registration time (unixtime) of peers begin in syncing
 
 	// The p2p host used to send/receive p2p messages
@@ -259,6 +262,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database) *N
 		node.blockchain = chain
 		node.BlockChannel = make(chan *types.Block)
 		node.ConfirmedBlockChannel = make(chan *types.Block)
+		node.BeaconBlockChannel = make(chan *types.Block)
 
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, params.TestChainConfig, chain)
 		node.Worker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey), node.Consensus.ShardID)
