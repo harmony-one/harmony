@@ -9,18 +9,13 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/harmony-one/harmony/drand"
-
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
-	peerstore "github.com/libp2p/go-libp2p-peerstore"
-	multiaddr "github.com/multiformats/go-multiaddr"
-
 	"github.com/harmony-one/harmony/consensus"
-	"github.com/harmony-one/harmony/internal/attack"
-	pkg_newnode "github.com/harmony-one/harmony/internal/newnode"
+	"github.com/harmony-one/harmony/drand"
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/utils"
+	contract_constants "github.com/harmony-one/harmony/internal/utils/contract"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
@@ -90,18 +85,12 @@ func main() {
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9000", "port of the node.")
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
-	attackedMode := flag.Int("attacked_mode", 0, "0 means not attacked, 1 means attacked, 2 means being open to be selected as attacked")
 	dbSupported := flag.Bool("db_supported", true, "false means not db_supported, true means db_supported")
 	freshDB := flag.Bool("fresh_db", false, "true means the existing disk based db will be removed")
 	profile := flag.Bool("profile", false, "Turn on profiling (CPU, Memory).")
 	metricsReportURL := flag.String("metrics_report_url", "", "If set, reports metrics to this URL.")
 	versionFlag := flag.Bool("version", false, "Output version info")
 	onlyLogTps := flag.Bool("only_log_tps", false, "Only log TPS if true")
-
-	//This IP belongs to jenkins.harmony.one
-	bcIP := flag.String("bc", "127.0.0.1", "IP of the beacon chain")
-	bcPort := flag.String("bc_port", "8081", "port of the beacon chain")
-	bcAddr := flag.String("bc_addr", "", "MultiAddr of the beacon chain")
 
 	//Leader needs to have a minimal number of peers to start consensus
 	minPeers := flag.Int("min_peers", 100, "Minimal number of Peers in shard")
@@ -115,6 +104,9 @@ func main() {
 
 	// isBeacon indicates this node is a beacon chain node
 	isBeacon := flag.Bool("is_beacon", false, "true means this node is a beacon chain node")
+
+	// isNewNode indicates this node is a new node
+	isNewNode := flag.Bool("is_newnode", false, "true means this node is a new node")
 
 	// isLeader indicates this node is a beacon chain leader node during the bootstrap process
 	isLeader := flag.Bool("is_leader", false, "true means this node is a beacon chain leader node")
@@ -150,7 +142,6 @@ func main() {
 	var leader p2p.Peer
 	var selfPeer p2p.Peer
 	var clientPeer *p2p.Peer
-	var BCPeer *p2p.Peer
 	var role string
 
 	nodePriKey, _, err := utils.LoadKeyFromFile(*keyFile)
@@ -164,56 +155,14 @@ func main() {
 	}
 	selfPeer = p2p.Peer{IP: *ip, Port: *port, ValidatorID: -1, PubKey: peerPubKey}
 
-	if !*libp2pPD {
-		if *bcAddr != "" {
-			// Turn the destination into a multiaddr.
-			maddr, err := multiaddr.NewMultiaddr(*bcAddr)
-			if err != nil {
-				panic(err)
-			}
-
-			// Extract the peer ID from the multiaddr.
-			info, err := peerstore.InfoFromP2pAddr(maddr)
-			if err != nil {
-				panic(err)
-			}
-
-			BCPeer = &p2p.Peer{IP: *bcIP, Port: *bcPort, Addrs: info.Addrs, PeerID: info.ID}
-		} else {
-			BCPeer = &p2p.Peer{IP: *bcIP, Port: *bcPort}
-		}
-
-		// Use Peer Discovery to get shard/leader/peer/...
-		candidateNode := pkg_newnode.New(*ip, *port, nodePriKey)
-		candidateNode.AddPeer(BCPeer)
-		candidateNode.ContactBeaconChain(*BCPeer)
-
-		shardID = candidateNode.GetShardID()
-		leader = candidateNode.GetLeader()
-		selfPeer = candidateNode.GetSelfPeer()
-		clientPeer = candidateNode.GetClientPeer()
-		selfPeer.PubKey = candidateNode.PubK
-
-		if leader.IP == *ip && leader.Port == *port {
-			role = "leader"
-		} else {
-			role = "validator"
-		}
-
-		if role == "validator" {
-			// Attack determination.
-			attack.GetInstance().SetAttackEnabled(attackDetermination(*attackedMode))
-		}
-		utils.UseLibP2P = false
+	if *isLeader {
+		role = "leader"
+		leader = selfPeer
 	} else {
-		if *isLeader {
-			role = "leader"
-			leader = selfPeer
-		} else {
-			role = "validator"
-		}
-		utils.UseLibP2P = true
+		role = "validator"
 	}
+	utils.UseLibP2P = true
+
 	// Init logging.
 	loggingInit(*logFolder, role, *ip, *port, *onlyLogTps)
 
@@ -253,6 +202,7 @@ func main() {
 	currentNode := node.New(host, consensus, ldb)
 	currentNode.Consensus.OfflinePeers = currentNode.OfflinePeers
 	currentNode.Role = node.NewNode
+	currentNode.AccountKey = contract_constants.GenesisBeaconAccountPriKey
 
 	if *isBeacon {
 		if role == "leader" {
@@ -268,7 +218,9 @@ func main() {
 		}
 		currentNode.AddBeaconChainDatabase(beacondb)
 
-		if role == "leader" {
+		if *isNewNode {
+			currentNode.Role = node.NewNode
+		} else if role == "leader" {
 			currentNode.Role = node.ShardLeader
 		} else {
 			currentNode.Role = node.ShardValidator
