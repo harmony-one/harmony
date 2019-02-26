@@ -174,7 +174,7 @@ type Node struct {
 	clientReceiver p2p.GroupReceiver
 
 	// Duplicated Ping Message Received
-	duplicatedPing map[string]bool
+	duplicatedPing sync.Map
 
 	// Channel to notify consensus service to really start consensus
 	startConsensus chan struct{}
@@ -290,8 +290,6 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database) *N
 
 	// start the goroutine to receive group message
 	go node.ReceiveGroupMessage()
-
-	node.duplicatedPing = make(map[string]bool)
 
 	if utils.UseLibP2P {
 		node.startConsensus = make(chan struct{})
