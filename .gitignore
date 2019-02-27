@@ -55,6 +55,9 @@ db/
 # harmony node keystore
 .hmykey
 
+# staking keystore
+.stakingkey
+
 # vendor directory
 vendor
 

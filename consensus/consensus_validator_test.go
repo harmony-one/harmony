@@ -5,6 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/params"
+
 	"github.com/golang/mock/gomock"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/harmony/api/proto"
@@ -17,6 +20,33 @@ import (
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 	"github.com/stretchr/testify/assert"
 )
+
+type MockChainReader struct{}
+
+func (MockChainReader) Config() *params.ChainConfig {
+	return nil
+}
+
+func (MockChainReader) CurrentHeader() *types.Header {
+	return &types.Header{}
+}
+
+func (MockChainReader) GetHeader(hash common.Hash, number uint64) *types.Header {
+	return &types.Header{}
+}
+
+func (MockChainReader) GetHeaderByNumber(number uint64) *types.Header {
+	return &types.Header{}
+}
+
+func (MockChainReader) GetHeaderByHash(hash common.Hash) *types.Header {
+	return &types.Header{}
+}
+
+// GetBlock retrieves a block from the database by hash and number.
+func (MockChainReader) GetBlock(hash common.Hash, number uint64) *types.Block {
+	return &types.Block{}
+}
 
 func TestProcessMessageValidatorAnnounce(test *testing.T) {
 	ctrl := gomock.NewController(test)
@@ -62,9 +92,7 @@ func TestProcessMessageValidatorAnnounce(test *testing.T) {
 	}
 
 	consensusValidator1 := New(m, "0", []p2p.Peer{validator1, validator2, validator3}, leader)
-	consensusValidator1.BlockVerifier = func(block *types.Block) bool {
-		return true
-	}
+	consensusValidator1.ChainReader = MockChainReader{}
 
 	copy(consensusValidator1.blockHash[:], hashBytes[:])
 	consensusValidator1.processAnnounceMessage(message)
@@ -112,9 +140,7 @@ func TestProcessMessageValidatorPrepared(test *testing.T) {
 	preparedMsg, _ := consensusLeader.constructPreparedMessage()
 
 	consensusValidator1 := New(m, "0", []p2p.Peer{validator1, validator2, validator3}, leader)
-	consensusValidator1.BlockVerifier = func(block *types.Block) bool {
-		return true
-	}
+	consensusValidator1.ChainReader = MockChainReader{}
 
 	// Get actual consensus messages.
 	announceMsg, err = proto.GetConsensusMessagePayload(announceMsg)
@@ -202,9 +228,7 @@ func TestProcessMessageValidatorCommitted(test *testing.T) {
 	}
 
 	consensusValidator1 := New(m, "0", []p2p.Peer{validator1, validator2, validator3}, leader)
-	consensusValidator1.BlockVerifier = func(block *types.Block) bool {
-		return true
-	}
+	consensusValidator1.ChainReader = MockChainReader{}
 	consensusValidator1.OnConsensusDone = func(newBlock *types.Block) {}
 
 	if err = protobuf.Unmarshal(announceMsg, message); err != nil {

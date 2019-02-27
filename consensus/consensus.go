@@ -42,6 +42,9 @@ type Consensus struct {
 	prepareBitmap        *bls_cosi.Mask
 	commitBitmap         *bls_cosi.Mask
 
+	// The chain reader for the blockchain this consensus is working on
+	ChainReader consensus_engine.ChainReader
+
 	// map of nodeID to validator Peer object
 	// FIXME: should use PubKey of p2p.Peer as the hashkey
 	validators sync.Map // key is uint16, value is p2p.Peer
@@ -85,8 +88,6 @@ type Consensus struct {
 
 	// Signal channel for starting a new consensus process
 	ReadySignal chan struct{}
-	// The verifier func passed from Node object
-	BlockVerifier func(*types.Block) bool
 	// The post-consensus processing func passed from Node object
 	// Called when consensus on a new block is done
 	OnConsensusDone func(*types.Block)
@@ -166,6 +167,7 @@ func (consensus *Consensus) GetNextRnd() ([32]byte, [32]byte, error) {
 }
 
 // New creates a new Consensus object
+// TODO: put shardId into chain reader's chain config
 func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Consensus {
 	consensus := Consensus{}
 	consensus.host = host
@@ -517,10 +519,17 @@ func NewFaker() *Consensus {
 	return &Consensus{}
 }
 
-// VerifyHeader checks whether a header conforms to the consensus rules of the
-// stock bft engine.
+// VerifyHeader checks whether a header conforms to the consensus rules of the bft engine.
 func (consensus *Consensus) VerifyHeader(chain consensus_engine.ChainReader, header *types.Header, seal bool) error {
-	// TODO: implement this
+	parentHeader := chain.GetHeader(header.ParentHash, header.Number.Uint64()-1)
+	if parentHeader == nil {
+		return consensus_engine.ErrUnknownAncestor
+	}
+	if seal {
+		if err := consensus.VerifySeal(chain, header); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -533,28 +542,6 @@ func (consensus *Consensus) VerifyHeaders(chain consensus_engine.ChainReader, he
 		results <- nil
 	}
 	return abort, results
-}
-
-func (consensus *Consensus) verifyHeaderWorker(chain consensus_engine.ChainReader, headers []*types.Header, seals []bool, index int) error {
-	var parent *types.Header
-	if index == 0 {
-		parent = chain.GetHeader(headers[0].ParentHash, headers[0].Number.Uint64()-1)
-	} else if headers[index-1].Hash() == headers[index].ParentHash {
-		parent = headers[index-1]
-	}
-	if parent == nil {
-		return consensus_engine.ErrUnknownAncestor
-	}
-	if chain.GetHeader(headers[index].Hash(), headers[index].Number.Uint64()) != nil {
-		return nil // known block
-	}
-	return consensus.verifyHeader(chain, headers[index], parent, false, seals[index])
-}
-
-// verifyHeader checks whether a header conforms to the consensus rules of the
-// stock bft engine.
-func (consensus *Consensus) verifyHeader(chain consensus_engine.ChainReader, header, parent *types.Header, uncle bool, seal bool) error {
-	return nil
 }
 
 // VerifySeal implements consensus.Engine, checking whether the given block satisfies

@@ -180,7 +180,7 @@ func main() {
 		panic("unable to new host in harmony")
 	}
 
-	log.Info("HARMONY", "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, host.GetID().Pretty()))
+	log.Info("New Harmony Node...", "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, host.GetID().Pretty()))
 
 	host.AddPeer(&leader)
 
@@ -203,6 +203,9 @@ func main() {
 	currentNode.Consensus.OfflinePeers = currentNode.OfflinePeers
 	currentNode.Role = node.NewNode
 	currentNode.AccountKey = stakingPriKey
+
+	// TODO: refactor the creation of blockchain out of node.New()
+	consensus.ChainReader = currentNode.Blockchain()
 
 	if *isBeacon {
 		if role == "leader" {
@@ -242,7 +245,6 @@ func main() {
 	}
 
 	// Assign closure functions to the consensus object
-	consensus.BlockVerifier = currentNode.VerifyNewBlock
 	consensus.OnConsensusDone = currentNode.PostConsensusProcessing
 	currentNode.State = node.NodeWaitToJoin
 
