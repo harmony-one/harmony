@@ -58,11 +58,6 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan *types.Block, stop
 					utils.GetLogInstance().Debug("WaitForNewBlock", "removed peers", c)
 				}
 
-				for !consensus.HasEnoughValidators() {
-					utils.GetLogInstance().Debug("Not enough validators", "# Validators", len(consensus.PublicKeys))
-					time.Sleep(waitForEnoughValidators * time.Millisecond)
-				}
-
 				if core.IsEpochBlock(newBlock) {
 					// Receive pRnd from DRG protocol
 					utils.GetLogInstance().Debug("[DRG] Waiting for pRnd")
@@ -364,15 +359,4 @@ func (consensus *Consensus) reportMetrics(block types.Block) {
 		"blockLatency":    int(timeElapsed / time.Millisecond),
 	}
 	profiler.LogMetrics(metrics)
-}
-
-// HasEnoughValidators checks the number of publicKeys to determine
-// if the shard has enough validators
-// FIXME (HAR-82): we need epoch support or a better way to determine
-// when to initiate the consensus
-func (consensus *Consensus) HasEnoughValidators() bool {
-	if len(consensus.PublicKeys) < consensus.MinPeers {
-		return false
-	}
-	return true
 }
