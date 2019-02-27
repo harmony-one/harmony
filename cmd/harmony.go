@@ -290,7 +290,6 @@ func main() {
 	}
 
 	// Assign closure functions to the consensus object
-	consensus.BlockVerifier = currentNode.VerifyNewBlock
 	consensus.OnConsensusDone = currentNode.PostConsensusProcessing
 	currentNode.State = node.NodeWaitToJoin
 

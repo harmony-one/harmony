@@ -42,6 +42,9 @@ type Consensus struct {
 	prepareBitmap        *bls_cosi.Mask
 	commitBitmap         *bls_cosi.Mask
 
+	// The chain reader for the blockchain this consensus is working on
+	ChainReader consensus_engine.ChainReader
+
 	// map of nodeID to validator Peer object
 	// FIXME: should use PubKey of p2p.Peer as the hashkey
 	validators sync.Map // key is uint16, value is p2p.Peer
@@ -85,8 +88,6 @@ type Consensus struct {
 
 	// Signal channel for starting a new consensus process
 	ReadySignal chan struct{}
-	// The verifier func passed from Node object
-	BlockVerifier func(*types.Block) bool
 	// The post-consensus processing func passed from Node object
 	// Called when consensus on a new block is done
 	OnConsensusDone func(*types.Block)
@@ -521,10 +522,17 @@ func NewFaker() *Consensus {
 	return &Consensus{}
 }
 
-// VerifyHeader checks whether a header conforms to the consensus rules of the
-// stock bft engine.
+// VerifyHeader checks whether a header conforms to the consensus rules of the bft engine.
 func (consensus *Consensus) VerifyHeader(chain consensus_engine.ChainReader, header *types.Header, seal bool) error {
-	// TODO: implement this
+	parentHeader := chain.GetHeader(header.ParentHash, header.Number.Uint64()-1)
+	if parentHeader == nil {
+		return consensus_engine.ErrUnknownAncestor
+	}
+	if seal {
+		if err := consensus.VerifySeal(chain, header); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
