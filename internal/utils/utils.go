@@ -217,7 +217,7 @@ func LoadKeyFromFile(keyfile string) (key p2p_crypto.PrivKey, pk p2p_crypto.PubK
 	return key, pk, err
 }
 
-// LoadKeyFromFile load private key from keyfile
+// LoadStakingKeyFromFile load staking private key from keyfile
 // If the private key is not loadable or no file, it will generate
 // a new random private key
 func LoadStakingKeyFromFile(keyfile string) *ecdsa.PrivateKey {
