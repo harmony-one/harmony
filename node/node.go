@@ -122,6 +122,9 @@ type Node struct {
 	State      State      // State of the Node
 	stateMutex sync.Mutex // mutex for change node state
 
+	// BeaconNeighbors store only neighbor nodes in the beacon chain shard
+	BeaconNeighbors sync.Map // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
+
 	TxPool       *core.TxPool
 	Worker       *worker.Worker
 	BeaconWorker *worker.Worker // worker for beacon chain
@@ -290,10 +293,10 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database) *N
 func (node *Node) AddPeers(peers []*p2p.Peer) int {
 	count := 0
 	for _, p := range peers {
-		key := fmt.Sprintf("%v", p.PubKey)
-		_, ok := node.Neighbors.Load(key)
+		key := fmt.Sprintf("%s:%s:%s", p.IP, p.Port, p.PeerID)
+		_, ok := node.Neighbors.LoadOrStore(key, *p)
 		if !ok {
-			node.Neighbors.Store(key, *p)
+			// !ok means new peer is stored
 			count++
 			node.host.AddPeer(p)
 			continue
@@ -309,6 +312,15 @@ func (node *Node) AddPeers(peers []*p2p.Peer) int {
 		node.DRand.AddPeers(peers)
 	}
 	return count
+}
+
+// AddBeaconPeer adds beacon chain neighbors nodes
+// Return false means new neighbor peer was added
+// Return true means redundant neighbor peer wasn't added
+func (node *Node) AddBeaconPeer(p *p2p.Peer) bool {
+	key := fmt.Sprintf("%s:%s:%s", p.IP, p.Port, p.PeerID)
+	_, ok := node.BeaconNeighbors.LoadOrStore(key, *p)
+	return ok
 }
 
 // CalculateResponse implements DownloadInterface on Node object.

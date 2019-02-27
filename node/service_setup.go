@@ -25,7 +25,7 @@ func (node *Node) setupForShardLeader() {
 	nodeConfig, chanPeer := node.initNodeConfiguration()
 
 	// Register peer discovery service. No need to do staking for beacon chain node.
-	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
+	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer, node.AddBeaconPeer))
 	// Register networkinfo service. "0" is the beacon shard ID
 	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
 
@@ -45,7 +45,7 @@ func (node *Node) setupForShardValidator() {
 	nodeConfig, chanPeer := node.initNodeConfiguration()
 
 	// Register peer discovery service. "0" is the beacon shard ID. No need to do staking for beacon chain node.
-	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
+	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer, node.AddBeaconPeer))
 	// Register networkinfo service. "0" is the beacon shard ID
 	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
 }
@@ -54,7 +54,7 @@ func (node *Node) setupForBeaconLeader() {
 	nodeConfig, chanPeer := node.initBeaconNodeConfiguration()
 
 	// Register peer discovery service. No need to do staking for beacon chain node.
-	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
+	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer, nil))
 	// Register networkinfo service.
 	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
 	// Register consensus service.
@@ -71,7 +71,7 @@ func (node *Node) setupForBeaconValidator() {
 	nodeConfig, chanPeer := node.initBeaconNodeConfiguration()
 
 	// Register peer discovery service. No need to do staking for beacon chain node.
-	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
+	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer, nil))
 	// Register networkinfo service.
 	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
 }
@@ -82,7 +82,7 @@ func (node *Node) setupForNewNode() {
 	// Register staking service.
 	node.serviceManager.RegisterService(service.Staking, staking.New(node.host, node.AccountKey, 0, node.beaconChain))
 	// Register peer discovery service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
+	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer, node.AddBeaconPeer))
 	// Register networkinfo service. "0" is the beacon shard ID
 	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
 
@@ -93,7 +93,7 @@ func (node *Node) setupForClientNode() {
 	nodeConfig, chanPeer := node.initNodeConfiguration()
 
 	// Register peer discovery service.
-	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer))
+	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer, nil))
 	// Register networkinfo service. "0" is the beacon shard ID
 	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer))
 }
