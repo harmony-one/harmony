@@ -484,3 +484,19 @@ func (node *Node) initBeaconNodeConfiguration() (service.NodeConfig, chan p2p.Pe
 
 	return nodeConfig, chanPeer
 }
+
+// AddBeaconChainDatabase adds database support for beaconchain blocks on normal sharding nodes (not BeaconChain node)
+func (node *Node) AddBeaconChainDatabase(db ethdb.Database) {
+	database := db
+	if database == nil {
+		database = ethdb.NewMemDatabase()
+	}
+	// TODO (chao) currently we use the same genesis block as normal shard
+	chain, err := node.GenesisBlockSetup(database)
+	if err != nil {
+		utils.GetLogInstance().Error("Error when doing genesis setup")
+		os.Exit(1)
+	}
+	node.beaconChain = chain
+	node.BeaconWorker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey), node.Consensus.ShardID)
+}
