@@ -204,6 +204,9 @@ func main() {
 	currentNode.Role = node.NewNode
 	currentNode.AccountKey = stakingPriKey
 
+	// TODO: refactor the creation of blockchain out of node.New()
+	consensus.ChainReader = currentNode.Blockchain()
+
 	if *isBeacon {
 		if role == "leader" {
 			currentNode.Role = node.BeaconLeader

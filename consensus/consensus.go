@@ -167,6 +167,7 @@ func (consensus *Consensus) GetNextRnd() ([32]byte, [32]byte, error) {
 }
 
 // New creates a new Consensus object
+// TODO: put shardId into chain reader's chain config
 func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Consensus {
 	consensus := Consensus{}
 	consensus.host = host

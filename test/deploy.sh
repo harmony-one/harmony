@@ -138,30 +138,18 @@ NUM_NN=0
 while IFS='' read -r line || [[ -n "$line" ]]; do
   IFS=' ' read ip port mode shardID <<< $line
   if [ "$mode" == "leader" ]; then
-<<<<<<< HEAD
      echo "launching leader ..."
-     $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key -is_leader 2>&1 | tee -a $LOG_FILE &
+     $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key -is_leader 2>&1 | tee -a $LOG_FILE &
   fi
   if [ "$mode" == "validator" ]; then
      echo "launching validator ..."
-     $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key 2>&1 | tee -a $LOG_FILE &
+     $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key 2>&1 | tee -a $LOG_FILE &
   fi
   sleep 0.5
   if [[ "$mode" == "newnode" && "$SYNC" == "true" ]]; then
      (( NUM_NN += 10 ))
      echo "launching new node ..."
-     (sleep $NUM_NN; $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key 2>&1 | tee -a $LOG_FILE ) &
-=======
-     $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key -is_leader 2>&1 | tee -a $LOG_FILE &
-  fi
-  if [ "$mode" == "validator" ]; then
-     $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key 2>&1 | tee -a $LOG_FILE &
-  fi
-  sleep 0.5
-  if [[ "$mode" == "newnode" && "$SYNC" == "true" ]]; then
-     (( NUM_NN += 35 ))
      (sleep $NUM_NN; $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key 2>&1 | tee -a $LOG_FILE ) &
->>>>>>> 06d1c76ced939e98205257f39ce379789193369b
   fi
 done < $config
 
