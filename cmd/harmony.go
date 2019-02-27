@@ -15,7 +15,6 @@ import (
 	"github.com/harmony-one/harmony/drand"
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/utils"
-	contract_constants "github.com/harmony-one/harmony/internal/utils/contract"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
@@ -95,6 +94,9 @@ func main() {
 	//Leader needs to have a minimal number of peers to start consensus
 	minPeers := flag.Int("min_peers", 100, "Minimal number of Peers in shard")
 
+	// Key file to store the private key of staking account.
+	stakingKeyFile := flag.String("staking_key", "./.stakingkey", "the private key file of the harmony node")
+
 	// Key file to store the private key
 	keyFile := flag.String("key", "./.hmykey", "the private key file of the harmony node")
 	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress")
@@ -143,6 +145,8 @@ func main() {
 	var selfPeer p2p.Peer
 	var clientPeer *p2p.Peer
 	var role string
+
+	stakingPriKey := utils.LoadStakingKeyFromFile(*stakingKeyFile)
 
 	nodePriKey, _, err := utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
@@ -202,7 +206,7 @@ func main() {
 	currentNode := node.New(host, consensus, ldb)
 	currentNode.Consensus.OfflinePeers = currentNode.OfflinePeers
 	currentNode.Role = node.NewNode
-	currentNode.AccountKey = contract_constants.GenesisBeaconAccountPriKey
+	currentNode.AccountKey = stakingPriKey
 
 	if *isBeacon {
 		if role == "leader" {
