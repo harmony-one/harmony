@@ -10,8 +10,6 @@ import (
 // Host is the client + server in p2p network.
 type Host interface {
 	GetSelfPeer() Peer
-	SendMessage(Peer, []byte) error
-	BindHandlerAndServe(handler StreamHandler)
 	Close() error
 	AddPeer(*Peer) error
 	GetID() libp2p_peer.ID

@@ -146,13 +146,9 @@ func (consensus *Consensus) startConsensus(newBlock *types.Block) {
 	// Leader sign the block hash itself
 	consensus.prepareSigs[consensus.nodeID] = consensus.priKey.SignHash(consensus.blockHash[:])
 
-	if utils.UseLibP2P {
-		// Construct broadcast p2p message
-		utils.GetLogInstance().Warn("[Consensus]", "sent announce message", len(msgToSend))
-		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
-	} else {
-		host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
-	}
+	// Construct broadcast p2p message
+	utils.GetLogInstance().Warn("[Consensus]", "sent announce message", len(msgToSend))
+	consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
 }
 
 // processPrepareMessage processes the prepare message sent from validators
@@ -217,12 +213,8 @@ func (consensus *Consensus) processPrepareMessage(message *msg_pb.Message) {
 		msgToSend, aggSig := consensus.constructPreparedMessage()
 		consensus.aggregatedPrepareSig = aggSig
 
-		if utils.UseLibP2P {
-			utils.GetLogInstance().Warn("[Consensus]", "sent prepared message", len(msgToSend))
-			consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
-		} else {
-			host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
-		}
+		utils.GetLogInstance().Warn("[Consensus]", "sent prepared message", len(msgToSend))
+		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
 
 		// Set state to targetState
 		consensus.state = targetState
@@ -296,12 +288,8 @@ func (consensus *Consensus) processCommitMessage(message *msg_pb.Message) {
 		msgToSend, aggSig := consensus.constructCommittedMessage()
 		consensus.aggregatedCommitSig = aggSig
 
-		if utils.UseLibP2P {
-			utils.GetLogInstance().Warn("[Consensus]", "sent committed message", len(msgToSend))
-			consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
-		} else {
-			host.BroadcastMessageFromLeader(consensus.host, consensus.GetValidatorPeers(), msgToSend, consensus.OfflinePeers)
-		}
+		utils.GetLogInstance().Warn("[Consensus]", "sent committed message", len(msgToSend))
+		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
 
 		var blockObj types.Block
 		err := rlp.DecodeBytes(consensus.block, &blockObj)

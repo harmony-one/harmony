@@ -19,7 +19,7 @@ function check_result() {
 }
 
 function cleanup() {
-   for pid in `/bin/ps -fu $USER| grep "harmony\|txgen\|soldier\|commander\|profiler\|beacon\|bootnode" | grep -v "grep" | grep -v "vi" | awk '{print $2}'`;
+   for pid in `/bin/ps -fu $USER| grep "harmony\|txgen\|soldier\|commander\|profiler\|bootnode" | grep -v "grep" | grep -v "vi" | awk '{print $2}'`;
    do
        echo 'Killed process: '$pid
        $DRYRUN kill -9 $pid 2> /dev/null
@@ -57,7 +57,6 @@ USAGE: $ME [OPTIONS] config_file_name
    -k nodeport    kill the node with specified port number (default: $KILLPORT)
    -n             dryrun mode (default: $DRYRUN)
    -S             enable sync test (default: $SYNC)
-   -P             enable libp2p peer discovery test (default: $P2P)
 
 This script will build all the binaries and start harmony and txgen based on the configuration file.
 
@@ -78,9 +77,8 @@ SHARDS=2
 KILLPORT=9004
 SYNC=true
 DRYRUN=
-P2P=false
 
-while getopts "hdtD:m:s:k:nSP" option; do
+while getopts "hdtD:m:s:k:nS" option; do
    case $option in
       h) usage ;;
       d) DB='-db_supported' ;;
@@ -91,7 +89,6 @@ while getopts "hdtD:m:s:k:nSP" option; do
       k) KILLPORT=$OPTARG ;;
       n) DRYRUN=echo ;;
       S) SYNC=true ;;
-      P) P2P=true ;;
    esac
 done
 
@@ -128,25 +125,12 @@ log_folder="tmp_log/log-$t"
 mkdir -p $log_folder
 LOG_FILE=$log_folder/r.log
 
-HMY_OPT=
-HMY_OPT2=
-HMY_OPT3=
-
-if [ "$P2P" == "false" ]; then
-   echo "launching beacon chain ..."
-   $DRYRUN $ROOT/bin/beacon -numShards $SHARDS > $log_folder/beacon.log 2>&1 | tee -a $LOG_FILE &
-   sleep 1 #waiting for beaconchain
-   BC_MA=$(grep "Beacon Chain Started" $log_folder/beacon.log | awk -F: ' { print $2 } ')
-   HMY_OPT=" -bc_addr $BC_MA"
-else
-   echo "launching boot node ..."
-   $DRYRUN $ROOT/bin/bootnode -port 19876 > $log_folder/bootnode.log 2>&1 | tee -a $LOG_FILE &
-   sleep 1
-   BN_MA=$(grep "BN_MA" $log_folder/bootnode.log | awk -F\= ' { print $2 } ')
-   HMY_OPT2=" -bootnodes $BN_MA"
-   HMY_OPT2+=" -libp2p_pd"
-   HMY_OPT3=" -is_beacon"
-fi
+echo "launching boot node ..."
+$DRYRUN $ROOT/bin/bootnode -port 19876 > $log_folder/bootnode.log 2>&1 | tee -a $LOG_FILE &
+sleep 1
+BN_MA=$(grep "BN_MA" $log_folder/bootnode.log | awk -F\= ' { print $2 } ')
+HMY_OPT2=" -bootnodes $BN_MA"
+HMY_OPT3=" -is_beacon"
 
 NUM_NN=0
 
@@ -154,15 +138,15 @@ NUM_NN=0
 while IFS='' read -r line || [[ -n "$line" ]]; do
   IFS=' ' read ip port mode shardID <<< $line
   if [ "$mode" == "leader" ]; then
-     $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key -is_leader 2>&1 | tee -a $LOG_FILE &
+     $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key -is_leader 2>&1 | tee -a $LOG_FILE &
   fi
   if [ "$mode" == "validator" ]; then
-     $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key 2>&1 | tee -a $LOG_FILE &
+     $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key 2>&1 | tee -a $LOG_FILE &
   fi
   sleep 0.5
   if [[ "$mode" == "newnode" && "$SYNC" == "true" ]]; then
      (( NUM_NN += 35 ))
-     (sleep $NUM_NN; $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key 2>&1 | tee -a $LOG_FILE ) &
+     (sleep $NUM_NN; $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key 2>&1 | tee -a $LOG_FILE ) &
   fi
 done < $config
 
@@ -177,7 +161,7 @@ if [ "$TXGEN" == "true" ]; then
    line=$(grep client $config)
    IFS=' ' read ip port mode shardID <<< $line
    if [ "$mode" == "client" ]; then
-      $DRYRUN $ROOT/bin/txgen -log_folder $log_folder -duration $DURATION -ip $ip -port $port $HMY_OPT $HMY_OPT2 2>&1 | tee -a $LOG_FILE
+      $DRYRUN $ROOT/bin/txgen -log_folder $log_folder -duration $DURATION -ip $ip -port $port $HMY_OPT2 2>&1 | tee -a $LOG_FILE
    fi
 else
    sleep $DURATION

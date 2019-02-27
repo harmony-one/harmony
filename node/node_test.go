@@ -120,13 +120,7 @@ func sendPingMessage(node *Node, leader p2p.Peer) {
 	}
 
 	ping1 := proto_discovery.NewPingMessage(p1)
-	buf1 := ping1.ConstructPingMessage()
-
-	fmt.Println("waiting for 5 seconds ...")
-	time.Sleep(5 * time.Second)
-
-	node.SendMessage(leader, buf1)
-	fmt.Println("sent ping message ...")
+	_ = ping1.ConstructPingMessage()
 }
 
 func sendPongMessage(node *Node, leader p2p.Peer) {
@@ -147,13 +141,7 @@ func sendPongMessage(node *Node, leader p2p.Peer) {
 	leaderPubKey := pki.GetBLSPrivateKeyFromInt(888).GetPublicKey()
 
 	pong1 := proto_discovery.NewPongMessage([]p2p.Peer{p1, p2}, pubKeys, leaderPubKey)
-	buf1 := pong1.ConstructPongMessage()
-
-	fmt.Println("waiting for 10 seconds ...")
-	time.Sleep(10 * time.Second)
-
-	node.SendMessage(leader, buf1)
-	fmt.Println("sent pong message ...")
+	_ = pong1.ConstructPongMessage()
 }
 
 func exitServer() {

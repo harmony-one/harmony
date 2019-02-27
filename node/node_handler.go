@@ -29,29 +29,6 @@ const (
 	MaxNumberOfTransactionsPerBlock = 8000
 )
 
-// MaybeBroadcastAsValidator returns if the node is a validator node.
-func (node *Node) MaybeBroadcastAsValidator(content []byte) {
-	// TODO: this is tree-based broadcasting. this needs to be replaced by p2p gossiping.
-	if node.SelfPeer.ValidatorID > 0 && node.SelfPeer.ValidatorID <= host.MaxBroadCast {
-		go host.BroadcastMessageFromValidator(node.host, node.SelfPeer, node.Consensus.GetValidatorPeers(), content)
-	}
-}
-
-// StreamHandler handles a new incoming network message.
-func (node *Node) StreamHandler(s p2p.Stream) {
-	defer s.Close()
-
-	// Read p2p message payload
-	content, err := p2p.ReadMessageContent(s)
-
-	if err != nil {
-		utils.GetLogInstance().Error("Read p2p data failed", "err", err, "node", node)
-		return
-	}
-
-	node.messageHandler(content, "")
-}
-
 // ReceiveGroupMessage use libp2p pubsub mechanism to receive broadcast messages
 func (node *Node) ReceiveGroupMessage() {
 	ctx := context.Background()
@@ -282,11 +259,7 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 	if node.ClientPeer != nil {
 		utils.GetLogInstance().Debug("Sending new block to client", "client", node.ClientPeer)
-		if utils.UseLibP2P {
-			node.host.SendMessageToGroups([]p2p.GroupID{node.MyClientGroupID}, host.ConstructP2pMessage(byte(0), proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock})))
-		} else {
-			node.SendMessage(*node.ClientPeer, proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock}))
-		}
+		node.host.SendMessageToGroups([]p2p.GroupID{node.MyClientGroupID}, host.ConstructP2pMessage(byte(0), proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock})))
 	}
 }
 
@@ -375,9 +348,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 
 	// add to incoming peer list
 	//node.host.AddIncomingPeer(*peer)
-	if utils.UseLibP2P {
-		node.host.ConnectHostPeer(*peer)
-	}
+	node.host.ConnectHostPeer(*peer)
 
 	if ping.Node.Role == proto_node.ClientRole {
 		utils.GetLogInstance().Info("Add Client Peer to Node", "Node", node.Consensus.GetNodeID(), "Client", peer)
@@ -387,29 +358,6 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 
 	// Add to Node's peer list anyway
 	node.AddPeers([]*p2p.Peer{peer})
-
-	// This is the old way of broadcasting pong message
-	if node.Consensus.IsLeader && !utils.UseLibP2P {
-		peers := node.Consensus.GetValidatorPeers()
-		pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys, node.Consensus.GetLeaderPubKey())
-		buffer := pong.ConstructPongMessage()
-
-		// Send a Pong message directly to the sender
-		// This is necessary because the sender will need to get a ValidatorID
-		// Just broadcast won't work, some validators won't receive the latest
-		// PublicKeys as we rely on a valid ValidatorID to do broadcast.
-		// This is very buggy, but we will move to libp2p, hope the problem will
-		// be resolved then.
-		// However, I disable it for now as we are sending redundant PONG messages
-		// to all validators.  This may not be needed. But it maybe add back.
-		//   p2p.SendMessage(*peer, buffer)
-
-		// Broadcast the message to all validators, as publicKeys is updated
-		// FIXME: HAR-89 use a separate nodefind/neighbor message
-
-		host.BroadcastMessageFromLeader(node.GetHost(), peers, buffer, node.Consensus.OfflinePeers)
-		//		utils.GetLogInstance().Info("PingMsgHandler send pong message")
-	}
 
 	return 1
 }
@@ -518,10 +466,6 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 
 	if node.State == NodeWaitToJoin {
 		node.State = NodeReadyForConsensus
-		// Notify JoinShard to stop sending Ping messages
-		if node.StopPing != nil {
-			node.StopPing <- struct{}{}
-		}
 	}
 
 	// Stop discovery service after received pong message

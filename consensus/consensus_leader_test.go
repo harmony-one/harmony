@@ -45,7 +45,7 @@ func TestProcessMessageLeaderPrepare(test *testing.T) {
 	// Asserts that the first and only call to Bar() is passed 99.
 	// Anything else will fail.
 	m.EXPECT().GetSelfPeer().Return(leader)
-	m.EXPECT().SendMessage(gomock.Any(), gomock.Any()).Times(3)
+	m.EXPECT().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, gomock.Any())
 
 	consensusLeader := New(m, "0", validators, leader)
 	consensusLeader.blockHash = blockHash
@@ -91,7 +91,6 @@ func TestProcessMessageLeaderPrepareInvalidSignature(test *testing.T) {
 	// Asserts that the first and only call to Bar() is passed 99.
 	// Anything else will fail.
 	m.EXPECT().GetSelfPeer().Return(leader)
-	m.EXPECT().SendMessage(gomock.Any(), gomock.Any()).Times(0)
 
 	consensusLeader := New(m, "0", validators, leader)
 	consensusLeader.blockHash = blockHash
@@ -146,7 +145,7 @@ func TestProcessMessageLeaderCommit(test *testing.T) {
 	// Asserts that the first and only call to Bar() is passed 99.
 	// Anything else will fail.
 	m.EXPECT().GetSelfPeer().Return(leader)
-	m.EXPECT().SendMessage(gomock.Any(), gomock.Any()).Times(3)
+	m.EXPECT().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, gomock.Any())
 
 	for i := 0; i < 3; i++ {
 		priKey, _, _ := utils.GenKeyP2P(validators[i].IP, validators[i].Port)
