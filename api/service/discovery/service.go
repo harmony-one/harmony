@@ -81,6 +81,7 @@ func (s *Service) contactP2pPeers() {
 	pingMsg.Node.Role = proto_node.ClientRole
 	clientMsgBuf := host.ConstructP2pMessage(byte(0), pingMsg.ConstructPingMessage())
 
+	s.sentPingMessage(p2p.GroupIDBeacon, regMsgBuf, clientMsgBuf)
 	for {
 		select {
 		case peer, ok := <-s.peerChan:
@@ -104,7 +105,6 @@ func (s *Service) contactP2pPeers() {
 		case action := <-s.actionChan:
 			s.config.Actions[action.Name] = action.Action
 		case <-tick.C:
-			var err error
 			for g, a := range s.config.Actions {
 				if a == p2p.ActionPause {
 					// Recived Pause Message, to reduce the frequency of ping message to every 1 minute
@@ -115,36 +115,44 @@ func (s *Service) contactP2pPeers() {
 				}
 
 				if a == p2p.ActionStart || a == p2p.ActionResume || a == p2p.ActionPause {
-					if g == p2p.GroupIDBeacon || g == p2p.GroupIDBeaconClient {
-						if s.config.IsBeacon {
-							// beacon chain node
-							err = s.host.SendMessageToGroups([]p2p.GroupID{s.config.Beacon}, regMsgBuf)
-						} else {
-							// non-beacon chain node, reg as client node
-							err = s.host.SendMessageToGroups([]p2p.GroupID{s.config.Beacon}, clientMsgBuf)
-						}
-					} else {
-						// The following logical will be used for 2nd stage peer discovery process
-						if s.config.Group == p2p.GroupIDUnknown {
-							continue
-						}
-						if s.config.IsClient {
-							// client node of reg shard, such as wallet/txgen
-							err = s.host.SendMessageToGroups([]p2p.GroupID{s.config.Group}, clientMsgBuf)
-						} else {
-							// regular node of a shard
-							err = s.host.SendMessageToGroups([]p2p.GroupID{s.config.Group}, regMsgBuf)
-						}
-					}
-					if err != nil {
-						utils.GetLogInstance().Error("[DISCOVERY] Failed to send ping message", "group", g)
-					} else {
-						//utils.GetLogInstance().Info("[DISCOVERY]", "Sent Ping Message", g)
-					}
+					s.sentPingMessage(g, regMsgBuf, clientMsgBuf)
 				}
 			}
 		}
 	}
+}
+
+// sentPingMessage sends a ping message to a pubsub topic
+func (s *Service) sentPingMessage(g p2p.GroupID, regMsgBuf, clientMsgBuf []byte) {
+	var err error
+	if g == p2p.GroupIDBeacon || g == p2p.GroupIDBeaconClient {
+		if s.config.IsBeacon {
+			// beacon chain node
+			err = s.host.SendMessageToGroups([]p2p.GroupID{s.config.Beacon}, regMsgBuf)
+		} else {
+			// non-beacon chain node, reg as client node
+			err = s.host.SendMessageToGroups([]p2p.GroupID{s.config.Beacon}, clientMsgBuf)
+		}
+	} else {
+		// The following logical will be used for 2nd stage peer discovery process
+		// do nothing when the groupID is unknown
+		if s.config.Group == p2p.GroupIDUnknown {
+			return
+		}
+		if s.config.IsClient {
+			// client node of reg shard, such as wallet/txgen
+			err = s.host.SendMessageToGroups([]p2p.GroupID{s.config.Group}, clientMsgBuf)
+		} else {
+			// regular node of a shard
+			err = s.host.SendMessageToGroups([]p2p.GroupID{s.config.Group}, regMsgBuf)
+		}
+	}
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to send ping message", "group", g)
+	} else {
+		utils.GetLogInstance().Info("[DISCOVERY]", "Sent Ping Message", g)
+	}
+
 }
 
 // Init is to initialize for discoveryService.
