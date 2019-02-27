@@ -539,28 +539,6 @@ func (consensus *Consensus) VerifyHeaders(chain consensus_engine.ChainReader, he
 	return abort, results
 }
 
-func (consensus *Consensus) verifyHeaderWorker(chain consensus_engine.ChainReader, headers []*types.Header, seals []bool, index int) error {
-	var parent *types.Header
-	if index == 0 {
-		parent = chain.GetHeader(headers[0].ParentHash, headers[0].Number.Uint64()-1)
-	} else if headers[index-1].Hash() == headers[index].ParentHash {
-		parent = headers[index-1]
-	}
-	if parent == nil {
-		return consensus_engine.ErrUnknownAncestor
-	}
-	if chain.GetHeader(headers[index].Hash(), headers[index].Number.Uint64()) != nil {
-		return nil // known block
-	}
-	return consensus.verifyHeader(chain, headers[index], parent, false, seals[index])
-}
-
-// verifyHeader checks whether a header conforms to the consensus rules of the
-// stock bft engine.
-func (consensus *Consensus) verifyHeader(chain consensus_engine.ChainReader, header, parent *types.Header, uncle bool, seal bool) error {
-	return nil
-}
-
 // VerifySeal implements consensus.Engine, checking whether the given block satisfies
 // the PoW difficulty requirements.
 func (consensus *Consensus) VerifySeal(chain consensus_engine.ChainReader, header *types.Header) error {
