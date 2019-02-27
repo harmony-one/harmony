@@ -473,11 +473,7 @@ func (consensus *Consensus) RemovePeers(peers []p2p.Peer) int {
 		pong := proto_discovery.NewPongMessage(validators, consensus.PublicKeys, consensus.leader.PubKey)
 		buffer := pong.ConstructPongMessage()
 
-		if utils.UseLibP2P {
-			consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), buffer))
-		} else {
-			host.BroadcastMessageFromLeader(consensus.host, validators, buffer, consensus.OfflinePeers)
-		}
+		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), buffer))
 	}
 
 	return count2
@@ -621,11 +617,6 @@ func (consensus *Consensus) GetPeerFromID(peerID uint32) (p2p.Peer, bool) {
 		return p2p.Peer{}, false
 	}
 	return value, true
-}
-
-// SendMessage sends message thru p2p host to peer.
-func (consensus *Consensus) SendMessage(peer p2p.Peer, message []byte) {
-	host.SendMessage(consensus.host, peer, message, nil)
 }
 
 // Populates the common basic fields for all consensus message.

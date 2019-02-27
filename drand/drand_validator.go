@@ -52,9 +52,5 @@ func (dRand *DRand) processInitMessage(message drand_proto.Message) {
 	msgToSend := dRand.constructCommitMessage(rand, proof)
 
 	// Send the commit message back to leader
-	if utils.UseLibP2P {
-		dRand.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
-	} else {
-		host.SendMessage(dRand.host, dRand.leader, msgToSend, nil)
-	}
+	dRand.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
 }

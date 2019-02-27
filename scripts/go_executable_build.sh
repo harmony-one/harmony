@@ -5,8 +5,8 @@ export GO111MODULE=on
 declare -A SRC
 SRC[harmony]=cmd/harmony.go
 SRC[txgen]=cmd/client/txgen/main.go
-SRC[wallet]=cmd/client/wallet/main.go
 SRC[bootnode]=cmd/bootnode/main.go
+# SRC[wallet]=cmd/client/wallet/main.go
 
 BINDIR=bin
 BUCKET=unique-bucket-bin

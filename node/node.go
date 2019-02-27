@@ -15,9 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/api/client"
 	clientService "github.com/harmony-one/harmony/api/client/service"
-	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
-	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
@@ -140,9 +138,6 @@ type Node struct {
 	// The p2p host used to send/receive p2p messages
 	host p2p.Host
 
-	// Channel to stop sending ping message
-	StopPing chan struct{}
-
 	// Signal channel for lost validators
 	OfflinePeers chan p2p.Peer
 
@@ -218,11 +213,7 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int) types.Transactions {
 
 // StartServer starts a server and process the requests by a handler.
 func (node *Node) StartServer() {
-	if utils.UseLibP2P {
-		select {}
-	} else {
-		node.host.BindHandlerAndServe(node.StreamHandler)
-	}
+	select {}
 }
 
 // Count the total number of transactions in the blockchain
@@ -282,7 +273,6 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database) *N
 	}
 
 	// Setup initial state of syncing.
-	node.StopPing = make(chan struct{})
 	node.peerRegistrationRecord = make(map[uint32]*syncConfig)
 
 	node.OfflinePeers = make(chan p2p.Peer)
@@ -291,11 +281,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database) *N
 	// start the goroutine to receive group message
 	go node.ReceiveGroupMessage()
 
-	if utils.UseLibP2P {
-		node.startConsensus = make(chan struct{})
-	} else {
-		node.startConsensus = nil
-	}
+	node.startConsensus = make(chan struct{})
 
 	return &node
 }
@@ -323,35 +309,6 @@ func (node *Node) AddPeers(peers []*p2p.Peer) int {
 		node.DRand.AddPeers(peers)
 	}
 	return count
-}
-
-// JoinShard helps a new node to join a shard.
-func (node *Node) JoinShard(leader p2p.Peer) {
-	// try to join the shard, send ping message every 1 second, with a 10 minutes time-out
-	tick := time.NewTicker(1 * time.Second)
-	timeout := time.NewTicker(10 * time.Minute)
-	defer tick.Stop()
-	defer timeout.Stop()
-
-	for {
-		select {
-		case <-tick.C:
-			ping := proto_discovery.NewPingMessage(node.SelfPeer)
-			if node.Client != nil { // assume this is the client node
-				ping.Node.Role = proto_node.ClientRole
-			}
-			buffer := ping.ConstructPingMessage()
-
-			// Talk to leader.
-			node.SendMessage(leader, buffer)
-		case <-timeout.C:
-			utils.GetLogInstance().Info("JoinShard timeout")
-			return
-		case <-node.StopPing:
-			utils.GetLogInstance().Info("Stopping JoinShard")
-			return
-		}
-	}
 }
 
 // CalculateResponse implements DownloadInterface on Node object.

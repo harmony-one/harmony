@@ -47,28 +47,6 @@ func (mr *MockHostMockRecorder) GetSelfPeer() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSelfPeer", reflect.TypeOf((*MockHost)(nil).GetSelfPeer))
 }
 
-// SendMessage mocks base method
-func (m *MockHost) SendMessage(arg0 p2p.Peer, arg1 []byte) error {
-	ret := m.ctrl.Call(m, "SendMessage", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// SendMessage indicates an expected call of SendMessage
-func (mr *MockHostMockRecorder) SendMessage(arg0, arg1 interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendMessage", reflect.TypeOf((*MockHost)(nil).SendMessage), arg0, arg1)
-}
-
-// BindHandlerAndServe mocks base method
-func (m *MockHost) BindHandlerAndServe(handler p2p.StreamHandler) {
-	m.ctrl.Call(m, "BindHandlerAndServe", handler)
-}
-
-// BindHandlerAndServe indicates an expected call of BindHandlerAndServe
-func (mr *MockHostMockRecorder) BindHandlerAndServe(handler interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BindHandlerAndServe", reflect.TypeOf((*MockHost)(nil).BindHandlerAndServe), handler)
-}
-
 // Close mocks base method
 func (m *MockHost) Close() error {
 	ret := m.ctrl.Call(m, "Close")
