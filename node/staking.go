@@ -43,7 +43,7 @@ func (node *Node) UpdateStakingList(block *types.Block) error {
 				//This means its a new node that is staking the first time.
 				node.CurrentStakes[currentSender] = value
 			}
-		case withdrawFuncSignature: //withdaw, currently: 0x2e1a7d4d
+		case withdrawFuncSignature: //withdraw, currently: 0x2e1a7d4d
 			value := decodeStakeCall(data)
 			if isPresent {
 				if node.CurrentStakes[currentSender] > value {
