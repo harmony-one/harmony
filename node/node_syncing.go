@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/rlp"
@@ -32,21 +33,11 @@ func getPeerFromIPandPort(ip, port string) p2p.Peer {
 	return p2p.Peer{IP: ip, Port: port, PeerID: peerID}
 }
 
-// GetBeaconSyncingPeers returns a list of peers for beaconchain syncing
-// TODO: currently hard coded
-func (node *Node) GetBeaconSyncingPeers() []p2p.Peer {
-	p1 := getPeerFromIPandPort("127.0.0.1", "6001")
-	p2 := getPeerFromIPandPort("127.0.0.1", "6002")
-	p3 := getPeerFromIPandPort("127.0.0.1", "6003")
-	p4 := getPeerFromIPandPort("127.0.0.1", "6004")
-	p5 := getPeerFromIPandPort("127.0.0.1", "6005")
-	return []p2p.Peer{p1, p2, p3, p4, p5}
-}
-
-// GetSyncingPeers returns list of peers.
-func (node *Node) GetSyncingPeers() []p2p.Peer {
+// getNeighborPeers is a helper function to return list of peers
+// based on different neightbor map
+func (node *Node) getNeighborPeers(neighbor sync.Map) []p2p.Peer {
 	res := []p2p.Peer{}
-	node.Neighbors.Range(func(k, v interface{}) bool {
+	neighbor.Range(func(k, v interface{}) bool {
 		res = append(res, v.(p2p.Peer))
 		return true
 	})
@@ -63,6 +54,16 @@ func (node *Node) GetSyncingPeers() []p2p.Peer {
 	}
 	utils.GetLogInstance().Debug("GetSyncingPeers: ", "res", res, "self", node.SelfPeer)
 	return res
+}
+
+// GetBeaconSyncingPeers returns a list of peers for beaconchain syncing
+func (node *Node) GetBeaconSyncingPeers() []p2p.Peer {
+	return node.getNeighborPeers(node.BeaconNeighbors)
+}
+
+// GetSyncingPeers returns list of peers for regular shard syncing.
+func (node *Node) GetSyncingPeers() []p2p.Peer {
+	return node.getNeighborPeers(node.Neighbors)
 }
 
 // DoBeaconSyncing update received beaconchain blocks and downloads missing beacon chain blocks
