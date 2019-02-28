@@ -110,6 +110,53 @@ func TestAddPeers(t *testing.T) {
 	}
 }
 
+func TestAddBeaconPeer(t *testing.T) {
+	_, pubKey1 := utils.GenKey("127.0.0.1", "2000")
+	_, pubKey2 := utils.GenKey("127.0.0.1", "8000")
+
+	peers1 := []*p2p.Peer{
+		&p2p.Peer{
+			IP:          "127.0.0.1",
+			Port:        "8888",
+			PubKey:      pubKey1,
+			ValidatorID: 1,
+			PeerID:      "1234",
+		},
+		&p2p.Peer{
+			IP:          "127.0.0.1",
+			Port:        "9999",
+			PubKey:      pubKey2,
+			ValidatorID: 2,
+			PeerID:      "4567",
+		},
+	}
+	_, pubKey := utils.GenKey("1", "2")
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "8982", PubKey: pubKey}
+	validator := p2p.Peer{IP: "127.0.0.1", Port: "8985"}
+	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
+	host, err := p2pimpl.NewHost(&leader, priKey)
+	if err != nil {
+		t.Fatalf("newhost failure: %v", err)
+	}
+	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader)
+	dRand := drand.New(host, "0", []p2p.Peer{leader, validator}, leader, nil, true)
+
+	node := New(host, consensus, nil)
+	node.DRand = dRand
+	for _, p := range peers1 {
+		ret := node.AddBeaconPeer(p)
+		if ret {
+			t.Errorf("AddBeaconPeer Failed, expecting false, got %v, peer %v", ret, p)
+		}
+	}
+	for _, p := range peers1 {
+		ret := node.AddBeaconPeer(p)
+		if !ret {
+			t.Errorf("AddBeaconPeer Failed, expecting true, got %v, peer %v", ret, p)
+		}
+	}
+}
+
 func sendPingMessage(node *Node, leader p2p.Peer) {
 	pubKey1 := pki.GetBLSPrivateKeyFromInt(333).GetPublicKey()
 

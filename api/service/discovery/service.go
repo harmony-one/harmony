@@ -14,27 +14,29 @@ import (
 
 // Service is the struct for discovery service.
 type Service struct {
-	host        p2p.Host
-	peerChan    chan p2p.Peer
-	stopChan    chan struct{}
-	actionChan  chan p2p.GroupAction
-	config      service.NodeConfig
-	actions     map[p2p.GroupID]p2p.ActionType
-	messageChan chan *msg_pb.Message
+	host              p2p.Host
+	peerChan          chan p2p.Peer
+	stopChan          chan struct{}
+	actionChan        chan p2p.GroupAction
+	config            service.NodeConfig
+	actions           map[p2p.GroupID]p2p.ActionType
+	messageChan       chan *msg_pb.Message
+	addBeaconPeerFunc func(*p2p.Peer) bool
 }
 
 // New returns discovery service.
 // h is the p2p host
 // config is the node config
 // (TODO: leo, build two overlays of network)
-func New(h p2p.Host, config service.NodeConfig, peerChan chan p2p.Peer) *Service {
+func New(h p2p.Host, config service.NodeConfig, peerChan chan p2p.Peer, addPeer func(*p2p.Peer) bool) *Service {
 	return &Service{
-		host:       h,
-		peerChan:   peerChan,
-		stopChan:   make(chan struct{}),
-		actionChan: make(chan p2p.GroupAction),
-		config:     config,
-		actions:    make(map[p2p.GroupID]p2p.ActionType),
+		host:              h,
+		peerChan:          peerChan,
+		stopChan:          make(chan struct{}),
+		actionChan:        make(chan p2p.GroupAction),
+		config:            config,
+		actions:           make(map[p2p.GroupID]p2p.ActionType),
+		addBeaconPeerFunc: addPeer,
 	}
 }
 
@@ -83,13 +85,19 @@ func (s *Service) contactP2pPeers() {
 		select {
 		case peer, ok := <-s.peerChan:
 			if !ok {
-				utils.GetLogInstance().Debug("end of info", "peer", peer.PeerID)
+				utils.GetLogInstance().Debug("[DISCOVERY] No More Peer!")
 				break
 			}
-			s.host.AddPeer(&peer)
+			// TODO (leo) this one assumes all peers received in the channel are beacon chain node
+			// It is just a temporary hack. When we work on re-sharding to regular shard, this has to be changed.
+			if !s.config.IsBeacon {
+				if s.addBeaconPeerFunc != nil {
+					s.addBeaconPeerFunc(&peer)
+				}
+			}
 			// Add to outgoing peer list
-			//s.host.AddOutgoingPeer(peer)
-			utils.GetLogInstance().Debug("[DISCOVERY]", "add outgoing peer", peer)
+			// s.host.AddOutgoingPeer(peer)
+			// utils.GetLogInstance().Debug("[DISCOVERY]", "add outgoing peer", peer)
 		case <-s.stopChan:
 			utils.GetLogInstance().Debug("[DISCOVERY] stop pinging ...")
 			return
