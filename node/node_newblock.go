@@ -47,7 +47,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 					threshold = FirstTimeThreshold
 					firstTime = false
 				}
-				utils.GetLogInstance().Debug("STARTING BLOCK", "threshold", threshold, "pendingTransactions", len(node.pendingTransactions))
+				utils.GetLogInstance().Debug("Proposing New Block...", "threshold", threshold, "pendingTransactions", len(node.pendingTransactions))
 				if len(node.pendingTransactions) >= threshold {
 					// Normal tx block consensus
 					selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
