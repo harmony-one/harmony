@@ -1,7 +1,7 @@
 pragma solidity >=0.4.22 <0.6.0;
 contract Faucet {
     mapping(address => bool) processed;
-    uint quota = 0.5 ether;
+    uint quota = 10 ether;
     address owner;
     constructor() public payable {
         owner = msg.sender;

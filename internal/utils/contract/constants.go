@@ -2,9 +2,10 @@ package contract
 
 import (
 	"crypto/ecdsa"
-	"fmt"
 	"os"
 	"strings"
+
+	"github.com/harmony-one/harmony/internal/utils"
 
 	"github.com/ethereum/go-ethereum/crypto"
 )
@@ -22,7 +23,7 @@ type DeployAccount struct {
 func BeaconAccountPriKey() *ecdsa.PrivateKey {
 	prikey, err := ecdsa.GenerateKey(crypto.S256(), strings.NewReader(beaconGenesisString))
 	if err != nil && prikey == nil {
-		fmt.Println("MINHDOAN***", err)
+		utils.GetLogInstance().Error("Failed to generate beacon chain contract deployer account")
 		os.Exit(1)
 	}
 	return prikey

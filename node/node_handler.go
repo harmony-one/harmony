@@ -218,7 +218,10 @@ func (node *Node) processStakingMessage(msgPayload []byte) {
 				}
 			}
 			utils.GetLogInstance().Info("Successfully added staking transaction to pending list.")
-			node.addPendingTransactions(txs)
+			go func() {
+				time.Sleep(5 * time.Second)
+				node.addPendingTransactions(txs)
+			}()
 		} else {
 			utils.GetLogInstance().Error("Failed to unmarshal staking transaction list", "error", err)
 		}
@@ -295,10 +298,12 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) bool {
 // 1. add the new block to blockchain
 // 2. [leader] send new block to the client
 func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
-	// if node.Role == BeaconLeader || node.Role == BeaconValidator {
-	// 	utils.GetLogInstance().Info("PostConsensusProcessing")
-	// 	node.UpdateStakingList(newBlock)
-	// }
+	utils.GetLogInstance().Info("PostConsensusProcessing")
+	if node.Role == BeaconLeader {
+		utils.GetLogInstance().Info("Updating staking list")
+		node.UpdateStakingList(newBlock)
+		node.printStakingList()
+	}
 	if node.Consensus.IsLeader {
 		node.BroadcastNewBlock(newBlock)
 	}

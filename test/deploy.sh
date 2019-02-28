@@ -135,6 +135,8 @@ HMY_OPT3=" -is_beacon"
 
 NUM_NN=0
 
+sleep 2
+
 # Start nodes
 while IFS='' read -r line || [[ -n "$line" ]]; do
   IFS=' ' read ip port mode shardID <<< $line

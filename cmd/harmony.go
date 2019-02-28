@@ -180,8 +180,6 @@ func main() {
 		panic("unable to new host in harmony")
 	}
 
-	log.Info("New Harmony Node...", "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, host.GetID().Pretty()))
-
 	host.AddPeer(&leader)
 
 	// Consensus object.
@@ -245,6 +243,7 @@ func main() {
 	}
 
 	// Assign closure functions to the consensus object
+	consensus.BlockVerifier = currentNode.VerifyNewBlock
 	consensus.OnConsensusDone = currentNode.PostConsensusProcessing
 	currentNode.State = node.NodeWaitToJoin
 
@@ -252,6 +251,7 @@ func main() {
 		go currentNode.SendPongMessage()
 	}
 
+	log.Info("New Harmony Node ====", "Role", currentNode.Role, "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, host.GetID().Pretty()))
 	go currentNode.SupportSyncing()
 	currentNode.ServiceManagerSetup()
 	currentNode.RunServices()

@@ -3,6 +3,8 @@ package node
 import (
 	"math/big"
 
+	"github.com/harmony-one/harmony/internal/utils"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/harmony-one/harmony/core/types"
 )
@@ -13,7 +15,8 @@ import (
 //Refer: https://solidity.readthedocs.io/en/develop/abi-spec.html
 
 const (
-	depositFuncSignature  = "0xd0e30db0"
+	// DepositFuncSignature is the func signature for deposit method
+	DepositFuncSignature  = "0xd0e30db0"
 	withdrawFuncSignature = "0x2e1a7d4d"
 	funcSingatureBytes    = 4
 )
@@ -27,13 +30,14 @@ func (node *Node) UpdateStakingList(block *types.Block) error {
 		txn := txns[i]
 		toAddress := txn.To()
 		if toAddress != nil && *toAddress != node.StakingContractAddress { //Not a address aimed at the staking contract.
+			utils.GetLogInstance().Info("Mismatched Staking Contract Address", "expected", node.StakingContractAddress.Hex(), "got", toAddress.Hex())
 			continue
 		}
 		currentSender, _ := types.Sender(signerType, txn)
 		_, isPresent := node.CurrentStakes[currentSender]
 		data := txn.Data()
 		switch funcSignature := decodeFuncSign(data); funcSignature {
-		case depositFuncSignature: //deposit, currently: 0xd0e30db0
+		case DepositFuncSignature: //deposit, currently: 0xd0e30db0
 			amount := txn.Value()
 			value := amount.Int64()
 			if isPresent {
@@ -61,6 +65,16 @@ func (node *Node) UpdateStakingList(block *types.Block) error {
 		}
 	}
 	return nil
+}
+
+func (node *Node) printStakingList() {
+	utils.GetLogInstance().Info("\n")
+	utils.GetLogInstance().Info("CURRENT STAKING INFO [START] ------------------------------------")
+	for addr, stake := range node.CurrentStakes {
+		utils.GetLogInstance().Info("", "Address", addr, "Stake", stake)
+	}
+	utils.GetLogInstance().Info("CURRENT STAKING INFO [END}   ------------------------------------")
+	utils.GetLogInstance().Info("\n")
 }
 
 //The first four bytes of the call data for a function call specifies the function to be called.

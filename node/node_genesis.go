@@ -31,12 +31,6 @@ func (node *Node) GenesisBlockSetup(db ethdb.Database) (*core.BlockChain, error)
 	genesisAlloc[contractAddress] = core.GenesisAccount{Balance: contractFunds}
 	node.ContractKeys = append(node.ContractKeys, contractKey)
 
-	node.AddFaucetContractToPendingTransactions()
-	if node.Role == BeaconLeader {
-		node.AddStakingContractToPendingTransactions() //This will save the latest information about staked nodes in current staked
-		node.DepositToFakeAccounts()
-	}
-
 	chainConfig := params.TestChainConfig
 	chainConfig.ChainID = big.NewInt(int64(node.Consensus.ShardID)) // Use ChainID as piggybacked ShardID
 	gspec := core.Genesis{
