@@ -134,7 +134,7 @@ func (node *Node) messageHandler(content []byte, sender string) {
 		if node.Role != BeaconLeader {
 			return
 		}
-		node.addStakingTxnIntoPendingTxns(msgPayload)
+		node.processStakingMessage(msgPayload)
 	case proto.Node:
 		actionType := proto_node.MessageType(msgType)
 		switch actionType {
@@ -201,14 +201,23 @@ func (node *Node) messageHandler(content []byte, sender string) {
 	}
 }
 
-func (node *Node) addStakingTxnIntoPendingTxns(msgPayload []byte) {
+func (node *Node) processStakingMessage(msgPayload []byte) {
 	msg := &message.Message{}
 	err := pb.Unmarshal(msgPayload, msg)
 	if err == nil {
 		stakingRequest := msg.GetStaking()
 		txs := types.Transactions{}
 		if err = rlp.DecodeBytes(stakingRequest.Transaction, &txs); err == nil {
-			utils.GetLogInstance().Error("Successfully added staking transaction to pending list.")
+			for _, tx := range txs {
+				signerType := types.HomesteadSigner{}
+				sender, err := types.Sender(signerType, tx)
+				if err != nil {
+					utils.GetLogInstance().Error("Failed to get the staker address", "error", err)
+				} else {
+					node.CallFaucetContract(sender)
+				}
+			}
+			utils.GetLogInstance().Info("Successfully added staking transaction to pending list.")
 			node.addPendingTransactions(txs)
 		} else {
 			utils.GetLogInstance().Error("Failed to unmarshal staking transaction list", "error", err)

@@ -30,6 +30,8 @@ const (
 	WaitTime = 5 * time.Second
 	// StakingContractAddress is the staking deployed contract address
 	StakingContractAddress = "TODO(minhdoan): Create a PR to generate staking contract address"
+	// StakingAmount is the amount of stake to put
+	StakingAmount = 10 ^ 18
 )
 
 // State is the state of staking service.
