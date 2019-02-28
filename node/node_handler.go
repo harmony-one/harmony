@@ -207,7 +207,8 @@ func (node *Node) addStakingTxnIntoPendingTxns(msgPayload []byte) {
 	if err == nil {
 		stakingRequest := msg.GetStaking()
 		txs := types.Transactions{}
-		if err = rlp.DecodeBytes(stakingRequest.Transaction, txs); err == nil {
+		if err = rlp.DecodeBytes(stakingRequest.Transaction, &txs); err == nil {
+			utils.GetLogInstance().Error("Successfully added staking transaction to pending list.")
 			node.addPendingTransactions(txs)
 		} else {
 			utils.GetLogInstance().Error("Failed to unmarshal staking transaction list", "error", err)
@@ -357,6 +358,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 	}
 
 	// Add to Node's peer list anyway
+	utils.GetLogInstance().Info("Add Peer to Node", "Node", node.Consensus.GetNodeID(), "Pear", peer)
 	node.AddPeers([]*p2p.Peer{peer})
 
 	return 1

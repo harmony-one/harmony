@@ -260,7 +260,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database) *N
 		if node.Role == BeaconLeader || node.Role == BeaconValidator {
 			node.CurrentStakes = make(map[common.Address]int64)
 		}
-		utils.GetLogInstance().Debug("Received", "blockHash", chain.GetBlockByNumber(0).Hash().Hex())
+		utils.GetLogInstance().Debug("Created Genesis Block", "blockHash", chain.GetBlockByNumber(0).Hash().Hex())
 		node.Consensus.ConsensusBlock = make(chan *consensus.BFTBlockInfo)
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 	}

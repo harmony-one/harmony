@@ -6,6 +6,8 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/rlp"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
@@ -143,19 +145,22 @@ func (s *Service) getFakeStakingInfo() *proto.StakingContractInfoResponse {
 
 // Constructs the staking message
 func constructStakingMessage(ts types.Transactions) []byte {
-	msg := &message.Message{
-		Type: message.MessageType_NEWNODE_BEACON_STAKING,
-		Request: &message.Message_Staking{
-			Staking: &message.StakingRequest{
-				Transaction: ts.GetRlp(0),
-				NodeId:      "",
+	tsBytes, err := rlp.EncodeToBytes(ts)
+	if err == nil {
+		msg := &message.Message{
+			Type: message.MessageType_NEWNODE_BEACON_STAKING,
+			Request: &message.Message_Staking{
+				Staking: &message.StakingRequest{
+					Transaction: tsBytes,
+					NodeId:      "",
+				},
 			},
-		},
+		}
+		if data, err := protobuf.Marshal(msg); err == nil {
+			return data
+		}
 	}
-	if data, err := protobuf.Marshal(msg); err == nil {
-		return data
-	}
-	utils.GetLogInstance().Error("Error when creating staking message")
+	utils.GetLogInstance().Error("Error when creating staking message", "error", err)
 	return nil
 }
 

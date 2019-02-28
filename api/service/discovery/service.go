@@ -129,7 +129,7 @@ func (s *Service) contactP2pPeers() {
 						}
 					}
 					if err != nil {
-						utils.GetLogInstance().Error("Failed to send ping message", "group", g)
+						utils.GetLogInstance().Error("[DISCOVERY] Failed to send ping message", "group", g)
 					} else {
 						utils.GetLogInstance().Info("[DISCOVERY]", "Sent Ping Message", g)
 					}
