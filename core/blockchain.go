@@ -1256,6 +1256,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 		stats.report(chain, i, cache)
 
 		// only insert new shardstate when block is epoch block
+		// TODO(minhdoan): this is only for beaconc chain
 		bc.InsertNewShardState(block)
 	}
 	// Append a single chain head event if we've progressed the chain
@@ -1735,6 +1736,7 @@ func (bc *BlockChain) ValidateNewShardState(block *types.Block) error {
 
 // InsertNewShardState insert new shard state into epoch block
 func (bc *BlockChain) InsertNewShardState(block *types.Block) {
+	// write state into db.
 	shardState := bc.GetNewShardState(block)
 	if shardState == nil {
 		return
