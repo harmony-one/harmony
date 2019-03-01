@@ -6,8 +6,16 @@ import (
 )
 
 func TestGetHashFromNodeList(t *testing.T) {
-	l1 := []NodeID{"node1", "node2", "node3"}
-	l2 := []NodeID{"node2", "node1", "node3"}
+	l1 := []NodeInfo{
+		NodeInfo{NodeID: "node1", IsLeader: true},
+		NodeInfo{NodeID: "node2", IsLeader: false},
+		NodeInfo{NodeID: "node3", IsLeader: false},
+	}
+	l2 := []NodeInfo{
+		NodeInfo{NodeID: "node2", IsLeader: false},
+		NodeInfo{NodeID: "node1", IsLeader: true},
+		NodeInfo{NodeID: "node3", IsLeader: false},
+	}
 	h1 := GetHashFromNodeList(l1)
 	h2 := GetHashFromNodeList(l2)
 
@@ -17,13 +25,42 @@ func TestGetHashFromNodeList(t *testing.T) {
 }
 
 func TestHash(t *testing.T) {
-	com1 := Committee{ShardID: 22, NodeList: []NodeID{"node11", "node22", "node1"}}
-	com2 := Committee{ShardID: 2, NodeList: []NodeID{"node4", "node5", "node6"}}
+	com1 := Committee{
+		ShardID: 22,
+		NodeList: []NodeInfo{
+			NodeInfo{NodeID: "node11", IsLeader: true},
+			NodeInfo{NodeID: "node22", IsLeader: false},
+			NodeInfo{NodeID: "node1", IsLeader: false},
+		},
+	}
+	com2 := Committee{
+		ShardID: 2,
+		NodeList: []NodeInfo{
+			NodeInfo{NodeID: "node4", IsLeader: true},
+			NodeInfo{NodeID: "node5", IsLeader: false},
+			NodeInfo{NodeID: "node6", IsLeader: false},
+		},
+	}
 	shardState1 := ShardState{com1, com2}
 	h1 := shardState1.Hash()
 
-	com3 := Committee{ShardID: 2, NodeList: []NodeID{"node6", "node5", "node4"}}
-	com4 := Committee{ShardID: 22, NodeList: []NodeID{"node1", "node11", "node22"}}
+	com3 := Committee{
+		ShardID: 2,
+		NodeList: []NodeInfo{
+			NodeInfo{NodeID: "node6", IsLeader: false},
+			NodeInfo{NodeID: "node5", IsLeader: false},
+			NodeInfo{NodeID: "node4", IsLeader: true},
+		},
+	}
+	com4 := Committee{
+		ShardID: 22,
+		NodeList: []NodeInfo{
+			NodeInfo{NodeID: "node1", IsLeader: false},
+			NodeInfo{NodeID: "node11", IsLeader: true},
+			NodeInfo{NodeID: "node22", IsLeader: false},
+		},
+	}
+
 	shardState2 := ShardState{com3, com4}
 	h2 := shardState2.Hash()
 

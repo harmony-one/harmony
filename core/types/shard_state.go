@@ -7,16 +7,9 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-type NodeRole byte
-
-const (
-	Leader NodeRole = iota
-	Validator
-)
-
 type NodeInfo struct {
-	NodeID string
-	Role   NodeRole
+	NodeID   string
+	IsLeader bool
 }
 
 // ShardState is the collection of all committees
@@ -30,14 +23,14 @@ type Committee struct {
 
 // GetHashFromNodeList will sort the list, then use Keccak256 to hash the list
 // notice that the input nodeList will be modified (sorted)
-func GetHashFromNodeList(nodeList []NodeID) []byte {
+func GetHashFromNodeList(nodeList []NodeInfo) []byte {
 	// in general, nodeList should not be empty
 	if nodeList == nil || len(nodeList) == 0 {
 		return []byte{}
 	}
 
 	sort.Slice(nodeList, func(i, j int) bool {
-		return CompareNodeID(nodeList[i], nodeList[j]) == -1
+		return CompareNodeInfo(nodeList[i], nodeList[j]) == -1
 	})
 	d := sha3.NewLegacyKeccak256()
 	for i := range nodeList {
@@ -61,17 +54,21 @@ func (ss ShardState) Hash() (h common.Hash) {
 }
 
 // CompareNodeID compares two nodes by their ID; used to sort node list
-func CompareNodeID(n1 NodeID, n2 NodeID) int {
-	if n1 < n2 {
+func CompareNodeInfo(n1 NodeInfo, n2 NodeInfo) int {
+	if n1.NodeID < n2.NodeID {
 		return -1
 	}
-	if n1 > n2 {
+	if n1.NodeID > n2.NodeID {
 		return 1
 	}
 	return 0
 }
 
 // Serialize serialize NodeID into bytes
-func (n NodeID) Serialize() []byte {
-	return []byte(n)
+func (n *NodeInfo) Serialize() []byte {
+	leader := 0
+	if n.IsLeader {
+		leader = 1
+	}
+	return append([]byte(n.NodeID), byte(leader))
 }
