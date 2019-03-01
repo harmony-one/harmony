@@ -21,6 +21,7 @@ import (
 type Service struct {
 	Host        p2p.Host
 	Rendezvous  p2p.GroupID
+	bootnodes   utils.AddrList
 	dht         *libp2pdht.IpfsDHT
 	ctx         context.Context
 	cancel      context.CancelFunc
@@ -33,7 +34,7 @@ type Service struct {
 }
 
 // New returns role conversion service.
-func New(h p2p.Host, rendezvous p2p.GroupID, peerChan chan p2p.Peer) *Service {
+func New(h p2p.Host, rendezvous p2p.GroupID, peerChan chan p2p.Peer, bootnodes utils.AddrList) *Service {
 	timeout := 30 * time.Minute
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	dht, err := libp2pdht.New(ctx, h.GetP2PHost())
@@ -50,6 +51,7 @@ func New(h p2p.Host, rendezvous p2p.GroupID, peerChan chan p2p.Peer) *Service {
 		stopChan:    make(chan struct{}),
 		stoppedChan: make(chan struct{}),
 		peerChan:    peerChan,
+		bootnodes:   bootnodes,
 	}
 }
 
@@ -71,7 +73,11 @@ func (s *Service) Init() error {
 	}
 
 	var wg sync.WaitGroup
-	for _, peerAddr := range utils.BootNodes {
+	if s.bootnodes == nil {
+		s.bootnodes = utils.BootNodes
+	}
+
+	for _, peerAddr := range s.bootnodes {
 		peerinfo, _ := peerstore.InfoFromP2pAddr(peerAddr)
 		wg.Add(1)
 		go func() {
