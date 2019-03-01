@@ -106,6 +106,7 @@ func main() {
 
 	// isNewNode indicates this node is a new node
 	isNewNode := flag.Bool("is_newnode", false, "true means this node is a new node")
+	accountIndex := flag.Int("account_index", 0, "the index of the staking account to use")
 
 	// isLeader indicates this node is a beacon chain leader node during the bootstrap process
 	isLeader := flag.Bool("is_leader", false, "true means this node is a beacon chain leader node")
@@ -143,7 +144,7 @@ func main() {
 	var clientPeer *p2p.Peer
 	var role string
 
-	stakingPriKey := node.LoadStakingKeyFromFile(*stakingKeyFile)
+	stakingPriKey := node.LoadStakingKeyFromFile(*stakingKeyFile, *accountIndex)
 
 	nodePriKey, _, err := utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
