@@ -35,7 +35,7 @@ func getPeerFromIPandPort(ip, port string) p2p.Peer {
 
 // getNeighborPeers is a helper function to return list of peers
 // based on different neightbor map
-func (node *Node) getNeighborPeers(neighbor sync.Map) []p2p.Peer {
+func (node *Node) getNeighborPeers(neighbor *sync.Map) []p2p.Peer {
 	res := []p2p.Peer{}
 	neighbor.Range(func(k, v interface{}) bool {
 		res = append(res, v.(p2p.Peer))
@@ -58,12 +58,12 @@ func (node *Node) getNeighborPeers(neighbor sync.Map) []p2p.Peer {
 
 // GetBeaconSyncingPeers returns a list of peers for beaconchain syncing
 func (node *Node) GetBeaconSyncingPeers() []p2p.Peer {
-	return node.getNeighborPeers(node.BeaconNeighbors)
+	return node.getNeighborPeers(&node.BeaconNeighbors)
 }
 
 // GetSyncingPeers returns list of peers for regular shard syncing.
 func (node *Node) GetSyncingPeers() []p2p.Peer {
-	return node.getNeighborPeers(node.Neighbors)
+	return node.getNeighborPeers(&node.Neighbors)
 }
 
 // DoBeaconSyncing update received beaconchain blocks and downloads missing beacon chain blocks
