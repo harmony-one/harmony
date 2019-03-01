@@ -1,6 +1,8 @@
 package node
 
 import (
+	"strings"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -104,4 +106,32 @@ func TestConstructBlocksSyncMessage(t *testing.T) {
 		t.Error("Failed to contruct block sync message")
 	}
 
+}
+
+func TestRoleTypeToString(t *testing.T) {
+	validator := ValidatorRole
+	client := ClientRole
+	unknown := RoleType(3)
+
+	if strings.Compare(validator.String(), "Validator") != 0 {
+		t.Error("Validator role String mismatch")
+	}
+	if strings.Compare(client.String(), "Client") != 0 {
+		t.Error("Validator role String mismatch")
+	}
+	if strings.Compare(unknown.String(), "Unknown") != 0 {
+		t.Error("Validator role String mismatch")
+	}
+}
+
+func TestInfoToString(t *testing.T) {
+	info := Info{
+		IP:          "127.0.0.1",
+		Port:        "81",
+		ValidatorID: 1,
+		PeerID:      "peer",
+	}
+	if strings.Compare(info.String(), "Info:127.0.0.1/81=>1/<peer.ID 3sdfvR>") != 0 {
+		t.Error("Info string mismatch")
+	}
 }
