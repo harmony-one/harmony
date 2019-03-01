@@ -7,8 +7,17 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-// NodeID is a unique ID represent a node
-type NodeID string
+type NodeRole byte
+
+const (
+	Leader NodeRole = iota
+	Validator
+)
+
+type NodeInfo struct {
+	NodeID string
+	Role   NodeRole
+}
 
 // ShardState is the collection of all committees
 type ShardState []Committee
@@ -16,7 +25,7 @@ type ShardState []Committee
 // Committee contains the active nodes in one shard
 type Committee struct {
 	ShardID  uint32
-	NodeList []NodeID // a list of NodeID where NodeID is represented by a string
+	NodeList []NodeInfo
 }
 
 // GetHashFromNodeList will sort the list, then use Keccak256 to hash the list
