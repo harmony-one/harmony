@@ -149,8 +149,8 @@ func (s *Service) sentPingMessage(g p2p.GroupID, regMsgBuf, clientMsgBuf []byte)
 	}
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to send ping message", "group", g)
-	} else {
-		utils.GetLogInstance().Info("[DISCOVERY]", "Sent Ping Message", g)
+		//	} else {
+		//		utils.GetLogInstance().Info("[DISCOVERY]", "Sent Ping Message", g)
 	}
 
 }
