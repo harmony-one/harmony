@@ -158,7 +158,7 @@ func fakeGetInitShardState() types.ShardState {
 		com := types.Committee{ShardID: sid}
 		for j := 0; j < 10; j++ {
 			nid := strconv.Itoa(int(rand.Int63()))
-			com.NodeList = append(com.NodeList, types.NodeID(nid))
+			com.NodeList = append(com.NodeList, types.NodeInfo{NodeID: nid, IsLeader: j == 0})
 		}
 		shardState = append(shardState, com)
 	}
