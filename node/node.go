@@ -58,6 +58,26 @@ const (
 	ClientNode
 )
 
+func (role Role) String() string {
+	switch role {
+	case Unknown:
+		return "Unknown"
+	case ShardLeader:
+		return "ShardLeader"
+	case ShardValidator:
+		return "ShardValidator"
+	case BeaconLeader:
+		return "BeaconLeader"
+	case BeaconValidator:
+		return "BeaconValidator"
+	case NewNode:
+		return "NewNode"
+	case ClientNode:
+		return "ClientNode"
+	}
+	return "Unknown"
+}
+
 func (state State) String() string {
 	switch state {
 	case NodeInit:
@@ -160,9 +180,9 @@ type Node struct {
 	Address    common.Address
 
 	// For test only
-	TestBankKeys      []*ecdsa.PrivateKey
-	ContractKeys      []*ecdsa.PrivateKey
-	ContractAddresses []common.Address
+	TestBankKeys        []*ecdsa.PrivateKey
+	ContractDeployerKey *ecdsa.PrivateKey
+	ContractAddresses   []common.Address
 
 	// Group Message Receiver
 	groupReceiver p2p.GroupReceiver
@@ -205,11 +225,9 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 func (node *Node) getTransactionsForNewBlock(maxNumTxs int) types.Transactions {
 	node.pendingTxMutex.Lock()
 	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(node.pendingTransactions, maxNumTxs)
-	_ = invalid // invalid txs are discard
 
-	utils.GetLogInstance().Debug("Invalid transactions discarded", "number", len(invalid))
 	node.pendingTransactions = unselected
-	utils.GetLogInstance().Debug("Remaining pending transactions", "number", len(node.pendingTransactions), "selected", len(selected))
+	utils.GetLogInstance().Debug("Selecting Transactions", "remainPending", len(node.pendingTransactions), "selected", len(selected), "invalidDiscarded", len(invalid))
 	node.pendingTxMutex.Unlock()
 	return selected
 }
@@ -260,12 +278,16 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database) *N
 
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, params.TestChainConfig, chain)
 		node.Worker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey), node.Consensus.ShardID)
-		if node.Role == BeaconLeader || node.Role == BeaconValidator {
-			node.CurrentStakes = make(map[common.Address]int64)
-		}
+
 		utils.GetLogInstance().Debug("Created Genesis Block", "blockHash", chain.GetBlockByNumber(0).Hash().Hex())
 		node.Consensus.ConsensusBlock = make(chan *consensus.BFTBlockInfo)
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
+
+		// Setup one time smart contracts
+		node.AddFaucetContractToPendingTransactions()
+		node.CurrentStakes = make(map[common.Address]int64)
+		node.AddStakingContractToPendingTransactions() //This will save the latest information about staked nodes in current staked
+		node.DepositToStakingAccounts()
 	}
 
 	if consensusObj != nil && consensusObj.IsLeader {

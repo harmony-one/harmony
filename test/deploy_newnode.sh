@@ -115,6 +115,7 @@ mkdir -p $log_folder
 LOG_FILE=$log_folder/r.log
 
 HMY_OPT=
+# Change to the beacon chain output from deploy.sh
 HMY_OPT2=
 HMY_OPT3=
 

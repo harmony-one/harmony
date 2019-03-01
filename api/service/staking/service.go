@@ -2,7 +2,6 @@ package staking
 
 import (
 	"crypto/ecdsa"
-	"fmt"
 	"math/big"
 	"time"
 
@@ -30,6 +29,8 @@ const (
 	WaitTime = 5 * time.Second
 	// StakingContractAddress is the staking deployed contract address
 	StakingContractAddress = "TODO(minhdoan): Create a PR to generate staking contract address"
+	// StakingAmount is the amount of stake to put
+	StakingAmount = 10
 )
 
 // State is the state of staking service.
@@ -50,13 +51,13 @@ type Service struct {
 }
 
 // New returns staking service.
-func New(host p2p.Host, accountKey *ecdsa.PrivateKey, stakingAmount int64, beaconChain *core.BlockChain) *Service {
+func New(host p2p.Host, accountKey *ecdsa.PrivateKey, beaconChain *core.BlockChain) *Service {
 	return &Service{
 		host:          host,
 		stopChan:      make(chan struct{}),
 		stoppedChan:   make(chan struct{}),
 		accountKey:    accountKey,
-		stakingAmount: stakingAmount,
+		stakingAmount: StakingAmount,
 		beaconChain:   beaconChain,
 	}
 }
@@ -82,6 +83,7 @@ func (s *Service) Run() {
 					return
 				}
 				s.DoService()
+				return
 			case <-s.stopChan:
 				return
 			}
@@ -135,9 +137,14 @@ func (s *Service) getStakingInfo() *proto.StakingContractInfoResponse {
 
 func (s *Service) getFakeStakingInfo() *proto.StakingContractInfoResponse {
 	balance := big.NewInt(params.Ether)
-	nonce := uint64(0)
+	nonce := uint64(0) // TODO: make it a incrementing field
+
+	priKey := contract_constants.GenesisBeaconAccountPriKey
+	contractAddress := crypto.PubkeyToAddress(priKey.PublicKey)
+
+	stakingContractAddress := crypto.CreateAddress(contractAddress, uint64(nonce))
 	return &proto.StakingContractInfoResponse{
-		ContractAddress: fmt.Sprintf("%s", contract_constants.DeployedContractAddress),
+		ContractAddress: stakingContractAddress.Hex(),
 		Balance:         balance.Bytes(),
 		Nonce:           nonce,
 	}
@@ -173,9 +180,9 @@ func (s *Service) createRawStakingMessage() []byte {
 		toAddress,
 		0, // beacon chain.
 		big.NewInt(s.stakingAmount),
-		params.CallValueTransferGas*2,           // hard-code
-		big.NewInt(int64(params.Sha256BaseGas)), // pick some predefined gas price.
-		nil)
+		params.TxGas*10,              // hard-code
+		nil,                          // pick some predefined gas price.
+		common.FromHex("0xd0e30db0")) // Refer to Node.DepositFuncSignature
 
 	if signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, s.accountKey); err == nil {
 		ts := types.Transactions{signedTx}

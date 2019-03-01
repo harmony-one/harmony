@@ -130,9 +130,12 @@ $DRYRUN $ROOT/bin/bootnode -port 19876 > $log_folder/bootnode.log 2>&1 | tee -a 
 sleep 1
 BN_MA=$(grep "BN_MA" $log_folder/bootnode.log | awk -F\= ' { print $2 } ')
 HMY_OPT2=" -bootnodes $BN_MA"
+echo "bootnode launched." + " $BN_MA"
 HMY_OPT3=" -is_beacon"
 
 NUM_NN=0
+
+sleep 2
 
 # Start nodes
 while IFS='' read -r line || [[ -n "$line" ]]; do

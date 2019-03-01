@@ -262,8 +262,7 @@ func (consensus *Consensus) processCommittedMessage(message *msg_pb.Message) {
 				utils.GetLogInstance().Debug("failed to construct the new block after consensus")
 			}
 			// check block data (transactions
-			// TODO: change to verify the block body
-			if err := consensus.VerifyHeader(consensus.ChainReader, blockObj.Header(), true); err != nil {
+			if err := consensus.VerifyHeader(consensus.ChainReader, blockObj.Header(), false); err != nil {
 				utils.GetLogInstance().Debug("[WARNING] Block content is not verified successfully", "consensusID", consensus.consensusID)
 				return
 			}

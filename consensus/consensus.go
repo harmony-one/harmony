@@ -91,6 +91,8 @@ type Consensus struct {
 	// The post-consensus processing func passed from Node object
 	// Called when consensus on a new block is done
 	OnConsensusDone func(*types.Block)
+	// The verifier func passed from Node object
+	BlockVerifier func(*types.Block) bool
 
 	// current consensus block to check if out of sync
 	ConsensusBlock chan *BFTBlockInfo

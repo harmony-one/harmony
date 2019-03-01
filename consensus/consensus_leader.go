@@ -321,7 +321,7 @@ func (consensus *Consensus) processCommitMessage(message *msg_pb.Message) {
 		consensus.consensusID++
 
 		consensus.OnConsensusDone(&blockObj)
-		utils.GetLogInstance().Debug("HOORAY!!! CONSENSUS REACHED!!!", "consensusID", consensus.consensusID, "numOfSignatures", len(commitSigs))
+		utils.GetLogInstance().Debug("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!", "consensusID", consensus.consensusID, "numOfSignatures", len(commitSigs))
 
 		// TODO: remove this temporary delay
 		time.Sleep(500 * time.Millisecond)
