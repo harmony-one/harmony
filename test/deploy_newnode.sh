@@ -116,7 +116,7 @@ LOG_FILE=$log_folder/r.log
 
 HMY_OPT=
 # Change to the beacon chain output from deploy.sh
-HMY_OPT2="-bootnodes /ip4/127.0.0.1/tcp/19876/p2p/QmWGSpah5QiBB1aKHKoJpM4VqJxcefc8kVxEbzXD59M8kP"
+HMY_OPT2=
 HMY_OPT3=
 
 ($DRYRUN $ROOT/bin/harmony -ip 127.0.0.1 -port 9100 -log_folder $log_folder -is_newnode $DB -min_peers $MIN $HMY_OPT $HMY_OPT2 $HMY_OPT3 -key /tmp/127.0.0.1-9100.key 2>&1 | tee -a $LOG_FILE ) &
