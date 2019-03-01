@@ -52,16 +52,25 @@ echo "Running go generate..."
 gogenerate_status_before="${tmpdir}/gogenerate_status_before.txt"
 gogenerate_status_after="${tmpdir}/gogenerate_status_after.txt"
 gogenerate_status_diff="${tmpdir}/gogenerate_status.diff"
+gogenerate_output="${tmpdir}/gogenerate_output.txt"
 git status --porcelain=v2 > "${gogenerate_status_before}"
-"${progdir}/gogenerate.sh"
-git status --porcelain=v2 > "${gogenerate_status_after}"
-if diff -u "${gogenerate_status_before}" "${gogenerate_status_after}" \
-	> "${gogenerate_status_diff}"
+if "${progdir}/gogenerate.sh" > "${gogenerate_output}" 2>&1
 then
-	echo "go generate succeeded; all generated files seem up to date."
+	echo "go generate succeeded."
+	echo "Checking if go generate changed any files..."
+	git status --porcelain=v2 > "${gogenerate_status_after}"
+	if diff -u "${gogenerate_status_before}" "${gogenerate_status_after}" \
+		> "${gogenerate_status_diff}"
+	then
+		echo "All generated files seem up to date."
+	else
+		echo "go generate changed working tree contents!"
+		"${progdir}/print_file.sh" "${gogenerate_status_diff}" "git status diff"
+		ok=false
+	fi
 else
-	echo "go generate changed working tree contents!"
-	"${progdir}/print_file.sh" "${gogenerate_status_diff}" "git status diff"
+	echo "go generate FAILED!"
+	"${progdir}/print_file.sh" "${gogenerate_output}" "go generate"
 	ok=false
 fi
 
