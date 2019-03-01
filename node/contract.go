@@ -96,7 +96,7 @@ func (node *Node) getDeployedStakingContract() common.Address {
 // AddFaucetContractToPendingTransactions adds the faucet contract the genesis block.
 func (node *Node) AddFaucetContractToPendingTransactions() {
 	// Add a contract deployment transactionv
-	priKey := node.ContractKeys[0]
+	priKey := node.ContractDeployerKey
 	dataEnc := common.FromHex(FaucetContractBinary)
 	// Unsigned transaction to avoid the case of transaction address.
 
@@ -112,28 +112,37 @@ func (node *Node) AddFaucetContractToPendingTransactions() {
 
 // CallFaucetContract invokes the faucet contract to give the walletAddress initial money
 func (node *Node) CallFaucetContract(address common.Address) common.Hash {
-	return node.callGetFreeTokenWithTransaction(address)
+	return node.callGetFreeToken(address)
 }
 
-func (node *Node) callGetFreeTokenWithTransaction(address common.Address) common.Hash {
+func (node *Node) callGetFreeToken(address common.Address) common.Hash {
 	state, err := node.blockchain.State()
 	if err != nil {
 		log.Error("Failed to get chain state", "Error", err)
 	}
-	nonce := state.GetNonce(crypto.PubkeyToAddress(node.ContractKeys[0].PublicKey))
+	nonce := state.GetNonce(crypto.PubkeyToAddress(node.ContractDeployerKey.PublicKey))
+	return node.callGetFreeTokenWithNonce(address, nonce)
+}
+
+func (node *Node) callGetFreeTokenWithNonce(address common.Address, nonce uint64) common.Hash {
 	contractData := FaucetFreeMoneyMethodCall + hex.EncodeToString(address.Bytes())
 	dataEnc := common.FromHex(contractData)
 	utils.GetLogInstance().Info("Sending Free Token to ", "Address", address.Hex())
-	tx, _ := types.SignTx(types.NewTransaction(nonce, node.ContractAddresses[0], node.Consensus.ShardID, big.NewInt(0), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, node.ContractKeys[0])
+	tx, _ := types.SignTx(types.NewTransaction(nonce, node.ContractAddresses[0], node.Consensus.ShardID, big.NewInt(0), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, node.ContractDeployerKey)
 
 	node.addPendingTransactions(types.Transactions{tx})
 	return tx.Hash()
 }
 
-// DepositToFakeAccounts invokes the faucet contract to give the fake accounts initial money
-func (node *Node) DepositToFakeAccounts() {
-	for _, deployAccount := range contract.FakeAccounts {
+// DepositToStakingAccounts invokes the faucet contract to give the staking accounts initial money
+func (node *Node) DepositToStakingAccounts() {
+	state, err := node.blockchain.State()
+	if err != nil {
+		log.Error("Failed to get chain state", "Error", err)
+	}
+	nonce := state.GetNonce(crypto.PubkeyToAddress(node.ContractDeployerKey.PublicKey)) + 1 // + 1 because deployer key is already used for faucet contract deployment
+	for i, deployAccount := range contract.StakingAccounts {
 		address := common.HexToAddress(deployAccount.Address)
-		node.callGetFreeTokenWithTransaction(address)
+		node.callGetFreeTokenWithNonce(address, nonce+uint64(i))
 	}
 }

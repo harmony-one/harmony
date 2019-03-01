@@ -177,9 +177,9 @@ type Node struct {
 	Address    common.Address
 
 	// For test only
-	TestBankKeys      []*ecdsa.PrivateKey
-	ContractKeys      []*ecdsa.PrivateKey
-	ContractAddresses []common.Address
+	TestBankKeys        []*ecdsa.PrivateKey
+	ContractDeployerKey *ecdsa.PrivateKey
+	ContractAddresses   []common.Address
 
 	// Group Message Receiver
 	groupReceiver p2p.GroupReceiver
@@ -284,7 +284,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database) *N
 		node.AddFaucetContractToPendingTransactions()
 		node.CurrentStakes = make(map[common.Address]int64)
 		node.AddStakingContractToPendingTransactions() //This will save the latest information about staked nodes in current staked
-		// node.DepositToFakeAccounts()
+		node.DepositToStakingAccounts()
 	}
 
 	if consensusObj != nil && consensusObj.IsLeader {

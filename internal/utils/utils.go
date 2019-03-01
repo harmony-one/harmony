@@ -2,7 +2,6 @@ package utils
 
 import (
 	"bytes"
-	"crypto/ecdsa"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -14,7 +13,6 @@ import (
 	"strconv"
 	"sync"
 
-	crypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/p2p"
 	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
@@ -215,24 +213,4 @@ func LoadKeyFromFile(keyfile string) (key p2p_crypto.PrivKey, pk p2p_crypto.PubK
 	}
 	key, pk, err = LoadPrivateKey(keyStruct.Key)
 	return key, pk, err
-}
-
-// LoadStakingKeyFromFile load staking private key from keyfile
-// If the private key is not loadable or no file, it will generate
-// a new random private key
-func LoadStakingKeyFromFile(keyfile string) *ecdsa.PrivateKey {
-	key, err := crypto.LoadECDSA(keyfile)
-	if err != nil {
-		GetLogInstance().Error("no key file. Let's create a staking private key")
-		key, err = crypto.GenerateKey()
-		if err != nil {
-			GetLogInstance().Error("Unable to generate the private key")
-			os.Exit(1)
-		}
-		if err = crypto.SaveECDSA(keyfile, key); err != nil {
-			GetLogInstance().Error("Unable to save the private key", "error", err)
-			os.Exit(1)
-		}
-	}
-	return key
 }

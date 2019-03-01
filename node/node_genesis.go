@@ -24,12 +24,12 @@ const (
 func (node *Node) GenesisBlockSetup(db ethdb.Database) (*core.BlockChain, error) {
 	// Initialize genesis block and blockchain
 	genesisAlloc := node.CreateGenesisAllocWithTestingAddresses(FakeAddressNumber)
-	contractKey, _ := ecdsa.GenerateKey(crypto.S256(), strings.NewReader("Test contract key string stream that is fixed so that generated test key are deterministic every time"))
-	contractAddress := crypto.PubkeyToAddress(contractKey.PublicKey)
-	contractFunds := big.NewInt(TotalInitFund)
-	contractFunds = contractFunds.Mul(contractFunds, big.NewInt(params.Ether))
-	genesisAlloc[contractAddress] = core.GenesisAccount{Balance: contractFunds}
-	node.ContractKeys = append(node.ContractKeys, contractKey)
+	contractDeployerKey, _ := ecdsa.GenerateKey(crypto.S256(), strings.NewReader("Test contract key string stream that is fixed so that generated test key are deterministic every time"))
+	contractDeployerAddress := crypto.PubkeyToAddress(contractDeployerKey.PublicKey)
+	contractDeployerFunds := big.NewInt(TotalInitFund)
+	contractDeployerFunds = contractDeployerFunds.Mul(contractDeployerFunds, big.NewInt(params.Ether))
+	genesisAlloc[contractDeployerAddress] = core.GenesisAccount{Balance: contractDeployerFunds}
+	node.ContractDeployerKey = contractDeployerKey
 
 	chainConfig := params.TestChainConfig
 	chainConfig.ChainID = big.NewInt(int64(node.Consensus.ShardID)) // Use ChainID as piggybacked ShardID

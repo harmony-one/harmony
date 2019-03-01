@@ -208,20 +208,8 @@ func (node *Node) processStakingMessage(msgPayload []byte) {
 		stakingRequest := msg.GetStaking()
 		txs := types.Transactions{}
 		if err = rlp.DecodeBytes(stakingRequest.Transaction, &txs); err == nil {
-			for _, tx := range txs {
-				signerType := types.HomesteadSigner{}
-				sender, err := types.Sender(signerType, tx)
-				if err != nil {
-					utils.GetLogInstance().Error("Failed to get the staker address", "error", err)
-				} else {
-					node.CallFaucetContract(sender)
-				}
-			}
 			utils.GetLogInstance().Info("Successfully added staking transaction to pending list.")
-			go func() {
-				time.Sleep(5 * time.Second)
-				node.addPendingTransactions(txs)
-			}()
+			node.addPendingTransactions(txs)
 		} else {
 			utils.GetLogInstance().Error("Failed to unmarshal staking transaction list", "error", err)
 		}

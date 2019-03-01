@@ -143,7 +143,7 @@ func main() {
 	var clientPeer *p2p.Peer
 	var role string
 
-	stakingPriKey := utils.LoadStakingKeyFromFile(*stakingKeyFile)
+	stakingPriKey := node.LoadStakingKeyFromFile(*stakingKeyFile)
 
 	nodePriKey, _, err := utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
