@@ -5,12 +5,11 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ethereum/go-ethereum/rlp"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
 	proto "github.com/harmony-one/harmony/api/client/service/proto"
 	proto_common "github.com/harmony-one/harmony/api/proto"
@@ -182,7 +181,8 @@ func (s *Service) createRawStakingMessage() []byte {
 		big.NewInt(s.stakingAmount),
 		params.TxGas*10,
 		nil,
-		common.FromHex("0xd0e30db0"))
+		common.FromHex("0xd0e30db0"),
+	)
 
 	if signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, s.accountKey); err == nil {
 		ts := types.Transactions{signedTx}

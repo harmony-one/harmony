@@ -162,6 +162,7 @@ func (node *Node) RunServices() {
 	node.serviceManager.RunServices()
 }
 
+// StopServicesByRole stops all service of the given role.
 func (node *Node) StopServicesByRole(role Role) {
 	switch role {
 	case ShardLeader:

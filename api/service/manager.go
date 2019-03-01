@@ -193,6 +193,7 @@ func (m *Manager) SetupServiceMessageChan(mapServiceTypeChan map[Type]chan *msg_
 	}
 }
 
+// StopService stops service with type t.
 func (m *Manager) StopService(t Type) {
 	if service, ok := m.services[t]; ok {
 		service.StopService()
