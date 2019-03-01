@@ -390,7 +390,8 @@ func (node *Node) SendPongMessage() {
 				sentMessage = false
 			} else {
 				// stable number of peers/pubkeys, sent the pong message
-				if !sentMessage {
+				// also make sure number of peers is greater than the minimal required number
+				if !sentMessage && numPubKeysNow >= node.Consensus.MinPeers {
 					pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys, node.Consensus.GetLeaderPubKey())
 					buffer := pong.ConstructPongMessage()
 					err := node.host.SendMessageToGroups([]p2p.GroupID{node.MyShardGroupID}, host.ConstructP2pMessage(byte(0), buffer))
@@ -403,6 +404,8 @@ func (node *Node) SendPongMessage() {
 					sentMessage = true
 					// stop sending ping message
 					node.serviceManager.TakeAction(&service.Action{Action: service.Stop, ServiceType: service.PeerDiscovery})
+					// wait a bit until all validators received pong message
+					time.Sleep(200 * time.Millisecond)
 					node.startConsensus <- struct{}{}
 				}
 			}
@@ -417,6 +420,22 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 	if err != nil {
 		utils.GetLogInstance().Error("Can't get Pong Message")
 		return -1
+	}
+
+	// set the leader pub key is the first thing to do
+	// otherwise, we may not be able to validate the consensus messages received
+	// which will result in first consensus timeout
+	err = node.Consensus.SetLeaderPubKey(pong.LeaderPubKey)
+	if err != nil {
+		utils.GetLogInstance().Error("Unmarshal Consensus Leader PubKey Failed", "error", err)
+	} else {
+		utils.GetLogInstance().Info("Set Consensus Leader PubKey")
+	}
+	err = node.DRand.SetLeaderPubKey(pong.LeaderPubKey)
+	if err != nil {
+		utils.GetLogInstance().Error("Unmarshal DRand Leader PubKey Failed", "error", err)
+	} else {
+		utils.GetLogInstance().Info("Set DRand Leader PubKey")
 	}
 
 	peers := make([]*p2p.Peer, 0)
@@ -439,15 +458,6 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 
 	if len(peers) > 0 {
 		node.AddPeers(peers)
-	}
-
-	err = node.Consensus.SetLeaderPubKey(pong.LeaderPubKey)
-	if err != nil {
-		utils.GetLogInstance().Error("Unmarshal Consensus Leader PubKey Failed", "error", err)
-	}
-	err = node.DRand.SetLeaderPubKey(pong.LeaderPubKey)
-	if err != nil {
-		utils.GetLogInstance().Error("Unmarshal DRand Leader PubKey Failed", "error", err)
 	}
 
 	// Reset Validator PublicKeys every time we receive PONG message from Leader
