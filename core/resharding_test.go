@@ -14,8 +14,20 @@ func TestFakeNewNodeList(t *testing.T) {
 }
 
 func TestShuffle(t *testing.T) {
-	nodeList := []types.NodeID{"node1", "node2", "node3", "node4", "node5", "node6", "node7", "node8", "node9", "node10"}
-	cpList := []types.NodeID{}
+	nodeList := []types.NodeInfo{
+		types.NodeInfo{NodeID: "node1", IsLeader: true},
+		types.NodeInfo{NodeID: "node2", IsLeader: false},
+		types.NodeInfo{NodeID: "node3", IsLeader: false},
+		types.NodeInfo{NodeID: "node4", IsLeader: false},
+		types.NodeInfo{NodeID: "node5", IsLeader: false},
+		types.NodeInfo{NodeID: "node6", IsLeader: false},
+		types.NodeInfo{NodeID: "node7", IsLeader: false},
+		types.NodeInfo{NodeID: "node8", IsLeader: false},
+		types.NodeInfo{NodeID: "node9", IsLeader: false},
+		types.NodeInfo{NodeID: "node10", IsLeader: false},
+	}
+
+	cpList := []types.NodeInfo{}
 	cpList = append(cpList, nodeList...)
 	Shuffle(nodeList)
 	cnt := 0

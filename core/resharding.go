@@ -35,7 +35,7 @@ func (ss *ShardingState) sortCommitteeBySize() {
 }
 
 // assignNewNodes add new nodes into the N/2 active committees evenly
-func (ss *ShardingState) assignNewNodes(newNodeList []types.NodeID) {
+func (ss *ShardingState) assignNewNodes(newNodeList []types.NodeInfo) {
 	ss.sortCommitteeBySize()
 	numActiveShards := ss.numShards / 2
 	Shuffle(newNodeList)
@@ -49,7 +49,7 @@ func (ss *ShardingState) assignNewNodes(newNodeList []types.NodeID) {
 func (ss *ShardingState) cuckooResharding(percent float64) {
 	ss.sortCommitteeBySize()
 	numActiveShards := ss.numShards / 2
-	kickedNodes := []types.NodeID{}
+	kickedNodes := []types.NodeInfo{}
 	for i := range ss.shardState {
 		if i >= numActiveShards {
 			break
@@ -69,16 +69,16 @@ func (ss *ShardingState) cuckooResharding(percent float64) {
 }
 
 // UpdateShardState will first add new nodes into shards, then use cuckoo rule to reshard to get new shard state
-func (ss *ShardingState) UpdateShardState(newNodeList []types.NodeID, percent float64) {
+func (ss *ShardingState) UpdateShardState(newNodeList []types.NodeInfo, percent float64) {
 	rand.Seed(int64(ss.rnd))
 	ss.assignNewNodes(newNodeList)
 	ss.cuckooResharding(percent)
 }
 
 // Shuffle will shuffle the list with result uniquely determined by seed, assuming there is no repeat items in the list
-func Shuffle(list []types.NodeID) {
+func Shuffle(list []types.NodeInfo) {
 	sort.Slice(list, func(i, j int) bool {
-		return types.CompareNodeID(list[i], list[j]) == -1
+		return types.CompareNodeInfo(list[i], list[j]) == -1
 	})
 	rand.Shuffle(len(list), func(i, j int) {
 		list[i], list[j] = list[j], list[i]
@@ -131,7 +131,7 @@ func CalculateNewShardState(bc *BlockChain, epoch uint64) types.ShardState {
 }
 
 // calculateKickoutRate calculates the cuckoo rule kick out rate in order to make committee balanced
-func (ss *ShardingState) calculateKickoutRate(newNodeList []types.NodeID) float64 {
+func (ss *ShardingState) calculateKickoutRate(newNodeList []types.NodeInfo) float64 {
 	numActiveCommittees := ss.numShards / 2
 	newNodesPerShard := math.Ceil(float64(len(newNodeList)) / float64(numActiveCommittees))
 	ss.sortCommitteeBySize()
@@ -166,13 +166,13 @@ func fakeGetInitShardState() types.ShardState {
 }
 
 // remove later after new nodes list generation ready
-func fakeNewNodeList(seed int64) []types.NodeID {
+func fakeNewNodeList(seed int64) []types.NodeInfo {
 	rand.Seed(seed)
 	numNewNodes := rand.Intn(10)
-	nodeList := []types.NodeID{}
+	nodeList := []types.NodeInfo{}
 	for i := 0; i < numNewNodes; i++ {
 		nid := strconv.Itoa(int(rand.Int63()))
-		nodeList = append(nodeList, types.NodeID(nid))
+		nodeList = append(nodeList, types.NodeInfo{NodeID: nid, IsLeader: i == 0})
 	}
 	return nodeList
 }
