@@ -105,9 +105,9 @@ func decodeFuncSign(data []byte) string {
 // a new random private key
 // Currently for deploy_newnode.sh, we hard-coded the first fake account as staking account and
 // it is minted in genesis block. See genesis_node.go
-func LoadStakingKeyFromFile(keyfile string) *ecdsa.PrivateKey {
+func LoadStakingKeyFromFile(keyfile string, accountIndex int) *ecdsa.PrivateKey {
 	// contract.FakeAccounts[0] gets minted tokens in genesis block of beacon chain.
-	key, err := crypto.HexToECDSA(contract.FakeAccounts[0].Private)
+	key, err := crypto.HexToECDSA(contract.StakingAccounts[accountIndex].Private)
 	if err != nil {
 		utils.GetLogInstance().Error("Unable to get staking key")
 		os.Exit(1)
