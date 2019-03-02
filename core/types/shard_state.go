@@ -54,7 +54,7 @@ func (ss ShardState) Hash() (h common.Hash) {
 	return h
 }
 
-// CompareNodeID compares two nodes by their ID; used to sort node list
+// CompareNodeInfo compares two nodes by their ID; used to sort node list
 func CompareNodeInfo(n1 NodeInfo, n2 NodeInfo) int {
 	if n1.NodeID < n2.NodeID {
 		return -1
