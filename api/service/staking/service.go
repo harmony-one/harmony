@@ -178,11 +178,11 @@ func (s *Service) createRawStakingMessage() []byte {
 	tx := types.NewTransaction(
 		stakingInfo.Nonce,
 		toAddress,
-		0, // beacon chain.
+		0,
 		big.NewInt(s.stakingAmount),
-		params.TxGas*10,              // hard-code
-		nil,                          // pick some predefined gas price.
-		common.FromHex("0xd0e30db0")) // Refer to Node.DepositFuncSignature
+		params.TxGas*10,
+		nil,
+		common.FromHex("0xd0e30db0"))
 
 	if signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, s.accountKey); err == nil {
 		ts := types.Transactions{signedTx}
