@@ -199,3 +199,17 @@ func (m *Manager) StopService(t Type) {
 		service.StopService()
 	}
 }
+
+// StopServicesByRole stops all service of the given role.
+func (m *Manager) StopServicesByRole(liveServices []Type) {
+	marked := make(map[Type]bool)
+	for _, s := range liveServices {
+		marked[s] = true
+	}
+
+	for t := range m.GetServices() {
+		if _, ok := marked[t]; !ok {
+			m.StopService(t)
+		}
+	}
+}
