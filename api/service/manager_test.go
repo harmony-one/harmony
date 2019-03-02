@@ -10,14 +10,21 @@ import (
 
 type SupportSyncingTest struct {
 	msgChan chan *msg_pb.Message
+	status  *int
 }
 
 func (s *SupportSyncingTest) StartService() {
 	fmt.Println("SupportSyncingTest starting")
+	if s.status != nil {
+		*s.status = 1
+	}
 }
 
 func (s *SupportSyncingTest) StopService() {
 	fmt.Println("SupportSyncingTest stopping")
+	if s.status != nil {
+		*s.status = 2
+	}
 }
 
 func (s *SupportSyncingTest) NotifyService(data map[string]interface{}) {
@@ -64,4 +71,27 @@ func TestMessageChan(t *testing.T) {
 	})
 
 	m.SendAction(&Action{ServiceType: Done})
+}
+
+func TestStopServices(t *testing.T) {
+	m := &Manager{}
+	m.SetupServiceManager()
+	status := 0
+	m.RegisterService(SupportSyncing, &SupportSyncingTest{status: &status})
+	msgChans := make(map[Type]chan *msg_pb.Message)
+	m.SetupServiceMessageChan(msgChans)
+
+	m.SendAction(&Action{
+		Action:      Notify,
+		ServiceType: SupportSyncing,
+		Params: map[string]interface{}{
+			"chan": msgChans[SupportSyncing],
+			"test": t,
+		},
+	})
+
+	m.StopServicesByRole([]Type{})
+	if status != 2 {
+		t.Error("Service did not stop")
+	}
 }
