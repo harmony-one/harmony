@@ -7,6 +7,7 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
+// NodeInfo represents a node info
 type NodeInfo struct {
 	NodeID   string
 	IsLeader bool
