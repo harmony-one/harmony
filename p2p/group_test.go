@@ -20,3 +20,28 @@ func TestGroupID_String(t *testing.T) {
 		})
 	}
 }
+
+func TestActionTypeString(t *testing.T) {
+	tests := []struct {
+		name               string
+		actionType         ActionType
+		expectedActionName string
+	}{
+		{"ActionStart", ActionStart, "ActionStart"},
+		{"ActionPause", ActionPause, "ActionPause"},
+		{"ActionResume", ActionResume, "ActionResume"},
+		{"ActionStop", ActionStop, "ActionStop"},
+		{"UnknownAction", ActionType(8), "ActionUnknown"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.actionType.String(); got != tt.expectedActionName {
+				t.Errorf("ActionType.String() = %v, expected %v", got, tt.expectedActionName)
+			}
+		})
+	}
+}
+
+func TestGroupAction(t *testing.T) {
+
+}
