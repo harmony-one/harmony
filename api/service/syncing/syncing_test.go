@@ -1,6 +1,7 @@
 package syncing
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
@@ -37,4 +38,19 @@ func TestCompareSyncPeerConfigByblockHashes(t *testing.T) {
 	// syncPeerConfig1 is less than syncPeerConfig2
 	blockHashes1 = blockHashes1[:1]
 	assert.Equal(t, CompareSyncPeerConfigByblockHashes(syncPeerConfig1, syncPeerConfig2), 0, "syncPeerConfig1 is less than syncPeerConfig2")
+}
+
+func TestCreateStateSync(t *testing.T) {
+	stateSync := CreateStateSync("127.0.0.1", "8000")
+
+	if stateSync == nil {
+		t.Error("Unable to create stateSync")
+	}
+}
+
+func TestGetServicePort(t *testing.T) {
+	servicePort := GetServicePort("8000")
+	if strings.Compare(servicePort, "11000") != 0 {
+		t.Errorf("Service port match failure expected %s, actual %s", servicePort, "11000")
+	}
 }
