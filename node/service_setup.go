@@ -11,6 +11,7 @@ import (
 	"github.com/harmony-one/harmony/api/service/networkinfo"
 	"github.com/harmony-one/harmony/api/service/randomness"
 	"github.com/harmony-one/harmony/api/service/staking"
+	"github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 )
@@ -96,18 +97,18 @@ func (node *Node) setupForClientNode() {
 func (node *Node) ServiceManagerSetup() {
 	node.serviceManager = &service.Manager{}
 	node.serviceMessageChan = make(map[service.Type]chan *msg_pb.Message)
-	switch node.Role {
-	case ShardLeader:
+	switch node.NodeConfig.Role() {
+	case nodeconfig.ShardLeader:
 		node.setupForShardLeader()
-	case ShardValidator:
+	case nodeconfig.ShardValidator:
 		node.setupForShardValidator()
-	case BeaconLeader:
+	case nodeconfig.BeaconLeader:
 		node.setupForBeaconLeader()
-	case BeaconValidator:
+	case nodeconfig.BeaconValidator:
 		node.setupForBeaconValidator()
-	case NewNode:
+	case nodeconfig.NewNode:
 		node.setupForNewNode()
-	case ClientNode:
+	case nodeconfig.ClientNode:
 		node.setupForClientNode()
 	}
 	node.serviceManager.SetupServiceMessageChan(node.serviceMessageChan)

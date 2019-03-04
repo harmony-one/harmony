@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/drand"
+	"github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node"
@@ -200,7 +201,7 @@ func main() {
 	// Current node.
 	currentNode := node.New(host, consensus, ldb)
 	currentNode.Consensus.OfflinePeers = currentNode.OfflinePeers
-	currentNode.Role = node.NewNode
+	currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
 	currentNode.AccountKey = stakingPriKey
 
 	// TODO: refactor the creation of blockchain out of node.New()
@@ -208,11 +209,11 @@ func main() {
 
 	if *isBeacon {
 		if role == "leader" {
-			currentNode.Role = node.BeaconLeader
+			currentNode.NodeConfig.SetRole(nodeconfig.BeaconLeader)
 		} else {
-			currentNode.Role = node.BeaconValidator
+			currentNode.NodeConfig.SetRole(nodeconfig.BeaconValidator)
 		}
-		currentNode.MyShardGroupID = p2p.GroupIDBeacon
+		currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
 	} else {
 		var beacondb ethdb.Database
 		if *dbSupported {
@@ -221,13 +222,13 @@ func main() {
 		currentNode.AddBeaconChainDatabase(beacondb)
 
 		if *isNewNode {
-			currentNode.Role = node.NewNode
+			currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
 		} else if role == "leader" {
-			currentNode.Role = node.ShardLeader
+			currentNode.NodeConfig.SetRole(nodeconfig.ShardLeader)
 		} else {
-			currentNode.Role = node.ShardValidator
+			currentNode.NodeConfig.SetRole(nodeconfig.ShardValidator)
 		}
-		currentNode.MyShardGroupID = p2p.GroupIDUnknown
+		currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDUnknown)
 	}
 
 	// Add randomness protocol
@@ -252,7 +253,7 @@ func main() {
 		go currentNode.SendPongMessage()
 	}
 
-	log.Info("New Harmony Node ====", "Role", currentNode.Role, "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, host.GetID().Pretty()))
+	log.Info("New Harmony Node ====", "Role", currentNode.NodeConfig.Role(), "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, host.GetID().Pretty()))
 	go currentNode.SupportSyncing()
 	currentNode.ServiceManagerSetup()
 	currentNode.RunServices()
