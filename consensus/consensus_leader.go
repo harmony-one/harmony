@@ -66,7 +66,7 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan *types.Block, stop
 					pRnd := [32]byte{}
 					copy(pRnd[:], pRndAndBitmap[:32])
 					bitmap := pRndAndBitmap[32:]
-					vrfBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.PubKey)
+					vrfBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.BlsPubKey)
 					vrfBitmap.SetMask(bitmap)
 
 					// TODO: check validity of pRnd
@@ -166,7 +166,7 @@ func (consensus *Consensus) processPrepareMessage(message *msg_pb.Message) {
 		return
 	}
 
-	if err := consensus.checkConsensusMessage(message, validatorPeer.PubKey); err != nil {
+	if err := consensus.checkConsensusMessage(message, validatorPeer.BlsPubKey); err != nil {
 		utils.GetLogInstance().Debug("Failed to check the validator message", "validatorID", validatorID)
 		return
 	}
@@ -191,14 +191,14 @@ func (consensus *Consensus) processPrepareMessage(message *msg_pb.Message) {
 		return
 	}
 
-	if !sign.VerifyHash(validatorPeer.PubKey, consensus.blockHash[:]) {
+	if !sign.VerifyHash(validatorPeer.BlsPubKey, consensus.blockHash[:]) {
 		utils.GetLogInstance().Error("Received invalid BLS signature", "validatorID", validatorID)
 		return
 	}
 
 	utils.GetLogInstance().Debug("Received new prepare signature", "numReceivedSoFar", len(prepareSigs), "validatorID", validatorID, "PublicKeys", len(consensus.PublicKeys))
 	prepareSigs[validatorID] = &sign
-	prepareBitmap.SetKey(validatorPeer.PubKey, true) // Set the bitmap indicating that this validator signed.
+	prepareBitmap.SetKey(validatorPeer.BlsPubKey, true) // Set the bitmap indicating that this validator signed.
 
 	targetState := PreparedDone
 	if len(prepareSigs) >= ((len(consensus.PublicKeys)*2)/3+1) && consensus.state < targetState {
@@ -237,7 +237,7 @@ func (consensus *Consensus) processCommitMessage(message *msg_pb.Message) {
 		return
 	}
 
-	if err := consensus.checkConsensusMessage(message, validatorPeer.PubKey); err != nil {
+	if err := consensus.checkConsensusMessage(message, validatorPeer.BlsPubKey); err != nil {
 		utils.GetLogInstance().Debug("Failed to check the validator message", "validatorID", validatorID)
 		return
 	}
@@ -265,7 +265,7 @@ func (consensus *Consensus) processCommitMessage(message *msg_pb.Message) {
 		return
 	}
 	aggSig := bls_cosi.AggregateSig(consensus.GetPrepareSigsArray())
-	if !sign.VerifyHash(validatorPeer.PubKey, append(aggSig.Serialize(), consensus.prepareBitmap.Bitmap...)) {
+	if !sign.VerifyHash(validatorPeer.BlsPubKey, append(aggSig.Serialize(), consensus.prepareBitmap.Bitmap...)) {
 		utils.GetLogInstance().Error("Received invalid BLS signature", "validatorID", validatorID)
 		return
 	}
@@ -273,7 +273,7 @@ func (consensus *Consensus) processCommitMessage(message *msg_pb.Message) {
 	utils.GetLogInstance().Debug("Received new commit message", "numReceivedSoFar", len(commitSigs), "validatorID", strconv.Itoa(int(validatorID)))
 	commitSigs[validatorID] = &sign
 	// Set the bitmap indicating that this validator signed.
-	commitBitmap.SetKey(validatorPeer.PubKey, true)
+	commitBitmap.SetKey(validatorPeer.BlsPubKey, true)
 
 	targetState := CommittedDone
 	if len(commitSigs) >= ((len(consensus.PublicKeys)*2)/3+1) && consensus.state != targetState {

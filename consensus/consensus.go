@@ -192,14 +192,14 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Cons
 	// Initialize cosign bitmap
 	allPublicKeys := make([]*bls.PublicKey, 0)
 	for _, validatorPeer := range peers {
-		allPublicKeys = append(allPublicKeys, validatorPeer.PubKey)
+		allPublicKeys = append(allPublicKeys, validatorPeer.BlsPubKey)
 	}
-	allPublicKeys = append(allPublicKeys, leader.PubKey)
+	allPublicKeys = append(allPublicKeys, leader.BlsPubKey)
 
 	consensus.PublicKeys = allPublicKeys
 
-	prepareBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.PubKey)
-	commitBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.PubKey)
+	prepareBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.BlsPubKey)
+	commitBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.BlsPubKey)
 	consensus.prepareBitmap = prepareBitmap
 	consensus.commitBitmap = commitBitmap
 
@@ -384,8 +384,8 @@ func (consensus *Consensus) ResetState() {
 	consensus.prepareSigs = map[uint32]*bls.Sign{}
 	consensus.commitSigs = map[uint32]*bls.Sign{}
 
-	prepareBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.PubKey)
-	commitBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.PubKey)
+	prepareBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.BlsPubKey)
+	commitBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.BlsPubKey)
 	consensus.prepareBitmap = prepareBitmap
 	consensus.commitBitmap = commitBitmap
 
@@ -421,7 +421,7 @@ func (consensus *Consensus) AddPeers(peers []*p2p.Peer) int {
 			}
 			consensus.validators.Store(utils.GetUniqueIDFromPeer(*peer), *peer)
 			consensus.pubKeyLock.Lock()
-			consensus.PublicKeys = append(consensus.PublicKeys, peer.PubKey)
+			consensus.PublicKeys = append(consensus.PublicKeys, peer.BlsPubKey)
 			consensus.pubKeyLock.Unlock()
 			//			utils.GetLogInstance().Debug("[SYNC]", "new peer added", peer)
 		}
@@ -458,7 +458,7 @@ func (consensus *Consensus) RemovePeers(peers []p2p.Peer) int {
 
 		for i, pp := range newList {
 			// Not Found the pubkey, if found pubkey, ignore it
-			if reflect.DeepEqual(peer.PubKey, pp) {
+			if reflect.DeepEqual(peer.BlsPubKey, pp) {
 				//				consensus.Log.Debug("RemovePeers", "i", i, "pp", pp, "peer.PubKey", peer.PubKey)
 				newList = append(newList[:i], newList[i+1:]...)
 				count2++
@@ -473,7 +473,7 @@ func (consensus *Consensus) RemovePeers(peers []p2p.Peer) int {
 		// Or the shard won't be able to reach consensus if public keys are mismatch
 
 		validators := consensus.GetValidatorPeers()
-		pong := proto_discovery.NewPongMessage(validators, consensus.PublicKeys, consensus.leader.PubKey)
+		pong := proto_discovery.NewPongMessage(validators, consensus.PublicKeys, consensus.leader.BlsPubKey)
 		buffer := pong.ConstructPongMessage()
 
 		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), buffer))
@@ -497,7 +497,7 @@ func (consensus *Consensus) DebugPrintValidators() {
 	count := 0
 	consensus.validators.Range(func(k, v interface{}) bool {
 		if p, ok := v.(p2p.Peer); ok {
-			str2 := fmt.Sprintf("%s", p.PubKey.Serialize())
+			str2 := fmt.Sprintf("%s", p.BlsPubKey.Serialize())
 			utils.GetLogInstance().Debug("validator:", "IP", p.IP, "Port", p.Port, "VID", p.ValidatorID, "Key", str2)
 			count++
 			return true
@@ -653,11 +653,11 @@ func (consensus *Consensus) signAndMarshalConsensusMessage(message *msg_pb.Messa
 
 // SetLeaderPubKey deserialize the public key of consensus leader
 func (consensus *Consensus) SetLeaderPubKey(k []byte) error {
-	consensus.leader.PubKey = &bls.PublicKey{}
-	return consensus.leader.PubKey.Deserialize(k)
+	consensus.leader.BlsPubKey = &bls.PublicKey{}
+	return consensus.leader.BlsPubKey.Deserialize(k)
 }
 
 // GetLeaderPubKey returns the public key of consensus leader
 func (consensus *Consensus) GetLeaderPubKey() *bls.PublicKey {
-	return consensus.leader.PubKey
+	return consensus.leader.BlsPubKey
 }

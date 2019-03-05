@@ -17,7 +17,7 @@ import (
 
 func TestUpdateStakingDeposit(t *testing.T) {
 	_, pubKey := utils.GenKey("1", "2")
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", PubKey: pubKey}
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", BlsPubKey: pubKey}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "8885"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2pimpl.NewHost(&leader, priKey)
@@ -59,7 +59,7 @@ func TestUpdateStakingDeposit(t *testing.T) {
 
 func TestUpdateStakingWithdrawal(t *testing.T) {
 	_, pubKey := utils.GenKey("1", "2")
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", PubKey: pubKey}
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", BlsPubKey: pubKey}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "8885"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2pimpl.NewHost(&leader, priKey)
