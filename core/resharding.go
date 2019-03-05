@@ -14,7 +14,8 @@ const (
 	// InitialSeed is the initial random seed, a magic number to answer everything, remove later
 	InitialSeed uint32 = 42
 	// FirstEpoch is the number of the first epoch.
-	FirstEpoch = 0
+	// TODO(minhdoan): we should design the first epoch as 0. Please figure out how to change other logic to make it 0
+	FirstEpoch = 1
 )
 
 // ShardingState is data structure hold the sharding state
