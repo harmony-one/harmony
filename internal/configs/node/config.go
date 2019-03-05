@@ -26,6 +26,7 @@ const (
 	BeaconValidator
 	NewNode
 	ClientNode
+	WalletNode
 )
 
 func (role Role) String() string {
@@ -44,6 +45,8 @@ func (role Role) String() string {
 		return "NewNode"
 	case ClientNode:
 		return "ClientNode"
+	case WalletNode:
+		return "WalletNode"
 	}
 	return "Unknown"
 }
