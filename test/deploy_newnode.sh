@@ -104,7 +104,7 @@ shift $((OPTIND-1))
 # Also it's recommended to use `go build` for testing the whole exe. 
 pushd $ROOT
 echo "compiling ..."
-go build -o bin/harmony cmd/harmony.go
+go build -o bin/harmony cmd/harmony/main.go
 popd
 
 # Create a tmp folder for logs
