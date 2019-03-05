@@ -17,10 +17,12 @@ import (
 	crypto2 "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
-	clientService "github.com/harmony-one/harmony/api/client/service"
+
+	//clientService "github.com/harmony-one/harmony/api/client/service"
 	"github.com/harmony-one/harmony/cmd/client/wallet/lib"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/node"
+	"github.com/harmony-one/harmony/p2p"
 )
 
 var (
@@ -308,28 +310,37 @@ func convertBalanceIntoReadableFormat(balance *big.Int) string {
 // FetchBalance fetches account balance of specified address from the Harmony network
 func FetchBalance(address common.Address, walletNode *node.Node) map[uint32]AccountState {
 	result := make(map[uint32]AccountState)
-	for shardID, leader := range walletNode.Client.Leaders {
-		port, _ := strconv.Atoi(leader.Port)
-		client := clientService.NewClient(leader.IP, strconv.Itoa(port+node.ClientServicePortDiff))
-		response := client.GetBalance(address)
-		balance := big.NewInt(0)
-		balance.SetBytes(response.Balance)
-		result[shardID] = AccountState{balance, response.Nonce}
+	peers := []p2p.Peer{}
+	walletNode.BeaconNeighbors.Range(func(k, v interface{}) bool {
+		peers = append(peers, v.(p2p.Peer))
+		return true
+	})
+
+	for peer := range peers {
+		fmt.Printf("[test] peer is: %v\n", peer)
 	}
+	//	for shardID, leader := range walletNode.Client.Leaders {
+	//		port, _ := strconv.Atoi(leader.Port)
+	//		client := clientService.NewClient(leader.IP, strconv.Itoa(port+node.ClientServicePortDiff))
+	//		response := client.GetBalance(address)
+	//		balance := big.NewInt(0)
+	//		balance.SetBytes(response.Balance)
+	//		result[shardID] = AccountState{balance, response.Nonce}
+	//	}
 	return result
 }
 
 // GetFreeToken requests for token test token on each shard
 func GetFreeToken(address common.Address, walletNode *node.Node) {
-	for shardID, leader := range walletNode.Client.Leaders {
-		port, _ := strconv.Atoi(leader.Port)
-		client := clientService.NewClient(leader.IP, strconv.Itoa(port+node.ClientServicePortDiff))
-		response := client.GetFreeToken(address)
-
-		txID := common.Hash{}
-		txID.SetBytes(response.TxId)
-		fmt.Printf("Transaction Id requesting free token in shard %d: %s\n", int(shardID), txID.Hex())
-	}
+	//	for shardID, leader := range walletNode.Client.Leaders {
+	//		port, _ := strconv.Atoi(leader.Port)
+	//		client := clientService.NewClient(leader.IP, strconv.Itoa(port+node.ClientServicePortDiff))
+	//		response := client.GetFreeToken(address)
+	//
+	//		txID := common.Hash{}
+	//		txID.SetBytes(response.TxId)
+	//		fmt.Printf("Transaction Id requesting free token in shard %d: %s\n", int(shardID), txID.Hex())
+	//	}
 }
 
 // ReadAddresses reads the addresses stored in local keystore

@@ -14,7 +14,7 @@ import (
 
 // CreateWalletNode creates wallet server node.
 func CreateWalletNode() *node.Node {
-	shardIDLeaderMap := make(map[uint32]p2p.Peer)
+	shardIDs := []uint32{0}
 
 	//	port, _ := strconv.Atoi("9999")
 
@@ -38,7 +38,7 @@ func CreateWalletNode() *node.Node {
 		}
 	*/
 	walletNode := node.New(host, nil, nil)
-	walletNode.Client = client.NewClient(walletNode.GetHost(), shardIDLeaderMap)
+	walletNode.Client = client.NewClient(walletNode.GetHost(), shardIDs)
 	return walletNode
 }
 
