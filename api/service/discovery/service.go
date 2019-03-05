@@ -72,7 +72,34 @@ func (s *Service) Run() {
 	go s.contactP2pPeers()
 }
 
+func (s *Service) addP2pPeers() {
+	count := 0
+	for {
+		select {
+		case peer, ok := <-s.peerChan:
+			if !ok {
+				utils.GetLogInstance().Debug("[Wallet] No More Peer")
+				break
+			}
+			if s.addBeaconPeerFunc != nil {
+				s.addBeaconPeerFunc(&peer)
+				count++
+				if count > 0 { // TODO currently we use 1 peer for walletNode
+					return
+				}
+			}
+		case <-s.stopChan:
+			utils.GetLogInstance().Debug("wallet: stop discovery")
+			return
+		}
+	}
+}
+
 func (s *Service) contactP2pPeers() {
+	if s.config.IsWallet {
+		go s.addP2pPeers()
+		return
+	}
 	tick := time.NewTicker(5 * time.Second)
 
 	pingMsg := proto_discovery.NewPingMessage(s.host.GetSelfPeer())
