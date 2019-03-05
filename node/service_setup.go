@@ -1,12 +1,6 @@
 package node
 
 import (
-	"os"
-
-	"github.com/harmony-one/harmony/api/service/staking"
-
-	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/params"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/blockproposal"
@@ -16,9 +10,8 @@ import (
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/api/service/networkinfo"
 	"github.com/harmony-one/harmony/api/service/randomness"
-	"github.com/harmony-one/harmony/crypto/pki"
+	"github.com/harmony-one/harmony/api/service/staking"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
 )
 
@@ -99,22 +92,6 @@ func (node *Node) setupForClientNode() {
 	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer, nil))
 }
 
-// AddBeaconChainDatabase adds database support for beaconchain blocks on normal sharding nodes (not BeaconChain node)
-func (node *Node) AddBeaconChainDatabase(db ethdb.Database) {
-	database := db
-	if database == nil {
-		database = ethdb.NewMemDatabase()
-	}
-	// TODO (chao) currently we use the same genesis block as normal shard
-	chain, err := node.GenesisBlockSetup(database)
-	if err != nil {
-		utils.GetLogInstance().Error("Error when doing genesis setup")
-		os.Exit(1)
-	}
-	node.beaconChain = chain
-	node.BeaconWorker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey), node.Consensus.ShardID)
-}
-
 // ServiceManagerSetup setups service store.
 func (node *Node) ServiceManagerSetup() {
 	node.serviceManager = &service.Manager{}
@@ -143,4 +120,13 @@ func (node *Node) RunServices() {
 		return
 	}
 	node.serviceManager.RunServices()
+}
+
+// StopServices runs registered services.
+func (node *Node) StopServices() {
+	if node.serviceManager == nil {
+		utils.GetLogInstance().Info("Service manager is not set up yet.")
+		return
+	}
+	node.serviceManager.StopServicesByRole([]service.Type{})
 }

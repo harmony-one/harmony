@@ -2,6 +2,7 @@ package discovery
 
 import (
 	"testing"
+	"time"
 
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -16,10 +17,17 @@ var (
 )
 
 func TestDiscoveryService(t *testing.T) {
-	selfPeer := p2p.Peer{IP: ip, Port: port}
-	priKey, _, err := utils.GenKeyP2P(ip, port)
+	nodePriKey, _, err := utils.LoadKeyFromFile("/tmp/127.0.0.1.12345.key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	peerPriKey, peerPubKey := utils.GenKey("127.0.0.1", "12345")
+	if peerPriKey == nil || peerPubKey == nil {
+		t.Fatal("generate key error")
+	}
+	selfPeer := p2p.Peer{IP: "127.0.0.1", Port: "12345", ValidatorID: -1, PubKey: peerPubKey}
 
-	host, err := p2pimpl.NewHost(&selfPeer, priKey)
+	host, err := p2pimpl.NewHost(&selfPeer, nodePriKey)
 	if err != nil {
 		t.Fatalf("unable to new host in harmony: %v", err)
 	}
@@ -31,4 +39,10 @@ func TestDiscoveryService(t *testing.T) {
 	if dService == nil {
 		t.Fatalf("unable to create new discovery service")
 	}
+
+	dService.StartService()
+
+	time.Sleep(3 * time.Second)
+
+	dService.StopService()
 }

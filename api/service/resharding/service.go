@@ -1,8 +1,16 @@
-package rconversion
+package resharding
 
 import (
+	"time"
+
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/utils"
+)
+
+// Constants for resharding service.
+const (
+	ReshardingCheckTime = time.Second
 )
 
 // Service is the role conversion service.
@@ -10,11 +18,12 @@ type Service struct {
 	stopChan    chan struct{}
 	stoppedChan chan struct{}
 	messageChan chan *msg_pb.Message
+	beaconChain *core.BlockChain
 }
 
 // New returns role conversion service.
-func New() *Service {
-	return &Service{}
+func New(beaconChain *core.BlockChain) *Service {
+	return &Service{beaconChain: beaconChain}
 }
 
 // StartService starts role conversion service.
@@ -49,6 +58,18 @@ func (s *Service) Run(stopChan chan struct{}, stoppedChan chan struct{}) {
 
 // DoService does role conversion.
 func (s *Service) DoService() {
+	tick := time.NewTicker(ReshardingCheckTime)
+	// Get current shard state hash.
+	currentShardStateHash := s.beaconChain.CurrentBlock().Header().ShardStateHash
+	for {
+		select {
+		case <-tick.C:
+			LatestShardStateHash := s.beaconChain.CurrentBlock().Header().ShardStateHash
+			if currentShardStateHash != LatestShardStateHash {
+				// TODO(minhdoan): Add resharding logic later after modifying the resharding func as it current doesn't calculate the role (leader/validator)
+			}
+		}
+	}
 }
 
 // StopService stops role conversion service.

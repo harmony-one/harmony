@@ -13,6 +13,8 @@ import (
 const (
 	// InitialSeed is the initial random seed, a magic number to answer everything, remove later
 	InitialSeed uint32 = 42
+	// FirstEpoch is the number of the first epoch.
+	FirstEpoch = 0
 )
 
 // ShardingState is data structure hold the sharding state
@@ -47,36 +49,50 @@ func (ss *ShardingState) assignNewNodes(newNodeList []types.NodeID) {
 
 // cuckooResharding uses cuckoo rule to reshard X% of active committee(shards) into inactive committee(shards)
 func (ss *ShardingState) cuckooResharding(percent float64) {
-	ss.sortCommitteeBySize()
 	numActiveShards := ss.numShards / 2
 	kickedNodes := []types.NodeID{}
 	for i := range ss.shardState {
 		if i >= numActiveShards {
 			break
 		}
-		Shuffle(ss.shardState[i].NodeList)
 		numKicked := int(percent * float64(len(ss.shardState[i].NodeList)))
-		tmp := ss.shardState[i].NodeList[:numKicked]
+		if numKicked == 0 {
+			numKicked++
+		}
+		length := len(ss.shardState[i].NodeList)
+		tmp := ss.shardState[i].NodeList[length-numKicked:]
 		kickedNodes = append(kickedNodes, tmp...)
-		ss.shardState[i].NodeList = ss.shardState[i].NodeList[numKicked:]
+		ss.shardState[i].NodeList = ss.shardState[i].NodeList[:length-numKicked]
 	}
 
 	Shuffle(kickedNodes)
+	numInactiveShards := ss.numShards - numActiveShards
 	for i, nid := range kickedNodes {
-		id := numActiveShards + i%(ss.numShards-numActiveShards)
+		id := numActiveShards + i%numInactiveShards
 		ss.shardState[id].NodeList = append(ss.shardState[id].NodeList, nid)
+	}
+}
+
+// UpdateShardState will first add new nodes into shards, then use cuckoo rule to reshard to get new shard state
+func (ss *ShardingState) assignLeaders() {
+	for i := 0; i < ss.numShards; i++ {
+		Shuffle(ss.shardState[i].NodeList)
+		ss.shardState[i].Leader = ss.shardState[i].NodeList[0]
 	}
 }
 
 // UpdateShardState will first add new nodes into shards, then use cuckoo rule to reshard to get new shard state
 func (ss *ShardingState) UpdateShardState(newNodeList []types.NodeID, percent float64) {
 	rand.Seed(int64(ss.rnd))
+	ss.sortCommitteeBySize()
+	ss.assignLeaders()
 	ss.assignNewNodes(newNodeList)
 	ss.cuckooResharding(percent)
 }
 
 // Shuffle will shuffle the list with result uniquely determined by seed, assuming there is no repeat items in the list
 func Shuffle(list []types.NodeID) {
+	// Sort to make sure everyone will generate the same with the same rand seed.
 	sort.Slice(list, func(i, j int) bool {
 		return types.CompareNodeID(list[i], list[j]) == -1
 	})
@@ -96,16 +112,6 @@ func GetEpochFromBlockNumber(blockNumber uint64) uint64 {
 	return blockNumber / uint64(BlocksPerEpoch)
 }
 
-// GetPreviousEpochBlockNumber gets the epoch block number of previous epoch
-func GetPreviousEpochBlockNumber(blockNumber uint64) uint64 {
-	epoch := GetEpochFromBlockNumber(blockNumber)
-	if epoch == 1 {
-		// no previous epoch
-		return epoch
-	}
-	return GetBlockNumberFromEpoch(epoch - 1)
-}
-
 // GetShardingStateFromBlockChain will retrieve random seed and shard map from beacon chain for given a epoch
 func GetShardingStateFromBlockChain(bc *BlockChain, epoch uint64) *ShardingState {
 	number := GetBlockNumberFromEpoch(epoch)
@@ -120,8 +126,8 @@ func GetShardingStateFromBlockChain(bc *BlockChain, epoch uint64) *ShardingState
 // CalculateNewShardState get sharding state from previous epoch and calcualte sharding state for new epoch
 // TODO: currently, we just mock everything
 func CalculateNewShardState(bc *BlockChain, epoch uint64) types.ShardState {
-	if epoch == 1 {
-		return fakeGetInitShardState()
+	if epoch == FirstEpoch {
+		return fakeGetInitShardState(6, 10)
 	}
 	ss := GetShardingStateFromBlockChain(bc, epoch-1)
 	newNodeList := fakeNewNodeList(int64(ss.rnd))
@@ -140,23 +146,17 @@ func (ss *ShardingState) calculateKickoutRate(newNodeList []types.NodeID) float6
 		return 0.0
 	}
 	rate := newNodesPerShard / float64(L)
-	return math.Min(rate, 1.0)
-}
-
-// FakeGenRandSeed generate random seed based on previous rnd seed; remove later after VRF implemented
-func FakeGenRandSeed(seed uint32) uint32 {
-	rand.Seed(int64(seed))
-	return rand.Uint32()
+	return math.Max(0.1, math.Min(rate, 1.0))
 }
 
 // remove later after bootstrap codes ready
-func fakeGetInitShardState() types.ShardState {
+func fakeGetInitShardState(numberOfShards, numOfNodes int) types.ShardState {
 	rand.Seed(int64(InitialSeed))
 	shardState := types.ShardState{}
-	for i := 0; i < 6; i++ {
+	for i := 0; i < numberOfShards; i++ {
 		sid := uint32(i)
 		com := types.Committee{ShardID: sid}
-		for j := 0; j < 10; j++ {
+		for j := 0; j < numOfNodes; j++ {
 			nid := strconv.Itoa(int(rand.Int63()))
 			com.NodeList = append(com.NodeList, types.NodeID(nid))
 		}

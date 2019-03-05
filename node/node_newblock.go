@@ -58,6 +58,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 							utils.GetLogInstance().Debug("Failed commiting new block", "Error", err)
 						} else {
 							// add new shard state if it's epoch block
+							// TODO(minhdoan): only happens for beaconchain
 							node.addNewShardState(block)
 							newBlock = block
 							break

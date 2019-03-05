@@ -2,21 +2,23 @@ package types
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"golang.org/x/crypto/sha3"
 )
 
-// NodeID is a unique ID represent a node
-type NodeID string
-
 // ShardState is the collection of all committees
 type ShardState []Committee
+
+// NodeID represents node id.
+type NodeID string
 
 // Committee contains the active nodes in one shard
 type Committee struct {
 	ShardID  uint32
-	NodeList []NodeID // a list of NodeID where NodeID is represented by a string
+	Leader   NodeID
+	NodeList []NodeID
 }
 
 // GetHashFromNodeList will sort the list, then use Keccak256 to hash the list
@@ -53,16 +55,10 @@ func (ss ShardState) Hash() (h common.Hash) {
 
 // CompareNodeID compares two nodes by their ID; used to sort node list
 func CompareNodeID(n1 NodeID, n2 NodeID) int {
-	if n1 < n2 {
-		return -1
-	}
-	if n1 > n2 {
-		return 1
-	}
-	return 0
+	return strings.Compare(string(n1), string(n2))
 }
 
 // Serialize serialize NodeID into bytes
-func (n NodeID) Serialize() []byte {
-	return []byte(n)
+func (n *NodeID) Serialize() []byte {
+	return []byte(string(*n))
 }

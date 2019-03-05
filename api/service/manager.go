@@ -31,6 +31,7 @@ const (
 	BlockProposal
 	NetworkInfo
 	PeerDiscovery
+	Resharding
 	Staking
 	Test
 	Done
@@ -56,6 +57,8 @@ func (t Type) String() string {
 		return "Staking"
 	case PeerDiscovery:
 		return "PeerDiscovery"
+	case Resharding:
+		return "Resharding"
 	case Test:
 		return "Test"
 	case Done:
@@ -101,6 +104,10 @@ func (m *Manager) GetServices() map[Type]Interface {
 func (m *Manager) Register(t Type, service Interface) {
 	if m.services == nil {
 		m.services = make(map[Type]Interface)
+	}
+	if _, ok := m.services[t]; ok {
+		utils.GetLogInstance().Error("This service is already included: ", "servie", t)
+		return
 	}
 	m.services[t] = service
 }
@@ -183,5 +190,26 @@ func (m *Manager) SetupServiceMessageChan(mapServiceTypeChan map[Type]chan *msg_
 		// TODO(minhdoan): for performance, consider buffered channel.
 		mapServiceTypeChan[serviceType] = make(chan *msg_pb.Message)
 		service.SetMessageChan(mapServiceTypeChan[serviceType])
+	}
+}
+
+// StopService stops service with type t.
+func (m *Manager) StopService(t Type) {
+	if service, ok := m.services[t]; ok {
+		service.StopService()
+	}
+}
+
+// StopServicesByRole stops all service of the given role.
+func (m *Manager) StopServicesByRole(liveServices []Type) {
+	marked := make(map[Type]bool)
+	for _, s := range liveServices {
+		marked[s] = true
+	}
+
+	for t := range m.GetServices() {
+		if _, ok := marked[t]; !ok {
+			m.StopService(t)
+		}
 	}
 }
