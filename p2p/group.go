@@ -30,6 +30,19 @@ const (
 	GroupIDUnknown      GroupID = "B1acKh0lE"
 )
 
+// ShardIDType defines the data type of a shard ID
+type ShardIDType string
+
+// NewGroupIDShard returns a new groupID for a shard
+func NewGroupIDShard(sid ShardIDType) GroupID {
+	return GroupID(fmt.Sprintf("harmony/0.0.1/shard/%s", sid))
+}
+
+// NewGroupIDShardClient returns a new groupID for a shard's client
+func NewGroupIDShardClient(sid ShardIDType) GroupID {
+	return GroupID(fmt.Sprintf("harmony/0.0.1/shard/%s/client", sid))
+}
+
 // ActionType lists action on group
 type ActionType uint
 

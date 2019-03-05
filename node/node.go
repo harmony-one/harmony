@@ -25,6 +25,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/drand"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
@@ -43,40 +44,6 @@ const (
 	NodeDoingConsensus                 // Node is already doing consensus
 	NodeLeader                         // Node is the leader of some shard.
 )
-
-// Role defines a role of a node.
-type Role byte
-
-// All constants for different node roles.
-const (
-	Unknown Role = iota
-	ShardLeader
-	ShardValidator
-	BeaconLeader
-	BeaconValidator
-	NewNode
-	ClientNode
-)
-
-func (role Role) String() string {
-	switch role {
-	case Unknown:
-		return "Unknown"
-	case ShardLeader:
-		return "ShardLeader"
-	case ShardValidator:
-		return "ShardValidator"
-	case BeaconLeader:
-		return "BeaconLeader"
-	case BeaconValidator:
-		return "BeaconValidator"
-	case NewNode:
-		return "NewNode"
-	case ClientNode:
-		return "ClientNode"
-	}
-	return "Unknown"
-}
 
 func (state State) String() string {
 	switch state {
@@ -164,9 +131,6 @@ type Node struct {
 	// Signal channel for lost validators
 	OfflinePeers chan p2p.Peer
 
-	// Node Role.
-	Role Role
-
 	// Service manager.
 	serviceManager *service.Manager
 
@@ -197,11 +161,8 @@ type Node struct {
 	// Channel to notify consensus service to really start consensus
 	startConsensus chan struct{}
 
-	// My GroupID
-	MyShardGroupID p2p.GroupID
-
-	// My ShardClient GroupID
-	MyClientGroupID p2p.GroupID
+	// node configuration, including group ID, shard ID, etc
+	NodeConfig *nodeconfig.ConfigType
 
 	// map of service type to its message channel.
 	serviceMessageChan map[service.Type]chan *msg_pb.Message
@@ -307,6 +268,9 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database) *N
 	go node.ReceiveGroupMessage()
 
 	node.startConsensus = make(chan struct{})
+
+	// init the global and the only node config
+	node.NodeConfig = nodeconfig.GetConfigs(nodeconfig.Global)
 
 	return &node
 }
@@ -480,7 +444,7 @@ func (node *Node) initBeaconNodeConfiguration() (service.NodeConfig, chan p2p.Pe
 	if err != nil {
 		utils.GetLogInstance().Error("create client receiver error", "msg", err)
 	}
-	node.MyClientGroupID = p2p.GroupIDBeaconClient
+	node.NodeConfig.SetClientGroupID(p2p.GroupIDBeaconClient)
 
 	return nodeConfig, chanPeer
 }

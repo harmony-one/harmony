@@ -19,6 +19,7 @@ import (
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/pki"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
@@ -131,7 +132,7 @@ func (node *Node) messageHandler(content []byte, sender string) {
 	case proto.Staking:
 		msgPayload, _ := proto.GetStakingMessagePayload(content)
 		// Only beacon leader processes staking txn
-		if node.Role != BeaconLeader {
+		if node.NodeConfig.Role() != nodeconfig.BeaconLeader {
 			return
 		}
 		node.processStakingMessage(msgPayload)
@@ -153,7 +154,8 @@ func (node *Node) messageHandler(content []byte, sender string) {
 					utils.GetLogInstance().Error("block sync", "error", err)
 				} else {
 					// for non-beaconchain node, subscribe to beacon block broadcast
-					if proto_node.BlockMessageType(msgPayload[0]) == proto_node.Sync && node.Role != BeaconValidator && node.Role != BeaconLeader && node.Role != ClientNode {
+					role := node.NodeConfig.Role()
+					if proto_node.BlockMessageType(msgPayload[0]) == proto_node.Sync && role != nodeconfig.BeaconValidator && role != nodeconfig.BeaconLeader && role != nodeconfig.ClientNode {
 						for _, block := range blocks {
 							node.BeaconBlockChannel <- block
 						}
@@ -260,7 +262,7 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 	if node.ClientPeer != nil {
 		utils.GetLogInstance().Debug("Sending new block to client", "client", node.ClientPeer)
-		node.host.SendMessageToGroups([]p2p.GroupID{node.MyClientGroupID}, host.ConstructP2pMessage(byte(0), proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock})))
+		node.host.SendMessageToGroups([]p2p.GroupID{node.NodeConfig.GetClientGroupID()}, host.ConstructP2pMessage(byte(0), proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock})))
 	}
 }
 
@@ -287,7 +289,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) bool {
 // 2. [leader] send new block to the client
 func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 	utils.GetLogInstance().Info("PostConsensusProcessing")
-	if node.Role == BeaconLeader {
+	if node.NodeConfig.Role() == nodeconfig.BeaconLeader {
 		utils.GetLogInstance().Info("Updating staking list")
 		node.UpdateStakingList(newBlock)
 		node.printStakingList()
@@ -394,12 +396,12 @@ func (node *Node) SendPongMessage() {
 				if !sentMessage && numPubKeysNow >= node.Consensus.MinPeers {
 					pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys, node.Consensus.GetLeaderPubKey())
 					buffer := pong.ConstructPongMessage()
-					err := node.host.SendMessageToGroups([]p2p.GroupID{node.MyShardGroupID}, host.ConstructP2pMessage(byte(0), buffer))
+					err := node.host.SendMessageToGroups([]p2p.GroupID{node.NodeConfig.GetShardGroupID()}, host.ConstructP2pMessage(byte(0), buffer))
 					if err != nil {
-						utils.GetLogInstance().Error("[PONG] failed to send pong message", "group", node.MyShardGroupID)
+						utils.GetLogInstance().Error("[PONG] failed to send pong message", "group", node.NodeConfig.GetShardGroupID())
 						continue
 					} else {
-						utils.GetLogInstance().Info("[PONG] sent pong message to", "group", node.MyShardGroupID)
+						utils.GetLogInstance().Info("[PONG] sent pong message to", "group", node.NodeConfig.GetShardGroupID())
 					}
 					sentMessage = true
 					// stop sending ping message
@@ -484,7 +486,7 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 
 	// Stop discovery service after received pong message
 	data := make(map[string]interface{})
-	data["peer"] = p2p.GroupAction{Name: node.MyShardGroupID, Action: p2p.ActionPause}
+	data["peer"] = p2p.GroupAction{Name: node.NodeConfig.GetShardGroupID(), Action: p2p.ActionPause}
 
 	node.serviceManager.TakeAction(&service.Action{Action: service.Notify, ServiceType: service.PeerDiscovery, Params: data})
 	return node.Consensus.UpdatePublicKeys(publicKeys) + node.DRand.UpdatePublicKeys(publicKeys)
