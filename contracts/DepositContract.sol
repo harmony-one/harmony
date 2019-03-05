@@ -2,7 +2,6 @@ pragma solidity >=0.4.22;
 
 contract DepositContract {
     mapping(address => uint) private stakes;
-    address public owner;
 
     function deposit() public payable returns(uint) {
         stakes[msg.sender] += msg.value;
