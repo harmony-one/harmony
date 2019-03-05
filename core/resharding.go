@@ -74,7 +74,7 @@ func (ss *ShardingState) cuckooResharding(percent float64) {
 	}
 }
 
-// UpdateShardState will first add new nodes into shards, then use cuckoo rule to reshard to get new shard state
+// assignLeaders will first add new nodes into shards, then use cuckoo rule to reshard to get new shard state
 func (ss *ShardingState) assignLeaders() {
 	for i := 0; i < ss.numShards; i++ {
 		Shuffle(ss.shardState[i].NodeList)
