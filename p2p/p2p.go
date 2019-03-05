@@ -16,7 +16,7 @@ type StreamHandler func(Stream)
 type Peer struct {
 	IP          string         // IP address of the peer
 	Port        string         // Port number of the peer
-	PubKey      *bls.PublicKey // Public key of the peer, used for consensus signing
+	BlsPubKey   *bls.PublicKey // Public key of the peer, used for consensus signing
 	ValidatorID int            // -1 is the default value, means not assigned any validator ID in the shard
 	Addrs       []ma.Multiaddr // MultiAddress of the peer
 	PeerID      libp2p_peer.ID // PeerID, the pubkey for communication
