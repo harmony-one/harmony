@@ -11,6 +11,7 @@ import (
 const (
 	DefaultThreshold   = 1
 	FirstTimeThreshold = 2
+	ConsensusTimeOut   = 10
 )
 
 // WaitForConsensusReady listen for the readiness signal from consensus and generate new block for consensus.
@@ -30,10 +31,10 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 			select {
 			case <-readySignal:
 				time.Sleep(100 * time.Millisecond) // Delay a bit so validator is catched up (test-only).
-			case <-time.After(300 * time.Second):
+			case <-time.After(ConsensusTimeOut * time.Second):
 				node.Consensus.ResetState()
 				timeoutCount++
-				utils.GetLogInstance().Debug("Consensus timeout, retry!", "count", timeoutCount, "node", node)
+				utils.GetLogInstance().Debug("Consensus timeout, retry!", "count", timeoutCount)
 				// FIXME: retry is not working, there is no retry logic here. It will only wait for new transaction.
 			case <-stopChan:
 				return
