@@ -19,7 +19,7 @@ contract StakeLockContract {
         uint256 _amount;
         uint256 _blockNum;
         uint256 _epochNum;
-        uint256 _continueCount;
+        uint256 _lockPeriodCount;  // The number of locking period the token will be locked.
     }
 
     /**
@@ -91,7 +91,7 @@ contract StakeLockContract {
         returns (uint256 unlockableTokens)
     {
         uint256 currentEpoch = currentEpoch();
-        if (locked[_of]._epochNum + locked[_of]._continueCount * LOCK_PERIOD_IN_EPOCHS < currentEpoch) {
+        if (locked[_of]._epochNum + locked[_of]._lockPeriodCount * LOCK_PERIOD_IN_EPOCHS < currentEpoch) {
             unlockableTokens = locked[_of]._amount;
         }
     }
