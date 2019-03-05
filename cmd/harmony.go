@@ -147,7 +147,7 @@ func main() {
 
 	stakingPriKey := node.LoadStakingKeyFromFile(*stakingKeyFile, *accountIndex)
 
-	nodePriKey, _, err := utils.LoadKeyFromFile(*keyFile)
+	p2pPriKey, _, err := utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
 		panic(err)
 	}
@@ -156,7 +156,7 @@ func main() {
 	if peerPriKey == nil || peerPubKey == nil {
 		panic(fmt.Errorf("generate key error"))
 	}
-	selfPeer = p2p.Peer{IP: *ip, Port: *port, ValidatorID: -1, PubKey: peerPubKey}
+	selfPeer = p2p.Peer{IP: *ip, Port: *port, ValidatorID: -1, BlsPubKey: peerPubKey}
 
 	if *isLeader {
 		role = "leader"
@@ -174,7 +174,7 @@ func main() {
 		ldb, _ = InitLDBDatabase(*ip, *port, *freshDB, false)
 	}
 
-	host, err := p2pimpl.NewHost(&selfPeer, nodePriKey)
+	host, err := p2pimpl.NewHost(&selfPeer, p2pPriKey)
 	if *logConn {
 		host.GetP2PHost().Network().Notify(utils.ConnLogger)
 	}
