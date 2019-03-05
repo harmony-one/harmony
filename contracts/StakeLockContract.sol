@@ -8,9 +8,9 @@ contract StakeLockContract {
     string internal constant NOT_LOCKED = 'No tokens locked';
     string internal constant AMOUNT_ZERO = 'Amount can not be 0';
 
-    uint256 internal constant LOCK_PERIOD_IN_EPOCHS = 3;
+    uint256 internal constant LOCK_PERIOD_IN_EPOCHS = 3;  // Final locking period TBD.
 
-    uint256 internal numBlocksPerEpoch = 5;
+    uint256 internal numBlocksPerEpoch = 5;  // This value is for testing only
 
     /**
      * @dev locked token structure
@@ -33,7 +33,7 @@ contract StakeLockContract {
     event Locked(address indexed _of, uint _amount, uint256 _epoch);
     event Unlocked(address indexed account, uint index);
 
-	/**
+    /**
      * @dev Returns total tokens held by an address (locked + transferable)
      * @param _of The address to query the total balance of
      */
