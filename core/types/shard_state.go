@@ -59,6 +59,6 @@ func CompareNodeID(n1 NodeID, n2 NodeID) int {
 }
 
 // Serialize serialize NodeID into bytes
-func (n *NodeID) Serialize() []byte {
-	return []byte(string(*n))
+func (n NodeID) Serialize() []byte {
+	return []byte(string(n))
 }

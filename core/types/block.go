@@ -92,15 +92,14 @@ type Header struct {
 	MixDigest   common.Hash    `json:"mixHash"          gencodec:"required"`
 	Nonce       BlockNonce     `json:"nonce"            gencodec:"required"`
 	// Additional Fields
-	ShardID          ShardID  `json:"shardID"          gencodec:"required"`
-	PrepareSignature [48]byte `json:"signature"        gencodec:"required"`
-	PrepareBitmap    []byte   `json:"bitmap"           gencodec:"required"` // Contains which validator signed
-	CommitSignature  [48]byte `json:"signature"        gencodec:"required"`
-	CommitBitmap     []byte   `json:"bitmap"           gencodec:"required"` // Contains which validator signed
-
-	RandPreimage   [32]byte    `json:"randPreimage"`
-	RandSeed       [32]byte    `json:"randSeed"`
-	ShardStateHash common.Hash `json:"shardStateRoot"`
+	ShardID          ShardID     `json:"shardID"          gencodec:"required"`
+	PrepareSignature [48]byte    `json:"prepareSignature"        gencodec:"required"`
+	PrepareBitmap    []byte      `json:"prepareBitmap"           gencodec:"required"` // Contains which validator signed
+	CommitSignature  [48]byte    `json:"commitSignature"        gencodec:"required"`
+	CommitBitmap     []byte      `json:"commitBitmap"           gencodec:"required"` // Contains which validator signed
+	RandPreimage     [32]byte    `json:"randPreimage"`
+	RandSeed         [32]byte    `json:"randSeed"`
+	ShardStateHash   common.Hash `json:"shardStateRoot"`
 }
 
 // field type overrides for gencodec
