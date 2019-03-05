@@ -2,6 +2,7 @@ package drand
 
 import (
 	"math/big"
+	"strings"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -68,6 +69,10 @@ func TestAddPeers(test *testing.T) {
 
 	if countValidatorPeers != 1 {
 		test.Error("Unable to add new peer")
+	}
+
+	if len(dRand.GetValidatorPeers()) != 3 {
+		test.Errorf("Number of validators doesn't match, actual count = %d expected count = 3", len(dRand.GetValidatorPeers()))
 	}
 }
 
@@ -140,8 +145,16 @@ func TestUpdatePublicKeys(test *testing.T) {
 	_, pubKey1 := utils.GenKey("127.0.0.1", "5555")
 	_, pubKey2 := utils.GenKey("127.0.0.1", "6666")
 
-	if dRand.UpdatePublicKeys([]*bls.PublicKey{pubKey1, pubKey2}) != 2 {
+	publicKeys := []*bls.PublicKey{pubKey1, pubKey2}
+
+	if dRand.UpdatePublicKeys(publicKeys) != 2 {
 		test.Error("Count of public keys doesn't match")
+	}
+
+	for index, publicKey := range dRand.PublicKeys {
+		if strings.Compare(publicKey.GetHexString(), publicKeys[index].GetHexString()) != 0 {
+			test.Error("Public keys not updated succssfully")
+		}
 	}
 }
 

@@ -3,6 +3,9 @@ package drand
 import (
 	"testing"
 
+	protobuf "github.com/golang/protobuf/proto"
+	drand_proto "github.com/harmony-one/harmony/api/drand"
+	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
@@ -37,9 +40,14 @@ func TestProcessInitMessage(test *testing.T) {
 	dRand.blockHash = [32]byte{}
 	msg := dRand.constructInitMessage()
 
-	if len(msg) != 93 {
-		test.Errorf("Init message is not constructed in the correct size: %d", len(msg))
+	msgPayload, _ := proto.GetDRandMessagePayload(msg)
+
+	message := drand_proto.Message{}
+	err = protobuf.Unmarshal(msgPayload, &message)
+
+	if err != nil {
+		test.Error("Error in extracting Init message from payload", err)
 	}
 
-	dRand.ProcessMessageValidator(msg)
+	dRand.ProcessMessageValidator(msgPayload)
 }

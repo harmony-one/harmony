@@ -3,6 +3,9 @@ package drand
 import (
 	"testing"
 
+	protobuf "github.com/golang/protobuf/proto"
+	drand_proto "github.com/harmony-one/harmony/api/drand"
+	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
@@ -37,8 +40,14 @@ func TestProcessCommitMessage(test *testing.T) {
 	dRand.blockHash = [32]byte{}
 	msg := dRand.constructCommitMessage([32]byte{}, []byte{})
 
-	if len(msg) != 191 {
-		test.Errorf("Commit message is not constructed in the correct size: %d", len(msg))
+	msgPayload, _ := proto.GetDRandMessagePayload(msg)
+
+	message := drand_proto.Message{}
+	err = protobuf.Unmarshal(msgPayload, &message)
+
+	if err != nil {
+		test.Error("Error in extracting Commit message from payload", err)
 	}
-	dRand.ProcessMessageLeader(msg)
+
+	dRand.ProcessMessageLeader(msgPayload)
 }
