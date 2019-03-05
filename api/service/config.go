@@ -3,7 +3,7 @@ package service
 import (
 	"strconv"
 
-	"github.com/harmony-one/harmony/internal/configs/node"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/p2p"
 )
 

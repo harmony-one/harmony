@@ -13,7 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/drand"
-	"github.com/harmony-one/harmony/internal/configs/node"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node"

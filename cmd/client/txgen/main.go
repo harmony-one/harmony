@@ -15,7 +15,7 @@ import (
 	"github.com/harmony-one/harmony/cmd/client/txgen/txgen"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/configs/node"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
