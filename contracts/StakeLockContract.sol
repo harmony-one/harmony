@@ -16,11 +16,11 @@ contract StakeLockContract {
      * @dev locked token structure
      */
     struct lockedToken {
-        uint256 _amount;
-        uint256 _blockNum;
-        uint256 _epochNum;
+        uint256 _amount;           // The amount of token locked
+        uint256 _blockNum;         // The number of the block when the token was locked
+        uint256 _epochNum;         // The epoch when the token was locked
         uint256 _lockPeriodCount;  // The number of locking period the token will be locked.
-        uint256 _index;  // The index in the addressList
+        uint256 _index;            // The index in the addressList
     }
 
     /**
