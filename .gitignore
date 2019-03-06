@@ -66,6 +66,3 @@ node_modules/
 
 # txgen node keystore
 .txgenkey
-
-# go mod summary file
-go.sum
