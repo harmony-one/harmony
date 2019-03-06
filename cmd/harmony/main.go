@@ -115,10 +115,7 @@ var (
 	logConn = flag.Bool("log_conn", false, "log incoming/outgoing connections")
 )
 
-func main() {
-	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress")
-	flag.Parse()
-
+func initSetup() {
 	if *versionFlag {
 		printVersion(os.Args[0])
 	}
@@ -139,6 +136,18 @@ func main() {
 		}
 		utils.BootNodes = bootNodeAddrs
 	}
+}
+
+func createGlobalConfig() *nodeconfig.ConfigType {
+	nodeConfig := nodeconfig.GetGlobalConfig()
+	return nodeConfig
+}
+
+func main() {
+	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress")
+	flag.Parse()
+
+	initSetup()
 
 	var shardID = "0"
 	var peers []p2p.Peer
