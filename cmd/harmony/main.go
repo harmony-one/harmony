@@ -80,41 +80,43 @@ func loggingInit(logFolder, role, ip, port string, onlyLogTps bool) {
 	log.Root().SetHandler(h)
 }
 
-func main() {
+var (
 	// TODO: use http://getmyipaddress.org/ or http://www.get-myip.com/ to retrieve my IP address
-	ip := flag.String("ip", "127.0.0.1", "IP of the node")
-	port := flag.String("port", "9000", "port of the node.")
-	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
-	dbSupported := flag.Bool("db_supported", true, "false means not db_supported, true means db_supported")
-	freshDB := flag.Bool("fresh_db", false, "true means the existing disk based db will be removed")
-	profile := flag.Bool("profile", false, "Turn on profiling (CPU, Memory).")
-	metricsReportURL := flag.String("metrics_report_url", "", "If set, reports metrics to this URL.")
-	versionFlag := flag.Bool("version", false, "Output version info")
-	onlyLogTps := flag.Bool("only_log_tps", false, "Only log TPS if true")
+	ip               = flag.String("ip", "127.0.0.1", "IP of the node")
+	port             = flag.String("port", "9000", "port of the node.")
+	logFolder        = flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
+	dbSupported      = flag.Bool("db_supported", true, "false means not db_supported, true means db_supported")
+	freshDB          = flag.Bool("fresh_db", false, "true means the existing disk based db will be removed")
+	profile          = flag.Bool("profile", false, "Turn on profiling (CPU, Memory).")
+	metricsReportURL = flag.String("metrics_report_url", "", "If set, reports metrics to this URL.")
+	versionFlag      = flag.Bool("version", false, "Output version info")
+	onlyLogTps       = flag.Bool("only_log_tps", false, "Only log TPS if true")
 
 	//Leader needs to have a minimal number of peers to start consensus
-	minPeers := flag.Int("min_peers", 100, "Minimal number of Peers in shard")
+	minPeers = flag.Int("min_peers", 100, "Minimal number of Peers in shard")
 
 	// Key file to store the private key of staking account.
-	stakingKeyFile := flag.String("staking_key", "./.stakingkey", "the private key file of the harmony node")
+	stakingKeyFile = flag.String("staking_key", "./.stakingkey", "the private key file of the harmony node")
 
 	// Key file to store the private key
-	keyFile := flag.String("key", "./.hmykey", "the private key file of the harmony node")
-	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress")
+	keyFile = flag.String("key", "./.hmykey", "the private key file of the harmony node")
 
 	// isBeacon indicates this node is a beacon chain node
-	isBeacon := flag.Bool("is_beacon", false, "true means this node is a beacon chain node")
+	isBeacon = flag.Bool("is_beacon", false, "true means this node is a beacon chain node")
 
 	// isNewNode indicates this node is a new node
-	isNewNode := flag.Bool("is_newnode", false, "true means this node is a new node")
-	accountIndex := flag.Int("account_index", 0, "the index of the staking account to use")
+	isNewNode    = flag.Bool("is_newnode", false, "true means this node is a new node")
+	accountIndex = flag.Int("account_index", 0, "the index of the staking account to use")
 
 	// isLeader indicates this node is a beacon chain leader node during the bootstrap process
-	isLeader := flag.Bool("is_leader", false, "true means this node is a beacon chain leader node")
+	isLeader = flag.Bool("is_leader", false, "true means this node is a beacon chain leader node")
 
 	// logConn logs incoming/outgoing connections
-	logConn := flag.Bool("log_conn", false, "log incoming/outgoing connections")
+	logConn = flag.Bool("log_conn", false, "log incoming/outgoing connections")
+)
 
+func main() {
+	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress")
 	flag.Parse()
 
 	if *versionFlag {
