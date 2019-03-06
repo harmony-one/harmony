@@ -1,14 +1,18 @@
+package nodeconfig
+
 // Package nodeconfig includes all the configuration variables for a node.
 // It is a global configuration for node and other services.
 // It will be included in node module, and other modules.
-package nodeconfig
 
 import (
 	"crypto/ecdsa"
 	"fmt"
 	"sync"
 
+	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/p2p"
+	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
 )
 
 // Role defines a role of a node.
@@ -54,15 +58,23 @@ const (
 // ConfigType is the structure of all node related configuration variables
 type ConfigType struct {
 	// The three groupID design, please refer to https://github.com/harmony-one/harmony/blob/master/node/node.md#libp2p-integration
-	beacon     p2p.GroupID // the beacon group ID
-	group      p2p.GroupID // the group ID of the shard
-	client     p2p.GroupID // the client group ID of the shard
-	isClient   bool        // whether this node is a client node, such as wallet/txgen
-	isBeacon   bool        // whether this node is a beacon node or not
-	isLeader   bool        // whether this node is a leader or not
-	shardID    uint32      // shardID of this node
-	role       Role        // Role of the node
-	stakingKey *ecdsa.PrivateKey
+	beacon      p2p.GroupID // the beacon group ID
+	group       p2p.GroupID // the group ID of the shard
+	client      p2p.GroupID // the client group ID of the shard
+	isClient    bool        // whether this node is a client node, such as wallet/txgen
+	isBeacon    bool        // whether this node is a beacon node or not
+	isLeader    bool        // whether this node is a leader or not
+	ShardID     uint32      // ShardID of this node
+	role        Role        // Role of the node
+	CurrentRole string
+	StakingKey  *ecdsa.PrivateKey
+	P2pPriKey   p2p_crypto.PrivKey
+	BlsPriKey   *bls.SecretKey
+	BlsPubKey   *bls.PublicKey
+	BeaconDB    *ethdb.LDBDatabase
+	MainDB      *ethdb.LDBDatabase
+	Peer        p2p.Peer
+	Host        p2p.Host
 }
 
 // configs is a list of node configuration.
@@ -82,8 +94,13 @@ func GetConfigs(index int) *ConfigType {
 	return &configs[index]
 }
 
+// GetGlobalConfig returns global config.
+func GetGlobalConfig() *ConfigType {
+	return GetConfigs(Global)
+}
+
 func (conf *ConfigType) String() string {
-	return fmt.Sprintf("%s/%s/%s:%v,%v,%v:%v", conf.beacon, conf.group, conf.client, conf.isClient, conf.isBeacon, conf.isLeader, conf.shardID)
+	return fmt.Sprintf("%s/%s/%s:%v,%v,%v:%v", conf.beacon, conf.group, conf.client, conf.isClient, conf.isBeacon, conf.isLeader, conf.ShardID)
 }
 
 // SetBeaconGroupID set the groupID for beacon group
@@ -114,11 +131,6 @@ func (conf *ConfigType) SetIsBeacon(b bool) {
 // SetIsLeader set the isLeader configuration
 func (conf *ConfigType) SetIsLeader(b bool) {
 	conf.isLeader = b
-}
-
-// SetShardID set the shardID
-func (conf *ConfigType) SetShardID(s uint32) {
-	conf.shardID = s
 }
 
 // SetRole set the role
@@ -154,11 +166,6 @@ func (conf *ConfigType) IsBeacon() bool {
 // IsLeader returns the isLeader configuration
 func (conf *ConfigType) IsLeader() bool {
 	return conf.isLeader
-}
-
-// ShardID returns the shardID
-func (conf *ConfigType) ShardID() uint32 {
-	return conf.shardID
 }
 
 // Role returns the role

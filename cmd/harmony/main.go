@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -80,43 +81,34 @@ func loggingInit(logFolder, role, ip, port string, onlyLogTps bool) {
 	log.Root().SetHandler(h)
 }
 
-func main() {
-	// TODO: use http://getmyipaddress.org/ or http://www.get-myip.com/ to retrieve my IP address
-	ip := flag.String("ip", "127.0.0.1", "IP of the node")
-	port := flag.String("port", "9000", "port of the node.")
-	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
-	dbSupported := flag.Bool("db_supported", true, "false means not db_supported, true means db_supported")
-	freshDB := flag.Bool("fresh_db", false, "true means the existing disk based db will be removed")
-	profile := flag.Bool("profile", false, "Turn on profiling (CPU, Memory).")
-	metricsReportURL := flag.String("metrics_report_url", "", "If set, reports metrics to this URL.")
-	versionFlag := flag.Bool("version", false, "Output version info")
-	onlyLogTps := flag.Bool("only_log_tps", false, "Only log TPS if true")
-
+var (
+	ip               = flag.String("ip", "127.0.0.1", "IP of the node")
+	port             = flag.String("port", "9000", "port of the node.")
+	logFolder        = flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
+	dbSupported      = flag.Bool("db_supported", true, "false means not db_supported, true means db_supported")
+	freshDB          = flag.Bool("fresh_db", false, "true means the existing disk based db will be removed")
+	profile          = flag.Bool("profile", false, "Turn on profiling (CPU, Memory).")
+	metricsReportURL = flag.String("metrics_report_url", "", "If set, reports metrics to this URL.")
+	versionFlag      = flag.Bool("version", false, "Output version info")
+	onlyLogTps       = flag.Bool("only_log_tps", false, "Only log TPS if true")
 	//Leader needs to have a minimal number of peers to start consensus
-	minPeers := flag.Int("min_peers", 100, "Minimal number of Peers in shard")
-
+	minPeers = flag.Int("min_peers", 100, "Minimal number of Peers in shard")
 	// Key file to store the private key of staking account.
-	stakingKeyFile := flag.String("staking_key", "./.stakingkey", "the private key file of the harmony node")
-
+	stakingKeyFile = flag.String("staking_key", "./.stakingkey", "the private key file of the harmony node")
 	// Key file to store the private key
-	keyFile := flag.String("key", "./.hmykey", "the private key file of the harmony node")
-	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress")
-
+	keyFile = flag.String("key", "./.hmykey", "the private key file of the harmony node")
 	// isBeacon indicates this node is a beacon chain node
-	isBeacon := flag.Bool("is_beacon", false, "true means this node is a beacon chain node")
-
+	isBeacon = flag.Bool("is_beacon", false, "true means this node is a beacon chain node")
 	// isNewNode indicates this node is a new node
-	isNewNode := flag.Bool("is_newnode", false, "true means this node is a new node")
-	accountIndex := flag.Int("account_index", 0, "the index of the staking account to use")
-
+	isNewNode    = flag.Bool("is_newnode", false, "true means this node is a new node")
+	accountIndex = flag.Int("account_index", 0, "the index of the staking account to use")
 	// isLeader indicates this node is a beacon chain leader node during the bootstrap process
-	isLeader := flag.Bool("is_leader", false, "true means this node is a beacon chain leader node")
-
+	isLeader = flag.Bool("is_leader", false, "true means this node is a beacon chain leader node")
 	// logConn logs incoming/outgoing connections
-	logConn := flag.Bool("log_conn", false, "log incoming/outgoing connections")
+	logConn = flag.Bool("log_conn", false, "log incoming/outgoing connections")
+)
 
-	flag.Parse()
-
+func initSetup() {
 	if *versionFlag {
 		printVersion(os.Args[0])
 	}
@@ -137,93 +129,55 @@ func main() {
 		}
 		utils.BootNodes = bootNodeAddrs
 	}
+}
 
-	var shardID = "0"
-	var peers []p2p.Peer
-	var leader p2p.Peer
-	var selfPeer p2p.Peer
-	var clientPeer *p2p.Peer
-	var role string
+func main() {
+	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress")
+	flag.Parse()
 
-	stakingPriKey := node.LoadStakingKeyFromFile(*stakingKeyFile, *accountIndex)
-
-	p2pPriKey, _, err := utils.LoadKeyFromFile(*keyFile)
-	if err != nil {
-		panic(err)
-	}
-
-	peerPriKey, peerPubKey := utils.GenKey(*ip, *port)
-	if peerPriKey == nil || peerPubKey == nil {
-		panic(fmt.Errorf("generate key error"))
-	}
-	selfPeer = p2p.Peer{IP: *ip, Port: *port, ValidatorID: -1, BlsPubKey: peerPubKey}
-
-	if *isLeader {
-		role = "leader"
-		leader = selfPeer
-	} else {
-		role = "validator"
-	}
+	initSetup()
+	nodeConfig := createGlobalConfigType()
 
 	// Init logging.
-	loggingInit(*logFolder, role, *ip, *port, *onlyLogTps)
-
-	// Initialize leveldb if dbSupported.
-	var ldb *ethdb.LDBDatabase
-	if *dbSupported {
-		ldb, _ = InitLDBDatabase(*ip, *port, *freshDB, false)
-	}
-
-	host, err := p2pimpl.NewHost(&selfPeer, p2pPriKey)
-	if *logConn {
-		host.GetP2PHost().Network().Notify(utils.ConnLogger)
-	}
-	if err != nil {
-		panic("unable to new host in harmony")
-	}
-
-	host.AddPeer(&leader)
-
-	// Consensus object.
-	// TODO: consensus object shouldn't start here
-	consensus := consensus.New(host, shardID, peers, leader)
-	consensus.MinPeers = *minPeers
+	loggingInit(*logFolder, nodeConfig.CurrentRole, *ip, *port, *onlyLogTps)
 
 	// Start Profiler for leader if profile argument is on
-	if role == "leader" && (*profile || *metricsReportURL != "") {
+	if nodeConfig.CurrentRole == "leader" && (*profile || *metricsReportURL != "") {
 		prof := profiler.GetProfiler()
-		prof.Config(shardID, *metricsReportURL)
+		prof.Config(strconv.Itoa(int(nodeConfig.ShardID)), *metricsReportURL)
 		if *profile {
 			prof.Start()
 		}
 	}
 
+	// Consensus object.
+	// TODO: consensus object shouldn't start here
+	// TODO(minhdoan): peers is actually an empty array.
+	consensus := consensus.New(nodeConfig.Host, strconv.Itoa(int(nodeConfig.ShardID)), []p2p.Peer{}, nodeConfig.Peer)
+	consensus.MinPeers = *minPeers
+
 	// Current node.
-	currentNode := node.New(host, consensus, ldb)
+	currentNode := node.New(nodeConfig.Host, consensus, nodeConfig.MainDB)
 	currentNode.Consensus.OfflinePeers = currentNode.OfflinePeers
 	currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
-	currentNode.AccountKey = stakingPriKey
+	currentNode.AccountKey = nodeConfig.StakingKey
 
 	// TODO: refactor the creation of blockchain out of node.New()
 	consensus.ChainReader = currentNode.Blockchain()
 
 	if *isBeacon {
-		if role == "leader" {
+		if nodeConfig.CurrentRole == "leader" {
 			currentNode.NodeConfig.SetRole(nodeconfig.BeaconLeader)
 		} else {
 			currentNode.NodeConfig.SetRole(nodeconfig.BeaconValidator)
 		}
 		currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
 	} else {
-		var beacondb ethdb.Database
-		if *dbSupported {
-			beacondb, _ = InitLDBDatabase(*ip, *port, *freshDB, true)
-		}
-		currentNode.AddBeaconChainDatabase(beacondb)
+		currentNode.AddBeaconChainDatabase(nodeConfig.BeaconDB)
 
 		if *isNewNode {
 			currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
-		} else if role == "leader" {
+		} else if nodeConfig.CurrentRole == "leader" {
 			currentNode.NodeConfig.SetRole(nodeconfig.ShardLeader)
 		} else {
 			currentNode.NodeConfig.SetRole(nodeconfig.ShardValidator)
@@ -234,15 +188,17 @@ func main() {
 	// Add randomness protocol
 	// TODO: enable drand only for beacon chain
 	// TODO: put this in a better place other than main.
-	dRand := drand.New(host, shardID, peers, leader, currentNode.ConfirmedBlockChannel, *isLeader)
+	// TODO(minhdoan): peers is acutally an empty array before and after refactoring.
+	dRand := drand.New(nodeConfig.Host, strconv.Itoa(int(nodeConfig.ShardID)), []p2p.Peer{}, nodeConfig.Peer, currentNode.ConfirmedBlockChannel, *isLeader)
 	currentNode.Consensus.RegisterPRndChannel(dRand.PRndChannel)
 	currentNode.Consensus.RegisterRndChannel(dRand.RndChannel)
 	currentNode.DRand = dRand
 
 	// If there is a client configured in the node list.
-	if clientPeer != nil {
-		currentNode.ClientPeer = clientPeer
-	}
+	// TODO(minhdoan): Remove it later after refactoring because clientPeer is null.
+	// if clientPeer != nil {
+	// 	currentNode.ClientPeer = clientPeer
+	// }
 
 	// Assign closure functions to the consensus object
 	consensus.BlockVerifier = currentNode.VerifyNewBlock
@@ -253,9 +209,55 @@ func main() {
 		go currentNode.SendPongMessage()
 	}
 
-	log.Info("New Harmony Node ====", "Role", currentNode.NodeConfig.Role(), "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, host.GetID().Pretty()))
+	log.Info("New Harmony Node ====", "Role", currentNode.NodeConfig.Role(), "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, nodeConfig.Host.GetID().Pretty()))
 	go currentNode.SupportSyncing()
 	currentNode.ServiceManagerSetup()
 	currentNode.RunServices()
 	currentNode.StartServer()
+}
+
+func createGlobalConfigType() *nodeconfig.ConfigType {
+	var err error
+
+	res := nodeconfig.GetGlobalConfig()
+	res.ShardID = 0
+
+	res.StakingKey = node.LoadStakingKeyFromFile(*stakingKeyFile, *accountIndex)
+
+	res.P2pPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
+	if err != nil {
+		panic(err)
+	}
+
+	res.BlsPriKey, res.BlsPubKey = utils.GenKey(*ip, *port)
+	if res.BlsPriKey == nil || res.BlsPubKey == nil {
+		panic(fmt.Errorf("generate key error"))
+	}
+	res.Peer = p2p.Peer{IP: *ip, Port: *port, ValidatorID: -1, BlsPubKey: res.BlsPubKey}
+
+	if *isLeader {
+		res.CurrentRole = "leader"
+	} else {
+		res.CurrentRole = "validator"
+	}
+
+	// Initialize leveldb if dbSupported.
+	if *dbSupported {
+		res.MainDB, _ = InitLDBDatabase(*ip, *port, *freshDB, false)
+	}
+
+	if *isBeacon {
+		res.BeaconDB, _ = InitLDBDatabase(*ip, *port, *freshDB, true)
+	}
+
+	res.Host, err = p2pimpl.NewHost(&res.Peer, res.P2pPriKey)
+	if *logConn {
+		res.Host.GetP2PHost().Network().Notify(utils.ConnLogger)
+	}
+	if err != nil {
+		panic("unable to new host in harmony")
+	}
+	res.Host.AddPeer(&res.Peer)
+
+	return res
 }
