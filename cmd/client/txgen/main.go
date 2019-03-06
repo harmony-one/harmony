@@ -15,6 +15,7 @@ import (
 	"github.com/harmony-one/harmony/cmd/client/txgen/txgen"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core/types"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
@@ -148,7 +149,7 @@ func main() {
 	}
 	clientNode.Client.UpdateBlocks = updateBlocksFunc
 
-	clientNode.Role = node.ClientNode
+	clientNode.NodeConfig.SetRole(nodeconfig.ClientNode)
 	clientNode.ServiceManagerSetup()
 	clientNode.RunServices()
 

@@ -6,6 +6,8 @@ import (
 	"time"
 
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/p2p"
 )
 
 type SupportSyncingTest struct {
@@ -93,5 +95,14 @@ func TestStopServices(t *testing.T) {
 	m.StopServicesByRole([]Type{})
 	if status != 2 {
 		t.Error("Service did not stop")
+	}
+}
+
+func TestInit(t *testing.T) {
+	if GroupIDShards[p2p.ShardIDType("0")] != p2p.GroupIDBeacon {
+		t.Errorf("GroupIDShards[0]: %v != GroupIDBeacon: %v", GroupIDShards[p2p.ShardIDType("0")], p2p.GroupIDBeacon)
+	}
+	if len(GroupIDShards) != nodeconfig.MaxShards {
+		t.Errorf("len(GroupIDShards): %v != TotalShards: %v", len(GroupIDShards), nodeconfig.MaxShards)
 	}
 }
