@@ -82,6 +82,10 @@ func GetConfigs(index int) *ConfigType {
 	return &configs[index]
 }
 
+func GetGlobalConfig() *ConfigType {
+	return GetConfigs(Global)
+}
+
 func (conf *ConfigType) String() string {
 	return fmt.Sprintf("%s/%s/%s:%v,%v,%v:%v", conf.beacon, conf.group, conf.client, conf.isClient, conf.isBeacon, conf.isLeader, conf.shardID)
 }
