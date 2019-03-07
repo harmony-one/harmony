@@ -227,7 +227,8 @@ It should cover the basic function to pass, to fail, and error conditions.
 * automated?
 ---
 
-##epoch change stress
+## epoch change stress
+
 * test case # : EC1
 * description : hight waiting nodes
 * test procedure : for 5 shards having 200 nodes each initiate epoch change with 10,000 nodes waiting
