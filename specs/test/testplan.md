@@ -83,14 +83,6 @@ It should cover the basic function to pass, to fail, and error conditions.
 * note
 * automated?
 ---
-* test case # : CS2
-* description : network connectivity issues #1
-* test procedure : node experiences network connectivity issues
-* passing criteria: leader is able to timeout node
-* dependency
-* note
-* automated?
----
 
 ### drand
 
