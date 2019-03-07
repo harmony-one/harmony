@@ -2,22 +2,18 @@ package node
 
 import (
 	"crypto/ecdsa"
-	"math"
 	"math/big"
 	"os"
-	"strings"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/harmony-one/harmony/core"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/harmony-one/harmony/contracts"
 	"github.com/harmony-one/harmony/internal/utils/contract"
 
 	"github.com/harmony-one/harmony/internal/utils"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/harmony-one/harmony/core/types"
-	contract_constants "github.com/harmony-one/harmony/internal/utils/contract"
 )
 
 //constants related to staking
@@ -26,117 +22,41 @@ import (
 //Refer: https://solidity.readthedocs.io/en/develop/abi-spec.html
 
 const (
-	// DepositFuncSignature is the func signature for deposit method
-	DepositFuncSignature  = "0xd0e30db0"
-	withdrawFuncSignature = "0x2e1a7d4d"
-	funcSingatureBytes    = 4
+	funcSingatureBytes = 4
+	lockPeriodInEpochs = 3 // This should be in sync with contracts/StakeLockContract.sol
 )
 
-// UpdateStakingList updates the stakes of every node.
-// TODO: read directly from smart contract, or at least check the receipt also for incompleted transaction.
-func (node *Node) UpdateStakingList(block *types.Block) error {
-	signerType := types.HomesteadSigner{}
-	txns := block.Transactions()
-	for i := range txns {
-		txn := txns[i]
-		toAddress := txn.To()
-		if toAddress != nil && *toAddress != node.StakingContractAddress { //Not a address aimed at the staking contract.
-			utils.GetLogInstance().Info("Mismatched Staking Contract Address", "expected", node.StakingContractAddress.Hex(), "got", toAddress.Hex())
-			continue
-		}
-		currentSender, _ := types.Sender(signerType, txn)
-		_, isPresent := node.CurrentStakes[currentSender]
-		data := txn.Data()
-		switch funcSignature := decodeFuncSign(data); funcSignature {
-		case DepositFuncSignature: //deposit, currently: 0xd0e30db0
-			amount := txn.Value()
-			value := amount.Int64()
-			if isPresent {
-				//This means the node has increased its stake.
-				node.CurrentStakes[currentSender] += value
-			} else {
-				//This means its a new node that is staking the first time.
-				node.CurrentStakes[currentSender] = value
-			}
-		case withdrawFuncSignature: //withdraw, currently: 0x2e1a7d4d
-			value := decodeStakeCall(data)
-			if isPresent {
-				if node.CurrentStakes[currentSender] > value {
-					node.CurrentStakes[currentSender] -= value
-				} else if node.CurrentStakes[currentSender] == value {
-					delete(node.CurrentStakes, currentSender)
-				} else {
-					continue //Overdraft protection.
-				}
-			} else {
-				continue //no-op: a node that is not staked cannot withdraw stake.
-			}
-		default:
-			continue //no-op if its not deposit or withdaw
-		}
-	}
-	return nil
+// StakeInfo is the struct for the return value of listLockedAddresses func in stake contract.
+type StakeInfo struct {
+	LockedAddresses  []common.Address
+	BlockNums        []*big.Int
+	LockPeriodCounts []*big.Int
+	Amounts          []*big.Int
 }
 
-// UpdateStakingListWithABI updates staking information by querying the staking smart contract.
-func (node *Node) UpdateStakingListWithABI() {
-	abi, err := abi.JSON(strings.NewReader(contracts.StakeLockContractABI))
-	if err != nil {
-		utils.GetLogInstance().Error("Failed to generate staking contract's ABI", "error", err)
-	}
-	bytesData, err := abi.Pack("listLockedAddresses")
-	if err != nil {
-		utils.GetLogInstance().Error("Failed to generate ABI function bytes data", "error", err)
-	}
+// UpdateStakingList updates staking information by querying the staking smart contract.
+func (node *Node) UpdateStakingList(stakeInfo *StakeInfo) {
+	node.CurrentStakes = make(map[common.Address]*big.Int)
+	if stakeInfo != nil {
+		for i, addr := range stakeInfo.LockedAddresses {
+			blockNum := stakeInfo.BlockNums[i]
+			lockPeriodCount := stakeInfo.LockPeriodCounts[i]
+			amount := stakeInfo.Amounts[i]
 
-	priKey := contract_constants.GenesisBeaconAccountPriKey
-	deployerAddress := crypto.PubkeyToAddress(priKey.PublicKey)
+			startEpoch := core.GetEpochFromBlockNumber(blockNum.Uint64())
+			curEpoch := core.GetEpochFromBlockNumber(node.blockchain.CurrentBlock().NumberU64())
 
-	state, err := node.blockchain.State()
-
-	stakingContractAddress := crypto.CreateAddress(deployerAddress, uint64(0))
-	tx := types.NewTransaction(
-		state.GetNonce(deployerAddress),
-		stakingContractAddress,
-		0,
-		nil,
-		math.MaxUint64,
-		nil,
-		bytesData,
-	)
-	signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, priKey)
-	if err != nil {
-		utils.GetLogInstance().Error("Failed to sign contract call tx", "error", err)
-		return
-	}
-	output, err := node.ContractCaller.CallContract(signedTx)
-
-	if err != nil {
-		utils.GetLogInstance().Error("Failed to call staking contract", "error", err)
-		return
-	}
-
-	ret := new(struct {
-		LockedAddresses  []common.Address
-		BlockNums        []*big.Int
-		LockPeriodCounts []*big.Int
-	})
-
-	err = abi.Unpack(ret, "listLockedAddresses", output)
-
-	if err != nil {
-		utils.GetLogInstance().Error("[ABI] Failed to unpack contract result", "error", err, "output", output)
-	} else {
-		utils.GetLogInstance().Info("\n")
-		utils.GetLogInstance().Info("ABI [START] ------------------------------------")
-		utils.GetLogInstance().Info("", "result", ret)
-		utils.GetLogInstance().Info("ABI [END}   ------------------------------------")
-		utils.GetLogInstance().Info("\n")
+			if startEpoch == curEpoch {
+				continue // The token are counted into stakes at the beginning of next epoch.
+			}
+			if curEpoch-startEpoch <= lockPeriodCount.Uint64()*lockPeriodInEpochs {
+				node.CurrentStakes[addr] = amount
+			}
+		}
 	}
 }
 
 func (node *Node) printStakingList() {
-	node.UpdateStakingListWithABI()
 	utils.GetLogInstance().Info("\n")
 	utils.GetLogInstance().Info("CURRENT STAKING INFO [START] ------------------------------------")
 	for addr, stake := range node.CurrentStakes {

@@ -304,7 +304,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 
 	if node.NodeConfig.Role() == nodeconfig.BeaconLeader {
 		utils.GetLogInstance().Info("Updating staking list")
-		node.UpdateStakingList(newBlock)
+		node.UpdateStakingList(node.QueryStakeInfo())
 		node.printStakingList()
 	}
 }

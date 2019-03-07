@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/binary"
 	"fmt"
+	"math/big"
 	"os"
 	"sync"
 	"time"
@@ -137,7 +138,7 @@ type Node struct {
 	serviceManager *service.Manager
 
 	//Staked Accounts and Contract
-	CurrentStakes          map[common.Address]int64 //This will save the latest information about staked nodes.
+	CurrentStakes          map[common.Address]*big.Int //This will save the latest information about staked nodes.
 	StakingContractAddress common.Address
 	WithdrawStakeFunc      []byte
 
@@ -251,7 +252,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database) *N
 
 		// Setup one time smart contracts
 		node.AddFaucetContractToPendingTransactions()
-		node.CurrentStakes = make(map[common.Address]int64)
+		node.CurrentStakes = make(map[common.Address]*big.Int)
 		node.AddStakingContractToPendingTransactions() //This will save the latest information about staked nodes in current staked
 		node.DepositToStakingAccounts()
 	}

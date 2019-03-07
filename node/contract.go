@@ -6,6 +6,9 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/common/math"
+
 	"github.com/harmony-one/harmony/contracts"
 
 	"github.com/harmony-one/harmony/internal/utils"
@@ -59,6 +62,55 @@ func (node *Node) generateDeployedStakingContractAddress(contractAddress common.
 	//deployedAddress := crypto.CreateAddress(contractAddress, uint64(nonce))
 	nonce := 0
 	return crypto.CreateAddress(contractAddress, uint64(nonce))
+}
+
+// QueryStakeInfo queries the stake info from the stake contract.
+func (node *Node) QueryStakeInfo() *StakeInfo {
+	abi, err := abi.JSON(strings.NewReader(contracts.StakeLockContractABI))
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to generate staking contract's ABI", "error", err)
+	}
+	bytesData, err := abi.Pack("listLockedAddresses")
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to generate ABI function bytes data", "error", err)
+	}
+
+	priKey := contract_constants.GenesisBeaconAccountPriKey
+	deployerAddress := crypto.PubkeyToAddress(priKey.PublicKey)
+
+	state, err := node.blockchain.State()
+
+	stakingContractAddress := crypto.CreateAddress(deployerAddress, uint64(0))
+	tx := types.NewTransaction(
+		state.GetNonce(deployerAddress),
+		stakingContractAddress,
+		0,
+		nil,
+		math.MaxUint64,
+		nil,
+		bytesData,
+	)
+	signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, priKey)
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to sign contract call tx", "error", err)
+		return nil
+	}
+	output, err := node.ContractCaller.CallContract(signedTx)
+
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to call staking contract", "error", err)
+		return nil
+	}
+
+	ret := &StakeInfo{}
+
+	err = abi.Unpack(ret, "listLockedAddresses", output)
+
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to unpack stake info", "error", err)
+		return nil
+	}
+	return ret
 }
 
 // CreateStakingWithdrawTransaction creates a new withdraw stake transaction
