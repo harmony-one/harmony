@@ -67,15 +67,16 @@ type ConfigType struct {
 	role     Role        // Role of the node
 
 	// TODO(minhdoan): Clean up later.
-	ShardIDString string
-	StringRole    string
-	Host          p2p.Host
-	StakingPriKey *ecdsa.PrivateKey
-	P2pPriKey     p2p_crypto.PrivKey
-	BlsPriKey     *bls.SecretKey
-	BlsPubKey     *bls.PublicKey
-	MainDB        *ethdb.LDBDatabase
-	BeaconDB      *ethdb.LDBDatabase
+	ShardIDString   string
+	StringRole      string
+	StakingPriKey   *ecdsa.PrivateKey
+	P2pPriKey       p2p_crypto.PrivKey
+	ConsensusPriKey *bls.SecretKey
+	BlsPubKey       *bls.PublicKey
+	// TODO(minhdoan): Think about better configuration for Host and DB.
+	Host     p2p.Host
+	MainDB   *ethdb.LDBDatabase
+	BeaconDB *ethdb.LDBDatabase
 
 	SelfPeer p2p.Peer
 	Leader   p2p.Peer

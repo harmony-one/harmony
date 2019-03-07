@@ -126,16 +126,20 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 		panic(err)
 	}
 
-	// Setup Bls keys
-	nodeConfig.BlsPriKey, nodeConfig.BlsPubKey = utils.GenKey(*ip, *port)
-	if nodeConfig.BlsPriKey == nil || nodeConfig.BlsPubKey == nil {
+	// Setup consensus keys
+	nodeConfig.ConsensusPriKey, nodeConfig.BlsPubKey = utils.GenKey(*ip, *port)
+	if nodeConfig.ConsensusPriKey == nil || nodeConfig.BlsPubKey == nil {
 		panic(fmt.Errorf("generate key error"))
 	}
 
 	// Initialize leveldb for main blockchain and beacon.
-	nodeConfig.MainDB, _ = InitLDBDatabase(*ip, *port, *freshDB, false)
+	if nodeConfig.MainDB, err = InitLDBDatabase(*ip, *port, *freshDB, false); err != nil {
+		panic(err)
+	}
 	if !*isBeacon {
-		nodeConfig.BeaconDB, _ = InitLDBDatabase(*ip, *port, *freshDB, true)
+		if nodeConfig.BeaconDB, err = InitLDBDatabase(*ip, *port, *freshDB, true); err != nil {
+			panic(err)
+		}
 	}
 
 	nodeConfig.SelfPeer = p2p.Peer{IP: *ip, Port: *port, ValidatorID: -1, BlsPubKey: nodeConfig.BlsPubKey}
