@@ -62,15 +62,15 @@ It should cover the basic function to pass, to fail, and error conditions.
 * passing criteria : the new node can join in the consensus after state syncing
 * dependency
 * note
-* automated?
+* automated? N
 ---
 * test case # : SS2
-* description :
-* test procedure :
-* passing criteria
+* description : network connectivity issues 
+* test procedure :  node experiences network connectivity issues or is down and then regains connectivity
+* passing criteria : the node is able to sync back to current state of blockchain from the point where it dropped off
 * dependency
 * note
-* automated?
+* automated? N
 ---
 ### consensus
 
@@ -83,9 +83,9 @@ It should cover the basic function to pass, to fail, and error conditions.
 * automated?
 ---
 * test case # : CS2
-* description :
-* test procedure :
-* passing criteria
+* description : network connectivity issues #1
+* test procedure : node experiences network connectivity issues
+* passing criteria: leader is able to timeout node
 * dependency
 * note
 * automated?
@@ -137,6 +137,14 @@ It should cover the basic function to pass, to fail, and error conditions.
 * note
 * automated?
 ---
+* test case # : RS2
+* description : reshard with 0 new nodes 
+* test procedure : in a ongoing 
+* passing criteria : a new leader should be selected
+* dependency
+* note
+* automated?
+---
 ### transaction
 
 * test case # : TX1
@@ -171,13 +179,22 @@ It should cover the basic function to pass, to fail, and error conditions.
 ### protocol level stress
 * test case # : STP1
 * description : 
-* test procedure :
-* passing criteria
+* test procedure : increase number of txns in block from 1000 to 10,000
+* evaluation: change in latency per shard/change in transactions per sec, per shard.
 * dependency
 * note
 * automated?
 
 ### networking level stress
+
+* test case # : NT1
+* description : 
+* test procedure : start consensus with a peer-p2p network of 50 peers, increase it to 1000 peers, send 1 ping message every 10 secs.
+* evaluation: change in latency per shard/change in transactions per sec, per shard.
+* dependency
+* note
+* automated?
+
 ### transaction stress
 
 * test case # : STX1
