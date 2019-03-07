@@ -97,6 +97,7 @@ func GetConfigs(index int) *ConfigType {
 	return &configs[index]
 }
 
+// GetGlobalConfig returns global config.
 func GetGlobalConfig() *ConfigType {
 	return GetConfigs(Global)
 }
