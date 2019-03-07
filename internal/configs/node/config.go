@@ -9,7 +9,9 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/p2p"
+	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
 )
 
 // Role defines a role of a node.
@@ -55,17 +57,25 @@ const (
 // ConfigType is the structure of all node related configuration variables
 type ConfigType struct {
 	// The three groupID design, please refer to https://github.com/harmony-one/harmony/blob/master/node/node.md#libp2p-integration
-	beacon   p2p.GroupID // the beacon group ID
-	group    p2p.GroupID // the group ID of the shard
-	client   p2p.GroupID // the client group ID of the shard
-	isClient bool        // whether this node is a client node, such as wallet/txgen
-	isBeacon bool        // whether this node is a beacon node or not
-	isLeader bool        // whether this node is a leader or not
-	shardID  uint32      // shardID of this node
-	role     Role        // Role of the node
+	beacon     p2p.GroupID // the beacon group ID
+	group      p2p.GroupID // the group ID of the shard
+	client     p2p.GroupID // the client group ID of the shard
+	isClient   bool        // whether this node is a client node, such as wallet/txgen
+	isBeacon   bool        // whether this node is a beacon node or not
+	isLeader   bool        // whether this node is a leader or not
+	shardID    uint32      // shardID of this node
+	role       Role        // Role of the node
+	StringRole string
 
 	StakingPriKey *ecdsa.PrivateKey
+	P2pPriKey     p2p_crypto.PrivKey
+	BlsPriKey     *bls.SecretKey
+	BlsPubKey     *bls.PublicKey
 	MainDB        *ethdb.LDBDatabase
+	BeaconDB      *ethdb.LDBDatabase
+
+	SelfPeer p2p.Peer
+	Leader   p2p.Peer
 }
 
 // configs is a list of node configuration.
