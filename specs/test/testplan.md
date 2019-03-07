@@ -109,6 +109,26 @@ It should cover the basic function to pass, to fail, and error conditions.
 * note
 * automated?
 ---
+### smartcontract
+
+* test case # : SC1
+* description : deploy ERC20 smart contract in 1 shard
+* test procedure : smart contract is deployed in a automated fashion e.g. faucet contract
+* passing criteria: ability to interact with smart contract e.g. receive tokens from faucet contract.
+* dependency
+* note
+* automated?
+---
+
+* test case # : SC2
+* description : deploy ERC721 (non-fungible tokens) smart contract in 1 shard
+* test procedure : smart contract is deployed in a automated fashion e.g. smart contract like Cryptokitties
+* passing criteria: ability to succesfully transfer the non-fungible token from one address to another via transaction
+* dependency
+* note
+* automated?
+---
+
 ### staking
 
 * test case # : SK1
