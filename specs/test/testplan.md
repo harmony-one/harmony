@@ -107,8 +107,8 @@ It should cover the basic function to pass, to fail, and error conditions.
 
 * test case # : SC1
 * description : deploy ERC20 smart contract in 1 shard
-* test procedure : smart contract is deployed in a automated fashion e.g. faucet contract
-* passing criteria: ability to interact with smart contract e.g. receive tokens from faucet contract.
+* test procedure : smart contract is deployed in a automated fashion e.g. erc20 (utility) token contract
+* passing criteria: ability to interact with smart contract e.g. transfer erc20 tokens from one address to another
 * dependency
 * note
 * automated?
@@ -212,7 +212,7 @@ It should cover the basic function to pass, to fail, and error conditions.
 ---
 * test case # : STP2
 * description : increasing number of nodes in a shard
-* test procedure : increase number of nodes in a shard from 100 to 5000
+* test procedure : increase number of nodes in a shard from 100 to 1000
 * evaluation: change in latency per shard/change in transactions per sec, per shard.
 * dependency
 * note
@@ -242,7 +242,7 @@ It should cover the basic function to pass, to fail, and error conditions.
 
 * test case # : NT1
 * description : 
-* test procedure : start consensus with a peer-p2p network of 50 peers, increase it to 1000 peers, send 1 ping message every 10 secs.
+* test procedure : start consensus with a peer-p2p network of 50 peers, increase it to 1000 peers, send 1 ping message every 100 ms.
 * evaluation: change in latency per shard/change in transactions per sec, per shard.
 * dependency
 * note
