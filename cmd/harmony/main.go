@@ -115,6 +115,10 @@ func initSetup() {
 func createGlobalConfig() *nodeconfig.ConfigType {
 	var err error
 	nodeConfig := nodeconfig.GetGlobalConfig()
+
+	// Currently we hardcode only one shard.
+	nodeConfig.ShardIDString = "0"
+
 	nodeConfig.StakingPriKey = node.LoadStakingKeyFromFile(*stakingKeyFile, *accountIndex)
 
 	nodeConfig.P2pPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
@@ -142,49 +146,28 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 		nodeConfig.StringRole = "validator"
 	}
 
-	return nodeConfig
-}
-
-func main() {
-	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress")
-	flag.Parse()
-
-	initSetup()
-	nodeConfig := createGlobalConfig()
-
-	var shardID = "0"
-	var peers []p2p.Peer
-	var clientPeer *p2p.Peer
-
-	// Init logging.
-	loggingInit(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps)
-
-	host, err := p2pimpl.NewHost(&nodeConfig.SelfPeer, nodeConfig.P2pPriKey)
+	nodeConfig.Host, err = p2pimpl.NewHost(&nodeConfig.SelfPeer, nodeConfig.P2pPriKey)
 	if *logConn {
-		host.GetP2PHost().Network().Notify(utils.ConnLogger)
+		nodeConfig.Host.GetP2PHost().Network().Notify(utils.ConnLogger)
 	}
 	if err != nil {
 		panic("unable to new host in harmony")
 	}
 
-	host.AddPeer(&nodeConfig.Leader)
+	nodeConfig.Host.AddPeer(&nodeConfig.Leader)
 
+	return nodeConfig
+}
+
+func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consensus, *node.Node) {
 	// Consensus object.
 	// TODO: consensus object shouldn't start here
-	consensus := consensus.New(host, shardID, peers, nodeConfig.Leader)
+	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of consensus later.
+	consensus := consensus.New(nodeConfig.Host, nodeConfig.ShardIDString, []p2p.Peer{}, nodeConfig.Leader)
 	consensus.MinPeers = *minPeers
 
-	// Start Profiler for leader if profile argument is on
-	if nodeConfig.StringRole == "leader" && (*profile || *metricsReportURL != "") {
-		prof := profiler.GetProfiler()
-		prof.Config(shardID, *metricsReportURL)
-		if *profile {
-			prof.Start()
-		}
-	}
-
 	// Current node.
-	currentNode := node.New(host, consensus, nodeConfig.MainDB)
+	currentNode := node.New(nodeConfig.Host, consensus, nodeConfig.MainDB)
 	currentNode.Consensus.OfflinePeers = currentNode.OfflinePeers
 	currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
 	currentNode.AccountKey = nodeConfig.StakingPriKey
@@ -215,26 +198,45 @@ func main() {
 	// Add randomness protocol
 	// TODO: enable drand only for beacon chain
 	// TODO: put this in a better place other than main.
-	dRand := drand.New(host, shardID, peers, nodeConfig.Leader, currentNode.ConfirmedBlockChannel, *isLeader)
+	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of drand later.
+	dRand := drand.New(nodeConfig.Host, nodeConfig.ShardIDString, []p2p.Peer{}, nodeConfig.Leader, currentNode.ConfirmedBlockChannel, *isLeader)
 	currentNode.Consensus.RegisterPRndChannel(dRand.PRndChannel)
 	currentNode.Consensus.RegisterRndChannel(dRand.RndChannel)
 	currentNode.DRand = dRand
-
-	// If there is a client configured in the node list.
-	if clientPeer != nil {
-		currentNode.ClientPeer = clientPeer
-	}
 
 	// Assign closure functions to the consensus object
 	consensus.BlockVerifier = currentNode.VerifyNewBlock
 	consensus.OnConsensusDone = currentNode.PostConsensusProcessing
 	currentNode.State = node.NodeWaitToJoin
+	return consensus, currentNode
+}
+
+func main() {
+	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress")
+	flag.Parse()
+
+	initSetup()
+	nodeConfig := createGlobalConfig()
+
+	// Init logging.
+	loggingInit(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps)
+
+	// Start Profiler for leader if profile argument is on
+	if nodeConfig.StringRole == "leader" && (*profile || *metricsReportURL != "") {
+		prof := profiler.GetProfiler()
+		prof.Config(nodeConfig.ShardIDString, *metricsReportURL)
+		if *profile {
+			prof.Start()
+		}
+	}
+
+	consensus, currentNode := setUpConsensusAndNode(nodeConfig)
 
 	if consensus.IsLeader {
 		go currentNode.SendPongMessage()
 	}
 
-	log.Info("New Harmony Node ====", "Role", currentNode.NodeConfig.Role(), "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, host.GetID().Pretty()))
+	log.Info("New Harmony Node ====", "Role", currentNode.NodeConfig.Role(), "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, nodeConfig.Host.GetID().Pretty()))
 	go currentNode.SupportSyncing()
 	currentNode.ServiceManagerSetup()
 	currentNode.RunServices()
