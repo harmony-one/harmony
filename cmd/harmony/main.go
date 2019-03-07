@@ -28,23 +28,6 @@ var (
 	commit  string
 )
 
-// Constants used by the harmony.
-const (
-	AttackProbability = 20
-)
-
-func attackDetermination(attackedMode int) bool {
-	switch attackedMode {
-	case 0:
-		return false
-	case 1:
-		return true
-	case 2:
-		return rand.Intn(100) < AttackProbability
-	}
-	return false
-}
-
 // InitLDBDatabase initializes a LDBDatabase. isBeacon=true will return the beacon chain database for normal shard nodes
 func InitLDBDatabase(ip string, port string, freshDB bool, isBeacon bool) (*ethdb.LDBDatabase, error) {
 	var dbFileName string
@@ -81,7 +64,6 @@ func loggingInit(logFolder, role, ip, port string, onlyLogTps bool) {
 }
 
 var (
-	// TODO: use http://getmyipaddress.org/ or http://www.get-myip.com/ to retrieve my IP address
 	ip               = flag.String("ip", "127.0.0.1", "IP of the node")
 	port             = flag.String("port", "9000", "port of the node.")
 	logFolder        = flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
@@ -90,26 +72,19 @@ var (
 	metricsReportURL = flag.String("metrics_report_url", "", "If set, reports metrics to this URL.")
 	versionFlag      = flag.Bool("version", false, "Output version info")
 	onlyLogTps       = flag.Bool("only_log_tps", false, "Only log TPS if true")
-
 	//Leader needs to have a minimal number of peers to start consensus
 	minPeers = flag.Int("min_peers", 100, "Minimal number of Peers in shard")
-
 	// Key file to store the private key of staking account.
 	stakingKeyFile = flag.String("staking_key", "./.stakingkey", "the private key file of the harmony node")
-
 	// Key file to store the private key
 	keyFile = flag.String("key", "./.hmykey", "the private key file of the harmony node")
-
 	// isBeacon indicates this node is a beacon chain node
 	isBeacon = flag.Bool("is_beacon", false, "true means this node is a beacon chain node")
-
 	// isNewNode indicates this node is a new node
 	isNewNode    = flag.Bool("is_newnode", false, "true means this node is a new node")
 	accountIndex = flag.Int("account_index", 0, "the index of the staking account to use")
-
 	// isLeader indicates this node is a beacon chain leader node during the bootstrap process
 	isLeader = flag.Bool("is_leader", false, "true means this node is a beacon chain leader node")
-
 	// logConn logs incoming/outgoing connections
 	logConn = flag.Bool("log_conn", false, "log incoming/outgoing connections")
 )
@@ -138,11 +113,34 @@ func initSetup() {
 }
 
 func createGlobalConfig() *nodeconfig.ConfigType {
+	var err error
 	nodeConfig := nodeconfig.GetGlobalConfig()
 	nodeConfig.StakingPriKey = node.LoadStakingKeyFromFile(*stakingKeyFile, *accountIndex)
 
-	// Initialize leveldb if dbSupported.
+	nodeConfig.P2pPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
+	if err != nil {
+		panic(err)
+	}
+
+	// Setup Bls keys
+	nodeConfig.BlsPriKey, nodeConfig.BlsPubKey = utils.GenKey(*ip, *port)
+	if nodeConfig.BlsPriKey == nil || nodeConfig.BlsPubKey == nil {
+		panic(fmt.Errorf("generate key error"))
+	}
+
+	// Initialize leveldb for main blockchain and beacon.
 	nodeConfig.MainDB, _ = InitLDBDatabase(*ip, *port, *freshDB, false)
+	if !*isBeacon {
+		nodeConfig.BeaconDB, _ = InitLDBDatabase(*ip, *port, *freshDB, true)
+	}
+
+	nodeConfig.SelfPeer = p2p.Peer{IP: *ip, Port: *port, ValidatorID: -1, BlsPubKey: nodeConfig.BlsPubKey}
+	if *isLeader {
+		nodeConfig.StringRole = "leader"
+		nodeConfig.Leader = nodeConfig.SelfPeer
+	} else {
+		nodeConfig.StringRole = "validator"
+	}
 
 	return nodeConfig
 }
@@ -156,33 +154,12 @@ func main() {
 
 	var shardID = "0"
 	var peers []p2p.Peer
-	var leader p2p.Peer
-	var selfPeer p2p.Peer
 	var clientPeer *p2p.Peer
-	var role string
-
-	p2pPriKey, _, err := utils.LoadKeyFromFile(*keyFile)
-	if err != nil {
-		panic(err)
-	}
-
-	peerPriKey, peerPubKey := utils.GenKey(*ip, *port)
-	if peerPriKey == nil || peerPubKey == nil {
-		panic(fmt.Errorf("generate key error"))
-	}
-	selfPeer = p2p.Peer{IP: *ip, Port: *port, ValidatorID: -1, BlsPubKey: peerPubKey}
-
-	if *isLeader {
-		role = "leader"
-		leader = selfPeer
-	} else {
-		role = "validator"
-	}
 
 	// Init logging.
-	loggingInit(*logFolder, role, *ip, *port, *onlyLogTps)
+	loggingInit(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps)
 
-	host, err := p2pimpl.NewHost(&selfPeer, p2pPriKey)
+	host, err := p2pimpl.NewHost(&nodeConfig.SelfPeer, nodeConfig.P2pPriKey)
 	if *logConn {
 		host.GetP2PHost().Network().Notify(utils.ConnLogger)
 	}
@@ -190,15 +167,15 @@ func main() {
 		panic("unable to new host in harmony")
 	}
 
-	host.AddPeer(&leader)
+	host.AddPeer(&nodeConfig.Leader)
 
 	// Consensus object.
 	// TODO: consensus object shouldn't start here
-	consensus := consensus.New(host, shardID, peers, leader)
+	consensus := consensus.New(host, shardID, peers, nodeConfig.Leader)
 	consensus.MinPeers = *minPeers
 
 	// Start Profiler for leader if profile argument is on
-	if role == "leader" && (*profile || *metricsReportURL != "") {
+	if nodeConfig.StringRole == "leader" && (*profile || *metricsReportURL != "") {
 		prof := profiler.GetProfiler()
 		prof.Config(shardID, *metricsReportURL)
 		if *profile {
@@ -216,19 +193,18 @@ func main() {
 	consensus.ChainReader = currentNode.Blockchain()
 
 	if *isBeacon {
-		if role == "leader" {
+		if nodeConfig.StringRole == "leader" {
 			currentNode.NodeConfig.SetRole(nodeconfig.BeaconLeader)
 		} else {
 			currentNode.NodeConfig.SetRole(nodeconfig.BeaconValidator)
 		}
 		currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
 	} else {
-		beacondb, _ := InitLDBDatabase(*ip, *port, *freshDB, true)
-		currentNode.AddBeaconChainDatabase(beacondb)
+		currentNode.AddBeaconChainDatabase(nodeConfig.BeaconDB)
 
 		if *isNewNode {
 			currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
-		} else if role == "leader" {
+		} else if nodeConfig.StringRole == "leader" {
 			currentNode.NodeConfig.SetRole(nodeconfig.ShardLeader)
 		} else {
 			currentNode.NodeConfig.SetRole(nodeconfig.ShardValidator)
@@ -239,7 +215,7 @@ func main() {
 	// Add randomness protocol
 	// TODO: enable drand only for beacon chain
 	// TODO: put this in a better place other than main.
-	dRand := drand.New(host, shardID, peers, leader, currentNode.ConfirmedBlockChannel, *isLeader)
+	dRand := drand.New(host, shardID, peers, nodeConfig.Leader, currentNode.ConfirmedBlockChannel, *isLeader)
 	currentNode.Consensus.RegisterPRndChannel(dRand.PRndChannel)
 	currentNode.Consensus.RegisterRndChannel(dRand.RndChannel)
 	currentNode.DRand = dRand
