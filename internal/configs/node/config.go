@@ -66,6 +66,7 @@ type ConfigType struct {
 	shardID  uint32      // shardID of this node
 	role     Role        // Role of the node
 
+	// TODO(minhdoan): Clean up later.
 	ShardIDString string
 	StringRole    string
 	Host          p2p.Host
@@ -97,6 +98,7 @@ func GetConfigs(index int) *ConfigType {
 	return &configs[index]
 }
 
+// GetGlobalConfig returns global config.
 func GetGlobalConfig() *ConfigType {
 	return GetConfigs(Global)
 }
