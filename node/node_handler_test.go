@@ -11,7 +11,7 @@ import (
 
 func TestAddNewBlock(t *testing.T) {
 	_, pubKey := utils.GenKey("1", "2")
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "9882", BlsPubKey: pubKey}
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "9882", ConsensusPubKey: pubKey}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "9885"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2pimpl.NewHost(&leader, priKey)
@@ -34,7 +34,7 @@ func TestAddNewBlock(t *testing.T) {
 
 func TestVerifyNewBlock(t *testing.T) {
 	_, pubKey := utils.GenKey("1", "2")
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", BlsPubKey: pubKey}
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", ConsensusPubKey: pubKey}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "8885"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2pimpl.NewHost(&leader, priKey)

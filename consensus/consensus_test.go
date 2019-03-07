@@ -39,16 +39,16 @@ func TestRemovePeers(t *testing.T) {
 	_, pk4 := utils.GenKey("4", "4")
 	_, pk5 := utils.GenKey("5", "5")
 
-	p1 := p2p.Peer{IP: "127.0.0.1", Port: "19901", BlsPubKey: pk1}
-	p2 := p2p.Peer{IP: "127.0.0.1", Port: "19902", BlsPubKey: pk2}
-	p3 := p2p.Peer{IP: "127.0.0.1", Port: "19903", BlsPubKey: pk3}
-	p4 := p2p.Peer{IP: "127.0.0.1", Port: "19904", BlsPubKey: pk4}
+	p1 := p2p.Peer{IP: "127.0.0.1", Port: "19901", ConsensusPubKey: pk1}
+	p2 := p2p.Peer{IP: "127.0.0.1", Port: "19902", ConsensusPubKey: pk2}
+	p3 := p2p.Peer{IP: "127.0.0.1", Port: "19903", ConsensusPubKey: pk3}
+	p4 := p2p.Peer{IP: "127.0.0.1", Port: "19904", ConsensusPubKey: pk4}
 
 	peers := []p2p.Peer{p1, p2, p3, p4}
 
 	peerRemove := []p2p.Peer{p1, p2}
 
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "9000", BlsPubKey: pk5}
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "9000", ConsensusPubKey: pk5}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2pimpl.NewHost(&leader, priKey)
 	if err != nil {

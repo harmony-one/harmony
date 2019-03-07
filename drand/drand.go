@@ -91,13 +91,13 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer, confi
 	// Initialize cosign bitmap
 	allPublicKeys := make([]*bls.PublicKey, 0)
 	for _, validatorPeer := range peers {
-		allPublicKeys = append(allPublicKeys, validatorPeer.BlsPubKey)
+		allPublicKeys = append(allPublicKeys, validatorPeer.ConsensusPubKey)
 	}
-	allPublicKeys = append(allPublicKeys, leader.BlsPubKey)
+	allPublicKeys = append(allPublicKeys, leader.ConsensusPubKey)
 
 	dRand.PublicKeys = allPublicKeys
 
-	bitmap, _ := bls_cosi.NewMask(dRand.PublicKeys, dRand.leader.BlsPubKey)
+	bitmap, _ := bls_cosi.NewMask(dRand.PublicKeys, dRand.leader.ConsensusPubKey)
 	dRand.bitmap = bitmap
 
 	dRand.pRand = nil
@@ -139,7 +139,7 @@ func (dRand *DRand) AddPeers(peers []*p2p.Peer) int {
 		if !ok {
 			dRand.validators.Store(utils.GetUniqueIDFromPeer(*peer), *peer)
 			dRand.pubKeyLock.Lock()
-			dRand.PublicKeys = append(dRand.PublicKeys, peer.BlsPubKey)
+			dRand.PublicKeys = append(dRand.PublicKeys, peer.ConsensusPubKey)
 			dRand.pubKeyLock.Unlock()
 			utils.GetLogInstance().Debug("[DRAND]", "AddPeers", *peer)
 		}
@@ -238,7 +238,7 @@ func (dRand *DRand) getValidatorPeerByID(validatorID uint32) *p2p.Peer {
 func (dRand *DRand) ResetState() {
 	dRand.vrfs = &map[uint32][]byte{}
 
-	bitmap, _ := bls_cosi.NewMask(dRand.PublicKeys, dRand.leader.BlsPubKey)
+	bitmap, _ := bls_cosi.NewMask(dRand.PublicKeys, dRand.leader.ConsensusPubKey)
 	dRand.bitmap = bitmap
 	dRand.pRand = nil
 	dRand.rand = nil
@@ -246,8 +246,8 @@ func (dRand *DRand) ResetState() {
 
 // SetLeaderPubKey deserialize the public key of drand leader
 func (dRand *DRand) SetLeaderPubKey(k []byte) error {
-	dRand.leader.BlsPubKey = &bls.PublicKey{}
-	return dRand.leader.BlsPubKey.Deserialize(k)
+	dRand.leader.ConsensusPubKey = &bls.PublicKey{}
+	return dRand.leader.ConsensusPubKey.Deserialize(k)
 }
 
 // UpdatePublicKeys updates the PublicKeys variable, protected by a mutex

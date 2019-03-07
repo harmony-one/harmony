@@ -54,7 +54,7 @@ func NewPingMessage(peer p2p.Peer) *PingMessageType {
 	ping.Node.Port = peer.Port
 	ping.Node.PeerID = peer.PeerID
 	ping.Node.ValidatorID = peer.ValidatorID
-	ping.Node.PubKey = peer.BlsPubKey.Serialize()
+	ping.Node.PubKey = peer.ConsensusPubKey.Serialize()
 	ping.Node.Role = node.ValidatorRole
 
 	return ping
@@ -75,7 +75,7 @@ func NewPongMessage(peers []p2p.Peer, pubKeys []*bls.PublicKey, leaderKey *bls.P
 		n.Port = p.Port
 		n.ValidatorID = p.ValidatorID
 		n.PeerID = p.PeerID
-		n.PubKey = p.BlsPubKey.Serialize()
+		n.PubKey = p.ConsensusPubKey.Serialize()
 		if err != nil {
 			fmt.Printf("Error Marshal PubKey: %v", err)
 			continue

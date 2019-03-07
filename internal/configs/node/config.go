@@ -71,8 +71,8 @@ type ConfigType struct {
 	Host          p2p.Host
 	StakingPriKey *ecdsa.PrivateKey
 	P2pPriKey     p2p_crypto.PrivKey
-	BlsPriKey     *bls.SecretKey
-	BlsPubKey     *bls.PublicKey
+	ConsensusPriKey     *bls.SecretKey
+	ConsensusPubKey     *bls.PublicKey
 	MainDB        *ethdb.LDBDatabase
 	BeaconDB      *ethdb.LDBDatabase
 

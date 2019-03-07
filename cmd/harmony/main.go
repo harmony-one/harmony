@@ -127,8 +127,8 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	}
 
 	// Setup Bls keys
-	nodeConfig.BlsPriKey, nodeConfig.BlsPubKey = utils.GenKey(*ip, *port)
-	if nodeConfig.BlsPriKey == nil || nodeConfig.BlsPubKey == nil {
+	nodeConfig.ConsensusPriKey, nodeConfig.ConsensusPubKey = utils.GenKey(*ip, *port)
+	if nodeConfig.ConsensusPriKey == nil || nodeConfig.ConsensusPubKey == nil {
 		panic(fmt.Errorf("generate key error"))
 	}
 
@@ -138,7 +138,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 		nodeConfig.BeaconDB, _ = InitLDBDatabase(*ip, *port, *freshDB, true)
 	}
 
-	nodeConfig.SelfPeer = p2p.Peer{IP: *ip, Port: *port, ValidatorID: -1, BlsPubKey: nodeConfig.BlsPubKey}
+	nodeConfig.SelfPeer = p2p.Peer{IP: *ip, Port: *port, ValidatorID: -1, ConsensusPubKey: nodeConfig.ConsensusPubKey}
 	if *isLeader {
 		nodeConfig.StringRole = "leader"
 		nodeConfig.Leader = nodeConfig.SelfPeer
