@@ -133,9 +133,13 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	}
 
 	// Initialize leveldb for main blockchain and beacon.
-	nodeConfig.MainDB, _ = InitLDBDatabase(*ip, *port, *freshDB, false)
+	if nodeConfig.MainDB, err = InitLDBDatabase(*ip, *port, *freshDB, false); err != nil {
+		panic(err)
+	}
 	if !*isBeacon {
-		nodeConfig.BeaconDB, _ = InitLDBDatabase(*ip, *port, *freshDB, true)
+		if nodeConfig.BeaconDB, err = InitLDBDatabase(*ip, *port, *freshDB, true); err != nil {
+			panic(err)
+		}
 	}
 
 	nodeConfig.SelfPeer = p2p.Peer{IP: *ip, Port: *port, ValidatorID: -1, BlsPubKey: nodeConfig.BlsPubKey}
