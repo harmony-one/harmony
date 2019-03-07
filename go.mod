@@ -81,6 +81,8 @@ require (
 	github.com/multiformats/go-multibase v0.3.0 // indirect
 	github.com/multiformats/go-multihash v1.0.10 // indirect
 	github.com/multiformats/go-multistream v0.3.9 // indirect
+	github.com/pborman/uuid v1.2.0 // indirect
+	github.com/rjeczalik/notify v0.9.2 // indirect
 	github.com/rs/cors v1.6.0 // indirect
 	github.com/shirou/gopsutil v2.18.12+incompatible
 	github.com/shirou/w32 v0.0.0-20160930032740-bb4de0191aa4 // indirect

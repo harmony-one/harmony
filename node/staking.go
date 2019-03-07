@@ -2,16 +2,22 @@ package node
 
 import (
 	"crypto/ecdsa"
+	"math"
 	"math/big"
 	"os"
+	"strings"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/harmony-one/harmony/contracts"
 	"github.com/harmony-one/harmony/internal/utils/contract"
 
 	"github.com/harmony-one/harmony/internal/utils"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/harmony-one/harmony/core/types"
+	contract_constants "github.com/harmony-one/harmony/internal/utils/contract"
 )
 
 //constants related to staking
@@ -72,7 +78,65 @@ func (node *Node) UpdateStakingList(block *types.Block) error {
 	return nil
 }
 
+// UpdateStakingListWithABI updates staking information by querying the staking smart contract.
+func (node *Node) UpdateStakingListWithABI() {
+	abi, err := abi.JSON(strings.NewReader(contracts.StakeLockContractABI))
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to generate staking contract's ABI", "error", err)
+	}
+	bytesData, err := abi.Pack("listLockedAddresses")
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to generate ABI function bytes data", "error", err)
+	}
+
+	priKey := contract_constants.GenesisBeaconAccountPriKey
+	deployerAddress := crypto.PubkeyToAddress(priKey.PublicKey)
+
+	state, err := node.blockchain.State()
+
+	stakingContractAddress := crypto.CreateAddress(deployerAddress, uint64(0))
+	tx := types.NewTransaction(
+		state.GetNonce(deployerAddress),
+		stakingContractAddress,
+		0,
+		nil,
+		math.MaxUint64,
+		nil,
+		bytesData,
+	)
+	signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, priKey)
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to sign contract call tx", "error", err)
+		return
+	}
+	output, err := node.ContractCaller.CallContract(signedTx)
+
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to call staking contract", "error", err)
+		return
+	}
+
+	ret := new(struct {
+		LockedAddresses  []common.Address
+		BlockNums        []*big.Int
+		LockPeriodCounts []*big.Int
+	})
+
+	err = abi.Unpack(ret, "listLockedAddresses", output)
+
+	if err != nil {
+		utils.GetLogInstance().Error("[ABI] Failed to unpack contract result", "error", err, "output", output)
+	} else {
+		utils.GetLogInstance().Info("\n")
+		utils.GetLogInstance().Info("ABI [START] ------------------------------------")
+		utils.GetLogInstance().Info("", "result", ret)
+		utils.GetLogInstance().Info("ABI [END}   ------------------------------------")
+		utils.GetLogInstance().Info("\n")
+	}
+}
+
 func (node *Node) printStakingList() {
+	node.UpdateStakingListWithABI()
 	utils.GetLogInstance().Info("\n")
 	utils.GetLogInstance().Info("CURRENT STAKING INFO [START] ------------------------------------")
 	for addr, stake := range node.CurrentStakes {

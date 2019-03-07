@@ -289,11 +289,6 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) bool {
 // 2. [leader] send new block to the client
 func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 	utils.GetLogInstance().Info("PostConsensusProcessing")
-	if node.NodeConfig.Role() == nodeconfig.BeaconLeader {
-		utils.GetLogInstance().Info("Updating staking list")
-		node.UpdateStakingList(newBlock)
-		node.printStakingList()
-	}
 	if node.Consensus.IsLeader {
 		node.BroadcastNewBlock(newBlock)
 	}
@@ -305,6 +300,12 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 		go func() {
 			node.ConfirmedBlockChannel <- newBlock
 		}()
+	}
+
+	if node.NodeConfig.Role() == nodeconfig.BeaconLeader {
+		utils.GetLogInstance().Info("Updating staking list")
+		node.UpdateStakingList(newBlock)
+		node.printStakingList()
 	}
 }
 

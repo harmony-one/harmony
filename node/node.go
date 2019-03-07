@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/contracts"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
@@ -166,6 +168,9 @@ type Node struct {
 
 	// map of service type to its message channel.
 	serviceMessageChan map[service.Type]chan *msg_pb.Message
+
+	// Used to call smart contract locally
+	ContractCaller *contracts.ContractCaller
 }
 
 // Blockchain returns the blockchain from node
@@ -250,6 +255,8 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database) *N
 		node.AddStakingContractToPendingTransactions() //This will save the latest information about staked nodes in current staked
 		node.DepositToStakingAccounts()
 	}
+
+	node.ContractCaller = contracts.NewContractCaller(&db, node.blockchain, params.TestChainConfig)
 
 	if consensusObj != nil && consensusObj.IsLeader {
 		node.State = NodeLeader
