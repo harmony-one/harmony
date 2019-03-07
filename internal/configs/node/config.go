@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/harmony-one/harmony/p2p"
 )
 
@@ -54,15 +55,17 @@ const (
 // ConfigType is the structure of all node related configuration variables
 type ConfigType struct {
 	// The three groupID design, please refer to https://github.com/harmony-one/harmony/blob/master/node/node.md#libp2p-integration
-	beacon     p2p.GroupID // the beacon group ID
-	group      p2p.GroupID // the group ID of the shard
-	client     p2p.GroupID // the client group ID of the shard
-	isClient   bool        // whether this node is a client node, such as wallet/txgen
-	isBeacon   bool        // whether this node is a beacon node or not
-	isLeader   bool        // whether this node is a leader or not
-	shardID    uint32      // shardID of this node
-	role       Role        // Role of the node
-	stakingKey *ecdsa.PrivateKey
+	beacon   p2p.GroupID // the beacon group ID
+	group    p2p.GroupID // the group ID of the shard
+	client   p2p.GroupID // the client group ID of the shard
+	isClient bool        // whether this node is a client node, such as wallet/txgen
+	isBeacon bool        // whether this node is a beacon node or not
+	isLeader bool        // whether this node is a leader or not
+	shardID  uint32      // shardID of this node
+	role     Role        // Role of the node
+
+	StakingPriKey *ecdsa.PrivateKey
+	MainDB        *ethdb.LDBDatabase
 }
 
 // configs is a list of node configuration.

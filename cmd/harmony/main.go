@@ -85,7 +85,6 @@ var (
 	ip               = flag.String("ip", "127.0.0.1", "IP of the node")
 	port             = flag.String("port", "9000", "port of the node.")
 	logFolder        = flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
-	dbSupported      = flag.Bool("db_supported", true, "false means not db_supported, true means db_supported")
 	freshDB          = flag.Bool("fresh_db", false, "true means the existing disk based db will be removed")
 	profile          = flag.Bool("profile", false, "Turn on profiling (CPU, Memory).")
 	metricsReportURL = flag.String("metrics_report_url", "", "If set, reports metrics to this URL.")
@@ -140,6 +139,11 @@ func initSetup() {
 
 func createGlobalConfig() *nodeconfig.ConfigType {
 	nodeConfig := nodeconfig.GetGlobalConfig()
+	nodeConfig.StakingPriKey = node.LoadStakingKeyFromFile(*stakingKeyFile, *accountIndex)
+
+	// Initialize leveldb if dbSupported.
+	nodeConfig.MainDB, _ = InitLDBDatabase(*ip, *port, *freshDB, false)
+
 	return nodeConfig
 }
 
@@ -148,6 +152,7 @@ func main() {
 	flag.Parse()
 
 	initSetup()
+	nodeConfig := createGlobalConfig()
 
 	var shardID = "0"
 	var peers []p2p.Peer
@@ -155,8 +160,6 @@ func main() {
 	var selfPeer p2p.Peer
 	var clientPeer *p2p.Peer
 	var role string
-
-	stakingPriKey := node.LoadStakingKeyFromFile(*stakingKeyFile, *accountIndex)
 
 	p2pPriKey, _, err := utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
@@ -178,12 +181,6 @@ func main() {
 
 	// Init logging.
 	loggingInit(*logFolder, role, *ip, *port, *onlyLogTps)
-
-	// Initialize leveldb if dbSupported.
-	var ldb *ethdb.LDBDatabase
-	if *dbSupported {
-		ldb, _ = InitLDBDatabase(*ip, *port, *freshDB, false)
-	}
 
 	host, err := p2pimpl.NewHost(&selfPeer, p2pPriKey)
 	if *logConn {
@@ -210,10 +207,10 @@ func main() {
 	}
 
 	// Current node.
-	currentNode := node.New(host, consensus, ldb)
+	currentNode := node.New(host, consensus, nodeConfig.MainDB)
 	currentNode.Consensus.OfflinePeers = currentNode.OfflinePeers
 	currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
-	currentNode.AccountKey = stakingPriKey
+	currentNode.AccountKey = nodeConfig.StakingPriKey
 
 	// TODO: refactor the creation of blockchain out of node.New()
 	consensus.ChainReader = currentNode.Blockchain()
@@ -226,10 +223,7 @@ func main() {
 		}
 		currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
 	} else {
-		var beacondb ethdb.Database
-		if *dbSupported {
-			beacondb, _ = InitLDBDatabase(*ip, *port, *freshDB, true)
-		}
+		beacondb, _ := InitLDBDatabase(*ip, *port, *freshDB, true)
 		currentNode.AddBeaconChainDatabase(beacondb)
 
 		if *isNewNode {
