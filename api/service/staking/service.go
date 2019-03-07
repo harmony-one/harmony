@@ -3,7 +3,10 @@ package staking
 import (
 	"crypto/ecdsa"
 	"math/big"
+	"os"
 	"time"
+
+	"github.com/ethereum/go-ethereum/accounts/abi"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -98,6 +101,14 @@ func (s *Service) IsStaked() bool {
 // DoService does staking.
 func (s *Service) DoService() {
 	utils.GetLogInstance().Info("Trying to send a staking transaction.")
+	abi, err := s.getStakeLockContractABI()
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to generate staking contract's ABI", "error", err)
+	} else {
+		utils.GetLogInstance().Info("Generated staking contract's ABI", "abi", abi)
+	}
+	// TODO: use abi to generate staking transaction.
+
 	if s.beaconChain == nil {
 		utils.GetLogInstance().Info("Can not send a staking transaction because of nil beacon chain.")
 		return
@@ -108,6 +119,17 @@ func (s *Service) DoService() {
 	} else {
 		utils.GetLogInstance().Error("Can not create staking transaction")
 	}
+}
+
+func (s *Service) getStakeLockContractABI() (abi.ABI, error) {
+	f, err := os.Open("./contracts/StakeLockContract.json")
+	if err != nil {
+		if os.IsNotExist(err) {
+			return abi.ABI{}, err
+		}
+	}
+	defer f.Close()
+	return abi.JSON(f)
 }
 
 func (s *Service) getStakingInfo() *proto.StakingContractInfoResponse {
