@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"strings"
 	"sync"
 	"time"
 
@@ -114,27 +113,32 @@ func (s *Service) Run() {
 
 // DoService does network info.
 func (s *Service) DoService() {
+	_, ipv4Net, err := net.ParseCIDR("100.64.0.0/10")
+	if err != nil {
+		utils.GetLogInstance().Error("can't parse CIDR", "error", err)
+		return
+	}
 	for {
 		select {
 		case peer := <-s.peerInfo:
 			if peer.ID != s.Host.GetP2PHost().ID() && len(peer.ID) > 0 {
-				//				utils.GetLogInstance().Info("Found Peer", "peer", peer.ID, "addr", peer.Addrs, "my ID", s.Host.GetP2PHost().ID())
+				//	utils.GetLogInstance().Info("Found Peer", "peer", peer.ID, "addr", peer.Addrs, "my ID", s.Host.GetP2PHost().ID())
 				if err := s.Host.GetP2PHost().Connect(s.ctx, peer); err != nil {
 					utils.GetLogInstance().Warn("can't connect to peer node", "error", err)
 				} else {
 					utils.GetLogInstance().Info("connected to peer node", "peer", peer)
 				}
 				// figure out the public ip/port
-				ip := "127.0.0.1"
-				var port string
+				var ip, port string
+
 				for _, addr := range peer.Addrs {
 					netaddr, err := manet.ToNetAddr(addr)
 					if err != nil {
 						continue
 					}
-					nip := netaddr.(*net.TCPAddr).IP.String()
-					if strings.Compare(nip, "127.0.0.1") != 0 {
-						ip = nip
+					nip := netaddr.(*net.TCPAddr).IP
+					if nip.IsGlobalUnicast() || ipv4Net.Contains(nip) {
+						ip = nip.String()
 						port = fmt.Sprintf("%d", netaddr.(*net.TCPAddr).Port)
 						break
 					}
