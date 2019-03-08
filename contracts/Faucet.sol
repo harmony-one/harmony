@@ -1,4 +1,5 @@
-pragma solidity >=0.4.22 <0.6.0;
+pragma solidity >=0.4.22;
+
 contract Faucet {
     mapping(address => bool) processed;
     uint quota = 10 ether;
