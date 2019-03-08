@@ -10,7 +10,7 @@ In mainnet launch, we expect to launch one shard beacon chain and at least 2 reg
 
 Blockchain data archival is very important for main launch as this is the last option to recover the network if any emergency happens such as the network getting shutdown or restarted.
 
-The goal of this effort is to design archival system run by Harmony to store block chain of beacon chain and other shard chains in both testnet (beacon chain only) and mainnet (1 + 2 model).
+The goal of this effort is to design archival system run by Harmony and separated from Harmony blockchain to backup block chain of beacon chain and other shard chains in both testnet (beacon chain only) and mainnet (1 + 2 model).
 
 Specifically, if we run in testnet with on beacon chain we want to have a system to back up all data of beacon chain on the fly. And if we run in mainnet with beacon chain and N other shard chain, we want to back up all data of beacon chain and shard chain each.
 
@@ -44,7 +44,10 @@ Put and Delete are two methods to modify data in db.
 
 ### First proposal
 
-For each shard chain or beacon chain we'd set up a leveldb db and deploy a corresponding server which listen to receive Put and Delete operation together with key and value data, then execute the same operation with the same key, value in the leveldb db.
+At the backup side, there are two options:
+
+- For each shard chain or beacon chain we'd set up a leveldb db and deploy a corresponding server which listen to receive Put and Delete operation together with key and value data, then execute the same operation with the same key, value in the leveldb db.
+- We only need to set up and deploy one single server but with multiple leveldb. This server will listen from all beacon chain and shard chain to receive Put and Delete operation together with key and value data, then execute the same operation with the same key, value in the leveldb db.
 
 #### What needs to implement in our code
 
@@ -90,3 +93,10 @@ message DeleteResponse {
 }
 
 ```
+
+#### Using backup data to restart beacon chain/shard chain.
+
+We need to add some logic for our blockchain to pick up backup data and restart the blockchain.
+
+- Specifically, for testnet we need to add some logi so that it can configure from the backup data and restart smoothly.
+- For mainnet, we need to add some logic so that each shard and beacon chain can configure from back data, respectively, and restart all shard chain and beacon chain.
