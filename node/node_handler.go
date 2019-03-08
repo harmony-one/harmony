@@ -268,7 +268,7 @@ func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 
 // VerifyNewBlock is called by consensus participants to verify the block (account model) they are running consensus on
 func (node *Node) VerifyNewBlock(newBlock *types.Block) bool {
-	err := node.blockchain.ValidateNewBlock(newBlock, pki.GetAddressFromPublicKey(node.SelfPeer.PubKey))
+	err := node.blockchain.ValidateNewBlock(newBlock, pki.GetAddressFromPublicKey(node.SelfPeer.BlsPubKey))
 	if err != nil {
 		utils.GetLogInstance().Debug("Failed verifying new block", "Error", err, "tx", newBlock.Transactions()[0])
 		return false
@@ -343,8 +343,8 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 	peer.PeerID = ping.Node.PeerID
 	peer.ValidatorID = ping.Node.ValidatorID
 
-	peer.PubKey = &bls.PublicKey{}
-	err = peer.PubKey.Deserialize(ping.Node.PubKey[:])
+	peer.BlsPubKey = &bls.PublicKey{}
+	err = peer.BlsPubKey.Deserialize(ping.Node.PubKey[:])
 	if err != nil {
 		utils.GetLogInstance().Error("UnmarshalBinary Failed", "error", err)
 		return -1
@@ -450,8 +450,8 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		peer.ValidatorID = p.ValidatorID
 		peer.PeerID = p.PeerID
 
-		peer.PubKey = &bls.PublicKey{}
-		err = peer.PubKey.Deserialize(p.PubKey[:])
+		peer.BlsPubKey = &bls.PublicKey{}
+		err = peer.BlsPubKey.Deserialize(p.PubKey[:])
 		if err != nil {
 			utils.GetLogInstance().Error("UnmarshalBinary Failed", "error", err)
 			continue

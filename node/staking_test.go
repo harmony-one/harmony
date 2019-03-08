@@ -21,7 +21,7 @@ var (
 func TestUpdateStakingList(t *testing.T) {
 
 	_, pubKey := utils.GenKey("1", "2")
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "9882", PubKey: pubKey}
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "9882", BlsPubKey: pubKey}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "9885"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2pimpl.NewHost(&leader, priKey)

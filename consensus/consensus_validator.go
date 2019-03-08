@@ -91,7 +91,7 @@ func (consensus *Consensus) processAnnounceMessage(message *msg_pb.Message) {
 	copy(consensus.blockHash[:], blockHash[:])
 	consensus.block = block
 
-	if err := consensus.checkConsensusMessage(message, consensus.leader.PubKey); err != nil {
+	if err := consensus.checkConsensusMessage(message, consensus.leader.BlsPubKey); err != nil {
 		utils.GetLogInstance().Debug("Failed to check the leader message")
 		if err == consensus_engine.ErrConsensusIDNotMatch {
 			utils.GetLogInstance().Debug("sending bft block to state syncing")
@@ -152,7 +152,7 @@ func (consensus *Consensus) processPreparedMessage(message *msg_pb.Message) {
 	// Update readyByConsensus for attack.
 	attack.GetInstance().UpdateConsensusReady(consensusID)
 
-	if err := consensus.checkConsensusMessage(message, consensus.leader.PubKey); err != nil {
+	if err := consensus.checkConsensusMessage(message, consensus.leader.BlsPubKey); err != nil {
 		utils.GetLogInstance().Debug("processPreparedMessage error", "error", err)
 		return
 	}
@@ -213,7 +213,7 @@ func (consensus *Consensus) processCommittedMessage(message *msg_pb.Message) {
 	// Update readyByConsensus for attack.
 	attack.GetInstance().UpdateConsensusReady(consensusID)
 
-	if err := consensus.checkConsensusMessage(message, consensus.leader.PubKey); err != nil {
+	if err := consensus.checkConsensusMessage(message, consensus.leader.BlsPubKey); err != nil {
 		utils.GetLogInstance().Debug("processCommittedMessage error", "error", err)
 		return
 	}

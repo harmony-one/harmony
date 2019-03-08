@@ -113,7 +113,7 @@ cleanup
 # Also it's recommended to use `go build` for testing the whole exe. 
 pushd $ROOT
 echo "compiling ..."
-go build -o bin/harmony cmd/harmony.go
+go build -o bin/harmony cmd/harmony/main.go
 go build -o bin/txgen cmd/client/txgen/main.go
 go build -o bin/bootnode cmd/bootnode/main.go
 popd

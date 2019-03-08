@@ -4,10 +4,14 @@
 package nodeconfig
 
 import (
+	"crypto/ecdsa"
 	"fmt"
 	"sync"
 
+	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/p2p"
+	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
 )
 
 // Role defines a role of a node.
@@ -61,6 +65,19 @@ type ConfigType struct {
 	isLeader bool        // whether this node is a leader or not
 	shardID  uint32      // shardID of this node
 	role     Role        // Role of the node
+
+	ShardIDString string
+	StringRole    string
+	Host          p2p.Host
+	StakingPriKey *ecdsa.PrivateKey
+	P2pPriKey     p2p_crypto.PrivKey
+	BlsPriKey     *bls.SecretKey
+	BlsPubKey     *bls.PublicKey
+	MainDB        *ethdb.LDBDatabase
+	BeaconDB      *ethdb.LDBDatabase
+
+	SelfPeer p2p.Peer
+	Leader   p2p.Peer
 }
 
 // configs is a list of node configuration.
@@ -78,6 +95,11 @@ func GetConfigs(index int) *ConfigType {
 		return nil
 	}
 	return &configs[index]
+}
+
+// GetGlobalConfig returns global config.
+func GetGlobalConfig() *ConfigType {
+	return GetConfigs(Global)
 }
 
 func (conf *ConfigType) String() string {

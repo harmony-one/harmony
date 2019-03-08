@@ -62,16 +62,17 @@ It should cover the basic function to pass, to fail, and error conditions.
 * passing criteria : the new node can join in the consensus after state syncing
 * dependency
 * note
-* automated?
+* automated? N
 ---
 * test case # : SS2
-* description :
-* test procedure :
-* passing criteria
+* description : network connectivity issues 
+* test procedure :  node experiences network connectivity issues or is down and then regains connectivity
+* passing criteria : the node is able to sync back to current state of blockchain from the point where it dropped off
 * dependency
 * note
-* automated?
+* automated? N
 ---
+
 ### consensus
 
 * test case # : CS1
@@ -82,14 +83,7 @@ It should cover the basic function to pass, to fail, and error conditions.
 * note
 * automated?
 ---
-* test case # : CS2
-* description :
-* test procedure :
-* passing criteria
-* dependency
-* note
-* automated?
----
+
 ### drand
 
 * test case # : DR1
@@ -100,7 +94,6 @@ It should cover the basic function to pass, to fail, and error conditions.
 * note
 * automated?
 ---
-
 * test case # : DR2
 * description :
 * test procedure :
@@ -109,6 +102,26 @@ It should cover the basic function to pass, to fail, and error conditions.
 * note
 * automated?
 ---
+
+### smartcontract
+
+* test case # : SC1
+* description : deploy ERC20 smart contract in 1 shard
+* test procedure : smart contract is deployed in a automated fashion e.g. erc20 (utility) token contract
+* passing criteria: ability to interact with smart contract e.g. transfer erc20 tokens from one address to another
+* dependency
+* note
+* automated?
+---
+* test case # : SC2
+* description : deploy ERC721 (non-fungible tokens) smart contract in 1 shard
+* test procedure : smart contract is deployed in a automated fashion e.g. smart contract like Cryptokitties
+* passing criteria: ability to succesfully transfer the non-fungible token from one address to another via transaction
+* dependency
+* note
+* automated?
+---
+
 ### staking
 
 * test case # : SK1
@@ -127,6 +140,7 @@ It should cover the basic function to pass, to fail, and error conditions.
 * note
 * automated?
 ---
+
 ### resharding
 
 * test case # : RS1
@@ -137,6 +151,23 @@ It should cover the basic function to pass, to fail, and error conditions.
 * note
 * automated?
 ---
+* test case # : RS2
+* description : reshard with 2 shards 
+* test procedure : 0 new nodes join the network for the new epoch
+* passing criteria : a new leader should be selected
+* dependency
+* note
+* automated?
+---
+* test case # : RS3
+* description : reshard with 2 shards with 250 nodes each
+* test procedure : 50 to 250 new nodes join the network for the new epoch
+* passing criteria : a new leader should be selected
+* dependency
+* note
+* automated?
+---
+
 ### transaction
 
 * test case # : TX1
@@ -147,6 +178,7 @@ It should cover the basic function to pass, to fail, and error conditions.
 * note
 * automated?
 ---
+
 ### view change
 
 * test case # : VC1
@@ -157,7 +189,6 @@ It should cover the basic function to pass, to fail, and error conditions.
 * note
 * automated?
 ---
-
 * test case # : VC2
 * description : change malicious leader
 * test procedure : started beacon chain with 50 nodes, leader started consensus and offline, after sometime, a new leader is selected
@@ -168,16 +199,56 @@ It should cover the basic function to pass, to fail, and error conditions.
 ---
 
 ## stress test
+
 ### protocol level stress
+
 * test case # : STP1
 * description : 
-* test procedure :
-* passing criteria
+* test procedure : increase number of txns in block from 1000 to 10,000, stepwise
+* evaluation: change in block latency per shard/change in transactions per sec, per shard.
 * dependency
 * note
 * automated?
+---
+* test case # : STP2
+* description : increasing number of nodes in a shard
+* test procedure : increase number of nodes in a shard from 100 to 1000
+* evaluation: change in latency per shard/change in transactions per sec, per shard.
+* dependency
+* note
+* automated?
+---
+* test case # : STP3
+* description :  epoch change with increasing number of nodes in shard
+* test procedure : initiate epoch change with increasing number of nodes in a shard from 100 to 1000
+* evaluation: latency in leader election
+* dependency
+* note
+* automated?
+---
+
+## epoch change stress
+
+* test case # : EC1
+* description : hight waiting nodes
+* test procedure : for 5 shards having 200 nodes each initiate epoch change with 10,000 nodes waiting
+* evaluation: latency in leader election/resharding
+* dependency
+* note
+* automated?
+---
 
 ### networking level stress
+
+* test case # : NT1
+* description : 
+* test procedure : start consensus with a peer-p2p network of 50 peers, increase it to 1000 peers, send 1 ping message every 100 ms.
+* evaluation: change in latency per shard/change in transactions per sec, per shard.
+* dependency
+* note
+* automated?
+---
+
 ### transaction stress
 
 * test case # : STX1
