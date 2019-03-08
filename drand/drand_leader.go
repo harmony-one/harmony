@@ -74,7 +74,7 @@ func (dRand *DRand) init(epochBlock *types.Block) {
 
 	(*dRand.vrfs)[dRand.nodeID] = append(rand[:], proof...)
 
-	utils.GetLogInstance().Info("[DRG] sent init", "msg", msgToSend, "leader.PubKey", dRand.leader.BlsPubKey)
+	utils.GetLogInstance().Info("[DRG] sent init", "msg", msgToSend, "leader.PubKey", dRand.leader.ConsensusPubKey)
 	dRand.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
 }
 
@@ -114,9 +114,9 @@ func (dRand *DRand) processCommitMessage(message drand_proto.Message) {
 	}
 
 	// Verify message signature
-	err := verifyMessageSig(validatorPeer.BlsPubKey, message)
+	err := verifyMessageSig(validatorPeer.ConsensusPubKey, message)
 	if err != nil {
-		utils.GetLogInstance().Warn("[DRAND] failed to verify the message signature", "Error", err, "PubKey", validatorPeer.BlsPubKey)
+		utils.GetLogInstance().Warn("[DRAND] failed to verify the message signature", "Error", err, "PubKey", validatorPeer.ConsensusPubKey)
 		return
 	}
 
@@ -136,7 +136,7 @@ func (dRand *DRand) processCommitMessage(message drand_proto.Message) {
 	utils.GetLogInstance().Debug("Received new VRF commit", "numReceivedSoFar", len((*vrfs)), "validatorID", validatorID, "PublicKeys", len(dRand.PublicKeys))
 
 	(*vrfs)[validatorID] = message.Payload
-	dRand.bitmap.SetKey(validatorPeer.BlsPubKey, true) // Set the bitmap indicating that this validator signed.
+	dRand.bitmap.SetKey(validatorPeer.ConsensusPubKey, true) // Set the bitmap indicating that this validator signed.
 
 	if len((*vrfs)) >= ((len(dRand.PublicKeys))/3 + 1) {
 		// Construct pRand and initiate consensus on it

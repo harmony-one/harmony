@@ -244,7 +244,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database) *N
 		node.BeaconBlockChannel = make(chan *types.Block)
 
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, params.TestChainConfig, chain)
-		node.Worker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.BlsPubKey), node.Consensus.ShardID)
+		node.Worker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.ConsensusPubKey), node.Consensus.ShardID)
 
 		utils.GetLogInstance().Debug("Created Genesis Block", "blockHash", chain.GetBlockByNumber(0).Hash().Hex())
 		node.Consensus.ConsensusBlock = make(chan *consensus.BFTBlockInfo)
@@ -470,5 +470,5 @@ func (node *Node) AddBeaconChainDatabase(db ethdb.Database) {
 		os.Exit(1)
 	}
 	node.beaconChain = chain
-	node.BeaconWorker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.BlsPubKey), node.Consensus.ShardID)
+	node.BeaconWorker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.ConsensusPubKey), node.Consensus.ShardID)
 }

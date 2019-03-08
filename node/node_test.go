@@ -19,7 +19,7 @@ import (
 
 func TestNewNode(t *testing.T) {
 	_, pubKey := utils.GenKey("1", "2")
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", BlsPubKey: pubKey}
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", ConsensusPubKey: pubKey}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "8885"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2pimpl.NewHost(&leader, priKey)
@@ -43,7 +43,7 @@ func TestNewNode(t *testing.T) {
 
 func TestGetSyncingPeers(t *testing.T) {
 	_, pubKey := utils.GenKey("1", "2")
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", BlsPubKey: pubKey}
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", ConsensusPubKey: pubKey}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "8885"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2pimpl.NewHost(&leader, priKey)
@@ -73,20 +73,20 @@ func TestAddPeers(t *testing.T) {
 
 	peers1 := []*p2p.Peer{
 		&p2p.Peer{
-			IP:          "127.0.0.1",
-			Port:        "8888",
-			BlsPubKey:   pubKey1,
-			ValidatorID: 1,
+			IP:              "127.0.0.1",
+			Port:            "8888",
+			ConsensusPubKey: pubKey1,
+			ValidatorID:     1,
 		},
 		&p2p.Peer{
-			IP:          "127.0.0.1",
-			Port:        "9999",
-			BlsPubKey:   pubKey2,
-			ValidatorID: 2,
+			IP:              "127.0.0.1",
+			Port:            "9999",
+			ConsensusPubKey: pubKey2,
+			ValidatorID:     2,
 		},
 	}
 	_, pubKey := utils.GenKey("1", "2")
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "8982", BlsPubKey: pubKey}
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "8982", ConsensusPubKey: pubKey}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "8985"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2pimpl.NewHost(&leader, priKey)
@@ -116,22 +116,22 @@ func TestAddBeaconPeer(t *testing.T) {
 
 	peers1 := []*p2p.Peer{
 		&p2p.Peer{
-			IP:          "127.0.0.1",
-			Port:        "8888",
-			BlsPubKey:   pubKey1,
-			ValidatorID: 1,
-			PeerID:      "1234",
+			IP:              "127.0.0.1",
+			Port:            "8888",
+			ConsensusPubKey: pubKey1,
+			ValidatorID:     1,
+			PeerID:          "1234",
 		},
 		&p2p.Peer{
-			IP:          "127.0.0.1",
-			Port:        "9999",
-			BlsPubKey:   pubKey2,
-			ValidatorID: 2,
-			PeerID:      "4567",
+			IP:              "127.0.0.1",
+			Port:            "9999",
+			ConsensusPubKey: pubKey2,
+			ValidatorID:     2,
+			PeerID:          "4567",
 		},
 	}
 	_, pubKey := utils.GenKey("1", "2")
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "8982", BlsPubKey: pubKey}
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "8982", ConsensusPubKey: pubKey}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "8985"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2pimpl.NewHost(&leader, priKey)
@@ -161,9 +161,9 @@ func sendPingMessage(node *Node, leader p2p.Peer) {
 	pubKey1 := pki.GetBLSPrivateKeyFromInt(333).GetPublicKey()
 
 	p1 := p2p.Peer{
-		IP:        "127.0.0.1",
-		Port:      "9999",
-		BlsPubKey: pubKey1,
+		IP:              "127.0.0.1",
+		Port:            "9999",
+		ConsensusPubKey: pubKey1,
 	}
 
 	ping1 := proto_discovery.NewPingMessage(p1)
@@ -174,14 +174,14 @@ func sendPongMessage(node *Node, leader p2p.Peer) {
 	pubKey1 := pki.GetBLSPrivateKeyFromInt(333).GetPublicKey()
 	pubKey2 := pki.GetBLSPrivateKeyFromInt(444).GetPublicKey()
 	p1 := p2p.Peer{
-		IP:        "127.0.0.1",
-		Port:      "9998",
-		BlsPubKey: pubKey1,
+		IP:              "127.0.0.1",
+		Port:            "9998",
+		ConsensusPubKey: pubKey1,
 	}
 	p2 := p2p.Peer{
-		IP:        "127.0.0.1",
-		Port:      "9999",
-		BlsPubKey: pubKey2,
+		IP:              "127.0.0.1",
+		Port:            "9999",
+		ConsensusPubKey: pubKey2,
 	}
 
 	pubKeys := []*bls.PublicKey{pubKey1, pubKey2}
@@ -200,7 +200,7 @@ func exitServer() {
 
 func TestPingPongHandler(t *testing.T) {
 	_, pubKey := utils.GenKey("127.0.0.1", "8881")
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "8881", BlsPubKey: pubKey}
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "8881", ConsensusPubKey: pubKey}
 	//   validator := p2p.Peer{IP: "127.0.0.1", Port: "9991"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2pimpl.NewHost(&leader, priKey)

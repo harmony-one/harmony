@@ -57,9 +57,9 @@ It should cover the basic function to pass, to fail, and error conditions.
 ### state syncing
 
 * test case # : SS1
-* description : beacon chain node ss
-* test procedure : one new beacon node join in the beacon chain after beacon chain reach a few consensuses
-* passing criteria : the new node can join in the consensus after state syncing
+* description : node state sync basic
+* test procedure :  node joins network and is able to sync to latest block
+* passing criteria : blockheight of node is equal to that of the shards blockchain and node has joined consensus.
 * dependency
 * note
 * automated? N
@@ -68,6 +68,14 @@ It should cover the basic function to pass, to fail, and error conditions.
 * description : network connectivity issues 
 * test procedure :  node experiences network connectivity issues or is down and then regains connectivity
 * passing criteria : the node is able to sync back to current state of blockchain from the point where it dropped off
+* dependency
+* note
+* automated? N
+---
+* test case # : SS1
+* description : beacon chain node ss
+* test procedure : one new beacon node join in the beacon chain after beacon chain reach a few consensuses
+* passing criteria : the new node can join in the consensus after state syncing
 * dependency
 * note
 * automated? N
