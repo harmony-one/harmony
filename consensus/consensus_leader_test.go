@@ -30,7 +30,7 @@ func TestProcessMessageLeaderPrepare(test *testing.T) {
 	defer ctrl.Finish()
 
 	leader := p2p.Peer{IP: ip, Port: "7777"}
-	_, leader.BlsPubKey = utils.GenKey(leader.IP, leader.Port)
+	_, leader.ConsensusPubKey = utils.GenKey(leader.IP, leader.Port)
 
 	validators := make([]p2p.Peer, 3)
 	hosts := make([]p2p.Host, 3)
@@ -38,7 +38,7 @@ func TestProcessMessageLeaderPrepare(test *testing.T) {
 	for i := 0; i < 3; i++ {
 		port := fmt.Sprintf("%d", 7788+i)
 		validators[i] = p2p.Peer{IP: ip, Port: port, ValidatorID: i + 1}
-		_, validators[i].BlsPubKey = utils.GenKey(validators[i].IP, validators[i].Port)
+		_, validators[i].ConsensusPubKey = utils.GenKey(validators[i].IP, validators[i].Port)
 	}
 
 	m := mock_host.NewMockHost(ctrl)
@@ -76,7 +76,7 @@ func TestProcessMessageLeaderPrepareInvalidSignature(test *testing.T) {
 	defer ctrl.Finish()
 
 	leader := p2p.Peer{IP: ip, Port: "7777"}
-	_, leader.BlsPubKey = utils.GenKey(leader.IP, leader.Port)
+	_, leader.ConsensusPubKey = utils.GenKey(leader.IP, leader.Port)
 
 	validators := make([]p2p.Peer, 3)
 	hosts := make([]p2p.Host, 3)
@@ -84,7 +84,7 @@ func TestProcessMessageLeaderPrepareInvalidSignature(test *testing.T) {
 	for i := 0; i < 3; i++ {
 		port := fmt.Sprintf("%d", 7788+i)
 		validators[i] = p2p.Peer{IP: ip, Port: port, ValidatorID: i + 1}
-		_, validators[i].BlsPubKey = utils.GenKey(validators[i].IP, validators[i].Port)
+		_, validators[i].ConsensusPubKey = utils.GenKey(validators[i].IP, validators[i].Port)
 	}
 
 	m := mock_host.NewMockHost(ctrl)
@@ -130,7 +130,7 @@ func TestProcessMessageLeaderCommit(test *testing.T) {
 	defer ctrl.Finish()
 
 	leader := p2p.Peer{IP: ip, Port: "8889"}
-	_, leader.BlsPubKey = utils.GenKey(leader.IP, leader.Port)
+	_, leader.ConsensusPubKey = utils.GenKey(leader.IP, leader.Port)
 
 	validators := make([]p2p.Peer, 3)
 	hosts := make([]p2p.Host, 3)
@@ -138,7 +138,7 @@ func TestProcessMessageLeaderCommit(test *testing.T) {
 	for i := 0; i < 3; i++ {
 		port := fmt.Sprintf("%d", 8788+i)
 		validators[i] = p2p.Peer{IP: ip, Port: port, ValidatorID: i + 1}
-		_, validators[i].BlsPubKey = utils.GenKey(validators[i].IP, validators[i].Port)
+		_, validators[i].ConsensusPubKey = utils.GenKey(validators[i].IP, validators[i].Port)
 	}
 
 	m := mock_host.NewMockHost(ctrl)

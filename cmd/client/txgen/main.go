@@ -83,7 +83,7 @@ func main() {
 		panic(fmt.Errorf("generate key error"))
 	}
 
-	selfPeer := p2p.Peer{IP: *ip, Port: *port, ValidatorID: -1, BlsPubKey: peerPubKey}
+	selfPeer := p2p.Peer{IP: *ip, Port: *port, ValidatorID: -1, ConsensusPubKey: peerPubKey}
 
 	// Init with LibP2P enabled, FIXME: (leochen) right now we support only one shard
 	shardIDLeaderMap = make(map[uint32]p2p.Peer)
