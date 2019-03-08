@@ -35,7 +35,6 @@ func (node *Node) UpdateStakingList(block *types.Block) error {
 		txn := txns[i]
 		toAddress := txn.To()
 		if toAddress != nil && *toAddress != node.StakingContractAddress { //Not a address aimed at the staking contract.
-			utils.GetLogInstance().Info("Mismatched Staking Contract Address", "expected", node.StakingContractAddress.Hex(), "got", toAddress.Hex())
 			continue
 		}
 		currentSender, _ := types.Sender(signerType, txn)

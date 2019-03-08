@@ -18,7 +18,7 @@ func TestService(t *testing.T) {
 	if peerPriKey == nil || peerPubKey == nil {
 		t.Fatal("generate key error")
 	}
-	selfPeer := p2p.Peer{IP: "127.0.0.1", Port: "12345", ValidatorID: -1, BlsPubKey: peerPubKey}
+	selfPeer := p2p.Peer{IP: "127.0.0.1", Port: "12345", ValidatorID: -1, ConsensusPubKey: peerPubKey}
 
 	host, err := p2pimpl.NewHost(&selfPeer, nodePriKey)
 	if err != nil {
