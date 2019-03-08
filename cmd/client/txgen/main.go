@@ -72,7 +72,7 @@ func main() {
 		utils.BootNodes = bootNodeAddrs
 	}
 
-	var shardIDLeaderMap map[uint32]p2p.Peer
+	var shardIDs []uint32
 	nodePriKey, _, err := utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
 		panic(err)
@@ -86,13 +86,12 @@ func main() {
 	selfPeer := p2p.Peer{IP: *ip, Port: *port, ValidatorID: -1, ConsensusPubKey: peerPubKey}
 
 	// Init with LibP2P enabled, FIXME: (leochen) right now we support only one shard
-	shardIDLeaderMap = make(map[uint32]p2p.Peer)
-	shardIDLeaderMap[0] = p2p.Peer{}
+	shardIDs = append(shardIDs, 0)
 
 	// Do cross shard tx if there are more than one shard
 	setting := txgen.Settings{
 		NumOfAddress:      10000,
-		CrossShard:        len(shardIDLeaderMap) > 1,
+		CrossShard:        len(shardIDs) > 1,
 		MaxNumTxsPerBatch: *maxNumTxsPerBatch,
 		CrossShardRatio:   *crossShardRatio,
 	}
@@ -112,7 +111,7 @@ func main() {
 	if err != nil {
 		panic("unable to new host in txgen")
 	}
-	for shardID := range shardIDLeaderMap {
+	for _, shardID := range shardIDs {
 		node := node.New(host, &consensus.Consensus{ShardID: shardID}, nil)
 		// Assign many fake addresses so we have enough address to play with at first
 		nodes = append(nodes, node)
@@ -121,7 +120,7 @@ func main() {
 	// Client/txgenerator server node setup
 	consensusObj := consensus.New(host, "0", nil, p2p.Peer{})
 	clientNode := node.New(host, consensusObj, nil)
-	clientNode.Client = client.NewClient(clientNode.GetHost(), shardIDLeaderMap)
+	clientNode.Client = client.NewClient(clientNode.GetHost(), shardIDs)
 
 	readySignal := make(chan uint32)
 
@@ -161,7 +160,7 @@ func main() {
 		// wait for 3 seconds for client to send ping message to leader
 		// FIXME (leo) the readySignal should be set once we really sent ping message to leader
 		time.Sleep(3 * time.Second) // wait for nodes to be ready
-		for i := range shardIDLeaderMap {
+		for _, i := range shardIDs {
 			readySignal <- i
 		}
 	}()
@@ -194,7 +193,7 @@ func main() {
 			lock.Lock()
 			for shardID, txs := range shardIDTxsMap { // Send the txs to corresponding shards
 				go func(shardID uint32, txs types.Transactions) {
-					SendTxsToLeader(clientNode, shardIDLeaderMap[shardID], txs)
+					SendTxsToShard(clientNode, txs)
 				}(shardID, txs)
 			}
 			lock.Unlock()
@@ -211,15 +210,8 @@ func main() {
 	time.Sleep(3 * time.Second)
 }
 
-// SendTxsToLeader sends txs to leader account.
-func SendTxsToLeader(clientNode *node.Node, leader p2p.Peer, txs types.Transactions) {
-	utils.GetLogInstance().Debug("[Generator] Sending account-based txs to...", "leader", leader, "numTxs", len(txs))
+// SendTxsToShard sends txs to shard, currently just to beacon shard
+func SendTxsToShard(clientNode *node.Node, txs types.Transactions) {
 	msg := proto_node.ConstructTransactionListMessageAccount(txs)
 	clientNode.GetHost().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeaconClient}, p2p_host.ConstructP2pMessage(byte(0), msg))
-}
-
-func debugPrintShardIDLeaderMap(leaderMap map[uint32]p2p.Peer) {
-	for k, v := range leaderMap {
-		utils.GetLogInstance().Debug("Leader", "ShardID", k, "Leader", v)
-	}
 }

@@ -39,6 +39,8 @@ func (node *Node) setupForShardLeader() {
 func (node *Node) setupForShardValidator() {
 	nodeConfig, chanPeer := node.initNodeConfiguration()
 
+	// Register client support service.
+	node.serviceManager.RegisterService(service.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
 	// Register peer discovery service. "0" is the beacon shard ID. No need to do staking for beacon chain node.
 	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer, node.AddBeaconPeer))
 	// Register networkinfo service. "0" is the beacon shard ID
@@ -65,6 +67,8 @@ func (node *Node) setupForBeaconLeader() {
 func (node *Node) setupForBeaconValidator() {
 	nodeConfig, chanPeer := node.initBeaconNodeConfiguration()
 
+	// Register client support service.
+	node.serviceManager.RegisterService(service.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
 	// Register peer discovery service. No need to do staking for beacon chain node.
 	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer, nil))
 	// Register networkinfo service.
@@ -93,6 +97,14 @@ func (node *Node) setupForClientNode() {
 	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer, nil))
 }
 
+func (node *Node) setupForWalletNode() {
+	nodeConfig, chanPeer := node.initWalletNodeConfiguration()
+	// Register peer discovery service.
+	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer, node.AddBeaconPeer))
+	// Register networkinfo service. "0" is the beacon shard ID
+	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer, nil))
+}
+
 // ServiceManagerSetup setups service store.
 func (node *Node) ServiceManagerSetup() {
 	node.serviceManager = &service.Manager{}
@@ -110,6 +122,8 @@ func (node *Node) ServiceManagerSetup() {
 		node.setupForNewNode()
 	case nodeconfig.ClientNode:
 		node.setupForClientNode()
+	case nodeconfig.WalletNode:
+		node.setupForWalletNode()
 	}
 	node.serviceManager.SetupServiceMessageChan(node.serviceMessageChan)
 }

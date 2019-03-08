@@ -6,12 +6,12 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/harmony-one/harmony/api/client"
+	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
+	p2p_host "github.com/harmony-one/harmony/p2p/host"
 	mock_host "github.com/harmony-one/harmony/p2p/host/mock"
-	peer "github.com/libp2p/go-libp2p-peer"
 )
 
 func TestCreateWalletNode(test *testing.T) {
@@ -31,11 +31,13 @@ func TestSubmitTransaction(test *testing.T) {
 	m.EXPECT().GetSelfPeer().AnyTimes()
 
 	walletNode := node.New(m, nil, nil)
-	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9990")
-	peerID, _ := peer.IDFromPrivateKey(priKey)
-	walletNode.Client = client.NewClient(walletNode.GetHost(), map[uint32]p2p.Peer{0: p2p.Peer{IP: "127.0.0.1", Port: "9990", PeerID: peerID}})
+	walletNode.Client = client.NewClient(walletNode.GetHost(), []uint32{0})
 
-	SubmitTransaction(&types.Transaction{}, walletNode, 0)
+	tx := &types.Transaction{}
+	msg := proto_node.ConstructTransactionListMessageAccount(types.Transactions{tx})
+	m.EXPECT().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeaconClient}, p2p_host.ConstructP2pMessage(byte(0), msg))
+
+	SubmitTransaction(tx, walletNode, 0)
 
 	time.Sleep(1 * time.Second)
 }
