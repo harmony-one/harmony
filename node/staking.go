@@ -30,7 +30,7 @@ const (
 type StakeInfo struct {
 	LockedAddresses  []common.Address
 	BlockNums        []*big.Int
-	LockPeriodCounts []*big.Int  // The number of locking period the token will be locked.
+	LockPeriodCounts []*big.Int // The number of locking period the token will be locked.
 	Amounts          []*big.Int
 }
 
