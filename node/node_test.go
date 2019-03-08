@@ -73,16 +73,16 @@ func TestAddPeers(t *testing.T) {
 
 	peers1 := []*p2p.Peer{
 		&p2p.Peer{
-			IP:          "127.0.0.1",
-			Port:        "8888",
-			ConsensusPubKey:   pubKey1,
-			ValidatorID: 1,
+			IP:              "127.0.0.1",
+			Port:            "8888",
+			ConsensusPubKey: pubKey1,
+			ValidatorID:     1,
 		},
 		&p2p.Peer{
-			IP:          "127.0.0.1",
-			Port:        "9999",
-			ConsensusPubKey:   pubKey2,
-			ValidatorID: 2,
+			IP:              "127.0.0.1",
+			Port:            "9999",
+			ConsensusPubKey: pubKey2,
+			ValidatorID:     2,
 		},
 	}
 	_, pubKey := utils.GenKey("1", "2")
@@ -116,18 +116,18 @@ func TestAddBeaconPeer(t *testing.T) {
 
 	peers1 := []*p2p.Peer{
 		&p2p.Peer{
-			IP:          "127.0.0.1",
-			Port:        "8888",
-			ConsensusPubKey:   pubKey1,
-			ValidatorID: 1,
-			PeerID:      "1234",
+			IP:              "127.0.0.1",
+			Port:            "8888",
+			ConsensusPubKey: pubKey1,
+			ValidatorID:     1,
+			PeerID:          "1234",
 		},
 		&p2p.Peer{
-			IP:          "127.0.0.1",
-			Port:        "9999",
-			ConsensusPubKey:   pubKey2,
-			ValidatorID: 2,
-			PeerID:      "4567",
+			IP:              "127.0.0.1",
+			Port:            "9999",
+			ConsensusPubKey: pubKey2,
+			ValidatorID:     2,
+			PeerID:          "4567",
 		},
 	}
 	_, pubKey := utils.GenKey("1", "2")
@@ -161,8 +161,8 @@ func sendPingMessage(node *Node, leader p2p.Peer) {
 	pubKey1 := pki.GetBLSPrivateKeyFromInt(333).GetPublicKey()
 
 	p1 := p2p.Peer{
-		IP:        "127.0.0.1",
-		Port:      "9999",
+		IP:              "127.0.0.1",
+		Port:            "9999",
 		ConsensusPubKey: pubKey1,
 	}
 
@@ -174,13 +174,13 @@ func sendPongMessage(node *Node, leader p2p.Peer) {
 	pubKey1 := pki.GetBLSPrivateKeyFromInt(333).GetPublicKey()
 	pubKey2 := pki.GetBLSPrivateKeyFromInt(444).GetPublicKey()
 	p1 := p2p.Peer{
-		IP:        "127.0.0.1",
-		Port:      "9998",
+		IP:              "127.0.0.1",
+		Port:            "9998",
 		ConsensusPubKey: pubKey1,
 	}
 	p2 := p2p.Peer{
-		IP:        "127.0.0.1",
-		Port:      "9999",
+		IP:              "127.0.0.1",
+		Port:            "9999",
 		ConsensusPubKey: pubKey2,
 	}
 
