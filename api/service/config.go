@@ -13,11 +13,9 @@ import (
 // cyclic imports
 type NodeConfig struct {
 	// The three groupID design, please refer to https://github.com/harmony-one/harmony/blob/master/node/node.md#libp2p-integration
-	Beacon p2p.GroupID // the beacon group ID
-	Group  p2p.GroupID // the group ID of the shard
-	Client p2p.GroupID // the client group ID of the shard
-
-	// TODO: refatoring IsClient, IsBeacon and IsWallet as ServiceNodeType, not conflict with Node Role
+	Beacon   p2p.GroupID                    // the beacon group ID
+	Group    p2p.GroupID                    // the group ID of the shard
+	Client   p2p.GroupID                    // the client group ID of the shard
 	IsClient bool                           // whether this node is a client node, such as wallet/txgen
 	IsBeacon bool                           // whether this node is a beacon node or not
 	IsWallet bool                           // whether this node is a wallet or not
