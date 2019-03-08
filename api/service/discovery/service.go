@@ -69,6 +69,11 @@ func (s *Service) NotifyService(params map[string]interface{}) {
 
 // Run is the main function of the service
 func (s *Service) Run() {
+	if s.config.IsWallet {
+		go s.addP2pPeers()
+		return
+	}
+
 	go s.contactP2pPeers()
 }
 
@@ -96,10 +101,6 @@ func (s *Service) addP2pPeers() {
 }
 
 func (s *Service) contactP2pPeers() {
-	if s.config.IsWallet {
-		go s.addP2pPeers()
-		return
-	}
 	tick := time.NewTicker(5 * time.Second)
 
 	pingMsg := proto_discovery.NewPingMessage(s.host.GetSelfPeer())
