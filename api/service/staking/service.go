@@ -3,10 +3,11 @@ package staking
 import (
 	"crypto/ecdsa"
 	"math/big"
-	"os"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/harmony-one/harmony/contracts"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -101,13 +102,6 @@ func (s *Service) IsStaked() bool {
 // DoService does staking.
 func (s *Service) DoService() {
 	utils.GetLogInstance().Info("Trying to send a staking transaction.")
-	abi, err := s.getStakeLockContractABI()
-	if err != nil {
-		utils.GetLogInstance().Error("Failed to generate staking contract's ABI", "error", err)
-	} else {
-		utils.GetLogInstance().Info("Generated staking contract's ABI", "abi", abi)
-	}
-	// TODO: use abi to generate staking transaction.
 
 	if s.beaconChain == nil {
 		utils.GetLogInstance().Info("Can not send a staking transaction because of nil beacon chain.")
@@ -119,17 +113,6 @@ func (s *Service) DoService() {
 	} else {
 		utils.GetLogInstance().Error("Can not create staking transaction")
 	}
-}
-
-func (s *Service) getStakeLockContractABI() (abi.ABI, error) {
-	f, err := os.Open("./contracts/StakeLockContract.json")
-	if err != nil {
-		if os.IsNotExist(err) {
-			return abi.ABI{}, err
-		}
-	}
-	defer f.Close()
-	return abi.JSON(f)
 }
 
 func (s *Service) getStakingInfo() *proto.StakingContractInfoResponse {
@@ -196,6 +179,16 @@ func (s *Service) createRawStakingMessage() []byte {
 	// TODO(minhdoan): Enable getStakingInfo back after testing.
 	stakingInfo := s.getFakeStakingInfo()
 	toAddress := common.HexToAddress(stakingInfo.ContractAddress)
+
+	abi, err := abi.JSON(strings.NewReader(contracts.StakeLockContractABI))
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to generate staking contract's ABI", "error", err)
+	}
+	bytesData, err := abi.Pack("lock")
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to generate ABI function bytes data", "error", err)
+	}
+
 	tx := types.NewTransaction(
 		stakingInfo.Nonce,
 		toAddress,
@@ -203,7 +196,7 @@ func (s *Service) createRawStakingMessage() []byte {
 		big.NewInt(s.stakingAmount),
 		params.TxGas*10,
 		nil,
-		common.FromHex("0xd0e30db0"),
+		bytesData,
 	)
 
 	if signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, s.accountKey); err == nil {

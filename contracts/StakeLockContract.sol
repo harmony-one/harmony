@@ -118,14 +118,16 @@ contract StakeLockContract {
     function listLockedAddresses()
         public
         view
-        returns (address[] memory lockedAddresses, uint256[] memory blockNums, uint256[] memory lockPeriodCounts)
+        returns (address[] memory lockedAddresses, uint256[] memory blockNums, uint256[] memory lockPeriodCounts, uint256[] memory amounts)
     {
         lockedAddresses = addressList;
         blockNums = new uint256[](addressList.length);
         lockPeriodCounts = new uint256[](addressList.length);
+        amounts = new uint256[](addressList.length);
         for (uint i = 0; i < lockedAddresses.length; i++) {
             blockNums[i] = locked[lockedAddresses[i]]._blockNum;
             lockPeriodCounts[i] = locked[lockedAddresses[i]]._lockPeriodCount;
+            amounts[i] = locked[lockedAddresses[i]]._amount;
         }
     }
 }
