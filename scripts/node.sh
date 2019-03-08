@@ -29,6 +29,16 @@ function valid_ip()
     return $stat
 }
 
+function myip() {
+   PUB_IP=$(dig @resolver1.opendns.com ANY myip.opendns.com +short)
+   if valid_ip $PUB_IP; then
+      echo MYIP = $PUB_IP
+   else
+      echo NO valid public IP found: $PUB_IP
+      exit 1
+   fi
+}
+
 function setup_env
 {
 # setup environment variables, may not be nessary
@@ -80,31 +90,18 @@ done
 chmod +x harmony
 
 NODE_PORT=9000
+PUB_IP=
 
 if [ "$OS" == "Linux" ]; then
-   IS_AWS=$(curl -m 5 -s -I http://169.254.169.254/latest/meta-data/instance-type -o /dev/null -w "%{http_code}")
-   if [ "$IS_AWS" != "200" ]; then
-# NOT AWS, Assuming Azure
-      PUB_IP=$(curl -m 5 -H Metadata:true "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/publicIpAddress?api-version=2017-04-02&format=text")
-   else
-      PUB_IP=$(curl -m 5 http://169.254.169.254/latest/meta-data/public-ipv4)
-   fi
    setup_env
 # Kill existing soldier/node
    fuser -k -n tcp $NODE_PORT
-else
-   # use dig to find out my public IP
-   # https://unix.stackexchange.com/questions/22615/how-can-i-get-my-external-ip-address-in-a-shell-script
-   PUB_IP=$(dig @resolver1.opendns.com ANY myip.opendns.com +short)
 fi
 
-if valid_ip $PUB_IP; then
-	echo MYIP = $PUB_IP
-else
-	echo NO valid public IP found: $PUB_IP
-	exit 1
-fi
+# find my public ip address
+myip
 
+# public beacon node multiaddress
 BC_MA=/ip4/54.183.5.66/tcp/9999/ipfs/QmdQVypu6NSm7m8bNZj5EJCnjPhXR8QyRmDnDBidxGaHWi
 
 if [ "$OS" == "Linux" ]; then
