@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 
-add-apt-repository ppa:ethereum/ethereum
-apt-get update
-apt-get -y install solc
+sudo add-apt-repository ppa:ethereum/ethereum
+sudo apt-get update
+sudo apt-get -y install solc
