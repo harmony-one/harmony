@@ -9,8 +9,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/harmony-one/harmony/internal/utils/contract"
-
 	"github.com/harmony-one/harmony/internal/utils"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -84,14 +82,10 @@ func decodeFuncSign(data []byte) string {
 	return funcSign
 }
 
-// LoadStakingKeyFromFile load staking private key from keyfile
-// If the private key is not loadable or no file, it will generate
-// a new random private key
-// Currently for deploy_newnode.sh, we hard-coded the first fake account as staking account and
-// it is minted in genesis block. See genesis_node.go
-func LoadStakingKeyFromFile(keyfile string, accountIndex int) *ecdsa.PrivateKey {
+// StoreStakingKeyFromFile load the staking private key and store it in local keyfile
+func StoreStakingKeyFromFile(keyfile string, priKey string) *ecdsa.PrivateKey {
 	// contract.FakeAccounts[0] gets minted tokens in genesis block of beacon chain.
-	key, err := crypto.HexToECDSA(contract.StakingAccounts[accountIndex].Private)
+	key, err := crypto.HexToECDSA(priKey)
 	if err != nil {
 		utils.GetLogInstance().Error("Unable to get staking key")
 		os.Exit(1)

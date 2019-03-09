@@ -9,6 +9,8 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/harmony-one/harmony/internal/utils/contract"
+
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/consensus"
@@ -119,18 +121,28 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	// Currently we hardcode only one shard.
 	nodeConfig.ShardIDString = "0"
 
-	nodeConfig.StakingPriKey = node.LoadStakingKeyFromFile(*stakingKeyFile, *accountIndex)
+	// Key Setup ================= [Start]
+	// Staking private key is the ecdsa key used for token related transaction signing (especially the staking txs).
+	stakingPriKey := ""
+	if *isBeacon {
+		stakingPriKey = contract.InitialBeaconChainAccounts[*accountIndex].Private
+	} else {
+		stakingPriKey = contract.NewNodeAccounts[*accountIndex].Private
+	}
+	nodeConfig.StakingPriKey = node.StoreStakingKeyFromFile(*stakingKeyFile, stakingPriKey)
 
+	// P2p private key is used for secure message transfer between p2p nodes.
 	nodeConfig.P2pPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
 		panic(err)
 	}
 
-	// Setup Bls keys
+	// Consensus keys are the BLS12-381 keys used to sign consensus messages
 	nodeConfig.ConsensusPriKey, nodeConfig.ConsensusPubKey = utils.GenKey(*ip, *port)
 	if nodeConfig.ConsensusPriKey == nil || nodeConfig.ConsensusPubKey == nil {
 		panic(fmt.Errorf("generate key error"))
 	}
+	// Key Setup ================= [End]
 
 	// Initialize leveldb for main blockchain and beacon.
 	if nodeConfig.MainDB, err = InitLDBDatabase(*ip, *port, *freshDB, false); err != nil {
