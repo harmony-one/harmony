@@ -16,87 +16,18 @@ Specifically, if we run in testnet with on beacon chain we want to have a system
 
 ## Architecture Design
 
-### How data is stored currently in beacon chain and shard chain
-
-Currently our code reuse all blockchain, block, account model data structure, hence all data are stored by leveldb. There are 3 three roots stateRoot, transactionRoot, receiptsRoot stored in both memory in current block and in db for all blocks.
-
-The operations to store the data are implemented with following interface in rawdb package
-
-```
-// DatabaseReader wraps the Has and Get method of a backing data store.
-type DatabaseReader interface {
-	Has(key []byte) (bool, error)
-	Get(key []byte) ([]byte, error)
-}
-
-// DatabaseWriter wraps the Put method of a backing data store.
-type DatabaseWriter interface {
-	Put(key []byte, value []byte) error
-}
-
-// DatabaseDeleter wraps the Delete method of a backing data store.
-type DatabaseDeleter interface {
-	Delete(key []byte) error
-}
-```
-
-Put and Delete are two methods to modify data in db.
-
 ### First proposal
 
-At the backup side, there are two options:
+#### Archival node or light node
 
-- For each shard chain or beacon chain we'd set up a leveldb db and deploy a corresponding server which listen to receive Put and Delete operation together with key and value data, then execute the same operation with the same key, value in the leveldb db.
-- We only need to set up and deploy one single server but with multiple leveldb. This server will listen from all beacon chain and shard chain to receive Put and Delete operation together with key and value data, then execute the same operation with the same key, value in the leveldb db.
+For each shard chain or beacon chain, we need to run a few nodes (let's call archival node or light node) joining that shard or beacon shard and receive new block proposal from the leader of that shard.
 
-#### What needs to implement in our code
+Followings are the set of services the archival node needs to run
 
-- Beacon chain or shard chain should be able to access the IP/Port of its corresponding server (backup server) to back up its data. The server info (IP/Port) can be stored in bootnode or hard-code.
-- We should set up a client to the backup server.
-- We need to extend the implemenation of Put and Delete interface to make an RPC call to the backup server before executing Put or Delete.
-- Keep in mind that beacon chain only has one leveldb but the shard chain currently has one leveldb for itself and another leveldb for syncing beacon chain.
+- NetworkInfo, Discovery.
+- Implement receiving new block in node_handler.
+- Currently leaders in shard chain or beacon chain only broadcast only to validators in their shard. We may need to modify some logic in discovery to make sure the archival node will receive the broadcast.
 
-#### What needs to implement in backup server node
+#### Other functionality.
 
-- Set up an gRPC server.
-- Send server info to bootnode or an centralized server.
-- Implement the Put and Delete logic when receiving messages from beacon chain or shard chain.
-
-Protobuf code for gRPC server:
-
-```
-syntax = "proto3";
-
-package backup;
-
-// BackupService services Put and Delete operation in backup node.
-service BackupService {
-  rpc Put(PutRequest) returns (PutResponse) {}
-  rpc Delete(DeleteRequest) returns (DeleteResponse) {}
-}
-
-// PutRequest is the request of Put operation.
-message PutRequest {
-  bytes key = 1;
-  bytes value = 2;
-}
-
-message PutResponse {
-}
-
-// DeleteRequest is the request of Delete operation.
-message DeleteRequest {
-  bytes key = 1;
-}
-
-message DeleteResponse {
-}
-
-```
-
-#### Using backup data to restart beacon chain/shard chain.
-
-We need to add some logic for our blockchain to pick up backup data and restart the blockchain.
-
-- Specifically, for testnet we need to add some logi so that it can configure from the backup data and restart smoothly.
-- For mainnet, we need to add some logic so that each shard and beacon chain can configure from back data, respectively, and restart all shard chain and beacon chain.
+Though the archival nodes do not participate into consensus but the keep the blockchain data, they can function as a light node, answering any type of READ transactions about the blockchain like reading balance of an address, read data state of a deployed smart contract.
