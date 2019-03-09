@@ -3,7 +3,6 @@ package node
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"os"
 	"time"
 
@@ -13,7 +12,6 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
-	proto_identity "github.com/harmony-one/harmony/api/proto/identity"
 	"github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/api/service"
@@ -94,19 +92,6 @@ func (node *Node) messageHandler(content []byte, sender string) {
 	}
 
 	switch msgCategory {
-	case proto.Identity:
-		actionType := proto_identity.IDMessageType(msgType)
-		switch actionType {
-		case proto_identity.Identity:
-			messageType := proto_identity.MessageType(msgPayload[0])
-			switch messageType {
-			case proto_identity.Register:
-				fmt.Println("received a identity message")
-				utils.GetLogInstance().Info("NET: received message: IDENTITY/REGISTER")
-			default:
-				utils.GetLogInstance().Error("Announce message should be sent to IdentityChain")
-			}
-		}
 	case proto.Consensus:
 		msgPayload, _ := proto.GetConsensusMessagePayload(content)
 		if consensusObj.IsLeader {

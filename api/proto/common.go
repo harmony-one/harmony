@@ -30,7 +30,6 @@ const (
 	Consensus MessageCategory = iota
 	Node
 	Client
-	Identity
 	DRand
 	Staking
 	// TODO: add more types
