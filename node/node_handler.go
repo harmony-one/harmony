@@ -70,7 +70,6 @@ func (node *Node) ReceiveClientGroupMessage() {
 // messageHandler parses the message and dispatch the actions
 func (node *Node) messageHandler(content []byte, sender string) {
 	//	node.MaybeBroadcastAsValidator(content)
-
 	consensusObj := node.Consensus
 
 	msgCategory, err := proto.GetMessageCategory(content)
@@ -328,12 +327,14 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 	peer.Port = ping.Node.Port
 	peer.PeerID = ping.Node.PeerID
 	peer.ValidatorID = ping.Node.ValidatorID
+	peer.ConsensusPubKey = nil
 
-	peer.ConsensusPubKey = &bls.PublicKey{}
-	err = peer.ConsensusPubKey.Deserialize(ping.Node.PubKey[:])
-	if err != nil {
-		utils.GetLogInstance().Error("UnmarshalBinary Failed", "error", err)
-		return -1
+	if ping.Node.PubKey != nil {
+		peer.ConsensusPubKey = &bls.PublicKey{}
+		if err := peer.ConsensusPubKey.Deserialize(ping.Node.PubKey[:]); err != nil {
+			utils.GetLogInstance().Error("UnmarshalBinary Failed", "error", err)
+			return -1
+		}
 	}
 
 	//	utils.GetLogInstance().Debug("[pingMessageHandler]", "incoming peer", peer)
@@ -345,6 +346,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 	if ping.Node.Role == proto_node.ClientRole {
 		utils.GetLogInstance().Info("Add Client Peer to Node", "Node", node.Consensus.GetNodeID(), "Client", peer)
 		node.ClientPeer = peer
+		node.AddPeers([]*p2p.Peer{peer})
 		return 0
 	}
 

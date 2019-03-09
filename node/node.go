@@ -408,35 +408,12 @@ func (node *Node) RemovePeersHandler() {
 	}
 }
 
-func (node *Node) initWalletNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
+func (node *Node) initNodeConfiguration(isClient bool) (service.NodeConfig, chan p2p.Peer) {
 	chanPeer := make(chan p2p.Peer)
 
 	nodeConfig := service.NodeConfig{
 		IsBeacon: false,
 		IsClient: false,
-		IsWallet: true,
-		Beacon:   p2p.GroupIDBeacon,
-		Group:    p2p.GroupIDUnknown,
-		Actions:  make(map[p2p.GroupID]p2p.ActionType),
-	}
-	nodeConfig.Actions[p2p.GroupIDBeaconClient] = p2p.ActionStop
-
-	var err error
-	node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
-	if err != nil {
-		utils.GetLogInstance().Error("create group receiver error", "msg", err)
-	}
-
-	return nodeConfig, chanPeer
-}
-
-func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
-	chanPeer := make(chan p2p.Peer)
-
-	nodeConfig := service.NodeConfig{
-		IsBeacon: false,
-		IsClient: true,
-		IsWallet: false,
 		Beacon:   p2p.GroupIDBeacon,
 		Group:    p2p.GroupIDUnknown,
 		Actions:  make(map[p2p.GroupID]p2p.ActionType),
@@ -458,7 +435,6 @@ func (node *Node) initBeaconNodeConfiguration() (service.NodeConfig, chan p2p.Pe
 	nodeConfig := service.NodeConfig{
 		IsBeacon: true,
 		IsClient: true,
-		IsWallet: false,
 		Beacon:   p2p.GroupIDBeacon,
 		Group:    p2p.GroupIDUnknown,
 		Actions:  make(map[p2p.GroupID]p2p.ActionType),

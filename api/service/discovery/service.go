@@ -69,41 +69,13 @@ func (s *Service) NotifyService(params map[string]interface{}) {
 
 // Run is the main function of the service
 func (s *Service) Run() {
-	if s.config.IsWallet {
-		go s.addP2pPeers()
-		return
-	}
-
-	go s.contactP2pPeers()
+	go s.contactP2pPeers(s.config.IsClient)
 }
 
-func (s *Service) addP2pPeers() {
-	count := 0
-	for {
-		select {
-		case peer, ok := <-s.peerChan:
-			if !ok {
-				utils.GetLogInstance().Debug("[Wallet] No More Peer")
-				break
-			}
-			if s.addBeaconPeerFunc != nil {
-				s.addBeaconPeerFunc(&peer)
-				count++
-				if count > 0 { // TODO currently we use 1 peer for walletNode
-					return
-				}
-			}
-		case <-s.stopChan:
-			utils.GetLogInstance().Debug("wallet: stop discovery")
-			return
-		}
-	}
-}
-
-func (s *Service) contactP2pPeers() {
+func (s *Service) contactP2pPeers(isClient bool) {
 	tick := time.NewTicker(5 * time.Second)
 
-	pingMsg := proto_discovery.NewPingMessage(s.host.GetSelfPeer())
+	pingMsg := proto_discovery.NewPingMessage(s.host.GetSelfPeer(), isClient)
 	regMsgBuf := host.ConstructP2pMessage(byte(0), pingMsg.ConstructPingMessage())
 
 	pingMsg.Node.Role = proto_node.ClientRole
