@@ -254,7 +254,6 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database) *N
 		node.AddFaucetContractToPendingTransactions()
 		node.CurrentStakes = make(map[common.Address]*big.Int)
 		node.AddStakingContractToPendingTransactions() //This will save the latest information about staked nodes in current staked
-		node.DepositToStakingAccounts()
 	}
 
 	node.ContractCaller = contracts.NewContractCaller(&db, node.blockchain, params.TestChainConfig)

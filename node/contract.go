@@ -16,7 +16,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/utils/contract"
 	contract_constants "github.com/harmony-one/harmony/internal/utils/contract"
 )
 
@@ -157,17 +156,4 @@ func (node *Node) callGetFreeTokenWithNonce(address common.Address, nonce uint64
 
 	node.addPendingTransactions(types.Transactions{tx})
 	return tx.Hash()
-}
-
-// DepositToStakingAccounts invokes the faucet contract to give the staking accounts initial money
-func (node *Node) DepositToStakingAccounts() {
-	state, err := node.blockchain.State()
-	if err != nil {
-		log.Error("Failed to get chain state", "Error", err)
-	}
-	nonce := state.GetNonce(crypto.PubkeyToAddress(node.ContractDeployerKey.PublicKey)) + 1 // + 1 because deployer key is already used for faucet contract deployment
-	for i, deployAccount := range contract.StakingAccounts {
-		address := common.HexToAddress(deployAccount.Address)
-		node.callGetFreeTokenWithNonce(address, nonce+uint64(i))
-	}
 }

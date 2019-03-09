@@ -38,18 +38,8 @@ var GenesisBeaconAccountPublicKey = GenesisBeaconAccountPriKey.PublicKey
 // DeployedContractAddress is the deployed contract address of the staking smart contract in beacon chain.
 var DeployedContractAddress = crypto.CreateAddress(crypto.PubkeyToAddress(GenesisBeaconAccountPublicKey), uint64(0))
 
-// StakingAccounts is the accounts only used for staking.
-var StakingAccounts = [...]DeployAccount{
-	{Address: "0xE2bD4413172C98d5094B94de1A8AC6a383d68b84", Private: "e401343197a852f361e38ce6b46c99f1d6d1f80499864c6ae7effee42b46ab6b", Public: "0xE2bD4413172C98d5094B94de1A8AC6a383d68b84"},
-	{Address: "0x183418934Fd8A97c98E086151317B2df6259b8A8", Private: "a7d764439a7619f703c97ee2a2cf0be2cd62ad4c9deebd5423d6f28de417b907", Public: "0x183418934Fd8A97c98E086151317B2df6259b8A8"},
-	{Address: "0x9df0e70D4cb3E9beC0548D8Ac56F46596D1BcdB6", Private: "4e3f7c819a15249d2824834cd7ce20fe24d6eab8eb39ac63b78cb3713362cf78", Public: "0x9df0e70D4cb3E9beC0548D8Ac56F46596D1BcdB6"},
-	{Address: "0x64570B8D2f9028b850340b6710bB0027baC5EFa2", Private: "8565eded3f70b2f8608495fa7e301fefc36cbc03286c0f4e75ffde7e02b49791", Public: "0x64570B8D2f9028b850340b6710bB0027baC5EFa2"},
-	{Address: "0x7E653426a7E0c1D210A652bf0E74B15838059b80", Private: "23176da901759e231d7b2d8761f3448220fcfd0232ed0b9644689a6ad7d50990", Public: "0x7E653426a7E0c1D210A652bf0E74B15838059b80"},
-	{Address: "0xAe44500A96756112C69F88008388037F6C6dd723", Private: "a9b4c273ffa398a1b1c8eeab63c40cef2c2fb2fc1fc4de9ab73a61f12e4d990a", Public: "0xAe44500A96756112C69F88008388037F6C6dd723"},
-}
-
-// FakeAccounts is the accounts only used for development purpose.
-var FakeAccounts = [...]DeployAccount{
+// InitialBeaconChainAccounts are the accounts for the initial beacon chain node.
+var InitialBeaconChainAccounts = [...]DeployAccount{
 	{Address: "0xE2bD4413172C98d5094B94de1A8AC6a383d68b84", Private: "e401343197a852f361e38ce6b46c99f1d6d1f80499864c6ae7effee42b46ab6b", Public: "0xE2bD4413172C98d5094B94de1A8AC6a383d68b84"},
 	{Address: "0x183418934Fd8A97c98E086151317B2df6259b8A8", Private: "a7d764439a7619f703c97ee2a2cf0be2cd62ad4c9deebd5423d6f28de417b907", Public: "0x183418934Fd8A97c98E086151317B2df6259b8A8"},
 	{Address: "0x9df0e70D4cb3E9beC0548D8Ac56F46596D1BcdB6", Private: "4e3f7c819a15249d2824834cd7ce20fe24d6eab8eb39ac63b78cb3713362cf78", Public: "0x9df0e70D4cb3E9beC0548D8Ac56F46596D1BcdB6"},
@@ -60,6 +50,10 @@ var FakeAccounts = [...]DeployAccount{
 	{Address: "0x6f7659765a8784F782fc6Bcdb153e915076bb9F0", Private: "24be53d408b360cc1a3608d54fa8ba070692bbe8f594062c30a5e9e89cee9794", Public: "0x6f7659765a8784F782fc6Bcdb153e915076bb9F0"},
 	{Address: "0xfA24E616BaE95160878C7F1150d1e014904809E9", Private: "41d628799eee7637bd79ae9fc2fd1321cffbb4b858348d6abf5b4247b78fd492", Public: "0xfA24E616BaE95160878C7F1150d1e014904809E9"},
 	{Address: "0x47DF74d43fa4Ca1D814897eBD8Cf07e6bA024f75", Private: "d5a62757aa51f2ae883c5cb8631d312750ecc31f3934fffd95bcd969bd190c94", Public: "0x47DF74d43fa4Ca1D814897eBD8Cf07e6bA024f75"},
+}
+
+// NewNodeAccounts is the accounts used for new node to stake and join the network.
+var NewNodeAccounts = [...]DeployAccount{
 	{Address: "0x1a3e7a44ee21101d7D64FBf29B0F6F1fc295F723", Private: "27978f895b11d9c737e1ab1623fde722c04b4f9ccb4ab776bf15932cc72d7c66", Public: "0x1a3e7a44ee21101d7D64FBf29B0F6F1fc295F723"},
 	{Address: "0x10A02A0a6e95a676AE23e2db04BEa3D1B8b7ca2E", Private: "371cb68abe6a6101ac88603fc847e0c013a834253acee5315884d2c4e387ebca", Public: "0x10A02A0a6e95a676AE23e2db04BEa3D1B8b7ca2E"},
 	{Address: "0x3e881F6C36A3A14a2D1816b0A5471d1caBB16F33", Private: "3f8af52063c6648be37d4b33559f784feb16d8e5ffaccf082b3657ea35b05977", Public: "0x3e881F6C36A3A14a2D1816b0A5471d1caBB16F33"},

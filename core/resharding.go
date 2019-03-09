@@ -86,6 +86,7 @@ func (ss *ShardingState) assignLeaders() {
 func (ss *ShardingState) UpdateShardState(newNodeList []types.NodeID, percent float64) {
 	rand.Seed(int64(ss.rnd))
 	ss.sortCommitteeBySize()
+	// TODO: separate shuffling and leader assignment
 	ss.assignLeaders()
 	ss.assignNewNodes(newNodeList)
 	ss.cuckooResharding(percent)
@@ -124,7 +125,7 @@ func GetShardingStateFromBlockChain(bc *BlockChain, epoch uint64) *ShardingState
 	return &ShardingState{epoch: epoch, rnd: rndSeed, shardState: shardState, numShards: len(shardState)}
 }
 
-// CalculateNewShardState get sharding state from previous epoch and calcualte sharding state for new epoch
+// CalculateNewShardState get sharding state from previous epoch and calculate sharding state for new epoch
 // TODO: currently, we just mock everything
 func CalculateNewShardState(bc *BlockChain, epoch uint64) types.ShardState {
 	if epoch == FirstEpoch {

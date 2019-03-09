@@ -1653,7 +1653,7 @@ func (bc *BlockChain) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscript
 	return bc.scope.Track(bc.logsFeed.Subscribe(ch))
 }
 
-// GetShardState retrives sharding state given block hash and block number
+// GetShardState retrieves sharding state given block hash and block number
 func (bc *BlockChain) GetShardState(hash common.Hash, number uint64) types.ShardState {
 	if cached, ok := bc.shardStateCache.Get(hash); ok {
 		shardState := cached.(types.ShardState)
