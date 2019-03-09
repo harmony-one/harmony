@@ -2,7 +2,7 @@ package lib
 
 import (
 	"fmt"
-	"time"
+	//	"time"
 
 	"github.com/harmony-one/harmony/api/client"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
@@ -31,7 +31,7 @@ func CreateWalletNode() *node.Node {
 	walletNode := node.New(host, nil, nil)
 	walletNode.Client = client.NewClient(walletNode.GetHost(), shardIDs)
 
-	walletNode.NodeConfig.SetRole(nodeconfig.WalletNode)
+	walletNode.NodeConfig.SetRole(nodeconfig.ClientNode)
 	walletNode.ServiceManagerSetup()
 	walletNode.RunServices()
 	return walletNode
@@ -40,13 +40,14 @@ func CreateWalletNode() *node.Node {
 // GetPeersFromBeaconChain get peers from beacon chain
 // TODO: add support for normal shards
 func GetPeersFromBeaconChain(walletNode *node.Node) []p2p.Peer {
-	peers := []p2p.Peer{}
+	p1 := p2p.Peer{IP: "127.0.0.1", Port: "9000"}
+	peers := []p2p.Peer{p1}
 
-	time.Sleep(5 * time.Second)
-	walletNode.BeaconNeighbors.Range(func(k, v interface{}) bool {
-		peers = append(peers, v.(p2p.Peer))
-		return true
-	})
+	//	time.Sleep(4 * time.Second)
+	//	walletNode.BeaconNeighbors.Range(func(k, v interface{}) bool {
+	//		peers = append(peers, v.(p2p.Peer))
+	//		return true
+	//	})
 	fmt.Println("peers: ", peers)
 	return peers
 }
@@ -60,7 +61,8 @@ func SubmitTransaction(tx *types.Transaction, walletNode *node.Node, shardID uin
 }
 
 func getBootNodes() []ma.Multiaddr {
-	addrStrings := []string{"/ip4/54.213.43.194/tcp/9874/p2p/QmdZ7ccH4A6jr6kKzdhx2ttfKz6AEeTpwMChysUL1QLbYX"}
+	addrStrings := []string{"/ip4/127.0.0.1/tcp/19876/p2p/QmbTLMb9C8dmjrDYoiJb2mayXspcURkNB4ARxgsoA5Aoe3"}
+	//addrStrings := []string{"/ip4/54.213.43.194/tcp/9874/p2p/QmQhPRqqfTRExqWmTifjMaBvRd3HBmnmj9jYAvTy6HPPJj"}
 	bootNodeAddrs, err := utils.StringsToAddrs(addrStrings)
 	if err != nil {
 		panic(err)

@@ -46,16 +46,22 @@ func (p PongMessageType) String() string {
 }
 
 // NewPingMessage creates a new Ping message based on the p2p.Peer input
-func NewPingMessage(peer p2p.Peer) *PingMessageType {
+func NewPingMessage(peer p2p.Peer, isClient bool) *PingMessageType {
 	ping := new(PingMessageType)
 
 	ping.Version = proto.ProtocolVersion
 	ping.Node.IP = peer.IP
 	ping.Node.Port = peer.Port
 	ping.Node.PeerID = peer.PeerID
-	ping.Node.ValidatorID = peer.ValidatorID
-	ping.Node.PubKey = peer.ConsensusPubKey.Serialize()
-	ping.Node.Role = node.ValidatorRole
+	if !isClient {
+		ping.Node.ValidatorID = peer.ValidatorID
+		ping.Node.PubKey = peer.ConsensusPubKey.Serialize()
+		ping.Node.Role = node.ValidatorRole
+	} else {
+		ping.Node.ValidatorID = -1
+		ping.Node.PubKey = nil
+		ping.Node.Role = node.ClientRole
+	}
 
 	return ping
 }
