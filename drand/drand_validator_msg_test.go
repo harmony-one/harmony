@@ -3,6 +3,9 @@ package drand
 import (
 	"testing"
 
+	protobuf "github.com/golang/protobuf/proto"
+	drand_proto "github.com/harmony-one/harmony/api/drand"
+	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
@@ -19,8 +22,36 @@ func TestConstructCommitMessage(test *testing.T) {
 	dRand := New(host, "0", []p2p.Peer{leader, validator}, leader, nil, true)
 	dRand.blockHash = [32]byte{}
 	msg := dRand.constructCommitMessage([32]byte{}, []byte{})
+	msgPayload, _ := proto.GetDRandMessagePayload(msg)
 
-	if len(msg) != 191 {
-		test.Errorf("Commit message is not constructed in the correct size: %d", len(msg))
+	message := drand_proto.Message{}
+	err = protobuf.Unmarshal(msgPayload, &message)
+
+	if err != nil {
+		test.Error("Error in extracting Commit message from payload", err)
 	}
+}
+
+func TestProcessInitMessage(test *testing.T) {
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "19999"}
+	validator := p2p.Peer{IP: "127.0.0.1", Port: "55555"}
+	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
+	host, err := p2pimpl.NewHost(&leader, priKey)
+	if err != nil {
+		test.Fatalf("newhost failure: %v", err)
+	}
+	dRand := New(host, "0", []p2p.Peer{leader, validator}, leader, nil, true)
+	dRand.blockHash = [32]byte{}
+	msg := dRand.constructInitMessage()
+
+	msgPayload, _ := proto.GetDRandMessagePayload(msg)
+
+	message := drand_proto.Message{}
+	err = protobuf.Unmarshal(msgPayload, &message)
+
+	if err != nil {
+		test.Error("Error in extracting Init message from payload", err)
+	}
+
+	dRand.ProcessMessageValidator(msgPayload)
 }

@@ -99,3 +99,11 @@ func TestCopyBytes(t *testing.T) {
 		t.Errorf("should not be 0")
 	}
 }
+
+func TestPadBytes(test *testing.T) {
+	byteSuite := BytesSuite{}
+	c := checker.C{}
+	byteSuite.TestCopyBytes(&c)
+	byteSuite.TestLeftPadBytes(&c)
+	byteSuite.TestRightPadBytes(&c)
+}
