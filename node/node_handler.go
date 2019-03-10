@@ -346,7 +346,6 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 	if ping.Node.Role == proto_node.ClientRole {
 		utils.GetLogInstance().Info("Add Client Peer to Node", "Node", node.Consensus.GetNodeID(), "Client", peer)
 		node.ClientPeer = peer
-		node.AddPeers([]*p2p.Peer{peer})
 		return 0
 	}
 

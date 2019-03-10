@@ -408,12 +408,14 @@ func (node *Node) RemovePeersHandler() {
 	}
 }
 
-func (node *Node) initNodeConfiguration(isClient bool) (service.NodeConfig, chan p2p.Peer) {
+// isBeacon = true if the node is beacon node
+// isClient = true if the node light client(txgen,wallet)
+func (node *Node) initNodeConfiguration(isBeacon bool, isClient bool) (service.NodeConfig, chan p2p.Peer) {
 	chanPeer := make(chan p2p.Peer)
 
 	nodeConfig := service.NodeConfig{
-		IsBeacon: false,
-		IsClient: false,
+		IsBeacon: isBeacon,
+		IsClient: isClient,
 		Beacon:   p2p.GroupIDBeacon,
 		Group:    p2p.GroupIDUnknown,
 		Actions:  make(map[p2p.GroupID]p2p.ActionType),
@@ -421,38 +423,17 @@ func (node *Node) initNodeConfiguration(isClient bool) (service.NodeConfig, chan
 	nodeConfig.Actions[p2p.GroupIDBeaconClient] = p2p.ActionStart
 
 	var err error
-	node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
+	if !isBeacon {
+		node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
+	} else {
+		node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeacon)
+		node.clientReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
+		node.NodeConfig.SetClientGroupID(p2p.GroupIDBeaconClient)
+	}
+
 	if err != nil {
 		utils.GetLogInstance().Error("create group receiver error", "msg", err)
 	}
-
-	return nodeConfig, chanPeer
-}
-
-func (node *Node) initBeaconNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
-	chanPeer := make(chan p2p.Peer)
-
-	nodeConfig := service.NodeConfig{
-		IsBeacon: true,
-		IsClient: true,
-		Beacon:   p2p.GroupIDBeacon,
-		Group:    p2p.GroupIDUnknown,
-		Actions:  make(map[p2p.GroupID]p2p.ActionType),
-	}
-	nodeConfig.Actions[p2p.GroupIDBeaconClient] = p2p.ActionStart
-
-	var err error
-	node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeacon)
-	if err != nil {
-		utils.GetLogInstance().Error("create group receiver error", "msg", err)
-	}
-
-	// All beacon chain node will subscribe to BeaconClient topic
-	node.clientReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
-	if err != nil {
-		utils.GetLogInstance().Error("create client receiver error", "msg", err)
-	}
-	node.NodeConfig.SetClientGroupID(p2p.GroupIDBeaconClient)
 
 	return nodeConfig, chanPeer
 }

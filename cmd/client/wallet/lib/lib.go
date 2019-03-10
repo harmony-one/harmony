@@ -2,7 +2,7 @@ package lib
 
 import (
 	"fmt"
-	//	"time"
+	"time"
 
 	"github.com/harmony-one/harmony/api/client"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
@@ -40,15 +40,13 @@ func CreateWalletNode() *node.Node {
 // GetPeersFromBeaconChain get peers from beacon chain
 // TODO: add support for normal shards
 func GetPeersFromBeaconChain(walletNode *node.Node) []p2p.Peer {
-	p1 := p2p.Peer{IP: "127.0.0.1", Port: "9000"}
-	peers := []p2p.Peer{p1}
+	peers := []p2p.Peer{}
 
-	//	time.Sleep(4 * time.Second)
-	//	walletNode.BeaconNeighbors.Range(func(k, v interface{}) bool {
-	//		peers = append(peers, v.(p2p.Peer))
-	//		return true
-	//	})
-	fmt.Println("peers: ", peers)
+	time.Sleep(4 * time.Second)
+	walletNode.BeaconNeighbors.Range(func(k, v interface{}) bool {
+		peers = append(peers, v.(p2p.Peer))
+		return true
+	})
 	return peers
 }
 
