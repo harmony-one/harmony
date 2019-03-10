@@ -113,7 +113,7 @@ func (s *Service) Run() {
 
 // DoService does network info.
 func (s *Service) DoService() {
-	_, ipv4Net, err := net.ParseCIDR("100.64.0.0/10")
+	_, cgnPrefix, err := net.ParseCIDR("100.64.0.0/10")
 	if err != nil {
 		utils.GetLogInstance().Error("can't parse CIDR", "error", err)
 		return
@@ -137,7 +137,7 @@ func (s *Service) DoService() {
 						continue
 					}
 					nip := netaddr.(*net.TCPAddr).IP
-					if nip.IsGlobalUnicast() || ipv4Net.Contains(nip) {
+					if (nip.IsGlobalUnicast() && !utils.IsPrivateIP(nip)) || cgnPrefix.Contains(nip) {
 						ip = nip.String()
 						port = fmt.Sprintf("%d", netaddr.(*net.TCPAddr).Port)
 						break
