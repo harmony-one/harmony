@@ -152,6 +152,7 @@ func main() {
 	clientNode.ServiceManagerSetup()
 	clientNode.RunServices()
 
+	// Start the client server to listen to leader's message
 	go func() {
 		// wait for 3 seconds for client to send ping message to leader
 		// FIXME (leo) the readySignal should be set once we really sent ping message to leader

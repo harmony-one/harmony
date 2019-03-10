@@ -51,7 +51,7 @@ var (
 )
 
 func TestString(test *testing.T) {
-	ping1 := NewPingMessage(p1)
+	ping1 := NewPingMessage(p1, false)
 
 	r1 := fmt.Sprintf("%v", *ping1)
 	if strings.Compare(r1, e1) != 0 {
@@ -74,7 +74,7 @@ func TestString(test *testing.T) {
 }
 
 func TestSerialize(test *testing.T) {
-	ping1 := NewPingMessage(p1)
+	ping1 := NewPingMessage(p1, true)
 	buf1 = ping1.ConstructPingMessage()
 	msg1, err := proto.GetMessagePayload(buf1)
 	if err != nil {

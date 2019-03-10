@@ -166,8 +166,10 @@ func sendPingMessage(node *Node, leader p2p.Peer) {
 		ConsensusPubKey: pubKey1,
 	}
 
-	ping1 := proto_discovery.NewPingMessage(p1)
+	ping1 := proto_discovery.NewPingMessage(p1, true)
+	ping2 := proto_discovery.NewPingMessage(p1, false)
 	_ = ping1.ConstructPingMessage()
+	_ = ping2.ConstructPingMessage()
 }
 
 func sendPongMessage(node *Node, leader p2p.Peer) {
