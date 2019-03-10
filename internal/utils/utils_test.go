@@ -3,6 +3,7 @@ package utils
 import (
 	"bytes"
 	"encoding/hex"
+	"net"
 	"os"
 	"testing"
 
@@ -156,4 +157,39 @@ func TestSaveLoadKeyFile(t *testing.T) {
 
 	os.Remove(filename)
 	os.Remove(nonexist)
+}
+
+func TestIsPrivateIP(t *testing.T) {
+	addr := []struct {
+		ip        net.IP
+		isPrivate bool
+	}{
+		{
+			net.IPv4(127, 0, 0, 1),
+			true,
+		},
+		{
+			net.IPv4(172, 31, 82, 23),
+			true,
+		},
+		{
+			net.IPv4(192, 168, 82, 23),
+			true,
+		},
+		{
+			net.IPv4(54, 172, 99, 189),
+			false,
+		},
+		{
+			net.IPv4(10, 1, 0, 1),
+			true,
+		},
+	}
+
+	for _, a := range addr {
+		r := IsPrivateIP(a.ip)
+		if r != a.isPrivate {
+			t.Errorf("IP: %v, IsPrivate: %v, Expected: %v", a.ip, r, a.isPrivate)
+		}
+	}
 }

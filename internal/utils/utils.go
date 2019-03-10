@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	mrand "math/rand"
+	"net"
 	"os"
 	"regexp"
 	"strconv"
@@ -19,6 +20,7 @@ import (
 )
 
 var lock sync.Mutex
+var privateNets []*net.IPNet
 
 // PrivKeyStore is used to persist private key to/from file
 type PrivKeyStore struct {
@@ -27,6 +29,18 @@ type PrivKeyStore struct {
 
 func init() {
 	bls.Init(bls.BLS12_381)
+
+	for _, cidr := range []string{
+		"127.0.0.0/8",    // IPv4 loopback
+		"10.0.0.0/8",     // RFC1918
+		"172.16.0.0/12",  // RFC1918
+		"192.168.0.0/16", // RFC1918
+		"::1/128",        // IPv6 loopback
+		"fe80::/10",      // IPv6 link-local
+	} {
+		_, block, _ := net.ParseCIDR(cidr)
+		privateNets = append(privateNets, block)
+	}
 }
 
 // Unmarshal is a function that unmarshals the data from the
@@ -213,4 +227,14 @@ func LoadKeyFromFile(keyfile string) (key p2p_crypto.PrivKey, pk p2p_crypto.PubK
 	}
 	key, pk, err = LoadPrivateKey(keyStruct.Key)
 	return key, pk, err
+}
+
+// IsPrivateIP checks if an IP address is private or not
+func IsPrivateIP(ip net.IP) bool {
+	for _, block := range privateNets {
+		if block.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }
