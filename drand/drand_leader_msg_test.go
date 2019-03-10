@@ -23,8 +23,13 @@ func TestConstructInitMessage(test *testing.T) {
 	dRand.blockHash = [32]byte{}
 	msg := dRand.constructInitMessage()
 
-	if len(msg) != 93 {
-		test.Errorf("Init message is not constructed in the correct size: %d", len(msg))
+	msgPayload, _ := proto.GetDRandMessagePayload(msg)
+
+	message := drand_proto.Message{}
+	err = protobuf.Unmarshal(msgPayload, &message)
+
+	if err != nil {
+		test.Error("Error in extracting Init message from payload", err)
 	}
 }
 
