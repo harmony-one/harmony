@@ -38,7 +38,7 @@ var GenesisBeaconAccountPublicKey = GenesisBeaconAccountPriKey.PublicKey
 // DeployedContractAddress is the deployed contract address of the staking smart contract in beacon chain.
 var DeployedContractAddress = crypto.CreateAddress(crypto.PubkeyToAddress(GenesisBeaconAccountPublicKey), uint64(0))
 
-// InitialBeaconChainAccounts are the accounts for the initial beacon chain node.
+// InitialBeaconChainAccounts are the ECSDA accounts for the initial beacon chain nodes.
 var InitialBeaconChainAccounts = [...]DeployAccount{
 	{Address: "0xE2bD4413172C98d5094B94de1A8AC6a383d68b84", Private: "e401343197a852f361e38ce6b46c99f1d6d1f80499864c6ae7effee42b46ab6b", Public: "0xE2bD4413172C98d5094B94de1A8AC6a383d68b84"},
 	{Address: "0x183418934Fd8A97c98E086151317B2df6259b8A8", Private: "a7d764439a7619f703c97ee2a2cf0be2cd62ad4c9deebd5423d6f28de417b907", Public: "0x183418934Fd8A97c98E086151317B2df6259b8A8"},
@@ -50,6 +50,20 @@ var InitialBeaconChainAccounts = [...]DeployAccount{
 	{Address: "0x6f7659765a8784F782fc6Bcdb153e915076bb9F0", Private: "24be53d408b360cc1a3608d54fa8ba070692bbe8f594062c30a5e9e89cee9794", Public: "0x6f7659765a8784F782fc6Bcdb153e915076bb9F0"},
 	{Address: "0xfA24E616BaE95160878C7F1150d1e014904809E9", Private: "41d628799eee7637bd79ae9fc2fd1321cffbb4b858348d6abf5b4247b78fd492", Public: "0xfA24E616BaE95160878C7F1150d1e014904809E9"},
 	{Address: "0x47DF74d43fa4Ca1D814897eBD8Cf07e6bA024f75", Private: "d5a62757aa51f2ae883c5cb8631d312750ecc31f3934fffd95bcd969bd190c94", Public: "0x47DF74d43fa4Ca1D814897eBD8Cf07e6bA024f75"},
+}
+
+// InitialBeaconChainBLSAccounts are the BLS accounts for the initial beacon chain nodes.
+var InitialBeaconChainBLSAccounts = [...]DeployAccount{
+	{Address: "", Private: "66acb3a7c990be4b06709058fdef8122b7ecdbaf023e56ccf8cdf671c5333646", Public: ""},
+	{Address: "", Private: "5e9e2fffbf7cfad085d7b0147d2acd680cfd8b8d62daa9c39370185ba0207920", Public: ""},
+	{Address: "", Private: "56714bb94188c335d1243fa3d17fd50ff63a1a9bf740faecd97996f3a0737e87", Public: ""},
+	{Address: "", Private: "3de4fbe27f453b254014094108bf11b0a2ba4144585bf4cb10332155476339e9", Public: ""},
+	{Address: "", Private: "18c62ae8cd2a37e50b8fc89c53458ad6d9482f413d50086199d309ad1062684c", Public: ""},
+	{Address: "", Private: "2ca85157154a7df9fcdb4a404c7a8ac0675bbff7e841237b0de4645a9dcaca1c", Public: ""},
+	{Address: "", Private: "1dc77bb20378c7cacf82dd6fb7d5dedbb2c0855d85e0eb2d7d6df05bbb5da65d", Public: ""},
+	{Address: "", Private: "185bcaede728332c088645b31b988404512eeeb02413360cac6e30c9ca002661", Public: ""},
+	{Address: "", Private: "18b5d0d89b4575e002e4fd41e46fa628a248e1caa55fa887acd3c446b89058e3", Public: ""},
+	{Address: "", Private: "2221983e3f69897d54fcaa3cb131f4c729592f1b10faf247c0772e7b6476c1fd", Public: ""},
 }
 
 // NewNodeAccounts is the accounts used for new node to stake and join the network.

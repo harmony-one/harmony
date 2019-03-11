@@ -1,13 +1,9 @@
 package main
 
 import (
-	"crypto/ecdsa"
-	"crypto/rand"
-	"encoding/hex"
 	"log"
 	"time"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/harmony-one/bls/ffi/go/bls"
 )
 
@@ -21,18 +17,11 @@ func main() {
 	var aggPub *bls.PublicKey
 
 	startTime := time.Now()
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 10; i++ {
 		var sec bls.SecretKey
 		sec.SetByCSPRNG()
+		log.Printf("Secret Key: %s", sec.GetHexString())
 
-		if i == 0 {
-			testECKey, _ := ecdsa.GenerateKey(crypto.S256(), rand.Reader)
-			log.Printf("Secret Key: 0x%s", sec.GetHexString())
-			log.Printf("Secret Key: 0x%s", hex.EncodeToString(sec.GetLittleEndian()))
-			log.Printf("Secret Key Length: %d", len(sec.GetLittleEndian()))
-			log.Printf("Secret Key: 0x%s", hex.EncodeToString(testECKey.D.Bytes()))
-			log.Printf("Secret Key Length: %d", len(testECKey.D.Bytes()))
-		}
 		if i == 0 {
 			aggSig = sec.Sign(m)
 			aggPub = sec.GetPublicKey()
