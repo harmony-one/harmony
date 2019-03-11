@@ -105,6 +105,35 @@ func (node *Node) setupForWalletNode() {
 	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer, nil))
 }
 
+func (node *Node) setupForVariableNode() {
+	nodeConfig, chanPeer := node.initVariableNodeConfiguration()
+
+	for _, configService := range node.GetConfiguredServices() { //Find a appropriate place to abstract services, from both service and package nodeconfig
+		switch configService {
+		case service.PeerDiscovery:
+			node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer, node.AddBeaconPeer))
+		case service.NetworkInfo:
+			// Register networkinfo service. "0" is the beacon shard ID
+		case service.Consensus:
+			node.serviceManager.RegisterService(service.Consensus, consensus.New(node.BlockChannel, node.Consensus, node.startConsensus))
+		case service.BlockProposal:
+			// Register new block service.
+			node.serviceManager.RegisterService(service.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReady))
+		case service.ClientSupport:
+			// Register client support service.
+			node.serviceManager.RegisterService(service.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
+		case service.Randomness:
+			// Register randomness service
+			node.serviceManager.RegisterService(service.Randomness, randomness.New(node.DRand))
+		case service.SupportExplorer:
+			// Register explorer service.
+			node.serviceManager.RegisterService(service.SupportExplorer, explorer.New(&node.SelfPeer))
+		}
+	}
+	// Register peer discovery service.
+
+}
+
 // ServiceManagerSetup setups service store.
 func (node *Node) ServiceManagerSetup() {
 	node.serviceManager = &service.Manager{}
@@ -124,6 +153,8 @@ func (node *Node) ServiceManagerSetup() {
 		node.setupForClientNode()
 	case nodeconfig.WalletNode:
 		node.setupForWalletNode()
+	case nodeconfig.VariableNode:
+		node.setupForVariableNode()
 	}
 	node.serviceManager.SetupServiceMessageChan(node.serviceMessageChan)
 }

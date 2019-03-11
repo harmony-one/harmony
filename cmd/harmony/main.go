@@ -253,7 +253,7 @@ func main() {
 	}
 
 	log.Info("New Harmony Node ====", "Role", currentNode.NodeConfig.Role(), "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, nodeConfig.Host.GetID().Pretty()))
-	go currentNode.SupportSyncing()
+	go currentNode.SupportSyncing() //To be integrated into services.
 	currentNode.ServiceManagerSetup()
 	currentNode.RunServices()
 	currentNode.StartServer()

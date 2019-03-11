@@ -3,6 +3,7 @@ package service
 import (
 	"strconv"
 
+	"github.com/harmony-one/harmony/api/service"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/p2p"
 )
@@ -22,6 +23,7 @@ type NodeConfig struct {
 	IsLeader bool                           // whether this node is a leader or not
 	ShardID  uint32                         // shardID of this node
 	Actions  map[p2p.GroupID]p2p.ActionType // actions on the groups
+	Services []service.Type
 }
 
 // GroupIDShards is a map of Group ID

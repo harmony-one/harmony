@@ -27,6 +27,7 @@ const (
 	NewNode
 	ClientNode
 	WalletNode
+	VariableNode
 )
 
 func (role Role) String() string {
@@ -47,6 +48,8 @@ func (role Role) String() string {
 		return "ClientNode"
 	case WalletNode:
 		return "WalletNode"
+	case VariableNode:
+		return "VariableNode"
 	}
 	return "Unknown"
 }
@@ -66,10 +69,12 @@ type ConfigType struct {
 	isClient bool        // whether this node is a client node, such as wallet/txgen
 	isBeacon bool        // whether this node is a beacon node or not
 	isLeader bool        // whether this node is a leader or not
+	isWallet bool        // whether this node is a leader or not
 	shardID  uint32      // shardID of this node
 	role     Role        // Role of the node
 
-	ShardIDString   string
+	ShardIDString string
+
 	StringRole      string
 	Host            p2p.Host
 	StakingPriKey   *ecdsa.PrivateKey
@@ -78,9 +83,8 @@ type ConfigType struct {
 	ConsensusPubKey *bls.PublicKey
 	MainDB          *ethdb.LDBDatabase
 	BeaconDB        *ethdb.LDBDatabase
-
-	SelfPeer p2p.Peer
-	Leader   p2p.Peer
+	SelfPeer        p2p.Peer
+	Leader          p2p.Peer
 }
 
 // configs is a list of node configuration.
@@ -98,6 +102,12 @@ func GetConfigs(index int) *ConfigType {
 		return nil
 	}
 	return &configs[index]
+}
+
+//GetVariableConfig returns config for the variable node
+func GetVariableConfig() *ConfigType {
+	config := &ConfigType{}
+	return config
 }
 
 // GetGlobalConfig returns global config.
@@ -177,6 +187,11 @@ func (conf *ConfigType) IsBeacon() bool {
 // IsLeader returns the isLeader configuration
 func (conf *ConfigType) IsLeader() bool {
 	return conf.isLeader
+}
+
+//IsWallet returns the isClient configuration
+func (conf *ConfigType) IsWallet() bool {
+	return conf.isWallet
 }
 
 // ShardID returns the shardID

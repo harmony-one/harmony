@@ -480,6 +480,38 @@ func (node *Node) initBeaconNodeConfiguration() (service.NodeConfig, chan p2p.Pe
 	return nodeConfig, chanPeer
 }
 
+func (node *Node) initVariableNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
+	//Use NodeConfig to populate service's nodeconfig information.
+	//Use this in other configuration setups as well inorder to prevent
+	chanPeer := make(chan p2p.Peer)
+
+	nodeConfig := service.NodeConfig{
+		IsBeacon: node.NodeConfig.IsBeacon(),
+		IsClient: node.NodeConfig.IsClient(),
+		IsWallet: node.NodeConfig.IsWallet(),
+		Beacon:   p2p.GroupIDBeacon,
+		Group:    p2p.GroupIDUnknown,
+		Actions:  make(map[p2p.GroupID]p2p.ActionType),
+		Services: node.GetConfiguredServices(),
+	}
+	nodeConfig.Actions[p2p.GroupIDBeaconClient] = p2p.ActionStart
+
+	var err error
+	node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeacon)
+	if err != nil {
+		utils.GetLogInstance().Error("create group receiver error", "msg", err)
+	}
+
+	// All beacon chain node will subscribe to BeaconClient topic
+	node.clientReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
+	if err != nil {
+		utils.GetLogInstance().Error("create client receiver error", "msg", err)
+	}
+	node.NodeConfig.SetClientGroupID(p2p.GroupIDBeaconClient)
+
+	return nodeConfig, chanPeer
+}
+
 // AddBeaconChainDatabase adds database support for beaconchain blocks on normal sharding nodes (not BeaconChain node)
 func (node *Node) AddBeaconChainDatabase(db ethdb.Database) {
 	database := db
@@ -494,4 +526,10 @@ func (node *Node) AddBeaconChainDatabase(db ethdb.Database) {
 	}
 	node.beaconChain = chain
 	node.BeaconWorker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.ConsensusPubKey), node.Consensus.ShardID)
+}
+
+//GetConfiguredServices setups services required for the node
+func (node *Node) GetConfiguredServices() []service.Type {
+	services := make([]service.Type, 5)
+	return services
 }
