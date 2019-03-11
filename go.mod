@@ -22,7 +22,7 @@ require (
 	github.com/gorilla/mux v1.7.0
 	github.com/gorilla/websocket v1.4.0 // indirect
 	github.com/gxed/hashland v0.0.1
-	github.com/harmony-one/bls v0.0.0-20190220064443-3c0ae384f04f
+	github.com/harmony-one/bls v0.0.0-20190309234102-1bd75ac96c09
 	github.com/hashicorp/golang-lru v0.5.0
 	github.com/ipfs/go-cid v0.9.0 // indirect
 	github.com/ipfs/go-datastore v3.2.0+incompatible
