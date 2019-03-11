@@ -15,7 +15,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	crypto2 "github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/log"
+
+	//	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	clientService "github.com/harmony-one/harmony/api/client/service"
 	"github.com/harmony-one/harmony/cmd/client/wallet/lib"
@@ -63,8 +64,9 @@ var (
 // The main wallet program entrance. Note the this wallet program is for demo-purpose only. It does not implement
 // the secure storage of keys.
 func main() {
-	h := log.StreamHandler(os.Stdout, log.TerminalFormat(false))
-	log.Root().SetHandler(h)
+	// disable logging for wallet
+	//	h := log.StreamHandler(os.Stdout, log.TerminalFormat(false))
+	//	log.Root().SetHandler(h)
 
 	// Verify that a subcommand has been provided
 	// os.Arg[0] is the main command
