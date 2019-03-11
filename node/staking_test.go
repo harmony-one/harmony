@@ -16,6 +16,7 @@ var (
 	blockNum        = big.NewInt(15000)
 	lockPeriodCount = big.NewInt(1)
 	testAddress     = common.Address{123}
+	testBlsAddress  = common.Address{132}.Bytes() // [20]byte
 )
 
 func TestUpdateStakingList(t *testing.T) {
@@ -39,8 +40,9 @@ func TestUpdateStakingList(t *testing.T) {
 		node.AddNewBlock(block)
 	}
 
-	stakeInfo := &StakeInfo{
+	stakeInfo := &StakeInfoReturnValue{
 		[]common.Address{testAddress},
+		[][20]byte{testAddress},
 		[]*big.Int{blockNum},
 		[]*big.Int{lockPeriodCount},
 		[]*big.Int{amount},
@@ -48,7 +50,7 @@ func TestUpdateStakingList(t *testing.T) {
 
 	node.UpdateStakingList(stakeInfo)
 
-	if node.CurrentStakes[testAddress].Cmp(amount) != 0 {
+	if node.CurrentStakes[testAddress].Amount.Cmp(amount) != 0 {
 		t.Error("Stake Info is not updated correctly")
 	}
 }

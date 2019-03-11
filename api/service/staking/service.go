@@ -47,6 +47,7 @@ type Service struct {
 	stopChan      chan struct{}
 	stoppedChan   chan struct{}
 	accountKey    *ecdsa.PrivateKey
+	blsAddress    [20]byte
 	stakingAmount int64
 	state         State
 	beaconChain   *core.BlockChain
@@ -54,12 +55,13 @@ type Service struct {
 }
 
 // New returns staking service.
-func New(host p2p.Host, accountKey *ecdsa.PrivateKey, beaconChain *core.BlockChain) *Service {
+func New(host p2p.Host, accountKey *ecdsa.PrivateKey, beaconChain *core.BlockChain, blsAddress [20]byte) *Service {
 	return &Service{
 		host:          host,
 		stopChan:      make(chan struct{}),
 		stoppedChan:   make(chan struct{}),
 		accountKey:    accountKey,
+		blsAddress:    blsAddress,
 		stakingAmount: StakingAmount,
 		beaconChain:   beaconChain,
 	}
@@ -184,7 +186,8 @@ func (s *Service) createRawStakingMessage() []byte {
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to generate staking contract's ABI", "error", err)
 	}
-	bytesData, err := abi.Pack("lock")
+	// TODO: the bls address should be signed by the bls private key
+	bytesData, err := abi.Pack("lock", s.blsAddress)
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to generate ABI function bytes data", "error", err)
 	}

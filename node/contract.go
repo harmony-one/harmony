@@ -59,7 +59,7 @@ func (node *Node) generateDeployedStakingContractAddress(contractAddress common.
 }
 
 // QueryStakeInfo queries the stake info from the stake contract.
-func (node *Node) QueryStakeInfo() *StakeInfo {
+func (node *Node) QueryStakeInfo() *StakeInfoReturnValue {
 	abi, err := abi.JSON(strings.NewReader(contracts.StakeLockContractABI))
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to generate staking contract's ABI", "error", err)
@@ -96,7 +96,7 @@ func (node *Node) QueryStakeInfo() *StakeInfo {
 		return nil
 	}
 
-	ret := &StakeInfo{}
+	ret := &StakeInfoReturnValue{}
 
 	err = abi.Unpack(ret, "listLockedAddresses", output)
 

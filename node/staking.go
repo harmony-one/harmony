@@ -24,22 +24,30 @@ const (
 	lockPeriodInEpochs = 3 // This should be in sync with contracts/StakeLockContract.sol
 )
 
-// StakeInfo is the struct for the return value of listLockedAddresses func in stake contract.
-type StakeInfo struct {
+// StakeInfoReturnValue is the struct for the return value of listLockedAddresses func in stake contract.
+type StakeInfoReturnValue struct {
 	LockedAddresses  []common.Address
+	BlsAddresses     [][20]byte
 	BlockNums        []*big.Int
 	LockPeriodCounts []*big.Int // The number of locking period the token will be locked.
 	Amounts          []*big.Int
 }
 
+// StakeInfo stores the staking information for a staker.
+type StakeInfo struct {
+	BlsAddress      [20]byte
+	BlockNum        *big.Int
+	LockPeriodCount *big.Int // The number of locking period the token will be locked.
+	Amount          *big.Int
+}
+
 // UpdateStakingList updates staking information by querying the staking smart contract.
-func (node *Node) UpdateStakingList(stakeInfo *StakeInfo) {
-	node.CurrentStakes = make(map[common.Address]*big.Int)
-	if stakeInfo != nil {
-		for i, addr := range stakeInfo.LockedAddresses {
-			blockNum := stakeInfo.BlockNums[i]
-			lockPeriodCount := stakeInfo.LockPeriodCounts[i]
-			amount := stakeInfo.Amounts[i]
+func (node *Node) UpdateStakingList(stakeInfoReturnValue *StakeInfoReturnValue) {
+	node.CurrentStakes = make(map[common.Address]*StakeInfo)
+	if stakeInfoReturnValue != nil {
+		for i, addr := range stakeInfoReturnValue.LockedAddresses {
+			blockNum := stakeInfoReturnValue.BlockNums[i]
+			lockPeriodCount := stakeInfoReturnValue.LockPeriodCounts[i]
 
 			startEpoch := core.GetEpochFromBlockNumber(blockNum.Uint64())
 			curEpoch := core.GetEpochFromBlockNumber(node.blockchain.CurrentBlock().NumberU64())
@@ -48,7 +56,12 @@ func (node *Node) UpdateStakingList(stakeInfo *StakeInfo) {
 				continue // The token are counted into stakes at the beginning of next epoch.
 			}
 			if curEpoch-startEpoch <= lockPeriodCount.Uint64()*lockPeriodInEpochs {
-				node.CurrentStakes[addr] = amount
+				node.CurrentStakes[addr] = &StakeInfo{
+					stakeInfoReturnValue.BlsAddresses[i],
+					blockNum,
+					lockPeriodCount,
+					stakeInfoReturnValue.Amounts[i],
+				}
 			}
 		}
 	}
@@ -57,8 +70,8 @@ func (node *Node) UpdateStakingList(stakeInfo *StakeInfo) {
 func (node *Node) printStakingList() {
 	utils.GetLogInstance().Info("\n")
 	utils.GetLogInstance().Info("CURRENT STAKING INFO [START] ------------------------------------")
-	for addr, stake := range node.CurrentStakes {
-		utils.GetLogInstance().Info("", "Address", addr, "Stake", stake)
+	for addr, stakeInfo := range node.CurrentStakes {
+		utils.GetLogInstance().Info("", "Address", addr, "StakeInfo", stakeInfo)
 	}
 	utils.GetLogInstance().Info("CURRENT STAKING INFO [END}   ------------------------------------")
 	utils.GetLogInstance().Info("\n")
