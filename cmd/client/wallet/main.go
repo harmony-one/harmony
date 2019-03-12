@@ -19,8 +19,8 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	clientService "github.com/harmony-one/harmony/api/client/service"
-	"github.com/harmony-one/harmony/cmd/client/wallet/lib"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/wallet/wallet"
 	"github.com/harmony-one/harmony/node"
 )
 
@@ -172,7 +172,7 @@ func processImportCommnad() {
 
 func processBalancesCommand() {
 	balanceCommand.Parse(os.Args[2:])
-	walletNode := lib.CreateWalletNode()
+	walletNode := wallet.CreateWalletNode()
 
 	if *balanceAddressPtr == "" {
 		for i, address := range ReadAddresses() {
@@ -192,7 +192,7 @@ func processBalancesCommand() {
 
 func processGetFreeToken() {
 	freeTokenCommand.Parse(os.Args[2:])
-	walletNode := lib.CreateWalletNode()
+	walletNode := wallet.CreateWalletNode()
 
 	if *freeTokenAddressPtr == "" {
 		fmt.Println("Error: --address is required")
@@ -256,7 +256,7 @@ func processTransferCommand() {
 	// Generate transaction
 	senderPriKey := priKeys[senderIndex]
 	senderAddress := addresses[senderIndex]
-	walletNode := lib.CreateWalletNode()
+	walletNode := wallet.CreateWalletNode()
 	shardIDToAccountState := FetchBalance(senderAddress, walletNode)
 
 	state, ok := shardIDToAccountState[uint32(shardID)]
@@ -274,7 +274,7 @@ func processTransferCommand() {
 	amountBigInt := big.NewInt(int64(amount * params.GWei))
 	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(params.GWei))
 	tx, _ := types.SignTx(types.NewTransaction(state.nonce, receiverAddress, uint32(shardID), amountBigInt, params.TxGas, nil, nil), types.HomesteadSigner{}, senderPriKey)
-	lib.SubmitTransaction(tx, walletNode, uint32(shardID))
+	wallet.SubmitTransaction(tx, walletNode, uint32(shardID))
 }
 
 func convertBalanceIntoReadableFormat(balance *big.Int) string {
@@ -321,7 +321,7 @@ func convertBalanceIntoReadableFormat(balance *big.Int) string {
 // TODO add support for non beacon chain shards
 func FetchBalance(address common.Address, walletNode *node.Node) map[uint32]AccountState {
 	result := make(map[uint32]AccountState)
-	peers := lib.GetPeersFromBeaconChain(walletNode)
+	peers := wallet.GetPeersFromBeaconChain(walletNode)
 	if len(peers) == 0 {
 		fmt.Printf("[FATAL] Can't find peers\n")
 		return nil
@@ -338,7 +338,7 @@ func FetchBalance(address common.Address, walletNode *node.Node) map[uint32]Acco
 
 // GetFreeToken requests for token test token on each shard
 func GetFreeToken(address common.Address, walletNode *node.Node) {
-	peers := lib.GetPeersFromBeaconChain(walletNode)
+	peers := wallet.GetPeersFromBeaconChain(walletNode)
 	if len(peers) == 0 {
 		fmt.Printf("[FATAL] Can't find peers\n")
 		return
