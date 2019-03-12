@@ -142,6 +142,17 @@ func CalculateNewShardState(bc *BlockChain, epoch uint64) types.ShardState {
 	return ss.shardState
 }
 
+func fakeNewNodeList(seed int64) []types.NodeID {
+	rand.Seed(seed)
+	numNewNodes := rand.Intn(10)
+	nodeList := []types.NodeID{}
+	for i := 0; i < numNewNodes; i++ {
+		nid := strconv.Itoa(int(rand.Int63()))
+		nodeList = append(nodeList, types.NodeID(nid))
+	}
+	return nodeList
+}
+
 // calculateKickoutRate calculates the cuckoo rule kick out rate in order to make committee balanced
 func (ss *ShardingState) calculateKickoutRate(newNodeList []types.NodeID) float64 {
 	numActiveCommittees := ss.numShards / 2
@@ -172,16 +183,4 @@ func getInitShardState(numberOfShards, numNodesPerShard int) types.ShardState {
 		shardState = append(shardState, com)
 	}
 	return shardState
-}
-
-// remove later after new nodes list generation ready
-func fakeNewNodeList(seed int64) []types.NodeID {
-	rand.Seed(seed)
-	numNewNodes := rand.Intn(10)
-	nodeList := []types.NodeID{}
-	for i := 0; i < numNewNodes; i++ {
-		nid := strconv.Itoa(int(rand.Int63()))
-		nodeList = append(nodeList, types.NodeID(nid))
-	}
-	return nodeList
 }

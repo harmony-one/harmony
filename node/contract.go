@@ -4,6 +4,8 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/harmony-one/harmony/contracts/structs"
+
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common/math"
 
@@ -59,7 +61,7 @@ func (node *Node) generateDeployedStakingContractAddress(contractAddress common.
 }
 
 // QueryStakeInfo queries the stake info from the stake contract.
-func (node *Node) QueryStakeInfo() *StakeInfoReturnValue {
+func (node *Node) QueryStakeInfo() *structs.StakeInfoReturnValue {
 	abi, err := abi.JSON(strings.NewReader(contracts.StakeLockContractABI))
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to generate staking contract's ABI", "error", err)
@@ -96,7 +98,7 @@ func (node *Node) QueryStakeInfo() *StakeInfoReturnValue {
 		return nil
 	}
 
-	ret := &StakeInfoReturnValue{}
+	ret := &structs.StakeInfoReturnValue{}
 
 	err = abi.Unpack(ret, "listLockedAddresses", output)
 

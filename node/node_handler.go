@@ -262,7 +262,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) bool {
 	// TODO: verify the vrf randomness
 	_ = newBlock.Header().RandPreimage
 
-	err = node.blockchain.ValidateNewShardState(newBlock)
+	err = node.blockchain.ValidateNewShardState(newBlock, &node.CurrentStakes)
 	if err != nil {
 		utils.GetLogInstance().Debug("Failed to verify new sharding state", "err", err)
 	}
@@ -298,6 +298,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 func (node *Node) AddNewBlock(newBlock *types.Block) {
 	blockNum, err := node.blockchain.InsertChain([]*types.Block{newBlock})
 
+	node.blockchain.InsertNewShardState(newBlock, &node.CurrentStakes)
 	if err != nil {
 		utils.GetLogInstance().Debug("Error adding new block to blockchain", "blockNum", blockNum, "Error", err)
 	} else {

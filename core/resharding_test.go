@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// remove later after bootstrap codes ready
 func fakeGetInitShardState(numberOfShards, numOfNodes int) types.ShardState {
 	rand.Seed(int64(InitialSeed))
 	shardState := types.ShardState{}

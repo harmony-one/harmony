@@ -4,6 +4,8 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/harmony-one/harmony/contracts/structs"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -40,7 +42,7 @@ func TestUpdateStakingList(t *testing.T) {
 		node.AddNewBlock(block)
 	}
 
-	stakeInfo := &StakeInfoReturnValue{
+	stakeInfo := &structs.StakeInfoReturnValue{
 		[]common.Address{testAddress},
 		[][20]byte{testAddress},
 		[]*big.Int{blockNum},
