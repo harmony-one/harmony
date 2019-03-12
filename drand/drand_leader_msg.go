@@ -1,20 +1,27 @@
 package drand
 
 import (
-	drand_proto "github.com/harmony-one/harmony/api/drand"
 	"github.com/harmony-one/harmony/api/proto"
+	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // Constructs the init message
 func (dRand *DRand) constructInitMessage() []byte {
-	message := drand_proto.Message{}
-	message.Type = drand_proto.MessageType_INIT
-	message.SenderId = dRand.nodeID
+	message := &msg_pb.Message{
+		ReceiverType: msg_pb.ReceiverType_VALIDATOR,
+		ServiceType:  msg_pb.ServiceType_DRAND,
+		Type:         msg_pb.MessageType_DRAND_INIT,
+		Request: &msg_pb.Message_Drand{
+			Drand: &msg_pb.DrandRequest{},
+		},
+	}
 
-	message.BlockHash = dRand.blockHash[:]
+	drandMsg := message.GetDrand()
+	drandMsg.SenderId = dRand.nodeID
+	drandMsg.BlockHash = dRand.blockHash[:]
 	// Don't need the payload in init message
-	marshaledMessage, err := dRand.signAndMarshalDRandMessage(&message)
+	marshaledMessage, err := dRand.signAndMarshalDRandMessage(message)
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to sign and marshal the init message", "error", err)
 	}

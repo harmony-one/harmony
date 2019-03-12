@@ -6,6 +6,7 @@ import (
 
 	protobuf "github.com/golang/protobuf/proto"
 	drand_proto "github.com/harmony-one/harmony/api/drand"
+	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/vdf"
@@ -80,15 +81,15 @@ func (dRand *DRand) init(epochBlock *types.Block) {
 
 // ProcessMessageLeader dispatches messages for the leader to corresponding processors.
 func (dRand *DRand) ProcessMessageLeader(payload []byte) {
-	message := drand_proto.Message{}
-	err := protobuf.Unmarshal(payload, &message)
+	message := &msg_pb.Message{}
+	err := protobuf.Unmarshal(payload, message)
 
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to unmarshal message payload.", "err", err, "dRand", dRand)
 	}
 
 	switch message.Type {
-	case drand_proto.MessageType_COMMIT:
+	case msg_pb.MessageType_COMMIT:
 		dRand.processCommitMessage(message)
 	default:
 		utils.GetLogInstance().Error("Unexpected message type", "msgType", message.Type, "dRand", dRand)
@@ -96,8 +97,8 @@ func (dRand *DRand) ProcessMessageLeader(payload []byte) {
 }
 
 // ProcessMessageValidator dispatches validator's consensus message.
-func (dRand *DRand) processCommitMessage(message drand_proto.Message) {
-	if message.Type != drand_proto.MessageType_COMMIT {
+func (dRand *DRand) processCommitMessage(message *msg_pb.Message) {
+	if message.Type != msg_pb.MessageType_DRAND_COMMIT {
 		utils.GetLogInstance().Error("Wrong message type received", "expected", drand_proto.MessageType_COMMIT, "got", message.Type)
 		return
 	}
@@ -105,7 +106,8 @@ func (dRand *DRand) processCommitMessage(message drand_proto.Message) {
 	dRand.mutex.Lock()
 	defer dRand.mutex.Unlock()
 
-	validatorID := message.SenderId
+	drandMsg := message.GetDrand()
+	validatorID := drandMsg.SenderId
 	validatorPeer := dRand.getValidatorPeerByID(validatorID)
 	vrfs := dRand.vrfs
 	if len((*vrfs)) >= ((len(dRand.PublicKeys))/3 + 1) {
@@ -120,9 +122,9 @@ func (dRand *DRand) processCommitMessage(message drand_proto.Message) {
 		return
 	}
 
-	rand := message.Payload[:32]
-	proof := message.Payload[32 : len(message.Payload)-64]
-	pubKeyBytes := message.Payload[len(message.Payload)-64:]
+	rand := drandMsg.Payload[:32]
+	proof := drandMsg.Payload[32 : len(drandMsg.Payload)-64]
+	pubKeyBytes := drandMsg.Payload[len(drandMsg.Payload)-64:]
 	_, pubKey := p256.GenerateKey()
 	pubKey.Deserialize(pubKeyBytes)
 
@@ -135,7 +137,7 @@ func (dRand *DRand) processCommitMessage(message drand_proto.Message) {
 
 	utils.GetLogInstance().Debug("Received new VRF commit", "numReceivedSoFar", len((*vrfs)), "validatorID", validatorID, "PublicKeys", len(dRand.PublicKeys))
 
-	(*vrfs)[validatorID] = message.Payload
+	(*vrfs)[validatorID] = drandMsg.Payload
 	dRand.bitmap.SetKey(validatorPeer.ConsensusPubKey, true) // Set the bitmap indicating that this validator signed.
 
 	if len((*vrfs)) >= ((len(dRand.PublicKeys))/3 + 1) {

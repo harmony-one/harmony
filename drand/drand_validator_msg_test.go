@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	protobuf "github.com/golang/protobuf/proto"
-	drand_proto "github.com/harmony-one/harmony/api/drand"
 	"github.com/harmony-one/harmony/api/proto"
+	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
@@ -24,8 +24,8 @@ func TestConstructCommitMessage(test *testing.T) {
 	msg := dRand.constructCommitMessage([32]byte{}, []byte{})
 	msgPayload, _ := proto.GetDRandMessagePayload(msg)
 
-	message := drand_proto.Message{}
-	err = protobuf.Unmarshal(msgPayload, &message)
+	message := &msg_pb.Message{}
+	err = protobuf.Unmarshal(msgPayload, message)
 
 	if err != nil {
 		test.Error("Error in extracting Commit message from payload", err)
@@ -46,8 +46,8 @@ func TestProcessInitMessage(test *testing.T) {
 
 	msgPayload, _ := proto.GetDRandMessagePayload(msg)
 
-	message := drand_proto.Message{}
-	err = protobuf.Unmarshal(msgPayload, &message)
+	message := &msg_pb.Message{}
+	err = protobuf.Unmarshal(msgPayload, message)
 
 	if err != nil {
 		test.Error("Error in extracting Init message from payload", err)
