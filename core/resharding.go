@@ -158,11 +158,13 @@ func (ss *ShardingState) UpdateShardingState(stakeInfo *map[common.Address]*stru
 			addr.SetBytes(addrBytes)
 			oldAddresses[addr] = true
 			_, ok := (*stakeInfo)[addr]
-			if !ok {
-				// Remove the node if it's no longer staked
+			if ok {
 				newNodeList = append(newNodeList, nodeID)
+			} else {
+				// Remove the node if it's no longer staked
 			}
 		}
+		shard.NodeList = newNodeList
 	}
 
 	newAddresses := []types.NodeID{}
