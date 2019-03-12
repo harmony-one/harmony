@@ -2,7 +2,6 @@ package drand
 
 import (
 	protobuf "github.com/golang/protobuf/proto"
-	drand_proto "github.com/harmony-one/harmony/api/drand"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -28,7 +27,7 @@ func (dRand *DRand) ProcessMessageValidator(payload []byte) {
 // ProcessMessageValidator dispatches validator's consensus message.
 func (dRand *DRand) processInitMessage(message *msg_pb.Message) {
 	if message.Type != msg_pb.MessageType_DRAND_INIT {
-		utils.GetLogInstance().Error("Wrong message type received", "expected", drand_proto.MessageType_COMMIT, "got", message.Type)
+		utils.GetLogInstance().Error("Wrong message type received", "expected", msg_pb.MessageType_DRAND_INIT, "got", message.Type)
 		return
 	}
 

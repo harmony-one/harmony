@@ -5,7 +5,6 @@ import (
 	"time"
 
 	protobuf "github.com/golang/protobuf/proto"
-	drand_proto "github.com/harmony-one/harmony/api/drand"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -89,7 +88,7 @@ func (dRand *DRand) ProcessMessageLeader(payload []byte) {
 	}
 
 	switch message.Type {
-	case msg_pb.MessageType_COMMIT:
+	case msg_pb.MessageType_DRAND_COMMIT:
 		dRand.processCommitMessage(message)
 	default:
 		utils.GetLogInstance().Error("Unexpected message type", "msgType", message.Type, "dRand", dRand)
@@ -99,7 +98,7 @@ func (dRand *DRand) ProcessMessageLeader(payload []byte) {
 // ProcessMessageValidator dispatches validator's consensus message.
 func (dRand *DRand) processCommitMessage(message *msg_pb.Message) {
 	if message.Type != msg_pb.MessageType_DRAND_COMMIT {
-		utils.GetLogInstance().Error("Wrong message type received", "expected", drand_proto.MessageType_COMMIT, "got", message.Type)
+		utils.GetLogInstance().Error("Wrong message type received", "expected", msg_pb.MessageType_DRAND_COMMIT, "got", message.Type)
 		return
 	}
 
