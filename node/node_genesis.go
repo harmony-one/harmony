@@ -43,9 +43,10 @@ func (node *Node) GenesisBlockSetup(db ethdb.Database) (*core.BlockChain, error)
 	chainConfig := params.TestChainConfig
 	chainConfig.ChainID = big.NewInt(int64(node.Consensus.ShardID)) // Use ChainID as piggybacked ShardID
 	gspec := core.Genesis{
-		Config:  chainConfig,
-		Alloc:   genesisAlloc,
-		ShardID: uint32(node.Consensus.ShardID),
+		Config:         chainConfig,
+		Alloc:          genesisAlloc,
+		ShardID:        uint32(node.Consensus.ShardID),
+		ShardStateHash: core.GetInitShardState().Hash(),
 	}
 
 	// Store genesis block into db.

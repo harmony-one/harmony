@@ -19,9 +19,12 @@ import (
 const (
 	// InitialSeed is the initial random seed, a magic number to answer everything, remove later
 	InitialSeed uint32 = 42
-	// FirstEpoch is the number of the first epoch.
-	// TODO(minhdoan): we should design the first epoch as 0. Please figure out how to change other logic to make it 0
-	FirstEpoch = 1
+	// GenesisEpoch is the number of the first genesis epoch.
+	GenesisEpoch = 0
+	// GenesisShardNum is the number of shard at genesis
+	GenesisShardNum = 3
+	// GenesisShardSize is the size of each shard at genesis
+	GenesisShardSize = 10
 )
 
 // ShardingState is data structure hold the sharding state
@@ -134,8 +137,8 @@ func GetShardingStateFromBlockChain(bc *BlockChain, epoch uint64) *ShardingState
 // CalculateNewShardState get sharding state from previous epoch and calculate sharding state for new epoch
 // TODO: currently, we just mock everything
 func CalculateNewShardState(bc *BlockChain, epoch uint64, stakeInfo *map[common.Address]*structs.StakeInfo) types.ShardState {
-	if epoch == FirstEpoch {
-		return getInitShardState(3, 10)
+	if epoch == GenesisEpoch {
+		return GetInitShardState()
 	}
 	ss := GetShardingStateFromBlockChain(bc, epoch-1)
 	newNodeList := ss.UpdateShardingState(stakeInfo)
@@ -190,13 +193,13 @@ func (ss *ShardingState) calculateKickoutRate(newNodeList []types.NodeID) float6
 	return math.Max(0.1, math.Min(rate, 1.0))
 }
 
-// getInitShardState returns the initial shard state at genesis.
-func getInitShardState(numberOfShards, numNodesPerShard int) types.ShardState {
+// GetInitShardState returns the initial shard state at genesis.
+func GetInitShardState() types.ShardState {
 	shardState := types.ShardState{}
-	for i := 0; i < numberOfShards; i++ {
+	for i := 0; i < GenesisShardNum; i++ {
 		com := types.Committee{ShardID: uint32(i)}
 		if i == 0 {
-			for j := 0; j < numNodesPerShard; j++ {
+			for j := 0; j < GenesisShardSize; j++ {
 				priKey := bls.SecretKey{}
 				priKey.SetHexString(contract.InitialBeaconChainAccounts[i].Private)
 				addrBytes := priKey.GetPublicKey().GetAddress()
