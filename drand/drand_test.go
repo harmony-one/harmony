@@ -7,7 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
-	drand_proto "github.com/harmony-one/harmony/api/drand"
+	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -167,12 +167,20 @@ func TestVerifyMessageSig(test *testing.T) {
 		test.Fatalf("newhost failure: %v", err)
 	}
 	dRand := New(host, "0", []p2p.Peer{leader, validator}, leader, nil, true)
-	message := drand_proto.Message{}
-	message.Type = drand_proto.MessageType_INIT
-	message.SenderId = dRand.nodeID
 
-	message.BlockHash = dRand.blockHash[:]
-	dRand.signDRandMessage(&message)
+	message := &msg_pb.Message{
+		ReceiverType: msg_pb.ReceiverType_VALIDATOR,
+		ServiceType:  msg_pb.ServiceType_DRAND,
+		Type:         msg_pb.MessageType_DRAND_INIT,
+		Request: &msg_pb.Message_Drand{
+			Drand: &msg_pb.DrandRequest{},
+		},
+	}
+	drandMsg := message.GetDrand()
+	drandMsg.SenderId = dRand.nodeID
+	drandMsg.BlockHash = dRand.blockHash[:]
+
+	dRand.signDRandMessage(message)
 
 	if verifyMessageSig(dRand.pubKey, message) != nil {
 		test.Error("Failed to verify the signature")
