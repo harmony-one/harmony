@@ -86,7 +86,7 @@ type Info struct {
 }
 
 func (info Info) String() string {
-	return fmt.Sprintf("Info:%v/%v=>%v/%v", info.IP, info.Port, info.ValidatorID, info.PeerID)
+	return fmt.Sprintf("Info:%v/%v=>%v/%v", info.IP, info.Port, info.ValidatorID, info.PeerID.Pretty())
 }
 
 // BlockMessageType represents the type of messages used for Node/Block

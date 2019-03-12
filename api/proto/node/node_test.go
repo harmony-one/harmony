@@ -10,7 +10,6 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 
-	//	"fmt"
 	"math/big"
 	"reflect"
 	"testing"
@@ -131,7 +130,7 @@ func TestInfoToString(t *testing.T) {
 		ValidatorID: 1,
 		PeerID:      "peer",
 	}
-	if strings.Compare(info.String(), "Info:127.0.0.1/81=>1/<peer.ID 3sdfvR>") != 0 {
-		t.Error("Info string mismatch")
+	if strings.Compare(info.String(), "Info:127.0.0.1/81=>1/3sdfvR") != 0 {
+		t.Errorf("Info string mismatch: %v", info.String())
 	}
 }
