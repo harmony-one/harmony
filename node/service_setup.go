@@ -98,8 +98,8 @@ func (node *Node) setupForClientNode() {
 	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer, nil))
 }
 
-func (node *Node) setupForBackupNode() {
-	nodeConfig, chanPeer := node.initNodeConfiguration()
+func (node *Node) setupForBackupNode(isBeacon bool) {
+	nodeConfig, chanPeer := node.initNodeConfiguration(isBeacon, false)
 	// Register peer discovery service.
 	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer, node.AddBeaconPeer))
 	// Register networkinfo service. "0" is the beacon shard ID
@@ -125,7 +125,7 @@ func (node *Node) ServiceManagerSetup() {
 	case nodeconfig.ClientNode:
 		node.setupForClientNode()
 	case nodeconfig.BackupNode:
-		node.setupForBackupNode()
+		node.setupForBackupNode(true)
 	}
 	node.serviceManager.SetupServiceMessageChan(node.serviceMessageChan)
 }
