@@ -1713,7 +1713,7 @@ func (bc *BlockChain) GetNewShardState(block *types.Block, stakeInfo *map[common
 	shardState := bc.GetShardState(hash, number)
 	if shardState == nil {
 		epoch := GetEpochFromBlockNumber(number)
-		shardState = CalculateNewShardState(bc, epoch)
+		shardState = CalculateNewShardState(bc, epoch, stakeInfo)
 		bc.shardStateCache.Add(hash, shardState)
 	}
 	return shardState

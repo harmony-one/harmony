@@ -6,9 +6,11 @@ import (
 	"math"
 	"math/rand"
 	"sort"
-	"strconv"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/contracts/structs"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/internal/utils/contract"
 
 	"github.com/harmony-one/harmony/core/types"
@@ -86,8 +88,8 @@ func (ss *ShardingState) assignLeaders() {
 	}
 }
 
-// UpdateShardState will first add new nodes into shards, then use cuckoo rule to reshard to get new shard state
-func (ss *ShardingState) UpdateShardState(newNodeList []types.NodeID, percent float64) {
+// Reshard will first add new nodes into shards, then use cuckoo rule to reshard to get new shard state
+func (ss *ShardingState) Reshard(newNodeList []types.NodeID, percent float64) {
 	rand.Seed(int64(ss.rnd))
 	ss.sortCommitteeBySize()
 	// TODO: separate shuffling and leader assignment
@@ -131,26 +133,46 @@ func GetShardingStateFromBlockChain(bc *BlockChain, epoch uint64) *ShardingState
 
 // CalculateNewShardState get sharding state from previous epoch and calculate sharding state for new epoch
 // TODO: currently, we just mock everything
-func CalculateNewShardState(bc *BlockChain, epoch uint64) types.ShardState {
+func CalculateNewShardState(bc *BlockChain, epoch uint64, stakeInfo *map[common.Address]*structs.StakeInfo) types.ShardState {
 	if epoch == FirstEpoch {
 		return getInitShardState(3, 10)
 	}
 	ss := GetShardingStateFromBlockChain(bc, epoch-1)
-	newNodeList := fakeNewNodeList(int64(ss.rnd))
+	newNodeList := ss.UpdateShardingState(stakeInfo)
 	percent := ss.calculateKickoutRate(newNodeList)
-	ss.UpdateShardState(newNodeList, percent)
+	ss.Reshard(newNodeList, percent)
 	return ss.shardState
 }
 
-func fakeNewNodeList(seed int64) []types.NodeID {
-	rand.Seed(seed)
-	numNewNodes := rand.Intn(10)
-	nodeList := []types.NodeID{}
-	for i := 0; i < numNewNodes; i++ {
-		nid := strconv.Itoa(int(rand.Int63()))
-		nodeList = append(nodeList, types.NodeID(nid))
+// UpdateShardingState remove the unstaked nodes and returns the newly staked node Ids.
+func (ss *ShardingState) UpdateShardingState(stakeInfo *map[common.Address]*structs.StakeInfo) []types.NodeID {
+	oldAddresses := make(map[common.Address]bool)
+	for _, shard := range ss.shardState {
+		newNodeList := shard.NodeList[:0]
+		for _, nodeID := range shard.NodeList {
+			addr := common.Address{}
+			addrBytes, err := hex.DecodeString(string(nodeID))
+			if err != nil {
+				utils.GetLogInstance().Error("Failed to decode address hex")
+			}
+			addr.SetBytes(addrBytes)
+			oldAddresses[addr] = true
+			_, ok := (*stakeInfo)[addr]
+			if !ok {
+				// Remove the node if it's no longer staked
+				newNodeList = append(newNodeList, nodeID)
+			}
+		}
 	}
-	return nodeList
+
+	newAddresses := []types.NodeID{}
+	for addr := range *stakeInfo {
+		_, ok := oldAddresses[addr]
+		if !ok {
+			newAddresses = append(newAddresses, types.NodeID(addr.Hex()))
+		}
+	}
+	return newAddresses
 }
 
 // calculateKickoutRate calculates the cuckoo rule kick out rate in order to make committee balanced

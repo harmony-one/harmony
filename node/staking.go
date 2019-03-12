@@ -40,6 +40,7 @@ func (node *Node) UpdateStakingList(stakeInfoReturnValue *structs.StakeInfoRetur
 			if startEpoch == curEpoch {
 				continue // The token are counted into stakes at the beginning of next epoch.
 			}
+			// True if the token is still staked within the locking period.
 			if curEpoch-startEpoch <= lockPeriodCount.Uint64()*lockPeriodInEpochs {
 				node.CurrentStakes[addr] = &structs.StakeInfo{
 					stakeInfoReturnValue.BlsAddresses[i],
