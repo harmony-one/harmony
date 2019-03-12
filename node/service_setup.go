@@ -105,6 +105,15 @@ func (node *Node) setupForWalletNode() {
 	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer, nil))
 }
 
+func (node *Node) setupForBackupNode() {
+	nodeConfig, chanPeer := node.initNodeConfiguration()
+	// Register peer discovery service.
+	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer, node.AddBeaconPeer))
+	// Register networkinfo service. "0" is the beacon shard ID
+	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer, nil))
+	//TODO: Add Syncing as a service.
+}
+
 // ServiceManagerSetup setups service store.
 func (node *Node) ServiceManagerSetup() {
 	node.serviceManager = &service.Manager{}
@@ -124,6 +133,8 @@ func (node *Node) ServiceManagerSetup() {
 		node.setupForClientNode()
 	case nodeconfig.WalletNode:
 		node.setupForWalletNode()
+	case nodeconfig.BackupNode:
+		node.setupForBackupNode()
 	}
 	node.serviceManager.SetupServiceMessageChan(node.serviceMessageChan)
 }

@@ -27,6 +27,7 @@ const (
 	NewNode
 	ClientNode
 	WalletNode
+	BackupNode
 )
 
 func (role Role) String() string {
@@ -47,6 +48,8 @@ func (role Role) String() string {
 		return "ClientNode"
 	case WalletNode:
 		return "WalletNode"
+	case BackupNode:
+		return "BackupNode"
 	}
 	return "Unknown"
 }
