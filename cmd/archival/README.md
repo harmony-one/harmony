@@ -18,15 +18,18 @@ Specifically, if we run in testnet with on beacon chain we want to have a system
 
 ### First proposal
 
-#### Archival node or light node
+#### Archival node or backup node
 
-For each shard chain or beacon chain, we need to run a few nodes (let's call archival node or light node) joining that shard or beacon shard and receive new block proposal from the leader of that shard.
+For each shard chain or beacon chain, we need to run a few nodes (let's call archival node or backup node) joining that shard or beacon shard and receive new block proposal from the leader of that shard.
 
-Followings are the set of services the archival node needs to run
+Followings are the set of functions required by archival node. 
 
 - NetworkInfo, Discovery.
-- Implement receiving new block in node_handler.
-- Currently leaders in shard chain or beacon chain only broadcast only to validators in their shard. We may need to modify some logic in discovery to make sure the archival node will receive the broadcast.
+- Receive new block that reaches final consensus by the shard.
+- Keep sync with latest blockchain if backup node is offline or due to slow network condition
+- Save and flush the received new block into EBS 
+- Save the latest blockchain into S3 every N days (N=1) as long term storage
+- Accept recover requests from other nodes and broadcast backup blockchain data when the whole network is down
 
 #### Other functionality.
 
