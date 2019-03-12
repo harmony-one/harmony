@@ -2,11 +2,39 @@ package core
 
 import (
 	"fmt"
+	"math/rand"
+	"strconv"
 	"testing"
 
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/stretchr/testify/assert"
 )
+
+func fakeGetInitShardState(numberOfShards, numOfNodes int) types.ShardState {
+	rand.Seed(int64(InitialSeed))
+	shardState := types.ShardState{}
+	for i := 0; i < numberOfShards; i++ {
+		sid := uint32(i)
+		com := types.Committee{ShardID: sid}
+		for j := 0; j < numOfNodes; j++ {
+			nid := strconv.Itoa(int(rand.Int63()))
+			com.NodeList = append(com.NodeList, types.NodeID(nid))
+		}
+		shardState = append(shardState, com)
+	}
+	return shardState
+}
+
+func fakeNewNodeList(seed int64) []types.NodeID {
+	rand.Seed(seed)
+	numNewNodes := rand.Intn(10)
+	nodeList := []types.NodeID{}
+	for i := 0; i < numNewNodes; i++ {
+		nid := strconv.Itoa(int(rand.Int63()))
+		nodeList = append(nodeList, types.NodeID(nid))
+	}
+	return nodeList
+}
 
 func TestFakeNewNodeList(t *testing.T) {
 	nodeList := fakeNewNodeList(42)
@@ -63,7 +91,7 @@ func TestUpdateShardState(t *testing.T) {
 		"node6",
 	}
 
-	ss.UpdateShardState(newNodeList, 0.2)
+	ss.Reshard(newNodeList, 0.2)
 	assert.Equal(t, 6, ss.numShards)
 	for _, shard := range ss.shardState {
 		assert.Equal(t, string(shard.Leader), string(shard.NodeList[0]))

@@ -5,6 +5,8 @@ import (
 	"math/big"
 	"os"
 
+	"github.com/harmony-one/harmony/contracts/structs"
+
 	"github.com/harmony-one/harmony/core"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -24,26 +26,9 @@ const (
 	lockPeriodInEpochs = 3 // This should be in sync with contracts/StakeLockContract.sol
 )
 
-// StakeInfoReturnValue is the struct for the return value of listLockedAddresses func in stake contract.
-type StakeInfoReturnValue struct {
-	LockedAddresses  []common.Address
-	BlsAddresses     [][20]byte
-	BlockNums        []*big.Int
-	LockPeriodCounts []*big.Int // The number of locking period the token will be locked.
-	Amounts          []*big.Int
-}
-
-// StakeInfo stores the staking information for a staker.
-type StakeInfo struct {
-	BlsAddress      [20]byte
-	BlockNum        *big.Int
-	LockPeriodCount *big.Int // The number of locking period the token will be locked.
-	Amount          *big.Int
-}
-
 // UpdateStakingList updates staking information by querying the staking smart contract.
-func (node *Node) UpdateStakingList(stakeInfoReturnValue *StakeInfoReturnValue) {
-	node.CurrentStakes = make(map[common.Address]*StakeInfo)
+func (node *Node) UpdateStakingList(stakeInfoReturnValue *structs.StakeInfoReturnValue) {
+	node.CurrentStakes = make(map[common.Address]*structs.StakeInfo)
 	if stakeInfoReturnValue != nil {
 		for i, addr := range stakeInfoReturnValue.LockedAddresses {
 			blockNum := stakeInfoReturnValue.BlockNums[i]
@@ -55,8 +40,9 @@ func (node *Node) UpdateStakingList(stakeInfoReturnValue *StakeInfoReturnValue) 
 			if startEpoch == curEpoch {
 				continue // The token are counted into stakes at the beginning of next epoch.
 			}
+			// True if the token is still staked within the locking period.
 			if curEpoch-startEpoch <= lockPeriodCount.Uint64()*lockPeriodInEpochs {
-				node.CurrentStakes[addr] = &StakeInfo{
+				node.CurrentStakes[addr] = &structs.StakeInfo{
 					stakeInfoReturnValue.BlsAddresses[i],
 					blockNum,
 					lockPeriodCount,

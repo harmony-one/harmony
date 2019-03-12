@@ -27,6 +27,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/harmony-one/harmony/contracts/structs"
+	lru "github.com/hashicorp/golang-lru"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/common/prque"
@@ -44,7 +47,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/utils"
-	lru "github.com/hashicorp/golang-lru"
 )
 
 var (
@@ -1254,10 +1256,6 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 
 		cache, _ := bc.stateCache.TrieDB().Size()
 		stats.report(chain, i, cache)
-
-		// only insert new shardstate when block is epoch block
-		// TODO(minhdoan): this is only for beaconc chain
-		bc.InsertNewShardState(block)
 	}
 	// Append a single chain head event if we've progressed the chain
 	if lastCanon != nil && bc.CurrentBlock().Hash() == lastCanon.Hash() {
@@ -1705,7 +1703,7 @@ func (bc *BlockChain) GetRandPreimageByNumber(number uint64) [32]byte {
 
 // GetNewShardState will calculate (if not exist) and get the new shard state for epoch block or nil if block is not epoch block
 // epoch block is where the new shard state stored
-func (bc *BlockChain) GetNewShardState(block *types.Block) types.ShardState {
+func (bc *BlockChain) GetNewShardState(block *types.Block, stakeInfo *map[common.Address]*structs.StakeInfo) types.ShardState {
 	hash := block.Hash()
 	// just ignore non-epoch block
 	if !IsEpochBlock(block) {
@@ -1715,15 +1713,15 @@ func (bc *BlockChain) GetNewShardState(block *types.Block) types.ShardState {
 	shardState := bc.GetShardState(hash, number)
 	if shardState == nil {
 		epoch := GetEpochFromBlockNumber(number)
-		shardState = CalculateNewShardState(bc, epoch)
+		shardState = CalculateNewShardState(bc, epoch, stakeInfo)
 		bc.shardStateCache.Add(hash, shardState)
 	}
 	return shardState
 }
 
 // ValidateNewShardState validate whether the new shard state root matches
-func (bc *BlockChain) ValidateNewShardState(block *types.Block) error {
-	shardState := bc.GetNewShardState(block)
+func (bc *BlockChain) ValidateNewShardState(block *types.Block, stakeInfo *map[common.Address]*structs.StakeInfo) error {
+	shardState := bc.GetNewShardState(block, stakeInfo)
 	if shardState == nil {
 		return nil
 	}
@@ -1735,9 +1733,9 @@ func (bc *BlockChain) ValidateNewShardState(block *types.Block) error {
 }
 
 // InsertNewShardState insert new shard state into epoch block
-func (bc *BlockChain) InsertNewShardState(block *types.Block) {
+func (bc *BlockChain) InsertNewShardState(block *types.Block, stakeInfo *map[common.Address]*structs.StakeInfo) {
 	// write state into db.
-	shardState := bc.GetNewShardState(block)
+	shardState := bc.GetNewShardState(block, stakeInfo)
 	if shardState == nil {
 		return
 	}

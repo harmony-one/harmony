@@ -79,7 +79,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 }
 
 func (node *Node) addNewShardState(block *types.Block) {
-	shardState := node.blockchain.GetNewShardState(block)
+	shardState := node.blockchain.GetNewShardState(block, &node.CurrentStakes)
 	if shardState != nil {
 		shardHash := shardState.Hash()
 		utils.GetLogInstance().Debug("[resharding] adding new shard state", "shardHash", shardHash)

@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/contracts/structs"
+
 	"github.com/harmony-one/harmony/contracts"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -137,7 +139,7 @@ type Node struct {
 	serviceManager *service.Manager
 
 	//Staked Accounts and Contract
-	CurrentStakes          map[common.Address]*StakeInfo //This will save the latest information about staked nodes.
+	CurrentStakes          map[common.Address]*structs.StakeInfo //This will save the latest information about staked nodes.
 	StakingContractAddress common.Address
 	WithdrawStakeFunc      []byte
 
@@ -251,7 +253,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database) *N
 
 		// Setup one time smart contracts
 		node.AddFaucetContractToPendingTransactions()
-		node.CurrentStakes = make(map[common.Address]*StakeInfo)
+		node.CurrentStakes = make(map[common.Address]*structs.StakeInfo)
 		node.AddStakingContractToPendingTransactions() //This will save the latest information about staked nodes in current staked
 	}
 
