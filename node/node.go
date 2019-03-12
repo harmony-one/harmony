@@ -240,6 +240,9 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database) *N
 			os.Exit(1)
 		}
 		node.blockchain = chain
+		// Store the genesis shard state into db.
+		node.blockchain.StoreNewShardState(node.blockchain.CurrentBlock(), nil)
+
 		node.BlockChannel = make(chan *types.Block)
 		node.ConfirmedBlockChannel = make(chan *types.Block)
 		node.BeaconBlockChannel = make(chan *types.Block)

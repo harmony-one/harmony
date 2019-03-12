@@ -8,3 +8,4 @@
 127.0.0.1 9007 validator 0
 127.0.0.1 9008 validator 0
 127.0.0.1 9009 validator 0
+127.0.0.1 19999 client 0

@@ -154,7 +154,7 @@ func (node *Node) messageHandler(content []byte, sender string) {
 			utils.GetLogInstance().Info("NET: received message: Node/Control")
 			controlType := msgPayload[0]
 			if proto_node.ControlMessageType(controlType) == proto_node.STOP {
-				utils.GetLogInstance().Debug("Stopping Node", "node", node, "numBlocks", node.blockchain.CurrentBlock().NumberU64(), "numTxsProcessed", node.countNumTransactionsInBlockchain())
+				utils.GetLogInstance().Debug("Stopping Node", "numBlocks", node.blockchain.CurrentBlock().NumberU64(), "numTxsProcessed", node.countNumTransactionsInBlockchain())
 
 				var avgBlockSizeInBytes common.StorageSize
 				txCount := 0
@@ -298,7 +298,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 func (node *Node) AddNewBlock(newBlock *types.Block) {
 	blockNum, err := node.blockchain.InsertChain([]*types.Block{newBlock})
 
-	node.blockchain.InsertNewShardState(newBlock, &node.CurrentStakes)
+	node.blockchain.StoreNewShardState(newBlock, &node.CurrentStakes)
 	if err != nil {
 		utils.GetLogInstance().Debug("Error adding new block to blockchain", "blockNum", blockNum, "Error", err)
 	} else {

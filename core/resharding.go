@@ -86,8 +86,11 @@ func (ss *ShardingState) cuckooResharding(percent float64) {
 // assignLeaders will first add new nodes into shards, then use cuckoo rule to reshard to get new shard state
 func (ss *ShardingState) assignLeaders() {
 	for i := 0; i < ss.numShards; i++ {
-		Shuffle(ss.shardState[i].NodeList)
-		ss.shardState[i].Leader = ss.shardState[i].NodeList[0]
+		// At genesis epoch, the shards are empty.
+		if len(ss.shardState[i].NodeList) > 0 {
+			Shuffle(ss.shardState[i].NodeList)
+			ss.shardState[i].Leader = ss.shardState[i].NodeList[0]
+		}
 	}
 }
 
@@ -143,6 +146,7 @@ func CalculateNewShardState(bc *BlockChain, epoch uint64, stakeInfo *map[common.
 	ss := GetShardingStateFromBlockChain(bc, epoch-1)
 	newNodeList := ss.UpdateShardingState(stakeInfo)
 	percent := ss.calculateKickoutRate(newNodeList)
+	utils.GetLogInstance().Info("Kickout Percentage", "percentage", percent)
 	ss.Reshard(newNodeList, percent)
 	return ss.shardState
 }
@@ -201,7 +205,7 @@ func GetInitShardState() types.ShardState {
 		if i == 0 {
 			for j := 0; j < GenesisShardSize; j++ {
 				priKey := bls.SecretKey{}
-				priKey.SetHexString(contract.InitialBeaconChainAccounts[i].Private)
+				priKey.SetHexString(contract.InitialBeaconChainAccounts[j].Private)
 				addrBytes := priKey.GetPublicKey().GetAddress()
 				address := hex.EncodeToString(addrBytes[:])
 				com.NodeList = append(com.NodeList, types.NodeID(address))
