@@ -17,9 +17,12 @@ func (dRand *DRand) ProcessMessageValidator(payload []byte) {
 		utils.GetLogInstance().Error("Failed to unmarshal message payload.", "err", err, "dRand", dRand)
 	}
 
-	if message.Type == msg_pb.MessageType_DRAND_INIT {
+	switch message.Type {
+	case msg_pb.MessageType_DRAND_INIT:
 		dRand.processInitMessage(message)
-	} else {
+	case msg_pb.MessageType_DRAND_COMMIT:
+		// do nothing on the COMMIT message, as it is intended to send to leader
+	default:
 		utils.GetLogInstance().Error("Unexpected message type", "msgType", message.Type, "dRand", dRand)
 	}
 }
