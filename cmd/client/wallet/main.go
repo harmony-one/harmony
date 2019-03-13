@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/ecdsa"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"flag"
 	"fmt"
@@ -48,11 +49,12 @@ var (
 	accountImportPtr     = accountImportCommand.String("privateKey", "", "Specify the private key to import")
 
 	// Transfer subcommands
-	transferCommand     = flag.NewFlagSet("transfer", flag.ExitOnError)
-	transferSenderPtr   = transferCommand.String("from", "0", "Specify the sender account address or index")
-	transferReceiverPtr = transferCommand.String("to", "", "Specify the receiver account")
-	transferAmountPtr   = transferCommand.Float64("amount", 0, "Specify the amount to transfer")
-	transferShardIDPtr  = transferCommand.Int("shardID", -1, "Specify the shard ID for the transfer")
+	transferCommand      = flag.NewFlagSet("transfer", flag.ExitOnError)
+	transferSenderPtr    = transferCommand.String("from", "0", "Specify the sender account address or index")
+	transferReceiverPtr  = transferCommand.String("to", "", "Specify the receiver account")
+	transferAmountPtr    = transferCommand.Float64("amount", 0, "Specify the amount to transfer")
+	transferShardIDPtr   = transferCommand.Int("shardID", -1, "Specify the shard ID for the transfer")
+	transferInputDataPtr = transferCommand.String("inputData", "", "Base64-encoded input data to embed in the transaction")
 
 	freeTokenCommand    = flag.NewFlagSet("getFreeToken", flag.ExitOnError)
 	freeTokenAddressPtr = freeTokenCommand.String("address", "", "Specify the account address to receive the free token")
@@ -93,6 +95,7 @@ func main() {
 		fmt.Println("        --to             - The receiver account's address")
 		fmt.Println("        --amount         - The amount of token to transfer")
 		fmt.Println("        --shardID        - The shard Id for the transfer")
+		fmt.Println("        --inputData      - Base64-encoded input data to embed in the transaction")
 		os.Exit(1)
 	}
 
@@ -212,6 +215,14 @@ func processTransferCommand() {
 	receiver := *transferReceiverPtr
 	amount := *transferAmountPtr
 	shardID := *transferShardIDPtr
+	base64InputData := *transferInputDataPtr
+
+	inputData, err := base64.StdEncoding.DecodeString(base64InputData)
+	if err != nil {
+		fmt.Printf("Cannot base64-decode input data (%s): %s\n",
+			base64InputData, err)
+		return
+	}
 
 	if shardID == -1 {
 		fmt.Println("Please specify the shard ID for the transfer (e.g. --shardID=0)")
@@ -273,7 +284,7 @@ func processTransferCommand() {
 
 	amountBigInt := big.NewInt(int64(amount * params.GWei))
 	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(params.GWei))
-	tx, _ := types.SignTx(types.NewTransaction(state.nonce, receiverAddress, uint32(shardID), amountBigInt, params.TxGas, nil, nil), types.HomesteadSigner{}, senderPriKey)
+	tx, _ := types.SignTx(types.NewTransaction(state.nonce, receiverAddress, uint32(shardID), amountBigInt, params.TxGas, nil, inputData), types.HomesteadSigner{}, senderPriKey)
 	wallet.SubmitTransaction(tx, walletNode, uint32(shardID))
 }
 
