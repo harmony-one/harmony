@@ -1,6 +1,12 @@
 syntax = "proto3";
 package message;
 
+
+// Client is the service used for any client-facing requests.
+service ClientService {
+  rpc Process(Message) returns (Response) {}
+}
+
 // ReceiverType indicates who is the receiver of this message.
 enum ReceiverType {
   NEWNODE = 0;
@@ -42,7 +48,32 @@ message Message {
       StakingRequest staking = 5;
       ConsensusRequest consensus = 6;
       DrandRequest drand = 7;
+      // Refactor this later after demo.
+      LotteryRequest lottery_request = 8;
   }
+}
+
+message Response {
+  ReceiverType receiver_type = 1;
+  ServiceType service_type = 2;
+  MessageType type = 3;
+  oneof response {
+    LotteryResponse lottery_response = 4;
+  }
+}
+
+message LotteryResponse {
+  repeated string players = 1;
+  repeated uint64 balances = 3;
+}
+
+message LotteryRequest {
+  enum Type {
+    ENTER = 0;
+    RESULT = 1;
+  }
+  Type type = 1;
+  string private_key = 2;
 }
 
 // Staking Request from new node to beacon node.
