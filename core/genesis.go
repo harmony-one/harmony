@@ -45,16 +45,17 @@ var errGenesisNoConfig = errors.New("genesis has no chain configuration")
 // Genesis specifies the header fields, state of a genesis block. It also defines hard
 // fork switch-over blocks through the chain configuration.
 type Genesis struct {
-	Config     *params.ChainConfig `json:"config"`
-	Nonce      uint64              `json:"nonce"`
-	ShardID    uint32              `json:"shardID"`
-	Timestamp  uint64              `json:"timestamp"`
-	ExtraData  []byte              `json:"extraData"`
-	GasLimit   uint64              `json:"gasLimit"   gencodec:"required"`
-	Difficulty *big.Int            `json:"difficulty" gencodec:"required"`
-	Mixhash    common.Hash         `json:"mixHash"`
-	Coinbase   common.Address      `json:"coinbase"`
-	Alloc      GenesisAlloc        `json:"alloc"      gencodec:"required"`
+	Config         *params.ChainConfig `json:"config"`
+	Nonce          uint64              `json:"nonce"`
+	ShardID        uint32              `json:"shardID"`
+	Timestamp      uint64              `json:"timestamp"`
+	ExtraData      []byte              `json:"extraData"`
+	GasLimit       uint64              `json:"gasLimit"   gencodec:"required"`
+	Difficulty     *big.Int            `json:"difficulty" gencodec:"required"`
+	Mixhash        common.Hash         `json:"mixHash"`
+	Coinbase       common.Address      `json:"coinbase"`
+	Alloc          GenesisAlloc        `json:"alloc"      gencodec:"required"`
+	ShardStateHash common.Hash         `json:"shardStateHash"`
 
 	// These fields are used for consensus tests. Please don't use them
 	// in actual genesis blocks.
@@ -237,18 +238,19 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 	}
 	root := statedb.IntermediateRoot(false)
 	head := &types.Header{
-		Number:     new(big.Int).SetUint64(g.Number),
-		Nonce:      types.EncodeNonce(g.Nonce),
-		ShardID:    types.EncodeShardID(g.ShardID),
-		Time:       new(big.Int).SetUint64(g.Timestamp),
-		ParentHash: g.ParentHash,
-		Extra:      g.ExtraData,
-		GasLimit:   g.GasLimit,
-		GasUsed:    g.GasUsed,
-		Difficulty: g.Difficulty,
-		MixDigest:  g.Mixhash,
-		Coinbase:   g.Coinbase,
-		Root:       root,
+		Number:         new(big.Int).SetUint64(g.Number),
+		Nonce:          types.EncodeNonce(g.Nonce),
+		ShardID:        types.EncodeShardID(g.ShardID),
+		Time:           new(big.Int).SetUint64(g.Timestamp),
+		ParentHash:     g.ParentHash,
+		Extra:          g.ExtraData,
+		GasLimit:       g.GasLimit,
+		GasUsed:        g.GasUsed,
+		Difficulty:     g.Difficulty,
+		MixDigest:      g.Mixhash,
+		Coinbase:       g.Coinbase,
+		Root:           root,
+		ShardStateHash: g.ShardStateHash,
 	}
 	if g.GasLimit == 0 {
 		head.GasLimit = 10000000000 // TODO(RJ): figure out better solution. // params.GenesisGasLimit

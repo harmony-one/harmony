@@ -60,7 +60,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 						} else {
 							// add new shard state if it's epoch block
 							// TODO(minhdoan): only happens for beaconchain
-							node.addNewShardState(block)
+							node.addNewShardStateHash(block)
 							newBlock = block
 							break
 						}
@@ -78,7 +78,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 	}()
 }
 
-func (node *Node) addNewShardState(block *types.Block) {
+func (node *Node) addNewShardStateHash(block *types.Block) {
 	shardState := node.blockchain.GetNewShardState(block, &node.CurrentStakes)
 	if shardState != nil {
 		shardHash := shardState.Hash()
