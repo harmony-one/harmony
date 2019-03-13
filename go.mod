@@ -14,7 +14,7 @@ require (
 	github.com/gorilla/mux v1.7.0
 	github.com/harmony-one/bls v0.0.0-20190309234102-1bd75ac96c09
 	github.com/hashicorp/golang-lru v0.5.1
-	github.com/ipfs/go-datastore v3.2.0+incompatible
+	github.com/ipfs/go-datastore v0.0.1
 	github.com/libp2p/go-libp2p v0.0.2
 	github.com/libp2p/go-libp2p-crypto v0.0.1
 	github.com/libp2p/go-libp2p-discovery v0.0.1
