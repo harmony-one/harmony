@@ -198,6 +198,7 @@ func (ss *ShardingState) calculateKickoutRate(newNodeList []types.NodeID) float6
 }
 
 // GetInitShardState returns the initial shard state at genesis.
+// TODO: make the deploy.sh config file in sync with genesis constants.
 func GetInitShardState() types.ShardState {
 	shardState := types.ShardState{}
 	for i := 0; i < GenesisShardNum; i++ {
