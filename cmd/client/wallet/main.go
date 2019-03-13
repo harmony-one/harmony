@@ -16,7 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	crypto2 "github.com/ethereum/go-ethereum/crypto"
 
-	//	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	clientService "github.com/harmony-one/harmony/api/client/service"
 	"github.com/harmony-one/harmony/cmd/client/wallet/lib"
@@ -61,12 +61,16 @@ var (
 	balanceAddressPtr = balanceCommand.String("address", "", "Specify the account address to check balance for")
 )
 
+// setupLog setup log for verbose output
+func setupLog() {
+	// enable logging for wallet
+	h := log.StreamHandler(os.Stdout, log.TerminalFormat(false))
+	log.Root().SetHandler(h)
+}
+
 // The main wallet program entrance. Note the this wallet program is for demo-purpose only. It does not implement
 // the secure storage of keys.
 func main() {
-	// disable logging for wallet
-	//	h := log.StreamHandler(os.Stdout, log.TerminalFormat(false))
-	//	log.Root().SetHandler(h)
 
 	// Verify that a subcommand has been provided
 	// os.Arg[0] is the main command
@@ -90,6 +94,12 @@ func main() {
 		fmt.Println("        --amount         - The amount of token to transfer")
 		fmt.Println("        --shardID        - The shard Id for the transfer")
 		os.Exit(1)
+	}
+
+	// Enable log if the last parameter is -verbose
+	if os.Args[len(os.Args)-1] == "--verbose" {
+		setupLog()
+		os.Args = os.Args[:len(os.Args)-1]
 	}
 
 	// Switch on the subcommand
@@ -312,7 +322,10 @@ func convertBalanceIntoReadableFormat(balance *big.Int) string {
 func FetchBalance(address common.Address, walletNode *node.Node) map[uint32]AccountState {
 	result := make(map[uint32]AccountState)
 	peers := lib.GetPeersFromBeaconChain(walletNode)
-
+	if len(peers) == 0 {
+		fmt.Printf("[FATAL] Can't find peers\n")
+		return nil
+	}
 	peer := peers[0]
 	port, _ := strconv.Atoi(peer.Port)
 	client := clientService.NewClient(peer.IP, strconv.Itoa(port+node.ClientServicePortDiff))
@@ -326,6 +339,10 @@ func FetchBalance(address common.Address, walletNode *node.Node) map[uint32]Acco
 // GetFreeToken requests for token test token on each shard
 func GetFreeToken(address common.Address, walletNode *node.Node) {
 	peers := lib.GetPeersFromBeaconChain(walletNode)
+	if len(peers) == 0 {
+		fmt.Printf("[FATAL] Can't find peers\n")
+		return
+	}
 	peer := peers[0]
 	port, _ := strconv.Atoi(peer.Port)
 	client := clientService.NewClient(peer.IP, strconv.Itoa(port+node.ClientServicePortDiff))
