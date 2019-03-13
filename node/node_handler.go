@@ -142,12 +142,14 @@ func (node *Node) messageHandler(content []byte, sender string) {
 				} else {
 					// for non-beaconchain node, subscribe to beacon block broadcast
 					role := node.NodeConfig.Role()
-					if proto_node.BlockMessageType(msgPayload[0]) == proto_node.Sync && (role == nodeconfig.ShardValidator || role == nodeconfig.ShardLeader || role == nodeconfig.NewNode) {
+					if proto_node.BlockMessageType(msgPayload[0]) == proto_node.Sync && (role == nodeconfig.ShardValidator || role == nodeconfig.ShardLeader || role == nodeconfig.NewNode || role == nodeconfig.ArchivalNode) {
+						utils.GetLogInstance().Info("Block being handled by block channel", "self peer", node.SelfPeer)
 						for _, block := range blocks {
 							node.BeaconBlockChannel <- block
 						}
 					}
 					if node.Client != nil && node.Client.UpdateBlocks != nil && blocks != nil {
+						utils.GetLogInstance().Info("Block being handled by client by", "self peer", node.SelfPeer)
 						node.Client.UpdateBlocks(blocks)
 					}
 				}
@@ -340,7 +342,7 @@ func (node *Node) AddNewBlock(newBlock *types.Block) {
 	if err != nil {
 		utils.GetLogInstance().Debug("Error adding new block to blockchain", "blockNum", blockNum, "Error", err)
 	} else {
-		utils.GetLogInstance().Info("adding new block to blockchain", "blockNum", blockNum)
+		utils.GetLogInstance().Info("adding new block to blockchain", "blockNum", blockNum, "by node", node.SelfPeer)
 	}
 }
 

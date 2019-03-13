@@ -8,29 +8,30 @@ import (
 	"path"
 	"runtime"
 	"strconv"
+	"sync"
 	"time"
-
-	"github.com/harmony-one/bls/ffi/go/bls"
-
-	"github.com/harmony-one/harmony/internal/utils/contract"
 
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
+
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/drand"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/internal/utils/contract"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 )
 
 var (
-	version string
-	builtBy string
-	builtAt string
-	commit  string
+	version    string
+	builtBy    string
+	builtAt    string
+	commit     string
+	stateMutex sync.Mutex
 )
 
 // InitLDBDatabase initializes a LDBDatabase. isBeacon=true will return the beacon chain database for normal shard nodes
@@ -85,6 +86,8 @@ var (
 	keyFile = flag.String("key", "./.hmykey", "the private key file of the harmony node")
 	// isBeacon indicates this node is a beacon chain node
 	isBeacon = flag.Bool("is_beacon", false, "true means this node is a beacon chain node")
+	// isArchival indicates this node is a archival node that will save and archive current blockchain
+	isArchival = flag.Bool("is_archival", false, "true means this node is a archival node")
 	// isNewNode indicates this node is a new node
 	isNewNode    = flag.Bool("is_newnode", false, "true means this node is a new node")
 	accountIndex = flag.Int("account_index", 0, "the index of the staking account to use")
@@ -171,6 +174,8 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	if *isLeader {
 		nodeConfig.StringRole = "leader"
 		nodeConfig.Leader = nodeConfig.SelfPeer
+	} else if *isArchival {
+		nodeConfig.StringRole = "archival"
 	} else {
 		nodeConfig.StringRole = "validator"
 	}
@@ -186,6 +191,13 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	nodeConfig.Host.AddPeer(&nodeConfig.Leader)
 
 	return nodeConfig
+}
+
+func setupArchivalNode(nodeConfig *nodeconfig.ConfigType) (*node.Node, *nodeconfig.ConfigType) {
+	currentNode := node.New(nodeConfig.Host, &consensus.Consensus{ShardID: uint32(0)}, nil)
+	currentNode.NodeConfig.SetRole(nodeconfig.ArchivalNode)
+	currentNode.AddBeaconChainDatabase(nodeConfig.BeaconDB)
+	return currentNode, nodeConfig
 }
 
 func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consensus, *node.Node) {
@@ -245,28 +257,32 @@ func main() {
 	flag.Parse()
 
 	initSetup()
+	var currentNode *node.Node
+	var consensus *consensus.Consensus
 	nodeConfig := createGlobalConfig()
-
-	// Init logging.
-	loggingInit(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps)
-
-	// Start Profiler for leader if profile argument is on
-	if nodeConfig.StringRole == "leader" && (*profile || *metricsReportURL != "") {
-		prof := profiler.GetProfiler()
-		prof.Config(nodeConfig.ShardIDString, *metricsReportURL)
-		if *profile {
-			prof.Start()
+	if *isArchival {
+		currentNode, nodeConfig = setupArchivalNode(nodeConfig)
+		loggingInit(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps)
+		log.Info("New Harmony Node ====", "Role", currentNode.NodeConfig.Role(), "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, nodeConfig.Host.GetID().Pretty()))
+		go currentNode.DoBeaconSyncing()
+	} else {
+		// Start Profiler for leader if profile argument is on
+		if nodeConfig.StringRole == "leader" && (*profile || *metricsReportURL != "") {
+			prof := profiler.GetProfiler()
+			prof.Config(nodeConfig.ShardIDString, *metricsReportURL)
+			if *profile {
+				prof.Start()
+			}
 		}
+		consensus, currentNode = setUpConsensusAndNode(nodeConfig)
+		if consensus.IsLeader {
+			go currentNode.SendPongMessage()
+		}
+		// Init logging.
+		loggingInit(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps)
+		log.Info("New Harmony Node ====", "Role", currentNode.NodeConfig.Role(), "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, nodeConfig.Host.GetID().Pretty()))
+		go currentNode.SupportSyncing()
 	}
-
-	consensus, currentNode := setUpConsensusAndNode(nodeConfig)
-
-	if consensus.IsLeader {
-		go currentNode.SendPongMessage()
-	}
-
-	log.Info("New Harmony Node ====", "Role", currentNode.NodeConfig.Role(), "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, nodeConfig.Host.GetID().Pretty()))
-	go currentNode.SupportSyncing()
 	currentNode.ServiceManagerSetup()
 	currentNode.RunServices()
 	currentNode.StartServer()

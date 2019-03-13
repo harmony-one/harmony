@@ -9,4 +9,6 @@
 127.0.0.1 9008 validator 0
 127.0.0.1 9009 validator 0
 127.0.0.1 9010 validator 0
+127.0.0.1 9011 archival 0
 127.0.0.1 19999 client 0
+

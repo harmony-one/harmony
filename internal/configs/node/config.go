@@ -27,7 +27,7 @@ const (
 	NewNode
 	ClientNode
 	WalletNode
-	BackupNode
+	ArchivalNode
 )
 
 func (role Role) String() string {
@@ -48,8 +48,8 @@ func (role Role) String() string {
 		return "ClientNode"
 	case WalletNode:
 		return "WalletNode"
-	case BackupNode:
-		return "BackupNode"
+	case ArchivalNode:
+		return "ArchivalNode"
 	}
 	return "Unknown"
 }
@@ -63,14 +63,15 @@ const (
 // ConfigType is the structure of all node related configuration variables
 type ConfigType struct {
 	// The three groupID design, please refer to https://github.com/harmony-one/harmony/blob/master/node/node.md#libp2p-integration
-	beacon   p2p.GroupID // the beacon group ID
-	group    p2p.GroupID // the group ID of the shard
-	client   p2p.GroupID // the client group ID of the shard
-	isClient bool        // whether this node is a client node, such as wallet/txgen
-	isBeacon bool        // whether this node is a beacon node or not
-	isLeader bool        // whether this node is a leader or not
-	shardID  uint32      // shardID of this node
-	role     Role        // Role of the node
+	beacon     p2p.GroupID // the beacon group ID
+	group      p2p.GroupID // the group ID of the shard
+	client     p2p.GroupID // the client group ID of the shard
+	isClient   bool        // whether this node is a client node, such as wallet/txgen
+	isBeacon   bool        // whether this node is a beacon node or not
+	isLeader   bool        // whether this node is a leader or not
+	isArchival bool        // whether this node is a archival node. archival node backups all blockchain information.
+	shardID    uint32      // shardID of this node
+	role       Role        // Role of the node
 
 	ShardIDString   string
 	StringRole      string
@@ -142,6 +143,11 @@ func (conf *ConfigType) SetIsLeader(b bool) {
 	conf.isLeader = b
 }
 
+// SetIsArchival set the isLeader configuration
+func (conf *ConfigType) SetIsArchival(b bool) {
+	conf.isArchival = b
+}
+
 // SetShardID set the shardID
 func (conf *ConfigType) SetShardID(s uint32) {
 	conf.shardID = s
@@ -180,6 +186,11 @@ func (conf *ConfigType) IsBeacon() bool {
 // IsLeader returns the isLeader configuration
 func (conf *ConfigType) IsLeader() bool {
 	return conf.isLeader
+}
+
+// IsArchival returns the isArchival configuration
+func (conf *ConfigType) IsArchival() bool {
+	return conf.isArchival
 }
 
 // ShardID returns the shardID
