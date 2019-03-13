@@ -62,6 +62,8 @@ func (node *Node) setupForBeaconLeader() {
 	node.serviceManager.RegisterService(service.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
 	// Register randomness service
 	node.serviceManager.RegisterService(service.Randomness, randomness.New(node.DRand))
+	// Register explorer service.
+	node.serviceManager.RegisterService(service.SupportExplorer, explorer.New(&node.SelfPeer))
 }
 
 func (node *Node) setupForBeaconValidator() {
