@@ -32,7 +32,11 @@ contract Lottery {
         _;
     }
 
-    function getPlayers() public view returns (address payable[] memory) {
-        return players;
+    function getPlayers() public view returns (address payable[] memory, uint256[] memory balances) {
+        balances = new uint256[](players.length);
+        for (uint256 i = 0; i < players.length; i++) {
+            balances[i] = players[i].balance;
+        }
+        return (players, balances);
     }
 }
