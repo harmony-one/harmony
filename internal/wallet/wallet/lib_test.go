@@ -7,6 +7,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/harmony-one/harmony/api/client"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
+	"github.com/harmony-one/harmony/api/service/networkinfo"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
@@ -15,6 +16,9 @@ import (
 )
 
 func TestCreateWalletNode(test *testing.T) {
+	// shorten the retry time
+	networkinfo.ConnectionRetry = 3
+
 	walletNode := CreateWalletNode()
 
 	if walletNode.Client == nil {

@@ -25,9 +25,11 @@ func TestService(t *testing.T) {
 		t.Fatal("unable to new host in harmony")
 	}
 
-	s := New(host, "teststring", nil, nil)
+	s := New(host, p2p.GroupIDBeaconClient, nil, nil)
+
 	s.StartService()
 
 	time.Sleep(2 * time.Second)
+
 	s.StopService()
 }
