@@ -82,6 +82,8 @@ var (
 	keyFile = flag.String("key", "./.hmykey", "the private key file of the harmony node")
 	// isBeacon indicates this node is a beacon chain node
 	isBeacon = flag.Bool("is_beacon", false, "true means this node is a beacon chain node")
+	// isArchival indicates this node is a archival node that will save and archive current blockchain
+	isArchival = flag.Bool("is_archival", true, "true means this node is a archival node")
 	// isNewNode indicates this node is a new node
 	isNewNode    = flag.Bool("is_newnode", false, "true means this node is a new node")
 	accountIndex = flag.Int("account_index", 0, "the index of the staking account to use")
@@ -175,6 +177,39 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	return nodeConfig
 }
 
+func createArchivalNode() (*node.Node, *nodeconfig.ConfigType) { //Mix of setUpConsensusAndNode and createGlobalConfig
+	var err error
+	nodeConfig := nodeconfig.GetGlobalConfig()
+
+	// Currently we hardcode only one shard.
+	nodeConfig.ShardIDString = "10000" //ShardID can be highest positive number of shard.
+	// Consensus keys are the BLS12-381 keys used to sign consensus messages
+	nodeConfig.ConsensusPriKey, nodeConfig.ConsensusPubKey = utils.GenKey(*ip, *port)
+	// P2p private key is used for secure message transfer between p2p nodes.
+	nodeConfig.P2pPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
+	if err != nil {
+		panic(err)
+	}
+	// Initialize leveldb for main blockchain and beacon.
+	if nodeConfig.BeaconDB, err = InitLDBDatabase(*ip, *port, *freshDB, true); err != nil {
+		panic(err)
+	}
+	nodeConfig.SelfPeer = p2p.Peer{IP: *ip, Port: *port, ValidatorID: -1, ConsensusPubKey: nodeConfig.ConsensusPubKey}
+	nodeConfig.StringRole = "Archival"
+	nodeConfig.Host, err = p2pimpl.NewHost(&nodeConfig.SelfPeer, nodeConfig.P2pPriKey)
+	if *logConn {
+		nodeConfig.Host.GetP2PHost().Network().Notify(utils.ConnLogger)
+	}
+	if err != nil {
+		panic("unable to new host in harmony")
+	}
+	currentNode := node.New(nodeConfig.Host, &consensus.Consensus{ShardID: uint32(10000)}, nodeConfig.BeaconDB) //at the moment the database supplied is beacondb as this is a beacon sync node
+	currentNode.NodeConfig.SetRole(nodeconfig.BackupNode)
+	currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
+	currentNode.AddBeaconChainDatabase(nodeConfig.BeaconDB)
+	return currentNode, nodeConfig
+}
+
 func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consensus, *node.Node) {
 	// Consensus object.
 	// TODO: consensus object shouldn't start here
@@ -232,26 +267,28 @@ func main() {
 	flag.Parse()
 
 	initSetup()
-	nodeConfig := createGlobalConfig()
-
-	// Init logging.
-	loggingInit(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps)
-
-	// Start Profiler for leader if profile argument is on
-	if nodeConfig.StringRole == "leader" && (*profile || *metricsReportURL != "") {
-		prof := profiler.GetProfiler()
-		prof.Config(nodeConfig.ShardIDString, *metricsReportURL)
-		if *profile {
-			prof.Start()
+	var nodeConfig *nodeconfig.ConfigType
+	var currentNode *node.Node
+	var consensus *consensus.Consensus
+	if *isArchival {
+		currentNode, nodeConfig = createArchivalNode()
+	} else {
+		nodeConfig := createGlobalConfig()
+		// Start Profiler for leader if profile argument is on
+		if nodeConfig.StringRole == "leader" && (*profile || *metricsReportURL != "") {
+			prof := profiler.GetProfiler()
+			prof.Config(nodeConfig.ShardIDString, *metricsReportURL)
+			if *profile {
+				prof.Start()
+			}
+		}
+		consensus, currentNode = setUpConsensusAndNode(nodeConfig)
+		if consensus.IsLeader {
+			go currentNode.SendPongMessage()
 		}
 	}
-
-	consensus, currentNode := setUpConsensusAndNode(nodeConfig)
-
-	if consensus.IsLeader {
-		go currentNode.SendPongMessage()
-	}
-
+	// Init logging.
+	loggingInit(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps)
 	log.Info("New Harmony Node ====", "Role", currentNode.NodeConfig.Role(), "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, nodeConfig.Host.GetID().Pretty()))
 	go currentNode.SupportSyncing()
 	currentNode.ServiceManagerSetup()
