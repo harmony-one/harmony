@@ -159,7 +159,9 @@ func (s *Service) DoService() {
 			if peer.ID != s.Host.GetP2PHost().ID() && len(peer.ID) > 0 {
 				//	utils.GetLogInstance().Info("Found Peer", "peer", peer.ID, "addr", peer.Addrs, "my ID", s.Host.GetP2PHost().ID())
 				if err := s.Host.GetP2PHost().Connect(s.ctx, peer); err != nil {
-					utils.GetLogInstance().Warn("can't connect to peer node", "error", err)
+					utils.GetLogInstance().Warn("can't connect to peer node", "error", err, "peer", peer)
+					// break if the node can't connect to peers, waiting for another peer
+					break
 				} else {
 					utils.GetLogInstance().Info("connected to peer node", "peer", peer)
 				}
