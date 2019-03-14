@@ -47,6 +47,7 @@ func GetPeersFromBeaconChain(walletNode *node.Node) []p2p.Peer {
 		peers = append(peers, v.(p2p.Peer))
 		return true
 	})
+	utils.GetLogInstance().Debug("GetPeersFromBeaconChain", "peers:", peers)
 	return peers
 }
 
@@ -59,8 +60,8 @@ func SubmitTransaction(tx *types.Transaction, walletNode *node.Node, shardID uin
 }
 
 func getBootNodes() []ma.Multiaddr {
-	addrStrings := []string{"/ip4/127.0.0.1/tcp/19876/p2p/QmbTLMb9C8dmjrDYoiJb2mayXspcURkNB4ARxgsoA5Aoe3"}
 	//addrStrings := []string{"/ip4/54.213.43.194/tcp/9874/p2p/QmQhPRqqfTRExqWmTifjMaBvRd3HBmnmj9jYAvTy6HPPJj"}
+	addrStrings := []string{"/ip4/100.26.90.187/tcp/9871/p2p/QmPH2XsLP88jpfejHycQRWB7vDjwDju9qT9rMmdNaNea5v", "/ip4/54.213.43.194/tcp/9871/p2p/QmQLjTciaJppXVPZFoj4gTdME5axzTxtVwty5Lg8kwt6Zs"}
 	bootNodeAddrs, err := utils.StringsToAddrs(addrStrings)
 	if err != nil {
 		panic(err)
