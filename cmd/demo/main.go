@@ -9,6 +9,7 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 )
 
+// Constants for main demo.
 const (
 	Port    = "313131"
 	LocalIP = "127.0.0.1"

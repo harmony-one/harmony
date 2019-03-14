@@ -22,6 +22,7 @@ type Server struct {
 	server *grpc.Server
 }
 
+// Process processes the Message and returns Response
 func (s *Server) Process(ctx context.Context, message *Message) (*Response, error) {
 	return &Response{}, nil
 }
@@ -40,12 +41,12 @@ func (s *Server) Start(ip, port string) (*grpc.Server, error) {
 	return s.server, nil
 }
 
-// Start starts the Server on given ip and port.
+// Stop stops the server.
 func (s *Server) Stop() {
 	s.server.Stop()
 }
 
-// New creates new Server which implements ClientServiceServer interface.
+// NewServer creates new Server which implements ClientServiceServer interface.
 func NewServer() *Server {
 	return &Server{Port: Port}
 }
