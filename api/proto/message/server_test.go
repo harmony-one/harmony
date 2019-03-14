@@ -7,7 +7,7 @@ import (
 
 func TestServerStart(t *testing.T) {
 	s := NewServer()
-	s.Start("127.0.0.1", "")
+	s.Start()
 	time.Sleep(time.Second)
 	s.Stop()
 }

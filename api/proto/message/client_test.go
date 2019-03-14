@@ -10,7 +10,7 @@ const (
 
 func TestClient(t *testing.T) {
 	s := NewServer()
-	s.Start(testIP, "")
+	s.Start()
 
 	client := NewClient(testIP)
 	client.Process(&Message{})
