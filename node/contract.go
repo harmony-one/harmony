@@ -116,6 +116,8 @@ func (node *Node) AddLotteryContract() {
 	priKey, err := crypto.HexToECDSA(contract_constants.DemoAccounts[0].Private)
 	if err != nil {
 		utils.GetLogInstance().Error("Error when creating private key for demo contract")
+		// Exit here to recognize the coding working.
+		// Basically we will remove this logic when launching so it's fine for now.
 		os.Exit(1)
 	}
 
