@@ -98,7 +98,7 @@ func (node *Node) setupForClientNode() {
 	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer, nil))
 }
 
-func (node *Node) setupForBackupNode(isBeacon bool) {
+func (node *Node) setupForArchivalNode(isBeacon bool) {
 	nodeConfig, chanPeer := node.initNodeConfiguration(isBeacon, false)
 	// Register peer discovery service.
 	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer, node.AddBeaconPeer))
@@ -124,8 +124,8 @@ func (node *Node) ServiceManagerSetup() {
 		node.setupForNewNode()
 	case nodeconfig.ClientNode:
 		node.setupForClientNode()
-	case nodeconfig.BackupNode:
-		node.setupForBackupNode(true)
+	case nodeconfig.ArchivalNode:
+		node.setupForArchivalNode(true)
 	}
 	node.serviceManager.SetupServiceMessageChan(node.serviceMessageChan)
 }

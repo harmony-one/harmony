@@ -204,7 +204,7 @@ func createArchivalNode() (*node.Node, *nodeconfig.ConfigType) { //Mix of setUpC
 		panic("unable to new host in harmony")
 	}
 	currentNode := node.New(nodeConfig.Host, &consensus.Consensus{ShardID: uint32(10000)}, nodeConfig.BeaconDB) //at the moment the database supplied is beacondb as this is a beacon sync node
-	currentNode.NodeConfig.SetRole(nodeconfig.BackupNode)
+	currentNode.NodeConfig.SetRole(nodeconfig.ArchivalNode)
 	currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
 	currentNode.AddBeaconChainDatabase(nodeConfig.BeaconDB)
 	return currentNode, nodeConfig
