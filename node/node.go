@@ -427,11 +427,15 @@ func (node *Node) initNodeConfiguration(isBeacon bool, isClient bool) (service.N
 
 	var err error
 	if !isBeacon {
+		node.stateMutex.Lock()
 		node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
+		node.stateMutex.Unlock()
 	} else {
+		node.stateMutex.Lock()
 		node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeacon)
 		node.clientReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
 		node.NodeConfig.SetClientGroupID(p2p.GroupIDBeaconClient)
+		node.stateMutex.Unlock()
 	}
 
 	if err != nil {
