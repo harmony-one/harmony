@@ -18,10 +18,12 @@ const (
 
 // Server is the Server struct for client service package.
 type Server struct {
-	Port string
+	Port   string
+	server *grpc.Server
 }
 
 func (s *Server) Process(ctx context.Context, message *Message) (*Response, error) {
+	return &Response{}, nil
 }
 
 // Start starts the Server on given ip and port.
@@ -32,13 +34,18 @@ func (s *Server) Start(ip, port string) (*grpc.Server, error) {
 		log.Fatalf("failed to listen: %v", err)
 	}
 	var opts []grpc.ServerOption
-	grpcServer := grpc.NewServer(opts...)
-	RegisterClientServiceServer(grpcServer, s)
-	go grpcServer.Serve(lis)
-	return grpcServer, nil
+	s.server = grpc.NewServer(opts...)
+	RegisterClientServiceServer(s.server, s)
+	go s.server.Serve(lis)
+	return s.server, nil
+}
+
+// Start starts the Server on given ip and port.
+func (s *Server) Stop() {
+	s.server.Stop()
 }
 
 // New creates new Server which implements ClientServiceServer interface.
 func NewServer() *Server {
-	return &Server{}
+	return &Server{Port: Port}
 }
