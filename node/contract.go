@@ -2,22 +2,19 @@ package node
 
 import (
 	"math/big"
+	"os"
 	"strings"
 
-	"github.com/harmony-one/harmony/contracts/structs"
-
 	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/common/math"
-
-	"github.com/harmony-one/harmony/contracts"
-
-	"github.com/harmony-one/harmony/internal/utils"
-
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/harmony-one/harmony/contracts"
+	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/utils"
 	contract_constants "github.com/harmony-one/harmony/internal/utils/contract"
 )
 
@@ -111,6 +108,28 @@ func (node *Node) QueryStakeInfo() *structs.StakeInfoReturnValue {
 
 func (node *Node) getDeployedStakingContract() common.Address {
 	return node.StakingContractAddress
+}
+
+// AddLotteryContract adds the demo lottery contract the genesis block.
+func (node *Node) AddLotteryContract() {
+	// Add a lottery demo contract.
+	priKey, err := crypto.HexToECDSA(contract_constants.DemoAccounts[0].Private)
+	if err != nil {
+		utils.GetLogInstance().Error("Error when creating private key for demo contract")
+		os.Exit(1)
+	}
+
+	dataEnc := common.FromHex(contracts.LotteryBin)
+	// Unsigned transaction to avoid the case of transaction address.
+
+	contractFunds := big.NewInt(0)
+	contractFunds = contractFunds.Mul(contractFunds, big.NewInt(params.Ether))
+	demoContract, _ := types.SignTx(
+		types.NewContractCreation(uint64(0), node.Consensus.ShardID, contractFunds, params.TxGasContractCreation*10, nil, dataEnc),
+		types.HomesteadSigner{},
+		priKey)
+	node.DemoContractAddress = crypto.CreateAddress(crypto.PubkeyToAddress(priKey.PublicKey), uint64(0))
+	node.addPendingTransactions(types.Transactions{demoContract})
 }
 
 // AddFaucetContractToPendingTransactions adds the faucet contract the genesis block.
