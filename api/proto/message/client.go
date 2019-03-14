@@ -6,13 +6,12 @@ import (
 	"log"
 	"time"
 
-	proto "github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 )
 
 // Client is the client model for client service.
 type Client struct {
-	clientServiceClient proto.ClientServiceClient
+	clientServiceClient ClientServiceClient
 	opts                []grpc.DialOption
 	conn                *grpc.ClientConn
 }
@@ -28,7 +27,7 @@ func NewClient(ip string) *Client {
 		return nil
 	}
 
-	client.clientServiceClient = proto.NewClientServiceClient(client.conn)
+	client.clientServiceClient = NewClientServiceClient(client.conn)
 	return &client
 }
 
