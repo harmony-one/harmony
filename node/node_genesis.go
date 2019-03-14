@@ -20,6 +20,8 @@ const (
 	FakeAddressNumber = 100
 	// TotalInitFund is the initial total fund for the contract deployer.
 	TotalInitFund = 9000000
+	// InitFreeFundInEther is the initial fund for sample accounts.
+	InitFreeFundInEther = 1000
 )
 
 // GenesisBlockSetup setups a genesis blockchain.
@@ -68,7 +70,7 @@ func (node *Node) CreateGenesisAllocWithTestingAddresses(numAddress int) core.Ge
 	for i := 0; i < numAddress; i++ {
 		testBankKey, _ := ecdsa.GenerateKey(crypto.S256(), reader)
 		testBankAddress := crypto.PubkeyToAddress(testBankKey.PublicKey)
-		testBankFunds := big.NewInt(1000)
+		testBankFunds := big.NewInt(InitFreeFundInEther)
 		testBankFunds = testBankFunds.Mul(testBankFunds, big.NewInt(params.Ether))
 		genesisAloc[testBankAddress] = core.GenesisAccount{Balance: testBankFunds}
 		node.TestBankKeys = append(node.TestBankKeys, testBankKey)
@@ -80,13 +82,13 @@ func (node *Node) CreateGenesisAllocWithTestingAddresses(numAddress int) core.Ge
 // including the account used by the nodes of the initial beacon chain and later new nodes.
 func AddNodeAddressesToGenesisAlloc(genesisAlloc core.GenesisAlloc) {
 	for _, account := range contract.InitialBeaconChainAccounts {
-		testBankFunds := big.NewInt(100)
+		testBankFunds := big.NewInt(InitFreeFundInEther)
 		testBankFunds = testBankFunds.Mul(testBankFunds, big.NewInt(params.Ether))
 		address := common.HexToAddress(account.Address)
 		genesisAlloc[address] = core.GenesisAccount{Balance: testBankFunds}
 	}
 	for _, account := range contract.NewNodeAccounts {
-		testBankFunds := big.NewInt(100)
+		testBankFunds := big.NewInt(InitFreeFundInEther)
 		testBankFunds = testBankFunds.Mul(testBankFunds, big.NewInt(params.Ether))
 		address := common.HexToAddress(account.Address)
 		genesisAlloc[address] = core.GenesisAccount{Balance: testBankFunds}
