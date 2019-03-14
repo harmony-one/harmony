@@ -77,7 +77,7 @@ func (node *Node) setupForBeaconValidator() {
 
 func (node *Node) setupForNewNode() {
 	// TODO determine the role of new node, currently assume it is beacon node
-	nodeConfig, chanPeer := node.initNodeConfiguration(true, false)
+	nodeConfig, chanPeer := node.initNodeConfiguration(true, true)
 
 	// Register staking service.
 	node.serviceManager.RegisterService(service.Staking, staking.New(node.host, node.AccountKey, node.beaconChain, node.NodeConfig.ConsensusPubKey.GetAddress()))

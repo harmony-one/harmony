@@ -286,18 +286,15 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 		}()
 	}
 
-	if node.NodeConfig.Role() == nodeconfig.BeaconLeader {
-		utils.GetLogInstance().Info("Updating staking list")
-		node.UpdateStakingList(node.QueryStakeInfo())
-		node.printStakingList()
-	}
+	utils.GetLogInstance().Info("Updating staking list")
+	node.UpdateStakingList(node.QueryStakeInfo())
+	node.printStakingList()
+	node.blockchain.StoreNewShardState(newBlock, &node.CurrentStakes)
 }
 
 // AddNewBlock is usedd to add new block into the blockchain.
 func (node *Node) AddNewBlock(newBlock *types.Block) {
 	blockNum, err := node.blockchain.InsertChain([]*types.Block{newBlock})
-
-	node.blockchain.StoreNewShardState(newBlock, &node.CurrentStakes)
 	if err != nil {
 		utils.GetLogInstance().Debug("Error adding new block to blockchain", "blockNum", blockNum, "Error", err)
 	} else {
