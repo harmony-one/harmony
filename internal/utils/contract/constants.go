@@ -5,9 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/harmony-one/harmony/internal/utils"
-
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 const beaconGenesisString = "This is long enoug phrase to generate private key"
