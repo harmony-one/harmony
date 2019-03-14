@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"math/rand"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -52,7 +53,8 @@ func (node *Node) GenesisBlockSetup(db ethdb.Database) (*core.BlockChain, error)
 
 	// Store genesis block into db.
 	gspec.MustCommit(db)
-	return core.NewBlockChain(db, nil, gspec.Config, node.Consensus, vm.Config{}, nil)
+	cacheConfig := core.CacheConfig{Disabled: false, TrieNodeLimit: 256 * 1024 * 1024, TrieTimeLimit: 5 * time.Minute}
+	return core.NewBlockChain(db, &cacheConfig, gspec.Config, node.Consensus, vm.Config{}, nil)
 }
 
 // CreateGenesisAllocWithTestingAddresses create the genesis block allocation that contains deterministically

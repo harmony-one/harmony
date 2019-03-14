@@ -24,8 +24,6 @@ function cleanup() {
        echo 'Killed process: '$pid
        $DRYRUN kill -9 $pid 2> /dev/null
    done
-   # Remove bc_config.json before starting experiment.
-   rm -f bc_config.json
    rm -rf ./db/harmony_*
 }
 
@@ -177,8 +175,6 @@ else
    sleep $DURATION
 fi
 
-# save bc_config.json
-[ -e bc_config.json ] && cp -f bc_config.json $log_folder
 
 cleanup
 check_result
