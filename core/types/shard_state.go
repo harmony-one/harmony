@@ -11,8 +11,11 @@ import (
 // ShardState is the collection of all committees
 type ShardState []Committee
 
-// NodeID represents node id.
-type NodeID string
+// NodeID represents node id (BLS address).
+type NodeID struct {
+	EcdsaAddress string
+	BlsAddress   string
+}
 
 // Committee contains the active nodes in one shard
 type Committee struct {
@@ -55,10 +58,10 @@ func (ss ShardState) Hash() (h common.Hash) {
 
 // CompareNodeID compares two nodes by their ID; used to sort node list
 func CompareNodeID(n1 NodeID, n2 NodeID) int {
-	return strings.Compare(string(n1), string(n2))
+	return strings.Compare(n1.BlsAddress, n2.BlsAddress)
 }
 
 // Serialize serialize NodeID into bytes
 func (n NodeID) Serialize() []byte {
-	return []byte(string(n))
+	return []byte(n.BlsAddress)
 }

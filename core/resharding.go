@@ -3,7 +3,6 @@ package core
 import (
 	"encoding/binary"
 	"encoding/hex"
-	"math"
 	"math/rand"
 	"sort"
 
@@ -19,12 +18,16 @@ import (
 const (
 	// InitialSeed is the initial random seed, a magic number to answer everything, remove later
 	InitialSeed uint32 = 42
-	// GenesisEpoch is the number of the first genesis epoch.
+	// GenesisEpoch is the number of the genesis epoch.
 	GenesisEpoch = 0
+	// FirstEpoch is the number of the first epoch.
+	FirstEpoch = 1
 	// GenesisShardNum is the number of shard at genesis
-	GenesisShardNum = 3
+	GenesisShardNum = 4
 	// GenesisShardSize is the size of each shard at genesis
 	GenesisShardSize = 10
+	// CuckooRate is the percentage of nodes getting reshuffled in the second step of cuckoo resharding.
+	CuckooRate = 0.1
 )
 
 // ShardingState is data structure hold the sharding state
@@ -67,9 +70,12 @@ func (ss *ShardingState) cuckooResharding(percent float64) {
 		}
 		numKicked := int(percent * float64(len(ss.shardState[i].NodeList)))
 		if numKicked == 0 {
-			numKicked++
+			numKicked++ // At least kick one node out
 		}
 		length := len(ss.shardState[i].NodeList)
+		if length-numKicked <= 0 {
+			continue // Never empty a shard
+		}
 		tmp := ss.shardState[i].NodeList[length-numKicked:]
 		kickedNodes = append(kickedNodes, tmp...)
 		ss.shardState[i].NodeList = ss.shardState[i].NodeList[:length-numKicked]
@@ -138,33 +144,40 @@ func GetShardingStateFromBlockChain(bc *BlockChain, epoch uint64) *ShardingState
 }
 
 // CalculateNewShardState get sharding state from previous epoch and calculate sharding state for new epoch
-// TODO: currently, we just mock everything
 func CalculateNewShardState(bc *BlockChain, epoch uint64, stakeInfo *map[common.Address]*structs.StakeInfo) types.ShardState {
 	if epoch == GenesisEpoch {
 		return GetInitShardState()
 	}
 	ss := GetShardingStateFromBlockChain(bc, epoch-1)
+	if epoch == FirstEpoch {
+		newNodes := []types.NodeID{}
+		for addr, stakeInfo := range *stakeInfo {
+			newNodes = append(newNodes, types.NodeID{addr.Hex(), hex.EncodeToString(stakeInfo.BlsAddress[:])})
+		}
+		rand.Seed(int64(ss.rnd))
+		Shuffle(newNodes)
+		utils.GetLogInstance().Info("[resharding] New Nodes", "data", newNodes)
+		for i, nid := range newNodes {
+			id := i%(GenesisShardNum-1) + 1 // assign the node to one of the empty shard
+			ss.shardState[id].NodeList = append(ss.shardState[id].NodeList, nid)
+		}
+		utils.GetLogInstance().Info("State", "data", ss)
+		return ss.shardState
+	}
 	newNodeList := ss.UpdateShardingState(stakeInfo)
-	percent := ss.calculateKickoutRate(newNodeList)
-	utils.GetLogInstance().Info("Kickout Percentage", "percentage", percent)
-	ss.Reshard(newNodeList, percent)
+	utils.GetLogInstance().Info("Cuckoo Rate", "percentage", CuckooRate)
+	ss.Reshard(newNodeList, CuckooRate)
 	return ss.shardState
 }
 
 // UpdateShardingState remove the unstaked nodes and returns the newly staked node Ids.
 func (ss *ShardingState) UpdateShardingState(stakeInfo *map[common.Address]*structs.StakeInfo) []types.NodeID {
-	oldAddresses := make(map[common.Address]bool)
+	oldAddresses := make(map[string]bool) // map of bls addresses
 	for _, shard := range ss.shardState {
 		newNodeList := shard.NodeList[:0]
 		for _, nodeID := range shard.NodeList {
-			addr := common.Address{}
-			addrBytes, err := hex.DecodeString(string(nodeID))
-			if err != nil {
-				utils.GetLogInstance().Error("Failed to decode address hex")
-			}
-			addr.SetBytes(addrBytes)
-			oldAddresses[addr] = true
-			_, ok := (*stakeInfo)[addr]
+			oldAddresses[nodeID.BlsAddress] = true
+			_, ok := (*stakeInfo)[common.HexToAddress(nodeID.EcdsaAddress)]
 			if ok {
 				newNodeList = append(newNodeList, nodeID)
 			} else {
@@ -175,26 +188,13 @@ func (ss *ShardingState) UpdateShardingState(stakeInfo *map[common.Address]*stru
 	}
 
 	newAddresses := []types.NodeID{}
-	for addr := range *stakeInfo {
-		_, ok := oldAddresses[addr]
+	for addr, info := range *stakeInfo {
+		_, ok := oldAddresses[addr.Hex()]
 		if !ok {
-			newAddresses = append(newAddresses, types.NodeID(addr.Hex()))
+			newAddresses = append(newAddresses, types.NodeID{hex.EncodeToString(info.BlsAddress[:]), addr.Hex()})
 		}
 	}
 	return newAddresses
-}
-
-// calculateKickoutRate calculates the cuckoo rule kick out rate in order to make committee balanced
-func (ss *ShardingState) calculateKickoutRate(newNodeList []types.NodeID) float64 {
-	numActiveCommittees := ss.numShards / 2
-	newNodesPerShard := math.Ceil(float64(len(newNodeList)) / float64(numActiveCommittees))
-	ss.sortCommitteeBySize()
-	L := len(ss.shardState[0].NodeList)
-	if L == 0 {
-		return 0.0
-	}
-	rate := newNodesPerShard / float64(L)
-	return math.Max(0.1, math.Min(rate, 1.0))
 }
 
 // GetInitShardState returns the initial shard state at genesis.
@@ -206,10 +206,11 @@ func GetInitShardState() types.ShardState {
 		if i == 0 {
 			for j := 0; j < GenesisShardSize; j++ {
 				priKey := bls.SecretKey{}
-				priKey.SetHexString(contract.InitialBeaconChainAccounts[j].Private)
+				priKey.SetHexString(contract.InitialBeaconChainBLSAccounts[j].Private)
 				addrBytes := priKey.GetPublicKey().GetAddress()
-				address := hex.EncodeToString(addrBytes[:])
-				com.NodeList = append(com.NodeList, types.NodeID(address))
+				blsAddr := hex.EncodeToString(addrBytes[:])
+				// TODO: directly read address for bls too
+				com.NodeList = append(com.NodeList, types.NodeID{blsAddr, contract.InitialBeaconChainAccounts[j].Address})
 			}
 		}
 		shardState = append(shardState, com)

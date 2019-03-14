@@ -7,14 +7,14 @@ import (
 
 func TestGetHashFromNodeList(t *testing.T) {
 	l1 := []NodeID{
-		"node1",
-		"node2",
-		"node3",
+		{"node1", "node1"},
+		{"node2", "node2"},
+		{"node3", "node3"},
 	}
 	l2 := []NodeID{
-		"node2",
-		"node1",
-		"node3",
+		{"node2", "node2"},
+		{"node1", "node1"},
+		{"node3", "node3"},
 	}
 	h1 := GetHashFromNodeList(l1)
 	h2 := GetHashFromNodeList(l2)
@@ -27,20 +27,20 @@ func TestGetHashFromNodeList(t *testing.T) {
 func TestHash(t *testing.T) {
 	com1 := Committee{
 		ShardID: 22,
-		Leader:  "node11",
+		Leader:  NodeID{"node11", "node11"},
 		NodeList: []NodeID{
-			"node11",
-			"node22",
-			"node1",
+			{"node11", "node11"},
+			{"node22", "node22"},
+			{"node1", "node1"},
 		},
 	}
 	com2 := Committee{
 		ShardID: 2,
-		Leader:  "node4",
+		Leader:  NodeID{"node4", "node4"},
 		NodeList: []NodeID{
-			"node4",
-			"node5",
-			"node6",
+			{"node4", "node4"},
+			{"node5", "node5"},
+			{"node6", "node6"},
 		},
 	}
 	shardState1 := ShardState{com1, com2}
@@ -48,20 +48,20 @@ func TestHash(t *testing.T) {
 
 	com3 := Committee{
 		ShardID: 2,
-		Leader:  "node4",
+		Leader:  NodeID{"node4", "node4"},
 		NodeList: []NodeID{
-			"node6",
-			"node5",
-			"node4",
+			{"node6", "node6"},
+			{"node5", "node5"},
+			{"node4", "node4"},
 		},
 	}
 	com4 := Committee{
 		ShardID: 22,
-		Leader:  "node11",
+		Leader:  NodeID{"node11", "node11"},
 		NodeList: []NodeID{
-			"node1",
-			"node11",
-			"node22",
+			{"node1", "node1"},
+			{"node11", "node11"},
+			{"node22", "node22"},
 		},
 	}
 
