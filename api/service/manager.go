@@ -24,6 +24,7 @@ type Type byte
 const (
 	SupportSyncing Type = iota
 	ClientSupport
+	NewClientSupport
 	SupportExplorer
 	Consensus
 	Randomness

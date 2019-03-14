@@ -13,12 +13,12 @@ import (
 
 // Constants for client service port.
 const (
+	IP   = "127.0.0.1"
 	Port = "30000"
 )
 
 // Server is the Server struct for client service package.
 type Server struct {
-	Port   string
 	server *grpc.Server
 }
 
@@ -28,8 +28,8 @@ func (s *Server) Process(ctx context.Context, message *Message) (*Response, erro
 }
 
 // Start starts the Server on given ip and port.
-func (s *Server) Start(ip, port string) (*grpc.Server, error) {
-	addr := net.JoinHostPort("", s.Port)
+func (s *Server) Start() (*grpc.Server, error) {
+	addr := net.JoinHostPort(IP, Port)
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
@@ -48,5 +48,5 @@ func (s *Server) Stop() {
 
 // NewServer creates new Server which implements ClientServiceServer interface.
 func NewServer() *Server {
-	return &Server{Port: Port}
+	return &Server{}
 }
