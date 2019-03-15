@@ -30,12 +30,23 @@ type Service struct {
 	peerInfo    <-chan peerstore.PeerInfo
 	discovery   *libp2pdis.RoutingDiscovery
 	messageChan chan *msg_pb.Message
+	started     bool
 }
+
+// ConnectionRetry set the number of retry of connection to bootnode in case the initial connection is failed
+var (
+	// retry for 10 minutes and give up then
+	ConnectionRetry = 300
+)
+
+const (
+	waitInRetry       = 2 * time.Second
+	connectionTimeout = 3 * time.Minute
+)
 
 // New returns role conversion service.
 func New(h p2p.Host, rendezvous p2p.GroupID, peerChan chan p2p.Peer, bootnodes utils.AddrList) *Service {
-	timeout := 30 * time.Minute
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
 	dht, err := libp2pdht.New(ctx, h.GetP2PHost())
 	if err != nil {
 		panic(err)
@@ -51,13 +62,20 @@ func New(h p2p.Host, rendezvous p2p.GroupID, peerChan chan p2p.Peer, bootnodes u
 		stoppedChan: make(chan struct{}),
 		peerChan:    peerChan,
 		bootnodes:   bootnodes,
+		discovery:   nil,
+		started:     false,
 	}
 }
 
 // StartService starts network info service.
 func (s *Service) StartService() {
-	s.Init()
+	err := s.Init()
+	if err != nil {
+		utils.GetLogInstance().Error("Service Init Failed", "error", err)
+		return
+	}
 	s.Run()
+	s.started = true
 }
 
 // Init initializes role conversion service.
@@ -76,19 +94,30 @@ func (s *Service) Init() error {
 		s.bootnodes = utils.BootNodes
 	}
 
+	connected := false
 	for _, peerAddr := range s.bootnodes {
 		peerinfo, _ := peerstore.InfoFromP2pAddr(peerAddr)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if err := s.Host.GetP2PHost().Connect(s.ctx, *peerinfo); err != nil {
-				utils.GetLogInstance().Warn("can't connect to bootnode", "error", err)
-			} else {
-				utils.GetLogInstance().Info("connected to bootnode", "node", *peerinfo)
+			for i := 0; i < ConnectionRetry; i++ {
+				if err := s.Host.GetP2PHost().Connect(s.ctx, *peerinfo); err != nil {
+					utils.GetLogInstance().Warn("can't connect to bootnode", "error", err, "try", i)
+					time.Sleep(waitInRetry)
+				} else {
+					utils.GetLogInstance().Info("connected to bootnode", "node", *peerinfo, "try", i)
+					// it is okay if any bootnode is connected
+					connected = true
+					break
+				}
 			}
 		}()
 	}
 	wg.Wait()
+
+	if !connected {
+		return fmt.Errorf("[FATAL] error connecting to bootnodes")
+	}
 
 	// We use a rendezvous point "shardID" to announce our location.
 	utils.GetLogInstance().Info("Announcing ourselves...")
@@ -102,10 +131,16 @@ func (s *Service) Init() error {
 // Run runs network info.
 func (s *Service) Run() {
 	defer close(s.stoppedChan)
+	if s.discovery == nil {
+		utils.GetLogInstance().Error("discovery is not initialized")
+		return
+	}
+
 	var err error
 	s.peerInfo, err = s.discovery.FindPeers(s.ctx, string(s.Rendezvous))
 	if err != nil {
 		utils.GetLogInstance().Error("FindPeers", "error", err)
+		return
 	}
 
 	go s.DoService()
@@ -124,7 +159,9 @@ func (s *Service) DoService() {
 			if peer.ID != s.Host.GetP2PHost().ID() && len(peer.ID) > 0 {
 				//	utils.GetLogInstance().Info("Found Peer", "peer", peer.ID, "addr", peer.Addrs, "my ID", s.Host.GetP2PHost().ID())
 				if err := s.Host.GetP2PHost().Connect(s.ctx, peer); err != nil {
-					utils.GetLogInstance().Warn("can't connect to peer node", "error", err)
+					utils.GetLogInstance().Warn("can't connect to peer node", "error", err, "peer", peer)
+					// break if the node can't connect to peers, waiting for another peer
+					break
 				} else {
 					utils.GetLogInstance().Info("connected to peer node", "peer", peer)
 				}
@@ -159,6 +196,11 @@ func (s *Service) DoService() {
 func (s *Service) StopService() {
 	utils.GetLogInstance().Info("Stopping network info service.")
 	defer s.cancel()
+
+	if !s.started {
+		utils.GetLogInstance().Info("Service didn't started. Exit.")
+		return
+	}
 
 	s.stopChan <- struct{}{}
 	<-s.stoppedChan

@@ -87,7 +87,7 @@ func (s *Service) Run() {
 				if s.IsStaked() {
 					return
 				}
-				s.DoService()
+				//s.DoService()
 				return
 			case <-s.stopChan:
 				return

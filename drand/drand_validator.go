@@ -2,7 +2,7 @@ package drand
 
 import (
 	protobuf "github.com/golang/protobuf/proto"
-	drand_proto "github.com/harmony-one/harmony/api/drand"
+	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
@@ -10,17 +10,17 @@ import (
 
 // ProcessMessageValidator dispatches messages for the validator to corresponding processors.
 func (dRand *DRand) ProcessMessageValidator(payload []byte) {
-	message := drand_proto.Message{}
-	err := protobuf.Unmarshal(payload, &message)
+	message := &msg_pb.Message{}
+	err := protobuf.Unmarshal(payload, message)
 
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to unmarshal message payload.", "err", err, "dRand", dRand)
 	}
 
 	switch message.Type {
-	case drand_proto.MessageType_INIT:
+	case msg_pb.MessageType_DRAND_INIT:
 		dRand.processInitMessage(message)
-	case drand_proto.MessageType_COMMIT:
+	case msg_pb.MessageType_DRAND_COMMIT:
 		// do nothing on the COMMIT message, as it is intended to send to leader
 	default:
 		utils.GetLogInstance().Error("Unexpected message type", "msgType", message.Type, "dRand", dRand)
@@ -28,13 +28,13 @@ func (dRand *DRand) ProcessMessageValidator(payload []byte) {
 }
 
 // ProcessMessageValidator dispatches validator's consensus message.
-func (dRand *DRand) processInitMessage(message drand_proto.Message) {
-	if message.Type != drand_proto.MessageType_INIT {
-		utils.GetLogInstance().Error("Wrong message type received", "expected", drand_proto.MessageType_INIT, "got", message.Type)
+func (dRand *DRand) processInitMessage(message *msg_pb.Message) {
+	if message.Type != msg_pb.MessageType_DRAND_INIT {
+		utils.GetLogInstance().Error("Wrong message type received", "expected", msg_pb.MessageType_DRAND_INIT, "got", message.Type)
 		return
 	}
 
-	blockHash := message.BlockHash
+	drandMsg := message.GetDrand()
 
 	// Verify message signature
 	err := verifyMessageSig(dRand.leader.ConsensusPubKey, message)
@@ -45,6 +45,7 @@ func (dRand *DRand) processInitMessage(message drand_proto.Message) {
 	utils.GetLogInstance().Debug("[DRG] verify the message signature Succeeded")
 
 	// TODO: check the blockHash is the block hash of last block of last epoch.
+	blockHash := drandMsg.BlockHash
 	copy(dRand.blockHash[:], blockHash[:])
 
 	rand, proof := dRand.vrf(dRand.blockHash)

@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/ecdsa"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"flag"
 	"fmt"
@@ -15,11 +16,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	crypto2 "github.com/ethereum/go-ethereum/crypto"
+
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	clientService "github.com/harmony-one/harmony/api/client/service"
-	"github.com/harmony-one/harmony/cmd/client/wallet/lib"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/wallet/wallet"
 	"github.com/harmony-one/harmony/node"
 )
 
@@ -47,11 +49,12 @@ var (
 	accountImportPtr     = accountImportCommand.String("privateKey", "", "Specify the private key to import")
 
 	// Transfer subcommands
-	transferCommand     = flag.NewFlagSet("transfer", flag.ExitOnError)
-	transferSenderPtr   = transferCommand.String("from", "0", "Specify the sender account address or index")
-	transferReceiverPtr = transferCommand.String("to", "", "Specify the receiver account")
-	transferAmountPtr   = transferCommand.Float64("amount", 0, "Specify the amount to transfer")
-	transferShardIDPtr  = transferCommand.Int("shardID", -1, "Specify the shard ID for the transfer")
+	transferCommand      = flag.NewFlagSet("transfer", flag.ExitOnError)
+	transferSenderPtr    = transferCommand.String("from", "0", "Specify the sender account address or index")
+	transferReceiverPtr  = transferCommand.String("to", "", "Specify the receiver account")
+	transferAmountPtr    = transferCommand.Float64("amount", 0, "Specify the amount to transfer")
+	transferShardIDPtr   = transferCommand.Int("shardID", -1, "Specify the shard ID for the transfer")
+	transferInputDataPtr = transferCommand.String("inputData", "", "Base64-encoded input data to embed in the transaction")
 
 	freeTokenCommand    = flag.NewFlagSet("getFreeToken", flag.ExitOnError)
 	freeTokenAddressPtr = freeTokenCommand.String("address", "", "Specify the account address to receive the free token")
@@ -60,11 +63,16 @@ var (
 	balanceAddressPtr = balanceCommand.String("address", "", "Specify the account address to check balance for")
 )
 
+// setupLog setup log for verbose output
+func setupLog() {
+	// enable logging for wallet
+	h := log.StreamHandler(os.Stdout, log.TerminalFormat(false))
+	log.Root().SetHandler(h)
+}
+
 // The main wallet program entrance. Note the this wallet program is for demo-purpose only. It does not implement
 // the secure storage of keys.
 func main() {
-	h := log.StreamHandler(os.Stdout, log.TerminalFormat(false))
-	log.Root().SetHandler(h)
 
 	// Verify that a subcommand has been provided
 	// os.Arg[0] is the main command
@@ -87,7 +95,14 @@ func main() {
 		fmt.Println("        --to             - The receiver account's address")
 		fmt.Println("        --amount         - The amount of token to transfer")
 		fmt.Println("        --shardID        - The shard Id for the transfer")
+		fmt.Println("        --inputData      - Base64-encoded input data to embed in the transaction")
 		os.Exit(1)
+	}
+
+	// Enable log if the last parameter is -verbose
+	if os.Args[len(os.Args)-1] == "--verbose" {
+		setupLog()
+		os.Args = os.Args[:len(os.Args)-1]
 	}
 
 	// Switch on the subcommand
@@ -160,7 +175,7 @@ func processImportCommnad() {
 
 func processBalancesCommand() {
 	balanceCommand.Parse(os.Args[2:])
-	walletNode := lib.CreateWalletNode()
+	walletNode := wallet.CreateWalletNode()
 
 	if *balanceAddressPtr == "" {
 		for i, address := range ReadAddresses() {
@@ -180,7 +195,7 @@ func processBalancesCommand() {
 
 func processGetFreeToken() {
 	freeTokenCommand.Parse(os.Args[2:])
-	walletNode := lib.CreateWalletNode()
+	walletNode := wallet.CreateWalletNode()
 
 	if *freeTokenAddressPtr == "" {
 		fmt.Println("Error: --address is required")
@@ -200,6 +215,14 @@ func processTransferCommand() {
 	receiver := *transferReceiverPtr
 	amount := *transferAmountPtr
 	shardID := *transferShardIDPtr
+	base64InputData := *transferInputDataPtr
+
+	inputData, err := base64.StdEncoding.DecodeString(base64InputData)
+	if err != nil {
+		fmt.Printf("Cannot base64-decode input data (%s): %s\n",
+			base64InputData, err)
+		return
+	}
 
 	if shardID == -1 {
 		fmt.Println("Please specify the shard ID for the transfer (e.g. --shardID=0)")
@@ -244,7 +267,7 @@ func processTransferCommand() {
 	// Generate transaction
 	senderPriKey := priKeys[senderIndex]
 	senderAddress := addresses[senderIndex]
-	walletNode := lib.CreateWalletNode()
+	walletNode := wallet.CreateWalletNode()
 	shardIDToAccountState := FetchBalance(senderAddress, walletNode)
 
 	state, ok := shardIDToAccountState[uint32(shardID)]
@@ -261,8 +284,8 @@ func processTransferCommand() {
 
 	amountBigInt := big.NewInt(int64(amount * params.GWei))
 	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(params.GWei))
-	tx, _ := types.SignTx(types.NewTransaction(state.nonce, receiverAddress, uint32(shardID), amountBigInt, params.TxGas, nil, nil), types.HomesteadSigner{}, senderPriKey)
-	lib.SubmitTransaction(tx, walletNode, uint32(shardID))
+	tx, _ := types.SignTx(types.NewTransaction(state.nonce, receiverAddress, uint32(shardID), amountBigInt, params.TxGas, nil, inputData), types.HomesteadSigner{}, senderPriKey)
+	wallet.SubmitTransaction(tx, walletNode, uint32(shardID))
 }
 
 func convertBalanceIntoReadableFormat(balance *big.Int) string {
@@ -309,8 +332,11 @@ func convertBalanceIntoReadableFormat(balance *big.Int) string {
 // TODO add support for non beacon chain shards
 func FetchBalance(address common.Address, walletNode *node.Node) map[uint32]AccountState {
 	result := make(map[uint32]AccountState)
-	peers := lib.GetPeersFromBeaconChain(walletNode)
-
+	peers := wallet.GetPeersFromBeaconChain(walletNode)
+	if len(peers) == 0 {
+		fmt.Printf("[FATAL] Can't find peers\n")
+		return nil
+	}
 	peer := peers[0]
 	port, _ := strconv.Atoi(peer.Port)
 	client := clientService.NewClient(peer.IP, strconv.Itoa(port+node.ClientServicePortDiff))
@@ -323,7 +349,11 @@ func FetchBalance(address common.Address, walletNode *node.Node) map[uint32]Acco
 
 // GetFreeToken requests for token test token on each shard
 func GetFreeToken(address common.Address, walletNode *node.Node) {
-	peers := lib.GetPeersFromBeaconChain(walletNode)
+	peers := wallet.GetPeersFromBeaconChain(walletNode)
+	if len(peers) == 0 {
+		fmt.Printf("[FATAL] Can't find peers\n")
+		return
+	}
 	peer := peers[0]
 	port, _ := strconv.Atoi(peer.Port)
 	client := clientService.NewClient(peer.IP, strconv.Itoa(port+node.ClientServicePortDiff))

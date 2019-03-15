@@ -1,7 +1,6 @@
 package service
 
 import (
-	"fmt"
 	"time"
 
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -25,6 +24,7 @@ type Type byte
 const (
 	SupportSyncing Type = iota
 	ClientSupport
+	NewClientSupport
 	SupportExplorer
 	Consensus
 	Randomness
@@ -142,13 +142,10 @@ func (m *Manager) TakeAction(action *Action) {
 	if service, ok := m.services[action.ServiceType]; ok {
 		switch action.Action {
 		case Start:
-			fmt.Printf("Start %s\n", action.ServiceType)
 			service.StartService()
 		case Stop:
-			fmt.Printf("Stop %s\n", action.ServiceType)
 			service.StopService()
 		case Notify:
-			fmt.Printf("Notify %s\n", action.ServiceType)
 			service.NotifyService(action.Params)
 		}
 	}

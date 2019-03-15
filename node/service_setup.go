@@ -9,6 +9,7 @@ import (
 	"github.com/harmony-one/harmony/api/service/discovery"
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/api/service/networkinfo"
+	"github.com/harmony-one/harmony/api/service/newclientsupport"
 	"github.com/harmony-one/harmony/api/service/randomness"
 	"github.com/harmony-one/harmony/api/service/staking"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -60,8 +61,13 @@ func (node *Node) setupForBeaconLeader() {
 	node.serviceManager.RegisterService(service.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReady))
 	// Register client support service.
 	node.serviceManager.RegisterService(service.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
+	// TODO(minhdoan): We will remove the old client support and use the new client support which uses new message protocol.
+	// Register client new support service.
+	node.serviceManager.RegisterService(service.NewClientSupport, newclientsupport.New())
 	// Register randomness service
 	node.serviceManager.RegisterService(service.Randomness, randomness.New(node.DRand))
+	// Register explorer service.
+	node.serviceManager.RegisterService(service.SupportExplorer, explorer.New(&node.SelfPeer))
 }
 
 func (node *Node) setupForBeaconValidator() {
@@ -77,7 +83,7 @@ func (node *Node) setupForBeaconValidator() {
 
 func (node *Node) setupForNewNode() {
 	// TODO determine the role of new node, currently assume it is beacon node
-	nodeConfig, chanPeer := node.initNodeConfiguration(true, false)
+	nodeConfig, chanPeer := node.initNodeConfiguration(true, true)
 
 	// Register staking service.
 	node.serviceManager.RegisterService(service.Staking, staking.New(node.host, node.AccountKey, node.beaconChain, node.NodeConfig.ConsensusPubKey.GetAddress()))
@@ -93,7 +99,7 @@ func (node *Node) setupForClientNode() {
 	nodeConfig, chanPeer := node.initNodeConfiguration(false, true)
 
 	// Register peer discovery service.
-	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer, nil))
+	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer, node.AddBeaconPeer))
 	// Register networkinfo service. "0" is the beacon shard ID
 	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer, nil))
 }

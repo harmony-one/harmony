@@ -1,23 +1,31 @@
 package drand
 
 import (
-	drand_proto "github.com/harmony-one/harmony/api/drand"
 	"github.com/harmony-one/harmony/api/proto"
+	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // Constructs the init message
 func (dRand *DRand) constructCommitMessage(vrf [32]byte, proof []byte) []byte {
-	message := drand_proto.Message{}
-	message.Type = drand_proto.MessageType_COMMIT
-	message.SenderId = dRand.nodeID
+	message := &msg_pb.Message{
+		ReceiverType: msg_pb.ReceiverType_LEADER,
+		ServiceType:  msg_pb.ServiceType_DRAND,
+		Type:         msg_pb.MessageType_DRAND_COMMIT,
+		Request: &msg_pb.Message_Drand{
+			Drand: &msg_pb.DrandRequest{},
+		},
+	}
 
-	message.BlockHash = dRand.blockHash[:]
-	message.Payload = append(vrf[:], proof...)
+	drandMsg := message.GetDrand()
+	drandMsg.SenderId = dRand.nodeID
+	drandMsg.BlockHash = dRand.blockHash[:]
+	drandMsg.BlockHash = dRand.blockHash[:]
+	drandMsg.Payload = append(vrf[:], proof...)
 	// Adding the public key into payload so leader can verify the vrf
 	// TODO: change the curve to follow the same curve with consensus, so the public key doesn't need to be attached.
-	message.Payload = append(message.Payload, (*dRand.vrfPubKey).Serialize()...)
-	marshaledMessage, err := dRand.signAndMarshalDRandMessage(&message)
+	drandMsg.Payload = append(drandMsg.Payload, (*dRand.vrfPubKey).Serialize()...)
+	marshaledMessage, err := dRand.signAndMarshalDRandMessage(message)
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to sign and marshal the commit message", "error", err)
 	}

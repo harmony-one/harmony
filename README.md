@@ -83,7 +83,7 @@ The configuration file configures number of nodes and their IP/Port.
 The script starts one local beacon chain node, the blockchain nodes, and run a transactional generator program which generates and sends simulated transactions to the local blockchain.
 
 ```bash
-./test/deploy.sh ./test/configs/local_config1.txt
+./test/deploy.sh ./test/configs/oneshard1.txt
 ```
 
 ## Testing

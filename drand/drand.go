@@ -9,7 +9,7 @@ import (
 
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
-	drand_proto "github.com/harmony-one/harmony/api/drand"
+	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/vrf"
@@ -149,9 +149,8 @@ func (dRand *DRand) AddPeers(peers []*p2p.Peer) int {
 }
 
 // Sign on the drand message signature field.
-func (dRand *DRand) signDRandMessage(message *drand_proto.Message) error {
+func (dRand *DRand) signDRandMessage(message *msg_pb.Message) error {
 	message.Signature = nil
-	// TODO: use custom serialization method rather than protobuf
 	marshaledMessage, err := protobuf.Marshal(message)
 	if err != nil {
 		return err
@@ -165,7 +164,7 @@ func (dRand *DRand) signDRandMessage(message *drand_proto.Message) error {
 }
 
 // Signs the drand message and returns the marshaled message.
-func (dRand *DRand) signAndMarshalDRandMessage(message *drand_proto.Message) ([]byte, error) {
+func (dRand *DRand) signAndMarshalDRandMessage(message *msg_pb.Message) ([]byte, error) {
 	err := dRand.signDRandMessage(message)
 	if err != nil {
 		return []byte{}, err
@@ -199,10 +198,10 @@ func (dRand *DRand) GetValidatorPeers() []p2p.Peer {
 }
 
 // Verify the signature of the message are valid from the signer's public key.
-func verifyMessageSig(signerPubKey *bls.PublicKey, message drand_proto.Message) error {
+func verifyMessageSig(signerPubKey *bls.PublicKey, message *msg_pb.Message) error {
 	signature := message.Signature
 	message.Signature = nil
-	messageBytes, err := protobuf.Marshal(&message)
+	messageBytes, err := protobuf.Marshal(message)
 	if err != nil {
 		return err
 	}

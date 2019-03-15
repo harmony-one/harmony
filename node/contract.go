@@ -4,20 +4,16 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/harmony-one/harmony/contracts/structs"
-
 	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/common/math"
-
-	"github.com/harmony-one/harmony/contracts"
-
-	"github.com/harmony-one/harmony/internal/utils"
-
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/harmony-one/harmony/contracts"
+	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/utils"
 	contract_constants "github.com/harmony-one/harmony/internal/utils/contract"
 )
 
@@ -113,6 +109,15 @@ func (node *Node) getDeployedStakingContract() common.Address {
 	return node.StakingContractAddress
 }
 
+// GetNonceOfAddress returns nonce of an address.
+func (node *Node) GetNonceOfAddress(address common.Address) uint64 {
+	state, err := node.blockchain.State()
+	if err != nil {
+		log.Error("Failed to get chain state", "Error", err)
+	}
+	return state.GetNonce(address)
+}
+
 // AddFaucetContractToPendingTransactions adds the faucet contract the genesis block.
 func (node *Node) AddFaucetContractToPendingTransactions() {
 	// Add a contract deployment transactionv
@@ -136,11 +141,7 @@ func (node *Node) CallFaucetContract(address common.Address) common.Hash {
 }
 
 func (node *Node) callGetFreeToken(address common.Address) common.Hash {
-	state, err := node.blockchain.State()
-	if err != nil {
-		log.Error("Failed to get chain state", "Error", err)
-	}
-	nonce := state.GetNonce(crypto.PubkeyToAddress(node.ContractDeployerKey.PublicKey))
+	nonce := node.GetNonceOfAddress(crypto.PubkeyToAddress(node.ContractDeployerKey.PublicKey))
 	return node.callGetFreeTokenWithNonce(address, nonce)
 }
 

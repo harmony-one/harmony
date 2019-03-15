@@ -1,6 +1,12 @@
 syntax = "proto3";
 package message;
 
+
+// Client is the service used for any client-facing requests.
+service ClientService {
+  rpc Process(Message) returns (Response) {}
+}
+
 // ReceiverType indicates who is the receiver of this message.
 enum ReceiverType {
   NEWNODE = 0;
@@ -13,6 +19,7 @@ enum ReceiverType {
 enum ServiceType {
   CONSENSUS = 0;
   STAKING = 1;
+  DRAND = 2;
 }
 
 // MessageType indicates what is the type of this message.
@@ -23,6 +30,8 @@ enum MessageType {
   PREPARED = 3;
   COMMIT = 4;
   COMMITTED = 5;
+  DRAND_INIT = 6;
+  DRAND_COMMIT = 7;
 }
 
 // This is universal message for all communication protocols.
@@ -38,7 +47,33 @@ message Message {
   oneof request {
       StakingRequest staking = 5;
       ConsensusRequest consensus = 6;
+      DrandRequest drand = 7;
+      // Refactor this later after demo.
+      LotteryRequest lottery_request = 8;
   }
+}
+
+message Response {
+  ReceiverType receiver_type = 1;
+  ServiceType service_type = 2;
+  MessageType type = 3;
+  oneof response {
+    LotteryResponse lottery_response = 4;
+  }
+}
+
+message LotteryResponse {
+  repeated string players = 1;
+  repeated uint64 balances = 3;
+}
+
+message LotteryRequest {
+  enum Type {
+    ENTER = 0;
+    RESULT = 1;
+  }
+  Type type = 1;
+  string private_key = 2;
 }
 
 // Staking Request from new node to beacon node.
@@ -47,11 +82,15 @@ message StakingRequest {
   string node_id = 2;
 }
 
-// Consensus request.
-// TODO: Will organize more later.
 message ConsensusRequest {
   uint32 consensus_id = 1;
   bytes block_hash = 2;
   uint32 sender_id = 3;
   bytes payload = 4;
+}
+
+message DrandRequest {
+  uint32 sender_id = 1; // TODO: make it public key
+  bytes block_hash = 2;
+  bytes payload = 3;
 }
