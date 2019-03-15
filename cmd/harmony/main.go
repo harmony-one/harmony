@@ -87,7 +87,7 @@ var (
 	// isBeacon indicates this node is a beacon chain node
 	isBeacon = flag.Bool("is_beacon", false, "true means this node is a beacon chain node")
 	// isArchival indicates this node is a archival node that will save and archive current blockchain
-	isArchival = flag.Bool("is_archival", true, "true means this node is a archival node")
+	isArchival = flag.Bool("is_archival", false, "true means this node is a archival node")
 	// isNewNode indicates this node is a new node
 	isNewNode    = flag.Bool("is_newnode", false, "true means this node is a new node")
 	accountIndex = flag.Int("account_index", 0, "the index of the staking account to use")

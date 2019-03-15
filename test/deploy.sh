@@ -77,6 +77,7 @@ SHARDS=2
 KILLPORT=9004
 SYNC=true
 DRYRUN=
+ARCHIVE=true
 
 while getopts "hdtD:m:s:k:nS" option; do
    case $option in
@@ -174,17 +175,17 @@ else
    sleep $DURATION
 fi
 
-if [ "$ARCHIVE" == "true" ]; then
-   echo "launching Archival Node ... wait"
-   sleep 2
-   line=$(grep archival $config)
-   IFS=' ' read ip port mode shardID <<< $line
-   if [ "$mode" == "archival" ]; then
-      $DRYRUN $ROOT/bin/harmony -log_folder $log_folder -duration $DURATION -ip $ip -port $port -key /tmp/$ip-$port.key  $HMY_OPT2 -is_archival  2>&1 | tee -a $LOG_FILE
-   fi
-else
-   sleep $DURATION
-fi
+# if [ "$ARCHIVE" == "true" ]; then
+#    echo "launching Archival Node ... wait"
+#    sleep 2
+#    line=$(grep archival $config)
+#    IFS=' ' read ip port mode shardID <<< $line
+#    if [ "$mode" == "archival" && "$ARCHIVE" == "true" ]; then
+#       $DRYRUN $ROOT/bin/harmony -log_folder $log_folder  $DB -min_peers $MIN $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key -is_archival  2>&1 | tee -a $LOG_FILE
+#    fi
+# else
+#    sleep $DURATION
+# fi
 
 # save bc_config.json
 [ -e bc_config.json ] && cp -f bc_config.json $log_folder
