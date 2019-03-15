@@ -63,7 +63,8 @@ func (node *Node) setupForBeaconLeader() {
 	node.serviceManager.RegisterService(service.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
 	// TODO(minhdoan): We will remove the old client support and use the new client support which uses new message protocol.
 	// Register client new support service.
-	node.serviceManager.RegisterService(service.NewClientSupport, newclientsupport.New())
+	node.serviceManager.RegisterService(service.NewClientSupport, newclientsupport.New(
+		node.CreateTransactionForEnterMethod, node.GetResult))
 	// Register randomness service
 	node.serviceManager.RegisterService(service.Randomness, randomness.New(node.DRand))
 	// Register explorer service.

@@ -9,10 +9,13 @@ const (
 )
 
 func TestClient(t *testing.T) {
-	s := NewServer()
+	s := NewServer(nil, nil)
 	s.Start()
 
 	client := NewClient(testIP)
-	client.Process(&Message{})
+	_, err := client.Process(&Message{})
+	if err == nil {
+		t.Errorf("Not expected.")
+	}
 	s.Stop()
 }

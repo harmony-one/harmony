@@ -6,7 +6,7 @@ import (
 )
 
 func TestServerStart(t *testing.T) {
-	s := NewServer()
+	s := NewServer(nil, nil)
 	s.Start()
 	time.Sleep(time.Second)
 	s.Stop()
