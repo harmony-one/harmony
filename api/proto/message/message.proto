@@ -8,11 +8,13 @@ service ClientService {
 }
 
 // ReceiverType indicates who is the receiver of this message.
+// TODO(minhdoan): Why LEADER_OR_VALIDATOR, think of a better design.
 enum ReceiverType {
   NEWNODE = 0;
   LEADER = 1;
   VALIDATOR = 2;
   CLIENT = 3;
+  LEADER_OR_VALIDATOR = 4;
 }
 
 // ServiceType indicates which service used to generate this message.
@@ -20,6 +22,7 @@ enum ServiceType {
   CONSENSUS = 0;
   STAKING = 1;
   DRAND = 2;
+  CLIENT_SUPPORT = 3;
 }
 
 // MessageType indicates what is the type of this message.
@@ -32,6 +35,7 @@ enum MessageType {
   COMMITTED = 5;
   DRAND_INIT = 6;
   DRAND_COMMIT = 7;
+  LOTTERY_REQUEST = 8; // it should be either ENTER or GETPLAYERS but it will be removed later.
 }
 
 // This is universal message for all communication protocols.
@@ -63,7 +67,7 @@ message Response {
 }
 
 message LotteryResponse {
-  repeated string players = 1;
+  repeated string players = 2;
   repeated uint64 balances = 3;
 }
 
@@ -74,6 +78,7 @@ message LotteryRequest {
   }
   Type type = 1;
   string private_key = 2;
+  int64 amount = 3;
 }
 
 // Staking Request from new node to beacon node.

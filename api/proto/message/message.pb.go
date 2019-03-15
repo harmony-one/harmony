@@ -6,9 +6,10 @@ package message
 import (
 	context "context"
 	fmt "fmt"
+	math "math"
+
 	proto "github.com/golang/protobuf/proto"
 	grpc "google.golang.org/grpc"
-	math "math"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -23,13 +24,15 @@ var _ = math.Inf
 const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
 // ReceiverType indicates who is the receiver of this message.
+// TODO(minhdoan): Why LEADER_OR_VALIDATOR, think of a better design.
 type ReceiverType int32
 
 const (
-	ReceiverType_NEWNODE   ReceiverType = 0
-	ReceiverType_LEADER    ReceiverType = 1
-	ReceiverType_VALIDATOR ReceiverType = 2
-	ReceiverType_CLIENT    ReceiverType = 3
+	ReceiverType_NEWNODE             ReceiverType = 0
+	ReceiverType_LEADER              ReceiverType = 1
+	ReceiverType_VALIDATOR           ReceiverType = 2
+	ReceiverType_CLIENT              ReceiverType = 3
+	ReceiverType_LEADER_OR_VALIDATOR ReceiverType = 4
 )
 
 var ReceiverType_name = map[int32]string{
@@ -37,13 +40,15 @@ var ReceiverType_name = map[int32]string{
 	1: "LEADER",
 	2: "VALIDATOR",
 	3: "CLIENT",
+	4: "LEADER_OR_VALIDATOR",
 }
 
 var ReceiverType_value = map[string]int32{
-	"NEWNODE":   0,
-	"LEADER":    1,
-	"VALIDATOR": 2,
-	"CLIENT":    3,
+	"NEWNODE":             0,
+	"LEADER":              1,
+	"VALIDATOR":           2,
+	"CLIENT":              3,
+	"LEADER_OR_VALIDATOR": 4,
 }
 
 func (x ReceiverType) String() string {
@@ -58,21 +63,24 @@ func (ReceiverType) EnumDescriptor() ([]byte, []int) {
 type ServiceType int32
 
 const (
-	ServiceType_CONSENSUS ServiceType = 0
-	ServiceType_STAKING   ServiceType = 1
-	ServiceType_DRAND     ServiceType = 2
+	ServiceType_CONSENSUS      ServiceType = 0
+	ServiceType_STAKING        ServiceType = 1
+	ServiceType_DRAND          ServiceType = 2
+	ServiceType_CLIENT_SUPPORT ServiceType = 3
 )
 
 var ServiceType_name = map[int32]string{
 	0: "CONSENSUS",
 	1: "STAKING",
 	2: "DRAND",
+	3: "CLIENT_SUPPORT",
 }
 
 var ServiceType_value = map[string]int32{
-	"CONSENSUS": 0,
-	"STAKING":   1,
-	"DRAND":     2,
+	"CONSENSUS":      0,
+	"STAKING":        1,
+	"DRAND":          2,
+	"CLIENT_SUPPORT": 3,
 }
 
 func (x ServiceType) String() string {
@@ -95,6 +103,7 @@ const (
 	MessageType_COMMITTED              MessageType = 5
 	MessageType_DRAND_INIT             MessageType = 6
 	MessageType_DRAND_COMMIT           MessageType = 7
+	MessageType_LOTTERY_REQUEST        MessageType = 8
 )
 
 var MessageType_name = map[int32]string{
@@ -106,6 +115,7 @@ var MessageType_name = map[int32]string{
 	5: "COMMITTED",
 	6: "DRAND_INIT",
 	7: "DRAND_COMMIT",
+	8: "LOTTERY_REQUEST",
 }
 
 var MessageType_value = map[string]int32{
@@ -117,6 +127,7 @@ var MessageType_value = map[string]int32{
 	"COMMITTED":              5,
 	"DRAND_INIT":             6,
 	"DRAND_COMMIT":           7,
+	"LOTTERY_REQUEST":        8,
 }
 
 func (x MessageType) String() string {
@@ -389,7 +400,7 @@ func (*Response) XXX_OneofWrappers() []interface{} {
 }
 
 type LotteryResponse struct {
-	Players              []string `protobuf:"bytes,1,rep,name=players,proto3" json:"players,omitempty"`
+	Players              []string `protobuf:"bytes,2,rep,name=players,proto3" json:"players,omitempty"`
 	Balances             []uint64 `protobuf:"varint,3,rep,packed,name=balances,proto3" json:"balances,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
@@ -438,6 +449,7 @@ func (m *LotteryResponse) GetBalances() []uint64 {
 type LotteryRequest struct {
 	Type                 LotteryRequest_Type `protobuf:"varint,1,opt,name=type,proto3,enum=message.LotteryRequest_Type" json:"type,omitempty"`
 	PrivateKey           string              `protobuf:"bytes,2,opt,name=private_key,json=privateKey,proto3" json:"private_key,omitempty"`
+	Amount               int64               `protobuf:"varint,3,opt,name=amount,proto3" json:"amount,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}            `json:"-"`
 	XXX_unrecognized     []byte              `json:"-"`
 	XXX_sizecache        int32               `json:"-"`
@@ -480,6 +492,13 @@ func (m *LotteryRequest) GetPrivateKey() string {
 		return m.PrivateKey
 	}
 	return ""
+}
+
+func (m *LotteryRequest) GetAmount() int64 {
+	if m != nil {
+		return m.Amount
+	}
+	return 0
 }
 
 // Staking Request from new node to beacon node.
