@@ -37,12 +37,9 @@ func (client *Client) Close() {
 }
 
 // Process processes message.
-func (client *Client) Process(message *Message) *Response {
+func (client *Client) Process(message *Message) (*Response, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	response, err := client.clientServiceClient.Process(ctx, message)
-	if err != nil {
-		log.Fatalf("Getting error when processing message: %s", err)
-	}
-	return response
+	return response, err
 }
