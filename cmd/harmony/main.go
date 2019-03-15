@@ -7,8 +7,11 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/api/client"
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils/contract"
 
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -24,10 +27,11 @@ import (
 )
 
 var (
-	version string
-	builtBy string
-	builtAt string
-	commit  string
+	version    string
+	builtBy    string
+	builtAt    string
+	commit     string
+	stateMutex sync.Mutex
 )
 
 // InitLDBDatabase initializes a LDBDatabase. isBeacon=true will return the beacon chain database for normal shard nodes
@@ -203,10 +207,22 @@ func createArchivalNode() (*node.Node, *nodeconfig.ConfigType) { //Mix of setUpC
 	if err != nil {
 		panic("unable to new host in harmony")
 	}
-	currentNode := node.New(nodeConfig.Host, &consensus.Consensus{ShardID: uint32(10000)}, nodeConfig.BeaconDB) //at the moment the database supplied is beacondb as this is a beacon sync node
+	currentNode := node.New(nodeConfig.Host, &consensus.Consensus{ShardID: uint32(0)}, nodeConfig.BeaconDB) //at the moment the database supplied is beacondb as this is a beacon sync node
 	currentNode.NodeConfig.SetRole(nodeconfig.ArchivalNode)
 	currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDBeaconClient)
 	currentNode.AddBeaconChainDatabase(nodeConfig.BeaconDB)
+	currentNode.Client = client.NewClient(currentNode.GetHost(), []uint32{0})
+	GetLatestBlocks := func(blocks []*types.Block) { //This should also loop over all shards.
+		for _, block := range blocks {
+			utils.GetLogInstance().Info("Current Block", "hash", currentNode.Blockchain().CurrentBlock().Hash().Hex())
+			utils.GetLogInstance().Info("Adding block from leader", "txNum", len(block.Transactions()), "shardID", 0, "preHash", block.ParentHash().Hex())
+			currentNode.AddNewBlock(block)
+			stateMutex.Lock()
+			currentNode.Worker.UpdateCurrent()
+			stateMutex.Unlock()
+		}
+	}
+	currentNode.Client.UpdateBlocks = GetLatestBlocks
 	return currentNode, nodeConfig
 }
 

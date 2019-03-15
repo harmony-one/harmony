@@ -177,7 +177,7 @@ fi
 if [ "$ARCHIVE" == "true" ]; then
    echo "launching Archival Node ... wait"
    sleep 2
-   line=$(grep client $config)
+   line=$(grep archival $config)
    IFS=' ' read ip port mode shardID <<< $line
    if [ "$mode" == "archival" ]; then
       $DRYRUN $ROOT/bin/harmony -log_folder $log_folder -duration $DURATION -ip $ip -port $port -key /tmp/$ip-$port.key  $HMY_OPT2 -is_archival  2>&1 | tee -a $LOG_FILE
