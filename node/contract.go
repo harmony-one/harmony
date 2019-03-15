@@ -134,6 +134,51 @@ func (node *Node) AddLotteryContract() {
 	node.addPendingTransactions(types.Transactions{demoContract})
 }
 
+func (node *Node) GetNonceOfAddress(address common.Address) uint64 {
+	state, err := node.blockchain.State()
+	if err != nil {
+		log.Error("Failed to get chain state", "Error", err)
+	}
+	return state.GetNonce(address)
+}
+
+// CreateTransactionForEnterMethod creates transaction to call enter method of lottery contract.
+func (node *Node) CreateTransactionForEnterMethod(amount int64, priKey string) types.Transactions {
+	var err error
+	toAddress := node.DemoContractAddress
+
+	abi, err := abi.JSON(strings.NewReader(contracts.LotteryABI))
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to generate staking contract's ABI", "error", err)
+	}
+	// TODO: the bls address should be signed by the bls private key
+	bytesData, err := abi.Pack("enter")
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to generate ABI function bytes data", "error", err)
+	}
+
+	key, err := crypto.HexToECDSA(priKey)
+	nonce := node.GetNonceOfAddress(crypto.PubkeyToAddress(key.PublicKey))
+	tx := types.NewTransaction(
+		nonce,
+		toAddress,
+		0,
+		big.NewInt(amount),
+		params.TxGas*10,
+		nil,
+		bytesData,
+	)
+
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to get private key", "error", err)
+	}
+	if signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, key); err == nil {
+		node.addPendingTransactions(types.Transactions{signedTx})
+	} else {
+		utils.GetLogInstance().Error("Unable to call enter method", "error", err)
+	}
+}
+
 // AddFaucetContractToPendingTransactions adds the faucet contract the genesis block.
 func (node *Node) AddFaucetContractToPendingTransactions() {
 	// Add a contract deployment transactionv
@@ -157,11 +202,7 @@ func (node *Node) CallFaucetContract(address common.Address) common.Hash {
 }
 
 func (node *Node) callGetFreeToken(address common.Address) common.Hash {
-	state, err := node.blockchain.State()
-	if err != nil {
-		log.Error("Failed to get chain state", "Error", err)
-	}
-	nonce := state.GetNonce(crypto.PubkeyToAddress(node.ContractDeployerKey.PublicKey))
+	nonce := node.GetNonceOfAddress(crypto.PubkeyToAddress(node.ContractDeployerKey.PublicKey))
 	return node.callGetFreeTokenWithNonce(address, nonce)
 }
 
