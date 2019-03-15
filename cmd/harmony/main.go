@@ -182,7 +182,7 @@ func createArchivalNode() (*node.Node, *nodeconfig.ConfigType) { //Mix of setUpC
 	nodeConfig := nodeconfig.GetGlobalConfig()
 
 	// Currently we hardcode only one shard.
-	nodeConfig.ShardIDString = "10000" //ShardID can be highest positive number of shard.
+	nodeConfig.ShardIDString = "0" //ShardID can be highest positive number of shard.
 	// Consensus keys are the BLS12-381 keys used to sign consensus messages
 	nodeConfig.ConsensusPriKey, nodeConfig.ConsensusPubKey = utils.GenKey(*ip, *port)
 	// P2p private key is used for secure message transfer between p2p nodes.
@@ -205,7 +205,7 @@ func createArchivalNode() (*node.Node, *nodeconfig.ConfigType) { //Mix of setUpC
 	}
 	currentNode := node.New(nodeConfig.Host, &consensus.Consensus{ShardID: uint32(10000)}, nodeConfig.BeaconDB) //at the moment the database supplied is beacondb as this is a beacon sync node
 	currentNode.NodeConfig.SetRole(nodeconfig.ArchivalNode)
-	currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
+	currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDBeaconClient)
 	currentNode.AddBeaconChainDatabase(nodeConfig.BeaconDB)
 	return currentNode, nodeConfig
 }

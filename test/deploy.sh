@@ -89,6 +89,7 @@ while getopts "hdtD:m:s:k:nS" option; do
       k) KILLPORT=$OPTARG ;;
       n) DRYRUN=echo ;;
       S) SYNC=true ;;
+      A) ARCHIVE=true ;;
    esac
 done
 
@@ -168,6 +169,18 @@ if [ "$TXGEN" == "true" ]; then
    IFS=' ' read ip port mode shardID <<< $line
    if [ "$mode" == "client" ]; then
       $DRYRUN $ROOT/bin/txgen -log_folder $log_folder -duration $DURATION -ip $ip -port $port $HMY_OPT2 2>&1 | tee -a $LOG_FILE
+   fi
+else
+   sleep $DURATION
+fi
+
+if [ "$ARCHIVE" == "true" ]; then
+   echo "launching Archival Node ... wait"
+   sleep 2
+   line=$(grep client $config)
+   IFS=' ' read ip port mode shardID <<< $line
+   if [ "$mode" == "archival" ]; then
+      $DRYRUN $ROOT/bin/harmony -log_folder $log_folder -duration $DURATION -ip $ip -port $port -key /tmp/$ip-$port.key  $HMY_OPT2 -is_archival  2>&1 | tee -a $LOG_FILE
    fi
 else
    sleep $DURATION
