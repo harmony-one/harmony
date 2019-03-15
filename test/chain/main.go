@@ -60,13 +60,15 @@ var (
 	contractworker        *pkgworker.Worker
 	nonce                 uint64
 	dataEnc               []byte
-	AllRandomUserAddress  []common.Address
-	AllRandomUserKey      []*ecdsa.PrivateKey
-	FaucetContractAddress common.Address
+	allRandomUserAddress  []common.Address
+	allRandomUserKey      []*ecdsa.PrivateKey
+	faucetContractAddress common.Address
+	stakeContractAddress  common.Address
 	chain                 *core.BlockChain
 	err                   error
 	block                 *types.Block
 	state                 *core_state.DB
+	stakingtxns           []*types.Transaction
 )
 
 func init() {
@@ -107,7 +109,7 @@ func fundFaucetContract(chain *core.BlockChain) {
 	nonce = contractworker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(FaucetPriKey.PublicKey))
 	dataEnc = common.FromHex(FaucetContractBinary)
 	ftx, _ := types.SignTx(types.NewContractCreation(nonce, 0, big.NewInt(7000000000000000000), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, FaucetPriKey)
-	FaucetContractAddress = crypto.CreateAddress(FaucetAddress, nonce)
+	faucetContractAddress = crypto.CreateAddress(FaucetAddress, nonce)
 	state := contractworker.GetCurrentState()
 	txs = append(txs, ftx)
 	//Funding the user addressed
@@ -116,8 +118,8 @@ func fundFaucetContract(chain *core.BlockChain) {
 		randomUserAddress := crypto.PubkeyToAddress(randomUserKey.PublicKey)
 		amount := i*100000 + 37 // Put different amount in each  account.
 		tx, _ := types.SignTx(types.NewTransaction(nonce+uint64(i), randomUserAddress, 0, big.NewInt(int64(amount)), params.TxGas, nil, nil), types.HomesteadSigner{}, FaucetPriKey)
-		AllRandomUserAddress = append(AllRandomUserAddress, randomUserAddress)
-		AllRandomUserKey = append(AllRandomUserKey, randomUserKey)
+		allRandomUserAddress = append(allRandomUserAddress, randomUserAddress)
+		allRandomUserKey = append(allRandomUserKey, randomUserKey)
 		txs = append(txs, tx)
 	}
 	amount := 720000
@@ -136,9 +138,9 @@ func fundFaucetContract(chain *core.BlockChain) {
 	state = contractworker.GetCurrentState()
 	fmt.Println("Balances before call of faucet contract")
 	fmt.Println("contract balance:")
-	fmt.Println(state.GetBalance(FaucetContractAddress))
+	fmt.Println(state.GetBalance(faucetContractAddress))
 	fmt.Println("user address balance")
-	fmt.Println(state.GetBalance(AllRandomUserAddress[0]))
+	fmt.Println(state.GetBalance(allRandomUserAddress[0]))
 	fmt.Println("staking address balance")
 	fmt.Println(state.GetBalance(StakingAddress))
 	fmt.Println()
@@ -150,7 +152,7 @@ func callFaucetContractToFundAnAddress(chain *core.BlockChain) {
 	fmt.Println("--------- Now Setting up Faucet Contract Call ---------")
 	fmt.Println()
 
-	paddedAddress := common.LeftPadBytes(AllRandomUserAddress[0].Bytes(), 32)
+	paddedAddress := common.LeftPadBytes(allRandomUserAddress[0].Bytes(), 32)
 	transferFnSignature := []byte("request(address)")
 	//hash := sha3.NewKeccak256()
 	hash := sha3.NewLegacyKeccak256()
@@ -160,7 +162,7 @@ func callFaucetContractToFundAnAddress(chain *core.BlockChain) {
 	var callEnc []byte
 	callEnc = append(callEnc, callFuncHex...)
 	callEnc = append(callEnc, paddedAddress...)
-	callfaucettx, _ := types.SignTx(types.NewTransaction(nonce+uint64(5), FaucetContractAddress, 0, big.NewInt(0), params.TxGasContractCreation*10, nil, callEnc), types.HomesteadSigner{}, FaucetPriKey)
+	callfaucettx, _ := types.SignTx(types.NewTransaction(nonce+uint64(5), faucetContractAddress, 0, big.NewInt(0), params.TxGasContractCreation*10, nil, callEnc), types.HomesteadSigner{}, FaucetPriKey)
 
 	err = contractworker.CommitTransactions(types.Transactions{callfaucettx})
 	if err != nil {
@@ -177,9 +179,9 @@ func callFaucetContractToFundAnAddress(chain *core.BlockChain) {
 	state = contractworker.GetCurrentState()
 	fmt.Println("Balances AFTER CALL of faucet contract")
 	fmt.Println("contract balance:")
-	fmt.Println(state.GetBalance(FaucetContractAddress))
+	fmt.Println(state.GetBalance(faucetContractAddress))
 	fmt.Println("user address balance")
-	fmt.Println(state.GetBalance(AllRandomUserAddress[0]))
+	fmt.Println(state.GetBalance(allRandomUserAddress[0]))
 	fmt.Println("staking address balance")
 	fmt.Println(state.GetBalance(StakingAddress))
 	fmt.Println()
@@ -198,131 +200,136 @@ func playSetupStakingContract(chain *core.BlockChain) {
 	fmt.Println("--------- Now Setting up Staking Contract ---------")
 	fmt.Println()
 	//worker := pkgworker.New(params.TestChainConfig, chain, consensus.NewFaker(), crypto.PubkeyToAddress(StakingPriKey.PublicKey), 0)
-	var stakingtxns []*types.Transaction
 
 	state = contractworker.GetCurrentState()
 	fmt.Println("Before Staking Balances")
 	fmt.Println("user address balance")
-	fmt.Println(state.GetBalance(AllRandomUserAddress[0]))
+	fmt.Println(state.GetBalance(allRandomUserAddress[0]))
 	fmt.Println("The balances for 2 more users:")
-	fmt.Println(state.GetBalance(AllRandomUserAddress[1]))
-	fmt.Println(state.GetBalance(AllRandomUserAddress[2]))
+	fmt.Println(state.GetBalance(allRandomUserAddress[1]))
+	fmt.Println(state.GetBalance(allRandomUserAddress[2]))
 
 	nonce = contractworker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(StakingPriKey.PublicKey))
 	dataEnc = common.FromHex(StakingContractBinary)
 	stx, _ := types.SignTx(types.NewContractCreation(nonce, 0, big.NewInt(0), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, StakingPriKey)
 	stakingtxns = append(stakingtxns, stx)
 
-	StakeContractAddress := crypto.CreateAddress(StakingAddress, nonce+uint64(0))
+	stakeContractAddress = crypto.CreateAddress(StakingAddress, nonce+uint64(0))
 
 	state = contractworker.GetCurrentState()
 	fmt.Println("stake contract balance :")
-	fmt.Println(state.GetBalance(StakeContractAddress))
+	fmt.Println(state.GetBalance(stakeContractAddress))
+	fmt.Println("stake address balance :")
+	fmt.Println(state.GetBalance(StakingAddress))
+}
+
+func playStaking(chain *core.BlockChain) {
+	depositFnSignature := []byte("deposit()")
+	//hash = sha3.NewKeccak256()
+	hash := sha3.NewLegacyKeccak256()
+	hash.Write(depositFnSignature)
+	methodID := hash.Sum(nil)[:4]
+
+	var callEncl []byte
+	callEncl = append(callEncl, methodID...)
+	stake := 100000
+	fmt.Println()
+	fmt.Println("--------- Staking Contract added to txns ---------")
+	fmt.Println()
+	fmt.Printf("-- Now Staking with stake: %d --\n", stake)
+	fmt.Println()
+	for i := 0; i <= 2; i++ {
+		//Deposit Does not take a argument, stake is transferred via amount.
+		tx, _ := types.SignTx(types.NewTransaction(0, stakeContractAddress, 0, big.NewInt(int64(stake)), params.TxGas*5, nil, callEncl), types.HomesteadSigner{}, allRandomUserKey[i])
+		stakingtxns = append(stakingtxns, tx)
+	}
+	err = contractworker.CommitTransactions(stakingtxns)
+
+	if err != nil {
+		fmt.Println(err)
+	}
+	block, _ = contractworker.Commit()
+	_, err = chain.InsertChain(types.Blocks{block})
+	if err != nil {
+		fmt.Println(err)
+	}
+	// receipts := contractworker.GetCurrentReceipts()
+	// fmt.Println(receipts[len(receipts)-4].ContractAddress)
+	state = contractworker.GetCurrentState()
+
+	fmt.Printf("After Staking Balances (should be less by %d)\n", stake)
+	fmt.Println("user address balance")
+	fmt.Println(state.GetBalance(allRandomUserAddress[0]))
+	fmt.Println("The balances for 2 more users:")
+	fmt.Println(state.GetBalance(allRandomUserAddress[1]))
+	fmt.Println(state.GetBalance(allRandomUserAddress[2]))
+	fmt.Println("faucet contract balance (unchanged):")
+	fmt.Println(state.GetBalance(faucetContractAddress))
+	fmt.Println("stake contract balance :")
+	fmt.Println(state.GetBalance(stakeContractAddress))
+	fmt.Println("stake address balance :")
+	fmt.Println(state.GetBalance(StakingAddress))
+}
+
+func playWithdrawStaking(chain *core.BlockChain) {
+	fmt.Println()
+	fmt.Println("--------- Now Setting up Withdrawing Stakes ---------")
+
+	withdrawFnSignature := []byte("withdraw(uint256)")
+	//hash = sha3.NewKeccak256()
+	hash := sha3.NewLegacyKeccak256()
+	hash.Write(withdrawFnSignature)
+	methodID := hash.Sum(nil)[:4]
+
+	withdraw := "5000"
+	withdrawstake := new(big.Int)
+	withdrawstake.SetString(withdraw, 10)
+	paddedAmount := common.LeftPadBytes(withdrawstake.Bytes(), 32)
+
+	var dataEncl []byte
+	dataEncl = append(dataEncl, methodID...)
+	dataEncl = append(dataEncl, paddedAmount...)
+
+	var withdrawstakingtxns []*types.Transaction
+
+	fmt.Println()
+	fmt.Printf("-- Withdrawing Stake by amount: %s --\n", withdraw)
+	fmt.Println()
+
+	for i := 0; i <= 2; i++ {
+		cnonce := contractworker.GetCurrentState().GetNonce(allRandomUserAddress[i])
+		tx, _ := types.SignTx(types.NewTransaction(cnonce, stakeContractAddress, 0, big.NewInt(0), params.TxGas*5, nil, dataEncl), types.HomesteadSigner{}, allRandomUserKey[i])
+		withdrawstakingtxns = append(withdrawstakingtxns, tx)
+	}
+
+	err = contractworker.CommitTransactions(withdrawstakingtxns)
+	if err != nil {
+		fmt.Println("error:")
+		fmt.Println(err)
+	}
+
+	block, _ = contractworker.Commit()
+	_, err = chain.InsertChain(types.Blocks{block})
+	if err != nil {
+		fmt.Println(err)
+	}
+	state = contractworker.GetCurrentState()
+	fmt.Printf("Withdraw Staking Balances (should be up by %s)\n", withdraw)
+	fmt.Println(state.GetBalance(allRandomUserAddress[0]))
+	fmt.Println(state.GetBalance(allRandomUserAddress[1]))
+	fmt.Println(state.GetBalance(allRandomUserAddress[2]))
+	fmt.Println("faucet contract balance (unchanged):")
+	fmt.Println(state.GetBalance(faucetContractAddress))
+	fmt.Printf("stake contract balance (should downup by %s)\n", withdraw)
+	fmt.Println(state.GetBalance(stakeContractAddress))
 	fmt.Println("stake address balance :")
 	fmt.Println(state.GetBalance(StakingAddress))
 }
 
 func playStakingContract(chain *core.BlockChain) {
 	playSetupStakingContract(chain)
-	// fmt.Println()
-	// fmt.Println("--------- Staking Contract added to txns ---------")
-	// fmt.Println()
-	// fmt.Printf("-- Now Staking with stake: %d --\n", stake)
-	// fmt.Println()
-	// depositFnSignature := []byte("deposit()")
-	// //hash = sha3.NewKeccak256()
-	// hash := sha3.NewLegacyKeccak256()
-	// hash.Write(depositFnSignature)
-	// methodID := hash.Sum(nil)[:4]
-
-	// var callEncl []byte
-	// callEncl = append(callEncl, methodID...)
-	// stake := 100000
-	// for i := 0; i <= 2; i++ {
-
-	// 	//Deposit Does not take a argument, stake is transferred via amount.
-	// 	tx, _ := types.SignTx(types.NewTransaction(0, StakeContractAddress, 0, big.NewInt(int64(stake)), params.TxGas*5, nil, callEncl), types.HomesteadSigner{}, AllRandomUserKey[i])
-	// 	stakingtxns = append(stakingtxns, tx)
-	// }
-	// err = contractworker.CommitTransactions(stakingtxns)
-
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
-	// block, _ = contractworker.Commit()
-	// _, err = chain.InsertChain(types.Blocks{block})
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
-	// // receipts := contractworker.GetCurrentReceipts()
-	// // fmt.Println(receipts[len(receipts)-4].ContractAddress)
-	// state = contractworker.GetCurrentState()
-
-	// fmt.Printf("After Staking Balances (should be less by %d)\n", stake)
-	// fmt.Println("user address balance")
-	// fmt.Println(state.GetBalance(AllRandomUserAddress[0]))
-	// fmt.Println("The balances for 2 more users:")
-	// fmt.Println(state.GetBalance(AllRandomUserAddress[1]))
-	// fmt.Println(state.GetBalance(AllRandomUserAddress[2]))
-	// fmt.Println("faucet contract balance (unchanged):")
-	// fmt.Println(state.GetBalance(FaucetContractAddress))
-	// fmt.Println("stake contract balance :")
-	// fmt.Println(state.GetBalance(StakeContractAddress))
-	// fmt.Println("stake address balance :")
-	// fmt.Println(state.GetBalance(StakingAddress))
-	// fmt.Println()
-	// fmt.Println("--------- Now Setting up Withdrawing Stakes ---------")
-
-	// withdrawFnSignature := []byte("withdraw(uint256)")
-	// //hash = sha3.NewKeccak256()
-	// hash = sha3.NewLegacyKeccak256()
-	// hash.Write(withdrawFnSignature)
-	// methodID = hash.Sum(nil)[:4]
-
-	// withdraw := "5000"
-	// withdrawstake := new(big.Int)
-	// withdrawstake.SetString(withdraw, 10)
-	// paddedAmount := common.LeftPadBytes(withdrawstake.Bytes(), 32)
-
-	// var dataEncl []byte
-	// dataEncl = append(dataEncl, methodID...)
-	// dataEncl = append(dataEncl, paddedAmount...)
-
-	// var withdrawstakingtxns []*types.Transaction
-
-	// fmt.Println()
-	// fmt.Printf("-- Withdrawing Stake by amount: %s --\n", withdraw)
-	// fmt.Println()
-
-	// for i := 0; i <= 2; i++ {
-	// 	cnonce := contractworker.GetCurrentState().GetNonce(AllRandomUserAddress[i])
-	// 	tx, _ := types.SignTx(types.NewTransaction(cnonce, StakeContractAddress, 0, big.NewInt(0), params.TxGas*5, nil, dataEncl), types.HomesteadSigner{}, AllRandomUserKey[i])
-	// 	withdrawstakingtxns = append(withdrawstakingtxns, tx)
-	// }
-
-	// err = contractworker.CommitTransactions(withdrawstakingtxns)
-	// if err != nil {
-	// 	fmt.Println("error:")
-	// 	fmt.Println(err)
-	// }
-
-	// block, _ = contractworker.Commit()
-	// _, err = chain.InsertChain(types.Blocks{block})
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
-	// state = contractworker.GetCurrentState()
-	// fmt.Printf("Withdraw Staking Balances (should be up by %s)\n", withdraw)
-	// fmt.Println(state.GetBalance(AllRandomUserAddress[0]))
-	// fmt.Println(state.GetBalance(AllRandomUserAddress[1]))
-	// fmt.Println(state.GetBalance(AllRandomUserAddress[2]))
-	// fmt.Println("faucet contract balance (unchanged):")
-	// fmt.Println(state.GetBalance(FaucetContractAddress))
-	// fmt.Printf("stake contract balance (should downup by %s)\n", withdraw)
-	// fmt.Println(state.GetBalance(StakeContractAddress))
-	// fmt.Println("stake address balance :")
-	// fmt.Println(state.GetBalance(StakingAddress))
-
+	playStaking(chain)
+	playWithdrawStaking(chain)
 }
 
 func main() {
