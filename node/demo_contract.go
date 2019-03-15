@@ -47,17 +47,19 @@ func (node *Node) AddLotteryContract() {
 }
 
 // CreateTransactionForEnterMethod generates transaction for enter method and add it into pending tx list.
-func (node *Node) CreateTransactionForEnterMethod(amount int64, priKey string) {
+func (node *Node) CreateTransactionForEnterMethod(amount int64, priKey string) error {
 	var err error
 	toAddress := node.DemoContractAddress
 
 	abi, err := abi.JSON(strings.NewReader(contracts.LotteryABI))
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to generate staking contract's ABI", "error", err)
+		return err
 	}
 	bytesData, err := abi.Pack(Enter)
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to generate ABI function bytes data", "error", err)
+		return err
 	}
 
 	key, err := crypto.HexToECDSA(priKey)
@@ -74,10 +76,17 @@ func (node *Node) CreateTransactionForEnterMethod(amount int64, priKey string) {
 
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to get private key", "error", err)
+		return err
 	}
 	if signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, key); err == nil {
 		node.addPendingTransactions(types.Transactions{signedTx})
-	} else {
-		utils.GetLogInstance().Error("Unable to call enter method", "error", err)
+		return nil
 	}
+	utils.GetLogInstance().Error("Unable to call enter method", "error", err)
+	return err
+}
+
+// GetResult get current players and their balances.
+func (node *Node) GetResult() (players []string, balances []uint64) {
+	return []string{}, []uint64{}
 }

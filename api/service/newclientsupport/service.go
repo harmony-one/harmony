@@ -11,8 +11,13 @@ type Service struct {
 }
 
 // New returns new client support service.
-func New() *Service {
-	return &Service{server: msg_pb.NewServer()}
+func New(
+	CreateTransactionForEnterMethod func(int64, string) error,
+	GetResult func() ([]string, []uint64),
+) *Service {
+	return &Service{
+		server: msg_pb.NewServer(CreateTransactionForEnterMethod, GetResult),
+	}
 }
 
 // StartService starts client support service.
