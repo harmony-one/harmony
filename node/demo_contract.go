@@ -8,9 +8,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/contracts"
+	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	contract_constants "github.com/harmony-one/harmony/internal/utils/contract"
@@ -19,6 +21,7 @@ import (
 // Constants for lottery.
 const (
 	Enter      = "enter"
+	PickWinner = "pickWinner"
 	GetPlayers = "getPlayers"
 )
 
@@ -43,7 +46,7 @@ func (node *Node) AddLotteryContract() {
 		types.HomesteadSigner{},
 		priKey)
 	node.DemoContractAddress = crypto.CreateAddress(crypto.PubkeyToAddress(priKey.PublicKey), uint64(0))
-	node.DemoContractPrivateKey = priKey
+	node.LotteryManagerPrivateKey = priKey
 	node.addPendingTransactions(types.Transactions{demoContract})
 }
 
@@ -90,7 +93,7 @@ func (node *Node) CreateTransactionForEnterMethod(amount int64, priKey string) e
 }
 
 // GetResult2 get current players and their balances.
-func (node *Node) GetResult2() (players []string, balances []uint64) {
+func (node *Node) GetResult2(priKey string) (players []string, balances []*big.Int) {
 	for _, account := range contract_constants.DemoAccounts {
 		players = append(players, account.Address)
 		key, err := crypto.HexToECDSA(account.Private)
@@ -104,47 +107,92 @@ func (node *Node) GetResult2() (players []string, balances []uint64) {
 }
 
 // GetResult get current players and their balances.
-func (node *Node) GetResult() (players []string, balances []uint64) {
-	return node.GetResult2()
-	// abi, err := abi.JSON(strings.NewReader(contracts.LotteryABI))
-	// if err != nil {
-	// 	utils.GetLogInstance().Error("Failed to generate staking contract's ABI", "error", err)
-	// }
-	// bytesData, err := abi.Pack("getPlayers")
-	// if err != nil {
-	// 	utils.GetLogInstance().Error("Failed to generate ABI function bytes data", "error", err)
-	// }
+func (node *Node) GetResult(priKey string) (players []string, balances []*big.Int) {
+	// return node.GetResult2(priKey)
+	abi, err := abi.JSON(strings.NewReader(contracts.LotteryABI))
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to generate staking contract's ABI", "error", err)
+	}
+	bytesData, err := abi.Pack("getPlayers")
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to generate ABI function bytes data", "error", err)
+	}
 
-	// demoContractAddress := node.DemoContractAddress
-	// demoContractPrivateKey := node.DemoContractPrivateKey
+	demoContractAddress := node.DemoContractAddress
+	key, err := crypto.HexToECDSA(priKey)
+	nonce := node.GetNonceOfAddress(crypto.PubkeyToAddress(key.PublicKey))
 
-	// tx := types.NewTransaction(
-	// 	node.GetNonceOfAddress(demoContractAddress),
-	// 	demoContractAddress,
-	// 	0,
-	// 	nil,
-	// 	math.MaxUint64,
-	// 	nil,
-	// 	bytesData,
-	// )
-	// signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, demoContractPrivateKey)
-	// if err != nil {
-	// 	utils.GetLogInstance().Error("Failed to sign contract call tx", "error", err)
-	// 	return nil
-	// }
-	// output, err := node.ContractCaller.CallContract(signedTx)
+	tx := types.NewTransaction(
+		nonce,
+		demoContractAddress,
+		0,
+		nil,
+		math.MaxUint64,
+		nil,
+		bytesData,
+	)
+	signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, key)
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to sign contract call tx", "error", err)
+		return nil, nil
+	}
+	output, err := node.ContractCaller.CallContract(signedTx)
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to call staking contract", "error", err)
+		return nil, nil
+	}
 
-	// if err != nil {
-	// 	utils.GetLogInstance().Error("Failed to call staking contract", "error", err)
-	// 	return nil
-	// }
+	ret := &structs.PlayersInfo{}
+	err = abi.Unpack(ret, "getPlayers", output)
 
-	// ret := &structs.PlayersInfo{}
-	// err = abi.Unpack(ret, "getPlayers", output)
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to unpack stake info", "error", err)
+		return nil, nil
+	}
+	for _, player := range ret.Players {
+		players = append(players, player.String())
+	}
+	balances = ret.Balances
+	return players, balances
+}
 
-	// if err != nil {
-	// 	utils.GetLogInstance().Error("Failed to unpack stake info", "error", err)
-	// 	return nil
-	// }
-	// return ret
+// CreateTransactionForEnterMethod generates transaction for enter method and add it into pending tx list.
+func (node *Node) CreateTransactionForPickWinner() error {
+	var err error
+	toAddress := node.DemoContractAddress
+
+	abi, err := abi.JSON(strings.NewReader(contracts.LotteryABI))
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to generate staking contract's ABI", "error", err)
+		return err
+	}
+	bytesData, err := abi.Pack(PickWinner)
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to generate ABI function bytes data", "error", err)
+		return err
+	}
+
+	key := node.LotteryManagerPrivateKey
+	nonce := node.GetNonceOfAddress(crypto.PubkeyToAddress(key.PublicKey))
+	Amount := big.NewInt(0)
+	tx := types.NewTransaction(
+		nonce,
+		toAddress,
+		0,
+		Amount,
+		params.TxGas*10,
+		nil,
+		bytesData,
+	)
+
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to get private key", "error", err)
+		return err
+	}
+	if signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, key); err == nil {
+		node.addPendingTransactions(types.Transactions{signedTx})
+		return nil
+	}
+	utils.GetLogInstance().Error("Unable to call enter method", "error", err)
+	return err
 }

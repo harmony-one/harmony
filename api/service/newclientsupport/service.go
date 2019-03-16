@@ -1,6 +1,8 @@
 package newclientsupport
 
 import (
+	"math/big"
+
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 )
 
@@ -13,7 +15,7 @@ type Service struct {
 // New returns new client support service.
 func New(
 	CreateTransactionForEnterMethod func(int64, string) error,
-	GetResult func() ([]string, []uint64),
+	GetResult func(string) ([]string, []*big.Int),
 ) *Service {
 	return &Service{
 		server: msg_pb.NewServer(CreateTransactionForEnterMethod, GetResult),

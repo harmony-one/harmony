@@ -6,7 +6,11 @@ package message
 import (
 	"context"
 	"log"
+	"math/big"
 	"net"
+
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/harmony-one/harmony/internal/utils"
 
 	"google.golang.org/grpc"
 )
@@ -21,7 +25,7 @@ const (
 type Server struct {
 	server                          *grpc.Server
 	CreateTransactionForEnterMethod func(int64, string) error
-	GetResult                       func() ([]string, []uint64)
+	GetResult                       func(string) ([]string, []*big.Int)
 }
 
 // Process processes the Message and returns Response
@@ -29,6 +33,7 @@ func (s *Server) Process(ctx context.Context, message *Message) (*Response, erro
 	if message.GetType() != MessageType_LOTTERY_REQUEST {
 		return &Response{}, ErrWrongMessage
 	}
+	utils.GetLogInstance().Info("Recieved:", "message", message)
 	lotteryRequest := message.GetLotteryRequest()
 	if lotteryRequest.GetType() == LotteryRequest_ENTER {
 		if s.CreateTransactionForEnterMethod == nil {
@@ -36,17 +41,30 @@ func (s *Server) Process(ctx context.Context, message *Message) (*Response, erro
 		}
 		amount := lotteryRequest.Amount
 		priKey := lotteryRequest.PrivateKey
+
+		key, err := crypto.HexToECDSA(priKey)
+		if err != nil {
+			utils.GetLogInstance().Error("Error when HexToECDSA")
+		}
+		address := crypto.PubkeyToAddress(key.PublicKey)
+
+		utils.GetLogInstance().Info("Enter:", "amount", amount, "for address", address)
 		if err := s.CreateTransactionForEnterMethod(amount, priKey); err != nil {
 			return nil, ErrEnterMethod
 		}
 		return &Response{}, nil
 	} else if lotteryRequest.GetType() == LotteryRequest_RESULT {
-		players, balances := s.GetResult()
+		players, balances := s.GetResult(lotteryRequest.PrivateKey)
+		stringBalances := []string{}
+		for _, balance := range balances {
+			stringBalances = append(stringBalances, balance.String())
+		}
+		utils.GetLogInstance().Info("getPlayers", "players", players, "balances", stringBalances)
 		ret := &Response{
 			Response: &Response_LotteryResponse{
 				LotteryResponse: &LotteryResponse{
 					Players:  players,
-					Balances: balances,
+					Balances: stringBalances,
 				},
 			},
 		}
@@ -77,7 +95,7 @@ func (s *Server) Stop() {
 // NewServer creates new Server which implements ClientServiceServer interface.
 func NewServer(
 	CreateTransactionForEnterMethod func(int64, string) error,
-	GetResult func() ([]string, []uint64)) *Server {
+	GetResult func(string) ([]string, []*big.Int)) *Server {
 	return &Server{
 		CreateTransactionForEnterMethod: CreateTransactionForEnterMethod,
 		GetResult:                       GetResult,

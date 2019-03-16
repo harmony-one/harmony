@@ -9,10 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/harmony-one/harmony/contracts/structs"
-
-	"github.com/harmony-one/harmony/contracts"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
@@ -25,6 +21,8 @@ import (
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
 	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
 	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/contracts"
+	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/pki"
@@ -144,8 +142,8 @@ type Node struct {
 	WithdrawStakeFunc      []byte
 
 	// Demo account.
-	DemoContractAddress    common.Address
-	DemoContractPrivateKey *ecdsa.PrivateKey
+	DemoContractAddress      common.Address
+	LotteryManagerPrivateKey *ecdsa.PrivateKey
 
 	//Node Account
 	AccountKey *ecdsa.PrivateKey
