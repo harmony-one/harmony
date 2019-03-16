@@ -19,7 +19,7 @@ install:
   - cd bls
   - make
   - cd ../harmony
-  - go get -t -v ./...
+  - go get -v ./...
   - go get -u golang.org/x/lint/golint
   - go get -u golang.org/x/tools/cmd/goimports
   - go get gopkg.in/check.v1
