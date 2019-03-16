@@ -91,7 +91,6 @@ func (s *Service) Run() *http.Server {
 	s.router.Path("/address").HandlerFunc(s.GetExplorerAddress)
 
 	// Set up router for nodes.
-	// s.router.Path("/nodes").HandlerFunc(s.GetExplorerAddress).Methods("GET")
 	s.router.Path("/nodes").HandlerFunc(s.GetExplorerNodes)
 
 	// Do serving now.
