@@ -8,4 +8,5 @@ var (
 	ErrEnterMethod            = errors.New("Error when processing enter method")
 	ErrResultMethod           = errors.New("Error when processing result/getPlayers method")
 	ErrEnterProcessorNotReady = errors.New("Error because enter processor is not ready")
+	ErrWhenPickingWinner      = errors.New("Error when picking winner")
 )

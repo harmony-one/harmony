@@ -64,7 +64,7 @@ func (node *Node) setupForBeaconLeader() {
 	// TODO(minhdoan): We will remove the old client support and use the new client support which uses new message protocol.
 	// Register client new support service.
 	node.serviceManager.RegisterService(service.NewClientSupport, newclientsupport.New(
-		node.CreateTransactionForEnterMethod, node.GetResult))
+		node.CreateTransactionForEnterMethod, node.GetResult, node.CreateTransactionForPickWinner))
 	// Register randomness service
 	node.serviceManager.RegisterService(service.Randomness, randomness.New(node.DRand))
 	// Register explorer service.
