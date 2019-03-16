@@ -3,7 +3,7 @@ go:
   - stable
 go_import_path: github.com/harmony-one/harmony
 install:
-  - env GO111MODULE=on
+  - export GO111MODULE=on
   - export GOPATH=$HOME/gopath
   - export CGO_CPPFLAGS="-I$GOPATH/src/github.com/harmony-one/bls/include -I$GOPATH/src/github.com/harmony-one/mcl/include"
   - export CGO_LDFLAGS="-L$GOPATH/src/github.com/harmony-one/bls/lib -L$GOPATH/src/github.com/harmony-one/mcl/lib"
