@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"net"
 	"net/http"
 	"os"
@@ -88,6 +89,10 @@ func (s *Service) Run() *http.Server {
 	// Set up router for address.
 	s.router.Path("/address").Queries("id", "{[0-9A-Fa-fx]*?}").HandlerFunc(s.GetExplorerAddress).Methods("GET")
 	s.router.Path("/address").HandlerFunc(s.GetExplorerAddress)
+
+	// Set up router for nodes.
+	// s.router.Path("/nodes").HandlerFunc(s.GetExplorerAddress).Methods("GET")
+	s.router.Path("/nodes").HandlerFunc(s.GetExplorerNodes)
 
 	// Do serving now.
 	utils.GetLogInstance().Info("Listening on ", "port: ", GetExplorerPort(s.Port))
@@ -245,6 +250,15 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 	}
 	data.Address = address
 	json.NewEncoder(w).Encode(data.Address)
+}
+
+// GetExplorerNodes serves /nodes end-point.
+func (s *Service) GetExplorerNodes(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var nodes int
+	nodes = 50 + rand.Int()%50 // TODO(ricl): get nodes count.
+	json.NewEncoder(w).Encode(nodes)
 }
 
 // NotifyService notify service
