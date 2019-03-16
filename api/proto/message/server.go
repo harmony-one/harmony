@@ -40,13 +40,17 @@ func (s *Server) Process(ctx context.Context, message *Message) (*Response, erro
 			return nil, ErrEnterMethod
 		}
 		return &Response{}, nil
-
 	} else if lotteryRequest.GetType() == LotteryRequest_RESULT {
-		// if err := s.GetResult(); err != nil {
-		// 	return &Response{}, ErrResultMethod
-		// } else {
-		// 	return &Response{}, nil
-		// }
+		players, balances := s.GetResult()
+		ret := &Response{
+			Response: &Response_LotteryResponse{
+				LotteryResponse: &LotteryResponse{
+					Players:  players,
+					Balances: balances,
+				},
+			},
+		}
+		return ret, nil
 	}
 	return &Response{}, nil
 }

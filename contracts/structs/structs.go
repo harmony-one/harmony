@@ -22,3 +22,9 @@ type StakeInfo struct {
 	LockPeriodCount *big.Int // The number of locking period the token will be locked.
 	Amount          *big.Int
 }
+
+// PlayersInfo stores the result of getPlayers.
+type PlayersInfo struct {
+	Players  []common.Address
+	Balances []*big.Int
+}
