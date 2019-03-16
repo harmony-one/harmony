@@ -131,7 +131,7 @@ func (node *Node) ServiceManagerSetup() {
 	case nodeconfig.ClientNode:
 		node.setupForClientNode()
 	case nodeconfig.ArchivalNode:
-		node.setupForArchivalNode(true)
+		node.setupForArchivalNode(false)
 	}
 	node.serviceManager.SetupServiceMessageChan(node.serviceMessageChan)
 }

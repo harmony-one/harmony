@@ -164,6 +164,8 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	if *isLeader {
 		nodeConfig.StringRole = "leader"
 		nodeConfig.Leader = nodeConfig.SelfPeer
+	} else if *isArchival {
+		nodeConfig.StringRole = "archival"
 	} else {
 		nodeConfig.StringRole = "validator"
 	}
@@ -181,35 +183,16 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	return nodeConfig
 }
 
-func createArchivalNode() (*node.Node, *nodeconfig.ConfigType) { //Mix of setUpConsensusAndNode and createGlobalConfig
-	var err error
-	nodeConfig := nodeconfig.GetGlobalConfig()
+func setupArchivalNode(nodeConfig *nodeconfig.ConfigType) (*node.Node, *nodeconfig.ConfigType) { //Mix of setUpConsensusAndNode and createGlobalConfig
+	//var err error
 
-	// Currently we hardcode only one shard.
-	nodeConfig.ShardIDString = "0" //ShardID can be highest positive number of shard.
-	// Consensus keys are the BLS12-381 keys used to sign consensus messages
-	nodeConfig.ConsensusPriKey, nodeConfig.ConsensusPubKey = utils.GenKey(*ip, *port)
-	// P2p private key is used for secure message transfer between p2p nodes.
-	nodeConfig.P2pPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
-	if err != nil {
-		panic(err)
-	}
-	// Initialize leveldb for main blockchain and beacon.
-	if nodeConfig.BeaconDB, err = InitLDBDatabase(*ip, *port, *freshDB, true); err != nil {
-		panic(err)
-	}
-	nodeConfig.SelfPeer = p2p.Peer{IP: *ip, Port: *port, ValidatorID: -1, ConsensusPubKey: nodeConfig.ConsensusPubKey}
-	nodeConfig.StringRole = "Archival"
-	nodeConfig.Host, err = p2pimpl.NewHost(&nodeConfig.SelfPeer, nodeConfig.P2pPriKey)
-	if *logConn {
-		nodeConfig.Host.GetP2PHost().Network().Notify(utils.ConnLogger)
-	}
-	if err != nil {
-		panic("unable to new host in harmony")
-	}
+	// Initialize leveldb for beacon.
+	// if nodeConfig.BeaconDB, err = InitLDBDatabase(*ip, *port, *freshDB, true); err != nil {
+	// 	panic(err)
+	// }
 	currentNode := node.New(nodeConfig.Host, &consensus.Consensus{ShardID: uint32(0)}, nodeConfig.BeaconDB) //at the moment the database supplied is beacondb as this is a beacon sync node
 	currentNode.NodeConfig.SetRole(nodeconfig.ArchivalNode)
-	currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDBeaconClient)
+	currentNode.NodeConfig.SetClientGroupID(p2p.GroupIDBeaconClient)
 	currentNode.AddBeaconChainDatabase(nodeConfig.BeaconDB)
 	currentNode.Client = client.NewClient(currentNode.GetHost(), []uint32{0})
 	GetLatestBlocks := func(blocks []*types.Block) { //This should also loop over all shards.
@@ -283,13 +266,14 @@ func main() {
 	flag.Parse()
 
 	initSetup()
-	var nodeConfig *nodeconfig.ConfigType
 	var currentNode *node.Node
 	var consensus *consensus.Consensus
+	nodeConfig := createGlobalConfig()
 	if *isArchival {
-		currentNode, nodeConfig = createArchivalNode()
+		currentNode, nodeConfig = setupArchivalNode(nodeConfig)
+		loggingInit(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps)
+		log.Info("New Harmony Node ====", "Role", currentNode.NodeConfig.Role(), "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, nodeConfig.Host.GetID().Pretty()))
 	} else {
-		nodeConfig := createGlobalConfig()
 		// Start Profiler for leader if profile argument is on
 		if nodeConfig.StringRole == "leader" && (*profile || *metricsReportURL != "") {
 			prof := profiler.GetProfiler()
@@ -302,11 +286,11 @@ func main() {
 		if consensus.IsLeader {
 			go currentNode.SendPongMessage()
 		}
+		// Init logging.
+		loggingInit(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps)
+		log.Info("New Harmony Node ====", "Role", currentNode.NodeConfig.Role(), "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, nodeConfig.Host.GetID().Pretty()))
+		go currentNode.SupportSyncing()
 	}
-	// Init logging.
-	loggingInit(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps)
-	log.Info("New Harmony Node ====", "Role", currentNode.NodeConfig.Role(), "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, nodeConfig.Host.GetID().Pretty()))
-	go currentNode.SupportSyncing()
 	currentNode.ServiceManagerSetup()
 	currentNode.RunServices()
 	currentNode.StartServer()

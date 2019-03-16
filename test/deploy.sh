@@ -77,7 +77,6 @@ SHARDS=2
 KILLPORT=9004
 SYNC=true
 DRYRUN=
-ARCHIVE=true
 
 while getopts "hdtD:m:s:k:nS" option; do
    case $option in
@@ -90,7 +89,6 @@ while getopts "hdtD:m:s:k:nS" option; do
       k) KILLPORT=$OPTARG ;;
       n) DRYRUN=echo ;;
       S) SYNC=true ;;
-      A) ARCHIVE=true ;;
    esac
 done
 
@@ -150,6 +148,10 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
      echo "launching validator ..."
      $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key 2>&1 | tee -a $LOG_FILE &
   fi
+  if [ "$mode" == "archival" ]; then
+      echo "launching archival node ... wait"
+      $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB $HMY_OPT2 -key /tmp/$ip-$port.key -is_archival  2>&1 | tee -a $LOG_FILE
+  fi
   sleep 0.5
   if [[ "$mode" == "newnode" && "$SYNC" == "true" ]]; then
      (( NUM_NN += 10 ))
@@ -165,7 +167,7 @@ fi
 
 if [ "$TXGEN" == "true" ]; then
    echo "launching txgen ... wait"
-#   sleep 2
+#  sleep 2
    line=$(grep client $config)
    IFS=' ' read ip port mode shardID <<< $line
    if [ "$mode" == "client" ]; then
@@ -175,19 +177,7 @@ else
    sleep $DURATION
 fi
 
-# if [ "$ARCHIVE" == "true" ]; then
-#    echo "launching Archival Node ... wait"
-#    sleep 2
-#    line=$(grep archival $config)
-#    IFS=' ' read ip port mode shardID <<< $line
-#    if [ "$mode" == "archival" && "$ARCHIVE" == "true" ]; then
-#       $DRYRUN $ROOT/bin/harmony -log_folder $log_folder  $DB -min_peers $MIN $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key -is_archival  2>&1 | tee -a $LOG_FILE
-#    fi
-# else
-#    sleep $DURATION
-# fi
-
-# save bc_config.json
+save bc_config.json
 [ -e bc_config.json ] && cp -f bc_config.json $log_folder
 
 cleanup
