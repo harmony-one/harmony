@@ -134,8 +134,11 @@ type Node struct {
 	//Staked Accounts and Contract
 	CurrentStakes          map[common.Address]*structs.StakeInfo //This will save the latest information about staked nodes.
 	StakingContractAddress common.Address
-	DemoContractAddress    common.Address
 	WithdrawStakeFunc      []byte
+
+	// Demo account.
+	DemoContractAddress    common.Address
+	DemoContractPrivateKey *ecdsa.PrivateKey
 
 	//Node Account
 	AccountKey *ecdsa.PrivateKey

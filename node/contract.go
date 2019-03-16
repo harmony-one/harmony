@@ -118,6 +118,15 @@ func (node *Node) GetNonceOfAddress(address common.Address) uint64 {
 	return state.GetNonce(address)
 }
 
+// GetBalanceOfAddress returns balance of an address.
+func (node *Node) GetBalanceOfAddress(address common.Address) uint64 {
+	state, err := node.blockchain.State()
+	if err != nil {
+		log.Error("Failed to get chain state", "Error", err)
+	}
+	return state.GetBalance(address).Uint64()
+}
+
 // AddFaucetContractToPendingTransactions adds the faucet contract the genesis block.
 func (node *Node) AddFaucetContractToPendingTransactions() {
 	// Add a contract deployment transactionv
@@ -154,8 +163,8 @@ func (node *Node) callGetFreeTokenWithNonce(address common.Address, nonce uint64
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to generate ABI function bytes data", "error", err)
 	}
-	utils.GetLogInstance().Info("Sending Free Token to ", "Address", address.Hex())
 	tx, _ := types.SignTx(types.NewTransaction(nonce, node.ContractAddresses[0], node.Consensus.ShardID, big.NewInt(0), params.TxGasContractCreation*10, nil, bytesData), types.HomesteadSigner{}, node.ContractDeployerKey)
+	utils.GetLogInstance().Info("Sending Free Token to ", "Address", address.Hex())
 
 	node.addPendingTransactions(types.Transactions{tx})
 	return tx.Hash()

@@ -2,8 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 	"net/http"
+	"strconv"
 
 	"github.com/gorilla/mux"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -11,7 +13,7 @@ import (
 
 // Constants for main demo.
 const (
-	Port    = "313131"
+	Port    = "31313"
 	LocalIP = "127.0.0.1"
 )
 
@@ -23,13 +25,52 @@ var (
 // Enter processes /enter end point.
 func Enter(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode("")
+	key := r.FormValue("key")
+	amount, err := strconv.ParseInt(r.FormValue("amount"), 10, 0)
+	if err != nil {
+		fmt.Println(err)
+		json.NewEncoder(w).Encode("")
+		return
+	}
+
+	msg := &msg_pb.Message{
+		Request: &msg_pb.Message_LotteryRequest{
+			LotteryRequest: &msg_pb.LotteryRequest{
+				Type:       msg_pb.LotteryRequest_ENTER,
+				PrivateKey: key,
+				Amount:     amount,
+			},
+		},
+	}
+	res, err := grpcClient.Process(msg)
+	if err != nil {
+		fmt.Println(err)
+		json.NewEncoder(w).Encode("")
+		return
+	}
+	json.NewEncoder(w).Encode(res)
 }
 
 // Result processes /result end point.
 func Result(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+
 	json.NewEncoder(w).Encode("")
+	msg := &msg_pb.Message{
+		Request: &msg_pb.Message_LotteryRequest{
+			LotteryRequest: &msg_pb.LotteryRequest{
+				Type: msg_pb.LotteryRequest_RESULT,
+			},
+		},
+	}
+
+	res, err := grpcClient.Process(msg)
+	if err != nil {
+		fmt.Println(err)
+		json.NewEncoder(w).Encode("")
+		return
+	}
+	json.NewEncoder(w).Encode(res)
 }
 
 func main() {
@@ -37,11 +78,12 @@ func main() {
 
 	router := mux.NewRouter()
 	// Set up router for server.
-	router.Path("/enter").Queries("key", "{[0-9A-Fa-fx]*?}", "ether", "[0-9]*").HandlerFunc(Enter).Methods("GET")
+	router.Path("/enter").Queries("key", "{[0-9A-Fa-fx]*?}", "amount", "[0-9]*").HandlerFunc(Enter).Methods("GET")
 	router.Path("/enter").HandlerFunc(Enter)
 
 	router.Path("/result").HandlerFunc(Result)
 
 	server := &http.Server{Addr: addr, Handler: router}
+	fmt.Println("Serving")
 	server.ListenAndServe()
 }
