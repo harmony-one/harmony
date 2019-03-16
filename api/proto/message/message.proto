@@ -68,7 +68,7 @@ message Response {
 
 message LotteryResponse {
   repeated string players = 2;
-  repeated uint64 balances = 3;
+  repeated string balances = 3;
 }
 
 message LotteryRequest {
