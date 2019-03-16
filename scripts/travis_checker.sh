@@ -16,15 +16,6 @@ tmpdir=$(mktemp -d)
 
 . "${progdir}/setup_bls_build_flags.sh"
 
-echo "Running go test..."
-if go test -v -count=1 ./...
-then
-	echo "go test succeeded."
-else
-	echo "go test FAILED!"
-	ok=false
-fi
-
 echo "Running golint..."
 golint_output="${tmpdir}/golint_output.txt"
 if "${progdir}/golint.sh" -set_exit_status > "${golint_output}" 2>&1
@@ -71,6 +62,15 @@ then
 else
 	echo "go generate FAILED!"
 	"${progdir}/print_file.sh" "${gogenerate_output}" "go generate"
+	ok=false
+fi
+
+echo "Running go test..."
+if go test -v -count=1 ./...
+then
+	echo "go test succeeded."
+else
+	echo "go test FAILED!"
 	ok=false
 fi
 
