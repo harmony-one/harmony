@@ -26,6 +26,7 @@ type Server struct {
 	server                          *grpc.Server
 	CreateTransactionForEnterMethod func(int64, string) error
 	GetResult                       func(string) ([]string, []*big.Int)
+	CreateTransactionForPickWinner  func() error
 }
 
 // Process processes the Message and returns Response
@@ -69,6 +70,11 @@ func (s *Server) Process(ctx context.Context, message *Message) (*Response, erro
 			},
 		}
 		return ret, nil
+	} else if lotteryRequest.GetType() == LotteryRequest_PICK_WINNER {
+		if s.CreateTransactionForPickWinner() != nil {
+			return nil, ErrWhenPickingWinner
+		}
+		return &Response{}, nil
 	}
 	return &Response{}, nil
 }
@@ -95,9 +101,11 @@ func (s *Server) Stop() {
 // NewServer creates new Server which implements ClientServiceServer interface.
 func NewServer(
 	CreateTransactionForEnterMethod func(int64, string) error,
-	GetResult func(string) ([]string, []*big.Int)) *Server {
+	GetResult func(string) ([]string, []*big.Int),
+	CreateTransactionForPickWinner func() error) *Server {
 	return &Server{
 		CreateTransactionForEnterMethod: CreateTransactionForEnterMethod,
+		CreateTransactionForPickWinner:  CreateTransactionForPickWinner,
 		GetResult:                       GetResult,
 	}
 }

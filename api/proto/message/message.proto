@@ -75,6 +75,7 @@ message LotteryRequest {
   enum Type {
     ENTER = 0;
     RESULT = 1;
+    PICK_WINNER = 2;
   }
   Type type = 1;
   string private_key = 2;
