@@ -156,7 +156,7 @@ func (node *Node) GetResult(priKey string) (players []string, balances []*big.In
 	return players, balances
 }
 
-// CreateTransactionForEnterMethod generates transaction for enter method and add it into pending tx list.
+// CreateTransactionForPickWinner picks winner by sending a smart contract transaction method pickWinner.
 func (node *Node) CreateTransactionForPickWinner() error {
 	var err error
 	toAddress := node.DemoContractAddress
