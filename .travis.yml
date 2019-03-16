@@ -28,8 +28,8 @@ install:
   - go get github.com/golang/protobuf/protoc-gen-go
   - ./scripts/install_protoc.sh -V 3.6.1
   - ./scripts/travis_checker.sh
-  - go build -v ./...
 script:
+  - go build -v ./...
   - ./scripts/travis_checker.sh
 notifications:
   slack: harmonyone:gggCd1QQopsQAW8JYgBWiH7M
