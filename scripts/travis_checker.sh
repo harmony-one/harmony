@@ -1,6 +1,6 @@
 #!/bin/bash
 
-unset -v ok tmpdir goimports_output golint_output progdir
+unset -v ok tmpdir gomod_diff_output goimports_output golint_output progdir
 ok=true
 
 case "${0}" in
@@ -15,6 +15,19 @@ trap 'case "${tmpdir}" in ?*) rm -rf "${tmpdir}";; esac' EXIT
 tmpdir=$(mktemp -d)
 
 . "${progdir}/setup_bls_build_flags.sh"
+
+echo "Checking go.mod..."
+gomod_diff_output="${tmpdir}/gomod.diff"
+if git diff --exit-code -- go.mod > "${gomod_diff_output}"
+then
+	echo "go.mod stayed the same as in the repository."
+else
+	echo "go.mod has changed from the repository version!"
+	"${progdir}/print_file.sh" "${gomod_diff_output}" "go.mod diff"
+	"${progdir}/print_file.sh" go.mod "go.mod changed contents"
+	#ok=false
+	echo "Not treating this as an error, but consider updating go.mod!"
+fi
 
 echo "Running golint..."
 golint_output="${tmpdir}/golint_output.txt"
