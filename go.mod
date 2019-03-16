@@ -12,7 +12,7 @@ require (
 	github.com/golang/mock v1.2.0
 	github.com/golang/protobuf v1.3.0
 	github.com/gorilla/mux v1.7.0
-	github.com/harmony-one/bls v0.0.0-20190309234102-1bd75ac96c09
+	github.com/harmony-one/bls v0.0.1
 	github.com/hashicorp/golang-lru v0.5.1
 	github.com/ipfs/go-datastore v3.2.0+incompatible
 	github.com/libp2p/go-libp2p v0.0.2
