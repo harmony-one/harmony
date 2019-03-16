@@ -105,7 +105,7 @@ func (node *Node) setupForClientNode() {
 }
 
 func (node *Node) setupForArchivalNode(isBeacon bool) {
-	nodeConfig, chanPeer := node.initNodeConfiguration(isBeacon, true)
+	nodeConfig, chanPeer := node.initArchivalNodeConfiguration(false, true)
 	// Register peer discovery service.
 	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer, node.AddBeaconPeer))
 	// Register networkinfo service. "0" is the beacon shard ID

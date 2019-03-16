@@ -192,7 +192,6 @@ func setupArchivalNode(nodeConfig *nodeconfig.ConfigType) (*node.Node, *nodeconf
 	// }
 	currentNode := node.New(nodeConfig.Host, &consensus.Consensus{ShardID: uint32(0)}, nodeConfig.BeaconDB) //at the moment the database supplied is beacondb as this is a beacon sync node
 	currentNode.NodeConfig.SetRole(nodeconfig.ArchivalNode)
-	currentNode.NodeConfig.SetClientGroupID(p2p.GroupIDBeaconClient)
 	currentNode.AddBeaconChainDatabase(nodeConfig.BeaconDB)
 	currentNode.Client = client.NewClient(currentNode.GetHost(), []uint32{0})
 	GetLatestBlocks := func(blocks []*types.Block) { //This should also loop over all shards.
@@ -273,6 +272,7 @@ func main() {
 		currentNode, nodeConfig = setupArchivalNode(nodeConfig)
 		loggingInit(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps)
 		log.Info("New Harmony Node ====", "Role", currentNode.NodeConfig.Role(), "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, nodeConfig.Host.GetID().Pretty()))
+		//Alternaitvely shut down client on node and just do `go currentNode.DoBeaconSync()`
 	} else {
 		// Start Profiler for leader if profile argument is on
 		if nodeConfig.StringRole == "leader" && (*profile || *metricsReportURL != "") {

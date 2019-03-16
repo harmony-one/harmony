@@ -446,6 +446,28 @@ func (node *Node) initNodeConfiguration(isBeacon bool, isClient bool) (service.N
 	return nodeConfig, chanPeer
 }
 
+func (node *Node) initArchivalNodeConfiguration(isBeacon bool, isClient bool) (service.NodeConfig, chan p2p.Peer) {
+	chanPeer := make(chan p2p.Peer)
+
+	nodeConfig := service.NodeConfig{
+		IsBeacon: isBeacon,
+		IsClient: isClient,
+		Beacon:   p2p.GroupIDBeacon,
+		Group:    p2p.GroupIDUnknown,
+		Actions:  make(map[p2p.GroupID]p2p.ActionType),
+	}
+	nodeConfig.Actions[p2p.GroupIDBeaconClient] = p2p.ActionStart
+
+	var err error
+	//Archival node does not need send transactions or need to receive Beacon Consensus Messages
+	node.clientReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
+	node.NodeConfig.SetClientGroupID(p2p.GroupIDBeaconClient)
+	if err != nil {
+		utils.GetLogInstance().Error("create group receiver error", "msg", err)
+	}
+	return nodeConfig, chanPeer
+}
+
 // AddBeaconChainDatabase adds database support for beaconchain blocks on normal sharding nodes (not BeaconChain node)
 func (node *Node) AddBeaconChainDatabase(db ethdb.Database) {
 	database := db
