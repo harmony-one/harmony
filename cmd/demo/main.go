@@ -77,6 +77,29 @@ func Result(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(res)
 }
 
+// Result processes /result end point.
+func PickWinner(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	json.NewEncoder(w).Encode("")
+	msg := &msg_pb.Message{
+		Type: msg_pb.MessageType_LOTTERY_REQUEST,
+		Request: &msg_pb.Message_LotteryRequest{
+			LotteryRequest: &msg_pb.LotteryRequest{
+				Type: msg_pb.LotteryRequest_PICK_WINNER,
+			},
+		},
+	}
+
+	res, err := grpcClient.Process(msg)
+	if err != nil {
+		fmt.Println(err)
+		json.NewEncoder(w).Encode("")
+		return
+	}
+	json.NewEncoder(w).Encode(res)
+}
+
 func main() {
 	addr := net.JoinHostPort("", Port)
 
@@ -86,6 +109,7 @@ func main() {
 	router.Path("/enter").HandlerFunc(Enter)
 
 	router.Path("/result").HandlerFunc(Result)
+	router.Path("/winner").HandlerFunc(PickWinner)
 
 	server := &http.Server{Addr: addr, Handler: router}
 	fmt.Println("Serving")
