@@ -401,7 +401,7 @@ func (*Response) XXX_OneofWrappers() []interface{} {
 
 type LotteryResponse struct {
 	Players              []string `protobuf:"bytes,2,rep,name=players,proto3" json:"players,omitempty"`
-	Balances             []uint64 `protobuf:"varint,3,rep,packed,name=balances,proto3" json:"balances,omitempty"`
+	Balances             []string `protobuf:"bytes,3,rep,name=balances,proto3" json:"balances,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -439,7 +439,7 @@ func (m *LotteryResponse) GetPlayers() []string {
 	return nil
 }
 
-func (m *LotteryResponse) GetBalances() []uint64 {
+func (m *LotteryResponse) GetBalances() []string {
 	if m != nil {
 		return m.Balances
 	}

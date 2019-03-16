@@ -119,12 +119,12 @@ func (node *Node) GetNonceOfAddress(address common.Address) uint64 {
 }
 
 // GetBalanceOfAddress returns balance of an address.
-func (node *Node) GetBalanceOfAddress(address common.Address) uint64 {
+func (node *Node) GetBalanceOfAddress(address common.Address) *big.Int {
 	state, err := node.blockchain.State()
 	if err != nil {
 		log.Error("Failed to get chain state", "Error", err)
 	}
-	return state.GetBalance(address).Uint64()
+	return state.GetBalance(address)
 }
 
 // AddFaucetContractToPendingTransactions adds the faucet contract the genesis block.
