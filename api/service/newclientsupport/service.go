@@ -16,9 +16,10 @@ type Service struct {
 func New(
 	CreateTransactionForEnterMethod func(int64, string) error,
 	GetResult func(string) ([]string, []*big.Int),
+	CreateTransactionForPickWinner func() error,
 ) *Service {
 	return &Service{
-		server: msg_pb.NewServer(CreateTransactionForEnterMethod, GetResult),
+		server: msg_pb.NewServer(CreateTransactionForEnterMethod, GetResult, CreateTransactionForPickWinner),
 	}
 }
 
