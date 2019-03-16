@@ -3,12 +3,14 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/harmony-one/bls/ffi/go/bls"
 	"math/rand"
 	"os"
 	"path"
 	"runtime"
+	"strconv"
 	"time"
+
+	"github.com/harmony-one/bls/ffi/go/bls"
 
 	"github.com/harmony-one/harmony/internal/utils/contract"
 
@@ -127,8 +129,11 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	stakingPriKey := ""
 	consensusPriKey := &bls.SecretKey{}
 	if *isBeacon {
-		stakingPriKey = contract.InitialBeaconChainAccounts[*accountIndex].Private
-		err := consensusPriKey.DeserializeHexStr(contract.InitialBeaconChainBLSAccounts[*accountIndex].Private)
+		// TODO: use a better way to get the index for accounts.
+		portNum, _ := strconv.Atoi(*port)
+		index := portNum % 10
+		stakingPriKey = contract.InitialBeaconChainAccounts[index].Private
+		err := consensusPriKey.SetHexString(contract.InitialBeaconChainBLSAccounts[index].Private)
 		if err != nil {
 			panic(fmt.Errorf("generate key error"))
 		}
@@ -137,9 +142,6 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 		// TODO: use user supplied key
 		consensusPriKey, _ = utils.GenKey(*ip, *port)
 	}
-	consensusPriKey, _ = utils.GenKey(*ip, *port)
-	fmt.Println("TESTTEST")
-	fmt.Println(consensusPriKey.SerializeToHexStr())
 	nodeConfig.StakingPriKey = node.StoreStakingKeyFromFile(*stakingKeyFile, stakingPriKey)
 
 	// P2p private key is used for secure message transfer between p2p nodes.
@@ -226,7 +228,7 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	// TODO: enable drand only for beacon chain
 	// TODO: put this in a better place other than main.
 	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of drand later.
-	dRand := drand.New(nodeConfig.Host, nodeConfig.ShardIDString, []p2p.Peer{}, nodeConfig.Leader, currentNode.ConfirmedBlockChannel, *isLeader)
+	dRand := drand.New(nodeConfig.Host, nodeConfig.ShardIDString, []p2p.Peer{}, nodeConfig.Leader, currentNode.ConfirmedBlockChannel, *isLeader, nodeConfig.ConsensusPriKey)
 	currentNode.Consensus.RegisterPRndChannel(dRand.PRndChannel)
 	currentNode.Consensus.RegisterRndChannel(dRand.RndChannel)
 	currentNode.DRand = dRand

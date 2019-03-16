@@ -3,6 +3,8 @@ package drand
 import (
 	"testing"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -19,7 +21,7 @@ func TestConstructInitMessage(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	dRand := New(host, "0", []p2p.Peer{leader, validator}, leader, nil, true)
+	dRand := New(host, "0", []p2p.Peer{leader, validator}, leader, nil, true, bls.RandPrivateKey())
 	dRand.blockHash = [32]byte{}
 	msg := dRand.constructInitMessage()
 
@@ -41,7 +43,7 @@ func TestProcessCommitMessage(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	dRand := New(host, "0", []p2p.Peer{leader, validator}, leader, nil, true)
+	dRand := New(host, "0", []p2p.Peer{leader, validator}, leader, nil, true, bls.RandPrivateKey())
 	dRand.blockHash = [32]byte{}
 	msg := dRand.constructCommitMessage([32]byte{}, []byte{})
 

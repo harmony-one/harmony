@@ -192,7 +192,7 @@ func (ss *ShardingState) UpdateShardingState(stakeInfo *map[common.Address]*stru
 	for addr, info := range *stakeInfo {
 		_, ok := oldAddresses[addr.Hex()]
 		if !ok {
-			newAddresses = append(newAddresses, types.NodeID{common.BytesToAddress(info.BlsAddress[:]).Hex(), addr.Hex()})
+			newAddresses = append(newAddresses, types.NodeID{addr.Hex(), common.BytesToAddress(info.BlsAddress[:]).Hex()})
 		}
 	}
 	return newAddresses
@@ -211,7 +211,7 @@ func GetInitShardState() types.ShardState {
 				addrBytes := priKey.GetPublicKey().GetAddress()
 				blsAddr := common.BytesToAddress(addrBytes[:]).Hex()
 				// TODO: directly read address for bls too
-				curNodeID := types.NodeID{blsAddr, contract.InitialBeaconChainAccounts[j].Address}
+				curNodeID := types.NodeID{contract.InitialBeaconChainAccounts[j].Address, blsAddr}
 				if j == 0 {
 					com.Leader = curNodeID
 				}
