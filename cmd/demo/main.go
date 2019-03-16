@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 )
@@ -77,7 +78,7 @@ func Result(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(res)
 }
 
-// PickWinner picks a winner.
+// PickWinner picks the winner by running pickWinner of smart contract.
 func PickWinner(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -111,7 +112,9 @@ func main() {
 	router.Path("/result").HandlerFunc(Result)
 	router.Path("/winner").HandlerFunc(PickWinner)
 
-	server := &http.Server{Addr: addr, Handler: router}
+	handlers.AllowedOrigins([]string{"*"})
+
+	server := &http.Server{Addr: addr, Handler: handlers.CORS(handlers.AllowedOrigins([]string{"*"}))(router)}
 	fmt.Println("Serving")
 	server.ListenAndServe()
 }
