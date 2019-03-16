@@ -9,7 +9,7 @@ const (
 )
 
 func TestClient(t *testing.T) {
-	s := NewServer(nil, nil)
+	s := NewServer(nil, nil, nil)
 	s.Start()
 
 	client := NewClient(testIP)

@@ -141,18 +141,21 @@ func (MessageType) EnumDescriptor() ([]byte, []int) {
 type LotteryRequest_Type int32
 
 const (
-	LotteryRequest_ENTER  LotteryRequest_Type = 0
-	LotteryRequest_RESULT LotteryRequest_Type = 1
+	LotteryRequest_ENTER       LotteryRequest_Type = 0
+	LotteryRequest_RESULT      LotteryRequest_Type = 1
+	LotteryRequest_PICK_WINNER LotteryRequest_Type = 2
 )
 
 var LotteryRequest_Type_name = map[int32]string{
 	0: "ENTER",
 	1: "RESULT",
+	2: "PICK_WINNER",
 }
 
 var LotteryRequest_Type_value = map[string]int32{
-	"ENTER":  0,
-	"RESULT": 1,
+	"ENTER":       0,
+	"RESULT":      1,
+	"PICK_WINNER": 2,
 }
 
 func (x LotteryRequest_Type) String() string {

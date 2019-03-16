@@ -108,7 +108,7 @@ func (node *Node) GetResult2(priKey string) (players []string, balances []*big.I
 
 // GetResult get current players and their balances.
 func (node *Node) GetResult(priKey string) (players []string, balances []*big.Int) {
-	// return node.GetResult2(priKey)
+	return node.GetResult2(priKey)
 	abi, err := abi.JSON(strings.NewReader(contracts.LotteryABI))
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to generate staking contract's ABI", "error", err)
