@@ -34,6 +34,7 @@ func Enter(w http.ResponseWriter, r *http.Request) {
 	}
 
 	msg := &msg_pb.Message{
+		Type: msg_pb.MessageType_LOTTERY_REQUEST,
 		Request: &msg_pb.Message_LotteryRequest{
 			LotteryRequest: &msg_pb.LotteryRequest{
 				Type:       msg_pb.LotteryRequest_ENTER,
@@ -54,12 +55,15 @@ func Enter(w http.ResponseWriter, r *http.Request) {
 // Result processes /result end point.
 func Result(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	key := r.FormValue("key")
 
 	json.NewEncoder(w).Encode("")
 	msg := &msg_pb.Message{
+		Type: msg_pb.MessageType_LOTTERY_REQUEST,
 		Request: &msg_pb.Message_LotteryRequest{
 			LotteryRequest: &msg_pb.LotteryRequest{
-				Type: msg_pb.LotteryRequest_RESULT,
+				Type:       msg_pb.LotteryRequest_RESULT,
+				PrivateKey: key,
 			},
 		},
 	}

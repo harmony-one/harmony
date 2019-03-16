@@ -137,8 +137,8 @@ type Node struct {
 	WithdrawStakeFunc      []byte
 
 	// Demo account.
-	DemoContractAddress    common.Address
-	DemoContractPrivateKey *ecdsa.PrivateKey
+	DemoContractAddress      common.Address
+	LotteryManagerPrivateKey *ecdsa.PrivateKey
 
 	//Node Account
 	AccountKey *ecdsa.PrivateKey

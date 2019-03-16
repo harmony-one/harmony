@@ -23,6 +23,7 @@ import (
 	"github.com/harmony-one/harmony/crypto/pki"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
+	contract_constants "github.com/harmony-one/harmony/internal/utils/contract"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 )
@@ -340,7 +341,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 
 // Debug --
 func (node *Node) Debug() {
-	players, balances := node.GetResult()
+	players, balances := node.GetResult(contract_constants.DemoAccounts[0].Private)
 	for i := range players {
 		utils.GetLogInstance().Info("******RESULT****", "player", players[i], "balance", balances[i])
 	}
