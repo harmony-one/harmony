@@ -16,7 +16,7 @@ brew install openssl
 
 ## Dev Environment Setup
 
-The required go version is: **go1.11**
+The required go version is: **go1.12**
 
 ```bash
 export GOPATH=$HOME/<path_of_your_choice>
@@ -30,15 +30,15 @@ mkdir -p $HOME/<path_of_your_choice>/src/github.com/harmony-one
 
 cd $HOME/<path_of_your_choice>/src/github.com/harmony-one
 
-git clone git@github.com:harmony-one/mcl.git
+git clone https://github.com/harmony-one/mcl.git
 
 cd mcl && make -j4 && cd ..
 
-git clone git@github.com:harmony-one/bls.git
+git clone https://github.com/harmony-one/bls.git
 
 cd bls && make -j4 && cd ..
 
-git clone git@github.com:harmony-one/harmony.git
+git clone https://github.com/harmony-one/harmony.git
 
 cd harmony
 
