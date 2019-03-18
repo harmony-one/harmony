@@ -41,7 +41,6 @@ func (node *Node) getNeighborPeers(neighbor *sync.Map) []p2p.Peer {
 		res = append(res, v.(p2p.Peer))
 		return true
 	})
-
 	removeID := -1
 	for i := range res {
 		if res[i].Port == node.SelfPeer.Port {
@@ -52,12 +51,12 @@ func (node *Node) getNeighborPeers(neighbor *sync.Map) []p2p.Peer {
 	if removeID != -1 {
 		res = append(res[:removeID], res[removeID+1:]...)
 	}
-	utils.GetLogInstance().Debug("GetSyncingPeers: ", "res", res, "self", node.SelfPeer)
 	return res
 }
 
 // GetBeaconSyncingPeers returns a list of peers for beaconchain syncing
 func (node *Node) GetBeaconSyncingPeers() []p2p.Peer {
+
 	return node.getNeighborPeers(&node.BeaconNeighbors)
 }
 
@@ -71,6 +70,7 @@ func (node *Node) DoBeaconSyncing() {
 	for {
 		select {
 		case beaconBlock := <-node.BeaconBlockChannel:
+			utils.GetLogInstance().Debug("[SYNC] Received BeaconBlockChannel Ping for Sync")
 			if node.beaconSync == nil {
 				node.beaconSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port)
 				node.beaconSync.CreateSyncConfig(node.GetBeaconSyncingPeers())
@@ -79,6 +79,7 @@ func (node *Node) DoBeaconSyncing() {
 			startHash := node.beaconChain.CurrentBlock().Hash()
 			node.beaconSync.AddLastMileBlock(beaconBlock)
 			node.beaconSync.StartStateSync(startHash[:], node.beaconChain, node.BeaconWorker, true)
+			utils.GetLogInstance().Debug("[SYNC] STARTING BEACON SYNC")
 		}
 	}
 }

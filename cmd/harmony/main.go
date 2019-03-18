@@ -10,8 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/harmony-one/harmony/api/client"
-	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils/contract"
 
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -183,28 +181,10 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	return nodeConfig
 }
 
-func setupArchivalNode(nodeConfig *nodeconfig.ConfigType) (*node.Node, *nodeconfig.ConfigType) { //Mix of setUpConsensusAndNode and createGlobalConfig
-	//var err error
-
-	// Initialize leveldb for beacon.
-	// if nodeConfig.BeaconDB, err = InitLDBDatabase(*ip, *port, *freshDB, true); err != nil {
-	// 	panic(err)
-	// }
-	currentNode := node.New(nodeConfig.Host, &consensus.Consensus{ShardID: uint32(0)}, nodeConfig.BeaconDB) //at the moment the database supplied is beacondb as this is a beacon sync node
+func setupArchivalNode(nodeConfig *nodeconfig.ConfigType) (*node.Node, *nodeconfig.ConfigType) {
+	currentNode := node.New(nodeConfig.Host, &consensus.Consensus{ShardID: uint32(0)}, nil)
 	currentNode.NodeConfig.SetRole(nodeconfig.ArchivalNode)
 	currentNode.AddBeaconChainDatabase(nodeConfig.BeaconDB)
-	currentNode.Client = client.NewClient(currentNode.GetHost(), []uint32{0})
-	GetLatestBlocks := func(blocks []*types.Block) { //This should also loop over all shards.
-		for _, block := range blocks {
-			utils.GetLogInstance().Info("Current Block", "hash", currentNode.Blockchain().CurrentBlock().Hash().Hex())
-			utils.GetLogInstance().Info("Adding block from leader", "txNum", len(block.Transactions()), "shardID", 0, "preHash", block.ParentHash().Hex())
-			currentNode.AddNewBlock(block)
-			stateMutex.Lock()
-			currentNode.Worker.UpdateCurrent()
-			stateMutex.Unlock()
-		}
-	}
-	currentNode.Client.UpdateBlocks = GetLatestBlocks
 	return currentNode, nodeConfig
 }
 
@@ -272,7 +252,7 @@ func main() {
 		currentNode, nodeConfig = setupArchivalNode(nodeConfig)
 		loggingInit(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps)
 		log.Info("New Harmony Node ====", "Role", currentNode.NodeConfig.Role(), "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, nodeConfig.Host.GetID().Pretty()))
-		//Alternaitvely shut down client on node and just do `go currentNode.DoBeaconSync()`
+		go currentNode.DoBeaconSyncing()
 	} else {
 		// Start Profiler for leader if profile argument is on
 		if nodeConfig.StringRole == "leader" && (*profile || *metricsReportURL != "") {

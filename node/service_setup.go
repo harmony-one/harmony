@@ -104,8 +104,8 @@ func (node *Node) setupForClientNode() {
 	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer, nil))
 }
 
-func (node *Node) setupForArchivalNode(isBeacon bool) {
-	nodeConfig, chanPeer := node.initArchivalNodeConfiguration(false, true)
+func (node *Node) setupForArchivalNode() {
+	nodeConfig, chanPeer := node.initNodeConfiguration(false, false)
 	// Register peer discovery service.
 	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer, node.AddBeaconPeer))
 	// Register networkinfo service. "0" is the beacon shard ID
@@ -131,7 +131,7 @@ func (node *Node) ServiceManagerSetup() {
 	case nodeconfig.ClientNode:
 		node.setupForClientNode()
 	case nodeconfig.ArchivalNode:
-		node.setupForArchivalNode(false)
+		node.setupForArchivalNode()
 	}
 	node.serviceManager.SetupServiceMessageChan(node.serviceMessageChan)
 }

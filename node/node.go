@@ -247,7 +247,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database) *N
 		node.BlockChannel = make(chan *types.Block)
 		node.ConfirmedBlockChannel = make(chan *types.Block)
 		node.BeaconBlockChannel = make(chan *types.Block)
-
+		utils.GetLogInstance().Debug("All Channels setup for ", "node", node.SelfPeer)
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, params.TestChainConfig, chain)
 		node.Worker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.ConsensusPubKey), node.Consensus.ShardID)
 
@@ -431,40 +431,18 @@ func (node *Node) initNodeConfiguration(isBeacon bool, isClient bool) (service.N
 	nodeConfig.Actions[p2p.GroupIDBeaconClient] = p2p.ActionStart
 
 	var err error
-	if !isBeacon {
-		node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
-	} else {
+	if isBeacon {
 		node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeacon)
 		node.clientReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
 		node.NodeConfig.SetClientGroupID(p2p.GroupIDBeaconClient)
+	} else {
+		node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
 	}
 
 	if err != nil {
 		utils.GetLogInstance().Error("create group receiver error", "msg", err)
 	}
 
-	return nodeConfig, chanPeer
-}
-
-func (node *Node) initArchivalNodeConfiguration(isBeacon bool, isClient bool) (service.NodeConfig, chan p2p.Peer) {
-	chanPeer := make(chan p2p.Peer)
-
-	nodeConfig := service.NodeConfig{
-		IsBeacon: isBeacon,
-		IsClient: isClient,
-		Beacon:   p2p.GroupIDBeacon,
-		Group:    p2p.GroupIDUnknown,
-		Actions:  make(map[p2p.GroupID]p2p.ActionType),
-	}
-	nodeConfig.Actions[p2p.GroupIDBeaconClient] = p2p.ActionStart
-
-	var err error
-	//Archival node does not need send transactions or need to receive Beacon Consensus Messages
-	node.clientReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
-	node.NodeConfig.SetClientGroupID(p2p.GroupIDBeaconClient)
-	if err != nil {
-		utils.GetLogInstance().Error("create group receiver error", "msg", err)
-	}
 	return nodeConfig, chanPeer
 }
 
