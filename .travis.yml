@@ -3,7 +3,7 @@ go:
   - stable
 go_import_path: github.com/harmony-one/harmony
 install:
-  - env GO111MODULE=on
+  - export GO111MODULE=on
   - export GOPATH=$HOME/gopath
   - export CGO_CPPFLAGS="-I$GOPATH/src/github.com/harmony-one/bls/include -I$GOPATH/src/github.com/harmony-one/mcl/include"
   - export CGO_LDFLAGS="-L$GOPATH/src/github.com/harmony-one/bls/lib -L$GOPATH/src/github.com/harmony-one/mcl/lib"
@@ -19,7 +19,7 @@ install:
   - cd bls
   - make
   - cd ../harmony
-  - go get -t -v ./...
+  - go get -v ./...
   - go get -u golang.org/x/lint/golint
   - go get -u golang.org/x/tools/cmd/goimports
   - go get gopkg.in/check.v1
@@ -27,9 +27,8 @@ install:
   - go get github.com/golang/mock/mockgen
   - go get github.com/golang/protobuf/protoc-gen-go
   - ./scripts/install_protoc.sh -V 3.6.1
-  - ./scripts/travis_checker.sh
-  - go build -v ./...
 script:
+  - go build -v ./...
   - ./scripts/travis_checker.sh
 notifications:
   slack: harmonyone:gggCd1QQopsQAW8JYgBWiH7M

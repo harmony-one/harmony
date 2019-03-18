@@ -1,7 +1,0 @@
-[submodule "vendor/github.com/ethereum/go-ethereum"]
-	path = vendor/github.com/ethereum/go-ethereum
-	url = https://github.com/harmony-one/go-ethereum
-	branch = master
-[submodule "vendor/github.com/libp2p/go-libp2p-kad-dht"]
-	path = vendor/github.com/libp2p/go-libp2p-kad-dht
-	url = https://github.com/libp2p/go-libp2p-kad-dht
