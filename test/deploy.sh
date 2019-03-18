@@ -167,7 +167,7 @@ fi
 
 if [ "$TXGEN" == "true" ]; then
    echo "launching txgen ... wait"
-#  sleep 2
+#   sleep 2
    line=$(grep client $config)
    IFS=' ' read ip port mode shardID <<< $line
    if [ "$mode" == "client" ]; then
@@ -177,7 +177,7 @@ else
    sleep $DURATION
 fi
 
-save bc_config.json
+#save bc_config.json
 [ -e bc_config.json ] && cp -f bc_config.json $log_folder
 
 cleanup
