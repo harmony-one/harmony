@@ -37,8 +37,8 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
-//go:generate gencodec -type Genesis -field-override genesisSpecMarshaling -out gen_genesis.go
-//go:generate gencodec -type GenesisAccount -field-override genesisAccountMarshaling -out gen_genesis_account.go
+// no go:generate gencodec -type Genesis -field-override genesisSpecMarshaling -out gen_genesis.go
+// no go:generate gencodec -type GenesisAccount -field-override genesisAccountMarshaling -out gen_genesis_account.go
 
 var errGenesisNoConfig = errors.New("genesis has no chain configuration")
 
