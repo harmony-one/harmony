@@ -42,6 +42,9 @@ var (
 const (
 	waitInRetry       = 2 * time.Second
 	connectionTimeout = 3 * time.Minute
+
+	// register to bootnode every ticker
+	dhtTicker = 6 * time.Hour
 )
 
 // New returns role conversion service.
@@ -153,6 +156,7 @@ func (s *Service) DoService() {
 		utils.GetLogInstance().Error("can't parse CIDR", "error", err)
 		return
 	}
+	tick := time.NewTicker(dhtTicker)
 	for {
 		select {
 		case peer := <-s.peerInfo:
@@ -188,6 +192,9 @@ func (s *Service) DoService() {
 			}
 		case <-s.stopChan:
 			return
+		case <-tick.C:
+			libp2pdis.Advertise(s.ctx, s.discovery, string(s.Rendezvous))
+			utils.GetLogInstance().Info("Successfully announced!")
 		}
 	}
 }
