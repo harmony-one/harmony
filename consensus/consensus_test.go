@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -18,7 +20,7 @@ func TestNew(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader)
+	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader, bls.RandPrivateKey())
 	if consensus.consensusID != 0 {
 		test.Errorf("Consensus Id is initialized to the wrong value: %d", consensus.consensusID)
 	}
@@ -54,7 +56,7 @@ func TestRemovePeers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus := New(host, "0", peers, leader)
+	consensus := New(host, "0", peers, leader, nil)
 
 	//	consensus.DebugPrintPublicKeys()
 	f := consensus.RemovePeers(peerRemove)
@@ -72,7 +74,7 @@ func TestGetPeerFromID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader)
+	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader, bls.RandPrivateKey())
 	leaderID := utils.GetUniqueIDFromIPPort(leader.IP, leader.Port)
 	validatorID := utils.GetUniqueIDFromIPPort(validator.IP, validator.Port)
 	l, _ := consensus.GetPeerFromID(leaderID)
@@ -93,7 +95,7 @@ func TestPopulateMessageFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader)
+	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader, bls.RandPrivateKey())
 	consensus.consensusID = 2
 	consensus.blockHash = blockHash
 	consensus.nodeID = 3
@@ -125,7 +127,7 @@ func TestSignAndMarshalConsensusMessage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader)
+	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader, bls.RandPrivateKey())
 	consensus.consensusID = 2
 	consensus.blockHash = blockHash
 	consensus.nodeID = 3
