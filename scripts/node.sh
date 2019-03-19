@@ -60,12 +60,28 @@ function setup_env
    echo "session required pam_limits.so" | sudo tee -a /etc/pam.d/common-session
 }
 
+function find_harmony_process
+{
+   unset -v pidfile pid
+   pidfile="harmony-${PUB_IP}.pid"
+   pid=$!
+   echo "${pid}" > "${pidfile}"
+   ps -f -p "${pid}"
+}
+
+######## main #########
+if [[ $EUID -ne 0 ]]; then
+   echo "This script must be run as root"
+   echo Please use \"sudo ./node.sh\"
+   exit 1
+fi
+
 killnode
 
 mkdir -p latest
 BUCKET=pub.harmony.one
 OS=$(uname -s)
-REL=20190216
+REL=banjo
 
 if [ "$OS" == "Darwin" ]; then
    FOLDER=release/$REL/darwin-x86_64/
@@ -101,17 +117,25 @@ fi
 # find my public ip address
 myip
 
-# public beacon node multiaddress
-BC_MA=/ip4/54.183.5.66/tcp/9999/ipfs/QmdQVypu6NSm7m8bNZj5EJCnjPhXR8QyRmDnDBidxGaHWi
+# public boot node multiaddress
+BN_MA=/ip4/100.26.90.187/tcp/9876/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9,/ip4/54.213.43.194/tcp/9876/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX
 
 if [ "$OS" == "Linux" ]; then
 # Run Harmony Node
-   nohup ./harmony -bc_addr $BC_MA -ip $PUB_IP -port $NODE_PORT > harmony-${PUB_IP}.log 2>&1 &
+   LD_LIBRARY_PATH=$(pwd) nohup ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_beacon > harmony-${PUB_IP}.log 2>&1 &
 else
-   ./harmony -bc_addr $BC_MA -ip $PUB_IP -port $NODE_PORT > harmony-${PUB_IP}.log 2>&1 &
+   DYLD_FALLBACK_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_beacon > harmony-${PUB_IP}.log 2>&1 &
 fi
+
+echo "############### Running Harmony Process ###############"
+find_harmony_process
+echo
+echo
 
 echo Please run the following command to inspect the log
 echo "tail -f harmony-${PUB_IP}.log"
+
+echo
+echo You may use \"sudo kill harmony\" to terminate running harmony node program.
 
 trap killnode SIGINT SIGTERM

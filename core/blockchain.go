@@ -1733,17 +1733,14 @@ func (bc *BlockChain) ValidateNewShardState(block *types.Block, stakeInfo *map[c
 }
 
 // StoreNewShardState insert new shard state into epoch block
-func (bc *BlockChain) StoreNewShardState(block *types.Block, stakeInfo *map[common.Address]*structs.StakeInfo) {
+func (bc *BlockChain) StoreNewShardState(block *types.Block, stakeInfo *map[common.Address]*structs.StakeInfo) types.ShardState {
 	// write state into db.
 	shardState := bc.GetNewShardState(block, stakeInfo)
-	if shardState == nil {
-		return
+	if shardState != nil {
+		hash := block.Hash()
+		number := block.NumberU64()
+		rawdb.WriteShardState(bc.db, hash, number, shardState)
+		utils.GetLogInstance().Debug("[Resharding] Saved new shard state success", "state", shardState)
 	}
-	hash := block.Hash()
-	number := block.NumberU64()
-	rawdb.WriteShardState(bc.db, hash, number, shardState)
-	utils.GetLogInstance().Debug("[Resharding] Saved new shard state success", "shardStateHash", shardState.Hash())
-	for _, c := range shardState {
-		utils.GetLogInstance().Debug("[Resharding] Shard Info", "shardID", c.ShardID, "NodeList", c.NodeList)
-	}
+	return shardState
 }
