@@ -27,16 +27,18 @@ type Service struct {
 	router      *mux.Router
 	IP          string
 	Port        string
+	GetNumPeers func() int
 	storage     *Storage
 	server      *http.Server
 	messageChan chan *msg_pb.Message
 }
 
 // New returns explorer service.
-func New(selfPeer *p2p.Peer) *Service {
+func New(selfPeer *p2p.Peer, GetNumPeers func() int) *Service {
 	return &Service{
-		IP:   selfPeer.IP,
-		Port: selfPeer.Port,
+		IP:          selfPeer.IP,
+		Port:        selfPeer.Port,
+		GetNumPeers: GetNumPeers,
 	}
 }
 
@@ -88,6 +90,9 @@ func (s *Service) Run() *http.Server {
 	// Set up router for address.
 	s.router.Path("/address").Queries("id", "{[0-9A-Fa-fx]*?}").HandlerFunc(s.GetExplorerAddress).Methods("GET")
 	s.router.Path("/address").HandlerFunc(s.GetExplorerAddress)
+
+	// Set up router for nodes.
+	s.router.Path("/nodes").HandlerFunc(s.GetExplorerNodes)
 
 	// Do serving now.
 	utils.GetLogInstance().Info("Listening on ", "port: ", GetExplorerPort(s.Port))
@@ -245,6 +250,12 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 	}
 	data.Address = address
 	json.NewEncoder(w).Encode(data.Address)
+}
+
+// GetExplorerNodes serves /nodes end-point.
+func (s *Service) GetExplorerNodes(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(s.GetNumPeers())
 }
 
 // NotifyService notify service

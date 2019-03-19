@@ -26,7 +26,7 @@ func (node *Node) setupForShardLeader() {
 	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer, nil))
 
 	// Register explorer service.
-	node.serviceManager.RegisterService(service.SupportExplorer, explorer.New(&node.SelfPeer))
+	node.serviceManager.RegisterService(service.SupportExplorer, explorer.New(&node.SelfPeer, node.Consensus.GetNumPeers))
 	// Register consensus service.
 	node.serviceManager.RegisterService(service.Consensus, consensus.New(node.BlockChannel, node.Consensus, node.startConsensus))
 	// Register new block service.
@@ -67,7 +67,7 @@ func (node *Node) setupForBeaconLeader() {
 	// Register randomness service
 	node.serviceManager.RegisterService(service.Randomness, randomness.New(node.DRand))
 	// Register explorer service.
-	node.serviceManager.RegisterService(service.SupportExplorer, explorer.New(&node.SelfPeer))
+	node.serviceManager.RegisterService(service.SupportExplorer, explorer.New(&node.SelfPeer, node.Consensus.GetNumPeers))
 }
 
 func (node *Node) setupForBeaconValidator() {
