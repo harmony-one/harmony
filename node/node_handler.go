@@ -3,8 +3,11 @@ package node
 import (
 	"bytes"
 	"context"
+	"math"
 	"os"
 	"time"
+
+	"github.com/harmony-one/harmony/core"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -289,7 +292,46 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 	utils.GetLogInstance().Info("Updating staking list")
 	node.UpdateStakingList(node.QueryStakeInfo())
 	node.printStakingList()
-	node.blockchain.StoreNewShardState(newBlock, &node.CurrentStakes)
+	if core.IsEpochBlock(newBlock) {
+		shardState := node.blockchain.StoreNewShardState(newBlock, &node.CurrentStakes)
+		if shardState != nil {
+			myShard := uint32(math.MaxUint32)
+			isLeader := false
+			for _, shard := range shardState {
+				for _, nodeID := range shard.NodeList {
+					blsAddr := node.Consensus.PubKey.GetAddress()
+					blsAddrStr := common.BytesToAddress(blsAddr[:]).Hex()
+					if nodeID.BlsAddress == blsAddrStr {
+						myShard = shard.ShardID
+						isLeader = shard.Leader == nodeID
+					}
+				}
+			}
+
+			if myShard != uint32(math.MaxUint32) {
+				aboutLeader := ""
+				if node.Consensus.IsLeader {
+					aboutLeader = "I am not leader anymore"
+					if isLeader {
+						aboutLeader = "I am still leader"
+					}
+				} else {
+					aboutLeader = "I am still validator"
+					if isLeader {
+						aboutLeader = "I become the leader"
+					}
+				}
+				if node.blockchain.ShardID() == myShard {
+					utils.GetLogInstance().Info("[Resharding] I stay at", "shardID", myShard, "leader")
+				} else {
+					utils.GetLogInstance().Info("[Resharding] I got resharded to", "shardID", myShard, "isLeader", isLeader)
+				}
+				utils.GetLogInstance().Info("[Resharding] " + aboutLeader)
+			} else {
+				utils.GetLogInstance().Info("[Resharding] Somehow I got kicked out")
+			}
+		}
+	}
 }
 
 // AddNewBlock is usedd to add new block into the blockchain.
