@@ -32,8 +32,8 @@ func TestNew(test *testing.T) {
 }
 
 func TestGetValidatorPeers(test *testing.T) {
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902"}
-	validator := p2p.Peer{IP: "127.0.0.1", Port: "9905"}
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902", ConsensusPubKey: bls2.RandPrivateKey().GetPublicKey()}
+	validator := p2p.Peer{IP: "127.0.0.1", Port: "9905", ConsensusPubKey: bls2.RandPrivateKey().GetPublicKey()}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2pimpl.NewHost(&leader, priKey)
 	if err != nil {
@@ -48,13 +48,13 @@ func TestGetValidatorPeers(test *testing.T) {
 	countValidatorPeers := len(dRand.GetValidatorPeers())
 
 	if countValidatorPeers != 2 {
-		test.Error("Count of validator peers doesn't match")
+		test.Error("Count of validator peers doesn't match, got", countValidatorPeers)
 	}
 }
 
 func TestAddPeers(test *testing.T) {
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902"}
-	validator := p2p.Peer{IP: "127.0.0.1", Port: "9905"}
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902", ConsensusPubKey: bls2.RandPrivateKey().GetPublicKey()}
+	validator := p2p.Peer{IP: "127.0.0.1", Port: "9905", ConsensusPubKey: bls2.RandPrivateKey().GetPublicKey()}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2pimpl.NewHost(&leader, priKey)
 	if err != nil {
@@ -79,28 +79,29 @@ func TestAddPeers(test *testing.T) {
 }
 
 func TestGetValidatorByPeerId(test *testing.T) {
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902"}
-	validator := p2p.Peer{IP: "127.0.0.1", Port: "9905"}
+	leaderPriKey := bls2.RandPrivateKey()
+	leaderPubKey := bls2.RandPrivateKey().GetPublicKey()
+	validatorPubKey := bls2.RandPrivateKey().GetPublicKey()
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902", ConsensusPubKey: leaderPubKey}
+	validator := p2p.Peer{IP: "127.0.0.1", Port: "9905", ConsensusPubKey: validatorPubKey}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2pimpl.NewHost(&leader, priKey)
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	dRand := New(host, "0", []p2p.Peer{leader, validator}, leader, nil, true, bls2.RandPrivateKey())
+	dRand := New(host, "0", []p2p.Peer{leader, validator}, leader, nil, true, leaderPriKey)
 
 	if !dRand.IsLeader {
 		test.Error("dRand should belong to a leader")
 	}
 
-	validatorID := utils.GetUniqueIDFromPeer(validator)
+	validatorAddress := utils.GetAddressFromBlsPubKey(validatorPubKey).Hex()
 
-	if dRand.getValidatorPeerByID(validatorID) == nil {
+	if dRand.getValidatorPeerByAddress(validatorAddress) == nil {
 		test.Error("Unable to get validator by Peerid")
 	}
-	newPeer := p2p.Peer{IP: "127.0.0.1", Port: "9907"}
-	newPeerID := utils.GetUniqueIDFromPeer(newPeer)
 
-	if dRand.getValidatorPeerByID(newPeerID) != nil {
+	if dRand.getValidatorPeerByAddress("random address") != nil {
 		test.Error("Found validator for absent validatorId")
 	}
 }
@@ -144,8 +145,8 @@ func TestUpdatePublicKeys(test *testing.T) {
 	}
 	dRand := New(host, "0", []p2p.Peer{leader, validator}, leader, nil, true, bls2.RandPrivateKey())
 
-	_, pubKey1 := utils.GenKey("127.0.0.1", "5555")
-	_, pubKey2 := utils.GenKey("127.0.0.1", "6666")
+	pubKey1 := bls2.RandPrivateKey().GetPublicKey()
+	pubKey2 := bls2.RandPrivateKey().GetPublicKey()
 
 	publicKeys := []*bls.PublicKey{pubKey1, pubKey2}
 
@@ -179,7 +180,7 @@ func TestVerifyMessageSig(test *testing.T) {
 		},
 	}
 	drandMsg := message.GetDrand()
-	drandMsg.SenderId = dRand.nodeID
+	drandMsg.SenderAddress = dRand.SelfAddress
 	drandMsg.BlockHash = dRand.blockHash[:]
 
 	dRand.signDRandMessage(message)

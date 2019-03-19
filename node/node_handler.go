@@ -365,7 +365,6 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 	peer.IP = ping.Node.IP
 	peer.Port = ping.Node.Port
 	peer.PeerID = ping.Node.PeerID
-	peer.ValidatorID = ping.Node.ValidatorID
 	peer.ConsensusPubKey = nil
 
 	if ping.Node.PubKey != nil {
@@ -383,13 +382,13 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 	node.host.ConnectHostPeer(*peer)
 
 	if ping.Node.Role == proto_node.ClientRole {
-		utils.GetLogInstance().Info("Add Client Peer to Node", "Node", node.Consensus.GetNodeID(), "Client", peer)
+		utils.GetLogInstance().Info("Add Client Peer to Node", "Address", node.Consensus.GetSelfAddress(), "Client", peer)
 		node.ClientPeer = peer
 		return 0
 	}
 
 	// Add to Node's peer list anyway
-	utils.GetLogInstance().Info("Add Peer to Node", "Node", node.Consensus.GetNodeID(), "Pear", peer)
+	utils.GetLogInstance().Info("Add Peer to Node", "Address", node.Consensus.GetSelfAddress(), "Pear", peer)
 	node.AddPeers([]*p2p.Peer{peer})
 
 	return 1
@@ -473,7 +472,6 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		peer := new(p2p.Peer)
 		peer.IP = p.IP
 		peer.Port = p.Port
-		peer.ValidatorID = p.ValidatorID
 		peer.PeerID = p.PeerID
 
 		peer.ConsensusPubKey = &bls.PublicKey{}

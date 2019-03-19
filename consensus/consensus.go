@@ -34,8 +34,8 @@ type Consensus struct {
 	state State
 
 	// Commits collected from validators.
-	prepareSigs          map[uint32]*bls.Sign
-	commitSigs           map[uint32]*bls.Sign
+	prepareSigs          map[string]*bls.Sign // key is the validator's address
+	commitSigs           map[string]*bls.Sign // key is the validator's address
 	aggregatedPrepareSig *bls.Sign
 	aggregatedCommitSig  *bls.Sign
 	prepareBitmap        *bls_cosi.Mask
@@ -65,8 +65,8 @@ type Consensus struct {
 
 	// Whether I am leader. False means I am validator
 	IsLeader bool
-	// Leader or validator Id - 4 byte
-	nodeID uint32
+	// Leader or validator address in hex
+	SelfAddress string
 	// Consensus Id (View Id) - 4 byte
 	consensusID uint32
 	// Blockhash - 32 byte
@@ -182,11 +182,11 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer, blsPr
 
 	consensus.leader = leader
 	for _, peer := range peers {
-		consensus.validators.Store(utils.GetUniqueIDFromPeer(peer), peer)
+		consensus.validators.Store(peer.GetAddressHex(), peer)
 	}
 
-	consensus.prepareSigs = map[uint32]*bls.Sign{}
-	consensus.commitSigs = map[uint32]*bls.Sign{}
+	consensus.prepareSigs = map[string]*bls.Sign{}
+	consensus.commitSigs = map[string]*bls.Sign{}
 
 	// Initialize cosign bitmap
 	allPublicKeys := make([]*bls.PublicKey, 0)
@@ -207,7 +207,7 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer, blsPr
 
 	// For now use socket address as ID
 	// TODO: populate Id derived from address
-	consensus.nodeID = utils.GetUniqueIDFromPeer(selfPeer)
+	consensus.SelfAddress = selfPeer.GetAddressHex()
 
 	if blsPriKey != nil {
 		consensus.priKey = blsPriKey
@@ -278,16 +278,16 @@ func (consensus *Consensus) checkConsensusMessage(message *msg_pb.Message, publi
 	return nil
 }
 
-// Gets the validator peer based on validator ID.
-func (consensus *Consensus) getValidatorPeerByID(validatorID uint32) *p2p.Peer {
-	v, ok := consensus.validators.Load(validatorID)
+// GetPeerByAddress the validator peer based on validator Address.
+func (consensus *Consensus) GetPeerByAddress(validatorAddress string) *p2p.Peer {
+	v, ok := consensus.validators.Load(validatorAddress)
 	if !ok {
-		utils.GetLogInstance().Warn("Unrecognized validator", "validatorID", validatorID, "consensus", consensus)
+		utils.GetLogInstance().Warn("Unrecognized validator", "validatorAddress", validatorAddress, "consensus", consensus)
 		return nil
 	}
 	value, ok := v.(p2p.Peer)
 	if !ok {
-		utils.GetLogInstance().Warn("Invalid validator", "validatorID", validatorID, "consensus", consensus)
+		utils.GetLogInstance().Warn("Invalid validator", "validatorAddress", validatorAddress, "consensus", consensus)
 		return nil
 	}
 	return &value
@@ -377,8 +377,8 @@ func (consensus *Consensus) GetCommitSigsArray() []*bls.Sign {
 // ResetState resets the state of the consensus
 func (consensus *Consensus) ResetState() {
 	consensus.state = Finished
-	consensus.prepareSigs = map[uint32]*bls.Sign{}
-	consensus.commitSigs = map[uint32]*bls.Sign{}
+	consensus.prepareSigs = map[string]*bls.Sign{}
+	consensus.commitSigs = map[string]*bls.Sign{}
 
 	prepareBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.ConsensusPubKey)
 	commitBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.ConsensusPubKey)
@@ -400,8 +400,8 @@ func (consensus *Consensus) String() string {
 	} else {
 		duty = "VLD" // validator
 	}
-	return fmt.Sprintf("[duty:%s, PubKey:%s, ShardID:%v, nodeID:%v, state:%s]",
-		duty, hex.EncodeToString(consensus.PubKey.Serialize()), consensus.ShardID, consensus.nodeID, consensus.state)
+	return fmt.Sprintf("[duty:%s, PubKey:%s, ShardID:%v, Address:%v, state:%s]",
+		duty, hex.EncodeToString(consensus.PubKey.Serialize()), consensus.ShardID, consensus.SelfAddress, consensus.state)
 }
 
 // AddPeers adds new peers into the validator map of the consensus
@@ -410,12 +410,9 @@ func (consensus *Consensus) AddPeers(peers []*p2p.Peer) int {
 	count := 0
 
 	for _, peer := range peers {
-		_, ok := consensus.validators.Load(utils.GetUniqueIDFromPeer(*peer))
+		_, ok := consensus.validators.Load(peer.GetAddressHex())
 		if !ok {
-			if peer.ValidatorID == -1 {
-				peer.ValidatorID = int(consensus.uniqueIDInstance.GetUniqueID())
-			}
-			consensus.validators.Store(utils.GetUniqueIDFromPeer(*peer), *peer)
+			consensus.validators.Store(peer.GetAddressHex(), *peer)
 			consensus.pubKeyLock.Lock()
 			consensus.PublicKeys = append(consensus.PublicKeys, peer.ConsensusPubKey)
 			consensus.pubKeyLock.Unlock()
@@ -494,7 +491,7 @@ func (consensus *Consensus) DebugPrintValidators() {
 	consensus.validators.Range(func(k, v interface{}) bool {
 		if p, ok := v.(p2p.Peer); ok {
 			str2 := fmt.Sprintf("%s", p.ConsensusPubKey.Serialize())
-			utils.GetLogInstance().Debug("validator:", "IP", p.IP, "Port", p.Port, "VID", p.ValidatorID, "Key", str2)
+			utils.GetLogInstance().Debug("validator:", "IP", p.IP, "Port", p.Port, "address", p.GetAddressHex(), "Key", str2)
 			count++
 			return true
 		}
@@ -600,22 +597,9 @@ func accumulateRewards(config *params.ChainConfig, state *state.DB, header *type
 	// TODO: implement mining rewards
 }
 
-// GetNodeID returns the nodeID
-func (consensus *Consensus) GetNodeID() uint32 {
-	return consensus.nodeID
-}
-
-// GetPeerFromID will get peer from peerID, bool value in return true means success and false means fail
-func (consensus *Consensus) GetPeerFromID(peerID uint32) (p2p.Peer, bool) {
-	v, ok := consensus.validators.Load(peerID)
-	if !ok {
-		return p2p.Peer{}, false
-	}
-	value, ok := v.(p2p.Peer)
-	if !ok {
-		return p2p.Peer{}, false
-	}
-	return value, true
+// GetSelfAddress returns the address in hex
+func (consensus *Consensus) GetSelfAddress() string {
+	return consensus.SelfAddress
 }
 
 // Populates the common basic fields for all consensus message.
@@ -627,10 +611,10 @@ func (consensus *Consensus) populateMessageFields(request *msg_pb.ConsensusReque
 	// 32 byte block hash
 	request.BlockHash = consensus.blockHash[:]
 
-	// 4 byte sender id
-	request.SenderId = uint32(consensus.nodeID)
+	// sender address
+	request.SenderAddress = consensus.SelfAddress
 
-	utils.GetLogInstance().Debug("[populateMessageFields]", "myConsensusID", consensus.consensusID, "SenderId", request.SenderId)
+	utils.GetLogInstance().Debug("[populateMessageFields]", "myConsensusID", consensus.consensusID, "SenderAddress", request.SenderAddress)
 }
 
 // Signs the consensus message and returns the marshaled message.

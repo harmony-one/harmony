@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/api/client"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
@@ -78,12 +80,12 @@ func main() {
 		panic(err)
 	}
 
-	peerPriKey, peerPubKey := utils.GenKey(*ip, *port)
-	if peerPriKey == nil || peerPubKey == nil {
+	peerPubKey := bls.RandPrivateKey().GetPublicKey()
+	if peerPubKey == nil {
 		panic(fmt.Errorf("generate key error"))
 	}
 
-	selfPeer := p2p.Peer{IP: *ip, Port: *port, ValidatorID: -1, ConsensusPubKey: peerPubKey}
+	selfPeer := p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: peerPubKey}
 
 	// Init with LibP2P enabled, FIXME: (leochen) right now we support only one shard
 	shardIDs = append(shardIDs, 0)

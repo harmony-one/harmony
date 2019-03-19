@@ -19,7 +19,7 @@ import (
 
 // DRand is the main struct which contains state for the distributed randomness protocol.
 type DRand struct {
-	vrfs                  *map[uint32][]byte
+	vrfs                  *map[string][]byte // Key is the address hex
 	bitmap                *bls_cosi.Mask
 	pRand                 *[32]byte
 	rand                  *[32]byte
@@ -32,7 +32,7 @@ type DRand struct {
 
 	// map of nodeID to validator Peer object
 	// FIXME: should use PubKey of p2p.Peer as the hashkey
-	validators sync.Map // key is uint16, value is p2p.Peer
+	validators sync.Map // key is string, value is p2p.Peer
 
 	// Leader's address
 	leader p2p.Peer
@@ -52,8 +52,8 @@ type DRand struct {
 	// Whether I am leader. False means I am validator
 	IsLeader bool
 
-	// Leader or validator Id - 4 byte
-	nodeID uint32
+	// Leader or validator address
+	SelfAddress string
 
 	// The p2p host used to send/receive p2p messages
 	host p2p.Host
@@ -82,10 +82,10 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer, confi
 
 	dRand.leader = leader
 	for _, peer := range peers {
-		dRand.validators.Store(utils.GetUniqueIDFromPeer(peer), peer)
+		dRand.validators.Store(peer.GetAddressHex(), peer)
 	}
 
-	dRand.vrfs = &map[uint32][]byte{}
+	dRand.vrfs = &map[string][]byte{}
 
 	// Initialize cosign bitmap
 	allPublicKeys := make([]*bls.PublicKey, 0)
@@ -103,8 +103,7 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer, confi
 	dRand.rand = nil
 
 	// For now use socket address as ID
-	// TODO: populate Id derived from address
-	dRand.nodeID = utils.GetUniqueIDFromPeer(selfPeer)
+	dRand.SelfAddress = selfPeer.GetAddressHex()
 
 	// Set private key for myself so that I can sign messages.
 	if blsPriKey != nil {
@@ -132,9 +131,9 @@ func (dRand *DRand) AddPeers(peers []*p2p.Peer) int {
 	count := 0
 
 	for _, peer := range peers {
-		_, ok := dRand.validators.Load(utils.GetUniqueIDFromPeer(*peer))
+		_, ok := dRand.validators.Load(peer.GetAddressHex())
 		if !ok {
-			dRand.validators.Store(utils.GetUniqueIDFromPeer(*peer), *peer)
+			dRand.validators.Store(peer.GetAddressHex(), *peer)
 			dRand.pubKeyLock.Lock()
 			dRand.PublicKeys = append(dRand.PublicKeys, peer.ConsensusPubKey)
 			dRand.pubKeyLock.Unlock()
@@ -216,15 +215,15 @@ func verifyMessageSig(signerPubKey *bls.PublicKey, message *msg_pb.Message) erro
 }
 
 // Gets the validator peer based on validator ID.
-func (dRand *DRand) getValidatorPeerByID(validatorID uint32) *p2p.Peer {
-	v, ok := dRand.validators.Load(validatorID)
+func (dRand *DRand) getValidatorPeerByAddress(validatorAddress string) *p2p.Peer {
+	v, ok := dRand.validators.Load(validatorAddress)
 	if !ok {
-		utils.GetLogInstance().Warn("Unrecognized validator", "validatorID", validatorID, "dRand", dRand)
+		utils.GetLogInstance().Warn("Unrecognized validator", "validatorAddress", validatorAddress, "dRand", dRand)
 		return nil
 	}
 	value, ok := v.(p2p.Peer)
 	if !ok {
-		utils.GetLogInstance().Warn("Invalid validator", "validatorID", validatorID, "dRand", dRand)
+		utils.GetLogInstance().Warn("Invalid validator", "validatorAddress", validatorAddress, "dRand", dRand)
 		return nil
 	}
 	return &value
@@ -232,7 +231,7 @@ func (dRand *DRand) getValidatorPeerByID(validatorID uint32) *p2p.Peer {
 
 // ResetState resets the state of the randomness protocol
 func (dRand *DRand) ResetState() {
-	dRand.vrfs = &map[uint32][]byte{}
+	dRand.vrfs = &map[string][]byte{}
 
 	bitmap, _ := bls_cosi.NewMask(dRand.PublicKeys, dRand.leader.ConsensusPubKey)
 	dRand.bitmap = bitmap

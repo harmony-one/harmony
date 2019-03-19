@@ -77,16 +77,15 @@ func (r RoleType) String() string {
 // this is basically a simplified version of Peer
 // for network transportation
 type Info struct {
-	IP          string
-	Port        string
-	PubKey      []byte
-	ValidatorID int
-	Role        RoleType
-	PeerID      peer.ID // Peerstore ID
+	IP     string
+	Port   string
+	PubKey []byte
+	Role   RoleType
+	PeerID peer.ID // Peerstore ID
 }
 
 func (info Info) String() string {
-	return fmt.Sprintf("Info:%v/%v=>%v/%v", info.IP, info.Port, info.ValidatorID, info.PeerID.Pretty())
+	return fmt.Sprintf("Info:%v/%v=>%v", info.IP, info.Port, info.PeerID.Pretty())
 }
 
 // BlockMessageType represents the type of messages used for Node/Block

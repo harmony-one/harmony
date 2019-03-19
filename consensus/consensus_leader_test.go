@@ -32,8 +32,10 @@ func TestProcessMessageLeaderPrepare(test *testing.T) {
 	defer ctrl.Finish()
 
 	leader := p2p.Peer{IP: ip, Port: "7777"}
-	var priKey *bls.SecretKey
-	priKey, leader.ConsensusPubKey = utils.GenKey(leader.IP, leader.Port)
+	leaderPriKey := bls_cosi.RandPrivateKey()
+	leaderPubKey := leaderPriKey.GetPublicKey()
+
+	leader.ConsensusPubKey = leaderPubKey
 
 	validators := make([]p2p.Peer, 3)
 	hosts := make([]p2p.Host, 3)
@@ -41,8 +43,9 @@ func TestProcessMessageLeaderPrepare(test *testing.T) {
 	validatorsPriKeys := [3]*bls.SecretKey{}
 	for i := 0; i < 3; i++ {
 		port := fmt.Sprintf("%d", 7788+i)
-		validators[i] = p2p.Peer{IP: ip, Port: port, ValidatorID: i + 1}
-		validatorsPriKeys[i], validators[i].ConsensusPubKey = utils.GenKey(validators[i].IP, validators[i].Port)
+		validators[i] = p2p.Peer{IP: ip, Port: port}
+		validatorsPriKeys[i] = bls_cosi.RandPrivateKey()
+		validators[i].ConsensusPubKey = validatorsPriKeys[i].GetPublicKey()
 	}
 
 	m := mock_host.NewMockHost(ctrl)
@@ -51,7 +54,7 @@ func TestProcessMessageLeaderPrepare(test *testing.T) {
 	m.EXPECT().GetSelfPeer().Return(leader)
 	m.EXPECT().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, gomock.Any())
 
-	consensusLeader := New(m, "0", validators, leader, priKey)
+	consensusLeader := New(m, "0", validators, leader, leaderPriKey)
 	consensusLeader.blockHash = blockHash
 
 	consensusValidators := make([]*Consensus, 3)
@@ -80,8 +83,8 @@ func TestProcessMessageLeaderPrepareInvalidSignature(test *testing.T) {
 	defer ctrl.Finish()
 
 	leader := p2p.Peer{IP: ip, Port: "7777"}
-	var priKey *bls.SecretKey
-	priKey, leader.ConsensusPubKey = utils.GenKey(leader.IP, leader.Port)
+	leaderPriKey := bls_cosi.RandPrivateKey()
+	leader.ConsensusPubKey = leaderPriKey.GetPublicKey()
 
 	validators := make([]p2p.Peer, 3)
 	hosts := make([]p2p.Host, 3)
@@ -89,8 +92,9 @@ func TestProcessMessageLeaderPrepareInvalidSignature(test *testing.T) {
 	validatorKeys := [3]*bls.SecretKey{}
 	for i := 0; i < 3; i++ {
 		port := fmt.Sprintf("%d", 7788+i)
-		validators[i] = p2p.Peer{IP: ip, Port: port, ValidatorID: i + 1}
-		validatorKeys[i], validators[i].ConsensusPubKey = utils.GenKey(validators[i].IP, validators[i].Port)
+		validators[i] = p2p.Peer{IP: ip, Port: port}
+		validatorKeys[i] = bls_cosi.RandPrivateKey()
+		validators[i].ConsensusPubKey = validatorKeys[i].GetPublicKey()
 	}
 
 	m := mock_host.NewMockHost(ctrl)
@@ -98,7 +102,7 @@ func TestProcessMessageLeaderPrepareInvalidSignature(test *testing.T) {
 	// Anything else will fail.
 	m.EXPECT().GetSelfPeer().Return(leader)
 
-	consensusLeader := New(m, "0", validators, leader, priKey)
+	consensusLeader := New(m, "0", validators, leader, leaderPriKey)
 	consensusLeader.blockHash = blockHash
 
 	consensusValidators := make([]*Consensus, 3)
@@ -136,8 +140,8 @@ func TestProcessMessageLeaderCommit(test *testing.T) {
 	defer ctrl.Finish()
 
 	leader := p2p.Peer{IP: ip, Port: "8889"}
-	var priKey *bls.SecretKey
-	priKey, leader.ConsensusPubKey = utils.GenKey(leader.IP, leader.Port)
+	leaderPriKey := bls_cosi.RandPrivateKey()
+	leader.ConsensusPubKey = leaderPriKey.GetPublicKey()
 
 	validators := make([]p2p.Peer, 3)
 	hosts := make([]p2p.Host, 3)
@@ -145,8 +149,9 @@ func TestProcessMessageLeaderCommit(test *testing.T) {
 	validatorKeys := [3]*bls.SecretKey{}
 	for i := 0; i < 3; i++ {
 		port := fmt.Sprintf("%d", 8788+i)
-		validators[i] = p2p.Peer{IP: ip, Port: port, ValidatorID: i + 1}
-		validatorKeys[i], validators[i].ConsensusPubKey = utils.GenKey(validators[i].IP, validators[i].Port)
+		validators[i] = p2p.Peer{IP: ip, Port: port}
+		validatorKeys[i] = bls_cosi.RandPrivateKey()
+		validators[i].ConsensusPubKey = validatorKeys[i].GetPublicKey()
 	}
 
 	m := mock_host.NewMockHost(ctrl)
@@ -164,12 +169,12 @@ func TestProcessMessageLeaderCommit(test *testing.T) {
 		hosts[i] = host
 	}
 
-	consensusLeader := New(m, "0", validators, leader, priKey)
+	consensusLeader := New(m, "0", validators, leader, leaderPriKey)
 	consensusLeader.state = PreparedDone
 	consensusLeader.blockHash = blockHash
 	consensusLeader.OnConsensusDone = func(newBlock *types.Block) {}
 	consensusLeader.block, _ = rlp.EncodeToBytes(types.NewBlock(&types.Header{}, nil, nil))
-	consensusLeader.prepareSigs[consensusLeader.nodeID] = consensusLeader.priKey.SignHash(consensusLeader.blockHash[:])
+	consensusLeader.prepareSigs[consensusLeader.SelfAddress] = consensusLeader.priKey.SignHash(consensusLeader.blockHash[:])
 
 	aggSig := bls_cosi.AggregateSig(consensusLeader.GetPrepareSigsArray())
 	multiSigAndBitmap := append(aggSig.Serialize(), consensusLeader.prepareBitmap.Bitmap...)

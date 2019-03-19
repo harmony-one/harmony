@@ -37,7 +37,7 @@ type PongMessageType struct {
 }
 
 func (p PingMessageType) String() string {
-	return fmt.Sprintf("ping:%v/%v=>%v:%v:%v/%v", p.Node.Role, p.Version, p.Node.IP, p.Node.Port, p.Node.ValidatorID, p.Node.PubKey)
+	return fmt.Sprintf("ping:%v/%v=>%v:%v/%v", p.Node.Role, p.Version, p.Node.IP, p.Node.Port, p.Node.PubKey)
 }
 
 func (p PongMessageType) String() string {
@@ -54,11 +54,9 @@ func NewPingMessage(peer p2p.Peer, isClient bool) *PingMessageType {
 	ping.Node.Port = peer.Port
 	ping.Node.PeerID = peer.PeerID
 	if !isClient {
-		ping.Node.ValidatorID = peer.ValidatorID
 		ping.Node.PubKey = peer.ConsensusPubKey.Serialize()
 		ping.Node.Role = node.ValidatorRole
 	} else {
-		ping.Node.ValidatorID = -1
 		ping.Node.PubKey = nil
 		ping.Node.Role = node.ClientRole
 	}
@@ -79,7 +77,6 @@ func NewPongMessage(peers []p2p.Peer, pubKeys []*bls.PublicKey, leaderKey *bls.P
 		n := node.Info{}
 		n.IP = p.IP
 		n.Port = p.Port
-		n.ValidatorID = p.ValidatorID
 		n.PeerID = p.PeerID
 		n.PubKey = p.ConsensusPubKey.Serialize()
 		if err != nil {

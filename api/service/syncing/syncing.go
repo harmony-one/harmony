@@ -35,6 +35,7 @@ const (
 type SyncPeerConfig struct {
 	ip          string
 	port        string
+	peerHash    []byte
 	client      *downloader.Client
 	blockHashes [][]byte       // block hashes before node doing sync
 	newBlocks   []*types.Block // blocks after node doing sync
@@ -109,10 +110,7 @@ func GetServicePort(nodePort string) string {
 // AddNewBlock will add newly received block into state syncing queue
 func (ss *StateSync) AddNewBlock(peerHash []byte, block *types.Block) {
 	for i, pc := range ss.syncConfig.peers {
-		pid := utils.GetUniqueIDFromIPPort(pc.ip, GetServicePort(pc.port))
-		ph := make([]byte, 4)
-		binary.BigEndian.PutUint32(ph, pid)
-		if bytes.Compare(ph, peerHash) != 0 {
+		if bytes.Compare(pc.peerHash, peerHash) != 0 {
 			continue
 		}
 		pc.mux.Lock()

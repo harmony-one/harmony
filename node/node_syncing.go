@@ -178,22 +178,22 @@ func (node *Node) SendNewBlockToUnsync() {
 		}
 
 		// really need to have a unique id independent of ip/port
-		selfPeerID := utils.GetUniqueIDFromIPPort(node.SelfPeer.IP, node.SelfPeer.Port)
-		utils.GetLogInstance().Debug("[SYNC] peerRegistration Record", "peerID", selfPeerID, "number", len(node.peerRegistrationRecord))
+		selfPeerAddress := node.Consensus.SelfAddress
+		utils.GetLogInstance().Debug("[SYNC] peerRegistration Record", "selfPeerAddress", selfPeerAddress, "number", len(node.peerRegistrationRecord))
 
 		for peerID, config := range node.peerRegistrationRecord {
 			elapseTime := time.Now().UnixNano() - config.timestamp
 			if elapseTime > broadcastTimeout {
 				utils.GetLogInstance().Warn("[SYNC] SendNewBlockToUnsync to peer timeout", "peerID", peerID)
 				// send last time and delete
-				config.client.PushNewBlock(selfPeerID, blockHash, true)
+				config.client.PushNewBlock(node.Consensus.PubKey.GetAddress(), blockHash, true)
 				node.stateMutex.Lock()
 				node.peerRegistrationRecord[peerID].client.Close()
 				delete(node.peerRegistrationRecord, peerID)
 				node.stateMutex.Unlock()
 				continue
 			}
-			response := config.client.PushNewBlock(selfPeerID, blockHash, false)
+			response := config.client.PushNewBlock(node.Consensus.PubKey.GetAddress(), blockHash, false)
 			if response != nil && response.Type == downloader_pb.DownloaderResponse_INSYNC {
 				node.stateMutex.Lock()
 				node.peerRegistrationRecord[peerID].client.Close()

@@ -18,7 +18,7 @@ func (dRand *DRand) constructCommitMessage(vrf [32]byte, proof []byte) []byte {
 	}
 
 	drandMsg := message.GetDrand()
-	drandMsg.SenderId = dRand.nodeID
+	drandMsg.SenderAddress = dRand.SelfAddress
 	drandMsg.BlockHash = dRand.blockHash[:]
 	drandMsg.BlockHash = dRand.blockHash[:]
 	drandMsg.Payload = append(vrf[:], proof...)
