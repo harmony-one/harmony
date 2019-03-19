@@ -630,7 +630,7 @@ func (consensus *Consensus) populateMessageFields(request *msg_pb.ConsensusReque
 	// 4 byte sender id
 	request.SenderId = uint32(consensus.nodeID)
 
-	utils.GetLogInstance().Debug("[populateMessageFields]", "myConsensusID", consensus.consensusID, "SenderId", request.SenderId)
+	//	utils.GetLogInstance().Debug("[populateMessageFields]", "myConsensusID", consensus.consensusID, "SenderId", request.SenderId)
 }
 
 // Signs the consensus message and returns the marshaled message.
