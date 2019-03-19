@@ -333,10 +333,12 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 			}
 		}
 	}
+	// TODO(minhdoan): this is for demo only. clean it up later.
 	node.Debug()
 }
 
 // Debug --
+// TODO(minhdoan): this is for demo only. clean it up later.
 func (node *Node) Debug() {
 	players, balances := node.GetResult(contract_constants.DemoAccounts[0].Private)
 	for i := range players {

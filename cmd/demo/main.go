@@ -1,5 +1,6 @@
 package main
 
+// This code is just for demo purpose. Please ignore little details.
 import (
 	"encoding/json"
 	"fmt"

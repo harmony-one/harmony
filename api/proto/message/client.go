@@ -6,6 +6,8 @@ import (
 	"log"
 	"time"
 
+	"github.com/harmony-one/harmony/internal/utils"
+
 	"google.golang.org/grpc"
 )
 
@@ -40,7 +42,7 @@ func (client *Client) Close() {
 func (client *Client) Process(message *Message) (*Response, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	fmt.Println("***SENDING MESSAGE", message)
+	utils.GetLogInstance().Info("***SENDING MESSAGE", "message", message)
 	response, err := client.clientServiceClient.Process(ctx, message)
 	return response, err
 }

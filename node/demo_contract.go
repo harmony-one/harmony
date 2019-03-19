@@ -93,6 +93,7 @@ func (node *Node) CreateTransactionForEnterMethod(amount int64, priKey string) e
 }
 
 // GetResult2 get current players and their balances.
+// TODO(minhdoan): this is for demo only. clean it up later.
 func (node *Node) GetResult2(priKey string) (players []string, balances []*big.Int) {
 	for _, account := range contract_constants.DemoAccounts {
 		players = append(players, account.Address)
@@ -107,6 +108,7 @@ func (node *Node) GetResult2(priKey string) (players []string, balances []*big.I
 }
 
 // GetResult get current players and their balances.
+// TODO(minhdoan): this is for demo only. clean it up later.
 func (node *Node) GetResult(priKey string) (players []string, balances []*big.Int) {
 	return node.GetResult2(priKey)
 	abi, err := abi.JSON(strings.NewReader(contracts.LotteryABI))
