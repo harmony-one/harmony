@@ -61,7 +61,7 @@ func SubmitTransaction(tx *types.Transaction, walletNode *node.Node, shardID uin
 
 func getBootNodes() []ma.Multiaddr {
 	//addrStrings := []string{"/ip4/54.213.43.194/tcp/9874/p2p/QmQhPRqqfTRExqWmTifjMaBvRd3HBmnmj9jYAvTy6HPPJj"}
-	addrStrings := []string{"/ip4/100.26.90.187/tcp/9871/p2p/QmPH2XsLP88jpfejHycQRWB7vDjwDju9qT9rMmdNaNea5v", "/ip4/54.213.43.194/tcp/9871/p2p/QmQLjTciaJppXVPZFoj4gTdME5axzTxtVwty5Lg8kwt6Zs"}
+	addrStrings := []string{"/ip4/100.26.90.187/tcp/9876/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9", "/ip4/54.213.43.194/tcp/9876/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX"}
 	bootNodeAddrs, err := utils.StringsToAddrs(addrStrings)
 	if err != nil {
 		panic(err)
