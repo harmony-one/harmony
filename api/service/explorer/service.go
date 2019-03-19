@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"net"
 	"net/http"
 	"os"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/gorilla/mux"
+	"github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -28,16 +28,19 @@ type Service struct {
 	router      *mux.Router
 	IP          string
 	Port        string
+	pubkeys     []*bls.PublicKey
 	storage     *Storage
 	server      *http.Server
 	messageChan chan *msg_pb.Message
 }
 
 // New returns explorer service.
-func New(selfPeer *p2p.Peer) *Service {
+func New(selfPeer *p2p.Peer, pubkeys []*bls.PublicKey) *Service {
+	utils.GetLogInstance().Info("NodeCount", "NodeCount", len(pubkeys))
 	return &Service{
-		IP:   selfPeer.IP,
-		Port: selfPeer.Port,
+		IP:      selfPeer.IP,
+		Port:    selfPeer.Port,
+		pubkeys: pubkeys,
 	}
 }
 
@@ -254,10 +257,8 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 // GetExplorerNodes serves /nodes end-point.
 func (s *Service) GetExplorerNodes(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-
-	var nodes int
-	nodes = 50 + rand.Int()%50 // TODO(ricl): get nodes count.
-	json.NewEncoder(w).Encode(nodes)
+	utils.GetLogInstance().Info("NodeCount", "NodeCount", len(s.pubkeys))
+	json.NewEncoder(w).Encode(len(s.pubkeys))
 }
 
 // NotifyService notify service
