@@ -4,6 +4,7 @@ package consensus // consensus
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -61,7 +62,7 @@ type Consensus struct {
 
 	// private/public keys of current node
 	priKey *bls.SecretKey
-	PubKey *bls.PublicKey
+	pubKey *bls.PublicKey
 
 	// Whether I am leader. False means I am validator
 	IsLeader bool
@@ -169,7 +170,7 @@ func (consensus *Consensus) GetNextRnd() ([32]byte, [32]byte, error) {
 
 // New creates a new Consensus object
 // TODO: put shardId into chain reader's chain config
-func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer, blsPriKey *bls.SecretKey) *Consensus {
+func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer) *Consensus {
 	consensus := Consensus{}
 	consensus.host = host
 
@@ -209,10 +210,13 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer, blsPr
 	// TODO: populate Id derived from address
 	consensus.nodeID = utils.GetUniqueIDFromPeer(selfPeer)
 
-	if blsPriKey != nil {
-		consensus.priKey = blsPriKey
-		consensus.PubKey = blsPriKey.GetPublicKey()
-	}
+	// Set private key for myself so that I can sign messages.
+	nodeIDBytes := make([]byte, 32)
+	binary.LittleEndian.PutUint32(nodeIDBytes, consensus.nodeID)
+	privateKey := bls.SecretKey{}
+	err := privateKey.SetLittleEndian(nodeIDBytes)
+	consensus.priKey = &privateKey
+	consensus.pubKey = privateKey.GetPublicKey()
 
 	consensus.consensusID = 0 // or view Id in the original pbft paper
 
@@ -238,7 +242,7 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer, blsPr
 	consensus.uniqueIDInstance = utils.GetUniqueValidatorIDInstance()
 	consensus.OfflinePeerList = make([]p2p.Peer, 0)
 
-	//	consensus.Log.Info("New Consensus", "IP", ip, "Port", port, "NodeID", consensus.nodeID, "priKey", consensus.priKey, "PubKey", consensus.PubKey)
+	//	consensus.Log.Info("New Consensus", "IP", ip, "Port", port, "NodeID", consensus.nodeID, "priKey", consensus.priKey, "pubKey", consensus.pubKey)
 	return &consensus
 }
 
@@ -400,8 +404,8 @@ func (consensus *Consensus) String() string {
 	} else {
 		duty = "VLD" // validator
 	}
-	return fmt.Sprintf("[duty:%s, PubKey:%s, ShardID:%v, nodeID:%v, state:%s]",
-		duty, hex.EncodeToString(consensus.PubKey.Serialize()), consensus.ShardID, consensus.nodeID, consensus.state)
+	return fmt.Sprintf("[duty:%s, pubKey:%s, ShardID:%v, nodeID:%v, state:%s]",
+		duty, hex.EncodeToString(consensus.pubKey.Serialize()), consensus.ShardID, consensus.nodeID, consensus.state)
 }
 
 // AddPeers adds new peers into the validator map of the consensus

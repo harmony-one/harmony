@@ -6,8 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/harmony-one/bls/ffi/go/bls"
-
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/golang/mock/gomock"
 	protobuf "github.com/golang/protobuf/proto"
@@ -32,17 +30,15 @@ func TestProcessMessageLeaderPrepare(test *testing.T) {
 	defer ctrl.Finish()
 
 	leader := p2p.Peer{IP: ip, Port: "7777"}
-	var priKey *bls.SecretKey
-	priKey, leader.ConsensusPubKey = utils.GenKey(leader.IP, leader.Port)
+	_, leader.ConsensusPubKey = utils.GenKey(leader.IP, leader.Port)
 
 	validators := make([]p2p.Peer, 3)
 	hosts := make([]p2p.Host, 3)
 
-	validatorsPriKeys := [3]*bls.SecretKey{}
 	for i := 0; i < 3; i++ {
 		port := fmt.Sprintf("%d", 7788+i)
 		validators[i] = p2p.Peer{IP: ip, Port: port, ValidatorID: i + 1}
-		validatorsPriKeys[i], validators[i].ConsensusPubKey = utils.GenKey(validators[i].IP, validators[i].Port)
+		_, validators[i].ConsensusPubKey = utils.GenKey(validators[i].IP, validators[i].Port)
 	}
 
 	m := mock_host.NewMockHost(ctrl)
@@ -51,7 +47,7 @@ func TestProcessMessageLeaderPrepare(test *testing.T) {
 	m.EXPECT().GetSelfPeer().Return(leader)
 	m.EXPECT().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, gomock.Any())
 
-	consensusLeader := New(m, "0", validators, leader, priKey)
+	consensusLeader := New(m, "0", validators, leader)
 	consensusLeader.blockHash = blockHash
 
 	consensusValidators := make([]*Consensus, 3)
@@ -63,7 +59,7 @@ func TestProcessMessageLeaderPrepare(test *testing.T) {
 		}
 		hosts[i] = host
 
-		consensusValidators[i] = New(hosts[i], "0", validators, leader, validatorsPriKeys[i])
+		consensusValidators[i] = New(hosts[i], "0", validators, leader)
 		consensusValidators[i].blockHash = blockHash
 		msg := consensusValidators[i].constructPrepareMessage()
 		msgPayload, _ := proto.GetConsensusMessagePayload(msg)
@@ -80,17 +76,15 @@ func TestProcessMessageLeaderPrepareInvalidSignature(test *testing.T) {
 	defer ctrl.Finish()
 
 	leader := p2p.Peer{IP: ip, Port: "7777"}
-	var priKey *bls.SecretKey
-	priKey, leader.ConsensusPubKey = utils.GenKey(leader.IP, leader.Port)
+	_, leader.ConsensusPubKey = utils.GenKey(leader.IP, leader.Port)
 
 	validators := make([]p2p.Peer, 3)
 	hosts := make([]p2p.Host, 3)
 
-	validatorKeys := [3]*bls.SecretKey{}
 	for i := 0; i < 3; i++ {
 		port := fmt.Sprintf("%d", 7788+i)
 		validators[i] = p2p.Peer{IP: ip, Port: port, ValidatorID: i + 1}
-		validatorKeys[i], validators[i].ConsensusPubKey = utils.GenKey(validators[i].IP, validators[i].Port)
+		_, validators[i].ConsensusPubKey = utils.GenKey(validators[i].IP, validators[i].Port)
 	}
 
 	m := mock_host.NewMockHost(ctrl)
@@ -98,7 +92,7 @@ func TestProcessMessageLeaderPrepareInvalidSignature(test *testing.T) {
 	// Anything else will fail.
 	m.EXPECT().GetSelfPeer().Return(leader)
 
-	consensusLeader := New(m, "0", validators, leader, priKey)
+	consensusLeader := New(m, "0", validators, leader)
 	consensusLeader.blockHash = blockHash
 
 	consensusValidators := make([]*Consensus, 3)
@@ -110,7 +104,7 @@ func TestProcessMessageLeaderPrepareInvalidSignature(test *testing.T) {
 		}
 		hosts[i] = host
 
-		consensusValidators[i] = New(hosts[i], "0", validators, leader, validatorKeys[i])
+		consensusValidators[i] = New(hosts[i], "0", validators, leader)
 		consensusValidators[i].blockHash = blockHash
 		msgBytes := consensusValidators[i].constructPrepareMessage()
 		msgPayload, _ := proto.GetConsensusMessagePayload(msgBytes)
@@ -136,17 +130,15 @@ func TestProcessMessageLeaderCommit(test *testing.T) {
 	defer ctrl.Finish()
 
 	leader := p2p.Peer{IP: ip, Port: "8889"}
-	var priKey *bls.SecretKey
-	priKey, leader.ConsensusPubKey = utils.GenKey(leader.IP, leader.Port)
+	_, leader.ConsensusPubKey = utils.GenKey(leader.IP, leader.Port)
 
 	validators := make([]p2p.Peer, 3)
 	hosts := make([]p2p.Host, 3)
 
-	validatorKeys := [3]*bls.SecretKey{}
 	for i := 0; i < 3; i++ {
 		port := fmt.Sprintf("%d", 8788+i)
 		validators[i] = p2p.Peer{IP: ip, Port: port, ValidatorID: i + 1}
-		validatorKeys[i], validators[i].ConsensusPubKey = utils.GenKey(validators[i].IP, validators[i].Port)
+		_, validators[i].ConsensusPubKey = utils.GenKey(validators[i].IP, validators[i].Port)
 	}
 
 	m := mock_host.NewMockHost(ctrl)
@@ -164,7 +156,7 @@ func TestProcessMessageLeaderCommit(test *testing.T) {
 		hosts[i] = host
 	}
 
-	consensusLeader := New(m, "0", validators, leader, priKey)
+	consensusLeader := New(m, "0", validators, leader)
 	consensusLeader.state = PreparedDone
 	consensusLeader.blockHash = blockHash
 	consensusLeader.OnConsensusDone = func(newBlock *types.Block) {}
@@ -182,7 +174,7 @@ func TestProcessMessageLeaderCommit(test *testing.T) {
 		<-consensusLeader.ReadySignal
 	}()
 	for i := 0; i < 3; i++ {
-		consensusValidators[i] = New(hosts[i], "0", validators, leader, validatorKeys[i])
+		consensusValidators[i] = New(hosts[i], "0", validators, leader)
 		consensusValidators[i].blockHash = blockHash
 		payload := consensusValidators[i].constructCommitMessage(multiSigAndBitmap)
 		msg, err := proto.GetConsensusMessagePayload(payload)

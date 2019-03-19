@@ -3,8 +3,6 @@ package consensus
 import (
 	"testing"
 
-	"github.com/harmony-one/harmony/crypto/bls"
-
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -21,7 +19,7 @@ func TestConstructAnnounceMessage(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader, bls.RandPrivateKey())
+	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader)
 	consensus.blockHash = [32]byte{}
 
 	message := &msg_pb.Message{}
@@ -47,7 +45,7 @@ func TestConstructPreparedMessage(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader, bls.RandPrivateKey())
+	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader)
 	consensus.blockHash = [32]byte{}
 
 	message := "test string"

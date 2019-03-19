@@ -11,13 +11,6 @@ func init() {
 	bls.Init(bls.BLS12_381)
 }
 
-// RandPrivateKey returns a random private key.
-func RandPrivateKey() *bls.SecretKey {
-	sec := bls.SecretKey{}
-	sec.SetByCSPRNG()
-	return &sec
-}
-
 // AggregateSig aggregates all the BLS signature into a single multi-signature.
 func AggregateSig(sigs []*bls.Sign) *bls.Sign {
 	var aggregatedSig bls.Sign

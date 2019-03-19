@@ -10,8 +10,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/harmony-one/bls/ffi/go/bls"
-
 	"github.com/harmony-one/harmony/internal/utils/contract"
 
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -127,20 +125,13 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	// Key Setup ================= [Start]
 	// Staking private key is the ecdsa key used for token related transaction signing (especially the staking txs).
 	stakingPriKey := ""
-	consensusPriKey := &bls.SecretKey{}
 	if *isBeacon {
 		// TODO: use a better way to get the index for accounts.
 		portNum, _ := strconv.Atoi(*port)
 		index := portNum % 10
 		stakingPriKey = contract.InitialBeaconChainAccounts[index].Private
-		err := consensusPriKey.SetHexString(contract.InitialBeaconChainBLSAccounts[index].Private)
-		if err != nil {
-			panic(fmt.Errorf("generate key error"))
-		}
 	} else {
 		stakingPriKey = contract.NewNodeAccounts[*accountIndex].Private
-		// TODO: use user supplied key
-		consensusPriKey, _ = utils.GenKey(*ip, *port)
 	}
 	nodeConfig.StakingPriKey = node.StoreStakingKeyFromFile(*stakingKeyFile, stakingPriKey)
 
@@ -151,7 +142,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	}
 
 	// Consensus keys are the BLS12-381 keys used to sign consensus messages
-	nodeConfig.ConsensusPriKey, nodeConfig.ConsensusPubKey = consensusPriKey, consensusPriKey.GetPublicKey()
+	nodeConfig.ConsensusPriKey, nodeConfig.ConsensusPubKey = utils.GenKey(*ip, *port)
 	if nodeConfig.ConsensusPriKey == nil || nodeConfig.ConsensusPubKey == nil {
 		panic(fmt.Errorf("generate key error"))
 	}
@@ -192,7 +183,7 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	// Consensus object.
 	// TODO: consensus object shouldn't start here
 	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of consensus later.
-	consensus := consensus.New(nodeConfig.Host, nodeConfig.ShardIDString, []p2p.Peer{}, nodeConfig.Leader, nodeConfig.ConsensusPriKey)
+	consensus := consensus.New(nodeConfig.Host, nodeConfig.ShardIDString, []p2p.Peer{}, nodeConfig.Leader)
 	consensus.MinPeers = *minPeers
 
 	// Current node.

@@ -176,7 +176,7 @@ func (consensus *Consensus) processPreparedMessage(message *msg_pb.Message) {
 	mask, err := bls_cosi.NewMask(consensus.PublicKeys, nil)
 	mask.SetMask(bitmap)
 	if !deserializedMultiSig.VerifyHash(mask.AggregatePublic, blockHash) || err != nil {
-		utils.GetLogInstance().Warn("Failed to verify the multi signature for prepare phase", "Error", err, "leader ID", leaderID, "PubKeys", len(consensus.PublicKeys))
+		utils.GetLogInstance().Warn("Failed to verify the multi signature for prepare phase", "Error", err, "leader ID", leaderID)
 		return
 	}
 	consensus.aggregatedPrepareSig = &deserializedMultiSig
