@@ -34,6 +34,9 @@ func CreateWalletNode() *node.Node {
 	walletNode.NodeConfig.SetRole(nodeconfig.ClientNode)
 	walletNode.ServiceManagerSetup()
 	walletNode.RunServices()
+	// wait for networkinfo/discovery service to run
+	// FIXME (leo): use async mode or channel to communicate
+	time.Sleep(3 * time.Second)
 	return walletNode
 }
 
@@ -52,15 +55,20 @@ func GetPeersFromBeaconChain(walletNode *node.Node) []p2p.Peer {
 }
 
 // SubmitTransaction submits the transaction to the Harmony network
-func SubmitTransaction(tx *types.Transaction, walletNode *node.Node, shardID uint32) error {
+func SubmitTransaction(tx *types.Transaction, walletNode *node.Node, shardID uint32, stopChan chan struct{}) error {
 	msg := proto_node.ConstructTransactionListMessageAccount(types.Transactions{tx})
 	walletNode.GetHost().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeaconClient}, p2p_host.ConstructP2pMessage(byte(0), msg))
 	fmt.Printf("Transaction Id for shard %d: %s\n", int(shardID), tx.Hash().Hex())
+	// FIXME (leo): how to we know the tx was successful sent to the network
+	// this is a hacky way to wait for sometime
+	time.Sleep(3 * time.Second)
+	stopChan <- struct{}{}
 	return nil
 }
 
 func getBootNodes() []ma.Multiaddr {
 	//addrStrings := []string{"/ip4/54.213.43.194/tcp/9874/p2p/QmQhPRqqfTRExqWmTifjMaBvRd3HBmnmj9jYAvTy6HPPJj"}
+	// This is the bootnode of banjo testnet
 	addrStrings := []string{"/ip4/100.26.90.187/tcp/9876/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9", "/ip4/54.213.43.194/tcp/9876/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX"}
 	bootNodeAddrs, err := utils.StringsToAddrs(addrStrings)
 	if err != nil {
