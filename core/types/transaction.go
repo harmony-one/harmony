@@ -29,7 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-//go:generate gencodec -type txdata -field-override txdataMarshaling -out gen_tx_json.go
+// no go:generate gencodec -type txdata -field-override txdataMarshaling -out gen_tx_json.go
 
 // Errors constants for Transaction.
 var (

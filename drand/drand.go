@@ -2,7 +2,6 @@ package drand
 
 import (
 	"crypto/sha256"
-	"encoding/binary"
 	"errors"
 	"strconv"
 	"sync"
@@ -67,7 +66,7 @@ type DRand struct {
 }
 
 // New creates a new dRand object
-func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer, confirmedBlockChannel chan *types.Block, isLeader bool) *DRand {
+func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer, confirmedBlockChannel chan *types.Block, isLeader bool, blsPriKey *bls.SecretKey) *DRand {
 	dRand := DRand{}
 	dRand.host = host
 
@@ -108,12 +107,10 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer, confi
 	dRand.nodeID = utils.GetUniqueIDFromPeer(selfPeer)
 
 	// Set private key for myself so that I can sign messages.
-	nodeIDBytes := make([]byte, 32)
-	binary.LittleEndian.PutUint32(nodeIDBytes, dRand.nodeID)
-	privateKey := bls.SecretKey{}
-	err := privateKey.SetLittleEndian(nodeIDBytes)
-	dRand.priKey = &privateKey
-	dRand.pubKey = privateKey.GetPublicKey()
+	if blsPriKey != nil {
+		dRand.priKey = blsPriKey
+		dRand.pubKey = blsPriKey.GetPublicKey()
+	}
 
 	// VRF keys
 	priKey, pubKey := p256.GenerateKey()

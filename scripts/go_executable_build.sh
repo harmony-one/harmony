@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-export GO111MODULE=on
-
 declare -A SRC
 SRC[harmony]=cmd/harmony/main.go
 SRC[txgen]=cmd/client/txgen/main.go
@@ -89,7 +87,7 @@ function build_only
       if [[ -z "$build" || "$bin" == "$build" ]]; then
          rm -f $BINDIR/$bin
          echo "building ${SRC[$bin]}"
-         env GOOS=$GOOS GOARCH=$GOARCH go build -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE ${SRC[$bin]}
+         env GOOS=$GOOS GOARCH=$GOARCH go build -v -x -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE ${SRC[$bin]}
          if [ "$(uname -s)" == "Linux" ]; then
             $BINDIR/$bin -version
          fi

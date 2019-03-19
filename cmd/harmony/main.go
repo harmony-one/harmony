@@ -7,7 +7,10 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"strconv"
 	"time"
+
+	"github.com/harmony-one/bls/ffi/go/bls"
 
 	"github.com/harmony-one/harmony/internal/utils/contract"
 
@@ -124,10 +127,20 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	// Key Setup ================= [Start]
 	// Staking private key is the ecdsa key used for token related transaction signing (especially the staking txs).
 	stakingPriKey := ""
+	consensusPriKey := &bls.SecretKey{}
 	if *isBeacon {
-		stakingPriKey = contract.InitialBeaconChainAccounts[*accountIndex].Private
+		// TODO: use a better way to get the index for accounts.
+		portNum, _ := strconv.Atoi(*port)
+		index := portNum % 10
+		stakingPriKey = contract.InitialBeaconChainAccounts[index].Private
+		err := consensusPriKey.SetHexString(contract.InitialBeaconChainBLSAccounts[index].Private)
+		if err != nil {
+			panic(fmt.Errorf("generate key error"))
+		}
 	} else {
 		stakingPriKey = contract.NewNodeAccounts[*accountIndex].Private
+		// TODO: use user supplied key
+		consensusPriKey, _ = utils.GenKey(*ip, *port)
 	}
 	nodeConfig.StakingPriKey = node.StoreStakingKeyFromFile(*stakingKeyFile, stakingPriKey)
 
@@ -138,7 +151,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	}
 
 	// Consensus keys are the BLS12-381 keys used to sign consensus messages
-	nodeConfig.ConsensusPriKey, nodeConfig.ConsensusPubKey = utils.GenKey(*ip, *port)
+	nodeConfig.ConsensusPriKey, nodeConfig.ConsensusPubKey = consensusPriKey, consensusPriKey.GetPublicKey()
 	if nodeConfig.ConsensusPriKey == nil || nodeConfig.ConsensusPubKey == nil {
 		panic(fmt.Errorf("generate key error"))
 	}
@@ -179,7 +192,7 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	// Consensus object.
 	// TODO: consensus object shouldn't start here
 	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of consensus later.
-	consensus := consensus.New(nodeConfig.Host, nodeConfig.ShardIDString, []p2p.Peer{}, nodeConfig.Leader)
+	consensus := consensus.New(nodeConfig.Host, nodeConfig.ShardIDString, []p2p.Peer{}, nodeConfig.Leader, nodeConfig.ConsensusPriKey)
 	consensus.MinPeers = *minPeers
 
 	// Current node.
@@ -215,7 +228,7 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	// TODO: enable drand only for beacon chain
 	// TODO: put this in a better place other than main.
 	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of drand later.
-	dRand := drand.New(nodeConfig.Host, nodeConfig.ShardIDString, []p2p.Peer{}, nodeConfig.Leader, currentNode.ConfirmedBlockChannel, *isLeader)
+	dRand := drand.New(nodeConfig.Host, nodeConfig.ShardIDString, []p2p.Peer{}, nodeConfig.Leader, currentNode.ConfirmedBlockChannel, *isLeader, nodeConfig.ConsensusPriKey)
 	currentNode.Consensus.RegisterPRndChannel(dRand.PRndChannel)
 	currentNode.Consensus.RegisterRndChannel(dRand.RndChannel)
 	currentNode.DRand = dRand

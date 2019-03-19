@@ -119,8 +119,9 @@ HMY_OPT=
 HMY_OPT2=
 HMY_OPT3=
 
-for i in {0..4}
+for i in 0{1..9} {10..99}
 do
     echo "launching new node $i ..."
-    ($DRYRUN $ROOT/bin/harmony -ip 127.0.0.1 -port 910$i -log_folder $log_folder -is_newnode $DB -account_index $i -min_peers $MIN $HMY_OPT $HMY_OPT2 $HMY_OPT3 -key /tmp/127.0.0.1-910$i.key 2>&1 | tee -a $LOG_FILE ) &
+    ($DRYRUN $ROOT/bin/harmony -ip 127.0.0.1 -port 91$i -log_folder $log_folder -is_newnode $DB -account_index $i -min_peers $MIN $HMY_OPT $HMY_OPT2 $HMY_OPT3 -key /tmp/127.0.0.1-91$i.key 2>&1 | tee -a $LOG_FILE ) &
+    sleep 3
 done

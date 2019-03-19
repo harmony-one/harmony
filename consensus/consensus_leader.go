@@ -350,7 +350,7 @@ func (consensus *Consensus) reportMetrics(block types.Block) {
 		txHashes = append(txHashes, hex.EncodeToString(txHash[:]))
 	}
 	metrics := map[string]interface{}{
-		"key":             hex.EncodeToString(consensus.pubKey.Serialize()),
+		"key":             hex.EncodeToString(consensus.PubKey.Serialize()),
 		"tps":             tps,
 		"txCount":         numOfTxs,
 		"nodeCount":       len(consensus.PublicKeys) + 1,

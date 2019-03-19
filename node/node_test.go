@@ -26,7 +26,7 @@ func TestNewNode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader)
+	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader, nil)
 	node := New(host, consensus, nil)
 	if node.Consensus == nil {
 		t.Error("Consensus is not initialized for the node")
@@ -51,7 +51,7 @@ func TestGetSyncingPeers(t *testing.T) {
 		t.Fatalf("newhost failure: %v", err)
 	}
 
-	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader)
+	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader, nil)
 
 	node := New(host, consensus, nil)
 	peer := p2p.Peer{IP: "127.0.0.1", Port: "8000"}
@@ -93,8 +93,8 @@ func TestAddPeers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader)
-	dRand := drand.New(host, "0", []p2p.Peer{leader, validator}, leader, nil, true)
+	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader, nil)
+	dRand := drand.New(host, "0", []p2p.Peer{leader, validator}, leader, nil, true, nil)
 
 	node := New(host, consensus, nil)
 	node.DRand = dRand
@@ -138,8 +138,8 @@ func TestAddBeaconPeer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader)
-	dRand := drand.New(host, "0", []p2p.Peer{leader, validator}, leader, nil, true)
+	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader, nil)
+	dRand := drand.New(host, "0", []p2p.Peer{leader, validator}, leader, nil, true, nil)
 
 	node := New(host, consensus, nil)
 	node.DRand = dRand
@@ -209,7 +209,7 @@ func TestPingPongHandler(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus := consensus.New(host, "0", []p2p.Peer{leader}, leader)
+	consensus := consensus.New(host, "0", []p2p.Peer{leader}, leader, nil)
 	node := New(host, consensus, nil)
 	//go sendPingMessage(leader)
 	go sendPongMessage(node, leader)

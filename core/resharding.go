@@ -2,7 +2,6 @@ package core
 
 import (
 	"encoding/binary"
-	"encoding/hex"
 	"math/rand"
 	"sort"
 
@@ -151,8 +150,10 @@ func CalculateNewShardState(bc *BlockChain, epoch uint64, stakeInfo *map[common.
 	ss := GetShardingStateFromBlockChain(bc, epoch-1)
 	if epoch == FirstEpoch {
 		newNodes := []types.NodeID{}
+
 		for addr, stakeInfo := range *stakeInfo {
-			newNodes = append(newNodes, types.NodeID{addr.Hex(), hex.EncodeToString(stakeInfo.BlsAddress[:])})
+			blsAddr := common.BytesToAddress(stakeInfo.BlsAddress[:])
+			newNodes = append(newNodes, types.NodeID{addr.Hex(), blsAddr.Hex()})
 		}
 		rand.Seed(int64(ss.rnd))
 		Shuffle(newNodes)
@@ -191,7 +192,7 @@ func (ss *ShardingState) UpdateShardingState(stakeInfo *map[common.Address]*stru
 	for addr, info := range *stakeInfo {
 		_, ok := oldAddresses[addr.Hex()]
 		if !ok {
-			newAddresses = append(newAddresses, types.NodeID{hex.EncodeToString(info.BlsAddress[:]), addr.Hex()})
+			newAddresses = append(newAddresses, types.NodeID{addr.Hex(), common.BytesToAddress(info.BlsAddress[:]).Hex()})
 		}
 	}
 	return newAddresses
@@ -208,9 +209,13 @@ func GetInitShardState() types.ShardState {
 				priKey := bls.SecretKey{}
 				priKey.SetHexString(contract.InitialBeaconChainBLSAccounts[j].Private)
 				addrBytes := priKey.GetPublicKey().GetAddress()
-				blsAddr := hex.EncodeToString(addrBytes[:])
+				blsAddr := common.BytesToAddress(addrBytes[:]).Hex()
 				// TODO: directly read address for bls too
-				com.NodeList = append(com.NodeList, types.NodeID{blsAddr, contract.InitialBeaconChainAccounts[j].Address})
+				curNodeID := types.NodeID{contract.InitialBeaconChainAccounts[j].Address, blsAddr}
+				if j == 0 {
+					com.Leader = curNodeID
+				}
+				com.NodeList = append(com.NodeList, curNodeID)
 			}
 		}
 		shardState = append(shardState, com)
