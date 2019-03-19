@@ -657,3 +657,8 @@ func (consensus *Consensus) SetLeaderPubKey(k []byte) error {
 func (consensus *Consensus) GetLeaderPubKey() *bls.PublicKey {
 	return consensus.leader.ConsensusPubKey
 }
+
+// GetPublicKeyCount returns the length of PublicKeys
+func (consensus *Consensus) GetPublicKeyCount() int {
+	return len(consensus.PublicKeys)
+}
