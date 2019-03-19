@@ -41,7 +41,7 @@ func TestSubmitTransaction(test *testing.T) {
 	msg := proto_node.ConstructTransactionListMessageAccount(types.Transactions{tx})
 	m.EXPECT().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeaconClient}, p2p_host.ConstructP2pMessage(byte(0), msg))
 
-	SubmitTransaction(tx, walletNode, 0)
+	SubmitTransaction(tx, walletNode, 0, nil)
 
 	time.Sleep(1 * time.Second)
 }
