@@ -13,6 +13,7 @@ GOOS=linux
 GOARCH=amd64
 FOLDER=/${WHOAMI:-$USER}
 RACE=
+VERBOSE=
 
 unset -v progdir
 case "${0}" in
@@ -87,7 +88,7 @@ function build_only
       if [[ -z "$build" || "$bin" == "$build" ]]; then
          rm -f $BINDIR/$bin
          echo "building ${SRC[$bin]}"
-         env GOOS=$GOOS GOARCH=$GOARCH go build -v -x -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE ${SRC[$bin]}
+         env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE ${SRC[$bin]}
          if [ "$(uname -s)" == "Linux" ]; then
             $BINDIR/$bin -version
          fi
@@ -116,7 +117,7 @@ function upload
       if [ -e ${LIB[$lib]} ]; then
          $AWSCLI s3 cp ${LIB[$lib]} s3://${BUCKET}$FOLDER/$lib --acl public-read
       else
-         echo "!! MISSING $lib !!"
+         echo "!! MISSING ${LIB[$lib]} !!"
       fi
    done
 
@@ -153,7 +154,7 @@ function upload_wallet
       if [ -e ${LIB[$lib]} ]; then
          $AWSCLI s3 cp ${LIB[$lib]} s3://${PUBBUCKET}/$DESTDIR/$lib --acl public-read
       else
-         echo "!! MISSING $lib !!"
+         echo "!! MISSING ${LIB[$lib]} !!"
       fi
    done
 
@@ -161,7 +162,7 @@ function upload_wallet
 }
 
 ################################ MAIN FUNCTION ##############################
-while getopts "hp:a:o:b:f:r" option; do
+while getopts "hp:a:o:b:f:rv" option; do
    case $option in
       h) usage ;;
       p) PROFILE=$OPTARG ;;
@@ -170,6 +171,7 @@ while getopts "hp:a:o:b:f:r" option; do
       b) BUCKET=$OPTARG/ ;;
       f) FOLDER=$OPTARG ;;
       r) RACE=-race ;;
+      v) VERBOSE='-v -x' ;;
    esac
 done
 
