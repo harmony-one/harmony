@@ -24,21 +24,21 @@ const (
 
 // Service is the struct for explorer service.
 type Service struct {
-	router            *mux.Router
-	IP                string
-	Port              string
-	getPublicKeyCount func() int
-	storage           *Storage
-	server            *http.Server
-	messageChan       chan *msg_pb.Message
+	router      *mux.Router
+	IP          string
+	Port        string
+	GetNumPeers func() int
+	storage     *Storage
+	server      *http.Server
+	messageChan chan *msg_pb.Message
 }
 
 // New returns explorer service.
-func New(selfPeer *p2p.Peer, getPublicKeyCount func() int) *Service {
+func New(selfPeer *p2p.Peer, GetNumPeers func() int) *Service {
 	return &Service{
-		IP:                selfPeer.IP,
-		Port:              selfPeer.Port,
-		getPublicKeyCount: getPublicKeyCount,
+		IP:          selfPeer.IP,
+		Port:        selfPeer.Port,
+		GetNumPeers: GetNumPeers,
 	}
 }
 
@@ -255,7 +255,7 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 // GetExplorerNodes serves /nodes end-point.
 func (s *Service) GetExplorerNodes(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(s.getPublicKeyCount())
+	json.NewEncoder(w).Encode(s.GetNumPeers())
 }
 
 // NotifyService notify service
