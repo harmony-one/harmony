@@ -43,6 +43,7 @@ require (
 	github.com/whyrusleeping/go-logging v0.0.0-20170515211332-0457bb6b88fc
 	golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2
 	golang.org/x/lint v0.0.0-20190313153728-d0100b6bd8b3
+	golang.org/x/tools v0.0.0-20190320160634-b6b7807791df
 	google.golang.org/grpc v1.19.0
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
