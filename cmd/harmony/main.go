@@ -8,7 +8,6 @@ import (
 	"path"
 	"runtime"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -27,11 +26,10 @@ import (
 )
 
 var (
-	version    string
-	builtBy    string
-	builtAt    string
-	commit     string
-	stateMutex sync.Mutex
+	version string
+	builtBy string
+	builtAt string
+	commit  string
 )
 
 // InitLDBDatabase initializes a LDBDatabase. isBeacon=true will return the beacon chain database for normal shard nodes
@@ -86,9 +84,9 @@ var (
 	keyFile = flag.String("key", "./.hmykey", "the private key file of the harmony node")
 	// isBeacon indicates this node is a beacon chain node
 	isBeacon = flag.Bool("is_beacon", false, "true means this node is a beacon chain node")
-	// isArchival indicates this node is a archival node that will save and archive current blockchain
+	// isArchival indicates this node is an archival node that will save and archive current blockchain
 	isArchival = flag.Bool("is_archival", false, "true means this node is a archival node")
-	// isNewNode indicates this node is a new node
+	//isNewNode indicates this node is a new node
 	isNewNode    = flag.Bool("is_newnode", false, "true means this node is a new node")
 	accountIndex = flag.Int("account_index", 0, "the index of the staking account to use")
 	// isLeader indicates this node is a beacon chain leader node during the bootstrap process
@@ -263,7 +261,6 @@ func main() {
 	if *isArchival {
 		currentNode, nodeConfig = setupArchivalNode(nodeConfig)
 		loggingInit(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps)
-		log.Info("New Harmony Node ====", "Role", currentNode.NodeConfig.Role(), "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, nodeConfig.Host.GetID().Pretty()))
 		go currentNode.DoBeaconSyncing()
 	} else {
 		// Start Profiler for leader if profile argument is on
@@ -280,9 +277,9 @@ func main() {
 		}
 		// Init logging.
 		loggingInit(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps)
-		log.Info("New Harmony Node ====", "Role", currentNode.NodeConfig.Role(), "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, nodeConfig.Host.GetID().Pretty()))
 		go currentNode.SupportSyncing()
 	}
+	log.Info("New Harmony Node ====", "Role", currentNode.NodeConfig.Role(), "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, nodeConfig.Host.GetID().Pretty()))
 	currentNode.ServiceManagerSetup()
 	currentNode.RunServices()
 	currentNode.StartServer()

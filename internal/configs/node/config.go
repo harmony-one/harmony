@@ -143,7 +143,7 @@ func (conf *ConfigType) SetIsLeader(b bool) {
 	conf.isLeader = b
 }
 
-// SetIsArchival set the isLeader configuration
+// SetIsArchival set the isArchival configuration
 func (conf *ConfigType) SetIsArchival(b bool) {
 	conf.isArchival = b
 }

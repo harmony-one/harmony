@@ -177,7 +177,7 @@ else
    sleep $DURATION
 fi
 
-#save bc_config.json
+# save bc_config.json
 [ -e bc_config.json ] && cp -f bc_config.json $log_folder
 
 cleanup

@@ -70,7 +70,6 @@ func (node *Node) DoBeaconSyncing() {
 	for {
 		select {
 		case beaconBlock := <-node.BeaconBlockChannel:
-			utils.GetLogInstance().Debug("[SYNC] Received BeaconBlockChannel Ping for Sync")
 			if node.beaconSync == nil {
 				node.beaconSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port)
 				node.beaconSync.CreateSyncConfig(node.GetBeaconSyncingPeers())
