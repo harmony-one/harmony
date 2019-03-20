@@ -75,7 +75,7 @@ func (consensus *Consensus) ProcessMessageValidator(payload []byte) {
 
 // Processes the announce message sent from the leader
 func (consensus *Consensus) processAnnounceMessage(message *msg_pb.Message) {
-	utils.GetLogInstance().Info("Received Announce Message", "nodeID", consensus.nodeID)
+	utils.GetLogInstance().Info("Received Announce Message", "ValidatorAddress", consensus.SelfAddress)
 
 	consensusMsg := message.GetConsensus()
 
@@ -130,13 +130,13 @@ func (consensus *Consensus) processAnnounceMessage(message *msg_pb.Message) {
 
 // Processes the prepared message sent from the leader
 func (consensus *Consensus) processPreparedMessage(message *msg_pb.Message) {
-	utils.GetLogInstance().Info("Received Prepared Message", "nodeID", consensus.nodeID)
+	utils.GetLogInstance().Info("Received Prepared Message", "ValidatorAddress", consensus.SelfAddress)
 
 	consensusMsg := message.GetConsensus()
 
 	consensusID := consensusMsg.ConsensusId
 	blockHash := consensusMsg.BlockHash
-	leaderID := consensusMsg.SenderId
+	leaderID := consensusMsg.SenderAddress
 	messagePayload := consensusMsg.Payload
 
 	//#### Read payload data
@@ -193,11 +193,11 @@ func (consensus *Consensus) processPreparedMessage(message *msg_pb.Message) {
 
 // Processes the committed message sent from the leader
 func (consensus *Consensus) processCommittedMessage(message *msg_pb.Message) {
-	utils.GetLogInstance().Warn("Received Committed Message", "nodeID", consensus.nodeID)
+	utils.GetLogInstance().Warn("Received Committed Message", "ValidatorAddress", consensus.SelfAddress)
 
 	consensusMsg := message.GetConsensus()
 	consensusID := consensusMsg.ConsensusId
-	leaderID := consensusMsg.SenderId
+	leaderID := consensusMsg.SenderAddress
 	messagePayload := consensusMsg.Payload
 
 	//#### Read payload data

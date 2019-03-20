@@ -3,6 +3,8 @@ package node
 import (
 	"testing"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -10,7 +12,7 @@ import (
 )
 
 func prepareNode(t *testing.T) *Node {
-	_, pubKey := utils.GenKey("1", "2")
+	pubKey := bls.RandPrivateKey().GetPublicKey()
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", ConsensusPubKey: pubKey}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "8885"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")

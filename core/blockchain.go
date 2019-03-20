@@ -1728,7 +1728,7 @@ func (bc *BlockChain) ValidateNewShardState(block *types.Block, stakeInfo *map[c
 	if shardState.Hash() != block.Header().ShardStateHash {
 		return ErrShardStateNotMatch
 	}
-	utils.GetLogInstance().Debug("[resharding] validate new shard state success", "shardStateHash", shardState.Hash())
+	utils.GetLogInstance().Debug("[resharding] validate new shard state successfully", "shardStateHash", shardState.Hash())
 	return nil
 }
 
@@ -1740,7 +1740,7 @@ func (bc *BlockChain) StoreNewShardState(block *types.Block, stakeInfo *map[comm
 		hash := block.Hash()
 		number := block.NumberU64()
 		rawdb.WriteShardState(bc.db, hash, number, shardState)
-		utils.GetLogInstance().Debug("[Resharding] Saved new shard state success", "state", shardState)
+		utils.GetLogInstance().Debug("[Resharding] Saved new shard state successfully", "state", shardState)
 	}
 	return shardState
 }

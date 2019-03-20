@@ -2,7 +2,6 @@ package syncing
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"reflect"
 	"sort"
@@ -35,6 +34,7 @@ const (
 type SyncPeerConfig struct {
 	ip          string
 	port        string
+	peerHash    []byte
 	client      *downloader.Client
 	blockHashes [][]byte       // block hashes before node doing sync
 	newBlocks   []*types.Block // blocks after node doing sync
@@ -58,10 +58,11 @@ type SyncConfig struct {
 }
 
 // CreateStateSync returns the implementation of StateSyncInterface interface.
-func CreateStateSync(ip string, port string) *StateSync {
+func CreateStateSync(ip string, port string, addr [20]byte) *StateSync {
 	stateSync := &StateSync{}
 	stateSync.selfip = ip
 	stateSync.selfport = port
+	stateSync.selfAddress = addr
 	stateSync.commonBlocks = make(map[int]*types.Block)
 	stateSync.lastMileBlocks = []*types.Block{}
 	return stateSync
@@ -73,6 +74,7 @@ type StateSync struct {
 	selfport           string
 	peerNumber         int
 	activePeerNumber   int
+	selfAddress        [20]byte // address of my BLS key
 	commonBlocks       map[int]*types.Block
 	lastMileBlocks     []*types.Block // last mile blocks to catch up with the consensus
 	syncConfig         *SyncConfig
@@ -109,10 +111,7 @@ func GetServicePort(nodePort string) string {
 // AddNewBlock will add newly received block into state syncing queue
 func (ss *StateSync) AddNewBlock(peerHash []byte, block *types.Block) {
 	for i, pc := range ss.syncConfig.peers {
-		pid := utils.GetUniqueIDFromIPPort(pc.ip, GetServicePort(pc.port))
-		ph := make([]byte, 4)
-		binary.BigEndian.PutUint32(ph, pid)
-		if bytes.Compare(ph, peerHash) != 0 {
+		if bytes.Compare(pc.peerHash, peerHash) != 0 {
 			continue
 		}
 		pc.mux.Lock()
@@ -543,9 +542,6 @@ func (ss *StateSync) RegisterNodeInfo() int {
 	ss.CleanUpNilPeers()
 	registrationNumber := RegistrationNumber
 	utils.GetLogInstance().Debug("[SYNC] node registration to peers", "registrationNumber", registrationNumber, "activePeerNumber", ss.activePeerNumber)
-	peerID := utils.GetUniqueIDFromIPPort(ss.selfip, ss.selfport)
-	peerHash := make([]byte, 4)
-	binary.BigEndian.PutUint32(peerHash[:], peerID)
 
 	count := 0
 	for id := range ss.syncConfig.peers {
@@ -556,9 +552,9 @@ func (ss *StateSync) RegisterNodeInfo() int {
 		if peerConfig.client == nil {
 			continue
 		}
-		err := peerConfig.registerToBroadcast(peerHash)
+		err := peerConfig.registerToBroadcast(ss.selfAddress[:])
 		if err != nil {
-			utils.GetLogInstance().Debug("[SYNC] register failed to peer", "ip", peerConfig.ip, "port", peerConfig.port, "peerHash", peerHash)
+			utils.GetLogInstance().Debug("[SYNC] register failed to peer", "ip", peerConfig.ip, "port", peerConfig.port, "selfAddress", ss.selfAddress)
 			continue
 		}
 		utils.GetLogInstance().Debug("[SYNC] register success", "ip", peerConfig.ip, "port", peerConfig.port)

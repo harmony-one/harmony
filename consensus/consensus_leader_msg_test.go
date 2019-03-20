@@ -37,10 +37,12 @@ func TestConstructAnnounceMessage(test *testing.T) {
 }
 
 func TestConstructPreparedMessage(test *testing.T) {
-	leaderPriKey, leaderPubKey := utils.GenKey("127.0.0.1", "6000")
+	leaderPriKey := bls.RandPrivateKey()
+	leaderPubKey := leaderPriKey.GetPublicKey()
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "6000", ConsensusPubKey: leaderPubKey}
 
-	validatorPriKey, validatorPubKey := utils.GenKey("127.0.0.1", "5555")
+	validatorPriKey := bls.RandPrivateKey()
+	validatorPubKey := leaderPriKey.GetPublicKey()
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "5555", ConsensusPubKey: validatorPubKey}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2pimpl.NewHost(&leader, priKey)
@@ -51,8 +53,8 @@ func TestConstructPreparedMessage(test *testing.T) {
 	consensus.blockHash = [32]byte{}
 
 	message := "test string"
-	consensus.prepareSigs[0] = leaderPriKey.Sign(message)
-	consensus.prepareSigs[1] = validatorPriKey.Sign(message)
+	consensus.prepareSigs["0"] = leaderPriKey.Sign(message)
+	consensus.prepareSigs["1"] = validatorPriKey.Sign(message)
 	consensus.prepareBitmap.SetKey(leaderPubKey, true)
 	consensus.prepareBitmap.SetKey(validatorPubKey, true)
 

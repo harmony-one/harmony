@@ -5,14 +5,13 @@ import (
 	"testing"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // Test the basic functionality of a BLS multi-sig mask.
 func TestNewMask(test *testing.T) {
-	_, pubKey1 := utils.GenKey("127.0.0.1", "5555")
-	_, pubKey2 := utils.GenKey("127.0.0.1", "6666")
-	_, pubKey3 := utils.GenKey("127.0.0.1", "7777")
+	pubKey1 := RandPrivateKey().GetPublicKey()
+	pubKey2 := RandPrivateKey().GetPublicKey()
+	pubKey3 := RandPrivateKey().GetPublicKey()
 
 	mask, err := NewMask([]*bls.PublicKey{pubKey1, pubKey2, pubKey3}, pubKey1)
 
@@ -39,10 +38,10 @@ func TestNewMask(test *testing.T) {
 }
 
 func TestNewMaskWithAbsentPublicKey(test *testing.T) {
-	_, pubKey1 := utils.GenKey("127.0.0.1", "5555")
-	_, pubKey2 := utils.GenKey("127.0.0.1", "6666")
-	_, pubKey3 := utils.GenKey("127.0.0.1", "7777")
-	_, pubKey4 := utils.GenKey("127.0.0.1", "8190")
+	pubKey1 := RandPrivateKey().GetPublicKey()
+	pubKey2 := RandPrivateKey().GetPublicKey()
+	pubKey3 := RandPrivateKey().GetPublicKey()
+	pubKey4 := RandPrivateKey().GetPublicKey()
 
 	mask, err := NewMask([]*bls.PublicKey{pubKey1, pubKey2, pubKey3}, pubKey4)
 
@@ -57,9 +56,9 @@ func TestNewMaskWithAbsentPublicKey(test *testing.T) {
 }
 
 func TestThreshHoldPolicy(test *testing.T) {
-	_, pubKey1 := utils.GenKey("127.0.0.1", "5555")
-	_, pubKey2 := utils.GenKey("127.0.0.1", "6666")
-	_, pubKey3 := utils.GenKey("127.0.0.1", "7777")
+	pubKey1 := RandPrivateKey().GetPublicKey()
+	pubKey2 := RandPrivateKey().GetPublicKey()
+	pubKey3 := RandPrivateKey().GetPublicKey()
 
 	mask, err := NewMask([]*bls.PublicKey{pubKey1, pubKey2, pubKey3}, pubKey1)
 
@@ -93,9 +92,9 @@ func TestThreshHoldPolicy(test *testing.T) {
 }
 
 func TestCompletePolicy(test *testing.T) {
-	_, pubKey1 := utils.GenKey("127.0.0.1", "5555")
-	_, pubKey2 := utils.GenKey("127.0.0.1", "6666")
-	_, pubKey3 := utils.GenKey("127.0.0.1", "7777")
+	pubKey1 := RandPrivateKey().GetPublicKey()
+	pubKey2 := RandPrivateKey().GetPublicKey()
+	pubKey3 := RandPrivateKey().GetPublicKey()
 
 	mask, err := NewMask([]*bls.PublicKey{pubKey1, pubKey2, pubKey3}, pubKey1)
 
@@ -162,10 +161,10 @@ func TestAggregateMasks(test *testing.T) {
 }
 
 func TestEnableKeyFunctions(test *testing.T) {
-	_, pubKey1 := utils.GenKey("127.0.0.1", "5555")
-	_, pubKey2 := utils.GenKey("127.0.0.1", "6666")
-	_, pubKey3 := utils.GenKey("127.0.0.1", "7777")
-	_, pubKey4 := utils.GenKey("127.0.0.1", "1234")
+	pubKey1 := RandPrivateKey().GetPublicKey()
+	pubKey2 := RandPrivateKey().GetPublicKey()
+	pubKey3 := RandPrivateKey().GetPublicKey()
+	pubKey4 := RandPrivateKey().GetPublicKey()
 
 	mask, err := NewMask([]*bls.PublicKey{pubKey1, pubKey2, pubKey3}, pubKey1)
 
@@ -212,8 +211,8 @@ func TestEnableKeyFunctions(test *testing.T) {
 }
 
 func TestCopyParticipatingMask(test *testing.T) {
-	_, pubKey1 := utils.GenKey("127.0.0.1", "5555")
-	_, pubKey2 := utils.GenKey("127.0.0.1", "6666")
+	pubKey1 := RandPrivateKey().GetPublicKey()
+	pubKey2 := RandPrivateKey().GetPublicKey()
 
 	mask, _ := NewMask([]*bls.PublicKey{pubKey1, pubKey2}, pubKey1)
 
@@ -226,8 +225,8 @@ func TestCopyParticipatingMask(test *testing.T) {
 }
 
 func TestSetMask(test *testing.T) {
-	_, pubKey1 := utils.GenKey("127.0.0.1", "5555")
-	_, pubKey2 := utils.GenKey("127.0.0.1", "6666")
+	pubKey1 := RandPrivateKey().GetPublicKey()
+	pubKey2 := RandPrivateKey().GetPublicKey()
 
 	mask, _ := NewMask([]*bls.PublicKey{pubKey1, pubKey2}, pubKey1)
 

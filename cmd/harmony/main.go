@@ -141,7 +141,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	} else {
 		stakingPriKey = contract.NewNodeAccounts[*accountIndex].Private
 		// TODO: use user supplied key
-		consensusPriKey, _ = utils.GenKey(*ip, *port)
+		consensusPriKey.SetByCSPRNG()
 	}
 	nodeConfig.StakingPriKey = node.StoreStakingKeyFromFile(*stakingKeyFile, stakingPriKey)
 
@@ -168,7 +168,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 		}
 	}
 
-	nodeConfig.SelfPeer = p2p.Peer{IP: *ip, Port: *port, ValidatorID: -1, ConsensusPubKey: nodeConfig.ConsensusPubKey}
+	nodeConfig.SelfPeer = p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nodeConfig.ConsensusPubKey}
 	if *isLeader {
 		nodeConfig.StringRole = "leader"
 		nodeConfig.Leader = nodeConfig.SelfPeer

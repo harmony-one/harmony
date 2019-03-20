@@ -4,6 +4,8 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/harmony-one/harmony/contracts/structs"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -22,8 +24,7 @@ var (
 )
 
 func TestUpdateStakingList(t *testing.T) {
-
-	_, pubKey := utils.GenKey("1", "2")
+	pubKey := bls.RandPrivateKey().GetPublicKey()
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "9882", ConsensusPubKey: pubKey}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "9885"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")

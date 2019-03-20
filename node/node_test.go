@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	bls2 "github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/drand"
 
@@ -18,7 +20,7 @@ import (
 )
 
 func TestNewNode(t *testing.T) {
-	_, pubKey := utils.GenKey("1", "2")
+	pubKey := bls2.RandPrivateKey().GetPublicKey()
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", ConsensusPubKey: pubKey}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "8885"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
@@ -42,7 +44,7 @@ func TestNewNode(t *testing.T) {
 }
 
 func TestGetSyncingPeers(t *testing.T) {
-	_, pubKey := utils.GenKey("1", "2")
+	pubKey := bls2.RandPrivateKey().GetPublicKey()
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", ConsensusPubKey: pubKey}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "8885"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
@@ -76,16 +78,14 @@ func TestAddPeers(t *testing.T) {
 			IP:              "127.0.0.1",
 			Port:            "8888",
 			ConsensusPubKey: pubKey1,
-			ValidatorID:     1,
 		},
 		&p2p.Peer{
 			IP:              "127.0.0.1",
 			Port:            "9999",
 			ConsensusPubKey: pubKey2,
-			ValidatorID:     2,
 		},
 	}
-	_, pubKey := utils.GenKey("1", "2")
+	pubKey := bls2.RandPrivateKey().GetPublicKey()
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8982", ConsensusPubKey: pubKey}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "8985"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
@@ -111,26 +111,24 @@ func TestAddPeers(t *testing.T) {
 }
 
 func TestAddBeaconPeer(t *testing.T) {
-	_, pubKey1 := utils.GenKey("127.0.0.1", "2000")
-	_, pubKey2 := utils.GenKey("127.0.0.1", "8000")
+	pubKey1 := bls2.RandPrivateKey().GetPublicKey()
+	pubKey2 := bls2.RandPrivateKey().GetPublicKey()
 
 	peers1 := []*p2p.Peer{
 		&p2p.Peer{
 			IP:              "127.0.0.1",
 			Port:            "8888",
 			ConsensusPubKey: pubKey1,
-			ValidatorID:     1,
 			PeerID:          "1234",
 		},
 		&p2p.Peer{
 			IP:              "127.0.0.1",
 			Port:            "9999",
 			ConsensusPubKey: pubKey2,
-			ValidatorID:     2,
 			PeerID:          "4567",
 		},
 	}
-	_, pubKey := utils.GenKey("1", "2")
+	pubKey := bls2.RandPrivateKey().GetPublicKey()
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8982", ConsensusPubKey: pubKey}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "8985"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
@@ -201,7 +199,7 @@ func exitServer() {
 }
 
 func TestPingPongHandler(t *testing.T) {
-	_, pubKey := utils.GenKey("127.0.0.1", "8881")
+	pubKey := bls2.RandPrivateKey().GetPublicKey()
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8881", ConsensusPubKey: pubKey}
 	//   validator := p2p.Peer{IP: "127.0.0.1", Port: "9991"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")

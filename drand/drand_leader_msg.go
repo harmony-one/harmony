@@ -18,7 +18,7 @@ func (dRand *DRand) constructInitMessage() []byte {
 	}
 
 	drandMsg := message.GetDrand()
-	drandMsg.SenderId = dRand.nodeID
+	drandMsg.SenderAddress = dRand.SelfAddress
 	drandMsg.BlockHash = dRand.blockHash[:]
 	// Don't need the payload in init message
 	marshaledMessage, err := dRand.signAndMarshalDRandMessage(message)

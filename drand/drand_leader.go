@@ -72,7 +72,7 @@ func (dRand *DRand) init(epochBlock *types.Block) {
 	// Leader commit vrf itself
 	rand, proof := dRand.vrf(dRand.blockHash)
 
-	(*dRand.vrfs)[dRand.nodeID] = append(rand[:], proof...)
+	(*dRand.vrfs)[dRand.SelfAddress] = append(rand[:], proof...)
 
 	utils.GetLogInstance().Info("[DRG] sent init", "msg", msgToSend, "leader.PubKey", dRand.leader.ConsensusPubKey)
 	dRand.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
@@ -106,11 +106,11 @@ func (dRand *DRand) processCommitMessage(message *msg_pb.Message) {
 	defer dRand.mutex.Unlock()
 
 	drandMsg := message.GetDrand()
-	validatorID := drandMsg.SenderId
-	validatorPeer := dRand.getValidatorPeerByID(validatorID)
+	validatorAddress := drandMsg.SenderAddress
+	validatorPeer := dRand.getValidatorPeerByAddress(validatorAddress)
 	vrfs := dRand.vrfs
 	if len((*vrfs)) >= ((len(dRand.PublicKeys))/3 + 1) {
-		utils.GetLogInstance().Debug("Received additional randomness commit message", "validatorID", validatorID)
+		utils.GetLogInstance().Debug("Received additional randomness commit message", "validatorAddress", validatorAddress)
 		return
 	}
 
@@ -130,18 +130,18 @@ func (dRand *DRand) processCommitMessage(message *msg_pb.Message) {
 	expectedRand, err := pubKey.ProofToHash(dRand.blockHash[:], proof)
 
 	if err != nil || !bytes.Equal(expectedRand[:], rand) {
-		utils.GetLogInstance().Error("[DRAND] Failed to verify the VRF", "error", err, "validatorID", validatorID, "expectedRand", expectedRand, "receivedRand", rand)
+		utils.GetLogInstance().Error("[DRAND] Failed to verify the VRF", "error", err, "validatorAddress", validatorAddress, "expectedRand", expectedRand, "receivedRand", rand)
 		return
 	}
 
-	utils.GetLogInstance().Debug("Received new VRF commit", "numReceivedSoFar", len((*vrfs)), "validatorID", validatorID, "PublicKeys", len(dRand.PublicKeys))
+	utils.GetLogInstance().Debug("Received new VRF commit", "numReceivedSoFar", len((*vrfs)), "validatorAddress", validatorAddress, "PublicKeys", len(dRand.PublicKeys))
 
-	(*vrfs)[validatorID] = drandMsg.Payload
+	(*vrfs)[validatorAddress] = drandMsg.Payload
 	dRand.bitmap.SetKey(validatorPeer.ConsensusPubKey, true) // Set the bitmap indicating that this validator signed.
 
 	if len((*vrfs)) >= ((len(dRand.PublicKeys))/3 + 1) {
 		// Construct pRand and initiate consensus on it
-		utils.GetLogInstance().Debug("[DRAND] {BINGO} Received enough randomness commit", "numReceivedSoFar", len((*vrfs)), "validatorID", validatorID, "PublicKeys", len(dRand.PublicKeys))
+		utils.GetLogInstance().Debug("[DRAND] {BINGO} Received enough randomness commit", "numReceivedSoFar", len((*vrfs)), "validatorAddress", validatorAddress, "PublicKeys", len(dRand.PublicKeys))
 
 		pRnd := [32]byte{}
 		// Bitwise XOR on all the submitted vrfs

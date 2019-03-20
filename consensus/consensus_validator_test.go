@@ -5,8 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/harmony-one/bls/ffi/go/bls"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/params"
 
@@ -55,15 +53,15 @@ func TestProcessMessageValidatorAnnounce(test *testing.T) {
 	defer ctrl.Finish()
 
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "9982"}
-	var leaderPriKey *bls.SecretKey
-	leaderPriKey, leader.ConsensusPubKey = utils.GenKey(leader.IP, leader.Port)
+	leaderPriKey := bls_cosi.RandPrivateKey()
+	leader.ConsensusPubKey = leaderPriKey.GetPublicKey()
 
-	validator1 := p2p.Peer{IP: "127.0.0.1", Port: "9984", ValidatorID: 1}
-	_, validator1.ConsensusPubKey = utils.GenKey(validator1.IP, validator1.Port)
-	validator2 := p2p.Peer{IP: "127.0.0.1", Port: "9986", ValidatorID: 2}
-	_, validator2.ConsensusPubKey = utils.GenKey(validator2.IP, validator2.Port)
-	validator3 := p2p.Peer{IP: "127.0.0.1", Port: "9988", ValidatorID: 3}
-	_, validator3.ConsensusPubKey = utils.GenKey(validator3.IP, validator3.Port)
+	validator1 := p2p.Peer{IP: "127.0.0.1", Port: "9984"}
+	validator1.ConsensusPubKey = bls_cosi.RandPrivateKey().GetPublicKey()
+	validator2 := p2p.Peer{IP: "127.0.0.1", Port: "9986"}
+	validator2.ConsensusPubKey = bls_cosi.RandPrivateKey().GetPublicKey()
+	validator3 := p2p.Peer{IP: "127.0.0.1", Port: "9988"}
+	validator3.ConsensusPubKey = bls_cosi.RandPrivateKey().GetPublicKey()
 
 	m := mock_host.NewMockHost(ctrl)
 	// Asserts that the first and only call to Bar() is passed 99.
@@ -110,15 +108,15 @@ func TestProcessMessageValidatorPrepared(test *testing.T) {
 	defer ctrl.Finish()
 
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "7782"}
-	var leaderPriKey *bls.SecretKey
-	leaderPriKey, leader.ConsensusPubKey = utils.GenKey(leader.IP, leader.Port)
+	leaderPriKey := bls_cosi.RandPrivateKey()
+	leader.ConsensusPubKey = leaderPriKey.GetPublicKey()
 
-	validator1 := p2p.Peer{IP: "127.0.0.1", Port: "7784", ValidatorID: 1}
-	_, validator1.ConsensusPubKey = utils.GenKey(validator1.IP, validator1.Port)
-	validator2 := p2p.Peer{IP: "127.0.0.1", Port: "7786", ValidatorID: 2}
-	_, validator2.ConsensusPubKey = utils.GenKey(validator2.IP, validator2.Port)
-	validator3 := p2p.Peer{IP: "127.0.0.1", Port: "7788", ValidatorID: 3}
-	_, validator3.ConsensusPubKey = utils.GenKey(validator3.IP, validator3.Port)
+	validator1 := p2p.Peer{IP: "127.0.0.1", Port: "7784"}
+	validator1.ConsensusPubKey = bls_cosi.RandPrivateKey().GetPublicKey()
+	validator2 := p2p.Peer{IP: "127.0.0.1", Port: "7786"}
+	validator2.ConsensusPubKey = bls_cosi.RandPrivateKey().GetPublicKey()
+	validator3 := p2p.Peer{IP: "127.0.0.1", Port: "7788"}
+	validator3.ConsensusPubKey = bls_cosi.RandPrivateKey().GetPublicKey()
 
 	m := mock_host.NewMockHost(ctrl)
 	// Asserts that the first and only call to Bar() is passed 99.
@@ -139,7 +137,7 @@ func TestProcessMessageValidatorPrepared(test *testing.T) {
 	copy(consensusLeader.blockHash[:], hashBytes[:])
 
 	announceMsg := consensusLeader.constructAnnounceMessage()
-	consensusLeader.prepareSigs[consensusLeader.nodeID] = consensusLeader.priKey.SignHash(consensusLeader.blockHash[:])
+	consensusLeader.prepareSigs[consensusLeader.SelfAddress] = consensusLeader.priKey.SignHash(consensusLeader.blockHash[:])
 
 	preparedMsg, _ := consensusLeader.constructPreparedMessage()
 
@@ -179,15 +177,15 @@ func TestProcessMessageValidatorCommitted(test *testing.T) {
 	defer ctrl.Finish()
 
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "7782"}
-	var leaderPriKey *bls.SecretKey
-	leaderPriKey, leader.ConsensusPubKey = utils.GenKey(leader.IP, leader.Port)
+	leaderPriKey := bls_cosi.RandPrivateKey()
+	leader.ConsensusPubKey = leaderPriKey.GetPublicKey()
 
-	validator1 := p2p.Peer{IP: "127.0.0.1", Port: "7784", ValidatorID: 1}
-	_, validator1.ConsensusPubKey = utils.GenKey(validator1.IP, validator1.Port)
-	validator2 := p2p.Peer{IP: "127.0.0.1", Port: "7786", ValidatorID: 2}
-	_, validator2.ConsensusPubKey = utils.GenKey(validator2.IP, validator2.Port)
-	validator3 := p2p.Peer{IP: "127.0.0.1", Port: "7788", ValidatorID: 3}
-	_, validator3.ConsensusPubKey = utils.GenKey(validator3.IP, validator3.Port)
+	validator1 := p2p.Peer{IP: "127.0.0.1", Port: "7784"}
+	validator1.ConsensusPubKey = bls_cosi.RandPrivateKey().GetPublicKey()
+	validator2 := p2p.Peer{IP: "127.0.0.1", Port: "7786"}
+	validator2.ConsensusPubKey = bls_cosi.RandPrivateKey().GetPublicKey()
+	validator3 := p2p.Peer{IP: "127.0.0.1", Port: "7788"}
+	validator3.ConsensusPubKey = bls_cosi.RandPrivateKey().GetPublicKey()
 
 	m := mock_host.NewMockHost(ctrl)
 	// Asserts that the first and only call to Bar() is passed 99.
@@ -209,13 +207,13 @@ func TestProcessMessageValidatorCommitted(test *testing.T) {
 	copy(consensusLeader.blockHash[:], hashBytes[:])
 
 	announceMsg := consensusLeader.constructAnnounceMessage()
-	consensusLeader.prepareSigs[consensusLeader.nodeID] = consensusLeader.priKey.SignHash(consensusLeader.blockHash[:])
+	consensusLeader.prepareSigs[consensusLeader.SelfAddress] = consensusLeader.priKey.SignHash(consensusLeader.blockHash[:])
 
 	preparedMsg, _ := consensusLeader.constructPreparedMessage()
 	aggSig := bls_cosi.AggregateSig(consensusLeader.GetPrepareSigsArray())
 	multiSigAndBitmap := append(aggSig.Serialize(), consensusLeader.prepareBitmap.Bitmap...)
 
-	consensusLeader.commitSigs[consensusLeader.nodeID] = consensusLeader.priKey.SignHash(multiSigAndBitmap)
+	consensusLeader.commitSigs[consensusLeader.SelfAddress] = consensusLeader.priKey.SignHash(multiSigAndBitmap)
 	committedMsg, _ := consensusLeader.constructCommittedMessage()
 
 	// Get actual consensus messages.

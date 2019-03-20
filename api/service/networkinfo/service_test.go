@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
@@ -14,11 +16,12 @@ func TestService(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	peerPriKey, peerPubKey := utils.GenKey("127.0.0.1", "12345")
+	peerPriKey := bls.RandPrivateKey()
+	peerPubKey := peerPriKey.GetPublicKey()
 	if peerPriKey == nil || peerPubKey == nil {
 		t.Fatal("generate key error")
 	}
-	selfPeer := p2p.Peer{IP: "127.0.0.1", Port: "12345", ValidatorID: -1, ConsensusPubKey: peerPubKey}
+	selfPeer := p2p.Peer{IP: "127.0.0.1", Port: "12345", ConsensusPubKey: peerPubKey}
 
 	host, err := p2pimpl.NewHost(&selfPeer, nodePriKey)
 	if err != nil {

@@ -2,7 +2,6 @@ package downloader
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
 	"time"
 
@@ -86,17 +85,15 @@ func (client *Client) Register(hash []byte) *pb.DownloaderResponse {
 }
 
 // PushNewBlock will send the lastest verified blow to registered nodes
-func (client *Client) PushNewBlock(peerID uint32, blockHash []byte, timeout bool) *pb.DownloaderResponse {
+func (client *Client) PushNewBlock(peerAddress [20]byte, blockHash []byte, timeout bool) *pb.DownloaderResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	peerHash := make([]byte, 4)
-	binary.BigEndian.PutUint32(peerHash, peerID)
 	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_NEWBLOCK}
 	request.BlockHash = make([]byte, len(blockHash))
 	copy(request.BlockHash, blockHash)
-	request.PeerHash = make([]byte, len(peerHash))
-	copy(request.PeerHash, peerHash)
+	request.PeerHash = make([]byte, len(peerAddress))
+	copy(request.PeerHash, peerAddress[:])
 
 	if timeout {
 		request.Type = pb.DownloaderRequest_REGISTERTIMEOUT

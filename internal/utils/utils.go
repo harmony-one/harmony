@@ -14,8 +14,9 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/p2p"
 	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
 )
 
@@ -69,12 +70,6 @@ func ConvertFixedDataIntoByteArray(data interface{}) []byte {
 	return buff.Bytes()
 }
 
-// GetUniqueIDFromPeer ...
-// TODO(minhdoan): this is probably a hack, probably needs some strong non-collision hash.
-func GetUniqueIDFromPeer(peer p2p.Peer) uint32 {
-	return GetUniqueIDFromIPPort(peer.IP, peer.Port)
-}
-
 // GetUniqueIDFromIPPort --
 func GetUniqueIDFromIPPort(ip, port string) uint32 {
 	reg, err := regexp.Compile("[^0-9]+")
@@ -86,20 +81,12 @@ func GetUniqueIDFromIPPort(ip, port string) uint32 {
 	return uint32(value)
 }
 
-// GenKey generates a bls key pair given ip and port.
-func GenKey(ip, port string) (*bls.SecretKey, *bls.PublicKey) {
-	nodeIDBytes := make([]byte, 32)
-	binary.LittleEndian.PutUint32(nodeIDBytes, GetUniqueIDFromIPPort(ip, port))
-	privateKey := bls.SecretKey{}
-	err := privateKey.SetLittleEndian(nodeIDBytes)
-	if err != nil {
-		log.Print("failed to set private key", err)
-		return nil, nil
-	}
-	priKey := &privateKey
-	pubKey := privateKey.GetPublicKey()
-
-	return priKey, pubKey
+// GetAddressFromBlsPubKey return the address object from bls pub key.
+func GetAddressFromBlsPubKey(pubKey *bls.PublicKey) common.Address {
+	addr := common.Address{}
+	addrBytes := pubKey.GetAddress()
+	addr.SetBytes(addrBytes[:])
+	return addr
 }
 
 // GenKeyP2P generates a pair of RSA keys used in libp2p host

@@ -3,7 +3,6 @@ package node
 import (
 	"bytes"
 	"crypto/ecdsa"
-	"encoding/binary"
 	"fmt"
 	"math/big"
 	"os"
@@ -129,7 +128,7 @@ type Node struct {
 	downloaderServer       *downloader.Server
 	stateSync              *syncing.StateSync
 	beaconSync             *syncing.StateSync
-	peerRegistrationRecord map[uint32]*syncConfig // record registration time (unixtime) of peers begin in syncing
+	peerRegistrationRecord map[string]*syncConfig // record registration time (unixtime) of peers begin in syncing
 
 	// The p2p host used to send/receive p2p messages
 	host p2p.Host
@@ -287,7 +286,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database) *N
 	}
 
 	// Setup initial state of syncing.
-	node.peerRegistrationRecord = make(map[uint32]*syncConfig)
+	node.peerRegistrationRecord = make(map[string]*syncConfig)
 
 	node.OfflinePeers = make(chan p2p.Peer)
 	go node.RemovePeersHandler()
@@ -314,9 +313,6 @@ func (node *Node) AddPeers(peers []*p2p.Peer) int {
 			count++
 			node.host.AddPeer(p)
 			continue
-		}
-		if node.SelfPeer.ValidatorID == -1 && p.IP == node.SelfPeer.IP && p.Port == node.SelfPeer.Port {
-			node.SelfPeer.ValidatorID = p.ValidatorID
 		}
 	}
 
@@ -382,30 +378,32 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 		node.stateSync.AddNewBlock(request.PeerHash, &blockObj)
 
 	case downloader_pb.DownloaderRequest_REGISTER:
-		peerID := binary.BigEndian.Uint32(request.PeerHash)
-		if _, ok := node.peerRegistrationRecord[peerID]; ok {
+		peerAddress := common.BytesToAddress(request.PeerHash[:]).Hex()
+		if _, ok := node.peerRegistrationRecord[peerAddress]; ok {
 			response.Type = downloader_pb.DownloaderResponse_FAIL
-			utils.GetLogInstance().Warn("[SYNC] peerRegistration record already exists", "peerID", peerID)
+			utils.GetLogInstance().Warn("[SYNC] peerRegistration record already exists", "peerAddress", peerAddress)
 			return response, nil
 		} else if len(node.peerRegistrationRecord) >= maxBroadcastNodes {
 			response.Type = downloader_pb.DownloaderResponse_FAIL
-			utils.GetLogInstance().Warn("[SYNC] maximum registration limit exceeds", "peerID", peerID)
+			utils.GetLogInstance().Warn("[SYNC] maximum registration limit exceeds", "peerAddress", peerAddress)
 			return response, nil
 		} else {
-			peer, ok := node.Consensus.GetPeerFromID(peerID)
-			if !ok {
-				utils.GetLogInstance().Warn("[SYNC] unable to get peer from peerID", "peerID", peerID)
+			peer := node.Consensus.GetPeerByAddress(peerAddress)
+			response.Type = downloader_pb.DownloaderResponse_FAIL
+			if peer == nil {
+				utils.GetLogInstance().Warn("[SYNC] unable to get peer from peerID", "peerAddress", peerAddress)
+				return response, nil
 			}
 			client := downloader.ClientSetup(peer.IP, GetSyncingPort(peer.Port))
 			if client == nil {
-				utils.GetLogInstance().Warn("[SYNC] unable to setup client for peerID", "peerID", peerID)
+				utils.GetLogInstance().Warn("[SYNC] unable to setup client for peerID", "peerAddress", peerAddress)
 				return response, nil
 			}
 			config := &syncConfig{timestamp: time.Now().UnixNano(), client: client}
 			node.stateMutex.Lock()
-			node.peerRegistrationRecord[peerID] = config
+			node.peerRegistrationRecord[peerAddress] = config
 			node.stateMutex.Unlock()
-			utils.GetLogInstance().Debug("[SYNC] register peerID success", "peerID", peerID)
+			utils.GetLogInstance().Debug("[SYNC] register peerID success", "peerAddress", peerAddress)
 			response.Type = downloader_pb.DownloaderResponse_SUCCESS
 		}
 	case downloader_pb.DownloaderRequest_REGISTERTIMEOUT:
