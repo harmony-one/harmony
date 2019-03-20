@@ -24,8 +24,6 @@ function cleanup() {
        echo 'Killed process: '$pid
        $DRYRUN kill -9 $pid 2> /dev/null
    done
-   # Remove bc_config.json before starting experiment.
-   rm -f bc_config.json
    rm -rf ./db/harmony_*
 }
 
@@ -148,6 +146,10 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
      echo "launching validator ..."
      $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -min_peers $MIN $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key 2>&1 | tee -a $LOG_FILE &
   fi
+  if [ "$mode" == "archival" ]; then
+      echo "launching archival node ... wait"
+      $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB $HMY_OPT2 -key /tmp/$ip-$port.key -is_archival  2>&1 | tee -a $LOG_FILE &
+  fi
   sleep 0.5
   if [[ "$mode" == "newnode" && "$SYNC" == "true" ]]; then
      (( NUM_NN += 10 ))
@@ -173,8 +175,6 @@ else
    sleep $DURATION
 fi
 
-# save bc_config.json
-[ -e bc_config.json ] && cp -f bc_config.json $log_folder
 
 cleanup
 check_result

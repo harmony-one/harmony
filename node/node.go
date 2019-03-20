@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"fmt"
+	"math/big"
 	"os"
 	"sync"
 	"time"
@@ -26,6 +27,7 @@ import (
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/drand"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -217,8 +219,11 @@ func (node *Node) countNumTransactionsInBlockchain() int {
 
 // New creates a new node.
 func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database) *Node {
-	node := Node{}
+	var chain *core.BlockChain
+	var err error
+	var isFirstTime bool // if cannot get blockchain from database, then isFirstTime = true
 
+	node := Node{}
 	if host != nil {
 		node.host = host
 		node.SelfPeer = host.GetSelfPeer()
@@ -228,15 +233,22 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database) *N
 		// Consensus and associated channel to communicate blocks
 		node.Consensus = consensusObj
 
-		// Init db.
+		// Init db
 		database := db
 		if database == nil {
 			database = ethdb.NewMemDatabase()
+			chain, err = node.GenesisBlockSetup(database)
+			isFirstTime = true
+		} else {
+			chain, err = node.InitBlockChainFromDB(db, node.Consensus)
+			isFirstTime = false
+			if err != nil || chain == nil || chain.CurrentBlock().NumberU64() <= 0 {
+				chain, err = node.GenesisBlockSetup(database)
+				isFirstTime = true
+			}
 		}
-
-		chain, err := node.GenesisBlockSetup(database)
 		if err != nil {
-			utils.GetLogInstance().Error("Error when doing genesis setup")
+			utils.GetLogInstance().Error("Error when setup blockchain", "err", err)
 			os.Exit(1)
 		}
 		node.blockchain = chain
@@ -246,22 +258,22 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database) *N
 		node.BlockChannel = make(chan *types.Block)
 		node.ConfirmedBlockChannel = make(chan *types.Block)
 		node.BeaconBlockChannel = make(chan *types.Block)
-
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, params.TestChainConfig, chain)
 		node.Worker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.ConsensusPubKey), node.Consensus.ShardID)
 
-		utils.GetLogInstance().Debug("Created Genesis Block", "blockHash", chain.GetBlockByNumber(0).Hash().Hex())
 		node.Consensus.ConsensusBlock = make(chan *consensus.BFTBlockInfo)
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 
-		// Setup one time smart contracts
-		node.AddFaucetContractToPendingTransactions()
-		node.CurrentStakes = make(map[common.Address]*structs.StakeInfo)
-		node.AddStakingContractToPendingTransactions() //This will save the latest information about staked nodes in current staked
+		if isFirstTime {
+			// Setup one time smart contracts
+			node.AddFaucetContractToPendingTransactions()
+			node.CurrentStakes = make(map[common.Address]*structs.StakeInfo)
+			node.AddStakingContractToPendingTransactions() //This will save the latest information about staked nodes in current staked
+			// TODO(minhdoan): Think of a better approach to deploy smart contract.
+			// This is temporary for demo purpose.
+			node.AddLotteryContract()
 
-		// TODO(minhdoan): Think of a better approach to deploy smart contract.
-		// This is temporary for demo purpose.
-		node.AddLotteryContract()
+		}
 	}
 
 	node.ContractCaller = contracts.NewContractCaller(&db, node.blockchain, params.TestChainConfig)
@@ -429,12 +441,12 @@ func (node *Node) initNodeConfiguration(isBeacon bool, isClient bool) (service.N
 	nodeConfig.Actions[p2p.GroupIDBeaconClient] = p2p.ActionStart
 
 	var err error
-	if !isBeacon {
-		node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
-	} else {
+	if isBeacon {
 		node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeacon)
 		node.clientReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
 		node.NodeConfig.SetClientGroupID(p2p.GroupIDBeaconClient)
+	} else {
+		node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
 	}
 
 	if err != nil {
@@ -458,4 +470,15 @@ func (node *Node) AddBeaconChainDatabase(db ethdb.Database) {
 	}
 	node.beaconChain = chain
 	node.BeaconWorker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.ConsensusPubKey), node.Consensus.ShardID)
+}
+
+// InitBlockChainFromDB retrieves the latest blockchain and state available from the local database
+func (node *Node) InitBlockChainFromDB(db ethdb.Database, consensus *consensus.Consensus) (*core.BlockChain, error) {
+	chainConfig := params.TestChainConfig
+	if consensus != nil {
+		chainConfig.ChainID = big.NewInt(int64(consensus.ShardID)) // Use ChainID as piggybacked ShardID
+	}
+	cacheConfig := core.CacheConfig{Disabled: false, TrieNodeLimit: 256 * 1024 * 1024, TrieTimeLimit: 5 * time.Minute}
+	chain, err := core.NewBlockChain(db, &cacheConfig, chainConfig, consensus, vm.Config{}, nil)
+	return chain, err
 }
