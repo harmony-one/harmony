@@ -41,7 +41,7 @@ func TestCompareSyncPeerConfigByblockHashes(t *testing.T) {
 }
 
 func TestCreateStateSync(t *testing.T) {
-	stateSync := CreateStateSync("127.0.0.1", "8000")
+	stateSync := CreateStateSync("127.0.0.1", "8000", [20]byte{})
 
 	if stateSync == nil {
 		t.Error("Unable to create stateSync")

@@ -8,8 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/harmony-one/bls/ffi/go/bls"
-
 	"github.com/harmony-one/harmony/contracts/structs"
 
 	"github.com/harmony-one/harmony/contracts"
@@ -368,9 +366,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 		node.stateSync.AddNewBlock(request.PeerHash, &blockObj)
 
 	case downloader_pb.DownloaderRequest_REGISTER:
-		pubKey := bls.PublicKey{}
-		pubKey.Deserialize(request.PeerHash)
-		peerAddress := utils.GetAddressFromBlsPubKey(&pubKey).Hex()
+		peerAddress := common.BytesToAddress(request.PeerHash[:]).Hex()
 		if _, ok := node.peerRegistrationRecord[peerAddress]; ok {
 			response.Type = downloader_pb.DownloaderResponse_FAIL
 			utils.GetLogInstance().Warn("[SYNC] peerRegistration record already exists", "peerAddress", peerAddress)
@@ -381,8 +377,10 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 			return response, nil
 		} else {
 			peer := node.Consensus.GetPeerByAddress(peerAddress)
+			response.Type = downloader_pb.DownloaderResponse_FAIL
 			if peer == nil {
 				utils.GetLogInstance().Warn("[SYNC] unable to get peer from peerID", "peerAddress", peerAddress)
+				return response, nil
 			}
 			client := downloader.ClientSetup(peer.IP, GetSyncingPort(peer.Port))
 			if client == nil {

@@ -72,7 +72,7 @@ func (node *Node) DoBeaconSyncing() {
 		select {
 		case beaconBlock := <-node.BeaconBlockChannel:
 			if node.beaconSync == nil {
-				node.beaconSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port)
+				node.beaconSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.Consensus.PubKey.GetAddress())
 				node.beaconSync.CreateSyncConfig(node.GetBeaconSyncingPeers())
 				node.beaconSync.MakeConnectionToPeers()
 			}
@@ -136,7 +136,7 @@ func (node *Node) DoSyncing() {
 			}
 
 			if node.stateSync == nil {
-				node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port)
+				node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.Consensus.PubKey.GetAddress())
 				node.stateSync.CreateSyncConfig(node.GetSyncingPeers())
 				node.stateSync.MakeConnectionToPeers()
 			}

@@ -2,7 +2,6 @@ package syncing
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"reflect"
 	"sort"
@@ -59,10 +58,11 @@ type SyncConfig struct {
 }
 
 // CreateStateSync returns the implementation of StateSyncInterface interface.
-func CreateStateSync(ip string, port string) *StateSync {
+func CreateStateSync(ip string, port string, addr [20]byte) *StateSync {
 	stateSync := &StateSync{}
 	stateSync.selfip = ip
 	stateSync.selfport = port
+	stateSync.selfAddress = addr
 	stateSync.commonBlocks = make(map[int]*types.Block)
 	stateSync.lastMileBlocks = []*types.Block{}
 	return stateSync
@@ -74,6 +74,7 @@ type StateSync struct {
 	selfport           string
 	peerNumber         int
 	activePeerNumber   int
+	selfAddress        [20]byte // address of my BLS key
 	commonBlocks       map[int]*types.Block
 	lastMileBlocks     []*types.Block // last mile blocks to catch up with the consensus
 	syncConfig         *SyncConfig
@@ -541,9 +542,6 @@ func (ss *StateSync) RegisterNodeInfo() int {
 	ss.CleanUpNilPeers()
 	registrationNumber := RegistrationNumber
 	utils.GetLogInstance().Debug("[SYNC] node registration to peers", "registrationNumber", registrationNumber, "activePeerNumber", ss.activePeerNumber)
-	peerID := utils.GetUniqueIDFromIPPort(ss.selfip, ss.selfport)
-	peerHash := make([]byte, 4)
-	binary.BigEndian.PutUint32(peerHash[:], peerID)
 
 	count := 0
 	for id := range ss.syncConfig.peers {
@@ -554,9 +552,9 @@ func (ss *StateSync) RegisterNodeInfo() int {
 		if peerConfig.client == nil {
 			continue
 		}
-		err := peerConfig.registerToBroadcast(peerHash)
+		err := peerConfig.registerToBroadcast(ss.selfAddress[:])
 		if err != nil {
-			utils.GetLogInstance().Debug("[SYNC] register failed to peer", "ip", peerConfig.ip, "port", peerConfig.port, "peerHash", peerHash)
+			utils.GetLogInstance().Debug("[SYNC] register failed to peer", "ip", peerConfig.ip, "port", peerConfig.port, "selfAddress", ss.selfAddress)
 			continue
 		}
 		utils.GetLogInstance().Debug("[SYNC] register success", "ip", peerConfig.ip, "port", peerConfig.port)
