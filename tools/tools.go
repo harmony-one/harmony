@@ -11,6 +11,7 @@ package tools
 // scripts/install_build_tools.sh parses these imports to install them.
 import (
 	_ "github.com/golang/mock/mockgen"
+	_ "github.com/golang/protobuf/protoc-gen-go"
 	_ "github.com/harmony-ek/gencodec"
 	_ "golang.org/x/lint/golint"
 	_ "golang.org/x/tools/cmd/goimports"
