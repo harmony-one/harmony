@@ -207,10 +207,13 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	if *isBeacon {
 		if nodeConfig.StringRole == "leader" {
 			currentNode.NodeConfig.SetRole(nodeconfig.BeaconLeader)
+			currentNode.NodeConfig.SetIsLeader(true)
 		} else {
 			currentNode.NodeConfig.SetRole(nodeconfig.BeaconValidator)
+			currentNode.NodeConfig.SetIsLeader(false)
 		}
 		currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
+		currentNode.NodeConfig.SetIsBeacon(true)
 	} else {
 		currentNode.AddBeaconChainDatabase(nodeConfig.BeaconDB)
 
@@ -218,10 +221,13 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 			currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
 		} else if nodeConfig.StringRole == "leader" {
 			currentNode.NodeConfig.SetRole(nodeconfig.ShardLeader)
+			currentNode.NodeConfig.SetIsLeader(true)
 		} else {
 			currentNode.NodeConfig.SetRole(nodeconfig.ShardValidator)
+			currentNode.NodeConfig.SetIsLeader(false)
 		}
 		currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDUnknown)
+		currentNode.NodeConfig.SetIsBeacon(false)
 	}
 
 	// Add randomness protocol

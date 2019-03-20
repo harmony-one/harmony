@@ -13,6 +13,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	crypto2 "github.com/ethereum/go-ethereum/crypto"
@@ -61,6 +62,13 @@ var (
 
 	balanceCommand    = flag.NewFlagSet("getFreeToken", flag.ExitOnError)
 	balanceAddressPtr = balanceCommand.String("address", "", "Specify the account address to check balance for")
+
+	// Quit the program once stopChan received message
+	stopChan = make(chan struct{})
+	// Print out progress char
+	tick = time.NewTicker(time.Second)
+	// Flag to keep waiting for async call finished
+	async = true
 )
 
 // setupLog setup log for verbose output
@@ -110,24 +118,35 @@ func main() {
 	case "-version":
 		printVersion(os.Args[0])
 	case "new":
-		processNewCommnad()
+		go processNewCommnad()
 	case "list":
-		processListCommand()
+		go processListCommand()
 	case "removeAll":
-		clearKeystore()
+		go clearKeystore()
 		fmt.Println("All existing accounts deleted...")
 	case "import":
-		processImportCommnad()
+		go processImportCommnad()
 	case "balances":
-		processBalancesCommand()
+		go processBalancesCommand()
 	case "getFreeToken":
-		processGetFreeToken()
+		go processGetFreeToken()
 	case "transfer":
-		processTransferCommand()
+		go processTransferCommand()
 	default:
 		fmt.Printf("Unknown action: %s\n", os.Args[1])
 		flag.PrintDefaults()
 		os.Exit(1)
+	}
+
+	// Waiting for async call finished and print out some progress
+	for async {
+		select {
+		case <-tick.C:
+			fmt.Printf("=")
+		case <-stopChan:
+			fmt.Println("Done.")
+			os.Exit(0)
+		}
 	}
 }
 
@@ -137,6 +156,7 @@ func processNewCommnad() {
 
 	if err != nil {
 		fmt.Println("Failed to get randomness for the private key...")
+		async = false
 		return
 	}
 	priKey, err := crypto2.GenerateKey()
@@ -146,6 +166,7 @@ func processNewCommnad() {
 	storePrivateKey(crypto2.FromECDSA(priKey))
 	fmt.Printf("New account created with address:{%s}\n", crypto2.PubkeyToAddress(priKey.PublicKey).Hex())
 	fmt.Printf("Please keep a copy of the private key:{%s}\n", hex.EncodeToString(crypto2.FromECDSA(priKey)))
+	async = false
 }
 
 func processListCommand() {
@@ -153,6 +174,7 @@ func processListCommand() {
 		fmt.Printf("Account %d:{%s}\n", i, crypto2.PubkeyToAddress(key.PublicKey).Hex())
 		fmt.Printf("    PrivateKey:{%s}\n", hex.EncodeToString(key.D.Bytes()))
 	}
+	async = false
 }
 
 func processImportCommnad() {
@@ -160,6 +182,7 @@ func processImportCommnad() {
 	priKey := *accountImportPtr
 	if priKey == "" {
 		fmt.Println("Error: --privateKey is required")
+		async = false
 		return
 	}
 	if !accountImportCommand.Parsed() {
@@ -171,6 +194,7 @@ func processImportCommnad() {
 	}
 	storePrivateKey(priKeyBytes)
 	fmt.Println("Private key imported...")
+	async = false
 }
 
 func processBalancesCommand() {
@@ -181,16 +205,17 @@ func processBalancesCommand() {
 		for i, address := range ReadAddresses() {
 			fmt.Printf("Account %d: %s:\n", i, address.Hex())
 			for shardID, balanceNonce := range FetchBalance(address, walletNode) {
-				fmt.Printf("    Balance in Shard %d:  %s \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance))
+				fmt.Printf("    Balance in Shard %d:  %s, nonce: %v \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance), balanceNonce.nonce)
 			}
 		}
 	} else {
 		address := common.HexToAddress(*balanceAddressPtr)
 		fmt.Printf("Account: %s:\n", address.Hex())
 		for shardID, balanceNonce := range FetchBalance(address, walletNode) {
-			fmt.Printf("    Balance in Shard %d:  %s \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance))
+			fmt.Printf("    Balance in Shard %d:  %s, nonce: %v \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance), balanceNonce.nonce)
 		}
 	}
+	async = false
 }
 
 func processGetFreeToken() {
@@ -199,11 +224,14 @@ func processGetFreeToken() {
 
 	if *freeTokenAddressPtr == "" {
 		fmt.Println("Error: --address is required")
+		async = false
 		return
 	}
 	address := common.HexToAddress(*freeTokenAddressPtr)
 
 	GetFreeToken(address, walletNode)
+
+	async = false
 }
 
 func processTransferCommand() {
@@ -221,20 +249,24 @@ func processTransferCommand() {
 	if err != nil {
 		fmt.Printf("Cannot base64-decode input data (%s): %s\n",
 			base64InputData, err)
+		async = false
 		return
 	}
 
 	if shardID == -1 {
 		fmt.Println("Please specify the shard ID for the transfer (e.g. --shardID=0)")
+		async = false
 		return
 	}
 	if amount <= 0 {
 		fmt.Println("Please specify positive amount to transfer")
+		async = false
 		return
 	}
 	priKeys := readPrivateKeys()
 	if len(priKeys) == 0 {
 		fmt.Println("No imported account to use.")
+		async = false
 		return
 	}
 	senderIndex, err := strconv.Atoi(sender)
@@ -249,18 +281,21 @@ func processTransferCommand() {
 		}
 		if senderIndex == -1 {
 			fmt.Println("The specified sender account does not exist in the wallet.")
+			async = false
 			return
 		}
 	}
 
 	if senderIndex >= len(priKeys) {
 		fmt.Println("Sender account index out of bounds.")
+		async = false
 		return
 	}
 
 	receiverAddress := common.HexToAddress(receiver)
 	if len(receiverAddress) != 20 {
 		fmt.Println("The receiver address is not valid.")
+		async = false
 		return
 	}
 
@@ -273,19 +308,21 @@ func processTransferCommand() {
 	state, ok := shardIDToAccountState[uint32(shardID)]
 	if !ok {
 		fmt.Printf("Failed connecting to the shard %d\n", shardID)
+		async = false
 		return
 	}
 	balance := state.balance
 	balance = balance.Div(balance, big.NewInt(params.GWei))
 	if amount > float64(balance.Uint64())/params.GWei {
 		fmt.Printf("Balance is not enough for the transfer, current balance is %.6f\n", float64(balance.Uint64())/params.GWei)
+		async = false
 		return
 	}
 
 	amountBigInt := big.NewInt(int64(amount * params.GWei))
 	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(params.GWei))
 	tx, _ := types.SignTx(types.NewTransaction(state.nonce, receiverAddress, uint32(shardID), amountBigInt, params.TxGas, nil, inputData), types.HomesteadSigner{}, senderPriKey)
-	wallet.SubmitTransaction(tx, walletNode, uint32(shardID))
+	wallet.SubmitTransaction(tx, walletNode, uint32(shardID), stopChan)
 }
 
 func convertBalanceIntoReadableFormat(balance *big.Int) string {

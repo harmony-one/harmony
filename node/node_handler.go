@@ -387,9 +387,10 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 		return 0
 	}
 
-	// Add to Node's peer list anyway
-	utils.GetLogInstance().Info("Add Peer to Node", "Address", node.Consensus.GetSelfAddress(), "Pear", peer)
-	node.AddPeers([]*p2p.Peer{peer})
+	if node.NodeConfig.IsLeader() {
+		utils.GetLogInstance().Info("Add Peer to Node", "Address", node.Consensus.GetSelfAddress(), "Pear", peer)
+		node.AddPeers([]*p2p.Peer{peer})
+	}
 
 	return 1
 }
