@@ -429,7 +429,7 @@ func (node *Node) SendPongMessage() {
 						utils.GetLogInstance().Error("[PONG] failed to send pong message", "group", node.NodeConfig.GetShardGroupID())
 						continue
 					} else {
-						utils.GetLogInstance().Info("[PONG] sent pong message to", "group", node.NodeConfig.GetShardGroupID())
+						utils.GetLogInstance().Info("[PONG] sent pong message to", "group", node.NodeConfig.GetShardGroupID(), "# nodes", numPeersNow)
 					}
 					sentMessage = true
 					// stop sending ping message
