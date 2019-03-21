@@ -13,9 +13,10 @@ message DownloaderRequest {
     HEADER = 0;
     BLOCK = 1;
     NEWBLOCK = 2;
-    REGISTER = 3;
-    REGISTERTIMEOUT = 4;
-    UNKNOWN = 5;
+    BLOCKHEIGHT = 3;
+    REGISTER = 4;
+    REGISTERTIMEOUT = 5;
+    UNKNOWN = 6;
   }
  
   // Request type.
@@ -38,4 +39,5 @@ message DownloaderResponse {
   repeated bytes payload = 1;
   // response of registration request
   RegisterResponseType type = 2;
+  uint64 blockHeight = 3;
 }

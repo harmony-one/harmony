@@ -30,7 +30,6 @@ func (s *Server) Query(ctx context.Context, request *pb.DownloaderRequest) (*pb.
 
 // Start starts the Server on given ip and port.
 func (s *Server) Start(ip, port string) (*grpc.Server, error) {
-	// TODO(minhdoan): Currently not using ip. Fix it later.
 	addr := net.JoinHostPort("", port)
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {

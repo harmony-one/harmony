@@ -105,3 +105,15 @@ func (client *Client) PushNewBlock(peerAddress [20]byte, blockHash []byte, timeo
 	}
 	return response
 }
+
+// GetBlockChainHeight gets the blockheight from peer
+func (client *Client) GetBlockChainHeight() *pb.DownloaderResponse {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_BLOCKHEIGHT}
+	response, err := client.dlClient.Query(ctx, request)
+	if err != nil {
+		utils.GetLogInstance().Info("[SYNC] unable to get blockchain height", "error", err)
+	}
+	return response
+}
