@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 	"reflect"
 	"sync"
 
@@ -27,6 +28,12 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
+)
+
+// Block reward per block signature.
+// TODO ek – per sig per stake
+var (
+	BlockReward = big.NewInt(params.Ether / 1000)
 )
 
 // Consensus is the main struct with all states and data related to consensus process.
@@ -575,7 +582,7 @@ func (consensus *Consensus) VerifySeal(chain consensus_engine.ChainReader, heade
 func (consensus *Consensus) Finalize(chain consensus_engine.ChainReader, header *types.Header, state *state.DB, txs []*types.Transaction, receipts []*types.Receipt) (*types.Block, error) {
 	// Accumulate any block and uncle rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
-	accumulateRewards(chain.Config(), state, header)
+	consensus.accumulateRewards(chain.Config(), state, header)
 	header.Root = state.IntermediateRoot(false)
 	return types.NewBlock(header, txs, receipts), nil
 }
@@ -615,11 +622,64 @@ func (consensus *Consensus) Prepare(chain consensus_engine.ChainReader, header *
 	return nil
 }
 
-// AccumulateRewards credits the coinbase of the given block with the mining
+// accumulateRewards credits the coinbase of the given block with the mining
 // reward. The total reward consists of the static block reward and rewards for
 // included uncles. The coinbase of each uncle block is also rewarded.
-func accumulateRewards(config *params.ChainConfig, state *state.DB, header *types.Header) {
-	// TODO: implement mining rewards
+func (consensus *Consensus) accumulateRewards(
+	config *params.ChainConfig, state *state.DB, header *types.Header,
+) {
+	if header.ParentHash == (common.Hash{}) {
+		// This block is a genesis block,
+		// without a parent block whose signer to reward.
+		return
+	}
+	if consensus.ChainReader == nil {
+		utils.GetLogInstance().Error("accumulateRewards: ChainReader is nil")
+		return
+	}
+	parent := consensus.ChainReader.GetBlockByHash(header.ParentHash)
+	if parent == nil {
+		utils.GetLogInstance().Error(
+			"accumulateRewards: cannot retrieve parent block",
+			"curHash", header.Hash().Hex(),
+			"parentHash", header.ParentHash.Hex(),
+		)
+		return
+	}
+	mask, err := bls_cosi.NewMask(consensus.PublicKeys, consensus.PubKey)
+	if err != nil {
+		utils.GetLogInstance().Error(
+			"accumulateRewards: cannot create group sig mask", "error", err)
+		return
+	}
+	if err := mask.SetMask(parent.Header().CommitBitmap); err != nil {
+		utils.GetLogInstance().Error(
+			"accumulateRewards: cannot set group sig mask bits", "error", err)
+		return
+	}
+	numSigs := 0
+	numAccounts := 0
+	totalAmount := big.NewInt(0)
+	for _, key := range mask.GetPubKeyFromMask(true) {
+		numSigs++
+		stakeInfos := consensus.stakeInfoFinder.FindStakeInfoByNodeKey(key)
+		if len(stakeInfos) == 0 {
+			utils.GetLogInstance().Error(
+				"accumulateRewards: node has no stake info",
+				"nodeKey", key.GetHexString())
+			continue
+		}
+		numAccounts += len(stakeInfos)
+		for _, stakeInfo := range stakeInfos {
+			state.AddBalance(stakeInfo.Address, BlockReward)
+			totalAmount = new(big.Int).Add(totalAmount, BlockReward)
+		}
+	}
+	utils.GetLogInstance().Debug(
+		"accumulateRewards: rewards have been paid out",
+		"numSigs", numSigs,
+		"numAccounts", numAccounts,
+		"totalAmount", totalAmount)
 }
 
 // GetSelfAddress returns the address in hex
