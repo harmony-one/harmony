@@ -92,8 +92,8 @@ func (node *Node) CreateTransactionForEnterMethod(amount int64, priKey string) e
 	return err
 }
 
-// GetResult2 get current players and their balances.
-func (node *Node) GetResult2(priKey string) (players []string, balances []*big.Int) {
+// GetResultDirectly get current players and their balances, not from smart contract.
+func (node *Node) GetResultDirectly(priKey string) (players []string, balances []*big.Int) {
 	for _, account := range contract_constants.DemoAccounts {
 		players = append(players, account.Address)
 		key, err := crypto.HexToECDSA(account.Private)
@@ -108,7 +108,7 @@ func (node *Node) GetResult2(priKey string) (players []string, balances []*big.I
 
 // GetResult get current players and their balances.
 func (node *Node) GetResult(priKey string) (players []string, balances []*big.Int) {
-	return node.GetResult2(priKey)
+	// return node.GetResult2(priKey)
 	abi, err := abi.JSON(strings.NewReader(contracts.LotteryABI))
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to generate staking contract's ABI", "error", err)
@@ -156,7 +156,7 @@ func (node *Node) GetResult(priKey string) (players []string, balances []*big.In
 	return players, balances
 }
 
-// CreateTransactionForEnterMethod generates transaction for enter method and add it into pending tx list.
+// CreateTransactionForPickWinner generates transaction for enter method and add it into pending tx list.
 func (node *Node) CreateTransactionForPickWinner() error {
 	var err error
 	toAddress := node.DemoContractAddress

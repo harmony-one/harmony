@@ -40,7 +40,6 @@ func (client *Client) Close() {
 func (client *Client) Process(message *Message) (*Response, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	fmt.Println("***SENDING MESSAGE", message)
 	response, err := client.clientServiceClient.Process(ctx, message)
 	return response, err
 }

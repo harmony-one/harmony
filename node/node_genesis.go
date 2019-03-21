@@ -7,8 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/harmony-one/harmony/internal/utils"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -102,6 +100,5 @@ func AddNodeAddressesToGenesisAlloc(genesisAlloc core.GenesisAlloc) {
 		testBankFunds = testBankFunds.Mul(testBankFunds, big.NewInt(params.Ether))
 		address := common.HexToAddress(account.Address)
 		genesisAlloc[address] = core.GenesisAccount{Balance: testBankFunds}
-		utils.GetLogInstance().Info("****free money****", "address", address, "balance", testBankFunds)
 	}
 }

@@ -8,7 +8,6 @@ service ClientService {
 }
 
 // ReceiverType indicates who is the receiver of this message.
-// TODO(minhdoan): Why LEADER_OR_VALIDATOR, think of a better design.
 enum ReceiverType {
   NEWNODE = 0;
   LEADER = 1;

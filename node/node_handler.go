@@ -23,7 +23,6 @@ import (
 	"github.com/harmony-one/harmony/crypto/pki"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
-	contract_constants "github.com/harmony-one/harmony/internal/utils/contract"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 )
@@ -333,17 +332,6 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 				utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d]  Somehow I got kicked out", core.GetEpochFromBlockNumber(newBlock.NumberU64())), "BlsAddress", blsAddr)
 			}
 		}
-	}
-
-	// TODO(minhdoan): clean debug later.
-	// node.Debug()
-}
-
-// Debug --
-func (node *Node) Debug() {
-	players, balances := node.GetResult(contract_constants.DemoAccounts[0].Private)
-	for i := range players {
-		utils.GetLogInstance().Info("******RESULT****", "player", players[i], "balance", balances[i])
 	}
 }
 
