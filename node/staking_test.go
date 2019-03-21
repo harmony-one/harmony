@@ -32,7 +32,7 @@ func TestUpdateStakingList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus := consensus.New(host, "0", []p2p.Peer{leader, validator}, leader, nil)
+	consensus := consensus.New(host, 0, []p2p.Peer{leader, validator}, leader, nil)
 	node := New(host, consensus, nil)
 
 	for i := 0; i < 5; i++ {

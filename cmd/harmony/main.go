@@ -122,7 +122,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	nodeConfig := nodeconfig.GetGlobalConfig()
 
 	// Currently we hardcode only one shard.
-	nodeConfig.ShardIDString = "0"
+	nodeConfig.ShardID = 0
 
 	// Key Setup ================= [Start]
 	// Staking private key is the ecdsa key used for token related transaction signing (especially the staking txs).
@@ -199,7 +199,7 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	// Consensus object.
 	// TODO: consensus object shouldn't start here
 	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of consensus later.
-	consensus := consensus.New(nodeConfig.Host, nodeConfig.ShardIDString, []p2p.Peer{}, nodeConfig.Leader, nodeConfig.ConsensusPriKey)
+	consensus := consensus.New(nodeConfig.Host, nodeConfig.ShardID, []p2p.Peer{}, nodeConfig.Leader, nodeConfig.ConsensusPriKey)
 	consensus.MinPeers = *minPeers
 
 	// Current node.
@@ -241,7 +241,7 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	// TODO: enable drand only for beacon chain
 	// TODO: put this in a better place other than main.
 	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of drand later.
-	dRand := drand.New(nodeConfig.Host, nodeConfig.ShardIDString, []p2p.Peer{}, nodeConfig.Leader, currentNode.ConfirmedBlockChannel, *isLeader, nodeConfig.ConsensusPriKey)
+	dRand := drand.New(nodeConfig.Host, nodeConfig.ShardID, []p2p.Peer{}, nodeConfig.Leader, currentNode.ConfirmedBlockChannel, *isLeader, nodeConfig.ConsensusPriKey)
 	currentNode.Consensus.RegisterPRndChannel(dRand.PRndChannel)
 	currentNode.Consensus.RegisterRndChannel(dRand.RndChannel)
 	currentNode.DRand = dRand
@@ -269,7 +269,7 @@ func main() {
 		// Start Profiler for leader if profile argument is on
 		if nodeConfig.StringRole == "leader" && (*profile || *metricsReportURL != "") {
 			prof := profiler.GetProfiler()
-			prof.Config(nodeConfig.ShardIDString, *metricsReportURL)
+			prof.Config(nodeConfig.ShardID, *metricsReportURL)
 			if *profile {
 				prof.Start()
 			}
@@ -282,7 +282,7 @@ func main() {
 		loggingInit(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps)
 		go currentNode.SupportSyncing()
 	}
-	log.Info("New Harmony Node ====", "Role", currentNode.NodeConfig.Role(), "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, nodeConfig.Host.GetID().Pretty()))
+	utils.GetLogInstance().Info("New Harmony Node ====", "Role", currentNode.NodeConfig.Role(), "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, nodeConfig.Host.GetID().Pretty()))
 	currentNode.ServiceManagerSetup()
 	currentNode.RunServices()
 	currentNode.StartServer()

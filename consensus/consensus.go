@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strconv"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -169,7 +168,7 @@ func (consensus *Consensus) GetNextRnd() ([32]byte, [32]byte, error) {
 
 // New creates a new Consensus object
 // TODO: put shardId into chain reader's chain config
-func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer, blsPriKey *bls.SecretKey) *Consensus {
+func New(host p2p.Host, ShardID uint32, peers []p2p.Peer, leader p2p.Peer, blsPriKey *bls.SecretKey) *Consensus {
 	consensus := Consensus{}
 	consensus.host = host
 
@@ -215,12 +214,7 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer, blsPr
 	}
 
 	consensus.consensusID = 0 // or view Id in the original pbft paper
-
-	myShardID, err := strconv.Atoi(ShardID)
-	if err != nil {
-		panic("Unparseable shard Id" + ShardID)
-	}
-	consensus.ShardID = uint32(myShardID)
+	consensus.ShardID = ShardID
 
 	// For validators to keep track of all blocks received but not yet committed, so as to catch up to latest consensus if lagged behind.
 	consensus.blocksReceived = make(map[uint32]*BlockConsensusStatus)

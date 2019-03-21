@@ -15,7 +15,7 @@ import (
 // Profiler is the profiler data structure.
 type Profiler struct {
 	pid              int32
-	shardID          string
+	shardID          uint32
 	MetricsReportURL string
 	// Internal
 	proc *process.Process
@@ -34,7 +34,7 @@ func GetProfiler() *Profiler {
 }
 
 // Config configurates Profiler.
-func (profiler *Profiler) Config(shardID string, metricsReportURL string) {
+func (profiler *Profiler) Config(shardID uint32, metricsReportURL string) {
 	profiler.pid = int32(os.Getpid())
 	profiler.shardID = shardID
 	profiler.MetricsReportURL = metricsReportURL
