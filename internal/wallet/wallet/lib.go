@@ -57,7 +57,7 @@ func GetPeersFromBeaconChain(walletNode *node.Node) []p2p.Peer {
 }
 
 // SubmitTransaction submits the transaction to the Harmony network
-func SubmitTransaction(tx *types.Transaction, walletNode *node.Node, shardID uint32, stopChan chan struct{}) error {
+func SubmitTransaction(tx *types.Transaction, walletNode *node.Node, shardID uint32) error {
 	msg := proto_node.ConstructTransactionListMessageAccount(types.Transactions{tx})
 	err := walletNode.GetHost().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeaconClient}, p2p_host.ConstructP2pMessage(byte(0), msg))
 	if err != nil {
@@ -68,9 +68,6 @@ func SubmitTransaction(tx *types.Transaction, walletNode *node.Node, shardID uin
 	// FIXME (leo): how to we know the tx was successful sent to the network
 	// this is a hacky way to wait for sometime
 	time.Sleep(2 * time.Second)
-	if stopChan != nil {
-		stopChan <- struct{}{}
-	}
 	return nil
 }
 

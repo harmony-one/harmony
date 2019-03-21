@@ -72,13 +72,6 @@ var (
 
 	balanceCommand    = flag.NewFlagSet("getFreeToken", flag.ExitOnError)
 	balanceAddressPtr = balanceCommand.String("address", "", "Specify the account address to check balance for")
-
-	// Quit the program once stopChan received message
-	stopChan = make(chan struct{})
-	// Print out progress char
-	tick = time.NewTicker(time.Second)
-	// Flag to wait for async command: transfer
-	async = true
 )
 
 var (
@@ -161,22 +154,11 @@ func main() {
 
 	switch os.Args[1] {
 	case "transfer":
-		go processTransferCommand()
+		processTransferCommand()
 	default:
 		fmt.Printf("Unknown action: %s\n", os.Args[1])
 		flag.PrintDefaults()
 		os.Exit(1)
-	}
-
-	// Waiting for async call finished and print out some progress
-	for async {
-		select {
-		case <-tick.C:
-			fmt.Printf("=")
-		case <-stopChan:
-			fmt.Println("Done.")
-			os.Exit(0)
-		}
 	}
 }
 
@@ -298,24 +280,20 @@ func processTransferCommand() {
 	if err != nil {
 		fmt.Printf("Cannot base64-decode input data (%s): %s\n",
 			base64InputData, err)
-		async = false
 		return
 	}
 
 	if shardID == -1 {
 		fmt.Println("Please specify the shard ID for the transfer (e.g. --shardID=0)")
-		async = false
 		return
 	}
 	if amount <= 0 {
 		fmt.Println("Please specify positive amount to transfer")
-		async = false
 		return
 	}
 	priKeys := readPrivateKeys()
 	if len(priKeys) == 0 {
 		fmt.Println("No imported account to use.")
-		async = false
 		return
 	}
 	senderIndex, err := strconv.Atoi(sender)
@@ -330,21 +308,18 @@ func processTransferCommand() {
 		}
 		if senderIndex == -1 {
 			fmt.Println("The specified sender account does not exist in the wallet.")
-			async = false
 			return
 		}
 	}
 
 	if senderIndex >= len(priKeys) {
 		fmt.Println("Sender account index out of bounds.")
-		async = false
 		return
 	}
 
 	receiverAddress := common.HexToAddress(receiver)
 	if len(receiverAddress) != 20 {
 		fmt.Println("The receiver address is not valid.")
-		async = false
 		return
 	}
 
@@ -359,21 +334,19 @@ func processTransferCommand() {
 	state, ok := shardIDToAccountState[uint32(shardID)]
 	if !ok {
 		fmt.Printf("Failed connecting to the shard %d\n", shardID)
-		async = false
 		return
 	}
 	balance := state.balance
 	balance = balance.Div(balance, big.NewInt(params.GWei))
 	if amount > float64(balance.Uint64())/params.GWei {
 		fmt.Printf("Balance is not enough for the transfer, current balance is %.6f\n", float64(balance.Uint64())/params.GWei)
-		async = false
 		return
 	}
 
 	amountBigInt := big.NewInt(int64(amount * params.GWei))
 	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(params.GWei))
 	tx, _ := types.SignTx(types.NewTransaction(state.nonce, receiverAddress, uint32(shardID), amountBigInt, params.TxGas, nil, inputData), types.HomesteadSigner{}, senderPriKey)
-	wallet.SubmitTransaction(tx, walletNode, uint32(shardID), stopChan)
+	wallet.SubmitTransaction(tx, walletNode, uint32(shardID))
 }
 
 func convertBalanceIntoReadableFormat(balance *big.Int) string {
