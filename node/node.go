@@ -356,6 +356,10 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 			var hash common.Hash
 			hash.SetBytes(bytes)
 			block := node.blockchain.GetBlockByHash(hash)
+			if block == nil {
+				utils.GetLogInstance().Error("[SYNC] GetBlockByHash returns nil")
+				return nil, fmt.Errorf("GetBlockByHash return nil. Hash: %v", hash)
+			}
 			encodedBlock, err := rlp.EncodeToBytes(block)
 			if err == nil {
 				response.Payload = append(response.Payload, encodedBlock)
