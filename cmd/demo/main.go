@@ -22,7 +22,7 @@ var (
 	grpcClient = msg_pb.NewClient(LocalIP)
 )
 
-// Enter processes /enter end point.
+// Enter ---
 func Enter(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	key := r.FormValue("key")
@@ -52,7 +52,7 @@ func Enter(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(res)
 }
 
-// Result processes /result end point.
+// Result --
 func Result(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	key := r.FormValue("key")
@@ -77,7 +77,7 @@ func Result(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(res)
 }
 
-// Result processes /result end point.
+// PickWinner picks a winner.
 func PickWinner(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 

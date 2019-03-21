@@ -9,7 +9,6 @@ import (
 	"github.com/harmony-one/harmony/api/service/discovery"
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/api/service/networkinfo"
-	"github.com/harmony-one/harmony/api/service/newclientsupport"
 	"github.com/harmony-one/harmony/api/service/randomness"
 	"github.com/harmony-one/harmony/api/service/staking"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -61,10 +60,6 @@ func (node *Node) setupForBeaconLeader() {
 	node.serviceManager.RegisterService(service.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReady))
 	// Register client support service.
 	node.serviceManager.RegisterService(service.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
-	// TODO(minhdoan): We will remove the old client support and use the new client support which uses new message protocol.
-	// Register client new support service.
-	node.serviceManager.RegisterService(service.NewClientSupport, newclientsupport.New(
-		node.CreateTransactionForEnterMethod, node.GetResult, node.CreateTransactionForPickWinner))
 	// Register randomness service
 	node.serviceManager.RegisterService(service.Randomness, randomness.New(node.DRand))
 	// Register explorer service.
