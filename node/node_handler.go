@@ -3,6 +3,7 @@ package node
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"math"
 	"os"
 	"time"
@@ -293,17 +294,16 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 
 	utils.GetLogInstance().Info("Updating staking list")
 	node.UpdateStakingList(node.QueryStakeInfo())
-	node.printStakingList()
+	// node.printStakingList()
 	if core.IsEpochBlock(newBlock) {
 		shardState := node.blockchain.StoreNewShardState(newBlock, &node.CurrentStakes)
 		if shardState != nil {
 			myShard := uint32(math.MaxUint32)
 			isLeader := false
+			blsAddr := node.Consensus.SelfAddress
 			for _, shard := range shardState {
 				for _, nodeID := range shard.NodeList {
-					blsAddr := node.Consensus.PubKey.GetAddress()
-					blsAddrStr := common.BytesToAddress(blsAddr[:]).Hex()
-					if nodeID.BlsAddress == blsAddrStr {
+					if nodeID.BlsAddress == blsAddr {
 						myShard = shard.ShardID
 						isLeader = shard.Leader == nodeID
 					}
@@ -324,13 +324,12 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 					}
 				}
 				if node.blockchain.ShardID() == myShard {
-					utils.GetLogInstance().Info("[Resharding] I stay at", "shardID", myShard, "leader")
+					utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d] I stay at shard %d, %s", core.GetEpochFromBlockNumber(newBlock.NumberU64()), myShard, aboutLeader), "BlsAddress", blsAddr)
 				} else {
-					utils.GetLogInstance().Info("[Resharding] I got resharded to", "shardID", myShard, "isLeader", isLeader)
+					utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d] I got resharded to shard %d, %s", core.GetEpochFromBlockNumber(newBlock.NumberU64()), myShard, aboutLeader), "BlsAddress", blsAddr)
 				}
-				utils.GetLogInstance().Info("[Resharding] " + aboutLeader)
 			} else {
-				utils.GetLogInstance().Info("[Resharding] Somehow I got kicked out")
+				utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d]  Somehow I got kicked out", core.GetEpochFromBlockNumber(newBlock.NumberU64())), "BlsAddress", blsAddr)
 			}
 		}
 	}
