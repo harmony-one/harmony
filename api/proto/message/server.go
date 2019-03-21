@@ -5,6 +5,7 @@ package message
 // TODO(minhdoan): Refactor and clean up the other client service.
 import (
 	"context"
+	fmt "fmt"
 	"log"
 	"math/big"
 	"net"
@@ -31,11 +32,13 @@ type Server struct {
 
 // Process processes the Message and returns Response
 func (s *Server) Process(ctx context.Context, message *Message) (*Response, error) {
+	fmt.Println("MINH", message)
 	if message.GetType() != MessageType_LOTTERY_REQUEST {
 		return &Response{}, ErrWrongMessage
 	}
-	utils.GetLogInstance().Info("Recieved:", "message", message)
+	// utils.GetLogInstance().Info("Recieved:", "message", message)
 	lotteryRequest := message.GetLotteryRequest()
+	fmt.Println("lottery request", lotteryRequest)
 	if lotteryRequest.GetType() == LotteryRequest_ENTER {
 		if s.CreateTransactionForEnterMethod == nil {
 			return nil, ErrEnterProcessorNotReady
