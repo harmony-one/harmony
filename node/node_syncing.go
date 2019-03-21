@@ -16,7 +16,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
-	peer "github.com/libp2p/go-libp2p-peer"
 )
 
 // Constants related to doing syncing.
@@ -31,13 +30,6 @@ func GetSyncingPort(nodePort string) string {
 		return fmt.Sprintf("%d", port-syncing.SyncingPortDifference)
 	}
 	return ""
-}
-
-// (TODO) temporary, remove it later
-func getPeerFromIPandPort(ip, port string) p2p.Peer {
-	priKey, _, _ := utils.GenKeyP2P(ip, port)
-	peerID, _ := peer.IDFromPrivateKey(priKey)
-	return p2p.Peer{IP: ip, Port: port, PeerID: peerID}
 }
 
 // getNeighborPeers is a helper function to return list of peers
@@ -75,7 +67,7 @@ func (node *Node) DoBeaconSyncing() {
 		select {
 		case beaconBlock := <-node.BeaconBlockChannel:
 			if node.beaconSync == nil {
-				node.beaconSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.Consensus.PubKey.GetAddress())
+				node.beaconSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
 				node.beaconSync.CreateSyncConfig(node.GetBeaconSyncingPeers())
 				node.beaconSync.MakeConnectionToPeers()
 			}
@@ -110,7 +102,7 @@ func (node *Node) IsOutOfSync(consensusBlockInfo *consensus.BFTBlockInfo) bool {
 // DoSync syncs with peers until catchup, this function is not coupled with consensus
 func (node *Node) DoSync() {
 	<-node.peerReadyChan
-	ss := syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.Consensus.PubKey.GetAddress())
+	ss := syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
 	if ss.CreateSyncConfig(node.GetSyncingPeers()) {
 		ss.MakeConnectionToPeers()
 		ss.SyncLoop(node.blockchain, node.Worker)
@@ -150,7 +142,7 @@ func (node *Node) DoSyncing() {
 			}
 
 			if node.stateSync == nil {
-				node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.Consensus.PubKey.GetAddress())
+				node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
 				node.stateSync.CreateSyncConfig(node.GetSyncingPeers())
 				node.stateSync.MakeConnectionToPeers()
 			}
@@ -201,14 +193,14 @@ func (node *Node) SendNewBlockToUnsync() {
 			if elapseTime > broadcastTimeout {
 				utils.GetLogInstance().Warn("[SYNC] SendNewBlockToUnsync to peer timeout", "peerID", peerID)
 				// send last time and delete
-				config.client.PushNewBlock(node.Consensus.PubKey.GetAddress(), blockHash, true)
+				config.client.PushNewBlock(node.GetSyncID(), blockHash, true)
 				node.stateMutex.Lock()
 				node.peerRegistrationRecord[peerID].client.Close()
 				delete(node.peerRegistrationRecord, peerID)
 				node.stateMutex.Unlock()
 				continue
 			}
-			response := config.client.PushNewBlock(node.Consensus.PubKey.GetAddress(), blockHash, false)
+			response := config.client.PushNewBlock(node.GetSyncID(), blockHash, false)
 			if response != nil && response.Type == downloader_pb.DownloaderResponse_INSYNC {
 				node.stateMutex.Lock()
 				node.peerRegistrationRecord[peerID].client.Close()
@@ -270,32 +262,30 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 		node.stateSync.AddNewBlock(request.PeerHash, &blockObj)
 
 	case downloader_pb.DownloaderRequest_REGISTER:
-		peerAddress := common.BytesToAddress(request.PeerHash[:]).Hex()
-		if _, ok := node.peerRegistrationRecord[peerAddress]; ok {
+		peerID := string(request.PeerHash[:])
+		ip := request.Ip
+		port := request.Port
+		if _, ok := node.peerRegistrationRecord[peerID]; ok {
 			response.Type = downloader_pb.DownloaderResponse_FAIL
-			utils.GetLogInstance().Warn("[SYNC] peerRegistration record already exists", "peerAddress", peerAddress)
+			utils.GetLogInstance().Warn("[SYNC] peerRegistration record already exists", "ip", ip, "port", port)
 			return response, nil
 		} else if len(node.peerRegistrationRecord) >= maxBroadcastNodes {
 			response.Type = downloader_pb.DownloaderResponse_FAIL
-			utils.GetLogInstance().Warn("[SYNC] maximum registration limit exceeds", "peerAddress", peerAddress)
+			utils.GetLogInstance().Warn("[SYNC] maximum registration limit exceeds", "ip", ip, "port", port)
 			return response, nil
 		} else {
-			peer := node.Consensus.GetPeerByAddress(peerAddress)
 			response.Type = downloader_pb.DownloaderResponse_FAIL
-			if peer == nil {
-				utils.GetLogInstance().Warn("[SYNC] unable to get peer from peerID", "peerAddress", peerAddress)
-				return response, nil
-			}
-			client := downloader.ClientSetup(peer.IP, GetSyncingPort(peer.Port))
+			syncPort := GetSyncingPort(port)
+			client := downloader.ClientSetup(ip, syncPort)
 			if client == nil {
-				utils.GetLogInstance().Warn("[SYNC] unable to setup client for peerID", "peerAddress", peerAddress)
+				utils.GetLogInstance().Warn("[SYNC] unable to setup client for peerID", "ip", ip, "port", port)
 				return response, nil
 			}
 			config := &syncConfig{timestamp: time.Now().UnixNano(), client: client}
 			node.stateMutex.Lock()
-			node.peerRegistrationRecord[peerAddress] = config
+			node.peerRegistrationRecord[peerID] = config
 			node.stateMutex.Unlock()
-			utils.GetLogInstance().Debug("[SYNC] register peerID success", "peerAddress", peerAddress)
+			utils.GetLogInstance().Debug("[SYNC] register peerID success", "ip", ip, "port", port)
 			response.Type = downloader_pb.DownloaderResponse_SUCCESS
 		}
 

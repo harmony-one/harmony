@@ -26,6 +26,8 @@ message DownloaderRequest {
   repeated bytes hashes = 2;
   bytes peerHash = 3;
   bytes blockHash = 4;
+  string ip = 5;
+  string port = 6;
 }
 
 // DownloaderResponse is the generic response of DownloaderRequest.
