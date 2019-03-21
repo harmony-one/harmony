@@ -131,8 +131,9 @@ type Node struct {
 	// Service manager.
 	serviceManager *service.Manager
 
-	//Staked Accounts and Contract
+	// Staked Accounts and Contract
 	CurrentStakes          map[common.Address]*structs.StakeInfo //This will save the latest information about staked nodes.
+	CurrentStakesByNode    map[[20]byte]*structs.StakeInfo
 	StakingContractAddress common.Address
 	WithdrawStakeFunc      []byte
 
@@ -268,6 +269,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 			// Setup one time smart contracts
 			node.AddFaucetContractToPendingTransactions()
 			node.CurrentStakes = make(map[common.Address]*structs.StakeInfo)
+			node.CurrentStakesByNode = make(map[[20]byte]*structs.StakeInfo)
 			node.AddStakingContractToPendingTransactions() //This will save the latest information about staked nodes in current staked
 			// TODO(minhdoan): Think of a better approach to deploy smart contract.
 			// This is temporary for demo purpose.

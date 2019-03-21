@@ -30,6 +30,7 @@ func (node *Node) UpdateStakingList(stakeInfoReturnValue *structs.StakeInfoRetur
 		return
 	}
 	node.CurrentStakes = make(map[common.Address]*structs.StakeInfo)
+	node.CurrentStakesByNode = make(map[[20]byte]*structs.StakeInfo)
 	for i, addr := range stakeInfoReturnValue.LockedAddresses {
 		blockNum := stakeInfoReturnValue.BlockNums[i]
 		lockPeriodCount := stakeInfoReturnValue.LockPeriodCounts[i]
@@ -42,12 +43,16 @@ func (node *Node) UpdateStakingList(stakeInfoReturnValue *structs.StakeInfoRetur
 		}
 		// True if the token is still staked within the locking period.
 		if curEpoch-startEpoch <= lockPeriodCount.Uint64()*lockPeriodInEpochs {
-			node.CurrentStakes[addr] = &structs.StakeInfo{
-				stakeInfoReturnValue.BlsAddresses[i],
+			blsAddr := stakeInfoReturnValue.BlsAddresses[i]
+			stakeInfo := &structs.StakeInfo{
+				addr,
+				blsAddr,
 				blockNum,
 				lockPeriodCount,
 				stakeInfoReturnValue.Amounts[i],
 			}
+			node.CurrentStakes[addr] = stakeInfo
+			node.CurrentStakesByNode[blsAddr] = stakeInfo
 		}
 	}
 }

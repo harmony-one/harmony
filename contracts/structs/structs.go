@@ -17,6 +17,7 @@ type StakeInfoReturnValue struct {
 
 // StakeInfo stores the staking information for a staker.
 type StakeInfo struct {
+	Address         common.Address
 	BlsAddress      [20]byte
 	BlockNum        *big.Int
 	LockPeriodCount *big.Int // The number of locking period the token will be locked.
