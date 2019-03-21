@@ -15,6 +15,8 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"golang.org/x/crypto/sha3"
+
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
@@ -24,7 +26,6 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
-	"golang.org/x/crypto/sha3"
 )
 
 // Consensus is the main struct with all states and data related to consensus process.

@@ -5,15 +5,13 @@ import (
 	"math/big"
 	"os"
 
-	"github.com/harmony-one/harmony/contracts/structs"
-
-	"github.com/harmony-one/harmony/core"
-
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/harmony-one/harmony/internal/utils"
-
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
+
+	"github.com/harmony-one/harmony/contracts/structs"
+	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 //constants related to staking
