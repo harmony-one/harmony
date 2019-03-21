@@ -2,10 +2,8 @@ package syncing
 
 import (
 	"bytes"
-	"fmt"
 	"reflect"
 	"sort"
-	"strconv"
 	"sync"
 	"time"
 
@@ -25,9 +23,10 @@ import (
 const (
 	ConsensusRatio                        = float64(0.66)
 	SleepTimeAfterNonConsensusBlockHashes = time.Second * 30
-	TimesToFail                           = 5
+	TimesToFail                           = 5 // Downloadblocks service retry limit
 	RegistrationNumber                    = 3
 	SyncingPortDifference                 = 3000
+	inSyncThreshold                       = 1 // when peerBlockHeight - myBlockHeight <= inSyncThreshold, it's ready to join consensus
 )
 
 // SyncPeerConfig is peer config to sync.
@@ -74,6 +73,7 @@ type StateSync struct {
 	selfport           string
 	peerNumber         int
 	activePeerNumber   int
+	currentHeight      uint64   // current height of local blockchain
 	selfAddress        [20]byte // address of my BLS key
 	commonBlocks       map[int]*types.Block
 	lastMileBlocks     []*types.Block // last mile blocks to catch up with the consensus
@@ -96,16 +96,6 @@ func (ss *StateSync) CloseConnections() {
 			pc.client.Close()
 		}
 	}
-}
-
-// GetServicePort returns the service port from syncing port
-// TODO: really need use a unique ID instead of ip/port
-func GetServicePort(nodePort string) string {
-	if port, err := strconv.Atoi(nodePort); err == nil {
-		return fmt.Sprintf("%d", port+SyncingPortDifference)
-	}
-	utils.GetLogInstance().Warn("unable to get service port")
-	return ""
 }
 
 // AddNewBlock will add newly received block into state syncing queue
@@ -158,9 +148,12 @@ func (peerConfig *SyncPeerConfig) GetBlocks(hashes [][]byte) ([][]byte, error) {
 }
 
 // CreateSyncConfig creates SyncConfig for StateSync object.
-func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer) {
+func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer) bool {
 	utils.GetLogInstance().Debug("CreateSyncConfig: len of peers", "len", len(peers))
-	utils.GetLogInstance().Debug("CreateSyncConfig: len of peers", "peers", peers)
+	if len(peers) == 0 {
+		utils.GetLogInstance().Warn("[SYNC] Unable to get neighbor peers")
+		return false
+	}
 	ss.peerNumber = len(peers)
 	ss.syncConfig = &SyncConfig{
 		peers: make([]*SyncPeerConfig, ss.peerNumber),
@@ -170,16 +163,15 @@ func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer) {
 			ip:   peers[id].IP,
 			port: peers[id].Port,
 		}
-		utils.GetLogInstance().Debug("[SYNC] CreateSyncConfig: peer port to connect", "port", peers[id].Port)
 	}
-	utils.GetLogInstance().Info("[SYNC] Finished creating SyncConfig.")
+	utils.GetLogInstance().Info("[SYNC] Finished creating SyncConfig")
+	return true
 }
 
 // MakeConnectionToPeers makes grpc connection to all peers.
 func (ss *StateSync) MakeConnectionToPeers() {
 	var wg sync.WaitGroup
 	wg.Add(ss.peerNumber)
-
 	for id := range ss.syncConfig.peers {
 		go func(peerConfig *SyncPeerConfig) {
 			defer wg.Done()
@@ -447,10 +439,11 @@ func (ss *StateSync) updateBlockAndStatus(block *types.Block, bc *core.BlockChai
 		utils.GetLogInstance().Debug("Error adding new block to blockchain", "Error", err)
 		return false
 	}
-	utils.GetLogInstance().Info("[SYNC] new block added to blockchain", "blockHeight", bc.CurrentBlock().NumberU64(), "blockHex", bc.CurrentBlock().Hash().Hex(), "parentHex", bc.CurrentBlock().ParentHash().Hex())
 	ss.syncMux.Lock()
+	ss.currentHeight = bc.CurrentBlock().NumberU64()
 	worker.UpdateCurrent()
 	ss.syncMux.Unlock()
+	utils.GetLogInstance().Info("[SYNC] new block added to blockchain", "blockHeight", bc.CurrentBlock().NumberU64(), "blockHex", bc.CurrentBlock().Hash().Hex())
 	return true
 }
 
@@ -507,17 +500,14 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 	}
 }
 
-// StartStateSync starts state sync. isBeacon=true means it's the non-beacon node sync beaconchain block
-func (ss *StateSync) StartStateSync(startHash []byte, bc *core.BlockChain, worker *worker.Worker, isBeacon bool) {
-	if !isBeacon {
-		ss.RegisterNodeInfo()
-	}
+// ProcessStateSync processes state sync from the blocks received but not yet processed so far
+func (ss *StateSync) ProcessStateSync(startHash []byte, bc *core.BlockChain, worker *worker.Worker) {
+	ss.RegisterNodeInfo()
 	// Gets consensus hashes.
 	if !ss.GetConsensusHashes(startHash) {
-		utils.GetLogInstance().Debug("[SYNC] StartStateSync unable to reach consensus on ss.GetConsensusHashes")
+		utils.GetLogInstance().Debug("[SYNC] ProcessStateSync unable to reach consensus on ss.GetConsensusHashes")
 		return
 	}
-	utils.GetLogInstance().Debug("[SYNC] StartStateSync reach consensus on ss.GetConsensusHashes")
 	ss.generateStateSyncTaskQueue(bc)
 	// Download blocks.
 	if ss.stateSyncTaskQueue.Len() > 0 {
@@ -561,4 +551,38 @@ func (ss *StateSync) RegisterNodeInfo() int {
 		count++
 	}
 	return count
+}
+
+// getMaxPeerHeight gets the maximum blockchain heights from peers
+func (ss *StateSync) getMaxPeerHeight() uint64 {
+	ss.CleanUpNilPeers()
+	maxHeight := uint64(0)
+	var wg sync.WaitGroup
+	for id := range ss.syncConfig.peers {
+		wg.Add(1)
+		go func(peerConfig *SyncPeerConfig) {
+			defer wg.Done()
+			response := peerConfig.client.GetBlockChainHeight()
+			ss.syncMux.Lock()
+			if response != nil && maxHeight < response.BlockHeight {
+				maxHeight = response.BlockHeight
+			}
+			ss.syncMux.Unlock()
+		}(ss.syncConfig.peers[id])
+	}
+	wg.Wait()
+	return maxHeight
+}
+
+// SyncLoop will keep syncing with peers until catches up
+func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker) {
+	for {
+		otherHeight := ss.getMaxPeerHeight()
+		if ss.currentHeight+inSyncThreshold >= otherHeight {
+			utils.GetLogInstance().Info("[SYNC] Node is now IN SYNC!")
+			return
+		}
+		startHash := bc.CurrentBlock().Hash()
+		ss.ProcessStateSync(startHash[:], bc, worker)
+	}
 }

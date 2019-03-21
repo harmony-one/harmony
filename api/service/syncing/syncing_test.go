@@ -1,7 +1,6 @@
 package syncing
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
@@ -45,12 +44,5 @@ func TestCreateStateSync(t *testing.T) {
 
 	if stateSync == nil {
 		t.Error("Unable to create stateSync")
-	}
-}
-
-func TestGetServicePort(t *testing.T) {
-	servicePort := GetServicePort("8000")
-	if strings.Compare(servicePort, "11000") != 0 {
-		t.Errorf("Service port match failure expected %s, actual %s", servicePort, "11000")
 	}
 }

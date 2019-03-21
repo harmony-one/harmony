@@ -1,7 +1,6 @@
 package node
 
 import (
-	"bytes"
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
@@ -12,14 +11,12 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/api/client"
 	clientService "github.com/harmony-one/harmony/api/client/service"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
-	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/contracts"
 	"github.com/harmony-one/harmony/contracts/structs"
@@ -67,12 +64,6 @@ func (state State) String() string {
 	}
 	return "Unknown"
 }
-
-// Constants related to doing syncing.
-const (
-	lastMileThreshold = 4
-	inSyncThreshold   = 1
-)
 
 const (
 	// ClientServicePortDiff is the positive port diff for client service
@@ -164,6 +155,9 @@ type Node struct {
 
 	// Channel to notify consensus service to really start consensus
 	startConsensus chan struct{}
+
+	// channel to notify the peers are ready
+	peerReadyChan chan struct{}
 
 	// node configuration, including group ID, shard ID, etc
 	NodeConfig *nodeconfig.ConfigType
@@ -293,6 +287,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database) *N
 	go node.ReceiveGroupMessage()
 
 	node.startConsensus = make(chan struct{})
+	node.peerReadyChan = make(chan struct{})
 
 	// init the global and the only node config
 	node.NodeConfig = nodeconfig.GetConfigs(nodeconfig.Global)
@@ -329,92 +324,6 @@ func (node *Node) AddBeaconPeer(p *p2p.Peer) bool {
 	key := fmt.Sprintf("%s:%s:%s", p.IP, p.Port, p.PeerID)
 	_, ok := node.BeaconNeighbors.LoadOrStore(key, *p)
 	return ok
-}
-
-// CalculateResponse implements DownloadInterface on Node object.
-func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*downloader_pb.DownloaderResponse, error) {
-	response := &downloader_pb.DownloaderResponse{}
-	switch request.Type {
-	case downloader_pb.DownloaderRequest_HEADER:
-		utils.GetLogInstance().Debug("[SYNC] CalculateResponse DownloaderRequest_HEADER", "request.BlockHash", request.BlockHash)
-		var startHeaderHash []byte
-		if request.BlockHash == nil {
-			tmp := node.blockchain.Genesis().Hash()
-			startHeaderHash = tmp[:]
-		} else {
-			startHeaderHash = request.BlockHash
-		}
-		for block := node.blockchain.CurrentBlock(); block != nil; block = node.blockchain.GetBlockByHash(block.Header().ParentHash) {
-			blockHash := block.Hash()
-			if bytes.Compare(blockHash[:], startHeaderHash) == 0 {
-				break
-			}
-			response.Payload = append(response.Payload, blockHash[:])
-		}
-	case downloader_pb.DownloaderRequest_BLOCK:
-		for _, bytes := range request.Hashes {
-			var hash common.Hash
-			hash.SetBytes(bytes)
-			block := node.blockchain.GetBlockByHash(hash)
-			if block == nil {
-				utils.GetLogInstance().Error("[SYNC] GetBlockByHash returns nil")
-				return nil, fmt.Errorf("GetBlockByHash return nil. Hash: %v", hash)
-			}
-			encodedBlock, err := rlp.EncodeToBytes(block)
-			if err == nil {
-				response.Payload = append(response.Payload, encodedBlock)
-			}
-		}
-	case downloader_pb.DownloaderRequest_NEWBLOCK:
-		if node.State != NodeNotInSync {
-			utils.GetLogInstance().Debug("[SYNC] new block received, but state is", "state", node.State.String())
-			response.Type = downloader_pb.DownloaderResponse_INSYNC
-			return response, nil
-		}
-		var blockObj types.Block
-		err := rlp.DecodeBytes(request.BlockHash, &blockObj)
-		if err != nil {
-			utils.GetLogInstance().Warn("[SYNC] unable to decode received new block")
-			return response, err
-		}
-		node.stateSync.AddNewBlock(request.PeerHash, &blockObj)
-
-	case downloader_pb.DownloaderRequest_REGISTER:
-		peerAddress := common.BytesToAddress(request.PeerHash[:]).Hex()
-		if _, ok := node.peerRegistrationRecord[peerAddress]; ok {
-			response.Type = downloader_pb.DownloaderResponse_FAIL
-			utils.GetLogInstance().Warn("[SYNC] peerRegistration record already exists", "peerAddress", peerAddress)
-			return response, nil
-		} else if len(node.peerRegistrationRecord) >= maxBroadcastNodes {
-			response.Type = downloader_pb.DownloaderResponse_FAIL
-			utils.GetLogInstance().Warn("[SYNC] maximum registration limit exceeds", "peerAddress", peerAddress)
-			return response, nil
-		} else {
-			peer := node.Consensus.GetPeerByAddress(peerAddress)
-			response.Type = downloader_pb.DownloaderResponse_FAIL
-			if peer == nil {
-				utils.GetLogInstance().Warn("[SYNC] unable to get peer from peerID", "peerAddress", peerAddress)
-				return response, nil
-			}
-			client := downloader.ClientSetup(peer.IP, GetSyncingPort(peer.Port))
-			if client == nil {
-				utils.GetLogInstance().Warn("[SYNC] unable to setup client for peerID", "peerAddress", peerAddress)
-				return response, nil
-			}
-			config := &syncConfig{timestamp: time.Now().UnixNano(), client: client}
-			node.stateMutex.Lock()
-			node.peerRegistrationRecord[peerAddress] = config
-			node.stateMutex.Unlock()
-			utils.GetLogInstance().Debug("[SYNC] register peerID success", "peerAddress", peerAddress)
-			response.Type = downloader_pb.DownloaderResponse_SUCCESS
-		}
-	case downloader_pb.DownloaderRequest_REGISTERTIMEOUT:
-		if node.State == NodeNotInSync {
-			count := node.stateSync.RegisterNodeInfo()
-			utils.GetLogInstance().Debug("[SYNC] extra node registered", "number", count)
-		}
-	}
-	return response, nil
 }
 
 // RemovePeersHandler is a goroutine to wait on the OfflinePeers channel
