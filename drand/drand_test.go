@@ -24,7 +24,7 @@ func TestNew(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	dRand := New(host, "0", []p2p.Peer{leader, validator}, leader, nil, true, bls2.RandPrivateKey())
+	dRand := New(host, 0, []p2p.Peer{leader, validator}, leader, nil, true, bls2.RandPrivateKey())
 
 	if !dRand.IsLeader {
 		test.Error("dRand should belong to a leader")
@@ -39,7 +39,7 @@ func TestGetValidatorPeers(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	dRand := New(host, "0", []p2p.Peer{leader, validator}, leader, nil, true, bls2.RandPrivateKey())
+	dRand := New(host, 0, []p2p.Peer{leader, validator}, leader, nil, true, bls2.RandPrivateKey())
 
 	if !dRand.IsLeader {
 		test.Error("dRand should belong to a leader")
@@ -60,7 +60,7 @@ func TestAddPeers(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	dRand := New(host, "0", []p2p.Peer{leader, validator}, leader, nil, true, bls2.RandPrivateKey())
+	dRand := New(host, 0, []p2p.Peer{leader, validator}, leader, nil, true, bls2.RandPrivateKey())
 
 	if !dRand.IsLeader {
 		test.Error("dRand should belong to a leader")
@@ -89,7 +89,7 @@ func TestGetValidatorByPeerId(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	dRand := New(host, "0", []p2p.Peer{leader, validator}, leader, nil, true, leaderPriKey)
+	dRand := New(host, 0, []p2p.Peer{leader, validator}, leader, nil, true, leaderPriKey)
 
 	if !dRand.IsLeader {
 		test.Error("dRand should belong to a leader")
@@ -114,7 +114,7 @@ func TestResetState(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	dRand := New(host, "0", []p2p.Peer{leader, validator}, leader, nil, true, bls2.RandPrivateKey())
+	dRand := New(host, 0, []p2p.Peer{leader, validator}, leader, nil, true, bls2.RandPrivateKey())
 	dRand.ResetState()
 }
 
@@ -126,7 +126,7 @@ func TestSetLeaderPubKey(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	dRand := New(host, "0", []p2p.Peer{leader, validator}, leader, nil, true, bls2.RandPrivateKey())
+	dRand := New(host, 0, []p2p.Peer{leader, validator}, leader, nil, true, bls2.RandPrivateKey())
 
 	_, newPublicKey, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	newPublicKeyBytes, _ := newPublicKey.Bytes()
@@ -143,7 +143,7 @@ func TestUpdatePublicKeys(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	dRand := New(host, "0", []p2p.Peer{leader, validator}, leader, nil, true, bls2.RandPrivateKey())
+	dRand := New(host, 0, []p2p.Peer{leader, validator}, leader, nil, true, bls2.RandPrivateKey())
 
 	pubKey1 := bls2.RandPrivateKey().GetPublicKey()
 	pubKey2 := bls2.RandPrivateKey().GetPublicKey()
@@ -169,7 +169,7 @@ func TestVerifyMessageSig(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	dRand := New(host, "0", []p2p.Peer{leader, validator}, leader, nil, true, bls2.RandPrivateKey())
+	dRand := New(host, 0, []p2p.Peer{leader, validator}, leader, nil, true, bls2.RandPrivateKey())
 
 	message := &msg_pb.Message{
 		ReceiverType: msg_pb.ReceiverType_VALIDATOR,
@@ -198,7 +198,7 @@ func TestVrf(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	dRand := New(host, "0", []p2p.Peer{leader, validator}, leader, nil, true, bls2.RandPrivateKey())
+	dRand := New(host, 0, []p2p.Peer{leader, validator}, leader, nil, true, bls2.RandPrivateKey())
 	tx1 := types.NewTransaction(1, common.BytesToAddress([]byte{0x11}), 0, big.NewInt(111), 1111, big.NewInt(11111), []byte{0x11, 0x11, 0x11})
 	txs := []*types.Transaction{tx1}
 

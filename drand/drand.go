@@ -3,7 +3,6 @@ package drand
 import (
 	"crypto/sha256"
 	"errors"
-	"strconv"
 	"sync"
 
 	protobuf "github.com/golang/protobuf/proto"
@@ -66,7 +65,7 @@ type DRand struct {
 }
 
 // New creates a new dRand object
-func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer, confirmedBlockChannel chan *types.Block, isLeader bool, blsPriKey *bls.SecretKey) *DRand {
+func New(host p2p.Host, ShardID uint32, peers []p2p.Peer, leader p2p.Peer, confirmedBlockChannel chan *types.Block, isLeader bool, blsPriKey *bls.SecretKey) *DRand {
 	dRand := DRand{}
 	dRand.host = host
 
@@ -115,12 +114,7 @@ func New(host p2p.Host, ShardID string, peers []p2p.Peer, leader p2p.Peer, confi
 	priKey, pubKey := p256.GenerateKey()
 	dRand.vrfPriKey = &priKey
 	dRand.vrfPubKey = &pubKey
-
-	myShardID, err := strconv.Atoi(ShardID)
-	if err != nil {
-		panic("Unparseable shard Id" + ShardID)
-	}
-	dRand.ShardID = uint32(myShardID)
+	dRand.ShardID = ShardID
 
 	return &dRand
 }

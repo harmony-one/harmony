@@ -21,7 +21,7 @@ func TestConstructPrepareMessage(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader, bls.RandPrivateKey())
+	consensus := New(host, 0, []p2p.Peer{leader, validator}, leader, bls.RandPrivateKey())
 	consensus.blockHash = [32]byte{}
 	msgBytes := consensus.constructPrepareMessage()
 	msgBytes, err = proto.GetConsensusMessagePayload(msgBytes)
@@ -47,7 +47,7 @@ func TestConstructCommitMessage(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader, bls.RandPrivateKey())
+	consensus := New(host, 0, []p2p.Peer{leader, validator}, leader, bls.RandPrivateKey())
 	consensus.blockHash = [32]byte{}
 	msg := consensus.constructCommitMessage([]byte("random string"))
 	msg, err = proto.GetConsensusMessagePayload(msg)

@@ -70,10 +70,9 @@ type ConfigType struct {
 	isBeacon   bool        // whether this node is a beacon node or not
 	isLeader   bool        // whether this node is a leader or not
 	isArchival bool        // whether this node is a archival node. archival node backups all blockchain information.
-	shardID    uint32      // shardID of this node
+	ShardID    uint32      // ShardID of this node
 	role       Role        // Role of the node
 
-	ShardIDString   string
 	StringRole      string
 	Host            p2p.Host
 	StakingPriKey   *ecdsa.PrivateKey
@@ -110,7 +109,7 @@ func GetGlobalConfig() *ConfigType {
 }
 
 func (conf *ConfigType) String() string {
-	return fmt.Sprintf("%s/%s/%s:%v,%v,%v:%v", conf.beacon, conf.group, conf.client, conf.isClient, conf.isBeacon, conf.isLeader, conf.shardID)
+	return fmt.Sprintf("%s/%s/%s:%v,%v,%v:%v", conf.beacon, conf.group, conf.client, conf.isClient, conf.isBeacon, conf.isLeader, conf.ShardID)
 }
 
 // SetBeaconGroupID set the groupID for beacon group
@@ -148,9 +147,9 @@ func (conf *ConfigType) SetIsArchival(b bool) {
 	conf.isArchival = b
 }
 
-// SetShardID set the shardID
+// SetShardID set the ShardID
 func (conf *ConfigType) SetShardID(s uint32) {
-	conf.shardID = s
+	conf.ShardID = s
 }
 
 // SetRole set the role
@@ -191,11 +190,6 @@ func (conf *ConfigType) IsLeader() bool {
 // IsArchival returns the isArchival configuration
 func (conf *ConfigType) IsArchival() bool {
 	return conf.isArchival
-}
-
-// ShardID returns the shardID
-func (conf *ConfigType) ShardID() uint32 {
-	return conf.shardID
 }
 
 // Role returns the role

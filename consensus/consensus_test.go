@@ -20,7 +20,7 @@ func TestNew(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader, bls.RandPrivateKey())
+	consensus := New(host, 0, []p2p.Peer{leader, validator}, leader, bls.RandPrivateKey())
 	if consensus.consensusID != 0 {
 		test.Errorf("Consensus Id is initialized to the wrong value: %d", consensus.consensusID)
 	}
@@ -56,7 +56,7 @@ func TestRemovePeers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus := New(host, "0", peers, leader, nil)
+	consensus := New(host, 0, peers, leader, nil)
 
 	//	consensus.DebugPrintPublicKeys()
 	f := consensus.RemovePeers(peerRemove)
@@ -77,7 +77,7 @@ func TestGetPeerFromID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader, leaderPriKey)
+	consensus := New(host, 0, []p2p.Peer{leader, validator}, leader, leaderPriKey)
 	leaderAddress := utils.GetAddressFromBlsPubKey(leader.ConsensusPubKey)
 	validatorAddress := utils.GetAddressFromBlsPubKey(validator.ConsensusPubKey)
 	l := consensus.GetPeerByAddress(leaderAddress.Hex())
@@ -98,7 +98,7 @@ func TestPopulateMessageFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader, bls.RandPrivateKey())
+	consensus := New(host, 0, []p2p.Peer{leader, validator}, leader, bls.RandPrivateKey())
 	consensus.consensusID = 2
 	consensus.blockHash = blockHash
 	consensus.SelfAddress = "fake address"
@@ -130,7 +130,7 @@ func TestSignAndMarshalConsensusMessage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus := New(host, "0", []p2p.Peer{leader, validator}, leader, bls.RandPrivateKey())
+	consensus := New(host, 0, []p2p.Peer{leader, validator}, leader, bls.RandPrivateKey())
 	consensus.consensusID = 2
 	consensus.blockHash = blockHash
 	consensus.SelfAddress = "fake address"
