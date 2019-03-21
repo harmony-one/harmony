@@ -22,7 +22,7 @@ func ClientSetup(ip, port string) *Client {
 	client := Client{}
 	client.opts = append(client.opts, grpc.WithInsecure())
 	var err error
-	client.conn, err = grpc.Dial(fmt.Sprintf("%s:%s", ip, port), client.opts...)
+	client.conn, err = grpc.Dial(fmt.Sprintf(ip+":"+port), client.opts...)
 	if err != nil {
 		utils.GetLogInstance().Info("client.go:ClientSetup fail to dial: ", "error", err)
 		return nil
@@ -71,29 +71,31 @@ func (client *Client) GetBlocks(hashes [][]byte) *pb.DownloaderResponse {
 
 // Register will register node's ip/port information to peers receive newly created blocks in future
 // hash is the bytes of "ip:port" string representation
-func (client *Client) Register(hash []byte) *pb.DownloaderResponse {
+func (client *Client) Register(hash []byte, ip, port string) *pb.DownloaderResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_REGISTER}
 	request.PeerHash = make([]byte, len(hash))
 	copy(request.PeerHash, hash)
+	request.Ip = ip
+	request.Port = port
 	response, err := client.dlClient.Query(ctx, request)
-	if err != nil {
-		utils.GetLogInstance().Info("[SYNC] client.go:Register failed.", "error", err)
+	if err != nil || response == nil {
+		utils.GetLogInstance().Info("[SYNC] client.go:Register failed.", "error", err, "response", response)
 	}
 	return response
 }
 
-// PushNewBlock will send the lastest verified blow to registered nodes
-func (client *Client) PushNewBlock(peerAddress [20]byte, blockHash []byte, timeout bool) *pb.DownloaderResponse {
+// PushNewBlock will send the lastest verified block to registered nodes
+func (client *Client) PushNewBlock(selfPeerHash [20]byte, blockHash []byte, timeout bool) *pb.DownloaderResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_NEWBLOCK}
 	request.BlockHash = make([]byte, len(blockHash))
 	copy(request.BlockHash, blockHash)
-	request.PeerHash = make([]byte, len(peerAddress))
-	copy(request.PeerHash, peerAddress[:])
+	request.PeerHash = make([]byte, len(selfPeerHash))
+	copy(request.PeerHash, selfPeerHash[:])
 
 	if timeout {
 		request.Type = pb.DownloaderRequest_REGISTERTIMEOUT

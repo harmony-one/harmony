@@ -57,11 +57,11 @@ type SyncConfig struct {
 }
 
 // CreateStateSync returns the implementation of StateSyncInterface interface.
-func CreateStateSync(ip string, port string, addr [20]byte) *StateSync {
+func CreateStateSync(ip string, port string, peerHash [20]byte) *StateSync {
 	stateSync := &StateSync{}
 	stateSync.selfip = ip
 	stateSync.selfport = port
-	stateSync.selfAddress = addr
+	stateSync.selfPeerHash = peerHash
 	stateSync.commonBlocks = make(map[int]*types.Block)
 	stateSync.lastMileBlocks = []*types.Block{}
 	return stateSync
@@ -71,10 +71,10 @@ func CreateStateSync(ip string, port string, addr [20]byte) *StateSync {
 type StateSync struct {
 	selfip             string
 	selfport           string
+	selfPeerHash       [20]byte // hash of ip and address combination
 	peerNumber         int
 	activePeerNumber   int
-	currentHeight      uint64   // current height of local blockchain
-	selfAddress        [20]byte // address of my BLS key
+	currentHeight      uint64 // current height of local blockchain
 	commonBlocks       map[int]*types.Block
 	lastMileBlocks     []*types.Block // last mile blocks to catch up with the consensus
 	syncConfig         *SyncConfig
@@ -516,8 +516,8 @@ func (ss *StateSync) ProcessStateSync(startHash []byte, bc *core.BlockChain, wor
 	ss.generateNewState(bc, worker)
 }
 
-func (peerConfig *SyncPeerConfig) registerToBroadcast(peerHash []byte) error {
-	response := peerConfig.client.Register(peerHash)
+func (peerConfig *SyncPeerConfig) registerToBroadcast(peerHash []byte, ip, port string) error {
+	response := peerConfig.client.Register(peerHash, ip, port)
 	if response == nil || response.Type == pb.DownloaderResponse_FAIL {
 		return ErrRegistrationFail
 	} else if response.Type == pb.DownloaderResponse_SUCCESS {
@@ -542,9 +542,9 @@ func (ss *StateSync) RegisterNodeInfo() int {
 		if peerConfig.client == nil {
 			continue
 		}
-		err := peerConfig.registerToBroadcast(ss.selfAddress[:])
+		err := peerConfig.registerToBroadcast(ss.selfPeerHash[:], ss.selfip, ss.selfport)
 		if err != nil {
-			utils.GetLogInstance().Debug("[SYNC] register failed to peer", "ip", peerConfig.ip, "port", peerConfig.port, "selfAddress", ss.selfAddress)
+			utils.GetLogInstance().Debug("[SYNC] register failed to peer", "ip", peerConfig.ip, "port", peerConfig.port, "selfPeerHash", ss.selfPeerHash)
 			continue
 		}
 		utils.GetLogInstance().Debug("[SYNC] register success", "ip", peerConfig.ip, "port", peerConfig.port)

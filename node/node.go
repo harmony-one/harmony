@@ -70,6 +70,8 @@ const (
 	ClientServicePortDiff       = 5555
 	maxBroadcastNodes           = 10                  // broadcast at most maxBroadcastNodes peers that need in sync
 	broadcastTimeout      int64 = 3 * 60 * 1000000000 // 3 mins
+	//SyncIDLength is the length of bytes for syncID
+	SyncIDLength = 20
 )
 
 // use to push new block to outofsync node
@@ -114,6 +116,7 @@ type Node struct {
 	clientServer *clientService.Server
 
 	// Syncing component.
+	syncID                 [SyncIDLength]byte // a unique ID for the node during the state syncing process with peers
 	downloaderServer       *downloader.Server
 	stateSync              *syncing.StateSync
 	beaconSync             *syncing.StateSync
@@ -209,6 +212,11 @@ func (node *Node) countNumTransactionsInBlockchain() int {
 	return count
 }
 
+// GetSyncID returns the syncID of this node
+func (node *Node) GetSyncID() [SyncIDLength]byte {
+	return node.syncID
+}
+
 // New creates a new node.
 func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database) *Node {
 	var chain *core.BlockChain
@@ -216,6 +224,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database) *N
 	var isFirstTime bool // if cannot get blockchain from database, then isFirstTime = true
 
 	node := Node{}
+	copy(node.syncID[:], GenerateRandomString(SyncIDLength))
 	if host != nil {
 		node.host = host
 		node.SelfPeer = host.GetSelfPeer()
