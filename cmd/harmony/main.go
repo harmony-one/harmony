@@ -7,7 +7,6 @@ import (
 	"os"
 	"path"
 	"runtime"
-	"strconv"
 	"time"
 
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -130,15 +129,13 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	stakingPriKey := ""
 	consensusPriKey := &bls.SecretKey{}
 	if *isBeacon {
-		// TODO: use a better way to get the index for accounts.
-		portNum, _ := strconv.Atoi(*port)
-		index := portNum % 10
-		stakingPriKey = contract.InitialBeaconChainAccounts[index].Private
-		err := consensusPriKey.SetHexString(contract.InitialBeaconChainBLSAccounts[index].Private)
+		stakingPriKey = contract.InitialBeaconChainAccounts[*accountIndex].Private
+		err := consensusPriKey.SetHexString(contract.InitialBeaconChainBLSAccounts[*accountIndex].Private)
 		if err != nil {
 			panic(fmt.Errorf("generate key error"))
 		}
 	} else {
+		// TODO: let user specify the ECDSA key
 		stakingPriKey = contract.NewNodeAccounts[*accountIndex].Private
 		// TODO: use user supplied key
 		consensusPriKey.SetByCSPRNG()

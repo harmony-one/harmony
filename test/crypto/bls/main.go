@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"time"
 
@@ -17,11 +18,10 @@ func main() {
 	var aggPub *bls.PublicKey
 
 	startTime := time.Now()
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 400; i++ {
 		var sec bls.SecretKey
 		sec.SetByCSPRNG()
-		log.Printf("Secret Key: %s", sec.GetHexString())
-
+		fmt.Printf("{Address: \"\", Private: \"%s\", Public: \"\"},\n", sec.GetHexString())
 		if i == 0 {
 			aggSig = sec.Sign(m)
 			aggPub = sec.GetPublicKey()
