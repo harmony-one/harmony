@@ -2,7 +2,7 @@ package main
 
 import (
 	"crypto/ecdsa"
-	"crypto/rand"
+	cRand "crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
 	"flag"
@@ -10,6 +10,7 @@ import (
 	"io"
 	"io/ioutil"
 	"math/big"
+	"math/rand"
 	"os"
 	"path"
 	"strconv"
@@ -20,10 +21,15 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/harmony-one/harmony/api/client"
 	clientService "github.com/harmony-one/harmony/api/client/service"
 	"github.com/harmony-one/harmony/core/types"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/internal/wallet/wallet"
 	"github.com/harmony-one/harmony/node"
+	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/p2p/p2pimpl"
 )
 
 var (
@@ -44,6 +50,10 @@ type AccountState struct {
 	nonce   uint64
 }
 
+const (
+	rpcRetry = 3
+)
+
 var (
 	// Account subcommands
 	accountImportCommand = flag.NewFlagSet("import", flag.ExitOnError)
@@ -54,7 +64,7 @@ var (
 	transferSenderPtr    = transferCommand.String("from", "0", "Specify the sender account address or index")
 	transferReceiverPtr  = transferCommand.String("to", "", "Specify the receiver account")
 	transferAmountPtr    = transferCommand.Float64("amount", 0, "Specify the amount to transfer")
-	transferShardIDPtr   = transferCommand.Int("shardID", -1, "Specify the shard ID for the transfer")
+	transferShardIDPtr   = transferCommand.Int("shardID", 0, "Specify the shard ID for the transfer")
 	transferInputDataPtr = transferCommand.String("inputData", "", "Base64-encoded input data to embed in the transaction")
 
 	freeTokenCommand    = flag.NewFlagSet("getFreeToken", flag.ExitOnError)
@@ -67,20 +77,38 @@ var (
 	stopChan = make(chan struct{})
 	// Print out progress char
 	tick = time.NewTicker(time.Second)
-	// Flag to keep waiting for async call finished
+	// Flag to wait for async command: transfer
 	async = true
+)
+
+var (
+	// list of bootnodes
+	addrStrings = []string{"/ip4/100.26.90.187/tcp/9876/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9", "/ip4/54.213.43.194/tcp/9876/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX"}
+
+	// list of rpc servers
+	rpcServers = []struct {
+		IP   string
+		Port string
+	}{
+		{"18.236.96.207", "14555"},
+		{"18.206.91.170", "14555"},
+		{"54.213.63.26", "14555"},
+		{"13.229.96.10", "14555"},
+		{"34.243.2.56", "14555"},
+	}
 )
 
 // setupLog setup log for verbose output
 func setupLog() {
 	// enable logging for wallet
-	h := log.StreamHandler(os.Stdout, log.TerminalFormat(false))
+	h := log.StreamHandler(os.Stdout, log.TerminalFormat(true))
 	log.Root().SetHandler(h)
 }
 
 // The main wallet program entrance. Note the this wallet program is for demo-purpose only. It does not implement
 // the secure storage of keys.
 func main() {
+	rand.Seed(int64(time.Now().Nanosecond()))
 
 	// Verify that a subcommand has been provided
 	// os.Arg[0] is the main command
@@ -118,18 +146,20 @@ func main() {
 	case "-version":
 		printVersion(os.Args[0])
 	case "new":
-		go processNewCommnad()
+		processNewCommnad()
 	case "list":
-		go processListCommand()
+		processListCommand()
 	case "removeAll":
-		go clearKeystore()
-		fmt.Println("All existing accounts deleted...")
+		clearKeystore()
 	case "import":
-		go processImportCommnad()
+		processImportCommnad()
 	case "balances":
-		go processBalancesCommand()
+		processBalancesCommand()
 	case "getFreeToken":
-		go processGetFreeToken()
+		processGetFreeToken()
+	}
+
+	switch os.Args[1] {
 	case "transfer":
 		go processTransferCommand()
 	default:
@@ -150,14 +180,39 @@ func main() {
 	}
 }
 
+// createWalletNode creates wallet server node.
+func createWalletNode() *node.Node {
+	bootNodeAddrs, err := utils.StringsToAddrs(addrStrings)
+	if err != nil {
+		panic(err)
+	}
+	utils.BootNodes = bootNodeAddrs
+
+	shardIDs := []uint32{0}
+
+	// dummy host for wallet
+	self := p2p.Peer{IP: "127.0.0.1", Port: "6999"}
+	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "6999")
+	host, err := p2pimpl.NewHost(&self, priKey)
+	if err != nil {
+		panic(err)
+	}
+	w := node.New(host, nil, nil)
+	w.Client = client.NewClient(w.GetHost(), shardIDs)
+
+	w.NodeConfig.SetRole(nodeconfig.ClientNode)
+	w.ServiceManagerSetup()
+	w.RunServices()
+	return w
+}
+
 func processNewCommnad() {
 	randomBytes := [32]byte{}
-	_, err := io.ReadFull(rand.Reader, randomBytes[:])
+	_, err := io.ReadFull(cRand.Reader, randomBytes[:])
 
 	if err != nil {
 		fmt.Println("Failed to get randomness for the private key...")
-		async = false
-		return
+		os.Exit(0)
 	}
 	priKey, err := crypto2.GenerateKey()
 	if err != nil {
@@ -166,7 +221,7 @@ func processNewCommnad() {
 	storePrivateKey(crypto2.FromECDSA(priKey))
 	fmt.Printf("New account created with address:{%s}\n", crypto2.PubkeyToAddress(priKey.PublicKey).Hex())
 	fmt.Printf("Please keep a copy of the private key:{%s}\n", hex.EncodeToString(crypto2.FromECDSA(priKey)))
-	async = false
+	os.Exit(0)
 }
 
 func processListCommand() {
@@ -174,7 +229,7 @@ func processListCommand() {
 		fmt.Printf("Account %d:{%s}\n", i, crypto2.PubkeyToAddress(key.PublicKey).Hex())
 		fmt.Printf("    PrivateKey:{%s}\n", hex.EncodeToString(key.D.Bytes()))
 	}
-	async = false
+	os.Exit(0)
 }
 
 func processImportCommnad() {
@@ -182,8 +237,7 @@ func processImportCommnad() {
 	priKey := *accountImportPtr
 	if priKey == "" {
 		fmt.Println("Error: --privateKey is required")
-		async = false
-		return
+		os.Exit(0)
 	}
 	if !accountImportCommand.Parsed() {
 		fmt.Println("Failed to parse flags")
@@ -194,44 +248,39 @@ func processImportCommnad() {
 	}
 	storePrivateKey(priKeyBytes)
 	fmt.Println("Private key imported...")
-	async = false
+	os.Exit(0)
 }
 
 func processBalancesCommand() {
 	balanceCommand.Parse(os.Args[2:])
-	walletNode := wallet.CreateWalletNode()
 
 	if *balanceAddressPtr == "" {
 		for i, address := range ReadAddresses() {
 			fmt.Printf("Account %d: %s:\n", i, address.Hex())
-			for shardID, balanceNonce := range FetchBalance(address, walletNode) {
+			for shardID, balanceNonce := range FetchBalance(address) {
 				fmt.Printf("    Balance in Shard %d:  %s, nonce: %v \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance), balanceNonce.nonce)
 			}
 		}
 	} else {
 		address := common.HexToAddress(*balanceAddressPtr)
 		fmt.Printf("Account: %s:\n", address.Hex())
-		for shardID, balanceNonce := range FetchBalance(address, walletNode) {
+		for shardID, balanceNonce := range FetchBalance(address) {
 			fmt.Printf("    Balance in Shard %d:  %s, nonce: %v \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance), balanceNonce.nonce)
 		}
 	}
-	async = false
+	os.Exit(0)
 }
 
 func processGetFreeToken() {
 	freeTokenCommand.Parse(os.Args[2:])
-	walletNode := wallet.CreateWalletNode()
 
 	if *freeTokenAddressPtr == "" {
 		fmt.Println("Error: --address is required")
-		async = false
-		return
+	} else {
+		address := common.HexToAddress(*freeTokenAddressPtr)
+		GetFreeToken(address)
 	}
-	address := common.HexToAddress(*freeTokenAddressPtr)
-
-	GetFreeToken(address, walletNode)
-
-	async = false
+	os.Exit(0)
 }
 
 func processTransferCommand() {
@@ -302,8 +351,10 @@ func processTransferCommand() {
 	// Generate transaction
 	senderPriKey := priKeys[senderIndex]
 	senderAddress := addresses[senderIndex]
-	walletNode := wallet.CreateWalletNode()
-	shardIDToAccountState := FetchBalance(senderAddress, walletNode)
+
+	walletNode := createWalletNode()
+
+	shardIDToAccountState := FetchBalance(senderAddress)
 
 	state, ok := shardIDToAccountState[uint32(shardID)]
 	if !ok {
@@ -367,38 +418,53 @@ func convertBalanceIntoReadableFormat(balance *big.Int) string {
 
 // FetchBalance fetches account balance of specified address from the Harmony network
 // TODO add support for non beacon chain shards
-func FetchBalance(address common.Address, walletNode *node.Node) map[uint32]AccountState {
+func FetchBalance(address common.Address) map[uint32]AccountState {
 	result := make(map[uint32]AccountState)
-	peers := wallet.GetPeersFromBeaconChain(walletNode)
-	if len(peers) == 0 {
-		fmt.Printf("[FATAL] Can't find peers\n")
-		return nil
-	}
-	peer := peers[0]
-	port, _ := strconv.Atoi(peer.Port)
-	client := clientService.NewClient(peer.IP, strconv.Itoa(port+node.ClientServicePortDiff))
-	response := client.GetBalance(address)
 	balance := big.NewInt(0)
-	balance.SetBytes(response.Balance)
-	result[0] = AccountState{balance, response.Nonce}
+	result[0] = AccountState{balance, 0}
+
+	for retry := 0; retry < rpcRetry; retry++ {
+		server := rpcServers[rand.Intn(len(rpcServers))]
+		client, err := clientService.NewClient(server.IP, server.Port)
+		if err != nil {
+			continue
+		}
+
+		log.Debug("FetchBalance", "server", server)
+		response, err := client.GetBalance(address)
+		if err != nil {
+			log.Info("failed to get balance, retrying ...")
+			continue
+		}
+		log.Debug("FetchBalance", "response", response)
+		balance.SetBytes(response.Balance)
+		result[0] = AccountState{balance, response.Nonce}
+		break
+	}
 	return result
 }
 
 // GetFreeToken requests for token test token on each shard
-func GetFreeToken(address common.Address, walletNode *node.Node) {
-	peers := wallet.GetPeersFromBeaconChain(walletNode)
-	if len(peers) == 0 {
-		fmt.Printf("[FATAL] Can't find peers\n")
-		return
-	}
-	peer := peers[0]
-	port, _ := strconv.Atoi(peer.Port)
-	client := clientService.NewClient(peer.IP, strconv.Itoa(port+node.ClientServicePortDiff))
-	response := client.GetFreeToken(address)
+func GetFreeToken(address common.Address) {
+	for retry := 0; retry < rpcRetry; retry++ {
+		server := rpcServers[0]
+		client, err := clientService.NewClient(server.IP, server.Port)
+		if err != nil {
+			continue
+		}
 
-	txID := common.Hash{}
-	txID.SetBytes(response.TxId)
-	fmt.Printf("Transaction Id requesting free token in shard %d: %s\n", int(0), txID.Hex())
+		log.Debug("GetFreeToken", "server", server)
+		response, err := client.GetFreeToken(address)
+		if err != nil {
+			log.Info("failed to get free token, retrying ...")
+			continue
+		}
+		log.Debug("GetFreeToken", "response", response)
+		txID := common.Hash{}
+		txID.SetBytes(response.TxId)
+		fmt.Printf("Transaction Id requesting free token in shard %d: %s\n", int(0), txID.Hex())
+		break
+	}
 }
 
 // ReadAddresses reads the addresses stored in local keystore
@@ -439,6 +505,8 @@ func storePrivateKey(priKey []byte) {
 // clearKeystore deletes all data in the local keystore
 func clearKeystore() {
 	ioutil.WriteFile("keystore", []byte{}, 0644)
+	fmt.Println("All existing accounts deleted...")
+	os.Exit(0)
 }
 
 // readPrivateKeys reads all the private key stored in local keystore

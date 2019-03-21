@@ -3,7 +3,6 @@ package client
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -20,18 +19,17 @@ type Client struct {
 }
 
 // NewClient setups a Client given ip and port.
-func NewClient(ip, port string) *Client {
+func NewClient(ip, port string) (*Client, error) {
 	client := Client{}
 	client.opts = append(client.opts, grpc.WithInsecure())
 	var err error
 	client.conn, err = grpc.Dial(fmt.Sprintf("%s:%s", ip, port), client.opts...)
 	if err != nil {
-		log.Fatalf("fail to dial: %v", err)
-		return nil
+		return nil, err
 	}
 
 	client.clientServiceClient = proto.NewClientServiceClient(client.conn)
-	return &client
+	return &client, nil
 }
 
 // Close closes the Client.
@@ -40,37 +38,25 @@ func (client *Client) Close() {
 }
 
 // GetBalance gets account balance from the client service.
-func (client *Client) GetBalance(address common.Address) *proto.FetchAccountStateResponse {
+func (client *Client) GetBalance(address common.Address) (*proto.FetchAccountStateResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	request := &proto.FetchAccountStateRequest{Address: address.Bytes()}
-	response, err := client.clientServiceClient.FetchAccountState(ctx, request)
-	if err != nil {
-		log.Fatalf("Error getting balance: %s", err)
-	}
-	return response
+	return client.clientServiceClient.FetchAccountState(ctx, request)
 }
 
 // GetFreeToken requests free token from the faucet contract.
-func (client *Client) GetFreeToken(address common.Address) *proto.GetFreeTokenResponse {
+func (client *Client) GetFreeToken(address common.Address) (*proto.GetFreeTokenResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	request := &proto.GetFreeTokenRequest{Address: address.Bytes()}
-	response, err := client.clientServiceClient.GetFreeToken(ctx, request)
-	if err != nil {
-		log.Fatalf("Error getting free token: %s", err)
-	}
-	return response
+	return client.clientServiceClient.GetFreeToken(ctx, request)
 }
 
 // GetStakingContractInfo gets necessary info for staking.
-func (client *Client) GetStakingContractInfo(address common.Address) *proto.StakingContractInfoResponse {
+func (client *Client) GetStakingContractInfo(address common.Address) (*proto.StakingContractInfoResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	request := &proto.StakingContractInfoRequest{Address: address.Bytes()}
-	response, err := client.clientServiceClient.GetStakingContractInfo(ctx, request)
-	if err != nil {
-		log.Fatalf("Error getting free token: %s", err)
-	}
-	return response
+	return client.clientServiceClient.GetStakingContractInfo(ctx, request)
 }
