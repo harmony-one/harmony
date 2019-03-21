@@ -80,6 +80,8 @@ var (
 	addrStrings = []string{"/ip4/100.26.90.187/tcp/9876/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9", "/ip4/54.213.43.194/tcp/9876/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX"}
 
 	// list of rpc servers
+	// TODO; (leo) take build time parameters or environment parameters to add rpcServers
+	// Then this can be automated
 	rpcServers = []struct {
 		IP   string
 		Port string
@@ -151,9 +153,6 @@ func main() {
 		processBalancesCommand()
 	case "getFreeToken":
 		processGetFreeToken()
-	}
-
-	switch os.Args[1] {
 	case "transfer":
 		processTransferCommand()
 	default:
@@ -174,6 +173,8 @@ func createWalletNode() *node.Node {
 	shardIDs := []uint32{0}
 
 	// dummy host for wallet
+	// TODO: potentially, too many dummy IP may flush out good IP address from our bootnode DHT
+	// we need to understand the impact to bootnode DHT with this dummy host ip added
 	self := p2p.Peer{IP: "127.0.0.1", Port: "6999"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "6999")
 	host, err := p2pimpl.NewHost(&self, priKey)
@@ -195,7 +196,7 @@ func processNewCommnad() {
 
 	if err != nil {
 		fmt.Println("Failed to get randomness for the private key...")
-		os.Exit(0)
+		return
 	}
 	priKey, err := crypto2.GenerateKey()
 	if err != nil {
@@ -204,7 +205,6 @@ func processNewCommnad() {
 	storePrivateKey(crypto2.FromECDSA(priKey))
 	fmt.Printf("New account created with address:{%s}\n", crypto2.PubkeyToAddress(priKey.PublicKey).Hex())
 	fmt.Printf("Please keep a copy of the private key:{%s}\n", hex.EncodeToString(crypto2.FromECDSA(priKey)))
-	os.Exit(0)
 }
 
 func processListCommand() {
@@ -212,7 +212,6 @@ func processListCommand() {
 		fmt.Printf("Account %d:{%s}\n", i, crypto2.PubkeyToAddress(key.PublicKey).Hex())
 		fmt.Printf("    PrivateKey:{%s}\n", hex.EncodeToString(key.D.Bytes()))
 	}
-	os.Exit(0)
 }
 
 func processImportCommnad() {
@@ -220,7 +219,7 @@ func processImportCommnad() {
 	priKey := *accountImportPtr
 	if priKey == "" {
 		fmt.Println("Error: --privateKey is required")
-		os.Exit(0)
+		return
 	}
 	if !accountImportCommand.Parsed() {
 		fmt.Println("Failed to parse flags")
@@ -231,7 +230,6 @@ func processImportCommnad() {
 	}
 	storePrivateKey(priKeyBytes)
 	fmt.Println("Private key imported...")
-	os.Exit(0)
 }
 
 func processBalancesCommand() {
@@ -251,7 +249,6 @@ func processBalancesCommand() {
 			fmt.Printf("    Balance in Shard %d:  %s, nonce: %v \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance), balanceNonce.nonce)
 		}
 	}
-	os.Exit(0)
 }
 
 func processGetFreeToken() {
@@ -263,13 +260,13 @@ func processGetFreeToken() {
 		address := common.HexToAddress(*freeTokenAddressPtr)
 		GetFreeToken(address)
 	}
-	os.Exit(0)
 }
 
 func processTransferCommand() {
 	transferCommand.Parse(os.Args[2:])
 	if !transferCommand.Parsed() {
 		fmt.Println("Failed to parse flags")
+		return
 	}
 	sender := *transferSenderPtr
 	receiver := *transferReceiverPtr
@@ -391,7 +388,7 @@ func convertBalanceIntoReadableFormat(balance *big.Int) string {
 }
 
 // FetchBalance fetches account balance of specified address from the Harmony network
-// TODO add support for non beacon chain shards
+// TODO: (chao) add support for non beacon chain shards
 func FetchBalance(address common.Address) map[uint32]AccountState {
 	result := make(map[uint32]AccountState)
 	balance := big.NewInt(0)
@@ -480,7 +477,6 @@ func storePrivateKey(priKey []byte) {
 func clearKeystore() {
 	ioutil.WriteFile("keystore", []byte{}, 0644)
 	fmt.Println("All existing accounts deleted...")
-	os.Exit(0)
 }
 
 // readPrivateKeys reads all the private key stored in local keystore
