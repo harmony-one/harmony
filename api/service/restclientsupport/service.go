@@ -82,13 +82,14 @@ func (s *Service) Run() *http.Server {
 	return server
 }
 
+// Response is the data struct used the respoind to lottery app.
 type Response struct {
 	Players  []string `json:"players"`
 	Balances []string `json:"balances"`
 	Success  bool     `json:"success"`
 }
 
-// Enter --
+// Enter triggers enter method of smart contract.
 func (s *Service) Enter(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	key := r.FormValue("key")
@@ -114,7 +115,7 @@ func (s *Service) Enter(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(res)
 }
 
-// Result --
+// Result generates result of result end point.
 func (s *Service) Result(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	key := r.FormValue("key")
@@ -138,7 +139,7 @@ func (s *Service) Result(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(res)
 }
 
-// Result --
+// Winner triggers winner method of lottery smart contract.
 func (s *Service) Winner(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
