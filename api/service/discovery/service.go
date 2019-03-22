@@ -89,7 +89,6 @@ func (s *Service) contactP2pPeers() {
 			// It is just a temporary hack. When we work on re-sharding to regular shard, this has to be changed.
 			if !s.config.IsBeacon {
 				if s.addBeaconPeerFunc != nil {
-					utils.GetLogInstance().Debug("hehe", "peer", peer)
 					s.addBeaconPeerFunc(&peer)
 				}
 			}

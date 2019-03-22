@@ -3,7 +3,5 @@
 127.0.0.1 9002 validator 0
 127.0.0.1 9003 validator 0
 127.0.0.1 9004 validator 0
-127.0.0.1 9005 validator 0
 127.0.0.1 9009 archival 0
-127.0.0.1 9010 newnode 0
 127.0.0.1 19999 client 0

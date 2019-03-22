@@ -114,14 +114,14 @@ func main() {
 		panic("unable to new host in txgen")
 	}
 	for _, shardID := range shardIDs {
-		node := node.New(host, &consensus.Consensus{ShardID: shardID}, nil)
+		node := node.New(host, &consensus.Consensus{ShardID: shardID}, nil, false)
 		// Assign many fake addresses so we have enough address to play with at first
 		nodes = append(nodes, node)
 	}
 
 	// Client/txgenerator server node setup
 	consensusObj := consensus.New(host, 0, nil, p2p.Peer{}, nil)
-	clientNode := node.New(host, consensusObj, nil)
+	clientNode := node.New(host, consensusObj, nil, false)
 	clientNode.Client = client.NewClient(clientNode.GetHost(), shardIDs)
 
 	readySignal := make(chan uint32)
