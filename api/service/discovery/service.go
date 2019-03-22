@@ -89,6 +89,7 @@ func (s *Service) contactP2pPeers() {
 			// It is just a temporary hack. When we work on re-sharding to regular shard, this has to be changed.
 			if !s.config.IsBeacon {
 				if s.addBeaconPeerFunc != nil {
+					utils.GetLogInstance().Debug("hehe", "peer", peer)
 					s.addBeaconPeerFunc(&peer)
 				}
 			}
@@ -135,7 +136,6 @@ func (s *Service) sentPingMessage(g p2p.GroupID, msgBuf []byte) {
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to send ping message", "group", g)
 	}
-
 }
 
 // Init is to initialize for discoveryService.

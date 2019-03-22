@@ -490,7 +490,6 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 
 	if len(peers) > 0 {
 		node.AddPeers(peers)
-		node.peerReadyChan <- struct{}{}
 	}
 
 	// Reset Validator PublicKeys every time we receive PONG message from Leader

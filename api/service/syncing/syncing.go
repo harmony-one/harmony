@@ -26,7 +26,7 @@ const (
 	TimesToFail                           = 5 // Downloadblocks service retry limit
 	RegistrationNumber                    = 3
 	SyncingPortDifference                 = 3000
-	inSyncThreshold                       = 1 // when peerBlockHeight - myBlockHeight <= inSyncThreshold, it's ready to join consensus
+	inSyncThreshold                       = 0 // when peerBlockHeight - myBlockHeight <= inSyncThreshold, it's ready to join consensus
 )
 
 // SyncPeerConfig is peer config to sync.
@@ -181,6 +181,15 @@ func (ss *StateSync) MakeConnectionToPeers() {
 	wg.Wait()
 	ss.CleanUpNilPeers()
 	utils.GetLogInstance().Info("[SYNC] Finished making connection to peers.")
+}
+
+// GetActivePeerNumber returns the number of active peers
+func (ss *StateSync) GetActivePeerNumber() int {
+	if ss.syncConfig == nil || len(ss.syncConfig.peers) == 0 {
+		return 0
+	}
+	ss.CleanUpNilPeers()
+	return ss.activePeerNumber
 }
 
 // CleanUpNilPeers cleans up peer with nil client and recalculate activePeerNumber.
@@ -574,11 +583,16 @@ func (ss *StateSync) getMaxPeerHeight() uint64 {
 	return maxHeight
 }
 
+// IsOutOfSync checks whether the node is out of sync from other peers
+func (ss *StateSync) IsOutOfSync() bool {
+	otherHeight := ss.getMaxPeerHeight()
+	return ss.currentHeight+inSyncThreshold < otherHeight
+}
+
 // SyncLoop will keep syncing with peers until catches up
-func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker) {
+func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, willJoinConsensus bool) {
 	for {
-		otherHeight := ss.getMaxPeerHeight()
-		if ss.currentHeight+inSyncThreshold >= otherHeight {
+		if !ss.IsOutOfSync() {
 			utils.GetLogInstance().Info("[SYNC] Node is now IN SYNC!")
 			return
 		}
