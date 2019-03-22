@@ -404,13 +404,11 @@ func (consensus *Consensus) AddPeers(peers []*p2p.Peer) int {
 	count := 0
 
 	for _, peer := range peers {
-		_, ok := consensus.validators.Load(peer.GetAddressHex())
+		_, ok := consensus.validators.LoadOrStore(peer.GetAddressHex(), *peer)
 		if !ok {
-			consensus.validators.Store(peer.GetAddressHex(), *peer)
 			consensus.pubKeyLock.Lock()
 			consensus.PublicKeys = append(consensus.PublicKeys, peer.ConsensusPubKey)
 			consensus.pubKeyLock.Unlock()
-			//			utils.GetLogInstance().Debug("[SYNC]", "new peer added", peer)
 		}
 		count++
 	}

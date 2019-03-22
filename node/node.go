@@ -321,7 +321,9 @@ func (node *Node) AddPeers(peers []*p2p.Peer) int {
 		}
 	}
 
-	if count > 0 {
+	// Only leader needs to add the peer info into consensus
+	// Validators will receive the updated peer info from Leader via pong message
+	if count > 0 && node.NodeConfig.IsLeader() {
 		node.Consensus.AddPeers(peers)
 		// TODO: make peers into a context object shared by consensus and drand
 		node.DRand.AddPeers(peers)
