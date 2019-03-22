@@ -14,11 +14,11 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	"log"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/api/proto/node"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 )
 
@@ -107,7 +107,8 @@ func GetPingMessage(payload []byte) (*PingMessageType, error) {
 	err := decoder.Decode(ping)
 
 	if err != nil {
-		log.Panic("Can't deserialize Ping message")
+		utils.GetLogInstance().Error("[GetPingMessage] Decode", "error", err)
+		return nil, fmt.Errorf("Decode Ping Error")
 	}
 
 	return ping, nil
@@ -124,7 +125,8 @@ func GetPongMessage(payload []byte) (*PongMessageType, error) {
 	err := decoder.Decode(pong)
 
 	if err != nil {
-		log.Panic("Can't deserialize Pong message")
+		utils.GetLogInstance().Error("[GetPongMessage] Decode", "error", err)
+		return nil, fmt.Errorf("Decode Pong Error")
 	}
 
 	return pong, nil
@@ -138,7 +140,7 @@ func (p PingMessageType) ConstructPingMessage() []byte {
 	encoder := gob.NewEncoder(byteBuffer)
 	err := encoder.Encode(p)
 	if err != nil {
-		log.Panic("Can't serialize Ping message", "error:", err)
+		utils.GetLogInstance().Error("[ConstructPingMessage] Encode", "error", err)
 		return nil
 	}
 	return byteBuffer.Bytes()
@@ -152,7 +154,7 @@ func (p PongMessageType) ConstructPongMessage() []byte {
 	encoder := gob.NewEncoder(byteBuffer)
 	err := encoder.Encode(p)
 	if err != nil {
-		log.Panic("Can't serialize Pong message", "error:", err)
+		utils.GetLogInstance().Error("[ConstructPongMessage] Encode", "error", err)
 		return nil
 	}
 	return byteBuffer.Bytes()
