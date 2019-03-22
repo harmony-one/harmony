@@ -358,7 +358,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 
 	ping, err := proto_discovery.GetPingMessage(msgPayload)
 	if err != nil {
-		utils.GetLogInstance().Error("Can't get Ping Message")
+		utils.GetLogInstance().Error("Can't get Ping Message", "error", err)
 		return -1
 	}
 
@@ -448,7 +448,7 @@ func (node *Node) SendPongMessage() {
 func (node *Node) pongMessageHandler(msgPayload []byte) int {
 	pong, err := proto_discovery.GetPongMessage(msgPayload)
 	if err != nil {
-		utils.GetLogInstance().Error("Can't get Pong Message")
+		utils.GetLogInstance().Error("Can't get Pong Message", "error", err)
 		return -1
 	}
 
