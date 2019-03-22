@@ -183,7 +183,7 @@ func createWalletNode() *node.Node {
 	if err != nil {
 		panic(err)
 	}
-	w := node.New(host, nil, nil)
+	w := node.New(host, nil, nil, false)
 	w.Client = client.NewClient(w.GetHost(), shardIDs)
 
 	w.NodeConfig.SetRole(nodeconfig.ClientNode)

@@ -188,13 +188,6 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	return nodeConfig
 }
 
-func setupArchivalNode(nodeConfig *nodeconfig.ConfigType) (*node.Node, *nodeconfig.ConfigType) {
-	currentNode := node.New(nodeConfig.Host, &consensus.Consensus{ShardID: uint32(0)}, nil)
-	currentNode.NodeConfig.SetRole(nodeconfig.ArchivalNode)
-	currentNode.AddBeaconChainDatabase(nodeConfig.BeaconDB)
-	return currentNode, nodeConfig
-}
-
 func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consensus, *node.Node) {
 	// Consensus object.
 	// TODO: consensus object shouldn't start here
@@ -203,7 +196,7 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	consensus.MinPeers = *minPeers
 
 	// Current node.
-	currentNode := node.New(nodeConfig.Host, consensus, nodeConfig.MainDB)
+	currentNode := node.New(nodeConfig.Host, consensus, nodeConfig.MainDB, *isArchival)
 	currentNode.Consensus.OfflinePeers = currentNode.OfflinePeers
 	currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
 	currentNode.AccountKey = nodeConfig.StakingPriKey
@@ -211,6 +204,7 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	// TODO: refactor the creation of blockchain out of node.New()
 	consensus.ChainReader = currentNode.Blockchain()
 
+	// TODO: need change config file and use switch instead of complicated "if else" condition
 	if *isBeacon {
 		if nodeConfig.StringRole == "leader" {
 			currentNode.NodeConfig.SetRole(nodeconfig.BeaconLeader)
@@ -224,7 +218,9 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	} else {
 		currentNode.AddBeaconChainDatabase(nodeConfig.BeaconDB)
 
-		if *isNewNode {
+		if *isArchival {
+			currentNode.NodeConfig.SetRole(nodeconfig.ArchivalNode)
+		} else if *isNewNode {
 			currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
 		} else if nodeConfig.StringRole == "leader" {
 			currentNode.NodeConfig.SetRole(nodeconfig.ShardLeader)
@@ -261,27 +257,23 @@ func main() {
 	var currentNode *node.Node
 	var consensus *consensus.Consensus
 	nodeConfig := createGlobalConfig()
-	if *isArchival {
-		currentNode, nodeConfig = setupArchivalNode(nodeConfig)
-		loggingInit(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps)
-		go currentNode.SupportBeaconSyncing()
-	} else {
-		// Start Profiler for leader if profile argument is on
-		if nodeConfig.StringRole == "leader" && (*profile || *metricsReportURL != "") {
-			prof := profiler.GetProfiler()
-			prof.Config(nodeConfig.ShardID, *metricsReportURL)
-			if *profile {
-				prof.Start()
-			}
+
+	// Init logging.
+	loggingInit(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps)
+
+	// Start Profiler for leader if profile argument is on
+	if nodeConfig.StringRole == "leader" && (*profile || *metricsReportURL != "") {
+		prof := profiler.GetProfiler()
+		prof.Config(nodeConfig.ShardID, *metricsReportURL)
+		if *profile {
+			prof.Start()
 		}
-		consensus, currentNode = setUpConsensusAndNode(nodeConfig)
-		if consensus.IsLeader {
-			go currentNode.SendPongMessage()
-		}
-		// Init logging.
-		loggingInit(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps)
-		go currentNode.SupportSyncing()
 	}
+	consensus, currentNode = setUpConsensusAndNode(nodeConfig)
+	if consensus.IsLeader {
+		go currentNode.SendPongMessage()
+	}
+	go currentNode.SupportSyncing()
 	utils.GetLogInstance().Info("New Harmony Node ====", "Role", currentNode.NodeConfig.Role(), "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, nodeConfig.Host.GetID().Pretty()))
 	currentNode.ServiceManagerSetup()
 	currentNode.RunServices()

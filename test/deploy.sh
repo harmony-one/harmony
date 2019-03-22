@@ -11,6 +11,7 @@ set -eo pipefail
 function check_result() {
    find $log_folder -name leader-*.log > $log_folder/all-leaders.txt
    find $log_folder -name validator-*.log > $log_folder/all-validators.txt
+   find $log_folder -name archival-*.log >> $log_folder/all-validators.txt
 
    echo ====== RESULTS ======
    results=$($ROOT/test/cal_tps.sh $log_folder/all-leaders.txt $log_folder/all-validators.txt)

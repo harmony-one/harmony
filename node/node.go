@@ -218,7 +218,7 @@ func (node *Node) GetSyncID() [SyncIDLength]byte {
 }
 
 // New creates a new node.
-func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database) *Node {
+func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, isArchival bool) *Node {
 	var chain *core.BlockChain
 	var err error
 	var isFirstTime bool // if cannot get blockchain from database, then isFirstTime = true
@@ -238,13 +238,13 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database) *N
 		database := db
 		if database == nil {
 			database = ethdb.NewMemDatabase()
-			chain, err = node.GenesisBlockSetup(database)
+			chain, err = node.GenesisBlockSetup(database, false)
 			isFirstTime = true
 		} else {
-			chain, err = node.InitBlockChainFromDB(db, node.Consensus)
+			chain, err = node.InitBlockChainFromDB(db, node.Consensus, isArchival)
 			isFirstTime = false
 			if err != nil || chain == nil || chain.CurrentBlock().NumberU64() <= 0 {
-				chain, err = node.GenesisBlockSetup(database)
+				chain, err = node.GenesisBlockSetup(database, isArchival)
 				isFirstTime = true
 			}
 		}
@@ -383,7 +383,7 @@ func (node *Node) AddBeaconChainDatabase(db ethdb.Database) {
 		database = ethdb.NewMemDatabase()
 	}
 	// TODO (chao) currently we use the same genesis block as normal shard
-	chain, err := node.GenesisBlockSetup(database)
+	chain, err := node.GenesisBlockSetup(database, false)
 	if err != nil {
 		utils.GetLogInstance().Error("Error when doing genesis setup")
 		os.Exit(1)
@@ -393,12 +393,15 @@ func (node *Node) AddBeaconChainDatabase(db ethdb.Database) {
 }
 
 // InitBlockChainFromDB retrieves the latest blockchain and state available from the local database
-func (node *Node) InitBlockChainFromDB(db ethdb.Database, consensus *consensus.Consensus) (*core.BlockChain, error) {
+func (node *Node) InitBlockChainFromDB(db ethdb.Database, consensus *consensus.Consensus, isArchival bool) (*core.BlockChain, error) {
 	chainConfig := params.TestChainConfig
 	if consensus != nil {
 		chainConfig.ChainID = big.NewInt(int64(consensus.ShardID)) // Use ChainID as piggybacked ShardID
 	}
-	cacheConfig := core.CacheConfig{Disabled: false, TrieNodeLimit: 256 * 1024 * 1024, TrieTimeLimit: 5 * time.Minute}
+	cacheConfig := core.CacheConfig{}
+	if isArchival {
+		cacheConfig = core.CacheConfig{Disabled: true, TrieNodeLimit: 256 * 1024 * 1024, TrieTimeLimit: 30 * time.Second}
+	}
 	chain, err := core.NewBlockChain(db, &cacheConfig, chainConfig, consensus, vm.Config{}, nil)
 	return chain, err
 }
