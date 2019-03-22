@@ -95,7 +95,7 @@ func (node *Node) CreateTransactionForEnterMethod(amount int64, priKey string) e
 // GetResultDirectly get current players and their balances, not from smart contract.
 func (node *Node) GetResultDirectly(priKey string) (players []string, balances []*big.Int) {
 	for _, account := range contract_constants.DemoAccounts {
-		players = append(players, account.Address)
+		players = append(players, account.Private)
 		key, err := crypto.HexToECDSA(account.Private)
 		if err != nil {
 			utils.GetLogInstance().Error("Error when HexToECDSA")
