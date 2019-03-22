@@ -385,10 +385,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 	if ping.Node.Role == proto_node.ClientRole {
 		utils.GetLogInstance().Info("Add Client Peer to Node", "Address", node.Consensus.GetSelfAddress(), "Client", peer)
 		node.ClientPeer = peer
-		return 0
-	}
-
-	if node.NodeConfig.IsLeader() {
+	} else {
 		utils.GetLogInstance().Info("Add Peer to Node", "Address", node.Consensus.GetSelfAddress(), "Pear", peer)
 		node.AddPeers([]*p2p.Peer{peer})
 	}
@@ -398,10 +395,11 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 
 // SendPongMessage is the a goroutine to periodcally send pong message to all peers
 func (node *Node) SendPongMessage() {
-	tick := time.NewTicker(3 * time.Second)
+	tick := time.NewTicker(2 * time.Second)
 	numPeers := len(node.Consensus.GetValidatorPeers())
 	numPubKeys := len(node.Consensus.PublicKeys)
 	sentMessage := false
+	firstTime := true
 
 	// Send Pong Message only when there is change on the number of peers
 	for {
@@ -417,6 +415,7 @@ func (node *Node) SendPongMessage() {
 			}
 			// new peers added
 			if numPubKeysNow != numPubKeys || numPeersNow != numPeers {
+				utils.GetLogInstance().Info("[PONG] different number of peers", "numPeers", numPeers, "numPeersNow", numPeersNow)
 				sentMessage = false
 			} else {
 				// stable number of peers/pubkeys, sent the pong message
@@ -436,7 +435,11 @@ func (node *Node) SendPongMessage() {
 					node.serviceManager.TakeAction(&service.Action{Action: service.Stop, ServiceType: service.PeerDiscovery})
 					// wait a bit until all validators received pong message
 					time.Sleep(200 * time.Millisecond)
-					node.startConsensus <- struct{}{}
+					// only need to notify consensus leader once to start the consensus
+					if firstTime {
+						node.startConsensus <- struct{}{}
+						firstTime = false
+					}
 				}
 			}
 			numPeers = numPeersNow
