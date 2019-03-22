@@ -652,7 +652,10 @@ func (consensus *Consensus) accumulateRewards(
 			"accumulateRewards: cannot create group sig mask", "error", err)
 		return
 	}
-	if err := mask.SetMask(parent.Header().CommitBitmap); err != nil {
+	parentSigners := parent.Header().CommitBitmap
+	utils.GetLogInstance().Debug("accumulateRewards: setting group sig mask",
+		"destLen", mask.Len(), "srcLen", len(parentSigners))
+	if err := mask.SetMask(parentSigners); err != nil {
 		utils.GetLogInstance().Error(
 			"accumulateRewards: cannot set group sig mask bits", "error", err)
 		return
