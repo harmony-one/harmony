@@ -264,7 +264,7 @@ func main() {
 	if *isArchival {
 		currentNode, nodeConfig = setupArchivalNode(nodeConfig)
 		loggingInit(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps)
-		go currentNode.DoBeaconSyncing()
+		go currentNode.SupportBeaconSyncing()
 	} else {
 		// Start Profiler for leader if profile argument is on
 		if nodeConfig.StringRole == "leader" && (*profile || *metricsReportURL != "") {

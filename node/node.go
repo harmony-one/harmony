@@ -162,9 +162,6 @@ type Node struct {
 	// Channel to notify consensus service to really start consensus
 	startConsensus chan struct{}
 
-	// channel to notify the peers are ready
-	peerReadyChan chan struct{}
-
 	// node configuration, including group ID, shard ID, etc
 	NodeConfig *nodeconfig.ConfigType
 
@@ -265,7 +262,6 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database) *N
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, params.TestChainConfig, chain)
 		node.Worker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.ConsensusPubKey), node.Consensus.ShardID)
 
-		node.Consensus.ConsensusBlock = make(chan *consensus.BFTBlockInfo)
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 
 		if isFirstTime {
@@ -299,7 +295,6 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database) *N
 	go node.ReceiveGroupMessage()
 
 	node.startConsensus = make(chan struct{})
-	node.peerReadyChan = make(chan struct{})
 
 	// init the global and the only node config
 	node.NodeConfig = nodeconfig.GetConfigs(nodeconfig.Global)
