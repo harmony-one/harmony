@@ -606,9 +606,9 @@ func (consensus *Consensus) populateMessageFields(request *msg_pb.ConsensusReque
 	request.BlockHash = consensus.blockHash[:]
 
 	// sender address
-	request.SenderAddress = consensus.SelfAddress
+	request.SenderPubkey = consensus.PubKey.Serialize()
 
-	utils.GetLogInstance().Debug("[populateMessageFields]", "myConsensusID", consensus.consensusID, "SenderAddress", request.SenderAddress)
+	utils.GetLogInstance().Debug("[populateMessageFields]", "myConsensusID", consensus.consensusID, "SenderAddress", consensus.SelfAddress)
 }
 
 // Signs the consensus message and returns the marshaled message.

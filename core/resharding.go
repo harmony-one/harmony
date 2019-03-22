@@ -162,7 +162,6 @@ func CalculateNewShardState(bc *BlockChain, epoch uint64, stakeInfo *map[common.
 			id := i%(GenesisShardNum-1) + 1 // assign the node to one of the empty shard
 			ss.shardState[id].NodeList = append(ss.shardState[id].NodeList, nid)
 		}
-		utils.GetLogInstance().Info("State", "data", ss)
 		return ss.shardState
 	}
 	newNodeList := ss.UpdateShardingState(stakeInfo)

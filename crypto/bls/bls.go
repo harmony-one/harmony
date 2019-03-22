@@ -18,6 +18,13 @@ func RandPrivateKey() *bls.SecretKey {
 	return &sec
 }
 
+// BytesToBlsPublicKey converts bytes into bls.PublicKey pointer.
+func BytesToBlsPublicKey(bytes []byte) (*bls.PublicKey, error) {
+	pubKey := &bls.PublicKey{}
+	err := pubKey.Deserialize(bytes)
+	return pubKey, err
+}
+
 // AggregateSig aggregates all the BLS signature into a single multi-signature.
 func AggregateSig(sigs []*bls.Sign) *bls.Sign {
 	var aggregatedSig bls.Sign

@@ -98,10 +98,10 @@ func TestPopulateMessageFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus := New(host, 0, []p2p.Peer{leader, validator}, leader, bls.RandPrivateKey())
+	blsPriKey := bls.RandPrivateKey()
+	consensus := New(host, 0, []p2p.Peer{leader, validator}, leader, blsPriKey)
 	consensus.consensusID = 2
 	consensus.blockHash = blockHash
-	consensus.SelfAddress = "fake address"
 
 	msg := &msg_pb.Message{
 		Request: &msg_pb.Message_Consensus{
@@ -117,7 +117,7 @@ func TestPopulateMessageFields(t *testing.T) {
 	if !bytes.Equal(consensusMsg.BlockHash[:], blockHash[:]) {
 		t.Errorf("Block hash is not populated correctly")
 	}
-	if consensusMsg.SenderAddress != "fake address" {
+	if bytes.Compare(consensusMsg.SenderPubkey, blsPriKey.GetPublicKey().Serialize()) != 0 {
 		t.Errorf("Sender ID is not populated correctly")
 	}
 }

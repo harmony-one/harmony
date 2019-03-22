@@ -85,12 +85,12 @@ message StakingRequest {
 message ConsensusRequest {
   uint32 consensus_id = 1;
   bytes block_hash = 2;
-  string sender_address = 3;
+  bytes sender_pubkey = 3;
   bytes payload = 4;
 }
 
 message DrandRequest {
-  string sender_address = 1;
+  bytes sender_pubkey = 1;
   bytes block_hash = 2;
   bytes payload = 3;
 }

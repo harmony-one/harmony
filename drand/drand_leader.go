@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	protobuf "github.com/golang/protobuf/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core"
@@ -106,7 +109,15 @@ func (dRand *DRand) processCommitMessage(message *msg_pb.Message) {
 	defer dRand.mutex.Unlock()
 
 	drandMsg := message.GetDrand()
-	validatorAddress := drandMsg.SenderAddress
+
+	senderPubKey, err := bls.BytesToBlsPublicKey(drandMsg.SenderPubkey)
+	if err != nil {
+		utils.GetLogInstance().Debug("Failed to deserialize BLS public key", "error", err)
+		return
+	}
+	addrBytes := senderPubKey.GetAddress()
+	validatorAddress := common.BytesToAddress(addrBytes[:]).Hex()
+
 	validatorPeer := dRand.getValidatorPeerByAddress(validatorAddress)
 	vrfs := dRand.vrfs
 	if len((*vrfs)) >= ((len(dRand.PublicKeys))/3 + 1) {
@@ -115,7 +126,7 @@ func (dRand *DRand) processCommitMessage(message *msg_pb.Message) {
 	}
 
 	// Verify message signature
-	err := verifyMessageSig(validatorPeer.ConsensusPubKey, message)
+	err = verifyMessageSig(validatorPeer.ConsensusPubKey, message)
 	if err != nil {
 		utils.GetLogInstance().Warn("[DRAND] failed to verify the message signature", "Error", err, "PubKey", validatorPeer.ConsensusPubKey)
 		return
@@ -124,10 +135,10 @@ func (dRand *DRand) processCommitMessage(message *msg_pb.Message) {
 	rand := drandMsg.Payload[:32]
 	proof := drandMsg.Payload[32 : len(drandMsg.Payload)-64]
 	pubKeyBytes := drandMsg.Payload[len(drandMsg.Payload)-64:]
-	_, pubKey := p256.GenerateKey()
-	pubKey.Deserialize(pubKeyBytes)
+	_, vrfPubKey := p256.GenerateKey()
+	vrfPubKey.Deserialize(pubKeyBytes)
 
-	expectedRand, err := pubKey.ProofToHash(dRand.blockHash[:], proof)
+	expectedRand, err := vrfPubKey.ProofToHash(dRand.blockHash[:], proof)
 
 	if err != nil || !bytes.Equal(expectedRand[:], rand) {
 		utils.GetLogInstance().Error("[DRAND] Failed to verify the VRF", "error", err, "validatorAddress", validatorAddress, "expectedRand", expectedRand, "receivedRand", rand)

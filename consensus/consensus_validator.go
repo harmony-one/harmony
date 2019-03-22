@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -136,7 +137,14 @@ func (consensus *Consensus) processPreparedMessage(message *msg_pb.Message) {
 
 	consensusID := consensusMsg.ConsensusId
 	blockHash := consensusMsg.BlockHash
-	leaderID := consensusMsg.SenderAddress
+	pubKey, err := bls_cosi.BytesToBlsPublicKey(consensusMsg.SenderPubkey)
+	if err != nil {
+		utils.GetLogInstance().Debug("Failed to deserialize BLS public key", "error", err)
+		return
+	}
+	addrBytes := pubKey.GetAddress()
+	leaderAddress := common.BytesToAddress(addrBytes[:]).Hex()
+
 	messagePayload := consensusMsg.Payload
 
 	//#### Read payload data
@@ -168,15 +176,15 @@ func (consensus *Consensus) processPreparedMessage(message *msg_pb.Message) {
 
 	// Verify the multi-sig for prepare phase
 	deserializedMultiSig := bls.Sign{}
-	err := deserializedMultiSig.Deserialize(multiSig)
+	err = deserializedMultiSig.Deserialize(multiSig)
 	if err != nil {
-		utils.GetLogInstance().Warn("Failed to deserialize the multi signature for prepare phase", "Error", err, "leader ID", leaderID)
+		utils.GetLogInstance().Warn("Failed to deserialize the multi signature for prepare phase", "Error", err, "leader Address", leaderAddress)
 		return
 	}
 	mask, err := bls_cosi.NewMask(consensus.PublicKeys, nil)
 	mask.SetMask(bitmap)
 	if !deserializedMultiSig.VerifyHash(mask.AggregatePublic, blockHash) || err != nil {
-		utils.GetLogInstance().Warn("Failed to verify the multi signature for prepare phase", "Error", err, "leader ID", leaderID, "PubKeys", len(consensus.PublicKeys))
+		utils.GetLogInstance().Warn("Failed to verify the multi signature for prepare phase", "Error", err, "leader Address", leaderAddress, "PubKeys", len(consensus.PublicKeys))
 		return
 	}
 	consensus.aggregatedPrepareSig = &deserializedMultiSig
@@ -197,7 +205,13 @@ func (consensus *Consensus) processCommittedMessage(message *msg_pb.Message) {
 
 	consensusMsg := message.GetConsensus()
 	consensusID := consensusMsg.ConsensusId
-	leaderID := consensusMsg.SenderAddress
+	pubKey, err := bls_cosi.BytesToBlsPublicKey(consensusMsg.SenderPubkey)
+	if err != nil {
+		utils.GetLogInstance().Debug("Failed to deserialize BLS public key", "error", err)
+		return
+	}
+	addrBytes := pubKey.GetAddress()
+	leaderAddress := common.BytesToAddress(addrBytes[:]).Hex()
 	messagePayload := consensusMsg.Payload
 
 	//#### Read payload data
@@ -229,16 +243,16 @@ func (consensus *Consensus) processCommittedMessage(message *msg_pb.Message) {
 
 	// Verify the multi-sig for commit phase
 	deserializedMultiSig := bls.Sign{}
-	err := deserializedMultiSig.Deserialize(multiSig)
+	err = deserializedMultiSig.Deserialize(multiSig)
 	if err != nil {
-		utils.GetLogInstance().Warn("Failed to deserialize the multi signature for commit phase", "Error", err, "leader ID", leaderID)
+		utils.GetLogInstance().Warn("Failed to deserialize the multi signature for commit phase", "Error", err, "leader Address", leaderAddress)
 		return
 	}
 	mask, err := bls_cosi.NewMask(consensus.PublicKeys, nil)
 	mask.SetMask(bitmap)
 	prepareMultiSigAndBitmap := append(consensus.aggregatedPrepareSig.Serialize(), consensus.prepareBitmap.Bitmap...)
 	if !deserializedMultiSig.VerifyHash(mask.AggregatePublic, prepareMultiSigAndBitmap) || err != nil {
-		utils.GetLogInstance().Warn("Failed to verify the multi signature for commit phase", "Error", err, "leader ID", leaderID)
+		utils.GetLogInstance().Warn("Failed to verify the multi signature for commit phase", "Error", err, "leader Address", leaderAddress)
 		return
 	}
 	consensus.aggregatedCommitSig = &deserializedMultiSig

@@ -4,6 +4,8 @@ import (
 	"encoding/hex"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -149,7 +151,14 @@ func (consensus *Consensus) startConsensus(newBlock *types.Block) {
 func (consensus *Consensus) processPrepareMessage(message *msg_pb.Message) {
 	consensusMsg := message.GetConsensus()
 
-	validatorAddress := consensusMsg.SenderAddress
+	pubKey, err := bls_cosi.BytesToBlsPublicKey(consensusMsg.SenderPubkey)
+	if err != nil {
+		utils.GetLogInstance().Debug("Failed to deserialize BLS public key", "error", err)
+		return
+	}
+	addrBytes := pubKey.GetAddress()
+	validatorAddress := common.BytesToAddress(addrBytes[:]).Hex()
+
 	prepareSig := consensusMsg.Payload
 
 	prepareSigs := consensus.prepareSigs
@@ -166,7 +175,7 @@ func (consensus *Consensus) processPrepareMessage(message *msg_pb.Message) {
 	}
 
 	if err := consensus.checkConsensusMessage(message, validatorPeer.ConsensusPubKey); err != nil {
-		utils.GetLogInstance().Debug("Failed to check the validator message", "validatorAddress", validatorAddress)
+		utils.GetLogInstance().Debug("Failed to check the validator message", "error", err, "validatorAddress", validatorAddress)
 		return
 	}
 
@@ -184,7 +193,7 @@ func (consensus *Consensus) processPrepareMessage(message *msg_pb.Message) {
 
 	// Check BLS signature for the multi-sig
 	var sign bls.Sign
-	err := sign.Deserialize(prepareSig)
+	err = sign.Deserialize(prepareSig)
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to deserialize bls signature", "validatorAddress", validatorAddress)
 		return
@@ -223,7 +232,14 @@ func (consensus *Consensus) processPrepareMessage(message *msg_pb.Message) {
 func (consensus *Consensus) processCommitMessage(message *msg_pb.Message) {
 	consensusMsg := message.GetConsensus()
 
-	validatorAddress := consensusMsg.SenderAddress
+	pubKey, err := bls_cosi.BytesToBlsPublicKey(consensusMsg.SenderPubkey)
+	if err != nil {
+		utils.GetLogInstance().Debug("Failed to deserialize BLS public key", "error", err)
+		return
+	}
+	addrBytes := pubKey.GetAddress()
+	validatorAddress := common.BytesToAddress(addrBytes[:]).Hex()
+
 	commitSig := consensusMsg.Payload
 
 	consensus.mutex.Lock()
@@ -258,7 +274,7 @@ func (consensus *Consensus) processCommitMessage(message *msg_pb.Message) {
 
 	// Verify the signature on prepare multi-sig and bitmap is correct
 	var sign bls.Sign
-	err := sign.Deserialize(commitSig)
+	err = sign.Deserialize(commitSig)
 	if err != nil {
 		utils.GetLogInstance().Debug("Failed to deserialize bls signature", "validatorAddress", validatorAddress)
 		return
