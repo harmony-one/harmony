@@ -34,6 +34,7 @@ type Transaction struct {
 	To        string   `json:"to"`
 	Value     *big.Int `json:"value"`
 	Bytes     string   `json:"bytes"`
+	Data      string   `json:"data"`
 }
 
 // Block ...
