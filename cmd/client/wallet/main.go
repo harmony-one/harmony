@@ -86,11 +86,13 @@ var (
 		IP   string
 		Port string
 	}{
-		{"18.236.96.207", "14555"},
-		{"18.206.91.170", "14555"},
-		{"54.213.63.26", "14555"},
-		{"13.229.96.10", "14555"},
-		{"34.243.2.56", "14555"},
+		{"52.39.144.88", "14555"},
+		{"100.27.48.137", "14555"},
+		{"18.236.238.59", "14555"},
+		{"34.216.169.242", "14555"},
+		{"52.39.189.88", "14555"},
+		{"3.92.19.244", "14555"},
+		{"35.171.228.165", "14555"},
 	}
 )
 
@@ -508,6 +510,6 @@ func submitTransaction(tx *types.Transaction, walletNode *node.Node, shardID uin
 	fmt.Printf("Transaction Id for shard %d: %s\n", int(shardID), tx.Hash().Hex())
 	// FIXME (leo): how to we know the tx was successful sent to the network
 	// this is a hacky way to wait for sometime
-	time.Sleep(2 * time.Second)
+	time.Sleep(3 * time.Second)
 	return nil
 }
