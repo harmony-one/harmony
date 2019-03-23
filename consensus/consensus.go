@@ -667,9 +667,10 @@ func (consensus *Consensus) accumulateRewards(
 		numSigs++
 		stakeInfos := consensus.stakeInfoFinder.FindStakeInfoByNodeKey(key)
 		if len(stakeInfos) == 0 {
+			nodeAddr := key.GetAddress()
 			utils.GetLogInstance().Error(
 				"accumulateRewards: node has no stake info",
-				"nodeKey", key.GetHexString())
+				"nodeAddr", hex.EncodeToString(nodeAddr[:]))
 			continue
 		}
 		numAccounts += len(stakeInfos)

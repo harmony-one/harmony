@@ -2,6 +2,7 @@ package node
 
 import (
 	"crypto/ecdsa"
+	"encoding/hex"
 	"math/big"
 	"os"
 
@@ -33,17 +34,22 @@ func (node *Node) UpdateStakingList(stakeInfoReturnValue *structs.StakeInfoRetur
 	node.CurrentStakesByNode = make(map[[20]byte]*structs.StakeInfo)
 	for i, addr := range stakeInfoReturnValue.LockedAddresses {
 		blockNum := stakeInfoReturnValue.BlockNums[i]
+		blsAddr := stakeInfoReturnValue.BlsAddresses[i]
 		lockPeriodCount := stakeInfoReturnValue.LockPeriodCounts[i]
+		logger := utils.GetLogInstance().New(
+			"accountAddr", addr.Hex(),
+			"nodeAddr", hex.EncodeToString(blsAddr[:]))
 
 		startEpoch := core.GetEpochFromBlockNumber(blockNum.Uint64())
 		curEpoch := core.GetEpochFromBlockNumber(node.blockchain.CurrentBlock().NumberU64())
 
-		if startEpoch == curEpoch {
+		if startEpoch >= curEpoch {
+			logger.Info("future stake; skipping")
 			continue // The token are counted into stakes at the beginning of next epoch.
 		}
 		// True if the token is still staked within the locking period.
 		if curEpoch-startEpoch <= lockPeriodCount.Uint64()*lockPeriodInEpochs {
-			blsAddr := stakeInfoReturnValue.BlsAddresses[i]
+			logger.Info("active stake; recording")
 			stakeInfo := &structs.StakeInfo{
 				addr,
 				blsAddr,
@@ -53,6 +59,8 @@ func (node *Node) UpdateStakingList(stakeInfoReturnValue *structs.StakeInfoRetur
 			}
 			node.CurrentStakes[addr] = stakeInfo
 			node.CurrentStakesByNode[blsAddr] = stakeInfo
+		} else {
+			logger.Info("expired stake; skipping")
 		}
 	}
 }
