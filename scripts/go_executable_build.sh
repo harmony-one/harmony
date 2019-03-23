@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+export GO111MODULE=on
+
 declare -A SRC
 SRC[harmony]=cmd/harmony/main.go
 SRC[txgen]=cmd/client/txgen/main.go
