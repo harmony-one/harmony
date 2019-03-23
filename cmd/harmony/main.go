@@ -169,8 +169,6 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	if *isLeader {
 		nodeConfig.StringRole = "leader"
 		nodeConfig.Leader = nodeConfig.SelfPeer
-	} else if *isArchival {
-		nodeConfig.StringRole = "archival"
 	} else {
 		nodeConfig.StringRole = "validator"
 	}
@@ -218,9 +216,7 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	} else {
 		currentNode.AddBeaconChainDatabase(nodeConfig.BeaconDB)
 
-		if *isArchival {
-			currentNode.NodeConfig.SetRole(nodeconfig.ArchivalNode)
-		} else if *isNewNode {
+		if *isNewNode {
 			currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
 		} else if nodeConfig.StringRole == "leader" {
 			currentNode.NodeConfig.SetRole(nodeconfig.ShardLeader)

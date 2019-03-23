@@ -1,0 +1,7 @@
+127.0.0.1 9000 leader_archival 0
+127.0.0.1 9001 archival 0
+127.0.0.1 9002 archival 0
+127.0.0.1 9003 archival 0
+127.0.0.1 9004 archival 0
+127.0.0.1 9009 archival 0
+127.0.0.1 19999 client 0
