@@ -61,10 +61,12 @@ func (node *Node) QueryStakeInfo() *structs.StakeInfoReturnValue {
 	abi, err := abi.JSON(strings.NewReader(contracts.StakeLockContractABI))
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to generate staking contract's ABI", "error", err)
+		return nil
 	}
 	bytesData, err := abi.Pack("listLockedAddresses")
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to generate ABI function bytes data", "error", err)
+		return nil
 	}
 
 	priKey := contract_constants.GenesisBeaconAccountPriKey
