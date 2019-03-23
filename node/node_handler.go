@@ -295,8 +295,13 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 		}()
 	}
 
-	utils.GetLogInstance().Info("Updating staking list")
-	node.UpdateStakingList(node.QueryStakeInfo())
+	stakeInfo := node.QueryStakeInfo()
+	if stakeInfo != nil {
+		utils.GetLogInstance().Info("Updating staking list")
+		node.UpdateStakingList(stakeInfo)
+	} else {
+		utils.GetLogInstance().Warn("QueryStakeInfo failed")
+	}
 	// node.printStakingList()
 	if core.IsEpochBlock(newBlock) {
 		shardState := node.blockchain.StoreNewShardState(newBlock, &node.CurrentStakes)
