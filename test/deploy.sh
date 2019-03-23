@@ -70,7 +70,7 @@ EOU
 
 DB=
 TXGEN=true
-DURATION=90
+DURATION=9000
 MIN=5
 SHARDS=2
 KILLPORT=9004
@@ -99,7 +99,7 @@ if [ -z "$config" ]; then
 fi
 
 if [ "$SYNC" == "true" ]; then
-    DURATION=300
+    DURATION=9000
 fi
 
 # Kill nodes if any
@@ -144,13 +144,17 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
      echo "launching leader ..."
      $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -account_index $i  -min_peers $MIN $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key -is_leader 2>&1 | tee -a $LOG_FILE &
   fi
+  if [ "$mode" == "leader_archival" ]; then
+     echo "launching leader ..."
+     $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -account_index $i  -min_peers $MIN $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key -is_leader -is_archival 2>&1 | tee -a $LOG_FILE &
+  fi
   if [ "$mode" == "validator" ]; then
      echo "launching validator ..."
      $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -account_index $i  -min_peers $MIN $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key 2>&1 | tee -a $LOG_FILE &
   fi
   if [ "$mode" == "archival" ]; then
       echo "launching archival node ... wait"
-      $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -account_index $i  $HMY_OPT2 -key /tmp/$ip-$port.key -is_archival  2>&1 | tee -a $LOG_FILE &
+      $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -account_index $i -min_peers $MIN $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key -is_archival  2>&1 | tee -a $LOG_FILE &
   fi
   sleep 0.5
   if [[ "$mode" == "newnode" && "$SYNC" == "true" ]]; then

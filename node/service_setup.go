@@ -106,18 +106,6 @@ func (node *Node) setupForClientNode() {
 	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer, nil))
 }
 
-// archival node act as normal validator and will backup data for its own shard; currently, just we just have beacon shard archival
-func (node *Node) setupForArchivalNode() {
-	nodeConfig, chanPeer := node.initNodeConfiguration(true, false) // (false,_) will backup for normal shard
-
-	// Register client support service.
-	node.serviceManager.RegisterService(service.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
-	// Register peer discovery service. No need to do staking for beacon chain node.
-	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer, nil))
-	// Register networkinfo service.
-	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer, nil))
-}
-
 // ServiceManagerSetup setups service store.
 func (node *Node) ServiceManagerSetup() {
 	node.serviceManager = &service.Manager{}
@@ -135,8 +123,6 @@ func (node *Node) ServiceManagerSetup() {
 		node.setupForNewNode()
 	case nodeconfig.ClientNode:
 		node.setupForClientNode()
-	case nodeconfig.ArchivalNode:
-		node.setupForArchivalNode()
 	}
 	node.serviceManager.SetupServiceMessageChan(node.serviceMessageChan)
 }

@@ -27,7 +27,6 @@ const (
 	NewNode
 	ClientNode
 	WalletNode
-	ArchivalNode
 )
 
 func (role Role) String() string {
@@ -48,8 +47,6 @@ func (role Role) String() string {
 		return "ClientNode"
 	case WalletNode:
 		return "WalletNode"
-	case ArchivalNode:
-		return "ArchivalNode"
 	}
 	return "Unknown"
 }
@@ -63,15 +60,14 @@ const (
 // ConfigType is the structure of all node related configuration variables
 type ConfigType struct {
 	// The three groupID design, please refer to https://github.com/harmony-one/harmony/blob/master/node/node.md#libp2p-integration
-	beacon     p2p.GroupID // the beacon group ID
-	group      p2p.GroupID // the group ID of the shard
-	client     p2p.GroupID // the client group ID of the shard
-	isClient   bool        // whether this node is a client node, such as wallet/txgen
-	isBeacon   bool        // whether this node is a beacon node or not
-	isLeader   bool        // whether this node is a leader or not
-	isArchival bool        // whether this node is a archival node. archival node backups all blockchain information.
-	ShardID    uint32      // ShardID of this node
-	role       Role        // Role of the node
+	beacon   p2p.GroupID // the beacon group ID
+	group    p2p.GroupID // the group ID of the shard
+	client   p2p.GroupID // the client group ID of the shard
+	isClient bool        // whether this node is a client node, such as wallet/txgen
+	isBeacon bool        // whether this node is a beacon node or not
+	isLeader bool        // whether this node is a leader or not
+	ShardID  uint32      // ShardID of this node
+	role     Role        // Role of the node
 
 	StringRole      string
 	Host            p2p.Host
@@ -142,11 +138,6 @@ func (conf *ConfigType) SetIsLeader(b bool) {
 	conf.isLeader = b
 }
 
-// SetIsArchival set the isArchival configuration
-func (conf *ConfigType) SetIsArchival(b bool) {
-	conf.isArchival = b
-}
-
 // SetShardID set the ShardID
 func (conf *ConfigType) SetShardID(s uint32) {
 	conf.ShardID = s
@@ -185,11 +176,6 @@ func (conf *ConfigType) IsBeacon() bool {
 // IsLeader returns the isLeader configuration
 func (conf *ConfigType) IsLeader() bool {
 	return conf.isLeader
-}
-
-// IsArchival returns the isArchival configuration
-func (conf *ConfigType) IsArchival() bool {
-	return conf.isArchival
 }
 
 // Role returns the role
