@@ -30,6 +30,8 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rlp"
 	"golang.org/x/crypto/sha3"
+
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // Constants for block.
@@ -157,6 +159,28 @@ type Block struct {
 	// inter-peer block relay.
 	ReceivedAt   time.Time
 	ReceivedFrom interface{}
+}
+
+// SetPrepareSig sets the block's prepare group signature.
+func (b *Block) SetPrepareSig(sig []byte, signers []byte) {
+	if len(sig) != len(b.header.PrepareSignature) {
+		utils.GetLogInstance().Warn("SetPrepareSig: sig size mismatch",
+			"srcLen", len(sig),
+			"dstLen", len(b.header.PrepareSignature))
+	}
+	copy(b.header.PrepareSignature[:], sig[:])
+	b.header.PrepareBitmap = append(signers[:0:0], signers...)
+}
+
+// SetCommitSig sets the block's commit group signature.
+func (b *Block) SetCommitSig(sig []byte, signers []byte) {
+	if len(sig) != len(b.header.CommitSignature) {
+		utils.GetLogInstance().Warn("SetCommitSig: sig size mismatch",
+			"srcLen", len(sig),
+			"dstLen", len(b.header.CommitSignature))
+	}
+	copy(b.header.CommitSignature[:], sig[:])
+	b.header.CommitBitmap = append(signers[:0:0], signers...)
 }
 
 // DeprecatedTd is an old relic for extracting the TD of a block. It is in the
