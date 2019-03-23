@@ -32,6 +32,8 @@ func (node *Node) UpdateStakingList(stakeInfoReturnValue *structs.StakeInfoRetur
 	}
 	node.CurrentStakes = make(map[common.Address]*structs.StakeInfo)
 	node.CurrentStakesByNode = make(map[[20]byte]*structs.StakeInfo)
+	utils.GetLogInstance().Info("UpdateStakingList",
+		"numStakeInfos", len(stakeInfoReturnValue.LockedAddresses))
 	for i, addr := range stakeInfoReturnValue.LockedAddresses {
 		blockNum := stakeInfoReturnValue.BlockNums[i]
 		blsAddr := stakeInfoReturnValue.BlsAddresses[i]
