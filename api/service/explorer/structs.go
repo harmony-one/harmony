@@ -1,6 +1,7 @@
 package explorer
 
 import (
+	"encoding/hex"
 	"math/big"
 	"strconv"
 
@@ -72,5 +73,6 @@ func GetTransaction(tx *types.Transaction, accountBlock *types.Block) *Transacti
 		To:        msg.To().Hex(),
 		Value:     msg.Value(),
 		Bytes:     strconv.Itoa(int(tx.Size())),
+		Data:      hex.EncodeToString(tx.Data()),
 	}
 }
