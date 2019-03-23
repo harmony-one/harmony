@@ -26,28 +26,29 @@ const (
 	lockPeriodInEpochs = 3 // This should be in sync with contracts/StakeLockContract.sol
 )
 
-// UpdateStakingList updates staking information by querying the staking smart contract.
+// UpdateStakingList updates staking list from the given StakeInfo query result.
 func (node *Node) UpdateStakingList(stakeInfoReturnValue *structs.StakeInfoReturnValue) {
+	if stakeInfoReturnValue == nil {
+		return
+	}
 	node.CurrentStakes = make(map[common.Address]*structs.StakeInfo)
-	if stakeInfoReturnValue != nil {
-		for i, addr := range stakeInfoReturnValue.LockedAddresses {
-			blockNum := stakeInfoReturnValue.BlockNums[i]
-			lockPeriodCount := stakeInfoReturnValue.LockPeriodCounts[i]
+	for i, addr := range stakeInfoReturnValue.LockedAddresses {
+		blockNum := stakeInfoReturnValue.BlockNums[i]
+		lockPeriodCount := stakeInfoReturnValue.LockPeriodCounts[i]
 
-			startEpoch := core.GetEpochFromBlockNumber(blockNum.Uint64())
-			curEpoch := core.GetEpochFromBlockNumber(node.blockchain.CurrentBlock().NumberU64())
+		startEpoch := core.GetEpochFromBlockNumber(blockNum.Uint64())
+		curEpoch := core.GetEpochFromBlockNumber(node.blockchain.CurrentBlock().NumberU64())
 
-			if startEpoch == curEpoch {
-				continue // The token are counted into stakes at the beginning of next epoch.
-			}
-			// True if the token is still staked within the locking period.
-			if curEpoch-startEpoch <= lockPeriodCount.Uint64()*lockPeriodInEpochs {
-				node.CurrentStakes[addr] = &structs.StakeInfo{
-					stakeInfoReturnValue.BlsAddresses[i],
-					blockNum,
-					lockPeriodCount,
-					stakeInfoReturnValue.Amounts[i],
-				}
+		if startEpoch == curEpoch {
+			continue // The token are counted into stakes at the beginning of next epoch.
+		}
+		// True if the token is still staked within the locking period.
+		if curEpoch-startEpoch <= lockPeriodCount.Uint64()*lockPeriodInEpochs {
+			node.CurrentStakes[addr] = &structs.StakeInfo{
+				stakeInfoReturnValue.BlsAddresses[i],
+				blockNum,
+				lockPeriodCount,
+				stakeInfoReturnValue.Amounts[i],
 			}
 		}
 	}
