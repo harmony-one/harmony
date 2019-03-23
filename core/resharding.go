@@ -24,7 +24,7 @@ const (
 	// GenesisShardNum is the number of shard at genesis
 	GenesisShardNum = 4
 	// GenesisShardSize is the size of each shard at genesis
-	GenesisShardSize = 50
+	GenesisShardSize = 10
 	// CuckooRate is the percentage of nodes getting reshuffled in the second step of cuckoo resharding.
 	CuckooRate = 0.1
 )
@@ -198,24 +198,22 @@ func (ss *ShardingState) UpdateShardingState(stakeInfo *map[common.Address]*stru
 }
 
 // GetInitShardState returns the initial shard state at genesis.
-// TODO: make the deploy.sh config file in sync with genesis constants.
 func GetInitShardState() types.ShardState {
 	shardState := types.ShardState{}
 	for i := 0; i < GenesisShardNum; i++ {
 		com := types.Committee{ShardID: uint32(i)}
-		if i == 0 {
-			for j := 0; j < GenesisShardSize; j++ {
-				priKey := bls.SecretKey{}
-				priKey.SetHexString(contract.InitialBeaconChainBLSAccounts[j].Private)
-				addrBytes := priKey.GetPublicKey().GetAddress()
-				blsAddr := common.BytesToAddress(addrBytes[:]).Hex()
-				// TODO: directly read address for bls too
-				curNodeID := types.NodeID{contract.InitialBeaconChainAccounts[j].Address, blsAddr}
-				if j == 0 {
-					com.Leader = curNodeID
-				}
-				com.NodeList = append(com.NodeList, curNodeID)
+		for j := 0; j < GenesisShardSize; j++ {
+			index := i*GenesisShardNum + j // The initial account to use for genesis nodes
+			priKey := bls.SecretKey{}
+			priKey.SetHexString(contract.GenesisBLSAccounts[index].Private)
+			addrBytes := priKey.GetPublicKey().GetAddress()
+			blsAddr := common.BytesToAddress(addrBytes[:]).Hex()
+			// TODO: directly read address for bls too
+			curNodeID := types.NodeID{contract.GenesisAccounts[index].Address, blsAddr}
+			if j == 0 {
+				com.Leader = curNodeID
 			}
+			com.NodeList = append(com.NodeList, curNodeID)
 		}
 		shardState = append(shardState, com)
 	}

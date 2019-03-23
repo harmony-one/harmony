@@ -86,7 +86,7 @@ func (node *Node) CreateGenesisAllocWithTestingAddresses(numAddress int) core.Ge
 // AddNodeAddressesToGenesisAlloc adds to the genesis block allocation the accounts used for network validators/nodes,
 // including the account used by the nodes of the initial beacon chain and later new nodes.
 func AddNodeAddressesToGenesisAlloc(genesisAlloc core.GenesisAlloc) {
-	for _, account := range contract.InitialBeaconChainAccounts {
+	for _, account := range contract.GenesisAccounts {
 		testBankFunds := big.NewInt(InitFreeFundInEther)
 		testBankFunds = testBankFunds.Mul(testBankFunds, big.NewInt(params.Ether))
 		address := common.HexToAddress(account.Address)

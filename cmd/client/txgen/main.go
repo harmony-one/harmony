@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/core"
+
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -88,12 +90,14 @@ func main() {
 	selfPeer := p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: peerPubKey}
 
 	// Init with LibP2P enabled, FIXME: (leochen) right now we support only one shard
-	shardIDs = append(shardIDs, 0)
+	for i := 0; i < core.GenesisShardNum; i++ {
+		shardIDs = append(shardIDs, uint32(i))
+	}
 
 	// Do cross shard tx if there are more than one shard
 	setting := txgen.Settings{
 		NumOfAddress:      10000,
-		CrossShard:        len(shardIDs) > 1,
+		CrossShard:        false, // len(shardIDs) > 1,
 		MaxNumTxsPerBatch: *maxNumTxsPerBatch,
 		CrossShardRatio:   *crossShardRatio,
 	}
@@ -128,14 +132,14 @@ func main() {
 
 	// This func is used to update the client's blockchain when new blocks are received from the leaders
 	updateBlocksFunc := func(blocks []*types.Block) {
-		utils.GetLogInstance().Info("[Txgen] Received new block", "block", blocks)
+		utils.GetLogInstance().Info("[Txgen] Received new block", "block num", blocks[0].NumberU64())
 		for _, block := range blocks {
 			for _, node := range nodes {
 				shardID := block.ShardID()
 
 				if node.Consensus.ShardID == shardID {
 					// Add it to blockchain
-					utils.GetLogInstance().Info("Current Block", "hash", node.Blockchain().CurrentBlock().Hash().Hex())
+					utils.GetLogInstance().Info("Current Block", "block num", node.Blockchain().CurrentBlock().NumberU64())
 					utils.GetLogInstance().Info("Adding block from leader", "txNum", len(block.Transactions()), "shardID", shardID, "preHash", block.ParentHash().Hex())
 					node.AddNewBlock(block)
 					stateMutex.Lock()
@@ -151,6 +155,7 @@ func main() {
 	clientNode.Client.UpdateBlocks = updateBlocksFunc
 
 	clientNode.NodeConfig.SetRole(nodeconfig.ClientNode)
+	clientNode.NodeConfig.SetIsClient(true)
 	clientNode.ServiceManagerSetup()
 	clientNode.RunServices()
 

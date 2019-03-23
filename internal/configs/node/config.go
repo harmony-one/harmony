@@ -5,6 +5,7 @@ package nodeconfig
 
 import (
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -61,10 +62,9 @@ const (
 type ConfigType struct {
 	// The three groupID design, please refer to https://github.com/harmony-one/harmony/blob/master/node/node.md#libp2p-integration
 	beacon   p2p.GroupID // the beacon group ID
-	group    p2p.GroupID // the group ID of the shard
+	group    p2p.GroupID // the group ID of the shard (note: for beacon chain node, the beacon and shard group are the same)
 	client   p2p.GroupID // the client group ID of the shard
 	isClient bool        // whether this node is a client node, such as wallet/txgen
-	isBeacon bool        // whether this node is a beacon node or not
 	isLeader bool        // whether this node is a leader or not
 	ShardID  uint32      // ShardID of this node
 	role     Role        // Role of the node
@@ -85,27 +85,40 @@ type ConfigType struct {
 // configs is a list of node configuration.
 // It has at least one configuration.
 // The first one is the default, global node configuration
-var configs []ConfigType
+var shardConfigs []ConfigType
+var defaultConfig ConfigType
 var onceForConfigs sync.Once
 
-// GetConfigs return the indexed ConfigType variable
-func GetConfigs(index int) *ConfigType {
+// GetShardConfig return the shard's ConfigType variable
+func GetShardConfig(shardID uint32) *ConfigType {
 	onceForConfigs.Do(func() {
-		configs = make([]ConfigType, MaxShards)
+		shardConfigs = make([]ConfigType, MaxShards)
 	})
-	if index > cap(configs) {
+	if int(shardID) >= cap(shardConfigs) {
 		return nil
 	}
-	return &configs[index]
+	return &shardConfigs[shardID]
 }
 
-// GetGlobalConfig returns global config.
-func GetGlobalConfig() *ConfigType {
-	return GetConfigs(Global)
+// SetConfigs set ConfigType in the right index.
+func SetConfigs(config ConfigType, shardID uint32) error {
+	onceForConfigs.Do(func() {
+		shardConfigs = make([]ConfigType, MaxShards)
+	})
+	if int(shardID) >= cap(shardConfigs) {
+		return errors.New("Failed to set ConfigType")
+	}
+	shardConfigs[int(shardID)] = config
+	return nil
+}
+
+// GetDefaultConfig returns default config.
+func GetDefaultConfig() *ConfigType {
+	return &defaultConfig
 }
 
 func (conf *ConfigType) String() string {
-	return fmt.Sprintf("%s/%s/%s:%v,%v,%v:%v", conf.beacon, conf.group, conf.client, conf.isClient, conf.isBeacon, conf.isLeader, conf.ShardID)
+	return fmt.Sprintf("%s/%s/%s:%v,%v,%v:%v", conf.beacon, conf.group, conf.client, conf.isClient, conf.IsBeacon(), conf.isLeader, conf.ShardID)
 }
 
 // SetBeaconGroupID set the groupID for beacon group
@@ -126,11 +139,6 @@ func (conf *ConfigType) SetClientGroupID(g p2p.GroupID) {
 // SetIsClient set the isClient configuration
 func (conf *ConfigType) SetIsClient(b bool) {
 	conf.isClient = b
-}
-
-// SetIsBeacon set the isBeacon configuration
-func (conf *ConfigType) SetIsBeacon(b bool) {
-	conf.isBeacon = b
 }
 
 // SetIsLeader set the isLeader configuration
@@ -170,7 +178,7 @@ func (conf *ConfigType) IsClient() bool {
 
 // IsBeacon returns the isBeacon configuration
 func (conf *ConfigType) IsBeacon() bool {
-	return conf.isBeacon
+	return conf.ShardID == 0
 }
 
 // IsLeader returns the isLeader configuration

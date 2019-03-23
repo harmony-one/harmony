@@ -37,8 +37,8 @@ var GenesisBeaconAccountPublicKey = GenesisBeaconAccountPriKey.PublicKey
 // DeployedContractAddress is the deployed contract address of the staking smart contract in beacon chain.
 var DeployedContractAddress = crypto.CreateAddress(crypto.PubkeyToAddress(GenesisBeaconAccountPublicKey), uint64(0))
 
-// InitialBeaconChainAccounts are the ECSDA accounts for the initial beacon chain nodes.
-var InitialBeaconChainAccounts = [...]DeployAccount{
+// GenesisAccounts are the ECSDA accounts for the initial genesis nodes.
+var GenesisAccounts = [...]DeployAccount{
 	{Address: "0xE2bD4413172C98d5094B94de1A8AC6a383d68b84", Private: "e401343197a852f361e38ce6b46c99f1d6d1f80499864c6ae7effee42b46ab6b", Public: "0xE2bD4413172C98d5094B94de1A8AC6a383d68b84"},
 	{Address: "0x183418934Fd8A97c98E086151317B2df6259b8A8", Private: "a7d764439a7619f703c97ee2a2cf0be2cd62ad4c9deebd5423d6f28de417b907", Public: "0x183418934Fd8A97c98E086151317B2df6259b8A8"},
 	{Address: "0x9df0e70D4cb3E9beC0548D8Ac56F46596D1BcdB6", Private: "4e3f7c819a15249d2824834cd7ce20fe24d6eab8eb39ac63b78cb3713362cf78", Public: "0x9df0e70D4cb3E9beC0548D8Ac56F46596D1BcdB6"},
@@ -451,8 +451,8 @@ var InitialBeaconChainAccounts = [...]DeployAccount{
 	{Address: "0x193Cd8BB827F0D5Cd704B7bb9b44AAB3E5448260", Private: "58cc6ae8ab7abcb22f6f40a078e452a50baaa889c95d776b7c83d600aaa00a60", Public: "0x193Cd8BB827F0D5Cd704B7bb9b44AAB3E5448260"},
 }
 
-// InitialBeaconChainBLSAccounts are the BLS accounts for the initial beacon chain nodes.
-var InitialBeaconChainBLSAccounts = [...]DeployAccount{
+// GenesisBLSAccounts are the BLS accounts for the initial genesis nodes.
+var GenesisBLSAccounts = [...]DeployAccount{
 	{Address: "", Private: "66acb3a7c990be4b06709058fdef8122b7ecdbaf023e56ccf8cdf671c5333646", Public: ""},
 	{Address: "", Private: "5e9e2fffbf7cfad085d7b0147d2acd680cfd8b8d62daa9c39370185ba0207920", Public: ""},
 	{Address: "", Private: "56714bb94188c335d1243fa3d17fd50ff63a1a9bf740faecd97996f3a0737e87", Public: ""},
