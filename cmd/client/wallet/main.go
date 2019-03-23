@@ -81,19 +81,27 @@ var (
 	addrStrings = []string{"/ip4/100.26.90.187/tcp/9876/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9", "/ip4/54.213.43.194/tcp/9876/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX"}
 
 	// list of rpc servers
-	// TODO; (leo) take build time parameters or environment parameters to add rpcServers
-	// Then this can be automated
-	rpcServers = []struct {
-		IP   string
-		Port string
-	}{
-		{"52.39.144.88", "14555"},
-		{"100.27.48.137", "14555"},
-		{"18.236.238.59", "14555"},
-		{"34.216.169.242", "14555"},
-		{"52.39.189.88", "14555"},
-		{"3.92.19.244", "14555"},
-		{"35.171.228.165", "14555"},
+	rpcServers = []p2p.Peer{
+		p2p.Peer{
+			IP:   "52.39.144.88",
+			Port: "14555",
+		},
+		p2p.Peer{
+			IP:   "100.27.48.137",
+			Port: "14555",
+		},
+		p2p.Peer{
+			IP:   "18.236.238.59",
+			Port: "14555",
+		},
+		p2p.Peer{
+			IP:   "52.39.189.88",
+			Port: "14555",
+		},
+		p2p.Peer{
+			IP:   "3.92.19.244",
+			Port: "14555",
+		},
 	}
 )
 
@@ -134,10 +142,29 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Enable log if the last parameter is -verbose
-	if os.Args[len(os.Args)-1] == "--verbose" {
-		setupLog()
-		os.Args = os.Args[:len(os.Args)-1]
+ARG:
+	for {
+		lastArg := os.Args[len(os.Args)-1]
+		switch lastArg {
+		case "--verbose":
+			setupLog()
+			os.Args = os.Args[:len(os.Args)-1]
+		case "--devnet":
+			// the multiaddress of bootnodes for devnet
+			addrStrings = []string{"/ip4/100.26.90.187/tcp/9871/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv", "/ip4/54.213.43.194/tcp/9871/p2p/QmRVbTpEYup8dSaURZfF6ByrMTSKa4UyUzJhSjahFzRqNj"}
+			os.Args = os.Args[:len(os.Args)-1]
+		default:
+			break ARG
+		}
+	}
+
+	if len(os.Getenv("RpcNodes")) > 0 {
+		rpcServers = utils.StringsToPeers(os.Getenv("RpcNodes"))
+	}
+	if len(rpcServers) == 0 {
+		fmt.Println("Error: please set environment variable RpcNodes")
+		fmt.Println("Example: export RpcNodes=127.0.0.1:8000,192.168.0.1:9999")
+		os.Exit(0)
 	}
 
 	// Switch on the subcommand
