@@ -345,7 +345,18 @@ func processTransferCommand() {
 
 	amountBigInt := big.NewInt(int64(amount * params.GWei))
 	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(params.GWei))
-	tx, _ := types.SignTx(types.NewTransaction(state.nonce, receiverAddress, uint32(shardID), amountBigInt, params.TxGas, nil, inputData), types.HomesteadSigner{}, senderPriKey)
+	gas := params.TxGas
+	for b := range inputData {
+		if b != 0 {
+			gas += params.TxDataNonZeroGas
+		} else {
+			gas += params.TxDataZeroGas
+		}
+	}
+	tx := types.NewTransaction(
+		state.nonce, receiverAddress, uint32(shardID), amountBigInt,
+		gas, nil, inputData)
+	tx, _ = types.SignTx(tx, types.HomesteadSigner{}, senderPriKey)
 	submitTransaction(tx, walletNode, uint32(shardID))
 }
 
