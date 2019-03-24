@@ -346,7 +346,7 @@ func processTransferCommand() {
 	amountBigInt := big.NewInt(int64(amount * params.GWei))
 	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(params.GWei))
 	gas := params.TxGas
-	for b := range inputData {
+	for _, b := range inputData {
 		if b != 0 {
 			gas += params.TxDataNonZeroGas
 		} else {
