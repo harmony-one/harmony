@@ -78,7 +78,7 @@ var (
 
 var (
 	// list of bootnodes
-	addrStrings = []string{"/ip4/100.26.90.187/tcp/9876/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9", "/ip4/54.213.43.194/tcp/9876/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX"}
+	addrStrings = []string{"/ip4/100.26.90.187/tcp/9871/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv", "/ip4/54.213.43.194/tcp/9871/p2p/QmRVbTpEYup8dSaURZfF6ByrMTSKa4UyUzJhSjahFzRqNj"}
 
 	// list of rpc servers
 	// TODO; (leo) take build time parameters or environment parameters to add rpcServers
@@ -87,13 +87,10 @@ var (
 		IP   string
 		Port string
 	}{
-		{"52.39.144.88", "14555"},
-		{"100.27.48.137", "14555"},
-		{"18.236.238.59", "14555"},
-		{"34.216.169.242", "14555"},
-		{"52.39.189.88", "14555"},
-		{"3.92.19.244", "14555"},
-		{"35.171.228.165", "14555"},
+		{"54.85.166.160", "14555"},
+		{"3.92.195.65", "14555"},
+		{"35.175.246.181", "14555"},
+		{"107.23.115.9", "14555"},
 	}
 )
 
