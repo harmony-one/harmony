@@ -38,20 +38,15 @@ func GetSyncingPort(nodePort string) string {
 // getNeighborPeers is a helper function to return list of peers
 // based on different neightbor map
 func (node *Node) getNeighborPeers(neighbor *sync.Map) []p2p.Peer {
-	res := []p2p.Peer{}
 	tmp := []p2p.Peer{}
 	neighbor.Range(func(k, v interface{}) bool {
-		tmp = append(tmp, v.(p2p.Peer))
+		p := v.(p2p.Peer)
+		t := p.Port
+		p.Port = GetSyncingPort(t)
+		tmp = append(tmp, p)
 		return true
 	})
-	for _, peer := range tmp {
-		port := GetSyncingPort(peer.Port)
-		if peer.Port != node.SelfPeer.Port && port != "" {
-			peer.Port = port
-			res = append(res, peer)
-		}
-	}
-	return res
+	return tmp
 }
 
 // GetBeaconSyncingPeers returns a list of peers for beaconchain syncing
