@@ -18,6 +18,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	crypto2 "github.com/ethereum/go-ethereum/crypto"
+	"github.com/harmony-one/harmony/core"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
@@ -345,13 +346,10 @@ func processTransferCommand() {
 
 	amountBigInt := big.NewInt(int64(amount * params.GWei))
 	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(params.GWei))
-	gas := params.TxGas
-	for _, b := range inputData {
-		if b != 0 {
-			gas += params.TxDataNonZeroGas
-		} else {
-			gas += params.TxDataZeroGas
-		}
+	gas, err := core.IntrinsicGas(inputData, false, true)
+	if err != nil {
+		fmt.Printf("cannot calculate required gas: %v\n", err)
+		return
 	}
 	tx := types.NewTransaction(
 		state.nonce, receiverAddress, uint32(shardID), amountBigInt,
