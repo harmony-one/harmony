@@ -253,10 +253,12 @@ func (consensus *Consensus) processCommittedMessage(message *msg_pb.Message) {
 			}
 
 			// Put the signatures into the block
-			copy(blockObj.Header().PrepareSignature[:], consensus.aggregatedPrepareSig.Serialize()[:])
-			copy(blockObj.Header().PrepareBitmap[:], consensus.prepareBitmap.Bitmap)
-			copy(blockObj.Header().CommitSignature[:], consensus.aggregatedCommitSig.Serialize()[:])
-			copy(blockObj.Header().CommitBitmap[:], consensus.commitBitmap.Bitmap)
+			blockObj.SetPrepareSig(
+				consensus.aggregatedPrepareSig.Serialize(),
+				consensus.prepareBitmap.Bitmap)
+			blockObj.SetCommitSig(
+				consensus.aggregatedCommitSig.Serialize(),
+				consensus.commitBitmap.Bitmap)
 			utils.GetLogInstance().Info("Adding block to chain", "numTx", len(blockObj.Transactions()))
 			consensus.OnConsensusDone(&blockObj)
 			consensus.ResetState()
