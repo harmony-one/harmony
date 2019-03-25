@@ -67,9 +67,6 @@ SyncingLoop:
 	for {
 		select {
 		case <-ticker.C:
-			if willJoinConsensus {
-				<-node.Consensus.ConsensusIDLowChan
-			}
 			if node.stateSync == nil {
 				node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
 			}
@@ -97,6 +94,9 @@ SyncingLoop:
 			node.stateMutex.Lock()
 			node.State = NodeReadyForConsensus
 			node.stateMutex.Unlock()
+			if willJoinConsensus {
+				<-node.Consensus.ConsensusIDLowChan
+			}
 		}
 	}
 }
