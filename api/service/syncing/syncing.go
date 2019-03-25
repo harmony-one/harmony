@@ -74,7 +74,6 @@ type StateSync struct {
 	selfPeerHash       [20]byte // hash of ip and address combination
 	peerNumber         int
 	activePeerNumber   int
-	currentHeight      uint64 // current height of local blockchain
 	commonBlocks       map[int]*types.Block
 	lastMileBlocks     []*types.Block // last mile blocks to catch up with the consensus
 	syncConfig         *SyncConfig
@@ -449,7 +448,6 @@ func (ss *StateSync) updateBlockAndStatus(block *types.Block, bc *core.BlockChai
 		return false
 	}
 	ss.syncMux.Lock()
-	ss.currentHeight = bc.CurrentBlock().NumberU64()
 	worker.UpdateCurrent()
 	ss.syncMux.Unlock()
 	utils.GetLogInstance().Info("[SYNC] new block added to blockchain", "blockHeight", bc.CurrentBlock().NumberU64(), "blockHex", bc.CurrentBlock().Hash().Hex())
@@ -584,15 +582,17 @@ func (ss *StateSync) getMaxPeerHeight() uint64 {
 }
 
 // IsOutOfSync checks whether the node is out of sync from other peers
-func (ss *StateSync) IsOutOfSync() bool {
+func (ss *StateSync) IsOutOfSync(bc *core.BlockChain) bool {
 	otherHeight := ss.getMaxPeerHeight()
-	return ss.currentHeight+inSyncThreshold < otherHeight
+	currentHeight := bc.CurrentBlock().NumberU64()
+	utils.GetLogInstance().Debug("[SYNC] IsOutOfSync", "otherHeight", otherHeight, "myHeight", currentHeight)
+	return currentHeight+inSyncThreshold < otherHeight
 }
 
 // SyncLoop will keep syncing with peers until catches up
 func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, willJoinConsensus bool) {
 	for {
-		if !ss.IsOutOfSync() {
+		if !ss.IsOutOfSync(bc) {
 			utils.GetLogInstance().Info("[SYNC] Node is now IN SYNC!")
 			return
 		}
