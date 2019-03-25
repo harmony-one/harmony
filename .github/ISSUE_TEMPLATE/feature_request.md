@@ -23,7 +23,8 @@ A clear and concise description of what the problem is. Ex. I'm always frustrate
 - [ ] others ...
 
 
-**Describe the solution you'd like**
+# Proposed Solution
+
 A clear and concise description of what you want to happen.
 
 **Describe alternatives you've considered**
