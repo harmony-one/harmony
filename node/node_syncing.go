@@ -78,7 +78,7 @@ SyncingLoop:
 					continue SyncingLoop
 				}
 			}
-			if node.stateSync.IsOutOfSync() {
+			if node.stateSync.IsOutOfSync(bc) {
 				utils.GetLogInstance().Debug("[SYNC] out of sync, doing syncing")
 				node.stateMutex.Lock()
 				node.State = NodeNotInSync
