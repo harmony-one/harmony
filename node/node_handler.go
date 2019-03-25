@@ -394,6 +394,8 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 // SendPongMessage is the a goroutine to periodcally send pong message to all peers
 func (node *Node) SendPongMessage() {
 	tick := time.NewTicker(2 * time.Second)
+	tick2 := time.NewTicker(120 * time.Second)
+
 	numPeers := len(node.Consensus.GetValidatorPeers())
 	numPubKeys := len(node.Consensus.PublicKeys)
 	sentMessage := false
@@ -405,7 +407,7 @@ func (node *Node) SendPongMessage() {
 		case <-tick.C:
 			peers := node.Consensus.GetValidatorPeers()
 			numPeersNow := len(peers)
-			numPubKeysNow := len(node.Consensus.PublicKeys)
+			numPubKeysNow := node.Consensus.GetNumPeers()
 
 			// no peers, wait for another tick
 			if numPeersNow == 0 || numPubKeysNow == 0 {
@@ -429,12 +431,13 @@ func (node *Node) SendPongMessage() {
 						utils.GetLogInstance().Info("[PONG] sent pong message to", "group", node.NodeConfig.GetShardGroupID(), "# nodes", numPeersNow)
 					}
 					sentMessage = true
-					// stop sending ping message
-					node.serviceManager.TakeAction(&service.Action{Action: service.Stop, ServiceType: service.PeerDiscovery})
 					// wait a bit until all validators received pong message
 					time.Sleep(200 * time.Millisecond)
+
 					// only need to notify consensus leader once to start the consensus
 					if firstTime {
+						// Leader stops sending ping message
+						node.serviceManager.TakeAction(&service.Action{Action: service.Stop, ServiceType: service.PeerDiscovery})
 						node.startConsensus <- struct{}{}
 						firstTime = false
 					}
@@ -442,6 +445,19 @@ func (node *Node) SendPongMessage() {
 			}
 			numPeers = numPeersNow
 			numPubKeys = numPubKeysNow
+		case <-tick2.C:
+			// send pong message regularly to make sure new node received all the public keys
+			// also nodes offline/online will receive the public keys
+			peers := node.Consensus.GetValidatorPeers()
+			pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys, node.Consensus.GetLeaderPubKey())
+			buffer := pong.ConstructPongMessage()
+			err := node.host.SendMessageToGroups([]p2p.GroupID{node.NodeConfig.GetShardGroupID()}, host.ConstructP2pMessage(byte(0), buffer))
+			if err != nil {
+				utils.GetLogInstance().Error("[PONG] failed to send regular pong message", "group", node.NodeConfig.GetShardGroupID())
+				continue
+			} else {
+				utils.GetLogInstance().Info("[PONG] sent regular pong message to", "group", node.NodeConfig.GetShardGroupID(), "# nodes", len(peers))
+			}
 		}
 	}
 }
