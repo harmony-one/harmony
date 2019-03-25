@@ -44,8 +44,7 @@ type Consensus struct {
 	ChainReader consensus_engine.ChainReader
 
 	// map of nodeID to validator Peer object
-	// FIXME: should use PubKey of p2p.Peer as the hashkey
-	validators sync.Map // key is uint16, value is p2p.Peer
+	validators sync.Map // key is the hex string of the blsKey, value is p2p.Peer
 
 	// Minimal number of peers in the shard
 	// If the number of validators is less than minPeers, the consensus won't start
@@ -56,6 +55,7 @@ type Consensus struct {
 
 	// Public keys of the committee including leader and validators
 	PublicKeys []*bls.PublicKey
+
 	pubKeyLock sync.Mutex
 
 	// private/public keys of current node
@@ -168,7 +168,7 @@ func New(host p2p.Host, ShardID uint32, peers []p2p.Peer, leader p2p.Peer, blsPr
 
 	consensus.leader = leader
 	for _, peer := range peers {
-		consensus.validators.Store(peer.GetAddressHex(), peer)
+		consensus.validators.Store(utils.GetAddressHex(peer.ConsensusPubKey), peer)
 	}
 
 	consensus.prepareSigs = map[string]*bls.Sign{}
@@ -193,7 +193,7 @@ func New(host p2p.Host, ShardID uint32, peers []p2p.Peer, leader p2p.Peer, blsPr
 
 	// For now use socket address as ID
 	// TODO: populate Id derived from address
-	consensus.SelfAddress = selfPeer.GetAddressHex()
+	consensus.SelfAddress = utils.GetAddressHex(selfPeer.ConsensusPubKey)
 
 	if blsPriKey != nil {
 		consensus.priKey = blsPriKey
@@ -407,7 +407,7 @@ func (consensus *Consensus) AddPeers(peers []*p2p.Peer) int {
 	count := 0
 
 	for _, peer := range peers {
-		_, ok := consensus.validators.LoadOrStore(peer.GetAddressHex(), *peer)
+		_, ok := consensus.validators.LoadOrStore(utils.GetAddressHex(peer.ConsensusPubKey), *peer)
 		if !ok {
 			consensus.pubKeyLock.Lock()
 			consensus.PublicKeys = append(consensus.PublicKeys, peer.ConsensusPubKey)
@@ -486,7 +486,7 @@ func (consensus *Consensus) DebugPrintValidators() {
 	consensus.validators.Range(func(k, v interface{}) bool {
 		if p, ok := v.(p2p.Peer); ok {
 			str2 := fmt.Sprintf("%s", p.ConsensusPubKey.Serialize())
-			utils.GetLogInstance().Debug("validator:", "IP", p.IP, "Port", p.Port, "address", p.GetAddressHex(), "Key", str2)
+			utils.GetLogInstance().Debug("validator:", "IP", p.IP, "Port", p.Port, "address", utils.GetAddressHex(p.ConsensusPubKey), "Key", str2)
 			count++
 			return true
 		}

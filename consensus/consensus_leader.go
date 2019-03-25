@@ -20,10 +20,6 @@ import (
 	"github.com/harmony-one/harmony/p2p/host"
 )
 
-const (
-	waitForEnoughValidators = 1000
-)
-
 var (
 	startTime time.Time
 )
