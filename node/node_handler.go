@@ -347,10 +347,8 @@ func (node *Node) AddNewBlock(newBlock *types.Block) {
 
 func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 	if sender != "" {
-		_, ok := node.duplicatedPing.Load(sender)
-		if !ok {
-			node.duplicatedPing.Store(sender, true)
-		} else {
+		_, ok := node.duplicatedPing.LoadOrStore(sender, true)
+		if ok {
 			// duplicated ping message return
 			return 0
 		}
@@ -386,8 +384,8 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 		utils.GetLogInstance().Info("Add Client Peer to Node", "Address", node.Consensus.GetSelfAddress(), "Client", peer)
 		node.ClientPeer = peer
 	} else {
-		utils.GetLogInstance().Info("Add Peer to Node", "Address", node.Consensus.GetSelfAddress(), "Pear", peer)
 		node.AddPeers([]*p2p.Peer{peer})
+		utils.GetLogInstance().Info("Add Peer to Node", "Address", node.Consensus.GetSelfAddress(), "Peer", peer, "# Peers", node.Consensus.GetNumPeers())
 	}
 
 	return 1
@@ -462,7 +460,7 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 	if err != nil {
 		utils.GetLogInstance().Error("Unmarshal Consensus Leader PubKey Failed", "error", err)
 	} else {
-		utils.GetLogInstance().Info("Set Consensus Leader PubKey")
+		utils.GetLogInstance().Info("Set Consensus Leader PubKey", "key", utils.GetAddressHex(node.Consensus.GetLeaderPubKey()))
 	}
 	err = node.DRand.SetLeaderPubKey(pong.LeaderPubKey)
 	if err != nil {

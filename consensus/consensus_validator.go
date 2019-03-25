@@ -68,7 +68,7 @@ func (consensus *Consensus) processAnnounceMessage(message *msg_pb.Message) {
 	consensus.block = block
 
 	if err := consensus.checkConsensusMessage(message, consensus.leader.ConsensusPubKey); err != nil {
-		utils.GetLogInstance().Debug("Failed to check the leader message")
+		utils.GetLogInstance().Debug("Failed to check the leader message", "key", utils.GetAddressHex(consensus.leader.ConsensusPubKey))
 		return
 	}
 

@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/crypto/pki"
 	p2p "github.com/harmony-one/harmony/p2p"
 	crypto "github.com/libp2p/go-libp2p-crypto"
 	"github.com/stretchr/testify/assert"
@@ -203,4 +205,30 @@ func TestStringsToPeers(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestGetAddressHex(t *testing.T) {
+	pubKey1 := pki.GetBLSPrivateKeyFromInt(333).GetPublicKey()
+	pubKey2 := pki.GetBLSPrivateKeyFromInt(1024).GetPublicKey()
+	tests := []struct {
+		key      *bls.PublicKey
+		expected string
+	}{
+		{
+			pubKey1,
+			"0x8fAd8DAa0206a9a6710b05604a58e6EA1B3A160E",
+		},
+		{
+			pubKey2,
+			"0x91B5B75ddeb29085BF0490bc562e93059Ad1c254",
+		},
+	}
+
+	for _, test := range tests {
+		result := GetAddressHex(test.key)
+		if result != test.expected {
+			t.Errorf("Hex Of %v is: %v, got: %v", test.key, test.expected, result)
+		}
+	}
+
 }
