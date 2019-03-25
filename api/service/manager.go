@@ -25,6 +25,7 @@ const (
 	SupportSyncing Type = iota
 	ClientSupport
 	NewClientSupport
+	RestClientSupport
 	SupportExplorer
 	Consensus
 	Randomness
@@ -41,6 +42,10 @@ func (t Type) String() string {
 	switch t {
 	case ClientSupport:
 		return "ClientSupport"
+	case NewClientSupport:
+		return "NewClientSupport"
+	case RestClientSupport:
+		return "RestClientSupport"
 	case SupportSyncing:
 		return "SyncingSupport"
 	case SupportExplorer:

@@ -10,6 +10,7 @@ import (
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/api/service/networkinfo"
 	"github.com/harmony-one/harmony/api/service/randomness"
+	"github.com/harmony-one/harmony/api/service/restclientsupport"
 	"github.com/harmony-one/harmony/api/service/staking"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -60,6 +61,11 @@ func (node *Node) setupForBeaconLeader() {
 	node.serviceManager.RegisterService(service.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReady))
 	// Register client support service.
 	node.serviceManager.RegisterService(service.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
+	// TODO(minhdoan): We will remove the old client support and use the new client support which uses new message protocol.
+	// Register client new support service.
+	// TODO(minhdoan): Also consider provide clientsupport/restclientsupport for other shards in the future.
+	node.serviceManager.RegisterService(service.RestClientSupport, restclientsupport.New(
+		node.CreateTransactionForEnterMethod, node.GetResult, node.CreateTransactionForPickWinner))
 	// Register randomness service
 	node.serviceManager.RegisterService(service.Randomness, randomness.New(node.DRand))
 	// Register explorer service.
@@ -100,15 +106,6 @@ func (node *Node) setupForClientNode() {
 	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer, nil))
 }
 
-func (node *Node) setupForArchivalNode() {
-	nodeConfig, chanPeer := node.initNodeConfiguration(false, false)
-	// Register peer discovery service.
-	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer, node.AddBeaconPeer))
-	// Register networkinfo service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer, nil))
-	//TODO: Add Syncing as a service.
-}
-
 // ServiceManagerSetup setups service store.
 func (node *Node) ServiceManagerSetup() {
 	node.serviceManager = &service.Manager{}
@@ -126,8 +123,6 @@ func (node *Node) ServiceManagerSetup() {
 		node.setupForNewNode()
 	case nodeconfig.ClientNode:
 		node.setupForClientNode()
-	case nodeconfig.ArchivalNode:
-		node.setupForArchivalNode()
 	}
 	node.serviceManager.SetupServiceMessageChan(node.serviceMessageChan)
 }

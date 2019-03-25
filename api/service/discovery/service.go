@@ -134,7 +134,6 @@ func (s *Service) sentPingMessage(g p2p.GroupID, msgBuf []byte) {
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to send ping message", "group", g)
 	}
-
 }
 
 // Init is to initialize for discoveryService.

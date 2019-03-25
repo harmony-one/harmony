@@ -26,7 +26,7 @@ const (
 )
 
 // GenesisBlockSetup setups a genesis blockchain.
-func (node *Node) GenesisBlockSetup(db ethdb.Database) (*core.BlockChain, error) {
+func (node *Node) GenesisBlockSetup(db ethdb.Database, isArchival bool) (*core.BlockChain, error) {
 	// Initialize genesis block and blockchain
 	// Tests account for txgen to use
 	genesisAlloc := node.CreateGenesisAllocWithTestingAddresses(FakeAddressNumber)
@@ -53,7 +53,10 @@ func (node *Node) GenesisBlockSetup(db ethdb.Database) (*core.BlockChain, error)
 
 	// Store genesis block into db.
 	gspec.MustCommit(db)
-	cacheConfig := core.CacheConfig{Disabled: false, TrieNodeLimit: 256 * 1024 * 1024, TrieTimeLimit: 5 * time.Minute}
+	cacheConfig := core.CacheConfig{}
+	if isArchival {
+		cacheConfig = core.CacheConfig{Disabled: true, TrieNodeLimit: 256 * 1024 * 1024, TrieTimeLimit: 30 * time.Second}
+	}
 	return core.NewBlockChain(db, &cacheConfig, gspec.Config, node.Consensus, vm.Config{}, nil)
 }
 

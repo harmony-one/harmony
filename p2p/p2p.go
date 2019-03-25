@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/harmony-one/bls/ffi/go/bls"
 	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 	ma "github.com/multiformats/go-multiaddr"
@@ -25,12 +23,4 @@ type Peer struct {
 
 func (p Peer) String() string {
 	return fmt.Sprintf("%s/%s[%d]", net.JoinHostPort(p.IP, p.Port), p.PeerID, len(p.Addrs))
-}
-
-// GetAddressHex returns the hex string of the address of consensus pubKey.
-func (p Peer) GetAddressHex() string {
-	addr := common.Address{}
-	addrBytes := p.ConsensusPubKey.GetAddress()
-	addr.SetBytes(addrBytes[:])
-	return addr.Hex()
 }

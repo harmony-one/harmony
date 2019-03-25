@@ -6,7 +6,6 @@ import (
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
-	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/attack"
@@ -14,30 +13,6 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 )
-
-// sendBFTBlockToStateSyncing will send the latest BFT consensus block to state syncing checkingjjkkkkkkkkkkkkkkkjnjk
-func (consensus *Consensus) sendBFTBlockToStateSyncing(consensusID uint32) {
-	// validator send consensus block to state syncing
-	if val, ok := consensus.blocksReceived[consensusID]; ok {
-		consensus.mutex.Lock()
-		delete(consensus.blocksReceived, consensusID)
-		consensus.mutex.Unlock()
-
-		var blockObj types.Block
-		err := rlp.DecodeBytes(val.block, &blockObj)
-		if err != nil {
-			utils.GetLogInstance().Debug("failed to construct the cached block")
-			return
-		}
-		blockInfo := &BFTBlockInfo{Block: &blockObj, ConsensusID: consensusID}
-		select {
-		case consensus.ConsensusBlock <- blockInfo:
-		default:
-			utils.GetLogInstance().Warn("consensus block unable to sent to state sync", "height", blockObj.NumberU64(), "blockHash", blockObj.Hash().Hex())
-		}
-	}
-	return
-}
 
 // IsValidatorMessage checks if a message is to be sent to a validator.
 func (consensus *Consensus) IsValidatorMessage(message *msg_pb.Message) bool {
@@ -93,11 +68,7 @@ func (consensus *Consensus) processAnnounceMessage(message *msg_pb.Message) {
 	consensus.block = block
 
 	if err := consensus.checkConsensusMessage(message, consensus.leader.ConsensusPubKey); err != nil {
-		utils.GetLogInstance().Debug("Failed to check the leader message")
-		if err == consensus_engine.ErrConsensusIDNotMatch {
-			utils.GetLogInstance().Debug("sending bft block to state syncing")
-			consensus.sendBFTBlockToStateSyncing(consensusID)
-		}
+		utils.GetLogInstance().Debug("Failed to check the leader message", "key", utils.GetAddressHex(consensus.leader.ConsensusPubKey))
 		return
 	}
 
@@ -282,10 +253,12 @@ func (consensus *Consensus) processCommittedMessage(message *msg_pb.Message) {
 			}
 
 			// Put the signatures into the block
-			copy(blockObj.Header().PrepareSignature[:], consensus.aggregatedPrepareSig.Serialize()[:])
-			copy(blockObj.Header().PrepareBitmap[:], consensus.prepareBitmap.Bitmap)
-			copy(blockObj.Header().CommitSignature[:], consensus.aggregatedCommitSig.Serialize()[:])
-			copy(blockObj.Header().CommitBitmap[:], consensus.commitBitmap.Bitmap)
+			blockObj.SetPrepareSig(
+				consensus.aggregatedPrepareSig.Serialize(),
+				consensus.prepareBitmap.Bitmap)
+			blockObj.SetCommitSig(
+				consensus.aggregatedCommitSig.Serialize(),
+				consensus.commitBitmap.Bitmap)
 			utils.GetLogInstance().Info("Adding block to chain", "numTx", len(blockObj.Transactions()))
 			consensus.OnConsensusDone(&blockObj)
 			consensus.ResetState()

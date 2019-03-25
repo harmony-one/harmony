@@ -16,6 +16,7 @@ require (
 	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/golang/mock v1.2.0
 	github.com/golang/protobuf v1.3.0
+	github.com/gorilla/handlers v1.4.0
 	github.com/gorilla/mux v1.7.0
 	github.com/harmony-one/bls v0.0.1
 	github.com/hashicorp/golang-lru v0.5.1

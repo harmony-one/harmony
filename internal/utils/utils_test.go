@@ -3,8 +3,12 @@ package utils
 import (
 	"net"
 	"os"
+	"reflect"
 	"testing"
 
+	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/crypto/pki"
+	p2p "github.com/harmony-one/harmony/p2p"
 	crypto "github.com/libp2p/go-libp2p-crypto"
 	"github.com/stretchr/testify/assert"
 )
@@ -165,4 +169,66 @@ func TestIsPrivateIP(t *testing.T) {
 			t.Errorf("IP: %v, IsPrivate: %v, Expected: %v", a.ip, r, a.isPrivate)
 		}
 	}
+}
+
+func TestStringsToPeers(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected []p2p.Peer
+	}{
+		{
+			"127.0.0.1:9000,192.168.192.1:8888,54.32.12.3:9898",
+			[]p2p.Peer{
+				p2p.Peer{IP: "127.0.0.1", Port: "9000"},
+				p2p.Peer{IP: "192.168.192.1", Port: "8888"},
+				p2p.Peer{IP: "54.32.12.3", Port: "9898"},
+			},
+		},
+		{
+			"a:b,xx:XX,hello:world",
+			[]p2p.Peer{
+				p2p.Peer{IP: "a", Port: "b"},
+				p2p.Peer{IP: "xx", Port: "XX"},
+				p2p.Peer{IP: "hello", Port: "world"},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		peers := StringsToPeers(test.input)
+		if len(peers) != 3 {
+			t.Errorf("StringsToPeers failure")
+		}
+		for i, p := range peers {
+			if !reflect.DeepEqual(p, test.expected[i]) {
+				t.Errorf("StringToPeers: expected: %v, got: %v", test.expected[i], p)
+			}
+		}
+	}
+}
+
+func TestGetAddressHex(t *testing.T) {
+	pubKey1 := pki.GetBLSPrivateKeyFromInt(333).GetPublicKey()
+	pubKey2 := pki.GetBLSPrivateKeyFromInt(1024).GetPublicKey()
+	tests := []struct {
+		key      *bls.PublicKey
+		expected string
+	}{
+		{
+			pubKey1,
+			"0x8fAd8DAa0206a9a6710b05604a58e6EA1B3A160E",
+		},
+		{
+			pubKey2,
+			"0x91B5B75ddeb29085BF0490bc562e93059Ad1c254",
+		},
+	}
+
+	for _, test := range tests {
+		result := GetAddressHex(test.key)
+		if result != test.expected {
+			t.Errorf("Hex Of %v is: %v, got: %v", test.key, test.expected, result)
+		}
+	}
+
 }

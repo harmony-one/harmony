@@ -225,3 +225,11 @@ func IsPrivateIP(ip net.IP) bool {
 	}
 	return false
 }
+
+// GetAddressHex returns the hex string of the address of consensus pubKey.
+func GetAddressHex(key *bls.PublicKey) string {
+	addr := common.Address{}
+	addrBytes := key.GetAddress()
+	addr.SetBytes(addrBytes[:])
+	return addr.Hex()
+}

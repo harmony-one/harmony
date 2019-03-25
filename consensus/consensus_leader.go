@@ -20,10 +20,6 @@ import (
 	"github.com/harmony-one/harmony/p2p/host"
 )
 
-const (
-	waitForEnoughValidators = 1000
-)
-
 var (
 	startTime time.Time
 )
@@ -308,10 +304,12 @@ func (consensus *Consensus) processCommitMessage(message *msg_pb.Message) {
 		}
 
 		// Sign the block
-		copy(blockObj.Header().PrepareSignature[:], consensus.aggregatedPrepareSig.Serialize()[:])
-		copy(blockObj.Header().PrepareBitmap[:], consensus.prepareBitmap.Bitmap)
-		copy(blockObj.Header().CommitSignature[:], consensus.aggregatedCommitSig.Serialize()[:])
-		copy(blockObj.Header().CommitBitmap[:], consensus.commitBitmap.Bitmap)
+		blockObj.SetPrepareSig(
+			consensus.aggregatedPrepareSig.Serialize(),
+			consensus.prepareBitmap.Bitmap)
+		blockObj.SetCommitSig(
+			consensus.aggregatedCommitSig.Serialize(),
+			consensus.commitBitmap.Bitmap)
 
 		consensus.state = targetState
 

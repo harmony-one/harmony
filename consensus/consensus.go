@@ -44,8 +44,7 @@ type Consensus struct {
 	ChainReader consensus_engine.ChainReader
 
 	// map of nodeID to validator Peer object
-	// FIXME: should use PubKey of p2p.Peer as the hashkey
-	validators sync.Map // key is uint16, value is p2p.Peer
+	validators sync.Map // key is the hex string of the blsKey, value is p2p.Peer
 
 	// Minimal number of peers in the shard
 	// If the number of validators is less than minPeers, the consensus won't start
@@ -56,6 +55,7 @@ type Consensus struct {
 
 	// Public keys of the committee including leader and validators
 	PublicKeys []*bls.PublicKey
+
 	pubKeyLock sync.Mutex
 
 	// private/public keys of current node
@@ -76,6 +76,8 @@ type Consensus struct {
 	blockHashes [][32]byte
 	// Shard Id which this node belongs to
 	ShardID uint32
+	// whether to ignore consensusID check
+	ignoreConsensusIDCheck bool
 
 	// global consensus mutex
 	mutex sync.Mutex
@@ -92,10 +94,11 @@ type Consensus struct {
 	// The verifier func passed from Node object
 	BlockVerifier func(*types.Block) bool
 
-	// current consensus block to check if out of sync
-	ConsensusBlock chan *BFTBlockInfo
 	// verified block to state sync broadcast
 	VerifiedNewBlock chan *types.Block
+
+	// will trigger state syncing when consensus ID is low
+	ConsensusIDLowChan chan struct{}
 
 	// Channel for DRG protocol to send pRnd (preimage of randomness resulting from combined vrf randomnesses) to consensus. The first 32 bytes are randomness, the rest is for bitmap.
 	PRndChannel chan []byte
@@ -115,13 +118,6 @@ type Consensus struct {
 	OfflinePeerList []p2p.Peer
 }
 
-// BFTBlockInfo send the latest block that was in BFT consensus process as well as its consensusID to state syncing
-// consensusID is necessary to make sure the out of sync node can enter the correct view
-type BFTBlockInfo struct {
-	Block       *types.Block
-	ConsensusID uint32
-}
-
 // BlockConsensusStatus used to keep track of the consensus status of multiple blocks received so far
 // This is mainly used in the case that this node is lagging behind and needs to catch up.
 // For example, the consensus moved to round N and this node received message(N).
@@ -131,16 +127,6 @@ type BFTBlockInfo struct {
 type BlockConsensusStatus struct {
 	block []byte // the block data
 	state State  // the latest state of the consensus
-}
-
-// UpdateConsensusID is used to update latest consensusID for nodes that out of sync
-func (consensus *Consensus) UpdateConsensusID(consensusID uint32) {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-	if consensus.consensusID < consensusID {
-		utils.GetLogInstance().Debug("update consensusID", "myConsensusID", consensus.consensusID, "newConsensusID", consensusID)
-		consensus.consensusID = consensusID
-	}
 }
 
 // WaitForNewRandomness listens to the RndChannel to receive new VDF randomness.
@@ -171,6 +157,7 @@ func (consensus *Consensus) GetNextRnd() ([32]byte, [32]byte, error) {
 func New(host p2p.Host, ShardID uint32, peers []p2p.Peer, leader p2p.Peer, blsPriKey *bls.SecretKey) *Consensus {
 	consensus := Consensus{}
 	consensus.host = host
+	consensus.ConsensusIDLowChan = make(chan struct{})
 
 	selfPeer := host.GetSelfPeer()
 	if leader.Port == selfPeer.Port && leader.IP == selfPeer.IP {
@@ -181,7 +168,7 @@ func New(host p2p.Host, ShardID uint32, peers []p2p.Peer, leader p2p.Peer, blsPr
 
 	consensus.leader = leader
 	for _, peer := range peers {
-		consensus.validators.Store(peer.GetAddressHex(), peer)
+		consensus.validators.Store(utils.GetAddressHex(peer.ConsensusPubKey), peer)
 	}
 
 	consensus.prepareSigs = map[string]*bls.Sign{}
@@ -206,7 +193,7 @@ func New(host p2p.Host, ShardID uint32, peers []p2p.Peer, leader p2p.Peer, blsPr
 
 	// For now use socket address as ID
 	// TODO: populate Id derived from address
-	consensus.SelfAddress = selfPeer.GetAddressHex()
+	consensus.SelfAddress = utils.GetAddressHex(selfPeer.ConsensusPubKey)
 
 	if blsPriKey != nil {
 		consensus.priKey = blsPriKey
@@ -258,18 +245,34 @@ func (consensus *Consensus) checkConsensusMessage(message *msg_pb.Message, publi
 		utils.GetLogInstance().Warn("Failed to verify the message signature", "Error", err)
 		return consensus_engine.ErrInvalidConsensusMessage
 	}
-
-	// check consensus Id
-	if consensusID != consensus.consensusID {
-		utils.GetLogInstance().Warn("Wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
-		return consensus_engine.ErrConsensusIDNotMatch
-	}
-
 	if !bytes.Equal(blockHash, consensus.blockHash[:]) {
 		utils.GetLogInstance().Warn("Wrong blockHash", "consensus", consensus)
 		return consensus_engine.ErrInvalidConsensusMessage
 	}
+
+	// just ignore consensus check for the first time when node join
+	if consensus.ignoreConsensusIDCheck {
+		consensus.consensusID = consensusID
+		consensus.ToggleConsensusCheck()
+		return nil
+	} else if consensusID != consensus.consensusID {
+		utils.GetLogInstance().Warn("Wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
+		// notify state syncing to start
+		select {
+		case consensus.ConsensusIDLowChan <- struct{}{}:
+		default:
+		}
+
+		return consensus_engine.ErrConsensusIDNotMatch
+	}
 	return nil
+}
+
+// ToggleConsensusCheck flip the flag of whether ignore consensusID check during consensus process
+func (consensus *Consensus) ToggleConsensusCheck() {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+	consensus.ignoreConsensusIDCheck = !consensus.ignoreConsensusIDCheck
 }
 
 // GetPeerByAddress the validator peer based on validator Address.
@@ -404,13 +407,11 @@ func (consensus *Consensus) AddPeers(peers []*p2p.Peer) int {
 	count := 0
 
 	for _, peer := range peers {
-		_, ok := consensus.validators.Load(peer.GetAddressHex())
+		_, ok := consensus.validators.LoadOrStore(utils.GetAddressHex(peer.ConsensusPubKey), *peer)
 		if !ok {
-			consensus.validators.Store(peer.GetAddressHex(), *peer)
 			consensus.pubKeyLock.Lock()
 			consensus.PublicKeys = append(consensus.PublicKeys, peer.ConsensusPubKey)
 			consensus.pubKeyLock.Unlock()
-			//			utils.GetLogInstance().Debug("[SYNC]", "new peer added", peer)
 		}
 		count++
 	}
@@ -485,7 +486,7 @@ func (consensus *Consensus) DebugPrintValidators() {
 	consensus.validators.Range(func(k, v interface{}) bool {
 		if p, ok := v.(p2p.Peer); ok {
 			str2 := fmt.Sprintf("%s", p.ConsensusPubKey.Serialize())
-			utils.GetLogInstance().Debug("validator:", "IP", p.IP, "Port", p.Port, "address", p.GetAddressHex(), "Key", str2)
+			utils.GetLogInstance().Debug("validator:", "IP", p.IP, "Port", p.Port, "address", utils.GetAddressHex(p.ConsensusPubKey), "Key", str2)
 			count++
 			return true
 		}

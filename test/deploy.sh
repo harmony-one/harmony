@@ -11,6 +11,7 @@ set -eo pipefail
 function check_result() {
    find $log_folder -name leader-*.log > $log_folder/all-leaders.txt
    find $log_folder -name validator-*.log > $log_folder/all-validators.txt
+   find $log_folder -name archival-*.log >> $log_folder/all-validators.txt
 
    echo ====== RESULTS ======
    results=$($ROOT/test/cal_tps.sh $log_folder/all-leaders.txt $log_folder/all-validators.txt)
@@ -143,13 +144,17 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
      echo "launching leader ..."
      $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -account_index $i  -min_peers $MIN $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key -is_leader 2>&1 | tee -a $LOG_FILE &
   fi
+  if [ "$mode" == "leader_archival" ]; then
+     echo "launching leader ..."
+     $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -account_index $i  -min_peers $MIN $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key -is_leader -is_archival 2>&1 | tee -a $LOG_FILE &
+  fi
   if [ "$mode" == "validator" ]; then
      echo "launching validator ..."
      $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -account_index $i  -min_peers $MIN $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key 2>&1 | tee -a $LOG_FILE &
   fi
   if [ "$mode" == "archival" ]; then
       echo "launching archival node ... wait"
-      $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -account_index $i  $HMY_OPT2 -key /tmp/$ip-$port.key -is_archival  2>&1 | tee -a $LOG_FILE &
+      $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -account_index $i -min_peers $MIN $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key -is_archival  2>&1 | tee -a $LOG_FILE &
   fi
   sleep 0.5
   if [[ "$mode" == "newnode" && "$SYNC" == "true" ]]; then

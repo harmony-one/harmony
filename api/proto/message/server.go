@@ -34,7 +34,6 @@ func (s *Server) Process(ctx context.Context, message *Message) (*Response, erro
 	if message.GetType() != MessageType_LOTTERY_REQUEST {
 		return &Response{}, ErrWrongMessage
 	}
-	utils.GetLogInstance().Info("Recieved:", "message", message)
 	lotteryRequest := message.GetLotteryRequest()
 	if lotteryRequest.GetType() == LotteryRequest_ENTER {
 		if s.CreateTransactionForEnterMethod == nil {

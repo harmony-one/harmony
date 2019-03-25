@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	p2p "github.com/harmony-one/harmony/p2p"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
@@ -44,6 +45,23 @@ func StringsToAddrs(addrStrings []string) (maddrs []ma.Multiaddr, err error) {
 		maddrs = append(maddrs, addr)
 	}
 	return
+}
+
+// StringsToPeers converts a string to a list of Peers
+// addr is a string of format "ip:port,ip:port"
+func StringsToPeers(input string) []p2p.Peer {
+	addrs := strings.Split(input, ",")
+	peers := make([]p2p.Peer, 0)
+	for _, addr := range addrs {
+		data := strings.Split(addr, ":")
+		if len(data) >= 2 {
+			peer := p2p.Peer{}
+			peer.IP = data[0]
+			peer.Port = data[1]
+			peers = append(peers, peer)
+		}
+	}
+	return peers
 }
 
 // DefaultBootNodeAddrStrings is a list of Harmony bootnodes address. Used to find other peers in the network.

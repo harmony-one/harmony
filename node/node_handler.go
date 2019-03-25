@@ -143,7 +143,7 @@ func (node *Node) messageHandler(content []byte, sender string) {
 				} else {
 					// for non-beaconchain node, subscribe to beacon block broadcast
 					role := node.NodeConfig.Role()
-					if proto_node.BlockMessageType(msgPayload[0]) == proto_node.Sync && (role == nodeconfig.ShardValidator || role == nodeconfig.ShardLeader || role == nodeconfig.NewNode || role == nodeconfig.ArchivalNode) {
+					if proto_node.BlockMessageType(msgPayload[0]) == proto_node.Sync && (role == nodeconfig.ShardValidator || role == nodeconfig.ShardLeader || role == nodeconfig.NewNode) {
 						utils.GetLogInstance().Info("Block being handled by block channel", "self peer", node.SelfPeer)
 						for _, block := range blocks {
 							node.BeaconBlockChannel <- block
@@ -347,10 +347,8 @@ func (node *Node) AddNewBlock(newBlock *types.Block) {
 
 func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 	if sender != "" {
-		_, ok := node.duplicatedPing.Load(sender)
-		if !ok {
-			node.duplicatedPing.Store(sender, true)
-		} else {
+		_, ok := node.duplicatedPing.LoadOrStore(sender, true)
+		if ok {
 			// duplicated ping message return
 			return 0
 		}
@@ -385,12 +383,9 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 	if ping.Node.Role == proto_node.ClientRole {
 		utils.GetLogInstance().Info("Add Client Peer to Node", "Address", node.Consensus.GetSelfAddress(), "Client", peer)
 		node.ClientPeer = peer
-		return 0
-	}
-
-	if node.NodeConfig.IsLeader() {
-		utils.GetLogInstance().Info("Add Peer to Node", "Address", node.Consensus.GetSelfAddress(), "Pear", peer)
+	} else {
 		node.AddPeers([]*p2p.Peer{peer})
+		utils.GetLogInstance().Info("Add Peer to Node", "Address", node.Consensus.GetSelfAddress(), "Peer", peer, "# Peers", node.Consensus.GetNumPeers())
 	}
 
 	return 1
@@ -398,10 +393,13 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 
 // SendPongMessage is the a goroutine to periodcally send pong message to all peers
 func (node *Node) SendPongMessage() {
-	tick := time.NewTicker(3 * time.Second)
+	tick := time.NewTicker(2 * time.Second)
+	tick2 := time.NewTicker(120 * time.Second)
+
 	numPeers := len(node.Consensus.GetValidatorPeers())
 	numPubKeys := len(node.Consensus.PublicKeys)
 	sentMessage := false
+	firstTime := true
 
 	// Send Pong Message only when there is change on the number of peers
 	for {
@@ -409,7 +407,7 @@ func (node *Node) SendPongMessage() {
 		case <-tick.C:
 			peers := node.Consensus.GetValidatorPeers()
 			numPeersNow := len(peers)
-			numPubKeysNow := len(node.Consensus.PublicKeys)
+			numPubKeysNow := node.Consensus.GetNumPeers()
 
 			// no peers, wait for another tick
 			if numPeersNow == 0 || numPubKeysNow == 0 {
@@ -417,6 +415,7 @@ func (node *Node) SendPongMessage() {
 			}
 			// new peers added
 			if numPubKeysNow != numPubKeys || numPeersNow != numPeers {
+				utils.GetLogInstance().Info("[PONG] different number of peers", "numPeers", numPeers, "numPeersNow", numPeersNow)
 				sentMessage = false
 			} else {
 				// stable number of peers/pubkeys, sent the pong message
@@ -432,15 +431,33 @@ func (node *Node) SendPongMessage() {
 						utils.GetLogInstance().Info("[PONG] sent pong message to", "group", node.NodeConfig.GetShardGroupID(), "# nodes", numPeersNow)
 					}
 					sentMessage = true
-					// stop sending ping message
-					node.serviceManager.TakeAction(&service.Action{Action: service.Stop, ServiceType: service.PeerDiscovery})
 					// wait a bit until all validators received pong message
 					time.Sleep(200 * time.Millisecond)
-					node.startConsensus <- struct{}{}
+
+					// only need to notify consensus leader once to start the consensus
+					if firstTime {
+						// Leader stops sending ping message
+						node.serviceManager.TakeAction(&service.Action{Action: service.Stop, ServiceType: service.PeerDiscovery})
+						node.startConsensus <- struct{}{}
+						firstTime = false
+					}
 				}
 			}
 			numPeers = numPeersNow
 			numPubKeys = numPubKeysNow
+		case <-tick2.C:
+			// send pong message regularly to make sure new node received all the public keys
+			// also nodes offline/online will receive the public keys
+			peers := node.Consensus.GetValidatorPeers()
+			pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys, node.Consensus.GetLeaderPubKey())
+			buffer := pong.ConstructPongMessage()
+			err := node.host.SendMessageToGroups([]p2p.GroupID{node.NodeConfig.GetShardGroupID()}, host.ConstructP2pMessage(byte(0), buffer))
+			if err != nil {
+				utils.GetLogInstance().Error("[PONG] failed to send regular pong message", "group", node.NodeConfig.GetShardGroupID())
+				continue
+			} else {
+				utils.GetLogInstance().Info("[PONG] sent regular pong message to", "group", node.NodeConfig.GetShardGroupID(), "# nodes", len(peers))
+			}
 		}
 	}
 }
@@ -459,7 +476,7 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 	if err != nil {
 		utils.GetLogInstance().Error("Unmarshal Consensus Leader PubKey Failed", "error", err)
 	} else {
-		utils.GetLogInstance().Info("Set Consensus Leader PubKey")
+		utils.GetLogInstance().Info("Set Consensus Leader PubKey", "key", utils.GetAddressHex(node.Consensus.GetLeaderPubKey()))
 	}
 	err = node.DRand.SetLeaderPubKey(pong.LeaderPubKey)
 	if err != nil {
@@ -487,7 +504,6 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 
 	if len(peers) > 0 {
 		node.AddPeers(peers)
-		node.peerReadyChan <- struct{}{}
 	}
 
 	// Reset Validator PublicKeys every time we receive PONG message from Leader

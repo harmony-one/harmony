@@ -81,7 +81,7 @@ func New(host p2p.Host, ShardID uint32, peers []p2p.Peer, leader p2p.Peer, confi
 
 	dRand.leader = leader
 	for _, peer := range peers {
-		dRand.validators.Store(peer.GetAddressHex(), peer)
+		dRand.validators.Store(utils.GetAddressHex(peer.ConsensusPubKey), peer)
 	}
 
 	dRand.vrfs = &map[string][]byte{}
@@ -102,7 +102,7 @@ func New(host p2p.Host, ShardID uint32, peers []p2p.Peer, leader p2p.Peer, confi
 	dRand.rand = nil
 
 	// For now use socket address as ID
-	dRand.SelfAddress = selfPeer.GetAddressHex()
+	dRand.SelfAddress = utils.GetAddressHex(selfPeer.ConsensusPubKey)
 
 	// Set private key for myself so that I can sign messages.
 	if blsPriKey != nil {
@@ -125,13 +125,12 @@ func (dRand *DRand) AddPeers(peers []*p2p.Peer) int {
 	count := 0
 
 	for _, peer := range peers {
-		_, ok := dRand.validators.Load(peer.GetAddressHex())
+		_, ok := dRand.validators.LoadOrStore(utils.GetAddressHex(peer.ConsensusPubKey), *peer)
 		if !ok {
-			dRand.validators.Store(peer.GetAddressHex(), *peer)
 			dRand.pubKeyLock.Lock()
 			dRand.PublicKeys = append(dRand.PublicKeys, peer.ConsensusPubKey)
 			dRand.pubKeyLock.Unlock()
-			utils.GetLogInstance().Debug("[DRAND]", "AddPeers", *peer)
+			//			utils.GetLogInstance().Debug("[DRAND]", "AddPeers", *peer)
 		}
 		count++
 	}
