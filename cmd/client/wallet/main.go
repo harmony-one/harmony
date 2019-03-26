@@ -267,7 +267,8 @@ func processBalancesCommand() {
 
 	if *balanceAddressPtr == "" {
 		for i, address := range ReadAddresses() {
-			fmt.Printf("Account %d: %s:\n", i, address.Hex())
+			fmt.Printf("Account %d:\n", i)
+			fmt.Printf("    Address: %s\n", address.Hex())
 			for shardID, balanceNonce := range FetchBalance(address) {
 				fmt.Printf("    Balance in Shard %d:  %s, nonce: %v \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance), balanceNonce.nonce)
 			}
