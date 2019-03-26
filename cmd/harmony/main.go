@@ -120,10 +120,16 @@ func initSetup() {
 
 func createGlobalConfig() *nodeconfig.ConfigType {
 	var err error
-	nodeConfig := nodeconfig.GetGlobalConfig()
+
+	nodeConfig := nodeconfig.GetDefaultConfig()
+
+	shardID := uint32(*accountIndex / core.GenesisShardSize)
+	if !*isNewNode {
+		nodeConfig = nodeconfig.GetShardConfig(shardID)
+	}
 
 	// The initial genesis nodes are sequentially put into genesis shards based on their accountIndex
-	nodeConfig.ShardID = uint32(*accountIndex / core.GenesisShardNum)
+	nodeConfig.ShardID = shardID
 
 	// Key Setup ================= [Start]
 	// Staking private key is the ecdsa key used for token related transaction signing (especially the staking txs).
@@ -168,7 +174,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 
 	nodeConfig.SelfPeer = p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nodeConfig.ConsensusPubKey}
 
-	if *accountIndex % core.GenesisShardNum == 0 {  // The first node in a shard is the leader at genesis
+	if *accountIndex%core.GenesisShardSize == 0 { // The first node in a shard is the leader at genesis
 		nodeConfig.StringRole = "leader"
 		nodeConfig.Leader = nodeConfig.SelfPeer
 	} else {
@@ -205,21 +211,32 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	consensus.ChainReader = currentNode.Blockchain()
 
 	if *isGenesis {
-	// TODO: need change config file and use switch instead of complicated "if else" condition
-		if nodeConfig.StringRole == "leader" {
-			currentNode.NodeConfig.SetRole(nodeconfig.BeaconLeader)
-			currentNode.NodeConfig.SetIsLeader(true)
+		// TODO: need change config file and use switch instead of complicated "if else" condition
+		if nodeConfig.ShardID == 0 { // Beacon chain
+			if nodeConfig.StringRole == "leader" {
+				currentNode.NodeConfig.SetRole(nodeconfig.BeaconLeader)
+				currentNode.NodeConfig.SetIsLeader(true)
+			} else {
+				currentNode.NodeConfig.SetRole(nodeconfig.BeaconValidator)
+				currentNode.NodeConfig.SetIsLeader(false)
+			}
+			currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
 		} else {
-			currentNode.NodeConfig.SetRole(nodeconfig.BeaconValidator)
-			currentNode.NodeConfig.SetIsLeader(false)
+			if nodeConfig.StringRole == "leader" {
+				currentNode.NodeConfig.SetRole(nodeconfig.ShardLeader)
+				currentNode.NodeConfig.SetIsLeader(true)
+			} else {
+				currentNode.NodeConfig.SetRole(nodeconfig.ShardValidator)
+				currentNode.NodeConfig.SetIsLeader(false)
+			}
+			currentNode.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
 		}
-		currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
-		currentNode.NodeConfig.SetIsBeacon(true)
 	} else {
 		currentNode.AddBeaconChainDatabase(nodeConfig.BeaconDB)
 
 		if *isNewNode {
 			currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
+			// TODO: fix the roles as it's unknown before resharding.
 		} else if nodeConfig.StringRole == "leader" {
 			currentNode.NodeConfig.SetRole(nodeconfig.ShardLeader)
 			currentNode.NodeConfig.SetIsLeader(true)
@@ -228,7 +245,6 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 			currentNode.NodeConfig.SetIsLeader(false)
 		}
 		currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDUnknown)
-		currentNode.NodeConfig.SetIsBeacon(false)
 	}
 
 	// Add randomness protocol

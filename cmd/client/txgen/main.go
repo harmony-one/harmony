@@ -151,6 +151,7 @@ func main() {
 	clientNode.Client.UpdateBlocks = updateBlocksFunc
 
 	clientNode.NodeConfig.SetRole(nodeconfig.ClientNode)
+	clientNode.NodeConfig.SetIsClient(true)
 	clientNode.ServiceManagerSetup()
 	clientNode.RunServices()
 

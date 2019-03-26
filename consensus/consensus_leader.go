@@ -140,7 +140,7 @@ func (consensus *Consensus) startConsensus(newBlock *types.Block) {
 
 	// Construct broadcast p2p message
 	utils.GetLogInstance().Warn("[Consensus]", "sent announce message", len(msgToSend))
-	consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
+	consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 }
 
 // processPrepareMessage processes the prepare message sent from validators
@@ -213,7 +213,7 @@ func (consensus *Consensus) processPrepareMessage(message *msg_pb.Message) {
 		consensus.aggregatedPrepareSig = aggSig
 
 		utils.GetLogInstance().Warn("[Consensus]", "sent prepared message", len(msgToSend))
-		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
+		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 
 		// Set state to targetState
 		consensus.state = targetState
@@ -295,7 +295,7 @@ func (consensus *Consensus) processCommitMessage(message *msg_pb.Message) {
 		consensus.aggregatedCommitSig = aggSig
 
 		utils.GetLogInstance().Warn("[Consensus]", "sent committed message", len(msgToSend))
-		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
+		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 
 		var blockObj types.Block
 		err := rlp.DecodeBytes(consensus.block, &blockObj)

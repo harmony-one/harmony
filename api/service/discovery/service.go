@@ -76,7 +76,7 @@ func (s *Service) contactP2pPeers() {
 
 	pingMsg := proto_discovery.NewPingMessage(s.host.GetSelfPeer(), s.config.IsClient)
 	msgBuf := host.ConstructP2pMessage(byte(0), pingMsg.ConstructPingMessage())
-	s.sentPingMessage(p2p.GroupIDBeacon, msgBuf)
+	s.sentPingMessage(s.config.ShardGroupID, msgBuf)
 
 	for {
 		select {
@@ -126,10 +126,10 @@ func (s *Service) sentPingMessage(g p2p.GroupID, msgBuf []byte) {
 	} else {
 		// The following logical will be used for 2nd stage peer discovery process
 		// do nothing when the groupID is unknown
-		if s.config.Group == p2p.GroupIDUnknown {
+		if s.config.ShardGroupID == p2p.GroupIDUnknown {
 			return
 		}
-		err = s.host.SendMessageToGroups([]p2p.GroupID{s.config.Group}, msgBuf)
+		err = s.host.SendMessageToGroups([]p2p.GroupID{s.config.ShardGroupID}, msgBuf)
 	}
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to send ping message", "group", g)

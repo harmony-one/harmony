@@ -36,11 +36,11 @@ const (
 func (node *Node) ReceiveGroupMessage() {
 	ctx := context.Background()
 	for {
-		if node.groupReceiver == nil {
+		if node.shardGroupReceiver == nil {
 			time.Sleep(100 * time.Millisecond)
 			continue
 		}
-		msg, sender, err := node.groupReceiver.Receive(ctx)
+		msg, sender, err := node.shardGroupReceiver.Receive(ctx)
 		if sender != node.host.GetID() {
 			//			utils.GetLogInstance().Info("[PUBSUB]", "received group msg", len(msg), "sender", sender)
 			if err == nil {
