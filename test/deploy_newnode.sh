@@ -57,7 +57,6 @@ USAGE: $ME [OPTIONS] config_file_name
    -k nodeport    kill the node with specified port number (default: $KILLPORT)
    -n             dryrun mode (default: $DRYRUN)
    -S             enable sync test (default: $SYNC)
-   -P             enable libp2p peer discovery test (default: $P2P)
 
 This script will build all the binaries and start harmony and txgen based on the configuration file.
 
@@ -78,7 +77,6 @@ SHARDS=2
 KILLPORT=9004
 SYNC=true
 DRYRUN=
-P2P=false
 
 while getopts "hdtD:m:s:k:nSP" option; do
    case $option in
@@ -91,7 +89,6 @@ while getopts "hdtD:m:s:k:nSP" option; do
       k) KILLPORT=$OPTARG ;;
       n) DRYRUN=echo ;;
       S) SYNC=true ;;
-      P) P2P=true ;;
    esac
 done
 
