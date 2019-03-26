@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/harmony-one/harmony/contracts/structs"
@@ -64,6 +65,46 @@ func (node *Node) UpdateStakingList(stakeInfoReturnValue *structs.StakeInfoRetur
 		} else {
 			logger.Info("expired stake; skipping")
 		}
+	}
+}
+
+// UpdateStakingListWithInitShardState updates the current stakes list with
+// initial hardcoded stakes.
+//
+// Initial stakers are assumed to be active since ever and until forever,
+// but with zero stake.
+//
+// TODO ek – this is a hack,
+//  until we can streamline initial stakers without hardcoded accounts.
+func (node *Node) UpdateStakingListWithInitShardState() {
+	initShardState := core.GetInitShardState()
+	shardID := node.Consensus.ShardID
+	if shardID >= uint32(len(initShardState)) {
+		utils.GetLogInstance().Debug("UpdateStakingListWithInitShardState: "+
+			"shard did not exist initially, nothing to do",
+			"shardID", shardID)
+		return
+	}
+	initCommittee := initShardState[shardID]
+	utils.GetLogInstance().Debug("UpdateStakingListWithInitShardState: "+
+		"adding initial shard members",
+		"shardID", shardID,
+		"committeeSize", len(initCommittee.NodeList))
+	for _, member := range initCommittee.NodeList {
+		ecdsaAddress := common.HexToAddress(member.EcdsaAddress)
+		blsAddress := common.HexToAddress(member.BlsAddress)
+		stakeInfo := &structs.StakeInfo{
+			Address:         ecdsaAddress,
+			BlsAddress:      blsAddress,
+			BlockNum:        big.NewInt(0),             // since ever
+			LockPeriodCount: big.NewInt(math.MaxInt64), // until forever
+			Amount:          big.NewInt(0),             // TODO ek
+		}
+		utils.GetLogInstance().Info("permanent stake; adding",
+			"accountAddr", ecdsaAddress.Hex(),
+			"nodeAddr", hex.EncodeToString(blsAddress[:]))
+		node.CurrentStakes[ecdsaAddress] = stakeInfo
+		node.CurrentStakesByNode[blsAddress] = stakeInfo
 	}
 }
 
