@@ -211,8 +211,8 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	// TODO: refactor the creation of blockchain out of node.New()
 	consensus.ChainReader = currentNode.Blockchain()
 
-	// TODO: need change config file and use switch instead of complicated "if else" condition
 	if *isGenesis {
+		// TODO: need change config file and use switch instead of complicated "if else" condition
 		if nodeConfig.ShardID == 0 { // Beacon chain
 			if nodeConfig.StringRole == "leader" {
 				currentNode.NodeConfig.SetRole(nodeconfig.BeaconLeader)
