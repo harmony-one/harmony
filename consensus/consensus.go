@@ -641,3 +641,8 @@ func (consensus *Consensus) GetLeaderPubKey() *bls.PublicKey {
 func (consensus *Consensus) GetNumPeers() int {
 	return len(consensus.PublicKeys)
 }
+
+// GetConsensusID returns the consensus ID
+func (consensus *Consensus) GetConsensusID() uint32 {
+	return consensus.consensusID
+}
