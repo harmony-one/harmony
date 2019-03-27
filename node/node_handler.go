@@ -281,7 +281,10 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 	utils.GetLogInstance().Info("PostConsensusProcessing")
 	if node.Consensus.IsLeader {
 		node.BroadcastNewBlock(newBlock)
+	} else {
+		utils.GetLogInstance().Info("BINGO !!! Reached Consensus", "ConsensusID", node.Consensus.GetConsensusID())
 	}
+
 	node.AddNewBlock(newBlock)
 
 	// TODO: enable drand only for beacon chain
