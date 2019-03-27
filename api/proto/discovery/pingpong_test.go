@@ -62,7 +62,7 @@ func TestString(test *testing.T) {
 		test.Errorf("expect: %v, got: %v", e3, r3)
 	}
 
-	pong1 := NewPongMessage(p2, pubKeys, leaderPubKey)
+	pong1 := NewPongMessage(p2, pubKeys, leaderPubKey, 0)
 	r2 := fmt.Sprintf("%v", *pong1)
 
 	if !strings.HasPrefix(r2, e2) {
@@ -85,7 +85,7 @@ func TestSerialize(test *testing.T) {
 		test.Error("Serialize/Deserialze Ping Message Failed")
 	}
 
-	pong1 := NewPongMessage(p2, pubKeys, leaderPubKey)
+	pong1 := NewPongMessage(p2, pubKeys, leaderPubKey, 0)
 	buf2 = pong1.ConstructPongMessage()
 
 	msg2, err := proto.GetMessagePayload(buf2)

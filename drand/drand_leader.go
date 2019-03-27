@@ -78,7 +78,7 @@ func (dRand *DRand) init(epochBlock *types.Block) {
 	(*dRand.vrfs)[dRand.SelfAddress] = append(rand[:], proof...)
 
 	utils.GetLogInstance().Info("[DRG] sent init", "msg", msgToSend, "leader.PubKey", dRand.leader.ConsensusPubKey)
-	dRand.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
+	dRand.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(dRand.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 }
 
 // ProcessMessageLeader dispatches messages for the leader to corresponding processors.
@@ -100,6 +100,7 @@ func (dRand *DRand) ProcessMessageLeader(payload []byte) {
 
 // ProcessMessageValidator dispatches validator's consensus message.
 func (dRand *DRand) processCommitMessage(message *msg_pb.Message) {
+	utils.GetLogInstance().Error("[DRG] Leader received commit")
 	if message.Type != msg_pb.MessageType_DRAND_COMMIT {
 		utils.GetLogInstance().Error("Wrong message type received", "expected", msg_pb.MessageType_DRAND_COMMIT, "got", message.Type)
 		return

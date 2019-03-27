@@ -124,7 +124,7 @@ func (s *Service) Init() error {
 	}
 
 	// We use a rendezvous point "shardID" to announce our location.
-	utils.GetLogInstance().Info("Announcing ourselves...")
+	utils.GetLogInstance().Info("Announcing ourselves...", "Rendezvous", string(s.Rendezvous))
 	s.discovery = libp2pdis.NewRoutingDiscovery(s.dht)
 	libp2pdis.Advertise(s.ctx, s.discovery, string(s.Rendezvous))
 	utils.GetLogInstance().Info("Successfully announced!")
@@ -195,7 +195,7 @@ func (s *Service) DoService() {
 			return
 		case <-tick.C:
 			libp2pdis.Advertise(s.ctx, s.discovery, string(s.Rendezvous))
-			utils.GetLogInstance().Info("Successfully announced!")
+			utils.GetLogInstance().Info("Successfully announced!", "Rendezvous", string(s.Rendezvous))
 		}
 	}
 }

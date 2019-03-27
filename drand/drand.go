@@ -65,7 +65,7 @@ type DRand struct {
 }
 
 // New creates a new dRand object
-func New(host p2p.Host, ShardID uint32, peers []p2p.Peer, leader p2p.Peer, confirmedBlockChannel chan *types.Block, isLeader bool, blsPriKey *bls.SecretKey) *DRand {
+func New(host p2p.Host, ShardID uint32, peers []p2p.Peer, leader p2p.Peer, confirmedBlockChannel chan *types.Block, blsPriKey *bls.SecretKey) *DRand {
 	dRand := DRand{}
 	dRand.host = host
 
@@ -77,7 +77,11 @@ func New(host p2p.Host, ShardID uint32, peers []p2p.Peer, leader p2p.Peer, confi
 	dRand.RndChannel = make(chan [64]byte)
 
 	selfPeer := host.GetSelfPeer()
-	dRand.IsLeader = isLeader
+	if leader.Port == selfPeer.Port && leader.IP == selfPeer.IP {
+		dRand.IsLeader = true
+	} else {
+		dRand.IsLeader = false
+	}
 
 	dRand.leader = leader
 	for _, peer := range peers {

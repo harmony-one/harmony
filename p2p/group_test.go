@@ -9,8 +9,7 @@ func TestGroupID_String(t *testing.T) {
 		want string
 	}{
 		{"empty", GroupID(""), ""},
-		{"ABC", GroupID("ABC"), "414243"},
-		{"binary", GroupID([]byte{1, 2, 3}), "010203"},
+		{"ABC", GroupID("ABC"), "ABC"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -48,11 +47,11 @@ func TestGroupAction(t *testing.T) {
 		groupAction             GroupAction
 		expectedGroupActionName string
 	}{
-		{"BeaconStart", GroupAction{Name: GroupID("ABC"), Action: ActionStart}, "414243/ActionStart"},
-		{"BeaconPause", GroupAction{Name: GroupID("ABC"), Action: ActionPause}, "414243/ActionPause"},
-		{"BeaconResume", GroupAction{Name: GroupID("ABC"), Action: ActionResume}, "414243/ActionResume"},
-		{"BeaconStop", GroupAction{Name: GroupID("ABC"), Action: ActionStop}, "414243/ActionStop"},
-		{"BeaconUnknown", GroupAction{Name: GroupID("ABC"), Action: ActionType(8)}, "414243/ActionUnknown"},
+		{"BeaconStart", GroupAction{Name: GroupID("ABC"), Action: ActionStart}, "ABC/ActionStart"},
+		{"BeaconPause", GroupAction{Name: GroupID("ABC"), Action: ActionPause}, "ABC/ActionPause"},
+		{"BeaconResume", GroupAction{Name: GroupID("ABC"), Action: ActionResume}, "ABC/ActionResume"},
+		{"BeaconStop", GroupAction{Name: GroupID("ABC"), Action: ActionStop}, "ABC/ActionStop"},
+		{"BeaconUnknown", GroupAction{Name: GroupID("ABC"), Action: ActionType(8)}, "ABC/ActionUnknown"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
