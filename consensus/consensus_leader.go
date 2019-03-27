@@ -59,7 +59,7 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan *types.Block, stop
 					// Receive pRnd from DRG protocol
 					utils.GetLogInstance().Debug("[DRG] Waiting for pRnd")
 					pRndAndBitmap := <-consensus.PRndChannel
-					utils.GetLogInstance().Debug("[DRG] GOT pRnd", "pRnd", pRndAndBitmap)
+					utils.GetLogInstance().Debug("[DRG] Got pRnd", "pRnd", pRndAndBitmap)
 					pRnd := [32]byte{}
 					copy(pRnd[:], pRndAndBitmap[:32])
 					bitmap := pRndAndBitmap[32:]

@@ -57,12 +57,12 @@ func (node *Node) ReceiveClientGroupMessage() {
 	for {
 		if node.clientReceiver == nil {
 			// check less frequent on client messages
-			time.Sleep(1000 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 			continue
 		}
 		msg, sender, err := node.clientReceiver.Receive(ctx)
 		if sender != node.host.GetID() {
-			utils.GetLogInstance().Info("[CLIENT]", "received group msg", len(msg), "sender", sender)
+			utils.GetLogInstance().Info("[CLIENT]", "received group msg", len(msg), "sender", sender, "error", err)
 			if err == nil {
 				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
 				go node.messageHandler(msg[5:], string(sender))
@@ -110,10 +110,10 @@ func (node *Node) messageHandler(content []byte, sender string) {
 		msgPayload, _ := proto.GetDRandMessagePayload(content)
 		if node.DRand != nil {
 			if node.DRand.IsLeader {
-				//				utils.GetLogInstance().Info("NET: DRand Leader received message")
+				utils.GetLogInstance().Info("NET: DRand Leader received message")
 				node.DRand.ProcessMessageLeader(msgPayload)
 			} else {
-				//				utils.GetLogInstance().Info("NET: DRand Validator received message")
+				utils.GetLogInstance().Info("NET: DRand Validator received message")
 				node.DRand.ProcessMessageValidator(msgPayload)
 			}
 		}
@@ -421,7 +421,7 @@ func (node *Node) SendPongMessage() {
 				// stable number of peers/pubkeys, sent the pong message
 				// also make sure number of peers is greater than the minimal required number
 				if !sentMessage && numPubKeysNow >= node.Consensus.MinPeers {
-					pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys, node.Consensus.GetLeaderPubKey())
+					pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys, node.Consensus.GetLeaderPubKey(), node.Consensus.ShardID)
 					buffer := pong.ConstructPongMessage()
 					err := node.host.SendMessageToGroups([]p2p.GroupID{node.NodeConfig.GetShardGroupID()}, host.ConstructP2pMessage(byte(0), buffer))
 					if err != nil {
@@ -449,7 +449,7 @@ func (node *Node) SendPongMessage() {
 			// send pong message regularly to make sure new node received all the public keys
 			// also nodes offline/online will receive the public keys
 			peers := node.Consensus.GetValidatorPeers()
-			pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys, node.Consensus.GetLeaderPubKey())
+			pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys, node.Consensus.GetLeaderPubKey(), node.Consensus.ShardID)
 			buffer := pong.ConstructPongMessage()
 			err := node.host.SendMessageToGroups([]p2p.GroupID{node.NodeConfig.GetShardGroupID()}, host.ConstructP2pMessage(byte(0), buffer))
 			if err != nil {
@@ -469,6 +469,11 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		return -1
 	}
 
+	if pong.ShardID != node.Consensus.ShardID {
+		utils.GetLogInstance().Error("Received Pong message for the wrong shard", "receivedShardID", pong.ShardID)
+		return 0
+	}
+
 	// set the leader pub key is the first thing to do
 	// otherwise, we may not be able to validate the consensus messages received
 	// which will result in first consensus timeout
@@ -482,7 +487,7 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 	if err != nil {
 		utils.GetLogInstance().Error("Unmarshal DRand Leader PubKey Failed", "error", err)
 	} else {
-		utils.GetLogInstance().Info("Set DRand Leader PubKey")
+		utils.GetLogInstance().Info("Set DRand Leader PubKey", "key", utils.GetAddressHex(node.Consensus.GetLeaderPubKey()))
 	}
 
 	peers := make([]*p2p.Peer, 0)

@@ -21,7 +21,7 @@ func TestConstructCommitMessage(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	dRand := New(host, 0, []p2p.Peer{leader, validator}, leader, nil, true, bls.RandPrivateKey())
+	dRand := New(host, 0, []p2p.Peer{leader, validator}, leader, nil, bls.RandPrivateKey())
 	dRand.blockHash = [32]byte{}
 	msg := dRand.constructCommitMessage([32]byte{}, []byte{})
 	msgPayload, _ := proto.GetDRandMessagePayload(msg)
@@ -42,7 +42,7 @@ func TestProcessInitMessage(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	dRand := New(host, 0, []p2p.Peer{leader, validator}, leader, nil, true, bls.RandPrivateKey())
+	dRand := New(host, 0, []p2p.Peer{leader, validator}, leader, nil, bls.RandPrivateKey())
 	dRand.blockHash = [32]byte{}
 	msg := dRand.constructInitMessage()
 

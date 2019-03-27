@@ -94,7 +94,7 @@ func TestAddPeers(t *testing.T) {
 		t.Fatalf("newhost failure: %v", err)
 	}
 	consensus := consensus.New(host, 0, []p2p.Peer{leader, validator}, leader, nil)
-	dRand := drand.New(host, 0, []p2p.Peer{leader, validator}, leader, nil, true, nil)
+	dRand := drand.New(host, 0, []p2p.Peer{leader, validator}, leader, nil, nil)
 
 	node := New(host, consensus, nil, false)
 	node.DRand = dRand
@@ -137,7 +137,7 @@ func TestAddBeaconPeer(t *testing.T) {
 		t.Fatalf("newhost failure: %v", err)
 	}
 	consensus := consensus.New(host, 0, []p2p.Peer{leader, validator}, leader, nil)
-	dRand := drand.New(host, 0, []p2p.Peer{leader, validator}, leader, nil, true, nil)
+	dRand := drand.New(host, 0, []p2p.Peer{leader, validator}, leader, nil, nil)
 
 	node := New(host, consensus, nil, false)
 	node.DRand = dRand
@@ -187,7 +187,7 @@ func sendPongMessage(node *Node, leader p2p.Peer) {
 	pubKeys := []*bls.PublicKey{pubKey1, pubKey2}
 	leaderPubKey := pki.GetBLSPrivateKeyFromInt(888).GetPublicKey()
 
-	pong1 := proto_discovery.NewPongMessage([]p2p.Peer{p1, p2}, pubKeys, leaderPubKey)
+	pong1 := proto_discovery.NewPongMessage([]p2p.Peer{p1, p2}, pubKeys, leaderPubKey, 0)
 	_ = pong1.ConstructPongMessage()
 }
 

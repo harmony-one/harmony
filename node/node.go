@@ -284,10 +284,11 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 
 	if consensusObj != nil && consensusObj.IsLeader {
 		node.State = NodeLeader
-		go node.ReceiveClientGroupMessage()
 	} else {
 		node.State = NodeInit
+
 	}
+	go node.ReceiveClientGroupMessage()
 
 	// Setup initial state of syncing.
 	node.peerRegistrationRecord = make(map[string]*syncConfig)

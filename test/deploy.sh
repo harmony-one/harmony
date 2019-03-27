@@ -156,7 +156,6 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
       echo "launching archival node ... wait"
       $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -account_index $i -min_peers $MIN $HMY_OPT2 -key /tmp/$ip-$port.key -is_archival  2>&1 | tee -a $LOG_FILE &
   fi
-  sleep 0.5
   if [[ "$mode" == "newnode" && "$SYNC" == "true" ]]; then
      (( NUM_NN += 30 ))
      echo "launching new node ..."
