@@ -2,6 +2,8 @@ package node
 
 // CreateTransactionForEnterMethod creates transaction to call enter method of lottery contract.
 import (
+	"fmt"
+	"math"
 	"math/big"
 	"os"
 	"strings"
@@ -104,55 +106,62 @@ func (node *Node) GetResultDirectly(priKey string) (players []string, balances [
 	return players, balances
 }
 
+// GenerateResultDirectly get current players and their balances, not from smart contract.
+func (node *Node) GenerateResultDirectly(addresses []common.Address) (players []string, balances []*big.Int) {
+	for _, address := range addresses {
+		players = append(players, address.String())
+		balances = append(balances, node.GetBalanceOfAddress(address))
+	}
+	fmt.Println("generate result", players, balances)
+	return players, balances
+}
+
 // GetResult get current players and their balances.
 func (node *Node) GetResult(priKey string) (players []string, balances []*big.Int) {
-	return node.GetResultDirectly(priKey)
 	// TODO(minhdoan): get result from smart contract is current not working. Fix it later.
-	// abi, err := abi.JSON(strings.NewReader(contracts.LotteryABI))
-	// if err != nil {
-	// 	utils.GetLogInstance().Error("Failed to generate staking contract's ABI", "error", err)
-	// }
-	// bytesData, err := abi.Pack("getPlayers")
-	// if err != nil {
-	// 	utils.GetLogInstance().Error("Failed to generate ABI function bytes data", "error", err)
-	// }
+	abi, err := abi.JSON(strings.NewReader(contracts.LotteryABI))
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to generate staking contract's ABI", "error", err)
+	}
+	bytesData, err := abi.Pack("getPlayers")
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to generate ABI function bytes data", "error", err)
+	}
 
-	// demoContractAddress := node.DemoContractAddress
-	// key, err := crypto.HexToECDSA(priKey)
-	// nonce := node.GetNonceOfAddress(crypto.PubkeyToAddress(key.PublicKey))
+	demoContractAddress := node.DemoContractAddress
+	key, err := crypto.HexToECDSA(priKey)
+	nonce := node.GetNonceOfAddress(crypto.PubkeyToAddress(key.PublicKey))
 
-	// tx := types.NewTransaction(
-	// 	nonce,
-	// 	demoContractAddress,
-	// 	0,
-	// 	nil,
-	// 	math.MaxUint64,
-	// 	nil,
-	// 	bytesData,
-	// )
-	// signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, key)
-	// if err != nil {
-	// 	utils.GetLogInstance().Error("Failed to sign contract call tx", "error", err)
-	// 	return nil, nil
-	// }
-	// output, err := node.ContractCaller.CallContract(signedTx)
-	// if err != nil {
-	// 	utils.GetLogInstance().Error("Failed to call staking contract", "error", err)
-	// 	return nil, nil
-	// }
+	tx := types.NewTransaction(
+		nonce,
+		demoContractAddress,
+		0,
+		nil,
+		math.MaxUint64,
+		nil,
+		bytesData,
+	)
+	signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, key)
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to sign contract call tx", "error", err)
+		return nil, nil
+	}
+	output, err := node.ContractCaller.CallContract(signedTx)
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to call staking contract", "error", err)
+		return nil, nil
+	}
 
-	// ret := &structs.PlayersInfo{}
-	// err = abi.Unpack(ret, "getPlayers", output)
+	ret := []common.Address{}
+	err = abi.Unpack(&ret, "getPlayers", output)
 
-	// if err != nil {
-	// 	utils.GetLogInstance().Error("Failed to unpack stake info", "error", err)
-	// 	return nil, nil
-	// }
-	// for _, player := range ret.Players {
-	// 	players = append(players, player.String())
-	// }
-	// balances = ret.Balances
-	// return players, balances
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to unpack getPlayers", "error", err)
+		return nil, nil
+	}
+	utils.GetLogInstance().Info("get result: ", ret)
+	fmt.Println("get result called:", ret)
+	return node.GenerateResultDirectly(ret)
 }
 
 // CreateTransactionForPickWinner generates transaction for enter method and add it into pending tx list.
