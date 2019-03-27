@@ -123,7 +123,6 @@ func (s *Service) sentPingMessage(g p2p.GroupID, msgBuf []byte) {
 	var err error
 	if g == p2p.GroupIDBeacon || g == p2p.GroupIDBeaconClient {
 		err = s.host.SendMessageToGroups([]p2p.GroupID{s.config.Beacon}, msgBuf)
-
 	} else {
 		// The following logical will be used for 2nd stage peer discovery process
 		// do nothing when the groupID is unknown

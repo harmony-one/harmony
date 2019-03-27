@@ -89,11 +89,12 @@ func (s *Service) Init() error {
 	// thread that will refresh the peer table every five minutes.
 	utils.GetLogInstance().Debug("Bootstrapping the DHT")
 	if err := s.dht.Bootstrap(s.ctx); err != nil {
-		return fmt.Errorf("error bootstrap dht")
+		return fmt.Errorf("error bootstrap dht: %s", err)
 	}
 
 	var wg sync.WaitGroup
 	if s.bootnodes == nil {
+		// TODO: should've passed in bootnodes through constructor.
 		s.bootnodes = utils.BootNodes
 	}
 
