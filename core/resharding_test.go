@@ -10,6 +10,32 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var (
+	blsPubKey1  = [96]byte{}
+	blsPubKey2  = [96]byte{}
+	blsPubKey3  = [96]byte{}
+	blsPubKey4  = [96]byte{}
+	blsPubKey5  = [96]byte{}
+	blsPubKey6  = [96]byte{}
+	blsPubKey7  = [96]byte{}
+	blsPubKey8  = [96]byte{}
+	blsPubKey9  = [96]byte{}
+	blsPubKey10 = [96]byte{}
+)
+
+func init() {
+	copy(blsPubKey1[:], []byte("random key 1"))
+	copy(blsPubKey2[:], []byte("random key 2"))
+	copy(blsPubKey3[:], []byte("random key 3"))
+	copy(blsPubKey4[:], []byte("random key 4"))
+	copy(blsPubKey5[:], []byte("random key 5"))
+	copy(blsPubKey6[:], []byte("random key 6"))
+	copy(blsPubKey7[:], []byte("random key 7"))
+	copy(blsPubKey8[:], []byte("random key 8"))
+	copy(blsPubKey9[:], []byte("random key 9"))
+	copy(blsPubKey10[:], []byte("random key 10"))
+}
+
 func fakeGetInitShardState(numberOfShards, numOfNodes int) types.ShardState {
 	rand.Seed(int64(InitialSeed))
 	shardState := types.ShardState{}
@@ -18,7 +44,9 @@ func fakeGetInitShardState(numberOfShards, numOfNodes int) types.ShardState {
 		com := types.Committee{ShardID: sid}
 		for j := 0; j < numOfNodes; j++ {
 			nid := strconv.Itoa(int(rand.Int63()))
-			com.NodeList = append(com.NodeList, types.NodeID{nid, nid})
+			blsPubKey := [96]byte{}
+			copy(blsPubKey1[:], []byte(nid))
+			com.NodeList = append(com.NodeList, types.NodeID{nid, blsPubKey})
 		}
 		shardState = append(shardState, com)
 	}
@@ -31,7 +59,9 @@ func fakeNewNodeList(seed int64) []types.NodeID {
 	nodeList := []types.NodeID{}
 	for i := 0; i < numNewNodes; i++ {
 		nid := strconv.Itoa(int(rand.Int63()))
-		nodeList = append(nodeList, types.NodeID{nid, nid})
+		blsPubKey := [96]byte{}
+		copy(blsPubKey1[:], []byte(nid))
+		nodeList = append(nodeList, types.NodeID{nid, blsPubKey})
 	}
 	return nodeList
 }
@@ -43,16 +73,16 @@ func TestFakeNewNodeList(t *testing.T) {
 
 func TestShuffle(t *testing.T) {
 	nodeList := []types.NodeID{
-		{"node1", "node1"},
-		{"node2", "node2"},
-		{"node3", "node3"},
-		{"node4", "node4"},
-		{"node5", "node5"},
-		{"node6", "node6"},
-		{"node7", "node7"},
-		{"node8", "node8"},
-		{"node9", "node9"},
-		{"node10", "node10"},
+		{"node1", blsPubKey1},
+		{"node2", blsPubKey2},
+		{"node3", blsPubKey3},
+		{"node4", blsPubKey4},
+		{"node5", blsPubKey5},
+		{"node6", blsPubKey6},
+		{"node7", blsPubKey7},
+		{"node8", blsPubKey8},
+		{"node9", blsPubKey9},
+		{"node10", blsPubKey10},
 	}
 
 	cpList := []types.NodeID{}
@@ -83,18 +113,18 @@ func TestUpdateShardState(t *testing.T) {
 	shardState := fakeGetInitShardState(6, 10)
 	ss := &ShardingState{epoch: 1, rnd: 42, shardState: shardState, numShards: len(shardState)}
 	newNodeList := []types.NodeID{
-		{"node1", "node1"},
-		{"node2", "node2"},
-		{"node3", "node3"},
-		{"node4", "node4"},
-		{"node5", "node5"},
-		{"node6", "node6"},
+		{"node1", blsPubKey1},
+		{"node2", blsPubKey2},
+		{"node3", blsPubKey3},
+		{"node4", blsPubKey4},
+		{"node5", blsPubKey5},
+		{"node6", blsPubKey6},
 	}
 
 	ss.Reshard(newNodeList, 0.2)
 	assert.Equal(t, 6, ss.numShards)
 	for _, shard := range ss.shardState {
-		assert.Equal(t, shard.Leader.BlsAddress, shard.NodeList[0].BlsAddress)
+		assert.Equal(t, shard.Leader.BlsPublicKey, shard.NodeList[0].BlsPublicKey)
 	}
 }
 
@@ -102,9 +132,9 @@ func TestAssignNewNodes(t *testing.T) {
 	shardState := fakeGetInitShardState(2, 2)
 	ss := &ShardingState{epoch: 1, rnd: 42, shardState: shardState, numShards: len(shardState)}
 	newNodes := []types.NodeID{
-		{"node1", "node1"},
-		{"node2", "node2"},
-		{"node3", "node3"},
+		{"node1", blsPubKey1},
+		{"node2", blsPubKey2},
+		{"node3", blsPubKey3},
 	}
 
 	ss.assignNewNodes(newNodes)

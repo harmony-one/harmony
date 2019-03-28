@@ -148,22 +148,6 @@ func CalculateNewShardState(bc *BlockChain, epoch uint64, stakeInfo *map[common.
 		return GetInitShardState()
 	}
 	ss := GetShardingStateFromBlockChain(bc, epoch-1)
-	if epoch == FirstEpoch {
-		newNodes := []types.NodeID{}
-
-		for addr, stakeInfo := range *stakeInfo {
-			blsAddr := common.BytesToAddress(stakeInfo.BlsAddress[:])
-			newNodes = append(newNodes, types.NodeID{addr.Hex(), blsAddr.Hex()})
-		}
-		rand.Seed(int64(ss.rnd))
-		Shuffle(newNodes)
-		utils.GetLogInstance().Info("[resharding] New Nodes", "data", newNodes)
-		for i, nid := range newNodes {
-			id := i%(GenesisShardNum-1) + 1 // assign the node to one of the empty shard
-			ss.shardState[id].NodeList = append(ss.shardState[id].NodeList, nid)
-		}
-		return ss.shardState
-	}
 	newNodeList := ss.UpdateShardingState(stakeInfo)
 	utils.GetLogInstance().Info("Cuckoo Rate", "percentage", CuckooRate)
 	ss.Reshard(newNodeList, CuckooRate)
@@ -172,11 +156,11 @@ func CalculateNewShardState(bc *BlockChain, epoch uint64, stakeInfo *map[common.
 
 // UpdateShardingState remove the unstaked nodes and returns the newly staked node Ids.
 func (ss *ShardingState) UpdateShardingState(stakeInfo *map[common.Address]*structs.StakeInfo) []types.NodeID {
-	oldAddresses := make(map[string]bool) // map of bls addresses
+	oldBlsPublicKeys := make(map[types.BlsPublicKey]bool) // map of bls public keys
 	for _, shard := range ss.shardState {
 		newNodeList := shard.NodeList[:0]
 		for _, nodeID := range shard.NodeList {
-			oldAddresses[nodeID.BlsAddress] = true
+			oldBlsPublicKeys[nodeID.BlsPublicKey] = true
 			_, ok := (*stakeInfo)[common.HexToAddress(nodeID.EcdsaAddress)]
 			if ok {
 				newNodeList = append(newNodeList, nodeID)
@@ -189,9 +173,9 @@ func (ss *ShardingState) UpdateShardingState(stakeInfo *map[common.Address]*stru
 
 	newAddresses := []types.NodeID{}
 	for addr, info := range *stakeInfo {
-		_, ok := oldAddresses[addr.Hex()]
+		_, ok := oldBlsPublicKeys[info.BlsPublicKey]
 		if !ok {
-			newAddresses = append(newAddresses, types.NodeID{addr.Hex(), common.BytesToAddress(info.BlsAddress[:]).Hex()})
+			newAddresses = append(newAddresses, types.NodeID{addr.Hex(), info.BlsPublicKey})
 		}
 	}
 	return newAddresses
@@ -206,10 +190,10 @@ func GetInitShardState() types.ShardState {
 			index := i*GenesisShardSize + j // The initial account to use for genesis nodes
 			priKey := bls.SecretKey{}
 			priKey.SetHexString(contract.GenesisBLSAccounts[index].Private)
-			addrBytes := priKey.GetPublicKey().GetAddress()
-			blsAddr := common.BytesToAddress(addrBytes[:]).Hex()
+			pubKey := [96]byte{}
+			copy(pubKey[:], priKey.GetPublicKey().Serialize()[:])
 			// TODO: directly read address for bls too
-			curNodeID := types.NodeID{contract.GenesisAccounts[index].Address, blsAddr}
+			curNodeID := types.NodeID{contract.GenesisAccounts[index].Address, pubKey}
 			if j == 0 {
 				com.Leader = curNodeID
 			}

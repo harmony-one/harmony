@@ -5,16 +5,38 @@ import (
 	"testing"
 )
 
+var (
+	blsPubKey1  = [96]byte{}
+	blsPubKey2  = [96]byte{}
+	blsPubKey3  = [96]byte{}
+	blsPubKey4  = [96]byte{}
+	blsPubKey5  = [96]byte{}
+	blsPubKey6  = [96]byte{}
+	blsPubKey11 = [96]byte{}
+	blsPubKey22 = [96]byte{}
+)
+
+func init() {
+	copy(blsPubKey1[:], []byte("random key 1"))
+	copy(blsPubKey2[:], []byte("random key 2"))
+	copy(blsPubKey3[:], []byte("random key 3"))
+	copy(blsPubKey4[:], []byte("random key 4"))
+	copy(blsPubKey5[:], []byte("random key 5"))
+	copy(blsPubKey6[:], []byte("random key 6"))
+	copy(blsPubKey11[:], []byte("random key 11"))
+	copy(blsPubKey22[:], []byte("random key 22"))
+}
+
 func TestGetHashFromNodeList(t *testing.T) {
 	l1 := []NodeID{
-		{"node1", "node1"},
-		{"node2", "node2"},
-		{"node3", "node3"},
+		{"node1", blsPubKey1},
+		{"node2", blsPubKey2},
+		{"node3", blsPubKey3},
 	}
 	l2 := []NodeID{
-		{"node2", "node2"},
-		{"node1", "node1"},
-		{"node3", "node3"},
+		{"node2", blsPubKey2},
+		{"node1", blsPubKey1},
+		{"node3", blsPubKey3},
 	}
 	h1 := GetHashFromNodeList(l1)
 	h2 := GetHashFromNodeList(l2)
@@ -27,20 +49,20 @@ func TestGetHashFromNodeList(t *testing.T) {
 func TestHash(t *testing.T) {
 	com1 := Committee{
 		ShardID: 22,
-		Leader:  NodeID{"node11", "node11"},
+		Leader:  NodeID{"node11", blsPubKey11},
 		NodeList: []NodeID{
-			{"node11", "node11"},
-			{"node22", "node22"},
-			{"node1", "node1"},
+			{"node11", blsPubKey11},
+			{"node22", blsPubKey22},
+			{"node1", blsPubKey1},
 		},
 	}
 	com2 := Committee{
 		ShardID: 2,
-		Leader:  NodeID{"node4", "node4"},
+		Leader:  NodeID{"node4", blsPubKey4},
 		NodeList: []NodeID{
-			{"node4", "node4"},
-			{"node5", "node5"},
-			{"node6", "node6"},
+			{"node4", blsPubKey4},
+			{"node5", blsPubKey5},
+			{"node6", blsPubKey6},
 		},
 	}
 	shardState1 := ShardState{com1, com2}
@@ -48,20 +70,20 @@ func TestHash(t *testing.T) {
 
 	com3 := Committee{
 		ShardID: 2,
-		Leader:  NodeID{"node4", "node4"},
+		Leader:  NodeID{"node4", blsPubKey4},
 		NodeList: []NodeID{
-			{"node6", "node6"},
-			{"node5", "node5"},
-			{"node4", "node4"},
+			{"node6", blsPubKey6},
+			{"node5", blsPubKey5},
+			{"node4", blsPubKey4},
 		},
 	}
 	com4 := Committee{
 		ShardID: 22,
-		Leader:  NodeID{"node11", "node11"},
+		Leader:  NodeID{"node11", blsPubKey11},
 		NodeList: []NodeID{
-			{"node1", "node1"},
-			{"node11", "node11"},
-			{"node22", "node22"},
+			{"node1", blsPubKey1},
+			{"node11", blsPubKey11},
+			{"node22", blsPubKey22},
 		},
 	}
 

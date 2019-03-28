@@ -20,7 +20,9 @@ var (
 	blockNum        = big.NewInt(15000)
 	lockPeriodCount = big.NewInt(1)
 	testAddress     = common.Address{123}
-	testBlsAddress  = common.Address{132}.Bytes() // [20]byte
+	testBlsPubKey1  = [32]byte{}
+	testBlsPubKey2  = [32]byte{}
+	testBlsPubKey3  = [32]byte{}
 )
 
 func TestUpdateStakingList(t *testing.T) {
@@ -45,7 +47,9 @@ func TestUpdateStakingList(t *testing.T) {
 
 	stakeInfo := &structs.StakeInfoReturnValue{
 		[]common.Address{testAddress},
-		[][20]byte{testAddress},
+		[][32]byte{testBlsPubKey1},
+		[][32]byte{testBlsPubKey2},
+		[][32]byte{testBlsPubKey3},
 		[]*big.Int{blockNum},
 		[]*big.Int{lockPeriodCount},
 		[]*big.Int{amount},

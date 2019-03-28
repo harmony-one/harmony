@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -133,7 +135,7 @@ func TestSignAndMarshalConsensusMessage(t *testing.T) {
 	consensus := New(host, 0, []p2p.Peer{leader, validator}, leader, bls.RandPrivateKey())
 	consensus.consensusID = 2
 	consensus.blockHash = blockHash
-	consensus.SelfAddress = "fake address"
+	consensus.SelfAddress = common.Address{}
 
 	msg := &msg_pb.Message{}
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(msg)

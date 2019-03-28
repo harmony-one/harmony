@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/bls/ffi/go/bls"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
@@ -256,8 +258,6 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 			os.Exit(1)
 		}
 		node.blockchain = chain
-		// Store the genesis shard state into db.
-		node.blockchain.StoreNewShardState(node.blockchain.CurrentBlock(), nil)
 
 		node.BlockChannel = make(chan *types.Block)
 		node.ConfirmedBlockChannel = make(chan *types.Block)
@@ -278,6 +278,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 		} else {
 			node.AddContractKeyAndAddress()
 		}
+
 	}
 
 	node.ContractCaller = contracts.NewContractCaller(&db, node.blockchain, params.TestChainConfig)
@@ -311,6 +312,26 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 	return &node
 }
 
+// InitGenesisShardState initialize genesis shard state and update committee pub keys for consensus and drand
+func (node *Node) InitGenesisShardState() {
+	// Store the genesis shard state into db.
+	shardState := node.blockchain.StoreNewShardState(node.blockchain.CurrentBlock(), nil)
+	// Update validator public keys
+	for _, shard := range shardState {
+		if shard.ShardID == node.Consensus.ShardID {
+			pubKeys := []*bls.PublicKey{}
+			for _, node := range shard.NodeList {
+				blsPubKey := &bls.PublicKey{}
+				blsPubKey.Deserialize(node.BlsPublicKey[:])
+				pubKeys = append(pubKeys, blsPubKey)
+			}
+			node.Consensus.UpdatePublicKeys(pubKeys)
+			node.DRand.UpdatePublicKeys(pubKeys)
+			break
+		}
+	}
+}
+
 // AddPeers adds neighbors nodes
 func (node *Node) AddPeers(peers []*p2p.Peer) int {
 	count := 0
@@ -327,6 +348,7 @@ func (node *Node) AddPeers(peers []*p2p.Peer) int {
 
 	// Only leader needs to add the peer info into consensus
 	// Validators will receive the updated peer info from Leader via pong message
+	// TODO: remove this after fully migrating to beacon chain-based committee membership
 	if count > 0 && node.NodeConfig.IsLeader() {
 		node.Consensus.AddPeers(peers)
 		// TODO: make peers into a context object shared by consensus and drand

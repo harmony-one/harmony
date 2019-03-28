@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	protobuf "github.com/golang/protobuf/proto"
@@ -116,10 +115,13 @@ func (dRand *DRand) processCommitMessage(message *msg_pb.Message) {
 		utils.GetLogInstance().Debug("Failed to deserialize BLS public key", "error", err)
 		return
 	}
-	addrBytes := senderPubKey.GetAddress()
-	validatorAddress := common.BytesToAddress(addrBytes[:]).Hex()
+	validatorAddress := utils.GetBlsAddress(senderPubKey)
 
-	validatorPeer := dRand.getValidatorPeerByAddress(validatorAddress)
+	if !dRand.IsValidatorInCommittee(validatorAddress) {
+		utils.GetLogInstance().Error("Invalid validator", "validatorAddress", validatorAddress)
+		return
+	}
+
 	vrfs := dRand.vrfs
 	if len((*vrfs)) >= ((len(dRand.PublicKeys))/3 + 1) {
 		utils.GetLogInstance().Debug("Received additional randomness commit message", "validatorAddress", validatorAddress)
@@ -127,9 +129,9 @@ func (dRand *DRand) processCommitMessage(message *msg_pb.Message) {
 	}
 
 	// Verify message signature
-	err = verifyMessageSig(validatorPeer.ConsensusPubKey, message)
+	err = verifyMessageSig(senderPubKey, message)
 	if err != nil {
-		utils.GetLogInstance().Warn("[DRAND] failed to verify the message signature", "Error", err, "PubKey", validatorPeer.ConsensusPubKey)
+		utils.GetLogInstance().Warn("[DRAND] failed to verify the message signature", "Error", err, "PubKey", senderPubKey)
 		return
 	}
 
@@ -149,7 +151,7 @@ func (dRand *DRand) processCommitMessage(message *msg_pb.Message) {
 	utils.GetLogInstance().Debug("Received new VRF commit", "numReceivedSoFar", len((*vrfs)), "validatorAddress", validatorAddress, "PublicKeys", len(dRand.PublicKeys))
 
 	(*vrfs)[validatorAddress] = drandMsg.Payload
-	dRand.bitmap.SetKey(validatorPeer.ConsensusPubKey, true) // Set the bitmap indicating that this validator signed.
+	dRand.bitmap.SetKey(senderPubKey, true) // Set the bitmap indicating that this validator signed.
 
 	if len((*vrfs)) >= ((len(dRand.PublicKeys))/3 + 1) {
 		// Construct pRand and initiate consensus on it

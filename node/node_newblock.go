@@ -63,6 +63,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 							// TODO(minhdoan): only happens for beaconchain
 							node.addNewShardStateHash(block)
 							newBlock = block
+							utils.GetLogInstance().Debug("Successfully proposed new block", "blockNum", block.NumberU64(), "numTxs", block.Transactions().Len())
 							break
 						}
 					}

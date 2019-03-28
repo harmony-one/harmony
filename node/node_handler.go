@@ -3,6 +3,7 @@ package node
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"os"
@@ -98,10 +99,10 @@ func (node *Node) messageHandler(content []byte, sender string) {
 	case proto.Consensus:
 		msgPayload, _ := proto.GetConsensusMessagePayload(content)
 		if consensusObj.IsLeader {
-			//			utils.GetLogInstance().Info("NET: Leader received consensus message")
+			utils.GetLogInstance().Info("NET: Leader received consensus message")
 			consensusObj.ProcessMessageLeader(msgPayload)
 		} else {
-			//			utils.GetLogInstance().Info("NET: Validator received consensus message")
+			utils.GetLogInstance().Info("NET: Validator received consensus message")
 			consensusObj.ProcessMessageValidator(msgPayload)
 			// TODO(minhdoan): add logic to check if the current blockchain is not sync with other consensus
 			// we should switch to other state rather than DoingConsensus.
@@ -303,10 +304,10 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 		if shardState != nil {
 			myShard := uint32(math.MaxUint32)
 			isLeader := false
-			blsAddr := node.Consensus.SelfAddress
+			myBlsPubKey := node.Consensus.PubKey.Serialize()
 			for _, shard := range shardState {
 				for _, nodeID := range shard.NodeList {
-					if nodeID.BlsAddress == blsAddr {
+					if bytes.Compare(nodeID.BlsPublicKey[:], myBlsPubKey) == 0 {
 						myShard = shard.ShardID
 						isLeader = shard.Leader == nodeID
 					}
@@ -327,12 +328,12 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 					}
 				}
 				if node.blockchain.ShardID() == myShard {
-					utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d] I stay at shard %d, %s", core.GetEpochFromBlockNumber(newBlock.NumberU64()), myShard, aboutLeader), "BlsAddress", blsAddr)
+					utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d] I stay at shard %d, %s", core.GetEpochFromBlockNumber(newBlock.NumberU64()), myShard, aboutLeader), "BlsPubKey", hex.EncodeToString(myBlsPubKey))
 				} else {
-					utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d] I got resharded to shard %d, %s", core.GetEpochFromBlockNumber(newBlock.NumberU64()), myShard, aboutLeader), "BlsAddress", blsAddr)
+					utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d] I got resharded to shard %d from shard %d, %s", core.GetEpochFromBlockNumber(newBlock.NumberU64()), myShard, node.blockchain.ShardID(), aboutLeader), "BlsPubKey", hex.EncodeToString(myBlsPubKey))
 				}
 			} else {
-				utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d]  Somehow I got kicked out", core.GetEpochFromBlockNumber(newBlock.NumberU64())), "BlsAddress", blsAddr)
+				utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d]  Somehow I got kicked out", core.GetEpochFromBlockNumber(newBlock.NumberU64())), "BlsPubKey", hex.EncodeToString(myBlsPubKey))
 			}
 		}
 	}
@@ -388,7 +389,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 		node.ClientPeer = peer
 	} else {
 		node.AddPeers([]*p2p.Peer{peer})
-		utils.GetLogInstance().Info("Add Peer to Node", "Address", node.Consensus.GetSelfAddress(), "Peer", peer, "# Peers", node.Consensus.GetNumPeers())
+		utils.GetLogInstance().Info("Add Peer to Node", "Address", node.Consensus.GetSelfAddress(), "Peer", peer, "# Peers", node.Consensus.GetNumValidators())
 	}
 
 	return 1
@@ -396,6 +397,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 
 // SendPongMessage is the a goroutine to periodcally send pong message to all peers
 func (node *Node) SendPongMessage() {
+	utils.GetLogInstance().Info("Starting Pong routing")
 	tick := time.NewTicker(2 * time.Second)
 	tick2 := time.NewTicker(120 * time.Second)
 
@@ -410,10 +412,11 @@ func (node *Node) SendPongMessage() {
 		case <-tick.C:
 			peers := node.Consensus.GetValidatorPeers()
 			numPeersNow := len(peers)
-			numPubKeysNow := node.Consensus.GetNumPeers()
+			numPubKeysNow := node.Consensus.GetNumValidators()
 
 			// no peers, wait for another tick
-			if numPeersNow == 0 || numPubKeysNow == 0 {
+			if numPubKeysNow == 0 {
+				utils.GetLogInstance().Info("[PONG] no peers, continue", "numPeers", numPeers, "numPeersNow", numPeersNow)
 				continue
 			}
 			// new peers added
@@ -440,6 +443,7 @@ func (node *Node) SendPongMessage() {
 					// only need to notify consensus leader once to start the consensus
 					if firstTime {
 						// Leader stops sending ping message
+						time.Sleep(5 * time.Second)
 						node.serviceManager.TakeAction(&service.Action{Action: service.Stop, ServiceType: service.PeerDiscovery})
 						node.startConsensus <- struct{}{}
 						firstTime = false
@@ -480,17 +484,18 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 	// set the leader pub key is the first thing to do
 	// otherwise, we may not be able to validate the consensus messages received
 	// which will result in first consensus timeout
+	// TODO: remove this after fully migrating to beacon chain-based committee membership
 	err = node.Consensus.SetLeaderPubKey(pong.LeaderPubKey)
 	if err != nil {
 		utils.GetLogInstance().Error("Unmarshal Consensus Leader PubKey Failed", "error", err)
 	} else {
-		utils.GetLogInstance().Info("Set Consensus Leader PubKey", "key", utils.GetAddressHex(node.Consensus.GetLeaderPubKey()))
+		utils.GetLogInstance().Info("Set Consensus Leader PubKey", "key", node.Consensus.GetLeaderPubKey())
 	}
 	err = node.DRand.SetLeaderPubKey(pong.LeaderPubKey)
 	if err != nil {
 		utils.GetLogInstance().Error("Unmarshal DRand Leader PubKey Failed", "error", err)
 	} else {
-		utils.GetLogInstance().Info("Set DRand Leader PubKey", "key", utils.GetAddressHex(node.Consensus.GetLeaderPubKey()))
+		utils.GetLogInstance().Info("Set DRand Leader PubKey", "key", node.Consensus.GetLeaderPubKey())
 	}
 
 	peers := make([]*p2p.Peer, 0)
@@ -541,5 +546,7 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 	data["peer"] = p2p.GroupAction{Name: node.NodeConfig.GetShardGroupID(), Action: p2p.ActionPause}
 
 	node.serviceManager.TakeAction(&service.Action{Action: service.Notify, ServiceType: service.PeerDiscovery, Params: data})
+
+	// TODO: remove this after fully migrating to beacon chain-based committee membership
 	return node.Consensus.UpdatePublicKeys(publicKeys) + node.DRand.UpdatePublicKeys(publicKeys)
 }

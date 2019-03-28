@@ -5,6 +5,8 @@ import (
 	"math/big"
 	"os"
 
+	"github.com/harmony-one/harmony/core/types"
+
 	"github.com/harmony-one/harmony/contracts/structs"
 
 	"github.com/harmony-one/harmony/core"
@@ -44,8 +46,12 @@ func (node *Node) UpdateStakingList(stakeInfoReturnValue *structs.StakeInfoRetur
 		}
 		// True if the token is still staked within the locking period.
 		if curEpoch-startEpoch <= lockPeriodCount.Uint64()*lockPeriodInEpochs {
+			blsPubKey := types.BlsPublicKey{}
+			copy(blsPubKey[:32], stakeInfoReturnValue.BlsPubicKeys1[i][:])
+			copy(blsPubKey[32:64], stakeInfoReturnValue.BlsPubicKeys2[i][:])
+			copy(blsPubKey[64:96], stakeInfoReturnValue.BlsPubicKeys2[i][:])
 			node.CurrentStakes[addr] = &structs.StakeInfo{
-				stakeInfoReturnValue.BlsAddresses[i],
+				blsPubKey,
 				blockNum,
 				lockPeriodCount,
 				stakeInfoReturnValue.Amounts[i],

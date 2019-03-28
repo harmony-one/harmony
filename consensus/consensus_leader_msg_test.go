@@ -3,6 +3,8 @@ package consensus
 import (
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	protobuf "github.com/golang/protobuf/proto"
@@ -53,8 +55,8 @@ func TestConstructPreparedMessage(test *testing.T) {
 	consensus.blockHash = [32]byte{}
 
 	message := "test string"
-	consensus.prepareSigs["0"] = leaderPriKey.Sign(message)
-	consensus.prepareSigs["1"] = validatorPriKey.Sign(message)
+	consensus.prepareSigs[common.Address{}] = leaderPriKey.Sign(message)
+	consensus.prepareSigs[common.Address{}] = validatorPriKey.Sign(message)
 	consensus.prepareBitmap.SetKey(leaderPubKey, true)
 	consensus.prepareBitmap.SetKey(validatorPubKey, true)
 
