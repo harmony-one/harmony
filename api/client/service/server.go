@@ -22,7 +22,7 @@ type Server struct {
 func (s *Server) FetchAccountState(ctx context.Context, request *proto.FetchAccountStateRequest) (*proto.FetchAccountStateResponse, error) {
 	var address common.Address
 	address.SetBytes(request.Address)
-	log.Println("Returning FetchAccountStateResponse for address: ", address.Hex())
+	//	log.Println("Returning FetchAccountStateResponse for address: ", address.Hex())
 	state, err := s.stateReader()
 	if err != nil {
 		return nil, err
@@ -34,7 +34,7 @@ func (s *Server) FetchAccountState(ctx context.Context, request *proto.FetchAcco
 func (s *Server) GetFreeToken(ctx context.Context, request *proto.GetFreeTokenRequest) (*proto.GetFreeTokenResponse, error) {
 	var address common.Address
 	address.SetBytes(request.Address)
-	log.Println("Returning GetFreeTokenResponse for address: ", address.Hex())
+	//	log.Println("Returning GetFreeTokenResponse for address: ", address.Hex())
 	return &proto.GetFreeTokenResponse{TxId: s.callFaucetContract(address).Bytes()}, nil
 }
 
