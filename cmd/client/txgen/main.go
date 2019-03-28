@@ -158,7 +158,7 @@ func main() {
 	go func() {
 		// wait for 3 seconds for client to send ping message to leader
 		// FIXME (leo) the readySignal should be set once we really sent ping message to leader
-		time.Sleep(1 * time.Second) // wait for nodes to be ready
+		time.Sleep(3 * time.Second) // wait for nodes to be ready
 		for _, i := range shardIDs {
 			readySignal <- i
 		}

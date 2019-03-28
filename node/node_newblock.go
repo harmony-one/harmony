@@ -12,6 +12,7 @@ const (
 	DefaultThreshold   = 1
 	FirstTimeThreshold = 2
 	ConsensusTimeOut   = 10
+	PeriodicBlock      = 3 * time.Second
 )
 
 // WaitForConsensusReady listen for the readiness signal from consensus and generate new block for consensus.
@@ -68,7 +69,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 				}
 				// If not enough transactions to run Consensus,
 				// periodically check whether we have enough transactions to package into block.
-				time.Sleep(1 * time.Second)
+				time.Sleep(PeriodicBlock)
 			}
 			// Send the new block to Consensus so it can be confirmed.
 			if newBlock != nil {
