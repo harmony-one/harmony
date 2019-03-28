@@ -461,10 +461,10 @@ func (consensus *Consensus) RemovePeers(peers []p2p.Peer) int {
 		// Or the shard won't be able to reach consensus if public keys are mismatch
 
 		validators := consensus.GetValidatorPeers()
-		pong := proto_discovery.NewPongMessage(validators, consensus.PublicKeys, consensus.leader.ConsensusPubKey)
+		pong := proto_discovery.NewPongMessage(validators, consensus.PublicKeys, consensus.leader.ConsensusPubKey, consensus.ShardID)
 		buffer := pong.ConstructPongMessage()
 
-		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), buffer))
+		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), buffer))
 	}
 
 	return count2

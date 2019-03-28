@@ -130,7 +130,7 @@ sleep 1
 BN_MA=$(grep "BN_MA" $log_folder/bootnode.log | awk -F\= ' { print $2 } ')
 HMY_OPT2=" -bootnodes $BN_MA"
 echo "bootnode launched." + " $BN_MA"
-HMY_OPT3=" -is_beacon"
+HMY_OPT3=" -is_genesis"
 
 NUM_NN=0
 
@@ -146,7 +146,7 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
   fi
   if [ "$mode" == "leader_archival" ]; then
      echo "launching leader ..."
-     $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -account_index $i  -min_peers $MIN $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key -is_leader -is_archival 2>&1 | tee -a $LOG_FILE &
+     $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -account_index $i  -min_peers $MIN $HMY_OPT2 -key /tmp/$ip-$port.key -is_leader -is_archival 2>&1 | tee -a $LOG_FILE &
   fi
   if [ "$mode" == "validator" ]; then
      echo "launching validator ..."
@@ -154,13 +154,12 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
   fi
   if [ "$mode" == "archival" ]; then
       echo "launching archival node ... wait"
-      $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -account_index $i -min_peers $MIN $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key -is_archival  2>&1 | tee -a $LOG_FILE &
+      $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -account_index $i -min_peers $MIN $HMY_OPT2 -key /tmp/$ip-$port.key -is_archival  2>&1 | tee -a $LOG_FILE &
   fi
-  sleep 0.5
   if [[ "$mode" == "newnode" && "$SYNC" == "true" ]]; then
      (( NUM_NN += 30 ))
      echo "launching new node ..."
-     (sleep $NUM_NN; $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -account_index $i  -min_peers $MIN $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key 2>&1 | tee -a $LOG_FILE ) &
+     (sleep $NUM_NN; $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -account_index $i  -min_peers $MIN $HMY_OPT2 -key /tmp/$ip-$port.key 2>&1 | tee -a $LOG_FILE ) &
   fi
   (( i++ ))
 done < $config
