@@ -41,6 +41,7 @@ func (node *Node) getNeighborPeers(neighbor *sync.Map) []p2p.Peer {
 
 // GetBeaconSyncingPeers returns a list of peers for beaconchain syncing
 func (node *Node) GetBeaconSyncingPeers() []p2p.Peer {
+	utils.GetLogInstance().Info("[SYNC] BeaconSyncing Peers is called", "node", node.SelfPeer)
 	return node.getNeighborPeers(&node.BeaconNeighbors)
 }
 
@@ -107,6 +108,11 @@ func (node *Node) SupportSyncing() {
 	if node.NodeConfig.Role() != nodeconfig.ShardLeader && node.NodeConfig.Role() != nodeconfig.BeaconLeader {
 		go node.DoSyncing(node.blockchain, node.Worker, node.GetSyncingPeers, true)
 	}
+}
+
+// GetSync gets sync.
+func (node *Node) GetSync() {
+	go node.DoSyncing(node.blockchain, node.Worker, node.GetBeaconSyncingPeers, false) //Don't join consensus
 }
 
 // InitSyncingServer starts downloader server.
