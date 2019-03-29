@@ -9,6 +9,8 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/harmony-one/harmony/core"
+
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 
@@ -31,7 +33,7 @@ var (
 	commit  string
 )
 
-// InitLDBDatabase initializes a LDBDatabase. isBeacon=true will return the beacon chain database for normal shard nodes
+// InitLDBDatabase initializes a LDBDatabase. isGenesis=true will return the beacon chain database for normal shard nodes
 func InitLDBDatabase(ip string, port string, freshDB bool, isBeacon bool) (*ethdb.LDBDatabase, error) {
 	var dbFileName string
 	if isBeacon {
@@ -81,8 +83,8 @@ var (
 	stakingKeyFile = flag.String("staking_key", "./.stakingkey", "the private key file of the harmony node")
 	// Key file to store the private key
 	keyFile = flag.String("key", "./.hmykey", "the private key file of the harmony node")
-	// isBeacon indicates this node is a beacon chain node
-	isBeacon = flag.Bool("is_beacon", false, "true means this node is a beacon chain node")
+	// isGenesis indicates this node is a genesis node
+	isGenesis = flag.Bool("is_genesis", false, "true means this node is a genesis node")
 	// isArchival indicates this node is an archival node that will save and archive current blockchain
 	isArchival = flag.Bool("is_archival", false, "true means this node is a archival node")
 	//isNewNode indicates this node is a new node
@@ -119,18 +121,24 @@ func initSetup() {
 
 func createGlobalConfig() *nodeconfig.ConfigType {
 	var err error
-	nodeConfig := nodeconfig.GetGlobalConfig()
 
-	// Currently we hardcode only one shard.
-	nodeConfig.ShardID = 0
+	nodeConfig := nodeconfig.GetDefaultConfig()
+
+	shardID := uint32(*accountIndex / core.GenesisShardSize)
+	if !*isNewNode {
+		nodeConfig = nodeconfig.GetShardConfig(shardID)
+	}
+
+	// The initial genesis nodes are sequentially put into genesis shards based on their accountIndex
+	nodeConfig.ShardID = shardID
 
 	// Key Setup ================= [Start]
 	// Staking private key is the ecdsa key used for token related transaction signing (especially the staking txs).
 	stakingPriKey := ""
 	consensusPriKey := &bls.SecretKey{}
-	if *isBeacon {
-		stakingPriKey = contract.InitialBeaconChainAccounts[*accountIndex].Private
-		err := consensusPriKey.SetHexString(contract.InitialBeaconChainBLSAccounts[*accountIndex].Private)
+	if *isGenesis {
+		stakingPriKey = contract.GenesisAccounts[*accountIndex].Private
+		err := consensusPriKey.SetHexString(contract.GenesisBLSAccounts[*accountIndex].Private)
 		if err != nil {
 			panic(fmt.Errorf("generate key error"))
 		}
@@ -159,14 +167,15 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	if nodeConfig.MainDB, err = InitLDBDatabase(*ip, *port, *freshDB, false); err != nil {
 		panic(err)
 	}
-	if !*isBeacon {
+	if !*isGenesis {
 		if nodeConfig.BeaconDB, err = InitLDBDatabase(*ip, *port, *freshDB, true); err != nil {
 			panic(err)
 		}
 	}
 
 	nodeConfig.SelfPeer = p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nodeConfig.ConsensusPubKey}
-	if *isLeader {
+
+	if *accountIndex%core.GenesisShardSize == 0 { // The first node in a shard is the leader at genesis
 		nodeConfig.StringRole = "leader"
 		nodeConfig.Leader = nodeConfig.SelfPeer
 	} else {
@@ -202,22 +211,33 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	// TODO: refactor the creation of blockchain out of node.New()
 	consensus.ChainReader = currentNode.Blockchain()
 
-	// TODO: need change config file and use switch instead of complicated "if else" condition
-	if *isBeacon {
-		if nodeConfig.StringRole == "leader" {
-			currentNode.NodeConfig.SetRole(nodeconfig.BeaconLeader)
-			currentNode.NodeConfig.SetIsLeader(true)
+	if *isGenesis {
+		// TODO: need change config file and use switch instead of complicated "if else" condition
+		if nodeConfig.ShardID == 0 { // Beacon chain
+			if nodeConfig.StringRole == "leader" {
+				currentNode.NodeConfig.SetRole(nodeconfig.BeaconLeader)
+				currentNode.NodeConfig.SetIsLeader(true)
+			} else {
+				currentNode.NodeConfig.SetRole(nodeconfig.BeaconValidator)
+				currentNode.NodeConfig.SetIsLeader(false)
+			}
+			currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
 		} else {
-			currentNode.NodeConfig.SetRole(nodeconfig.BeaconValidator)
-			currentNode.NodeConfig.SetIsLeader(false)
+			if nodeConfig.StringRole == "leader" {
+				currentNode.NodeConfig.SetRole(nodeconfig.ShardLeader)
+				currentNode.NodeConfig.SetIsLeader(true)
+			} else {
+				currentNode.NodeConfig.SetRole(nodeconfig.ShardValidator)
+				currentNode.NodeConfig.SetIsLeader(false)
+			}
+			currentNode.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
 		}
-		currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
-		currentNode.NodeConfig.SetIsBeacon(true)
 	} else {
 		currentNode.AddBeaconChainDatabase(nodeConfig.BeaconDB)
 
 		if *isNewNode {
 			currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
+			// TODO: fix the roles as it's unknown before resharding.
 		} else if nodeConfig.StringRole == "leader" {
 			currentNode.NodeConfig.SetRole(nodeconfig.ShardLeader)
 			currentNode.NodeConfig.SetIsLeader(true)
@@ -226,14 +246,13 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 			currentNode.NodeConfig.SetIsLeader(false)
 		}
 		currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDUnknown)
-		currentNode.NodeConfig.SetIsBeacon(false)
 	}
 
 	// Add randomness protocol
 	// TODO: enable drand only for beacon chain
 	// TODO: put this in a better place other than main.
 	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of drand later.
-	dRand := drand.New(nodeConfig.Host, nodeConfig.ShardID, []p2p.Peer{}, nodeConfig.Leader, currentNode.ConfirmedBlockChannel, *isLeader, nodeConfig.ConsensusPriKey)
+	dRand := drand.New(nodeConfig.Host, nodeConfig.ShardID, []p2p.Peer{}, nodeConfig.Leader, currentNode.ConfirmedBlockChannel, nodeConfig.ConsensusPriKey)
 	currentNode.Consensus.RegisterPRndChannel(dRand.PRndChannel)
 	currentNode.Consensus.RegisterRndChannel(dRand.RndChannel)
 	currentNode.DRand = dRand
