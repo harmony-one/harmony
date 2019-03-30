@@ -20,7 +20,6 @@ install:
   - make
   - cd ../harmony
   - go get -v ./...
-  - go get gopkg.in/check.v1
   - scripts/install_build_tools.sh
 script:
   - go build -v ./...
