@@ -57,6 +57,16 @@ type RefBlock struct {
 	Height string `json:"height"`
 }
 
+// Node ...
+type Node struct {
+	ID string `json:"id"`
+}
+
+// Shard ...
+type Shard struct {
+	Nodes []Node `json:"nodes"`
+}
+
 // GetTransaction ...
 func GetTransaction(tx *types.Transaction, accountBlock *types.Block) *Transaction {
 	if tx.To() == nil {
