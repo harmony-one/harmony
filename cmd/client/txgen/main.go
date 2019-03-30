@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/consensus"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -20,7 +21,6 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/api/client"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
-	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node"
@@ -56,13 +56,15 @@ func main() {
 
 	maxNumTxsPerBatch := flag.Int("max_num_txs_per_batch", 20000, "number of transactions to send per message")
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
-	duration := flag.Int("duration", 10, "duration of the tx generation in second. If it's negative, the experiment runs forever.")
+	duration := flag.Int("duration", 0, "duration of the tx generation in second. If it's negative, the experiment runs forever.")
 	versionFlag := flag.Bool("version", false, "Output version info")
 	//crossShardRatio := flag.Int("cross_shard_ratio", 30, "The percentage of cross shard transactions.")
 	shardIDFlag := flag.Int("shardID", 0, "The shardID the node belongs to.")
 	// Key file to store the private key
 	keyFile := flag.String("key", "./.txgenkey", "the private key file of the txgen")
 	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress")
+	// logConn logs incoming/outgoing connections
+	//logConn := flag.Bool("log_conn", true, "log incoming/outgoing connections")
 
 	flag.Parse()
 
@@ -121,25 +123,40 @@ func main() {
 	if err != nil {
 		panic("unable to new host in txgen")
 	}
+	// if *logConn {
+	// 	host.GetP2PHost().Network().Notify(utils.ConnLogger)
+	// }
 	node := node.New(host, &consensus.Consensus{ShardID: uint32(shardID)}, nil, true) //Make it archival node.
-	nodeConfig := nodeconfig.GetGlobalConfig()
-	node.NodeConfig = nodeConfig
+	//node := node.New(host, nil, nil, true) //Make it archival node.
+
 	node.Client = client.NewClient(node.GetHost(), shardIDs)
 	node.NodeConfig.SetRole(nodeconfig.ClientNode)
+	node.NodeConfig.SetIsBeacon(false)
 	node.ServiceManagerSetup()
 	node.RunServices()
-	go node.GetSync()
-	node.StartServer()
+	time.Sleep(5 * time.Second)
+	// This func is used to update the client's blockchain when new blocks are received from the leaders
+	updateBlocksFunc := func(blocks []*types.Block) {
+		for _, block := range blocks {
+			if node.Consensus.ShardID == uint32(shardID) {
+				utils.GetLogInstance().Info("[Txgen] Received new block", "block num", blocks[0].NumberU64())
+				// Add it to blockchain
+				utils.GetLogInstance().Info("Current Block", "block num", node.Blockchain().CurrentBlock().NumberU64())
+				utils.GetLogInstance().Info("Adding block from leader", "txNum", len(block.Transactions()), "shardID", shardID, "preHash", block.ParentHash().Hex())
+				node.AddNewBlock(block)
+				stateMutex.Lock()
+				node.Worker.UpdateCurrent()
+				stateMutex.Unlock()
+			} else {
+				continue
+			}
+		}
+	}
 
-	// // Start the client server to listen to leader's message
-	go func() {
-		// wait for 3 seconds for client to send ping message to leader
-		// FIXME (leo) the readySignal should be set once we really sent ping message to leader
-		time.Sleep(1 * time.Second) // wait for nodes to be ready
-		// for _, i := range shardIDs {
-		// 	readySignal <- i
-		// }
-	}()
+	node.Client.UpdateBlocks = updateBlocksFunc
+	//node.Neighbors.LoadOrStore()
+	go node.GetSync()
+	time.Sleep(5 * time.Second)
 
 	// Transaction generation process
 	start := time.Now()
@@ -160,6 +177,7 @@ func main() {
 	node.GetHost().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeaconClient}, p2p_host.ConstructP2pMessage(byte(0), msg))
 	node.GetHost().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, p2p_host.ConstructP2pMessage(byte(0), msg))
 	time.Sleep(3 * time.Second)
+	node.StartServer()
 }
 
 // SendTxsToShard sends txs to shard, currently just to beacon shard

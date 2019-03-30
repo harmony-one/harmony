@@ -66,6 +66,7 @@ type ConfigType struct {
 	client   p2p.GroupID // the client group ID of the shard
 	isClient bool        // whether this node is a client node, such as wallet/txgen
 	isLeader bool        // whether this node is a leader or not
+	isBeacon bool        // whether this node is boolean or not
 	ShardID  uint32      // ShardID of this node
 	role     Role        // Role of the node
 
@@ -141,6 +142,11 @@ func (conf *ConfigType) SetIsClient(b bool) {
 	conf.isClient = b
 }
 
+// SetIsBeacon set the isBeacon configuration
+func (conf *ConfigType) SetIsBeacon(b bool) {
+	conf.isBeacon = b
+}
+
 // SetIsLeader set the isLeader configuration
 func (conf *ConfigType) SetIsLeader(b bool) {
 	conf.isLeader = b
@@ -178,7 +184,7 @@ func (conf *ConfigType) IsClient() bool {
 
 // IsBeacon returns the isBeacon configuration
 func (conf *ConfigType) IsBeacon() bool {
-	return conf.ShardID == 0
+	return conf.isBeacon
 }
 
 // IsLeader returns the isLeader configuration
