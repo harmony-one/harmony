@@ -11,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/gorilla/mux"
+	"github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -27,18 +28,18 @@ type Service struct {
 	router      *mux.Router
 	IP          string
 	Port        string
-	GetNumPeers func() int
+	GetPeers    func() []*bls.PublicKey
 	storage     *Storage
 	server      *http.Server
 	messageChan chan *msg_pb.Message
 }
 
 // New returns explorer service.
-func New(selfPeer *p2p.Peer, GetNumPeers func() int) *Service {
+func New(selfPeer *p2p.Peer, GetPeers func() []*bls.PublicKey) *Service {
 	return &Service{
-		IP:          selfPeer.IP,
-		Port:        selfPeer.Port,
-		GetNumPeers: GetNumPeers,
+		IP:       selfPeer.IP,
+		Port:     selfPeer.Port,
+		GetPeers: GetPeers,
 	}
 }
 
@@ -91,8 +92,13 @@ func (s *Service) Run() *http.Server {
 	s.router.Path("/address").Queries("id", "{[0-9A-Fa-fx]*?}").HandlerFunc(s.GetExplorerAddress).Methods("GET")
 	s.router.Path("/address").HandlerFunc(s.GetExplorerAddress)
 
-	// Set up router for nodes.
-	s.router.Path("/nodes").HandlerFunc(s.GetExplorerNodes)
+	// Set up router for node count.
+	s.router.Path("/nodes").HandlerFunc(s.GetExplorerNodeCount) // TODO(ricl): this is going to be replaced by /node-count
+	s.router.Path("/node-count").HandlerFunc(s.GetExplorerNodeCount)
+
+	// Set up router for shard
+	s.router.Path("/shard").Queries("id", "{[0-9]*?}").HandlerFunc(s.GetExplorerShard).Methods("GET")
+	s.router.Path("/shard").HandlerFunc(s.GetExplorerShard)
 
 	// Do serving now.
 	utils.GetLogInstance().Info("Listening on ", "port: ", GetExplorerPort(s.Port))
@@ -252,10 +258,24 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(data.Address)
 }
 
-// GetExplorerNodes serves /nodes end-point.
-func (s *Service) GetExplorerNodes(w http.ResponseWriter, r *http.Request) {
+// GetExplorerNodeCount serves /nodes end-point.
+func (s *Service) GetExplorerNodeCount(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(s.GetNumPeers())
+	json.NewEncoder(w).Encode(len(s.GetPeers()))
+}
+
+// GetExplorerShard serves /shard end-point
+func (s *Service) GetExplorerShard(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	var nodes []Node
+	for _, node := range s.GetPeers() {
+		nodes = append(nodes, Node{
+			ID: node.SerializeToHexStr(),
+		})
+	}
+	json.NewEncoder(w).Encode(Shard{
+		Nodes: nodes,
+	})
 }
 
 // NotifyService notify service

@@ -637,9 +637,9 @@ func (consensus *Consensus) GetLeaderPubKey() *bls.PublicKey {
 	return consensus.leader.ConsensusPubKey
 }
 
-// GetNumPeers returns the length of PublicKeys
-func (consensus *Consensus) GetNumPeers() int {
-	return len(consensus.PublicKeys)
+// GetPeers returns PublicKeys
+func (consensus *Consensus) GetPeers() []*bls.PublicKey {
+	return consensus.PublicKeys
 }
 
 // GetConsensusID returns the consensus ID
