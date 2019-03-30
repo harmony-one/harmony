@@ -154,7 +154,7 @@ func (consensus *Consensus) GetNextRnd() ([32]byte, [32]byte, error) {
 
 // New creates a new Consensus object
 // TODO: put shardId into chain reader's chain config
-func New(host p2p.Host, ShardID uint32, peers []p2p.Peer, leader p2p.Peer, blsPriKey *bls.SecretKey) *Consensus {
+func New(host p2p.Host, ShardID uint32, peers []p2p.Peer, leader p2p.Peer, blsPriKey *bls.SecretKey) (*Consensus, error) {
 	consensus := Consensus{}
 	consensus.host = host
 	consensus.ConsensusIDLowChan = make(chan struct{})
@@ -183,8 +183,14 @@ func New(host p2p.Host, ShardID uint32, peers []p2p.Peer, leader p2p.Peer, blsPr
 
 	consensus.PublicKeys = allPublicKeys
 
-	prepareBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.ConsensusPubKey)
-	commitBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.ConsensusPubKey)
+	prepareBitmap, err := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.ConsensusPubKey)
+	if err != nil {
+		return nil, err
+	}
+	commitBitmap, err := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.ConsensusPubKey)
+	if err != nil {
+		return nil, err
+	}
 	consensus.prepareBitmap = prepareBitmap
 	consensus.commitBitmap = commitBitmap
 
@@ -220,7 +226,7 @@ func New(host p2p.Host, ShardID uint32, peers []p2p.Peer, leader p2p.Peer, blsPr
 	consensus.OfflinePeerList = make([]p2p.Peer, 0)
 
 	//	consensus.Log.Info("New Consensus", "IP", ip, "Port", port, "NodeID", consensus.nodeID, "priKey", consensus.priKey, "PubKey", consensus.PubKey)
-	return &consensus
+	return &consensus, nil
 }
 
 // RegisterPRndChannel registers the channel for receiving randomness preimage from DRG protocol

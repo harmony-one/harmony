@@ -20,7 +20,10 @@ func prepareNode(t *testing.T) *Node {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus := consensus.New(host, 0, []p2p.Peer{leader, validator}, leader, nil)
+	consensus, err := consensus.New(host, 0, []p2p.Peer{leader, validator}, leader, nil)
+	if err != nil {
+		t.Fatalf("Cannot craeate consensus: %v", err)
+	}
 	return New(host, consensus, nil, false)
 
 }

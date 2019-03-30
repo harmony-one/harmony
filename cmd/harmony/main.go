@@ -199,7 +199,11 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	// Consensus object.
 	// TODO: consensus object shouldn't start here
 	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of consensus later.
-	consensus := consensus.New(nodeConfig.Host, nodeConfig.ShardID, []p2p.Peer{}, nodeConfig.Leader, nodeConfig.ConsensusPriKey)
+	consensus, err := consensus.New(nodeConfig.Host, nodeConfig.ShardID, []p2p.Peer{}, nodeConfig.Leader, nodeConfig.ConsensusPriKey)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error :%v \n", err)
+		os.Exit(1)
+	}
 	consensus.MinPeers = *minPeers
 
 	// Current node.
