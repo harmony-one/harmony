@@ -17,6 +17,7 @@ require (
 	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/golang/mock v1.2.0
 	github.com/golang/protobuf v1.3.0
+	github.com/golangci/golangci-lint v1.15.0
 	github.com/gorilla/handlers v1.4.0
 	github.com/gorilla/mux v1.7.0
 	github.com/harmony-ek/gencodec v0.0.0-20190215044613-e6740dbdd846
@@ -41,7 +42,6 @@ require (
 	github.com/rjeczalik/notify v0.9.2 // indirect
 	github.com/rs/cors v1.6.0 // indirect
 	github.com/shirou/gopsutil v2.18.12+incompatible
-	github.com/shirou/w32 v0.0.0-20160930032740-bb4de0191aa4 // indirect
 	github.com/stretchr/testify v1.3.0
 	github.com/whyrusleeping/go-logging v0.0.0-20170515211332-0457bb6b88fc
 	golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2
