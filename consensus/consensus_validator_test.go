@@ -48,6 +48,10 @@ func (MockChainReader) GetBlock(hash common.Hash, number uint64) *types.Block {
 	return &types.Block{}
 }
 
+func (MockChainReader) GetBlockByHash(hash common.Hash) *types.Block {
+	return nil
+}
+
 func TestProcessMessageValidatorAnnounce(test *testing.T) {
 	ctrl := gomock.NewController(test)
 	defer ctrl.Finish()
