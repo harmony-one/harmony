@@ -218,6 +218,7 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	if *isGenesis {
 		// TODO: need change config file and use switch instead of complicated "if else" condition
 		if nodeConfig.ShardID == 0 { // Beacon chain
+			nodeConfig.SetIsBeacon(true)
 			if nodeConfig.StringRole == "leader" {
 				currentNode.NodeConfig.SetRole(nodeconfig.BeaconLeader)
 				currentNode.NodeConfig.SetIsLeader(true)

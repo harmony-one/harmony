@@ -45,8 +45,14 @@ func TestNodeConfigMultiple(t *testing.T) {
 		t.Errorf("expecting nil, got: %v", f)
 	}
 
+	if c.IsBeacon() != false {
+		t.Errorf("expecting the node to not be beacon yet, got: %v", c.IsBeacon())
+	}
+
+	c.SetIsBeacon(true)
+
 	if c.IsBeacon() != true {
-		t.Errorf("expecting true, got: %v", c.IsBeacon())
+		t.Errorf("expecting the node to be beacon, got: %v", c.IsBeacon())
 	}
 
 	d.SetShardGroupID("abcd")
