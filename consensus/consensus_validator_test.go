@@ -48,6 +48,10 @@ func (MockChainReader) GetBlock(hash common.Hash, number uint64) *types.Block {
 	return &types.Block{}
 }
 
+// GetBlockByHash retrieves a block from the chain by its hash.
+// This mocked version (which is not supposed to be called), however,
+// returns nil so that, if the returned block is used in any way,
+// it will throw a nil pointer exception.
 func (MockChainReader) GetBlockByHash(hash common.Hash) *types.Block {
 	return nil
 }
