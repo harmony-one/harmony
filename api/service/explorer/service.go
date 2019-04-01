@@ -107,8 +107,8 @@ func (s *Service) Run() *http.Server {
 	return server
 }
 
-// GetAccountBlocks returns a list of types.Block to server blocks end-point.
-func (s *Service) GetAccountBlocks(from, to int) []*types.Block {
+// ReadBlocksFromDB returns a list of types.Block to server blocks end-point.
+func (s *Service) ReadBlocksFromDB(from, to int) []*types.Block {
 	blocks := []*types.Block{}
 	for i := from - 1; i <= to+1; i++ {
 		if i < 0 {
@@ -160,19 +160,12 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accountBlocks := s.GetAccountBlocks(fromInt, toInt)
+	accountBlocks := s.ReadBlocksFromDB(fromInt, toInt)
 	for id, accountBlock := range accountBlocks {
 		if id == 0 || id == len(accountBlocks)-1 || accountBlock == nil {
 			continue
 		}
-		block := &Block{
-			Height:     strconv.Itoa(id + fromInt - 1),
-			ID:         accountBlock.Hash().Hex(),
-			TXCount:    strconv.Itoa(accountBlock.Transactions().Len()),
-			Timestamp:  strconv.Itoa(int(accountBlock.Time().Int64() * 1000)),
-			MerkleRoot: accountBlock.Hash().Hex(),
-			Bytes:      strconv.Itoa(int(accountBlock.Size())),
-		}
+		block := NewBlock(accountBlock, id+fromInt-1)
 		// Populate transactions
 		for _, tx := range accountBlock.Transactions() {
 			transaction := GetTransaction(tx, accountBlock)
