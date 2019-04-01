@@ -123,8 +123,6 @@ func main() {
 	consensusObj := consensus.New(host, 0, nil, p2p.Peer{}, nil)
 	clientNode := node.New(host, consensusObj, nil, false)
 	clientNode.Client = client.NewClient(clientNode.GetHost(), shardIDs)
-	consensusObj.SetStakeInfoFinder(clientNode)
-	consensusObj.ChainReader = clientNode.Blockchain()
 
 	readySignal := make(chan uint32)
 
