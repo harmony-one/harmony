@@ -155,8 +155,8 @@ func main() {
 
 	node.Client.UpdateBlocks = updateBlocksFunc
 	//node.Neighbors.LoadOrStore()
-	go node.GetSync()
-	time.Sleep(5 * time.Second)
+	//go node.GetSync()
+	//time.Sleep(5 * time.Second)
 
 	// Transaction generation process
 	start := time.Now()
@@ -169,8 +169,9 @@ func main() {
 			break
 		}
 		txs, _ := GenerateSimulatedTransactionsAccount(int(shardID), node, setting)
-		time.Sleep(3 * time.Second)
 		SendTxsToShard(node, txs)
+		go node.GetSync()
+		time.Sleep(5 * time.Second)
 	}
 
 	msg := proto_node.ConstructStopMessage()
@@ -195,6 +196,7 @@ func GenerateSimulatedTransactionsAccount(shardID int, node *node.Node, setting 
 		//for j := 0; j < 4; j++ {
 		randomUserAddress := crypto.PubkeyToAddress(node.TestBankKeys[rand.Intn(100)].PublicKey)
 		randAmount := rand.Float32()
+		//utils.GetLogInstance().Debug("Transaction Nonce", "nonce", baseNonce)
 		tx, _ := types.SignTx(types.NewTransaction(baseNonce+uint64(0), randomUserAddress, uint32(shardID), big.NewInt(int64(params.Ether*randAmount)), params.TxGas, nil, nil), types.HomesteadSigner{}, node.TestBankKeys[i])
 		//txs[i*1+j] = tx
 		txs[i] = tx

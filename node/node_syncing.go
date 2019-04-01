@@ -113,6 +113,7 @@ func (node *Node) SupportSyncing() {
 // GetSync gets sync.
 func (node *Node) GetSync() {
 	go node.DoSyncing(node.blockchain, node.Worker, node.GetBeaconSyncingPeers, false) //Don't join consensus
+	//go node.DoSyncing(node.blockchain, node.Worker, node.GetSyncingPeers, false)
 }
 
 // InitSyncingServer starts downloader server.
