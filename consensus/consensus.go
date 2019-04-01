@@ -660,11 +660,10 @@ func (consensus *Consensus) accumulateRewards(
 			"accumulateRewards: cannot set group sig mask bits", "error", err)
 		return
 	}
-	numSigs := 0
 	numAccounts := 0
 	totalAmount := big.NewInt(0)
-	for _, key := range mask.GetPubKeyFromMask(true) {
-		numSigs++
+	signingKeys := mask.GetPubKeyFromMask(true)
+	for _, key := range signingKeys {
 		stakeInfos := consensus.stakeInfoFinder.FindStakeInfoByNodeKey(key)
 		if len(stakeInfos) == 0 {
 			nodeAddr := key.GetAddress()
@@ -681,7 +680,7 @@ func (consensus *Consensus) accumulateRewards(
 	}
 	utils.GetLogInstance().Debug(
 		"accumulateRewards: rewards have been paid out",
-		"numSigs", numSigs,
+		"numSigs", len(signingKeys),
 		"numAccounts", numAccounts,
 		"totalAmount", totalAmount)
 }
