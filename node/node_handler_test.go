@@ -20,7 +20,10 @@ func TestAddNewBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus := consensus.New(host, 0, []p2p.Peer{leader, validator}, leader, nil)
+	consensus, err := consensus.New(host, 0, []p2p.Peer{leader, validator}, leader, nil)
+	if err != nil {
+		t.Fatalf("Cannot craeate consensus: %v", err)
+	}
 	node := New(host, consensus, nil, false)
 
 	selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
@@ -43,7 +46,10 @@ func TestVerifyNewBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus := consensus.New(host, 0, []p2p.Peer{leader, validator}, leader, nil)
+	consensus, err := consensus.New(host, 0, []p2p.Peer{leader, validator}, leader, nil)
+	if err != nil {
+		t.Fatalf("Cannot craeate consensus: %v", err)
+	}
 	node := New(host, consensus, nil, false)
 
 	selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
