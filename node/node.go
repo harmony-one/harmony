@@ -141,7 +141,6 @@ type Node struct {
 
 	//Node Account
 	AccountKey *ecdsa.PrivateKey
-	Address    common.Address
 
 	// For test only
 	TestBankKeys        []*ecdsa.PrivateKey
