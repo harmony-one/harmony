@@ -25,6 +25,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
@@ -582,7 +583,10 @@ func (consensus *Consensus) VerifySeal(chain consensus_engine.ChainReader, heade
 func (consensus *Consensus) Finalize(chain consensus_engine.ChainReader, header *types.Header, state *state.DB, txs []*types.Transaction, receipts []*types.Receipt) (*types.Block, error) {
 	// Accumulate any block and uncle rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
-	consensus.accumulateRewards(chain.Config(), state, header)
+	err := consensus.accumulateRewards(chain.Config(), state, header)
+	if err != nil {
+		ctxerror.Log15(utils.GetLogInstance().Error, err)
+	}
 	header.Root = state.IntermediateRoot(false)
 	return types.NewBlock(header, txs, receipts), nil
 }
@@ -627,38 +631,31 @@ func (consensus *Consensus) Prepare(chain consensus_engine.ChainReader, header *
 // included uncles. The coinbase of each uncle block is also rewarded.
 func (consensus *Consensus) accumulateRewards(
 	config *params.ChainConfig, state *state.DB, header *types.Header,
-) {
+) error {
 	if header.ParentHash == (common.Hash{}) {
 		// This block is a genesis block,
 		// without a parent block whose signer to reward.
-		return
+		return nil
 	}
 	if consensus.ChainReader == nil {
-		utils.GetLogInstance().Error("accumulateRewards: ChainReader is nil")
-		return
+		return errors.New("ChainReader is nil")
 	}
 	parent := consensus.ChainReader.GetBlockByHash(header.ParentHash)
 	if parent == nil {
-		utils.GetLogInstance().Error(
-			"accumulateRewards: cannot retrieve parent block",
+		return ctxerror.New("cannot retrieve parent block",
 			"curHash", header.Hash().Hex(),
 			"parentHash", header.ParentHash.Hex(),
 		)
-		return
 	}
 	mask, err := bls_cosi.NewMask(consensus.PublicKeys, consensus.PubKey)
 	if err != nil {
-		utils.GetLogInstance().Error(
-			"accumulateRewards: cannot create group sig mask", "error", err)
-		return
+		return ctxerror.New("cannot create group sig mask").WithCause(err)
 	}
 	parentSigners := parent.Header().CommitBitmap
 	utils.GetLogInstance().Debug("accumulateRewards: setting group sig mask",
 		"destLen", mask.Len(), "srcLen", len(parentSigners))
 	if err := mask.SetMask(parentSigners); err != nil {
-		utils.GetLogInstance().Error(
-			"accumulateRewards: cannot set group sig mask bits", "error", err)
-		return
+		return ctxerror.New("cannot set group sig mask bits").WithCause(err)
 	}
 	numAccounts := 0
 	totalAmount := big.NewInt(0)
@@ -683,6 +680,7 @@ func (consensus *Consensus) accumulateRewards(
 		"numSigs", len(signingKeys),
 		"numAccounts", numAccounts,
 		"totalAmount", totalAmount)
+	return nil
 }
 
 // GetSelfAddress returns the address in hex
