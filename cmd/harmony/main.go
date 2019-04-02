@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 
@@ -199,6 +200,8 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
 	currentNode.AccountKey = nodeConfig.StakingPriKey
 	consensus.SetStakeInfoFinder(currentNode)
+	utils.GetLogInstance().Info("node account set",
+		"address", crypto.PubkeyToAddress(currentNode.AccountKey.PublicKey).Hex())
 
 	// TODO: refactor the creation of blockchain out of node.New()
 	consensus.ChainReader = currentNode.Blockchain()
