@@ -691,6 +691,11 @@ func (consensus *Consensus) accumulateRewards(
 		}
 		numAccounts += len(stakeInfos)
 		for _, stakeInfo := range stakeInfos {
+			utils.GetLogInstance().Info("accumulateRewards: rewarding",
+				"block", header.Hash(),
+				"account", stakeInfo.Account,
+				"node", stakeInfo.BlsPublicKey.Hex(),
+				"amount", BlockReward)
 			state.AddBalance(stakeInfo.Account, BlockReward)
 			totalAmount = new(big.Int).Add(totalAmount, BlockReward)
 		}
