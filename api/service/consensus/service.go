@@ -24,6 +24,7 @@ func New(blockChannel chan *types.Block, consensus *consensus.Consensus, startCh
 
 // StartService starts consensus service.
 func (s *Service) StartService() {
+	utils.GetLogInstance().Info("Starting consensus service.")
 	s.stopChan = make(chan struct{})
 	s.stoppedChan = make(chan struct{})
 	s.consensus.WaitForNewBlock(s.blockChannel, s.stopChan, s.stoppedChan, s.startChan)

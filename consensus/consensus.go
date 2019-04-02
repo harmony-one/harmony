@@ -33,8 +33,8 @@ type Consensus struct {
 	state State
 
 	// Commits collected from validators.
-	prepareSigs          map[string]*bls.Sign // key is the validator's address
-	commitSigs           map[string]*bls.Sign // key is the validator's address
+	prepareSigs          map[common.Address]*bls.Sign // key is the validator's address
+	commitSigs           map[common.Address]*bls.Sign // key is the validator's address
 	aggregatedPrepareSig *bls.Sign
 	aggregatedCommitSig  *bls.Sign
 	prepareBitmap        *bls_cosi.Mask
@@ -55,8 +55,9 @@ type Consensus struct {
 
 	// Public keys of the committee including leader and validators
 	PublicKeys []*bls.PublicKey
-
-	pubKeyLock sync.Mutex
+	// The addresses of my committee
+	CommitteeAddresses map[common.Address]bool
+	pubKeyLock         sync.Mutex
 
 	// private/public keys of current node
 	priKey *bls.SecretKey
@@ -65,7 +66,7 @@ type Consensus struct {
 	// Whether I am leader. False means I am validator
 	IsLeader bool
 	// Leader or validator address in hex
-	SelfAddress string
+	SelfAddress common.Address
 	// Consensus Id (View Id) - 4 byte
 	consensusID uint32
 	// Blockhash - 32 byte
@@ -167,12 +168,15 @@ func New(host p2p.Host, ShardID uint32, peers []p2p.Peer, leader p2p.Peer, blsPr
 	}
 
 	consensus.leader = leader
+	consensus.CommitteeAddresses = map[common.Address]bool{}
 	for _, peer := range peers {
-		consensus.validators.Store(utils.GetAddressHex(peer.ConsensusPubKey), peer)
+		consensus.validators.Store(utils.GetBlsAddress(peer.ConsensusPubKey).Hex(), peer)
+
+		consensus.CommitteeAddresses[utils.GetBlsAddress(peer.ConsensusPubKey)] = true
 	}
 
-	consensus.prepareSigs = map[string]*bls.Sign{}
-	consensus.commitSigs = map[string]*bls.Sign{}
+	consensus.prepareSigs = map[common.Address]*bls.Sign{}
+	consensus.commitSigs = map[common.Address]*bls.Sign{}
 
 	// Initialize cosign bitmap
 	allPublicKeys := make([]*bls.PublicKey, 0)
@@ -199,7 +203,7 @@ func New(host p2p.Host, ShardID uint32, peers []p2p.Peer, leader p2p.Peer, blsPr
 
 	// For now use socket address as ID
 	// TODO: populate Id derived from address
-	consensus.SelfAddress = utils.GetAddressHex(selfPeer.ConsensusPubKey)
+	consensus.SelfAddress = utils.GetBlsAddress(selfPeer.ConsensusPubKey)
 
 	if blsPriKey != nil {
 		consensus.priKey = blsPriKey
@@ -282,6 +286,7 @@ func (consensus *Consensus) ToggleConsensusCheck() {
 }
 
 // GetPeerByAddress the validator peer based on validator Address.
+// TODO: deprecate this, as validators network info shouldn't known to everyone
 func (consensus *Consensus) GetPeerByAddress(validatorAddress string) *p2p.Peer {
 	v, ok := consensus.validators.Load(validatorAddress)
 	if !ok {
@@ -294,6 +299,12 @@ func (consensus *Consensus) GetPeerByAddress(validatorAddress string) *p2p.Peer 
 		return nil
 	}
 	return &value
+}
+
+// IsValidatorInCommittee returns whether the given validator BLS address is part of my committee
+func (consensus *Consensus) IsValidatorInCommittee(validatorBlsAddress common.Address) bool {
+	_, ok := consensus.CommitteeAddresses[validatorBlsAddress]
+	return ok
 }
 
 // Verify the signature of the message are valid from the signer's public key.
@@ -380,8 +391,8 @@ func (consensus *Consensus) GetCommitSigsArray() []*bls.Sign {
 // ResetState resets the state of the consensus
 func (consensus *Consensus) ResetState() {
 	consensus.state = Finished
-	consensus.prepareSigs = map[string]*bls.Sign{}
-	consensus.commitSigs = map[string]*bls.Sign{}
+	consensus.prepareSigs = map[common.Address]*bls.Sign{}
+	consensus.commitSigs = map[common.Address]*bls.Sign{}
 
 	prepareBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.ConsensusPubKey)
 	commitBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.ConsensusPubKey)
@@ -413,10 +424,13 @@ func (consensus *Consensus) AddPeers(peers []*p2p.Peer) int {
 	count := 0
 
 	for _, peer := range peers {
-		_, ok := consensus.validators.LoadOrStore(utils.GetAddressHex(peer.ConsensusPubKey), *peer)
+		_, ok := consensus.validators.LoadOrStore(utils.GetBlsAddress(peer.ConsensusPubKey).Hex(), *peer)
 		if !ok {
 			consensus.pubKeyLock.Lock()
-			consensus.PublicKeys = append(consensus.PublicKeys, peer.ConsensusPubKey)
+			if _, ok := consensus.CommitteeAddresses[peer.ConsensusPubKey.GetAddress()]; !ok {
+				consensus.PublicKeys = append(consensus.PublicKeys, peer.ConsensusPubKey)
+				consensus.CommitteeAddresses[peer.ConsensusPubKey.GetAddress()] = true
+			}
 			consensus.pubKeyLock.Unlock()
 		}
 		count++
@@ -492,7 +506,7 @@ func (consensus *Consensus) DebugPrintValidators() {
 	consensus.validators.Range(func(k, v interface{}) bool {
 		if p, ok := v.(p2p.Peer); ok {
 			str2 := fmt.Sprintf("%s", p.ConsensusPubKey.Serialize())
-			utils.GetLogInstance().Debug("validator:", "IP", p.IP, "Port", p.Port, "address", utils.GetAddressHex(p.ConsensusPubKey), "Key", str2)
+			utils.GetLogInstance().Debug("validator:", "IP", p.IP, "Port", p.Port, "address", utils.GetBlsAddress(p.ConsensusPubKey), "Key", str2)
 			count++
 			return true
 		}
@@ -505,6 +519,12 @@ func (consensus *Consensus) DebugPrintValidators() {
 func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int {
 	consensus.pubKeyLock.Lock()
 	consensus.PublicKeys = append(pubKeys[:0:0], pubKeys...)
+	consensus.CommitteeAddresses = map[common.Address]bool{}
+	for _, pubKey := range consensus.PublicKeys {
+		consensus.CommitteeAddresses[utils.GetBlsAddress(pubKey)] = true
+	}
+	// TODO: use pubkey to identify leader rather than p2p.Peer.
+	consensus.leader = p2p.Peer{ConsensusPubKey: pubKeys[0]}
 	consensus.pubKeyLock.Unlock()
 
 	return len(consensus.PublicKeys)
@@ -599,7 +619,7 @@ func accumulateRewards(config *params.ChainConfig, state *state.DB, header *type
 }
 
 // GetSelfAddress returns the address in hex
-func (consensus *Consensus) GetSelfAddress() string {
+func (consensus *Consensus) GetSelfAddress() common.Address {
 	return consensus.SelfAddress
 }
 
