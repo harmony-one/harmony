@@ -295,8 +295,18 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 		}()
 	}
 
-	utils.GetLogInstance().Info("Updating staking list")
-	node.UpdateStakingList(node.QueryStakeInfo())
+	stakeInfo := node.QueryStakeInfo()
+	if stakeInfo != nil {
+		utils.GetLogInstance().Info("Updating staking list")
+		node.UpdateStakingList(stakeInfo)
+	} else {
+		utils.GetLogInstance().Warn("QueryStakeInfo failed")
+	}
+	// Add initial shard state to current stakers.
+	// TODO ek – this is a hack,
+	//  until we can streamline initial stakers without hardcoded accounts.
+	node.UpdateStakingListWithInitShardState()
+
 	// node.printStakingList()
 	if core.IsEpochBlock(newBlock) {
 		shardState := node.blockchain.StoreNewShardState(newBlock, &node.CurrentStakes)

@@ -11,6 +11,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/harmony-one/bls/ffi/go/bls"
+
 	"github.com/harmony-one/harmony/api/client"
 	clientService "github.com/harmony-one/harmony/api/client/service"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -131,8 +133,9 @@ type Node struct {
 	// Service manager.
 	serviceManager *service.Manager
 
-	//Staked Accounts and Contract
+	// Staked Accounts and Contract
 	CurrentStakes          map[common.Address]*structs.StakeInfo //This will save the latest information about staked nodes.
+	CurrentStakesByNode    map[[20]byte]*structs.StakeInfo
 	StakingContractAddress common.Address
 	WithdrawStakeFunc      []byte
 
@@ -170,6 +173,28 @@ type Node struct {
 
 	// Used to call smart contract locally
 	ContractCaller *contracts.ContractCaller
+}
+
+// FindStakeInfoByNodeKey returns the stake information for the node identified
+// by the given consensus signing key, or nil if not found.
+func (node *Node) FindStakeInfoByNodeKey(
+	key *bls.PublicKey,
+) (stakeInfos []*structs.StakeInfo) {
+	if stakeInfo, ok := node.CurrentStakesByNode[key.GetAddress()]; ok {
+		stakeInfos = append(stakeInfos, stakeInfo)
+	}
+	return
+}
+
+// FindStakeInfoByAccount returns the stake info for the given staking account,
+// or nil if not found.
+func (node *Node) FindStakeInfoByAccount(
+	addr common.Address,
+) (stakeInfos []*structs.StakeInfo) {
+	if stakeInfo, ok := node.CurrentStakes[addr]; ok {
+		stakeInfos = append(stakeInfos, stakeInfo)
+	}
+	return
 }
 
 // Blockchain returns the blockchain from node
@@ -268,6 +293,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 			// Setup one time smart contracts
 			node.AddFaucetContractToPendingTransactions()
 			node.CurrentStakes = make(map[common.Address]*structs.StakeInfo)
+			node.CurrentStakesByNode = make(map[[20]byte]*structs.StakeInfo)
 			node.AddStakingContractToPendingTransactions() //This will save the latest information about staked nodes in current staked
 			// TODO(minhdoan): Think of a better approach to deploy smart contract.
 			// This is temporary for demo purpose.

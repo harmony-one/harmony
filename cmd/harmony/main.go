@@ -198,6 +198,7 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	currentNode.Consensus.OfflinePeers = currentNode.OfflinePeers
 	currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
 	currentNode.AccountKey = nodeConfig.StakingPriKey
+	consensus.SetStakeInfoFinder(currentNode)
 
 	// TODO: refactor the creation of blockchain out of node.New()
 	consensus.ChainReader = currentNode.Blockchain()

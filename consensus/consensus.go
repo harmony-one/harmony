@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 	"reflect"
 	"sync"
 
@@ -15,16 +16,25 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"golang.org/x/crypto/sha3"
+
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
-	"golang.org/x/crypto/sha3"
+)
+
+// Block reward per block signature.
+// TODO ek – per sig per stake
+var (
+	BlockReward = big.NewInt(params.Ether / 1000)
 )
 
 // Consensus is the main struct with all states and data related to consensus process.
@@ -116,6 +126,34 @@ type Consensus struct {
 
 	// List of offline Peers
 	OfflinePeerList []p2p.Peer
+
+	// Staking information finder
+	stakeInfoFinder StakeInfoFinder
+}
+
+// StakeInfoFinder returns the stake information finder instance this
+// consensus uses, e.g. for block reward distribution.
+func (consensus *Consensus) StakeInfoFinder() StakeInfoFinder {
+	return consensus.stakeInfoFinder
+}
+
+// SetStakeInfoFinder sets the stake information finder instance this
+// consensus uses, e.g. for block reward distribution.
+func (consensus *Consensus) SetStakeInfoFinder(stakeInfoFinder StakeInfoFinder) {
+	consensus.stakeInfoFinder = stakeInfoFinder
+}
+
+// StakeInfoFinder finds the staking account for the given consensus key.
+type StakeInfoFinder interface {
+	// FindStakeInfoByNodeKey returns a list of staking information matching
+	// the given node key.  Caller may modify the returned slice of StakeInfo
+	// struct pointers, but must not modify the StakeInfo structs themselves.
+	FindStakeInfoByNodeKey(key *bls.PublicKey) []*structs.StakeInfo
+
+	// FindStakeInfoByAccount returns a list of staking information matching
+	// the given account.  Caller may modify the returned slice of StakeInfo
+	// struct pointers, but must not modify the StakeInfo structs themselves.
+	FindStakeInfoByAccount(addr common.Address) []*structs.StakeInfo
 }
 
 // BlockConsensusStatus used to keep track of the consensus status of multiple blocks received so far
@@ -545,7 +583,10 @@ func (consensus *Consensus) VerifySeal(chain consensus_engine.ChainReader, heade
 func (consensus *Consensus) Finalize(chain consensus_engine.ChainReader, header *types.Header, state *state.DB, txs []*types.Transaction, receipts []*types.Receipt) (*types.Block, error) {
 	// Accumulate any block and uncle rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
-	accumulateRewards(chain.Config(), state, header)
+	err := consensus.accumulateRewards(chain.Config(), state, header)
+	if err != nil {
+		ctxerror.Log15(utils.GetLogInstance().Error, err)
+	}
 	header.Root = state.IntermediateRoot(false)
 	return types.NewBlock(header, txs, receipts), nil
 }
@@ -585,11 +626,61 @@ func (consensus *Consensus) Prepare(chain consensus_engine.ChainReader, header *
 	return nil
 }
 
-// AccumulateRewards credits the coinbase of the given block with the mining
+// accumulateRewards credits the coinbase of the given block with the mining
 // reward. The total reward consists of the static block reward and rewards for
 // included uncles. The coinbase of each uncle block is also rewarded.
-func accumulateRewards(config *params.ChainConfig, state *state.DB, header *types.Header) {
-	// TODO: implement mining rewards
+func (consensus *Consensus) accumulateRewards(
+	config *params.ChainConfig, state *state.DB, header *types.Header,
+) error {
+	if header.ParentHash == (common.Hash{}) {
+		// This block is a genesis block,
+		// without a parent block whose signer to reward.
+		return nil
+	}
+	if consensus.ChainReader == nil {
+		return errors.New("ChainReader is nil")
+	}
+	parent := consensus.ChainReader.GetBlockByHash(header.ParentHash)
+	if parent == nil {
+		return ctxerror.New("cannot retrieve parent block",
+			"curHash", header.Hash().Hex(),
+			"parentHash", header.ParentHash.Hex(),
+		)
+	}
+	mask, err := bls_cosi.NewMask(consensus.PublicKeys, consensus.PubKey)
+	if err != nil {
+		return ctxerror.New("cannot create group sig mask").WithCause(err)
+	}
+	parentSigners := parent.Header().CommitBitmap
+	utils.GetLogInstance().Debug("accumulateRewards: setting group sig mask",
+		"destLen", mask.Len(), "srcLen", len(parentSigners))
+	if err := mask.SetMask(parentSigners); err != nil {
+		return ctxerror.New("cannot set group sig mask bits").WithCause(err)
+	}
+	numAccounts := 0
+	totalAmount := big.NewInt(0)
+	signingKeys := mask.GetPubKeyFromMask(true)
+	for _, key := range signingKeys {
+		stakeInfos := consensus.stakeInfoFinder.FindStakeInfoByNodeKey(key)
+		if len(stakeInfos) == 0 {
+			nodeAddr := key.GetAddress()
+			utils.GetLogInstance().Error(
+				"accumulateRewards: node has no stake info",
+				"nodeAddr", hex.EncodeToString(nodeAddr[:]))
+			continue
+		}
+		numAccounts += len(stakeInfos)
+		for _, stakeInfo := range stakeInfos {
+			state.AddBalance(stakeInfo.Address, BlockReward)
+			totalAmount = new(big.Int).Add(totalAmount, BlockReward)
+		}
+	}
+	utils.GetLogInstance().Debug(
+		"accumulateRewards: rewards have been paid out",
+		"numSigs", len(signingKeys),
+		"numAccounts", numAccounts,
+		"totalAmount", totalAmount)
+	return nil
 }
 
 // GetSelfAddress returns the address in hex

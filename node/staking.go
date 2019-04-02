@@ -5,15 +5,14 @@ import (
 	"math/big"
 	"os"
 
-	"github.com/harmony-one/harmony/contracts/structs"
-
-	"github.com/harmony-one/harmony/core"
-
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/harmony-one/harmony/internal/utils"
-
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/common/math"
+	"github.com/ethereum/go-ethereum/crypto"
+
+	"github.com/harmony-one/harmony/contracts/structs"
+	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 //constants related to staking
@@ -32,25 +31,68 @@ func (node *Node) UpdateStakingList(stakeInfoReturnValue *structs.StakeInfoRetur
 		return
 	}
 	node.CurrentStakes = make(map[common.Address]*structs.StakeInfo)
+	node.CurrentStakesByNode = make(map[[20]byte]*structs.StakeInfo)
+	utils.GetLogInstance().Info("UpdateStakingList",
+		"numStakeInfos", len(stakeInfoReturnValue.LockedAddresses))
 	for i, addr := range stakeInfoReturnValue.LockedAddresses {
 		blockNum := stakeInfoReturnValue.BlockNums[i]
+		blsAddr := stakeInfoReturnValue.BlsAddresses[i]
 		lockPeriodCount := stakeInfoReturnValue.LockPeriodCounts[i]
-
 		startEpoch := core.GetEpochFromBlockNumber(blockNum.Uint64())
 		curEpoch := core.GetEpochFromBlockNumber(node.blockchain.CurrentBlock().NumberU64())
 
-		if startEpoch == curEpoch {
+		if startEpoch >= curEpoch {
 			continue // The token are counted into stakes at the beginning of next epoch.
 		}
 		// True if the token is still staked within the locking period.
 		if curEpoch-startEpoch <= lockPeriodCount.Uint64()*lockPeriodInEpochs {
-			node.CurrentStakes[addr] = &structs.StakeInfo{
-				stakeInfoReturnValue.BlsAddresses[i],
+			stakeInfo := &structs.StakeInfo{
+				addr,
+				blsAddr,
 				blockNum,
 				lockPeriodCount,
 				stakeInfoReturnValue.Amounts[i],
 			}
+			node.CurrentStakes[addr] = stakeInfo
+			node.CurrentStakesByNode[blsAddr] = stakeInfo
 		}
+	}
+}
+
+// UpdateStakingListWithInitShardState updates the current stakes list with
+// initial hardcoded stakes.
+//
+// Initial stakers are assumed to be active since ever and until forever,
+// but with zero stake.
+//
+// TODO ek – this is a hack,
+//  until we can streamline initial stakers without hardcoded accounts.
+func (node *Node) UpdateStakingListWithInitShardState() {
+	initShardState := core.GetInitShardState()
+	shardID := node.Consensus.ShardID
+	if shardID >= uint32(len(initShardState)) {
+		utils.GetLogInstance().Debug("UpdateStakingListWithInitShardState: "+
+			"shard did not exist initially, nothing to do",
+			"shardID", shardID)
+		return
+	}
+	initCommittee := initShardState[shardID]
+	utils.GetLogInstance().Debug("UpdateStakingListWithInitShardState: "+
+		"adding initial shard members",
+		"shardID", shardID,
+		"committeeSize", len(initCommittee.NodeList))
+	for _, member := range initCommittee.NodeList {
+		ecdsaAddress := common.HexToAddress(member.EcdsaAddress)
+		blsAddress := common.HexToAddress(member.BlsAddress)
+		stakeInfo := &structs.StakeInfo{
+			Address:         ecdsaAddress,
+			BlsAddress:      blsAddress,
+			BlockNum:        big.NewInt(0),             // since ever
+			LockPeriodCount: big.NewInt(math.MaxInt64), // until forever
+			Amount:          big.NewInt(0),             // TODO ek
+		}
+		node.CurrentStakes[ecdsaAddress] = stakeInfo
+		node.CurrentStakesByNode[blsAddress] = stakeInfo
 	}
 }
 
