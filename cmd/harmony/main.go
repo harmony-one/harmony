@@ -11,6 +11,7 @@ import (
 
 	"github.com/harmony-one/harmony/core"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 
@@ -208,6 +209,8 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	currentNode := node.New(nodeConfig.Host, currentConsensus, nodeConfig.MainDB, *isArchival)
 	currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
 	currentNode.AccountKey = nodeConfig.StakingPriKey
+	utils.GetLogInstance().Info("node account set",
+		"address", crypto.PubkeyToAddress(currentNode.AccountKey.PublicKey))
 
 	if gsif, err := consensus.NewGenesisStakeInfoFinder(); err == nil {
 		currentConsensus.SetStakeInfoFinder(gsif)
