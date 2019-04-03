@@ -19,12 +19,14 @@ package rawdb
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 )
 
 // ReadCanonicalHash retrieves the hash assigned to a canonical block number.
@@ -375,17 +377,25 @@ func FindCommonAncestor(db DatabaseReader, a, b *types.Header) *types.Header {
 }
 
 // ReadShardState retrieves sharding state.
-func ReadShardState(db DatabaseReader, hash common.Hash, number uint64) types.ShardState {
-	data, _ := db.Get(shardStateKey(number, hash))
-	if len(data) == 0 {
-		return nil
+func ReadShardState(db DatabaseReader, hash common.Hash, number uint64,
+) (types.ShardState, error) {
+	key := shardStateKey(number, hash)
+	data, err := db.Get(key)
+	if err != nil {
+		return nil, ctxerror.New("cannot read shard state",
+			"blockHash", hash, "blockNumber", number, "shardStateKey", key)
+	} else if len(data) == 0 {
+		return nil, ctxerror.New("empty sharding state",
+			"blockHash", hash, "blockNumber", number, "shardStateKey", key)
 	}
 	shardState := types.ShardState{}
 	if err := rlp.DecodeBytes(data, &shardState); err != nil {
 		log.Error("Fail to decode sharding state", "hash", hash, "number", number, "err", err)
-		return nil
+		return nil, ctxerror.New("failed to decode sharding state",
+			"blockHash", hash, "blockNumber", number, "shardStateKey", key,
+			"data", hex.EncodeToString(data)).WithCause(err)
 	}
-	return shardState
+	return shardState, nil
 }
 
 // WriteShardState stores sharding state into database.
