@@ -134,26 +134,27 @@ func main() {
 	node.NodeConfig.SetIsBeacon(false)
 	node.ServiceManagerSetup()
 	node.RunServices()
-	time.Sleep(5 * time.Second)
+	go node.GetSync()
+	time.Sleep(15 * time.Second)
 	// This func is used to update the client's blockchain when new blocks are received from the leaders
-	updateBlocksFunc := func(blocks []*types.Block) {
-		for _, block := range blocks {
-			if node.Consensus.ShardID == uint32(shardID) {
-				utils.GetLogInstance().Info("[Txgen] Received new block", "block num", blocks[0].NumberU64())
-				// Add it to blockchain
-				utils.GetLogInstance().Info("Current Block", "block num", node.Blockchain().CurrentBlock().NumberU64())
-				utils.GetLogInstance().Info("Adding block from leader", "txNum", len(block.Transactions()), "shardID", shardID, "preHash", block.ParentHash().Hex())
-				node.AddNewBlock(block)
-				stateMutex.Lock()
-				node.Worker.UpdateCurrent()
-				stateMutex.Unlock()
-			} else {
-				continue
-			}
-		}
-	}
+	// updateBlocksFunc := func(blocks []*types.Block) {
+	// 	for _, block := range blocks {
+	// 		if node.Consensus.ShardID == uint32(shardID) {
+	// 			utils.GetLogInstance().Info("[Txgen] Received new block", "block num", blocks[0].NumberU64())
+	// 			// Add it to blockchain
+	// 			utils.GetLogInstance().Info("Current Block", "block num", node.Blockchain().CurrentBlock().NumberU64())
+	// 			utils.GetLogInstance().Info("Adding block from leader", "txNum", len(block.Transactions()), "shardID", shardID, "preHash", block.ParentHash().Hex())
+	// 			node.AddNewBlock(block)
+	// 			stateMutex.Lock()
+	// 			node.Worker.UpdateCurrent()
+	// 			stateMutex.Unlock()
+	// 		} else {
+	// 			continue
+	// 		}
+	// 	}
+	// }
 
-	node.Client.UpdateBlocks = updateBlocksFunc
+	//node.Client.UpdateBlocks = updateBlocksFunc
 	//node.Neighbors.LoadOrStore()
 	//go node.GetSync()
 	//time.Sleep(5 * time.Second)
@@ -161,17 +162,24 @@ func main() {
 	// Transaction generation process
 	start := time.Now()
 	totalTime := float64(*duration)
-
+	const checkFrequency = 20
+	ticker := time.NewTicker(checkFrequency * time.Second)
 	for {
 		t := time.Now()
 		if totalTime > 0 && t.Sub(start).Seconds() >= totalTime {
 			utils.GetLogInstance().Debug("Generator timer ended.", "duration", (int(t.Sub(start))), "startTime", start, "totalTime", totalTime)
 			break
 		}
-		txs, _ := GenerateSimulatedTransactionsAccount(int(shardID), node, setting)
-		SendTxsToShard(node, txs)
-		go node.GetSync()
-		time.Sleep(5 * time.Second)
+		select {
+		case <-ticker.C:
+			if node.State.String() == "NodeReadyForConsensus" {
+				utils.GetLogInstance().Debug("Generator Will Send Txns.", "node", node.SelfPeer)
+				utils.GetLogInstance().Debug("Node State", "node state", node.State.String())
+				txs, _ := GenerateSimulatedTransactionsAccount(int(shardID), node, setting)
+				SendTxsToShard(node, txs)
+				go node.GetSync()
+			}
+		}
 	}
 
 	msg := proto_node.ConstructStopMessage()
