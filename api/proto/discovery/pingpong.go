@@ -95,7 +95,6 @@ func NewPongMessage(peers []p2p.Peer, pubKeys []*bls.PublicKey, leaderKey *bls.P
 	}
 
 	pong.LeaderPubKey = leaderKey.Serialize()
-	// utils.GetLogInstance().Info("[NewPongMessage]", "keys", len(pong.PubKeys), "peers", len(pong.Peers), "leaderPubKey", utils.GetAddressHex(leaderKey))
 
 	return pong
 }

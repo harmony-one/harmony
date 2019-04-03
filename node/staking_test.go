@@ -20,7 +20,9 @@ var (
 	blockNum        = big.NewInt(15000)
 	lockPeriodCount = big.NewInt(1)
 	testAddress     = common.Address{123}
-	testBlsAddress  = common.Address{132}.Bytes() // [20]byte
+	testBlsPubKey1  = [32]byte{}
+	testBlsPubKey2  = [32]byte{}
+	testBlsPubKey3  = [32]byte{}
 )
 
 func TestUpdateStakingList(t *testing.T) {
@@ -32,7 +34,10 @@ func TestUpdateStakingList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus := consensus.New(host, 0, []p2p.Peer{leader, validator}, leader, nil)
+	consensus, err := consensus.New(host, 0, []p2p.Peer{leader, validator}, leader, nil)
+	if err != nil {
+		t.Fatalf("Cannot craeate consensus: %v", err)
+	}
 	node := New(host, consensus, nil, false)
 
 	for i := 0; i < 5; i++ {
@@ -45,7 +50,9 @@ func TestUpdateStakingList(t *testing.T) {
 
 	stakeInfo := &structs.StakeInfoReturnValue{
 		[]common.Address{testAddress},
-		[][20]byte{testAddress},
+		[][32]byte{testBlsPubKey1},
+		[][32]byte{testBlsPubKey2},
+		[][32]byte{testBlsPubKey3},
 		[]*big.Int{blockNum},
 		[]*big.Int{lockPeriodCount},
 		[]*big.Int{amount},

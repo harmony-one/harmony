@@ -1,8 +1,9 @@
 package types
 
 import (
+	"bytes"
+	"encoding/hex"
 	"sort"
-	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"golang.org/x/crypto/sha3"
@@ -11,10 +12,13 @@ import (
 // ShardState is the collection of all committees
 type ShardState []Committee
 
+// BlsPublicKey defines the bls public key
+type BlsPublicKey [96]byte
+
 // NodeID represents node id (BLS address).
 type NodeID struct {
 	EcdsaAddress string
-	BlsAddress   string
+	BlsPublicKey BlsPublicKey
 }
 
 // Committee contains the active nodes in one shard
@@ -22,6 +26,11 @@ type Committee struct {
 	ShardID  uint32
 	Leader   NodeID
 	NodeList []NodeID
+}
+
+// Hex returns the hex string of bls public key
+func (pk BlsPublicKey) Hex() string {
+	return hex.EncodeToString(pk[:])
 }
 
 // GetHashFromNodeList will sort the list, then use Keccak256 to hash the list
@@ -58,10 +67,10 @@ func (ss ShardState) Hash() (h common.Hash) {
 
 // CompareNodeID compares two nodes by their ID; used to sort node list
 func CompareNodeID(n1 NodeID, n2 NodeID) int {
-	return strings.Compare(n1.BlsAddress, n2.BlsAddress)
+	return bytes.Compare(n1.BlsPublicKey[:], n2.BlsPublicKey[:])
 }
 
 // Serialize serialize NodeID into bytes
 func (n NodeID) Serialize() []byte {
-	return []byte(n.BlsAddress)
+	return append(n.BlsPublicKey[:], []byte(n.EcdsaAddress)...)
 }

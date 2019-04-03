@@ -207,7 +207,7 @@ func TestStringsToPeers(t *testing.T) {
 	}
 }
 
-func TestGetAddressHex(t *testing.T) {
+func TestGetBlsAddress(t *testing.T) {
 	pubKey1 := pki.GetBLSPrivateKeyFromInt(333).GetPublicKey()
 	pubKey2 := pki.GetBLSPrivateKeyFromInt(1024).GetPublicKey()
 	tests := []struct {
@@ -225,8 +225,8 @@ func TestGetAddressHex(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result := GetAddressHex(test.key)
-		if result != test.expected {
+		result := GetBlsAddress(test.key)
+		if result.Hex() != test.expected {
 			t.Errorf("Hex Of %v is: %v, got: %v", test.key, test.expected, result)
 		}
 	}

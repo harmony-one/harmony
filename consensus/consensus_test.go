@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -20,7 +22,10 @@ func TestNew(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	consensus := New(host, 0, []p2p.Peer{leader, validator}, leader, bls.RandPrivateKey())
+	consensus, err := New(host, 0, []p2p.Peer{leader, validator}, leader, bls.RandPrivateKey())
+	if err != nil {
+		test.Fatalf("Cannot craeate consensus: %v", err)
+	}
 	if consensus.consensusID != 0 {
 		test.Errorf("Consensus Id is initialized to the wrong value: %d", consensus.consensusID)
 	}
@@ -56,7 +61,10 @@ func TestRemovePeers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus := New(host, 0, peers, leader, nil)
+	consensus, err := New(host, 0, peers, leader, nil)
+	if err != nil {
+		t.Fatalf("Cannot craeate consensus: %v", err)
+	}
 
 	//	consensus.DebugPrintPublicKeys()
 	f := consensus.RemovePeers(peerRemove)
@@ -77,7 +85,10 @@ func TestGetPeerFromID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus := New(host, 0, []p2p.Peer{leader, validator}, leader, leaderPriKey)
+	consensus, err := New(host, 0, []p2p.Peer{leader, validator}, leader, leaderPriKey)
+	if err != nil {
+		t.Fatalf("Cannot craeate consensus: %v", err)
+	}
 	leaderAddress := utils.GetAddressFromBlsPubKey(leader.ConsensusPubKey)
 	validatorAddress := utils.GetAddressFromBlsPubKey(validator.ConsensusPubKey)
 	l := consensus.GetPeerByAddress(leaderAddress.Hex())
@@ -99,7 +110,10 @@ func TestPopulateMessageFields(t *testing.T) {
 		t.Fatalf("newhost failure: %v", err)
 	}
 	blsPriKey := bls.RandPrivateKey()
-	consensus := New(host, 0, []p2p.Peer{leader, validator}, leader, blsPriKey)
+	consensus, err := New(host, 0, []p2p.Peer{leader, validator}, leader, blsPriKey)
+	if err != nil {
+		t.Fatalf("Cannot craeate consensus: %v", err)
+	}
 	consensus.consensusID = 2
 	consensus.blockHash = blockHash
 
@@ -130,10 +144,13 @@ func TestSignAndMarshalConsensusMessage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus := New(host, 0, []p2p.Peer{leader, validator}, leader, bls.RandPrivateKey())
+	consensus, err := New(host, 0, []p2p.Peer{leader, validator}, leader, bls.RandPrivateKey())
+	if err != nil {
+		t.Fatalf("Cannot craeate consensus: %v", err)
+	}
 	consensus.consensusID = 2
 	consensus.blockHash = blockHash
-	consensus.SelfAddress = "fake address"
+	consensus.SelfAddress = common.Address{}
 
 	msg := &msg_pb.Message{}
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(msg)

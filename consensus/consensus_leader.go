@@ -147,13 +147,13 @@ func (consensus *Consensus) startConsensus(newBlock *types.Block) {
 func (consensus *Consensus) processPrepareMessage(message *msg_pb.Message) {
 	consensusMsg := message.GetConsensus()
 
-	pubKey, err := bls_cosi.BytesToBlsPublicKey(consensusMsg.SenderPubkey)
+	validatorPubKey, err := bls_cosi.BytesToBlsPublicKey(consensusMsg.SenderPubkey)
 	if err != nil {
 		utils.GetLogInstance().Debug("Failed to deserialize BLS public key", "error", err)
 		return
 	}
-	addrBytes := pubKey.GetAddress()
-	validatorAddress := common.BytesToAddress(addrBytes[:]).Hex()
+	addrBytes := validatorPubKey.GetAddress()
+	validatorAddress := common.BytesToAddress(addrBytes[:])
 
 	prepareSig := consensusMsg.Payload
 
@@ -163,14 +163,12 @@ func (consensus *Consensus) processPrepareMessage(message *msg_pb.Message) {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
-	validatorPeer := consensus.GetPeerByAddress(validatorAddress)
-
-	if validatorPeer == nil {
+	if !consensus.IsValidatorInCommittee(validatorAddress) {
 		utils.GetLogInstance().Error("Invalid validator", "validatorAddress", validatorAddress)
 		return
 	}
 
-	if err := consensus.checkConsensusMessage(message, validatorPeer.ConsensusPubKey); err != nil {
+	if err := consensus.checkConsensusMessage(message, validatorPubKey); err != nil {
 		utils.GetLogInstance().Debug("Failed to check the validator message", "error", err, "validatorAddress", validatorAddress)
 		return
 	}
@@ -195,14 +193,14 @@ func (consensus *Consensus) processPrepareMessage(message *msg_pb.Message) {
 		return
 	}
 
-	if !sign.VerifyHash(validatorPeer.ConsensusPubKey, consensus.blockHash[:]) {
+	if !sign.VerifyHash(validatorPubKey, consensus.blockHash[:]) {
 		utils.GetLogInstance().Error("Received invalid BLS signature", "validatorAddress", validatorAddress)
 		return
 	}
 
 	utils.GetLogInstance().Debug("Received new prepare signature", "numReceivedSoFar", len(prepareSigs), "validatorAddress", validatorAddress, "PublicKeys", len(consensus.PublicKeys))
 	prepareSigs[validatorAddress] = &sign
-	prepareBitmap.SetKey(validatorPeer.ConsensusPubKey, true) // Set the bitmap indicating that this validator signed.
+	prepareBitmap.SetKey(validatorPubKey, true) // Set the bitmap indicating that this validator signed.
 
 	targetState := PreparedDone
 	if len(prepareSigs) >= ((len(consensus.PublicKeys)*2)/3+1) && consensus.state < targetState {
@@ -228,27 +226,25 @@ func (consensus *Consensus) processPrepareMessage(message *msg_pb.Message) {
 func (consensus *Consensus) processCommitMessage(message *msg_pb.Message) {
 	consensusMsg := message.GetConsensus()
 
-	pubKey, err := bls_cosi.BytesToBlsPublicKey(consensusMsg.SenderPubkey)
+	validatorPubKey, err := bls_cosi.BytesToBlsPublicKey(consensusMsg.SenderPubkey)
 	if err != nil {
 		utils.GetLogInstance().Debug("Failed to deserialize BLS public key", "error", err)
 		return
 	}
-	addrBytes := pubKey.GetAddress()
-	validatorAddress := common.BytesToAddress(addrBytes[:]).Hex()
+	addrBytes := validatorPubKey.GetAddress()
+	validatorAddress := common.BytesToAddress(addrBytes[:])
 
 	commitSig := consensusMsg.Payload
 
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
-	validatorPeer := consensus.GetPeerByAddress(validatorAddress)
-
-	if validatorPeer == nil {
+	if !consensus.IsValidatorInCommittee(validatorAddress) {
 		utils.GetLogInstance().Error("Invalid validator", "validatorAddress", validatorAddress)
 		return
 	}
 
-	if err := consensus.checkConsensusMessage(message, validatorPeer.ConsensusPubKey); err != nil {
+	if err := consensus.checkConsensusMessage(message, validatorPubKey); err != nil {
 		utils.GetLogInstance().Debug("Failed to check the validator message", "validatorAddress", validatorAddress)
 		return
 	}
@@ -276,7 +272,7 @@ func (consensus *Consensus) processCommitMessage(message *msg_pb.Message) {
 		return
 	}
 	aggSig := bls_cosi.AggregateSig(consensus.GetPrepareSigsArray())
-	if !sign.VerifyHash(validatorPeer.ConsensusPubKey, append(aggSig.Serialize(), consensus.prepareBitmap.Bitmap...)) {
+	if !sign.VerifyHash(validatorPubKey, append(aggSig.Serialize(), consensus.prepareBitmap.Bitmap...)) {
 		utils.GetLogInstance().Error("Received invalid BLS signature", "validatorAddress", validatorAddress)
 		return
 	}
@@ -284,7 +280,7 @@ func (consensus *Consensus) processCommitMessage(message *msg_pb.Message) {
 	utils.GetLogInstance().Debug("Received new commit message", "numReceivedSoFar", len(commitSigs), "validatorAddress", validatorAddress)
 	commitSigs[validatorAddress] = &sign
 	// Set the bitmap indicating that this validator signed.
-	commitBitmap.SetKey(validatorPeer.ConsensusPubKey, true)
+	commitBitmap.SetKey(validatorPubKey, true)
 
 	targetState := CommittedDone
 	if len(commitSigs) >= ((len(consensus.PublicKeys)*2)/3+1) && consensus.state != targetState {

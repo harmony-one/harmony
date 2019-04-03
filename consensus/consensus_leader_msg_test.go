@@ -3,6 +3,8 @@ package consensus
 import (
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	protobuf "github.com/golang/protobuf/proto"
@@ -21,7 +23,10 @@ func TestConstructAnnounceMessage(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	consensus := New(host, 0, []p2p.Peer{leader, validator}, leader, bls.RandPrivateKey())
+	consensus, err := New(host, 0, []p2p.Peer{leader, validator}, leader, bls.RandPrivateKey())
+	if err != nil {
+		test.Fatalf("Cannot craeate consensus: %v", err)
+	}
 	consensus.blockHash = [32]byte{}
 
 	message := &msg_pb.Message{}
@@ -49,12 +54,15 @@ func TestConstructPreparedMessage(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	consensus := New(host, 0, []p2p.Peer{leader, validator}, leader, bls.RandPrivateKey())
+	consensus, err := New(host, 0, []p2p.Peer{leader, validator}, leader, bls.RandPrivateKey())
+	if err != nil {
+		test.Fatalf("Cannot craeate consensus: %v", err)
+	}
 	consensus.blockHash = [32]byte{}
 
 	message := "test string"
-	consensus.prepareSigs["0"] = leaderPriKey.Sign(message)
-	consensus.prepareSigs["1"] = validatorPriKey.Sign(message)
+	consensus.prepareSigs[common.Address{}] = leaderPriKey.Sign(message)
+	consensus.prepareSigs[common.Address{}] = validatorPriKey.Sign(message)
 	consensus.prepareBitmap.SetKey(leaderPubKey, true)
 	consensus.prepareBitmap.SetKey(validatorPubKey, true)
 
