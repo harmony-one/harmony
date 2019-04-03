@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/contracts/structs"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -1652,33 +1653,39 @@ func (bc *BlockChain) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscript
 }
 
 // GetShardState retrieves sharding state given block hash and block number
-func (bc *BlockChain) GetShardState(hash common.Hash, number uint64) types.ShardState {
+func (bc *BlockChain) GetShardState(hash common.Hash, number uint64,
+) (types.ShardState, error) {
 	if cached, ok := bc.shardStateCache.Get(hash); ok {
 		shardState := cached.(types.ShardState)
-		return shardState
+		return shardState, nil
 	}
-	shardState := rawdb.ReadShardState(bc.db, hash, number)
-	if shardState == nil {
-		return nil
+	shardState, err := rawdb.ReadShardState(bc.db, hash, number)
+	if err != nil {
+		return nil, ctxerror.New("cannot read shard state",
+			"blockHash", hash, "blockNumber", number).WithCause(err)
 	}
 	bc.shardStateCache.Add(hash, shardState)
-	return shardState
+	return shardState, nil
 }
 
 // GetShardStateByNumber retrieves sharding state given the block number
-func (bc *BlockChain) GetShardStateByNumber(number uint64) types.ShardState {
+func (bc *BlockChain) GetShardStateByNumber(number uint64,
+) (types.ShardState, error) {
 	hash := rawdb.ReadCanonicalHash(bc.db, number)
 	if hash == (common.Hash{}) {
-		return nil
+		return nil, ctxerror.New("shard state block not found",
+			"blockNumber", number)
 	}
 	return bc.GetShardState(hash, number)
 }
 
 // GetShardStateByHash retrieves the shard state given the blockhash, return nil if not exist
-func (bc *BlockChain) GetShardStateByHash(hash common.Hash) types.ShardState {
+func (bc *BlockChain) GetShardStateByHash(hash common.Hash,
+) (types.ShardState, error) {
 	number := bc.hc.GetBlockNumber(hash)
 	if number == nil {
-		return nil
+		return nil, ctxerror.New("shard state block not found",
+			"blockHash", hash)
 	}
 	return bc.GetShardState(hash, *number)
 }
@@ -1710,9 +1717,12 @@ func (bc *BlockChain) GetNewShardState(block *types.Block, stakeInfo *map[common
 		return nil
 	}
 	number := block.NumberU64()
-	shardState := bc.GetShardState(hash, number)
-	if shardState == nil {
-		epoch := GetEpochFromBlockNumber(number)
+	epoch := GetEpochFromBlockNumber(number)
+	shardState, err := bc.GetShardState(hash, number)
+	if err != nil {
+		utils.GetLogInstance().Debug("creating new shard state",
+			"epoch", epoch,
+			"inResponseToError", err)
 		shardState = CalculateNewShardState(bc, epoch, stakeInfo)
 		bc.shardStateCache.Add(hash, shardState)
 	}

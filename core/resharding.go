@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/contracts/structs"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/internal/utils/contract"
 
@@ -132,14 +133,31 @@ func GetEpochFromBlockNumber(blockNumber uint64) uint64 {
 }
 
 // GetShardingStateFromBlockChain will retrieve random seed and shard map from beacon chain for given a epoch
-func GetShardingStateFromBlockChain(bc *BlockChain, epoch uint64) *ShardingState {
+func GetShardingStateFromBlockChain(bc *BlockChain, epoch uint64,
+) (*ShardingState, error) {
 	number := GetBlockNumberFromEpoch(epoch)
-	shardState := bc.GetShardStateByNumber(number)
+	shardState, err := bc.GetShardStateByNumber(number)
+	if err != nil {
+		return nil, ctxerror.New("cannot get shard state for epoch",
+			"epoch", epoch).WithCause(err)
+	}
 
 	rndSeedBytes := bc.GetRandSeedByNumber(number)
+	if rndSeedBytes == [32]byte{} {
+		utils.GetLogInstance().Warn("cannot get randomness from block",
+			"blockNumber", number)
+		// TODO ek – should we fail here?  Continuing here would end up using
+		//  all-zeros for randomness, which seems like a security breach.
+	}
 	rndSeed := binary.BigEndian.Uint64(rndSeedBytes[:])
 
-	return &ShardingState{epoch: epoch, rnd: rndSeed, shardState: shardState, numShards: len(shardState)}
+	shardingState := ShardingState{
+		epoch:      epoch,
+		rnd:        rndSeed,
+		shardState: shardState,
+		numShards:  len(shardState), // TODO ek – this field seems redundant
+	}
+	return &shardingState, nil
 }
 
 // CalculateNewShardState get sharding state from previous epoch and calculate sharding state for new epoch
@@ -147,7 +165,15 @@ func CalculateNewShardState(bc *BlockChain, epoch uint64, stakeInfo *map[common.
 	if epoch == GenesisEpoch {
 		return GetInitShardState()
 	}
-	ss := GetShardingStateFromBlockChain(bc, epoch-1)
+	ss, err := GetShardingStateFromBlockChain(bc, epoch-1)
+	if err != nil {
+		utils.GetLogInstance().Crit("CANNOT CALCULATE SHARDING STATE",
+			"epoch", epoch)
+		// TODO ek – what should we do here?  We are processing a new epoch
+		//  block, so we better have the new sharding state before advancing
+		//  to the next block (which would require the new sharding state),
+		//  but the sharding state is not available here.
+	}
 	if epoch == FirstEpoch {
 		newNodes := []types.NodeID{}
 
