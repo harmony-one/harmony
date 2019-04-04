@@ -162,7 +162,7 @@ func main() {
 	// Transaction generation process
 	start := time.Now()
 	totalTime := float64(*duration)
-	const checkFrequency = 20
+	const checkFrequency = 10
 	ticker := time.NewTicker(checkFrequency * time.Second)
 	for {
 		t := time.Now()
