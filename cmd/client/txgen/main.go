@@ -135,7 +135,7 @@ func main() {
 	node.ServiceManagerSetup()
 	node.RunServices()
 	go node.GetSync()
-	time.Sleep(15 * time.Second)
+	//time.Sleep(15 * time.Second)
 	// This func is used to update the client's blockchain when new blocks are received from the leaders
 	// updateBlocksFunc := func(blocks []*types.Block) {
 	// 	for _, block := range blocks {
