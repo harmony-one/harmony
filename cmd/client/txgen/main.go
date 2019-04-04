@@ -38,7 +38,7 @@ var (
 )
 
 const (
-	checkFrequency = 20 //
+	checkFrequency = 20 //checkfrequency checks whether the transaction generator is ready to send the next batch of transactions.
 )
 
 // Settings is the settings for TX generation. No Cross-Shard Support!
@@ -141,29 +141,6 @@ func main() {
 
 	go node.GetSync()
 	time.Sleep(checkFrequency * time.Second)
-	// This func is used to update the client's blockchain when new blocks are received from the leaders
-	// updateBlocksFunc := func(blocks []*types.Block) {
-	// 	for _, block := range blocks {
-	// 		if node.Consensus.ShardID == uint32(shardID) {
-	// 			utils.GetLogInstance().Info("[Txgen] Received new block", "block num", blocks[0].NumberU64())
-	// 			// Add it to blockchain
-	// 			utils.GetLogInstance().Info("Current Block", "block num", node.Blockchain().CurrentBlock().NumberU64())
-	// 			utils.GetLogInstance().Info("Adding block from leader", "txNum", len(block.Transactions()), "shardID", shardID, "preHash", block.ParentHash().Hex())
-	// 			node.AddNewBlock(block)
-	// 			stateMutex.Lock()
-	// 			node.Worker.UpdateCurrent()
-	// 			stateMutex.Unlock()
-	// 		} else {
-	// 			continue
-	// 		}
-	// 	}
-	// }
-
-	//node.Client.UpdateBlocks = updateBlocksFunc
-	//node.Neighbors.LoadOrStore()
-	//go node.GetSync()
-	//time.Sleep(5 * time.Second)
-
 	// Transaction generation process
 	start := time.Now()
 	totalTime := float64(*duration)
