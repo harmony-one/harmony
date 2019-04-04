@@ -37,6 +37,10 @@ var (
 	stateMutex sync.Mutex
 )
 
+const (
+	checkFrequency = 20 //
+)
+
 // Settings is the settings for TX generation. No Cross-Shard Support!
 type Settings struct {
 	NumOfAddress      int
@@ -134,8 +138,9 @@ func main() {
 	node.NodeConfig.SetIsBeacon(false)
 	node.ServiceManagerSetup()
 	node.RunServices()
+
 	go node.GetSync()
-	//time.Sleep(15 * time.Second)
+	time.Sleep(checkFrequency * time.Second)
 	// This func is used to update the client's blockchain when new blocks are received from the leaders
 	// updateBlocksFunc := func(blocks []*types.Block) {
 	// 	for _, block := range blocks {
@@ -162,7 +167,6 @@ func main() {
 	// Transaction generation process
 	start := time.Now()
 	totalTime := float64(*duration)
-	const checkFrequency = 10
 	ticker := time.NewTicker(checkFrequency * time.Second)
 	for {
 		t := time.Now()
