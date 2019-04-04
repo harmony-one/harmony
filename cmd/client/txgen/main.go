@@ -67,9 +67,6 @@ func main() {
 	// Key file to store the private key
 	keyFile := flag.String("key", "./.txgenkey", "the private key file of the txgen")
 	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress")
-	// logConn logs incoming/outgoing connections
-	//logConn := flag.Bool("log_conn", true, "log incoming/outgoing connections")
-
 	flag.Parse()
 
 	if *versionFlag {
@@ -105,8 +102,6 @@ func main() {
 	selfPeer := p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: peerPubKey}
 
 	// Init with LibP2P enabled, FIXME: (leochen) right now we support only one shard
-
-	// Do cross shard tx if there are more than one shard
 	setting := Settings{
 		NumOfAddress:      10000,
 		MaxNumTxsPerBatch: *maxNumTxsPerBatch,
@@ -127,21 +122,17 @@ func main() {
 	if err != nil {
 		panic("unable to new host in txgen")
 	}
-	// if *logConn {
-	// 	host.GetP2PHost().Network().Notify(utils.ConnLogger)
-	// }
 	node := node.New(host, &consensus.Consensus{ShardID: uint32(shardID)}, nil, true) //Make it archival node.
-	//node := node.New(host, nil, nil, true) //Make it archival node.
-
 	node.Client = client.NewClient(node.GetHost(), shardIDs)
 	node.NodeConfig.SetRole(nodeconfig.ClientNode)
 	node.NodeConfig.SetIsBeacon(false)
 	node.ServiceManagerSetup()
 	node.RunServices()
-
 	go node.GetSync()
-	time.Sleep(checkFrequency * time.Second)
+	time.Sleep(checkFrequency * time.Second) //Time for txgen to boot and get its peers and for services to be up and running
+
 	// Transaction generation process
+
 	start := time.Now()
 	totalTime := float64(*duration)
 	ticker := time.NewTicker(checkFrequency * time.Second)
@@ -178,18 +169,14 @@ func SendTxsToShard(clientNode *node.Node, txs types.Transactions) {
 
 // GenerateSimulatedTransactionsAccount generates simulated transaction for account model.
 func GenerateSimulatedTransactionsAccount(shardID int, node *node.Node, setting Settings) (types.Transactions, types.Transactions) {
-	_ = setting // TODO: take use of settings
+	_ = setting // TODO: make use of settings
 	txs := make([]*types.Transaction, 100)
 	for i := 0; i < 100; i++ {
 		baseNonce := node.Worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(node.TestBankKeys[i].PublicKey))
-		//for j := 0; j < 4; j++ {
 		randomUserAddress := crypto.PubkeyToAddress(node.TestBankKeys[rand.Intn(100)].PublicKey)
 		randAmount := rand.Float32()
-		//utils.GetLogInstance().Debug("Transaction Nonce", "nonce", baseNonce)
 		tx, _ := types.SignTx(types.NewTransaction(baseNonce+uint64(0), randomUserAddress, uint32(shardID), big.NewInt(int64(params.Ether*randAmount)), params.TxGas, nil, nil), types.HomesteadSigner{}, node.TestBankKeys[i])
-		//txs[i*1+j] = tx
 		txs[i] = tx
-		//}
 	}
 	return txs, nil
 }
