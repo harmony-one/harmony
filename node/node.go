@@ -278,7 +278,6 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 		} else {
 			node.AddContractKeyAndAddress()
 		}
-
 	}
 
 	node.ContractCaller = contracts.NewContractCaller(&db, node.blockchain, params.TestChainConfig)

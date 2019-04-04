@@ -262,6 +262,9 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	currentNode.Consensus.RegisterRndChannel(dRand.RndChannel)
 	currentNode.DRand = dRand
 
+	// This needs to be executed after consensus and drand are setup
+	currentNode.InitGenesisShardState()
+
 	// Assign closure functions to the consensus object
 	consensus.BlockVerifier = currentNode.VerifyNewBlock
 	consensus.OnConsensusDone = currentNode.PostConsensusProcessing
