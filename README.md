@@ -51,6 +51,19 @@ git submodule update --init --recursive
 
 ## Build
 
+Note : Some of our scripts require bash 4.x support, please [install bash 4.x](http://tldrdevnotes.com/bash-upgrade-3-4-macos) on MacOS X.
+
+### Build all executables
+
+You can  run the script `./scripts/go_executable_build.sh` to build all the executables.
+
+### Build individual executables
+
+Initialize BLS 
+```
+source scripts/setup_bls_build_flags.sh
+```
+
 Harmony server / main node:
 
 ```
@@ -68,10 +81,6 @@ Tx Generator:
 ```
 go build -o bin/txgen cmd/client/txgen/main.go
 ```
-
-You can also run the script `./scripts/go_executable_build.sh` to build all the executables.
-
-Some of our scripts require bash 4.x support, please [install bash 4.x](http://tldrdevnotes.com/bash-upgrade-3-4-macos) on MacOS X.
 
 ## Usage
 
