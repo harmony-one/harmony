@@ -38,6 +38,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 				utils.GetLogInstance().Debug("Consensus timeout, retry!", "count", timeoutCount)
 				// FIXME: retry is not working, there is no retry logic here. It will only wait for new transaction.
 			case <-stopChan:
+				utils.GetLogInstance().Debug("Consensus propose new block: STOPPED!")
 				return
 			}
 
@@ -74,7 +75,9 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 			}
 			// Send the new block to Consensus so it can be confirmed.
 			if newBlock != nil {
+				utils.GetLogInstance().Debug("Consensus sending new block to block channel")
 				node.BlockChannel <- newBlock
+				utils.GetLogInstance().Debug("Consensus sent new block to block channel")
 			}
 		}
 	}()
