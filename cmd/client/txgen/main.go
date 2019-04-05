@@ -68,7 +68,7 @@ func main() {
 	keyFile := flag.String("key", "./.txgenkey", "the private key file of the txgen")
 	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress")
 	flag.Parse()
-
+	time.Sleep(checkFrequency * time.Second) //This lets other nodes start their services before I query for blockchain height.
 	if *versionFlag {
 		printVersion(os.Args[0])
 	}
@@ -128,6 +128,7 @@ func main() {
 	node.NodeConfig.SetIsBeacon(false)
 	node.ServiceManagerSetup()
 	node.RunServices()
+	time.Sleep(checkFrequency * time.Second) //Time for txgen to start its services. This gets me peers.
 	go node.GetSync()
 	time.Sleep(checkFrequency * time.Second) //Time for txgen to boot and get its peers and for services to be up and running
 
