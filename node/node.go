@@ -142,6 +142,10 @@ type Node struct {
 	DemoContractAddress      common.Address
 	LotteryManagerPrivateKey *ecdsa.PrivateKey
 
+	// ERC20 contract.
+	ERC20ContractAddress common.Address
+	ERC20OwnerPrivateKey *ecdsa.PrivateKey
+
 	//Node Account
 	AccountKey *ecdsa.PrivateKey
 	Address    common.Address
@@ -275,6 +279,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 			// TODO(minhdoan): Think of a better approach to deploy smart contract.
 			// This is temporary for demo purpose.
 			node.AddLotteryContract()
+			node.AddERC20TokenContract()
 		} else {
 			node.AddContractKeyAndAddress()
 		}

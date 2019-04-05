@@ -30,11 +30,10 @@ contract Token {
      *
      * Initializes contract with initial supply tokens to the creator of the contract
      */
-    constructor(
-        uint256 initialSupply,
-        string memory tokenName,
-        string memory tokenSymbol
-    ) public {
+    constructor() public {
+        uint256 initialSupply = 21000000000;
+        string memory tokenName = 'Harmony';
+        string memory tokenSymbol = 'HRX';
         totalSupply = initialSupply * 10 ** uint256(decimals);  // Update total supply with the decimal amount
         balanceOf[msg.sender] = totalSupply;                // Give the creator all initial tokens
         name = tokenName;                                   // Set the name for display purposes

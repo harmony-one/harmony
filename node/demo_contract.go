@@ -50,6 +50,31 @@ func (node *Node) AddLotteryContract() {
 	node.addPendingTransactions(types.Transactions{demoContract})
 }
 
+// AddERC20TokenContract adds the demo lottery contract the genesis block.
+func (node *Node) AddERC20TokenContract() {
+	// Add a lottery demo contract.
+	priKey, err := crypto.HexToECDSA(contract_constants.DemoAccounts[1].Private)
+	if err != nil {
+		utils.GetLogInstance().Error("Error when creating private key for demo contract")
+		// Exit here to recognize the coding working.
+		// Basically we will remove this logic when launching so it's fine for now.
+		os.Exit(1)
+	}
+
+	dataEnc := common.FromHex(contracts.TokenBin)
+	// Unsigned transaction to avoid the case of transaction address.
+
+	contractFunds := big.NewInt(0)
+	contractFunds = contractFunds.Mul(contractFunds, big.NewInt(params.Ether))
+	tokenContract, _ := types.SignTx(
+		types.NewContractCreation(uint64(0), node.Consensus.ShardID, contractFunds, params.TxGasContractCreation*10, nil, dataEnc),
+		types.HomesteadSigner{},
+		priKey)
+	node.ERC20ContractAddress = crypto.CreateAddress(crypto.PubkeyToAddress(priKey.PublicKey), uint64(0))
+	node.ERC20OwnerPrivateKey = priKey
+	node.addPendingTransactions(types.Transactions{tokenContract})
+}
+
 // CreateTransactionForEnterMethod generates transaction for enter method and add it into pending tx list.
 func (node *Node) CreateTransactionForEnterMethod(amount int64, priKey string) error {
 	var err error
