@@ -279,7 +279,8 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 			// TODO(minhdoan): Think of a better approach to deploy smart contract.
 			// This is temporary for demo purpose.
 			node.AddLotteryContract()
-			node.AddERC20TokenContract()
+			// Enable this if needed.
+			// node.AddERC20TokenContract()
 		} else {
 			node.AddContractKeyAndAddress()
 		}
