@@ -103,9 +103,7 @@ func (ss *StateSync) AddLastMileBlock(block *types.Block) {
 // CloseConnections close grpc  connections for state sync clients
 func (ss *StateSync) CloseConnections() {
 	for _, pc := range ss.syncConfig.peers {
-		if pc.client != nil {
-			pc.client.Close()
-		}
+		pc.client.Close()
 	}
 }
 
@@ -148,9 +146,6 @@ func CompareSyncPeerConfigByblockHashes(a *SyncPeerConfig, b *SyncPeerConfig) in
 
 // GetBlocks gets blocks by calling grpc request to the corresponding peer.
 func (peerConfig *SyncPeerConfig) GetBlocks(hashes [][]byte) ([][]byte, error) {
-	if peerConfig.client == nil {
-		return nil, ErrSyncPeerConfigClientNotReady
-	}
 	response := peerConfig.client.GetBlocks(hashes)
 	if response == nil {
 		return nil, ErrGetBlock
@@ -264,9 +259,6 @@ func (ss *StateSync) GetConsensusHashes(startHash []byte) bool {
 	for {
 		var wg sync.WaitGroup
 		for id := range ss.syncConfig.peers {
-			if ss.syncConfig.peers[id].client == nil {
-				continue
-			}
 			wg.Add(1)
 			go func(peerConfig *SyncPeerConfig) {
 				defer wg.Done()
@@ -295,12 +287,10 @@ func (ss *StateSync) GetConsensusHashes(startHash []byte) bool {
 func (ss *StateSync) generateStateSyncTaskQueue(bc *core.BlockChain) {
 	ss.stateSyncTaskQueue = queue.New(0)
 	for _, configPeer := range ss.syncConfig.peers {
-		if configPeer.client != nil {
-			for id, blockHash := range configPeer.blockHashes {
-				ss.stateSyncTaskQueue.Put(SyncBlockTask{index: id, blockHash: blockHash})
-			}
-			break
+		for id, blockHash := range configPeer.blockHashes {
+			ss.stateSyncTaskQueue.Put(SyncBlockTask{index: id, blockHash: blockHash})
 		}
+		break
 	}
 	utils.GetLogInstance().Info("syncing: Finished generateStateSyncTaskQueue", "length", ss.stateSyncTaskQueue.Len())
 }
@@ -312,9 +302,6 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 	wg.Add(len(ss.syncConfig.peers))
 	count := 0
 	for i := range ss.syncConfig.peers {
-		if ss.syncConfig.peers[i].client == nil {
-			continue
-		}
 		go func(peerConfig *SyncPeerConfig, stateSyncTaskQueue *queue.Queue, bc *core.BlockChain) {
 			defer wg.Done()
 			for !stateSyncTaskQueue.Empty() {
@@ -542,9 +529,6 @@ func (ss *StateSync) RegisterNodeInfo() int {
 		}
 		if peerConfig.ip == ss.selfip && peerConfig.port == GetSyncingPort(ss.selfport) {
 			utils.GetLogInstance().Debug("[SYNC] skip self", "peerport", peerConfig.port, "selfport", ss.selfport, "selfsyncport", GetSyncingPort(ss.selfport))
-			continue
-		}
-		if peerConfig.client == nil {
 			continue
 		}
 		err := peerConfig.registerToBroadcast(ss.selfPeerHash[:], ss.selfip, ss.selfport)
