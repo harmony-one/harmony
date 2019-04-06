@@ -385,7 +385,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 		node.ClientPeer = peer
 	} else {
 		node.AddPeers([]*p2p.Peer{peer})
-		utils.GetLogInstance().Info("Add Peer to Node", "Address", node.Consensus.GetSelfAddress(), "Peer", peer, "# Peers", len(node.Consensus.GetPeers()))
+		utils.GetLogInstance().Info("Add Peer to Node", "Address", node.Consensus.GetSelfAddress(), "Peer", peer, "# Peers", len(node.Consensus.PublicKeys))
 	}
 
 	return 1
@@ -407,7 +407,7 @@ func (node *Node) SendPongMessage() {
 		case <-tick.C:
 			peers := node.Consensus.GetValidatorPeers()
 			numPeersNow := len(peers)
-			numPubKeysNow := len(node.Consensus.GetPeers())
+			numPubKeysNow := len(node.Consensus.PublicKeys)
 
 			// no peers, wait for another tick
 			if numPeersNow == 0 || numPubKeysNow == 0 {
