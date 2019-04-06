@@ -159,17 +159,13 @@ func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer) error {
 	ss.syncConfig = &SyncConfig{
 		peers: make([]*SyncPeerConfig, ss.peerNumber),
 	}
+	var wg sync.WaitGroup
+	wg.Add(ss.peerNumber)
 	for id := range ss.syncConfig.peers {
 		ss.syncConfig.peers[id] = &SyncPeerConfig{
 			ip:   peers[id].IP,
 			port: peers[id].Port,
 		}
-	}
-	utils.GetLogInstance().Info("[SYNC] Finished creating SyncConfig")
-
-	var wg sync.WaitGroup
-	wg.Add(ss.peerNumber)
-	for id := range ss.syncConfig.peers {
 		go func(peerConfig *SyncPeerConfig) {
 			defer wg.Done()
 			peerConfig.client = downloader.ClientSetup(peerConfig.ip, peerConfig.port)
