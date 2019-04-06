@@ -56,7 +56,18 @@ type SyncBlockTask struct {
 
 // SyncConfig contains an array of SyncPeerConfig.
 type SyncConfig struct {
+	// mtx locks peers, and *SyncPeerConfig pointers in peers.
+	// SyncPeerConfig itself is guarded by its own mutex.
+	mtx sync.RWMutex
+
 	peers []*SyncPeerConfig
+}
+
+// AddPeer adds the given sync peer.
+func (sc *SyncConfig) AddPeer(peer *SyncPeerConfig) {
+	sc.mtx.Lock()
+	defer sc.mtx.Unlock()
+	sc.peers = append(sc.peers, peer)
 }
 
 // CreateStateSync returns the implementation of StateSyncInterface interface.
@@ -156,20 +167,23 @@ func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer) error {
 		return ctxerror.New("[SYNC] no peers to connect to")
 	}
 	ss.peerNumber = len(peers)
-	ss.syncConfig = &SyncConfig{
-		peers: make([]*SyncPeerConfig, ss.peerNumber),
-	}
+	ss.syncConfig = &SyncConfig{}
 	var wg sync.WaitGroup
 	wg.Add(ss.peerNumber)
-	for id := range ss.syncConfig.peers {
-		ss.syncConfig.peers[id] = &SyncPeerConfig{
-			ip:   peers[id].IP,
-			port: peers[id].Port,
-		}
-		go func(peerConfig *SyncPeerConfig) {
+	for _, peer := range peers {
+		go func(peer p2p.Peer) {
 			defer wg.Done()
-			peerConfig.client = downloader.ClientSetup(peerConfig.ip, peerConfig.port)
-		}(ss.syncConfig.peers[id])
+			client := downloader.ClientSetup(peer.IP, peer.Port)
+			if client == nil {
+				return
+			}
+			peerConfig := &SyncPeerConfig{
+				ip:     peer.IP,
+				port:   peer.Port,
+				client: client,
+			}
+			ss.syncConfig.AddPeer(peerConfig)
+		}(peer)
 	}
 	wg.Wait()
 	ss.CleanUpNilPeers()
