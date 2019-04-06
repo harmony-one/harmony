@@ -26,7 +26,7 @@ const (
 )
 
 // GenesisBlockSetup setups a genesis blockchain.
-func (node *Node) GenesisBlockSetup(db ethdb.Database, isArchival bool) (*core.BlockChain, error) {
+func (node *Node) GenesisBlockSetup(db ethdb.Database, shardID uint32, isArchival bool) (*core.BlockChain, error) {
 	// Initialize genesis block and blockchain
 	// Tests account for txgen to use
 	genesisAlloc := node.CreateGenesisAllocWithTestingAddresses(FakeAddressNumber)
@@ -39,11 +39,13 @@ func (node *Node) GenesisBlockSetup(db ethdb.Database, isArchival bool) (*core.B
 	genesisAlloc[contractDeployerAddress] = core.GenesisAccount{Balance: contractDeployerFunds}
 	node.ContractDeployerKey = contractDeployerKey
 
-	// Accounts used by validator/nodes to stake and participate in the network.
-	AddNodeAddressesToGenesisAlloc(genesisAlloc)
+	if shardID == 0 {
+		// Accounts used by validator/nodes to stake and participate in the network.
+		AddNodeAddressesToGenesisAlloc(genesisAlloc)
+	}
 
 	chainConfig := params.TestChainConfig
-	chainConfig.ChainID = big.NewInt(int64(node.Consensus.ShardID)) // Use ChainID as piggybacked ShardID
+	chainConfig.ChainID = big.NewInt(int64(shardID)) // Use ChainID as piggybacked ShardID
 	gspec := core.Genesis{
 		Config:         chainConfig,
 		Alloc:          genesisAlloc,

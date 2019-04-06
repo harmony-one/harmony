@@ -111,13 +111,17 @@ func (node *Node) SupportSyncing() {
 
 // InitSyncingServer starts downloader server.
 func (node *Node) InitSyncingServer() {
-	node.downloaderServer = downloader.NewServer(node)
+	if node.downloaderServer == nil {
+		node.downloaderServer = downloader.NewServer(node)
+	}
 }
 
 // StartSyncingServer starts syncing server.
 func (node *Node) StartSyncingServer() {
 	utils.GetLogInstance().Info("support_sycning: StartSyncingServer")
-	node.downloaderServer.Start(node.SelfPeer.IP, syncing.GetSyncingPort(node.SelfPeer.Port))
+	if node.downloaderServer.GrpcServer == nil {
+		node.downloaderServer.Start(node.SelfPeer.IP, syncing.GetSyncingPort(node.SelfPeer.Port))
+	}
 }
 
 // SendNewBlockToUnsync send latest verified block to unsync, registered nodes

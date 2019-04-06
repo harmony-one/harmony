@@ -70,7 +70,7 @@ EOU
 
 DB=
 TXGEN=true
-DURATION=90
+DURATION=60
 MIN=5
 SHARDS=2
 KILLPORT=9004
@@ -99,7 +99,7 @@ if [ -z "$config" ]; then
 fi
 
 if [ "$SYNC" == "true" ]; then
-    DURATION=300
+    DURATION=120
 fi
 
 # Kill nodes if any

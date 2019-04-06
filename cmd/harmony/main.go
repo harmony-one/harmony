@@ -167,7 +167,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	if nodeConfig.MainDB, err = InitLDBDatabase(*ip, *port, *freshDB, false); err != nil {
 		panic(err)
 	}
-	if !*isGenesis {
+	if shardID != 0 {
 		if nodeConfig.BeaconDB, err = InitLDBDatabase(*ip, *port, *freshDB, true); err != nil {
 			panic(err)
 		}
@@ -238,8 +238,6 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 			currentNode.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
 		}
 	} else {
-		currentNode.AddBeaconChainDatabase(nodeConfig.BeaconDB)
-
 		if *isNewNode {
 			currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
 			// TODO: fix the roles as it's unknown before resharding.
@@ -262,6 +260,9 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	currentNode.Consensus.RegisterRndChannel(dRand.RndChannel)
 	currentNode.DRand = dRand
 
+	if consensus.ShardID != 0 {
+		currentNode.AddBeaconChainDatabase(nodeConfig.BeaconDB)
+	}
 	// This needs to be executed after consensus and drand are setup
 	currentNode.InitGenesisShardState()
 
@@ -296,6 +297,10 @@ func main() {
 	if consensus.IsLeader {
 		go currentNode.SendPongMessage()
 	}
+	// TODO: enable beacon chain sync
+	//if consensus.ShardID != 0 {
+	//	go currentNode.SupportBeaconSyncing()
+	//}
 	go currentNode.SupportSyncing()
 	utils.GetLogInstance().Info("New Harmony Node ====", "Role", currentNode.NodeConfig.Role(), "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, nodeConfig.Host.GetID().Pretty()))
 	currentNode.ServiceManagerSetup()

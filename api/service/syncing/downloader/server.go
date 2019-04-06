@@ -17,6 +17,7 @@ const (
 // Server is the Server struct for downloader package.
 type Server struct {
 	downloadInterface DownloadInterface
+	GrpcServer        *grpc.Server
 }
 
 // Query returns the feature at the given point.
@@ -39,6 +40,8 @@ func (s *Server) Start(ip, port string) (*grpc.Server, error) {
 	grpcServer := grpc.NewServer(opts...)
 	pb.RegisterDownloaderServer(grpcServer, s)
 	go grpcServer.Serve(lis)
+	s.GrpcServer = grpcServer
+
 	return grpcServer, nil
 }
 
