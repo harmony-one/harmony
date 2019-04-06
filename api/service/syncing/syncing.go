@@ -16,6 +16,7 @@ import (
 	pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
@@ -149,11 +150,10 @@ func (peerConfig *SyncPeerConfig) GetBlocks(hashes [][]byte) ([][]byte, error) {
 }
 
 // CreateSyncConfig creates SyncConfig for StateSync object.
-func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer) bool {
+func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer) error {
 	utils.GetLogInstance().Debug("CreateSyncConfig: len of peers", "len", len(peers))
 	if len(peers) == 0 {
-		utils.GetLogInstance().Warn("[SYNC] Unable to get neighbor peers")
-		return false
+		return ctxerror.New("[SYNC] no peers to connect to")
 	}
 	ss.peerNumber = len(peers)
 	ss.syncConfig = &SyncConfig{
@@ -166,7 +166,7 @@ func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer) bool {
 		}
 	}
 	utils.GetLogInstance().Info("[SYNC] Finished creating SyncConfig")
-	return true
+	return nil
 }
 
 // MakeConnectionToPeers makes grpc connection to all peers.
