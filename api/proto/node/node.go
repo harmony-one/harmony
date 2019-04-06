@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/harmony-one/harmony/internal/utils"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
@@ -25,6 +27,7 @@ const (
 	Control
 	PING // node send ip/pki to register with leader
 	PONG // node broadcast pubK
+	ShardState
 	// TODO: add more types
 )
 
@@ -169,4 +172,34 @@ func ConstructBlocksSyncMessage(blocks []*types.Block) []byte {
 	blocksData, _ := rlp.EncodeToBytes(blocks)
 	byteBuffer.Write(blocksData)
 	return byteBuffer.Bytes()
+}
+
+// ConstructEpochShardStateMessage contructs epoch shard state message
+func ConstructEpochShardStateMessage(epochShardState types.EpochShardState) []byte {
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
+	byteBuffer.WriteByte(byte(ShardState))
+
+	encoder := gob.NewEncoder(byteBuffer)
+	err := encoder.Encode(epochShardState)
+	if err != nil {
+		utils.GetLogInstance().Error("[ConstructEpochShardStateMessage] Encode", "error", err)
+		return nil
+	}
+	return byteBuffer.Bytes()
+}
+
+// DeserializeEpochShardStateFromMessage deserializes the shard state Message from bytes payload
+func DeserializeEpochShardStateFromMessage(payload []byte) (*types.EpochShardState, error) {
+	epochShardState := new(types.EpochShardState)
+
+	r := bytes.NewBuffer(payload)
+	decoder := gob.NewDecoder(r)
+	err := decoder.Decode(epochShardState)
+
+	if err != nil {
+		utils.GetLogInstance().Error("[GetEpochShardStateFromMessage] Decode", "error", err)
+		return nil, fmt.Errorf("Decode epoch shard state Error")
+	}
+
+	return epochShardState, nil
 }

@@ -9,6 +9,12 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
+// EpochShardState is the shard state of an epoch
+type EpochShardState struct {
+	Epoch      uint64
+	ShardState ShardState
+}
+
 // ShardState is the collection of all committees
 type ShardState []Committee
 

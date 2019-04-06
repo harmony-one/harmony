@@ -188,6 +188,8 @@ func (node *Node) messageHandler(content []byte, sender string) {
 			node.pingMessageHandler(msgPayload, sender)
 		case proto_node.PONG:
 			node.pongMessageHandler(msgPayload)
+		case proto_node.ShardState:
+			node.epochShardStateMessageHandler(msgPayload)
 		}
 	default:
 		utils.GetLogInstance().Error("Unknown", "MsgCategory", msgCategory)
@@ -303,6 +305,17 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 		if core.IsEpochBlock(newBlock) {
 			shardState := node.blockchain.StoreNewShardState(newBlock, &node.CurrentStakes)
 			if shardState != nil {
+				if node.Consensus.IsLeader {
+					epochShardState := types.EpochShardState{Epoch: core.GetEpochFromBlockNumber(newBlock.NumberU64()), ShardState: shardState}
+					epochShardStateMessage := proto_node.ConstructEpochShardStateMessage(epochShardState)
+					// Broadcast new shard state
+					err := node.host.SendMessageToGroups([]p2p.GroupID{node.NodeConfig.GetClientGroupID()}, host.ConstructP2pMessage(byte(0), epochShardStateMessage))
+					if err != nil {
+						utils.GetLogInstance().Error("[Resharding] failed to broadcast shard state message", "group", node.NodeConfig.GetClientGroupID())
+					} else {
+						utils.GetLogInstance().Info("[Resharding] broadcasted shard state message to", "group", node.NodeConfig.GetClientGroupID())
+					}
+				}
 				myShard := uint32(math.MaxUint32)
 				isLeader := false
 				myBlsPubKey := node.Consensus.PubKey.Serialize()
@@ -551,4 +564,18 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 
 	// TODO: remove this after fully migrating to beacon chain-based committee membership
 	return node.Consensus.UpdatePublicKeys(publicKeys) + node.DRand.UpdatePublicKeys(publicKeys)
+}
+
+func (node *Node) epochShardStateMessageHandler(msgPayload []byte) int {
+	epochShardState, err := proto_node.DeserializeEpochShardStateFromMessage(msgPayload)
+	if err != nil {
+		utils.GetLogInstance().Error("Can't get shard state Message", "error", err)
+		return -1
+	}
+	node.processEpochShardState(epochShardState)
+	return 0
+}
+
+func (node *Node) processEpochShardState(epochShardState *types.EpochShardState) {
+	utils.GetLogInstance().Error("[Received shard state]")
 }
