@@ -166,11 +166,7 @@ func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer) error {
 		}
 	}
 	utils.GetLogInstance().Info("[SYNC] Finished creating SyncConfig")
-	return nil
-}
 
-// MakeConnectionToPeers makes grpc connection to all peers.
-func (ss *StateSync) MakeConnectionToPeers() {
 	var wg sync.WaitGroup
 	wg.Add(ss.peerNumber)
 	for id := range ss.syncConfig.peers {
@@ -182,6 +178,8 @@ func (ss *StateSync) MakeConnectionToPeers() {
 	wg.Wait()
 	ss.CleanUpNilPeers()
 	utils.GetLogInstance().Info("[SYNC] Finished making connection to peers.")
+
+	return nil
 }
 
 // GetActivePeerNumber returns the number of active peers

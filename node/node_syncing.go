@@ -67,7 +67,6 @@ SyncingLoop:
 					ctxerror.Log15(utils.GetLogInstance().Debug, err)
 					continue SyncingLoop
 				}
-				node.stateSync.MakeConnectionToPeers()
 			}
 			if node.stateSync.IsOutOfSync(bc) {
 				utils.GetLogInstance().Debug("[SYNC] out of sync, doing syncing")
