@@ -2,8 +2,10 @@ package syncing
 
 import (
 	"bytes"
+	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
@@ -546,6 +548,10 @@ func (ss *StateSync) RegisterNodeInfo() int {
 		if count >= registrationNumber {
 			break
 		}
+		if peerConfig.ip == ss.selfip && peerConfig.port == GetSyncingPort(ss.selfport) {
+			utils.GetLogInstance().Debug("[SYNC] skip self", "peerport", peerConfig.port, "selfport", ss.selfport, "selfsyncport", GetSyncingPort(ss.selfport))
+			continue
+		}
 		if peerConfig.client == nil {
 			continue
 		}
@@ -599,4 +605,12 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, willJo
 		startHash := bc.CurrentBlock().Hash()
 		ss.ProcessStateSync(startHash[:], bc, worker)
 	}
+}
+
+// GetSyncingPort returns the syncing port.
+func GetSyncingPort(nodePort string) string {
+	if port, err := strconv.Atoi(nodePort); err == nil {
+		return fmt.Sprintf("%d", port-SyncingPortDifference)
+	}
+	return ""
 }

@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/bls/ffi/go/bls"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
@@ -149,8 +151,11 @@ type Node struct {
 	ContractDeployerKey *ecdsa.PrivateKey
 	ContractAddresses   []common.Address
 
-	// Group Message Receiver
-	groupReceiver p2p.GroupReceiver
+	// Shard group Message Receiver
+	shardGroupReceiver p2p.GroupReceiver
+
+	// Global group Message Receiver
+	globalGroupReceiver p2p.GroupReceiver
 
 	// Client Message Receiver to handle light client messages
 	// Beacon leader needs to use this receiver to talk to new node
@@ -253,8 +258,6 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 			os.Exit(1)
 		}
 		node.blockchain = chain
-		// Store the genesis shard state into db.
-		node.blockchain.StoreNewShardState(node.blockchain.CurrentBlock(), nil)
 
 		node.BlockChannel = make(chan *types.Block)
 		node.ConfirmedBlockChannel = make(chan *types.Block)
@@ -275,16 +278,18 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 		} else {
 			node.AddContractKeyAndAddress()
 		}
+
 	}
 
 	node.ContractCaller = contracts.NewContractCaller(&db, node.blockchain, params.TestChainConfig)
 
 	if consensusObj != nil && consensusObj.IsLeader {
 		node.State = NodeLeader
-		go node.ReceiveClientGroupMessage()
 	} else {
 		node.State = NodeInit
+
 	}
+	go node.ReceiveClientGroupMessage()
 
 	// Setup initial state of syncing.
 	node.peerRegistrationRecord = make(map[string]*syncConfig)
@@ -297,10 +302,34 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 
 	node.startConsensus = make(chan struct{})
 
-	// init the global and the only node config
-	node.NodeConfig = nodeconfig.GetConfigs(nodeconfig.Global)
+	// Get the node config that's created in the harmony.go program.
+	if consensusObj != nil {
+		node.NodeConfig = nodeconfig.GetShardConfig(consensusObj.ShardID)
+	} else {
+		node.NodeConfig = nodeconfig.GetDefaultConfig()
+	}
 
 	return &node
+}
+
+// InitGenesisShardState initialize genesis shard state and update committee pub keys for consensus and drand
+func (node *Node) InitGenesisShardState() {
+	// Store the genesis shard state into db.
+	shardState := node.blockchain.StoreNewShardState(node.blockchain.CurrentBlock(), nil)
+	// Update validator public keys
+	for _, shard := range shardState {
+		if shard.ShardID == node.Consensus.ShardID {
+			pubKeys := []*bls.PublicKey{}
+			for _, node := range shard.NodeList {
+				blsPubKey := &bls.PublicKey{}
+				blsPubKey.Deserialize(node.BlsPublicKey[:])
+				pubKeys = append(pubKeys, blsPubKey)
+			}
+			node.Consensus.UpdatePublicKeys(pubKeys)
+			node.DRand.UpdatePublicKeys(pubKeys)
+			break
+		}
+	}
 }
 
 // AddPeers adds neighbors nodes
@@ -319,6 +348,7 @@ func (node *Node) AddPeers(peers []*p2p.Peer) int {
 
 	// Only leader needs to add the peer info into consensus
 	// Validators will receive the updated peer info from Leader via pong message
+	// TODO: remove this after fully migrating to beacon chain-based committee membership
 	if count > 0 && node.NodeConfig.IsLeader() {
 		node.Consensus.AddPeers(peers)
 		// TODO: make peers into a context object shared by consensus and drand
@@ -349,26 +379,40 @@ func (node *Node) RemovePeersHandler() {
 
 // isBeacon = true if the node is beacon node
 // isClient = true if the node light client(txgen,wallet)
-func (node *Node) initNodeConfiguration(isBeacon bool, isClient bool) (service.NodeConfig, chan p2p.Peer) {
+func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 	chanPeer := make(chan p2p.Peer)
 
 	nodeConfig := service.NodeConfig{
-		IsBeacon: isBeacon,
-		IsClient: isClient,
-		Beacon:   p2p.GroupIDBeacon,
-		Group:    p2p.GroupIDUnknown,
-		Actions:  make(map[p2p.GroupID]p2p.ActionType),
+		IsBeacon:     node.NodeConfig.IsBeacon(),
+		IsClient:     node.NodeConfig.IsClient(),
+		Beacon:       p2p.GroupIDBeacon,
+		ShardGroupID: node.NodeConfig.GetShardGroupID(),
+		Actions:      make(map[p2p.GroupID]p2p.ActionType),
 	}
-	nodeConfig.Actions[p2p.GroupIDBeaconClient] = p2p.ActionStart
+
+	if nodeConfig.IsClient {
+		nodeConfig.Actions[p2p.GroupIDBeaconClient] = p2p.ActionStart
+	} else {
+		nodeConfig.Actions[node.NodeConfig.GetShardGroupID()] = p2p.ActionStart
+	}
 
 	var err error
-	if isBeacon {
-		node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeacon)
-		node.clientReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
-		node.NodeConfig.SetClientGroupID(p2p.GroupIDBeaconClient)
-	} else {
-		node.groupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
+	node.shardGroupReceiver, err = node.host.GroupReceiver(node.NodeConfig.GetShardGroupID())
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to create shard receiver", "msg", err)
 	}
+
+	node.globalGroupReceiver, err = node.host.GroupReceiver(p2p.GroupIDGlobal)
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to create global receiver", "msg", err)
+	}
+
+	node.clientReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to create beacon client receiver", "msg", err)
+	}
+
+	node.NodeConfig.SetClientGroupID(p2p.GroupIDBeaconClient)
 
 	if err != nil {
 		utils.GetLogInstance().Error("create group receiver error", "msg", err)

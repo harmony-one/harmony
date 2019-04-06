@@ -54,7 +54,10 @@ func TestProcessMessageLeaderPrepare(test *testing.T) {
 	m.EXPECT().GetSelfPeer().Return(leader)
 	m.EXPECT().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, gomock.Any())
 
-	consensusLeader := New(m, 0, validators, leader, leaderPriKey)
+	consensusLeader, err := New(m, 0, validators, leader, leaderPriKey)
+	if err != nil {
+		test.Fatalf("Cannot craeate consensus: %v", err)
+	}
 	consensusLeader.blockHash = blockHash
 
 	consensusValidators := make([]*Consensus, 3)
@@ -66,7 +69,10 @@ func TestProcessMessageLeaderPrepare(test *testing.T) {
 		}
 		hosts[i] = host
 
-		consensusValidators[i] = New(hosts[i], 0, validators, leader, validatorsPriKeys[i])
+		consensusValidators[i], err = New(hosts[i], 0, validators, leader, validatorsPriKeys[i])
+		if err != nil {
+			test.Fatalf("Cannot craeate consensus: %v", err)
+		}
 		consensusValidators[i].blockHash = blockHash
 		msg := consensusValidators[i].constructPrepareMessage()
 		msgPayload, _ := proto.GetConsensusMessagePayload(msg)
@@ -102,7 +108,10 @@ func TestProcessMessageLeaderPrepareInvalidSignature(test *testing.T) {
 	// Anything else will fail.
 	m.EXPECT().GetSelfPeer().Return(leader)
 
-	consensusLeader := New(m, 0, validators, leader, leaderPriKey)
+	consensusLeader, err := New(m, 0, validators, leader, leaderPriKey)
+	if err != nil {
+		test.Fatalf("Cannot craeate consensus: %v", err)
+	}
 	consensusLeader.blockHash = blockHash
 
 	consensusValidators := make([]*Consensus, 3)
@@ -114,7 +123,10 @@ func TestProcessMessageLeaderPrepareInvalidSignature(test *testing.T) {
 		}
 		hosts[i] = host
 
-		consensusValidators[i] = New(hosts[i], 0, validators, leader, validatorKeys[i])
+		consensusValidators[i], err = New(hosts[i], 0, validators, leader, validatorKeys[i])
+		if err != nil {
+			test.Fatalf("Cannot craeate consensus: %v", err)
+		}
 		consensusValidators[i].blockHash = blockHash
 		msgBytes := consensusValidators[i].constructPrepareMessage()
 		msgPayload, _ := proto.GetConsensusMessagePayload(msgBytes)
@@ -169,7 +181,10 @@ func TestProcessMessageLeaderCommit(test *testing.T) {
 		hosts[i] = host
 	}
 
-	consensusLeader := New(m, 0, validators, leader, leaderPriKey)
+	consensusLeader, err := New(m, 0, validators, leader, leaderPriKey)
+	if err != nil {
+		test.Fatalf("Cannot craeate consensus: %v", err)
+	}
 	consensusLeader.state = PreparedDone
 	consensusLeader.blockHash = blockHash
 	consensusLeader.OnConsensusDone = func(newBlock *types.Block) {}
@@ -187,7 +202,10 @@ func TestProcessMessageLeaderCommit(test *testing.T) {
 		<-consensusLeader.ReadySignal
 	}()
 	for i := 0; i < 3; i++ {
-		consensusValidators[i] = New(hosts[i], 0, validators, leader, validatorKeys[i])
+		consensusValidators[i], err = New(hosts[i], 0, validators, leader, validatorKeys[i])
+		if err != nil {
+			test.Fatalf("Cannot craeate consensus: %v", err)
+		}
 		consensusValidators[i].blockHash = blockHash
 		payload := consensusValidators[i].constructCommitMessage(multiSigAndBitmap)
 		msg, err := proto.GetConsensusMessagePayload(payload)

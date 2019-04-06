@@ -2,8 +2,6 @@ package node
 
 import (
 	"bytes"
-	"fmt"
-	"strconv"
 	"sync"
 	"time"
 
@@ -27,14 +25,6 @@ const (
 	SyncFrequency     = 10 // unit in second
 )
 
-// GetSyncingPort returns the syncing port.
-func GetSyncingPort(nodePort string) string {
-	if port, err := strconv.Atoi(nodePort); err == nil {
-		return fmt.Sprintf("%d", port-syncing.SyncingPortDifference)
-	}
-	return ""
-}
-
 // getNeighborPeers is a helper function to return list of peers
 // based on different neightbor map
 func (node *Node) getNeighborPeers(neighbor *sync.Map) []p2p.Peer {
@@ -42,7 +32,7 @@ func (node *Node) getNeighborPeers(neighbor *sync.Map) []p2p.Peer {
 	neighbor.Range(func(k, v interface{}) bool {
 		p := v.(p2p.Peer)
 		t := p.Port
-		p.Port = GetSyncingPort(t)
+		p.Port = syncing.GetSyncingPort(t)
 		tmp = append(tmp, p)
 		return true
 	})
@@ -127,7 +117,7 @@ func (node *Node) InitSyncingServer() {
 // StartSyncingServer starts syncing server.
 func (node *Node) StartSyncingServer() {
 	utils.GetLogInstance().Info("support_sycning: StartSyncingServer")
-	node.downloaderServer.Start(node.SelfPeer.IP, GetSyncingPort(node.SelfPeer.Port))
+	node.downloaderServer.Start(node.SelfPeer.IP, syncing.GetSyncingPort(node.SelfPeer.Port))
 }
 
 // SendNewBlockToUnsync send latest verified block to unsync, registered nodes
@@ -193,6 +183,9 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 			var hash common.Hash
 			hash.SetBytes(bytes)
 			block := node.blockchain.GetBlockByHash(hash)
+			if block == nil {
+				continue
+			}
 			encodedBlock, err := rlp.EncodeToBytes(block)
 			if err == nil {
 				response.Payload = append(response.Payload, encodedBlock)
@@ -231,7 +224,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 			return response, nil
 		} else {
 			response.Type = downloader_pb.DownloaderResponse_FAIL
-			syncPort := GetSyncingPort(port)
+			syncPort := syncing.GetSyncingPort(port)
 			client := downloader.ClientSetup(ip, syncPort)
 			if client == nil {
 				utils.GetLogInstance().Warn("[SYNC] unable to setup client for peerID", "ip", ip, "port", port)

@@ -7,7 +7,7 @@ contract StakeLockContract {
     string internal constant ALREADY_LOCKED = 'Tokens already locked';
     string internal constant NO_TOKEN_UNLOCKABLE = 'No tokens unlockable';
     string internal constant AMOUNT_ZERO = 'Amount can not be 0';
-    string internal constant EMPTY_BLS_ADDRESS = 'BLS address should not be empty';
+    string internal constant EMPTY_BLS_PUBKEY = 'BLS public key should not be empty';
 
     uint256 internal constant LOCK_PERIOD_IN_EPOCHS = 3;  // Final locking period TBD.
 
@@ -22,8 +22,10 @@ contract StakeLockContract {
         uint256 _epochNum;         // The epoch when the token was locked
         uint256 _lockPeriodCount;  // The number of locking period the token will be locked.
         uint256 _index;            // The index in the addressList
-        bytes20 _blsAddress;       // The address of BLS account used for consensus message signing.
-                                   // TODO: the bls address should be signed by the bls key to prove the ownership.
+        bytes32 _blsPublicKey1;       // The BLS public key divided into 3 32bytes chucks used for consensus message signing.
+        bytes32 _blsPublicKey2;
+        bytes32 _blsPublicKey3;
+                                   // TODO: the BLS public key should be signed by the bls key to prove the ownership.
     }
 
     /**
@@ -40,21 +42,23 @@ contract StakeLockContract {
     /**
      * @dev Locks a specified amount of tokens against an address
      *      starting at the specific epoch
-     * @param _blsAddress The address of BLS key for consensus message signing
+     * @param _blsPublicKey1 The first part of BLS public key for consensus message signing
+     * @param _blsPublicKey2 The second part of BLS public key for consensus message signing
+     * @param _blsPublicKey3 The third part of BLS public key for consensus message signing
      */
-    function lock(bytes20 _blsAddress)
+    function lock(bytes32 _blsPublicKey1, bytes32 _blsPublicKey2, bytes32 _blsPublicKey3)
         public
         payable
         returns (bool)
     {
         // If tokens are already locked, then functions extendLock or
         // increaseLockAmount should be used to make any changes
-        require(_blsAddress != 0, EMPTY_BLS_ADDRESS);
+        // require(_blsPublicKey != 0, EMPTY_BLS_PUBKEY);
         require(balanceOf(msg.sender) == 0, ALREADY_LOCKED);
         require(msg.value != 0, AMOUNT_ZERO);
 
         // By default, the tokens can only be locked for one locking period.
-        locked[msg.sender] = lockedToken(msg.value, block.number, currentEpoch(), 1, addressList.push(msg.sender) - 1, _blsAddress);
+        locked[msg.sender] = lockedToken(msg.value, block.number, currentEpoch(), 1, addressList.push(msg.sender) - 1, _blsPublicKey1, _blsPublicKey2, _blsPublicKey3);
 
         emit Locked(msg.sender, msg.value, currentEpoch());
         return true;
@@ -123,16 +127,20 @@ contract StakeLockContract {
     function listLockedAddresses()
         public
         view
-        returns (address[] memory lockedAddresses, bytes20[] memory blsAddresses, uint256[] memory blockNums, uint256[] memory lockPeriodCounts, uint256[] memory amounts)
+        returns (address[] memory lockedAddresses, bytes32[] memory blsPubicKeys1, bytes32[] memory blsPubicKeys2, bytes32[] memory blsPubicKeys3, uint256[] memory blockNums, uint256[] memory lockPeriodCounts, uint256[] memory amounts)
     {
         lockedAddresses = addressList;
-        blsAddresses = new bytes20[](addressList.length);
+        blsPubicKeys1 = new bytes32[](addressList.length);
+        blsPubicKeys2 = new bytes32[](addressList.length);
+        blsPubicKeys3 = new bytes32[](addressList.length);
         blockNums = new uint256[](addressList.length);
         lockPeriodCounts = new uint256[](addressList.length);
         amounts = new uint256[](addressList.length);
         for (uint i = 0; i < lockedAddresses.length; i++) {
             blockNums[i] = locked[lockedAddresses[i]]._blockNum;
-            blsAddresses[i] = locked[lockedAddresses[i]]._blsAddress;
+            blsPubicKeys1[i] = locked[lockedAddresses[i]]._blsPublicKey1;
+            blsPubicKeys2[i] = locked[lockedAddresses[i]]._blsPublicKey2;
+            blsPubicKeys3[i] = locked[lockedAddresses[i]]._blsPublicKey3;
             lockPeriodCounts[i] = locked[lockedAddresses[i]]._lockPeriodCount;
             amounts[i] = locked[lockedAddresses[i]]._amount;
         }

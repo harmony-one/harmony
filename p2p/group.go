@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strconv"
 
 	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 )
@@ -19,28 +20,37 @@ import (
 type GroupID string
 
 func (id GroupID) String() string {
-	return fmt.Sprintf("%x", string(id))
+	return fmt.Sprintf("%s", string(id))
 }
 
 // Const of group ID
 const (
-	GroupIDBeacon       GroupID = "harmony/0.0.1/beacon"
-	GroupIDBeaconClient GroupID = "harmony/0.0.1/beacon/client"
-	GroupIDGlobal       GroupID = "harmony/0.0.1/global"
-	GroupIDUnknown      GroupID = "B1acKh0lE"
+	GroupIDBeacon            GroupID = "harmony/0.0.1/node/beacon"
+	GroupIDBeaconClient      GroupID = "harmony/0.0.1/client/beacon"
+	GroupIDShardPrefix       GroupID = "harmony/0.0.1/node/shard/%s"
+	GroupIDShardClientPrefix GroupID = "harmony/0.0.1/client/shard/%s"
+	GroupIDGlobal            GroupID = "harmony/0.0.1/node/global"
+	GroupIDGlobalClient      GroupID = "harmony/0.0.1/node/global"
+	GroupIDUnknown           GroupID = "B1acKh0lE"
 )
 
-// ShardIDType defines the data type of a shard ID
-type ShardIDType string
+// ShardID defines the ID of a shard
+type ShardID uint32
 
-// NewGroupIDShard returns a new groupID for a shard
-func NewGroupIDShard(sid ShardIDType) GroupID {
-	return GroupID(fmt.Sprintf("harmony/0.0.1/shard/%s", sid))
+// NewGroupIDByShardID returns a new groupID for a shard
+func NewGroupIDByShardID(shardID ShardID) GroupID {
+	if shardID == 0 {
+		return GroupIDBeacon
+	}
+	return GroupID(fmt.Sprintf(GroupIDShardPrefix.String(), strconv.Itoa(int(shardID))))
 }
 
-// NewGroupIDShardClient returns a new groupID for a shard's client
-func NewGroupIDShardClient(sid ShardIDType) GroupID {
-	return GroupID(fmt.Sprintf("harmony/0.0.1/shard/%s/client", sid))
+// NewClientGroupIDByShardID returns a new groupID for a shard's client
+func NewClientGroupIDByShardID(shardID ShardID) GroupID {
+	if shardID == 0 {
+		return GroupIDBeaconClient
+	}
+	return GroupID(fmt.Sprintf(GroupIDShardClientPrefix.String(), strconv.Itoa(int(shardID))))
 }
 
 // ActionType lists action on group

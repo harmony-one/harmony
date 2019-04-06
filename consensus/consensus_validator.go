@@ -68,7 +68,7 @@ func (consensus *Consensus) processAnnounceMessage(message *msg_pb.Message) {
 	consensus.block = block
 
 	if err := consensus.checkConsensusMessage(message, consensus.leader.ConsensusPubKey); err != nil {
-		utils.GetLogInstance().Debug("Failed to check the leader message", "key", utils.GetAddressHex(consensus.leader.ConsensusPubKey))
+		utils.GetLogInstance().Debug("Failed to check the leader message", "key", utils.GetBlsAddress(consensus.leader.ConsensusPubKey))
 		return
 	}
 
@@ -95,7 +95,7 @@ func (consensus *Consensus) processAnnounceMessage(message *msg_pb.Message) {
 	// Construct and send prepare message
 	msgToSend := consensus.constructPrepareMessage()
 	utils.GetLogInstance().Warn("[Consensus]", "sent prepare message", len(msgToSend))
-	consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
+	consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 
 	consensus.state = PrepareDone
 }
@@ -165,7 +165,7 @@ func (consensus *Consensus) processPreparedMessage(message *msg_pb.Message) {
 	multiSigAndBitmap := append(multiSig, bitmap...)
 	msgToSend := consensus.constructCommitMessage(multiSigAndBitmap)
 	utils.GetLogInstance().Warn("[Consensus]", "sent commit message", len(msgToSend))
-	consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msgToSend))
+	consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 
 	consensus.state = CommitDone
 }

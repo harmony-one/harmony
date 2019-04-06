@@ -57,7 +57,6 @@ USAGE: $ME [OPTIONS] config_file_name
    -k nodeport    kill the node with specified port number (default: $KILLPORT)
    -n             dryrun mode (default: $DRYRUN)
    -S             enable sync test (default: $SYNC)
-   -P             enable libp2p peer discovery test (default: $P2P)
 
 This script will build all the binaries and start harmony and txgen based on the configuration file.
 
@@ -78,7 +77,6 @@ SHARDS=2
 KILLPORT=9004
 SYNC=true
 DRYRUN=
-P2P=false
 
 while getopts "hdtD:m:s:k:nSP" option; do
    case $option in
@@ -91,7 +89,6 @@ while getopts "hdtD:m:s:k:nSP" option; do
       k) KILLPORT=$OPTARG ;;
       n) DRYRUN=echo ;;
       S) SYNC=true ;;
-      P) P2P=true ;;
    esac
 done
 
@@ -118,6 +115,25 @@ HMY_OPT=
 # Change to the beacon chain output from deploy.sh
 HMY_OPT2=
 HMY_OPT3=
+
+unset -v latest_bootnode_log
+latest_bootnode_log=$(ls -tr "${ROOT}"/tmp_log/log-*/bootnode.log | tail -1)
+case "${latest_bootnode_log}" in
+"")
+	echo "cannot determine latest bootnode log"
+	exit 69
+	;;
+esac
+unset -v bn_ma
+bn_ma=$(sed -n 's:^.*BN_MA=::p' "${latest_bootnode_log}" | tail -1)
+case "${bn_ma}" in
+"")
+	echo "cannot determine boot node address from ${latest_bootnode_log}"
+	exit 69
+	;;
+esac
+echo "autodetected boot node multiaddr: ${bn_ma}"
+HMY_OPT2="-bootnodes ${bn_ma}"
 
 for i in 0{1..9} {10..99}
 do

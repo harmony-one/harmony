@@ -8,10 +8,10 @@ import (
 
 func TestNodeConfigSingleton(t *testing.T) {
 	// init 3 configs
-	_ = GetConfigs(2)
+	_ = GetShardConfig(2)
 
 	// get the singleton variable
-	c := GetConfigs(Global)
+	c := GetShardConfig(Global)
 
 	c.SetIsLeader(true)
 
@@ -21,7 +21,7 @@ func TestNodeConfigSingleton(t *testing.T) {
 
 	c.SetBeaconGroupID(p2p.GroupIDBeacon)
 
-	d := GetConfigs(Global)
+	d := GetShardConfig(Global)
 
 	if !d.IsLeader() {
 		t.Errorf("IsLeader = %v, expected = %v", d.IsLeader(), true)
@@ -36,18 +36,23 @@ func TestNodeConfigSingleton(t *testing.T) {
 
 func TestNodeConfigMultiple(t *testing.T) {
 	// init 3 configs
-	c := GetConfigs(2)
-	d := GetConfigs(1)
-	e := GetConfigs(0)
-	f := GetConfigs(42)
+	c := GetShardConfig(2)
+	d := GetShardConfig(1)
+	e := GetShardConfig(0)
+	f := GetShardConfig(42)
 
 	if f != nil {
 		t.Errorf("expecting nil, got: %v", f)
 	}
 
+	if c.IsBeacon() != false {
+		t.Errorf("expecting the node to not be beacon yet, got: %v", c.IsBeacon())
+	}
+
 	c.SetIsBeacon(true)
+
 	if c.IsBeacon() != true {
-		t.Errorf("expecting true, got: %v", c.IsBeacon())
+		t.Errorf("expecting the node to be beacon, got: %v", c.IsBeacon())
 	}
 
 	d.SetShardGroupID("abcd")

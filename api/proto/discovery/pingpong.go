@@ -30,6 +30,7 @@ type PingMessageType struct {
 
 // PongMessageType defines the data structure of the Pong message
 type PongMessageType struct {
+	ShardID      uint32
 	Version      uint16 // version of the protocol
 	Peers        []node.Info
 	PubKeys      [][]byte // list of publickKeys, has to be identical among all validators/leaders
@@ -65,8 +66,9 @@ func NewPingMessage(peer p2p.Peer, isClient bool) *PingMessageType {
 }
 
 // NewPongMessage creates a new Pong message based on a list of p2p.Peer and a list of publicKeys
-func NewPongMessage(peers []p2p.Peer, pubKeys []*bls.PublicKey, leaderKey *bls.PublicKey) *PongMessageType {
+func NewPongMessage(peers []p2p.Peer, pubKeys []*bls.PublicKey, leaderKey *bls.PublicKey, shardID uint32) *PongMessageType {
 	pong := new(PongMessageType)
+	pong.ShardID = shardID
 	pong.PubKeys = make([][]byte, 0)
 
 	pong.Version = proto.ProtocolVersion
@@ -93,7 +95,6 @@ func NewPongMessage(peers []p2p.Peer, pubKeys []*bls.PublicKey, leaderKey *bls.P
 	}
 
 	pong.LeaderPubKey = leaderKey.Serialize()
-	// utils.GetLogInstance().Info("[NewPongMessage]", "keys", len(pong.PubKeys), "peers", len(pong.Peers), "leaderPubKey", utils.GetAddressHex(leaderKey))
 
 	return pong
 }

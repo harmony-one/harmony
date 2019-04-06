@@ -28,7 +28,10 @@ func TestNewNode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus := consensus.New(host, 0, []p2p.Peer{leader, validator}, leader, nil)
+	consensus, err := consensus.New(host, 0, []p2p.Peer{leader, validator}, leader, nil)
+	if err != nil {
+		t.Fatalf("Cannot craeate consensus: %v", err)
+	}
 	node := New(host, consensus, nil, false)
 	if node.Consensus == nil {
 		t.Error("Consensus is not initialized for the node")
@@ -53,8 +56,10 @@ func TestGetSyncingPeers(t *testing.T) {
 		t.Fatalf("newhost failure: %v", err)
 	}
 
-	consensus := consensus.New(host, 0, []p2p.Peer{leader, validator}, leader, nil)
-
+	consensus, err := consensus.New(host, 0, []p2p.Peer{leader, validator}, leader, nil)
+	if err != nil {
+		t.Fatalf("Cannot craeate consensus: %v", err)
+	}
 	node := New(host, consensus, nil, false)
 	peer := p2p.Peer{IP: "127.0.0.1", Port: "8000"}
 	peer2 := p2p.Peer{IP: "127.0.0.1", Port: "8001"}
@@ -93,8 +98,11 @@ func TestAddPeers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus := consensus.New(host, 0, []p2p.Peer{leader, validator}, leader, nil)
-	dRand := drand.New(host, 0, []p2p.Peer{leader, validator}, leader, nil, true, nil)
+	consensus, err := consensus.New(host, 0, []p2p.Peer{leader, validator}, leader, nil)
+	if err != nil {
+		t.Fatalf("Cannot craeate consensus: %v", err)
+	}
+	dRand := drand.New(host, 0, []p2p.Peer{leader, validator}, leader, nil, nil)
 
 	node := New(host, consensus, nil, false)
 	node.DRand = dRand
@@ -136,8 +144,11 @@ func TestAddBeaconPeer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus := consensus.New(host, 0, []p2p.Peer{leader, validator}, leader, nil)
-	dRand := drand.New(host, 0, []p2p.Peer{leader, validator}, leader, nil, true, nil)
+	consensus, err := consensus.New(host, 0, []p2p.Peer{leader, validator}, leader, nil)
+	if err != nil {
+		t.Fatalf("Cannot craeate consensus: %v", err)
+	}
+	dRand := drand.New(host, 0, []p2p.Peer{leader, validator}, leader, nil, nil)
 
 	node := New(host, consensus, nil, false)
 	node.DRand = dRand
@@ -187,7 +198,7 @@ func sendPongMessage(node *Node, leader p2p.Peer) {
 	pubKeys := []*bls.PublicKey{pubKey1, pubKey2}
 	leaderPubKey := pki.GetBLSPrivateKeyFromInt(888).GetPublicKey()
 
-	pong1 := proto_discovery.NewPongMessage([]p2p.Peer{p1, p2}, pubKeys, leaderPubKey)
+	pong1 := proto_discovery.NewPongMessage([]p2p.Peer{p1, p2}, pubKeys, leaderPubKey, 0)
 	_ = pong1.ConstructPongMessage()
 }
 
@@ -207,7 +218,10 @@ func TestPingPongHandler(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus := consensus.New(host, 0, []p2p.Peer{leader}, leader, nil)
+	consensus, err := consensus.New(host, 0, []p2p.Peer{leader}, leader, nil)
+	if err != nil {
+		t.Fatalf("Cannot craeate consensus: %v", err)
+	}
 	node := New(host, consensus, nil, false)
 	//go sendPingMessage(leader)
 	go sendPongMessage(node, leader)

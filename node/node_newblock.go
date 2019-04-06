@@ -12,6 +12,7 @@ const (
 	DefaultThreshold   = 1
 	FirstTimeThreshold = 2
 	ConsensusTimeOut   = 10
+	PeriodicBlock      = 3 * time.Second
 )
 
 // WaitForConsensusReady listen for the readiness signal from consensus and generate new block for consensus.
@@ -21,7 +22,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 		defer close(stoppedChan)
 
 		utils.GetLogInstance().Debug("Waiting for Consensus ready")
-		time.Sleep(15 * time.Second) // Wait for other nodes to be ready (test-only)
+		time.Sleep(30 * time.Second) // Wait for other nodes to be ready (test-only)
 
 		firstTime := true
 		var newBlock *types.Block
@@ -37,6 +38,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 				utils.GetLogInstance().Debug("Consensus timeout, retry!", "count", timeoutCount)
 				// FIXME: retry is not working, there is no retry logic here. It will only wait for new transaction.
 			case <-stopChan:
+				utils.GetLogInstance().Debug("Consensus propose new block: STOPPED!")
 				return
 			}
 
@@ -62,17 +64,20 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 							// TODO(minhdoan): only happens for beaconchain
 							node.addNewShardStateHash(block)
 							newBlock = block
+							utils.GetLogInstance().Debug("Successfully proposed new block", "blockNum", block.NumberU64(), "numTxs", block.Transactions().Len())
 							break
 						}
 					}
 				}
 				// If not enough transactions to run Consensus,
 				// periodically check whether we have enough transactions to package into block.
-				time.Sleep(1 * time.Second)
+				time.Sleep(PeriodicBlock)
 			}
 			// Send the new block to Consensus so it can be confirmed.
 			if newBlock != nil {
+				utils.GetLogInstance().Debug("Consensus sending new block to block channel")
 				node.BlockChannel <- newBlock
+				utils.GetLogInstance().Debug("Consensus sent new block to block channel")
 			}
 		}
 	}()

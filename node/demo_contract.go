@@ -2,17 +2,17 @@ package node
 
 // CreateTransactionForEnterMethod creates transaction to call enter method of lottery contract.
 import (
+	"fmt"
+	"math"
 	"math/big"
 	"os"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/contracts"
-	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	contract_constants "github.com/harmony-one/harmony/internal/utils/contract"
@@ -106,9 +106,19 @@ func (node *Node) GetResultDirectly(priKey string) (players []string, balances [
 	return players, balances
 }
 
+// GenerateResultDirectly get current players and their balances, not from smart contract.
+func (node *Node) GenerateResultDirectly(addresses []common.Address) (players []string, balances []*big.Int) {
+	for _, address := range addresses {
+		players = append(players, address.String())
+		balances = append(balances, node.GetBalanceOfAddress(address))
+	}
+	fmt.Println("generate result", players, balances)
+	return players, balances
+}
+
 // GetResult get current players and their balances.
 func (node *Node) GetResult(priKey string) (players []string, balances []*big.Int) {
-	// return node.GetResult2(priKey)
+	// TODO(minhdoan): get result from smart contract is current not working. Fix it later.
 	abi, err := abi.JSON(strings.NewReader(contracts.LotteryABI))
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to generate staking contract's ABI", "error", err)
@@ -142,18 +152,16 @@ func (node *Node) GetResult(priKey string) (players []string, balances []*big.In
 		return nil, nil
 	}
 
-	ret := &structs.PlayersInfo{}
-	err = abi.Unpack(ret, "getPlayers", output)
+	ret := []common.Address{}
+	err = abi.Unpack(&ret, "getPlayers", output)
 
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to unpack stake info", "error", err)
+		utils.GetLogInstance().Error("Failed to unpack getPlayers", "error", err)
 		return nil, nil
 	}
-	for _, player := range ret.Players {
-		players = append(players, player.String())
-	}
-	balances = ret.Balances
-	return players, balances
+	utils.GetLogInstance().Info("get result: ", ret)
+	fmt.Println("get result called:", ret)
+	return node.GenerateResultDirectly(ret)
 }
 
 // CreateTransactionForPickWinner generates transaction for enter method and add it into pending tx list.
