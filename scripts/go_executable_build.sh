@@ -14,7 +14,7 @@ PUBBUCKET=pub.harmony.one
 GOOS=linux
 GOARCH=amd64
 FOLDER=/${WHOAMI:-$USER}
-RACE=
+RACE="-race"
 VERBOSE=
 
 unset -v progdir
