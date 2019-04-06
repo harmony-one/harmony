@@ -239,15 +239,15 @@ func (syncConfig *SyncConfig) CleanUpPeers(maxFirstID int) {
 }
 
 // GetBlockHashesConsensusAndCleanUp chesk if all consensus hashes are equal.
-func (ss *StateSync) GetBlockHashesConsensusAndCleanUp() bool {
+func (sc *SyncConfig) GetBlockHashesConsensusAndCleanUp() bool {
 	// Sort all peers by the blockHashes.
-	sort.Slice(ss.syncConfig.peers, func(i, j int) bool {
-		return CompareSyncPeerConfigByblockHashes(ss.syncConfig.peers[i], ss.syncConfig.peers[j]) == -1
+	sort.Slice(sc.peers, func(i, j int) bool {
+		return CompareSyncPeerConfigByblockHashes(sc.peers[i], sc.peers[j]) == -1
 	})
-	maxFirstID, maxCount := ss.syncConfig.GetHowManyMaxConsensus()
+	maxFirstID, maxCount := sc.GetHowManyMaxConsensus()
 	utils.GetLogInstance().Info("[SYNC] block consensus hashes", "maxFirstID", maxFirstID, "maxCount", maxCount)
-	if float64(maxCount) >= ConsensusRatio*float64(len(ss.syncConfig.peers)) {
-		ss.syncConfig.CleanUpPeers(maxFirstID)
+	if float64(maxCount) >= ConsensusRatio*float64(len(sc.peers)) {
+		sc.CleanUpPeers(maxFirstID)
 		return true
 	}
 	return false
@@ -270,7 +270,7 @@ func (ss *StateSync) GetConsensusHashes(startHash []byte) bool {
 			}(ss.syncConfig.peers[id])
 		}
 		wg.Wait()
-		if ss.GetBlockHashesConsensusAndCleanUp() {
+		if ss.syncConfig.GetBlockHashesConsensusAndCleanUp() {
 			break
 		}
 		if count > TimesToFail {
