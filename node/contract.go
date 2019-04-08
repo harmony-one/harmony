@@ -117,6 +117,7 @@ func (node *Node) GetNonceOfAddress(address common.Address) uint64 {
 	state, err := node.blockchain.State()
 	if err != nil {
 		log.Error("Failed to get chain state", "Error", err)
+		return 0
 	}
 	return state.GetNonce(address)
 }
@@ -126,6 +127,7 @@ func (node *Node) GetBalanceOfAddress(address common.Address) *big.Int {
 	state, err := node.blockchain.State()
 	if err != nil {
 		log.Error("Failed to get chain state", "Error", err)
+		return nil
 	}
 	return state.GetBalance(address)
 }
@@ -161,10 +163,16 @@ func (node *Node) callGetFreeTokenWithNonce(address common.Address, nonce uint64
 	abi, err := abi.JSON(strings.NewReader(contracts.FaucetABI))
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to generate faucet contract's ABI", "error", err)
+		return common.Hash{}
 	}
 	bytesData, err := abi.Pack("request", address)
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to generate ABI function bytes data", "error", err)
+		return common.Hash{}
+	}
+	if len(node.ContractAddresses) == 0 {
+		utils.GetLogInstance().Error("Failed to find the contract address")
+		return common.Hash{}
 	}
 	tx, _ := types.SignTx(types.NewTransaction(nonce, node.ContractAddresses[0], node.Consensus.ShardID, big.NewInt(0), params.TxGasContractCreation*10, nil, bytesData), types.HomesteadSigner{}, node.ContractDeployerKey)
 	utils.GetLogInstance().Info("Sending Free Token to ", "Address", address.Hex())
