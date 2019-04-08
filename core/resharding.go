@@ -167,12 +167,10 @@ func CalculateNewShardState(bc *BlockChain, epoch uint64, stakeInfo *map[common.
 	}
 	ss, err := GetShardingStateFromBlockChain(bc, epoch-1)
 	if err != nil {
-		utils.GetLogInstance().Crit("CANNOT CALCULATE SHARDING STATE",
+		utils.GetLogInstance().Error("CANNOT CALCULATE SHARDING STATE",
 			"epoch", epoch)
-		// TODO ek – what should we do here?  We are processing a new epoch
-		//  block, so we better have the new sharding state before advancing
-		//  to the next block (which would require the new sharding state),
-		//  but the sharding state is not available here.
+		// TODO cm - temporary fix, we cannot really proceed without previous state
+		ss = &ShardingState{epoch: epoch}
 	}
 	if epoch == FirstEpoch {
 		newNodes := []types.NodeID{}
