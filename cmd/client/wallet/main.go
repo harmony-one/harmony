@@ -439,6 +439,7 @@ func FetchBalance(address common.Address) map[uint32]AccountState {
 			response, err := client.GetBalance(address)
 			if err != nil {
 				log.Info("failed to get balance, retrying ...")
+				time.Sleep(200 * time.Millisecond)
 				continue
 			}
 			log.Debug("FetchBalance", "response", response)
@@ -453,25 +454,29 @@ func FetchBalance(address common.Address) map[uint32]AccountState {
 
 // GetFreeToken requests for token test token on each shard
 func GetFreeToken(address common.Address) {
-	for retry := 0; retry < rpcRetry; retry++ {
-		// use the 1st server from shard 0 (beacon chain) to make the getFreeToken call
-		server := walletProfile.RPCServer[0][0]
+	for i := 0; i < walletProfile.Shards; i++ {
+		// use the 1st server (leader) to make the getFreeToken call
+		server := walletProfile.RPCServer[i][0]
 		client, err := clientService.NewClient(server.IP, server.Port)
 		if err != nil {
 			continue
 		}
 
 		log.Debug("GetFreeToken", "server", server)
-		response, err := client.GetFreeToken(address)
-		if err != nil {
-			log.Info("failed to get free token, retrying ...")
-			continue
+
+		for retry := 0; retry < rpcRetry; retry++ {
+			response, err := client.GetFreeToken(address)
+			if err != nil {
+				log.Info("failed to get free token, retrying ...")
+				time.Sleep(200 * time.Millisecond)
+				continue
+			}
+			log.Debug("GetFreeToken", "response", response)
+			txID := common.Hash{}
+			txID.SetBytes(response.TxId)
+			fmt.Printf("Transaction Id requesting free token in shard %d: %s\n", int(0), txID.Hex())
+			break
 		}
-		log.Debug("GetFreeToken", "response", response)
-		txID := common.Hash{}
-		txID.SetBytes(response.TxId)
-		fmt.Printf("Transaction Id requesting free token in shard %d: %s\n", int(0), txID.Hex())
-		break
 	}
 }
 
