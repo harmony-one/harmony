@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"os/exec"
+	"syscall"
 	"time"
 
 	"github.com/harmony-one/harmony/core"
@@ -22,7 +24,7 @@ import (
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/pki"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
@@ -579,8 +581,32 @@ func (node *Node) processEpochShardState(epochShardState *types.EpochShardState)
 			utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d] I stay at shard %d, %s", epoch, myShard, aboutLeader), "BlsPubKey", hex.EncodeToString(myBlsPubKey))
 		} else {
 			utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d] I got resharded to shard %d from shard %d, %s", epoch, myShard, node.blockchain.ShardID(), aboutLeader), "BlsPubKey", hex.EncodeToString(myBlsPubKey))
+
+			execFile, err := lookPath()
+			if err != nil {
+				utils.GetLogInstance().Crit("Failed to get program path when restarting program" , "error", err)
+			}
+
+			utils.GetLogInstance().Info("Restarting program" , "args", os.Args, "env", os.Environ())
+			err = syscall.Exec(execFile, os.Args, os.Environ())
+			if err != nil {
+				utils.GetLogInstance().Crit("Failed to restart program after resharding" , "error", err)
+			}
+			os.Exit(0)
 		}
 	} else {
 		utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d]  Somehow I got kicked out", epoch), "BlsPubKey", hex.EncodeToString(myBlsPubKey))
+		os.Exit(0)
 	}
+}
+
+func lookPath() (argv0 string, err error) {
+	argv0, err = exec.LookPath(os.Args[0])
+	if nil != err {
+		return
+	}
+	if _, err = os.Stat(argv0); nil != err {
+		return
+	}
+	return
 }
