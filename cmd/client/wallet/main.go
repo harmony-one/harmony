@@ -53,7 +53,9 @@ type AccountState struct {
 }
 
 const (
-	rpcRetry = 3
+	rpcRetry          = 3
+	defaultConfigFile = ".hmy/wallet.ini"
+	defaultProfile    = "default"
 )
 
 var (
@@ -77,32 +79,7 @@ var (
 )
 
 var (
-	// list of bootnodes
-	addrStrings = []string{"/ip4/100.26.90.187/tcp/9876/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9", "/ip4/54.213.43.194/tcp/9876/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX"}
-
-	// list of rpc servers
-	rpcServers = []p2p.Peer{
-		p2p.Peer{
-			IP:   "18.236.187.250",
-			Port: "14555",
-		},
-		p2p.Peer{
-			IP:   "54.186.236.223",
-			Port: "14555",
-		},
-		p2p.Peer{
-			IP:   "18.213.246.142",
-			Port: "14555",
-		},
-		p2p.Peer{
-			IP:   "75.101.226.226",
-			Port: "14555",
-		},
-		p2p.Peer{
-			IP:   "34.221.85.140",
-			Port: "14555",
-		},
-	}
+	walletProfile *utils.WalletProfile
 )
 
 // setupLog setup log for verbose output
@@ -122,7 +99,10 @@ func main() {
 	// os.Arg[1] will be the subcommand
 	if len(os.Args) < 2 {
 		fmt.Println("Usage:")
-		fmt.Println("    wallet <action> <params>")
+		fmt.Println("    wallet -p profile <action> <params>")
+		fmt.Println("    -p profile       - Specify the profile of the wallet, either testnet/devnet or others configured. Default is: testnet")
+		fmt.Println("                       The profile is in file:", defaultConfigFile)
+		fmt.Println()
 		fmt.Println("Actions:")
 		fmt.Println("    1. new           - Generates a new account and store the private key locally")
 		fmt.Println("    2. list          - Lists all accounts in local keystore")
@@ -133,7 +113,7 @@ func main() {
 		fmt.Println("        --address        - The address to check balance for")
 		fmt.Println("    6. getFreeToken  - Gets free token on each shard")
 		fmt.Println("        --address        - The free token receiver account's address")
-		fmt.Println("    7. transfer")
+		fmt.Println("    7. transfer      - Transfer token from one account to another")
 		fmt.Println("        --from           - The sender account's address or index in the local keystore")
 		fmt.Println("        --to             - The receiver account's address")
 		fmt.Println("        --amount         - The amount of token to transfer")
@@ -149,22 +129,22 @@ ARG:
 		case "--verbose":
 			setupLog()
 			os.Args = os.Args[:len(os.Args)-1]
-		case "--devnet":
-			// the multiaddress of bootnodes for devnet
-			addrStrings = []string{"/ip4/100.26.90.187/tcp/9871/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv", "/ip4/54.213.43.194/tcp/9871/p2p/QmRVbTpEYup8dSaURZfF6ByrMTSKa4UyUzJhSjahFzRqNj"}
-			os.Args = os.Args[:len(os.Args)-1]
 		default:
 			break ARG
 		}
 	}
 
-	if len(os.Getenv("RpcNodes")) > 0 {
-		rpcServers = utils.StringsToPeers(os.Getenv("RpcNodes"))
+	var profile string
+	if os.Args[1] == "-p" {
+		profile = os.Args[2]
+		os.Args = os.Args[2:]
+	} else {
+		profile = defaultProfile
 	}
-	if len(rpcServers) == 0 {
-		fmt.Println("Error: please set environment variable RpcNodes")
-		fmt.Println("Example: export RpcNodes=127.0.0.1:8000,192.168.0.1:9999")
-		os.Exit(0)
+	if len(os.Args) == 1 {
+		fmt.Println("Missing action")
+		flag.PrintDefaults()
+		os.Exit(1)
 	}
 
 	// Switch on the subcommand
@@ -180,10 +160,13 @@ ARG:
 	case "import":
 		processImportCommnad()
 	case "balances":
+		readProfile(profile)
 		processBalancesCommand()
 	case "getFreeToken":
+		readProfile(profile)
 		processGetFreeToken()
 	case "transfer":
+		readProfile(profile)
 		processTransferCommand()
 	default:
 		fmt.Printf("Unknown action: %s\n", os.Args[1])
@@ -192,9 +175,19 @@ ARG:
 	}
 }
 
+func readProfile(profile string) {
+	fmt.Printf("Using %s profile for wallet\n", profile)
+	var err error
+	walletProfile, err = utils.ReadWalletProfile(defaultConfigFile, profile)
+	if err != nil {
+		fmt.Printf("Read wallet profile error: %v\nExiting ...\n", err)
+		os.Exit(2)
+	}
+}
+
 // createWalletNode creates wallet server node.
 func createWalletNode() *node.Node {
-	bootNodeAddrs, err := utils.StringsToAddrs(addrStrings)
+	bootNodeAddrs, err := utils.StringsToAddrs(walletProfile.Bootnodes)
 	if err != nil {
 		panic(err)
 	}
@@ -427,29 +420,30 @@ func convertBalanceIntoReadableFormat(balance *big.Int) string {
 }
 
 // FetchBalance fetches account balance of specified address from the Harmony network
-// TODO: (chao) add support for non beacon chain shards
 func FetchBalance(address common.Address) map[uint32]AccountState {
 	result := make(map[uint32]AccountState)
 	balance := big.NewInt(0)
-	result[0] = AccountState{balance, 0}
+	for i := 0; i < walletProfile.Shards; i++ {
+		result[uint32(i)] = AccountState{balance, 0}
 
-	for retry := 0; retry < rpcRetry; retry++ {
-		server := rpcServers[rand.Intn(len(rpcServers))]
-		client, err := clientService.NewClient(server.IP, server.Port)
-		if err != nil {
-			continue
-		}
+		for retry := 0; retry < rpcRetry; retry++ {
+			server := walletProfile.RPCServer[i][rand.Intn(len(walletProfile.RPCServer[i]))]
+			client, err := clientService.NewClient(server.IP, server.Port)
+			if err != nil {
+				continue
+			}
 
-		log.Debug("FetchBalance", "server", server)
-		response, err := client.GetBalance(address)
-		if err != nil {
-			log.Info("failed to get balance, retrying ...")
-			continue
+			log.Debug("FetchBalance", "server", server)
+			response, err := client.GetBalance(address)
+			if err != nil {
+				log.Info("failed to get balance, retrying ...")
+				continue
+			}
+			log.Debug("FetchBalance", "response", response)
+			balance.SetBytes(response.Balance)
+			result[uint32(i)] = AccountState{balance, response.Nonce}
+			break
 		}
-		log.Debug("FetchBalance", "response", response)
-		balance.SetBytes(response.Balance)
-		result[0] = AccountState{balance, response.Nonce}
-		break
 	}
 	return result
 }
@@ -457,7 +451,8 @@ func FetchBalance(address common.Address) map[uint32]AccountState {
 // GetFreeToken requests for token test token on each shard
 func GetFreeToken(address common.Address) {
 	for retry := 0; retry < rpcRetry; retry++ {
-		server := rpcServers[0]
+		// use the 1st server from shard 0 (beacon chain) to make the getFreeToken call
+		server := walletProfile.RPCServer[0][0]
 		client, err := clientService.NewClient(server.IP, server.Port)
 		if err != nil {
 			continue

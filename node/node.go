@@ -243,13 +243,13 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 		database := db
 		if database == nil {
 			database = ethdb.NewMemDatabase()
-			chain, err = node.GenesisBlockSetup(database, false)
+			chain, err = node.GenesisBlockSetup(database, consensusObj.ShardID, false)
 			isFirstTime = true
 		} else {
 			chain, err = node.InitBlockChainFromDB(db, node.Consensus, isArchival)
 			isFirstTime = false
 			if err != nil || chain == nil || chain.CurrentBlock().NumberU64() <= 0 {
-				chain, err = node.GenesisBlockSetup(database, isArchival)
+				chain, err = node.GenesisBlockSetup(database, consensusObj.ShardID, isArchival)
 				isFirstTime = true
 			}
 		}
@@ -267,18 +267,20 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 
-		if isFirstTime {
-			// Setup one time smart contracts
-			node.AddFaucetContractToPendingTransactions()
-			node.CurrentStakes = make(map[common.Address]*structs.StakeInfo)
-			node.AddStakingContractToPendingTransactions() //This will save the latest information about staked nodes in current staked
-			// TODO(minhdoan): Think of a better approach to deploy smart contract.
-			// This is temporary for demo purpose.
-			node.AddLotteryContract()
-		} else {
-			node.AddContractKeyAndAddress()
+		if node.Consensus.ShardID == 0 {
+			// Contracts only exist in beacon chain
+			if isFirstTime {
+				// Setup one time smart contracts
+				node.AddFaucetContractToPendingTransactions()
+				node.CurrentStakes = make(map[common.Address]*structs.StakeInfo)
+				node.AddStakingContractToPendingTransactions() //This will save the latest information about staked nodes in current staked
+				// TODO(minhdoan): Think of a better approach to deploy smart contract.
+				// This is temporary for demo purpose.
+				node.AddLotteryContract()
+			} else {
+				node.AddContractKeyAndAddress()
+			}
 		}
-
 	}
 
 	node.ContractCaller = contracts.NewContractCaller(&db, node.blockchain, params.TestChainConfig)
@@ -315,7 +317,14 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 // InitGenesisShardState initialize genesis shard state and update committee pub keys for consensus and drand
 func (node *Node) InitGenesisShardState() {
 	// Store the genesis shard state into db.
-	shardState := node.blockchain.StoreNewShardState(node.blockchain.CurrentBlock(), nil)
+	shardState := types.ShardState{}
+	if node.Consensus != nil {
+		if node.Consensus.ShardID == 0 {
+			shardState = node.blockchain.StoreNewShardState(node.blockchain.CurrentBlock(), nil)
+		} else {
+			shardState = node.beaconChain.StoreNewShardState(node.beaconChain.CurrentBlock(), nil)
+		}
+	}
 	// Update validator public keys
 	for _, shard := range shardState {
 		if shard.ShardID == node.Consensus.ShardID {
@@ -428,7 +437,7 @@ func (node *Node) AddBeaconChainDatabase(db ethdb.Database) {
 		database = ethdb.NewMemDatabase()
 	}
 	// TODO (chao) currently we use the same genesis block as normal shard
-	chain, err := node.GenesisBlockSetup(database, false)
+	chain, err := node.GenesisBlockSetup(database, 0, false)
 	if err != nil {
 		utils.GetLogInstance().Error("Error when doing genesis setup")
 		os.Exit(1)

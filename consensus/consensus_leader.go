@@ -55,28 +55,31 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan *types.Block, stop
 					utils.GetLogInstance().Debug("WaitForNewBlock", "removed peers", c)
 				}
 
-				if core.IsEpochBlock(newBlock) {
-					// Receive pRnd from DRG protocol
-					utils.GetLogInstance().Debug("[DRG] Waiting for pRnd")
-					pRndAndBitmap := <-consensus.PRndChannel
-					utils.GetLogInstance().Debug("[DRG] Got pRnd", "pRnd", pRndAndBitmap)
-					pRnd := [32]byte{}
-					copy(pRnd[:], pRndAndBitmap[:32])
-					bitmap := pRndAndBitmap[32:]
-					vrfBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.ConsensusPubKey)
-					vrfBitmap.SetMask(bitmap)
+				if consensus.ShardID == 0 {
+					if core.IsEpochBlock(newBlock) { // Only beacon chain do randomness generation
+						// Receive pRnd from DRG protocol
+						utils.GetLogInstance().Debug("[DRG] Waiting for pRnd")
+						pRndAndBitmap := <-consensus.PRndChannel
+						utils.GetLogInstance().Debug("[DRG] Got pRnd", "pRnd", pRndAndBitmap)
+						pRnd := [32]byte{}
+						copy(pRnd[:], pRndAndBitmap[:32])
+						bitmap := pRndAndBitmap[32:]
+						vrfBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.ConsensusPubKey)
+						vrfBitmap.SetMask(bitmap)
 
-					// TODO: check validity of pRnd
-					newBlock.AddRandPreimage(pRnd)
-				}
-				rnd, blockHash, err := consensus.GetNextRnd()
-				if err == nil {
-					// Verify the randomness
-					_ = blockHash
-					utils.GetLogInstance().Info("Adding randomness into new block", "rnd", rnd)
-					newBlock.AddRandSeed(rnd)
-				} else {
-					utils.GetLogInstance().Info("Failed to get randomness", "error", err)
+						// TODO: check validity of pRnd
+						newBlock.AddRandPreimage(pRnd)
+					}
+
+					rnd, blockHash, err := consensus.GetNextRnd()
+					if err == nil {
+						// Verify the randomness
+						_ = blockHash
+						utils.GetLogInstance().Info("Adding randomness into new block", "rnd", rnd)
+						newBlock.AddRandSeed(rnd)
+					} else {
+						utils.GetLogInstance().Info("Failed to get randomness", "error", err)
+					}
 				}
 				startTime = time.Now()
 				utils.GetLogInstance().Debug("STARTING CONSENSUS", "numTxs", len(newBlock.Transactions()), "consensus", consensus, "startTime", startTime, "publicKeys", len(consensus.PublicKeys))
@@ -312,7 +315,7 @@ func (consensus *Consensus) processCommitMessage(message *msg_pb.Message) {
 		select {
 		case consensus.VerifiedNewBlock <- &blockObj:
 		default:
-			utils.GetLogInstance().Info("[SYNC] consensus verified block send to chan failed", "blockHash", blockObj.Hash())
+			utils.GetLogInstance().Info("[SYNC] Failed to send consensus verified block for state sync", "blockHash", blockObj.Hash())
 		}
 
 		consensus.reportMetrics(blockObj)

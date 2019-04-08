@@ -288,52 +288,54 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 
 	node.AddNewBlock(newBlock)
 
-	// TODO: enable drand only for beacon chain
-	// ConfirmedBlockChannel which is listened by drand leader who will initiate DRG if its a epoch block (first block of a epoch)
-	if node.DRand != nil {
-		go func() {
-			node.ConfirmedBlockChannel <- newBlock
-		}()
-	}
+	if node.Consensus.ShardID == 0 {
 
-	utils.GetLogInstance().Info("Updating staking list")
-	node.UpdateStakingList(node.QueryStakeInfo())
-	// node.printStakingList()
-	if core.IsEpochBlock(newBlock) {
-		shardState := node.blockchain.StoreNewShardState(newBlock, &node.CurrentStakes)
-		if shardState != nil {
-			myShard := uint32(math.MaxUint32)
-			isLeader := false
-			myBlsPubKey := node.Consensus.PubKey.Serialize()
-			for _, shard := range shardState {
-				for _, nodeID := range shard.NodeList {
-					if bytes.Compare(nodeID.BlsPublicKey[:], myBlsPubKey) == 0 {
-						myShard = shard.ShardID
-						isLeader = shard.Leader == nodeID
+		// ConfirmedBlockChannel which is listened by drand leader who will initiate DRG if its a epoch block (first block of a epoch)
+		if node.DRand != nil {
+			go func() {
+				node.ConfirmedBlockChannel <- newBlock
+			}()
+		}
+
+		utils.GetLogInstance().Info("Updating staking list")
+		node.UpdateStakingList(node.QueryStakeInfo())
+		// node.printStakingList()
+		if core.IsEpochBlock(newBlock) {
+			shardState := node.blockchain.StoreNewShardState(newBlock, &node.CurrentStakes)
+			if shardState != nil {
+				myShard := uint32(math.MaxUint32)
+				isLeader := false
+				myBlsPubKey := node.Consensus.PubKey.Serialize()
+				for _, shard := range shardState {
+					for _, nodeID := range shard.NodeList {
+						if bytes.Compare(nodeID.BlsPublicKey[:], myBlsPubKey) == 0 {
+							myShard = shard.ShardID
+							isLeader = shard.Leader == nodeID
+						}
 					}
 				}
-			}
 
-			if myShard != uint32(math.MaxUint32) {
-				aboutLeader := ""
-				if node.Consensus.IsLeader {
-					aboutLeader = "I am not leader anymore"
-					if isLeader {
-						aboutLeader = "I am still leader"
+				if myShard != uint32(math.MaxUint32) {
+					aboutLeader := ""
+					if node.Consensus.IsLeader {
+						aboutLeader = "I am not leader anymore"
+						if isLeader {
+							aboutLeader = "I am still leader"
+						}
+					} else {
+						aboutLeader = "I am still validator"
+						if isLeader {
+							aboutLeader = "I become the leader"
+						}
+					}
+					if node.blockchain.ShardID() == myShard {
+						utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d] I stay at shard %d, %s", core.GetEpochFromBlockNumber(newBlock.NumberU64()), myShard, aboutLeader), "BlsPubKey", hex.EncodeToString(myBlsPubKey))
+					} else {
+						utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d] I got resharded to shard %d from shard %d, %s", core.GetEpochFromBlockNumber(newBlock.NumberU64()), myShard, node.blockchain.ShardID(), aboutLeader), "BlsPubKey", hex.EncodeToString(myBlsPubKey))
 					}
 				} else {
-					aboutLeader = "I am still validator"
-					if isLeader {
-						aboutLeader = "I become the leader"
-					}
+					utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d]  Somehow I got kicked out", core.GetEpochFromBlockNumber(newBlock.NumberU64())), "BlsPubKey", hex.EncodeToString(myBlsPubKey))
 				}
-				if node.blockchain.ShardID() == myShard {
-					utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d] I stay at shard %d, %s", core.GetEpochFromBlockNumber(newBlock.NumberU64()), myShard, aboutLeader), "BlsPubKey", hex.EncodeToString(myBlsPubKey))
-				} else {
-					utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d] I got resharded to shard %d from shard %d, %s", core.GetEpochFromBlockNumber(newBlock.NumberU64()), myShard, node.blockchain.ShardID(), aboutLeader), "BlsPubKey", hex.EncodeToString(myBlsPubKey))
-				}
-			} else {
-				utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d]  Somehow I got kicked out", core.GetEpochFromBlockNumber(newBlock.NumberU64())), "BlsPubKey", hex.EncodeToString(myBlsPubKey))
 			}
 		}
 	}

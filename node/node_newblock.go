@@ -38,6 +38,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 				utils.GetLogInstance().Debug("Consensus timeout, retry!", "count", timeoutCount)
 				// FIXME: retry is not working, there is no retry logic here. It will only wait for new transaction.
 			case <-stopChan:
+				utils.GetLogInstance().Debug("Consensus propose new block: STOPPED!")
 				return
 			}
 
@@ -59,9 +60,10 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 						if err != nil {
 							utils.GetLogInstance().Debug("Failed commiting new block", "Error", err)
 						} else {
-							// add new shard state if it's epoch block
-							// TODO(minhdoan): only happens for beaconchain
-							node.addNewShardStateHash(block)
+							if node.Consensus.ShardID == 0 {
+								// add new shard state if it's epoch block
+								node.addNewShardStateHash(block)
+							}
 							newBlock = block
 							utils.GetLogInstance().Debug("Successfully proposed new block", "blockNum", block.NumberU64(), "numTxs", block.Transactions().Len())
 							break
@@ -74,7 +76,9 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 			}
 			// Send the new block to Consensus so it can be confirmed.
 			if newBlock != nil {
+				utils.GetLogInstance().Debug("Consensus sending new block to block channel")
 				node.BlockChannel <- newBlock
+				utils.GetLogInstance().Debug("Consensus sent new block to block channel")
 			}
 		}
 	}()

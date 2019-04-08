@@ -13,6 +13,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
@@ -61,10 +62,9 @@ SyncingLoop:
 				node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
 			}
 			if node.stateSync.GetActivePeerNumber() == 0 {
-				if node.stateSync.CreateSyncConfig(getPeers()) {
-					node.stateSync.MakeConnectionToPeers()
-				} else {
-					utils.GetLogInstance().Debug("[SYNC] no active peers, continue SyncingLoop")
+				peers := getPeers()
+				if err := node.stateSync.CreateSyncConfig(peers); err != nil {
+					ctxerror.Log15(utils.GetLogInstance().Debug, err)
 					continue SyncingLoop
 				}
 			}
@@ -116,13 +116,17 @@ func (node *Node) GetSync() {
 
 // InitSyncingServer starts downloader server.
 func (node *Node) InitSyncingServer() {
-	node.downloaderServer = downloader.NewServer(node)
+	if node.downloaderServer == nil {
+		node.downloaderServer = downloader.NewServer(node)
+	}
 }
 
 // StartSyncingServer starts syncing server.
 func (node *Node) StartSyncingServer() {
 	utils.GetLogInstance().Info("support_sycning: StartSyncingServer")
-	node.downloaderServer.Start(node.SelfPeer.IP, syncing.GetSyncingPort(node.SelfPeer.Port))
+	if node.downloaderServer.GrpcServer == nil {
+		node.downloaderServer.Start(node.SelfPeer.IP, syncing.GetSyncingPort(node.SelfPeer.Port))
+	}
 }
 
 // SendNewBlockToUnsync send latest verified block to unsync, registered nodes

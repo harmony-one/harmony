@@ -20,13 +20,7 @@ install:
   - make
   - cd ../harmony
   - go get -v ./...
-  - go get -u golang.org/x/lint/golint
-  - go get -u golang.org/x/tools/cmd/goimports
-  - go get gopkg.in/check.v1
-  - go get github.com/harmony-ek/gencodec
-  - go get github.com/golang/mock/mockgen
-  - go get github.com/golang/protobuf/protoc-gen-go
-  - ./scripts/install_protoc.sh -V 3.6.1
+  - scripts/install_build_tools.sh
 script:
   - go build -v ./...
   - ./scripts/travis_checker.sh
