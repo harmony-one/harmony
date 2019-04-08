@@ -491,11 +491,15 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 	} else {
 		utils.GetLogInstance().Info("Set Consensus Leader PubKey", "key", utils.GetAddressHex(node.Consensus.GetLeaderPubKey()))
 	}
-	err = node.DRand.SetLeaderPubKey(pong.LeaderPubKey)
-	if err != nil {
-		utils.GetLogInstance().Error("Unmarshal DRand Leader PubKey Failed", "error", err)
-	} else {
-		utils.GetLogInstance().Info("Set DRand Leader PubKey")
+
+	// Disable Drand if the constant is set true.
+	if !nodeconfig.DrandDisable {
+		err = node.DRand.SetLeaderPubKey(pong.LeaderPubKey)
+		if err != nil {
+			utils.GetLogInstance().Error("Unmarshal DRand Leader PubKey Failed", "error", err)
+		} else {
+			utils.GetLogInstance().Info("Set DRand Leader PubKey")
+		}
 	}
 
 	peers := make([]*p2p.Peer, 0)
@@ -546,5 +550,9 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 	data["peer"] = p2p.GroupAction{Name: node.NodeConfig.GetShardGroupID(), Action: p2p.ActionPause}
 
 	node.serviceManager.TakeAction(&service.Action{Action: service.Notify, ServiceType: service.PeerDiscovery, Params: data})
-	return node.Consensus.UpdatePublicKeys(publicKeys) + node.DRand.UpdatePublicKeys(publicKeys)
+	// Disable Drand if the constant is set true.
+	if !nodeconfig.DrandDisable {
+		node.DRand.UpdatePublicKeys(publicKeys)
+	}
+	return node.Consensus.UpdatePublicKeys(publicKeys)
 }

@@ -237,10 +237,12 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	// TODO: enable drand only for beacon chain
 	// TODO: put this in a better place other than main.
 	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of drand later.
-	dRand := drand.New(nodeConfig.Host, nodeConfig.ShardID, []p2p.Peer{}, nodeConfig.Leader, currentNode.ConfirmedBlockChannel, *isLeader, nodeConfig.ConsensusPriKey)
-	currentNode.Consensus.RegisterPRndChannel(dRand.PRndChannel)
-	currentNode.Consensus.RegisterRndChannel(dRand.RndChannel)
-	currentNode.DRand = dRand
+	if !nodeconfig.DrandDisable {
+		dRand := drand.New(nodeConfig.Host, nodeConfig.ShardID, []p2p.Peer{}, nodeConfig.Leader, currentNode.ConfirmedBlockChannel, *isLeader, nodeConfig.ConsensusPriKey)
+		currentNode.Consensus.RegisterPRndChannel(dRand.PRndChannel)
+		currentNode.Consensus.RegisterRndChannel(dRand.RndChannel)
+		currentNode.DRand = dRand
+	}
 
 	// Assign closure functions to the consensus object
 	consensus.BlockVerifier = currentNode.VerifyNewBlock

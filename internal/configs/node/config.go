@@ -17,6 +17,10 @@ import (
 // Role defines a role of a node.
 type Role byte
 
+const (
+	DrandDisable = true
+)
+
 // All constants for different node roles.
 const (
 	Unknown Role = iota
