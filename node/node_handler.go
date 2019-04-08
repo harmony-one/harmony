@@ -316,39 +316,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 						utils.GetLogInstance().Info("[Resharding] broadcasted shard state message to", "group", node.NodeConfig.GetClientGroupID())
 					}
 				}
-				myShard := uint32(math.MaxUint32)
-				isLeader := false
-				myBlsPubKey := node.Consensus.PubKey.Serialize()
-				for _, shard := range shardState {
-					for _, nodeID := range shard.NodeList {
-						if bytes.Compare(nodeID.BlsPublicKey[:], myBlsPubKey) == 0 {
-							myShard = shard.ShardID
-							isLeader = shard.Leader == nodeID
-						}
-					}
-				}
-
-				if myShard != uint32(math.MaxUint32) {
-					aboutLeader := ""
-					if node.Consensus.IsLeader {
-						aboutLeader = "I am not leader anymore"
-						if isLeader {
-							aboutLeader = "I am still leader"
-						}
-					} else {
-						aboutLeader = "I am still validator"
-						if isLeader {
-							aboutLeader = "I become the leader"
-						}
-					}
-					if node.blockchain.ShardID() == myShard {
-						utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d] I stay at shard %d, %s", core.GetEpochFromBlockNumber(newBlock.NumberU64()), myShard, aboutLeader), "BlsPubKey", hex.EncodeToString(myBlsPubKey))
-					} else {
-						utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d] I got resharded to shard %d from shard %d, %s", core.GetEpochFromBlockNumber(newBlock.NumberU64()), myShard, node.blockchain.ShardID(), aboutLeader), "BlsPubKey", hex.EncodeToString(myBlsPubKey))
-					}
-				} else {
-					utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d]  Somehow I got kicked out", core.GetEpochFromBlockNumber(newBlock.NumberU64())), "BlsPubKey", hex.EncodeToString(myBlsPubKey))
-				}
+				node.processEpochShardState(&types.EpochShardState{Epoch: core.GetEpochFromBlockNumber(newBlock.NumberU64()), ShardState: shardState})
 			}
 		}
 	}
@@ -577,5 +545,42 @@ func (node *Node) epochShardStateMessageHandler(msgPayload []byte) int {
 }
 
 func (node *Node) processEpochShardState(epochShardState *types.EpochShardState) {
-	utils.GetLogInstance().Error("[Received shard state]")
+	utils.GetLogInstance().Error("[Received shard state]", "shardState", epochShardState)
+
+	shardState := epochShardState.ShardState
+	epoch := epochShardState.Epoch
+
+	myShard := uint32(math.MaxUint32)
+	isNextLeader := false
+	myBlsPubKey := node.Consensus.PubKey.Serialize()
+	for _, shard := range shardState {
+		for _, nodeID := range shard.NodeList {
+			if bytes.Compare(nodeID.BlsPublicKey[:], myBlsPubKey) == 0 {
+				myShard = shard.ShardID
+				isNextLeader = shard.Leader == nodeID
+			}
+		}
+	}
+
+	if myShard != uint32(math.MaxUint32) {
+		aboutLeader := ""
+		if node.Consensus.IsLeader {
+			aboutLeader = "I am not leader anymore"
+			if isNextLeader {
+				aboutLeader = "I am still leader"
+			}
+		} else {
+			aboutLeader = "I am still validator"
+			if isNextLeader {
+				aboutLeader = "I become the leader"
+			}
+		}
+		if node.blockchain.ShardID() == myShard {
+			utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d] I stay at shard %d, %s", epoch, myShard, aboutLeader), "BlsPubKey", hex.EncodeToString(myBlsPubKey))
+		} else {
+			utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d] I got resharded to shard %d from shard %d, %s", epoch, myShard, node.blockchain.ShardID(), aboutLeader), "BlsPubKey", hex.EncodeToString(myBlsPubKey))
+		}
+	} else {
+		utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d]  Somehow I got kicked out", epoch), "BlsPubKey", hex.EncodeToString(myBlsPubKey))
+	}
 }
