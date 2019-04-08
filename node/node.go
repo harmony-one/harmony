@@ -347,7 +347,9 @@ func (node *Node) AddPeers(peers []*p2p.Peer) int {
 	if count > 0 && node.NodeConfig.IsLeader() {
 		node.Consensus.AddPeers(peers)
 		// TODO: make peers into a context object shared by consensus and drand
-		node.DRand.AddPeers(peers)
+		if !nodeconfig.DrandDisable {
+			node.DRand.AddPeers(peers)
+		}
 	}
 	return count
 }
