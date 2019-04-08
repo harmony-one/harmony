@@ -39,6 +39,13 @@ function myip() {
    fi
 }
 
+function add_env
+{
+   filename=$1
+   shift
+   grep -qxF "$@" $filename || echo "$@" >> $filename
+}
+
 function setup_env
 {
 # setup environment variables, may not be nessary
@@ -49,15 +56,15 @@ function setup_env
    sysctl -w net.ipv4.tcp_wmem='4096 65536 16777216'
    sysctl -w net.ipv4.tcp_mem='65536 131072 262144'
 
-   echo "* soft     nproc          65535" | sudo tee -a /etc/security/limits.conf
-   echo "* hard     nproc          65535" | sudo tee -a /etc/security/limits.conf
-   echo "* soft     nofile         65535" | sudo tee -a /etc/security/limits.conf
-   echo "* hard     nofile         65535" | sudo tee -a /etc/security/limits.conf
-   echo "root soft     nproc          65535" | sudo tee -a /etc/security/limits.conf
-   echo "root hard     nproc          65535" | sudo tee -a /etc/security/limits.conf
-   echo "root soft     nofile         65535" | sudo tee -a /etc/security/limits.conf
-   echo "root hard     nofile         65535" | sudo tee -a /etc/security/limits.conf
-   echo "session required pam_limits.so" | sudo tee -a /etc/pam.d/common-session
+   add_env /etc/security/limits.conf "* soft     nproc          65535"
+   add_env /etc/security/limits.conf "* hard     nproc          65535"
+   add_env /etc/security/limits.conf "* soft     nofile         65535"
+   add_env /etc/security/limits.conf "* hard     nofile         65535"
+   add_env /etc/security/limits.conf "root soft     nproc          65535"
+   add_env /etc/security/limits.conf "root hard     nproc          65535"
+   add_env /etc/security/limits.conf "root soft     nofile         65535"
+   add_env /etc/security/limits.conf "root hard     nofile         65535"
+   add_env /etc/pam.d/common-session "session required pam_limits.so"
 }
 
 function find_harmony_process
@@ -72,7 +79,7 @@ function find_harmony_process
 ######## main #########
 if [[ $EUID -ne 0 ]]; then
    echo "This script must be run as root"
-   echo Please use \"sudo ./node.sh\"
+   echo Please use \"sudo $0\"
    exit 1
 fi
 
@@ -136,6 +143,6 @@ echo Please run the following command to inspect the log
 echo "tail -f harmony-${PUB_IP}.log"
 
 echo
-echo You may use \"sudo kill harmony\" to terminate running harmony node program.
+echo You may use \"sudo pkill harmony\" to terminate running harmony node program.
 
 trap killnode SIGINT SIGTERM
