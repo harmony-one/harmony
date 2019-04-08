@@ -422,8 +422,10 @@ func convertBalanceIntoReadableFormat(balance *big.Int) string {
 // FetchBalance fetches account balance of specified address from the Harmony network
 func FetchBalance(address common.Address) map[uint32]AccountState {
 	result := make(map[uint32]AccountState)
-	balance := big.NewInt(0)
 	for i := 0; i < walletProfile.Shards; i++ {
+		balance := big.NewInt(0)
+		var nonce uint64
+
 		result[uint32(i)] = AccountState{balance, 0}
 
 		for retry := 0; retry < rpcRetry; retry++ {
@@ -441,9 +443,10 @@ func FetchBalance(address common.Address) map[uint32]AccountState {
 			}
 			log.Debug("FetchBalance", "response", response)
 			balance.SetBytes(response.Balance)
-			result[uint32(i)] = AccountState{balance, response.Nonce}
+			nonce = response.Nonce
 			break
 		}
+		result[uint32(i)] = AccountState{balance, nonce}
 	}
 	return result
 }
