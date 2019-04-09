@@ -493,7 +493,7 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 	}
 
 	// Disable Drand if the constant is set true.
-	if !nodeconfig.DrandDisable {
+	if nodeconfig.GetGlobalConfig().DrandEnable {
 		err = node.DRand.SetLeaderPubKey(pong.LeaderPubKey)
 		if err != nil {
 			utils.GetLogInstance().Error("Unmarshal DRand Leader PubKey Failed", "error", err)
@@ -551,7 +551,7 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 
 	node.serviceManager.TakeAction(&service.Action{Action: service.Notify, ServiceType: service.PeerDiscovery, Params: data})
 	// Disable Drand if the constant is set true.
-	if !nodeconfig.DrandDisable {
+	if nodeconfig.GetGlobalConfig().DrandEnable {
 		node.DRand.UpdatePublicKeys(publicKeys)
 	}
 	return node.Consensus.UpdatePublicKeys(publicKeys)
