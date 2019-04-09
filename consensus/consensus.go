@@ -647,7 +647,7 @@ func (consensus *Consensus) accumulateRewards(
 			"parentHash", header.ParentHash.Hex(),
 		)
 	}
-	mask, err := bls_cosi.NewMask(consensus.PublicKeys, consensus.PubKey)
+	mask, err := bls_cosi.NewMask(consensus.PublicKeys, nil)
 	if err != nil {
 		return ctxerror.New("cannot create group sig mask").WithCause(err)
 	}
