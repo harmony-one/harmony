@@ -14,6 +14,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -55,29 +56,32 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan *types.Block, stop
 					utils.GetLogInstance().Debug("WaitForNewBlock", "removed peers", c)
 				}
 
-				if core.IsEpochBlock(newBlock) {
-					// Receive pRnd from DRG protocol
-					utils.GetLogInstance().Debug("[DRG] Waiting for pRnd")
-					pRndAndBitmap := <-consensus.PRndChannel
-					utils.GetLogInstance().Debug("[DRG] GOT pRnd", "pRnd", pRndAndBitmap)
-					pRnd := [32]byte{}
-					copy(pRnd[:], pRndAndBitmap[:32])
-					bitmap := pRndAndBitmap[32:]
-					vrfBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.ConsensusPubKey)
-					vrfBitmap.SetMask(bitmap)
+				if nodeconfig.GetGlobalConfig().DrandEnable {
+					if core.IsEpochBlock(newBlock) {
+						// Receive pRnd from DRG protocol
+						utils.GetLogInstance().Debug("[DRG] Waiting for pRnd")
+						pRndAndBitmap := <-consensus.PRndChannel
+						utils.GetLogInstance().Debug("[DRG] GOT pRnd", "pRnd", pRndAndBitmap)
+						pRnd := [32]byte{}
+						copy(pRnd[:], pRndAndBitmap[:32])
+						bitmap := pRndAndBitmap[32:]
+						vrfBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.ConsensusPubKey)
+						vrfBitmap.SetMask(bitmap)
 
-					// TODO: check validity of pRnd
-					newBlock.AddRandPreimage(pRnd)
+						// TODO: check validity of pRnd
+						newBlock.AddRandPreimage(pRnd)
+					}
+					rnd, blockHash, err := consensus.GetNextRnd()
+					if err == nil {
+						// Verify the randomness
+						_ = blockHash
+						utils.GetLogInstance().Info("Adding randomness into new block", "rnd", rnd)
+						newBlock.AddRandSeed(rnd)
+					} else {
+						utils.GetLogInstance().Info("Failed to get randomness", "error", err)
+					}
 				}
-				rnd, blockHash, err := consensus.GetNextRnd()
-				if err == nil {
-					// Verify the randomness
-					_ = blockHash
-					utils.GetLogInstance().Info("Adding randomness into new block", "rnd", rnd)
-					newBlock.AddRandSeed(rnd)
-				} else {
-					utils.GetLogInstance().Info("Failed to get randomness", "error", err)
-				}
+
 				startTime = time.Now()
 				utils.GetLogInstance().Debug("STARTING CONSENSUS", "numTxs", len(newBlock.Transactions()), "consensus", consensus, "startTime", startTime, "publicKeys", len(consensus.PublicKeys))
 				for { // Wait until last consensus is finished

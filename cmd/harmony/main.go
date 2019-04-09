@@ -93,6 +93,8 @@ var (
 	isLeader = flag.Bool("is_leader", false, "true means this node is a beacon chain leader node")
 	// logConn logs incoming/outgoing connections
 	logConn = flag.Bool("log_conn", false, "log incoming/outgoing connections")
+	// drandEnable enables drand randomness
+	drandEnable = flag.Bool("drand_enable", false, "enable drand")
 )
 
 func initSetup() {
@@ -183,6 +185,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	}
 
 	nodeConfig.Host.AddPeer(&nodeConfig.Leader)
+	nodeConfig.DrandEnable = *drandEnable
 
 	return nodeConfig
 }
@@ -237,7 +240,7 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	// TODO: enable drand only for beacon chain
 	// TODO: put this in a better place other than main.
 	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of drand later.
-	if !nodeconfig.DrandDisable {
+	if nodeconfig.GetGlobalConfig().DrandEnable {
 		dRand := drand.New(nodeConfig.Host, nodeConfig.ShardID, []p2p.Peer{}, nodeConfig.Leader, currentNode.ConfirmedBlockChannel, *isLeader, nodeConfig.ConsensusPriKey)
 		currentNode.Consensus.RegisterPRndChannel(dRand.PRndChannel)
 		currentNode.Consensus.RegisterRndChannel(dRand.RndChannel)

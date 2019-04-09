@@ -17,10 +17,6 @@ import (
 // Role defines a role of a node.
 type Role byte
 
-const (
-	DrandDisable = true
-)
-
 // All constants for different node roles.
 const (
 	Unknown Role = iota
@@ -64,14 +60,15 @@ const (
 // ConfigType is the structure of all node related configuration variables
 type ConfigType struct {
 	// The three groupID design, please refer to https://github.com/harmony-one/harmony/blob/master/node/node.md#libp2p-integration
-	beacon   p2p.GroupID // the beacon group ID
-	group    p2p.GroupID // the group ID of the shard
-	client   p2p.GroupID // the client group ID of the shard
-	isClient bool        // whether this node is a client node, such as wallet/txgen
-	isBeacon bool        // whether this node is a beacon node or not
-	isLeader bool        // whether this node is a leader or not
-	ShardID  uint32      // ShardID of this node
-	role     Role        // Role of the node
+	beacon      p2p.GroupID // the beacon group ID
+	group       p2p.GroupID // the group ID of the shard
+	client      p2p.GroupID // the client group ID of the shard
+	isClient    bool        // whether this node is a client node, such as wallet/txgen
+	isBeacon    bool        // whether this node is a beacon node or not
+	isLeader    bool        // whether this node is a leader or not
+	DrandEnable bool
+	ShardID     uint32 // ShardID of this node
+	role        Role   // Role of the node
 
 	StringRole      string
 	Host            p2p.Host
