@@ -16,6 +16,7 @@ GOARCH=amd64
 FOLDER=/${WHOAMI:-$USER}
 RACE=
 VERBOSE=
+DEBUG=
 
 unset -v progdir
 case "${0}" in
@@ -54,6 +55,7 @@ OPTIONS:
    -f folder      set the upload folder name in the bucket (default: $FOLDER)
    -r             enable -race build option (default: $RACE)
    -v             verbose build process (default: $VERBOSE)
+   -d             enable debug symbol (default: $DEBUG)
 
 ACTION:
    build       build binaries only (default action)
@@ -91,7 +93,7 @@ function build_only
       if [[ -z "$build" || "$bin" == "$build" ]]; then
          rm -f $BINDIR/$bin
          echo "building ${SRC[$bin]}"
-         env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE ${SRC[$bin]}
+         env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE $DEBUG -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE ${SRC[$bin]}
          if [ "$(uname -s)" == "Linux" ]; then
             $BINDIR/$bin -version
          fi
@@ -165,7 +167,7 @@ function upload_wallet
 }
 
 ################################ MAIN FUNCTION ##############################
-while getopts "hp:a:o:b:f:rv" option; do
+while getopts "hp:a:o:b:f:rvd" option; do
    case $option in
       h) usage ;;
       p) PROFILE=$OPTARG ;;
@@ -175,6 +177,7 @@ while getopts "hp:a:o:b:f:rv" option; do
       f) FOLDER=$OPTARG ;;
       r) RACE=-race ;;
       v) VERBOSE='-v -x' ;;
+      d) DEBUG='-gcflags=all="-N -l"' ;;
    esac
 done
 
