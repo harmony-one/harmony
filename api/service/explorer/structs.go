@@ -49,6 +49,7 @@ type Block struct {
 	Bytes      string         `json:"bytes"`
 	NextBlock  RefBlock       `json:"nextBlock"`
 	TXs        []*Transaction `json:"txs"`
+	Signers    []string       `json:"signers"`
 }
 
 // RefBlock ...
@@ -65,6 +66,20 @@ type Node struct {
 // Shard ...
 type Shard struct {
 	Nodes []Node `json:"nodes"`
+}
+
+// NewBlock ...
+func NewBlock(block *types.Block, height int) *Block {
+	// TODO(ricl): use block.Header().CommitBitmap and GetPubKeyFromMask
+	return &Block{
+		Height:     strconv.Itoa(height),
+		ID:         block.Hash().Hex(),
+		TXCount:    strconv.Itoa(block.Transactions().Len()),
+		Timestamp:  strconv.Itoa(int(block.Time().Int64() * 1000)),
+		MerkleRoot: block.Hash().Hex(),
+		Bytes:      strconv.Itoa(int(block.Size())),
+		Signers:    []string{},
+	}
 }
 
 // GetTransaction ...

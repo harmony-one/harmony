@@ -11,11 +11,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/gorilla/mux"
-	"github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 )
 
 // Constants for explorer service.
@@ -28,18 +28,18 @@ type Service struct {
 	router      *mux.Router
 	IP          string
 	Port        string
-	GetPeers    func() []*bls.PublicKey
+	GetNodeIDs  func() []libp2p_peer.ID
 	storage     *Storage
 	server      *http.Server
 	messageChan chan *msg_pb.Message
 }
 
 // New returns explorer service.
-func New(selfPeer *p2p.Peer, GetPeers func() []*bls.PublicKey) *Service {
+func New(selfPeer *p2p.Peer, GetNodeIDs func() []libp2p_peer.ID) *Service {
 	return &Service{
-		IP:       selfPeer.IP,
-		Port:     selfPeer.Port,
-		GetPeers: GetPeers,
+		IP:         selfPeer.IP,
+		Port:       selfPeer.Port,
+		GetNodeIDs: GetNodeIDs,
 	}
 }
 
@@ -107,8 +107,8 @@ func (s *Service) Run() *http.Server {
 	return server
 }
 
-// GetAccountBlocks returns a list of types.Block to server blocks end-point.
-func (s *Service) GetAccountBlocks(from, to int) []*types.Block {
+// ReadBlocksFromDB returns a list of types.Block to server blocks end-point.
+func (s *Service) ReadBlocksFromDB(from, to int) []*types.Block {
 	blocks := []*types.Block{}
 	for i := from - 1; i <= to+1; i++ {
 		if i < 0 {
@@ -160,19 +160,12 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accountBlocks := s.GetAccountBlocks(fromInt, toInt)
+	accountBlocks := s.ReadBlocksFromDB(fromInt, toInt)
 	for id, accountBlock := range accountBlocks {
 		if id == 0 || id == len(accountBlocks)-1 || accountBlock == nil {
 			continue
 		}
-		block := &Block{
-			Height:     strconv.Itoa(id + fromInt - 1),
-			ID:         accountBlock.Hash().Hex(),
-			TXCount:    strconv.Itoa(accountBlock.Transactions().Len()),
-			Timestamp:  strconv.Itoa(int(accountBlock.Time().Int64() * 1000)),
-			MerkleRoot: accountBlock.Hash().Hex(),
-			Bytes:      strconv.Itoa(int(accountBlock.Size())),
-		}
+		block := NewBlock(accountBlock, id+fromInt-1)
 		// Populate transactions
 		for _, tx := range accountBlock.Transactions() {
 			transaction := GetTransaction(tx, accountBlock)
@@ -261,16 +254,16 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 // GetExplorerNodeCount serves /nodes end-point.
 func (s *Service) GetExplorerNodeCount(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(len(s.GetPeers()))
+	json.NewEncoder(w).Encode(len(s.GetNodeIDs()))
 }
 
 // GetExplorerShard serves /shard end-point
 func (s *Service) GetExplorerShard(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var nodes []Node
-	for _, node := range s.GetPeers() {
+	for _, nodeID := range s.GetNodeIDs() {
 		nodes = append(nodes, Node{
-			ID: node.SerializeToHexStr(),
+			ID: libp2p_peer.IDB58Encode(nodeID),
 		})
 	}
 	json.NewEncoder(w).Encode(Shard{
