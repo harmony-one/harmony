@@ -343,14 +343,14 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 			defer wg.Done()
 			for !stateSyncTaskQueue.Empty() {
 				task, err := ss.stateSyncTaskQueue.Poll(1, time.Millisecond)
-				if err == queue.ErrTimeout {
+				if err == queue.ErrTimeout || len(task) == 0 {
 					utils.GetLogInstance().Debug("[SYNC] ss.stateSyncTaskQueue poll timeout", "error", err)
 					break
 				}
 				syncTask := task[0].(SyncBlockTask)
 				//id := syncTask.index
 				payload, err := peerConfig.GetBlocks([][]byte{syncTask.blockHash})
-				if err != nil {
+				if err != nil || len(payload) == 0 {
 					count++
 					utils.GetLogInstance().Debug("[SYNC] GetBlocks failed", "failNumber", count)
 					if count > TimesToFail {
