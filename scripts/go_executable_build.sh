@@ -16,6 +16,7 @@ GOARCH=amd64
 FOLDER=/${WHOAMI:-$USER}
 RACE=
 VERBOSE=
+DEBUG=false
 
 unset -v progdir
 case "${0}" in
@@ -84,14 +85,17 @@ function build_only
    COMMIT=$(git describe --always --long --dirty)
    BUILTAT=$(date +%FT%T%z)
    BUILTBY=${USER}@
-
    local build=$1
 
    for bin in "${!SRC[@]}"; do
       if [[ -z "$build" || "$bin" == "$build" ]]; then
          rm -f $BINDIR/$bin
          echo "building ${SRC[$bin]}"
-         env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE ${SRC[$bin]}
+         if [ "$DEBUG" == "true" ]; then
+            env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="all=-N -l -c 2" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE ${SRC[$bin]}
+         else
+            env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="all=-c 2" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE ${SRC[$bin]}
+         fi
          if [ "$(uname -s)" == "Linux" ]; then
             $BINDIR/$bin -version
          fi
@@ -175,6 +179,7 @@ while getopts "hp:a:o:b:f:rv" option; do
       f) FOLDER=$OPTARG ;;
       r) RACE=-race ;;
       v) VERBOSE='-v -x' ;;
+      d) DEBUG=true ;;
    esac
 done
 
