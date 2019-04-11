@@ -75,6 +75,11 @@ func (node *Node) QueryStakeInfo() *structs.StakeInfoReturnValue {
 
 	state, err := node.blockchain.State()
 
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to get blockchain state", "error", err)
+		return nil
+	}
+
 	stakingContractAddress := crypto.CreateAddress(deployerAddress, uint64(0))
 	tx := types.NewTransaction(
 		state.GetNonce(deployerAddress),

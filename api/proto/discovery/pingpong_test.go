@@ -89,6 +89,9 @@ func TestSerialize(test *testing.T) {
 	buf2 = pong1.ConstructPongMessage()
 
 	msg2, err := proto.GetMessagePayload(buf2)
+	if err != nil {
+		test.Error("GetMessagePayload Failed!")
+	}
 	pong, err := GetPongMessage(msg2)
 	if err != nil {
 		test.Error("Pong failed!")

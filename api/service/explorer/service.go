@@ -146,12 +146,19 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 	}
 	db := s.storage.GetDB()
 	fromInt, err := strconv.Atoi(from)
+	if err != nil {
+		json.NewEncoder(w).Encode(data.Blocks)
+		return
+	}
 	var toInt int
 	if to == "" {
-		bytes, err := db.Get([]byte(BlockHeightKey))
-		if err == nil {
-			toInt, err = strconv.Atoi(string(bytes))
-		}
+		toInt, err = func() (int, error) {
+			bytes, err := db.Get([]byte(BlockHeightKey))
+			if err == nil {
+				return strconv.Atoi(string(bytes))
+			}
+			return toInt, err
+		}()
 	} else {
 		toInt, err = strconv.Atoi(to)
 	}
