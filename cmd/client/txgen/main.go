@@ -126,6 +126,7 @@ func main() {
 	node.Client = client.NewClient(node.GetHost(), shardIDs)
 	node.NodeConfig.SetRole(nodeconfig.ClientNode)
 	node.NodeConfig.SetIsBeacon(false)
+	node.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
 	node.ServiceManagerSetup()
 	node.RunServices()
 	//time.Sleep(checkFrequency * time.Second) //Time for txgen to start its services. This gets me peers.
