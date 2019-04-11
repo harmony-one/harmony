@@ -89,9 +89,9 @@ func (node *Node) addNewShardStateHash(block *types.Block) {
 	if shardState != nil {
 		shardHash := shardState.Hash()
 		utils.GetLogInstance().Debug("[resharding] adding new shard state", "shardHash", shardHash)
-		for _, c := range shardState {
-			utils.GetLogInstance().Debug("new shard information", "shardID", c.ShardID, "NodeList", c.NodeList)
-		}
+		//		for _, c := range shardState {
+		//			utils.GetLogInstance().Debug("new shard information", "shardID", c.ShardID, "NodeList", c.NodeList)
+		//		}
 		block.AddShardStateHash(shardHash)
 	}
 }
