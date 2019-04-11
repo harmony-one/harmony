@@ -1751,14 +1751,14 @@ func (bc *BlockChain) StoreNewShardState(block *types.Block, stakeInfo *map[comm
 		number := block.NumberU64()
 		rawdb.WriteShardState(bc.db, hash, number, shardState)
 		utils.GetLogInstance().Debug("[Resharding] Saved new shard state successfully")
-		for _, shard := range shardState {
-			output := shard.Leader.BlsAddress
-			output = output + " \n"
-			for _, node := range shard.NodeList {
-				output = output + node.BlsAddress + " \n"
-			}
-			utils.GetLogInstance().Debug(fmt.Sprintf("[Resharding][shard: %d] Leader: %s", shard.ShardID, output))
-		}
+		//		for _, shard := range shardState {
+		//			output := shard.Leader.BlsAddress
+		//			output = output + " \n"
+		//			for _, node := range shard.NodeList {
+		//				output = output + node.BlsAddress + " \n"
+		//			}
+		//			utils.GetLogInstance().Debug(fmt.Sprintf("[Resharding][shard: %d] Leader: %s", shard.ShardID, output))
+		//		}
 	}
 	return shardState
 }
