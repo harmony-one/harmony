@@ -122,7 +122,7 @@ func main() {
 	if err != nil {
 		panic("unable to new host in txgen")
 	}
-	node := node.New(host, &consensus.Consensus{ShardID: uint32(shardID)}, nil, true) //Make it archival node.
+	node := node.New(host, &consensus.Consensus{ShardID: uint32(shardID)}, nil, false) //Make it archival node.
 	node.Client = client.NewClient(node.GetHost(), shardIDs)
 	node.NodeConfig.SetRole(nodeconfig.ClientNode)
 	node.NodeConfig.SetIsBeacon(false)
