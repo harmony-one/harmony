@@ -52,11 +52,14 @@ type NodeID struct {
 	BlsPublicKey BlsPublicKey
 }
 
+// NodeIDList is a list of NodeIDList.
+type NodeIDList []NodeID
+
 // Committee contains the active nodes in one shard
 type Committee struct {
 	ShardID  uint32
 	Leader   NodeID
-	NodeList []NodeID
+	NodeList NodeIDList
 }
 
 // GetHashFromNodeList will sort the list, then use Keccak256 to hash the list
