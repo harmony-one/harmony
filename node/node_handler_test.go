@@ -54,7 +54,7 @@ func TestVerifyNewBlock(t *testing.T) {
 	node.Worker.CommitTransactions(selectedTxs)
 	block, _ := node.Worker.Commit()
 
-	if !node.VerifyNewBlock(block) {
-		t.Error("New block is not verified successfully")
+	if err := node.VerifyNewBlock(block); err != nil {
+		t.Error("New block is not verified successfully:", err)
 	}
 }

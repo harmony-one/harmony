@@ -130,7 +130,7 @@ type Consensus struct {
 	// Called when consensus on a new block is done
 	OnConsensusDone func(*types.Block)
 	// The verifier func passed from Node object
-	BlockVerifier func(*types.Block) bool
+	BlockVerifier func(*types.Block) error
 
 	// verified block to state sync broadcast
 	VerifiedNewBlock chan *types.Block

@@ -15,6 +15,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
@@ -129,9 +130,13 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		utils.GetLogInstance().Warn("onAnnounce block content is not verified successfully", "error", err)
 		return
 	}
-	if consensus.BlockVerifier != nil && !consensus.BlockVerifier(&blockObj) {
-		// TODO ek – log reason
-		utils.GetLogger().Warn("block verification failed")
+	if consensus.BlockVerifier == nil {
+		// do nothing
+	} else if err := consensus.BlockVerifier(&blockObj); err != nil {
+		err := ctxerror.New("block verification failed",
+			"blockHash", blockObj.Hash(),
+		).WithCause(err)
+		ctxerror.Log15(utils.GetLogInstance().Warn, err)
 		return
 	}
 

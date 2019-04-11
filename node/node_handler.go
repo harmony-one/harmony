@@ -29,6 +29,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/pki"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
@@ -246,11 +247,13 @@ func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 }
 
 // VerifyNewBlock is called by consensus participants to verify the block (account model) they are running consensus on
-func (node *Node) VerifyNewBlock(newBlock *types.Block) bool {
+func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 	err := node.blockchain.ValidateNewBlock(newBlock, pki.GetAddressFromPublicKey(node.SelfPeer.ConsensusPubKey))
 	if err != nil {
-		utils.GetLogInstance().Debug("Failed verifying new block", "Error", err, "tx", newBlock.Transactions()[0])
-		return false
+		return ctxerror.New("failed to ValidateNewBlock",
+			"blockHash", newBlock.Hash(),
+			"tx", newBlock.Transactions()[0],
+		).WithCause(err)
 	}
 
 	// TODO: verify the vrf randomness
@@ -259,8 +262,9 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) bool {
 	err = node.blockchain.ValidateNewShardState(newBlock, &node.CurrentStakes)
 	if err != nil {
 		utils.GetLogInstance().Debug("Failed to verify new sharding state", "err", err)
+		// TODO ek – fail here too
 	}
-	return true
+	return nil
 }
 
 // PostConsensusProcessing is called by consensus participants, after consensus is done, to:
