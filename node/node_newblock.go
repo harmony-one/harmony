@@ -58,7 +58,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 						node.Worker.CommitTransactions(selectedTxs)
 						block, err := node.Worker.Commit()
 						if err != nil {
-							utils.GetLogInstance().Debug("Failed commiting new block", "Error", err)
+							utils.GetLogInstance().Debug("Failed committing new block", "Error", err)
 						} else {
 							if node.Consensus.ShardID == 0 {
 								// add new shard state if it's epoch block

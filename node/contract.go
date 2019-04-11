@@ -48,7 +48,7 @@ func (node *Node) generateDeployedStakingContractAddress(contractAddress common.
 	//Correct Way 1:
 	//node.SendTx(mycontracttx)
 	//receipts := node.worker.GetCurrentReceipts()
-	//deployedcontractaddress = recepits[len(receipts)-1].ContractAddress //get the address from the receipt
+	//deployedcontractaddress = receipts[len(receipts)-1].ContractAddress //get the address from the receipt
 
 	//Correct Way 2:
 	//nonce := GetNonce(contractAddress)
