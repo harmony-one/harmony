@@ -127,20 +127,20 @@ func main() {
 	node.NodeConfig.SetRole(nodeconfig.ClientNode)
 	node.NodeConfig.SetIsBeacon(false)
 	node.NodeConfig.SetIsClient(true)
-	//node.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
+	node.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
 	node.ServiceManagerSetup()
 	node.RunServices()
 
 	time.Sleep(checkFrequency * time.Second) //Time for txgen to start its services. This gets me peers.
-	utils.GetLogInstance().Debug("Running Go Sync", "node", node.SelfPeer)
-	go node.GetSync()
-	time.Sleep(checkFrequency * time.Second) //Time for txgen to boot and get its peers and for services to be up and running
-	utils.GetLogInstance().Debug("Finished waiting for Go Sync", "node", node.SelfPeer)
+	// utils.GetLogInstance().Debug("Running Go Sync", "node", node.SelfPeer)
+	// go node.GetSync()
+	// time.Sleep(checkFrequency * time.Second) //Time for txgen to boot and get its peers and for services to be up and running
+	// utils.GetLogInstance().Debug("Finished waiting for Go Sync", "node", node.SelfPeer)
 
 	start := time.Now()
 	totalTime := float64(*duration)
 	ticker := time.NewTicker(checkFrequency * time.Second)
-	//utils.GetLogInstance().Debug("Setting up Ticker", "node", node.SelfPeer)
+	utils.GetLogInstance().Debug("Setting up Ticker", "node", node.SelfPeer)
 	for {
 		t := time.Now()
 		if totalTime > 0 && t.Sub(start).Seconds() >= totalTime {
