@@ -1721,14 +1721,22 @@ func (bc *BlockChain) GetNewShardState(block *types.Block, stakeInfo *map[common
 
 // ValidateNewShardState validate whether the new shard state root matches
 func (bc *BlockChain) ValidateNewShardState(block *types.Block, stakeInfo *map[common.Address]*structs.StakeInfo) error {
-	shardState := bc.GetNewShardState(block, stakeInfo)
-	if shardState == nil {
+	proposed := block.Header().ShardState
+	if proposed == nil {
+		// For now, beacon validators simply wait until the beacon leader
+		// proposes a new sharding state.
+		// TODO ek – invoke view change if leader continues epoch for too long
 		return nil
 	}
-	if shardState.Hash() != block.Header().ShardStateHash {
-		return ErrShardStateNotMatch
+	if block.ShardID() == 0 { // Beacon chain
+		nextEpoch := GetEpochFromBlockNumber(block.NumberU64()) + 1
+		expected := CalculateNewShardState(bc, nextEpoch, stakeInfo)
+		if types.CompareShardState(expected, proposed) != 0 {
+			// TODO ek – log state proposal differences
+			return errors.New("shard state proposal is different from expected")
+		}
+	} else { // regular chain
 	}
-	utils.GetLogInstance().Debug("[resharding] validate new shard state successfully", "shardStateHash", shardState.Hash())
 	return nil
 }
 
