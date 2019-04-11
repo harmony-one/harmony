@@ -126,6 +126,7 @@ func main() {
 	node.Client = client.NewClient(node.GetHost(), shardIDs)
 	node.NodeConfig.SetRole(nodeconfig.ClientNode)
 	node.NodeConfig.SetIsBeacon(false)
+	node.NodeConfig.SetIsClient(true)
 	//node.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
 	node.ServiceManagerSetup()
 	node.RunServices()
