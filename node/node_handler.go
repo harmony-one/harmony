@@ -261,8 +261,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 
 	err = node.blockchain.ValidateNewShardState(newBlock, &node.CurrentStakes)
 	if err != nil {
-		utils.GetLogInstance().Debug("Failed to verify new sharding state", "err", err)
-		// TODO ek – fail here too
+		return ctxerror.New("failed to verify sharding state").WithCause(err)
 	}
 	return nil
 }
