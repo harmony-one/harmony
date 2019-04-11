@@ -122,13 +122,13 @@ func main() {
 	if err != nil {
 		panic("unable to new host in txgen")
 	}
-	node := node.New(host, &consensus.Consensus{ShardID: uint32(shardID)}, nil, false) //Changed it : no longer archival node.
+	node := node.New(host, &consensus.Consensus{ShardID: uint32(shardID)}, nil, true) //Changed it : no longer archival node.
 	node.Client = client.NewClient(node.GetHost(), shardIDs)
 	node.NodeConfig.SetRole(nodeconfig.ClientNode)
 	node.NodeConfig.SetIsBeacon(false)
 	node.ServiceManagerSetup()
 	node.RunServices()
-	time.Sleep(checkFrequency * time.Second) //Time for txgen to start its services. This gets me peers.
+	//time.Sleep(checkFrequency * time.Second) //Time for txgen to start its services. This gets me peers.
 	// utils.GetLogInstance().Debug("Running Go Sync", "node", node.SelfPeer)
 	// go node.GetSync()
 	// time.Sleep(checkFrequency * time.Second) //Time for txgen to boot and get its peers and for services to be up and running
@@ -138,6 +138,7 @@ func main() {
 	start := time.Now()
 	totalTime := float64(*duration)
 	ticker := time.NewTicker(checkFrequency * time.Second)
+	utils.GetLogInstance().Debug("Setting up Ticker", "node", node.SelfPeer)
 	for {
 		t := time.Now()
 		if totalTime > 0 && t.Sub(start).Seconds() >= totalTime {
@@ -153,8 +154,6 @@ func main() {
 				SendTxsToShard(node, txs)
 				go node.GetSync()
 			}
-		default:
-
 		}
 	}
 

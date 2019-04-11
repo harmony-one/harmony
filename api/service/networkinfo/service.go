@@ -96,6 +96,7 @@ func (s *Service) Init() error {
 	if s.bootnodes == nil {
 		// TODO: should've passed in bootnodes through constructor.
 		s.bootnodes = utils.BootNodes
+		utils.GetLogInstance().Debug("I don't have bootnodes")
 	}
 
 	connected := false
@@ -134,6 +135,7 @@ func (s *Service) Init() error {
 
 // Run runs network info.
 func (s *Service) Run() {
+	utils.GetLogInstance().Info("Strting to RUN networkinfo service")
 	defer close(s.stoppedChan)
 	if s.discovery == nil {
 		utils.GetLogInstance().Error("discovery is not initialized")
@@ -152,6 +154,7 @@ func (s *Service) Run() {
 
 // DoService does network info.
 func (s *Service) DoService() {
+	utils.GetLogInstance().Info("Strting to DoService networkinfo service")
 	_, cgnPrefix, err := net.ParseCIDR("100.64.0.0/10")
 	if err != nil {
 		utils.GetLogInstance().Error("can't parse CIDR", "error", err)
@@ -161,6 +164,7 @@ func (s *Service) DoService() {
 	for {
 		select {
 		case peer := <-s.peerInfo:
+			utils.GetLogInstance().Info("peerInfo channel received")
 			if peer.ID != s.Host.GetP2PHost().ID() && len(peer.ID) > 0 {
 				//	utils.GetLogInstance().Info("Found Peer", "peer", peer.ID, "addr", peer.Addrs, "my ID", s.Host.GetP2PHost().ID())
 				if err := s.Host.GetP2PHost().Connect(s.ctx, peer); err != nil {

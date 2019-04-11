@@ -85,6 +85,7 @@ func (s *Service) contactP2pPeers() {
 				utils.GetLogInstance().Debug("[DISCOVERY] No More Peer!")
 				break
 			}
+			utils.GetLogInstance().Error(:"Received PEERCHAIN message")
 			// TODO (leo) this one assumes all peers received in the channel are beacon chain node
 			// It is just a temporary hack. When we work on re-sharding to regular shard, this has to be changed.
 			if !s.config.IsBeacon {
@@ -120,12 +121,15 @@ func (s *Service) contactP2pPeers() {
 
 // sentPingMessage sends a ping message to a pubsub topic
 func (s *Service) sentPingMessage(g p2p.GroupID, msgBuf []byte) {
+	utils.GetLogInstance().Error("Now sending ping message to pubsub topic")
 	var err error
 	if g == p2p.GroupIDBeacon || g == p2p.GroupIDBeaconClient {
+		utils.GetLogInstance().Error("sending ping message to beacon or beaconclient topic")
 		err = s.host.SendMessageToGroups([]p2p.GroupID{s.config.Beacon}, msgBuf)
 	} else {
 		// The following logical will be used for 2nd stage peer discovery process
 		// do nothing when the groupID is unknown
+		utils.GetLogInstance().Error("This message should show up ONLY in second stage of peer discovery")
 		if s.config.ShardGroupID == p2p.GroupIDUnknown {
 			return
 		}
