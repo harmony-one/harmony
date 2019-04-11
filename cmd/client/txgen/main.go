@@ -118,11 +118,16 @@ func main() {
 
 	// Nodes containing blockchain data to mirror the shards' data in the network
 
-	host, err := p2pimpl.NewHost(&selfPeer, nodePriKey)
+	myhost, err := p2pimpl.NewHost(&selfPeer, nodePriKey)
 	if err != nil {
 		panic("unable to new host in txgen")
 	}
-	node := node.New(host, &consensus.Consensus{host: host,ShardID: uint32(shardID)}, nil, true) //Changed it : no longer archival node.
+	consensus, err := consensus.New(myhost, uint32(shardID), []p2p.Peer{}, p2p.Peer{}, nil)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error :%v \n", err)
+		os.Exit(1)
+	}
+	node := node.New(myhost, consensus, nil, true) //Changed it : no longer archival node.
 	node.Client = client.NewClient(node.GetHost(), shardIDs)
 	node.NodeConfig.SetRole(nodeconfig.ClientNode)
 	node.NodeConfig.SetIsBeacon(false)
@@ -156,6 +161,7 @@ func main() {
 				txs, _ := GenerateSimulatedTransactionsAccount(int(shardID), node, setting)
 				SendTxsToShard(node, txs)
 				go node.GetSync()
+			}
 		}
 	}
 
