@@ -3,6 +3,7 @@ package node
 import (
 	"time"
 
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 )
@@ -60,10 +61,10 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 						if err != nil {
 							utils.GetLogInstance().Debug("Failed committing new block", "Error", err)
 						} else {
-							if node.Consensus.ShardID == 0 {
-								// add new shard state if it's epoch block
-								// TODO: bug fix - the stored shard state between here and PostConsensusProcessing are different.
-								//node.addNewShardState(block)
+							if core.IsEpochLastBlock(block) && node.Consensus.ShardID == 0 {
+								nextEpoch := core.GetEpochFromBlockNumber(block.NumberU64()) + 1
+								shardState := core.CalculateNewShardState(node.blockchain, nextEpoch, &node.CurrentStakes)
+								block.AddShardState(shardState)
 							}
 							newBlock = block
 							utils.GetLogInstance().Debug("Successfully proposed new block", "blockNum", block.NumberU64(), "numTxs", block.Transactions().Len())
@@ -142,10 +143,10 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 						utils.GetLogInstance().Debug("Failed committing new block", "Error", err)
 						continue
 					}
-					if node.Consensus.ShardID == 0 {
-						// add new shard state if it's epoch block
-						// TODO: bug fix - the stored shard state between here and PostConsensusProcessing are different.
-						//node.addNewShardState(block)
+					if core.IsEpochLastBlock(block) && node.Consensus.ShardID == 0 {
+						nextEpoch := core.GetEpochFromBlockNumber(block.NumberU64()) + 1
+						shardState := core.CalculateNewShardState(node.blockchain, nextEpoch, &node.CurrentStakes)
+						block.AddShardState(shardState)
 					}
 					newBlock := block
 					utils.GetLogInstance().Debug("Successfully proposed new block", "blockNum", block.NumberU64(), "numTxs", block.Transactions().Len())
