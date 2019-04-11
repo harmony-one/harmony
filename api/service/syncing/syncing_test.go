@@ -10,7 +10,7 @@ import (
 // Simple test for IncorrectResponse
 func TestCreateTestSyncPeerConfig(t *testing.T) {
 	client := &downloader.Client{}
-	blockHashes := [][]byte{[]byte{}}
+	blockHashes := [][]byte{{}}
 	syncPeerConfig := CreateTestSyncPeerConfig(client, blockHashes)
 	assert.Equal(t, client, syncPeerConfig.GetClient(), "error")
 }
@@ -18,9 +18,9 @@ func TestCreateTestSyncPeerConfig(t *testing.T) {
 // Simple test for IncorrectResponse
 func TestCompareSyncPeerConfigByblockHashes(t *testing.T) {
 	client := &downloader.Client{}
-	blockHashes1 := [][]byte{[]byte{1, 2, 3}}
+	blockHashes1 := [][]byte{{1, 2, 3}}
 	syncPeerConfig1 := CreateTestSyncPeerConfig(client, blockHashes1)
-	blockHashes2 := [][]byte{[]byte{1, 2, 4}}
+	blockHashes2 := [][]byte{{1, 2, 4}}
 	syncPeerConfig2 := CreateTestSyncPeerConfig(client, blockHashes2)
 
 	// syncPeerConfig1 is less than syncPeerConfig2

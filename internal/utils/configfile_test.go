@@ -9,84 +9,84 @@ import (
 
 func TestReadWalletProfile(t *testing.T) {
 	config := []*WalletProfile{
-		&WalletProfile{
+		{
 			Profile:   "default",
 			Bootnodes: []string{"127.0.0.1:9000/abcd", "127.0.0.1:9999/daeg"},
 			Shards:    4,
 			RPCServer: [][]p2p.Peer{
-				[]p2p.Peer{
-					p2p.Peer{
+				{
+					{
 						IP:   "127.0.0.4",
 						Port: "8888",
 					},
-					p2p.Peer{
+					{
 						IP:   "192.168.0.4",
 						Port: "9876",
 					},
 				},
-				[]p2p.Peer{
-					p2p.Peer{
+				{
+					{
 						IP:   "127.0.0.1",
 						Port: "8888",
 					},
-					p2p.Peer{
+					{
 						IP:   "192.168.0.1",
 						Port: "9876",
 					},
 				},
-				[]p2p.Peer{
-					p2p.Peer{
+				{
+					{
 						IP:   "127.0.0.2",
 						Port: "8888",
 					},
-					p2p.Peer{
+					{
 						IP:   "192.168.0.2",
 						Port: "9876",
 					},
 				},
-				[]p2p.Peer{
-					p2p.Peer{
+				{
+					{
 						IP:   "127.0.0.3",
 						Port: "8888",
 					},
-					p2p.Peer{
+					{
 						IP:   "192.168.0.3",
 						Port: "9876",
 					},
 				},
 			},
 		},
-		&WalletProfile{
+		{
 			Profile:   "testnet",
 			Bootnodes: []string{"192.168.0.1:9990/abcd", "127.0.0.1:8888/daeg"},
 			Shards:    3,
 			RPCServer: [][]p2p.Peer{
-				[]p2p.Peer{
-					p2p.Peer{
+				{
+					{
 						IP:   "192.168.2.3",
 						Port: "8888",
 					},
-					p2p.Peer{
+					{
 						IP:   "192.168.192.3",
 						Port: "9877",
 					},
 				},
-				[]p2p.Peer{
-					p2p.Peer{
+				{
+					{
 						IP:   "192.168.2.1",
 						Port: "8888",
 					},
-					p2p.Peer{
+					{
 						IP:   "192.168.192.1",
 						Port: "9877",
 					},
 				},
-				[]p2p.Peer{
-					p2p.Peer{
+				{
+					{
 						IP:   "192.168.2.2",
 						Port: "8888",
 					},
-					p2p.Peer{
+					{
 						IP:   "192.168.192.2",
 						Port: "9877",
 					},
