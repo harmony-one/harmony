@@ -122,11 +122,11 @@ func main() {
 	if err != nil {
 		panic("unable to new host in txgen")
 	}
-	node := node.New(host, &consensus.Consensus{ShardID: uint32(shardID)}, nil, true) //Changed it : no longer archival node.
+	node := node.New(host, &consensus.Consensus{host: host,ShardID: uint32(shardID)}, nil, true) //Changed it : no longer archival node.
 	node.Client = client.NewClient(node.GetHost(), shardIDs)
 	node.NodeConfig.SetRole(nodeconfig.ClientNode)
 	node.NodeConfig.SetIsBeacon(false)
-	node.NodeConfig.SetIsClient(true)
+	//node.NodeConfig.SetIsClient(true)
 	node.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
 	node.ServiceManagerSetup()
 	node.RunServices()
@@ -141,6 +141,7 @@ func main() {
 	totalTime := float64(*duration)
 	ticker := time.NewTicker(checkFrequency * time.Second)
 	utils.GetLogInstance().Debug("Setting up Ticker", "node", node.SelfPeer)
+	go node.GetSync()
 	for {
 		t := time.Now()
 		if totalTime > 0 && t.Sub(start).Seconds() >= totalTime {
@@ -155,7 +156,6 @@ func main() {
 				txs, _ := GenerateSimulatedTransactionsAccount(int(shardID), node, setting)
 				SendTxsToShard(node, txs)
 				go node.GetSync()
-			}
 		}
 	}
 

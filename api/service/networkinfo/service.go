@@ -144,9 +144,12 @@ func (s *Service) Run() {
 
 	var err error
 	s.peerInfo, err = s.discovery.FindPeers(s.ctx, string(s.Rendezvous))
+
 	if err != nil {
 		utils.GetLogInstance().Error("FindPeers", "error", err)
 		return
+	} else {
+		utils.GetLogInstance().Error("discovery is not initialized", "peerInfo", s.peerInfo)
 	}
 
 	go s.DoService()
@@ -164,6 +167,7 @@ func (s *Service) DoService() {
 	for {
 		select {
 		case peer := <-s.peerInfo:
+
 			if peer.ID != s.Host.GetP2PHost().ID() && len(peer.ID) > 0 {
 				//	utils.GetLogInstance().Info("Found Peer", "peer", peer.ID, "addr", peer.Addrs, "my ID", s.Host.GetP2PHost().ID())
 				if err := s.Host.GetP2PHost().Connect(s.ctx, peer); err != nil {
@@ -193,6 +197,8 @@ func (s *Service) DoService() {
 				if s.peerChan != nil {
 					s.peerChan <- p
 				}
+			} else {
+				utils.GetLogInstance().Warn("peer Info", "peer", peer.ID, "peer Adds", peer.Addrs)
 			}
 		case <-s.stopChan:
 			return
