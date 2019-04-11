@@ -129,6 +129,11 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		utils.GetLogInstance().Warn("onAnnounce block content is not verified successfully", "error", err)
 		return
 	}
+	if consensus.BlockVerifier != nil && !consensus.BlockVerifier(&blockObj) {
+		// TODO ek – log reason
+		utils.GetLogger().Warn("block verification failed")
+		return
+	}
 
 	logMsgs := consensus.pbftLog.GetMessagesByTypeSeqView(msg_pb.MessageType_ANNOUNCE, recvMsg.SeqNum, recvMsg.ConsensusID)
 	if len(logMsgs) > 0 {

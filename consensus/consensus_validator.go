@@ -91,6 +91,11 @@ func (consensus *Consensus) processAnnounceMessage(message *msg_pb.Message) {
 		utils.GetLogInstance().Warn("Block content is not verified successfully", "error", err)
 		return
 	}
+	if consensus.BlockVerifier != nil && !consensus.BlockVerifier(&blockObj) {
+		// TODO ek – log reason
+		utils.GetLogInstance().Warn("block verification failed")
+		return
+	}
 
 	// Construct and send prepare message
 	msgToSend := consensus.constructPrepareMessage()
