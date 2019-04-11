@@ -73,7 +73,7 @@ func (s *Service) Run() {
 
 func (s *Service) contactP2pPeers() {
 	tick := time.NewTicker(5 * time.Second)
-
+	utils.GetLogInstance().Error("Now contacting p2p peers")
 	pingMsg := proto_discovery.NewPingMessage(s.host.GetSelfPeer(), s.config.IsClient)
 	msgBuf := host.ConstructP2pMessage(byte(0), pingMsg.ConstructPingMessage())
 	s.sentPingMessage(s.config.ShardGroupID, msgBuf)
