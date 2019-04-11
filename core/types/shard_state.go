@@ -156,6 +156,8 @@ func GetHashFromNodeList(nodeList []NodeID) []byte {
 
 // Hash is the root hash of ShardState
 func (ss ShardState) Hash() (h common.Hash) {
+	// TODO ek – this sorting really doesn't belong here; it should instead
+	//  be made an explicit invariant to be maintained and, if needed, checked.
 	sort.Slice(ss, func(i, j int) bool {
 		return ss[i].ShardID < ss[j].ShardID
 	})

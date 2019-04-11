@@ -117,10 +117,10 @@ func TestProcessMessageValidatorAnnounce(test *testing.T) {
 
 func testBlockBytes() ([]byte, error) {
 	return hex.DecodeString("" +
-		// BEGIN 673-byte Block
-		"f902a1" +
-		// BEGIN 668-byte header
-		"f9029c" +
+		// BEGIN 674-byte Block
+		"f902a2" +
+		// BEGIN 669-byte header
+		"f9029d" +
 		// 32-byte ParentHash
 		"a0" +
 		"0000000000000000000000000000000000000000000000000000000000000000" +
@@ -195,6 +195,9 @@ func testBlockBytes() ([]byte, error) {
 		// 32-byte ShardStateHash
 		"a0" +
 		"0000000000000000000000000000000000000000000000000000000000000000" +
+		// BEGIN 0-byte ShardState
+		"c0" +
+		// END ShardState
 		// END header
 		// BEGIN 0-byte uncles
 		"c0" +

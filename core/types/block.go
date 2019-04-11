@@ -92,6 +92,7 @@ type Header struct {
 	RandPreimage     [32]byte    `json:"randPreimage"`
 	RandSeed         [32]byte    `json:"randSeed"`
 	ShardStateHash   common.Hash `json:"shardStateRoot"`
+	ShardState       ShardState  `json:"shardState"`
 }
 
 // field type overrides for gencodec
@@ -475,7 +476,11 @@ func (b *Block) AddRandPreimage(pRnd [32]byte) {
 	b.header.RandPreimage = pRnd
 }
 
-// AddShardStateHash add shardStateHash into block header
-func (b *Block) AddShardStateHash(shardStateHash common.Hash) {
-	b.header.ShardStateHash = shardStateHash
+// AddShardState add shardState into block header
+func (b *Block) AddShardState(shardState ShardState) {
+	// Make a copy because ShardState.Hash() internally sorts entries.
+	// Store the sorted copy.
+	shardState = append(shardState[:0:0], shardState...)
+	b.header.ShardStateHash = shardState.Hash()
+	b.header.ShardState = shardState
 }

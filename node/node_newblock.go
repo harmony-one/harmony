@@ -63,7 +63,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 							if node.Consensus.ShardID == 0 {
 								// add new shard state if it's epoch block
 								// TODO: bug fix - the stored shard state between here and PostConsensusProcessing are different.
-								//node.addNewShardStateHash(block)
+								//node.addNewShardState(block)
 							}
 							newBlock = block
 							utils.GetLogInstance().Debug("Successfully proposed new block", "blockNum", block.NumberU64(), "numTxs", block.Transactions().Len())
@@ -85,12 +85,13 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 	}()
 }
 
-func (node *Node) addNewShardStateHash(block *types.Block) {
+func (node *Node) addNewShardState(block *types.Block) {
+	logger := utils.GetLogInstance().New("blockHash", block.Hash())
 	shardState := node.blockchain.GetNewShardState(block, &node.CurrentStakes)
 	if shardState != nil {
 		shardHash := shardState.Hash()
-		utils.GetLogInstance().Debug("[Shard State Hash] adding new shard state", "shardHash", shardHash)
-		block.AddShardStateHash(shardHash)
+		logger.Debug("[Shard State Hash] adding new shard state", "shardHash", shardHash)
+		block.AddShardState(shardState)
 	}
 }
 
@@ -144,7 +145,7 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 					if node.Consensus.ShardID == 0 {
 						// add new shard state if it's epoch block
 						// TODO: bug fix - the stored shard state between here and PostConsensusProcessing are different.
-						//node.addNewShardStateHash(block)
+						//node.addNewShardState(block)
 					}
 					newBlock := block
 					utils.GetLogInstance().Debug("Successfully proposed new block", "blockNum", block.NumberU64(), "numTxs", block.Transactions().Len())
