@@ -16,9 +16,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
-
-	"github.com/harmony-one/harmony/core"
-
 	"github.com/ethereum/go-ethereum/rlp"
 	pb "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -28,6 +25,7 @@ import (
 	"github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/api/service"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/pki"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -315,23 +313,11 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 		// TODO: update staking information once per epoch.
 		node.UpdateStakingList(node.QueryStakeInfo())
 		node.printStakingList()
-		if core.IsEpochBlock(newBlock) {
-			shardState := node.blockchain.StoreNewShardState(newBlock, &node.CurrentStakes)
-			if shardState != nil {
-				if nodeconfig.GetDefaultConfig().IsLeader() {
-					epochShardState := types.EpochShardState{Epoch: core.GetEpochFromBlockNumber(newBlock.NumberU64()), ShardState: shardState}
-					epochShardStateMessage := proto_node.ConstructEpochShardStateMessage(epochShardState)
-					// Broadcast new shard state
-					err := node.host.SendMessageToGroups([]p2p.GroupID{node.NodeConfig.GetClientGroupID()}, host.ConstructP2pMessage(byte(0), epochShardStateMessage))
-					if err != nil {
-						utils.GetLogInstance().Error("[Resharding] failed to broadcast shard state message", "group", node.NodeConfig.GetClientGroupID())
-					} else {
-						utils.GetLogInstance().Info("[Resharding] broadcasted shard state message to", "group", node.NodeConfig.GetClientGroupID())
-					}
-				}
-				node.processEpochShardState(&types.EpochShardState{Epoch: core.GetEpochFromBlockNumber(newBlock.NumberU64()), ShardState: shardState})
-			}
-		}
+	}
+	if core.IsEpochLastBlock(newBlock) {
+		// TODO ek – wait for beacon chain's last block to be available
+		// TODO ek - retrieve the global resharding assignment
+		// TODO ek – if needed, (start to) move to another shard
 	}
 }
 
