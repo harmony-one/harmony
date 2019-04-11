@@ -24,6 +24,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
+	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -663,9 +664,18 @@ func (consensus *Consensus) GetLeaderPubKey() *bls.PublicKey {
 	return consensus.leader.ConsensusPubKey
 }
 
-// GetPeers returns PublicKeys
-func (consensus *Consensus) GetPeers() []*bls.PublicKey {
-	return consensus.PublicKeys
+// GetNodeIDs returns Node IDs of all nodes in the same shard
+func (consensus *Consensus) GetNodeIDs() []libp2p_peer.ID {
+	nodes := make([]libp2p_peer.ID, 0)
+	nodes = append(nodes, consensus.host.GetID())
+	consensus.validators.Range(func(k, v interface{}) bool {
+		if peer, ok := v.(p2p.Peer); ok {
+			nodes = append(nodes, peer.PeerID)
+			return true
+		}
+		return false
+	})
+	return nodes
 }
 
 // GetConsensusID returns the consensus ID
