@@ -55,8 +55,8 @@ func TestConstructTransactionListMessageAccount(t *testing.T) {
 
 func TestConstructRequestTransactionsMessage(t *testing.T) {
 	txIDs := [][]byte{
-		[]byte{1, 2},
-		[]byte{3, 4},
+		{1, 2},
+		{3, 4},
 	}
 
 	buf := ConstructRequestTransactionsMessage(txIDs)

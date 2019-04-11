@@ -79,12 +79,12 @@ func TestAddPeers(t *testing.T) {
 	pubKey2 := pki.GetBLSPrivateKeyFromInt(444).GetPublicKey()
 
 	peers1 := []*p2p.Peer{
-		&p2p.Peer{
+		{
 			IP:              "127.0.0.1",
 			Port:            "8888",
 			ConsensusPubKey: pubKey1,
 		},
-		&p2p.Peer{
+		{
 			IP:              "127.0.0.1",
 			Port:            "9999",
 			ConsensusPubKey: pubKey2,
@@ -123,13 +123,13 @@ func TestAddBeaconPeer(t *testing.T) {
 	pubKey2 := bls2.RandPrivateKey().GetPublicKey()
 
 	peers1 := []*p2p.Peer{
-		&p2p.Peer{
+		{
 			IP:              "127.0.0.1",
 			Port:            "8888",
 			ConsensusPubKey: pubKey1,
 			PeerID:          "1234",
 		},
-		&p2p.Peer{
+		{
 			IP:              "127.0.0.1",
 			Port:            "9999",
 			ConsensusPubKey: pubKey2,
