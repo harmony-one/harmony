@@ -8,6 +8,8 @@ USER=$(whoami)
 set -x
 set -eo pipefail
 
+export GO111MODULE=on
+
 function check_result() {
    find $log_folder -name leader-*.log > $log_folder/all-leaders.txt
    find $log_folder -name validator-*.log > $log_folder/all-validators.txt
