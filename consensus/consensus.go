@@ -231,6 +231,11 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 	return &consensus, nil
 }
 
+// SetConsensusID set the consensusID to the height of the blockchain
+func (consensus *Consensus) SetConsensusID(height uint32) {
+	consensus.consensusID = height
+}
+
 // RegisterPRndChannel registers the channel for receiving randomness preimage from DRG protocol
 func (consensus *Consensus) RegisterPRndChannel(pRndChannel chan []byte) {
 	consensus.PRndChannel = pRndChannel
