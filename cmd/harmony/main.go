@@ -247,6 +247,12 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 		currentNode.DRand = dRand
 	}
 
+	// Set the consensus ID to be the current block number
+	height := currentNode.Blockchain().CurrentBlock().NumberU64()
+
+	consensus.SetConsensusID(uint32(height))
+	utils.GetLogInstance().Info("Init Blockchain", "height", height)
+
 	// Assign closure functions to the consensus object
 	consensus.BlockVerifier = currentNode.VerifyNewBlock
 	consensus.OnConsensusDone = currentNode.PostConsensusProcessing
