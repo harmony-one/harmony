@@ -74,7 +74,7 @@ func TestProcessMessageValidatorAnnounce(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	consensusLeader, err := New(host, 0, []p2p.Peer{validator1, validator2, validator3}, leader, leaderPriKey)
+	consensusLeader, err := New(host, 0, leader, leaderPriKey)
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}
@@ -101,7 +101,7 @@ func TestProcessMessageValidatorAnnounce(test *testing.T) {
 		test.Errorf("Failed to unmarshal message payload")
 	}
 
-	consensusValidator1, err := New(m, 0, []p2p.Peer{validator1, validator2, validator3}, leader, bls_cosi.RandPrivateKey())
+	consensusValidator1, err := New(m, 0, leader, bls_cosi.RandPrivateKey())
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}
@@ -141,7 +141,7 @@ func TestProcessMessageValidatorPrepared(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	consensusLeader, err := New(host, 0, []p2p.Peer{validator1, validator2, validator3}, leader, leaderPriKey)
+	consensusLeader, err := New(host, 0, leader, leaderPriKey)
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}
@@ -162,7 +162,7 @@ func TestProcessMessageValidatorPrepared(test *testing.T) {
 
 	preparedMsg, _ := consensusLeader.constructPreparedMessage()
 
-	consensusValidator1, err := New(m, 0, []p2p.Peer{validator1, validator2, validator3}, leader, bls_cosi.RandPrivateKey())
+	consensusValidator1, err := New(m, 0, leader, bls_cosi.RandPrivateKey())
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}
@@ -223,7 +223,7 @@ func TestProcessMessageValidatorCommitted(test *testing.T) {
 		test.Fatalf("newhost failure: %v", err)
 	}
 	message := &msg_pb.Message{}
-	consensusLeader, err := New(host, 0, []p2p.Peer{validator1, validator2, validator3}, leader, leaderPriKey)
+	consensusLeader, err := New(host, 0, leader, leaderPriKey)
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}
@@ -263,7 +263,7 @@ func TestProcessMessageValidatorCommitted(test *testing.T) {
 		test.Errorf("Failed to get consensus message")
 	}
 
-	consensusValidator1, err := New(m, 0, []p2p.Peer{validator1, validator2, validator3}, leader, bls_cosi.RandPrivateKey())
+	consensusValidator1, err := New(m, 0, leader, bls_cosi.RandPrivateKey())
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}

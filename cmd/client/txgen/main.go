@@ -124,7 +124,7 @@ func main() {
 	}
 
 	// Client/txgenerator server node setup
-	consensusObj, err := consensus.New(host, 0, nil, p2p.Peer{}, nil)
+	consensusObj, err := consensus.New(host, 0, p2p.Peer{}, nil)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error :%v \n", err)
 		os.Exit(1)
