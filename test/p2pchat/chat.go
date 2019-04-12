@@ -136,11 +136,16 @@ func main() {
 	}
 
 	if err != nil {
-		fmt.Printf("pubsub error: %v", err)
+		fmt.Printf("pub error: %v", err)
 		panic(err)
 	}
 
 	sub, err := ps.Subscribe("pubsubtestchannel")
+
+	if err != nil {
+		fmt.Printf("sub error: %v", err)
+		panic(err)
+	}
 
 	go writePubsub(ps)
 	go readPubsub(sub)

@@ -130,6 +130,10 @@ func (node *Node) GetResult(priKey string) (players []string, balances []*big.In
 
 	demoContractAddress := node.DemoContractAddress
 	key, err := crypto.HexToECDSA(priKey)
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to parse private key", "error", err)
+	}
+
 	nonce := node.GetNonceOfAddress(crypto.PubkeyToAddress(key.PublicKey))
 
 	tx := types.NewTransaction(

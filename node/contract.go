@@ -48,7 +48,7 @@ func (node *Node) generateDeployedStakingContractAddress(contractAddress common.
 	//Correct Way 1:
 	//node.SendTx(mycontracttx)
 	//receipts := node.worker.GetCurrentReceipts()
-	//deployedcontractaddress = recepits[len(receipts)-1].ContractAddress //get the address from the receipt
+	//deployedcontractaddress = receipts[len(receipts)-1].ContractAddress //get the address from the receipt
 
 	//Correct Way 2:
 	//nonce := GetNonce(contractAddress)
@@ -74,6 +74,11 @@ func (node *Node) QueryStakeInfo() *structs.StakeInfoReturnValue {
 	deployerAddress := crypto.PubkeyToAddress(priKey.PublicKey)
 
 	state, err := node.blockchain.State()
+
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to get blockchain state", "error", err)
+		return nil
+	}
 
 	stakingContractAddress := crypto.CreateAddress(deployerAddress, uint64(0))
 	tx := types.NewTransaction(

@@ -555,7 +555,7 @@ func (peerConfig *SyncPeerConfig) registerToBroadcast(peerHash []byte, ip, port 
 }
 
 // RegisterNodeInfo will register node to peers to accept future new block broadcasting
-// return number of successfull registration
+// return number of successful registration
 func (ss *StateSync) RegisterNodeInfo() int {
 	registrationNumber := RegistrationNumber
 	utils.GetLogInstance().Debug("[SYNC] node registration to peers",

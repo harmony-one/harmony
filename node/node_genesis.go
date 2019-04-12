@@ -63,7 +63,7 @@ func (node *Node) GenesisBlockSetup(db ethdb.Database, shardID uint32, isArchiva
 }
 
 // CreateGenesisAllocWithTestingAddresses create the genesis block allocation that contains deterministically
-// generated testing addressess with tokens. This is mostly used for generated simulated transactions in txgen.
+// generated testing addresses with tokens. This is mostly used for generated simulated transactions in txgen.
 // TODO: Remove it later when moving to production.
 func (node *Node) CreateGenesisAllocWithTestingAddresses(numAddress int) core.GenesisAlloc {
 	rand.Seed(0)
