@@ -30,7 +30,8 @@ function valid_ip()
 }
 
 function myip() {
-   PUB_IP=$(dig @resolver1.opendns.com ANY myip.opendns.com +short)
+# get ipv4 address only, right now only support ipv4 addresses
+   PUB_IP=$(dig -4 @resolver1.opendns.com ANY myip.opendns.com +short)
    if valid_ip $PUB_IP; then
       echo MYIP = $PUB_IP
    else
@@ -127,6 +128,7 @@ myip
 # public boot node multiaddress
 BN_MA=/ip4/100.26.90.187/tcp/9876/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9,/ip4/54.213.43.194/tcp/9876/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX
 
+echo "############### Running Harmony Process ###############"
 if [ "$OS" == "Linux" ]; then
 # Run Harmony Node
    LD_LIBRARY_PATH=$(pwd) nohup ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_beacon > harmony-${PUB_IP}.log 2>&1 &
@@ -134,7 +136,6 @@ else
    DYLD_FALLBACK_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_beacon > harmony-${PUB_IP}.log 2>&1 &
 fi
 
-echo "############### Running Harmony Process ###############"
 find_harmony_process
 echo
 echo
