@@ -17,13 +17,12 @@ import (
 
 func TestConstructAnnounceMessage(test *testing.T) {
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "19999"}
-	validator := p2p.Peer{IP: "127.0.0.1", Port: "55555"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2pimpl.NewHost(&leader, priKey)
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := New(host, 0, []p2p.Peer{leader, validator}, leader, bls.RandPrivateKey())
+	consensus, err := New(host, 0, leader, bls.RandPrivateKey())
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}
@@ -48,13 +47,12 @@ func TestConstructPreparedMessage(test *testing.T) {
 
 	validatorPriKey := bls.RandPrivateKey()
 	validatorPubKey := leaderPriKey.GetPublicKey()
-	validator := p2p.Peer{IP: "127.0.0.1", Port: "5555", ConsensusPubKey: validatorPubKey}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2pimpl.NewHost(&leader, priKey)
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := New(host, 0, []p2p.Peer{leader, validator}, leader, bls.RandPrivateKey())
+	consensus, err := New(host, 0, leader, bls.RandPrivateKey())
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}
