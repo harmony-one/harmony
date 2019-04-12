@@ -37,13 +37,13 @@ func TestProcessMessageLeaderPrepare(test *testing.T) {
 
 	leader.ConsensusPubKey = leaderPubKey
 
-	validators := make([]p2p.Peer, 3)
+	validators := make([]*p2p.Peer, 3)
 	hosts := make([]p2p.Host, 3)
 
 	validatorsPriKeys := [3]*bls.SecretKey{}
 	for i := 0; i < 3; i++ {
 		port := fmt.Sprintf("%d", 7788+i)
-		validators[i] = p2p.Peer{IP: ip, Port: port}
+		validators[i] = &p2p.Peer{IP: ip, Port: port}
 		validatorsPriKeys[i] = bls_cosi.RandPrivateKey()
 		validators[i].ConsensusPubKey = validatorsPriKeys[i].GetPublicKey()
 	}
@@ -54,22 +54,23 @@ func TestProcessMessageLeaderPrepare(test *testing.T) {
 	m.EXPECT().GetSelfPeer().Return(leader)
 	m.EXPECT().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, gomock.Any())
 
-	consensusLeader, err := New(m, 0, validators, leader, leaderPriKey)
+	consensusLeader, err := New(m, 0, leader, leaderPriKey)
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}
 	consensusLeader.blockHash = blockHash
+	consensusLeader.AddPeers(validators)
 
 	consensusValidators := make([]*Consensus, 3)
 	for i := 0; i < 3; i++ {
 		priKey, _, _ := utils.GenKeyP2P(validators[i].IP, validators[i].Port)
-		host, err := p2pimpl.NewHost(&validators[i], priKey)
+		host, err := p2pimpl.NewHost(validators[i], priKey)
 		if err != nil {
 			test.Fatalf("newhost error: %v", err)
 		}
 		hosts[i] = host
 
-		consensusValidators[i], err = New(hosts[i], 0, validators, leader, validatorsPriKeys[i])
+		consensusValidators[i], err = New(hosts[i], 0, leader, validatorsPriKeys[i])
 		if err != nil {
 			test.Fatalf("Cannot craeate consensus: %v", err)
 		}
@@ -108,7 +109,7 @@ func TestProcessMessageLeaderPrepareInvalidSignature(test *testing.T) {
 	// Anything else will fail.
 	m.EXPECT().GetSelfPeer().Return(leader)
 
-	consensusLeader, err := New(m, 0, validators, leader, leaderPriKey)
+	consensusLeader, err := New(m, 0, leader, leaderPriKey)
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}
@@ -123,7 +124,7 @@ func TestProcessMessageLeaderPrepareInvalidSignature(test *testing.T) {
 		}
 		hosts[i] = host
 
-		consensusValidators[i], err = New(hosts[i], 0, validators, leader, validatorKeys[i])
+		consensusValidators[i], err = New(hosts[i], 0, leader, validatorKeys[i])
 		if err != nil {
 			test.Fatalf("Cannot craeate consensus: %v", err)
 		}
@@ -155,13 +156,13 @@ func TestProcessMessageLeaderCommit(test *testing.T) {
 	leaderPriKey := bls_cosi.RandPrivateKey()
 	leader.ConsensusPubKey = leaderPriKey.GetPublicKey()
 
-	validators := make([]p2p.Peer, 3)
+	validators := make([]*p2p.Peer, 3)
 	hosts := make([]p2p.Host, 3)
 
 	validatorKeys := [3]*bls.SecretKey{}
 	for i := 0; i < 3; i++ {
 		port := fmt.Sprintf("%d", 8788+i)
-		validators[i] = p2p.Peer{IP: ip, Port: port}
+		validators[i] = &p2p.Peer{IP: ip, Port: port}
 		validatorKeys[i] = bls_cosi.RandPrivateKey()
 		validators[i].ConsensusPubKey = validatorKeys[i].GetPublicKey()
 	}
@@ -174,17 +175,18 @@ func TestProcessMessageLeaderCommit(test *testing.T) {
 
 	for i := 0; i < 3; i++ {
 		priKey, _, _ := utils.GenKeyP2P(validators[i].IP, validators[i].Port)
-		host, err := p2pimpl.NewHost(&validators[i], priKey)
+		host, err := p2pimpl.NewHost(validators[i], priKey)
 		if err != nil {
 			test.Fatalf("newhost error: %v", err)
 		}
 		hosts[i] = host
 	}
 
-	consensusLeader, err := New(m, 0, validators, leader, leaderPriKey)
+	consensusLeader, err := New(m, 0, leader, leaderPriKey)
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}
+	consensusLeader.AddPeers(validators)
 	consensusLeader.state = PreparedDone
 	consensusLeader.blockHash = blockHash
 	consensusLeader.OnConsensusDone = func(newBlock *types.Block) {}
@@ -202,7 +204,7 @@ func TestProcessMessageLeaderCommit(test *testing.T) {
 		<-consensusLeader.ReadySignal
 	}()
 	for i := 0; i < 3; i++ {
-		consensusValidators[i], err = New(hosts[i], 0, validators, leader, validatorKeys[i])
+		consensusValidators[i], err = New(hosts[i], 0, leader, validatorKeys[i])
 		if err != nil {
 			test.Fatalf("Cannot craeate consensus: %v", err)
 		}

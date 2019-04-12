@@ -156,7 +156,7 @@ func (consensus *Consensus) GetNextRnd() ([32]byte, [32]byte, error) {
 
 // New creates a new Consensus object
 // TODO: put shardId into chain reader's chain config
-func New(host p2p.Host, ShardID uint32, peers []p2p.Peer, leader p2p.Peer, blsPriKey *bls.SecretKey) (*Consensus, error) {
+func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKey) (*Consensus, error) {
 	consensus := Consensus{}
 	consensus.host = host
 	consensus.ConsensusIDLowChan = make(chan struct{})
@@ -170,20 +170,15 @@ func New(host p2p.Host, ShardID uint32, peers []p2p.Peer, leader p2p.Peer, blsPr
 
 	consensus.leader = leader
 	consensus.CommitteeAddresses = map[common.Address]bool{}
-	for _, peer := range peers {
-		consensus.validators.Store(utils.GetBlsAddress(peer.ConsensusPubKey).Hex(), peer)
-
-		consensus.CommitteeAddresses[utils.GetBlsAddress(peer.ConsensusPubKey)] = true
-	}
 
 	consensus.prepareSigs = map[common.Address]*bls.Sign{}
 	consensus.commitSigs = map[common.Address]*bls.Sign{}
 
+	consensus.validators.Store(utils.GetBlsAddress(leader.ConsensusPubKey).Hex(), leader)
+	consensus.CommitteeAddresses[utils.GetBlsAddress(leader.ConsensusPubKey)] = true
+
 	// Initialize cosign bitmap
 	allPublicKeys := make([]*bls.PublicKey, 0)
-	for _, validatorPeer := range peers {
-		allPublicKeys = append(allPublicKeys, validatorPeer.ConsensusPubKey)
-	}
 	allPublicKeys = append(allPublicKeys, leader.ConsensusPubKey)
 
 	consensus.PublicKeys = allPublicKeys
@@ -211,7 +206,9 @@ func New(host p2p.Host, ShardID uint32, peers []p2p.Peer, leader p2p.Peer, blsPr
 		consensus.PubKey = blsPriKey.GetPublicKey()
 	}
 
-	consensus.consensusID = 0 // or view Id in the original pbft paper
+	// consensusID has to be initialized as the height of the blockchain during initialization
+	// as it was displayed on explorer as Height right now
+	consensus.consensusID = 0
 	consensus.ShardID = ShardID
 
 	// For validators to keep track of all blocks received but not yet committed, so as to catch up to latest consensus if lagged behind.
