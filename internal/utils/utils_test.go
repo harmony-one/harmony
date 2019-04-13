@@ -179,17 +179,17 @@ func TestStringsToPeers(t *testing.T) {
 		{
 			"127.0.0.1:9000,192.168.192.1:8888,54.32.12.3:9898",
 			[]p2p.Peer{
-				p2p.Peer{IP: "127.0.0.1", Port: "9000"},
-				p2p.Peer{IP: "192.168.192.1", Port: "8888"},
-				p2p.Peer{IP: "54.32.12.3", Port: "9898"},
+				{IP: "127.0.0.1", Port: "9000"},
+				{IP: "192.168.192.1", Port: "8888"},
+				{IP: "54.32.12.3", Port: "9898"},
 			},
 		},
 		{
 			"a:b,xx:XX,hello:world",
 			[]p2p.Peer{
-				p2p.Peer{IP: "a", Port: "b"},
-				p2p.Peer{IP: "xx", Port: "XX"},
-				p2p.Peer{IP: "hello", Port: "world"},
+				{IP: "a", Port: "b"},
+				{IP: "xx", Port: "XX"},
+				{IP: "hello", Port: "world"},
 			},
 		},
 	}

@@ -121,10 +121,7 @@ func (journal *txJournal) insert(tx *types.Transaction) error {
 	if journal.writer == nil {
 		return errNoActiveJournal
 	}
-	if err := rlp.Encode(journal.writer, tx); err != nil {
-		return err
-	}
-	return nil
+	return rlp.Encode(journal.writer, tx)
 }
 
 // rotate regenerates the transaction journal based on the current contents of

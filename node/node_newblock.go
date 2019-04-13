@@ -58,7 +58,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 						node.Worker.CommitTransactions(selectedTxs)
 						block, err := node.Worker.Commit()
 						if err != nil {
-							utils.GetLogInstance().Debug("Failed commiting new block", "Error", err)
+							utils.GetLogInstance().Debug("Failed committing new block", "Error", err)
 						} else {
 							if node.Consensus.ShardID == 0 {
 								// add new shard state if it's epoch block
@@ -89,9 +89,9 @@ func (node *Node) addNewShardStateHash(block *types.Block) {
 	if shardState != nil {
 		shardHash := shardState.Hash()
 		utils.GetLogInstance().Debug("[resharding] adding new shard state", "shardHash", shardHash)
-		for _, c := range shardState {
-			utils.GetLogInstance().Debug("new shard information", "shardID", c.ShardID, "NodeList", c.NodeList)
-		}
+		//		for _, c := range shardState {
+		//			utils.GetLogInstance().Debug("new shard information", "shardID", c.ShardID, "NodeList", c.NodeList)
+		//		}
 		block.AddShardStateHash(shardHash)
 	}
 }
