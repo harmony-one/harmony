@@ -3,23 +3,25 @@ package main
 import (
 	"flag"
 	"fmt"
+	"math/big"
+	"math/rand"
 	"os"
 	"path"
 	"runtime"
 	"sync"
 	"time"
 
-	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/consensus"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 
 	"github.com/harmony-one/harmony/crypto/bls"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/api/client"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
-	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core/types"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/txgen"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
@@ -35,6 +37,16 @@ var (
 	stateMutex sync.Mutex
 )
 
+const (
+	checkFrequency = 20 //checkfrequency checks whether the transaction generator is ready to send the next batch of transactions.
+)
+
+// Settings is the settings for TX generation. No Cross-Shard Support!
+type Settings struct {
+	NumOfAddress      int
+	MaxNumTxsPerBatch int
+}
+
 func printVersion(me string) {
 	fmt.Fprintf(os.Stderr, "Harmony (C) 2018. %v, version %v-%v (%v %v)\n", path.Base(me), version, commit, builtBy, builtAt)
 	os.Exit(0)
@@ -48,16 +60,15 @@ func main() {
 
 	maxNumTxsPerBatch := flag.Int("max_num_txs_per_batch", 20000, "number of transactions to send per message")
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
-	duration := flag.Int("duration", 10, "duration of the tx generation in second. If it's negative, the experiment runs forever.")
+	duration := flag.Int("duration", 0, "duration of the tx generation in second. If it's negative, the experiment runs forever.")
 	versionFlag := flag.Bool("version", false, "Output version info")
-	crossShardRatio := flag.Int("cross_shard_ratio", 30, "The percentage of cross shard transactions.")
-
+	//crossShardRatio := flag.Int("cross_shard_ratio", 30, "The percentage of cross shard transactions.")
+	shardIDFlag := flag.Int("shardID", 0, "The shardID the node belongs to.")
 	// Key file to store the private key
 	keyFile := flag.String("key", "./.txgenkey", "the private key file of the txgen")
 	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress")
-
 	flag.Parse()
-
+	time.Sleep(checkFrequency * time.Second) //This lets other nodes start their services before I query for blockchain height.
 	if *versionFlag {
 		printVersion(os.Args[0])
 	}
@@ -76,7 +87,6 @@ func main() {
 		utils.BootNodes = bootNodeAddrs
 	}
 
-	var shardIDs []uint32
 	nodePriKey, _, err := utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
 		panic(err)
@@ -86,25 +96,20 @@ func main() {
 	if peerPubKey == nil {
 		panic(fmt.Errorf("generate key error"))
 	}
-
+	shardID := *shardIDFlag
+	var shardIDs []uint32
+	shardIDs = append(shardIDs, uint32(shardID))
 	selfPeer := p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: peerPubKey}
 
 	// Init with LibP2P enabled, FIXME: (leochen) right now we support only one shard
-	for i := 0; i < core.GenesisShardNum; i++ {
-		shardIDs = append(shardIDs, uint32(i))
-	}
-
-	// Do cross shard tx if there are more than one shard
-	setting := txgen.Settings{
+	setting := Settings{
 		NumOfAddress:      10000,
-		CrossShard:        false, // len(shardIDs) > 1,
 		MaxNumTxsPerBatch: *maxNumTxsPerBatch,
-		CrossShardRatio:   *crossShardRatio,
 	}
 
 	// TODO(Richard): refactor this chuck to a single method
 	// Setup a logger to stdout and log file.
-	logFileName := fmt.Sprintf("./%v/txgen.log", *logFolder)
+	logFileName := fmt.Sprintf("./%v/txgen-%v.log", *logFolder, shardID)
 	h := log.MultiHandler(
 		log.StreamHandler(os.Stdout, log.TerminalFormat(false)),
 		log.Must.FileHandler(logFileName, log.LogfmtFormat()), // Log to file
@@ -112,72 +117,29 @@ func main() {
 	log.Root().SetHandler(h)
 
 	// Nodes containing blockchain data to mirror the shards' data in the network
-	nodes := []*node.Node{}
-	host, err := p2pimpl.NewHost(&selfPeer, nodePriKey)
+
+	myhost, err := p2pimpl.NewHost(&selfPeer, nodePriKey)
 	if err != nil {
 		panic("unable to new host in txgen")
 	}
-	for _, shardID := range shardIDs {
-		node := node.New(host, &consensus.Consensus{ShardID: shardID}, nil, false)
-		// Assign many fake addresses so we have enough address to play with at first
-		nodes = append(nodes, node)
-	}
-
-	// Client/txgenerator server node setup
-	consensusObj, err := consensus.New(host, 0, p2p.Peer{}, nil)
+	consensus, err := consensus.New(myhost, uint32(shardID), []p2p.Peer{}, p2p.Peer{}, nil)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error :%v \n", err)
 		os.Exit(1)
 	}
-
-	clientNode := node.New(host, consensusObj, nil, false)
-	clientNode.Client = client.NewClient(clientNode.GetHost(), shardIDs)
-
-	readySignal := make(chan uint32)
-
-	// This func is used to update the client's blockchain when new blocks are received from the leaders
-	updateBlocksFunc := func(blocks []*types.Block) {
-		utils.GetLogInstance().Info("[Txgen] Received new block", "block num", blocks[0].NumberU64())
-		for _, block := range blocks {
-			for _, node := range nodes {
-				shardID := block.ShardID()
-
-				if node.Consensus.ShardID == shardID {
-					// Add it to blockchain
-					utils.GetLogInstance().Info("Current Block", "block num", node.Blockchain().CurrentBlock().NumberU64())
-					utils.GetLogInstance().Info("Adding block from leader", "txNum", len(block.Transactions()), "shardID", shardID, "preHash", block.ParentHash().Hex())
-					node.AddNewBlock(block)
-					stateMutex.Lock()
-					node.Worker.UpdateCurrent()
-					stateMutex.Unlock()
-					readySignal <- shardID
-				} else {
-					continue
-				}
-			}
-		}
-	}
-	clientNode.Client.UpdateBlocks = updateBlocksFunc
-
-	clientNode.NodeConfig.SetRole(nodeconfig.ClientNode)
-	clientNode.NodeConfig.SetIsClient(true)
-	clientNode.ServiceManagerSetup()
-	clientNode.RunServices()
-
-	// Start the client server to listen to leader's message
-	go func() {
-		// wait for 3 seconds for client to send ping message to leader
-		// FIXME (leo) the readySignal should be set once we really sent ping message to leader
-		time.Sleep(3 * time.Second) // wait for nodes to be ready
-		for _, i := range shardIDs {
-			readySignal <- i
-		}
-	}()
-
-	// Transaction generation process
+	node := node.New(myhost, consensus, nil, true) //Changed it : no longer archival node.
+	node.Client = client.NewClient(node.GetHost(), shardIDs)
+	node.NodeConfig.SetRole(nodeconfig.ClientNode)
+	node.NodeConfig.SetIsBeacon(false)
+	node.NodeConfig.SetIsClient(true)
+	node.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
+	node.ServiceManagerSetup()
+	node.RunServices()
+	time.Sleep(checkFrequency * time.Second) //Time for txgen to start its services.
 	start := time.Now()
 	totalTime := float64(*duration)
-
+	ticker := time.NewTicker(checkFrequency * time.Second)
+	go node.GetSync()
 	for {
 		t := time.Now()
 		if totalTime > 0 && t.Sub(start).Seconds() >= totalTime {
@@ -185,42 +147,39 @@ func main() {
 			break
 		}
 		select {
-		case shardID := <-readySignal:
-			shardIDTxsMap := make(map[uint32]types.Transactions)
-			lock := sync.Mutex{}
-
-			stateMutex.Lock()
-			utils.GetLogInstance().Warn("STARTING TX GEN", "gomaxprocs", runtime.GOMAXPROCS(0))
-			txs, _ := txgen.GenerateSimulatedTransactionsAccount(int(shardID), nodes, setting)
-
-			lock.Lock()
-			// Put txs into corresponding shards
-			shardIDTxsMap[shardID] = append(shardIDTxsMap[shardID], txs...)
-			lock.Unlock()
-			stateMutex.Unlock()
-
-			lock.Lock()
-			for shardID, txs := range shardIDTxsMap { // Send the txs to corresponding shards
-				go func(shardID uint32, txs types.Transactions) {
-					SendTxsToShard(clientNode, txs)
-				}(shardID, txs)
+		case <-ticker.C:
+			if node.State.String() == "NodeReadyForConsensus" {
+				utils.GetLogInstance().Debug("Generator Will Send Txns.", "txgen node", node.SelfPeer, "Node State", node.State.String())
+				txs, _ := GenerateSimulatedTransactionsAccount(int(shardID), node, setting)
+				SendTxsToShard(node, txs)
+				go node.GetSync()
 			}
-			lock.Unlock()
-		case <-time.After(10 * time.Second):
-			utils.GetLogInstance().Warn("No new block is received so far")
 		}
 	}
 
-	// Send a stop message to stop the nodes at the end
 	msg := proto_node.ConstructStopMessage()
-	clientNode.GetHost().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeaconClient}, p2p_host.ConstructP2pMessage(byte(0), msg))
-	clientNode.GetHost().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, p2p_host.ConstructP2pMessage(byte(0), msg))
-
+	node.GetHost().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeaconClient}, p2p_host.ConstructP2pMessage(byte(0), msg))
+	node.GetHost().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, p2p_host.ConstructP2pMessage(byte(0), msg))
 	time.Sleep(3 * time.Second)
+	node.StartServer()
 }
 
 // SendTxsToShard sends txs to shard, currently just to beacon shard
 func SendTxsToShard(clientNode *node.Node, txs types.Transactions) {
 	msg := proto_node.ConstructTransactionListMessageAccount(txs)
 	clientNode.GetHost().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeaconClient}, p2p_host.ConstructP2pMessage(byte(0), msg))
+}
+
+// GenerateSimulatedTransactionsAccount generates simulated transaction for account model.
+func GenerateSimulatedTransactionsAccount(shardID int, node *node.Node, setting Settings) (types.Transactions, types.Transactions) {
+	_ = setting // TODO: make use of settings
+	txs := make([]*types.Transaction, 100)
+	for i := 0; i < 100; i++ {
+		baseNonce := node.Worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(node.TestBankKeys[i].PublicKey))
+		randomUserAddress := crypto.PubkeyToAddress(node.TestBankKeys[rand.Intn(100)].PublicKey)
+		randAmount := rand.Float32()
+		tx, _ := types.SignTx(types.NewTransaction(baseNonce+uint64(0), randomUserAddress, uint32(shardID), big.NewInt(int64(params.Ether*randAmount)), params.TxGas, nil, nil), types.HomesteadSigner{}, node.TestBankKeys[i])
+		txs[i] = tx
+	}
+	return txs, nil
 }
