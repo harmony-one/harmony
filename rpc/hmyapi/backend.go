@@ -6,15 +6,15 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/rpc"
 )
 
 // Backend interface provides the common API services (that are provided by
@@ -55,7 +55,8 @@ type Backend interface {
 	CurrentBlock() *types.Block
 }
 
-func GetAPIs(apiBackend Backend) []rpc.API {
+// GetAPIs returns all the APIs.
+func GetAPIs(b *core.BlockChain) []rpc.API {
 	// nonceLock := new(AddrLocker)
 	return []rpc.API{
 		// {
@@ -63,12 +64,14 @@ func GetAPIs(apiBackend Backend) []rpc.API {
 		// 	Version:   "1.0",
 		// 	Service:   NewPublicEthereumAPI(apiBackend),
 		// 	Public:    true,
-		// }, {
-		// 	Namespace: "eth",
-		// 	Version:   "1.0",
-		// 	Service:   NewPublicBlockChainAPI(apiBackend),
-		// 	Public:    true,
-		// }, {
+		// },
+		{
+			Namespace: "eth",
+			Version:   "1.0",
+			Service:   NewPublicBlockChainAPI(b),
+			Public:    true,
+		},
+		// {
 		// 	Namespace: "eth",
 		// 	Version:   "1.0",
 		// 	Service:   NewPublicTransactionPoolAPI(apiBackend, nonceLock),

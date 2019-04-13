@@ -1,19 +1,3 @@
-// Copyright 2015 The go-ethereum Authors
-// This file is part of the go-ethereum library.
-//
-// The go-ethereum library is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Lesser General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// The go-ethereum library is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Lesser General Public License for more details.
-//
-// You should have received a copy of the GNU Lesser General Public License
-// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
-
 package rpc
 
 import (
@@ -27,12 +11,8 @@ import (
 	"mime"
 	"net"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
-
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/rs/cors"
 )
 
 const (
@@ -212,30 +192,31 @@ func (t *httpServerConn) SetWriteDeadline(time.Time) error { return nil }
 // NewHTTPServer creates a new HTTP RPC server around an API provider.
 //
 // Deprecated: Server implements http.Handler
-func NewHTTPServer(cors []string, vhosts []string, timeouts HTTPTimeouts, srv http.Handler) *http.Server {
+func NewHTTPServer(srv http.Handler) *http.Server {
 	// Wrap the CORS-handler within a host-handler
-	handler := newCorsHandler(srv, cors)
-	handler = newVHostHandler(vhosts, handler)
+	// handler := newCorsHandler(srv, cors)
+	// handler = newVHostHandler(vhosts, handler)
+	handler := srv
 
-	// Make sure timeout values are meaningful
-	if timeouts.ReadTimeout < time.Second {
-		log.Warn("Sanitizing invalid HTTP read timeout", "provided", timeouts.ReadTimeout, "updated", DefaultHTTPTimeouts.ReadTimeout)
-		timeouts.ReadTimeout = DefaultHTTPTimeouts.ReadTimeout
-	}
-	if timeouts.WriteTimeout < time.Second {
-		log.Warn("Sanitizing invalid HTTP write timeout", "provided", timeouts.WriteTimeout, "updated", DefaultHTTPTimeouts.WriteTimeout)
-		timeouts.WriteTimeout = DefaultHTTPTimeouts.WriteTimeout
-	}
-	if timeouts.IdleTimeout < time.Second {
-		log.Warn("Sanitizing invalid HTTP idle timeout", "provided", timeouts.IdleTimeout, "updated", DefaultHTTPTimeouts.IdleTimeout)
-		timeouts.IdleTimeout = DefaultHTTPTimeouts.IdleTimeout
-	}
+	// // Make sure timeout values are meaningful
+	// if timeouts.ReadTimeout < time.Second {
+	// 	log.Warn("Sanitizing invalid HTTP read timeout", "provided", timeouts.ReadTimeout, "updated", DefaultHTTPTimeouts.ReadTimeout)
+	// 	timeouts.ReadTimeout = DefaultHTTPTimeouts.ReadTimeout
+	// }
+	// if timeouts.WriteTimeout < time.Second {
+	// 	log.Warn("Sanitizing invalid HTTP write timeout", "provided", timeouts.WriteTimeout, "updated", DefaultHTTPTimeouts.WriteTimeout)
+	// 	timeouts.WriteTimeout = DefaultHTTPTimeouts.WriteTimeout
+	// }
+	// if timeouts.IdleTimeout < time.Second {
+	// 	log.Warn("Sanitizing invalid HTTP idle timeout", "provided", timeouts.IdleTimeout, "updated", DefaultHTTPTimeouts.IdleTimeout)
+	// 	timeouts.IdleTimeout = DefaultHTTPTimeouts.IdleTimeout
+	// }
 	// Bundle and start the HTTP server
 	return &http.Server{
-		Handler:      handler,
-		ReadTimeout:  timeouts.ReadTimeout,
-		WriteTimeout: timeouts.WriteTimeout,
-		IdleTimeout:  timeouts.IdleTimeout,
+		Handler: handler,
+		// ReadTimeout:  timeouts.ReadTimeout,
+		// WriteTimeout: timeouts.WriteTimeout,
+		// IdleTimeout:  timeouts.IdleTimeout,
 	}
 }
 
@@ -296,19 +277,19 @@ func validateRequest(r *http.Request) (int, error) {
 	return http.StatusUnsupportedMediaType, err
 }
 
-func newCorsHandler(srv http.Handler, allowedOrigins []string) http.Handler {
-	// disable CORS support if user has not specified a custom CORS configuration
-	if len(allowedOrigins) == 0 {
-		return srv
-	}
-	c := cors.New(cors.Options{
-		AllowedOrigins: allowedOrigins,
-		AllowedMethods: []string{http.MethodPost, http.MethodGet},
-		MaxAge:         600,
-		AllowedHeaders: []string{"*"},
-	})
-	return c.Handler(srv)
-}
+// func newCorsHandler(srv http.Handler, allowedOrigins []string) http.Handler {
+// 	// disable CORS support if user has not specified a custom CORS configuration
+// 	if len(allowedOrigins) == 0 {
+// 		return srv
+// 	}
+// 	c := cors.New(cors.Options{
+// 		AllowedOrigins: allowedOrigins,
+// 		AllowedMethods: []string{http.MethodPost, http.MethodGet},
+// 		MaxAge:         600,
+// 		AllowedHeaders: []string{"*"},
+// 	})
+// 	return c.Handler(srv)
+// }
 
 // virtualHostHandler is a handler which validates the Host-header of incoming requests.
 // The virtualHostHandler can prevent DNS rebinding attacks, which do not utilize CORS-headers,
@@ -349,10 +330,10 @@ func (h *virtualHostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "invalid host specified", http.StatusForbidden)
 }
 
-func newVHostHandler(vhosts []string, next http.Handler) http.Handler {
-	vhostMap := make(map[string]struct{})
-	for _, allowedHost := range vhosts {
-		vhostMap[strings.ToLower(allowedHost)] = struct{}{}
-	}
-	return &virtualHostHandler{vhostMap, next}
-}
+// func newVHostHandler(vhosts []string, next http.Handler) http.Handler {
+// 	vhostMap := make(map[string]struct{})
+// 	for _, allowedHost := range vhosts {
+// 		vhostMap[strings.ToLower(allowedHost)] = struct{}{}
+// 	}
+// 	return &virtualHostHandler{vhostMap, next}
+// }

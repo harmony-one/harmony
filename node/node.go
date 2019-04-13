@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
+	"net"
 	"os"
 	"sync"
 	"time"
@@ -31,6 +32,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/rpc"
 )
 
 // State is a state of a node.
@@ -175,6 +177,13 @@ type Node struct {
 
 	// Used to call smart contract locally
 	ContractCaller *contracts.ContractCaller
+
+	// HTTP RPC
+	rpcAPIs       []rpc.API    // List of APIs currently provided by the node
+	httpEndpoint  string       // HTTP endpoint (interface + port) to listen at (empty = HTTP disabled)
+	httpWhitelist []string     // HTTP RPC modules to allow through this endpoint
+	httpListener  net.Listener // HTTP RPC listener socket to server API requests
+	httpHandler   *rpc.Server  // HTTP RPC request handler to process the API requests
 }
 
 // Blockchain returns the blockchain from node
@@ -309,6 +318,11 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 		node.NodeConfig = nodeconfig.GetShardConfig(consensusObj.ShardID)
 	} else {
 		node.NodeConfig = nodeconfig.GetDefaultConfig()
+	}
+
+	// Lastly start the configured RPC interfaces
+	if err := node.startRPC(node.blockchain); err != nil {
+		return nil
 	}
 
 	return &node
