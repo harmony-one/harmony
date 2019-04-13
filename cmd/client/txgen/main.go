@@ -122,7 +122,7 @@ func main() {
 	if err != nil {
 		panic("unable to new host in txgen")
 	}
-	consensus, err := consensus.New(myhost, uint32(shardID), []p2p.Peer{}, p2p.Peer{}, nil)
+	consensus, err := consensus.New(myhost, uint32(shardID), p2p.Peer{}, nil)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error :%v \n", err)
 		os.Exit(1)
