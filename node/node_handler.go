@@ -475,11 +475,13 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 	} else {
 		utils.GetLogInstance().Info("Set Consensus Leader PubKey", "key", node.Consensus.GetLeaderPubKey())
 	}
-	err = node.DRand.SetLeaderPubKey(pong.LeaderPubKey)
-	if err != nil {
-		utils.GetLogInstance().Error("Unmarshal DRand Leader PubKey Failed", "error", err)
-	} else {
-		utils.GetLogInstance().Info("Set DRand Leader PubKey", "key", node.Consensus.GetLeaderPubKey())
+	if node.DRand != nil {  //ak: For nodes that participate in DRand. 
+		err = node.DRand.SetLeaderPubKey(pong.LeaderPubKey)
+		if err != nil {
+			utils.GetLogInstance().Error("Unmarshal DRand Leader PubKey Failed", "error", err)
+		} else {
+			utils.GetLogInstance().Info("Set DRand Leader PubKey", "key", node.Consensus.GetLeaderPubKey())
+		}
 	}
 
 	peers := make([]*p2p.Peer, 0)
@@ -532,7 +534,11 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 	node.serviceManager.TakeAction(&service.Action{Action: service.Notify, ServiceType: service.PeerDiscovery, Params: data})
 
 	// TODO: remove this after fully migrating to beacon chain-based committee membership
-	return node.Consensus.UpdatePublicKeys(publicKeys) + node.DRand.UpdatePublicKeys(publicKeys)
+	if node.DRand != nil { 
+		return node.Consensus.UpdatePublicKeys(publicKeys) + node.DRand.UpdatePublicKeys(publicKeys)
+	else {
+		return node.Consensus.UpdatePublicKeys(publicKeys)
+	}
 }
 
 func (node *Node) epochShardStateMessageHandler(msgPayload []byte) int {
