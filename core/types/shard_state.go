@@ -22,6 +22,17 @@ type EpochShardState struct {
 // ShardState is the collection of all committees
 type ShardState []Committee
 
+// FindCommitteeByID returns the committee configuration for the given shard,
+// or nil if the given shard is not found.
+func (ss ShardState) FindCommitteeByID(shardID uint32) *Committee {
+	for _, committee := range ss {
+		if committee.ShardID == shardID {
+			return &committee
+		}
+	}
+	return nil
+}
+
 // CompareShardState compares two ShardState instances.
 func CompareShardState(s1, s2 ShardState) int {
 	commonLen := len(s1)

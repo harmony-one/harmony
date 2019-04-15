@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
+	"math/big"
 	"os"
 	"os/exec"
 	"strconv"
@@ -250,6 +251,8 @@ func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 
 // VerifyNewBlock is called by consensus participants to verify the block (account model) they are running consensus on
 func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
+	// TODO ek – where do we verify parent-child invariants,
+	//  e.g. "child.Number == child.IsGenesis() ? 0 : parent.Number+1"?
 	err := node.blockchain.ValidateNewBlock(newBlock, pki.GetAddressFromPublicKey(node.SelfPeer.ConsensusPubKey))
 	if err != nil {
 		return ctxerror.New("failed to ValidateNewBlock",
@@ -268,10 +271,16 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 	return nil
 }
 
+// BigMaxUint64 is maximum possible uint64 value, that is, (1**64)-1.
+var BigMaxUint64 = new(big.Int).SetBytes([]byte{
+	255, 255, 255, 255, 255, 255, 255, 255,
+})
+
 // ValidateNewShardState validate whether the new shard state root matches
 func (node *Node) ValidateNewShardState(block *types.Block, stakeInfo *map[common.Address]*structs.StakeInfo) error {
-	proposed := block.Header().ShardState
-	if proposed == nil {
+	// TODO ek – how does RLP handle nil versus zero-sized slices?  same?
+	proposedShardState := block.Header().ShardState
+	if len(proposedShardState) == 0 {
 		// For now, beacon validators simply wait until the beacon leader
 		// proposes a new sharding state.
 		// TODO ek – invoke view change if leader continues epoch for too long
@@ -281,16 +290,80 @@ func (node *Node) ValidateNewShardState(block *types.Block, stakeInfo *map[commo
 		// Beacon validators independently recalculate the master state and
 		// compare it against the proposed copy.
 		nextEpoch := core.GetEpochFromBlockNumber(block.NumberU64()) + 1
+		// TODO ek – this may be called from regular shards,
+		//  for vetting beacon chain blocks received during block syncing.
+		//  DRand may or or may not get in the way.  Test this out.
 		expected := core.CalculateNewShardState(node.blockchain, nextEpoch, stakeInfo)
-		if types.CompareShardState(expected, proposed) != 0 {
+		if types.CompareShardState(expected, proposedShardState) != 0 {
 			// TODO ek – log state proposal differences
+			// TODO ek – this error should trigger view change
 			return errors.New("shard state proposal is different from expected")
 		}
 	} else {
 		// Regular validators fetch the local-shard copy on the beacon chain
 		// and compare it against the proposed copy.
-		// TODO ek – we aren't in the right place to have access to beacon
-		//  chain.  Move this method one level up.
+		//
+		// We trust the master proposal in our copy of beacon chain.
+		// The sanity check for the master proposal is done earlier,
+		// when the beacon block containing the master proposal is received
+		// and before it is admitted into the local beacon chain.
+		if len(proposedShardState) != 1 {
+			// TODO ek – this error should trigger view change
+			return ctxerror.New(
+				"regular resharding proposal has incorrect number of shards",
+				"numShards", len(proposedShardState))
+		}
+		proposed := &proposedShardState[0]
+		if proposed.ShardID != block.ShardID() {
+			return ctxerror.New(
+				"regular resharding proposal has incorrect shard ID",
+				"blockShardID", block.ShardID(),
+				"proposalShardID", proposed.ShardID)
+		}
+		epoch := block.Header().Epoch
+		// TODO ek – this check is due to uint64-based block number
+		//  processing and is only a temporary hack.  Very unlikely to hit
+		//  this in testnet, but still logically necessary.
+		if epoch.Cmp(common.Big0) < 0 || epoch.Cmp(BigMaxUint64) > 0 {
+			return ctxerror.New("block epoch out of range",
+				"epoch", block.Header().Epoch)
+		}
+		epochLastBlockNum := core.GetLastBlockNumberFromEpoch(epoch.Uint64())
+		epochLastBlock := node.beaconChain.GetBlockByNumber(epochLastBlockNum)
+		if epochLastBlock == nil {
+			// TODO ek - restore this check once the leader is made to delay
+			//  proposal until it thinks that the quorum has synchronized
+			//  through the end of beacon chain.
+			//  See the corresponding to-do in proposeLocalShardState.
+			//return ctxerror.New("cannot find epoch-last block of beacon chain",
+			//	"epoch", block.Header().Epoch,
+			//	"epochLastBlockNum", epochLastBlockNum)
+
+			// For now just agree to the leader proposal if we aren't sure.
+			return nil
+		}
+		masterProposal := epochLastBlock.Header().ShardState
+		expected := masterProposal.FindCommitteeByID(block.ShardID())
+		if expected == nil {
+			// The beacon committee “disowned” our shard,
+			// which means that this is the last epoch for us for now.
+			// The local proposal should reflect this by having an empty
+			// table with no leader.
+			if len(proposed.NodeList) != 0 {
+				// TODO ek – this error should trigger view change
+				return errors.New(
+					"leader proposed to continue against beacon decision")
+			}
+			if types.CompareNodeID(&proposed.Leader, &types.NodeID{}) != 0 {
+				// TODO ek – this error should trigger view change
+				return errors.New(
+					"leader proposed empty committee with non-empty leader")
+			}
+		} else if types.CompareCommittee(expected, proposed) != 0 {
+			// TODO ek – log differences
+			// TODO ek – this error should trigger view change
+			return errors.New("proposal differs from one in beacon chain")
+		}
 	}
 	return nil
 }
