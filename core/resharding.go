@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
+
 	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/internal/utils/contract"
@@ -142,6 +143,12 @@ func Shuffle(list []types.NodeID) {
 func GetBlockNumberFromEpoch(epoch uint64) uint64 {
 	number := epoch * uint64(BlocksPerEpoch) // currently we use the first block in each epoch
 	return number
+}
+
+// GetLastBlockNumberFromEpoch calculates the last block number for the given
+// epoch.  TODO ek – this is a temp hack.
+func GetLastBlockNumberFromEpoch(epoch uint64) uint64 {
+	return (epoch+1)*BlocksPerEpoch - 1
 }
 
 // GetEpochFromBlockNumber calculates the epoch number the block belongs to
