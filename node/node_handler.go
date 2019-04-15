@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/gob"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -25,6 +26,7 @@ import (
 	"github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/api/service"
+	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/pki"
@@ -259,9 +261,36 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 	// TODO: verify the vrf randomness
 	_ = newBlock.Header().RandPreimage
 
-	err = node.blockchain.ValidateNewShardState(newBlock, &node.CurrentStakes)
+	err = node.ValidateNewShardState(newBlock, &node.CurrentStakes)
 	if err != nil {
 		return ctxerror.New("failed to verify sharding state").WithCause(err)
+	}
+	return nil
+}
+
+// ValidateNewShardState validate whether the new shard state root matches
+func (node *Node) ValidateNewShardState(block *types.Block, stakeInfo *map[common.Address]*structs.StakeInfo) error {
+	proposed := block.Header().ShardState
+	if proposed == nil {
+		// For now, beacon validators simply wait until the beacon leader
+		// proposes a new sharding state.
+		// TODO ek – invoke view change if leader continues epoch for too long
+		return nil
+	}
+	if block.ShardID() == 0 {
+		// Beacon validators independently recalculate the master state and
+		// compare it against the proposed copy.
+		nextEpoch := core.GetEpochFromBlockNumber(block.NumberU64()) + 1
+		expected := core.CalculateNewShardState(node.blockchain, nextEpoch, stakeInfo)
+		if types.CompareShardState(expected, proposed) != 0 {
+			// TODO ek – log state proposal differences
+			return errors.New("shard state proposal is different from expected")
+		}
+	} else {
+		// Regular validators fetch the local-shard copy on the beacon chain
+		// and compare it against the proposed copy.
+		// TODO ek – we aren't in the right place to have access to beacon
+		//  chain.  Move this method one level up.
 	}
 	return nil
 }
