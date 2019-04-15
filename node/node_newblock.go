@@ -1,6 +1,7 @@
 package node
 
 import (
+	"math/big"
 	"time"
 
 	"github.com/harmony-one/harmony/core"
@@ -61,11 +62,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 						if err != nil {
 							utils.GetLogInstance().Debug("Failed committing new block", "Error", err)
 						} else {
-							if core.IsEpochLastBlock(block) && node.Consensus.ShardID == 0 {
-								nextEpoch := core.GetEpochFromBlockNumber(block.NumberU64()) + 1
-								shardState := core.CalculateNewShardState(node.blockchain, nextEpoch, &node.CurrentStakes)
-								block.AddShardState(shardState)
-							}
+							node.proposeShardState(block)
 							newBlock = block
 							utils.GetLogInstance().Debug("Successfully proposed new block", "blockNum", block.NumberU64(), "numTxs", block.Transactions().Len())
 							break
@@ -84,16 +81,6 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 			}
 		}
 	}()
-}
-
-func (node *Node) addNewShardState(block *types.Block) {
-	logger := utils.GetLogInstance().New("blockHash", block.Hash())
-	shardState := node.blockchain.GetNewShardState(block, &node.CurrentStakes)
-	if shardState != nil {
-		shardHash := shardState.Hash()
-		logger.Debug("[Shard State Hash] adding new shard state", "shardHash", shardHash)
-		block.AddShardState(shardState)
-	}
 }
 
 // WaitForConsensusReadyv2 listen for the readiness signal from consensus and generate new block for consensus.
@@ -143,11 +130,7 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 						utils.GetLogInstance().Debug("Failed committing new block", "Error", err)
 						continue
 					}
-					if core.IsEpochLastBlock(block) && node.Consensus.ShardID == 0 {
-						nextEpoch := core.GetEpochFromBlockNumber(block.NumberU64()) + 1
-						shardState := core.CalculateNewShardState(node.blockchain, nextEpoch, &node.CurrentStakes)
-						block.AddShardState(shardState)
-					}
+					node.proposeShardState(block)
 					newBlock := block
 					utils.GetLogInstance().Debug("Successfully proposed new block", "blockNum", block.NumberU64(), "numTxs", block.Transactions().Len())
 
@@ -158,4 +141,54 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 			}
 		}
 	}()
+}
+
+func (node *Node) proposeShardState(block *types.Block) {
+	if node.Consensus.ShardID == 0 {
+		node.proposeBeaconShardState(block)
+	} else {
+		node.proposeLocalShardState(block)
+	}
+}
+
+func (node *Node) proposeBeaconShardState(block *types.Block) {
+	// TODO ek - replace this with variable epoch logic.
+	if !core.IsEpochLastBlock(block) {
+		// We haven't reached the end of this epoch; don't propose yet.
+		return
+	}
+	nextEpoch := core.GetEpochFromBlockNumber(block.NumberU64()) + 1
+	shardState := core.CalculateNewShardState(node.blockchain, nextEpoch, &node.CurrentStakes)
+	block.AddShardState(shardState)
+}
+
+func (node *Node) beaconEpochEndBlock(epoch *big.Int) *types.Block {
+	// TODO ek – replace this with variable epoch logic.
+	lastBlockNumber := core.GetLastBlockNumberFromEpoch(epoch.Uint64())
+	return node.beaconChain.GetBlockByNumber(lastBlockNumber)
+}
+
+func (node *Node) proposeLocalShardState(block *types.Block) {
+	epochLastBlock := node.beaconEpochEndBlock(block.Header().Epoch)
+	if epochLastBlock == nil {
+		// Beacon committee has yet to end epoch; don't propose yet.
+		return
+	}
+	// TODO ek – delay proposal until we are fairly sure that the quorum has
+	//  synchronized through the end of epoch on the beacon chain.
+	//  Otherwise our proposal may fail to reach consensus.
+	//  For now we are fine because we cheat by disabling the validator check.
+	shardState := make(types.ShardState, 1)
+	beaconShardState := epochLastBlock.Header().ShardState
+	committee := beaconShardState.FindCommitteeByID(block.ShardID())
+	if committee != nil {
+		// Propose as announced in beacon chain.
+		shardState[0] = *committee
+	} else {
+		utils.GetLogInstance().Info(
+			"beacon committee disowned us; proposing to disband",
+			"shardID", block.ShardID())
+		// Leave local proposal empty to signal the end of shard (disbanding).
+	}
+	block.AddShardState(shardState)
 }
