@@ -161,7 +161,7 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
      echo "launching new node ..."
      (sleep $NUM_NN; $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -account_index $i  -min_peers $MIN $HMY_OPT2 -key /tmp/$ip-$port.key 2>&1 | tee -a $LOG_FILE ) &
   fi
-  (( i++ ))
+  i=$((i+1))
 done < $config
 
 # Emulate node offline
