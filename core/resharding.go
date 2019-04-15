@@ -54,7 +54,10 @@ func (ss *ShardingState) assignNewNodes(newNodeList []types.NodeID) {
 	numActiveShards := ss.numShards / 2
 	Shuffle(newNodeList)
 	for i, nid := range newNodeList {
-		id := i % numActiveShards
+		id := 0
+		if numActiveShards > 0 {
+			id = i % numActiveShards
+		}
 		ss.shardState[id].NodeList = append(ss.shardState[id].NodeList, nid)
 	}
 }
@@ -83,7 +86,10 @@ func (ss *ShardingState) cuckooResharding(percent float64) {
 	Shuffle(kickedNodes)
 	numInactiveShards := ss.numShards - numActiveShards
 	for i, nid := range kickedNodes {
-		id := numActiveShards + i%numInactiveShards
+		id := numActiveShards
+		if numInactiveShards > 0 {
+			id += i % numInactiveShards
+		}
 		ss.shardState[id].NodeList = append(ss.shardState[id].NodeList, nid)
 	}
 }
