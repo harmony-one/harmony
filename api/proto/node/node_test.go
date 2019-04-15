@@ -75,6 +75,7 @@ func TestConstructBlocksSyncMessage(t *testing.T) {
 	head := &types.Header{
 		Number:  new(big.Int).SetUint64(uint64(10000)),
 		Nonce:   types.EncodeNonce(uint64(10000)),
+		Epoch:   big.NewInt(0),
 		ShardID: 0,
 		Time:    new(big.Int).SetUint64(uint64(100000)),
 		Root:    root,

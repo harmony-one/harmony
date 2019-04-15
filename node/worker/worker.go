@@ -110,11 +110,18 @@ func (w *Worker) UpdateCurrent() error {
 	parent := w.chain.CurrentBlock()
 	num := parent.Number()
 	timestamp := time.Now().Unix()
+	// New block's epoch is the same as parent's...
+	epoch := new(big.Int).Set(parent.Header().Epoch)
+	if len(parent.Header().ShardState) > 0 {
+		// ... except if parent has a resharding assignment it increases by 1.
+		epoch = epoch.Add(epoch, common.Big1)
+	}
 	header := &types.Header{
 		ParentHash: parent.Hash(),
 		Number:     num.Add(num, common.Big1),
 		GasLimit:   core.CalcGasLimit(parent, w.gasFloor, w.gasCeil),
 		Time:       big.NewInt(timestamp),
+		Epoch:      epoch,
 		ShardID:    w.chain.ShardID(),
 	}
 	return w.makeCurrent(parent, header)
@@ -170,11 +177,18 @@ func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus_en
 	parent := worker.chain.CurrentBlock()
 	num := parent.Number()
 	timestamp := time.Now().Unix()
+	// New block's epoch is the same as parent's...
+	epoch := new(big.Int).Set(parent.Header().Epoch)
+	if len(parent.Header().ShardState) > 0 {
+		// ... except if parent has a resharding assignment it increases by 1.
+		epoch = epoch.Add(epoch, common.Big1)
+	}
 	header := &types.Header{
 		ParentHash: parent.Hash(),
 		Number:     num.Add(num, common.Big1),
 		GasLimit:   core.CalcGasLimit(parent, worker.gasFloor, worker.gasCeil),
 		Time:       big.NewInt(timestamp),
+		Epoch:      epoch,
 		ShardID:    worker.chain.ShardID(),
 	}
 	worker.makeCurrent(parent, header)

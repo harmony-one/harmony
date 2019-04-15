@@ -84,6 +84,7 @@ type Header struct {
 	MixDigest   common.Hash    `json:"mixHash"          gencodec:"required"`
 	Nonce       BlockNonce     `json:"nonce"            gencodec:"required"`
 	// Additional Fields
+	Epoch            *big.Int    `json:"epoch"            gencodec:"required"`
 	ShardID          uint32      `json:"shardID"          gencodec:"required"`
 	PrepareSignature [48]byte    `json:"prepareSignature" gencodec:"required"`
 	PrepareBitmap    []byte      `json:"prepareBitmap"    gencodec:"required"` // Contains which validator signed
