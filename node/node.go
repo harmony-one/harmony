@@ -127,9 +127,6 @@ type Node struct {
 	// The p2p host used to send/receive p2p messages
 	host p2p.Host
 
-	// Signal channel for lost validators
-	OfflinePeers chan p2p.Peer
-
 	// Service manager.
 	serviceManager *service.Manager
 
@@ -305,9 +302,6 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 	// Setup initial state of syncing.
 	node.peerRegistrationRecord = make(map[string]*syncConfig)
 
-	node.OfflinePeers = make(chan p2p.Peer)
-	go node.RemovePeersHandler()
-
 	// start the goroutine to receive group message
 	go node.ReceiveGroupMessage()
 
@@ -382,17 +376,6 @@ func (node *Node) AddBeaconPeer(p *p2p.Peer) bool {
 	key := fmt.Sprintf("%s:%s:%s", p.IP, p.Port, p.PeerID)
 	_, ok := node.BeaconNeighbors.LoadOrStore(key, *p)
 	return ok
-}
-
-// RemovePeersHandler is a goroutine to wait on the OfflinePeers channel
-// and remove the peers from validator list
-func (node *Node) RemovePeersHandler() {
-	for {
-		select {
-		case p := <-node.OfflinePeers:
-			node.Consensus.OfflinePeerList = append(node.Consensus.OfflinePeerList, p)
-		}
-	}
 }
 
 // isBeacon = true if the node is beacon node

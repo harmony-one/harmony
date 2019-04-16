@@ -208,7 +208,6 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 
 	// Current node.
 	currentNode := node.New(nodeConfig.Host, consensus, nodeConfig.MainDB, *isArchival)
-	currentNode.Consensus.OfflinePeers = currentNode.OfflinePeers
 	currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
 	currentNode.AccountKey = nodeConfig.StakingPriKey
 

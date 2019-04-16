@@ -112,12 +112,6 @@ type Consensus struct {
 
 	// The p2p host used to send/receive p2p messages
 	host p2p.Host
-
-	// Signal channel for lost validators
-	OfflinePeers chan p2p.Peer
-
-	// List of offline Peers
-	OfflinePeerList []p2p.Peer
 }
 
 // BlockConsensusStatus used to keep track of the consensus status of multiple blocks received so far
@@ -225,7 +219,6 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 	}
 
 	consensus.uniqueIDInstance = utils.GetUniqueValidatorIDInstance()
-	consensus.OfflinePeerList = make([]p2p.Peer, 0)
 
 	//	consensus.Log.Info("New Consensus", "IP", ip, "Port", port, "NodeID", consensus.nodeID, "priKey", consensus.priKey, "PubKey", consensus.PubKey)
 	return &consensus, nil
@@ -404,9 +397,6 @@ func (consensus *Consensus) ResetState() {
 
 	consensus.aggregatedPrepareSig = nil
 	consensus.aggregatedCommitSig = nil
-
-	// Clear the OfflinePeersList again
-	consensus.OfflinePeerList = make([]p2p.Peer, 0)
 }
 
 // Returns a string representation of this consensus
