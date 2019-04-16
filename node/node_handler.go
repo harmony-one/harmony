@@ -418,6 +418,24 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 		// TODO: update staking information once per epoch.
 		node.UpdateStakingList(node.QueryStakeInfo())
 		node.printStakingList()
+		// TODO ek – this is a temp hack until beacon chain sync is fixed
+		if len(newBlock.Header().ShardState) > 0 && node.Consensus.IsLeader {
+			// End-of-epoch block on beacon chain; block's EpochState is the
+			// master resharding table.  Broadcast it to the network.
+			epochShardStateMessage := proto_node.ConstructEpochShardStateMessage(
+				types.EpochShardState{
+					Epoch:      newBlock.Header().Epoch.Uint64() + 1,
+					ShardState: newBlock.Header().ShardState,
+				},
+			)
+			err := node.host.SendMessageToGroups(
+				[]p2p.GroupID{node.NodeConfig.GetClientGroupID()},
+				host.ConstructP2pMessage(byte(0), epochShardStateMessage))
+			if err != nil {
+				e := ctxerror.New("cannot broadcast shard state").WithCause(err)
+				ctxerror.Log15(utils.GetLogInstance().Error, e)
+			}
+		}
 	}
 	if core.IsEpochLastBlock(newBlock) {
 		// TODO ek – wait for beacon chain's last block to be available
