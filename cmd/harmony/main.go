@@ -90,8 +90,6 @@ var (
 	//isNewNode indicates this node is a new node
 	isNewNode    = flag.Bool("is_newnode", false, "true means this node is a new node")
 	accountIndex = flag.Int("account_index", 0, "the index of the staking account to use")
-	// isLeader indicates this node is a beacon chain leader node during the bootstrap process
-	isLeader = flag.Bool("is_leader", false, "true means this node is a beacon chain leader node")
 	// logConn logs incoming/outgoing connections
 	logConn = flag.Bool("log_conn", false, "log incoming/outgoing connections")
 )
@@ -280,7 +278,7 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 }
 
 func main() {
-	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress")
+	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
 	flag.Parse()
 
 	initSetup()
