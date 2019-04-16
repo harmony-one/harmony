@@ -103,10 +103,14 @@ func (node *Node) SupportSyncing() {
 	node.InitSyncingServer()
 	node.StartSyncingServer()
 	go node.SendNewBlockToUnsync()
-
 	if node.NodeConfig.Role() != nodeconfig.ShardLeader && node.NodeConfig.Role() != nodeconfig.BeaconLeader {
 		go node.DoSyncing(node.blockchain, node.Worker, node.GetSyncingPeers, true)
 	}
+}
+
+// GetSync gets sync-ed to blockchain without joining consensus
+func (node *Node) GetSync() {
+	go node.DoSyncing(node.blockchain, node.Worker, node.GetBeaconSyncingPeers, false) //Don't join consensus
 }
 
 // InitSyncingServer starts downloader server.
