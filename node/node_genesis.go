@@ -11,10 +11,9 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
+
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/internal/utils/contract"
 )
 
@@ -29,9 +28,6 @@ const (
 
 // GenesisBlockSetup setups a genesis blockchain.
 func (node *Node) GenesisBlockSetup(db ethdb.Database, shardID uint32, isArchival bool) (*core.BlockChain, error) {
-	logger := utils.GetLogInstance().New(
-		"shardID", shardID,
-		"isArchival", isArchival)
 	// Initialize genesis block and blockchain
 	// Tests account for txgen to use
 
@@ -58,25 +54,10 @@ func (node *Node) GenesisBlockSetup(db ethdb.Database, shardID uint32, isArchiva
 	// TODO: create separate chain config instead of using the same pointer reference
 	chainConfig := *params.TestChainConfig
 	chainConfig.ChainID = big.NewInt(int64(shardID)) // Use ChainID as piggybacked ShardID
-	shardState := core.GetInitShardState()
-	var localShardState types.ShardState
-	var localShardStateHash common.Hash
-	for idx, oneShardState := range shardState {
-		if oneShardState.ShardID == shardID {
-			localShardState = shardState[idx : idx+1]
-			localShardStateHash = localShardState.Hash()
-			break
-		}
-	}
-	if localShardState == nil {
-		logger.Warn("initial shard state did not contain our shard")
-	}
 	gspec := core.Genesis{
-		Config:         &chainConfig,
-		Alloc:          genesisAlloc,
-		ShardID:        shardID,
-		ShardStateHash: localShardStateHash,
-		ShardState:     localShardState,
+		Config:  &chainConfig,
+		Alloc:   genesisAlloc,
+		ShardID: shardID,
 	}
 
 	// Store genesis block into db.

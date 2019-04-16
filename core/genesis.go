@@ -253,7 +253,7 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 		Coinbase:       g.Coinbase,
 		Root:           root,
 		ShardStateHash: g.ShardStateHash,
-		ShardState:     g.ShardState,
+		// ShardState is absent in epoch block; genesis shard state is implied
 	}
 	if g.GasLimit == 0 {
 		head.GasLimit = 10000000000 // TODO(RJ): figure out better solution. // params.GenesisGasLimit
