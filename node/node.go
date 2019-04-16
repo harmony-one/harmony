@@ -267,18 +267,27 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 
+		// Add Faucet contract to all shards, so that on testnet, we can demo wallet in explorer
+		// TODO (leo): we need to have support of cross-shard tx later so that the token can be transferred from beacon chain shard to other tx shards.
+		if isFirstTime {
+			// Setup one time smart contracts
+			node.AddFaucetContractToPendingTransactions()
+		} else {
+			node.AddContractKeyAndAddress(scFaucet)
+		}
+
 		if node.Consensus.ShardID == 0 {
 			// Contracts only exist in beacon chain
 			if isFirstTime {
 				// Setup one time smart contracts
-				node.AddFaucetContractToPendingTransactions()
 				node.CurrentStakes = make(map[common.Address]*structs.StakeInfo)
 				node.AddStakingContractToPendingTransactions() //This will save the latest information about staked nodes in current staked
 				// TODO(minhdoan): Think of a better approach to deploy smart contract.
 				// This is temporary for demo purpose.
 				node.AddLotteryContract()
 			} else {
-				node.AddContractKeyAndAddress()
+				node.AddContractKeyAndAddress(scStaking)
+				node.AddContractKeyAndAddress(scLottery)
 			}
 		}
 	}
