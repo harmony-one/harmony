@@ -62,6 +62,7 @@ func (node *Node) DoBeaconSyncing() {
 				peers := node.GetBeaconSyncingPeers()
 				if err := node.beaconSync.CreateSyncConfig(peers, true); err != nil {
 					ctxerror.Log15(utils.GetLogInstance().Debug, err)
+					continue
 				}
 			}
 			node.beaconSync.AddLastMileBlock(beaconBlock)
@@ -113,7 +114,7 @@ SyncingLoop:
 
 // SupportBeaconSyncing sync with beacon chain for archival node in beacon chan or non-beacon node
 func (node *Node) SupportBeaconSyncing() {
-	node.DoBeaconSyncing()
+	go node.DoBeaconSyncing()
 }
 
 // SupportSyncing keeps sleeping until it's doing consensus or it's a leader.
