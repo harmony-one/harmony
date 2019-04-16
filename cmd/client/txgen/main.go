@@ -60,7 +60,7 @@ func main() {
 
 	maxNumTxsPerBatch := flag.Int("max_num_txs_per_batch", 20000, "number of transactions to send per message")
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
-	duration := flag.Int("duration", 0, "duration of the tx generation in second. If it's negative, the experiment runs forever.")
+	duration := flag.Int("duration", 10, "duration of the tx generation in second. If it's negative, the experiment runs forever.")
 	versionFlag := flag.Bool("version", false, "Output version info")
 	//crossShardRatio := flag.Int("cross_shard_ratio", 30, "The percentage of cross shard transactions.")
 	shardIDFlag := flag.Int("shardID", 0, "The shardID the node belongs to.")
@@ -68,7 +68,6 @@ func main() {
 	keyFile := flag.String("key", "./.txgenkey", "the private key file of the txgen")
 	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress")
 	flag.Parse()
-	time.Sleep(checkFrequency * time.Second) //This lets other nodes start their services before I query for blockchain height.
 	if *versionFlag {
 		printVersion(os.Args[0])
 	}
@@ -122,24 +121,24 @@ func main() {
 	if err != nil {
 		panic("unable to new host in txgen")
 	}
-	consensus, err := consensus.New(myhost, uint32(shardID), p2p.Peer{}, nil)
+	consensusObj, err := consensus.New(myhost, uint32(shardID), p2p.Peer{}, nil)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error :%v \n", err)
 		os.Exit(1)
 	}
-	node := node.New(myhost, consensus, nil, true) //Changed it : no longer archival node.
-	node.Client = client.NewClient(node.GetHost(), shardIDs)
-	node.NodeConfig.SetRole(nodeconfig.ClientNode)
-	node.NodeConfig.SetIsBeacon(false)
-	node.NodeConfig.SetIsClient(true)
-	node.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
-	node.ServiceManagerSetup()
-	node.RunServices()
+	txGen:= node.New(myhost, consensusObj, nil, true) //Changed it : no longer archival node.
+	txGen.Client = client.NewClient(node.GetHost(), shardIDs)
+	txGen.NodeConfig.SetRole(nodeconfig.ClientNode)
+	txGen.NodeConfig.SetIsBeacon(false)
+	txGen.NodeConfig.SetIsClient(true)
+	txGen.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
+	txGen.ServiceManagerSetup()
+	txGen.RunServices()
 	time.Sleep(checkFrequency * time.Second) //Time for txgen to start its services.
 	start := time.Now()
 	totalTime := float64(*duration)
 	ticker := time.NewTicker(checkFrequency * time.Second)
-	go node.GetSync()
+	txGen.GetSync()
 	for {
 		t := time.Now()
 		if totalTime > 0 && t.Sub(start).Seconds() >= totalTime {
@@ -148,26 +147,23 @@ func main() {
 		}
 		select {
 		case <-ticker.C:
-			if node.State.String() == "NodeReadyForConsensus" {
-				utils.GetLogInstance().Debug("Generator Will Send Txns.", "txgen node", node.SelfPeer, "Node State", node.State.String())
-				txs, _ := GenerateSimulatedTransactionsAccount(int(shardID), node, setting)
+			if txGen.State.String() == "NodeReadyForConsensus" {
+				utils.GetLogInstance().Debug("Generator Will Send Txns.", "txgen node", txGen.SelfPeer, "Node State", txGen.State.String())
+				txs, _ := GenerateSimulatedTransactionsAccount(int(shardID), txGen, setting)
 				SendTxsToShard(node, txs)
-				go node.GetSync()
+				go txGen.GetSync()
 			}
 		}
 	}
-
-	msg := proto_node.ConstructStopMessage()
-	node.GetHost().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeaconClient}, p2p_host.ConstructP2pMessage(byte(0), msg))
-	node.GetHost().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, p2p_host.ConstructP2pMessage(byte(0), msg))
 	time.Sleep(3 * time.Second)
-	node.StartServer()
+	txGen.StartServer()
 }
 
 // SendTxsToShard sends txs to shard, currently just to beacon shard
 func SendTxsToShard(clientNode *node.Node, txs types.Transactions) {
 	msg := proto_node.ConstructTransactionListMessageAccount(txs)
-	clientNode.GetHost().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeaconClient}, p2p_host.ConstructP2pMessage(byte(0), msg))
+	clientNode.GetHost().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeaconClient}, p2p_host.ConstructP2pMessage(byte(0), msg))))
+
 }
 
 // GenerateSimulatedTransactionsAccount generates simulated transaction for account model.
