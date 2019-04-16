@@ -103,7 +103,7 @@ func (s *Service) contactP2pPeers() {
 		case <-tick.C:
 			for g, a := range s.config.Actions {
 				if a == p2p.ActionPause {
-					// Recived Pause Message, to reduce the frequency of ping message to every 1 minute
+					// Received Pause Message, to reduce the frequency of ping message to every 1 minute
 					// TODO (leo) use different timer tick for different group, mainly differentiate beacon and regular shards
 					// beacon ping could be less frequent than regular shard
 					tick.Stop()

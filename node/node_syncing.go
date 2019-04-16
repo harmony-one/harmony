@@ -118,7 +118,7 @@ func (node *Node) InitSyncingServer() {
 
 // StartSyncingServer starts syncing server.
 func (node *Node) StartSyncingServer() {
-	utils.GetLogInstance().Info("support_sycning: StartSyncingServer")
+	utils.GetLogInstance().Info("support_syncing: StartSyncingServer")
 	if node.downloaderServer.GrpcServer == nil {
 		node.downloaderServer.Start(node.SelfPeer.IP, syncing.GetSyncingPort(node.SelfPeer.Port))
 	}

@@ -14,13 +14,12 @@ import (
 func prepareNode(t *testing.T) *Node {
 	pubKey := bls.RandPrivateKey().GetPublicKey()
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", ConsensusPubKey: pubKey}
-	validator := p2p.Peer{IP: "127.0.0.1", Port: "8885"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2pimpl.NewHost(&leader, priKey)
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := consensus.New(host, 0, []p2p.Peer{leader, validator}, leader, nil)
+	consensus, err := consensus.New(host, 0, leader, nil)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}

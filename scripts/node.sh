@@ -30,13 +30,21 @@ function valid_ip()
 }
 
 function myip() {
-   PUB_IP=$(dig @resolver1.opendns.com ANY myip.opendns.com +short)
+# get ipv4 address only, right now only support ipv4 addresses
+   PUB_IP=$(dig -4 @resolver1.opendns.com ANY myip.opendns.com +short)
    if valid_ip $PUB_IP; then
       echo MYIP = $PUB_IP
    else
       echo NO valid public IP found: $PUB_IP
       exit 1
    fi
+}
+
+function add_env
+{
+   filename=$1
+   shift
+   grep -qxF "$@" $filename || echo "$@" >> $filename
 }
 
 function setup_env
@@ -49,15 +57,15 @@ function setup_env
    sysctl -w net.ipv4.tcp_wmem='4096 65536 16777216'
    sysctl -w net.ipv4.tcp_mem='65536 131072 262144'
 
-   echo "* soft     nproc          65535" | sudo tee -a /etc/security/limits.conf
-   echo "* hard     nproc          65535" | sudo tee -a /etc/security/limits.conf
-   echo "* soft     nofile         65535" | sudo tee -a /etc/security/limits.conf
-   echo "* hard     nofile         65535" | sudo tee -a /etc/security/limits.conf
-   echo "root soft     nproc          65535" | sudo tee -a /etc/security/limits.conf
-   echo "root hard     nproc          65535" | sudo tee -a /etc/security/limits.conf
-   echo "root soft     nofile         65535" | sudo tee -a /etc/security/limits.conf
-   echo "root hard     nofile         65535" | sudo tee -a /etc/security/limits.conf
-   echo "session required pam_limits.so" | sudo tee -a /etc/pam.d/common-session
+   add_env /etc/security/limits.conf "* soft     nproc          65535"
+   add_env /etc/security/limits.conf "* hard     nproc          65535"
+   add_env /etc/security/limits.conf "* soft     nofile         65535"
+   add_env /etc/security/limits.conf "* hard     nofile         65535"
+   add_env /etc/security/limits.conf "root soft     nproc          65535"
+   add_env /etc/security/limits.conf "root hard     nproc          65535"
+   add_env /etc/security/limits.conf "root soft     nofile         65535"
+   add_env /etc/security/limits.conf "root hard     nofile         65535"
+   add_env /etc/pam.d/common-session "session required pam_limits.so"
 }
 
 function find_harmony_process
@@ -72,7 +80,7 @@ function find_harmony_process
 ######## main #########
 if [[ $EUID -ne 0 ]]; then
    echo "This script must be run as root"
-   echo Please use \"sudo ./node.sh\"
+   echo Please use \"sudo $0\"
    exit 1
 fi
 
@@ -120,6 +128,7 @@ myip
 # public boot node multiaddress
 BN_MA=/ip4/100.26.90.187/tcp/9876/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9,/ip4/54.213.43.194/tcp/9876/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX
 
+echo "############### Running Harmony Process ###############"
 if [ "$OS" == "Linux" ]; then
 # Run Harmony Node
    LD_LIBRARY_PATH=$(pwd) nohup ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_beacon > harmony-${PUB_IP}.log 2>&1 &
@@ -127,7 +136,6 @@ else
    DYLD_FALLBACK_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_beacon > harmony-${PUB_IP}.log 2>&1 &
 fi
 
-echo "############### Running Harmony Process ###############"
 find_harmony_process
 echo
 echo
@@ -136,6 +144,6 @@ echo Please run the following command to inspect the log
 echo "tail -f harmony-${PUB_IP}.log"
 
 echo
-echo You may use \"sudo kill harmony\" to terminate running harmony node program.
+echo You may use \"sudo pkill harmony\" to terminate running harmony node program.
 
 trap killnode SIGINT SIGTERM
