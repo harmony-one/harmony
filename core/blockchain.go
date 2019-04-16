@@ -1674,15 +1674,6 @@ func (bc *BlockChain) GetShardStateByNumber(number uint64) types.ShardState {
 	return bc.GetShardState(hash, number)
 }
 
-// GetShardStateByHash retrieves the shard state given the blockhash, return nil if not exist
-func (bc *BlockChain) GetShardStateByHash(hash common.Hash) types.ShardState {
-	number := bc.hc.GetBlockNumber(hash)
-	if number == nil {
-		return nil
-	}
-	return bc.GetShardState(hash, *number)
-}
-
 // GetRandSeedByNumber retrieves the rand seed given the block number, return 0 if not exist
 func (bc *BlockChain) GetRandSeedByNumber(number uint64) [32]byte {
 	header := bc.GetHeaderByNumber(number)
