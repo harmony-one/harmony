@@ -182,8 +182,8 @@ func (peerConfig *SyncPeerConfig) GetBlocks(hashes [][]byte) ([][]byte, error) {
 }
 
 // CreateSyncConfig creates SyncConfig for StateSync object.
-func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer) error {
-	utils.GetLogInstance().Debug("CreateSyncConfig: len of peers", "len", len(peers))
+func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error {
+	utils.GetLogInstance().Debug("CreateSyncConfig: len of peers", "len", len(peers), "isBeacon", isBeacon)
 	if len(peers) == 0 {
 		return ctxerror.New("[SYNC] no peers to connect to")
 	}
@@ -206,7 +206,7 @@ func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer) error {
 		}(peer)
 	}
 	wg.Wait()
-	utils.GetLogInstance().Info("[SYNC] Finished making connection to peers.", "len", len(ss.syncConfig.peers))
+	utils.GetLogInstance().Info("[SYNC] Finished making connection to peers.", "len", len(ss.syncConfig.peers), "isBeacon", isBeacon)
 
 	return nil
 }

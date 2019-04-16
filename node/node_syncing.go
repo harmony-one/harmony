@@ -60,7 +60,7 @@ func (node *Node) DoBeaconSyncing() {
 			}
 			if node.beaconSync.GetActivePeerNumber() == 0 {
 				peers := node.GetBeaconSyncingPeers()
-				if err := node.beaconSync.CreateSyncConfig(peers); err != nil {
+				if err := node.beaconSync.CreateSyncConfig(peers, true); err != nil {
 					ctxerror.Log15(utils.GetLogInstance().Debug, err)
 				}
 			}
@@ -83,7 +83,7 @@ SyncingLoop:
 			}
 			if node.stateSync.GetActivePeerNumber() == 0 {
 				peers := getPeers()
-				if err := node.stateSync.CreateSyncConfig(peers); err != nil {
+				if err := node.stateSync.CreateSyncConfig(peers, false); err != nil {
 					ctxerror.Log15(utils.GetLogInstance().Debug, err)
 					continue SyncingLoop
 				}
