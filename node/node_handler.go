@@ -546,7 +546,7 @@ func (node *Node) epochShardStateMessageHandler(msgPayload []byte) int {
 		utils.GetLogInstance().Error("Can't get shard state Message", "error", err)
 		return -1
 	}
-	if node.Consensus.ShardID != 0 {
+	if node.Consensus != nil && node.Consensus.ShardID != 0 {
 		node.processEpochShardState(epochShardState)
 	}
 	return 0
