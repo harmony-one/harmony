@@ -2,6 +2,7 @@ package node
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -39,7 +40,10 @@ func (n *Node) startRPC(b *core.BlockChain) error {
 	// 	n.stopInProc()
 	// 	return err
 	// }
+	port, _ := strconv.Atoi(n.SelfPeer.Port)
+	n.httpEndpoint = fmt.Sprintf("127.0.0.1:%v", port+123)
 	if err := n.startHTTP(n.httpEndpoint, apis); err != nil {
+		utils.GetLogInstance().Debug("Failed to start RPC HTTP")
 		// n.stopIPC()
 		// n.stopInProc()
 		return err
@@ -108,6 +112,7 @@ func (n *Node) startRPC(b *core.BlockChain) error {
 
 // startHTTP initializes and starts the HTTP RPC endpoint.
 func (n *Node) startHTTP(endpoint string, apis []rpc.API) error {
+	utils.GetLogInstance().Debug("rpc startHTTP", "endpoint", endpoint, "apis", apis)
 	// Short circuit if the HTTP endpoint isn't being exposed
 	if endpoint == "" {
 		return nil

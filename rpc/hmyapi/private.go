@@ -1,7 +1,6 @@
 package hmyapi
 
 import (
-	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -9,9 +8,9 @@ import (
 // It offers methods to create, (un)lock en list accounts. Some methods accept
 // passwords and are therefore considered private by default.
 type PrivateAccountAPI struct {
-	am        *accounts.Manager
+	// am        *accounts.Manager
 	nonceLock *AddrLocker
-	b         Backend
+	// b         Backend
 }
 
 // NewAccount will create a new account and returns the address for the new account.
