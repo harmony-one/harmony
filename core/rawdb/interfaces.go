@@ -16,6 +16,8 @@
 
 package rawdb
 
+//go:generate mockgen -source interfaces.go -destination mock/mock.go
+
 // DatabaseReader wraps the Has and Get method of a backing data store.
 type DatabaseReader interface {
 	Has(key []byte) (bool, error)

@@ -19,12 +19,17 @@ package rawdb
 import (
 	"bytes"
 	"math/big"
+	"os"
+	"reflect"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/golang/mock/gomock"
+	mock "github.com/harmony-one/harmony/core/rawdb/mock"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/syndtr/goleveldb/leveldb"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -108,6 +113,11 @@ func TestBlockStorage(t *testing.T) {
 		Extra:       []byte("test block"),
 		TxHash:      types.EmptyRootHash,
 		ReceiptHash: types.EmptyRootHash,
+		Epoch:       big.NewInt(0),
+		Number:      big.NewInt(0),
+		ShardState: types.ShardState{
+			{},
+		},
 	})
 	if entry := ReadBlock(db, block.Hash(), block.NumberU64()); entry != nil {
 		t.Fatalf("Non existent block returned: %v", entry)
@@ -134,6 +144,16 @@ func TestBlockStorage(t *testing.T) {
 		t.Fatalf("Stored body not found")
 	} else if types.DeriveSha(types.Transactions(entry.Transactions)) != types.DeriveSha(block.Transactions()) || types.CalcUncleHash(entry.Uncles) != types.CalcUncleHash(block.Uncles()) {
 		t.Fatalf("Retrieved body mismatch: have %v, want %v", entry, block.Body())
+	}
+	if actual, err := ReadEpochBlockNumber(db, big.NewInt(0)); err != nil {
+		t.Fatalf("Genesis epoch block number not found, error=%#v", err)
+	} else if expected := big.NewInt(0); actual.Cmp(expected) != 0 {
+		t.Fatalf("Genesis epoch block number mismatch: have %v, want %v", actual, expected)
+	}
+	if actual, err := ReadEpochBlockNumber(db, big.NewInt(1)); err != nil {
+		t.Fatalf("Next epoch block number not found, error=%#v", err)
+	} else if expected := big.NewInt(1); actual.Cmp(expected) != 0 {
+		t.Fatalf("Next epoch block number mismatch: have %v, want %v", actual, expected)
 	}
 	// Delete the block and verify the execution
 	DeleteBlock(db, block.Hash(), block.NumberU64())
@@ -313,5 +333,156 @@ func TestBlockReceiptStorage(t *testing.T) {
 	DeleteReceipts(db, hash, 0)
 	if rs := ReadReceipts(db, hash, 0); len(rs) != 0 {
 		t.Fatalf("deleted receipts returned: %v", rs)
+	}
+}
+
+func TestReadEpochBlockNumber(t *testing.T) {
+	type args struct {
+		// db is mocked
+		epoch *big.Int
+	}
+	type dbCall struct {
+		key   []byte
+		data  []byte
+		error error
+	}
+	tests := []struct {
+		name    string
+		args    args
+		dbCall  dbCall
+		want    *big.Int
+		wantErr bool
+	}{
+		{
+			"0",
+			args{epoch: big.NewInt(0)},
+			dbCall{
+				key:   []byte{},
+				data:  []byte{},
+				error: nil,
+			},
+			big.NewInt(0),
+			false,
+		},
+		{
+			"1",
+			args{epoch: big.NewInt(1)},
+			dbCall{
+				key:   []byte{0x01},
+				data:  []byte{0x64},
+				error: nil,
+			},
+			big.NewInt(100),
+			false,
+		},
+		{
+			"1000",
+			args{epoch: big.NewInt(1000)},
+			dbCall{
+				key:   []byte{0x03, 0xe8},
+				data:  []byte{0x01, 0x86, 0xa0},
+				error: nil,
+			},
+			big.NewInt(100000),
+			false,
+		},
+		{
+			"error",
+			args{epoch: big.NewInt(0)},
+			dbCall{
+				key:   []byte{},
+				data:  []byte{},
+				error: leveldb.ErrNotFound,
+			},
+			nil,
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			db := mock.NewMockDatabaseReader(ctrl)
+			fullKey := append(epochBlockNumberPrefix, tt.dbCall.key...)
+			db.EXPECT().Get(fullKey).Return(tt.dbCall.data, tt.dbCall.error)
+			got, err := ReadEpochBlockNumber(db, tt.args.epoch)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ReadEpochBlockNumber() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ReadEpochBlockNumber() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestWriteEpochBlockNumber(t *testing.T) {
+	type args struct {
+		epoch    *big.Int
+		blockNum *big.Int
+	}
+	type dbCall struct {
+		key   []byte
+		data  []byte
+		error error
+	}
+	tests := []struct {
+		name    string
+		args    args
+		dbCall  dbCall
+		wantErr bool
+	}{
+		{
+			"0",
+			args{epoch: big.NewInt(0), blockNum: big.NewInt(0)},
+			dbCall{
+				key:   []byte{},
+				data:  []byte{},
+				error: nil,
+			},
+			false,
+		},
+		{
+			"1",
+			args{epoch: big.NewInt(1), blockNum: big.NewInt(100)},
+			dbCall{
+				key:   []byte{0x01},
+				data:  []byte{0x64},
+				error: nil,
+			},
+			false,
+		},
+		{
+			"1000",
+			args{epoch: big.NewInt(1000), blockNum: big.NewInt(100000)},
+			dbCall{
+				key:   []byte{0x03, 0xe8},
+				data:  []byte{0x01, 0x86, 0xa0},
+				error: nil,
+			},
+			false,
+		},
+		{
+			"error",
+			args{epoch: big.NewInt(1000), blockNum: big.NewInt(100000)},
+			dbCall{
+				key:   []byte{0x03, 0xe8},
+				data:  []byte{0x01, 0x86, 0xa0},
+				error: os.ErrClosed,
+			},
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			db := mock.NewMockDatabaseWriter(ctrl)
+			fullKey := append(epochBlockNumberPrefix, tt.dbCall.key...)
+			db.EXPECT().Put(fullKey, tt.dbCall.data).Return(tt.dbCall.error)
+			if err := WriteEpochBlockNumber(db, tt.args.epoch, tt.args.blockNum); (err != nil) != tt.wantErr {
+				t.Errorf("WriteEpochBlockNumber() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
 }

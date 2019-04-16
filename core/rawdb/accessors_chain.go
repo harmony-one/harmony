@@ -24,7 +24,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
+
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/ctxerror"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // ReadCanonicalHash retrieves the hash assigned to a canonical block number.
@@ -337,6 +340,29 @@ func ReadBlock(db DatabaseReader, hash common.Hash, number uint64) *types.Block 
 func WriteBlock(db DatabaseWriter, block *types.Block) {
 	WriteBody(db, block.Hash(), block.NumberU64(), block.Body())
 	WriteHeader(db, block.Header())
+	epoch := block.Header().Epoch
+	if epoch == nil {
+		// backward compatibility
+		return
+	}
+	epoch = new(big.Int).Set(epoch)
+	epochBlockNum := block.Number()
+	writeOne := func() {
+		if err := WriteEpochBlockNumber(db, epoch, epochBlockNum); err != nil {
+			ctxerror.Log15(utils.GetLogInstance().Error, err)
+		}
+	}
+	// A block may be a genesis block AND end-of-epoch block at the same time.
+	if epochBlockNum.Sign() == 0 {
+		// Genesis block; record this block's epoch and block numbers.
+		writeOne()
+	}
+	if len(block.Header().ShardState) > 0 {
+		// End-of-epoch block; record the next epoch after this block.
+		epoch = new(big.Int).Add(epoch, common.Big1)
+		epochBlockNum = new(big.Int).Add(epochBlockNum, common.Big1)
+		writeOne()
+	}
 }
 
 // DeleteBlock removes all block data associated with a hash.
@@ -397,4 +423,20 @@ func WriteShardState(db DatabaseWriter, hash common.Hash, number uint64, shardSt
 	if err := db.Put(shardStateKey(number, hash), data); err != nil {
 		log.Crit("Failed to store sharding state", "err", err)
 	}
+}
+
+// ReadEpochBlockNumber retrieves the epoch block number for the given epoch,
+// or nil if the given epoch is not found in the database.
+func ReadEpochBlockNumber(db DatabaseReader, epoch *big.Int) (*big.Int, error) {
+	data, err := db.Get(epochBlockNumberKey(epoch))
+	if err != nil {
+		return nil, err
+	}
+	return new(big.Int).SetBytes(data), nil
+}
+
+// WriteEpochBlockNumber stores the given epoch-number-to-epoch-block-number
+// in the database.
+func WriteEpochBlockNumber(db DatabaseWriter, epoch, blockNum *big.Int) error {
+	return db.Put(epochBlockNumberKey(epoch), blockNum.Bytes())
 }

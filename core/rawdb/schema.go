@@ -19,6 +19,7 @@ package rawdb
 
 import (
 	"encoding/binary"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/metrics"
@@ -57,6 +58,10 @@ var (
 
 	preimagePrefix = []byte("secure-key-")      // preimagePrefix + hash -> preimage
 	configPrefix   = []byte("ethereum-config-") // config prefix for the db
+
+	// epochBlockNumberPrefix + epoch (big.Int.Bytes())
+	// -> epoch block number (big.Int.Bytes())
+	epochBlockNumberPrefix = []byte("harmony-epoch-block-number-")
 
 	// Chain index prefixes (use `i` + single byte to avoid mixing data types).
 	BloomBitsIndexPrefix = []byte("iB") // BloomBitsIndexPrefix is the data table of a chain indexer to track its progress
@@ -137,4 +142,8 @@ func configKey(hash common.Hash) []byte {
 
 func shardStateKey(number uint64, hash common.Hash) []byte {
 	return append(append(shardStatePrefix, encodeBlockNumber(number)...), hash.Bytes()...)
+}
+
+func epochBlockNumberKey(epoch *big.Int) []byte {
+	return append(epochBlockNumberPrefix, epoch.Bytes()...)
 }

@@ -46,6 +46,7 @@ require (
 	github.com/shirou/gopsutil v2.18.12+incompatible
 	github.com/smartystreets/goconvey v0.0.0-20190330032615-68dc04aab96a // indirect
 	github.com/stretchr/testify v1.3.0
+	github.com/syndtr/goleveldb v1.0.0
 	github.com/whyrusleeping/go-logging v0.0.0-20170515211332-0457bb6b88fc
 	golang.org/x/crypto v0.0.0-20190313024323-a1f597ede03a
 	golang.org/x/lint v0.0.0-20190313153728-d0100b6bd8b3
