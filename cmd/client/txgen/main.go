@@ -62,7 +62,7 @@ func main() {
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	duration := flag.Int("duration", 10, "duration of the tx generation in second. If it's negative, the experiment runs forever.")
 	versionFlag := flag.Bool("version", false, "Output version info")
-	//crossShardRatio := flag.Int("cross_shard_ratio", 30, "The percentage of cross shard transactions.")
+	crossShardRatio := flag.Int("cross_shard_ratio", 30, "The percentage of cross shard transactions.") //Keeping this for backward compatibility
 	shardIDFlag := flag.Int("shardID", 0, "The shardID the node belongs to.")
 	// Key file to store the private key
 	keyFile := flag.String("key", "./.txgenkey", "the private key file of the txgen")
@@ -105,6 +105,7 @@ func main() {
 		NumOfAddress:      10000,
 		MaxNumTxsPerBatch: *maxNumTxsPerBatch,
 	}
+	utils.GetLogInstance().Debug("Cross Shard Ratio Is Set But not used", "cx ratio", *crossShardRatio)
 
 	// TODO(Richard): refactor this chuck to a single method
 	// Setup a logger to stdout and log file.
@@ -156,7 +157,6 @@ func main() {
 		}
 	}
 	time.Sleep(3 * time.Second)
-	txGen.StartServer()
 }
 
 // SendTxsToShard sends txs to shard, currently just to beacon shard
