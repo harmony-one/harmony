@@ -52,6 +52,7 @@ git submodule update --init --recursive
 ## Build
 
 Note : Some of our scripts require bash 4.x support, please [install bash 4.x](http://tldrdevnotes.com/bash-upgrade-3-4-macos) on MacOS X.
+Make sure you set `export GO111MODULE=on`.
 
 ### Build all executables
 
