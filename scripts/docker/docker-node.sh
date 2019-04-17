@@ -4,7 +4,9 @@ DOCKER_IMAGE=harmonyone/node:master
 
 function usage()
 {
-  echo "usage: $(basename $0) [-p base_port] account_id"
+  echo "usage: $(basename $0) [-p base_port] [-k] account_id"
+  echo "  -p base_port: base port, default; 9000"
+  echo "  -k          : kill running node"
   exit 1
 }
 
@@ -15,10 +17,12 @@ if [ -z "$(which docker)" ]; then
 fi
 
 port_base=
+kill_only=
 
-while getopts "p:" opt; do
+while getopts "p:k" opt; do
   case "$opt" in
     p) port_base="$OPTARG";;
+    k) kill_only="true";;
     *) usage;;
   esac
 done
@@ -47,21 +51,41 @@ if [ "$port_base" -gt 59900 ]; then
   exit 1
 fi
 
+if [ -n "$(docker ps -q -a -f name=^harmony-$account_id-$port_base$)" ]; then
+  echo "Stop node for account id: $account_id (port $port_base)"
+  docker rm -v -f harmony-$account_id-$port_base >/dev/null
+elif [ "$kill_only" = "true" ]; then
+  echo "Cannot find exist node for account id: $account_id (port $port_base)"
+  exit 1
+fi
+
+if [ "$kill_only" = "true" ]; then
+  exit
+fi
+
 port_rest=$(( $port_base - 3000 ))
 port_rpc=$(( $port_base + 5555 ))
+
 # Pull latest image
-docker pull $DOCKER_IMAGE
-# Stop running container
-docker rm -v -f harmony-$account_id-$port_base
+echo "Pull latest node image"
+docker pull $DOCKER_IMAGE >/dev/null
+
 docker run -it -d \
   --name harmony-$account_id-$port_base \
   -p $port_base:$port_base -p $port_rest:$port_rest -p $port_rpc:$port_rpc \
   -e NODE_PORT=$port_base \
   -e NODE_ACCOUNT_ID=$account_id \
-  --mount type=volume,source=data-$port_base,destination=/harmony/db \
-  --mount type=volume,source=log-$port_base,destination=/harmony/log \
-  $DOCKER_IMAGE
+  --mount type=volume,source=db-$account_id-$port_base,destination=/harmony/db \
+  --mount type=volume,source=log-$account_id-$port_base,destination=/harmony/log \
+  $DOCKER_IMAGE >/dev/null
 
-echo "Please run \`docker logs -f harmony-$account_id-$port_base\` to check console logs"
+
+echo
+echo "======================================"
+echo "Node for account $account_id (port $port_base) is running in container 'harmony-$account_id-$port_base'"
+echo
+echo "To check console log, please run \`docker logs -f harmony-$account_id-$port_base\`"
+echo "To stop node, please run \`$0 -k -p $port_base $account_id\`"
+echo "======================================"
 
 # vim: ai ts=2 sw=2 et sts=2 ft=sh
