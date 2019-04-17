@@ -127,9 +127,6 @@ type Node struct {
 	// The p2p host used to send/receive p2p messages
 	host p2p.Host
 
-	// Signal channel for lost validators
-	OfflinePeers chan p2p.Peer
-
 	// Service manager.
 	serviceManager *service.Manager
 
@@ -154,7 +151,7 @@ type Node struct {
 	// Shard group Message Receiver
 	shardGroupReceiver p2p.GroupReceiver
 
-	// Global group Message Receiver
+	// Global group Message Receiver, communicate with beacon chain, or cross-shard TX
 	globalGroupReceiver p2p.GroupReceiver
 
 	// Client Message Receiver to handle light client messages
@@ -300,16 +297,20 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 		node.State = NodeInit
 
 	}
+
+	// start the goroutine to receive client message
+	// client messages are sent by clients, like txgen, wallet
 	go node.ReceiveClientGroupMessage()
-
-	// Setup initial state of syncing.
-	node.peerRegistrationRecord = make(map[string]*syncConfig)
-
-	node.OfflinePeers = make(chan p2p.Peer)
-	go node.RemovePeersHandler()
 
 	// start the goroutine to receive group message
 	go node.ReceiveGroupMessage()
+
+	// start the goroutine to receive global message, used for cross-shard TX
+	// FIXME (leo): we use beacon client topic as the global topic for now
+	go node.ReceiveGlobalMessage()
+
+	// Setup initial state of syncing.
+	node.peerRegistrationRecord = make(map[string]*syncConfig)
 
 	node.startConsensus = make(chan struct{})
 
@@ -384,17 +385,6 @@ func (node *Node) AddBeaconPeer(p *p2p.Peer) bool {
 	return ok
 }
 
-// RemovePeersHandler is a goroutine to wait on the OfflinePeers channel
-// and remove the peers from validator list
-func (node *Node) RemovePeersHandler() {
-	for {
-		select {
-		case p := <-node.OfflinePeers:
-			node.Consensus.OfflinePeerList = append(node.Consensus.OfflinePeerList, p)
-		}
-	}
-}
-
 // isBeacon = true if the node is beacon node
 // isClient = true if the node light client(txgen,wallet)
 func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
@@ -420,20 +410,14 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 		utils.GetLogInstance().Error("Failed to create shard receiver", "msg", err)
 	}
 
-	node.globalGroupReceiver, err = node.host.GroupReceiver(p2p.GroupIDGlobal)
+	node.globalGroupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to create global receiver", "msg", err)
 	}
 
-	node.clientReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
+	node.clientReceiver, err = node.host.GroupReceiver(node.NodeConfig.GetClientGroupID())
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to create beacon client receiver", "msg", err)
-	}
-
-	node.NodeConfig.SetClientGroupID(p2p.GroupIDBeaconClient)
-
-	if err != nil {
-		utils.GetLogInstance().Error("create group receiver error", "msg", err)
+		utils.GetLogInstance().Error("Failed to create client receiver", "msg", err)
 	}
 
 	return nodeConfig, chanPeer

@@ -34,6 +34,25 @@ const (
 	MaxNumberOfTransactionsPerBlock = 8000
 )
 
+// ReceiveGlobalMessage use libp2p pubsub mechanism to receive global broadcast messages
+func (node *Node) ReceiveGlobalMessage() {
+	ctx := context.Background()
+	for {
+		if node.globalGroupReceiver == nil {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+		msg, sender, err := node.globalGroupReceiver.Receive(ctx)
+		if sender != node.host.GetID() {
+			utils.GetLogInstance().Info("[PUBSUB]", "received global msg", len(msg), "sender", sender)
+			if err == nil {
+				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
+				go node.messageHandler(msg[5:], string(sender))
+			}
+		}
+	}
+}
+
 // ReceiveGroupMessage use libp2p pubsub mechanism to receive broadcast messages
 func (node *Node) ReceiveGroupMessage() {
 	ctx := context.Background()

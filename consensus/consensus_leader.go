@@ -50,11 +50,6 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan *types.Block, stop
 				newBlock := <-blockChannel
 				// TODO: think about potential race condition
 
-				c := consensus.RemovePeers(consensus.OfflinePeerList)
-				if c > 0 {
-					utils.GetLogInstance().Debug("WaitForNewBlock", "removed peers", c)
-				}
-
 				if consensus.ShardID == 0 {
 					if core.IsEpochBlock(newBlock) { // Only beacon chain do randomness generation
 						// Receive pRnd from DRG protocol
