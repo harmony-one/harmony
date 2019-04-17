@@ -306,7 +306,8 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 	go node.ReceiveGroupMessage()
 
 	// start the goroutine to receive global message, used for cross-shard TX
-	// go node.ReceiveGlobalMessage()
+	// FIXME (leo): we use beacon client topic as the global topic for now
+	go node.ReceiveGlobalMessage()
 
 	// Setup initial state of syncing.
 	node.peerRegistrationRecord = make(map[string]*syncConfig)
@@ -409,7 +410,7 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 		utils.GetLogInstance().Error("Failed to create shard receiver", "msg", err)
 	}
 
-	node.globalGroupReceiver, err = node.host.GroupReceiver(p2p.GroupIDGlobal)
+	node.globalGroupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to create global receiver", "msg", err)
 	}
