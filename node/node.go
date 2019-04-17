@@ -151,7 +151,7 @@ type Node struct {
 	// Shard group Message Receiver
 	shardGroupReceiver p2p.GroupReceiver
 
-	// Global group Message Receiver
+	// Global group Message Receiver, communicate with beacon chain, or cross-shard TX
 	globalGroupReceiver p2p.GroupReceiver
 
 	// Client Message Receiver to handle light client messages
@@ -297,13 +297,19 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 		node.State = NodeInit
 
 	}
-	go node.ReceiveClientGroupMessage()
 
-	// Setup initial state of syncing.
-	node.peerRegistrationRecord = make(map[string]*syncConfig)
+	// start the goroutine to receive client message
+	// client messages are sent by clients, like txgen, wallet
+	go node.ReceiveClientGroupMessage()
 
 	// start the goroutine to receive group message
 	go node.ReceiveGroupMessage()
+
+	// start the goroutine to receive global message, used for cross-shard TX
+	// go node.ReceiveGlobalMessage()
+
+	// Setup initial state of syncing.
+	node.peerRegistrationRecord = make(map[string]*syncConfig)
 
 	node.startConsensus = make(chan struct{})
 
@@ -408,15 +414,9 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 		utils.GetLogInstance().Error("Failed to create global receiver", "msg", err)
 	}
 
-	node.clientReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
+	node.clientReceiver, err = node.host.GroupReceiver(node.NodeConfig.GetClientGroupID())
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to create beacon client receiver", "msg", err)
-	}
-
-	node.NodeConfig.SetClientGroupID(p2p.GroupIDBeaconClient)
-
-	if err != nil {
-		utils.GetLogInstance().Error("create group receiver error", "msg", err)
+		utils.GetLogInstance().Error("Failed to create client receiver", "msg", err)
 	}
 
 	return nodeConfig, chanPeer

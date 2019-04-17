@@ -226,6 +226,7 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 				currentNode.NodeConfig.SetIsLeader(false)
 			}
 			currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
+			currentNode.NodeConfig.SetClientGroupID(p2p.GroupIDBeaconClient)
 		} else {
 			if nodeConfig.StringRole == "leader" {
 				currentNode.NodeConfig.SetRole(nodeconfig.ShardLeader)
@@ -235,6 +236,7 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 				currentNode.NodeConfig.SetIsLeader(false)
 			}
 			currentNode.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
+			currentNode.NodeConfig.SetClientGroupID(p2p.NewClientGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
 		}
 	} else {
 		if *isNewNode {
