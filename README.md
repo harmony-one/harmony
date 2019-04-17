@@ -17,7 +17,7 @@ brew install openssl
 
 ## Dev Environment Setup
 
-The required go version is: **go1.11**
+The required go version is: **go1.12**
 
 ```bash
 export GOPATH=$HOME/<path_of_your_choice>
