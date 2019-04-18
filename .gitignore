@@ -64,3 +64,6 @@ node_modules/
 
 # go mod summary file
 go.sum
+
+# bnkey
+test/.bnkey

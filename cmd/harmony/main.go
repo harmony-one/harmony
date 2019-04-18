@@ -302,10 +302,9 @@ func main() {
 	if consensus.IsLeader {
 		go currentNode.SendPongMessage()
 	}
-	// TODO: enable beacon chain sync
-	//if consensus.ShardID != 0 {
-	//	go currentNode.SupportBeaconSyncing()
-	//}
+	if consensus.ShardID != 0 {
+		go currentNode.SupportBeaconSyncing()
+	}
 	go currentNode.SupportSyncing()
 	utils.GetLogInstance().Info("New Harmony Node ====", "Role", currentNode.NodeConfig.Role(), "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, nodeConfig.Host.GetID().Pretty()))
 	currentNode.ServiceManagerSetup()

@@ -165,7 +165,7 @@ func (node *Node) messageHandler(content []byte, sender string) {
 					// for non-beaconchain node, subscribe to beacon block broadcast
 					role := node.NodeConfig.Role()
 					if proto_node.BlockMessageType(msgPayload[0]) == proto_node.Sync && (role == nodeconfig.ShardValidator || role == nodeconfig.ShardLeader || role == nodeconfig.NewNode) {
-						utils.GetLogInstance().Info("Block being handled by block channel", "self peer", node.SelfPeer)
+						utils.GetLogInstance().Info("Block being handled by block channel", "self peer", node.SelfPeer, "block", blocks[0].NumberU64())
 						for _, block := range blocks {
 							node.BeaconBlockChannel <- block
 						}

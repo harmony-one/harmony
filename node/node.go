@@ -430,13 +430,13 @@ func (node *Node) AddBeaconChainDatabase(db ethdb.Database) {
 		database = ethdb.NewMemDatabase()
 	}
 	// TODO (chao) currently we use the same genesis block as normal shard
-	chain, err := node.GenesisBlockSetup(database, 0, false)
+	chain, err := node.GenesisBlockSetup(database, 0, true)
 	if err != nil {
 		utils.GetLogInstance().Error("Error when doing genesis setup")
 		os.Exit(1)
 	}
 	node.beaconChain = chain
-	node.BeaconWorker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.ConsensusPubKey), node.Consensus.ShardID)
+	node.BeaconWorker = worker.New(params.TestChainConfig, chain, &consensus.Consensus{}, pki.GetAddressFromPublicKey(node.SelfPeer.ConsensusPubKey), node.Consensus.ShardID)
 }
 
 // InitBlockChainFromDB retrieves the latest blockchain and state available from the local database
