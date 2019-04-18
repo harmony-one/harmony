@@ -76,6 +76,7 @@ func (sc *SyncConfig) ForEachPeer(f func(peer *SyncPeerConfig) (brk bool)) {
 	sc.mtx.RLock()
 	defer sc.mtx.RUnlock()
 	for _, peer := range sc.peers {
+		utils.GetLogInstance().Debug("in ForEachPeer", "peer ip", peer.ip, "peer port", peer.port)
 		if f(peer) {
 			break
 		}
@@ -594,6 +595,7 @@ func (ss *StateSync) getMaxPeerHeight() uint64 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			utils.GetLogInstance().Debug("[SYNC] getMaxPeer", "ip", peerConfig.ip, "port", peerConfig.port)
 			response := peerConfig.client.GetBlockChainHeight()
 			ss.syncMux.Lock()
 			if response != nil && maxHeight < response.BlockHeight {
