@@ -3,12 +3,8 @@ package node
 import (
 	"bytes"
 	"context"
-	"fmt"
-	"math"
 	"os"
 	"time"
-
-	"github.com/harmony-one/harmony/core"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -267,10 +263,12 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) bool {
 	// TODO: verify the vrf randomness
 	_ = newBlock.Header().RandPreimage
 
+	/* FIXME: for lottery app stability
 	err = node.blockchain.ValidateNewShardState(newBlock, &node.CurrentStakes)
 	if err != nil {
 		utils.GetLogInstance().Debug("Failed to verify new sharding state", "err", err)
 	}
+	*/
 	return true
 }
 
@@ -295,6 +293,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 		}()
 	}
 
+	/* FIXME: for lottery app stability
 	stakeInfo := node.QueryStakeInfo()
 	if stakeInfo != nil {
 		utils.GetLogInstance().Info("Updating staking list")
@@ -346,6 +345,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 			}
 		}
 	}
+	*/
 }
 
 // AddNewBlock is usedd to add new block into the blockchain.
@@ -407,7 +407,8 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 // SendPongMessage is the a goroutine to periodcally send pong message to all peers
 func (node *Node) SendPongMessage() {
 	tick := time.NewTicker(2 * time.Second)
-	tick2 := time.NewTicker(120 * time.Second)
+	//	FIXME: for lottery app stability
+	// tick2 := time.NewTicker(120 * time.Second)
 
 	numPeers := len(node.Consensus.GetValidatorPeers())
 	numPubKeys := len(node.Consensus.PublicKeys)
@@ -458,19 +459,21 @@ func (node *Node) SendPongMessage() {
 			}
 			numPeers = numPeersNow
 			numPubKeys = numPubKeysNow
-		case <-tick2.C:
-			// send pong message regularly to make sure new node received all the public keys
-			// also nodes offline/online will receive the public keys
-			peers := node.Consensus.GetValidatorPeers()
-			pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys, node.Consensus.GetLeaderPubKey())
-			buffer := pong.ConstructPongMessage()
-			err := node.host.SendMessageToGroups([]p2p.GroupID{node.NodeConfig.GetShardGroupID()}, host.ConstructP2pMessage(byte(0), buffer))
-			if err != nil {
-				utils.GetLogInstance().Error("[PONG] failed to send regular pong message", "group", node.NodeConfig.GetShardGroupID())
-				continue
-			} else {
-				utils.GetLogInstance().Info("[PONG] sent regular pong message to", "group", node.NodeConfig.GetShardGroupID(), "# nodes", len(peers))
-			}
+			/* FIXME: for lottery app stability
+			case <-tick2.C:
+				// send pong message regularly to make sure new node received all the public keys
+				// also nodes offline/online will receive the public keys
+				peers := node.Consensus.GetValidatorPeers()
+				pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys, node.Consensus.GetLeaderPubKey())
+				buffer := pong.ConstructPongMessage()
+				err := node.host.SendMessageToGroups([]p2p.GroupID{node.NodeConfig.GetShardGroupID()}, host.ConstructP2pMessage(byte(0), buffer))
+				if err != nil {
+					utils.GetLogInstance().Error("[PONG] failed to send regular pong message", "group", node.NodeConfig.GetShardGroupID())
+					continue
+				} else {
+					utils.GetLogInstance().Info("[PONG] sent regular pong message to", "group", node.NodeConfig.GetShardGroupID(), "# nodes", len(peers))
+				}
+			*/
 		}
 	}
 }
