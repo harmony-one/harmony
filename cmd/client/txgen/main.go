@@ -135,7 +135,6 @@ func main() {
 	txGen.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
 	txGen.ServiceManagerSetup()
 	txGen.RunServices()
-	time.Sleep(checkFrequency * time.Second) //Time for txgen to start its services.
 	start := time.Now()
 	totalTime := float64(*duration)
 	ticker := time.NewTicker(checkFrequency * time.Second)
