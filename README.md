@@ -17,7 +17,7 @@ brew install openssl
 
 ## Dev Environment Setup
 
-The required go version is: **go1.11**
+The required go version is: **go1.12**
 
 ```bash
 export GOPATH=$HOME/<path_of_your_choice>
@@ -52,6 +52,7 @@ git submodule update --init --recursive
 ## Build
 
 Note : Some of our scripts require bash 4.x support, please [install bash 4.x](http://tldrdevnotes.com/bash-upgrade-3-4-macos) on MacOS X.
+Make sure you set `export GO111MODULE=on`.
 
 ### Build all executables
 
@@ -93,7 +94,7 @@ The configuration file configures number of nodes and their IP/Port.
 The script starts one local beacon chain node, the blockchain nodes, and run a transactional generator program which generates and sends simulated transactions to the local blockchain.
 
 ```bash
-./test/deploy.sh ./test/configs/oneshard1.txt
+./test/deploy.sh ./test/configs/ten-oneshard.txt
 ```
 
 ## Testing

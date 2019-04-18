@@ -182,8 +182,8 @@ func (peerConfig *SyncPeerConfig) GetBlocks(hashes [][]byte) ([][]byte, error) {
 }
 
 // CreateSyncConfig creates SyncConfig for StateSync object.
-func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer) error {
-	utils.GetLogInstance().Debug("CreateSyncConfig: len of peers", "len", len(peers))
+func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error {
+	utils.GetLogInstance().Debug("CreateSyncConfig: len of peers", "len", len(peers), "isBeacon", isBeacon)
 	if len(peers) == 0 {
 		return ctxerror.New("[SYNC] no peers to connect to")
 	}
@@ -206,7 +206,7 @@ func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer) error {
 		}(peer)
 	}
 	wg.Wait()
-	utils.GetLogInstance().Info("[SYNC] Finished making connection to peers.")
+	utils.GetLogInstance().Info("[SYNC] Finished making connection to peers.", "len", len(ss.syncConfig.peers), "isBeacon", isBeacon)
 
 	return nil
 }
@@ -529,8 +529,10 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 }
 
 // ProcessStateSync processes state sync from the blocks received but not yet processed so far
-func (ss *StateSync) ProcessStateSync(startHash []byte, bc *core.BlockChain, worker *worker.Worker) {
-	ss.RegisterNodeInfo()
+func (ss *StateSync) ProcessStateSync(startHash []byte, bc *core.BlockChain, worker *worker.Worker, isBeacon bool) {
+	if !isBeacon {
+		ss.RegisterNodeInfo()
+	}
 	// Gets consensus hashes.
 	if !ss.GetConsensusHashes(startHash) {
 		utils.GetLogInstance().Debug("[SYNC] ProcessStateSync unable to reach consensus on ss.GetConsensusHashes")
@@ -614,14 +616,14 @@ func (ss *StateSync) IsOutOfSync(bc *core.BlockChain) bool {
 }
 
 // SyncLoop will keep syncing with peers until catches up
-func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, willJoinConsensus bool) {
+func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, willJoinConsensus bool, isBeacon bool) {
 	for {
 		if !ss.IsOutOfSync(bc) {
 			utils.GetLogInstance().Info("[SYNC] Node is now IN SYNC!")
 			return
 		}
 		startHash := bc.CurrentBlock().Hash()
-		ss.ProcessStateSync(startHash[:], bc, worker)
+		ss.ProcessStateSync(startHash[:], bc, worker, isBeacon)
 	}
 }
 

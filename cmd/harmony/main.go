@@ -90,8 +90,6 @@ var (
 	//isNewNode indicates this node is a new node
 	isNewNode    = flag.Bool("is_newnode", false, "true means this node is a new node")
 	accountIndex = flag.Int("account_index", 0, "the index of the staking account to use")
-	// isLeader indicates this node is a beacon chain leader node during the bootstrap process
-	isLeader = flag.Bool("is_leader", false, "true means this node is a beacon chain leader node")
 	// logConn logs incoming/outgoing connections
 	logConn = flag.Bool("log_conn", false, "log incoming/outgoing connections")
 )
@@ -208,7 +206,6 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 
 	// Current node.
 	currentNode := node.New(nodeConfig.Host, consensus, nodeConfig.MainDB, *isArchival)
-	currentNode.Consensus.OfflinePeers = currentNode.OfflinePeers
 	currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
 	currentNode.AccountKey = nodeConfig.StakingPriKey
 
@@ -227,6 +224,7 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 				currentNode.NodeConfig.SetIsLeader(false)
 			}
 			currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
+			currentNode.NodeConfig.SetClientGroupID(p2p.GroupIDBeaconClient)
 		} else {
 			if nodeConfig.StringRole == "leader" {
 				currentNode.NodeConfig.SetRole(nodeconfig.ShardLeader)
@@ -236,6 +234,7 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 				currentNode.NodeConfig.SetIsLeader(false)
 			}
 			currentNode.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
+			currentNode.NodeConfig.SetClientGroupID(p2p.NewClientGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
 		}
 	} else {
 		if *isNewNode {
@@ -280,7 +279,7 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 }
 
 func main() {
-	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress")
+	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
 	flag.Parse()
 
 	initSetup()
@@ -303,10 +302,9 @@ func main() {
 	if consensus.IsLeader {
 		go currentNode.SendPongMessage()
 	}
-	// TODO: enable beacon chain sync
-	//if consensus.ShardID != 0 {
-	//	go currentNode.SupportBeaconSyncing()
-	//}
+	if consensus.ShardID != 0 {
+		go currentNode.SupportBeaconSyncing()
+	}
 	go currentNode.SupportSyncing()
 	utils.GetLogInstance().Info("New Harmony Node ====", "Role", currentNode.NodeConfig.Role(), "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, nodeConfig.Host.GetID().Pretty()))
 	currentNode.ServiceManagerSetup()

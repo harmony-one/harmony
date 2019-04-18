@@ -84,22 +84,28 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
+if [ -z "$1" ]; then
+   echo "Please set account index. validate ranges are 46-49, 96-99, 146-149, 196-199"
+   echo "Usage: $0 account_index_number"
+   exit 1
+fi
+
+IDX=$1
+
 killnode
 
 mkdir -p latest
 BUCKET=pub.harmony.one
 OS=$(uname -s)
-REL=banjo
+REL=cello
 
 if [ "$OS" == "Darwin" ]; then
    FOLDER=release/$REL/darwin-x86_64/
    BIN=( harmony libbls384.dylib libcrypto.1.0.0.dylib libgmp.10.dylib libgmpxx.4.dylib libmcl.dylib )
-   export DYLD_FALLBACK_LIBRARY_PATH=$(pwd)
 fi
 if [ "$OS" == "Linux" ]; then
    FOLDER=release/$REL/linux-x86_64/
    BIN=( harmony libbls384.so libcrypto.so.10 libgmp.so.10 libgmpxx.so.4 libmcl.so )
-   export LD_LIBRARY_PATH=$(pwd)
 fi
 
 # clean up old files
@@ -126,14 +132,14 @@ fi
 myip
 
 # public boot node multiaddress
-BN_MA=/ip4/100.26.90.187/tcp/9876/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9,/ip4/54.213.43.194/tcp/9876/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX
+BN_MA=/ip4/100.26.90.187/tcp/9874/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv,/ip4/54.213.43.194/tcp/9874/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9
 
 echo "############### Running Harmony Process ###############"
 if [ "$OS" == "Linux" ]; then
 # Run Harmony Node
-   LD_LIBRARY_PATH=$(pwd) nohup ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_beacon > harmony-${PUB_IP}.log 2>&1 &
+   LD_LIBRARY_PATH=$(pwd) nohup ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -account_index $IDX > harmony-${PUB_IP}.log 2>&1 &
 else
-   DYLD_FALLBACK_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_beacon > harmony-${PUB_IP}.log 2>&1 &
+   DYLD_FALLBACK_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -account_index $IDX > harmony-${PUB_IP}.log 2>&1 &
 fi
 
 find_harmony_process

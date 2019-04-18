@@ -50,6 +50,27 @@ func (node *Node) GetSyncingPeers() []p2p.Peer {
 	return node.getNeighborPeers(&node.Neighbors)
 }
 
+// DoBeaconSyncing update received beaconchain blocks and downloads missing beacon chain blocks
+func (node *Node) DoBeaconSyncing() {
+	for {
+		select {
+		case beaconBlock := <-node.BeaconBlockChannel:
+			if node.beaconSync == nil {
+				node.beaconSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
+			}
+			if node.beaconSync.GetActivePeerNumber() == 0 {
+				peers := node.GetBeaconSyncingPeers()
+				if err := node.beaconSync.CreateSyncConfig(peers, true); err != nil {
+					ctxerror.Log15(utils.GetLogInstance().Debug, err)
+					continue
+				}
+			}
+			node.beaconSync.AddLastMileBlock(beaconBlock)
+			node.beaconSync.SyncLoop(node.beaconChain, node.BeaconWorker, false, true)
+		}
+	}
+}
+
 // DoSyncing keep the node in sync with other peers, willJoinConsensus means the node will try to join consensus after catch up
 func (node *Node) DoSyncing(bc *core.BlockChain, worker *worker.Worker, getPeers func() []p2p.Peer, willJoinConsensus bool) {
 	ticker := time.NewTicker(SyncFrequency * time.Second)
@@ -63,7 +84,7 @@ SyncingLoop:
 			}
 			if node.stateSync.GetActivePeerNumber() == 0 {
 				peers := getPeers()
-				if err := node.stateSync.CreateSyncConfig(peers); err != nil {
+				if err := node.stateSync.CreateSyncConfig(peers, false); err != nil {
 					ctxerror.Log15(utils.GetLogInstance().Debug, err)
 					continue SyncingLoop
 				}
@@ -73,7 +94,7 @@ SyncingLoop:
 				node.stateMutex.Lock()
 				node.State = NodeNotInSync
 				node.stateMutex.Unlock()
-				node.stateSync.SyncLoop(bc, worker, willJoinConsensus)
+				node.stateSync.SyncLoop(bc, worker, willJoinConsensus, false)
 				if willJoinConsensus {
 					node.stateMutex.Lock()
 					node.State = NodeReadyForConsensus
@@ -93,9 +114,7 @@ SyncingLoop:
 
 // SupportBeaconSyncing sync with beacon chain for archival node in beacon chan or non-beacon node
 func (node *Node) SupportBeaconSyncing() {
-	node.InitSyncingServer()
-	node.StartSyncingServer()
-	go node.DoSyncing(node.beaconChain, node.BeaconWorker, node.GetBeaconSyncingPeers, false)
+	go node.DoBeaconSyncing()
 }
 
 // SupportSyncing keeps sleeping until it's doing consensus or it's a leader.

@@ -34,6 +34,25 @@ const (
 	MaxNumberOfTransactionsPerBlock = 8000
 )
 
+// ReceiveGlobalMessage use libp2p pubsub mechanism to receive global broadcast messages
+func (node *Node) ReceiveGlobalMessage() {
+	ctx := context.Background()
+	for {
+		if node.globalGroupReceiver == nil {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+		msg, sender, err := node.globalGroupReceiver.Receive(ctx)
+		if sender != node.host.GetID() {
+			utils.GetLogInstance().Info("[PUBSUB]", "received global msg", len(msg), "sender", sender)
+			if err == nil {
+				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
+				go node.messageHandler(msg[5:], string(sender))
+			}
+		}
+	}
+}
+
 // ReceiveGroupMessage use libp2p pubsub mechanism to receive broadcast messages
 func (node *Node) ReceiveGroupMessage() {
 	ctx := context.Background()
@@ -146,7 +165,7 @@ func (node *Node) messageHandler(content []byte, sender string) {
 					// for non-beaconchain node, subscribe to beacon block broadcast
 					role := node.NodeConfig.Role()
 					if proto_node.BlockMessageType(msgPayload[0]) == proto_node.Sync && (role == nodeconfig.ShardValidator || role == nodeconfig.ShardLeader || role == nodeconfig.NewNode) {
-						utils.GetLogInstance().Info("Block being handled by block channel", "self peer", node.SelfPeer)
+						utils.GetLogInstance().Info("Block being handled by block channel", "self peer", node.SelfPeer, "block", blocks[0].NumberU64())
 						for _, block := range blocks {
 							node.BeaconBlockChannel <- block
 						}
