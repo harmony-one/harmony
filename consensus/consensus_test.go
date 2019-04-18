@@ -148,15 +148,13 @@ func TestSignAndMarshalConsensusMessage(t *testing.T) {
 
 func TestSetConsensusID(t *testing.T) {
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902"}
+	validator := p2p.Peer{IP: "127.0.0.1", Port: "9905"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2pimpl.NewHost(&leader, priKey)
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := New(host, 0, leader, bls.RandPrivateKey())
-	if err != nil {
-		t.Fatalf("Cannot craeate consensus: %v", err)
-	}
+	consensus := New(host, 0, []p2p.Peer{leader, validator}, leader, bls.RandPrivateKey())
 
 	height := uint32(1000)
 	consensus.SetConsensusID(height)
