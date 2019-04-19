@@ -132,6 +132,36 @@ func (s *Service) Init() error {
 	return nil
 }
 
+func (s *Service) getPeers() bool {
+	var recievePeersInfo <-chan peerstore.PeerInfo
+	ticker := time.NewTicker(5 * time.Second)
+	ticks := 0
+	for {
+		select {
+		case tick := <-ticker.C:
+			ticks++
+			recievePeersInfo, err = s.discovery.FindPeers(s.ctx, string(s.Rendezvous))
+			if err != nil {
+				utils.GetLogInstance().Error("FindPeers", "error", err)
+			} else {
+				recievePeer := <-recievePeersInfo
+				if recievePeer.ID != s.Host.GetP2PHost().ID() && len(recievePeer.ID) > 0 {
+					s.peerInfo <- recievePeer
+					ticker.Stop()
+					return true
+				}
+			}
+			if ticks > 100 {
+				utils.GetLogInstance().Error("Unable to find peers after 8 mins ...")
+				ticker.Stop()
+				return false
+			}
+
+		}
+
+	}
+}
+
 // Run runs network info.
 func (s *Service) Run() {
 	defer close(s.stoppedChan)
@@ -139,15 +169,11 @@ func (s *Service) Run() {
 		utils.GetLogInstance().Error("discovery is not initialized")
 		return
 	}
-
-	var err error
-	s.peerInfo, err = s.discovery.FindPeers(s.ctx, string(s.Rendezvous))
-	if err != nil {
-		utils.GetLogInstance().Error("FindPeers", "error", err)
-		return
+	val := s.getPeers()
+	if val {
+		go s.DoService()
 	}
-
-	go s.DoService()
+	s.StopService()
 }
 
 // DoService does network info.
