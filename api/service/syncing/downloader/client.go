@@ -116,6 +116,8 @@ func (client *Client) GetBlockChainHeight() *pb.DownloaderResponse {
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
 		utils.GetLogInstance().Info("[SYNC] unable to get blockchain height", "error", err)
+	} else {
+		utils.GetLogInstance().Info("[SYNC] succesful call to get blockchain height", "response", response)
 	}
 	return response
 }
