@@ -134,22 +134,29 @@ func (s *Service) Init() error {
 	return nil
 }
 
+func pong(roc <-chan peerstore.PeerInfo) <-chan peerstore.PeerInfo {
+	return roc
+}
+
 func (s *Service) getPeers() bool {
 	var recievePeersInfo <-chan peerstore.PeerInfo
+	var err error
 	ticker := time.NewTicker(5 * time.Second)
 	ticks := 0
 	for {
 		select {
-		case tick := <-ticker.C:
+		case timeTick := <-ticker.C:
 			ticks++
-			recievePeersInfo, err = s.discovery.FindPeers(s.ctx, string(s.Rendezvous))
+			utils.GetLogInstance().Error("Trying to get peers after", "time", timeTick)
+			recievePeersInfo, err = s.discovery.FindPeers(ctx, string(s.Rendezvous))
+			sendPeersInfo := make(chan peerstore.PeerInfo)
 			if err != nil {
 				utils.GetLogInstance().Error("FindPeers", "error", err)
 			} else {
 				recievePeer := <-recievePeersInfo
 				if recievePeer.ID != s.Host.GetP2PHost().ID() && len(recievePeer.ID) > 0 {
-					s.peerInfo <- recievePeer
-					ticker.Stop()
+					sendPeersInfo <- recievePeer
+					s.peerInfo = pong(sendPeersInfo)
 					return true
 				}
 			}
