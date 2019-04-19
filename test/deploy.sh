@@ -98,7 +98,7 @@ if [ -z "$config" ]; then
 fi
 
 if [ "$SYNC" == "true" ]; then
-    DURATION=120
+    DURATION=300
 fi
 
 # Kill nodes if any

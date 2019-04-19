@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"math/rand"
@@ -72,7 +73,7 @@ var (
 	ip               = flag.String("ip", "127.0.0.1", "IP of the node")
 	port             = flag.String("port", "9000", "port of the node.")
 	logFolder        = flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
-	freshDB          = flag.Bool("fresh_db", false, "true means the existing disk based db will be removed")
+	freshDB          = flag.Bool("fresh_db", true, "true means the existing disk based db will be removed")
 	profile          = flag.Bool("profile", false, "Turn on profiling (CPU, Memory).")
 	metricsReportURL = flag.String("metrics_report_url", "", "If set, reports metrics to this URL.")
 	versionFlag      = flag.Bool("version", false, "Output version info")
@@ -90,6 +91,8 @@ var (
 	//isNewNode indicates this node is a new node
 	isNewNode    = flag.Bool("is_newnode", false, "true means this node is a new node")
 	accountIndex = flag.Int("account_index", 0, "the index of the staking account to use")
+	// isLeader indicates this node is a beacon chain leader node during the bootstrap process
+	shardID = flag.Int("shard_id", -1, "the shard ID of this node")
 	// logConn logs incoming/outgoing connections
 	logConn = flag.Bool("log_conn", false, "log incoming/outgoing connections")
 )
@@ -122,13 +125,27 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 
 	nodeConfig := nodeconfig.GetDefaultConfig()
 
-	shardID := uint32(*accountIndex / core.GenesisShardSize)
+	myShardID := uint32(*accountIndex / core.GenesisShardSize)
+
+	// Specified Shard ID override calculated Shard ID
+	if *shardID >= 0 {
+		utils.GetLogInstance().Info("ShardID Override", "original", myShardID, "override", *shardID)
+		myShardID = uint32(*shardID)
+	}
+
 	if !*isNewNode {
-		nodeConfig = nodeconfig.GetShardConfig(shardID)
+		nodeConfig = nodeconfig.GetShardConfig(myShardID)
+	} else {
+		myShardID = 0 // This should be default value as new node doesn't belong to any shard.
+		if *shardID >= 0 {
+			utils.GetLogInstance().Info("ShardID Override", "original", myShardID, "override", *shardID)
+			myShardID = uint32(*shardID)
+			nodeConfig = nodeconfig.GetShardConfig(myShardID)
+		}
 	}
 
 	// The initial genesis nodes are sequentially put into genesis shards based on their accountIndex
-	nodeConfig.ShardID = shardID
+	nodeConfig.ShardID = myShardID
 
 	// Key Setup ================= [Start]
 	// Staking private key is the ecdsa key used for token related transaction signing (especially the staking txs).
@@ -144,7 +161,10 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 		// TODO: let user specify the ECDSA key
 		stakingPriKey = contract.NewNodeAccounts[*accountIndex].Private
 		// TODO: use user supplied key
-		consensusPriKey.SetByCSPRNG()
+		err := consensusPriKey.SetHexString(contract.GenesisBLSAccounts[200+*accountIndex].Private) // TODO: use separate bls accounts for this.
+		if err != nil {
+			panic(fmt.Errorf("generate key error"))
+		}
 	}
 	nodeConfig.StakingPriKey = node.StoreStakingKeyFromFile(*stakingKeyFile, stakingPriKey)
 
@@ -165,7 +185,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	if nodeConfig.MainDB, err = InitLDBDatabase(*ip, *port, *freshDB, false); err != nil {
 		panic(err)
 	}
-	if shardID != 0 {
+	if myShardID != 0 {
 		if nodeConfig.BeaconDB, err = InitLDBDatabase(*ip, *port, *freshDB, true); err != nil {
 			panic(err)
 		}
@@ -212,6 +232,7 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	// TODO: refactor the creation of blockchain out of node.New()
 	consensus.ChainReader = currentNode.Blockchain()
 
+	// TODO: the setup should only based on shard state
 	if *isGenesis {
 		// TODO: need change config file and use switch instead of complicated "if else" condition
 		if nodeConfig.ShardID == 0 { // Beacon chain
@@ -239,16 +260,27 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	} else {
 		if *isNewNode {
 			currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
-			// TODO: fix the roles as it's unknown before resharding.
+			currentNode.NodeConfig.SetClientGroupID(p2p.GroupIDBeaconClient)
+			currentNode.NodeConfig.SetBeaconGroupID(p2p.GroupIDBeacon)
+			if *shardID > -1 {
+				// I will be a validator (single leader is fixed for now)
+				currentNode.NodeConfig.SetRole(nodeconfig.ShardValidator)
+				currentNode.NodeConfig.SetIsLeader(false)
+				currentNode.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
+				currentNode.NodeConfig.SetClientGroupID(p2p.NewClientGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
+			}
 		} else if nodeConfig.StringRole == "leader" {
 			currentNode.NodeConfig.SetRole(nodeconfig.ShardLeader)
 			currentNode.NodeConfig.SetIsLeader(true)
+			currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDUnknown)
 		} else {
 			currentNode.NodeConfig.SetRole(nodeconfig.ShardValidator)
 			currentNode.NodeConfig.SetIsLeader(false)
+			currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDUnknown)
 		}
-		currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDUnknown)
 	}
+	currentNode.NodeConfig.ConsensusPubKey = nodeConfig.ConsensusPubKey
+	currentNode.NodeConfig.ConsensusPriKey = nodeConfig.ConsensusPriKey
 
 	// Add randomness protocol
 	// TODO: enable drand only for beacon chain
@@ -259,11 +291,16 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	currentNode.Consensus.RegisterRndChannel(dRand.RndChannel)
 	currentNode.DRand = dRand
 
+	// TODO: enable beacon chain sync
+	// TODO: fix bug that beacon chain override the shard chain in DB.
 	if consensus.ShardID != 0 {
 		currentNode.AddBeaconChainDatabase(nodeConfig.BeaconDB)
 	}
+
 	// This needs to be executed after consensus and drand are setup
-	currentNode.InitGenesisShardState()
+	if !*isNewNode || *shardID > -1 { // initial staking new node doesn't need to initialize shard state
+		currentNode.InitShardState(*shardID == -1 && !*isNewNode) // TODO: Have a better why to distinguish non-genesis node
+	}
 
 	// Set the consensus ID to be the current block number
 	height := currentNode.Blockchain().CurrentBlock().NumberU64()
@@ -299,15 +336,19 @@ func main() {
 		}
 	}
 	consensus, currentNode = setUpConsensusAndNode(nodeConfig)
+	// TODO: put this inside discovery service
 	if consensus.IsLeader {
 		go currentNode.SendPongMessage()
 	}
-	if consensus.ShardID != 0 {
-		go currentNode.SupportBeaconSyncing()
-	}
+	//if consensus.ShardID != 0 {
+	//	go currentNode.SupportBeaconSyncing()
+	//}
+
+	utils.GetLogInstance().Info("==== New Harmony Node ====", "BlsPubKey", hex.EncodeToString(nodeConfig.ConsensusPubKey.Serialize()), "ShardID", nodeConfig.ShardID, "ShardGroupID", nodeConfig.GetShardGroupID(), "BeaconGroupID", nodeConfig.GetBeaconGroupID(), "ClientGroupID", nodeConfig.GetClientGroupID(), "Role", currentNode.NodeConfig.Role(), "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, nodeConfig.Host.GetID().Pretty()))
+
 	go currentNode.SupportSyncing()
-	utils.GetLogInstance().Info("New Harmony Node ====", "Role", currentNode.NodeConfig.Role(), "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, nodeConfig.Host.GetID().Pretty()))
 	currentNode.ServiceManagerSetup()
 	currentNode.RunServices()
+
 	currentNode.StartServer()
 }

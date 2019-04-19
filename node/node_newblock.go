@@ -31,7 +31,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 			// keep waiting for Consensus ready
 			select {
 			case <-readySignal:
-				time.Sleep(100 * time.Millisecond) // Delay a bit so validator is catched up (test-only).
+				time.Sleep(5000 * time.Millisecond) // Delay a bit so validator is catched up (test-only).
 			case <-time.After(ConsensusTimeOut * time.Second):
 				node.Consensus.ResetState()
 				timeoutCount++
@@ -51,7 +51,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 					firstTime = false
 				}
 				if len(node.pendingTransactions) >= threshold {
-					utils.GetLogInstance().Debug("PROPOSING NEW BLOCK ------------------------------------------------", "threshold", threshold, "pendingTransactions", len(node.pendingTransactions))
+					utils.GetLogInstance().Debug("PROPOSING NEW BLOCK ------------------------------------------------", "blockNum", node.blockchain.CurrentBlock().NumberU64()+1, "threshold", threshold, "pendingTransactions", len(node.pendingTransactions))
 					// Normal tx block consensus
 					selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
 					if len(selectedTxs) != 0 {
@@ -62,7 +62,8 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 						} else {
 							if node.Consensus.ShardID == 0 {
 								// add new shard state if it's epoch block
-								node.addNewShardStateHash(block)
+								// TODO: bug fix - the stored shard state between here and PostConsensusProcessing are different.
+								//node.addNewShardStateHash(block)
 							}
 							newBlock = block
 							utils.GetLogInstance().Debug("Successfully proposed new block", "blockNum", block.NumberU64(), "numTxs", block.Transactions().Len())
@@ -88,10 +89,7 @@ func (node *Node) addNewShardStateHash(block *types.Block) {
 	shardState := node.blockchain.GetNewShardState(block, &node.CurrentStakes)
 	if shardState != nil {
 		shardHash := shardState.Hash()
-		utils.GetLogInstance().Debug("[resharding] adding new shard state", "shardHash", shardHash)
-		//		for _, c := range shardState {
-		//			utils.GetLogInstance().Debug("new shard information", "shardID", c.ShardID, "NodeList", c.NodeList)
-		//		}
+		utils.GetLogInstance().Debug("[Shard State Hash] adding new shard state", "shardHash", shardHash)
 		block.AddShardStateHash(shardHash)
 	}
 }

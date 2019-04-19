@@ -24,7 +24,7 @@ const (
 	// GenesisShardNum is the number of shard at genesis
 	GenesisShardNum = 4
 	// GenesisShardSize is the size of each shard at genesis
-	GenesisShardSize = 50
+	GenesisShardSize = 5
 	// CuckooRate is the percentage of nodes getting reshuffled in the second step of cuckoo resharding.
 	CuckooRate = 0.1
 )
@@ -94,25 +94,35 @@ func (ss *ShardingState) cuckooResharding(percent float64) {
 	}
 }
 
-// assignLeaders will first add new nodes into shards, then use cuckoo rule to reshard to get new shard state
-func (ss *ShardingState) assignLeaders() {
-	for i := 0; i < ss.numShards; i++ {
-		// At genesis epoch, the shards are empty.
-		if len(ss.shardState[i].NodeList) > 0 {
-			Shuffle(ss.shardState[i].NodeList)
-			ss.shardState[i].Leader = ss.shardState[i].NodeList[0]
-		}
-	}
-}
-
 // Reshard will first add new nodes into shards, then use cuckoo rule to reshard to get new shard state
 func (ss *ShardingState) Reshard(newNodeList []types.NodeID, percent float64) {
 	rand.Seed(int64(ss.rnd))
 	ss.sortCommitteeBySize()
-	// TODO: separate shuffling and leader assignment
-	ss.assignLeaders()
+
+	// Take out and preserve leaders
+	leaders := []types.NodeID{}
+	for i := 0; i < ss.numShards; i++ {
+		if len(ss.shardState[i].NodeList) > 0 {
+			leaders = append(leaders, ss.shardState[i].NodeList[0])
+			utils.GetLogInstance().Info("LEADER===01", "shard", ss.shardState[i])
+			ss.shardState[i].NodeList = ss.shardState[i].NodeList[1:]
+			utils.GetLogInstance().Info("LEADER===02", "shard", ss.shardState[i])
+			// Also shuffle the rest of the nodes
+			Shuffle(ss.shardState[i].NodeList)
+			utils.GetLogInstance().Info("LEADER===03", "shard", ss.shardState[i])
+		}
+	}
+
+	utils.GetLogInstance().Info("LEADER===1", "leaders", leaders)
 	ss.assignNewNodes(newNodeList)
 	ss.cuckooResharding(percent)
+
+	// Put leader back
+	for i := 0; i < ss.numShards; i++ {
+		ss.shardState[i].NodeList = append(leaders[i:i+1], ss.shardState[i].NodeList...)
+		ss.shardState[i].Leader = leaders[i]
+		utils.GetLogInstance().Info("LEADER===2", "shard", ss.shardState[i])
+	}
 }
 
 // Shuffle will shuffle the list with result uniquely determined by seed, assuming there is no repeat items in the list
@@ -154,6 +164,7 @@ func CalculateNewShardState(bc *BlockChain, epoch uint64, stakeInfo *map[common.
 		return GetInitShardState()
 	}
 	ss := GetShardingStateFromBlockChain(bc, epoch-1)
+	utils.GetLogInstance().Info("Original Shard", "epoch", epoch-1, "state", ss)
 	newNodeList := ss.UpdateShardingState(stakeInfo)
 	utils.GetLogInstance().Info("Cuckoo Rate", "percentage", CuckooRate)
 	ss.Reshard(newNodeList, CuckooRate)
@@ -171,7 +182,7 @@ func (ss *ShardingState) UpdateShardingState(stakeInfo *map[common.Address]*stru
 			if ok {
 				newNodeList = append(newNodeList, nodeID)
 			} else {
-				// Remove the node if it's no longer staked
+				// TODO: Remove the node if it's no longer staked
 			}
 		}
 		shard.NodeList = newNodeList
