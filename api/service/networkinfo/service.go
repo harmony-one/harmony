@@ -22,7 +22,6 @@ type Service struct {
 	Rendezvous  p2p.GroupID
 	bootnodes   utils.AddrList
 	dht         *libp2pdht.IpfsDHT
-	ctx         context.Context
 	cancel      context.CancelFunc
 	stopChan    chan struct{}
 	stoppedChan chan struct{}
@@ -37,6 +36,9 @@ type Service struct {
 var (
 	// retry for 10 minutes and give up then
 	ConnectionRetry = 300
+
+	// context
+	ctx context.Context
 )
 
 const (
@@ -49,7 +51,8 @@ const (
 
 // New returns role conversion service.
 func New(h p2p.Host, rendezvous p2p.GroupID, peerChan chan p2p.Peer, bootnodes utils.AddrList) *Service {
-	ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithTimeout(context.Background(), connectionTimeout)
 	dht, err := libp2pdht.New(ctx, h.GetP2PHost())
 	if err != nil {
 		panic(err)
@@ -59,7 +62,6 @@ func New(h p2p.Host, rendezvous p2p.GroupID, peerChan chan p2p.Peer, bootnodes u
 		Host:        h,
 		dht:         dht,
 		Rendezvous:  rendezvous,
-		ctx:         ctx,
 		cancel:      cancel,
 		stopChan:    make(chan struct{}),
 		stoppedChan: make(chan struct{}),
@@ -88,7 +90,7 @@ func (s *Service) Init() error {
 	// Bootstrap the DHT. In the default configuration, this spawns a Background
 	// thread that will refresh the peer table every five minutes.
 	utils.GetLogInstance().Debug("Bootstrapping the DHT")
-	if err := s.dht.Bootstrap(s.ctx); err != nil {
+	if err := s.dht.Bootstrap(ctx); err != nil {
 		return fmt.Errorf("error bootstrap dht: %s", err)
 	}
 
@@ -105,7 +107,7 @@ func (s *Service) Init() error {
 		go func() {
 			defer wg.Done()
 			for i := 0; i < ConnectionRetry; i++ {
-				if err := s.Host.GetP2PHost().Connect(s.ctx, *peerinfo); err != nil {
+				if err := s.Host.GetP2PHost().Connect(ctx, *peerinfo); err != nil {
 					utils.GetLogInstance().Warn("can't connect to bootnode", "error", err, "try", i)
 					time.Sleep(waitInRetry)
 				} else {
@@ -126,7 +128,7 @@ func (s *Service) Init() error {
 	// We use a rendezvous point "shardID" to announce our location.
 	utils.GetLogInstance().Info("Announcing ourselves...", "Rendezvous", string(s.Rendezvous))
 	s.discovery = libp2pdis.NewRoutingDiscovery(s.dht)
-	libp2pdis.Advertise(s.ctx, s.discovery, string(s.Rendezvous))
+	libp2pdis.Advertise(ctx, s.discovery, string(s.Rendezvous))
 	utils.GetLogInstance().Info("Successfully announced!")
 
 	return nil
@@ -141,7 +143,7 @@ func (s *Service) Run() {
 	}
 
 	var err error
-	s.peerInfo, err = s.discovery.FindPeers(s.ctx, string(s.Rendezvous))
+	s.peerInfo, err = s.discovery.FindPeers(ctx, string(s.Rendezvous))
 	if err != nil {
 		utils.GetLogInstance().Error("FindPeers", "error", err)
 		return
@@ -163,7 +165,7 @@ func (s *Service) DoService() {
 		case peer := <-s.peerInfo:
 			if peer.ID != s.Host.GetP2PHost().ID() && len(peer.ID) > 0 {
 				//	utils.GetLogInstance().Info("Found Peer", "peer", peer.ID, "addr", peer.Addrs, "my ID", s.Host.GetP2PHost().ID())
-				if err := s.Host.GetP2PHost().Connect(s.ctx, peer); err != nil {
+				if err := s.Host.GetP2PHost().Connect(ctx, peer); err != nil {
 					utils.GetLogInstance().Warn("can't connect to peer node", "error", err, "peer", peer)
 					// break if the node can't connect to peers, waiting for another peer
 					break
@@ -194,7 +196,7 @@ func (s *Service) DoService() {
 		case <-s.stopChan:
 			return
 		case <-tick.C:
-			libp2pdis.Advertise(s.ctx, s.discovery, string(s.Rendezvous))
+			libp2pdis.Advertise(ctx, s.discovery, string(s.Rendezvous))
 			utils.GetLogInstance().Info("Successfully announced!", "Rendezvous", string(s.Rendezvous))
 		}
 	}
