@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"math/big"
 	"strings"
+	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -170,8 +171,8 @@ func (node *Node) CallFaucetContract(address common.Address) common.Hash {
 }
 
 func (node *Node) callGetFreeToken(address common.Address) common.Hash {
-	nonce := node.GetNonceOfAddress(crypto.PubkeyToAddress(node.ContractDeployerKey.PublicKey))
-	return node.callGetFreeTokenWithNonce(address, nonce)
+	nonce := atomic.AddUint64(&node.ContractDeployerCurrentNonce, 1)
+	return node.callGetFreeTokenWithNonce(address, nonce-1)
 }
 
 func (node *Node) callGetFreeTokenWithNonce(address common.Address, nonce uint64) common.Hash {
