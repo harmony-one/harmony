@@ -11,6 +11,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ethereum/go-ethereum/crypto"
+
 	"github.com/harmony-one/harmony/core"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -311,6 +313,10 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 	}
 
 	node.AddNewBlock(newBlock)
+
+	// Update contract deployer's nonce so default contract like faucet can issue transaction with current nonce
+	nonce := node.GetNonceOfAddress(crypto.PubkeyToAddress(node.ContractDeployerKey.PublicKey))
+	atomic.StoreUint64(&node.ContractDeployerCurrentNonce, nonce)
 
 	if node.Consensus.ShardID == 0 {
 		// Update contract deployer's nonce so default contract like faucet can issue transaction with current nonce
