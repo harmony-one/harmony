@@ -438,8 +438,6 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 func (node *Node) AddBeaconChainDatabase(db ethdb.Database) {
 	database := db
 	if database == nil {
-		fmt.Println("CHAIN ID===NEW DB")
-		fmt.Println(node.blockchain.ShardID())
 		database = ethdb.NewMemDatabase()
 	}
 	// TODO (chao) currently we use the same genesis block as normal shard

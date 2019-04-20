@@ -24,7 +24,7 @@ const (
 	// GenesisShardNum is the number of shard at genesis
 	GenesisShardNum = 4
 	// GenesisShardSize is the size of each shard at genesis
-	GenesisShardSize = 5
+	GenesisShardSize = 50
 	// CuckooRate is the percentage of nodes getting reshuffled in the second step of cuckoo resharding.
 	CuckooRate = 0.1
 )
@@ -104,24 +104,22 @@ func (ss *ShardingState) Reshard(newNodeList []types.NodeID, percent float64) {
 	for i := 0; i < ss.numShards; i++ {
 		if len(ss.shardState[i].NodeList) > 0 {
 			leaders = append(leaders, ss.shardState[i].NodeList[0])
-			utils.GetLogInstance().Info("LEADER===01", "shard", ss.shardState[i])
 			ss.shardState[i].NodeList = ss.shardState[i].NodeList[1:]
-			utils.GetLogInstance().Info("LEADER===02", "shard", ss.shardState[i])
 			// Also shuffle the rest of the nodes
 			Shuffle(ss.shardState[i].NodeList)
-			utils.GetLogInstance().Info("LEADER===03", "shard", ss.shardState[i])
 		}
 	}
 
-	utils.GetLogInstance().Info("LEADER===1", "leaders", leaders)
 	ss.assignNewNodes(newNodeList)
 	ss.cuckooResharding(percent)
 
 	// Put leader back
+	if len(leaders) < ss.numShards {
+		utils.GetLogInstance().Error("Not enough leaders to assign to shards")
+	}
 	for i := 0; i < ss.numShards; i++ {
-		ss.shardState[i].NodeList = append(leaders[i:i+1], ss.shardState[i].NodeList...)
+		ss.shardState[i].NodeList = append([]types.NodeID{leaders[i]}, ss.shardState[i].NodeList...)
 		ss.shardState[i].Leader = leaders[i]
-		utils.GetLogInstance().Info("LEADER===2", "shard", ss.shardState[i])
 	}
 }
 
@@ -164,7 +162,6 @@ func CalculateNewShardState(bc *BlockChain, epoch uint64, stakeInfo *map[common.
 		return GetInitShardState()
 	}
 	ss := GetShardingStateFromBlockChain(bc, epoch-1)
-	utils.GetLogInstance().Info("Original Shard", "epoch", epoch-1, "state", ss)
 	newNodeList := ss.UpdateShardingState(stakeInfo)
 	utils.GetLogInstance().Info("Cuckoo Rate", "percentage", CuckooRate)
 	ss.Reshard(newNodeList, CuckooRate)
@@ -175,12 +172,12 @@ func CalculateNewShardState(bc *BlockChain, epoch uint64, stakeInfo *map[common.
 func (ss *ShardingState) UpdateShardingState(stakeInfo *map[common.Address]*structs.StakeInfo) []types.NodeID {
 	oldBlsPublicKeys := make(map[types.BlsPublicKey]bool) // map of bls public keys
 	for _, shard := range ss.shardState {
-		newNodeList := shard.NodeList[:0]
+		newNodeList := shard.NodeList
 		for _, nodeID := range shard.NodeList {
 			oldBlsPublicKeys[nodeID.BlsPublicKey] = true
 			_, ok := (*stakeInfo)[common.HexToAddress(nodeID.EcdsaAddress)]
 			if ok {
-				newNodeList = append(newNodeList, nodeID)
+				// newNodeList = append(newNodeList, nodeID)
 			} else {
 				// TODO: Remove the node if it's no longer staked
 			}

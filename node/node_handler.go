@@ -358,6 +358,7 @@ func (node *Node) AddNewBlock(newBlock *types.Block) {
 }
 
 func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
+	utils.GetLogInstance().Error("Got Ping Message")
 	if sender != "" {
 		_, ok := node.duplicatedPing.LoadOrStore(sender, true)
 		if ok {
@@ -478,6 +479,7 @@ func (node *Node) SendPongMessage() {
 }
 
 func (node *Node) pongMessageHandler(msgPayload []byte) int {
+	utils.GetLogInstance().Error("Got Pong Message")
 	pong, err := proto_discovery.GetPongMessage(msgPayload)
 	if err != nil {
 		utils.GetLogInstance().Error("Can't get Pong Message", "error", err)
@@ -583,21 +585,21 @@ func (node *Node) processEpochShardState(epochShardState *types.EpochShardState)
 		utils.GetLogInstance().Debug("new shard information", "shardID", c.ShardID, "NodeList", c.NodeList)
 	}
 
-	myShard := uint32(math.MaxUint32)
+	myShardID := uint32(math.MaxUint32)
 	isNextLeader := false
 	myBlsPubKey := node.Consensus.PubKey.Serialize()
 	myShardState := types.Committee{}
 	for _, shard := range shardState {
 		for _, nodeID := range shard.NodeList {
 			if bytes.Compare(nodeID.BlsPublicKey[:], myBlsPubKey) == 0 {
-				myShard = shard.ShardID
+				myShardID = shard.ShardID
 				isNextLeader = shard.Leader == nodeID
 				myShardState = shard
 			}
 		}
 	}
 
-	if myShard != uint32(math.MaxUint32) {
+	if myShardID != uint32(math.MaxUint32) {
 		// Update public keys
 		ss := myShardState
 		publicKeys := []*bls.PublicKey{}
@@ -624,38 +626,17 @@ func (node *Node) processEpochShardState(epochShardState *types.EpochShardState)
 				aboutLeader = "I become the leader"
 			}
 		}
-		if node.blockchain.ShardID() == myShard {
-			utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d] I stay at shard %d, %s", epoch, myShard, aboutLeader), "BlsPubKey", hex.EncodeToString(myBlsPubKey))
+		if node.blockchain.ShardID() == myShardID {
+			utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d] I stay at shard %d, %s", epoch, myShardID, aboutLeader), "BlsPubKey", hex.EncodeToString(myBlsPubKey))
 		} else {
-			utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d] I got resharded to shard %d from shard %d, %s", epoch, myShard, node.blockchain.ShardID(), aboutLeader), "BlsPubKey", hex.EncodeToString(myBlsPubKey))
+			utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d] I got resharded to shard %d from shard %d, %s", epoch, myShardID, node.blockchain.ShardID(), aboutLeader), "BlsPubKey", hex.EncodeToString(myBlsPubKey))
 			node.storeEpochShardState(epochShardState)
 
-			execFile, err := lookPath()
+			execFile, err := getBinaryPath()
 			if err != nil {
 				utils.GetLogInstance().Crit("Failed to get program path when restarting program", "error", err, "file", execFile)
 			}
-			args := os.Args
-			hasShardID := false
-			shardIDFlag := "-shard_id"
-			// newNodeFlag := "-is_newnode"
-			for i, arg := range args {
-				if arg == shardIDFlag {
-					if i+1 < len(args) {
-						args[i+1] = strconv.Itoa(int(myShard))
-					} else {
-						args = append(args, strconv.Itoa(int(myShard)))
-					}
-					hasShardID = true
-				}
-				// TODO: enable this
-				//if arg == newNodeFlag {
-				//	args[i] = ""  // remove new node flag
-				//}
-			}
-			if !hasShardID {
-				args = append(args, shardIDFlag)
-				args = append(args, strconv.Itoa(int(myShard)))
-			}
+			args := getRestartArguments(myShardID)
 			utils.GetLogInstance().Info("Restarting program", "args", args, "env", os.Environ())
 			err = syscall.Exec(execFile, args, os.Environ())
 			if err != nil {
@@ -668,7 +649,34 @@ func (node *Node) processEpochShardState(epochShardState *types.EpochShardState)
 	}
 }
 
-func lookPath() (argv0 string, err error) {
+func getRestartArguments(myShardID uint32) []string {
+	args := os.Args
+	hasShardID := false
+	shardIDFlag := "-shard_id"
+	// newNodeFlag := "-is_newnode"
+	for i, arg := range args {
+		if arg == shardIDFlag {
+			if i+1 < len(args) {
+				args[i+1] = strconv.Itoa(int(myShardID))
+			} else {
+				args = append(args, strconv.Itoa(int(myShardID)))
+			}
+			hasShardID = true
+		}
+		// TODO: enable this
+		//if arg == newNodeFlag {
+		//	args[i] = ""  // remove new node flag
+		//}
+	}
+	if !hasShardID {
+		args = append(args, shardIDFlag)
+		args = append(args, strconv.Itoa(int(myShardID)))
+	}
+	return args
+}
+
+// Gets the path of this currently running binary program.
+func getBinaryPath() (argv0 string, err error) {
 	argv0, err = exec.LookPath(os.Args[0])
 	if nil != err {
 		return
@@ -679,6 +687,8 @@ func lookPath() (argv0 string, err error) {
 	return
 }
 
+// Stores the epoch shard state into local file
+// TODO: think about storing it into level db.
 func (node *Node) storeEpochShardState(epochShardState *types.EpochShardState) {
 	byteBuffer := bytes.NewBuffer([]byte{})
 	encoder := gob.NewEncoder(byteBuffer)
@@ -686,14 +696,14 @@ func (node *Node) storeEpochShardState(epochShardState *types.EpochShardState) {
 	if err != nil {
 		utils.GetLogInstance().Error("[Resharded] Failed to encode epoch shard state", "error", err)
 	}
-	err = ioutil.WriteFile("./tmp_log/epoch_shard_state"+node.SelfPeer.IP+node.SelfPeer.Port, byteBuffer.Bytes(), 0644)
+	err = ioutil.WriteFile("./epoch_shard_state"+node.SelfPeer.IP+node.SelfPeer.Port, byteBuffer.Bytes(), 0644)
 	if err != nil {
 		utils.GetLogInstance().Error("[Resharded] Failed to store epoch shard state in local file", "error", err)
 	}
 }
 
 func (node *Node) retrieveEpochShardState() (*types.EpochShardState, error) {
-	b, err := ioutil.ReadFile("./tmp_log/epoch_shard_state" + node.SelfPeer.IP + node.SelfPeer.Port)
+	b, err := ioutil.ReadFile("./epoch_shard_state" + node.SelfPeer.IP + node.SelfPeer.Port)
 	if err != nil {
 		utils.GetLogInstance().Error("[Resharded] Failed to retrieve epoch shard state", "error", err)
 	}

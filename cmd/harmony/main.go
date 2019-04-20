@@ -73,7 +73,7 @@ var (
 	ip               = flag.String("ip", "127.0.0.1", "IP of the node")
 	port             = flag.String("port", "9000", "port of the node.")
 	logFolder        = flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
-	freshDB          = flag.Bool("fresh_db", true, "true means the existing disk based db will be removed")
+	freshDB          = flag.Bool("fresh_db", false, "true means the existing disk based db will be removed")
 	profile          = flag.Bool("profile", false, "Turn on profiling (CPU, Memory).")
 	metricsReportURL = flag.String("metrics_report_url", "", "If set, reports metrics to this URL.")
 	versionFlag      = flag.Bool("version", false, "Output version info")
@@ -91,8 +91,7 @@ var (
 	//isNewNode indicates this node is a new node
 	isNewNode    = flag.Bool("is_newnode", false, "true means this node is a new node")
 	accountIndex = flag.Int("account_index", 0, "the index of the staking account to use")
-	// isLeader indicates this node is a beacon chain leader node during the bootstrap process
-	shardID = flag.Int("shard_id", -1, "the shard ID of this node")
+	shardID      = flag.Int("shard_id", -1, "the shard ID of this node")
 	// logConn logs incoming/outgoing connections
 	logConn = flag.Bool("log_conn", false, "log incoming/outgoing connections")
 )
@@ -349,6 +348,5 @@ func main() {
 	go currentNode.SupportSyncing()
 	currentNode.ServiceManagerSetup()
 	currentNode.RunServices()
-
 	currentNode.StartServer()
 }

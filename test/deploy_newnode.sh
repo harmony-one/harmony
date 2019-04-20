@@ -94,24 +94,12 @@ done
 
 shift $((OPTIND-1))
 
-# Since `go run` will generate a temporary exe every time,
-# On windows, your system will pop up a network security dialog for each instance
-# and you won't be able to turn it off. With `go build` generating one
-# exe, the dialog will only pop up once at the very first time.
-# Also it's recommended to use `go build` for testing the whole exe. 
-pushd $ROOT
-echo "compiling ..."
-go build -o bin/harmony cmd/harmony/main.go
-popd
-
 # Create a tmp folder for logs
 t=`date +"%Y%m%d-%H%M%S"`
 log_folder="tmp_log/log-$t"
 
 mkdir -p $log_folder
 LOG_FILE=$log_folder/r.log
-
-BN_MA=/ip4/127.0.0.1/tcp/19876/p2p/Qmc1V6W7BwX8Ugb42Ti8RnXF1rY5PF7nnZ6bKBryCgi6cv
 
 HMY_OPT=
 # Change to the beacon chain output from deploy.sh
@@ -137,7 +125,7 @@ esac
 echo "autodetected boot node multiaddr: ${bn_ma}"
 HMY_OPT2="-bootnodes ${bn_ma}"
 
-for i in 0{1..9} # {10..99}
+for i in 0{1..5} # {10..99}
 do
     echo "launching new node $i ..."
     ($DRYRUN $ROOT/bin/harmony -ip 127.0.0.1 -port 91$i -log_folder $log_folder -is_newnode $DB -account_index $i -min_peers $MIN $HMY_OPT $HMY_OPT2 $HMY_OPT3 -key /tmp/127.0.0.1-91$i.key 2>&1 | tee -a $LOG_FILE ) &
