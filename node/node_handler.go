@@ -645,7 +645,7 @@ func (node *Node) processEpochShardState(epochShardState *types.EpochShardState)
 		}
 	} else {
 		utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d]  Somehow I got kicked out. Exiting", epoch), "BlsPubKey", hex.EncodeToString(myBlsPubKey))
-		os.Exit(8)  // 8 represents it's a loop and the program restart itself
+		os.Exit(8) // 8 represents it's a loop and the program restart itself
 	}
 }
 
