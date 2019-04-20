@@ -87,6 +87,9 @@ func (r *GroupReceiverImpl) Close() error {
 func (r *GroupReceiverImpl) Receive(ctx context.Context) (
 	msg []byte, sender libp2p_peer.ID, err error,
 ) {
+	if r.sub == nil {
+		return nil, libp2p_peer.ID(""), fmt.Errorf("Receive: r.sub == nil")
+	}
 	m, err := r.sub.Next(ctx)
 	if err == nil {
 		msg = m.Data
