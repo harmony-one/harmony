@@ -90,7 +90,7 @@ SyncingLoop:
 				}
 			}
 			if node.stateSync.IsOutOfSync(bc) {
-				utils.GetLogInstance().Debug("[SYNC] out of sync, doing syncing")
+				utils.GetLogInstance().Debug("[SYNC] out of sync, doing syncing", "willJoinConsensus", willJoinConsensus)
 				node.stateMutex.Lock()
 				node.State = NodeNotInSync
 				node.stateMutex.Unlock()

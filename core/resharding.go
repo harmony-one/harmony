@@ -94,25 +94,33 @@ func (ss *ShardingState) cuckooResharding(percent float64) {
 	}
 }
 
-// assignLeaders will first add new nodes into shards, then use cuckoo rule to reshard to get new shard state
-func (ss *ShardingState) assignLeaders() {
-	for i := 0; i < ss.numShards; i++ {
-		// At genesis epoch, the shards are empty.
-		if len(ss.shardState[i].NodeList) > 0 {
-			Shuffle(ss.shardState[i].NodeList)
-			ss.shardState[i].Leader = ss.shardState[i].NodeList[0]
-		}
-	}
-}
-
 // Reshard will first add new nodes into shards, then use cuckoo rule to reshard to get new shard state
 func (ss *ShardingState) Reshard(newNodeList []types.NodeID, percent float64) {
 	rand.Seed(int64(ss.rnd))
 	ss.sortCommitteeBySize()
-	// TODO: separate shuffling and leader assignment
-	ss.assignLeaders()
+
+	// Take out and preserve leaders
+	leaders := []types.NodeID{}
+	for i := 0; i < ss.numShards; i++ {
+		if len(ss.shardState[i].NodeList) > 0 {
+			leaders = append(leaders, ss.shardState[i].NodeList[0])
+			ss.shardState[i].NodeList = ss.shardState[i].NodeList[1:]
+			// Also shuffle the rest of the nodes
+			Shuffle(ss.shardState[i].NodeList)
+		}
+	}
+
 	ss.assignNewNodes(newNodeList)
 	ss.cuckooResharding(percent)
+
+	// Put leader back
+	if len(leaders) < ss.numShards {
+		utils.GetLogInstance().Error("Not enough leaders to assign to shards")
+	}
+	for i := 0; i < ss.numShards; i++ {
+		ss.shardState[i].NodeList = append([]types.NodeID{leaders[i]}, ss.shardState[i].NodeList...)
+		ss.shardState[i].Leader = leaders[i]
+	}
 }
 
 // Shuffle will shuffle the list with result uniquely determined by seed, assuming there is no repeat items in the list
@@ -164,14 +172,14 @@ func CalculateNewShardState(bc *BlockChain, epoch uint64, stakeInfo *map[common.
 func (ss *ShardingState) UpdateShardingState(stakeInfo *map[common.Address]*structs.StakeInfo) []types.NodeID {
 	oldBlsPublicKeys := make(map[types.BlsPublicKey]bool) // map of bls public keys
 	for _, shard := range ss.shardState {
-		newNodeList := shard.NodeList[:0]
+		newNodeList := shard.NodeList
 		for _, nodeID := range shard.NodeList {
 			oldBlsPublicKeys[nodeID.BlsPublicKey] = true
 			_, ok := (*stakeInfo)[common.HexToAddress(nodeID.EcdsaAddress)]
 			if ok {
-				newNodeList = append(newNodeList, nodeID)
+				// newNodeList = append(newNodeList, nodeID)
 			} else {
-				// Remove the node if it's no longer staked
+				// TODO: Remove the node if it's no longer staked
 			}
 		}
 		shard.NodeList = newNodeList
