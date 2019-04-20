@@ -58,7 +58,11 @@ func (ss *ShardingState) assignNewNodes(newNodeList []types.NodeID) {
 		if numActiveShards > 0 {
 			id = i % numActiveShards
 		}
-		ss.shardState[id].NodeList = append(ss.shardState[id].NodeList, nid)
+		if id < len(ss.shardState) {
+			ss.shardState[id].NodeList = append(ss.shardState[id].NodeList, nid)
+		} else {
+			utils.GetLogInstance().Error("assignNewNodes", "index out of range", len(ss.shardState), "id", id)
+		}
 	}
 }
 
