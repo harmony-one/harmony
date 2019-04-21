@@ -126,3 +126,28 @@ func NewPublicNetAPI(net *p2p.Server, networkVersion uint64) *PublicNetAPI {
 func (s *PublicNetAPI) PeerCount() hexutil.Uint {
 	return hexutil.Uint(s.net.PeerCount())
 }
+
+// PublicTransactionPoolAPI exposes methods for the RPC interface
+type PublicTransactionPoolAPI struct {
+	b         *core.BlockChain
+	nonceLock *AddrLocker
+}
+
+// NewPublicTransactionPoolAPI creates a new RPC service with methods specific for the transaction pool.
+func NewPublicTransactionPoolAPI(b *core.BlockChain, nonceLock *AddrLocker) *PublicTransactionPoolAPI {
+	return &PublicTransactionPoolAPI{b, nonceLock}
+}
+
+// GetBlockTransactionCountByNumber returns the number of transactions in the block with the given block number.
+func (s *PublicTransactionPoolAPI) GetBlockTransactionCountByNumber(ctx context.Context, blockNr rpc.BlockNumber) *hexutil.Uint {
+	block := s.b.GetBlockByNumber(uint64(blockNr))
+	n := hexutil.Uint(block.Transactions().Len())
+	return &n
+}
+
+// GetBlockTransactionCountByHash returns the number of transactions in the block with the given hash.
+func (s *PublicTransactionPoolAPI) GetBlockTransactionCountByHash(ctx context.Context, blockHash common.Hash) *hexutil.Uint {
+	block := s.b.GetBlockByHash(blockHash)
+	n := hexutil.Uint(block.Transactions().Len())
+	return &n
+}
