@@ -151,3 +151,15 @@ func (s *PublicTransactionPoolAPI) GetBlockTransactionCountByHash(ctx context.Co
 	n := hexutil.Uint(block.Transactions().Len())
 	return &n
 }
+
+// GetTransactionByBlockNumberAndIndex returns the transaction for the given block number and index.
+func (s *PublicTransactionPoolAPI) GetTransactionByBlockNumberAndIndex(ctx context.Context, blockNr rpc.BlockNumber, index hexutil.Uint) *RPCTransaction {
+	block := s.b.GetBlockByNumber(uint64(blockNr))
+	return newRPCTransactionFromBlockIndex(block, uint64(index))
+}
+
+// GetTransactionByBlockHashAndIndex returns the transaction for the given block hash and index.
+func (s *PublicTransactionPoolAPI) GetTransactionByBlockHashAndIndex(ctx context.Context, blockHash common.Hash, index hexutil.Uint) *RPCTransaction {
+	block := s.b.GetBlockByHash(blockHash)
+	return newRPCTransactionFromBlockIndex(block, uint64(index))
+}
