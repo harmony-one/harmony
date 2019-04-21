@@ -34,6 +34,7 @@ const (
 	PeerDiscovery
 	Resharding
 	Staking
+	RPC
 	Test
 	Done
 )
@@ -64,6 +65,8 @@ func (t Type) String() string {
 		return "PeerDiscovery"
 	case Resharding:
 		return "Resharding"
+	case RPC:
+		return "RPC"
 	case Test:
 		return "Test"
 	case Done:
