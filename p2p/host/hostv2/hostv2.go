@@ -88,7 +88,7 @@ func (r *GroupReceiverImpl) Receive(ctx context.Context) (
 	msg []byte, sender libp2p_peer.ID, err error,
 ) {
 	if r.sub == nil {
-		return nil, libp2p_peer.ID(""), fmt.Errorf("Receive: r.sub == nil")
+		return nil, libp2p_peer.ID(""), fmt.Errorf("GroupReceiver has been closed")
 	}
 	m, err := r.sub.Next(ctx)
 	if err == nil {
