@@ -57,6 +57,11 @@ func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 	return result
 }
 
+// newRPCPendingTransaction returns a pending transaction that will serialize to the RPC representation
+func newRPCPendingTransaction(tx *types.Transaction) *RPCTransaction {
+	return newRPCTransaction(tx, common.Hash{}, 0, 0)
+}
+
 // RPCBlock represents a block that will serialize to the RPC representation of a block
 type RPCBlock struct {
 	Number           *hexutil.Big     `json:"number"`

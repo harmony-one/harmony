@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/rpc"
 )
@@ -130,12 +131,13 @@ func (s *PublicNetAPI) PeerCount() hexutil.Uint {
 // PublicTransactionPoolAPI exposes methods for the RPC interface
 type PublicTransactionPoolAPI struct {
 	b         *core.BlockChain
+	txPool    *core.TxPool
 	nonceLock *AddrLocker
 }
 
 // NewPublicTransactionPoolAPI creates a new RPC service with methods specific for the transaction pool.
-func NewPublicTransactionPoolAPI(b *core.BlockChain, nonceLock *AddrLocker) *PublicTransactionPoolAPI {
-	return &PublicTransactionPoolAPI{b, nonceLock}
+func NewPublicTransactionPoolAPI(b *core.BlockChain, nonceLock *AddrLocker, txPool *core.TxPool) *PublicTransactionPoolAPI {
+	return &PublicTransactionPoolAPI{b, txPool, nonceLock}
 }
 
 // GetBlockTransactionCountByNumber returns the number of transactions in the block with the given block number.
@@ -162,4 +164,18 @@ func (s *PublicTransactionPoolAPI) GetTransactionByBlockNumberAndIndex(ctx conte
 func (s *PublicTransactionPoolAPI) GetTransactionByBlockHashAndIndex(ctx context.Context, blockHash common.Hash, index hexutil.Uint) *RPCTransaction {
 	block := s.b.GetBlockByHash(blockHash)
 	return newRPCTransactionFromBlockIndex(block, uint64(index))
+}
+
+// GetTransactionByHash returns the transaction for the given hash
+func (s *PublicTransactionPoolAPI) GetTransactionByHash(ctx context.Context, hash common.Hash) *RPCTransaction {
+	// Try to return an already finalized transaction
+	if tx, blockHash, blockNumber, index := rawdb.ReadTransaction(s.b.ChainDb(), hash); tx != nil {
+		return newRPCTransaction(tx, blockHash, blockNumber, index)
+	}
+	// No finalized transaction, try to retrieve it from the pool
+	if tx := s.txPool.Get(hash); tx != nil {
+		return newRPCPendingTransaction(tx)
+	}
+	// Transaction unknown, return as such
+	return nil
 }

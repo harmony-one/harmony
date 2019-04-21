@@ -8,7 +8,7 @@ import (
 const namespace = "hmy"
 
 // GetAPIs returns all the APIs.
-func GetAPIs(b *core.BlockChain) []rpc.API {
+func GetAPIs(b *core.BlockChain, txPool *core.TxPool) []rpc.API {
 	nonceLock := new(AddrLocker)
 	return []rpc.API{
 		{
@@ -19,7 +19,7 @@ func GetAPIs(b *core.BlockChain) []rpc.API {
 		}, {
 			Namespace: namespace,
 			Version:   "1.0",
-			Service:   NewPublicTransactionPoolAPI(b, nonceLock),
+			Service:   NewPublicTransactionPoolAPI(b, nonceLock, txPool),
 			Public:    true,
 		},
 	}

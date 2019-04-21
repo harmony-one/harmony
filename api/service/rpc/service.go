@@ -22,6 +22,7 @@ type Service struct {
 	// Util
 	peer       *p2p.Peer
 	blockchain *core.BlockChain
+	txPool     *core.TxPool
 	// HTTP RPC
 	rpcAPIs       []rpc.API    // List of APIs currently provided by the node
 	httpEndpoint  string       // HTTP endpoint (interface + port) to listen at (empty = HTTP disabled)
@@ -31,17 +32,18 @@ type Service struct {
 }
 
 // New returns RPC service.
-func New(b *core.BlockChain, p *p2p.Peer) *Service {
+func New(b *core.BlockChain, p *p2p.Peer, t *core.TxPool) *Service {
 	return &Service{
 		blockchain: b,
 		peer:       p,
+		txPool:     t,
 	}
 }
 
 // StartService starts RPC service.
 func (s *Service) StartService() {
 	utils.GetLogInstance().Info("Starting RPC service.")
-	if err := s.startRPC(s.blockchain); err != nil {
+	if err := s.startRPC(); err != nil {
 		// TODO(ricl): what if failed to start service?
 	}
 }
@@ -69,8 +71,8 @@ func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {
 // startRPC is a helper method to start all the various RPC endpoint during node
 // startup. It's not meant to be called at any time afterwards as it makes certain
 // assumptions about the state of the node.
-func (s *Service) startRPC(b *core.BlockChain) error {
-	apis := hmyapi.GetAPIs(b)
+func (s *Service) startRPC() error {
+	apis := hmyapi.GetAPIs(s.blockchain, s.txPool)
 	// Gather all the possible APIs to surface
 	// apis := s.apis()
 	// for _, service := range services {

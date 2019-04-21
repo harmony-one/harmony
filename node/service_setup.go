@@ -36,7 +36,7 @@ func (node *Node) setupForShardLeader() {
 	node.serviceManager.RegisterService(service.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
 
 	// Register RPC service
-	node.serviceManager.RegisterService(service.RPC, rpcservice.New(node.blockchain, &node.SelfPeer))
+	node.serviceManager.RegisterService(service.RPC, rpcservice.New(node.blockchain, &node.SelfPeer, node.TxPool))
 }
 
 func (node *Node) setupForShardValidator() {
