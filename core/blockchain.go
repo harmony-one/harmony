@@ -70,7 +70,7 @@ const (
 	// BlocksPerEpoch is the number of blocks in one epoch
 	// currently set to small number for testing
 	// in future, this need to be adjusted dynamically instead of constant
-	BlocksPerEpoch = 5
+	BlocksPerEpoch = 10000
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	BlockChainVersion = 3
@@ -1741,14 +1741,6 @@ func (bc *BlockChain) StoreNewShardState(block *types.Block, stakeInfo *map[comm
 		number := block.NumberU64()
 		rawdb.WriteShardState(bc.db, hash, number, shardState)
 		utils.GetLogInstance().Debug("[Resharding] Saved new shard state successfully", "epoch", GetEpochFromBlockNumber(block.NumberU64()))
-		//		for _, shard := range shardState {
-		//			output := shard.Leader.BlsAddress
-		//			output = output + " \n"
-		//			for _, node := range shard.NodeList {
-		//				output = output + node.BlsAddress + " \n"
-		//			}
-		//			utils.GetLogInstance().Debug(fmt.Sprintf("[Resharding][shard: %d] Leader: %s", shard.ShardID, output))
-		//		}
 	}
 	return shardState
 }

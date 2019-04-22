@@ -542,7 +542,9 @@ func readPrivateKeys() []*ecdsa.PrivateKey {
 // submitTransaction submits the transaction to the Harmony network
 func submitTransaction(tx *types.Transaction, walletNode *node.Node, shardID uint32) error {
 	msg := proto_node.ConstructTransactionListMessageAccount(types.Transactions{tx})
-	err := walletNode.GetHost().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeaconClient}, p2p_host.ConstructP2pMessage(byte(0), msg))
+	clientGroup := p2p.NewClientGroupIDByShardID(p2p.ShardID(shardID))
+
+	err := walletNode.GetHost().SendMessageToGroups([]p2p.GroupID{clientGroup}, p2p_host.ConstructP2pMessage(byte(0), msg))
 	if err != nil {
 		fmt.Printf("Error in SubmitTransaction: %v\n", err)
 		return err

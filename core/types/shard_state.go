@@ -80,3 +80,7 @@ func CompareNodeID(n1 NodeID, n2 NodeID) int {
 func (n NodeID) Serialize() []byte {
 	return append(n.BlsPublicKey[:], []byte(n.EcdsaAddress)...)
 }
+
+func (n NodeID) String() string {
+	return "ECDSA: " + n.EcdsaAddress + ", BLS: " + hex.EncodeToString(n.BlsPublicKey[:])
+}
