@@ -71,6 +71,7 @@ type PublicHarmonyAPI struct {
 }
 
 // TODO(ricl): update the following two functions.
+
 // ProtocolVersion returns the current Harmony protocol version this node supports
 func (s *PublicHarmonyAPI) ProtocolVersion() hexutil.Uint {
 	return hexutil.Uint(1)

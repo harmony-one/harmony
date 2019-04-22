@@ -9,7 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-const MetadataApi = "rpc"
+const metadataAPI = "rpc"
 
 // Server is an RPC server.
 type Server struct {
@@ -24,8 +24,8 @@ func NewServer() *Server {
 	server := &Server{idgen: randomIDGenerator(), codecs: mapset.NewSet(), run: 1}
 	// Register the default service providing meta information about the RPC service such
 	// as the services and methods it offers.
-	rpcService := &RPCService{server}
-	server.RegisterName(MetadataApi, rpcService)
+	rpcService := &Service{server}
+	server.RegisterName(metadataAPI, rpcService)
 	return server
 }
 
@@ -97,14 +97,14 @@ func (s *Server) Stop() {
 	}
 }
 
-// RPCService gives meta information about the server.
+// Service gives meta information about the server.
 // e.g. gives information about the loaded modules.
-type RPCService struct {
+type Service struct {
 	server *Server
 }
 
 // Modules returns the list of RPC services with their version number
-func (s *RPCService) Modules() map[string]string {
+func (s *Service) Modules() map[string]string {
 	s.server.services.mu.Lock()
 	defer s.server.services.mu.Unlock()
 

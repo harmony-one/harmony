@@ -234,14 +234,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// untilEOF and writes the response to w and order the server to process a
 	// single request.
 	ctx := r.Context()
-	ctx = context.WithValue(ctx, "remote", r.RemoteAddr)
-	ctx = context.WithValue(ctx, "scheme", r.Proto)
-	ctx = context.WithValue(ctx, "local", r.Host)
+	ctx = context.WithValue(ctx, interface{}("remote"), r.RemoteAddr)
+	ctx = context.WithValue(ctx, interface{}("scheme"), r.Proto)
+	ctx = context.WithValue(ctx, interface{}("local"), r.Host)
 	if ua := r.Header.Get("User-Agent"); ua != "" {
-		ctx = context.WithValue(ctx, "User-Agent", ua)
+		ctx = context.WithValue(ctx, interface{}("User-Agent"), ua)
 	}
 	if origin := r.Header.Get("Origin"); origin != "" {
-		ctx = context.WithValue(ctx, "Origin", origin)
+		ctx = context.WithValue(ctx, interface{}("Origin"), origin)
 	}
 
 	w.Header().Set("content-type", contentType)

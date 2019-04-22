@@ -42,12 +42,13 @@ type jsonWriter interface {
 	RemoteAddr() string
 }
 
+// BlockNumber ...
 type BlockNumber int64
 
 const (
-	PendingBlockNumber  = BlockNumber(-2)
-	LatestBlockNumber   = BlockNumber(-1)
-	EarliestBlockNumber = BlockNumber(0)
+	pendingBlockNumber  = BlockNumber(-2)
+	latestBlockNumber   = BlockNumber(-1)
+	earliestBlockNumber = BlockNumber(0)
 )
 
 // UnmarshalJSON parses the given JSON fragment into a BlockNumber. It supports:
@@ -64,13 +65,13 @@ func (bn *BlockNumber) UnmarshalJSON(data []byte) error {
 
 	switch input {
 	case "earliest":
-		*bn = EarliestBlockNumber
+		*bn = earliestBlockNumber
 		return nil
 	case "latest":
-		*bn = LatestBlockNumber
+		*bn = latestBlockNumber
 		return nil
 	case "pending":
-		*bn = PendingBlockNumber
+		*bn = pendingBlockNumber
 		return nil
 	}
 
@@ -86,6 +87,7 @@ func (bn *BlockNumber) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// Int64 turns blockNumber to int64
 func (bn BlockNumber) Int64() int64 {
 	return (int64)(bn)
 }

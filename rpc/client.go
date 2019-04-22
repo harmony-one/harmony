@@ -32,9 +32,9 @@ import (
 )
 
 var (
-	ErrClientQuit                = errors.New("client is closed")
-	ErrNoResult                  = errors.New("no result in JSON-RPC response")
-	ErrSubscriptionQueueOverflow = errors.New("subscription queue overflow")
+	errClientQuit                = errors.New("client is closed")
+	errNoResult                  = errors.New("no result in JSON-RPC response")
+	errSubscriptionQueueOverflow = errors.New("subscription queue overflow")
 	errClientReconnected         = errors.New("client reconnected")
 	errDead                      = errors.New("connection lost")
 )
@@ -184,7 +184,7 @@ func DialContext(ctx context.Context, rawurl string) (*Client, error) {
 	}
 }
 
-// Client retrieves the client from the context, if any. This can be used to perform
+// ClientFromContext Client retrieves the client from the context, if any. This can be used to perform
 // 'reverse calls' in a handler method.
 func ClientFromContext(ctx context.Context) (*Client, bool) {
 	client, ok := ctx.Value(clientContextKey{}).(*Client)
@@ -297,7 +297,7 @@ func (c *Client) CallContext(ctx context.Context, result interface{}, method str
 	case resp.Error != nil:
 		return resp.Error
 	case len(resp.Result) == 0:
-		return ErrNoResult
+		return errNoResult
 	default:
 		return json.Unmarshal(resp.Result, &result)
 	}
@@ -315,7 +315,7 @@ func (c *Client) BatchCall(b []BatchElem) error {
 	return c.BatchCallContext(ctx, b)
 }
 
-// BatchCall sends all given requests as a single batch and waits for the server
+// BatchCallContext sends all given requests as a single batch and waits for the server
 // to return a response for all of them. The wait duration is bounded by the
 // context's deadline.
 //
@@ -368,7 +368,7 @@ func (c *Client) BatchCallContext(ctx context.Context, b []BatchElem) error {
 			continue
 		}
 		if len(resp.Result) == 0 {
-			elem.Error = ErrNoResult
+			elem.Error = errNoResult
 			continue
 		}
 		elem.Error = json.Unmarshal(resp.Result, elem.Result)
@@ -387,9 +387,8 @@ func (c *Client) Notify(ctx context.Context, method string, args ...interface{})
 
 	if c.isHTTP {
 		return c.sendHTTP(ctx, op, msg)
-	} else {
-		return c.send(ctx, op, msg)
 	}
+	return c.send(ctx, op, msg)
 }
 
 // EthSubscribe registers a subscripion under the "eth" namespace.
@@ -412,7 +411,7 @@ func (c *Client) ShhSubscribe(ctx context.Context, channel interface{}, args ...
 //
 // Slow subscribers will be dropped eventually. Client buffers up to 8000 notifications
 // before considering the subscriber dead. The subscription Err channel will receive
-// ErrSubscriptionQueueOverflow. Use a sufficiently large buffer on the channel or ensure
+// errSubscriptionQueueOverflow. Use a sufficiently large buffer on the channel or ensure
 // that the channel usually has at least one reader to prevent this issue.
 func (c *Client) Subscribe(ctx context.Context, namespace string, channel interface{}, args ...interface{}) (*ClientSubscription, error) {
 	// Check type of channel first.
@@ -472,7 +471,7 @@ func (c *Client) send(ctx context.Context, op *requestOp, msg interface{}) error
 		// subscription notifications.
 		return ctx.Err()
 	case <-c.closing:
-		return ErrClientQuit
+		return errClientQuit
 	}
 }
 
@@ -511,7 +510,7 @@ func (c *Client) reconnect(ctx context.Context) error {
 		return nil
 	case <-c.didClose:
 		newconn.Close()
-		return ErrClientQuit
+		return errClientQuit
 	}
 }
 
@@ -528,7 +527,7 @@ func (c *Client) dispatch(codec ServerCodec) {
 	defer func() {
 		close(c.closing)
 		if reading {
-			conn.close(ErrClientQuit, nil)
+			conn.close(errClientQuit, nil)
 			c.drainRead()
 		}
 		close(c.didClose)
