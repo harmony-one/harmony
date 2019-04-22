@@ -15,6 +15,10 @@ import (
 	"github.com/harmony-one/harmony/rpc/hmyapi"
 )
 
+const (
+	rpcPortDiff = 123
+)
+
 // Service is the struct for rpc service.
 type Service struct {
 	messageChan chan *msg_pb.Message
@@ -73,34 +77,15 @@ func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {
 // assumptions about the state of the node.
 func (s *Service) startRPC() error {
 	apis := hmyapi.GetAPIs(s.blockchain, s.txPool)
-	// Gather all the possible APIs to surface
-	// apis := s.apis()
-	// for _, service := range services {
-	// 	apis = append(apis, service.APIs()...)
-	// }
-	// Start the various API endpoints, terminating all in case of errors
-	// if err := s.startInProc(apis); err != nil {
-	// 	return err
-	// }
-	// if err := s.startIPC(apis); err != nil {
-	// 	s.stopInProc()
-	// 	return err
-	// }
+
 	port, _ := strconv.Atoi(s.peer.Port)
-	s.httpEndpoint = fmt.Sprintf("127.0.0.1:%v", port+123)
+	s.httpEndpoint = fmt.Sprintf("127.0.0.1:%v", port+rpcPortDiff)
 	if err := s.startHTTP(s.httpEndpoint, apis); err != nil {
 		utils.GetLogInstance().Debug("Failed to start RPC HTTP")
-		// s.stopIPC()
-		// s.stopInProc()
 		return err
 	}
 	utils.GetLogInstance().Debug("Started RPC HTTP")
-	// if err := s.startWS(s.wsEndpoint, apis, s.config.WSModules, s.config.WSOrigins, s.config.WSExposeAll); err != nil {
-	// 	s.stopHTTP()
-	// 	s.stopIPC()
-	// 	s.stopInProc()
-	// 	return err
-	// }
+
 	// All API endpoints started successfully
 	s.rpcAPIs = apis
 	return nil
@@ -139,87 +124,3 @@ func (s *Service) stopHTTP() {
 		s.httpHandler = nil
 	}
 }
-
-// // startInProc initializes an in-process RPC endpoint.
-// func (s *Node) startInProc(apis []rpc.API) error {
-// 	// Register all the APIs exposed by the services
-// 	handler := rpc.NewServer()
-// 	for _, api := range apis {
-// 		if err := handler.RegisterName(api.Namespace, api.Service); err != nil {
-// 			return err
-// 		}
-// 		utils.GetLogInstance().Debug("InProc registered", "namespace", api.Namespace)
-// 	}
-// 	s.inprocHandler = handler
-// 	return nil
-// }
-
-// // stopInProc terminates the in-process RPC endpoint.
-// func (s *Node) stopInProc() {
-// 	if s.inprocHandler != nil {
-// 		s.inprocHandler.Stop()
-// 		s.inprocHandler = nil
-// 	}
-// }
-
-// // startIPC initializes and starts the IPC RPC endpoint.
-// func (s *Node) startIPC(apis []rpc.API) error {
-// 	if s.ipcEndpoint == "" {
-// 		return nil // IPC disabled.
-// 	}
-// 	listener, handler, err := rpc.StartIPCEndpoint(s.ipcEndpoint, apis)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	s.ipcListener = listener
-// 	s.ipcHandler = handler
-// 	utils.GetLogInstance().Info("IPC endpoint opened", "url", s.ipcEndpoint)
-// 	return nil
-// }
-
-// // stopIPC terminates the IPC RPC endpoint.
-// func (s *Node) stopIPC() {
-// 	if s.ipcListener != nil {
-// 		s.ipcListener.Close()
-// 		s.ipcListener = nil
-
-// 		utils.GetLogInstance().Info("IPC endpoint closed", "url", s.ipcEndpoint)
-// 	}
-// 	if s.ipcHandler != nil {
-// 		s.ipcHandler.Stop()
-// 		s.ipcHandler = nil
-// 	}
-// }
-
-// // startWS initializes and starts the websocket RPC endpoint.
-// func (s *Node) startWS(endpoint string, apis []rpc.API, modules []string, wsOrigins []string, exposeAll bool) error {
-// 	// Short circuit if the WS endpoint isn't being exposed
-// 	if endpoint == "" {
-// 		return nil
-// 	}
-// 	listener, handler, err := rpc.StartWSEndpoint(endpoint, apis, modules, wsOrigins, exposeAll)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	utils.GetLogInstance().Info("WebSocket endpoint opened", "url", fmt.Sprintf("ws://%s", listener.Addr()))
-// 	// All listeners booted successfully
-// 	s.wsEndpoint = endpoint
-// 	s.wsListener = listener
-// 	s.wsHandler = handler
-
-// 	return nil
-// }
-
-// // stopWS terminates the websocket RPC endpoint.
-// func (s *Node) stopWS() {
-// 	if s.wsListener != nil {
-// 		s.wsListener.Close()
-// 		s.wsListener = nil
-
-// 		utils.GetLogInstance().Info("WebSocket endpoint closed", "url", fmt.Sprintf("ws://%s", s.wsEndpoint))
-// 	}
-// 	if s.wsHandler != nil {
-// 		s.wsHandler.Stop()
-// 		s.wsHandler = nil
-// 	}
-// }
