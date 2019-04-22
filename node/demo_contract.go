@@ -185,6 +185,9 @@ func (node *Node) CreateTransactionForPickWinner() error {
 	}
 
 	key := node.LotteryManagerPrivateKey
+	if key == nil {
+		return fmt.Errorf("LotterManagerPrivateKey is nil")
+	}
 	nonce := node.GetNonceOfAddress(crypto.PubkeyToAddress(key.PublicKey))
 	Amount := big.NewInt(0)
 	tx := types.NewTransaction(
