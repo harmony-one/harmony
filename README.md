@@ -127,25 +127,24 @@ See [`CONTRIBUTING`](CONTRIBUTING.md) for details.
 
 ### Features Done
 
-- Basic consensus protocol with O(n) complexity
-- Basic validator server
-- P2p network connection and unicast
+- Fully sharded network with beacon chain and shard chains
+- Cuckoo-rule based resharding
+- Staking on beacon chain
+- Distributed randomness generation with VRF and VDF (Proof-of-Concept VDF)
+- Sharded P2P network and P2P gossiping
+- FBFT (Fast Byzantine Fault Tolerance) Consensus with BLS multi-signature
 - Account model and support for Solidity
 - Simple wallet program
-- Mock beacon chain with static sharding
 - Information disposal algorithm using erasure encoding (to be integrated)
 - Blockchain explorer with performance report and transaction lookup
 - Transaction generator for loadtesting
 
+
 ### Features To Be Implemented
 
-- Full beacon chain with multiple validators
-- Resharding
-- Staking on beacon chain
 - Fast state synchronization
-- Distributed randomness generation with VRF and VDF
+- Fully implemented VDF
 - Kademlia routing
-- P2P network and gossiping
-- Full protocol of consensus with BLS multi-sig and view-change protocol
+- Consensus view-change protocol
 - Integration with WASM
 - Cross-shard transaction
