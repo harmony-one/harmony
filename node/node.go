@@ -127,9 +127,6 @@ type Node struct {
 	// The p2p host used to send/receive p2p messages
 	host p2p.Host
 
-	// Signal channel for lost validators
-	OfflinePeers chan p2p.Peer
-
 	// Service manager.
 	serviceManager *service.Manager
 
@@ -147,14 +144,15 @@ type Node struct {
 	Address    common.Address
 
 	// For test only
-	TestBankKeys        []*ecdsa.PrivateKey
-	ContractDeployerKey *ecdsa.PrivateKey
-	ContractAddresses   []common.Address
+	TestBankKeys                 []*ecdsa.PrivateKey
+	ContractDeployerKey          *ecdsa.PrivateKey
+	ContractDeployerCurrentNonce uint64 // The nonce of the deployer contract at current block
+	ContractAddresses            []common.Address
 
 	// Shard group Message Receiver
 	shardGroupReceiver p2p.GroupReceiver
 
-	// Global group Message Receiver
+	// Global group Message Receiver, communicate with beacon chain, or cross-shard TX
 	globalGroupReceiver p2p.GroupReceiver
 
 	// Client Message Receiver to handle light client messages
@@ -257,6 +255,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 			utils.GetLogInstance().Error("Error when setup blockchain", "err", err)
 			os.Exit(1)
 		}
+
 		node.blockchain = chain
 
 		node.BlockChannel = make(chan *types.Block)
@@ -267,18 +266,27 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 
+		// Add Faucet contract to all shards, so that on testnet, we can demo wallet in explorer
+		// TODO (leo): we need to have support of cross-shard tx later so that the token can be transferred from beacon chain shard to other tx shards.
+		if isFirstTime {
+			// Setup one time smart contracts
+			node.AddFaucetContractToPendingTransactions()
+		} else {
+			node.AddContractKeyAndAddress(scFaucet)
+		}
+
 		if node.Consensus.ShardID == 0 {
 			// Contracts only exist in beacon chain
 			if isFirstTime {
 				// Setup one time smart contracts
-				node.AddFaucetContractToPendingTransactions()
 				node.CurrentStakes = make(map[common.Address]*structs.StakeInfo)
 				node.AddStakingContractToPendingTransactions() //This will save the latest information about staked nodes in current staked
 				// TODO(minhdoan): Think of a better approach to deploy smart contract.
 				// This is temporary for demo purpose.
 				node.AddLotteryContract()
 			} else {
-				node.AddContractKeyAndAddress()
+				node.AddContractKeyAndAddress(scStaking)
+				node.AddContractKeyAndAddress(scLottery)
 			}
 		}
 	}
@@ -291,16 +299,20 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 		node.State = NodeInit
 
 	}
+
+	// start the goroutine to receive client message
+	// client messages are sent by clients, like txgen, wallet
 	go node.ReceiveClientGroupMessage()
-
-	// Setup initial state of syncing.
-	node.peerRegistrationRecord = make(map[string]*syncConfig)
-
-	node.OfflinePeers = make(chan p2p.Peer)
-	go node.RemovePeersHandler()
 
 	// start the goroutine to receive group message
 	go node.ReceiveGroupMessage()
+
+	// start the goroutine to receive global message, used for cross-shard TX
+	// FIXME (leo): we use beacon client topic as the global topic for now
+	go node.ReceiveGlobalMessage()
+
+	// Setup initial state of syncing.
+	node.peerRegistrationRecord = make(map[string]*syncConfig)
 
 	node.startConsensus = make(chan struct{})
 
@@ -314,17 +326,27 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 	return &node
 }
 
-// InitGenesisShardState initialize genesis shard state and update committee pub keys for consensus and drand
-func (node *Node) InitGenesisShardState() {
-	// Store the genesis shard state into db.
+// InitShardState initialize genesis shard state and update committee pub keys for consensus and drand
+func (node *Node) InitShardState(isGenesis bool) {
 	shardState := types.ShardState{}
-	if node.Consensus != nil {
-		if node.Consensus.ShardID == 0 {
-			shardState = node.blockchain.StoreNewShardState(node.blockchain.CurrentBlock(), nil)
-		} else {
-			shardState = node.beaconChain.StoreNewShardState(node.beaconChain.CurrentBlock(), nil)
+	if isGenesis {
+		// Store the genesis shard state into db.
+		if node.Consensus != nil {
+			if node.Consensus.ShardID == 0 {
+				shardState = node.blockchain.StoreNewShardState(node.blockchain.CurrentBlock(), nil)
+			} else {
+				shardState = node.beaconChain.StoreNewShardState(node.beaconChain.CurrentBlock(), nil)
+			}
 		}
+	} else {
+		epochShardState, err := node.retrieveEpochShardState()
+		if err != nil {
+			utils.GetLogInstance().Error("[Shard State] Failed to decode epoch shard state", "error", err)
+		}
+		utils.GetLogInstance().Info("Successfully loaded epoch shard state")
+		shardState = epochShardState.ShardState
 	}
+
 	// Update validator public keys
 	for _, shard := range shardState {
 		if shard.ShardID == node.Consensus.ShardID {
@@ -358,11 +380,11 @@ func (node *Node) AddPeers(peers []*p2p.Peer) int {
 	// Only leader needs to add the peer info into consensus
 	// Validators will receive the updated peer info from Leader via pong message
 	// TODO: remove this after fully migrating to beacon chain-based committee membership
-	if count > 0 && node.NodeConfig.IsLeader() {
-		node.Consensus.AddPeers(peers)
-		// TODO: make peers into a context object shared by consensus and drand
-		node.DRand.AddPeers(peers)
-	}
+	//if count > 0 && node.NodeConfig.IsLeader() {
+	//	node.Consensus.AddPeers(peers)
+	//	// TODO: make peers into a context object shared by consensus and drand
+	//	node.DRand.AddPeers(peers)
+	//}
 	return count
 }
 
@@ -373,17 +395,6 @@ func (node *Node) AddBeaconPeer(p *p2p.Peer) bool {
 	key := fmt.Sprintf("%s:%s:%s", p.IP, p.Port, p.PeerID)
 	_, ok := node.BeaconNeighbors.LoadOrStore(key, *p)
 	return ok
-}
-
-// RemovePeersHandler is a goroutine to wait on the OfflinePeers channel
-// and remove the peers from validator list
-func (node *Node) RemovePeersHandler() {
-	for {
-		select {
-		case p := <-node.OfflinePeers:
-			node.Consensus.OfflinePeerList = append(node.Consensus.OfflinePeerList, p)
-		}
-	}
 }
 
 // isBeacon = true if the node is beacon node
@@ -411,20 +422,14 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 		utils.GetLogInstance().Error("Failed to create shard receiver", "msg", err)
 	}
 
-	node.globalGroupReceiver, err = node.host.GroupReceiver(p2p.GroupIDGlobal)
+	node.globalGroupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to create global receiver", "msg", err)
 	}
 
-	node.clientReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
+	node.clientReceiver, err = node.host.GroupReceiver(node.NodeConfig.GetClientGroupID())
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to create beacon client receiver", "msg", err)
-	}
-
-	node.NodeConfig.SetClientGroupID(p2p.GroupIDBeaconClient)
-
-	if err != nil {
-		utils.GetLogInstance().Error("create group receiver error", "msg", err)
+		utils.GetLogInstance().Error("Failed to create client receiver", "msg", err)
 	}
 
 	return nodeConfig, chanPeer
@@ -437,13 +442,13 @@ func (node *Node) AddBeaconChainDatabase(db ethdb.Database) {
 		database = ethdb.NewMemDatabase()
 	}
 	// TODO (chao) currently we use the same genesis block as normal shard
-	chain, err := node.GenesisBlockSetup(database, 0, false)
+	chain, err := node.GenesisBlockSetup(database, 0, true)
 	if err != nil {
 		utils.GetLogInstance().Error("Error when doing genesis setup")
 		os.Exit(1)
 	}
 	node.beaconChain = chain
-	node.BeaconWorker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.ConsensusPubKey), node.Consensus.ShardID)
+	node.BeaconWorker = worker.New(params.TestChainConfig, chain, &consensus.Consensus{}, pki.GetAddressFromPublicKey(node.SelfPeer.ConsensusPubKey), node.Consensus.ShardID)
 }
 
 // InitBlockChainFromDB retrieves the latest blockchain and state available from the local database

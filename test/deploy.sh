@@ -8,6 +8,8 @@ USER=$(whoami)
 set -x
 set -eo pipefail
 
+export GO111MODULE=on
+
 function check_result() {
    find $log_folder -name leader-*.log > $log_folder/all-leaders.txt
    find $log_folder -name validator-*.log > $log_folder/all-validators.txt
@@ -53,7 +55,6 @@ USAGE: $ME [OPTIONS] config_file_name
    -D duration    txgen run duration (default: $DURATION)
    -m min_peers   minimal number of peers to start consensus (default: $MIN)
    -s shards      number of shards (default: $SHARDS)
-   -k nodeport    kill the node with specified port number (default: $KILLPORT)
    -n             dryrun mode (default: $DRYRUN)
    -S             enable sync test (default: $SYNC)
 
@@ -73,11 +74,10 @@ TXGEN=true
 DURATION=60
 MIN=5
 SHARDS=2
-KILLPORT=9004
 SYNC=true
 DRYRUN=
 
-while getopts "hdtD:m:s:k:nS" option; do
+while getopts "hdtD:m:s:nS" option; do
    case $option in
       h) usage ;;
       d) DB='-db_supported' ;;
@@ -85,7 +85,6 @@ while getopts "hdtD:m:s:k:nS" option; do
       D) DURATION=$OPTARG ;;
       m) MIN=$OPTARG ;;
       s) SHARDS=$OPTARG ;;
-      k) KILLPORT=$OPTARG ;;
       n) DRYRUN=echo ;;
       S) SYNC=true ;;
    esac
@@ -99,7 +98,7 @@ if [ -z "$config" ]; then
 fi
 
 if [ "$SYNC" == "true" ]; then
-    DURATION=120
+    DURATION=200
 fi
 
 # Kill nodes if any
@@ -161,13 +160,8 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
      echo "launching new node ..."
      (sleep $NUM_NN; $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -account_index $i  -min_peers $MIN $HMY_OPT2 -key /tmp/$ip-$port.key 2>&1 | tee -a $LOG_FILE ) &
   fi
-  (( i++ ))
+  i=$((i+1))
 done < $config
-
-# Emulate node offline
-if [ "$SYNC" == "false" ]; then
- (sleep 45; killnode $KILLPORT) &
-fi
 
 if [ "$TXGEN" == "true" ]; then
    echo "launching txgen ... wait"

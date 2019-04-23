@@ -17,7 +17,7 @@ brew install openssl
 
 ## Dev Environment Setup
 
-The required go version is: **go1.11**
+The required go version is: **go1.12**
 
 ```bash
 export GOPATH=$HOME/<path_of_your_choice>
@@ -52,6 +52,7 @@ git submodule update --init --recursive
 ## Build
 
 Note : Some of our scripts require bash 4.x support, please [install bash 4.x](http://tldrdevnotes.com/bash-upgrade-3-4-macos) on MacOS X.
+Make sure you set `export GO111MODULE=on`.
 
 ### Build all executables
 
@@ -93,7 +94,7 @@ The configuration file configures number of nodes and their IP/Port.
 The script starts one local beacon chain node, the blockchain nodes, and run a transactional generator program which generates and sends simulated transactions to the local blockchain.
 
 ```bash
-./test/deploy.sh ./test/configs/oneshard1.txt
+./test/deploy.sh ./test/configs/ten-oneshard.txt
 ```
 
 ## Testing
@@ -126,25 +127,24 @@ See [`CONTRIBUTING`](CONTRIBUTING.md) for details.
 
 ### Features Done
 
-- Basic consensus protocol with O(n) complexity
-- Basic validator server
-- P2p network connection and unicast
+- Fully sharded network with beacon chain and shard chains
+- Cuckoo-rule based resharding
+- Staking on beacon chain
+- Distributed randomness generation with VRF and VDF (Proof-of-Concept VDF)
+- Sharded P2P network and P2P gossiping
+- FBFT (Fast Byzantine Fault Tolerance) Consensus with BLS multi-signature
 - Account model and support for Solidity
 - Simple wallet program
-- Mock beacon chain with static sharding
 - Information disposal algorithm using erasure encoding (to be integrated)
 - Blockchain explorer with performance report and transaction lookup
 - Transaction generator for loadtesting
 
+
 ### Features To Be Implemented
 
-- Full beacon chain with multiple validators
-- Resharding
-- Staking on beacon chain
 - Fast state synchronization
-- Distributed randomness generation with VRF and VDF
+- Fully implemented VDF
 - Kademlia routing
-- P2P network and gossiping
-- Full protocol of consensus with BLS multi-sig and view-change protocol
+- Consensus view-change protocol
 - Integration with WASM
 - Cross-shard transaction

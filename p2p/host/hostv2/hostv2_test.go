@@ -128,4 +128,11 @@ func TestHostV2_GroupReceiver(t *testing.T) {
 			t.Error("expected an error; got none")
 		}
 	})
+	t.Run("Closed", func(t *testing.T) {
+		var emptyReceiver GroupReceiverImpl
+		_, _, err := emptyReceiver.Receive(context.Background())
+		if err == nil {
+			t.Errorf("Receive() from nil/closed receiver did not return error")
+		}
+	})
 }

@@ -81,7 +81,7 @@ EOF
 
 function build_only
 {
-   VERSION=$(git rev-list --all --count)
+   VERSION=$(git rev-list --count HEAD)
    COMMIT=$(git describe --always --long --dirty)
    BUILTAT=$(date +%FT%T%z)
    BUILTBY=${USER}@

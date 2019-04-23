@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"math/big"
 	"strings"
+	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -21,6 +22,16 @@ import (
 // Constants related to smart contract.
 const (
 	FaucetContractFund = 8000000
+)
+
+// BuiltInSC is the type of built-in smart contract in blockchain
+type builtInSC uint
+
+// List of smart contract type built-in
+const (
+	scFaucet builtInSC = iota
+	scStaking
+	scLottery
 )
 
 // AddStakingContractToPendingTransactions adds the deposit smart contract the genesis block.
@@ -160,8 +171,8 @@ func (node *Node) CallFaucetContract(address common.Address) common.Hash {
 }
 
 func (node *Node) callGetFreeToken(address common.Address) common.Hash {
-	nonce := node.GetNonceOfAddress(crypto.PubkeyToAddress(node.ContractDeployerKey.PublicKey))
-	return node.callGetFreeTokenWithNonce(address, nonce)
+	nonce := atomic.AddUint64(&node.ContractDeployerCurrentNonce, 1)
+	return node.callGetFreeTokenWithNonce(address, nonce-1)
 }
 
 func (node *Node) callGetFreeTokenWithNonce(address common.Address, nonce uint64) common.Hash {
@@ -187,18 +198,24 @@ func (node *Node) callGetFreeTokenWithNonce(address common.Address, nonce uint64
 }
 
 // AddContractKeyAndAddress is used to add smart contract related information when node restart and resume with previous state
-func (node *Node) AddContractKeyAndAddress() {
-	// faucet contract
-	contractDeployerKey, _ := ecdsa.GenerateKey(crypto.S256(), strings.NewReader("Test contract key string stream that is fixed so that generated test key are deterministic every time"))
-	node.ContractDeployerKey = contractDeployerKey
-	node.ContractAddresses = append(node.ContractAddresses, crypto.CreateAddress(crypto.PubkeyToAddress(contractDeployerKey.PublicKey), uint64(0)))
-
-	// staking contract
-	node.CurrentStakes = make(map[common.Address]*structs.StakeInfo)
-	stakingPrivKey := contract_constants.GenesisBeaconAccountPriKey
-	node.StakingContractAddress = crypto.CreateAddress(crypto.PubkeyToAddress(stakingPrivKey.PublicKey), uint64(0))
-
-	// lottery
-	lotteryPriKey, _ := crypto.HexToECDSA(contract_constants.DemoAccounts[0].Private)
-	node.DemoContractAddress = crypto.CreateAddress(crypto.PubkeyToAddress(lotteryPriKey.PublicKey), uint64(0))
+// It supports three kinds of on-chain smart contracts for now.
+func (node *Node) AddContractKeyAndAddress(t builtInSC) {
+	switch t {
+	case scFaucet:
+		// faucet contract
+		contractDeployerKey, _ := ecdsa.GenerateKey(crypto.S256(), strings.NewReader("Test contract key string stream that is fixed so that generated test key are deterministic every time"))
+		node.ContractDeployerKey = contractDeployerKey
+		node.ContractAddresses = append(node.ContractAddresses, crypto.CreateAddress(crypto.PubkeyToAddress(contractDeployerKey.PublicKey), uint64(0)))
+	case scStaking:
+		// staking contract
+		node.CurrentStakes = make(map[common.Address]*structs.StakeInfo)
+		stakingPrivKey := contract_constants.GenesisBeaconAccountPriKey
+		node.StakingContractAddress = crypto.CreateAddress(crypto.PubkeyToAddress(stakingPrivKey.PublicKey), uint64(0))
+	case scLottery:
+		// lottery
+		lotteryPriKey, _ := crypto.HexToECDSA(contract_constants.DemoAccounts[0].Private)
+		node.DemoContractAddress = crypto.CreateAddress(crypto.PubkeyToAddress(lotteryPriKey.PublicKey), uint64(0))
+	default:
+		utils.GetLogInstance().Error("AddContractKeyAndAddress", "unknown SC", t)
+	}
 }
