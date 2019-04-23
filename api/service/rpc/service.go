@@ -76,7 +76,7 @@ func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {
 // startup. It's not meant to be called at any time afterwards as it makes certain
 // assumptions about the state of the node.
 func (s *Service) startRPC() error {
-	apis := hmyapi.GetAPIs(s.blockchain, s.txPool)
+	apis := hmyapi.GetAPIs(rpc.NewBackend(s.blockchain, s.txPool))
 
 	port, _ := strconv.Atoi(s.peer.Port)
 	s.httpEndpoint = fmt.Sprintf("127.0.0.1:%v", port+rpcPortDiff)

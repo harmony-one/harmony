@@ -82,30 +82,31 @@ type RPCBlock struct {
 	ReceiptsRoot     common.Hash      `json:"receiptsRoot"`
 	Transactions     []interface{}    `json:"transactions"`
 	Uncles           []common.Hash    `json:"uncles"`
+	TotalDifficulty  *big.Int         `json:"totalDifficulty"`
 }
 
 // RPCMarshalBlock converts the given block to the RPC output which depends on fullTx. If inclTx is true transactions are
 // returned. When fullTx is true the returned block contains full transaction details, otherwise it will only contain
 // transaction hashes.
-func RPCMarshalBlock(b *types.Block, inclTx bool, fullTx bool) (*RPCBlock, error) {
+func RPCMarshalBlock(b *types.Block, inclTx bool, fullTx bool) (map[string]interface{}, error) {
 	head := b.Header() // copies the header once
-	block := &RPCBlock{
-		Number:           (*hexutil.Big)(head.Number),
-		Hash:             b.Hash(),
-		ParentHash:       head.ParentHash,
-		Nonce:            head.Nonce,
-		MixHash:          head.MixDigest,
-		LogsBloom:        head.Bloom,
-		StateRoot:        head.Root,
-		Miner:            head.Coinbase,
-		Difficulty:       (*hexutil.Big)(head.Difficulty),
-		ExtraData:        hexutil.Bytes(head.Extra),
-		Size:             hexutil.Uint64(b.Size()),
-		GasLimit:         hexutil.Uint64(head.GasLimit),
-		GasUsed:          hexutil.Uint64(head.GasUsed),
-		Timestamp:        head.Time,
-		TransactionsRoot: head.TxHash,
-		ReceiptsRoot:     head.ReceiptHash,
+	fields := map[string]interface{}{
+		"number":           (*hexutil.Big)(head.Number),
+		"hash":             b.Hash(),
+		"parentHash":       head.ParentHash,
+		"nonce":            head.Nonce,
+		"mixHash":          head.MixDigest,
+		"logsBloom":        head.Bloom,
+		"stateRoot":        head.Root,
+		"miner":            head.Coinbase,
+		"difficulty":       (*hexutil.Big)(head.Difficulty),
+		"extraData":        hexutil.Bytes(head.Extra),
+		"size":             hexutil.Uint64(b.Size()),
+		"gasLimit":         hexutil.Uint64(head.GasLimit),
+		"gasUsed":          hexutil.Uint64(head.GasUsed),
+		"timestamp":        head.Time, // TODO(ricl): should be hexutil.Uint64
+		"transactionsRoot": head.TxHash,
+		"receiptsRoot":     head.ReceiptHash,
 	}
 
 	if inclTx {
@@ -125,7 +126,7 @@ func RPCMarshalBlock(b *types.Block, inclTx bool, fullTx bool) (*RPCBlock, error
 				return nil, err
 			}
 		}
-		block.Transactions = transactions
+		fields["transactions"] = transactions
 	}
 
 	uncles := b.Uncles()
@@ -133,7 +134,7 @@ func RPCMarshalBlock(b *types.Block, inclTx bool, fullTx bool) (*RPCBlock, error
 	for i, uncle := range uncles {
 		uncleHashes[i] = uncle.Hash()
 	}
-	block.Uncles = uncleHashes
+	fields["uncles"] = uncleHashes
 
-	return block, nil
+	return fields, nil
 }

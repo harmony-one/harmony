@@ -46,7 +46,8 @@ type jsonWriter interface {
 type BlockNumber int64
 
 const (
-	pendingBlockNumber  = BlockNumber(-2)
+	// PendingBlockNumber ...
+	PendingBlockNumber  = BlockNumber(-2)
 	latestBlockNumber   = BlockNumber(-1)
 	earliestBlockNumber = BlockNumber(0)
 )
@@ -71,7 +72,7 @@ func (bn *BlockNumber) UnmarshalJSON(data []byte) error {
 		*bn = latestBlockNumber
 		return nil
 	case "pending":
-		*bn = pendingBlockNumber
+		*bn = PendingBlockNumber
 		return nil
 	}
 

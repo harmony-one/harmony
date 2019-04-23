@@ -15,34 +15,39 @@ import (
 // PublicBlockChainAPI provides an API to access the Ethereum blockchain.
 // It offers only methods that operate on public data that is freely available to anyone.
 type PublicBlockChainAPI struct {
-	b *core.BlockChain
+	b *rpc.HmyAPIBackend
 }
 
 // NewPublicBlockChainAPI creates a new Ethereum blockchain API.
-func NewPublicBlockChainAPI(b *core.BlockChain) *PublicBlockChainAPI {
+func NewPublicBlockChainAPI(b *rpc.HmyAPIBackend) *PublicBlockChainAPI {
 	return &PublicBlockChainAPI{b}
 }
 
 // GetBlockByNumber returns the requested block. When blockNr is -1 the chain head is returned. When fullTx is true all
 // transactions in the block are returned in full detail, otherwise only the transaction hash is returned.
-func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr rpc.BlockNumber, fullTx bool) (*RPCBlock, error) {
-	block := s.b.GetBlockByNumber(uint64(blockNr))
-
-	if block == nil {
-		return nil, nil
+func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr rpc.BlockNumber, fullTx bool) (map[string]interface{}, error) {
+	block, err := s.b.BlockByNumber(ctx, blockNr)
+	if block != nil {
+		response, err := RPCMarshalBlock(block, false, false)
+		if err == nil && blockNr == rpc.PendingBlockNumber {
+			// Pending blocks need to nil out a few fields
+			for _, field := range []string{"hash", "nonce", "miner"} {
+				response[field] = nil
+			}
+		}
+		return response, err
 	}
-
-	return RPCMarshalBlock(block, false, false)
+	return nil, err
 }
 
 // GetBlockByHash returns the requested block. When fullTx is true all transactions in the block are returned in full
 // detail, otherwise only the transaction hash is returned.
-func (s *PublicBlockChainAPI) GetBlockByHash(ctx context.Context, blockHash common.Hash, fullTx bool) (*RPCBlock, error) {
-	block := s.b.GetBlockByHash(blockHash)
-	if block == nil {
-		return nil, nil
+func (s *PublicBlockChainAPI) GetBlockByHash(ctx context.Context, blockHash common.Hash, fullTx bool) (map[string]interface{}, error) {
+	block, err := s.b.GetBlock(ctx, blockHash)
+	if block != nil {
+		return RPCMarshalBlock(block, false, false)
 	}
-	return RPCMarshalBlock(block, false, false)
+	return nil, err
 }
 
 // newRPCTransactionFromBlockHash returns a transaction that will serialize to the RPC representation.
@@ -62,6 +67,17 @@ func newRPCTransactionFromBlockIndex(b *types.Block, index uint64) *RPCTransacti
 		return nil
 	}
 	return newRPCTransaction(txs[index], b.Hash(), b.NumberU64(), index)
+}
+
+// GetBalance returns the amount of wei for the given address in the state of the
+// given block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta
+// block numbers are also allowed.
+func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (*hexutil.Big, error) {
+	state, _, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
+	if state == nil || err != nil {
+		return nil, err
+	}
+	return (*hexutil.Big)(state.GetBalance(address)), state.Error()
 }
 
 // PublicHarmonyAPI provides an API to access Harmony related information.
@@ -121,40 +137,47 @@ func (s *PublicNetAPI) PeerCount() hexutil.Uint {
 
 // PublicTransactionPoolAPI exposes methods for the RPC interface
 type PublicTransactionPoolAPI struct {
-	b         *core.BlockChain
-	txPool    *core.TxPool
+	b         *rpc.HmyAPIBackend
 	nonceLock *AddrLocker
 }
 
 // NewPublicTransactionPoolAPI creates a new RPC service with methods specific for the transaction pool.
-func NewPublicTransactionPoolAPI(b *core.BlockChain, nonceLock *AddrLocker, txPool *core.TxPool) *PublicTransactionPoolAPI {
-	return &PublicTransactionPoolAPI{b, txPool, nonceLock}
+func NewPublicTransactionPoolAPI(b *rpc.HmyAPIBackend, nonceLock *AddrLocker) *PublicTransactionPoolAPI {
+	return &PublicTransactionPoolAPI{b, nonceLock}
 }
 
 // GetBlockTransactionCountByNumber returns the number of transactions in the block with the given block number.
 func (s *PublicTransactionPoolAPI) GetBlockTransactionCountByNumber(ctx context.Context, blockNr rpc.BlockNumber) *hexutil.Uint {
-	block := s.b.GetBlockByNumber(uint64(blockNr))
-	n := hexutil.Uint(block.Transactions().Len())
-	return &n
+	if block, _ := s.b.BlockByNumber(ctx, blockNr); block != nil {
+		n := hexutil.Uint(len(block.Transactions()))
+		return &n
+	}
+	return nil
 }
 
 // GetBlockTransactionCountByHash returns the number of transactions in the block with the given hash.
 func (s *PublicTransactionPoolAPI) GetBlockTransactionCountByHash(ctx context.Context, blockHash common.Hash) *hexutil.Uint {
-	block := s.b.GetBlockByHash(blockHash)
-	n := hexutil.Uint(block.Transactions().Len())
-	return &n
+	if block, _ := s.b.GetBlock(ctx, blockHash); block != nil {
+		n := hexutil.Uint(len(block.Transactions()))
+		return &n
+	}
+	return nil
 }
 
 // GetTransactionByBlockNumberAndIndex returns the transaction for the given block number and index.
 func (s *PublicTransactionPoolAPI) GetTransactionByBlockNumberAndIndex(ctx context.Context, blockNr rpc.BlockNumber, index hexutil.Uint) *RPCTransaction {
-	block := s.b.GetBlockByNumber(uint64(blockNr))
-	return newRPCTransactionFromBlockIndex(block, uint64(index))
+	if block, _ := s.b.BlockByNumber(ctx, blockNr); block != nil {
+		return newRPCTransactionFromBlockIndex(block, uint64(index))
+	}
+	return nil
 }
 
 // GetTransactionByBlockHashAndIndex returns the transaction for the given block hash and index.
 func (s *PublicTransactionPoolAPI) GetTransactionByBlockHashAndIndex(ctx context.Context, blockHash common.Hash, index hexutil.Uint) *RPCTransaction {
-	block := s.b.GetBlockByHash(blockHash)
-	return newRPCTransactionFromBlockIndex(block, uint64(index))
+	if block, _ := s.b.GetBlock(ctx, blockHash); block != nil {
+		return newRPCTransactionFromBlockIndex(block, uint64(index))
+	}
+	return nil
 }
 
 // GetTransactionByHash returns the transaction for the given hash
@@ -164,9 +187,50 @@ func (s *PublicTransactionPoolAPI) GetTransactionByHash(ctx context.Context, has
 		return newRPCTransaction(tx, blockHash, blockNumber, index)
 	}
 	// No finalized transaction, try to retrieve it from the pool
-	if tx := s.txPool.Get(hash); tx != nil {
+	if tx := s.b.GetPoolTransaction(hash); tx != nil {
 		return newRPCPendingTransaction(tx)
 	}
 	// Transaction unknown, return as such
 	return nil
+}
+
+// GetCode returns the code stored at the given address in the state for the given block number.
+func (s *PublicBlockChainAPI) GetCode(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (hexutil.Bytes, error) {
+	state, _, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
+	if state == nil || err != nil {
+		return nil, err
+	}
+	code := state.GetCode(address)
+	return code, state.Error()
+}
+
+// GetStorageAt returns the storage from the state at the given address, key and
+// block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta block
+// numbers are also allowed.
+func (s *PublicBlockChainAPI) GetStorageAt(ctx context.Context, address common.Address, key string, blockNr rpc.BlockNumber) (hexutil.Bytes, error) {
+	state, _, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
+	if state == nil || err != nil {
+		return nil, err
+	}
+	res := state.GetState(address, common.HexToHash(key))
+	return res[:], state.Error()
+}
+
+// GetTransactionCount returns the number of transactions the given address has sent for the given block number
+func (s *PublicTransactionPoolAPI) GetTransactionCount(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (*hexutil.Uint64, error) {
+	// Ask transaction pool for the nonce which includes pending transactions
+	if blockNr == rpc.PendingBlockNumber {
+		nonce, err := s.b.GetPoolNonce(ctx, address)
+		if err != nil {
+			return nil, err
+		}
+		return (*hexutil.Uint64)(&nonce), nil
+	}
+	// Resolve block number and use its state to ask for the nonce
+	state, _, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
+	if state == nil || err != nil {
+		return nil, err
+	}
+	nonce := state.GetNonce(address)
+	return (*hexutil.Uint64)(&nonce), state.Error()
 }
