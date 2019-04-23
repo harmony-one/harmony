@@ -90,7 +90,7 @@ SyncingLoop:
 				}
 			}
 			if node.stateSync.IsOutOfSync(bc) {
-				utils.GetLogInstance().Debug("[SYNC] out of sync, doing syncing")
+				utils.GetLogInstance().Debug("[SYNC] out of sync, doing syncing", "willJoinConsensus", willJoinConsensus)
 				node.stateMutex.Lock()
 				node.State = NodeNotInSync
 				node.stateMutex.Unlock()
@@ -189,7 +189,6 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 	response := &downloader_pb.DownloaderResponse{}
 	switch request.Type {
 	case downloader_pb.DownloaderRequest_HEADER:
-		utils.GetLogInstance().Debug("[SYNC] CalculateResponse DownloaderRequest_HEADER", "request.BlockHash", request.BlockHash)
 		var startHeaderHash []byte
 		if request.BlockHash == nil {
 			tmp := node.blockchain.Genesis().Hash()

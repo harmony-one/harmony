@@ -144,9 +144,10 @@ type Node struct {
 	Address    common.Address
 
 	// For test only
-	TestBankKeys        []*ecdsa.PrivateKey
-	ContractDeployerKey *ecdsa.PrivateKey
-	ContractAddresses   []common.Address
+	TestBankKeys                 []*ecdsa.PrivateKey
+	ContractDeployerKey          *ecdsa.PrivateKey
+	ContractDeployerCurrentNonce uint64 // The nonce of the deployer contract at current block
+	ContractAddresses            []common.Address
 
 	// Shard group Message Receiver
 	shardGroupReceiver p2p.GroupReceiver
@@ -254,6 +255,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 			utils.GetLogInstance().Error("Error when setup blockchain", "err", err)
 			os.Exit(1)
 		}
+
 		node.blockchain = chain
 
 		node.BlockChannel = make(chan *types.Block)
@@ -324,17 +326,27 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 	return &node
 }
 
-// InitGenesisShardState initialize genesis shard state and update committee pub keys for consensus and drand
-func (node *Node) InitGenesisShardState() {
-	// Store the genesis shard state into db.
+// InitShardState initialize genesis shard state and update committee pub keys for consensus and drand
+func (node *Node) InitShardState(isGenesis bool) {
 	shardState := types.ShardState{}
-	if node.Consensus != nil {
-		if node.Consensus.ShardID == 0 {
-			shardState = node.blockchain.StoreNewShardState(node.blockchain.CurrentBlock(), nil)
-		} else {
-			shardState = node.beaconChain.StoreNewShardState(node.beaconChain.CurrentBlock(), nil)
+	if isGenesis {
+		// Store the genesis shard state into db.
+		if node.Consensus != nil {
+			if node.Consensus.ShardID == 0 {
+				shardState = node.blockchain.StoreNewShardState(node.blockchain.CurrentBlock(), nil)
+			} else {
+				shardState = node.beaconChain.StoreNewShardState(node.beaconChain.CurrentBlock(), nil)
+			}
 		}
+	} else {
+		epochShardState, err := node.retrieveEpochShardState()
+		if err != nil {
+			utils.GetLogInstance().Error("[Shard State] Failed to decode epoch shard state", "error", err)
+		}
+		utils.GetLogInstance().Info("Successfully loaded epoch shard state")
+		shardState = epochShardState.ShardState
 	}
+
 	// Update validator public keys
 	for _, shard := range shardState {
 		if shard.ShardID == node.Consensus.ShardID {
@@ -368,11 +380,11 @@ func (node *Node) AddPeers(peers []*p2p.Peer) int {
 	// Only leader needs to add the peer info into consensus
 	// Validators will receive the updated peer info from Leader via pong message
 	// TODO: remove this after fully migrating to beacon chain-based committee membership
-	if count > 0 && node.NodeConfig.IsLeader() {
-		node.Consensus.AddPeers(peers)
-		// TODO: make peers into a context object shared by consensus and drand
-		node.DRand.AddPeers(peers)
-	}
+	//if count > 0 && node.NodeConfig.IsLeader() {
+	//	node.Consensus.AddPeers(peers)
+	//	// TODO: make peers into a context object shared by consensus and drand
+	//	node.DRand.AddPeers(peers)
+	//}
 	return count
 }
 

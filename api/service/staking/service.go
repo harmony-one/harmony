@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/harmony-one/bls/ffi/go/bls"
+
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/harmony-one/harmony/contracts"
 
@@ -47,7 +49,7 @@ type Service struct {
 	stopChan      chan struct{}
 	stoppedChan   chan struct{}
 	accountKey    *ecdsa.PrivateKey
-	blsAddress    [20]byte
+	blsPublicKey  *bls.PublicKey
 	stakingAmount int64
 	state         State
 	beaconChain   *core.BlockChain
@@ -55,13 +57,13 @@ type Service struct {
 }
 
 // New returns staking service.
-func New(host p2p.Host, accountKey *ecdsa.PrivateKey, beaconChain *core.BlockChain, blsAddress [20]byte) *Service {
+func New(host p2p.Host, accountKey *ecdsa.PrivateKey, beaconChain *core.BlockChain, blsPublicKey *bls.PublicKey) *Service {
 	return &Service{
 		host:          host,
 		stopChan:      make(chan struct{}),
 		stoppedChan:   make(chan struct{}),
 		accountKey:    accountKey,
-		blsAddress:    blsAddress,
+		blsPublicKey:  blsPublicKey,
 		stakingAmount: StakingAmount,
 		beaconChain:   beaconChain,
 	}
@@ -80,6 +82,7 @@ func (s *Service) Run() {
 		defer close(s.stoppedChan)
 		// Do service first time and after that doing it every 5 minutes.
 		// The reason we have to do it in every x minutes because of beacon chain syncing.
+		time.Sleep(WaitTime)
 		s.DoService()
 		for {
 			select {
@@ -105,13 +108,15 @@ func (s *Service) IsStaked() bool {
 func (s *Service) DoService() {
 	utils.GetLogInstance().Info("Trying to send a staking transaction.")
 
-	if s.beaconChain == nil {
-		utils.GetLogInstance().Info("Can not send a staking transaction because of nil beacon chain.")
-		return
-	}
+	// TODO: no need to sync beacon chain to stake
+	//if s.beaconChain == nil {
+	//	utils.GetLogInstance().Info("Can not send a staking transaction because of nil beacon chain.")
+	//	return
+	//}
 
 	if msg := s.createStakingMessage(); msg != nil {
 		s.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msg))
+		utils.GetLogInstance().Error("Sent staking transaction to the network.")
 	} else {
 		utils.GetLogInstance().Error("Can not create staking transaction")
 	}
@@ -187,7 +192,19 @@ func (s *Service) createRawStakingMessage() []byte {
 		utils.GetLogInstance().Error("Failed to generate staking contract's ABI", "error", err)
 	}
 	// TODO: the bls address should be signed by the bls private key
-	bytesData, err := abi.Pack("lock", s.blsAddress)
+	blsPubKeyBytes := s.blsPublicKey.Serialize()
+	if len(blsPubKeyBytes) != 96 {
+		utils.GetLogInstance().Error("Wrong bls pubkey size", "size", len(blsPubKeyBytes))
+		return []byte{}
+	}
+	blsPubKeyPart1 := [32]byte{}
+	blsPubKeyPart2 := [32]byte{}
+	blsPubKeyPart3 := [32]byte{}
+	copy(blsPubKeyPart1[:], blsPubKeyBytes[:32])
+	copy(blsPubKeyPart2[:], blsPubKeyBytes[32:64])
+	copy(blsPubKeyPart3[:], blsPubKeyBytes[64:96])
+	bytesData, err := abi.Pack("lock", blsPubKeyPart1, blsPubKeyPart2, blsPubKeyPart3)
+
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to generate ABI function bytes data", "error", err)
 	}

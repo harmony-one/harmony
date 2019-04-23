@@ -29,6 +29,7 @@ const (
 func (node *Node) GenesisBlockSetup(db ethdb.Database, shardID uint32, isArchival bool) (*core.BlockChain, error) {
 	// Initialize genesis block and blockchain
 	// Tests account for txgen to use
+
 	genesisAlloc := node.CreateGenesisAllocWithTestingAddresses(FakeAddressNumber)
 
 	// Smart contract deployer account used to deploy protocol-level smart contract
@@ -44,12 +45,13 @@ func (node *Node) GenesisBlockSetup(db ethdb.Database, shardID uint32, isArchiva
 		AddNodeAddressesToGenesisAlloc(genesisAlloc)
 	}
 
-	chainConfig := params.TestChainConfig
+	// TODO: create separate chain config instead of using the same pointer reference
+	chainConfig := *params.TestChainConfig
 	chainConfig.ChainID = big.NewInt(int64(shardID)) // Use ChainID as piggybacked ShardID
 	gspec := core.Genesis{
-		Config:         chainConfig,
+		Config:         &chainConfig,
 		Alloc:          genesisAlloc,
-		ShardID:        uint32(node.Consensus.ShardID),
+		ShardID:        shardID,
 		ShardStateHash: core.GetInitShardState().Hash(),
 	}
 

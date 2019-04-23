@@ -518,6 +518,8 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int {
 	}
 	// TODO: use pubkey to identify leader rather than p2p.Peer.
 	consensus.leader = p2p.Peer{ConsensusPubKey: pubKeys[0]}
+	utils.GetLogInstance().Info("My Leader", "info", hex.EncodeToString(consensus.leader.ConsensusPubKey.Serialize()))
+	utils.GetLogInstance().Info("My Committee", "info", consensus.PublicKeys)
 	consensus.pubKeyLock.Unlock()
 
 	return len(consensus.PublicKeys)

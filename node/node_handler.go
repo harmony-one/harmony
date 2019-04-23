@@ -3,12 +3,19 @@ package node
 import (
 	"bytes"
 	"context"
+	"encoding/gob"
 	"encoding/hex"
 	"fmt"
+	"io/ioutil"
 	"math"
 	"os"
 	"os/exec"
+	"strconv"
+	"sync/atomic"
+	"syscall"
 	"time"
+
+	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/harmony-one/harmony/core"
 
@@ -119,10 +126,8 @@ func (node *Node) messageHandler(content []byte, sender string) {
 	case proto.Consensus:
 		msgPayload, _ := proto.GetConsensusMessagePayload(content)
 		if consensusObj.IsLeader {
-			utils.GetLogInstance().Info("NET: Leader received consensus message")
 			consensusObj.ProcessMessageLeader(msgPayload)
 		} else {
-			utils.GetLogInstance().Info("NET: Validator received consensus message")
 			consensusObj.ProcessMessageValidator(msgPayload)
 			// TODO(minhdoan): add logic to check if the current blockchain is not sync with other consensus
 			// we should switch to other state rather than DoingConsensus.
@@ -131,14 +136,13 @@ func (node *Node) messageHandler(content []byte, sender string) {
 		msgPayload, _ := proto.GetDRandMessagePayload(content)
 		if node.DRand != nil {
 			if node.DRand.IsLeader {
-				utils.GetLogInstance().Info("NET: DRand Leader received message")
 				node.DRand.ProcessMessageLeader(msgPayload)
 			} else {
-				utils.GetLogInstance().Info("NET: DRand Validator received message")
 				node.DRand.ProcessMessageValidator(msgPayload)
 			}
 		}
 	case proto.Staking:
+		utils.GetLogInstance().Info("NET: Received staking message")
 		msgPayload, _ := proto.GetStakingMessagePayload(content)
 		// Only beacon leader processes staking txn
 		if node.NodeConfig.Role() != nodeconfig.BeaconLeader {
@@ -301,7 +305,6 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) bool {
 // 1. add the new block to blockchain
 // 2. [leader] send new block to the client
 func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
-	utils.GetLogInstance().Info("PostConsensusProcessing")
 	if node.Consensus.IsLeader {
 		node.BroadcastNewBlock(newBlock)
 	} else {
@@ -309,6 +312,10 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 	}
 
 	node.AddNewBlock(newBlock)
+
+	// Update contract deployer's nonce so default contract like faucet can issue transaction with current nonce
+	nonce := node.GetNonceOfAddress(crypto.PubkeyToAddress(node.ContractDeployerKey.PublicKey))
+	atomic.StoreUint64(&node.ContractDeployerCurrentNonce, nonce)
 
 	if node.Consensus.ShardID == 0 {
 
@@ -319,9 +326,9 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 			}()
 		}
 
-		utils.GetLogInstance().Info("Updating staking list")
+		// TODO: update staking information once per epoch.
 		node.UpdateStakingList(node.QueryStakeInfo())
-		// node.printStakingList()
+		node.printStakingList()
 		if core.IsEpochBlock(newBlock) {
 			shardState := node.blockchain.StoreNewShardState(newBlock, &node.CurrentStakes)
 			if shardState != nil {
@@ -353,6 +360,7 @@ func (node *Node) AddNewBlock(newBlock *types.Block) {
 }
 
 func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
+	utils.GetLogInstance().Error("Got Ping Message")
 	if sender != "" {
 		_, ok := node.duplicatedPing.LoadOrStore(sender, true)
 		if ok {
@@ -400,7 +408,6 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 
 // SendPongMessage is the a goroutine to periodcally send pong message to all peers
 func (node *Node) SendPongMessage() {
-	utils.GetLogInstance().Info("Starting Pong routing")
 	tick := time.NewTicker(2 * time.Second)
 	tick2 := time.NewTicker(120 * time.Second)
 
@@ -473,6 +480,7 @@ func (node *Node) SendPongMessage() {
 }
 
 func (node *Node) pongMessageHandler(msgPayload []byte) int {
+	utils.GetLogInstance().Error("Got Pong Message")
 	pong, err := proto_discovery.GetPongMessage(msgPayload)
 	if err != nil {
 		utils.GetLogInstance().Error("Can't get Pong Message", "error", err)
@@ -488,20 +496,18 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 	// otherwise, we may not be able to validate the consensus messages received
 	// which will result in first consensus timeout
 	// TODO: remove this after fully migrating to beacon chain-based committee membership
-	err = node.Consensus.SetLeaderPubKey(pong.LeaderPubKey)
-	if err != nil {
-		utils.GetLogInstance().Error("Unmarshal Consensus Leader PubKey Failed", "error", err)
-	} else {
-		utils.GetLogInstance().Info("Set Consensus Leader PubKey", "key", node.Consensus.GetLeaderPubKey())
-	}
-	if node.DRand != nil { //ak: SetLeader in DRand should be only for nodes that participate in DRand.
-		err = node.DRand.SetLeaderPubKey(pong.LeaderPubKey)
-		if err != nil {
-			utils.GetLogInstance().Error("Unmarshal DRand Leader PubKey Failed", "error", err)
-		} else {
-			utils.GetLogInstance().Info("Set DRand Leader PubKey", "key", node.Consensus.GetLeaderPubKey())
-		}
-	}
+	//err = node.Consensus.SetLeaderPubKey(pong.LeaderPubKey)
+	//if err != nil {
+	//	utils.GetLogInstance().Error("Unmarshal Consensus Leader PubKey Failed", "error", err)
+	//} else {
+	//	utils.GetLogInstance().Info("Set Consensus Leader PubKey", "key", node.Consensus.GetLeaderPubKey())
+	//}
+	//err = node.DRand.SetLeaderPubKey(pong.LeaderPubKey)
+	//if err != nil {
+	//	utils.GetLogInstance().Error("Unmarshal DRand Leader PubKey Failed", "error", err)
+	//} else {
+	//	utils.GetLogInstance().Info("Set DRand Leader PubKey", "key", node.Consensus.GetLeaderPubKey())
+	//}
 
 	peers := make([]*p2p.Peer, 0)
 
@@ -553,43 +559,67 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 	node.serviceManager.TakeAction(&service.Action{Action: service.Notify, ServiceType: service.PeerDiscovery, Params: data})
 
 	// TODO: remove this after fully migrating to beacon chain-based committee membership
+<<<<<<< HEAD
 	if node.DRand != nil { //ak: If nodes are not doing DRand we should not update their DRand keys
 		return node.Consensus.UpdatePublicKeys(publicKeys) + node.DRand.UpdatePublicKeys(publicKeys)
 	}
 	return node.Consensus.UpdatePublicKeys(publicKeys)
+=======
+	return 0
+	//return node.Consensus.UpdatePublicKeys(publicKeys) + node.DRand.UpdatePublicKeys(publicKeys)
+>>>>>>> b89875607e7a0ff214b63db25e2cc606ca79bcda
 }
 
 func (node *Node) epochShardStateMessageHandler(msgPayload []byte) int {
+	utils.GetLogInstance().Error("[Received new shard state]")
 	epochShardState, err := proto_node.DeserializeEpochShardStateFromMessage(msgPayload)
 	if err != nil {
 		utils.GetLogInstance().Error("Can't get shard state Message", "error", err)
 		return -1
 	}
-	if node.Consensus != nil && node.Consensus.ShardID != 0 {
+	if (node.Consensus != nil && node.Consensus.ShardID != 0) || node.NodeConfig.Role() == nodeconfig.NewNode {
 		node.processEpochShardState(epochShardState)
 	}
 	return 0
 }
 
 func (node *Node) processEpochShardState(epochShardState *types.EpochShardState) {
-	utils.GetLogInstance().Error("[Received shard state]", "shardState", epochShardState)
-
 	shardState := epochShardState.ShardState
 	epoch := epochShardState.Epoch
 
-	myShard := uint32(math.MaxUint32)
+	for _, c := range shardState {
+		utils.GetLogInstance().Debug("new shard information", "shardID", c.ShardID, "NodeList", c.NodeList)
+	}
+
+	myShardID := uint32(math.MaxUint32)
 	isNextLeader := false
 	myBlsPubKey := node.Consensus.PubKey.Serialize()
+	myShardState := types.Committee{}
 	for _, shard := range shardState {
 		for _, nodeID := range shard.NodeList {
 			if bytes.Compare(nodeID.BlsPublicKey[:], myBlsPubKey) == 0 {
-				myShard = shard.ShardID
+				myShardID = shard.ShardID
 				isNextLeader = shard.Leader == nodeID
+				myShardState = shard
 			}
 		}
 	}
 
-	if myShard != uint32(math.MaxUint32) {
+	if myShardID != uint32(math.MaxUint32) {
+		// Update public keys
+		ss := myShardState
+		publicKeys := []*bls.PublicKey{}
+		for _, nodeID := range ss.NodeList {
+			key := &bls.PublicKey{}
+			err := key.Deserialize(nodeID.BlsPublicKey[:])
+			if err != nil {
+				utils.GetLogInstance().Error("Failed to deserialize BLS public key in shard state", "error", err)
+			}
+			publicKeys = append(publicKeys, key)
+		}
+		node.Consensus.UpdatePublicKeys(publicKeys)
+		node.DRand.UpdatePublicKeys(publicKeys)
+
 		aboutLeader := ""
 		if node.Consensus.IsLeader {
 			aboutLeader = "I am not leader anymore"
@@ -602,31 +632,57 @@ func (node *Node) processEpochShardState(epochShardState *types.EpochShardState)
 				aboutLeader = "I become the leader"
 			}
 		}
-		if node.blockchain.ShardID() == myShard {
-			utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d] I stay at shard %d, %s", epoch, myShard, aboutLeader), "BlsPubKey", hex.EncodeToString(myBlsPubKey))
+		if node.blockchain.ShardID() == myShardID {
+			utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d] I stay at shard %d, %s", epoch, myShardID, aboutLeader), "BlsPubKey", hex.EncodeToString(myBlsPubKey))
 		} else {
-			utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d] I got resharded to shard %d from shard %d, %s", epoch, myShard, node.blockchain.ShardID(), aboutLeader), "BlsPubKey", hex.EncodeToString(myBlsPubKey))
+			utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d] I got resharded to shard %d from shard %d, %s", epoch, myShardID, node.blockchain.ShardID(), aboutLeader), "BlsPubKey", hex.EncodeToString(myBlsPubKey))
+			node.storeEpochShardState(epochShardState)
 
-			execFile, err := lookPath()
+			execFile, err := getBinaryPath()
 			if err != nil {
 				utils.GetLogInstance().Crit("Failed to get program path when restarting program", "error", err, "file", execFile)
 			}
-
-			utils.GetLogInstance().Info("Restarting program", "args", os.Args, "env", os.Environ())
-			// TODO: enable restart
-			//err = syscall.Exec(execFile, os.Args, os.Environ())
-			//if err != nil {
-			//	utils.GetLogInstance().Crit("Failed to restart program after resharding" , "error", err)
-			//}
-			//os.Exit(0)
+			args := getRestartArguments(myShardID)
+			utils.GetLogInstance().Info("Restarting program", "args", args, "env", os.Environ())
+			err = syscall.Exec(execFile, args, os.Environ())
+			if err != nil {
+				utils.GetLogInstance().Crit("Failed to restart program after resharding", "error", err)
+			}
 		}
 	} else {
-		utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d]  Somehow I got kicked out", epoch), "BlsPubKey", hex.EncodeToString(myBlsPubKey))
-		//os.Exit(0)
+		utils.GetLogInstance().Info(fmt.Sprintf("[Resharded][epoch:%d]  Somehow I got kicked out. Exiting", epoch), "BlsPubKey", hex.EncodeToString(myBlsPubKey))
+		os.Exit(8) // 8 represents it's a loop and the program restart itself
 	}
 }
 
-func lookPath() (argv0 string, err error) {
+func getRestartArguments(myShardID uint32) []string {
+	args := os.Args
+	hasShardID := false
+	shardIDFlag := "-shard_id"
+	// newNodeFlag := "-is_newnode"
+	for i, arg := range args {
+		if arg == shardIDFlag {
+			if i+1 < len(args) {
+				args[i+1] = strconv.Itoa(int(myShardID))
+			} else {
+				args = append(args, strconv.Itoa(int(myShardID)))
+			}
+			hasShardID = true
+		}
+		// TODO: enable this
+		//if arg == newNodeFlag {
+		//	args[i] = ""  // remove new node flag
+		//}
+	}
+	if !hasShardID {
+		args = append(args, shardIDFlag)
+		args = append(args, strconv.Itoa(int(myShardID)))
+	}
+	return args
+}
+
+// Gets the path of this currently running binary program.
+func getBinaryPath() (argv0 string, err error) {
 	argv0, err = exec.LookPath(os.Args[0])
 	if nil != err {
 		return
@@ -635,4 +691,36 @@ func lookPath() (argv0 string, err error) {
 		return
 	}
 	return
+}
+
+// Stores the epoch shard state into local file
+// TODO: think about storing it into level db.
+func (node *Node) storeEpochShardState(epochShardState *types.EpochShardState) {
+	byteBuffer := bytes.NewBuffer([]byte{})
+	encoder := gob.NewEncoder(byteBuffer)
+	err := encoder.Encode(epochShardState)
+	if err != nil {
+		utils.GetLogInstance().Error("[Resharded] Failed to encode epoch shard state", "error", err)
+	}
+	err = ioutil.WriteFile("./epoch_shard_state"+node.SelfPeer.IP+node.SelfPeer.Port, byteBuffer.Bytes(), 0644)
+	if err != nil {
+		utils.GetLogInstance().Error("[Resharded] Failed to store epoch shard state in local file", "error", err)
+	}
+}
+
+func (node *Node) retrieveEpochShardState() (*types.EpochShardState, error) {
+	b, err := ioutil.ReadFile("./epoch_shard_state" + node.SelfPeer.IP + node.SelfPeer.Port)
+	if err != nil {
+		utils.GetLogInstance().Error("[Resharded] Failed to retrieve epoch shard state", "error", err)
+	}
+	epochShardState := new(types.EpochShardState)
+
+	r := bytes.NewBuffer(b)
+	decoder := gob.NewDecoder(r)
+	err = decoder.Decode(epochShardState)
+
+	if err != nil {
+		return nil, fmt.Errorf("Decode local epoch shard state error")
+	}
+	return epochShardState, nil
 }
