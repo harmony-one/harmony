@@ -126,10 +126,8 @@ func (node *Node) messageHandler(content []byte, sender string) {
 	case proto.Consensus:
 		msgPayload, _ := proto.GetConsensusMessagePayload(content)
 		if consensusObj.IsLeader {
-			utils.GetLogInstance().Info("NET: Leader received consensus message")
 			consensusObj.ProcessMessageLeader(msgPayload)
 		} else {
-			utils.GetLogInstance().Info("NET: Validator received consensus message")
 			consensusObj.ProcessMessageValidator(msgPayload)
 			// TODO(minhdoan): add logic to check if the current blockchain is not sync with other consensus
 			// we should switch to other state rather than DoingConsensus.
@@ -138,10 +136,8 @@ func (node *Node) messageHandler(content []byte, sender string) {
 		msgPayload, _ := proto.GetDRandMessagePayload(content)
 		if node.DRand != nil {
 			if node.DRand.IsLeader {
-				utils.GetLogInstance().Info("NET: DRand Leader received message")
 				node.DRand.ProcessMessageLeader(msgPayload)
 			} else {
-				utils.GetLogInstance().Info("NET: DRand Validator received message")
 				node.DRand.ProcessMessageValidator(msgPayload)
 			}
 		}
@@ -309,7 +305,6 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) bool {
 // 1. add the new block to blockchain
 // 2. [leader] send new block to the client
 func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
-	utils.GetLogInstance().Info("PostConsensusProcessing")
 	if node.Consensus.IsLeader {
 		node.BroadcastNewBlock(newBlock)
 	} else {
@@ -413,7 +408,6 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 
 // SendPongMessage is the a goroutine to periodcally send pong message to all peers
 func (node *Node) SendPongMessage() {
-	utils.GetLogInstance().Info("Starting Pong routing")
 	tick := time.NewTicker(2 * time.Second)
 	tick2 := time.NewTicker(120 * time.Second)
 
@@ -583,8 +577,6 @@ func (node *Node) epochShardStateMessageHandler(msgPayload []byte) int {
 }
 
 func (node *Node) processEpochShardState(epochShardState *types.EpochShardState) {
-	utils.GetLogInstance().Error("[Processing new shard state]")
-
 	shardState := epochShardState.ShardState
 	epoch := epochShardState.Epoch
 
