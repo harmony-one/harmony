@@ -559,15 +559,8 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 	node.serviceManager.TakeAction(&service.Action{Action: service.Notify, ServiceType: service.PeerDiscovery, Params: data})
 
 	// TODO: remove this after fully migrating to beacon chain-based committee membership
-<<<<<<< HEAD
-	if node.DRand != nil { //ak: If nodes are not doing DRand we should not update their DRand keys
-		return node.Consensus.UpdatePublicKeys(publicKeys) + node.DRand.UpdatePublicKeys(publicKeys)
-	}
-	return node.Consensus.UpdatePublicKeys(publicKeys)
-=======
 	return 0
 	//return node.Consensus.UpdatePublicKeys(publicKeys) + node.DRand.UpdatePublicKeys(publicKeys)
->>>>>>> b89875607e7a0ff214b63db25e2cc606ca79bcda
 }
 
 func (node *Node) epochShardStateMessageHandler(msgPayload []byte) int {
