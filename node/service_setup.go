@@ -64,7 +64,7 @@ func (node *Node) setupForBeaconLeader() {
 	// Register client new support service.
 	// TODO(minhdoan): Also consider provide clientsupport/restclientsupport for other shards in the future.
 	node.serviceManager.RegisterService(service.RestClientSupport, restclientsupport.New(
-		node.CreateTransactionForEnterMethod, node.GetResult, node.CreateTransactionForPickWinner))
+		node.CreateTransactionForEnterMethod, node.GetResult, node.CreateTransactionForPickWinner, node.CallFaucetContract))
 	// Register randomness service
 	node.serviceManager.RegisterService(service.Randomness, randomness.New(node.DRand))
 	// Register explorer service.
