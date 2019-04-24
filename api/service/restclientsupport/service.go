@@ -1,6 +1,7 @@
 package restclientsupport
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -117,25 +118,23 @@ func (s *Service) GetBalance(w http.ResponseWriter, r *http.Request) {
 
 // FundMe implements the GetFreeToken interface to request free token.
 func (s *Service) FundMe(w http.ResponseWriter, r *http.Request) {
-	// (ctx context.Context, request *proto.GetFreeTokenRequest) (*proto.GetFreeTokenResponse, error) {
-	// var address common.Address
-	// address.SetBytes(request.Address)
-	// //	log.Println("Returning GetFreeTokenResponse for address: ", address.Hex())
-	// return &proto.GetFreeTokenResponse{TxId: s.callFaucetContract(address).Bytes()}, nil
 	w.Header().Set("Content-Type", "application/json")
-	// key := r.FormValue("key")
-
-	// TODO(RJ): implement the logic similar to get FreeToken with key.
-
-	// GetFreeToken implements the GetFreeToken interface to request free token.
-	// func (s *Server) GetFreeToken(ctx context.Context, request *proto.GetFreeTokenRequest) (*proto.GetFreeTokenResponse, error) {
-	// 	var address common.Address
-	// 	address.SetBytes(request.Address)
-	// 	//	log.Println("Returning GetFreeTokenResponse for address: ", address.Hex())
-	// 	return &proto.GetFreeTokenResponse{TxId: s.callFaucetContract(address).Bytes()}, nil
-	// }
+	addressHex := r.FormValue("key")
+	fmt.Println("fundMe: address", addressHex)
 
 	res := &Response{Success: false}
+	if s.CreateTransactionForEnterMethod == nil {
+		json.NewEncoder(w).Encode(res)
+		return
+	}
+	address := common.HexToAddress(addressHex)
+	emptyHash := common.Hash{}
+	if txID := s.CallFaucetContract(address); bytes.Compare(txID.Bytes(), emptyHash[:]) == 0 {
+		json.NewEncoder(w).Encode(res)
+		return
+	}
+
+	res.Success = true
 	json.NewEncoder(w).Encode(res)
 }
 
