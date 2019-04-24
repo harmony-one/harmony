@@ -34,6 +34,7 @@ type Service struct {
 	CreateTransactionForPickWinner  func() error
 	messageChan                     chan *msg_pb.Message
 	CallFaucetContract              func(common.Address) common.Hash
+	GetAccountBalance               func(common.Address) (*big.Int, error)
 }
 
 // New returns new client support service.
@@ -41,12 +42,13 @@ func New(
 	CreateTransactionForEnterMethod func(int64, string) error,
 	GetResult func(string) ([]string, []*big.Int),
 	CreateTransactionForPickWinner func() error,
-	CallFaucetContract func(common.Address) common.Hash) *Service {
+	CallFaucetContract func(common.Address) common.Hash, GetAccountBalance func(common.Address) (*big.Int, error)) *Service {
 	return &Service{
 		CreateTransactionForEnterMethod: CreateTransactionForEnterMethod,
 		GetResult:                       GetResult,
 		CreateTransactionForPickWinner:  CreateTransactionForPickWinner,
 		CallFaucetContract:              CallFaucetContract,
+		GetAccountBalance:               GetAccountBalance,
 	}
 }
 
@@ -108,12 +110,25 @@ type Response struct {
 // GetBalance implements the GetFreeToken interface to request free token.
 func (s *Service) GetBalance(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	key := r.FormValue("key")
-	res := &Response{Success: false}
-	res.Players = append(res.Players, key)
-	// res.Balances = append(res.Players, GETMYBALANCE) // implements this
-	json.NewEncoder(w).Encode(res)
+	addressHex := r.FormValue("key")
+	fmt.Println("fundMe: address", addressHex)
 
+	res := &Response{Success: false}
+	if s.GetAccountBalance == nil {
+		json.NewEncoder(w).Encode(res)
+		return
+	}
+	res.Players = append(res.Players, addressHex)
+
+	address := common.HexToAddress(addressHex)
+	balance, err := s.GetAccountBalance(address)
+	if err != nil {
+		json.NewEncoder(w).Encode(res)
+		return
+	}
+	res.Balances = append(res.Players, balance.String())
+	res.Success = true
+	json.NewEncoder(w).Encode(res)
 }
 
 // FundMe implements the GetFreeToken interface to request free token.
@@ -123,7 +138,7 @@ func (s *Service) FundMe(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("fundMe: address", addressHex)
 
 	res := &Response{Success: false}
-	if s.CreateTransactionForEnterMethod == nil {
+	if s.CallFaucetContract == nil {
 		json.NewEncoder(w).Encode(res)
 		return
 	}
