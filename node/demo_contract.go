@@ -101,7 +101,8 @@ func (node *Node) GetResultDirectly(priKey string) (players []string, balances [
 			utils.GetLogInstance().Error("Error when HexToECDSA")
 		}
 		address := crypto.PubkeyToAddress(key.PublicKey)
-		balances = append(balances, node.GetBalanceOfAddress(address))
+		balance, err := node.GetBalanceOfAddress(address)
+		balances = append(balances, balance)
 	}
 	return players, balances
 }
@@ -110,7 +111,8 @@ func (node *Node) GetResultDirectly(priKey string) (players []string, balances [
 func (node *Node) GenerateResultDirectly(addresses []common.Address) (players []string, balances []*big.Int) {
 	for _, address := range addresses {
 		players = append(players, address.String())
-		balances = append(balances, node.GetBalanceOfAddress(address))
+		balance, _ := node.GetBalanceOfAddress(address)
+		balances = append(balances, balance)
 	}
 	fmt.Println("generate result", players, balances)
 	return players, balances
