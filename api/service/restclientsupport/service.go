@@ -9,10 +9,15 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/gorilla/mux"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/internal/utils"
 )
+
+/*
+ * This service is specific to support the lottery app.
+ */
 
 // Constants for rest client support service.
 const (
@@ -34,11 +39,12 @@ func New(
 	CreateTransactionForEnterMethod func(int64, string) error,
 	GetResult func(string) ([]string, []*big.Int),
 	CreateTransactionForPickWinner func() error,
-) *Service {
+	CallFaucetContract func(common.Address) common.Hash) *Service {
 	return &Service{
 		CreateTransactionForEnterMethod: CreateTransactionForEnterMethod,
 		GetResult:                       GetResult,
 		CreateTransactionForPickWinner:  CreateTransactionForPickWinner,
+		CallFaucetContract:              CallFaucetContract,
 	}
 }
 
@@ -73,6 +79,10 @@ func (s *Service) Run() *http.Server {
 	s.router.Path("/result").HandlerFunc(s.Result)
 
 	// Set up router for tx.
+	s.router.Path("/fundme").Queries("key", "{[0-9A-Fa-fx]*?}").HandlerFunc(s.FundMe).Methods("GET")
+	s.router.Path("/fundme").HandlerFunc(s.FundMe)
+
+	// Set up router for tx.
 	s.router.Path("/winner").HandlerFunc(s.Winner)
 
 	// Do serving now.
@@ -87,6 +97,30 @@ type Response struct {
 	Players  []string `json:"players"`
 	Balances []string `json:"balances"`
 	Success  bool     `json:"success"`
+}
+
+// FundMe implements the GetFreeToken interface to request free token.
+func (s *Service) FundMe(w http.ResponseWriter, r *http.Request) {
+	// (ctx context.Context, request *proto.GetFreeTokenRequest) (*proto.GetFreeTokenResponse, error) {
+	// var address common.Address
+	// address.SetBytes(request.Address)
+	// //	log.Println("Returning GetFreeTokenResponse for address: ", address.Hex())
+	// return &proto.GetFreeTokenResponse{TxId: s.callFaucetContract(address).Bytes()}, nil
+	w.Header().Set("Content-Type", "application/json")
+	key := r.FormValue("key")
+
+	// TODO(RJ): implement the logic similar to get FreeToken with key.
+
+	// GetFreeToken implements the GetFreeToken interface to request free token.
+	// func (s *Server) GetFreeToken(ctx context.Context, request *proto.GetFreeTokenRequest) (*proto.GetFreeTokenResponse, error) {
+	// 	var address common.Address
+	// 	address.SetBytes(request.Address)
+	// 	//	log.Println("Returning GetFreeTokenResponse for address: ", address.Hex())
+	// 	return &proto.GetFreeTokenResponse{TxId: s.callFaucetContract(address).Bytes()}, nil
+	// }
+
+	res := &Response{Success: false}
+	json.NewEncoder(w).Encode(res)
 }
 
 // Enter triggers enter method of smart contract.
