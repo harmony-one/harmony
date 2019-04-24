@@ -32,6 +32,7 @@ type Service struct {
 	GetResult                       func(string) ([]string, []*big.Int)
 	CreateTransactionForPickWinner  func() error
 	messageChan                     chan *msg_pb.Message
+	CallFaucetContract              func(common.Address) common.Hash
 }
 
 // New returns new client support service.
@@ -74,15 +75,19 @@ func (s *Service) Run() *http.Server {
 	s.router.Path("/enter").Queries("key", "{[0-9A-Fa-fx]*?}", "amount", "{[0-9]*?}").HandlerFunc(s.Enter).Methods("GET")
 	s.router.Path("/enter").HandlerFunc(s.Enter)
 
-	// Set up router for tx.
+	// Set up router for result.
 	s.router.Path("/result").Queries("key", "{[0-9A-Fa-fx]*?}").HandlerFunc(s.Result).Methods("GET")
 	s.router.Path("/result").HandlerFunc(s.Result)
 
-	// Set up router for tx.
+	// Set up router for fundme.
 	s.router.Path("/fundme").Queries("key", "{[0-9A-Fa-fx]*?}").HandlerFunc(s.FundMe).Methods("GET")
 	s.router.Path("/fundme").HandlerFunc(s.FundMe)
 
-	// Set up router for tx.
+	// Set up router for fundme.
+	s.router.Path("/balance").Queries("key", "{[0-9A-Fa-fx]*?}").HandlerFunc(s.GetBalance).Methods("GET")
+	s.router.Path("/balance").HandlerFunc(s.GetBalance)
+
+	// Set up router for winner.
 	s.router.Path("/winner").HandlerFunc(s.Winner)
 
 	// Do serving now.
@@ -99,6 +104,17 @@ type Response struct {
 	Success  bool     `json:"success"`
 }
 
+// GetBalance implements the GetFreeToken interface to request free token.
+func (s *Service) GetBalance(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	key := r.FormValue("key")
+	res := &Response{Success: false}
+	res.Players = append(res.Players, key)
+	// res.Balances = append(res.Players, GETMYBALANCE) // implements this
+	json.NewEncoder(w).Encode(res)
+
+}
+
 // FundMe implements the GetFreeToken interface to request free token.
 func (s *Service) FundMe(w http.ResponseWriter, r *http.Request) {
 	// (ctx context.Context, request *proto.GetFreeTokenRequest) (*proto.GetFreeTokenResponse, error) {
@@ -107,7 +123,7 @@ func (s *Service) FundMe(w http.ResponseWriter, r *http.Request) {
 	// //	log.Println("Returning GetFreeTokenResponse for address: ", address.Hex())
 	// return &proto.GetFreeTokenResponse{TxId: s.callFaucetContract(address).Bytes()}, nil
 	w.Header().Set("Content-Type", "application/json")
-	key := r.FormValue("key")
+	// key := r.FormValue("key")
 
 	// TODO(RJ): implement the logic similar to get FreeToken with key.
 
