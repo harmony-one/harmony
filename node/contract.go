@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"math/big"
 	"strings"
+	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -166,7 +167,8 @@ func (node *Node) AddFaucetContractToPendingTransactions() {
 
 // CallFaucetContract invokes the faucet contract to give the walletAddress initial money
 func (node *Node) CallFaucetContract(address common.Address) common.Hash {
-	return node.callGetFreeToken(address)
+	nonce := atomic.AddUint64(&node.ContractDeployerCurrentNonce, 1)
+	return node.callGetFreeTokenWithNonce(address, nonce-1)
 }
 
 func (node *Node) callGetFreeToken(address common.Address) common.Hash {
