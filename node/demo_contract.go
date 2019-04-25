@@ -165,7 +165,7 @@ func (node *Node) GetResult(priKey string) (players []string, balances []*big.In
 		utils.GetLogInstance().Error("Failed to unpack getPlayers", "error", err)
 		return nil, nil
 	}
-	utils.GetLogInstance().Info("get result: ", ret)
+	utils.GetLogInstance().Info("get result: ", "ret", ret)
 	fmt.Println("get result called:", ret)
 	return node.GenerateResultDirectly(ret)
 }
