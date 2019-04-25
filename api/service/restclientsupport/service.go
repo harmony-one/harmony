@@ -126,7 +126,7 @@ func (s *Service) GetBalance(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(res)
 		return
 	}
-	res.Balances = append(res.Players, balance.String())
+	res.Balances = append(res.Balances, balance.String())
 	res.Success = true
 	json.NewEncoder(w).Encode(res)
 }
