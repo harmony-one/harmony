@@ -12,13 +12,13 @@ import (
 	"github.com/harmony-one/harmony/rpc"
 )
 
-// PublicBlockChainAPI provides an API to access the Ethereum blockchain.
+// PublicBlockChainAPI provides an API to access the Harmony blockchain.
 // It offers only methods that operate on public data that is freely available to anyone.
 type PublicBlockChainAPI struct {
 	b *rpc.HmyAPIBackend
 }
 
-// NewPublicBlockChainAPI creates a new Ethereum blockchain API.
+// NewPublicBlockChainAPI creates a new Harmony blockchain API.
 func NewPublicBlockChainAPI(b *rpc.HmyAPIBackend) *PublicBlockChainAPI {
 	return &PublicBlockChainAPI{b}
 }
