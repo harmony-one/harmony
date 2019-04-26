@@ -3,6 +3,7 @@ package consensus // consensus
 
 import (
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -15,9 +16,11 @@ import (
 
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
-	// The current state of the consensus
-	state State
+	phase PbftPhase
+	mode  PbftMode
 
+	//TODO depreciate it after implement PbftPhase
+	state State
 	// Commits collected from validators.
 	prepareSigs          map[common.Address]*bls.Sign // key is the validator's address
 	commitSigs           map[common.Address]*bls.Sign // key is the validator's address
@@ -55,6 +58,10 @@ type Consensus struct {
 	SelfAddress common.Address
 	// Consensus Id (View Id) - 4 byte
 	consensusID uint32
+
+	// newConsensusID is the new consensusID for new leader change
+	newConsensusID uint32
+
 	// Blockhash - 32 byte
 	blockHash [32]byte
 	// Block to run consensus on
@@ -68,6 +75,27 @@ type Consensus struct {
 
 	// global consensus mutex
 	mutex sync.Mutex
+
+	// channel to receive consensus message
+	msgChan chan []byte
+
+	// timer to make sure leader publishes block in a timely manner; if not
+	// then this node will propose view change
+	idleTimeout utils.Timeout
+
+	// timer to make sure this node commit a block in a timely manner; if not
+	// this node will initialize a view change
+	commitTimeout utils.Timeout
+
+	// When doing view change, timer to make sure a valid view change message
+	// sent by new leader in a timely manner; if not this node will start
+	// a new view change
+	viewChangeTimeout utils.Timeout
+
+	// The duration of viewChangeTimeout; when a view change is initialized with v+1
+	// timeout will be equal to viewChangeDuration; if view change failed and start v+2
+	// timeout will be 2*viewChangeDuration; timeout of view change v+n is n*viewChangeDuration
+	viewChangeDuration time.Duration
 
 	// Validator specific fields
 	// Blocks received but not done with consensus yet
@@ -167,6 +195,8 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 	consensus.consensusID = 0
 	consensus.ShardID = ShardID
 
+	consensus.msgChan = make(chan []byte)
+
 	// For validators to keep track of all blocks received but not yet committed, so as to catch up to latest consensus if lagged behind.
 	consensus.blocksReceived = make(map[uint32]*BlockConsensusStatus)
 
@@ -184,4 +214,53 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 
 	//	consensus.Log.Info("New Consensus", "IP", ip, "Port", port, "NodeID", consensus.nodeID, "priKey", consensus.priKey, "PubKey", consensus.PubKey)
 	return &consensus, nil
+}
+
+// Start is the entry point and main loop for consensus
+func (consensus *Consensus) Start(stopChan chan struct{}, stoppedChan chan struct{}) {
+	defer close(stoppedChan)
+	tick := time.NewTicker(blockDuration)
+	consensus.idleTimeout.Start()
+	for {
+		select {
+		default:
+			msg := consensus.recvWithTimeout(receiveTimeout)
+			consensus.handleMessageUpdate(msg)
+			if consensus.idleTimeout.CheckExpire() {
+				consensus.startViewChange(consensus.consensusID + 1)
+			}
+			if consensus.commitTimeout.CheckExpire() {
+				consensus.startViewChange(consensus.consensusID + 1)
+			}
+			if consensus.viewChangeTimeout.CheckExpire() {
+				if consensus.mode.Mode() == Normal {
+					continue
+				}
+				consensusID := consensus.mode.ConsensusID()
+				consensus.startViewChange(consensusID + 1)
+			}
+		case <-tick.C:
+			consensus.tryPublishBlock()
+		case <-stopChan:
+			return
+		}
+	}
+
+}
+
+// recvWithTimeout receives message before timeout
+// TODO: cm
+func (consensus *Consensus) recvWithTimeout(timeoutDuration time.Duration) []byte {
+	// use consensus.msgChan to get message
+	return []byte{}
+}
+
+// handleMessageUpdate will update the consensus state according to received message
+// TODO: cm
+func (consensus *Consensus) handleMessageUpdate(msg []byte) {
+}
+
+// tryPublishBlock periodically check if block is finalized and then publish it
+// TODO: cm
+func (consensus *Consensus) tryPublishBlock() {
 }
