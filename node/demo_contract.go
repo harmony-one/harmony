@@ -73,7 +73,7 @@ func (node *Node) CreateTransactionForEnterMethod(amount int64, priKey string) e
 	balance, err := node.GetBalanceOfAddress(address)
 	if err != nil {
 		return err
-	} else if balance.Cmp(Amount) == -1 && amount <= 0 {
+	} else if balance.Cmp(Amount) == -1 || amount <= 0 {
 		return ErrLotteryAppFailed
 	}
 
