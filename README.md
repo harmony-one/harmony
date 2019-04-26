@@ -139,12 +139,14 @@ See [`CONTRIBUTING`](CONTRIBUTING.md) for details.
 - Blockchain explorer with performance report and transaction lookup
 - Transaction generator for loadtesting
 
+### Features To Be Implemented for Mainnet
 
-### Features To Be Implemented
-
-- Fast state synchronization
-- Fully implemented VDF
-- Kademlia routing
+- Secure VDF
 - Consensus view-change protocol
-- Integration with WASM
 - Cross-shard transaction
+
+### Features Planned after Mainnet
+
+- Integration with WASM
+- Fast state synchronization
+- Kademlia routing
