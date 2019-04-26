@@ -139,7 +139,7 @@ See [`CONTRIBUTING`](CONTRIBUTING.md) for details.
 - Blockchain explorer with performance report and transaction lookup
 - Transaction generator for loadtesting
 
-### Features To Be Implemented for Mainnet
+### Features To Be Implemented
 
 - Secure VDF
 - Consensus view-change protocol
