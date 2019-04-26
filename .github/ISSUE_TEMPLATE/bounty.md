@@ -20,7 +20,7 @@ https://github.com/harmony-one/harmony-open/blob/master/README.md
 # Description
 
 # T-shirt Size
-<-! XS, S, M, L, XL, XXL -->
+<!- XS, S, M, L, XL, XXL -->
 
 # Time Estimation
 
