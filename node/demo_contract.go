@@ -67,17 +67,9 @@ func (node *Node) CreateTransactionForEnterMethod(amount int64, priKey string) e
 	}
 
 	key, err := crypto.HexToECDSA(priKey)
-	address := crypto.PubkeyToAddress(key.PublicKey)
+	nonce := node.GetNonceOfAddress(crypto.PubkeyToAddress(key.PublicKey))
 	Amount := big.NewInt(amount)
 	Amount = Amount.Mul(Amount, big.NewInt(params.Ether))
-	balance, err := node.GetBalanceOfAddress(address)
-	if err != nil {
-		return err
-	} else if balance.Cmp(Amount) == -1 || amount <= 0 {
-		return ErrLotteryAppFailed
-	}
-
-	nonce := node.GetNonceOfAddress(address)
 	tx := types.NewTransaction(
 		nonce,
 		toAddress,
