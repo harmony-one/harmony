@@ -48,7 +48,9 @@ func New(b *core.BlockChain, p *p2p.Peer, t *core.TxPool) *Service {
 func (s *Service) StartService() {
 	utils.GetLogInstance().Info("Starting RPC service.")
 	if err := s.startRPC(); err != nil {
-		// TODO(ricl): what if failed to start service?
+		utils.GetLogInstance().Error("Failed to start RPC service.")
+	} else {
+		utils.GetLogInstance().Info("Started RPC service.")
 	}
 }
 
@@ -79,7 +81,7 @@ func (s *Service) startRPC() error {
 	apis := hmyapi.GetAPIs(rpc.NewBackend(s.blockchain, s.txPool))
 
 	port, _ := strconv.Atoi(s.peer.Port)
-	s.httpEndpoint = fmt.Sprintf("127.0.0.1:%v", port+rpcPortDiff)
+	s.httpEndpoint = fmt.Sprintf("localhost:%v", port+rpcPortDiff)
 	if err := s.startHTTP(s.httpEndpoint, apis); err != nil {
 		utils.GetLogInstance().Debug("Failed to start RPC HTTP")
 		return err

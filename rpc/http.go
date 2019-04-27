@@ -193,30 +193,13 @@ func (t *httpServerConn) SetWriteDeadline(time.Time) error { return nil }
 //
 // Deprecated: Server implements http.Handler
 func NewHTTPServer(srv http.Handler) *http.Server {
-	// Wrap the CORS-handler within a host-handler
-	// handler := newCorsHandler(srv, cors)
-	// handler = newVHostHandler(vhosts, handler)
+	// TODO(ricl): eth wraps it in CORS-handler. Might need to port if we want to use cors.
 	handler := srv
 
-	// // Make sure timeout values are meaningful
-	// if timeouts.ReadTimeout < time.Second {
-	// 	log.Warn("Sanitizing invalid HTTP read timeout", "provided", timeouts.ReadTimeout, "updated", DefaultHTTPTimeouts.ReadTimeout)
-	// 	timeouts.ReadTimeout = DefaultHTTPTimeouts.ReadTimeout
-	// }
-	// if timeouts.WriteTimeout < time.Second {
-	// 	log.Warn("Sanitizing invalid HTTP write timeout", "provided", timeouts.WriteTimeout, "updated", DefaultHTTPTimeouts.WriteTimeout)
-	// 	timeouts.WriteTimeout = DefaultHTTPTimeouts.WriteTimeout
-	// }
-	// if timeouts.IdleTimeout < time.Second {
-	// 	log.Warn("Sanitizing invalid HTTP idle timeout", "provided", timeouts.IdleTimeout, "updated", DefaultHTTPTimeouts.IdleTimeout)
-	// 	timeouts.IdleTimeout = DefaultHTTPTimeouts.IdleTimeout
-	// }
+	// TODO(ricl): port timeout handlers if necessary
 	// Bundle and start the HTTP server
 	return &http.Server{
 		Handler: handler,
-		// ReadTimeout:  timeouts.ReadTimeout,
-		// WriteTimeout: timeouts.WriteTimeout,
-		// IdleTimeout:  timeouts.IdleTimeout,
 	}
 }
 

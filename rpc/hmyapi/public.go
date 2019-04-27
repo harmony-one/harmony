@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
@@ -90,8 +91,7 @@ type PublicHarmonyAPI struct {
 
 // ProtocolVersion returns the current Harmony protocol version this node supports
 func (s *PublicHarmonyAPI) ProtocolVersion() hexutil.Uint {
-	return hexutil.Uint(1)
-	// return hexutil.Uint(s.b.ProtocolVersion())
+	return hexutil.Uint(proto.ProtocolVersion)
 }
 
 // Syncing returns false in case the node is currently not syncing with the network. It can be up to date or has not
@@ -102,21 +102,8 @@ func (s *PublicHarmonyAPI) ProtocolVersion() hexutil.Uint {
 // - pulledStates:  number of state entries processed until now
 // - knownStates:   number of known state entries that still need to be pulled
 func (s *PublicHarmonyAPI) Syncing() (interface{}, error) {
+	// TODO(ricl): port
 	return false, nil
-	// progress := s.b.Downloader().Progress()
-
-	// // Return not syncing if the synchronisation already completed
-	// if progress.CurrentBlock >= progress.HighestBlock {
-	// 	return false, nil
-	// }
-	// // Otherwise gather the block sync stats
-	// return map[string]interface{}{
-	// 	"startingBlock": hexutil.Uint64(progress.StartingBlock),
-	// 	"currentBlock":  hexutil.Uint64(progress.CurrentBlock),
-	// 	"highestBlock":  hexutil.Uint64(progress.HighestBlock),
-	// 	"pulledStates":  hexutil.Uint64(progress.PulledStates),
-	// 	"knownStates":   hexutil.Uint64(progress.KnownStates),
-	// }, nil
 }
 
 // PublicNetAPI offers network related RPC methods
