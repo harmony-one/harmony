@@ -46,6 +46,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -66,6 +67,7 @@ const (
 	badBlockLimit       = 10
 	triesInMemory       = 128
 	shardCacheLimit     = 2
+	epochCacheLimit     = 10
 
 	// BlocksPerEpoch is the number of blocks in one epoch
 	// currently set to small number for testing
@@ -130,6 +132,7 @@ type BlockChain struct {
 	blockCache      *lru.Cache     // Cache for the most recent entire blocks
 	futureBlocks    *lru.Cache     // future blocks are blocks added for later processing
 	shardStateCache *lru.Cache
+	epochCache      *lru.Cache     // Cache epoch number → first block number
 
 	quit    chan struct{} // blockchain quit channel
 	running int32         // running must be called atomically
@@ -163,6 +166,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	futureBlocks, _ := lru.New(maxFutureBlocks)
 	badBlocks, _ := lru.New(badBlockLimit)
 	shardCache, _ := lru.New(shardCacheLimit)
+	epochCache, _ := lru.New(epochCacheLimit)
 
 	bc := &BlockChain{
 		chainConfig:     chainConfig,
@@ -178,6 +182,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		blockCache:      blockCache,
 		futureBlocks:    futureBlocks,
 		shardStateCache: shardCache,
+		epochCache:      epochCache,
 		engine:          engine,
 		vmConfig:        vmConfig,
 		badBlocks:       badBlocks,
@@ -1721,4 +1726,41 @@ func (bc *BlockChain) StoreNewShardState(block *types.Block, stakeInfo *map[comm
 		utils.GetLogInstance().Debug("[Resharding] Saved new shard state successfully", "epoch", GetEpochFromBlockNumber(block.NumberU64()))
 	}
 	return shardState
+}
+
+// ChainDb returns the database
+func (bc *BlockChain) ChainDb() ethdb.Database { return bc.db }
+
+// GetEpochBlockNumber returns the first block number of the given epoch.
+func (bc *BlockChain) GetEpochBlockNumber(epoch *big.Int) (*big.Int, error) {
+	// Try cache first
+	cacheKey := string(epoch.Bytes())
+	if cachedValue, ok := bc.epochCache.Get(cacheKey); ok {
+		return (&big.Int{}).SetBytes([]byte(cachedValue.(string))), nil
+	}
+	blockNum, err := rawdb.ReadEpochBlockNumber(bc.db, epoch)
+	if err != nil {
+		return nil, ctxerror.New("cannot read epoch block number from database",
+			"epoch", epoch,
+		).WithCause(err)
+	}
+	cachedValue := []byte(blockNum.Bytes())
+	bc.epochCache.Add(cacheKey, cachedValue)
+	return blockNum, nil
+}
+
+// StoreEpochBlockNumber stores the given epoch-first block number.
+func (bc *BlockChain) StoreEpochBlockNumber(
+	epoch *big.Int, blockNum *big.Int,
+) error {
+	cacheKey := string(epoch.Bytes())
+	cachedValue := []byte(blockNum.Bytes())
+	bc.epochCache.Add(cacheKey, cachedValue)
+	if err := rawdb.WriteEpochBlockNumber(bc.db, epoch, blockNum); err != nil {
+		return ctxerror.New("cannot write epoch block number to database",
+			"epoch", epoch,
+			"epochBlockNum", blockNum,
+		).WithCause(err)
+	}
+	return nil
 }
