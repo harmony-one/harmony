@@ -28,6 +28,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"golang.org/x/crypto/sha3"
 
@@ -484,4 +485,17 @@ func (b *Block) AddShardState(shardState ShardState) {
 	shardState = append(shardState[:0:0], shardState...)
 	b.header.ShardStateHash = shardState.Hash()
 	b.header.ShardState = shardState
+}
+
+// Logger returns a sub-logger with block contexts added.
+func (b *Block) Logger(logger log.Logger) log.Logger {
+	// Avoid using b.Hash() 'cause it fixates/caches calculated hash into the
+	// block and we don't want to fixate a premature hash from a half-built
+	// header.
+	return logger.New(
+		"blockHash", b.header.Hash(),
+		"blockShard", b.header.ShardID,
+		"blockEpoch", b.header.Epoch,
+		"blockNumber", b.header.Number,
+	)
 }
