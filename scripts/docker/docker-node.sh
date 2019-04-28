@@ -32,7 +32,7 @@ shift $(($OPTIND-1))
 account_id=$1
 
 if [ -z "$account_id" ]; then
-  echo "Please provide account id. Valid ranges are 46-49, 96-99, 146-149, 196-199."
+  echo "Please provide account index.  Valid ranges are 46-49, 96-99, 146-149, 196-199.  Please contact Harmony if not sure which one to use."
   usage
 fi
 
