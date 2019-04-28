@@ -18,6 +18,7 @@ import (
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
@@ -112,6 +113,34 @@ type Consensus struct {
 
 	// The p2p host used to send/receive p2p messages
 	host p2p.Host
+
+	// Staking information finder
+	stakeInfoFinder StakeInfoFinder
+}
+
+// StakeInfoFinder returns the stake information finder instance this
+// consensus uses, e.g. for block reward distribution.
+func (consensus *Consensus) StakeInfoFinder() StakeInfoFinder {
+	return consensus.stakeInfoFinder
+}
+
+// SetStakeInfoFinder sets the stake information finder instance this
+// consensus uses, e.g. for block reward distribution.
+func (consensus *Consensus) SetStakeInfoFinder(stakeInfoFinder StakeInfoFinder) {
+	consensus.stakeInfoFinder = stakeInfoFinder
+}
+
+// StakeInfoFinder finds the staking account for the given consensus key.
+type StakeInfoFinder interface {
+	// FindStakeInfoByNodeKey returns a list of staking information matching
+	// the given node key.  Caller may modify the returned slice of StakeInfo
+	// struct pointers, but must not modify the StakeInfo structs themselves.
+	FindStakeInfoByNodeKey(key *bls.PublicKey) []*structs.StakeInfo
+
+	// FindStakeInfoByAccount returns a list of staking information matching
+	// the given account.  Caller may modify the returned slice of StakeInfo
+	// struct pointers, but must not modify the StakeInfo structs themselves.
+	FindStakeInfoByAccount(addr common.Address) []*structs.StakeInfo
 }
 
 // BlockConsensusStatus used to keep track of the consensus status of multiple blocks received so far
