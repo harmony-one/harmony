@@ -1744,3 +1744,6 @@ func (bc *BlockChain) StoreNewShardState(block *types.Block, stakeInfo *map[comm
 	}
 	return shardState
 }
+
+// ChainDb returns the database
+func (bc *BlockChain) ChainDb() ethdb.Database { return bc.db }
