@@ -6,7 +6,10 @@ import (
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"golang.org/x/crypto/sha3"
+
+	"github.com/harmony-one/harmony/internal/ctxerror"
 )
 
 // EpochShardState is the shard state of an epoch
@@ -24,6 +27,23 @@ type BlsPublicKey [96]byte
 // Hex returns the hex string of bls public key
 func (pk BlsPublicKey) Hex() string {
 	return hex.EncodeToString(pk[:])
+}
+
+// FromLibBLSPublicKey replaces the key contents with the given key,
+func (pk *BlsPublicKey) FromLibBLSPublicKey(key *bls.PublicKey) error {
+	bytes := key.Serialize()
+	if len(bytes) != len(pk) {
+		return ctxerror.New("BLS public key size mismatch",
+			"expected", len(pk),
+			"actual", len(bytes))
+	}
+	copy(pk[:], bytes)
+	return nil
+}
+
+// ToLibBLSPublicKey copies the key contents into the given key.
+func (pk *BlsPublicKey) ToLibBLSPublicKey(key *bls.PublicKey) error {
+	return key.Deserialize(pk[:])
 }
 
 // NodeID represents node id (BLS address).
