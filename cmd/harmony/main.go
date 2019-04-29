@@ -209,6 +209,13 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
 	currentNode.AccountKey = nodeConfig.StakingPriKey
 
+	if gsif, err := consensus.NewGenesisStakeInfoFinder(); err == nil {
+		currentConsensus.SetStakeInfoFinder(gsif)
+	} else {
+		_, _ = fmt.Fprintf(os.Stderr, "Cannot initialize stake info: %v\n", err)
+		os.Exit(1)
+	}
+
 	// TODO: refactor the creation of blockchain out of node.New()
 	currentConsensus.ChainReader = currentNode.Blockchain()
 

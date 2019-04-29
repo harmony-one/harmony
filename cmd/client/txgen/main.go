@@ -111,6 +111,12 @@ func main() {
 	)
 	log.Root().SetHandler(h)
 
+	gsif, err := consensus.NewGenesisStakeInfoFinder()
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "Cannot initialize stake info: %v\n", err)
+		os.Exit(1)
+	}
+
 	// Nodes containing blockchain data to mirror the shards' data in the network
 	nodes := []*node.Node{}
 	host, err := p2pimpl.NewHost(&selfPeer, nodePriKey)
@@ -118,7 +124,9 @@ func main() {
 		panic("unable to new host in txgen")
 	}
 	for _, shardID := range shardIDs {
-		node := node.New(host, &consensus.Consensus{ShardID: shardID}, nil, false)
+		c := &consensus.Consensus{ShardID: shardID}
+		node := node.New(host, c, nil, false)
+		c.SetStakeInfoFinder(gsif)
 		// Assign many fake addresses so we have enough address to play with at first
 		nodes = append(nodes, node)
 	}
@@ -132,6 +140,8 @@ func main() {
 
 	clientNode := node.New(host, consensusObj, nil, false)
 	clientNode.Client = client.NewClient(clientNode.GetHost(), shardIDs)
+
+	consensusObj.SetStakeInfoFinder(gsif)
 
 	readySignal := make(chan uint32)
 
