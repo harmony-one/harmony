@@ -193,7 +193,7 @@ func (node *Node) CreateTransactionForPickWinner() error {
 		toAddress,
 		0,
 		Amount,
-		params.TxGas*10,
+		params.TxGas*1000,
 		nil,
 		bytesData,
 	)
