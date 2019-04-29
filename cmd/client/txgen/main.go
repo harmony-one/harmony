@@ -127,6 +127,7 @@ func main() {
 		c := &consensus.Consensus{ShardID: shardID}
 		node := node.New(host, c, nil, false)
 		c.SetStakeInfoFinder(gsif)
+		c.ChainReader = node.Blockchain()
 		// Assign many fake addresses so we have enough address to play with at first
 		nodes = append(nodes, node)
 	}
@@ -142,6 +143,7 @@ func main() {
 	clientNode.Client = client.NewClient(clientNode.GetHost(), shardIDs)
 
 	consensusObj.SetStakeInfoFinder(gsif)
+	consensusObj.ChainReader = clientNode.Blockchain()
 
 	readySignal := make(chan uint32)
 
