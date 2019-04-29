@@ -9,7 +9,10 @@ import (
 	"sync"
 	"time"
 
+	bls2 "github.com/harmony-one/bls/ffi/go/bls"
+
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/internal/utils/contract"
 
 	"github.com/harmony-one/harmony/crypto/bls"
 
@@ -128,6 +131,19 @@ func main() {
 		node := node.New(host, c, nil, false)
 		c.SetStakeInfoFinder(gsif)
 		c.ChainReader = node.Blockchain()
+		// Replace public keys with genesis accounts for the shard
+		c.PublicKeys = nil
+		startIdx := core.GenesisShardSize * shardID
+		endIdx := startIdx + core.GenesisShardSize
+		for _, acct := range contract.GenesisBLSAccounts[startIdx:endIdx] {
+			secretKey := bls2.SecretKey{}
+			if err := secretKey.SetHexString(acct.Private); err != nil {
+				_, _ = fmt.Fprintf(os.Stderr, "cannot parse secret key: %v\n",
+					err)
+				os.Exit(1)
+			}
+			c.PublicKeys = append(c.PublicKeys, secretKey.GetPublicKey())
+		}
 		// Assign many fake addresses so we have enough address to play with at first
 		nodes = append(nodes, node)
 	}
