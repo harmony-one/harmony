@@ -21,6 +21,11 @@ type ShardState []Committee
 // BlsPublicKey defines the bls public key
 type BlsPublicKey [96]byte
 
+// Hex returns the hex string of bls public key
+func (pk BlsPublicKey) Hex() string {
+	return hex.EncodeToString(pk[:])
+}
+
 // NodeID represents node id (BLS address).
 type NodeID struct {
 	EcdsaAddress string
@@ -32,11 +37,6 @@ type Committee struct {
 	ShardID  uint32
 	Leader   NodeID
 	NodeList []NodeID
-}
-
-// Hex returns the hex string of bls public key
-func (pk BlsPublicKey) Hex() string {
-	return hex.EncodeToString(pk[:])
 }
 
 // GetHashFromNodeList will sort the list, then use Keccak256 to hash the list
