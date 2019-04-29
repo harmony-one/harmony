@@ -7,14 +7,19 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 	"reflect"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	libp2p_peer "github.com/libp2p/go-libp2p-peer"
+	"golang.org/x/crypto/sha3"
+
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
@@ -22,11 +27,11 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/internal/utils/contract"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
-	libp2p_peer "github.com/libp2p/go-libp2p-peer"
-	"golang.org/x/crypto/sha3"
 )
 
 // Consensus is the main struct with all states and data related to consensus process.
@@ -702,4 +707,82 @@ func (consensus *Consensus) GetNodeIDs() []libp2p_peer.ID {
 // GetConsensusID returns the consensus ID
 func (consensus *Consensus) GetConsensusID() uint32 {
 	return consensus.consensusID
+}
+
+// GenesisStakeInfoFinder is a stake info finder implementation using only
+// genesis accounts.
+// When used for block reward, it rewards only foundational nodes.
+type GenesisStakeInfoFinder struct {
+	byNodeKey map[types.BlsPublicKey][]*structs.StakeInfo
+	byAccount map[common.Address][]*structs.StakeInfo
+}
+
+// FindStakeInfoByNodeKey returns the genesis account matching the given node
+// key, as a single-item StakeInfo list.
+// It returns nil if the key is not a genesis node key.
+func (f *GenesisStakeInfoFinder) FindStakeInfoByNodeKey(
+	key *bls.PublicKey,
+) []*structs.StakeInfo {
+	var pk types.BlsPublicKey
+	if err := pk.FromLibBLSPublicKey(key); err != nil {
+		ctxerror.Log15(utils.GetLogInstance().Warn, ctxerror.New(
+			"cannot convert BLS public key",
+		).WithCause(err))
+		return nil
+	}
+	l, _ := f.byNodeKey[pk]
+	return l
+}
+
+// FindStakeInfoByAccount returns the genesis account matching the given
+// address, as a single-item StakeInfo list.
+// It returns nil if the address is not a genesis account.
+func (f *GenesisStakeInfoFinder) FindStakeInfoByAccount(
+	addr common.Address,
+) []*structs.StakeInfo {
+	l, _ := f.byAccount[addr]
+	return l
+}
+
+// NewGenesisStakeInfoFinder returns a stake info finder that can look up
+// genesis nodes.
+func NewGenesisStakeInfoFinder() (*GenesisStakeInfoFinder, error) {
+	f := &GenesisStakeInfoFinder{
+		byNodeKey: make(map[types.BlsPublicKey][]*structs.StakeInfo),
+		byAccount: make(map[common.Address][]*structs.StakeInfo),
+	}
+	for idx, account := range contract.GenesisAccounts {
+		blsSecretKeyHex := contract.GenesisBLSAccounts[idx].Private
+		blsSecretKey := bls.SecretKey{}
+		if err := blsSecretKey.SetHexString(blsSecretKeyHex); err != nil {
+			return nil, ctxerror.New("cannot convert BLS secret key",
+				"accountIndex", idx,
+			).WithCause(err)
+		}
+		pub := blsSecretKey.GetPublicKey()
+		var blsPublicKey types.BlsPublicKey
+		if err := blsPublicKey.FromLibBLSPublicKey(pub); err != nil {
+			return nil, ctxerror.New("cannot convert BLS public key",
+				"accountIndex", idx,
+			).WithCause(err)
+		}
+		addressBytes, err := hexutil.Decode(account.Address)
+		if err != nil {
+			return nil, ctxerror.New("cannot decode account address",
+				"accountIndex", idx,
+			).WithCause(err)
+		}
+		var address common.Address
+		address.SetBytes(addressBytes)
+		stakeInfo := &structs.StakeInfo{
+			Account:         address,
+			BlsPublicKey:    blsPublicKey,
+			BlockNum:        common.Big0,
+			LockPeriodCount: big.NewInt(0x7fffffffffffffff),
+			Amount:          common.Big0,
+		}
+		f.byNodeKey[blsPublicKey] = append(f.byNodeKey[blsPublicKey], stakeInfo)
+		f.byAccount[address] = append(f.byAccount[address], stakeInfo)
+	}
+	return f, nil
 }
