@@ -32,9 +32,13 @@ enum MessageType {
   PREPARED = 3;
   COMMIT = 4;
   COMMITTED = 5;
-  DRAND_INIT = 6;
-  DRAND_COMMIT = 7;
-  LOTTERY_REQUEST = 8; // it should be either ENTER or GETPLAYERS but it will be removed later.
+  VIEWCHANGE = 6;
+  NEWVIEW = 7;
+  NEWBLOCK = 8;
+  COMMITBLOCK = 9;
+  DRAND_INIT = 10;
+  DRAND_COMMIT = 11; 
+  LOTTERY_REQUEST = 12; // it should be either ENTER or GETPLAYERS but it will be removed later.
 }
 
 // This is universal message for all communication protocols.
