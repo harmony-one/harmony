@@ -27,14 +27,16 @@ const (
 
 // Service is the struct for rest client support service.
 type Service struct {
-	router                          *mux.Router
-	server                          *http.Server
-	CreateTransactionForEnterMethod func(int64, string) error
-	GetResult                       func(string) ([]string, []*big.Int)
-	CreateTransactionForPickWinner  func() error
-	messageChan                     chan *msg_pb.Message
-	CallFaucetContract              func(common.Address) common.Hash
-	GetAccountBalance               func(common.Address) (*big.Int, error)
+	router                           *mux.Router
+	server                           *http.Server
+	CreateTransactionForEnterMethod  func(int64, string) error
+	GetResult                        func(string) ([]string, []*big.Int)
+	CreateTransactionForPickWinner   func() error
+	messageChan                      chan *msg_pb.Message
+	CallFaucetContract               func(common.Address) common.Hash
+	GetAccountBalance                func(common.Address) (*big.Int, error)
+	CreateTransactionForPlayMethod   func(string) error
+	CreateTransactionForPayoutMethod func(string, int) error
 }
 
 // New returns new client support service.
@@ -42,13 +44,17 @@ func New(
 	CreateTransactionForEnterMethod func(int64, string) error,
 	GetResult func(string) ([]string, []*big.Int),
 	CreateTransactionForPickWinner func() error,
-	CallFaucetContract func(common.Address) common.Hash, GetAccountBalance func(common.Address) (*big.Int, error)) *Service {
+	CallFaucetContract func(common.Address) common.Hash, GetAccountBalance func(common.Address) (*big.Int, error),
+	CreateTransactionForPlayMethod func(string) error,
+	CreateTransactionForPayoutMethod func(string, int) error) *Service {
 	return &Service{
-		CreateTransactionForEnterMethod: CreateTransactionForEnterMethod,
-		GetResult:                       GetResult,
-		CreateTransactionForPickWinner:  CreateTransactionForPickWinner,
-		CallFaucetContract:              CallFaucetContract,
-		GetAccountBalance:               GetAccountBalance,
+		CreateTransactionForEnterMethod:  CreateTransactionForEnterMethod,
+		GetResult:                        GetResult,
+		CreateTransactionForPickWinner:   CreateTransactionForPickWinner,
+		CallFaucetContract:               CallFaucetContract,
+		GetAccountBalance:                GetAccountBalance,
+		CreateTransactionForPlayMethod:   CreateTransactionForPlayMethod,
+		CreateTransactionForPayoutMethod: CreateTransactionForPayoutMethod,
 	}
 }
 
@@ -93,6 +99,12 @@ func (s *Service) Run() *http.Server {
 	// Set up router for winner.
 	s.router.Path("/winner").HandlerFunc(s.Winner)
 
+	// Routing for puzzle app.
+	// Set up router for play.
+	s.router.Path("/play").HandlerFunc(s.Play)
+
+	// Set up router for payout.
+	s.router.Path("/payout").HandlerFunc(s.Payout)
 	// Do serving now.
 	utils.GetLogInstance().Info("Listening on ", "port: ", Port)
 	server := &http.Server{Addr: addr, Handler: s.router}
@@ -218,6 +230,58 @@ func (s *Service) Winner(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.CreateTransactionForPickWinner(); err != nil {
+		utils.GetLogInstance().Error("error", err)
+		json.NewEncoder(w).Encode(res)
+		return
+	}
+	res.Success = true
+	json.NewEncoder(w).Encode(res)
+}
+
+// Play triggers play method of puzzle smart contract.
+func (s *Service) Play(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	key := r.FormValue("key")
+
+	fmt.Println("puzzle-play", key)
+	res := &Response{
+		Success: false,
+	}
+
+	if s.CreateTransactionForPlayMethod == nil {
+		fmt.Println("puzzle-play no method", key)
+		json.NewEncoder(w).Encode(res)
+		return
+	}
+
+	if err := s.CreateTransactionForPlayMethod(key); err != nil {
+		utils.GetLogInstance().Error("puzzle-play, error", err)
+		json.NewEncoder(w).Encode(res)
+		return
+	}
+	res.Success = true
+	json.NewEncoder(w).Encode(res)
+}
+
+// Payout triggers play payout of puzzle smart contract.
+func (s *Service) Payout(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	key := r.FormValue("key")
+	newLevel := r.FormValue("new_level")
+	fmt.Println("payout: key", key, "new_level", newLevel)
+	newLevelInt, err := strconv.Atoi(newLevel)
+
+	fmt.Println("play")
+	res := &Response{
+		Success: false,
+	}
+
+	if s.CreateTransactionForPayoutMethod == nil {
+		json.NewEncoder(w).Encode(res)
+		return
+	}
+
+	if err = s.CreateTransactionForPayoutMethod(key, newLevelInt); err != nil {
 		utils.GetLogInstance().Error("error", err)
 		json.NewEncoder(w).Encode(res)
 		return

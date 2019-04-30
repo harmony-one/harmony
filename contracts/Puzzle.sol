@@ -11,11 +11,10 @@ contract Puzzle {
 
     /**
      * @dev The player enters into the current game session by
-     *      paying at least 1 token.
+     *      paying at least 2 token.
      */
-    function play(uint8 level) public payable {
-        require(msg.value >= 1 ether, INSUFFICIENT_FUND_MESSAGE);
-        level_map[msg.sender] = level;
+    function play() public payable {
+        require(msg.value >= 2 ether, INSUFFICIENT_FUND_MESSAGE);
     }
 
     /**
