@@ -167,7 +167,14 @@ func (node *Node) AddFaucetContractToPendingTransactions() {
 
 // CallFaucetContract invokes the faucet contract to give the walletAddress initial money
 func (node *Node) CallFaucetContract(address common.Address) common.Hash {
+	// Temporary code to workaround explorer issue for searching new addresses (https://github.com/harmony-one/harmony/issues/503)
 	nonce := atomic.AddUint64(&node.ContractDeployerCurrentNonce, 1)
+	tx, _ := types.SignTx(types.NewTransaction(nonce-1, address, node.Consensus.ShardID, big.NewInt(0), params.TxGasContractCreation*10, nil, nil), types.HomesteadSigner{}, node.ContractDeployerKey)
+	utils.GetLogInstance().Info("Sending placeholder token to ", "Address", address.Hex())
+	node.addPendingTransactions(types.Transactions{tx})
+	// END Temporary code
+
+	nonce = atomic.AddUint64(&node.ContractDeployerCurrentNonce, 1)
 	return node.callGetFreeTokenWithNonce(address, nonce-1)
 }
 
