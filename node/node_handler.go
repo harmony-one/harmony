@@ -414,7 +414,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 func (node *Node) SendPongMessage() {
 	tick := time.NewTicker(2 * time.Second)
 	//	FIXME: for lottery app stability
-	// tick2 := time.NewTicker(120 * time.Second)
+	tick2 := time.NewTicker(600 * time.Second)
 
 	numPeers := len(node.Consensus.GetValidatorPeers())
 	numPubKeys := len(node.Consensus.PublicKeys)
@@ -465,21 +465,19 @@ func (node *Node) SendPongMessage() {
 			}
 			numPeers = numPeersNow
 			numPubKeys = numPubKeysNow
-			/* FIXME: for lottery app stability
-			case <-tick2.C:
-				// send pong message regularly to make sure new node received all the public keys
-				// also nodes offline/online will receive the public keys
-				peers := node.Consensus.GetValidatorPeers()
-				pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys, node.Consensus.GetLeaderPubKey())
-				buffer := pong.ConstructPongMessage()
-				err := node.host.SendMessageToGroups([]p2p.GroupID{node.NodeConfig.GetShardGroupID()}, host.ConstructP2pMessage(byte(0), buffer))
-				if err != nil {
-					utils.GetLogInstance().Error("[PONG] failed to send regular pong message", "group", node.NodeConfig.GetShardGroupID())
-					continue
-				} else {
-					utils.GetLogInstance().Info("[PONG] sent regular pong message to", "group", node.NodeConfig.GetShardGroupID(), "# nodes", len(peers))
-				}
-			*/
+		case <-tick2.C:
+			// send pong message regularly to make sure new node received all the public keys
+			// also nodes offline/online will receive the public keys
+			peers := node.Consensus.GetValidatorPeers()
+			pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys, node.Consensus.GetLeaderPubKey())
+			buffer := pong.ConstructPongMessage()
+			err := node.host.SendMessageToGroups([]p2p.GroupID{node.NodeConfig.GetShardGroupID()}, host.ConstructP2pMessage(byte(0), buffer))
+			if err != nil {
+				utils.GetLogInstance().Error("[PONG] failed to send regular pong message", "group", node.NodeConfig.GetShardGroupID())
+				continue
+			} else {
+				utils.GetLogInstance().Info("[PONG] sent regular pong message to", "group", node.NodeConfig.GetShardGroupID(), "# nodes", len(peers))
+			}
 		}
 	}
 }
