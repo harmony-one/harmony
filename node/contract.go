@@ -32,6 +32,7 @@ const (
 	scFaucet builtInSC = iota
 	scStaking
 	scLottery
+	scPuzzle
 )
 
 // AddStakingContractToPendingTransactions adds the deposit smart contract the genesis block.
@@ -223,6 +224,10 @@ func (node *Node) AddContractKeyAndAddress(t builtInSC) {
 		// lottery
 		lotteryPriKey, _ := crypto.HexToECDSA(contract_constants.DemoAccounts[0].Private)
 		node.DemoContractAddress = crypto.CreateAddress(crypto.PubkeyToAddress(lotteryPriKey.PublicKey), uint64(0))
+	case scPuzzle:
+		// puzzle
+		puzzlePriKey, _ := crypto.HexToECDSA(contract_constants.PuzzleAccounts[0].Private)
+		node.PuzzleContractAddress = crypto.CreateAddress(crypto.PubkeyToAddress(puzzlePriKey.PublicKey), uint64(0))
 	default:
 		utils.GetLogInstance().Error("AddContractKeyAndAddress", "unknown SC", t)
 	}

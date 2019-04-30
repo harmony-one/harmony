@@ -1,6 +1,5 @@
 package node
 
-// CreateTransactionForEnterMethod creates transaction to call enter method of lottery contract.
 import (
 	"fmt"
 	"math"
@@ -23,6 +22,7 @@ const (
 	Enter      = "enter"
 	PickWinner = "pickWinner"
 	GetPlayers = "getPlayers"
+	PuzzleFund = 100000000
 )
 
 // AddLotteryContract adds the demo lottery contract the genesis block.
