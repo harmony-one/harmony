@@ -70,7 +70,7 @@ const (
 	// BlocksPerEpoch is the number of blocks in one epoch
 	// currently set to small number for testing
 	// in future, this need to be adjusted dynamically instead of constant
-	BlocksPerEpoch = 5
+	BlocksPerEpoch = 1000000000
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	BlockChainVersion = 3
