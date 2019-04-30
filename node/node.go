@@ -139,6 +139,10 @@ type Node struct {
 	DemoContractAddress      common.Address
 	LotteryManagerPrivateKey *ecdsa.PrivateKey
 
+	// Demo account.
+	PuzzleContractAddress   common.Address
+	PuzzleManagerPrivateKey *ecdsa.PrivateKey
+
 	//Node Account
 	AccountKey *ecdsa.PrivateKey
 
@@ -269,6 +273,13 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 		if isFirstTime {
 			// Setup one time smart contracts
 			node.AddFaucetContractToPendingTransactions()
+			node.CurrentStakes = make(map[common.Address]*structs.StakeInfo)
+			node.CurrentStakesByNode = make(map[[20]byte]*structs.StakeInfo)
+			node.AddStakingContractToPendingTransactions() //This will save the latest information about staked nodes in current staked
+			// TODO(minhdoan): Think of a better approach to deploy smart contract.
+			// This is temporary for demo purpose.
+			node.AddLotteryContract()
+			node.AddPuzzleContract()
 		} else {
 			node.AddContractKeyAndAddress(scFaucet)
 		}
@@ -285,6 +296,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 			} else {
 				node.AddContractKeyAndAddress(scStaking)
 				node.AddContractKeyAndAddress(scLottery)
+				node.AddContractKeyAndAddress(scPuzzle)
 			}
 		}
 	}

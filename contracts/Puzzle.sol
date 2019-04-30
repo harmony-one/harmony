@@ -21,12 +21,14 @@ contract Puzzle {
     /**
      * @dev pay the player if they have crossed their last best level.
      */
-    function payout(address player, uint8 new_level) public payable restricted {
+    function payout(address payable player, uint8 new_level) public payable restricted {
         uint8 cur_level = level_map[player];
         if (new_level >= cur_level) {
-            player.transfer(2 * (new_level - cur_level + 1) * 1 ether);
+            player.transfer(2 * (new_level - cur_level + 1) * 2 ether);
+            level_map[player] = new_level;
+        } else {
+            delete level_map[player];
         }
-        delete level_map[player];
     }
 
     modifier restricted() {

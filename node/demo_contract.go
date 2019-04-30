@@ -23,6 +23,7 @@ const (
 	Enter      = "enter"
 	PickWinner = "pickWinner"
 	GetPlayers = "getPlayers"
+	PuzzleFund = 100000000
 )
 
 // AddLotteryContract adds the demo lottery contract the genesis block.
@@ -47,6 +48,31 @@ func (node *Node) AddLotteryContract() {
 		priKey)
 	node.DemoContractAddress = crypto.CreateAddress(crypto.PubkeyToAddress(priKey.PublicKey), uint64(0))
 	node.LotteryManagerPrivateKey = priKey
+	node.addPendingTransactions(types.Transactions{demoContract})
+}
+
+// AddPuzzleContract adds the demo puzzle contract the genesis block.
+func (node *Node) AddPuzzleContract() {
+	// Add a lottery demo contract.
+	priKey, err := crypto.HexToECDSA(contract_constants.PuzzleAccounts[0].Private)
+	if err != nil {
+		utils.GetLogInstance().Error("Error when creating private key for demo contract")
+		// Exit here to recognize the coding working.
+		// Basically we will remove this logic when launching so it's fine for now.
+		os.Exit(1)
+	}
+
+	dataEnc := common.FromHex(contracts.PuzzleBin)
+	// Unsigned transaction to avoid the case of transaction address.
+
+	contractFunds := big.NewInt(PuzzleFund)
+	contractFunds = contractFunds.Mul(contractFunds, big.NewInt(params.Ether))
+	demoContract, _ := types.SignTx(
+		types.NewContractCreation(uint64(0), node.Consensus.ShardID, contractFunds, params.TxGasContractCreation*10, nil, dataEnc),
+		types.HomesteadSigner{},
+		priKey)
+	node.PuzzleContractAddress = crypto.CreateAddress(crypto.PubkeyToAddress(priKey.PublicKey), uint64(0))
+	node.PuzzleManagerPrivateKey = priKey
 	node.addPendingTransactions(types.Transactions{demoContract})
 }
 
