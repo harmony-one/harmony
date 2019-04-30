@@ -217,8 +217,8 @@ func (node *Node) AddContractKeyAndAddress(t builtInSC) {
 		// lottery
 		lotteryPriKey, _ := crypto.HexToECDSA(contract_constants.DemoAccounts[0].Private)
 		node.DemoContractAddress = crypto.CreateAddress(crypto.PubkeyToAddress(lotteryPriKey.PublicKey), uint64(0))
+	case scPuzzle:
 		puzzlePriKey, _ := crypto.HexToECDSA(contract_constants.PuzzleAccounts[0].Private)
-		node.PuzzleContractAddress = crypto.CreateAddress(crypto.PubkeyToAddress(e.PublicKey), uint64(0))
 		node.PuzzleContractAddress = crypto.CreateAddress(crypto.PubkeyToAddress(e.PublicKey), uint64(0))
 	default:
 		utils.GetLogInstance().Error("AddContractKeyAndAddress", "unknown SC", t)

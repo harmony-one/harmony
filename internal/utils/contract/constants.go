@@ -883,7 +883,7 @@ var DemoAccounts = [...]DeployAccount{
 	{Address: "0xd2Cb501B40D3a9a013A38267a4d2A4Cf6bD2CAa8", Private: "3c8642f7188e05acc4467d9e2aa7fd539e82aa90a5497257cf0ecbb98ed3b88f", Public: "0xd2Cb501B40D3a9a013A38267a4d2A4Cf6bD2CAa8"},
 }
 
-// DemoAccounts is the accounts used for lottery demo.
+// PuzzleAccounts is the accounts used for lottery demo.
 var PuzzleAccounts = [...]DeployAccount{
 	{Address: "0xBE3958eD7A723Cb6fFF92b0B07682672B2AbD15A", Private: "0e9ee528c878a492ee6ae645ad31656239bb12536377aeff1e7aa521dd5848c9", Public: "0xBE3958eD7A723Cb6fFF92b0B07682672B2AbD15A"},
 	{Address: "0x87A4c9209d7DD8aBDcE2285cB0FF4b2015A80f95", Private: "8d95c5b66b15a162c9bfcbfe0de041fe328e489f50af0fd9772a4251d090179c", Public: "0x87A4c9209d7DD8aBDcE2285cB0FF4b2015A80f95"},

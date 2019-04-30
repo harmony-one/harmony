@@ -139,7 +139,7 @@ type Node struct {
 	DemoContractAddress      common.Address
 	LotteryManagerPrivateKey *ecdsa.PrivateKey
 
-	// Demo account.
+	// Puzzle account.
 	PuzzleContractAddress   common.Address
 	PuzzleManagerPrivateKey *ecdsa.PrivateKey
 

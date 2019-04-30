@@ -11,10 +11,10 @@ contract Puzzle {
 
     /**
      * @dev The player enters into the current game session by
-     *      paying at least 2 token.
+     *      paying at least 1 token.
      */
     function play(uint8 level) public payable {
-        require(msg.value >= 2 ether, INSUFFICIENT_FUND_MESSAGE);
+        require(msg.value >= 1 ether, INSUFFICIENT_FUND_MESSAGE);
         level_map[msg.sender] = level;
     }
 
@@ -24,7 +24,7 @@ contract Puzzle {
     function payout(address payable player, uint8 new_level) public payable restricted {
         uint8 cur_level = level_map[player];
         if (new_level >= cur_level) {
-            player.transfer(2 * (new_level - cur_level + 1) * 2 ether);
+            player.transfer(2 * (new_level - cur_level + 1) * 1 ether);
             level_map[player] = new_level;
         } else {
             delete level_map[player];
