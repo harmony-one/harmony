@@ -191,4 +191,8 @@ func (node *Node) AddContractKeyAndAddress() {
 	// lottery
 	lotteryPriKey, _ := crypto.HexToECDSA(contract_constants.DemoAccounts[0].Private)
 	node.DemoContractAddress = crypto.CreateAddress(crypto.PubkeyToAddress(lotteryPriKey.PublicKey), uint64(0))
+
+	// puzzle
+	puzzlePriKey, _ := crypto.HexToECDSA(contract_constants.PuzzleAccounts[0].Private)
+	node.PuzzleContractAddress = crypto.CreateAddress(crypto.PubkeyToAddress(e.PublicKey), uint64(0))
 }
