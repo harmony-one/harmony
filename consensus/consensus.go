@@ -37,7 +37,7 @@ import (
 // Block reward per block signature.
 // TODO ek – per sig per stake
 var (
-	BlockReward = big.NewInt(params.Ether / 1000)
+	BlockReward = big.NewInt(params.Ether / 10)
 )
 
 // Consensus is the main struct with all states and data related to consensus process.
