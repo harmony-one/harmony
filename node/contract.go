@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"math/big"
 	"strings"
+	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -138,13 +139,13 @@ func (node *Node) GetNonceOfAddress(address common.Address) uint64 {
 }
 
 // GetBalanceOfAddress returns balance of an address.
-func (node *Node) GetBalanceOfAddress(address common.Address) *big.Int {
+func (node *Node) GetBalanceOfAddress(address common.Address) (*big.Int, error) {
 	state, err := node.blockchain.State()
 	if err != nil {
 		log.Error("Failed to get chain state", "Error", err)
-		return nil
+		return nil, err
 	}
-	return state.GetBalance(address)
+	return state.GetBalance(address), nil
 }
 
 // AddFaucetContractToPendingTransactions adds the faucet contract the genesis block.
@@ -166,7 +167,8 @@ func (node *Node) AddFaucetContractToPendingTransactions() {
 
 // CallFaucetContract invokes the faucet contract to give the walletAddress initial money
 func (node *Node) CallFaucetContract(address common.Address) common.Hash {
-	return node.callGetFreeToken(address)
+	nonce := atomic.AddUint64(&node.ContractDeployerCurrentNonce, 1)
+	return node.callGetFreeTokenWithNonce(address, nonce-1)
 }
 
 func (node *Node) callGetFreeToken(address common.Address) common.Hash {

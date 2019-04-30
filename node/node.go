@@ -143,9 +143,10 @@ type Node struct {
 	AccountKey *ecdsa.PrivateKey
 
 	// For test only
-	TestBankKeys        []*ecdsa.PrivateKey
-	ContractDeployerKey *ecdsa.PrivateKey
-	ContractAddresses   []common.Address
+	TestBankKeys                 []*ecdsa.PrivateKey
+	ContractDeployerKey          *ecdsa.PrivateKey
+	ContractDeployerCurrentNonce uint64 // The nonce of the deployer contract at current block
+	ContractAddresses            []common.Address
 
 	// Shard group Message Receiver
 	shardGroupReceiver p2p.GroupReceiver
