@@ -139,6 +139,10 @@ type Node struct {
 	DemoContractAddress      common.Address
 	LotteryManagerPrivateKey *ecdsa.PrivateKey
 
+	// Puzzle account.
+	PuzzleContractAddress   common.Address
+	PuzzleManagerPrivateKey *ecdsa.PrivateKey
+
 	//Node Account
 	AccountKey *ecdsa.PrivateKey
 
@@ -282,9 +286,11 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 				// TODO(minhdoan): Think of a better approach to deploy smart contract.
 				// This is temporary for demo purpose.
 				node.AddLotteryContract()
+				node.AddPuzzleContract()
 			} else {
 				node.AddContractKeyAndAddress(scStaking)
 				node.AddContractKeyAndAddress(scLottery)
+				node.AddContractKeyAndAddress(scPuzzle)
 			}
 		}
 	}
