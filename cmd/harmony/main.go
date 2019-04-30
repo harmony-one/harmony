@@ -9,13 +9,13 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/harmony-one/harmony/core"
-
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
-
 	"github.com/harmony-one/bls/ffi/go/bls"
+
 	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/drand"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/profiler"
@@ -197,20 +197,29 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	// Consensus object.
 	// TODO: consensus object shouldn't start here
 	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of consensus later.
-	consensus, err := consensus.New(nodeConfig.Host, nodeConfig.ShardID, nodeConfig.Leader, nodeConfig.ConsensusPriKey)
+	currentConsensus, err := consensus.New(nodeConfig.Host, nodeConfig.ShardID, nodeConfig.Leader, nodeConfig.ConsensusPriKey)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error :%v \n", err)
 		os.Exit(1)
 	}
-	consensus.MinPeers = *minPeers
+	currentConsensus.MinPeers = *minPeers
 
 	// Current node.
-	currentNode := node.New(nodeConfig.Host, consensus, nodeConfig.MainDB, *isArchival)
+	currentNode := node.New(nodeConfig.Host, currentConsensus, nodeConfig.MainDB, *isArchival)
 	currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
 	currentNode.AccountKey = nodeConfig.StakingPriKey
+	utils.GetLogInstance().Info("node account set",
+		"address", crypto.PubkeyToAddress(currentNode.AccountKey.PublicKey))
+
+	if gsif, err := consensus.NewGenesisStakeInfoFinder(); err == nil {
+		currentConsensus.SetStakeInfoFinder(gsif)
+	} else {
+		_, _ = fmt.Fprintf(os.Stderr, "Cannot initialize stake info: %v\n", err)
+		os.Exit(1)
+	}
 
 	// TODO: refactor the creation of blockchain out of node.New()
-	consensus.ChainReader = currentNode.Blockchain()
+	currentConsensus.ChainReader = currentNode.Blockchain()
 
 	if *isGenesis {
 		// TODO: need change config file and use switch instead of complicated "if else" condition
@@ -259,7 +268,7 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	currentNode.Consensus.RegisterRndChannel(dRand.RndChannel)
 	currentNode.DRand = dRand
 
-	if consensus.ShardID != 0 {
+	if currentConsensus.ShardID != 0 {
 		currentNode.AddBeaconChainDatabase(nodeConfig.BeaconDB)
 	}
 	// This needs to be executed after consensus and drand are setup
@@ -268,14 +277,14 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	// Set the consensus ID to be the current block number
 	height := currentNode.Blockchain().CurrentBlock().NumberU64()
 
-	consensus.SetConsensusID(uint32(height))
+	currentConsensus.SetConsensusID(uint32(height))
 	utils.GetLogInstance().Info("Init Blockchain", "height", height)
 
 	// Assign closure functions to the consensus object
-	consensus.BlockVerifier = currentNode.VerifyNewBlock
-	consensus.OnConsensusDone = currentNode.PostConsensusProcessing
+	currentConsensus.BlockVerifier = currentNode.VerifyNewBlock
+	currentConsensus.OnConsensusDone = currentNode.PostConsensusProcessing
 	currentNode.State = node.NodeWaitToJoin
-	return consensus, currentNode
+	return currentConsensus, currentNode
 }
 
 func main() {
