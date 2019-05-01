@@ -283,15 +283,18 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 				// Setup one time smart contracts
 				node.CurrentStakes = make(map[common.Address]*structs.StakeInfo)
 				node.AddStakingContractToPendingTransactions() //This will save the latest information about staked nodes in current staked
-				// TODO(minhdoan): Think of a better approach to deploy smart contract.
-				// This is temporary for demo purpose.
-				node.AddLotteryContract()
-				node.AddPuzzleContract()
 			} else {
 				node.AddContractKeyAndAddress(scStaking)
-				node.AddContractKeyAndAddress(scLottery)
-				node.AddContractKeyAndAddress(scPuzzle)
 			}
+		}
+		if isFirstTime {
+			// TODO(minhdoan): Think of a better approach to deploy smart contract.
+			// This is temporary for demo purpose.
+			node.AddLotteryContract()
+			node.AddPuzzleContract()
+		} else {
+			node.AddContractKeyAndAddress(scLottery)
+			node.AddContractKeyAndAddress(scPuzzle)
 		}
 	}
 

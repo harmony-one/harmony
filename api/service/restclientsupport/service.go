@@ -36,7 +36,7 @@ type Service struct {
 	CallFaucetContract               func(common.Address) common.Hash
 	GetAccountBalance                func(common.Address) (*big.Int, error)
 	CreateTransactionForPlayMethod   func(string) error
-	CreateTransactionForPayoutMethod func(string, int) error
+	CreateTransactionForPayoutMethod func(common.Address, uint8) error
 }
 
 // New returns new client support service.
@@ -46,7 +46,7 @@ func New(
 	CreateTransactionForPickWinner func() error,
 	CallFaucetContract func(common.Address) common.Hash, GetAccountBalance func(common.Address) (*big.Int, error),
 	CreateTransactionForPlayMethod func(string) error,
-	CreateTransactionForPayoutMethod func(string, int) error) *Service {
+	CreateTransactionForPayoutMethod func(common.Address, uint8) error) *Service {
 	return &Service{
 		CreateTransactionForEnterMethod:  CreateTransactionForEnterMethod,
 		GetResult:                        GetResult,
@@ -282,8 +282,8 @@ func (s *Service) Payout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err = s.CreateTransactionForPayoutMethod(key, newLevelInt); err != nil {
-		utils.GetLogInstance().Error("error", err)
+	if err = s.CreateTransactionForPayoutMethod(common.HexToAddress(key), uint8(newLevelInt)); err != nil {
+		utils.GetLogInstance().Error("Payout error", err)
 		json.NewEncoder(w).Encode(res)
 		return
 	}
