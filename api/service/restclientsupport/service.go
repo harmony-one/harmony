@@ -35,7 +35,7 @@ type Service struct {
 	messageChan                      chan *msg_pb.Message
 	CallFaucetContract               func(common.Address) common.Hash
 	GetAccountBalance                func(common.Address) (*big.Int, error)
-	CreateTransactionForPlayMethod   func(string) error
+	CreateTransactionForPlayMethod   func(string, int) error
 	CreateTransactionForPayoutMethod func(string, int, int, string) error
 }
 
@@ -45,7 +45,7 @@ func New(
 	GetResult func(string) ([]string, []*big.Int),
 	CreateTransactionForPickWinner func() error,
 	CallFaucetContract func(common.Address) common.Hash, GetAccountBalance func(common.Address) (*big.Int, error),
-	CreateTransactionForPlayMethod func(string) error,
+	CreateTransactionForPlayMethod func(string, int) error,
 	CreateTransactionForPayoutMethod func(string, int, int, string) error) *Service {
 	return &Service{
 		CreateTransactionForEnterMethod:  CreateTransactionForEnterMethod,
@@ -243,6 +243,7 @@ func (s *Service) Winner(w http.ResponseWriter, r *http.Request) {
 func (s *Service) Play(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	key := r.FormValue("key")
+	amount := r.FormValue("amount")
 
 	fmt.Println("puzzle-play", key)
 	res := &Response{
@@ -255,7 +256,7 @@ func (s *Service) Play(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.CreateTransactionForPlayMethod(key); err != nil {
+	if err := s.CreateTransactionForPlayMethod(key, amount); err != nil {
 		utils.GetLogInstance().Error("puzzle-play, error", err)
 		json.NewEncoder(w).Encode(res)
 		return

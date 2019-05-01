@@ -22,9 +22,6 @@ const (
 	Payout = "payout"
 )
 
-// GameStake represents one ether.
-var GameStake = 2 * big.NewInt(params.Ether)
-
 // AddPuzzleContract adds the demo puzzle contract the genesis block.
 func (node *Node) AddPuzzleContract() {
 	// Add a puzzle demo contract.
@@ -51,10 +48,10 @@ func (node *Node) AddPuzzleContract() {
 }
 
 // CreateTransactionForPlayMethod generates transaction for enter method and add it into pending tx list.
-func (node *Node) CreateTransactionForPlayMethod(priKey string) error {
+func (node *Node) CreateTransactionForPlayMethod(priKey string, amount int) error {
 	var err error
 	toAddress := node.PuzzleContractAddress
-
+	GameStake := amount * big.NewInt(params.Ether)
 	abi, err := abi.JSON(strings.NewReader(contracts.PuzzleABI))
 	if err != nil {
 		utils.GetLogInstance().Error("puzzle-play: Failed to generate staking contract's ABI", "error", err)
