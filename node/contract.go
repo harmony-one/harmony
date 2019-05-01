@@ -96,7 +96,7 @@ func (node *Node) QueryStakeInfo() *structs.StakeInfoReturnValue {
 	tx := types.NewTransaction(
 		state.GetNonce(deployerAddress),
 		stakingContractAddress,
-		0,
+		node.NodeConfig.ShardID,
 		nil,
 		math.MaxUint64,
 		nil,
