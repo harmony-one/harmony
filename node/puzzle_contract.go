@@ -100,7 +100,7 @@ func (node *Node) CreateTransactionForPlayMethod(priKey string) error {
 }
 
 // CreateTransactionForPayoutMethod generates transaction for payout method and add it into pending tx list.
-func (node *Node) CreateTransactionForPayoutMethod(address string, newLevel int, session int, sequence string) error {
+func (node *Node) CreateTransactionForPayoutMethod(address string, level int, session int, sequence string) error {
 	var err error
 	toAddress := node.PuzzleContractAddress
 
@@ -109,7 +109,7 @@ func (node *Node) CreateTransactionForPayoutMethod(address string, newLevel int,
 		utils.GetLogInstance().Error("Failed to generate staking contract's ABI", "error", err)
 		return err
 	}
-	bytesData, err := abi.Pack("payout", address, newLevel, session, sequence)
+	bytesData, err := abi.Pack("payout", address, level, session, sequence)
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to generate ABI function bytes data", "error", err)
 		return err
