@@ -73,7 +73,7 @@ func (node *Node) CreateTransactionForEnterMethod(amount int64, priKey string) e
 	tx := types.NewTransaction(
 		nonce,
 		toAddress,
-		0,
+		node.NodeConfig.ShardID,
 		Amount,
 		params.TxGas*10,
 		nil,
@@ -141,7 +141,7 @@ func (node *Node) GetResult(priKey string) (players []string, balances []*big.In
 	tx := types.NewTransaction(
 		nonce,
 		demoContractAddress,
-		0,
+		node.NodeConfig.ShardID,
 		nil,
 		math.MaxUint64,
 		nil,
@@ -192,7 +192,7 @@ func (node *Node) CreateTransactionForPickWinner() error {
 	tx := types.NewTransaction(
 		nonce,
 		toAddress,
-		0,
+		node.NodeConfig.ShardID,
 		Amount,
 		params.TxGas*1000,
 		nil,
