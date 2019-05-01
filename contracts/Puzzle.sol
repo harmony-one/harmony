@@ -60,8 +60,7 @@ contract GameContract {
             setLevel(player,level);
             amount = progress*(playerStake[player]/thresholdLevel);
             player.transfer(amount);
-        }
-
+    }
 
     modifier restricted() {
         require(msg.sender == manager, RESTRICTED_MESSAGE);
@@ -96,3 +95,4 @@ contract GameContract {
         return players;
     }
 }
+
