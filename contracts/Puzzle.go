@@ -4,19 +4,34 @@
 package contracts
 
 import (
+	"math/big"
 	"strings"
 
+	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/event"
+)
+
+// Reference imports to suppress errors if they are not otherwise used.
+var (
+	_ = big.NewInt
+	_ = strings.NewReader
+	_ = ethereum.NotFound
+	_ = abi.U256
+	_ = bind.Bind
+	_ = common.Big1
+	_ = types.BloomLookup
+	_ = event.NewSubscription
 )
 
 // PuzzleABI is the input ABI used to generate the binding from.
-const PuzzleABI = "[{\"constant\":true,\"inputs\":[{\"name\":\"\",\"type\":\"address\"}],\"name\":\"level_map\",\"outputs\":[{\"name\":\"\",\"type\":\"uint8\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"player\",\"type\":\"address\"},{\"name\":\"new_level\",\"type\":\"uint8\"}],\"name\":\"payout\",\"outputs\":[],\"payable\":true,\"stateMutability\":\"payable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"manager\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"play\",\"outputs\":[],\"payable\":true,\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[],\"payable\":true,\"stateMutability\":\"payable\",\"type\":\"constructor\"}]"
+const PuzzleABI = "[{\"constant\":true,\"inputs\":[],\"name\":\"manager\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"sessionID\",\"type\":\"uint256\"}],\"name\":\"play\",\"outputs\":[],\"payable\":true,\"stateMutability\":\"payable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"player\",\"type\":\"address\"},{\"name\":\"level\",\"type\":\"uint256\"}],\"name\":\"setLevel\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"getPlayers\",\"outputs\":[{\"name\":\"\",\"type\":\"address[]\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"player\",\"type\":\"address\"},{\"name\":\"level\",\"type\":\"uint256\"},{\"name\":\"session\",\"type\":\"uint256\"},{\"name\":\"\",\"type\":\"string\"}],\"name\":\"payout\",\"outputs\":[],\"payable\":true,\"stateMutability\":\"payable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"player\",\"type\":\"address\"}],\"name\":\"resetPlayer\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"reset\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"players\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"}]"
 
 // PuzzleBin is the compiled bytecode used for deploying new contracts.
-const PuzzleBin = `0x608060405260008054600160a060020a031916331790556103be806100256000396000f3fe60806040526004361061005b577c0100000000000000000000000000000000000000000000000000000000600035046311b88fef8114610060578063158b4aa6146100a9578063481c6a75146100da57806393e84cd91461010b575b600080fd5b34801561006c57600080fd5b506100936004803603602081101561008357600080fd5b5035600160a060020a0316610113565b6040805160ff9092168252519081900360200190f35b6100d8600480360360408110156100bf57600080fd5b508035600160a060020a0316906020013560ff16610128565b005b3480156100e657600080fd5b506100ef6102da565b60408051600160a060020a039092168252519081900360200190f35b6100d86102e9565b60016020526000908152604090205460ff1681565b60005460408051808201909152601381527f556e617574686f72697a65642041636365737300000000000000000000000000602082015290600160a060020a0316331461020d576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825283818151815260200191508051906020019080838360005b838110156101d25781810151838201526020016101ba565b50505050905090810190601f1680156101ff5780820380516001836020036101000a031916815260200191505b509250505060405180910390fd5b50600160a060020a03821660009081526001602052604090205460ff90811690821681116102b457604051600160a060020a0384169067ffffffffffffffff670de0b6b3a764000060ff60026001878903010216021680156108fc02916000818181858888f19350505050158015610289573d6000803e3d6000fd5b50600160a060020a0383166000908152600160205260409020805460ff191660ff84161790556102d5565b600160a060020a0383166000908152600160205260409020805460ff191690555b505050565b600054600160a060020a031681565b60408051808201909152601181527f496e73756666696369656e742046756e640000000000000000000000000000006020820152671bc16d674ec8000034101561038f576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401808060200182810382528381815181526020019150805190602001908083836000838110156101d25781810151838201526020016101ba565b5056fea165627a7a72305820dcdfb1bf37c0dddda1b2ec670fa6ef6c8913a8b4b6e815bf184697e5da7b0d1c0029`
+const PuzzleBin = `0x608060405234801561001057600080fd5b50600380546001600160a01b0319163317905561087f806100326000396000f3fe60806040526004361061007b5760003560e01c80638f3a7d8b1161004e5780638f3a7d8b1461016e578063c95e090914610230578063d826f88f14610263578063f71d96cb146102785761007b565b8063481c6a75146100805780636898f82b146100b1578063722dcd8f146100d05780638b5b9ccc14610109575b600080fd5b34801561008c57600080fd5b506100956102a2565b604080516001600160a01b039092168252519081900360200190f35b6100ce600480360360208110156100c757600080fd5b50356102b1565b005b3480156100dc57600080fd5b506100ce600480360360408110156100f357600080fd5b506001600160a01b0381351690602001356103ff565b34801561011557600080fd5b5061011e61041b565b60408051602080825283518183015283519192839290830191858101910280838360005b8381101561015a578181015183820152602001610142565b505050509050019250505060405180910390f35b6100ce6004803603608081101561018457600080fd5b6001600160a01b0382351691602081013591604082013591908101906080810160608201356401000000008111156101bb57600080fd5b8201836020820111156101cd57600080fd5b803590602001918460018302840111640100000000831117156101ef57600080fd5b91908080601f01602080910402602001604051908101604052809392919081815260200183838082843760009201919091525092955061047e945050505050565b34801561023c57600080fd5b506100ce6004803603602081101561025357600080fd5b50356001600160a01b0316610616565b34801561026f57600080fd5b506100ce6106d2565b34801561028457600080fd5b506100956004803603602081101561029b57600080fd5b50356107b8565b6003546001600160a01b031681565b60408051808201909152601181527f496e73756666696369656e742046756e6400000000000000000000000000000060208201526801158e460913d0000034101561037d57604051600160e51b62461bcd0281526004018080602001828103825283818151815260200191508051906020019080838360005b8381101561034257818101518382015260200161032a565b50505050905090810190601f16801561036f5780820380516001836020036101000a031916815260200191505b509250505060405180910390fd5b503360009081526020819052604090205415156103d757600480546001810182556000919091527f8a35acfbc15ff81a39ae7d344fd709f28e8600b4aa8c65c6b64bfe7fe36bd19b0180546001600160a01b031916331790555b3360009081526020818152604080832093909355600181528282208290556002905220349055565b6001600160a01b03909116600090815260016020526040902055565b6060600480548060200260200160405190810160405280929190818152602001828054801561047357602002820191906000526020600020905b81546001600160a01b03168152600190910190602001808311610455575b505050505090505b90565b6003546040805180820190915260138152600160681b72556e617574686f72697a656420416363657373026020820152906001600160a01b0316331461050957604051600160e51b62461bcd0281526004018080602001828103825283818151815260200191508051906020019080838360008381101561034257818101518382015260200161032a565b5081600080866001600160a01b03166001600160a01b0316815260200190815260200160002054146040518060600160405280602c8152602001610828602c913990151561059c57604051600160e51b62461bcd0281526004018080602001828103825283818151815260200191508051906020019080838360008381101561034257818101518382015260200161032a565b506001600160a01b03841660009081526001602052604090205483036105c285856103ff565b6001600160a01b03851660008181526002602052604080822054905160059091048402929183156108fc02918491818181858888f1935050505015801561060d573d6000803e3d6000fd5b50505050505050565b6003546040805180820190915260138152600160681b72556e617574686f72697a656420416363657373026020820152906001600160a01b031633146106a157604051600160e51b62461bcd0281526004018080602001828103825283818151815260200191508051906020019080838360008381101561034257818101518382015260200161032a565b506001600160a01b031660009081526001602090815260408083208390558282528083208390556002909152812055565b6003546040805180820190915260138152600160681b72556e617574686f72697a656420416363657373026020820152906001600160a01b0316331461075d57604051600160e51b62461bcd0281526004018080602001828103825283818151815260200191508051906020019080838360008381101561034257818101518382015260200161032a565b5060045460005b818110156107a657600060048281548110151561077d57fe5b6000918252602090912001546001600160a01b0316905061079d81610616565b50600101610764565b5060006107b46004826107e0565b5050565b60048054829081106107c657fe5b6000918252602090912001546001600160a01b0316905081565b81548183558181111561080457600083815260209020610804918101908301610809565b505050565b61047b91905b80821115610823576000815560010161080f565b509056fe506c617965722072657175657374696e67207061796f757420666f7220756e6b6e6f776e2073657373696f6ea165627a7a72305820565023c31d341faf87f17e3031d315462faab38087fb5c7191bc471c812bf5680029`
 
 // DeployPuzzle deploys a new Ethereum contract, binding an instance of Puzzle to it.
 func DeployPuzzle(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *Puzzle, error) {
@@ -173,30 +188,30 @@ func (_Puzzle *PuzzleTransactorRaw) Transact(opts *bind.TransactOpts, method str
 	return _Puzzle.Contract.contract.Transact(opts, method, params...)
 }
 
-// LevelMap is a free data retrieval call binding the contract method 0x11b88fef.
+// GetPlayers is a free data retrieval call binding the contract method 0x8b5b9ccc.
 //
-// Solidity: function level_map( address) constant returns(uint8)
-func (_Puzzle *PuzzleCaller) LevelMap(opts *bind.CallOpts, arg0 common.Address) (uint8, error) {
+// Solidity: function getPlayers() constant returns(address[])
+func (_Puzzle *PuzzleCaller) GetPlayers(opts *bind.CallOpts) ([]common.Address, error) {
 	var (
-		ret0 = new(uint8)
+		ret0 = new([]common.Address)
 	)
 	out := ret0
-	err := _Puzzle.contract.Call(opts, out, "level_map", arg0)
+	err := _Puzzle.contract.Call(opts, out, "getPlayers")
 	return *ret0, err
 }
 
-// LevelMap is a free data retrieval call binding the contract method 0x11b88fef.
+// GetPlayers is a free data retrieval call binding the contract method 0x8b5b9ccc.
 //
-// Solidity: function level_map( address) constant returns(uint8)
-func (_Puzzle *PuzzleSession) LevelMap(arg0 common.Address) (uint8, error) {
-	return _Puzzle.Contract.LevelMap(&_Puzzle.CallOpts, arg0)
+// Solidity: function getPlayers() constant returns(address[])
+func (_Puzzle *PuzzleSession) GetPlayers() ([]common.Address, error) {
+	return _Puzzle.Contract.GetPlayers(&_Puzzle.CallOpts)
 }
 
-// LevelMap is a free data retrieval call binding the contract method 0x11b88fef.
+// GetPlayers is a free data retrieval call binding the contract method 0x8b5b9ccc.
 //
-// Solidity: function level_map( address) constant returns(uint8)
-func (_Puzzle *PuzzleCallerSession) LevelMap(arg0 common.Address) (uint8, error) {
-	return _Puzzle.Contract.LevelMap(&_Puzzle.CallOpts, arg0)
+// Solidity: function getPlayers() constant returns(address[])
+func (_Puzzle *PuzzleCallerSession) GetPlayers() ([]common.Address, error) {
+	return _Puzzle.Contract.GetPlayers(&_Puzzle.CallOpts)
 }
 
 // Manager is a free data retrieval call binding the contract method 0x481c6a75.
@@ -225,44 +240,133 @@ func (_Puzzle *PuzzleCallerSession) Manager() (common.Address, error) {
 	return _Puzzle.Contract.Manager(&_Puzzle.CallOpts)
 }
 
-// Payout is a paid mutator transaction binding the contract method 0x158b4aa6.
+// Players is a free data retrieval call binding the contract method 0xf71d96cb.
 //
-// Solidity: function payout(player address, new_level uint8) returns()
-func (_Puzzle *PuzzleTransactor) Payout(opts *bind.TransactOpts, player common.Address, new_level uint8) (*types.Transaction, error) {
-	return _Puzzle.contract.Transact(opts, "payout", player, new_level)
+// Solidity: function players(uint256 ) constant returns(address)
+func (_Puzzle *PuzzleCaller) Players(opts *bind.CallOpts, arg0 *big.Int) (common.Address, error) {
+	var (
+		ret0 = new(common.Address)
+	)
+	out := ret0
+	err := _Puzzle.contract.Call(opts, out, "players", arg0)
+	return *ret0, err
 }
 
-// Payout is a paid mutator transaction binding the contract method 0x158b4aa6.
+// Players is a free data retrieval call binding the contract method 0xf71d96cb.
 //
-// Solidity: function payout(player address, new_level uint8) returns()
-func (_Puzzle *PuzzleSession) Payout(player common.Address, new_level uint8) (*types.Transaction, error) {
-	return _Puzzle.Contract.Payout(&_Puzzle.TransactOpts, player, new_level)
+// Solidity: function players(uint256 ) constant returns(address)
+func (_Puzzle *PuzzleSession) Players(arg0 *big.Int) (common.Address, error) {
+	return _Puzzle.Contract.Players(&_Puzzle.CallOpts, arg0)
 }
 
-// Payout is a paid mutator transaction binding the contract method 0x158b4aa6.
+// Players is a free data retrieval call binding the contract method 0xf71d96cb.
 //
-// Solidity: function payout(player address, new_level uint8) returns()
-func (_Puzzle *PuzzleTransactorSession) Payout(player common.Address, new_level uint8) (*types.Transaction, error) {
-	return _Puzzle.Contract.Payout(&_Puzzle.TransactOpts, player, new_level)
+// Solidity: function players(uint256 ) constant returns(address)
+func (_Puzzle *PuzzleCallerSession) Players(arg0 *big.Int) (common.Address, error) {
+	return _Puzzle.Contract.Players(&_Puzzle.CallOpts, arg0)
 }
 
-// Play is a paid mutator transaction binding the contract method 0x93e84cd9.
+// Payout is a paid mutator transaction binding the contract method 0x8f3a7d8b.
 //
-// Solidity: function play() returns()
-func (_Puzzle *PuzzleTransactor) Play(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _Puzzle.contract.Transact(opts, "play")
+// Solidity: function payout(address player, uint256 level, uint256 session, string ) returns()
+func (_Puzzle *PuzzleTransactor) Payout(opts *bind.TransactOpts, player common.Address, level *big.Int, session *big.Int, arg3 string) (*types.Transaction, error) {
+	return _Puzzle.contract.Transact(opts, "payout", player, level, session, arg3)
 }
 
-// Play is a paid mutator transaction binding the contract method 0x93e84cd9.
+// Payout is a paid mutator transaction binding the contract method 0x8f3a7d8b.
 //
-// Solidity: function play() returns()
-func (_Puzzle *PuzzleSession) Play() (*types.Transaction, error) {
-	return _Puzzle.Contract.Play(&_Puzzle.TransactOpts)
+// Solidity: function payout(address player, uint256 level, uint256 session, string ) returns()
+func (_Puzzle *PuzzleSession) Payout(player common.Address, level *big.Int, session *big.Int, arg3 string) (*types.Transaction, error) {
+	return _Puzzle.Contract.Payout(&_Puzzle.TransactOpts, player, level, session, arg3)
 }
 
-// Play is a paid mutator transaction binding the contract method 0x93e84cd9.
+// Payout is a paid mutator transaction binding the contract method 0x8f3a7d8b.
 //
-// Solidity: function play() returns()
-func (_Puzzle *PuzzleTransactorSession) Play() (*types.Transaction, error) {
-	return _Puzzle.Contract.Play(&_Puzzle.TransactOpts)
+// Solidity: function payout(address player, uint256 level, uint256 session, string ) returns()
+func (_Puzzle *PuzzleTransactorSession) Payout(player common.Address, level *big.Int, session *big.Int, arg3 string) (*types.Transaction, error) {
+	return _Puzzle.Contract.Payout(&_Puzzle.TransactOpts, player, level, session, arg3)
+}
+
+// Play is a paid mutator transaction binding the contract method 0x6898f82b.
+//
+// Solidity: function play(uint256 sessionID) returns()
+func (_Puzzle *PuzzleTransactor) Play(opts *bind.TransactOpts, sessionID *big.Int) (*types.Transaction, error) {
+	return _Puzzle.contract.Transact(opts, "play", sessionID)
+}
+
+// Play is a paid mutator transaction binding the contract method 0x6898f82b.
+//
+// Solidity: function play(uint256 sessionID) returns()
+func (_Puzzle *PuzzleSession) Play(sessionID *big.Int) (*types.Transaction, error) {
+	return _Puzzle.Contract.Play(&_Puzzle.TransactOpts, sessionID)
+}
+
+// Play is a paid mutator transaction binding the contract method 0x6898f82b.
+//
+// Solidity: function play(uint256 sessionID) returns()
+func (_Puzzle *PuzzleTransactorSession) Play(sessionID *big.Int) (*types.Transaction, error) {
+	return _Puzzle.Contract.Play(&_Puzzle.TransactOpts, sessionID)
+}
+
+// Reset is a paid mutator transaction binding the contract method 0xd826f88f.
+//
+// Solidity: function reset() returns()
+func (_Puzzle *PuzzleTransactor) Reset(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _Puzzle.contract.Transact(opts, "reset")
+}
+
+// Reset is a paid mutator transaction binding the contract method 0xd826f88f.
+//
+// Solidity: function reset() returns()
+func (_Puzzle *PuzzleSession) Reset() (*types.Transaction, error) {
+	return _Puzzle.Contract.Reset(&_Puzzle.TransactOpts)
+}
+
+// Reset is a paid mutator transaction binding the contract method 0xd826f88f.
+//
+// Solidity: function reset() returns()
+func (_Puzzle *PuzzleTransactorSession) Reset() (*types.Transaction, error) {
+	return _Puzzle.Contract.Reset(&_Puzzle.TransactOpts)
+}
+
+// ResetPlayer is a paid mutator transaction binding the contract method 0xc95e0909.
+//
+// Solidity: function resetPlayer(address player) returns()
+func (_Puzzle *PuzzleTransactor) ResetPlayer(opts *bind.TransactOpts, player common.Address) (*types.Transaction, error) {
+	return _Puzzle.contract.Transact(opts, "resetPlayer", player)
+}
+
+// ResetPlayer is a paid mutator transaction binding the contract method 0xc95e0909.
+//
+// Solidity: function resetPlayer(address player) returns()
+func (_Puzzle *PuzzleSession) ResetPlayer(player common.Address) (*types.Transaction, error) {
+	return _Puzzle.Contract.ResetPlayer(&_Puzzle.TransactOpts, player)
+}
+
+// ResetPlayer is a paid mutator transaction binding the contract method 0xc95e0909.
+//
+// Solidity: function resetPlayer(address player) returns()
+func (_Puzzle *PuzzleTransactorSession) ResetPlayer(player common.Address) (*types.Transaction, error) {
+	return _Puzzle.Contract.ResetPlayer(&_Puzzle.TransactOpts, player)
+}
+
+// SetLevel is a paid mutator transaction binding the contract method 0x722dcd8f.
+//
+// Solidity: function setLevel(address player, uint256 level) returns()
+func (_Puzzle *PuzzleTransactor) SetLevel(opts *bind.TransactOpts, player common.Address, level *big.Int) (*types.Transaction, error) {
+	return _Puzzle.contract.Transact(opts, "setLevel", player, level)
+}
+
+// SetLevel is a paid mutator transaction binding the contract method 0x722dcd8f.
+//
+// Solidity: function setLevel(address player, uint256 level) returns()
+func (_Puzzle *PuzzleSession) SetLevel(player common.Address, level *big.Int) (*types.Transaction, error) {
+	return _Puzzle.Contract.SetLevel(&_Puzzle.TransactOpts, player, level)
+}
+
+// SetLevel is a paid mutator transaction binding the contract method 0x722dcd8f.
+//
+// Solidity: function setLevel(address player, uint256 level) returns()
+func (_Puzzle *PuzzleTransactorSession) SetLevel(player common.Address, level *big.Int) (*types.Transaction, error) {
+	return _Puzzle.Contract.SetLevel(&_Puzzle.TransactOpts, player, level)
 }
