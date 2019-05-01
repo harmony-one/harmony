@@ -104,6 +104,7 @@ func (s *Service) Run() *http.Server {
 	s.router.Path("/play").HandlerFunc(s.Play)
 
 	// Set up router for payout.
+	s.router.Path("/payout").Queries("key", "{[0-9A-Fa-fx]*?}", "new_level", "{[0-9]*?}").HandlerFunc(s.Payout).Methods("GET")
 	s.router.Path("/payout").HandlerFunc(s.Payout)
 	// Do serving now.
 	utils.GetLogInstance().Info("Listening on ", "port: ", Port)
