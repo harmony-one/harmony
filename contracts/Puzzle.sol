@@ -5,60 +5,51 @@ contract Puzzle {
     string internal constant RESTRICTED_MESSAGE = "Unauthorized Access";
     string internal constant INCORRECT_SESSION = "Player requesting payout for unknown session";
     string internal constant INCORRECT_LEVEL = "Player requesting payout for earlier level";
-    uint amount;
-    uint sessionID;
-    uint progress;
-    string seq;
-    uint constant thresholdLevel = 4;
-    mapping(address => uint) playerLevel;
+
+    uint constant thresholdLevel = 5;
     mapping(address => uint) playerSession;
+    mapping(address => uint) playerLevel;
     mapping(address => uint) playerStake;
+
     address public manager;  // The adress of the owner of this contract
-    address payable[] public players;   // The players of current session
+    address payable[] public players;   // all players
 
     constructor() public {
         manager = msg.sender;
     }
-    
-    /**
-     * @dev random number generator
-     *     
-     */
-    function random() private returns (uint) {
-        sessionID = uint(keccak256(abi.encodePacked(now, msg.sender, this)));
-        return sessionID;   
-    }
-    
+
     /**
      * @dev The player enters into the current game session by
-     *      paying at least 2 token.
+     *      paying at least 20 token.
      */
-    function play() public payable returns (uint) {
-        require(msg.value >= 2 ether, INSUFFICIENT_FUND_MESSAGE);
-        sessionID = random();
-        playerLevel[msg.sender] = 0;
+    function play(uint sessionID) public payable {
+        require(msg.value >= 20 ether, INSUFFICIENT_FUND_MESSAGE);
+
+        if (playerSession[msg.sender] == 0) {
+            // New player
+            players.push(msg.sender);
+        }
         playerSession[msg.sender] = sessionID;
+        playerLevel[msg.sender] = 0;
         playerStake[msg.sender] = msg.value;
-        players.push(msg.sender);
-        return sessionID;
     }
 
     /**
-     * @dev returns the current best level the player has crossed   
+     * @dev set the current best level the player has crossed
      */
-    function setLevel(address player, uint level) public{
+    function setLevel(address player, uint level) public {
          playerLevel[player] = level;
     }
-    
+
     /**
      * @dev pay the player if they have crossed their last best level.
      */
     function payout(address payable player, uint level, uint session, string memory /*sequence*/) public payable restricted {
-            require(playerSession[player] == session, INCORRECT_SESSION );
-            require(level > playerLevel[player], INCORRECT_LEVEL);
-            progress = level - playerLevel[player]; //if a later transaction for a higher level comes earlier.
+            require(playerSession[player] == session, INCORRECT_SESSION);
+
+            uint progress = level - playerLevel[player]; //if a later transaction for a higher level comes earlier.
             setLevel(player,level);
-            amount = progress*(playerStake[player]/thresholdLevel);
+            uint amount = progress*(playerStake[player]/thresholdLevel);
             player.transfer(amount);
     }
 
