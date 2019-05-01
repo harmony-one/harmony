@@ -36,7 +36,7 @@ type Service struct {
 	CallFaucetContract               func(common.Address) common.Hash
 	GetAccountBalance                func(common.Address) (*big.Int, error)
 	CreateTransactionForPlayMethod   func(string) error
-	CreateTransactionForPayoutMethod func(string, int) error
+	CreateTransactionForPayoutMethod func(string, int, int, string) error
 }
 
 // New returns new client support service.
@@ -46,7 +46,7 @@ func New(
 	CreateTransactionForPickWinner func() error,
 	CallFaucetContract func(common.Address) common.Hash, GetAccountBalance func(common.Address) (*big.Int, error),
 	CreateTransactionForPlayMethod func(string) error,
-	CreateTransactionForPayoutMethod func(string, int) error) *Service {
+	CreateTransactionForPayoutMethod func(string, int, int, string) error) *Service {
 	return &Service{
 		CreateTransactionForEnterMethod:  CreateTransactionForEnterMethod,
 		GetResult:                        GetResult,
@@ -104,7 +104,7 @@ func (s *Service) Run() *http.Server {
 	s.router.Path("/play").HandlerFunc(s.Play)
 
 	// Set up router for payout.
-	s.router.Path("/payout").Queries("key", "{[0-9A-Fa-fx]*?}", "new_level", "{[0-9]*?}").HandlerFunc(s.Payout).Methods("GET")
+	s.router.Path("/payout").Queries("key", "{[0-9A-Fa-fx]*?}", "new_level", "{[0-9]*?}", "txid", "{[0-9]*?}", "sequence", "{[A-Za-z]*?}").HandlerFunc(s.Payout).Methods("GET")
 	s.router.Path("/payout").HandlerFunc(s.Payout)
 	// Do serving now.
 	utils.GetLogInstance().Info("Listening on ", "port: ", Port)
@@ -268,8 +268,10 @@ func (s *Service) Play(w http.ResponseWriter, r *http.Request) {
 func (s *Service) Payout(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	key := r.FormValue("key")
-	newLevel := r.FormValue("new_level")
-	fmt.Println("payout: key", key, "new_level", newLevel)
+	newLevel := r.FormValue("level")
+	sessionID = r.FormValue("txid")
+	solutionSequence = r.FormValue("sequence")
+	fmt.Println("payout: key", key, "level", newLevel, "session", sessionID, "solution sequence", solutionSequence)
 	newLevelInt, err := strconv.Atoi(newLevel)
 
 	fmt.Println("play")
@@ -282,7 +284,7 @@ func (s *Service) Payout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err = s.CreateTransactionForPayoutMethod(key, newLevelInt); err != nil {
+	if err = s.CreateTransactionForPayoutMethod(key, newLevelInt, sessionID, solutionSequence); err != nil {
 		utils.GetLogInstance().Error("error", err)
 		json.NewEncoder(w).Encode(res)
 		return
