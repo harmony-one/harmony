@@ -6,7 +6,7 @@ contract Puzzle {
     string internal constant NOT_IN_GAME = "Player is not in an active game";
     string internal constant INCORRECT_LEVEL = "Player requesting payout for earlier level";
 
-    uint constant thresholdLevel = 5;
+    uint constant thresholdLevel = 4;
     mapping(address => uint) playerLevel;
     mapping(address => uint) playerStake;
     mapping(address => bool) playerInGame;  // Whether the player is in a active game or not. Payout won't work if not in game.
