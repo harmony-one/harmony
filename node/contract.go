@@ -21,7 +21,7 @@ import (
 
 // Constants related to smart contract.
 const (
-	FaucetContractFund = 8000000
+	FaucetContractFund = 80000000
 )
 
 // BuiltInSC is the type of built-in smart contract in blockchain
