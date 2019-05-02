@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	s := restclientsupport.New(nil, nil, nil, nil, nil, nil, nil)
+	s := restclientsupport.New(nil, nil, nil, nil, nil, nil, nil, nil)
 	s.StartService()
 	fmt.Println("Server started")
 	select {}

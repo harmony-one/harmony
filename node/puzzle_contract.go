@@ -23,6 +23,7 @@ const (
 	EndGame = "endGame"
 )
 
+// OneEther is one ether
 var OneEther = big.NewInt(params.Ether)
 
 // AddPuzzleContract adds the demo puzzle contract the genesis block.
