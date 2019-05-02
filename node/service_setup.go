@@ -25,6 +25,11 @@ func (node *Node) setupForShardLeader() {
 	// Register networkinfo service. "0" is the beacon shard ID
 	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, node.NodeConfig.GetShardGroupID(), chanPeer, nil))
 
+	node.serviceManager.RegisterService(service.RestClientSupport, restclientsupport.New(
+		node.CreateTransactionForEnterMethod, node.GetResult,
+		node.CreateTransactionForPickWinner, node.CallFaucetContract, node.GetBalanceOfAddress,
+		node.CreateTransactionForPlayMethod, node.CreateTransactionForPayoutMethod))
+
 	// Register explorer service.
 	node.serviceManager.RegisterService(service.SupportExplorer, explorer.New(&node.SelfPeer, node.Consensus.GetNodeIDs, node.GetBalanceOfAddress))
 	// Register consensus service.
@@ -62,7 +67,6 @@ func (node *Node) setupForBeaconLeader() {
 	node.serviceManager.RegisterService(service.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
 	// TODO(minhdoan): We will remove the old client support and use the new client support which uses new message protocol.
 	// Register client new support service.
-	// TODO(minhdoan): Also consider provide clientsupport/restclientsupport for other shards in the future.
 	node.serviceManager.RegisterService(service.RestClientSupport, restclientsupport.New(
 		node.CreateTransactionForEnterMethod, node.GetResult,
 		node.CreateTransactionForPickWinner, node.CallFaucetContract, node.GetBalanceOfAddress,

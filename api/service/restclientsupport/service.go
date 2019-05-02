@@ -104,7 +104,7 @@ func (s *Service) Run() *http.Server {
 	s.router.Path("/play").HandlerFunc(s.Play)
 
 	// Set up router for payout.
-	s.router.Path("/payout").Queries("key", "{[0-9A-Fa-fx]*?}", "level", "{[0-9]*?}", "session", "{[0-9]*?}", "sequence", "{[A-Za-z]*?}").HandlerFunc(s.Payout).Methods("GET")
+	s.router.Path("/payout").Queries("key", "{[0-9A-Fa-fx]*?}", "level", "{[0-9]*?}", "sequence", "{[A-Za-z]*?}").HandlerFunc(s.Payout).Methods("GET")
 	s.router.Path("/payout").HandlerFunc(s.Payout)
 	// Do serving now.
 	utils.GetLogInstance().Info("Listening on ", "port: ", Port)
@@ -270,9 +270,8 @@ func (s *Service) Payout(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	key := r.FormValue("key")
 	level := r.FormValue("level")
-	session = r.FormValue("session")
 	sequence = r.FormValue("sequence")
-	fmt.Println("payout: key", key, "level", level, "session", session, "sequence", sequence)
+	fmt.Println("payout: key", key, "level", level, "sequence", sequence)
 	newLevelInt, err := strconv.Atoi(newLevel)
 
 	fmt.Println("play")
@@ -285,7 +284,7 @@ func (s *Service) Payout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err = s.CreateTransactionForPayoutMethod(key, level, session, sequence); err != nil {
+	if err = s.CreateTransactionForPayoutMethod(key, level, sequence); err != nil {
 		utils.GetLogInstance().Error("error", err)
 		json.NewEncoder(w).Encode(res)
 		return
