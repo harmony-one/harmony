@@ -28,7 +28,7 @@ func (node *Node) setupForShardLeader() {
 	node.serviceManager.RegisterService(service.RestClientSupport, restclientsupport.New(
 		node.CreateTransactionForEnterMethod, node.GetResult,
 		node.CreateTransactionForPickWinner, node.CallFaucetContract, node.GetBalanceOfAddress,
-		node.CreateTransactionForPlayMethod, node.CreateTransactionForPayoutMethod))
+		node.CreateTransactionForPlayMethod, node.CreateTransactionForPayoutMethod, node.CreateTransactionForEndMethod))
 
 	// Register explorer service.
 	node.serviceManager.RegisterService(service.SupportExplorer, explorer.New(&node.SelfPeer, node.Consensus.GetNodeIDs, node.GetBalanceOfAddress))
@@ -70,7 +70,7 @@ func (node *Node) setupForBeaconLeader() {
 	node.serviceManager.RegisterService(service.RestClientSupport, restclientsupport.New(
 		node.CreateTransactionForEnterMethod, node.GetResult,
 		node.CreateTransactionForPickWinner, node.CallFaucetContract, node.GetBalanceOfAddress,
-		node.CreateTransactionForPlayMethod, node.CreateTransactionForPayoutMethod))
+		node.CreateTransactionForPlayMethod, node.CreateTransactionForPayoutMethod, node.CreateTransactionForEndMethod))
 	// Register randomness service
 	node.serviceManager.RegisterService(service.Randomness, randomness.New(node.DRand))
 	// Register explorer service.
