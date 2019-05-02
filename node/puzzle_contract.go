@@ -22,6 +22,8 @@ const (
 	Payout = "payout"
 )
 
+var OneEther = big.NewInt(params.Ether)
+
 // AddPuzzleContract adds the demo puzzle contract the genesis block.
 func (node *Node) AddPuzzleContract() {
 	// Add a puzzle demo contract.
@@ -39,7 +41,7 @@ func (node *Node) AddPuzzleContract() {
 	contractFunds := big.NewInt(PuzzleFund)
 	contractFunds = contractFunds.Mul(contractFunds, big.NewInt(params.Ether))
 	demoContract, _ := types.SignTx(
-		types.NewContractCreation(uint64(0), node.Consensus.ShardID, contractFunds, params.TxGasContractCreation*10, nil, dataEnc),
+		types.NewContractCreation(uint64(0), node.Consensus.ShardID, contractFunds, params.TxGasContractCreation*1000, nil, dataEnc),
 		types.HomesteadSigner{},
 		priKey)
 	node.PuzzleContractAddress = crypto.CreateAddress(crypto.PubkeyToAddress(priKey.PublicKey), uint64(0))
@@ -47,12 +49,10 @@ func (node *Node) AddPuzzleContract() {
 	node.addPendingTransactions(types.Transactions{demoContract})
 }
 
-// CreateTransactionForPlayMethod generates transaction for enter method and add it into pending tx list.
-func (node *Node) CreateTransactionForPlayMethod(priKey string, amount string) error {
+// CreateTransactionForPlayMethod generates transaction for play method and add it into pending tx list.
+func (node *Node) CreateTransactionForPlayMethod(priKey string, amount int64) error {
 	var err error
 	toAddress := node.PuzzleContractAddress
-	GameStake := new(big.Int)
-	GameStake, _ = GameStake.SetString(amount, 10)
 	abi, err := abi.JSON(strings.NewReader(contracts.PuzzleABI))
 	if err != nil {
 		utils.GetLogInstance().Error("puzzle-play: Failed to generate staking contract's ABI", "error", err)
@@ -64,23 +64,26 @@ func (node *Node) CreateTransactionForPlayMethod(priKey string, amount string) e
 		return err
 	}
 
+	Stake := big.NewInt(0)
+	Stake = Stake.Mul(OneEther, big.NewInt(amount))
+
 	key, err := crypto.HexToECDSA(priKey)
 	address := crypto.PubkeyToAddress(key.PublicKey)
 	balance, err := node.GetBalanceOfAddress(address)
 	if err != nil {
 		utils.GetLogInstance().Error("puzzle-play: can not get address", "error", err)
 		return err
-	} else if balance.Cmp(GameStake) == -1 {
-		utils.GetLogInstance().Error("puzzle-play: insufficient fund", "error", err)
+	} else if balance.Cmp(Stake) == -1 {
+		utils.GetLogInstance().Error("puzzle-play: insufficient fund", "error", err, "stake", Stake, "balance", balance)
 		return ErrPuzzleInsufficientFund
 	}
 	nonce := node.GetNonceOfAddress(address)
 	tx := types.NewTransaction(
 		nonce,
 		toAddress,
-		0,
-		GameStake,
-		params.TxGas*10,
+		node.NodeConfig.ShardID,
+		Stake,
+		params.TxGas*100,
 		nil,
 		bytesData,
 	)
@@ -98,7 +101,7 @@ func (node *Node) CreateTransactionForPlayMethod(priKey string, amount string) e
 }
 
 // CreateTransactionForPayoutMethod generates transaction for payout method and add it into pending tx list.
-func (node *Node) CreateTransactionForPayoutMethod(address string, level int, sequence string) error {
+func (node *Node) CreateTransactionForPayoutMethod(address common.Address, level int, sequence string) error {
 	var err error
 	toAddress := node.PuzzleContractAddress
 
@@ -107,7 +110,9 @@ func (node *Node) CreateTransactionForPayoutMethod(address string, level int, se
 		utils.GetLogInstance().Error("Failed to generate staking contract's ABI", "error", err)
 		return err
 	}
-	bytesData, err := abi.Pack("payout", address, level, sequence)
+	// add params for address payable player, uint8 new_level, steps string
+	fmt.Println("Payout: address", address)
+	bytesData, err := abi.Pack(Payout, address, big.NewInt(int64(level)), sequence)
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to generate ABI function bytes data", "error", err)
 		return err
@@ -122,9 +127,9 @@ func (node *Node) CreateTransactionForPayoutMethod(address string, level int, se
 	tx := types.NewTransaction(
 		nonce,
 		toAddress,
-		0,
+		node.NodeConfig.ShardID,
 		Amount,
-		params.TxGas*10000,
+		params.TxGas*10,
 		nil,
 		bytesData,
 	)
