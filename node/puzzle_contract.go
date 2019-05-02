@@ -18,8 +18,9 @@ import (
 
 // Constants for puzzle.
 const (
-	Play   = "play"
-	Payout = "payout"
+	Play    = "play"
+	Payout  = "payout"
+	EndGame = "endGame"
 )
 
 var OneEther = big.NewInt(params.Ether)
@@ -113,6 +114,52 @@ func (node *Node) CreateTransactionForPayoutMethod(address common.Address, level
 	// add params for address payable player, uint8 new_level, steps string
 	fmt.Println("Payout: address", address)
 	bytesData, err := abi.Pack(Payout, address, big.NewInt(int64(level)), sequence)
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to generate ABI function bytes data", "error", err)
+		return err
+	}
+
+	key := node.PuzzleManagerPrivateKey
+	if key == nil {
+		return fmt.Errorf("PuzzleManagerPrivateKey is nil")
+	}
+	nonce := node.GetNonceOfAddress(crypto.PubkeyToAddress(key.PublicKey))
+	Amount := big.NewInt(0)
+	tx := types.NewTransaction(
+		nonce,
+		toAddress,
+		node.NodeConfig.ShardID,
+		Amount,
+		params.TxGas*10,
+		nil,
+		bytesData,
+	)
+
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to get private key", "error", err)
+		return err
+	}
+	if signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, key); err == nil {
+		node.addPendingTransactions(types.Transactions{signedTx})
+		return nil
+	}
+	utils.GetLogInstance().Error("Unable to call enter method", "error", err)
+	return err
+}
+
+// CreateTransactionForEndMethod generates transaction for endGame method and add it into pending tx list.
+func (node *Node) CreateTransactionForEndMethod(address common.Address) error {
+	var err error
+	toAddress := node.PuzzleContractAddress
+
+	abi, err := abi.JSON(strings.NewReader(contracts.PuzzleABI))
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to generate staking contract's ABI", "error", err)
+		return err
+	}
+	// add params for address payable player, uint8 new_level, steps string
+	fmt.Println("EndGame: address", address)
+	bytesData, err := abi.Pack(EndGame, address)
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to generate ABI function bytes data", "error", err)
 		return err

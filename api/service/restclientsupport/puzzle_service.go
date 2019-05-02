@@ -3,10 +3,11 @@ package restclientsupport
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/internal/utils"
 	"net/http"
 	"strconv"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // Play triggers play method of puzzle smart contract.
@@ -31,7 +32,6 @@ func (s *Service) Play(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(res)
 		return
 	}
-
 
 	if err := s.CreateTransactionForPlayMethod(key, amountInt); err != nil {
 		utils.GetLogInstance().Error("puzzle-play, error", err)
@@ -61,6 +61,30 @@ func (s *Service) Payout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err = s.CreateTransactionForPayoutMethod(common.HexToAddress(address), newLevelInt, sequence); err != nil {
+		utils.GetLogInstance().Error("Payout error", err)
+		json.NewEncoder(w).Encode(res)
+		return
+	}
+	res.Success = true
+	json.NewEncoder(w).Encode(res)
+}
+
+// End triggers endGame of puzzle smart contract.
+func (s *Service) End(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	address := r.FormValue("address")
+
+	fmt.Println("Payout: address", address)
+	res := &Response{
+		Success: false,
+	}
+
+	if s.CreateTransactionForPayoutMethod == nil {
+		json.NewEncoder(w).Encode(res)
+		return
+	}
+
+	if err := s.CreateTransactionForEndMethod(common.HexToAddress(address)); err != nil {
 		utils.GetLogInstance().Error("Payout error", err)
 		json.NewEncoder(w).Encode(res)
 		return
