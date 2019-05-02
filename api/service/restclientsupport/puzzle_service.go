@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -46,12 +45,12 @@ func (s *Service) Play(w http.ResponseWriter, r *http.Request) {
 // Payout triggers play payout of puzzle smart contract.
 func (s *Service) Payout(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	address := r.FormValue("address")
-	newLevel := r.FormValue("new_level")
+	key := r.FormValue("key")
+	newLevel := r.FormValue("level")
 	sequence := r.FormValue("sequence")
 	newLevelInt, err := strconv.Atoi(newLevel)
 
-	fmt.Println("Payout: address", address, "new_level", newLevelInt)
+	fmt.Println("Payout: key", key, "new_level", newLevelInt)
 	res := &Response{
 		Success: false,
 	}
@@ -60,7 +59,7 @@ func (s *Service) Payout(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(res)
 		return
 	}
-	txID, err := s.CreateTransactionForPayoutMethod(common.HexToAddress(address), newLevelInt, sequence)
+	txID, err := s.CreateTransactionForPayoutMethod(key, newLevelInt, sequence)
 
 	if err != nil {
 		utils.GetLogInstance().Error("Payout error", err)
@@ -75,9 +74,9 @@ func (s *Service) Payout(w http.ResponseWriter, r *http.Request) {
 // End triggers endGame of puzzle smart contract.
 func (s *Service) End(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	address := r.FormValue("address")
+	key := r.FormValue("key")
 
-	fmt.Println("Payout: address", address)
+	fmt.Println("endgame: key", key)
 	res := &Response{
 		Success: false,
 	}
@@ -87,7 +86,7 @@ func (s *Service) End(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	txID, err := s.CreateTransactionForEndMethod(common.HexToAddress(address))
+	txID, err := s.CreateTransactionForEndMethod(key)
 	if err != nil {
 		utils.GetLogInstance().Error("Payout error", err)
 		json.NewEncoder(w).Encode(res)

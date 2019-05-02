@@ -102,7 +102,7 @@ func (node *Node) CreateTransactionForPlayMethod(priKey string, amount int64) (s
 }
 
 // CreateTransactionForPayoutMethod generates transaction for payout method and add it into pending tx list.
-func (node *Node) CreateTransactionForPayoutMethod(address common.Address, level int, sequence string) (string, error) {
+func (node *Node) CreateTransactionForPayoutMethod(priKey string, level int, sequence string) (string, error) {
 	var err error
 	toAddress := node.PuzzleContractAddress
 
@@ -111,6 +111,10 @@ func (node *Node) CreateTransactionForPayoutMethod(address common.Address, level
 		utils.GetLogInstance().Error("Failed to generate staking contract's ABI", "error", err)
 		return "", err
 	}
+
+	key, err := crypto.HexToECDSA(priKey)
+	address := crypto.PubkeyToAddress(key.PublicKey)
+
 	// add params for address payable player, uint8 new_level, steps string
 	fmt.Println("Payout: address", address)
 	bytesData, err := abi.Pack(Payout, address, big.NewInt(int64(level)), sequence)
@@ -119,11 +123,10 @@ func (node *Node) CreateTransactionForPayoutMethod(address common.Address, level
 		return "", err
 	}
 
-	key := node.PuzzleManagerPrivateKey
 	if key == nil {
-		return "", fmt.Errorf("PuzzleManagerPrivateKey is nil")
+		return "", fmt.Errorf("user key is nil")
 	}
-	nonce := node.GetNonceOfAddress(crypto.PubkeyToAddress(key.PublicKey))
+	nonce := node.GetNonceOfAddress(address)
 	Amount := big.NewInt(0)
 	tx := types.NewTransaction(
 		nonce,
@@ -148,7 +151,7 @@ func (node *Node) CreateTransactionForPayoutMethod(address common.Address, level
 }
 
 // CreateTransactionForEndMethod generates transaction for endGame method and add it into pending tx list.
-func (node *Node) CreateTransactionForEndMethod(address common.Address) (string, error) {
+func (node *Node) CreateTransactionForEndMethod(priKey string) (string, error) {
 	var err error
 	toAddress := node.PuzzleContractAddress
 
@@ -157,6 +160,9 @@ func (node *Node) CreateTransactionForEndMethod(address common.Address) (string,
 		utils.GetLogInstance().Error("Failed to generate staking contract's ABI", "error", err)
 		return "", err
 	}
+	key, err := crypto.HexToECDSA(priKey)
+	address := crypto.PubkeyToAddress(key.PublicKey)
+
 	// add params for address payable player, uint8 new_level, steps string
 	fmt.Println("EndGame: address", address)
 	bytesData, err := abi.Pack(EndGame, address)
@@ -165,11 +171,10 @@ func (node *Node) CreateTransactionForEndMethod(address common.Address) (string,
 		return "", err
 	}
 
-	key := node.PuzzleManagerPrivateKey
 	if key == nil {
-		return "", fmt.Errorf("PuzzleManagerPrivateKey is nil")
+		return "", fmt.Errorf("user key is nil")
 	}
-	nonce := node.GetNonceOfAddress(crypto.PubkeyToAddress(key.PublicKey))
+	nonce := node.GetNonceOfAddress(address)
 	Amount := big.NewInt(0)
 	tx := types.NewTransaction(
 		nonce,
