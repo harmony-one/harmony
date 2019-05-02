@@ -35,8 +35,8 @@ type Service struct {
 	messageChan                      chan *msg_pb.Message
 	CallFaucetContract               func(common.Address) common.Hash
 	GetAccountBalance                func(common.Address) (*big.Int, error)
-	CreateTransactionForPlayMethod   func(string) error
-	CreateTransactionForPayoutMethod func(string, int) error
+	CreateTransactionForPlayMethod   func(string, string) error
+	CreateTransactionForPayoutMethod func(string, int, string) error
 }
 
 // New returns new client support service.
@@ -45,8 +45,8 @@ func New(
 	GetResult func(string) ([]string, []*big.Int),
 	CreateTransactionForPickWinner func() error,
 	CallFaucetContract func(common.Address) common.Hash, GetAccountBalance func(common.Address) (*big.Int, error),
-	CreateTransactionForPlayMethod func(string) error,
-	CreateTransactionForPayoutMethod func(string, int) error) *Service {
+	CreateTransactionForPlayMethod func(string, string) error,
+	CreateTransactionForPayoutMethod func(string, int, string) error) *Service {
 	return &Service{
 		CreateTransactionForEnterMethod:  CreateTransactionForEnterMethod,
 		GetResult:                        GetResult,
@@ -104,7 +104,7 @@ func (s *Service) Run() *http.Server {
 	s.router.Path("/play").HandlerFunc(s.Play)
 
 	// Set up router for payout.
-	s.router.Path("/payout").Queries("key", "{[0-9A-Fa-fx]*?}", "new_level", "{[0-9]*?}").HandlerFunc(s.Payout).Methods("GET")
+	s.router.Path("/payout").Queries("key", "{[0-9A-Fa-fx]*?}", "level", "{[0-9]*?}", "sequence", "{[A-Za-z]*?}").HandlerFunc(s.Payout).Methods("GET")
 	s.router.Path("/payout").HandlerFunc(s.Payout)
 	// Do serving now.
 	utils.GetLogInstance().Info("Listening on ", "port: ", Port)
@@ -243,6 +243,7 @@ func (s *Service) Winner(w http.ResponseWriter, r *http.Request) {
 func (s *Service) Play(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	key := r.FormValue("key")
+	amount := r.FormValue("amount")
 
 	fmt.Println("puzzle-play", key)
 	res := &Response{
@@ -254,8 +255,7 @@ func (s *Service) Play(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(res)
 		return
 	}
-
-	if err := s.CreateTransactionForPlayMethod(key); err != nil {
+	if err := s.CreateTransactionForPlayMethod(key, amount); err != nil {
 		utils.GetLogInstance().Error("puzzle-play, error", err)
 		json.NewEncoder(w).Encode(res)
 		return
@@ -268,10 +268,13 @@ func (s *Service) Play(w http.ResponseWriter, r *http.Request) {
 func (s *Service) Payout(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	key := r.FormValue("key")
-	newLevel := r.FormValue("new_level")
-	fmt.Println("payout: key", key, "new_level", newLevel)
-	newLevelInt, err := strconv.Atoi(newLevel)
-
+	level := r.FormValue("level")
+	sequence := r.FormValue("sequence")
+	fmt.Println("payout: key", key, "level", level, "sequence", sequence)
+	levelInt, err := strconv.Atoi(level)
+	if err != nil {
+		utils.GetLogInstance().Error("error", err)
+	}
 	fmt.Println("play")
 	res := &Response{
 		Success: false,
@@ -282,7 +285,7 @@ func (s *Service) Payout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err = s.CreateTransactionForPayoutMethod(key, newLevelInt); err != nil {
+	if err = s.CreateTransactionForPayoutMethod(key, levelInt, sequence); err != nil {
 		utils.GetLogInstance().Error("error", err)
 		json.NewEncoder(w).Encode(res)
 		return
