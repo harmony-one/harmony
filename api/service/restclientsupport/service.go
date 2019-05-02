@@ -255,11 +255,11 @@ func (s *Service) Play(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(res)
 		return
 	}
-	amountInt, err = strconv.Atoi(amount)
+	amountInt, err := strconv.Atoi(amount)
 	if err != nil {
 		utils.GetLogInstance().Error("error", err)
 	}
-	if err := s.CreateTransactionForPlayMethod(key, int(amount)); err != nil {
+	if err := s.CreateTransactionForPlayMethod(key, amountInt); err != nil {
 		utils.GetLogInstance().Error("puzzle-play, error", err)
 		json.NewEncoder(w).Encode(res)
 		return
@@ -273,7 +273,7 @@ func (s *Service) Payout(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	key := r.FormValue("key")
 	level := r.FormValue("level")
-	sequence = r.FormValue("sequence")
+	sequence := r.FormValue("sequence")
 	fmt.Println("payout: key", key, "level", level, "sequence", sequence)
 	levelInt, err := strconv.Atoi(level)
 	if err != nil {
