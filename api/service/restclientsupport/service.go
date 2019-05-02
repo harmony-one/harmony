@@ -36,7 +36,7 @@ type Service struct {
 	CallFaucetContract               func(common.Address) common.Hash
 	GetAccountBalance                func(common.Address) (*big.Int, error)
 	CreateTransactionForPlayMethod   func(string, int) error
-	CreateTransactionForPayoutMethod func(string, int, int, string) error
+	CreateTransactionForPayoutMethod func(string, int, string) error
 }
 
 // New returns new client support service.
@@ -46,7 +46,7 @@ func New(
 	CreateTransactionForPickWinner func() error,
 	CallFaucetContract func(common.Address) common.Hash, GetAccountBalance func(common.Address) (*big.Int, error),
 	CreateTransactionForPlayMethod func(string, int) error,
-	CreateTransactionForPayoutMethod func(string, int, int, string) error) *Service {
+	CreateTransactionForPayoutMethod func(string, int, string) error) *Service {
 	return &Service{
 		CreateTransactionForEnterMethod:  CreateTransactionForEnterMethod,
 		GetResult:                        GetResult,
