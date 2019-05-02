@@ -36,8 +36,8 @@ type Service struct {
 	CallFaucetContract               func(common.Address) common.Hash
 	GetAccountBalance                func(common.Address) (*big.Int, error)
 	CreateTransactionForPlayMethod   func(string, int64) (string, error)
-	CreateTransactionForPayoutMethod func(common.Address, int, string) (string, error)
-	CreateTransactionForEndMethod    func(common.Address) (string, error)
+	CreateTransactionForPayoutMethod func(string, int, string) (string, error)
+	CreateTransactionForEndMethod    func(string) (string, error)
 }
 
 // New returns new client support service.
@@ -47,8 +47,8 @@ func New(
 	CreateTransactionForPickWinner func() error,
 	CallFaucetContract func(common.Address) common.Hash, GetAccountBalance func(common.Address) (*big.Int, error),
 	CreateTransactionForPlayMethod func(string, int64) (string, error),
-	CreateTransactionForPayoutMethod func(common.Address, int, string) (string, error),
-	CreateTransactionForEndMethod func(common.Address) (string, error)) *Service {
+	CreateTransactionForPayoutMethod func(string, int, string) (string, error),
+	CreateTransactionForEndMethod func(string) (string, error)) *Service {
 	return &Service{
 		CreateTransactionForEnterMethod:  CreateTransactionForEnterMethod,
 		GetResult:                        GetResult,
@@ -103,15 +103,15 @@ func (s *Service) Run() *http.Server {
 	s.router.Path("/winner").HandlerFunc(s.Winner)
 
 	// Routing for puzzle app.
-	s.router.Path("/play").Queries("address", "{[0-9A-Fa-fx]*?}", "amount", "{[0-9]*?}").HandlerFunc(s.Play).Methods("GET")
+	s.router.Path("/play").Queries("key", "{[0-9A-Fa-fx]*?}", "amount", "{[0-9]*?}").HandlerFunc(s.Play).Methods("GET")
 	s.router.Path("/play").HandlerFunc(s.Play)
 
 	// Set up router for payout.
-	s.router.Path("/payout").Queries("address", "{[0-9A-Fa-fx]*?}", "level", "{[0-9]*?}", "sequence", "{[A-Za-z]*?}").HandlerFunc(s.Payout).Methods("GET")
+	s.router.Path("/payout").Queries("key", "{[0-9A-Fa-fx]*?}", "level", "{[0-9]*?}", "sequence", "{[A-Za-z]*?}").HandlerFunc(s.Payout).Methods("GET")
 	s.router.Path("/payout").HandlerFunc(s.Payout)
 
 	// Set up router for endgame.
-	s.router.Path("/end").Queries("address", "{[0-9A-Fa-fx]*?}").HandlerFunc(s.End).Methods("GET")
+	s.router.Path("/end").Queries("key", "{[0-9A-Fa-fx]*?}").HandlerFunc(s.End).Methods("GET")
 	s.router.Path("/end").HandlerFunc(s.End)
 	// Do serving now.
 	utils.GetLogInstance().Info("Listening on ", "port: ", Port)

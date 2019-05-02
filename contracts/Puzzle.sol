@@ -46,7 +46,7 @@ contract Puzzle {
     /**
      * @dev pay the player if they have crossed their last best level.
      */
-    function payout(address payable player, uint level, string memory /*sequence*/) public restricted {
+    function payout(address payable player, uint level, string memory /*sequence*/) public {
             require(playerInGame[player] == true, NOT_IN_GAME);
 
             uint progress = level - playerLevel[player]; //if a later transaction for a higher level comes earlier.
@@ -58,7 +58,7 @@ contract Puzzle {
     /**
      * @dev set the player's game state to inactive.
      */
-    function endGame(address player) public restricted {
+    function endGame(address player) public {
             delete playerInGame[player];
     }
 
