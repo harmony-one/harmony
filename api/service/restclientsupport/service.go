@@ -35,7 +35,7 @@ type Service struct {
 	messageChan                      chan *msg_pb.Message
 	CallFaucetContract               func(common.Address) common.Hash
 	GetAccountBalance                func(common.Address) (*big.Int, error)
-	CreateTransactionForPlayMethod   func(string, int) error
+	CreateTransactionForPlayMethod   func(string, string) error
 	CreateTransactionForPayoutMethod func(string, int, string) error
 }
 
@@ -45,7 +45,7 @@ func New(
 	GetResult func(string) ([]string, []*big.Int),
 	CreateTransactionForPickWinner func() error,
 	CallFaucetContract func(common.Address) common.Hash, GetAccountBalance func(common.Address) (*big.Int, error),
-	CreateTransactionForPlayMethod func(string, int) error,
+	CreateTransactionForPlayMethod func(string, string) error,
 	CreateTransactionForPayoutMethod func(string, int, string) error) *Service {
 	return &Service{
 		CreateTransactionForEnterMethod:  CreateTransactionForEnterMethod,
@@ -255,11 +255,7 @@ func (s *Service) Play(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(res)
 		return
 	}
-	amountInt, err := strconv.Atoi(amount)
-	if err != nil {
-		utils.GetLogInstance().Error("error", err)
-	}
-	if err := s.CreateTransactionForPlayMethod(key, amountInt); err != nil {
+	if err := s.CreateTransactionForPlayMethod(key, amount); err != nil {
 		utils.GetLogInstance().Error("puzzle-play, error", err)
 		json.NewEncoder(w).Encode(res)
 		return

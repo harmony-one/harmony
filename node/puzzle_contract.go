@@ -48,10 +48,11 @@ func (node *Node) AddPuzzleContract() {
 }
 
 // CreateTransactionForPlayMethod generates transaction for enter method and add it into pending tx list.
-func (node *Node) CreateTransactionForPlayMethod(priKey string, amount int) error {
+func (node *Node) CreateTransactionForPlayMethod(priKey string, amount string) error {
 	var err error
 	toAddress := node.PuzzleContractAddress
-	GameStake := amount * big.NewInt(params.Ether)
+	GameStake := new(big.Int)
+	GameStake, _ = GameStake.SetString(amount, 10)
 	abi, err := abi.JSON(strings.NewReader(contracts.PuzzleABI))
 	if err != nil {
 		utils.GetLogInstance().Error("puzzle-play: Failed to generate staking contract's ABI", "error", err)
