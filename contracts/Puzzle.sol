@@ -15,7 +15,7 @@ contract Puzzle {
     address public manager;  // The adress of the owner of this contract
     address payable[] public players;   // all players
 
-    constructor() public {
+    constructor() public payable {
         manager = msg.sender;
     }
 
@@ -46,7 +46,7 @@ contract Puzzle {
     /**
      * @dev pay the player if they have crossed their last best level.
      */
-    function payout(address payable player, uint level, string memory /*sequence*/) public payable restricted {
+    function payout(address payable player, uint level, string memory /*sequence*/) public restricted {
             require(playerInGame[player] == true, NOT_IN_GAME);
 
             uint progress = level - playerLevel[player]; //if a later transaction for a higher level comes earlier.
