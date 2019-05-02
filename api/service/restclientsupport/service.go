@@ -165,12 +165,15 @@ func (s *Service) FundMe(w http.ResponseWriter, r *http.Request) {
 	}
 	address := common.HexToAddress(addressHex)
 	emptyHash := common.Hash{}
-	if txID := s.CallFaucetContract(address); bytes.Compare(txID.Bytes(), emptyHash[:]) == 0 {
+
+	txID := s.CallFaucetContract(address)
+	if bytes.Compare(txID.Bytes(), emptyHash[:]) == 0 {
 		json.NewEncoder(w).Encode(res)
 		return
 	}
 
 	res.Success = true
+	res.TxID = txID.Hex()
 	json.NewEncoder(w).Encode(res)
 }
 
