@@ -36,7 +36,7 @@ type Service struct {
 	CallFaucetContract               func(common.Address) common.Hash
 	GetAccountBalance                func(common.Address) (*big.Int, error)
 	CreateTransactionForPlayMethod   func(string, int64) error
-	CreateTransactionForPayoutMethod func(common.Address, uint8, string) error
+	CreateTransactionForPayoutMethod func(common.Address, int, string) error
 }
 
 // New returns new client support service.
@@ -46,7 +46,7 @@ func New(
 	CreateTransactionForPickWinner func() error,
 	CallFaucetContract func(common.Address) common.Hash, GetAccountBalance func(common.Address) (*big.Int, error),
 	CreateTransactionForPlayMethod func(string, int64) error,
-	CreateTransactionForPayoutMethod func(common.Address, uint8, string) error) *Service {
+	CreateTransactionForPayoutMethod func(common.Address, int, string) error) *Service {
 	return &Service{
 		CreateTransactionForEnterMethod:  CreateTransactionForEnterMethod,
 		GetResult:                        GetResult,
@@ -104,7 +104,7 @@ func (s *Service) Run() *http.Server {
 	s.router.Path("/play").HandlerFunc(s.Play)
 
 	// Set up router for payout.
-	s.router.Path("/payout").Queries("address", "{[0-9A-Fa-fx]*?}", "new_level", "{[0-9]*?}").HandlerFunc(s.Payout).Methods("GET")
+	s.router.Path("/payout").Queries("address", "{[0-9A-Fa-fx]*?}", "level", "{[0-9]*?}", "sequence", "{[A-Za-z]*?}").HandlerFunc(s.Payout).Methods("GET")
 	s.router.Path("/payout").HandlerFunc(s.Payout)
 	// Do serving now.
 	utils.GetLogInstance().Info("Listening on ", "port: ", Port)

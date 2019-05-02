@@ -47,6 +47,7 @@ func (s *Service) Payout(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	address := r.FormValue("address")
 	newLevel := r.FormValue("new_level")
+	sequence := r.FormValue("sequence")
 	newLevelInt, err := strconv.Atoi(newLevel)
 
 	fmt.Println("Payout: address", address, "new_level", newLevelInt)
@@ -59,7 +60,7 @@ func (s *Service) Payout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err = s.CreateTransactionForPayoutMethod(common.HexToAddress(address), uint8(newLevelInt), "" /* place holder for steps*/); err != nil {
+	if err = s.CreateTransactionForPayoutMethod(common.HexToAddress(address), newLevelInt, sequence); err != nil {
 		utils.GetLogInstance().Error("Payout error", err)
 		json.NewEncoder(w).Encode(res)
 		return
