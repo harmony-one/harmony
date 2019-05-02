@@ -51,18 +51,18 @@ func (node *Node) AddPuzzleContract() {
 }
 
 // CreateTransactionForPlayMethod generates transaction for play method and add it into pending tx list.
-func (node *Node) CreateTransactionForPlayMethod(priKey string, amount int64) error {
+func (node *Node) CreateTransactionForPlayMethod(priKey string, amount int64) (string, error) {
 	var err error
 	toAddress := node.PuzzleContractAddress
 	abi, err := abi.JSON(strings.NewReader(contracts.PuzzleABI))
 	if err != nil {
 		utils.GetLogInstance().Error("puzzle-play: Failed to generate staking contract's ABI", "error", err)
-		return err
+		return "", err
 	}
 	bytesData, err := abi.Pack(Play)
 	if err != nil {
 		utils.GetLogInstance().Error("puzzle-play: Failed to generate ABI function bytes data", "error", err)
-		return err
+		return "", err
 	}
 
 	Stake := big.NewInt(0)
@@ -73,10 +73,10 @@ func (node *Node) CreateTransactionForPlayMethod(priKey string, amount int64) er
 	balance, err := node.GetBalanceOfAddress(address)
 	if err != nil {
 		utils.GetLogInstance().Error("puzzle-play: can not get address", "error", err)
-		return err
+		return "", err
 	} else if balance.Cmp(Stake) == -1 {
 		utils.GetLogInstance().Error("puzzle-play: insufficient fund", "error", err, "stake", Stake, "balance", balance)
-		return ErrPuzzleInsufficientFund
+		return "", ErrPuzzleInsufficientFund
 	}
 	nonce := node.GetNonceOfAddress(address)
 	tx := types.NewTransaction(
@@ -91,37 +91,37 @@ func (node *Node) CreateTransactionForPlayMethod(priKey string, amount int64) er
 
 	if err != nil {
 		utils.GetLogInstance().Error("puzzle-play: Failed to get private key", "error", err)
-		return err
+		return "", err
 	}
 	if signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, key); err == nil {
 		node.addPendingTransactions(types.Transactions{signedTx})
-		return nil
+		return signedTx.Hash().Hex(), nil
 	}
 	utils.GetLogInstance().Error("puzzle-play: Unable to call enter method", "error", err)
-	return err
+	return "", err
 }
 
 // CreateTransactionForPayoutMethod generates transaction for payout method and add it into pending tx list.
-func (node *Node) CreateTransactionForPayoutMethod(address common.Address, level int, sequence string) error {
+func (node *Node) CreateTransactionForPayoutMethod(address common.Address, level int, sequence string) (string, error) {
 	var err error
 	toAddress := node.PuzzleContractAddress
 
 	abi, err := abi.JSON(strings.NewReader(contracts.PuzzleABI))
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to generate staking contract's ABI", "error", err)
-		return err
+		return "", err
 	}
 	// add params for address payable player, uint8 new_level, steps string
 	fmt.Println("Payout: address", address)
 	bytesData, err := abi.Pack(Payout, address, big.NewInt(int64(level)), sequence)
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to generate ABI function bytes data", "error", err)
-		return err
+		return "", err
 	}
 
 	key := node.PuzzleManagerPrivateKey
 	if key == nil {
-		return fmt.Errorf("PuzzleManagerPrivateKey is nil")
+		return "", fmt.Errorf("PuzzleManagerPrivateKey is nil")
 	}
 	nonce := node.GetNonceOfAddress(crypto.PubkeyToAddress(key.PublicKey))
 	Amount := big.NewInt(0)
@@ -137,37 +137,37 @@ func (node *Node) CreateTransactionForPayoutMethod(address common.Address, level
 
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to get private key", "error", err)
-		return err
+		return "", err
 	}
 	if signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, key); err == nil {
 		node.addPendingTransactions(types.Transactions{signedTx})
-		return nil
+		return signedTx.Hash().Hex(), nil
 	}
 	utils.GetLogInstance().Error("Unable to call enter method", "error", err)
-	return err
+	return "", err
 }
 
 // CreateTransactionForEndMethod generates transaction for endGame method and add it into pending tx list.
-func (node *Node) CreateTransactionForEndMethod(address common.Address) error {
+func (node *Node) CreateTransactionForEndMethod(address common.Address) (string, error) {
 	var err error
 	toAddress := node.PuzzleContractAddress
 
 	abi, err := abi.JSON(strings.NewReader(contracts.PuzzleABI))
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to generate staking contract's ABI", "error", err)
-		return err
+		return "", err
 	}
 	// add params for address payable player, uint8 new_level, steps string
 	fmt.Println("EndGame: address", address)
 	bytesData, err := abi.Pack(EndGame, address)
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to generate ABI function bytes data", "error", err)
-		return err
+		return "", err
 	}
 
 	key := node.PuzzleManagerPrivateKey
 	if key == nil {
-		return fmt.Errorf("PuzzleManagerPrivateKey is nil")
+		return "", fmt.Errorf("PuzzleManagerPrivateKey is nil")
 	}
 	nonce := node.GetNonceOfAddress(crypto.PubkeyToAddress(key.PublicKey))
 	Amount := big.NewInt(0)
@@ -183,12 +183,12 @@ func (node *Node) CreateTransactionForEndMethod(address common.Address) error {
 
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to get private key", "error", err)
-		return err
+		return "", err
 	}
 	if signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, key); err == nil {
 		node.addPendingTransactions(types.Transactions{signedTx})
-		return nil
+		return signedTx.Hash().Hex(), nil
 	}
 	utils.GetLogInstance().Error("Unable to call enter method", "error", err)
-	return err
+	return "", err
 }
