@@ -32,13 +32,14 @@ func (s *Service) Play(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(res)
 		return
 	}
-
-	if err := s.CreateTransactionForPlayMethod(key, amountInt); err != nil {
+	txID, err := s.CreateTransactionForPlayMethod(key, amountInt)
+	if err != nil {
 		utils.GetLogInstance().Error("puzzle-play, error", err)
 		json.NewEncoder(w).Encode(res)
 		return
 	}
 	res.Success = true
+	res.TxID = txID
 	json.NewEncoder(w).Encode(res)
 }
 
@@ -59,13 +60,15 @@ func (s *Service) Payout(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(res)
 		return
 	}
+	txID, err := s.CreateTransactionForPayoutMethod(common.HexToAddress(address), newLevelInt, sequence)
 
-	if err = s.CreateTransactionForPayoutMethod(common.HexToAddress(address), newLevelInt, sequence); err != nil {
+	if err != nil {
 		utils.GetLogInstance().Error("Payout error", err)
 		json.NewEncoder(w).Encode(res)
 		return
 	}
 	res.Success = true
+	res.TxID = txID
 	json.NewEncoder(w).Encode(res)
 }
 
@@ -84,11 +87,13 @@ func (s *Service) End(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.CreateTransactionForEndMethod(common.HexToAddress(address)); err != nil {
+	txID, err := s.CreateTransactionForEndMethod(common.HexToAddress(address))
+	if err != nil {
 		utils.GetLogInstance().Error("Payout error", err)
 		json.NewEncoder(w).Encode(res)
 		return
 	}
 	res.Success = true
+	res.TxID = txID
 	json.NewEncoder(w).Encode(res)
 }

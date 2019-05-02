@@ -35,9 +35,9 @@ type Service struct {
 	messageChan                      chan *msg_pb.Message
 	CallFaucetContract               func(common.Address) common.Hash
 	GetAccountBalance                func(common.Address) (*big.Int, error)
-	CreateTransactionForPlayMethod   func(string, int64) error
-	CreateTransactionForPayoutMethod func(common.Address, int, string) error
-	CreateTransactionForEndMethod    func(common.Address) error
+	CreateTransactionForPlayMethod   func(string, int64) (string, error)
+	CreateTransactionForPayoutMethod func(common.Address, int, string) (string, error)
+	CreateTransactionForEndMethod    func(common.Address) (string, error)
 }
 
 // New returns new client support service.
@@ -46,9 +46,9 @@ func New(
 	GetResult func(string) ([]string, []*big.Int),
 	CreateTransactionForPickWinner func() error,
 	CallFaucetContract func(common.Address) common.Hash, GetAccountBalance func(common.Address) (*big.Int, error),
-	CreateTransactionForPlayMethod func(string, int64) error,
-	CreateTransactionForPayoutMethod func(common.Address, int, string) error,
-	CreateTransactionForEndMethod func(common.Address) error) *Service {
+	CreateTransactionForPlayMethod func(string, int64) (string, error),
+	CreateTransactionForPayoutMethod func(common.Address, int, string) (string, error),
+	CreateTransactionForEndMethod func(common.Address) (string, error)) *Service {
 	return &Service{
 		CreateTransactionForEnterMethod:  CreateTransactionForEnterMethod,
 		GetResult:                        GetResult,
@@ -124,6 +124,7 @@ func (s *Service) Run() *http.Server {
 type Response struct {
 	Players  []string `json:"players"`
 	Balances []string `json:"balances"`
+	TxID     string   `json:"txid"`
 	Success  bool     `json:"success"`
 }
 
