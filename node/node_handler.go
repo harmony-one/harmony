@@ -312,6 +312,17 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 	nonce := node.GetNonceOfAddress(crypto.PubkeyToAddress(node.ContractDeployerKey.PublicKey))
 	atomic.StoreUint64(&node.ContractDeployerCurrentNonce, nonce)
 
+	for _, tx := range newBlock.Transactions() {
+		msg, err := tx.AsMessage(types.HomesteadSigner{})
+		if err != nil {
+			utils.GetLogInstance().Error("Error when parsing tx into message")
+		}
+		if _, ok := node.AddressNonce[msg.From()]; ok {
+			nonce := node.GetNonceOfAddress(msg.From())
+			atomic.StoreUint64(node.AddressNonce[msg.From()], nonce)
+		}
+	}
+
 	if node.Consensus.ShardID == 0 {
 		// Update contract deployer's nonce so default contract like faucet can issue transaction with current nonce
 		nonce := node.GetNonceOfAddress(crypto.PubkeyToAddress(node.ContractDeployerKey.PublicKey))
