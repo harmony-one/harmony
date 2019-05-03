@@ -70,6 +70,10 @@ func (node *Node) CreateTransactionForPlayMethod(priKey string, amount int64) (s
 	Stake = Stake.Mul(OneEther, big.NewInt(amount))
 
 	key, err := crypto.HexToECDSA(priKey)
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to parse private key", "error", err)
+		return "", err
+	}
 	address := crypto.PubkeyToAddress(key.PublicKey)
 	balance, err := node.GetBalanceOfAddress(address)
 	if err != nil {
@@ -114,6 +118,10 @@ func (node *Node) CreateTransactionForPayoutMethod(priKey string, level int, seq
 	}
 
 	key, err := crypto.HexToECDSA(priKey)
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to parse private key", "error", err)
+		return "", err
+	}
 	address := crypto.PubkeyToAddress(key.PublicKey)
 
 	// add params for address payable player, uint8 new_level, steps string
@@ -162,6 +170,10 @@ func (node *Node) CreateTransactionForEndMethod(priKey string) (string, error) {
 		return "", err
 	}
 	key, err := crypto.HexToECDSA(priKey)
+	if err != nil {
+		utils.GetLogInstance().Error("Failed to parse private key", "error", err)
+		return "", err
+	}
 	address := crypto.PubkeyToAddress(key.PublicKey)
 
 	// add params for address payable player, uint8 new_level, steps string
