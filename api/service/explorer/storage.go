@@ -101,41 +101,6 @@ func (storage *Storage) Dump(block *types.Block, height uint32) {
 		utils.GetLogInstance().Debug("Failed to serialize block ", "error", err)
 	}
 
-	// Debug code: will clean up after relaunching.
-	// keys := map[string]int{}
-	// for _, tx := range block.Transactions() {
-	// 	explorerTransaction := GetTransaction(tx, block)
-	// 	if explorerTransaction == nil {
-	// 		continue
-	// 	}
-	// 	utils.GetLogInstance().Info("minh tx info before adding", "from", explorerTransaction.From, "to", explorerTransaction.To)
-	// 	key := GetAddressKey(explorerTransaction.To)
-	// 	var address Address
-	// 	if data, err := storage.db.Get([]byte(key)); err == nil {
-	// 		err = rlp.DecodeBytes(data, &address)
-	// 		if err == nil {
-	// 			utils.GetLogInstance().Info("existed for", "key", key, "address", address)
-	// 			keys[key] = len(address.TXs)
-	// 		} else {
-	// 			utils.GetLogInstance().Error("error when decode bytes for address", "address", address, "err", err)
-	// 		}
-	// 	} else {
-	// 		utils.GetLogInstance().Info("not existed for", "key", key)
-	// 	}
-	// 	key = GetAddressKey(explorerTransaction.From)
-	// 	if data, err := storage.db.Get([]byte(key)); err == nil {
-	// 		err = rlp.DecodeBytes(data, &address)
-	// 		if err == nil {
-	// 			utils.GetLogInstance().Info("existed for", "key", key, "address", address)
-	// 			keys[key] = len(address.TXs)
-	// 		} else {
-	// 			utils.GetLogInstance().Error("error when decode bytes for address", "address", address, "err", err)
-	// 		}
-	// 	} else {
-	// 		utils.GetLogInstance().Info("not existed for", "key", key)
-	// 	}
-	// }
-
 	// Store txs
 	for _, tx := range block.Transactions() {
 		if tx.To() == nil {
@@ -147,45 +112,6 @@ func (storage *Storage) Dump(block *types.Block, height uint32) {
 		storage.UpdateAddress(batch, explorerTransaction, tx)
 	}
 	batch.Write()
-
-	// Debug code: will clean up after relaunching.
-	// utils.GetLogInstance().Info("minh test", "inserted", []byte(strconv.Itoa(int(height))))
-	// res, _ := storage.db.Get([]byte(BlockHeightKey))
-	// utils.GetLogInstance().Info("minh test", "after inserted", res)
-	// for _, tx := range block.Transactions() {
-	// 	explorerTransaction := GetTransaction(tx, block)
-	// 	if explorerTransaction == nil {
-	// 		continue
-	// 	}
-	// 	utils.GetLogInstance().Info("****minh tx info after adding***", "from", explorerTransaction.From, "to", explorerTransaction.To)
-
-	// 	key := GetAddressKey(explorerTransaction.To)
-	// 	var address Address
-	// 	if data, err := storage.db.Get([]byte(key)); err == nil {
-	// 		err = rlp.DecodeBytes(data, &address)
-	// 		if err == nil {
-	// 			utils.GetLogInstance().Info("existed for", "key", key, "address", address)
-	// 			utils.GetLogInstance().Info("existed for", "key", key, "address", address, "before", keys[key], "after", len(address.TXs))
-	// 		} else {
-	// 			utils.GetLogInstance().Error("error when decode bytes for address", "address", address, "err", err)
-	// 		}
-	// 	} else {
-	// 		utils.GetLogInstance().Info("not existed for", "key", key)
-	// 	}
-
-	// 	key = GetAddressKey(explorerTransaction.From)
-	// 	if data, err := storage.db.Get([]byte(key)); err == nil {
-	// 		err = rlp.DecodeBytes(data, &address)
-	// 		if err == nil {
-	// 			utils.GetLogInstance().Info("existed for", "key", key, "address", address)
-	// 			utils.GetLogInstance().Info("existed for", "key", key, "address", address, "before", keys[key], "after", len(address.TXs))
-	// 		} else {
-	// 			utils.GetLogInstance().Error("error when decode bytes for address", "address", address, "err", err)
-	// 		}
-	// 	} else {
-	// 		utils.GetLogInstance().Info("not existed for", "key", key)
-	// 	}
-	// }
 }
 
 // UpdateTXStorage ...
@@ -220,10 +146,7 @@ func (storage *Storage) UpdateAddressStorage(batch ethdb.Batch, adr string, expl
 		address.Balance = tx.Value()
 	}
 	address.ID = adr
-	// Debug code. clean it up after relaunching.
-	// utils.GetLogInstance().Info("minh UpdateAddressStorage:", "address", adr, "length:", len(address.TXs))
 	address.TXs = append(address.TXs, explorerTransaction)
-	// utils.GetLogInstance().Info("minh UpdateAddressStorage after append:", "address", adr, "length:", len(address.TXs))
 	if encoded, err := rlp.EncodeToBytes(address); err == nil {
 		batch.Put([]byte(key), encoded)
 	} else {
