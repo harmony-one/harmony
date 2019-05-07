@@ -53,10 +53,11 @@ func (node *Node) UpdateStakingList(stakeInfoReturnValue *structs.StakeInfoRetur
 			copy(blsPubKey[32:64], stakeInfoReturnValue.BlsPubicKeys2[i][:])
 			copy(blsPubKey[64:96], stakeInfoReturnValue.BlsPubicKeys3[i][:])
 			node.CurrentStakes[addr] = &structs.StakeInfo{
-				blsPubKey,
-				blockNum,
-				lockPeriodCount,
-				stakeInfoReturnValue.Amounts[i],
+				Account:         addr,
+				BlsPublicKey:    blsPubKey,
+				BlockNum:        blockNum,
+				LockPeriodCount: lockPeriodCount,
+				Amount:          stakeInfoReturnValue.Amounts[i],
 			}
 		}
 	}

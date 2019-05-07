@@ -317,7 +317,29 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 	nonce := node.GetNonceOfAddress(crypto.PubkeyToAddress(node.ContractDeployerKey.PublicKey))
 	atomic.StoreUint64(&node.ContractDeployerCurrentNonce, nonce)
 
+	for _, tx := range newBlock.Transactions() {
+		msg, err := tx.AsMessage(types.HomesteadSigner{})
+		if err != nil {
+			utils.GetLogInstance().Error("Error when parsing tx into message")
+		}
+		if _, ok := node.AddressNonce[msg.From()]; ok {
+			nonce := node.GetNonceOfAddress(msg.From())
+			atomic.StoreUint64(node.AddressNonce[msg.From()], nonce)
+		}
+	}
+
 	if node.Consensus.ShardID == 0 {
+		// Update contract deployer's nonce so default contract like faucet can issue transaction with current nonce
+		nonce := node.GetNonceOfAddress(crypto.PubkeyToAddress(node.ContractDeployerKey.PublicKey))
+		atomic.StoreUint64(&node.ContractDeployerCurrentNonce, nonce)
+
+		// TODO: enable drand only for beacon chain
+		// ConfirmedBlockChannel which is listened by drand leader who will initiate DRG if its a epoch block (first block of a epoch)
+		if node.DRand != nil {
+			go func() {
+				node.ConfirmedBlockChannel <- newBlock
+			}()
+		}
 
 		// ConfirmedBlockChannel which is listened by drand leader who will initiate DRG if its a epoch block (first block of a epoch)
 		if node.DRand != nil {
@@ -560,7 +582,6 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 
 	// TODO: remove this after fully migrating to beacon chain-based committee membership
 	return 0
-	//return node.Consensus.UpdatePublicKeys(publicKeys) + node.DRand.UpdatePublicKeys(publicKeys)
 }
 
 func (node *Node) epochShardStateMessageHandler(msgPayload []byte) int {

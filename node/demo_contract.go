@@ -1,6 +1,5 @@
 package node
 
-// CreateTransactionForEnterMethod creates transaction to call enter method of lottery contract.
 import (
 	"fmt"
 	"math"
@@ -23,6 +22,7 @@ const (
 	Enter      = "enter"
 	PickWinner = "pickWinner"
 	GetPlayers = "getPlayers"
+	PuzzleFund = 100000000
 )
 
 // AddLotteryContract adds the demo lottery contract the genesis block.
@@ -73,7 +73,7 @@ func (node *Node) CreateTransactionForEnterMethod(amount int64, priKey string) e
 	tx := types.NewTransaction(
 		nonce,
 		toAddress,
-		0,
+		node.NodeConfig.ShardID,
 		Amount,
 		params.TxGas*10,
 		nil,
@@ -101,7 +101,8 @@ func (node *Node) GetResultDirectly(priKey string) (players []string, balances [
 			utils.GetLogInstance().Error("Error when HexToECDSA")
 		}
 		address := crypto.PubkeyToAddress(key.PublicKey)
-		balances = append(balances, node.GetBalanceOfAddress(address))
+		balance, err := node.GetBalanceOfAddress(address)
+		balances = append(balances, balance)
 	}
 	return players, balances
 }
@@ -110,7 +111,8 @@ func (node *Node) GetResultDirectly(priKey string) (players []string, balances [
 func (node *Node) GenerateResultDirectly(addresses []common.Address) (players []string, balances []*big.Int) {
 	for _, address := range addresses {
 		players = append(players, address.String())
-		balances = append(balances, node.GetBalanceOfAddress(address))
+		balance, _ := node.GetBalanceOfAddress(address)
+		balances = append(balances, balance)
 	}
 	fmt.Println("generate result", players, balances)
 	return players, balances
@@ -139,7 +141,7 @@ func (node *Node) GetResult(priKey string) (players []string, balances []*big.In
 	tx := types.NewTransaction(
 		nonce,
 		demoContractAddress,
-		0,
+		node.NodeConfig.ShardID,
 		nil,
 		math.MaxUint64,
 		nil,
@@ -163,7 +165,7 @@ func (node *Node) GetResult(priKey string) (players []string, balances []*big.In
 		utils.GetLogInstance().Error("Failed to unpack getPlayers", "error", err)
 		return nil, nil
 	}
-	utils.GetLogInstance().Info("get result: ", ret)
+	utils.GetLogInstance().Info("get result: ", "ret", ret)
 	fmt.Println("get result called:", ret)
 	return node.GenerateResultDirectly(ret)
 }
@@ -193,9 +195,9 @@ func (node *Node) CreateTransactionForPickWinner() error {
 	tx := types.NewTransaction(
 		nonce,
 		toAddress,
-		0,
+		node.NodeConfig.ShardID,
 		Amount,
-		params.TxGas*10,
+		params.TxGas*1000,
 		nil,
 		bytesData,
 	)

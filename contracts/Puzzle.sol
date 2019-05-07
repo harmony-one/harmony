@@ -1,79 +1,80 @@
 pragma solidity >=0.4.22; 
 
-contract GameContract {
+contract Puzzle {
     string internal constant INSUFFICIENT_FUND_MESSAGE = "Insufficient Fund";
     string internal constant RESTRICTED_MESSAGE = "Unauthorized Access";
-    string internal constant INCORRECT_SESSION = "Player requesting payout for unknown session";
+    string internal constant NOT_IN_GAME = "Player is not in an active game";
     string internal constant INCORRECT_LEVEL = "Player requesting payout for earlier level";
-    uint amount;
-    uint sessionID;
-    uint progress;
-    string seq;
+
     uint constant thresholdLevel = 4;
     mapping(address => uint) playerLevel;
-    mapping(address => uint) playerSession;
     mapping(address => uint) playerStake;
-    address public manager;  // The adress of the owner of this contract
-    address payable[] public players;   // The players of current session
+    mapping(address => bool) playerInGame;  // Whether the player is in a active game or not. Payout won't work if not in game.
+    mapping(address => bool) playerSet;
 
-    constructor() public {
+    address public manager;  // The adress of the owner of this contract
+    address payable[] public players;   // all players
+
+    constructor() public payable {
         manager = msg.sender;
     }
-    
+
     /**
-     * @dev random number generator
-     *     
+     * @dev The player enters into a new game by
+     *      paying at least 20 token.
      */
-    function random() private returns (uint) {
-        sessionID = uint(keccak256(abi.encodePacked(now, msg.sender, this)));
-        return sessionID;   
-    }
-    
-    /**
-     * @dev The player enters into the current game session by
-     *      paying at least 2 token.
-     */
-    function play() public payable returns (uint) {
-        require(msg.value >= 2 ether, INSUFFICIENT_FUND_MESSAGE);
-        sessionID = random();
+    function play() public payable {
+        require(msg.value >= 20 ether, INSUFFICIENT_FUND_MESSAGE);
+
+        if (playerSet[msg.sender] == false) {
+            // New player, never staked before
+            playerSet[msg.sender] = true;
+            players.push(msg.sender);
+        }
         playerLevel[msg.sender] = 0;
-        playerSession[msg.sender] = sessionID;
         playerStake[msg.sender] = msg.value;
-        players.push(msg.sender);
-        return sessionID;
+        playerInGame[msg.sender] = true;
     }
 
     /**
-     * @dev returns the current best level the player has crossed   
+     * @dev set the current best level the player has crossed
      */
-    function setLevel(address player, uint level) public{
+    function setLevel(address player, uint level) public {
          playerLevel[player] = level;
     }
-    
+
     /**
      * @dev pay the player if they have crossed their last best level.
      */
-    function payout(address payable player, uint level, uint session, string memory /*sequence*/) public payable restricted {
-            require(playerSession[player] == session, INCORRECT_SESSION );
-            require(level > playerLevel[player], INCORRECT_LEVEL);
-            progress = level - playerLevel[player]; //if a later transaction for a higher level comes earlier.
+    function payout(address payable player, uint level, string memory /*sequence*/) public {
+            require(playerInGame[player] == true, NOT_IN_GAME);
+
+            uint progress = level - playerLevel[player]; //if a later transaction for a higher level comes earlier.
             setLevel(player,level);
-            amount = progress*(playerStake[player]/thresholdLevel);
+            uint amount = progress*(playerStake[player]/thresholdLevel);
             player.transfer(amount);
+    }
+
+    /**
+     * @dev set the player's game state to inactive.
+     */
+    function endGame(address player) public {
+            delete playerInGame[player];
     }
 
     modifier restricted() {
         require(msg.sender == manager, RESTRICTED_MESSAGE);
         _;
     }
-    
+
     /**
      * @dev Resets the current session of one player
      */
     function resetPlayer(address player) public restricted {
             delete playerLevel[player];
-            delete playerSession[player];
-            delete playerStake[player]; 
+            delete playerInGame[player];
+            delete playerStake[player];
+            delete playerSet[player];
     }
     
     /**
@@ -95,4 +96,3 @@ contract GameContract {
         return players;
     }
 }
-

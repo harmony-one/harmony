@@ -2,16 +2,31 @@
 package consensus // consensus
 
 import (
+	"errors"
+	"math/big"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/bls/ffi/go/bls"
+
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/harmony/contracts/structs"
+	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/internal/utils/contract"
 	"github.com/harmony-one/harmony/p2p"
+)
+
+// Block reward per block signature.
+// TODO ek – per sig per stake
+var (
+	BlockReward = big.NewInt(params.Ether / 10)
 )
 
 // Consensus is the main struct with all states and data related to consensus process.
@@ -125,6 +140,34 @@ type Consensus struct {
 
 	// The p2p host used to send/receive p2p messages
 	host p2p.Host
+
+	// Staking information finder
+	stakeInfoFinder StakeInfoFinder
+}
+
+// StakeInfoFinder returns the stake information finder instance this
+// consensus uses, e.g. for block reward distribution.
+func (consensus *Consensus) StakeInfoFinder() StakeInfoFinder {
+	return consensus.stakeInfoFinder
+}
+
+// SetStakeInfoFinder sets the stake information finder instance this
+// consensus uses, e.g. for block reward distribution.
+func (consensus *Consensus) SetStakeInfoFinder(stakeInfoFinder StakeInfoFinder) {
+	consensus.stakeInfoFinder = stakeInfoFinder
+}
+
+// StakeInfoFinder finds the staking account for the given consensus key.
+type StakeInfoFinder interface {
+	// FindStakeInfoByNodeKey returns a list of staking information matching
+	// the given node key.  Caller may modify the returned slice of StakeInfo
+	// struct pointers, but must not modify the StakeInfo structs themselves.
+	FindStakeInfoByNodeKey(key *bls.PublicKey) []*structs.StakeInfo
+
+	// FindStakeInfoByAccount returns a list of staking information matching
+	// the given account.  Caller may modify the returned slice of StakeInfo
+	// struct pointers, but must not modify the StakeInfo structs themselves.
+	FindStakeInfoByAccount(addr common.Address) []*structs.StakeInfo
 }
 
 // BlockConsensusStatus used to keep track of the consensus status of multiple blocks received so far
@@ -260,7 +303,145 @@ func (consensus *Consensus) recvWithTimeout(timeoutDuration time.Duration) []byt
 func (consensus *Consensus) handleMessageUpdate(msg []byte) {
 }
 
+// AccumulateRewards credits the coinbase of the given block with the mining
+// reward. The total reward consists of the static block reward and rewards for
+// included uncles. The coinbase of each uncle block is also rewarded.
+func (consensus *Consensus) accumulateRewards(
+	config *params.ChainConfig, state *state.DB, header *types.Header,
+) error {
+	logger := utils.GetLogInstance().New("parentHash", header.ParentHash)
+	if header.ParentHash == (common.Hash{}) {
+		// This block is a genesis block,
+		// without a parent block whose signer to reward.
+		return nil
+	}
+	if consensus.ChainReader == nil {
+		return errors.New("ChainReader is nil")
+	}
+	parent := consensus.ChainReader.GetHeaderByHash(header.ParentHash)
+	if parent == nil {
+		return ctxerror.New("cannot retrieve parent header",
+			"parentHash", header.ParentHash,
+		)
+	}
+	mask, err := bls_cosi.NewMask(consensus.PublicKeys, nil)
+	if err != nil {
+		return ctxerror.New("cannot create group sig mask").WithCause(err)
+	}
+	logger.Debug("accumulateRewards: setting group sig mask",
+		"destLen", mask.Len(),
+		"srcLen", len(parent.CommitBitmap),
+	)
+	if err := mask.SetMask(parent.CommitBitmap); err != nil {
+		return ctxerror.New("cannot set group sig mask bits").WithCause(err)
+	}
+	totalAmount := big.NewInt(0)
+	numAccounts := 0
+	signingKeys := mask.GetPubKeyFromMask(true)
+	for _, key := range signingKeys {
+		stakeInfos := consensus.stakeInfoFinder.FindStakeInfoByNodeKey(key)
+		if len(stakeInfos) == 0 {
+			logger.Error("accumulateRewards: node has no stake info",
+				"nodeKey", key.GetHexString())
+			continue
+		}
+		numAccounts += len(stakeInfos)
+		for _, stakeInfo := range stakeInfos {
+			utils.GetLogInstance().Info("accumulateRewards: rewarding",
+				"block", header.Hash(),
+				"account", stakeInfo.Account,
+				"node", stakeInfo.BlsPublicKey.Hex(),
+				"amount", BlockReward)
+			state.AddBalance(stakeInfo.Account, BlockReward)
+			totalAmount = new(big.Int).Add(totalAmount, BlockReward)
+		}
+	}
+	logger.Debug("accumulateRewards: paid out block reward",
+		"numSigs", len(signingKeys),
+		"numAccounts", numAccounts,
+		"totalAmount", totalAmount)
+	return nil
+}
+
 // tryPublishBlock periodically check if block is finalized and then publish it
 // TODO: cm
 func (consensus *Consensus) tryPublishBlock() {
+}
+
+// GenesisStakeInfoFinder is a stake info finder implementation using only
+// genesis accounts.
+// When used for block reward, it rewards only foundational nodes.
+type GenesisStakeInfoFinder struct {
+	byNodeKey map[types.BlsPublicKey][]*structs.StakeInfo
+	byAccount map[common.Address][]*structs.StakeInfo
+}
+
+// FindStakeInfoByNodeKey returns the genesis account matching the given node
+// key, as a single-item StakeInfo list.
+// It returns nil if the key is not a genesis node key.
+func (f *GenesisStakeInfoFinder) FindStakeInfoByNodeKey(
+	key *bls.PublicKey,
+) []*structs.StakeInfo {
+	var pk types.BlsPublicKey
+	if err := pk.FromLibBLSPublicKey(key); err != nil {
+		ctxerror.Log15(utils.GetLogInstance().Warn, ctxerror.New(
+			"cannot convert BLS public key",
+		).WithCause(err))
+		return nil
+	}
+	l, _ := f.byNodeKey[pk]
+	return l
+}
+
+// FindStakeInfoByAccount returns the genesis account matching the given
+// address, as a single-item StakeInfo list.
+// It returns nil if the address is not a genesis account.
+func (f *GenesisStakeInfoFinder) FindStakeInfoByAccount(
+	addr common.Address,
+) []*structs.StakeInfo {
+	l, _ := f.byAccount[addr]
+	return l
+}
+
+// NewGenesisStakeInfoFinder returns a stake info finder that can look up
+// genesis nodes.
+func NewGenesisStakeInfoFinder() (*GenesisStakeInfoFinder, error) {
+	f := &GenesisStakeInfoFinder{
+		byNodeKey: make(map[types.BlsPublicKey][]*structs.StakeInfo),
+		byAccount: make(map[common.Address][]*structs.StakeInfo),
+	}
+	for idx, account := range contract.GenesisAccounts {
+		blsSecretKeyHex := contract.GenesisBLSAccounts[idx].Private
+		blsSecretKey := bls.SecretKey{}
+		if err := blsSecretKey.SetHexString(blsSecretKeyHex); err != nil {
+			return nil, ctxerror.New("cannot convert BLS secret key",
+				"accountIndex", idx,
+			).WithCause(err)
+		}
+		pub := blsSecretKey.GetPublicKey()
+		var blsPublicKey types.BlsPublicKey
+		if err := blsPublicKey.FromLibBLSPublicKey(pub); err != nil {
+			return nil, ctxerror.New("cannot convert BLS public key",
+				"accountIndex", idx,
+			).WithCause(err)
+		}
+		addressBytes, err := hexutil.Decode(account.Address)
+		if err != nil {
+			return nil, ctxerror.New("cannot decode account address",
+				"accountIndex", idx,
+			).WithCause(err)
+		}
+		var address common.Address
+		address.SetBytes(addressBytes)
+		stakeInfo := &structs.StakeInfo{
+			Account:         address,
+			BlsPublicKey:    blsPublicKey,
+			BlockNum:        common.Big0,
+			LockPeriodCount: big.NewInt(0x7fffffffffffffff),
+			Amount:          common.Big0,
+		}
+		f.byNodeKey[blsPublicKey] = append(f.byNodeKey[blsPublicKey], stakeInfo)
+		f.byAccount[address] = append(f.byAccount[address], stakeInfo)
+	}
+	return f, nil
 }

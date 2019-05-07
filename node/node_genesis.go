@@ -20,9 +20,9 @@ const (
 	// FakeAddressNumber is the number of fake address.
 	FakeAddressNumber = 100
 	// TotalInitFund is the initial total fund for the contract deployer.
-	TotalInitFund = 9000000
+	TotalInitFund = 1000000100
 	// InitFreeFundInEther is the initial fund for sample accounts.
-	InitFreeFundInEther = 1000
+	InitFreeFundInEther = 100
 )
 
 // GenesisBlockSetup setups a genesis blockchain.
@@ -39,6 +39,11 @@ func (node *Node) GenesisBlockSetup(db ethdb.Database, shardID uint32, isArchiva
 	contractDeployerFunds = contractDeployerFunds.Mul(contractDeployerFunds, big.NewInt(params.Ether))
 	genesisAlloc[contractDeployerAddress] = core.GenesisAccount{Balance: contractDeployerFunds}
 	node.ContractDeployerKey = contractDeployerKey
+
+	// Add puzzle fund
+	puzzleFunds := big.NewInt(TotalInitFund)
+	puzzleFunds = puzzleFunds.Mul(puzzleFunds, big.NewInt(params.Ether))
+	genesisAlloc[common.HexToAddress(contract.PuzzleAccounts[0].Address)] = core.GenesisAccount{Balance: puzzleFunds}
 
 	if shardID == 0 {
 		// Accounts used by validator/nodes to stake and participate in the network.
@@ -96,12 +101,12 @@ func AddNodeAddressesToGenesisAlloc(genesisAlloc core.GenesisAlloc) {
 		address := common.HexToAddress(account.Address)
 		genesisAlloc[address] = core.GenesisAccount{Balance: testBankFunds}
 	}
-	for _, account := range contract.NewNodeAccounts {
-		testBankFunds := big.NewInt(InitFreeFundInEther)
-		testBankFunds = testBankFunds.Mul(testBankFunds, big.NewInt(params.Ether))
-		address := common.HexToAddress(account.Address)
-		genesisAlloc[address] = core.GenesisAccount{Balance: testBankFunds}
-	}
+	//for _, account := range contract.NewNodeAccounts {
+	//	testBankFunds := big.NewInt(InitFreeFundInEther)
+	//	testBankFunds = testBankFunds.Mul(testBankFunds, big.NewInt(params.Ether))
+	//	address := common.HexToAddress(account.Address)
+	//	genesisAlloc[address] = core.GenesisAccount{Balance: testBankFunds}
+	//}
 	for _, account := range contract.DemoAccounts {
 		testBankFunds := big.NewInt(InitFreeFundInEther)
 		testBankFunds = testBankFunds.Mul(testBankFunds, big.NewInt(params.Ether))

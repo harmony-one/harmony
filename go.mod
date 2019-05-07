@@ -8,7 +8,7 @@ require (
 	github.com/allegro/bigcache v1.2.0 // indirect
 	github.com/aristanetworks/goarista v0.0.0-20190308231643-e9fb69a13f45 // indirect
 	github.com/cespare/cp v1.1.1 // indirect
-	github.com/deckarep/golang-set v1.7.1 // indirect
+	github.com/deckarep/golang-set v1.7.1
 	github.com/edsrzf/mmap-go v1.0.0 // indirect
 	github.com/ethereum/go-ethereum v1.8.23
 	github.com/fjl/memsize v0.0.0-20180929194037-2a09253e352a // indirect
@@ -46,6 +46,7 @@ require (
 	github.com/whyrusleeping/go-logging v0.0.0-20170515211332-0457bb6b88fc
 	golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2
 	golang.org/x/lint v0.0.0-20190313153728-d0100b6bd8b3
+	golang.org/x/net v0.0.0-20190311183353-d8887717615a
 	golang.org/x/tools v0.0.0-20190320160634-b6b7807791df
 	google.golang.org/grpc v1.19.0
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
