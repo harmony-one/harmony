@@ -4,10 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"net"
 	"net/http"
 	"os"
 	"strconv"
+
+	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/gorilla/mux"
@@ -25,21 +28,23 @@ const (
 
 // Service is the struct for explorer service.
 type Service struct {
-	router      *mux.Router
-	IP          string
-	Port        string
-	GetNodeIDs  func() []libp2p_peer.ID
-	storage     *Storage
-	server      *http.Server
-	messageChan chan *msg_pb.Message
+	router            *mux.Router
+	IP                string
+	Port              string
+	GetNodeIDs        func() []libp2p_peer.ID
+	storage           *Storage
+	server            *http.Server
+	messageChan       chan *msg_pb.Message
+	GetAccountBalance func(common.Address) (*big.Int, error)
 }
 
 // New returns explorer service.
-func New(selfPeer *p2p.Peer, GetNodeIDs func() []libp2p_peer.ID) *Service {
+func New(selfPeer *p2p.Peer, GetNodeIDs func() []libp2p_peer.ID, GetAccountBalance func(common.Address) (*big.Int, error)) *Service {
 	return &Service{
-		IP:         selfPeer.IP,
-		Port:       selfPeer.Port,
-		GetNodeIDs: GetNodeIDs,
+		IP:                selfPeer.IP,
+		Port:              selfPeer.Port,
+		GetNodeIDs:        GetNodeIDs,
+		GetAccountBalance: GetAccountBalance,
 	}
 }
 
@@ -255,6 +260,16 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data.Address = address
+
+	// Check the balance from blockchain rather than local DB dump
+	if s.GetAccountBalance != nil {
+		address := common.HexToAddress(id)
+		balance, err := s.GetAccountBalance(address)
+		if err == nil {
+			data.Address.Balance = balance
+		}
+	}
+
 	json.NewEncoder(w).Encode(data.Address)
 }
 

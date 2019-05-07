@@ -139,15 +139,21 @@ type Node struct {
 	DemoContractAddress      common.Address
 	LotteryManagerPrivateKey *ecdsa.PrivateKey
 
+	// Puzzle account.
+	PuzzleContractAddress   common.Address
+	PuzzleManagerPrivateKey *ecdsa.PrivateKey
+
 	//Node Account
 	AccountKey *ecdsa.PrivateKey
-	Address    common.Address
 
 	// For test only
 	TestBankKeys                 []*ecdsa.PrivateKey
 	ContractDeployerKey          *ecdsa.PrivateKey
 	ContractDeployerCurrentNonce uint64 // The nonce of the deployer contract at current block
 	ContractAddresses            []common.Address
+
+	// For puzzle contracts
+	AddressNonce map[common.Address]*uint64
 
 	// Shard group Message Receiver
 	shardGroupReceiver p2p.GroupReceiver
@@ -281,13 +287,18 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 				// Setup one time smart contracts
 				node.CurrentStakes = make(map[common.Address]*structs.StakeInfo)
 				node.AddStakingContractToPendingTransactions() //This will save the latest information about staked nodes in current staked
-				// TODO(minhdoan): Think of a better approach to deploy smart contract.
-				// This is temporary for demo purpose.
-				node.AddLotteryContract()
 			} else {
 				node.AddContractKeyAndAddress(scStaking)
-				node.AddContractKeyAndAddress(scLottery)
 			}
+		}
+		if isFirstTime {
+			// TODO(minhdoan): Think of a better approach to deploy smart contract.
+			// This is temporary for demo purpose.
+			node.AddLotteryContract()
+			node.AddPuzzleContract()
+		} else {
+			node.AddContractKeyAndAddress(scLottery)
+			node.AddContractKeyAndAddress(scPuzzle)
 		}
 	}
 
@@ -313,6 +324,8 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 
 	// Setup initial state of syncing.
 	node.peerRegistrationRecord = make(map[string]*syncConfig)
+
+	node.AddressNonce = make(map[common.Address]*uint64)
 
 	node.startConsensus = make(chan struct{})
 

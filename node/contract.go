@@ -21,7 +21,7 @@ import (
 
 // Constants related to smart contract.
 const (
-	FaucetContractFund = 8000000
+	FaucetContractFund = 80000000
 )
 
 // BuiltInSC is the type of built-in smart contract in blockchain
@@ -32,6 +32,7 @@ const (
 	scFaucet builtInSC = iota
 	scStaking
 	scLottery
+	scPuzzle
 )
 
 // AddStakingContractToPendingTransactions adds the deposit smart contract the genesis block.
@@ -95,7 +96,7 @@ func (node *Node) QueryStakeInfo() *structs.StakeInfoReturnValue {
 	tx := types.NewTransaction(
 		state.GetNonce(deployerAddress),
 		stakingContractAddress,
-		0,
+		node.NodeConfig.ShardID,
 		nil,
 		math.MaxUint64,
 		nil,
@@ -139,13 +140,13 @@ func (node *Node) GetNonceOfAddress(address common.Address) uint64 {
 }
 
 // GetBalanceOfAddress returns balance of an address.
-func (node *Node) GetBalanceOfAddress(address common.Address) *big.Int {
+func (node *Node) GetBalanceOfAddress(address common.Address) (*big.Int, error) {
 	state, err := node.blockchain.State()
 	if err != nil {
 		log.Error("Failed to get chain state", "Error", err)
-		return nil
+		return nil, err
 	}
-	return state.GetBalance(address)
+	return state.GetBalance(address), nil
 }
 
 // AddFaucetContractToPendingTransactions adds the faucet contract the genesis block.
@@ -167,7 +168,15 @@ func (node *Node) AddFaucetContractToPendingTransactions() {
 
 // CallFaucetContract invokes the faucet contract to give the walletAddress initial money
 func (node *Node) CallFaucetContract(address common.Address) common.Hash {
-	return node.callGetFreeToken(address)
+	// Temporary code to workaround explorer issue for searching new addresses (https://github.com/harmony-one/harmony/issues/503)
+	nonce := atomic.AddUint64(&node.ContractDeployerCurrentNonce, 1)
+	tx, _ := types.SignTx(types.NewTransaction(nonce-1, address, node.Consensus.ShardID, big.NewInt(0), params.TxGasContractCreation*10, nil, nil), types.HomesteadSigner{}, node.ContractDeployerKey)
+	utils.GetLogInstance().Info("Sending placeholder token to ", "Address", address.Hex())
+	node.addPendingTransactions(types.Transactions{tx})
+	// END Temporary code
+
+	nonce = atomic.AddUint64(&node.ContractDeployerCurrentNonce, 1)
+	return node.callGetFreeTokenWithNonce(address, nonce-1)
 }
 
 func (node *Node) callGetFreeToken(address common.Address) common.Hash {
@@ -215,6 +224,10 @@ func (node *Node) AddContractKeyAndAddress(t builtInSC) {
 		// lottery
 		lotteryPriKey, _ := crypto.HexToECDSA(contract_constants.DemoAccounts[0].Private)
 		node.DemoContractAddress = crypto.CreateAddress(crypto.PubkeyToAddress(lotteryPriKey.PublicKey), uint64(0))
+	case scPuzzle:
+		// puzzle
+		puzzlePriKey, _ := crypto.HexToECDSA(contract_constants.PuzzleAccounts[0].Private)
+		node.PuzzleContractAddress = crypto.CreateAddress(crypto.PubkeyToAddress(puzzlePriKey.PublicKey), uint64(0))
 	default:
 		utils.GetLogInstance().Error("AddContractKeyAndAddress", "unknown SC", t)
 	}
