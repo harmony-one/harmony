@@ -43,9 +43,9 @@ git clone git@github.com:harmony-one/harmony.git
 
 cd harmony
 
-go get ./...
+export GO111MODULE=on
 
-git submodule update --init --recursive
+./scripts/go_executable_build.sh
 
 ```
 
@@ -94,7 +94,7 @@ The configuration file configures number of nodes and their IP/Port.
 The script starts one local beacon chain node, the blockchain nodes, and run a transactional generator program which generates and sends simulated transactions to the local blockchain.
 
 ```bash
-./test/deploy.sh ./test/configs/ten-oneshard.txt
+./test/deploy.sh ./test/configs/beaconchain40.txt
 ```
 
 ## Testing
