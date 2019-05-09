@@ -39,6 +39,7 @@ import (
 const (
 	// MaxNumberOfTransactionsPerBlock is the max number of transaction per a block.
 	MaxNumberOfTransactionsPerBlock = 8000
+	consensusTimeout                = 5 * time.Second
 )
 
 // ReceiveGlobalMessage use libp2p pubsub mechanism to receive global broadcast messages
@@ -101,9 +102,6 @@ func (node *Node) ReceiveClientGroupMessage() {
 
 // messageHandler parses the message and dispatch the actions
 func (node *Node) messageHandler(content []byte, sender string) {
-	//	node.MaybeBroadcastAsValidator(content)
-	consensusObj := node.Consensus
-
 	msgCategory, err := proto.GetMessageCategory(content)
 	if err != nil {
 		utils.GetLogInstance().Error("Read node type failed", "err", err, "node", node)
@@ -125,13 +123,7 @@ func (node *Node) messageHandler(content []byte, sender string) {
 	switch msgCategory {
 	case proto.Consensus:
 		msgPayload, _ := proto.GetConsensusMessagePayload(content)
-		if consensusObj.IsLeader {
-			consensusObj.ProcessMessageLeader(msgPayload)
-		} else {
-			consensusObj.ProcessMessageValidator(msgPayload)
-			// TODO(minhdoan): add logic to check if the current blockchain is not sync with other consensus
-			// we should switch to other state rather than DoingConsensus.
-		}
+		node.ConsensusMessageHandler(msgPayload)
 	case proto.DRand:
 		msgPayload, _ := proto.GetDRandMessagePayload(content)
 		if node.DRand != nil {
@@ -737,4 +729,24 @@ func (node *Node) retrieveEpochShardState() (*types.EpochShardState, error) {
 		return nil, fmt.Errorf("Decode local epoch shard state error")
 	}
 	return epochShardState, nil
+}
+
+// ConsensusMessageHandler passes received message in node_handler to consensus
+func (node *Node) ConsensusMessageHandler(msgPayload []byte) {
+	if node.Consensus.ConsensusVersion == "v1" {
+		if node.Consensus.IsLeader {
+			node.Consensus.ProcessMessageLeader(msgPayload)
+		} else {
+			node.Consensus.ProcessMessageValidator(msgPayload)
+		}
+		return
+	}
+	if node.Consensus.ConsensusVersion == "v2" {
+		select {
+		case node.Consensus.MsgChan <- msgPayload:
+		case <-time.After(consensusTimeout):
+			utils.GetLogInstance().Debug("[Consensus] ConsensusMessageHandler timeout", "duration", consensusTimeout)
+		}
+		return
+	}
 }
