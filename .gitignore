@@ -67,3 +67,6 @@ go.sum
 
 # bnkey
 test/.bnkey
+
+# exported keys
+.hmy/*.key

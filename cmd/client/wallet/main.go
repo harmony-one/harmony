@@ -2,19 +2,19 @@ package main
 
 import (
 	"crypto/ecdsa"
-	cRand "crypto/rand"
 	"encoding/base64"
-	"encoding/hex"
 	"flag"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"math/big"
 	"math/rand"
 	"os"
 	"path"
 	"strconv"
+	"syscall"
 	"time"
+
+	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/ethereum/go-ethereum/common"
 	crypto2 "github.com/ethereum/go-ethereum/crypto"
@@ -32,6 +32,9 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	p2p_host "github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
+
+	eth_accounts "github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 )
 
 var (
@@ -56,12 +59,22 @@ const (
 	rpcRetry          = 3
 	defaultConfigFile = ".hmy/wallet.ini"
 	defaultProfile    = "default"
+	keystoreDir       = ".hmy/keystore"
 )
 
 var (
+	// New subcommands
+	newCommand          = flag.NewFlagSet("new", flag.ExitOnError)
+	newCommandNoPassPtr = newCommand.Bool("nopass", false, "The account has no pass phrase")
+
+	// List subcommands
+	listCommand          = flag.NewFlagSet("list", flag.ExitOnError)
+	listCommandNoPassPtr = listCommand.Bool("nopass", false, "The account has no pass phrase")
+
 	// Account subcommands
 	accountImportCommand = flag.NewFlagSet("import", flag.ExitOnError)
-	accountImportPtr     = accountImportCommand.String("privateKey", "", "Specify the private key to import")
+	accountImportPtr     = accountImportCommand.String("privateKey", "", "Specify the private keyfile to import")
+	accountImportPassPtr = accountImportCommand.String("pass", "", "Specify the passphrase of the private key")
 
 	// Transfer subcommands
 	transferCommand      = flag.NewFlagSet("transfer", flag.ExitOnError)
@@ -80,6 +93,7 @@ var (
 
 var (
 	walletProfile *utils.WalletProfile
+	ks            *keystore.KeyStore
 )
 
 // setupLog setup log for verbose output
@@ -105,10 +119,13 @@ func main() {
 		fmt.Println()
 		fmt.Println("Actions:")
 		fmt.Println("    1. new           - Generates a new account and store the private key locally")
+		fmt.Println("        --nopass         - The private key has no passphrase (for test only)")
 		fmt.Println("    2. list          - Lists all accounts in local keystore")
+		fmt.Println("        --nopass         - The private key has no passphrase (for test only)")
 		fmt.Println("    3. removeAll     - Removes all accounts in local keystore")
 		fmt.Println("    4. import        - Imports a new account by private key")
-		fmt.Println("        --privateKey     - the private key to import")
+		fmt.Println("        --pass           - The passphrase of the private key to import")
+		fmt.Println("        --privateKey     - The private key to import")
 		fmt.Println("    5. balances      - Shows the balances of all addresses or specific address")
 		fmt.Println("        --address        - The address to check balance for")
 		fmt.Println("    6. getFreeToken  - Gets free token on each shard")
@@ -146,6 +163,11 @@ ARG:
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
+
+	// create new keystore backend
+	scryptN := keystore.StandardScryptN
+	scryptP := keystore.StandardScryptP
+	ks = keystore.NewKeyStore(keystoreDir, scryptN, scryptP)
 
 	// Switch on the subcommand
 	switch os.Args[1] {
@@ -213,27 +235,73 @@ func createWalletNode() *node.Node {
 	return w
 }
 
-func processNewCommnad() {
-	randomBytes := [32]byte{}
-	_, err := io.ReadFull(cRand.Reader, randomBytes[:])
+func getPassphrase(prompt string) string {
+	fmt.Printf(prompt)
+	bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
+	if err != nil {
+		panic("read password error")
+	}
+	password := string(bytePassword)
+	fmt.Println()
+	return password
+}
 
-	if err != nil {
-		fmt.Println("Failed to get randomness for the private key...")
-		return
+func processNewCommnad() {
+	newCommand.Parse(os.Args[2:])
+	noPass := *newCommandNoPassPtr
+	password := ""
+
+	if !noPass {
+		fmt.Printf("Passphrase: ")
+		bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
+		if err != nil {
+			panic("read password error")
+		}
+		password = string(bytePassword)
+		fmt.Println()
 	}
-	priKey, err := crypto2.GenerateKey()
+
+	account, err := ks.NewAccount(password)
 	if err != nil {
-		panic("Failed to generate the private key")
+		fmt.Printf("new account error: %v\n", err)
 	}
-	storePrivateKey(crypto2.FromECDSA(priKey))
-	fmt.Printf("New account created with address:{%s}\n", crypto2.PubkeyToAddress(priKey.PublicKey).Hex())
-	fmt.Printf("Please keep a copy of the private key:{%s}\n", hex.EncodeToString(crypto2.FromECDSA(priKey)))
+	fmt.Printf("account: %s\n", account.Address.Hex())
+	fmt.Printf("URL: %s\n", account.URL)
 }
 
 func processListCommand() {
-	for i, key := range readPrivateKeys() {
-		fmt.Printf("Account %d:{%s}\n", i, crypto2.PubkeyToAddress(key.PublicKey).Hex())
-		fmt.Printf("    PrivateKey:{%s}\n", hex.EncodeToString(key.D.Bytes()))
+	listCommand.Parse(os.Args[2:])
+	noPass := *listCommandNoPassPtr
+
+	accounts := ks.Accounts()
+	for _, account := range accounts {
+		fmt.Printf("account: %s\n", account.Address.Hex())
+		fmt.Printf("URL: %s\n", account.URL)
+		password := ""
+		newpass := ""
+		if !noPass {
+			password = getPassphrase("Passphrase: ")
+			newpass = getPassphrase("Export Passphrase: ")
+		}
+		data, err := ks.Export(account, password, newpass)
+		if err == nil {
+			f, err := os.OpenFile(fmt.Sprintf(".hmy/%s.key", account.Address.Hex()), os.O_CREATE|os.O_WRONLY, 0644)
+			if err != nil {
+				panic("Failed to open keystore")
+			}
+			_, err = f.Write(data)
+			if err != nil {
+				panic("Failed to write to keystore")
+			}
+			f.Close()
+			continue
+		}
+		switch err {
+		case eth_accounts.ErrInvalidPassphrase:
+			fmt.Println("Invalid Passphrase")
+		default:
+			fmt.Printf("export error: %v\n", err)
+		}
 	}
 }
 
@@ -247,22 +315,29 @@ func processImportCommnad() {
 	if !accountImportCommand.Parsed() {
 		fmt.Println("Failed to parse flags")
 	}
-	priKeyBytes, err := hex.DecodeString(priKey)
+	pass := *accountImportPassPtr
+
+	data, err := ioutil.ReadFile(priKey)
 	if err != nil {
-		panic("Failed to parse the private key into bytes")
+		panic("Failed to readfile")
 	}
-	storePrivateKey(priKeyBytes)
-	fmt.Println("Private key imported...")
+
+	account, err := ks.Import(data, pass, pass)
+	if err != nil {
+		panic("Failed to import the private key")
+	}
+	fmt.Printf("Private key imported for account: %s\n", account.Address.Hex())
 }
 
 func processBalancesCommand() {
 	balanceCommand.Parse(os.Args[2:])
 
 	if *balanceAddressPtr == "" {
-		for i, address := range ReadAddresses() {
+		accounts := ks.Accounts()
+		for i, account := range accounts {
 			fmt.Printf("Account %d:\n", i)
-			fmt.Printf("    Address: %s\n", address.Hex())
-			for shardID, balanceNonce := range FetchBalance(address) {
+			fmt.Printf("    Address: %s\n", account.Address.Hex())
+			for shardID, balanceNonce := range FetchBalance(account.Address) {
 				fmt.Printf("    Balance in Shard %d:  %s, nonce: %v \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance), balanceNonce.nonce)
 			}
 		}
@@ -517,7 +592,13 @@ func storePrivateKey(priKey []byte) {
 
 // clearKeystore deletes all data in the local keystore
 func clearKeystore() {
-	ioutil.WriteFile("keystore", []byte{}, 0644)
+	dir, err := ioutil.ReadDir(keystoreDir)
+	if err != nil {
+		panic("Failed to read keystore directory")
+	}
+	for _, d := range dir {
+		os.RemoveAll(path.Join([]string{keystoreDir, d.Name()}...))
+	}
 	fmt.Println("All existing accounts deleted...")
 }
 
