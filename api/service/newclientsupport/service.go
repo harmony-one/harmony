@@ -3,6 +3,7 @@ package newclientsupport
 import (
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/rpc"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 )
 
@@ -41,4 +42,9 @@ func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {
 // NotifyService notify service
 func (s *Service) NotifyService(params map[string]interface{}) {
 	return
+}
+
+// APIs for the services.
+func (s *Service) APIs() []rpc.API {
+	return nil
 }

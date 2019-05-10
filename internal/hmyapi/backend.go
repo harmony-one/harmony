@@ -1,22 +1,21 @@
 package hmyapi
 
 import (
-	"github.com/harmony-one/harmony/rpc"
+	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/harmony-one/harmony/core"
 )
 
-const namespace = "hmy"
-
 // GetAPIs returns all the APIs.
-func GetAPIs(b *rpc.HmyAPIBackend) []rpc.API {
+func GetAPIs(b *core.HmyAPIBackend) []rpc.API {
 	nonceLock := new(AddrLocker)
 	return []rpc.API{
 		{
-			Namespace: namespace,
+			Namespace: "hmy",
 			Version:   "1.0",
 			Service:   NewPublicBlockChainAPI(b),
 			Public:    true,
 		}, {
-			Namespace: namespace,
+			Namespace: "hmy",
 			Version:   "1.0",
 			Service:   NewPublicTransactionPoolAPI(b, nonceLock),
 			Public:    true,
