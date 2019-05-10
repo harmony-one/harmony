@@ -140,8 +140,8 @@ func configKey(hash common.Hash) []byte {
 	return append(configPrefix, hash.Bytes()...)
 }
 
-func shardStateKey(number uint64, hash common.Hash) []byte {
-	return append(append(shardStatePrefix, encodeBlockNumber(number)...), hash.Bytes()...)
+func shardStateKey(epoch *big.Int) []byte {
+	return append(shardStatePrefix, epoch.Bytes()...)
 }
 
 func epochBlockNumberKey(epoch *big.Int) []byte {

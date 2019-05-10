@@ -401,28 +401,42 @@ func FindCommonAncestor(db DatabaseReader, a, b *types.Header) *types.Header {
 }
 
 // ReadShardState retrieves sharding state.
-func ReadShardState(db DatabaseReader, hash common.Hash, number uint64) types.ShardState {
-	data, _ := db.Get(shardStateKey(number, hash))
-	if len(data) == 0 {
-		return nil
+func ReadShardState(
+	db DatabaseReader, epoch *big.Int,
+) (shardState types.ShardState, err error) {
+	var data []byte
+	data, err = db.Get(shardStateKey(epoch))
+	if err != nil {
+		return nil, ctxerror.New("cannot read sharding state from rawdb",
+			"epoch", epoch,
+		).WithCause(err)
 	}
-	shardState := types.ShardState{}
-	if err := rlp.DecodeBytes(data, &shardState); err != nil {
-		log.Error("Fail to decode sharding state", "hash", hash, "number", number, "err", err)
-		return nil
+	if err = rlp.DecodeBytes(data, &shardState); err != nil {
+		return nil, ctxerror.New("cannot decode sharding state",
+			"epoch", epoch,
+		).WithCause(err)
 	}
-	return shardState
+	return shardState, nil
 }
 
 // WriteShardState stores sharding state into database.
-func WriteShardState(db DatabaseWriter, hash common.Hash, number uint64, shardState types.ShardState) {
+func WriteShardState(
+	db DatabaseWriter, epoch *big.Int, shardState types.ShardState,
+) (err error) {
 	data, err := rlp.EncodeToBytes(shardState)
 	if err != nil {
-		log.Crit("Failed to encode sharding state", "err", err)
+		return ctxerror.New("cannot encode sharding state",
+			"epoch", epoch,
+		).WithCause(err)
 	}
-	if err := db.Put(shardStateKey(number, hash), data); err != nil {
-		log.Crit("Failed to store sharding state", "err", err)
+	if err = db.Put(shardStateKey(epoch), data); err != nil {
+		return ctxerror.New("cannot write sharding state",
+			"epoch", epoch,
+		).WithCause(err)
 	}
+	utils.GetLogger().Info("wrote sharding state",
+		"epoch", epoch, "numShards", len(shardState))
+	return nil
 }
 
 // ReadEpochBlockNumber retrieves the epoch block number for the given epoch,
