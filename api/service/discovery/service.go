@@ -3,6 +3,7 @@ package discovery
 import (
 	"time"
 
+	"github.com/ethereum/go-ethereum/rpc"
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service"
@@ -146,4 +147,9 @@ func (s *Service) Init() {
 // SetMessageChan sets up message channel to service.
 func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {
 	s.messageChan = messageChan
+}
+
+// APIs for the services.
+func (s *Service) APIs() []rpc.API {
+	return nil
 }

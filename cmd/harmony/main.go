@@ -354,6 +354,7 @@ func main() {
 
 	go currentNode.SupportSyncing()
 	currentNode.ServiceManagerSetup()
+	currentNode.StartRPC(*port)
 	currentNode.RunServices()
 	currentNode.StartServer()
 }

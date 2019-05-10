@@ -11,7 +11,6 @@ import (
 	"github.com/harmony-one/harmony/api/service/networkinfo"
 	"github.com/harmony-one/harmony/api/service/randomness"
 	"github.com/harmony-one/harmony/api/service/restclientsupport"
-	rpcservice "github.com/harmony-one/harmony/api/service/rpc"
 	"github.com/harmony-one/harmony/api/service/staking"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -39,9 +38,6 @@ func (node *Node) setupForShardLeader() {
 	node.serviceManager.RegisterService(service.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReady))
 	// Register client support service.
 	node.serviceManager.RegisterService(service.ClientSupport, clientsupport.New(node.blockchain.State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
-
-	// Register RPC service
-	node.serviceManager.RegisterService(service.RPC, rpcservice.New(node.blockchain, &node.SelfPeer, node.TxPool))
 }
 
 func (node *Node) setupForShardValidator() {

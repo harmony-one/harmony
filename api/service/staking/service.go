@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/rpc"
 	protobuf "github.com/golang/protobuf/proto"
 	proto "github.com/harmony-one/harmony/api/client/service/proto"
 	proto_common "github.com/harmony-one/harmony/api/proto"
@@ -249,4 +250,9 @@ func (s *Service) NotifyService(params map[string]interface{}) {
 // SetMessageChan sets up message channel to service.
 func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {
 	s.messageChan = messageChan
+}
+
+// APIs for the services.
+func (s *Service) APIs() []rpc.API {
+	return nil
 }

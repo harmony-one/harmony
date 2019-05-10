@@ -1,4 +1,4 @@
-package rpc
+package core
 
 import (
 	"context"
@@ -6,25 +6,25 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/harmony-one/harmony/core"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 )
 
 // HmyAPIBackend ...
 type HmyAPIBackend struct {
-	blockchain *core.BlockChain
-	txPool     *core.TxPool
+	blockchain *BlockChain
+	txPool     *TxPool
 }
 
 // NewBackend ...
-func NewBackend(blockchain *core.BlockChain, txPool *core.TxPool) *HmyAPIBackend {
+func NewBackend(blockchain *BlockChain, txPool *TxPool) *HmyAPIBackend {
 	return &HmyAPIBackend{blockchain, txPool}
 }
 
 // ChainDb ...
 func (b *HmyAPIBackend) ChainDb() ethdb.Database {
-	return b.blockchain.ChainDb()
+	return b.blockchain.db
 }
 
 // GetBlock ...
@@ -38,22 +38,22 @@ func (b *HmyAPIBackend) GetPoolTransaction(hash common.Hash) *types.Transaction 
 }
 
 // BlockByNumber ...
-func (b *HmyAPIBackend) BlockByNumber(ctx context.Context, blockNr BlockNumber) (*types.Block, error) {
+func (b *HmyAPIBackend) BlockByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Block, error) {
 	// Pending block is only known by the miner
-	if blockNr == PendingBlockNumber {
+	if blockNr == rpc.PendingBlockNumber {
 		return nil, errors.New("not implemented")
 	}
 	// Otherwise resolve and return the block
-	if blockNr == latestBlockNumber {
+	if blockNr == rpc.LatestBlockNumber {
 		return b.blockchain.CurrentBlock(), nil
 	}
 	return b.blockchain.GetBlockByNumber(uint64(blockNr)), nil
 }
 
 // StateAndHeaderByNumber ...
-func (b *HmyAPIBackend) StateAndHeaderByNumber(ctx context.Context, blockNr BlockNumber) (*state.DB, *types.Header, error) {
+func (b *HmyAPIBackend) StateAndHeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*state.DB, *types.Header, error) {
 	// Pending state is only known by the miner
-	if blockNr == PendingBlockNumber {
+	if blockNr == rpc.PendingBlockNumber {
 		return nil, nil, errors.New("not implemented")
 	}
 	// Otherwise resolve the block number and return its state
@@ -66,13 +66,13 @@ func (b *HmyAPIBackend) StateAndHeaderByNumber(ctx context.Context, blockNr Bloc
 }
 
 // HeaderByNumber ...
-func (b *HmyAPIBackend) HeaderByNumber(ctx context.Context, blockNr BlockNumber) (*types.Header, error) {
+func (b *HmyAPIBackend) HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Header, error) {
 	// Pending block is only known by the miner
-	if blockNr == PendingBlockNumber {
+	if blockNr == rpc.PendingBlockNumber {
 		return nil, errors.New("not implemented")
 	}
 	// Otherwise resolve and return the block
-	if blockNr == latestBlockNumber {
+	if blockNr == rpc.LatestBlockNumber {
 		return b.blockchain.CurrentBlock().Header(), nil
 	}
 	return b.blockchain.GetHeaderByNumber(uint64(blockNr)), nil
