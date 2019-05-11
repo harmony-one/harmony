@@ -84,13 +84,6 @@ func (consensus *Consensus) Prepare(chain consensus_engine.ChainReader, header *
 	return nil
 }
 
-// AccumulateRewards credits the coinbase of the given block with the mining
-// reward. The total reward consists of the static block reward and rewards for
-// included uncles. The coinbase of each uncle block is also rewarded.
-func accumulateRewards(config *params.ChainConfig, state *state.DB, header *types.Header) {
-	// TODO: implement mining rewards
-}
-
 // GetSelfAddress returns the address in hex
 func (consensus *Consensus) GetSelfAddress() common.Address {
 	return consensus.SelfAddress
@@ -98,9 +91,8 @@ func (consensus *Consensus) GetSelfAddress() common.Address {
 
 // Populates the common basic fields for all consensus message.
 func (consensus *Consensus) populateMessageFields(request *msg_pb.ConsensusRequest) {
-	// TODO(minhdoan): Maybe look into refactor this.
-	// 4 byte consensus id
 	request.ConsensusId = consensus.consensusID
+	request.SeqNum = consensus.seqNum
 
 	// 32 byte block hash
 	request.BlockHash = consensus.blockHash[:]

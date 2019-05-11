@@ -33,10 +33,13 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 			case <-readySignal:
 				time.Sleep(1000 * time.Millisecond) // Delay a bit so validator is catched up (test-only).
 			case <-time.After(ConsensusTimeOut * time.Second):
-				node.Consensus.ResetState()
-				timeoutCount++
-				utils.GetLogInstance().Debug("Consensus timeout, retry!", "count", timeoutCount)
-				// FIXME: retry is not working, there is no retry logic here. It will only wait for new transaction.
+				if node.Consensus.LeaderPubKey.IsEqual(node.Consensus.PubKey) {
+					node.Consensus.ResetState()
+					timeoutCount++
+					utils.GetLogInstance().Debug("Consensus timeout, retry!", "count", timeoutCount)
+				} else {
+					timeoutCount = 0
+				}
 			case <-stopChan:
 				utils.GetLogInstance().Debug("Consensus propose new block: STOPPED!")
 				return
@@ -75,11 +78,13 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 				// periodically check whether we have enough transactions to package into block.
 				time.Sleep(PeriodicBlock)
 			}
-			// Send the new block to Consensus so it can be confirmed.
+			// Send the new block to Consensus so it can be confirmed
+			// if node is not leader, newBlock send will just timeout
 			if newBlock != nil {
-				utils.GetLogInstance().Debug("Consensus sending new block to block channel")
-				node.BlockChannel <- newBlock
-				utils.GetLogInstance().Debug("Consensus sent new block to block channel")
+				select {
+				case node.BlockChannel <- newBlock:
+				case <-time.After(ConsensusTimeout * time.Second):
+				}
 			}
 		}
 	}()

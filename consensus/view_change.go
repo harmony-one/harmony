@@ -1,13 +1,17 @@
 package consensus
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/harmony-one/harmony/internal/utils"
+)
 
 // PbftPhase  PBFT phases: pre-prepare, prepare and commit
 type PbftPhase int
 
 // Enum for PbftPhase
 const (
-	Annonce PbftPhase = iota
+	Announce PbftPhase = iota
 	Prepare
 	Commit
 	Finish
@@ -58,4 +62,43 @@ func (consensus *Consensus) startViewChange(consensusID uint32) {
 	consensus.mode.SetMode(ViewChanging)
 	consensus.mode.SetConsensusID(consensusID)
 	// TODO (cm): implement the actual logic
+}
+
+// switchPhase will switch PbftPhase to nextPhase if the desirePhase equals the nextPhase
+func (consensus *Consensus) switchPhase(desirePhase PbftPhase) {
+	var nextPhase PbftPhase
+	switch consensus.phase {
+	case Announce:
+		nextPhase = Prepare
+	case Prepare:
+		nextPhase = Commit
+	case Commit:
+		nextPhase = Finish
+	case Finish:
+		nextPhase = Announce
+	}
+	if nextPhase == desirePhase {
+		consensus.mutex.Lock()
+		consensus.phase = nextPhase
+		consensus.mutex.Unlock()
+	}
+}
+
+// GetLeaderKey uniquely determine who is the leader for given consensusID
+func (consensus *Consensus) GetNextLeaderKey() *bls.PublicKey {
+	idx := getIndexOfPubKey(consensus.LeaderPubKey)
+	if idx == -1 {
+		utils.GetLogInstance().Warn("GetNextLeaderKey: currentLeaderKey not found", "key", currentLeaderKey.GetHexString())
+	}
+	idx = (idx + 1) % len(consensus.PublicKeys)
+	return consensus.PublicKeys[idx]
+}
+
+func (consensus *Consensus) getIndexOfPubKey(pubKey *bls.PublicKey) int {
+	for i := 0; i < len(consensus.PublicKeys); i++ {
+		if consensus.PublicKeys[i].IsEqual(pubKey) {
+			return i
+		}
+	}
+	return -1 // not found
 }
