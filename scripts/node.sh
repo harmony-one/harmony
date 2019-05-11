@@ -85,8 +85,11 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 if [ -z "$1" ]; then
-   echo "Please set account index. validate ranges are 46-49, 96-99, 146-149, 196-199"
    echo "Usage: $0 account_index_number"
+   echo
+   echo "Please provide account index.  Valid ranges are 44-49, 94-99, 144-149, 194-199."
+   echo "Please contact us in #nodes channel of discord if not sure which one to use."
+   echo
    exit 1
 fi
 
