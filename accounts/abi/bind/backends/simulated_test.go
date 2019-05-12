@@ -25,8 +25,8 @@ import (
 	"github.com/harmony-one/harmony/accounts/abi/bind"
 	"github.com/harmony-one/harmony/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 

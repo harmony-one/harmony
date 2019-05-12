@@ -251,7 +251,7 @@ var bindTests = []struct {
 
 			"github.com/harmony-one/harmony/accounts/abi/bind"
 			"github.com/harmony-one/harmony/accounts/abi/bind/backends"
-			"github.com/ethereum/go-ethereum/core"
+			"github.com/harmony-one/harmony/core"
 			"github.com/ethereum/go-ethereum/crypto"
 		`,
 		`
@@ -300,7 +300,7 @@ var bindTests = []struct {
 
 			"github.com/harmony-one/harmony/accounts/abi/bind"
 			"github.com/harmony-one/harmony/accounts/abi/bind/backends"
-			"github.com/ethereum/go-ethereum/core"
+			"github.com/harmony-one/harmony/core"
 			"github.com/ethereum/go-ethereum/crypto"
 		`,
 		`
@@ -340,7 +340,7 @@ var bindTests = []struct {
 
 			"github.com/harmony-one/harmony/accounts/abi/bind"
 			"github.com/harmony-one/harmony/accounts/abi/bind/backends"
-			"github.com/ethereum/go-ethereum/core"
+			"github.com/harmony-one/harmony/core"
 			"github.com/ethereum/go-ethereum/crypto"
 		`,
 		`
@@ -392,7 +392,7 @@ var bindTests = []struct {
 			"github.com/harmony-one/harmony/accounts/abi/bind"
 			"github.com/harmony-one/harmony/accounts/abi/bind/backends"
 			"github.com/ethereum/go-ethereum/common"
-			"github.com/ethereum/go-ethereum/core"
+			"github.com/harmony-one/harmony/core"
 			"github.com/ethereum/go-ethereum/crypto"
 		`,
 		`
@@ -434,7 +434,7 @@ var bindTests = []struct {
 
 			"github.com/harmony-one/harmony/accounts/abi/bind"
 			"github.com/harmony-one/harmony/accounts/abi/bind/backends"
-			"github.com/ethereum/go-ethereum/core"
+			"github.com/harmony-one/harmony/core"
 			"github.com/ethereum/go-ethereum/crypto"
 		`,
 		`
@@ -516,7 +516,7 @@ var bindTests = []struct {
 
 			"github.com/harmony-one/harmony/accounts/abi/bind"
 			"github.com/harmony-one/harmony/accounts/abi/bind/backends"
-			"github.com/ethereum/go-ethereum/core"
+			"github.com/harmony-one/harmony/core"
 			"github.com/ethereum/go-ethereum/crypto"
 		`,
 		`
@@ -560,7 +560,7 @@ var bindTests = []struct {
 			"github.com/harmony-one/harmony/accounts/abi/bind"
 			"github.com/harmony-one/harmony/accounts/abi/bind/backends"
 			"github.com/ethereum/go-ethereum/common"
-			"github.com/ethereum/go-ethereum/core"
+			"github.com/harmony-one/harmony/core"
 			"github.com/ethereum/go-ethereum/crypto"
 		`,
 		`
@@ -629,7 +629,7 @@ var bindTests = []struct {
 
 			"github.com/harmony-one/harmony/accounts/abi/bind"
 			"github.com/harmony-one/harmony/accounts/abi/bind/backends"
-			"github.com/ethereum/go-ethereum/core"
+			"github.com/harmony-one/harmony/core"
 			"github.com/ethereum/go-ethereum/crypto"
 		`,
 		`
@@ -717,7 +717,7 @@ var bindTests = []struct {
 			"github.com/harmony-one/harmony/accounts/abi/bind"
 			"github.com/harmony-one/harmony/accounts/abi/bind/backends"
 			"github.com/ethereum/go-ethereum/common"
-			"github.com/ethereum/go-ethereum/core"
+			"github.com/harmony-one/harmony/core"
 			"github.com/ethereum/go-ethereum/crypto"
 		`,
 		`
@@ -901,7 +901,7 @@ var bindTests = []struct {
 
 			"github.com/harmony-one/harmony/accounts/abi/bind"
 			"github.com/harmony-one/harmony/accounts/abi/bind/backends"
-			"github.com/ethereum/go-ethereum/core"
+			"github.com/harmony-one/harmony/core"
 			"github.com/ethereum/go-ethereum/crypto"
 		`,
 		`
