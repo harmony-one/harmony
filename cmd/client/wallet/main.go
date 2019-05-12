@@ -197,10 +197,23 @@ ARG:
 	}
 }
 
+//go:generate go run ../../../scripts/wallet_embed_ini_files.go
+
 func readProfile(profile string) {
 	fmt.Printf("Using %s profile for wallet\n", profile)
+
+	// try to load .hmy/wallet.ini from filesystem
+	// use default_wallet_ini if .hmy/wallet.ini doesn't exist
 	var err error
-	walletProfile, err = utils.ReadWalletProfile(defaultConfigFile, profile)
+	var iniBytes []byte
+
+	iniBytes, err = ioutil.ReadFile(defaultConfigFile)
+	if err != nil {
+		log.Debug(fmt.Sprintf("%s doesn't exist, using default ini\n", defaultConfigFile))
+		iniBytes = []byte(defaultWalletIni)
+	}
+
+	walletProfile, err = utils.ReadWalletProfile(iniBytes, profile)
 	if err != nil {
 		fmt.Printf("Read wallet profile error: %v\nExiting ...\n", err)
 		os.Exit(2)

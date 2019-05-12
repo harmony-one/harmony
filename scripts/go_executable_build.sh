@@ -6,7 +6,7 @@ declare -A SRC
 SRC[harmony]=cmd/harmony/main.go
 SRC[txgen]=cmd/client/txgen/main.go
 SRC[bootnode]=cmd/bootnode/main.go
-SRC[wallet]=cmd/client/wallet/main.go
+SRC[wallet]="cmd/client/wallet/main.go cmd/client/wallet/generated_ini.go"
 
 BINDIR=bin
 BUCKET=unique-bucket-bin
