@@ -29,7 +29,7 @@ import (
 	"text/template"
 	"unicode"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/harmony-one/harmony/accounts/abi"
 )
 
 // Lang is a target programming language selector to generate bindings for.
