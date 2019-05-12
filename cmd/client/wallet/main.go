@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/ecdsa"
 	"encoding/base64"
 	"flag"
 	"fmt"
@@ -10,21 +9,19 @@ import (
 	"math/rand"
 	"os"
 	"path"
-	"strconv"
 	"syscall"
 	"time"
 
 	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/ethereum/go-ethereum/common"
-	crypto2 "github.com/ethereum/go-ethereum/crypto"
-	"github.com/harmony-one/harmony/core"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/api/client"
 	clientService "github.com/harmony-one/harmony/api/client/service"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -33,8 +30,8 @@ import (
 	p2p_host "github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 
-	eth_accounts "github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/harmony-one/harmony/accounts"
+	"github.com/harmony-one/harmony/accounts/keystore"
 )
 
 var (
@@ -77,12 +74,13 @@ var (
 	accountImportPassPtr = accountImportCommand.String("pass", "", "Specify the passphrase of the private key")
 
 	// Transfer subcommands
-	transferCommand      = flag.NewFlagSet("transfer", flag.ExitOnError)
-	transferSenderPtr    = transferCommand.String("from", "0", "Specify the sender account address or index")
-	transferReceiverPtr  = transferCommand.String("to", "", "Specify the receiver account")
-	transferAmountPtr    = transferCommand.Float64("amount", 0, "Specify the amount to transfer")
-	transferShardIDPtr   = transferCommand.Int("shardID", 0, "Specify the shard ID for the transfer")
-	transferInputDataPtr = transferCommand.String("inputData", "", "Base64-encoded input data to embed in the transaction")
+	transferCommand       = flag.NewFlagSet("transfer", flag.ExitOnError)
+	transferSenderPtr     = transferCommand.String("from", "0", "Specify the sender account address or index")
+	transferReceiverPtr   = transferCommand.String("to", "", "Specify the receiver account")
+	transferAmountPtr     = transferCommand.Float64("amount", 0, "Specify the amount to transfer")
+	transferShardIDPtr    = transferCommand.Int("shardID", 0, "Specify the shard ID for the transfer")
+	transferInputDataPtr  = transferCommand.String("inputData", "", "Base64-encoded input data to embed in the transaction")
+	transferSenderPassPtr = transferCommand.String("pass", "", "Passphrase of the sender's private key")
 
 	freeTokenCommand    = flag.NewFlagSet("getFreeToken", flag.ExitOnError)
 	freeTokenAddressPtr = freeTokenCommand.String("address", "", "Specify the account address to receive the free token")
@@ -136,6 +134,7 @@ func main() {
 		fmt.Println("        --amount         - The amount of token to transfer")
 		fmt.Println("        --shardID        - The shard Id for the transfer")
 		fmt.Println("        --inputData      - Base64-encoded input data to embed in the transaction")
+		fmt.Println("        --pass           - Passphrase of sender's private key")
 		os.Exit(1)
 	}
 
@@ -273,8 +272,8 @@ func processListCommand() {
 	listCommand.Parse(os.Args[2:])
 	noPass := *listCommandNoPassPtr
 
-	accounts := ks.Accounts()
-	for _, account := range accounts {
+	allAccounts := ks.Accounts()
+	for _, account := range allAccounts {
 		fmt.Printf("account: %s\n", account.Address.Hex())
 		fmt.Printf("URL: %s\n", account.URL)
 		password := ""
@@ -297,7 +296,7 @@ func processListCommand() {
 			continue
 		}
 		switch err {
-		case eth_accounts.ErrInvalidPassphrase:
+		case accounts.ErrInvalidPassphrase:
 			fmt.Println("Invalid Passphrase")
 		default:
 			fmt.Printf("export error: %v\n", err)
@@ -333,8 +332,8 @@ func processBalancesCommand() {
 	balanceCommand.Parse(os.Args[2:])
 
 	if *balanceAddressPtr == "" {
-		accounts := ks.Accounts()
-		for i, account := range accounts {
+		allAccounts := ks.Accounts()
+		for i, account := range allAccounts {
 			fmt.Printf("Account %d:\n", i)
 			fmt.Printf("    Address: %s\n", account.Address.Hex())
 			for shardID, balanceNonce := range FetchBalance(account.Address) {
@@ -372,6 +371,7 @@ func processTransferCommand() {
 	amount := *transferAmountPtr
 	shardID := *transferShardIDPtr
 	base64InputData := *transferInputDataPtr
+	senderPass := *transferSenderPassPtr
 
 	inputData, err := base64.StdEncoding.DecodeString(base64InputData)
 	if err != nil {
@@ -388,31 +388,6 @@ func processTransferCommand() {
 		fmt.Println("Please specify positive amount to transfer")
 		return
 	}
-	priKeys := readPrivateKeys()
-	if len(priKeys) == 0 {
-		fmt.Println("No imported account to use.")
-		return
-	}
-	senderIndex, err := strconv.Atoi(sender)
-	addresses := ReadAddresses()
-	if err != nil {
-		senderIndex = -1
-		for i, address := range addresses {
-			if address.Hex() == sender {
-				senderIndex = i
-				break
-			}
-		}
-		if senderIndex == -1 {
-			fmt.Println("The specified sender account does not exist in the wallet.")
-			return
-		}
-	}
-
-	if senderIndex >= len(priKeys) {
-		fmt.Println("Sender account index out of bounds.")
-		return
-	}
 
 	receiverAddress := common.HexToAddress(receiver)
 	if len(receiverAddress) != 20 {
@@ -420,9 +395,11 @@ func processTransferCommand() {
 		return
 	}
 
-	// Generate transaction
-	senderPriKey := priKeys[senderIndex]
-	senderAddress := addresses[senderIndex]
+	senderAddress := common.HexToAddress(sender)
+	if len(senderAddress) != 20 {
+		fmt.Println("The sender address is not valid.")
+		return
+	}
 
 	walletNode := createWalletNode()
 
@@ -433,6 +410,7 @@ func processTransferCommand() {
 		fmt.Printf("Failed connecting to the shard %d\n", shardID)
 		return
 	}
+
 	balance := state.balance
 	balance = balance.Div(balance, big.NewInt(params.GWei))
 	if amount > float64(balance.Uint64())/params.GWei {
@@ -447,10 +425,25 @@ func processTransferCommand() {
 		fmt.Printf("cannot calculate required gas: %v\n", err)
 		return
 	}
+
 	tx := types.NewTransaction(
 		state.nonce, receiverAddress, uint32(shardID), amountBigInt,
 		gas, nil, inputData)
-	tx, _ = types.SignTx(tx, types.HomesteadSigner{}, senderPriKey)
+
+	account, err := ks.Find(accounts.Account{Address: senderAddress})
+	if err != nil {
+		fmt.Printf("Find Account Error: %v\n", err)
+		return
+	}
+
+	ks.Unlock(account, senderPass)
+
+	tx, err = ks.SignTx(account, tx, nil)
+	if err != nil {
+		fmt.Printf("SignTx Error: %v\n", err)
+		return
+	}
+
 	submitTransaction(tx, walletNode, uint32(shardID))
 }
 
@@ -555,41 +548,6 @@ func GetFreeToken(address common.Address) {
 	}
 }
 
-// ReadAddresses reads the addresses stored in local keystore
-func ReadAddresses() []common.Address {
-	priKeys := readPrivateKeys()
-	addresses := []common.Address{}
-	for _, key := range priKeys {
-		addresses = append(addresses, crypto2.PubkeyToAddress(key.PublicKey))
-	}
-	return addresses
-}
-
-// storePrivateKey stores the specified private key in local keystore
-func storePrivateKey(priKey []byte) {
-	privateKey, err := crypto2.ToECDSA(priKey)
-	if err != nil {
-		panic("Failed to deserialize private key")
-	}
-	for _, address := range ReadAddresses() {
-		if address == crypto2.PubkeyToAddress(privateKey.PublicKey) {
-			fmt.Println("The key already exists in the keystore")
-			return
-		}
-	}
-	f, err := os.OpenFile("keystore", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-
-	if err != nil {
-		panic("Failed to open keystore")
-	}
-	_, err = f.Write(priKey)
-
-	if err != nil {
-		panic("Failed to write to keystore")
-	}
-	f.Close()
-}
-
 // clearKeystore deletes all data in the local keystore
 func clearKeystore() {
 	dir, err := ioutil.ReadDir(keystoreDir)
@@ -600,24 +558,6 @@ func clearKeystore() {
 		os.RemoveAll(path.Join([]string{keystoreDir, d.Name()}...))
 	}
 	fmt.Println("All existing accounts deleted...")
-}
-
-// readPrivateKeys reads all the private key stored in local keystore
-func readPrivateKeys() []*ecdsa.PrivateKey {
-	keys, err := ioutil.ReadFile("keystore")
-	if err != nil {
-		return []*ecdsa.PrivateKey{}
-	}
-	priKeys := []*ecdsa.PrivateKey{}
-	for i := 0; i < len(keys); i += 32 {
-		priKey, err := crypto2.ToECDSA(keys[i : i+32])
-		if err != nil {
-			fmt.Println("Failed deserializing key data: ", keys[i:i+32])
-			continue
-		}
-		priKeys = append(priKeys, priKey)
-	}
-	return priKeys
 }
 
 // submitTransaction submits the transaction to the Harmony network
