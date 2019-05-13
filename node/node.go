@@ -153,7 +153,7 @@ type Node struct {
 	ContractAddresses            []common.Address
 
 	// For puzzle contracts
-	AddressNonce map[common.Address]*uint64
+	AddressNonce sync.Map
 
 	// Shard group Message Receiver
 	shardGroupReceiver p2p.GroupReceiver
@@ -324,8 +324,6 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 
 	// Setup initial state of syncing.
 	node.peerRegistrationRecord = make(map[string]*syncConfig)
-
-	node.AddressNonce = make(map[common.Address]*uint64)
 
 	node.startConsensus = make(chan struct{})
 

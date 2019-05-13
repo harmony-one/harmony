@@ -40,6 +40,11 @@ func (node *Node) getNeighborPeers(neighbor *sync.Map) []p2p.Peer {
 	return tmp
 }
 
+// GetSync gets sync-ed to blockchain without joining consensus
+func (node *Node) GetSync() {
+	go node.DoSyncing(node.blockchain, node.Worker, node.GetSyncingPeers, false) //Don't join consensus
+}
+
 // GetBeaconSyncingPeers returns a list of peers for beaconchain syncing
 func (node *Node) GetBeaconSyncingPeers() []p2p.Peer {
 	return node.getNeighborPeers(&node.BeaconNeighbors)
