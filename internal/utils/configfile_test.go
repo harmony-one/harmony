@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"io/ioutil"
 	"reflect"
 	"testing"
 
@@ -95,14 +96,19 @@ func TestReadWalletProfile(t *testing.T) {
 		},
 	}
 
-	config1, err := ReadWalletProfile("test.ini", "default")
+	testIniBytes, err := ioutil.ReadFile("test.ini")
+	if err != nil {
+		t.Fatalf("Failed to read test.ini: %v", err)
+	}
+
+	config1, err := ReadWalletProfile(testIniBytes, "default")
 	if err != nil {
 		t.Fatalf("ReadWalletProfile Error: %v", err)
 	}
 	if !reflect.DeepEqual(config[0], config1) {
 		t.Errorf("Got: %v\nExpect: %v\n", config1, config[0])
 	}
-	config2, err := ReadWalletProfile("test.ini", "testnet")
+	config2, err := ReadWalletProfile(testIniBytes, "testnet")
 	if err != nil {
 		t.Fatalf("ReadWalletProfile Error: %v", err)
 	}

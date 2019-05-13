@@ -18,8 +18,8 @@ type WalletProfile struct {
 }
 
 // ReadWalletProfile reads an ini file and return WalletProfile
-func ReadWalletProfile(fn string, profile string) (*WalletProfile, error) {
-	cfg, err := ini.ShadowLoad(fn)
+func ReadWalletProfile(iniBytes []byte, profile string) (*WalletProfile, error) {
+	cfg, err := ini.ShadowLoad(iniBytes)
 	if err != nil {
 		return nil, err
 	}
