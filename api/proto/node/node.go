@@ -6,14 +6,10 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/harmony-one/harmony/internal/utils"
-
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/harmony/core/types"
-
 	"github.com/harmony-one/harmony/api/proto"
-	peer "github.com/libp2p/go-libp2p-peer"
+	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // MessageType is to indicate the specific type of message under Node category
@@ -30,12 +26,6 @@ const (
 	ShardState
 	// TODO: add more types
 )
-
-// BlockchainSyncMessage is a struct for blockchain sync message.
-type BlockchainSyncMessage struct {
-	BlockHeight int
-	BlockHashes []common.Hash
-}
 
 // BlockchainSyncMessageType represents BlockchainSyncMessageType type.
 type BlockchainSyncMessageType int
@@ -76,21 +66,6 @@ func (r RoleType) String() string {
 	return "Unknown"
 }
 
-// Info refers to Peer struct in p2p/peer.go
-// this is basically a simplified version of Peer
-// for network transportation
-type Info struct {
-	IP     string
-	Port   string
-	PubKey []byte
-	Role   RoleType
-	PeerID peer.ID // Peerstore ID
-}
-
-func (info Info) String() string {
-	return fmt.Sprintf("Info:%v/%v=>%v", info.IP, info.Port, info.PeerID.Pretty())
-}
-
 // BlockMessageType represents the type of messages used for Node/Block
 type BlockMessageType int
 
@@ -107,26 +82,47 @@ const (
 	STOP ControlMessageType = iota
 )
 
+// ConstructPingMessage contructs ping message from node to leader
+func (p PingMessageType) ConstructPingMessage() []byte {
+	siz := p.XXX_Size()
+	b := make([]byte, 0, siz)
+	ret, err := p.XXX_Marshal(b, true)
+	if err != nil {
+		return nil
+	}
+	return ret
+}
+
+// ConstructPongMessage contructs pong message from leader to node
+func (p PongMessageType) ConstructPongMessage() []byte {
+	siz := p.XXX_Size()
+	b := make([]byte, 0, siz)
+	ret, err := p.XXX_Marshal(b, true)
+	if err != nil {
+		return nil
+	}
+	return ret
+}
+
 // SerializeBlockchainSyncMessage serializes BlockchainSyncMessage.
 func SerializeBlockchainSyncMessage(blockchainSyncMessage *BlockchainSyncMessage) []byte {
-	var result bytes.Buffer
-	encoder := gob.NewEncoder(&result)
-	err := encoder.Encode(blockchainSyncMessage)
+	siz := blockchainSyncMessage.XXX_Size()
+	b := make([]byte, 0, siz)
+	ret, err := blockchainSyncMessage.XXX_Marshal(b, true)
 	if err != nil {
-		log.Panic(err)
+		return nil
 	}
-	return result.Bytes()
+	return ret
 }
 
 // DeserializeBlockchainSyncMessage deserializes BlockchainSyncMessage.
 func DeserializeBlockchainSyncMessage(d []byte) (*BlockchainSyncMessage, error) {
-	var blockchainSyncMessage BlockchainSyncMessage
-	decoder := gob.NewDecoder(bytes.NewReader(d))
-	err := decoder.Decode(&blockchainSyncMessage)
+	bsm := BlockchainSyncMessage{}
+	err := bsm.XXX_Unmarshal(d)
 	if err != nil {
-		log.Panic(err)
+		return nil, err
 	}
-	return &blockchainSyncMessage, err
+	return &bsm, nil
 }
 
 // ConstructTransactionListMessageAccount constructs serialized transactions in account model

@@ -1,7 +1,9 @@
 package node
 
 import (
+	"math/big"
 	"strings"
+	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -9,10 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
-
-	"math/big"
-	"reflect"
-	"testing"
 )
 
 var (
@@ -27,19 +25,20 @@ func TestSerializeBlockchainSyncMessage(t *testing.T) {
 	h1 := common.HexToHash("123")
 	h2 := common.HexToHash("abc")
 
+	hash := [][]byte{
+		h1.Bytes(),
+		h2.Bytes(),
+	}
+
 	msg := BlockchainSyncMessage{
 		BlockHeight: 2,
-		BlockHashes: []common.Hash{
-			h1,
-			h2,
-		},
+		BlockHashes: hash,
 	}
 
 	serializedByte := SerializeBlockchainSyncMessage(&msg)
-
 	dMsg, err := DeserializeBlockchainSyncMessage(serializedByte)
 
-	if err != nil || !reflect.DeepEqual(msg, *dMsg) {
+	if err != nil || strings.Compare(msg.String(), dMsg.String()) != 0 {
 		t.Errorf("Failed to serialize/deserialize blockchain sync message\n")
 	}
 }
@@ -129,7 +128,9 @@ func TestInfoToString(t *testing.T) {
 		Port:   "81",
 		PeerID: "peer",
 	}
-	if strings.Compare(info.String(), "Info:127.0.0.1/81=>3sdfvR") != 0 {
-		t.Errorf("Info string mismatch: %v", info.String())
+	var expected string
+	expected = `IP:"127.0.0.1" Port:"81" PeerID:"peer"`
+	if strings.EqualFold(info.String(), expected) {
+		t.Errorf("Info string mismatch: %s", info.String())
 	}
 }

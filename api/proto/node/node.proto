@@ -1,0 +1,26 @@
+syntax = "proto3";
+package node;
+
+message Info{
+  string IP=1;
+  string Port=2;
+  bytes PubKey=3;
+  uint32 Role=4;
+  string PeerID=5;
+}
+message BlockchainSyncMessage {
+  int64 BlockHeight=1;
+  repeated bytes BlockHashes=2;
+}
+
+message PingMessageType{
+ uint32 Version=1;
+ Info Node=2;
+}
+message PongMessageType {
+    uint32 ShardID=1;
+    uint32 Version=2;
+    repeated Info Peers=3;
+    repeated bytes PubKeys=4;
+    bytes LeaderPubKey=5;
+}

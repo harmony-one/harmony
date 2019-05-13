@@ -34,6 +34,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
+	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 )
 
 const (
@@ -392,7 +393,11 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 	peer := new(p2p.Peer)
 	peer.IP = ping.Node.IP
 	peer.Port = ping.Node.Port
-	peer.PeerID = ping.Node.PeerID
+	id, err := libp2p_peer.IDFromString(ping.Node.PeerID)
+	if err != nil {
+		return -1
+	}
+	peer.PeerID = id
 	peer.ConsensusPubKey = nil
 
 	if ping.Node.PubKey != nil {
@@ -409,7 +414,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 	//node.host.AddIncomingPeer(*peer)
 	node.host.ConnectHostPeer(*peer)
 
-	if ping.Node.Role == proto_node.ClientRole {
+	if ping.Node.Role == uint32(proto_node.ClientRole) {
 		utils.GetLogInstance().Info("Add Client Peer to Node", "Address", node.Consensus.GetSelfAddress(), "Client", peer)
 		node.ClientPeer = peer
 	} else {
@@ -529,7 +534,11 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		peer := new(p2p.Peer)
 		peer.IP = p.IP
 		peer.Port = p.Port
-		peer.PeerID = p.PeerID
+		id, err := libp2p_peer.IDFromString(p.PeerID)
+		if err != nil {
+			continue
+		}
+		peer.PeerID = id
 
 		peer.ConsensusPubKey = &bls.PublicKey{}
 		err = peer.ConsensusPubKey.Deserialize(p.PubKey[:])

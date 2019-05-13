@@ -11,8 +11,6 @@ pong: peer responds to ping messages, sending all pubkeys known by peer
 package discovery
 
 import (
-	"bytes"
-	"encoding/gob"
 	"fmt"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -22,64 +20,40 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 )
 
-// PingMessageType defines the data structure of the Ping message
-type PingMessageType struct {
-	Version uint16 // version of the protocol
-	Node    node.Info
-}
-
-// PongMessageType defines the data structure of the Pong message
-type PongMessageType struct {
-	ShardID      uint32
-	Version      uint16 // version of the protocol
-	Peers        []node.Info
-	PubKeys      [][]byte // list of publickKeys, has to be identical among all validators/leaders
-	LeaderPubKey []byte   // public key of shard leader
-}
-
-func (p PingMessageType) String() string {
-	return fmt.Sprintf("ping:%v/%v=>%v:%v/%v", p.Node.Role, p.Version, p.Node.IP, p.Node.Port, p.Node.PubKey)
-}
-
-func (p PongMessageType) String() string {
-	str := fmt.Sprintf("pong:%v=>length:%v, keys:%v, leader:%v\n", p.Version, len(p.Peers), len(p.PubKeys), len(p.LeaderPubKey))
-	return str
-}
-
 // NewPingMessage creates a new Ping message based on the p2p.Peer input
-func NewPingMessage(peer p2p.Peer, isClient bool) *PingMessageType {
-	ping := new(PingMessageType)
+func NewPingMessage(peer p2p.Peer, isClient bool) *node.PingMessageType {
+	ping := new(node.PingMessageType)
 
 	ping.Version = proto.ProtocolVersion
 	ping.Node.IP = peer.IP
 	ping.Node.Port = peer.Port
-	ping.Node.PeerID = peer.PeerID
+	ping.Node.PeerID = peer.PeerID.String()
 	if !isClient {
 		ping.Node.PubKey = peer.ConsensusPubKey.Serialize()
-		ping.Node.Role = node.ValidatorRole
+		ping.Node.Role = uint32(node.ValidatorRole)
 	} else {
 		ping.Node.PubKey = nil
-		ping.Node.Role = node.ClientRole
+		ping.Node.Role = uint32(node.ClientRole)
 	}
 
 	return ping
 }
 
 // NewPongMessage creates a new Pong message based on a list of p2p.Peer and a list of publicKeys
-func NewPongMessage(peers []p2p.Peer, pubKeys []*bls.PublicKey, leaderKey *bls.PublicKey, shardID uint32) *PongMessageType {
-	pong := new(PongMessageType)
+func NewPongMessage(peers []p2p.Peer, pubKeys []*bls.PublicKey, leaderKey *bls.PublicKey, shardID uint32) *node.PongMessageType {
+	pong := new(node.PongMessageType)
 	pong.ShardID = shardID
 	pong.PubKeys = make([][]byte, 0)
 
 	pong.Version = proto.ProtocolVersion
-	pong.Peers = make([]node.Info, 0)
+	pong.Peers = make([]*node.Info, 0)
 
 	var err error
 	for _, p := range peers {
-		n := node.Info{}
+		n := &node.Info{}
 		n.IP = p.IP
 		n.Port = p.Port
-		n.PeerID = p.PeerID
+		n.PeerID = p.PeerID.String()
 		n.PubKey = p.ConsensusPubKey.Serialize()
 		if err != nil {
 			fmt.Printf("Error Marshal PubKey: %v", err)
@@ -100,12 +74,10 @@ func NewPongMessage(peers []p2p.Peer, pubKeys []*bls.PublicKey, leaderKey *bls.P
 }
 
 // GetPingMessage deserializes the Ping Message from a list of byte
-func GetPingMessage(payload []byte) (*PingMessageType, error) {
-	ping := new(PingMessageType)
+func GetPingMessage(payload []byte) (*node.PingMessageType, error) {
+	ping := new(node.PingMessageType)
 
-	r := bytes.NewBuffer(payload)
-	decoder := gob.NewDecoder(r)
-	err := decoder.Decode(ping)
+	err := ping.XXX_Unmarshal(payload)
 
 	if err != nil {
 		utils.GetLogInstance().Error("[GetPingMessage] Decode", "error", err)
@@ -116,14 +88,12 @@ func GetPingMessage(payload []byte) (*PingMessageType, error) {
 }
 
 // GetPongMessage deserializes the Pong Message from a list of byte
-func GetPongMessage(payload []byte) (*PongMessageType, error) {
-	pong := new(PongMessageType)
-	pong.Peers = make([]node.Info, 0)
+func GetPongMessage(payload []byte) (*node.PongMessageType, error) {
+	pong := new(node.PongMessageType)
+	pong.Peers = make([]*node.Info, 0)
 	pong.PubKeys = make([][]byte, 0)
 
-	r := bytes.NewBuffer(payload)
-	decoder := gob.NewDecoder(r)
-	err := decoder.Decode(pong)
+	err := pong.XXX_Unmarshal(payload)
 
 	if err != nil {
 		utils.GetLogInstance().Error("[GetPongMessage] Decode", "error", err)
@@ -131,32 +101,4 @@ func GetPongMessage(payload []byte) (*PongMessageType, error) {
 	}
 
 	return pong, nil
-}
-
-// ConstructPingMessage contructs ping message from node to leader
-func (p PingMessageType) ConstructPingMessage() []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
-	byteBuffer.WriteByte(byte(node.PING))
-
-	encoder := gob.NewEncoder(byteBuffer)
-	err := encoder.Encode(p)
-	if err != nil {
-		utils.GetLogInstance().Error("[ConstructPingMessage] Encode", "error", err)
-		return nil
-	}
-	return byteBuffer.Bytes()
-}
-
-// ConstructPongMessage contructs pong message from leader to node
-func (p PongMessageType) ConstructPongMessage() []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
-	byteBuffer.WriteByte(byte(node.PONG))
-
-	encoder := gob.NewEncoder(byteBuffer)
-	err := encoder.Encode(p)
-	if err != nil {
-		utils.GetLogInstance().Error("[ConstructPongMessage] Encode", "error", err)
-		return nil
-	}
-	return byteBuffer.Bytes()
 }
