@@ -68,7 +68,7 @@ func (abi ABI) Pack(name string, args ...interface{}) ([]byte, error) {
 		return nil, err
 	}
 	// Pack up the method ID too if not a constructor and return
-	return append(method.Id(), arguments...), nil
+	return append(method.ID(), arguments...), nil
 }
 
 // Unpack output in v according to the abi specification
@@ -152,14 +152,14 @@ func (abi *ABI) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// MethodById looks up a method by the 4-byte id
+// MethodByID looks up a method by the 4-byte id
 // returns nil if none found
-func (abi *ABI) MethodById(sigdata []byte) (*Method, error) {
+func (abi *ABI) MethodByID(sigdata []byte) (*Method, error) {
 	if len(sigdata) < 4 {
 		return nil, fmt.Errorf("data too short (%d bytes) for abi method lookup", len(sigdata))
 	}
 	for _, method := range abi.Methods {
-		if bytes.Equal(method.Id(), sigdata[:4]) {
+		if bytes.Equal(method.ID(), sigdata[:4]) {
 			return &method, nil
 		}
 	}

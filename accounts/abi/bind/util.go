@@ -22,8 +22,8 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/core/types"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/harmony-one/harmony/core/types"
 )
 
 // WaitMined waits for tx to be mined on the blockchain.

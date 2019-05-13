@@ -23,8 +23,8 @@ import (
 
 	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/harmony-one/harmony/core/types"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -35,6 +35,7 @@ type Account struct {
 	URL     URL            `json:"url"`     // Optional resource locator within a backend
 }
 
+// MimetypeTextWithValidator ...
 const (
 	MimetypeTextWithValidator = "text/validator"
 	MimetypeTypedData         = "data/typed"
@@ -210,7 +211,7 @@ const (
 	// of starting any background processes such as automatic key derivation.
 	WalletOpened
 
-	// WalletDropped
+	// WalletDropped ...
 	WalletDropped
 )
 

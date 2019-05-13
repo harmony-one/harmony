@@ -33,13 +33,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/harmony-one/harmony/accounts"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/harmony-one/harmony/accounts"
+	"github.com/harmony-one/harmony/core/types"
 )
 
+// ErrLocked ...
 var (
 	ErrLocked  = accounts.NewAuthNeededError("password or unlock")
 	ErrNoMatch = errors.New("no key for given address or file")

@@ -72,6 +72,7 @@ func (method Method) String() string {
 	return fmt.Sprintf("function %v(%v) %sreturns(%v)", method.Name, strings.Join(inputs, ", "), constant, strings.Join(outputs, ", "))
 }
 
-func (method Method) Id() []byte {
+// ID returns ...
+func (method Method) ID() []byte {
 	return crypto.Keccak256([]byte(method.Sig()))[:4]
 }

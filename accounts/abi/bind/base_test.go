@@ -24,13 +24,13 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum"
-	"github.com/harmony-one/harmony/accounts/abi"
-	"github.com/harmony-one/harmony/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/harmony-one/harmony/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/accounts/abi"
+	"github.com/harmony-one/harmony/accounts/abi/bind"
+	"github.com/harmony-one/harmony/core/types"
 )
 
 type mockCaller struct {

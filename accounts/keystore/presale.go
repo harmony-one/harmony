@@ -25,8 +25,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/harmony-one/harmony/accounts"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/harmony-one/harmony/accounts"
 	"github.com/pborman/uuid"
 	"golang.org/x/crypto/pbkdf2"
 )
@@ -37,7 +37,7 @@ func importPreSaleKey(keyStore keyStore, keyJSON []byte, password string) (accou
 	if err != nil {
 		return accounts.Account{}, nil, err
 	}
-	key.Id = uuid.NewRandom()
+	key.ID = uuid.NewRandom()
 	a := accounts.Account{
 		Address: key.Address,
 		URL: accounts.URL{
@@ -86,7 +86,7 @@ func decryptPreSaleKey(fileContent []byte, password string) (key *Key, err error
 	ecKey := crypto.ToECDSAUnsafe(ethPriv)
 
 	key = &Key{
-		Id:         nil,
+		ID:         nil,
 		Address:    crypto.PubkeyToAddress(ecKey.PublicKey),
 		PrivateKey: ecKey,
 	}

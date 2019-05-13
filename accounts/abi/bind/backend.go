@@ -32,11 +32,11 @@ var (
 	// have any code associated with it (i.e. suicided).
 	ErrNoCode = errors.New("no contract code at given address")
 
-	// This error is raised when attempting to perform a pending state action
+	// ErrNoPendingState this error is raised when attempting to perform a pending state action
 	// on a backend that doesn't implement PendingContractCaller.
 	ErrNoPendingState = errors.New("backend does not support pending state")
 
-	// This error is returned by WaitDeployed if contract creation leaves an
+	// ErrNoCodeAfterDeploy this error is returned by WaitDeployed if contract creation leaves an
 	// empty contract behind.
 	ErrNoCodeAfterDeploy = errors.New("no contract code after deployment")
 )

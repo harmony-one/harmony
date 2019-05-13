@@ -22,10 +22,10 @@ import (
 	"io"
 	"io/ioutil"
 
-	"github.com/harmony-one/harmony/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/harmony-one/harmony/accounts/keystore"
+	"github.com/harmony-one/harmony/core/types"
 )
 
 // NewTransactor is a utility method to easily create a transaction signer from

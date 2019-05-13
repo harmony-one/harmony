@@ -35,6 +35,7 @@ import (
 // Lang is a target programming language selector to generate bindings for.
 type Lang int
 
+// LangGo is the golang
 const (
 	LangGo Lang = iota
 	LangJava

@@ -187,8 +187,8 @@ func TestMethodSignature(t *testing.T) {
 	}
 
 	idexp := crypto.Keccak256([]byte(exp))[:4]
-	if !bytes.Equal(m.Id(), idexp) {
-		t.Errorf("expected ids to match %x != %x", m.Id(), idexp)
+	if !bytes.Equal(m.ID(), idexp) {
+		t.Errorf("expected ids to match %x != %x", m.ID(), idexp)
 	}
 
 	uintt, _ := NewType("uint256", nil)
@@ -880,7 +880,7 @@ func TestUnpackIntoMapNamingConflict(t *testing.T) {
 	}
 }
 
-func TestABI_MethodById(t *testing.T) {
+func TestABI_MethodByID(t *testing.T) {
 	const abiJSON = `[
 		{"type":"function","name":"receive","constant":false,"inputs":[{"name":"memo","type":"bytes"}],"outputs":[],"payable":true,"stateMutability":"payable"},
 		{"type":"event","name":"received","anonymous":false,"inputs":[{"indexed":false,"name":"sender","type":"address"},{"indexed":false,"name":"amount","type":"uint256"},{"indexed":false,"name":"memo","type":"bytes"}]},
@@ -911,23 +911,23 @@ func TestABI_MethodById(t *testing.T) {
 	}
 	for name, m := range abi.Methods {
 		a := fmt.Sprintf("%v", m)
-		m2, err := abi.MethodById(m.Id())
+		m2, err := abi.MethodByID(m.ID())
 		if err != nil {
 			t.Fatalf("Failed to look up ABI method: %v", err)
 		}
 		b := fmt.Sprintf("%v", m2)
 		if a != b {
-			t.Errorf("Method %v (id %v) not 'findable' by id in ABI", name, common.ToHex(m.Id()))
+			t.Errorf("Method %v (id %v) not 'findable' by id in ABI", name, common.ToHex(m.ID()))
 		}
 	}
 	// Also test empty
-	if _, err := abi.MethodById([]byte{0x00}); err == nil {
+	if _, err := abi.MethodByID([]byte{0x00}); err == nil {
 		t.Errorf("Expected error, too short to decode data")
 	}
-	if _, err := abi.MethodById([]byte{}); err == nil {
+	if _, err := abi.MethodByID([]byte{}); err == nil {
 		t.Errorf("Expected error, too short to decode data")
 	}
-	if _, err := abi.MethodById(nil); err == nil {
+	if _, err := abi.MethodByID(nil); err == nil {
 		t.Errorf("Expected error, nil is short to decode data")
 	}
 }
