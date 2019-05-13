@@ -55,7 +55,7 @@ func TestString(test *testing.T) {
 		test.Errorf("expect: %v, got: %v", e1, r1)
 	}
 
-	ping1.Node.Role = node.ClientRole
+	ping1.Node.Role = uint32(node.ClientRole)
 
 	r3 := fmt.Sprintf("%v", *ping1)
 	if strings.Compare(r3, e3) != 0 {
