@@ -177,8 +177,13 @@ func main() {
 					node.AddNewBlock(block)
 					stateMutex.Lock()
 					node.Worker.UpdateCurrent()
+					utils.GetLogInstance().Info("[Txgen] Updates Block Number", "block num", node.Blockchain().CurrentBlock().NumberU64())
+					utils.GetLogInstance().Info("[Txgen] Received Block Number", "block num", blocks[0].NumberU64())
+					if block.NumberU64()-node.Blockchain().CurrentBlock().NumberU64() == 0 {
+						readySignal <- shardID
+						utils.GetLogInstance().Info("[Txgen] Sending Ready Signal", "block num", blocks[0].NumberU64())
+					}
 					stateMutex.Unlock()
-					readySignal <- shardID
 				} else {
 					continue
 				}
@@ -192,16 +197,7 @@ func main() {
 	clientNode.ServiceManagerSetup()
 	clientNode.RunServices()
 
-	// Start the client server to listen to leader's message
-	go func() {
-		// wait for 3 seconds for client to send ping message to leader
-		// FIXME (leo) the readySignal should be set once we really sent ping message to leader
-		time.Sleep(3 * time.Second) // wait for nodes to be ready
-		for _, i := range shardIDs {
-			readySignal <- i
-		}
-	}()
-
+	time.Sleep(5 * time.Second) // wait for nodes to be ready
 	// Transaction generation process
 	start := time.Now()
 	totalTime := float64(*duration)
