@@ -23,7 +23,8 @@ import (
 // NewPingMessage creates a new Ping message based on the p2p.Peer input
 func NewPingMessage(peer p2p.Peer, isClient bool) *node.PingMessageType {
 	ping := new(node.PingMessageType)
-
+	info := new(node.Info)
+	ping.Node = info
 	ping.Version = proto.ProtocolVersion
 	ping.Node.IP = peer.IP
 	ping.Node.Port = peer.Port
