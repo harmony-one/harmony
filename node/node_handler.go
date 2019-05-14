@@ -314,9 +314,9 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 		if err != nil {
 			utils.GetLogInstance().Error("Error when parsing tx into message")
 		}
-		if _, ok := node.AddressNonce[msg.From()]; ok {
+		if _, ok := node.AddressNonce.Load(msg.From()); ok {
 			nonce := node.GetNonceOfAddress(msg.From())
-			atomic.StoreUint64(node.AddressNonce[msg.From()], nonce)
+			node.AddressNonce.Store(msg.From(), nonce)
 		}
 	}
 
