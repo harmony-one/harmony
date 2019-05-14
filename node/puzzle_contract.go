@@ -214,11 +214,15 @@ func (node *Node) CreateTransactionForEndMethod(priKey string) (string, error) {
 
 // GetAndIncreaseAddressNonce get and increase the address's nonce
 func (node *Node) GetAndIncreaseAddressNonce(address common.Address) uint64 {
-	if value, ok := node.AddressNonce[address]; ok {
-		nonce := atomic.AddUint64(value, 1)
+	if value, ok := node.AddressNonce.Load(address); ok {
+		n, ok := value.(uint64)
+		if !ok {
+			return 0
+		}
+		nonce := atomic.AddUint64(&n, 1)
 		return nonce - 1
 	}
 	nonce := node.GetNonceOfAddress(address) + 1
-	node.AddressNonce[address] = &nonce
+	node.AddressNonce.Store(address, nonce)
 	return nonce - 1
 }
