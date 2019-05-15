@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/rpc"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/p2p"
@@ -39,6 +40,8 @@ func (s *SupportSyncingTest) NotifyService(data map[string]interface{}) {
 func (s *SupportSyncingTest) SetMessageChan(msgChan chan *msg_pb.Message) {
 	s.msgChan = msgChan
 }
+
+func (s *SupportSyncingTest) APIs() []rpc.API { return nil }
 
 // Test TakeAction.
 func TestTakeAction(t *testing.T) {

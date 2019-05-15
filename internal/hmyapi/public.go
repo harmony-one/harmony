@@ -6,21 +6,21 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/rpc"
 )
 
 // PublicBlockChainAPI provides an API to access the Harmony blockchain.
 // It offers only methods that operate on public data that is freely available to anyone.
 type PublicBlockChainAPI struct {
-	b *rpc.HmyAPIBackend
+	b *core.HmyAPIBackend
 }
 
 // NewPublicBlockChainAPI creates a new Harmony blockchain API.
-func NewPublicBlockChainAPI(b *rpc.HmyAPIBackend) *PublicBlockChainAPI {
+func NewPublicBlockChainAPI(b *core.HmyAPIBackend) *PublicBlockChainAPI {
 	return &PublicBlockChainAPI{b}
 }
 
@@ -124,12 +124,12 @@ func (s *PublicNetAPI) PeerCount() hexutil.Uint {
 
 // PublicTransactionPoolAPI exposes methods for the RPC interface
 type PublicTransactionPoolAPI struct {
-	b         *rpc.HmyAPIBackend
+	b         *core.HmyAPIBackend
 	nonceLock *AddrLocker
 }
 
 // NewPublicTransactionPoolAPI creates a new RPC service with methods specific for the transaction pool.
-func NewPublicTransactionPoolAPI(b *rpc.HmyAPIBackend, nonceLock *AddrLocker) *PublicTransactionPoolAPI {
+func NewPublicTransactionPoolAPI(b *core.HmyAPIBackend, nonceLock *AddrLocker) *PublicTransactionPoolAPI {
 	return &PublicTransactionPoolAPI{b, nonceLock}
 }
 

@@ -3,6 +3,7 @@ package service
 import (
 	"time"
 
+	"github.com/ethereum/go-ethereum/rpc"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/internal/utils"
 )
@@ -34,7 +35,6 @@ const (
 	PeerDiscovery
 	Resharding
 	Staking
-	RPC
 	Test
 	Done
 )
@@ -65,8 +65,6 @@ func (t Type) String() string {
 		return "PeerDiscovery"
 	case Resharding:
 		return "Resharding"
-	case RPC:
-		return "RPC"
 	case Test:
 		return "Test"
 	case Done:
@@ -95,6 +93,9 @@ type Interface interface {
 	SetMessageChan(msgChan chan *msg_pb.Message)
 	StopService()
 	NotifyService(map[string]interface{})
+
+	// APIs retrieves the list of RPC descriptors the service provides
+	APIs() []rpc.API
 }
 
 // Manager stores all services for service manager.
