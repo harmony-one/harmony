@@ -32,16 +32,16 @@ func printVersion(me string) {
 	os.Exit(0)
 }
 
-func loggingInit(logFolder, ip, port string) {
+func loggingInit(logFolder, ip, port string, verbosity log.Lvl) {
 	// Setup a logger to stdout and log file.
 	if err := os.MkdirAll(logFolder, 0755); err != nil {
 		panic(err)
 	}
 	logFileName := fmt.Sprintf("./%v/bootnode-%v-%v.log", logFolder, ip, port)
-	h := log.MultiHandler(
+	h := log.LvlFilterHandler(verbosity, log.MultiHandler(
 		log.StreamHandler(os.Stdout, log.TerminalFormat(false)),
 		log.Must.FileHandler(logFileName, log.JSONFormat()), // Log to file
-	)
+	))
 	log.Root().SetHandler(h)
 }
 
@@ -51,6 +51,7 @@ func main() {
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	keyFile := flag.String("key", "./.bnkey", "the private key file of the bootnode")
 	versionFlag := flag.Bool("version", false, "Output version info")
+	verbosity := flag.Int("verbosity", 3, "Logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail (default: 3)")
 
 	flag.Parse()
 
@@ -60,9 +61,10 @@ func main() {
 
 	// Logging setup
 	utils.SetPortAndIP(*port, *ip)
+	utils.SetVerbosity(log.Lvl(*verbosity))
 
 	// Init logging.
-	loggingInit(*logFolder, *ip, *port)
+	loggingInit(*logFolder, *ip, *port, log.Lvl(*verbosity))
 
 	privKey, _, err := utils.LoadKeyFromFile(*keyFile)
 	if err != nil {

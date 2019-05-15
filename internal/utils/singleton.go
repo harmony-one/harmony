@@ -3,6 +3,7 @@
 package utils
 
 import (
+	"os"
 	"sync"
 	"sync/atomic"
 
@@ -11,8 +12,9 @@ import (
 
 // Global Port and IP for logging.
 var (
-	Port string
-	IP   string
+	Port      string
+	IP        string
+	Verbosity = log.LvlInfo
 )
 
 // SetPortAndIP used to print out loggings of node with Port and IP.
@@ -20,6 +22,11 @@ var (
 func SetPortAndIP(port, ip string) {
 	Port = port
 	IP = ip
+}
+
+// SetVerbosity specifies the verbosity of global logger
+func SetVerbosity(verbosity log.Lvl) {
+	Verbosity = verbosity
 }
 
 // UniqueValidatorID defines the structure of unique validator ID
@@ -51,6 +58,7 @@ func (s *UniqueValidatorID) GetUniqueID() uint32 {
 func GetLogInstance() log.Logger {
 	onceForLog.Do(func() {
 		logInstance = log.New("port", Port, "ip", IP)
+		logInstance.SetHandler(log.LvlFilterHandler(Verbosity, log.StreamHandler(os.Stdout, log.TerminalFormat(false))))
 	})
 	return logInstance
 }

@@ -58,13 +58,13 @@ func printVersion(me string) {
 	os.Exit(0)
 }
 
-func loggingInit(logFolder, role, ip, port string, onlyLogTps bool) {
+func loggingInit(logFolder, role, ip, port string, onlyLogTps bool, verbosity log.Lvl) {
 	// Setup a logger to stdout and log file.
 	logFileName := fmt.Sprintf("./%v/%s-%v-%v.log", logFolder, role, ip, port)
-	h := log.MultiHandler(
+	h := log.LvlFilterHandler(verbosity, log.MultiHandler(
 		log.StreamHandler(os.Stdout, log.TerminalFormat(false)),
 		log.Must.FileHandler(logFileName, log.JSONFormat()), // Log to file
-	)
+	))
 	if onlyLogTps {
 		h = log.MatchFilterHandler("msg", "TPS Report", h)
 	}
@@ -105,6 +105,8 @@ var (
 	ks        *keystore.KeyStore
 	myAccount accounts.Account
 	myPass    = ""
+	// logging verbosity
+	verbosity = flag.Int("verbosity", 3, "Logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail (default: 3)")
 )
 
 func initSetup() {
@@ -114,6 +116,7 @@ func initSetup() {
 
 	// Logging setup
 	utils.SetPortAndIP(*port, *ip)
+	utils.SetVerbosity(log.Lvl(*verbosity))
 
 	// Set default keystore Dir
 	hmykey.DefaultKeyStoreDir = *keystoreDir
@@ -375,7 +378,7 @@ func main() {
 	nodeConfig := createGlobalConfig()
 
 	// Init logging.
-	loggingInit(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps)
+	loggingInit(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps, log.Lvl(*verbosity))
 
 	// Start Profiler for leader if profile argument is on
 	if nodeConfig.StringRole == "leader" && (*profile || *metricsReportURL != "") {
