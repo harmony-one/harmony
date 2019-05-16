@@ -94,6 +94,10 @@ var (
 	shardID      = flag.Int("shard_id", -1, "the shard ID of this node")
 	// logConn logs incoming/outgoing connections
 	logConn = flag.Bool("log_conn", false, "log incoming/outgoing connections")
+	// Enable processing of kill (STOP) message.  Only for automated testing.
+	enableStopMessage = flag.Bool("enable_stop", false,
+		"enable processing of STOP message, e.g. from txgen "+
+			"(USE ONLY IN SHORT-LIVED, PRIVATE TEST NETWORKS)")
 )
 
 func initSetup() {
@@ -227,6 +231,10 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	currentNode := node.New(nodeConfig.Host, currentConsensus, nodeConfig.MainDB, *isArchival)
 	currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
 	currentNode.AccountKey = nodeConfig.StakingPriKey
+	if *enableStopMessage {
+		utils.GetLogInstance().Warn("enabling STOP message processing for this node")
+		currentNode.ProcessStopMessage = true
+	}
 	utils.GetLogInstance().Info("node account set",
 		"address", crypto.PubkeyToAddress(currentNode.AccountKey.PublicKey))
 

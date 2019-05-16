@@ -179,6 +179,11 @@ type Node struct {
 
 	// Used to call smart contract locally
 	ContractCaller *contracts.ContractCaller
+
+	// Enable processing of STOP message.
+	// When enabled ANYONE can bring down this node.
+	// Use only for private testing, and definitely never on prod network.
+	ProcessStopMessage bool
 }
 
 // Blockchain returns the blockchain from node

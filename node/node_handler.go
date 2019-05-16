@@ -175,7 +175,7 @@ func (node *Node) messageHandler(content []byte, sender string) {
 		case proto_node.Control:
 			utils.GetLogInstance().Info("NET: received message: Node/Control")
 			controlType := msgPayload[0]
-			if proto_node.ControlMessageType(controlType) == proto_node.STOP {
+			if proto_node.ControlMessageType(controlType) == proto_node.STOP && node.ProcessStopMessage {
 				utils.GetLogInstance().Debug("Stopping Node", "numBlocks", node.blockchain.CurrentBlock().NumberU64(), "numTxsProcessed", node.countNumTransactionsInBlockchain())
 
 				var avgBlockSizeInBytes common.StorageSize
