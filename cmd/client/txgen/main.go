@@ -40,7 +40,7 @@ var (
 )
 
 const (
-	checkFrequency = 5 //checkfrequency checks whether the transaction generator is ready to send the next batch of transactions.
+	checkFrequency = 2 //checkfrequency checks whether the transaction generator is ready to send the next batch of transactions.
 )
 
 // Settings is the settings for TX generation. No Cross-Shard Support!
