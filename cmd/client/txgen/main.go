@@ -62,7 +62,7 @@ var (
 	port              = flag.String("port", "9999", "port of the node.")
 	maxNumTxsPerBatch = flag.Int("max_num_txs_per_batch", 20000, "number of transactions to send per message")
 	logFolder         = flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
-	duration          = flag.Int("duration", 10, "duration of the tx generation in second. If it's negative, the experiment runs forever.")
+	duration          = flag.Int("duration", 30, "duration of the tx generation in second. If it's negative, the experiment runs forever.")
 	versionFlag       = flag.Bool("version", false, "Output version info")
 	crossShardRatio   = flag.Int("cross_shard_ratio", 30, "The percentage of cross shard transactions.") //Keeping this for backward compatibility
 	shardIDFlag       = flag.Int("shardID", 0, "The shardID the node belongs to.")
@@ -155,6 +155,7 @@ func main() {
 	time.Sleep(20 * time.Second)
 	start := time.Now()
 	totalTime := float64(*duration)
+	utils.GetLogInstance().Debug("Total Duration", "totalTime", totalTime)
 	ticker := time.NewTicker(checkFrequency * time.Second)
 	txGen.DoSyncWithoutConsensus()
 syncLoop:
@@ -199,11 +200,13 @@ syncLoop:
 		time.Sleep(3 * time.Second) // wait for nodes to be ready
 		readySignal <- uint32(0)
 	}()
+pushLoop:
 	for {
 		t := time.Now()
+		utils.GetLogInstance().Debug("Current running time", "running time", t.Sub(start).Seconds(), "totaltime", totalTime)
 		if totalTime > 0 && t.Sub(start).Seconds() >= totalTime {
 			utils.GetLogInstance().Debug("Generator timer ended.", "duration", (int(t.Sub(start))), "startTime", start, "totalTime", totalTime)
-			break
+			break pushLoop
 		}
 		select {
 		case shardID := <-readySignal:
@@ -220,11 +223,6 @@ syncLoop:
 			utils.GetLogInstance().Warn("No new block is received so far")
 		}
 	}
-
-	// Send a stop message to stop the nodes at the end
-	msg := proto_node.ConstructStopMessage()
-	txGen.GetHost().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeaconClient}, p2p_host.ConstructP2pMessage(byte(0), msg))
-	time.Sleep(3 * time.Second)
 }
 
 // SendTxsToShard sends txs to shard, currently just to beacon shard
