@@ -39,7 +39,7 @@ import (
 const (
 	// MaxNumberOfTransactionsPerBlock is the max number of transaction per a block.
 	MaxNumberOfTransactionsPerBlock = 8000
-	consensusTimeout                = 5 * time.Second
+	consensusTimeout                = 7 * time.Second
 )
 
 // ReceiveGlobalMessage use libp2p pubsub mechanism to receive global broadcast messages
@@ -52,7 +52,7 @@ func (node *Node) ReceiveGlobalMessage() {
 		}
 		msg, sender, err := node.globalGroupReceiver.Receive(ctx)
 		if sender != node.host.GetID() {
-			utils.GetLogInstance().Info("[PUBSUB]", "received global msg", len(msg), "sender", sender)
+			//utils.GetLogInstance().Info("[PUBSUB]", "received global msg", len(msg), "sender", sender)
 			if err == nil {
 				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
 				go node.messageHandler(msg[5:], string(sender))
@@ -71,7 +71,7 @@ func (node *Node) ReceiveGroupMessage() {
 		}
 		msg, sender, err := node.shardGroupReceiver.Receive(ctx)
 		if sender != node.host.GetID() {
-			//			utils.GetLogInstance().Info("[PUBSUB]", "received group msg", len(msg), "sender", sender)
+			//utils.GetLogInstance().Info("[PUBSUB]", "received group msg", len(msg), "sender", sender)
 			if err == nil {
 				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
 				go node.messageHandler(msg[5:], string(sender))
@@ -91,7 +91,7 @@ func (node *Node) ReceiveClientGroupMessage() {
 		}
 		msg, sender, err := node.clientReceiver.Receive(ctx)
 		if sender != node.host.GetID() {
-			utils.GetLogInstance().Info("[CLIENT]", "received group msg", len(msg), "sender", sender, "error", err)
+			// utils.GetLogInstance().Info("[CLIENT]", "received group msg", len(msg), "sender", sender, "error", err)
 			if err == nil {
 				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
 				go node.messageHandler(msg[5:], string(sender))
@@ -339,9 +339,9 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 func (node *Node) AddNewBlock(newBlock *types.Block) {
 	blockNum, err := node.blockchain.InsertChain([]*types.Block{newBlock})
 	if err != nil {
-		utils.GetLogInstance().Debug("Error adding new block to blockchain", "blockNum", blockNum, "Error", err)
+		utils.GetLogInstance().Debug("Error adding new block to blockchain", "blockNum", blockNum, "hash", newBlock.Header().Hash(), "Error", err)
 	} else {
-		utils.GetLogInstance().Info("adding new block to blockchain", "blockNum", blockNum, "by node", node.SelfPeer)
+		utils.GetLogInstance().Info("adding new block to blockchain", "blockNum", blockNum, "hash", newBlock.Header().Hash(), "by node", node.SelfPeer)
 	}
 }
 

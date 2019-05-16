@@ -283,6 +283,8 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 		node.Worker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.ConsensusPubKey), node.Consensus.ShardID)
 
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
+		// the sequence number is the next block number to be added in consensus protocol, which is always one more than current chain header block
+		node.Consensus.SetSeqNum(chain.CurrentBlock().NumberU64() + 1)
 
 		// Add Faucet contract to all shards, so that on testnet, we can demo wallet in explorer
 		// TODO (leo): we need to have support of cross-shard tx later so that the token can be transferred from beacon chain shard to other tx shards.

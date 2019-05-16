@@ -1,9 +1,10 @@
 package consensus
 
 import (
+	"sync"
+
 	mapset "github.com/deckarep/golang-set"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
 )
@@ -13,6 +14,7 @@ type PbftLog struct {
 	blocks     mapset.Set //store blocks received in PBFT
 	messages   mapset.Set // store messages received in PBFT
 	maxLogSize uint32
+	mutex      sync.Mutex
 }
 
 // PbftMessage is the record of pbft messages received by a node during PBFT process
@@ -23,7 +25,6 @@ type PbftMessage struct {
 	BlockHash    common.Hash
 	SenderPubkey []byte
 	Payload      []byte
-	Signature    *bls.Sign
 }
 
 // NewPbftLog returns new instance of PbftLog
@@ -55,7 +56,7 @@ func (log *PbftLog) GetBlockByHash(hash common.Hash) *types.Block {
 	var found *types.Block
 	it := log.Blocks().Iterator()
 	for block := range it.C {
-		if block.(*types.Block).Hash() == hash {
+		if block.(*types.Block).Header().Hash() == hash {
 			found = block.(*types.Block)
 			it.Stop()
 		}
@@ -63,16 +64,40 @@ func (log *PbftLog) GetBlockByHash(hash common.Hash) *types.Block {
 	return found
 }
 
-// GetBlockByNumber returns the blocks match the given block number
-func (log *PbftLog) GetBlocksByNumber(id uint64) []*types.Block {
-	var found []*types.Block
+// GetBlocksByNumber returns the blocks match the given block number
+func (log *PbftLog) GetBlocksByNumber(number uint64) []*types.Block {
+	found := []*types.Block{}
 	it := log.Blocks().Iterator()
 	for block := range it.C {
-		if block.(*types.Block).NumberU64() == id {
+		if block.(*types.Block).NumberU64() == number {
 			found = append(found, block.(*types.Block))
 		}
 	}
 	return found
+}
+
+// DeleteBlocksByNumber deletes blocks match given block number
+func (log *PbftLog) DeleteBlocksByNumber(number uint64) {
+	found := mapset.NewSet()
+	it := log.Blocks().Iterator()
+	for block := range it.C {
+		if block.(*types.Block).NumberU64() == number {
+			found.Add(block)
+		}
+	}
+	log.blocks = log.blocks.Difference(found)
+}
+
+// DeleteMessagesByNumber deletes messages match given block number
+func (log *PbftLog) DeleteMessagesByNumber(number uint64) {
+	found := mapset.NewSet()
+	it := log.Messages().Iterator()
+	for msg := range it.C {
+		if msg.(*PbftMessage).SeqNum == number {
+			found.Add(msg)
+		}
+	}
+	log.messages = log.messages.Difference(found)
 }
 
 // AddMessage adds a pbft message into the log
@@ -82,7 +107,7 @@ func (log *PbftLog) AddMessage(msg *PbftMessage) {
 
 // GetMessagesByTypeSeqViewHash returns pbft messages with matching type, seqNum, consensusID and blockHash
 func (log *PbftLog) GetMessagesByTypeSeqViewHash(typ msg_pb.MessageType, seqNum uint64, consensusID uint32, blockHash common.Hash) []*PbftMessage {
-	var found []*types.Block
+	found := []*PbftMessage{}
 	it := log.Messages().Iterator()
 	for msg := range it.C {
 		if msg.(*PbftMessage).MessageType == typ && msg.(*PbftMessage).SeqNum == seqNum && msg.(*PbftMessage).ConsensusID == consensusID && msg.(*PbftMessage).BlockHash == blockHash {
@@ -92,15 +117,39 @@ func (log *PbftLog) GetMessagesByTypeSeqViewHash(typ msg_pb.MessageType, seqNum 
 	return found
 }
 
+// GetMessagesByTypeSeq returns pbft messages with matching type, seqNum
+func (log *PbftLog) GetMessagesByTypeSeq(typ msg_pb.MessageType, seqNum uint64) []*PbftMessage {
+	found := []*PbftMessage{}
+	it := log.Messages().Iterator()
+	for msg := range it.C {
+		if msg.(*PbftMessage).MessageType == typ && msg.(*PbftMessage).SeqNum == seqNum {
+			found = append(found, msg.(*PbftMessage))
+		}
+	}
+	return found
+}
+
+// GetMessagesByTypeSeqHash returns pbft messages with matching type, seqNum
+func (log *PbftLog) GetMessagesByTypeSeqHash(typ msg_pb.MessageType, seqNum uint64, blockHash common.Hash) []*PbftMessage {
+	found := []*PbftMessage{}
+	it := log.Messages().Iterator()
+	for msg := range it.C {
+		if msg.(*PbftMessage).MessageType == typ && msg.(*PbftMessage).SeqNum == seqNum && msg.(*PbftMessage).BlockHash == blockHash {
+			found = append(found, msg.(*PbftMessage))
+		}
+	}
+	return found
+}
+
 // HasMatchingAnnounce returns whether the log contains announce type message with given seqNum, consensusID and blockHash
 func (log *PbftLog) HasMatchingAnnounce(seqNum uint64, consensusID uint32, blockHash common.Hash) bool {
-	found := log.GetMessagesByTypeSeqViewHash(seqNum, consensusID, blockHash)
+	found := log.GetMessagesByTypeSeqViewHash(msg_pb.MessageType_ANNOUNCE, seqNum, consensusID, blockHash)
 	return len(found) == 1
 }
 
 // GetMessagesByTypeSeqView returns pbft messages with matching type, seqNum and consensusID
 func (log *PbftLog) GetMessagesByTypeSeqView(typ msg_pb.MessageType, seqNum uint64, consensusID uint32) []*PbftMessage {
-	var found []*PbftMessage
+	found := []*PbftMessage{}
 	it := log.Messages().Iterator()
 	for msg := range it.C {
 		if msg.(*PbftMessage).MessageType != typ || msg.(*PbftMessage).SeqNum != seqNum || msg.(*PbftMessage).ConsensusID != consensusID {
@@ -111,7 +160,7 @@ func (log *PbftLog) GetMessagesByTypeSeqView(typ msg_pb.MessageType, seqNum uint
 	return found
 }
 
-// ParsePbftmessage parses PBFT message into PbftMessage structure
+// ParsePbftMessage parses PBFT message into PbftMessage structure
 func ParsePbftMessage(msg *msg_pb.Message) (*PbftMessage, error) {
 	pbftMsg := PbftMessage{}
 	pbftMsg.MessageType = msg.GetType()
@@ -122,15 +171,9 @@ func ParsePbftMessage(msg *msg_pb.Message) (*PbftMessage, error) {
 	pbftMsg.BlockHash = common.Hash{}
 	copy(pbftMsg.BlockHash[:], consensusMsg.BlockHash[:])
 	pbftMsg.Payload = make([]byte, len(consensusMsg.Payload))
-	copy(pbftMsg.Payload, consensusMsg.Payload[:])
+	copy(pbftMsg.Payload[:], consensusMsg.Payload[:])
 	pbftMsg.SenderPubkey = make([]byte, len(consensusMsg.SenderPubkey))
-	copy(pbftMsg.SenderPubkey, consensusMsg.SenderPubkey[:])
+	copy(pbftMsg.SenderPubkey[:], consensusMsg.SenderPubkey[:])
 
-	msgSig := bls.Sign{}
-	err := msgSig.Deserialize(msg.GetSignature())
-	if err != nil {
-		return nil, err
-	}
-	pbftMsg.Signature = &msgSig
 	return &pbftMsg, nil
 }

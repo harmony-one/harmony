@@ -3,6 +3,7 @@ package consensus
 import (
 	"sync"
 
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -14,7 +15,6 @@ const (
 	Announce PbftPhase = iota
 	Prepare
 	Commit
-	Finish
 )
 
 // Mode determines whether a node is in normal or viewchanging mode
@@ -66,6 +66,8 @@ func (consensus *Consensus) startViewChange(consensusID uint32) {
 
 // switchPhase will switch PbftPhase to nextPhase if the desirePhase equals the nextPhase
 func (consensus *Consensus) switchPhase(desirePhase PbftPhase) {
+	utils.GetLogInstance().Debug("switchPhase: ", "desirePhase", desirePhase, "myPhase", consensus.phase)
+
 	var nextPhase PbftPhase
 	switch consensus.phase {
 	case Announce:
@@ -73,22 +75,18 @@ func (consensus *Consensus) switchPhase(desirePhase PbftPhase) {
 	case Prepare:
 		nextPhase = Commit
 	case Commit:
-		nextPhase = Finish
-	case Finish:
 		nextPhase = Announce
 	}
 	if nextPhase == desirePhase {
-		consensus.mutex.Lock()
 		consensus.phase = nextPhase
-		consensus.mutex.Unlock()
 	}
 }
 
-// GetLeaderKey uniquely determine who is the leader for given consensusID
+// GetNextLeaderKey uniquely determine who is the leader for given consensusID
 func (consensus *Consensus) GetNextLeaderKey() *bls.PublicKey {
-	idx := getIndexOfPubKey(consensus.LeaderPubKey)
+	idx := consensus.getIndexOfPubKey(consensus.LeaderPubKey)
 	if idx == -1 {
-		utils.GetLogInstance().Warn("GetNextLeaderKey: currentLeaderKey not found", "key", currentLeaderKey.GetHexString())
+		utils.GetLogInstance().Warn("GetNextLeaderKey: currentLeaderKey not found", "key", consensus.LeaderPubKey.GetHexString())
 	}
 	idx = (idx + 1) % len(consensus.PublicKeys)
 	return consensus.PublicKeys[idx]

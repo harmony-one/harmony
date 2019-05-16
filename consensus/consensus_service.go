@@ -9,7 +9,6 @@ import (
 	"reflect"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -100,7 +99,7 @@ func (consensus *Consensus) populateMessageFields(request *msg_pb.ConsensusReque
 	// sender address
 	request.SenderPubkey = consensus.PubKey.Serialize()
 
-	utils.GetLogInstance().Debug("[populateMessageFields]", "myConsensusID", consensus.consensusID, "SenderAddress", consensus.SelfAddress)
+	utils.GetLogInstance().Debug("[populateMessageFields]", "myConsensusID", consensus.consensusID, "SenderAddress", consensus.SelfAddress, "seqNum", consensus.seqNum)
 }
 
 // Signs the consensus message and returns the marshaled message.
@@ -182,6 +181,17 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int {
 	}
 	// TODO: use pubkey to identify leader rather than p2p.Peer.
 	consensus.leader = p2p.Peer{ConsensusPubKey: pubKeys[0]}
+	consensus.LeaderPubKey = pubKeys[0]
+	prepareBitmap, err := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.ConsensusPubKey)
+	if err == nil {
+		consensus.prepareBitmap = prepareBitmap
+	}
+
+	commitBitmap, err := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.ConsensusPubKey)
+	if err == nil {
+		consensus.commitBitmap = commitBitmap
+	}
+
 	utils.GetLogInstance().Info("My Leader", "info", hex.EncodeToString(consensus.leader.ConsensusPubKey.Serialize()))
 	utils.GetLogInstance().Info("My Committee", "info", consensus.PublicKeys)
 	consensus.pubKeyLock.Unlock()
@@ -230,7 +240,7 @@ func (consensus *Consensus) VerifySeal(chain consensus_engine.ChainReader, heade
 func (consensus *Consensus) Finalize(chain consensus_engine.ChainReader, header *types.Header, state *state.DB, txs []*types.Transaction, receipts []*types.Receipt) (*types.Block, error) {
 	// Accumulate any block and uncle rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
-	accumulateRewards(chain.Config(), state, header)
+	consensus.accumulateRewards(chain.Config(), state, header)
 	header.Root = state.IntermediateRoot(false)
 	return types.NewBlock(header, txs, receipts), nil
 }
@@ -298,6 +308,7 @@ func (consensus *Consensus) GetCommitSigsArray() []*bls.Sign {
 // ResetState resets the state of the consensus
 func (consensus *Consensus) ResetState() {
 	consensus.state = Finished
+	consensus.phase = Announce
 	consensus.prepareSigs = map[common.Address]*bls.Sign{}
 	consensus.commitSigs = map[common.Address]*bls.Sign{}
 
@@ -441,7 +452,24 @@ func verifyMessageSig(signerPubKey *bls.PublicKey, message *msg_pb.Message) erro
 	if !msgSig.VerifyHash(signerPubKey, msgHash[:]) {
 		return errors.New("failed to verify the signature")
 	}
+	message.Signature = signature
 	return nil
+}
+
+// verifySenderKey verifys the message senderKey is properly signed and senderAddr is valid
+func (consensus *Consensus) verifySenderKey(msg *msg_pb.Message) (*bls.PublicKey, error) {
+	consensusMsg := msg.GetConsensus()
+	senderKey, err := bls_cosi.BytesToBlsPublicKey(consensusMsg.SenderPubkey)
+	if err != nil {
+		return nil, err
+	}
+	addrBytes := senderKey.GetAddress()
+	senderAddr := common.BytesToAddress(addrBytes[:])
+
+	if !consensus.IsValidatorInCommittee(senderAddr) {
+		return nil, errors.New(fmt.Sprintf("Validator address %s is not in committee", senderAddr))
+	}
+	return senderKey, nil
 }
 
 // SetConsensusID set the consensusID to the height of the blockchain
@@ -492,4 +520,11 @@ func (consensus *Consensus) checkConsensusMessage(message *msg_pb.Message, publi
 		return consensus_engine.ErrConsensusIDNotMatch
 	}
 	return nil
+}
+
+// SetSeqNum sets the seqNum in consensus object, called at node bootstrap
+func (consensus *Consensus) SetSeqNum(seqNum uint64) {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+	consensus.seqNum = seqNum
 }

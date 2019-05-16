@@ -25,7 +25,7 @@ import (
 
 const (
 	// ConsensusVersion : v1 old version without viewchange, v2 new version with viewchange
-	ConsensusVersion = "v1"
+	ConsensusVersion = "v2"
 )
 
 // Block reward per block signature.
@@ -199,7 +199,7 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 	consensus.ConsensusVersion = ConsensusVersion
 
 	consensus.pbftLog = NewPbftLog()
-	consensus.phase = Commit // for a new node, try to committing its chain head
+	consensus.phase = Announce
 	consensus.mode = PbftMode{mode: Normal}
 
 	selfPeer := host.GetSelfPeer()
