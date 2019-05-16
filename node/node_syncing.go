@@ -41,7 +41,7 @@ func (node *Node) getNeighborPeers(neighbor *sync.Map) []p2p.Peer {
 }
 
 // GetSync gets sync-ed to blockchain without joining consensus
-func (node *Node) GetSync() {
+func (node *Node) DoSyncWithoutConsensus() {
 	go node.DoSyncing(node.blockchain, node.Worker, node.GetSyncingPeers, false) //Don't join consensus
 }
 

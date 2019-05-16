@@ -56,38 +56,21 @@ func printVersion(me string) {
 
 // The main entrance for the transaction generator program which simulate transactions and send to the network for
 // processing.
-func main() {
-	ip := flag.String("ip", "127.0.0.1", "IP of the node")
-	port := flag.String("port", "9999", "port of the node.")
 
-	maxNumTxsPerBatch := flag.Int("max_num_txs_per_batch", 20000, "number of transactions to send per message")
-	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
-	duration := flag.Int("duration", 10, "duration of the tx generation in second. If it's negative, the experiment runs forever.")
-	versionFlag := flag.Bool("version", false, "Output version info")
-	crossShardRatio := flag.Int("cross_shard_ratio", 30, "The percentage of cross shard transactions.") //Keeping this for backward compatibility
-	shardIDFlag := flag.Int("shardID", 0, "The shardID the node belongs to.")
+var (
+	ip                = flag.String("ip", "127.0.0.1", "IP of the node")
+	port              = flag.String("port", "9999", "port of the node.")
+	maxNumTxsPerBatch = flag.Int("max_num_txs_per_batch", 20000, "number of transactions to send per message")
+	logFolder         = flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
+	duration          = flag.Int("duration", 10, "duration of the tx generation in second. If it's negative, the experiment runs forever.")
+	versionFlag       = flag.Bool("version", false, "Output version info")
+	crossShardRatio   = flag.Int("cross_shard_ratio", 30, "The percentage of cross shard transactions.") //Keeping this for backward compatibility
+	shardIDFlag       = flag.Int("shardID", 0, "The shardID the node belongs to.")
 	// Key file to store the private key
-	keyFile := flag.String("key", "./.txgenkey", "the private key file of the txgen")
-	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress")
-	flag.Parse()
-	if *versionFlag {
-		printVersion(os.Args[0])
-	}
+	keyFile = flag.String("key", "./.txgenkey", "the private key file of the txgen")
+)
 
-	// Add GOMAXPROCS to achieve max performance.
-	runtime.GOMAXPROCS(1024)
-
-	// Logging setup
-	utils.SetPortAndIP(*port, *ip)
-
-	if len(utils.BootNodes) == 0 {
-		bootNodeAddrs, err := utils.StringsToAddrs(utils.DefaultBootNodeAddrStrings)
-		if err != nil {
-			panic(err)
-		}
-		utils.BootNodes = bootNodeAddrs
-	}
-
+func setUpTXGen() *node.Node {
 	nodePriKey, _, err := utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
 		panic(err)
@@ -101,22 +84,6 @@ func main() {
 	var shardIDs []uint32
 	shardIDs = append(shardIDs, uint32(shardID))
 	selfPeer := p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: peerPubKey}
-
-	// Init with LibP2P enabled, FIXME: (leochen) right now we support only one shard
-	setting := Settings{
-		NumOfAddress:      10000,
-		MaxNumTxsPerBatch: *maxNumTxsPerBatch,
-	}
-	utils.GetLogInstance().Debug("Cross Shard Ratio Is Set But not used", "cx ratio", *crossShardRatio)
-
-	// TODO(Richard): refactor this chuck to a single method
-	// Setup a logger to stdout and log file.
-	logFileName := fmt.Sprintf("./%v/txgen-%v.log", *logFolder, shardID)
-	h := log.MultiHandler(
-		log.StreamHandler(os.Stdout, log.TerminalFormat(false)),
-		log.Must.FileHandler(logFileName, log.LogfmtFormat()), // Log to file
-	)
-	log.Root().SetHandler(h)
 
 	gsif, err := consensus.NewGenesisStakeInfoFinder()
 	// Nodes containing blockchain data to mirror the shards' data in the network
@@ -150,18 +117,53 @@ func main() {
 	txGen.NodeConfig.SetIsBeacon(true)
 	txGen.NodeConfig.SetIsClient(true)
 	txGen.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
+	return txGen
+}
+func main() {
+	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress")
+	flag.Parse()
+	if *versionFlag {
+		printVersion(os.Args[0])
+	}
+	// Add GOMAXPROCS to achieve max performance.
+	runtime.GOMAXPROCS(1024)
+	// Logging setup
+	utils.SetPortAndIP(*port, *ip)
+	if len(utils.BootNodes) == 0 {
+		bootNodeAddrs, err := utils.StringsToAddrs(utils.DefaultBootNodeAddrStrings)
+		if err != nil {
+			panic(err)
+		}
+		utils.BootNodes = bootNodeAddrs
+	}
+	// Init with LibP2P enabled, FIXME: (leochen) right now we support only one shard
+	setting := Settings{
+		NumOfAddress:      10000,
+		MaxNumTxsPerBatch: *maxNumTxsPerBatch,
+	}
+	utils.GetLogInstance().Debug("Cross Shard Ratio Is Set But not used", "cx ratio", *crossShardRatio)
+
+	// TODO(Richard): refactor this chuck to a single method
+	// Setup a logger to stdout and log file.
+	logFileName := fmt.Sprintf("./%v/txgen.log", *logFolder)
+	h := log.MultiHandler(
+		log.StreamHandler(os.Stdout, log.TerminalFormat(false)),
+		log.Must.FileHandler(logFileName, log.LogfmtFormat()), // Log to file
+	)
+	log.Root().SetHandler(h)
+	txGen := setUpTXGen()
 	txGen.ServiceManagerSetup()
 	txGen.RunServices()
 	time.Sleep(20 * time.Second)
 	start := time.Now()
 	totalTime := float64(*duration)
 	ticker := time.NewTicker(checkFrequency * time.Second)
-	txGen.GetSync()
+	txGen.DoSyncWithoutConsensus()
 syncLoop:
 	for {
 		t := time.Now()
 		if totalTime > 0 && t.Sub(start).Seconds() >= totalTime {
-			utils.GetLogInstance().Debug("Generator timer ended.", "duration", (int(t.Sub(start))), "startTime", start, "totalTime", totalTime)
+			utils.GetLogInstance().Debug("Generator timer ended in syncLoop.", "duration", (int(t.Sub(start))), "startTime", start, "totalTime", totalTime)
 			break syncLoop
 		}
 		select {
@@ -179,9 +181,7 @@ syncLoop:
 		utils.GetLogInstance().Info("[Txgen] Received new block", "block num", blocks[0].NumberU64())
 		for _, block := range blocks {
 			shardID := block.ShardID()
-
 			if txGen.Consensus.ShardID == shardID {
-				// Add it to blockchain
 				utils.GetLogInstance().Info("Adding block from leader", "txNum", len(block.Transactions()), "shardID", shardID, "preHash", block.ParentHash().Hex(), "currentBlock", txGen.Blockchain().CurrentBlock().NumberU64(), "incoming block", block.NumberU64())
 				txGen.AddNewBlock(block)
 				stateMutex.Lock()
@@ -199,9 +199,7 @@ syncLoop:
 		// wait for 3 seconds for client to send ping message to leader
 		// FIXME (leo) the readySignal should be set once we really sent ping message to leader
 		time.Sleep(3 * time.Second) // wait for nodes to be ready
-		for _, i := range shardIDs {
-			readySignal <- i
-		}
+		readySignal <- uint32(0)
 	}()
 	for {
 		t := time.Now()
@@ -228,7 +226,6 @@ syncLoop:
 	// Send a stop message to stop the nodes at the end
 	msg := proto_node.ConstructStopMessage()
 	txGen.GetHost().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeaconClient}, p2p_host.ConstructP2pMessage(byte(0), msg))
-	txGen.GetHost().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, p2p_host.ConstructP2pMessage(byte(0), msg))
 	time.Sleep(3 * time.Second)
 }
 
