@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/api/client"
 	clientService "github.com/harmony-one/harmony/api/client/service"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -179,6 +180,8 @@ type Node struct {
 
 	// Used to call smart contract locally
 	ContractCaller *contracts.ContractCaller
+
+	accountManager *accounts.Manager
 }
 
 // Blockchain returns the blockchain from node
@@ -242,6 +245,15 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 	if host != nil && consensusObj != nil {
 		// Consensus and associated channel to communicate blocks
 		node.Consensus = consensusObj
+
+		// TODO(ricl): placeholder. Set the account manager to node.accountManager
+		// // Ensure that the AccountManager method works before the node has started.
+		// // We rely on this in cmd/geth.
+		// am, ephemeralKeystore, err := makeAccountManager(conf)
+		// if err != nil {
+		// 	return nil, err
+		// }
+		// node.accountManager = am
 
 		// Init db
 		database := db
@@ -308,7 +320,6 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 		node.State = NodeLeader
 	} else {
 		node.State = NodeInit
-
 	}
 
 	// start the goroutine to receive client message
