@@ -81,8 +81,6 @@ func setUpTXGen() *node.Node {
 		panic(fmt.Errorf("generate key error"))
 	}
 	shardID := *shardIDFlag
-	var shardIDs []uint32
-	shardIDs = append(shardIDs, uint32(shardID))
 	selfPeer := p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: peerPubKey}
 
 	gsif, err := consensus.NewGenesisStakeInfoFinder()
@@ -98,7 +96,7 @@ func setUpTXGen() *node.Node {
 	}
 	consensusObj, err := consensus.New(myhost, uint32(shardID), p2p.Peer{}, nil)
 	txGen := node.New(myhost, consensusObj, nil, false) //Changed it : no longer archival node.
-	txGen.Client = client.NewClient(txGen.GetHost(), shardIDs)
+	txGen.Client = client.NewClient(txGen.GetHost(), uint32(shardID))
 	consensusObj.SetStakeInfoFinder(gsif)
 	consensusObj.ChainReader = txGen.Blockchain()
 	consensusObj.PublicKeys = nil
