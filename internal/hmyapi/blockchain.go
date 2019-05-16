@@ -7,7 +7,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/core/types"
 )
 
 // PublicBlockChainAPI provides an API to access the Harmony blockchain.
@@ -79,23 +78,4 @@ func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address common.Add
 		return nil, err
 	}
 	return (*hexutil.Big)(state.GetBalance(address)), state.Error()
-}
-
-// newRPCTransactionFromBlockHash returns a transaction that will serialize to the RPC representation.
-func newRPCTransactionFromBlockHash(b *types.Block, hash common.Hash) *RPCTransaction {
-	for idx, tx := range b.Transactions() {
-		if tx.Hash() == hash {
-			return newRPCTransactionFromBlockIndex(b, uint64(idx))
-		}
-	}
-	return nil
-}
-
-// newRPCTransactionFromBlockIndex returns a transaction that will serialize to the RPC representation.
-func newRPCTransactionFromBlockIndex(b *types.Block, index uint64) *RPCTransaction {
-	txs := b.Transactions()
-	if index >= uint64(len(txs)) {
-		return nil
-	}
-	return newRPCTransaction(txs[index], b.Hash(), b.NumberU64(), index)
 }
