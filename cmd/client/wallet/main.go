@@ -226,9 +226,7 @@ func createWalletNode() *node.Node {
 		panic(err)
 	}
 	utils.BootNodes = bootNodeAddrs
-
-	shardIDs := []uint32{0}
-
+	shardID := 0
 	// dummy host for wallet
 	// TODO: potentially, too many dummy IP may flush out good IP address from our bootnode DHT
 	// we need to understand the impact to bootnode DHT with this dummy host ip added
@@ -239,7 +237,7 @@ func createWalletNode() *node.Node {
 		panic(err)
 	}
 	w := node.New(host, nil, nil, false)
-	w.Client = client.NewClient(w.GetHost(), shardIDs)
+	w.Client = client.NewClient(w.GetHost(), uint32(shardID))
 
 	w.NodeConfig.SetRole(nodeconfig.ClientNode)
 	w.ServiceManagerSetup()
