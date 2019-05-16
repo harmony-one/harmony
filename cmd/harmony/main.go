@@ -58,21 +58,23 @@ func printVersion(me string) {
 	os.Exit(0)
 }
 
-func loggingInit(logFolder, role, ip, port string, onlyLogTps bool, verbosity log.Lvl) {
+func initLogFile(logFolder, role, ip, port string, onlyLogTps bool) {
 	// Setup a logger to stdout and log file.
-	logFileName := fmt.Sprintf("./%v/%s-%v-%v.log", logFolder, role, ip, port)
-	h := log.LvlFilterHandler(verbosity, log.MultiHandler(
-		log.StreamHandler(os.Stdout, log.TerminalFormat(false)),
-		log.Must.FileHandler(logFileName, log.JSONFormat()), // Log to file
-	))
-	if onlyLogTps {
-		h = log.MatchFilterHandler("msg", "TPS Report", h)
+	if err := os.MkdirAll(logFolder, 0755); err != nil {
+		panic(err)
 	}
-	log.Root().SetHandler(h)
+	logFileName := fmt.Sprintf("./%v/%s-%v-%v.log", logFolder, role, ip, port)
+	fileHandler := log.Must.FileHandler(logFileName, log.JSONFormat())
+	utils.AddLogHandler(fileHandler)
+
+	if onlyLogTps {
+		matchFilterHandler := log.MatchFilterHandler("msg", "TPS Report", utils.GetLogInstance().GetHandler())
+		utils.GetLogInstance().SetHandler(matchFilterHandler)
+	}
 }
 
 var (
-	ip               = flag.String("ip", "127.0.0.1", "IP of the node")
+	ip               = flag.String("ip", "127.0.0.1", "ip of the node")
 	port             = flag.String("port", "9000", "port of the node.")
 	logFolder        = flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	freshDB          = flag.Bool("fresh_db", false, "true means the existing disk based db will be removed")
@@ -372,13 +374,15 @@ func main() {
 	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
 	flag.Parse()
 
+	// Configure log parameters
+	utils.SetLogContext(*port, *ip)
+	utils.SetLogVerbosity(log.Lvl(*verbosity))
+
 	initSetup()
 	var currentNode *node.Node
 	var consensus *consensus.Consensus
 	nodeConfig := createGlobalConfig()
-
-	// Init logging.
-	loggingInit(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps, log.Lvl(*verbosity))
+	initLogFile(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps)
 
 	// Start Profiler for leader if profile argument is on
 	if nodeConfig.StringRole == "leader" && (*profile || *metricsReportURL != "") {

@@ -128,8 +128,8 @@ func main() {
 	// Add GOMAXPROCS to achieve max performance.
 	runtime.GOMAXPROCS(1024)
 	// Logging setup
-	utils.SetPortAndIP(*port, *ip)
-	utils.SetVerbosity(log.Lvl(*verbosity))
+	utils.SetLogContext(*port, *ip)
+	utils.SetLogVerbosity(log.Lvl(*verbosity))
 	if len(utils.BootNodes) == 0 {
 		bootNodeAddrs, err := utils.StringsToAddrs(utils.DefaultBootNodeAddrStrings)
 		if err != nil {

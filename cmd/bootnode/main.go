@@ -32,17 +32,14 @@ func printVersion(me string) {
 	os.Exit(0)
 }
 
-func loggingInit(logFolder, ip, port string, verbosity log.Lvl) {
+func initLogFile(logFolder, ip, port string) {
 	// Setup a logger to stdout and log file.
 	if err := os.MkdirAll(logFolder, 0755); err != nil {
 		panic(err)
 	}
 	logFileName := fmt.Sprintf("./%v/bootnode-%v-%v.log", logFolder, ip, port)
-	h := log.LvlFilterHandler(verbosity, log.MultiHandler(
-		log.StreamHandler(os.Stdout, log.TerminalFormat(false)),
-		log.Must.FileHandler(logFileName, log.JSONFormat()), // Log to file
-	))
-	log.Root().SetHandler(h)
+	fileHandler := log.Must.FileHandler(logFileName, log.JSONFormat()) // Log to file
+	utils.AddLogHandler(fileHandler)
 }
 
 func main() {
@@ -60,11 +57,9 @@ func main() {
 	}
 
 	// Logging setup
-	utils.SetPortAndIP(*port, *ip)
-	utils.SetVerbosity(log.Lvl(*verbosity))
-
-	// Init logging.
-	loggingInit(*logFolder, *ip, *port, log.Lvl(*verbosity))
+	utils.SetLogContext(*port, *ip)
+	utils.SetLogVerbosity(log.Lvl(*verbosity))
+	initLogFile(*logFolder, *ip, *port)
 
 	privKey, _, err := utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
