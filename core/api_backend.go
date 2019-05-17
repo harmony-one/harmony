@@ -6,20 +6,23 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 )
 
 // HmyAPIBackend ...
 type HmyAPIBackend struct {
-	blockchain *BlockChain
-	txPool     *TxPool
+	blockchain     *BlockChain
+	txPool         *TxPool
+	accountManager *accounts.Manager
 }
 
 // NewBackend ...
-func NewBackend(blockchain *BlockChain, txPool *TxPool) *HmyAPIBackend {
-	return &HmyAPIBackend{blockchain, txPool}
+func NewBackend(blockchain *BlockChain, txPool *TxPool, accountManager *accounts.Manager) *HmyAPIBackend {
+	return &HmyAPIBackend{blockchain, txPool, accountManager}
 }
 
 // ChainDb ...
@@ -81,4 +84,24 @@ func (b *HmyAPIBackend) HeaderByNumber(ctx context.Context, blockNr rpc.BlockNum
 // GetPoolNonce ...
 func (b *HmyAPIBackend) GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error) {
 	return b.txPool.State().GetNonce(addr), nil
+}
+
+// SendTx ...
+func (b *HmyAPIBackend) SendTx(ctx context.Context, signedTx *types.Transaction) error {
+	return b.txPool.Add(ctx, signedTx)
+}
+
+// ChainConfig ...
+func (b *HmyAPIBackend) ChainConfig() *params.ChainConfig {
+	return b.blockchain.chainConfig
+}
+
+// CurrentBlock ...
+func (b *HmyAPIBackend) CurrentBlock() *types.Block {
+	return types.NewBlockWithHeader(b.blockchain.CurrentHeader())
+}
+
+// AccountManager ...
+func (b *HmyAPIBackend) AccountManager() *accounts.Manager {
+	return b.accountManager
 }

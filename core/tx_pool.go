@@ -17,6 +17,7 @@
 package core
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -688,6 +689,13 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (bool, error) {
 
 	log.Trace("Pooled new future transaction", "hash", hash, "from", from, "to", tx.To())
 	return replace, nil
+}
+
+// Add adds a transaction to the pool if valid and passes it to the tx relay
+// backend
+func (pool *TxPool) Add(ctx context.Context, tx *types.Transaction) error {
+	// TODO(ricl): placeholder
+	return nil
 }
 
 // enqueueTx inserts a new transaction into the non-executable transaction queue.
