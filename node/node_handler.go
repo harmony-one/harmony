@@ -19,10 +19,10 @@ import (
 
 	"github.com/harmony-one/harmony/core"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	pb "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
+
 	"github.com/harmony-one/harmony/api/proto"
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	"github.com/harmony-one/harmony/api/proto/message"
@@ -171,34 +171,6 @@ func (node *Node) messageHandler(content []byte, sender string) {
 						node.Client.UpdateBlocks(blocks)
 					}
 				}
-			}
-		case proto_node.Control:
-			utils.GetLogInstance().Info("NET: received message: Node/Control")
-			controlType := msgPayload[0]
-			if proto_node.ControlMessageType(controlType) == proto_node.STOP && node.ProcessStopMessage {
-				utils.GetLogInstance().Debug("Stopping Node", "numBlocks", node.blockchain.CurrentBlock().NumberU64(), "numTxsProcessed", node.countNumTransactionsInBlockchain())
-
-				var avgBlockSizeInBytes common.StorageSize
-				txCount := 0
-				blockCount := 0
-				avgTxSize := 0
-
-				for block := node.blockchain.CurrentBlock(); block != nil; block = node.blockchain.GetBlockByHash(block.Header().ParentHash) {
-					avgBlockSizeInBytes += block.Size()
-					txCount += len(block.Transactions())
-					bytes, _ := rlp.EncodeToBytes(block.Transactions())
-					avgTxSize += len(bytes)
-					blockCount++
-				}
-
-				if blockCount != 0 && txCount != 0 {
-					avgBlockSizeInBytes = avgBlockSizeInBytes / common.StorageSize(blockCount)
-					avgTxSize = avgTxSize / txCount
-				}
-
-				utils.GetLogInstance().Debug("Blockchain Report", "totalNumBlocks", blockCount, "avgBlockSizeInCurrentEpoch", avgBlockSizeInBytes, "totalNumTxs", txCount, "avgTxSzieInCurrentEpoch", avgTxSize)
-
-				os.Exit(0)
 			}
 		case proto_node.PING:
 			node.pingMessageHandler(msgPayload, sender)

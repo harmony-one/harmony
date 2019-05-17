@@ -66,14 +66,6 @@ func TestConstructRequestTransactionsMessage(t *testing.T) {
 	}
 }
 
-func TestConstructStopMessage(t *testing.T) {
-	buf := ConstructStopMessage()
-
-	if len(buf) == 0 {
-		t.Error("Failed to contruct STOP message")
-	}
-}
-
 func TestConstructBlocksSyncMessage(t *testing.T) {
 
 	db := ethdb.NewMemDatabase()

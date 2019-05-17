@@ -24,7 +24,7 @@ const (
 	Transaction MessageType = iota
 	Block
 	Client
-	Control
+	_    // used to be Control
 	PING // node send ip/pki to register with leader
 	PONG // node broadcast pubK
 	ShardState
@@ -99,14 +99,6 @@ const (
 	Sync BlockMessageType = iota
 )
 
-// ControlMessageType is the type of messages used for Node/Control
-type ControlMessageType int
-
-// ControlMessageType
-const (
-	STOP ControlMessageType = iota
-)
-
 // SerializeBlockchainSyncMessage serializes BlockchainSyncMessage.
 func SerializeBlockchainSyncMessage(blockchainSyncMessage *BlockchainSyncMessage) []byte {
 	var result bytes.Buffer
@@ -152,14 +144,6 @@ func ConstructRequestTransactionsMessage(transactionIds [][]byte) []byte {
 	for _, txID := range transactionIds {
 		byteBuffer.Write(txID)
 	}
-	return byteBuffer.Bytes()
-}
-
-// ConstructStopMessage constructs STOP message for node to stop
-func ConstructStopMessage() []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
-	byteBuffer.WriteByte(byte(Control))
-	byteBuffer.WriteByte(byte(STOP))
 	return byteBuffer.Bytes()
 }
 
