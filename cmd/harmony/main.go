@@ -18,6 +18,7 @@ import (
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/drand"
+	attack "github.com/harmony-one/harmony/internal/attack"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -92,6 +93,7 @@ var (
 	isNewNode    = flag.Bool("is_newnode", false, "true means this node is a new node")
 	accountIndex = flag.Int("account_index", 0, "the index of the staking account to use")
 	shardID      = flag.Int("shard_id", -1, "the shard ID of this node")
+	delayAttack  = flag.Bool("delayAttack", false, "delay response of the node indefinetely")
 	// logConn logs incoming/outgoing connections
 	logConn = flag.Bool("log_conn", false, "log incoming/outgoing connections")
 )
@@ -217,6 +219,11 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	// TODO: consensus object shouldn't start here
 	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of consensus later.
 	currentConsensus, err := consensus.New(nodeConfig.Host, nodeConfig.ShardID, nodeConfig.Leader, nodeConfig.ConsensusPriKey)
+	attackInstance := attack.GetInstance()
+	if *delayAttack {
+		attackInstance.SetDelayResponseAttack()
+	}
+	currentConsensus.DelayAttack = attackInstance
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error :%v \n", err)
 		os.Exit(1)

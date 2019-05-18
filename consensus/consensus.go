@@ -17,6 +17,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	attack "github.com/harmony-one/harmony/internal/attack"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/internal/utils/contract"
@@ -148,6 +149,7 @@ type Consensus struct {
 
 	// Staking information finder
 	stakeInfoFinder StakeInfoFinder
+	DelayAttack     *attack.Model
 }
 
 // StakeInfoFinder returns the stake information finder instance this

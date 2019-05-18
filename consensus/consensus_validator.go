@@ -129,7 +129,10 @@ func (consensus *Consensus) processPreparedMessage(message *msg_pb.Message) {
 	//#### END Read payload data
 
 	// Update readyByConsensus for attack.
-	attack.GetInstance().UpdateConsensusReady(consensusID)
+	if consensus.DelayAttack.AttackEnabled {
+		consensus.DelayAttack.UpdateConsensusReady(consensusID)
+		consensus.DelayAttack.DelayResponse()
+	}
 
 	if err := consensus.checkConsensusMessage(message, consensus.leader.ConsensusPubKey); err != nil {
 		utils.GetLogInstance().Debug("processPreparedMessage error", "error", err)

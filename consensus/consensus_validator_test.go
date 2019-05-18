@@ -14,6 +14,7 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	attack "github.com/harmony-one/harmony/internal/attack"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	mock_host "github.com/harmony-one/harmony/p2p/host/mock"
@@ -102,6 +103,7 @@ func TestProcessMessageValidatorAnnounce(test *testing.T) {
 	}
 
 	consensusValidator1, err := New(m, 0, leader, bls_cosi.RandPrivateKey())
+	consensusValidator1.DelayAttack = attack.GetInstance()
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}
@@ -167,7 +169,7 @@ func TestProcessMessageValidatorPrepared(test *testing.T) {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}
 	consensusValidator1.ChainReader = MockChainReader{}
-
+	consensusValidator1.DelayAttack = attack.GetInstance()
 	// Get actual consensus messages.
 	announceMsg, err = proto.GetConsensusMessagePayload(announceMsg)
 	if err != nil {
@@ -269,7 +271,7 @@ func TestProcessMessageValidatorCommitted(test *testing.T) {
 	}
 	consensusValidator1.ChainReader = MockChainReader{}
 	consensusValidator1.OnConsensusDone = func(newBlock *types.Block) {}
-
+	consensusValidator1.DelayAttack = attack.GetInstance()
 	if err = protobuf.Unmarshal(announceMsg, message); err != nil {
 		test.Errorf("Failed to unmarshal message payload")
 	}

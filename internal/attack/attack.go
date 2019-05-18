@@ -12,8 +12,8 @@ import (
 // Constants used for attack model.
 const (
 	DroppingTickDuration    = 2 * time.Second
-	HitRate                 = 10
-	DelayResponseDuration   = 10 * time.Second
+	HitRate                 = 2
+	DelayResponseDuration   = 90 * time.Second
 	ConsensusIDThresholdMin = 10
 	ConsensusIDThresholdMax = 100
 )
@@ -61,6 +61,13 @@ func (attack *Model) SetAttackEnabled(AttackEnabled bool) {
 		attack.attackType = Type(rand.Intn(3))
 		attack.ConsensusIDThreshold = uint32(ConsensusIDThresholdMin + rand.Intn(ConsensusIDThresholdMax-ConsensusIDThresholdMin))
 	}
+}
+
+// SetDelayResponseAttack sets attack to DelayResponse enabled.
+func (attack *Model) SetDelayResponseAttack() {
+	attack.AttackEnabled = true
+	attack.attackType = Type(1)
+	attack.ConsensusIDThreshold = 0
 }
 
 // Run runs enabled attacks.
