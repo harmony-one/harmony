@@ -5,11 +5,12 @@
 package mock_p2p
 
 import (
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	p2p "github.com/harmony-one/harmony/p2p"
 	go_libp2p_host "github.com/libp2p/go-libp2p-host"
 	go_libp2p_peer "github.com/libp2p/go-libp2p-peer"
-	reflect "reflect"
 )
 
 // MockHost is a mock of Host interface
@@ -97,6 +98,11 @@ func (m *MockHost) GetP2PHost() go_libp2p_host.Host {
 	ret := m.ctrl.Call(m, "GetP2PHost")
 	ret0, _ := ret[0].(go_libp2p_host.Host)
 	return ret0
+}
+
+// GetPeerCount ...
+func (m *MockHost) GetPeerCount() int {
+	return 1 // TODO(ricl): port
 }
 
 // GetP2PHost indicates an expected call of GetP2PHost
