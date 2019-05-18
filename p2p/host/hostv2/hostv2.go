@@ -209,6 +209,11 @@ func (host *HostV2) GetP2PHost() libp2p_host.Host {
 	return host.h
 }
 
+// GetPeerCount ...
+func (host *HostV2) GetPeerCount() int {
+	return host.h.Peerstore().Peers().Len()
+}
+
 // ConnectHostPeer connects to peer host
 func (host *HostV2) ConnectHostPeer(peer p2p.Peer) {
 	ctx := context.Background()

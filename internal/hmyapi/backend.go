@@ -12,12 +12,23 @@ func GetAPIs(b *core.HmyAPIBackend) []rpc.API {
 		{
 			Namespace: "hmy",
 			Version:   "1.0",
+			Service:   NewPublicHarmonyAPI(b),
+			Public:    true,
+		},
+		{
+			Namespace: "hmy",
+			Version:   "1.0",
 			Service:   NewPublicBlockChainAPI(b),
 			Public:    true,
 		}, {
 			Namespace: "hmy",
 			Version:   "1.0",
 			Service:   NewPublicTransactionPoolAPI(b, nonceLock),
+			Public:    true,
+		}, {
+			Namespace: "hmy",
+			Version:   "1.0",
+			Service:   NewPublicAccountAPI(b.AccountManager()),
 			Public:    true,
 		},
 	}

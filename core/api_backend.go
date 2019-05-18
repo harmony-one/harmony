@@ -105,3 +105,8 @@ func (b *HmyAPIBackend) CurrentBlock() *types.Block {
 func (b *HmyAPIBackend) AccountManager() *accounts.Manager {
 	return b.accountManager
 }
+
+// GetReceipts ...
+func (b *HmyAPIBackend) GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error) {
+	return b.blockchain.GetReceiptsByHash(hash), nil
+}

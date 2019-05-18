@@ -14,6 +14,7 @@ type Host interface {
 	AddPeer(*Peer) error
 	GetID() libp2p_peer.ID
 	GetP2PHost() libp2p_host.Host
+	GetPeerCount() int
 
 	//AddIncomingPeer(Peer)
 	//AddOutgoingPeer(Peer)

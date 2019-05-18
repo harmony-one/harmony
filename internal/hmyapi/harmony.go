@@ -1,6 +1,9 @@
 package hmyapi
 
 import (
+	"context"
+	"math/big"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/core"
@@ -9,7 +12,12 @@ import (
 // PublicHarmonyAPI provides an API to access Harmony related information.
 // It offers only methods that operate on public data that is freely available to anyone.
 type PublicHarmonyAPI struct {
-	b *core.BlockChain
+	b *core.HmyAPIBackend
+}
+
+// NewPublicHarmonyAPI ...
+func NewPublicHarmonyAPI(b *core.HmyAPIBackend) *PublicHarmonyAPI {
+	return &PublicHarmonyAPI{b}
 }
 
 // ProtocolVersion returns the current Harmony protocol version this node supports
@@ -25,6 +33,12 @@ func (s *PublicHarmonyAPI) ProtocolVersion() hexutil.Uint {
 // - pulledStates:  number of state entries processed until now
 // - knownStates:   number of known state entries that still need to be pulled
 func (s *PublicHarmonyAPI) Syncing() (interface{}, error) {
-	// TODO(ricl): port
+	// TODO(ricl): find our Downloader module for syncing blocks
 	return false, nil
+}
+
+// GasPrice returns a suggestion for a gas price.
+func (s *PublicHarmonyAPI) GasPrice(ctx context.Context) (*hexutil.Big, error) {
+	// TODO(ricl): add SuggestPrice API
+	return (*hexutil.Big)(big.NewInt(1)), nil
 }
