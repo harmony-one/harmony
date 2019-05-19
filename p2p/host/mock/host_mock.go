@@ -5,12 +5,11 @@
 package mock_p2p
 
 import (
-	reflect "reflect"
-
 	gomock "github.com/golang/mock/gomock"
 	p2p "github.com/harmony-one/harmony/p2p"
 	go_libp2p_host "github.com/libp2p/go-libp2p-host"
 	go_libp2p_peer "github.com/libp2p/go-libp2p-peer"
+	reflect "reflect"
 )
 
 // MockHost is a mock of Host interface
@@ -100,15 +99,24 @@ func (m *MockHost) GetP2PHost() go_libp2p_host.Host {
 	return ret0
 }
 
-// GetPeerCount ...
-func (m *MockHost) GetPeerCount() int {
-	return 1 // TODO(ricl): port
-}
-
 // GetP2PHost indicates an expected call of GetP2PHost
 func (mr *MockHostMockRecorder) GetP2PHost() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetP2PHost", reflect.TypeOf((*MockHost)(nil).GetP2PHost))
+}
+
+// GetPeerCount mocks base method
+func (m *MockHost) GetPeerCount() int {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPeerCount")
+	ret0, _ := ret[0].(int)
+	return ret0
+}
+
+// GetPeerCount indicates an expected call of GetPeerCount
+func (mr *MockHostMockRecorder) GetPeerCount() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPeerCount", reflect.TypeOf((*MockHost)(nil).GetPeerCount))
 }
 
 // ConnectHostPeer mocks base method
