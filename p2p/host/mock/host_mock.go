@@ -105,6 +105,20 @@ func (mr *MockHostMockRecorder) GetP2PHost() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetP2PHost", reflect.TypeOf((*MockHost)(nil).GetP2PHost))
 }
 
+// GetPeerCount mocks base method
+func (m *MockHost) GetPeerCount() int {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPeerCount")
+	ret0, _ := ret[0].(int)
+	return ret0
+}
+
+// GetPeerCount indicates an expected call of GetPeerCount
+func (mr *MockHostMockRecorder) GetPeerCount() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPeerCount", reflect.TypeOf((*MockHost)(nil).GetPeerCount))
+}
+
 // ConnectHostPeer mocks base method
 func (m *MockHost) ConnectHostPeer(arg0 p2p.Peer) {
 	m.ctrl.T.Helper()
