@@ -105,7 +105,7 @@ type Consensus struct {
 	// Leader or validator address in hex
 	SelfAddress common.Address
 	// Consensus Id (View Id) - 4 byte
-	consensusID uint32
+	consensusID uint32 // TODO(chao): change it to uint64 or add overflow checking mechanism
 
 	// Blockhash - 32 byte
 	blockHash [32]byte

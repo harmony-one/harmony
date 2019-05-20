@@ -467,7 +467,7 @@ func (consensus *Consensus) verifySenderKey(msg *msg_pb.Message) (*bls.PublicKey
 	senderAddr := common.BytesToAddress(addrBytes[:])
 
 	if !consensus.IsValidatorInCommittee(senderAddr) {
-		return nil, errors.New(fmt.Sprintf("Validator address %s is not in committee", senderAddr))
+		return nil, fmt.Errorf("Validator address %s is not in committee", senderAddr)
 	}
 	return senderKey, nil
 }

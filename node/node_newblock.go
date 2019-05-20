@@ -105,7 +105,6 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 		time.Sleep(30 * time.Second) // Wait for other nodes to be ready (test-only)
 
 		firstTime := true
-		var newBlock *types.Block
 		for {
 			// keep waiting for Consensus ready
 			select {
@@ -147,7 +146,7 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 						// TODO: bug fix - the stored shard state between here and PostConsensusProcessing are different.
 						//node.addNewShardStateHash(block)
 					}
-					newBlock = block
+					newBlock := block
 					utils.GetLogInstance().Debug("Successfully proposed new block", "blockNum", block.NumberU64(), "numTxs", block.Transactions().Len())
 
 					// Send the new block to Consensus so it can be confirmed.

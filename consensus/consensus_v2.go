@@ -50,14 +50,15 @@ func (consensus *Consensus) handleMessageUpdate(payload []byte) {
 
 }
 
-func (consensus *Consensus) tryAnnouncing(block *types.Block) {
+// TODO: move to consensus_leader.go later
+func (consensus *Consensus) tryAnnounce(block *types.Block) {
 	// here we assume the leader should always be update to date
 	if block.NumberU64() != consensus.seqNum {
-		utils.GetLogInstance().Debug("tryAnnouncing seqNum not match", "blockNum", block.NumberU64(), "mySeqNum", consensus.seqNum)
+		utils.GetLogInstance().Debug("tryAnnounce seqNum not match", "blockNum", block.NumberU64(), "mySeqNum", consensus.seqNum)
 		return
 	}
 	if !consensus.PubKey.IsEqual(consensus.LeaderPubKey) {
-		utils.GetLogInstance().Debug("tryAnnouncing key not match", "myKey", consensus.PubKey, "leaderKey", consensus.LeaderPubKey)
+		utils.GetLogInstance().Debug("tryAnnounce key not match", "myKey", consensus.PubKey, "leaderKey", consensus.LeaderPubKey)
 		return
 	}
 	blockHash := block.Hash()
@@ -66,7 +67,7 @@ func (consensus *Consensus) tryAnnouncing(block *types.Block) {
 	// prepare message and broadcast to validators
 	encodedBlock, err := rlp.EncodeToBytes(block)
 	if err != nil {
-		utils.GetLogInstance().Debug("tryAnnouncing Failed encoding block")
+		utils.GetLogInstance().Debug("tryAnnounce Failed encoding block")
 		return
 	}
 	consensus.block = encodedBlock
@@ -85,7 +86,7 @@ func (consensus *Consensus) tryAnnouncing(block *types.Block) {
 	consensus.prepareSigs[consensus.SelfAddress] = consensus.priKey.SignHash(consensus.blockHash[:])
 
 	// Construct broadcast p2p message
-	utils.GetLogInstance().Warn("tryAnnouncing", "sent announce message", len(msgToSend), "groupID", p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID)))
+	utils.GetLogInstance().Warn("tryAnnounce", "sent announce message", len(msgToSend), "groupID", p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID)))
 	consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 }
 
@@ -143,12 +144,12 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	consensus.blockHash = recvMsg.BlockHash
 	consensus.pbftLog.AddMessage(recvMsg)
 	consensus.pbftLog.AddBlock(&blockObj)
-	consensus.tryPreparing(blockObj.Header().Hash())
+	consensus.tryPrepare(blockObj.Header().Hash())
 	return
 }
 
-// tryPreparing will try to send prepare message
-func (consensus *Consensus) tryPreparing(blockHash common.Hash) {
+// tryPrepare will try to send prepare message
+func (consensus *Consensus) tryPrepare(blockHash common.Hash) {
 	var hash common.Hash
 	copy(hash[:], blockHash[:])
 	block := consensus.pbftLog.GetBlockByHash(hash)
@@ -161,17 +162,18 @@ func (consensus *Consensus) tryPreparing(blockHash common.Hash) {
 	}
 
 	consensus.switchPhase(Prepare)
-	consensus.idleTimeout.Stop()
-	consensus.commitTimeout.Start()
+	consensus.idleTimeout.Stop()    // leader send prepare msg ontime, so we can stop idleTimeout
+	consensus.commitTimeout.Start() // start commit phase timeout
 
-	if !consensus.PubKey.IsEqual(consensus.LeaderPubKey) { //TODO(chao): check whether this is necessary when calling tryPreparing
+	if !consensus.PubKey.IsEqual(consensus.LeaderPubKey) { //TODO(chao): check whether this is necessary when calling tryPrepare
 		// Construct and send prepare message
 		msgToSend := consensus.constructPrepareMessage()
-		utils.GetLogInstance().Warn("tryPreparing", "sent prepare message", len(msgToSend))
+		utils.GetLogInstance().Warn("tryPrepare", "sent prepare message", len(msgToSend))
 		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 	}
 }
 
+// TODO: move to consensus_leader.go later
 func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	if !consensus.PubKey.IsEqual(consensus.LeaderPubKey) {
 		return
@@ -214,16 +216,15 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
+	if len(prepareSigs) >= ((len(consensus.PublicKeys)*2)/3 + 1) {
+		// already have enough signatures
+		return
+	}
 
 	// proceed only when the message is not received before
 	_, ok := prepareSigs[validatorAddress]
 	if ok {
 		utils.GetLogInstance().Debug("Already received prepare message from the validator", "validatorAddress", validatorAddress)
-		return
-	}
-
-	if len(prepareSigs) >= ((len(consensus.PublicKeys)*2)/3 + 1) {
-		// already have enough signatures
 		return
 	}
 
@@ -344,6 +345,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	return
 }
 
+// TODO: move it to consensus_leader.go later
 func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	if !consensus.PubKey.IsEqual(consensus.LeaderPubKey) {
 		return
@@ -628,6 +630,8 @@ func (consensus *Consensus) tryCatchup() {
 func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	return
 }
+
+// TODO: move to consensus_leader.go later
 func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	return
 }
@@ -674,7 +678,7 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 
 				startTime = time.Now()
 				utils.GetLogInstance().Debug("STARTING CONSENSUS", "numTxs", len(newBlock.Transactions()), "consensus", consensus, "startTime", startTime, "publicKeys", len(consensus.PublicKeys))
-				consensus.tryAnnouncing(newBlock)
+				consensus.tryAnnounce(newBlock)
 
 			case msg := <-consensus.MsgChan:
 				consensus.handleMessageUpdate(msg)
