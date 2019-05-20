@@ -9,10 +9,10 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/p2p"
 	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
+
+	"github.com/harmony-one/harmony/p2p"
 )
 
 // Role defines a role of a node.
@@ -76,8 +76,9 @@ type ConfigType struct {
 	P2pPriKey       p2p_crypto.PrivKey
 	ConsensusPriKey *bls.SecretKey
 	ConsensusPubKey *bls.PublicKey
-	MainDB          *ethdb.LDBDatabase
-	BeaconDB        *ethdb.LDBDatabase
+
+	// Database directory
+	DBDir    string
 
 	SelfPeer p2p.Peer
 	Leader   p2p.Peer

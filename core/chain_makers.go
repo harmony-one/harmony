@@ -23,6 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
+
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -273,3 +274,4 @@ func (cr *fakeChainReader) GetHeaderByNumber(number uint64) *types.Header       
 func (cr *fakeChainReader) GetHeaderByHash(hash common.Hash) *types.Header          { return nil }
 func (cr *fakeChainReader) GetHeader(hash common.Hash, number uint64) *types.Header { return nil }
 func (cr *fakeChainReader) GetBlock(hash common.Hash, number uint64) *types.Block   { return nil }
+func (cr *fakeChainReader) ReadShardState(epoch *big.Int) (types.ShardState, error) { return nil, nil }

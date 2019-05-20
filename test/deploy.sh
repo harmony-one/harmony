@@ -69,7 +69,7 @@ EOU
    exit 0
 }
 
-DB=
+DB=false
 TXGEN=true
 DURATION=60
 MIN=5
@@ -80,7 +80,7 @@ DRYRUN=
 while getopts "hdtD:m:s:nS" option; do
    case $option in
       h) usage ;;
-      d) DB='-db_supported' ;;
+      d) DB=true ;;
       t) TXGEN=false ;;
       D) DURATION=$OPTARG ;;
       m) MIN=$OPTARG ;;
@@ -127,9 +127,15 @@ echo "launching boot node ..."
 $DRYRUN $ROOT/bin/bootnode -port 19876 > $log_folder/bootnode.log 2>&1 | tee -a $LOG_FILE &
 sleep 1
 BN_MA=$(grep "BN_MA" $log_folder/bootnode.log | awk -F\= ' { print $2 } ')
-HMY_OPT2=" -bootnodes $BN_MA"
 echo "bootnode launched." + " $BN_MA"
-HMY_OPT3=" -is_genesis"
+
+unset -v base_args
+declare -a base_args args
+base_args=(-log_folder "${log_folder}" -min_peers "${MIN}" -bootnodes "${BN_MA}")
+if "${DB}"
+then
+  base_args=("${base_args[@]}" -db_supported)
+fi
 
 NUM_NN=0
 
@@ -139,27 +145,20 @@ sleep 2
 i=0
 while IFS='' read -r line || [[ -n "$line" ]]; do
   IFS=' ' read ip port mode shardID <<< $line
-  if [ "$mode" == "leader" ]; then
-     echo "launching leader ..."
-     $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -account_index $i  -min_peers $MIN $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key -is_leader 2>&1 | tee -a $LOG_FILE &
-  fi
-  if [ "$mode" == "leader_archival" ]; then
-     echo "launching leader ..."
-     $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -account_index $i  -min_peers $MIN $HMY_OPT2 -key /tmp/$ip-$port.key -is_leader -is_archival 2>&1 | tee -a $LOG_FILE &
-  fi
-  if [ "$mode" == "validator" ]; then
-     echo "launching validator ..."
-     $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -account_index $i  -min_peers $MIN $HMY_OPT2 $HMY_OPT3 -key /tmp/$ip-$port.key 2>&1 | tee -a $LOG_FILE &
-  fi
-  if [ "$mode" == "archival" ]; then
-      echo "launching archival node ... wait"
-      $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -account_index $i -min_peers $MIN $HMY_OPT2 -key /tmp/$ip-$port.key -is_archival  2>&1 | tee -a $LOG_FILE &
-  fi
-  if [[ "$mode" == "newnode" && "$SYNC" == "true" ]]; then
-     (( NUM_NN += 30 ))
-     echo "launching new node ..."
-     (sleep $NUM_NN; $DRYRUN $ROOT/bin/harmony -ip $ip -port $port -log_folder $log_folder $DB -account_index $i  -min_peers $MIN $HMY_OPT2 -key /tmp/$ip-$port.key 2>&1 | tee -a $LOG_FILE ) &
-  fi
+  args=("${base_args[@]}" -ip "${ip}" -port "${port}" -account_index "${i}" -key "/tmp/${ip}-${port}.key" -db_dir "db-${ip}-${port}")
+  case "${mode}" in
+  leader*|validator*) args=("${args[@]}" -is_genesis);;
+  esac
+  case "${mode}" in leader*) args=("${args[@]}" -is_leader);; esac
+  case "${mode}" in *archival|archival) args=("${args[@]}" -is_archival);; esac
+  case "${mode}" in
+  newnode)
+    "${SYNC}" || continue
+    sleep "${NUM_NN}"
+    NUM_NN=$((${NUM_NN} + 30))
+    ;;
+  esac
+  $DRYRUN "${ROOT}/bin/harmony" "${args[@]}" 2>&1 | tee -a "${LOG_FILE}" &
   i=$((i+1))
 done < $config
 
@@ -169,7 +168,7 @@ if [ "$TXGEN" == "true" ]; then
    line=$(grep client $config)
    IFS=' ' read ip port mode shardID <<< $line
    if [ "$mode" == "client" ]; then
-      $DRYRUN $ROOT/bin/txgen -log_folder $log_folder -duration $DURATION -ip $ip -port $port $HMY_OPT2 2>&1 | tee -a $LOG_FILE
+      $DRYRUN $ROOT/bin/txgen -log_folder $log_folder -duration $DURATION -ip $ip -port $port $HMY_OPT2 > $LOG_FILE 2>&1
    fi
 else
    sleep $DURATION

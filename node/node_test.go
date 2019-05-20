@@ -7,8 +7,10 @@ import (
 	"time"
 
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/shardchain"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
+
 	"github.com/harmony-one/harmony/drand"
 
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
@@ -18,6 +20,8 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 )
+
+var testDBFactory = &shardchain.MemDBFactory{}
 
 func TestNewNode(t *testing.T) {
 	pubKey := bls2.RandPrivateKey().GetPublicKey()
@@ -31,16 +35,16 @@ func TestNewNode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
-	node := New(host, consensus, nil, false)
+	node := New(host, consensus, testDBFactory, false)
 	if node.Consensus == nil {
 		t.Error("Consensus is not initialized for the node")
 	}
 
-	if node.blockchain == nil {
+	if node.Blockchain() == nil {
 		t.Error("Blockchain is not initialized for the node")
 	}
 
-	if node.blockchain.CurrentBlock() == nil {
+	if node.Blockchain().CurrentBlock() == nil {
 		t.Error("Genesis block is not initialized for the node")
 	}
 }
@@ -58,7 +62,7 @@ func TestGetSyncingPeers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
-	node := New(host, consensus, nil, false)
+	node := New(host, consensus, testDBFactory, false)
 	peer := p2p.Peer{IP: "127.0.0.1", Port: "8000"}
 	peer2 := p2p.Peer{IP: "127.0.0.1", Port: "8001"}
 	node.Neighbors.Store("minh", peer)
@@ -102,7 +106,7 @@ func TestAddPeers(t *testing.T) {
 	}
 	dRand := drand.New(host, 0, []p2p.Peer{leader, validator}, leader, nil, nil)
 
-	node := New(host, consensus, nil, false)
+	node := New(host, consensus, testDBFactory, false)
 	node.DRand = dRand
 	r1 := node.AddPeers(peers1)
 	e1 := 2
@@ -148,7 +152,7 @@ func TestAddBeaconPeer(t *testing.T) {
 	}
 	dRand := drand.New(host, 0, []p2p.Peer{leader, validator}, leader, nil, nil)
 
-	node := New(host, consensus, nil, false)
+	node := New(host, consensus, testDBFactory, false)
 	node.DRand = dRand
 	for _, p := range peers1 {
 		ret := node.AddBeaconPeer(p)
@@ -220,7 +224,7 @@ func TestPingPongHandler(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
-	node := New(host, consensus, nil, false)
+	node := New(host, consensus, testDBFactory, false)
 	//go sendPingMessage(leader)
 	go sendPongMessage(node, leader)
 	go exitServer()

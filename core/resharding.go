@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/binary"
+	"math/big"
 	"math/rand"
 	"sort"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 
 	"github.com/harmony-one/harmony/contracts/structs"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/internal/utils/contract"
 
@@ -25,7 +27,7 @@ const (
 	// GenesisShardNum is the number of shard at genesis
 	GenesisShardNum = 4
 	// GenesisShardSize is the size of each shard at genesis
-	GenesisShardSize = 50
+	GenesisShardSize = 5
 	// CuckooRate is the percentage of nodes getting reshuffled in the second step of cuckoo resharding.
 	CuckooRate = 0.1
 )
@@ -34,7 +36,7 @@ const (
 type ShardingState struct {
 	epoch      uint64 // current epoch
 	rnd        uint64 // random seed for resharding
-	numShards  int
+	numShards  int    // TODO ek – equal to len(shardState); remove this
 	shardState types.ShardState
 }
 
@@ -157,26 +159,37 @@ func GetEpochFromBlockNumber(blockNumber uint64) uint64 {
 }
 
 // GetShardingStateFromBlockChain will retrieve random seed and shard map from beacon chain for given a epoch
-func GetShardingStateFromBlockChain(bc *BlockChain, epoch uint64) *ShardingState {
-	number := GetBlockNumberFromEpoch(epoch)
-	shardState := bc.GetShardStateByNumber(number)
+func GetShardingStateFromBlockChain(bc *BlockChain, epoch *big.Int) (*ShardingState, error) {
+	shardState, err := bc.ReadShardState(epoch)
+	if err != nil {
+		return nil, err
+	}
 
-	rndSeedBytes := bc.GetRandSeedByNumber(number)
+	blockNumber := GetBlockNumberFromEpoch(epoch.Uint64())
+	rndSeedBytes := bc.GetRandSeedByNumber(blockNumber)
 	rndSeed := binary.BigEndian.Uint64(rndSeedBytes[:])
 
-	return &ShardingState{epoch: epoch, rnd: rndSeed, shardState: shardState, numShards: len(shardState)}
+	return &ShardingState{epoch: epoch.Uint64(), rnd: rndSeed, shardState: shardState, numShards: len(shardState)}, nil
 }
 
 // CalculateNewShardState get sharding state from previous epoch and calculate sharding state for new epoch
-func CalculateNewShardState(bc *BlockChain, epoch uint64, stakeInfo *map[common.Address]*structs.StakeInfo) types.ShardState {
-	if epoch == GenesisEpoch {
-		return GetInitShardState()
+func CalculateNewShardState(
+	bc *BlockChain, epoch *big.Int,
+	stakeInfo *map[common.Address]*structs.StakeInfo,
+) (types.ShardState, error) {
+	if epoch.Cmp(big.NewInt(GenesisEpoch)) == 0 {
+		return GetInitShardState(), nil
 	}
-	ss := GetShardingStateFromBlockChain(bc, epoch-1)
+	prevEpoch := new(big.Int).Sub(epoch, common.Big1)
+	ss, err := GetShardingStateFromBlockChain(bc, prevEpoch)
+	if err != nil {
+		return nil, ctxerror.New("cannot retrieve previous sharding state").
+			WithCause(err)
+	}
 	newNodeList := ss.UpdateShardingState(stakeInfo)
 	utils.GetLogInstance().Info("Cuckoo Rate", "percentage", CuckooRate)
 	ss.Reshard(newNodeList, CuckooRate)
-	return ss.shardState
+	return ss.shardState, nil
 }
 
 // UpdateShardingState remove the unstaked nodes and returns the newly staked node Ids.

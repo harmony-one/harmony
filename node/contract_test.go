@@ -23,7 +23,7 @@ func prepareNode(t *testing.T) *Node {
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
-	return New(host, consensus, nil, false)
+	return New(host, consensus, testDBFactory, false)
 
 }
 

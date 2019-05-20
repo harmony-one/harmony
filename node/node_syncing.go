@@ -44,7 +44,7 @@ func (node *Node) getNeighborPeers(neighbor *sync.Map) []p2p.Peer {
 
 // DoSyncWithoutConsensus gets sync-ed to blockchain without joining consensus
 func (node *Node) DoSyncWithoutConsensus() {
-	go node.DoSyncing(node.blockchain, node.Worker, node.GetSyncingPeers, false) //Don't join consensus
+	go node.DoSyncing(node.Blockchain(), node.Worker, node.GetSyncingPeers, false) //Don't join consensus
 }
 
 // GetBeaconSyncingPeers returns a list of peers for beaconchain syncing
@@ -73,7 +73,7 @@ func (node *Node) DoBeaconSyncing() {
 				}
 			}
 			node.beaconSync.AddLastMileBlock(beaconBlock)
-			node.beaconSync.SyncLoop(node.beaconChain, node.BeaconWorker, false, true)
+			node.beaconSync.SyncLoop(node.Beaconchain(), node.BeaconWorker, false, true)
 		}
 	}
 }
@@ -139,7 +139,7 @@ func (node *Node) SupportSyncing() {
 	go node.SendNewBlockToUnsync()
 
 	if node.NodeConfig.Role() != nodeconfig.ShardLeader && node.NodeConfig.Role() != nodeconfig.BeaconLeader {
-		go node.DoSyncing(node.blockchain, node.Worker, node.GetSyncingPeers, true)
+		go node.DoSyncing(node.Blockchain(), node.Worker, node.GetSyncingPeers, true)
 	}
 }
 
@@ -202,12 +202,12 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 	case downloader_pb.DownloaderRequest_HEADER:
 		var startHeaderHash []byte
 		if request.BlockHash == nil {
-			tmp := node.blockchain.Genesis().Hash()
+			tmp := node.Blockchain().Genesis().Hash()
 			startHeaderHash = tmp[:]
 		} else {
 			startHeaderHash = request.BlockHash
 		}
-		for block := node.blockchain.CurrentBlock(); block != nil; block = node.blockchain.GetBlockByHash(block.Header().ParentHash) {
+		for block := node.Blockchain().CurrentBlock(); block != nil; block = node.Blockchain().GetBlockByHash(block.Header().ParentHash) {
 			blockHash := block.Hash()
 			if bytes.Compare(blockHash[:], startHeaderHash) == 0 {
 				break
@@ -219,7 +219,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 		for _, bytes := range request.Hashes {
 			var hash common.Hash
 			hash.SetBytes(bytes)
-			block := node.blockchain.GetBlockByHash(hash)
+			block := node.Blockchain().GetBlockByHash(hash)
 			if block == nil {
 				continue
 			}
@@ -230,7 +230,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 		}
 
 	case downloader_pb.DownloaderRequest_BLOCKHEIGHT:
-		response.BlockHeight = node.blockchain.CurrentBlock().NumberU64()
+		response.BlockHeight = node.Blockchain().CurrentBlock().NumberU64()
 
 	// this is the out of sync node acts as grpc server side
 	case downloader_pb.DownloaderRequest_NEWBLOCK:

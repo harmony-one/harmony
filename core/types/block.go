@@ -120,6 +120,18 @@ func (h *Header) Size() common.StorageSize {
 	return common.StorageSize(unsafe.Sizeof(*h)) + common.StorageSize(len(h.Extra)+(h.Difficulty.BitLen()+h.Number.BitLen()+h.Time.BitLen())/8)
 }
 
+// Logger returns a sub-logger with block contexts added.
+func (h *Header) Logger(logger log.Logger) log.Logger {
+	return logger.New(
+		"blockHash", h.Hash(),
+		"blockShard", h.ShardID,
+		"blockEpoch", h.Epoch,
+		"blockNumber", h.Number,
+	)
+}
+
+// Log15Ctx returns the contexts
+
 func rlpHash(x interface{}) (h common.Hash) {
 	hw := sha3.NewLegacyKeccak256()
 	rlp.Encode(hw, x)
@@ -489,13 +501,5 @@ func (b *Block) AddShardState(shardState ShardState) {
 
 // Logger returns a sub-logger with block contexts added.
 func (b *Block) Logger(logger log.Logger) log.Logger {
-	// Avoid using b.Hash() 'cause it fixates/caches calculated hash into the
-	// block and we don't want to fixate a premature hash from a half-built
-	// header.
-	return logger.New(
-		"blockHash", b.header.Hash(),
-		"blockShard", b.header.ShardID,
-		"blockEpoch", b.header.Epoch,
-		"blockNumber", b.header.Number,
-	)
+	return b.header.Logger(logger)
 }

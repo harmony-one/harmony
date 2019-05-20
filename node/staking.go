@@ -41,7 +41,7 @@ func (node *Node) UpdateStakingList(stakeInfoReturnValue *structs.StakeInfoRetur
 		lockPeriodCount := stakeInfoReturnValue.LockPeriodCounts[i]
 
 		startEpoch := core.GetEpochFromBlockNumber(blockNum.Uint64())
-		curEpoch := core.GetEpochFromBlockNumber(node.blockchain.CurrentBlock().NumberU64())
+		curEpoch := core.GetEpochFromBlockNumber(node.Blockchain().CurrentBlock().NumberU64())
 
 		if startEpoch == curEpoch {
 			continue // The token are counted into stakes at the beginning of next epoch.

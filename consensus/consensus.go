@@ -2,13 +2,13 @@
 package consensus // consensus
 
 import (
-	"errors"
 	"math/big"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/bls/ffi/go/bls"
 
@@ -272,61 +272,74 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 	return &consensus, nil
 }
 
-// AccumulateRewards credits the coinbase of the given block with the mining
+// accumulateRewards credits the coinbase of the given block with the mining
 // reward. The total reward consists of the static block reward and rewards for
 // included uncles. The coinbase of each uncle block is also rewarded.
-func (consensus *Consensus) accumulateRewards(
-	config *params.ChainConfig, state *state.DB, header *types.Header,
+func accumulateRewards(
+	bc consensus_engine.ChainReader, state *state.DB, header *types.Header,
 ) error {
-	logger := utils.GetLogInstance().New("parentHash", header.ParentHash)
-	if header.ParentHash == (common.Hash{}) {
-		// This block is a genesis block,
-		// without a parent block whose signer to reward.
+	logger := header.Logger(utils.GetLogInstance())
+    getLogger := func() log.Logger { return utils.WithCallerSkip(logger, 1) }
+	blockNum := header.Number.Uint64()
+	if blockNum == 0 {
+		// Epoch block doesn't have any reward
 		return nil
 	}
-	if consensus.ChainReader == nil {
-		return errors.New("ChainReader is nil")
+	parentHeader := bc.GetHeaderByNumber(blockNum - 1)
+	if parentHeader == nil {
+		return ctxerror.New("cannot find parent block header in DB",
+			"parentBlockNumber", blockNum - 1)
 	}
-	parent := consensus.ChainReader.GetHeaderByHash(header.ParentHash)
-	if parent == nil {
-		return ctxerror.New("cannot retrieve parent header",
-			"parentHash", header.ParentHash,
+	shardState, err := bc.ReadShardState(parentHeader.Epoch)
+	if err != nil {
+		return ctxerror.New("cannot read shard state",
+			"epoch", parentHeader.Epoch,
+		).WithCause(err)
+	}
+	parentShardState := shardState.FindCommitteeByID(parentHeader.ShardID)
+	if parentShardState == nil {
+		return ctxerror.New("cannot find shard in the shard state",
+			"parentBlockNumber", parentHeader.Number,
+			"shardID", parentHeader.ShardID,
 		)
 	}
-	mask, err := bls_cosi.NewMask(consensus.PublicKeys, nil)
+	var committerKeys []*bls.PublicKey
+	for _, member := range parentShardState.NodeList {
+		committerKey := new(bls.PublicKey)
+		err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
+		if err != nil {
+			return ctxerror.New("cannot convert BLS public key",
+				"blsPublicKey", member.BlsPublicKey).WithCause(err)
+		}
+		committerKeys = append(committerKeys, committerKey)
+	}
+	mask, err := bls_cosi.NewMask(committerKeys, nil)
 	if err != nil {
 		return ctxerror.New("cannot create group sig mask").WithCause(err)
 	}
-	logger.Debug("accumulateRewards: setting group sig mask",
-		"destLen", mask.Len(),
-		"srcLen", len(parent.CommitBitmap),
-	)
-	if err := mask.SetMask(parent.CommitBitmap); err != nil {
+	if err := mask.SetMask(parentHeader.CommitBitmap); err != nil {
 		return ctxerror.New("cannot set group sig mask bits").WithCause(err)
 	}
 	totalAmount := big.NewInt(0)
 	numAccounts := 0
-	signingKeys := mask.GetPubKeyFromMask(true)
-	for _, key := range signingKeys {
-		stakeInfos := consensus.stakeInfoFinder.FindStakeInfoByNodeKey(key)
-		if len(stakeInfos) == 0 {
-			logger.Error("accumulateRewards: node has no stake info",
-				"nodeKey", key.GetHexString())
+	for idx, member := range parentShardState.NodeList {
+		if signed, err := mask.IndexEnabled(idx); err != nil {
+			return ctxerror.New("cannot check for committer bit",
+				"committerIndex", idx,
+			).WithCause(err)
+		} else if !signed {
 			continue
 		}
-		numAccounts += len(stakeInfos)
-		for _, stakeInfo := range stakeInfos {
-			utils.GetLogInstance().Info("accumulateRewards: rewarding",
-				"block", header.Hash(),
-				"account", stakeInfo.Account,
-				"node", stakeInfo.BlsPublicKey.Hex(),
-				"amount", BlockReward)
-			state.AddBalance(stakeInfo.Account, BlockReward)
-			totalAmount = new(big.Int).Add(totalAmount, BlockReward)
-		}
+		numAccounts++
+		account := common.HexToAddress(member.EcdsaAddress)
+		getLogger().Info("rewarding block signer",
+			"account", account,
+			"node", member.BlsPublicKey.Hex(),
+			"amount", BlockReward)
+		state.AddBalance(account, BlockReward)
+		totalAmount = new(big.Int).Add(totalAmount, BlockReward)
 	}
-	logger.Debug("accumulateRewards: paid out block reward",
-		"numSigs", len(signingKeys),
+	getLogger().Debug("paid out block reward",
 		"numAccounts", numAccounts,
 		"totalAmount", totalAmount)
 	return nil

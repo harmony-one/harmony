@@ -12,6 +12,9 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	libp2p_peer "github.com/libp2p/go-libp2p-peer"
+	"golang.org/x/crypto/sha3"
+
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
@@ -22,8 +25,6 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
-	libp2p_peer "github.com/libp2p/go-libp2p-peer"
-	"golang.org/x/crypto/sha3"
 )
 
 // WaitForNewRandomness listens to the RndChannel to receive new VDF randomness.
@@ -241,7 +242,7 @@ func (consensus *Consensus) VerifySeal(chain consensus_engine.ChainReader, heade
 func (consensus *Consensus) Finalize(chain consensus_engine.ChainReader, header *types.Header, state *state.DB, txs []*types.Transaction, receipts []*types.Receipt) (*types.Block, error) {
 	// Accumulate any block and uncle rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
-	consensus.accumulateRewards(chain.Config(), state, header)
+	accumulateRewards(chain, state, header)
 	header.Root = state.IntermediateRoot(false)
 	return types.NewBlock(header, txs, receipts), nil
 }

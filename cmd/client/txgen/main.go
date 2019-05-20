@@ -13,11 +13,13 @@ import (
 
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/internal/shardchain"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	bls2 "github.com/harmony-one/bls/ffi/go/bls"
+
 	"github.com/harmony-one/harmony/api/client"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/core/types"
@@ -97,7 +99,8 @@ func setUpTXGen() *node.Node {
 		os.Exit(1)
 	}
 	consensusObj, err := consensus.New(myhost, uint32(shardID), p2p.Peer{}, nil)
-	txGen := node.New(myhost, consensusObj, nil, false) //Changed it : no longer archival node.
+	chainDBFactory := &shardchain.MemDBFactory{}
+	txGen := node.New(myhost, consensusObj, chainDBFactory, false) //Changed it : no longer archival node.
 	txGen.Client = client.NewClient(txGen.GetHost(), uint32(shardID))
 	consensusObj.SetStakeInfoFinder(gsif)
 	consensusObj.ChainReader = txGen.Blockchain()

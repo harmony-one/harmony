@@ -4,6 +4,9 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -53,7 +56,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 					firstTime = false
 				}
 				if len(node.pendingTransactions) >= threshold {
-					utils.GetLogInstance().Debug("PROPOSING NEW BLOCK ------------------------------------------------", "blockNum", node.blockchain.CurrentBlock().NumberU64()+1, "threshold", threshold, "pendingTransactions", len(node.pendingTransactions))
+					utils.GetLogInstance().Debug("PROPOSING NEW BLOCK ------------------------------------------------", "blockNum", node.Blockchain().CurrentBlock().NumberU64()+1, "threshold", threshold, "pendingTransactions", len(node.pendingTransactions))
 					// Normal tx block consensus
 					selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
 					if len(selectedTxs) != 0 {
@@ -123,7 +126,7 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 					if len(selectedTxs) == 0 {
 						continue
 					}
-					utils.GetLogInstance().Debug("PROPOSING NEW BLOCK ------------------------------------------------", "blockNum", node.blockchain.CurrentBlock().NumberU64()+1, "threshold", threshold, "selectedTxs", len(selectedTxs))
+					utils.GetLogInstance().Debug("PROPOSING NEW BLOCK ------------------------------------------------", "blockNum", node.Blockchain().CurrentBlock().NumberU64()+1, "threshold", threshold, "selectedTxs", len(selectedTxs))
 					node.Worker.CommitTransactions(selectedTxs)
 					block, err := node.Worker.Commit()
 					if err != nil {
@@ -143,52 +146,56 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 	}()
 }
 
-func (node *Node) proposeShardState(block *types.Block) {
-	if node.Consensus.ShardID == 0 {
-		node.proposeBeaconShardState(block)
-	} else {
+func (node *Node) proposeShardState(block *types.Block) error {
+	switch node.Consensus.ShardID {
+	case 0:
+		return node.proposeBeaconShardState(block)
+	default:
 		node.proposeLocalShardState(block)
+		return nil
 	}
 }
 
-func (node *Node) proposeBeaconShardState(block *types.Block) {
+func (node *Node) proposeBeaconShardState(block *types.Block) error {
 	// TODO ek - replace this with variable epoch logic.
 	if !core.IsEpochLastBlock(block) {
 		// We haven't reached the end of this epoch; don't propose yet.
-		return
+		return nil
 	}
-	nextEpoch := core.GetEpochFromBlockNumber(block.NumberU64()) + 1
-	shardState := core.CalculateNewShardState(node.blockchain, nextEpoch, &node.CurrentStakes)
+	nextEpoch := new(big.Int).Add(block.Header().Epoch, common.Big1)
+	shardState, err := core.CalculateNewShardState(
+		node.Blockchain(), nextEpoch, &node.CurrentStakes)
+	if err != nil {
+		return err
+	}
 	block.AddShardState(shardState)
-}
-
-func (node *Node) beaconEpochEndBlock(epoch *big.Int) *types.Block {
-	// TODO ek – replace this with variable epoch logic.
-	lastBlockNumber := core.GetLastBlockNumberFromEpoch(epoch.Uint64())
-	return node.beaconChain.GetBlockByNumber(lastBlockNumber)
+	return nil
 }
 
 func (node *Node) proposeLocalShardState(block *types.Block) {
-	epochLastBlock := node.beaconEpochEndBlock(block.Header().Epoch)
-	if epochLastBlock == nil {
-		// Beacon committee has yet to end epoch; don't propose yet.
+	logger := block.Logger(utils.GetLogInstance())
+	getLogger := func() log.Logger { return utils.WithCallerSkip(logger, 1) }
+	// TODO ek – read this from beaconchain once BC sync is fixed
+	if node.nextShardState.master == nil {
+		getLogger().Debug("yet to receive master proposal from beaconchain")
 		return
 	}
-	// TODO ek – delay proposal until we are fairly sure that the quorum has
-	//  synchronized through the end of epoch on the beacon chain.
-	//  Otherwise our proposal may fail to reach consensus.
-	//  For now we are fine because we cheat by disabling the validator check.
-	shardState := make(types.ShardState, 1)
-	beaconShardState := epochLastBlock.Header().ShardState
-	committee := beaconShardState.FindCommitteeByID(block.ShardID())
+	logger = logger.New(
+		"nextEpoch", node.nextShardState.master.Epoch,
+		"proposeTime", node.nextShardState.proposeTime)
+	if time.Now().Before(node.nextShardState.proposeTime) {
+		getLogger().Debug("still waiting for shard state to propagate")
+		return
+	}
+	masterShardState := node.nextShardState.master.ShardState
+	var localShardState types.ShardState
+	committee := masterShardState.FindCommitteeByID(block.ShardID())
 	if committee != nil {
-		// Propose as announced in beacon chain.
-		shardState[0] = *committee
+		getLogger().Info("found local shard info; proposing it")
+		localShardState = append(localShardState, *committee)
 	} else {
-		utils.GetLogInstance().Info(
-			"beacon committee disowned us; proposing to disband",
-			"shardID", block.ShardID())
+		getLogger().Info("beacon committee disowned us; proposing nothing")
 		// Leave local proposal empty to signal the end of shard (disbanding).
 	}
-	block.AddShardState(shardState)
+	block.AddShardState(localShardState)
 }

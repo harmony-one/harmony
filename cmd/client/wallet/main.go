@@ -18,12 +18,14 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
+
 	"github.com/harmony-one/harmony/api/client"
 	clientService "github.com/harmony-one/harmony/api/client/service"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
@@ -236,7 +238,8 @@ func createWalletNode() *node.Node {
 	if err != nil {
 		panic(err)
 	}
-	w := node.New(host, nil, nil, false)
+	chainDBFactory := &shardchain.MemDBFactory{}
+	w := node.New(host, nil, chainDBFactory, false)
 	w.Client = client.NewClient(w.GetHost(), uint32(shardID))
 
 	w.NodeConfig.SetRole(nodeconfig.ClientNode)
