@@ -172,9 +172,8 @@ func TestVerifyMessageSig(test *testing.T) {
 	dRand := New(host, 0, []p2p.Peer{leader, validator}, leader, nil, bls2.RandPrivateKey())
 
 	message := &msg_pb.Message{
-		ReceiverType: msg_pb.ReceiverType_VALIDATOR,
-		ServiceType:  msg_pb.ServiceType_DRAND,
-		Type:         msg_pb.MessageType_DRAND_INIT,
+		ServiceType: msg_pb.ServiceType_DRAND,
+		Type:        msg_pb.MessageType_DRAND_INIT,
 		Request: &msg_pb.Message_Drand{
 			Drand: &msg_pb.DrandRequest{},
 		},

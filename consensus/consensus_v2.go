@@ -32,6 +32,11 @@ func (consensus *Consensus) handleMessageUpdate(payload []byte) {
 		return
 	}
 
+	// stop receiving normal message when is in viewchanging
+	if consensus.mode.Mode() == ViewChanging && msg.Type != msg_pb.MessageType_VIEWCHANGE && msg.Type != msg_pb.MessageType_NEWVIEW {
+		return
+	}
+
 	switch msg.Type {
 	case msg_pb.MessageType_ANNOUNCE:
 		consensus.onAnnounce(msg)
@@ -79,7 +84,12 @@ func (consensus *Consensus) tryAnnounce(block *types.Block) {
 	msgPayload, _ := proto.GetConsensusMessagePayload(msgToSend)
 	msg := &msg_pb.Message{}
 	_ = protobuf.Unmarshal(msgPayload, msg)
-	pbftMsg, _ := ParsePbftMessage(msg)
+	pbftMsg, err := ParsePbftMessage(msg)
+	if err != nil {
+		utils.GetLogInstance().Warn("tryAnnounce unable to parse pbft message", "error", err)
+		return
+	}
+
 	consensus.pbftLog.AddMessage(pbftMsg)
 	consensus.pbftLog.AddBlock(block)
 
@@ -113,6 +123,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	recvMsg, err := ParsePbftMessage(msg)
 	if err != nil {
 		utils.GetLogInstance().Debug("onAnnounce Unparseable leader message", "error", err)
+		return
 	}
 	block := recvMsg.Payload
 
@@ -146,6 +157,12 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	consensus.pbftLog.AddMessage(recvMsg)
 	consensus.pbftLog.AddBlock(&blockObj)
 	consensus.tryPrepare(blockObj.Header().Hash())
+
+	consensus.consensusTimeout["bootstrap"].Stop()
+	consensus.consensusTimeout["announce"].Stop()
+	if !consensus.consensusTimeout["prepare"].IsActive() {
+		consensus.consensusTimeout["prepare"].Start()
+	}
 	return
 }
 
@@ -163,13 +180,11 @@ func (consensus *Consensus) tryPrepare(blockHash common.Hash) {
 	}
 
 	consensus.switchPhase(Prepare)
-	consensus.idleTimeout.Stop()    // leader send prepare msg ontime, so we can stop idleTimeout
-	consensus.commitTimeout.Start() // start commit phase timeout
 
 	if !consensus.PubKey.IsEqual(consensus.LeaderPubKey) { //TODO(chao): check whether this is necessary when calling tryPrepare
 		// Construct and send prepare message
 		msgToSend := consensus.constructPrepareMessage()
-		utils.GetLogInstance().Warn("tryPrepare", "sent prepare message", len(msgToSend))
+		utils.GetLogInstance().Info("tryPrepare", "sent prepare message", len(msgToSend))
 		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 	}
 }
@@ -207,7 +222,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		return
 	}
 
-	validatorPubKey, _ := bls_cosi.BytesToBlsPublicKey(recvMsg.SenderPubkey)
+	validatorPubKey := recvMsg.SenderPubkey
 	addrBytes := validatorPubKey.GetAddress()
 	validatorAddress := common.BytesToAddress(addrBytes[:])
 
@@ -234,6 +249,10 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	err = sign.Deserialize(prepareSig)
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to deserialize bls signature", "validatorAddress", validatorAddress)
+		return
+	}
+	if !sign.VerifyHash(validatorPubKey, consensus.blockHash[:]) {
+		utils.GetLogInstance().Error("Received invalid BLS signature", "validatorAddress", validatorAddress)
 		return
 	}
 
@@ -289,7 +308,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	}
 
 	blockHash := recvMsg.BlockHash
-	pubKey, _ := bls_cosi.BytesToBlsPublicKey(recvMsg.SenderPubkey)
+	pubKey := recvMsg.SenderPubkey
 	if !pubKey.IsEqual(consensus.LeaderPubKey) {
 		utils.GetLogInstance().Debug("onPrepared leader pubkey not match", "suppose", consensus.LeaderPubKey, "got", pubKey)
 		return
@@ -344,6 +363,11 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 
 	consensus.switchPhase(Commit)
+
+	consensus.consensusTimeout["prepare"].Stop()
+	if !consensus.consensusTimeout["commit"].IsActive() {
+		consensus.consensusTimeout["commit"].Start()
+	}
 	return
 }
 
@@ -364,6 +388,10 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	}
 
 	recvMsg, err := ParsePbftMessage(msg)
+	if err != nil {
+		utils.GetLogInstance().Debug("onCommit parse pbft message failed", "error", err)
+		return
+	}
 
 	if recvMsg.ConsensusID != consensus.consensusID || recvMsg.SeqNum != consensus.seqNum || consensus.phase != Commit {
 		return
@@ -373,7 +401,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		return
 	}
 
-	validatorPubKey, _ := bls_cosi.BytesToBlsPublicKey(recvMsg.SenderPubkey)
+	validatorPubKey := recvMsg.SenderPubkey
 	addrBytes := validatorPubKey.GetAddress()
 	validatorAddress := common.BytesToAddress(addrBytes[:])
 
@@ -499,7 +527,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		return
 	}
 
-	validatorPubKey, _ := bls_cosi.BytesToBlsPublicKey(recvMsg.SenderPubkey)
+	validatorPubKey := recvMsg.SenderPubkey
 	addrBytes := validatorPubKey.GetAddress()
 	leaderAddress := common.BytesToAddress(addrBytes[:]).Hex()
 
@@ -543,6 +571,10 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	consensus.commitBitmap = mask
 
 	consensus.tryCatchup()
+	consensus.consensusTimeout["commit"].Stop()
+	if !consensus.consensusTimeout["announce"].IsActive() {
+		consensus.consensusTimeout["announce"].Start()
+	}
 	return
 }
 
@@ -630,15 +662,6 @@ func (consensus *Consensus) tryCatchup() {
 	}
 }
 
-func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
-	return
-}
-
-// TODO: move to consensus_leader.go later
-func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
-	return
-}
-
 // Start waits for the next new block and run consensus
 func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan struct{}, stoppedChan chan struct{}, startChannel chan struct{}) {
 	if nodeconfig.GetDefaultConfig().IsLeader() {
@@ -647,7 +670,8 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 	go func() {
 		utils.GetLogInstance().Info("start consensus", "time", time.Now())
 		defer close(stoppedChan)
-		consensus.idleTimeout.Start()
+		ticker := time.NewTicker(3 * time.Second)
+		consensus.consensusTimeout["bootstrap"].Start()
 		for {
 			select {
 			case newBlock := <-blockChannel:
@@ -685,19 +709,27 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 
 			case msg := <-consensus.MsgChan:
 				consensus.handleMessageUpdate(msg)
-				if consensus.idleTimeout.CheckExpire() {
-					consensus.startViewChange(consensus.consensusID + 1)
-				}
-				if consensus.commitTimeout.CheckExpire() {
-					consensus.startViewChange(consensus.consensusID + 1)
-				}
-				if consensus.viewChangeTimeout.CheckExpire() {
-					if consensus.mode.Mode() == Normal {
-						continue
+
+			case <-ticker.C:
+				if !consensus.PubKey.IsEqual(consensus.LeaderPubKey) {
+					for k, v := range consensus.consensusTimeout {
+						if !v.CheckExpire() {
+							continue
+						}
+						if k != "viewchange" {
+							utils.GetLogInstance().Debug("ops", "phase", k, "mode", consensus.mode.Mode())
+							consensus.startViewChange(consensus.consensusID + 1)
+							break
+						} else {
+							utils.GetLogInstance().Debug("ops", "phase", k, "mode", consensus.mode.Mode())
+							consensusID := consensus.mode.ConsensusID()
+							consensus.startViewChange(consensusID + 1)
+							break
+						}
 					}
-					consensusID := consensus.mode.ConsensusID()
-					consensus.startViewChange(consensusID + 1)
+
 				}
+
 			case <-stopChan:
 				return
 			}

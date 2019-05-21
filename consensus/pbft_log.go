@@ -1,12 +1,16 @@
 package consensus
 
 import (
+	"fmt"
 	"sync"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
+	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // PbftLog represents the log stored by a node during PBFT process
@@ -19,12 +23,18 @@ type PbftLog struct {
 
 // PbftMessage is the record of pbft messages received by a node during PBFT process
 type PbftMessage struct {
-	MessageType  msg_pb.MessageType
-	ConsensusID  uint32
-	SeqNum       uint64
-	BlockHash    common.Hash
-	SenderPubkey []byte
-	Payload      []byte
+	MessageType   msg_pb.MessageType
+	ConsensusID   uint32
+	SeqNum        uint64
+	BlockHash     common.Hash
+	SenderPubkey  *bls.PublicKey
+	LeaderPubkey  *bls.PublicKey
+	Payload       []byte
+	ViewchangeSig *bls.Sign
+	M1AggSig      *bls.Sign
+	M1Bitmap      *bls_cosi.Mask
+	M2AggSig      *bls.Sign
+	M2Bitmap      *bls_cosi.Mask
 }
 
 // NewPbftLog returns new instance of PbftLog
@@ -172,8 +182,108 @@ func ParsePbftMessage(msg *msg_pb.Message) (*PbftMessage, error) {
 	copy(pbftMsg.BlockHash[:], consensusMsg.BlockHash[:])
 	pbftMsg.Payload = make([]byte, len(consensusMsg.Payload))
 	copy(pbftMsg.Payload[:], consensusMsg.Payload[:])
-	pbftMsg.SenderPubkey = make([]byte, len(consensusMsg.SenderPubkey))
-	copy(pbftMsg.SenderPubkey[:], consensusMsg.SenderPubkey[:])
+	pubKey, err := bls_cosi.BytesToBlsPublicKey(consensusMsg.SenderPubkey)
+	if err != nil {
+		return nil, err
+	}
+	pbftMsg.SenderPubkey = pubKey
+	return &pbftMsg, nil
+}
+
+// ParseViewChangeMessage parses view change message into PbftMessage structure
+func ParseViewChangeMessage(msg *msg_pb.Message) (*PbftMessage, error) {
+	pbftMsg := PbftMessage{}
+	pbftMsg.MessageType = msg.GetType()
+	if pbftMsg.MessageType != msg_pb.MessageType_VIEWCHANGE {
+		return nil, fmt.Errorf("ParseViewChangeMessage: incorrect message type %s", pbftMsg.MessageType)
+	}
+
+	vcMsg := msg.GetViewchange()
+	pbftMsg.ConsensusID = vcMsg.ConsensusId
+	pbftMsg.SeqNum = vcMsg.SeqNum
+	pbftMsg.Payload = make([]byte, len(vcMsg.Payload))
+	copy(pbftMsg.Payload[:], vcMsg.Payload[:])
+
+	pubKey, err := bls_cosi.BytesToBlsPublicKey(vcMsg.SenderPubkey)
+	if err != nil {
+		utils.GetLogInstance().Warn("ParseViewChangeMessage failed to parse senderpubkey", "error", err)
+		return nil, err
+	}
+	leaderKey, err := bls_cosi.BytesToBlsPublicKey(vcMsg.LeaderPubkey)
+	if err != nil {
+		utils.GetLogInstance().Warn("ParseViewChangeMessage failed to parse leaderpubkey", "error", err)
+		return nil, err
+	}
+
+	vcSig := bls.Sign{}
+	err = vcSig.Deserialize(vcMsg.ViewchangeSig)
+	if err != nil {
+		utils.GetLogInstance().Warn("ParseViewChangeMessage failed to deserialize the viewchange signature", "error", err)
+		return nil, err
+	}
+	pbftMsg.SenderPubkey = pubKey
+	pbftMsg.LeaderPubkey = leaderKey
+	pbftMsg.ViewchangeSig = &vcSig
+
+	return &pbftMsg, nil
+
+}
+
+// ParseNewViewMessage parses new view message into PbftMessage structure
+func (consensus *Consensus) ParseNewViewMessage(msg *msg_pb.Message) (*PbftMessage, error) {
+	pbftMsg := PbftMessage{}
+	pbftMsg.MessageType = msg.GetType()
+
+	if pbftMsg.MessageType != msg_pb.MessageType_NEWVIEW {
+		return nil, fmt.Errorf("ParseNewViewMessage: incorrect message type %s", pbftMsg.MessageType)
+	}
+
+	vcMsg := msg.GetViewchange()
+	pbftMsg.ConsensusID = vcMsg.ConsensusId
+	pbftMsg.SeqNum = vcMsg.SeqNum
+	pbftMsg.Payload = make([]byte, len(vcMsg.Payload))
+	copy(pbftMsg.Payload[:], vcMsg.Payload[:])
+
+	pubKey, err := bls_cosi.BytesToBlsPublicKey(vcMsg.SenderPubkey)
+	if err != nil {
+		utils.GetLogInstance().Warn("ParseViewChangeMessage failed to parse senderpubkey", "error", err)
+		return nil, err
+	}
+	pbftMsg.SenderPubkey = pubKey
+
+	if len(vcMsg.M1Aggsigs) > 0 {
+		m1Sig := bls.Sign{}
+		err = m1Sig.Deserialize(vcMsg.M1Aggsigs)
+		if err != nil {
+			utils.GetLogInstance().Warn("ParseViewChangeMessage failed to deserialize the multi signature for M1 aggregated signature", "error", err)
+			return nil, err
+		}
+		m1mask, err := bls_cosi.NewMask(consensus.PublicKeys, nil)
+		if err != nil {
+			utils.GetLogInstance().Warn("ParseViewChangeMessage failed to create mask for multi signature", "error", err)
+			return nil, err
+		}
+		m1mask.SetMask(vcMsg.M1Bitmap)
+		pbftMsg.M1AggSig = &m1Sig
+		pbftMsg.M1Bitmap = m1mask
+	}
+
+	if len(vcMsg.M2Aggsigs) > 0 {
+		m2Sig := bls.Sign{}
+		err = m2Sig.Deserialize(vcMsg.M2Aggsigs)
+		if err != nil {
+			utils.GetLogInstance().Warn("ParseViewChangeMessage failed to deserialize the multi signature for M2 aggregated signature", "error", err)
+			return nil, err
+		}
+		m2mask, err := bls_cosi.NewMask(consensus.PublicKeys, nil)
+		if err != nil {
+			utils.GetLogInstance().Warn("ParseViewChangeMessage failed to create mask for multi signature", "error", err)
+			return nil, err
+		}
+		m2mask.SetMask(vcMsg.M2Bitmap)
+		pbftMsg.M2AggSig = &m2Sig
+		pbftMsg.M2Bitmap = m2mask
+	}
 
 	return &pbftMsg, nil
 }
