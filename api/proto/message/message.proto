@@ -7,15 +7,6 @@ service ClientService {
   rpc Process(Message) returns (Response) {}
 }
 
-// ReceiverType indicates who is the receiver of this message.
-enum ReceiverType {
-  NEWNODE = 0;
-  LEADER = 1;
-  VALIDATOR = 2;
-  CLIENT = 3;
-  LEADER_OR_VALIDATOR = 4;
-}
-
 // ServiceType indicates which service used to generate this message.
 enum ServiceType {
   CONSENSUS = 0;
@@ -45,25 +36,24 @@ enum MessageType {
 //
 // The request field will be either one of the structure corresponding to the MessageType type.
 message Message {
-  ReceiverType receiver_type = 1;
-  ServiceType service_type = 2;
-  MessageType type = 3;
-  bytes signature = 4;
+  ServiceType service_type = 1;
+  MessageType type = 2;
+  bytes signature = 3;
   oneof request {
-      StakingRequest staking = 5;
-      ConsensusRequest consensus = 6;
-      DrandRequest drand = 7;
+      StakingRequest staking = 4;
+      ConsensusRequest consensus = 5;
+      DrandRequest drand = 6;
+      ViewChangeRequest viewchange = 7;
       // Refactor this later after demo.
       LotteryRequest lottery_request = 8;
   }
 }
 
 message Response {
-  ReceiverType receiver_type = 1;
-  ServiceType service_type = 2;
-  MessageType type = 3;
+  ServiceType service_type = 1;
+  MessageType type = 2;
   oneof response {
-    LotteryResponse lottery_response = 4;
+    LotteryResponse lottery_response = 3;
   }
 }
 
@@ -101,4 +91,19 @@ message DrandRequest {
   bytes sender_pubkey = 1;
   bytes block_hash = 2;
   bytes payload = 3;
+}
+
+message ViewChangeRequest {
+    uint32 consensus_id = 1;
+    uint64 seq_num = 2;
+    bytes sender_pubkey = 3;
+    bytes leader_pubkey = 4;
+    bytes payload = 5; // message payload: either m1 type or m2 type 
+    bytes viewchange_sig = 6; // signature on payload
+                        
+    // below is for newview message only
+    bytes m1_aggsigs = 7; // m1: |block_hash|bhp_sigs|bhp_bitmap|
+    bytes m1_bitmap = 8;
+    bytes m2_aggsigs = 9; // m2: |nil|
+    bytes m2_bitmap = 10;
 }

@@ -58,6 +58,7 @@ func TestProcessMessageLeaderPrepare(test *testing.T) {
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}
+	consensusLeader.ResetState()
 	consensusLeader.blockHash = blockHash
 	consensusLeader.AddPeers(validators)
 
@@ -113,6 +114,7 @@ func TestProcessMessageLeaderPrepareInvalidSignature(test *testing.T) {
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}
+	consensusLeader.ResetState()
 	consensusLeader.blockHash = blockHash
 
 	consensusValidators := make([]*Consensus, 3)
@@ -186,6 +188,7 @@ func TestProcessMessageLeaderCommit(test *testing.T) {
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}
+	consensusLeader.ResetState()
 	consensusLeader.AddPeers(validators)
 	consensusLeader.state = PreparedDone
 	consensusLeader.blockHash = blockHash

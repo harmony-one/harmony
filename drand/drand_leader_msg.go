@@ -9,9 +9,8 @@ import (
 // Constructs the init message
 func (dRand *DRand) constructInitMessage() []byte {
 	message := &msg_pb.Message{
-		ReceiverType: msg_pb.ReceiverType_VALIDATOR,
-		ServiceType:  msg_pb.ServiceType_DRAND,
-		Type:         msg_pb.MessageType_DRAND_INIT,
+		ServiceType: msg_pb.ServiceType_DRAND,
+		Type:        msg_pb.MessageType_DRAND_INIT,
 		Request: &msg_pb.Message_Drand{
 			Drand: &msg_pb.DrandRequest{},
 		},

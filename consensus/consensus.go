@@ -5,7 +5,6 @@ import (
 	"errors"
 	"math/big"
 	"sync"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -48,23 +47,9 @@ type Consensus struct {
 	seqNum uint64
 	// channel to receive consensus message
 	MsgChan chan []byte
-	// timer to make sure leader publishes block in a timely manner; if not
-	// then this node will propose view change
-	idleTimeout utils.Timeout
 
-	// timer to make sure this node commit a block in a timely manner; if not
-	// this node will initialize a view change
-	commitTimeout utils.Timeout
-
-	// When doing view change, timer to make sure a valid view change message
-	// sent by new leader in a timely manner; if not this node will start
-	// a new view change
-	viewChangeTimeout utils.Timeout
-
-	// The duration of viewChangeTimeout; when a view change is initialized with v+1
-	// timeout will be equal to viewChangeDuration; if view change failed and start v+2
-	// timeout will be 2*viewChangeDuration; timeout of view change v+n is n*viewChangeDuration
-	viewChangeDuration time.Duration
+	// 5 timeouts: announce, prepare, commit, viewchange, newview
+	consensusTimeout map[string]*utils.Timeout
 
 	//TODO depreciate it after implement PbftPhase
 	state State
@@ -77,13 +62,13 @@ type Consensus struct {
 	commitBitmap         *bls_cosi.Mask
 
 	// Commits collected from view change
-	bhpSigs          map[common.Address]*bls.Sign // signature on vcBlockHash+aggregatedSig for prepared message
-	nilSigs          map[common.Address]*bls.Sign // signature on nilHash
+	bhpSigs          map[common.Address]*bls.Sign // signature on m1 type message
+	nilSigs          map[common.Address]*bls.Sign // signature on m2 type (i.e. nil) messages
 	aggregatedBHPSig *bls.Sign
 	aggregatedNILSig *bls.Sign
 	bhpBitmap        *bls_cosi.Mask
 	nilBitmap        *bls_cosi.Mask
-	vcBlockHash      [32]byte   //view change blockHash, i.e. the blockHash of prepared message in v will be passed to v+1
+	m1Payload        []byte     // message payload for type m1 := |vcBlockHash|prepared_agg_sigs|prepared_bitmap|
 	vcLock           sync.Mutex // mutex for view change
 
 	// The chain reader for the blockchain this consensus is working on
@@ -207,9 +192,12 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 	consensus.ConsensusIDLowChan = make(chan struct{})
 	consensus.ConsensusVersion = ConsensusVersion
 
+	// pbft related
 	consensus.pbftLog = NewPbftLog()
 	consensus.phase = Announce
 	consensus.mode = PbftMode{mode: Normal}
+	// pbft timeout
+	consensus.consensusTimeout = createTimeout()
 
 	selfPeer := host.GetSelfPeer()
 	if leader.Port == selfPeer.Port && leader.IP == selfPeer.IP {
@@ -220,6 +208,7 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 
 	consensus.prepareSigs = map[common.Address]*bls.Sign{}
 	consensus.commitSigs = map[common.Address]*bls.Sign{}
+	consensus.CommitteeAddresses = make(map[common.Address]bool)
 
 	consensus.validators.Store(utils.GetBlsAddress(leader.ConsensusPubKey).Hex(), leader)
 
@@ -242,11 +231,10 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 	// For validators to keep track of all blocks received but not yet committed, so as to catch up to latest consensus if lagged behind.
 	consensus.blocksReceived = make(map[uint32]*BlockConsensusStatus)
 
+	consensus.ReadySignal = make(chan struct{})
 	if nodeconfig.GetDefaultConfig().IsLeader() {
-		consensus.ReadySignal = make(chan struct{})
 		// send a signal to indicate it's ready to run consensus
 		// this signal is consumed by node object to create a new block and in turn trigger a new consensus on it
-		// this is a goroutine because go channel without buffer will block
 		go func() {
 			consensus.ReadySignal <- struct{}{}
 		}()

@@ -14,21 +14,12 @@ import (
 	"github.com/harmony-one/harmony/p2p/host"
 )
 
-// IsValidatorMessage checks if a message is to be sent to a validator.
-func (consensus *Consensus) IsValidatorMessage(message *msg_pb.Message) bool {
-	return message.ReceiverType == msg_pb.ReceiverType_VALIDATOR && message.ServiceType == msg_pb.ServiceType_CONSENSUS
-}
-
 // ProcessMessageValidator dispatches validator's consensus message.
 func (consensus *Consensus) ProcessMessageValidator(payload []byte) {
 	message := &msg_pb.Message{}
 	err := protobuf.Unmarshal(payload, message)
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to unmarshal message payload.", "err", err, "consensus", consensus)
-	}
-
-	if !consensus.IsValidatorMessage(message) {
-		return
 	}
 
 	switch message.Type {

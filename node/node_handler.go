@@ -39,7 +39,7 @@ import (
 const (
 	// MaxNumberOfTransactionsPerBlock is the max number of transaction per a block.
 	MaxNumberOfTransactionsPerBlock = 8000
-	consensusTimeout                = 7 * time.Second
+	consensusTimeout                = 10 * time.Second
 )
 
 // ReceiveGlobalMessage use libp2p pubsub mechanism to receive global broadcast messages
@@ -269,7 +269,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) bool {
 // 1. add the new block to blockchain
 // 2. [leader] send new block to the client
 func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
-	if nodeconfig.GetDefaultConfig().IsLeader() {
+	if node.Consensus.PubKey.IsEqual(node.Consensus.LeaderPubKey) {
 		node.BroadcastNewBlock(newBlock)
 	} else {
 		utils.GetLogInstance().Info("BINGO !!! Reached Consensus", "ConsensusID", node.Consensus.GetConsensusID())
@@ -346,7 +346,6 @@ func (node *Node) AddNewBlock(newBlock *types.Block) {
 }
 
 func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
-	utils.GetLogInstance().Error("Got Ping Message")
 	if sender != "" {
 		_, ok := node.duplicatedPing.LoadOrStore(sender, true)
 		if ok {
@@ -717,7 +716,7 @@ func (node *Node) ConsensusMessageHandler(msgPayload []byte) {
 		select {
 		case node.Consensus.MsgChan <- msgPayload:
 		case <-time.After(consensusTimeout):
-			utils.GetLogInstance().Debug("[Consensus] ConsensusMessageHandler timeout", "duration", consensusTimeout)
+			utils.GetLogInstance().Debug("[Consensus] ConsensusMessageHandler timeout", "duration", consensusTimeout, "msgPayload", len(msgPayload))
 		}
 		return
 	}

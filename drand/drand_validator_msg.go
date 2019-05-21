@@ -9,9 +9,8 @@ import (
 // Constructs the init message
 func (dRand *DRand) constructCommitMessage(vrf [32]byte, proof []byte) []byte {
 	message := &msg_pb.Message{
-		ReceiverType: msg_pb.ReceiverType_LEADER,
-		ServiceType:  msg_pb.ServiceType_DRAND,
-		Type:         msg_pb.MessageType_DRAND_COMMIT,
+		ServiceType: msg_pb.ServiceType_DRAND,
+		Type:        msg_pb.MessageType_DRAND_COMMIT,
 		Request: &msg_pb.Message_Drand{
 			Drand: &msg_pb.DrandRequest{},
 		},

@@ -196,6 +196,9 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int {
 	utils.GetLogInstance().Info("My Leader", "info", hex.EncodeToString(consensus.leader.ConsensusPubKey.Serialize()))
 	utils.GetLogInstance().Info("My Committee", "info", consensus.PublicKeys)
 	consensus.pubKeyLock.Unlock()
+	// reset states after update public keys
+	consensus.ResetState()
+	consensus.ResetViewChangeState()
 
 	return len(consensus.PublicKeys)
 }
@@ -306,6 +309,24 @@ func (consensus *Consensus) GetCommitSigsArray() []*bls.Sign {
 	return sigs
 }
 
+// GetBhpSigsArray returns the signatures for prepared message in viewchange
+func (consensus *Consensus) GetBhpSigsArray() []*bls.Sign {
+	sigs := []*bls.Sign{}
+	for _, sig := range consensus.bhpSigs {
+		sigs = append(sigs, sig)
+	}
+	return sigs
+}
+
+// GetNilSigsArray returns the signatures for nil prepared message in viewchange
+func (consensus *Consensus) GetNilSigsArray() []*bls.Sign {
+	sigs := []*bls.Sign{}
+	for _, sig := range consensus.nilSigs {
+		sigs = append(sigs, sig)
+	}
+	return sigs
+}
+
 // ResetState resets the state of the consensus
 func (consensus *Consensus) ResetState() {
 	consensus.state = Finished
@@ -313,8 +334,8 @@ func (consensus *Consensus) ResetState() {
 	consensus.prepareSigs = map[common.Address]*bls.Sign{}
 	consensus.commitSigs = map[common.Address]*bls.Sign{}
 
-	prepareBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.ConsensusPubKey)
-	commitBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.ConsensusPubKey)
+	prepareBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.LeaderPubKey)
+	commitBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.LeaderPubKey)
 	consensus.prepareBitmap = prepareBitmap
 	consensus.commitBitmap = commitBitmap
 
@@ -471,6 +492,21 @@ func (consensus *Consensus) verifySenderKey(msg *msg_pb.Message) (*bls.PublicKey
 		return nil, fmt.Errorf("Validator address %s is not in committee", senderAddr)
 	}
 	return senderKey, nil
+}
+
+func (consensus *Consensus) verifyViewChangeSenderKey(msg *msg_pb.Message) (*bls.PublicKey, common.Address, error) {
+	vcMsg := msg.GetViewchange()
+	senderKey, err := bls_cosi.BytesToBlsPublicKey(vcMsg.SenderPubkey)
+	if err != nil {
+		return nil, common.Address{}, err
+	}
+	addrBytes := senderKey.GetAddress()
+	senderAddr := common.BytesToAddress(addrBytes[:])
+
+	if !consensus.IsValidatorInCommittee(senderAddr) {
+		return nil, common.Address{}, fmt.Errorf("Validator address %s is not in committee", senderAddr)
+	}
+	return senderKey, senderAddr, nil
 }
 
 // SetConsensusID set the consensusID to the height of the blockchain

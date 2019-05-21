@@ -72,8 +72,8 @@ EOU
 DB=
 TXGEN=true
 DURATION=60
-MIN=5
-SHARDS=2
+MIN=3
+SHARDS=1
 SYNC=true
 DRYRUN=
 
@@ -98,7 +98,7 @@ if [ -z "$config" ]; then
 fi
 
 if [ "$SYNC" == "true" ]; then
-    DURATION=200
+    DURATION=600
 fi
 
 # Kill nodes if any

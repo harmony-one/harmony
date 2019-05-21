@@ -13,9 +13,8 @@ import (
 // Constructs the announce message
 func (consensus *Consensus) constructAnnounceMessage() []byte {
 	message := &msg_pb.Message{
-		ReceiverType: msg_pb.ReceiverType_VALIDATOR,
-		ServiceType:  msg_pb.ServiceType_CONSENSUS,
-		Type:         msg_pb.MessageType_ANNOUNCE,
+		ServiceType: msg_pb.ServiceType_CONSENSUS,
+		Type:        msg_pb.MessageType_ANNOUNCE,
 		Request: &msg_pb.Message_Consensus{
 			Consensus: &msg_pb.ConsensusRequest{},
 		},
@@ -35,9 +34,8 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 // Construct the prepared message, returning prepared message in bytes.
 func (consensus *Consensus) constructPreparedMessage() ([]byte, *bls.Sign) {
 	message := &msg_pb.Message{
-		ReceiverType: msg_pb.ReceiverType_VALIDATOR,
-		ServiceType:  msg_pb.ServiceType_CONSENSUS,
-		Type:         msg_pb.MessageType_PREPARED,
+		ServiceType: msg_pb.ServiceType_CONSENSUS,
+		Type:        msg_pb.MessageType_PREPARED,
 		Request: &msg_pb.Message_Consensus{
 			Consensus: &msg_pb.ConsensusRequest{},
 		},
@@ -69,9 +67,8 @@ func (consensus *Consensus) constructPreparedMessage() ([]byte, *bls.Sign) {
 // Construct the committed message, returning committed message in bytes.
 func (consensus *Consensus) constructCommittedMessage() ([]byte, *bls.Sign) {
 	message := &msg_pb.Message{
-		ReceiverType: msg_pb.ReceiverType_VALIDATOR,
-		ServiceType:  msg_pb.ServiceType_CONSENSUS,
-		Type:         msg_pb.MessageType_COMMITTED,
+		ServiceType: msg_pb.ServiceType_CONSENSUS,
+		Type:        msg_pb.MessageType_COMMITTED,
 		Request: &msg_pb.Message_Consensus{
 			Consensus: &msg_pb.ConsensusRequest{},
 		},
