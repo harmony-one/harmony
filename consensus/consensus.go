@@ -76,6 +76,16 @@ type Consensus struct {
 	prepareBitmap        *bls_cosi.Mask
 	commitBitmap         *bls_cosi.Mask
 
+	// Commits collected from view change
+	bhpSigs          map[common.Address]*bls.Sign // signature on vcBlockHash+aggregatedSig for prepared message
+	nilSigs          map[common.Address]*bls.Sign // signature on nilHash
+	aggregatedBHPSig *bls.Sign
+	aggregatedNILSig *bls.Sign
+	bhpBitmap        *bls_cosi.Mask
+	nilBitmap        *bls_cosi.Mask
+	vcBlockHash      [32]byte   //view change blockHash, i.e. the blockHash of prepared message in v will be passed to v+1
+	vcLock           sync.Mutex // mutex for view change
+
 	// The chain reader for the blockchain this consensus is working on
 	ChainReader consensus_engine.ChainReader
 
@@ -208,34 +218,10 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 		nodeconfig.GetDefaultConfig().SetIsLeader(false)
 	}
 
-	consensus.leader = leader
-	consensus.CommitteeAddresses = map[common.Address]bool{}
-
 	consensus.prepareSigs = map[common.Address]*bls.Sign{}
 	consensus.commitSigs = map[common.Address]*bls.Sign{}
 
 	consensus.validators.Store(utils.GetBlsAddress(leader.ConsensusPubKey).Hex(), leader)
-	consensus.CommitteeAddresses[utils.GetBlsAddress(leader.ConsensusPubKey)] = true
-
-	// Initialize cosign bitmap
-	allPublicKeys := make([]*bls.PublicKey, 0)
-	allPublicKeys = append(allPublicKeys, leader.ConsensusPubKey)
-
-	consensus.PublicKeys = allPublicKeys
-
-	prepareBitmap, err := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.ConsensusPubKey)
-	if err != nil {
-		return nil, err
-	}
-	commitBitmap, err := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.ConsensusPubKey)
-	if err != nil {
-		return nil, err
-	}
-	consensus.prepareBitmap = prepareBitmap
-	consensus.commitBitmap = commitBitmap
-
-	consensus.aggregatedPrepareSig = nil
-	consensus.aggregatedCommitSig = nil
 
 	// For now use socket address as ID
 	// TODO: populate Id derived from address

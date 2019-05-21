@@ -321,6 +321,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	}
 	mask, err := bls_cosi.NewMask(consensus.PublicKeys, nil)
 	mask.SetMask(bitmap)
+	// TODO: add 2f+1 signature checking
 	if !deserializedMultiSig.VerifyHash(mask.AggregatePublic, blockHash[:]) || err != nil {
 		myBlockHash := common.Hash{}
 		myBlockHash.SetBytes(consensus.blockHash[:])
@@ -527,6 +528,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	mask, err := bls_cosi.NewMask(consensus.PublicKeys, nil)
 	mask.SetMask(bitmap)
 	prepareMultiSigAndBitmap := append(consensus.aggregatedPrepareSig.Serialize(), consensus.prepareBitmap.Bitmap...)
+	// TODO: add 2f+1 signature checking
 	if !deserializedMultiSig.VerifyHash(mask.AggregatePublic, prepareMultiSigAndBitmap) || err != nil {
 		utils.GetLogInstance().Warn("Failed to verify the multi signature for commit phase", "Error", err, "leader Address", leaderAddress)
 		return
