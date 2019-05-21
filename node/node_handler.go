@@ -422,7 +422,8 @@ func (node *Node) SendPongMessage() {
 			} else {
 				// stable number of peers/pubkeys, sent the pong message
 				// also make sure number of peers is greater than the minimal required number
-				if !sentMessage && numPubKeysNow >= node.Consensus.MinPeers {
+				utils.GetLogInstance().Info("hehe", "numPeers", numPeers, "numPeersNow", numPeersNow)
+				if !sentMessage && numPeersNow >= node.Consensus.MinPeers {
 					pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys, node.Consensus.GetLeaderPubKey(), node.Consensus.ShardID)
 					buffer := pong.ConstructPongMessage()
 					err := node.host.SendMessageToGroups([]p2p.GroupID{node.NodeConfig.GetShardGroupID()}, host.ConstructP2pMessage(byte(0), buffer))

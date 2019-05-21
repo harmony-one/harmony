@@ -393,6 +393,7 @@ func (node *Node) AddPeers(peers []*p2p.Peer) int {
 	for _, p := range peers {
 		key := fmt.Sprintf("%s:%s:%s", p.IP, p.Port, p.PeerID)
 		_, ok := node.Neighbors.LoadOrStore(key, *p)
+		utils.GetLogInstance().Debug("haha", "ok", ok, "peerAdd", p)
 		if !ok {
 			// !ok means new peer is stored
 			count++
@@ -404,11 +405,11 @@ func (node *Node) AddPeers(peers []*p2p.Peer) int {
 	// Only leader needs to add the peer info into consensus
 	// Validators will receive the updated peer info from Leader via pong message
 	// TODO: remove this after fully migrating to beacon chain-based committee membership
-	//if count > 0 && node.NodeConfig.IsLeader() {
-	//	node.Consensus.AddPeers(peers)
-	//	// TODO: make peers into a context object shared by consensus and drand
-	//	node.DRand.AddPeers(peers)
-	//}
+	if count > 0 && node.NodeConfig.IsLeader() {
+		node.Consensus.AddPeers(peers)
+		//	// TODO: make peers into a context object shared by consensus and drand
+		//	node.DRand.AddPeers(peers)
+	}
 	return count
 }
 
