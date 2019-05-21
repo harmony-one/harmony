@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	rpcHTTPPortOffset = 10
-	rpcWSPortOffset   = 20
+	rpcHTTPPortOffset = 500
+	rpcWSPortOffset   = 800
 )
 
 var (
