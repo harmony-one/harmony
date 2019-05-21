@@ -3,7 +3,9 @@ package consensus
 import (
 	"sync"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -61,7 +63,6 @@ func (pm *PbftMode) SetConsensusID(consensusID uint32) {
 func (consensus *Consensus) startViewChange(consensusID uint32) {
 	consensus.mode.SetMode(ViewChanging)
 	consensus.mode.SetConsensusID(consensusID)
-	// TODO (cm): implement the actual logic
 }
 
 // switchPhase will switch PbftPhase to nextPhase if the desirePhase equals the nextPhase
@@ -99,4 +100,17 @@ func (consensus *Consensus) getIndexOfPubKey(pubKey *bls.PublicKey) int {
 		}
 	}
 	return -1 // not found
+}
+
+func (consensus *Consensus) ResetViewChangeState() {
+	bhpBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.ConsensusPubKey)
+	nilBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.ConsensusPubKey)
+	consensus.bhpBitmap = bhpBitmap
+	consensus.nilBitmap = nilBitmap
+
+	consensus.bhpSigs = map[common.Address]*bls.Sign{}
+	consensus.nilSigs = map[common.Address]*bls.Sign{}
+	consensus.aggregatedBHPSig = nil
+	consensus.aggregatedNILSig = nil
+	consensus.vcBlockHash = [32]byte{}
 }
