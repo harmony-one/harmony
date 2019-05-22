@@ -269,7 +269,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) bool {
 // 1. add the new block to blockchain
 // 2. [leader] send new block to the client
 func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
-	if node.Consensus.IsLeader {
+	if nodeconfig.GetDefaultConfig().IsLeader() {
 		node.BroadcastNewBlock(newBlock)
 	} else {
 		utils.GetLogInstance().Info("BINGO !!! Reached Consensus", "ConsensusID", node.Consensus.GetConsensusID())
@@ -318,7 +318,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 		if core.IsEpochBlock(newBlock) {
 			shardState := node.blockchain.StoreNewShardState(newBlock, &node.CurrentStakes)
 			if shardState != nil {
-				if node.Consensus.IsLeader {
+				if nodeconfig.GetDefaultConfig().IsLeader() {
 					epochShardState := types.EpochShardState{Epoch: core.GetEpochFromBlockNumber(newBlock.NumberU64()), ShardState: shardState}
 					epochShardStateMessage := proto_node.ConstructEpochShardStateMessage(epochShardState)
 					// Broadcast new shard state
@@ -599,7 +599,7 @@ func (node *Node) processEpochShardState(epochShardState *types.EpochShardState)
 		node.DRand.UpdatePublicKeys(publicKeys)
 
 		aboutLeader := ""
-		if node.Consensus.IsLeader {
+		if nodeconfig.GetDefaultConfig().IsLeader() {
 			aboutLeader = "I am not leader anymore"
 			if isNextLeader {
 				aboutLeader = "I am still leader"
@@ -706,7 +706,7 @@ func (node *Node) retrieveEpochShardState() (*types.EpochShardState, error) {
 // ConsensusMessageHandler passes received message in node_handler to consensus
 func (node *Node) ConsensusMessageHandler(msgPayload []byte) {
 	if node.Consensus.ConsensusVersion == "v1" {
-		if node.Consensus.IsLeader {
+		if nodeconfig.GetDefaultConfig().IsLeader() {
 			node.Consensus.ProcessMessageLeader(msgPayload)
 		} else {
 			node.Consensus.ProcessMessageValidator(msgPayload)

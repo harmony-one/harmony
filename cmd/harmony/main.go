@@ -256,7 +256,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	return nodeConfig
 }
 
-func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consensus, *node.Node) {
+func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// Consensus object.
 	// TODO: consensus object shouldn't start here
 	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of consensus later.
@@ -362,7 +362,7 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	currentConsensus.BlockVerifier = currentNode.VerifyNewBlock
 	currentConsensus.OnConsensusDone = currentNode.PostConsensusProcessing
 	currentNode.State = node.NodeWaitToJoin
-	return currentConsensus, currentNode
+	return currentNode
 }
 
 func main() {
@@ -370,8 +370,6 @@ func main() {
 	flag.Parse()
 
 	initSetup()
-	var currentNode *node.Node
-	var consensus *consensus.Consensus
 	nodeConfig := createGlobalConfig()
 
 	// Init logging.
@@ -385,17 +383,14 @@ func main() {
 			prof.Start()
 		}
 	}
-	consensus, currentNode = setUpConsensusAndNode(nodeConfig)
-	// TODO: put this inside discovery service
-	if consensus.IsLeader {
-		go currentNode.SendPongMessage()
-	}
+	currentNode := setUpConsensusAndNode(nodeConfig)
 	//if consensus.ShardID != 0 {
 	//	go currentNode.SupportBeaconSyncing()
 	//}
 
 	utils.GetLogInstance().Info("==== New Harmony Node ====", "BlsPubKey", hex.EncodeToString(nodeConfig.ConsensusPubKey.Serialize()), "ShardID", nodeConfig.ShardID, "ShardGroupID", nodeConfig.GetShardGroupID(), "BeaconGroupID", nodeConfig.GetBeaconGroupID(), "ClientGroupID", nodeConfig.GetClientGroupID(), "Role", currentNode.NodeConfig.Role(), "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, nodeConfig.Host.GetID().Pretty()))
 
+	currentNode.MaybeKeepSendingPongMessage()
 	go currentNode.SupportSyncing()
 	currentNode.ServiceManagerSetup()
 	currentNode.StartRPC(*port)

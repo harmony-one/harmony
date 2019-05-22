@@ -18,6 +18,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
@@ -324,7 +325,7 @@ func (consensus *Consensus) ResetState() {
 // Returns a string representation of this consensus
 func (consensus *Consensus) String() string {
 	var duty string
-	if consensus.IsLeader {
+	if nodeconfig.GetDefaultConfig().IsLeader() {
 		duty = "LDR" // leader
 	} else {
 		duty = "VLD" // validator
