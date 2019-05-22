@@ -286,7 +286,6 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 			"error", err)
 	}
 
-	// TODO ek – make db directory configurable
 	node.shardChains = shardchain.NewCollection(
 		chainDBFactory, &genesisInitializer{&node}, consensusObj)
 

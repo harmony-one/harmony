@@ -130,8 +130,6 @@ func (h *Header) Logger(logger log.Logger) log.Logger {
 	)
 }
 
-// Log15Ctx returns the contexts
-
 func rlpHash(x interface{}) (h common.Hash) {
 	hw := sha3.NewLegacyKeccak256()
 	rlp.Encode(hw, x)
