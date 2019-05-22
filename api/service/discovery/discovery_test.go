@@ -37,7 +37,7 @@ func TestDiscoveryService(t *testing.T) {
 
 	config := service.NodeConfig{}
 
-	dService = New(host, config, nil, nil)
+	dService = New(host, config, nil, nil, nil)
 
 	if dService == nil {
 		t.Fatalf("unable to create new discovery service")

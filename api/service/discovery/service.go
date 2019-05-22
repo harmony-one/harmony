@@ -7,6 +7,7 @@ import (
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
@@ -22,13 +23,14 @@ type Service struct {
 	actions           map[p2p.GroupID]p2p.ActionType
 	messageChan       chan *msg_pb.Message
 	addBeaconPeerFunc func(*p2p.Peer) bool
+	sendPongMessage   func()
 }
 
 // New returns discovery service.
 // h is the p2p host
 // config is the node config
 // (TODO: leo, build two overlays of network)
-func New(h p2p.Host, config service.NodeConfig, peerChan chan p2p.Peer, addPeer func(*p2p.Peer) bool) *Service {
+func New(h p2p.Host, config service.NodeConfig, peerChan chan p2p.Peer, addPeer func(*p2p.Peer) bool, sendPongMessage func()) *Service {
 	return &Service{
 		host:              h,
 		peerChan:          peerChan,
@@ -37,6 +39,7 @@ func New(h p2p.Host, config service.NodeConfig, peerChan chan p2p.Peer, addPeer 
 		config:            config,
 		actions:           make(map[p2p.GroupID]p2p.ActionType),
 		addBeaconPeerFunc: addPeer,
+		sendPongMessage:   sendPongMessage,
 	}
 }
 
@@ -70,6 +73,9 @@ func (s *Service) NotifyService(params map[string]interface{}) {
 // Run is the main function of the service
 func (s *Service) Run() {
 	go s.contactP2pPeers()
+	if nodeconfig.GetDefaultConfig().IsLeader() {
+		go s.sendPongMessage()
+	}
 }
 
 func (s *Service) contactP2pPeers() {

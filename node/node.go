@@ -210,13 +210,6 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int) types.Transactions {
 	return selected
 }
 
-// MaybeKeepSendingPongMessage keeps sending pong message if the current node is a leader.
-func (node *Node) MaybeKeepSendingPongMessage() {
-	if nodeconfig.GetDefaultConfig().IsLeader() {
-		go node.SendPongMessage()
-	}
-}
-
 // StartServer starts a server and process the requests by a handler.
 func (node *Node) StartServer() {
 	select {}
