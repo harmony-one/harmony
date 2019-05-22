@@ -1077,6 +1077,20 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 	n, events, logs, err := bc.insertChain(chain)
 	bc.PostChainEvents(events, logs)
+	// TODO ek – make this a post-chain event
+	if err == nil {
+		for _, block := range chain {
+			header := block.Header()
+			if header.ShardStateHash != (common.Hash{}) {
+				epoch := new(big.Int).Add(header.Epoch, common.Big1)
+				err = bc.WriteShardState(epoch, header.ShardState)
+				if err != nil {
+					ctxerror.Log15(header.Logger(utils.GetLogger()).Warn,
+						ctxerror.New("cannot store shard state").WithCause(err))
+				}
+			}
+		}
+	}
 	return n, err
 }
 

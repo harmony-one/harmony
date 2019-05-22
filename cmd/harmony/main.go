@@ -388,7 +388,15 @@ func main() {
 	//	go currentNode.SupportBeaconSyncing()
 	//}
 
-	utils.GetLogInstance().Info("==== New Harmony Node ====", "BlsPubKey", hex.EncodeToString(nodeConfig.ConsensusPubKey.Serialize()), "ShardID", nodeConfig.ShardID, "ShardGroupID", nodeConfig.GetShardGroupID(), "BeaconGroupID", nodeConfig.GetBeaconGroupID(), "ClientGroupID", nodeConfig.GetClientGroupID(), "Role", currentNode.NodeConfig.Role(), "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, nodeConfig.Host.GetID().Pretty()))
+	utils.GetLogInstance().Info("==== New Harmony Node ====",
+		"BlsPubKey", hex.EncodeToString(nodeConfig.ConsensusPubKey.Serialize()),
+		"ShardID", nodeConfig.ShardID,
+		"ShardGroupID", nodeConfig.GetShardGroupID(),
+		"BeaconGroupID", nodeConfig.GetBeaconGroupID(),
+		"ClientGroupID", nodeConfig.GetClientGroupID(),
+		"Role", currentNode.NodeConfig.Role(),
+		"multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s",
+			*ip, *port, nodeConfig.Host.GetID().Pretty()))
 
 	currentNode.MaybeKeepSendingPongMessage()
 	go currentNode.SupportSyncing()

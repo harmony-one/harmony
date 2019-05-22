@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -26,7 +25,6 @@ import (
 	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/drand"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -270,7 +268,6 @@ func (node *Node) GetSyncID() [SyncIDLength]byte {
 
 // New creates a new node.
 func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardchain.DBFactory, isArchival bool) *Node {
-	var chain *core.BlockChain
 	var err error
 
 	node := Node{}
@@ -296,7 +293,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		node.Consensus = consensusObj
 
 		// Load the chains.
-		chain = node.Blockchain() // this also sets node.isFirstTime if the DB is fresh
+		chain := node.Blockchain() // this also sets node.isFirstTime if the DB is fresh
 		_ = node.Beaconchain()
 
 		node.BlockChannel = make(chan *types.Block)
@@ -487,18 +484,4 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 	}
 
 	return nodeConfig, chanPeer
-}
-
-// InitBlockChainFromDB retrieves the latest blockchain and state available from the local database
-func (node *Node) InitBlockChainFromDB(db ethdb.Database, consensus *consensus.Consensus, isArchival bool) (*core.BlockChain, error) {
-	chainConfig := params.TestChainConfig
-	if consensus != nil {
-		chainConfig.ChainID = big.NewInt(int64(consensus.ShardID)) // Use ChainID as piggybacked ShardID
-	}
-	cacheConfig := core.CacheConfig{}
-	if isArchival {
-		cacheConfig = core.CacheConfig{Disabled: true, TrieNodeLimit: 256 * 1024 * 1024, TrieTimeLimit: 30 * time.Second}
-	}
-	chain, err := core.NewBlockChain(db, &cacheConfig, chainConfig, consensus, vm.Config{}, nil)
-	return chain, err
 }

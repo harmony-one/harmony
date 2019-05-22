@@ -8,11 +8,13 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/params"
+
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 )
 
 // environment is the worker's current environment and holds all of the current state information.
@@ -157,7 +159,7 @@ func (w *Worker) Commit() (*types.Block, error) {
 	s := w.current.state.Copy()
 	block, err := w.engine.Finalize(w.chain, w.current.header, s, w.current.txs, w.current.receipts)
 	if err != nil {
-		return nil, err
+		return nil, ctxerror.New("cannot finalize block").WithCause(err)
 	}
 	return block, nil
 }

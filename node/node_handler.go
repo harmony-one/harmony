@@ -673,15 +673,7 @@ func (node *Node) epochShardStateMessageHandler(msgPayload []byte) error {
 	if node.Consensus == nil && node.NodeConfig.Role() != nodeconfig.NewNode {
 		return nil
 	}
-	// Remember the master sharding state if the epoch ID matches.
-	curEpoch := node.Blockchain().CurrentBlock().Header().Epoch
-	expectedEpoch := new(big.Int).Add(curEpoch, common.Big1)
 	receivedEpoch := big.NewInt(int64(epochShardState.Epoch))
-	if receivedEpoch.Cmp(expectedEpoch) != 0 {
-		return ctxerror.New("invalid epoch in epoch shard state message",
-			"receivedEpoch", receivedEpoch,
-			"expectedEpoch", expectedEpoch)
-	}
 	getLogger().Info("received new shard state", "epoch", receivedEpoch)
 	node.nextShardState.master = epochShardState
 	if node.Consensus.IsLeader {

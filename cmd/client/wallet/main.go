@@ -556,7 +556,7 @@ func GetFreeToken(address common.Address) {
 			log.Debug("GetFreeToken", "response", response)
 			txID := common.Hash{}
 			txID.SetBytes(response.TxId)
-			fmt.Printf("Transaction Id requesting free token in shard %d: %s\n", int(0), txID.Hex())
+			fmt.Printf("Transaction Id requesting free token in shard %d: %s\n", i, txID.Hex())
 			break
 		}
 	}

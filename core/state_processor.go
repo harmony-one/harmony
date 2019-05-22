@@ -24,6 +24,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 )
 
 // StateProcessor is a basic Processor, which takes care of transitioning
@@ -75,7 +76,10 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 		allLogs = append(allLogs, receipt.Logs...)
 	}
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
-	p.engine.Finalize(p.bc, header, statedb, block.Transactions(), receipts)
+	_, err := p.engine.Finalize(p.bc, header, statedb, block.Transactions(), receipts)
+	if err != nil {
+		return nil, nil, 0, ctxerror.New("cannot finalize block").WithCause(err)
+	}
 
 	return receipts, allLogs, *usedGas, nil
 }

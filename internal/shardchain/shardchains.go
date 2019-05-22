@@ -1,6 +1,7 @@
 package shardchain
 
 import (
+	"math/big"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -41,9 +42,9 @@ func NewCollection(
 ) *collection {
 	return &collection{
 		dbFactory: dbFactory,
-		dbInit: dbInit,
-		engine: engine,
-		pool: make(map[uint32]*core.BlockChain),
+		dbInit:    dbInit,
+		engine:    engine,
+		pool:      make(map[uint32]*core.BlockChain),
 	}
 }
 
@@ -73,7 +74,7 @@ func (sc *collection) ShardChain(shardID uint32) (*core.BlockChain, error) {
 			"shardID", shardID)
 		if err := sc.dbInit.InitChainDB(db, shardID); err != nil {
 			return nil, ctxerror.New("cannot initialize a new chain database").
-                WithCause(err)
+				WithCause(err)
 		}
 	}
 	var cacheConfig *core.CacheConfig
@@ -82,7 +83,7 @@ func (sc *collection) ShardChain(shardID uint32) (*core.BlockChain, error) {
 		cacheConfig = &core.CacheConfig{Disabled: true}
 	}
 	chainConfig := *params.TestChainConfig
-	chainConfig.ChainID.SetUint64(uint64(shardID))
+	chainConfig.ChainID = big.NewInt(int64(shardID))
 	bc, err := core.NewBlockChain(
 		db, cacheConfig, &chainConfig, sc.engine, vm.Config{}, nil,
 	)

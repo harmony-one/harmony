@@ -10,8 +10,12 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/pkg/errors"
 
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/rawdb"
+	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/internal/utils/contract"
 )
@@ -32,7 +36,22 @@ type genesisInitializer struct {
 
 // InitChainDB sets up a new genesis block in the database for the given shard.
 func (gi *genesisInitializer) InitChainDB(db ethdb.Database, shardID uint32) error {
-	return gi.node.SetupGenesisBlock(db, shardID)
+	shardState := core.GetInitShardState()
+	if shardID != 0 {
+		// store only the local shard
+		if c := shardState.FindCommitteeByID(shardID); c == nil {
+			return errors.New("cannot find local shard in genesis")
+		} else {
+			shardState = types.ShardState{*c}
+		}
+	}
+	if err := rawdb.WriteShardState(db, common.Big0, shardState); err != nil {
+		return ctxerror.New("cannot store epoch shard state").WithCause(err)
+	}
+	if err := gi.node.SetupGenesisBlock(db, shardID); err != nil {
+		return ctxerror.New("cannot setup genesis block").WithCause(err)
+	}
+	return nil
 }
 
 // GenesisBlockSetup setups a genesis blockchain.
@@ -78,25 +97,25 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32) error {
 	// Store genesis block into db.
 	_, err := gspec.Commit(db)
 
-    return err
+	return err
 }
 
 // CreateTestBankKeys deterministically generates testing addresses.
 func CreateTestBankKeys(numAddresses int) (keys []*ecdsa.PrivateKey, err error) {
 	rand.Seed(0)
-    bytes := make([]byte, 1000000)
-    for i := range bytes {
-    	bytes[i] = byte(rand.Intn(100))
+	bytes := make([]byte, 1000000)
+	for i := range bytes {
+		bytes[i] = byte(rand.Intn(100))
 	}
-    reader := strings.NewReader(string(bytes))
-    for i := 0; i < numAddresses; i++ {
-        key, err := ecdsa.GenerateKey(crypto.S256(), reader)
-        if err != nil {
-        	return nil, err
+	reader := strings.NewReader(string(bytes))
+	for i := 0; i < numAddresses; i++ {
+		key, err := ecdsa.GenerateKey(crypto.S256(), reader)
+		if err != nil {
+			return nil, err
 		}
-        keys = append(keys, key)
+		keys = append(keys, key)
 	}
-    return keys, nil
+	return keys, nil
 }
 
 // CreateGenesisAllocWithTestingAddresses create the genesis block allocation that contains deterministically
@@ -112,7 +131,6 @@ func (node *Node) CreateGenesisAllocWithTestingAddresses(numAddress int) core.Ge
 	}
 	return genesisAloc
 }
-
 
 // AddNodeAddressesToGenesisAlloc adds to the genesis block allocation the accounts used for network validators/nodes,
 // including the account used by the nodes of the initial beacon chain and later new nodes.

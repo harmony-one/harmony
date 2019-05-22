@@ -279,16 +279,21 @@ func accumulateRewards(
 	bc consensus_engine.ChainReader, state *state.DB, header *types.Header,
 ) error {
 	logger := header.Logger(utils.GetLogInstance())
-    getLogger := func() log.Logger { return utils.WithCallerSkip(logger, 1) }
+	getLogger := func() log.Logger { return utils.WithCallerSkip(logger, 1) }
 	blockNum := header.Number.Uint64()
 	if blockNum == 0 {
-		// Epoch block doesn't have any reward
+		// Epoch block has no parent to reward.
 		return nil
 	}
 	parentHeader := bc.GetHeaderByNumber(blockNum - 1)
 	if parentHeader == nil {
 		return ctxerror.New("cannot find parent block header in DB",
-			"parentBlockNumber", blockNum - 1)
+			"parentBlockNumber", blockNum-1)
+	}
+	if parentHeader.Number.Cmp(common.Big0) == 0 {
+		// Parent is an epoch block,
+		// which is not signed in the usual manner therefore rewards nothing.
+		return nil
 	}
 	shardState, err := bc.ReadShardState(parentHeader.Epoch)
 	if err != nil {

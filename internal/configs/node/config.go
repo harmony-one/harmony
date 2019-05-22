@@ -78,7 +78,7 @@ type ConfigType struct {
 	ConsensusPubKey *bls.PublicKey
 
 	// Database directory
-	DBDir    string
+	DBDir string
 
 	SelfPeer p2p.Peer
 	Leader   p2p.Peer
