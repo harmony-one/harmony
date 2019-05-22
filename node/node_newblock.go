@@ -19,6 +19,7 @@ const (
 	FirstTimeThreshold = 2
 	ConsensusTimeOut   = 10
 	PeriodicBlock      = 1 * time.Second
+	BlockPeriod        = 10 * time.Second
 )
 
 // WaitForConsensusReady listen for the readiness signal from consensus and generate new block for consensus.
@@ -33,7 +34,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 		firstTime := true
 		var newBlock *types.Block
 		timeoutCount := 0
-		deadline := time.Now().Add(10 * time.Second)
+		deadline := time.Now().Add(BlockPeriod)
 		for {
 			// keep waiting for Consensus ready
 			select {
@@ -58,7 +59,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 					firstTime = false
 				}
 				if len(node.pendingTransactions) >= threshold || !time.Now().Before(deadline) {
-					deadline = time.Now().Add(10 * time.Second)
+					deadline = time.Now().Add(BlockPeriod)
 					utils.GetLogInstance().Debug("PROPOSING NEW BLOCK ------------------------------------------------", "blockNum", node.Blockchain().CurrentBlock().NumberU64()+1, "threshold", threshold, "pendingTransactions", len(node.pendingTransactions))
 					// Normal tx block consensus
 					selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
@@ -117,7 +118,7 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 
 			case <-readySignal:
 				firstTry := true
-				deadline := time.Now().Add(10 * time.Second)
+				deadline := time.Now().Add(BlockPeriod)
 				for {
 					if !firstTry {
 						time.Sleep(PeriodicBlock)
@@ -133,7 +134,7 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 					if len(node.pendingTransactions) < threshold && time.Now().Before(deadline) {
 						continue
 					}
-					deadline = time.Now().Add(10 * time.Second)
+					deadline = time.Now().Add(BlockPeriod)
 					// Normal tx block consensus
 					selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
 					utils.GetLogInstance().Debug("PROPOSING NEW BLOCK ------------------------------------------------", "blockNum", node.Blockchain().CurrentBlock().NumberU64()+1, "threshold", threshold, "selectedTxs", len(selectedTxs))
