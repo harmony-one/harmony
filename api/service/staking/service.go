@@ -1,14 +1,14 @@
 package staking
 
 import (
-	"crypto/ecdsa"
 	"math/big"
 	"strings"
 	"time"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/harmony-one/harmony/accounts"
+	"github.com/harmony-one/harmony/accounts/abi"
 	"github.com/harmony-one/harmony/contracts"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -24,6 +24,7 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	hmykey "github.com/harmony-one/harmony/internal/keystore"
 	"github.com/harmony-one/harmony/internal/utils"
 	contract_constants "github.com/harmony-one/harmony/internal/utils/contract"
 	"github.com/harmony-one/harmony/p2p"
@@ -49,7 +50,7 @@ type Service struct {
 	host          p2p.Host
 	stopChan      chan struct{}
 	stoppedChan   chan struct{}
-	accountKey    *ecdsa.PrivateKey
+	account       accounts.Account
 	blsPublicKey  *bls.PublicKey
 	stakingAmount int64
 	state         State
@@ -58,12 +59,11 @@ type Service struct {
 }
 
 // New returns staking service.
-func New(host p2p.Host, accountKey *ecdsa.PrivateKey, beaconChain *core.BlockChain, blsPublicKey *bls.PublicKey) *Service {
+func New(host p2p.Host, account accounts.Account, beaconChain *core.BlockChain, blsPublicKey *bls.PublicKey) *Service {
 	return &Service{
 		host:          host,
 		stopChan:      make(chan struct{}),
 		stoppedChan:   make(chan struct{}),
-		accountKey:    accountKey,
 		blsPublicKey:  blsPublicKey,
 		stakingAmount: StakingAmount,
 		beaconChain:   beaconChain,
@@ -124,7 +124,7 @@ func (s *Service) DoService() {
 }
 
 func (s *Service) getStakingInfo() *proto.StakingContractInfoResponse {
-	address := crypto.PubkeyToAddress(s.accountKey.PublicKey)
+	address := s.account.Address
 	state, err := s.beaconChain.State()
 	if err != nil {
 		utils.GetLogInstance().Error("error to get beacon chain state when getting staking info")
@@ -220,7 +220,8 @@ func (s *Service) createRawStakingMessage() []byte {
 		bytesData,
 	)
 
-	if signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, s.accountKey); err == nil {
+	hmykey.Unlock(s.account)
+	if signedTx, err := hmykey.SignTx(s.account, tx); err == nil {
 		ts := types.Transactions{signedTx}
 		return constructStakingMessage(ts)
 	}
