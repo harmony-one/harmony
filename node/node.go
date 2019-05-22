@@ -210,6 +210,13 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int) types.Transactions {
 	return selected
 }
 
+// MaybeKeepSendingPongMessage keeps sending pong message if the current node is a leader.
+func (node *Node) MaybeKeepSendingPongMessage() {
+	if nodeconfig.GetDefaultConfig().IsLeader() {
+		go node.SendPongMessage()
+	}
+}
+
 // StartServer starts a server and process the requests by a handler.
 func (node *Node) StartServer() {
 	select {}
@@ -319,7 +326,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 
 	node.ContractCaller = contracts.NewContractCaller(&db, node.blockchain, params.TestChainConfig)
 
-	if consensusObj != nil && consensusObj.IsLeader {
+	if consensusObj != nil && nodeconfig.GetDefaultConfig().IsLeader() {
 		node.State = NodeLeader
 	} else {
 		node.State = NodeInit
