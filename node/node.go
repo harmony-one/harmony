@@ -148,8 +148,9 @@ type Node struct {
 	// TODO: leochen, can we use multiple account for staking?
 	StakingAccount accounts.Account
 
-	// For test only
-	TestBankKeys                 []*ecdsa.PrivateKey
+	// For test only; TODO ek – remove this
+	TestBankKeys []*ecdsa.PrivateKey
+
 	ContractDeployerKey          *ecdsa.PrivateKey
 	ContractDeployerCurrentNonce uint64 // The nonce of the deployer contract at current block
 	ContractAddresses            []common.Address
@@ -191,6 +192,7 @@ type Node struct {
 
 		// When for a leader to propose the next shard state,
 		// or for a validator to wait for a proposal before view change.
+		// TODO ek – replace with retry-based logic instead of delay
 		proposeTime time.Time
 	}
 

@@ -133,6 +133,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	if consensus.BlockVerifier == nil {
 		// do nothing
 	} else if err := consensus.BlockVerifier(&blockObj); err != nil {
+		// TODO ek – maybe we could do this in commit phase
 		err := ctxerror.New("block verification failed",
 			"blockHash", blockObj.Hash(),
 		).WithCause(err)

@@ -340,6 +340,7 @@ func ReadBlock(db DatabaseReader, hash common.Hash, number uint64) *types.Block 
 func WriteBlock(db DatabaseWriter, block *types.Block) {
 	WriteBody(db, block.Hash(), block.NumberU64(), block.Body())
 	WriteHeader(db, block.Header())
+	// TODO ek – maybe roll the below into WriteHeader()
 	epoch := block.Header().Epoch
 	if epoch == nil {
 		// backward compatibility
