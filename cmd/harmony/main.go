@@ -117,8 +117,8 @@ func initSetup() {
 	}
 
 	// Logging setup
-	utils.SetPortAndIP(*port, *ip)
-	utils.SetVerbosity(log.Lvl(*verbosity))
+	utils.SetLogContext(*port, *ip)
+	utils.SetLogVerbosity(log.Lvl(*verbosity))
 
 	// Set default keystore Dir
 	hmykey.DefaultKeyStoreDir = *keystoreDir
