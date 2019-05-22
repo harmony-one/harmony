@@ -10,15 +10,17 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
 
+	"github.com/harmony-one/harmony/accounts"
+	"github.com/harmony-one/harmony/accounts/keystore"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/drand"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	hmykey "github.com/harmony-one/harmony/internal/keystore"
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/internal/utils/contract"
@@ -94,6 +96,15 @@ var (
 	shardID      = flag.Int("shard_id", -1, "the shard ID of this node")
 	// logConn logs incoming/outgoing connections
 	logConn = flag.Bool("log_conn", false, "log incoming/outgoing connections")
+
+	keystoreDir = flag.String(".hmy/keystore", hmykey.DefaultKeyStoreDir, "The default keystore directory")
+
+	// true by default for now.  will be switch to false once have full support.
+	hmyNoPass = flag.Bool("nopass", true, "No passphrase for the key (testing only)")
+
+	ks        *keystore.KeyStore
+	myAccount accounts.Account
+	myPass    = ""
 )
 
 func initSetup() {
@@ -103,6 +114,9 @@ func initSetup() {
 
 	// Logging setup
 	utils.SetPortAndIP(*port, *ip)
+
+	// Set default keystore Dir
+	hmykey.DefaultKeyStoreDir = *keystoreDir
 
 	// Add GOMAXPROCS to achieve max performance.
 	runtime.GOMAXPROCS(1024)
@@ -116,6 +130,42 @@ func initSetup() {
 			panic(err)
 		}
 		utils.BootNodes = bootNodeAddrs
+	}
+
+	ks = hmykey.GetHmyKeyStore()
+
+	allAccounts := ks.Accounts()
+
+	if *accountIndex < 0 || *accountIndex >= len(contract.GenesisAccounts) {
+		fmt.Printf("Invalid account_index: %v\n", *accountIndex)
+		os.Exit(4)
+	}
+
+	foundAccount := false
+	for _, account := range allAccounts {
+		if contract.GenesisAccounts[*accountIndex].Address == account.Address.Hex() {
+			myAccount = account
+			foundAccount = true
+			break
+		}
+	}
+
+	if !foundAccount {
+		fmt.Printf("Can't find the matching account key of account_index: %v.\n", *accountIndex)
+		os.Exit(4)
+	}
+
+	fmt.Printf("My Account: %s\n", myAccount.Address.Hex())
+	fmt.Printf("Key URL: %s\n", myAccount.URL)
+
+	if !*hmyNoPass {
+		myPass = utils.AskForPassphrase("Passphrase: ")
+		err := ks.Unlock(myAccount, myPass)
+		if err != nil {
+			fmt.Printf("Wrong Passphrase! Unable to unlock account key!\n")
+			os.Exit(3)
+		}
+		hmykey.SetHmyPass(myPass)
 	}
 }
 
@@ -147,25 +197,19 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	nodeConfig.ShardID = myShardID
 
 	// Key Setup ================= [Start]
-	// Staking private key is the ecdsa key used for token related transaction signing (especially the staking txs).
-	stakingPriKey := ""
 	consensusPriKey := &bls.SecretKey{}
+
 	if *isGenesis {
-		stakingPriKey = contract.GenesisAccounts[*accountIndex].Private
 		err := consensusPriKey.SetHexString(contract.GenesisBLSAccounts[*accountIndex].Private)
 		if err != nil {
 			panic(fmt.Errorf("generate key error"))
 		}
 	} else {
-		// TODO: let user specify the ECDSA key
-		stakingPriKey = contract.NewNodeAccounts[*accountIndex].Private
-		// TODO: use user supplied key
 		err := consensusPriKey.SetHexString(contract.GenesisBLSAccounts[200+*accountIndex].Private) // TODO: use separate bls accounts for this.
 		if err != nil {
 			panic(fmt.Errorf("generate key error"))
 		}
 	}
-	nodeConfig.StakingPriKey = node.StoreStakingKeyFromFile(*stakingKeyFile, stakingPriKey)
 
 	// P2p private key is used for secure message transfer between p2p nodes.
 	nodeConfig.P2pPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
@@ -226,9 +270,9 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	// Current node.
 	currentNode := node.New(nodeConfig.Host, currentConsensus, nodeConfig.MainDB, *isArchival)
 	currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
-	currentNode.AccountKey = nodeConfig.StakingPriKey
+	currentNode.StakingAccount = myAccount
 	utils.GetLogInstance().Info("node account set",
-		"address", crypto.PubkeyToAddress(currentNode.AccountKey.PublicKey))
+		"address", currentNode.StakingAccount.Address.Hex())
 
 	if gsif, err := consensus.NewGenesisStakeInfoFinder(); err == nil {
 		currentConsensus.SetStakeInfoFinder(gsif)
