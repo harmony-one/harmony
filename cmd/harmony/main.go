@@ -10,7 +10,6 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -166,6 +165,7 @@ func initSetup() {
 			fmt.Printf("Wrong Passphrase! Unable to unlock account key!\n")
 			os.Exit(3)
 		}
+		hmykey.SetHmyPass(myPass)
 	}
 }
 
@@ -197,25 +197,19 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	nodeConfig.ShardID = myShardID
 
 	// Key Setup ================= [Start]
-	// Staking private key is the ecdsa key used for token related transaction signing (especially the staking txs).
-	stakingPriKey := ""
 	consensusPriKey := &bls.SecretKey{}
+
 	if *isGenesis {
-		stakingPriKey = contract.GenesisAccounts[*accountIndex].Private
 		err := consensusPriKey.SetHexString(contract.GenesisBLSAccounts[*accountIndex].Private)
 		if err != nil {
 			panic(fmt.Errorf("generate key error"))
 		}
 	} else {
-		// TODO: let user specify the ECDSA key
-		stakingPriKey = contract.NewNodeAccounts[*accountIndex].Private
-		// TODO: use user supplied key
 		err := consensusPriKey.SetHexString(contract.GenesisBLSAccounts[200+*accountIndex].Private) // TODO: use separate bls accounts for this.
 		if err != nil {
 			panic(fmt.Errorf("generate key error"))
 		}
 	}
-	nodeConfig.StakingPriKey = node.StoreStakingKeyFromFile(*stakingKeyFile, stakingPriKey)
 
 	// P2p private key is used for secure message transfer between p2p nodes.
 	nodeConfig.P2pPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
@@ -276,9 +270,9 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	// Current node.
 	currentNode := node.New(nodeConfig.Host, currentConsensus, nodeConfig.MainDB, *isArchival)
 	currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
-	currentNode.AccountKey = nodeConfig.StakingPriKey
+	currentNode.StakingAccount = myAccount
 	utils.GetLogInstance().Info("node account set",
-		"address", crypto.PubkeyToAddress(currentNode.AccountKey.PublicKey))
+		"address", currentNode.StakingAccount.Address.Hex())
 
 	if gsif, err := consensus.NewGenesisStakeInfoFinder(); err == nil {
 		currentConsensus.SetStakeInfoFinder(gsif)
