@@ -17,6 +17,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/internal/utils/contract"
@@ -100,8 +101,6 @@ type Consensus struct {
 	// the publickey of leader
 	LeaderPubKey *bls.PublicKey
 
-	// Whether I am leader. False means I am validator
-	IsLeader bool
 	// Leader or validator address in hex
 	SelfAddress common.Address
 	// Consensus Id (View Id) - 4 byte
@@ -204,9 +203,9 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 
 	selfPeer := host.GetSelfPeer()
 	if leader.Port == selfPeer.Port && leader.IP == selfPeer.IP {
-		consensus.IsLeader = true
+		nodeconfig.GetDefaultConfig().SetIsLeader(true)
 	} else {
-		consensus.IsLeader = false
+		nodeconfig.GetDefaultConfig().SetIsLeader(false)
 	}
 
 	consensus.leader = leader
@@ -257,7 +256,7 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 	// For validators to keep track of all blocks received but not yet committed, so as to catch up to latest consensus if lagged behind.
 	consensus.blocksReceived = make(map[uint32]*BlockConsensusStatus)
 
-	if consensus.IsLeader {
+	if nodeconfig.GetDefaultConfig().IsLeader() {
 		consensus.ReadySignal = make(chan struct{})
 		// send a signal to indicate it's ready to run consensus
 		// this signal is consumed by node object to create a new block and in turn trigger a new consensus on it

@@ -14,6 +14,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
@@ -638,7 +639,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 
 // Start waits for the next new block and run consensus
 func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan struct{}, stoppedChan chan struct{}, startChannel chan struct{}) {
-	if consensus.IsLeader {
+	if nodeconfig.GetDefaultConfig().IsLeader() {
 		<-startChannel
 	}
 	go func() {
