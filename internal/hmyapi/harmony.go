@@ -6,17 +6,16 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/harmony-one/harmony/api/proto"
-	"github.com/harmony-one/harmony/core"
 )
 
 // PublicHarmonyAPI provides an API to access Harmony related information.
 // It offers only methods that operate on public data that is freely available to anyone.
 type PublicHarmonyAPI struct {
-	b *core.HmyAPIBackend
+	b Backend
 }
 
 // NewPublicHarmonyAPI ...
-func NewPublicHarmonyAPI(b *core.HmyAPIBackend) *PublicHarmonyAPI {
+func NewPublicHarmonyAPI(b Backend) *PublicHarmonyAPI {
 	return &PublicHarmonyAPI{b}
 }
 

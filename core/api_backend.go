@@ -5,24 +5,35 @@ import (
 	"errors"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/accounts"
+	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 )
 
-// HmyAPIBackend ...
+// HmyAPIBackend An implementation of Backend. Full client.
 type HmyAPIBackend struct {
 	blockchain     *BlockChain
 	txPool         *TxPool
 	accountManager *accounts.Manager
+	eventMux       *event.TypeMux
+
+	bloomIndexer *core.ChainIndexer // Bloom indexer operating during block imports
 }
 
 // NewBackend ...
-func NewBackend(blockchain *BlockChain, txPool *TxPool, accountManager *accounts.Manager) *HmyAPIBackend {
-	return &HmyAPIBackend{blockchain, txPool, accountManager}
+func NewBackend(blockchain *BlockChain, txPool *TxPool, accountManager *accounts.Manager, eventMux *event.TypeMux) *HmyAPIBackend {
+	return &HmyAPIBackend{
+		blockchain:     blockchain,
+		txPool:         txPool,
+		accountManager: accountManager,
+		eventMux:       eventMux,
+	}
 }
 
 // ChainDb ...
@@ -109,4 +120,18 @@ func (b *HmyAPIBackend) AccountManager() *accounts.Manager {
 // GetReceipts ...
 func (b *HmyAPIBackend) GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error) {
 	return b.blockchain.GetReceiptsByHash(hash), nil
+}
+
+// EventMux ...
+func (b *HmyAPIBackend) EventMux() *event.TypeMux { return b.eventMux }
+
+// BloomStatus ...
+func (b *HmyAPIBackend) BloomStatus() (uint64, uint64) {
+	sections, _, _ := b.bloomIndexer.Sections()
+	return params.BloomBitsBlocks, sections
+}
+
+// ProtocolVersion ...
+func (b *HmyAPIBackend) ProtocolVersion() int {
+	return proto.ProtocolVersion
 }
