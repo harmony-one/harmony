@@ -39,7 +39,8 @@ func (gi *genesisInitializer) InitChainDB(db ethdb.Database, shardID uint32) err
 	shardState := core.GetInitShardState()
 	if shardID != 0 {
 		// store only the local shard
-		if c := shardState.FindCommitteeByID(shardID); c == nil {
+		c := shardState.FindCommitteeByID(shardID)
+		if c == nil {
 			return errors.New("cannot find local shard in genesis")
 		}
 		shardState = types.ShardState{*c}

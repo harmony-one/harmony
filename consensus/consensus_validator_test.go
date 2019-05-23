@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"encoding/hex"
+	"math/big"
 	"testing"
 	"time"
 
@@ -46,6 +47,10 @@ func (MockChainReader) GetHeaderByHash(hash common.Hash) *types.Header {
 // GetBlock retrieves a block from the database by hash and number.
 func (MockChainReader) GetBlock(hash common.Hash, number uint64) *types.Block {
 	return &types.Block{}
+}
+
+func (MockChainReader) ReadShardState(epoch *big.Int) (types.ShardState, error) {
+    return nil, nil
 }
 
 func TestProcessMessageValidatorAnnounce(test *testing.T) {
