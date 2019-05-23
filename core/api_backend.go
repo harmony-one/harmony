@@ -15,14 +15,16 @@ import (
 
 // HmyAPIBackend ...
 type HmyAPIBackend struct {
-	blockchain     *BlockChain
-	txPool         *TxPool
-	accountManager *accounts.Manager
+	blockchain *BlockChain
+	// TODO: will need to refator to remove txPool as we are not using it in our blockchain.
+	txPool                *TxPool
+	accountManager        *accounts.Manager
+	addPendingTransaction func(newTx *types.Transaction)
 }
 
 // NewBackend ...
-func NewBackend(blockchain *BlockChain, txPool *TxPool, accountManager *accounts.Manager) *HmyAPIBackend {
-	return &HmyAPIBackend{blockchain, txPool, accountManager}
+func NewBackend(blockchain *BlockChain, txPool *TxPool, accountManager *accounts.Manager, addPendingTransaction func(newTx *types.Transaction)) *HmyAPIBackend {
+	return &HmyAPIBackend{blockchain, txPool, accountManager, addPendingTransaction}
 }
 
 // ChainDb ...
@@ -88,7 +90,8 @@ func (b *HmyAPIBackend) GetPoolNonce(ctx context.Context, addr common.Address) (
 
 // SendTx ...
 func (b *HmyAPIBackend) SendTx(ctx context.Context, signedTx *types.Transaction) error {
-	return b.txPool.Add(ctx, signedTx)
+	b.addPendingTransaction(signedTx)
+	return nil
 }
 
 // ChainConfig ...

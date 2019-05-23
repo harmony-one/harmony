@@ -694,7 +694,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (bool, error) {
 // Add adds a transaction to the pool if valid and passes it to the tx relay
 // backend
 func (pool *TxPool) Add(ctx context.Context, tx *types.Transaction) error {
-	// TODO(ricl): placeholder
+	// As of now, we are not using tx_pool.
 	return nil
 }
 
