@@ -70,7 +70,7 @@ func (pk *BlsPublicKey) ToLibBLSPublicKey(key *bls.PublicKey) error {
 // CompareBlsPublicKey compares two BlsPublicKey, lexicographically.
 func CompareBlsPublicKey(k1, k2 BlsPublicKey) int {
 	return bytes.Compare(k1[:], k2[:])
-	}
+}
 
 // NodeID represents node id (BLS address).
 type NodeID struct {
