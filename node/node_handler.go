@@ -256,9 +256,9 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 	//  e.g. "child.Number == child.IsGenesis() ? 0 : parent.Number+1"?
 	err := node.Blockchain().ValidateNewBlock(newBlock, pki.GetAddressFromPublicKey(node.SelfPeer.ConsensusPubKey))
 	if err != nil {
-		return ctxerror.New("failed to ValidateNewBlock",
+		return ctxerror.New("cannot ValidateNewBlock",
 			"blockHash", newBlock.Hash(),
-			"tx", newBlock.Transactions()[0],
+			"numTx", len(newBlock.Transactions()),
 		).WithCause(err)
 	}
 
