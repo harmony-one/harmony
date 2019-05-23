@@ -48,7 +48,7 @@ func main() {
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	keyFile := flag.String("key", "./.bnkey", "the private key file of the bootnode")
 	versionFlag := flag.Bool("version", false, "Output version info")
-	verbosity := flag.Int("verbosity", 3, "Logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail (default: 3)")
+	verbosity := flag.Int("verbosity", 5, "Logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail (default: 5)")
 
 	flag.Parse()
 
