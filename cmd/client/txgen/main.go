@@ -68,6 +68,8 @@ var (
 	shardIDFlag       = flag.Int("shardID", 0, "The shardID the node belongs to.")
 	// Key file to store the private key
 	keyFile = flag.String("key", "./.txgenkey", "the private key file of the txgen")
+	// logging verbosity
+	verbosity = flag.Int("verbosity", 5, "Logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail (default: 5)")
 )
 
 func setUpTXGen() *node.Node {
@@ -126,7 +128,8 @@ func main() {
 	// Add GOMAXPROCS to achieve max performance.
 	runtime.GOMAXPROCS(1024)
 	// Logging setup
-	utils.SetPortAndIP(*port, *ip)
+	utils.SetLogContext(*port, *ip)
+	utils.SetLogVerbosity(log.Lvl(*verbosity))
 	if len(utils.BootNodes) == 0 {
 		bootNodeAddrs, err := utils.StringsToAddrs(utils.DefaultBootNodeAddrStrings)
 		if err != nil {

@@ -3,34 +3,57 @@
 package utils
 
 import (
+	"io"
+	"os"
 	"sync"
 	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/log"
 )
 
-// Global Port and IP for logging.
 var (
-	Port string
-	IP   string
+	// Validator ID
+	validatorIDInstance      *UniqueValidatorID
+	onceForUniqueValidatorID sync.Once
+	// Global port and ip for logging.
+	port string
+	ip   string
+	// Logging
+	logInstance  log.Logger
+	glogger      *log.GlogHandler // top-level handler
+	logHandlers  []log.Handler    // sub handlers of glogger
+	logVerbosity log.Lvl
+	onceForLog   sync.Once
 )
 
-// SetPortAndIP used to print out loggings of node with Port and IP.
+// SetLogContext used to print out loggings of node with port and ip.
 // Every instance (node, txgen, etc..) needs to set this for logging.
-func SetPortAndIP(port, ip string) {
-	Port = port
-	IP = ip
+func SetLogContext(_port, _ip string) {
+	port = _port
+	ip = _ip
+}
+
+// SetLogVerbosity specifies the verbosity of global logger
+func SetLogVerbosity(verbosity log.Lvl) {
+	logVerbosity = verbosity
+	if glogger != nil {
+		glogger.Verbosity(logVerbosity)
+	}
+}
+
+// AddLogHandler add a log handler
+func AddLogHandler(handler log.Handler) {
+	logHandlers = append(logHandlers, handler)
+	if glogger != nil {
+		multiHandler := log.MultiHandler(logHandlers...)
+		glogger.SetHandler(multiHandler)
+	}
 }
 
 // UniqueValidatorID defines the structure of unique validator ID
 type UniqueValidatorID struct {
 	uniqueID uint32
 }
-
-var validatorIDInstance *UniqueValidatorID
-var logInstance log.Logger
-var onceForUniqueValidatorID sync.Once
-var onceForLog sync.Once
 
 // GetUniqueValidatorIDInstance returns a singleton instance
 func GetUniqueValidatorIDInstance() *UniqueValidatorID {
@@ -50,7 +73,14 @@ func (s *UniqueValidatorID) GetUniqueID() uint32 {
 // GetLogInstance returns logging singleton.
 func GetLogInstance() log.Logger {
 	onceForLog.Do(func() {
-		logInstance = log.New("port", Port, "ip", IP)
+		ostream := log.StreamHandler(io.Writer(os.Stdout), log.TerminalFormat(false))
+		logHandlers = append(logHandlers, ostream)
+		multiHandler := log.MultiHandler(logHandlers...)
+		glogger = log.NewGlogHandler(multiHandler)
+		glogger.Verbosity(logVerbosity)
+		logInstance = log.New("port", port, "ip", ip)
+		logInstance.SetHandler(glogger)
+		log.Root().SetHandler(glogger)
 	})
 	return logInstance
 }

@@ -30,6 +30,11 @@ func GetAPIs(b *core.HmyAPIBackend) []rpc.API {
 			Version:   "1.0",
 			Service:   NewPublicAccountAPI(b.AccountManager()),
 			Public:    true,
+		}, {
+			Namespace: "hmy",
+			Version:   "1.0",
+			Service:   NewDebugAPI(b),
+			Public:    true, // FIXME: change to false once IPC implemented
 		},
 	}
 }
