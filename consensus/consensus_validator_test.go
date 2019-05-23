@@ -50,7 +50,7 @@ func (MockChainReader) GetBlock(hash common.Hash, number uint64) *types.Block {
 }
 
 func (MockChainReader) ReadShardState(epoch *big.Int) (types.ShardState, error) {
-    return nil, nil
+	return nil, nil
 }
 
 func TestProcessMessageValidatorAnnounce(test *testing.T) {
