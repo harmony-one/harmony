@@ -29,7 +29,9 @@ type Collection interface {
 	Close() error
 }
 
-type collection struct {
+// CollectionImpl is the main implementation of the shard chain collection.
+// See the Collection interface for details.
+type CollectionImpl struct {
 	dbFactory DBFactory
 	dbInit    DBInitializer
 	engine    engine.Engine
@@ -37,10 +39,16 @@ type collection struct {
 	pool      map[uint32]*core.BlockChain
 }
 
+// NewCollection creates and returns a new shard chain collection.
+//
+// dbFactory is the shard chain database factory to use.
+//
+// dbInit is the shard chain initializer to use when the database returned by
+// the factory is brand new (empty).
 func NewCollection(
 	dbFactory DBFactory, dbInit DBInitializer, engine engine.Engine,
-) *collection {
-	return &collection{
+) *CollectionImpl {
+	return &CollectionImpl{
 		dbFactory: dbFactory,
 		dbInit:    dbInit,
 		engine:    engine,
@@ -50,7 +58,7 @@ func NewCollection(
 
 // ShardChain returns the blockchain for the given shard,
 // opening one as necessary.
-func (sc *collection) ShardChain(shardID uint32) (*core.BlockChain, error) {
+func (sc *CollectionImpl) ShardChain(shardID uint32) (*core.BlockChain, error) {
 	sc.mtx.Lock()
 	defer sc.mtx.Unlock()
 	if bc, ok := sc.pool[shardID]; ok {
@@ -96,7 +104,7 @@ func (sc *collection) ShardChain(shardID uint32) (*core.BlockChain, error) {
 }
 
 // CloseShardChain closes the given shard chain.
-func (sc *collection) CloseShardChain(shardID uint32) error {
+func (sc *CollectionImpl) CloseShardChain(shardID uint32) error {
 	sc.mtx.Lock()
 	defer sc.mtx.Unlock()
 	bc, ok := sc.pool[shardID]
@@ -112,7 +120,7 @@ func (sc *collection) CloseShardChain(shardID uint32) error {
 }
 
 // Close closes all shard chains.
-func (sc *collection) Close() error {
+func (sc *CollectionImpl) Close() error {
 	newPool := make(map[uint32]*core.BlockChain)
 	sc.mtx.Lock()
 	oldPool := sc.pool

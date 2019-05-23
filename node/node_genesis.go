@@ -41,9 +41,8 @@ func (gi *genesisInitializer) InitChainDB(db ethdb.Database, shardID uint32) err
 		// store only the local shard
 		if c := shardState.FindCommitteeByID(shardID); c == nil {
 			return errors.New("cannot find local shard in genesis")
-		} else {
-			shardState = types.ShardState{*c}
 		}
+		shardState = types.ShardState{*c}
 	}
 	if err := rawdb.WriteShardState(db, common.Big0, shardState); err != nil {
 		return ctxerror.New("cannot store epoch shard state").WithCause(err)
@@ -54,7 +53,7 @@ func (gi *genesisInitializer) InitChainDB(db ethdb.Database, shardID uint32) err
 	return nil
 }
 
-// GenesisBlockSetup setups a genesis blockchain.
+// SetupGenesisBlock sets up a genesis blockchain.
 func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32) error {
 	utils.GetLogger().Info("setting up a brand new chain database",
 		"shardID", shardID)
