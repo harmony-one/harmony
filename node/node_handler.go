@@ -676,7 +676,7 @@ func (node *Node) epochShardStateMessageHandler(msgPayload []byte) error {
 	receivedEpoch := big.NewInt(int64(epochShardState.Epoch))
 	getLogger().Info("received new shard state", "epoch", receivedEpoch)
 	node.nextShardState.master = epochShardState
-	if node.Consensus.IsLeader {
+	if node.NodeConfig.IsLeader() {
 		// Wait a bit to allow the master table to reach other validators.
 		node.nextShardState.proposeTime = time.Now().Add(5 * time.Second)
 	} else {
@@ -702,7 +702,7 @@ func (node *Node) transitionIntoNextEpoch(shardState types.ShardState) {
 	logger = logger.New(
 		"blsPubKey", hex.EncodeToString(node.Consensus.PubKey.Serialize()),
 		"curShard", node.Blockchain().ShardID(),
-		"curLeader", node.Consensus.IsLeader)
+		"curLeader", node.NodeConfig.IsLeader())
 	for _, c := range shardState {
 		logger.Debug("new shard information",
 			"shardID", c.ShardID,
