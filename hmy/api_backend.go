@@ -1,25 +1,26 @@
-package core
+package hmy
 
 import (
 	"context"
 	"errors"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/bloombits"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/api/proto"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 )
 
 // HmyAPIBackend An implementation of Backend. Full client.
 type HmyAPIBackend struct {
-	blockchain     *BlockChain
-	txPool         *TxPool
+	blockchain     *core.BlockChain
+	txPool         *core.TxPool
 	accountManager *accounts.Manager
 	eventMux       *event.TypeMux
 
@@ -134,4 +135,47 @@ func (b *HmyAPIBackend) BloomStatus() (uint64, uint64) {
 // ProtocolVersion ...
 func (b *HmyAPIBackend) ProtocolVersion() int {
 	return proto.ProtocolVersion
+}
+
+// Filter related APIs
+
+// GetLogs ...
+func (b *HmyAPIBackend) GetLogs(ctx context.Context, blockHash common.Hash) ([][]*types.Log, error) {
+	// TODO(ricl): implement
+	return nil, nil
+}
+
+// HeaderByHash ...
+func (b *HmyAPIBackend) HeaderByHash(ctx context.Context, blockHash common.Hash) (*types.Header, error) {
+	// TODO(ricl): implement
+	return nil, nil
+}
+
+// ServiceFilter ...
+func (b *HmyAPIBackend) ServiceFilter(ctx context.Context, session *bloombits.MatcherSession) {
+	// TODO(ricl): implement
+}
+
+// SubscribeNewTxsEvent ...
+func (b *HmyAPIBackend) SubscribeNewTxsEvent(chan<- core.NewTxsEvent) event.Subscription {
+	// TODO(ricl): implement
+	return nil
+}
+
+// SubscribeChainEvent ...
+func (b *HmyAPIBackend) SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription {
+	// TODO(ricl): implement
+	return nil
+}
+
+// SubscribeRemovedLogsEvent ...
+func (b *HmyAPIBackend) SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) event.Subscription {
+	// TODO(ricl): implement
+	return nil
+}
+
+// SubscribeLogsEvent ...
+func (b *HmyAPIBackend) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription {
+	// TODO(ricl): implement
+	return nil
 }

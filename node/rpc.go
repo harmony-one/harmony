@@ -6,10 +6,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/hmyapi"
+	"github.com/harmony-one/harmony/internal/hmyapi/filters"
 )
 
 const (
@@ -42,9 +44,11 @@ var (
 // StartRPC start RPC service
 func (node *Node) StartRPC(nodePort string) error {
 	// Gather all the possible APIs to surface
-	apiBackend = core.NewBackend(node.blockchain, node.TxPool, node.accountManager)
+	apiBackend = core.NewBackend(node.blockchain, node.TxPool, node.accountManager, new(event.TypeMux))
 
+	// TODO(ricl): add another layer corresponding to eth and les.
 	apis := hmyapi.GetAPIs(apiBackend)
+
 	for _, service := range node.serviceManager.GetServices() {
 		apis = append(apis, service.APIs()...)
 	}
@@ -130,4 +134,23 @@ func (node *Node) stopWS() {
 		wsHandler.Stop()
 		wsHandler = nil
 	}
+}
+
+// APIs return the collection of RPC services the ethereum package offers.
+// NOTE, some of these services probably need to be moved to somewhere else.
+func (node *Node) APIs() []rpc.API {
+	// Gather all the possible APIs to surface
+	apiBackend = core.NewBackend(node.blockchain, node.TxPool, node.accountManager, new(event.TypeMux))
+
+	apis := hmyapi.GetAPIs(apiBackend)
+
+	// Append all the local APIs and return
+	return append(apis, []rpc.API{
+		{
+			Namespace: "eth",
+			Version:   "1.0",
+			Service:   filters.NewPublicFilterAPI(apiBackend, false),
+			Public:    true,
+		},
+	}...)
 }
