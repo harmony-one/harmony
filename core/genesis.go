@@ -240,7 +240,7 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 	head := &types.Header{
 		Number:         new(big.Int).SetUint64(g.Number),
 		Nonce:          types.EncodeNonce(g.Nonce),
-		ShardID:        types.EncodeShardID(g.ShardID),
+		ShardID:        g.ShardID,
 		Time:           new(big.Int).SetUint64(g.Timestamp),
 		ParentHash:     g.ParentHash,
 		Extra:          g.ExtraData,
