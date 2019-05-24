@@ -71,7 +71,7 @@ func (b *BlockGen) SetNonce(nonce types.BlockNonce) {
 }
 
 // SetShardID sets the shardID field of the generated block.
-func (b *BlockGen) SetShardID(shardID types.ShardID) {
+func (b *BlockGen) SetShardID(shardID uint32) {
 	b.header.ShardID = shardID
 }
 

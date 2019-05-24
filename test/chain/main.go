@@ -350,7 +350,7 @@ func main() {
 	if n > 0 {
 		blocks, _ := core.GenerateChain(chainConfig, genesis, consensus.NewFaker(), database, n, func(i int, gen *core.BlockGen) {
 			gen.SetCoinbase(FaucetAddress)
-			gen.SetShardID(types.EncodeShardID(0))
+			gen.SetShardID(0)
 			gen.AddTx(pendingTxs[i])
 		})
 		if _, err := chain.InsertChain(blocks); err != nil {
