@@ -285,10 +285,13 @@ func accumulateRewards(
 		// Epoch block has no parent to reward.
 		return nil
 	}
-	parentHeader := bc.GetHeaderByNumber(blockNum - 1)
+	// TODO ek – retrieving by parent number (blockNum - 1) doesn't work,
+	//  while it is okay with hash.  Sounds like DB inconsistency.
+	//  Figure out why.
+	parentHeader := bc.GetHeaderByHash(header.ParentHash)
 	if parentHeader == nil {
 		return ctxerror.New("cannot find parent block header in DB",
-			"parentBlockNumber", blockNum-1)
+			"parentHash", header.ParentHash)
 	}
 	if parentHeader.Number.Cmp(common.Big0) == 0 {
 		// Parent is an epoch block,
