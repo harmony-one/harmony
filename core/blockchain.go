@@ -1079,8 +1079,11 @@ func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 	bc.PostChainEvents(events, logs)
 	// TODO ek – make this a post-chain event
 	if err == nil {
-		for _, block := range chain {
+		for idx, block := range chain {
 			header := block.Header()
+			header.Logger(utils.GetLogger()).Info("added block to chain",
+				"segmentIndex", idx,
+				"parentHash", header.ParentHash)
 			if header.ShardStateHash != (common.Hash{}) {
 				epoch := new(big.Int).Add(header.Epoch, common.Big1)
 				err = bc.WriteShardState(epoch, header.ShardState)
