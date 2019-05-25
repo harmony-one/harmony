@@ -42,6 +42,7 @@
 * [x] hmy_getTransactionByBlockHashAndIndex  - get transaction object of block by block hash and index number
 * [x] hmy_getTransactionByBlockNumberAndIndex - get transaction object of block by block number and index number
 * [ ] hmy_sign - sign message using node specific sign method.
+* [ ] hmy_pendingTransactions - returns the pending transactions list.
 
 ### Contract related
 * [ ] hmy_call - call contract method 
@@ -53,14 +54,13 @@
 * ~~[ ] hmy_compileSerpent~~ - DEPRECATED
 
 ### Subscribes
-* [ ] hmy_pendingTransactions - pending transaction subscriber
 * [ ] hmy_getLogs - log subscriber
-* [ ] hmy_newFilter -  creates a filter object, based on filter options
+* [x] hmy_newFilter -  creates a filter object, based on filter options
 * [x] hmy_newBlockFilter - creates a filter in the node, to notify when a new block arrives
 * [x] hmy_newPendingTransactionFilter - creates a filter in the node, to notify when new pending transactions arrive
 * [ ] hmy_getFilterChanges - polling method for a filter
 * [ ] hmy_getFilterLogs - returns an array of all logs matching filter with given id.
-* [ ] hmy_uninstallFilter - uninstalls a filter with given id
+* [x] hmy_uninstallFilter - uninstalls a filter with given id
 
 
 ### Others, not very important for current stage of work

@@ -160,3 +160,16 @@ func (b *APIBackend) SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) 
 func (b *APIBackend) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription {
 	return b.hmy.BlockChain().SubscribeLogsEvent(ch)
 }
+
+// GetPoolTransactions ...
+func (b *APIBackend) GetPoolTransactions() (types.Transactions, error) {
+	pending, err := b.hmy.txPool.Pending()
+	if err != nil {
+		return nil, err
+	}
+	var txs types.Transactions
+	for _, batch := range pending {
+		txs = append(txs, batch...)
+	}
+	return txs, nil
+}
