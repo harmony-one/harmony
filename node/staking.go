@@ -1,10 +1,8 @@
 package node
 
 import (
-	"crypto/ecdsa"
 	"encoding/hex"
 	"math/big"
-	"os"
 
 	"github.com/harmony-one/harmony/core/types"
 
@@ -13,7 +11,6 @@ import (
 	"github.com/harmony-one/harmony/core"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/harmony-one/harmony/internal/utils"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -89,19 +86,4 @@ func decodeStakeCall(getData []byte) int64 {
 func decodeFuncSign(data []byte) string {
 	funcSign := hexutil.Encode(data[:funcSingatureBytes]) //The function signature is first 4 bytes of data in ethereum
 	return funcSign
-}
-
-// StoreStakingKeyFromFile load the staking private key and store it in local keyfile
-func StoreStakingKeyFromFile(keyfile string, priKey string) *ecdsa.PrivateKey {
-	// contract.FakeAccounts[0] gets minted tokens in genesis block of beacon chain.
-	key, err := crypto.HexToECDSA(priKey)
-	if err != nil {
-		utils.GetLogInstance().Error("Unable to get staking key")
-		os.Exit(1)
-	}
-	if err := crypto.SaveECDSA(keyfile, key); err != nil {
-		utils.GetLogInstance().Error("Unable to save the private key", "error", err)
-		os.Exit(1)
-	}
-	return key
 }
