@@ -17,19 +17,21 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 )
 
-// HmyAPIBackend An implementation of Backend. Full client.
-type HmyAPIBackend struct {
+// APIBackend An implementation of Backend. Full client.
+type APIBackend struct {
 	blockchain     *core.BlockChain
 	txPool         *core.TxPool
 	accountManager *accounts.Manager
 	eventMux       *event.TypeMux
 
+	hmy *Harmony
+
 	bloomIndexer *core.ChainIndexer // Bloom indexer operating during block imports
 }
 
 // NewBackend ...
-func NewBackend(blockchain *BlockChain, txPool *TxPool, accountManager *accounts.Manager, eventMux *event.TypeMux) *HmyAPIBackend {
-	return &HmyAPIBackend{
+func NewBackend(blockchain *core.BlockChain, txPool *core.TxPool, accountManager *accounts.Manager, eventMux *event.TypeMux) *APIBackend {
+	return &APIBackend{
 		blockchain:     blockchain,
 		txPool:         txPool,
 		accountManager: accountManager,
@@ -38,22 +40,22 @@ func NewBackend(blockchain *BlockChain, txPool *TxPool, accountManager *accounts
 }
 
 // ChainDb ...
-func (b *HmyAPIBackend) ChainDb() ethdb.Database {
-	return b.blockchain.db
+func (b *APIBackend) ChainDb() ethdb.Database {
+	return b.hmy.chainDb
 }
 
 // GetBlock ...
-func (b *HmyAPIBackend) GetBlock(ctx context.Context, hash common.Hash) (*types.Block, error) {
+func (b *APIBackend) GetBlock(ctx context.Context, hash common.Hash) (*types.Block, error) {
 	return b.blockchain.GetBlockByHash(hash), nil
 }
 
 // GetPoolTransaction ...
-func (b *HmyAPIBackend) GetPoolTransaction(hash common.Hash) *types.Transaction {
+func (b *APIBackend) GetPoolTransaction(hash common.Hash) *types.Transaction {
 	return b.txPool.Get(hash)
 }
 
 // BlockByNumber ...
-func (b *HmyAPIBackend) BlockByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Block, error) {
+func (b *APIBackend) BlockByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Block, error) {
 	// Pending block is only known by the miner
 	if blockNr == rpc.PendingBlockNumber {
 		return nil, errors.New("not implemented")
@@ -66,7 +68,7 @@ func (b *HmyAPIBackend) BlockByNumber(ctx context.Context, blockNr rpc.BlockNumb
 }
 
 // StateAndHeaderByNumber ...
-func (b *HmyAPIBackend) StateAndHeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*state.DB, *types.Header, error) {
+func (b *APIBackend) StateAndHeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*state.DB, *types.Header, error) {
 	// Pending state is only known by the miner
 	if blockNr == rpc.PendingBlockNumber {
 		return nil, nil, errors.New("not implemented")
@@ -81,7 +83,7 @@ func (b *HmyAPIBackend) StateAndHeaderByNumber(ctx context.Context, blockNr rpc.
 }
 
 // HeaderByNumber ...
-func (b *HmyAPIBackend) HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Header, error) {
+func (b *APIBackend) HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Header, error) {
 	// Pending block is only known by the miner
 	if blockNr == rpc.PendingBlockNumber {
 		return nil, errors.New("not implemented")
@@ -94,88 +96,88 @@ func (b *HmyAPIBackend) HeaderByNumber(ctx context.Context, blockNr rpc.BlockNum
 }
 
 // GetPoolNonce ...
-func (b *HmyAPIBackend) GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error) {
+func (b *APIBackend) GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error) {
 	return b.txPool.State().GetNonce(addr), nil
 }
 
 // SendTx ...
-func (b *HmyAPIBackend) SendTx(ctx context.Context, signedTx *types.Transaction) error {
+func (b *APIBackend) SendTx(ctx context.Context, signedTx *types.Transaction) error {
 	return b.txPool.Add(ctx, signedTx)
 }
 
 // ChainConfig ...
-func (b *HmyAPIBackend) ChainConfig() *params.ChainConfig {
-	return b.blockchain.chainConfig
+func (b *APIBackend) ChainConfig() *params.ChainConfig {
+	return b.hmy.blockchain.Config()
 }
 
 // CurrentBlock ...
-func (b *HmyAPIBackend) CurrentBlock() *types.Block {
+func (b *APIBackend) CurrentBlock() *types.Block {
 	return types.NewBlockWithHeader(b.blockchain.CurrentHeader())
 }
 
 // AccountManager ...
-func (b *HmyAPIBackend) AccountManager() *accounts.Manager {
+func (b *APIBackend) AccountManager() *accounts.Manager {
 	return b.accountManager
 }
 
 // GetReceipts ...
-func (b *HmyAPIBackend) GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error) {
+func (b *APIBackend) GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error) {
 	return b.blockchain.GetReceiptsByHash(hash), nil
 }
 
 // EventMux ...
-func (b *HmyAPIBackend) EventMux() *event.TypeMux { return b.eventMux }
+func (b *APIBackend) EventMux() *event.TypeMux { return b.eventMux }
 
 // BloomStatus ...
-func (b *HmyAPIBackend) BloomStatus() (uint64, uint64) {
+func (b *APIBackend) BloomStatus() (uint64, uint64) {
 	sections, _, _ := b.bloomIndexer.Sections()
 	return params.BloomBitsBlocks, sections
 }
 
 // ProtocolVersion ...
-func (b *HmyAPIBackend) ProtocolVersion() int {
+func (b *APIBackend) ProtocolVersion() int {
 	return proto.ProtocolVersion
 }
 
 // Filter related APIs
 
 // GetLogs ...
-func (b *HmyAPIBackend) GetLogs(ctx context.Context, blockHash common.Hash) ([][]*types.Log, error) {
+func (b *APIBackend) GetLogs(ctx context.Context, blockHash common.Hash) ([][]*types.Log, error) {
 	// TODO(ricl): implement
 	return nil, nil
 }
 
 // HeaderByHash ...
-func (b *HmyAPIBackend) HeaderByHash(ctx context.Context, blockHash common.Hash) (*types.Header, error) {
+func (b *APIBackend) HeaderByHash(ctx context.Context, blockHash common.Hash) (*types.Header, error) {
 	// TODO(ricl): implement
 	return nil, nil
 }
 
 // ServiceFilter ...
-func (b *HmyAPIBackend) ServiceFilter(ctx context.Context, session *bloombits.MatcherSession) {
+func (b *APIBackend) ServiceFilter(ctx context.Context, session *bloombits.MatcherSession) {
 	// TODO(ricl): implement
 }
 
 // SubscribeNewTxsEvent ...
-func (b *HmyAPIBackend) SubscribeNewTxsEvent(chan<- core.NewTxsEvent) event.Subscription {
+func (b *APIBackend) SubscribeNewTxsEvent(chan<- core.NewTxsEvent) event.Subscription {
 	// TODO(ricl): implement
 	return nil
 }
 
 // SubscribeChainEvent ...
-func (b *HmyAPIBackend) SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription {
+func (b *APIBackend) SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription {
 	// TODO(ricl): implement
 	return nil
 }
 
 // SubscribeRemovedLogsEvent ...
-func (b *HmyAPIBackend) SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) event.Subscription {
+func (b *APIBackend) SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) event.Subscription {
 	// TODO(ricl): implement
 	return nil
 }
 
 // SubscribeLogsEvent ...
-func (b *HmyAPIBackend) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription {
+func (b *APIBackend) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription {
 	// TODO(ricl): implement
 	return nil
 }

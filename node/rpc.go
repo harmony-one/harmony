@@ -9,7 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/internal/hmyapi"
 	"github.com/harmony-one/harmony/internal/hmyapi/filters"
 )
@@ -38,13 +38,13 @@ var (
 	wsModules = []string{"net", "web3"}
 	wsOrigins = []string{"*"}
 
-	apiBackend *core.HmyAPIBackend
+	apiBackend *hmy.APIBackend
 )
 
 // StartRPC start RPC service
 func (node *Node) StartRPC(nodePort string) error {
 	// Gather all the possible APIs to surface
-	apiBackend = core.NewBackend(node.blockchain, node.TxPool, node.accountManager, new(event.TypeMux))
+	apiBackend = hmy.NewBackend(node.blockchain, node.TxPool, node.accountManager, new(event.TypeMux))
 
 	// TODO(ricl): add another layer corresponding to eth and les.
 	apis := hmyapi.GetAPIs(apiBackend)
@@ -140,7 +140,7 @@ func (node *Node) stopWS() {
 // NOTE, some of these services probably need to be moved to somewhere else.
 func (node *Node) APIs() []rpc.API {
 	// Gather all the possible APIs to surface
-	apiBackend = core.NewBackend(node.blockchain, node.TxPool, node.accountManager, new(event.TypeMux))
+	apiBackend = hmy.NewBackend(node.blockchain, node.TxPool, node.accountManager, new(event.TypeMux))
 
 	apis := hmyapi.GetAPIs(apiBackend)
 

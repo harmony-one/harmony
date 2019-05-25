@@ -6,8 +6,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/accounts"
-	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/hmy"
 )
 
 // PrivateAccountAPI provides an API to access accounts managed by this node.
@@ -16,7 +16,7 @@ import (
 type PrivateAccountAPI struct {
 	am        *accounts.Manager
 	nonceLock *AddrLocker
-	b         *core.HmyAPIBackend
+	b         *hmy.APIBackend
 }
 
 // NewAccount will create a new account and returns the address for the new account.
