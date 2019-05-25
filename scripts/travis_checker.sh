@@ -68,6 +68,7 @@ then
 	then
 		echo "All generated files seem up to date."
 	else
+		echo "go generate FAILED!"
 		echo "go generate changed working tree contents!"
 		"${progdir}/print_file.sh" "${gogenerate_status_diff}" "git status diff"
 		ok=false
