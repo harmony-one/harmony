@@ -103,19 +103,5 @@ func StoreStakingKeyFromFile(keyfile string, priKey string) *ecdsa.PrivateKey {
 		utils.GetLogInstance().Error("Unable to save the private key", "error", err)
 		os.Exit(1)
 	}
-	// TODO(minhdoan): Enable this back.
-	// key, err := crypto.LoadECDSA(keyfile)
-	// if err != nil {
-	// 	GetLogInstance().Error("no key file. Let's create a staking private key")
-	// 	key, err = crypto.GenerateKey()
-	// 	if err != nil {
-	// 		GetLogInstance().Error("Unable to generate the private key")
-	// 		os.Exit(1)
-	// 	}
-	// 	if err = crypto.SaveECDSA(keyfile, key); err != nil {
-	// 		GetLogInstance().Error("Unable to save the private key", "error", err)
-	// 		os.Exit(1)
-	// 	}
-	// }
 	return key
 }
