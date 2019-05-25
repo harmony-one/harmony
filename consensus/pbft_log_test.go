@@ -52,7 +52,7 @@ func TestParsePbftMessage(t *testing.T) {
 }
 
 func TestGetMessagesByTypeSeqViewHash(t *testing.T) {
-	pbftMsg := PbftMessage{MessageType: msg_pb.MessageType_ANNOUNCE, SeqNum: 2, ConsensusID: 3, BlockHash: [32]byte{01, 02}}
+	pbftMsg := PbftMessage{MessageType: msg_pb.MessageType_ANNOUNCE, BlockNum: 2, ViewID: 3, BlockHash: [32]byte{01, 02}}
 	log := NewPbftLog()
 	log.AddMessage(&pbftMsg)
 
@@ -68,7 +68,7 @@ func TestGetMessagesByTypeSeqViewHash(t *testing.T) {
 }
 
 func TestHasMatchingAnnounce(t *testing.T) {
-	pbftMsg := PbftMessage{MessageType: msg_pb.MessageType_ANNOUNCE, SeqNum: 2, ConsensusID: 3, BlockHash: [32]byte{01, 02}}
+	pbftMsg := PbftMessage{MessageType: msg_pb.MessageType_ANNOUNCE, BlockNum: 2, ViewID: 3, BlockHash: [32]byte{01, 02}}
 	log := NewPbftLog()
 	log.AddMessage(&pbftMsg)
 	found := log.HasMatchingAnnounce(2, 3, [32]byte{01, 02})

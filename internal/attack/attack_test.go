@@ -18,9 +18,9 @@ func TestUpdateConsensusReady(t *testing.T) {
 	model := GetInstance()
 	model.NodeKilledByItSelf()
 
-	model.UpdateConsensusReady(model.ConsensusIDThreshold - 1)
+	model.UpdateConsensusReady(model.ViewIDThreshold - 1)
 	model.DelayResponse()
 
-	model.UpdateConsensusReady(model.ConsensusIDThreshold + 1)
+	model.UpdateConsensusReady(model.ViewIDThreshold + 1)
 	model.DelayResponse()
 }

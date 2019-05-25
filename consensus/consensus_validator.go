@@ -46,13 +46,13 @@ func (consensus *Consensus) processAnnounceMessage(message *msg_pb.Message) {
 
 	consensusMsg := message.GetConsensus()
 
-	consensusID := consensusMsg.ConsensusId
+	viewID := consensusMsg.ViewId
 	blockHash := consensusMsg.BlockHash
 	block := consensusMsg.Payload
 
 	// Add block to received block cache
 	consensus.mutex.Lock()
-	consensus.blocksReceived[consensusID] = &BlockConsensusStatus{block, consensus.state}
+	consensus.blocksReceived[viewID] = &BlockConsensusStatus{block, consensus.state}
 	consensus.mutex.Unlock()
 
 	copy(consensus.blockHash[:], blockHash[:])
@@ -97,7 +97,7 @@ func (consensus *Consensus) processPreparedMessage(message *msg_pb.Message) {
 
 	consensusMsg := message.GetConsensus()
 
-	consensusID := consensusMsg.ConsensusId
+	viewID := consensusMsg.ViewId
 	blockHash := consensusMsg.BlockHash
 	pubKey, err := bls_cosi.BytesToBlsPublicKey(consensusMsg.SenderPubkey)
 	if err != nil {
@@ -120,7 +120,7 @@ func (consensus *Consensus) processPreparedMessage(message *msg_pb.Message) {
 	//#### END Read payload data
 
 	// Update readyByConsensus for attack.
-	attack.GetInstance().UpdateConsensusReady(consensusID)
+	attack.GetInstance().UpdateConsensusReady(viewID)
 
 	if err := consensus.checkConsensusMessage(message, consensus.leader.ConsensusPubKey); err != nil {
 		utils.GetLogInstance().Debug("processPreparedMessage error", "error", err)
@@ -166,7 +166,7 @@ func (consensus *Consensus) processCommittedMessage(message *msg_pb.Message) {
 	utils.GetLogInstance().Warn("Received Committed Message", "ValidatorAddress", consensus.SelfAddress)
 
 	consensusMsg := message.GetConsensus()
-	consensusID := consensusMsg.ConsensusId
+	viewID := consensusMsg.ViewId
 	pubKey, err := bls_cosi.BytesToBlsPublicKey(consensusMsg.SenderPubkey)
 	if err != nil {
 		utils.GetLogInstance().Debug("Failed to deserialize BLS public key", "error", err)
@@ -187,7 +187,7 @@ func (consensus *Consensus) processCommittedMessage(message *msg_pb.Message) {
 	//#### END Read payload data
 
 	// Update readyByConsensus for attack.
-	attack.GetInstance().UpdateConsensusReady(consensusID)
+	attack.GetInstance().UpdateConsensusReady(viewID)
 
 	if err := consensus.checkConsensusMessage(message, consensus.leader.ConsensusPubKey); err != nil {
 		utils.GetLogInstance().Debug("processCommittedMessage error", "error", err)
@@ -225,12 +225,12 @@ func (consensus *Consensus) processCommittedMessage(message *msg_pb.Message) {
 	// The logic is to roll up to the latest blocks one by one to try catching up with the leader.
 	// but because of checkConsensusMessage, the catchup logic will never be used here
 	for {
-		val, ok := consensus.blocksReceived[consensus.consensusID]
+		val, ok := consensus.blocksReceived[consensus.viewID]
 		if ok {
-			delete(consensus.blocksReceived, consensus.consensusID)
+			delete(consensus.blocksReceived, consensus.viewID)
 
 			consensus.blockHash = [32]byte{}
-			consensus.consensusID = consensusID + 1 // roll up one by one, until the next block is not received yet.
+			consensus.viewID = viewID + 1 // roll up one by one, until the next block is not received yet.
 
 			var blockObj types.Block
 			err := rlp.DecodeBytes(val.block, &blockObj)
@@ -239,7 +239,7 @@ func (consensus *Consensus) processCommittedMessage(message *msg_pb.Message) {
 			}
 			// check block data (transactions
 			if err := consensus.VerifyHeader(consensus.ChainReader, blockObj.Header(), false); err != nil {
-				utils.GetLogInstance().Debug("[WARNING] Block content is not verified successfully", "consensusID", consensus.consensusID)
+				utils.GetLogInstance().Debug("[WARNING] Block content is not verified successfully", "viewID", consensus.viewID)
 				return
 			}
 

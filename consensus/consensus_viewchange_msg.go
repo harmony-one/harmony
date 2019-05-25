@@ -18,18 +18,18 @@ func (consensus *Consensus) constructViewChangeMessage() []byte {
 	}
 
 	vcMsg := message.GetViewchange()
-	vcMsg.ConsensusId = consensus.mode.GetConsensusID()
-	vcMsg.SeqNum = consensus.seqNum
+	vcMsg.ViewId = consensus.mode.GetViewID()
+	vcMsg.BlockNum = consensus.blockNum
 	// sender address
 	vcMsg.SenderPubkey = consensus.PubKey.Serialize()
 
 	// next leader key already updated
 	vcMsg.LeaderPubkey = consensus.LeaderPubKey.Serialize()
 
-	preparedMsgs := consensus.pbftLog.GetMessagesByTypeSeqHash(msg_pb.MessageType_PREPARED, consensus.seqNum, consensus.blockHash)
+	preparedMsgs := consensus.pbftLog.GetMessagesByTypeSeqHash(msg_pb.MessageType_PREPARED, consensus.blockNum, consensus.blockHash)
 
 	if len(preparedMsgs) > 1 {
-		utils.GetLogInstance().Warn("constructViewChangeMessage got more than 1 prepared message", "seqNum", consensus.seqNum, "consensusID", consensus.consensusID)
+		utils.GetLogInstance().Warn("constructViewChangeMessage got more than 1 prepared message", "blockNum", consensus.blockNum, "viewID", consensus.viewID)
 	}
 
 	var msgToSign []byte
@@ -65,8 +65,8 @@ func (consensus *Consensus) constructNewViewMessage() []byte {
 	}
 
 	vcMsg := message.GetViewchange()
-	vcMsg.ConsensusId = consensus.mode.GetConsensusID()
-	vcMsg.SeqNum = consensus.seqNum
+	vcMsg.ViewId = consensus.mode.GetViewID()
+	vcMsg.BlockNum = consensus.blockNum
 	// sender address
 	vcMsg.SenderPubkey = consensus.PubKey.Serialize()
 

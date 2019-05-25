@@ -17,5 +17,12 @@ const (
 	maxLogSize    uint32        = 1000
 )
 
-// NIL is the m2 type message
+const (
+	timeoutNormal     = "normal"
+	timeoutViewChange = "viewchange"
+)
+
+// NIL is the m2 type message, which suppose to be nil/empty, however
+// we cannot sign on empty message, instead we sign on some default "nil" message
+// to indicate there is no prepared message received when we start view change
 var NIL = []byte{0x01}

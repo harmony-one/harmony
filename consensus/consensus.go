@@ -43,8 +43,8 @@ type Consensus struct {
 	phase PbftPhase
 	// mode: indicate a node is in normal or viewchanging mode
 	mode PbftMode
-	// seqNum: the next blockNumber that PBFT is going to agree on, should be equal to the blockNumber of next block
-	seqNum uint64
+	// blockNum: the next blockNumber that PBFT is going to agree on, should be equal to the blockNumber of next block
+	blockNum uint64
 	// channel to receive consensus message
 	MsgChan chan []byte
 
@@ -62,8 +62,8 @@ type Consensus struct {
 	commitBitmap         *bls_cosi.Mask
 
 	// Commits collected from view change
-	bhpSigs          map[common.Address]*bls.Sign // signature on m1 type message
-	nilSigs          map[common.Address]*bls.Sign // signature on m2 type (i.e. nil) messages
+	bhpSigs          map[common.Address]*bls.Sign // bhpSigs: blockHashPreparedSigs is the signature on m1 type message
+	nilSigs          map[common.Address]*bls.Sign // nilSigs: there is no prepared message when view change, it's signature on m2 type (i.e. nil) messages
 	aggregatedBHPSig *bls.Sign
 	aggregatedNILSig *bls.Sign
 	bhpBitmap        *bls_cosi.Mask
@@ -99,7 +99,7 @@ type Consensus struct {
 	// Leader or validator address in hex
 	SelfAddress common.Address
 	// Consensus Id (View Id) - 4 byte
-	consensusID uint32 // TODO(chao): change it to uint64 or add overflow checking mechanism
+	viewID uint32 // TODO(chao): change it to uint64 or add overflow checking mechanism
 
 	// Blockhash - 32 byte
 	blockHash [32]byte
@@ -109,8 +109,8 @@ type Consensus struct {
 	blockHashes [][32]byte
 	// Shard Id which this node belongs to
 	ShardID uint32
-	// whether to ignore consensusID check
-	ignoreConsensusIDCheck bool
+	// whether to ignore viewID check
+	ignoreViewIDCheck bool
 
 	// global consensus mutex
 	mutex sync.Mutex
@@ -131,7 +131,7 @@ type Consensus struct {
 	VerifiedNewBlock chan *types.Block
 
 	// will trigger state syncing when consensus ID is low
-	ConsensusIDLowChan chan struct{}
+	ViewIDLowChan chan struct{}
 
 	// Channel for DRG protocol to send pRnd (preimage of randomness resulting from combined vrf randomnesses) to consensus. The first 32 bytes are randomness, the rest is for bitmap.
 	PRndChannel chan []byte
@@ -189,7 +189,7 @@ type BlockConsensusStatus struct {
 func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKey) (*Consensus, error) {
 	consensus := Consensus{}
 	consensus.host = host
-	consensus.ConsensusIDLowChan = make(chan struct{})
+	consensus.ViewIDLowChan = make(chan struct{})
 	consensus.ConsensusVersion = ConsensusVersion
 
 	// pbft related
@@ -221,9 +221,9 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 		consensus.PubKey = blsPriKey.GetPublicKey()
 	}
 
-	// consensusID has to be initialized as the height of the blockchain during initialization
+	// viewID has to be initialized as the height of the blockchain during initialization
 	// as it was displayed on explorer as Height right now
-	consensus.consensusID = 0
+	consensus.viewID = 0
 	consensus.ShardID = ShardID
 
 	consensus.MsgChan = make(chan []byte)

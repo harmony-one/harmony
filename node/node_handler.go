@@ -272,7 +272,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 	if node.Consensus.PubKey.IsEqual(node.Consensus.LeaderPubKey) {
 		node.BroadcastNewBlock(newBlock)
 	} else {
-		utils.GetLogInstance().Info("BINGO !!! Reached Consensus", "ConsensusID", node.Consensus.GetConsensusID())
+		utils.GetLogInstance().Info("BINGO !!! Reached Consensus", "ViewID", node.Consensus.GetViewID())
 	}
 
 	node.AddNewBlock(newBlock)
