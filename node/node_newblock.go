@@ -93,3 +93,67 @@ func (node *Node) addNewShardStateHash(block *types.Block) {
 		block.AddShardStateHash(shardHash)
 	}
 }
+
+// WaitForConsensusReadyv2 listen for the readiness signal from consensus and generate new block for consensus.
+// only leader will receive the ready signal
+func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan chan struct{}, stoppedChan chan struct{}) {
+	go func() {
+		// Setup stoppedChan
+		defer close(stoppedChan)
+
+		utils.GetLogInstance().Debug("Waiting for Consensus ready")
+		time.Sleep(30 * time.Second) // Wait for other nodes to be ready (test-only)
+
+		firstTime := true
+		for {
+			// keep waiting for Consensus ready
+			select {
+			case <-stopChan:
+				utils.GetLogInstance().Debug("Consensus propose new block: STOPPED!")
+				return
+
+			case <-readySignal:
+				firstTry := true
+				for {
+					if !firstTry {
+						time.Sleep(PeriodicBlock)
+					}
+					firstTry = false
+					// threshold and firstTime are for the test-only built-in smart contract tx.
+					// TODO: remove in production
+					threshold := DefaultThreshold
+					if firstTime {
+						threshold = FirstTimeThreshold
+						firstTime = false
+					}
+					if len(node.pendingTransactions) < threshold {
+						continue
+					}
+					// Normal tx block consensus
+					selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
+					if len(selectedTxs) == 0 {
+						continue
+					}
+					utils.GetLogInstance().Debug("PROPOSING NEW BLOCK ------------------------------------------------", "blockNum", node.blockchain.CurrentBlock().NumberU64()+1, "threshold", threshold, "selectedTxs", len(selectedTxs))
+					node.Worker.CommitTransactions(selectedTxs)
+					block, err := node.Worker.Commit()
+					if err != nil {
+						utils.GetLogInstance().Debug("Failed committing new block", "Error", err)
+						continue
+					}
+					if node.Consensus.ShardID == 0 {
+						// add new shard state if it's epoch block
+						// TODO: bug fix - the stored shard state between here and PostConsensusProcessing are different.
+						//node.addNewShardStateHash(block)
+					}
+					newBlock := block
+					utils.GetLogInstance().Debug("Successfully proposed new block", "blockNum", block.NumberU64(), "numTxs", block.Transactions().Len())
+
+					// Send the new block to Consensus so it can be confirmed.
+					node.BlockChannel <- newBlock
+					break
+				}
+			}
+		}
+	}()
+}

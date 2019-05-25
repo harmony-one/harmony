@@ -45,20 +45,10 @@ var (
 // out on a block.
 type BlockNonce [8]byte
 
-// ShardID is a 32-bit id for the shard a block belongs to
-type ShardID [4]byte
-
 // EncodeNonce converts the given integer to a block nonce.
 func EncodeNonce(i uint64) BlockNonce {
 	var n BlockNonce
 	binary.BigEndian.PutUint64(n[:], i)
-	return n
-}
-
-// EncodeShardID converts the given integer to a shard id.
-func EncodeShardID(i uint32) ShardID {
-	var n ShardID
-	binary.BigEndian.PutUint32(n[:], i)
 	return n
 }
 
@@ -94,11 +84,11 @@ type Header struct {
 	MixDigest   common.Hash    `json:"mixHash"          gencodec:"required"`
 	Nonce       BlockNonce     `json:"nonce"            gencodec:"required"`
 	// Additional Fields
-	ShardID          ShardID     `json:"shardID"          gencodec:"required"`
-	PrepareSignature [48]byte    `json:"prepareSignature"        gencodec:"required"`
-	PrepareBitmap    []byte      `json:"prepareBitmap"           gencodec:"required"` // Contains which validator signed
-	CommitSignature  [48]byte    `json:"commitSignature"        gencodec:"required"`
-	CommitBitmap     []byte      `json:"commitBitmap"           gencodec:"required"` // Contains which validator signed
+	ShardID          uint32      `json:"shardID"          gencodec:"required"`
+	PrepareSignature [48]byte    `json:"prepareSignature" gencodec:"required"`
+	PrepareBitmap    []byte      `json:"prepareBitmap"    gencodec:"required"` // Contains which validator signed
+	CommitSignature  [48]byte    `json:"commitSignature"  gencodec:"required"`
+	CommitBitmap     []byte      `json:"commitBitmap"     gencodec:"required"` // Contains which validator signed
 	RandPreimage     [32]byte    `json:"randPreimage"`
 	RandSeed         [32]byte    `json:"randSeed"`
 	ShardStateHash   common.Hash `json:"shardStateRoot"`
@@ -345,7 +335,7 @@ func (b *Block) MixDigest() common.Hash { return b.header.MixDigest }
 func (b *Block) Nonce() uint64 { return binary.BigEndian.Uint64(b.header.Nonce[:]) }
 
 // ShardID is the header ShardID
-func (b *Block) ShardID() uint32 { return binary.BigEndian.Uint32(b.header.ShardID[:]) }
+func (b *Block) ShardID() uint32 { return b.header.ShardID }
 
 // Bloom returns header bloom.
 func (b *Block) Bloom() Bloom { return b.header.Bloom }

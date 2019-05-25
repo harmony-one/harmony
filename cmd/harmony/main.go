@@ -10,15 +10,17 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
 
+	"github.com/harmony-one/harmony/accounts"
+	"github.com/harmony-one/harmony/accounts/keystore"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/drand"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	hmykey "github.com/harmony-one/harmony/internal/keystore"
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/internal/utils/contract"
@@ -56,21 +58,23 @@ func printVersion(me string) {
 	os.Exit(0)
 }
 
-func loggingInit(logFolder, role, ip, port string, onlyLogTps bool) {
+func initLogFile(logFolder, role, ip, port string, onlyLogTps bool) {
 	// Setup a logger to stdout and log file.
-	logFileName := fmt.Sprintf("./%v/%s-%v-%v.log", logFolder, role, ip, port)
-	h := log.MultiHandler(
-		log.StreamHandler(os.Stdout, log.TerminalFormat(false)),
-		log.Must.FileHandler(logFileName, log.JSONFormat()), // Log to file
-	)
-	if onlyLogTps {
-		h = log.MatchFilterHandler("msg", "TPS Report", h)
+	if err := os.MkdirAll(logFolder, 0755); err != nil {
+		panic(err)
 	}
-	log.Root().SetHandler(h)
+	logFileName := fmt.Sprintf("./%v/%s-%v-%v.log", logFolder, role, ip, port)
+	fileHandler := log.Must.FileHandler(logFileName, log.JSONFormat())
+	utils.AddLogHandler(fileHandler)
+
+	if onlyLogTps {
+		matchFilterHandler := log.MatchFilterHandler("msg", "TPS Report", utils.GetLogInstance().GetHandler())
+		utils.GetLogInstance().SetHandler(matchFilterHandler)
+	}
 }
 
 var (
-	ip               = flag.String("ip", "127.0.0.1", "IP of the node")
+	ip               = flag.String("ip", "127.0.0.1", "ip of the node")
 	port             = flag.String("port", "9000", "port of the node.")
 	logFolder        = flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	freshDB          = flag.Bool("fresh_db", false, "true means the existing disk based db will be removed")
@@ -94,6 +98,17 @@ var (
 	shardID      = flag.Int("shard_id", -1, "the shard ID of this node")
 	// logConn logs incoming/outgoing connections
 	logConn = flag.Bool("log_conn", false, "log incoming/outgoing connections")
+
+	keystoreDir = flag.String(".hmy/keystore", hmykey.DefaultKeyStoreDir, "The default keystore directory")
+
+	// true by default for now.  will be switch to false once have full support.
+	hmyNoPass = flag.Bool("nopass", true, "No passphrase for the key (testing only)")
+
+	ks        *keystore.KeyStore
+	myAccount accounts.Account
+	myPass    = ""
+	// logging verbosity
+	verbosity = flag.Int("verbosity", 5, "Logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail (default: 5)")
 )
 
 func initSetup() {
@@ -102,7 +117,11 @@ func initSetup() {
 	}
 
 	// Logging setup
-	utils.SetPortAndIP(*port, *ip)
+	utils.SetLogContext(*port, *ip)
+	utils.SetLogVerbosity(log.Lvl(*verbosity))
+
+	// Set default keystore Dir
+	hmykey.DefaultKeyStoreDir = *keystoreDir
 
 	// Add GOMAXPROCS to achieve max performance.
 	runtime.GOMAXPROCS(1024)
@@ -116,6 +135,42 @@ func initSetup() {
 			panic(err)
 		}
 		utils.BootNodes = bootNodeAddrs
+	}
+
+	ks = hmykey.GetHmyKeyStore()
+
+	allAccounts := ks.Accounts()
+
+	if *accountIndex < 0 || *accountIndex >= len(contract.GenesisAccounts) {
+		fmt.Printf("Invalid account_index: %v\n", *accountIndex)
+		os.Exit(4)
+	}
+
+	foundAccount := false
+	for _, account := range allAccounts {
+		if contract.GenesisAccounts[*accountIndex].Address == account.Address.Hex() {
+			myAccount = account
+			foundAccount = true
+			break
+		}
+	}
+
+	if !foundAccount {
+		fmt.Printf("Can't find the matching account key of account_index: %v.\n", *accountIndex)
+		os.Exit(4)
+	}
+
+	fmt.Printf("My Account: %s\n", myAccount.Address.Hex())
+	fmt.Printf("Key URL: %s\n", myAccount.URL)
+
+	if !*hmyNoPass {
+		myPass = utils.AskForPassphrase("Passphrase: ")
+		err := ks.Unlock(myAccount, myPass)
+		if err != nil {
+			fmt.Printf("Wrong Passphrase! Unable to unlock account key!\n")
+			os.Exit(3)
+		}
+		hmykey.SetHmyPass(myPass)
 	}
 }
 
@@ -147,25 +202,19 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	nodeConfig.ShardID = myShardID
 
 	// Key Setup ================= [Start]
-	// Staking private key is the ecdsa key used for token related transaction signing (especially the staking txs).
-	stakingPriKey := ""
 	consensusPriKey := &bls.SecretKey{}
+
 	if *isGenesis {
-		stakingPriKey = contract.GenesisAccounts[*accountIndex].Private
 		err := consensusPriKey.SetHexString(contract.GenesisBLSAccounts[*accountIndex].Private)
 		if err != nil {
 			panic(fmt.Errorf("generate key error"))
 		}
 	} else {
-		// TODO: let user specify the ECDSA key
-		stakingPriKey = contract.NewNodeAccounts[*accountIndex].Private
-		// TODO: use user supplied key
 		err := consensusPriKey.SetHexString(contract.GenesisBLSAccounts[200+*accountIndex].Private) // TODO: use separate bls accounts for this.
 		if err != nil {
 			panic(fmt.Errorf("generate key error"))
 		}
 	}
-	nodeConfig.StakingPriKey = node.StoreStakingKeyFromFile(*stakingKeyFile, stakingPriKey)
 
 	// P2p private key is used for secure message transfer between p2p nodes.
 	nodeConfig.P2pPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
@@ -212,7 +261,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	return nodeConfig
 }
 
-func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consensus, *node.Node) {
+func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// Consensus object.
 	// TODO: consensus object shouldn't start here
 	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of consensus later.
@@ -226,9 +275,9 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	// Current node.
 	currentNode := node.New(nodeConfig.Host, currentConsensus, nodeConfig.MainDB, *isArchival)
 	currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
-	currentNode.AccountKey = nodeConfig.StakingPriKey
+	currentNode.StakingAccount = myAccount
 	utils.GetLogInstance().Info("node account set",
-		"address", crypto.PubkeyToAddress(currentNode.AccountKey.PublicKey))
+		"address", currentNode.StakingAccount.Address.Hex())
 
 	if gsif, err := consensus.NewGenesisStakeInfoFinder(); err == nil {
 		currentConsensus.SetStakeInfoFinder(gsif)
@@ -318,20 +367,20 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) (*consensus.Consen
 	currentConsensus.BlockVerifier = currentNode.VerifyNewBlock
 	currentConsensus.OnConsensusDone = currentNode.PostConsensusProcessing
 	currentNode.State = node.NodeWaitToJoin
-	return currentConsensus, currentNode
+	return currentNode
 }
 
 func main() {
 	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
 	flag.Parse()
 
-	initSetup()
-	var currentNode *node.Node
-	var consensus *consensus.Consensus
-	nodeConfig := createGlobalConfig()
+	// Configure log parameters
+	utils.SetLogContext(*port, *ip)
+	utils.SetLogVerbosity(log.Lvl(*verbosity))
 
-	// Init logging.
-	loggingInit(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps)
+	initSetup()
+	nodeConfig := createGlobalConfig()
+	initLogFile(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps)
 
 	// Start Profiler for leader if profile argument is on
 	if nodeConfig.StringRole == "leader" && (*profile || *metricsReportURL != "") {
@@ -341,17 +390,14 @@ func main() {
 			prof.Start()
 		}
 	}
-	consensus, currentNode = setUpConsensusAndNode(nodeConfig)
-	// TODO: put this inside discovery service
-	if consensus.IsLeader {
-		go currentNode.SendPongMessage()
-	}
+	currentNode := setUpConsensusAndNode(nodeConfig)
 	//if consensus.ShardID != 0 {
 	//	go currentNode.SupportBeaconSyncing()
 	//}
 
 	utils.GetLogInstance().Info("==== New Harmony Node ====", "BlsPubKey", hex.EncodeToString(nodeConfig.ConsensusPubKey.Serialize()), "ShardID", nodeConfig.ShardID, "ShardGroupID", nodeConfig.GetShardGroupID(), "BeaconGroupID", nodeConfig.GetBeaconGroupID(), "ClientGroupID", nodeConfig.GetClientGroupID(), "Role", currentNode.NodeConfig.Role(), "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, nodeConfig.Host.GetID().Pretty()))
 
+	currentNode.MaybeKeepSendingPongMessage()
 	go currentNode.SupportSyncing()
 	currentNode.ServiceManagerSetup()
 	currentNode.StartRPC(*port)

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"sort"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -20,6 +21,26 @@ type EpochShardState struct {
 
 // ShardState is the collection of all committees
 type ShardState []Committee
+
+// CompareShardState compares two ShardState instances.
+func CompareShardState(s1, s2 ShardState) int {
+	commonLen := len(s1)
+	if commonLen > len(s2) {
+		commonLen = len(s2)
+	}
+	for idx := 0; idx < commonLen; idx++ {
+		if c := CompareCommittee(&s1[idx], &s2[idx]); c != 0 {
+			return c
+		}
+	}
+	switch {
+	case len(s1) < len(s2):
+		return -1
+	case len(s1) > len(s2):
+		return +1
+	}
+	return 0
+}
 
 // BlsPublicKey defines the bls public key
 type BlsPublicKey [96]byte
@@ -46,17 +67,73 @@ func (pk *BlsPublicKey) ToLibBLSPublicKey(key *bls.PublicKey) error {
 	return key.Deserialize(pk[:])
 }
 
+// CompareBlsPublicKey compares two BlsPublicKey, lexicographically.
+func CompareBlsPublicKey(k1, k2 BlsPublicKey) int {
+	return bytes.Compare(k1[:], k2[:])
+}
+
 // NodeID represents node id (BLS address).
 type NodeID struct {
 	EcdsaAddress string
 	BlsPublicKey BlsPublicKey
 }
 
+// CompareNodeID compares two node IDs.
+func CompareNodeID(id1, id2 *NodeID) int {
+	if c := strings.Compare(id1.EcdsaAddress, id2.EcdsaAddress); c != 0 {
+		return c
+	}
+	if c := CompareBlsPublicKey(id1.BlsPublicKey, id2.BlsPublicKey); c != 0 {
+		return c
+	}
+	return 0
+}
+
+// NodeIDList is a list of NodeIDList.
+type NodeIDList []NodeID
+
+// CompareNodeIDList compares two node ID lists.
+func CompareNodeIDList(l1, l2 NodeIDList) int {
+	commonLen := len(l1)
+	if commonLen > len(l2) {
+		commonLen = len(l2)
+	}
+	for idx := 0; idx < commonLen; idx++ {
+		if c := CompareNodeID(&l1[idx], &l2[idx]); c != 0 {
+			return c
+		}
+	}
+	switch {
+	case len(l1) < len(l2):
+		return -1
+	case len(l1) > len(l2):
+		return +1
+	}
+	return 0
+}
+
 // Committee contains the active nodes in one shard
 type Committee struct {
 	ShardID  uint32
 	Leader   NodeID
-	NodeList []NodeID
+	NodeList NodeIDList
+}
+
+// CompareCommittee compares two committees and their leader/node list.
+func CompareCommittee(c1, c2 *Committee) int {
+	switch {
+	case c1.ShardID < c2.ShardID:
+		return -1
+	case c1.ShardID > c2.ShardID:
+		return +1
+	}
+	if c := CompareNodeID(&c1.Leader, &c2.Leader); c != 0 {
+		return c
+	}
+	if c := CompareNodeIDList(c1.NodeList, c2.NodeList); c != 0 {
+		return c
+	}
+	return 0
 }
 
 // GetHashFromNodeList will sort the list, then use Keccak256 to hash the list
@@ -68,7 +145,7 @@ func GetHashFromNodeList(nodeList []NodeID) []byte {
 	}
 
 	sort.Slice(nodeList, func(i, j int) bool {
-		return CompareNodeID(nodeList[i], nodeList[j]) == -1
+		return CompareNodeIDByBLSKey(nodeList[i], nodeList[j]) == -1
 	})
 	d := sha3.NewLegacyKeccak256()
 	for i := range nodeList {
@@ -91,8 +168,8 @@ func (ss ShardState) Hash() (h common.Hash) {
 	return h
 }
 
-// CompareNodeID compares two nodes by their ID; used to sort node list
-func CompareNodeID(n1 NodeID, n2 NodeID) int {
+// CompareNodeIDByBLSKey compares two nodes by their ID; used to sort node list
+func CompareNodeIDByBLSKey(n1 NodeID, n2 NodeID) int {
 	return bytes.Compare(n1.BlsPublicKey[:], n2.BlsPublicKey[:])
 }
 

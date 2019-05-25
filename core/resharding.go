@@ -131,7 +131,7 @@ func (ss *ShardingState) Reshard(newNodeList []types.NodeID, percent float64) {
 func Shuffle(list []types.NodeID) {
 	// Sort to make sure everyone will generate the same with the same rand seed.
 	sort.Slice(list, func(i, j int) bool {
-		return types.CompareNodeID(list[i], list[j]) == -1
+		return types.CompareNodeIDByBLSKey(list[i], list[j]) == -1
 	})
 	rand.Shuffle(len(list), func(i, j int) {
 		list[i], list[j] = list[j], list[i]

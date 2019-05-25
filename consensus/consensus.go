@@ -17,6 +17,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/internal/utils/contract"
@@ -25,7 +26,7 @@ import (
 
 const (
 	// ConsensusVersion : v1 old version without viewchange, v2 new version with viewchange
-	ConsensusVersion = "v1"
+	ConsensusVersion = "v2"
 )
 
 // Block reward per block signature.
@@ -37,12 +38,14 @@ var (
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
 	ConsensusVersion string
+	// pbftLog stores the pbft messages and blocks during PBFT process
+	pbftLog *PbftLog
 	// phase: different phase of PBFT protocol: pre-prepare, prepare, commit, finish etc
 	phase PbftPhase
 	// mode: indicate a node is in normal or viewchanging mode
 	mode PbftMode
 	// seqNum: the next blockNumber that PBFT is going to agree on, should be equal to the blockNumber of next block
-	seqNum uint32
+	seqNum uint64
 	// channel to receive consensus message
 	MsgChan chan []byte
 	// timer to make sure leader publishes block in a timely manner; if not
@@ -95,13 +98,13 @@ type Consensus struct {
 	// private/public keys of current node
 	priKey *bls.SecretKey
 	PubKey *bls.PublicKey
+	// the publickey of leader
+	LeaderPubKey *bls.PublicKey
 
-	// Whether I am leader. False means I am validator
-	IsLeader bool
 	// Leader or validator address in hex
 	SelfAddress common.Address
 	// Consensus Id (View Id) - 4 byte
-	consensusID uint32
+	consensusID uint32 // TODO(chao): change it to uint64 or add overflow checking mechanism
 
 	// Blockhash - 32 byte
 	blockHash [32]byte
@@ -194,11 +197,15 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 	consensus.ConsensusIDLowChan = make(chan struct{})
 	consensus.ConsensusVersion = ConsensusVersion
 
+	consensus.pbftLog = NewPbftLog()
+	consensus.phase = Announce
+	consensus.mode = PbftMode{mode: Normal}
+
 	selfPeer := host.GetSelfPeer()
 	if leader.Port == selfPeer.Port && leader.IP == selfPeer.IP {
-		consensus.IsLeader = true
+		nodeconfig.GetDefaultConfig().SetIsLeader(true)
 	} else {
-		consensus.IsLeader = false
+		nodeconfig.GetDefaultConfig().SetIsLeader(false)
 	}
 
 	consensus.leader = leader
@@ -249,7 +256,7 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 	// For validators to keep track of all blocks received but not yet committed, so as to catch up to latest consensus if lagged behind.
 	consensus.blocksReceived = make(map[uint32]*BlockConsensusStatus)
 
-	if consensus.IsLeader {
+	if nodeconfig.GetDefaultConfig().IsLeader() {
 		consensus.ReadySignal = make(chan struct{})
 		// send a signal to indicate it's ready to run consensus
 		// this signal is consumed by node object to create a new block and in turn trigger a new consensus on it

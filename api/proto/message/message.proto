@@ -34,8 +34,6 @@ enum MessageType {
   COMMITTED = 5;
   VIEWCHANGE = 6;
   NEWVIEW = 7;
-  NEWBLOCK = 8;
-  COMMITBLOCK = 9;
   DRAND_INIT = 10;
   DRAND_COMMIT = 11; 
   LOTTERY_REQUEST = 12; // it should be either ENTER or GETPLAYERS but it will be removed later.
@@ -93,9 +91,10 @@ message StakingRequest {
 
 message ConsensusRequest {
   uint32 consensus_id = 1;
-  bytes block_hash = 2;
-  bytes sender_pubkey = 3;
-  bytes payload = 4;
+  uint64 seq_num = 2;
+  bytes block_hash = 3;
+  bytes sender_pubkey = 4;
+  bytes payload = 5;
 }
 
 message DrandRequest {

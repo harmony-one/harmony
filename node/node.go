@@ -144,8 +144,9 @@ type Node struct {
 	PuzzleContractAddress   common.Address
 	PuzzleManagerPrivateKey *ecdsa.PrivateKey
 
-	//Node Account
-	AccountKey *ecdsa.PrivateKey
+	// Staking Account
+	// TODO: leochen, can we use multiple account for staking?
+	StakingAccount accounts.Account
 
 	// For test only
 	TestBankKeys                 []*ecdsa.PrivateKey
@@ -207,6 +208,13 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int) types.Transactions {
 	utils.GetLogInstance().Debug("Selecting Transactions", "remainPending", len(node.pendingTransactions), "selected", len(selected), "invalidDiscarded", len(invalid))
 	node.pendingTxMutex.Unlock()
 	return selected
+}
+
+// MaybeKeepSendingPongMessage keeps sending pong message if the current node is a leader.
+func (node *Node) MaybeKeepSendingPongMessage() {
+	if nodeconfig.GetDefaultConfig().IsLeader() {
+		go node.SendPongMessage()
+	}
 }
 
 // StartServer starts a server and process the requests by a handler.
@@ -283,6 +291,8 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 		node.Worker = worker.New(params.TestChainConfig, chain, node.Consensus, pki.GetAddressFromPublicKey(node.SelfPeer.ConsensusPubKey), node.Consensus.ShardID)
 
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
+		// the sequence number is the next block number to be added in consensus protocol, which is always one more than current chain header block
+		node.Consensus.SetSeqNum(chain.CurrentBlock().NumberU64() + 1)
 
 		// Add Faucet contract to all shards, so that on testnet, we can demo wallet in explorer
 		// TODO (leo): we need to have support of cross-shard tx later so that the token can be transferred from beacon chain shard to other tx shards.
@@ -316,7 +326,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 
 	node.ContractCaller = contracts.NewContractCaller(&db, node.blockchain, params.TestChainConfig)
 
-	if consensusObj != nil && consensusObj.IsLeader {
+	if consensusObj != nil && nodeconfig.GetDefaultConfig().IsLeader() {
 		node.State = NodeLeader
 	} else {
 		node.State = NodeInit

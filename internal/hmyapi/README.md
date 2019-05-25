@@ -52,7 +52,7 @@
 * ~~[ ] hmy_compileSolidity~~ - DEPRECATED
 * ~~[ ] hmy_compileSerpent~~ - DEPRECATED
 
-### Subscription
+### Subscribes
 * [ ] hmy_pendingTransactions - pending transaction subscriber
 * [ ] hmy_getLogs - log subscriber
 * [ ] hmy_newFilter -  creates a filter object, based on filter options
