@@ -58,17 +58,17 @@ func (consensus *Consensus) Start(stopChan chan struct{}, stoppedChan chan struc
             msg := consensus.recvWithTimeout(receiveTimeout)
             consensus.handleMessageUpdate(msg)
             if consensus.idleTimeout.CheckExpire() {
-                consensus.startViewChange(consensus.consensusID + 1)
+                consensus.startViewChange(consensus.viewID + 1)
             }
             if consensus.commitTimeout.CheckExpire() {
-                consensus.startViewChange(consensus.consensusID + 1)
+                consensus.startViewChange(consensus.viewID + 1)
             }
             if consensus.viewChangeTimeout.CheckExpire() {
                 if consensus.mode.Mode() == Normal {
                     continue
                 }
-                consensusID := consensus.mode.ConsensusID()
-                consensus.startViewChange(consensusID + 1)
+                viewID := consensus.mode.ViewID()
+                consensus.startViewChange(viewID + 1)
             }
         case <-tick.C:
             consensus.tryPublishBlock()

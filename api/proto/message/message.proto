@@ -80,8 +80,8 @@ message StakingRequest {
 }
 
 message ConsensusRequest {
-  uint32 consensus_id = 1;
-  uint64 seq_num = 2;
+  uint32 view_id = 1;
+  uint64 block_num = 2;
   bytes block_hash = 3;
   bytes sender_pubkey = 4;
   bytes payload = 5;
@@ -94,8 +94,8 @@ message DrandRequest {
 }
 
 message ViewChangeRequest {
-    uint32 consensus_id = 1;
-    uint64 seq_num = 2;
+    uint32 view_id = 1;
+    uint64 block_num = 2;
     bytes sender_pubkey = 3;
     bytes leader_pubkey = 4;
     bytes payload = 5; // message payload: either m1 type or m2 type 

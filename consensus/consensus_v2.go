@@ -59,8 +59,8 @@ func (consensus *Consensus) handleMessageUpdate(payload []byte) {
 // TODO: move to consensus_leader.go later
 func (consensus *Consensus) tryAnnounce(block *types.Block) {
 	// here we assume the leader should always be update to date
-	if block.NumberU64() != consensus.seqNum {
-		utils.GetLogInstance().Debug("tryAnnounce seqNum not match", "blockNum", block.NumberU64(), "mySeqNum", consensus.seqNum)
+	if block.NumberU64() != consensus.blockNum {
+		utils.GetLogInstance().Debug("tryAnnounce blockNum not match", "blockNum", block.NumberU64(), "myBlockNum", consensus.blockNum)
 		return
 	}
 	if !consensus.PubKey.IsEqual(consensus.LeaderPubKey) {
@@ -141,11 +141,11 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		return
 	}
 
-	logMsgs := consensus.pbftLog.GetMessagesByTypeSeqView(msg_pb.MessageType_ANNOUNCE, recvMsg.SeqNum, recvMsg.ConsensusID)
+	logMsgs := consensus.pbftLog.GetMessagesByTypeSeqView(msg_pb.MessageType_ANNOUNCE, recvMsg.BlockNum, recvMsg.ViewID)
 	if len(logMsgs) > 0 {
 		if logMsgs[0].BlockHash != blockObj.Header().Hash() {
 			utils.GetLogInstance().Debug("onAnnounce leader is malicious", "leaderKey", utils.GetBlsAddress(consensus.LeaderPubKey))
-			consensus.startViewChange(consensus.consensusID + 1)
+			consensus.startViewChange(consensus.viewID + 1)
 		}
 		return
 	}
@@ -175,7 +175,7 @@ func (consensus *Consensus) tryPrepare(blockHash common.Hash) {
 		return
 	}
 
-	if consensus.phase != Announce || consensus.seqNum != block.NumberU64() || !consensus.pbftLog.HasMatchingAnnounce(consensus.seqNum, consensus.consensusID, hash) {
+	if consensus.phase != Announce || consensus.blockNum != block.NumberU64() || !consensus.pbftLog.HasMatchingAnnounce(consensus.blockNum, consensus.viewID, hash) {
 		return
 	}
 
@@ -211,14 +211,14 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		return
 	}
 
-	if recvMsg.ConsensusID != consensus.consensusID || recvMsg.SeqNum != consensus.seqNum || consensus.phase != Prepare {
-		utils.GetLogInstance().Debug("onPrepare message not match", "myPhase", consensus.phase, "myConsensusID", consensus.consensusID,
-			"msgConsensusID", recvMsg.ConsensusID, "mySeqNum", consensus.seqNum, "msgSeqNum", recvMsg.SeqNum)
+	if recvMsg.ViewID != consensus.viewID || recvMsg.BlockNum != consensus.blockNum || consensus.phase != Prepare {
+		utils.GetLogInstance().Debug("onPrepare message not match", "myPhase", consensus.phase, "myViewID", consensus.viewID,
+			"msgViewID", recvMsg.ViewID, "myBlockNum", consensus.blockNum, "msgBlockNum", recvMsg.BlockNum)
 		return
 	}
 
-	if !consensus.pbftLog.HasMatchingAnnounce(consensus.seqNum, consensus.consensusID, recvMsg.BlockHash) {
-		utils.GetLogInstance().Debug("onPrepare no matching announce message", "seqNum", consensus.seqNum, "consensusID", consensus.consensusID, "blockHash", recvMsg.BlockHash)
+	if !consensus.pbftLog.HasMatchingAnnounce(consensus.blockNum, consensus.viewID, recvMsg.BlockHash) {
+		utils.GetLogInstance().Debug("onPrepare no matching announce message", "blockNum", consensus.blockNum, "viewID", consensus.viewID, "blockHash", recvMsg.BlockHash)
 		return
 	}
 
@@ -303,7 +303,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		utils.GetLogInstance().Debug("onPrepared Unparseable validator message", "error", err)
 		return
 	}
-	if recvMsg.SeqNum < consensus.seqNum {
+	if recvMsg.BlockNum < consensus.blockNum {
 		return
 	}
 
@@ -349,7 +349,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	}
 
 	consensus.pbftLog.AddMessage(recvMsg)
-	if recvMsg.SeqNum > consensus.seqNum || consensus.phase != Prepare || recvMsg.ConsensusID != consensus.consensusID {
+	if recvMsg.BlockNum > consensus.blockNum || consensus.phase != Prepare || recvMsg.ViewID != consensus.viewID {
 		return
 	}
 
@@ -393,11 +393,11 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		return
 	}
 
-	if recvMsg.ConsensusID != consensus.consensusID || recvMsg.SeqNum != consensus.seqNum || consensus.phase != Commit {
+	if recvMsg.ViewID != consensus.viewID || recvMsg.BlockNum != consensus.blockNum || consensus.phase != Commit {
 		return
 	}
 
-	if !consensus.pbftLog.HasMatchingAnnounce(consensus.seqNum, consensus.consensusID, recvMsg.BlockHash) {
+	if !consensus.pbftLog.HasMatchingAnnounce(consensus.blockNum, consensus.viewID, recvMsg.BlockHash) {
 		return
 	}
 
@@ -481,15 +481,15 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		consensus.reportMetrics(blockObj)
 
 		// Dump new block into level db.
-		explorer.GetStorageInstance(consensus.leader.IP, consensus.leader.Port, true).Dump(&blockObj, consensus.consensusID)
+		explorer.GetStorageInstance(consensus.leader.IP, consensus.leader.Port, true).Dump(&blockObj, consensus.viewID)
 
 		// Reset state to Finished, and clear other data.
 		consensus.ResetState()
-		consensus.consensusID++
-		consensus.seqNum++
+		consensus.viewID++
+		consensus.blockNum++
 
 		consensus.OnConsensusDone(&blockObj)
-		utils.GetLogInstance().Debug("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!", "consensusID", consensus.consensusID, "numOfSignatures", len(commitSigs))
+		utils.GetLogInstance().Debug("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!", "viewID", consensus.viewID, "numOfSignatures", len(commitSigs))
 
 		// Send signal to Node so the new block can be added and new round of consensus can be triggered
 		consensus.ReadySignal <- struct{}{}
@@ -523,7 +523,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		utils.GetLogInstance().Warn("onCommitted unable to parse msg", "error", err)
 		return
 	}
-	if recvMsg.SeqNum < consensus.seqNum {
+	if recvMsg.BlockNum < consensus.blockNum {
 		return
 	}
 
@@ -564,7 +564,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 
 	consensus.pbftLog.AddMessage(recvMsg)
 
-	if recvMsg.SeqNum > consensus.seqNum || consensus.phase != Commit || recvMsg.ConsensusID != consensus.consensusID {
+	if recvMsg.BlockNum > consensus.blockNum || consensus.phase != Commit || recvMsg.ViewID != consensus.viewID {
 		return
 	}
 	consensus.aggregatedCommitSig = &deserializedMultiSig
@@ -580,18 +580,18 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 
 // try to catch up if fall behind
 func (consensus *Consensus) tryCatchup() {
-	utils.GetLogInstance().Info("tryCatchup: commit new blocks", "seqNum", consensus.seqNum)
+	utils.GetLogInstance().Info("tryCatchup: commit new blocks", "blockNum", consensus.blockNum)
 	if consensus.phase != Commit {
 		return
 	}
 	consensus.switchPhase(Announce)
 	for {
-		msgs := consensus.pbftLog.GetMessagesByTypeSeq(msg_pb.MessageType_COMMITTED, consensus.seqNum)
+		msgs := consensus.pbftLog.GetMessagesByTypeSeq(msg_pb.MessageType_COMMITTED, consensus.blockNum)
 		if len(msgs) == 0 {
 			break
 		}
 		if len(msgs) > 1 {
-			utils.GetLogInstance().Info("[PBFT] we should only get one committed message for a given blockNum", "blockNum", consensus.seqNum, "numMsgs", len(msgs))
+			utils.GetLogInstance().Info("[PBFT] we should only get one committed message for a given blockNum", "blockNum", consensus.blockNum, "numMsgs", len(msgs))
 		}
 
 		block := consensus.pbftLog.GetBlockByHash(msgs[0].BlockHash)
@@ -600,13 +600,13 @@ func (consensus *Consensus) tryCatchup() {
 		}
 
 		if block.ParentHash() != consensus.ChainReader.CurrentHeader().Hash() {
-			utils.GetLogInstance().Debug("[PBFT] parent block hash not match", "blockNum", consensus.seqNum)
+			utils.GetLogInstance().Debug("[PBFT] parent block hash not match", "blockNum", consensus.blockNum)
 			break
 		}
 
-		preparedMsgs := consensus.pbftLog.GetMessagesByTypeSeqHash(msg_pb.MessageType_PREPARED, msgs[0].SeqNum, msgs[0].BlockHash)
+		preparedMsgs := consensus.pbftLog.GetMessagesByTypeSeqHash(msg_pb.MessageType_PREPARED, msgs[0].BlockNum, msgs[0].BlockHash)
 		if len(preparedMsgs) > 1 {
-			utils.GetLogInstance().Info("[PBFT] we should only get one prepared message for a given blockNum", "blockNum", consensus.seqNum, "numMsgs", len(preparedMsgs))
+			utils.GetLogInstance().Info("[PBFT] we should only get one prepared message for a given blockNum", "blockNum", consensus.blockNum, "numMsgs", len(preparedMsgs))
 		}
 		if len(preparedMsgs) == 0 {
 			break
@@ -617,8 +617,8 @@ func (consensus *Consensus) tryCatchup() {
 			if msg.BlockHash == msgs[0].BlockHash {
 				cnt++
 				consensus.blockHash = [32]byte{}
-				consensus.seqNum = consensus.seqNum + 1
-				consensus.consensusID = consensus.consensusID + 1
+				consensus.blockNum = consensus.blockNum + 1
+				consensus.viewID = consensus.viewID + 1
 
 				//#### Read payload data from committed msg
 				aggSig := make([]byte, 48)
@@ -656,7 +656,7 @@ func (consensus *Consensus) tryCatchup() {
 				break
 			}
 		}
-		if cnt == 0 { // didn't find match block for current seqNum, return
+		if cnt == 0 { // didn't find match block for current blockNum, return
 			break
 		}
 	}
@@ -674,6 +674,26 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 		consensus.consensusTimeout["bootstrap"].Start()
 		for {
 			select {
+			case <-ticker.C:
+				if !consensus.PubKey.IsEqual(consensus.LeaderPubKey) {
+					for k, v := range consensus.consensusTimeout {
+						if !v.CheckExpire() {
+							continue
+						}
+						if k != "viewchange" {
+							utils.GetLogInstance().Debug("ops", "phase", k, "mode", consensus.mode.Mode())
+							consensus.startViewChange(consensus.viewID + 1)
+							break
+						} else {
+							utils.GetLogInstance().Debug("ops", "phase", k, "mode", consensus.mode.Mode())
+							viewID := consensus.mode.ViewID()
+							consensus.startViewChange(viewID + 1)
+							break
+						}
+					}
+
+				}
+
 			case newBlock := <-blockChannel:
 				utils.GetLogInstance().Info("receive newBlock", "blockNum", newBlock.NumberU64())
 				if consensus.ShardID == 0 {
@@ -709,27 +729,6 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 
 			case msg := <-consensus.MsgChan:
 				consensus.handleMessageUpdate(msg)
-
-			case <-ticker.C:
-				if !consensus.PubKey.IsEqual(consensus.LeaderPubKey) {
-					for k, v := range consensus.consensusTimeout {
-						if !v.CheckExpire() {
-							continue
-						}
-						if k != "viewchange" {
-							utils.GetLogInstance().Debug("ops", "phase", k, "mode", consensus.mode.Mode())
-							consensus.startViewChange(consensus.consensusID + 1)
-							break
-						} else {
-							utils.GetLogInstance().Debug("ops", "phase", k, "mode", consensus.mode.Mode())
-							consensusID := consensus.mode.ConsensusID()
-							consensus.startViewChange(consensusID + 1)
-							break
-						}
-					}
-
-				}
-
 			case <-stopChan:
 				return
 			}

@@ -24,8 +24,8 @@ type PbftLog struct {
 // PbftMessage is the record of pbft messages received by a node during PBFT process
 type PbftMessage struct {
 	MessageType   msg_pb.MessageType
-	ConsensusID   uint32
-	SeqNum        uint64
+	ViewID        uint32
+	BlockNum      uint64
 	BlockHash     common.Hash
 	SenderPubkey  *bls.PublicKey
 	LeaderPubkey  *bls.PublicKey
@@ -103,7 +103,7 @@ func (log *PbftLog) DeleteMessagesByNumber(number uint64) {
 	found := mapset.NewSet()
 	it := log.Messages().Iterator()
 	for msg := range it.C {
-		if msg.(*PbftMessage).SeqNum == number {
+		if msg.(*PbftMessage).BlockNum == number {
 			found.Add(msg)
 		}
 	}
@@ -115,54 +115,54 @@ func (log *PbftLog) AddMessage(msg *PbftMessage) {
 	log.messages.Add(msg)
 }
 
-// GetMessagesByTypeSeqViewHash returns pbft messages with matching type, seqNum, consensusID and blockHash
-func (log *PbftLog) GetMessagesByTypeSeqViewHash(typ msg_pb.MessageType, seqNum uint64, consensusID uint32, blockHash common.Hash) []*PbftMessage {
+// GetMessagesByTypeSeqViewHash returns pbft messages with matching type, blockNum, viewID and blockHash
+func (log *PbftLog) GetMessagesByTypeSeqViewHash(typ msg_pb.MessageType, blockNum uint64, viewID uint32, blockHash common.Hash) []*PbftMessage {
 	found := []*PbftMessage{}
 	it := log.Messages().Iterator()
 	for msg := range it.C {
-		if msg.(*PbftMessage).MessageType == typ && msg.(*PbftMessage).SeqNum == seqNum && msg.(*PbftMessage).ConsensusID == consensusID && msg.(*PbftMessage).BlockHash == blockHash {
+		if msg.(*PbftMessage).MessageType == typ && msg.(*PbftMessage).BlockNum == blockNum && msg.(*PbftMessage).ViewID == viewID && msg.(*PbftMessage).BlockHash == blockHash {
 			found = append(found, msg.(*PbftMessage))
 		}
 	}
 	return found
 }
 
-// GetMessagesByTypeSeq returns pbft messages with matching type, seqNum
-func (log *PbftLog) GetMessagesByTypeSeq(typ msg_pb.MessageType, seqNum uint64) []*PbftMessage {
+// GetMessagesByTypeSeq returns pbft messages with matching type, blockNum
+func (log *PbftLog) GetMessagesByTypeSeq(typ msg_pb.MessageType, blockNum uint64) []*PbftMessage {
 	found := []*PbftMessage{}
 	it := log.Messages().Iterator()
 	for msg := range it.C {
-		if msg.(*PbftMessage).MessageType == typ && msg.(*PbftMessage).SeqNum == seqNum {
+		if msg.(*PbftMessage).MessageType == typ && msg.(*PbftMessage).BlockNum == blockNum {
 			found = append(found, msg.(*PbftMessage))
 		}
 	}
 	return found
 }
 
-// GetMessagesByTypeSeqHash returns pbft messages with matching type, seqNum
-func (log *PbftLog) GetMessagesByTypeSeqHash(typ msg_pb.MessageType, seqNum uint64, blockHash common.Hash) []*PbftMessage {
+// GetMessagesByTypeSeqHash returns pbft messages with matching type, blockNum
+func (log *PbftLog) GetMessagesByTypeSeqHash(typ msg_pb.MessageType, blockNum uint64, blockHash common.Hash) []*PbftMessage {
 	found := []*PbftMessage{}
 	it := log.Messages().Iterator()
 	for msg := range it.C {
-		if msg.(*PbftMessage).MessageType == typ && msg.(*PbftMessage).SeqNum == seqNum && msg.(*PbftMessage).BlockHash == blockHash {
+		if msg.(*PbftMessage).MessageType == typ && msg.(*PbftMessage).BlockNum == blockNum && msg.(*PbftMessage).BlockHash == blockHash {
 			found = append(found, msg.(*PbftMessage))
 		}
 	}
 	return found
 }
 
-// HasMatchingAnnounce returns whether the log contains announce type message with given seqNum, consensusID and blockHash
-func (log *PbftLog) HasMatchingAnnounce(seqNum uint64, consensusID uint32, blockHash common.Hash) bool {
-	found := log.GetMessagesByTypeSeqViewHash(msg_pb.MessageType_ANNOUNCE, seqNum, consensusID, blockHash)
+// HasMatchingAnnounce returns whether the log contains announce type message with given blockNum, viewID and blockHash
+func (log *PbftLog) HasMatchingAnnounce(blockNum uint64, viewID uint32, blockHash common.Hash) bool {
+	found := log.GetMessagesByTypeSeqViewHash(msg_pb.MessageType_ANNOUNCE, blockNum, viewID, blockHash)
 	return len(found) == 1
 }
 
-// GetMessagesByTypeSeqView returns pbft messages with matching type, seqNum and consensusID
-func (log *PbftLog) GetMessagesByTypeSeqView(typ msg_pb.MessageType, seqNum uint64, consensusID uint32) []*PbftMessage {
+// GetMessagesByTypeSeqView returns pbft messages with matching type, blockNum and viewID
+func (log *PbftLog) GetMessagesByTypeSeqView(typ msg_pb.MessageType, blockNum uint64, viewID uint32) []*PbftMessage {
 	found := []*PbftMessage{}
 	it := log.Messages().Iterator()
 	for msg := range it.C {
-		if msg.(*PbftMessage).MessageType != typ || msg.(*PbftMessage).SeqNum != seqNum || msg.(*PbftMessage).ConsensusID != consensusID {
+		if msg.(*PbftMessage).MessageType != typ || msg.(*PbftMessage).BlockNum != blockNum || msg.(*PbftMessage).ViewID != viewID {
 			continue
 		}
 		found = append(found, msg.(*PbftMessage))
@@ -176,8 +176,8 @@ func ParsePbftMessage(msg *msg_pb.Message) (*PbftMessage, error) {
 	pbftMsg.MessageType = msg.GetType()
 	consensusMsg := msg.GetConsensus()
 
-	pbftMsg.ConsensusID = consensusMsg.ConsensusId
-	pbftMsg.SeqNum = consensusMsg.SeqNum
+	pbftMsg.ViewID = consensusMsg.ViewId
+	pbftMsg.BlockNum = consensusMsg.BlockNum
 	pbftMsg.BlockHash = common.Hash{}
 	copy(pbftMsg.BlockHash[:], consensusMsg.BlockHash[:])
 	pbftMsg.Payload = make([]byte, len(consensusMsg.Payload))
@@ -199,8 +199,8 @@ func ParseViewChangeMessage(msg *msg_pb.Message) (*PbftMessage, error) {
 	}
 
 	vcMsg := msg.GetViewchange()
-	pbftMsg.ConsensusID = vcMsg.ConsensusId
-	pbftMsg.SeqNum = vcMsg.SeqNum
+	pbftMsg.ViewID = vcMsg.ViewId
+	pbftMsg.BlockNum = vcMsg.BlockNum
 	pbftMsg.Payload = make([]byte, len(vcMsg.Payload))
 	copy(pbftMsg.Payload[:], vcMsg.Payload[:])
 
@@ -239,8 +239,8 @@ func (consensus *Consensus) ParseNewViewMessage(msg *msg_pb.Message) (*PbftMessa
 	}
 
 	vcMsg := msg.GetViewchange()
-	pbftMsg.ConsensusID = vcMsg.ConsensusId
-	pbftMsg.SeqNum = vcMsg.SeqNum
+	pbftMsg.ViewID = vcMsg.ViewId
+	pbftMsg.BlockNum = vcMsg.BlockNum
 	pbftMsg.Payload = make([]byte, len(vcMsg.Payload))
 	copy(pbftMsg.Payload[:], vcMsg.Payload[:])
 

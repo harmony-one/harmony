@@ -11,11 +11,11 @@ import (
 
 // Constants used for attack model.
 const (
-	DroppingTickDuration    = 2 * time.Second
-	HitRate                 = 10
-	DelayResponseDuration   = 10 * time.Second
-	ConsensusIDThresholdMin = 10
-	ConsensusIDThresholdMax = 100
+	DroppingTickDuration  = 2 * time.Second
+	HitRate               = 10
+	DelayResponseDuration = 10 * time.Second
+	ViewIDThresholdMin    = 10
+	ViewIDThresholdMax    = 100
 )
 
 // Type is the type of attack model.
@@ -32,7 +32,7 @@ const (
 type Model struct {
 	AttackEnabled             bool
 	attackType                Type
-	ConsensusIDThreshold      uint32
+	ViewIDThreshold           uint32
 	readyByConsensusThreshold bool
 }
 
@@ -59,7 +59,7 @@ func (attack *Model) SetAttackEnabled(AttackEnabled bool) {
 	attack.AttackEnabled = AttackEnabled
 	if AttackEnabled {
 		attack.attackType = Type(rand.Intn(3))
-		attack.ConsensusIDThreshold = uint32(ConsensusIDThresholdMin + rand.Intn(ConsensusIDThresholdMax-ConsensusIDThresholdMin))
+		attack.ViewIDThreshold = uint32(ViewIDThresholdMin + rand.Intn(ViewIDThresholdMax-ViewIDThresholdMin))
 	}
 }
 
@@ -104,9 +104,9 @@ func (attack *Model) IncorrectResponse() bool {
 	return false
 }
 
-// UpdateConsensusReady enables an attack type given the current consensusID.
-func (attack *Model) UpdateConsensusReady(consensusID uint32) {
-	if consensusID > attack.ConsensusIDThreshold {
+// UpdateConsensusReady enables an attack type given the current viewID.
+func (attack *Model) UpdateConsensusReady(viewID uint32) {
+	if viewID > attack.ViewIDThreshold {
 		attack.readyByConsensusThreshold = true
 	}
 }

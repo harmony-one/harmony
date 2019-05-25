@@ -91,8 +91,8 @@ func (consensus *Consensus) GetSelfAddress() common.Address {
 
 // Populates the common basic fields for all consensus message.
 func (consensus *Consensus) populateMessageFields(request *msg_pb.ConsensusRequest) {
-	request.ConsensusId = consensus.consensusID
-	request.SeqNum = consensus.seqNum
+	request.ViewId = consensus.viewID
+	request.BlockNum = consensus.blockNum
 
 	// 32 byte block hash
 	request.BlockHash = consensus.blockHash[:]
@@ -100,7 +100,7 @@ func (consensus *Consensus) populateMessageFields(request *msg_pb.ConsensusReque
 	// sender address
 	request.SenderPubkey = consensus.PubKey.Serialize()
 
-	utils.GetLogInstance().Debug("[populateMessageFields]", "myConsensusID", consensus.consensusID, "SenderAddress", consensus.SelfAddress, "seqNum", consensus.seqNum)
+	utils.GetLogInstance().Debug("[populateMessageFields]", "myViewID", consensus.viewID, "SenderAddress", consensus.SelfAddress, "blockNum", consensus.blockNum)
 }
 
 // Signs the consensus message and returns the marshaled message.
@@ -142,9 +142,9 @@ func (consensus *Consensus) GetNodeIDs() []libp2p_peer.ID {
 	return nodes
 }
 
-// GetConsensusID returns the consensus ID
-func (consensus *Consensus) GetConsensusID() uint32 {
-	return consensus.consensusID
+// GetViewID returns the consensus ID
+func (consensus *Consensus) GetViewID() uint32 {
+	return consensus.viewID
 }
 
 // DebugPrintPublicKeys print all the PublicKeys in string format in Consensus
@@ -427,11 +427,11 @@ func (consensus *Consensus) RemovePeers(peers []p2p.Peer) int {
 	return count2
 }
 
-// ToggleConsensusCheck flip the flag of whether ignore consensusID check during consensus process
+// ToggleConsensusCheck flip the flag of whether ignore viewID check during consensus process
 func (consensus *Consensus) ToggleConsensusCheck() {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
-	consensus.ignoreConsensusIDCheck = !consensus.ignoreConsensusIDCheck
+	consensus.ignoreViewIDCheck = !consensus.ignoreViewIDCheck
 }
 
 // GetPeerByAddress the validator peer based on validator Address.
@@ -509,9 +509,9 @@ func (consensus *Consensus) verifyViewChangeSenderKey(msg *msg_pb.Message) (*bls
 	return senderKey, senderAddr, nil
 }
 
-// SetConsensusID set the consensusID to the height of the blockchain
-func (consensus *Consensus) SetConsensusID(height uint32) {
-	consensus.consensusID = height
+// SetViewID set the viewID to the height of the blockchain
+func (consensus *Consensus) SetViewID(height uint32) {
+	consensus.viewID = height
 }
 
 // RegisterPRndChannel registers the channel for receiving randomness preimage from DRG protocol
@@ -527,7 +527,7 @@ func (consensus *Consensus) RegisterRndChannel(rndChannel chan [64]byte) {
 // Checks the basic meta of a consensus message, including the signature.
 func (consensus *Consensus) checkConsensusMessage(message *msg_pb.Message, publicKey *bls.PublicKey) error {
 	consensusMsg := message.GetConsensus()
-	consensusID := consensusMsg.ConsensusId
+	viewID := consensusMsg.ViewId
 	blockHash := consensusMsg.BlockHash
 
 	// Verify message signature
@@ -542,26 +542,26 @@ func (consensus *Consensus) checkConsensusMessage(message *msg_pb.Message, publi
 	}
 
 	// just ignore consensus check for the first time when node join
-	if consensus.ignoreConsensusIDCheck {
-		consensus.consensusID = consensusID
+	if consensus.ignoreViewIDCheck {
+		consensus.viewID = viewID
 		consensus.ToggleConsensusCheck()
 		return nil
-	} else if consensusID != consensus.consensusID {
-		utils.GetLogInstance().Warn("Wrong consensus Id", "myConsensusId", consensus.consensusID, "theirConsensusId", consensusID, "consensus", consensus)
+	} else if viewID != consensus.viewID {
+		utils.GetLogInstance().Warn("Wrong consensus Id", "myViewId", consensus.viewID, "theirViewId", viewID, "consensus", consensus)
 		// notify state syncing to start
 		select {
-		case consensus.ConsensusIDLowChan <- struct{}{}:
+		case consensus.ViewIDLowChan <- struct{}{}:
 		default:
 		}
 
-		return consensus_engine.ErrConsensusIDNotMatch
+		return consensus_engine.ErrViewIDNotMatch
 	}
 	return nil
 }
 
-// SetSeqNum sets the seqNum in consensus object, called at node bootstrap
-func (consensus *Consensus) SetSeqNum(seqNum uint64) {
+// SetBlockNum sets the blockNum in consensus object, called at node bootstrap
+func (consensus *Consensus) SetBlockNum(blockNum uint64) {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
-	consensus.seqNum = seqNum
+	consensus.blockNum = blockNum
 }

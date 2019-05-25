@@ -33,11 +33,11 @@ const (
 	ViewChanging
 )
 
-// PbftMode contains mode and consensusID of viewchanging
+// PbftMode contains mode and viewID of viewchanging
 type PbftMode struct {
-	mode        Mode
-	consensusID uint32
-	mux         sync.Mutex
+	mode   Mode
+	viewID uint32
+	mux    sync.Mutex
 }
 
 // Mode return the current node mode
@@ -52,21 +52,21 @@ func (pm *PbftMode) SetMode(m Mode) {
 	pm.mode = m
 }
 
-// ConsensusID return the current viewchanging id
-func (pm *PbftMode) ConsensusID() uint32 {
-	return pm.consensusID
+// ViewID return the current viewchanging id
+func (pm *PbftMode) ViewID() uint32 {
+	return pm.viewID
 }
 
-// SetConsensusID sets the viewchanging id accordingly
-func (pm *PbftMode) SetConsensusID(consensusID uint32) {
+// SetViewID sets the viewchanging id accordingly
+func (pm *PbftMode) SetViewID(viewID uint32) {
 	pm.mux.Lock()
 	defer pm.mux.Unlock()
-	pm.consensusID = consensusID
+	pm.viewID = viewID
 }
 
-// GetConsensusID returns the current viewchange consensusID
-func (pm *PbftMode) GetConsensusID() uint32 {
-	return pm.consensusID
+// GetViewID returns the current viewchange viewID
+func (pm *PbftMode) GetViewID() uint32 {
+	return pm.viewID
 }
 
 // switchPhase will switch PbftPhase to nextPhase if the desirePhase equals the nextPhase
@@ -87,7 +87,7 @@ func (consensus *Consensus) switchPhase(desirePhase PbftPhase) {
 	}
 }
 
-// GetNextLeaderKey uniquely determine who is the leader for given consensusID
+// GetNextLeaderKey uniquely determine who is the leader for given viewID
 func (consensus *Consensus) GetNextLeaderKey() *bls.PublicKey {
 	idx := consensus.getIndexOfPubKey(consensus.LeaderPubKey)
 	if idx == -1 {
@@ -132,23 +132,23 @@ func createTimeout() map[string]*utils.Timeout {
 }
 
 // startViewChange send a  new view change
-func (consensus *Consensus) startViewChange(consensusID uint32) {
+func (consensus *Consensus) startViewChange(viewID uint32) {
 	for k := range consensus.consensusTimeout {
 		if k != "viewchange" {
 			consensus.consensusTimeout[k].Stop()
 		}
 	}
 	consensus.mode.SetMode(ViewChanging)
-	consensus.mode.SetConsensusID(consensusID)
+	consensus.mode.SetViewID(viewID)
 	nextLeaderKey := consensus.GetNextLeaderKey()
 	consensus.LeaderPubKey = consensus.GetNextLeaderKey()
 	if nextLeaderKey.IsEqual(consensus.PubKey) {
 		return
 	}
 
-	diff := consensusID - consensus.consensusID
+	diff := viewID - consensus.viewID
 	duration := time.Duration(int64(diff) * int64(viewChangeDuration))
-	utils.GetLogInstance().Info("startViewChange", "consensusID", consensusID, "timeoutDuration", duration, "nextLeader", consensus.LeaderPubKey.GetHexString()[:10])
+	utils.GetLogInstance().Info("startViewChange", "viewID", viewID, "timeoutDuration", duration, "nextLeader", consensus.LeaderPubKey.GetHexString()[:10])
 
 	msgToSend := consensus.constructViewChangeMessage()
 	consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
@@ -160,7 +160,7 @@ func (consensus *Consensus) startViewChange(consensusID uint32) {
 
 // new leader send new view message
 func (consensus *Consensus) startNewView() {
-	utils.GetLogInstance().Info("startNewView", "consensusID", consensus.mode.GetConsensusID())
+	utils.GetLogInstance().Info("startNewView", "viewID", consensus.mode.GetViewID())
 	consensus.mode.SetMode(Normal)
 	consensus.switchPhase(Announce)
 
@@ -185,12 +185,12 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		return
 	}
 
-	utils.GetLogInstance().Warn("onViewChange received", "viewChangeID", recvMsg.ConsensusID, "myCurrentID", consensus.consensusID, "ValidatorAddress", consensus.SelfAddress)
+	utils.GetLogInstance().Warn("onViewChange received", "viewChangeID", recvMsg.ViewID, "myCurrentID", consensus.viewID, "ValidatorAddress", consensus.SelfAddress)
 
-	if consensus.seqNum > recvMsg.SeqNum {
+	if consensus.blockNum > recvMsg.BlockNum {
 		return
 	}
-	if consensus.mode.Mode() == ViewChanging && consensus.mode.GetConsensusID() > recvMsg.ConsensusID {
+	if consensus.mode.Mode() == ViewChanging && consensus.mode.GetViewID() > recvMsg.ViewID {
 		return
 	}
 	if err = verifyMessageSig(senderKey, msg); err != nil {
@@ -202,13 +202,13 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	defer consensus.vcLock.Unlock()
 
 	consensus.mode.SetMode(ViewChanging)
-	consensus.mode.SetConsensusID(recvMsg.ConsensusID)
+	consensus.mode.SetViewID(recvMsg.ViewID)
 
 	_, ok1 := consensus.nilSigs[consensus.SelfAddress]
 	_, ok2 := consensus.bhpSigs[consensus.SelfAddress]
 	if !(ok1 || ok2) {
 		// add own signature for newview message
-		preparedMsgs := consensus.pbftLog.GetMessagesByTypeSeq(msg_pb.MessageType_PREPARED, recvMsg.SeqNum)
+		preparedMsgs := consensus.pbftLog.GetMessagesByTypeSeq(msg_pb.MessageType_PREPARED, recvMsg.BlockNum)
 		if len(preparedMsgs) == 0 {
 			sign := consensus.priKey.SignHash(NIL)
 			consensus.nilSigs[consensus.SelfAddress] = sign
@@ -323,7 +323,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		utils.GetLogInstance().Warn("onViewChange", "sent newview message", len(msgToSend))
 		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 
-		consensus.consensusID = consensus.mode.GetConsensusID()
+		consensus.viewID = consensus.mode.GetViewID()
 		consensus.ResetViewChangeState()
 		consensus.ResetState()
 		consensus.consensusTimeout["viewchange"].Stop()
@@ -350,7 +350,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		utils.GetLogInstance().Warn("onNewView key not match", "senderKey", senderKey.GetHexString()[:10], "newLeaderKey", consensus.LeaderPubKey.GetHexString()[:10])
 		return
 	}
-	if consensus.seqNum > recvMsg.SeqNum {
+	if consensus.blockNum > recvMsg.BlockNum {
 		return
 	}
 	if err = verifyMessageSig(senderKey, msg); err != nil {
@@ -414,7 +414,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 
 		//create prepared message?: consensus.pbftLog.AddMessage(recvMsg)
 
-		if recvMsg.SeqNum > consensus.seqNum {
+		if recvMsg.BlockNum > consensus.blockNum {
 			return
 		}
 
@@ -431,7 +431,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		consensus.consensusTimeout["announce"].Start()
 		utils.GetLogInstance().Info("onNewView === announce")
 	}
-	consensus.consensusID = consensus.mode.GetConsensusID()
+	consensus.viewID = consensus.mode.GetViewID()
 	consensus.ResetViewChangeState()
 	consensus.ResetState()
 	consensus.consensusTimeout["viewchange"].Stop()

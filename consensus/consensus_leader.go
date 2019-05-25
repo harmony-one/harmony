@@ -316,14 +316,14 @@ func (consensus *Consensus) processCommitMessage(message *msg_pb.Message) {
 		consensus.reportMetrics(blockObj)
 
 		// Dump new block into level db.
-		explorer.GetStorageInstance(consensus.leader.IP, consensus.leader.Port, true).Dump(&blockObj, consensus.consensusID)
+		explorer.GetStorageInstance(consensus.leader.IP, consensus.leader.Port, true).Dump(&blockObj, consensus.viewID)
 
 		// Reset state to Finished, and clear other data.
 		consensus.ResetState()
-		consensus.consensusID++
+		consensus.viewID++
 
 		consensus.OnConsensusDone(&blockObj)
-		utils.GetLogInstance().Debug("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!", "consensusID", consensus.consensusID, "numOfSignatures", len(commitSigs))
+		utils.GetLogInstance().Debug("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!", "viewID", consensus.viewID, "numOfSignatures", len(commitSigs))
 
 		// TODO: remove this temporary delay
 		time.Sleep(500 * time.Millisecond)
