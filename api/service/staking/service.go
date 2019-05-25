@@ -117,7 +117,7 @@ func (s *Service) DoService() {
 
 	if msg := s.createStakingMessage(); msg != nil {
 		s.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msg))
-		utils.GetLogInstance().Error("Sent staking transaction to the network.")
+		utils.GetLogInstance().Info("Sent staking transaction to the network.")
 	} else {
 		utils.GetLogInstance().Error("Can not create staking transaction")
 	}

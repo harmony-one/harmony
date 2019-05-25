@@ -463,6 +463,7 @@ func (node *Node) AddNewBlock(newBlock *types.Block) {
 }
 
 func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
+	utils.GetLogInstance().Info("Got Ping Message")
 	if sender != "" {
 		_, ok := node.duplicatedPing.LoadOrStore(sender, true)
 		if ok {

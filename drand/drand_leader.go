@@ -99,7 +99,7 @@ func (dRand *DRand) ProcessMessageLeader(payload []byte) {
 
 // ProcessMessageValidator dispatches validator's consensus message.
 func (dRand *DRand) processCommitMessage(message *msg_pb.Message) {
-	utils.GetLogInstance().Error("[DRG] Leader received commit")
+	utils.GetLogInstance().Info("[DRG] Leader received commit")
 	if message.Type != msg_pb.MessageType_DRAND_COMMIT {
 		utils.GetLogInstance().Error("Wrong message type received", "expected", msg_pb.MessageType_DRAND_COMMIT, "got", message.Type)
 		return
