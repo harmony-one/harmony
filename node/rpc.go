@@ -38,16 +38,15 @@ var (
 	wsModules = []string{"net", "web3"}
 	wsOrigins = []string{"*"}
 
-	apiBackend *hmy.APIBackend
+	harmony *hmy.Harmony
 )
 
 // StartRPC start RPC service
 func (node *Node) StartRPC(nodePort string) error {
 	// Gather all the possible APIs to surface
-	apiBackend = hmy.NewBackend(node.blockchain, node.TxPool, node.accountManager, new(event.TypeMux))
+	harmony, _ = hmy.New(node.blockchain, node.TxPool, node.accountManager, new(event.TypeMux))
 
-	// TODO(ricl): add another layer corresponding to eth and les.
-	apis := hmyapi.GetAPIs(apiBackend)
+	apis := node.APIs()
 
 	for _, service := range node.serviceManager.GetServices() {
 		apis = append(apis, service.APIs()...)
@@ -140,16 +139,14 @@ func (node *Node) stopWS() {
 // NOTE, some of these services probably need to be moved to somewhere else.
 func (node *Node) APIs() []rpc.API {
 	// Gather all the possible APIs to surface
-	apiBackend = hmy.NewBackend(node.blockchain, node.TxPool, node.accountManager, new(event.TypeMux))
-
-	apis := hmyapi.GetAPIs(apiBackend)
+	apis := hmyapi.GetAPIs(harmony.APIBackend)
 
 	// Append all the local APIs and return
 	return append(apis, []rpc.API{
 		{
-			Namespace: "eth",
+			Namespace: "hmy",
 			Version:   "1.0",
-			Service:   filters.NewPublicFilterAPI(apiBackend, false),
+			Service:   filters.NewPublicFilterAPI(harmony.APIBackend, false),
 			Public:    true,
 		},
 	}...)

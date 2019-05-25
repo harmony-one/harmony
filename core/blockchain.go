@@ -1744,3 +1744,10 @@ func (bc *BlockChain) StoreNewShardState(block *types.Block, stakeInfo *map[comm
 	}
 	return shardState
 }
+
+// ChainDB ...
+// TODO(ricl): in eth, this is not exposed. I expose it here because I need it in Harmony object.
+// In eth, chainDB is initialized within Ethereum object
+func (bc *BlockChain) ChainDB() ethdb.Database {
+	return bc.db
+}
