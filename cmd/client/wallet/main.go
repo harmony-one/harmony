@@ -9,10 +9,7 @@ import (
 	"math/rand"
 	"os"
 	"path"
-	"syscall"
 	"time"
-
-	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/ethereum/go-ethereum/common"
 
@@ -245,30 +242,18 @@ func createWalletNode() *node.Node {
 	return w
 }
 
-func getPassphrase(prompt string) string {
-	fmt.Printf(prompt)
-	bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
-	if err != nil {
-		panic("read password error")
-	}
-	password := string(bytePassword)
-	fmt.Println()
-	return password
-}
-
 func processNewCommnad() {
 	newCommand.Parse(os.Args[2:])
 	noPass := *newCommandNoPassPtr
 	password := ""
 
 	if !noPass {
-		fmt.Printf("Passphrase: ")
-		bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
-		if err != nil {
-			panic("read password error")
+		password := utils.AskForPassphrase("Passphrase: ")
+		password2 := utils.AskForPassphrase("Passphrase again: ")
+		if password != password2 {
+			fmt.Printf("Passphrase doesn't match. Please try again!\n")
+			os.Exit(3)
 		}
-		password = string(bytePassword)
-		fmt.Println()
 	}
 
 	account, err := ks.NewAccount(password)
@@ -290,8 +275,8 @@ func processListCommand() {
 		password := ""
 		newpass := ""
 		if !noPass {
-			password = getPassphrase("Passphrase: ")
-			newpass = getPassphrase("Export Passphrase: ")
+			password = utils.AskForPassphrase("Passphrase: ")
+			newpass = utils.AskForPassphrase("Export Passphrase: ")
 		}
 		data, err := ks.Export(account, password, newpass)
 		if err == nil {
