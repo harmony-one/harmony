@@ -430,9 +430,10 @@ func (b *Block) WithBody(transactions []*Transaction, uncles []*Header) *Block {
 // Hash returns the keccak256 hash of b's header.
 // The hash is computed on the first call and cached thereafter.
 func (b *Block) Hash() common.Hash {
-	if hash := b.hash.Load(); hash != nil {
-		return hash.(common.Hash)
-	}
+	//if hash := b.hash.Load(); hash != nil {
+	//	return hash.(common.Hash)
+	//}
+	//b.Logger(utils.GetLogger()).Debug("finalizing and caching block hash")
 	v := b.header.Hash()
 	b.hash.Store(v)
 	return v
