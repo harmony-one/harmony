@@ -56,7 +56,7 @@ USAGE: $ME [OPTIONS] config_file_name
    -m min_peers   minimal number of peers to start consensus (default: $MIN)
    -s shards      number of shards (default: $SHARDS)
    -n             dryrun mode (default: $DRYRUN)
-   -S             enable sync test (default: $SYNC)
+   -S             disable sync test (default: $SYNC)
 
 This script will build all the binaries and start harmony and txgen based on the configuration file.
 
@@ -74,7 +74,7 @@ TXGEN=true
 DURATION=
 MIN=5
 SHARDS=2
-SYNC=false
+SYNC=true
 DRYRUN=
 
 while getopts "hdtD:m:s:nS" option; do
@@ -86,7 +86,7 @@ while getopts "hdtD:m:s:nS" option; do
       m) MIN=$OPTARG ;;
       s) SHARDS=$OPTARG ;;
       n) DRYRUN=echo ;;
-      S) SYNC=true ;;
+      S) SYNC=false ;;
    esac
 done
 
