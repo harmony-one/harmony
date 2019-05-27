@@ -228,7 +228,7 @@ pushLoop:
 	}
 }
 
-// SendTxsToShard sends txs to shard, currently just to beacon shard
+// SendTxsToShard sends txs to shard, currently just to beacon shard.
 func SendTxsToShard(clientNode *node.Node, txs types.Transactions) {
 	msg := proto_node.ConstructTransactionListMessageAccount(txs)
 	err := clientNode.GetHost().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeaconClient}, p2p_host.ConstructP2pMessage(byte(0), msg))
