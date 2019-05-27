@@ -298,21 +298,21 @@ func accumulateRewards(
 		// which is not signed in the usual manner therefore rewards nothing.
 		return nil
 	}
-	shardState, err := bc.ReadShardState(parentHeader.Epoch)
+	parentShardState, err := bc.ReadShardState(parentHeader.Epoch)
 	if err != nil {
 		return ctxerror.New("cannot read shard state",
 			"epoch", parentHeader.Epoch,
 		).WithCause(err)
 	}
-	parentShardState := shardState.FindCommitteeByID(parentHeader.ShardID)
-	if parentShardState == nil {
+	parentCommittee := parentShardState.FindCommitteeByID(parentHeader.ShardID)
+	if parentCommittee == nil {
 		return ctxerror.New("cannot find shard in the shard state",
 			"parentBlockNumber", parentHeader.Number,
 			"shardID", parentHeader.ShardID,
 		)
 	}
 	var committerKeys []*bls.PublicKey
-	for _, member := range parentShardState.NodeList {
+	for _, member := range parentCommittee.NodeList {
 		committerKey := new(bls.PublicKey)
 		err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
 		if err != nil {
@@ -330,7 +330,7 @@ func accumulateRewards(
 	}
 	totalAmount := big.NewInt(0)
 	numAccounts := 0
-	for idx, member := range parentShardState.NodeList {
+	for idx, member := range parentCommittee.NodeList {
 		if signed, err := mask.IndexEnabled(idx); err != nil {
 			return ctxerror.New("cannot check for committer bit",
 				"committerIndex", idx,
