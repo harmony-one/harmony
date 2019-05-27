@@ -1692,6 +1692,7 @@ func (bc *BlockChain) ReadShardState(epoch *big.Int) (types.ShardState, error) {
 func (bc *BlockChain) WriteShardState(
 	epoch *big.Int, shardState types.ShardState,
 ) error {
+	shardState = shardState.DeepCopy()
 	err := rawdb.WriteShardState(bc.db, epoch, shardState)
 	if err != nil {
 		return err

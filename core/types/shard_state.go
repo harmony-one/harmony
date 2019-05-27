@@ -33,6 +33,14 @@ func (ss ShardState) FindCommitteeByID(shardID uint32) *Committee {
 	return nil
 }
 
+func (ss ShardState) DeepCopy() ShardState {
+	var r ShardState
+	for _, c := range ss {
+		r = append(r, c.DeepCopy())
+	}
+	return r
+}
+
 // CompareShardState compares two ShardState instances.
 func CompareShardState(s1, s2 ShardState) int {
 	commonLen := len(s1)
@@ -103,6 +111,10 @@ func CompareNodeID(id1, id2 *NodeID) int {
 // NodeIDList is a list of NodeIDList.
 type NodeIDList []NodeID
 
+func (l NodeIDList) DeepCopy() NodeIDList {
+	return append(l[:0:0], l...)
+}
+
 // CompareNodeIDList compares two node ID lists.
 func CompareNodeIDList(l1, l2 NodeIDList) int {
 	commonLen := len(l1)
@@ -128,6 +140,12 @@ type Committee struct {
 	ShardID  uint32
 	Leader   NodeID
 	NodeList NodeIDList
+}
+
+func (c Committee) DeepCopy() Committee {
+	r := c
+	r.NodeList = r.NodeList.DeepCopy()
+	return r
 }
 
 // CompareCommittee compares two committees and their leader/node list.
