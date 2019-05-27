@@ -44,11 +44,10 @@ func (node *Node) StartRPC(nodePort string) error {
 	// Gather all the possible APIs to surface
 	apiBackend = core.NewBackend(node.blockchain, node.TxPool, node.accountManager)
 
+	// Get list of backend apis.
 	apis := hmyapi.GetAPIs(apiBackend)
-	for _, service := range node.serviceManager.GetServices() {
-		apis = append(apis, service.APIs()...)
-	}
 
+	// Get port.
 	port, _ := strconv.Atoi(nodePort)
 
 	httpEndpoint = fmt.Sprintf(":%v", port+rpcHTTPPortOffset)
@@ -62,6 +61,7 @@ func (node *Node) StartRPC(nodePort string) error {
 		return err
 	}
 
+	// TODO: Think about better design as we should not use global variables.
 	rpcAPIs = apis
 	return nil
 }
@@ -87,6 +87,8 @@ func (node *Node) startHTTP(endpoint string, apis []rpc.API, modules []string, c
 }
 
 // stopHTTP terminates the HTTP RPC endpoint.
+// TOOD: stopHTTP currently is never called.
+// This RPC service might need to be moved to service manager or better designed.
 func (node *Node) stopHTTP() {
 	if httpListener != nil {
 		httpListener.Close()
