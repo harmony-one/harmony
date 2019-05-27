@@ -315,7 +315,12 @@ func (node *Node) validateNewShardState(block *types.Block, stakeInfo *map[commo
 		if types.CompareShardState(expected, proposed) != 0 {
 			// TODO ek – log state proposal differences
 			// TODO ek – this error should trigger view change
-			return errors.New("shard state proposal is different from expected")
+			err := errors.New("shard state proposal is different from expected")
+			// TODO ek/chao – calculated shard state is different even with the
+			//  same input, i.e. it is nondeterministic.
+			//  Don't treat this as a blocker until we fix the nondeterminism.
+			//return err
+			ctxerror.Log15(utils.GetLogger().Warn, err)
 		}
 	} else {
 		// Regular validators fetch the local-shard copy on the beacon chain
