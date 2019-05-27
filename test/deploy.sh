@@ -86,7 +86,7 @@ while getopts "hdtD:m:s:nS" option; do
       m) MIN=$OPTARG ;;
       s) SHARDS=$OPTARG ;;
       n) DRYRUN=echo ;;
-      S) SYNC=true ;;
+      S) SYNC=false ;;
    esac
 done
 
