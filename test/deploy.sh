@@ -71,10 +71,10 @@ EOU
 
 DB=
 TXGEN=true
-DURATION=60
+DURATION=
 MIN=5
 SHARDS=2
-SYNC=true
+SYNC=false
 DRYRUN=
 
 while getopts "hdtD:m:s:nS" option; do
@@ -97,8 +97,12 @@ if [ -z "$config" ]; then
    usage
 fi
 
-if [ "$SYNC" == "true" ]; then
-    DURATION=200
+if [ "$SYNC" == "true" ] && [ -z "$DURATION" ]; then
+   DURATION=200 # set duration to be 200 if duration is unset.
+fi
+
+if [ -z "$DURATION" ]; then
+   DURATION=60 # if duration is unset, set it to be 60
 fi
 
 # Kill nodes if any
