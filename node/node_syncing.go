@@ -111,7 +111,7 @@ SyncingLoop:
 			node.State = NodeReadyForConsensus
 			node.stateMutex.Unlock()
 			if willJoinConsensus {
-				<-node.Consensus.ConsensusIDLowChan
+				<-node.Consensus.ViewIDLowChan
 			}
 		}
 	}

@@ -21,8 +21,8 @@ func TestNew(test *testing.T) {
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}
-	if consensus.consensusID != 0 {
-		test.Errorf("Consensus Id is initialized to the wrong value: %d", consensus.consensusID)
+	if consensus.viewID != 0 {
+		test.Errorf("Consensus Id is initialized to the wrong value: %d", consensus.viewID)
 	}
 
 	if !nodeconfig.GetDefaultConfig().IsLeader() {

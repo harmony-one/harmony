@@ -55,6 +55,11 @@ func (timeout *Timeout) Duration() time.Duration {
 	return timeout.d
 }
 
+// SetDuration set new duration for the timer
+func (timeout *Timeout) SetDuration(nd time.Duration) {
+	timeout.d = nd
+}
+
 // IsActive checks whether timeout clock is active;
 // A timeout is active means it's not stopped caused by stop
 // and also not expired with time elapses longer than duration from start

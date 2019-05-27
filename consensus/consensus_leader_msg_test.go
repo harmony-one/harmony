@@ -56,6 +56,7 @@ func TestConstructPreparedMessage(test *testing.T) {
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}
+	consensus.ResetState()
 	consensus.blockHash = [32]byte{}
 
 	message := "test string"
