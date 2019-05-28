@@ -88,7 +88,7 @@ var (
 	// Key file to store the private key of staking account.
 	stakingKeyFile = flag.String("staking_key", "./.stakingkey", "the private key file of the harmony node")
 	// Key file to store the private key
-	keyFile = flag.String("key", "./.hmykey", "the private key file of the harmony node")
+	keyFile = flag.String("key", "./.hmykey", "the p2p key file of the harmony node")
 	// isGenesis indicates this node is a genesis node
 	isGenesis = flag.Bool("is_genesis", false, "true means this node is a genesis node")
 	// isArchival indicates this node is an archival node that will save and archive current blockchain
@@ -100,10 +100,10 @@ var (
 	// logConn logs incoming/outgoing connections
 	logConn = flag.Bool("log_conn", false, "log incoming/outgoing connections")
 
-	keystoreDir = flag.String(".hmy/keystore", hmykey.DefaultKeyStoreDir, "The default keystore directory")
+	keystoreDir = flag.String("keystore", hmykey.DefaultKeyStoreDir, "The default keystore directory")
 
 	// true by default for now.  will be switch to false once have full support.
-	hmyNoPass = flag.Bool("nopass", true, "No passphrase for the key (testing only)")
+	hmyNoPass = flag.Bool("nopass", false, "No passphrase for the key (testing only)")
 
 	ks        *keystore.KeyStore
 	myAccount accounts.Account
@@ -353,7 +353,7 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// Set the consensus ID to be the current block number
 	height := currentNode.Blockchain().CurrentBlock().NumberU64()
 
-	currentConsensus.SetConsensusID(uint32(height))
+	currentConsensus.SetViewID(uint32(height))
 	utils.GetLogInstance().Info("Init Blockchain", "height", height)
 
 	// Assign closure functions to the consensus object

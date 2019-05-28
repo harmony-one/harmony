@@ -100,6 +100,7 @@ func (node *Node) WaitForConsensusReady(readySignal chan struct{}, stopChan chan
 
 // WaitForConsensusReadyv2 listen for the readiness signal from consensus and generate new block for consensus.
 // only leader will receive the ready signal
+// TODO: clean pending transactions for validators; or validators not prepare pending transactions
 func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan chan struct{}, stoppedChan chan struct{}) {
 	go func() {
 		// Setup stoppedChan

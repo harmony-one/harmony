@@ -11,6 +11,7 @@ SRC[wallet]="cmd/client/wallet/main.go cmd/client/wallet/generated_wallet.ini.go
 BINDIR=bin
 BUCKET=unique-bucket-bin
 PUBBUCKET=pub.harmony.one
+REL=cello
 GOOS=linux
 GOARCH=amd64
 FOLDER=/${WHOAMI:-$USER}
@@ -144,22 +145,19 @@ function upload_wallet
 
    case "$OS" in
       "Linux")
-         DEST=wallet/wallet
-         DESTDIR=wallet ;;
+         FOLDER=release/$REL/linux-x86_64 ;;
       "Darwin")
-         DEST=wallet.osx/wallet
-         DESTDIR=wallet.osx ;;
+         FOLDER=release/$REL/darwin-x86_64 ;;
       *)
          echo "Unsupported OS: $OS"
          return ;;
    esac
 
-   $AWSCLI s3 cp $BINDIR/wallet s3://$PUBBUCKET/$DEST
-   $AWSCLI s3api put-object-acl --bucket $PUBBUCKET --key $DEST --acl public-read
+   $AWSCLI s3 cp $BINDIR/wallet s3://$PUBBUCKET/$FOLDER/wallet --acl public-read
 
    for lib in "${!LIB[@]}"; do
       if [ -e ${LIB[$lib]} ]; then
-         $AWSCLI s3 cp ${LIB[$lib]} s3://${PUBBUCKET}/$DESTDIR/$lib --acl public-read
+         $AWSCLI s3 cp ${LIB[$lib]} s3://${PUBBUCKET}/$FOLDER/$lib --acl public-read
       else
          echo "!! MISSING ${LIB[$lib]} !!"
       fi

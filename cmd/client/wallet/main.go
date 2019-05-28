@@ -9,10 +9,7 @@ import (
 	"math/rand"
 	"os"
 	"path"
-	"syscall"
 	"time"
-
-	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/ethereum/go-ethereum/common"
 
@@ -67,8 +64,11 @@ var (
 	newCommandNoPassPtr = newCommand.Bool("nopass", false, "The account has no pass phrase")
 
 	// List subcommands
-	listCommand          = flag.NewFlagSet("list", flag.ExitOnError)
-	listCommandNoPassPtr = listCommand.Bool("nopass", false, "The account has no pass phrase")
+	listCommand = flag.NewFlagSet("list", flag.ExitOnError)
+
+	// Export subcommands
+	exportCommand           = flag.NewFlagSet("export", flag.ExitOnError)
+	exportCommandAccountPtr = exportCommand.String("account", "", "The account to be exported")
 
 	// Account subcommands
 	accountImportCommand = flag.NewFlagSet("import", flag.ExitOnError)
@@ -121,7 +121,6 @@ func main() {
 		fmt.Println("    1. new           - Generates a new account and store the private key locally")
 		fmt.Println("        --nopass         - The private key has no passphrase (for test only)")
 		fmt.Println("    2. list          - Lists all accounts in local keystore")
-		fmt.Println("        --nopass         - The private key has no passphrase (for test only)")
 		fmt.Println("    3. removeAll     - Removes all accounts in local keystore")
 		fmt.Println("    4. import        - Imports a new account by private key")
 		fmt.Println("        --pass           - The passphrase of the private key to import")
@@ -137,6 +136,8 @@ func main() {
 		fmt.Println("        --shardID        - The shard Id for the transfer")
 		fmt.Println("        --inputData      - Base64-encoded input data to embed in the transaction")
 		fmt.Println("        --pass           - Passphrase of sender's private key")
+		fmt.Println("    8. export        - Export account key to a new file")
+		fmt.Println("        --account        - Specify the account to export. Empty will export every key.")
 		os.Exit(1)
 	}
 
@@ -178,6 +179,8 @@ ARG:
 		processNewCommnad()
 	case "list":
 		processListCommand()
+	case "export":
+		processExportCommand()
 	case "removeAll":
 		clearKeystore()
 	case "import":
@@ -248,30 +251,18 @@ func createWalletNode() *node.Node {
 	return w
 }
 
-func getPassphrase(prompt string) string {
-	fmt.Printf(prompt)
-	bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
-	if err != nil {
-		panic("read password error")
-	}
-	password := string(bytePassword)
-	fmt.Println()
-	return password
-}
-
 func processNewCommnad() {
 	newCommand.Parse(os.Args[2:])
 	noPass := *newCommandNoPassPtr
 	password := ""
 
 	if !noPass {
-		fmt.Printf("Passphrase: ")
-		bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
-		if err != nil {
-			panic("read password error")
+		password = utils.AskForPassphrase("Passphrase: ")
+		password2 := utils.AskForPassphrase("Passphrase again: ")
+		if password != password2 {
+			fmt.Printf("Passphrase doesn't match. Please try again!\n")
+			os.Exit(3)
 		}
-		password = string(bytePassword)
-		fmt.Println()
 	}
 
 	account, err := ks.NewAccount(password)
@@ -282,38 +273,53 @@ func processNewCommnad() {
 	fmt.Printf("URL: %s\n", account.URL)
 }
 
+func _exportAccount(account accounts.Account) {
+	fmt.Printf("account: %s\n", account.Address.Hex())
+	fmt.Printf("URL: %s\n", account.URL)
+	pass := utils.AskForPassphrase("Original Passphrase: ")
+	newpass := utils.AskForPassphrase("Export Passphrase: ")
+
+	data, err := ks.Export(account, pass, newpass)
+	if err == nil {
+		filename := fmt.Sprintf(".hmy/%s.key", account.Address.Hex())
+		f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			panic("Failed to open keystore")
+		}
+		_, err = f.Write(data)
+		if err != nil {
+			panic("Failed to write to keystore")
+		}
+		f.Close()
+		fmt.Printf("Exported keyfile to: %v\n", filename)
+		return
+	}
+	switch err {
+	case accounts.ErrInvalidPassphrase:
+		fmt.Println("Invalid Passphrase")
+	default:
+		fmt.Printf("export error: %v\n", err)
+	}
+}
+
 func processListCommand() {
 	listCommand.Parse(os.Args[2:])
-	noPass := *listCommandNoPassPtr
 
 	allAccounts := ks.Accounts()
 	for _, account := range allAccounts {
 		fmt.Printf("account: %s\n", account.Address.Hex())
 		fmt.Printf("URL: %s\n", account.URL)
-		password := ""
-		newpass := ""
-		if !noPass {
-			password = getPassphrase("Passphrase: ")
-			newpass = getPassphrase("Export Passphrase: ")
-		}
-		data, err := ks.Export(account, password, newpass)
-		if err == nil {
-			f, err := os.OpenFile(fmt.Sprintf(".hmy/%s.key", account.Address.Hex()), os.O_CREATE|os.O_WRONLY, 0644)
-			if err != nil {
-				panic("Failed to open keystore")
-			}
-			_, err = f.Write(data)
-			if err != nil {
-				panic("Failed to write to keystore")
-			}
-			f.Close()
-			continue
-		}
-		switch err {
-		case accounts.ErrInvalidPassphrase:
-			fmt.Println("Invalid Passphrase")
-		default:
-			fmt.Printf("export error: %v\n", err)
+	}
+}
+
+func processExportCommand() {
+	exportCommand.Parse(os.Args[2:])
+	acc := *exportCommandAccountPtr
+
+	allAccounts := ks.Accounts()
+	for _, account := range allAccounts {
+		if acc == "" || acc == account.Address.Hex() {
+			_exportAccount(account)
 		}
 	}
 }
@@ -450,7 +456,13 @@ func processTransferCommand() {
 		return
 	}
 
-	ks.Unlock(account, senderPass)
+	err = ks.Unlock(account, senderPass)
+	if err != nil {
+		fmt.Printf("Unlock account failed! %v\n", err)
+		return
+	}
+
+	fmt.Printf("Unlock account succeeded! '%v'\n", senderPass)
 
 	tx, err = ks.SignTx(account, tx, nil)
 	if err != nil {

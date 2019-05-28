@@ -161,7 +161,7 @@ func main() {
 	time.Sleep(20 * time.Second)
 	start := time.Now()
 	totalTime := float64(*duration)
-	utils.GetLogInstance().Debug("Total Duration", "totalTime", totalTime)
+	utils.GetLogInstance().Debug("Total Duration", "totalTime", totalTime, "RunForever", isDurationForever(totalTime))
 	ticker := time.NewTicker(checkFrequency * time.Second)
 	txGen.DoSyncWithoutConsensus()
 syncLoop:
@@ -210,7 +210,7 @@ pushLoop:
 	for {
 		t := time.Now()
 		utils.GetLogInstance().Debug("Current running time", "running time", t.Sub(start).Seconds(), "totaltime", totalTime)
-		if totalTime > 0 && t.Sub(start).Seconds() >= totalTime {
+		if !isDurationForever(totalTime) && t.Sub(start).Seconds() >= totalTime {
 			utils.GetLogInstance().Debug("Generator timer ended.", "duration", (int(t.Sub(start))), "startTime", start, "totalTime", totalTime)
 			break pushLoop
 		}
@@ -252,4 +252,8 @@ func GenerateSimulatedTransactionsAccount(shardID uint32, node *node.Node, setti
 		txs[i] = tx
 	}
 	return txs, nil
+}
+
+func isDurationForever(duration float64) bool {
+	return duration <= 0
 }

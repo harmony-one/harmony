@@ -46,7 +46,7 @@ func TestPopulateMessageFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
-	consensus.consensusID = 2
+	consensus.viewID = 2
 	consensus.blockHash = blockHash
 
 	msg := &msg_pb.Message{
@@ -57,7 +57,7 @@ func TestPopulateMessageFields(t *testing.T) {
 	consensusMsg := msg.GetConsensus()
 	consensus.populateMessageFields(consensusMsg)
 
-	if consensusMsg.ConsensusId != 2 {
+	if consensusMsg.ViewId != 2 {
 		t.Errorf("Consensus ID is not populated correctly")
 	}
 	if !bytes.Equal(consensusMsg.BlockHash[:], blockHash[:]) {
@@ -79,7 +79,7 @@ func TestSignAndMarshalConsensusMessage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
-	consensus.consensusID = 2
+	consensus.viewID = 2
 	consensus.blockHash = blockHash
 	consensus.SelfAddress = common.Address{}
 
@@ -94,7 +94,7 @@ func TestSignAndMarshalConsensusMessage(t *testing.T) {
 	}
 }
 
-func TestSetConsensusID(t *testing.T) {
+func TestSetViewID(t *testing.T) {
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2pimpl.NewHost(&leader, priKey)
@@ -107,8 +107,8 @@ func TestSetConsensusID(t *testing.T) {
 	}
 
 	height := uint32(1000)
-	consensus.SetConsensusID(height)
-	if consensus.consensusID != height {
-		t.Errorf("Cannot set consensus ID. Got: %v, Expected: %v", consensus.consensusID, height)
+	consensus.SetViewID(height)
+	if consensus.viewID != height {
+		t.Errorf("Cannot set consensus ID. Got: %v, Expected: %v", consensus.viewID, height)
 	}
 }

@@ -119,9 +119,7 @@ SyncingLoop:
 			node.State = NodeReadyForConsensus
 			node.stateMutex.Unlock()
 			if willJoinConsensus {
-				getLogger().Debug("waiting until we have missed a consensus")
-				<-node.Consensus.ConsensusIDLowChan
-				getLogger().Debug("missed a consensus; need to sync again")
+				<-node.Consensus.ViewIDLowChan
 			}
 		}
 	}

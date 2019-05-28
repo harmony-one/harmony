@@ -9,9 +9,8 @@ import (
 // Construct the prepare message to send to leader (assumption the consensus data is already verified)
 func (consensus *Consensus) constructPrepareMessage() []byte {
 	message := &msg_pb.Message{
-		ReceiverType: msg_pb.ReceiverType_LEADER,
-		ServiceType:  msg_pb.ServiceType_CONSENSUS,
-		Type:         msg_pb.MessageType_PREPARE,
+		ServiceType: msg_pb.ServiceType_CONSENSUS,
+		Type:        msg_pb.MessageType_PREPARE,
 		Request: &msg_pb.Message_Consensus{
 			Consensus: &msg_pb.ConsensusRequest{},
 		},
@@ -36,9 +35,8 @@ func (consensus *Consensus) constructPrepareMessage() []byte {
 // Construct the commit message which contains the signature on the multi-sig of prepare phase.
 func (consensus *Consensus) constructCommitMessage(multiSigAndBitmap []byte) []byte {
 	message := &msg_pb.Message{
-		ReceiverType: msg_pb.ReceiverType_LEADER,
-		ServiceType:  msg_pb.ServiceType_CONSENSUS,
-		Type:         msg_pb.MessageType_COMMIT,
+		ServiceType: msg_pb.ServiceType_CONSENSUS,
+		Type:        msg_pb.MessageType_COMMIT,
 		Request: &msg_pb.Message_Consensus{
 			Consensus: &msg_pb.ConsensusRequest{},
 		},
