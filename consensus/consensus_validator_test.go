@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/golang/mock/gomock"
 	protobuf "github.com/golang/protobuf/proto"
-	//"github.com/stretchr/testify/assert"
 
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
