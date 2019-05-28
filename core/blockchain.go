@@ -72,7 +72,10 @@ const (
 	// BlocksPerEpoch is the number of blocks in one epoch
 	// currently set to small number for testing
 	// in future, this need to be adjusted dynamically instead of constant
-	BlocksPerEpoch = 10000
+	// TODO ek – inflate to disable resharding until we can 1) fix shard
+	//  state mutation bug and 2) implement key passphrase recycle across
+	//  process restart (exec) for shard migration
+	BlocksPerEpoch = 1000000000000
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	BlockChainVersion = 3
