@@ -2,7 +2,7 @@
 
 BUCKET=pub.harmony.one
 OS=$(uname -s)
-REL=cello
+REL=drum
 
 if [ "$OS" == "Darwin" ]; then
    FOLDER=release/$REL/darwin-x86_64/
