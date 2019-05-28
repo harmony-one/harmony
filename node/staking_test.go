@@ -37,7 +37,7 @@ func TestUpdateStakingList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
-	node := New(host, consensus, nil, false)
+	node := New(host, consensus, testDBFactory, false)
 
 	for i := 0; i < 5; i++ {
 		selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)

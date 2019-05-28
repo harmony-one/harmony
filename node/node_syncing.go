@@ -6,7 +6,9 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
+
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
 	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
@@ -42,7 +44,7 @@ func (node *Node) getNeighborPeers(neighbor *sync.Map) []p2p.Peer {
 
 // DoSyncWithoutConsensus gets sync-ed to blockchain without joining consensus
 func (node *Node) DoSyncWithoutConsensus() {
-	go node.DoSyncing(node.blockchain, node.Worker, node.GetSyncingPeers, false) //Don't join consensus
+	go node.DoSyncing(node.Blockchain(), node.Worker, node.GetSyncingPeers, false) //Don't join consensus
 }
 
 // GetBeaconSyncingPeers returns a list of peers for beaconchain syncing
@@ -71,7 +73,7 @@ func (node *Node) DoBeaconSyncing() {
 				}
 			}
 			node.beaconSync.AddLastMileBlock(beaconBlock)
-			node.beaconSync.SyncLoop(node.beaconChain, node.BeaconWorker, false, true)
+			node.beaconSync.SyncLoop(node.Beaconchain(), node.BeaconWorker, false, true)
 		}
 	}
 }
@@ -80,12 +82,16 @@ func (node *Node) DoBeaconSyncing() {
 func (node *Node) DoSyncing(bc *core.BlockChain, worker *worker.Worker, getPeers func() []p2p.Peer, willJoinConsensus bool) {
 	ticker := time.NewTicker(SyncFrequency * time.Second)
 
+	logger := utils.GetLogInstance()
+	getLogger := func() log.Logger { return utils.WithCallerSkip(logger, 1) }
 SyncingLoop:
 	for {
 		select {
 		case <-ticker.C:
 			if node.stateSync == nil {
 				node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
+				logger = logger.New("syncID", node.GetSyncID())
+				getLogger().Debug("initialized state sync")
 			}
 			if node.stateSync.GetActivePeerNumber() == 0 {
 				peers := getPeers()
@@ -100,7 +106,9 @@ SyncingLoop:
 				node.State = NodeNotInSync
 				node.stateMutex.Unlock()
 				node.stateSync.SyncLoop(bc, worker, willJoinConsensus, false)
+				getLogger().Debug("now in sync")
 				if willJoinConsensus {
+					getLogger().Debug("entering NodeReadyForConsensus state")
 					node.stateMutex.Lock()
 					node.State = NodeReadyForConsensus
 					node.stateMutex.Unlock()
@@ -129,7 +137,7 @@ func (node *Node) SupportSyncing() {
 	go node.SendNewBlockToUnsync()
 
 	if node.NodeConfig.Role() != nodeconfig.ShardLeader && node.NodeConfig.Role() != nodeconfig.BeaconLeader {
-		go node.DoSyncing(node.blockchain, node.Worker, node.GetSyncingPeers, true)
+		go node.DoSyncing(node.Blockchain(), node.Worker, node.GetSyncingPeers, true)
 	}
 }
 
@@ -192,12 +200,12 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 	case downloader_pb.DownloaderRequest_HEADER:
 		var startHeaderHash []byte
 		if request.BlockHash == nil {
-			tmp := node.blockchain.Genesis().Hash()
+			tmp := node.Blockchain().Genesis().Hash()
 			startHeaderHash = tmp[:]
 		} else {
 			startHeaderHash = request.BlockHash
 		}
-		for block := node.blockchain.CurrentBlock(); block != nil; block = node.blockchain.GetBlockByHash(block.Header().ParentHash) {
+		for block := node.Blockchain().CurrentBlock(); block != nil; block = node.Blockchain().GetBlockByHash(block.Header().ParentHash) {
 			blockHash := block.Hash()
 			if bytes.Compare(blockHash[:], startHeaderHash) == 0 {
 				break
@@ -209,7 +217,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 		for _, bytes := range request.Hashes {
 			var hash common.Hash
 			hash.SetBytes(bytes)
-			block := node.blockchain.GetBlockByHash(hash)
+			block := node.Blockchain().GetBlockByHash(hash)
 			if block == nil {
 				continue
 			}
@@ -220,7 +228,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 		}
 
 	case downloader_pb.DownloaderRequest_BLOCKHEIGHT:
-		response.BlockHeight = node.blockchain.CurrentBlock().NumberU64()
+		response.BlockHeight = node.Blockchain().CurrentBlock().NumberU64()
 
 	// this is the out of sync node acts as grpc server side
 	case downloader_pb.DownloaderRequest_NEWBLOCK:

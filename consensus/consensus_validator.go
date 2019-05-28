@@ -9,6 +9,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/attack"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
@@ -80,6 +81,16 @@ func (consensus *Consensus) processAnnounceMessage(message *msg_pb.Message) {
 	// check block data transactions
 	if err := consensus.VerifyHeader(consensus.ChainReader, blockObj.Header(), false); err != nil {
 		utils.GetLogInstance().Warn("Block content is not verified successfully", "error", err)
+		return
+	}
+	if consensus.BlockVerifier == nil {
+		// do nothing
+	} else if err := consensus.BlockVerifier(&blockObj); err != nil {
+		// TODO ek – maybe we could do this in commit phase
+		err := ctxerror.New("block verification failed",
+			"blockHash", blockObj.Hash(),
+		).WithCause(err)
+		ctxerror.Log15(utils.GetLogInstance().Warn, err)
 		return
 	}
 

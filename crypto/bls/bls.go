@@ -2,9 +2,10 @@ package bls
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
+
+	"github.com/harmony-one/harmony/internal/ctxerror"
 )
 
 func init() {
@@ -84,7 +85,9 @@ func (m *Mask) Len() int {
 // cosigners 0-7, bits 0-7 of byte 1 correspond to cosigners 8-15, etc.
 func (m *Mask) SetMask(mask []byte) error {
 	if m.Len() != len(mask) {
-		return fmt.Errorf("mismatching Bitmap lengths")
+		return ctxerror.New("mismatching bitmap lengths",
+			"expectedBitmapLength", m.Len(),
+			"providedBitmapLength", len(mask))
 	}
 	for i := range m.publics {
 		byt := i >> 3

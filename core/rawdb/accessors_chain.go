@@ -24,7 +24,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
+
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/ctxerror"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // ReadCanonicalHash retrieves the hash assigned to a canonical block number.
@@ -337,6 +340,30 @@ func ReadBlock(db DatabaseReader, hash common.Hash, number uint64) *types.Block 
 func WriteBlock(db DatabaseWriter, block *types.Block) {
 	WriteBody(db, block.Hash(), block.NumberU64(), block.Body())
 	WriteHeader(db, block.Header())
+	// TODO ek – maybe roll the below into WriteHeader()
+	epoch := block.Header().Epoch
+	if epoch == nil {
+		// backward compatibility
+		return
+	}
+	epoch = new(big.Int).Set(epoch)
+	epochBlockNum := block.Number()
+	writeOne := func() {
+		if err := WriteEpochBlockNumber(db, epoch, epochBlockNum); err != nil {
+			ctxerror.Log15(utils.GetLogInstance().Error, err)
+		}
+	}
+	// A block may be a genesis block AND end-of-epoch block at the same time.
+	if epochBlockNum.Sign() == 0 {
+		// Genesis block; record this block's epoch and block numbers.
+		writeOne()
+	}
+	if len(block.Header().ShardState) > 0 {
+		// End-of-epoch block; record the next epoch after this block.
+		epoch = new(big.Int).Add(epoch, common.Big1)
+		epochBlockNum = new(big.Int).Add(epochBlockNum, common.Big1)
+		writeOne()
+	}
 }
 
 // DeleteBlock removes all block data associated with a hash.
@@ -375,26 +402,56 @@ func FindCommonAncestor(db DatabaseReader, a, b *types.Header) *types.Header {
 }
 
 // ReadShardState retrieves sharding state.
-func ReadShardState(db DatabaseReader, hash common.Hash, number uint64) types.ShardState {
-	data, _ := db.Get(shardStateKey(number, hash))
-	if len(data) == 0 {
-		return nil
+func ReadShardState(
+	db DatabaseReader, epoch *big.Int,
+) (shardState types.ShardState, err error) {
+	var data []byte
+	data, err = db.Get(shardStateKey(epoch))
+	if err != nil {
+		return nil, ctxerror.New("cannot read sharding state from rawdb",
+			"epoch", epoch,
+		).WithCause(err)
 	}
-	shardState := types.ShardState{}
-	if err := rlp.DecodeBytes(data, &shardState); err != nil {
-		log.Error("Fail to decode sharding state", "hash", hash, "number", number, "err", err)
-		return nil
+	if err = rlp.DecodeBytes(data, &shardState); err != nil {
+		return nil, ctxerror.New("cannot decode sharding state",
+			"epoch", epoch,
+		).WithCause(err)
 	}
-	return shardState
+	return shardState, nil
 }
 
 // WriteShardState stores sharding state into database.
-func WriteShardState(db DatabaseWriter, hash common.Hash, number uint64, shardState types.ShardState) {
+func WriteShardState(
+	db DatabaseWriter, epoch *big.Int, shardState types.ShardState,
+) (err error) {
 	data, err := rlp.EncodeToBytes(shardState)
 	if err != nil {
-		log.Crit("Failed to encode sharding state", "err", err)
+		return ctxerror.New("cannot encode sharding state",
+			"epoch", epoch,
+		).WithCause(err)
 	}
-	if err := db.Put(shardStateKey(number, hash), data); err != nil {
-		log.Crit("Failed to store sharding state", "err", err)
+	if err = db.Put(shardStateKey(epoch), data); err != nil {
+		return ctxerror.New("cannot write sharding state",
+			"epoch", epoch,
+		).WithCause(err)
 	}
+	utils.GetLogger().Info("wrote sharding state",
+		"epoch", epoch, "numShards", len(shardState))
+	return nil
+}
+
+// ReadEpochBlockNumber retrieves the epoch block number for the given epoch,
+// or nil if the given epoch is not found in the database.
+func ReadEpochBlockNumber(db DatabaseReader, epoch *big.Int) (*big.Int, error) {
+	data, err := db.Get(epochBlockNumberKey(epoch))
+	if err != nil {
+		return nil, err
+	}
+	return new(big.Int).SetBytes(data), nil
+}
+
+// WriteEpochBlockNumber stores the given epoch-number-to-epoch-block-number
+// in the database.
+func WriteEpochBlockNumber(db DatabaseWriter, epoch, blockNum *big.Int) error {
+	return db.Put(epochBlockNumberKey(epoch), blockNum.Bytes())
 }

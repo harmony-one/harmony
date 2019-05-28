@@ -22,6 +22,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	hmykey "github.com/harmony-one/harmony/internal/keystore"
 	"github.com/harmony-one/harmony/internal/profiler"
+	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/internal/utils/contract"
 	"github.com/harmony-one/harmony/node"
@@ -109,6 +110,9 @@ var (
 	myPass    = ""
 	// logging verbosity
 	verbosity = flag.Int("verbosity", 5, "Logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail (default: 5)")
+
+	// dbDir is the database directory.
+	dbDir = flag.String("db_dir", "", "blockchain database directory")
 )
 
 func initSetup() {
@@ -229,16 +233,6 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	}
 	// Key Setup ================= [End]
 
-	// Initialize leveldb for main blockchain and beacon.
-	if nodeConfig.MainDB, err = InitLDBDatabase(*ip, *port, *freshDB, false); err != nil {
-		panic(err)
-	}
-	if myShardID != 0 {
-		if nodeConfig.BeaconDB, err = InitLDBDatabase(*ip, *port, *freshDB, true); err != nil {
-			panic(err)
-		}
-	}
-
 	nodeConfig.SelfPeer = p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nodeConfig.ConsensusPubKey}
 
 	if *accountIndex%core.GenesisShardSize == 0 { // The first node in a shard is the leader at genesis
@@ -258,6 +252,8 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 
 	nodeConfig.Host.AddPeer(&nodeConfig.Leader)
 
+	nodeConfig.DBDir = *dbDir
+
 	return nodeConfig
 }
 
@@ -273,7 +269,8 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentConsensus.MinPeers = *minPeers
 
 	// Current node.
-	currentNode := node.New(nodeConfig.Host, currentConsensus, nodeConfig.MainDB, *isArchival)
+	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
+	currentNode := node.New(nodeConfig.Host, currentConsensus, chainDBFactory, *isArchival)
 	currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
 	currentNode.StakingAccount = myAccount
 	utils.GetLogInstance().Info("node account set",
@@ -348,10 +345,6 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentNode.Consensus.RegisterRndChannel(dRand.RndChannel)
 	currentNode.DRand = dRand
 
-	if currentConsensus.ShardID != 0 {
-		currentNode.AddBeaconChainDatabase(nodeConfig.BeaconDB)
-	}
-
 	// This needs to be executed after consensus and drand are setup
 	if !*isNewNode || *shardID > -1 { // initial staking new node doesn't need to initialize shard state
 		currentNode.InitShardState(*shardID == -1 && !*isNewNode) // TODO: Have a better why to distinguish non-genesis node
@@ -395,7 +388,15 @@ func main() {
 	//	go currentNode.SupportBeaconSyncing()
 	//}
 
-	utils.GetLogInstance().Info("==== New Harmony Node ====", "BlsPubKey", hex.EncodeToString(nodeConfig.ConsensusPubKey.Serialize()), "ShardID", nodeConfig.ShardID, "ShardGroupID", nodeConfig.GetShardGroupID(), "BeaconGroupID", nodeConfig.GetBeaconGroupID(), "ClientGroupID", nodeConfig.GetClientGroupID(), "Role", currentNode.NodeConfig.Role(), "multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, nodeConfig.Host.GetID().Pretty()))
+	utils.GetLogInstance().Info("==== New Harmony Node ====",
+		"BlsPubKey", hex.EncodeToString(nodeConfig.ConsensusPubKey.Serialize()),
+		"ShardID", nodeConfig.ShardID,
+		"ShardGroupID", nodeConfig.GetShardGroupID(),
+		"BeaconGroupID", nodeConfig.GetBeaconGroupID(),
+		"ClientGroupID", nodeConfig.GetClientGroupID(),
+		"Role", currentNode.NodeConfig.Role(),
+		"multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s",
+			*ip, *port, nodeConfig.Host.GetID().Pretty()))
 
 	currentNode.MaybeKeepSendingPongMessage()
 	go currentNode.SupportSyncing()

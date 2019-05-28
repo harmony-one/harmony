@@ -56,6 +56,7 @@ type Genesis struct {
 	Coinbase       common.Address      `json:"coinbase"`
 	Alloc          GenesisAlloc        `json:"alloc"      gencodec:"required"`
 	ShardStateHash common.Hash         `json:"shardStateHash"`
+	ShardState     types.ShardState    `json:"shardState"`
 
 	// These fields are used for consensus tests. Please don't use them
 	// in actual genesis blocks.
@@ -240,6 +241,7 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 	head := &types.Header{
 		Number:         new(big.Int).SetUint64(g.Number),
 		Nonce:          types.EncodeNonce(g.Nonce),
+		Epoch:          big.NewInt(0),
 		ShardID:        g.ShardID,
 		Time:           new(big.Int).SetUint64(g.Timestamp),
 		ParentHash:     g.ParentHash,
@@ -251,6 +253,7 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 		Coinbase:       g.Coinbase,
 		Root:           root,
 		ShardStateHash: g.ShardStateHash,
+		// ShardState is absent in epoch block; genesis shard state is implied
 	}
 	if g.GasLimit == 0 {
 		head.GasLimit = 10000000000 // TODO(RJ): figure out better solution. // params.GenesisGasLimit

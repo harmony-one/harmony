@@ -41,15 +41,16 @@ require (
 	github.com/multiformats/go-multiaddr v0.0.2
 	github.com/multiformats/go-multiaddr-net v0.0.1
 	github.com/pborman/uuid v1.2.0
+	github.com/pkg/errors v0.8.1
 	github.com/rjeczalik/notify v0.9.2
 	github.com/rs/cors v1.6.0 // indirect
 	github.com/shirou/gopsutil v2.18.12+incompatible
 	github.com/smartystreets/goconvey v0.0.0-20190330032615-68dc04aab96a // indirect
 	github.com/stretchr/testify v1.3.0
+	github.com/syndtr/goleveldb v1.0.0
 	github.com/whyrusleeping/go-logging v0.0.0-20170515211332-0457bb6b88fc
 	golang.org/x/crypto v0.0.0-20190313024323-a1f597ede03a
 	golang.org/x/lint v0.0.0-20190313153728-d0100b6bd8b3
-	golang.org/x/net v0.0.0-20190313220215-9f648a60d977
 	golang.org/x/tools v0.0.0-20190328211700-ab21143f2384
 	google.golang.org/grpc v1.19.0
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127

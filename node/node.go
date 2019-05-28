@@ -2,17 +2,17 @@ package node
 
 import (
 	"crypto/ecdsa"
+	"encoding/hex"
 	"fmt"
 	"math/big"
-	"os"
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/bls/ffi/go/bls"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/api/client"
 	clientService "github.com/harmony-one/harmony/api/client/service"
@@ -25,10 +25,11 @@ import (
 	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/drand"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/ctxerror"
+	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
@@ -94,9 +95,8 @@ type Node struct {
 	pendingTxMutex         sync.Mutex
 	DRand                  *drand.DRand // The instance for distributed randomness protocol
 
-	blockchain  *core.BlockChain   // The blockchain for the shard where this node belongs
-	beaconChain *core.BlockChain   // The blockchain for beacon chain.
-	db          *ethdb.LDBDatabase // LevelDB to store blockchain.
+	// Shard databases
+	shardChains shardchain.Collection
 
 	ClientPeer *p2p.Peer      // The peer for the harmony tx generator client, used for leaders to return proof-of-accept
 	Client     *client.Client // The presence of a client object means this node will also act as a client
@@ -148,8 +148,9 @@ type Node struct {
 	// TODO: leochen, can we use multiple account for staking?
 	StakingAccount accounts.Account
 
-	// For test only
-	TestBankKeys                 []*ecdsa.PrivateKey
+	// For test only; TODO ek – remove this
+	TestBankKeys []*ecdsa.PrivateKey
+
 	ContractDeployerKey          *ecdsa.PrivateKey
 	ContractDeployerCurrentNonce uint64 // The nonce of the deployer contract at current block
 	ContractAddresses            []common.Address
@@ -183,11 +184,41 @@ type Node struct {
 	ContractCaller *contracts.ContractCaller
 
 	accountManager *accounts.Manager
+
+	// Next shard state
+	nextShardState struct {
+		// The received master shard state
+		master *types.EpochShardState
+
+		// When for a leader to propose the next shard state,
+		// or for a validator to wait for a proposal before view change.
+		// TODO ek – replace with retry-based logic instead of delay
+		proposeTime time.Time
+	}
+
+	isFirstTime bool // the node was started with a fresh database
 }
 
-// Blockchain returns the blockchain from node
+// Blockchain returns the blockchain for the node's current shard.
 func (node *Node) Blockchain() *core.BlockChain {
-	return node.blockchain
+	shardID := node.Consensus.ShardID
+	bc, err := node.shardChains.ShardChain(shardID)
+	if err != nil {
+		err = ctxerror.New("cannot get shard chain", "shardID", shardID).
+			WithCause(err)
+		panic(err) //ctxerror.Log15(utils.GetLogger().Crit, err)
+	}
+	return bc
+}
+
+// Beaconchain returns the beaconchain from node.
+func (node *Node) Beaconchain() *core.BlockChain {
+	bc, err := node.shardChains.ShardChain(0)
+	if err != nil {
+		err = ctxerror.New("cannot get beaconchain").WithCause(err)
+		ctxerror.Log15(utils.GetLogger().Crit, err)
+	}
+	return bc
 }
 
 // Add new transactions to the pending transaction list
@@ -226,7 +257,7 @@ func (node *Node) StartServer() {
 // Currently used for stats reporting purpose
 func (node *Node) countNumTransactionsInBlockchain() int {
 	count := 0
-	for block := node.blockchain.CurrentBlock(); block != nil; block = node.blockchain.GetBlockByHash(block.Header().ParentHash) {
+	for block := node.Blockchain().CurrentBlock(); block != nil; block = node.Blockchain().GetBlockByHash(block.Header().ParentHash) {
 		count += len(block.Transactions())
 	}
 	return count
@@ -238,10 +269,8 @@ func (node *Node) GetSyncID() [SyncIDLength]byte {
 }
 
 // New creates a new node.
-func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, isArchival bool) *Node {
-	var chain *core.BlockChain
+func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardchain.DBFactory, isArchival bool) *Node {
 	var err error
-	var isFirstTime bool // if cannot get blockchain from database, then isFirstTime = true
 
 	node := Node{}
 	copy(node.syncID[:], GenerateRandomString(SyncIDLength))
@@ -250,39 +279,23 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 		node.SelfPeer = host.GetSelfPeer()
 	}
 
+	// Create test keys.  Genesis will later need this.
+	node.TestBankKeys, err = CreateTestBankKeys(FakeAddressNumber)
+	if err != nil {
+		utils.GetLogInstance().Crit("Error while creating test keys",
+			"error", err)
+	}
+
+	node.shardChains = shardchain.NewCollection(
+		chainDBFactory, &genesisInitializer{&node}, consensusObj)
+
 	if host != nil && consensusObj != nil {
 		// Consensus and associated channel to communicate blocks
 		node.Consensus = consensusObj
 
-		// TODO(ricl): placeholder. Set the account manager to node.accountManager
-		// // Ensure that the AccountManager method works before the node has started.
-		// // We rely on this in cmd/geth.
-		// am, ephemeralKeystore, err := makeAccountManager(conf)
-		// if err != nil {
-		// 	return nil, err
-		// }
-		// node.accountManager = am
-
-		// Init db
-		database := db
-		if database == nil {
-			database = ethdb.NewMemDatabase()
-			chain, err = node.GenesisBlockSetup(database, consensusObj.ShardID, false)
-			isFirstTime = true
-		} else {
-			chain, err = node.InitBlockChainFromDB(db, node.Consensus, isArchival)
-			isFirstTime = false
-			if err != nil || chain == nil || chain.CurrentBlock().NumberU64() <= 0 {
-				chain, err = node.GenesisBlockSetup(database, consensusObj.ShardID, isArchival)
-				isFirstTime = true
-			}
-		}
-		if err != nil {
-			utils.GetLogInstance().Error("Error when setup blockchain", "err", err)
-			os.Exit(1)
-		}
-
-		node.blockchain = chain
+		// Load the chains.
+		chain := node.Blockchain() // this also sets node.isFirstTime if the DB is fresh
+		_ = node.Beaconchain()
 
 		node.BlockChannel = make(chan *types.Block)
 		node.ConfirmedBlockChannel = make(chan *types.Block)
@@ -296,7 +309,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 
 		// Add Faucet contract to all shards, so that on testnet, we can demo wallet in explorer
 		// TODO (leo): we need to have support of cross-shard tx later so that the token can be transferred from beacon chain shard to other tx shards.
-		if isFirstTime {
+		if node.isFirstTime {
 			// Setup one time smart contracts
 			node.AddFaucetContractToPendingTransactions()
 		} else {
@@ -305,7 +318,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 
 		if node.Consensus.ShardID == 0 {
 			// Contracts only exist in beacon chain
-			if isFirstTime {
+			if node.isFirstTime {
 				// Setup one time smart contracts
 				node.CurrentStakes = make(map[common.Address]*structs.StakeInfo)
 				node.AddStakingContractToPendingTransactions() //This will save the latest information about staked nodes in current staked
@@ -313,7 +326,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 				node.AddContractKeyAndAddress(scStaking)
 			}
 		}
-		if isFirstTime {
+		if node.isFirstTime {
 			// TODO(minhdoan): Think of a better approach to deploy smart contract.
 			// This is temporary for demo purpose.
 			node.AddLotteryContract()
@@ -324,7 +337,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 		}
 	}
 
-	node.ContractCaller = contracts.NewContractCaller(&db, node.blockchain, params.TestChainConfig)
+	node.ContractCaller = contracts.NewContractCaller(node.Blockchain(), params.TestChainConfig)
 
 	if consensusObj != nil && nodeconfig.GetDefaultConfig().IsLeader() {
 		node.State = NodeLeader
@@ -359,40 +372,47 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 }
 
 // InitShardState initialize genesis shard state and update committee pub keys for consensus and drand
-func (node *Node) InitShardState(isGenesis bool) {
-	shardState := types.ShardState{}
-	if isGenesis {
-		// Store the genesis shard state into db.
-		if node.Consensus != nil {
-			if node.Consensus.ShardID == 0 {
-				shardState = node.blockchain.StoreNewShardState(node.blockchain.CurrentBlock(), nil)
-			} else {
-				shardState = node.beaconChain.StoreNewShardState(node.beaconChain.CurrentBlock(), nil)
-			}
-		}
-	} else {
-		epochShardState, err := node.retrieveEpochShardState()
-		if err != nil {
-			utils.GetLogInstance().Error("[Shard State] Failed to decode epoch shard state", "error", err)
-		}
-		utils.GetLogInstance().Info("Successfully loaded epoch shard state")
-		shardState = epochShardState.ShardState
+func (node *Node) InitShardState(isGenesis bool) (err error) {
+	logger := utils.GetLogInstance().New("isGenesis", isGenesis)
+	getLogger := func() log.Logger { return utils.WithCallerSkip(logger, 1) }
+	if node.Consensus == nil {
+		getLogger().Crit("consensus is nil; cannot figure out shard ID")
 	}
+	shardID := node.Consensus.ShardID
+	logger = logger.New("shardID", shardID)
+	getLogger().Info("initializing shard state")
+
+	// Get genesis epoch shard state from chain
+	genesisEpoch := big.NewInt(core.GenesisEpoch)
+	shardState, err := node.Beaconchain().GetShardState(genesisEpoch, nil)
+	if err != nil {
+		return ctxerror.New("cannot read genesis shard state").WithCause(err)
+	}
+	getLogger().Info("Successfully loaded epoch shard state")
 
 	// Update validator public keys
-	for _, shard := range shardState {
-		if shard.ShardID == node.Consensus.ShardID {
-			pubKeys := []*bls.PublicKey{}
-			for _, node := range shard.NodeList {
-				blsPubKey := &bls.PublicKey{}
-				blsPubKey.Deserialize(node.BlsPublicKey[:])
-				pubKeys = append(pubKeys, blsPubKey)
-			}
-			node.Consensus.UpdatePublicKeys(pubKeys)
-			node.DRand.UpdatePublicKeys(pubKeys)
-			break
-		}
+	committee := shardState.FindCommitteeByID(shardID)
+	if committee == nil {
+		return ctxerror.New("our shard is not found in genesis shard state",
+			"shardID", shardID)
 	}
+	pubKeys := []*bls.PublicKey{}
+	for _, node := range committee.NodeList {
+		pubKey := &bls.PublicKey{}
+		pubKeyBytes := node.BlsPublicKey[:]
+		err = pubKey.Deserialize(pubKeyBytes)
+		if err != nil {
+			return ctxerror.New("cannot deserialize BLS public key",
+				"shardID", shardID,
+				"pubKeyBytes", hex.EncodeToString(pubKeyBytes),
+			).WithCause(err)
+		}
+		pubKeys = append(pubKeys, pubKey)
+	}
+	getLogger().Info("initialized shard state", "numPubKeys", len(pubKeys))
+	node.Consensus.UpdatePublicKeys(pubKeys)
+	node.DRand.UpdatePublicKeys(pubKeys)
+	return nil
 }
 
 // AddPeers adds neighbors nodes
@@ -465,34 +485,4 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 	}
 
 	return nodeConfig, chanPeer
-}
-
-// AddBeaconChainDatabase adds database support for beaconchain blocks on normal sharding nodes (not BeaconChain node)
-func (node *Node) AddBeaconChainDatabase(db ethdb.Database) {
-	database := db
-	if database == nil {
-		database = ethdb.NewMemDatabase()
-	}
-	// TODO (chao) currently we use the same genesis block as normal shard
-	chain, err := node.GenesisBlockSetup(database, 0, true)
-	if err != nil {
-		utils.GetLogInstance().Error("Error when doing genesis setup")
-		os.Exit(1)
-	}
-	node.beaconChain = chain
-	node.BeaconWorker = worker.New(params.TestChainConfig, chain, &consensus.Consensus{}, pki.GetAddressFromPublicKey(node.SelfPeer.ConsensusPubKey), node.Consensus.ShardID)
-}
-
-// InitBlockChainFromDB retrieves the latest blockchain and state available from the local database
-func (node *Node) InitBlockChainFromDB(db ethdb.Database, consensus *consensus.Consensus, isArchival bool) (*core.BlockChain, error) {
-	chainConfig := params.TestChainConfig
-	if consensus != nil {
-		chainConfig.ChainID = big.NewInt(int64(consensus.ShardID)) // Use ChainID as piggybacked ShardID
-	}
-	cacheConfig := core.CacheConfig{}
-	if isArchival {
-		cacheConfig = core.CacheConfig{Disabled: true, TrieNodeLimit: 256 * 1024 * 1024, TrieTimeLimit: 30 * time.Second}
-	}
-	chain, err := core.NewBlockChain(db, &cacheConfig, chainConfig, consensus, vm.Config{}, nil)
-	return chain, err
 }

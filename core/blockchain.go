@@ -27,9 +27,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/harmony-one/harmony/contracts/structs"
-	lru "github.com/hashicorp/golang-lru"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/common/prque"
@@ -41,11 +38,15 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
+	lru "github.com/hashicorp/golang-lru"
+
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -66,11 +67,15 @@ const (
 	badBlockLimit       = 10
 	triesInMemory       = 128
 	shardCacheLimit     = 2
+	epochCacheLimit     = 10
 
 	// BlocksPerEpoch is the number of blocks in one epoch
 	// currently set to small number for testing
 	// in future, this need to be adjusted dynamically instead of constant
-	BlocksPerEpoch = 10000
+	// TODO ek – inflate to disable resharding until we can 1) fix shard
+	//  state mutation bug and 2) implement key passphrase recycle across
+	//  process restart (exec) for shard migration
+	BlocksPerEpoch = 1000000000000
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	BlockChainVersion = 3
@@ -130,6 +135,7 @@ type BlockChain struct {
 	blockCache      *lru.Cache     // Cache for the most recent entire blocks
 	futureBlocks    *lru.Cache     // future blocks are blocks added for later processing
 	shardStateCache *lru.Cache
+	epochCache      *lru.Cache // Cache epoch number → first block number
 
 	quit    chan struct{} // blockchain quit channel
 	running int32         // running must be called atomically
@@ -163,6 +169,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	futureBlocks, _ := lru.New(maxFutureBlocks)
 	badBlocks, _ := lru.New(badBlockLimit)
 	shardCache, _ := lru.New(shardCacheLimit)
+	epochCache, _ := lru.New(epochCacheLimit)
 
 	bc := &BlockChain{
 		chainConfig:     chainConfig,
@@ -178,6 +185,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		blockCache:      blockCache,
 		futureBlocks:    futureBlocks,
 		shardStateCache: shardCache,
+		epochCache:      epochCache,
 		engine:          engine,
 		vmConfig:        vmConfig,
 		badBlocks:       badBlocks,
@@ -1072,6 +1080,23 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 	n, events, logs, err := bc.insertChain(chain)
 	bc.PostChainEvents(events, logs)
+	// TODO ek – make this a post-chain event
+	if err == nil {
+		for idx, block := range chain {
+			header := block.Header()
+			header.Logger(utils.GetLogger()).Info("added block to chain",
+				"segmentIndex", idx,
+				"parentHash", header.ParentHash)
+			if header.ShardStateHash != (common.Hash{}) {
+				epoch := new(big.Int).Add(header.Epoch, common.Big1)
+				err = bc.WriteShardState(epoch, header.ShardState)
+				if err != nil {
+					ctxerror.Log15(header.Logger(utils.GetLogger()).Warn,
+						ctxerror.New("cannot store shard state").WithCause(err))
+				}
+			}
+		}
+	}
 	return n, err
 }
 
@@ -1651,36 +1676,33 @@ func (bc *BlockChain) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscript
 	return bc.scope.Track(bc.logsFeed.Subscribe(ch))
 }
 
-// GetShardState retrieves sharding state given block hash and block number
-func (bc *BlockChain) GetShardState(hash common.Hash, number uint64) types.ShardState {
-	if cached, ok := bc.shardStateCache.Get(hash); ok {
+// ReadShardState retrieves sharding state given the epoch number.
+func (bc *BlockChain) ReadShardState(epoch *big.Int) (types.ShardState, error) {
+	cacheKey := string(epoch.Bytes())
+	if cached, ok := bc.shardStateCache.Get(cacheKey); ok {
 		shardState := cached.(types.ShardState)
-		return shardState
+		return shardState, nil
 	}
-	shardState := rawdb.ReadShardState(bc.db, hash, number)
-	if shardState == nil {
-		return nil
+	shardState, err := rawdb.ReadShardState(bc.db, epoch)
+	if err != nil {
+		return nil, err
 	}
-	bc.shardStateCache.Add(hash, shardState)
-	return shardState
+	bc.shardStateCache.Add(cacheKey, shardState)
+	return shardState, nil
 }
 
-// GetShardStateByNumber retrieves sharding state given the block number
-func (bc *BlockChain) GetShardStateByNumber(number uint64) types.ShardState {
-	hash := rawdb.ReadCanonicalHash(bc.db, number)
-	if hash == (common.Hash{}) {
-		return nil
+// WriteShardState saves the given sharding state under the given epoch number.
+func (bc *BlockChain) WriteShardState(
+	epoch *big.Int, shardState types.ShardState,
+) error {
+	shardState = shardState.DeepCopy()
+	err := rawdb.WriteShardState(bc.db, epoch, shardState)
+	if err != nil {
+		return err
 	}
-	return bc.GetShardState(hash, number)
-}
-
-// GetShardStateByHash retrieves the shard state given the blockhash, return nil if not exist
-func (bc *BlockChain) GetShardStateByHash(hash common.Hash) types.ShardState {
-	number := bc.hc.GetBlockNumber(hash)
-	if number == nil {
-		return nil
-	}
-	return bc.GetShardState(hash, *number)
+	cacheKey := string(epoch.Bytes())
+	bc.shardStateCache.Add(cacheKey, shardState)
+	return nil
 }
 
 // GetRandSeedByNumber retrieves the rand seed given the block number, return 0 if not exist
@@ -1701,46 +1723,60 @@ func (bc *BlockChain) GetRandPreimageByNumber(number uint64) [32]byte {
 	return header.RandPreimage
 }
 
-// GetNewShardState will calculate (if not exist) and get the new shard state for epoch block or nil if block is not epoch block
-// epoch block is where the new shard state stored
-func (bc *BlockChain) GetNewShardState(block *types.Block, stakeInfo *map[common.Address]*structs.StakeInfo) types.ShardState {
-	hash := block.Hash()
-	// just ignore non-epoch block
-	if !IsEpochBlock(block) {
-		return nil
+// GetShardState returns the shard state for the given epoch,
+// creating one if needed.
+func (bc *BlockChain) GetShardState(
+	epoch *big.Int, stakeInfo *map[common.Address]*structs.StakeInfo,
+) (types.ShardState, error) {
+	shardState, err := bc.ReadShardState(epoch)
+	if err == nil { // TODO ek – distinguish ErrNotFound
+		return shardState, err
 	}
-	number := block.NumberU64()
-	shardState := bc.GetShardState(hash, number)
-	if shardState == nil {
-		epoch := GetEpochFromBlockNumber(number)
-		shardState = CalculateNewShardState(bc, epoch, stakeInfo)
-		bc.shardStateCache.Add(hash, shardState)
+	shardState, err = CalculateNewShardState(bc, epoch, stakeInfo)
+	if err != nil {
+		return nil, err
 	}
-	return shardState
+	err = bc.WriteShardState(epoch, shardState)
+	if err != nil {
+		return nil, err
+	}
+	utils.GetLogger().Debug("saved new shard state", "epoch", epoch)
+	return shardState, nil
 }
 
-// ValidateNewShardState validate whether the new shard state root matches
-func (bc *BlockChain) ValidateNewShardState(block *types.Block, stakeInfo *map[common.Address]*structs.StakeInfo) error {
-	shardState := bc.GetNewShardState(block, stakeInfo)
-	if shardState == nil {
-		return nil
+// ChainDb returns the database
+func (bc *BlockChain) ChainDb() ethdb.Database { return bc.db }
+
+// GetEpochBlockNumber returns the first block number of the given epoch.
+func (bc *BlockChain) GetEpochBlockNumber(epoch *big.Int) (*big.Int, error) {
+	// Try cache first
+	cacheKey := string(epoch.Bytes())
+	if cachedValue, ok := bc.epochCache.Get(cacheKey); ok {
+		return (&big.Int{}).SetBytes([]byte(cachedValue.(string))), nil
 	}
-	if shardState.Hash() != block.Header().ShardStateHash {
-		return ErrShardStateNotMatch
+	blockNum, err := rawdb.ReadEpochBlockNumber(bc.db, epoch)
+	if err != nil {
+		return nil, ctxerror.New("cannot read epoch block number from database",
+			"epoch", epoch,
+		).WithCause(err)
 	}
-	utils.GetLogInstance().Debug("[resharding] validate new shard state successfully", "shardStateHash", shardState.Hash())
+	cachedValue := []byte(blockNum.Bytes())
+	bc.epochCache.Add(cacheKey, cachedValue)
+	return blockNum, nil
+}
+
+// StoreEpochBlockNumber stores the given epoch-first block number.
+func (bc *BlockChain) StoreEpochBlockNumber(
+	epoch *big.Int, blockNum *big.Int,
+) error {
+	cacheKey := string(epoch.Bytes())
+	cachedValue := []byte(blockNum.Bytes())
+	bc.epochCache.Add(cacheKey, cachedValue)
+	if err := rawdb.WriteEpochBlockNumber(bc.db, epoch, blockNum); err != nil {
+		return ctxerror.New("cannot write epoch block number to database",
+			"epoch", epoch,
+			"epochBlockNum", blockNum,
+		).WithCause(err)
+	}
 	return nil
-}
-
-// StoreNewShardState insert new shard state into epoch block
-func (bc *BlockChain) StoreNewShardState(block *types.Block, stakeInfo *map[common.Address]*structs.StakeInfo) types.ShardState {
-	// write state into db.
-	shardState := bc.GetNewShardState(block, stakeInfo)
-	if shardState != nil {
-		hash := block.Hash()
-		number := block.NumberU64()
-		rawdb.WriteShardState(bc.db, hash, number, shardState)
-		utils.GetLogInstance().Debug("[Resharding] Saved new shard state successfully", "epoch", GetEpochFromBlockNumber(block.NumberU64()))
-	}
-	return shardState
 }

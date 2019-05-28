@@ -22,6 +22,26 @@ type EpochShardState struct {
 // ShardState is the collection of all committees
 type ShardState []Committee
 
+// FindCommitteeByID returns the committee configuration for the given shard,
+// or nil if the given shard is not found.
+func (ss ShardState) FindCommitteeByID(shardID uint32) *Committee {
+	for _, committee := range ss {
+		if committee.ShardID == shardID {
+			return &committee
+		}
+	}
+	return nil
+}
+
+// DeepCopy returns a deep copy of the receiver.
+func (ss ShardState) DeepCopy() ShardState {
+	var r ShardState
+	for _, c := range ss {
+		r = append(r, c.DeepCopy())
+	}
+	return r
+}
+
 // CompareShardState compares two ShardState instances.
 func CompareShardState(s1, s2 ShardState) int {
 	commonLen := len(s1)
@@ -92,6 +112,11 @@ func CompareNodeID(id1, id2 *NodeID) int {
 // NodeIDList is a list of NodeIDList.
 type NodeIDList []NodeID
 
+// DeepCopy returns a deep copy of the receiver.
+func (l NodeIDList) DeepCopy() NodeIDList {
+	return append(l[:0:0], l...)
+}
+
 // CompareNodeIDList compares two node ID lists.
 func CompareNodeIDList(l1, l2 NodeIDList) int {
 	commonLen := len(l1)
@@ -115,8 +140,14 @@ func CompareNodeIDList(l1, l2 NodeIDList) int {
 // Committee contains the active nodes in one shard
 type Committee struct {
 	ShardID  uint32
-	Leader   NodeID
 	NodeList NodeIDList
+}
+
+// DeepCopy returns a deep copy of the receiver.
+func (c Committee) DeepCopy() Committee {
+	r := c
+	r.NodeList = r.NodeList.DeepCopy()
+	return r
 }
 
 // CompareCommittee compares two committees and their leader/node list.
@@ -126,9 +157,6 @@ func CompareCommittee(c1, c2 *Committee) int {
 		return -1
 	case c1.ShardID > c2.ShardID:
 		return +1
-	}
-	if c := CompareNodeID(&c1.Leader, &c2.Leader); c != 0 {
-		return c
 	}
 	if c := CompareNodeIDList(c1.NodeList, c2.NodeList); c != 0 {
 		return c
@@ -156,6 +184,8 @@ func GetHashFromNodeList(nodeList []NodeID) []byte {
 
 // Hash is the root hash of ShardState
 func (ss ShardState) Hash() (h common.Hash) {
+	// TODO ek – this sorting really doesn't belong here; it should instead
+	//  be made an explicit invariant to be maintained and, if needed, checked.
 	sort.Slice(ss, func(i, j int) bool {
 		return ss[i].ShardID < ss[j].ShardID
 	})

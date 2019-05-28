@@ -1,8 +1,11 @@
 package engine
 
 import (
+	"math/big"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/params"
+
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 )
@@ -28,6 +31,9 @@ type ChainReader interface {
 
 	// GetBlock retrieves a block from the database by hash and number.
 	GetBlock(hash common.Hash, number uint64) *types.Block
+
+	// ReadShardState retrieves sharding state given the epoch number.
+	ReadShardState(epoch *big.Int) (types.ShardState, error)
 }
 
 // Engine is an algorithm agnostic consensus engine.

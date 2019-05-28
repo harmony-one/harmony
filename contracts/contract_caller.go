@@ -6,8 +6,8 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 
 	"github.com/ethereum/go-ethereum/common/math"
-	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
+
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
@@ -15,7 +15,6 @@ import (
 
 // ContractCaller is used to call smart contract locally
 type ContractCaller struct {
-	database   *ethdb.Database
 	blockchain *core.BlockChain // Ethereum blockchain to handle the consensus
 
 	mu     sync.Mutex
@@ -23,9 +22,8 @@ type ContractCaller struct {
 }
 
 // NewContractCaller initialize a new contract caller.
-func NewContractCaller(db *ethdb.Database, bc *core.BlockChain, config *params.ChainConfig) *ContractCaller {
+func NewContractCaller(bc *core.BlockChain, config *params.ChainConfig) *ContractCaller {
 	cc := ContractCaller{}
-	cc.database = db
 	cc.blockchain = bc
 	cc.mu = sync.Mutex{}
 	cc.config = config

@@ -8,13 +8,14 @@ import (
 
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
+
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service/explorer"
-	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
@@ -138,6 +139,16 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	// check block data transactions
 	if err := consensus.VerifyHeader(consensus.ChainReader, blockObj.Header(), false); err != nil {
 		utils.GetLogInstance().Warn("onAnnounce block content is not verified successfully", "error", err)
+		return
+	}
+	if consensus.BlockVerifier == nil {
+		// do nothing
+	} else if err := consensus.BlockVerifier(&blockObj); err != nil {
+		// TODO ek – maybe we could do this in commit phase
+		err := ctxerror.New("block verification failed",
+			"blockHash", blockObj.Hash(),
+		).WithCause(err)
+		ctxerror.Log15(utils.GetLogInstance().Warn, err)
 		return
 	}
 
@@ -697,20 +708,21 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 			case newBlock := <-blockChannel:
 				utils.GetLogInstance().Info("receive newBlock", "blockNum", newBlock.NumberU64())
 				if consensus.ShardID == 0 {
-					if core.IsEpochBlock(newBlock) { // Only beacon chain do randomness generation
-						// Receive pRnd from DRG protocol
-						utils.GetLogInstance().Debug("[DRG] Waiting for pRnd")
-						pRndAndBitmap := <-consensus.PRndChannel
-						utils.GetLogInstance().Debug("[DRG] Got pRnd", "pRnd", pRndAndBitmap)
-						pRnd := [32]byte{}
-						copy(pRnd[:], pRndAndBitmap[:32])
-						bitmap := pRndAndBitmap[32:]
-						vrfBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.ConsensusPubKey)
-						vrfBitmap.SetMask(bitmap)
-
-						// TODO: check validity of pRnd
-						newBlock.AddRandPreimage(pRnd)
-					}
+					// TODO ek/rj - re-enable this after fixing DRand
+					//if core.IsEpochBlock(newBlock) { // Only beacon chain do randomness generation
+					//	// Receive pRnd from DRG protocol
+					//	utils.GetLogInstance().Debug("[DRG] Waiting for pRnd")
+					//	pRndAndBitmap := <-consensus.PRndChannel
+					//	utils.GetLogInstance().Debug("[DRG] Got pRnd", "pRnd", pRndAndBitmap)
+					//	pRnd := [32]byte{}
+					//	copy(pRnd[:], pRndAndBitmap[:32])
+					//	bitmap := pRndAndBitmap[32:]
+					//	vrfBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.ConsensusPubKey)
+					//	vrfBitmap.SetMask(bitmap)
+					//
+					//	// TODO: check validity of pRnd
+					//	newBlock.AddRandPreimage(pRnd)
+					//}
 
 					rnd, blockHash, err := consensus.GetNextRnd()
 					if err == nil {

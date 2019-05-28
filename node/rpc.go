@@ -42,7 +42,7 @@ var (
 // StartRPC start RPC service
 func (node *Node) StartRPC(nodePort string) error {
 	// Gather all the possible APIs to surface
-	apiBackend = core.NewBackend(node.blockchain, node.TxPool, node.accountManager)
+	apiBackend = core.NewBackend(node.Blockchain(), node.TxPool, node.accountManager)
 
 	apis := hmyapi.GetAPIs(apiBackend)
 	for _, service := range node.serviceManager.GetServices() {
