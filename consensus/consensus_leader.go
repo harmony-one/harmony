@@ -9,9 +9,9 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
+
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service/explorer"
-	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/profiler"
@@ -51,20 +51,21 @@ func (consensus *Consensus) WaitForNewBlock(blockChannel chan *types.Block, stop
 				// TODO: think about potential race condition
 
 				if consensus.ShardID == 0 {
-					if core.IsEpochBlock(newBlock) { // Only beacon chain do randomness generation
-						// Receive pRnd from DRG protocol
-						utils.GetLogInstance().Debug("[DRG] Waiting for pRnd")
-						pRndAndBitmap := <-consensus.PRndChannel
-						utils.GetLogInstance().Debug("[DRG] Got pRnd", "pRnd", pRndAndBitmap)
-						pRnd := [32]byte{}
-						copy(pRnd[:], pRndAndBitmap[:32])
-						bitmap := pRndAndBitmap[32:]
-						vrfBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.ConsensusPubKey)
-						vrfBitmap.SetMask(bitmap)
-
-						// TODO: check validity of pRnd
-						newBlock.AddRandPreimage(pRnd)
-					}
+					// TODO ek/rj - re-enable this after fixing DRand
+					//if core.IsEpochBlock(newBlock) { // Only beacon chain do randomness generation
+					//	// Receive pRnd from DRG protocol
+					//	utils.GetLogInstance().Debug("[DRG] Waiting for pRnd")
+					//	pRndAndBitmap := <-consensus.PRndChannel
+					//	utils.GetLogInstance().Debug("[DRG] Got pRnd", "pRnd", pRndAndBitmap)
+					//	pRnd := [32]byte{}
+					//	copy(pRnd[:], pRndAndBitmap[:32])
+					//	bitmap := pRndAndBitmap[32:]
+					//	vrfBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.ConsensusPubKey)
+					//	vrfBitmap.SetMask(bitmap)
+					//
+					//	// TODO: check validity of pRnd
+					//	newBlock.AddRandPreimage(pRnd)
+					//}
 
 					rnd, blockHash, err := consensus.GetNextRnd()
 					if err == nil {

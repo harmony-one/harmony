@@ -8,10 +8,10 @@ import (
 
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
+
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service/explorer"
-	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -662,20 +662,21 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 			case newBlock := <-blockChannel:
 				utils.GetLogInstance().Info("receive newBlock", "blockNum", newBlock.NumberU64())
 				if consensus.ShardID == 0 {
-					if core.IsEpochBlock(newBlock) { // Only beacon chain do randomness generation
-						// Receive pRnd from DRG protocol
-						utils.GetLogInstance().Debug("[DRG] Waiting for pRnd")
-						pRndAndBitmap := <-consensus.PRndChannel
-						utils.GetLogInstance().Debug("[DRG] Got pRnd", "pRnd", pRndAndBitmap)
-						pRnd := [32]byte{}
-						copy(pRnd[:], pRndAndBitmap[:32])
-						bitmap := pRndAndBitmap[32:]
-						vrfBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.ConsensusPubKey)
-						vrfBitmap.SetMask(bitmap)
-
-						// TODO: check validity of pRnd
-						newBlock.AddRandPreimage(pRnd)
-					}
+					// TODO ek/rj - re-enable this after fixing DRand
+					//if core.IsEpochBlock(newBlock) { // Only beacon chain do randomness generation
+					//	// Receive pRnd from DRG protocol
+					//	utils.GetLogInstance().Debug("[DRG] Waiting for pRnd")
+					//	pRndAndBitmap := <-consensus.PRndChannel
+					//	utils.GetLogInstance().Debug("[DRG] Got pRnd", "pRnd", pRndAndBitmap)
+					//	pRnd := [32]byte{}
+					//	copy(pRnd[:], pRndAndBitmap[:32])
+					//	bitmap := pRndAndBitmap[32:]
+					//	vrfBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.ConsensusPubKey)
+					//	vrfBitmap.SetMask(bitmap)
+					//
+					//	// TODO: check validity of pRnd
+					//	newBlock.AddRandPreimage(pRnd)
+					//}
 
 					rnd, blockHash, err := consensus.GetNextRnd()
 					if err == nil {
