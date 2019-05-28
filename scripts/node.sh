@@ -87,8 +87,9 @@ fi
 if [ -z "$1" ]; then
    echo "Usage: $0 account_index_number"
    echo
-   echo "Please provide account index.  Valid ranges are 44-49, 94-99, 144-149, 194-199."
-   echo "Please contact us in #nodes channel of discord if not sure which one to use."
+   echo "Please provide account index."
+   echo "For foundational nodes, please follow the instructions in discord #foundational-nodes channel"
+   echo "to get your account index number."
    echo
    exit 1
 fi
@@ -103,11 +104,11 @@ OS=$(uname -s)
 REL=drum
 
 if [ "$OS" == "Darwin" ]; then
-   FOLDER=release/$REL/darwin-x86_64/
+   FOLDER=release/darwin-x86_64/$REL/
    BIN=( harmony libbls384.dylib libcrypto.1.0.0.dylib libgmp.10.dylib libgmpxx.4.dylib libmcl.dylib )
 fi
 if [ "$OS" == "Linux" ]; then
-   FOLDER=release/$REL/linux-x86_64/
+   FOLDER=release/linux-x86_64/$REL/
    BIN=( harmony libbls384.so libcrypto.so.10 libgmp.so.10 libgmpxx.so.4 libmcl.so )
 fi
 
