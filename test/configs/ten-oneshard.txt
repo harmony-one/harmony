@@ -1,4 +1,4 @@
-127.0.0.1 9000 leader 0
+127.0.0.1 9000 validator 0
 127.0.0.1 9001 validator 0
 127.0.0.1 9002 validator 0
 127.0.0.1 9003 validator 0
