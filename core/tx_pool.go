@@ -695,6 +695,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (bool, error) {
 // backend
 func (pool *TxPool) Add(ctx context.Context, tx *types.Transaction) error {
 	// TODO(ricl): placeholder
+	// TODO(minhdoan): follow with richard why we need this. As of now TxPool is not used now.
 	return nil
 }
 
