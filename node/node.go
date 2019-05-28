@@ -229,6 +229,13 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 	utils.GetLogInstance().Debug("Got more transactions", "num", len(newTxs), "totalPending", len(node.pendingTransactions))
 }
 
+func (node *Node) addPendingTransaction(newTx *types.Transaction) {
+	node.pendingTxMutex.Lock()
+	node.pendingTransactions = append(node.pendingTransactions, newTx)
+	node.pendingTxMutex.Unlock()
+	utils.GetLogInstance().Debug("Got ONE more transaction", "totalPending", len(node.pendingTransactions))
+}
+
 // Take out a subset of valid transactions from the pending transaction list
 // Note the pending transaction list will then contain the rest of the txs
 func (node *Node) getTransactionsForNewBlock(maxNumTxs int) types.Transactions {
