@@ -135,7 +135,7 @@ echo "bootnode launched." + " $BN_MA"
 
 unset -v base_args
 declare -a base_args args
-base_args=(-log_folder "${log_folder}" -min_peers "${MIN}" -bootnodes "${BN_MA}")
+base_args=(-log_folder "${log_folder}" -min_peers "${MIN}" -bootnodes "${BN_MA}" -nopass)
 if "${DB}"
 then
   base_args=("${base_args[@]}" -db_supported)

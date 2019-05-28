@@ -102,7 +102,7 @@ var (
 
 	keystoreDir = flag.String("keystore", hmykey.DefaultKeyStoreDir, "The default keystore directory")
 
-	// true by default for now.  will be switch to false once have full support.
+	// -nopass is false by default.  The keyfile must be encrypted.
 	hmyNoPass = flag.Bool("nopass", false, "No passphrase for the key (testing only)")
 
 	ks        *keystore.KeyStore
