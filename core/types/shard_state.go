@@ -33,6 +33,7 @@ func (ss ShardState) FindCommitteeByID(shardID uint32) *Committee {
 	return nil
 }
 
+// DeepCopy returns a deep copy of the receiver.
 func (ss ShardState) DeepCopy() ShardState {
 	var r ShardState
 	for _, c := range ss {
@@ -111,6 +112,7 @@ func CompareNodeID(id1, id2 *NodeID) int {
 // NodeIDList is a list of NodeIDList.
 type NodeIDList []NodeID
 
+// DeepCopy returns a deep copy of the receiver.
 func (l NodeIDList) DeepCopy() NodeIDList {
 	return append(l[:0:0], l...)
 }
@@ -141,6 +143,7 @@ type Committee struct {
 	NodeList NodeIDList
 }
 
+// DeepCopy returns a deep copy of the receiver.
 func (c Committee) DeepCopy() Committee {
 	r := c
 	r.NodeList = r.NodeList.DeepCopy()
