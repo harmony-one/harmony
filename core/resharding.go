@@ -126,7 +126,6 @@ func (ss *ShardingState) Reshard(newNodeList []types.NodeID, percent float64) {
 	}
 	for i := 0; i < ss.numShards; i++ {
 		ss.shardState[i].NodeList = append([]types.NodeID{leaders[i]}, ss.shardState[i].NodeList...)
-		ss.shardState[i].Leader = leaders[i]
 	}
 }
 
@@ -233,9 +232,6 @@ func GetInitShardState() types.ShardState {
 			copy(pubKey[:], priKey.GetPublicKey().Serialize()[:])
 			// TODO: directly read address for bls too
 			curNodeID := types.NodeID{contract.GenesisAccounts[index].Address, pubKey}
-			if j == 0 {
-				com.Leader = curNodeID
-			}
 			com.NodeList = append(com.NodeList, curNodeID)
 		}
 		shardState = append(shardState, com)

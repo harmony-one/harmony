@@ -138,7 +138,6 @@ func CompareNodeIDList(l1, l2 NodeIDList) int {
 // Committee contains the active nodes in one shard
 type Committee struct {
 	ShardID  uint32
-	Leader   NodeID
 	NodeList NodeIDList
 }
 
@@ -155,9 +154,6 @@ func CompareCommittee(c1, c2 *Committee) int {
 		return -1
 	case c1.ShardID > c2.ShardID:
 		return +1
-	}
-	if c := CompareNodeID(&c1.Leader, &c2.Leader); c != 0 {
-		return c
 	}
 	if c := CompareNodeIDList(c1.NodeList, c2.NodeList); c != 0 {
 		return c
