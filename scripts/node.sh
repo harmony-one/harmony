@@ -141,7 +141,7 @@ BN_MA=/ip4/100.26.90.187/tcp/9874/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3
 echo "############### Running Harmony Process ###############"
 if [ "$OS" == "Linux" ]; then
 # Run Harmony Node
-   LD_LIBRARY_PATH=$(pwd) nohup ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -account_index $IDX > harmony-${PUB_IP}.log 2>&1 &
+   LD_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -account_index $IDX
 else
    DYLD_FALLBACK_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -account_index $IDX > harmony-${PUB_IP}.log 2>&1 &
 fi
