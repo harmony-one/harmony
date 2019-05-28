@@ -88,7 +88,7 @@ var GenesisAccounts = [...]DeployAccount{
 	{Address: "0x1f6CafAb4e651bF17dCb09188496A3d55D1A7828", Private: "", Public: "0x1f6CafAb4e651bF17dCb09188496A3d55D1A7828"},
 
 	// 40-49
-	{Address: "0x5a8ef0FE9e5548e9C9C6Bb1781Dbf7214d402c3c", Private: "", Public: "0x5a8ef0FE9e5548e9C9C6Bb1781Dbf7214d402c3c"},
+	{Address: "0xB68751A436f287CE3DA347277259af5c7bA84e38", Private: "", Public: "0xB68751A436f287CE3DA347277259af5c7bA84e38"},
 	{Address: "0xA28e6f8D23cc3Fe77D531c7D60bd73F8fD71C5c7", Private: "", Public: "0xA28e6f8D23cc3Fe77D531c7D60bd73F8fD71C5c7"},
 	{Address: "0x6c11b83856804D1eae8823beB697d09569fE87A0", Private: "", Public: "0x6c11b83856804D1eae8823beB697d09569fE87A0"},
 	{Address: "0x225268acc5e8Be5f1B69063EA6eaDFfE676Aaa6a", Private: "", Public: "0x225268acc5e8Be5f1B69063EA6eaDFfE676Aaa6a"},
