@@ -127,7 +127,7 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 						threshold = FirstTimeThreshold
 						firstTime = false
 					}
-					if len(node.pendingTransactions) < threshold {
+					if len(node.pendingTransactions) < 5 {
 						continue
 					}
 					// Normal tx block consensus

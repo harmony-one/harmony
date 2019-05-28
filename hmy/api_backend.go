@@ -151,6 +151,16 @@ func (b *APIBackend) SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscr
 	return b.hmy.BlockChain().SubscribeChainEvent(ch)
 }
 
+// SubscribeChainHeadEvent ...
+func (b *APIBackend) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
+	return b.hmy.BlockChain().SubscribeChainHeadEvent(ch)
+}
+
+// SubscribeChainSideEvent ...
+func (b *APIBackend) SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) event.Subscription {
+	return b.hmy.BlockChain().SubscribeChainSideEvent(ch)
+}
+
 // SubscribeRemovedLogsEvent ...
 func (b *APIBackend) SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) event.Subscription {
 	return b.hmy.BlockChain().SubscribeRemovedLogsEvent(ch)
