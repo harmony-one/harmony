@@ -15,15 +15,20 @@ import (
 
 // HmyAPIBackend ...
 type HmyAPIBackend struct {
-	blockchain            *BlockChain
-	txPool                *TxPool
-	accountManager        *accounts.Manager
-	addPendingTransaction func(newTx *types.Transaction)
+	blockchain     *BlockChain
+	txPool         *TxPool
+	accountManager *accounts.Manager
+	nodeAPI        NodeAPIFunctions
+}
+
+// NodeAPIFunctions is the list of functions from node used to call rpc apis.
+type NodeAPIFunctions interface {
+	AddPendingTransaction(newTx *types.Transaction)
 }
 
 // NewBackend ...
-func NewBackend(blockchain *BlockChain, txPool *TxPool, accountManager *accounts.Manager, addPendingTransaction func(newTx *types.Transaction)) *HmyAPIBackend {
-	return &HmyAPIBackend{blockchain, txPool, accountManager, addPendingTransaction}
+func NewBackend(blockchain *BlockChain, txPool *TxPool, accountManager *accounts.Manager, nodeAPI NodeAPIFunctions) *HmyAPIBackend {
+	return &HmyAPIBackend{blockchain, txPool, accountManager, nodeAPI}
 }
 
 // ChainDb ...
@@ -89,7 +94,7 @@ func (b *HmyAPIBackend) GetPoolNonce(ctx context.Context, addr common.Address) (
 
 // SendTx ...
 func (b *HmyAPIBackend) SendTx(ctx context.Context, signedTx *types.Transaction) error {
-	b.addPendingTransaction(signedTx)
+	b.nodeAPI.AddPendingTransaction(signedTx)
 	return nil
 }
 

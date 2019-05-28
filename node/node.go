@@ -221,7 +221,7 @@ func (node *Node) Beaconchain() *core.BlockChain {
 	return bc
 }
 
-// Add new transactions to the pending transaction list
+// Add new transactions to the pending transaction list.
 func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 	node.pendingTxMutex.Lock()
 	node.pendingTransactions = append(node.pendingTransactions, newTxs...)
@@ -229,10 +229,9 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 	utils.GetLogInstance().Debug("Got more transactions", "num", len(newTxs), "totalPending", len(node.pendingTransactions))
 }
 
-func (node *Node) addPendingTransaction(newTx *types.Transaction) {
-	node.pendingTxMutex.Lock()
-	node.pendingTransactions = append(node.pendingTransactions, newTx)
-	node.pendingTxMutex.Unlock()
+// AddPendingTransaction adds one new transaction to the pending transaction list.
+func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
+	node.addPendingTransactions(types.Transactions{newTx})
 	utils.GetLogInstance().Debug("Got ONE more transaction", "totalPending", len(node.pendingTransactions))
 }
 
