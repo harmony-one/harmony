@@ -206,7 +206,7 @@ func (node *Node) Blockchain() *core.BlockChain {
 	if err != nil {
 		err = ctxerror.New("cannot get shard chain", "shardID", shardID).
 			WithCause(err)
-		panic(err) //ctxerror.Log15(utils.GetLogger().Crit, err)
+		ctxerror.Log15(utils.GetLogger().Crit, err)
 	}
 	return bc
 }
