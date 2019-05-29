@@ -151,7 +151,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		ctxerror.Log15(utils.GetLogInstance().Warn, err)
 		return
 	}
-
+	//blockObj.Logger(utils.GetLogger()).Debug("received announce", "viewID", recvMsg.ViewID, "msgBlockNum", recvMsg.BlockNum)
 	logMsgs := consensus.pbftLog.GetMessagesByTypeSeqView(msg_pb.MessageType_ANNOUNCE, recvMsg.BlockNum, recvMsg.ViewID)
 	if len(logMsgs) > 0 {
 		if logMsgs[0].BlockHash != blockObj.Header().Hash() {
@@ -160,13 +160,17 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		}
 		return
 	}
-
 	blockPayload := make([]byte, len(block))
 	copy(blockPayload[:], block[:])
 	consensus.block = blockPayload
 	consensus.blockHash = recvMsg.BlockHash
 	consensus.pbftLog.AddMessage(recvMsg)
 	consensus.pbftLog.AddBlock(&blockObj)
+
+	if consensus.checkViewID(msg) != nil {
+		utils.GetLogger().Debug("viewID check failed", "viewID", recvMsg.ViewID, "myViewID", consensus.viewID)
+		return
+	}
 	consensus.tryPrepare(blockObj.Header().Hash())
 
 	consensus.consensusTimeout["bootstrap"].Stop()
@@ -315,6 +319,9 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		return
 	}
 	if recvMsg.BlockNum < consensus.blockNum {
+		utils.GetLogger().Debug("old block received, ignoring",
+			"receivedNumber", recvMsg.BlockNum,
+			"expectedNumber", consensus.blockNum)
 		return
 	}
 
@@ -359,9 +366,23 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		return
 	}
 
+	// TODO ek/cm - make sure we update blocks for syncing
 	consensus.pbftLog.AddMessage(recvMsg)
-	if recvMsg.BlockNum > consensus.blockNum || consensus.phase != Prepare || recvMsg.ViewID != consensus.viewID {
+	if consensus.checkViewID(msg) != nil {
+		utils.GetLogger().Debug("viewID check failed", "viewID", recvMsg.ViewID, "myViewID", consensus.viewID)
 		return
+	}
+	if recvMsg.BlockNum > consensus.blockNum {
+		utils.GetLogger().Debug("future block received, ignoring",
+			"receivedNumber", recvMsg.BlockNum,
+			"expectedNumber", consensus.blockNum)
+		return
+	}
+	if consensus.phase != Prepare {
+		utils.GetLogger().Debug("we are in a wrong phase",
+			"actualPhase", consensus.phase,
+			"expectedPhase", Prepare)
+		// return    // TODO: check if we should return
 	}
 
 	consensus.aggregatedPrepareSig = &deserializedMultiSig
@@ -575,6 +596,11 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 
 	consensus.pbftLog.AddMessage(recvMsg)
 
+	if consensus.checkViewID(msg) != nil {
+		utils.GetLogger().Debug("viewID check failed", "viewID", recvMsg.ViewID, "myViewID", consensus.viewID)
+		return
+	}
+
 	if recvMsg.BlockNum > consensus.blockNum || consensus.phase != Commit || recvMsg.ViewID != consensus.viewID {
 		return
 	}
@@ -688,6 +714,9 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 			case <-ticker.C:
 				if !consensus.PubKey.IsEqual(consensus.LeaderPubKey) {
 					for k, v := range consensus.consensusTimeout {
+						if consensus.mode.Mode() == Syncing {
+							v.Stop()
+						}
 						if !v.CheckExpire() {
 							continue
 						}

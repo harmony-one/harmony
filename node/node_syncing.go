@@ -12,6 +12,7 @@ import (
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
 	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
+	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -104,6 +105,7 @@ SyncingLoop:
 				utils.GetLogInstance().Debug("[SYNC] out of sync, doing syncing", "willJoinConsensus", willJoinConsensus)
 				node.stateMutex.Lock()
 				node.State = NodeNotInSync
+				node.Consensus.SetMode(consensus.Syncing)
 				node.stateMutex.Unlock()
 				node.stateSync.SyncLoop(bc, worker, willJoinConsensus, false)
 				getLogger().Debug("now in sync")
@@ -112,6 +114,8 @@ SyncingLoop:
 					node.stateMutex.Lock()
 					node.State = NodeReadyForConsensus
 					node.stateMutex.Unlock()
+					node.Consensus.SetMode(consensus.Normal)
+					node.Consensus.SetBlockNum(node.Consensus.ChainReader.CurrentHeader().Number.Uint64() + 1)
 					node.Consensus.ToggleConsensusCheck()
 				}
 			}
