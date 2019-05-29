@@ -12,6 +12,9 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	libp2p_peer "github.com/libp2p/go-libp2p-peer"
+	"golang.org/x/crypto/sha3"
+
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
@@ -19,11 +22,10 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
-	libp2p_peer "github.com/libp2p/go-libp2p-peer"
-	"golang.org/x/crypto/sha3"
 )
 
 // WaitForNewRandomness listens to the RndChannel to receive new VDF randomness.
@@ -244,7 +246,9 @@ func (consensus *Consensus) VerifySeal(chain consensus_engine.ChainReader, heade
 func (consensus *Consensus) Finalize(chain consensus_engine.ChainReader, header *types.Header, state *state.DB, txs []*types.Transaction, receipts []*types.Receipt) (*types.Block, error) {
 	// Accumulate any block and uncle rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
-	consensus.accumulateRewards(chain.Config(), state, header)
+	if err := accumulateRewards(chain, state, header); err != nil {
+		return nil, ctxerror.New("cannot pay block reward").WithCause(err)
+	}
 	header.Root = state.IntermediateRoot(false)
 	return types.NewBlock(header, txs, receipts), nil
 }
@@ -533,7 +537,10 @@ func (consensus *Consensus) checkConsensusMessage(message *msg_pb.Message, publi
 	// Verify message signature
 	err := verifyMessageSig(publicKey, message)
 	if err != nil {
-		utils.GetLogInstance().Warn("Failed to verify the message signature", "Error", err)
+		ctxerror.Log15(utils.GetLogger().Warn,
+			ctxerror.New("failed to verify the message signature",
+				"publicKey", publicKey.GetHexString(),
+			).WithCause(err))
 		return consensus_engine.ErrInvalidConsensusMessage
 	}
 	if !bytes.Equal(blockHash, consensus.blockHash[:]) {

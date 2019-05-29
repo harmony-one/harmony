@@ -23,7 +23,7 @@ func TestAddNewBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
-	node := New(host, consensus, nil, false)
+	node := New(host, consensus, testDBFactory, false)
 
 	selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
 	node.Worker.CommitTransactions(selectedTxs)
@@ -31,7 +31,7 @@ func TestAddNewBlock(t *testing.T) {
 
 	node.AddNewBlock(block)
 
-	if node.blockchain.CurrentBlock().NumberU64() != 1 {
+	if node.Blockchain().CurrentBlock().NumberU64() != 1 {
 		t.Error("New block is not added successfully")
 	}
 }
@@ -48,13 +48,13 @@ func TestVerifyNewBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
-	node := New(host, consensus, nil, false)
+	node := New(host, consensus, testDBFactory, false)
 
 	selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
 	node.Worker.CommitTransactions(selectedTxs)
 	block, _ := node.Worker.Commit()
 
-	if !node.VerifyNewBlock(block) {
-		t.Error("New block is not verified successfully")
+	if err := node.VerifyNewBlock(block); err != nil {
+		t.Error("New block is not verified successfully:", err)
 	}
 }

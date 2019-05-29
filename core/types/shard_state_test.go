@@ -49,7 +49,6 @@ func TestGetHashFromNodeList(t *testing.T) {
 func TestHash(t *testing.T) {
 	com1 := Committee{
 		ShardID: 22,
-		Leader:  NodeID{"node11", blsPubKey11},
 		NodeList: []NodeID{
 			{"node11", blsPubKey11},
 			{"node22", blsPubKey22},
@@ -58,7 +57,6 @@ func TestHash(t *testing.T) {
 	}
 	com2 := Committee{
 		ShardID: 2,
-		Leader:  NodeID{"node4", blsPubKey4},
 		NodeList: []NodeID{
 			{"node4", blsPubKey4},
 			{"node5", blsPubKey5},
@@ -70,7 +68,6 @@ func TestHash(t *testing.T) {
 
 	com3 := Committee{
 		ShardID: 2,
-		Leader:  NodeID{"node4", blsPubKey4},
 		NodeList: []NodeID{
 			{"node6", blsPubKey6},
 			{"node5", blsPubKey5},
@@ -79,7 +76,6 @@ func TestHash(t *testing.T) {
 	}
 	com4 := Committee{
 		ShardID: 22,
-		Leader:  NodeID{"node11", blsPubKey11},
 		NodeList: []NodeID{
 			{"node1", blsPubKey1},
 			{"node11", blsPubKey11},

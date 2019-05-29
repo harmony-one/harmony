@@ -85,7 +85,7 @@ func (node *Node) QueryStakeInfo() *structs.StakeInfoReturnValue {
 	priKey := contract_constants.GenesisBeaconAccountPriKey
 	deployerAddress := crypto.PubkeyToAddress(priKey.PublicKey)
 
-	state, err := node.blockchain.State()
+	state, err := node.Blockchain().State()
 
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to get blockchain state", "error", err)
@@ -131,7 +131,7 @@ func (node *Node) getDeployedStakingContract() common.Address {
 
 // GetNonceOfAddress returns nonce of an address.
 func (node *Node) GetNonceOfAddress(address common.Address) uint64 {
-	state, err := node.blockchain.State()
+	state, err := node.Blockchain().State()
 	if err != nil {
 		log.Error("Failed to get chain state", "Error", err)
 		return 0
@@ -141,7 +141,7 @@ func (node *Node) GetNonceOfAddress(address common.Address) uint64 {
 
 // GetBalanceOfAddress returns balance of an address.
 func (node *Node) GetBalanceOfAddress(address common.Address) (*big.Int, error) {
-	state, err := node.blockchain.State()
+	state, err := node.Blockchain().State()
 	if err != nil {
 		log.Error("Failed to get chain state", "Error", err)
 		return nil, err

@@ -8,11 +8,13 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/params"
+
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 )
 
 // environment is the worker's current environment and holds all of the current state information.
@@ -110,11 +112,18 @@ func (w *Worker) UpdateCurrent() error {
 	parent := w.chain.CurrentBlock()
 	num := parent.Number()
 	timestamp := time.Now().Unix()
+	// New block's epoch is the same as parent's...
+	epoch := new(big.Int).Set(parent.Header().Epoch)
+	if len(parent.Header().ShardState) > 0 {
+		// ... except if parent has a resharding assignment it increases by 1.
+		epoch = epoch.Add(epoch, common.Big1)
+	}
 	header := &types.Header{
 		ParentHash: parent.Hash(),
 		Number:     num.Add(num, common.Big1),
 		GasLimit:   core.CalcGasLimit(parent, w.gasFloor, w.gasCeil),
 		Time:       big.NewInt(timestamp),
+		Epoch:      epoch,
 		ShardID:    w.chain.ShardID(),
 	}
 	return w.makeCurrent(parent, header)
@@ -150,7 +159,7 @@ func (w *Worker) Commit() (*types.Block, error) {
 	s := w.current.state.Copy()
 	block, err := w.engine.Finalize(w.chain, w.current.header, s, w.current.txs, w.current.receipts)
 	if err != nil {
-		return nil, err
+		return nil, ctxerror.New("cannot finalize block").WithCause(err)
 	}
 	return block, nil
 }
@@ -170,11 +179,18 @@ func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus_en
 	parent := worker.chain.CurrentBlock()
 	num := parent.Number()
 	timestamp := time.Now().Unix()
+	// New block's epoch is the same as parent's...
+	epoch := new(big.Int).Set(parent.Header().Epoch)
+	if len(parent.Header().ShardState) > 0 {
+		// ... except if parent has a resharding assignment it increases by 1.
+		epoch = epoch.Add(epoch, common.Big1)
+	}
 	header := &types.Header{
 		ParentHash: parent.Hash(),
 		Number:     num.Add(num, common.Big1),
 		GasLimit:   core.CalcGasLimit(parent, worker.gasFloor, worker.gasCeil),
 		Time:       big.NewInt(timestamp),
+		Epoch:      epoch,
 		ShardID:    worker.chain.ShardID(),
 	}
 	worker.makeCurrent(parent, header)

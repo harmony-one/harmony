@@ -2,14 +2,15 @@ package consensus
 
 import (
 	"encoding/hex"
+	"math/big"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/params"
-
 	"github.com/golang/mock/gomock"
 	protobuf "github.com/golang/protobuf/proto"
+
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
@@ -18,7 +19,6 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	mock_host "github.com/harmony-one/harmony/p2p/host/mock"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
-	//"github.com/stretchr/testify/assert"
 )
 
 type MockChainReader struct{}
@@ -46,6 +46,10 @@ func (MockChainReader) GetHeaderByHash(hash common.Hash) *types.Header {
 // GetBlock retrieves a block from the database by hash and number.
 func (MockChainReader) GetBlock(hash common.Hash, number uint64) *types.Block {
 	return &types.Block{}
+}
+
+func (MockChainReader) ReadShardState(epoch *big.Int) (types.ShardState, error) {
+	return nil, nil
 }
 
 func TestProcessMessageValidatorAnnounce(test *testing.T) {
@@ -118,10 +122,10 @@ func TestProcessMessageValidatorAnnounce(test *testing.T) {
 
 func testBlockBytes() ([]byte, error) {
 	return hex.DecodeString("" +
-		// BEGIN 673-byte Block
-		"f902a1" +
-		// BEGIN 668-byte header
-		"f9029c" +
+		// BEGIN 675-byte Block
+		"f902a3" +
+		// BEGIN 670-byte header
+		"f9029e" +
 		// 32-byte ParentHash
 		"a0" +
 		"0000000000000000000000000000000000000000000000000000000000000000" +
@@ -171,6 +175,9 @@ func testBlockBytes() ([]byte, error) {
 		// 8-byte Nonce
 		"88" +
 		"0000000000000000" +
+		// 0-byte Epoch
+		"80" +
+		"" +
 		// single-byte ShardID
 		"01" +
 		// 48-byte PrepareSignature
@@ -196,6 +203,9 @@ func testBlockBytes() ([]byte, error) {
 		// 32-byte ShardStateHash
 		"a0" +
 		"0000000000000000000000000000000000000000000000000000000000000000" +
+		// BEGIN 0-byte ShardState
+		"c0" +
+		// END ShardState
 		// END header
 		// BEGIN 0-byte uncles
 		"c0" +

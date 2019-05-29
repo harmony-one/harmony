@@ -5,14 +5,18 @@ import (
 	"math/big"
 	"math/rand"
 	"strings"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/pkg/errors"
+
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/core/rawdb"
+	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/ctxerror"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/internal/utils/contract"
 )
 
@@ -25,8 +29,39 @@ const (
 	InitFreeFundInEther = 100
 )
 
-// GenesisBlockSetup setups a genesis blockchain.
-func (node *Node) GenesisBlockSetup(db ethdb.Database, shardID uint32, isArchival bool) (*core.BlockChain, error) {
+// genesisInitializer is a shardchain.DBInitializer adapter.
+type genesisInitializer struct {
+	node *Node
+}
+
+// InitChainDB sets up a new genesis block in the database for the given shard.
+func (gi *genesisInitializer) InitChainDB(db ethdb.Database, shardID uint32) error {
+	shardState := core.GetInitShardState()
+	if shardID != 0 {
+		// store only the local shard
+		c := shardState.FindCommitteeByID(shardID)
+		if c == nil {
+			return errors.New("cannot find local shard in genesis")
+		}
+		shardState = types.ShardState{*c}
+	}
+	if err := rawdb.WriteShardState(db, common.Big0, shardState); err != nil {
+		return ctxerror.New("cannot store epoch shard state").WithCause(err)
+	}
+	if err := gi.node.SetupGenesisBlock(db, shardID); err != nil {
+		return ctxerror.New("cannot setup genesis block").WithCause(err)
+	}
+	return nil
+}
+
+// SetupGenesisBlock sets up a genesis blockchain.
+func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32) error {
+	utils.GetLogger().Info("setting up a brand new chain database",
+		"shardID", shardID)
+	if shardID == node.Consensus.ShardID {
+		node.isFirstTime = true
+	}
+
 	// Initialize genesis block and blockchain
 	// Tests account for txgen to use
 
@@ -54,40 +89,45 @@ func (node *Node) GenesisBlockSetup(db ethdb.Database, shardID uint32, isArchiva
 	chainConfig := *params.TestChainConfig
 	chainConfig.ChainID = big.NewInt(int64(shardID)) // Use ChainID as piggybacked ShardID
 	gspec := core.Genesis{
-		Config:         &chainConfig,
-		Alloc:          genesisAlloc,
-		ShardID:        shardID,
-		ShardStateHash: core.GetInitShardState().Hash(),
+		Config:  &chainConfig,
+		Alloc:   genesisAlloc,
+		ShardID: shardID,
 	}
 
 	// Store genesis block into db.
-	gspec.MustCommit(db)
-	cacheConfig := core.CacheConfig{}
-	if isArchival {
-		cacheConfig = core.CacheConfig{Disabled: true, TrieNodeLimit: 256 * 1024 * 1024, TrieTimeLimit: 30 * time.Second}
+	_, err := gspec.Commit(db)
+
+	return err
+}
+
+// CreateTestBankKeys deterministically generates testing addresses.
+func CreateTestBankKeys(numAddresses int) (keys []*ecdsa.PrivateKey, err error) {
+	rand.Seed(0)
+	bytes := make([]byte, 1000000)
+	for i := range bytes {
+		bytes[i] = byte(rand.Intn(100))
 	}
-	return core.NewBlockChain(db, &cacheConfig, gspec.Config, node.Consensus, vm.Config{}, nil)
+	reader := strings.NewReader(string(bytes))
+	for i := 0; i < numAddresses; i++ {
+		key, err := ecdsa.GenerateKey(crypto.S256(), reader)
+		if err != nil {
+			return nil, err
+		}
+		keys = append(keys, key)
+	}
+	return keys, nil
 }
 
 // CreateGenesisAllocWithTestingAddresses create the genesis block allocation that contains deterministically
 // generated testing addresses with tokens. This is mostly used for generated simulated transactions in txgen.
 // TODO: Remove it later when moving to production.
 func (node *Node) CreateGenesisAllocWithTestingAddresses(numAddress int) core.GenesisAlloc {
-	rand.Seed(0)
-	len := 1000000
-	bytes := make([]byte, len)
-	for i := 0; i < len; i++ {
-		bytes[i] = byte(rand.Intn(100))
-	}
-	reader := strings.NewReader(string(bytes))
 	genesisAloc := make(core.GenesisAlloc)
-	for i := 0; i < numAddress; i++ {
-		testBankKey, _ := ecdsa.GenerateKey(crypto.S256(), reader)
+	for _, testBankKey := range node.TestBankKeys {
 		testBankAddress := crypto.PubkeyToAddress(testBankKey.PublicKey)
 		testBankFunds := big.NewInt(InitFreeFundInEther)
 		testBankFunds = testBankFunds.Mul(testBankFunds, big.NewInt(params.Ether))
 		genesisAloc[testBankAddress] = core.GenesisAccount{Balance: testBankFunds}
-		node.TestBankKeys = append(node.TestBankKeys, testBankKey)
 	}
 	return genesisAloc
 }

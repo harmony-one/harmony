@@ -28,6 +28,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"golang.org/x/crypto/sha3"
 
@@ -84,6 +85,7 @@ type Header struct {
 	MixDigest   common.Hash    `json:"mixHash"          gencodec:"required"`
 	Nonce       BlockNonce     `json:"nonce"            gencodec:"required"`
 	// Additional Fields
+	Epoch            *big.Int    `json:"epoch"            gencodec:"required"`
 	ShardID          uint32      `json:"shardID"          gencodec:"required"`
 	PrepareSignature [48]byte    `json:"prepareSignature" gencodec:"required"`
 	PrepareBitmap    []byte      `json:"prepareBitmap"    gencodec:"required"` // Contains which validator signed
@@ -92,6 +94,7 @@ type Header struct {
 	RandPreimage     [32]byte    `json:"randPreimage"`
 	RandSeed         [32]byte    `json:"randSeed"`
 	ShardStateHash   common.Hash `json:"shardStateRoot"`
+	ShardState       ShardState  `json:"shardState"`
 }
 
 // field type overrides for gencodec
@@ -115,6 +118,16 @@ func (h *Header) Hash() common.Hash {
 // to approximate and limit the memory consumption of various caches.
 func (h *Header) Size() common.StorageSize {
 	return common.StorageSize(unsafe.Sizeof(*h)) + common.StorageSize(len(h.Extra)+(h.Difficulty.BitLen()+h.Number.BitLen()+h.Time.BitLen())/8)
+}
+
+// Logger returns a sub-logger with block contexts added.
+func (h *Header) Logger(logger log.Logger) log.Logger {
+	return logger.New(
+		"blockHash", h.Hash(),
+		"blockShard", h.ShardID,
+		"blockEpoch", h.Epoch,
+		"blockNumber", h.Number,
+	)
 }
 
 func rlpHash(x interface{}) (h common.Hash) {
@@ -417,9 +430,10 @@ func (b *Block) WithBody(transactions []*Transaction, uncles []*Header) *Block {
 // Hash returns the keccak256 hash of b's header.
 // The hash is computed on the first call and cached thereafter.
 func (b *Block) Hash() common.Hash {
-	if hash := b.hash.Load(); hash != nil {
-		return hash.(common.Hash)
-	}
+	//if hash := b.hash.Load(); hash != nil {
+	//	return hash.(common.Hash)
+	//}
+	//b.Logger(utils.GetLogger()).Debug("finalizing and caching block hash")
 	v := b.header.Hash()
 	b.hash.Store(v)
 	return v
@@ -475,7 +489,16 @@ func (b *Block) AddRandPreimage(pRnd [32]byte) {
 	b.header.RandPreimage = pRnd
 }
 
-// AddShardStateHash add shardStateHash into block header
-func (b *Block) AddShardStateHash(shardStateHash common.Hash) {
-	b.header.ShardStateHash = shardStateHash
+// AddShardState add shardState into block header
+func (b *Block) AddShardState(shardState ShardState) {
+	// Make a copy because ShardState.Hash() internally sorts entries.
+	// Store the sorted copy.
+	shardState = append(shardState[:0:0], shardState...)
+	b.header.ShardStateHash = shardState.Hash()
+	b.header.ShardState = shardState
+}
+
+// Logger returns a sub-logger with block contexts added.
+func (b *Block) Logger(logger log.Logger) log.Logger {
+	return b.header.Logger(logger)
 }

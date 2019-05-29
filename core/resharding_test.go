@@ -123,9 +123,6 @@ func TestUpdateShardState(t *testing.T) {
 
 	ss.Reshard(newNodeList, 0.2)
 	assert.Equal(t, 6, ss.numShards)
-	for _, shard := range ss.shardState {
-		assert.Equal(t, shard.Leader.BlsPublicKey, shard.NodeList[0].BlsPublicKey)
-	}
 }
 
 func TestAssignNewNodes(t *testing.T) {
