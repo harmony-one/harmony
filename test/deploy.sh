@@ -166,7 +166,10 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
     NUM_NN=$((${NUM_NN} + 30))
     ;;
   esac
-  $DRYRUN "${ROOT}/bin/harmony" "${args[@]}" 2>&1 | tee -a "${LOG_FILE}" &
+  case "${mode}" in
+  client) ;;
+  *) $DRYRUN "${ROOT}/bin/harmony" "${args[@]}" 2>&1 | tee -a "${LOG_FILE}" &;;
+  esac
   i=$((i+1))
 done < $config
 
