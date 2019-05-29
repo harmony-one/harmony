@@ -8,19 +8,18 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/accounts"
-	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 )
 
 // PublicTransactionPoolAPI exposes methods for the RPC interface
 type PublicTransactionPoolAPI struct {
-	b         *core.HmyAPIBackend
+	b         Backend
 	nonceLock *AddrLocker
 }
 
 // NewPublicTransactionPoolAPI creates a new RPC service with methods specific for the transaction pool.
-func NewPublicTransactionPoolAPI(b *core.HmyAPIBackend, nonceLock *AddrLocker) *PublicTransactionPoolAPI {
+func NewPublicTransactionPoolAPI(b Backend, nonceLock *AddrLocker) *PublicTransactionPoolAPI {
 	return &PublicTransactionPoolAPI{b, nonceLock}
 }
 
@@ -183,4 +182,31 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 		fields["contractAddress"] = receipt.ContractAddress
 	}
 	return fields, nil
+}
+
+// PendingTransactions returns the transactions that are in the transaction pool
+// and have a from address that is one of the accounts this node manages.
+func (s *PublicTransactionPoolAPI) PendingTransactions() ([]*RPCTransaction, error) {
+	pending, err := s.b.GetPoolTransactions()
+	if err != nil {
+		return nil, err
+	}
+	accounts := make(map[common.Address]struct{})
+	for _, wallet := range s.b.AccountManager().Wallets() {
+		for _, account := range wallet.Accounts() {
+			accounts[account.Address] = struct{}{}
+		}
+	}
+	transactions := make([]*RPCTransaction, 0, len(pending))
+	for _, tx := range pending {
+		var signer types.Signer = types.HomesteadSigner{}
+		if tx.Protected() {
+			signer = types.NewEIP155Signer(tx.ChainID())
+		}
+		from, _ := types.Sender(signer, tx)
+		if _, exists := accounts[from]; exists {
+			transactions = append(transactions, newRPCPendingTransaction(tx))
+		}
+	}
+	return transactions, nil
 }

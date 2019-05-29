@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
 )
 
 var _ = (*receiptMarshaling)(nil)
@@ -18,7 +19,7 @@ func (r Receipt) MarshalJSON() ([]byte, error) {
 		PostState         hexutil.Bytes  `json:"root"`
 		Status            hexutil.Uint64 `json:"status"`
 		CumulativeGasUsed hexutil.Uint64 `json:"cumulativeGasUsed" gencodec:"required"`
-		Bloom             Bloom          `json:"logsBloom"         gencodec:"required"`
+		Bloom             ethtypes.Bloom `json:"logsBloom"         gencodec:"required"`
 		Logs              []*Log         `json:"logs"              gencodec:"required"`
 		TxHash            common.Hash    `json:"transactionHash" gencodec:"required"`
 		ContractAddress   common.Address `json:"contractAddress"`
@@ -42,7 +43,7 @@ func (r *Receipt) UnmarshalJSON(input []byte) error {
 		PostState         *hexutil.Bytes  `json:"root"`
 		Status            *hexutil.Uint64 `json:"status"`
 		CumulativeGasUsed *hexutil.Uint64 `json:"cumulativeGasUsed" gencodec:"required"`
-		Bloom             *Bloom          `json:"logsBloom"         gencodec:"required"`
+		Bloom             *ethtypes.Bloom `json:"logsBloom"         gencodec:"required"`
 		Logs              []*Log          `json:"logs"              gencodec:"required"`
 		TxHash            *common.Hash    `json:"transactionHash" gencodec:"required"`
 		ContractAddress   *common.Address `json:"contractAddress"`

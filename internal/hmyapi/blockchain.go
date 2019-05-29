@@ -6,17 +6,16 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/harmony-one/harmony/core"
 )
 
 // PublicBlockChainAPI provides an API to access the Harmony blockchain.
 // It offers only methods that operate on public data that is freely available to anyone.
 type PublicBlockChainAPI struct {
-	b *core.HmyAPIBackend
+	b Backend
 }
 
 // NewPublicBlockChainAPI creates a new Harmony blockchain API.
-func NewPublicBlockChainAPI(b *core.HmyAPIBackend) *PublicBlockChainAPI {
+func NewPublicBlockChainAPI(b Backend) *PublicBlockChainAPI {
 	return &PublicBlockChainAPI{b}
 }
 

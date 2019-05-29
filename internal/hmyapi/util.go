@@ -6,12 +6,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 )
 
 // SubmitTransaction is a helper function that submits tx to txPool and logs a message.
-func SubmitTransaction(ctx context.Context, b *core.HmyAPIBackend, tx *types.Transaction) (common.Hash, error) {
+func SubmitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (common.Hash, error) {
 	if err := b.SendTx(ctx, tx); err != nil {
 		return common.Hash{}, err
 	}

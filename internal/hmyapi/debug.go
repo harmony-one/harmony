@@ -5,17 +5,16 @@ import (
 	"errors"
 
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // DebugAPI Internal JSON RPC for debugging purpose
 type DebugAPI struct {
-	b *core.HmyAPIBackend
+	b Backend
 }
 
 // NewDebugAPI Creates a new DebugAPI instance
-func NewDebugAPI(b *core.HmyAPIBackend) *DebugAPI {
+func NewDebugAPI(b Backend) *DebugAPI {
 	return &DebugAPI{b}
 }
 

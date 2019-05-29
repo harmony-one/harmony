@@ -6,10 +6,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/internal/hmyapi"
+	"github.com/harmony-one/harmony/internal/hmyapi/filters"
 )
 
 const (
@@ -36,15 +38,16 @@ var (
 	wsModules = []string{"net", "web3"}
 	wsOrigins = []string{"*"}
 
-	apiBackend *core.HmyAPIBackend
+	harmony *hmy.Harmony
 )
 
 // StartRPC start RPC service
 func (node *Node) StartRPC(nodePort string) error {
 	// Gather all the possible APIs to surface
-	apiBackend = core.NewBackend(node.Blockchain(), node.TxPool, node.accountManager, node)
+	harmony, _ = hmy.New(node, node.TxPool, new(event.TypeMux))
 
-	apis := hmyapi.GetAPIs(apiBackend)
+	apis := node.APIs()
+
 	for _, service := range node.serviceManager.GetServices() {
 		apis = append(apis, service.APIs()...)
 	}
@@ -130,4 +133,21 @@ func (node *Node) stopWS() {
 		wsHandler.Stop()
 		wsHandler = nil
 	}
+}
+
+// APIs return the collection of RPC services the ethereum package offers.
+// NOTE, some of these services probably need to be moved to somewhere else.
+func (node *Node) APIs() []rpc.API {
+	// Gather all the possible APIs to surface
+	apis := hmyapi.GetAPIs(harmony.APIBackend)
+
+	// Append all the local APIs and return
+	return append(apis, []rpc.API{
+		{
+			Namespace: "hmy",
+			Version:   "1.0",
+			Service:   filters.NewPublicFilterAPI(harmony.APIBackend, false),
+			Public:    true,
+		},
+	}...)
 }
