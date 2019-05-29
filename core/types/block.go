@@ -28,6 +28,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"golang.org/x/crypto/sha3"
@@ -75,7 +76,7 @@ type Header struct {
 	Root        common.Hash    `json:"stateRoot"        gencodec:"required"`
 	TxHash      common.Hash    `json:"transactionsRoot" gencodec:"required"`
 	ReceiptHash common.Hash    `json:"receiptsRoot"     gencodec:"required"`
-	Bloom       Bloom          `json:"logsBloom"        gencodec:"required"`
+	Bloom       ethtypes.Bloom `json:"logsBloom"        gencodec:"required"`
 	Difficulty  *big.Int       `json:"difficulty"       gencodec:"required"`
 	Number      *big.Int       `json:"number"           gencodec:"required"`
 	GasLimit    uint64         `json:"gasLimit"         gencodec:"required"`
@@ -351,7 +352,7 @@ func (b *Block) Nonce() uint64 { return binary.BigEndian.Uint64(b.header.Nonce[:
 func (b *Block) ShardID() uint32 { return b.header.ShardID }
 
 // Bloom returns header bloom.
-func (b *Block) Bloom() Bloom { return b.header.Bloom }
+func (b *Block) Bloom() ethtypes.Bloom { return b.header.Bloom }
 
 // Coinbase returns header coinbase.
 func (b *Block) Coinbase() common.Address { return b.header.Coinbase }

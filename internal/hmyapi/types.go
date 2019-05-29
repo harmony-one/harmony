@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/harmony-one/harmony/core/types"
 )
 
@@ -69,7 +70,7 @@ type RPCBlock struct {
 	ParentHash       common.Hash      `json:"parentHash"`
 	Nonce            types.BlockNonce `json:"nonce"`
 	MixHash          common.Hash      `json:"mixHash"`
-	LogsBloom        types.Bloom      `json:"logsBloom"`
+	LogsBloom        ethtypes.Bloom   `json:"logsBloom"`
 	StateRoot        common.Hash      `json:"stateRoot"`
 	Miner            common.Address   `json:"miner"`
 	Difficulty       *hexutil.Big     `json:"difficulty"`
