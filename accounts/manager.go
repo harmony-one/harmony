@@ -17,6 +17,7 @@
 package accounts
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 	"sync"
@@ -166,14 +167,19 @@ func (am *Manager) Wallet(url string) (Wallet, error) {
 // accounts can be dynamically added to and removed from wallets, this method has
 // a linear runtime in the number of wallets.
 func (am *Manager) Find(account Account) (Wallet, error) {
+	fmt.Println("come here1")
 	am.lock.RLock()
+	fmt.Println("come here2")
+
 	defer am.lock.RUnlock()
 
 	for _, wallet := range am.wallets {
+
 		if wallet.Contains(account) {
 			return wallet, nil
 		}
 	}
+	fmt.Println("come here")
 	return nil, ErrUnknownAccount
 }
 

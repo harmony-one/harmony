@@ -85,7 +85,8 @@ func (b *APIBackend) GetPoolNonce(ctx context.Context, addr common.Address) (uin
 
 // SendTx ...
 func (b *APIBackend) SendTx(ctx context.Context, signedTx *types.Transaction) error {
-	return b.hmy.txPool.Add(ctx, signedTx)
+	b.hmy.nodeAPI.AddPendingTransaction(signedTx)
+	return nil
 }
 
 // ChainConfig ...

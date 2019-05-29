@@ -10,6 +10,7 @@ import (
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // PublicTransactionPoolAPI exposes methods for the RPC interface
@@ -96,10 +97,16 @@ func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args Sen
 	// Look up the wallet containing the requested signer
 	account := accounts.Account{Address: args.From}
 
+	utils.GetLogInstance().Info("TESTING----", "string", account.Address.String(), "hex", account.Address.Hex())
+	if s.b.AccountManager() == nil {
+		panic("the accouhnt manager not initialized")
+	}
 	wallet, err := s.b.AccountManager().Find(account)
 	if err != nil {
+		utils.GetLogInstance().Info("TESTING----", "error", err)
 		return common.Hash{}, err
 	}
+	utils.GetLogInstance().Info("TESTING----", "minhdoan no error")
 
 	if args.Nonce == nil {
 		// Hold the addresse's mutex around signing to prevent concurrent assignment of

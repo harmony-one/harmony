@@ -185,6 +185,56 @@ type Node struct {
 	accountManager *accounts.Manager
 }
 
+func makeAccountManager(conf *Config) (*accounts.Manager, string, error) {
+	scryptN, scryptP, keydir, err := conf.AccountConfig()
+	var ephemeral string
+	if keydir == "" {
+		// There is no datadir.
+		keydir, err = ioutil.TempDir("", "go-ethereum-keystore")
+		ephemeral = keydir
+	}
+
+	if err != nil {
+		return nil, "", err
+	}
+	if err := os.MkdirAll(keydir, 0700); err != nil {
+		return nil, "", err
+	}
+	// Assemble the account manager and supported backends
+	var backends []accounts.Backend
+	if len(conf.ExternalSigner) > 0 {
+		log.Info("Using external signer", "url", conf.ExternalSigner)
+		if extapi, err := external.NewExternalBackend(conf.ExternalSigner); err == nil {
+			backends = append(backends, extapi)
+		} else {
+			log.Info("Error configuring external signer", "error", err)
+		}
+	}
+	if len(backends) == 0 {
+		// For now, we're using EITHER external signer OR local signers.
+		// If/when we implement some form of lockfile for USB and keystore wallets,
+		// we can have both, but it's very confusing for the user to see the same
+		// accounts in both externally and locally, plus very racey.
+		backends = append(backends, keystore.NewKeyStore(keydir, scryptN, scryptP))
+		// if !conf.NoUSB {
+		// 	// Start a USB hub for Ledger hardware wallets
+		// 	if ledgerhub, err := usbwallet.NewLedgerHub(); err != nil {
+		// 		log.Warn(fmt.Sprintf("Failed to start Ledger hub, disabling: %v", err))
+		// 	} else {
+		// 		backends = append(backends, ledgerhub)
+		// 	}
+		// 	// Start a USB hub for Trezor hardware wallets
+		// 	if trezorhub, err := usbwallet.NewTrezorHub(); err != nil {
+		// 		log.Warn(fmt.Sprintf("Failed to start Trezor hub, disabling: %v", err))
+		// 	} else {
+		// 		backends = append(backends, trezorhub)
+		// 	}
+		// }
+	}
+
+	return accounts.NewManager(backends...), ephemeral, nil
+}
+
 // Blockchain returns the blockchain from node
 func (node *Node) Blockchain() *core.BlockChain {
 	return node.blockchain
@@ -196,6 +246,12 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 	node.pendingTransactions = append(node.pendingTransactions, newTxs...)
 	node.pendingTxMutex.Unlock()
 	utils.GetLogInstance().Debug("Got more transactions", "num", len(newTxs), "totalPending", len(node.pendingTransactions))
+}
+
+// AddPendingTransaction adds one new transaction to the pending transaction list.
+func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
+	node.addPendingTransactions(types.Transactions{newTx})
+	utils.GetLogInstance().Debug("Got ONE more transaction", "totalPending", len(node.pendingTransactions))
 }
 
 // Take out a subset of valid transactions from the pending transaction list
@@ -237,6 +293,14 @@ func (node *Node) GetSyncID() [SyncIDLength]byte {
 	return node.syncID
 }
 
+func (node *Node) SetupAccountManager() {
+	am, ephemeralKeystore, err := makeAccountManager(conf)
+	if err != nil {
+		return nil, err
+	}
+	node.accountManager = am
+}
+
 // New creates a new node.
 func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, isArchival bool) *Node {
 	var chain *core.BlockChain
@@ -254,14 +318,8 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, db ethdb.Database, is
 		// Consensus and associated channel to communicate blocks
 		node.Consensus = consensusObj
 
-		// TODO(ricl): placeholder. Set the account manager to node.accountManager
-		// // Ensure that the AccountManager method works before the node has started.
-		// // We rely on this in cmd/geth.
-		// am, ephemeralKeystore, err := makeAccountManager(conf)
-		// if err != nil {
-		// 	return nil, err
-		// }
-		// node.accountManager = am
+		// 
+		node.SetupAccountManager()
 
 		// Init db
 		database := db

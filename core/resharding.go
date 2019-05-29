@@ -24,7 +24,7 @@ const (
 	// GenesisShardNum is the number of shard at genesis
 	GenesisShardNum = 1
 	// GenesisShardSize is the size of each shard at genesis
-	GenesisShardSize = 10
+	GenesisShardSize = 5
 	// CuckooRate is the percentage of nodes getting reshuffled in the second step of cuckoo resharding.
 	CuckooRate = 0.1
 )

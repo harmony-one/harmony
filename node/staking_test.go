@@ -48,13 +48,13 @@ func TestUpdateStakingList(t *testing.T) {
 	}
 
 	stakeInfo := &structs.StakeInfoReturnValue{
-		[]common.Address{testAddress},
-		[][32]byte{testBlsPubKey1},
-		[][32]byte{testBlsPubKey2},
-		[][32]byte{testBlsPubKey3},
-		[]*big.Int{blockNum},
-		[]*big.Int{lockPeriodCount},
-		[]*big.Int{amount},
+		LockedAddresses:  []common.Address{testAddress},
+		BlsPubicKeys1:    [][32]byte{testBlsPubKey1},
+		BlsPubicKeys2:    [][32]byte{testBlsPubKey2},
+		BlsPubicKeys3:    [][32]byte{testBlsPubKey3},
+		BlockNums:        []*big.Int{blockNum},
+		LockPeriodCounts: []*big.Int{lockPeriodCount},
+		Amounts:          []*big.Int{amount},
 	}
 
 	node.UpdateStakingList(stakeInfo)
