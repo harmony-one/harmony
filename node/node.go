@@ -206,7 +206,7 @@ func (node *Node) Blockchain() *core.BlockChain {
 	if err != nil {
 		err = ctxerror.New("cannot get shard chain", "shardID", shardID).
 			WithCause(err)
-		panic(err) //ctxerror.Log15(utils.GetLogger().Crit, err)
+		ctxerror.Log15(utils.GetLogger().Crit, err)
 	}
 	return bc
 }
@@ -221,12 +221,18 @@ func (node *Node) Beaconchain() *core.BlockChain {
 	return bc
 }
 
-// Add new transactions to the pending transaction list
+// Add new transactions to the pending transaction list.
 func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 	node.pendingTxMutex.Lock()
 	node.pendingTransactions = append(node.pendingTransactions, newTxs...)
 	node.pendingTxMutex.Unlock()
 	utils.GetLogInstance().Debug("Got more transactions", "num", len(newTxs), "totalPending", len(node.pendingTransactions))
+}
+
+// AddPendingTransaction adds one new transaction to the pending transaction list.
+func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
+	node.addPendingTransactions(types.Transactions{newTx})
+	utils.GetLogInstance().Debug("Got ONE more transaction", "totalPending", len(node.pendingTransactions))
 }
 
 // Take out a subset of valid transactions from the pending transaction list

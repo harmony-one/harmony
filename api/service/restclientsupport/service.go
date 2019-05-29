@@ -74,7 +74,7 @@ func (s *Service) StopService() {
 	if err := s.server.Shutdown(context.Background()); err != nil {
 		utils.GetLogInstance().Error("Error when shutting down rest client support server", "error", err)
 	} else {
-		utils.GetLogInstance().Error("Shutting down rest client support server successufully")
+		utils.GetLogInstance().Info("Shutting down rest client support server successufully")
 	}
 }
 

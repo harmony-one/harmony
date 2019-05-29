@@ -4,12 +4,10 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/harmony-one/harmony/crypto/bls"
-
-	"github.com/harmony-one/harmony/contracts/structs"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/contracts/structs"
+	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
@@ -48,13 +46,13 @@ func TestUpdateStakingList(t *testing.T) {
 	}
 
 	stakeInfo := &structs.StakeInfoReturnValue{
-		[]common.Address{testAddress},
-		[][32]byte{testBlsPubKey1},
-		[][32]byte{testBlsPubKey2},
-		[][32]byte{testBlsPubKey3},
-		[]*big.Int{blockNum},
-		[]*big.Int{lockPeriodCount},
-		[]*big.Int{amount},
+		LockedAddresses:  []common.Address{testAddress},
+		BlsPubicKeys1:    [][32]byte{testBlsPubKey1},
+		BlsPubicKeys2:    [][32]byte{testBlsPubKey2},
+		BlsPubicKeys3:    [][32]byte{testBlsPubKey3},
+		BlockNums:        []*big.Int{blockNum},
+		LockPeriodCounts: []*big.Int{lockPeriodCount},
+		Amounts:          []*big.Int{amount},
 	}
 
 	node.UpdateStakingList(stakeInfo)

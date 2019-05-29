@@ -62,7 +62,7 @@ func (s *Service) StopService() {
 	if err := s.server.Shutdown(context.Background()); err != nil {
 		utils.GetLogInstance().Error("Error when shutting down explorer server", "error", err)
 	} else {
-		utils.GetLogInstance().Error("Shutting down explorer server successufully")
+		utils.GetLogInstance().Info("Shutting down explorer server successufully")
 	}
 }
 
