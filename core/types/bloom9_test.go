@@ -19,6 +19,8 @@ package types
 import (
 	"math/big"
 	"testing"
+
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
 )
 
 func TestBloom(t *testing.T) {
@@ -33,7 +35,7 @@ func TestBloom(t *testing.T) {
 		"lo",
 	}
 
-	var bloom Bloom
+	var bloom ethtypes.Bloom
 	for _, data := range positive {
 		bloom.Add(new(big.Int).SetBytes([]byte(data)))
 	}
