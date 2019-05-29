@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/types"
 )
 
 // Harmony implements the Harmony full node service.
@@ -24,21 +25,31 @@ type Harmony struct {
 
 	bloomIndexer *core.ChainIndexer // Bloom indexer operating during block imports
 	APIBackend   *APIBackend
+
+	nodeAPI NodeAPI
+}
+
+// NodeAPI is the list of functions from node used to call rpc apis.
+type NodeAPI interface {
+	AddPendingTransaction(newTx *types.Transaction)
+	Blockchain() *core.BlockChain
+	AccountManager() *accounts.Manager
 }
 
 // New creates a new Harmony object (including the
 // initialisation of the common Harmony object)
-func New(blockchain *core.BlockChain, txPool *core.TxPool, accountManager *accounts.Manager, eventMux *event.TypeMux) (*Harmony, error) {
-	chainDb := blockchain.ChainDB()
+func New(nodeAPI NodeAPI, txPool *core.TxPool, eventMux *event.TypeMux) (*Harmony, error) {
+	chainDb := nodeAPI.Blockchain().ChainDB()
 	hmy := &Harmony{
 		shutdownChan:   make(chan bool),
 		bloomRequests:  make(chan chan *bloombits.Retrieval),
-		blockchain:     blockchain,
+		blockchain:     nodeAPI.Blockchain(),
 		txPool:         txPool,
-		accountManager: accountManager,
+		accountManager: nodeAPI.AccountManager(),
 		eventMux:       eventMux,
 		chainDb:        chainDb,
 		bloomIndexer:   NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms),
+		nodeAPI:        nodeAPI,
 	}
 
 	hmy.APIBackend = &APIBackend{hmy}
