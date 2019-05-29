@@ -1,18 +1,18 @@
 package hmy
 
 import (
+	"github.com/ethereum/go-ethereum/core/bloombits"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/core"
-	"github.com/ethereum/go-ethereum/core/bloombits"
 )
 
 // Harmony implements the Harmony full node service.
 type Harmony struct {
 	// Channel for shutting down the service
-	shutdownChan chan bool // Channel for shutting down the Harmony
+	shutdownChan  chan bool                      // Channel for shutting down the Harmony
 	bloomRequests chan chan *bloombits.Retrieval // Channel receiving bloom data retrieval requests
 
 	blockchain     *core.BlockChain
