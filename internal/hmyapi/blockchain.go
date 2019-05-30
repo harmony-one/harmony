@@ -78,3 +78,9 @@ func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address common.Add
 	}
 	return (*hexutil.Big)(state.GetBalance(address)), state.Error()
 }
+
+// BlockNumber returns the block number of the chain head.
+func (s *PublicBlockChainAPI) BlockNumber() hexutil.Uint64 {
+	header, _ := s.b.HeaderByNumber(context.Background(), rpc.LatestBlockNumber) // latest header should always be available
+	return hexutil.Uint64(header.Number.Uint64())
+}
