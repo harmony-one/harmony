@@ -11,9 +11,12 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 )
 
+// {Address: "0x1a3e7a44ee21101d7D64FBf29B0F6F1fc295F723", Private: "27978f895b11d9c737e1ab1623fde722c04b4f9ccb4ab776bf15932cc72d7c66", Public: "0x1a3e7a44ee21101d7D64FBf29B0F6F1fc295F723"},
+// {Address: "0x10A02A0a6e95a676AE23e2db04BEa3D1B8b7ca2E", Private: "371cb68abe6a6101ac88603fc847e0c013a834253acee5315884d2c4e387ebca", Public: "0x10A02A0a6e95a676AE23e2db04BEa3D1B8b7ca2E"},
+
 var (
-	fromPrivateKey = flag.String("private", "fad9c8855b740a0b7ed4c221dbad0f33a83a49cad6b3fe8d5817ac83d38b6a19", "private key")
-	toAddress      = flag.String("to_address", "0x4592d8f8d7b001e72cb26a73e4fa1806a51ac79d", "private key")
+	fromPrivateKey = flag.String("private", "27978f895b11d9c737e1ab1623fde722c04b4f9ccb4ab776bf15932cc72d7c66", "private key")
+	toAddress      = flag.String("to_address", "0x10A02A0a6e95a676AE23e2db04BEa3D1B8b7ca2E", "address of to account.")
 	shardID        = flag.Int64("shard_id", 0, "shard id")
 )
 
@@ -39,6 +42,7 @@ func generateTxnHarmony(PrivateKeyFrom string, ToAddress string, shardID uint32,
 
 	ts := types.Transactions{signedTx}
 	rawTxBytes := ts.GetRlp(0)
+	fmt.Println(rawTxBytes)
 	rawTxHex := hex.EncodeToString(rawTxBytes)
 	fmt.Println("serialized: ", rawTxHex)
 
