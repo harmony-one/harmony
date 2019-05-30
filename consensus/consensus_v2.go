@@ -173,10 +173,6 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	}
 	consensus.tryPrepare(blockObj.Header().Hash())
 
-	consensus.consensusTimeout["announce"].Stop()
-	if !consensus.consensusTimeout["prepare"].IsActive() {
-		consensus.consensusTimeout["prepare"].Start()
-	}
 	return
 }
 
@@ -378,10 +374,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 
 	consensus.switchPhase(Commit)
 
-	consensus.consensusTimeout["prepare"].Stop()
-	if !consensus.consensusTimeout["commit"].IsActive() {
-		consensus.consensusTimeout["commit"].Start()
-	}
 	return
 }
 
@@ -568,17 +560,14 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		return
 	}
 
-	if recvMsg.BlockNum > consensus.blockNum || consensus.phase != Commit || recvMsg.ViewID != consensus.viewID {
+	if recvMsg.BlockNum > consensus.blockNum {
 		return
 	}
 	consensus.aggregatedCommitSig = aggSig
 	consensus.commitBitmap = mask
 
 	consensus.tryCatchup()
-	consensus.consensusTimeout["commit"].Stop()
-	if !consensus.consensusTimeout["announce"].IsActive() {
-		consensus.consensusTimeout["announce"].Start()
-	}
+	consensus.consensusTimeout[timeoutConsensus].Start()
 	return
 }
 
@@ -686,11 +675,11 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 						if !v.CheckExpire() {
 							continue
 						}
-						if k != "viewchange" {
+						if k == timeoutConsensus {
 							utils.GetLogInstance().Debug("ops", "phase", k, "mode", consensus.mode.Mode())
 							consensus.startViewChange(consensus.viewID + 1)
 							break
-						} else {
+						} else if k == timeoutViewChange {
 							utils.GetLogInstance().Debug("ops", "phase", k, "mode", consensus.mode.Mode())
 							viewID := consensus.mode.ViewID()
 							consensus.startViewChange(viewID + 1)

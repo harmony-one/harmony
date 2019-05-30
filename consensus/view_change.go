@@ -126,13 +126,10 @@ func (consensus *Consensus) ResetViewChangeState() {
 	consensus.aggregatedNILSig = nil
 }
 
-func createTimeout() map[string]*utils.Timeout {
-	timeouts := make(map[string]*utils.Timeout)
-	strs := []string{"announce", "prepare", "commit"}
-	for _, s := range strs {
-		timeouts[s] = utils.NewTimeout(phaseDuration)
-	}
-	timeouts["viewchange"] = utils.NewTimeout(viewChangeDuration)
+func createTimeout() map[TimeoutType]*utils.Timeout {
+	timeouts := make(map[TimeoutType]*utils.Timeout)
+	timeouts[timeoutConsensus] = utils.NewTimeout(phaseDuration)
+	timeouts[timeoutViewChange] = utils.NewTimeout(viewChangeDuration)
 	return timeouts
 }
 
@@ -141,11 +138,7 @@ func (consensus *Consensus) startViewChange(viewID uint32) {
 	if consensus.disableViewChange {
 		return
 	}
-	for k := range consensus.consensusTimeout {
-		if k != "viewchange" {
-			consensus.consensusTimeout[k].Stop()
-		}
-	}
+	consensus.consensusTimeout[timeoutConsensus].Stop()
 	consensus.SetMode(ViewChanging)
 	consensus.SetViewID(viewID)
 	nextLeaderKey := consensus.GetNextLeaderKey()
@@ -161,8 +154,8 @@ func (consensus *Consensus) startViewChange(viewID uint32) {
 	msgToSend := consensus.constructViewChangeMessage()
 	consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 
-	consensus.consensusTimeout["viewchange"].SetDuration(duration)
-	consensus.consensusTimeout["viewchange"].Start()
+	consensus.consensusTimeout[timeoutViewChange].SetDuration(duration)
+	consensus.consensusTimeout[timeoutViewChange].Start()
 
 }
 
@@ -319,7 +312,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		consensus.viewID = consensus.mode.GetViewID()
 		consensus.ResetViewChangeState()
 		consensus.ResetState()
-		consensus.consensusTimeout["viewchange"].Stop()
+		consensus.consensusTimeout[timeoutViewChange].Stop()
 
 	}
 	utils.GetLogInstance().Debug("onViewChange", "numSigs", len(consensus.bhpSigs)+len(consensus.nilSigs), "needed", (len(consensus.PublicKeys)*2)/3+1)
@@ -402,15 +395,14 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 
 		consensus.phase = Commit
-		consensus.consensusTimeout["commit"].Start()
 	} else {
 		consensus.phase = Announce
-		consensus.consensusTimeout["announce"].Start()
 		utils.GetLogInstance().Info("onNewView === announce")
 	}
 	consensus.viewID = consensus.mode.GetViewID()
 	consensus.ResetViewChangeState()
 	consensus.ResetState()
-	consensus.consensusTimeout["viewchange"].Stop()
+	consensus.consensusTimeout[timeoutConsensus].Start()
+	consensus.consensusTimeout[timeoutViewChange].Stop()
 
 }

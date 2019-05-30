@@ -48,8 +48,8 @@ type Consensus struct {
 	// channel to receive consensus message
 	MsgChan chan []byte
 
-	// 5 timeouts: announce, prepare, commit, viewchange, newview
-	consensusTimeout map[string]*utils.Timeout
+	// 2 types of timeouts: normal and viewchange
+	consensusTimeout map[TimeoutType]*utils.Timeout
 
 	//TODO depreciate it after implement PbftPhase
 	state State
