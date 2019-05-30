@@ -5,12 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/harmony-one/bls/ffi/go/bls"
-
-	"github.com/harmony-one/harmony/accounts"
-	"github.com/harmony-one/harmony/accounts/abi"
-	"github.com/harmony-one/harmony/contracts"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
@@ -18,10 +12,14 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 	protobuf "github.com/golang/protobuf/proto"
+	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/accounts"
+	"github.com/harmony-one/harmony/accounts/abi"
 	proto "github.com/harmony-one/harmony/api/client/service/proto"
 	proto_common "github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/api/proto/message"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	"github.com/harmony-one/harmony/contracts"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	hmykey "github.com/harmony-one/harmony/internal/keystore"
