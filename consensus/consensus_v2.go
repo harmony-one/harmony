@@ -156,7 +156,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	if len(logMsgs) > 0 {
 		if logMsgs[0].BlockHash != blockObj.Header().Hash() {
 			utils.GetLogInstance().Debug("onAnnounce leader is malicious", "leaderKey", utils.GetBlsAddress(consensus.LeaderPubKey))
-			consensus.startViewChange(consensus.viewID + 1)
+			//consensus.startViewChange(consensus.viewID + 1)
 		}
 		return
 	}
@@ -722,12 +722,12 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 						}
 						if k != "viewchange" {
 							utils.GetLogInstance().Debug("ops", "phase", k, "mode", consensus.mode.Mode())
-							consensus.startViewChange(consensus.viewID + 1)
+							//consensus.startViewChange(consensus.viewID + 1)
 							break
 						} else {
 							utils.GetLogInstance().Debug("ops", "phase", k, "mode", consensus.mode.Mode())
-							viewID := consensus.mode.ViewID()
-							consensus.startViewChange(viewID + 1)
+							//viewID := consensus.mode.ViewID()
+							//consensus.startViewChange(viewID + 1)
 							break
 						}
 					}
