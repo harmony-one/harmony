@@ -5,9 +5,9 @@ import (
 	"errors"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/bloombits"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -189,5 +189,6 @@ func (b *APIBackend) GetPoolTransactions() (types.Transactions, error) {
 
 // GetBalance ...
 func (b *APIBackend) GetBalance(address common.Address) (*hexutil.Big, error) {
-	return nil, nil
+	balance, err := b.hmy.nodeAPI.GetBalanceOfAddress(address)
+	return (*hexutil.Big)(balance), err
 }
