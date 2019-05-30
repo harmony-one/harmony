@@ -114,9 +114,7 @@ SyncingLoop:
 					node.stateMutex.Lock()
 					node.State = NodeReadyForConsensus
 					node.stateMutex.Unlock()
-					node.Consensus.SetMode(consensus.Normal)
-					node.Consensus.SetBlockNum(node.Consensus.ChainReader.CurrentHeader().Number.Uint64() + 1)
-					node.Consensus.ToggleConsensusCheck()
+					node.Consensus.BlocksSynchronized()
 				}
 			}
 			node.stateMutex.Lock()

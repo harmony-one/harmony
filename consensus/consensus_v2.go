@@ -156,7 +156,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	if len(logMsgs) > 0 {
 		if logMsgs[0].BlockHash != blockObj.Header().Hash() {
 			utils.GetLogInstance().Debug("onAnnounce leader is malicious", "leaderKey", utils.GetBlsAddress(consensus.LeaderPubKey))
-			//consensus.startViewChange(consensus.viewID + 1)
+			consensus.startViewChange(consensus.viewID + 1)
 		}
 		return
 	}
@@ -173,7 +173,6 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	}
 	consensus.tryPrepare(blockObj.Header().Hash())
 
-	consensus.consensusTimeout["bootstrap"].Stop()
 	consensus.consensusTimeout["announce"].Stop()
 	if !consensus.consensusTimeout["prepare"].IsActive() {
 		consensus.consensusTimeout["prepare"].Start()
@@ -708,7 +707,6 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 		utils.GetLogInstance().Info("start consensus", "time", time.Now())
 		defer close(stoppedChan)
 		ticker := time.NewTicker(3 * time.Second)
-		consensus.consensusTimeout["bootstrap"].Start()
 		for {
 			select {
 			case <-ticker.C:
@@ -722,17 +720,29 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 						}
 						if k != "viewchange" {
 							utils.GetLogInstance().Debug("ops", "phase", k, "mode", consensus.mode.Mode())
-							//consensus.startViewChange(consensus.viewID + 1)
+							consensus.startViewChange(consensus.viewID + 1)
 							break
 						} else {
 							utils.GetLogInstance().Debug("ops", "phase", k, "mode", consensus.mode.Mode())
-							//viewID := consensus.mode.ViewID()
-							//consensus.startViewChange(viewID + 1)
+							viewID := consensus.mode.ViewID()
+							consensus.startViewChange(viewID + 1)
 							break
 						}
 					}
 
 				}
+
+			case <-consensus.syncReadyChan:
+				func() {
+					consensus.mode.mux.Lock()
+					defer consensus.mode.mux.Unlock()
+					if consensus.mode.mode != Syncing {
+						return
+					}
+					consensus.mode.mode = Syncing
+					consensus.SetBlockNum(consensus.ChainReader.CurrentHeader().Number.Uint64() + 1)
+					consensus.ignoreViewIDCheck = true
+				}()
 
 			case newBlock := <-blockChannel:
 				utils.GetLogInstance().Info("receive newBlock", "blockNum", newBlock.NumberU64())

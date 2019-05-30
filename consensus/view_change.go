@@ -132,7 +132,6 @@ func createTimeout() map[string]*utils.Timeout {
 	for _, s := range strs {
 		timeouts[s] = utils.NewTimeout(phaseDuration)
 	}
-	timeouts["bootstrap"] = utils.NewTimeout(bootstrapDuration)
 	timeouts["viewchange"] = utils.NewTimeout(viewChangeDuration)
 	return timeouts
 }

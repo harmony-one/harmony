@@ -146,6 +146,9 @@ type Consensus struct {
 
 	// Staking information finder
 	stakeInfoFinder StakeInfoFinder
+
+	// Used to convey to the consensus main loop that block syncing has finished.
+	syncReadyChan chan struct{}
 }
 
 // StakeInfoFinder returns the stake information finder instance this
@@ -158,6 +161,12 @@ func (consensus *Consensus) StakeInfoFinder() StakeInfoFinder {
 // consensus uses, e.g. for block reward distribution.
 func (consensus *Consensus) SetStakeInfoFinder(stakeInfoFinder StakeInfoFinder) {
 	consensus.stakeInfoFinder = stakeInfoFinder
+}
+
+// BlocksSynchronized lets the main loop know that block synchronization finished
+// thus the blockchain is likely to be up to date.
+func (consensus *Consensus) BlocksSynchronized() {
+	consensus.syncReadyChan <- struct{}{}
 }
 
 // StakeInfoFinder finds the staking account for the given consensus key.
@@ -227,6 +236,7 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 	consensus.ShardID = ShardID
 
 	consensus.MsgChan = make(chan []byte)
+	consensus.syncReadyChan = make(chan struct{})
 
 	// For validators to keep track of all blocks received but not yet committed, so as to catch up to latest consensus if lagged behind.
 	consensus.blocksReceived = make(map[uint32]*BlockConsensusStatus)

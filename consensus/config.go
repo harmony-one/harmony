@@ -10,8 +10,6 @@ const (
 	// timeout will be 2*viewChangeDuration; timeout of view change v+n is n*viewChangeDuration
 	viewChangeDuration time.Duration = 30 * time.Second
 
-	bootstrapDuration time.Duration = 60 * time.Second
-
 	// timeout duration for announce/prepare/commit
 	phaseDuration time.Duration = 20 * time.Second
 	maxLogSize    uint32        = 1000

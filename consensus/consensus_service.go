@@ -580,15 +580,19 @@ func (consensus *Consensus) checkViewID(message *msg_pb.Message) error {
 		consensus.ignoreViewIDCheck = false
 		consensus.mutex.Unlock()
 		return nil
-	} else if viewID != consensus.viewID {
-		utils.GetLogger().Warn("wrong consensus id", "myViewId", consensus.viewID, "theirViewId", viewID, "consensus", consensus)
+	} else if viewID > consensus.viewID {
+		utils.GetLogger().Warn("view id is low", "myViewId", consensus.viewID, "theirViewId", viewID, "consensus", consensus)
 		// notify state syncing to start
+		// TODO ek/cm - think more about this
+		consensus.SetMode(Syncing)
 		select {
 		case consensus.ViewIDLowChan <- struct{}{}:
 		default:
 		}
 
 		return consensus_engine.ErrViewIDNotMatch
+	} else if viewID < consensus.viewID {
+		return errors.New("view ID belongs to the past")
 	}
 	return nil
 }
