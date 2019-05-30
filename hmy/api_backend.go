@@ -130,21 +130,18 @@ func (b *APIBackend) ProtocolVersion() int {
 // Filter related APIs
 
 // GetLogs ...
-// TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) GetLogs(ctx context.Context, blockHash common.Hash) ([][]*types.Log, error) {
 	// TODO(ricl): implement
 	return nil, nil
 }
 
 // HeaderByHash ...
-// TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) HeaderByHash(ctx context.Context, blockHash common.Hash) (*types.Header, error) {
 	// TODO(ricl): implement
 	return nil, nil
 }
 
 // ServiceFilter ...
-// TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) ServiceFilter(ctx context.Context, session *bloombits.MatcherSession) {
 	// TODO(ricl): implement
 }
