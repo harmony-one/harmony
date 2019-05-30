@@ -141,17 +141,17 @@ BN_MA=/ip4/100.26.90.187/tcp/9874/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3
 echo "############### Running Harmony Process ###############"
 if [ "$OS" == "Linux" ]; then
 # Run Harmony Node
-   LD_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -account_index $IDX
+   LD_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -is_archival -account_index $IDX
 else
-   DYLD_FALLBACK_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -account_index $IDX > harmony-${PUB_IP}.log 2>&1 &
+   DYLD_FALLBACK_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -is_archival -account_index $IDX
 fi
 
 find_harmony_process
 echo
 echo
 
-echo Please run the following command to inspect the log
-echo "tail -f harmony-${PUB_IP}.log"
+# echo Please run the following command to inspect the log
+# echo "tail -f harmony-${PUB_IP}.log"
 
 echo
 echo You may use \"sudo pkill harmony\" to terminate running harmony node program.
