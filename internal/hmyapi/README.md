@@ -14,7 +14,7 @@
 ### BlockChain info related
 * [ ] hmy_gasPrice - return min-gas-price
 * [ ] hmy_estimateGas - calculating estimate gas using signed bytes
-* [ ] hmy_blockNumber - get latest block number
+* [x] hmy_blockNumber - get latest block number
 * [x] hmy_getBlockByHash - get block by block hash
 * [x] hmy_getBlockByNumber
 * [ ] hmy_getUncleByBlockHashAndIndex - get uncle by block hash and index number
