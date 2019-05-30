@@ -11,13 +11,16 @@ const (
 	viewChangeDuration time.Duration = 30 * time.Second
 
 	// timeout duration for announce/prepare/commit
-	phaseDuration time.Duration = 20 * time.Second
+	phaseDuration time.Duration = 60 * time.Second
 	maxLogSize    uint32        = 1000
 )
 
+// TimeoutType is the type of timeout in view change protocol
+type TimeoutType int
+
 const (
-	timeoutNormal     = "normal"
-	timeoutViewChange = "viewchange"
+	timeoutConsensus TimeoutType = iota
+	timeoutViewChange
 )
 
 // NIL is the m2 type message, which suppose to be nil/empty, however
