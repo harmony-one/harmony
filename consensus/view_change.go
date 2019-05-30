@@ -258,28 +258,20 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		}
 		// first time receive m1 type message, need verify validity of prepared message
 		if len(consensus.m1Payload) == 0 {
-			//#### Read payload data
-			offset := 0
-			blockHash := recvMsg.Payload[offset : offset+32]
-			offset += 32
-			// 48 byte of multi-sig
-			multiSig := recvMsg.Payload[offset : offset+48]
-			offset += 48
-			// bitmap
-			bitmap := recvMsg.Payload[offset:]
-			//#### END Read payload data
-			// Verify the multi-sig for prepare phase
-			deserializedMultiSig := bls.Sign{}
-			err = deserializedMultiSig.Deserialize(multiSig)
-			if err != nil {
-				utils.GetLogInstance().Warn("onViewChange failed to deserialize the multi signature for prepared payload", "error", err)
+			if len(recvMsg.Payload) <= 32 {
+				utils.GetLogger().Debug("m1 recvMsg payload not enough length", "len", len(recvMsg.Payload))
 				return
 			}
-			mask, err := bls_cosi.NewMask(consensus.PublicKeys, nil)
-			mask.SetMask(bitmap)
+			blockHash := recvMsg.Payload[:32]
+			aggSig, mask, err := consensus.readSignatureBitmapPayload(recvMsg.Payload, 32)
+			if err != nil {
+				utils.GetLogger().Error("m1 recvMsg payload read error", "error", err)
+				return
+			}
+			// Verify the multi-sig for prepare phase
 			// TODO: add 2f+1 signature checking
-			if !deserializedMultiSig.VerifyHash(mask.AggregatePublic, blockHash[:]) || err != nil {
-				utils.GetLogInstance().Warn("onViewChange failed to verify multi signature for m1 prepared payload", "error", err, "blockHash", blockHash)
+			if !aggSig.VerifyHash(mask.AggregatePublic, blockHash[:]) {
+				utils.GetLogInstance().Warn("onViewChange failed to verify multi signature for m1 prepared payload", "blockHash", blockHash)
 				return
 			}
 			consensus.m1Payload = append(recvMsg.Payload[:0:0], recvMsg.Payload...)
@@ -304,19 +296,12 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		} else {
 			consensus.phase = Commit
 			copy(consensus.blockHash[:], consensus.m1Payload[:32])
-			//#### Read payload data
-			offset := 32
-			// 48 byte of multi-sig
-			multiSig := recvMsg.Payload[offset : offset+48]
-			offset += 48
-			// bitmap
-			bitmap := recvMsg.Payload[offset:]
-			//#### END Read payload data
-			aggSig := bls.Sign{}
-			_ = aggSig.Deserialize(multiSig)
-			mask, _ := bls_cosi.NewMask(consensus.PublicKeys, nil)
-			mask.SetMask(bitmap)
-			consensus.aggregatedPrepareSig = &aggSig
+			aggSig, mask, err := consensus.readSignatureBitmapPayload(recvMsg.Payload, 32)
+			if err != nil {
+				utils.GetLogger().Error("readSignatureBitmapPayload fail", "error", err)
+				return
+			}
+			consensus.aggregatedPrepareSig = aggSig
 			consensus.prepareBitmap = mask
 
 			// Leader sign the multi-sig and bitmap (for commit phase)
@@ -386,35 +371,19 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		}
 	}
 
-	if len(recvMsg.Payload) > 0 && recvMsg.M1AggSig != nil {
-		//#### Read payload data
+	if len(recvMsg.Payload) > 32 && recvMsg.M1AggSig != nil {
 		blockHash := recvMsg.Payload[:32]
-		offset := 32
-		// 48 byte of multi-sig
-		multiSig := recvMsg.Payload[offset : offset+48]
-		offset += 48
-		// bitmap
-		bitmap := recvMsg.Payload[offset:]
-		//#### END Read payload data
-
-		aggSig := bls.Sign{}
-		err := aggSig.Deserialize(multiSig)
+		aggSig, mask, err := consensus.readSignatureBitmapPayload(recvMsg.Payload, 32)
 		if err != nil {
-			utils.GetLogInstance().Warn("onNewView unable to deserialize prepared message agg sig", "err", err)
+			utils.GetLogger().Error("unable to read signature/bitmap", "error", err)
 			return
 		}
-		mask, err := bls_cosi.NewMask(consensus.PublicKeys, nil)
-		if err != nil {
-			utils.GetLogInstance().Warn("onNewView unable to setup mask for prepared message", "err", err)
-			return
-		}
-		mask.SetMask(bitmap)
 		if !aggSig.VerifyHash(mask.AggregatePublic, blockHash) {
 			utils.GetLogInstance().Warn("onNewView failed to verify signature for prepared message")
 			return
 		}
 		copy(consensus.blockHash[:], blockHash)
-		consensus.aggregatedPrepareSig = &aggSig
+		consensus.aggregatedPrepareSig = aggSig
 		consensus.prepareBitmap = mask
 
 		//create prepared message?: consensus.pbftLog.AddMessage(recvMsg)
@@ -424,7 +393,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		}
 
 		// Construct and send the commit message
-		multiSigAndBitmap := append(multiSig, bitmap...)
+		multiSigAndBitmap := append(aggSig.Serialize(), mask.Bitmap...)
 		msgToSend := consensus.constructCommitMessage(multiSigAndBitmap)
 		utils.GetLogInstance().Info("onNewView === commit", "sent commit message", len(msgToSend))
 		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))

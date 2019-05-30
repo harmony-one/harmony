@@ -601,3 +601,31 @@ func (consensus *Consensus) SetBlockNum(blockNum uint64) {
 	defer consensus.mutex.Unlock()
 	consensus.blockNum = blockNum
 }
+
+// read the payload for signature and bitmap; offset is the beginning position of reading
+func (consensus *Consensus) readSignatureBitmapPayload(recvPayload []byte, offset int) (*bls.Sign, *bls_cosi.Mask, error) {
+	if offset+48 > len(recvPayload) {
+		return nil, nil, errors.New("payload not have enough length")
+	}
+	payload := append(recvPayload[:0:0], recvPayload...)
+	//#### Read payload data
+	// 48 byte of multi-sig
+	multiSig := payload[offset : offset+48]
+	offset += 48
+	// bitmap
+	bitmap := payload[offset:]
+	//#### END Read payload data
+
+	aggSig := bls.Sign{}
+	err := aggSig.Deserialize(multiSig)
+	if err != nil {
+		return nil, nil, errors.New("unable to deserialize multi-signature from payload")
+	}
+	mask, err := bls_cosi.NewMask(consensus.PublicKeys, nil)
+	if err != nil {
+		utils.GetLogInstance().Warn("onNewView unable to setup mask for prepared message", "err", err)
+		return nil, nil, errors.New("unable to setup mask from payload")
+	}
+	mask.SetMask(bitmap)
+	return &aggSig, mask, nil
+}

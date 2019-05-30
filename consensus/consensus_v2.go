@@ -330,38 +330,21 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		utils.GetLogInstance().Debug("onPrepared leader pubkey not match", "suppose", consensus.LeaderPubKey, "got", pubKey)
 		return
 	}
-	addrBytes := pubKey.GetAddress()
-	leaderAddress := common.BytesToAddress(addrBytes[:]).Hex()
 
-	messagePayload := recvMsg.Payload
-
-	//#### Read payload data
-	offset := 0
-	// 48 byte of multi-sig
-	multiSig := messagePayload[offset : offset+48]
-	offset += 48
-
-	// bitmap
-	bitmap := messagePayload[offset:]
-	//#### END Read payload data
+	aggSig, mask, err := consensus.readSignatureBitmapPayload(recvMsg.Payload, 0)
+	if err != nil {
+		utils.GetLogger().Error("readSignatureBitmapPayload failed", "error", err)
+		return
+	}
 
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
-	// Verify the multi-sig for prepare phase
-	deserializedMultiSig := bls.Sign{}
-	err = deserializedMultiSig.Deserialize(multiSig)
-	if err != nil {
-		utils.GetLogInstance().Warn("onPrepared failed to deserialize the multi signature for prepare phase", "Error", err, "leader Address", leaderAddress)
-		return
-	}
-	mask, err := bls_cosi.NewMask(consensus.PublicKeys, nil)
-	mask.SetMask(bitmap)
 	// TODO: add 2f+1 signature checking
-	if !deserializedMultiSig.VerifyHash(mask.AggregatePublic, blockHash[:]) || err != nil {
+	if !aggSig.VerifyHash(mask.AggregatePublic, blockHash[:]) {
 		myBlockHash := common.Hash{}
 		myBlockHash.SetBytes(consensus.blockHash[:])
-		utils.GetLogInstance().Warn("onPrepared failed to verify multi signature for prepare phase", "error", err, "blockHash", blockHash, "myBlockHash", myBlockHash)
+		utils.GetLogInstance().Warn("onPrepared failed to verify multi signature for prepare phase", "blockHash", blockHash, "myBlockHash", myBlockHash)
 		return
 	}
 
@@ -384,11 +367,11 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		// return    // TODO: check if we should return
 	}
 
-	consensus.aggregatedPrepareSig = &deserializedMultiSig
+	consensus.aggregatedPrepareSig = aggSig
 	consensus.prepareBitmap = mask
 
 	// Construct and send the commit message
-	multiSigAndBitmap := append(multiSig, bitmap...)
+	multiSigAndBitmap := append(aggSig.Serialize(), consensus.prepareBitmap.Bitmap...)
 	msgToSend := consensus.constructCommitMessage(multiSigAndBitmap)
 	utils.GetLogInstance().Warn("[Consensus]", "sent commit message", len(msgToSend))
 	consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
@@ -562,34 +545,19 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	addrBytes := validatorPubKey.GetAddress()
 	leaderAddress := common.BytesToAddress(addrBytes[:]).Hex()
 
-	messagePayload := recvMsg.Payload
-
-	//#### Read payload data
-	offset := 0
-	// 48 byte of multi-sig
-	multiSig := messagePayload[offset : offset+48]
-	offset += 48
-
-	// bitmap
-	bitmap := messagePayload[offset:]
-	//#### END Read payload data
+	aggSig, mask, err := consensus.readSignatureBitmapPayload(recvMsg.Payload, 0)
+	if err != nil {
+		utils.GetLogger().Error("readSignatureBitmapPayload failed", "error", err)
+		return
+	}
 
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
-	// Verify the multi-sig for commit phase
-	deserializedMultiSig := bls.Sign{}
-	err = deserializedMultiSig.Deserialize(multiSig)
-	if err != nil {
-		utils.GetLogInstance().Warn("Failed to deserialize the multi signature for commit phase", "Error", err, "leader Address", leaderAddress)
-		return
-	}
-	mask, err := bls_cosi.NewMask(consensus.PublicKeys, nil)
-	mask.SetMask(bitmap)
-	prepareMultiSigAndBitmap := append(consensus.aggregatedPrepareSig.Serialize(), consensus.prepareBitmap.Bitmap...)
 	// TODO: add 2f+1 signature checking
-	if !deserializedMultiSig.VerifyHash(mask.AggregatePublic, prepareMultiSigAndBitmap) || err != nil {
-		utils.GetLogInstance().Warn("Failed to verify the multi signature for commit phase", "Error", err, "leader Address", leaderAddress)
+	prepareMultiSigAndBitmap := append(consensus.aggregatedPrepareSig.Serialize(), consensus.prepareBitmap.Bitmap...)
+	if !aggSig.VerifyHash(mask.AggregatePublic, prepareMultiSigAndBitmap) {
+		utils.GetLogger().Error("Failed to verify the multi signature for commit phase", "leader Address", leaderAddress)
 		return
 	}
 
@@ -603,7 +571,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	if recvMsg.BlockNum > consensus.blockNum || consensus.phase != Commit || recvMsg.ViewID != consensus.viewID {
 		return
 	}
-	consensus.aggregatedCommitSig = &deserializedMultiSig
+	consensus.aggregatedCommitSig = aggSig
 	consensus.commitBitmap = mask
 
 	consensus.tryCatchup()
