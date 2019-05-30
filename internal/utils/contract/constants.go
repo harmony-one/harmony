@@ -952,6 +952,7 @@ var DemoAccounts = [...]DeployAccount{
 	{Address: "0xfE9BABE6904C28E31971337738FBCBAF8c72873e", Private: "7d24797eeba0cdac9bf943f0d82c4b18eb206108d6e1b7f610471594c0c94306", Public: "0xfE9BABE6904C28E31971337738FBCBAF8c72873e"},
 	{Address: "0x3f78622de8D8f87EAa0E8b28C2851e2450E91250", Private: "4fa2fecce1becfaf7e5fba5394caacb318333b04071462b5ca850ee5a406dcfe", Public: "0x3f78622de8D8f87EAa0E8b28C2851e2450E91250"},
 	{Address: "0xd2Cb501B40D3a9a013A38267a4d2A4Cf6bD2CAa8", Private: "3c8642f7188e05acc4467d9e2aa7fd539e82aa90a5497257cf0ecbb98ed3b88f", Public: "0xd2Cb501B40D3a9a013A38267a4d2A4Cf6bD2CAa8"},
+	{Address: "0x2676e6dd2d7618be14cb4c18a355c81bf7aac647", Private: "bf29f6a33b2c24a8b5182ef44cc35ce87534ef827c8dfbc1e6bb536aa52f8563", Public: "0x2676e6dd2d7618be14cb4c18a355c81bf7aac647"},
 }
 
 // PuzzleAccounts is the accounts used for lottery demo.
