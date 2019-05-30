@@ -72,11 +72,8 @@ func (s *PublicBlockChainAPI) GetStorageAt(ctx context.Context, address common.A
 // given block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta
 // block numbers are also allowed.
 func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (*hexutil.Big, error) {
-	state, _, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
-	if state == nil || err != nil {
-		return nil, err
-	}
-	return (*hexutil.Big)(state.GetBalance(address)), state.Error()
+	// TODO: currently only get latest balance. Will add complete logic later.
+	return s.b.GetBalance(address)
 }
 
 // BlockNumber returns the block number of the chain head.

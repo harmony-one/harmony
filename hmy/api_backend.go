@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/bloombits"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
@@ -111,9 +112,11 @@ func (b *APIBackend) GetReceipts(ctx context.Context, hash common.Hash) (types.R
 }
 
 // EventMux ...
+// TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) EventMux() *event.TypeMux { return b.hmy.eventMux }
 
 // BloomStatus ...
+// TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) BloomStatus() (uint64, uint64) {
 	sections, _, _ := b.hmy.bloomIndexer.Sections()
 	return params.BloomBitsBlocks, sections
@@ -143,37 +146,44 @@ func (b *APIBackend) ServiceFilter(ctx context.Context, session *bloombits.Match
 	// TODO(ricl): implement
 }
 
-// SubscribeNewTxsEvent ...
+// SubscribeNewTxsEvent subcribes new tx event.
+// TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) event.Subscription {
 	return b.hmy.TxPool().SubscribeNewTxsEvent(ch)
 }
 
-// SubscribeChainEvent ...
+// SubscribeChainEvent subcribes chain event.
+// TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription {
 	return b.hmy.BlockChain().SubscribeChainEvent(ch)
 }
 
-// SubscribeChainHeadEvent ...
+// SubscribeChainHeadEvent subcribes chain head event.
+// TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
 	return b.hmy.BlockChain().SubscribeChainHeadEvent(ch)
 }
 
-// SubscribeChainSideEvent ...
+// SubscribeChainSideEvent subcribes chain side event.
+// TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) event.Subscription {
 	return b.hmy.BlockChain().SubscribeChainSideEvent(ch)
 }
 
-// SubscribeRemovedLogsEvent ...
+// SubscribeRemovedLogsEvent subcribes removed logs event.
+// TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) event.Subscription {
 	return b.hmy.BlockChain().SubscribeRemovedLogsEvent(ch)
 }
 
-// SubscribeLogsEvent ...
+// SubscribeLogsEvent subcribes log event.
+// TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription {
 	return b.hmy.BlockChain().SubscribeLogsEvent(ch)
 }
 
-// GetPoolTransactions ...
+// GetPoolTransactions returns pool transactions.
+// TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) GetPoolTransactions() (types.Transactions, error) {
 	pending, err := b.hmy.txPool.Pending()
 	if err != nil {
@@ -184,4 +194,10 @@ func (b *APIBackend) GetPoolTransactions() (types.Transactions, error) {
 		txs = append(txs, batch...)
 	}
 	return txs, nil
+}
+
+// GetBalance returns balance of an given address.
+func (b *APIBackend) GetBalance(address common.Address) (*hexutil.Big, error) {
+	balance, err := b.hmy.nodeAPI.GetBalanceOfAddress(address)
+	return (*hexutil.Big)(balance), err
 }
