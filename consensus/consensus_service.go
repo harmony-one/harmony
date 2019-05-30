@@ -569,19 +569,17 @@ func (consensus *Consensus) checkConsensusMessage(message *msg_pb.Message, publi
 }
 
 // Check viewID
-func (consensus *Consensus) checkViewID(message *msg_pb.Message) error {
-	consensusMsg := message.GetConsensus()
-	viewID := consensusMsg.ViewId
-
+func (consensus *Consensus) checkViewID(msg *PbftMessage) error {
 	// just ignore consensus check for the first time when node join
 	if consensus.ignoreViewIDCheck {
-		consensus.viewID = viewID
+		consensus.viewID = msg.ViewID
+		consensus.LeaderPubKey = msg.SenderPubkey
 		consensus.mutex.Lock()
 		consensus.ignoreViewIDCheck = false
 		consensus.mutex.Unlock()
 		return nil
-	} else if viewID > consensus.viewID {
-		utils.GetLogger().Warn("view id is low", "myViewId", consensus.viewID, "theirViewId", viewID, "consensus", consensus)
+	} else if msg.ViewID > consensus.viewID {
+		utils.GetLogger().Warn("view id is low", "myViewId", consensus.viewID, "theirViewId", msg.ViewID)
 		// notify state syncing to start
 		// TODO ek/cm - think more about this
 		consensus.SetMode(Syncing)
@@ -591,7 +589,7 @@ func (consensus *Consensus) checkViewID(message *msg_pb.Message) error {
 		}
 
 		return consensus_engine.ErrViewIDNotMatch
-	} else if viewID < consensus.viewID {
+	} else if msg.ViewID < consensus.viewID {
 		return errors.New("view ID belongs to the past")
 	}
 	return nil

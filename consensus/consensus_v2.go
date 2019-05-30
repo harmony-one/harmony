@@ -167,7 +167,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	consensus.pbftLog.AddMessage(recvMsg)
 	consensus.pbftLog.AddBlock(&blockObj)
 
-	if consensus.checkViewID(msg) != nil {
+	if consensus.checkViewID(recvMsg) != nil {
 		utils.GetLogger().Debug("viewID check failed", "viewID", recvMsg.ViewID, "myViewID", consensus.viewID)
 		return
 	}
@@ -367,7 +367,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 
 	// TODO ek/cm - make sure we update blocks for syncing
 	consensus.pbftLog.AddMessage(recvMsg)
-	if consensus.checkViewID(msg) != nil {
+	if consensus.checkViewID(recvMsg) != nil {
 		utils.GetLogger().Debug("viewID check failed", "viewID", recvMsg.ViewID, "myViewID", consensus.viewID)
 		return
 	}
@@ -595,7 +595,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 
 	consensus.pbftLog.AddMessage(recvMsg)
 
-	if consensus.checkViewID(msg) != nil {
+	if consensus.checkViewID(recvMsg) != nil {
 		utils.GetLogger().Debug("viewID check failed", "viewID", recvMsg.ViewID, "myViewID", consensus.viewID)
 		return
 	}
