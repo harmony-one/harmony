@@ -28,6 +28,7 @@ function cleanup() {
        $DRYRUN kill -9 $pid 2> /dev/null
    done
    rm -rf ./db/harmony_*
+   rm -rf ./db*
 }
 
 function killnode() {
