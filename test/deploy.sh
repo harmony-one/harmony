@@ -69,6 +69,9 @@ EOU
    exit 0
 }
 
+DEFAULT_DURATION_NOSYNC=60
+DEFAULT_DURATION_SYNC=200
+
 DB=false
 TXGEN=true
 DURATION=
@@ -97,13 +100,14 @@ if [ -z "$config" ]; then
    usage
 fi
 
-if [ "$SYNC" == "true" ] && [ -z "$DURATION" ]; then
-   DURATION=200 # set duration to be 200 if duration is unset.
-fi
-
-if [ -z "$DURATION" ]; then
-   DURATION=60 # if duration is unset, set it to be 60
-fi
+case "${DURATION-}" in
+"")
+    case "${SYNC}" in
+    false) DURATION="${DEFAULT_DURATION_NOSYNC}";;
+    true) DURATION="${DEFAULT_DURATION_SYNC}";;
+    esac
+    ;;
+esac
 
 # Kill nodes if any
 cleanup
@@ -162,7 +166,10 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
     NUM_NN=$((${NUM_NN} + 30))
     ;;
   esac
-  $DRYRUN "${ROOT}/bin/harmony" "${args[@]}" 2>&1 | tee -a "${LOG_FILE}" &
+  case "${mode}" in
+  client) ;;
+  *) $DRYRUN "${ROOT}/bin/harmony" "${args[@]}" 2>&1 | tee -a "${LOG_FILE}" &;;
+  esac
   i=$((i+1))
 done < $config
 
