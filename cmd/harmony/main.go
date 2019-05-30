@@ -113,6 +113,10 @@ var (
 
 	// dbDir is the database directory.
 	dbDir = flag.String("db_dir", "", "blockchain database directory")
+
+	// Disable view change.
+	disableViewChange = flag.Bool("disable_view_change", false,
+		"Do not propose view change (testing only)")
 )
 
 func initSetup() {
@@ -267,6 +271,9 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 		os.Exit(1)
 	}
 	currentConsensus.MinPeers = *minPeers
+	if *disableViewChange {
+		currentConsensus.DisableViewChangeForTestingOnly()
+	}
 
 	// Current node.
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}

@@ -149,6 +149,9 @@ type Consensus struct {
 
 	// Used to convey to the consensus main loop that block syncing has finished.
 	syncReadyChan chan struct{}
+
+	// If true, this consensus will not propose view change.
+	disableViewChange bool
 }
 
 // StakeInfoFinder returns the stake information finder instance this
@@ -161,6 +164,16 @@ func (consensus *Consensus) StakeInfoFinder() StakeInfoFinder {
 // consensus uses, e.g. for block reward distribution.
 func (consensus *Consensus) SetStakeInfoFinder(stakeInfoFinder StakeInfoFinder) {
 	consensus.stakeInfoFinder = stakeInfoFinder
+}
+
+// DisableViewChangeForTestingOnly makes the receiver not propose view
+// changes when it should, e.g. leader timeout.
+//
+// As the name implies, this is intended for testing only,
+// and should not be used on production network.
+// This is also not part of the long-term consensus API and may go away later.
+func (consensus *Consensus) DisableViewChangeForTestingOnly() {
+	consensus.disableViewChange = true
 }
 
 // BlocksSynchronized lets the main loop know that block synchronization finished
