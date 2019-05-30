@@ -32,11 +32,12 @@ type Collection interface {
 // CollectionImpl is the main implementation of the shard chain collection.
 // See the Collection interface for details.
 type CollectionImpl struct {
-	dbFactory DBFactory
-	dbInit    DBInitializer
-	engine    engine.Engine
-	mtx       sync.Mutex
-	pool      map[uint32]*core.BlockChain
+	dbFactory    DBFactory
+	dbInit       DBInitializer
+	engine       engine.Engine
+	mtx          sync.Mutex
+	pool         map[uint32]*core.BlockChain
+	disableCache bool
 }
 
 // NewCollection creates and returns a new shard chain collection.
@@ -86,8 +87,7 @@ func (sc *CollectionImpl) ShardChain(shardID uint32) (*core.BlockChain, error) {
 		}
 	}
 	var cacheConfig *core.CacheConfig
-	// TODO ek – archival
-	if false {
+	if sc.disableCache {
 		cacheConfig = &core.CacheConfig{Disabled: true}
 	}
 	chainConfig := *params.TestChainConfig
@@ -101,6 +101,13 @@ func (sc *CollectionImpl) ShardChain(shardID uint32) (*core.BlockChain, error) {
 	db = nil // don't close
 	sc.pool[shardID] = bc
 	return bc, nil
+}
+
+// DisableCache disables caching mode for newly opened chains.
+// It does not affect already open chains.  For best effect,
+// use this immediately after creating collection.
+func (sc *CollectionImpl) DisableCache() {
+	sc.disableCache = true
 }
 
 // CloseShardChain closes the given shard chain.

@@ -292,8 +292,12 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 			"error", err)
 	}
 
-	node.shardChains = shardchain.NewCollection(
+	collection := shardchain.NewCollection(
 		chainDBFactory, &genesisInitializer{&node}, consensusObj)
+	if isArchival {
+		collection.DisableCache()
+	}
+	node.shardChains = collection
 
 	if host != nil && consensusObj != nil {
 		// Consensus and associated channel to communicate blocks
