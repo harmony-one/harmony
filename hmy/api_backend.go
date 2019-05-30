@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/bloombits"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -184,4 +185,9 @@ func (b *APIBackend) GetPoolTransactions() (types.Transactions, error) {
 		txs = append(txs, batch...)
 	}
 	return txs, nil
+}
+
+// GetBalance ...
+func (b *APIBackend) GetBalance(address common.Address) (*hexutil.Big, error) {
+	return nil, nil
 }

@@ -1,6 +1,9 @@
 package hmy
 
 import (
+	"math/big"
+
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/bloombits"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
@@ -34,6 +37,7 @@ type NodeAPI interface {
 	AddPendingTransaction(newTx *types.Transaction)
 	Blockchain() *core.BlockChain
 	AccountManager() *accounts.Manager
+	GetBalanceOfAddress(address common.Address) (*big.Int, error)
 }
 
 // New creates a new Harmony object (including the
