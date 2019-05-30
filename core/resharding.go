@@ -25,9 +25,9 @@ const (
 	// FirstEpoch is the number of the first epoch.
 	FirstEpoch = 1
 	// GenesisShardNum is the number of shard at genesis
-	GenesisShardNum = 4
+	GenesisShardNum = 1
 	// GenesisShardSize is the size of each shard at genesis
-	GenesisShardSize = 50
+	GenesisShardSize = 10
 	// CuckooRate is the percentage of nodes getting reshuffled in the second step of cuckoo resharding.
 	CuckooRate = 0.1
 )

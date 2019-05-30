@@ -8,6 +8,8 @@ USER=$(whoami)
 set -x
 set -eo pipefail
 
+rm -rf tmp_log/
+
 export GO111MODULE=on
 
 function check_result() {
