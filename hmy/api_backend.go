@@ -3,6 +3,7 @@ package hmy
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -87,7 +88,11 @@ func (b *APIBackend) GetPoolNonce(ctx context.Context, addr common.Address) (uin
 
 // SendTx ...
 func (b *APIBackend) SendTx(ctx context.Context, signedTx *types.Transaction) error {
-	// return b.hmy.txPool.Add(ctx, signedTx)
+	fmt.Println("sending pending transaction SubmitTransaction ", signedTx.Hash().Hex())
+
+	message, _ := signedTx.AsMessage(types.HomesteadSigner{})
+	fmt.Println("SubmitTransaction get nonce of from", " from ", message.From(), " nonce ", b.hmy.nodeAPI.GetNonceOfAddress(message.From()))
+
 	b.hmy.nodeAPI.AddPendingTransaction(signedTx)
 	return nil // TODO(ricl): AddPendingTransaction should return error
 }

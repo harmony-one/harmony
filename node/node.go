@@ -229,10 +229,25 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 	utils.GetLogInstance().Debug("Got more transactions", "num", len(newTxs), "totalPending", len(node.pendingTransactions))
 }
 
+func isMyTransaction(tx *types.Transaction) bool {
+	msg, _ := tx.AsMessage(types.HomesteadSigner{})
+
+	// {Address: "0xd2Cb501B40D3a9a013A38267a4d2A4Cf6bD2CAa8", Private: "3c8642f7188e05acc4467d9e2aa7fd539e82aa90a5497257cf0ecbb98ed3b88f", Public: "0xd2Cb501B40D3a9a013A38267a4d2A4Cf6bD2CAa8"},
+	// {Address: "0x10A02A0a6e95a676AE23e2db04BEa3D1B8b7ca2E", Private: "371cb68abe6a6101ac88603fc847e0c013a834253acee5315884d2c4e387ebca", Public: "0x10A02A0a6e95a676AE23e2db04BEa3D1B8b7ca2E"},
+	// curl 'http://127.0.0.1:30000/balance?key=0xd2Cb501B40D3a9a013A38267a4d2A4Cf6bD2CAa8'
+
+	return msg.From().Hex() == "0xd2Cb501B40D3a9a013A38267a4d2A4Cf6bD2CAa8"
+}
+
 // AddPendingTransaction adds one new transaction to the pending transaction list.
 func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
+	if isMyTransaction(newTx) {
+		utils.GetLogInstance().Debug("Received my transaction SubmitTransaction", "hash", newTx.Hash().Hex())
+		msg, _ := newTx.AsMessage(types.HomesteadSigner{})
+		utils.GetLogInstance().Debug("Received my transaction SubmitTransaction", "nonce is ", node.GetNonceOfAddress(msg.From()))
+	}
 	node.addPendingTransactions(types.Transactions{newTx})
-	utils.GetLogInstance().Debug("Got ONE more transaction", "totalPending", len(node.pendingTransactions))
+	utils.GetLogInstance().Debug("Got ONE more transaction ", "totalPending", len(node.pendingTransactions))
 }
 
 // Take out a subset of valid transactions from the pending transaction list

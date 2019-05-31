@@ -12,10 +12,11 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
-
+	"github.com/harmony-one/harmony/accounts"
+	"github.com/harmony-one/harmony/accounts/keystore"
 	"github.com/harmony-one/harmony/api/client"
 	clientService "github.com/harmony-one/harmony/api/client/service"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
@@ -28,9 +29,6 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	p2p_host "github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
-
-	"github.com/harmony-one/harmony/accounts"
-	"github.com/harmony-one/harmony/accounts/keystore"
 )
 
 var (
@@ -392,6 +390,10 @@ func processTransferCommand() {
 	shardID := *transferShardIDPtr
 	base64InputData := *transferInputDataPtr
 	senderPass := *transferSenderPassPtr
+	privateKey, _ := crypto.HexToECDSA("3c8642f7188e05acc4467d9e2aa7fd539e82aa90a5497257cf0ecbb98ed3b88f")
+	// {Address: "0xd2Cb501B40D3a9a013A38267a4d2A4Cf6bD2CAa8", Private: "3c8642f7188e05acc4467d9e2aa7fd539e82aa90a5497257cf0ecbb98ed3b88f", Public: "0xd2Cb501B40D3a9a013A38267a4d2A4Cf6bD2CAa8"},
+
+	fmt.Println(sender, receiver, amount, shardID, base64InputData, senderPass)
 
 	inputData, err := base64.StdEncoding.DecodeString(base64InputData)
 	if err != nil {
@@ -421,22 +423,26 @@ func processTransferCommand() {
 		return
 	}
 
-	walletNode := createWalletNode()
+	/*
+		walletNode := createWalletNode()
 
-	shardIDToAccountState := FetchBalance(senderAddress)
+		shardIDToAccountState := FetchBalance(senderAddress)
 
-	state, ok := shardIDToAccountState[uint32(shardID)]
-	if !ok {
-		fmt.Printf("Failed connecting to the shard %d\n", shardID)
-		return
-	}
+		state, ok := shardIDToAccountState[uint32(shardID)]
+		if !ok {
+			fmt.Printf("Failed connecting to the shard %d\n", shardID)
+			return
+		}
 
-	balance := state.balance
-	balance = balance.Div(balance, big.NewInt(params.GWei))
-	if amount > float64(balance.Uint64())/params.GWei {
-		fmt.Printf("Balance is not enough for the transfer, current balance is %.6f\n", float64(balance.Uint64())/params.GWei)
-		return
-	}
+		balance := state.balance
+		balance = balance.Div(balance, big.NewInt(params.GWei))
+		if amount > float64(balance.Uint64())/params.GWei {
+			fmt.Printf("Balance is not enough for the transfer, current balance is %.6f\n", float64(balance.Uint64())/params.GWei)
+			return
+		}
+	*/
+
+	fmt.Println(inputData)
 
 	amountBigInt := big.NewInt(int64(amount * params.GWei))
 	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(params.GWei))
@@ -447,30 +453,54 @@ func processTransferCommand() {
 	}
 
 	tx := types.NewTransaction(
-		state.nonce, receiverAddress, uint32(shardID), amountBigInt,
+		// state.nonce, receiverAddress, uint32(shardID), amountBigInt,
+		uint64(0), receiverAddress, uint32(shardID), amountBigInt,
 		gas, nil, inputData)
 
-	account, err := ks.Find(accounts.Account{Address: senderAddress})
-	if err != nil {
-		fmt.Printf("Find Account Error: %v\n", err)
-		return
+	signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, privateKey)
+	msg, _ := signedTx.AsMessage(types.HomesteadSigner{})
+	// 	to         *common.Address
+	// from       common.Address
+	// nonce      uint64
+	// amount     *big.Int
+	// gasLimit   uint64
+	// gasPrice   *big.Int
+	// data       []byte
+	// checkNonce bool
+
+	fmt.Println("from", msg.From().Hex(), "to", msg.To().Hex(), "nonce", msg.Nonce(), "amount", msg.Value(), "gas", msg.Gas(), "gas_price", msg.GasPrice(), "data", msg.Data())
+
+	if err == nil {
+		fmt.Println("hash:", signedTx.Hash().Hex())
+	} else {
+		fmt.Println("error", err)
 	}
 
-	err = ks.Unlock(account, senderPass)
-	if err != nil {
-		fmt.Printf("Unlock account failed! %v\n", err)
-		return
-	}
+	/*
+		account, err := ks.Find(accounts.Account{Address: senderAddress})
+		if err != nil {
+			fmt.Printf("Find Account Error: %v\n", err)
+			return
+		}
 
-	fmt.Printf("Unlock account succeeded! '%v'\n", senderPass)
+		err = ks.Unlock(account, senderPass)
+		if err != nil {
+			fmt.Printf("Unlock account failed! %v\n", err)
+			return
+		}
 
-	tx, err = ks.SignTx(account, tx, nil)
-	if err != nil {
-		fmt.Printf("SignTx Error: %v\n", err)
-		return
-	}
+		types.SignTx(tx, types.HomesteadSigner{}, unlockedKey.PrivateKey)
 
-	submitTransaction(tx, walletNode, uint32(shardID))
+		fmt.Printf("Unlock account succeeded! '%v'\n", senderPass)
+
+		tx, err = ks.SignTx(account, tx, nil)
+		if err != nil {
+			fmt.Printf("SignTx Error: %v\n", err)
+			return
+		}
+	*/
+
+	// submitTransaction(tx, walletNode, uint32(shardID))
 }
 
 func convertBalanceIntoReadableFormat(balance *big.Int) string {

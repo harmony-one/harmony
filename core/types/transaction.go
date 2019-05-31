@@ -47,9 +47,9 @@ type Transaction struct {
 
 type txdata struct {
 	AccountNonce uint64          `json:"nonce"    gencodec:"required"`
-	ShardID      uint32          `json:"shardID"  gencodec:"required"`
 	Price        *big.Int        `json:"gasPrice" gencodec:"required"`
 	GasLimit     uint64          `json:"gas"      gencodec:"required"`
+	ShardID      uint32          `json:"shardID"  gencodec:"required"`
 	Recipient    *common.Address `json:"to"       rlp:"nil"` // nil means contract creation
 	Amount       *big.Int        `json:"value"    gencodec:"required"`
 	Payload      []byte          `json:"input"    gencodec:"required"`

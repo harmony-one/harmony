@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"fmt"
 	"math/big"
 	"time"
 
@@ -43,6 +44,16 @@ type Worker struct {
 	shardID uint32
 }
 
+func (w *Worker) isMyTransaction(tx *types.Transaction) bool {
+	msg, _ := tx.AsMessage(types.HomesteadSigner{})
+
+	// {Address: "0xd2Cb501B40D3a9a013A38267a4d2A4Cf6bD2CAa8", Private: "3c8642f7188e05acc4467d9e2aa7fd539e82aa90a5497257cf0ecbb98ed3b88f", Public: "0xd2Cb501B40D3a9a013A38267a4d2A4Cf6bD2CAa8"},
+	// {Address: "0x10A02A0a6e95a676AE23e2db04BEa3D1B8b7ca2E", Private: "371cb68abe6a6101ac88603fc847e0c013a834253acee5315884d2c4e387ebca", Public: "0x10A02A0a6e95a676AE23e2db04BEa3D1B8b7ca2E"},
+	// curl 'http://127.0.0.1:30000/balance?key=0xd2Cb501B40D3a9a013A38267a4d2A4Cf6bD2CAa8'
+
+	return msg.From().Hex() == "0xd2Cb501B40D3a9a013A38267a4d2A4Cf6bD2CAa8"
+}
+
 // SelectTransactionsForNewBlock selects transactions for new block.
 func (w *Worker) SelectTransactionsForNewBlock(txs types.Transactions, maxNumTxs int) (types.Transactions, types.Transactions, types.Transactions) {
 	if w.current.gasPool == nil {
@@ -52,8 +63,15 @@ func (w *Worker) SelectTransactionsForNewBlock(txs types.Transactions, maxNumTxs
 	unselected := types.Transactions{}
 	invalid := types.Transactions{}
 	for _, tx := range txs {
+
+		if w.isMyTransaction(tx) {
+			fmt.Println("received SubmitTransaction")
+		}
 		if tx.ShardID() != w.shardID {
 			invalid = append(invalid, tx)
+			if w.isMyTransaction(tx) {
+				fmt.Println("received SubmitTransaction but invalid because of different shardID")
+			}
 		}
 		snap := w.current.state.Snapshot()
 		_, err := w.commitTransaction(tx, w.coinbase)
@@ -66,6 +84,9 @@ func (w *Worker) SelectTransactionsForNewBlock(txs types.Transactions, maxNumTxs
 				log.Debug("Invalid transaction", "Error", err)
 			} else {
 				selected = append(selected, tx)
+				if w.isMyTransaction(tx) {
+					fmt.Println("received  and selected SubmitTransaction")
+				}
 			}
 		}
 	}
@@ -79,8 +100,20 @@ func (w *Worker) SelectTransactionsForNewBlock(txs types.Transactions, maxNumTxs
 func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
 	snap := w.current.state.Snapshot()
 
+	msg, _ := tx.AsMessage(types.HomesteadSigner{})
+
+	// {Address: "0xd2Cb501B40D3a9a013A38267a4d2A4Cf6bD2CAa8", Private: "3c8642f7188e05acc4467d9e2aa7fd539e82aa90a5497257cf0ecbb98ed3b88f", Public: "0xd2Cb501B40D3a9a013A38267a4d2A4Cf6bD2CAa8"},
+	// {Address: "0x10A02A0a6e95a676AE23e2db04BEa3D1B8b7ca2E", Private: "371cb68abe6a6101ac88603fc847e0c013a834253acee5315884d2c4e387ebca", Public: "0x10A02A0a6e95a676AE23e2db04BEa3D1B8b7ca2E"},
+	// curl 'http://127.0.0.1:30000/balance?key=0xd2Cb501B40D3a9a013A38267a4d2A4Cf6bD2CAa8'
+
+	if msg.From().Hex() == "0xd2Cb501B40D3a9a013A38267a4d2A4Cf6bD2CAa8" {
+		fmt.Println("SubmitTransaction received")
+	}
 	receipt, _, err := core.ApplyTransaction(w.config, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, vm.Config{})
 	if err != nil {
+		if msg.From().Hex() == "0xd2Cb501B40D3a9a013A38267a4d2A4Cf6bD2CAa8" {
+			fmt.Println("error SubmitTransaction 4", "error", err)
+		}
 		w.current.state.RevertToSnapshot(snap)
 		return nil, err
 	}
