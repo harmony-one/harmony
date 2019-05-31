@@ -38,6 +38,7 @@ type NodeAPI interface {
 	Blockchain() *core.BlockChain
 	AccountManager() *accounts.Manager
 	GetBalanceOfAddress(address common.Address) (*big.Int, error)
+	GetNonceOfAddress(address common.Address) uint64
 }
 
 // New creates a new Harmony object (including the

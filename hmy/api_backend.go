@@ -16,7 +16,6 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // APIBackend An implementation of Backend. Full client.
@@ -199,8 +198,6 @@ func (b *APIBackend) GetPoolTransactions() (types.Transactions, error) {
 
 // GetBalance returns balance of an given address.
 func (b *APIBackend) GetBalance(address common.Address) (*hexutil.Big, error) {
-	utils.GetLogInstance().Info("Get Balance---- minh doan", "address", address)
 	balance, err := b.hmy.nodeAPI.GetBalanceOfAddress(address)
-	utils.GetLogInstance().Info("Get Balance---- minh doan", "balance", balance)
 	return (*hexutil.Big)(balance), err
 }
