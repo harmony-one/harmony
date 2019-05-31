@@ -455,52 +455,55 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 
 	if len(commitSigs) >= consensus.Quorum() {
 		utils.GetLogInstance().Info("Enough commits received!", "num", len(commitSigs), "state", consensus.state)
-		consensus.switchPhase(Announce)
-
-		// Construct and broadcast committed message
-		msgToSend, aggSig := consensus.constructCommittedMessage()
-		consensus.aggregatedCommitSig = aggSig
-
-		utils.GetLogInstance().Warn("[Consensus]", "sent committed message", len(msgToSend))
-		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
-
-		var blockObj types.Block
-		err := rlp.DecodeBytes(consensus.block, &blockObj)
-		if err != nil {
-			utils.GetLogInstance().Debug("failed to construct the new block after consensus")
-		}
-
-		// Sign the block
-		blockObj.SetPrepareSig(
-			consensus.aggregatedPrepareSig.Serialize(),
-			consensus.prepareBitmap.Bitmap)
-		blockObj.SetCommitSig(
-			consensus.aggregatedCommitSig.Serialize(),
-			consensus.commitBitmap.Bitmap)
-
-		select {
-		case consensus.VerifiedNewBlock <- &blockObj:
-		default:
-			utils.GetLogInstance().Info("[SYNC] Failed to send consensus verified block for state sync", "blockHash", blockObj.Hash())
-		}
-
-		consensus.reportMetrics(blockObj)
-
-		// Dump new block into level db.
-		explorer.GetStorageInstance(consensus.leader.IP, consensus.leader.Port, true).Dump(&blockObj, consensus.viewID)
-
-		// Reset state to Finished, and clear other data.
-		consensus.ResetState()
-		consensus.viewID++
-		consensus.blockNum++
-
-		consensus.OnConsensusDone(&blockObj)
-		utils.GetLogInstance().Debug("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!", "viewID", consensus.viewID, "numOfSignatures", len(commitSigs))
-
-		// Send signal to Node so the new block can be added and new round of consensus can be triggered
-		consensus.ReadySignal <- struct{}{}
+		consensus.finalizeCommits()
 	}
-	return
+}
+
+func (consensus *Consensus) finalizeCommits() {
+	consensus.switchPhase(Announce)
+
+	// Construct and broadcast committed message
+	msgToSend, aggSig := consensus.constructCommittedMessage()
+	consensus.aggregatedCommitSig = aggSig
+
+	utils.GetLogInstance().Warn("[Consensus]", "sent committed message", len(msgToSend))
+	consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
+
+	var blockObj types.Block
+	err := rlp.DecodeBytes(consensus.block, &blockObj)
+	if err != nil {
+		utils.GetLogInstance().Debug("failed to construct the new block after consensus")
+	}
+
+	// Sign the block
+	blockObj.SetPrepareSig(
+		consensus.aggregatedPrepareSig.Serialize(),
+		consensus.prepareBitmap.Bitmap)
+	blockObj.SetCommitSig(
+		consensus.aggregatedCommitSig.Serialize(),
+		consensus.commitBitmap.Bitmap)
+
+	select {
+	case consensus.VerifiedNewBlock <- &blockObj:
+	default:
+		utils.GetLogInstance().Info("[SYNC] Failed to send consensus verified block for state sync", "blockHash", blockObj.Hash())
+	}
+
+	consensus.reportMetrics(blockObj)
+
+	// Dump new block into level db.
+	explorer.GetStorageInstance(consensus.leader.IP, consensus.leader.Port, true).Dump(&blockObj, consensus.viewID)
+
+	// Reset state to Finished, and clear other data.
+	consensus.ResetState()
+	consensus.viewID++
+	consensus.blockNum++
+
+	consensus.OnConsensusDone(&blockObj)
+	utils.GetLogInstance().Debug("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!", "viewID", consensus.viewID, "numOfSignatures", len(consensus.commitSigs))
+
+	// Send signal to Node so the new block can be added and new round of consensus can be triggered
+	consensus.ReadySignal <- struct{}{}
 }
 
 func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
