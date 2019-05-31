@@ -37,6 +37,12 @@ var (
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
 	ConsensusVersion string
+
+	// Consensus round.  Increments every time state is reset.
+	// Useful for delayed processing for the current round,
+	// such as commit finalization.
+	round uint64
+
 	// pbftLog stores the pbft messages and blocks during PBFT process
 	pbftLog *PbftLog
 	// phase: different phase of PBFT protocol: pre-prepare, prepare, commit, finish etc
@@ -152,6 +158,9 @@ type Consensus struct {
 
 	// If true, this consensus will not propose view change.
 	disableViewChange bool
+
+	// Consensus rounds whose commit phase finished
+	commitFinishChan chan uint64
 }
 
 // StakeInfoFinder returns the stake information finder instance this
@@ -180,6 +189,11 @@ func (consensus *Consensus) DisableViewChangeForTestingOnly() {
 // thus the blockchain is likely to be up to date.
 func (consensus *Consensus) BlocksSynchronized() {
 	consensus.syncReadyChan <- struct{}{}
+}
+
+// Quorum returns the consensus quorum of the current committee (2f+1).
+func (consensus *Consensus) Quorum() int {
+	return len(consensus.PublicKeys)*2/3 + 1
 }
 
 // StakeInfoFinder finds the staking account for the given consensus key.
@@ -250,6 +264,7 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 
 	consensus.MsgChan = make(chan []byte)
 	consensus.syncReadyChan = make(chan struct{})
+	consensus.commitFinishChan = make(chan uint64)
 
 	// For validators to keep track of all blocks received but not yet committed, so as to catch up to latest consensus if lagged behind.
 	consensus.blocksReceived = make(map[uint32]*BlockConsensusStatus)

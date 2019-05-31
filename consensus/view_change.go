@@ -224,7 +224,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		}
 	}
 
-	if (len(consensus.bhpSigs) + len(consensus.nilSigs)) >= ((len(consensus.PublicKeys)*2)/3 + 1) {
+	if (len(consensus.bhpSigs) + len(consensus.nilSigs)) >= consensus.Quorum() {
 		return
 	}
 
@@ -281,7 +281,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		consensus.bhpBitmap.SetKey(recvMsg.SenderPubkey, true) // Set the bitmap indicating that this validator signed.
 	}
 
-	if (len(consensus.bhpSigs) + len(consensus.nilSigs)) >= ((len(consensus.PublicKeys)*2)/3 + 1) {
+	if (len(consensus.bhpSigs) + len(consensus.nilSigs)) >= consensus.Quorum() {
 		consensus.SetMode(Normal)
 		consensus.LeaderPubKey = consensus.PubKey
 		if len(consensus.m1Payload) == 0 {
@@ -315,7 +315,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		consensus.consensusTimeout[timeoutViewChange].Stop()
 
 	}
-	utils.GetLogInstance().Debug("onViewChange", "numSigs", len(consensus.bhpSigs)+len(consensus.nilSigs), "needed", (len(consensus.PublicKeys)*2)/3+1)
+	utils.GetLogInstance().Debug("onViewChange", "numSigs", len(consensus.bhpSigs)+len(consensus.nilSigs), "needed", consensus.Quorum())
 }
 
 // TODO: move to consensus_leader.go later

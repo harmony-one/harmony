@@ -333,6 +333,7 @@ func (consensus *Consensus) GetNilSigsArray() []*bls.Sign {
 
 // ResetState resets the state of the consensus
 func (consensus *Consensus) ResetState() {
+	consensus.round++
 	consensus.state = Finished
 	consensus.phase = Announce
 	consensus.prepareSigs = map[common.Address]*bls.Sign{}

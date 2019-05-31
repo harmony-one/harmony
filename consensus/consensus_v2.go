@@ -242,7 +242,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
-	if len(prepareSigs) >= ((len(consensus.PublicKeys)*2)/3 + 1) {
+	if len(prepareSigs) >= consensus.Quorum() {
 		// already have enough signatures
 		return
 	}
@@ -270,7 +270,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	prepareSigs[validatorAddress] = &sign
 	prepareBitmap.SetKey(validatorPubKey, true) // Set the bitmap indicating that this validator signed.
 
-	if len(prepareSigs) >= ((len(consensus.PublicKeys)*2)/3 + 1) {
+	if len(prepareSigs) >= consensus.Quorum() {
 		consensus.switchPhase(Commit)
 
 		// Construct and broadcast prepared message
@@ -431,9 +431,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		return
 	}
 
-	if len((commitSigs)) >= ((len(consensus.PublicKeys)*2)/3 + 1) {
-		return
-	}
+	quorumWasMet := len(commitSigs) >= consensus.Quorum()
 
 	// Verify the signature on prepare multi-sig and bitmap is correct
 	var sign bls.Sign
@@ -453,54 +451,64 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	// Set the bitmap indicating that this validator signed.
 	commitBitmap.SetKey(validatorPubKey, true)
 
-	if len(commitSigs) >= ((len(consensus.PublicKeys)*2)/3 + 1) {
+	quorumIsMet := len(commitSigs) >= consensus.Quorum()
+
+	if !quorumWasMet && quorumIsMet {
 		utils.GetLogInstance().Info("Enough commits received!", "num", len(commitSigs), "state", consensus.state)
-		consensus.switchPhase(Announce)
-
-		// Construct and broadcast committed message
-		msgToSend, aggSig := consensus.constructCommittedMessage()
-		consensus.aggregatedCommitSig = aggSig
-
-		utils.GetLogInstance().Warn("[Consensus]", "sent committed message", len(msgToSend))
-		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
-
-		var blockObj types.Block
-		err := rlp.DecodeBytes(consensus.block, &blockObj)
-		if err != nil {
-			utils.GetLogInstance().Debug("failed to construct the new block after consensus")
-		}
-
-		// Sign the block
-		blockObj.SetPrepareSig(
-			consensus.aggregatedPrepareSig.Serialize(),
-			consensus.prepareBitmap.Bitmap)
-		blockObj.SetCommitSig(
-			consensus.aggregatedCommitSig.Serialize(),
-			consensus.commitBitmap.Bitmap)
-
-		select {
-		case consensus.VerifiedNewBlock <- &blockObj:
-		default:
-			utils.GetLogInstance().Info("[SYNC] Failed to send consensus verified block for state sync", "blockHash", blockObj.Hash())
-		}
-
-		consensus.reportMetrics(blockObj)
-
-		// Dump new block into level db.
-		explorer.GetStorageInstance(consensus.leader.IP, consensus.leader.Port, true).Dump(&blockObj, consensus.viewID)
-
-		// Reset state to Finished, and clear other data.
-		consensus.ResetState()
-		consensus.viewID++
-		consensus.blockNum++
-
-		consensus.OnConsensusDone(&blockObj)
-		utils.GetLogInstance().Debug("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!", "viewID", consensus.viewID, "numOfSignatures", len(commitSigs))
-
-		// Send signal to Node so the new block can be added and new round of consensus can be triggered
-		consensus.ReadySignal <- struct{}{}
+		go func(round uint64) {
+			time.Sleep(1 * time.Second)
+			utils.GetLogger().Debug("Commit grace period ended", "round", round)
+			consensus.commitFinishChan <- round
+		}(consensus.round)
 	}
-	return
+}
+
+func (consensus *Consensus) finalizeCommits() {
+	utils.GetLogger().Info("finalizing block", "num", len(consensus.commitSigs), "state", consensus.state)
+	consensus.switchPhase(Announce)
+
+	// Construct and broadcast committed message
+	msgToSend, aggSig := consensus.constructCommittedMessage()
+	consensus.aggregatedCommitSig = aggSig
+
+	utils.GetLogInstance().Warn("[Consensus]", "sent committed message", len(msgToSend))
+	consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
+
+	var blockObj types.Block
+	err := rlp.DecodeBytes(consensus.block, &blockObj)
+	if err != nil {
+		utils.GetLogInstance().Debug("failed to construct the new block after consensus")
+	}
+
+	// Sign the block
+	blockObj.SetPrepareSig(
+		consensus.aggregatedPrepareSig.Serialize(),
+		consensus.prepareBitmap.Bitmap)
+	blockObj.SetCommitSig(
+		consensus.aggregatedCommitSig.Serialize(),
+		consensus.commitBitmap.Bitmap)
+
+	select {
+	case consensus.VerifiedNewBlock <- &blockObj:
+	default:
+		utils.GetLogInstance().Info("[SYNC] Failed to send consensus verified block for state sync", "blockHash", blockObj.Hash())
+	}
+
+	consensus.reportMetrics(blockObj)
+
+	// Dump new block into level db.
+	explorer.GetStorageInstance(consensus.leader.IP, consensus.leader.Port, true).Dump(&blockObj, consensus.viewID)
+
+	// Reset state to Finished, and clear other data.
+	consensus.ResetState()
+	consensus.viewID++
+	consensus.blockNum++
+
+	consensus.OnConsensusDone(&blockObj)
+	utils.GetLogInstance().Debug("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!", "viewID", consensus.viewID, "numOfSignatures", len(consensus.commitSigs))
+
+	// Send signal to Node so the new block can be added and new round of consensus can be triggered
+	consensus.ReadySignal <- struct{}{}
 }
 
 func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
@@ -737,6 +745,16 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 
 			case msg := <-consensus.MsgChan:
 				consensus.handleMessageUpdate(msg)
+
+			case round := <-consensus.commitFinishChan:
+				func() {
+					consensus.mutex.Lock()
+					defer consensus.mutex.Unlock()
+					if round == consensus.round {
+						consensus.finalizeCommits()
+					}
+				}()
+
 			case <-stopChan:
 				return
 			}
