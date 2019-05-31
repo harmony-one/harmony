@@ -179,7 +179,7 @@ func (consensus *Consensus) processPrepareMessage(message *msg_pb.Message) {
 		return
 	}
 
-	if len(prepareSigs) >= ((len(consensus.PublicKeys)*2)/3 + 1) {
+	if len(prepareSigs) >= consensus.Quorum() {
 		utils.GetLogInstance().Debug("Received additional prepare message", "validatorAddress", validatorAddress)
 		return
 	}
@@ -202,7 +202,7 @@ func (consensus *Consensus) processPrepareMessage(message *msg_pb.Message) {
 	prepareBitmap.SetKey(validatorPubKey, true) // Set the bitmap indicating that this validator signed.
 
 	targetState := PreparedDone
-	if len(prepareSigs) >= ((len(consensus.PublicKeys)*2)/3+1) && consensus.state < targetState {
+	if len(prepareSigs) >= consensus.Quorum() && consensus.state < targetState {
 		utils.GetLogInstance().Debug("Enough prepares received with signatures", "num", len(prepareSigs), "state", consensus.state)
 
 		// Construct and broadcast prepared message
@@ -258,7 +258,7 @@ func (consensus *Consensus) processCommitMessage(message *msg_pb.Message) {
 		return
 	}
 
-	if len((commitSigs)) >= ((len(consensus.PublicKeys)*2)/3 + 1) {
+	if len(commitSigs) >= consensus.Quorum() {
 		utils.GetLogInstance().Debug("Received additional new commit message", "validatorAddress", validatorAddress)
 		return
 	}
@@ -282,7 +282,7 @@ func (consensus *Consensus) processCommitMessage(message *msg_pb.Message) {
 	commitBitmap.SetKey(validatorPubKey, true)
 
 	targetState := CommittedDone
-	if len(commitSigs) >= ((len(consensus.PublicKeys)*2)/3+1) && consensus.state != targetState {
+	if len(commitSigs) >= consensus.Quorum() && consensus.state != targetState {
 		utils.GetLogInstance().Info("Enough commits received!", "num", len(commitSigs), "state", consensus.state)
 
 		// Construct and broadcast committed message

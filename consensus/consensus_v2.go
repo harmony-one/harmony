@@ -242,7 +242,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
-	if len(prepareSigs) >= ((len(consensus.PublicKeys)*2)/3 + 1) {
+	if len(prepareSigs) >= consensus.Quorum() {
 		// already have enough signatures
 		return
 	}
@@ -270,7 +270,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	prepareSigs[validatorAddress] = &sign
 	prepareBitmap.SetKey(validatorPubKey, true) // Set the bitmap indicating that this validator signed.
 
-	if len(prepareSigs) >= ((len(consensus.PublicKeys)*2)/3 + 1) {
+	if len(prepareSigs) >= consensus.Quorum() {
 		consensus.switchPhase(Commit)
 
 		// Construct and broadcast prepared message
@@ -431,7 +431,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		return
 	}
 
-	if len((commitSigs)) >= ((len(consensus.PublicKeys)*2)/3 + 1) {
+	if len(commitSigs) >= consensus.Quorum() {
 		return
 	}
 
@@ -453,7 +453,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	// Set the bitmap indicating that this validator signed.
 	commitBitmap.SetKey(validatorPubKey, true)
 
-	if len(commitSigs) >= ((len(consensus.PublicKeys)*2)/3 + 1) {
+	if len(commitSigs) >= consensus.Quorum() {
 		utils.GetLogInstance().Info("Enough commits received!", "num", len(commitSigs), "state", consensus.state)
 		consensus.switchPhase(Announce)
 

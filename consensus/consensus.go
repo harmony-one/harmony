@@ -182,6 +182,11 @@ func (consensus *Consensus) BlocksSynchronized() {
 	consensus.syncReadyChan <- struct{}{}
 }
 
+// Quorum returns the consensus quorum of the current committee (2f+1).
+func (consensus *Consensus) Quorum() int {
+	return len(consensus.PublicKeys)*2/3 + 1
+}
+
 // StakeInfoFinder finds the staking account for the given consensus key.
 type StakeInfoFinder interface {
 	// FindStakeInfoByNodeKey returns a list of staking information matching
