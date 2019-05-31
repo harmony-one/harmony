@@ -33,8 +33,9 @@ func (consensus *Consensus) handleMessageUpdate(payload []byte) {
 		return
 	}
 
-	// stop receiving normal message when is in viewchanging
-	if consensus.mode.Mode() == ViewChanging && msg.Type != msg_pb.MessageType_VIEWCHANGE && msg.Type != msg_pb.MessageType_NEWVIEW {
+	// when node is in ViewChanging mode, it still accepts normal message into PbftLog to avoid possible trap forever
+	// but drop PREPARE and COMMIT which are message types for leader
+	if consensus.mode.Mode() == ViewChanging && (msg.Type == msg_pb.MessageType_PREPARE || msg.Type == msg_pb.MessageType_COMMIT) {
 		return
 	}
 
@@ -112,7 +113,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		utils.GetLogInstance().Debug("onAnnounce verifySenderKey failed", "error", err)
 		return
 	}
-	if !senderKey.IsEqual(consensus.LeaderPubKey) {
+	if !senderKey.IsEqual(consensus.LeaderPubKey) && consensus.mode.Mode() != Syncing {
 		utils.GetLogInstance().Warn("onAnnounce senderKey not match leader PubKey", "senderKey", senderKey.GetHexString(), "leaderKey", consensus.LeaderPubKey.GetHexString())
 		return
 	}
@@ -136,12 +137,21 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		return
 	}
 
-	// check block data transactions
-	if err := consensus.VerifyHeader(consensus.ChainReader, blockObj.Header(), false); err != nil {
-		utils.GetLogInstance().Warn("onAnnounce block content is not verified successfully", "error", err)
+	if blockObj.NumberU64() != recvMsg.BlockNum || recvMsg.BlockNum < consensus.blockNum {
+		utils.GetLogger().Warn("blockNum not match", "recvBlockNum", recvMsg.BlockNum, "blockObjNum", blockObj.NumberU64(), "myBlockNum", consensus.blockNum)
 		return
 	}
-	if consensus.BlockVerifier == nil {
+
+	if consensus.mode.Mode() != Syncing {
+		// skip verify header when node is in Syncing mode
+		if err := consensus.VerifyHeader(consensus.ChainReader, blockObj.Header(), false); err != nil {
+			utils.GetLogInstance().Warn("onAnnounce block content is not verified successfully", "error", err, "inChain", consensus.ChainReader.CurrentHeader().Number, "have", blockObj.Header().ParentHash)
+			return
+		}
+	}
+
+	// skip verify block in Syncing mode
+	if consensus.BlockVerifier == nil && consensus.mode.Mode() == Syncing {
 		// do nothing
 	} else if err := consensus.BlockVerifier(&blockObj); err != nil {
 		// TODO ek – maybe we could do this in commit phase
@@ -166,6 +176,11 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	consensus.blockHash = recvMsg.BlockHash
 	consensus.pbftLog.AddMessage(recvMsg)
 	consensus.pbftLog.AddBlock(&blockObj)
+
+	// we have already added message and block, skip check viewID and send prepare message if is in ViewChanging mode
+	if consensus.mode.Mode() == ViewChanging {
+		return
+	}
 
 	if consensus.checkViewID(recvMsg) != nil {
 		utils.GetLogger().Debug("viewID check failed", "viewID", recvMsg.ViewID, "myViewID", consensus.viewID)
@@ -297,7 +312,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		utils.GetLogInstance().Debug("onPrepared verifySenderKey failed", "error", err)
 		return
 	}
-	if !senderKey.IsEqual(consensus.LeaderPubKey) {
+	if !senderKey.IsEqual(consensus.LeaderPubKey) && consensus.mode.Mode() != Syncing {
 		utils.GetLogInstance().Warn("onPrepared senderKey not match leader PubKey")
 		return
 	}
@@ -321,12 +336,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	}
 
 	blockHash := recvMsg.BlockHash
-	pubKey := recvMsg.SenderPubkey
-	if !pubKey.IsEqual(consensus.LeaderPubKey) {
-		utils.GetLogInstance().Debug("onPrepared leader pubkey not match", "suppose", consensus.LeaderPubKey, "got", pubKey)
-		return
-	}
-
 	aggSig, mask, err := consensus.readSignatureBitmapPayload(recvMsg.Payload, 0)
 	if err != nil {
 		utils.GetLogger().Error("readSignatureBitmapPayload failed", "error", err)
@@ -346,6 +355,12 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 
 	// TODO ek/cm - make sure we update blocks for syncing
 	consensus.pbftLog.AddMessage(recvMsg)
+
+	if consensus.mode.Mode() == ViewChanging {
+		utils.GetLogger().Debug("viewchanging mode just exist after viewchanging")
+		return
+	}
+
 	if consensus.checkViewID(recvMsg) != nil {
 		utils.GetLogger().Debug("viewID check failed", "viewID", recvMsg.ViewID, "myViewID", consensus.viewID)
 		return
@@ -356,15 +371,16 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 			"expectedNumber", consensus.blockNum)
 		return
 	}
+
+	consensus.aggregatedPrepareSig = aggSig
+	consensus.prepareBitmap = mask
+
 	if consensus.phase != Prepare {
 		utils.GetLogger().Debug("we are in a wrong phase",
 			"actualPhase", consensus.phase,
 			"expectedPhase", Prepare)
-		// return    // TODO: check if we should return
+		return
 	}
-
-	consensus.aggregatedPrepareSig = aggSig
-	consensus.prepareBitmap = mask
 
 	// Construct and send the commit message
 	multiSigAndBitmap := append(aggSig.Serialize(), consensus.prepareBitmap.Bitmap...)
@@ -504,6 +520,9 @@ func (consensus *Consensus) finalizeCommits() {
 	consensus.viewID++
 	consensus.blockNum++
 
+	consensus.consensusTimeout[timeoutConsensus].Start()
+	consensus.consensusTimeout[timeoutBootstrap].Stop()
+
 	consensus.OnConsensusDone(&blockObj)
 	utils.GetLogInstance().Debug("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!", "viewID", consensus.viewID, "numOfSignatures", len(consensus.commitSigs))
 
@@ -523,7 +542,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		utils.GetLogInstance().Debug("onCommitted verifySenderKey failed", "error", err)
 		return
 	}
-	if !senderKey.IsEqual(consensus.LeaderPubKey) {
+	if !senderKey.IsEqual(consensus.LeaderPubKey) && consensus.mode.Mode() != Syncing {
 		utils.GetLogInstance().Warn("onCommitted senderKey not match leader PubKey")
 		return
 	}
@@ -554,18 +573,24 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
-	// TODO: add 2f+1 signature checking
-	prepareMultiSigAndBitmap := append(consensus.aggregatedPrepareSig.Serialize(), consensus.prepareBitmap.Bitmap...)
-	if !aggSig.VerifyHash(mask.AggregatePublic, prepareMultiSigAndBitmap) {
-		utils.GetLogger().Error("Failed to verify the multi signature for commit phase", "leader Address", leaderAddress)
-		return
-	}
-
 	consensus.pbftLog.AddMessage(recvMsg)
+	// skip ViewChanging and Syncing??
+	if consensus.mode.Mode() == Normal {
+		// TODO: add 2f+1 signature checking
+		if consensus.aggregatedPrepareSig == nil || consensus.prepareBitmap == nil {
+			utils.GetLogger().Debug("Not receive prepared message yet")
+			return
+		}
+		prepareMultiSigAndBitmap := append(consensus.aggregatedPrepareSig.Serialize(), consensus.prepareBitmap.Bitmap...)
+		if !aggSig.VerifyHash(mask.AggregatePublic, prepareMultiSigAndBitmap) {
+			utils.GetLogger().Error("Failed to verify the multi signature for commit phase", "leader Address", leaderAddress)
+			return
+		}
 
-	if consensus.checkViewID(recvMsg) != nil {
-		utils.GetLogger().Debug("viewID check failed", "viewID", recvMsg.ViewID, "myViewID", consensus.viewID)
-		return
+		if consensus.checkViewID(recvMsg) != nil {
+			utils.GetLogger().Debug("viewID check failed", "viewID", recvMsg.ViewID, "myViewID", consensus.viewID)
+			return
+		}
 	}
 
 	if recvMsg.BlockNum > consensus.blockNum {
@@ -576,15 +601,17 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 
 	consensus.tryCatchup()
 	consensus.consensusTimeout[timeoutConsensus].Start()
+	consensus.consensusTimeout[timeoutBootstrap].Stop()
 	return
 }
 
 // try to catch up if fall behind
 func (consensus *Consensus) tryCatchup() {
 	utils.GetLogInstance().Info("tryCatchup: commit new blocks", "blockNum", consensus.blockNum)
-	if consensus.phase != Commit {
+	if consensus.phase != Commit && consensus.mode.Mode() == Normal {
 		return
 	}
+	currentBlockNum := consensus.blockNum
 	consensus.switchPhase(Announce)
 	for {
 		msgs := consensus.pbftLog.GetMessagesByTypeSeq(msg_pb.MessageType_COMMITTED, consensus.blockNum)
@@ -592,7 +619,7 @@ func (consensus *Consensus) tryCatchup() {
 			break
 		}
 		if len(msgs) > 1 {
-			utils.GetLogInstance().Info("[PBFT] we should only get one committed message for a given blockNum", "blockNum", consensus.blockNum, "numMsgs", len(msgs))
+			utils.GetLogInstance().Error("[PBFT] DANGER!!! we should only get one committed message for a given blockNum", "blockNum", consensus.blockNum, "numMsgs", len(msgs))
 		}
 
 		block := consensus.pbftLog.GetBlockByHash(msgs[0].BlockHash)
@@ -607,60 +634,64 @@ func (consensus *Consensus) tryCatchup() {
 
 		preparedMsgs := consensus.pbftLog.GetMessagesByTypeSeqHash(msg_pb.MessageType_PREPARED, msgs[0].BlockNum, msgs[0].BlockHash)
 		if len(preparedMsgs) > 1 {
-			utils.GetLogInstance().Info("[PBFT] we should only get one prepared message for a given blockNum", "blockNum", consensus.blockNum, "numMsgs", len(preparedMsgs))
+			utils.GetLogInstance().Warn("[PBFT] we get more than one prepared messages for a given blockNum", "blockNum", consensus.blockNum, "numMsgs", len(preparedMsgs))
 		}
 		if len(preparedMsgs) == 0 {
 			break
 		}
 
-		cnt := 0
-		for _, msg := range preparedMsgs {
-			if msg.BlockHash == msgs[0].BlockHash {
-				cnt++
-				consensus.blockHash = [32]byte{}
-				consensus.blockNum = consensus.blockNum + 1
-				consensus.viewID = consensus.viewID + 1
-
-				//#### Read payload data from committed msg
-				aggSig := make([]byte, 48)
-				bitmap := make([]byte, len(msgs[0].Payload)-48)
-				offset := 0
-				copy(aggSig[:], msgs[0].Payload[offset:offset+48])
-				offset += 48
-				copy(bitmap[:], msgs[0].Payload[offset:])
-				//#### END Read payload data from committed msg
-
-				//#### Read payload data from prepared msg
-				prepareSig := make([]byte, 48)
-				prepareBitmap := make([]byte, len(msg.Payload)-48)
-				offset = 0
-				copy(prepareSig[:], msg.Payload[offset:offset+48])
-				offset += 48
-				copy(prepareBitmap[:], msg.Payload[offset:])
-				//#### END Read payload data from committed msg
-
-				// Put the signatures into the block
-				block.SetPrepareSig(prepareSig, prepareBitmap)
-
-				block.SetCommitSig(aggSig, bitmap)
-				utils.GetLogInstance().Info("Adding block to chain", "numTx", len(block.Transactions()))
-				consensus.OnConsensusDone(block)
-				consensus.ResetState()
-
-				select {
-				case consensus.VerifiedNewBlock <- block:
-				default:
-					utils.GetLogInstance().Info("[SYNC] consensus verified block send to chan failed", "blockHash", block.Hash())
-					continue
-				}
-
-				break
-			}
-		}
-		if cnt == 0 { // didn't find match block for current blockNum, return
+		msg := consensus.pbftLog.FindMessageByMaxViewID(preparedMsgs)
+		if msg == nil {
 			break
 		}
+		consensus.blockHash = [32]byte{}
+		consensus.blockNum = consensus.blockNum + 1
+		consensus.viewID = msgs[0].ViewID + 1
+		consensus.LeaderPubKey = msgs[0].SenderPubkey
+
+		//#### Read payload data from committed msg
+		aggSig := make([]byte, 48)
+		bitmap := make([]byte, len(msgs[0].Payload)-48)
+		offset := 0
+		copy(aggSig[:], msgs[0].Payload[offset:offset+48])
+		offset += 48
+		copy(bitmap[:], msgs[0].Payload[offset:])
+		//#### END Read payload data from committed msg
+
+		//#### Read payload data from prepared msg
+		prepareSig := make([]byte, 48)
+		prepareBitmap := make([]byte, len(msg.Payload)-48)
+		offset = 0
+		copy(prepareSig[:], msg.Payload[offset:offset+48])
+		offset += 48
+		copy(prepareBitmap[:], msg.Payload[offset:])
+		//#### END Read payload data from committed msg
+
+		// Put the signatures into the block
+		block.SetPrepareSig(prepareSig, prepareBitmap)
+
+		block.SetCommitSig(aggSig, bitmap)
+		utils.GetLogInstance().Info("Adding block to chain", "numTx", len(block.Transactions()))
+		consensus.OnConsensusDone(block)
+		consensus.ResetState()
+
+		select {
+		case consensus.VerifiedNewBlock <- block:
+		default:
+			utils.GetLogInstance().Info("[SYNC] consensus verified block send to chan failed", "blockHash", block.Hash())
+			continue
+		}
+
+		break
 	}
+	// catup up and skip from view change trap
+	if currentBlockNum < consensus.blockNum && consensus.mode.Mode() == ViewChanging {
+		consensus.mode.SetMode(Normal)
+		consensus.consensusTimeout[timeoutViewChange].Stop()
+	}
+	// clean up old log
+	consensus.pbftLog.DeleteBlocksLessThan(consensus.blockNum)
+	consensus.pbftLog.DeleteMessagesLessThan(consensus.blockNum)
 }
 
 // Start waits for the next new block and run consensus
@@ -672,29 +703,27 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 		utils.GetLogInstance().Info("start consensus", "time", time.Now())
 		defer close(stoppedChan)
 		ticker := time.NewTicker(3 * time.Second)
+		consensus.consensusTimeout[timeoutBootstrap].Start()
 		for {
 			select {
 			case <-ticker.C:
-				if !consensus.PubKey.IsEqual(consensus.LeaderPubKey) {
-					for k, v := range consensus.consensusTimeout {
-						if consensus.mode.Mode() == Syncing {
-							v.Stop()
-						}
-						if !v.CheckExpire() {
-							continue
-						}
-						if k == timeoutConsensus {
-							utils.GetLogInstance().Debug("ops", "phase", k, "mode", consensus.mode.Mode())
-							consensus.startViewChange(consensus.viewID + 1)
-							break
-						} else if k == timeoutViewChange {
-							utils.GetLogInstance().Debug("ops", "phase", k, "mode", consensus.mode.Mode())
-							viewID := consensus.mode.ViewID()
-							consensus.startViewChange(viewID + 1)
-							break
-						}
+				for k, v := range consensus.consensusTimeout {
+					if consensus.mode.Mode() == Syncing {
+						v.Stop()
 					}
-
+					if !v.CheckExpire() {
+						continue
+					}
+					if k != timeoutViewChange {
+						utils.GetLogInstance().Debug("ops", "phase", k, "mode", consensus.mode.Mode())
+						consensus.startViewChange(consensus.viewID + 1)
+						break
+					} else {
+						utils.GetLogInstance().Debug("ops", "phase", k, "mode", consensus.mode.Mode())
+						viewID := consensus.mode.ViewID()
+						consensus.startViewChange(viewID + 1)
+						break
+					}
 				}
 
 			case <-consensus.syncReadyChan:

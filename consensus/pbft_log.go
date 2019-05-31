@@ -86,24 +86,24 @@ func (log *PbftLog) GetBlocksByNumber(number uint64) []*types.Block {
 	return found
 }
 
-// DeleteBlocksByNumber deletes blocks match given block number
-func (log *PbftLog) DeleteBlocksByNumber(number uint64) {
+// DeleteBlocksLessThan deletes blocks less than given block number
+func (log *PbftLog) DeleteBlocksLessThan(number uint64) {
 	found := mapset.NewSet()
 	it := log.Blocks().Iterator()
 	for block := range it.C {
-		if block.(*types.Block).NumberU64() == number {
+		if block.(*types.Block).NumberU64() < number {
 			found.Add(block)
 		}
 	}
 	log.blocks = log.blocks.Difference(found)
 }
 
-// DeleteMessagesByNumber deletes messages match given block number
-func (log *PbftLog) DeleteMessagesByNumber(number uint64) {
+// DeleteMessagesLessThan deletes messages less than given block number
+func (log *PbftLog) DeleteMessagesLessThan(number uint64) {
 	found := mapset.NewSet()
 	it := log.Messages().Iterator()
 	for msg := range it.C {
-		if msg.(*PbftMessage).BlockNum == number {
+		if msg.(*PbftMessage).BlockNum < number {
 			found.Add(msg)
 		}
 	}
@@ -168,6 +168,22 @@ func (log *PbftLog) GetMessagesByTypeSeqView(typ msg_pb.MessageType, blockNum ui
 		found = append(found, msg.(*PbftMessage))
 	}
 	return found
+}
+
+// FindMessageByMaxViewID returns the message that has maximum ViewID
+func (log *PbftLog) FindMessageByMaxViewID(msgs []*PbftMessage) *PbftMessage {
+	if len(msgs) == 0 {
+		return nil
+	}
+	maxIdx := -1
+	maxViewID := uint32(0)
+	for k, v := range msgs {
+		if v.ViewID >= maxViewID {
+			maxIdx = k
+			maxViewID = v.ViewID
+		}
+	}
+	return msgs[maxIdx]
 }
 
 // ParsePbftMessage parses PBFT message into PbftMessage structure

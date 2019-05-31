@@ -336,6 +336,8 @@ func (consensus *Consensus) ResetState() {
 	consensus.round++
 	consensus.state = Finished
 	consensus.phase = Announce
+	consensus.blockHash = [32]byte{}
+
 	consensus.prepareSigs = map[common.Address]*bls.Sign{}
 	consensus.commitSigs = map[common.Address]*bls.Sign{}
 

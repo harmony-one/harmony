@@ -125,6 +125,7 @@ func createTimeout() map[TimeoutType]*utils.Timeout {
 	timeouts := make(map[TimeoutType]*utils.Timeout)
 	timeouts[timeoutConsensus] = utils.NewTimeout(phaseDuration)
 	timeouts[timeoutViewChange] = utils.NewTimeout(viewChangeDuration)
+	timeouts[timeoutBootstrap] = utils.NewTimeout(bootstrapDuration)
 	return timeouts
 }
 
@@ -134,13 +135,10 @@ func (consensus *Consensus) startViewChange(viewID uint32) {
 		return
 	}
 	consensus.consensusTimeout[timeoutConsensus].Stop()
+	consensus.consensusTimeout[timeoutBootstrap].Stop()
 	consensus.mode.SetMode(ViewChanging)
 	consensus.mode.SetViewID(viewID)
-	nextLeaderKey := consensus.GetNextLeaderKey()
 	consensus.LeaderPubKey = consensus.GetNextLeaderKey()
-	if nextLeaderKey.IsEqual(consensus.PubKey) {
-		return
-	}
 
 	diff := viewID - consensus.viewID
 	duration := time.Duration(int64(diff) * int64(viewChangeDuration))
@@ -151,7 +149,6 @@ func (consensus *Consensus) startViewChange(viewID uint32) {
 
 	consensus.consensusTimeout[timeoutViewChange].SetDuration(duration)
 	consensus.consensusTimeout[timeoutViewChange].Start()
-
 }
 
 // new leader send new view message
@@ -315,10 +312,10 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 
 // TODO: move to consensus_leader.go later
 func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
-	utils.GetLogInstance().Info("onNewView received new view message")
+	utils.GetLogInstance().Debug("onNewView received new view message")
 	senderKey, _, err := consensus.verifyViewChangeSenderKey(msg)
 	if err != nil {
-		utils.GetLogInstance().Debug("onNewView verifySenderKey failed", "error", err)
+		utils.GetLogInstance().Warn("onNewView verifySenderKey failed", "error", err)
 		return
 	}
 	recvMsg, err := consensus.ParseNewViewMessage(msg)
@@ -327,11 +324,11 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		return
 	}
 
-	if !consensus.LeaderPubKey.IsEqual(senderKey) {
-		utils.GetLogInstance().Warn("onNewView key not match", "senderKey", senderKey.GetHexString()[:10], "newLeaderKey", consensus.LeaderPubKey.GetHexString()[:10])
-		return
-	}
-	if consensus.blockNum > recvMsg.BlockNum {
+	//	if !consensus.LeaderPubKey.IsEqual(senderKey) {
+	//		utils.GetLogInstance().Warn("onNewView key not match", "senderKey", senderKey.GetHexString()[:10], "newLeaderKey", consensus.LeaderPubKey.GetHexString()[:10])
+	//		return
+	//	}
+	if consensus.blockNum != recvMsg.BlockNum {
 		return
 	}
 	if err = verifyMessageSig(senderKey, msg); err != nil {
@@ -377,7 +374,14 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		consensus.aggregatedPrepareSig = aggSig
 		consensus.prepareBitmap = mask
 
-		//create prepared message?: consensus.pbftLog.AddMessage(recvMsg)
+		// create prepared message from newview
+		preparedMsg := PbftMessage{MessageType: msg_pb.MessageType_PREPARED, ViewID: recvMsg.ViewID, BlockNum: recvMsg.BlockNum}
+		preparedMsg.BlockHash = common.Hash{}
+		copy(preparedMsg.BlockHash[:], blockHash[:])
+		preparedMsg.Payload = make([]byte, len(recvMsg.Payload)-32)
+		copy(preparedMsg.Payload[:], recvMsg.Payload[32:])
+		preparedMsg.SenderPubkey = senderKey
+		consensus.pbftLog.AddMessage(&preparedMsg)
 
 		if recvMsg.BlockNum > consensus.blockNum {
 			return
@@ -395,9 +399,9 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		utils.GetLogInstance().Info("onNewView === announce")
 	}
 	consensus.viewID = consensus.mode.GetViewID()
+	consensus.LeaderPubKey = senderKey
 	consensus.ResetViewChangeState()
 	consensus.ResetState()
 	consensus.consensusTimeout[timeoutConsensus].Start()
 	consensus.consensusTimeout[timeoutViewChange].Stop()
-
 }

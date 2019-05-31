@@ -107,7 +107,7 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 		defer close(stoppedChan)
 
 		utils.GetLogInstance().Debug("Waiting for Consensus ready")
-		time.Sleep(30 * time.Second) // Wait for other nodes to be ready (test-only)
+		time.Sleep(45 * time.Second) // Wait for other nodes to be ready (test-only)
 
 		firstTime := true
 		for {
