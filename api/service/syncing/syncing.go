@@ -363,6 +363,7 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 				var blockObj types.Block
 				// currently only send one block a time
 				err = rlp.DecodeBytes(payload[0], &blockObj)
+
 				if err != nil {
 					count++
 					utils.GetLogInstance().Debug("[SYNC] downloadBlocks: failed to DecodeBytes from received new block")
@@ -605,6 +606,13 @@ func (ss *StateSync) getMaxPeerHeight() uint64 {
 	})
 	wg.Wait()
 	return maxHeight
+}
+
+// IsSameBlockchainHeight checks whether the node is out of sync from other peers
+func (ss *StateSync) IsSameBlockchainHeight(bc *core.BlockChain) (uint64, bool) {
+	otherHeight := ss.getMaxPeerHeight()
+	currentHeight := bc.CurrentBlock().NumberU64()
+	return otherHeight, currentHeight == otherHeight
 }
 
 // IsOutOfSync checks whether the node is out of sync from other peers

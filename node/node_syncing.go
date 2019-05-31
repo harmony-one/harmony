@@ -48,6 +48,14 @@ func (node *Node) DoSyncWithoutConsensus() {
 	go node.DoSyncing(node.Blockchain(), node.Worker, node.GetSyncingPeers, false) //Don't join consensus
 }
 
+// IsSameHeight tells whether node is at same bc height as a peer
+func (node *Node) IsSameHeight() (uint64, bool) {
+	if node.stateSync == nil {
+		node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
+	}
+	return node.stateSync.IsSameBlockchainHeight(node.Blockchain())
+}
+
 // GetBeaconSyncingPeers returns a list of peers for beaconchain syncing
 func (node *Node) GetBeaconSyncingPeers() []p2p.Peer {
 	return node.getNeighborPeers(&node.BeaconNeighbors)
