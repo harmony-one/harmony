@@ -37,6 +37,12 @@ var (
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
 	ConsensusVersion string
+
+	// Consensus round.  Increments every time state is reset.
+	// Useful for delayed processing for the current round,
+	// such as commit finalization.
+	round uint64
+
 	// pbftLog stores the pbft messages and blocks during PBFT process
 	pbftLog *PbftLog
 	// phase: different phase of PBFT protocol: pre-prepare, prepare, commit, finish etc
