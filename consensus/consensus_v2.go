@@ -431,9 +431,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		return
 	}
 
-	if len(commitSigs) >= consensus.Quorum() {
-		return
-	}
+	quorumWasMet := len(commitSigs) >= consensus.Quorum()
 
 	// Verify the signature on prepare multi-sig and bitmap is correct
 	var sign bls.Sign
@@ -453,13 +451,20 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	// Set the bitmap indicating that this validator signed.
 	commitBitmap.SetKey(validatorPubKey, true)
 
-	if len(commitSigs) >= consensus.Quorum() {
+	quorumIsMet := len(commitSigs) >= consensus.Quorum()
+
+	if !quorumWasMet && quorumIsMet {
 		utils.GetLogInstance().Info("Enough commits received!", "num", len(commitSigs), "state", consensus.state)
-		consensus.finalizeCommits()
+		go func(round uint64) {
+			time.Sleep(1 * time.Second)
+			utils.GetLogger().Debug("Commit grace period ended", "round", round)
+			consensus.commitFinishChan <- round
+		}(consensus.round)
 	}
 }
 
 func (consensus *Consensus) finalizeCommits() {
+	utils.GetLogger().Info("finalizing block", "num", len(consensus.commitSigs), "state", consensus.state)
 	consensus.switchPhase(Announce)
 
 	// Construct and broadcast committed message
@@ -740,6 +745,16 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 
 			case msg := <-consensus.MsgChan:
 				consensus.handleMessageUpdate(msg)
+
+			case round := <-consensus.commitFinishChan:
+				func() {
+					consensus.mutex.Lock()
+					defer consensus.mutex.Unlock()
+					if round == consensus.round {
+						consensus.finalizeCommits()
+					}
+				}()
+
 			case <-stopChan:
 				return
 			}

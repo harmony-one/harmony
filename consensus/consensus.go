@@ -158,6 +158,9 @@ type Consensus struct {
 
 	// If true, this consensus will not propose view change.
 	disableViewChange bool
+
+	// Consensus rounds whose commit phase finished
+	commitFinishChan chan uint64
 }
 
 // StakeInfoFinder returns the stake information finder instance this
@@ -261,6 +264,7 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 
 	consensus.MsgChan = make(chan []byte)
 	consensus.syncReadyChan = make(chan struct{})
+	consensus.commitFinishChan = make(chan uint64)
 
 	// For validators to keep track of all blocks received but not yet committed, so as to catch up to latest consensus if lagged behind.
 	consensus.blocksReceived = make(map[uint32]*BlockConsensusStatus)
