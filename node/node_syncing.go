@@ -14,7 +14,6 @@ import (
 	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
@@ -144,9 +143,7 @@ func (node *Node) SupportSyncing() {
 	node.StartSyncingServer()
 	go node.SendNewBlockToUnsync()
 
-	if node.NodeConfig.Role() != nodeconfig.ShardLeader && node.NodeConfig.Role() != nodeconfig.BeaconLeader {
-		go node.DoSyncing(node.Blockchain(), node.Worker, node.GetSyncingPeers, true)
-	}
+	go node.DoSyncing(node.Blockchain(), node.Worker, node.GetSyncingPeers, true)
 }
 
 // InitSyncingServer starts downloader server.
