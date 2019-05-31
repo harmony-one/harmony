@@ -53,7 +53,7 @@ func (node *Node) IsSameHeight() (uint64, bool) {
 	if node.stateSync == nil {
 		node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
 	}
-	return node.stateSync.IsItSameBlockchainHeight(node.Blockchain())
+	return node.stateSync.IsSameBlockchainHeight(node.Blockchain())
 }
 
 // GetBeaconSyncingPeers returns a list of peers for beaconchain syncing

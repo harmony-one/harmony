@@ -608,8 +608,8 @@ func (ss *StateSync) getMaxPeerHeight() uint64 {
 	return maxHeight
 }
 
-// IsItSameBlockchainHeight checks whether the node is out of sync from other peers
-func (ss *StateSync) IsItSameBlockchainHeight(bc *core.BlockChain) (uint64, bool) {
+// IsSameBlockchainHeight checks whether the node is out of sync from other peers
+func (ss *StateSync) IsSameBlockchainHeight(bc *core.BlockChain) (uint64, bool) {
 	otherHeight := ss.getMaxPeerHeight()
 	currentHeight := bc.CurrentBlock().NumberU64()
 	return otherHeight, currentHeight == otherHeight

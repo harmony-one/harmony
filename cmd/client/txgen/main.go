@@ -62,7 +62,7 @@ func printVersion(me string) {
 var (
 	ip              = flag.String("ip", "127.0.0.1", "IP of the node")
 	port            = flag.String("port", "9999", "port of the node.")
-	numTxns         = flag.Int("numTxns", 100, "number of transactions to send per message should be divisble by 100")
+	numTxns         = flag.Int("numTxns", 100, "number of transactions to send per message")
 	logFolder       = flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	duration        = flag.Int("duration", 30, "duration of the tx generation in second. If it's negative, the experiment runs forever.")
 	versionFlag     = flag.Bool("version", false, "Output version info")
@@ -270,6 +270,7 @@ func GenerateSimulatedTransactionsAccount(shardID uint32, node *node.Node, setti
 	TxnsToGenerate := setting.MaxNumTxsPerBatch // TODO: make use of settings
 	txs := make([]*types.Transaction, TxnsToGenerate)
 	rounds := (TxnsToGenerate / 100)
+	remainder := TxnsToGenerate % 100
 	for i := 0; i < 100; i++ {
 		baseNonce := node.Worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(node.TestBankKeys[i].PublicKey))
 		for j := 0; j < rounds; j++ {
@@ -277,6 +278,12 @@ func GenerateSimulatedTransactionsAccount(shardID uint32, node *node.Node, setti
 			randAmount := rand.Float32()
 			tx, _ := types.SignTx(types.NewTransaction(baseNonce+uint64(j), randomUserAddress, shardID, big.NewInt(int64(params.Ether*randAmount)), params.TxGas, nil, nil), types.HomesteadSigner{}, node.TestBankKeys[i])
 			txs[100*j+i] = tx
+		}
+		if i < remainder {
+			randomUserAddress := crypto.PubkeyToAddress(node.TestBankKeys[rand.Intn(100)].PublicKey)
+			randAmount := rand.Float32()
+			tx, _ := types.SignTx(types.NewTransaction(baseNonce+uint64(rounds), randomUserAddress, shardID, big.NewInt(int64(params.Ether*randAmount)), params.TxGas, nil, nil), types.HomesteadSigner{}, node.TestBankKeys[i])
+			txs[100*rounds+i] = tx
 		}
 	}
 	return txs, nil
