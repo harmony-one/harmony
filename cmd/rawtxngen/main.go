@@ -24,8 +24,8 @@ func generateTxnHarmony(PrivateKeyFrom string, ToAddress string, shardID uint32,
 	privateKey, _ := crypto.HexToECDSA(PrivateKeyFrom)
 	nonce := uint64(0)
 	value := big.NewInt(1000000000000000000 * amount)
-	gasLimit := uint64(21000)
-	gasPrice := big.NewInt(1000000)
+	gasLimit := uint64(210000)
+	gasPrice := big.NewInt(10000000)
 	toAddress := common.HexToAddress(ToAddress)
 	var data []byte
 
@@ -34,7 +34,6 @@ func generateTxnHarmony(PrivateKeyFrom string, ToAddress string, shardID uint32,
 		shardID,
 		value,
 		gasLimit, gasPrice, data),
-		// params.TxGas, nil, nil),
 		types.HomesteadSigner{},
 		privateKey)
 
@@ -45,7 +44,6 @@ func generateTxnHarmony(PrivateKeyFrom string, ToAddress string, shardID uint32,
 	fmt.Println(rawTxBytes)
 	rawTxHex := hex.EncodeToString(rawTxBytes)
 	fmt.Println("serialized: ", rawTxHex)
-
 	return signedTx
 }
 
