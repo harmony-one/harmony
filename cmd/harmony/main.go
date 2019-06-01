@@ -184,10 +184,10 @@ func initSetup() {
 
 func createGlobalConfig() *nodeconfig.ConfigType {
 	var err error
+	var myShardID uint32
 
 	nodeConfig := nodeconfig.GetDefaultConfig()
-
-	myShardID := uint32(*accountIndex / core.GenesisShardSize)
+	myShardID = uint32(*accountIndex % core.GenesisShardNum)
 
 	// Specified Shard ID override calculated Shard ID
 	if *shardID >= 0 {
@@ -239,9 +239,9 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 
 	nodeConfig.SelfPeer = p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nodeConfig.ConsensusPubKey}
 
-	if *accountIndex%core.GenesisShardSize == 0 { // The first node in a shard is the leader at genesis
-		nodeConfig.StringRole = "leader"
+	if *accountIndex < core.GenesisShardNum { // The first node in a shard is the leader at genesis
 		nodeConfig.Leader = nodeConfig.SelfPeer
+		nodeConfig.StringRole = "leader"
 	} else {
 		nodeConfig.StringRole = "validator"
 	}
