@@ -225,7 +225,7 @@ func GetInitShardState() types.ShardState {
 	for i := 0; i < GenesisShardNum; i++ {
 		com := types.Committee{ShardID: uint32(i)}
 		for j := 0; j < GenesisShardSize; j++ {
-			index := i*GenesisShardSize + j // The initial account to use for genesis nodes
+			index := i + j*GenesisShardNum // The initial account to use for genesis nodes
 			priKey := bls.SecretKey{}
 			priKey.SetHexString(contract.GenesisBLSAccounts[index].Private)
 			pubKey := [96]byte{}
