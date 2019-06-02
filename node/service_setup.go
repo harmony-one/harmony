@@ -10,7 +10,6 @@ import (
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/api/service/networkinfo"
 	"github.com/harmony-one/harmony/api/service/randomness"
-	"github.com/harmony-one/harmony/api/service/restclientsupport"
 	"github.com/harmony-one/harmony/api/service/staking"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -24,12 +23,6 @@ func (node *Node) setupForShardLeader() {
 	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer, node.AddBeaconPeer))
 	// Register networkinfo service. "0" is the beacon shard ID
 	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, node.NodeConfig.GetShardGroupID(), chanPeer, nil))
-
-	node.serviceManager.RegisterService(service.RestClientSupport, restclientsupport.New(
-		node.CreateTransactionForEnterMethod, node.GetResult,
-		node.CreateTransactionForPickWinner, node.CallFaucetContract, node.GetBalanceOfAddress,
-		node.CreateTransactionForPlayMethod, node.CreateTransactionForPayoutMethod, node.CreateTransactionForEndMethod))
-
 	// Register explorer service.
 	node.serviceManager.RegisterService(service.SupportExplorer, explorer.New(&node.SelfPeer, node.Consensus.GetNodeIDs, node.GetBalanceOfAddress))
 	// Register consensus service.
@@ -70,12 +63,6 @@ func (node *Node) setupForBeaconLeader() {
 	node.serviceManager.RegisterService(service.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReadyv2))
 	// Register client support service.
 	node.serviceManager.RegisterService(service.ClientSupport, clientsupport.New(node.Blockchain().State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
-	// TODO(minhdoan): We will remove the old client support and use the new client support which uses new message protocol.
-	// Register client new support service.
-	node.serviceManager.RegisterService(service.RestClientSupport, restclientsupport.New(
-		node.CreateTransactionForEnterMethod, node.GetResult,
-		node.CreateTransactionForPickWinner, node.CallFaucetContract, node.GetBalanceOfAddress,
-		node.CreateTransactionForPlayMethod, node.CreateTransactionForPayoutMethod, node.CreateTransactionForEndMethod))
 	// Register randomness service
 	node.serviceManager.RegisterService(service.Randomness, randomness.New(node.DRand))
 	// Register explorer service.
