@@ -24,7 +24,6 @@ type Type byte
 // Constants for Type.
 const (
 	SupportSyncing Type = iota
-	ClientSupport
 	SupportExplorer
 	Consensus
 	Randomness
@@ -39,8 +38,6 @@ const (
 
 func (t Type) String() string {
 	switch t {
-	case ClientSupport:
-		return "ClientSupport"
 	case SupportSyncing:
 		return "SyncingSupport"
 	case SupportExplorer:
