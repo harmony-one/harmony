@@ -141,12 +141,6 @@ func AddNodeAddressesToGenesisAlloc(genesisAlloc core.GenesisAlloc) {
 		address := common.HexToAddress(account.Address)
 		genesisAlloc[address] = core.GenesisAccount{Balance: testBankFunds}
 	}
-	//for _, account := range contract.NewNodeAccounts {
-	//	testBankFunds := big.NewInt(InitFreeFundInEther)
-	//	testBankFunds = testBankFunds.Mul(testBankFunds, big.NewInt(params.Ether))
-	//	address := common.HexToAddress(account.Address)
-	//	genesisAlloc[address] = core.GenesisAccount{Balance: testBankFunds}
-	//}
 	for _, account := range contract.DemoAccounts {
 		testBankFunds := big.NewInt(InitFreeFundInEther)
 		testBankFunds = testBankFunds.Mul(testBankFunds, big.NewInt(params.Ether))
