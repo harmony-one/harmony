@@ -53,11 +53,6 @@ func (pm *PbftMode) SetMode(m Mode) {
 	pm.mode = m
 }
 
-// SetMode set mode for consensus
-func (consensus *Consensus) SetMode(m Mode) {
-	consensus.mode.mode = m
-}
-
 // ViewID return the current viewchanging id
 func (pm *PbftMode) ViewID() uint32 {
 	return pm.viewID
@@ -114,7 +109,7 @@ func (consensus *Consensus) getIndexOfPubKey(pubKey *bls.PublicKey) int {
 
 // ResetViewChangeState reset the state for viewchange
 func (consensus *Consensus) ResetViewChangeState() {
-	consensus.SetMode(Normal)
+	consensus.mode.SetMode(Normal)
 	bhpBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, nil)
 	nilBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, nil)
 	consensus.bhpBitmap = bhpBitmap
@@ -139,8 +134,8 @@ func (consensus *Consensus) startViewChange(viewID uint32) {
 		return
 	}
 	consensus.consensusTimeout[timeoutConsensus].Stop()
-	consensus.SetMode(ViewChanging)
-	consensus.SetViewID(viewID)
+	consensus.mode.SetMode(ViewChanging)
+	consensus.mode.SetViewID(viewID)
 	nextLeaderKey := consensus.GetNextLeaderKey()
 	consensus.LeaderPubKey = consensus.GetNextLeaderKey()
 	if nextLeaderKey.IsEqual(consensus.PubKey) {
@@ -162,7 +157,7 @@ func (consensus *Consensus) startViewChange(viewID uint32) {
 // new leader send new view message
 func (consensus *Consensus) startNewView() {
 	utils.GetLogInstance().Info("startNewView", "viewID", consensus.mode.GetViewID())
-	consensus.SetMode(Normal)
+	consensus.mode.SetMode(Normal)
 	consensus.switchPhase(Announce)
 
 	msgToSend := consensus.constructNewViewMessage()
@@ -202,7 +197,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	consensus.vcLock.Lock()
 	defer consensus.vcLock.Unlock()
 
-	consensus.SetMode(ViewChanging)
+	consensus.mode.SetMode(ViewChanging)
 	consensus.mode.SetViewID(recvMsg.ViewID)
 
 	_, ok1 := consensus.nilSigs[consensus.SelfAddress]
@@ -282,7 +277,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	}
 
 	if (len(consensus.bhpSigs) + len(consensus.nilSigs)) >= consensus.Quorum() {
-		consensus.SetMode(Normal)
+		consensus.mode.SetMode(Normal)
 		consensus.LeaderPubKey = consensus.PubKey
 		if len(consensus.m1Payload) == 0 {
 			consensus.phase = Announce

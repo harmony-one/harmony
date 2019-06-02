@@ -583,7 +583,7 @@ func (consensus *Consensus) checkViewID(msg *PbftMessage) error {
 		utils.GetLogger().Warn("view id is low", "myViewId", consensus.viewID, "theirViewId", msg.ViewID)
 		// notify state syncing to start
 		// TODO ek/cm - think more about this
-		consensus.SetMode(Syncing)
+		consensus.mode.SetMode(Syncing)
 		select {
 		case consensus.ViewIDLowChan <- struct{}{}:
 		default:
