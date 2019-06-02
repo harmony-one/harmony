@@ -405,7 +405,6 @@ func main() {
 		"multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s",
 			*ip, *port, nodeConfig.Host.GetID().Pretty()))
 
-	currentNode.MaybeKeepSendingPongMessage()
 	go currentNode.SupportSyncing()
 	currentNode.ServiceManagerSetup()
 	currentNode.StartRPC(*port)
