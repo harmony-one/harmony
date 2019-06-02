@@ -514,8 +514,7 @@ func (node *Node) SendPongMessage() {
 	tick := time.NewTicker(2 * time.Second)
 	tick2 := time.NewTicker(120 * time.Second)
 
-	numPeers := len(node.Consensus.GetValidatorPeers())
-	numPubKeys := len(node.Consensus.PublicKeys)
+	numPeers := node.numPeers
 	sentMessage := false
 	firstTime := true
 
@@ -524,22 +523,21 @@ func (node *Node) SendPongMessage() {
 		select {
 		case <-tick.C:
 			peers := node.Consensus.GetValidatorPeers()
-			numPeersNow := len(peers)
-			numPubKeysNow := len(node.Consensus.PublicKeys)
+			numPeersNow := node.numPeers
 
 			// no peers, wait for another tick
-			if numPubKeysNow == 0 {
+			if numPeersNow == 0 {
 				utils.GetLogInstance().Info("[PONG] no peers, continue", "numPeers", numPeers, "numPeersNow", numPeersNow)
 				continue
 			}
 			// new peers added
-			if numPubKeysNow != numPubKeys || numPeersNow != numPeers {
+			if numPeersNow != numPeers {
 				utils.GetLogInstance().Info("[PONG] different number of peers", "numPeers", numPeers, "numPeersNow", numPeersNow)
 				sentMessage = false
 			} else {
-				// stable number of peers/pubkeys, sent the pong message
+				// stable number of peers, sent the pong message
 				// also make sure number of peers is greater than the minimal required number
-				if !sentMessage && numPubKeysNow >= node.Consensus.MinPeers {
+				if !sentMessage && numPeersNow >= node.Consensus.MinPeers {
 					pong := proto_discovery.NewPongMessage(peers, node.Consensus.PublicKeys, node.Consensus.GetLeaderPubKey(), node.Consensus.ShardID)
 					buffer := pong.ConstructPongMessage()
 					err := node.host.SendMessageToGroups([]p2p.GroupID{node.NodeConfig.GetShardGroupID()}, host.ConstructP2pMessage(byte(0), buffer))
@@ -564,7 +562,6 @@ func (node *Node) SendPongMessage() {
 				}
 			}
 			numPeers = numPeersNow
-			numPubKeys = numPubKeysNow
 		case <-tick2.C:
 			// send pong message regularly to make sure new node received all the public keys
 			// also nodes offline/online will receive the public keys

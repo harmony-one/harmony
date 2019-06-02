@@ -105,6 +105,7 @@ type Node struct {
 
 	// TODO: Neighbors should store only neighbor nodes in the same shard
 	Neighbors  sync.Map   // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
+	numPeers   int        // Number of Peers
 	State      State      // State of the Node
 	stateMutex sync.Mutex // mutex for change node state
 
@@ -435,6 +436,7 @@ func (node *Node) AddPeers(peers []*p2p.Peer) int {
 			// !ok means new peer is stored
 			count++
 			node.host.AddPeer(p)
+			node.numPeers++
 			continue
 		}
 	}
