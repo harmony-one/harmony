@@ -19,3 +19,7 @@
 - leader send different subsets of prepared signature in prepare phase
 - new leader doesn't send prepared message from previous view
 - new leader 't send inconsistent announce message from previous view
+
+### others
+
+- more than n/3 validators offline and restart after a while, recover the network
