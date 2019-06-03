@@ -337,15 +337,6 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 				node.AddContractKeyAndAddress(scStaking)
 			}
 		}
-		if node.isFirstTime {
-			// TODO(minhdoan): Think of a better approach to deploy smart contract.
-			// This is temporary for demo purpose.
-			node.AddLotteryContract()
-			node.AddPuzzleContract()
-		} else {
-			node.AddContractKeyAndAddress(scLottery)
-			node.AddContractKeyAndAddress(scPuzzle)
-		}
 	}
 
 	node.ContractCaller = contracts.NewContractCaller(node.Blockchain(), params.TestChainConfig)
