@@ -13,7 +13,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 
 	"google.golang.org/grpc"
-)
+
 
 // Server is the Server struct for client service package.
 type Server struct {
