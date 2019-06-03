@@ -15,7 +15,6 @@ import (
 
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/api/client"
-	clientService "github.com/harmony-one/harmony/api/client/service"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/syncing"
@@ -69,10 +68,8 @@ func (state State) String() string {
 }
 
 const (
-	// ClientServicePortDiff is the positive port diff for client service
-	ClientServicePortDiff       = 5555
-	maxBroadcastNodes           = 10                  // broadcast at most maxBroadcastNodes peers that need in sync
-	broadcastTimeout      int64 = 3 * 60 * 1000000000 // 3 mins
+	maxBroadcastNodes       = 10                  // broadcast at most maxBroadcastNodes peers that need in sync
+	broadcastTimeout  int64 = 3 * 60 * 1000000000 // 3 mins
 	//SyncIDLength is the length of bytes for syncID
 	SyncIDLength = 20
 )
@@ -114,9 +111,6 @@ type Node struct {
 	TxPool       *core.TxPool
 	Worker       *worker.Worker
 	BeaconWorker *worker.Worker // worker for beacon chain
-
-	// Client server (for wallet requests)
-	clientServer *clientService.Server
 
 	// Syncing component.
 	syncID                 [SyncIDLength]byte // a unique ID for the node during the state syncing process with peers
