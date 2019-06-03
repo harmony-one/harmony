@@ -69,6 +69,8 @@ type ConfigType struct {
 	isBeacon bool        // whether this node is beacon node doing consensus or not
 	ShardID  uint32      // ShardID of this node
 	role     Role        // Role of the node
+	Port     string
+	IP       string
 
 	StringRole      string
 	Host            p2p.Host

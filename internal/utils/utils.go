@@ -15,8 +15,8 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/internal/utils"
 	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
 )
 
@@ -232,4 +232,13 @@ func GetBlsAddress(key *bls.PublicKey) common.Address {
 	addrBytes := key.GetAddress()
 	addr.SetBytes(addrBytes[:])
 	return addr
+}
+
+// GetPortFromDiff returns the port from base and the diff.
+func GetPortFromDiff(port string, diff int) string {
+	if portNum, err := strconv.Atoi(port); err == nil {
+		return fmt.Sprintf("%d", portNum-diff)
+	}
+	utils.GetLogInstance().Error("error on parsing port.")
+	return ""
 }
