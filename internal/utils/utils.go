@@ -16,7 +16,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/internal/utils"
 	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
 )
 
@@ -239,6 +238,6 @@ func GetPortFromDiff(port string, diff int) string {
 	if portNum, err := strconv.Atoi(port); err == nil {
 		return fmt.Sprintf("%d", portNum-diff)
 	}
-	utils.GetLogInstance().Error("error on parsing port.")
+	GetLogInstance().Error("error on parsing port.")
 	return ""
 }

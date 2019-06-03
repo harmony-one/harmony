@@ -124,6 +124,10 @@ func initSetup() {
 		printVersion(os.Args[0])
 	}
 
+	// Set port and ip to global config.
+	nodeconfig.GetDefaultConfig().Port = *port
+	nodeconfig.GetDefaultConfig().IP = *ip
+
 	// Setup mem profiling.
 	memprofiling.GetMemProfiling().Config()
 
