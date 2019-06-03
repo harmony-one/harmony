@@ -44,6 +44,10 @@ func (consensus *Consensus) GetNextRnd() ([32]byte, [32]byte, error) {
 		return [32]byte{}, [32]byte{}, errors.New("No available randomness")
 	}
 	vdfOutput := consensus.pendingRnds[0]
+
+	//pop the first vdfOutput from the list
+	consensus.pendingRnds = consensus.pendingRnds[1:]
+
 	rnd := [32]byte{}
 	blockHash := [32]byte{}
 	copy(rnd[:], vdfOutput[:32])
