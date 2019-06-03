@@ -20,6 +20,8 @@ import (
 // implementations:
 //   * hmy/api_backend.go
 type Backend interface {
+	// NOTE(ricl): this is not in ETH Backend inteface. They put it directly in eth object.
+	NetVersion() uint64
 	// General Ethereum API
 	// Downloader() *downloader.Downloader
 	ProtocolVersion() int

@@ -18,7 +18,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 )
 
-// APIBackend An implementation of Backend. Full client.
+// APIBackend An implementation of internal/hmyapi/Backend. Full client.
 type APIBackend struct {
 	hmy *Harmony
 }
@@ -200,4 +200,9 @@ func (b *APIBackend) GetPoolTransactions() (types.Transactions, error) {
 func (b *APIBackend) GetBalance(address common.Address) (*hexutil.Big, error) {
 	balance, err := b.hmy.nodeAPI.GetBalanceOfAddress(address)
 	return (*hexutil.Big)(balance), err
+}
+
+// NetVersion returns net version
+func (b *APIBackend) NetVersion() uint64 {
+	return b.hmy.NetVersion()
 }
