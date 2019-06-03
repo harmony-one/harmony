@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
-
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/accounts/keystore"
 	"github.com/harmony-one/harmony/consensus"
@@ -21,6 +20,7 @@ import (
 	"github.com/harmony-one/harmony/drand"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	hmykey "github.com/harmony-one/harmony/internal/keystore"
+	memprofiling "github.com/harmony-one/harmony/internal/memprofiling"
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -123,6 +123,9 @@ func initSetup() {
 	if *versionFlag {
 		printVersion(os.Args[0])
 	}
+
+	// Setup mem profiling.
+	memprofiling.GetMemProfiling().Config()
 
 	// Logging setup
 	utils.SetLogContext(*port, *ip)
@@ -367,6 +370,10 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentConsensus.BlockVerifier = currentNode.VerifyNewBlock
 	currentConsensus.OnConsensusDone = currentNode.PostConsensusProcessing
 	currentNode.State = node.NodeWaitToJoin
+
+	// Watching currentNode and currentConsensus.
+	memprofiling.GetMemProfiling().Add("currentNode", currentNode)
+	memprofiling.GetMemProfiling().Add("currentConsensus", currentConsensus)
 	return currentNode
 }
 
@@ -406,6 +413,7 @@ func main() {
 			*ip, *port, nodeConfig.Host.GetID().Pretty()))
 
 	go currentNode.SupportSyncing()
+	memprofiling.GetMemProfiling().Start()
 	currentNode.ServiceManagerSetup()
 	currentNode.StartRPC(*port)
 	currentNode.RunServices()
