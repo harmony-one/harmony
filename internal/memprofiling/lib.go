@@ -5,12 +5,13 @@ import (
 	"net/http"
 
 	"github.com/fjl/memsize/memsizeui"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // Constants for mem profiling.
 const (
-	MemProfilingPort = 99999
+	MemProfilingPortDiff = 1000
 )
 
 // MemProfiling is the struct of MemProfiling.
@@ -27,7 +28,11 @@ func New() *MemProfiling {
 // Config configures mem profiling.
 func (m *MemProfiling) Config() {
 	m.h = new(memsizeui.Handler)
-	m.s = &http.Server{Addr: fmt.Sprintf("127.0.0.1:%d", MemProfilingPort), Handler: m.h}
+	m.s = &http.Server{
+		Addr:    fmt.Sprintf("%s:%s", nodeconfig.GetDefaultConfig().IP, utils.GetPortFromDiff(nodeconfig.GetDefaultConfig().Port, MemProfilingPortDiff)),
+		Handler: m.h,
+	}
+	utils.GetLogInstance().Info("running mem profiling", "port", utils.GetPortFromDiff(nodeconfig.GetDefaultConfig().Port, MemProfilingPortDiff))
 }
 
 // Add adds variables to watch for profiling.
