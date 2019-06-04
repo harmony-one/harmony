@@ -110,7 +110,7 @@ func (s *Service) contactP2pPeers() {
 					// TODO (leo) use different timer tick for different group, mainly differentiate beacon and regular shards
 					// beacon ping could be less frequent than regular shard
 					tick.Stop()
-					tick = time.NewTicker(1 * time.Minute)
+					tick = time.NewTicker(5 * time.Minute)
 				}
 
 				if a == p2p.ActionStart || a == p2p.ActionResume || a == p2p.ActionPause {
