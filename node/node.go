@@ -479,7 +479,6 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to create client receiver", "msg", err)
 	}
-
 	return nodeConfig, chanPeer
 }
 
