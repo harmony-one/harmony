@@ -30,12 +30,12 @@ type MemProfiling struct {
 func New() *MemProfiling {
 	return &MemProfiling{
 		observedObject: map[string]interface{}{},
+		h:              new(memsizeui.Handler),
 	}
 }
 
 // Config configures mem profiling.
 func (m *MemProfiling) Config() {
-	m.h = new(memsizeui.Handler)
 	m.s = &http.Server{
 		Addr:    fmt.Sprintf("%s:%s", nodeconfig.GetDefaultConfig().IP, utils.GetPortFromDiff(nodeconfig.GetDefaultConfig().Port, MemProfilingPortDiff)),
 		Handler: m.h,
