@@ -520,8 +520,13 @@ func (consensus *Consensus) finalizeCommits() {
 	consensus.viewID++
 	consensus.blockNum++
 
+	if consensus.consensusTimeout[timeoutBootstrap].IsActive() {
+		consensus.consensusTimeout[timeoutBootstrap].Stop()
+		utils.GetLogger().Debug("start consensus timeout; stop bootstrap timeout only once", "viewID", consensus.viewID, "block", consensus.blockNum)
+	} else {
+		utils.GetLogger().Debug("start consensus timeout", "viewID", consensus.viewID, "block", consensus.blockNum)
+	}
 	consensus.consensusTimeout[timeoutConsensus].Start()
-	consensus.consensusTimeout[timeoutBootstrap].Stop()
 
 	consensus.OnConsensusDone(&blockObj)
 	utils.GetLogInstance().Debug("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!", "viewID", consensus.viewID, "numOfSignatures", len(consensus.commitSigs))
@@ -600,8 +605,13 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	consensus.commitBitmap = mask
 
 	consensus.tryCatchup()
+	if consensus.consensusTimeout[timeoutBootstrap].IsActive() {
+		consensus.consensusTimeout[timeoutBootstrap].Stop()
+		utils.GetLogger().Debug("start consensus timeout; stop bootstrap timeout only once", "viewID", consensus.viewID, "block", consensus.blockNum)
+	} else {
+		utils.GetLogger().Debug("start consensus timeout", "viewID", consensus.viewID, "block", consensus.blockNum)
+	}
 	consensus.consensusTimeout[timeoutConsensus].Start()
-	consensus.consensusTimeout[timeoutBootstrap].Stop()
 	return
 }
 
@@ -704,6 +714,7 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 		defer close(stoppedChan)
 		ticker := time.NewTicker(3 * time.Second)
 		consensus.consensusTimeout[timeoutBootstrap].Start()
+		utils.GetLogger().Debug("start bootstrap timeout only once", "viewID", consensus.viewID, "block", consensus.blockNum)
 		for {
 			select {
 			case <-ticker.C:
