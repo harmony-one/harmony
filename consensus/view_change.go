@@ -122,6 +122,9 @@ func (consensus *Consensus) ResetViewChangeState() {
 	consensus.bhpSigs = map[common.Address]*bls.Sign{}
 	consensus.nilSigs = map[common.Address]*bls.Sign{}
 	consensus.viewIDSigs = map[common.Address]*bls.Sign{}
+
+	// Because we created new map objects we need to overwrite the mapping of observed objects.
+	consensus.WatchObservedObjects()
 }
 
 func createTimeout() map[TimeoutType]*utils.Timeout {
