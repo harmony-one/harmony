@@ -8,7 +8,7 @@ var once sync.Once
 // GetMemProfiling returns a pointer of MemProfiling.
 func GetMemProfiling() *MemProfiling {
 	once.Do(func() {
-		singleton = &MemProfiling{}
+		singleton = New()
 	})
 	return singleton
 }
