@@ -13,7 +13,6 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/core/types"
-	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -200,7 +199,7 @@ func (consensus *Consensus) tryPrepare(blockHash common.Hash) {
 		return
 	}
 
-	if consensus.phase != Announce || consensus.blockNum != block.NumberU64() || !consensus.pbftLog.HasMatchingAnnounce(consensus.blockNum, consensus.viewID, hash) {
+	if consensus.phase != Announce || consensus.blockNum != block.NumberU64() || !consensus.pbftLog.HasMatchingViewAnnounce(consensus.blockNum, consensus.viewID, hash) {
 		return
 	}
 
@@ -242,7 +241,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		return
 	}
 
-	if !consensus.pbftLog.HasMatchingAnnounce(consensus.blockNum, consensus.viewID, recvMsg.BlockHash) {
+	if !consensus.pbftLog.HasMatchingViewAnnounce(consensus.blockNum, consensus.viewID, recvMsg.BlockHash) {
 		utils.GetLogInstance().Debug("onPrepare no matching announce message", "blockNum", consensus.blockNum, "viewID", consensus.viewID, "blockHash", recvMsg.BlockHash)
 		return
 	}
@@ -416,10 +415,12 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	}
 
 	if recvMsg.ViewID != consensus.viewID || recvMsg.BlockNum != consensus.blockNum || consensus.phase != Commit {
+		utils.GetLogger().Debug("not match", "myViewID", consensus.viewID, "viewID", recvMsg.ViewID, "myBlock", consensus.blockNum, "block", recvMsg.BlockNum, "myPhase", consensus.phase, "phase", Commit)
 		return
 	}
 
-	if !consensus.pbftLog.HasMatchingAnnounce(consensus.blockNum, consensus.viewID, recvMsg.BlockHash) {
+	if !consensus.pbftLog.HasMatchingAnnounce(consensus.blockNum, recvMsg.BlockHash) {
+		utils.GetLogger().Debug("cannot find matching blockhash")
 		return
 	}
 
@@ -456,8 +457,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		utils.GetLogInstance().Debug("Failed to deserialize bls signature", "validatorAddress", validatorAddress)
 		return
 	}
-	aggSig := bls_cosi.AggregateSig(consensus.GetPrepareSigsArray())
-	if !sign.VerifyHash(validatorPubKey, append(aggSig.Serialize(), consensus.prepareBitmap.Bitmap...)) {
+	if !sign.VerifyHash(validatorPubKey, append(consensus.aggregatedPrepareSig.Serialize(), consensus.prepareBitmap.Bitmap...)) {
 		utils.GetLogInstance().Error("Received invalid BLS signature", "validatorAddress", validatorAddress)
 		return
 	}

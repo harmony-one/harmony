@@ -71,12 +71,12 @@ func TestHasMatchingAnnounce(t *testing.T) {
 	pbftMsg := PbftMessage{MessageType: msg_pb.MessageType_ANNOUNCE, BlockNum: 2, ViewID: 3, BlockHash: [32]byte{01, 02}}
 	log := NewPbftLog()
 	log.AddMessage(&pbftMsg)
-	found := log.HasMatchingAnnounce(2, 3, [32]byte{01, 02})
+	found := log.HasMatchingViewAnnounce(2, 3, [32]byte{01, 02})
 	if !found {
 		t.Error("found should be true")
 	}
 
-	notFound := log.HasMatchingAnnounce(2, 3, [32]byte{02, 02})
+	notFound := log.HasMatchingViewAnnounce(2, 3, [32]byte{02, 02})
 	if notFound {
 		t.Error("notFound should be false")
 	}

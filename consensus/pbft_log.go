@@ -153,7 +153,13 @@ func (log *PbftLog) GetMessagesByTypeSeqHash(typ msg_pb.MessageType, blockNum ui
 }
 
 // HasMatchingAnnounce returns whether the log contains announce type message with given blockNum, viewID and blockHash
-func (log *PbftLog) HasMatchingAnnounce(blockNum uint64, viewID uint32, blockHash common.Hash) bool {
+func (log *PbftLog) HasMatchingAnnounce(blockNum uint64, blockHash common.Hash) bool {
+	found := log.GetMessagesByTypeSeqHash(msg_pb.MessageType_ANNOUNCE, blockNum, blockHash)
+	return len(found) == 1
+}
+
+// HasMatchingViewAnnounce returns whether the log contains announce type message with given blockNum, viewID and blockHash
+func (log *PbftLog) HasMatchingViewAnnounce(blockNum uint64, viewID uint32, blockHash common.Hash) bool {
 	found := log.GetMessagesByTypeSeqViewHash(msg_pb.MessageType_ANNOUNCE, blockNum, viewID, blockHash)
 	return len(found) == 1
 }
