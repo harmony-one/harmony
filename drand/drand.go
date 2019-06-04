@@ -1,9 +1,10 @@
 package drand
 
 import (
-	"crypto/sha256"
 	"errors"
 	"sync"
+
+	"github.com/harmony-one/harmony/crypto/hash"
 
 	"github.com/ethereum/go-ethereum/common"
 
@@ -158,7 +159,7 @@ func (dRand *DRand) signDRandMessage(message *msg_pb.Message) error {
 		return err
 	}
 	// 64 byte of signature on previous data
-	hash := sha256.Sum256(marshaledMessage)
+	hash := hash.Keccak256(marshaledMessage)
 	signature := dRand.priKey.SignHash(hash[:])
 
 	message.Signature = signature.Serialize()
@@ -213,7 +214,7 @@ func verifyMessageSig(signerPubKey *bls.PublicKey, message *msg_pb.Message) erro
 	if err != nil {
 		return err
 	}
-	msgHash := sha256.Sum256(messageBytes)
+	msgHash := hash.Keccak256(messageBytes)
 	if !msgSig.VerifyHash(signerPubKey, msgHash[:]) {
 		return errors.New("failed to verify the signature")
 	}

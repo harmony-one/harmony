@@ -211,7 +211,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 }
 
 // ValidateNewBlock validates new block.
-func (bc *BlockChain) ValidateNewBlock(block *types.Block, address common.Address) error {
+func (bc *BlockChain) ValidateNewBlock(block *types.Block) error {
 	state, err := state.New(bc.CurrentBlock().Root(), bc.stateCache)
 
 	if err != nil {

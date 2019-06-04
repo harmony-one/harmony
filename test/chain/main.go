@@ -6,10 +6,11 @@ import (
 	"log"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 
-	//"github.com/ethereum/go-ethereum/crypto/sha3"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/crypto/hash"
+
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/consensus"
@@ -18,7 +19,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	pkgworker "github.com/harmony-one/harmony/node/worker"
-	"golang.org/x/crypto/sha3"
 )
 
 const (
@@ -154,10 +154,9 @@ func callFaucetContractToFundAnAddress(chain *core.BlockChain) {
 
 	paddedAddress := common.LeftPadBytes(allRandomUserAddress[0].Bytes(), 32)
 	transferFnSignature := []byte("request(address)")
-	//hash := sha3.NewKeccak256()
-	hash := sha3.NewLegacyKeccak256()
-	hash.Write(transferFnSignature)
-	callFuncHex := hash.Sum(nil)[:4]
+
+	fnHash := hash.Keccak256(transferFnSignature)
+	callFuncHex := fnHash[:4]
 
 	var callEnc []byte
 	callEnc = append(callEnc, callFuncHex...)
@@ -225,10 +224,9 @@ func playSetupStakingContract(chain *core.BlockChain) {
 
 func playStaking(chain *core.BlockChain) {
 	depositFnSignature := []byte("deposit()")
-	//hash = sha3.NewKeccak256()
-	hash := sha3.NewLegacyKeccak256()
-	hash.Write(depositFnSignature)
-	methodID := hash.Sum(nil)[:4]
+
+	fnHash := hash.Keccak256(depositFnSignature)
+	methodID := fnHash[:4]
 
 	var callEncl []byte
 	callEncl = append(callEncl, methodID...)
@@ -276,10 +274,9 @@ func playWithdrawStaking(chain *core.BlockChain) {
 	fmt.Println("--------- Now Setting up Withdrawing Stakes ---------")
 
 	withdrawFnSignature := []byte("withdraw(uint256)")
-	//hash = sha3.NewKeccak256()
-	hash := sha3.NewLegacyKeccak256()
-	hash.Write(withdrawFnSignature)
-	methodID := hash.Sum(nil)[:4]
+
+	fnHash := hash.Keccak256(withdrawFnSignature)
+	methodID := fnHash[:4]
 
 	withdraw := "5000"
 	withdrawstake := new(big.Int)
