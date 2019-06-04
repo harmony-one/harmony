@@ -16,6 +16,7 @@ type DeployAccount struct {
 	Address string
 	Private string
 	Public  string
+	Name    string
 }
 
 // BeaconAccountPriKey is the func which generates a constant private key.

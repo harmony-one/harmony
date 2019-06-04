@@ -40,7 +40,7 @@ import (
 const (
 	// MaxNumberOfTransactionsPerBlock is the max number of transaction per a block.
 	MaxNumberOfTransactionsPerBlock = 8000
-	consensusTimeout                = 10 * time.Second
+	consensusTimeout                = 30 * time.Second
 )
 
 // ReceiveGlobalMessage use libp2p pubsub mechanism to receive global broadcast messages
