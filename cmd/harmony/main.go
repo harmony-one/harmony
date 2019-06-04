@@ -378,6 +378,7 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// Watching currentNode and currentConsensus.
 	memprofiling.GetMemProfiling().Add("currentNode", currentNode)
 	memprofiling.GetMemProfiling().Add("currentConsensus", currentConsensus)
+	currentNode.WatchObservedObjects()
 	return currentNode
 }
 

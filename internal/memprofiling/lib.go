@@ -15,7 +15,7 @@ import (
 const (
 	MemProfilingPortDiff = 1000
 	// Constants of for scanning mem size.
-	memSizeScanTime = 10 * time.Second
+	memSizeScanTime = 30 * time.Second
 )
 
 // MemProfiling is the struct of MemProfiling.
@@ -65,7 +65,7 @@ func (m *MemProfiling) PeriodicallyScanMemSize() {
 	go func() {
 		for {
 			select {
-			case <-time.After(10 * time.Second):
+			case <-time.After(memSizeScanTime):
 				m := GetMemProfiling()
 				for k, v := range m.observedObject {
 					s := memsize.Scan(v)
