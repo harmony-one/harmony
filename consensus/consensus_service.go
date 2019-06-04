@@ -355,6 +355,9 @@ func (consensus *Consensus) ResetState() {
 	consensus.commitBitmap = commitBitmap
 	consensus.aggregatedPrepareSig = nil
 	consensus.aggregatedCommitSig = nil
+
+	// Because we created new map objects we need to overwrite the mapping of observed objects.
+	consensus.WatchObservedObjects()
 }
 
 // Returns a string representation of this consensus

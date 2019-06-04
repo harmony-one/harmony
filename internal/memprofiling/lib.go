@@ -3,6 +3,7 @@ package memprofiling
 import (
 	"fmt"
 	"net/http"
+	"reflect"
 	"time"
 
 	"github.com/fjl/memsize"
@@ -44,8 +45,13 @@ func (m *MemProfiling) Config() {
 
 // Add adds variables to watch for profiling.
 func (m *MemProfiling) Add(name string, v interface{}) {
-	m.h.Add(name, v)
-	m.observedObject[name] = v
+	if v != nil {
+		rv := reflect.ValueOf(v)
+		if !(rv.Kind() != reflect.Ptr || rv.IsNil()) {
+			m.h.Add(name, v)
+			m.observedObject[name] = v
+		}
+	}
 }
 
 // Start starts profiling server.
