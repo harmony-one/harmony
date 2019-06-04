@@ -29,7 +29,6 @@ import (
 	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/crypto/pki"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -254,7 +253,7 @@ func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 	// TODO ek – where do we verify parent-child invariants,
 	//  e.g. "child.Number == child.IsGenesis() ? 0 : parent.Number+1"?
-	err := node.Blockchain().ValidateNewBlock(newBlock, pki.GetAddressFromPublicKey(node.SelfPeer.ConsensusPubKey))
+	err := node.Blockchain().ValidateNewBlock(newBlock)
 	if err != nil {
 		return ctxerror.New("cannot ValidateNewBlock",
 			"blockHash", newBlock.Hash(),
