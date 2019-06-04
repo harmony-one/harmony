@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/contracts"
+	"github.com/harmony-one/harmony/core/denominations"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	contract_constants "github.com/harmony-one/harmony/internal/utils/contract"
@@ -40,7 +41,7 @@ func (node *Node) AddLotteryContract() {
 	// Unsigned transaction to avoid the case of transaction address.
 
 	contractFunds := big.NewInt(0)
-	contractFunds = contractFunds.Mul(contractFunds, big.NewInt(params.Ether))
+	contractFunds = contractFunds.Mul(contractFunds, big.NewInt(denominations.One))
 	demoContract, _ := types.SignTx(
 		types.NewContractCreation(uint64(0), node.Consensus.ShardID, contractFunds, params.TxGasContractCreation*10, nil, dataEnc),
 		types.HomesteadSigner{},
@@ -69,7 +70,7 @@ func (node *Node) CreateTransactionForEnterMethod(amount int64, priKey string) e
 	key, err := crypto.HexToECDSA(priKey)
 	nonce := node.GetNonceOfAddress(crypto.PubkeyToAddress(key.PublicKey))
 	Amount := big.NewInt(amount)
-	Amount = Amount.Mul(Amount, big.NewInt(params.Ether))
+	Amount = Amount.Mul(Amount, big.NewInt(denominations.One))
 	tx := types.NewTransaction(
 		nonce,
 		toAddress,

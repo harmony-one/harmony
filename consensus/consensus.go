@@ -8,11 +8,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/bls/ffi/go/bls"
 
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/contracts/structs"
+	"github.com/harmony-one/harmony/core/denominations"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
@@ -31,7 +31,7 @@ const (
 // Block reward per block signature.
 // TODO ek – per sig per stake
 var (
-	BlockReward = big.NewInt(params.Ether / 10)
+	BlockReward = big.NewInt(denominations.One / 10)
 )
 
 // Consensus is the main struct with all states and data related to consensus process.

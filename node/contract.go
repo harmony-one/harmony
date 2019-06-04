@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/contracts"
 	"github.com/harmony-one/harmony/contracts/structs"
+	"github.com/harmony-one/harmony/core/denominations"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	contract_constants "github.com/harmony-one/harmony/internal/utils/contract"
@@ -41,7 +42,7 @@ func (node *Node) AddStakingContractToPendingTransactions() {
 	contractAddress := crypto.PubkeyToAddress(priKey.PublicKey)
 	//Initially the smart contract should have minimal funds.
 	contractFunds := big.NewInt(0)
-	contractFunds = contractFunds.Mul(contractFunds, big.NewInt(params.Ether))
+	contractFunds = contractFunds.Mul(contractFunds, big.NewInt(denominations.One))
 	dataEnc := common.FromHex(contracts.StakeLockContractBin)
 	// Unsigned transaction to avoid the case of transaction address.
 	mycontracttx, _ := types.SignTx(types.NewContractCreation(uint64(0), node.Consensus.ShardID, contractFunds, params.TxGasContractCreation*100, nil, dataEnc), types.HomesteadSigner{}, priKey)
@@ -155,7 +156,7 @@ func (node *Node) AddFaucetContractToPendingTransactions() {
 	// Unsigned transaction to avoid the case of transaction address.
 
 	contractFunds := big.NewInt(FaucetContractFund)
-	contractFunds = contractFunds.Mul(contractFunds, big.NewInt(params.Ether))
+	contractFunds = contractFunds.Mul(contractFunds, big.NewInt(denominations.One))
 	mycontracttx, _ := types.SignTx(
 		types.NewContractCreation(uint64(0), node.Consensus.ShardID, contractFunds, params.TxGasContractCreation*10, nil, dataEnc),
 		types.HomesteadSigner{},

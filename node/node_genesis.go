@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/denominations"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -71,13 +72,13 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32) error {
 	contractDeployerKey, _ := ecdsa.GenerateKey(crypto.S256(), strings.NewReader("Test contract key string stream that is fixed so that generated test key are deterministic every time"))
 	contractDeployerAddress := crypto.PubkeyToAddress(contractDeployerKey.PublicKey)
 	contractDeployerFunds := big.NewInt(TotalInitFund)
-	contractDeployerFunds = contractDeployerFunds.Mul(contractDeployerFunds, big.NewInt(params.Ether))
+	contractDeployerFunds = contractDeployerFunds.Mul(contractDeployerFunds, big.NewInt(denominations.One))
 	genesisAlloc[contractDeployerAddress] = core.GenesisAccount{Balance: contractDeployerFunds}
 	node.ContractDeployerKey = contractDeployerKey
 
 	// Add puzzle fund
 	puzzleFunds := big.NewInt(TotalInitFund)
-	puzzleFunds = puzzleFunds.Mul(puzzleFunds, big.NewInt(params.Ether))
+	puzzleFunds = puzzleFunds.Mul(puzzleFunds, big.NewInt(denominations.One))
 	genesisAlloc[common.HexToAddress(contract.PuzzleAccounts[0].Address)] = core.GenesisAccount{Balance: puzzleFunds}
 
 	if shardID == 0 {
@@ -126,7 +127,7 @@ func (node *Node) CreateGenesisAllocWithTestingAddresses(numAddress int) core.Ge
 	for _, testBankKey := range node.TestBankKeys {
 		testBankAddress := crypto.PubkeyToAddress(testBankKey.PublicKey)
 		testBankFunds := big.NewInt(InitFreeFundInEther)
-		testBankFunds = testBankFunds.Mul(testBankFunds, big.NewInt(params.Ether))
+		testBankFunds = testBankFunds.Mul(testBankFunds, big.NewInt(denominations.One))
 		genesisAloc[testBankAddress] = core.GenesisAccount{Balance: testBankFunds}
 	}
 	return genesisAloc
@@ -137,13 +138,13 @@ func (node *Node) CreateGenesisAllocWithTestingAddresses(numAddress int) core.Ge
 func AddNodeAddressesToGenesisAlloc(genesisAlloc core.GenesisAlloc) {
 	for _, account := range contract.GenesisAccounts {
 		testBankFunds := big.NewInt(InitFreeFundInEther)
-		testBankFunds = testBankFunds.Mul(testBankFunds, big.NewInt(params.Ether))
+		testBankFunds = testBankFunds.Mul(testBankFunds, big.NewInt(denominations.One))
 		address := common.HexToAddress(account.Address)
 		genesisAlloc[address] = core.GenesisAccount{Balance: testBankFunds}
 	}
 	for _, account := range contract.DemoAccounts {
 		testBankFunds := big.NewInt(InitFreeFundInEther)
-		testBankFunds = testBankFunds.Mul(testBankFunds, big.NewInt(params.Ether))
+		testBankFunds = testBankFunds.Mul(testBankFunds, big.NewInt(denominations.One))
 		address := common.HexToAddress(account.Address)
 		genesisAlloc[address] = core.GenesisAccount{Balance: testBankFunds}
 	}

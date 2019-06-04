@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/contracts"
+	"github.com/harmony-one/harmony/core/denominations"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	contract_constants "github.com/harmony-one/harmony/internal/utils/contract"
@@ -25,7 +26,7 @@ const (
 )
 
 // OneEther is one ether
-var OneEther = big.NewInt(params.Ether)
+var OneEther = big.NewInt(denominations.One)
 
 // AddPuzzleContract adds the demo puzzle contract the genesis block.
 func (node *Node) AddPuzzleContract() {
@@ -42,7 +43,7 @@ func (node *Node) AddPuzzleContract() {
 	// Unsigned transaction to avoid the case of transaction address.
 
 	contractFunds := big.NewInt(PuzzleFund)
-	contractFunds = contractFunds.Mul(contractFunds, big.NewInt(params.Ether))
+	contractFunds = contractFunds.Mul(contractFunds, big.NewInt(denominations.One))
 	demoContract, _ := types.SignTx(
 		types.NewContractCreation(uint64(0), node.Consensus.ShardID, contractFunds, params.TxGasContractCreation*1000, nil, dataEnc),
 		types.HomesteadSigner{},
