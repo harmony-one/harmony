@@ -64,7 +64,7 @@ func TestIsHex(t *testing.T) {
 		{"0xHELLO_MY_NAME_IS_STEVEN_@#$^&*", false},
 	}
 	for _, test := range tests {
-		if ok := isHex(test.input); ok != test.ok {
+		if ok := IsHex(test.input); ok != test.ok {
 			t.Errorf("isHex(%q) = %v, want %v", test.input, ok, test.ok)
 		}
 	}

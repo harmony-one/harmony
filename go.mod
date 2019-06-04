@@ -7,6 +7,7 @@ require (
 	github.com/Workiva/go-datastructures v1.0.50
 	github.com/allegro/bigcache v1.2.0 // indirect
 	github.com/aristanetworks/goarista v0.0.0-20190308231643-e9fb69a13f45 // indirect
+	github.com/btcsuite/btcutil v0.0.0-20190207003914-4c204d697803
 	github.com/cespare/cp v1.1.1
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
@@ -48,6 +49,7 @@ require (
 	github.com/smartystreets/goconvey v0.0.0-20190330032615-68dc04aab96a // indirect
 	github.com/stretchr/testify v1.3.0
 	github.com/syndtr/goleveldb v1.0.0
+	github.com/tendermint/tendermint v0.31.7
 	github.com/whyrusleeping/go-logging v0.0.0-20170515211332-0457bb6b88fc
 	golang.org/x/crypto v0.0.0-20190313024323-a1f597ede03a
 	golang.org/x/lint v0.0.0-20190313153728-d0100b6bd8b3
