@@ -31,10 +31,11 @@ type PbftMessage struct {
 	LeaderPubkey  *bls.PublicKey
 	Payload       []byte
 	ViewchangeSig *bls.Sign
-	M1AggSig      *bls.Sign
-	M1Bitmap      *bls_cosi.Mask
+	ViewidSig     *bls.Sign
 	M2AggSig      *bls.Sign
 	M2Bitmap      *bls_cosi.Mask
+	M3AggSig      *bls.Sign
+	M3Bitmap      *bls_cosi.Mask
 }
 
 // NewPbftLog returns new instance of PbftLog
@@ -152,7 +153,13 @@ func (log *PbftLog) GetMessagesByTypeSeqHash(typ msg_pb.MessageType, blockNum ui
 }
 
 // HasMatchingAnnounce returns whether the log contains announce type message with given blockNum, viewID and blockHash
-func (log *PbftLog) HasMatchingAnnounce(blockNum uint64, viewID uint32, blockHash common.Hash) bool {
+func (log *PbftLog) HasMatchingAnnounce(blockNum uint64, blockHash common.Hash) bool {
+	found := log.GetMessagesByTypeSeqHash(msg_pb.MessageType_ANNOUNCE, blockNum, blockHash)
+	return len(found) == 1
+}
+
+// HasMatchingViewAnnounce returns whether the log contains announce type message with given blockNum, viewID and blockHash
+func (log *PbftLog) HasMatchingViewAnnounce(blockNum uint64, viewID uint32, blockHash common.Hash) bool {
 	found := log.GetMessagesByTypeSeqViewHash(msg_pb.MessageType_ANNOUNCE, blockNum, viewID, blockHash)
 	return len(found) == 1
 }
@@ -237,12 +244,18 @@ func ParseViewChangeMessage(msg *msg_pb.Message) (*PbftMessage, error) {
 		utils.GetLogInstance().Warn("ParseViewChangeMessage failed to deserialize the viewchange signature", "error", err)
 		return nil, err
 	}
+
+	vcSig1 := bls.Sign{}
+	err = vcSig1.Deserialize(vcMsg.ViewidSig)
+	if err != nil {
+		utils.GetLogInstance().Warn("ParseViewChangeMessage failed to deserialize the viewid signature", "error", err)
+		return nil, err
+	}
 	pbftMsg.SenderPubkey = pubKey
 	pbftMsg.LeaderPubkey = leaderKey
 	pbftMsg.ViewchangeSig = &vcSig
-
+	pbftMsg.ViewidSig = &vcSig1
 	return &pbftMsg, nil
-
 }
 
 // ParseNewViewMessage parses new view message into PbftMessage structure
@@ -267,21 +280,21 @@ func (consensus *Consensus) ParseNewViewMessage(msg *msg_pb.Message) (*PbftMessa
 	}
 	pbftMsg.SenderPubkey = pubKey
 
-	if len(vcMsg.M1Aggsigs) > 0 {
-		m1Sig := bls.Sign{}
-		err = m1Sig.Deserialize(vcMsg.M1Aggsigs)
+	if len(vcMsg.M3Aggsigs) > 0 {
+		m3Sig := bls.Sign{}
+		err = m3Sig.Deserialize(vcMsg.M3Aggsigs)
 		if err != nil {
-			utils.GetLogInstance().Warn("ParseViewChangeMessage failed to deserialize the multi signature for M1 aggregated signature", "error", err)
+			utils.GetLogInstance().Warn("ParseViewChangeMessage failed to deserialize the multi signature for M3 viewID signature", "error", err)
 			return nil, err
 		}
-		m1mask, err := bls_cosi.NewMask(consensus.PublicKeys, nil)
+		m3mask, err := bls_cosi.NewMask(consensus.PublicKeys, nil)
 		if err != nil {
 			utils.GetLogInstance().Warn("ParseViewChangeMessage failed to create mask for multi signature", "error", err)
 			return nil, err
 		}
-		m1mask.SetMask(vcMsg.M1Bitmap)
-		pbftMsg.M1AggSig = &m1Sig
-		pbftMsg.M1Bitmap = m1mask
+		m3mask.SetMask(vcMsg.M3Bitmap)
+		pbftMsg.M3AggSig = &m3Sig
+		pbftMsg.M3Bitmap = m3mask
 	}
 
 	if len(vcMsg.M2Aggsigs) > 0 {

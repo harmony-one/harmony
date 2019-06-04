@@ -68,14 +68,14 @@ type Consensus struct {
 	commitBitmap         *bls_cosi.Mask
 
 	// Commits collected from view change
-	bhpSigs          map[common.Address]*bls.Sign // bhpSigs: blockHashPreparedSigs is the signature on m1 type message
-	nilSigs          map[common.Address]*bls.Sign // nilSigs: there is no prepared message when view change, it's signature on m2 type (i.e. nil) messages
-	aggregatedBHPSig *bls.Sign
-	aggregatedNILSig *bls.Sign
-	bhpBitmap        *bls_cosi.Mask
-	nilBitmap        *bls_cosi.Mask
-	m1Payload        []byte     // message payload for type m1 := |vcBlockHash|prepared_agg_sigs|prepared_bitmap|
-	vcLock           sync.Mutex // mutex for view change
+	bhpSigs      map[common.Address]*bls.Sign // bhpSigs: blockHashPreparedSigs is the signature on m1 type message
+	nilSigs      map[common.Address]*bls.Sign // nilSigs: there is no prepared message when view change, it's signature on m2 type (i.e. nil) messages
+	viewIDSigs   map[common.Address]*bls.Sign // viewIDSigs: every validator sign on |viewID|blockHash| in view changing message
+	bhpBitmap    *bls_cosi.Mask
+	nilBitmap    *bls_cosi.Mask
+	viewIDBitmap *bls_cosi.Mask
+	m1Payload    []byte     // message payload for type m1 := |vcBlockHash|prepared_agg_sigs|prepared_bitmap|, new leader only need one
+	vcLock       sync.Mutex // mutex for view change
 
 	// The chain reader for the blockchain this consensus is working on
 	ChainReader consensus_engine.ChainReader
