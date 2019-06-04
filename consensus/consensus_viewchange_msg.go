@@ -1,6 +1,8 @@
 package consensus
 
 import (
+	"encoding/binary"
+
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
@@ -27,24 +29,32 @@ func (consensus *Consensus) constructViewChangeMessage() []byte {
 	vcMsg.LeaderPubkey = consensus.LeaderPubKey.Serialize()
 
 	preparedMsgs := consensus.pbftLog.GetMessagesByTypeSeqHash(msg_pb.MessageType_PREPARED, consensus.blockNum, consensus.blockHash)
-
-	if len(preparedMsgs) > 1 {
-		utils.GetLogInstance().Warn("constructViewChangeMessage got more than 1 prepared message", "blockNum", consensus.blockNum, "viewID", consensus.viewID)
-	}
+	preparedMsg := consensus.pbftLog.FindMessageByMaxViewID(preparedMsgs)
 
 	var msgToSign []byte
-	if len(preparedMsgs) == 0 {
+	if preparedMsg == nil {
 		msgToSign = NIL // m2 type message
 		vcMsg.Payload = []byte{}
 	} else {
 		// m1 type message
-		msgToSign = append(preparedMsgs[0].BlockHash[:], preparedMsgs[0].Payload...)
+		msgToSign = append(preparedMsg.BlockHash[:], preparedMsg.Payload...)
 		vcMsg.Payload = append(msgToSign[:0:0], msgToSign...)
 	}
 
 	sign := consensus.priKey.SignHash(msgToSign)
 	if sign != nil {
 		vcMsg.ViewchangeSig = sign.Serialize()
+	} else {
+		utils.GetLogger().Error("unable to serialize m1/m2 view change message signature")
+	}
+
+	viewIDHash := make([]byte, 4)
+	binary.LittleEndian.PutUint32(viewIDHash, consensus.mode.ViewID())
+	sign1 := consensus.priKey.SignHash(viewIDHash)
+	if sign1 != nil {
+		vcMsg.ViewidSig = sign1.Serialize()
+	} else {
+		utils.GetLogger().Error("unable to serialize viewID signature")
 	}
 
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
@@ -69,21 +79,20 @@ func (consensus *Consensus) constructNewViewMessage() []byte {
 	vcMsg.BlockNum = consensus.blockNum
 	// sender address
 	vcMsg.SenderPubkey = consensus.PubKey.Serialize()
-
-	// m1 type message
-	sig1arr := consensus.GetBhpSigsArray()
-	if len(sig1arr) > 0 {
-		m1Sig := bls_cosi.AggregateSig(sig1arr)
-		vcMsg.M1Aggsigs = m1Sig.Serialize()
-		vcMsg.M1Bitmap = consensus.bhpBitmap.Bitmap
-		vcMsg.Payload = consensus.m1Payload
-	}
+	vcMsg.Payload = consensus.m1Payload
 
 	sig2arr := consensus.GetNilSigsArray()
 	if len(sig2arr) > 0 {
 		m2Sig := bls_cosi.AggregateSig(sig2arr)
 		vcMsg.M2Aggsigs = m2Sig.Serialize()
 		vcMsg.M2Bitmap = consensus.nilBitmap.Bitmap
+	}
+
+	sig3arr := consensus.GetViewIDSigsArray()
+	if len(sig3arr) > 0 {
+		m3Sig := bls_cosi.AggregateSig(sig3arr)
+		vcMsg.M3Aggsigs = m3Sig.Serialize()
+		vcMsg.M3Bitmap = consensus.viewIDBitmap.Bitmap
 	}
 
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)

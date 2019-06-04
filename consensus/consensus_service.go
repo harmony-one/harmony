@@ -332,6 +332,15 @@ func (consensus *Consensus) GetNilSigsArray() []*bls.Sign {
 	return sigs
 }
 
+// GetViewIDSigsArray returns the signatures for viewID in viewchange
+func (consensus *Consensus) GetViewIDSigsArray() []*bls.Sign {
+	sigs := []*bls.Sign{}
+	for _, sig := range consensus.viewIDSigs {
+		sigs = append(sigs, sig)
+	}
+	return sigs
+}
+
 // ResetState resets the state of the consensus
 func (consensus *Consensus) ResetState() {
 	consensus.round++

@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"bytes"
+	"encoding/binary"
 	"sync"
 	"time"
 
@@ -112,13 +113,15 @@ func (consensus *Consensus) ResetViewChangeState() {
 	consensus.mode.SetMode(Normal)
 	bhpBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, nil)
 	nilBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, nil)
+	viewIDBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, nil)
 	consensus.bhpBitmap = bhpBitmap
 	consensus.nilBitmap = nilBitmap
+	consensus.viewIDBitmap = viewIDBitmap
+	consensus.m1Payload = []byte{}
 
 	consensus.bhpSigs = map[common.Address]*bls.Sign{}
 	consensus.nilSigs = map[common.Address]*bls.Sign{}
-	consensus.aggregatedBHPSig = nil
-	consensus.aggregatedNILSig = nil
+	consensus.viewIDSigs = map[common.Address]*bls.Sign{}
 }
 
 func createTimeout() map[TimeoutType]*utils.Timeout {
@@ -197,23 +200,31 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	consensus.mode.SetMode(ViewChanging)
 	consensus.mode.SetViewID(recvMsg.ViewID)
 
+	// add self m1 or m2 type message signature and bitmap
 	_, ok1 := consensus.nilSigs[consensus.SelfAddress]
 	_, ok2 := consensus.bhpSigs[consensus.SelfAddress]
 	if !(ok1 || ok2) {
 		// add own signature for newview message
 		preparedMsgs := consensus.pbftLog.GetMessagesByTypeSeq(msg_pb.MessageType_PREPARED, recvMsg.BlockNum)
-		if len(preparedMsgs) == 0 {
+		preparedMsg := consensus.pbftLog.FindMessageByMaxViewID(preparedMsgs)
+		if preparedMsg == nil {
 			sign := consensus.priKey.SignHash(NIL)
 			consensus.nilSigs[consensus.SelfAddress] = sign
 			consensus.nilBitmap.SetKey(consensus.PubKey, true)
 		} else {
-			if len(preparedMsgs) > 1 {
-				utils.GetLogInstance().Debug("onViewChange more than 1 prepared message for new leader")
-			}
-			msgToSign := append(preparedMsgs[0].BlockHash[:], preparedMsgs[0].Payload...)
+			msgToSign := append(preparedMsg.BlockHash[:], preparedMsg.Payload...)
 			consensus.bhpSigs[consensus.SelfAddress] = consensus.priKey.SignHash(msgToSign)
 			consensus.bhpBitmap.SetKey(consensus.PubKey, true)
 		}
+	}
+	// add self m3 type message signature and bitmap
+	_, ok3 := consensus.viewIDSigs[consensus.SelfAddress]
+	if !ok3 {
+		viewIDHash := make([]byte, 4)
+		binary.LittleEndian.PutUint32(viewIDHash, recvMsg.ViewID)
+		sign := consensus.priKey.SignHash(viewIDHash)
+		consensus.viewIDSigs[consensus.SelfAddress] = sign
+		consensus.viewIDBitmap.SetKey(consensus.PubKey, true)
 	}
 
 	if (len(consensus.bhpSigs) + len(consensus.nilSigs)) >= consensus.Quorum() {
@@ -244,8 +255,9 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			utils.GetLogInstance().Warn("onViewChange failed to verify signature for m1 type viewchange message")
 			return
 		}
+
 		// first time receive m1 type message, need verify validity of prepared message
-		if len(consensus.m1Payload) == 0 {
+		if len(consensus.m1Payload) == 0 || !bytes.Equal(consensus.m1Payload, recvMsg.Payload) {
 			if len(recvMsg.Payload) <= 32 {
 				utils.GetLogger().Debug("m1 recvMsg payload not enough length", "len", len(recvMsg.Payload))
 				return
@@ -262,18 +274,32 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				utils.GetLogInstance().Warn("onViewChange failed to verify multi signature for m1 prepared payload", "blockHash", blockHash)
 				return
 			}
-			consensus.m1Payload = append(recvMsg.Payload[:0:0], recvMsg.Payload...)
-		}
-		// consensus.m1Payload already verified
-		if !bytes.Equal(consensus.m1Payload, recvMsg.Payload) {
-			utils.GetLogInstance().Warn("onViewChange m1 message payload not equal, hence invalid")
-			return
+			if len(consensus.m1Payload) == 0 {
+				consensus.m1Payload = append(recvMsg.Payload[:0:0], recvMsg.Payload...)
+			}
 		}
 		consensus.bhpSigs[validatorAddress] = recvMsg.ViewchangeSig
 		consensus.bhpBitmap.SetKey(recvMsg.SenderPubkey, true) // Set the bitmap indicating that this validator signed.
 	}
 
-	if (len(consensus.bhpSigs) + len(consensus.nilSigs)) >= consensus.Quorum() {
+	// check and add viewID (m3 type) message signature
+	_, ok := consensus.viewIDSigs[validatorAddress]
+	if ok {
+		utils.GetLogInstance().Debug("onViewChange already received m3 viewID message from the validator", "validatorAddress", validatorAddress)
+		return
+	}
+	viewIDHash := make([]byte, 4)
+	binary.LittleEndian.PutUint32(viewIDHash, recvMsg.ViewID)
+	if !recvMsg.ViewidSig.VerifyHash(recvMsg.SenderPubkey, viewIDHash) {
+		utils.GetLogInstance().Warn("onViewChange failed to verify viewID signature", "viewID", recvMsg.ViewID)
+		return
+	}
+	consensus.viewIDSigs[validatorAddress] = recvMsg.ViewidSig
+	consensus.viewIDBitmap.SetKey(recvMsg.SenderPubkey, true) // Set the bitmap indicating that this validator signed.
+	utils.GetLogger().Debug("hehe1")
+
+	if len(consensus.viewIDSigs) >= consensus.Quorum() {
+		utils.GetLogger().Debug("hehe1")
 		consensus.mode.SetMode(Normal)
 		consensus.LeaderPubKey = consensus.PubKey
 		if len(consensus.m1Payload) == 0 {
@@ -305,9 +331,9 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		consensus.ResetViewChangeState()
 		consensus.ResetState()
 		consensus.consensusTimeout[timeoutViewChange].Stop()
-
 	}
-	utils.GetLogInstance().Debug("onViewChange", "numSigs", len(consensus.bhpSigs)+len(consensus.nilSigs), "needed", consensus.Quorum())
+	utils.GetLogInstance().Debug("onViewChange hehe viewIDSigs", "numSigs", len(consensus.viewIDSigs), "needed", consensus.Quorum())
+	utils.GetLogInstance().Debug("onViewChange hehe sumSigs", "numSigs", len(consensus.bhpSigs)+len(consensus.nilSigs), "needed", consensus.Quorum())
 }
 
 // TODO: move to consensus_leader.go later
@@ -324,10 +350,6 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		return
 	}
 
-	//	if !consensus.LeaderPubKey.IsEqual(senderKey) {
-	//		utils.GetLogInstance().Warn("onNewView key not match", "senderKey", senderKey.GetHexString()[:10], "newLeaderKey", consensus.LeaderPubKey.GetHexString()[:10])
-	//		return
-	//	}
 	if consensus.blockNum != recvMsg.BlockNum {
 		return
 	}
@@ -339,16 +361,17 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	consensus.vcLock.Lock()
 	defer consensus.vcLock.Unlock()
 
-	// TODO check total number of sigs > 2f+1
-	if recvMsg.M1AggSig != nil {
-		m1Sig := recvMsg.M1AggSig
-		m1Mask := recvMsg.M1Bitmap
-		consensus.aggregatedBHPSig = m1Sig
-		consensus.bhpBitmap = m1Mask
-		if !m1Sig.VerifyHash(m1Mask.AggregatePublic, recvMsg.Payload) {
-			utils.GetLogInstance().Warn("onNewView unable to verify aggregated signature of m1 payload")
-			return
-		}
+	if recvMsg.M3AggSig == nil {
+		return
+	}
+	m3Sig := recvMsg.M3AggSig
+	m3Mask := recvMsg.M3Bitmap
+	viewIDHash := make([]byte, 4)
+	binary.LittleEndian.PutUint32(viewIDHash, recvMsg.ViewID)
+	// TODO check total number of sigs >= 2f+1
+	if !m3Sig.VerifyHash(m3Mask.AggregatePublic, viewIDHash) {
+		utils.GetLogInstance().Warn("onNewView unable to verify aggregated signature of m3 payload")
+		return
 	}
 	if recvMsg.M2AggSig != nil {
 		m2Sig := recvMsg.M2AggSig
@@ -359,7 +382,10 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		}
 	}
 
-	if len(recvMsg.Payload) > 32 && recvMsg.M1AggSig != nil {
+	// TODO: check if M3 sigs > M1 sigs, then recvMsg.Payload should not be empty
+
+	// check validity of m1 type payload
+	if len(recvMsg.Payload) > 32 {
 		blockHash := recvMsg.Payload[:32]
 		aggSig, mask, err := consensus.readSignatureBitmapPayload(recvMsg.Payload, 32)
 		if err != nil {
