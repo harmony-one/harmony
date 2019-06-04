@@ -2,11 +2,12 @@ package consensus
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"reflect"
+
+	"github.com/harmony-one/harmony/crypto/hash"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -261,7 +262,7 @@ func (consensus *Consensus) Author(header *types.Header) (common.Address, error)
 
 // Sign on the hash of the message
 func (consensus *Consensus) signMessage(message []byte) []byte {
-	hash := sha256.Sum256(message)
+	hash := hash.Keccak256(message)
 	signature := consensus.priKey.SignHash(hash[:])
 	return signature.Serialize()
 }
@@ -477,7 +478,7 @@ func verifyMessageSig(signerPubKey *bls.PublicKey, message *msg_pb.Message) erro
 	if err != nil {
 		return err
 	}
-	msgHash := sha256.Sum256(messageBytes)
+	msgHash := hash.Keccak256(messageBytes)
 	if !msgSig.VerifyHash(signerPubKey, msgHash[:]) {
 		return errors.New("failed to verify the signature")
 	}

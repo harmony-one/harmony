@@ -1,10 +1,11 @@
 package consensus
 
 import (
-	"crypto/sha256"
 	"fmt"
 	"testing"
 	"time"
+
+	"github.com/harmony-one/harmony/crypto/hash"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 
@@ -24,7 +25,7 @@ import (
 
 var (
 	ip        = "127.0.0.1"
-	blockHash = sha256.Sum256([]byte("test"))
+	blockHash = hash.Keccak256Hash([]byte("test"))
 )
 
 func TestProcessMessageLeaderPrepare(test *testing.T) {
