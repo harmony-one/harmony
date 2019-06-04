@@ -197,9 +197,6 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	consensus.vcLock.Lock()
 	defer consensus.vcLock.Unlock()
 
-	consensus.mode.SetMode(ViewChanging)
-	consensus.mode.SetViewID(recvMsg.ViewID)
-
 	// add self m1 or m2 type message signature and bitmap
 	_, ok1 := consensus.nilSigs[consensus.SelfAddress]
 	_, ok2 := consensus.bhpSigs[consensus.SelfAddress]
@@ -227,7 +224,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		consensus.viewIDBitmap.SetKey(consensus.PubKey, true)
 	}
 
-	if (len(consensus.bhpSigs) + len(consensus.nilSigs)) >= consensus.Quorum() {
+	if len(consensus.viewIDSigs) >= consensus.Quorum() {
 		return
 	}
 
@@ -296,14 +293,12 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	}
 	consensus.viewIDSigs[validatorAddress] = recvMsg.ViewidSig
 	consensus.viewIDBitmap.SetKey(recvMsg.SenderPubkey, true) // Set the bitmap indicating that this validator signed.
-	utils.GetLogger().Debug("hehe1")
 
 	if len(consensus.viewIDSigs) >= consensus.Quorum() {
-		utils.GetLogger().Debug("hehe1")
 		consensus.mode.SetMode(Normal)
 		consensus.LeaderPubKey = consensus.PubKey
+		consensus.ResetState()
 		if len(consensus.m1Payload) == 0 {
-			consensus.phase = Announce
 			go func() {
 				consensus.ReadySignal <- struct{}{}
 			}()
@@ -322,18 +317,18 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			consensus.commitSigs[consensus.SelfAddress] = consensus.priKey.SignHash(consensus.m1Payload[32:])
 		}
 
+		consensus.mode.SetViewID(recvMsg.ViewID)
 		msgToSend := consensus.constructNewViewMessage()
 
 		utils.GetLogInstance().Warn("onViewChange", "sent newview message", len(msgToSend))
 		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 
-		consensus.viewID = consensus.mode.GetViewID()
+		consensus.viewID = recvMsg.ViewID
 		consensus.ResetViewChangeState()
-		consensus.ResetState()
 		consensus.consensusTimeout[timeoutViewChange].Stop()
+		consensus.consensusTimeout[timeoutConsensus].Start()
 	}
-	utils.GetLogInstance().Debug("onViewChange hehe viewIDSigs", "numSigs", len(consensus.viewIDSigs), "needed", consensus.Quorum())
-	utils.GetLogInstance().Debug("onViewChange hehe sumSigs", "numSigs", len(consensus.bhpSigs)+len(consensus.nilSigs), "needed", consensus.Quorum())
+	utils.GetLogInstance().Debug("onViewChange", "numSigs", len(consensus.viewIDSigs), "needed", consensus.Quorum())
 }
 
 // TODO: move to consensus_leader.go later
@@ -370,7 +365,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	binary.LittleEndian.PutUint32(viewIDHash, recvMsg.ViewID)
 	// TODO check total number of sigs >= 2f+1
 	if !m3Sig.VerifyHash(m3Mask.AggregatePublic, viewIDHash) {
-		utils.GetLogInstance().Warn("onNewView unable to verify aggregated signature of m3 payload")
+		utils.GetLogInstance().Warn("onNewView unable to verify aggregated signature of m3 payload", "m3Sig", m3Sig.GetHexString()[:10], "m3Mask", m3Mask.Bitmap, "viewID", recvMsg.ViewID)
 		return
 	}
 	if recvMsg.M2AggSig != nil {
@@ -413,21 +408,20 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 			return
 		}
 
+		consensus.viewID = consensus.mode.GetViewID()
 		// Construct and send the commit message
 		multiSigAndBitmap := append(aggSig.Serialize(), mask.Bitmap...)
 		msgToSend := consensus.constructCommitMessage(multiSigAndBitmap)
-		utils.GetLogInstance().Info("onNewView === commit", "sent commit message", len(msgToSend))
+		utils.GetLogInstance().Info("onNewView === commit", "sent commit message", len(msgToSend), "viewID", consensus.viewID)
 		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
-
 		consensus.phase = Commit
 	} else {
-		consensus.phase = Announce
+		consensus.ResetState()
 		utils.GetLogInstance().Info("onNewView === announce")
 	}
-	consensus.viewID = consensus.mode.GetViewID()
 	consensus.LeaderPubKey = senderKey
+	consensus.viewID = consensus.mode.GetViewID()
 	consensus.ResetViewChangeState()
-	consensus.ResetState()
 	consensus.consensusTimeout[timeoutConsensus].Start()
 	consensus.consensusTimeout[timeoutViewChange].Stop()
 }

@@ -344,10 +344,8 @@ func (consensus *Consensus) GetViewIDSigsArray() []*bls.Sign {
 // ResetState resets the state of the consensus
 func (consensus *Consensus) ResetState() {
 	consensus.round++
-	consensus.state = Finished
 	consensus.phase = Announce
 	consensus.blockHash = [32]byte{}
-
 	consensus.prepareSigs = map[common.Address]*bls.Sign{}
 	consensus.commitSigs = map[common.Address]*bls.Sign{}
 
@@ -355,7 +353,6 @@ func (consensus *Consensus) ResetState() {
 	commitBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.LeaderPubKey)
 	consensus.prepareBitmap = prepareBitmap
 	consensus.commitBitmap = commitBitmap
-
 	consensus.aggregatedPrepareSig = nil
 	consensus.aggregatedCommitSig = nil
 }
