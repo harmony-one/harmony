@@ -7,7 +7,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/common/denominations"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
@@ -277,8 +276,6 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 func accumulateRewards(
 	bc consensus_engine.ChainReader, state *state.DB, header *types.Header,
 ) error {
-	logger := header.Logger(utils.GetLogInstance())
-	getLogger := func() log.Logger { return utils.WithCallerSkip(logger, 1) }
 	blockNum := header.Number.Uint64()
 	if blockNum == 0 {
 		// Epoch block has no parent to reward.
@@ -339,14 +336,14 @@ func accumulateRewards(
 		}
 		numAccounts++
 		account := common.HexToAddress(member.EcdsaAddress)
-		getLogger().Info("rewarding block signer",
+		utils.GetLogger().Info("rewarding block signer",
 			"account", account,
 			"node", member.BlsPublicKey.Hex(),
 			"amount", BlockReward)
 		state.AddBalance(account, BlockReward)
 		totalAmount = new(big.Int).Add(totalAmount, BlockReward)
 	}
-	getLogger().Debug("paid out block reward",
+	utils.GetLogger().Debug("paid out block reward",
 		"numAccounts", numAccounts,
 		"totalAmount", totalAmount)
 	return nil

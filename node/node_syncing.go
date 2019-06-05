@@ -6,9 +6,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
-
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
 	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
@@ -89,16 +87,13 @@ func (node *Node) DoBeaconSyncing() {
 func (node *Node) DoSyncing(bc *core.BlockChain, worker *worker.Worker, getPeers func() []p2p.Peer, willJoinConsensus bool) {
 	ticker := time.NewTicker(SyncFrequency * time.Second)
 
-	logger := utils.GetLogInstance()
-	getLogger := func() log.Logger { return utils.WithCallerSkip(logger, 1) }
 SyncingLoop:
 	for {
 		select {
 		case <-ticker.C:
 			if node.stateSync == nil {
 				node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
-				logger = logger.New("syncID", node.GetSyncID())
-				getLogger().Debug("initialized state sync")
+				utils.GetLogger().Debug("initialized state sync", "syncID", node.GetSyncID())
 			}
 			if node.stateSync.GetActivePeerNumber() == 0 {
 				peers := getPeers()
@@ -113,9 +108,9 @@ SyncingLoop:
 				node.State = NodeNotInSync
 				node.stateMutex.Unlock()
 				node.stateSync.SyncLoop(bc, worker, willJoinConsensus, false)
-				getLogger().Debug("now in sync")
+				utils.GetLogger().Debug("now in sync")
 				if willJoinConsensus {
-					getLogger().Debug("entering NodeReadyForConsensus state")
+					utils.GetLogger().Debug("entering NodeReadyForConsensus state")
 					node.stateMutex.Lock()
 					node.State = NodeReadyForConsensus
 					node.stateMutex.Unlock()
