@@ -155,6 +155,7 @@ func (consensus *Consensus) startViewChange(viewID uint32) {
 
 	consensus.consensusTimeout[timeoutViewChange].SetDuration(duration)
 	consensus.consensusTimeout[timeoutViewChange].Start()
+	utils.GetLogger().Debug("start view change timeout", "viewID", consensus.viewID, "block", consensus.blockNum, "viewChangingID", consensus.mode.ViewID())
 }
 
 // new leader send new view message
@@ -330,6 +331,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		consensus.ResetViewChangeState()
 		consensus.consensusTimeout[timeoutViewChange].Stop()
 		consensus.consensusTimeout[timeoutConsensus].Start()
+		utils.GetLogger().Debug("start consensus timeout and stop view change timeout", "viewID", consensus.viewID, "block", consensus.blockNum, "viewChangingID", consensus.mode.ViewID())
 	}
 	utils.GetLogInstance().Debug("onViewChange", "numSigs", len(consensus.viewIDSigs), "needed", consensus.Quorum())
 }

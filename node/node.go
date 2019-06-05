@@ -12,9 +12,9 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/bls/ffi/go/bls"
-
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/api/client"
+	clientService "github.com/harmony-one/harmony/api/client/service"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/syncing"
@@ -46,6 +46,11 @@ const (
 	NodeReadyForConsensus              // Node is ready for doing consensus
 	NodeDoingConsensus                 // Node is already doing consensus
 	NodeLeader                         // Node is the leader of some shard.
+)
+
+const (
+	// TxPoolLimit is the limit of transaction pool.
+	TxPoolLimit = 20000
 )
 
 func (state State) String() string {
@@ -112,6 +117,9 @@ type Node struct {
 	TxPool       *core.TxPool
 	Worker       *worker.Worker
 	BeaconWorker *worker.Worker // worker for beacon chain
+
+	// Client server (for wallet requests)
+	clientServer *clientService.Server
 
 	// Syncing component.
 	syncID                 [SyncIDLength]byte // a unique ID for the node during the state syncing process with peers
@@ -220,8 +228,14 @@ func (node *Node) Beaconchain() *core.BlockChain {
 func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 	node.pendingTxMutex.Lock()
 	node.pendingTransactions = append(node.pendingTransactions, newTxs...)
+	// If length of pendingTransactions is greater than TxPoolLimit then by greedy take the TxPoolLimit recent transactions.
+	if len(node.pendingTransactions) > TxPoolLimit {
+		utils.GetLogInstance().Warn("Got more transactions than expected and this could caused OOM", "num", len(newTxs), "totalPending", len(node.pendingTransactions))
+		curLen := len(node.pendingTransactions)
+		node.pendingTransactions = node.pendingTransactions[curLen-TxPoolLimit:]
+	}
 	node.pendingTxMutex.Unlock()
-	utils.GetLogInstance().Debug("Got more transactions", "num", len(newTxs), "totalPending", len(node.pendingTransactions))
+	utils.GetLogInstance().Info("Got more transactions", "num", len(newTxs), "totalPending", len(node.pendingTransactions))
 }
 
 // AddPendingTransaction adds one new transaction to the pending transaction list.

@@ -30,6 +30,9 @@ type Harmony struct {
 	APIBackend   *APIBackend
 
 	nodeAPI NodeAPI
+
+	// aka network version, which is used to identify which network we are using
+	networkID uint64
 }
 
 // NodeAPI is the list of functions from node used to call rpc apis.
@@ -55,6 +58,7 @@ func New(nodeAPI NodeAPI, txPool *core.TxPool, eventMux *event.TypeMux) (*Harmon
 		chainDb:        chainDb,
 		bloomIndexer:   NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms),
 		nodeAPI:        nodeAPI,
+		networkID:      1, // TODO(ricl): this should be from config
 	}
 
 	hmy.APIBackend = &APIBackend{hmy}
@@ -67,3 +71,6 @@ func (s *Harmony) TxPool() *core.TxPool { return s.txPool }
 
 // BlockChain ...
 func (s *Harmony) BlockChain() *core.BlockChain { return s.blockchain }
+
+// NetVersion returns the network version, i.e. network ID identifying which network we are using
+func (s *Harmony) NetVersion() uint64 { return s.networkID }
