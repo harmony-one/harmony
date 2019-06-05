@@ -413,13 +413,6 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 			}()
 		}
 
-		// ConfirmedBlockChannel which is listened by drand leader who will initiate DRG if its a epoch block (first block of a epoch)
-		if node.DRand != nil {
-			go func() {
-				node.ConfirmedBlockChannel <- newBlock
-			}()
-		}
-
 		// TODO: update staking information once per epoch.
 		node.UpdateStakingList(node.QueryStakeInfo())
 		node.printStakingList()
