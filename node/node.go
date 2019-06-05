@@ -12,9 +12,9 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/bls/ffi/go/bls"
-
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/api/client"
+	clientService "github.com/harmony-one/harmony/api/client/service"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/syncing"
@@ -112,6 +112,9 @@ type Node struct {
 	TxPool       *core.TxPool
 	Worker       *worker.Worker
 	BeaconWorker *worker.Worker // worker for beacon chain
+
+	// Client server (for wallet requests)
+	clientServer *clientService.Server
 
 	// Syncing component.
 	syncID                 [SyncIDLength]byte // a unique ID for the node during the state syncing process with peers
