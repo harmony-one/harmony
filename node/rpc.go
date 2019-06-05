@@ -31,7 +31,7 @@ var (
 	httpEndpoint = ""
 	wsEndpoint   = ""
 
-	httpModules      = []string{"hmy"}
+	httpModules      = []string{"hmy", "net"}
 	httpVirtualHosts = []string{"*"}
 	httpTimeouts     = rpc.DefaultHTTPTimeouts
 
@@ -147,6 +147,12 @@ func (node *Node) APIs() []rpc.API {
 			Namespace: "hmy",
 			Version:   "1.0",
 			Service:   filters.NewPublicFilterAPI(harmony.APIBackend, false),
+			Public:    true,
+		},
+		{
+			Namespace: "net",
+			Version:   "1.0",
+			Service:   hmyapi.NewPublicNetAPI(node.host, harmony.APIBackend.NetVersion()),
 			Public:    true,
 		},
 	}...)
