@@ -23,11 +23,6 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 )
 
-const (
-	// ConsensusVersion : v1 old version without viewchange, v2 new version with viewchange
-	ConsensusVersion = "v2"
-)
-
 // Block reward per block signature.
 // TODO ek – per sig per stake
 var (
@@ -57,8 +52,6 @@ type Consensus struct {
 	// 2 types of timeouts: normal and viewchange
 	consensusTimeout map[TimeoutType]*utils.Timeout
 
-	//TODO depreciate it after implement PbftPhase
-	state State
 	// Commits collected from validators.
 	prepareSigs          map[common.Address]*bls.Sign // key is the validator's address
 	commitSigs           map[common.Address]*bls.Sign // key is the validator's address
@@ -120,10 +113,6 @@ type Consensus struct {
 
 	// global consensus mutex
 	mutex sync.Mutex
-
-	// Validator specific fields
-	// Blocks received but not done with consensus yet
-	blocksReceived map[uint32]*BlockConsensusStatus
 
 	// Signal channel for starting a new consensus process
 	ReadySignal chan struct{}
@@ -221,24 +210,12 @@ type StakeInfoFinder interface {
 	FindStakeInfoByAccount(addr common.Address) []*structs.StakeInfo
 }
 
-// BlockConsensusStatus used to keep track of the consensus status of multiple blocks received so far
-// This is mainly used in the case that this node is lagging behind and needs to catch up.
-// For example, the consensus moved to round N and this node received message(N).
-// However, this node may still not finished with round N-1, so the newly received message(N)
-// should be stored in this temporary structure. In case the round N-1 finishes, it can catch
-// up to the latest state of round N by using this structure.
-type BlockConsensusStatus struct {
-	block []byte // the block data
-	state State  // the latest state of the consensus
-}
-
 // New creates a new Consensus object
 // TODO: put shardId into chain reader's chain config
 func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKey) (*Consensus, error) {
 	consensus := Consensus{}
 	consensus.host = host
 	consensus.ViewIDLowChan = make(chan struct{})
-	consensus.ConsensusVersion = ConsensusVersion
 
 	// pbft related
 	consensus.pbftLog = NewPbftLog()
@@ -277,9 +254,6 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 	consensus.MsgChan = make(chan []byte)
 	consensus.syncReadyChan = make(chan struct{})
 	consensus.commitFinishChan = make(chan uint64)
-
-	// For validators to keep track of all blocks received but not yet committed, so as to catch up to latest consensus if lagged behind.
-	consensus.blocksReceived = make(map[uint32]*BlockConsensusStatus)
 
 	consensus.ReadySignal = make(chan struct{})
 	if nodeconfig.GetDefaultConfig().IsLeader() {

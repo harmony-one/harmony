@@ -28,11 +28,7 @@ func (s *Service) StartService() {
 	utils.GetLogInstance().Info("[consensus/service] Starting consensus service.")
 	s.stopChan = make(chan struct{})
 	s.stoppedChan = make(chan struct{})
-	if s.consensus.ConsensusVersion == "v1" {
-		s.consensus.WaitForNewBlock(s.blockChannel, s.stopChan, s.stoppedChan, s.startChan)
-	} else {
-		s.consensus.Start(s.blockChannel, s.stopChan, s.stoppedChan, s.startChan)
-	}
+	s.consensus.Start(s.blockChannel, s.stopChan, s.stoppedChan, s.startChan)
 	s.consensus.WaitForNewRandomness()
 }
 

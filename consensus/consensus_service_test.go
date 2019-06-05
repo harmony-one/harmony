@@ -47,6 +47,7 @@ func TestPopulateMessageFields(t *testing.T) {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
 	consensus.viewID = 2
+	blockHash := [32]byte{}
 	consensus.blockHash = blockHash
 
 	msg := &msg_pb.Message{
@@ -80,7 +81,7 @@ func TestSignAndMarshalConsensusMessage(t *testing.T) {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
 	consensus.viewID = 2
-	consensus.blockHash = blockHash
+	consensus.blockHash = [32]byte{}
 	consensus.SelfAddress = common.Address{}
 
 	msg := &msg_pb.Message{}

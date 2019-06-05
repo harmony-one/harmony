@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/harmony-one/harmony/crypto/hash"
 
@@ -24,6 +25,7 @@ import (
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
+	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
@@ -372,8 +374,8 @@ func (consensus *Consensus) String() string {
 	} else {
 		duty = "VLD" // validator
 	}
-	return fmt.Sprintf("[duty:%s, PubKey:%s, ShardID:%v, Address:%v, state:%s]",
-		duty, hex.EncodeToString(consensus.PubKey.Serialize()), consensus.ShardID, consensus.SelfAddress, consensus.state)
+	return fmt.Sprintf("[duty:%s, PubKey:%s, ShardID:%v, Address:%v]",
+		duty, hex.EncodeToString(consensus.PubKey.Serialize()), consensus.ShardID, consensus.SelfAddress)
 }
 
 // AddPeers adds new peers into the validator map of the consensus
@@ -645,4 +647,40 @@ func (consensus *Consensus) readSignatureBitmapPayload(recvPayload []byte, offse
 	}
 	mask.SetMask(bitmap)
 	return &aggSig, mask, nil
+}
+
+func (consensus *Consensus) reportMetrics(block types.Block) {
+	endTime := time.Now()
+	timeElapsed := endTime.Sub(startTime)
+	numOfTxs := len(block.Transactions())
+	tps := float64(numOfTxs) / timeElapsed.Seconds()
+	utils.GetLogInstance().Info("TPS Report",
+		"numOfTXs", numOfTxs,
+		"startTime", startTime,
+		"endTime", endTime,
+		"timeElapsed", timeElapsed,
+		"TPS", tps,
+		"consensus", consensus)
+
+	// Post metrics
+	profiler := profiler.GetProfiler()
+	if profiler.MetricsReportURL == "" {
+		return
+	}
+
+	txHashes := []string{}
+	for i, end := 0, len(block.Transactions()); i < 3 && i < end; i++ {
+		txHash := block.Transactions()[end-1-i].Hash()
+		txHashes = append(txHashes, hex.EncodeToString(txHash[:]))
+	}
+	metrics := map[string]interface{}{
+		"key":             hex.EncodeToString(consensus.PubKey.Serialize()),
+		"tps":             tps,
+		"txCount":         numOfTxs,
+		"nodeCount":       len(consensus.PublicKeys) + 1,
+		"latestBlockHash": hex.EncodeToString(consensus.blockHash[:]),
+		"latestTxHashes":  txHashes,
+		"blockLatency":    int(timeElapsed / time.Millisecond),
+	}
+	profiler.LogMetrics(metrics)
 }

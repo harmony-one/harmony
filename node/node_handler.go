@@ -807,20 +807,10 @@ func getBinaryPath() (argv0 string, err error) {
 
 // ConsensusMessageHandler passes received message in node_handler to consensus
 func (node *Node) ConsensusMessageHandler(msgPayload []byte) {
-	if node.Consensus.ConsensusVersion == "v1" {
-		if nodeconfig.GetDefaultConfig().IsLeader() {
-			node.Consensus.ProcessMessageLeader(msgPayload)
-		} else {
-			node.Consensus.ProcessMessageValidator(msgPayload)
-		}
-		return
+	select {
+	case node.Consensus.MsgChan <- msgPayload:
+	case <-time.After(consensusTimeout):
+		//utils.GetLogInstance().Debug("[Consensus] ConsensusMessageHandler timeout", "duration", consensusTimeout, "msgPayload", len(msgPayload))
 	}
-	if node.Consensus.ConsensusVersion == "v2" {
-		select {
-		case node.Consensus.MsgChan <- msgPayload:
-		case <-time.After(consensusTimeout):
-			utils.GetLogInstance().Debug("[Consensus] ConsensusMessageHandler timeout", "duration", consensusTimeout, "msgPayload", len(msgPayload))
-		}
-		return
-	}
+	return
 }
