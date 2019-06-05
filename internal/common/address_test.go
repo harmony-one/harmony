@@ -35,6 +35,9 @@ func TestIsBech32Address(t *testing.T) {
 		{"tone1fdv7u7rll9epgcqv9xxh9lhwq427nsqlr5wca5", true},
 		{"tone1fdv7u7rll9epgcqv9xxh9lhwq427nsqlr5wca1", false},
 		{"xone1fdv7u7rll9epgcqv9xxh9lhwq427nsqlr5wca5", false},
+		{"ne1fdv7u7rll9epgcqv9xxh9lhwq427nsqlr5wca5", false},
+		{"1one1fdv7u7rll9epgcqv9xxh9lhwq427nsqlr5wca5", false},
+		{"one2fdv7u7rll9epgcqv9xxh9lhwq427nsqlr5wca5", false},
 	}
 
 	for _, test := range tests {
