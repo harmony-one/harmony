@@ -144,7 +144,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	if consensus.mode.Mode() != Syncing {
 		// skip verify header when node is in Syncing mode
 		if err := consensus.VerifyHeader(consensus.ChainReader, blockObj.Header(), false); err != nil {
-			utils.GetLogInstance().Warn("onAnnounce block content is not verified successfully", "error", err, "inChain", consensus.ChainReader.CurrentHeader().Number, "have", blockObj.Header().ParentHash)
+			utils.GetLogInstance().Warn("onAnnounce block content is not verified successfully", "error", err, "inChain", consensus.ChainReader.CurrentHeader().Hash(), "have", blockObj.Header().ParentHash)
 			return
 		}
 	}
@@ -177,15 +177,9 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	consensus.pbftLog.AddBlock(&blockObj)
 
 	// we have already added message and block, skip check viewID and send prepare message if is in ViewChanging mode
-	if consensus.mode.Mode() == ViewChanging {
-		return
+	if consensus.mode.Mode() == Normal && consensus.viewID == recvMsg.ViewID {
+		consensus.tryPrepare(blockObj.Header().Hash())
 	}
-
-	if consensus.checkViewID(recvMsg) != nil {
-		utils.GetLogger().Debug("viewID check failed", "viewID", recvMsg.ViewID, "myViewID", consensus.viewID)
-		return
-	}
-	consensus.tryPrepare(blockObj.Header().Hash())
 
 	return
 }
@@ -205,12 +199,10 @@ func (consensus *Consensus) tryPrepare(blockHash common.Hash) {
 
 	consensus.switchPhase(Prepare)
 
-	if !consensus.PubKey.IsEqual(consensus.LeaderPubKey) { //TODO(chao): check whether this is necessary when calling tryPrepare
-		// Construct and send prepare message
-		msgToSend := consensus.constructPrepareMessage()
-		utils.GetLogInstance().Info("tryPrepare", "sent prepare message", len(msgToSend))
-		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
-	}
+	// Construct and send prepare message
+	msgToSend := consensus.constructPrepareMessage()
+	utils.GetLogInstance().Info("tryPrepare", "sent prepare message", len(msgToSend))
+	consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 }
 
 // TODO: move to consensus_leader.go later
@@ -360,7 +352,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		return
 	}
 
-	if consensus.checkViewID(recvMsg) != nil {
+	if consensus.viewID != recvMsg.ViewID {
 		utils.GetLogger().Debug("viewID check failed", "viewID", recvMsg.ViewID, "myViewID", consensus.viewID)
 		return
 	}
@@ -549,15 +541,15 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 
 	senderKey, err := consensus.verifySenderKey(msg)
 	if err != nil {
-		utils.GetLogInstance().Debug("onCommitted verifySenderKey failed", "error", err)
+		utils.GetLogInstance().Warn("onCommitted verifySenderKey failed", "error", err)
 		return
 	}
-	if !senderKey.IsEqual(consensus.LeaderPubKey) && consensus.mode.Mode() != Syncing {
+	if !senderKey.IsEqual(consensus.LeaderPubKey) && consensus.mode.Mode() == Normal {
 		utils.GetLogInstance().Warn("onCommitted senderKey not match leader PubKey")
 		return
 	}
 	if err = verifyMessageSig(senderKey, msg); err != nil {
-		utils.GetLogInstance().Debug("onCommitted Failed to verify sender's signature", "error", err)
+		utils.GetLogInstance().Warn("onCommitted Failed to verify sender's signature", "error", err)
 		return
 	}
 
@@ -580,10 +572,23 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		return
 	}
 
+	consensus.pbftLog.AddMessage(recvMsg)
+
+	if recvMsg.BlockNum > consensus.blockNum {
+		utils.GetLogger().Debug("onCommitted out of sync", "myBlock", consensus.blockNum, "msgBlock", recvMsg.BlockNum)
+		go func() {
+			select {
+			case consensus.blockNumLowChan <- struct{}{}:
+				consensus.mode.SetMode(Syncing)
+			case <-time.After(1 * time.Second):
+			}
+		}()
+		return
+	}
+
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
-	consensus.pbftLog.AddMessage(recvMsg)
 	// skip ViewChanging and Syncing??
 	if consensus.mode.Mode() == Normal {
 		// TODO: add 2f+1 signature checking
@@ -596,16 +601,8 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 			utils.GetLogger().Error("Failed to verify the multi signature for commit phase", "leader Address", leaderAddress)
 			return
 		}
-
-		if consensus.checkViewID(recvMsg) != nil {
-			utils.GetLogger().Debug("viewID check failed", "viewID", recvMsg.ViewID, "myViewID", consensus.viewID)
-			return
-		}
 	}
 
-	if recvMsg.BlockNum > consensus.blockNum {
-		return
-	}
 	consensus.aggregatedCommitSig = aggSig
 	consensus.commitBitmap = mask
 
@@ -747,16 +744,12 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 				}
 
 			case <-consensus.syncReadyChan:
-				func() {
-					consensus.mode.mux.Lock()
-					defer consensus.mode.mux.Unlock()
-					if consensus.mode.mode != Syncing {
-						return
-					}
-					consensus.mode.mode = Syncing
-					consensus.SetBlockNum(consensus.ChainReader.CurrentHeader().Number.Uint64() + 1)
-					consensus.ignoreViewIDCheck = true
-				}()
+				consensus.mode.SetMode(Normal)
+				header := consensus.ChainReader.CurrentHeader()
+				consensus.SetBlockNum(header.Number.Uint64() + 1)
+				consensus.SetViewID(header.ViewID + 1)
+				consensus.LeaderPubKey = consensus.PublicKeys[int(header.LeaderKeyIndex)]
+				utils.GetLogger().Debug("ready to join consensus", "viewID", consensus.viewID, "block", consensus.blockNum, "leaderKey", consensus.LeaderPubKey.GetHexString()[:20], "myKey", consensus.PubKey.GetHexString()[:20])
 
 			case newBlock := <-blockChannel:
 				utils.GetLogInstance().Info("receive newBlock", "blockNum", newBlock.NumberU64())
