@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/fjl/memsize"
@@ -24,6 +25,7 @@ type MemProfiling struct {
 	h              *memsizeui.Handler
 	s              *http.Server
 	observedObject map[string]interface{}
+	mu             sync.Mutex
 }
 
 // New returns MemProfiling object.
@@ -45,6 +47,8 @@ func (m *MemProfiling) Config() {
 
 // Add adds variables to watch for profiling.
 func (m *MemProfiling) Add(name string, v interface{}) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	if v != nil {
 		rv := reflect.ValueOf(v)
 		if !(rv.Kind() != reflect.Ptr || rv.IsNil()) {
@@ -72,12 +76,14 @@ func (m *MemProfiling) PeriodicallyScanMemSize() {
 		for {
 			select {
 			case <-time.After(memSizeScanTime):
+				m.mu.Lock()
 				m := GetMemProfiling()
 				for k, v := range m.observedObject {
 					s := memsize.Scan(v)
 					r := s.Report()
 					utils.GetLogInstance().Info("memsize report for " + k + r)
 				}
+				m.mu.Unlock()
 			}
 		}
 	}()
