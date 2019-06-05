@@ -93,7 +93,7 @@ type Node struct {
 	ConfirmedBlockChannel  chan *types.Block    // The channel to send confirmed blocks
 	BeaconBlockChannel     chan *types.Block    // The channel to send beacon blocks for non-beaconchain nodes
 	pendingTransactions    types.Transactions   // All the transactions received but not yet processed for Consensus
-	transactionInConsensus []*types.Transaction // The transactions selected into the new block and under Consensus process
+	transactionInConsensus types.Transactions   // The transactions selected into the new block and under Consensus process
 	pendingTxMutex         sync.Mutex
 	DRand                  *drand.DRand // The instance for distributed randomness protocol
 
@@ -285,8 +285,8 @@ func (node *Node) GetSyncID() [SyncIDLength]byte {
 
 // WatchObservedObjects adds more objects to watch for memory issues.
 func (node *Node) WatchObservedObjects() {
-	memprofiling.GetMemProfiling().Add("currentNode.pendingTransactions", node.pendingTransactions)
-	memprofiling.GetMemProfiling().Add("currentNode.transactionInConsensus", node.transactionInConsensus)
+	memprofiling.GetMemProfiling().Add("currentNode.pendingTransactions", &node.pendingTransactions)
+	memprofiling.GetMemProfiling().Add("currentNode.transactionInConsensus", &node.transactionInConsensus)
 }
 
 // New creates a new node.

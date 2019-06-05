@@ -154,14 +154,14 @@ type Consensus struct {
 
 // WatchObservedObjects adds more objects from consensus object to watch for memory issues.
 func (consensus *Consensus) WatchObservedObjects() {
-	memprofiling.GetMemProfiling().Add("consensus.prepareSigs", consensus.prepareSigs)
-	memprofiling.GetMemProfiling().Add("consensus.commitSigs", consensus.commitSigs)
-	memprofiling.GetMemProfiling().Add("consensus.prepareBitmap", consensus.prepareBitmap)
-	memprofiling.GetMemProfiling().Add("consensus.commitBitmap", consensus.commitBitmap)
-	memprofiling.GetMemProfiling().Add("consensus.bhpSigs", consensus.bhpSigs)
-	memprofiling.GetMemProfiling().Add("consensus.nilSigs", consensus.nilSigs)
-	memprofiling.GetMemProfiling().Add("consensus.bhpBitmap", consensus.bhpBitmap)
-	memprofiling.GetMemProfiling().Add("consensus.nilBitmap", consensus.nilBitmap)
+	memprofiling.GetMemProfiling().Add("consensus.prepareSigs", &consensus.prepareSigs)
+	memprofiling.GetMemProfiling().Add("consensus.commitSigs", &consensus.commitSigs)
+	memprofiling.GetMemProfiling().Add("consensus.prepareBitmap", &consensus.prepareBitmap)
+	memprofiling.GetMemProfiling().Add("consensus.commitBitmap", &consensus.commitBitmap)
+	memprofiling.GetMemProfiling().Add("consensus.bhpSigs", &consensus.bhpSigs)
+	memprofiling.GetMemProfiling().Add("consensus.nilSigs", &consensus.nilSigs)
+	memprofiling.GetMemProfiling().Add("consensus.bhpBitmap", &consensus.bhpBitmap)
+	memprofiling.GetMemProfiling().Add("consensus.nilBitmap", &consensus.nilBitmap)
 }
 
 // StakeInfoFinder returns the stake information finder instance this
