@@ -18,8 +18,6 @@ import (
 )
 
 const (
-	// InitialSeed is the initial random seed, a magic number to answer everything, remove later
-	InitialSeed uint32 = 42
 	// GenesisEpoch is the number of the genesis epoch.
 	GenesisEpoch = 0
 	// FirstEpoch is the number of the first epoch.
