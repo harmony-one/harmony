@@ -23,7 +23,7 @@ func (s *PublicNetAPI) PeerCount() hexutil.Uint {
 	return hexutil.Uint(s.net.GetPeerCount())
 }
 
-// Version ...
+// Version returns the network version, i.e. network ID identifying which network we are using
 func (s *PublicNetAPI) Version() string {
 	return fmt.Sprintf("%d", s.networkVersion) // TODO(ricl): we should add support for network id (https://github.com/ethereum/wiki/wiki/JSON-RPC#net_version)
 }
