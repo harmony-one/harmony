@@ -54,7 +54,7 @@ func StringToBigInt(s string, base int) *big.Int {
 func convertToGenesisItems(gc genesisConfig) []GenesisItem {
 	gi := []GenesisItem{}
 	for k, v := range gc {
-		gi = append(gi, GenesisItem{StringToBigInt(k, 16), StringToBigInt(v["wei"], 10)})
+		gi = append(gi, GenesisItem{StringToBigInt(k, 16), StringToBigInt(v["nano"], 10)})
 	}
 	sort.Slice(gi, func(i, j int) bool {
 		return gi[i].Addr.Cmp(gi[j].Addr) == -1
