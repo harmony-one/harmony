@@ -31,6 +31,7 @@ type Harmony struct {
 
 	nodeAPI NodeAPI
 
+	// aka network version, which is used to identify which network we are using
 	networkID uint64
 }
 
@@ -71,5 +72,5 @@ func (s *Harmony) TxPool() *core.TxPool { return s.txPool }
 // BlockChain ...
 func (s *Harmony) BlockChain() *core.BlockChain { return s.blockchain }
 
-// NetVersion returns net version -- the network ID
+// NetVersion returns the network version, i.e. network ID identifying which network we are using
 func (s *Harmony) NetVersion() uint64 { return s.networkID }
