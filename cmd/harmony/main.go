@@ -94,9 +94,10 @@ var (
 	// isArchival indicates this node is an archival node that will save and archive current blockchain
 	isArchival = flag.Bool("is_archival", false, "true means this node is a archival node")
 	//isNewNode indicates this node is a new node
-	isNewNode    = flag.Bool("is_newnode", false, "true means this node is a new node")
-	accountIndex = flag.Int("account_index", 0, "the index of the staking account to use")
-	shardID      = flag.Int("shard_id", -1, "the shard ID of this node")
+	isNewNode     = flag.Bool("is_newnode", false, "true means this node is a new node")
+	accountIndex  = flag.Int("account_index", 0, "the index of the staking account to use")
+	shardID       = flag.Int("shard_id", -1, "the shard ID of this node")
+	enableMemsize = flag.Bool("enableMemsize", false, "Enable memsize logging.")
 	// logConn logs incoming/outgoing connections
 	logConn = flag.Bool("log_conn", false, "log incoming/outgoing connections")
 
@@ -417,8 +418,10 @@ func main() {
 		"multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s",
 			*ip, *port, nodeConfig.Host.GetID().Pretty()))
 
+	if *enableMemsize {
+		memprofiling.GetMemProfiling().Start()
+	}
 	go currentNode.SupportSyncing()
-	memprofiling.GetMemProfiling().Start()
 	currentNode.ServiceManagerSetup()
 	currentNode.StartRPC(*port)
 	currentNode.RunServices()
