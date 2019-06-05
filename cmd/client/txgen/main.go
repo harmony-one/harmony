@@ -22,6 +22,7 @@ import (
 
 	"github.com/harmony-one/harmony/api/client"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
+	"github.com/harmony-one/harmony/core/denominations"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -276,13 +277,13 @@ func GenerateSimulatedTransactionsAccount(shardID uint32, node *node.Node, setti
 		for j := 0; j < rounds; j++ {
 			randomUserAddress := crypto.PubkeyToAddress(node.TestBankKeys[rand.Intn(100)].PublicKey)
 			randAmount := rand.Float32()
-			tx, _ := types.SignTx(types.NewTransaction(baseNonce+uint64(j), randomUserAddress, shardID, big.NewInt(int64(params.Ether*randAmount)), params.TxGas, nil, nil), types.HomesteadSigner{}, node.TestBankKeys[i])
+			tx, _ := types.SignTx(types.NewTransaction(baseNonce+uint64(j), randomUserAddress, shardID, big.NewInt(int64(denominations.One*randAmount)), params.TxGas, nil, nil), types.HomesteadSigner{}, node.TestBankKeys[i])
 			txs[100*j+i] = tx
 		}
 		if i < remainder {
 			randomUserAddress := crypto.PubkeyToAddress(node.TestBankKeys[rand.Intn(100)].PublicKey)
 			randAmount := rand.Float32()
-			tx, _ := types.SignTx(types.NewTransaction(baseNonce+uint64(rounds), randomUserAddress, shardID, big.NewInt(int64(params.Ether*randAmount)), params.TxGas, nil, nil), types.HomesteadSigner{}, node.TestBankKeys[i])
+			tx, _ := types.SignTx(types.NewTransaction(baseNonce+uint64(rounds), randomUserAddress, shardID, big.NewInt(int64(denominations.One*randAmount)), params.TxGas, nil, nil), types.HomesteadSigner{}, node.TestBankKeys[i])
 			txs[100*rounds+i] = tx
 		}
 	}

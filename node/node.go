@@ -27,6 +27,7 @@ import (
 	"github.com/harmony-one/harmony/drand"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
+	"github.com/harmony-one/harmony/internal/memprofiling"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
@@ -268,6 +269,12 @@ func (node *Node) GetSyncID() [SyncIDLength]byte {
 	return node.syncID
 }
 
+// WatchObservedObjects adds more objects to watch for memory issues.
+func (node *Node) WatchObservedObjects() {
+	memprofiling.GetMemProfiling().Add("currentNode.pendingTransactions", node.pendingTransactions)
+	memprofiling.GetMemProfiling().Add("currentNode.transactionInConsensus", node.transactionInConsensus)
+}
+
 // New creates a new node.
 func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardchain.DBFactory, isArchival bool) *Node {
 	var err error
@@ -479,7 +486,6 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 	if err != nil {
 		utils.GetLogInstance().Error("Failed to create client receiver", "msg", err)
 	}
-
 	return nodeConfig, chanPeer
 }
 

@@ -21,6 +21,7 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/contracts"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/denominations"
 	"github.com/harmony-one/harmony/core/types"
 	hmykey "github.com/harmony-one/harmony/internal/keystore"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -146,7 +147,7 @@ func (s *Service) getStakingInfo() *proto.StakingContractInfoResponse {
 }
 
 func (s *Service) getFakeStakingInfo() *proto.StakingContractInfoResponse {
-	balance := big.NewInt(params.Ether)
+	balance := big.NewInt(denominations.One)
 	nonce := uint64(0) // TODO: make it a incrementing field
 
 	priKey := contract_constants.GenesisBeaconAccountPriKey
