@@ -92,6 +92,8 @@ type Header struct {
 	PrepareBitmap    []byte      `json:"prepareBitmap"    gencodec:"required"` // Contains which validator signed
 	CommitSignature  [48]byte    `json:"commitSignature"  gencodec:"required"`
 	CommitBitmap     []byte      `json:"commitBitmap"     gencodec:"required"` // Contains which validator signed
+	ViewID           uint32      `json:"viewID"           gencodec:"required"` // new node to join consensus
+	LeaderKeyIndex   uint32      `json:"leaderKeyIndex"   gencodec:"required"` // Index of the leaderKey in PublicKeys; new node to join consensus
 	RandPreimage     [32]byte    `json:"randPreimage"`
 	RandSeed         [32]byte    `json:"randSeed"`
 	ShardStateHash   common.Hash `json:"shardStateRoot"`
@@ -185,6 +187,16 @@ func (b *Block) SetCommitSig(sig []byte, signers []byte) {
 	}
 	copy(b.header.CommitSignature[:], sig[:])
 	b.header.CommitBitmap = append(signers[:0:0], signers...)
+}
+
+// SetViewID sets the viewID to block header
+func (b *Block) SetViewID(viewID uint32) {
+	b.header.ViewID = viewID
+}
+
+// SetLeaderKeyIndex sets the leaderKeyIndex to block header
+func (b *Block) SetLeaderKeyIndex(index uint32) {
+	b.header.LeaderKeyIndex = index
 }
 
 // DeprecatedTd is an old relic for extracting the TD of a block. It is in the

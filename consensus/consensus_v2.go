@@ -504,6 +504,11 @@ func (consensus *Consensus) finalizeCommits() {
 		consensus.aggregatedCommitSig.Serialize(),
 		consensus.commitBitmap.Bitmap)
 
+	blockObj.SetViewID(consensus.viewID)
+	index := uint32(consensus.getIndexOfPubKey(consensus.LeaderPubKey))
+	blockObj.SetLeaderKeyIndex(index)
+	utils.GetLogInstance().Info("Adding block to chain", "leaderKeyIndex", blockObj.Header().LeaderKeyIndex, "viewID", blockObj.Header().ViewID)
+
 	select {
 	case consensus.VerifiedNewBlock <- &blockObj:
 	default:
@@ -679,9 +684,13 @@ func (consensus *Consensus) tryCatchup() {
 
 		// Put the signatures into the block
 		block.SetPrepareSig(prepareSig, prepareBitmap)
-
 		block.SetCommitSig(aggSig, bitmap)
-		utils.GetLogInstance().Info("Adding block to chain", "numTx", len(block.Transactions()))
+
+		block.SetViewID(msg.ViewID)
+		index := uint32(consensus.getIndexOfPubKey(consensus.LeaderPubKey))
+		block.SetLeaderKeyIndex(index)
+		utils.GetLogInstance().Info("Adding block to chain", "leaderKeyIndex", block.Header().LeaderKeyIndex, "viewID", block.Header().ViewID)
+
 		consensus.OnConsensusDone(block)
 		consensus.ResetState()
 
