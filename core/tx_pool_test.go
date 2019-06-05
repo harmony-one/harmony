@@ -31,6 +31,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/harmony-one/harmony/core/denominations"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 )
@@ -166,7 +167,7 @@ func (c *testChain) State() (*state.DB, error) {
 		c.statedb, _ = state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 		// simulate that the new head block included tx0 and tx1
 		c.statedb.SetNonce(c.address, 2)
-		c.statedb.SetBalance(c.address, new(big.Int).SetUint64(params.Ether))
+		c.statedb.SetBalance(c.address, new(big.Int).SetUint64(denominations.One))
 		*c.trigger = false
 	}
 	return stdb, nil
@@ -186,7 +187,7 @@ func TestStateChangeDuringTransactionPoolReset(t *testing.T) {
 	)
 
 	// setup pool with 2 transaction in it
-	statedb.SetBalance(address, new(big.Int).SetUint64(params.Ether))
+	statedb.SetBalance(address, new(big.Int).SetUint64(denominations.One))
 	blockchain := &testChain{&testBlockChain{statedb, 1000000000, new(event.Feed)}, address, &trigger}
 
 	tx0 := transaction(0, 100000, key)

@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/denominations"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 )
@@ -66,7 +67,7 @@ func TestCommitTransactions(t *testing.T) {
 	// Generate a test tx
 	baseNonce := worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(testBankKey.PublicKey))
 	randAmount := rand.Float32()
-	tx, _ := types.SignTx(types.NewTransaction(baseNonce, testBankAddress, uint32(0), big.NewInt(int64(params.Ether*randAmount)), params.TxGas, nil, nil), types.HomesteadSigner{}, testBankKey)
+	tx, _ := types.SignTx(types.NewTransaction(baseNonce, testBankAddress, uint32(0), big.NewInt(int64(denominations.One*randAmount)), params.TxGas, nil, nil), types.HomesteadSigner{}, testBankKey)
 
 	// Commit the tx to the worker
 	err := worker.CommitTransactions(types.Transactions{tx})
