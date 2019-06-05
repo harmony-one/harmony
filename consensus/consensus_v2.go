@@ -470,7 +470,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	quorumIsMet := len(commitSigs) >= consensus.Quorum()
 
 	if !quorumWasMet && quorumIsMet {
-		utils.GetLogInstance().Info("Enough commits received!", "num", len(commitSigs), "state", consensus.state)
+		utils.GetLogInstance().Info("Enough commits received!", "num", len(commitSigs), "phase", consensus.phase)
 		go func(round uint64) {
 			time.Sleep(1 * time.Second)
 			utils.GetLogger().Debug("Commit grace period ended", "round", round)
@@ -480,7 +480,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 }
 
 func (consensus *Consensus) finalizeCommits() {
-	utils.GetLogger().Info("finalizing block", "num", len(consensus.commitSigs), "state", consensus.state)
+	utils.GetLogger().Info("finalizing block", "num", len(consensus.commitSigs), "phase", consensus.phase)
 	consensus.switchPhase(Announce)
 
 	// Construct and broadcast committed message
