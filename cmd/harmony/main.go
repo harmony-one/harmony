@@ -97,7 +97,7 @@ var (
 	isNewNode     = flag.Bool("is_newnode", false, "true means this node is a new node")
 	accountIndex  = flag.Int("account_index", 0, "the index of the staking account to use")
 	shardID       = flag.Int("shard_id", -1, "the shard ID of this node")
-	enableMemsize = flag.Bool("enableMemsize", false, "Enable memsize logging.")
+	enableMemProfiling = flag.Bool("enableMemProfiling", false, "Enable memsize logging.")
 	// logConn logs incoming/outgoing connections
 	logConn = flag.Bool("log_conn", false, "log incoming/outgoing connections")
 
@@ -418,7 +418,7 @@ func main() {
 		"multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s",
 			*ip, *port, nodeConfig.Host.GetID().Pretty()))
 
-	if *enableMemsize {
+	if *enableMemProfiling {
 		memprofiling.GetMemProfiling().Start()
 	}
 	go currentNode.SupportSyncing()
