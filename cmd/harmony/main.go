@@ -94,9 +94,9 @@ var (
 	// isArchival indicates this node is an archival node that will save and archive current blockchain
 	isArchival = flag.Bool("is_archival", false, "true means this node is a archival node")
 	//isNewNode indicates this node is a new node
-	isNewNode     = flag.Bool("is_newnode", false, "true means this node is a new node")
-	accountIndex  = flag.Int("account_index", 0, "the index of the staking account to use")
-	shardID       = flag.Int("shard_id", -1, "the shard ID of this node")
+	isNewNode          = flag.Bool("is_newnode", false, "true means this node is a new node")
+	accountIndex       = flag.Int("account_index", 0, "the index of the staking account to use")
+	shardID            = flag.Int("shard_id", -1, "the shard ID of this node")
 	enableMemProfiling = flag.Bool("enableMemProfiling", false, "Enable memsize logging.")
 	// logConn logs incoming/outgoing connections
 	logConn = flag.Bool("log_conn", false, "log incoming/outgoing connections")
