@@ -49,6 +49,7 @@ const (
 )
 
 const (
+	// TxPoolLimit is the limit of transaction pool.
 	TxPoolLimit = 20000
 )
 
@@ -229,7 +230,7 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 	node.pendingTransactions = append(node.pendingTransactions, newTxs...)
 	// If length of pendingTransactions is greater than TxPoolLimit then by greedy take the TxPoolLimit recent transactions.
 	if len(node.pendingTransactions) > TxPoolLimit {
-		utils.GetLogInstance().Error("Got more transactions than expected and this could caused OOM", "num", len(newTxs), "totalPending", len(node.pendingTransactions))
+		utils.GetLogInstance().Warn("Got more transactions than expected and this could caused OOM", "num", len(newTxs), "totalPending", len(node.pendingTransactions))
 		curLen := len(node.pendingTransactions)
 		node.pendingTransactions = node.pendingTransactions[curLen-TxPoolLimit:]
 	}
