@@ -14,11 +14,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/params"
 
 	"github.com/harmony-one/harmony/api/client"
 	clientService "github.com/harmony-one/harmony/api/client/service"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
+	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -432,14 +432,14 @@ func processTransferCommand() {
 	}
 
 	balance := state.balance
-	balance = balance.Div(balance, big.NewInt(params.GWei))
-	if amount > float64(balance.Uint64())/params.GWei {
-		fmt.Printf("Balance is not enough for the transfer, current balance is %.6f\n", float64(balance.Uint64())/params.GWei)
+	balance = balance.Div(balance, big.NewInt(denominations.Nano))
+	if amount > float64(balance.Uint64())/denominations.Nano {
+		fmt.Printf("Balance is not enough for the transfer, current balance is %.6f\n", float64(balance.Uint64())/denominations.Nano)
 		return
 	}
 
-	amountBigInt := big.NewInt(int64(amount * params.GWei))
-	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(params.GWei))
+	amountBigInt := big.NewInt(int64(amount * denominations.Nano))
+	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(denominations.Nano))
 	gas, err := core.IntrinsicGas(inputData, false, true)
 	if err != nil {
 		fmt.Printf("cannot calculate required gas: %v\n", err)
@@ -474,7 +474,7 @@ func processTransferCommand() {
 }
 
 func convertBalanceIntoReadableFormat(balance *big.Int) string {
-	balance = balance.Div(balance, big.NewInt(params.GWei))
+	balance = balance.Div(balance, big.NewInt(denominations.Nano))
 	strBalance := fmt.Sprintf("%d", balance.Uint64())
 
 	bytes := []byte(strBalance)
