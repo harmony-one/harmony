@@ -331,9 +331,11 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		consensus.ResetViewChangeState()
 		consensus.consensusTimeout[timeoutViewChange].Stop()
 		consensus.consensusTimeout[timeoutConsensus].Start()
-		utils.GetLogger().Debug("start consensus timeout and stop view change timeout", "viewID", consensus.viewID, "block", consensus.blockNum, "viewChangingID", consensus.mode.ViewID())
+		utils.GetLogger().Debug("new leader start consensus timeout and stop view change timeout", "viewID", consensus.viewID, "block", consensus.blockNum, "viewChangingID", consensus.mode.ViewID())
+		utils.GetLogger().Debug("I am the new leader", "myKey", consensus.PubKey.GetHexString()[:20], "viewID", consensus.viewID, "block", consensus.blockNum)
 	}
 	utils.GetLogInstance().Debug("onViewChange", "numSigs", len(consensus.viewIDSigs), "needed", consensus.Quorum())
+
 }
 
 // TODO: move to consensus_leader.go later
@@ -427,6 +429,8 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	consensus.LeaderPubKey = senderKey
 	consensus.viewID = consensus.mode.GetViewID()
 	consensus.ResetViewChangeState()
+	utils.GetLogger().Debug("new leader changed", "newLeaderKey", consensus.LeaderPubKey.GetHexString()[:20], "viewID", consensus.viewID, "block", consensus.blockNum)
+	utils.GetLogger().Debug("validator start consensus timeout and stop view change timeout", "viewID", consensus.viewID, "block", consensus.blockNum, "viewChangingID", consensus.mode.ViewID())
 	consensus.consensusTimeout[timeoutConsensus].Start()
 	consensus.consensusTimeout[timeoutViewChange].Stop()
 }
