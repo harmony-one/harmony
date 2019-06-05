@@ -48,6 +48,10 @@ const (
 	NodeLeader                         // Node is the leader of some shard.
 )
 
+const (
+	TxPoolLimit = 20000
+)
+
 func (state State) String() string {
 	switch state {
 	case NodeInit:
@@ -223,8 +227,14 @@ func (node *Node) Beaconchain() *core.BlockChain {
 func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 	node.pendingTxMutex.Lock()
 	node.pendingTransactions = append(node.pendingTransactions, newTxs...)
+	// If length of pendingTransactions is greater than TxPoolLimit then by greedy take the TxPoolLimit recent transactions.
+	if len(node.pendingTransactions) > TxPoolLimit {
+		utils.GetLogInstance().Error("Got more transactions than expected and this could caused OOM", "num", len(newTxs), "totalPending", len(node.pendingTransactions))
+		curLen := len(node.pendingTransactions)
+		node.pendingTransactions = node.pendingTransactions[curLen-TxPoolLimit:]
+	}
 	node.pendingTxMutex.Unlock()
-	utils.GetLogInstance().Debug("Got more transactions", "num", len(newTxs), "totalPending", len(node.pendingTransactions))
+	utils.GetLogInstance().Info("Got more transactions", "num", len(newTxs), "totalPending", len(node.pendingTransactions))
 }
 
 // AddPendingTransaction adds one new transaction to the pending transaction list.
