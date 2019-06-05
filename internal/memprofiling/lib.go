@@ -81,7 +81,7 @@ func (m *MemProfiling) PeriodicallyScanMemSize() {
 				for k, v := range m.observedObject {
 					s := memsize.Scan(v)
 					r := s.Report()
-					utils.GetLogInstance().Info("memsize report for " + k + r)
+					utils.GetLogInstance().Info(fmt.Sprintf("memsize report for %s:\n %s", k, r))
 				}
 				m.mu.Unlock()
 			}
