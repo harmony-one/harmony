@@ -22,7 +22,7 @@ import (
 
 	"github.com/harmony-one/harmony/api/client"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
-	"github.com/harmony-one/harmony/core/denominations"
+	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
