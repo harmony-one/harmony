@@ -1,4 +1,4 @@
-package bls_vrf
+package blsvrf
 
 import (
 	"crypto"
@@ -9,7 +9,7 @@ import (
 )
 
 var (
-
+	// ErrInvalidVRF occurs when the VRF does not validate.
 	ErrInvalidVRF = errors.New("invalid VRF proof")
 )
 
@@ -52,6 +52,8 @@ func NewVRFSigner(seck *bls.SecretKey) vrf.PrivateKey {
 	return &PrivateKey{seck}
 }
 
+
+// Evaluate returns the verifiable unpredictable function evaluated using alpha
 // verifiable unpredictable function using BLS
 // reference:  https://tools.ietf.org/html/draft-goldbe-vrf-01
 // properties of VRF-BLS:

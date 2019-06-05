@@ -1,4 +1,4 @@
-package bls_vrf
+package blsvrf
 
 import (
 	"bytes"
@@ -9,15 +9,15 @@ import (
 )
 
 func TestVRF1(t *testing.T) {
-	bls_sk := bls.RandPrivateKey()
+	blsSk := bls.RandPrivateKey()
 
-	vrf_sk := NewVRFSigner(bls_sk)
-	vrf_pk := NewVRFVerifier(bls_sk.GetPublicKey())
+	vrfSk := NewVRFSigner(blsSk)
+	vrfPk := NewVRFVerifier(blsSk.GetPublicKey())
 
 	m1 := []byte("data1")
 
-	vrf, proof := vrf_sk.Evaluate(m1)
-	hash, err := vrf_pk.ProofToHash(m1, proof)
+	vrf, proof := vrfSk.Evaluate(m1)
+	hash, err := vrfPk.ProofToHash(m1, proof)
 
 	if err != nil {
 		t.Errorf("error generating proof to hash")
@@ -29,10 +29,10 @@ func TestVRF1(t *testing.T) {
 }
 
 func TestVRF2(t *testing.T) {
-	bls_sk := bls.RandPrivateKey()
+	blsSk := bls.RandPrivateKey()
 
-	k := NewVRFSigner(bls_sk)
-	pk := NewVRFVerifier(bls_sk.GetPublicKey())
+	k := NewVRFSigner(blsSk)
+	pk := NewVRFVerifier(blsSk.GetPublicKey())
 
 	m1 := []byte("data1")
 	m2 := []byte("data2")
@@ -67,10 +67,10 @@ func TestVRF2(t *testing.T) {
 
 
 func TestRightTruncateProof(t *testing.T) {
-	bls_sk := bls.RandPrivateKey()
+	blsSk := bls.RandPrivateKey()
 
-	k := NewVRFSigner(bls_sk)
-	pk := NewVRFVerifier(bls_sk.GetPublicKey())
+	k := NewVRFSigner(blsSk)
+	pk := NewVRFVerifier(blsSk.GetPublicKey())
 
 	data := []byte("data")
 	_, proof := k.Evaluate(data)
@@ -87,10 +87,10 @@ func TestRightTruncateProof(t *testing.T) {
 }
 
 func TestLeftTruncateProof(t *testing.T) {
-	bls_sk := bls.RandPrivateKey()
+	blsSk := bls.RandPrivateKey()
 
-	k := NewVRFSigner(bls_sk)
-	pk := NewVRFVerifier(bls_sk.GetPublicKey())
+	k := NewVRFSigner(blsSk)
+	pk := NewVRFVerifier(blsSk.GetPublicKey())
 
 	data := []byte("data")
 	_, proof := k.Evaluate(data)
@@ -104,10 +104,10 @@ func TestLeftTruncateProof(t *testing.T) {
 }
 
 func TestBitFlip(t *testing.T) {
-	bls_sk := bls.RandPrivateKey()
+	blsSk := bls.RandPrivateKey()
 
-	k := NewVRFSigner(bls_sk)
-	pk := NewVRFVerifier(bls_sk.GetPublicKey())
+	k := NewVRFSigner(blsSk)
+	pk := NewVRFVerifier(blsSk.GetPublicKey())
 
 	data := []byte("data")
 	_, proof := k.Evaluate(data)
