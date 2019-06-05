@@ -11,7 +11,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/vdf"
-	"github.com/harmony-one/harmony/crypto/vrf/p256"
+	vrf_bls "github.com/harmony-one/harmony/crypto/vrf/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
@@ -156,12 +156,10 @@ func (dRand *DRand) processCommitMessage(message *msg_pb.Message) {
 	}
 
 	rand := drandMsg.Payload[:32]
-	proof := drandMsg.Payload[32 : len(drandMsg.Payload)-64]
-	pubKeyBytes := drandMsg.Payload[len(drandMsg.Payload)-64:]
-	_, vrfPubKey := p256.GenerateKey()
-	vrfPubKey.Deserialize(pubKeyBytes)
+	proof := drandMsg.Payload[32:]
+	senderVerifier := vrf_bls.NewVRFVerifier(senderPubKey)
+	expectedRand, err := senderVerifier.ProofToHash(dRand.blockHash[:], proof)
 
-	expectedRand, err := vrfPubKey.ProofToHash(dRand.blockHash[:], proof)
 
 	if err != nil || !bytes.Equal(expectedRand[:], rand) {
 		utils.Logger().Error().

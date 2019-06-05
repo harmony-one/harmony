@@ -12,7 +12,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/vrf"
-	"github.com/harmony-one/harmony/crypto/vrf/p256"
+	vrf_bls "github.com/harmony-one/harmony/crypto/vrf/bls"
 	"github.com/harmony-one/harmony/p2p"
 )
 
@@ -114,9 +114,11 @@ func New(host p2p.Host, ShardID uint32, peers []p2p.Peer, leader p2p.Peer, confi
 	}
 
 	// VRF keys
-	priKey, pubKey := p256.GenerateKey()
-	dRand.vrfPriKey = &priKey
-	dRand.vrfPubKey = &pubKey
+	sk := vrf_bls.NewVRFSigner(blsPriKey)
+	pk := vrf_bls.NewVRFVerifier(blsPriKey.GetPublicKey())
+	dRand.vrfPriKey = &sk
+	dRand.vrfPubKey = &pk
+
 	dRand.ShardID = ShardID
 
 	return &dRand
