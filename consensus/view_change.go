@@ -297,8 +297,13 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				utils.GetLogger().Error("m1 recvMsg payload read error", "error", err)
 				return
 			}
+			// check has 2f+1 signature in m1 type message
+			if count := utils.CountOneBits(mask.Bitmap); count < consensus.Quorum() {
+				utils.GetLogger().Debug("not have enough signature", "need", consensus.Quorum(), "have", count)
+				return
+			}
+
 			// Verify the multi-sig for prepare phase
-			// TODO: add 2f+1 signature checking
 			if !aggSig.VerifyHash(mask.AggregatePublic, blockHash[:]) {
 				utils.GetLogInstance().Warn("onViewChange failed to verify multi signature for m1 prepared payload", "blockHash", blockHash)
 				return
@@ -398,21 +403,33 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	m3Mask := recvMsg.M3Bitmap
 	viewIDHash := make([]byte, 4)
 	binary.LittleEndian.PutUint32(viewIDHash, recvMsg.ViewID)
-	// TODO check total number of sigs >= 2f+1
+	// check total number of sigs >= 2f+1
+	if count := utils.CountOneBits(m3Mask.Bitmap); count < consensus.Quorum() {
+		utils.GetLogger().Debug("not have enough signature", "need", consensus.Quorum(), "have", count)
+		return
+	}
+
 	if !m3Sig.VerifyHash(m3Mask.AggregatePublic, viewIDHash) {
 		utils.GetLogInstance().Warn("onNewView unable to verify aggregated signature of m3 payload", "m3Sig", m3Sig.GetHexString()[:10], "m3Mask", m3Mask.Bitmap, "viewID", recvMsg.ViewID)
 		return
 	}
+
+	m2Mask := recvMsg.M2Bitmap
 	if recvMsg.M2AggSig != nil {
 		m2Sig := recvMsg.M2AggSig
-		m2Mask := recvMsg.M2Bitmap
 		if !m2Sig.VerifyHash(m2Mask.AggregatePublic, NIL) {
 			utils.GetLogInstance().Warn("onNewView unable to verify aggregated signature of m2 payload")
 			return
 		}
 	}
 
-	// TODO: check if M3 sigs > M1 sigs, then recvMsg.Payload should not be empty
+	// check when M3 sigs > M2 sigs, then M1 (recvMsg.Payload) should not be empty
+	if utils.CountOneBits(m3Mask.Bitmap) > utils.CountOneBits(m2Mask.Bitmap) {
+		if len(recvMsg.Payload) <= 32 {
+			utils.GetLogger().Debug("we should have m1 message payload non-empty and valid")
+			return
+		}
+	}
 
 	// check validity of m1 type payload
 	if len(recvMsg.Payload) > 32 {

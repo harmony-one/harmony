@@ -349,7 +349,12 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
-	// TODO: add 2f+1 signature checking
+	// check has 2f+1 signatures
+	if count := utils.CountOneBits(mask.Bitmap); count < consensus.Quorum() {
+		utils.GetLogger().Debug("not have enough signature", "need", consensus.Quorum(), "have", count)
+		return
+	}
+
 	if !aggSig.VerifyHash(mask.AggregatePublic, blockHash[:]) {
 		myBlockHash := common.Hash{}
 		myBlockHash.SetBytes(consensus.blockHash[:])
@@ -577,8 +582,13 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		return
 	}
 
+	// check has 2f+1 signatures
+	if count := utils.CountOneBits(mask.Bitmap); count < consensus.Quorum() {
+		utils.GetLogger().Debug("not have enough signature", "need", consensus.Quorum(), "have", count)
+		return
+	}
+
 	if consensus.mode.Mode() == Normal && consensus.aggregatedPrepareSig != nil && consensus.prepareBitmap != nil {
-		// TODO: add 2f+1 signature checking
 		prepareMultiSigAndBitmap := append(consensus.aggregatedPrepareSig.Serialize(), consensus.prepareBitmap.Bitmap...)
 		if !aggSig.VerifyHash(mask.AggregatePublic, prepareMultiSigAndBitmap) {
 			utils.GetLogger().Error("Failed to verify the multi signature for commit phase", "leader Address", leaderAddress)
