@@ -24,7 +24,7 @@ func TestVRF1(t *testing.T) {
 	}
 
 	if hash != vrf {
-		t.Errorf("error hash doesn't match");
+		t.Errorf("error hash doesn't match")
 	}
 }
 
@@ -64,7 +64,6 @@ func TestVRF2(t *testing.T) {
 		}
 	}
 }
-
 
 func TestRightTruncateProof(t *testing.T) {
 	blsSk := bls.RandPrivateKey()

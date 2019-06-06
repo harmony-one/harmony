@@ -4,6 +4,7 @@ import (
 	"crypto"
 	"crypto/sha256"
 	"errors"
+
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/crypto/vrf"
 )
@@ -51,7 +52,6 @@ func NewVRFVerifier(pubkey *bls.PublicKey) vrf.PublicKey {
 func NewVRFSigner(seck *bls.SecretKey) vrf.PrivateKey {
 	return &PrivateKey{seck}
 }
-
 
 // Evaluate returns the verifiable unpredictable function evaluated using alpha
 // verifiable unpredictable function using BLS
