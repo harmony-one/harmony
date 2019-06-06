@@ -20,12 +20,12 @@ import (
 	"github.com/harmony-one/harmony/drand"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
+	"github.com/harmony-one/harmony/internal/genesis"
 	hmykey "github.com/harmony-one/harmony/internal/keystore"
 	memprofiling "github.com/harmony-one/harmony/internal/memprofiling"
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/internal/utils/contract"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
@@ -91,12 +91,11 @@ var (
 	// Key file to store the private key
 	keyFile = flag.String("key", "./.hmykey", "the p2p key file of the harmony node")
 	// isGenesis indicates this node is a genesis node
-	isGenesis = flag.Bool("is_genesis", false, "true means this node is a genesis node")
+	isGenesis = flag.Bool("is_genesis", true, "true means this node is a genesis node")
 	// isArchival indicates this node is an archival node that will save and archive current blockchain
 	isArchival = flag.Bool("is_archival", false, "true means this node is a archival node")
 	//isNewNode indicates this node is a new node
 	isNewNode          = flag.Bool("is_newnode", false, "true means this node is a new node")
-	accountIndex       = flag.Int("account_index", 0, "the index of the staking account to use")
 	shardID            = flag.Int("shard_id", -1, "the shard ID of this node")
 	enableMemProfiling = flag.Bool("enableMemProfiling", false, "Enable memsize logging.")
 	enableGC           = flag.Bool("enableGC", true, "Enable calling garbage collector manually .")
@@ -109,9 +108,13 @@ var (
 	// -nopass is false by default.  The keyfile must be encrypted.
 	hmyNoPass = flag.Bool("nopass", false, "No passphrase for the key (testing only)")
 
-	ks        *keystore.KeyStore
-	myAccount accounts.Account
-	myPass    = ""
+	stakingAccounts = flag.String("accounts", "", "account addresses of the node")
+
+	ks             *keystore.KeyStore
+	myAccount      accounts.Account
+	genesisAccount *genesis.DeployAccount
+	accountIndex   int
+
 	// logging verbosity
 	verbosity = flag.Int("verbosity", 5, "Logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail (default: 5)")
 
@@ -160,14 +163,17 @@ func initSetup() {
 
 	allAccounts := ks.Accounts()
 
-	if *accountIndex < 0 || *accountIndex >= len(contract.GenesisAccounts) {
-		fmt.Printf("Invalid account_index: %v\n", *accountIndex)
-		os.Exit(4)
+	// TODO: lc try to enable multiple staking accounts per node
+	accountIndex, genesisAccount = genesis.FindAccount(*stakingAccounts)
+
+	if genesisAccount == nil {
+		fmt.Printf("Can't find the account address: %v!\n", *stakingAccounts)
+		os.Exit(100)
 	}
 
 	foundAccount := false
 	for _, account := range allAccounts {
-		if contract.GenesisAccounts[*accountIndex].Address == account.Address.Hex() {
+		if genesisAccount.Address == account.Address.Hex() {
 			myAccount = account
 			foundAccount = true
 			break
@@ -175,13 +181,17 @@ func initSetup() {
 	}
 
 	if !foundAccount {
-		fmt.Printf("Can't find the matching account key of account_index: %v.\n", *accountIndex)
-		os.Exit(4)
+		fmt.Printf("Can't find the matching account key: %v!\n", genesisAccount.Address)
+		os.Exit(101)
 	}
+
+	genesisAccount.ShardID = uint32(accountIndex % core.GenesisShardNum)
 
 	fmt.Printf("My Account: %s\n", myAccount.Address.Hex())
 	fmt.Printf("Key URL: %s\n", myAccount.URL)
+	fmt.Printf("My Genesis Account: %v\n", *genesisAccount)
 
+	var myPass string
 	if !*hmyNoPass {
 		myPass = utils.AskForPassphrase("Passphrase: ")
 		err := ks.Unlock(myAccount, myPass)
@@ -189,13 +199,14 @@ func initSetup() {
 			fmt.Printf("Wrong Passphrase! Unable to unlock account key!\n")
 			os.Exit(3)
 		}
-		hmykey.SetHmyPass(myPass)
 	}
 
 	// Set up manual call for garbage collection.
 	if *enableGC {
 		memprofiling.MaybeCallGCPeriodically()
 	}
+
+	hmykey.SetHmyPass(myPass)
 }
 
 func createGlobalConfig() *nodeconfig.ConfigType {
@@ -203,16 +214,15 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	var myShardID uint32
 
 	nodeConfig := nodeconfig.GetDefaultConfig()
-	myShardID = uint32(*accountIndex % core.GenesisShardNum)
 
 	// Specified Shard ID override calculated Shard ID
 	if *shardID >= 0 {
-		utils.GetLogInstance().Info("ShardID Override", "original", myShardID, "override", *shardID)
-		myShardID = uint32(*shardID)
+		utils.GetLogInstance().Info("ShardID Override", "original", genesisAccount.ShardID, "override", *shardID)
+		genesisAccount.ShardID = uint32(*shardID)
 	}
 
 	if !*isNewNode {
-		nodeConfig = nodeconfig.GetShardConfig(myShardID)
+		nodeConfig = nodeconfig.GetShardConfig(uint32(genesisAccount.ShardID))
 	} else {
 		myShardID = 0 // This should be default value as new node doesn't belong to any shard.
 		if *shardID >= 0 {
@@ -223,21 +233,24 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	}
 
 	// The initial genesis nodes are sequentially put into genesis shards based on their accountIndex
-	nodeConfig.ShardID = myShardID
+	nodeConfig.ShardID = uint32(genesisAccount.ShardID)
 
 	// Key Setup ================= [Start]
 	consensusPriKey := &bls.SecretKey{}
 
 	if *isGenesis {
-		err := consensusPriKey.SetHexString(contract.GenesisBLSAccounts[*accountIndex].Private)
+		err := consensusPriKey.SetHexString(genesisAccount.BLSKey)
 		if err != nil {
 			panic(fmt.Errorf("generate key error"))
 		}
 	} else {
-		err := consensusPriKey.SetHexString(contract.GenesisBLSAccounts[200+*accountIndex].Private) // TODO: use separate bls accounts for this.
-		if err != nil {
-			panic(fmt.Errorf("generate key error"))
-		}
+		// NewNode won't work
+		/*
+			err := consensusPriKey.SetHexString(genesis.NewNodeAccounts[])
+			if err != nil {
+				panic(fmt.Errorf("generate key error"))
+			}
+		*/
 	}
 
 	// P2p private key is used for secure message transfer between p2p nodes.
@@ -255,7 +268,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 
 	nodeConfig.SelfPeer = p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nodeConfig.ConsensusPubKey}
 
-	if *accountIndex < core.GenesisShardNum { // The first node in a shard is the leader at genesis
+	if accountIndex < core.GenesisShardNum { // The first node in a shard is the leader at genesis
 		nodeConfig.Leader = nodeConfig.SelfPeer
 		nodeConfig.StringRole = "leader"
 	} else {
