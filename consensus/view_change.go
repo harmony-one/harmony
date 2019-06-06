@@ -96,8 +96,12 @@ func (pm *PbftMode) GetViewID() uint32 {
 }
 
 // switchPhase will switch PbftPhase to nextPhase if the desirePhase equals the nextPhase
-func (consensus *Consensus) switchPhase(desirePhase PbftPhase) {
-	utils.GetLogInstance().Debug("switchPhase: ", "desirePhase", desirePhase, "myPhase", consensus.phase)
+func (consensus *Consensus) switchPhase(desirePhase PbftPhase, override bool) {
+	utils.GetLogInstance().Debug("switchPhase: ", "desirePhase", desirePhase, "myPhase", consensus.phase, "override", override)
+	if override {
+		consensus.phase = desirePhase
+		return
+	}
 
 	var nextPhase PbftPhase
 	switch consensus.phase {
@@ -186,7 +190,7 @@ func (consensus *Consensus) startViewChange(viewID uint32) {
 func (consensus *Consensus) startNewView() {
 	utils.GetLogInstance().Info("startNewView", "viewID", consensus.mode.GetViewID())
 	consensus.mode.SetMode(Normal)
-	consensus.switchPhase(Announce)
+	consensus.switchPhase(Announce, false)
 
 	msgToSend := consensus.constructNewViewMessage()
 	consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
