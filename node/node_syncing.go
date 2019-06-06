@@ -108,14 +108,11 @@ SyncingLoop:
 				}
 			}
 			if node.stateSync.IsOutOfSync(bc) {
-				utils.GetLogInstance().Debug("[SYNC] out of sync, doing syncing", "willJoinConsensus", willJoinConsensus)
 				node.stateMutex.Lock()
 				node.State = NodeNotInSync
 				node.stateMutex.Unlock()
 				node.stateSync.SyncLoop(bc, worker, willJoinConsensus, false)
-				getLogger().Debug("now in sync")
 				if willJoinConsensus {
-					getLogger().Debug("entering NodeReadyForConsensus state")
 					node.stateMutex.Lock()
 					node.State = NodeReadyForConsensus
 					node.stateMutex.Unlock()
@@ -126,7 +123,7 @@ SyncingLoop:
 			node.State = NodeReadyForConsensus
 			node.stateMutex.Unlock()
 			if willJoinConsensus {
-				<-node.Consensus.ViewIDLowChan
+				node.Consensus.WaitForSyncing()
 			}
 		}
 	}

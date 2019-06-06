@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -547,66 +546,19 @@ func (consensus *Consensus) RegisterRndChannel(rndChannel chan [64]byte) {
 	consensus.RndChannel = rndChannel
 }
 
-// Checks the basic meta of a consensus message, including the signature.
-func (consensus *Consensus) checkConsensusMessage(message *msg_pb.Message, publicKey *bls.PublicKey) error {
-	consensusMsg := message.GetConsensus()
-	viewID := consensusMsg.ViewId
-	blockHash := consensusMsg.BlockHash
-
-	// Verify message signature
-	err := verifyMessageSig(publicKey, message)
-	if err != nil {
-		ctxerror.Log15(utils.GetLogger().Warn,
-			ctxerror.New("failed to verify the message signature",
-				"publicKey", publicKey.GetHexString(),
-			).WithCause(err))
-		return consensus_engine.ErrInvalidConsensusMessage
-	}
-	if !bytes.Equal(blockHash, consensus.blockHash[:]) {
-		utils.GetLogInstance().Warn("Wrong blockHash", "consensus", consensus)
-		return consensus_engine.ErrInvalidConsensusMessage
-	}
-
-	// just ignore consensus check for the first time when node join
-	if consensus.ignoreViewIDCheck {
-		consensus.viewID = viewID
-		consensus.mutex.Lock()
-		consensus.ignoreViewIDCheck = false
-		consensus.mutex.Unlock()
-		return nil
-	} else if viewID != consensus.viewID {
-		utils.GetLogInstance().Warn("Wrong consensus Id", "myViewId", consensus.viewID, "theirViewId", viewID, "consensus", consensus)
-		// notify state syncing to start
-		select {
-		case consensus.ViewIDLowChan <- struct{}{}:
-		default:
-		}
-
-		return consensus_engine.ErrViewIDNotMatch
-	}
-	return nil
-}
-
-// Check viewID
+// Check viewID, caller's responsibility to hold lock when change ignoreViewIDCheck
 func (consensus *Consensus) checkViewID(msg *PbftMessage) error {
 	// just ignore consensus check for the first time when node join
 	if consensus.ignoreViewIDCheck {
 		consensus.viewID = msg.ViewID
+		consensus.mode.SetViewID(msg.ViewID)
 		consensus.LeaderPubKey = msg.SenderPubkey
-		consensus.mutex.Lock()
 		consensus.ignoreViewIDCheck = false
-		consensus.mutex.Unlock()
+		consensus.consensusTimeout[timeoutConsensus].Start()
+		utils.GetLogger().Debug("viewID and leaderKey override", "viewID", consensus.viewID, "leaderKey", consensus.LeaderPubKey.GetHexString()[:20])
+		utils.GetLogger().Debug("start consensus timeout", "viewID", consensus.viewID, "block", consensus.blockNum)
 		return nil
 	} else if msg.ViewID > consensus.viewID {
-		utils.GetLogger().Warn("view id is low", "myViewId", consensus.viewID, "theirViewId", msg.ViewID)
-		// notify state syncing to start
-		// TODO ek/cm - think more about this
-		consensus.mode.SetMode(Syncing)
-		select {
-		case consensus.ViewIDLowChan <- struct{}{}:
-		default:
-		}
-
 		return consensus_engine.ErrViewIDNotMatch
 	} else if msg.ViewID < consensus.viewID {
 		return errors.New("view ID belongs to the past")
