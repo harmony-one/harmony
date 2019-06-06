@@ -160,7 +160,6 @@ func (dRand *DRand) processCommitMessage(message *msg_pb.Message) {
 	senderVerifier := vrf_bls.NewVRFVerifier(senderPubKey)
 	expectedRand, err := senderVerifier.ProofToHash(dRand.blockHash[:], proof)
 
-
 	if err != nil || !bytes.Equal(expectedRand[:], rand) {
 		utils.Logger().Error().
 			Err(err).
