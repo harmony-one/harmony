@@ -47,6 +47,30 @@ func (pm *PbftMode) Mode() Mode {
 	return pm.mode
 }
 
+//String print mode string
+func (mode Mode) String() string {
+	if mode == Normal {
+		return "Normal"
+	} else if mode == ViewChanging {
+		return "ViewChanging"
+	} else if mode == Syncing {
+		return "Sycning"
+	}
+	return "Unknown"
+}
+
+// String print phase string
+func (phase PbftPhase) String() string {
+	if phase == Announce {
+		return "Announce"
+	} else if phase == Prepare {
+		return "Prepare"
+	} else if phase == Commit {
+		return "Commit"
+	}
+	return "Unknown"
+}
+
 // SetMode set the node mode as required
 func (pm *PbftMode) SetMode(m Mode) {
 	pm.mux.Lock()
@@ -427,7 +451,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		utils.GetLogInstance().Info("onNewView === announce")
 	}
 	consensus.LeaderPubKey = senderKey
-	consensus.viewID = consensus.mode.GetViewID()
+	consensus.viewID = recvMsg.ViewID
 	consensus.ResetViewChangeState()
 	utils.GetLogger().Debug("new leader changed", "newLeaderKey", consensus.LeaderPubKey.GetHexString()[:20], "viewID", consensus.viewID, "block", consensus.blockNum)
 	utils.GetLogger().Debug("validator start consensus timeout and stop view change timeout", "viewID", consensus.viewID, "block", consensus.blockNum, "viewChangingID", consensus.mode.ViewID())
