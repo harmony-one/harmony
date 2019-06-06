@@ -111,13 +111,13 @@ func New(host p2p.Host, ShardID uint32, peers []p2p.Peer, leader p2p.Peer, confi
 	if blsPriKey != nil {
 		dRand.priKey = blsPriKey
 		dRand.pubKey = blsPriKey.GetPublicKey()
-	}
 
-	// VRF keys
-	sk := vrf_bls.NewVRFSigner(blsPriKey)
-	pk := vrf_bls.NewVRFVerifier(blsPriKey.GetPublicKey())
-	dRand.vrfPriKey = &sk
-	dRand.vrfPubKey = &pk
+		// VRF keys
+		sk := vrf_bls.NewVRFSigner(blsPriKey)
+		pk := vrf_bls.NewVRFVerifier(blsPriKey.GetPublicKey())
+		dRand.vrfPriKey = &sk
+		dRand.vrfPubKey = &pk
+	}
 
 	dRand.ShardID = ShardID
 
