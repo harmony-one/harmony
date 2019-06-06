@@ -79,7 +79,7 @@ func (consensus *Consensus) tryAnnounce(block *types.Block) {
 	}
 	consensus.block = encodedBlock
 	msgToSend := consensus.constructAnnounceMessage()
-	consensus.switchPhase(Prepare)
+	consensus.switchPhase(Prepare, false)
 
 	// save announce message to pbftLog
 	msgPayload, _ := proto.GetConsensusMessagePayload(msgToSend)
@@ -208,7 +208,7 @@ func (consensus *Consensus) tryPrepare(blockHash common.Hash) {
 		return
 	}
 
-	consensus.switchPhase(Prepare)
+	consensus.switchPhase(Prepare, false)
 
 	// Construct and send prepare message
 	msgToSend := consensus.constructPrepareMessage()
@@ -289,7 +289,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	prepareBitmap.SetKey(validatorPubKey, true) // Set the bitmap indicating that this validator signed.
 
 	if len(prepareSigs) >= consensus.Quorum() {
-		consensus.switchPhase(Commit)
+		consensus.switchPhase(Commit, false)
 
 		// Construct and broadcast prepared message
 		msgToSend, aggSig := consensus.constructPreparedMessage()
@@ -392,7 +392,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	utils.GetLogInstance().Warn("[Consensus]", "sent commit message", len(msgToSend))
 	consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 
-	consensus.switchPhase(Commit)
+	consensus.switchPhase(Commit, false)
 
 	return
 }
@@ -486,7 +486,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 
 func (consensus *Consensus) finalizeCommits() {
 	utils.GetLogger().Info("finalizing block", "num", len(consensus.commitSigs), "phase", consensus.phase)
-	consensus.switchPhase(Announce)
+	consensus.switchPhase(Announce, false)
 
 	// Construct and broadcast committed message
 	msgToSend, aggSig := consensus.constructCommittedMessage()
@@ -634,7 +634,7 @@ func (consensus *Consensus) tryCatchup() {
 	//		return
 	//	}
 	currentBlockNum := consensus.blockNum
-	consensus.phase = Announce
+	consensus.switchPhase(Announce, true)
 	for {
 		msgs := consensus.pbftLog.GetMessagesByTypeSeq(msg_pb.MessageType_COMMITTED, consensus.blockNum)
 		if len(msgs) == 0 {
