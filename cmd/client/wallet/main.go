@@ -13,7 +13,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/accounts/keystore"
 	"github.com/harmony-one/harmony/api/client"
@@ -22,6 +21,7 @@ import (
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/crypto/bls"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -138,6 +138,7 @@ func main() {
 		fmt.Println("        --pass           - Passphrase of sender's private key")
 		fmt.Println("    8. export        - Export account key to a new file")
 		fmt.Println("        --account        - Specify the account to export. Empty will export every key.")
+		fmt.Println("    9. blsgen        - Generate a bls key.")
 		os.Exit(1)
 	}
 
@@ -181,6 +182,8 @@ ARG:
 		processListCommand()
 	case "export":
 		processExportCommand()
+	case "blsgen":
+		processBlsgenCommand()
 	case "removeAll":
 		clearKeystore()
 	case "import":
@@ -334,6 +337,13 @@ func processExportCommand() {
 			_exportAccount(account)
 		}
 	}
+}
+
+func processBlsgenCommand() {
+	privateKey := bls.RandPrivateKey()
+	publickKey := privateKey.GetPublicKey()
+	fmt.Printf("Bls private key: %s\n", privateKey.GetHexString())
+	fmt.Printf("Bls public key: %s\n", publickKey.GetHexString())
 }
 
 func processImportCommnad() {
