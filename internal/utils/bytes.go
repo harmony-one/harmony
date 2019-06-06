@@ -2,6 +2,9 @@ package utils
 
 import "encoding/hex"
 
+// use to look up number of 1 bit in 4 bits
+var halfByteLookup = [16]int{0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4}
+
 // FromHex returns the bytes represented by the hexadecimal string s.
 // s may be prefixed with "0x".
 func FromHex(s string) []byte {
@@ -78,4 +81,18 @@ func LeftPadBytes(slice []byte, l int) []byte {
 	copy(padded[l-len(slice):], slice)
 
 	return padded
+}
+
+// counts number of one bits in a byte
+func countOneBitsInByte(by byte) int {
+	return halfByteLookup[by&0x0F] + halfByteLookup[by>>4]
+}
+
+// CountOneBits counts the number of 1 bit in byte array
+func CountOneBits(arr []byte) int {
+	count := 0
+	for i := range arr {
+		count += countOneBitsInByte(arr[i])
+	}
+	return count
 }
