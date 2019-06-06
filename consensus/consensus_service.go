@@ -348,7 +348,6 @@ func (consensus *Consensus) GetViewIDSigsArray() []*bls.Sign {
 
 // ResetState resets the state of the consensus
 func (consensus *Consensus) ResetState() {
-	consensus.round++
 	consensus.phase = Announce
 	consensus.blockHash = [32]byte{}
 	consensus.prepareSigs = map[common.Address]*bls.Sign{}
