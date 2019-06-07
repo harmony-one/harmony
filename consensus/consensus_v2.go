@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"encoding/binary"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -392,9 +393,11 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	}
 
 	// Construct and send the commit message
-	multiSigAndBitmap := append(aggSig.Serialize(), consensus.prepareBitmap.Bitmap...)
-	msgToSend := consensus.constructCommitMessage(multiSigAndBitmap)
-	utils.GetLogInstance().Warn("[Consensus]", "sent commit message", len(msgToSend))
+	blockNumHash := make([]byte, 8)
+	binary.LittleEndian.PutUint64(blockNumHash, consensus.blockNum)
+	commitPayload := append(blockNumHash, consensus.blockHash[:]...)
+	msgToSend := consensus.constructCommitMessage(commitPayload)
+	utils.GetLogInstance().Debug("sent commit message", "viewID", consensus.viewID, "block", consensus.blockNum)
 	consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 
 	consensus.switchPhase(Commit, false)
@@ -463,14 +466,17 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		return
 	}
 
-	// Verify the signature on prepare multi-sig and bitmap is correct
+	// Verify the signature on commitPayload is correct
 	var sign bls.Sign
 	err = sign.Deserialize(commitSig)
 	if err != nil {
 		utils.GetLogInstance().Debug("Failed to deserialize bls signature", "validatorAddress", validatorAddress)
 		return
 	}
-	if !sign.VerifyHash(validatorPubKey, append(consensus.aggregatedPrepareSig.Serialize(), consensus.prepareBitmap.Bitmap...)) {
+	blockNumHash := make([]byte, 8)
+	binary.LittleEndian.PutUint64(blockNumHash, recvMsg.BlockNum)
+	commitPayload := append(blockNumHash, recvMsg.BlockHash[:]...)
+	if !sign.VerifyHash(validatorPubKey, commitPayload) {
 		utils.GetLogInstance().Error("Received invalid BLS signature", "validatorAddress", validatorAddress)
 		return
 	}
@@ -588,12 +594,12 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		return
 	}
 
-	if consensus.mode.Mode() == Normal && consensus.aggregatedPrepareSig != nil && consensus.prepareBitmap != nil {
-		prepareMultiSigAndBitmap := append(consensus.aggregatedPrepareSig.Serialize(), consensus.prepareBitmap.Bitmap...)
-		if !aggSig.VerifyHash(mask.AggregatePublic, prepareMultiSigAndBitmap) {
-			utils.GetLogger().Error("Failed to verify the multi signature for commit phase", "leader Address", leaderAddress)
-			return
-		}
+	blockNumHash := make([]byte, 8)
+	binary.LittleEndian.PutUint64(blockNumHash, recvMsg.BlockNum)
+	commitPayload := append(blockNumHash, recvMsg.BlockHash[:]...)
+	if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
+		utils.GetLogger().Error("Failed to verify the multi signature for commit phase", "leader Address", leaderAddress)
+		return
 	}
 
 	consensus.pbftLog.AddMessage(recvMsg)

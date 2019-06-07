@@ -33,7 +33,7 @@ func (consensus *Consensus) constructPrepareMessage() []byte {
 }
 
 // Construct the commit message which contains the signature on the multi-sig of prepare phase.
-func (consensus *Consensus) constructCommitMessage(multiSigAndBitmap []byte) []byte {
+func (consensus *Consensus) constructCommitMessage(commitPayload []byte) []byte {
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CONSENSUS,
 		Type:        msg_pb.MessageType_COMMIT,
@@ -46,7 +46,7 @@ func (consensus *Consensus) constructCommitMessage(multiSigAndBitmap []byte) []b
 	consensus.populateMessageFields(consensusMsg)
 
 	// 48 byte of bls signature
-	sign := consensus.priKey.SignHash(multiSigAndBitmap)
+	sign := consensus.priKey.SignHash(commitPayload)
 	if sign != nil {
 		consensusMsg.Payload = sign.Serialize()
 	}
