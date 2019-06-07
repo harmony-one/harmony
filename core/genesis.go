@@ -225,7 +225,7 @@ func (g *Genesis) configOrDefault(ghash common.Hash) *params.ChainConfig {
 // to the given database (or discards it if nil).
 func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 	if db == nil {
-		utils.GetLogInstance().Error("db should be initialized")
+		utils.GetLogger().Error("db should be initialized")
 		os.Exit(1)
 	}
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(db))

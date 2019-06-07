@@ -35,7 +35,7 @@ func (cc *ContractCaller) CallContract(tx *types.Transaction) ([]byte, error) {
 	currBlock := cc.blockchain.CurrentBlock()
 	msg, err := tx.AsMessage(types.MakeSigner(cc.config, currBlock.Header().Number))
 	if err != nil {
-		utils.GetLogInstance().Error("[ABI] Failed to convert transaction to message", "error", err)
+		utils.GetLogger().Error("[ABI] Failed to convert transaction to message", "error", err)
 		return []byte{}, err
 	}
 	evmContext := core.NewEVMContext(msg, currBlock.Header(), cc.blockchain, nil)
@@ -43,7 +43,7 @@ func (cc *ContractCaller) CallContract(tx *types.Transaction) ([]byte, error) {
 	// about the transaction and calling mechanisms.
 	stateDB, err := cc.blockchain.State()
 	if err != nil {
-		utils.GetLogInstance().Error("[ABI] Failed to retrieve state db", "error", err)
+		utils.GetLogger().Error("[ABI] Failed to retrieve state db", "error", err)
 		return []byte{}, err
 	}
 	vmenv := vm.NewEVM(evmContext, stateDB, cc.config, vm.Config{})
@@ -51,7 +51,7 @@ func (cc *ContractCaller) CallContract(tx *types.Transaction) ([]byte, error) {
 
 	returnValue, _, failed, err := core.NewStateTransition(vmenv, msg, gaspool).TransitionDb()
 	if err != nil || failed {
-		utils.GetLogInstance().Error("[ABI] Failed executing the transaction", "error", err)
+		utils.GetLogger().Error("[ABI] Failed executing the transaction", "error", err)
 		return []byte{}, err
 	}
 	return returnValue, nil

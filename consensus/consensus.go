@@ -271,7 +271,7 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 func accumulateRewards(
 	bc consensus_engine.ChainReader, state *state.DB, header *types.Header,
 ) error {
-	logger := header.Logger(utils.GetLogInstance())
+	logger := header.Logger(utils.GetLogger())
 	getLogger := func() log.Logger { return utils.WithCallerSkip(logger, 1) }
 	blockNum := header.Number.Uint64()
 	if blockNum == 0 {
@@ -362,7 +362,7 @@ func (f *GenesisStakeInfoFinder) FindStakeInfoByNodeKey(
 ) []*structs.StakeInfo {
 	var pk types.BlsPublicKey
 	if err := pk.FromLibBLSPublicKey(key); err != nil {
-		ctxerror.Log15(utils.GetLogInstance().Warn, ctxerror.New(
+		ctxerror.Log15(utils.GetLogger().Warn, ctxerror.New(
 			"cannot convert BLS public key",
 		).WithCause(err))
 		return nil

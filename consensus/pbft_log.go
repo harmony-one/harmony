@@ -229,26 +229,26 @@ func ParseViewChangeMessage(msg *msg_pb.Message) (*PbftMessage, error) {
 
 	pubKey, err := bls_cosi.BytesToBlsPublicKey(vcMsg.SenderPubkey)
 	if err != nil {
-		utils.GetLogInstance().Warn("ParseViewChangeMessage failed to parse senderpubkey", "error", err)
+		utils.GetLogger().Warn("ParseViewChangeMessage failed to parse senderpubkey", "error", err)
 		return nil, err
 	}
 	leaderKey, err := bls_cosi.BytesToBlsPublicKey(vcMsg.LeaderPubkey)
 	if err != nil {
-		utils.GetLogInstance().Warn("ParseViewChangeMessage failed to parse leaderpubkey", "error", err)
+		utils.GetLogger().Warn("ParseViewChangeMessage failed to parse leaderpubkey", "error", err)
 		return nil, err
 	}
 
 	vcSig := bls.Sign{}
 	err = vcSig.Deserialize(vcMsg.ViewchangeSig)
 	if err != nil {
-		utils.GetLogInstance().Warn("ParseViewChangeMessage failed to deserialize the viewchange signature", "error", err)
+		utils.GetLogger().Warn("ParseViewChangeMessage failed to deserialize the viewchange signature", "error", err)
 		return nil, err
 	}
 
 	vcSig1 := bls.Sign{}
 	err = vcSig1.Deserialize(vcMsg.ViewidSig)
 	if err != nil {
-		utils.GetLogInstance().Warn("ParseViewChangeMessage failed to deserialize the viewid signature", "error", err)
+		utils.GetLogger().Warn("ParseViewChangeMessage failed to deserialize the viewid signature", "error", err)
 		return nil, err
 	}
 	pbftMsg.SenderPubkey = pubKey
@@ -275,7 +275,7 @@ func (consensus *Consensus) ParseNewViewMessage(msg *msg_pb.Message) (*PbftMessa
 
 	pubKey, err := bls_cosi.BytesToBlsPublicKey(vcMsg.SenderPubkey)
 	if err != nil {
-		utils.GetLogInstance().Warn("ParseViewChangeMessage failed to parse senderpubkey", "error", err)
+		utils.GetLogger().Warn("ParseViewChangeMessage failed to parse senderpubkey", "error", err)
 		return nil, err
 	}
 	pbftMsg.SenderPubkey = pubKey
@@ -284,12 +284,12 @@ func (consensus *Consensus) ParseNewViewMessage(msg *msg_pb.Message) (*PbftMessa
 		m3Sig := bls.Sign{}
 		err = m3Sig.Deserialize(vcMsg.M3Aggsigs)
 		if err != nil {
-			utils.GetLogInstance().Warn("ParseViewChangeMessage failed to deserialize the multi signature for M3 viewID signature", "error", err)
+			utils.GetLogger().Warn("ParseViewChangeMessage failed to deserialize the multi signature for M3 viewID signature", "error", err)
 			return nil, err
 		}
 		m3mask, err := bls_cosi.NewMask(consensus.PublicKeys, nil)
 		if err != nil {
-			utils.GetLogInstance().Warn("ParseViewChangeMessage failed to create mask for multi signature", "error", err)
+			utils.GetLogger().Warn("ParseViewChangeMessage failed to create mask for multi signature", "error", err)
 			return nil, err
 		}
 		m3mask.SetMask(vcMsg.M3Bitmap)
@@ -301,12 +301,12 @@ func (consensus *Consensus) ParseNewViewMessage(msg *msg_pb.Message) (*PbftMessa
 		m2Sig := bls.Sign{}
 		err = m2Sig.Deserialize(vcMsg.M2Aggsigs)
 		if err != nil {
-			utils.GetLogInstance().Warn("ParseViewChangeMessage failed to deserialize the multi signature for M2 aggregated signature", "error", err)
+			utils.GetLogger().Warn("ParseViewChangeMessage failed to deserialize the multi signature for M2 aggregated signature", "error", err)
 			return nil, err
 		}
 		m2mask, err := bls_cosi.NewMask(consensus.PublicKeys, nil)
 		if err != nil {
-			utils.GetLogInstance().Warn("ParseViewChangeMessage failed to create mask for multi signature", "error", err)
+			utils.GetLogger().Warn("ParseViewChangeMessage failed to create mask for multi signature", "error", err)
 			return nil, err
 		}
 		m2mask.SetMask(vcMsg.M2Bitmap)

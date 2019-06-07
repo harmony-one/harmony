@@ -106,19 +106,19 @@ func (s *Service) IsStaked() bool {
 
 // DoService does staking.
 func (s *Service) DoService() {
-	utils.GetLogInstance().Info("Trying to send a staking transaction.")
+	utils.GetLogger().Info("Trying to send a staking transaction.")
 
 	// TODO: no need to sync beacon chain to stake
 	//if s.beaconChain == nil {
-	//	utils.GetLogInstance().Info("Can not send a staking transaction because of nil beacon chain.")
+	//	utils.GetLogger().Info("Can not send a staking transaction because of nil beacon chain.")
 	//	return
 	//}
 
 	if msg := s.createStakingMessage(); msg != nil {
 		s.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msg))
-		utils.GetLogInstance().Info("Sent staking transaction to the network.")
+		utils.GetLogger().Info("Sent staking transaction to the network.")
 	} else {
-		utils.GetLogInstance().Error("Can not create staking transaction")
+		utils.GetLogger().Error("Can not create staking transaction")
 	}
 }
 
@@ -126,17 +126,17 @@ func (s *Service) getStakingInfo() *proto.StakingContractInfoResponse {
 	address := s.account.Address
 	state, err := s.beaconChain.State()
 	if err != nil {
-		utils.GetLogInstance().Error("error to get beacon chain state when getting staking info")
+		utils.GetLogger().Error("error to get beacon chain state when getting staking info")
 		return nil
 	}
 	balance := state.GetBalance(address)
 	if balance == common.Big0 {
-		utils.GetLogInstance().Error("account balance empty when getting staking info")
+		utils.GetLogger().Error("account balance empty when getting staking info")
 		return nil
 	}
 	nonce := state.GetNonce(address)
 	if nonce == 0 {
-		utils.GetLogInstance().Error("nonce zero when getting staking info")
+		utils.GetLogger().Error("nonce zero when getting staking info")
 		return nil
 	}
 	return &proto.StakingContractInfoResponse{
@@ -178,7 +178,7 @@ func constructStakingMessage(ts types.Transactions) []byte {
 			return data
 		}
 	}
-	utils.GetLogInstance().Error("Error when creating staking message", "error", err)
+	utils.GetLogger().Error("Error when creating staking message", "error", err)
 	return nil
 }
 
@@ -189,12 +189,12 @@ func (s *Service) createRawStakingMessage() []byte {
 
 	abi, err := abi.JSON(strings.NewReader(contracts.StakeLockContractABI))
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to generate staking contract's ABI", "error", err)
+		utils.GetLogger().Error("Failed to generate staking contract's ABI", "error", err)
 	}
 	// TODO: the bls address should be signed by the bls private key
 	blsPubKeyBytes := s.blsPublicKey.Serialize()
 	if len(blsPubKeyBytes) != 96 {
-		utils.GetLogInstance().Error("Wrong bls pubkey size", "size", len(blsPubKeyBytes))
+		utils.GetLogger().Error("Wrong bls pubkey size", "size", len(blsPubKeyBytes))
 		return []byte{}
 	}
 	blsPubKeyPart1 := [32]byte{}
@@ -206,7 +206,7 @@ func (s *Service) createRawStakingMessage() []byte {
 	bytesData, err := abi.Pack("lock", blsPubKeyPart1, blsPubKeyPart2, blsPubKeyPart3)
 
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to generate ABI function bytes data", "error", err)
+		utils.GetLogger().Error("Failed to generate ABI function bytes data", "error", err)
 	}
 
 	tx := types.NewTransaction(
@@ -236,10 +236,10 @@ func (s *Service) createStakingMessage() []byte {
 
 // StopService stops staking service.
 func (s *Service) StopService() {
-	utils.GetLogInstance().Info("Stopping staking service.")
+	utils.GetLogger().Info("Stopping staking service.")
 	s.stopChan <- struct{}{}
 	<-s.stoppedChan
-	utils.GetLogInstance().Info("Role conversion stopped.")
+	utils.GetLogger().Info("Role conversion stopped.")
 }
 
 // NotifyService notify service

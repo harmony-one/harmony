@@ -14,7 +14,7 @@ func (dRand *DRand) ProcessMessageValidator(payload []byte) {
 	err := protobuf.Unmarshal(payload, message)
 
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to unmarshal message payload.", "err", err, "dRand", dRand)
+		utils.GetLogger().Error("Failed to unmarshal message payload.", "err", err, "dRand", dRand)
 	}
 
 	switch message.Type {
@@ -23,14 +23,14 @@ func (dRand *DRand) ProcessMessageValidator(payload []byte) {
 	case msg_pb.MessageType_DRAND_COMMIT:
 		// do nothing on the COMMIT message, as it is intended to send to leader
 	default:
-		utils.GetLogInstance().Error("Unexpected message type", "msgType", message.Type, "dRand", dRand)
+		utils.GetLogger().Error("Unexpected message type", "msgType", message.Type, "dRand", dRand)
 	}
 }
 
 // ProcessMessageValidator dispatches validator's consensus message.
 func (dRand *DRand) processInitMessage(message *msg_pb.Message) {
 	if message.Type != msg_pb.MessageType_DRAND_INIT {
-		utils.GetLogInstance().Error("Wrong message type received", "expected", msg_pb.MessageType_DRAND_INIT, "got", message.Type)
+		utils.GetLogger().Error("Wrong message type received", "expected", msg_pb.MessageType_DRAND_INIT, "got", message.Type)
 		return
 	}
 
@@ -39,10 +39,10 @@ func (dRand *DRand) processInitMessage(message *msg_pb.Message) {
 	// Verify message signature
 	err := verifyMessageSig(dRand.leader.ConsensusPubKey, message)
 	if err != nil {
-		utils.GetLogInstance().Warn("[DRG] Failed to verify the message signature", "Error", err)
+		utils.GetLogger().Warn("[DRG] Failed to verify the message signature", "Error", err)
 		return
 	}
-	utils.GetLogInstance().Debug("[DRG] verify the message signature Succeeded")
+	utils.GetLogger().Debug("[DRG] verify the message signature Succeeded")
 
 	// TODO: check the blockHash is the block hash of last block of last epoch.
 	blockHash := drandMsg.BlockHash

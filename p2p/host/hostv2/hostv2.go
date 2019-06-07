@@ -157,7 +157,7 @@ func (host *HostV2) Peerstore() libp2p_peerstore.Peerstore {
 // New creates a host for p2p communication
 func New(self *p2p.Peer, priKey libp2p_crypto.PrivKey) *HostV2 {
 	listenAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", self.Port))
-	logger := utils.GetLogInstance()
+	logger := utils.GetLogger()
 	if err != nil {
 		logger.Error("New MA Error", "IP", self.IP, "Port", self.Port)
 		return nil

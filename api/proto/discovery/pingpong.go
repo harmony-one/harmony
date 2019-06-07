@@ -108,7 +108,7 @@ func GetPingMessage(payload []byte) (*PingMessageType, error) {
 	err := decoder.Decode(ping)
 
 	if err != nil {
-		utils.GetLogInstance().Error("[GetPingMessage] Decode", "error", err)
+		utils.GetLogger().Error("[GetPingMessage] Decode", "error", err)
 		return nil, fmt.Errorf("Decode Ping Error")
 	}
 
@@ -126,7 +126,7 @@ func GetPongMessage(payload []byte) (*PongMessageType, error) {
 	err := decoder.Decode(pong)
 
 	if err != nil {
-		utils.GetLogInstance().Error("[GetPongMessage] Decode", "error", err)
+		utils.GetLogger().Error("[GetPongMessage] Decode", "error", err)
 		return nil, fmt.Errorf("Decode Pong Error")
 	}
 
@@ -141,7 +141,7 @@ func (p PingMessageType) ConstructPingMessage() []byte {
 	encoder := gob.NewEncoder(byteBuffer)
 	err := encoder.Encode(p)
 	if err != nil {
-		utils.GetLogInstance().Error("[ConstructPingMessage] Encode", "error", err)
+		utils.GetLogger().Error("[ConstructPingMessage] Encode", "error", err)
 		return nil
 	}
 	return byteBuffer.Bytes()
@@ -155,7 +155,7 @@ func (p PongMessageType) ConstructPongMessage() []byte {
 	encoder := gob.NewEncoder(byteBuffer)
 	err := encoder.Encode(p)
 	if err != nil {
-		utils.GetLogInstance().Error("[ConstructPongMessage] Encode", "error", err)
+		utils.GetLogger().Error("[ConstructPongMessage] Encode", "error", err)
 		return nil
 	}
 	return byteBuffer.Bytes()

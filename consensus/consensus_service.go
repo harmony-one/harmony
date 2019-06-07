@@ -108,7 +108,7 @@ func (consensus *Consensus) populateMessageFields(request *msg_pb.ConsensusReque
 	// sender address
 	request.SenderPubkey = consensus.PubKey.Serialize()
 
-	utils.GetLogInstance().Debug("[populateMessageFields]", "myViewID", consensus.viewID, "SenderAddress", consensus.SelfAddress, "blockNum", consensus.blockNum)
+	utils.GetLogger().Debug("[populateMessageFields]", "myViewID", consensus.viewID, "SenderAddress", consensus.SelfAddress, "blockNum", consensus.blockNum)
 }
 
 // Signs the consensus message and returns the marshaled message.
@@ -159,10 +159,10 @@ func (consensus *Consensus) GetViewID() uint32 {
 func (consensus *Consensus) DebugPrintPublicKeys() {
 	for _, k := range consensus.PublicKeys {
 		str := fmt.Sprintf("%s", hex.EncodeToString(k.Serialize()))
-		utils.GetLogInstance().Debug("pk:", "string", str)
+		utils.GetLogger().Debug("pk:", "string", str)
 	}
 
-	utils.GetLogInstance().Debug("PublicKeys:", "#", len(consensus.PublicKeys))
+	utils.GetLogger().Debug("PublicKeys:", "#", len(consensus.PublicKeys))
 }
 
 // DebugPrintValidators print all validator ip/port/key in string format in Consensus
@@ -171,13 +171,13 @@ func (consensus *Consensus) DebugPrintValidators() {
 	consensus.validators.Range(func(k, v interface{}) bool {
 		if p, ok := v.(p2p.Peer); ok {
 			str2 := fmt.Sprintf("%s", p.ConsensusPubKey.Serialize())
-			utils.GetLogInstance().Debug("validator:", "IP", p.IP, "Port", p.Port, "address", utils.GetBlsAddress(p.ConsensusPubKey), "Key", str2)
+			utils.GetLogger().Debug("validator:", "IP", p.IP, "Port", p.Port, "address", utils.GetBlsAddress(p.ConsensusPubKey), "Key", str2)
 			count++
 			return true
 		}
 		return false
 	})
-	utils.GetLogInstance().Debug("Validators", "#", count)
+	utils.GetLogger().Debug("Validators", "#", count)
 }
 
 // UpdatePublicKeys updates the PublicKeys variable, protected by a mutex
@@ -201,8 +201,8 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int {
 		consensus.commitBitmap = commitBitmap
 	}
 
-	utils.GetLogInstance().Info("My Leader", "info", hex.EncodeToString(consensus.leader.ConsensusPubKey.Serialize()))
-	utils.GetLogInstance().Info("My Committee", "info", consensus.PublicKeys)
+	utils.GetLogger().Info("My Leader", "info", hex.EncodeToString(consensus.leader.ConsensusPubKey.Serialize()))
+	utils.GetLogger().Info("My Committee", "info", consensus.PublicKeys)
 	consensus.pubKeyLock.Unlock()
 	// reset states after update public keys
 	consensus.ResetState()
@@ -460,12 +460,12 @@ func (consensus *Consensus) ToggleConsensusCheck() {
 func (consensus *Consensus) GetPeerByAddress(validatorAddress string) *p2p.Peer {
 	v, ok := consensus.validators.Load(validatorAddress)
 	if !ok {
-		utils.GetLogInstance().Warn("Unrecognized validator", "validatorAddress", validatorAddress, "consensus", consensus)
+		utils.GetLogger().Warn("Unrecognized validator", "validatorAddress", validatorAddress, "consensus", consensus)
 		return nil
 	}
 	value, ok := v.(p2p.Peer)
 	if !ok {
-		utils.GetLogInstance().Warn("Invalid validator", "validatorAddress", validatorAddress, "consensus", consensus)
+		utils.GetLogger().Warn("Invalid validator", "validatorAddress", validatorAddress, "consensus", consensus)
 		return nil
 	}
 	return &value
@@ -593,7 +593,7 @@ func (consensus *Consensus) readSignatureBitmapPayload(recvPayload []byte, offse
 	}
 	mask, err := bls_cosi.NewMask(consensus.PublicKeys, nil)
 	if err != nil {
-		utils.GetLogInstance().Warn("onNewView unable to setup mask for prepared message", "err", err)
+		utils.GetLogger().Warn("onNewView unable to setup mask for prepared message", "err", err)
 		return nil, nil, errors.New("unable to setup mask from payload")
 	}
 	mask.SetMask(bitmap)
@@ -605,7 +605,7 @@ func (consensus *Consensus) reportMetrics(block types.Block) {
 	timeElapsed := endTime.Sub(startTime)
 	numOfTxs := len(block.Transactions())
 	tps := float64(numOfTxs) / timeElapsed.Seconds()
-	utils.GetLogInstance().Info("TPS Report",
+	utils.GetLogger().Info("TPS Report",
 		"numOfTXs", numOfTxs,
 		"startTime", startTime,
 		"endTime", endTime,

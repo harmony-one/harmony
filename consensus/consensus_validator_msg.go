@@ -27,7 +27,7 @@ func (consensus *Consensus) constructPrepareMessage() []byte {
 
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to sign and marshal the Prepare message", "error", err)
+		utils.GetLogger().Error("Failed to sign and marshal the Prepare message", "error", err)
 	}
 	return proto.ConstructConsensusMessage(marshaledMessage)
 }
@@ -53,7 +53,7 @@ func (consensus *Consensus) constructCommitMessage(multiSigAndBitmap []byte) []b
 
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to sign and marshal the Commit message", "error", err)
+		utils.GetLogger().Error("Failed to sign and marshal the Commit message", "error", err)
 	}
 	return proto.ConstructConsensusMessage(marshaledMessage)
 }

@@ -44,11 +44,11 @@ func (s *Server) Process(ctx context.Context, message *Message) (*Response, erro
 
 		key, err := crypto.HexToECDSA(priKey)
 		if err != nil {
-			utils.GetLogInstance().Error("Error when HexToECDSA")
+			utils.GetLogger().Error("Error when HexToECDSA")
 		}
 		address := crypto.PubkeyToAddress(key.PublicKey)
 
-		utils.GetLogInstance().Info("Enter:", "amount", amount, "for address", address)
+		utils.GetLogger().Info("Enter:", "amount", amount, "for address", address)
 		if err := s.CreateTransactionForEnterMethod(amount, priKey); err != nil {
 			return nil, ErrEnterMethod
 		}
@@ -59,7 +59,7 @@ func (s *Server) Process(ctx context.Context, message *Message) (*Response, erro
 		for _, balance := range balances {
 			stringBalances = append(stringBalances, balance.String())
 		}
-		utils.GetLogInstance().Info("getPlayers", "players", players, "balances", stringBalances)
+		utils.GetLogger().Info("getPlayers", "players", players, "balances", stringBalances)
 		ret := &Response{
 			Response: &Response_LotteryResponse{
 				LotteryResponse: &LotteryResponse{

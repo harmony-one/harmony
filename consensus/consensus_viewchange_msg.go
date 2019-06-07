@@ -59,7 +59,7 @@ func (consensus *Consensus) constructViewChangeMessage() []byte {
 
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
 	if err != nil {
-		utils.GetLogInstance().Error("constructViewChangeMessage failed to sign and marshal the viewchange message", "error", err)
+		utils.GetLogger().Error("constructViewChangeMessage failed to sign and marshal the viewchange message", "error", err)
 	}
 	return proto.ConstructConsensusMessage(marshaledMessage)
 }
@@ -97,7 +97,7 @@ func (consensus *Consensus) constructNewViewMessage() []byte {
 
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
 	if err != nil {
-		utils.GetLogInstance().Error("constructNewViewMessage failed to sign and marshal the new view message", "error", err)
+		utils.GetLogger().Error("constructNewViewMessage failed to sign and marshal the new view message", "error", err)
 	}
 	return proto.ConstructConsensusMessage(marshaledMessage)
 }

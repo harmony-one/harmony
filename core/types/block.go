@@ -168,7 +168,7 @@ type Block struct {
 // SetPrepareSig sets the block's prepare group signature.
 func (b *Block) SetPrepareSig(sig []byte, signers []byte) {
 	if len(sig) != len(b.header.PrepareSignature) {
-		utils.GetLogInstance().Warn("SetPrepareSig: sig size mismatch",
+		utils.GetLogger().Warn("SetPrepareSig: sig size mismatch",
 			"srcLen", len(sig),
 			"dstLen", len(b.header.PrepareSignature))
 	}
@@ -179,7 +179,7 @@ func (b *Block) SetPrepareSig(sig []byte, signers []byte) {
 // SetCommitSig sets the block's commit group signature.
 func (b *Block) SetCommitSig(sig []byte, signers []byte) {
 	if len(sig) != len(b.header.CommitSignature) {
-		utils.GetLogInstance().Warn("SetCommitSig: sig size mismatch",
+		utils.GetLogger().Warn("SetCommitSig: sig size mismatch",
 			"srcLen", len(sig),
 			"dstLen", len(b.header.CommitSignature))
 	}

@@ -166,7 +166,7 @@ func ConstructEpochShardStateMessage(epochShardState types.EpochShardState) []by
 	encoder := gob.NewEncoder(byteBuffer)
 	err := encoder.Encode(epochShardState)
 	if err != nil {
-		utils.GetLogInstance().Error("[ConstructEpochShardStateMessage] Encode", "error", err)
+		utils.GetLogger().Error("[ConstructEpochShardStateMessage] Encode", "error", err)
 		return nil
 	}
 	return byteBuffer.Bytes()
@@ -181,7 +181,7 @@ func DeserializeEpochShardStateFromMessage(payload []byte) (*types.EpochShardSta
 	err := decoder.Decode(epochShardState)
 
 	if err != nil {
-		utils.GetLogInstance().Error("[GetEpochShardStateFromMessage] Decode", "error", err)
+		utils.GetLogger().Error("[GetEpochShardStateFromMessage] Decode", "error", err)
 		return nil, fmt.Errorf("Decode epoch shard state Error")
 	}
 

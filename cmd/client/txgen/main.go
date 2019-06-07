@@ -153,7 +153,7 @@ func main() {
 		MaxNumTxsPerBatch: *numTxns,
 	}
 	shardID := *shardIDFlag
-	utils.GetLogInstance().Debug("Cross Shard Ratio Is Set But not used", "cx ratio", *crossShardRatio)
+	utils.GetLogger().Debug("Cross Shard Ratio Is Set But not used", "cx ratio", *crossShardRatio)
 
 	// TODO(Richard): refactor this chuck to a single method
 	// Setup a logger to stdout and log file.
@@ -168,20 +168,20 @@ func main() {
 	txGen.RunServices()
 	start := time.Now()
 	totalTime := float64(*duration)
-	utils.GetLogInstance().Debug("Total Duration", "totalTime", totalTime, "RunForever", isDurationForever(totalTime))
+	utils.GetLogger().Debug("Total Duration", "totalTime", totalTime, "RunForever", isDurationForever(totalTime))
 	ticker := time.NewTicker(checkFrequency * time.Second)
 	txGen.DoSyncWithoutConsensus()
 syncLoop:
 	for {
 		t := time.Now()
 		if totalTime > 0 && t.Sub(start).Seconds() >= totalTime {
-			utils.GetLogInstance().Debug("Generator timer ended in syncLoop.", "duration", (int(t.Sub(start))), "startTime", start, "totalTime", totalTime)
+			utils.GetLogger().Debug("Generator timer ended in syncLoop.", "duration", (int(t.Sub(start))), "startTime", start, "totalTime", totalTime)
 			break syncLoop
 		}
 		select {
 		case <-ticker.C:
 			if txGen.State.String() == "NodeReadyForConsensus" {
-				utils.GetLogInstance().Debug("Generator is now in Sync.", "txgen node", txGen.SelfPeer, "Node State", txGen.State.String())
+				utils.GetLogger().Debug("Generator is now in Sync.", "txgen node", txGen.SelfPeer, "Node State", txGen.State.String())
 				ticker.Stop()
 				break syncLoop
 			}
@@ -190,11 +190,11 @@ syncLoop:
 	readySignal := make(chan uint32)
 	// This func is used to update the client's blockchain when new blocks are received from the leaders
 	updateBlocksFunc := func(blocks []*types.Block) {
-		utils.GetLogInstance().Info("[Txgen] Received new block", "block num", blocks[0].NumberU64())
+		utils.GetLogger().Info("[Txgen] Received new block", "block num", blocks[0].NumberU64())
 		for _, block := range blocks {
 			shardID := block.ShardID()
 			if txGen.Consensus.ShardID == shardID {
-				utils.GetLogInstance().Info("Got block from leader", "txNum", len(block.Transactions()), "shardID", shardID, "preHash", block.ParentHash().Hex(), "currentBlock", txGen.Blockchain().CurrentBlock().NumberU64(), "incoming block", block.NumberU64())
+				utils.GetLogger().Info("Got block from leader", "txNum", len(block.Transactions()), "shardID", shardID, "preHash", block.ParentHash().Hex(), "currentBlock", txGen.Blockchain().CurrentBlock().NumberU64(), "incoming block", block.NumberU64())
 				if block.NumberU64()-txGen.Blockchain().CurrentBlock().NumberU64() == 1 {
 					txGen.AddNewBlock(block)
 					stateMutex.Lock()
@@ -218,9 +218,9 @@ syncLoop:
 pushLoop:
 	for {
 		t := time.Now()
-		utils.GetLogInstance().Debug("Current running time", "running time", t.Sub(start).Seconds(), "totaltime", totalTime)
+		utils.GetLogger().Debug("Current running time", "running time", t.Sub(start).Seconds(), "totaltime", totalTime)
 		if !isDurationForever(totalTime) && t.Sub(start).Seconds() >= totalTime {
-			utils.GetLogInstance().Debug("Generator timer ended.", "duration", (int(t.Sub(start))), "startTime", start, "totalTime", totalTime)
+			utils.GetLogger().Debug("Generator timer ended.", "duration", (int(t.Sub(start))), "startTime", start, "totalTime", totalTime)
 			break pushLoop
 		}
 		if shardID != 0 {
@@ -228,7 +228,7 @@ pushLoop:
 				if otherHeight >= 1 {
 					go func() {
 						readySignal <- uint32(shardID)
-						utils.GetLogInstance().Debug("Same blockchain height so readySignal generated")
+						utils.GetLogger().Debug("Same blockchain height so readySignal generated")
 						time.Sleep(3 * time.Second) // wait for nodes to be ready
 					}()
 				}
@@ -237,16 +237,16 @@ pushLoop:
 		select {
 		case shardID := <-readySignal:
 			lock := sync.Mutex{}
-			utils.GetLogInstance().Warn("STARTING TX GEN PUSH LOOP", "gomaxprocs", runtime.GOMAXPROCS(0))
+			utils.GetLogger().Warn("STARTING TX GEN PUSH LOOP", "gomaxprocs", runtime.GOMAXPROCS(0))
 			txs, err := GenerateSimulatedTransactionsAccount(uint32(shardID), txGen, setting)
 			if err != nil {
-				utils.GetLogInstance().Debug("Error in Generating Txns", "Err", err)
+				utils.GetLogger().Debug("Error in Generating Txns", "Err", err)
 			}
 			lock.Lock()
 			SendTxsToShard(txGen, txs, uint32(shardID))
 			lock.Unlock()
 		case <-time.After(10 * time.Second):
-			utils.GetLogInstance().Warn("No new block is received so far")
+			utils.GetLogger().Warn("No new block is received so far")
 		}
 	}
 }
@@ -262,7 +262,7 @@ func SendTxsToShard(clientNode *node.Node, txs types.Transactions, shardID uint3
 		err = clientNode.GetHost().SendMessageToGroups([]p2p.GroupID{clientGroup}, p2p_host.ConstructP2pMessage(byte(0), msg))
 	}
 	if err != nil {
-		utils.GetLogInstance().Debug("Error in Sending Txns", "Err", err)
+		utils.GetLogger().Debug("Error in Sending Txns", "Err", err)
 	}
 }
 

@@ -47,7 +47,7 @@ func (s *Service) Run(stopChan chan struct{}, stoppedChan chan struct{}) {
 		for {
 			select {
 			default:
-				utils.GetLogInstance().Info("Running role conversion")
+				utils.GetLogger().Info("Running role conversion")
 				// TODO: Write some logic here.
 				s.DoService()
 			case <-stopChan:
@@ -75,10 +75,10 @@ func (s *Service) DoService() {
 
 // StopService stops role conversion service.
 func (s *Service) StopService() {
-	utils.GetLogInstance().Info("Stopping role conversion service.")
+	utils.GetLogger().Info("Stopping role conversion service.")
 	s.stopChan <- struct{}{}
 	<-s.stoppedChan
-	utils.GetLogInstance().Info("Role conversion stopped.")
+	utils.GetLogger().Info("Role conversion stopped.")
 }
 
 // NotifyService notify service

@@ -144,7 +144,7 @@ func (dRand *DRand) AddPeers(peers []*p2p.Peer) int {
 				dRand.CommitteeAddresses[peer.ConsensusPubKey.GetAddress()] = true
 			}
 			dRand.pubKeyLock.Unlock()
-			//			utils.GetLogInstance().Debug("[DRAND]", "AddPeers", *peer)
+			//			utils.GetLogger().Debug("[DRAND]", "AddPeers", *peer)
 		}
 		count++
 	}
@@ -225,12 +225,12 @@ func verifyMessageSig(signerPubKey *bls.PublicKey, message *msg_pb.Message) erro
 func (dRand *DRand) getValidatorPeerByAddress(validatorAddress string) *p2p.Peer {
 	v, ok := dRand.validators.Load(validatorAddress)
 	if !ok {
-		utils.GetLogInstance().Warn("Unrecognized validator", "validatorAddress", validatorAddress, "dRand", dRand)
+		utils.GetLogger().Warn("Unrecognized validator", "validatorAddress", validatorAddress, "dRand", dRand)
 		return nil
 	}
 	value, ok := v.(p2p.Peer)
 	if !ok {
-		utils.GetLogInstance().Warn("Invalid validator", "validatorAddress", validatorAddress, "dRand", dRand)
+		utils.GetLogger().Warn("Invalid validator", "validatorAddress", validatorAddress, "dRand", dRand)
 		return nil
 	}
 	return &value

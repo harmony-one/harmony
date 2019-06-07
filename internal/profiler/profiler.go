@@ -46,7 +46,7 @@ func (profiler *Profiler) LogMemory() {
 		// log mem usage
 		info, _ := profiler.proc.MemoryInfo()
 		memMap, _ := profiler.proc.MemoryMaps(false)
-		utils.GetLogInstance().Info("Mem Report", "info", info, "map", memMap, "shardID", profiler.shardID)
+		utils.GetLogger().Info("Mem Report", "info", info, "map", memMap, "shardID", profiler.shardID)
 
 		time.Sleep(3 * time.Second)
 	}
@@ -58,7 +58,7 @@ func (profiler *Profiler) LogCPU() {
 		// log cpu usage
 		percent, _ := profiler.proc.CPUPercent()
 		times, _ := profiler.proc.Times()
-		utils.GetLogInstance().Info("CPU Report", "percent", percent, "times", times, "shardID", profiler.shardID)
+		utils.GetLogger().Info("CPU Report", "percent", percent, "times", times, "shardID", profiler.shardID)
 
 		time.Sleep(3 * time.Second)
 	}

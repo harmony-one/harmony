@@ -50,18 +50,18 @@ func New(selfPeer *p2p.Peer, GetNodeIDs func() []libp2p_peer.ID, GetAccountBalan
 
 // StartService starts explorer service.
 func (s *Service) StartService() {
-	utils.GetLogInstance().Info("Starting explorer service.")
+	utils.GetLogger().Info("Starting explorer service.")
 	s.Init(true)
 	s.server = s.Run()
 }
 
 // StopService shutdowns explorer service.
 func (s *Service) StopService() {
-	utils.GetLogInstance().Info("Shutting down explorer service.")
+	utils.GetLogger().Info("Shutting down explorer service.")
 	if err := s.server.Shutdown(context.Background()); err != nil {
-		utils.GetLogInstance().Error("Error when shutting down explorer server", "error", err)
+		utils.GetLogger().Error("Error when shutting down explorer server", "error", err)
 	} else {
-		utils.GetLogInstance().Info("Shutting down explorer server successufully")
+		utils.GetLogger().Info("Shutting down explorer server successufully")
 	}
 }
 
@@ -70,7 +70,7 @@ func GetExplorerPort(nodePort string) string {
 	if port, err := strconv.Atoi(nodePort); err == nil {
 		return fmt.Sprintf("%d", port-explorerPortDifference)
 	}
-	utils.GetLogInstance().Error("error on parsing.")
+	utils.GetLogger().Error("error on parsing.")
 	return ""
 }
 
@@ -106,7 +106,7 @@ func (s *Service) Run() *http.Server {
 	s.router.Path("/shard").HandlerFunc(s.GetExplorerShard)
 
 	// Do serving now.
-	utils.GetLogInstance().Info("Listening on ", "port: ", GetExplorerPort(s.Port))
+	utils.GetLogger().Info("Listening on ", "port: ", GetExplorerPort(s.Port))
 	server := &http.Server{Addr: addr, Handler: s.router}
 	go server.ListenAndServe()
 	return server
@@ -128,7 +128,7 @@ func (s *Service) ReadBlocksFromDB(from, to int) []*types.Block {
 		}
 		block := new(types.Block)
 		if rlp.DecodeBytes(data, block) != nil {
-			utils.GetLogInstance().Error("Error on getting from db")
+			utils.GetLogger().Error("Error on getting from db")
 			os.Exit(1)
 		}
 		blocks = append(blocks, block)

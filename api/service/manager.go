@@ -109,7 +109,7 @@ func (m *Manager) Register(t Type, service Interface) {
 		m.services = make(map[Type]Interface)
 	}
 	if _, ok := m.services[t]; ok {
-		utils.GetLogInstance().Error("This service is already included: ", "servie", t)
+		utils.GetLogger().Error("This service is already included: ", "servie", t)
 		return
 	}
 	m.services[t] = service
@@ -139,7 +139,7 @@ func (m *Manager) SendAction(action *Action) {
 // TakeAction is how service manager handles the action.
 func (m *Manager) TakeAction(action *Action) {
 	if m.services == nil {
-		utils.GetLogInstance().Error("Service store is not initialized.")
+		utils.GetLogger().Error("Service store is not initialized.")
 		return
 	}
 	if service, ok := m.services[action.ServiceType]; ok {
@@ -166,7 +166,7 @@ func (m *Manager) StartServiceManager() chan *Action {
 					return
 				}
 			case <-time.After(WaitForStatusUpdate):
-				utils.GetLogInstance().Info("Waiting for new action.")
+				utils.GetLogger().Info("Waiting for new action.")
 			}
 		}
 	}()

@@ -75,7 +75,7 @@ func (node *Node) DoBeaconSyncing() {
 			if node.beaconSync.GetActivePeerNumber() == 0 {
 				peers := node.GetBeaconSyncingPeers()
 				if err := node.beaconSync.CreateSyncConfig(peers, true); err != nil {
-					ctxerror.Log15(utils.GetLogInstance().Debug, err)
+					ctxerror.Log15(utils.GetLogger().Debug, err)
 					continue
 				}
 			}
@@ -89,7 +89,7 @@ func (node *Node) DoBeaconSyncing() {
 func (node *Node) DoSyncing(bc *core.BlockChain, worker *worker.Worker, getPeers func() []p2p.Peer, willJoinConsensus bool) {
 	ticker := time.NewTicker(SyncFrequency * time.Second)
 
-	logger := utils.GetLogInstance()
+	logger := utils.GetLogger()
 	getLogger := func() log.Logger { return utils.WithCallerSkip(logger, 1) }
 SyncingLoop:
 	for {
@@ -103,7 +103,7 @@ SyncingLoop:
 			if node.stateSync.GetActivePeerNumber() == 0 {
 				peers := getPeers()
 				if err := node.stateSync.CreateSyncConfig(peers, false); err != nil {
-					ctxerror.Log15(utils.GetLogInstance().Debug, err)
+					ctxerror.Log15(utils.GetLogger().Debug, err)
 					continue SyncingLoop
 				}
 			}
@@ -152,7 +152,7 @@ func (node *Node) InitSyncingServer() {
 
 // StartSyncingServer starts syncing server.
 func (node *Node) StartSyncingServer() {
-	utils.GetLogInstance().Info("support_syncing: StartSyncingServer")
+	utils.GetLogger().Info("support_syncing: StartSyncingServer")
 	if node.downloaderServer.GrpcServer == nil {
 		node.downloaderServer.Start(node.SelfPeer.IP, syncing.GetSyncingPort(node.SelfPeer.Port))
 	}
@@ -164,18 +164,18 @@ func (node *Node) SendNewBlockToUnsync() {
 		block := <-node.Consensus.VerifiedNewBlock
 		blockHash, err := rlp.EncodeToBytes(block)
 		if err != nil {
-			utils.GetLogInstance().Warn("[SYNC] unable to encode block to hashes")
+			utils.GetLogger().Warn("[SYNC] unable to encode block to hashes")
 			continue
 		}
 
 		// really need to have a unique id independent of ip/port
 		selfPeerAddress := node.Consensus.SelfAddress
-		utils.GetLogInstance().Debug("[SYNC] peerRegistration Record", "selfPeerAddress", selfPeerAddress, "number", len(node.peerRegistrationRecord))
+		utils.GetLogger().Debug("[SYNC] peerRegistration Record", "selfPeerAddress", selfPeerAddress, "number", len(node.peerRegistrationRecord))
 
 		for peerID, config := range node.peerRegistrationRecord {
 			elapseTime := time.Now().UnixNano() - config.timestamp
 			if elapseTime > broadcastTimeout {
-				utils.GetLogInstance().Warn("[SYNC] SendNewBlockToUnsync to peer timeout", "peerID", peerID)
+				utils.GetLogger().Warn("[SYNC] SendNewBlockToUnsync to peer timeout", "peerID", peerID)
 				// send last time and delete
 				config.client.PushNewBlock(node.GetSyncID(), blockHash, true)
 				node.stateMutex.Lock()
@@ -235,14 +235,14 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 	// this is the out of sync node acts as grpc server side
 	case downloader_pb.DownloaderRequest_NEWBLOCK:
 		if node.State != NodeNotInSync {
-			utils.GetLogInstance().Debug("[SYNC] new block received, but state is", "state", node.State.String())
+			utils.GetLogger().Debug("[SYNC] new block received, but state is", "state", node.State.String())
 			response.Type = downloader_pb.DownloaderResponse_INSYNC
 			return response, nil
 		}
 		var blockObj types.Block
 		err := rlp.DecodeBytes(request.BlockHash, &blockObj)
 		if err != nil {
-			utils.GetLogInstance().Warn("[SYNC] unable to decode received new block")
+			utils.GetLogger().Warn("[SYNC] unable to decode received new block")
 			return response, err
 		}
 		node.stateSync.AddNewBlock(request.PeerHash, &blockObj)
@@ -253,32 +253,32 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 		port := request.Port
 		if _, ok := node.peerRegistrationRecord[peerID]; ok {
 			response.Type = downloader_pb.DownloaderResponse_FAIL
-			utils.GetLogInstance().Warn("[SYNC] peerRegistration record already exists", "ip", ip, "port", port)
+			utils.GetLogger().Warn("[SYNC] peerRegistration record already exists", "ip", ip, "port", port)
 			return response, nil
 		} else if len(node.peerRegistrationRecord) >= maxBroadcastNodes {
 			response.Type = downloader_pb.DownloaderResponse_FAIL
-			utils.GetLogInstance().Warn("[SYNC] maximum registration limit exceeds", "ip", ip, "port", port)
+			utils.GetLogger().Warn("[SYNC] maximum registration limit exceeds", "ip", ip, "port", port)
 			return response, nil
 		} else {
 			response.Type = downloader_pb.DownloaderResponse_FAIL
 			syncPort := syncing.GetSyncingPort(port)
 			client := downloader.ClientSetup(ip, syncPort)
 			if client == nil {
-				utils.GetLogInstance().Warn("[SYNC] unable to setup client for peerID", "ip", ip, "port", port)
+				utils.GetLogger().Warn("[SYNC] unable to setup client for peerID", "ip", ip, "port", port)
 				return response, nil
 			}
 			config := &syncConfig{timestamp: time.Now().UnixNano(), client: client}
 			node.stateMutex.Lock()
 			node.peerRegistrationRecord[peerID] = config
 			node.stateMutex.Unlock()
-			utils.GetLogInstance().Debug("[SYNC] register peerID success", "ip", ip, "port", port)
+			utils.GetLogger().Debug("[SYNC] register peerID success", "ip", ip, "port", port)
 			response.Type = downloader_pb.DownloaderResponse_SUCCESS
 		}
 
 	case downloader_pb.DownloaderRequest_REGISTERTIMEOUT:
 		if node.State == NodeNotInSync {
 			count := node.stateSync.RegisterNodeInfo()
-			utils.GetLogInstance().Debug("[SYNC] extra node registered", "number", count)
+			utils.GetLogger().Debug("[SYNC] extra node registered", "number", count)
 		}
 	}
 	return response, nil

@@ -69,11 +69,11 @@ func (storage *Storage) Init(ip, port string, remove bool) {
 	if remove {
 		var err = os.RemoveAll(dbFileName)
 		if err != nil {
-			utils.GetLogInstance().Error(err.Error())
+			utils.GetLogger().Error(err.Error())
 		}
 	}
 	if storage.db, err = ethdb.NewLDBDatabase(dbFileName, 0, 0); err != nil {
-		utils.GetLogInstance().Error(err.Error())
+		utils.GetLogger().Error(err.Error())
 	}
 }
 
@@ -84,7 +84,7 @@ func (storage *Storage) GetDB() *ethdb.LDBDatabase {
 
 // Dump extracts information from block and index them into lvdb for explorer.
 func (storage *Storage) Dump(block *types.Block, height uint32) {
-	utils.GetLogInstance().Info("Dumping block ", "block height", height)
+	utils.GetLogger().Info("Dumping block ", "block height", height)
 	if block == nil {
 		return
 	}
@@ -98,7 +98,7 @@ func (storage *Storage) Dump(block *types.Block, height uint32) {
 	if err == nil {
 		batch.Put([]byte(GetBlockKey(int(height))), blockData)
 	} else {
-		utils.GetLogInstance().Debug("Failed to serialize block ", "error", err)
+		utils.GetLogger().Debug("Failed to serialize block ", "error", err)
 	}
 
 	// Store txs
@@ -120,7 +120,7 @@ func (storage *Storage) UpdateTXStorage(batch ethdb.Batch, explorerTransaction *
 		key := GetTXKey(tx.Hash().Hex())
 		batch.Put([]byte(key), data)
 	} else {
-		utils.GetLogInstance().Error("EncodeRLP transaction error")
+		utils.GetLogger().Error("EncodeRLP transaction error")
 	}
 }
 
@@ -140,7 +140,7 @@ func (storage *Storage) UpdateAddressStorage(batch ethdb.Batch, adr string, expl
 		if err == nil {
 			address.Balance.Add(address.Balance, tx.Value())
 		} else {
-			utils.GetLogInstance().Error("Failed to error", "err", err)
+			utils.GetLogger().Error("Failed to error", "err", err)
 		}
 	} else {
 		address.Balance = tx.Value()
@@ -150,6 +150,6 @@ func (storage *Storage) UpdateAddressStorage(batch ethdb.Batch, adr string, expl
 	if encoded, err := rlp.EncodeToBytes(address); err == nil {
 		batch.Put([]byte(key), encoded)
 	} else {
-		utils.GetLogInstance().Error("Can not encode address account.")
+		utils.GetLogger().Error("Can not encode address account.")
 	}
 }

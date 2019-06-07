@@ -230,18 +230,18 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 	node.pendingTransactions = append(node.pendingTransactions, newTxs...)
 	// If length of pendingTransactions is greater than TxPoolLimit then by greedy take the TxPoolLimit recent transactions.
 	if len(node.pendingTransactions) > TxPoolLimit {
-		utils.GetLogInstance().Warn("Got more transactions than expected and this could caused OOM", "num", len(newTxs), "totalPending", len(node.pendingTransactions))
+		utils.GetLogger().Warn("Got more transactions than expected and this could caused OOM", "num", len(newTxs), "totalPending", len(node.pendingTransactions))
 		curLen := len(node.pendingTransactions)
 		node.pendingTransactions = node.pendingTransactions[curLen-TxPoolLimit:]
 	}
 	node.pendingTxMutex.Unlock()
-	utils.GetLogInstance().Info("Got more transactions", "num", len(newTxs), "totalPending", len(node.pendingTransactions))
+	utils.GetLogger().Info("Got more transactions", "num", len(newTxs), "totalPending", len(node.pendingTransactions))
 }
 
 // AddPendingTransaction adds one new transaction to the pending transaction list.
 func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
 	node.addPendingTransactions(types.Transactions{newTx})
-	utils.GetLogInstance().Debug("Got ONE more transaction", "totalPending", len(node.pendingTransactions))
+	utils.GetLogger().Debug("Got ONE more transaction", "totalPending", len(node.pendingTransactions))
 }
 
 // Take out a subset of valid transactions from the pending transaction list
@@ -251,7 +251,7 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int) types.Transactions {
 	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(node.pendingTransactions, maxNumTxs)
 
 	node.pendingTransactions = unselected
-	utils.GetLogInstance().Debug("Selecting Transactions", "remainPending", len(node.pendingTransactions), "selected", len(selected), "invalidDiscarded", len(invalid))
+	utils.GetLogger().Debug("Selecting Transactions", "remainPending", len(node.pendingTransactions), "selected", len(selected), "invalidDiscarded", len(invalid))
 	node.pendingTxMutex.Unlock()
 	return selected
 }
@@ -303,7 +303,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 	// Create test keys.  Genesis will later need this.
 	node.TestBankKeys, err = CreateTestBankKeys(FakeAddressNumber)
 	if err != nil {
-		utils.GetLogInstance().Crit("Error while creating test keys",
+		utils.GetLogger().Crit("Error while creating test keys",
 			"error", err)
 	}
 
@@ -389,7 +389,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 
 // InitShardState initialize genesis shard state and update committee pub keys for consensus and drand
 func (node *Node) InitShardState(isGenesis bool) (err error) {
-	logger := utils.GetLogInstance().New("isGenesis", isGenesis)
+	logger := utils.GetLogger().New("isGenesis", isGenesis)
 	getLogger := func() log.Logger { return utils.WithCallerSkip(logger, 1) }
 	if node.Consensus == nil {
 		getLogger().Crit("consensus is nil; cannot figure out shard ID")
@@ -488,17 +488,17 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 	var err error
 	node.shardGroupReceiver, err = node.host.GroupReceiver(node.NodeConfig.GetShardGroupID())
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to create shard receiver", "msg", err)
+		utils.GetLogger().Error("Failed to create shard receiver", "msg", err)
 	}
 
 	node.globalGroupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to create global receiver", "msg", err)
+		utils.GetLogger().Error("Failed to create global receiver", "msg", err)
 	}
 
 	node.clientReceiver, err = node.host.GroupReceiver(node.NodeConfig.GetClientGroupID())
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to create client receiver", "msg", err)
+		utils.GetLogger().Error("Failed to create client receiver", "msg", err)
 	}
 	return nodeConfig, chanPeer
 }

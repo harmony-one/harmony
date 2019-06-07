@@ -350,7 +350,7 @@ func WriteBlock(db DatabaseWriter, block *types.Block) {
 	epochBlockNum := block.Number()
 	writeOne := func() {
 		if err := WriteEpochBlockNumber(db, epoch, epochBlockNum); err != nil {
-			ctxerror.Log15(utils.GetLogInstance().Error, err)
+			ctxerror.Log15(utils.GetLogger().Error, err)
 		}
 	}
 	// A block may be a genesis block AND end-of-epoch block at the same time.

@@ -69,8 +69,8 @@ func initLogFile(logFolder, role, ip, port string, onlyLogTps bool) {
 	utils.AddLogHandler(fileHandler)
 
 	if onlyLogTps {
-		matchFilterHandler := log.MatchFilterHandler("msg", "TPS Report", utils.GetLogInstance().GetHandler())
-		utils.GetLogInstance().SetHandler(matchFilterHandler)
+		matchFilterHandler := log.MatchFilterHandler("msg", "TPS Report", utils.GetLogger().GetHandler())
+		utils.GetLogger().SetHandler(matchFilterHandler)
 	}
 }
 
@@ -199,7 +199,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 
 	// Specified Shard ID override calculated Shard ID
 	if *shardID >= 0 {
-		utils.GetLogInstance().Info("ShardID Override", "original", myShardID, "override", *shardID)
+		utils.GetLogger().Info("ShardID Override", "original", myShardID, "override", *shardID)
 		myShardID = uint32(*shardID)
 	}
 
@@ -208,7 +208,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	} else {
 		myShardID = 0 // This should be default value as new node doesn't belong to any shard.
 		if *shardID >= 0 {
-			utils.GetLogInstance().Info("ShardID Override", "original", myShardID, "override", *shardID)
+			utils.GetLogger().Info("ShardID Override", "original", myShardID, "override", *shardID)
 			myShardID = uint32(*shardID)
 			nodeConfig = nodeconfig.GetShardConfig(myShardID)
 		}
@@ -288,7 +288,7 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentNode := node.New(nodeConfig.Host, currentConsensus, chainDBFactory, *isArchival)
 	currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
 	currentNode.StakingAccount = myAccount
-	utils.GetLogInstance().Info("node account set",
+	utils.GetLogger().Info("node account set",
 		"address", currentNode.StakingAccount.Address.Hex())
 
 	if gsif, err := consensus.NewGenesisStakeInfoFinder(); err == nil {
@@ -369,7 +369,7 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	height := currentNode.Blockchain().CurrentBlock().NumberU64()
 
 	currentConsensus.SetViewID(uint32(height))
-	utils.GetLogInstance().Info("Init Blockchain", "height", height)
+	utils.GetLogger().Info("Init Blockchain", "height", height)
 
 	// Assign closure functions to the consensus object
 	currentConsensus.BlockVerifier = currentNode.VerifyNewBlock
@@ -408,7 +408,7 @@ func main() {
 	//	go currentNode.SupportBeaconSyncing()
 	//}
 
-	utils.GetLogInstance().Info("==== New Harmony Node ====",
+	utils.GetLogger().Info("==== New Harmony Node ====",
 		"BlsPubKey", hex.EncodeToString(nodeConfig.ConsensusPubKey.Serialize()),
 		"ShardID", nodeConfig.ShardID,
 		"ShardGroupID", nodeConfig.GetShardGroupID(),

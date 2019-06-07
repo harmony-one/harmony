@@ -134,7 +134,7 @@ func (node *Node) ServiceManagerSetup() {
 // RunServices runs registered services.
 func (node *Node) RunServices() {
 	if node.serviceManager == nil {
-		utils.GetLogInstance().Info("Service manager is not set up yet.")
+		utils.GetLogger().Info("Service manager is not set up yet.")
 		return
 	}
 	node.serviceManager.RunServices()
@@ -143,7 +143,7 @@ func (node *Node) RunServices() {
 // StopServices runs registered services.
 func (node *Node) StopServices() {
 	if node.serviceManager == nil {
-		utils.GetLogInstance().Info("Service manager is not set up yet.")
+		utils.GetLogger().Info("Service manager is not set up yet.")
 		return
 	}
 	node.serviceManager.StopServicesByRole([]service.Type{})

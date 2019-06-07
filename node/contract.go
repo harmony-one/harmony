@@ -72,12 +72,12 @@ func (node *Node) generateDeployedStakingContractAddress(contractAddress common.
 func (node *Node) QueryStakeInfo() *structs.StakeInfoReturnValue {
 	abi, err := abi.JSON(strings.NewReader(contracts.StakeLockContractABI))
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to generate staking contract's ABI", "error", err)
+		utils.GetLogger().Error("Failed to generate staking contract's ABI", "error", err)
 		return nil
 	}
 	bytesData, err := abi.Pack("listLockedAddresses")
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to generate ABI function bytes data", "error", err)
+		utils.GetLogger().Error("Failed to generate ABI function bytes data", "error", err)
 		return nil
 	}
 
@@ -87,7 +87,7 @@ func (node *Node) QueryStakeInfo() *structs.StakeInfoReturnValue {
 	state, err := node.Blockchain().State()
 
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to get blockchain state", "error", err)
+		utils.GetLogger().Error("Failed to get blockchain state", "error", err)
 		return nil
 	}
 
@@ -103,13 +103,13 @@ func (node *Node) QueryStakeInfo() *structs.StakeInfoReturnValue {
 	)
 	signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, priKey)
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to sign contract call tx", "error", err)
+		utils.GetLogger().Error("Failed to sign contract call tx", "error", err)
 		return nil
 	}
 	output, err := node.ContractCaller.CallContract(signedTx)
 
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to call staking contract", "error", err)
+		utils.GetLogger().Error("Failed to call staking contract", "error", err)
 		return nil
 	}
 
@@ -118,7 +118,7 @@ func (node *Node) QueryStakeInfo() *structs.StakeInfoReturnValue {
 	err = abi.Unpack(ret, "listLockedAddresses", output)
 
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to unpack stake info", "error", err)
+		utils.GetLogger().Error("Failed to unpack stake info", "error", err)
 		return nil
 	}
 	return ret
@@ -170,7 +170,7 @@ func (node *Node) CallFaucetContract(address common.Address) common.Hash {
 	// Temporary code to workaround explorer issue for searching new addresses (https://github.com/harmony-one/harmony/issues/503)
 	nonce := atomic.AddUint64(&node.ContractDeployerCurrentNonce, 1)
 	tx, _ := types.SignTx(types.NewTransaction(nonce-1, address, node.Consensus.ShardID, big.NewInt(0), params.TxGasContractCreation*10, nil, nil), types.HomesteadSigner{}, node.ContractDeployerKey)
-	utils.GetLogInstance().Info("Sending placeholder token to ", "Address", address.Hex())
+	utils.GetLogger().Info("Sending placeholder token to ", "Address", address.Hex())
 	node.addPendingTransactions(types.Transactions{tx})
 	// END Temporary code
 
@@ -186,20 +186,20 @@ func (node *Node) callGetFreeToken(address common.Address) common.Hash {
 func (node *Node) callGetFreeTokenWithNonce(address common.Address, nonce uint64) common.Hash {
 	abi, err := abi.JSON(strings.NewReader(contracts.FaucetABI))
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to generate faucet contract's ABI", "error", err)
+		utils.GetLogger().Error("Failed to generate faucet contract's ABI", "error", err)
 		return common.Hash{}
 	}
 	bytesData, err := abi.Pack("request", address)
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to generate ABI function bytes data", "error", err)
+		utils.GetLogger().Error("Failed to generate ABI function bytes data", "error", err)
 		return common.Hash{}
 	}
 	if len(node.ContractAddresses) == 0 {
-		utils.GetLogInstance().Error("Failed to find the contract address")
+		utils.GetLogger().Error("Failed to find the contract address")
 		return common.Hash{}
 	}
 	tx, _ := types.SignTx(types.NewTransaction(nonce, node.ContractAddresses[0], node.Consensus.ShardID, big.NewInt(0), params.TxGasContractCreation*10, nil, bytesData), types.HomesteadSigner{}, node.ContractDeployerKey)
-	utils.GetLogInstance().Info("Sending Free Token to ", "Address", address.Hex())
+	utils.GetLogger().Info("Sending Free Token to ", "Address", address.Hex())
 
 	node.addPendingTransactions(types.Transactions{tx})
 	return tx.Hash()
@@ -220,6 +220,6 @@ func (node *Node) AddContractKeyAndAddress(t builtInSC) {
 		stakingPrivKey := contract_constants.GenesisBeaconAccountPriKey
 		node.StakingContractAddress = crypto.CreateAddress(crypto.PubkeyToAddress(stakingPrivKey.PublicKey), uint64(0))
 	default:
-		utils.GetLogInstance().Error("AddContractKeyAndAddress", "unknown SC", t)
+		utils.GetLogger().Error("AddContractKeyAndAddress", "unknown SC", t)
 	}
 }

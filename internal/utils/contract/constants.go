@@ -23,7 +23,7 @@ type DeployAccount struct {
 func BeaconAccountPriKey() *ecdsa.PrivateKey {
 	prikey, err := ecdsa.GenerateKey(crypto.S256(), strings.NewReader(beaconGenesisString))
 	if err != nil && prikey == nil {
-		utils.GetLogInstance().Error("Failed to generate beacon chain contract deployer account")
+		utils.GetLogger().Error("Failed to generate beacon chain contract deployer account")
 		os.Exit(1)
 	}
 	return prikey

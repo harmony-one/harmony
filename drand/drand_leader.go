@@ -43,7 +43,7 @@ func (dRand *DRand) WaitForEpochBlock(blockChannel chan *types.Block, stopChan c
 						start := time.Now()
 						vdf.Execute()
 						duration := time.Now().Sub(start)
-						utils.GetLogInstance().Info("VDF computation finished", "time spent", duration.String())
+						utils.GetLogger().Info("VDF computation finished", "time spent", duration.String())
 						output := <-outputChannel
 
 						rndBytes := [64]byte{} // The first 32 bytes are the randomness and the last 32 bytes are the hash of the block where the corresponding pRnd was generated
@@ -63,7 +63,7 @@ func (dRand *DRand) WaitForEpochBlock(blockChannel chan *types.Block, stopChan c
 }
 
 func (dRand *DRand) init(epochBlock *types.Block) {
-	utils.GetLogInstance().Debug("INITING DRAND")
+	utils.GetLogger().Debug("INITING DRAND")
 	dRand.ResetState()
 	// Copy over block hash and block header data
 	blockHash := epochBlock.Hash()
@@ -76,7 +76,7 @@ func (dRand *DRand) init(epochBlock *types.Block) {
 
 	(*dRand.vrfs)[dRand.SelfAddress] = append(rand[:], proof...)
 
-	utils.GetLogInstance().Info("[DRG] sent init", "msg", msgToSend, "leader.PubKey", dRand.leader.ConsensusPubKey)
+	utils.GetLogger().Info("[DRG] sent init", "msg", msgToSend, "leader.PubKey", dRand.leader.ConsensusPubKey)
 	dRand.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(dRand.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 }
 
@@ -86,22 +86,22 @@ func (dRand *DRand) ProcessMessageLeader(payload []byte) {
 	err := protobuf.Unmarshal(payload, message)
 
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to unmarshal message payload.", "err", err, "dRand", dRand)
+		utils.GetLogger().Error("Failed to unmarshal message payload.", "err", err, "dRand", dRand)
 	}
 
 	switch message.Type {
 	case msg_pb.MessageType_DRAND_COMMIT:
 		dRand.processCommitMessage(message)
 	default:
-		utils.GetLogInstance().Error("Unexpected message type", "msgType", message.Type, "dRand", dRand)
+		utils.GetLogger().Error("Unexpected message type", "msgType", message.Type, "dRand", dRand)
 	}
 }
 
 // ProcessMessageValidator dispatches validator's consensus message.
 func (dRand *DRand) processCommitMessage(message *msg_pb.Message) {
-	utils.GetLogInstance().Info("[DRG] Leader received commit")
+	utils.GetLogger().Info("[DRG] Leader received commit")
 	if message.Type != msg_pb.MessageType_DRAND_COMMIT {
-		utils.GetLogInstance().Error("Wrong message type received", "expected", msg_pb.MessageType_DRAND_COMMIT, "got", message.Type)
+		utils.GetLogger().Error("Wrong message type received", "expected", msg_pb.MessageType_DRAND_COMMIT, "got", message.Type)
 		return
 	}
 
@@ -112,26 +112,26 @@ func (dRand *DRand) processCommitMessage(message *msg_pb.Message) {
 
 	senderPubKey, err := bls.BytesToBlsPublicKey(drandMsg.SenderPubkey)
 	if err != nil {
-		utils.GetLogInstance().Debug("Failed to deserialize BLS public key", "error", err)
+		utils.GetLogger().Debug("Failed to deserialize BLS public key", "error", err)
 		return
 	}
 	validatorAddress := utils.GetBlsAddress(senderPubKey)
 
 	if !dRand.IsValidatorInCommittee(validatorAddress) {
-		utils.GetLogInstance().Error("Invalid validator", "validatorAddress", validatorAddress)
+		utils.GetLogger().Error("Invalid validator", "validatorAddress", validatorAddress)
 		return
 	}
 
 	vrfs := dRand.vrfs
 	if len((*vrfs)) >= ((len(dRand.PublicKeys))/3 + 1) {
-		utils.GetLogInstance().Debug("Received additional randomness commit message", "validatorAddress", validatorAddress)
+		utils.GetLogger().Debug("Received additional randomness commit message", "validatorAddress", validatorAddress)
 		return
 	}
 
 	// Verify message signature
 	err = verifyMessageSig(senderPubKey, message)
 	if err != nil {
-		utils.GetLogInstance().Warn("[DRAND] failed to verify the message signature", "Error", err, "PubKey", senderPubKey)
+		utils.GetLogger().Warn("[DRAND] failed to verify the message signature", "Error", err, "PubKey", senderPubKey)
 		return
 	}
 
@@ -144,18 +144,18 @@ func (dRand *DRand) processCommitMessage(message *msg_pb.Message) {
 	expectedRand, err := vrfPubKey.ProofToHash(dRand.blockHash[:], proof)
 
 	if err != nil || !bytes.Equal(expectedRand[:], rand) {
-		utils.GetLogInstance().Error("[DRAND] Failed to verify the VRF", "error", err, "validatorAddress", validatorAddress, "expectedRand", expectedRand, "receivedRand", rand)
+		utils.GetLogger().Error("[DRAND] Failed to verify the VRF", "error", err, "validatorAddress", validatorAddress, "expectedRand", expectedRand, "receivedRand", rand)
 		return
 	}
 
-	utils.GetLogInstance().Debug("Received new VRF commit", "numReceivedSoFar", len((*vrfs)), "validatorAddress", validatorAddress, "PublicKeys", len(dRand.PublicKeys))
+	utils.GetLogger().Debug("Received new VRF commit", "numReceivedSoFar", len((*vrfs)), "validatorAddress", validatorAddress, "PublicKeys", len(dRand.PublicKeys))
 
 	(*vrfs)[validatorAddress] = drandMsg.Payload
 	dRand.bitmap.SetKey(senderPubKey, true) // Set the bitmap indicating that this validator signed.
 
 	if len((*vrfs)) >= ((len(dRand.PublicKeys))/3 + 1) {
 		// Construct pRand and initiate consensus on it
-		utils.GetLogInstance().Debug("[DRAND] {BINGO} Received enough randomness commit", "numReceivedSoFar", len((*vrfs)), "validatorAddress", validatorAddress, "PublicKeys", len(dRand.PublicKeys))
+		utils.GetLogger().Debug("[DRAND] {BINGO} Received enough randomness commit", "numReceivedSoFar", len((*vrfs)), "validatorAddress", validatorAddress, "PublicKeys", len(dRand.PublicKeys))
 
 		pRnd := [32]byte{}
 		// Bitwise XOR on all the submitted vrfs

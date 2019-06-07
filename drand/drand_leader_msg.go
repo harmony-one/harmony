@@ -22,7 +22,7 @@ func (dRand *DRand) constructInitMessage() []byte {
 	// Don't need the payload in init message
 	marshaledMessage, err := dRand.signAndMarshalDRandMessage(message)
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to sign and marshal the init message", "error", err)
+		utils.GetLogger().Error("Failed to sign and marshal the init message", "error", err)
 	}
 	return proto.ConstructDRandMessage(marshaledMessage)
 }
