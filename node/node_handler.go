@@ -571,7 +571,7 @@ func (node *Node) SendPongMessage() {
 }
 
 func (node *Node) pongMessageHandler(msgPayload []byte) int {
-	utils.GetLogInstance().Error("Got Pong Message")
+	utils.GetLogInstance().Info("Got Pong Message")
 	pong, err := proto_discovery.GetPongMessage(msgPayload)
 	if err != nil {
 		utils.GetLogInstance().Error("Can't get Pong Message", "error", err)
