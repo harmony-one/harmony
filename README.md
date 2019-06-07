@@ -37,7 +37,7 @@ cd mcl && make -j4 && cd ..
 
 git clone git@github.com:harmony-one/bls.git
 
-cd bls && make -j4 && cd ..
+cd bls && make BLS_SWAP_G=1 -j4 && cd ..
 
 git clone git@github.com:harmony-one/harmony.git
 
