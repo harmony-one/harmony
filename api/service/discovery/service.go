@@ -77,7 +77,7 @@ func (s *Service) contactP2pPeers() {
 
 	pingMsg := proto_discovery.NewPingMessage(s.host.GetSelfPeer(), s.config.IsClient)
 
-	utils.GetLogInstance().Error("Constructing Ping Message", "myPing", pingMsg)
+	utils.GetLogInstance().Info("Constructing Ping Message", "myPing", pingMsg)
 	msgBuf := host.ConstructP2pMessage(byte(0), pingMsg.ConstructPingMessage())
 	s.sentPingMessage(s.config.ShardGroupID, msgBuf)
 

@@ -31,13 +31,6 @@ var (
 
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
-	ConsensusVersion string
-
-	// Consensus round.  Increments every time state is reset.
-	// Useful for delayed processing for the current round,
-	// such as commit finalization.
-	round uint64
-
 	// pbftLog stores the pbft messages and blocks during PBFT process
 	pbftLog *PbftLog
 	// phase: different phase of PBFT protocol: pre-prepare, prepare, commit, finish etc
@@ -147,9 +140,6 @@ type Consensus struct {
 
 	// If true, this consensus will not propose view change.
 	disableViewChange bool
-
-	// Consensus rounds whose commit phase finished
-	commitFinishChan chan uint64
 }
 
 // WatchObservedObjects adds more objects from consensus object to watch for memory issues.
@@ -258,7 +248,6 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 
 	consensus.MsgChan = make(chan []byte)
 	consensus.syncReadyChan = make(chan struct{})
-	consensus.commitFinishChan = make(chan uint64)
 
 	consensus.ReadySignal = make(chan struct{})
 	if nodeconfig.GetDefaultConfig().IsLeader() {

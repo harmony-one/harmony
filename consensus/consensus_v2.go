@@ -79,7 +79,7 @@ func (consensus *Consensus) tryAnnounce(block *types.Block) {
 	}
 	consensus.block = encodedBlock
 	msgToSend := consensus.constructAnnounceMessage()
-	consensus.switchPhase(Prepare)
+	consensus.switchPhase(Prepare, false)
 
 	// save announce message to pbftLog
 	msgPayload, _ := proto.GetConsensusMessagePayload(msgToSend)
@@ -208,7 +208,7 @@ func (consensus *Consensus) tryPrepare(blockHash common.Hash) {
 		return
 	}
 
-	consensus.switchPhase(Prepare)
+	consensus.switchPhase(Prepare, false)
 
 	// Construct and send prepare message
 	msgToSend := consensus.constructPrepareMessage()
@@ -289,7 +289,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	prepareBitmap.SetKey(validatorPubKey, true) // Set the bitmap indicating that this validator signed.
 
 	if len(prepareSigs) >= consensus.Quorum() {
-		consensus.switchPhase(Commit)
+		consensus.switchPhase(Commit, false)
 
 		// Construct and broadcast prepared message
 		msgToSend, aggSig := consensus.constructPreparedMessage()
@@ -349,7 +349,12 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
-	// TODO: add 2f+1 signature checking
+	// check has 2f+1 signatures
+	if count := utils.CountOneBits(mask.Bitmap); count < consensus.Quorum() {
+		utils.GetLogger().Debug("not have enough signature", "need", consensus.Quorum(), "have", count)
+		return
+	}
+
 	if !aggSig.VerifyHash(mask.AggregatePublic, blockHash[:]) {
 		myBlockHash := common.Hash{}
 		myBlockHash.SetBytes(consensus.blockHash[:])
@@ -392,7 +397,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	utils.GetLogInstance().Warn("[Consensus]", "sent commit message", len(msgToSend))
 	consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 
-	consensus.switchPhase(Commit)
+	consensus.switchPhase(Commit, false)
 
 	return
 }
@@ -453,7 +458,10 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		return
 	}
 
-	quorumWasMet := len(commitSigs) >= consensus.Quorum()
+	// already had enough signautres
+	if len(commitSigs) >= consensus.Quorum() {
+		return
+	}
 
 	// Verify the signature on prepare multi-sig and bitmap is correct
 	var sign bls.Sign
@@ -472,21 +480,15 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	// Set the bitmap indicating that this validator signed.
 	commitBitmap.SetKey(validatorPubKey, true)
 
-	quorumIsMet := len(commitSigs) >= consensus.Quorum()
-
-	if !quorumWasMet && quorumIsMet {
+	if len(commitSigs) >= consensus.Quorum() {
 		utils.GetLogInstance().Info("Enough commits received!", "num", len(commitSigs), "phase", consensus.phase)
-		go func(round uint64) {
-			time.Sleep(1 * time.Second)
-			utils.GetLogger().Debug("Commit grace period ended", "round", round)
-			consensus.commitFinishChan <- round
-		}(consensus.round)
+		consensus.finalizeCommits()
 	}
 }
 
 func (consensus *Consensus) finalizeCommits() {
 	utils.GetLogger().Info("finalizing block", "num", len(consensus.commitSigs), "phase", consensus.phase)
-	consensus.switchPhase(Announce)
+	consensus.switchPhase(Announce, false)
 
 	// Construct and broadcast committed message
 	msgToSend, aggSig := consensus.constructCommittedMessage()
@@ -580,8 +582,13 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		return
 	}
 
+	// check has 2f+1 signatures
+	if count := utils.CountOneBits(mask.Bitmap); count < consensus.Quorum() {
+		utils.GetLogger().Debug("not have enough signature", "need", consensus.Quorum(), "have", count)
+		return
+	}
+
 	if consensus.mode.Mode() == Normal && consensus.aggregatedPrepareSig != nil && consensus.prepareBitmap != nil {
-		// TODO: add 2f+1 signature checking
 		prepareMultiSigAndBitmap := append(consensus.aggregatedPrepareSig.Serialize(), consensus.prepareBitmap.Bitmap...)
 		if !aggSig.VerifyHash(mask.AggregatePublic, prepareMultiSigAndBitmap) {
 			utils.GetLogger().Error("Failed to verify the multi signature for commit phase", "leader Address", leaderAddress)
@@ -634,7 +641,7 @@ func (consensus *Consensus) tryCatchup() {
 	//		return
 	//	}
 	currentBlockNum := consensus.blockNum
-	consensus.phase = Announce
+	consensus.switchPhase(Announce, true)
 	for {
 		msgs := consensus.pbftLog.GetMessagesByTypeSeq(msg_pb.MessageType_COMMITTED, consensus.blockNum)
 		if len(msgs) == 0 {
@@ -787,15 +794,6 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 
 			case msg := <-consensus.MsgChan:
 				consensus.handleMessageUpdate(msg)
-
-			case round := <-consensus.commitFinishChan:
-				func() {
-					consensus.mutex.Lock()
-					defer consensus.mutex.Unlock()
-					if round == consensus.round {
-						consensus.finalizeCommits()
-					}
-				}()
 
 			case <-stopChan:
 				return
