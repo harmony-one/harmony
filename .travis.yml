@@ -13,11 +13,11 @@ install:
   - cd github.com/harmony-one
   - git clone https://github.com/harmony-one/mcl.git
   - cd mcl
-  - make
+  - make -j4
   - cd ..
   - git clone https://github.com/harmony-one/bls.git
   - cd bls
-  - make
+  - make BLS_SWAP_G=1 -j4
   - cd ../harmony
   - go get -v ./...
   - scripts/install_build_tools.sh
