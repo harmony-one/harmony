@@ -16,5 +16,5 @@ ENTRYPOINT ["/bin/run"]
 WORKDIR /harmony
 
 COPY run /bin/run
-COPY libbls384.so libmcl.so /lib/
+COPY libbls384_256.so libmcl.so /lib/
 COPY harmony /bin/

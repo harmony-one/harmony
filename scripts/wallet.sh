@@ -6,11 +6,11 @@ REL=drum
 
 if [ "$OS" == "Darwin" ]; then
    FOLDER=release/$REL/darwin-x86_64/
-   BIN=( wallet wallet.ini libbls384.dylib libcrypto.1.0.0.dylib libgmp.10.dylib libgmpxx.4.dylib libmcl.dylib )
+   BIN=( wallet wallet.ini libbls384_256.dylib libcrypto.1.0.0.dylib libgmp.10.dylib libgmpxx.4.dylib libmcl.dylib )
 fi
 if [ "$OS" == "Linux" ]; then
    FOLDER=release/$REL/linux-x86_64/
-   BIN=( wallet wallet.ini libbls384.so libcrypto.so.10 libgmp.so.10 libgmpxx.so.4 libmcl.so )
+   BIN=( wallet wallet.ini libbls384_256.so libcrypto.so.10 libgmp.so.10 libgmpxx.so.4 libmcl.so )
 fi
 
 function usage

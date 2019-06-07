@@ -32,11 +32,11 @@ declare -A LIB
 if [ "$(uname -s)" == "Darwin" ]; then
    MD5='md5 -r'
    GOOS=darwin
-   LIB[libbls384.dylib]=${BLS_DIR}/lib/libbls384.dylib
+   LIB[libbls384_256.dylib]=${BLS_DIR}/lib/libbls384_256.dylib
    LIB[libmcl.dylib]=${MCL_DIR}/lib/libmcl.dylib
 else
    MD5=md5sum
-   LIB[libbls384.so]=${BLS_DIR}/lib/libbls384.so
+   LIB[libbls384_256.so]=${BLS_DIR}/lib/libbls384_256.so
    LIB[libmcl.so]=${MCL_DIR}/lib/libmcl.so
 fi
 
