@@ -218,6 +218,12 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	if consensus.blockNum > recvMsg.BlockNum {
 		return
 	}
+
+	if consensus.blockNum < recvMsg.BlockNum {
+		utils.GetLogger().Warn("new leader has lower blocknum", "have", consensus.blockNum, "got", recvMsg.BlockNum)
+		return
+	}
+
 	if consensus.mode.Mode() == ViewChanging && consensus.mode.GetViewID() > recvMsg.ViewID {
 		return
 	}
@@ -350,8 +356,11 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			consensus.aggregatedPrepareSig = aggSig
 			consensus.prepareBitmap = mask
 
-			// Leader sign the multi-sig and bitmap (for commit phase)
-			consensus.commitSigs[consensus.SelfAddress] = consensus.priKey.SignHash(consensus.m1Payload[32:])
+			// Leader sign commit message
+			blockNumHash := make([]byte, 8)
+			binary.LittleEndian.PutUint64(blockNumHash, consensus.blockNum)
+			commitPayload := append(blockNumHash, consensus.blockHash[:]...)
+			consensus.commitSigs[consensus.SelfAddress] = consensus.priKey.SignHash(commitPayload)
 		}
 
 		consensus.mode.SetViewID(recvMsg.ViewID)
@@ -385,14 +394,10 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		return
 	}
 
-	if consensus.blockNum != recvMsg.BlockNum {
-		return
-	}
 	if err = verifyMessageSig(senderKey, msg); err != nil {
 		utils.GetLogInstance().Debug("onNewView failed to verify new leader's signature", "error", err)
 		return
 	}
-
 	consensus.vcLock.Lock()
 	defer consensus.vcLock.Unlock()
 
@@ -455,27 +460,36 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		copy(preparedMsg.Payload[:], recvMsg.Payload[32:])
 		preparedMsg.SenderPubkey = senderKey
 		consensus.pbftLog.AddMessage(&preparedMsg)
+	}
 
-		if recvMsg.BlockNum > consensus.blockNum {
-			return
-		}
+	// newView message verified success, override my state
+	consensus.viewID = recvMsg.ViewID
+	consensus.mode.SetViewID(recvMsg.ViewID)
+	consensus.LeaderPubKey = senderKey
+	consensus.ResetViewChangeState()
 
-		consensus.viewID = consensus.mode.GetViewID()
+	// change view and leaderKey to keep in sync with network
+	if consensus.blockNum != recvMsg.BlockNum {
+		utils.GetLogger().Debug("new leader changed", "newLeaderKey", consensus.LeaderPubKey.GetHexString()[:20], "viewID", consensus.viewID, "myBlock", consensus.blockNum, "newViewBlockNum", recvMsg.BlockNum)
+		return
+	}
+
+	if len(recvMsg.Payload) > 32 {
 		// Construct and send the commit message
-		multiSigAndBitmap := append(aggSig.Serialize(), mask.Bitmap...)
-		msgToSend := consensus.constructCommitMessage(multiSigAndBitmap)
+		blockNumHash := make([]byte, 8)
+		binary.LittleEndian.PutUint64(blockNumHash, consensus.blockNum)
+		commitPayload := append(blockNumHash, consensus.blockHash[:]...)
+		msgToSend := consensus.constructCommitMessage(commitPayload)
+
 		utils.GetLogInstance().Info("onNewView === commit", "sent commit message", len(msgToSend), "viewID", consensus.viewID)
 		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
-		consensus.phase = Commit
+		consensus.switchPhase(Commit, true)
 	} else {
 		consensus.ResetState()
 		utils.GetLogInstance().Info("onNewView === announce")
 	}
-	consensus.LeaderPubKey = senderKey
-	consensus.viewID = recvMsg.ViewID
-	consensus.ResetViewChangeState()
 	utils.GetLogger().Debug("new leader changed", "newLeaderKey", consensus.LeaderPubKey.GetHexString()[:20], "viewID", consensus.viewID, "block", consensus.blockNum)
-	utils.GetLogger().Debug("validator start consensus timeout and stop view change timeout", "viewID", consensus.viewID, "block", consensus.blockNum, "viewChangingID", consensus.mode.ViewID())
+	utils.GetLogger().Debug("validator start consensus timeout and stop view change timeout", "viewID", consensus.viewID, "block", consensus.blockNum)
 	consensus.consensusTimeout[timeoutConsensus].Start()
 	consensus.consensusTimeout[timeoutViewChange].Stop()
 }
