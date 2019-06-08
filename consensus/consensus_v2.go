@@ -292,16 +292,25 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 
 	if len(prepareSigs) >= consensus.Quorum() {
 		consensus.switchPhase(Commit, false)
-
 		// Construct and broadcast prepared message
 		msgToSend, aggSig := consensus.constructPreparedMessage()
 		consensus.aggregatedPrepareSig = aggSig
+
+		// add prepared message to log
+		msgPayload, _ := proto.GetConsensusMessagePayload(msgToSend)
+		msg := &msg_pb.Message{}
+		_ = protobuf.Unmarshal(msgPayload, msg)
+		pbftMsg, err := ParsePbftMessage(msg)
+		if err != nil {
+			utils.GetLogger().Warn("onPrepare unable to parse pbft message", "error", err)
+			return
+		}
+		consensus.pbftLog.AddMessage(pbftMsg)
 
 		utils.GetLogger().Warn("sent prepared message", "viewID", consensus.viewID, "block", consensus.blockNum)
 		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 
 		// Leader add commit phase signature
-
 		blockNumHash := make([]byte, 8)
 		binary.LittleEndian.PutUint64(blockNumHash, consensus.blockNum)
 		commitPayload := append(blockNumHash, consensus.blockHash[:]...)
@@ -438,6 +447,11 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 
 	if !consensus.pbftLog.HasMatchingAnnounce(consensus.blockNum, recvMsg.BlockHash) {
 		utils.GetLogger().Debug("cannot find matching blockhash")
+		return
+	}
+
+	if !consensus.pbftLog.HasMatchingViewPrepared(consensus.blockNum, consensus.viewID, recvMsg.BlockHash) {
+		utils.GetLogger().Debug("cannot find matching prepared message")
 		return
 	}
 
