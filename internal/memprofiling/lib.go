@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"runtime"
 	"sync"
 	"time"
 
@@ -18,9 +19,11 @@ const (
 	MemProfilingPortDiff = 1000
 	// Constants of for scanning mem size.
 	memSizeScanTime = 30 * time.Second
+	// Run garbage collector every 30 minutes.
+	gcTime = 10 * time.Minute
 )
 
-// MemProfiling is the struct of MemProfiling.
+// MemProfiling is the struct to watch objects for memprofiling.
 type MemProfiling struct {
 	h              *memsizeui.Handler
 	s              *http.Server
@@ -87,4 +90,33 @@ func (m *MemProfiling) PeriodicallyScanMemSize() {
 			}
 		}
 	}()
+}
+
+// MaybeCallGCPeriodically runs GC manually every gcTime minutes. This is one of the options to mitigate the OOM issue.
+func MaybeCallGCPeriodically() {
+	go func() {
+		for {
+			select {
+			case <-time.After(gcTime):
+				PrintMemUsage("mem stats before GC")
+				runtime.GC()
+				PrintMemUsage("mem stats after GC")
+			}
+		}
+	}()
+}
+
+// PrintMemUsage prints memory usage.
+func PrintMemUsage(msg string) {
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	utils.GetLogInstance().Info(msg,
+		"alloc", bToMb(m.Alloc),
+		"totalalloc", bToMb(m.TotalAlloc),
+		"sys", bToMb(m.Sys),
+		"numgc", m.NumGC)
+}
+
+func bToMb(b uint64) uint64 {
+	return b / 1024 / 1024
 }

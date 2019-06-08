@@ -122,12 +122,6 @@ var (
 		"Do not propose view change (testing only)")
 )
 
-// Constants for GC.
-const (
-	// Run garbage collector every 30 minutes.
-	gcTime = 30 * time.Minute
-)
-
 func initSetup() {
 	if *versionFlag {
 		printVersion(os.Args[0])
@@ -199,20 +193,8 @@ func initSetup() {
 
 	// Set up manual call for garbage collection.
 	if *enableGC {
-		maybeCallGCPeriodically()
+		memprofiling.MaybeCallGCPeriodically()
 	}
-}
-
-// Run GC manually every 30 minutes. This is one of the options to mitigate the OOM issue.
-func maybeCallGCPeriodically() {
-	go func() {
-		for {
-			select {
-			case <-time.After(gcTime):
-				runtime.GC()
-			}
-		}
-	}()
 }
 
 func createGlobalConfig() *nodeconfig.ConfigType {
