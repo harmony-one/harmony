@@ -237,7 +237,7 @@ func GetInitShardState() types.ShardState {
 
 		// add FN runner's key
 		for j := GenesisShardHarmony; j < GenesisShardSize; j++ {
-			index := i + (j - GenesisShardHarmony)*GenesisShardNum
+			index := i + (j-GenesisShardHarmony)*GenesisShardNum
 			priKey := bls.SecretKey{}
 			priKey.SetHexString(genesis.GenesisFNAccounts[index].BLSKey)
 			pubKey := types.BlsPublicKey{}

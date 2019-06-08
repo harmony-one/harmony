@@ -17,8 +17,8 @@ import (
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/ctxerror"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/internal/genesis"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 const (

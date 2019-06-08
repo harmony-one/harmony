@@ -1,7 +1,7 @@
 package genesis
 
 // NewNodeAccounts are the accounts for the new node
-var NewNodeAccounts = [...]DeployAccount {
+var NewNodeAccounts = [...]DeployAccount{
 	{Address: "0x0e59b767D5E74cf7B29Ef9bEc3dA4c402d357C6C", Public: "0x0e59b767D5E74cf7B29Ef9bEc3dA4c402d357C6C", BLSKey: "60c398270c8122ae196f03b9bee10186f224f0fe378eefbdcdfd2240a52d46ef"},
 	{Address: "0x0fAAda81c203C74CAc786786f7D428477a04bF9c", Public: "0x0fAAda81c203C74CAc786786f7D428477a04bF9c", BLSKey: "3ff0efdc6c88d21070721840da44cb2d381a6056d08bc2bc5552bfaafd3652b3"},
 	{Address: "0x0fd228bdFbe9ad0c898e9A0Fee2E6FB01f596F0d", Public: "0x0fd228bdFbe9ad0c898e9A0Fee2E6FB01f596F0d", BLSKey: "34ef1d0db507afd5b59aa52c73cf2a46e25026a36592d83e561e07d618a10b4e"},

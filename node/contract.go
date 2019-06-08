@@ -16,8 +16,8 @@ import (
 	"github.com/harmony-one/harmony/contracts"
 	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/internal/genesis"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // Constants related to smart contract.
