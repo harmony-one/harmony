@@ -26,8 +26,8 @@ const (
 	GenesisShardNum = 4
 	// GenesisShardSize is the size of each shard at genesis
 	GenesisShardSize = 100
-	// GenesisShardHarmony is the number of harmony node at each shard
-	GenesisShardHarmony = 77
+	// GenesisShardHarmonyNodes is the number of harmony node at each shard
+	GenesisShardHarmonyNodes = 78
 	// CuckooRate is the percentage of nodes getting reshuffled in the second step of cuckoo resharding.
 	CuckooRate = 0.1
 )
@@ -224,7 +224,7 @@ func GetInitShardState() types.ShardState {
 	shardState := types.ShardState{}
 	for i := 0; i < GenesisShardNum; i++ {
 		com := types.Committee{ShardID: uint32(i)}
-		for j := 0; j < GenesisShardHarmony; j++ {
+		for j := 0; j < GenesisShardHarmonyNodes; j++ {
 			index := i + j*GenesisShardNum // The initial account to use for genesis nodes
 			priKey := bls.SecretKey{}
 			priKey.SetHexString(genesis.GenesisAccounts[index].BLSKey)
@@ -236,8 +236,8 @@ func GetInitShardState() types.ShardState {
 		}
 
 		// add FN runner's key
-		for j := GenesisShardHarmony; j < GenesisShardSize; j++ {
-			index := i + (j-GenesisShardHarmony)*GenesisShardNum
+		for j := GenesisShardHarmonyNodes; j < GenesisShardSize; j++ {
+			index := i + (j-GenesisShardHarmonyNodes)*GenesisShardNum
 			priKey := bls.SecretKey{}
 			priKey.SetHexString(genesis.GenesisFNAccounts[index].BLSKey)
 			pubKey := types.BlsPublicKey{}

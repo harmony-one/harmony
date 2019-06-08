@@ -1,10 +1,9 @@
 package genesis
 
 import (
-   "testing"
+	"testing"
 )
 
 func TestString(t *testing.T) {
-   _ = BeaconAccountPriKey()
+	_ = BeaconAccountPriKey()
 }
-
