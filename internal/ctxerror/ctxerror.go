@@ -8,6 +8,8 @@ package ctxerror
 
 import (
 	"fmt"
+
+	"github.com/ethereum/go-ethereum/log"
 )
 
 // CtxError is a context-aware error container.
@@ -121,4 +123,41 @@ func Log15(f Log15Func, e error) {
 	} else {
 		f(e.Error())
 	}
+}
+
+// Log15WithMsg logs an error with a message prefix using a log15-style
+// logging function.  It is a shortcut for a common pattern of prepending a
+// context prefix.
+func Log15WithMsg(f Log15Func, e error, msg string, ctx ...interface{}) {
+	Log15(f, New(msg, ctx...).WithCause(e))
+}
+
+// Trace logs an error with a message prefix using a log15-style logger.
+func Trace(l log.Logger, e error, msg string, ctx ...interface{}) {
+	Log15WithMsg(l.Trace, e, msg, ctx...)
+}
+
+// Debug logs an error with a message prefix using a log15-style logger.
+func Debug(l log.Logger, e error, msg string, ctx ...interface{}) {
+	Log15WithMsg(l.Debug, e, msg, ctx...)
+}
+
+// Info logs an error with a message prefix using a log15-style logger.
+func Info(l log.Logger, e error, msg string, ctx ...interface{}) {
+	Log15WithMsg(l.Info, e, msg, ctx...)
+}
+
+// Warn logs an error with a message prefix using a log15-style logger.
+func Warn(l log.Logger, e error, msg string, ctx ...interface{}) {
+	Log15WithMsg(l.Warn, e, msg, ctx...)
+}
+
+// Error logs an error with a message prefix using a log15-style logger.
+func Error(l log.Logger, e error, msg string, ctx ...interface{}) {
+	Log15WithMsg(l.Error, e, msg, ctx...)
+}
+
+// Crit logs an error with a message prefix using a log15-style logger.
+func Crit(l log.Logger, e error, msg string, ctx ...interface{}) {
+	Log15WithMsg(l.Crit, e, msg, ctx...)
 }
