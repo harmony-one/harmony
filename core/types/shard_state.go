@@ -63,7 +63,7 @@ func CompareShardState(s1, s2 ShardState) int {
 }
 
 // BlsPublicKey defines the bls public key
-type BlsPublicKey [96]byte
+type BlsPublicKey [48]byte
 
 // Hex returns the hex string of bls public key
 func (pk BlsPublicKey) Hex() string {

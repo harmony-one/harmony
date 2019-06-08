@@ -6,14 +6,14 @@ import (
 )
 
 var (
-	blsPubKey1  = [96]byte{}
-	blsPubKey2  = [96]byte{}
-	blsPubKey3  = [96]byte{}
-	blsPubKey4  = [96]byte{}
-	blsPubKey5  = [96]byte{}
-	blsPubKey6  = [96]byte{}
-	blsPubKey11 = [96]byte{}
-	blsPubKey22 = [96]byte{}
+	blsPubKey1  = [48]byte{}
+	blsPubKey2  = [48]byte{}
+	blsPubKey3  = [48]byte{}
+	blsPubKey4  = [48]byte{}
+	blsPubKey5  = [48]byte{}
+	blsPubKey6  = [48]byte{}
+	blsPubKey11 = [48]byte{}
+	blsPubKey22 = [48]byte{}
 )
 
 func init() {

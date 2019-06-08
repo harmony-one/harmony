@@ -11,16 +11,16 @@ import (
 )
 
 var (
-	blsPubKey1  = [96]byte{}
-	blsPubKey2  = [96]byte{}
-	blsPubKey3  = [96]byte{}
-	blsPubKey4  = [96]byte{}
-	blsPubKey5  = [96]byte{}
-	blsPubKey6  = [96]byte{}
-	blsPubKey7  = [96]byte{}
-	blsPubKey8  = [96]byte{}
-	blsPubKey9  = [96]byte{}
-	blsPubKey10 = [96]byte{}
+	blsPubKey1  = [48]byte{}
+	blsPubKey2  = [48]byte{}
+	blsPubKey3  = [48]byte{}
+	blsPubKey4  = [48]byte{}
+	blsPubKey5  = [48]byte{}
+	blsPubKey6  = [48]byte{}
+	blsPubKey7  = [48]byte{}
+	blsPubKey8  = [48]byte{}
+	blsPubKey9  = [48]byte{}
+	blsPubKey10 = [48]byte{}
 )
 
 func init() {
@@ -44,7 +44,7 @@ func fakeGetInitShardState(numberOfShards, numOfNodes int) types.ShardState {
 		com := types.Committee{ShardID: sid}
 		for j := 0; j < numOfNodes; j++ {
 			nid := strconv.Itoa(int(rand.Int63()))
-			blsPubKey := [96]byte{}
+			blsPubKey := [48]byte{}
 			copy(blsPubKey1[:], []byte(nid))
 			com.NodeList = append(com.NodeList, types.NodeID{nid, blsPubKey})
 		}
@@ -59,7 +59,7 @@ func fakeNewNodeList(seed int64) []types.NodeID {
 	nodeList := []types.NodeID{}
 	for i := 0; i < numNewNodes; i++ {
 		nid := strconv.Itoa(int(rand.Int63()))
-		blsPubKey := [96]byte{}
+		blsPubKey := [48]byte{}
 		copy(blsPubKey1[:], []byte(nid))
 		nodeList = append(nodeList, types.NodeID{nid, blsPubKey})
 	}

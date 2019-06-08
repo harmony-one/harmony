@@ -88,9 +88,9 @@ type Header struct {
 	// Additional Fields
 	Epoch            *big.Int    `json:"epoch"            gencodec:"required"`
 	ShardID          uint32      `json:"shardID"          gencodec:"required"`
-	PrepareSignature [48]byte    `json:"prepareSignature" gencodec:"required"`
+	PrepareSignature [96]byte    `json:"prepareSignature" gencodec:"required"`
 	PrepareBitmap    []byte      `json:"prepareBitmap"    gencodec:"required"` // Contains which validator signed
-	CommitSignature  [48]byte    `json:"commitSignature"  gencodec:"required"`
+	CommitSignature  [96]byte    `json:"commitSignature"  gencodec:"required"`
 	CommitBitmap     []byte      `json:"commitBitmap"     gencodec:"required"` // Contains which validator signed
 	RandPreimage     [32]byte    `json:"randPreimage"`
 	RandSeed         [32]byte    `json:"randSeed"`

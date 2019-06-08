@@ -47,7 +47,7 @@ func (consensus *Consensus) constructPreparedMessage() ([]byte, *bls.Sign) {
 	//// Payload
 	buffer := bytes.NewBuffer([]byte{})
 
-	// 48 bytes aggregated signature
+	// 96 bytes aggregated signature
 	aggSig := bls_cosi.AggregateSig(consensus.GetPrepareSigsArray())
 	buffer.Write(aggSig.Serialize())
 
@@ -80,7 +80,7 @@ func (consensus *Consensus) constructCommittedMessage() ([]byte, *bls.Sign) {
 	//// Payload
 	buffer := bytes.NewBuffer([]byte{})
 
-	// 48 bytes aggregated signature
+	// 96 bytes aggregated signature
 	aggSig := bls_cosi.AggregateSig(consensus.GetCommitSigsArray())
 	buffer.Write(aggSig.Serialize())
 

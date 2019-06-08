@@ -19,7 +19,7 @@ func (consensus *Consensus) constructPrepareMessage() []byte {
 	consensusMsg := message.GetConsensus()
 	consensus.populateMessageFields(consensusMsg)
 
-	// 48 byte of bls signature
+	// 96 byte of bls signature
 	sign := consensus.priKey.SignHash(consensusMsg.BlockHash)
 	if sign != nil {
 		consensusMsg.Payload = sign.Serialize()
@@ -45,7 +45,7 @@ func (consensus *Consensus) constructCommitMessage(commitPayload []byte) []byte 
 	consensusMsg := message.GetConsensus()
 	consensus.populateMessageFields(consensusMsg)
 
-	// 48 byte of bls signature
+	// 96 byte of bls signature
 	sign := consensus.priKey.SignHash(commitPayload)
 	if sign != nil {
 		consensusMsg.Payload = sign.Serialize()
