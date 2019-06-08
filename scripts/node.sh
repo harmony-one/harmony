@@ -105,11 +105,11 @@ REL=drum
 
 if [ "$OS" == "Darwin" ]; then
    FOLDER=release/darwin-x86_64/$REL/
-   BIN=( harmony libbls384.dylib libcrypto.1.0.0.dylib libgmp.10.dylib libgmpxx.4.dylib libmcl.dylib )
+   BIN=( harmony libbls384_256.dylib libcrypto.1.0.0.dylib libgmp.10.dylib libgmpxx.4.dylib libmcl.dylib )
 fi
 if [ "$OS" == "Linux" ]; then
    FOLDER=release/linux-x86_64/$REL/
-   BIN=( harmony libbls384.so libcrypto.so.10 libgmp.so.10 libgmpxx.so.4 libmcl.so )
+   BIN=( harmony libbls384_256.so libcrypto.so.10 libgmp.so.10 libgmpxx.so.4 libmcl.so )
 fi
 
 # clean up old files

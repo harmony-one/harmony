@@ -216,18 +216,18 @@ func TestGetBlsAddress(t *testing.T) {
 	}{
 		{
 			pubKey1,
-			"0x8fAd8DAa0206a9a6710b05604a58e6EA1B3A160E",
+			"0x489e9EC9863A29B086Fb979cefCA02277FbE513d",
 		},
 		{
 			pubKey2,
-			"0x91B5B75ddeb29085BF0490bc562e93059Ad1c254",
+			"0x836a098a5E04015c2c331657a1B90DBCb154fb37",
 		},
 	}
 
 	for _, test := range tests {
 		result := GetBlsAddress(test.key)
 		if result.Hex() != test.expected {
-			t.Errorf("Hex Of %v is: %v, got: %v", test.key, test.expected, result)
+			t.Errorf("Hex Of %x is: %s, got: %s", test.key, test.expected, result.Hex())
 		}
 	}
 

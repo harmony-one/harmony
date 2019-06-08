@@ -47,8 +47,7 @@ func (node *Node) UpdateStakingList(stakeInfoReturnValue *structs.StakeInfoRetur
 		if curEpoch-startEpoch <= lockPeriodCount.Uint64()*lockPeriodInEpochs {
 			blsPubKey := types.BlsPublicKey{}
 			copy(blsPubKey[:32], stakeInfoReturnValue.BlsPubicKeys1[i][:])
-			copy(blsPubKey[32:64], stakeInfoReturnValue.BlsPubicKeys2[i][:])
-			copy(blsPubKey[64:96], stakeInfoReturnValue.BlsPubicKeys3[i][:])
+			copy(blsPubKey[32:48], stakeInfoReturnValue.BlsPubicKeys2[i][:16])
 			node.CurrentStakes[addr] = &structs.StakeInfo{
 				Account:         addr,
 				BlsPublicKey:    blsPubKey,

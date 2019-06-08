@@ -683,20 +683,20 @@ func (consensus *Consensus) tryCatchup() {
 		consensus.LeaderPubKey = msgs[0].SenderPubkey
 
 		//#### Read payload data from committed msg
-		aggSig := make([]byte, 48)
-		bitmap := make([]byte, len(msgs[0].Payload)-48)
+		aggSig := make([]byte, 96)
+		bitmap := make([]byte, len(msgs[0].Payload)-96)
 		offset := 0
-		copy(aggSig[:], msgs[0].Payload[offset:offset+48])
-		offset += 48
+		copy(aggSig[:], msgs[0].Payload[offset:offset+96])
+		offset += 96
 		copy(bitmap[:], msgs[0].Payload[offset:])
 		//#### END Read payload data from committed msg
 
 		//#### Read payload data from prepared msg
-		prepareSig := make([]byte, 48)
-		prepareBitmap := make([]byte, len(msg.Payload)-48)
+		prepareSig := make([]byte, 96)
+		prepareBitmap := make([]byte, len(msg.Payload)-96)
 		offset = 0
-		copy(prepareSig[:], msg.Payload[offset:offset+48])
-		offset += 48
+		copy(prepareSig[:], msg.Payload[offset:offset+96])
+		offset += 96
 		copy(prepareBitmap[:], msg.Payload[offset:])
 		//#### END Read payload data from committed msg
 

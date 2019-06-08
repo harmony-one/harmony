@@ -13,7 +13,7 @@ type StakeInfoReturnValue struct {
 	LockedAddresses  []common.Address
 	BlsPubicKeys1    [][32]byte
 	BlsPubicKeys2    [][32]byte
-	BlsPubicKeys3    [][32]byte
+	BlsPubicKeys3    [][32]byte // TODO: remove third part as know we use 48 bytes pub key
 	BlockNums        []*big.Int
 	LockPeriodCounts []*big.Int // The number of locking period the token will be locked.
 	Amounts          []*big.Int

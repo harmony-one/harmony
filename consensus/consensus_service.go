@@ -574,14 +574,14 @@ func (consensus *Consensus) SetBlockNum(blockNum uint64) {
 
 // read the payload for signature and bitmap; offset is the beginning position of reading
 func (consensus *Consensus) readSignatureBitmapPayload(recvPayload []byte, offset int) (*bls.Sign, *bls_cosi.Mask, error) {
-	if offset+48 > len(recvPayload) {
+	if offset+96 > len(recvPayload) {
 		return nil, nil, errors.New("payload not have enough length")
 	}
 	payload := append(recvPayload[:0:0], recvPayload...)
 	//#### Read payload data
-	// 48 byte of multi-sig
-	multiSig := payload[offset : offset+48]
-	offset += 48
+	// 96 byte of multi-sig
+	multiSig := payload[offset : offset+96]
+	offset += 96
 	// bitmap
 	bitmap := payload[offset:]
 	//#### END Read payload data

@@ -27,7 +27,7 @@ const (
 	// GenesisShardNum is the number of shard at genesis
 	GenesisShardNum = 4
 	// GenesisShardSize is the size of each shard at genesis
-	GenesisShardSize = 100
+	GenesisShardSize = 10
 	// CuckooRate is the percentage of nodes getting reshuffled in the second step of cuckoo resharding.
 	CuckooRate = 0.1
 )
@@ -228,8 +228,8 @@ func GetInitShardState() types.ShardState {
 			index := i + j*GenesisShardNum // The initial account to use for genesis nodes
 			priKey := bls.SecretKey{}
 			priKey.SetHexString(contract.GenesisBLSAccounts[index].Private)
-			pubKey := [96]byte{}
-			copy(pubKey[:], priKey.GetPublicKey().Serialize()[:])
+			pubKey := types.BlsPublicKey{}
+			pubKey.FromLibBLSPublicKey(priKey.GetPublicKey())
 			// TODO: directly read address for bls too
 			curNodeID := types.NodeID{contract.GenesisAccounts[index].Address, pubKey}
 			com.NodeList = append(com.NodeList, curNodeID)
