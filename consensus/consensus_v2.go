@@ -99,8 +99,12 @@ func (consensus *Consensus) tryAnnounce(block *types.Block) {
 	consensus.prepareSigs[consensus.SelfAddress] = consensus.priKey.SignHash(consensus.blockHash[:])
 
 	// Construct broadcast p2p message
-	utils.GetLogger().Warn("sent announce message", "viewID", consensus.viewID, "block", consensus.blockNum, "groupID", p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID)))
-	consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
+	logger := utils.GetLogger().New("viewID", consensus.viewID, "block", consensus.blockNum, "groupID", p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID)))
+	if err := consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
+		ctxerror.Warn(logger, err, "cannot send announce message")
+	} else {
+		logger.Debug("sent announce message")
+	}
 }
 
 func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
@@ -214,9 +218,13 @@ func (consensus *Consensus) tryPrepare(blockHash common.Hash) {
 
 	// Construct and send prepare message
 	msgToSend := consensus.constructPrepareMessage()
-	utils.GetLogger().Info("sent prepare message", "viewID", consensus.viewID, "block", consensus.blockNum)
+	logger := utils.GetLogger().New("viewID", consensus.viewID, "block", consensus.blockNum)
 	// TODO: this will not return immediatey, may block
-	consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
+	if err := consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
+		ctxerror.Warn(logger, err, "cannot send prepare message")
+	} else {
+		logger.Info("sent prepare message")
+	}
 }
 
 // TODO: move to consensus_leader.go later
@@ -288,7 +296,10 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 
 	utils.GetLogger().Debug("Received new prepare signature", "numReceivedSoFar", len(prepareSigs), "validatorAddress", validatorAddress, "PublicKeys", len(consensus.PublicKeys))
 	prepareSigs[validatorAddress] = &sign
-	prepareBitmap.SetKey(validatorPubKey, true) // Set the bitmap indicating that this validator signed.
+	// Set the bitmap indicating that this validator signed.
+	if err := prepareBitmap.SetKey(validatorPubKey, true); err != nil {
+		ctxerror.Warn(utils.GetLogger(), err, "prepareBitmap.SetKey failed")
+	}
 
 	if len(prepareSigs) >= consensus.Quorum() {
 		consensus.switchPhase(Commit, false)
@@ -307,8 +318,12 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		}
 		consensus.pbftLog.AddMessage(pbftMsg)
 
-		utils.GetLogger().Warn("sent prepared message", "viewID", consensus.viewID, "block", consensus.blockNum)
-		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
+		logger := utils.GetLogger().New("viewID", consensus.viewID, "block", consensus.blockNum)
+		if err := consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
+			ctxerror.Warn(logger, err, "cannot send prepared message")
+		} else {
+			logger.Debug("sent prepared message")
+		}
 
 		// Leader add commit phase signature
 		blockNumHash := make([]byte, 8)
@@ -410,8 +425,12 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	binary.LittleEndian.PutUint64(blockNumHash, consensus.blockNum)
 	commitPayload := append(blockNumHash, consensus.blockHash[:]...)
 	msgToSend := consensus.constructCommitMessage(commitPayload)
-	utils.GetLogger().Debug("sent commit message", "viewID", consensus.viewID, "block", consensus.blockNum)
-	consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
+	logger := utils.GetLogger().New("viewID", consensus.viewID, "block", consensus.blockNum)
+	if err := consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
+		ctxerror.Warn(logger, err, "cannot send commit message")
+	} else {
+		logger.Debug("sent commit message")
+	}
 
 	consensus.switchPhase(Commit, false)
 
@@ -502,7 +521,9 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	utils.GetLogger().Debug("Received new commit message", "numReceivedSoFar", len(commitSigs), "viewID", recvMsg.ViewID, "block", recvMsg.BlockNum, "validatorAddress", validatorAddress)
 	commitSigs[validatorAddress] = &sign
 	// Set the bitmap indicating that this validator signed.
-	commitBitmap.SetKey(validatorPubKey, true)
+	if err := commitBitmap.SetKey(validatorPubKey, true); err != nil {
+		ctxerror.Warn(utils.GetLogger(), err, "commitBitmap.SetKey failed")
+	}
 
 	if len(commitSigs) >= consensus.Quorum() {
 		utils.GetLogger().Info("Enough commits received!", "num", len(commitSigs), "phase", consensus.phase)
@@ -518,8 +539,11 @@ func (consensus *Consensus) finalizeCommits() {
 	msgToSend, aggSig := consensus.constructCommittedMessage()
 	consensus.aggregatedCommitSig = aggSig
 
-	utils.GetLogger().Warn("[Consensus]", "sent committed message", len(msgToSend))
-	consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
+	if err := consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
+		ctxerror.Warn(utils.GetLogger(), err, "cannot send committed message")
+	} else {
+		utils.GetLogger().Debug("sent committed message", "len", len(msgToSend))
+	}
 
 	var blockObj types.Block
 	err := rlp.DecodeBytes(consensus.block, &blockObj)

@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -91,12 +92,16 @@ func (storage *Storage) Dump(block *types.Block, height uint32) {
 
 	batch := storage.db.NewBatch()
 	// Update block height.
-	batch.Put([]byte(BlockHeightKey), []byte(strconv.Itoa(int(height))))
+	if err := batch.Put([]byte(BlockHeightKey), []byte(strconv.Itoa(int(height)))); err != nil {
+		ctxerror.Warn(utils.GetLogger(), err, "cannot batch block height")
+	}
 
 	// Store block.
 	blockData, err := rlp.EncodeToBytes(block)
 	if err == nil {
-		batch.Put([]byte(GetBlockKey(int(height))), blockData)
+		if err := batch.Put([]byte(GetBlockKey(int(height))), blockData); err != nil {
+			ctxerror.Warn(utils.GetLogger(), err, "cannot batch block data")
+		}
 	} else {
 		utils.GetLogInstance().Debug("Failed to serialize block ", "error", err)
 	}
@@ -111,14 +116,18 @@ func (storage *Storage) Dump(block *types.Block, height uint32) {
 		storage.UpdateTXStorage(batch, explorerTransaction, tx)
 		storage.UpdateAddress(batch, explorerTransaction, tx)
 	}
-	batch.Write()
+	if err := batch.Write(); err != nil {
+		ctxerror.Warn(utils.GetLogger(), err, "cannot write batch")
+	}
 }
 
 // UpdateTXStorage ...
 func (storage *Storage) UpdateTXStorage(batch ethdb.Batch, explorerTransaction *Transaction, tx *types.Transaction) {
 	if data, err := rlp.EncodeToBytes(explorerTransaction); err == nil {
 		key := GetTXKey(tx.Hash().Hex())
-		batch.Put([]byte(key), data)
+		if err := batch.Put([]byte(key), data); err != nil {
+			ctxerror.Warn(utils.GetLogger(), err, "cannot batch TX")
+		}
 	} else {
 		utils.GetLogInstance().Error("EncodeRLP transaction error")
 	}
@@ -148,7 +157,9 @@ func (storage *Storage) UpdateAddressStorage(batch ethdb.Batch, adr string, expl
 	address.ID = adr
 	address.TXs = append(address.TXs, explorerTransaction)
 	if encoded, err := rlp.EncodeToBytes(address); err == nil {
-		batch.Put([]byte(key), encoded)
+		if err := batch.Put([]byte(key), encoded); err != nil {
+			ctxerror.Warn(utils.GetLogger(), err, "cannot batch address")
+		}
 	} else {
 		utils.GetLogInstance().Error("Can not encode address account.")
 	}

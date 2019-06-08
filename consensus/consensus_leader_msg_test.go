@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/harmony/api/proto"
@@ -62,8 +63,13 @@ func TestConstructPreparedMessage(test *testing.T) {
 	message := "test string"
 	consensus.prepareSigs[common.Address{}] = leaderPriKey.Sign(message)
 	consensus.prepareSigs[common.Address{}] = validatorPriKey.Sign(message)
-	consensus.prepareBitmap.SetKey(leaderPubKey, true)
-	consensus.prepareBitmap.SetKey(validatorPubKey, true)
+	// According to RJ these failures are benign.
+	if err := consensus.prepareBitmap.SetKey(leaderPubKey, true); err != nil {
+		test.Log(ctxerror.New("prepareBitmap.SetKey").WithCause(err))
+	}
+	if err := consensus.prepareBitmap.SetKey(validatorPubKey, true); err != nil {
+		test.Log(ctxerror.New("prepareBitmap.SetKey").WithCause(err))
+	}
 
 	msgBytes, _ := consensus.constructPreparedMessage()
 	msgPayload, _ := proto.GetConsensusMessagePayload(msgBytes)

@@ -7,7 +7,9 @@ import (
 
 func TestServerStart(t *testing.T) {
 	s := NewServer(nil, nil, nil)
-	s.Start()
+	if _, err := s.Start(); err != nil {
+		t.Fatalf("cannot start server: %s", err)
+	}
 	time.Sleep(time.Second)
 	s.Stop()
 }

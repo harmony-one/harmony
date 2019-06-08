@@ -83,8 +83,12 @@ func TestConstructBlocksSyncMessage(t *testing.T) {
 	head.GasLimit = 10000000000
 	head.Difficulty = params.GenesisDifficulty
 
-	statedb.Commit(false)
-	statedb.Database().TrieDB().Commit(root, true)
+	if _, err := statedb.Commit(false); err != nil {
+		t.Fatalf("statedb.Commit() failed: %s", err)
+	}
+	if err := statedb.Database().TrieDB().Commit(root, true); err != nil {
+		t.Fatalf("statedb.Database().TrieDB().Commit() failed: %s", err)
+	}
 
 	block1 := types.NewBlock(head, nil, nil)
 

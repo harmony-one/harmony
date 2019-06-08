@@ -10,7 +10,9 @@ const (
 
 func TestClient(t *testing.T) {
 	s := NewServer(nil, nil, nil)
-	s.Start()
+	if _, err := s.Start(); err != nil {
+		t.Fatalf("cannot start server: %s", err)
+	}
 
 	client := NewClient(testIP)
 	_, err := client.Process(&Message{})
