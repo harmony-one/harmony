@@ -9,6 +9,27 @@ import (
 	mock_utils "github.com/harmony-one/harmony/internal/utils/mock"
 )
 
+func TestExampleTestLogRedirectorUsingGetLogInstance(t *testing.T) {
+	tlr := NewTestLogRedirector(GetLogInstance(), t)
+	defer tlr.Close()
+
+	// Everything logged via GetLogInstance(),
+	// including lines said by the Menethil family below,
+	// is forwarded to the testing object.
+	// You will see their lines when you run this “test.”
+
+	terenasMenethil()
+	arthasMenethil()
+}
+
+func terenasMenethil() {
+	GetLogInstance().Info("what are you doing my son")
+}
+
+func arthasMenethil() {
+	GetLogInstance().Warn("succeding you father")
+}
+
 func TestNewTestLogRedirector(t *testing.T) {
 	logger := log.New()
 	origHandler := logger.GetHandler()
