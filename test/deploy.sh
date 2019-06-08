@@ -153,8 +153,8 @@ sleep 2
 # Start nodes
 i=0
 while IFS='' read -r line || [[ -n "$line" ]]; do
-  IFS=' ' read ip port mode shardID <<< $line
-  args=("${base_args[@]}" -ip "${ip}" -port "${port}" -account_index "${i}" -key "/tmp/${ip}-${port}.key" -db_dir "db-${ip}-${port}")
+  IFS=' ' read ip port mode account <<< $line
+  args=("${base_args[@]}" -ip "${ip}" -port "${port}" -key "/tmp/${ip}-${port}.key" -db_dir "db-${ip}-${port}" -accounts "${account}")
   case "${mode}" in
   leader*|validator*) args=("${args[@]}" -is_genesis);;
   esac
@@ -178,7 +178,7 @@ if [ "$TXGEN" == "true" ]; then
    echo "launching txgen ... wait"
 #   sleep 2
    line=$(grep client $config)
-   IFS=' ' read ip port mode shardID <<< $line
+   IFS=' ' read ip port mode account <<< $line
    if [ "$mode" == "client" ]; then
       $DRYRUN $ROOT/bin/txgen -log_folder $log_folder -duration $DURATION -ip $ip -port $port -bootnodes "${BN_MA}" > $LOG_FILE 2>&1
    fi
