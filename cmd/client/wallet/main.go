@@ -21,12 +21,8 @@ import (
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-<<<<<<< HEAD
-	"github.com/harmony-one/harmony/crypto/bls"
-	common2 "github.com/harmony-one/harmony/internal/common"
-=======
 	"github.com/harmony-one/harmony/internal/blsgen"
->>>>>>> add logic for wallet blsgen
+	common2 "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/shardchain"
@@ -347,6 +343,7 @@ func processExportCommand() {
 func processBlsgenCommand() {
 	newCommand.Parse(os.Args[2:])
 	noPass := *newCommandNoPassPtr
+	// Default password is an empty string
 	password := ""
 
 	if !noPass {

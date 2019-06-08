@@ -33,33 +33,6 @@ func keyFileName(publicKey *ffi_bls.PublicKey) string {
 	return fmt.Sprintf("UTC--%s--bls_%s", toISO8601(ts), hex.EncodeToString((address[:])))
 }
 
-// Test --
-func Test() {
-	privateKey := bls.RandPrivateKey()
-	publicKey := privateKey.GetPublicKey()
-	fmt.Printf("{Private: \"%s\", Public: \"%s\"},\n", privateKey.GetHexString(), publicKey.GetHexString())
-	privateKeyHex := privateKey.GetHexString()
-
-	encryptedPrivateKeyBytes := encrypt([]byte(privateKeyHex), "minh")
-	encryptedPrivateKeyStr := hex.EncodeToString(encryptedPrivateKeyBytes)
-
-	fileName := keyFileName(publicKey)
-	// the WriteFile method returns an error if unsuccessful
-	err := ioutil.WriteFile(fileName, encryptedPrivateKeyBytes, 0777)
-	check(err)
-
-	fmt.Println(encryptedPrivateKeyStr)
-
-	encryptedPrivateKeyBytes, err = ioutil.ReadFile(fileName)
-	check(err)
-
-	decryptedBytes := decrypt(encryptedPrivateKeyBytes, "minh")
-
-	priKey := &ffi_bls.SecretKey{}
-	priKey.SetHexString(string(decryptedBytes))
-	fmt.Printf("{Private: \"%s\"},\n", priKey.GetHexString())
-}
-
 // GenBlsKeyWithPassPhrase generates bls key with passphrase and write into disk.
 func GenBlsKeyWithPassPhrase(passphrase string) (*ffi_bls.SecretKey, string) {
 	privateKey := bls.RandPrivateKey()
@@ -69,7 +42,7 @@ func GenBlsKeyWithPassPhrase(passphrase string) (*ffi_bls.SecretKey, string) {
 	// Encrypt with passphrase
 	encryptedPrivateKeyBytes := encrypt([]byte(privateKeyHex), passphrase)
 	// Write to file.
-	err := ioutil.WriteFile(fileName, encryptedPrivateKeyBytes, 0777)
+	err := ioutil.WriteFile(fileName, encryptedPrivateKeyBytes, 0600)
 	check(err)
 	return privateKey, fileName
 }
@@ -127,17 +100,6 @@ func decrypt(data []byte, passphrase string) []byte {
 func check(err error) {
 	// handle this error
 	if err != nil {
-		// print it out
 		fmt.Println(err)
 	}
-}
-
-func encryptFile(filename string, data []byte, passphrase string) {
-	err := ioutil.WriteFile(filename, data, 0777)
-	check(err)
-}
-
-func decryptFile(filename string, passphrase string) []byte {
-	data, _ := ioutil.ReadFile(filename)
-	return decrypt(data, passphrase)
 }
