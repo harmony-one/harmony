@@ -17,7 +17,7 @@ import (
 	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
-	contract_constants "github.com/harmony-one/harmony/internal/utils/contract"
+	"github.com/harmony-one/harmony/internal/genesis"
 )
 
 // Constants related to smart contract.
@@ -38,7 +38,7 @@ const (
 func (node *Node) AddStakingContractToPendingTransactions() {
 	// Add a contract deployment transaction
 	//Generate contract key and associate funds with the smart contract
-	priKey := contract_constants.GenesisBeaconAccountPriKey
+	priKey := genesis.GenesisBeaconAccountPriKey
 	contractAddress := crypto.PubkeyToAddress(priKey.PublicKey)
 	//Initially the smart contract should have minimal funds.
 	contractFunds := big.NewInt(0)
@@ -81,7 +81,7 @@ func (node *Node) QueryStakeInfo() *structs.StakeInfoReturnValue {
 		return nil
 	}
 
-	priKey := contract_constants.GenesisBeaconAccountPriKey
+	priKey := genesis.GenesisBeaconAccountPriKey
 	deployerAddress := crypto.PubkeyToAddress(priKey.PublicKey)
 
 	state, err := node.Blockchain().State()
@@ -217,7 +217,7 @@ func (node *Node) AddContractKeyAndAddress(t builtInSC) {
 	case scStaking:
 		// staking contract
 		node.CurrentStakes = make(map[common.Address]*structs.StakeInfo)
-		stakingPrivKey := contract_constants.GenesisBeaconAccountPriKey
+		stakingPrivKey := genesis.GenesisBeaconAccountPriKey
 		node.StakingContractAddress = crypto.CreateAddress(crypto.PubkeyToAddress(stakingPrivKey.PublicKey), uint64(0))
 	default:
 		utils.GetLogInstance().Error("AddContractKeyAndAddress", "unknown SC", t)

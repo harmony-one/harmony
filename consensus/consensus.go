@@ -18,7 +18,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/internal/utils/contract"
+	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/p2p"
 )
 
@@ -373,8 +373,8 @@ func NewGenesisStakeInfoFinder() (*GenesisStakeInfoFinder, error) {
 		byNodeKey: make(map[types.BlsPublicKey][]*structs.StakeInfo),
 		byAccount: make(map[common.Address][]*structs.StakeInfo),
 	}
-	for idx, account := range contract.GenesisAccounts {
-		blsSecretKeyHex := contract.GenesisBLSAccounts[idx].Private
+	for idx, account := range genesis.GenesisAccounts {
+		blsSecretKeyHex := account.BLSKey
 		blsSecretKey := bls.SecretKey{}
 		if err := blsSecretKey.SetHexString(blsSecretKeyHex); err != nil {
 			return nil, ctxerror.New("cannot convert BLS secret key",

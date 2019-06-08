@@ -28,7 +28,7 @@ import (
 	"github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/internal/utils/contract"
+	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	p2p_host "github.com/harmony-one/harmony/p2p/host"
@@ -109,9 +109,9 @@ func setUpTXGen() *node.Node {
 	consensusObj.PublicKeys = nil
 	startIdx := 0
 	endIdx := startIdx + core.GenesisShardSize
-	for _, acct := range contract.GenesisBLSAccounts[startIdx:endIdx] {
+	for _, acct := range genesis.GenesisAccounts[startIdx:endIdx] {
 		secretKey := bls2.SecretKey{}
-		if err := secretKey.SetHexString(acct.Private); err != nil {
+		if err := secretKey.SetHexString(acct.BLSKey); err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "cannot parse secret key: %v\n",
 				err)
 			os.Exit(1)
