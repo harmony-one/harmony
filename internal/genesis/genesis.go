@@ -2,7 +2,7 @@ package genesis
 
 import (
 	"crypto/ecdsa"
-   "fmt"
+	"fmt"
 	"os"
 	"strings"
 
@@ -10,19 +10,18 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
-
 const genesisString = "https://harmony.one 'Open Consensus for 10B' 2019.06.01 $ONE"
 
 // DeployAccount is the account used in genesis
 type DeployAccount struct {
-	Address string       // account address
-	Public  string       // account public key
-   BLSKey  string       // account private BLS key (To be removed)
-   ShardID uint32       // shardID of the account
+	Address string // account address
+	Public  string // account public key
+	BLSKey  string // account private BLS key (To be removed)
+	ShardID uint32 // shardID of the account
 }
 
 func (d DeployAccount) String() string {
-   return fmt.Sprintf("%s/%s/%s:%d", d.Address, d.Public, d.BLSKey, d.ShardID)
+	return fmt.Sprintf("%s/%s/%s:%d", d.Address, d.Public, d.BLSKey, d.ShardID)
 }
 
 // BeaconAccountPriKey is the func which generates a constant private key.
@@ -39,17 +38,17 @@ func BeaconAccountPriKey() *ecdsa.PrivateKey {
 // the account address could be from GenesisAccounts or from GenesisFNAccounts
 // the account index can be used to determin the shard of the account
 func FindAccount(address string) (int, *DeployAccount) {
-   for i, acc := range GenesisAccounts {
-      if address == acc.Address {
-         return i, &acc
-      }
-   }
-   for i, acc := range GenesisFNAccounts {
-      if address == acc.Address {
-         return i, &acc
-      }
-   }
-   return 0, nil
+	for i, acc := range GenesisAccounts {
+		if address == acc.Address {
+			return i, &acc
+		}
+	}
+	for i, acc := range GenesisFNAccounts {
+		if address == acc.Address {
+			return i, &acc
+		}
+	}
+	return 0, nil
 }
 
 // GenesisBeaconAccountPriKey is the private key of genesis beacon account.
@@ -63,7 +62,7 @@ var DeployedContractAddress = crypto.CreateAddress(crypto.PubkeyToAddress(Genesi
 
 // GenesisAccounts are the accounts for the initial genesis nodes hosted by Harmony.
 var GenesisAccounts = [...]DeployAccount{
-   // 0-9
+	// 0-9
 	{Address: "0x007579ED2Fe889C5255C36d4978Ac94d25811771", Public: "0x007579ED2Fe889C5255C36d4978Ac94d25811771", BLSKey: "66acb3a7c990be4b06709058fdef8122b7ecdbaf023e56ccf8cdf671c5333646"},
 	{Address: "0x00F98965458a35f3788C45A095582AB18A5ae79c", Public: "0x00F98965458a35f3788C45A095582AB18A5ae79c", BLSKey: "5e9e2fffbf7cfad085d7b0147d2acd680cfd8b8d62daa9c39370185ba0207920"},
 	{Address: "0x0102B41674C3ac2634f404d8c25C25Bb959fE952", Public: "0x0102B41674C3ac2634f404d8c25C25Bb959fE952", BLSKey: "56714bb94188c335d1243fa3d17fd50ff63a1a9bf740faecd97996f3a0737e87"},
