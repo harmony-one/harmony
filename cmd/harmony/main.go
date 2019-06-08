@@ -98,6 +98,8 @@ var (
 	accountIndex       = flag.Int("account_index", 0, "the index of the staking account to use")
 	shardID            = flag.Int("shard_id", -1, "the shard ID of this node")
 	enableMemProfiling = flag.Bool("enableMemProfiling", false, "Enable memsize logging.")
+	enableGC           = flag.Bool("enableGC", true, "Enable calling garbage collector manually .")
+
 	// logConn logs incoming/outgoing connections
 	logConn = flag.Bool("log_conn", false, "log incoming/outgoing connections")
 
@@ -118,6 +120,12 @@ var (
 	// Disable view change.
 	disableViewChange = flag.Bool("disable_view_change", false,
 		"Do not propose view change (testing only)")
+)
+
+// Constants for GC.
+const (
+	// Run garbage collector every 30 minutes.
+	gcTime = 30 * time.Minute
 )
 
 func initSetup() {
@@ -188,6 +196,23 @@ func initSetup() {
 		}
 		hmykey.SetHmyPass(myPass)
 	}
+
+	// Set up manual call for garbage collection.
+	if *enableGC {
+		maybeCallGCPeriodically()
+	}
+}
+
+// Run GC manually every 30 minutes. This is one of the options to mitigate the OOM issue.
+func maybeCallGCPeriodically() {
+	go func() {
+		for {
+			select {
+			case <-time.After(gcTime):
+				runtime.GC()
+			}
+		}
+	}()
 }
 
 func createGlobalConfig() *nodeconfig.ConfigType {
