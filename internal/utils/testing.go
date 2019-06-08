@@ -3,10 +3,11 @@ package utils
 import (
 	"fmt"
 	"strings"
-	"testing"
 
 	"github.com/ethereum/go-ethereum/log"
 )
+
+//go:generate mockgen -source=testing.go -destination=mock/testing.go
 
 // TestLogRedirector is a log15-compatible log handler that logs to the testing
 // object.  It is useful when debugging, because it surfaces application log
@@ -29,14 +30,19 @@ import (
 type TestLogRedirector struct {
 	l log.Logger
 	h log.Handler
-	t *testing.T
+	t TestLogger
+}
+
+// TestLogger is the logging interface implemented by testing.T.
+type TestLogger interface {
+	Log(args ...interface{})
 }
 
 // NewTestLogRedirector returns a new testing log redirector.
 // The given logger's handler is saved and replaced by the receiver.
 // Caller shall ensure Close() is called when the redirector is no longer
 // needed.
-func NewTestLogRedirector(l log.Logger, t *testing.T) *TestLogRedirector {
+func NewTestLogRedirector(l log.Logger, t TestLogger) *TestLogRedirector {
 	r := &TestLogRedirector{l: l, h: l.GetHandler(), t: t}
 	l.SetHandler(r)
 	return r
