@@ -332,7 +332,7 @@ func accumulateRewards(
 			continue
 		}
 		numAccounts++
-		account := common.HexToAddress(member.EcdsaAddress)
+		account := member.EcdsaAddress
 		getLogger().Info("rewarding block signer",
 			"account", account,
 			"node", member.BlsPublicKey.Hex(),

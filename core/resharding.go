@@ -199,7 +199,7 @@ func (ss *ShardingState) UpdateShardingState(stakeInfo *map[common.Address]*stru
 		newNodeList := shard.NodeList
 		for _, nodeID := range shard.NodeList {
 			oldBlsPublicKeys[nodeID.BlsPublicKey] = true
-			_, ok := (*stakeInfo)[common.HexToAddress(nodeID.EcdsaAddress)]
+			_, ok := (*stakeInfo)[nodeID.EcdsaAddress]
 			if ok {
 				// newNodeList = append(newNodeList, nodeID)
 			} else {
@@ -213,7 +213,7 @@ func (ss *ShardingState) UpdateShardingState(stakeInfo *map[common.Address]*stru
 	for addr, info := range *stakeInfo {
 		_, ok := oldBlsPublicKeys[info.BlsPublicKey]
 		if !ok {
-			newAddresses = append(newAddresses, types.NodeID{addr.Hex(), info.BlsPublicKey})
+			newAddresses = append(newAddresses, types.NodeID{addr, info.BlsPublicKey})
 		}
 	}
 	return newAddresses
@@ -231,7 +231,7 @@ func GetInitShardState() types.ShardState {
 			pubKey := types.BlsPublicKey{}
 			pubKey.FromLibBLSPublicKey(priKey.GetPublicKey())
 			// TODO: directly read address for bls too
-			curNodeID := types.NodeID{contract.GenesisAccounts[index].Address, pubKey}
+			curNodeID := types.NodeID{common.HexToAddress(contract.GenesisAccounts[index].Address), pubKey}
 			com.NodeList = append(com.NodeList, curNodeID)
 		}
 		shardState = append(shardState, com)

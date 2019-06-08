@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"sort"
-	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -94,13 +93,13 @@ func CompareBlsPublicKey(k1, k2 BlsPublicKey) int {
 
 // NodeID represents node id (BLS address).
 type NodeID struct {
-	EcdsaAddress string
+	EcdsaAddress common.Address
 	BlsPublicKey BlsPublicKey
 }
 
 // CompareNodeID compares two node IDs.
 func CompareNodeID(id1, id2 *NodeID) int {
-	if c := strings.Compare(id1.EcdsaAddress, id2.EcdsaAddress); c != 0 {
+	if c := bytes.Compare(id1.EcdsaAddress[:], id2.EcdsaAddress[:]); c != 0 {
 		return c
 	}
 	if c := CompareBlsPublicKey(id1.BlsPublicKey, id2.BlsPublicKey); c != 0 {
@@ -205,9 +204,9 @@ func CompareNodeIDByBLSKey(n1 NodeID, n2 NodeID) int {
 
 // Serialize serialize NodeID into bytes
 func (n NodeID) Serialize() []byte {
-	return append(n.BlsPublicKey[:], []byte(n.EcdsaAddress)...)
+	return append(n.EcdsaAddress[:], n.BlsPublicKey[:]...)
 }
 
 func (n NodeID) String() string {
-	return "ECDSA: " + n.EcdsaAddress + ", BLS: " + hex.EncodeToString(n.BlsPublicKey[:])
+	return "ECDSA: " + n.EcdsaAddress.Hex() + ", BLS: " + hex.EncodeToString(n.BlsPublicKey[:])
 }

@@ -3,6 +3,8 @@ package types
 import (
 	"bytes"
 	"testing"
+
+	"github.com/ethereum/go-ethereum/common"
 )
 
 var (
@@ -29,14 +31,14 @@ func init() {
 
 func TestGetHashFromNodeList(t *testing.T) {
 	l1 := []NodeID{
-		{"node1", blsPubKey1},
-		{"node2", blsPubKey2},
-		{"node3", blsPubKey3},
+		{common.Address{0x11}, blsPubKey1},
+		{common.Address{0x22}, blsPubKey2},
+		{common.Address{0x33}, blsPubKey3},
 	}
 	l2 := []NodeID{
-		{"node2", blsPubKey2},
-		{"node1", blsPubKey1},
-		{"node3", blsPubKey3},
+		{common.Address{0x22}, blsPubKey2},
+		{common.Address{0x11}, blsPubKey1},
+		{common.Address{0x33}, blsPubKey3},
 	}
 	h1 := GetHashFromNodeList(l1)
 	h2 := GetHashFromNodeList(l2)
@@ -50,17 +52,17 @@ func TestHash(t *testing.T) {
 	com1 := Committee{
 		ShardID: 22,
 		NodeList: []NodeID{
-			{"node11", blsPubKey11},
-			{"node22", blsPubKey22},
-			{"node1", blsPubKey1},
+			{common.Address{0x12}, blsPubKey11},
+			{common.Address{0x23}, blsPubKey22},
+			{common.Address{0x11}, blsPubKey1},
 		},
 	}
 	com2 := Committee{
 		ShardID: 2,
 		NodeList: []NodeID{
-			{"node4", blsPubKey4},
-			{"node5", blsPubKey5},
-			{"node6", blsPubKey6},
+			{common.Address{0x44}, blsPubKey4},
+			{common.Address{0x55}, blsPubKey5},
+			{common.Address{0x66}, blsPubKey6},
 		},
 	}
 	shardState1 := ShardState{com1, com2}
@@ -69,17 +71,17 @@ func TestHash(t *testing.T) {
 	com3 := Committee{
 		ShardID: 2,
 		NodeList: []NodeID{
-			{"node6", blsPubKey6},
-			{"node5", blsPubKey5},
-			{"node4", blsPubKey4},
+			{common.Address{0x66}, blsPubKey6},
+			{common.Address{0x55}, blsPubKey5},
+			{common.Address{0x44}, blsPubKey4},
 		},
 	}
 	com4 := Committee{
 		ShardID: 22,
 		NodeList: []NodeID{
-			{"node1", blsPubKey1},
-			{"node11", blsPubKey11},
-			{"node22", blsPubKey22},
+			{common.Address{0x11}, blsPubKey1},
+			{common.Address{0x12}, blsPubKey11},
+			{common.Address{0x23}, blsPubKey22},
 		},
 	}
 
