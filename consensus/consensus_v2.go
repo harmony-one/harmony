@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"encoding/binary"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -28,7 +29,7 @@ func (consensus *Consensus) handleMessageUpdate(payload []byte) {
 	msg := &msg_pb.Message{}
 	err := protobuf.Unmarshal(payload, msg)
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to unmarshal message payload.", "err", err, "consensus", consensus)
+		utils.GetLogger().Error("Failed to unmarshal message payload.", "err", err, "consensus", consensus)
 		return
 	}
 
@@ -61,11 +62,11 @@ func (consensus *Consensus) handleMessageUpdate(payload []byte) {
 func (consensus *Consensus) tryAnnounce(block *types.Block) {
 	// here we assume the leader should always be update to date
 	if block.NumberU64() != consensus.blockNum {
-		utils.GetLogInstance().Debug("tryAnnounce blockNum not match", "blockNum", block.NumberU64(), "myBlockNum", consensus.blockNum)
+		utils.GetLogger().Debug("tryAnnounce blockNum not match", "blockNum", block.NumberU64(), "myBlockNum", consensus.blockNum)
 		return
 	}
 	if !consensus.PubKey.IsEqual(consensus.LeaderPubKey) {
-		utils.GetLogInstance().Debug("tryAnnounce key not match", "myKey", consensus.PubKey, "leaderKey", consensus.LeaderPubKey)
+		utils.GetLogger().Debug("tryAnnounce key not match", "myKey", consensus.PubKey, "leaderKey", consensus.LeaderPubKey)
 		return
 	}
 	blockHash := block.Hash()
@@ -74,7 +75,7 @@ func (consensus *Consensus) tryAnnounce(block *types.Block) {
 	// prepare message and broadcast to validators
 	encodedBlock, err := rlp.EncodeToBytes(block)
 	if err != nil {
-		utils.GetLogInstance().Debug("tryAnnounce Failed encoding block")
+		utils.GetLogger().Debug("tryAnnounce Failed encoding block")
 		return
 	}
 	consensus.block = encodedBlock
@@ -87,7 +88,7 @@ func (consensus *Consensus) tryAnnounce(block *types.Block) {
 	_ = protobuf.Unmarshal(msgPayload, msg)
 	pbftMsg, err := ParsePbftMessage(msg)
 	if err != nil {
-		utils.GetLogInstance().Warn("tryAnnounce unable to parse pbft message", "error", err)
+		utils.GetLogger().Warn("tryAnnounce unable to parse pbft message", "error", err)
 		return
 	}
 
@@ -98,7 +99,7 @@ func (consensus *Consensus) tryAnnounce(block *types.Block) {
 	consensus.prepareSigs[consensus.SelfAddress] = consensus.priKey.SignHash(consensus.blockHash[:])
 
 	// Construct broadcast p2p message
-	utils.GetLogInstance().Warn("tryAnnounce", "sent announce message", len(msgToSend), "groupID", p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID)))
+	utils.GetLogger().Warn("sent announce message", "viewID", consensus.viewID, "block", consensus.blockNum, "groupID", p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID)))
 	consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 }
 
@@ -110,21 +111,21 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 
 	senderKey, err := consensus.verifySenderKey(msg)
 	if err != nil {
-		utils.GetLogInstance().Debug("onAnnounce verifySenderKey failed", "error", err)
+		utils.GetLogger().Debug("onAnnounce verifySenderKey failed", "error", err)
 		return
 	}
 	if !senderKey.IsEqual(consensus.LeaderPubKey) && consensus.mode.Mode() == Normal && !consensus.ignoreViewIDCheck {
-		utils.GetLogInstance().Warn("onAnnounce senderKey not match leader PubKey", "senderKey", senderKey.GetHexString()[:10], "leaderKey", consensus.LeaderPubKey.GetHexString()[:10])
+		utils.GetLogger().Warn("onAnnounce senderKey not match leader PubKey", "senderKey", senderKey.GetHexString()[:10], "leaderKey", consensus.LeaderPubKey.GetHexString()[:10])
 		return
 	}
 	if err = verifyMessageSig(senderKey, msg); err != nil {
-		utils.GetLogInstance().Debug("onAnnounce Failed to verify leader signature", "error", err)
+		utils.GetLogger().Debug("onAnnounce Failed to verify leader signature", "error", err)
 		return
 	}
 
 	recvMsg, err := ParsePbftMessage(msg)
 	if err != nil {
-		utils.GetLogInstance().Debug("onAnnounce Unparseable leader message", "error", err)
+		utils.GetLogger().Debug("onAnnounce Unparseable leader message", "error", err)
 		return
 	}
 	block := recvMsg.Payload
@@ -133,7 +134,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	var blockObj types.Block
 	err = rlp.DecodeBytes(block, &blockObj)
 	if err != nil {
-		utils.GetLogInstance().Warn("onAnnounce Unparseable block header data", "error", err)
+		utils.GetLogger().Warn("onAnnounce Unparseable block header data", "error", err)
 		return
 	}
 
@@ -145,7 +146,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	if consensus.mode.Mode() == Normal {
 		// skip verify header when node is in Syncing mode
 		if err := consensus.VerifyHeader(consensus.ChainReader, blockObj.Header(), false); err != nil {
-			utils.GetLogInstance().Warn("onAnnounce block content is not verified successfully", "error", err, "inChain", consensus.ChainReader.CurrentHeader().Number, "got", blockObj.Header().Number)
+			utils.GetLogger().Warn("onAnnounce block content is not verified successfully", "error", err, "inChain", consensus.ChainReader.CurrentHeader().Number, "got", blockObj.Header().Number)
 			return
 		}
 	}
@@ -158,14 +159,14 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		err := ctxerror.New("block verification failed",
 			"blockHash", blockObj.Hash(),
 		).WithCause(err)
-		ctxerror.Log15(utils.GetLogInstance().Warn, err)
+		ctxerror.Log15(utils.GetLogger().Warn, err)
 		return
 	}
 	//blockObj.Logger(utils.GetLogger()).Debug("received announce", "viewID", recvMsg.ViewID, "msgBlockNum", recvMsg.BlockNum)
 	logMsgs := consensus.pbftLog.GetMessagesByTypeSeqView(msg_pb.MessageType_ANNOUNCE, recvMsg.BlockNum, recvMsg.ViewID)
 	if len(logMsgs) > 0 {
 		if logMsgs[0].BlockHash != blockObj.Header().Hash() {
-			utils.GetLogInstance().Debug("onAnnounce leader is malicious", "leaderKey", utils.GetBlsAddress(consensus.LeaderPubKey))
+			utils.GetLogger().Debug("onAnnounce leader is malicious", "leaderKey", utils.GetBlsAddress(consensus.LeaderPubKey))
 			consensus.startViewChange(consensus.viewID + 1)
 		}
 		return
@@ -174,6 +175,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	copy(blockPayload[:], block[:])
 	consensus.block = blockPayload
 	consensus.blockHash = recvMsg.BlockHash
+	utils.GetLogger().Debug("announce block added", "phase", consensus.phase, "myViewID", consensus.viewID, "myBlock", consensus.blockNum, "msgViewID", recvMsg.ViewID, "msgBlock", recvMsg.BlockNum)
 	consensus.pbftLog.AddMessage(recvMsg)
 	consensus.pbftLog.AddBlock(&blockObj)
 
@@ -212,7 +214,7 @@ func (consensus *Consensus) tryPrepare(blockHash common.Hash) {
 
 	// Construct and send prepare message
 	msgToSend := consensus.constructPrepareMessage()
-	utils.GetLogInstance().Info("tryPrepare", "sent prepare message", len(msgToSend))
+	utils.GetLogger().Info("sent prepare message", "viewID", consensus.viewID, "block", consensus.blockNum)
 	// TODO: this will not return immediatey, may block
 	consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 }
@@ -225,28 +227,28 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 
 	senderKey, err := consensus.verifySenderKey(msg)
 	if err != nil {
-		utils.GetLogInstance().Debug("onPrepare verifySenderKey failed", "error", err)
+		utils.GetLogger().Debug("onPrepare verifySenderKey failed", "error", err)
 		return
 	}
 	if err = verifyMessageSig(senderKey, msg); err != nil {
-		utils.GetLogInstance().Debug("onPrepare Failed to verify sender's signature", "error", err)
+		utils.GetLogger().Debug("onPrepare Failed to verify sender's signature", "error", err)
 		return
 	}
 
 	recvMsg, err := ParsePbftMessage(msg)
 	if err != nil {
-		utils.GetLogInstance().Debug("[Consensus] onPrepare Unparseable validator message", "error", err)
+		utils.GetLogger().Debug("[Consensus] onPrepare Unparseable validator message", "error", err)
 		return
 	}
 
 	if recvMsg.ViewID != consensus.viewID || recvMsg.BlockNum != consensus.blockNum || consensus.phase != Prepare {
-		utils.GetLogInstance().Debug("onPrepare message not match", "myPhase", consensus.phase, "myViewID", consensus.viewID,
+		utils.GetLogger().Debug("onPrepare message not match", "myPhase", consensus.phase, "myViewID", consensus.viewID,
 			"msgViewID", recvMsg.ViewID, "myBlockNum", consensus.blockNum, "msgBlockNum", recvMsg.BlockNum)
 		return
 	}
 
 	if !consensus.pbftLog.HasMatchingViewAnnounce(consensus.blockNum, consensus.viewID, recvMsg.BlockHash) {
-		utils.GetLogInstance().Debug("onPrepare no matching announce message", "blockNum", consensus.blockNum, "viewID", consensus.viewID, "blockHash", recvMsg.BlockHash)
+		utils.GetLogger().Debug("onPrepare no matching announce message", "blockNum", consensus.blockNum, "viewID", consensus.viewID, "blockHash", recvMsg.BlockHash)
 		return
 	}
 
@@ -268,7 +270,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	// proceed only when the message is not received before
 	_, ok := prepareSigs[validatorAddress]
 	if ok {
-		utils.GetLogInstance().Debug("Already received prepare message from the validator", "validatorAddress", validatorAddress)
+		utils.GetLogger().Debug("Already received prepare message from the validator", "validatorAddress", validatorAddress)
 		return
 	}
 
@@ -276,15 +278,15 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	var sign bls.Sign
 	err = sign.Deserialize(prepareSig)
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to deserialize bls signature", "validatorAddress", validatorAddress)
+		utils.GetLogger().Error("Failed to deserialize bls signature", "validatorAddress", validatorAddress)
 		return
 	}
 	if !sign.VerifyHash(validatorPubKey, consensus.blockHash[:]) {
-		utils.GetLogInstance().Error("Received invalid BLS signature", "validatorAddress", validatorAddress)
+		utils.GetLogger().Error("Received invalid BLS signature", "validatorAddress", validatorAddress)
 		return
 	}
 
-	utils.GetLogInstance().Debug("Received new prepare signature", "numReceivedSoFar", len(prepareSigs), "validatorAddress", validatorAddress, "PublicKeys", len(consensus.PublicKeys))
+	utils.GetLogger().Debug("Received new prepare signature", "numReceivedSoFar", len(prepareSigs), "validatorAddress", validatorAddress, "PublicKeys", len(consensus.PublicKeys))
 	prepareSigs[validatorAddress] = &sign
 	prepareBitmap.SetKey(validatorPubKey, true) // Set the bitmap indicating that this validator signed.
 
@@ -295,12 +297,15 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		msgToSend, aggSig := consensus.constructPreparedMessage()
 		consensus.aggregatedPrepareSig = aggSig
 
-		utils.GetLogInstance().Warn("onPrepare", "sent prepared message", len(msgToSend))
+		utils.GetLogger().Warn("sent prepared message", "viewID", consensus.viewID, "block", consensus.blockNum)
 		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 
-		// Leader sign the multi-sig and bitmap (for commit phase)
-		multiSigAndBitmap := append(aggSig.Serialize(), prepareBitmap.Bitmap...)
-		consensus.commitSigs[consensus.SelfAddress] = consensus.priKey.SignHash(multiSigAndBitmap)
+		// Leader add commit phase signature
+
+		blockNumHash := make([]byte, 8)
+		binary.LittleEndian.PutUint64(blockNumHash, consensus.blockNum)
+		commitPayload := append(blockNumHash, consensus.blockHash[:]...)
+		consensus.commitSigs[consensus.SelfAddress] = consensus.priKey.SignHash(commitPayload)
 	}
 	return
 }
@@ -313,24 +318,24 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 
 	senderKey, err := consensus.verifySenderKey(msg)
 	if err != nil {
-		utils.GetLogInstance().Debug("onPrepared verifySenderKey failed", "error", err)
+		utils.GetLogger().Debug("onPrepared verifySenderKey failed", "error", err)
 		return
 	}
 	if !senderKey.IsEqual(consensus.LeaderPubKey) && consensus.mode.Mode() == Normal && !consensus.ignoreViewIDCheck {
-		utils.GetLogInstance().Warn("onPrepared senderKey not match leader PubKey")
+		utils.GetLogger().Warn("onPrepared senderKey not match leader PubKey")
 		return
 	}
 	if err := verifyMessageSig(senderKey, msg); err != nil {
-		utils.GetLogInstance().Debug("onPrepared Failed to verify sender's signature", "error", err)
+		utils.GetLogger().Debug("onPrepared Failed to verify sender's signature", "error", err)
 		return
 	}
 
 	recvMsg, err := ParsePbftMessage(msg)
 	if err != nil {
-		utils.GetLogInstance().Debug("onPrepared Unparseable validator message", "error", err)
+		utils.GetLogger().Debug("onPrepared Unparseable validator message", "error", err)
 		return
 	}
-	utils.GetLogInstance().Info("onPrepared received prepared message", "myBlock", consensus.blockNum, "recvBlock", recvMsg.BlockNum)
+	utils.GetLogger().Info("onPrepared received prepared message", "myBlock", consensus.blockNum, "myViewID", consensus.viewID, "recvBlock", recvMsg.BlockNum, "msgViewID", recvMsg.ViewID)
 
 	if recvMsg.BlockNum < consensus.blockNum {
 		utils.GetLogger().Debug("old block received, ignoring",
@@ -358,11 +363,11 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	if !aggSig.VerifyHash(mask.AggregatePublic, blockHash[:]) {
 		myBlockHash := common.Hash{}
 		myBlockHash.SetBytes(consensus.blockHash[:])
-		utils.GetLogInstance().Warn("onPrepared failed to verify multi signature for prepare phase", "blockHash", blockHash, "myBlockHash", myBlockHash)
+		utils.GetLogger().Warn("onPrepared failed to verify multi signature for prepare phase", "blockHash", blockHash, "myBlockHash", myBlockHash)
 		return
 	}
 
-	// TODO ek/cm - make sure we update blocks for syncing
+	utils.GetLogger().Debug("prepared message added", "phase", consensus.phase, "myViewID", consensus.viewID, "myBlock", consensus.blockNum, "msgViewID", recvMsg.ViewID, "msgBlock", recvMsg.BlockNum)
 	consensus.pbftLog.AddMessage(recvMsg)
 
 	if consensus.mode.Mode() == ViewChanging {
@@ -392,9 +397,11 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	}
 
 	// Construct and send the commit message
-	multiSigAndBitmap := append(aggSig.Serialize(), consensus.prepareBitmap.Bitmap...)
-	msgToSend := consensus.constructCommitMessage(multiSigAndBitmap)
-	utils.GetLogInstance().Warn("[Consensus]", "sent commit message", len(msgToSend))
+	blockNumHash := make([]byte, 8)
+	binary.LittleEndian.PutUint64(blockNumHash, consensus.blockNum)
+	commitPayload := append(blockNumHash, consensus.blockHash[:]...)
+	msgToSend := consensus.constructCommitMessage(commitPayload)
+	utils.GetLogger().Debug("sent commit message", "viewID", consensus.viewID, "block", consensus.blockNum)
 	consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 
 	consensus.switchPhase(Commit, false)
@@ -410,17 +417,17 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 
 	senderKey, err := consensus.verifySenderKey(msg)
 	if err != nil {
-		utils.GetLogInstance().Debug("onCommit verifySenderKey failed", "error", err)
+		utils.GetLogger().Debug("onCommit verifySenderKey failed", "error", err)
 		return
 	}
 	if err = verifyMessageSig(senderKey, msg); err != nil {
-		utils.GetLogInstance().Debug("onCommit Failed to verify sender's signature", "error", err)
+		utils.GetLogger().Debug("onCommit Failed to verify sender's signature", "error", err)
 		return
 	}
 
 	recvMsg, err := ParsePbftMessage(msg)
 	if err != nil {
-		utils.GetLogInstance().Debug("onCommit parse pbft message failed", "error", err)
+		utils.GetLogger().Debug("onCommit parse pbft message failed", "error", err)
 		return
 	}
 
@@ -444,7 +451,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	defer consensus.mutex.Unlock()
 
 	if !consensus.IsValidatorInCommittee(validatorAddress) {
-		utils.GetLogInstance().Error("Invalid validator", "validatorAddress", validatorAddress)
+		utils.GetLogger().Error("Invalid validator", "validatorAddress", validatorAddress)
 		return
 	}
 
@@ -454,7 +461,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	// proceed only when the message is not received before
 	_, ok := commitSigs[validatorAddress]
 	if ok {
-		utils.GetLogInstance().Debug("Already received commit message from the validator", "validatorAddress", validatorAddress)
+		utils.GetLogger().Debug("Already received commit message from the validator", "validatorAddress", validatorAddress)
 		return
 	}
 
@@ -463,25 +470,28 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		return
 	}
 
-	// Verify the signature on prepare multi-sig and bitmap is correct
+	// Verify the signature on commitPayload is correct
 	var sign bls.Sign
 	err = sign.Deserialize(commitSig)
 	if err != nil {
-		utils.GetLogInstance().Debug("Failed to deserialize bls signature", "validatorAddress", validatorAddress)
+		utils.GetLogger().Debug("Failed to deserialize bls signature", "validatorAddress", validatorAddress)
 		return
 	}
-	if !sign.VerifyHash(validatorPubKey, append(consensus.aggregatedPrepareSig.Serialize(), consensus.prepareBitmap.Bitmap...)) {
-		utils.GetLogInstance().Error("Received invalid BLS signature", "validatorAddress", validatorAddress)
+	blockNumHash := make([]byte, 8)
+	binary.LittleEndian.PutUint64(blockNumHash, recvMsg.BlockNum)
+	commitPayload := append(blockNumHash, recvMsg.BlockHash[:]...)
+	if !sign.VerifyHash(validatorPubKey, commitPayload) {
+		utils.GetLogger().Error("cannot verify commit message", "viewID", recvMsg.ViewID, "block", recvMsg.BlockNum)
 		return
 	}
 
-	utils.GetLogInstance().Debug("Received new commit message", "numReceivedSoFar", len(commitSigs), "validatorAddress", validatorAddress)
+	utils.GetLogger().Debug("Received new commit message", "numReceivedSoFar", len(commitSigs), "viewID", recvMsg.ViewID, "block", recvMsg.BlockNum, "validatorAddress", validatorAddress)
 	commitSigs[validatorAddress] = &sign
 	// Set the bitmap indicating that this validator signed.
 	commitBitmap.SetKey(validatorPubKey, true)
 
 	if len(commitSigs) >= consensus.Quorum() {
-		utils.GetLogInstance().Info("Enough commits received!", "num", len(commitSigs), "phase", consensus.phase)
+		utils.GetLogger().Info("Enough commits received!", "num", len(commitSigs), "phase", consensus.phase)
 		consensus.finalizeCommits()
 	}
 }
@@ -494,13 +504,13 @@ func (consensus *Consensus) finalizeCommits() {
 	msgToSend, aggSig := consensus.constructCommittedMessage()
 	consensus.aggregatedCommitSig = aggSig
 
-	utils.GetLogInstance().Warn("[Consensus]", "sent committed message", len(msgToSend))
+	utils.GetLogger().Warn("[Consensus]", "sent committed message", len(msgToSend))
 	consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 
 	var blockObj types.Block
 	err := rlp.DecodeBytes(consensus.block, &blockObj)
 	if err != nil {
-		utils.GetLogInstance().Debug("failed to construct the new block after consensus")
+		utils.GetLogger().Debug("failed to construct the new block after consensus")
 	}
 
 	// Sign the block
@@ -514,7 +524,7 @@ func (consensus *Consensus) finalizeCommits() {
 	select {
 	case consensus.VerifiedNewBlock <- &blockObj:
 	default:
-		utils.GetLogInstance().Info("[SYNC] Failed to send consensus verified block for state sync", "blockHash", blockObj.Hash())
+		utils.GetLogger().Info("[SYNC] Failed to send consensus verified block for state sync", "blockHash", blockObj.Hash())
 	}
 
 	consensus.reportMetrics(blockObj)
@@ -536,14 +546,14 @@ func (consensus *Consensus) finalizeCommits() {
 	consensus.consensusTimeout[timeoutConsensus].Start()
 
 	consensus.OnConsensusDone(&blockObj)
-	utils.GetLogInstance().Debug("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!", "viewID", consensus.viewID, "numOfSignatures", len(consensus.commitSigs))
+	utils.GetLogger().Debug("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!", "viewID", consensus.viewID, "numOfSignatures", len(consensus.commitSigs))
 
 	// Send signal to Node so the new block can be added and new round of consensus can be triggered
 	consensus.ReadySignal <- struct{}{}
 }
 
 func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
-	utils.GetLogInstance().Warn("Received Committed Message", "ValidatorAddress", consensus.SelfAddress)
+	utils.GetLogger().Debug("receive committed message", "phase", consensus.phase, "viewID", consensus.viewID, "block", consensus.blockNum)
 
 	if consensus.PubKey.IsEqual(consensus.LeaderPubKey) && consensus.mode.Mode() == Normal {
 		return
@@ -551,30 +561,26 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 
 	senderKey, err := consensus.verifySenderKey(msg)
 	if err != nil {
-		utils.GetLogInstance().Warn("onCommitted verifySenderKey failed", "error", err)
+		utils.GetLogger().Warn("onCommitted verifySenderKey failed", "error", err)
 		return
 	}
 	if !senderKey.IsEqual(consensus.LeaderPubKey) && consensus.mode.Mode() == Normal && !consensus.ignoreViewIDCheck {
-		utils.GetLogInstance().Warn("onCommitted senderKey not match leader PubKey")
+		utils.GetLogger().Warn("onCommitted senderKey not match leader PubKey")
 		return
 	}
 	if err = verifyMessageSig(senderKey, msg); err != nil {
-		utils.GetLogInstance().Warn("onCommitted Failed to verify sender's signature", "error", err)
+		utils.GetLogger().Warn("onCommitted Failed to verify sender's signature", "error", err)
 		return
 	}
 
 	recvMsg, err := ParsePbftMessage(msg)
 	if err != nil {
-		utils.GetLogInstance().Warn("onCommitted unable to parse msg", "error", err)
+		utils.GetLogger().Warn("onCommitted unable to parse msg", "error", err)
 		return
 	}
 	if recvMsg.BlockNum < consensus.blockNum {
 		return
 	}
-
-	validatorPubKey := recvMsg.SenderPubkey
-	addrBytes := validatorPubKey.GetAddress()
-	leaderAddress := common.BytesToAddress(addrBytes[:]).Hex()
 
 	aggSig, mask, err := consensus.readSignatureBitmapPayload(recvMsg.Payload, 0)
 	if err != nil {
@@ -588,14 +594,15 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		return
 	}
 
-	if consensus.mode.Mode() == Normal && consensus.aggregatedPrepareSig != nil && consensus.prepareBitmap != nil {
-		prepareMultiSigAndBitmap := append(consensus.aggregatedPrepareSig.Serialize(), consensus.prepareBitmap.Bitmap...)
-		if !aggSig.VerifyHash(mask.AggregatePublic, prepareMultiSigAndBitmap) {
-			utils.GetLogger().Error("Failed to verify the multi signature for commit phase", "leader Address", leaderAddress)
-			return
-		}
+	blockNumHash := make([]byte, 8)
+	binary.LittleEndian.PutUint64(blockNumHash, recvMsg.BlockNum)
+	commitPayload := append(blockNumHash, recvMsg.BlockHash[:]...)
+	if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
+		utils.GetLogger().Error("Failed to verify the multi signature for commit phase", "blockNum", recvMsg.BlockNum)
+		return
 	}
 
+	utils.GetLogger().Debug("committed message added", "phase", consensus.phase, "myViewID", consensus.viewID, "myBlock", consensus.blockNum, "msgViewID", recvMsg.ViewID, "msgBlock", recvMsg.BlockNum)
 	consensus.pbftLog.AddMessage(recvMsg)
 	if recvMsg.BlockNum > consensus.blockNum {
 		utils.GetLogger().Debug("onCommitted out of sync", "myBlock", consensus.blockNum, "msgBlock", recvMsg.BlockNum)
@@ -636,7 +643,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 
 // try to catch up if fall behind
 func (consensus *Consensus) tryCatchup() {
-	utils.GetLogInstance().Info("tryCatchup: commit new blocks", "blockNum", consensus.blockNum)
+	utils.GetLogger().Info("tryCatchup: commit new blocks", "blockNum", consensus.blockNum)
 	//	if consensus.phase != Commit && consensus.mode.Mode() == Normal {
 	//		return
 	//	}
@@ -648,7 +655,7 @@ func (consensus *Consensus) tryCatchup() {
 			break
 		}
 		if len(msgs) > 1 {
-			utils.GetLogInstance().Error("[PBFT] DANGER!!! we should only get one committed message for a given blockNum", "blockNum", consensus.blockNum, "numMsgs", len(msgs))
+			utils.GetLogger().Error("[PBFT] DANGER!!! we should only get one committed message for a given blockNum", "blockNum", consensus.blockNum, "numMsgs", len(msgs))
 		}
 		utils.GetLogger().Info("committed message found", "block", consensus.blockNum)
 
@@ -658,7 +665,7 @@ func (consensus *Consensus) tryCatchup() {
 		}
 
 		if block.ParentHash() != consensus.ChainReader.CurrentHeader().Hash() {
-			utils.GetLogInstance().Debug("[PBFT] parent block hash not match", "blockNum", consensus.blockNum)
+			utils.GetLogger().Debug("[PBFT] parent block hash not match", "blockNum", consensus.blockNum)
 			break
 		}
 		utils.GetLogger().Info("block found to commit", "block", consensus.blockNum)
@@ -697,14 +704,14 @@ func (consensus *Consensus) tryCatchup() {
 		block.SetPrepareSig(prepareSig, prepareBitmap)
 
 		block.SetCommitSig(aggSig, bitmap)
-		utils.GetLogInstance().Info("Adding block to chain", "viewID", consensus.viewID, "block", consensus.blockNum)
+		utils.GetLogger().Info("Adding block to chain", "viewID", consensus.viewID, "block", consensus.blockNum)
 		consensus.OnConsensusDone(block)
 		consensus.ResetState()
 
 		select {
 		case consensus.VerifiedNewBlock <- block:
 		default:
-			utils.GetLogInstance().Info("[SYNC] consensus verified block send to chan failed", "blockHash", block.Hash())
+			utils.GetLogger().Info("[SYNC] consensus verified block send to chan failed", "blockHash", block.Hash())
 			continue
 		}
 
@@ -726,7 +733,7 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 		<-startChannel
 	}
 	go func() {
-		utils.GetLogInstance().Info("start consensus", "time", time.Now())
+		utils.GetLogger().Info("start consensus", "time", time.Now())
 		defer close(stoppedChan)
 		ticker := time.NewTicker(3 * time.Second)
 		consensus.consensusTimeout[timeoutBootstrap].Start()
@@ -742,11 +749,11 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 						continue
 					}
 					if k != timeoutViewChange {
-						utils.GetLogInstance().Debug("ops", "phase", k, "mode", consensus.mode.Mode(), "viewChangeID", consensus.viewID)
+						utils.GetLogger().Debug("ops", "phase", k, "mode", consensus.mode.Mode(), "viewChangeID", consensus.viewID)
 						consensus.startViewChange(consensus.viewID + 1)
 						break
 					} else {
-						utils.GetLogInstance().Debug("ops", "phase", k, "mode", consensus.mode.Mode(), "viewChangeID", consensus.mode.ViewID())
+						utils.GetLogger().Debug("ops", "phase", k, "mode", consensus.mode.Mode(), "viewChangeID", consensus.mode.ViewID())
 						viewID := consensus.mode.ViewID()
 						consensus.startViewChange(viewID + 1)
 						break
@@ -759,14 +766,14 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 				consensus.ignoreViewIDCheck = true
 
 			case newBlock := <-blockChannel:
-				utils.GetLogInstance().Info("receive newBlock", "blockNum", newBlock.NumberU64())
+				utils.GetLogger().Info("receive newBlock", "blockNum", newBlock.NumberU64())
 				if consensus.ShardID == 0 {
 					// TODO ek/rj - re-enable this after fixing DRand
 					//if core.IsEpochBlock(newBlock) { // Only beacon chain do randomness generation
 					//	// Receive pRnd from DRG protocol
-					//	utils.GetLogInstance().Debug("[DRG] Waiting for pRnd")
+					//	utils.GetLogger().Debug("[DRG] Waiting for pRnd")
 					//	pRndAndBitmap := <-consensus.PRndChannel
-					//	utils.GetLogInstance().Debug("[DRG] Got pRnd", "pRnd", pRndAndBitmap)
+					//	utils.GetLogger().Debug("[DRG] Got pRnd", "pRnd", pRndAndBitmap)
 					//	pRnd := [32]byte{}
 					//	copy(pRnd[:], pRndAndBitmap[:32])
 					//	bitmap := pRndAndBitmap[32:]
@@ -781,15 +788,15 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 					if err == nil {
 						// Verify the randomness
 						_ = blockHash
-						utils.GetLogInstance().Info("Adding randomness into new block", "rnd", rnd)
+						utils.GetLogger().Info("Adding randomness into new block", "rnd", rnd)
 						newBlock.AddRandSeed(rnd)
 					} else {
-						utils.GetLogInstance().Info("Failed to get randomness", "error", err)
+						utils.GetLogger().Info("Failed to get randomness", "error", err)
 					}
 				}
 
 				startTime = time.Now()
-				utils.GetLogInstance().Debug("STARTING CONSENSUS", "numTxs", len(newBlock.Transactions()), "consensus", consensus, "startTime", startTime, "publicKeys", len(consensus.PublicKeys))
+				utils.GetLogger().Debug("STARTING CONSENSUS", "numTxs", len(newBlock.Transactions()), "consensus", consensus, "startTime", startTime, "publicKeys", len(consensus.PublicKeys))
 				consensus.tryAnnounce(newBlock)
 
 			case msg := <-consensus.MsgChan:
