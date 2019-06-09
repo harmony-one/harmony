@@ -99,6 +99,8 @@ var (
 	accountIndex       = flag.Int("account_index", 0, "the index of the staking account to use")
 	shardID            = flag.Int("shard_id", -1, "the shard ID of this node")
 	enableMemProfiling = flag.Bool("enableMemProfiling", false, "Enable memsize logging.")
+	enableGC           = flag.Bool("enableGC", true, "Enable calling garbage collector manually .")
+
 	// logConn logs incoming/outgoing connections
 	logConn = flag.Bool("log_conn", false, "log incoming/outgoing connections")
 
@@ -188,6 +190,11 @@ func initSetup() {
 			os.Exit(3)
 		}
 		hmykey.SetHmyPass(myPass)
+	}
+
+	// Set up manual call for garbage collection.
+	if *enableGC {
+		memprofiling.MaybeCallGCPeriodically()
 	}
 }
 
@@ -387,7 +394,6 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// Watching currentNode and currentConsensus.
 	memprofiling.GetMemProfiling().Add("currentNode", currentNode)
 	memprofiling.GetMemProfiling().Add("currentConsensus", currentConsensus)
-	currentNode.WatchObservedObjects()
 	return currentNode
 }
 
