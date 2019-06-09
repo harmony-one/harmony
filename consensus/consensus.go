@@ -17,7 +17,6 @@ import (
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
-	"github.com/harmony-one/harmony/internal/memprofiling"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/internal/utils/contract"
 	"github.com/harmony-one/harmony/p2p"
@@ -142,18 +141,6 @@ type Consensus struct {
 	disableViewChange bool
 }
 
-// WatchObservedObjects adds more objects from consensus object to watch for memory issues.
-func (consensus *Consensus) WatchObservedObjects() {
-	memprofiling.GetMemProfiling().Add("consensus.prepareSigs", &consensus.prepareSigs)
-	memprofiling.GetMemProfiling().Add("consensus.commitSigs", &consensus.commitSigs)
-	memprofiling.GetMemProfiling().Add("consensus.prepareBitmap", &consensus.prepareBitmap)
-	memprofiling.GetMemProfiling().Add("consensus.commitBitmap", &consensus.commitBitmap)
-	memprofiling.GetMemProfiling().Add("consensus.bhpSigs", &consensus.bhpSigs)
-	memprofiling.GetMemProfiling().Add("consensus.nilSigs", &consensus.nilSigs)
-	memprofiling.GetMemProfiling().Add("consensus.bhpBitmap", &consensus.bhpBitmap)
-	memprofiling.GetMemProfiling().Add("consensus.nilBitmap", &consensus.nilBitmap)
-}
-
 // StakeInfoFinder returns the stake information finder instance this
 // consensus uses, e.g. for block reward distribution.
 func (consensus *Consensus) StakeInfoFinder() StakeInfoFinder {
@@ -260,8 +247,6 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 
 	consensus.uniqueIDInstance = utils.GetUniqueValidatorIDInstance()
 
-	// Watch objects for the first time.
-	consensus.WatchObservedObjects()
 	return &consensus, nil
 }
 
