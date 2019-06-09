@@ -27,7 +27,6 @@ import (
 	"github.com/harmony-one/harmony/drand"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
-	"github.com/harmony-one/harmony/internal/memprofiling"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
@@ -224,16 +223,19 @@ func (node *Node) Beaconchain() *core.BlockChain {
 	return bc
 }
 
+func (node *Node) reducePendingTransactions() {
+	// If length of pendingTransactions is greater than TxPoolLimit then by greedy take the TxPoolLimit recent transactions.
+	if len(node.pendingTransactions) > TxPoolLimit+TxPoolLimit {
+		curLen := len(node.pendingTransactions)
+		node.pendingTransactions = append(types.Transactions(nil), node.pendingTransactions[curLen-TxPoolLimit:]...)
+	}
+}
+
 // Add new transactions to the pending transaction list.
 func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 	node.pendingTxMutex.Lock()
 	node.pendingTransactions = append(node.pendingTransactions, newTxs...)
-	// If length of pendingTransactions is greater than TxPoolLimit then by greedy take the TxPoolLimit recent transactions.
-	if len(node.pendingTransactions) > TxPoolLimit {
-		utils.GetLogInstance().Warn("Got more transactions than expected and this could caused OOM", "num", len(newTxs), "totalPending", len(node.pendingTransactions))
-		curLen := len(node.pendingTransactions)
-		node.pendingTransactions = node.pendingTransactions[curLen-TxPoolLimit:]
-	}
+	node.reducePendingTransactions()
 	node.pendingTxMutex.Unlock()
 	utils.GetLogInstance().Info("Got more transactions", "num", len(newTxs), "totalPending", len(node.pendingTransactions))
 }
@@ -251,6 +253,7 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int) types.Transactions {
 	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(node.pendingTransactions, maxNumTxs)
 
 	node.pendingTransactions = unselected
+	node.reducePendingTransactions()
 	utils.GetLogInstance().Debug("Selecting Transactions", "remainPending", len(node.pendingTransactions), "selected", len(selected), "invalidDiscarded", len(invalid))
 	node.pendingTxMutex.Unlock()
 	return selected
@@ -281,12 +284,6 @@ func (node *Node) countNumTransactionsInBlockchain() int {
 // GetSyncID returns the syncID of this node
 func (node *Node) GetSyncID() [SyncIDLength]byte {
 	return node.syncID
-}
-
-// WatchObservedObjects adds more objects to watch for memory issues.
-func (node *Node) WatchObservedObjects() {
-	memprofiling.GetMemProfiling().Add("currentNode.pendingTransactions", &node.pendingTransactions)
-	memprofiling.GetMemProfiling().Add("currentNode.transactionInConsensus", &node.transactionInConsensus)
 }
 
 // New creates a new node.
