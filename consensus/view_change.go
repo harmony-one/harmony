@@ -426,6 +426,11 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		}
 	}
 
+	if m3Mask.Bitmap == nil || m2Mask.Bitmap == nil {
+		utils.GetLogInstance().Error("onNewView m3Mask or m2Mask is nil")
+		return
+	}
+
 	// check when M3 sigs > M2 sigs, then M1 (recvMsg.Payload) should not be empty
 	if utils.CountOneBits(m3Mask.Bitmap) > utils.CountOneBits(m2Mask.Bitmap) {
 		if len(recvMsg.Payload) <= 32 {
