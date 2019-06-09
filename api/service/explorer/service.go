@@ -16,6 +16,7 @@ import (
 	"github.com/gorilla/mux"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	libp2p_peer "github.com/libp2p/go-libp2p-peer"
@@ -25,6 +26,12 @@ import (
 const (
 	explorerPortDifference = 4000
 )
+
+// HTTPError is an HTTP error.
+type HTTPError struct {
+	Code int
+	Msg  string
+}
 
 // Service is the struct for explorer service.
 type Service struct {
@@ -108,7 +115,11 @@ func (s *Service) Run() *http.Server {
 	// Do serving now.
 	utils.GetLogInstance().Info("Listening on ", "port: ", GetExplorerPort(s.Port))
 	server := &http.Server{Addr: addr, Handler: s.router}
-	go server.ListenAndServe()
+	go func() {
+		if err := server.ListenAndServe(); err != nil {
+			ctxerror.Warn(utils.GetLogger(), err, "server.ListenAndServe()")
+		}
+	}()
 	return server
 }
 
@@ -145,14 +156,21 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 	data := &Data{
 		Blocks: []*Block{},
 	}
+	defer func() {
+		if err := json.NewEncoder(w).Encode(data.Blocks); err != nil {
+			ctxerror.Warn(utils.WithCallerSkip(utils.GetLogInstance(), 1), err,
+				"cannot JSON-encode blocks")
+		}
+	}()
+
 	if from == "" {
-		json.NewEncoder(w).Encode(data.Blocks)
 		return
 	}
 	db := s.storage.GetDB()
 	fromInt, err := strconv.Atoi(from)
 	if err != nil {
-		json.NewEncoder(w).Encode(data.Blocks)
+		ctxerror.Warn(utils.GetLogger(), err, "invalid from parameter",
+			"from", from)
 		return
 	}
 	var toInt int
@@ -168,7 +186,7 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 		toInt, err = strconv.Atoi(to)
 	}
 	if err != nil {
-		json.NewEncoder(w).Encode(data.Blocks)
+		ctxerror.Warn(utils.GetLogger(), err, "invalid to parameter", "to", to)
 		return
 	}
 
@@ -209,7 +227,7 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 		}
 		data.Blocks = append(data.Blocks, block)
 	}
-	json.NewEncoder(w).Encode(data.Blocks)
+	return
 }
 
 // GetExplorerTransaction servers /tx end-point.
@@ -218,23 +236,27 @@ func (s *Service) GetExplorerTransaction(w http.ResponseWriter, r *http.Request)
 	id := r.FormValue("id")
 
 	data := &Data{}
+	defer func() {
+		if err := json.NewEncoder(w).Encode(data.TX); err != nil {
+			ctxerror.Warn(utils.WithCallerSkip(utils.GetLogInstance(), 1), err,
+				"cannot JSON-encode TX")
+		}
+	}()
 	if id == "" {
-		json.NewEncoder(w).Encode(data.TX)
 		return
 	}
 	db := s.storage.GetDB()
 	bytes, err := db.Get([]byte(GetTXKey(id)))
 	if err != nil {
-		json.NewEncoder(w).Encode(data.TX)
+		ctxerror.Warn(utils.GetLogger(), err, "cannot read TX", "id", id)
 		return
 	}
 	tx := new(Transaction)
 	if rlp.DecodeBytes(bytes, tx) != nil {
-		json.NewEncoder(w).Encode(data.TX)
+		utils.GetLogger().Warn("cannot convert data from DB", "id", id)
 		return
 	}
 	data.TX = *tx
-	json.NewEncoder(w).Encode(data.TX)
 }
 
 // GetExplorerAddress serves /address end-point.
@@ -243,20 +265,26 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 	id := r.FormValue("id")
 	key := GetAddressKey(id)
 
+	var result interface{}
+	defer func() {
+		if err := json.NewEncoder(w).Encode(result); err != nil {
+			ctxerror.Warn(utils.WithCallerSkip(utils.GetLogInstance(), 1), err,
+				"cannot JSON-encode address")
+		}
+	}()
 	data := &Data{}
 	if id == "" {
-		json.NewEncoder(w).Encode(nil)
 		return
 	}
 	db := s.storage.GetDB()
 	bytes, err := db.Get([]byte(key))
 	if err != nil {
-		json.NewEncoder(w).Encode(nil)
+		ctxerror.Warn(utils.GetLogger(), err, "cannot read address", "id", id)
 		return
 	}
 	var address Address
 	if err = rlp.DecodeBytes(bytes, &address); err != nil {
-		json.NewEncoder(w).Encode(nil)
+		utils.GetLogger().Warn("cannot convert data from DB", "id", id)
 		return
 	}
 	data.Address = address
@@ -270,13 +298,15 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	json.NewEncoder(w).Encode(data.Address)
+	result = data.Address
 }
 
 // GetExplorerNodeCount serves /nodes end-point.
 func (s *Service) GetExplorerNodeCount(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(len(s.GetNodeIDs()))
+	if err := json.NewEncoder(w).Encode(len(s.GetNodeIDs())); err != nil {
+		ctxerror.Warn(utils.GetLogger(), err, "cannot JSON-encode node count")
+	}
 }
 
 // GetExplorerShard serves /shard end-point
@@ -288,9 +318,9 @@ func (s *Service) GetExplorerShard(w http.ResponseWriter, r *http.Request) {
 			ID: libp2p_peer.IDB58Encode(nodeID),
 		})
 	}
-	json.NewEncoder(w).Encode(Shard{
-		Nodes: nodes,
-	})
+	if err := json.NewEncoder(w).Encode(Shard{Nodes: nodes}); err != nil {
+		ctxerror.Warn(utils.GetLogger(), err, "cannot JSON-encode shard info")
+	}
 }
 
 // NotifyService notify service

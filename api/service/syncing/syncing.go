@@ -2,6 +2,7 @@ package syncing
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"reflect"
 	"sort"
@@ -324,7 +325,10 @@ func (ss *StateSync) generateStateSyncTaskQueue(bc *core.BlockChain) {
 	ss.stateSyncTaskQueue = queue.New(0)
 	ss.syncConfig.ForEachPeer(func(configPeer *SyncPeerConfig) (brk bool) {
 		for id, blockHash := range configPeer.blockHashes {
-			ss.stateSyncTaskQueue.Put(SyncBlockTask{index: id, blockHash: blockHash})
+			if err := ss.stateSyncTaskQueue.Put(SyncBlockTask{index: id, blockHash: blockHash}); err != nil {
+				ctxerror.Warn(utils.GetLogger(), err, "cannot add task",
+					"taskIndex", id, "taskBlock", hex.EncodeToString(blockHash))
+			}
 		}
 		brk = true
 		return
@@ -356,7 +360,11 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 					if count > TimesToFail {
 						break
 					}
-					ss.stateSyncTaskQueue.Put(syncTask)
+					if err := ss.stateSyncTaskQueue.Put(syncTask); err != nil {
+						ctxerror.Warn(utils.GetLogger(), err, "cannot add task",
+							"taskIndex", syncTask.index,
+							"taskBlock", hex.EncodeToString(syncTask.blockHash))
+					}
 					continue
 				}
 
@@ -370,7 +378,11 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 					if count > TimesToFail {
 						break
 					}
-					ss.stateSyncTaskQueue.Put(syncTask)
+					if err := ss.stateSyncTaskQueue.Put(syncTask); err != nil {
+						ctxerror.Warn(utils.GetLogger(), err, "cannot add task",
+							"taskIndex", syncTask.index,
+							"taskBlock", hex.EncodeToString(syncTask.blockHash))
+					}
 					continue
 				}
 				ss.syncMux.Lock()
@@ -467,7 +479,9 @@ func (ss *StateSync) updateBlockAndStatus(block *types.Block, bc *core.BlockChai
 		return false
 	}
 	ss.syncMux.Lock()
-	worker.UpdateCurrent()
+	if err := worker.UpdateCurrent(); err != nil {
+		ctxerror.Warn(utils.GetLogger(), err, "(*Worker).UpdateCurrent failed")
+	}
 	ss.syncMux.Unlock()
 	utils.GetLogInstance().Info("[SYNC] new block added to blockchain", "blockHeight", bc.CurrentBlock().NumberU64(), "blockHex", bc.CurrentBlock().Hash().Hex())
 	return true

@@ -32,8 +32,8 @@ func NewClient(ip string) *Client {
 }
 
 // Close closes the Client.
-func (client *Client) Close() {
-	client.conn.Close()
+func (client *Client) Close() error {
+	return client.conn.Close()
 }
 
 // Process processes message.

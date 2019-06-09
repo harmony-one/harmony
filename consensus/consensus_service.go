@@ -61,7 +61,7 @@ func (consensus *Consensus) GetNextRnd() ([32]byte, [32]byte, error) {
 func (consensus *Consensus) SealHash(header *types.Header) (hash common.Hash) {
 	hasher := sha3.NewLegacyKeccak256()
 
-	rlp.Encode(hasher, []interface{}{
+	if err := rlp.Encode(hasher, []interface{}{
 		header.ParentHash,
 		header.Coinbase,
 		header.Root,
@@ -74,7 +74,9 @@ func (consensus *Consensus) SealHash(header *types.Header) (hash common.Hash) {
 		header.GasUsed,
 		header.Time,
 		header.Extra,
-	})
+	}); err != nil {
+		ctxerror.Warn(utils.GetLogger(), err, "rlp.Encode failed")
+	}
 	hasher.Sum(hash[:0])
 	return hash
 }
@@ -442,7 +444,9 @@ func (consensus *Consensus) RemovePeers(peers []p2p.Peer) int {
 		pong := proto_discovery.NewPongMessage(validators, consensus.PublicKeys, consensus.leader.ConsensusPubKey, consensus.ShardID)
 		buffer := pong.ConstructPongMessage()
 
-		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), buffer))
+		if err := consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), buffer)); err != nil {
+			ctxerror.Warn(utils.GetLogger(), err, "cannot send pong message")
+		}
 	}
 
 	return count2
@@ -596,7 +600,9 @@ func (consensus *Consensus) readSignatureBitmapPayload(recvPayload []byte, offse
 		utils.GetLogInstance().Warn("onNewView unable to setup mask for prepared message", "err", err)
 		return nil, nil, errors.New("unable to setup mask from payload")
 	}
-	mask.SetMask(bitmap)
+	if err := mask.SetMask(bitmap); err != nil {
+		ctxerror.Warn(utils.GetLogger(), err, "mask.SetMask failed")
+	}
 	return &aggSig, mask, nil
 }
 

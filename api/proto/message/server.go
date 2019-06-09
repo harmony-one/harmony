@@ -10,6 +10,7 @@ import (
 	"net"
 
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 
 	"google.golang.org/grpc"
@@ -88,7 +89,11 @@ func (s *Server) Start() (*grpc.Server, error) {
 	var opts []grpc.ServerOption
 	s.server = grpc.NewServer(opts...)
 	RegisterClientServiceServer(s.server, s)
-	go s.server.Serve(lis)
+	go func() {
+		if err := s.server.Serve(lis); err != nil {
+			ctxerror.Warn(utils.GetLogger(), err, "server.Serve() failed")
+		}
+	}()
 	return s.server, nil
 }
 
