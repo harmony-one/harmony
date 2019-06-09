@@ -159,7 +159,7 @@ func (s *Service) getFakeStakingInfo() *proto.StakingContractInfoResponse {
 
 	stakingContractAddress := crypto.CreateAddress(contractAddress, uint64(nonce))
 	return &proto.StakingContractInfoResponse{
-		ContractAddress: stakingContractAddress.Hex(),
+		ContractAddress: common2.MustAddressToBech32(stakingContractAddress),
 		Balance:         balance.Bytes(),
 		Nonce:           nonce,
 	}
