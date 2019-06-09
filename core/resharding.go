@@ -11,15 +11,13 @@ import (
 
 	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/internal/ctxerror"
+	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/internal/utils/contract"
 
 	"github.com/harmony-one/harmony/core/types"
 )
 
 const (
-	// InitialSeed is the initial random seed, a magic number to answer everything, remove later
-	InitialSeed uint32 = 42
 	// GenesisEpoch is the number of the genesis epoch.
 	GenesisEpoch = 0
 	// FirstEpoch is the number of the first epoch.
@@ -27,7 +25,9 @@ const (
 	// GenesisShardNum is the number of shard at genesis
 	GenesisShardNum = 4
 	// GenesisShardSize is the size of each shard at genesis
-	GenesisShardSize = 10
+	GenesisShardSize = 100
+	// GenesisShardHarmonyNodes is the number of harmony node at each shard
+	GenesisShardHarmonyNodes = 78
 	// CuckooRate is the percentage of nodes getting reshuffled in the second step of cuckoo resharding.
 	CuckooRate = 0.1
 )
@@ -224,14 +224,26 @@ func GetInitShardState() types.ShardState {
 	shardState := types.ShardState{}
 	for i := 0; i < GenesisShardNum; i++ {
 		com := types.Committee{ShardID: uint32(i)}
-		for j := 0; j < GenesisShardSize; j++ {
+		for j := 0; j < GenesisShardHarmonyNodes; j++ {
 			index := i + j*GenesisShardNum // The initial account to use for genesis nodes
 			priKey := bls.SecretKey{}
-			priKey.SetHexString(contract.GenesisBLSAccounts[index].Private)
+			priKey.SetHexString(genesis.GenesisAccounts[index].BLSKey)
 			pubKey := types.BlsPublicKey{}
 			pubKey.FromLibBLSPublicKey(priKey.GetPublicKey())
 			// TODO: directly read address for bls too
-			curNodeID := types.NodeID{common.HexToAddress(contract.GenesisAccounts[index].Address), pubKey}
+			curNodeID := types.NodeID{common.HexToAddress(genesis.GenesisAccounts[index].Address), pubKey}
+			com.NodeList = append(com.NodeList, curNodeID)
+		}
+
+		// add FN runner's key
+		for j := GenesisShardHarmonyNodes; j < GenesisShardSize; j++ {
+			index := i + (j-GenesisShardHarmonyNodes)*GenesisShardNum
+			priKey := bls.SecretKey{}
+			priKey.SetHexString(genesis.GenesisFNAccounts[index].BLSKey)
+			pubKey := types.BlsPublicKey{}
+			pubKey.FromLibBLSPublicKey(priKey.GetPublicKey())
+			// TODO: directly read address for bls too
+			curNodeID := types.NodeID{common.HexToAddress(genesis.GenesisFNAccounts[index].Address), pubKey}
 			com.NodeList = append(com.NodeList, curNodeID)
 		}
 		shardState = append(shardState, com)

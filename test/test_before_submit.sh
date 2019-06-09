@@ -3,6 +3,8 @@
 DIRROOT=$(dirname $0)/..
 OS=$(uname -s)
 
+export GO111MODULE=on
+
 pushd $DIRROOT
 ./scripts/travis_checker.sh
 

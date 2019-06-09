@@ -39,7 +39,7 @@ func init() {
 }
 
 func fakeGetInitShardState(numberOfShards, numOfNodes int) types.ShardState {
-	rand.Seed(int64(InitialSeed))
+	rand.Seed(int64(42))
 	shardState := types.ShardState{}
 	for i := 0; i < numberOfShards; i++ {
 		sid := uint32(i)

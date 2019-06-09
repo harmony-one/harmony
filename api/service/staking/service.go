@@ -24,9 +24,9 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/ctxerror"
+	"github.com/harmony-one/harmony/internal/genesis"
 	hmykey "github.com/harmony-one/harmony/internal/keystore"
 	"github.com/harmony-one/harmony/internal/utils"
-	contract_constants "github.com/harmony-one/harmony/internal/utils/contract"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 )
@@ -152,7 +152,7 @@ func (s *Service) getFakeStakingInfo() *proto.StakingContractInfoResponse {
 	balance := big.NewInt(denominations.One)
 	nonce := uint64(0) // TODO: make it a incrementing field
 
-	priKey := contract_constants.GenesisBeaconAccountPriKey
+	priKey := genesis.GenesisBeaconAccountPriKey
 	contractAddress := crypto.PubkeyToAddress(priKey.PublicKey)
 
 	stakingContractAddress := crypto.CreateAddress(contractAddress, uint64(nonce))

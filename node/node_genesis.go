@@ -17,8 +17,8 @@ import (
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/ctxerror"
+	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/internal/utils/contract"
 )
 
 const (
@@ -76,11 +76,6 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32) error {
 	genesisAlloc[contractDeployerAddress] = core.GenesisAccount{Balance: contractDeployerFunds}
 	node.ContractDeployerKey = contractDeployerKey
 
-	// Add puzzle fund
-	puzzleFunds := big.NewInt(TotalInitFund)
-	puzzleFunds = puzzleFunds.Mul(puzzleFunds, big.NewInt(denominations.One))
-	genesisAlloc[common.HexToAddress(contract.PuzzleAccounts[0].Address)] = core.GenesisAccount{Balance: puzzleFunds}
-
 	if shardID == 0 {
 		// Accounts used by validator/nodes to stake and participate in the network.
 		AddNodeAddressesToGenesisAlloc(genesisAlloc)
@@ -136,13 +131,7 @@ func (node *Node) CreateGenesisAllocWithTestingAddresses(numAddress int) core.Ge
 // AddNodeAddressesToGenesisAlloc adds to the genesis block allocation the accounts used for network validators/nodes,
 // including the account used by the nodes of the initial beacon chain and later new nodes.
 func AddNodeAddressesToGenesisAlloc(genesisAlloc core.GenesisAlloc) {
-	for _, account := range contract.GenesisAccounts {
-		testBankFunds := big.NewInt(InitFreeFundInEther)
-		testBankFunds = testBankFunds.Mul(testBankFunds, big.NewInt(denominations.One))
-		address := common.HexToAddress(account.Address)
-		genesisAlloc[address] = core.GenesisAccount{Balance: testBankFunds}
-	}
-	for _, account := range contract.DemoAccounts {
+	for _, account := range genesis.GenesisAccounts {
 		testBankFunds := big.NewInt(InitFreeFundInEther)
 		testBankFunds = testBankFunds.Mul(testBankFunds, big.NewInt(denominations.One))
 		address := common.HexToAddress(account.Address)
