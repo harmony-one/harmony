@@ -188,6 +188,8 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		return
 	}
 
+	consensus.tryCatchup()
+
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
@@ -398,6 +400,8 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		utils.GetLogger().Debug("viewchanging mode just exist after viewchanging")
 		return
 	}
+
+	consensus.tryCatchup()
 
 	if consensus.checkViewID(recvMsg) != nil {
 		utils.GetLogger().Debug("viewID check failed", "viewID", recvMsg.ViewID, "myViewID", consensus.viewID)
@@ -639,10 +643,12 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		utils.GetLogger().Error("Failed to verify the multi signature for commit phase", "blockNum", recvMsg.BlockNum)
 		return
 	}
-
+	consensus.aggregatedCommitSig = aggSig
+	consensus.commitBitmap = mask
 	utils.GetLogger().Debug("committed message added", "phase", consensus.phase, "myViewID", consensus.viewID, "myBlock", consensus.blockNum, "msgViewID", recvMsg.ViewID, "msgBlock", recvMsg.BlockNum)
 	consensus.pbftLog.AddMessage(recvMsg)
-	if recvMsg.BlockNum > consensus.blockNum {
+
+	if recvMsg.BlockNum-consensus.blockNum > consensusBlockNumBuffer {
 		utils.GetLogger().Debug("onCommitted out of sync", "myBlock", consensus.blockNum, "msgBlock", recvMsg.BlockNum)
 		go func() {
 			select {
@@ -657,18 +663,15 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		return
 	}
 
+	//	if consensus.checkViewID(recvMsg) != nil {
+	//		utils.GetLogger().Debug("viewID check failed", "viewID", recvMsg.ViewID, "myViewID", consensus.viewID)
+	//		return
+	//	}
+
+	consensus.tryCatchup()
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
-	if consensus.checkViewID(recvMsg) != nil {
-		utils.GetLogger().Debug("viewID check failed", "viewID", recvMsg.ViewID, "myViewID", consensus.viewID)
-		return
-	}
-
-	consensus.aggregatedCommitSig = aggSig
-	consensus.commitBitmap = mask
-
-	go consensus.tryCatchup()
 	if consensus.consensusTimeout[timeoutBootstrap].IsActive() {
 		consensus.consensusTimeout[timeoutBootstrap].Stop()
 		utils.GetLogger().Debug("start consensus timeout; stop bootstrap timeout only once", "viewID", consensus.viewID, "block", consensus.blockNum)
@@ -686,7 +689,6 @@ func (consensus *Consensus) tryCatchup() {
 	//		return
 	//	}
 	currentBlockNum := consensus.blockNum
-	consensus.switchPhase(Announce, true)
 	for {
 		msgs := consensus.pbftLog.GetMessagesByTypeSeq(msg_pb.MessageType_COMMITTED, consensus.blockNum)
 		if len(msgs) == 0 {
@@ -754,6 +756,9 @@ func (consensus *Consensus) tryCatchup() {
 		}
 
 		break
+	}
+	if currentBlockNum < consensus.blockNum {
+		consensus.switchPhase(Announce, true)
 	}
 	// catup up and skip from view change trap
 	if currentBlockNum < consensus.blockNum && consensus.mode.Mode() == ViewChanging {
