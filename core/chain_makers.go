@@ -66,11 +66,6 @@ func (b *BlockGen) SetExtra(data []byte) {
 	b.header.Extra = data
 }
 
-// SetNonce sets the nonce field of the generated block.
-func (b *BlockGen) SetNonce(nonce types.BlockNonce) {
-	b.header.Nonce = nonce
-}
-
 // SetShardID sets the shardID field of the generated block.
 func (b *BlockGen) SetShardID(shardID uint32) {
 	b.header.ShardID = shardID

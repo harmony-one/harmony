@@ -60,7 +60,7 @@ func (consensus *Consensus) GetNextRnd() ([32]byte, [32]byte, error) {
 // SealHash returns the hash of a block prior to it being sealed.
 func (consensus *Consensus) SealHash(header *types.Header) (hash common.Hash) {
 	hasher := sha3.NewLegacyKeccak256()
-
+	// TODO: update with new fields
 	rlp.Encode(hasher, []interface{}{
 		header.ParentHash,
 		header.Coinbase,
@@ -68,7 +68,6 @@ func (consensus *Consensus) SealHash(header *types.Header) (hash common.Hash) {
 		header.TxHash,
 		header.ReceiptHash,
 		header.Bloom,
-		header.Difficulty,
 		header.Number,
 		header.GasLimit,
 		header.GasUsed,

@@ -77,14 +77,12 @@ type Header struct {
 	TxHash      common.Hash    `json:"transactionsRoot" gencodec:"required"`
 	ReceiptHash common.Hash    `json:"receiptsRoot"     gencodec:"required"`
 	Bloom       ethtypes.Bloom `json:"logsBloom"        gencodec:"required"`
-	Difficulty  *big.Int       `json:"difficulty"       gencodec:"required"`
 	Number      *big.Int       `json:"number"           gencodec:"required"`
 	GasLimit    uint64         `json:"gasLimit"         gencodec:"required"`
 	GasUsed     uint64         `json:"gasUsed"          gencodec:"required"`
 	Time        *big.Int       `json:"timestamp"        gencodec:"required"`
 	Extra       []byte         `json:"extraData"        gencodec:"required"`
 	MixDigest   common.Hash    `json:"mixHash"          gencodec:"required"`
-	Nonce       BlockNonce     `json:"nonce"            gencodec:"required"`
 	// Additional Fields
 	Epoch            *big.Int    `json:"epoch"            gencodec:"required"`
 	ShardID          uint32      `json:"shardID"          gencodec:"required"`
@@ -118,7 +116,8 @@ func (h *Header) Hash() common.Hash {
 // Size returns the approximate memory used by all internal contents. It is used
 // to approximate and limit the memory consumption of various caches.
 func (h *Header) Size() common.StorageSize {
-	return common.StorageSize(unsafe.Sizeof(*h)) + common.StorageSize(len(h.Extra)+(h.Difficulty.BitLen()+h.Number.BitLen()+h.Time.BitLen())/8)
+	// TODO: update with new fields
+	return common.StorageSize(unsafe.Sizeof(*h)) + common.StorageSize(len(h.Extra)+(h.Number.BitLen()+h.Time.BitLen())/8)
 }
 
 // Logger returns a sub-logger with block contexts added.
@@ -255,12 +254,10 @@ func NewBlockWithHeader(header *Header) *Block {
 // CopyHeader creates a deep copy of a block header to prevent side effects from
 // modifying a header variable.
 func CopyHeader(h *Header) *Header {
+	// TODO: update with new fields
 	cpy := *h
 	if cpy.Time = new(big.Int); h.Time != nil {
 		cpy.Time.Set(h.Time)
-	}
-	if cpy.Difficulty = new(big.Int); h.Difficulty != nil {
-		cpy.Difficulty.Set(h.Difficulty)
 	}
 	if cpy.Number = new(big.Int); h.Number != nil {
 		cpy.Number.Set(h.Number)
@@ -333,9 +330,6 @@ func (b *Block) GasLimit() uint64 { return b.header.GasLimit }
 // GasUsed returns header gas used.
 func (b *Block) GasUsed() uint64 { return b.header.GasUsed }
 
-// Difficulty is the header difficulty.
-func (b *Block) Difficulty() *big.Int { return new(big.Int).Set(b.header.Difficulty) }
-
 // Time is header time.
 func (b *Block) Time() *big.Int { return new(big.Int).Set(b.header.Time) }
 
@@ -344,9 +338,6 @@ func (b *Block) NumberU64() uint64 { return b.header.Number.Uint64() }
 
 // MixDigest is the header mix digest.
 func (b *Block) MixDigest() common.Hash { return b.header.MixDigest }
-
-// Nonce is the header nonce.
-func (b *Block) Nonce() uint64 { return binary.BigEndian.Uint64(b.header.Nonce[:]) }
 
 // ShardID is the header ShardID
 func (b *Block) ShardID() uint32 { return b.header.ShardID }
