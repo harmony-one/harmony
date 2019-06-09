@@ -1703,22 +1703,24 @@ func (bc *BlockChain) WriteShardState(
 	return nil
 }
 
-// GetRandSeedByNumber retrieves the rand seed given the block number, return 0 if not exist
-func (bc *BlockChain) GetRandSeedByNumber(number uint64) [32]byte {
+// GetVdfByNumber retrieves the rand seed given the block number, return 0 if not exist
+func (bc *BlockChain) GetVdfByNumber(number uint64) [32]byte {
 	header := bc.GetHeaderByNumber(number)
 	if header == nil {
 		return [32]byte{}
 	}
-	return header.RandSeed
+	result := [32]byte{}
+	copy(result[:], header.Vdf[:32])
+	return result
 }
 
-// GetRandPreimageByNumber retrieves the randomness preimage given the block number, return 0 if not exist
-func (bc *BlockChain) GetRandPreimageByNumber(number uint64) [32]byte {
+// GetVrfByNumber retrieves the randomness preimage given the block number, return 0 if not exist
+func (bc *BlockChain) GetVrfByNumber(number uint64) [32]byte {
 	header := bc.GetHeaderByNumber(number)
 	if header == nil {
 		return [32]byte{}
 	}
-	return header.RandPreimage
+	return header.Vrf
 }
 
 // GetShardState returns the shard state for the given epoch,

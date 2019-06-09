@@ -819,7 +819,7 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 					//	vrfBitmap.SetMask(bitmap)
 					//
 					//	// TODO: check validity of pRnd
-					//	newBlock.AddRandPreimage(pRnd)
+					//	newBlock.AddVrf(pRnd)
 					//}
 
 					rnd, blockHash, err := consensus.GetNextRnd()
@@ -827,7 +827,7 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 						// Verify the randomness
 						_ = blockHash
 						utils.GetLogger().Info("Adding randomness into new block", "rnd", rnd)
-						newBlock.AddRandSeed(rnd)
+						newBlock.AddVdf([258]byte{}) // TODO(HB): add real vdf
 					} else {
 						utils.GetLogger().Info("Failed to get randomness", "error", err)
 					}

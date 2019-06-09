@@ -90,10 +90,13 @@ type Header struct {
 	PrepareBitmap    []byte      `json:"prepareBitmap"    gencodec:"required"` // Contains which validator signed
 	CommitSignature  [96]byte    `json:"commitSignature"  gencodec:"required"`
 	CommitBitmap     []byte      `json:"commitBitmap"     gencodec:"required"` // Contains which validator signed
-	RandPreimage     [32]byte    `json:"randPreimage"`
-	RandSeed         [32]byte    `json:"randSeed"`
+	Vrf              [32]byte    `json:"vrf"`
+	VrfProof         [96]byte    `json:"vrfProof"`
+	Vdf              [258]byte   `json:"vdf"`
+	VdfProof         [258]byte   `json:"vdfProof"`
 	ShardStateHash   common.Hash `json:"shardStateRoot"`
 	ShardState       ShardState  `json:"shardState"`
+	CrossLinks       [][]byte    `json:"crossLinks"`
 }
 
 // field type overrides for gencodec
@@ -471,14 +474,14 @@ func Number(b1, b2 *Block) bool {
 	return b1.header.Number.Cmp(b2.header.Number) < 0
 }
 
-// AddRandSeed add random seed into block header
-func (b *Block) AddRandSeed(randSeed [32]byte) {
-	b.header.RandSeed = randSeed
+// AddVdf add vdf into block header
+func (b *Block) AddVdf(vdf [258]byte) {
+	b.header.Vdf = vdf
 }
 
-// AddRandPreimage add randomness preimage into block header
-func (b *Block) AddRandPreimage(pRnd [32]byte) {
-	b.header.RandPreimage = pRnd
+// AddVrf add vrf into block header
+func (b *Block) AddVrf(vrf [32]byte) {
+	b.header.Vrf = vrf
 }
 
 // AddShardState add shardState into block header

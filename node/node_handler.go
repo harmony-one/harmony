@@ -262,7 +262,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 	}
 
 	// TODO: verify the vrf randomness
-	_ = newBlock.Header().RandPreimage
+	_ = newBlock.Header().Vrf
 
 	err = node.validateNewShardState(newBlock, &node.CurrentStakes)
 	if err != nil {
