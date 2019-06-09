@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/crypto/hash"
+	common2 "github.com/harmony-one/harmony/internal/common"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -380,7 +381,7 @@ func (consensus *Consensus) AddPeers(peers []*p2p.Peer) int {
 	count := 0
 
 	for _, peer := range peers {
-		_, ok := consensus.validators.LoadOrStore(utils.GetBlsAddress(peer.ConsensusPubKey).Hex(), *peer)
+		_, ok := consensus.validators.LoadOrStore(common2.MustAddressToBech32(utils.GetBlsAddress(peer.ConsensusPubKey)), *peer)
 		if !ok {
 			consensus.pubKeyLock.Lock()
 			if _, ok := consensus.CommitteeAddresses[peer.ConsensusPubKey.GetAddress()]; !ok {
@@ -510,7 +511,7 @@ func (consensus *Consensus) verifySenderKey(msg *msg_pb.Message) (*bls.PublicKey
 	senderAddr := common.BytesToAddress(addrBytes[:])
 
 	if !consensus.IsValidatorInCommittee(senderAddr) {
-		return nil, fmt.Errorf("Validator address %s is not in committee", senderAddr.Hex())
+		return nil, fmt.Errorf("Validator address %s is not in committee", common2.MustAddressToBech32(senderAddr))
 	}
 	return senderKey, nil
 }
@@ -525,7 +526,7 @@ func (consensus *Consensus) verifyViewChangeSenderKey(msg *msg_pb.Message) (*bls
 	senderAddr := common.BytesToAddress(addrBytes[:])
 
 	if !consensus.IsValidatorInCommittee(senderAddr) {
-		return nil, common.Address{}, fmt.Errorf("Validator address %s is not in committee", senderAddr.Hex())
+		return nil, common.Address{}, fmt.Errorf("Validator address %s is not in committee", common2.MustAddressToBech32(senderAddr))
 	}
 	return senderKey, senderAddr, nil
 }

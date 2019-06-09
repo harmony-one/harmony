@@ -94,8 +94,8 @@ func GetTransaction(tx *types.Transaction, accountBlock *types.Block) *Transacti
 	return &Transaction{
 		ID:        tx.Hash().Hex(),
 		Timestamp: strconv.Itoa(int(accountBlock.Time().Int64() * 1000)),
-		From:      msg.From().Hex(),
-		To:        msg.To().Hex(),
+		From:      msg.From().Hex(), // TODO ek – use bech32
+		To:        msg.To().Hex(),   // TODO ek – use bech32
 		Value:     msg.Value(),
 		Bytes:     strconv.Itoa(int(tx.Size())),
 		Data:      hex.EncodeToString(tx.Data()),

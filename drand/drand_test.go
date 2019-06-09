@@ -6,9 +6,11 @@ import (
 	"testing"
 
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
+	common2 "github.com/harmony-one/harmony/internal/common"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
+
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -95,7 +97,7 @@ func TestGetValidatorByPeerId(test *testing.T) {
 		test.Error("dRand should belong to a leader")
 	}
 
-	validatorAddress := utils.GetAddressFromBlsPubKey(validatorPubKey).Hex()
+	validatorAddress := common2.MustAddressToBech32(utils.GetAddressFromBlsPubKey(validatorPubKey))
 
 	if dRand.getValidatorPeerByAddress(validatorAddress) == nil {
 		test.Error("Unable to get validator by Peerid")

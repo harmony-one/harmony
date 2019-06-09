@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/harmony-one/harmony/crypto/bls"
+	common2 "github.com/harmony-one/harmony/internal/common"
 
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -28,7 +29,7 @@ func TestGetPeerFromID(t *testing.T) {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
 	leaderAddress := utils.GetAddressFromBlsPubKey(leader.ConsensusPubKey)
-	l := consensus.GetPeerByAddress(leaderAddress.Hex())
+	l := consensus.GetPeerByAddress(common2.MustAddressToBech32(leaderAddress))
 	if l.IP != leader.IP || l.Port != leader.Port {
 		t.Errorf("leader IP not equal")
 	}
