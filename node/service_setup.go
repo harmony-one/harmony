@@ -7,7 +7,6 @@ import (
 	"github.com/harmony-one/harmony/api/service/clientsupport"
 	"github.com/harmony-one/harmony/api/service/consensus"
 	"github.com/harmony-one/harmony/api/service/discovery"
-	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/api/service/networkinfo"
 	"github.com/harmony-one/harmony/api/service/randomness"
 	"github.com/harmony-one/harmony/api/service/staking"
@@ -24,7 +23,7 @@ func (node *Node) setupForShardLeader() {
 	// Register networkinfo service. "0" is the beacon shard ID
 	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, node.NodeConfig.GetShardGroupID(), chanPeer, nil))
 	// Register explorer service.
-	node.serviceManager.RegisterService(service.SupportExplorer, explorer.New(&node.SelfPeer, node.Consensus.GetNodeIDs, node.GetBalanceOfAddress))
+	// node.serviceManager.RegisterService(service.SupportExplorer, explorer.New(&node.SelfPeer, node.Consensus.GetNodeIDs, node.GetBalanceOfAddress))
 	// Register consensus service.
 	node.serviceManager.RegisterService(service.Consensus, consensus.New(node.BlockChannel, node.Consensus, node.startConsensus))
 	// Register new block service.
@@ -65,7 +64,7 @@ func (node *Node) setupForBeaconLeader() {
 	// Register randomness service
 	node.serviceManager.RegisterService(service.Randomness, randomness.New(node.DRand))
 	// Register explorer service.
-	node.serviceManager.RegisterService(service.SupportExplorer, explorer.New(&node.SelfPeer, node.Consensus.GetNodeIDs, node.GetBalanceOfAddress))
+	// node.serviceManager.RegisterService(service.SupportExplorer, explorer.New(&node.SelfPeer, node.Consensus.GetNodeIDs, node.GetBalanceOfAddress))
 }
 
 func (node *Node) setupForBeaconValidator() {

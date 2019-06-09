@@ -11,23 +11,21 @@ import (
 	"sync"
 	"time"
 
-	"github.com/harmony-one/harmony/consensus"
-	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/internal/ctxerror"
-	"github.com/harmony-one/harmony/internal/shardchain"
-
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	bls2 "github.com/harmony-one/bls/ffi/go/bls"
-
 	"github.com/harmony-one/harmony/api/client"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/common/denominations"
+	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
+	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
@@ -64,7 +62,7 @@ func printVersion(me string) {
 var (
 	ip              = flag.String("ip", "127.0.0.1", "IP of the node")
 	port            = flag.String("port", "9999", "port of the node.")
-	numTxns         = flag.Int("numTxns", 100, "number of transactions to send per message")
+	numTxns         = flag.Int("numTxns", 400, "number of transactions to send per message")
 	logFolder       = flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	duration        = flag.Int("duration", 30, "duration of the tx generation in second. If it's negative, the experiment runs forever.")
 	versionFlag     = flag.Bool("version", false, "Output version info")

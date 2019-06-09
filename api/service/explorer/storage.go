@@ -91,6 +91,7 @@ func (storage *Storage) Dump(block *types.Block, height uint32) {
 	}
 
 	batch := storage.db.NewBatch()
+	defer batch.Reset()
 	// Update block height.
 	if err := batch.Put([]byte(BlockHeightKey), []byte(strconv.Itoa(int(height)))); err != nil {
 		ctxerror.Warn(utils.GetLogger(), err, "cannot batch block height")

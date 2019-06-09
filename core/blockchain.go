@@ -38,6 +38,7 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
+	"github.com/fjl/memsize"
 	lru "github.com/hashicorp/golang-lru"
 
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
@@ -932,6 +933,9 @@ func (bc *BlockChain) WriteBlockWithoutState(block *types.Block, td *big.Int) (e
 	bc.wg.Add(1)
 	defer bc.wg.Done()
 
+	sz := memsize.Scan(block)
+	utils.GetLogger().Info("mem stat writeblockwithstate", "block", sz.Report())
+
 	if err := bc.hc.WriteTd(block.Hash(), block.NumberU64(), td); err != nil {
 		return err
 	}
@@ -944,6 +948,10 @@ func (bc *BlockChain) WriteBlockWithoutState(block *types.Block, td *big.Int) (e
 func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.Receipt, state *state.DB) (status WriteStatus, err error) {
 	bc.wg.Add(1)
 	defer bc.wg.Done()
+
+	sz := memsize.Scan(block)
+	utils.GetLogger().Info("mem stat writeblockwithstate", "block", sz.Report())
+	utils.GetLogger().Info("mem stat writeblockwithstate", "state", memsize.Scan(state).Report())
 
 	// Calculate the total difficulty of the block
 	ptd := bc.GetTd(block.ParentHash(), block.NumberU64()-1)

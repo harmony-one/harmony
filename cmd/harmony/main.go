@@ -5,6 +5,8 @@ import (
 	"flag"
 	"fmt"
 	"math/rand"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"path"
 	"runtime"
@@ -98,7 +100,7 @@ var (
 	//isNewNode indicates this node is a new node
 	isNewNode          = flag.Bool("is_newnode", false, "true means this node is a new node")
 	shardID            = flag.Int("shard_id", -1, "the shard ID of this node")
-	enableMemProfiling = flag.Bool("enableMemProfiling", false, "Enable memsize logging.")
+	enableMemProfiling = flag.Bool("enableMemProfiling", true, "Enable memsize logging.")
 	enableGC           = flag.Bool("enableGC", true, "Enable calling garbage collector manually .")
 
 	// logConn logs incoming/outgoing connections
@@ -422,6 +424,13 @@ func main() {
 	initSetup()
 	nodeConfig := createGlobalConfig()
 	initLogFile(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps)
+
+	// mem profiling
+	go func() {
+		http.ListenAndServe(
+			fmt.Sprintf("%s:%s", nodeconfig.GetDefaultConfig().IP,
+				utils.GetPortFromDiff(nodeconfig.GetDefaultConfig().Port, 50)), nil)
+	}()
 
 	// Start Profiler for leader if profile argument is on
 	if nodeConfig.StringRole == "leader" && (*profile || *metricsReportURL != "") {

@@ -180,6 +180,7 @@ if [ "$TXGEN" == "true" ]; then
    line=$(grep client $config)
    IFS=' ' read ip port mode account <<< $line
    if [ "$mode" == "client" ]; then
+      echo "****minh $DURATION***"
       $DRYRUN $ROOT/bin/txgen -log_folder $log_folder -duration $DURATION -ip $ip -port $port -bootnodes "${BN_MA}" > $LOG_FILE 2>&1
    fi
 else
