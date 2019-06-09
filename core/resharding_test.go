@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -46,7 +48,7 @@ func fakeGetInitShardState(numberOfShards, numOfNodes int) types.ShardState {
 			nid := strconv.Itoa(int(rand.Int63()))
 			blsPubKey := [48]byte{}
 			copy(blsPubKey1[:], []byte(nid))
-			com.NodeList = append(com.NodeList, types.NodeID{nid, blsPubKey})
+			com.NodeList = append(com.NodeList, types.NodeID{common.BytesToAddress([]byte(nid)), blsPubKey})
 		}
 		shardState = append(shardState, com)
 	}
@@ -61,7 +63,7 @@ func fakeNewNodeList(seed int64) []types.NodeID {
 		nid := strconv.Itoa(int(rand.Int63()))
 		blsPubKey := [48]byte{}
 		copy(blsPubKey1[:], []byte(nid))
-		nodeList = append(nodeList, types.NodeID{nid, blsPubKey})
+		nodeList = append(nodeList, types.NodeID{common.BytesToAddress([]byte(nid)), blsPubKey})
 	}
 	return nodeList
 }
@@ -73,16 +75,16 @@ func TestFakeNewNodeList(t *testing.T) {
 
 func TestShuffle(t *testing.T) {
 	nodeList := []types.NodeID{
-		{"node1", blsPubKey1},
-		{"node2", blsPubKey2},
-		{"node3", blsPubKey3},
-		{"node4", blsPubKey4},
-		{"node5", blsPubKey5},
-		{"node6", blsPubKey6},
-		{"node7", blsPubKey7},
-		{"node8", blsPubKey8},
-		{"node9", blsPubKey9},
-		{"node10", blsPubKey10},
+		{common.Address{0x12}, blsPubKey1},
+		{common.Address{0x22}, blsPubKey2},
+		{common.Address{0x32}, blsPubKey3},
+		{common.Address{0x42}, blsPubKey4},
+		{common.Address{0x52}, blsPubKey5},
+		{common.Address{0x62}, blsPubKey6},
+		{common.Address{0x72}, blsPubKey7},
+		{common.Address{0x82}, blsPubKey8},
+		{common.Address{0x92}, blsPubKey9},
+		{common.Address{0x02}, blsPubKey10},
 	}
 
 	cpList := []types.NodeID{}
@@ -113,12 +115,12 @@ func TestUpdateShardState(t *testing.T) {
 	shardState := fakeGetInitShardState(6, 10)
 	ss := &ShardingState{epoch: 1, rnd: 42, shardState: shardState, numShards: len(shardState)}
 	newNodeList := []types.NodeID{
-		{"node1", blsPubKey1},
-		{"node2", blsPubKey2},
-		{"node3", blsPubKey3},
-		{"node4", blsPubKey4},
-		{"node5", blsPubKey5},
-		{"node6", blsPubKey6},
+		{common.Address{0x12}, blsPubKey1},
+		{common.Address{0x22}, blsPubKey2},
+		{common.Address{0x32}, blsPubKey3},
+		{common.Address{0x42}, blsPubKey4},
+		{common.Address{0x52}, blsPubKey5},
+		{common.Address{0x62}, blsPubKey6},
 	}
 
 	ss.Reshard(newNodeList, 0.2)
@@ -129,9 +131,9 @@ func TestAssignNewNodes(t *testing.T) {
 	shardState := fakeGetInitShardState(2, 2)
 	ss := &ShardingState{epoch: 1, rnd: 42, shardState: shardState, numShards: len(shardState)}
 	newNodes := []types.NodeID{
-		{"node1", blsPubKey1},
-		{"node2", blsPubKey2},
-		{"node3", blsPubKey3},
+		{common.Address{0x12}, blsPubKey1},
+		{common.Address{0x22}, blsPubKey2},
+		{common.Address{0x32}, blsPubKey3},
 	}
 
 	ss.assignNewNodes(newNodes)
