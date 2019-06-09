@@ -14,6 +14,8 @@ const (
 	phaseDuration     time.Duration = 90 * time.Second
 	bootstrapDuration time.Duration = 90 * time.Second
 	maxLogSize        uint32        = 1000
+	// threshold between received consensus message blockNum and my blockNum
+	consensusBlockNumBuffer uint64 = 1
 )
 
 // TimeoutType is the type of timeout in view change protocol
