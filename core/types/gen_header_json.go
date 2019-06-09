@@ -15,6 +15,7 @@ import (
 var _ = (*headerMarshaling)(nil)
 
 func (h Header) MarshalJSON() ([]byte, error) {
+	// TODO: update with new fields
 	type Header struct {
 		ParentHash  common.Hash    `json:"parentHash"       gencodec:"required"`
 		Coinbase    common.Address `json:"miner"            gencodec:"required"`
@@ -22,14 +23,12 @@ func (h Header) MarshalJSON() ([]byte, error) {
 		TxHash      common.Hash    `json:"transactionsRoot" gencodec:"required"`
 		ReceiptHash common.Hash    `json:"receiptsRoot"     gencodec:"required"`
 		Bloom       ethtypes.Bloom `json:"logsBloom"        gencodec:"required"`
-		Difficulty  *hexutil.Big   `json:"difficulty"       gencodec:"required"`
 		Number      *hexutil.Big   `json:"number"           gencodec:"required"`
 		GasLimit    hexutil.Uint64 `json:"gasLimit"         gencodec:"required"`
 		GasUsed     hexutil.Uint64 `json:"gasUsed"          gencodec:"required"`
 		Time        *hexutil.Big   `json:"timestamp"        gencodec:"required"`
 		Extra       hexutil.Bytes  `json:"extraData"        gencodec:"required"`
 		MixDigest   common.Hash    `json:"mixHash"          gencodec:"required"`
-		Nonce       BlockNonce     `json:"nonce"            gencodec:"required"`
 		Hash        common.Hash    `json:"hash"`
 	}
 	var enc Header
@@ -39,19 +38,18 @@ func (h Header) MarshalJSON() ([]byte, error) {
 	enc.TxHash = h.TxHash
 	enc.ReceiptHash = h.ReceiptHash
 	enc.Bloom = h.Bloom
-	enc.Difficulty = (*hexutil.Big)(h.Difficulty)
 	enc.Number = (*hexutil.Big)(h.Number)
 	enc.GasLimit = hexutil.Uint64(h.GasLimit)
 	enc.GasUsed = hexutil.Uint64(h.GasUsed)
 	enc.Time = (*hexutil.Big)(h.Time)
 	enc.Extra = h.Extra
 	enc.MixDigest = h.MixDigest
-	enc.Nonce = h.Nonce
 	enc.Hash = h.Hash()
 	return json.Marshal(&enc)
 }
 
 func (h *Header) UnmarshalJSON(input []byte) error {
+	// TODO: update with new fields
 	type Header struct {
 		ParentHash  *common.Hash    `json:"parentHash"       gencodec:"required"`
 		Coinbase    *common.Address `json:"miner"            gencodec:"required"`
@@ -59,14 +57,12 @@ func (h *Header) UnmarshalJSON(input []byte) error {
 		TxHash      *common.Hash    `json:"transactionsRoot" gencodec:"required"`
 		ReceiptHash *common.Hash    `json:"receiptsRoot"     gencodec:"required"`
 		Bloom       *ethtypes.Bloom `json:"logsBloom"        gencodec:"required"`
-		Difficulty  *hexutil.Big    `json:"difficulty"       gencodec:"required"`
 		Number      *hexutil.Big    `json:"number"           gencodec:"required"`
 		GasLimit    *hexutil.Uint64 `json:"gasLimit"         gencodec:"required"`
 		GasUsed     *hexutil.Uint64 `json:"gasUsed"          gencodec:"required"`
 		Time        *hexutil.Big    `json:"timestamp"        gencodec:"required"`
 		Extra       *hexutil.Bytes  `json:"extraData"        gencodec:"required"`
 		MixDigest   *common.Hash    `json:"mixHash"          gencodec:"required"`
-		Nonce       *BlockNonce     `json:"nonce"            gencodec:"required"`
 	}
 	var dec Header
 	if err := json.Unmarshal(input, &dec); err != nil {
@@ -96,13 +92,6 @@ func (h *Header) UnmarshalJSON(input []byte) error {
 		return errors.New("missing required field 'logsBloom' for Header")
 	}
 	h.Bloom = *dec.Bloom
-	if dec.Difficulty == nil {
-		return errors.New("missing required field 'difficulty' for Header")
-	}
-	h.Difficulty = (*big.Int)(dec.Difficulty)
-	if dec.Number == nil {
-		return errors.New("missing required field 'number' for Header")
-	}
 	h.Number = (*big.Int)(dec.Number)
 	if dec.GasLimit == nil {
 		return errors.New("missing required field 'gasLimit' for Header")
@@ -124,9 +113,5 @@ func (h *Header) UnmarshalJSON(input []byte) error {
 		return errors.New("missing required field 'mixHash' for Header")
 	}
 	h.MixDigest = *dec.MixDigest
-	if dec.Nonce == nil {
-		return errors.New("missing required field 'nonce' for Header")
-	}
-	h.Nonce = *dec.Nonce
 	return nil
 }

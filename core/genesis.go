@@ -240,7 +240,6 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 	root := statedb.IntermediateRoot(false)
 	head := &types.Header{
 		Number:         new(big.Int).SetUint64(g.Number),
-		Nonce:          types.EncodeNonce(g.Nonce),
 		Epoch:          big.NewInt(0),
 		ShardID:        g.ShardID,
 		Time:           new(big.Int).SetUint64(g.Timestamp),
@@ -248,7 +247,6 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 		Extra:          g.ExtraData,
 		GasLimit:       g.GasLimit,
 		GasUsed:        g.GasUsed,
-		Difficulty:     g.Difficulty,
 		MixDigest:      g.Mixhash,
 		Coinbase:       g.Coinbase,
 		Root:           root,
@@ -257,9 +255,6 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 	}
 	if g.GasLimit == 0 {
 		head.GasLimit = 10000000000 // TODO(RJ): figure out better solution. // params.GenesisGasLimit
-	}
-	if g.Difficulty == nil {
-		head.Difficulty = params.GenesisDifficulty
 	}
 	statedb.Commit(false)
 	statedb.Database().TrieDB().Commit(root, true)
