@@ -12,15 +12,17 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/ethereum/go-ethereum/log"
 
+	"github.com/harmony-one/harmony/accounts"
+	"github.com/harmony-one/harmony/accounts/keystore"
 	"github.com/harmony-one/harmony/api/client"
 	clientService "github.com/harmony-one/harmony/api/client/service"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/shardchain"
@@ -29,9 +31,6 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	p2p_host "github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
-
-	"github.com/harmony-one/harmony/accounts"
-	"github.com/harmony-one/harmony/accounts/keystore"
 )
 
 var (
@@ -380,7 +379,7 @@ func processBalancesCommand() {
 			}
 		}
 	} else {
-		address := common.HexToAddress(*balanceAddressPtr)
+		address := common2.ParseAddr(*balanceAddressPtr)
 		fmt.Printf("Account: %s:\n", address.Hex())
 		for shardID, balanceNonce := range FetchBalance(address) {
 			fmt.Printf("    Balance in Shard %d:  %s, nonce: %v \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance), balanceNonce.nonce)
@@ -397,7 +396,7 @@ func processGetFreeToken() {
 	if *freeTokenAddressPtr == "" {
 		fmt.Println("Error: --address is required")
 	} else {
-		address := common.HexToAddress(*freeTokenAddressPtr)
+		address := common2.ParseAddr(*freeTokenAddressPtr)
 		GetFreeToken(address)
 	}
 }
@@ -430,13 +429,13 @@ func processTransferCommand() {
 		return
 	}
 
-	receiverAddress := common.HexToAddress(receiver)
+	receiverAddress := common2.ParseAddr(receiver)
 	if len(receiverAddress) != 20 {
 		fmt.Println("The receiver address is not valid.")
 		return
 	}
 
-	senderAddress := common.HexToAddress(sender)
+	senderAddress := common2.ParseAddr(sender)
 	if len(senderAddress) != 20 {
 		fmt.Println("The sender address is not valid.")
 		return

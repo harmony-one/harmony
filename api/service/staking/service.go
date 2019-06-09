@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
+
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/accounts/abi"
 	proto "github.com/harmony-one/harmony/api/client/service/proto"
@@ -23,6 +24,7 @@ import (
 	"github.com/harmony-one/harmony/contracts"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
 	hmykey "github.com/harmony-one/harmony/internal/keystore"
@@ -187,7 +189,7 @@ func constructStakingMessage(ts types.Transactions) []byte {
 func (s *Service) createRawStakingMessage() []byte {
 	// TODO(minhdoan): Enable getStakingInfo back after testing.
 	stakingInfo := s.getFakeStakingInfo()
-	toAddress := common.HexToAddress(stakingInfo.ContractAddress)
+	toAddress := common2.ParseAddr(stakingInfo.ContractAddress)
 
 	abi, err := abi.JSON(strings.NewReader(contracts.StakeLockContractABI))
 	if err != nil {
