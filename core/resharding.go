@@ -231,7 +231,7 @@ func GetInitShardState() types.ShardState {
 			pubKey := types.BlsPublicKey{}
 			pubKey.FromLibBLSPublicKey(priKey.GetPublicKey())
 			// TODO: directly read address for bls too
-			curNodeID := types.NodeID{genesis.GenesisAccounts[index].Address, pubKey}
+			curNodeID := types.NodeID{common.HexToAddress(genesis.GenesisAccounts[index].Address), pubKey}
 			com.NodeList = append(com.NodeList, curNodeID)
 		}
 
@@ -243,7 +243,7 @@ func GetInitShardState() types.ShardState {
 			pubKey := types.BlsPublicKey{}
 			pubKey.FromLibBLSPublicKey(priKey.GetPublicKey())
 			// TODO: directly read address for bls too
-			curNodeID := types.NodeID{genesis.GenesisFNAccounts[index].Address, pubKey}
+			curNodeID := types.NodeID{common.HexToAddress(genesis.GenesisFNAccounts[index].Address), pubKey}
 			com.NodeList = append(com.NodeList, curNodeID)
 		}
 		shardState = append(shardState, com)
