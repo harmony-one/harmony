@@ -334,7 +334,7 @@ func accumulateRewards(
 		numAccounts++
 		account := member.EcdsaAddress
 		getLogger().Info("rewarding block signer",
-			"account", common.HexToAddress(account),
+			"account", account,
 			"node", member.BlsPublicKey.Hex(),
 			"amount", BlockReward)
 		state.AddBalance(account, BlockReward)
