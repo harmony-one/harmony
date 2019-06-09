@@ -30,7 +30,9 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/harmony-one/harmony/accounts"
+	common2 "github.com/harmony-one/harmony/internal/common"
 )
 
 // Minimum amount of time between cache reloads. This limit applies if the platform does
@@ -258,7 +260,7 @@ func (ac *accountCache) scanAccounts() error {
 		// Parse the address.
 		key.Address = ""
 		err = json.NewDecoder(buf).Decode(&key)
-		addr := common.HexToAddress(key.Address)
+		addr := common2.ParseAddr(key.Address)
 		switch {
 		case err != nil:
 			log.Debug("Failed to decode keystore key", "path", path, "err", err)

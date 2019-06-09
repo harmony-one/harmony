@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/common"
 )
 
 // {Address: "0xd2Cb501B40D3a9a013A38267a4d2A4Cf6bD2CAa8", Private: "3c8642f7188e05acc4467d9e2aa7fd539e82aa90a5497257cf0ecbb98ed3b88f", Public: "0xd2Cb501B40D3a9a013A38267a4d2A4Cf6bD2CAa8"},
@@ -52,7 +53,7 @@ func generateTxnHarmony(PrivateKeyFrom string, ToAddress string, shardID uint32,
 	nonce := uint64(0)
 	value := big.NewInt(1000000000000000000 * amount)
 	gasLimit := uint64(21000)
-	toAddress := common.HexToAddress(ToAddress)
+	toAddress := common.ParseAddr(ToAddress)
 	var data []byte
 
 	unsignedTx := types.NewTransaction(nonce,

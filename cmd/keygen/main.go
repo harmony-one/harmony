@@ -9,6 +9,8 @@ import (
 	"strconv"
 
 	crypto2 "github.com/ethereum/go-ethereum/crypto"
+
+	"github.com/harmony-one/harmony/internal/common"
 )
 
 var (
@@ -38,7 +40,7 @@ func main() {
 			}
 			crypto2.FromECDSA(priKey)
 
-			fmt.Printf("{Address: \"%s\", Private: \"%s\", Public: \"%s\"},\n", crypto2.PubkeyToAddress(priKey.PublicKey).Hex(), hex.EncodeToString(crypto2.FromECDSA(priKey)), crypto2.PubkeyToAddress(priKey.PublicKey).Hex())
+			fmt.Printf("{Address: \"%s\", Private: \"%s\", Public: \"%s\"},"+"\n", common.MustAddressToBech32(crypto2.PubkeyToAddress(priKey.PublicKey)), hex.EncodeToString(crypto2.FromECDSA(priKey)), common.MustAddressToBech32(crypto2.PubkeyToAddress(priKey.PublicKey)))
 		}
 	} else {
 		fmt.Println("Unable to parse # as the argument.")

@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"math/big"
 
+	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/harmony-one/harmony/internal/bech32"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/pkg/errors"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -142,4 +144,85 @@ func (a *UnprefixedAddress) UnmarshalText(input []byte) error {
 // MarshalText encodes the address as hex.
 func (a UnprefixedAddress) MarshalText() ([]byte, error) {
 	return []byte(hex.EncodeToString(a[:])), nil
+}
+
+// TODO ek – the following functions use Ethereum addresses until we have a
+//  proper abstraction set in place.
+
+// ParseBech32Addr decodes the given bech32 address and populates the given
+// human-readable-part string and address with the decoded result.
+func ParseBech32Addr(b32 string, hrp *string, addr *ethCommon.Address) error {
+	h, b, err := bech32.DecodeAndConvert(b32)
+	if err != nil {
+		return errors.Wrapf(err, "cannot decode %#v as bech32 address", b32)
+	}
+	if len(b) != ethCommon.AddressLength {
+		return errors.Errorf("decoded bech32 %#v has invalid length %d",
+			b32, len(b))
+	}
+	*hrp = h
+	addr.SetBytes(b)
+	return nil
+}
+
+// BuildBech32Addr encodes the given human-readable-part string and address
+// into a bech32 address.
+func BuildBech32Addr(hrp string, addr ethCommon.Address) (string, error) {
+	return bech32.ConvertAndEncode(hrp, addr.Bytes())
+}
+
+// MustBuildBech32Addr encodes the given human-readable-part string and
+// address into a bech32 address.  It panics on error.
+func MustBuildBech32Addr(hrp string, addr ethCommon.Address) string {
+	b32, err := BuildBech32Addr(hrp, addr)
+	if err != nil {
+		panic(err)
+	}
+	return b32
+}
+
+// Bech32AddressHRP is the human-readable part of the Harmony address used by
+// this process.
+var Bech32AddressHRP = "one"
+
+// Bech32ToAddress decodes the given bech32 address.
+func Bech32ToAddress(b32 string) (addr ethCommon.Address, err error) {
+	var hrp string
+	err = ParseBech32Addr(b32, &hrp, &addr)
+	if err == nil && hrp != Bech32AddressHRP {
+		err = errors.Errorf("%#v is not a %#v address", b32, Bech32AddressHRP)
+	}
+	return
+}
+
+// MustBech32ToAddress decodes the given bech32 address.  It panics on error.
+func MustBech32ToAddress(b32 string) ethCommon.Address {
+	addr, err := Bech32ToAddress(b32)
+	if err != nil {
+		panic(err)
+	}
+	return addr
+}
+
+// AddressToBech32 encodes the given address into bech32 format.
+func AddressToBech32(addr ethCommon.Address) (string, error) {
+	return BuildBech32Addr(Bech32AddressHRP, addr)
+}
+
+// MustAddressToBech32 encodes the given address into bech32 format.
+// It panics on error.
+func MustAddressToBech32(addr ethCommon.Address) string {
+	b32, err := BuildBech32Addr(Bech32AddressHRP, addr)
+	if err != nil {
+		panic(err)
+	}
+	return b32
+}
+
+// ParseAddr parses the given address, either as bech32 or as hex.
+func ParseAddr(s string) ethCommon.Address {
+	if addr, err := Bech32ToAddress(s); err == nil {
+		return addr
+	}
+	return ethCommon.HexToAddress(s)
 }

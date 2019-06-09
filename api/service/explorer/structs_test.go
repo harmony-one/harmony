@@ -22,6 +22,6 @@ func TestGetTransaction(t *testing.T) {
 
 	tx := GetTransaction(tx1, block)
 	assert.Equal(t, tx.ID, tx1.Hash().Hex(), "should be equal tx1.Hash()")
-	assert.Equal(t, tx.To, tx1.To().Hex(), "should be equal tx1.To()")
+	assert.Equal(t, tx.To, tx1.To().Hex(), "should be equal tx1.To()") // TODO ek – use bech32
 	assert.Equal(t, tx.Bytes, strconv.Itoa(int(tx1.Size())), "should be equal tx1.Size()")
 }
