@@ -13,6 +13,7 @@ import (
 
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/shardchain"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -198,7 +199,10 @@ syncLoop:
 				if block.NumberU64()-txGen.Blockchain().CurrentBlock().NumberU64() == 1 {
 					txGen.AddNewBlock(block)
 					stateMutex.Lock()
-					txGen.Worker.UpdateCurrent()
+					if err := txGen.Worker.UpdateCurrent(); err != nil {
+						ctxerror.Warn(utils.GetLogger(), err,
+							"(*Worker).UpdateCurrent failed")
+					}
 					stateMutex.Unlock()
 					readySignal <- shardID
 				}

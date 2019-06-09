@@ -23,6 +23,7 @@ import (
 	"github.com/harmony-one/harmony/contracts"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	hmykey "github.com/harmony-one/harmony/internal/keystore"
 	"github.com/harmony-one/harmony/internal/utils"
 	contract_constants "github.com/harmony-one/harmony/internal/utils/contract"
@@ -114,11 +115,12 @@ func (s *Service) DoService() {
 	//	return
 	//}
 
-	if msg := s.createStakingMessage(); msg != nil {
-		s.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msg))
-		utils.GetLogInstance().Info("Sent staking transaction to the network.")
-	} else {
+	if msg := s.createStakingMessage(); msg == nil {
 		utils.GetLogInstance().Error("Can not create staking transaction")
+	} else if err := s.host.SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeacon}, host.ConstructP2pMessage(byte(17), msg)); err != nil {
+		ctxerror.Warn(utils.GetLogger(), err, "cannot send staking message")
+	} else {
+		utils.GetLogInstance().Info("Sent staking transaction to the network.")
 	}
 }
 

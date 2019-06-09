@@ -19,6 +19,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/drand"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	hmykey "github.com/harmony-one/harmony/internal/keystore"
 	memprofiling "github.com/harmony-one/harmony/internal/memprofiling"
 	"github.com/harmony-one/harmony/internal/profiler"
@@ -262,7 +263,10 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 		panic("unable to new host in harmony")
 	}
 
-	nodeConfig.Host.AddPeer(&nodeConfig.Leader)
+	if err := nodeConfig.Host.AddPeer(&nodeConfig.Leader); err != nil {
+		ctxerror.Warn(utils.GetLogger(), err, "(*p2p.Host).AddPeer failed",
+			"peer", &nodeConfig.Leader)
+	}
 
 	nodeConfig.DBDir = *dbDir
 
@@ -362,7 +366,11 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 
 	// This needs to be executed after consensus and drand are setup
 	if !*isNewNode || *shardID > -1 { // initial staking new node doesn't need to initialize shard state
-		currentNode.InitShardState(*shardID == -1 && !*isNewNode) // TODO: Have a better why to distinguish non-genesis node
+		// TODO: Have a better why to distinguish non-genesis node
+		if err := currentNode.InitShardState(*shardID == -1 && !*isNewNode); err != nil {
+			ctxerror.Crit(utils.GetLogger(), err, "InitShardState failed",
+				"shardID", *shardID, "isNewNode", *isNewNode)
+		}
 	}
 
 	// Set the consensus ID to be the current block number
@@ -423,7 +431,9 @@ func main() {
 	}
 	go currentNode.SupportSyncing()
 	currentNode.ServiceManagerSetup()
-	currentNode.StartRPC(*port)
+	if err := currentNode.StartRPC(*port); err != nil {
+		ctxerror.Warn(utils.GetLogger(), err, "StartRPC failed")
+	}
 	currentNode.RunServices()
 	currentNode.StartServer()
 }

@@ -33,8 +33,8 @@ func NewClient(ip, port string) (*Client, error) {
 }
 
 // Close closes the Client.
-func (client *Client) Close() {
-	client.conn.Close()
+func (client *Client) Close() error {
+	return client.conn.Close()
 }
 
 // GetBalance gets account balance from the client service.

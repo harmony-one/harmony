@@ -34,7 +34,9 @@ func TestGetTXKey(t *testing.T) {
 
 func TestInit(t *testing.T) {
 	ins := GetStorageInstance("1.1.1.1", "3333", true)
-	ins.GetDB().Put([]byte{1}, []byte{2})
+	if err := ins.GetDB().Put([]byte{1}, []byte{2}); err != nil {
+		t.Fatal("(*LDBDatabase).Put failed:", err)
+	}
 	value, err := ins.GetDB().Get([]byte{1})
 	assert.Equal(t, bytes.Compare(value, []byte{2}), 0, "value should be []byte{2}")
 	assert.Nil(t, err, "error should be nil")

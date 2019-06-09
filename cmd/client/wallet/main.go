@@ -22,6 +22,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node"
@@ -252,7 +253,10 @@ func createWalletNode() *node.Node {
 }
 
 func processNewCommnad() {
-	newCommand.Parse(os.Args[2:])
+	if err := newCommand.Parse(os.Args[2:]); err != nil {
+		fmt.Println(ctxerror.New("failed to parse flags").WithCause(err))
+		return
+	}
 	noPass := *newCommandNoPassPtr
 	password := ""
 
@@ -290,7 +294,10 @@ func _exportAccount(account accounts.Account) {
 		if err != nil {
 			panic("Failed to write to keystore")
 		}
-		f.Close()
+		if err := f.Close(); err != nil {
+			fmt.Println(ctxerror.New("cannot close key file",
+				"filename", filename).WithCause(err))
+		}
 		fmt.Printf("Exported keyfile to: %v\n", filename)
 		return
 	}
@@ -303,7 +310,10 @@ func _exportAccount(account accounts.Account) {
 }
 
 func processListCommand() {
-	listCommand.Parse(os.Args[2:])
+	if err := listCommand.Parse(os.Args[2:]); err != nil {
+		fmt.Println(ctxerror.New("failed to parse flags").WithCause(err))
+		return
+	}
 
 	allAccounts := ks.Accounts()
 	for _, account := range allAccounts {
@@ -313,7 +323,10 @@ func processListCommand() {
 }
 
 func processExportCommand() {
-	exportCommand.Parse(os.Args[2:])
+	if err := exportCommand.Parse(os.Args[2:]); err != nil {
+		fmt.Println(ctxerror.New("failed to parse flags").WithCause(err))
+		return
+	}
 	acc := *exportCommandAccountPtr
 
 	allAccounts := ks.Accounts()
@@ -325,7 +338,10 @@ func processExportCommand() {
 }
 
 func processImportCommnad() {
-	accountImportCommand.Parse(os.Args[2:])
+	if err := accountImportCommand.Parse(os.Args[2:]); err != nil {
+		fmt.Println(ctxerror.New("failed to parse flags").WithCause(err))
+		return
+	}
 	priKey := *accountImportPtr
 	if priKey == "" {
 		fmt.Println("Error: --privateKey is required")
@@ -349,7 +365,10 @@ func processImportCommnad() {
 }
 
 func processBalancesCommand() {
-	balanceCommand.Parse(os.Args[2:])
+	if err := balanceCommand.Parse(os.Args[2:]); err != nil {
+		fmt.Println(ctxerror.New("failed to parse flags").WithCause(err))
+		return
+	}
 
 	if *balanceAddressPtr == "" {
 		allAccounts := ks.Accounts()
@@ -370,7 +389,10 @@ func processBalancesCommand() {
 }
 
 func processGetFreeToken() {
-	freeTokenCommand.Parse(os.Args[2:])
+	if err := freeTokenCommand.Parse(os.Args[2:]); err != nil {
+		fmt.Println(ctxerror.New("Failed to parse flags").WithCause(err))
+		return
+	}
 
 	if *freeTokenAddressPtr == "" {
 		fmt.Println("Error: --address is required")
@@ -381,9 +403,8 @@ func processGetFreeToken() {
 }
 
 func processTransferCommand() {
-	transferCommand.Parse(os.Args[2:])
-	if !transferCommand.Parsed() {
-		fmt.Println("Failed to parse flags")
+	if err := transferCommand.Parse(os.Args[2:]); err != nil {
+		fmt.Println(ctxerror.New("Failed to parse flags").WithCause(err))
 		return
 	}
 	sender := *transferSenderPtr
@@ -470,7 +491,10 @@ func processTransferCommand() {
 		return
 	}
 
-	submitTransaction(tx, walletNode, uint32(shardID))
+	if err := submitTransaction(tx, walletNode, uint32(shardID)); err != nil {
+		fmt.Println(ctxerror.New("submitTransaction failed",
+			"tx", tx, "shardID", shardID).WithCause(err))
+	}
 }
 
 func convertBalanceIntoReadableFormat(balance *big.Int) string {
@@ -581,7 +605,11 @@ func clearKeystore() {
 		panic("Failed to read keystore directory")
 	}
 	for _, d := range dir {
-		os.RemoveAll(path.Join([]string{keystoreDir, d.Name()}...))
+		subdir := path.Join([]string{keystoreDir, d.Name()}...)
+		if err := os.RemoveAll(subdir); err != nil {
+			fmt.Println(ctxerror.New("cannot remove directory",
+				"path", subdir).WithCause(err))
+		}
 	}
 	fmt.Println("All existing accounts deleted...")
 }
