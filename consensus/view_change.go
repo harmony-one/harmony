@@ -392,13 +392,14 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	}
 
 	if err = verifyMessageSig(senderKey, msg); err != nil {
-		utils.GetLogInstance().Debug("onNewView failed to verify new leader's signature", "error", err)
+		utils.GetLogInstance().Error("onNewView failed to verify new leader's signature", "error", err)
 		return
 	}
 	consensus.vcLock.Lock()
 	defer consensus.vcLock.Unlock()
 
-	if recvMsg.M3AggSig == nil {
+	if recvMsg.M3AggSig == nil || recvMsg.M3Bitmap == nil {
+		utils.GetLogInstance().Error("onNewView M3AggSig or M3Bitmap is nil")
 		return
 	}
 	m3Sig := recvMsg.M3AggSig
