@@ -114,6 +114,9 @@ func TestGetStakingContractInfo(test *testing.T) {
 	})
 
 	response, err := server.GetStakingContractInfo(nil, &proto.StakingContractInfoRequest{Address: testBankAddress.Bytes()})
+	if err != nil {
+		test.Fatal("GetStakingContractInfo failed:", err)
+	}
 
 	if bytes.Compare(response.Balance, testBankFunds.Bytes()) != 0 {
 		test.Errorf("Wrong balance is returned")
@@ -127,9 +130,5 @@ func TestGetStakingContractInfo(test *testing.T) {
 
 	if response.Nonce != 0 {
 		test.Errorf("Wrong nonce is returned")
-	}
-
-	if err != nil {
-		test.Errorf("Failed to get free token")
 	}
 }
