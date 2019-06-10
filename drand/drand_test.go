@@ -157,7 +157,7 @@ func TestUpdatePublicKeys(test *testing.T) {
 	}
 
 	for index, publicKey := range dRand.PublicKeys {
-		if strings.Compare(publicKey.GetHexString(), publicKeys[index].GetHexString()) != 0 {
+		if strings.Compare(publicKey.SerializeToHexStr(), publicKeys[index].SerializeToHexStr()) != 0 {
 			test.Error("Public keys not updated succssfully")
 		}
 	}
