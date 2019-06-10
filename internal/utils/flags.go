@@ -66,8 +66,7 @@ func StringsToPeers(input string) []p2p.Peer {
 
 // DefaultBootNodeAddrStrings is a list of Harmony bootnodes address. Used to find other peers in the network.
 var DefaultBootNodeAddrStrings = []string{
-	// FIXME: (leo) this is a bootnode I used for local test, change it to long running ones later
-	"/ip4/127.0.0.1/tcp/9876/p2p/QmayB8NwxmfGE4Usb4H61M8uwbfc7LRbmXb3ChseJgbVuf",
+   "/ip4/127.0.0.1/tcp/19876/p2p/Qmc1V6W7BwX8Ugb42Ti8RnXF1rY5PF7nnZ6bKBryCgi6cv",
 }
 
 // BootNodes is a list of boot nodes. It is populated either from default or from user CLI input.
