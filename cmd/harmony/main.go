@@ -18,6 +18,7 @@ import (
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/drand"
+	"github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
@@ -173,7 +174,7 @@ func initSetup() {
 
 	foundAccount := false
 	for _, account := range allAccounts {
-		if genesisAccount.Address == account.Address.Hex() {
+		if common.ParseAddr(genesisAccount.Address) == account.Address {
 			myAccount = account
 			foundAccount = true
 			break
@@ -187,7 +188,7 @@ func initSetup() {
 
 	genesisAccount.ShardID = uint32(accountIndex % core.GenesisShardNum)
 
-	fmt.Printf("My Account: %s\n", myAccount.Address.Hex())
+	fmt.Printf("My Account: %s\n", common.MustAddressToBech32(myAccount.Address))
 	fmt.Printf("Key URL: %s\n", myAccount.URL)
 	fmt.Printf("My Genesis Account: %v\n", *genesisAccount)
 
@@ -313,7 +314,7 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
 	currentNode.StakingAccount = myAccount
 	utils.GetLogInstance().Info("node account set",
-		"address", currentNode.StakingAccount.Address.Hex())
+		"address", common.MustAddressToBech32(currentNode.StakingAccount.Address))
 
 	if gsif, err := consensus.NewGenesisStakeInfoFinder(); err == nil {
 		currentConsensus.SetStakeInfoFinder(gsif)

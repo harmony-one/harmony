@@ -85,11 +85,11 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 if [ -z "$1" ]; then
-   echo "Usage: $0 account_index_number"
+   echo "Usage: $0 account_address"
    echo
-   echo "Please provide account index."
+   echo "Please provide account address."
    echo "For foundational nodes, please follow the instructions in discord #foundational-nodes channel"
-   echo "to get your account index number."
+   echo "to generate and register your account address with <genesis at harmony dot one>"
    echo
    exit 1
 fi
@@ -141,9 +141,9 @@ BN_MA=/ip4/100.26.90.187/tcp/9874/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3
 echo "############### Running Harmony Process ###############"
 if [ "$OS" == "Linux" ]; then
 # Run Harmony Node
-   LD_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -is_archival -account_index $IDX
+   LD_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -is_archival -accounts $IDX
 else
-   DYLD_FALLBACK_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -is_archival -account_index $IDX
+   DYLD_FALLBACK_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -is_archival -accounts $IDX
 fi
 
 find_harmony_process

@@ -87,14 +87,13 @@ type syncConfig struct {
 
 // Node represents a protocol-participating node in the network
 type Node struct {
-	Consensus              *consensus.Consensus // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
-	BlockChannel           chan *types.Block    // The channel to send newly proposed blocks
-	ConfirmedBlockChannel  chan *types.Block    // The channel to send confirmed blocks
-	BeaconBlockChannel     chan *types.Block    // The channel to send beacon blocks for non-beaconchain nodes
-	pendingTransactions    types.Transactions   // All the transactions received but not yet processed for Consensus
-	transactionInConsensus types.Transactions   // The transactions selected into the new block and under Consensus process
-	pendingTxMutex         sync.Mutex
-	DRand                  *drand.DRand // The instance for distributed randomness protocol
+	Consensus             *consensus.Consensus // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
+	BlockChannel          chan *types.Block    // The channel to send newly proposed blocks
+	ConfirmedBlockChannel chan *types.Block    // The channel to send confirmed blocks
+	BeaconBlockChannel    chan *types.Block    // The channel to send beacon blocks for non-beaconchain nodes
+	pendingTransactions   types.Transactions   // All the transactions received but not yet processed for Consensus
+	pendingTxMutex        sync.Mutex
+	DRand                 *drand.DRand // The instance for distributed randomness protocol
 
 	// Shard databases
 	shardChains shardchain.Collection
@@ -228,6 +227,7 @@ func (node *Node) reducePendingTransactions() {
 	if len(node.pendingTransactions) > TxPoolLimit+TxPoolLimit {
 		curLen := len(node.pendingTransactions)
 		node.pendingTransactions = append(types.Transactions(nil), node.pendingTransactions[curLen-TxPoolLimit:]...)
+		utils.GetLogger().Info("mem stat reduce pending transaction")
 	}
 }
 

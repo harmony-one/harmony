@@ -12,15 +12,17 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/ethereum/go-ethereum/log"
-
+	"github.com/harmony-one/harmony/accounts"
+	"github.com/harmony-one/harmony/accounts/keystore"
 	"github.com/harmony-one/harmony/api/client"
 	clientService "github.com/harmony-one/harmony/api/client/service"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/blsgen"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/shardchain"
@@ -29,9 +31,6 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	p2p_host "github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
-
-	"github.com/harmony-one/harmony/accounts"
-	"github.com/harmony-one/harmony/accounts/keystore"
 )
 
 var (
@@ -139,6 +138,8 @@ func main() {
 		fmt.Println("        --pass           - Passphrase of sender's private key")
 		fmt.Println("    8. export        - Export account key to a new file")
 		fmt.Println("        --account        - Specify the account to export. Empty will export every key.")
+		fmt.Println("    9. blsgen        - Generate a bls key and store private key locally.")
+		fmt.Println("        --nopass         - The private key has no passphrase (for test only)")
 		os.Exit(1)
 	}
 
@@ -182,6 +183,8 @@ ARG:
 		processListCommand()
 	case "export":
 		processExportCommand()
+	case "blsgen":
+		processBlsgenCommand()
 	case "removeAll":
 		clearKeystore()
 	case "import":
@@ -273,19 +276,19 @@ func processNewCommnad() {
 	if err != nil {
 		fmt.Printf("new account error: %v\n", err)
 	}
-	fmt.Printf("account: %s\n", account.Address.Hex())
+	fmt.Printf("account: %s\n", common2.MustAddressToBech32(account.Address))
 	fmt.Printf("URL: %s\n", account.URL)
 }
 
 func _exportAccount(account accounts.Account) {
-	fmt.Printf("account: %s\n", account.Address.Hex())
+	fmt.Printf("account: %s\n", common2.MustAddressToBech32(account.Address))
 	fmt.Printf("URL: %s\n", account.URL)
 	pass := utils.AskForPassphrase("Original Passphrase: ")
 	newpass := utils.AskForPassphrase("Export Passphrase: ")
 
 	data, err := ks.Export(account, pass, newpass)
 	if err == nil {
-		filename := fmt.Sprintf(".hmy/%s.key", account.Address.Hex())
+		filename := fmt.Sprintf(".hmy/%s.key", common2.MustAddressToBech32(account.Address))
 		f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			panic("Failed to open keystore")
@@ -317,7 +320,7 @@ func processListCommand() {
 
 	allAccounts := ks.Accounts()
 	for _, account := range allAccounts {
-		fmt.Printf("account: %s\n", account.Address.Hex())
+		fmt.Printf("account: %s\n", common2.MustAddressToBech32(account.Address))
 		fmt.Printf("URL: %s\n", account.URL)
 	}
 }
@@ -331,10 +334,32 @@ func processExportCommand() {
 
 	allAccounts := ks.Accounts()
 	for _, account := range allAccounts {
-		if acc == "" || acc == account.Address.Hex() {
+		if acc == "" || acc == common2.MustAddressToBech32(account.Address) {
 			_exportAccount(account)
 		}
 	}
+}
+
+func processBlsgenCommand() {
+	newCommand.Parse(os.Args[2:])
+	noPass := *newCommandNoPassPtr
+	// Default password is an empty string
+	password := ""
+
+	if !noPass {
+		password = utils.AskForPassphrase("Passphrase: ")
+		password2 := utils.AskForPassphrase("Passphrase again: ")
+		if password != password2 {
+			fmt.Printf("Passphrase doesn't match. Please try again!\n")
+			os.Exit(3)
+		}
+	}
+
+	privateKey, fileName := blsgen.GenBlsKeyWithPassPhrase(password)
+	publickKey := privateKey.GetPublicKey()
+	fmt.Printf("Bls private key: %s\n", privateKey.GetHexString())
+	fmt.Printf("Bls public key: %s\n", publickKey.GetHexString())
+	fmt.Printf("File storing the ENCRYPTED private key with your passphrase: %s\n", fileName)
 }
 
 func processImportCommnad() {
@@ -361,7 +386,7 @@ func processImportCommnad() {
 	if err != nil {
 		panic("Failed to import the private key")
 	}
-	fmt.Printf("Private key imported for account: %s\n", account.Address.Hex())
+	fmt.Printf("Private key imported for account: %s\n", common2.MustAddressToBech32(account.Address))
 }
 
 func processBalancesCommand() {
@@ -374,14 +399,14 @@ func processBalancesCommand() {
 		allAccounts := ks.Accounts()
 		for i, account := range allAccounts {
 			fmt.Printf("Account %d:\n", i)
-			fmt.Printf("    Address: %s\n", account.Address.Hex())
+			fmt.Printf("    Address: %s\n", common2.MustAddressToBech32(account.Address))
 			for shardID, balanceNonce := range FetchBalance(account.Address) {
 				fmt.Printf("    Balance in Shard %d:  %s, nonce: %v \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance), balanceNonce.nonce)
 			}
 		}
 	} else {
-		address := common.HexToAddress(*balanceAddressPtr)
-		fmt.Printf("Account: %s:\n", address.Hex())
+		address := common2.ParseAddr(*balanceAddressPtr)
+		fmt.Printf("Account: %s:\n", common2.MustAddressToBech32(address))
 		for shardID, balanceNonce := range FetchBalance(address) {
 			fmt.Printf("    Balance in Shard %d:  %s, nonce: %v \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance), balanceNonce.nonce)
 		}
@@ -397,7 +422,7 @@ func processGetFreeToken() {
 	if *freeTokenAddressPtr == "" {
 		fmt.Println("Error: --address is required")
 	} else {
-		address := common.HexToAddress(*freeTokenAddressPtr)
+		address := common2.ParseAddr(*freeTokenAddressPtr)
 		GetFreeToken(address)
 	}
 }
@@ -430,13 +455,13 @@ func processTransferCommand() {
 		return
 	}
 
-	receiverAddress := common.HexToAddress(receiver)
+	receiverAddress := common2.ParseAddr(receiver)
 	if len(receiverAddress) != 20 {
 		fmt.Println("The receiver address is not valid.")
 		return
 	}
 
-	senderAddress := common.HexToAddress(sender)
+	senderAddress := common2.ParseAddr(sender)
 	if len(senderAddress) != 20 {
 		fmt.Println("The sender address is not valid.")
 		return

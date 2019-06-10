@@ -15,6 +15,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
@@ -217,7 +218,7 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 	consensus.commitSigs = map[common.Address]*bls.Sign{}
 	consensus.CommitteeAddresses = make(map[common.Address]bool)
 
-	consensus.validators.Store(utils.GetBlsAddress(leader.ConsensusPubKey).Hex(), leader)
+	consensus.validators.Store(common2.MustAddressToBech32(utils.GetBlsAddress(leader.ConsensusPubKey)), leader)
 
 	// For now use socket address as ID
 	// TODO: populate Id derived from address

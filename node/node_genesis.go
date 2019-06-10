@@ -17,6 +17,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -140,7 +141,7 @@ func AddNodeAddressesToGenesisAlloc(genesisAlloc core.GenesisAlloc) {
 	for _, account := range genesis.GenesisAccounts {
 		testBankFunds := big.NewInt(InitFreeFundInEther)
 		testBankFunds = testBankFunds.Mul(testBankFunds, big.NewInt(denominations.One))
-		address := common.HexToAddress(account.Address)
+		address := common2.ParseAddr(account.Address)
 		genesisAlloc[address] = core.GenesisAccount{Balance: testBankFunds}
 	}
 }

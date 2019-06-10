@@ -539,14 +539,12 @@ func (node *Node) SendPongMessage() {
 						utils.GetLogInstance().Info("[PONG] sent pong message to", "group", node.NodeConfig.GetShardGroupID(), "# nodes", numPeersNow)
 					}
 					sentMessage = true
-					// wait a bit until all validators received pong message
-					time.Sleep(200 * time.Millisecond)
 
 					// only need to notify consensus leader once to start the consensus
 					if firstTime {
 						// Leader stops sending ping message
-						time.Sleep(5 * time.Second)
 						node.serviceManager.TakeAction(&service.Action{Action: service.Stop, ServiceType: service.PeerDiscovery})
+						utils.GetLogInstance().Info("[PONG] startConsensus")
 						node.startConsensus <- struct{}{}
 						firstTime = false
 					}

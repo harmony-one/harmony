@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	proto "github.com/harmony-one/harmony/api/client/service/proto"
 	"github.com/harmony-one/harmony/core/state"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 
@@ -50,7 +51,7 @@ func (s *Server) GetStakingContractInfo(ctx context.Context, request *proto.Stak
 		return nil, err
 	}
 	return &proto.StakingContractInfoResponse{
-		ContractAddress: s.getDeployedStakingContractAddress().Hex(),
+		ContractAddress: common2.MustAddressToBech32(s.getDeployedStakingContractAddress()),
 		Balance:         state.GetBalance(address).Bytes(),
 		Nonce:           state.GetNonce(address),
 	}, nil

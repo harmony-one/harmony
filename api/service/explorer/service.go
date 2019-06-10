@@ -14,12 +14,14 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/gorilla/mux"
+	libp2p_peer "github.com/libp2p/go-libp2p-peer"
+
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
-	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 )
 
 // Constants for explorer service.
@@ -291,7 +293,7 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 
 	// Check the balance from blockchain rather than local DB dump
 	if s.GetAccountBalance != nil {
-		address := common.HexToAddress(id)
+		address := common2.ParseAddr(id)
 		balance, err := s.GetAccountBalance(address)
 		if err == nil {
 			data.Address.Balance = balance

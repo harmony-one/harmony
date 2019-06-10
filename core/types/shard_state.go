@@ -9,6 +9,7 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"golang.org/x/crypto/sha3"
 
+	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 )
 
@@ -208,5 +209,5 @@ func (n NodeID) Serialize() []byte {
 }
 
 func (n NodeID) String() string {
-	return "ECDSA: " + n.EcdsaAddress.Hex() + ", BLS: " + hex.EncodeToString(n.BlsPublicKey[:])
+	return "ECDSA: " + common2.MustAddressToBech32(n.EcdsaAddress) + ", BLS: " + hex.EncodeToString(n.BlsPublicKey[:])
 }

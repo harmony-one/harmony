@@ -11,6 +11,7 @@ import (
 	client "github.com/harmony-one/harmony/api/client/service/proto"
 	proto "github.com/harmony-one/harmony/api/client/service/proto"
 	"github.com/harmony-one/harmony/core/state"
+	common2 "github.com/harmony-one/harmony/internal/common"
 
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
@@ -113,20 +114,21 @@ func TestGetStakingContractInfo(test *testing.T) {
 	})
 
 	response, err := server.GetStakingContractInfo(nil, &proto.StakingContractInfoRequest{Address: testBankAddress.Bytes()})
+	if err != nil {
+		test.Fatal("GetStakingContractInfo failed:", err)
+	}
 
 	if bytes.Compare(response.Balance, testBankFunds.Bytes()) != 0 {
 		test.Errorf("Wrong balance is returned")
 	}
 
-	if strings.Compare(response.ContractAddress, deployedStakingContractAddress.String()) != 0 {
-		test.Errorf("Wrong ContractAddress is returned")
+	if strings.Compare(response.ContractAddress, common2.MustAddressToBech32(deployedStakingContractAddress)) != 0 {
+		test.Errorf("Wrong ContractAddress is returned (expected %#v, got %#v)",
+			common2.MustAddressToBech32(deployedStakingContractAddress),
+			response.ContractAddress)
 	}
 
 	if response.Nonce != 0 {
 		test.Errorf("Wrong nonce is returned")
-	}
-
-	if err != nil {
-		test.Errorf("Failed to get free token")
 	}
 }

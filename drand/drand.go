@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/harmony-one/harmony/crypto/hash"
+	common2 "github.com/harmony-one/harmony/internal/common"
 
 	"github.com/ethereum/go-ethereum/common"
 
@@ -91,7 +92,7 @@ func New(host p2p.Host, ShardID uint32, peers []p2p.Peer, leader p2p.Peer, confi
 	dRand.leader = leader
 	dRand.CommitteeAddresses = map[common.Address]bool{}
 	for _, peer := range peers {
-		dRand.validators.Store(utils.GetBlsAddress(peer.ConsensusPubKey).Hex(), peer)
+		dRand.validators.Store(common2.MustAddressToBech32(utils.GetBlsAddress(peer.ConsensusPubKey)), peer)
 		dRand.CommitteeAddresses[utils.GetBlsAddress(peer.ConsensusPubKey)] = true
 	}
 
@@ -136,7 +137,7 @@ func (dRand *DRand) AddPeers(peers []*p2p.Peer) int {
 	count := 0
 
 	for _, peer := range peers {
-		_, ok := dRand.validators.LoadOrStore(utils.GetBlsAddress(peer.ConsensusPubKey).Hex(), *peer)
+		_, ok := dRand.validators.LoadOrStore(common2.MustAddressToBech32(utils.GetBlsAddress(peer.ConsensusPubKey)), *peer)
 		if !ok {
 			dRand.pubKeyLock.Lock()
 			if _, ok := dRand.CommitteeAddresses[peer.ConsensusPubKey.GetAddress()]; !ok {

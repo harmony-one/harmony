@@ -10,11 +10,11 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 
 	"github.com/harmony-one/harmony/contracts/structs"
+	"github.com/harmony-one/harmony/core/types"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/internal/utils"
-
-	"github.com/harmony-one/harmony/core/types"
 )
 
 const (
@@ -231,7 +231,7 @@ func GetInitShardState() types.ShardState {
 			pubKey := types.BlsPublicKey{}
 			pubKey.FromLibBLSPublicKey(priKey.GetPublicKey())
 			// TODO: directly read address for bls too
-			curNodeID := types.NodeID{common.HexToAddress(genesis.GenesisAccounts[index].Address), pubKey}
+			curNodeID := types.NodeID{common2.ParseAddr(genesis.GenesisAccounts[index].Address), pubKey}
 			com.NodeList = append(com.NodeList, curNodeID)
 		}
 
@@ -243,7 +243,7 @@ func GetInitShardState() types.ShardState {
 			pubKey := types.BlsPublicKey{}
 			pubKey.FromLibBLSPublicKey(priKey.GetPublicKey())
 			// TODO: directly read address for bls too
-			curNodeID := types.NodeID{common.HexToAddress(genesis.GenesisFNAccounts[index].Address), pubKey}
+			curNodeID := types.NodeID{common2.ParseAddr(genesis.GenesisFNAccounts[index].Address), pubKey}
 			com.NodeList = append(com.NodeList, curNodeID)
 		}
 		shardState = append(shardState, com)
