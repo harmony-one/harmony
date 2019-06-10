@@ -13,7 +13,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/accounts/keystore"
 	"github.com/harmony-one/harmony/api/client"
@@ -22,6 +21,7 @@ import (
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/blsgen"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -138,6 +138,8 @@ func main() {
 		fmt.Println("        --pass           - Passphrase of sender's private key")
 		fmt.Println("    8. export        - Export account key to a new file")
 		fmt.Println("        --account        - Specify the account to export. Empty will export every key.")
+		fmt.Println("    9. blsgen        - Generate a bls key and store private key locally.")
+		fmt.Println("        --nopass         - The private key has no passphrase (for test only)")
 		os.Exit(1)
 	}
 
@@ -181,6 +183,8 @@ ARG:
 		processListCommand()
 	case "export":
 		processExportCommand()
+	case "blsgen":
+		processBlsgenCommand()
 	case "removeAll":
 		clearKeystore()
 	case "import":
@@ -334,6 +338,28 @@ func processExportCommand() {
 			_exportAccount(account)
 		}
 	}
+}
+
+func processBlsgenCommand() {
+	newCommand.Parse(os.Args[2:])
+	noPass := *newCommandNoPassPtr
+	// Default password is an empty string
+	password := ""
+
+	if !noPass {
+		password = utils.AskForPassphrase("Passphrase: ")
+		password2 := utils.AskForPassphrase("Passphrase again: ")
+		if password != password2 {
+			fmt.Printf("Passphrase doesn't match. Please try again!\n")
+			os.Exit(3)
+		}
+	}
+
+	privateKey, fileName := blsgen.GenBlsKeyWithPassPhrase(password)
+	publickKey := privateKey.GetPublicKey()
+	fmt.Printf("Bls private key: %s\n", privateKey.GetHexString())
+	fmt.Printf("Bls public key: %s\n", publickKey.GetHexString())
+	fmt.Printf("File storing the ENCRYPTED private key with your passphrase: %s\n", fileName)
 }
 
 func processImportCommnad() {
