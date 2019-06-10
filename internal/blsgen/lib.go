@@ -29,8 +29,7 @@ func toISO8601(t time.Time) string {
 
 func keyFileName(publicKey *ffi_bls.PublicKey) string {
 	ts := time.Now().UTC()
-	address := publicKey.GetAddress()
-	return fmt.Sprintf("UTC--%s--bls_%s", toISO8601(ts), hex.EncodeToString((address[:])))
+	return fmt.Sprintf("UTC--%s--bls", toISO8601(ts))
 }
 
 // GenBlsKeyWithPassPhrase generates bls key with passphrase and write into disk.
