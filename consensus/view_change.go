@@ -426,7 +426,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		}
 	}
 
-	if m3Mask.Bitmap == nil || m2Mask.Bitmap == nil {
+	if m3Mask == nil || m2Mask == nil {
 		utils.GetLogInstance().Error("onNewView m3Mask or m2Mask is nil")
 		return
 	}
