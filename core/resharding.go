@@ -226,10 +226,10 @@ func GetInitShardState() types.ShardState {
 		com := types.Committee{ShardID: uint32(i)}
 		for j := 0; j < GenesisShardHarmonyNodes; j++ {
 			index := i + j*GenesisShardNum // The initial account to use for genesis nodes
-			priKey := bls.SecretKey{}
-			priKey.DeserializeHexStr(genesis.GenesisAccounts[index].BlsPriKey)
+			blsPublicKey := &bls.PublicKey{}
+			blsPublicKey.DeserializeHexStr(genesis.GenesisAccounts[index].BlsPublicKey)
 			pubKey := types.BlsPublicKey{}
-			pubKey.FromLibBLSPublicKey(priKey.GetPublicKey())
+			pubKey.FromLibBLSPublicKey(blsPublicKey)
 			// TODO: directly read address for bls too
 			curNodeID := types.NodeID{common2.ParseAddr(genesis.GenesisAccounts[index].Address), pubKey}
 			com.NodeList = append(com.NodeList, curNodeID)
@@ -238,10 +238,10 @@ func GetInitShardState() types.ShardState {
 		// add FN runner's key
 		for j := GenesisShardHarmonyNodes; j < GenesisShardSize; j++ {
 			index := i + (j-GenesisShardHarmonyNodes)*GenesisShardNum
-			priKey := bls.SecretKey{}
-			priKey.DeserializeHexStr(genesis.GenesisFNAccounts[index].BlsPriKey)
+			blsPublicKey := &bls.PublicKey{}
+			blsPublicKey.DeserializeHexStr(genesis.GenesisFNAccounts[index].BlsPublicKey)
 			pubKey := types.BlsPublicKey{}
-			pubKey.FromLibBLSPublicKey(priKey.GetPublicKey())
+			pubKey.FromLibBLSPublicKey(blsPublicKey)
 			// TODO: directly read address for bls too
 			curNodeID := types.NodeID{common2.ParseAddr(genesis.GenesisFNAccounts[index].Address), pubKey}
 			com.NodeList = append(com.NodeList, curNodeID)
