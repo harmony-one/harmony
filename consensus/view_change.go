@@ -343,7 +343,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				consensus.ReadySignal <- struct{}{}
 			}()
 		} else {
-			consensus.phase = Commit
+			consensus.switchPhase(Commit, true)
 			copy(consensus.blockHash[:], consensus.m1Payload[:32])
 			aggSig, mask, err := consensus.readSignatureBitmapPayload(recvMsg.Payload, 32)
 			if err != nil {
