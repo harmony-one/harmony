@@ -6,6 +6,8 @@ import (
 	"math/rand"
 	"strings"
 
+	"github.com/harmony-one/harmony/common/config"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
