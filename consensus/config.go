@@ -14,7 +14,7 @@ const (
 	bootstrapDuration time.Duration = 300 * time.Second
 	maxLogSize        uint32        = 1000
 	// threshold between received consensus message blockNum and my blockNum
-	consensusBlockNumBuffer uint64 = 1
+	consensusBlockNumBuffer uint64 = 10
 )
 
 // TimeoutType is the type of timeout in view change protocol
