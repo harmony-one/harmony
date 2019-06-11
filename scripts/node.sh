@@ -113,6 +113,18 @@ usage() {
    exit 64  # EX_USAGE
 }
 
+unset OPTIND OPTARG opt
+OPTIND=1
+while getopts : opt
+do
+   case "${opt}" in
+   '?') usage "unrecognized option -${OPTARG}";;
+   ':') usage "missing argument for -${OPTARG}";;
+   *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
+   esac
+done
+shift $((${OPTIND} - 1))
+
 case $# in
 0)
    usage "Please provide account address." \
