@@ -44,7 +44,7 @@ func FindAccount(address string) (int, *DeployAccount) {
 	}
 	for i, acc := range GenesisFNAccounts {
 		if address == acc.Address {
-			return i, &acc
+			return i + 8, &acc
 		}
 	}
 	return 0, nil
