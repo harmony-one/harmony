@@ -124,6 +124,12 @@ esac
 IDX="${1}"
 shift 1
 
+case $# in
+[1-9]*)
+   usage "extra arguments at the end ($*)"
+   ;;
+esac
+
 killnode
 
 mkdir -p latest
