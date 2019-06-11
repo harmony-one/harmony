@@ -105,17 +105,24 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-if [ -z "$1" ]; then
-   echo "Usage: $0 account_address"
-   echo
-   echo "Please provide account address."
-   echo "For foundational nodes, please follow the instructions in discord #foundational-nodes channel"
-   echo "to generate and register your account address with <genesis at harmony dot one>"
-   echo
-   exit 1
-fi
+usage() {
+   msg "$@"
+   cat <<- ENDEND
+	usage: ${progname} account_address
+	ENDEND
+   exit 64  # EX_USAGE
+}
 
-IDX=$1
+case $# in
+0)
+   usage "Please provide account address." \
+      "For foundational nodes, please follow the instructions in Discord #foundational-nodes channel" \
+      "to generate and register your account address with <genesis at harmony dot one>."
+   ;;
+esac
+
+IDX="${1}"
+shift 1
 
 killnode
 
