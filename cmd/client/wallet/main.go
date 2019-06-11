@@ -358,7 +358,7 @@ func processBlsgenCommand() {
 	privateKey, fileName := blsgen.GenBlsKeyWithPassPhrase(password)
 	publickKey := privateKey.GetPublicKey()
 	fmt.Printf("Bls private key: %s\n", privateKey.SerializeToHexStr())
-	fmt.Printf("Bls serialized public key: %s\n", publickKey.SerializeToHexStr())
+	fmt.Printf("Bls public key: %s\n", publickKey.SerializeToHexStr())
 	fmt.Printf("File storing the ENCRYPTED private key with your passphrase: %s\n", fileName)
 }
 
