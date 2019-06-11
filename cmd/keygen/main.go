@@ -9,8 +9,7 @@ import (
 	"strconv"
 
 	crypto2 "github.com/ethereum/go-ethereum/crypto"
-
-	"github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/crypto/bls"
 )
 
 var (
@@ -38,9 +37,15 @@ func main() {
 			if err != nil {
 				panic("Failed to generate the private key")
 			}
-			crypto2.FromECDSA(priKey)
 
-			fmt.Printf("{Address: \"%s\", Private: \"%s\", Public: \"%s\"},"+"\n", common.MustAddressToBech32(crypto2.PubkeyToAddress(priKey.PublicKey)), hex.EncodeToString(crypto2.FromECDSA(priKey)), common.MustAddressToBech32(crypto2.PubkeyToAddress(priKey.PublicKey)))
+			privateKey := bls.RandPrivateKey()
+			crypto2.FromECDSA(priKey)
+			fmt.Printf("{Address: \"%s\", Private: \"%s\", BlsPriKey: \"%s\", BlsPublicKey: \"%s\", Index: \"%d\"},"+"\n",
+				crypto2.PubkeyToAddress(priKey.PublicKey).Hex(),
+				hex.EncodeToString(crypto2.FromECDSA(priKey)),
+				privateKey.SerializeToHexStr(),
+				privateKey.GetPublicKey().SerializeToHexStr(),
+				i)
 		}
 	} else {
 		fmt.Println("Unable to parse # as the argument.")
