@@ -117,7 +117,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		return
 	}
 	if !senderKey.IsEqual(consensus.LeaderPubKey) && consensus.mode.Mode() == Normal && !consensus.ignoreViewIDCheck {
-		utils.GetLogger().Warn("onAnnounce senderKey not match leader PubKey", "senderKey", senderKey.GetHexString()[:10], "leaderKey", consensus.LeaderPubKey.GetHexString()[:10])
+		utils.GetLogger().Warn("onAnnounce senderKey not match leader PubKey", "senderKey", senderKey.SerializeToHexStr()[:10], "leaderKey", consensus.LeaderPubKey.SerializeToHexStr()[:10])
 		return
 	}
 	if err = verifyMessageSig(senderKey, msg); err != nil {
