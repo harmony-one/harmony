@@ -5,6 +5,8 @@ import (
 	"log"
 	"time"
 
+	"github.com/harmony-one/harmony/internal/genesis"
+
 	"github.com/harmony-one/bls/ffi/go/bls"
 )
 
@@ -18,10 +20,10 @@ func main() {
 	var aggPub *bls.PublicKey
 
 	startTime := time.Now()
-	for i := 0; i < 400; i++ {
+	for i := 0; i < len(genesis.NewNodeAccounts); i++ {
 		var sec bls.SecretKey
 		sec.SetByCSPRNG()
-		fmt.Printf("{Address: \"\", Private: \"%s\", Public: \"\"},\n", sec.GetHexString())
+		fmt.Printf("{Address: \"%s\", BlsPriKey: \"%s\"},\n", genesis.NewNodeAccounts[i].Address, sec.SerializeToHexStr())
 		if i == 0 {
 			aggSig = sec.Sign(m)
 			aggPub = sec.GetPublicKey()
@@ -32,8 +34,8 @@ func main() {
 	}
 	endTime := time.Now()
 	log.Printf("Time required to sign 1000 messages and aggregate 1000 pub keys and signatures: %f seconds", endTime.Sub(startTime).Seconds())
-	log.Printf("Aggregate Signature: 0x%s, length: %d", aggSig.GetHexString(), len(aggSig.Serialize()))
-	log.Printf("Aggregate Public Key: 0x%s, length: %d", aggPub.GetHexString(), len(aggPub.Serialize()))
+	log.Printf("Aggregate Signature: 0x%s, length: %d", aggSig.SerializeToHexStr(), len(aggSig.Serialize()))
+	log.Printf("Aggregate Public Key: 0x%s, length: %d", aggPub.SerializeToHexStr(), len(aggPub.Serialize()))
 
 	startTime = time.Now()
 	if !aggSig.Verify(aggPub, m) {
