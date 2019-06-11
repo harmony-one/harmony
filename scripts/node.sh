@@ -108,18 +108,23 @@ fi
 usage() {
    msg "$@"
    cat <<- ENDEND
-	usage: ${progname} account_address
+	usage: ${progname} [-b] account_address
+	-c              back up database/logs and start clean
 	ENDEND
    exit 64  # EX_USAGE
 }
 
+unset start_clean
+start_clean=false
+
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts : opt
+while getopts :c opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
    ':') usage "missing argument for -${OPTARG}";;
+   c) start_clean=true;;
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
@@ -144,7 +149,6 @@ esac
 
 killnode
 
-mkdir -p latest
 BUCKET=pub.harmony.one
 OS=$(uname -s)
 REL=drum
@@ -183,6 +187,18 @@ myip
 
 # public boot node multiaddress
 BN_MA=/ip4/100.26.90.187/tcp/9874/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv,/ip4/54.213.43.194/tcp/9874/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9
+
+if ${start_clean}
+then
+   msg "backing up old database/logs (-c)"
+   unset -v backup_dir now
+   now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+   mkdir -p backups
+   backup_dir=$(mktemp -d "backups/${now}.XXXXXX")
+   mv harmony_db_* latest "${backup_dir}/" || :
+   rm -rf latest
+fi
+mkdir -p latest
 
 echo "############### Running Harmony Process ###############"
 if [ "$OS" == "Linux" ]; then
