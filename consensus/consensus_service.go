@@ -11,6 +11,7 @@ import (
 	common2 "github.com/harmony-one/harmony/internal/common"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -637,4 +638,20 @@ func (consensus *Consensus) reportMetrics(block types.Block) {
 		"blockLatency":    int(timeElapsed / time.Millisecond),
 	}
 	profiler.LogMetrics(metrics)
+}
+
+// logger returns a sub-logger with consensus contexts added.
+func (consensus *Consensus) logger(logger log.Logger) log.Logger {
+	return logger.New(
+		"myBlock", consensus.blockNum,
+		"myViewID", consensus.viewID,
+		"phase", consensus.phase,
+		"mode", consensus.mode.Mode(),
+	)
+}
+
+// getLogger returns logger for consensus contexts added
+func (consensus *Consensus) getLogger() log.Logger {
+	logger := consensus.logger(utils.GetLogInstance())
+	return utils.WithCallerSkip(logger, 1)
 }
