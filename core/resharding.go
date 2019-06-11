@@ -227,7 +227,7 @@ func GetInitShardState() types.ShardState {
 		for j := 0; j < GenesisShardHarmonyNodes; j++ {
 			index := i + j*GenesisShardNum // The initial account to use for genesis nodes
 			priKey := bls.SecretKey{}
-			priKey.SetHexString(genesis.GenesisAccounts[index].BlsPriKey)
+			priKey.DeserializeHexStr(genesis.GenesisAccounts[index].BlsPriKey)
 			pubKey := types.BlsPublicKey{}
 			pubKey.FromLibBLSPublicKey(priKey.GetPublicKey())
 			// TODO: directly read address for bls too
@@ -239,7 +239,7 @@ func GetInitShardState() types.ShardState {
 		for j := GenesisShardHarmonyNodes; j < GenesisShardSize; j++ {
 			index := i + (j-GenesisShardHarmonyNodes)*GenesisShardNum
 			priKey := bls.SecretKey{}
-			priKey.SetHexString(genesis.GenesisFNAccounts[index].BlsPriKey)
+			priKey.DeserializeHexStr(genesis.GenesisFNAccounts[index].BlsPriKey)
 			pubKey := types.BlsPublicKey{}
 			pubKey.FromLibBLSPublicKey(priKey.GetPublicKey())
 			// TODO: directly read address for bls too

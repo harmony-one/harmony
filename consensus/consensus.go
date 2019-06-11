@@ -377,7 +377,7 @@ func NewGenesisStakeInfoFinder() (*GenesisStakeInfoFinder, error) {
 	for idx, account := range genesis.GenesisAccounts {
 		blsSecretKeyHex := account.BlsPriKey
 		blsSecretKey := bls.SecretKey{}
-		if err := blsSecretKey.SetHexString(blsSecretKeyHex); err != nil {
+		if err := blsSecretKey.DeserializeHexStr(blsSecretKeyHex); err != nil {
 			return nil, ctxerror.New("cannot convert BLS secret key",
 				"accountIndex", idx,
 			).WithCause(err)

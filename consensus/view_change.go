@@ -121,7 +121,7 @@ func (consensus *Consensus) switchPhase(desirePhase PbftPhase, override bool) {
 func (consensus *Consensus) GetNextLeaderKey() *bls.PublicKey {
 	idx := consensus.getIndexOfPubKey(consensus.LeaderPubKey)
 	if idx == -1 {
-		utils.GetLogInstance().Warn("GetNextLeaderKey: currentLeaderKey not found", "key", consensus.LeaderPubKey.GetHexString())
+		utils.GetLogInstance().Warn("GetNextLeaderKey: currentLeaderKey not found", "key", consensus.LeaderPubKey.SerializeToHexStr())
 	}
 	idx = (idx + 1) % len(consensus.PublicKeys)
 	return consensus.PublicKeys[idx]
@@ -173,7 +173,7 @@ func (consensus *Consensus) startViewChange(viewID uint32) {
 
 	diff := viewID - consensus.viewID
 	duration := time.Duration(int64(diff) * int64(viewChangeDuration))
-	utils.GetLogInstance().Info("startViewChange", "viewID", viewID, "timeoutDuration", duration, "nextLeader", consensus.LeaderPubKey.GetHexString()[:10])
+	utils.GetLogInstance().Info("startViewChange", "viewID", viewID, "timeoutDuration", duration, "nextLeader", consensus.LeaderPubKey.SerializeToHexStr()[:10])
 
 	msgToSend := consensus.constructViewChangeMessage()
 	consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
@@ -371,7 +371,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		consensus.consensusTimeout[timeoutViewChange].Stop()
 		consensus.consensusTimeout[timeoutConsensus].Start()
 		utils.GetLogger().Debug("new leader start consensus timeout and stop view change timeout", "viewID", consensus.viewID, "block", consensus.blockNum, "viewChangingID", consensus.mode.ViewID())
-		utils.GetLogger().Debug("I am the new leader", "myKey", consensus.PubKey.GetHexString()[:20], "viewID", consensus.viewID, "block", consensus.blockNum)
+		utils.GetLogger().Debug("I am the new leader", "myKey", consensus.PubKey.SerializeToHexStr()[:20], "viewID", consensus.viewID, "block", consensus.blockNum)
 	}
 	utils.GetLogInstance().Debug("onViewChange", "numSigs", len(consensus.viewIDSigs), "needed", consensus.Quorum())
 
@@ -413,7 +413,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	}
 
 	if !m3Sig.VerifyHash(m3Mask.AggregatePublic, viewIDHash) {
-		utils.GetLogInstance().Warn("onNewView unable to verify aggregated signature of m3 payload", "m3Sig", m3Sig.GetHexString()[:10], "m3Mask", m3Mask.Bitmap, "viewID", recvMsg.ViewID)
+		utils.GetLogInstance().Warn("onNewView unable to verify aggregated signature of m3 payload", "m3Sig", m3Sig.SerializeToHexStr()[:10], "m3Mask", m3Mask.Bitmap, "viewID", recvMsg.ViewID)
 		return
 	}
 
@@ -473,7 +473,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 
 	// change view and leaderKey to keep in sync with network
 	if consensus.blockNum != recvMsg.BlockNum {
-		utils.GetLogger().Debug("new leader changed", "newLeaderKey", consensus.LeaderPubKey.GetHexString()[:20], "viewID", consensus.viewID, "myBlock", consensus.blockNum, "newViewBlockNum", recvMsg.BlockNum)
+		utils.GetLogger().Debug("new leader changed", "newLeaderKey", consensus.LeaderPubKey.SerializeToHexStr()[:20], "viewID", consensus.viewID, "myBlock", consensus.blockNum, "newViewBlockNum", recvMsg.BlockNum)
 		return
 	}
 
@@ -491,7 +491,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		consensus.ResetState()
 		utils.GetLogInstance().Info("onNewView === announce")
 	}
-	utils.GetLogger().Debug("new leader changed", "newLeaderKey", consensus.LeaderPubKey.GetHexString()[:20], "viewID", consensus.viewID, "block", consensus.blockNum)
+	utils.GetLogger().Debug("new leader changed", "newLeaderKey", consensus.LeaderPubKey.SerializeToHexStr()[:20], "viewID", consensus.viewID, "block", consensus.blockNum)
 	utils.GetLogger().Debug("validator start consensus timeout and stop view change timeout", "viewID", consensus.viewID, "block", consensus.blockNum)
 	consensus.consensusTimeout[timeoutConsensus].Start()
 	consensus.consensusTimeout[timeoutViewChange].Stop()

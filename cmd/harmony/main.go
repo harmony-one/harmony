@@ -240,14 +240,14 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	consensusPriKey := &bls.SecretKey{}
 
 	if *isGenesis {
-		err := consensusPriKey.SetHexString(genesisAccount.BlsPriKey)
+		err := consensusPriKey.DeserializeHexStr(genesisAccount.BlsPriKey)
 		if err != nil {
 			panic(fmt.Errorf("generate key error"))
 		}
 	} else {
 		// NewNode won't work
 		/*
-			err := consensusPriKey.SetHexString(genesis.NewNodeAccounts[])
+			err := consensusPriKey.DeserializeHexStr(genesis.NewNodeAccounts[])
 			if err != nil {
 				panic(fmt.Errorf("generate key error"))
 			}

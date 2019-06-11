@@ -38,7 +38,7 @@ func GenBlsKeyWithPassPhrase(passphrase string) (*ffi_bls.SecretKey, string) {
 	privateKey := bls.RandPrivateKey()
 	publickKey := privateKey.GetPublicKey()
 	fileName := keyFileName(publickKey)
-	privateKeyHex := privateKey.GetHexString()
+	privateKeyHex := privateKey.SerializeToHexStr()
 	// Encrypt with passphrase
 	encryptedPrivateKeyBytes := encrypt([]byte(privateKeyHex), passphrase)
 	// Write to file.
@@ -54,7 +54,7 @@ func LoadBlsKeyWithPassPhrase(fileName, passphrase string) *ffi_bls.SecretKey {
 	decryptedBytes := decrypt(encryptedPrivateKeyBytes, passphrase)
 
 	priKey := &ffi_bls.SecretKey{}
-	priKey.SetHexString(string(decryptedBytes))
+	priKey.DeserializeHexStr(string(decryptedBytes))
 	return priKey
 }
 

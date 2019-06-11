@@ -135,9 +135,9 @@ func TestAggregatedSignature(test *testing.T) {
 
 	multiSignature := AggregateSig(signs)
 
-	str := multiSignature.GetHexString()
+	str := multiSignature.SerializeToHexStr()
 
-	if strings.Compare(multiSignature.GetHexString(), "0") == 0 {
+	if strings.Compare(multiSignature.SerializeToHexStr(), "0") == 0 {
 		test.Error("Error creating multisignature", str)
 	}
 }
