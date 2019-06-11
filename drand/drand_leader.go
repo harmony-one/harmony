@@ -33,7 +33,7 @@ func (dRand *DRand) WaitForEpochBlock(blockChannel chan *types.Block, stopChan c
 				if core.IsEpochLastBlock(newBlock) {
 					dRand.init(newBlock)
 				}
-				pRnd := newBlock.Header().RandPreimage
+				pRnd := newBlock.Header().Vrf
 				zeros := [32]byte{}
 				if core.IsEpochBlock(newBlock) && !bytes.Equal(pRnd[:], zeros[:]) {
 					// The epoch block should contain the randomness preimage pRnd

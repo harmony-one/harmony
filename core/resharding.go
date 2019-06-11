@@ -166,7 +166,7 @@ func GetShardingStateFromBlockChain(bc *BlockChain, epoch *big.Int) (*ShardingSt
 	shardState = shardState.DeepCopy()
 
 	blockNumber := GetBlockNumberFromEpoch(epoch.Uint64())
-	rndSeedBytes := bc.GetRandSeedByNumber(blockNumber)
+	rndSeedBytes := bc.GetVdfByNumber(blockNumber)
 	rndSeed := binary.BigEndian.Uint64(rndSeedBytes[:])
 
 	return &ShardingState{epoch: epoch.Uint64(), rnd: rndSeed, shardState: shardState, numShards: len(shardState)}, nil
