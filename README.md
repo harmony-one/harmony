@@ -56,11 +56,12 @@ Make sure you set `export GO111MODULE=on`.
 
 ### Build all executables
 
-You can  run the script `./scripts/go_executable_build.sh` to build all the executables.
+You can run the script `./scripts/go_executable_build.sh` to build all the executables.
 
 ### Build individual executables
 
-Initialize BLS 
+Initialize BLS
+
 ```
 source scripts/setup_bls_build_flags.sh
 ```
@@ -113,7 +114,7 @@ the terms and conditions.
 Harmony includes third-party open source code. In general, a source subtree
 with a `LICENSE` or `COPYRIGHT` file is from a third party, and our
 modifications thereto are licensed under the same third-party open source
-license.
+license .
 
 Also please see [our Fiduciary License Agreement](FLA.md) if you are
 contributing to the project. By your submission of your contribution to us, you
