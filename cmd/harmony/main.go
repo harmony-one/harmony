@@ -165,7 +165,7 @@ func initSetup() {
 	allAccounts := ks.Accounts()
 
 	// TODO: lc try to enable multiple staking accounts per node
-	accountIndex, genesisAccount = genesis.FindAccount(*stakingAccounts)
+	accountIndex, genesisAccount = genesis.FindAccount(*stakingAccounts, core.GenesisShardNum)
 
 	if genesisAccount == nil {
 		fmt.Printf("Can't find the account address: %v!\n", *stakingAccounts)
