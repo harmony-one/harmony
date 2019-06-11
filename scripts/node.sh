@@ -1,5 +1,26 @@
 #!/bin/bash
 
+unset -v progname
+progname="${0##*/}"
+
+unset -f msg err
+
+msg() {
+   case $# in
+   [1-9]*)
+      echo "${progname}: $*" >&2
+      ;;
+   esac
+}
+
+err() {
+   local code
+   code="${1}"
+   shift 1
+   msg "$@"
+   exit "${code}"
+}
+
 function killnode() {
    local port=$1
 
