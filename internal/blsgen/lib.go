@@ -33,6 +33,19 @@ func keyFileName(publicKey *ffi_bls.PublicKey) string {
 	return fmt.Sprintf("UTC--%s--bls_%s", toISO8601(ts), serializedPublicKey)
 }
 
+// WritePrivateKeyWithPassPhrase encrypt the key with passphrase and write into disk.
+func WritePrivateKeyWithPassPhrase(privateKey *ffi_bls.SecretKey, passphrase string) string {
+	publickKey := privateKey.GetPublicKey()
+	fileName := keyFileName(publickKey)
+	privateKeyHex := privateKey.SerializeToHexStr()
+	// Encrypt with passphrase
+	encryptedPrivateKeyBytes := encrypt([]byte(privateKeyHex), passphrase)
+	// Write to file.
+	err := ioutil.WriteFile(fileName, encryptedPrivateKeyBytes, 0600)
+	check(err)
+	return fileName
+}
+
 // GenBlsKeyWithPassPhrase generates bls key with passphrase and write into disk.
 func GenBlsKeyWithPassPhrase(passphrase string) (*ffi_bls.SecretKey, string) {
 	privateKey := bls.RandPrivateKey()
