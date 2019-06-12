@@ -6,6 +6,8 @@ import (
 	"math/rand"
 	"strings"
 
+	"github.com/harmony-one/harmony/common/config"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -23,11 +25,11 @@ import (
 )
 
 const (
-	// FakeAddressNumber is the number of fake address.
-	FakeAddressNumber = 100
+	// TestAccountNumber is the number of test accounts
+	TestAccountNumber = 100
 	// TotalInitFund is the initial total fund for the contract deployer.
-	TotalInitFund = 1000000100
-	// InitFreeFundInEther is the initial fund for sample accounts.
+	TotalInitFund = 12600000000
+	// InitFreeFundInEther is the initial fund for permissioned accounts.
 	InitFreeFundInEther = 100
 )
 
@@ -65,25 +67,33 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32) error {
 	}
 
 	// Initialize genesis block and blockchain
-	// Tests account for txgen to use
 
-	genesisAlloc := node.CreateGenesisAllocWithTestingAddresses(FakeAddressNumber)
+	genesisAlloc := make(core.GenesisAlloc)
+	chainConfig := params.ChainConfig{}
 
-	// Smart contract deployer account used to deploy protocol-level smart contract
-	contractDeployerKey, _ := ecdsa.GenerateKey(crypto.S256(), strings.NewReader("Test contract key string stream that is fixed so that generated test key are deterministic every time"))
-	contractDeployerAddress := crypto.PubkeyToAddress(contractDeployerKey.PublicKey)
-	contractDeployerFunds := big.NewInt(TotalInitFund)
-	contractDeployerFunds = contractDeployerFunds.Mul(contractDeployerFunds, big.NewInt(denominations.One))
-	genesisAlloc[contractDeployerAddress] = core.GenesisAccount{Balance: contractDeployerFunds}
-	node.ContractDeployerKey = contractDeployerKey
+	switch config.Network {
+	case config.Mainnet:
+		chainConfig = *params.MainnetChainConfig
+	case config.Testnet:
+		chainConfig = *params.TestnetChainConfig
+		// Tests account for txgen to use
+		node.AddTestingAddresses(genesisAlloc, TestAccountNumber)
+
+		// Smart contract deployer account used to deploy initial smart contract
+		contractDeployerKey, _ := ecdsa.GenerateKey(crypto.S256(), strings.NewReader("Test contract key string stream that is fixed so that generated test key are deterministic every time"))
+		contractDeployerAddress := crypto.PubkeyToAddress(contractDeployerKey.PublicKey)
+		contractDeployerFunds := big.NewInt(TotalInitFund)
+		contractDeployerFunds = contractDeployerFunds.Mul(contractDeployerFunds, big.NewInt(denominations.One))
+		genesisAlloc[contractDeployerAddress] = core.GenesisAccount{Balance: contractDeployerFunds}
+		node.ContractDeployerKey = contractDeployerKey
+	}
 
 	if shardID == 0 {
 		// Accounts used by validator/nodes to stake and participate in the network.
 		AddNodeAddressesToGenesisAlloc(genesisAlloc)
 	}
 
-	// TODO: create separate chain config instead of using the same pointer reference
-	chainConfig := *params.TestChainConfig
+	// TODO: add ShardID into chainconfig and change ChainID to NetworkID
 	chainConfig.ChainID = big.NewInt(int64(shardID)) // Use ChainID as piggybacked ShardID
 	gspec := core.Genesis{
 		Config:  &chainConfig,
@@ -115,18 +125,15 @@ func CreateTestBankKeys(numAddresses int) (keys []*ecdsa.PrivateKey, err error) 
 	return keys, nil
 }
 
-// CreateGenesisAllocWithTestingAddresses create the genesis block allocation that contains deterministically
+// AddTestingAddresses create the genesis block allocation that contains deterministically
 // generated testing addresses with tokens. This is mostly used for generated simulated transactions in txgen.
-// TODO: Remove it later when moving to production.
-func (node *Node) CreateGenesisAllocWithTestingAddresses(numAddress int) core.GenesisAlloc {
-	genesisAloc := make(core.GenesisAlloc)
+func (node *Node) AddTestingAddresses(gAlloc core.GenesisAlloc, numAddress int) {
 	for _, testBankKey := range node.TestBankKeys {
 		testBankAddress := crypto.PubkeyToAddress(testBankKey.PublicKey)
 		testBankFunds := big.NewInt(InitFreeFundInEther)
 		testBankFunds = testBankFunds.Mul(testBankFunds, big.NewInt(denominations.One))
-		genesisAloc[testBankAddress] = core.GenesisAccount{Balance: testBankFunds}
+		gAlloc[testBankAddress] = core.GenesisAccount{Balance: testBankFunds}
 	}
-	return genesisAloc
 }
 
 // AddNodeAddressesToGenesisAlloc adds to the genesis block allocation the accounts used for network validators/nodes,

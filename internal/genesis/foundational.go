@@ -3,7 +3,7 @@ package genesis
 // GenesisFNAccounts are the ECSDA accounts for the foundational nodes.
 var GenesisFNAccounts = [...]DeployAccount{
 	// 0 - 9
-	{Address: "0x04c3636dF766ad2d3E74424c016842f5704FAE3A", BlsPriKey: "9b1350b3c5589de34a8087b83ec329db059360744b94ed6c71617e0c1b3dde00"},
+	{Address: "one1djwg5f0l3ccnscupqz6htcqsjnl85jt8xvpwhc", BlsPriKey: "9b1350b3c5589de34a8087b83ec329db059360744b94ed6c71617e0c1b3dde00"},
 	{Address: "0x053515CC2CAae77F7e2F0A9C48A27c8f6D76E99d", BlsPriKey: "6fd90c24efcdc60e576847da9664f68844f2a847899eec870d06eacbeed2ab63"},
 	{Address: "0x0850243810E77fC6261965d2F163d36628E77E05", BlsPriKey: "d20cb066ace9fa2e28ff0d49ee1325bfc01ccc1046d3ad1348843d113bc5b661"},
 	{Address: "0x08aB87F3A8EB0b69a833575B6400670f3F330302", BlsPriKey: "a17c0bfc231ba484707c6a9604614a46f54efc791dc2657d6ad9982f157b3d23"},
@@ -54,17 +54,17 @@ var GenesisFNAccounts = [...]DeployAccount{
 	{Address: "0x7A4306d4D0A4f15A5fA54486cE4e6403E313805A", BlsPriKey: "955ae11ec862ea3d1f54998849f6c410c0aa7f14f25236300953621f033f841d"},
 	{Address: "0x7ACDCB2BAcA2911BdcE98e308515A289ac60b7d2", BlsPriKey: "bbe2f6ec33ab483cd993049c01dc642e83f5d5218ac856c1a5a5135e8fce5259"},
 	{Address: "0x7f42f7a4d66f0387AE77A219d0742E8a706231CA", BlsPriKey: "b8f2d04540f3f8dc1436b08dc82542a3cfd6e196e35f1ff7c7975836432e9b3b"},
-	{Address: "0x802bEcc3615Fb8b751ADebA452A30C57F351e8D1", BlsPriKey: "8e16fdf1d1b58de7f728639be6215da4e5d179f9b6c5856cf22069580d31273e"},
+	{Address: "one1zjjul68lhv8hef7angwvakmc37evv8gppraft0", BlsPriKey: "8e16fdf1d1b58de7f728639be6215da4e5d179f9b6c5856cf22069580d31273e"},
 	{Address: "0x82301962Afa7328FDC34e3610B48D899F031e15F", BlsPriKey: "9ec8a830b24931ebe14c20340aacc153f06912c0ee7a100380e8f7abdf1d080c"},
-	{Address: "0x86b4b2dEEE393eBb9633e6F0FEd74F39638A7B4e", BlsPriKey: "6b482ce15402527429cea5c32015e8a42759d03279bd1bdceb370bdcca07d83e"},
+	{Address: "one10746sav20n8h4gm3sevj3vfydtpv6vpksv2065", BlsPriKey: "6b482ce15402527429cea5c32015e8a42759d03279bd1bdceb370bdcca07d83e"},
 	{Address: "0x87a157db95dc3517Eb578d4cedee92a5ab275BD5", BlsPriKey: "8427ac9f6610bda12382085b0b4784dc0d0786e5e6729a5da9b7fc6aa31b2164"},
 	{Address: "0x880D5c6aD4117D26126543Af48f2f9bCDd4DaA0A", BlsPriKey: "bdbab9c75ffcbe55d13bf622bc5d0c3e65e71b171e75577d5a7919036679904f"},
-	{Address: "0x8cF87bB4BE77d8Dbf16fF61273e02E046a18D716", BlsPriKey: "0a2bce9991c0f9824b4fb51abcdc48fe45b7abc1d05b8772ee3216f317472d54"},
+	{Address: "one1rfaajrvn5zdfxydf5wkvrwsyylza6205xap9x0", BlsPriKey: "0a2bce9991c0f9824b4fb51abcdc48fe45b7abc1d05b8772ee3216f317472d54"},
 	{Address: "0x8dc63cCA875eAd38d9554bB97171a4f18AbE92E7", BlsPriKey: "16541e33b12ae532957f6ed011285eb305db1a682f6e37adc096c5a6a3c33b2d"},
 
 	// 50 - 59
 	{Address: "0x93570Dcb1Bf1a0bD1d476a542309754a6dbCE632", BlsPriKey: "8f3e1fc988edffda92663b9f6be8db41fef7f0293932ef4cbfc91f6d3ec7e114"},
-	{Address: "0x9668c58b282f954EA8B732e0D72045bdF19df8B3", BlsPriKey: "81aa2b5041cf1b3ab42dca1e9a73fb891847a0b0dd54213d21cec6fec66dda2d"},
+	{Address: "one1srnk0ekhuljsvsqykg6f9s067xfg6gaytle3rn", BlsPriKey: "81aa2b5041cf1b3ab42dca1e9a73fb891847a0b0dd54213d21cec6fec66dda2d"},
 	{Address: "0x97b834277538e4517f43f9E11fa0BbebaD7c0d3e", BlsPriKey: "d9b8e06e9aa348c9780ed850eaa2a6fa70a00c7ff048f9f3b7a326da217c0f13"},
 	{Address: "0x9c23fE8cdcA1a8E529deeE8eD8492575cc3F9129", BlsPriKey: "0297a14e0bdb90aab5a6739396bd199754b2bee0131df3613eff17ad1ca7ca43"},
 	{Address: "0xA28e6f8D23cc3Fe77D531c7D60bd73F8fD71C5c7", BlsPriKey: "6cb4251cdead996e23bbd22834608efd88d06abf42ceccf5566ed992067a5466"},
