@@ -23,6 +23,14 @@ func main() {
 	for i := 0; i < len(genesis.NewNodeAccounts); i++ {
 		var sec bls.SecretKey
 		sec.SetByCSPRNG()
+		err := sec.DeserializeHexStr(sec.SerializeToHexStr())
+		if err != nil {
+			fmt.Println(err)
+		}
+		if i%10 == 0 {
+			fmt.Println()
+			fmt.Printf("// %d - %d\n", i, i+9)
+		}
 		fmt.Printf("{Address: \"%s\", BlsPriKey: \"%s\"},\n", genesis.NewNodeAccounts[i].Address, sec.SerializeToHexStr())
 		if i == 0 {
 			aggSig = sec.Sign(m)
