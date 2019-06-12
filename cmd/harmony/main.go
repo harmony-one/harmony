@@ -219,7 +219,9 @@ func setUpConsensusKey(nodeConfig *nodeconfig.ConfigType) {
 
 	// If FN node running, they should either specify blsPrivateKey or the file with passphrase
 	if *blsPrivateKey != "" {
-		consensusPriKey.DeserializeHexStr(*blsPrivateKey)
+		if err := consensusPriKey.DeserializeHexStr(*blsPrivateKey); err != nil {
+			panic(err)
+		}
 	} else if *blsKeyFile != "" {
 		var myPass string
 		if !*hmyNoPass {
@@ -227,7 +229,7 @@ func setUpConsensusKey(nodeConfig *nodeconfig.ConfigType) {
 		}
 		consensusPriKey = blsgen.LoadBlsKeyWithPassPhrase(*blsKeyFile, myPass)
 	} else {
-		// This is harmony node running.
+		// This is where harmony node running.
 		if *blsPass == "" {
 			fmt.Println("Internal nodes need to have pass to decrypt blskey")
 			os.Exit(101)
@@ -236,6 +238,8 @@ func setUpConsensusKey(nodeConfig *nodeconfig.ConfigType) {
 		if !blsgen.FindBlsPriKey(genesisAccount.BlsPublicKey, *blsPass, consensusPriKey) {
 			fmt.Println("Can not find bls private key with the given passphrase ", *blsPass)
 			os.Exit(101)
+		} else {
+			utils.GetLogInstance().Info("***** FOUND BLS KEY *****")
 		}
 	}
 
