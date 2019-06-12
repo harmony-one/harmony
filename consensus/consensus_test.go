@@ -17,7 +17,7 @@ func TestNew(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := New(host, 0, leader, bls.RandPrivateKey())
+	consensus, err := New(host, 0, leader, bls.RandPrivateKey(), false, 0)
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}
