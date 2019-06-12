@@ -1,5 +1,26 @@
 #!/bin/bash
 
+unset -v progname
+progname="${0##*/}"
+
+unset -f msg err
+
+msg() {
+   case $# in
+   [1-9]*)
+      echo "${progname}: $*" >&2
+      ;;
+   esac
+}
+
+err() {
+   local code
+   code="${1}"
+   shift 1
+   msg "$@"
+   exit "${code}"
+}
+
 function killnode() {
    local port=$1
 
@@ -84,21 +105,50 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-if [ -z "$1" ]; then
-   echo "Usage: $0 account_address"
-   echo
-   echo "Please provide account address."
-   echo "For foundational nodes, please follow the instructions in discord #foundational-nodes channel"
-   echo "to generate and register your account address with <genesis at harmony dot one>"
-   echo
-   exit 1
-fi
+usage() {
+   msg "$@"
+   cat <<- ENDEND
+	usage: ${progname} [-b] account_address
+	-c              back up database/logs and start clean
+	ENDEND
+   exit 64  # EX_USAGE
+}
 
-IDX=$1
+unset start_clean
+start_clean=false
+
+unset OPTIND OPTARG opt
+OPTIND=1
+while getopts :c opt
+do
+   case "${opt}" in
+   '?') usage "unrecognized option -${OPTARG}";;
+   ':') usage "missing argument for -${OPTARG}";;
+   c) start_clean=true;;
+   *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
+   esac
+done
+shift $((${OPTIND} - 1))
+
+case $# in
+0)
+   usage "Please provide account address." \
+      "For foundational nodes, please follow the instructions in Discord #foundational-nodes channel" \
+      "to generate and register your account address with <genesis at harmony dot one>."
+   ;;
+esac
+
+IDX="${1}"
+shift 1
+
+case $# in
+[1-9]*)
+   usage "extra arguments at the end ($*)"
+   ;;
+esac
 
 killnode
 
-mkdir -p latest
 BUCKET=pub.harmony.one
 OS=$(uname -s)
 REL=drum
@@ -137,6 +187,18 @@ myip
 
 # public boot node multiaddress
 BN_MA=/ip4/100.26.90.187/tcp/9874/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv,/ip4/54.213.43.194/tcp/9874/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9
+
+if ${start_clean}
+then
+   msg "backing up old database/logs (-c)"
+   unset -v backup_dir now
+   now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+   mkdir -p backups
+   backup_dir=$(mktemp -d "backups/${now}.XXXXXX")
+   mv harmony_db_* latest "${backup_dir}/" || :
+   rm -rf latest
+fi
+mkdir -p latest
 
 echo "############### Running Harmony Process ###############"
 if [ "$OS" == "Linux" ]; then
