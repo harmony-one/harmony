@@ -164,6 +164,12 @@ func (log *PbftLog) HasMatchingViewAnnounce(blockNum uint64, viewID uint32, bloc
 	return len(found) == 1
 }
 
+// HasMatchingPrepared returns whether the log contains prepared message with given blockNum, viewID and blockHash
+func (log *PbftLog) HasMatchingPrepared(blockNum uint64, blockHash common.Hash) bool {
+	found := log.GetMessagesByTypeSeqHash(msg_pb.MessageType_PREPARED, blockNum, blockHash)
+	return len(found) >= 1
+}
+
 // HasMatchingViewPrepared returns whether the log contains prepared message with given blockNum, viewID and blockHash
 func (log *PbftLog) HasMatchingViewPrepared(blockNum uint64, viewID uint32, blockHash common.Hash) bool {
 	found := log.GetMessagesByTypeSeqViewHash(msg_pb.MessageType_PREPARED, blockNum, viewID, blockHash)

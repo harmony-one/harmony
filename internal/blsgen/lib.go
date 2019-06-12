@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"time"
 
 	ffi_bls "github.com/harmony-one/bls/ffi/go/bls"
@@ -33,6 +34,20 @@ func keyFileName(publicKey *ffi_bls.PublicKey) string {
 	return fmt.Sprintf("UTC--%s--bls_%s", toISO8601(ts), serializedPublicKey)
 }
 
+// WritePrivateKeyWithPassPhrase encrypt the key with passphrase and write into disk.
+func WritePrivateKeyWithPassPhrase(privateKey *ffi_bls.SecretKey, passphrase string) string {
+	publickKey := privateKey.GetPublicKey()
+	fileName := keyFileName(publickKey)
+	privateKeyHex := privateKey.SerializeToHexStr()
+	// Encrypt with passphrase
+	encryptedPrivateKeyStr := encrypt([]byte(privateKeyHex), passphrase)
+
+	// Write to file.
+	err := WriteToFile(fileName, encryptedPrivateKeyStr)
+	check(err)
+	return fileName
+}
+
 // GenBlsKeyWithPassPhrase generates bls key with passphrase and write into disk.
 func GenBlsKeyWithPassPhrase(passphrase string) (*ffi_bls.SecretKey, string) {
 	privateKey := bls.RandPrivateKey()
@@ -40,18 +55,31 @@ func GenBlsKeyWithPassPhrase(passphrase string) (*ffi_bls.SecretKey, string) {
 	fileName := keyFileName(publickKey)
 	privateKeyHex := privateKey.SerializeToHexStr()
 	// Encrypt with passphrase
-	encryptedPrivateKeyBytes := encrypt([]byte(privateKeyHex), passphrase)
+	encryptedPrivateKeyStr := encrypt([]byte(privateKeyHex), passphrase)
 	// Write to file.
-	err := ioutil.WriteFile(fileName, encryptedPrivateKeyBytes, 0600)
+	err := WriteToFile(fileName, encryptedPrivateKeyStr)
 	check(err)
 	return privateKey, fileName
+}
+
+// WriteToFile will print any string of text to a file safely by
+// checking for errors and syncing at the end.
+func WriteToFile(filename string, data string) error {
+	file, err := os.Create(filename)
+	check(err)
+	defer file.Close()
+
+	_, err = io.WriteString(file, data)
+	check(err)
+	return file.Sync()
 }
 
 // LoadBlsKeyWithPassPhrase loads bls key with passphrase.
 func LoadBlsKeyWithPassPhrase(fileName, passphrase string) *ffi_bls.SecretKey {
 	encryptedPrivateKeyBytes, err := ioutil.ReadFile(fileName)
 	check(err)
-	decryptedBytes := decrypt(encryptedPrivateKeyBytes, passphrase)
+	encryptedPrivateKeyStr := string(encryptedPrivateKeyBytes)
+	decryptedBytes := decrypt(encryptedPrivateKeyStr, passphrase)
 
 	priKey := &ffi_bls.SecretKey{}
 	priKey.DeserializeHexStr(string(decryptedBytes))
@@ -64,7 +92,7 @@ func createHash(key string) string {
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 
-func encrypt(data []byte, passphrase string) []byte {
+func encrypt(data []byte, passphrase string) string {
 	block, _ := aes.NewCipher([]byte(createHash(passphrase)))
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
@@ -75,10 +103,11 @@ func encrypt(data []byte, passphrase string) []byte {
 		panic(err.Error())
 	}
 	ciphertext := gcm.Seal(nonce, nonce, data, nil)
-	return ciphertext
+	return hex.EncodeToString(ciphertext)
 }
 
-func decrypt(data []byte, passphrase string) []byte {
+func decrypt(encryptedStr string, passphrase string) []byte {
+	var err error
 	key := []byte(createHash(passphrase))
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -88,6 +117,11 @@ func decrypt(data []byte, passphrase string) []byte {
 	if err != nil {
 		panic(err.Error())
 	}
+	data, err := hex.DecodeString(encryptedStr)
+	if err != nil {
+		panic(err.Error())
+	}
+
 	nonceSize := gcm.NonceSize()
 	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
 	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
