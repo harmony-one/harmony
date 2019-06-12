@@ -401,14 +401,22 @@ func processBalancesCommand() {
 			fmt.Printf("Account %d:\n", i)
 			fmt.Printf("    Address: %s\n", common2.MustAddressToBech32(account.Address))
 			for shardID, balanceNonce := range FetchBalance(account.Address) {
-				fmt.Printf("    Balance in Shard %d:  %s, nonce: %v \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance), balanceNonce.nonce)
+				if balanceNonce != nil {
+					fmt.Printf("    Balance in Shard %d:  %s, nonce: %v \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance), balanceNonce.nonce)
+				} else {
+					fmt.Printf("    Balance in Shard %d:  connection failed \n")
+				}
 			}
 		}
 	} else {
 		address := common2.ParseAddr(*balanceAddressPtr)
 		fmt.Printf("Account: %s:\n", common2.MustAddressToBech32(address))
 		for shardID, balanceNonce := range FetchBalance(address) {
-			fmt.Printf("    Balance in Shard %d:  %s, nonce: %v \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance), balanceNonce.nonce)
+			if balanceNonce != nil {
+				fmt.Printf("    Balance in Shard %d:  %s, nonce: %v \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance), balanceNonce.nonce)
+			} else {
+				fmt.Printf("    Balance in Shard %d:  connection failed \n")
+			}
 		}
 	}
 }
@@ -471,8 +479,8 @@ func processTransferCommand() {
 
 	shardIDToAccountState := FetchBalance(senderAddress)
 
-	state, ok := shardIDToAccountState[uint32(shardID)]
-	if !ok {
+	state := shardIDToAccountState[shardID]
+	if state != nil {
 		fmt.Printf("Failed connecting to the shard %d\n", shardID)
 		return
 	}
@@ -563,18 +571,23 @@ func convertBalanceIntoReadableFormat(balance *big.Int) string {
 }
 
 // FetchBalance fetches account balance of specified address from the Harmony network
-func FetchBalance(address common.Address) map[uint32]AccountState {
-	result := make(map[uint32]AccountState)
-	for i := 0; i < walletProfile.Shards; i++ {
+func FetchBalance(address common.Address) []*AccountState {
+	result := []*AccountState{}
+	for shardID := 0; shardID < walletProfile.Shards; shardID++ {
+		// Fill in nil pointers for each shard; nil represent failed balance fetch.
+		result = append(result, nil)
+	}
+
+	for shardID := 0; shardID < walletProfile.Shards; shardID++ {
 		balance := big.NewInt(0)
 		var nonce uint64
 
-		result[uint32(i)] = AccountState{balance, 0}
+		result[uint32(shardID)] = &AccountState{balance, 0}
 
 	LOOP:
-		for j := 0; j < len(walletProfile.RPCServer[i]); j++ {
+		for j := 0; j < len(walletProfile.RPCServer[shardID]); j++ {
 			for retry := 0; retry < rpcRetry; retry++ {
-				server := walletProfile.RPCServer[i][j]
+				server := walletProfile.RPCServer[shardID][j]
 				client, err := clientService.NewClient(server.IP, server.Port)
 				if err != nil {
 					continue
@@ -597,7 +610,7 @@ func FetchBalance(address common.Address) map[uint32]AccountState {
 				break LOOP
 			}
 		}
-		result[uint32(i)] = AccountState{balance, nonce}
+		result[shardID] = &AccountState{balance, nonce}
 	}
 	return result
 }
