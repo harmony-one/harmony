@@ -35,7 +35,7 @@ type Consensus struct {
 	// phase: different phase of PBFT protocol: pre-prepare, prepare, commit, finish etc
 	phase PbftPhase
 	// mode: indicate a node is in normal or viewchanging mode
-	mode PbftMode
+	mode *PbftMode
 	// blockNum: the next blockNumber that PBFT is going to agree on, should be equal to the blockNumber of next block
 	blockNum uint64
 	// channel to receive consensus message
@@ -236,7 +236,7 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 	// pbft related
 	consensus.PbftLog = NewPbftLog()
 	consensus.phase = Announce
-	consensus.mode = PbftMode{mode: Normal}
+	consensus.mode = &PbftMode{mode: Normal}
 	// pbft timeout
 	consensus.consensusTimeout = createTimeout()
 
