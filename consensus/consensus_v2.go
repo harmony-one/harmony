@@ -78,7 +78,7 @@ func (consensus *Consensus) tryAnnounce(block *types.Block) {
 	}
 	consensus.block = encodedBlock
 	msgToSend := consensus.constructAnnounceMessage()
-	consensus.switchPhase(Prepare, false)
+	consensus.switchPhase(Prepare, true)
 
 	// save announce message to pbftLog
 	msgPayload, _ := proto.GetConsensusMessagePayload(msgToSend)
@@ -117,7 +117,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		return
 	}
 	if !senderKey.IsEqual(consensus.LeaderPubKey) && consensus.mode.Mode() == Normal && !consensus.ignoreViewIDCheck {
-		utils.GetLogger().Warn("onAnnounce senderKey not match leader PubKey", "senderKey", senderKey.GetHexString()[:10], "leaderKey", consensus.LeaderPubKey.GetHexString()[:10])
+		utils.GetLogger().Warn("onAnnounce senderKey not match leader PubKey", "senderKey", senderKey.SerializeToHexStr()[:10], "leaderKey", consensus.LeaderPubKey.SerializeToHexStr()[:10])
 		return
 	}
 	if err = verifyMessageSig(senderKey, msg); err != nil {
@@ -209,12 +209,12 @@ func (consensus *Consensus) tryPrepare(blockHash common.Hash) {
 		return
 	}
 
-	if consensus.phase != Announce || consensus.blockNum != block.NumberU64() || !consensus.pbftLog.HasMatchingViewAnnounce(consensus.blockNum, consensus.viewID, hash) {
+	if consensus.blockNum != block.NumberU64() || !consensus.pbftLog.HasMatchingViewAnnounce(consensus.blockNum, consensus.viewID, hash) {
 		utils.GetLogger().Debug("not match", "myPhase", consensus.phase, "myBlock", consensus.blockNum, "viewID", consensus.viewID)
 		return
 	}
 
-	consensus.switchPhase(Prepare, false)
+	consensus.switchPhase(Prepare, true)
 
 	// Construct and send prepare message
 	msgToSend := consensus.constructPrepareMessage()
@@ -249,7 +249,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		return
 	}
 
-	if recvMsg.ViewID != consensus.viewID || recvMsg.BlockNum != consensus.blockNum || consensus.phase != Prepare {
+	if recvMsg.ViewID != consensus.viewID || recvMsg.BlockNum != consensus.blockNum {
 		utils.GetLogger().Debug("onPrepare message not match", "myPhase", consensus.phase, "myViewID", consensus.viewID,
 			"msgViewID", recvMsg.ViewID, "myBlockNum", consensus.blockNum, "msgBlockNum", recvMsg.BlockNum)
 		return
@@ -302,7 +302,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	}
 
 	if len(prepareSigs) >= consensus.Quorum() {
-		consensus.switchPhase(Commit, false)
+		consensus.switchPhase(Commit, true)
 		// Construct and broadcast prepared message
 		msgToSend, aggSig := consensus.constructPreparedMessage()
 		consensus.aggregatedPrepareSig = aggSig
@@ -415,13 +415,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	consensus.aggregatedPrepareSig = aggSig
 	consensus.prepareBitmap = mask
 
-	if consensus.phase != Prepare {
-		utils.GetLogger().Debug("we are in a wrong phase",
-			"actualPhase", consensus.phase,
-			"expectedPhase", Prepare)
-		return
-	}
-
 	// Construct and send the commit message
 	blockNumHash := make([]byte, 8)
 	binary.LittleEndian.PutUint64(blockNumHash, consensus.blockNum)
@@ -434,7 +427,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		logger.Debug("sent commit message")
 	}
 
-	consensus.switchPhase(Commit, false)
+	consensus.switchPhase(Commit, true)
 
 	return
 }
@@ -461,7 +454,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		return
 	}
 
-	if recvMsg.ViewID != consensus.viewID || recvMsg.BlockNum != consensus.blockNum || consensus.phase != Commit {
+	if recvMsg.ViewID != consensus.viewID || recvMsg.BlockNum != consensus.blockNum {
 		utils.GetLogger().Debug("not match", "myViewID", consensus.viewID, "viewID", recvMsg.ViewID, "myBlock", consensus.blockNum, "block", recvMsg.BlockNum, "myPhase", consensus.phase, "phase", Commit)
 		return
 	}
@@ -535,7 +528,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 
 func (consensus *Consensus) finalizeCommits() {
 	utils.GetLogger().Info("finalizing block", "num", len(consensus.commitSigs), "phase", consensus.phase)
-	consensus.switchPhase(Announce, false)
+	consensus.switchPhase(Announce, true)
 
 	// Construct and broadcast committed message
 	msgToSend, aggSig := consensus.constructCommittedMessage()

@@ -111,7 +111,7 @@ func setUpTXGen() *node.Node {
 	endIdx := startIdx + core.GenesisShardSize
 	for _, acct := range genesis.GenesisAccounts[startIdx:endIdx] {
 		secretKey := bls2.SecretKey{}
-		if err := secretKey.SetHexString(acct.BlsPriKey); err != nil {
+		if err := secretKey.DeserializeHexStr(acct.BlsPriKey); err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "cannot parse secret key: %v\n",
 				err)
 			os.Exit(1)

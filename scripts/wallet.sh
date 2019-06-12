@@ -40,6 +40,7 @@ Actions:
         --amount         - The amount of token to transfer
         --shardID        - The shard Id for the transfer
         --inputData      - Base64-encoded input data to embed in the transaction
+    8. blsgen        - Generates bls keys with passphrase and store the private key locally
 EOT
 	exit 0
 }
