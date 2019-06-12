@@ -59,7 +59,7 @@ var GenesisFNAccounts = [...]DeployAccount{
 	{Address: "one10746sav20n8h4gm3sevj3vfydtpv6vpksv2065", BlsPriKey: "d71db7ef78e1d2e5b89ab5834f8cad74393c96554cb388006b5c0063fbc2184c"},
 	{Address: "0x87a157db95dc3517Eb578d4cedee92a5ab275BD5", BlsPriKey: "917929a073714aa2a9bf5776b14bee7d116967241d1c01711ea3c2f62d830f41"},
 	{Address: "0x880D5c6aD4117D26126543Af48f2f9bCDd4DaA0A", BlsPriKey: "aa6599d626b55a3e0f818ee83d728003030f8214181092717f03681b0afcf355"},
-	{Address: "one1rfaajrvn5zdfxydf5wkvrwsyylza6205xap9x0", BlsPriKey: "ccf9344200b12a4ed9c6c4b37ce854c0cbad4cbfffeed18dfe7c46efaf2a300f"},
+	{Address: "one18683c2vyr4xdv4wd3ley8wd250pnmxn346s4qq", BlsPriKey: "ccf9344200b12a4ed9c6c4b37ce854c0cbad4cbfffeed18dfe7c46efaf2a300f"},
 	{Address: "0x8dc63cCA875eAd38d9554bB97171a4f18AbE92E7", BlsPriKey: "a49c1af4dcc1b9845c46f97304eda460e1f76f7a602c471f8471cda544de474e"},
 
 	// 50 - 59
