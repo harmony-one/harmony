@@ -71,7 +71,7 @@ var GenesisFNAccounts = [...]DeployAccount{
 	{Address: "0xA41F4dDd1b11A6107f1973037D070869495e71E4", BlsPriKey: "973641a9a2f31572f38f789d772e698833da413d4234ca10fd82976b2ff68d6f"},
 	{Address: "0x5a22c7ec1579C0d87760F4C8ec32fBE24d40E1Dc", BlsPriKey: "78c2d7215e63bfe22fb3f8052bf2607dc2b01815dbc7ae30fcc540a75aeaf01b"},
 	{Address: "0xD499fAC5afa17b5705B91838753Bfbf2e20138e4", BlsPriKey: "788b18e4b3480e4e22a7612a5bba18a07c1ce2ca63d98473c50c8ef0bcfe2b22"},
-	{Address: "                                          ", BlsPriKey: "0fb470757299aa687196bb09d7bdb3d65b991cff679aeeac282d02b01ec9b22b"},
+	{Address: "0xfF86Ff1FF457c3eBc18D71ffA30cfedd0860559c", BlsPriKey: "0fb470757299aa687196bb09d7bdb3d65b991cff679aeeac282d02b01ec9b22b"},
 	{Address: "0xB4018FF5B888e902bD952D6e55A5cDbd8C73Ac1A", BlsPriKey: "356fe79d613c2cb90d8f4617d803153e3f4c30727afec45ddaadd790a87a5d14"},
 
 	// 60 - 69
@@ -87,11 +87,11 @@ var GenesisFNAccounts = [...]DeployAccount{
 	{Address: "0x35D29200aFC9A4cDC05166096059a042078CB53e", BlsPriKey: "d54f56fd7bbef9b3e73de868a9414884c2617da2bc5f314ea0c36fc821848312"},
 
 	// 70 - 79
-	{Address: "                                          ", BlsPriKey: "2b1830345d134ea5d1b9cdf9d93af3abca5d90a86dbfc4beed98a749a9254332"},
+	{Address: "0xe4a69826534aD3f6ec6E432474B0380E7F9a9C3d", BlsPriKey: "2b1830345d134ea5d1b9cdf9d93af3abca5d90a86dbfc4beed98a749a9254332"},
 	{Address: "0xE2ab78ecf325084485957B2599d53Bcf944Cbca8", BlsPriKey: "080fde81e06a194228eadcb573edeb0e3c445295435d32401c404934ea58cb09"},
 	{Address: "0xEC7C495866689d6b7E335D810645F440f16F86d0", BlsPriKey: "1ec4cac69876c5339c16c5c48c31ac32164574007dc4d674f8f6fee6735b6f4d"},
 	{Address: "0xcb0A6c1914d2AD10855cC8cD70B040b7Dc6573a8", BlsPriKey: "ad0cc9631a98e5f527cee84f7daa2d24faa8d3714fd28c5d73c4e21c6ba3c13f"},
-	{Address: "                                          ", BlsPriKey: "672ccacc49f216aec996eceb74f63ff8beb1e53361146963452859b0dcafb728"},
+	{Address: "0xf10f63f5Bd46c58d2e9530E7F8cb6b4336D05d4E", BlsPriKey: "672ccacc49f216aec996eceb74f63ff8beb1e53361146963452859b0dcafb728"},
 	{Address: "                                          ", BlsPriKey: "b393c776a159098e0acdf67ba63f1d1a26760b9bcfe9f656da5aa85cd02fc43a"},
 	{Address: "0xa3B34f4E21C6c44A603E3c53abbF8b10C7BdaF59", BlsPriKey: "fbc7a2efb93e3fdd87136aa9a87e59040e2af25ae176e1519af92aff35d6570f"},
 	{Address: "!", BlsPriKey: "51a79e8fdce95c39fc33a8ec890783746f56e3700a8b2cc3f98e94248d07103a"},
@@ -105,16 +105,16 @@ var GenesisFNAccounts = [...]DeployAccount{
 	{Address: "                                          ", BlsPriKey: "00a3cb66218c2cd3efa31bcbe783ff920fb356ad31f14683ca8ceb131d774d0b"},
 	{Address: "0xdA1DF648bC047546326D05dF370ec0ee3D84642A", BlsPriKey: "e4db03641de29ccbc3531705d7702db8e77684d097d6cdb4b29ee754ad9c913b"},
 	{Address: "!", BlsPriKey: "85ae5067e08574799143cca66da055f4a2db065c3d451235acfaec90c2965f4e"},
-	{Address: "0xf10f63f5Bd46c58d2e9530E7F8cb6b4336D05d4E", BlsPriKey: "46bb0a5c47db2c94a456fd07690543db3f50710513814655d5eef13443a3b122"},
+	{Address: "!", BlsPriKey: "46bb0a5c47db2c94a456fd07690543db3f50710513814655d5eef13443a3b122"},
 	{Address: "                                          ", BlsPriKey: "107062c37224ef8123653a1f3c92e3ceb76e9f6c346808c71bdb165848c47f28"},
 	{Address: "0xfdc963E875Ea99E434e4B815b7d8Bf506dAA9222", BlsPriKey: "4a75d92d2b0ec874bd3c8fdf8fd46ecc0ab18aa31581c013acc6a25b610f2c68"},
 	{Address: "!", BlsPriKey: "af96cd1118284a8a5916359b7fa566346f2017eadc0d3efcaf67cffe374bf724"},
 
 	// 90 - 99
-	{Address: "0xe4a69826534aD3f6ec6E432474B0380E7F9a9C3d", BlsPriKey: "77da1ed33a8b00b2a227902f53045ed15aa2af735cb17ddbe5d42bcb29cda363"},
+	{Address: "!", BlsPriKey: "77da1ed33a8b00b2a227902f53045ed15aa2af735cb17ddbe5d42bcb29cda363"},
 	{Address: "0x74e0014c9899c82f05F6AC110583F9f7dCC36508", BlsPriKey: "49decb0f0d35ab8882b253a130f987a6d8dc8ee63b1df340c5ac953d68362790"},
 	{Address: "!", BlsPriKey: "4fc4c886c8c5ae820848c6be9c9eafe1012f69cefc17aa790f4ce9daaf0cfae0"},
 	{Address: "!", BlsPriKey: "51b5dce64da6a543fd171f2a1309347792767e1258c4cb4a9594311a162b9fb6"},
-	{Address: "0xfF86Ff1FF457c3eBc18D71ffA30cfedd0860559c", BlsPriKey: "4b0d338b30a055bee3e2f070adc93d341b9316a315b4b4efe1639f0be2c1c10b"},
+	{Address: "!", BlsPriKey: "4b0d338b30a055bee3e2f070adc93d341b9316a315b4b4efe1639f0be2c1c10b"},
 	{Address: "0xff1bE0eAC9B6053CD656947F0CcE7d277FF720Ec", BlsPriKey: "d94e179e77a8bf71206b2232eb826a9b5f8a64c55d919411263511e3a2ce7407"},
 }
