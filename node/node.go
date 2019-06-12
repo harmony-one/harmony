@@ -298,7 +298,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 	}
 
 	// Create test keys.  Genesis will later need this.
-	node.TestBankKeys, err = CreateTestBankKeys(FakeAddressNumber)
+	node.TestBankKeys, err = CreateTestBankKeys(TestAccountNumber)
 	if err != nil {
 		utils.GetLogInstance().Crit("Error while creating test keys",
 			"error", err)
