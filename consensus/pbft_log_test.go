@@ -19,7 +19,7 @@ func constructAnnounceMessage(t *testing.T) []byte {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := New(host, 0, leader, bls.RandPrivateKey())
+	consensus, err := New(host, 0, leader, bls.RandPrivateKey(), false, 0)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}

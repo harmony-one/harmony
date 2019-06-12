@@ -24,7 +24,7 @@ func TestGetPeerFromID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := New(host, 0, leader, leaderPriKey)
+	consensus, err := New(host, 0, leader, leaderPriKey, false, 0)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
@@ -43,7 +43,7 @@ func TestPopulateMessageFields(t *testing.T) {
 		t.Fatalf("newhost failure: %v", err)
 	}
 	blsPriKey := bls.RandPrivateKey()
-	consensus, err := New(host, 0, leader, blsPriKey)
+	consensus, err := New(host, 0, leader, blsPriKey, false, 0)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
@@ -77,7 +77,7 @@ func TestSignAndMarshalConsensusMessage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := New(host, 0, leader, bls.RandPrivateKey())
+	consensus, err := New(host, 0, leader, bls.RandPrivateKey(), false, 0)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
@@ -103,7 +103,7 @@ func TestSetViewID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := New(host, 0, leader, bls.RandPrivateKey())
+	consensus, err := New(host, 0, leader, bls.RandPrivateKey(), false, 0)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}

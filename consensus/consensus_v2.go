@@ -416,6 +416,11 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	commitPayload := append(blockNumHash, consensus.blockHash[:]...)
 	msgToSend := consensus.constructCommitMessage(commitPayload)
 
+	// TODO: genesis account node delay for 1 second, this is a temp fix for allows FN nodes to earning reward
+	if consensus.isHarmonyAccount && consensus.delayCommit > 0 {
+		time.Sleep(time.Duration(consensus.delayCommit) * time.Millisecond)
+	}
+
 	if err := consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
 		consensus.getLogger().Warn("cannot send commit message")
 	} else {
