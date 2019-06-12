@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"time"
 
 	ffi_bls "github.com/harmony-one/bls/ffi/go/bls"
@@ -53,11 +54,27 @@ func GenBlsKeyWithPassPhrase(passphrase string) (*ffi_bls.SecretKey, string) {
 	fileName := keyFileName(publickKey)
 	privateKeyHex := privateKey.SerializeToHexStr()
 	// Encrypt with passphrase
-	encryptedPrivateKeyBytes := encrypt([]byte(privateKeyHex), passphrase)
+	encryptedPrivateKeyStr := encrypt([]byte(privateKeyHex), passphrase)
 	// Write to file.
-	err := ioutil.WriteFile(fileName, encryptedPrivateKeyBytes, 0600)
+	err := WriteToFile(fileName, encryptedPrivateKeyStr)
 	check(err)
 	return privateKey, fileName
+}
+
+// WriteToFile will print any string of text to a file safely by
+// checking for errors and syncing at the end.
+func WriteToFile(filename string, data string) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	_, err = io.WriteString(file, data)
+	if err != nil {
+		return err
+	}
+	return file.Sync()
 }
 
 // LoadBlsKeyWithPassPhrase loads bls key with passphrase.
@@ -77,7 +94,7 @@ func createHash(key string) string {
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 
-func encrypt(data []byte, passphrase string) []byte {
+func encrypt(data []byte, passphrase string) string {
 	block, _ := aes.NewCipher([]byte(createHash(passphrase)))
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
@@ -88,10 +105,11 @@ func encrypt(data []byte, passphrase string) []byte {
 		panic(err.Error())
 	}
 	ciphertext := gcm.Seal(nonce, nonce, data, nil)
-	return ciphertext
+	return hex.EncodeToString(ciphertext)
 }
 
-func decrypt(data []byte, passphrase string) []byte {
+func decrypt(encryptedStr string, passphrase string) []byte {
+	var err error
 	key := []byte(createHash(passphrase))
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -101,6 +119,11 @@ func decrypt(data []byte, passphrase string) []byte {
 	if err != nil {
 		panic(err.Error())
 	}
+	data, err := hex.DecodeString(encryptedStr)
+	if err != nil {
+		panic(err.Error())
+	}
+
 	nonceSize := gcm.NonceSize()
 	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
 	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
