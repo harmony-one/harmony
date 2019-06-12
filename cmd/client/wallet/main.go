@@ -87,7 +87,7 @@ var (
 	freeTokenCommand    = flag.NewFlagSet("getFreeToken", flag.ExitOnError)
 	freeTokenAddressPtr = freeTokenCommand.String("address", "", "Specify the account address to receive the free token")
 
-	balanceCommand    = flag.NewFlagSet("getFreeToken", flag.ExitOnError)
+	balanceCommand    = flag.NewFlagSet("balances", flag.ExitOnError)
 	balanceAddressPtr = balanceCommand.String("address", "", "Specify the account address to check balance for")
 )
 
@@ -571,24 +571,31 @@ func FetchBalance(address common.Address) map[uint32]AccountState {
 
 		result[uint32(i)] = AccountState{balance, 0}
 
-		for retry := 0; retry < rpcRetry; retry++ {
-			server := walletProfile.RPCServer[i][rand.Intn(len(walletProfile.RPCServer[i]))]
-			client, err := clientService.NewClient(server.IP, server.Port)
-			if err != nil {
-				continue
-			}
+	LOOP:
+		for j := 0; j < len(walletProfile.RPCServer[i]); j++ {
+			for retry := 0; retry < rpcRetry; retry++ {
+				server := walletProfile.RPCServer[i][j]
+				client, err := clientService.NewClient(server.IP, server.Port)
+				if err != nil {
+					continue
+				}
 
-			log.Debug("FetchBalance", "server", server)
-			response, err := client.GetBalance(address)
-			if err != nil {
-				log.Info("failed to get balance, retrying ...")
-				time.Sleep(200 * time.Millisecond)
-				continue
+				log.Debug("FetchBalance", "server", server)
+				response, err := client.GetBalance(address)
+				if err != nil {
+					log.Info("failed to get balance, retrying ...")
+					time.Sleep(200 * time.Millisecond)
+					continue
+				}
+				log.Debug("FetchBalance", "response", response)
+				respBalance := big.NewInt(0)
+				respBalance.SetBytes(response.Balance)
+				if balance.Cmp(respBalance) < 0 {
+					balance.SetBytes(response.Balance)
+					nonce = response.Nonce
+				}
+				break LOOP
 			}
-			log.Debug("FetchBalance", "response", response)
-			balance.SetBytes(response.Balance)
-			nonce = response.Nonce
-			break
 		}
 		result[uint32(i)] = AccountState{balance, nonce}
 	}
