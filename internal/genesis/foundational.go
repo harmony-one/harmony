@@ -2,9 +2,6 @@ package genesis
 
 // GenesisFNAccounts are the ECSDA accounts for the foundational nodes.
 var GenesisFNAccounts = [...]DeployAccount{
-	{Address: "0x35D29200aFC9A4cDC05166096059a042078CB53e", BlsPriKey: "af96cd1118284a8a5916359b7fa566346f2017eadc0d3efcaf67cffe374bf724"},
-	{Address: "0xe4a69826534aD3f6ec6E432474B0380E7F9a9C3d", BlsPriKey: "77da1ed33a8b00b2a227902f53045ed15aa2af735cb17ddbe5d42bcb29cda363"},
-
 	// 0 - 9
 	{Address: "0x04c3636dF766ad2d3E74424c016842f5704FAE3A", BlsPriKey: "ff889b96e38934c08ea158ce32fb94ec605180a4f665ed378aea9b9ac1c39320"},
 	{Address: "0x053515CC2CAae77F7e2F0A9C48A27c8f6D76E99d", BlsPriKey: "aedc22d8d56a316ae67b05605deaa4981cdd0cd1aacbe5b7a0bf1b7caa23146d"},
