@@ -263,7 +263,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	// Consensus keys are the BLS12-381 keys used to sign consensus messages
 	nodeConfig.ConsensusPriKey, nodeConfig.ConsensusPubKey = consensusPriKey, consensusPriKey.GetPublicKey()
 	if nodeConfig.ConsensusPriKey == nil || nodeConfig.ConsensusPubKey == nil {
-		panic(fmt.Errorf("Failed to initialize BLS keys: %s", consensusPriKey))
+		panic(fmt.Errorf("Failed to initialize BLS keys: %s", consensusPriKey.SerializeToHexStr()))
 	}
 	// Key Setup ================= [End]
 
