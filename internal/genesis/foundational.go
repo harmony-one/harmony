@@ -69,7 +69,7 @@ var GenesisFNAccounts = [...]DeployAccount{
 	{Address: "0xB88AB7A6678c87aeBE7b753459258012eb2Cc76c", BlsPriKey: "15f9a467aaf80abe0471c317b490902d174c9b498c456d67bdcfba22f593be60"},
 	{Address: "0xA28e6f8D23cc3Fe77D531c7D60bd73F8fD71C5c7", BlsPriKey: "f0fb598b4becc13127c060302b5938915777b2b9c96028ae4bace6fed312923b"},
 	{Address: "0xA41F4dDd1b11A6107f1973037D070869495e71E4", BlsPriKey: "973641a9a2f31572f38f789d772e698833da413d4234ca10fd82976b2ff68d6f"},
-	{Address: "                                          ", BlsPriKey: "78c2d7215e63bfe22fb3f8052bf2607dc2b01815dbc7ae30fcc540a75aeaf01b"},
+	{Address: "0x5a22c7ec1579C0d87760F4C8ec32fBE24d40E1Dc", BlsPriKey: "78c2d7215e63bfe22fb3f8052bf2607dc2b01815dbc7ae30fcc540a75aeaf01b"},
 	{Address: "0xD499fAC5afa17b5705B91838753Bfbf2e20138e4", BlsPriKey: "788b18e4b3480e4e22a7612a5bba18a07c1ce2ca63d98473c50c8ef0bcfe2b22"},
 	{Address: "                                          ", BlsPriKey: "0fb470757299aa687196bb09d7bdb3d65b991cff679aeeac282d02b01ec9b22b"},
 	{Address: "0xB4018FF5B888e902bD952D6e55A5cDbd8C73Ac1A", BlsPriKey: "356fe79d613c2cb90d8f4617d803153e3f4c30727afec45ddaadd790a87a5d14"},
@@ -113,7 +113,7 @@ var GenesisFNAccounts = [...]DeployAccount{
 	// 90 - 99
 	{Address: "0xe4a69826534aD3f6ec6E432474B0380E7F9a9C3d", BlsPriKey: "77da1ed33a8b00b2a227902f53045ed15aa2af735cb17ddbe5d42bcb29cda363"},
 	{Address: "0x74e0014c9899c82f05F6AC110583F9f7dCC36508", BlsPriKey: "49decb0f0d35ab8882b253a130f987a6d8dc8ee63b1df340c5ac953d68362790"},
-	{Address: "0x5a22c7ec1579C0d87760F4C8ec32fBE24d40E1Dc", BlsPriKey: "4fc4c886c8c5ae820848c6be9c9eafe1012f69cefc17aa790f4ce9daaf0cfae0"},
+	{Address: "!", BlsPriKey: "4fc4c886c8c5ae820848c6be9c9eafe1012f69cefc17aa790f4ce9daaf0cfae0"},
 	{Address: "!", BlsPriKey: "51b5dce64da6a543fd171f2a1309347792767e1258c4cb4a9594311a162b9fb6"},
 	{Address: "0xfF86Ff1FF457c3eBc18D71ffA30cfedd0860559c", BlsPriKey: "4b0d338b30a055bee3e2f070adc93d341b9316a315b4b4efe1639f0be2c1c10b"},
 	{Address: "0xff1bE0eAC9B6053CD656947F0CcE7d277FF720Ec", BlsPriKey: "d94e179e77a8bf71206b2232eb826a9b5f8a64c55d919411263511e3a2ce7407"},
