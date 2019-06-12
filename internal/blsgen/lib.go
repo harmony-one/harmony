@@ -9,11 +9,17 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
+	"path/filepath"
 	"time"
 
 	ffi_bls "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/crypto/bls"
+)
+
+const (
+	BlsPriKeyStore = ".hmy/blsstore/"
 )
 
 func toISO8601(t time.Time) string {
@@ -92,6 +98,39 @@ func createHash(key string) string {
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 
+func visit(files *[]string) filepath.WalkFunc {
+	return func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			log.Fatal(err)
+		}
+		fi, err := os.Stat(path)
+		if !fi.Mode().IsDir() {
+			*files = append(*files, path)
+		}
+		return nil
+	}
+}
+
+// FindBlsPriKey finds bls private key from bls private store with passphrase.
+func FindBlsPriKey(BlsPublicKey, blsPass string, consensusPriKey *ffi_bls.SecretKey) bool {
+	var files []string
+	var err error
+	if _, err = os.Stat(BlsPriKeyStore); os.IsNotExist(err) {
+		return false
+	}
+
+	err = filepath.Walk(BlsPriKeyStore, visit(&files))
+	check(err)
+	for _, f := range files {
+		k := LoadBlsKeyWithPassPhrase(f, blsPass)
+		if k.GetPublicKey().SerializeToHexStr() == BlsPublicKey {
+			consensusPriKey = k
+			return true
+		}
+	}
+	return false
+}
+
 func encrypt(data []byte, passphrase string) string {
 	block, _ := aes.NewCipher([]byte(createHash(passphrase)))
 	gcm, err := cipher.NewGCM(block)
@@ -134,6 +173,6 @@ func decrypt(encryptedStr string, passphrase string) []byte {
 func check(err error) {
 	// handle this error
 	if err != nil {
-		fmt.Println(err)
+		panic(err)
 	}
 }

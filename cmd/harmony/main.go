@@ -103,6 +103,7 @@ var (
 	enableGC           = flag.Bool("enableGC", true, "Enable calling garbage collector manually .")
 	blsPrivateKey      = flag.String("blskey", "", "Bls serialized private key.")
 	blsKeyFile         = flag.String("blskey_file", "", "The file of bls serialized private key with passphrase.")
+	blsPass            = flag.String("blskey_pass", "", "The file of bls serialized private key with passphrase.")
 
 	// logConn logs incoming/outgoing connections
 	logConn = flag.Bool("log_conn", false, "log incoming/outgoing connections")
@@ -227,6 +228,15 @@ func setUpConsensusKey(nodeConfig *nodeconfig.ConfigType) {
 		consensusPriKey = blsgen.LoadBlsKeyWithPassPhrase(*blsKeyFile, myPass)
 	} else {
 		// This is harmony node running.
+		if *blsPass == "" {
+			fmt.Println("Internal nodes need to have pass to decrypt blskey")
+			os.Exit(101)
+		}
+		// Trying to find BlsPriKey based on genesisAccount.BlsPublicKey
+		if !blsgen.FindBlsPriKey(genesisAccount.BlsPublicKey, *blsPass, consensusPriKey) {
+			fmt.Println("Can not find bls private key with the given passphrase ", *blsPass)
+			os.Exit(101)
+		}
 	}
 
 	// Consensus keys are the BLS12-381 keys used to sign consensus messages
