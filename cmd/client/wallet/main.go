@@ -404,7 +404,7 @@ func processBalancesCommand() {
 				if balanceNonce != nil {
 					fmt.Printf("    Balance in Shard %d:  %s, nonce: %v \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance), balanceNonce.nonce)
 				} else {
-					fmt.Printf("    Balance in Shard %d:  connection failed \n")
+					fmt.Println("    Balance in Shard %d:  connection failed")
 				}
 			}
 		}
@@ -415,7 +415,7 @@ func processBalancesCommand() {
 			if balanceNonce != nil {
 				fmt.Printf("    Balance in Shard %d:  %s, nonce: %v \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance), balanceNonce.nonce)
 			} else {
-				fmt.Printf("    Balance in Shard %d:  connection failed \n")
+				fmt.Println("    Balance in Shard %d:  connection failed")
 			}
 		}
 	}
