@@ -459,8 +459,8 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		return
 	}
 
-	if !consensus.pbftLog.HasMatchingViewPrepared(consensus.blockNum, consensus.viewID, recvMsg.BlockHash) {
-		consensus.getLogger().Debug("cannot find matching prepared message")
+	if !consensus.pbftLog.HasMatchingPrepared(consensus.blockNum, recvMsg.BlockHash) {
+		consensus.getLogger().Debug("cannot find matching prepared message", "blockHash", recvMsg.BlockHash)
 		return
 	}
 

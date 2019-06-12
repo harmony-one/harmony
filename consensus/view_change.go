@@ -199,8 +199,6 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		return
 	}
 
-	consensus.getLogger().Warn("onViewChange received", "msgViewID", recvMsg.ViewID)
-
 	if consensus.blockNum > recvMsg.BlockNum {
 		return
 	}
@@ -302,6 +300,15 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			}
 			if len(consensus.m1Payload) == 0 {
 				consensus.m1Payload = append(recvMsg.Payload[:0:0], recvMsg.Payload...)
+				// create prepared message
+				preparedMsg := PbftMessage{MessageType: msg_pb.MessageType_PREPARED, ViewID: recvMsg.ViewID, BlockNum: recvMsg.BlockNum}
+				preparedMsg.BlockHash = common.Hash{}
+				copy(preparedMsg.BlockHash[:], recvMsg.Payload[:32])
+				preparedMsg.Payload = make([]byte, len(recvMsg.Payload)-32)
+				copy(preparedMsg.Payload[:], recvMsg.Payload[32:])
+				preparedMsg.SenderPubkey = consensus.PubKey
+				consensus.getLogger().Info("new leader prepared message added")
+				consensus.pbftLog.AddMessage(&preparedMsg)
 			}
 		}
 		consensus.bhpSigs[validatorAddress] = recvMsg.ViewchangeSig
@@ -415,21 +422,18 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		}
 	}
 
-	if m3Mask == nil || m2Mask == nil {
-		consensus.getLogger().Error("onNewView m3Mask or m2Mask is nil")
+	if m3Mask == nil || m3Mask.Bitmap == nil {
+		consensus.getLogger().Error("onNewView m3Mask or m3Mask.Bitmap is nil")
 		return
 	}
 
 	// check when M3 sigs > M2 sigs, then M1 (recvMsg.Payload) should not be empty
-	if utils.CountOneBits(m3Mask.Bitmap) > utils.CountOneBits(m2Mask.Bitmap) {
+	if m2Mask == nil || m2Mask.Bitmap == nil || (m2Mask != nil && m2Mask.Bitmap != nil && utils.CountOneBits(m3Mask.Bitmap) > utils.CountOneBits(m2Mask.Bitmap)) {
 		if len(recvMsg.Payload) <= 32 {
 			consensus.getLogger().Debug("we should have m1 message payload non-empty and valid")
 			return
 		}
-	}
-
-	// check validity of m1 type payload
-	if len(recvMsg.Payload) > 32 {
+		// m1 is not empty, check it's valid
 		blockHash := recvMsg.Payload[:32]
 		aggSig, mask, err := consensus.readSignatureBitmapPayload(recvMsg.Payload, 32)
 		if err != nil {
