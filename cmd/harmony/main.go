@@ -216,6 +216,7 @@ func initSetup() {
 func setUpConsensusKey(nodeConfig *nodeconfig.ConfigType) {
 	consensusPriKey := &bls.SecretKey{}
 
+	// If FN node running, they should either specify blsPrivateKey or the file with passphrase
 	if *blsPrivateKey != "" {
 		consensusPriKey.DeserializeHexStr(*blsPrivateKey)
 	} else if *blsKeyFile != "" {
@@ -224,6 +225,8 @@ func setUpConsensusKey(nodeConfig *nodeconfig.ConfigType) {
 			myPass = utils.AskForPassphrase("Passphrase to decrypt bls key from the file")
 		}
 		consensusPriKey = blsgen.LoadBlsKeyWithPassPhrase(*blsKeyFile, myPass)
+	} else {
+		// This is harmony node running.
 	}
 
 	// Consensus keys are the BLS12-381 keys used to sign consensus messages
