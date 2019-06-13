@@ -795,7 +795,6 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 				}
 
 			case <-consensus.syncReadyChan:
-				consensus.mode.SetMode(Normal)
 				consensus.SetBlockNum(consensus.ChainReader.CurrentHeader().Number.Uint64() + 1)
 				consensus.ignoreViewIDCheck = true
 
