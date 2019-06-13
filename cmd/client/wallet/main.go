@@ -436,7 +436,6 @@ func formatAddressCommand() {
 
 	if *formatAddressPtr == "" {
 		fmt.Println("Please specify the --address to show formats for.")
-		return
 	} else {
 		address := common2.ParseAddr(*formatAddressPtr)
 
