@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -70,6 +71,10 @@ var (
 	exportCommand           = flag.NewFlagSet("export", flag.ExitOnError)
 	exportCommandAccountPtr = exportCommand.String("account", "", "The account to be exported")
 
+	// ExportPriKey subcommands
+	exportPriKeyCommand           = flag.NewFlagSet("exportPriKey", flag.ExitOnError)
+	exportPriKeyCommandAccountPtr = exportPriKeyCommand.String("account", "", "The account whose private key to be exported")
+
 	// Account subcommands
 	accountImportCommand = flag.NewFlagSet("import", flag.ExitOnError)
 	accountImportPtr     = accountImportCommand.String("privateKey", "", "Specify the private keyfile to import")
@@ -89,6 +94,9 @@ var (
 
 	balanceCommand    = flag.NewFlagSet("balances", flag.ExitOnError)
 	balanceAddressPtr = balanceCommand.String("address", "", "Specify the account address to check balance for")
+
+	formatCommand    = flag.NewFlagSet("format", flag.ExitOnError)
+	formatAddressPtr = formatCommand.String("address", "", "Specify the account address to display different encoding formats")
 )
 
 var (
@@ -138,8 +146,12 @@ func main() {
 		fmt.Println("        --pass           - Passphrase of sender's private key")
 		fmt.Println("    8. export        - Export account key to a new file")
 		fmt.Println("        --account        - Specify the account to export. Empty will export every key.")
-		fmt.Println("    9. blsgen        - Generate a bls key and store private key locally.")
+		fmt.Println("    9. exportPriKey  - Export account private key")
+		fmt.Println("        --account        - Specify the account to export private key.")
+		fmt.Println("   10. blsgen        - Generate a bls key and store private key locally.")
 		fmt.Println("        --nopass         - The private key has no passphrase (for test only)")
+		fmt.Println("   11. format        - Shows different encoding formats of specific address")
+		fmt.Println("        --address        - The address to display the different encoding formats for")
 		os.Exit(1)
 	}
 
@@ -183,6 +195,8 @@ ARG:
 		processListCommand()
 	case "export":
 		processExportCommand()
+	case "exportPriKey":
+		processExportPriKeyCommand()
 	case "blsgen":
 		processBlsgenCommand()
 	case "removeAll":
@@ -198,6 +212,8 @@ ARG:
 	case "transfer":
 		readProfile(profile)
 		processTransferCommand()
+	case "format":
+		formatAddressCommand()
 	default:
 		fmt.Printf("Unknown action: %s\n", os.Args[1])
 		flag.PrintDefaults()
@@ -312,6 +328,19 @@ func _exportAccount(account accounts.Account) {
 	}
 }
 
+func _exportPriKeyAccount(account accounts.Account) {
+	fmt.Printf("account: %s\n", common2.MustAddressToBech32(account.Address))
+	fmt.Printf("URL: %s\n", account.URL)
+	pass := utils.AskForPassphrase("Original Passphrase: ")
+
+	account, key, err := ks.GetDecryptedKey(account, pass)
+	if err != nil {
+		fmt.Printf("Failed to decrypt the account: %s \n", err)
+	} else {
+		fmt.Printf("Private key: %s \n", hex.EncodeToString(key.PrivateKey.D.Bytes()))
+	}
+}
+
 func processListCommand() {
 	if err := listCommand.Parse(os.Args[2:]); err != nil {
 		fmt.Println(ctxerror.New("failed to parse flags").WithCause(err))
@@ -334,8 +363,23 @@ func processExportCommand() {
 
 	allAccounts := ks.Accounts()
 	for _, account := range allAccounts {
-		if acc == "" || acc == common2.MustAddressToBech32(account.Address) {
+		if acc == "" || common2.ParseAddr(acc) == account.Address {
 			_exportAccount(account)
+		}
+	}
+}
+
+func processExportPriKeyCommand() {
+	if err := exportCommand.Parse(os.Args[2:]); err != nil {
+		fmt.Println(ctxerror.New("failed to parse flags").WithCause(err))
+		return
+	}
+	acc := *exportCommandAccountPtr
+
+	allAccounts := ks.Accounts()
+	for _, account := range allAccounts {
+		if acc == "" || common2.ParseAddr(acc) == account.Address {
+			_exportPriKeyAccount(account)
 		}
 	}
 }
@@ -418,6 +462,22 @@ func processBalancesCommand() {
 				fmt.Printf("    Balance in Shard %d:  connection failed \n", shardID)
 			}
 		}
+	}
+}
+
+func formatAddressCommand() {
+	if err := formatCommand.Parse(os.Args[2:]); err != nil {
+		fmt.Println(ctxerror.New("failed to parse flags").WithCause(err))
+		return
+	}
+
+	if *formatAddressPtr == "" {
+		fmt.Println("Please specify the --address to show formats for.")
+	} else {
+		address := common2.ParseAddr(*formatAddressPtr)
+
+		fmt.Printf("account address in Bech32: %s\n", common2.MustAddressToBech32(address))
+		fmt.Printf("account address in Base16 (deprecated): %s\n", address.Hex())
 	}
 }
 
