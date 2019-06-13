@@ -242,7 +242,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	if *isGenesis {
 		err := consensusPriKey.DeserializeHexStr(genesisAccount.BlsPriKey)
 		if err != nil {
-			panic(fmt.Errorf("generate key error"))
+			panic(fmt.Errorf("Failed to parse BLS private key: %s, %s", genesisAccount.BlsPriKey, err))
 		}
 	} else {
 		// NewNode won't work
@@ -263,7 +263,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	// Consensus keys are the BLS12-381 keys used to sign consensus messages
 	nodeConfig.ConsensusPriKey, nodeConfig.ConsensusPubKey = consensusPriKey, consensusPriKey.GetPublicKey()
 	if nodeConfig.ConsensusPriKey == nil || nodeConfig.ConsensusPubKey == nil {
-		panic(fmt.Errorf("generate key error"))
+		panic(fmt.Errorf("Failed to initialize BLS keys: %s", consensusPriKey.SerializeToHexStr()))
 	}
 	// Key Setup ================= [End]
 
