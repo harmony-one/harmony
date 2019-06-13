@@ -107,4 +107,5 @@ var GenesisFNAccounts = [...]DeployAccount{
 	{Address: "0xfC9802AECC486878885F3D36895e209325c4cF8e", BlsPriKey: "6f4de7047da5349a6eb78dd27342ef70c7a20dcfc5a6abb6682cb858e700fd18"},
 	{Address: "0x56151Cda1F9574543d0f5F0b2c33384dbfDf0fb7", BlsPriKey: "d69892c1bf461a46d2132dd2f55de7cb39927080dea56e2c1a38b5cc6cdfc73c"},
 	{Address: "0x2fCb9070db07EB2b63B73a2a9D019dF45530f65D", BlsPriKey: "7355f51383eb59b8fdca818fc74a573de64ab0381c526b46a83599dc8026230a"},
+	{Address: "one1hrdt5e5lepygmj2vfthjzauuc9085lpnfjhha4", BlsPriKey: "00175d1df2edbca24fd403933e8af2397a11753854b234cb9f4b31c5120dbf2d"},
 }
