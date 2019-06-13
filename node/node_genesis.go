@@ -90,7 +90,7 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32) error {
 
 	if shardID == 0 {
 		// Accounts used by validator/nodes to stake and participate in the network.
-		AddNodeAddressesToGenesisAlloc(genesisAlloc)
+		// AddNodeAddressesToGenesisAlloc(genesisAlloc)
 	}
 
 	// TODO: add ShardID into chainconfig and change ChainID to NetworkID
