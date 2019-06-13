@@ -89,6 +89,9 @@ var (
 
 	balanceCommand    = flag.NewFlagSet("balances", flag.ExitOnError)
 	balanceAddressPtr = balanceCommand.String("address", "", "Specify the account address to check balance for")
+
+	formatCommand    = flag.NewFlagSet("format", flag.ExitOnError)
+	formatAddressPtr = formatCommand.String("address", "", "Specify the account address to display different encoding formats")
 )
 
 var (
@@ -140,6 +143,8 @@ func main() {
 		fmt.Println("        --account        - Specify the account to export. Empty will export every key.")
 		fmt.Println("    9. blsgen        - Generate a bls key and store private key locally.")
 		fmt.Println("        --nopass         - The private key has no passphrase (for test only)")
+		fmt.Println("   10. format        - Shows different encoding formats of specific address")
+		fmt.Println("        --address        - The address to display the various format for")
 		os.Exit(1)
 	}
 
@@ -198,6 +203,8 @@ ARG:
 	case "transfer":
 		readProfile(profile)
 		processTransferCommand()
+	case "format":
+		formatAddressCommand()
 	default:
 		fmt.Printf("Unknown action: %s\n", os.Args[1])
 		flag.PrintDefaults()
@@ -418,6 +425,23 @@ func processBalancesCommand() {
 				fmt.Printf("    Balance in Shard %d:  connection failed \n", shardID)
 			}
 		}
+	}
+}
+
+func formatAddressCommand() {
+	if err := formatCommand.Parse(os.Args[2:]); err != nil {
+		fmt.Println(ctxerror.New("failed to parse flags").WithCause(err))
+		return
+	}
+
+	if *formatAddressPtr == "" {
+		fmt.Println("Please specify the --address to show formats for.")
+		return
+	} else {
+		address := common2.ParseAddr(*formatAddressPtr)
+
+		fmt.Printf("account address in Bech32: %s\n", common2.MustAddressToBech32(address))
+		fmt.Printf("account address in Base16 (deprecated): %s\n", address.Hex())
 	}
 }
 
