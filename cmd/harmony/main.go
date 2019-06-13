@@ -95,8 +95,8 @@ var (
 	isGenesis = flag.Bool("is_genesis", true, "true means this node is a genesis node")
 	// isArchival indicates this node is an archival node that will save and archive current blockchain
 	isArchival = flag.Bool("is_archival", false, "true means this node is a archival node")
-	// delayCommit indicate how many ms to delay for harmony node
-	delayCommit = flag.Int("delay_commit_ms", 500, "how many ms delay for harmony node to send commit message in consensus")
+	// delayCommit is the commit-delay timer, used by Harmony nodes
+	delayCommit = flag.String("delay_commit", "500ms", "how long to delay sending commit messages in consensus, ex: 500ms, 1s")
 	//isNewNode indicates this node is a new node
 	isNewNode          = flag.Bool("is_newnode", false, "true means this node is a new node")
 	shardID            = flag.Int("shard_id", -1, "the shard ID of this node")
@@ -300,11 +300,17 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// Consensus object.
 	// TODO: consensus object shouldn't start here
 	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of consensus later.
-	currentConsensus, err := consensus.New(nodeConfig.Host, nodeConfig.ShardID, nodeConfig.Leader, nodeConfig.ConsensusPriKey, *delayCommit)
+	currentConsensus, err := consensus.New(nodeConfig.Host, nodeConfig.ShardID, nodeConfig.Leader, nodeConfig.ConsensusPriKey)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error :%v \n", err)
 		os.Exit(1)
 	}
+	commitDelay, err := time.ParseDuration(*delayCommit)
+	if err != nil || commitDelay < 0 {
+		_, _ = fmt.Fprintf(os.Stderr, "invalid commit delay %#v", *delayCommit)
+		os.Exit(1)
+	}
+	currentConsensus.SetCommitDelay(commitDelay)
 	currentConsensus.MinPeers = *minPeers
 	if *disableViewChange {
 		currentConsensus.DisableViewChangeForTestingOnly()
