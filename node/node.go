@@ -333,7 +333,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		// TODO (leo): we need to have support of cross-shard tx later so that the token can be transferred from beacon chain shard to other tx shards.
 		if node.isFirstTime {
 			// Setup one time smart contracts
-			node.AddFaucetContractToPendingTransactions()
+			//node.AddFaucetContractToPendingTransactions()
 		} else {
 			node.AddContractKeyAndAddress(scFaucet)
 		}

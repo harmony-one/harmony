@@ -251,7 +251,7 @@ func GetInitShardState() types.ShardState {
 			// priKey.DeserializeHexStr(genesis.GenesisFNAccounts[index].BlsPriKey)
 
 			pub := &bls.PublicKey{}
-			pub.DeserializeHexStr(genesis.GenesisAccounts[index].BlsPublicKey)
+			pub.DeserializeHexStr(genesis.GenesisFNAccounts[index].BlsPublicKey)
 
 			pubKey := types.BlsPublicKey{}
 			pubKey.FromLibBLSPublicKey(pub)
