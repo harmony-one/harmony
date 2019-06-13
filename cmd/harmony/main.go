@@ -18,6 +18,7 @@ import (
 	"github.com/harmony-one/harmony/accounts/keystore"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/internal/blsgen"
 	"github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -102,6 +103,9 @@ var (
 	shardID            = flag.Int("shard_id", -1, "the shard ID of this node")
 	enableMemProfiling = flag.Bool("enableMemProfiling", false, "Enable memsize logging.")
 	enableGC           = flag.Bool("enableGC", true, "Enable calling garbage collector manually .")
+	blsPrivateKey      = flag.String("blskey", "", "Bls serialized private key.")
+	blsKeyFile         = flag.String("blskey_file", "", "The file of bls serialized private key with passphrase.")
+	blsPassFile        = flag.String("blspass_file", "", "The file of bls serialized private key with passphrase.")
 
 	// logConn logs incoming/outgoing connections
 	logConn = flag.Bool("log_conn", false, "log incoming/outgoing connections")
@@ -223,6 +227,33 @@ func initSetup() {
 	hmykey.SetHmyPass(myPass)
 }
 
+func setUpConsensusKey(nodeConfig *nodeconfig.ConfigType) {
+	consensusPriKey := &bls.SecretKey{}
+
+	// If FN node running, they should either specify blsPrivateKey or the file with passphrase
+	if *blsPrivateKey != "" {
+		if err := consensusPriKey.DeserializeHexStr(*blsPrivateKey); err != nil {
+			panic(err)
+		}
+	} else if *blsKeyFile != "" && *blsPassFile != "" {
+		passPhrase := utils.ReadStringFromFile(*blsPassFile)
+		consensusPriKey = blsgen.LoadBlsKeyWithPassPhrase(*blsKeyFile, passPhrase)
+		if !genesis.IsBlsPublicKeyWhiteListed(consensusPriKey.GetPublicKey().SerializeToHexStr()) {
+			fmt.Println("Your bls key is not whitelisted")
+			os.Exit(101)
+		}
+	} else {
+		fmt.Println("Internal nodes need to have pass to decrypt blskey")
+		os.Exit(101)
+	}
+
+	// Consensus keys are the BLS12-381 keys used to sign consensus messages
+	nodeConfig.ConsensusPriKey, nodeConfig.ConsensusPubKey = consensusPriKey, consensusPriKey.GetPublicKey()
+	if nodeConfig.ConsensusPriKey == nil || nodeConfig.ConsensusPubKey == nil {
+		panic(fmt.Errorf("generate key error"))
+	}
+}
+
 func createGlobalConfig() *nodeconfig.ConfigType {
 	var err error
 	var myShardID uint32
@@ -249,36 +280,13 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	// The initial genesis nodes are sequentially put into genesis shards based on their accountIndex
 	nodeConfig.ShardID = uint32(genesisAccount.ShardID)
 
-	// Key Setup ================= [Start]
-	consensusPriKey := &bls.SecretKey{}
-
-	if *isGenesis {
-		err := consensusPriKey.DeserializeHexStr(genesisAccount.DummyKey)
-		if err != nil {
-			panic(fmt.Errorf("Failed to parse BLS private key: %s, %s", genesisAccount.DummyKey, err))
-		}
-	} else {
-		// NewNode won't work
-		/*
-			err := consensusPriKey.DeserializeHexStr(genesis.NewNodeAccounts[])
-			if err != nil {
-				panic(fmt.Errorf("generate key error"))
-			}
-		*/
-	}
-
+	// Set up consensus keys.
+	setUpConsensusKey(nodeConfig)
 	// P2p private key is used for secure message transfer between p2p nodes.
 	nodeConfig.P2pPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
 		panic(err)
 	}
-
-	// Consensus keys are the BLS12-381 keys used to sign consensus messages
-	nodeConfig.ConsensusPriKey, nodeConfig.ConsensusPubKey = consensusPriKey, consensusPriKey.GetPublicKey()
-	if nodeConfig.ConsensusPriKey == nil || nodeConfig.ConsensusPubKey == nil {
-		panic(fmt.Errorf("Failed to initialize BLS keys: %s", consensusPriKey.SerializeToHexStr()))
-	}
-	// Key Setup ================= [End]
 
 	nodeConfig.SelfPeer = p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nodeConfig.ConsensusPubKey}
 
