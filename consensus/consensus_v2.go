@@ -417,7 +417,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	msgToSend := consensus.constructCommitMessage(commitPayload)
 
 	// TODO: genesis account node delay for 1 second, this is a temp fix for allows FN nodes to earning reward
-	if consensus.isHarmonyAccount && consensus.delayCommit > 0 {
+	if consensus.delayCommit > 0 {
 		time.Sleep(time.Duration(consensus.delayCommit) * time.Millisecond)
 	}
 

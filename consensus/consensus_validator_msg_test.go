@@ -20,7 +20,7 @@ func TestConstructPrepareMessage(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := New(host, 0, leader, bls.RandPrivateKey(), false, 0)
+	consensus, err := New(host, 0, leader, bls.RandPrivateKey(), 0)
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}
@@ -48,7 +48,7 @@ func TestConstructCommitMessage(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := New(host, 0, leader, bls.RandPrivateKey(), false, 0)
+	consensus, err := New(host, 0, leader, bls.RandPrivateKey(), 0)
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}

@@ -42,8 +42,6 @@ type Consensus struct {
 	// channel to receive consensus message
 	MsgChan chan []byte
 
-	// whether this node belong to genesis accounts
-	isHarmonyAccount bool
 	// unit in ms, how many ms to delay for harmony node to send commit message
 	delayCommit int
 
@@ -200,10 +198,9 @@ type StakeInfoFinder interface {
 
 // New creates a new Consensus object
 // TODO: put shardId into chain reader's chain config
-func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKey, isHarmonyAccount bool, delayCommit int) (*Consensus, error) {
+func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKey, delayCommit int) (*Consensus, error) {
 	consensus := Consensus{}
 	consensus.host = host
-	consensus.isHarmonyAccount = isHarmonyAccount
 	consensus.delayCommit = delayCommit
 	consensus.blockNumLowChan = make(chan struct{})
 

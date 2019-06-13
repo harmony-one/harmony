@@ -113,11 +113,10 @@ var (
 
 	stakingAccounts = flag.String("accounts", "", "account addresses of the node")
 
-	ks               *keystore.KeyStore
-	myAccount        accounts.Account
-	genesisAccount   *genesis.DeployAccount
-	accountIndex     int
-	isHarmonyAccount bool
+	ks             *keystore.KeyStore
+	myAccount      accounts.Account
+	genesisAccount *genesis.DeployAccount
+	accountIndex   int
 
 	// logging verbosity
 	verbosity = flag.Int("verbosity", 5, "Logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail (default: 5)")
@@ -168,7 +167,7 @@ func initSetup() {
 	allAccounts := ks.Accounts()
 
 	// TODO: lc try to enable multiple staking accounts per node
-	accountIndex, genesisAccount, isHarmonyAccount = genesis.FindAccount(*stakingAccounts)
+	accountIndex, genesisAccount = genesis.FindAccount(*stakingAccounts)
 
 	if genesisAccount == nil {
 		fmt.Printf("Can't find the account address: %v!\n", *stakingAccounts)
@@ -301,7 +300,7 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// Consensus object.
 	// TODO: consensus object shouldn't start here
 	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of consensus later.
-	currentConsensus, err := consensus.New(nodeConfig.Host, nodeConfig.ShardID, nodeConfig.Leader, nodeConfig.ConsensusPriKey, isHarmonyAccount, *delayCommit)
+	currentConsensus, err := consensus.New(nodeConfig.Host, nodeConfig.ShardID, nodeConfig.Leader, nodeConfig.ConsensusPriKey, *delayCommit)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error :%v \n", err)
 		os.Exit(1)
