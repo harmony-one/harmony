@@ -2,8 +2,10 @@ package core
 
 import (
 	"encoding/binary"
+	"fmt"
 	"math/big"
 	"math/rand"
+	"os"
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -226,10 +228,16 @@ func GetInitShardState() types.ShardState {
 		com := types.Committee{ShardID: uint32(i)}
 		for j := 0; j < GenesisShardHarmonyNodes; j++ {
 			index := i + j*GenesisShardNum // The initial account to use for genesis nodes
+			pubKey := types.BlsPublicKey{}
+			pub := &bls.PublicKey{}
+			pub.DeserializeHexStr(genesis.GenesisAccounts[index].BlsPublicKey)
 			priKey := bls.SecretKey{}
 			priKey.DeserializeHexStr(genesis.GenesisAccounts[index].BlsPriKey)
-			pubKey := types.BlsPublicKey{}
-			pubKey.FromLibBLSPublicKey(priKey.GetPublicKey())
+			if !pub.IsEqual(priKey.GetPublicKey()) {
+				fmt.Println("SO WRONG")
+				os.Exit(11)
+			}
+			pubKey.FromLibBLSPublicKey(pub)
 			// TODO: directly read address for bls too
 			curNodeID := types.NodeID{common2.ParseAddr(genesis.GenesisAccounts[index].Address), pubKey}
 			com.NodeList = append(com.NodeList, curNodeID)
