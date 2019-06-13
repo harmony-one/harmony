@@ -31,7 +31,7 @@ func TestNewNode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := consensus.New(host, 0, leader, nil, false, 0)
+	consensus, err := consensus.New(host, 0, leader, nil, 0)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
@@ -58,7 +58,7 @@ func TestGetSyncingPeers(t *testing.T) {
 		t.Fatalf("newhost failure: %v", err)
 	}
 
-	consensus, err := consensus.New(host, 0, leader, nil, false, 0)
+	consensus, err := consensus.New(host, 0, leader, nil, 0)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
@@ -100,7 +100,7 @@ func TestAddPeers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := consensus.New(host, 0, leader, nil, false, 0)
+	consensus, err := consensus.New(host, 0, leader, nil, 0)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
@@ -146,7 +146,7 @@ func TestAddBeaconPeer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := consensus.New(host, 0, leader, nil, false, 0)
+	consensus, err := consensus.New(host, 0, leader, nil, 0)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
@@ -220,7 +220,7 @@ func TestPingPongHandler(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := consensus.New(host, 0, leader, nil, false, 0)
+	consensus, err := consensus.New(host, 0, leader, nil, 0)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}

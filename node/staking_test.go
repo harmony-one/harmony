@@ -31,7 +31,7 @@ func TestUpdateStakingList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := consensus.New(host, 0, leader, nil, false, 0)
+	consensus, err := consensus.New(host, 0, leader, nil, 0)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}

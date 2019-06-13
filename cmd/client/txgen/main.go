@@ -100,7 +100,7 @@ func setUpTXGen() *node.Node {
 		fmt.Fprintf(os.Stderr, "Error :%v \n", err)
 		os.Exit(1)
 	}
-	consensusObj, err := consensus.New(myhost, uint32(shardID), p2p.Peer{}, nil, false, 0)
+	consensusObj, err := consensus.New(myhost, uint32(shardID), p2p.Peer{}, nil, 0)
 	chainDBFactory := &shardchain.MemDBFactory{}
 	txGen := node.New(myhost, consensusObj, chainDBFactory, false) //Changed it : no longer archival node.
 	txGen.Client = client.NewClient(txGen.GetHost(), uint32(shardID))
