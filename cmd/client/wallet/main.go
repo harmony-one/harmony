@@ -144,7 +144,7 @@ func main() {
 		fmt.Println("    9. blsgen        - Generate a bls key and store private key locally.")
 		fmt.Println("        --nopass         - The private key has no passphrase (for test only)")
 		fmt.Println("   10. format        - Shows different encoding formats of specific address")
-		fmt.Println("        --address        - The address to display the various format for")
+		fmt.Println("        --address        - The address to display the different encoding formats for")
 		os.Exit(1)
 	}
 
