@@ -418,7 +418,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 
 	// TODO: genesis account node delay for 1 second, this is a temp fix for allows FN nodes to earning reward
 	if consensus.delayCommit > 0 {
-		time.Sleep(time.Duration(consensus.delayCommit) * time.Millisecond)
+		time.Sleep(consensus.delayCommit)
 	}
 
 	if err := consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {

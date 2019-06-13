@@ -4,6 +4,7 @@ package consensus // consensus
 import (
 	"math/big"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -42,8 +43,8 @@ type Consensus struct {
 	// channel to receive consensus message
 	MsgChan chan []byte
 
-	// unit in ms, how many ms to delay for harmony node to send commit message
-	delayCommit int
+	// How long to delay sending commit messages.
+	delayCommit time.Duration
 
 	// 2 types of timeouts: normal and viewchange
 	consensusTimeout map[TimeoutType]*utils.Timeout
@@ -145,6 +146,12 @@ type Consensus struct {
 	disableViewChange bool
 }
 
+// SetCommitDelay sets the commit message delay.  If set to non-zero,
+// validator delays commit message by the amount.
+func (consensus *Consensus) SetCommitDelay(delay time.Duration) {
+	consensus.delayCommit = delay
+}
+
 // StakeInfoFinder returns the stake information finder instance this
 // consensus uses, e.g. for block reward distribution.
 func (consensus *Consensus) StakeInfoFinder() StakeInfoFinder {
@@ -198,10 +205,9 @@ type StakeInfoFinder interface {
 
 // New creates a new Consensus object
 // TODO: put shardId into chain reader's chain config
-func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKey, delayCommit int) (*Consensus, error) {
+func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKey) (*Consensus, error) {
 	consensus := Consensus{}
 	consensus.host = host
-	consensus.delayCommit = delayCommit
 	consensus.blockNumLowChan = make(chan struct{})
 
 	// pbft related

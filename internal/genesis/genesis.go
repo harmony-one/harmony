@@ -36,7 +36,6 @@ func BeaconAccountPriKey() *ecdsa.PrivateKey {
 // FindAccount find the DeployAccount based on the account address, and the account index
 // the account address could be from GenesisAccounts or from GenesisFNAccounts
 // the account index can be used to determin the shard of the account
-// return flag=true means it is GenesisAccount node
 func FindAccount(address string) (int, *DeployAccount) {
 	for i, acc := range GenesisAccounts {
 		if address == acc.Address {
