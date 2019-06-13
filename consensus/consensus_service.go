@@ -551,6 +551,9 @@ func (consensus *Consensus) RegisterRndChannel(rndChannel chan [64]byte) {
 func (consensus *Consensus) checkViewID(msg *PbftMessage) error {
 	// just ignore consensus check for the first time when node join
 	if consensus.ignoreViewIDCheck {
+		//in syncing mode, node accepts incoming messages without viewID/leaderKey checking
+		//so only set mode to normal when new node enters consensus and need checking viewID
+		consensus.mode.SetMode(Normal)
 		consensus.viewID = msg.ViewID
 		consensus.mode.SetViewID(msg.ViewID)
 		consensus.LeaderPubKey = msg.SenderPubkey
