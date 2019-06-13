@@ -35,16 +35,10 @@ func toISO8601(t time.Time) string {
 		t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), tz)
 }
 
-func keyFileName(publicKey *ffi_bls.PublicKey) string {
-	ts := time.Now().UTC()
-	serializedPublicKey := publicKey.SerializeToHexStr()
-	return fmt.Sprintf("UTC--%s--bls_%s", toISO8601(ts), serializedPublicKey)
-}
-
 // WritePrivateKeyWithPassPhrase encrypt the key with passphrase and write into disk.
 func WritePrivateKeyWithPassPhrase(privateKey *ffi_bls.SecretKey, passphrase string) string {
 	publickKey := privateKey.GetPublicKey()
-	fileName := keyFileName(publickKey)
+	fileName := publickKey.SerializeToHexStr() + ".key"
 	privateKeyHex := privateKey.SerializeToHexStr()
 	// Encrypt with passphrase
 	encryptedPrivateKeyStr := encrypt([]byte(privateKeyHex), passphrase)
@@ -92,7 +86,7 @@ func FindBlsPriKey(BlsPublicKey, blsPass string, consensusPriKey *ffi_bls.Secret
 func GenBlsKeyWithPassPhrase(passphrase string) (*ffi_bls.SecretKey, string) {
 	privateKey := bls.RandPrivateKey()
 	publickKey := privateKey.GetPublicKey()
-	fileName := keyFileName(publickKey)
+	fileName := publickKey.SerializeToHexStr() + ".key"
 	privateKeyHex := privateKey.SerializeToHexStr()
 	// Encrypt with passphrase
 	encryptedPrivateKeyStr := encrypt([]byte(privateKeyHex), passphrase)
