@@ -22,7 +22,7 @@ const (
 	// Run garbage collector every 30 minutes.
 	gcTime = 10 * time.Minute
 	// Print out memstat every memStatTime.
-	memStatTime = 30 * time.Second
+	memStatTime = 300 * time.Second
 )
 
 // MemProfiling is the struct to watch objects for memprofiling.
@@ -100,9 +100,9 @@ func MaybeCallGCPeriodically() {
 		for {
 			select {
 			case <-time.After(gcTime):
-				PrintMemUsage("mem stats before GC")
+				PrintMemUsage("Memory stats before GC")
 				runtime.GC()
-				PrintMemUsage("mem stats after GC")
+				PrintMemUsage("Memory stats after GC")
 			}
 		}
 	}()
@@ -110,7 +110,7 @@ func MaybeCallGCPeriodically() {
 		for {
 			select {
 			case <-time.After(memStatTime):
-				PrintMemUsage("mem stats")
+				PrintMemUsage("Memory stats")
 			}
 		}
 	}()

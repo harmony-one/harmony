@@ -572,9 +572,9 @@ func (consensus *Consensus) finalizeCommits() {
 
 	if consensus.consensusTimeout[timeoutBootstrap].IsActive() {
 		consensus.consensusTimeout[timeoutBootstrap].Stop()
-		consensus.getLogger().Debug("start consensus timeout; stop bootstrap timeout only once")
+		consensus.getLogger().Debug("start consensus timer; stop bootstrap timer only once")
 	} else {
-		consensus.getLogger().Debug("start consensus timeout")
+		consensus.getLogger().Debug("start consensus timer")
 	}
 	consensus.consensusTimeout[timeoutConsensus].Start()
 
@@ -665,9 +665,9 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 
 	if consensus.consensusTimeout[timeoutBootstrap].IsActive() {
 		consensus.consensusTimeout[timeoutBootstrap].Stop()
-		consensus.getLogger().Debug("start consensus timeout; stop bootstrap timeout only once")
+		consensus.getLogger().Debug("start consensus timer; stop bootstrap timer only once")
 	} else {
-		consensus.getLogger().Debug("start consensus timeout")
+		consensus.getLogger().Debug("start consensus timer")
 	}
 	consensus.consensusTimeout[timeoutConsensus].Start()
 	return

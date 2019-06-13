@@ -560,7 +560,7 @@ func (consensus *Consensus) checkViewID(msg *PbftMessage) error {
 		consensus.ignoreViewIDCheck = false
 		consensus.consensusTimeout[timeoutConsensus].Start()
 		utils.GetLogger().Debug("viewID and leaderKey override", "viewID", consensus.viewID, "leaderKey", consensus.LeaderPubKey.SerializeToHexStr()[:20])
-		utils.GetLogger().Debug("start consensus timeout", "viewID", consensus.viewID, "block", consensus.blockNum)
+		utils.GetLogger().Debug("Start consensus timer", "viewID", consensus.viewID, "block", consensus.blockNum)
 		return nil
 	} else if msg.ViewID > consensus.viewID {
 		return consensus_engine.ErrViewIDNotMatch

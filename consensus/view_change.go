@@ -179,7 +179,7 @@ func (consensus *Consensus) startViewChange(viewID uint32) {
 
 	consensus.consensusTimeout[timeoutViewChange].SetDuration(duration)
 	consensus.consensusTimeout[timeoutViewChange].Start()
-	consensus.getLogger().Debug("start view change timeout", "viewChangingID", consensus.mode.ViewID())
+	consensus.getLogger().Debug("start view change timer", "viewChangingID", consensus.mode.ViewID())
 }
 
 func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
@@ -366,7 +366,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		consensus.ResetViewChangeState()
 		consensus.consensusTimeout[timeoutViewChange].Stop()
 		consensus.consensusTimeout[timeoutConsensus].Start()
-		consensus.getLogger().Debug("new leader start consensus timeout and stop view change timeout", "viewChangingID", consensus.mode.ViewID())
+		consensus.getLogger().Debug("new leader start consensus timer and stop view change timer", "viewChangingID", consensus.mode.ViewID())
 		consensus.getLogger().Debug("I am the new leader", "myKey", consensus.PubKey.SerializeToHexStr(), "viewID", consensus.viewID, "block", consensus.blockNum)
 	}
 	consensus.getLogger().Debug("onViewChange", "numSigs", len(consensus.viewIDSigs), "needed", consensus.Quorum())
@@ -485,7 +485,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		consensus.getLogger().Info("onNewView === announce")
 	}
 	consensus.getLogger().Debug("new leader changed", "newLeaderKey", consensus.LeaderPubKey.SerializeToHexStr())
-	consensus.getLogger().Debug("validator start consensus timeout and stop view change timeout")
+	consensus.getLogger().Debug("validator start consensus timer and stop view change timer")
 	consensus.consensusTimeout[timeoutConsensus].Start()
 	consensus.consensusTimeout[timeoutViewChange].Stop()
 }
