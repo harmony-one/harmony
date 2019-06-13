@@ -23,7 +23,7 @@ require (
 	github.com/gorilla/handlers v1.4.0
 	github.com/gorilla/mux v1.7.0
 	github.com/harmony-ek/gencodec v0.0.0-20190215044613-e6740dbdd846
-	github.com/harmony-one/bls v0.0.2
+	github.com/harmony-one/bls v0.0.4
 	github.com/hashicorp/golang-lru v0.5.1
 	github.com/iancoleman/strcase v0.0.0-20190422225806-e506e3ef7365
 	github.com/ipfs/go-datastore v0.0.1
