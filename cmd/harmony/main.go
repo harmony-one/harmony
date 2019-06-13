@@ -96,7 +96,7 @@ var (
 	// isArchival indicates this node is an archival node that will save and archive current blockchain
 	isArchival = flag.Bool("is_archival", false, "true means this node is a archival node")
 	// delayCommit is the commit-delay timer, used by Harmony nodes
-	delayCommit = flag.String("delay_commit", "500ms", "how long to delay sending commit messages in consensus, ex: 500ms, 1s")
+	delayCommit = flag.String("delay_commit", "0ms", "how long to delay sending commit messages in consensus, ex: 500ms, 1s")
 	//isNewNode indicates this node is a new node
 	isNewNode          = flag.Bool("is_newnode", false, "true means this node is a new node")
 	shardID            = flag.Int("shard_id", -1, "the shard ID of this node")
