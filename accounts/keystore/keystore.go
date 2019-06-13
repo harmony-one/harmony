@@ -237,7 +237,7 @@ func (ks *KeyStore) Delete(a accounts.Account, passphrase string) error {
 	// Decrypting the key isn't really necessary, but we do
 	// it anyway to check the password and zero out the key
 	// immediately afterwards.
-	a, key, err := ks.getDecryptedKey(a, passphrase)
+	a, key, err := ks.GetDecryptedKey(a, passphrase)
 	if key != nil {
 		zeroKey(key.PrivateKey)
 	}
@@ -291,7 +291,7 @@ func (ks *KeyStore) SignTx(a accounts.Account, tx *types.Transaction, chainID *b
 // can be decrypted with the given passphrase. The produced signature is in the
 // [R || S || V] format where V is 0 or 1.
 func (ks *KeyStore) SignHashWithPassphrase(a accounts.Account, passphrase string, hash []byte) (signature []byte, err error) {
-	_, key, err := ks.getDecryptedKey(a, passphrase)
+	_, key, err := ks.GetDecryptedKey(a, passphrase)
 	if err != nil {
 		return nil, err
 	}
@@ -302,7 +302,7 @@ func (ks *KeyStore) SignHashWithPassphrase(a accounts.Account, passphrase string
 // SignTxWithPassphrase signs the transaction if the private key matching the
 // given address can be decrypted with the given passphrase.
 func (ks *KeyStore) SignTxWithPassphrase(a accounts.Account, passphrase string, tx *types.Transaction, chainID *big.Int) (*types.Transaction, error) {
-	_, key, err := ks.getDecryptedKey(a, passphrase)
+	_, key, err := ks.GetDecryptedKey(a, passphrase)
 	if err != nil {
 		return nil, err
 	}
@@ -340,7 +340,7 @@ func (ks *KeyStore) Lock(addr common.Address) error {
 // shortens the active unlock timeout. If the address was previously unlocked
 // indefinitely the timeout is not altered.
 func (ks *KeyStore) TimedUnlock(a accounts.Account, passphrase string, timeout time.Duration) error {
-	a, key, err := ks.getDecryptedKey(a, passphrase)
+	a, key, err := ks.GetDecryptedKey(a, passphrase)
 	if err != nil {
 		return err
 	}
@@ -377,7 +377,8 @@ func (ks *KeyStore) Find(a accounts.Account) (accounts.Account, error) {
 	return a, err
 }
 
-func (ks *KeyStore) getDecryptedKey(a accounts.Account, auth string) (accounts.Account, *Key, error) {
+// GetDecryptedKey decrypt and return the key for the account.
+func (ks *KeyStore) GetDecryptedKey(a accounts.Account, auth string) (accounts.Account, *Key, error) {
 	a, err := ks.Find(a)
 	if err != nil {
 		return a, nil, err
@@ -422,7 +423,7 @@ func (ks *KeyStore) NewAccount(passphrase string) (accounts.Account, error) {
 
 // Export exports as a JSON key, encrypted with newPassphrase.
 func (ks *KeyStore) Export(a accounts.Account, passphrase, newPassphrase string) (keyJSON []byte, err error) {
-	_, key, err := ks.getDecryptedKey(a, passphrase)
+	_, key, err := ks.GetDecryptedKey(a, passphrase)
 	if err != nil {
 		return nil, err
 	}
@@ -468,7 +469,7 @@ func (ks *KeyStore) importKey(key *Key, passphrase string) (accounts.Account, er
 
 // Update changes the passphrase of an existing account.
 func (ks *KeyStore) Update(a accounts.Account, passphrase, newPassphrase string) error {
-	a, key, err := ks.getDecryptedKey(a, passphrase)
+	a, key, err := ks.GetDecryptedKey(a, passphrase)
 	if err != nil {
 		return err
 	}
