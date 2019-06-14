@@ -282,7 +282,7 @@ kill_node() {
          continue
       fi
       msg "binaries changed; moving from staging into main"
-      (cd staging; exec mv "${BIN[@]}" ..) || continue
+      (cd staging; exec mv harmony-checksums.txt "${BIN[@]}" ..) || continue
       msg "binaries updated, killing node to restart"
       kill_node
    done
