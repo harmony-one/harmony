@@ -299,5 +299,6 @@ do
       DYLD_FALLBACK_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -is_archival -accounts $IDX
    fi || msg "node process finished with status $?"
    ${loop} || break
-   # TODO add throttling
+   msg "restarting in 10s..."
+   sleep 10
 done
