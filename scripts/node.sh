@@ -180,6 +180,8 @@ then
 fi
 mkdir -p latest
 
+unset -v check_update_pid
+
 cleanup() {
    local trap_sig kill_sig
 
@@ -188,6 +190,10 @@ cleanup() {
    kill_sig="${trap_sig}"
    case "${kill_sig}" in
    0|EXIT) kill_sig=TERM;;
+   esac
+
+   case "${check_update_pid+set}" in
+   set) kill -${kill_sig} "${check_update_pid}";;
    esac
 }
 
@@ -211,6 +217,11 @@ for trap_sig in ${trap_sigs}
 do
    trap "trap_func ${trap_sig}" ${trap_sig}
 done
+
+{
+   # TODO ek – implement me
+} &
+check_update_pid=$!
 
 while :
 do
