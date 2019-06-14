@@ -19,6 +19,7 @@ type DeployAccount struct {
 	BlsPriKey    string // account private BLS key (To be removed)
 	BlsPublicKey string // account public BLS key
 	ShardID      uint32 // shardID of the account
+	Updated      string
 }
 
 func (d DeployAccount) String() string {
