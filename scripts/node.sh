@@ -154,7 +154,7 @@ download_binaries() {
       curl http://${BUCKET}.s3.amazonaws.com/${FOLDER}${bin} -o "${outdir}/${bin}" || return $?
    done
    chmod +x "${outdir}/harmony"
-   (cd "${outdir}" && exec openssl sha256 "${BIN[@]}") > "${outdir}/checksums.txt"
+   (cd "${outdir}" && exec openssl sha256 "${BIN[@]}") > "${outdir}/harmony-checksums.txt"
 }
 
 download_binaries || err 69 "initial node software update failed"
@@ -276,7 +276,7 @@ kill_node() {
          msg "staging download failed; retrying in 30s"
          sleep 30
       done
-      if diff staging/checksums.txt checksums.txt
+      if diff staging/harmony-checksums.txt harmony-checksums.txt
       then
          msg "binaries did not change"
          continue
