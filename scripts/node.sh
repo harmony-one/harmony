@@ -267,8 +267,26 @@ kill_node() {
 }
 
 {
-   # TODO ek – implement me
-} &
+   while :
+   do
+      msg "re-downloading binaries in 5m"
+      sleep 300
+      while ! download_binaries staging
+      do
+         msg "staging download failed; retrying in 30s"
+         sleep 30
+      done
+      if diff staging/checksums.txt checksums.txt
+      then
+         msg "binaries did not change"
+         continue
+      fi
+      msg "binaries changed; moving from staging into main"
+      (cd staging; exec mv "${BIN[@]}" ..) || continue
+      msg "binaries updated, killing node to restart"
+      kill_node
+   done
+} > harmony-update.out 2>&1 &
 check_update_pid=$!
 
 while :
