@@ -43,10 +43,9 @@ function myip() {
 # get ipv4 address only, right now only support ipv4 addresses
    PUB_IP=$(dig -4 @resolver1.opendns.com ANY myip.opendns.com +short)
    if valid_ip $PUB_IP; then
-      echo MYIP = $PUB_IP
+      msg "public IP address autodetected: $PUB_IP"
    else
-      echo NO valid public IP found: $PUB_IP
-      exit 1
+      err 1 "NO valid public IP found: $PUB_IP"
    fi
 }
 
@@ -80,8 +79,8 @@ function setup_env
 
 ######## main #########
 if [[ $EUID -ne 0 ]]; then
-   echo "This script must be run as root"
-   echo Please use \"sudo $0\"
+   msg "this script must be run as root"
+   msg please use \"sudo $0\"
    exit 1
 fi
 
@@ -267,7 +266,7 @@ check_update_pid=$!
 
 while :
 do
-   echo "############### Running Harmony Process ###############"
+   msg "############### Running Harmony Process ###############"
    if [ "$OS" == "Linux" ]; then
    # Run Harmony Node
       LD_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -is_archival -accounts $IDX || :
