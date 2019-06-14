@@ -137,4 +137,5 @@ var GenesisFNAccounts = [...]DeployAccount{
 	{Index: "132", Address: "one1t49clgldmutkd6759tyvxje36r4dmq6ukgsdzd", BlsPriKey: "be3e3134482aa89c4e75961c015e9ac3ee564575690117368c653f042804f73d", BlsPublicKey: "940e0941034288dd19b8cb2542fdedeacfe44bdf87c95bdc428350d5f8114d4b", Updated: "from sheet"},
 	{Index: "133", Address: "one1mtvr4rtt7zwp5xwz65razvy54vzxn57y8wd9um", BlsPriKey: "0d60c1b650d86a835ab555287c5475588a5a729bb57abade10a95c877c82313b", BlsPublicKey: "af4cbb5b185473e667b1004a59aaf265430cd6fc1d2578bf32e88e9c639cd839790f12bf4e58b9f685daf3b9ab3d7001", Updated: "from sheet"},
 	{Index: "134", Address: "one1ahw70lq9sqqygs8f7zdrvw7zd796w5n48hc5xh", BlsPriKey: "70d73a85dff49f9f0012827aeb61ecdafc19928c642f4532829a963d76b72d24", BlsPublicKey: "f0d6a1d78c4817e451fb242b7501b23a9e9b5214e6ae8695a00e344a2f6662dad96baeb4f983d5613404795fae71e80d", Updated: "from sheet"},
+	{Index: "135", Address: "one10ha8a07jpxlla89gcmlu7k9j3ra3sqdyq2c620", BlsPriKey: "f8454288baa18cbbc4b3d6c7e82edc387dff963576d0267ff5d70ee0cb60c420", BlsPublicKey: "03ed4996a4808aa1c9672dcbde4262311fcddd9d291e7f0b96d5fa4968831454479584d0ce0c2471557f506f189cd388", Updated: "from sheet"},
 }
