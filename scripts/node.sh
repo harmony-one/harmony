@@ -180,6 +180,38 @@ then
 fi
 mkdir -p latest
 
+cleanup() {
+   local trap_sig kill_sig
+
+   trap_sig="${1:-EXIT}"
+
+   kill_sig="${trap_sig}"
+   case "${kill_sig}" in
+   0|EXIT) kill_sig=TERM;;
+   esac
+}
+
+unset -v trap_sigs trap_sig
+trap_sigs="EXIT HUP INT TERM"
+
+trap_func() {
+   local trap_sig="${1-EXIT}"
+
+   trap - ${trap_sigs}
+
+   cleanup "${trap_sig}"
+
+   case "${trap_sig}" in
+   ""|0|EXIT) ;;
+   *) kill -"${trap_sig}" "$$";;
+   esac
+}
+
+for trap_sig in ${trap_sigs}
+do
+   trap "trap_func ${trap_sig}" ${trap_sig}
+done
+
 while :
 do
    echo "############### Running Harmony Process ###############"
@@ -190,4 +222,5 @@ do
       DYLD_FALLBACK_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -is_archival -accounts $IDX
    fi
    ${loop} || break
+   # TODO add throttling
 done
