@@ -37,11 +37,20 @@ func (consensus *Consensus) handleMessageUpdate(payload []byte) {
 		return
 	}
 
-	if msg.GetConsensus().ShardId != consensus.ShardID {
-		consensus.getLogger().Warn("Received consensus message from different shard",
-			"myShardId", consensus.ShardID, "receivedShardId", msg.GetConsensus().ShardId)
-		return
+	if msg.Type == msg_pb.MessageType_VIEWCHANGE || msg.Type == msg_pb.MessageType_NEWVIEW {
+		if msg.GetViewchange().ShardId != consensus.ShardID {
+			consensus.getLogger().Warn("Received view change message from different shard",
+				"myShardId", consensus.ShardID, "receivedShardId", msg.GetConsensus().ShardId)
+			return
+		}
+	} else {
+		if msg.GetConsensus().ShardId != consensus.ShardID {
+			consensus.getLogger().Warn("Received consensus message from different shard",
+				"myShardId", consensus.ShardID, "receivedShardId", msg.GetConsensus().ShardId)
+			return
+		}
 	}
+
 	switch msg.Type {
 	case msg_pb.MessageType_ANNOUNCE:
 		consensus.onAnnounce(msg)

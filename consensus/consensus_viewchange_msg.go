@@ -22,6 +22,7 @@ func (consensus *Consensus) constructViewChangeMessage() []byte {
 	vcMsg := message.GetViewchange()
 	vcMsg.ViewId = consensus.mode.GetViewID()
 	vcMsg.BlockNum = consensus.blockNum
+	vcMsg.ShardId = consensus.ShardID
 	// sender address
 	vcMsg.SenderPubkey = consensus.PubKey.Serialize()
 
@@ -77,6 +78,7 @@ func (consensus *Consensus) constructNewViewMessage() []byte {
 	vcMsg := message.GetViewchange()
 	vcMsg.ViewId = consensus.mode.GetViewID()
 	vcMsg.BlockNum = consensus.blockNum
+	vcMsg.ShardId = consensus.ShardID
 	// sender address
 	vcMsg.SenderPubkey = consensus.PubKey.Serialize()
 	vcMsg.Payload = consensus.m1Payload
