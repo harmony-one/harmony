@@ -94,17 +94,19 @@ usage() {
    exit 64  # EX_USAGE
 }
 
-unset start_clean
+unset start_clean loop
 start_clean=false
+loop=true
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :c opt
+while getopts :c1 opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
    ':') usage "missing argument for -${OPTARG}";;
    c) start_clean=true;;
+   1) loop=false;;
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
@@ -178,10 +180,14 @@ then
 fi
 mkdir -p latest
 
-echo "############### Running Harmony Process ###############"
-if [ "$OS" == "Linux" ]; then
-# Run Harmony Node
-   LD_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -is_archival -accounts $IDX
-else
-   DYLD_FALLBACK_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -is_archival -accounts $IDX
-fi
+while :
+do
+   echo "############### Running Harmony Process ###############"
+   if [ "$OS" == "Linux" ]; then
+   # Run Harmony Node
+      LD_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -is_archival -accounts $IDX
+   else
+      DYLD_FALLBACK_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -is_archival -accounts $IDX
+   fi
+   ${loop} || break
+done
