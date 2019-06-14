@@ -4,36 +4,13 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/harmony-one/harmony/crypto/bls"
-	common2 "github.com/harmony-one/harmony/internal/common"
 
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 )
-
-func TestGetPeerFromID(t *testing.T) {
-	leaderPriKey := bls.RandPrivateKey()
-	leaderPubKey := leaderPriKey.GetPublicKey()
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902", ConsensusPubKey: leaderPubKey}
-	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
-	host, err := p2pimpl.NewHost(&leader, priKey)
-	if err != nil {
-		t.Fatalf("newhost failure: %v", err)
-	}
-	consensus, err := New(host, 0, leader, leaderPriKey)
-	if err != nil {
-		t.Fatalf("Cannot craeate consensus: %v", err)
-	}
-	leaderAddress := utils.GetAddressFromBlsPubKey(leader.ConsensusPubKey)
-	l := consensus.GetPeerByAddress(common2.MustAddressToBech32(leaderAddress))
-	if l.IP != leader.IP || l.Port != leader.Port {
-		t.Errorf("leader IP not equal")
-	}
-}
 
 func TestPopulateMessageFields(t *testing.T) {
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902"}
@@ -83,7 +60,6 @@ func TestSignAndMarshalConsensusMessage(t *testing.T) {
 	}
 	consensus.viewID = 2
 	consensus.blockHash = [32]byte{}
-	consensus.SelfAddress = common.Address{}
 
 	msg := &msg_pb.Message{}
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(msg)
