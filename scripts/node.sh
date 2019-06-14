@@ -157,7 +157,7 @@ download_binaries() {
    (cd "${outdir}" && exec openssl sha256 "${BIN[@]}") > "${outdir}/checksums.txt"
 }
 
-download_binaries # for the first time
+download_binaries || err 69 "initial node software update failed"
 
 NODE_PORT=9000
 PUB_IP=
