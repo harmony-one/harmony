@@ -348,7 +348,7 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 			for !stateSyncTaskQueue.Empty() {
 				task, err := ss.stateSyncTaskQueue.Poll(1, time.Millisecond)
 				if err == queue.ErrTimeout || len(task) == 0 {
-					utils.GetLogInstance().Debug("[SYNC] ss.stateSyncTaskQueue poll timeout", "error", err)
+					utils.GetLogInstance().Error("[SYNC] ss.stateSyncTaskQueue poll timeout", "error", err)
 					break
 				}
 				syncTask := task[0].(SyncBlockTask)
@@ -356,7 +356,7 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 				payload, err := peerConfig.GetBlocks([][]byte{syncTask.blockHash})
 				if err != nil || len(payload) == 0 {
 					count++
-					utils.GetLogInstance().Debug("[SYNC] GetBlocks failed", "failNumber", count)
+					utils.GetLogInstance().Error("[SYNC] GetBlocks failed", "failNumber", count)
 					if count > TimesToFail {
 						break
 					}
@@ -374,7 +374,7 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 
 				if err != nil {
 					count++
-					utils.GetLogInstance().Debug("[SYNC] downloadBlocks: failed to DecodeBytes from received new block")
+					utils.GetLogInstance().Error("[SYNC] downloadBlocks: failed to DecodeBytes from received new block")
 					if count > TimesToFail {
 						break
 					}
@@ -475,7 +475,7 @@ func (ss *StateSync) updateBlockAndStatus(block *types.Block, bc *core.BlockChai
 	utils.GetLogInstance().Info("[SYNC] Current Block", "blockHex", bc.CurrentBlock().Hash().Hex())
 	_, err := bc.InsertChain([]*types.Block{block})
 	if err != nil {
-		utils.GetLogInstance().Debug("Error adding new block to blockchain", "Error", err)
+		utils.GetLogInstance().Error("Error adding new block to blockchain", "Error", err)
 		return false
 	}
 	ss.syncMux.Lock()

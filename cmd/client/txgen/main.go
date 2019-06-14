@@ -266,7 +266,7 @@ func SendTxsToShard(clientNode *node.Node, txs types.Transactions, shardID uint3
 		err = clientNode.GetHost().SendMessageToGroups([]p2p.GroupID{clientGroup}, p2p_host.ConstructP2pMessage(byte(0), msg))
 	}
 	if err != nil {
-		utils.GetLogInstance().Debug("Error in Sending Txns", "Err", err)
+		utils.GetLogInstance().Error("Error in Sending Txns", "Err", err)
 	}
 }
 
