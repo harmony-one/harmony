@@ -575,7 +575,7 @@ func (consensus *Consensus) finalizeCommits() {
 	consensus.consensusTimeout[timeoutConsensus].Start()
 
 	consensus.OnConsensusDone(&blockObj)
-	consensus.getLogger().Debug("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!", "numOfSignatures", len(consensus.commitSigs))
+	consensus.getLogger().Info("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!", "numOfSignatures", len(consensus.commitSigs))
 
 	// Send signal to Node so the new block can be added and new round of consensus can be triggered
 	consensus.ReadySignal <- struct{}{}
