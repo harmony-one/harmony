@@ -868,6 +868,8 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 		// Dump new block into level db.
 		utils.GetLogInstance().Info("[Explorer] Committing block into explorer DB", "msgBlock", recvMsg.BlockNum)
 		explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, true).Dump(block, block.NumberU64())
+
+		node.Consensus.PbftLog.DeleteBlockByNumber(block.NumberU64())
 	} else if msg.Type == msg_pb.MessageType_ANNOUNCE {
 
 		recvMsg, err := consensus.ParsePbftMessage(msg)
@@ -877,7 +879,6 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 		}
 		block := recvMsg.Payload
 
-		// check block header is valid
 		var blockObj types.Block
 		err = rlp.DecodeBytes(block, &blockObj)
 		node.Consensus.PbftLog.AddBlock(&blockObj)
