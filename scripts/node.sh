@@ -199,7 +199,10 @@ cleanup() {
    esac
 
    case "${check_update_pid+set}" in
-   set) kill -${kill_sig} "${check_update_pid}";;
+   set)
+      msg "terminating update checker (pid ${check_update_pid})"
+      kill -${kill_sig} "${check_update_pid}"
+      ;;
    esac
 }
 
@@ -208,6 +211,10 @@ trap_sigs="EXIT HUP INT TERM"
 
 trap_func() {
    local trap_sig="${1-EXIT}"
+   case "${trap_sig}" in
+   0|EXIT) msg "exiting";;
+   *) msg "received SIG${trap_sig}";;
+   esac
 
    trap - ${trap_sigs}
 
