@@ -237,6 +237,29 @@ kill_child() {
    kill "${pid}"
 }
 
+# Kill nodes that are direct child of this script (pid $$),
+# i.e. run directly from main loop.
+kill_node() {
+   local pids pid delay
+
+   msg "finding node processes that are our children"
+   pids=$(
+      ps axcwwo "pid=,ppid=,command=" |
+      awk -v me=$$ '$2 == me && $3 == "harmony" { print $1; }'
+   )
+   msg "found node processes: ${pids:-"<none>"}"
+   for pid in ${pids}
+   do
+      delay=0
+      while kill_child ${pid}
+      do
+         sleep ${delay}
+         delay=1
+      done
+      msg "pid ${pid} no longer running"
+   done
+}
+
 {
    # TODO ek – implement me
 } &
