@@ -97,7 +97,9 @@ var (
 	isArchival = flag.Bool("is_archival", false, "true means this node is a archival node")
 	// delayCommit is the commit-delay timer, used by Harmony nodes
 	delayCommit = flag.String("delay_commit", "0ms", "how long to delay sending commit messages in consensus, ex: 500ms, 1s")
-	//isNewNode indicates this node is a new node
+	// isExplorer indicates this node is a node to serve explorer
+	isExplorer = flag.Bool("is_explorer", false, "true means this node is a node to serve explorer")
+	// isNewNode indicates this node is a new node
 	isNewNode          = flag.Bool("is_newnode", false, "true means this node is a new node")
 	shardID            = flag.Int("shard_id", -1, "the shard ID of this node")
 	enableMemProfiling = flag.Bool("enableMemProfiling", false, "Enable memsize logging.")
@@ -162,54 +164,60 @@ func initSetup() {
 		utils.BootNodes = bootNodeAddrs
 	}
 
-	ks = hmykey.GetHmyKeyStore()
+	fmt.Println(*isGenesis)
+	fmt.Println(*isExplorer)
+	if !*isExplorer { // Explorer node doesn't need the following setup
+		ks = hmykey.GetHmyKeyStore()
 
-	allAccounts := ks.Accounts()
+		allAccounts := ks.Accounts()
 
-	// TODO: lc try to enable multiple staking accounts per node
-	accountIndex, genesisAccount = genesis.FindAccount(*stakingAccounts)
+		// TODO: lc try to enable multiple staking accounts per node
+		accountIndex, genesisAccount = genesis.FindAccount(*stakingAccounts)
 
-	if genesisAccount == nil {
-		fmt.Printf("Can't find the account address: %v!\n", *stakingAccounts)
-		os.Exit(100)
-	}
-
-	foundAccount := false
-	for _, account := range allAccounts {
-		if common.ParseAddr(genesisAccount.Address) == account.Address {
-			myAccount = account
-			foundAccount = true
-			break
+		if genesisAccount == nil {
+			fmt.Printf("Can't find the account address: %v!\n", *stakingAccounts)
+			os.Exit(100)
 		}
-	}
 
-	if !foundAccount {
-		fmt.Printf("Can't find the matching account key: %v!\n", genesisAccount.Address)
-		os.Exit(101)
-	}
-
-	genesisAccount.ShardID = uint32(accountIndex % core.GenesisShardNum)
-
-	fmt.Printf("My Account: %s\n", common.MustAddressToBech32(myAccount.Address))
-	fmt.Printf("Key URL: %s\n", myAccount.URL)
-	fmt.Printf("My Genesis Account: %v\n", *genesisAccount)
-
-	var myPass string
-	if !*hmyNoPass {
-		myPass = utils.AskForPassphrase("Passphrase: ")
-		err := ks.Unlock(myAccount, myPass)
-		if err != nil {
-			fmt.Printf("Wrong Passphrase! Unable to unlock account key!\n")
-			os.Exit(3)
+		foundAccount := false
+		for _, account := range allAccounts {
+			if common.ParseAddr(genesisAccount.Address) == account.Address {
+				myAccount = account
+				foundAccount = true
+				break
+			}
 		}
+
+		if !foundAccount {
+			fmt.Printf("Can't find the matching account key: %v!\n", genesisAccount.Address)
+			os.Exit(101)
+		}
+
+		genesisAccount.ShardID = uint32(accountIndex % core.GenesisShardNum)
+
+		fmt.Printf("My Account: %s\n", common.MustAddressToBech32(myAccount.Address))
+		fmt.Printf("Key URL: %s\n", myAccount.URL)
+		fmt.Printf("My Genesis Account: %v\n", *genesisAccount)
+
+		var myPass string
+		if !*hmyNoPass {
+			myPass = utils.AskForPassphrase("Passphrase: ")
+			err := ks.Unlock(myAccount, myPass)
+			if err != nil {
+				fmt.Printf("Wrong Passphrase! Unable to unlock account key!\n")
+				os.Exit(3)
+			}
+		}
+		hmykey.SetHmyPass(myPass)
+	} else {
+		genesisAccount = &genesis.DeployAccount{}
+		genesisAccount.ShardID = uint32(*shardID)
 	}
 
 	// Set up manual call for garbage collection.
 	if *enableGC {
 		memprofiling.MaybeCallGCPeriodically()
 	}
-
-	hmykey.SetHmyPass(myPass)
 }
 
 func createGlobalConfig() *nodeconfig.ConfigType {
@@ -218,56 +226,52 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 
 	nodeConfig := nodeconfig.GetDefaultConfig()
 
-	// Specified Shard ID override calculated Shard ID
-	if *shardID >= 0 {
-		utils.GetLogInstance().Info("ShardID Override", "original", genesisAccount.ShardID, "override", *shardID)
-		genesisAccount.ShardID = uint32(*shardID)
-	}
-
-	if !*isNewNode {
-		nodeConfig = nodeconfig.GetShardConfig(uint32(genesisAccount.ShardID))
-	} else {
-		myShardID = 0 // This should be default value as new node doesn't belong to any shard.
+	if !*isExplorer { // Explorer node doesn't need the following setup
+		// Specified Shard ID override calculated Shard ID
 		if *shardID >= 0 {
-			utils.GetLogInstance().Info("ShardID Override", "original", myShardID, "override", *shardID)
-			myShardID = uint32(*shardID)
-			nodeConfig = nodeconfig.GetShardConfig(myShardID)
+			utils.GetLogInstance().Info("ShardID Override", "original", genesisAccount.ShardID, "override", *shardID)
+			genesisAccount.ShardID = uint32(*shardID)
 		}
-	}
 
-	// The initial genesis nodes are sequentially put into genesis shards based on their accountIndex
-	nodeConfig.ShardID = uint32(genesisAccount.ShardID)
-
-	// Key Setup ================= [Start]
-	consensusPriKey := &bls.SecretKey{}
-
-	if *isGenesis {
-		err := consensusPriKey.DeserializeHexStr(genesisAccount.BlsPriKey)
-		if err != nil {
-			panic(fmt.Errorf("Failed to parse BLS private key: %s, %s", genesisAccount.BlsPriKey, err))
-		}
-	} else {
-		// NewNode won't work
-		/*
-			err := consensusPriKey.DeserializeHexStr(genesis.NewNodeAccounts[])
-			if err != nil {
-				panic(fmt.Errorf("generate key error"))
+		if !*isNewNode {
+			nodeConfig = nodeconfig.GetShardConfig(uint32(genesisAccount.ShardID))
+		} else {
+			myShardID = 0 // This should be default value as new node doesn't belong to any shard.
+			if *shardID >= 0 {
+				utils.GetLogInstance().Info("ShardID Override", "original", myShardID, "override", *shardID)
+				myShardID = uint32(*shardID)
+				nodeConfig = nodeconfig.GetShardConfig(myShardID)
 			}
-		*/
-	}
+		}
 
-	// P2p private key is used for secure message transfer between p2p nodes.
-	nodeConfig.P2pPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
-	if err != nil {
-		panic(err)
-	}
+		// The initial genesis nodes are sequentially put into genesis shards based on their accountIndex
+		nodeConfig.ShardID = uint32(genesisAccount.ShardID)
 
-	// Consensus keys are the BLS12-381 keys used to sign consensus messages
-	nodeConfig.ConsensusPriKey, nodeConfig.ConsensusPubKey = consensusPriKey, consensusPriKey.GetPublicKey()
-	if nodeConfig.ConsensusPriKey == nil || nodeConfig.ConsensusPubKey == nil {
-		panic(fmt.Errorf("Failed to initialize BLS keys: %s", consensusPriKey.SerializeToHexStr()))
+		// Key Setup ================= [Start]
+		consensusPriKey := &bls.SecretKey{}
+
+		if *isGenesis {
+			err := consensusPriKey.DeserializeHexStr(genesisAccount.BlsPriKey)
+			if err != nil {
+				panic(fmt.Errorf("Failed to parse BLS private key: %s, %s", genesisAccount.BlsPriKey, err))
+			}
+		} else {
+			// NewNode won't work
+			/*
+				err := consensusPriKey.DeserializeHexStr(genesis.NewNodeAccounts[])
+				if err != nil {
+					panic(fmt.Errorf("generate key error"))
+				}
+			*/
+		}
+
+		// Consensus keys are the BLS12-381 keys used to sign consensus messages
+		nodeConfig.ConsensusPriKey, nodeConfig.ConsensusPubKey = consensusPriKey, consensusPriKey.GetPublicKey()
+		if nodeConfig.ConsensusPriKey == nil || nodeConfig.ConsensusPubKey == nil {
+			panic(fmt.Errorf("Failed to initialize BLS keys: %s", consensusPriKey.SerializeToHexStr()))
+		}
+		// Key Setup ================= [End]
 	}
-	// Key Setup ================= [End]
 
 	nodeConfig.SelfPeer = p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nodeConfig.ConsensusPubKey}
 
@@ -276,6 +280,12 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 		nodeConfig.StringRole = "leader"
 	} else {
 		nodeConfig.StringRole = "validator"
+	}
+
+	// P2p private key is used for secure message transfer between p2p nodes.
+	nodeConfig.P2pPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
+	if err != nil {
+		panic(err)
 	}
 
 	nodeConfig.Host, err = p2pimpl.NewHost(&nodeConfig.SelfPeer, nodeConfig.P2pPriKey)
@@ -371,6 +381,11 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 				currentNode.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
 				currentNode.NodeConfig.SetClientGroupID(p2p.NewClientGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
 			}
+		} else if *isExplorer {
+			currentNode.NodeConfig.SetRole(nodeconfig.ExplorerNode)
+			currentNode.NodeConfig.SetIsLeader(false)
+			currentNode.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(*shardID)))
+			currentNode.NodeConfig.SetClientGroupID(p2p.NewClientGroupIDByShardID(p2p.ShardID(*shardID)))
 		} else if nodeConfig.StringRole == "leader" {
 			currentNode.NodeConfig.SetRole(nodeconfig.ShardLeader)
 			currentNode.NodeConfig.SetIsLeader(true)
@@ -427,6 +442,8 @@ func main() {
 	utils.SetLogContext(*port, *ip)
 	utils.SetLogVerbosity(log.Lvl(*verbosity))
 
+	fmt.Println(os.Args)
+	fmt.Println(*minPeers)
 	initSetup()
 	nodeConfig := createGlobalConfig()
 	initLogFile(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps)

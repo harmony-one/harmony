@@ -4,10 +4,8 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/harmony-one/harmony/crypto/hash"
-	common2 "github.com/harmony-one/harmony/internal/common"
-
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/crypto/hash"
 
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -32,10 +30,6 @@ type DRand struct {
 
 	// global consensus mutex
 	mutex sync.Mutex
-
-	// map of nodeID to validator Peer object
-	// FIXME: should use PubKey of p2p.Peer as the hashkey
-	validators sync.Map // key is string, value is p2p.Peer
 
 	// Leader's address
 	leader p2p.Peer
@@ -92,7 +86,6 @@ func New(host p2p.Host, ShardID uint32, peers []p2p.Peer, leader p2p.Peer, confi
 	dRand.leader = leader
 	dRand.CommitteeAddresses = map[common.Address]bool{}
 	for _, peer := range peers {
-		dRand.validators.Store(common2.MustAddressToBech32(utils.GetBlsAddress(peer.ConsensusPubKey)), peer)
 		dRand.CommitteeAddresses[utils.GetBlsAddress(peer.ConsensusPubKey)] = true
 	}
 
@@ -131,27 +124,6 @@ func New(host p2p.Host, ShardID uint32, peers []p2p.Peer, leader p2p.Peer, confi
 	return &dRand
 }
 
-// AddPeers adds new peers into the validator map of the consensus
-// and add the public keys
-func (dRand *DRand) AddPeers(peers []*p2p.Peer) int {
-	count := 0
-
-	for _, peer := range peers {
-		_, ok := dRand.validators.LoadOrStore(common2.MustAddressToBech32(utils.GetBlsAddress(peer.ConsensusPubKey)), *peer)
-		if !ok {
-			dRand.pubKeyLock.Lock()
-			if _, ok := dRand.CommitteeAddresses[peer.ConsensusPubKey.GetAddress()]; !ok {
-				dRand.PublicKeys = append(dRand.PublicKeys, peer.ConsensusPubKey)
-				dRand.CommitteeAddresses[peer.ConsensusPubKey.GetAddress()] = true
-			}
-			dRand.pubKeyLock.Unlock()
-			//			utils.GetLogInstance().Debug("[DRAND]", "AddPeers", *peer)
-		}
-		count++
-	}
-	return count
-}
-
 // Sign on the drand message signature field.
 func (dRand *DRand) signDRandMessage(message *msg_pb.Message) error {
 	message.Signature = nil
@@ -186,21 +158,6 @@ func (dRand *DRand) vrf(blockHash [32]byte) (rand [32]byte, proof []byte) {
 	return
 }
 
-// GetValidatorPeers returns list of validator peers.
-func (dRand *DRand) GetValidatorPeers() []p2p.Peer {
-	validatorPeers := make([]p2p.Peer, 0)
-
-	dRand.validators.Range(func(k, v interface{}) bool {
-		if peer, ok := v.(p2p.Peer); ok {
-			validatorPeers = append(validatorPeers, peer)
-			return true
-		}
-		return false
-	})
-
-	return validatorPeers
-}
-
 // Verify the signature of the message are valid from the signer's public key.
 func verifyMessageSig(signerPubKey *bls.PublicKey, message *msg_pb.Message) error {
 	signature := message.Signature
@@ -220,21 +177,6 @@ func verifyMessageSig(signerPubKey *bls.PublicKey, message *msg_pb.Message) erro
 		return errors.New("failed to verify the signature")
 	}
 	return nil
-}
-
-// Gets the validator peer based on validator ID.
-func (dRand *DRand) getValidatorPeerByAddress(validatorAddress string) *p2p.Peer {
-	v, ok := dRand.validators.Load(validatorAddress)
-	if !ok {
-		utils.GetLogInstance().Warn("Unrecognized validator", "validatorAddress", validatorAddress, "dRand", dRand)
-		return nil
-	}
-	value, ok := v.(p2p.Peer)
-	if !ok {
-		utils.GetLogInstance().Warn("Invalid validator", "validatorAddress", validatorAddress, "dRand", dRand)
-		return nil
-	}
-	return &value
 }
 
 // IsValidatorInCommittee returns whether the given validator BLS address is part of my committee

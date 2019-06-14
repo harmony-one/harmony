@@ -10,7 +10,6 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
-	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -80,7 +79,7 @@ func (consensus *Consensus) tryAnnounce(block *types.Block) {
 	msgToSend := consensus.constructAnnounceMessage()
 	consensus.switchPhase(Prepare, true)
 
-	// save announce message to pbftLog
+	// save announce message to PbftLog
 	msgPayload, _ := proto.GetConsensusMessagePayload(msgToSend)
 	msg := &msg_pb.Message{}
 	_ = protobuf.Unmarshal(msgPayload, msg)
@@ -90,8 +89,8 @@ func (consensus *Consensus) tryAnnounce(block *types.Block) {
 		return
 	}
 
-	consensus.pbftLog.AddMessage(pbftMsg)
-	consensus.pbftLog.AddBlock(block)
+	consensus.PbftLog.AddMessage(pbftMsg)
+	consensus.PbftLog.AddBlock(block)
 
 	// Leader sign the block hash itself
 	consensus.prepareSigs[consensus.PubKey.SerializeToHexStr()] = consensus.priKey.SignHash(consensus.blockHash[:])
@@ -164,7 +163,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		return
 	}
 	//blockObj.Logger(consensus.getLogger()).Debug("received announce", "viewID", recvMsg.ViewID, "msgBlockNum", recvMsg.BlockNum)
-	logMsgs := consensus.pbftLog.GetMessagesByTypeSeqView(msg_pb.MessageType_ANNOUNCE, recvMsg.BlockNum, recvMsg.ViewID)
+	logMsgs := consensus.PbftLog.GetMessagesByTypeSeqView(msg_pb.MessageType_ANNOUNCE, recvMsg.BlockNum, recvMsg.ViewID)
 	if len(logMsgs) > 0 {
 		if logMsgs[0].BlockHash != blockObj.Header().Hash() {
 			consensus.getLogger().Debug("onAnnounce leader is malicious", "leaderKey", consensus.LeaderPubKey)
@@ -177,8 +176,8 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	consensus.block = blockPayload
 	consensus.blockHash = recvMsg.BlockHash
 	consensus.getLogger().Debug("announce block added", "msgViewID", recvMsg.ViewID, "msgBlock", recvMsg.BlockNum)
-	consensus.pbftLog.AddMessage(recvMsg)
-	consensus.pbftLog.AddBlock(&blockObj)
+	consensus.PbftLog.AddMessage(recvMsg)
+	consensus.PbftLog.AddBlock(&blockObj)
 
 	// we have already added message and block, skip check viewID and send prepare message if is in ViewChanging mode
 	if consensus.mode.Mode() == ViewChanging {
@@ -203,12 +202,12 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 func (consensus *Consensus) tryPrepare(blockHash common.Hash) {
 	var hash common.Hash
 	copy(hash[:], blockHash[:])
-	block := consensus.pbftLog.GetBlockByHash(hash)
+	block := consensus.PbftLog.GetBlockByHash(hash)
 	if block == nil {
 		return
 	}
 
-	if consensus.blockNum != block.NumberU64() || !consensus.pbftLog.HasMatchingViewAnnounce(consensus.blockNum, consensus.viewID, hash) {
+	if consensus.blockNum != block.NumberU64() || !consensus.PbftLog.HasMatchingViewAnnounce(consensus.blockNum, consensus.viewID, hash) {
 		consensus.getLogger().Debug("blockNum or announce message not match")
 		return
 	}
@@ -253,7 +252,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		return
 	}
 
-	if !consensus.pbftLog.HasMatchingViewAnnounce(consensus.blockNum, consensus.viewID, recvMsg.BlockHash) {
+	if !consensus.PbftLog.HasMatchingViewAnnounce(consensus.blockNum, consensus.viewID, recvMsg.BlockHash) {
 		consensus.getLogger().Debug("onPrepare no matching announce message", "blockHash", recvMsg.BlockHash)
 		return
 	}
@@ -312,7 +311,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 			consensus.getLogger().Warn("onPrepare unable to parse pbft message", "error", err)
 			return
 		}
-		consensus.pbftLog.AddMessage(pbftMsg)
+		consensus.PbftLog.AddMessage(pbftMsg)
 
 		if err := consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
 			consensus.getLogger().Warn("cannot send prepared message")
@@ -363,9 +362,9 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	}
 
 	blockHash := recvMsg.BlockHash
-	aggSig, mask, err := consensus.readSignatureBitmapPayload(recvMsg.Payload, 0)
+	aggSig, mask, err := consensus.ReadSignatureBitmapPayload(recvMsg.Payload, 0)
 	if err != nil {
-		consensus.getLogger().Error("readSignatureBitmapPayload failed", "error", err)
+		consensus.getLogger().Error("ReadSignatureBitmapPayload failed", "error", err)
 		return
 	}
 
@@ -386,7 +385,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	}
 
 	consensus.getLogger().Debug("prepared message added", "msgViewID", recvMsg.ViewID, "msgBlock", recvMsg.BlockNum)
-	consensus.pbftLog.AddMessage(recvMsg)
+	consensus.PbftLog.AddMessage(recvMsg)
 
 	if consensus.mode.Mode() == ViewChanging {
 		consensus.getLogger().Debug("viewchanging mode just exist after viewchanging")
@@ -457,12 +456,12 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		return
 	}
 
-	if !consensus.pbftLog.HasMatchingAnnounce(consensus.blockNum, recvMsg.BlockHash) {
+	if !consensus.PbftLog.HasMatchingAnnounce(consensus.blockNum, recvMsg.BlockHash) {
 		consensus.getLogger().Debug("cannot find matching blockhash")
 		return
 	}
 
-	if !consensus.pbftLog.HasMatchingPrepared(consensus.blockNum, recvMsg.BlockHash) {
+	if !consensus.PbftLog.HasMatchingPrepared(consensus.blockNum, recvMsg.BlockHash) {
 		consensus.getLogger().Debug("cannot find matching prepared message", "blockHash", recvMsg.BlockHash)
 		return
 	}
@@ -558,9 +557,6 @@ func (consensus *Consensus) finalizeCommits() {
 
 	consensus.reportMetrics(blockObj)
 
-	// Dump new block into level db.
-	explorer.GetStorageInstance(consensus.leader.IP, consensus.leader.Port, true).Dump(&blockObj, consensus.viewID)
-
 	// Reset state to Finished, and clear other data.
 	consensus.ResetState()
 	consensus.viewID++
@@ -611,9 +607,9 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		return
 	}
 
-	aggSig, mask, err := consensus.readSignatureBitmapPayload(recvMsg.Payload, 0)
+	aggSig, mask, err := consensus.ReadSignatureBitmapPayload(recvMsg.Payload, 0)
 	if err != nil {
-		consensus.getLogger().Error("readSignatureBitmapPayload failed", "error", err)
+		consensus.getLogger().Error("ReadSignatureBitmapPayload failed", "error", err)
 		return
 	}
 
@@ -633,7 +629,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	consensus.aggregatedCommitSig = aggSig
 	consensus.commitBitmap = mask
 	consensus.getLogger().Debug("committed message added", "msgViewID", recvMsg.ViewID, "msgBlock", recvMsg.BlockNum)
-	consensus.pbftLog.AddMessage(recvMsg)
+	consensus.PbftLog.AddMessage(recvMsg)
 
 	if recvMsg.BlockNum-consensus.blockNum > consensusBlockNumBuffer {
 		consensus.getLogger().Debug("onCommitted out of sync", "msgBlock", recvMsg.BlockNum)
@@ -677,7 +673,7 @@ func (consensus *Consensus) tryCatchup() {
 	//	}
 	currentBlockNum := consensus.blockNum
 	for {
-		msgs := consensus.pbftLog.GetMessagesByTypeSeq(msg_pb.MessageType_COMMITTED, consensus.blockNum)
+		msgs := consensus.PbftLog.GetMessagesByTypeSeq(msg_pb.MessageType_COMMITTED, consensus.blockNum)
 		if len(msgs) == 0 {
 			break
 		}
@@ -686,7 +682,7 @@ func (consensus *Consensus) tryCatchup() {
 		}
 		consensus.getLogger().Info("committed message found")
 
-		block := consensus.pbftLog.GetBlockByHash(msgs[0].BlockHash)
+		block := consensus.PbftLog.GetBlockByHash(msgs[0].BlockHash)
 		if block == nil {
 			break
 		}
@@ -697,8 +693,8 @@ func (consensus *Consensus) tryCatchup() {
 		}
 		consensus.getLogger().Info("block found to commit")
 
-		preparedMsgs := consensus.pbftLog.GetMessagesByTypeSeqHash(msg_pb.MessageType_PREPARED, msgs[0].BlockNum, msgs[0].BlockHash)
-		msg := consensus.pbftLog.FindMessageByMaxViewID(preparedMsgs)
+		preparedMsgs := consensus.PbftLog.GetMessagesByTypeSeqHash(msg_pb.MessageType_PREPARED, msgs[0].BlockNum, msgs[0].BlockHash)
+		msg := consensus.PbftLog.FindMessageByMaxViewID(preparedMsgs)
 		if msg == nil {
 			break
 		}
@@ -753,8 +749,8 @@ func (consensus *Consensus) tryCatchup() {
 		consensus.consensusTimeout[timeoutViewChange].Stop()
 	}
 	// clean up old log
-	consensus.pbftLog.DeleteBlocksLessThan(consensus.blockNum)
-	consensus.pbftLog.DeleteMessagesLessThan(consensus.blockNum)
+	consensus.PbftLog.DeleteBlocksLessThan(consensus.blockNum)
+	consensus.PbftLog.DeleteMessagesLessThan(consensus.blockNum)
 }
 
 // Start waits for the next new block and run consensus

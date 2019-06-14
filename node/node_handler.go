@@ -3,6 +3,7 @@ package node
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"math"
@@ -14,12 +15,17 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/harmony-one/harmony/api/service/explorer"
+	"github.com/harmony-one/harmony/consensus"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	pb "github.com/golang/protobuf/proto"
+	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 
 	"github.com/harmony-one/harmony/api/proto"
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
@@ -124,6 +130,9 @@ func (node *Node) messageHandler(content []byte, sender string) {
 	case proto.Consensus:
 		msgPayload, _ := proto.GetConsensusMessagePayload(content)
 		node.ConsensusMessageHandler(msgPayload)
+		if node.NodeConfig.Role() == nodeconfig.ExplorerNode {
+			node.ExplorerMessageHandler(msgPayload)
+		}
 	case proto.DRand:
 		msgPayload, _ := proto.GetDRandMessagePayload(content)
 		if node.DRand != nil {
@@ -610,10 +619,12 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		peer.PeerID = p.PeerID
 
 		peer.ConsensusPubKey = &bls.PublicKey{}
-		err = peer.ConsensusPubKey.Deserialize(p.PubKey[:])
-		if err != nil {
-			utils.GetLogInstance().Error("UnmarshalBinary Failed", "error", err)
-			continue
+		if len(p.PubKey) != 0 { // TODO: add the check in bls library
+			err = peer.ConsensusPubKey.Deserialize(p.PubKey[:])
+			if err != nil {
+				utils.GetLogInstance().Error("UnmarshalBinary Failed", "error", err)
+				continue
+			}
 		}
 		peers = append(peers, peer)
 	}
@@ -809,6 +820,67 @@ func (node *Node) ConsensusMessageHandler(msgPayload []byte) {
 	case node.Consensus.MsgChan <- msgPayload:
 	case <-time.After(consensusTimeout):
 		//utils.GetLogInstance().Debug("[Consensus] ConsensusMessageHandler timeout", "duration", consensusTimeout, "msgPayload", len(msgPayload))
+	}
+	return
+}
+
+// ExplorerMessageHandler passes received message in node_handler to explorer service
+func (node *Node) ExplorerMessageHandler(payload []byte) {
+	if len(payload) == 0 {
+		return
+	}
+	msg := &msg_pb.Message{}
+	err := protobuf.Unmarshal(payload, msg)
+	if err != nil {
+		utils.GetLogger().Error("Failed to unmarshal message payload.", "err", err)
+		return
+	}
+
+	if msg.Type == msg_pb.MessageType_COMMITTED {
+
+		recvMsg, err := consensus.ParsePbftMessage(msg)
+		if err != nil {
+			utils.GetLogInstance().Debug("[Explorer] onCommitted unable to parse msg", "error", err)
+			return
+		}
+
+		aggSig, mask, err := node.Consensus.ReadSignatureBitmapPayload(recvMsg.Payload, 0)
+		if err != nil {
+			utils.GetLogInstance().Debug("[Explorer] readSignatureBitmapPayload failed", "error", err)
+			return
+		}
+
+		// check has 2f+1 signatures
+		if count := utils.CountOneBits(mask.Bitmap); count < node.Consensus.Quorum() {
+			utils.GetLogInstance().Debug("[Explorer] not have enough signature", "need", node.Consensus.Quorum(), "have", count)
+			return
+		}
+
+		blockNumHash := make([]byte, 8)
+		binary.LittleEndian.PutUint64(blockNumHash, recvMsg.BlockNum)
+		commitPayload := append(blockNumHash, recvMsg.BlockHash[:]...)
+		if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
+			utils.GetLogInstance().Debug("[Explorer] Failed to verify the multi signature for commit phase", "msgBlock", recvMsg.BlockNum)
+			return
+		}
+		block := node.Consensus.PbftLog.GetBlockByHash(recvMsg.BlockHash)
+
+		// Dump new block into level db.
+		utils.GetLogInstance().Info("[Explorer] Committing block into explorer DB", "msgBlock", recvMsg.BlockNum)
+		explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, true).Dump(block, block.NumberU64())
+	} else if msg.Type == msg_pb.MessageType_ANNOUNCE {
+
+		recvMsg, err := consensus.ParsePbftMessage(msg)
+		if err != nil {
+			utils.GetLogInstance().Debug("[Explorer] onAnnounce unable to parse msg", "error", err)
+			return
+		}
+		block := recvMsg.Payload
+
+		// check block header is valid
+		var blockObj types.Block
+		err = rlp.DecodeBytes(block, &blockObj)
+		node.Consensus.PbftLog.AddBlock(&blockObj)
 	}
 	return
 }

@@ -224,8 +224,8 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	_, ok2 := consensus.bhpSigs[consensus.PubKey.SerializeToHexStr()]
 	if !(ok1 || ok2) {
 		// add own signature for newview message
-		preparedMsgs := consensus.pbftLog.GetMessagesByTypeSeq(msg_pb.MessageType_PREPARED, recvMsg.BlockNum)
-		preparedMsg := consensus.pbftLog.FindMessageByMaxViewID(preparedMsgs)
+		preparedMsgs := consensus.PbftLog.GetMessagesByTypeSeq(msg_pb.MessageType_PREPARED, recvMsg.BlockNum)
+		preparedMsg := consensus.PbftLog.FindMessageByMaxViewID(preparedMsgs)
 		if preparedMsg == nil {
 			sign := consensus.priKey.SignHash(NIL)
 			consensus.nilSigs[consensus.PubKey.SerializeToHexStr()] = sign
@@ -282,7 +282,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				return
 			}
 			blockHash := recvMsg.Payload[:32]
-			aggSig, mask, err := consensus.readSignatureBitmapPayload(recvMsg.Payload, 32)
+			aggSig, mask, err := consensus.ReadSignatureBitmapPayload(recvMsg.Payload, 32)
 			if err != nil {
 				consensus.getLogger().Error("m1 recvMsg payload read error", "error", err)
 				return
@@ -308,7 +308,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				copy(preparedMsg.Payload[:], recvMsg.Payload[32:])
 				preparedMsg.SenderPubkey = consensus.PubKey
 				consensus.getLogger().Info("new leader prepared message added")
-				consensus.pbftLog.AddMessage(&preparedMsg)
+				consensus.PbftLog.AddMessage(&preparedMsg)
 			}
 		}
 		consensus.bhpSigs[senderKey.SerializeToHexStr()] = recvMsg.ViewchangeSig
@@ -341,9 +341,9 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		} else {
 			consensus.switchPhase(Commit, true)
 			copy(consensus.blockHash[:], consensus.m1Payload[:32])
-			aggSig, mask, err := consensus.readSignatureBitmapPayload(recvMsg.Payload, 32)
+			aggSig, mask, err := consensus.ReadSignatureBitmapPayload(recvMsg.Payload, 32)
 			if err != nil {
-				consensus.getLogger().Error("readSignatureBitmapPayload fail", "error", err)
+				consensus.getLogger().Error("ReadSignatureBitmapPayload fail", "error", err)
 				return
 			}
 			consensus.aggregatedPrepareSig = aggSig
@@ -435,7 +435,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		}
 		// m1 is not empty, check it's valid
 		blockHash := recvMsg.Payload[:32]
-		aggSig, mask, err := consensus.readSignatureBitmapPayload(recvMsg.Payload, 32)
+		aggSig, mask, err := consensus.ReadSignatureBitmapPayload(recvMsg.Payload, 32)
 		if err != nil {
 			consensus.getLogger().Error("unable to read signature/bitmap", "error", err)
 			return
@@ -455,7 +455,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		preparedMsg.Payload = make([]byte, len(recvMsg.Payload)-32)
 		copy(preparedMsg.Payload[:], recvMsg.Payload[32:])
 		preparedMsg.SenderPubkey = senderKey
-		consensus.pbftLog.AddMessage(&preparedMsg)
+		consensus.PbftLog.AddMessage(&preparedMsg)
 	}
 
 	// newView message verified success, override my state
