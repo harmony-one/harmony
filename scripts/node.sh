@@ -21,17 +21,6 @@ err() {
    exit "${code}"
 }
 
-function killnode() {
-   local port=$1
-
-   if [ -n "port" ]; then
-      pid=$(/bin/ps -fu $USER | grep "harmony" | grep "$port" | awk '{print $2}')
-      echo "killing node with port: $port"
-      $DRYRUN kill -9 $pid 2> /dev/null
-      echo "node with port: $port is killed"
-   fi
-}
-
 # https://www.linuxjournal.com/content/validating-ip-address-bash-script
 function valid_ip()
 {
@@ -89,15 +78,6 @@ function setup_env
    add_env /etc/pam.d/common-session "session required pam_limits.so"
 }
 
-function find_harmony_process
-{
-   unset -v pidfile pid
-   pidfile="harmony-${PUB_IP}.pid"
-   pid=$!
-   echo "${pid}" > "${pidfile}"
-   ps -f -p "${pid}"
-}
-
 ######## main #########
 if [[ $EUID -ne 0 ]]; then
    echo "This script must be run as root"
@@ -146,8 +126,6 @@ case $# in
    usage "extra arguments at the end ($*)"
    ;;
 esac
-
-killnode
 
 BUCKET=pub.harmony.one
 OS=$(uname -s)
@@ -207,15 +185,3 @@ if [ "$OS" == "Linux" ]; then
 else
    DYLD_FALLBACK_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -is_archival -accounts $IDX
 fi
-
-find_harmony_process
-echo
-echo
-
-# echo Please run the following command to inspect the log
-# echo "tail -f harmony-${PUB_IP}.log"
-
-echo
-echo You may use \"sudo pkill harmony\" to terminate running harmony node program.
-
-trap killnode SIGINT SIGTERM
