@@ -161,7 +161,7 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
   esac
   case "${mode}" in leader*) args=("${args[@]}" -is_leader);; esac
   case "${mode}" in *archival|archival) args=("${args[@]}" -is_archival);; esac
-  case "${mode}" in explorer*) args=("${args[@]}" -is_genesis=false -is_explorer=true -shard_id=${account});; esac
+  case "${mode}" in explorer*) args=("${args[@]}" -is_genesis=false -is_explorer=true -shard_id=0);; esac
   case "${mode}" in
   newnode)
     "${SYNC}" || continue
