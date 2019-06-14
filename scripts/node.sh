@@ -147,11 +147,18 @@ for bin in "${BIN[@]}"; do
    rm -f ${bin}
 done
 
-# download all the binaries
-for bin in "${BIN[@]}"; do
-   curl http://${BUCKET}.s3.amazonaws.com/${FOLDER}${bin} -o ${bin}
-done
-chmod +x harmony
+download_binaries() {
+   local outdir
+   outdir="${1:-.}"
+   mkdir -p "${outdir}"
+   for bin in "${BIN[@]}"; do
+      curl http://${BUCKET}.s3.amazonaws.com/${FOLDER}${bin} -o "${outdir}/${bin}" || return $?
+   done
+   chmod +x "${outdir}/harmony"
+   (cd "${outdir}" && exec openssl sha256 "${BIN[@]}") > "${outdir}/checksums.txt"
+}
+
+download_binaries # for the first time
 
 NODE_PORT=9000
 PUB_IP=
