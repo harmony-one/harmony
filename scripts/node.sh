@@ -195,7 +195,7 @@ cleanup() {
 
    kill_sig="${trap_sig}"
    case "${kill_sig}" in
-   0|EXIT) kill_sig=TERM;;
+   0|EXIT|2|INT) kill_sig=TERM;;
    esac
 
    case "${check_update_pid+set}" in
