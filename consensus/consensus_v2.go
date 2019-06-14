@@ -466,11 +466,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		return
 	}
 
-	// already had enough signautres
-	if len(commitSigs) >= consensus.Quorum() {
-		consensus.getLogger().Info("received additional commit message", "validatorPubKey", validatorPubKey)
-		return
-	}
+	quorumWasMet := len(commitSigs) >= consensus.Quorum()
 
 	// Verify the signature on commitPayload is correct
 	var sign bls.Sign
@@ -494,9 +490,23 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		ctxerror.Warn(consensus.getLogger(), err, "commitBitmap.SetKey failed")
 	}
 
-	if len(commitSigs) >= consensus.Quorum() {
-		consensus.getLogger().Info("Enough commits received!", "num", len(commitSigs))
-		consensus.finalizeCommits()
+	quorumIsMet := len(commitSigs) >= consensus.Quorum()
+	rewardThresholdIsMet := len(commitSigs) >= consensus.RewardThreshold()
+
+	if !quorumWasMet && quorumIsMet {
+		consensus.getLogger().Info("enough commits received for consensus", "num", len(commitSigs))
+		go func(viewID uint32) {
+			time.Sleep(2 * time.Second)
+			consensus.getLogger().Debug("Commit grace period ended")
+			consensus.commitFinishChan <- viewID
+		}(consensus.viewID)
+	}
+
+	if rewardThresholdIsMet {
+		go func(viewID uint32) {
+			consensus.commitFinishChan <- viewID
+			consensus.getLogger().Debug("enough commits received for block reward", "num", len(commitSigs))
+		}(consensus.viewID)
 	}
 }
 
@@ -821,6 +831,15 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 
 			case msg := <-consensus.MsgChan:
 				consensus.handleMessageUpdate(msg)
+
+			case viewID := <-consensus.commitFinishChan:
+				func() {
+					consensus.mutex.Lock()
+					defer consensus.mutex.Unlock()
+					if viewID == consensus.viewID {
+						consensus.finalizeCommits()
+					}
+				}()
 
 			case <-stopChan:
 				return
