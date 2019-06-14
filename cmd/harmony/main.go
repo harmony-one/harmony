@@ -164,51 +164,8 @@ func initSetup() {
 		utils.BootNodes = bootNodeAddrs
 	}
 
-	fmt.Println(*isGenesis)
-	fmt.Println(*isExplorer)
 	if !*isExplorer { // Explorer node doesn't need the following setup
-		ks = hmykey.GetHmyKeyStore()
-
-		allAccounts := ks.Accounts()
-
-		// TODO: lc try to enable multiple staking accounts per node
-		accountIndex, genesisAccount = genesis.FindAccount(*stakingAccounts)
-
-		if genesisAccount == nil {
-			fmt.Printf("Can't find the account address: %v!\n", *stakingAccounts)
-			os.Exit(100)
-		}
-
-		foundAccount := false
-		for _, account := range allAccounts {
-			if common.ParseAddr(genesisAccount.Address) == account.Address {
-				myAccount = account
-				foundAccount = true
-				break
-			}
-		}
-
-		if !foundAccount {
-			fmt.Printf("Can't find the matching account key: %v!\n", genesisAccount.Address)
-			os.Exit(101)
-		}
-
-		genesisAccount.ShardID = uint32(accountIndex % core.GenesisShardNum)
-
-		fmt.Printf("My Account: %s\n", common.MustAddressToBech32(myAccount.Address))
-		fmt.Printf("Key URL: %s\n", myAccount.URL)
-		fmt.Printf("My Genesis Account: %v\n", *genesisAccount)
-
-		var myPass string
-		if !*hmyNoPass {
-			myPass = utils.AskForPassphrase("Passphrase: ")
-			err := ks.Unlock(myAccount, myPass)
-			if err != nil {
-				fmt.Printf("Wrong Passphrase! Unable to unlock account key!\n")
-				os.Exit(3)
-			}
-		}
-		hmykey.SetHmyPass(myPass)
+		setupConsensusKeys()
 	} else {
 		genesisAccount = &genesis.DeployAccount{}
 		genesisAccount.ShardID = uint32(*shardID)
@@ -218,6 +175,51 @@ func initSetup() {
 	if *enableGC {
 		memprofiling.MaybeCallGCPeriodically()
 	}
+}
+
+func setupConsensusKeys() {
+	ks = hmykey.GetHmyKeyStore()
+
+	allAccounts := ks.Accounts()
+
+	// TODO: lc try to enable multiple staking accounts per node
+	accountIndex, genesisAccount = genesis.FindAccount(*stakingAccounts)
+
+	if genesisAccount == nil {
+		fmt.Printf("Can't find the account address: %v!\n", *stakingAccounts)
+		os.Exit(100)
+	}
+
+	foundAccount := false
+	for _, account := range allAccounts {
+		if common.ParseAddr(genesisAccount.Address) == account.Address {
+			myAccount = account
+			foundAccount = true
+			break
+		}
+	}
+
+	if !foundAccount {
+		fmt.Printf("Can't find the matching account key: %v!\n", genesisAccount.Address)
+		os.Exit(101)
+	}
+
+	genesisAccount.ShardID = uint32(accountIndex % core.GenesisShardNum)
+
+	fmt.Printf("My Account: %s\n", common.MustAddressToBech32(myAccount.Address))
+	fmt.Printf("Key URL: %s\n", myAccount.URL)
+	fmt.Printf("My Genesis Account: %v\n", *genesisAccount)
+
+	var myPass string
+	if !*hmyNoPass {
+		myPass = utils.AskForPassphrase("Passphrase: ")
+		err := ks.Unlock(myAccount, myPass)
+		if err != nil {
+			fmt.Printf("Wrong Passphrase! Unable to unlock account key!\n")
+			os.Exit(3)
+		}
+	}
+	hmykey.SetHmyPass(myPass)
 }
 
 func createGlobalConfig() *nodeconfig.ConfigType {
@@ -442,8 +444,6 @@ func main() {
 	utils.SetLogContext(*port, *ip)
 	utils.SetLogVerbosity(log.Lvl(*verbosity))
 
-	fmt.Println(os.Args)
-	fmt.Println(*minPeers)
 	initSetup()
 	nodeConfig := createGlobalConfig()
 	initLogFile(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps)
