@@ -3,8 +3,6 @@ package consensus
 import (
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 
@@ -61,8 +59,8 @@ func TestConstructPreparedMessage(test *testing.T) {
 	consensus.blockHash = [32]byte{}
 
 	message := "test string"
-	consensus.prepareSigs[common.Address{}] = leaderPriKey.Sign(message)
-	consensus.prepareSigs[common.Address{}] = validatorPriKey.Sign(message)
+	consensus.prepareSigs[leaderPubKey.SerializeToHexStr()] = leaderPriKey.Sign(message)
+	consensus.prepareSigs[validatorPubKey.SerializeToHexStr()] = validatorPriKey.Sign(message)
 	// According to RJ these failures are benign.
 	if err := consensus.prepareBitmap.SetKey(leaderPubKey, true); err != nil {
 		test.Log(ctxerror.New("prepareBitmap.SetKey").WithCause(err))

@@ -94,7 +94,7 @@ func (consensus *Consensus) tryAnnounce(block *types.Block) {
 	consensus.pbftLog.AddBlock(block)
 
 	// Leader sign the block hash itself
-	consensus.prepareSigs[consensus.SelfAddress] = consensus.priKey.SignHash(consensus.blockHash[:])
+	consensus.prepareSigs[consensus.PubKey.SerializeToHexStr()] = consensus.priKey.SignHash(consensus.blockHash[:])
 
 	// Construct broadcast p2p message
 	if err := consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
@@ -258,9 +258,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		return
 	}
 
-	validatorPubKey := recvMsg.SenderPubkey
-	addrBytes := validatorPubKey.GetAddress()
-	validatorAddress := common.BytesToAddress(addrBytes[:])
+	validatorPubKey := recvMsg.SenderPubkey.SerializeToHexStr()
 
 	prepareSig := recvMsg.Payload
 	prepareSigs := consensus.prepareSigs
@@ -274,9 +272,9 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	}
 
 	// proceed only when the message is not received before
-	_, ok := prepareSigs[validatorAddress]
+	_, ok := prepareSigs[validatorPubKey]
 	if ok {
-		consensus.getLogger().Debug("Already received prepare message from the validator", "validatorAddress", validatorAddress)
+		consensus.getLogger().Debug("Already received prepare message from the validator", "validatorPubKey", validatorPubKey)
 		return
 	}
 
@@ -284,18 +282,18 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	var sign bls.Sign
 	err = sign.Deserialize(prepareSig)
 	if err != nil {
-		consensus.getLogger().Error("Failed to deserialize bls signature", "validatorAddress", validatorAddress)
+		consensus.getLogger().Error("Failed to deserialize bls signature", "validatorPubKey", validatorPubKey)
 		return
 	}
-	if !sign.VerifyHash(validatorPubKey, consensus.blockHash[:]) {
-		consensus.getLogger().Error("Received invalid BLS signature", "validatorAddress", validatorAddress)
+	if !sign.VerifyHash(recvMsg.SenderPubkey, consensus.blockHash[:]) {
+		consensus.getLogger().Error("Received invalid BLS signature", "validatorPubKey", validatorPubKey)
 		return
 	}
 
-	consensus.getLogger().Debug("Received new prepare signature", "numReceivedSoFar", len(prepareSigs), "validatorAddress", validatorAddress, "PublicKeys", len(consensus.PublicKeys))
-	prepareSigs[validatorAddress] = &sign
+	consensus.getLogger().Debug("Received new prepare signature", "numReceivedSoFar", len(prepareSigs), "validatorPubKey", validatorPubKey, "PublicKeys", len(consensus.PublicKeys))
+	prepareSigs[validatorPubKey] = &sign
 	// Set the bitmap indicating that this validator signed.
-	if err := prepareBitmap.SetKey(validatorPubKey, true); err != nil {
+	if err := prepareBitmap.SetKey(recvMsg.SenderPubkey, true); err != nil {
 		ctxerror.Warn(consensus.getLogger(), err, "prepareBitmap.SetKey failed")
 	}
 
@@ -326,7 +324,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		blockNumHash := make([]byte, 8)
 		binary.LittleEndian.PutUint64(blockNumHash, consensus.blockNum)
 		commitPayload := append(blockNumHash, consensus.blockHash[:]...)
-		consensus.commitSigs[consensus.SelfAddress] = consensus.priKey.SignHash(commitPayload)
+		consensus.commitSigs[consensus.PubKey.SerializeToHexStr()] = consensus.priKey.SignHash(commitPayload)
 	}
 	return
 }
@@ -469,17 +467,15 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		return
 	}
 
-	validatorPubKey := recvMsg.SenderPubkey
-	addrBytes := validatorPubKey.GetAddress()
-	validatorAddress := common.BytesToAddress(addrBytes[:])
+	validatorPubKey := recvMsg.SenderPubkey.SerializeToHexStr()
 
 	commitSig := recvMsg.Payload
 
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
-	if !consensus.IsValidatorInCommittee(validatorAddress) {
-		consensus.getLogger().Error("Invalid validator", "validatorAddress", validatorAddress)
+	if !consensus.IsValidatorInCommittee(recvMsg.SenderPubkey) {
+		consensus.getLogger().Error("Invalid validator", "validatorPubKey", validatorPubKey)
 		return
 	}
 
@@ -487,9 +483,9 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	commitBitmap := consensus.commitBitmap
 
 	// proceed only when the message is not received before
-	_, ok := commitSigs[validatorAddress]
+	_, ok := commitSigs[validatorPubKey]
 	if ok {
-		consensus.getLogger().Debug("Already received commit message from the validator", "validatorAddress", validatorAddress)
+		consensus.getLogger().Debug("Already received commit message from the validator", "validatorPubKey", validatorPubKey)
 		return
 	}
 
@@ -502,21 +498,21 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	var sign bls.Sign
 	err = sign.Deserialize(commitSig)
 	if err != nil {
-		consensus.getLogger().Debug("Failed to deserialize bls signature", "validatorAddress", validatorAddress)
+		consensus.getLogger().Debug("Failed to deserialize bls signature", "validatorPubKey", validatorPubKey)
 		return
 	}
 	blockNumHash := make([]byte, 8)
 	binary.LittleEndian.PutUint64(blockNumHash, recvMsg.BlockNum)
 	commitPayload := append(blockNumHash, recvMsg.BlockHash[:]...)
-	if !sign.VerifyHash(validatorPubKey, commitPayload) {
+	if !sign.VerifyHash(recvMsg.SenderPubkey, commitPayload) {
 		consensus.getLogger().Error("cannot verify commit message", "msgViewID", recvMsg.ViewID, "msgBlock", recvMsg.BlockNum)
 		return
 	}
 
-	consensus.getLogger().Debug("Received new commit message", "numReceivedSoFar", len(commitSigs), "msgViewID", recvMsg.ViewID, "msgBlock", recvMsg.BlockNum, "validatorAddress", validatorAddress)
-	commitSigs[validatorAddress] = &sign
+	consensus.getLogger().Debug("Received new commit message", "numReceivedSoFar", len(commitSigs), "msgViewID", recvMsg.ViewID, "msgBlock", recvMsg.BlockNum, "validatorPubKey", validatorPubKey)
+	commitSigs[validatorPubKey] = &sign
 	// Set the bitmap indicating that this validator signed.
-	if err := commitBitmap.SetKey(validatorPubKey, true); err != nil {
+	if err := commitBitmap.SetKey(recvMsg.SenderPubkey, true); err != nil {
 		ctxerror.Warn(consensus.getLogger(), err, "commitBitmap.SetKey failed")
 	}
 
