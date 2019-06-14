@@ -225,6 +225,18 @@ do
    trap "trap_func ${trap_sig}" ${trap_sig}
 done
 
+# Kill the given PID, ensuring that it is a child of this script ($$).
+kill_child() {
+   local pid
+   pid="${1}"
+   case $(($(ps -oppid= -p"${pid}" || :) + 0)) in
+   $$) ;;
+   *) return 1;;
+   esac
+   msg "killing pid ${pid}"
+   kill "${pid}"
+}
+
 {
    # TODO ek – implement me
 } &
