@@ -805,10 +805,5 @@ func getBinaryPath() (argv0 string, err error) {
 
 // ConsensusMessageHandler passes received message in node_handler to consensus
 func (node *Node) ConsensusMessageHandler(msgPayload []byte) {
-	select {
-	case node.Consensus.MsgChan <- msgPayload:
-	case <-time.After(consensusTimeout):
-		//utils.GetLogInstance().Debug("[Consensus] ConsensusMessageHandler timeout", "duration", consensusTimeout, "msgPayload", len(msgPayload))
-	}
-	return
+	node.Consensus.MsgChan <- msgPayload
 }
