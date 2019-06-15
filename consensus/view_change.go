@@ -137,6 +137,7 @@ func (consensus *Consensus) getIndexOfPubKey(pubKey *bls.PublicKey) int {
 
 // ResetViewChangeState reset the state for viewchange
 func (consensus *Consensus) ResetViewChangeState() {
+	consensus.getLogger().Debug("[ResetViewChangeState] Resetting view change state", "Phase", consensus.phase)
 	consensus.mode.SetMode(Normal)
 	bhpBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, nil)
 	nilBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, nil)
