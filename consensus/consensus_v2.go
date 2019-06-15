@@ -38,13 +38,13 @@ func (consensus *Consensus) handleMessageUpdate(payload []byte) {
 	}
 
 	if msg.Type == msg_pb.MessageType_VIEWCHANGE || msg.Type == msg_pb.MessageType_NEWVIEW {
-		if msg.GetViewchange().ShardId != consensus.ShardID {
+		if msg.GetViewchange() != nil && msg.GetViewchange().ShardId != consensus.ShardID {
 			consensus.getLogger().Warn("Received view change message from different shard",
 				"myShardId", consensus.ShardID, "receivedShardId", msg.GetConsensus().ShardId)
 			return
 		}
 	} else {
-		if msg.GetConsensus().ShardId != consensus.ShardID {
+		if msg.GetConsensus() != nil && msg.GetConsensus().ShardId != consensus.ShardID {
 			consensus.getLogger().Warn("Received consensus message from different shard",
 				"myShardId", consensus.ShardID, "receivedShardId", msg.GetConsensus().ShardId)
 			return
