@@ -18,7 +18,6 @@ import (
 	"github.com/harmony-one/harmony/accounts/keystore"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/drand"
 	"github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -396,14 +395,12 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentNode.NodeConfig.ConsensusPubKey = nodeConfig.ConsensusPubKey
 	currentNode.NodeConfig.ConsensusPriKey = nodeConfig.ConsensusPriKey
 
-	// Add randomness protocol
-	// TODO: enable drand only for beacon chain
-	// TODO: put this in a better place other than main.
-	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of drand later.
-	dRand := drand.New(nodeConfig.Host, nodeConfig.ShardID, []p2p.Peer{}, nodeConfig.Leader, currentNode.ConfirmedBlockChannel, nodeConfig.ConsensusPriKey)
-	currentNode.Consensus.RegisterPRndChannel(dRand.PRndChannel)
-	currentNode.Consensus.RegisterRndChannel(dRand.RndChannel)
-	currentNode.DRand = dRand
+	// TODO: Disable drand. Currently drand isn't functioning but we want to compeletely turn it off for full protection.
+	// Enable it back after mainnet.
+	// dRand := drand.New(nodeConfig.Host, nodeConfig.ShardID, []p2p.Peer{}, nodeConfig.Leader, currentNode.ConfirmedBlockChannel, nodeConfig.ConsensusPriKey)
+	// currentNode.Consensus.RegisterPRndChannel(dRand.PRndChannel)
+	// currentNode.Consensus.RegisterRndChannel(dRand.RndChannel)
+	// currentNode.DRand = dRand
 
 	// This needs to be executed after consensus and drand are setup
 	if !*isNewNode || *shardID > -1 { // initial staking new node doesn't need to initialize shard state
