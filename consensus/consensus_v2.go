@@ -450,7 +450,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	}
 
 	if !consensus.pbftLog.HasMatchingAnnounce(consensus.blockNum, recvMsg.BlockHash) {
-		consensus.getLogger().Debug("[OnCommit] cannot find matching blockhash")
+		consensus.getLogger().Debug("[OnCommit] cannot find matching blockhash", "MsgBlockHash", recvMsg.BlockHash, "MsgBlockNum", recvMsg.BlockNum)
 		return
 	}
 
