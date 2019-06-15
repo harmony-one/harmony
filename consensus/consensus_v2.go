@@ -152,7 +152,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	if consensus.mode.Mode() == Normal {
 		// skip verify header when node is in Syncing mode
 		if err := consensus.VerifyHeader(consensus.ChainReader, blockObj.Header(), false); err != nil {
-			consensus.getLogger().Warn("onAnnounce block content is not verified successfully", "error", err, "inChain", consensus.ChainReader.CurrentHeader().Number, "got", blockObj.Header().Number)
+			consensus.getLogger().Warn("onAnnounce block content is not verified successfully", "error", err, "inChain", consensus.ChainReader.CurrentHeader().Number, "MsgBlockNumber", blockObj.Header().Number)
 			return
 		}
 	}
