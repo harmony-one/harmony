@@ -307,7 +307,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		if err := consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
 			consensus.getLogger().Warn("[OnPrepare] Cannot send prepared message")
 		} else {
-			consensus.getLogger().Debug("[OnPrepare] Sent prepared message")
+			consensus.getLogger().Debug("[OnPrepare] Sent Prepared Message!!", "BlockHash", consensus.blockHash, "BlockNum", consensus.blockNum)
 		}
 
 		consensus.getLogger().Debug("[OnPrepare] Switching phase", "From", consensus.phase, "To", Commit)
@@ -417,7 +417,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	if err := consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
 		consensus.getLogger().Warn("cannot send commit message")
 	} else {
-		consensus.getLogger().Debug("sent commit message")
+		consensus.getLogger().Debug("[OnPrepared] Sent Commit Message!!", "BlockHash", consensus.blockHash, "BlockNum", consensus.blockNum)
 	}
 
 	consensus.getLogger().Debug("[OnPrepared] Switching phase", "From", consensus.phase, "To", Commit)
@@ -537,9 +537,9 @@ func (consensus *Consensus) finalizeCommits() {
 	consensus.aggregatedCommitSig = aggSig
 
 	if err := consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
-		ctxerror.Warn(consensus.getLogger(), err, "cannot send committed message")
+		ctxerror.Warn(consensus.getLogger(), err, "[Finalizing] Cannot send committed message")
 	} else {
-		consensus.getLogger().Debug("[Finalizing] Sent committed message", "len", len(msgToSend))
+		consensus.getLogger().Debug("[Finalizing] Sent Committed Message", "BlockHash", consensus.blockHash, "BlockNum", consensus.blockNum)
 	}
 
 	consensus.getLogger().Debug("[Finalizing] Switching phase", "From", consensus.phase, "To", Announce)

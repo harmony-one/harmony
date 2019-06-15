@@ -173,7 +173,7 @@ func (consensus *Consensus) startViewChange(viewID uint32) {
 
 	diff := viewID - consensus.viewID
 	duration := time.Duration(int64(diff) * int64(viewChangeDuration))
-	consensus.getLogger().Info("startViewChange", "viewID", viewID, "timeoutDuration", duration, "nextLeader", consensus.LeaderPubKey.SerializeToHexStr())
+	consensus.getLogger().Info("startViewChange", "viewID", viewID, "timeoutDuration", duration, "NextLeader:", consensus.LeaderPubKey.SerializeToHexStr())
 
 	msgToSend := consensus.constructViewChangeMessage()
 	consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
