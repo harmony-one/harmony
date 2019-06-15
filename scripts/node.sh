@@ -86,7 +86,7 @@ fi
 
 print_usage() {
    cat <<- ENDEND
-	usage: ${progname} [-1c] account_address
+	usage: ${progname} [-1ch] account_address
 	-c              back up database/logs and start clean
 	 		(use only when directed by Harmony)
 	-1		do not loop; run once and exit
@@ -106,13 +106,14 @@ loop=true
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :c1 opt
+while getopts :1ch opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
    ':') usage "missing argument for -${OPTARG}";;
    c) start_clean=true;;
    1) loop=false;;
+   h) print_usage; exit 0;;
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
