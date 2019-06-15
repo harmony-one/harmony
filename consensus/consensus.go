@@ -143,6 +143,8 @@ type Consensus struct {
 
 	// Used to convey to the consensus main loop that block syncing has finished.
 	syncReadyChan chan struct{}
+	// Used to convey to the consensus main loop that node is out of sync
+	syncNotReadyChan chan struct{}
 
 	// If true, this consensus will not propose view change.
 	disableViewChange bool
@@ -180,6 +182,11 @@ func (consensus *Consensus) DisableViewChangeForTestingOnly() {
 // thus the blockchain is likely to be up to date.
 func (consensus *Consensus) BlocksSynchronized() {
 	consensus.syncReadyChan <- struct{}{}
+}
+
+// BlocksNotSynchronized lets the main loop know that block is not synchronized
+func (consensus *Consensus) BlocksNotSynchronized() {
+	consensus.syncNotReadyChan <- struct{}{}
 }
 
 // WaitForSyncing informs the node syncing service to start syncing
@@ -254,6 +261,7 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 
 	consensus.MsgChan = make(chan []byte)
 	consensus.syncReadyChan = make(chan struct{})
+	consensus.syncNotReadyChan = make(chan struct{})
 	consensus.commitFinishChan = make(chan uint32)
 
 	consensus.ReadySignal = make(chan struct{})
