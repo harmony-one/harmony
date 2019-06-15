@@ -327,7 +327,8 @@ func (consensus *Consensus) GetViewIDSigsArray() []*bls.Sign {
 
 // ResetState resets the state of the consensus
 func (consensus *Consensus) ResetState() {
-	consensus.phase = Announce
+	consensus.getLogger().Debug("[ResetState] Resetting consensus state", "Phase", consensus.phase)
+	consensus.switchPhase(Announce, true)
 	consensus.blockHash = [32]byte{}
 	consensus.prepareSigs = map[string]*bls.Sign{}
 	consensus.commitSigs = map[string]*bls.Sign{}
