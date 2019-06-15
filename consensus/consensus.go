@@ -45,6 +45,9 @@ type Consensus struct {
 	// How long to delay sending commit messages.
 	delayCommit time.Duration
 
+	// Consensus rounds whose commit phase finished
+	commitFinishChan chan uint32
+
 	// 2 types of timeouts: normal and viewchange
 	consensusTimeout map[TimeoutType]*utils.Timeout
 
@@ -189,6 +192,12 @@ func (consensus *Consensus) Quorum() int {
 	return len(consensus.PublicKeys)*2/3 + 1
 }
 
+// RewardThreshold returns the threshold to stop accepting commit messages
+// when leader receives enough signatures for block reward
+func (consensus *Consensus) RewardThreshold() int {
+	return len(consensus.PublicKeys) * 9 / 10
+}
+
 // StakeInfoFinder finds the staking account for the given consensus key.
 type StakeInfoFinder interface {
 	// FindStakeInfoByNodeKey returns a list of staking information matching
@@ -245,6 +254,7 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 
 	consensus.MsgChan = make(chan []byte)
 	consensus.syncReadyChan = make(chan struct{})
+	consensus.commitFinishChan = make(chan uint32)
 
 	consensus.ReadySignal = make(chan struct{})
 	if nodeconfig.GetDefaultConfig().IsLeader() {
