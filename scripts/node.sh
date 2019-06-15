@@ -84,14 +84,19 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-usage() {
-   msg "$@"
+print_usage() {
    cat <<- ENDEND
 	usage: ${progname} [-1c] account_address
 	-c              back up database/logs and start clean
 	 		(use only when directed by Harmony)
 	-1		do not loop; run once and exit
+	-h		print this help and exit
 	ENDEND
+}
+
+usage() {
+   msg "$@"
+   print_usage >&2
    exit 64  # EX_USAGE
 }
 
