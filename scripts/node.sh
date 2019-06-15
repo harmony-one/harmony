@@ -289,14 +289,18 @@ kill_node() {
 } > harmony-update.out 2>&1 &
 check_update_pid=$!
 
+unset -v passphrase
+read -rsp "Enter passphrase for account ${IDX}: " passphrase
+echo
+
 while :
 do
    msg "############### Running Harmony Process ###############"
    if [ "$OS" == "Linux" ]; then
    # Run Harmony Node
-      LD_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -is_archival -accounts $IDX
+      echo -n "${passphrase}" | LD_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -is_archival -accounts $IDX -pass stdin
    else
-      DYLD_FALLBACK_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -is_archival -accounts $IDX
+      echo -n "${passphrase}" | DYLD_FALLBACK_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -is_archival -accounts $IDX -pass stdin
    fi || msg "node process finished with status $?"
    ${loop} || break
    msg "restarting in 10s..."
