@@ -339,6 +339,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				consensus.ReadySignal <- struct{}{}
 			}()
 		} else {
+			consensus.getLogger().Debug("[OnViewChange] Switching phase", "From", consensus.phase, "To", Commit)
 			consensus.switchPhase(Commit, true)
 			copy(consensus.blockHash[:], consensus.m1Payload[:32])
 			aggSig, mask, err := consensus.readSignatureBitmapPayload(recvMsg.Payload, 32)
@@ -479,6 +480,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 
 		consensus.getLogger().Info("onNewView === commit")
 		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
+		consensus.getLogger().Debug("[OnViewChange] Switching phase", "From", consensus.phase, "To", Commit)
 		consensus.switchPhase(Commit, true)
 	} else {
 		consensus.ResetState()
