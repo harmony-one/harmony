@@ -328,6 +328,7 @@ func accumulateRewards(
 	}
 	totalAmount := big.NewInt(0)
 	numAccounts := 0
+	signers := []string{}
 	for idx, member := range parentCommittee.NodeList {
 		if signed, err := mask.IndexEnabled(idx); err != nil {
 			return ctxerror.New("cannot check for committer bit",
@@ -338,16 +339,14 @@ func accumulateRewards(
 		}
 		numAccounts++
 		account := member.EcdsaAddress
-		getLogger().Info("rewarding block signer",
-			"account", account,
-			"node", member.BlsPublicKey.Hex(),
-			"amount", BlockReward)
+		signers = append(signers, account.Hex())
 		state.AddBalance(account, BlockReward)
 		totalAmount = new(big.Int).Add(totalAmount, BlockReward)
 	}
-	getLogger().Debug("paid out block reward",
-		"numAccounts", numAccounts,
-		"totalAmount", totalAmount)
+	getLogger().Debug("【Block Reward] Successfully paid out block reward",
+		"NumAccounts", numAccounts,
+		"TotalAmount", totalAmount,
+		"Signers", signers)
 	return nil
 }
 

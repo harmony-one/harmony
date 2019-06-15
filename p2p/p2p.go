@@ -2,11 +2,10 @@ package p2p
 
 import (
 	"fmt"
-	"net"
-
 	"github.com/harmony-one/bls/ffi/go/bls"
 	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 	ma "github.com/multiformats/go-multiaddr"
+	"net"
 )
 
 // StreamHandler handles incoming p2p message.
@@ -22,5 +21,9 @@ type Peer struct {
 }
 
 func (p Peer) String() string {
-	return fmt.Sprintf("%s/%s[%d]", net.JoinHostPort(p.IP, p.Port), p.PeerID, len(p.Addrs))
+	BlsPubKey := "nil"
+	if p.ConsensusPubKey != nil {
+		BlsPubKey = p.ConsensusPubKey.SerializeToHexStr()
+	}
+	return fmt.Sprintf("BlsPubKey:%s-%s/%s[%d]", BlsPubKey, net.JoinHostPort(p.IP, p.Port), p.PeerID, len(p.Addrs))
 }

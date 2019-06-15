@@ -636,7 +636,7 @@ func (ss *StateSync) IsSameBlockchainHeight(bc *core.BlockChain) (uint64, bool) 
 func (ss *StateSync) IsOutOfSync(bc *core.BlockChain) bool {
 	otherHeight := ss.getMaxPeerHeight()
 	currentHeight := bc.CurrentBlock().NumberU64()
-	utils.GetLogInstance().Debug("[SYNC] IsOutOfSync", "otherHeight", otherHeight, "myHeight", currentHeight)
+	utils.GetLogInstance().Debug("[SYNC] Checking sync status", "OtherHeight", otherHeight, "MyHeight", currentHeight, "IsOutOfSync", currentHeight+inSyncThreshold < otherHeight)
 	return currentHeight+inSyncThreshold < otherHeight
 }
 

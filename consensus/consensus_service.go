@@ -538,5 +538,5 @@ func (consensus *Consensus) logger(logger log.Logger) log.Logger {
 // getLogger returns logger for consensus contexts added
 func (consensus *Consensus) getLogger() log.Logger {
 	logger := consensus.logger(utils.GetLogInstance())
-	return utils.WithCallerSkip(logger, 1)
+	return logger
 }
