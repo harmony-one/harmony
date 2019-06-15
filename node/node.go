@@ -424,7 +424,8 @@ func (node *Node) InitShardState(isGenesis bool) (err error) {
 	}
 	getLogger().Info("initialized shard state", "numPubKeys", len(pubKeys))
 	node.Consensus.UpdatePublicKeys(pubKeys)
-	node.DRand.UpdatePublicKeys(pubKeys)
+	// TODO: Disable drand. Currently drand isn't functioning but we want to compeletely turn it off for full protection.
+	// node.DRand.UpdatePublicKeys(pubKeys)
 	return nil
 }
 
