@@ -101,6 +101,7 @@ func (consensus *Consensus) Prepare(chain consensus_engine.ChainReader, header *
 func (consensus *Consensus) populateMessageFields(request *msg_pb.ConsensusRequest) {
 	request.ViewId = consensus.viewID
 	request.BlockNum = consensus.blockNum
+	request.ShardId = consensus.ShardID
 
 	// 32 byte block hash
 	request.BlockHash = consensus.blockHash[:]

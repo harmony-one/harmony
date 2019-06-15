@@ -37,6 +37,20 @@ func (consensus *Consensus) handleMessageUpdate(payload []byte) {
 		return
 	}
 
+	if msg.Type == msg_pb.MessageType_VIEWCHANGE || msg.Type == msg_pb.MessageType_NEWVIEW {
+		if msg.GetViewchange() != nil && msg.GetViewchange().ShardId != consensus.ShardID {
+			consensus.getLogger().Warn("Received view change message from different shard",
+				"myShardId", consensus.ShardID, "receivedShardId", msg.GetConsensus().ShardId)
+			return
+		}
+	} else {
+		if msg.GetConsensus() != nil && msg.GetConsensus().ShardId != consensus.ShardID {
+			consensus.getLogger().Warn("Received consensus message from different shard",
+				"myShardId", consensus.ShardID, "receivedShardId", msg.GetConsensus().ShardId)
+			return
+		}
+	}
+
 	switch msg.Type {
 	case msg_pb.MessageType_ANNOUNCE:
 		consensus.onAnnounce(msg)
@@ -57,14 +71,14 @@ func (consensus *Consensus) handleMessageUpdate(payload []byte) {
 }
 
 // TODO: move to consensus_leader.go later
-func (consensus *Consensus) tryAnnounce(block *types.Block) {
+func (consensus *Consensus) announce(block *types.Block) {
 	blockHash := block.Hash()
 	copy(consensus.blockHash[:], blockHash[:])
 
 	// prepare message and broadcast to validators
 	encodedBlock, err := rlp.EncodeToBytes(block)
 	if err != nil {
-		consensus.getLogger().Debug("tryAnnounce Failed encoding block")
+		consensus.getLogger().Debug("announce Failed encoding block")
 		return
 	}
 	consensus.block = encodedBlock
@@ -77,7 +91,7 @@ func (consensus *Consensus) tryAnnounce(block *types.Block) {
 	_ = protobuf.Unmarshal(msgPayload, msg)
 	pbftMsg, err := ParsePbftMessage(msg)
 	if err != nil {
-		consensus.getLogger().Warn("tryAnnounce unable to parse pbft message", "error", err)
+		consensus.getLogger().Warn("announce unable to parse pbft message", "error", err)
 		return
 	}
 
@@ -174,13 +188,13 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		consensus.getLogger().Debug("viewID check failed", "msgViewID", recvMsg.ViewID, "msgBlockNum", recvMsg.BlockNum)
 		return
 	}
-	consensus.tryPrepare(&blockObj)
+	consensus.prepare(&blockObj)
 
 	return
 }
 
 // tryPrepare will try to send prepare message
-func (consensus *Consensus) tryPrepare(block *types.Block) {
+func (consensus *Consensus) prepare(block *types.Block) {
 	//	if consensus.blockNum != block.NumberU64() || !consensus.pbftLog.HasMatchingViewAnnounce(consensus.blockNum, consensus.viewID, hash) {
 	//		consensus.getLogger().Debug("blockNum or announce message not match")
 	//		return
@@ -790,7 +804,6 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 						break
 					}
 				}
-
 			case <-consensus.syncReadyChan:
 				consensus.SetBlockNum(consensus.ChainReader.CurrentHeader().Number.Uint64() + 1)
 				consensus.ignoreViewIDCheck = true
@@ -827,7 +840,7 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 
 				startTime = time.Now()
 				consensus.getLogger().Debug("STARTING CONSENSUS", "numTxs", len(newBlock.Transactions()), "consensus", consensus, "startTime", startTime, "publicKeys", len(consensus.PublicKeys))
-				consensus.tryAnnounce(newBlock)
+				consensus.announce(newBlock)
 
 			case msg := <-consensus.MsgChan:
 				consensus.handleMessageUpdate(msg)

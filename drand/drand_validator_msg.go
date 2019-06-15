@@ -19,7 +19,7 @@ func (dRand *DRand) constructCommitMessage(vrf [32]byte, proof []byte) []byte {
 	drandMsg := message.GetDrand()
 	drandMsg.SenderPubkey = dRand.pubKey.Serialize()
 	drandMsg.BlockHash = dRand.blockHash[:]
-	drandMsg.BlockHash = dRand.blockHash[:]
+	drandMsg.ShardId = dRand.ShardID
 	drandMsg.Payload = append(vrf[:], proof...)
 	// Adding the public key into payload so leader can verify the vrf
 	// TODO: change the curve to follow the same curve with consensus, so the public key doesn't need to be attached.
