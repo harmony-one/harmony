@@ -430,32 +430,32 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 
 	senderKey, err := consensus.verifySenderKey(msg)
 	if err != nil {
-		consensus.getLogger().Debug("onCommit verifySenderKey failed", "error", err)
+		consensus.getLogger().Debug("[OnCommit] VerifySenderKey Failed", "error", err)
 		return
 	}
 	if err = verifyMessageSig(senderKey, msg); err != nil {
-		consensus.getLogger().Debug("onCommit Failed to verify sender's signature", "error", err)
+		consensus.getLogger().Debug("[OnCommit] Failed to verify sender's signature", "error", err)
 		return
 	}
 
 	recvMsg, err := ParsePbftMessage(msg)
 	if err != nil {
-		consensus.getLogger().Debug("onCommit parse pbft message failed", "error", err)
+		consensus.getLogger().Debug("[OnCommit] parse pbft message failed", "error", err)
 		return
 	}
 
 	if recvMsg.ViewID != consensus.viewID || recvMsg.BlockNum != consensus.blockNum {
-		consensus.getLogger().Debug("blockNum/viewID not match", "msgViewID", recvMsg.ViewID, "msgBlock", recvMsg.BlockNum)
+		consensus.getLogger().Debug("[OnCommit] blockNum/viewID not match", "msgViewID", recvMsg.ViewID, "msgBlock", recvMsg.BlockNum)
 		return
 	}
 
 	if !consensus.pbftLog.HasMatchingAnnounce(consensus.blockNum, recvMsg.BlockHash) {
-		consensus.getLogger().Debug("cannot find matching blockhash")
+		consensus.getLogger().Debug("[OnCommit] cannot find matching blockhash")
 		return
 	}
 
 	if !consensus.pbftLog.HasMatchingPrepared(consensus.blockNum, recvMsg.BlockHash) {
-		consensus.getLogger().Debug("cannot find matching prepared message", "blockHash", recvMsg.BlockHash)
+		consensus.getLogger().Debug("[OnCommit] cannot find matching prepared message", "blockHash", recvMsg.BlockHash)
 		return
 	}
 
@@ -467,7 +467,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	defer consensus.mutex.Unlock()
 
 	if !consensus.IsValidatorInCommittee(recvMsg.SenderPubkey) {
-		consensus.getLogger().Error("Invalid validator", "validatorPubKey", validatorPubKey)
+		consensus.getLogger().Error("[OnCommit] Invalid validator", "validatorPubKey", validatorPubKey)
 		return
 	}
 
@@ -477,7 +477,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	// proceed only when the message is not received before
 	_, ok := commitSigs[validatorPubKey]
 	if ok {
-		consensus.getLogger().Info("Already received commit message from the validator", "validatorPubKey", validatorPubKey)
+		consensus.getLogger().Info("[OnCommit] Already received commit message from the validator", "validatorPubKey", validatorPubKey)
 		return
 	}
 
@@ -487,22 +487,22 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	var sign bls.Sign
 	err = sign.Deserialize(commitSig)
 	if err != nil {
-		consensus.getLogger().Debug("Failed to deserialize bls signature", "validatorPubKey", validatorPubKey)
+		consensus.getLogger().Debug("[OnCommit] Failed to deserialize bls signature", "validatorPubKey", validatorPubKey)
 		return
 	}
 	blockNumHash := make([]byte, 8)
 	binary.LittleEndian.PutUint64(blockNumHash, recvMsg.BlockNum)
 	commitPayload := append(blockNumHash, recvMsg.BlockHash[:]...)
 	if !sign.VerifyHash(recvMsg.SenderPubkey, commitPayload) {
-		consensus.getLogger().Error("cannot verify commit message", "msgViewID", recvMsg.ViewID, "msgBlock", recvMsg.BlockNum)
+		consensus.getLogger().Error("[OnCommit] Cannot verify commit message", "msgViewID", recvMsg.ViewID, "msgBlock", recvMsg.BlockNum)
 		return
 	}
 
-	consensus.getLogger().Debug("Received new commit message", "numReceivedSoFar", len(commitSigs), "msgViewID", recvMsg.ViewID, "msgBlock", recvMsg.BlockNum, "validatorPubKey", validatorPubKey)
+	consensus.getLogger().Debug("[OnCommit] Received new commit message", "numReceivedSoFar", len(commitSigs), "msgViewID", recvMsg.ViewID, "msgBlock", recvMsg.BlockNum, "validatorPubKey", validatorPubKey)
 	commitSigs[validatorPubKey] = &sign
 	// Set the bitmap indicating that this validator signed.
 	if err := commitBitmap.SetKey(recvMsg.SenderPubkey, true); err != nil {
-		ctxerror.Warn(consensus.getLogger(), err, "commitBitmap.SetKey failed")
+		ctxerror.Warn(consensus.getLogger(), err, "[OnCommit] commitBitmap.SetKey failed")
 	}
 
 	quorumIsMet := len(commitSigs) >= consensus.Quorum()
