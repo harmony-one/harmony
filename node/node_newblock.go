@@ -43,10 +43,10 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 				utils.GetLogInstance().Debug("Consensus new block proposal: STOPPED!")
 				return
 			case <-time.After(ConsensusTimeOut * time.Second):
+				utils.GetLogInstance().Debug("Consensus timeout, retry!", "count", timeoutCount)
 				node.Consensus.ResetState()
 				timeoutCount++
 				if newBlock != nil {
-					utils.GetLogInstance().Debug("Consensus timeout, retry!", "count", timeoutCount)
 					// Send the new block to Consensus so it can be confirmed.
 					node.BlockChannel <- newBlock
 				}

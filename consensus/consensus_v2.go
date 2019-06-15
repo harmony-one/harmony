@@ -106,33 +106,33 @@ func (consensus *Consensus) announce(block *types.Block) {
 	if err := consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
 		consensus.getLogger().Warn("[Announce] Cannot send announce message", "groupID", p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID)))
 	} else {
-		consensus.getLogger().Debug("[Announce] Sent Announce Message")
+		consensus.getLogger().Debug("[Announce] Sent Announce Message!!", "BlockHash", block.Hash(), "BlockNum", block.NumberU64())
 	}
 }
 
 func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
-	consensus.getLogger().Debug("receive announce message")
+	consensus.getLogger().Debug("[OnAnnounce] Receive announce message")
 	if consensus.PubKey.IsEqual(consensus.LeaderPubKey) && consensus.mode.Mode() == Normal {
 		return
 	}
 
 	senderKey, err := consensus.verifySenderKey(msg)
 	if err != nil {
-		consensus.getLogger().Debug("onAnnounce verifySenderKey failed", "error", err)
+		consensus.getLogger().Debug("[OnAnnounce] verifySenderKey failed", "error", err)
 		return
 	}
 	if !senderKey.IsEqual(consensus.LeaderPubKey) && consensus.mode.Mode() == Normal && !consensus.ignoreViewIDCheck {
-		consensus.getLogger().Warn("onAnnounce senderKey not match leader PubKey", "senderKey", senderKey.SerializeToHexStr(), "leaderKey", consensus.LeaderPubKey.SerializeToHexStr())
+		consensus.getLogger().Warn("[OnAnnounce] SenderKey not match leader PubKey", "senderKey", senderKey.SerializeToHexStr(), "leaderKey", consensus.LeaderPubKey.SerializeToHexStr())
 		return
 	}
 	if err = verifyMessageSig(senderKey, msg); err != nil {
-		consensus.getLogger().Debug("onAnnounce Failed to verify leader signature", "error", err)
+		consensus.getLogger().Debug("[OnAnnounce] Failed to verify leader signature", "error", err)
 		return
 	}
 
 	recvMsg, err := ParsePbftMessage(msg)
 	if err != nil {
-		consensus.getLogger().Debug("onAnnounce Unparseable leader message", "error", err)
+		consensus.getLogger().Debug("[OnAnnounce] Unparseable leader message", "error", err)
 		return
 	}
 	block := recvMsg.Payload
@@ -141,19 +141,19 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	var blockObj types.Block
 	err = rlp.DecodeBytes(block, &blockObj)
 	if err != nil {
-		consensus.getLogger().Warn("onAnnounce Unparseable block header data", "error", err)
+		consensus.getLogger().Warn("[OnAnnounce] Unparseable block header data", "error", err)
 		return
 	}
 
 	if blockObj.NumberU64() != recvMsg.BlockNum || recvMsg.BlockNum < consensus.blockNum {
-		consensus.getLogger().Warn("blockNum not match", "MsgBlockNum", recvMsg.BlockNum, "blockNum", blockObj.NumberU64())
+		consensus.getLogger().Warn("[OnAnnounce] BlockNum not match", "MsgBlockNum", recvMsg.BlockNum, "blockNum", blockObj.NumberU64())
 		return
 	}
 
 	if consensus.mode.Mode() == Normal {
 		// skip verify header when node is in Syncing mode
 		if err := consensus.VerifyHeader(consensus.ChainReader, blockObj.Header(), false); err != nil {
-			consensus.getLogger().Warn("onAnnounce block content is not verified successfully", "error", err, "inChain", consensus.ChainReader.CurrentHeader().Number, "MsgBlockNumber", blockObj.Header().Number)
+			consensus.getLogger().Warn("[OnAnnounce] Block content is not verified successfully", "error", err, "inChain", consensus.ChainReader.CurrentHeader().Number, "MsgBlockNumber", blockObj.Header().Number)
 			return
 		}
 	}
@@ -162,7 +162,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	logMsgs := consensus.pbftLog.GetMessagesByTypeSeqView(msg_pb.MessageType_ANNOUNCE, recvMsg.BlockNum, recvMsg.ViewID)
 	if len(logMsgs) > 0 {
 		if logMsgs[0].BlockHash != blockObj.Header().Hash() {
-			consensus.getLogger().Debug("onAnnounce leader is malicious", "leaderKey", consensus.LeaderPubKey)
+			consensus.getLogger().Debug("[OnAnnounce] Leader is malicious", "leaderKey", consensus.LeaderPubKey)
 			consensus.startViewChange(consensus.viewID + 1)
 		}
 		return
@@ -171,7 +171,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	copy(blockPayload[:], block[:])
 	consensus.block = blockPayload
 	consensus.blockHash = recvMsg.BlockHash
-	consensus.getLogger().Debug("[Announce] Announce Block Added", "MsgViewID", recvMsg.ViewID, "MsgBlockNum", recvMsg.BlockNum)
+	consensus.getLogger().Debug("[OnAnnounce] Announce Block Added", "MsgViewID", recvMsg.ViewID, "MsgBlockNum", recvMsg.BlockNum)
 	consensus.pbftLog.AddMessage(recvMsg)
 	consensus.pbftLog.AddBlock(&blockObj)
 
@@ -208,9 +208,9 @@ func (consensus *Consensus) prepare(block *types.Block) {
 	msgToSend := consensus.constructPrepareMessage()
 	// TODO: this will not return immediatey, may block
 	if err := consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
-		consensus.getLogger().Warn("cannot send prepare message")
+		consensus.getLogger().Warn("[OnAnnounce]Cannot send prepare message")
 	} else {
-		consensus.getLogger().Info("sent prepare message")
+		consensus.getLogger().Info("[OnAnnounce] Sent Prepare Message!!", "BlockHash", block.Hash(), "BlockNum", block.NumberU64())
 	}
 }
 
