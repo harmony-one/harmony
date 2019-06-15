@@ -87,8 +87,10 @@ fi
 usage() {
    msg "$@"
    cat <<- ENDEND
-	usage: ${progname} [-b] account_address
+	usage: ${progname} [-1c] account_address
 	-c              back up database/logs and start clean
+	 		(use only when directed by Harmony)
+	-1		do not loop; run once and exit
 	ENDEND
    exit 64  # EX_USAGE
 }
