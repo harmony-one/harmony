@@ -84,12 +84,19 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
+print_usage() {
+   cat <<- ENDEND
+	usage: ${progname} [-1ch] account_address
+	-c              back up database/logs and start clean
+	 		(use only when directed by Harmony)
+	-1		do not loop; run once and exit
+	-h		print this help and exit
+	ENDEND
+}
+
 usage() {
    msg "$@"
-   cat <<- ENDEND
-	usage: ${progname} [-b] account_address
-	-c              back up database/logs and start clean
-	ENDEND
+   print_usage >&2
    exit 64  # EX_USAGE
 }
 
@@ -99,13 +106,14 @@ loop=true
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :c1 opt
+while getopts :1ch opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
    ':') usage "missing argument for -${OPTARG}";;
    c) start_clean=true;;
    1) loop=false;;
+   h) print_usage; exit 0;;
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
@@ -289,14 +297,18 @@ kill_node() {
 } > harmony-update.out 2>&1 &
 check_update_pid=$!
 
+unset -v passphrase
+read -rsp "Enter passphrase for account ${IDX}: " passphrase
+echo
+
 while :
 do
    msg "############### Running Harmony Process ###############"
    if [ "$OS" == "Linux" ]; then
    # Run Harmony Node
-      LD_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -is_archival -accounts $IDX
+      echo -n "${passphrase}" | LD_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -is_archival -accounts $IDX -pass stdin
    else
-      DYLD_FALLBACK_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -is_archival -accounts $IDX
+      echo -n "${passphrase}" | DYLD_FALLBACK_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -is_archival -accounts $IDX -pass stdin
    fi || msg "node process finished with status $?"
    ${loop} || break
    msg "restarting in 10s..."
