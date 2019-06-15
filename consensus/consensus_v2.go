@@ -806,7 +806,13 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 				}
 			case <-consensus.syncReadyChan:
 				consensus.SetBlockNum(consensus.ChainReader.CurrentHeader().Number.Uint64() + 1)
+				consensus.getLogger().Info("Node is in sync")
 				consensus.ignoreViewIDCheck = true
+
+			case <-consensus.syncNotReadyChan:
+				consensus.SetBlockNum(consensus.ChainReader.CurrentHeader().Number.Uint64() + 1)
+				consensus.mode.SetMode(Syncing)
+				consensus.getLogger().Info("Node is out of sync")
 
 			case newBlock := <-blockChannel:
 				consensus.getLogger().Info("receive newBlock", "msgBlock", newBlock.NumberU64())
