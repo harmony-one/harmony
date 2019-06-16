@@ -30,7 +30,8 @@ myBlockChainHeight="myHeight"
 heightStatus=$(grep $currentBlockHeight ./latest/validator*.log |  egrep  -o $myBlockChainHeight"(.*)([0-9]+)," | tail -n 1)
 
 # Which Shard
-my_shard=$(egrep -o "shard\/[0-9]+" ./latest/validator*.log | tail -n 1 |cut -f2 "/")
+my_shard=$(egrep -o "shardID\"\:[0-9]+" ./latest/validator*.log | tail -n 1 | cut -f2 -d ":")
+
 
 # Which IP
 ip=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
