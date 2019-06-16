@@ -22,6 +22,7 @@ func (consensus *Consensus) constructViewChangeMessage() []byte {
 	vcMsg := message.GetViewchange()
 	vcMsg.ViewId = consensus.mode.GetViewID()
 	vcMsg.BlockNum = consensus.blockNum
+	vcMsg.ShardId = consensus.ShardID
 	// sender address
 	vcMsg.SenderPubkey = consensus.PubKey.Serialize()
 
@@ -40,6 +41,7 @@ func (consensus *Consensus) constructViewChangeMessage() []byte {
 		msgToSign = append(preparedMsg.BlockHash[:], preparedMsg.Payload...)
 		vcMsg.Payload = append(msgToSign[:0:0], msgToSign...)
 	}
+	consensus.getLogger().Debug("[constructViewChangeMessage]", "m1Payload", vcMsg.Payload, "pubKey", consensus.PubKey.SerializeToHexStr())
 
 	sign := consensus.priKey.SignHash(msgToSign)
 	if sign != nil {
@@ -48,9 +50,9 @@ func (consensus *Consensus) constructViewChangeMessage() []byte {
 		utils.GetLogger().Error("unable to serialize m1/m2 view change message signature")
 	}
 
-	viewIDHash := make([]byte, 4)
-	binary.LittleEndian.PutUint32(viewIDHash, consensus.mode.ViewID())
-	sign1 := consensus.priKey.SignHash(viewIDHash)
+	viewIDBytes := make([]byte, 4)
+	binary.LittleEndian.PutUint32(viewIDBytes, consensus.mode.ViewID())
+	sign1 := consensus.priKey.SignHash(viewIDBytes)
 	if sign1 != nil {
 		vcMsg.ViewidSig = sign1.Serialize()
 	} else {
@@ -59,7 +61,7 @@ func (consensus *Consensus) constructViewChangeMessage() []byte {
 
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
 	if err != nil {
-		utils.GetLogInstance().Error("constructViewChangeMessage failed to sign and marshal the viewchange message", "error", err)
+		utils.GetLogInstance().Error("[constructViewChangeMessage] failed to sign and marshal the viewchange message", "error", err)
 	}
 	return proto.ConstructConsensusMessage(marshaledMessage)
 }
@@ -75,13 +77,15 @@ func (consensus *Consensus) constructNewViewMessage() []byte {
 	}
 
 	vcMsg := message.GetViewchange()
-	vcMsg.ViewId = consensus.mode.GetViewID()
+	vcMsg.ViewId = consensus.mode.ViewID()
 	vcMsg.BlockNum = consensus.blockNum
+	vcMsg.ShardId = consensus.ShardID
 	// sender address
 	vcMsg.SenderPubkey = consensus.PubKey.Serialize()
 	vcMsg.Payload = consensus.m1Payload
 
 	sig2arr := consensus.GetNilSigsArray()
+	consensus.getLogger().Debug("[constructNewViewMessage] M2 (NIL) type signatures", "len", len(sig2arr))
 	if len(sig2arr) > 0 {
 		m2Sig := bls_cosi.AggregateSig(sig2arr)
 		vcMsg.M2Aggsigs = m2Sig.Serialize()
@@ -89,6 +93,8 @@ func (consensus *Consensus) constructNewViewMessage() []byte {
 	}
 
 	sig3arr := consensus.GetViewIDSigsArray()
+	consensus.getLogger().Debug("[constructNewViewMessage] M3 (ViewID) type signatures", "len", len(sig3arr))
+	// even we check here for safty, m3 type signatures must >= 2f+1
 	if len(sig3arr) > 0 {
 		m3Sig := bls_cosi.AggregateSig(sig3arr)
 		vcMsg.M3Aggsigs = m3Sig.Serialize()
@@ -97,7 +103,7 @@ func (consensus *Consensus) constructNewViewMessage() []byte {
 
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
 	if err != nil {
-		utils.GetLogInstance().Error("constructNewViewMessage failed to sign and marshal the new view message", "error", err)
+		utils.GetLogInstance().Error("[constructNewViewMessage] failed to sign and marshal the new view message", "error", err)
 	}
 	return proto.ConstructConsensusMessage(marshaledMessage)
 }

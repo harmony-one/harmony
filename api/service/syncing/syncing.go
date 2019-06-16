@@ -476,6 +476,9 @@ func (ss *StateSync) updateBlockAndStatus(block *types.Block, bc *core.BlockChai
 	_, err := bc.InsertChain([]*types.Block{block})
 	if err != nil {
 		utils.GetLogInstance().Debug("Error adding new block to blockchain", "Error", err)
+
+		utils.GetLogInstance().Debug("Rolling back current block!", "block", bc.CurrentBlock())
+		bc.Rollback([]common.Hash{bc.CurrentBlock().Hash()})
 		return false
 	}
 	ss.syncMux.Lock()
@@ -633,7 +636,7 @@ func (ss *StateSync) IsSameBlockchainHeight(bc *core.BlockChain) (uint64, bool) 
 func (ss *StateSync) IsOutOfSync(bc *core.BlockChain) bool {
 	otherHeight := ss.getMaxPeerHeight()
 	currentHeight := bc.CurrentBlock().NumberU64()
-	utils.GetLogInstance().Debug("[SYNC] IsOutOfSync", "otherHeight", otherHeight, "myHeight", currentHeight)
+	utils.GetLogInstance().Debug("[SYNC] Checking sync status", "OtherHeight", otherHeight, "MyHeight", currentHeight, "IsOutOfSync", currentHeight+inSyncThreshold < otherHeight)
 	return currentHeight+inSyncThreshold < otherHeight
 }
 

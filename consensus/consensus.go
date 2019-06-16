@@ -45,6 +45,9 @@ type Consensus struct {
 	// How long to delay sending commit messages.
 	delayCommit time.Duration
 
+	// Consensus rounds whose commit phase finished
+	commitFinishChan chan uint32
+
 	// 2 types of timeouts: normal and viewchange
 	consensusTimeout map[TimeoutType]*utils.Timeout
 
@@ -140,6 +143,8 @@ type Consensus struct {
 
 	// Used to convey to the consensus main loop that block syncing has finished.
 	syncReadyChan chan struct{}
+	// Used to convey to the consensus main loop that node is out of sync
+	syncNotReadyChan chan struct{}
 
 	// If true, this consensus will not propose view change.
 	disableViewChange bool
@@ -179,6 +184,11 @@ func (consensus *Consensus) BlocksSynchronized() {
 	consensus.syncReadyChan <- struct{}{}
 }
 
+// BlocksNotSynchronized lets the main loop know that block is not synchronized
+func (consensus *Consensus) BlocksNotSynchronized() {
+	consensus.syncNotReadyChan <- struct{}{}
+}
+
 // WaitForSyncing informs the node syncing service to start syncing
 func (consensus *Consensus) WaitForSyncing() {
 	<-consensus.blockNumLowChan
@@ -187,6 +197,12 @@ func (consensus *Consensus) WaitForSyncing() {
 // Quorum returns the consensus quorum of the current committee (2f+1).
 func (consensus *Consensus) Quorum() int {
 	return len(consensus.PublicKeys)*2/3 + 1
+}
+
+// RewardThreshold returns the threshold to stop accepting commit messages
+// when leader receives enough signatures for block reward
+func (consensus *Consensus) RewardThreshold() int {
+	return len(consensus.PublicKeys) * 9 / 10
 }
 
 // StakeInfoFinder finds the staking account for the given consensus key.
@@ -245,6 +261,8 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 
 	consensus.MsgChan = make(chan []byte)
 	consensus.syncReadyChan = make(chan struct{})
+	consensus.syncNotReadyChan = make(chan struct{})
+	consensus.commitFinishChan = make(chan uint32)
 
 	consensus.ReadySignal = make(chan struct{})
 	if nodeconfig.GetDefaultConfig().IsLeader() {
@@ -318,6 +336,7 @@ func accumulateRewards(
 	}
 	totalAmount := big.NewInt(0)
 	numAccounts := 0
+	signers := []string{}
 	for idx, member := range parentCommittee.NodeList {
 		if signed, err := mask.IndexEnabled(idx); err != nil {
 			return ctxerror.New("cannot check for committer bit",
@@ -328,16 +347,14 @@ func accumulateRewards(
 		}
 		numAccounts++
 		account := member.EcdsaAddress
-		getLogger().Info("rewarding block signer",
-			"account", account,
-			"node", member.BlsPublicKey.Hex(),
-			"amount", BlockReward)
+		signers = append(signers, account.Hex())
 		state.AddBalance(account, BlockReward)
 		totalAmount = new(big.Int).Add(totalAmount, BlockReward)
 	}
-	getLogger().Debug("paid out block reward",
-		"numAccounts", numAccounts,
-		"totalAmount", totalAmount)
+	getLogger().Debug("【Block Reward] Successfully paid out block reward",
+		"NumAccounts", numAccounts,
+		"TotalAmount", totalAmount,
+		"Signers", signers)
 	return nil
 }
 

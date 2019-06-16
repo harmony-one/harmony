@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -19,6 +20,7 @@ type DeployAccount struct {
 	BlsPriKey    string // account private BLS key (To be removed)
 	BlsPublicKey string // account public BLS key
 	ShardID      uint32 // shardID of the account
+	Updated      string
 }
 
 func (d DeployAccount) String() string {
@@ -39,13 +41,14 @@ func BeaconAccountPriKey() *ecdsa.PrivateKey {
 // the account address could be from GenesisAccounts or from GenesisFNAccounts
 // the account index can be used to determin the shard of the account
 func FindAccount(address string) (int, *DeployAccount) {
+	addr := common.ParseAddr(address)
 	for i, acc := range GenesisAccounts {
-		if address == acc.Address {
+		if addr == common.ParseAddr(acc.Address) {
 			return i, &acc
 		}
 	}
 	for i, acc := range GenesisFNAccounts {
-		if address == acc.Address {
+		if addr == common.ParseAddr(acc.Address) {
 			return i + 8, &acc
 		}
 	}

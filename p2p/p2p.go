@@ -22,5 +22,9 @@ type Peer struct {
 }
 
 func (p Peer) String() string {
-	return fmt.Sprintf("%s/%s[%d]", net.JoinHostPort(p.IP, p.Port), p.PeerID, len(p.Addrs))
+	BlsPubKey := "nil"
+	if p.ConsensusPubKey != nil {
+		BlsPubKey = p.ConsensusPubKey.SerializeToHexStr()
+	}
+	return fmt.Sprintf("BlsPubKey:%s-%s/%s[%d]", BlsPubKey, net.JoinHostPort(p.IP, p.Port), p.PeerID, len(p.Addrs))
 }

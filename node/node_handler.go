@@ -448,9 +448,9 @@ func (node *Node) broadcastEpochShardState(newBlock *types.Block) error {
 func (node *Node) AddNewBlock(newBlock *types.Block) {
 	blockNum, err := node.Blockchain().InsertChain([]*types.Block{newBlock})
 	if err != nil {
-		utils.GetLogInstance().Debug("Error adding new block to blockchain", "blockNum", blockNum, "hash", newBlock.Header().Hash(), "Error", err)
+		utils.GetLogInstance().Debug("Error Adding new block to blockchain", "blockNum", blockNum, "hash", newBlock.Header().Hash(), "Error", err)
 	} else {
-		utils.GetLogInstance().Info("adding new block to blockchain", "blockNum", blockNum, "hash", newBlock.Header().Hash(), "by node", node.SelfPeer)
+		utils.GetLogInstance().Info("Added New Block to Blockchain!!!", "blockNum", blockNum, "hash", newBlock.Header().Hash(), "by node", node.SelfPeer)
 	}
 }
 
@@ -490,11 +490,11 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 	node.host.ConnectHostPeer(*peer)
 
 	if ping.Node.Role == proto_node.ClientRole {
-		utils.GetLogInstance().Info("Add Client Peer to Node", "PubKey", node.Consensus.PubKey.SerializeToHexStr(), "Client", peer)
+		utils.GetLogInstance().Info("Add Client Peer to Node", "Client", peer)
 		node.ClientPeer = peer
 	} else {
 		node.AddPeers([]*p2p.Peer{peer})
-		utils.GetLogInstance().Info("Add Peer to Node", "PubKey", node.Consensus.PubKey.SerializeToHexStr(), "Peer", peer, "# Peers", len(node.Consensus.PublicKeys))
+		utils.GetLogInstance().Info("Add Peer to Node", "Peer", peer, "# Peers", len(node.Consensus.PublicKeys))
 	}
 
 	return 1
@@ -518,12 +518,12 @@ func (node *Node) SendPongMessage() {
 
 			// no peers, wait for another tick
 			if numPeersNow == 0 {
-				utils.GetLogInstance().Info("[PONG] no peers, continue", "numPeers", numPeers, "numPeersNow", numPeersNow)
+				utils.GetLogInstance().Info("[PONG] No peers, continue", "numPeers", numPeers, "numPeersNow", numPeersNow)
 				continue
 			}
 			// new peers added
 			if numPeersNow != numPeers {
-				utils.GetLogInstance().Info("[PONG] different number of peers", "numPeers", numPeers, "numPeersNow", numPeersNow)
+				utils.GetLogInstance().Info("[PONG] Different number of peers", "numPeers", numPeers, "numPeersNow", numPeersNow)
 				sentMessage = false
 			} else {
 				// stable number of peers, sent the pong message
@@ -533,10 +533,10 @@ func (node *Node) SendPongMessage() {
 					buffer := pong.ConstructPongMessage()
 					err := node.host.SendMessageToGroups([]p2p.GroupID{node.NodeConfig.GetShardGroupID()}, host.ConstructP2pMessage(byte(0), buffer))
 					if err != nil {
-						utils.GetLogInstance().Error("[PONG] failed to send pong message", "group", node.NodeConfig.GetShardGroupID())
+						utils.GetLogInstance().Error("[PONG] Failed to send pong message", "group", node.NodeConfig.GetShardGroupID())
 						continue
 					} else {
-						utils.GetLogInstance().Info("[PONG] sent pong message to", "group", node.NodeConfig.GetShardGroupID(), "# nodes", numPeersNow)
+						utils.GetLogInstance().Info("[PONG] Sent pong message to", "group", node.NodeConfig.GetShardGroupID(), "# nodes", numPeersNow)
 					}
 					sentMessage = true
 
@@ -544,7 +544,7 @@ func (node *Node) SendPongMessage() {
 					if firstTime {
 						// Leader stops sending ping message
 						node.serviceManager.TakeAction(&service.Action{Action: service.Stop, ServiceType: service.PeerDiscovery})
-						utils.GetLogInstance().Info("[PONG] startConsensus")
+						utils.GetLogInstance().Info("[PONG] StartConsensus")
 						node.startConsensus <- struct{}{}
 						firstTime = false
 					}
@@ -559,10 +559,10 @@ func (node *Node) SendPongMessage() {
 			buffer := pong.ConstructPongMessage()
 			err := node.host.SendMessageToGroups([]p2p.GroupID{node.NodeConfig.GetShardGroupID()}, host.ConstructP2pMessage(byte(0), buffer))
 			if err != nil {
-				utils.GetLogInstance().Error("[PONG] failed to send regular pong message", "group", node.NodeConfig.GetShardGroupID())
+				utils.GetLogInstance().Error("[PONG] Failed to send regular pong message", "group", node.NodeConfig.GetShardGroupID())
 				continue
 			} else {
-				utils.GetLogInstance().Info("[PONG] sent regular pong message to", "group", node.NodeConfig.GetShardGroupID(), "# nodes", len(peers))
+				utils.GetLogInstance().Info("[PONG] Sent regular pong message to", "group", node.NodeConfig.GetShardGroupID(), "# nodes", len(peers))
 			}
 		}
 	}
@@ -805,10 +805,5 @@ func getBinaryPath() (argv0 string, err error) {
 
 // ConsensusMessageHandler passes received message in node_handler to consensus
 func (node *Node) ConsensusMessageHandler(msgPayload []byte) {
-	select {
-	case node.Consensus.MsgChan <- msgPayload:
-	case <-time.After(consensusTimeout):
-		//utils.GetLogInstance().Debug("[Consensus] ConsensusMessageHandler timeout", "duration", consensusTimeout, "msgPayload", len(msgPayload))
-	}
-	return
+	node.Consensus.MsgChan <- msgPayload
 }
