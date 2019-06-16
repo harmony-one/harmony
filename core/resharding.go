@@ -23,7 +23,7 @@ const (
 	// FirstEpoch is the number of the first epoch.
 	FirstEpoch = 1
 	// GenesisShardNum is the number of shard at genesis
-	GenesisShardNum = 1
+	GenesisShardNum = 4
 	// GenesisShardSize is the size of each shard at genesis
 	GenesisShardSize = 100
 	// GenesisShardHarmonyNodes is the number of harmony node at each shard
