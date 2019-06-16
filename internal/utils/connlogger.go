@@ -28,6 +28,10 @@ func connLogger(c net.Conn, l log.Logger) log.Logger {
 		"connRemoteAddr", c.RemoteMultiaddr())
 }
 
+func streamLogger(s net.Stream, l log.Logger) log.Logger {
+	return connLogger(s.Conn(), l).New("streamProtocolID", s.Protocol())
+}
+
 func (cl ConnLogger) Listen(n net.Network, ma ma.Multiaddr) {
 	WithCaller(netLogger(n, cl.l)).Debug("listener starting", "addr", ma)
 }
@@ -45,21 +49,11 @@ func (cl ConnLogger) Disconnected(n net.Network, c net.Conn) {
 }
 
 func (cl ConnLogger) OpenedStream(n net.Network, s net.Stream) {
-	conn := s.Conn()
-	WithCaller(netLogger(n, cl.l)).Debug("stream opened",
-		"localPeer", conn.LocalPeer(), "localAddr", conn.LocalMultiaddr(),
-		"remotePeer", conn.RemotePeer(), "remoteAddr", conn.RemoteMultiaddr(),
-		"protocol", s.Protocol(),
-	)
+	WithCaller(streamLogger(s, netLogger(n, cl.l))).Debug("stream opened")
 }
 
 func (cl ConnLogger) ClosedStream(n net.Network, s net.Stream) {
-	conn := s.Conn()
-	WithCaller(netLogger(n, cl.l)).Debug("stream closed",
-		"localPeer", conn.LocalPeer(), "localAddr", conn.LocalMultiaddr(),
-		"remotePeer", conn.RemotePeer(), "remoteAddr", conn.RemoteMultiaddr(),
-		"protocol", s.Protocol(),
-	)
+	WithCaller(streamLogger(s, netLogger(n, cl.l))).Debug("stream closed")
 }
 
 // NewConnLogger returns a new connection logger that uses the given
