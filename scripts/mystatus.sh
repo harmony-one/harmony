@@ -1,75 +1,88 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-function usage
-{
-   cat<<EOT
+usage () {
+   cat << EOT
 Usage: $0 [option] command
 
 Option:
-   -h          print this help
+    -h      print this help
 
 Monitor Help:
 
 Actions:
-    1. status        - Generates a status report of your node
+    1. status       - Generates a status report of your node
 EOT
-    exit 0
 }
 
+valid_ip () {
+# https://www.linuxjournal.com/content/validating-ip-address-bash-script
+    local  ip=$1
+    local  stat=1
+
+    if [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+        OIFS=$IFS
+        IFS='.'
+        ip=($ip)
+        IFS=$OIFS
+        [[ ${ip[0]} -le 255 && ${ip[1]} -le 255 \
+            && ${ip[2]} -le 255 && ${ip[3]} -le 255 ]]
+        stat=$?
+    fi
+    return $stat
+}
+
+status_report () {
+    
+    # Block heights
+    heightStatus=$(tac latest/validator*.log | grep -Eom1 '"myHeight":[0-9]+' | cut -d: -f2)
+    lengthOfChain=$(tac latest/validator*.log | grep -Eom1 '"otherHeight":[0-9]+' | cut -d: -f2)
+
+    # Shard number
+    my_shard=$(grep -Eom1 "shardID\"\:[0-9]+" latest/validator*.log | cut -d: -f2)
+
+    # Public IP
+    ip=$(dig -4 @resolver1.opendns.com ANY myip.opendns.com +short)
+
+    # Check validity of IP
+    if ! valid_ip $ip; then
+        echo "NO valid public IP found: $PUB_IP"
+        exit 2
+    fi
+
+    # Number of bingos
+    bingos=$(grep -c "BINGO" ./latest/validator*log)
+
+    #echo "Your Node Version : "
+    LD_LIBRARY_PATH=$(pwd) ./harmony -version
+    echo "Current Length of Chain:" $lengthOfChain
+    echo "Your Sync Status:" $heightStatus
+    echo "Your Shard:" $my_shard
+    echo "Your IP:" $ip
+    echo "Total Blocks Received  After Syncing:" $bingos
+    echo "Your Rewards:"
+    ./wallet.sh balances
+}
+
+#####Main#####
 
 while getopts "h" opt; do
     case $opt in
-        h) usage ;;
-        *) usage ;;
+        h|*)
+            usage
+            exit 1
+            ;;
     esac
 done
+shift $(($OPTIND-1))
 
-currentBlockHeight="otherHeight"
-myBlockChainHeight="myHeight"
+[ $# -eq 0 -o $# -gt 1 ] && usage && exit 1
 
-heightStatus=$(grep $currentBlockHeight ./latest/validator*.log |  egrep  -o $myBlockChainHeight"(.*)([0-9]+)," | tail -n 1)
-
-# Which Shard
-my_shard=$(egrep -o "shardID\"\:[0-9]+" ./latest/validator*.log | tail -n 1 | cut -f2 -d ":")
-
-
-# Which IP
-ip=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
-
-bingos=$(grep -c "BINGO" ./latest/validator*log)
-
-# balances=$(./wallet.sh balances)
-
-status=$(tac ./latest/* | egrep -m1 'BINGO|HOORAY' | \
-    grep ViewID | \
-    python -c $'import datetime, sys, json;\nfor x in sys.stdin:\n y = json.loads(x); print "%10s %s %s" % (y.get("ViewID", "*" + str(y.get("myViewID", 0))), datetime.datetime.strftime(datetime.datetime.strptime(y["t"][:-4], "%Y-%m-%dT%H:%M:%S.%f") + datetime.timedelta(hours=-7), "%m/%d %H:%M:%S.%f"), y["ip"])')
-
-lengthOfChain=$(cat $status | cut -f1 -d " ")
-#sudo /sbin/ldconfig -v
-#nodeVersion=$(LD_LIBRARY_PATH=$(pwd) ./harmony -version)
-
-#check if you're in snych
-
-#Reward
-
-#echo "Your Node Version : "
-LD_LIBRARY_PATH=$(pwd) ./harmony -version
-echo "Current Length of Chain : "$lengthOfChain
-echo "Your Sync Status : "$heightStatus
-echo "Your Shard : " $my_shard
-echo "Your IP: " $ip
-echo "Total Blocks Received  After Syncing: " $bingos
-echo "Your Rewards: "
-./wallet.sh balances
-
-
-# display the first block you started receiving
-
-# show the percentage of earned / recieved
-
-#Is your account registered
-# ./wallet.sh format --address one1xhffyq90exjvmsz3vcykqkdqggrcedf7zdcvt8
-# account address in Bech32: one1xhffyq90exjvmsz3vcykqkdqggrcedf7zdcvt8
-# account address in Base16 (deprecated): 0x35D29200aFC9A4cDC05166096059a042078CB53e
-
-# https://raw.githubusercontent.com/harmony-one/harmony/master/internal/genesis/foundational.go
+case "$1" in
+    status)
+        status_report
+        ;;
+    *)
+        usage;
+        exit 1
+        ;;
+esac
