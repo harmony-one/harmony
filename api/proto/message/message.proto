@@ -86,6 +86,7 @@ message ConsensusRequest {
   bytes block_hash = 4;
   bytes sender_pubkey = 5;
   bytes payload = 6;
+  bytes block = 7;
 }
 
 message DrandRequest {
