@@ -2,6 +2,7 @@ package bls
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -20,6 +21,9 @@ func RandPrivateKey() *bls.SecretKey {
 
 // BytesToBlsPublicKey converts bytes into bls.PublicKey pointer.
 func BytesToBlsPublicKey(bytes []byte) (*bls.PublicKey, error) {
+	if len(bytes) == 0 {
+		return nil, fmt.Errorf("[BytesToBlsPublicKey] bytes is empty")
+	}
 	pubKey := &bls.PublicKey{}
 	err := pubKey.Deserialize(bytes)
 	return pubKey, err
