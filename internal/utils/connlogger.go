@@ -16,43 +16,43 @@ type ConnLogger struct {
 	l log.Logger
 }
 
-func (cl ConnLogger) Listen(net net.Network, ma ma.Multiaddr) {
-	WithCaller(cl.l).Debug("listener starting", "net", net, "addr", ma)
+func (cl ConnLogger) Listen(n net.Network, ma ma.Multiaddr) {
+	WithCaller(cl.l).Debug("listener starting", "net", n, "addr", ma)
 }
 
-func (cl ConnLogger) ListenClose(net net.Network, ma ma.Multiaddr) {
-	WithCaller(cl.l).Debug("listener closing", "net", net, "addr", ma)
+func (cl ConnLogger) ListenClose(n net.Network, ma ma.Multiaddr) {
+	WithCaller(cl.l).Debug("listener closing", "net", n, "addr", ma)
 }
 
-func (cl ConnLogger) Connected(net net.Network, conn net.Conn) {
-	WithCaller(cl.l).Debug("connected", "net", net,
-		"localPeer", conn.LocalPeer(), "localAddr", conn.LocalMultiaddr(),
-		"remotePeer", conn.RemotePeer(), "remoteAddr", conn.RemoteMultiaddr(),
+func (cl ConnLogger) Connected(n net.Network, c net.Conn) {
+	WithCaller(cl.l).Debug("connected", "net", n,
+		"localPeer", c.LocalPeer(), "localAddr", c.LocalMultiaddr(),
+		"remotePeer", c.RemotePeer(), "remoteAddr", c.RemoteMultiaddr(),
 	)
 }
 
-func (cl ConnLogger) Disconnected(net net.Network, conn net.Conn) {
-	WithCaller(cl.l).Debug("disconnected", "net", net,
-		"localPeer", conn.LocalPeer(), "localAddr", conn.LocalMultiaddr(),
-		"remotePeer", conn.RemotePeer(), "remoteAddr", conn.RemoteMultiaddr(),
+func (cl ConnLogger) Disconnected(n net.Network, c net.Conn) {
+	WithCaller(cl.l).Debug("disconnected", "net", n,
+		"localPeer", c.LocalPeer(), "localAddr", c.LocalMultiaddr(),
+		"remotePeer", c.RemotePeer(), "remoteAddr", c.RemoteMultiaddr(),
 	)
 }
 
-func (cl ConnLogger) OpenedStream(net net.Network, stream net.Stream) {
-	conn := stream.Conn()
-	WithCaller(cl.l).Debug("stream opened", "net", net,
+func (cl ConnLogger) OpenedStream(n net.Network, s net.Stream) {
+	conn := s.Conn()
+	WithCaller(cl.l).Debug("stream opened", "net", n,
 		"localPeer", conn.LocalPeer(), "localAddr", conn.LocalMultiaddr(),
 		"remotePeer", conn.RemotePeer(), "remoteAddr", conn.RemoteMultiaddr(),
-		"protocol", stream.Protocol(),
+		"protocol", s.Protocol(),
 	)
 }
 
-func (cl ConnLogger) ClosedStream(net net.Network, stream net.Stream) {
-	conn := stream.Conn()
-	WithCaller(cl.l).Debug("stream closed", "net", net,
+func (cl ConnLogger) ClosedStream(n net.Network, s net.Stream) {
+	conn := s.Conn()
+	WithCaller(cl.l).Debug("stream closed", "net", n,
 		"localPeer", conn.LocalPeer(), "localAddr", conn.LocalMultiaddr(),
 		"remotePeer", conn.RemotePeer(), "remoteAddr", conn.RemoteMultiaddr(),
-		"protocol", stream.Protocol(),
+		"protocol", s.Protocol(),
 	)
 }
 
