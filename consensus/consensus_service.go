@@ -170,7 +170,9 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int {
 	consensus.pubKeyLock.Lock()
 	consensus.PublicKeys = append(pubKeys[:0:0], pubKeys...)
 	consensus.CommitteePublicKeys = map[string]bool{}
+	utils.GetLogInstance().Info("My Committee")
 	for _, pubKey := range consensus.PublicKeys {
+		utils.GetLogInstance().Info("Member", "BlsPubKey", pubKey.SerializeToHexStr())
 		consensus.CommitteePublicKeys[pubKey.SerializeToHexStr()] = true
 	}
 	// TODO: use pubkey to identify leader rather than p2p.Peer.
@@ -187,7 +189,6 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int {
 	}
 
 	utils.GetLogInstance().Info("My Leader", "info", consensus.LeaderPubKey.SerializeToHexStr())
-	utils.GetLogInstance().Info("My Committee", "info", consensus.PublicKeys)
 	consensus.pubKeyLock.Unlock()
 	// reset states after update public keys
 	consensus.ResetState()
@@ -327,7 +328,8 @@ func (consensus *Consensus) GetViewIDSigsArray() []*bls.Sign {
 
 // ResetState resets the state of the consensus
 func (consensus *Consensus) ResetState() {
-	consensus.phase = Announce
+	consensus.getLogger().Debug("[ResetState] Resetting consensus state", "Phase", consensus.phase)
+	consensus.switchPhase(Announce, true)
 	consensus.blockHash = [32]byte{}
 	consensus.prepareSigs = map[string]*bls.Sign{}
 	consensus.commitSigs = map[string]*bls.Sign{}
@@ -538,5 +540,5 @@ func (consensus *Consensus) logger(logger log.Logger) log.Logger {
 // getLogger returns logger for consensus contexts added
 func (consensus *Consensus) getLogger() log.Logger {
 	logger := consensus.logger(utils.GetLogInstance())
-	return utils.WithCallerSkip(logger, 1)
+	return logger
 }

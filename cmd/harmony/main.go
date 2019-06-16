@@ -174,7 +174,7 @@ func initSetup() {
 	accountIndex, genesisAccount = genesis.FindAccount(*stakingAccounts)
 
 	if genesisAccount == nil {
-		fmt.Printf("Can't find the account address: %v!\n", *stakingAccounts)
+		fmt.Printf("Can't find the account address: %v\n", *stakingAccounts)
 		os.Exit(100)
 	}
 
@@ -188,7 +188,7 @@ func initSetup() {
 	}
 
 	if !foundAccount {
-		fmt.Printf("Can't find the matching account key: %v!\n", genesisAccount.Address)
+		fmt.Printf("Can't find the matching account key: %v\n", genesisAccount.Address)
 		os.Exit(101)
 	}
 
