@@ -589,7 +589,7 @@ func (consensus *Consensus) finalizeCommits() {
 	consensus.consensusTimeout[timeoutConsensus].Start()
 
 	consensus.OnConsensusDone(&blockObj)
-	consensus.getLogger().Info("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!", "numOfSignatures", len(consensus.commitSigs), "BlockNum", consensus.blockNum-1, "ViewId", consensus.viewID-1, "BlockHash", blockObj.Hash())
+	consensus.getLogger().Info("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!", "numOfSignatures", len(consensus.commitSigs), "BlockNum", consensus.blockNum-1, "ViewId", consensus.viewID-1, "BlockHash", blockObj.Hash(), "index", consensus.getIndexOfPubKey(consensus.PubKey))
 
 	// TODO: wait for validators receive committed message; remove this temporary delay
 	time.Sleep(time.Second)
