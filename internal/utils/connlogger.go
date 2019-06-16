@@ -16,23 +16,27 @@ type ConnLogger struct {
 	l log.Logger
 }
 
+func netLogger(n net.Network, l log.Logger) log.Logger {
+	return l.New("net", n)
+}
+
 func (cl ConnLogger) Listen(n net.Network, ma ma.Multiaddr) {
-	WithCaller(cl.l).Debug("listener starting", "net", n, "addr", ma)
+	WithCaller(netLogger(n, cl.l)).Debug("listener starting", "addr", ma)
 }
 
 func (cl ConnLogger) ListenClose(n net.Network, ma ma.Multiaddr) {
-	WithCaller(cl.l).Debug("listener closing", "net", n, "addr", ma)
+	WithCaller(netLogger(n, cl.l)).Debug("listener closing", "addr", ma)
 }
 
 func (cl ConnLogger) Connected(n net.Network, c net.Conn) {
-	WithCaller(cl.l).Debug("connected", "net", n,
+	WithCaller(netLogger(n, cl.l)).Debug("connected",
 		"localPeer", c.LocalPeer(), "localAddr", c.LocalMultiaddr(),
 		"remotePeer", c.RemotePeer(), "remoteAddr", c.RemoteMultiaddr(),
 	)
 }
 
 func (cl ConnLogger) Disconnected(n net.Network, c net.Conn) {
-	WithCaller(cl.l).Debug("disconnected", "net", n,
+	WithCaller(netLogger(n, cl.l)).Debug("disconnected",
 		"localPeer", c.LocalPeer(), "localAddr", c.LocalMultiaddr(),
 		"remotePeer", c.RemotePeer(), "remoteAddr", c.RemoteMultiaddr(),
 	)
@@ -40,7 +44,7 @@ func (cl ConnLogger) Disconnected(n net.Network, c net.Conn) {
 
 func (cl ConnLogger) OpenedStream(n net.Network, s net.Stream) {
 	conn := s.Conn()
-	WithCaller(cl.l).Debug("stream opened", "net", n,
+	WithCaller(netLogger(n, cl.l)).Debug("stream opened",
 		"localPeer", conn.LocalPeer(), "localAddr", conn.LocalMultiaddr(),
 		"remotePeer", conn.RemotePeer(), "remoteAddr", conn.RemoteMultiaddr(),
 		"protocol", s.Protocol(),
@@ -49,7 +53,7 @@ func (cl ConnLogger) OpenedStream(n net.Network, s net.Stream) {
 
 func (cl ConnLogger) ClosedStream(n net.Network, s net.Stream) {
 	conn := s.Conn()
-	WithCaller(cl.l).Debug("stream closed", "net", n,
+	WithCaller(netLogger(n, cl.l)).Debug("stream closed",
 		"localPeer", conn.LocalPeer(), "localAddr", conn.LocalMultiaddr(),
 		"remotePeer", conn.RemotePeer(), "remoteAddr", conn.RemoteMultiaddr(),
 		"protocol", s.Protocol(),
