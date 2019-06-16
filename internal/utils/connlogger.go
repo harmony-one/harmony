@@ -17,7 +17,9 @@ type ConnLogger struct {
 }
 
 func netLogger(n net.Network, l log.Logger) log.Logger {
-	return l.New("net", n)
+	return l.New("net",
+		"netLocalPeer", n.LocalPeer(),
+		"netListenAddresses", n.ListenAddresses())
 }
 
 func connLogger(c net.Conn, l log.Logger) log.Logger {
