@@ -3,6 +3,7 @@ package consensus
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -136,83 +137,51 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		consensus.getLogger().Debug("[OnAnnounce] Unparseable leader message", "error", err, "MsgBlockNum", recvMsg.BlockNum)
 		return
 	}
-	block := recvMsg.Payload
 
-	// check block header is valid
-	var blockObj types.Block
-	err = rlp.DecodeBytes(block, &blockObj)
-	if err != nil {
-		consensus.getLogger().Warn("[OnAnnounce] Unparseable block header data", "error", err, "MsgBlockNum", recvMsg.BlockNum, "MsgPayloadBlockNum", blockObj.NumberU64())
-		return
-	}
-
-	if blockObj.NumberU64() != recvMsg.BlockNum || recvMsg.BlockNum < consensus.blockNum {
-		consensus.getLogger().Warn("[OnAnnounce] BlockNum not match", "MsgBlockNum", recvMsg.BlockNum, "blockNum", blockObj.NumberU64())
-		return
-	}
-
-	if consensus.mode.Mode() == Normal {
-		// skip verify header when node is in Syncing mode
-		if err := consensus.VerifyHeader(consensus.ChainReader, blockObj.Header(), false); err != nil {
-			consensus.getLogger().Warn("[OnAnnounce] Block content is not verified successfully", "error", err, "inChain", consensus.ChainReader.CurrentHeader().Number, "MsgBlockNum", blockObj.Header().Number)
-			return
-		}
-	}
-
-	//blockObj.Logger(consensus.getLogger()).Debug("received announce", "viewID", recvMsg.ViewID, "msgBlockNum", recvMsg.BlockNum)
 	logMsgs := consensus.pbftLog.GetMessagesByTypeSeqView(msg_pb.MessageType_ANNOUNCE, recvMsg.BlockNum, recvMsg.ViewID)
 	if len(logMsgs) > 0 {
-		if logMsgs[0].BlockHash != blockObj.Header().Hash() {
+		if logMsgs[0].BlockHash != recvMsg.BlockHash {
 			consensus.getLogger().Debug("[OnAnnounce] Leader is malicious", "leaderKey", consensus.LeaderPubKey.SerializeToHexStr())
 			consensus.startViewChange(consensus.viewID + 1)
 		}
 		return
 	}
-	blockPayload := make([]byte, len(block))
-	copy(blockPayload[:], block[:])
-	consensus.block = blockPayload
-	consensus.blockHash = recvMsg.BlockHash
-	consensus.getLogger().Debug("[OnAnnounce] Announce Block Added", "MsgViewID", recvMsg.ViewID, "MsgBlockNum", recvMsg.BlockNum)
-	consensus.pbftLog.AddMessage(recvMsg)
-	consensus.pbftLog.AddBlock(&blockObj)
 
-	consensus.tryCatchup()
+	consensus.getLogger().Debug("[OnAnnounce] Announce message Added", "MsgViewID", recvMsg.ViewID, "MsgBlockNum", recvMsg.BlockNum)
+	consensus.pbftLog.AddMessage(recvMsg)
+
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+
+	consensus.blockHash = recvMsg.BlockHash
+
 	// we have already added message and block, skip check viewID and send prepare message if is in ViewChanging mode
 	if consensus.mode.Mode() == ViewChanging {
 		consensus.getLogger().Debug("[OnAnnounce] Still in ViewChanging Mode, Exiting !!")
 		return
 	}
 
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-
 	if consensus.checkViewID(recvMsg) != nil {
 		consensus.getLogger().Debug("[OnAnnounce] ViewID check failed", "MsgViewID", recvMsg.ViewID, "msgBlockNum", recvMsg.BlockNum)
 		return
 	}
-	consensus.prepare(&blockObj)
+	consensus.prepare()
 
 	return
 }
 
 // tryPrepare will try to send prepare message
-func (consensus *Consensus) prepare(block *types.Block) {
-	//	if consensus.blockNum != block.NumberU64() || !consensus.pbftLog.HasMatchingViewAnnounce(consensus.blockNum, consensus.viewID, hash) {
-	//		consensus.getLogger().Debug("blockNum or announce message not match")
-	//		return
-	//	}
-
-	consensus.getLogger().Debug("[Announce] Switching Phase", "From", consensus.phase, "To", Prepare)
-	consensus.switchPhase(Prepare, true)
-
+func (consensus *Consensus) prepare() {
 	// Construct and send prepare message
 	msgToSend := consensus.constructPrepareMessage()
 	// TODO: this will not return immediatey, may block
 	if err := consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
 		consensus.getLogger().Warn("[OnAnnounce] Cannot send prepare message")
 	} else {
-		consensus.getLogger().Info("[OnAnnounce] Sent Prepare Message!!", "BlockHash", block.Hash(), "BlockNum", block.NumberU64())
+		consensus.getLogger().Info("[OnAnnounce] Sent Prepare Message!!", "BlockHash", hex.EncodeToString(consensus.blockHash[:]))
 	}
+	consensus.getLogger().Debug("[Announce] Switching Phase", "From", consensus.phase, "To", Prepare)
+	consensus.switchPhase(Prepare, true)
 }
 
 // TODO: move to consensus_leader.go later
@@ -357,22 +326,17 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		return
 	}
 
+	// check validity of prepared signature
 	blockHash := recvMsg.BlockHash
 	aggSig, mask, err := consensus.readSignatureBitmapPayload(recvMsg.Payload, 0)
 	if err != nil {
 		consensus.getLogger().Error("ReadSignatureBitmapPayload failed!!", "error", err)
 		return
 	}
-
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-
-	// check has 2f+1 signatures
 	if count := utils.CountOneBits(mask.Bitmap); count < consensus.Quorum() {
 		consensus.getLogger().Debug("Not enough signatures in the Prepared msg", "Need", consensus.Quorum(), "Got", count)
 		return
 	}
-
 	if !aggSig.VerifyHash(mask.AggregatePublic, blockHash[:]) {
 		myBlockHash := common.Hash{}
 		myBlockHash.SetBytes(consensus.blockHash[:])
@@ -380,8 +344,36 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		return
 	}
 
-	consensus.getLogger().Debug("[OnPrepared] Prepared message added", "MsgViewID", recvMsg.ViewID, "MsgBlockNum", recvMsg.BlockNum)
+	// check validity of block
+	block := recvMsg.Block
+	var blockObj types.Block
+	err = rlp.DecodeBytes(block, &blockObj)
+	if err != nil {
+		consensus.getLogger().Warn("[OnPrepared] Unparseable block header data", "error", err, "MsgBlockNum", recvMsg.BlockNum, "MsgPayloadBlockNum", blockObj.NumberU64())
+		return
+	}
+	if blockObj.NumberU64() != recvMsg.BlockNum || recvMsg.BlockNum < consensus.blockNum {
+		consensus.getLogger().Warn("[OnPrepared] BlockNum not match", "MsgBlockNum", recvMsg.BlockNum, "blockNum", blockObj.NumberU64())
+		return
+	}
+	if blockObj.Header().Hash() != recvMsg.BlockHash {
+		consensus.getLogger().Warn("[OnPrepared] BlockHash not match", "MsgBlockNum", recvMsg.BlockNum, "MsgBlockHash", recvMsg.BlockHash, "blockObjHash", blockObj.Header().Hash())
+		return
+	}
+	if consensus.mode.Mode() == Normal {
+		if err := consensus.VerifyHeader(consensus.ChainReader, blockObj.Header(), false); err != nil {
+			consensus.getLogger().Warn("[OnPrepared] Block content is not verified successfully", "error", err, "inChain", consensus.ChainReader.CurrentHeader().Number, "MsgBlockNum", blockObj.Header().Number)
+			return
+		}
+	}
+
+	consensus.getLogger().Debug("[OnPrepared] Prepared message and block added", "MsgViewID", recvMsg.ViewID, "MsgBlockNum", recvMsg.BlockNum, "blockHash", recvMsg.BlockHash)
+	consensus.pbftLog.AddBlock(&blockObj)
+	recvMsg.Block = []byte{} // save memory space
 	consensus.pbftLog.AddMessage(recvMsg)
+
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
 
 	consensus.tryCatchup()
 	if consensus.mode.Mode() == ViewChanging {
@@ -399,10 +391,16 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		return
 	}
 
+	// add block field
+	blockPayload := make([]byte, len(block))
+	copy(blockPayload[:], block[:])
+	consensus.block = blockPayload
+
+	// add preparedSig field
 	consensus.aggregatedPrepareSig = aggSig
 	consensus.prepareBitmap = mask
 
-	// Optimistically sign on the blockhash of prepare message
+	// Optimistically add blockhash field of prepare message
 	emptyHash := [32]byte{}
 	if bytes.Compare(consensus.blockHash[:], emptyHash[:]) == 0 {
 		copy(consensus.blockHash[:], blockHash[:])
@@ -648,13 +646,14 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		return
 	}
 
+	consensus.getLogger().Debug("[OnCommitted] Committed message added", "MsgViewID", recvMsg.ViewID, "MsgBlockNum", recvMsg.BlockNum)
+	consensus.pbftLog.AddMessage(recvMsg)
+
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
 	consensus.aggregatedCommitSig = aggSig
 	consensus.commitBitmap = mask
-	consensus.getLogger().Debug("[OnCommitted] Committed message added", "MsgViewID", recvMsg.ViewID, "MsgBlockNum", recvMsg.BlockNum)
-	consensus.pbftLog.AddMessage(recvMsg)
 
 	if recvMsg.BlockNum-consensus.blockNum > consensusBlockNumBuffer {
 		consensus.getLogger().Debug("[OnCommitted] out of sync", "MsgBlockNum", recvMsg.BlockNum)
