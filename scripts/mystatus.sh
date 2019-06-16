@@ -32,7 +32,6 @@ valid_ip () {
 }
 
 status_report () {
-    
     # Block heights
     heightStatus=$(tac latest/validator*.log | grep -Eom1 '"myHeight":[0-9]+' | cut -d: -f2)
     lengthOfChain=$(tac latest/validator*.log | grep -Eom1 '"otherHeight":[0-9]+' | cut -d: -f2)
@@ -45,7 +44,7 @@ status_report () {
 
     # Check validity of IP
     if ! valid_ip $ip; then
-        echo "NO valid public IP found: $PUB_IP"
+        echo "NO valid public IP found: $ip"
         exit 2
     fi
 
