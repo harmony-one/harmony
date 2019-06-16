@@ -17,22 +17,22 @@ type ConnLogger struct {
 }
 
 func (cl ConnLogger) Listen(net net.Network, ma ma.Multiaddr) {
-	cl.l.Debug("[CONNECTIONS] Listener starting", "net", net, "addr", ma)
+	WithCaller(cl.l).Debug("listener starting", "net", net, "addr", ma)
 }
 
 func (cl ConnLogger) ListenClose(net net.Network, ma ma.Multiaddr) {
-	cl.l.Debug("[CONNECTIONS] Listener closing", "net", net, "addr", ma)
+	WithCaller(cl.l).Debug("listener closing", "net", net, "addr", ma)
 }
 
 func (cl ConnLogger) Connected(net net.Network, conn net.Conn) {
-	cl.l.Debug("[CONNECTIONS] Connected", "net", net,
+	WithCaller(cl.l).Debug("connected", "net", net,
 		"localPeer", conn.LocalPeer(), "localAddr", conn.LocalMultiaddr(),
 		"remotePeer", conn.RemotePeer(), "remoteAddr", conn.RemoteMultiaddr(),
 	)
 }
 
 func (cl ConnLogger) Disconnected(net net.Network, conn net.Conn) {
-	cl.l.Debug("[CONNECTIONS] Disconnected", "net", net,
+	WithCaller(cl.l).Debug("disconnected", "net", net,
 		"localPeer", conn.LocalPeer(), "localAddr", conn.LocalMultiaddr(),
 		"remotePeer", conn.RemotePeer(), "remoteAddr", conn.RemoteMultiaddr(),
 	)
@@ -40,7 +40,7 @@ func (cl ConnLogger) Disconnected(net net.Network, conn net.Conn) {
 
 func (cl ConnLogger) OpenedStream(net net.Network, stream net.Stream) {
 	conn := stream.Conn()
-	cl.l.Debug("[CONNECTIONS] Stream opened", "net", net,
+	WithCaller(cl.l).Debug("stream opened", "net", net,
 		"localPeer", conn.LocalPeer(), "localAddr", conn.LocalMultiaddr(),
 		"remotePeer", conn.RemotePeer(), "remoteAddr", conn.RemoteMultiaddr(),
 		"protocol", stream.Protocol(),
@@ -49,7 +49,7 @@ func (cl ConnLogger) OpenedStream(net net.Network, stream net.Stream) {
 
 func (cl ConnLogger) ClosedStream(net net.Network, stream net.Stream) {
 	conn := stream.Conn()
-	cl.l.Debug("[CONNECTIONS] Stream closed", "net", net,
+	WithCaller(cl.l).Debug("stream closed", "net", net,
 		"localPeer", conn.LocalPeer(), "localAddr", conn.LocalMultiaddr(),
 		"remotePeer", conn.RemotePeer(), "remoteAddr", conn.RemoteMultiaddr(),
 		"protocol", stream.Protocol(),
