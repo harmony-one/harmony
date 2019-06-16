@@ -44,11 +44,13 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 				return
 			case <-time.After(ConsensusTimeOut * time.Second):
 				utils.GetLogInstance().Debug("Consensus timeout, retry!", "count", timeoutCount)
-				node.Consensus.ResetState()
-				timeoutCount++
-				if newBlock != nil {
-					// Send the new block to Consensus so it can be confirmed.
-					node.BlockChannel <- newBlock
+				if node.Consensus.PubKey.IsEqual(node.Consensus.LeaderPubKey) {
+					node.Consensus.ResetState()
+					timeoutCount++
+					if newBlock != nil {
+						// Send the new block to Consensus so it can be confirmed.
+						node.BlockChannel <- newBlock
+					}
 				}
 			case <-readySignal:
 				firstTry := true
