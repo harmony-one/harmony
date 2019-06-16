@@ -291,7 +291,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 
 	nodeConfig.Host, err = p2pimpl.NewHost(&nodeConfig.SelfPeer, nodeConfig.P2pPriKey)
 	if *logConn {
-		nodeConfig.Host.GetP2PHost().Network().Notify(utils.ConnLogger)
+		nodeConfig.Host.GetP2PHost().Network().Notify(utils.RootConnLogger)
 	}
 	if err != nil {
 		panic("unable to new host in harmony")
