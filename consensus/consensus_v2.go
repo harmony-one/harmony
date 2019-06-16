@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"bytes"
 	"encoding/binary"
 	"time"
 
@@ -401,6 +402,12 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 
 	consensus.aggregatedPrepareSig = aggSig
 	consensus.prepareBitmap = mask
+
+	// Optimistically sign on the blockhash of prepare message
+	emptyHash := [32]byte{}
+	if bytes.Compare(consensus.blockHash[:], emptyHash[:]) == 0 {
+		copy(consensus.blockHash[:], blockHash[:])
+	}
 
 	// Construct and send the commit message
 	blockNumBytes := make([]byte, 8)
