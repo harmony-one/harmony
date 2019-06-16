@@ -490,11 +490,11 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 	node.host.ConnectHostPeer(*peer)
 
 	if ping.Node.Role == proto_node.ClientRole {
-		utils.GetLogInstance().Info("Add Client Peer to Node", "Address", node.Consensus.GetSelfAddress(), "Client", peer)
+		utils.GetLogInstance().Info("Add Client Peer to Node", "PubKey", node.Consensus.PubKey.SerializeToHexStr(), "Client", peer)
 		node.ClientPeer = peer
 	} else {
 		node.AddPeers([]*p2p.Peer{peer})
-		utils.GetLogInstance().Info("Add Peer to Node", "Address", node.Consensus.GetSelfAddress(), "Peer", peer, "# Peers", len(node.Consensus.PublicKeys))
+		utils.GetLogInstance().Info("Add Peer to Node", "PubKey", node.Consensus.PubKey.SerializeToHexStr(), "Peer", peer, "# Peers", len(node.Consensus.PublicKeys))
 	}
 
 	return 1
@@ -805,10 +805,5 @@ func getBinaryPath() (argv0 string, err error) {
 
 // ConsensusMessageHandler passes received message in node_handler to consensus
 func (node *Node) ConsensusMessageHandler(msgPayload []byte) {
-	select {
-	case node.Consensus.MsgChan <- msgPayload:
-	case <-time.After(consensusTimeout):
-		//utils.GetLogInstance().Debug("[Consensus] ConsensusMessageHandler timeout", "duration", consensusTimeout, "msgPayload", len(msgPayload))
-	}
-	return
+	node.Consensus.MsgChan <- msgPayload
 }

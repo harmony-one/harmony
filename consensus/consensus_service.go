@@ -4,11 +4,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"reflect"
 	"time"
 
 	"github.com/harmony-one/harmony/crypto/hash"
-	common2 "github.com/harmony-one/harmony/internal/common"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -18,7 +16,6 @@ import (
 	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 	"golang.org/x/crypto/sha3"
 
-	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/state"
@@ -29,7 +26,6 @@ import (
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/p2p/host"
 )
 
 // WaitForNewRandomness listens to the RndChannel to receive new VDF randomness.
@@ -88,6 +84,12 @@ func (consensus *Consensus) Seal(chain consensus_engine.ChainReader, block *type
 	return nil
 }
 
+// Author returns the author of the block header.
+func (consensus *Consensus) Author(header *types.Header) (common.Address, error) {
+	// TODO: implement this
+	return common.Address{}, nil
+}
+
 // Prepare is to prepare ...
 // TODO(RJ): fix it.
 func (consensus *Consensus) Prepare(chain consensus_engine.ChainReader, header *types.Header) error {
@@ -95,23 +97,18 @@ func (consensus *Consensus) Prepare(chain consensus_engine.ChainReader, header *
 	return nil
 }
 
-// GetSelfAddress returns the address in hex
-func (consensus *Consensus) GetSelfAddress() common.Address {
-	return consensus.SelfAddress
-}
-
 // Populates the common basic fields for all consensus message.
 func (consensus *Consensus) populateMessageFields(request *msg_pb.ConsensusRequest) {
 	request.ViewId = consensus.viewID
 	request.BlockNum = consensus.blockNum
+	request.ShardId = consensus.ShardID
 
 	// 32 byte block hash
 	request.BlockHash = consensus.blockHash[:]
 
 	// sender address
 	request.SenderPubkey = consensus.PubKey.Serialize()
-
-	utils.GetLogInstance().Debug("[populateMessageFields]", "myViewID", consensus.viewID, "SenderAddress", consensus.SelfAddress, "blockNum", consensus.blockNum)
+	consensus.getLogger().Debug("[populateMessageFields]", "SenderKey", consensus.PubKey.SerializeToHexStr())
 }
 
 // Signs the consensus message and returns the marshaled message.
@@ -168,33 +165,18 @@ func (consensus *Consensus) DebugPrintPublicKeys() {
 	utils.GetLogInstance().Debug("PublicKeys:", "#", len(consensus.PublicKeys))
 }
 
-// DebugPrintValidators print all validator ip/port/key in string format in Consensus
-func (consensus *Consensus) DebugPrintValidators() {
-	count := 0
-	consensus.validators.Range(func(k, v interface{}) bool {
-		if p, ok := v.(p2p.Peer); ok {
-			str2 := fmt.Sprintf("%s", p.ConsensusPubKey.Serialize())
-			utils.GetLogInstance().Debug("validator:", "IP", p.IP, "Port", p.Port, "address", utils.GetBlsAddress(p.ConsensusPubKey), "Key", str2)
-			count++
-			return true
-		}
-		return false
-	})
-	utils.GetLogInstance().Debug("Validators", "#", count)
-}
-
 // UpdatePublicKeys updates the PublicKeys variable, protected by a mutex
 func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int {
 	consensus.pubKeyLock.Lock()
 	consensus.PublicKeys = append(pubKeys[:0:0], pubKeys...)
-	consensus.CommitteeAddresses = map[common.Address]bool{}
+	consensus.CommitteePublicKeys = map[string]bool{}
 	for _, pubKey := range consensus.PublicKeys {
-		consensus.CommitteeAddresses[utils.GetBlsAddress(pubKey)] = true
+		consensus.CommitteePublicKeys[pubKey.SerializeToHexStr()] = true
 	}
 	// TODO: use pubkey to identify leader rather than p2p.Peer.
 	consensus.leader = p2p.Peer{ConsensusPubKey: pubKeys[0]}
 	consensus.LeaderPubKey = pubKeys[0]
-	prepareBitmap, err := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.ConsensusPubKey)
+	prepareBitmap, err := bls_cosi.NewMask(consensus.PublicKeys, consensus.LeaderPubKey)
 	if err == nil {
 		consensus.prepareBitmap = prepareBitmap
 	}
@@ -204,7 +186,7 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int {
 		consensus.commitBitmap = commitBitmap
 	}
 
-	utils.GetLogInstance().Info("My Leader", "info", hex.EncodeToString(consensus.leader.ConsensusPubKey.Serialize()))
+	utils.GetLogInstance().Info("My Leader", "info", consensus.LeaderPubKey.SerializeToHexStr())
 	utils.GetLogInstance().Info("My Committee", "info", consensus.PublicKeys)
 	consensus.pubKeyLock.Unlock()
 	// reset states after update public keys
@@ -260,12 +242,6 @@ func (consensus *Consensus) Finalize(chain consensus_engine.ChainReader, header 
 	}
 	header.Root = state.IntermediateRoot(false)
 	return types.NewBlock(header, txs, receipts), nil
-}
-
-// Author returns the author of the block header.
-func (consensus *Consensus) Author(header *types.Header) (common.Address, error) {
-	// TODO: implement this
-	return common.Address{}, nil
 }
 
 // Sign on the hash of the message
@@ -353,8 +329,8 @@ func (consensus *Consensus) GetViewIDSigsArray() []*bls.Sign {
 func (consensus *Consensus) ResetState() {
 	consensus.phase = Announce
 	consensus.blockHash = [32]byte{}
-	consensus.prepareSigs = map[common.Address]*bls.Sign{}
-	consensus.commitSigs = map[common.Address]*bls.Sign{}
+	consensus.prepareSigs = map[string]*bls.Sign{}
+	consensus.commitSigs = map[string]*bls.Sign{}
 
 	prepareBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.LeaderPubKey)
 	commitBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.LeaderPubKey)
@@ -372,82 +348,8 @@ func (consensus *Consensus) String() string {
 	} else {
 		duty = "VLD" // validator
 	}
-	return fmt.Sprintf("[duty:%s, PubKey:%s, ShardID:%v, Address:%v]",
-		duty, hex.EncodeToString(consensus.PubKey.Serialize()), consensus.ShardID, consensus.SelfAddress)
-}
-
-// AddPeers adds new peers into the validator map of the consensus
-// and add the public keys
-func (consensus *Consensus) AddPeers(peers []*p2p.Peer) int {
-	count := 0
-
-	for _, peer := range peers {
-		_, ok := consensus.validators.LoadOrStore(common2.MustAddressToBech32(utils.GetBlsAddress(peer.ConsensusPubKey)), *peer)
-		if !ok {
-			consensus.pubKeyLock.Lock()
-			if _, ok := consensus.CommitteeAddresses[peer.ConsensusPubKey.GetAddress()]; !ok {
-				consensus.PublicKeys = append(consensus.PublicKeys, peer.ConsensusPubKey)
-				consensus.CommitteeAddresses[peer.ConsensusPubKey.GetAddress()] = true
-			}
-			consensus.pubKeyLock.Unlock()
-		}
-		count++
-	}
-	return count
-}
-
-// RemovePeers will remove the peer from the validator list and PublicKeys
-// It will be called when leader/node lost connection to peers
-func (consensus *Consensus) RemovePeers(peers []p2p.Peer) int {
-	// early return as most of the cases no peers to remove
-	if len(peers) == 0 {
-		return 0
-	}
-
-	count := 0
-	count2 := 0
-	newList := append(consensus.PublicKeys[:0:0], consensus.PublicKeys...)
-
-	for _, peer := range peers {
-		consensus.validators.Range(func(k, v interface{}) bool {
-			if p, ok := v.(p2p.Peer); ok {
-				// We are using peer.IP and peer.Port to identify the unique peer
-				// FIXME (lc): use a generic way to identify a peer
-				if p.IP == peer.IP && p.Port == peer.Port {
-					consensus.validators.Delete(k)
-					count++
-				}
-				return true
-			}
-			return false
-		})
-
-		for i, pp := range newList {
-			// Not Found the pubkey, if found pubkey, ignore it
-			if reflect.DeepEqual(peer.ConsensusPubKey, pp) {
-				//				consensus.Log.Debug("RemovePeers", "i", i, "pp", pp, "peer.PubKey", peer.PubKey)
-				newList = append(newList[:i], newList[i+1:]...)
-				count2++
-			}
-		}
-	}
-
-	if count2 > 0 {
-		consensus.UpdatePublicKeys(newList)
-
-		// Send out Pong messages to everyone in the shard to keep the publickeys in sync
-		// Or the shard won't be able to reach consensus if public keys are mismatch
-
-		validators := consensus.GetValidatorPeers()
-		pong := proto_discovery.NewPongMessage(validators, consensus.PublicKeys, consensus.leader.ConsensusPubKey, consensus.ShardID)
-		buffer := pong.ConstructPongMessage()
-
-		if err := consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), buffer)); err != nil {
-			ctxerror.Warn(utils.GetLogger(), err, "cannot send pong message")
-		}
-	}
-
-	return count2
+	return fmt.Sprintf("[duty:%s, PubKey:%s, ShardID:%v]",
+		duty, consensus.PubKey.SerializeToHexStr(), consensus.ShardID)
 }
 
 // ToggleConsensusCheck flip the flag of whether ignore viewID check during consensus process
@@ -457,25 +359,9 @@ func (consensus *Consensus) ToggleConsensusCheck() {
 	consensus.ignoreViewIDCheck = !consensus.ignoreViewIDCheck
 }
 
-// GetPeerByAddress the validator peer based on validator Address.
-// TODO: deprecate this, as validators network info shouldn't known to everyone
-func (consensus *Consensus) GetPeerByAddress(validatorAddress string) *p2p.Peer {
-	v, ok := consensus.validators.Load(validatorAddress)
-	if !ok {
-		utils.GetLogInstance().Warn("Unrecognized validator", "validatorAddress", validatorAddress, "consensus", consensus)
-		return nil
-	}
-	value, ok := v.(p2p.Peer)
-	if !ok {
-		utils.GetLogInstance().Warn("Invalid validator", "validatorAddress", validatorAddress, "consensus", consensus)
-		return nil
-	}
-	return &value
-}
-
 // IsValidatorInCommittee returns whether the given validator BLS address is part of my committee
-func (consensus *Consensus) IsValidatorInCommittee(validatorBlsAddress common.Address) bool {
-	_, ok := consensus.CommitteeAddresses[validatorBlsAddress]
+func (consensus *Consensus) IsValidatorInCommittee(pubKey *bls.PublicKey) bool {
+	_, ok := consensus.CommitteePublicKeys[pubKey.SerializeToHexStr()]
 	return ok
 }
 
@@ -508,28 +394,24 @@ func (consensus *Consensus) verifySenderKey(msg *msg_pb.Message) (*bls.PublicKey
 	if err != nil {
 		return nil, err
 	}
-	addrBytes := senderKey.GetAddress()
-	senderAddr := common.BytesToAddress(addrBytes[:])
 
-	if !consensus.IsValidatorInCommittee(senderAddr) {
-		return nil, fmt.Errorf("Validator address %s is not in committee", common2.MustAddressToBech32(senderAddr))
+	if !consensus.IsValidatorInCommittee(senderKey) {
+		return nil, fmt.Errorf("Validator %s is not in committee", senderKey.SerializeToHexStr())
 	}
 	return senderKey, nil
 }
 
-func (consensus *Consensus) verifyViewChangeSenderKey(msg *msg_pb.Message) (*bls.PublicKey, common.Address, error) {
+func (consensus *Consensus) verifyViewChangeSenderKey(msg *msg_pb.Message) (*bls.PublicKey, error) {
 	vcMsg := msg.GetViewchange()
 	senderKey, err := bls_cosi.BytesToBlsPublicKey(vcMsg.SenderPubkey)
 	if err != nil {
-		return nil, common.Address{}, err
+		return nil, err
 	}
-	addrBytes := senderKey.GetAddress()
-	senderAddr := common.BytesToAddress(addrBytes[:])
 
-	if !consensus.IsValidatorInCommittee(senderAddr) {
-		return nil, common.Address{}, fmt.Errorf("Validator address %s is not in committee", common2.MustAddressToBech32(senderAddr))
+	if !consensus.IsValidatorInCommittee(senderKey) {
+		return nil, fmt.Errorf("Validator %s is not in committee", senderKey.SerializeToHexStr())
 	}
-	return senderKey, senderAddr, nil
+	return senderKey, nil
 }
 
 // SetViewID set the viewID to the height of the blockchain
@@ -551,13 +433,16 @@ func (consensus *Consensus) RegisterRndChannel(rndChannel chan [64]byte) {
 func (consensus *Consensus) checkViewID(msg *PbftMessage) error {
 	// just ignore consensus check for the first time when node join
 	if consensus.ignoreViewIDCheck {
+		//in syncing mode, node accepts incoming messages without viewID/leaderKey checking
+		//so only set mode to normal when new node enters consensus and need checking viewID
+		consensus.mode.SetMode(Normal)
 		consensus.viewID = msg.ViewID
 		consensus.mode.SetViewID(msg.ViewID)
 		consensus.LeaderPubKey = msg.SenderPubkey
 		consensus.ignoreViewIDCheck = false
 		consensus.consensusTimeout[timeoutConsensus].Start()
 		utils.GetLogger().Debug("viewID and leaderKey override", "viewID", consensus.viewID, "leaderKey", consensus.LeaderPubKey.SerializeToHexStr()[:20])
-		utils.GetLogger().Debug("start consensus timeout", "viewID", consensus.viewID, "block", consensus.blockNum)
+		utils.GetLogger().Debug("Start consensus timer", "viewID", consensus.viewID, "block", consensus.blockNum)
 		return nil
 	} else if msg.ViewID > consensus.viewID {
 		return consensus_engine.ErrViewIDNotMatch

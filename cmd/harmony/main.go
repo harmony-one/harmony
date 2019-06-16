@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
+
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/accounts/keystore"
 	"github.com/harmony-one/harmony/consensus"
@@ -23,7 +24,7 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
 	hmykey "github.com/harmony-one/harmony/internal/keystore"
-	memprofiling "github.com/harmony-one/harmony/internal/memprofiling"
+	"github.com/harmony-one/harmony/internal/memprofiling"
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -95,6 +96,8 @@ var (
 	isGenesis = flag.Bool("is_genesis", true, "true means this node is a genesis node")
 	// isArchival indicates this node is an archival node that will save and archive current blockchain
 	isArchival = flag.Bool("is_archival", false, "true means this node is a archival node")
+	// delayCommit is the commit-delay timer, used by Harmony nodes
+	delayCommit = flag.String("delay_commit", "0ms", "how long to delay sending commit messages in consensus, ex: 500ms, 1s")
 	//isNewNode indicates this node is a new node
 	isNewNode          = flag.Bool("is_newnode", false, "true means this node is a new node")
 	shardID            = flag.Int("shard_id", -1, "the shard ID of this node")
@@ -108,6 +111,10 @@ var (
 
 	// -nopass is false by default.  The keyfile must be encrypted.
 	hmyNoPass = flag.Bool("nopass", false, "No passphrase for the key (testing only)")
+	// -pass takes on "pass:password", "env:var", "file:pathname",
+	// "fd:number", or "stdin" form.
+	// See “PASS PHRASE ARGUMENTS” section of openssl(1) for details.
+	hmyPass = flag.String("pass", "", "how to get passphrase for the key")
 
 	stakingAccounts = flag.String("accounts", "", "account addresses of the node")
 
@@ -194,7 +201,14 @@ func initSetup() {
 
 	var myPass string
 	if !*hmyNoPass {
-		myPass = utils.AskForPassphrase("Passphrase: ")
+		if *hmyPass == "" {
+			myPass = utils.AskForPassphrase("Passphrase: ")
+		} else if pass, err := utils.GetPassphraseFromSource(*hmyPass); err != nil {
+			fmt.Printf("Cannot read passphrase: %s\n", err)
+			os.Exit(3)
+		} else {
+			myPass = pass
+		}
 		err := ks.Unlock(myAccount, myPass)
 		if err != nil {
 			fmt.Printf("Wrong Passphrase! Unable to unlock account key!\n")
@@ -242,7 +256,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	if *isGenesis {
 		err := consensusPriKey.DeserializeHexStr(genesisAccount.BlsPriKey)
 		if err != nil {
-			panic(fmt.Errorf("generate key error"))
+			panic(fmt.Errorf("Failed to parse BLS private key: %s, %s", genesisAccount.BlsPriKey, err))
 		}
 	} else {
 		// NewNode won't work
@@ -263,7 +277,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	// Consensus keys are the BLS12-381 keys used to sign consensus messages
 	nodeConfig.ConsensusPriKey, nodeConfig.ConsensusPubKey = consensusPriKey, consensusPriKey.GetPublicKey()
 	if nodeConfig.ConsensusPriKey == nil || nodeConfig.ConsensusPubKey == nil {
-		panic(fmt.Errorf("generate key error"))
+		panic(fmt.Errorf("Failed to initialize BLS keys: %s", consensusPriKey.SerializeToHexStr()))
 	}
 	// Key Setup ================= [End]
 
@@ -303,6 +317,12 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 		fmt.Fprintf(os.Stderr, "Error :%v \n", err)
 		os.Exit(1)
 	}
+	commitDelay, err := time.ParseDuration(*delayCommit)
+	if err != nil || commitDelay < 0 {
+		_, _ = fmt.Fprintf(os.Stderr, "invalid commit delay %#v", *delayCommit)
+		os.Exit(1)
+	}
+	currentConsensus.SetCommitDelay(commitDelay)
 	currentConsensus.MinPeers = *minPeers
 	if *disableViewChange {
 		currentConsensus.DisableViewChangeForTestingOnly()

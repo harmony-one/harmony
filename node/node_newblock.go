@@ -17,7 +17,7 @@ import (
 const (
 	DefaultThreshold   = 1
 	FirstTimeThreshold = 2
-	ConsensusTimeOut   = 10
+	ConsensusTimeOut   = 30
 	PeriodicBlock      = 1 * time.Second
 	BlockPeriod        = 10 * time.Second
 )
@@ -34,13 +34,22 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 		time.Sleep(30 * time.Second) // Wait for other nodes to be ready (test-only)
 
 		firstTime := true
+		timeoutCount := 0
+		var newBlock *types.Block
 		for {
 			// keep waiting for Consensus ready
 			select {
 			case <-stopChan:
-				utils.GetLogInstance().Debug("Consensus propose new block: STOPPED!")
+				utils.GetLogInstance().Debug("Consensus new block proposal: STOPPED!")
 				return
-
+			case <-time.After(ConsensusTimeOut * time.Second):
+				node.Consensus.ResetState()
+				timeoutCount++
+				if newBlock != nil {
+					utils.GetLogInstance().Debug("Consensus timeout, retry!", "count", timeoutCount)
+					// Send the new block to Consensus so it can be confirmed.
+					node.BlockChannel <- newBlock
+				}
 			case <-readySignal:
 				firstTry := true
 				deadline := time.Now().Add(BlockPeriod)
@@ -62,25 +71,24 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 					deadline = time.Now().Add(BlockPeriod)
 					// Normal tx block consensus
 					selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
-					utils.GetLogInstance().Debug("PROPOSING NEW BLOCK ------------------------------------------------", "blockNum", node.Blockchain().CurrentBlock().NumberU64()+1, "threshold", threshold, "selectedTxs", len(selectedTxs))
+					utils.GetLogInstance().Info("PROPOSING NEW BLOCK ------------------------------------------------", "blockNum", node.Blockchain().CurrentBlock().NumberU64()+1, "threshold", threshold, "selectedTxs", len(selectedTxs))
 					if err := node.Worker.CommitTransactions(selectedTxs); err != nil {
 						ctxerror.Log15(utils.GetLogger().Error,
 							ctxerror.New("cannot commit transactions").
 								WithCause(err))
 					}
-					block, err := node.Worker.Commit()
+					newBlock, err := node.Worker.Commit()
 					if err != nil {
 						ctxerror.Log15(utils.GetLogger().Error,
 							ctxerror.New("cannot commit new block").
 								WithCause(err))
 						continue
-					} else if err := node.proposeShardState(block); err != nil {
+					} else if err := node.proposeShardState(newBlock); err != nil {
 						ctxerror.Log15(utils.GetLogger().Error,
 							ctxerror.New("cannot add shard state").
 								WithCause(err))
 					} else {
-						newBlock := block
-						utils.GetLogInstance().Debug("Successfully proposed new block", "blockNum", block.NumberU64(), "numTxs", block.Transactions().Len())
+						utils.GetLogInstance().Debug("Successfully proposed new block", "blockNum", newBlock.NumberU64(), "numTxs", newBlock.Transactions().Len())
 
 						// Send the new block to Consensus so it can be confirmed.
 						node.BlockChannel <- newBlock

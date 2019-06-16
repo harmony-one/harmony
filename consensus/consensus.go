@@ -4,6 +4,7 @@ package consensus // consensus
 import (
 	"math/big"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -15,7 +16,6 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
-	common2 "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
@@ -42,21 +42,27 @@ type Consensus struct {
 	// channel to receive consensus message
 	MsgChan chan []byte
 
+	// How long to delay sending commit messages.
+	delayCommit time.Duration
+
+	// Consensus rounds whose commit phase finished
+	commitFinishChan chan uint32
+
 	// 2 types of timeouts: normal and viewchange
 	consensusTimeout map[TimeoutType]*utils.Timeout
 
 	// Commits collected from validators.
-	prepareSigs          map[common.Address]*bls.Sign // key is the validator's address
-	commitSigs           map[common.Address]*bls.Sign // key is the validator's address
+	prepareSigs          map[string]*bls.Sign // key is the bls public key
+	commitSigs           map[string]*bls.Sign // key is the bls public key
 	aggregatedPrepareSig *bls.Sign
 	aggregatedCommitSig  *bls.Sign
 	prepareBitmap        *bls_cosi.Mask
 	commitBitmap         *bls_cosi.Mask
 
 	// Commits collected from view change
-	bhpSigs      map[common.Address]*bls.Sign // bhpSigs: blockHashPreparedSigs is the signature on m1 type message
-	nilSigs      map[common.Address]*bls.Sign // nilSigs: there is no prepared message when view change, it's signature on m2 type (i.e. nil) messages
-	viewIDSigs   map[common.Address]*bls.Sign // viewIDSigs: every validator sign on |viewID|blockHash| in view changing message
+	bhpSigs      map[string]*bls.Sign // bhpSigs: blockHashPreparedSigs is the signature on m1 type message
+	nilSigs      map[string]*bls.Sign // nilSigs: there is no prepared message when view change, it's signature on m2 type (i.e. nil) messages
+	viewIDSigs   map[string]*bls.Sign // viewIDSigs: every validator sign on |viewID|blockHash| in view changing message
 	bhpBitmap    *bls_cosi.Mask
 	nilBitmap    *bls_cosi.Mask
 	viewIDBitmap *bls_cosi.Mask
@@ -77,19 +83,19 @@ type Consensus struct {
 	leader p2p.Peer
 
 	// Public keys of the committee including leader and validators
-	PublicKeys []*bls.PublicKey
-	// The addresses of my committee
-	CommitteeAddresses map[common.Address]bool
-	pubKeyLock         sync.Mutex
+	PublicKeys          []*bls.PublicKey
+	CommitteePublicKeys map[string]bool
+
+	pubKeyLock sync.Mutex
 
 	// private/public keys of current node
 	priKey *bls.SecretKey
 	PubKey *bls.PublicKey
+
+	SelfAddress common.Address
 	// the publickey of leader
 	LeaderPubKey *bls.PublicKey
 
-	// Leader or validator address in hex
-	SelfAddress common.Address
 	// Consensus Id (View Id) - 4 byte
 	viewID uint32 // TODO(chao): change it to uint64 or add overflow checking mechanism
 
@@ -137,9 +143,17 @@ type Consensus struct {
 
 	// Used to convey to the consensus main loop that block syncing has finished.
 	syncReadyChan chan struct{}
+	// Used to convey to the consensus main loop that node is out of sync
+	syncNotReadyChan chan struct{}
 
 	// If true, this consensus will not propose view change.
 	disableViewChange bool
+}
+
+// SetCommitDelay sets the commit message delay.  If set to non-zero,
+// validator delays commit message by the amount.
+func (consensus *Consensus) SetCommitDelay(delay time.Duration) {
+	consensus.delayCommit = delay
 }
 
 // StakeInfoFinder returns the stake information finder instance this
@@ -170,6 +184,11 @@ func (consensus *Consensus) BlocksSynchronized() {
 	consensus.syncReadyChan <- struct{}{}
 }
 
+// BlocksNotSynchronized lets the main loop know that block is not synchronized
+func (consensus *Consensus) BlocksNotSynchronized() {
+	consensus.syncNotReadyChan <- struct{}{}
+}
+
 // WaitForSyncing informs the node syncing service to start syncing
 func (consensus *Consensus) WaitForSyncing() {
 	<-consensus.blockNumLowChan
@@ -178,6 +197,12 @@ func (consensus *Consensus) WaitForSyncing() {
 // Quorum returns the consensus quorum of the current committee (2f+1).
 func (consensus *Consensus) Quorum() int {
 	return len(consensus.PublicKeys)*2/3 + 1
+}
+
+// RewardThreshold returns the threshold to stop accepting commit messages
+// when leader receives enough signatures for block reward
+func (consensus *Consensus) RewardThreshold() int {
+	return len(consensus.PublicKeys) * 9 / 10
 }
 
 // StakeInfoFinder finds the staking account for the given consensus key.
@@ -214,14 +239,13 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 		nodeconfig.GetDefaultConfig().SetIsLeader(false)
 	}
 
-	consensus.prepareSigs = map[common.Address]*bls.Sign{}
-	consensus.commitSigs = map[common.Address]*bls.Sign{}
-	consensus.CommitteeAddresses = make(map[common.Address]bool)
+	consensus.prepareSigs = map[string]*bls.Sign{}
+	consensus.commitSigs = map[string]*bls.Sign{}
 
-	consensus.validators.Store(common2.MustAddressToBech32(utils.GetBlsAddress(leader.ConsensusPubKey)), leader)
+	consensus.CommitteePublicKeys = make(map[string]bool)
 
-	// For now use socket address as ID
-	// TODO: populate Id derived from address
+	consensus.validators.Store(leader.ConsensusPubKey.SerializeToHexStr(), leader)
+
 	consensus.SelfAddress = utils.GetBlsAddress(selfPeer.ConsensusPubKey)
 
 	if blsPriKey != nil {
@@ -237,6 +261,8 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 
 	consensus.MsgChan = make(chan []byte)
 	consensus.syncReadyChan = make(chan struct{})
+	consensus.syncNotReadyChan = make(chan struct{})
+	consensus.commitFinishChan = make(chan uint32)
 
 	consensus.ReadySignal = make(chan struct{})
 	if nodeconfig.GetDefaultConfig().IsLeader() {

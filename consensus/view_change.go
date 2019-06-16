@@ -146,9 +146,9 @@ func (consensus *Consensus) ResetViewChangeState() {
 	consensus.viewIDBitmap = viewIDBitmap
 	consensus.m1Payload = []byte{}
 
-	consensus.bhpSigs = map[common.Address]*bls.Sign{}
-	consensus.nilSigs = map[common.Address]*bls.Sign{}
-	consensus.viewIDSigs = map[common.Address]*bls.Sign{}
+	consensus.bhpSigs = map[string]*bls.Sign{}
+	consensus.nilSigs = map[string]*bls.Sign{}
+	consensus.viewIDSigs = map[string]*bls.Sign{}
 }
 
 func createTimeout() map[TimeoutType]*utils.Timeout {
@@ -179,11 +179,11 @@ func (consensus *Consensus) startViewChange(viewID uint32) {
 
 	consensus.consensusTimeout[timeoutViewChange].SetDuration(duration)
 	consensus.consensusTimeout[timeoutViewChange].Start()
-	consensus.getLogger().Debug("start view change timeout", "viewChangingID", consensus.mode.ViewID())
+	consensus.getLogger().Debug("start view change timer", "viewChangingID", consensus.mode.ViewID())
 }
 
 func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
-	senderKey, validatorAddress, err := consensus.verifyViewChangeSenderKey(msg)
+	senderKey, err := consensus.verifyViewChangeSenderKey(msg)
 	if err != nil {
 		consensus.getLogger().Debug("onViewChange verifySenderKey failed", "error", err)
 		return
@@ -220,29 +220,29 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	defer consensus.vcLock.Unlock()
 
 	// add self m1 or m2 type message signature and bitmap
-	_, ok1 := consensus.nilSigs[consensus.SelfAddress]
-	_, ok2 := consensus.bhpSigs[consensus.SelfAddress]
+	_, ok1 := consensus.nilSigs[consensus.PubKey.SerializeToHexStr()]
+	_, ok2 := consensus.bhpSigs[consensus.PubKey.SerializeToHexStr()]
 	if !(ok1 || ok2) {
 		// add own signature for newview message
 		preparedMsgs := consensus.pbftLog.GetMessagesByTypeSeq(msg_pb.MessageType_PREPARED, recvMsg.BlockNum)
 		preparedMsg := consensus.pbftLog.FindMessageByMaxViewID(preparedMsgs)
 		if preparedMsg == nil {
 			sign := consensus.priKey.SignHash(NIL)
-			consensus.nilSigs[consensus.SelfAddress] = sign
+			consensus.nilSigs[consensus.PubKey.SerializeToHexStr()] = sign
 			consensus.nilBitmap.SetKey(consensus.PubKey, true)
 		} else {
 			msgToSign := append(preparedMsg.BlockHash[:], preparedMsg.Payload...)
-			consensus.bhpSigs[consensus.SelfAddress] = consensus.priKey.SignHash(msgToSign)
+			consensus.bhpSigs[consensus.PubKey.SerializeToHexStr()] = consensus.priKey.SignHash(msgToSign)
 			consensus.bhpBitmap.SetKey(consensus.PubKey, true)
 		}
 	}
 	// add self m3 type message signature and bitmap
-	_, ok3 := consensus.viewIDSigs[consensus.SelfAddress]
+	_, ok3 := consensus.viewIDSigs[consensus.PubKey.SerializeToHexStr()]
 	if !ok3 {
 		viewIDHash := make([]byte, 4)
 		binary.LittleEndian.PutUint32(viewIDHash, recvMsg.ViewID)
 		sign := consensus.priKey.SignHash(viewIDHash)
-		consensus.viewIDSigs[consensus.SelfAddress] = sign
+		consensus.viewIDSigs[consensus.PubKey.SerializeToHexStr()] = sign
 		consensus.viewIDBitmap.SetKey(consensus.PubKey, true)
 	}
 
@@ -252,9 +252,9 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 
 	// m2 type message
 	if len(recvMsg.Payload) == 0 {
-		_, ok := consensus.nilSigs[validatorAddress]
+		_, ok := consensus.nilSigs[senderKey.SerializeToHexStr()]
 		if ok {
-			consensus.getLogger().Debug("onViewChange already received m2 message from the validator", "validatorAddress", validatorAddress)
+			consensus.getLogger().Debug("onViewChange already received m2 message from the validator", "validatorPubKey", senderKey.SerializeToHexStr())
 			return
 		}
 
@@ -262,12 +262,12 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			consensus.getLogger().Warn("onViewChange failed to verify signature for m2 type viewchange message")
 			return
 		}
-		consensus.nilSigs[validatorAddress] = recvMsg.ViewchangeSig
+		consensus.nilSigs[senderKey.SerializeToHexStr()] = recvMsg.ViewchangeSig
 		consensus.nilBitmap.SetKey(recvMsg.SenderPubkey, true) // Set the bitmap indicating that this validator signed.
 	} else { // m1 type message
-		_, ok := consensus.bhpSigs[validatorAddress]
+		_, ok := consensus.bhpSigs[senderKey.SerializeToHexStr()]
 		if ok {
-			consensus.getLogger().Debug("onViewChange already received m1 message from the validator", "validatorAddress", validatorAddress)
+			consensus.getLogger().Debug("onViewChange already received m1 message from the validator", "validatorPubKey", senderKey.SerializeToHexStr())
 			return
 		}
 		if !recvMsg.ViewchangeSig.VerifyHash(recvMsg.SenderPubkey, recvMsg.Payload) {
@@ -311,14 +311,14 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				consensus.pbftLog.AddMessage(&preparedMsg)
 			}
 		}
-		consensus.bhpSigs[validatorAddress] = recvMsg.ViewchangeSig
+		consensus.bhpSigs[senderKey.SerializeToHexStr()] = recvMsg.ViewchangeSig
 		consensus.bhpBitmap.SetKey(recvMsg.SenderPubkey, true) // Set the bitmap indicating that this validator signed.
 	}
 
 	// check and add viewID (m3 type) message signature
-	_, ok := consensus.viewIDSigs[validatorAddress]
+	_, ok := consensus.viewIDSigs[senderKey.SerializeToHexStr()]
 	if ok {
-		consensus.getLogger().Debug("onViewChange already received m3 viewID message from the validator", "validatorAddress", validatorAddress)
+		consensus.getLogger().Debug("onViewChange already received m3 viewID message from the validator", "senderKey.SerializeToHexStr()", senderKey.SerializeToHexStr())
 		return
 	}
 	viewIDHash := make([]byte, 4)
@@ -327,7 +327,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		consensus.getLogger().Warn("onViewChange failed to verify viewID signature", "msgViewID", recvMsg.ViewID)
 		return
 	}
-	consensus.viewIDSigs[validatorAddress] = recvMsg.ViewidSig
+	consensus.viewIDSigs[senderKey.SerializeToHexStr()] = recvMsg.ViewidSig
 	consensus.viewIDBitmap.SetKey(recvMsg.SenderPubkey, true) // Set the bitmap indicating that this validator signed.
 
 	if len(consensus.viewIDSigs) >= consensus.Quorum() {
@@ -353,7 +353,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			blockNumHash := make([]byte, 8)
 			binary.LittleEndian.PutUint64(blockNumHash, consensus.blockNum)
 			commitPayload := append(blockNumHash, consensus.blockHash[:]...)
-			consensus.commitSigs[consensus.SelfAddress] = consensus.priKey.SignHash(commitPayload)
+			consensus.commitSigs[consensus.PubKey.SerializeToHexStr()] = consensus.priKey.SignHash(commitPayload)
 		}
 
 		consensus.mode.SetViewID(recvMsg.ViewID)
@@ -366,7 +366,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		consensus.ResetViewChangeState()
 		consensus.consensusTimeout[timeoutViewChange].Stop()
 		consensus.consensusTimeout[timeoutConsensus].Start()
-		consensus.getLogger().Debug("new leader start consensus timeout and stop view change timeout", "viewChangingID", consensus.mode.ViewID())
+		consensus.getLogger().Debug("new leader start consensus timer and stop view change timer", "viewChangingID", consensus.mode.ViewID())
 		consensus.getLogger().Debug("I am the new leader", "myKey", consensus.PubKey.SerializeToHexStr(), "viewID", consensus.viewID, "block", consensus.blockNum)
 	}
 	consensus.getLogger().Debug("onViewChange", "numSigs", len(consensus.viewIDSigs), "needed", consensus.Quorum())
@@ -376,7 +376,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 // TODO: move to consensus_leader.go later
 func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	consensus.getLogger().Debug("onNewView received new view message")
-	senderKey, _, err := consensus.verifyViewChangeSenderKey(msg)
+	senderKey, err := consensus.verifyViewChangeSenderKey(msg)
 	if err != nil {
 		consensus.getLogger().Warn("onNewView verifySenderKey failed", "error", err)
 		return
@@ -485,7 +485,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		consensus.getLogger().Info("onNewView === announce")
 	}
 	consensus.getLogger().Debug("new leader changed", "newLeaderKey", consensus.LeaderPubKey.SerializeToHexStr())
-	consensus.getLogger().Debug("validator start consensus timeout and stop view change timeout")
+	consensus.getLogger().Debug("validator start consensus timer and stop view change timer")
 	consensus.consensusTimeout[timeoutConsensus].Start()
 	consensus.consensusTimeout[timeoutViewChange].Stop()
 }

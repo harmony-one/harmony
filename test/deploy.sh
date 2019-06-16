@@ -48,7 +48,7 @@ function usage {
    local ME=$(basename $0)
 
    cat<<EOU
-USAGE: $ME [OPTIONS] config_file_name
+USAGE: $ME [OPTIONS] config_file_name [extra args to node]
 
    -h             print this help message
    -d             enable db support (default: $DB)
@@ -97,9 +97,10 @@ done
 shift $((OPTIND-1))
 
 config=$1
-if [ -z "$config" ]; then
-   usage
-fi
+shift 1 || usage
+unset -v extra_args
+declare -a extra_args
+extra_args=("$@")
 
 case "${DURATION-}" in
 "")
@@ -169,7 +170,7 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
   esac
   case "${mode}" in
   client) ;;
-  *) $DRYRUN "${ROOT}/bin/harmony" "${args[@]}" 2>&1 | tee -a "${LOG_FILE}" &;;
+  *) $DRYRUN "${ROOT}/bin/harmony" "${args[@]}" "${extra_args[@]}" 2>&1 | tee -a "${LOG_FILE}" &;;
   esac
   i=$((i+1))
 done < $config

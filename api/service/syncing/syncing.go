@@ -476,6 +476,9 @@ func (ss *StateSync) updateBlockAndStatus(block *types.Block, bc *core.BlockChai
 	_, err := bc.InsertChain([]*types.Block{block})
 	if err != nil {
 		utils.GetLogInstance().Debug("Error adding new block to blockchain", "Error", err)
+
+		utils.GetLogInstance().Debug("Rolling back current block!", "block", bc.CurrentBlock())
+		bc.Rollback([]common.Hash{bc.CurrentBlock().Hash()})
 		return false
 	}
 	ss.syncMux.Lock()
