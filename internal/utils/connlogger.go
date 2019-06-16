@@ -33,11 +33,13 @@ func streamLogger(s net.Stream, l log.Logger) log.Logger {
 }
 
 func (cl ConnLogger) Listen(n net.Network, ma ma.Multiaddr) {
-	WithCaller(netLogger(n, cl.l)).Debug("listener starting", "addr", ma)
+	WithCaller(netLogger(n, cl.l)).
+		Debug("listener starting", "listenAddress", ma)
 }
 
 func (cl ConnLogger) ListenClose(n net.Network, ma ma.Multiaddr) {
-	WithCaller(netLogger(n, cl.l)).Debug("listener closing", "addr", ma)
+	WithCaller(netLogger(n, cl.l)).
+		Debug("listener closing", "listenAddress", ma)
 }
 
 func (cl ConnLogger) Connected(n net.Network, c net.Conn) {
