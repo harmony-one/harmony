@@ -1,30 +1,33 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 BUCKET=pub.harmony.one
 OS=$(uname -s)
 REL=drum
 
-if [ "$OS" == "Darwin" ]; then
-   FOLDER=release/$REL/darwin-x86_64/
-   BIN=( wallet libbls384_256.dylib libcrypto.1.0.0.dylib libgmp.10.dylib libgmpxx.4.dylib libmcl.dylib )
-fi
-if [ "$OS" == "Linux" ]; then
-   FOLDER=release/$REL/linux-x86_64/
-   BIN=( wallet libbls384_256.so libcrypto.so.10 libgmp.so.10 libgmpxx.so.4 libmcl.so )
-fi
+case "$OS" in
+    Darwin)
+        FOLDER=release/${REL}/darwin-x86_64/
+        BIN=( wallet libbls384_256.dylib libcrypto.1.0.0.dylib libgmp.10.dylib libgmpxx.4.dylib libmcl.dylib )
+        ;;
+    Linux)
+        FOLDER=release/${REL}/linux-x86_64/
+        BIN=( wallet libbls384_256.so libcrypto.so.10 libgmp.so.10 libgmpxx.so.4 libmcl.so )
+        ;;
+    *)
+        echo "${OS} not supported."
+        exit 2
+        ;;
+esac
 
-function usage
-{
-   cat<<EOT
+usage () {
+   cat << EOT
 Usage: $0 [option] command
 
-Option:
+Options:
    -d          download all the binaries/config files (do it when updated)
    -h          print this help
 
-Wallet Help:
-
-Actions:
+Commands:
     1. new           - Generates a new account and store the private key locally
     2. list          - Lists all accounts in local keystore
     3. removeAll     - Removes all accounts in local keystore
@@ -42,46 +45,41 @@ Actions:
         --inputData      - Base64-encoded input data to embed in the transaction
     8. blsgen        - Generates bls keys with passphrase and store the private key locally
 EOT
-	exit 0
 }
 
-function do_download
-{
+do_download () {
 # clean up old files
-	for bin in "${BIN[@]}"; do
-		rm -f ${bin}
-	done
+    for bin in "${BIN[@]}"; do
+        rm -f ${bin}
+    done
 
 # download all the binaries
-	for bin in "${BIN[@]}"; do
-		curl http://${BUCKET}.s3.amazonaws.com/${FOLDER}${bin} -o ${bin}
-	done
+    for bin in "${BIN[@]}"; do
+        curl http://${BUCKET}.s3.amazonaws.com/${FOLDER}${bin} -o ${bin}
+    done
 
-	mkdir -p .hmy
-	chmod +x wallet
-
-	exit 0
+    mkdir -p .hmy/keystore
+    chmod +x wallet
 }
 
-download_only=false
-
 while getopts "dh" opt; do
-	case $opt in
-		h) usage ;;
-		d) download_only=true ;;
-		*) usage ;;
-	esac
+    case ${opt} in
+        d)
+            do_download
+            exit 0
+            ;;
+        h|*)
+            usage
+            exit 1
+            ;;
+    esac
 done
 
 shift $((OPTIND-1))
 
-if [ $download_only == "true" ]; then
-	do_download
-fi
-
 # Run Harmony Wallet
-if [ "$OS" == "Linux" ]; then
-   LD_LIBRARY_PATH=$(pwd) ./wallet $*
+if [ "$OS" = "Linux" ]; then
+    LD_LIBRARY_PATH=$(pwd) ./wallet "$@"
 else
-   DYLD_FALLBACK_LIBRARY_PATH=$(pwd) ./wallet $*
+    DYLD_FALLBACK_LIBRARY_PATH=$(pwd) ./wallet "$@"
 fi
