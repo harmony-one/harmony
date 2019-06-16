@@ -260,7 +260,6 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		consensus.getLogger().Info("[OnPrepare] Received Additional Prepare Message", "ValidatorPubKey", validatorPubKey)
 		return
 	}
-	V
 	// proceed only when the message is not received before
 	_, ok := prepareSigs[validatorPubKey]
 	if ok {
