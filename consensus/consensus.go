@@ -401,7 +401,7 @@ func NewGenesisStakeInfoFinder() (*GenesisStakeInfoFinder, error) {
 		byAccount: make(map[common.Address][]*structs.StakeInfo),
 	}
 	for idx, account := range genesis.GenesisAccounts {
-		blsSecretKeyHex := account.BlsPriKey
+		blsSecretKeyHex := account.DummyKey
 		blsSecretKey := bls.SecretKey{}
 		if err := blsSecretKey.DeserializeHexStr(blsSecretKeyHex); err != nil {
 			return nil, ctxerror.New("cannot convert BLS secret key",

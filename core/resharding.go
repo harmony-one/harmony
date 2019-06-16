@@ -23,7 +23,7 @@ const (
 	// FirstEpoch is the number of the first epoch.
 	FirstEpoch = 1
 	// GenesisShardNum is the number of shard at genesis
-	GenesisShardNum = 4
+	GenesisShardNum = 1
 	// GenesisShardSize is the size of each shard at genesis
 	GenesisShardSize = 100
 	// GenesisShardHarmonyNodes is the number of harmony node at each shard
@@ -229,7 +229,7 @@ func GetInitShardState() types.ShardState {
 
 			// TODO: Old code. Will remove it later as long as the migration works.
 			// priKey := bls.SecretKey{}
-			// priKey.DeserializeHexStr(genesis.GenesisAccounts[index].BlsPriKey)
+			// priKey.DeserializeHexStr(genesis.GenesisAccounts[index].DummyKey)
 			// pubKey := types.BlsPublicKey{}
 			// pubKey.FromLibBLSPublicKey(priKey.GetPublicKey())
 
@@ -248,7 +248,7 @@ func GetInitShardState() types.ShardState {
 
 			// TODO: this is old code. We will remove as long as the migration works.
 			// priKey := bls.SecretKey{}
-			// priKey.DeserializeHexStr(genesis.GenesisFNAccounts[index].BlsPriKey)
+			// priKey.DeserializeHexStr(genesis.GenesisFNAccounts[index].DummyKey)
 
 			pub := &bls.PublicKey{}
 			pub.DeserializeHexStr(genesis.GenesisFNAccounts[index].BlsPublicKey)

@@ -253,9 +253,9 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	consensusPriKey := &bls.SecretKey{}
 
 	if *isGenesis {
-		err := consensusPriKey.DeserializeHexStr(genesisAccount.BlsPriKey)
+		err := consensusPriKey.DeserializeHexStr(genesisAccount.DummyKey)
 		if err != nil {
-			panic(fmt.Errorf("Failed to parse BLS private key: %s, %s", genesisAccount.BlsPriKey, err))
+			panic(fmt.Errorf("Failed to parse BLS private key: %s, %s", genesisAccount.DummyKey, err))
 		}
 	} else {
 		// NewNode won't work
