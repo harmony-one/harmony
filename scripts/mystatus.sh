@@ -93,7 +93,7 @@ while getopts "h" opt; do
 done
 shift $(($OPTIND-1))
 
-[ $# -eq 0 -o $# -gt 2 ] && usage && exit 1
+[ $# -eq 0 ] && usage && exit 1
 
 while :; do
     case "$1" in
