@@ -176,12 +176,12 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	consensus.pbftLog.AddMessage(recvMsg)
 	consensus.pbftLog.AddBlock(&blockObj)
 
+	consensus.tryCatchup()
 	// we have already added message and block, skip check viewID and send prepare message if is in ViewChanging mode
 	if consensus.mode.Mode() == ViewChanging {
+		consensus.getLogger().Debug("[OnAnnounce] Still in ViewChanging Mode, Exiting !!")
 		return
 	}
-
-	consensus.tryCatchup()
 
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
@@ -383,12 +383,11 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	consensus.getLogger().Debug("[OnPrepared] Prepared message added", "MsgViewID", recvMsg.ViewID, "MsgBlockNum", recvMsg.BlockNum)
 	consensus.pbftLog.AddMessage(recvMsg)
 
+	consensus.tryCatchup()
 	if consensus.mode.Mode() == ViewChanging {
-		consensus.getLogger().Debug("[OnPrepared] Exiting after viewchange!!")
+		consensus.getLogger().Debug("[OnPrepared] Still in ViewChanging mode, Exiting !!")
 		return
 	}
-
-	consensus.tryCatchup()
 
 	if consensus.checkViewID(recvMsg) != nil {
 		consensus.getLogger().Debug("[OnPrepared] ViewID check failed", "MsgViewID", recvMsg.ViewID, "MsgBlockNum", recvMsg.BlockNum)
@@ -678,6 +677,10 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	//	}
 
 	consensus.tryCatchup()
+	if consensus.mode.Mode() == ViewChanging {
+		consensus.getLogger().Debug("[OnCommitted] Still in ViewChanging mode, Exiting !!")
+		return
+	}
 
 	if consensus.consensusTimeout[timeoutBootstrap].IsActive() {
 		consensus.consensusTimeout[timeoutBootstrap].Stop()
