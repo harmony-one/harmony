@@ -49,6 +49,7 @@ func main() {
 	keyFile := flag.String("key", "./.bnkey", "the private key file of the bootnode")
 	versionFlag := flag.Bool("version", false, "Output version info")
 	verbosity := flag.Int("verbosity", 5, "Logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail (default: 5)")
+	logConn := flag.Bool("log_conn", false, "log incoming/outgoing connections")
 
 	flag.Parse()
 
@@ -74,6 +75,10 @@ func main() {
 	}
 
 	log.Info("bootnode", "BN_MA", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, host.GetID().Pretty()))
+
+	if *logConn {
+		host.GetP2PHost().Network().Notify(utils.ConnLogger)
+	}
 
 	dataStore := dsync.MutexWrap(ds.NewMapDatastore())
 	dht := kaddht.NewDHT(context.Background(), host.GetP2PHost(), dataStore)
