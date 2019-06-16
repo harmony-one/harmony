@@ -34,28 +34,34 @@ func streamLogger(s net.Stream, l log.Logger) log.Logger {
 	return connLogger(s.Conn(), l).New("streamProtocolID", s.Protocol())
 }
 
+// Listen logs a listener starting listening on an address.
 func (cl ConnLogger) Listen(n net.Network, ma ma.Multiaddr) {
 	WithCaller(netLogger(n, cl.l)).
 		Debug("listener starting", "listenAddress", ma)
 }
 
+// ListenClose logs a listener stopping listening on an address.
 func (cl ConnLogger) ListenClose(n net.Network, ma ma.Multiaddr) {
 	WithCaller(netLogger(n, cl.l)).
 		Debug("listener closing", "listenAddress", ma)
 }
 
+// Connected logs a connection getting opened.
 func (cl ConnLogger) Connected(n net.Network, c net.Conn) {
 	WithCaller(connLogger(c, netLogger(n, cl.l))).Debug("connected")
 }
 
+// Disconnected logs a connection getting closed.
 func (cl ConnLogger) Disconnected(n net.Network, c net.Conn) {
 	WithCaller(connLogger(c, netLogger(n, cl.l))).Debug("disconnected")
 }
 
+// OpenedStream logs a new stream getting opened.
 func (cl ConnLogger) OpenedStream(n net.Network, s net.Stream) {
 	WithCaller(streamLogger(s, netLogger(n, cl.l))).Debug("stream opened")
 }
 
+// ClosedStream logs a stream getting closed.
 func (cl ConnLogger) ClosedStream(n net.Network, s net.Stream) {
 	WithCaller(streamLogger(s, netLogger(n, cl.l))).Debug("stream closed")
 }
