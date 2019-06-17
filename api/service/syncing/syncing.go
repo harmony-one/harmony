@@ -25,12 +25,13 @@ import (
 
 // Constants for syncing.
 const (
-	ConsensusRatio                        = float64(0.66)
-	SleepTimeAfterNonConsensusBlockHashes = time.Second * 30
-	TimesToFail                           = 5 // Downloadblocks service retry limit
-	RegistrationNumber                    = 3
-	SyncingPortDifference                 = 3000
-	inSyncThreshold                       = 0 // when peerBlockHeight - myBlockHeight <= inSyncThreshold, it's ready to join consensus
+	ConsensusRatio                               = float64(0.66)
+	SleepTimeAfterNonConsensusBlockHashes        = time.Second * 30
+	TimesToFail                                  = 5 // Downloadblocks service retry limit
+	RegistrationNumber                           = 3
+	SyncingPortDifference                        = 3000
+	inSyncThreshold                              = 0    // when peerBlockHeight - myBlockHeight <= inSyncThreshold, it's ready to join consensus
+	BatchSize                             uint32 = 1000 //maximum size for one query of block hashes
 )
 
 // SyncPeerConfig is peer config to sync.
@@ -104,6 +105,26 @@ type StateSync struct {
 	syncConfig         *SyncConfig
 	stateSyncTaskQueue *queue.Queue
 	syncMux            sync.Mutex
+}
+
+// level = 0 only clean "old" blocks, level > 0 clean up everything
+func (ss *StateSync) cleanCache(level int) {
+	ss.syncMux.Lock()
+	defer ss.syncMux.Unlock()
+	ss.commonBlocks = make(map[int]*types.Block)
+	ss.syncConfig.ForEachPeer(func(configPeer *SyncPeerConfig) (brk bool) {
+		configPeer.blockHashes = nil
+		return
+	})
+	if level > 0 {
+		ss.commonBlocks = make(map[int]*types.Block)
+		ss.lastMileBlocks = nil
+		ss.syncConfig.ForEachPeer(func(configPeer *SyncPeerConfig) (brk bool) {
+			configPeer.blockHashes = nil
+			configPeer.newBlocks = nil
+			return
+		})
+	}
 }
 
 // AddLastMileBlock add the lastest a few block into queue for syncing
@@ -290,7 +311,7 @@ func (sc *SyncConfig) GetBlockHashesConsensusAndCleanUp() bool {
 }
 
 // GetConsensusHashes gets all hashes needed to download.
-func (ss *StateSync) GetConsensusHashes(startHash []byte) bool {
+func (ss *StateSync) GetConsensusHashes(startHash []byte, size uint32) bool {
 	count := 0
 	for {
 		var wg sync.WaitGroup
@@ -298,8 +319,12 @@ func (ss *StateSync) GetConsensusHashes(startHash []byte) bool {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				response := peerConfig.client.GetBlockHashes(startHash)
+				response := peerConfig.client.GetBlockHashes(startHash, size)
 				if response == nil {
+					return
+				}
+				if len(response.Payload) > int(size+1) {
+					utils.GetLogInstance().Warn("[Sync] GetConsensusHashes: receive more blockHahses than request!", "requestSize", size, "respondSize", len(response.Payload))
 					return
 				}
 				peerConfig.blockHashes = response.Payload
@@ -547,12 +572,9 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 }
 
 // ProcessStateSync processes state sync from the blocks received but not yet processed so far
-func (ss *StateSync) ProcessStateSync(startHash []byte, bc *core.BlockChain, worker *worker.Worker, isBeacon bool) {
-	if !isBeacon {
-		ss.RegisterNodeInfo()
-	}
+func (ss *StateSync) ProcessStateSync(startHash []byte, size uint32, bc *core.BlockChain, worker *worker.Worker) {
 	// Gets consensus hashes.
-	if !ss.GetConsensusHashes(startHash) {
+	if !ss.GetConsensusHashes(startHash, size) {
 		utils.GetLogInstance().Debug("[SYNC] ProcessStateSync unable to reach consensus on ss.GetConsensusHashes")
 		return
 	}
@@ -642,14 +664,25 @@ func (ss *StateSync) IsOutOfSync(bc *core.BlockChain) bool {
 
 // SyncLoop will keep syncing with peers until catches up
 func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, willJoinConsensus bool, isBeacon bool) {
+	if !isBeacon {
+		ss.RegisterNodeInfo()
+	}
 	for {
-		if !ss.IsOutOfSync(bc) {
+		otherHeight := ss.getMaxPeerHeight()
+		currentHeight := bc.CurrentBlock().NumberU64()
+		if currentHeight >= otherHeight {
 			utils.GetLogInstance().Info("[SYNC] Node is now IN SYNC!")
-			return
+			break
 		}
 		startHash := bc.CurrentBlock().Hash()
-		ss.ProcessStateSync(startHash[:], bc, worker, isBeacon)
+		size := uint32(otherHeight - currentHeight)
+		if size > BatchSize {
+			size = BatchSize
+		}
+		ss.ProcessStateSync(startHash[:], size, bc, worker)
+		ss.cleanCache(0)
 	}
+	ss.cleanCache(1)
 }
 
 // GetSyncingPort returns the syncing port.
