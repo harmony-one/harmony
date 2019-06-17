@@ -91,7 +91,7 @@ while getopts "h" opt; do
             ;;
     esac
 done
-shift $(($OPTIND-1))
+shift $(($OPTIND - 1))
 
 [ $# -eq 0 ] && usage && exit 1
 
