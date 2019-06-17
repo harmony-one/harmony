@@ -15,7 +15,6 @@ import (
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
@@ -92,8 +91,6 @@ func (consensus *Consensus) announce(block *types.Block) {
 	consensus.block = encodedBlock
 	consensus.blockHeader = encodedBlockHeader
 	msgToSend := consensus.constructAnnounceMessage()
-	consensus.getLogger().Debug("[Announce] Switching phase", "From", consensus.phase, "To", Prepare)
-	consensus.switchPhase(Prepare, true)
 
 	// save announce message to pbftLog
 	msgPayload, _ := proto.GetConsensusMessagePayload(msgToSend)
@@ -110,6 +107,10 @@ func (consensus *Consensus) announce(block *types.Block) {
 
 	// Leader sign the block hash itself
 	consensus.prepareSigs[consensus.PubKey.SerializeToHexStr()] = consensus.priKey.SignHash(consensus.blockHash[:])
+	if err := consensus.prepareBitmap.SetKey(consensus.PubKey, true); err != nil {
+		consensus.getLogger().Warn("[Announce] Leader prepareBitmap SetKey failed", "error", err)
+		return
+	}
 
 	// Construct broadcast p2p message
 	if err := consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
@@ -117,6 +118,9 @@ func (consensus *Consensus) announce(block *types.Block) {
 	} else {
 		consensus.getLogger().Debug("[Announce] Sent Announce Message!!", "BlockHash", block.Hash(), "BlockNum", block.NumberU64())
 	}
+
+	consensus.getLogger().Debug("[Announce] Switching phase", "From", consensus.phase, "To", Prepare)
+	consensus.switchPhase(Prepare, true)
 }
 
 func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
@@ -150,7 +154,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	var headerObj types.Header
 	err = rlp.DecodeBytes(blockHeader, &headerObj)
 	if err != nil {
-		consensus.getLogger().Warn("[OnAnnounce] Unparseable block header data", "error", err, "MsgBlockNum", recvMsg.BlockNum, "MsgPayloadBlockNum", headerObj.Number)
+		consensus.getLogger().Warn("[OnAnnounce] Unparseable block header data", "error", err, "MsgBlockNum", recvMsg.BlockNum)
 		return
 	}
 
@@ -280,7 +284,8 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	prepareSigs[validatorPubKey] = &sign
 	// Set the bitmap indicating that this validator signed.
 	if err := prepareBitmap.SetKey(recvMsg.SenderPubkey, true); err != nil {
-		ctxerror.Warn(consensus.getLogger(), err, "[OnPrepare] prepareBitmap.SetKey failed")
+		consensus.getLogger().Warn("[OnPrepare] prepareBitmap.SetKey failed", "error", err)
+		return
 	}
 
 	if len(prepareSigs) >= consensus.Quorum() {
@@ -289,7 +294,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		msgToSend, aggSig := consensus.constructPreparedMessage()
 		consensus.aggregatedPrepareSig = aggSig
 
-		// add prepared message to log
+		//leader adds prepared message to log
 		msgPayload, _ := proto.GetConsensusMessagePayload(msgToSend)
 		msg := &msg_pb.Message{}
 		_ = protobuf.Unmarshal(msgPayload, msg)
@@ -300,14 +305,6 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		}
 		consensus.pbftLog.AddMessage(pbftMsg)
 
-		if err := consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
-			consensus.getLogger().Warn("[OnPrepare] Cannot send prepared message")
-		} else {
-			consensus.getLogger().Debug("[OnPrepare] Sent Prepared Message!!", "BlockHash", consensus.blockHash, "BlockNum", consensus.blockNum)
-		}
-
-		consensus.getLogger().Debug("[OnPrepare] Switching phase", "From", consensus.phase, "To", Commit)
-		consensus.switchPhase(Commit, true)
 		// Leader add commit phase signature
 		blockNumHash := make([]byte, 8)
 		binary.LittleEndian.PutUint64(blockNumHash, consensus.blockNum)
@@ -315,7 +312,16 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		consensus.commitSigs[consensus.PubKey.SerializeToHexStr()] = consensus.priKey.SignHash(commitPayload)
 		if err := consensus.commitBitmap.SetKey(consensus.PubKey, true); err != nil {
 			consensus.getLogger().Debug("[OnPrepare] Leader commit bitmap set failed")
+			return
 		}
+
+		if err := consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
+			consensus.getLogger().Warn("[OnPrepare] Cannot send prepared message")
+		} else {
+			consensus.getLogger().Debug("[OnPrepare] Sent Prepared Message!!", "BlockHash", consensus.blockHash, "BlockNum", consensus.blockNum)
+		}
+		consensus.getLogger().Debug("[OnPrepare] Switching phase", "From", consensus.phase, "To", Commit)
+		consensus.switchPhase(Commit, true)
 	}
 	return
 }
@@ -376,7 +382,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	var blockObj types.Block
 	err = rlp.DecodeBytes(block, &blockObj)
 	if err != nil {
-		consensus.getLogger().Warn("[OnPrepared] Unparseable block header data", "error", err, "MsgBlockNum", recvMsg.BlockNum, "MsgPayloadBlockNum", blockObj.NumberU64())
+		consensus.getLogger().Warn("[OnPrepared] Unparseable block header data", "error", err, "MsgBlockNum", recvMsg.BlockNum)
 		return
 	}
 	if blockObj.NumberU64() != recvMsg.BlockNum || recvMsg.BlockNum < consensus.blockNum {
@@ -542,7 +548,8 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	commitSigs[validatorPubKey] = &sign
 	// Set the bitmap indicating that this validator signed.
 	if err := commitBitmap.SetKey(recvMsg.SenderPubkey, true); err != nil {
-		ctxerror.Warn(consensus.getLogger(), err, "[OnCommit] commitBitmap.SetKey failed")
+		consensus.getLogger().Warn("[OnCommit] commitBitmap.SetKey failed", "error", err)
+		return
 	}
 
 	quorumIsMet := len(commitSigs) >= consensus.Quorum()
@@ -568,47 +575,49 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 func (consensus *Consensus) finalizeCommits() {
 	consensus.getLogger().Info("[Finalizing] Finalizing Block", "NumCommits", len(consensus.commitSigs))
 
-	// Construct and broadcast committed message
-	msgToSend, aggSig := consensus.constructCommittedMessage()
-	consensus.aggregatedCommitSig = aggSig
+	beforeCatchupNum := consensus.blockNum
+	beforeCatchupViewID := consensus.viewID
 
+	// Construct committed message
+	msgToSend, aggSig := consensus.constructCommittedMessage()
+	consensus.aggregatedCommitSig = aggSig // this may not needed
+
+	// leader adds committed message to log
+	msgPayload, _ := proto.GetConsensusMessagePayload(msgToSend)
+	msg := &msg_pb.Message{}
+	_ = protobuf.Unmarshal(msgPayload, msg)
+	pbftMsg, err := ParsePbftMessage(msg)
+	if err != nil {
+		consensus.getLogger().Warn("[FinalizeCommits] Unable to parse pbft message", "error", err)
+		return
+	}
+	consensus.pbftLog.AddMessage(pbftMsg)
+
+	// find correct block content
+	block := consensus.pbftLog.GetBlockByHash(consensus.blockHash)
+	if block == nil {
+		consensus.getLogger().Warn("[FinalizeCommits] Cannot find block by hash", "blockHash", hex.EncodeToString(consensus.blockHash[:]))
+		return
+	}
+	consensus.tryCatchup()
+	if consensus.blockNum-beforeCatchupNum != 1 {
+		consensus.getLogger().Warn("[FinalizeCommits] Leader cannot provide the correct block for committed message", "beforeCatchupBlockNum", beforeCatchupNum)
+		return
+	}
+	// if leader success finalize the block, send committed message to validators
 	if err := consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
-		ctxerror.Warn(consensus.getLogger(), err, "[Finalizing] Cannot send committed message")
+		consensus.getLogger().Warn("[Finalizing] Cannot send committed message", "error", err)
 	} else {
 		consensus.getLogger().Debug("[Finalizing] Sent Committed Message", "BlockHash", consensus.blockHash, "BlockNum", consensus.blockNum)
 	}
 
-	consensus.getLogger().Debug("[Finalizing] Switching phase", "From", consensus.phase, "To", Announce)
-	consensus.switchPhase(Announce, true)
-	var blockObj types.Block
-	err := rlp.DecodeBytes(consensus.block, &blockObj)
-	if err != nil {
-		consensus.getLogger().Debug("[Finalizing] failed to construct the new block after consensus")
-	}
+	consensus.reportMetrics(*block)
 
-	// Sign the block
-	blockObj.SetPrepareSig(
-		consensus.aggregatedPrepareSig.Serialize(),
-		consensus.prepareBitmap.Bitmap)
-	blockObj.SetCommitSig(
-		consensus.aggregatedCommitSig.Serialize(),
-		consensus.commitBitmap.Bitmap)
-
-	select {
-	case consensus.VerifiedNewBlock <- &blockObj:
-	default:
-		consensus.getLogger().Info("[SYNC] Failed to send consensus verified block for state sync", "blockHash", blockObj.Hash())
-	}
-
-	consensus.reportMetrics(blockObj)
-
-	// Dump new block into level db.
-	explorer.GetStorageInstance(consensus.leader.IP, consensus.leader.Port, true).Dump(&blockObj, consensus.viewID)
-
-	// Reset state to Finished, and clear other data.
-	consensus.ResetState()
-	consensus.viewID++
-	consensus.blockNum++
+	// Dump new block into level db
+	// In current code, we add signatures in block in tryCatchup, the block dump to explorer does not contains signatures
+	// but since explorer doesn't need signatures, it should be fine
+	// in future, we will move signatures to next block
+	explorer.GetStorageInstance(consensus.leader.IP, consensus.leader.Port, true).Dump(block, beforeCatchupViewID)
 
 	if consensus.consensusTimeout[timeoutBootstrap].IsActive() {
 		consensus.consensusTimeout[timeoutBootstrap].Stop()
@@ -618,8 +627,7 @@ func (consensus *Consensus) finalizeCommits() {
 	}
 	consensus.consensusTimeout[timeoutConsensus].Start()
 
-	consensus.OnConsensusDone(&blockObj)
-	consensus.getLogger().Info("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!", "numOfSignatures", len(consensus.commitSigs), "BlockNum", consensus.blockNum-1, "ViewId", consensus.viewID-1, "BlockHash", blockObj.Hash(), "index", consensus.getIndexOfPubKey(consensus.PubKey))
+	consensus.getLogger().Info("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!", "BlockNum", beforeCatchupNum, "ViewId", beforeCatchupViewID, "BlockHash", block.Hash(), "index", consensus.getIndexOfPubKey(consensus.PubKey))
 
 	// TODO: wait for validators receive committed message; remove this temporary delay
 	time.Sleep(time.Second)
