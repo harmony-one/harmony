@@ -227,16 +227,16 @@ func GetInitShardState() types.ShardState {
 		for j := 0; j < GenesisShardHarmonyNodes; j++ {
 			index := i + j*GenesisShardNum // The initial account to use for genesis nodes
 
-			// TODO: Old code. Will remove it later as long as the migration works.
-			// priKey := bls.SecretKey{}
-			// priKey.DeserializeHexStr(genesis.GenesisAccounts[index].DummyKey)
-			// pubKey := types.BlsPublicKey{}
-			// pubKey.FromLibBLSPublicKey(priKey.GetPublicKey())
-
-			pub := &bls.PublicKey{}
-			pub.DeserializeHexStr(genesis.GenesisAccounts[index].BlsPublicKey)
+			priKey := &bls.SecretKey{}
+			priKey.DeserializeHexStr(genesis.GenesisAccounts[index].DummyKey)
 			pubKey := types.BlsPublicKey{}
-			pubKey.FromLibBLSPublicKey(pub)
+			pubKey.FromLibBLSPublicKey(priKey.GetPublicKey())
+
+			// TODO: Revert it back for bls migration.
+			// pub := &bls.PublicKey{}
+			// pub.DeserializeHexStr(genesis.GenesisAccounts[index].BlsPublicKey)
+			// pubKey := types.BlsPublicKey{}
+			// pubKey.FromLibBLSPublicKey(pub)
 			// TODO: directly read address for bls too
 			curNodeID := types.NodeID{common2.ParseAddr(genesis.GenesisAccounts[index].Address), pubKey}
 			com.NodeList = append(com.NodeList, curNodeID)
@@ -246,12 +246,9 @@ func GetInitShardState() types.ShardState {
 		for j := GenesisShardHarmonyNodes; j < GenesisShardSize; j++ {
 			index := i + (j-GenesisShardHarmonyNodes)*GenesisShardNum
 
-			// TODO: this is old code. We will remove as long as the migration works.
-			// priKey := bls.SecretKey{}
-			// priKey.DeserializeHexStr(genesis.GenesisFNAccounts[index].DummyKey)
-
-			pub := &bls.PublicKey{}
-			pub.DeserializeHexStr(genesis.GenesisFNAccounts[index].BlsPublicKey)
+			priKey := &bls.SecretKey{}
+			priKey.DeserializeHexStr(genesis.GenesisFNAccounts[index].DummyKey)
+			pub := priKey.GetPublicKey()
 
 			pubKey := types.BlsPublicKey{}
 			pubKey.FromLibBLSPublicKey(pub)
