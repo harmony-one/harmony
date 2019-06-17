@@ -83,7 +83,14 @@ func (consensus *Consensus) announce(block *types.Block) {
 		consensus.getLogger().Debug("[Announce] Failed encoding block")
 		return
 	}
+	encodedBlockHeader, err := rlp.EncodeToBytes(block.Header())
+	if err != nil {
+		consensus.getLogger().Debug("[Announce] Failed encoding block header")
+		return
+	}
+
 	consensus.block = encodedBlock
+	consensus.blockHeader = encodedBlockHeader
 	msgToSend := consensus.constructAnnounceMessage()
 	consensus.getLogger().Debug("[Announce] Switching phase", "From", consensus.phase, "To", Prepare)
 	consensus.switchPhase(Prepare, true)
@@ -136,6 +143,26 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	if err != nil {
 		consensus.getLogger().Debug("[OnAnnounce] Unparseable leader message", "error", err, "MsgBlockNum", recvMsg.BlockNum)
 		return
+	}
+
+	// verify validity of block header object
+	blockHeader := recvMsg.Payload
+	var headerObj types.Header
+	err = rlp.DecodeBytes(blockHeader, &headerObj)
+	if err != nil {
+		consensus.getLogger().Warn("[OnAnnounce] Unparseable block header data", "error", err, "MsgBlockNum", recvMsg.BlockNum, "MsgPayloadBlockNum", headerObj.Number)
+		return
+	}
+
+	if recvMsg.BlockNum < consensus.blockNum || recvMsg.BlockNum != headerObj.Number.Uint64() {
+		consensus.getLogger().Debug("[OnAnnounce] BlockNum not match", "MsgBlockNum", recvMsg.BlockNum, "BlockNum", headerObj.Number)
+		return
+	}
+	if consensus.mode.Mode() == Normal {
+		if err = consensus.VerifyHeader(consensus.ChainReader, &headerObj, false); err != nil {
+			consensus.getLogger().Warn("[OnAnnounce] Block content is not verified successfully", "error", err, "inChain", consensus.ChainReader.CurrentHeader().Number, "MsgBlockNum", headerObj.Number)
+			return
+		}
 	}
 
 	logMsgs := consensus.pbftLog.GetMessagesByTypeSeqView(msg_pb.MessageType_ANNOUNCE, recvMsg.BlockNum, recvMsg.ViewID)
@@ -362,15 +389,21 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	}
 	if consensus.mode.Mode() == Normal {
 		if err := consensus.VerifyHeader(consensus.ChainReader, blockObj.Header(), false); err != nil {
-			consensus.getLogger().Warn("[OnPrepared] Block content is not verified successfully", "error", err, "inChain", consensus.ChainReader.CurrentHeader().Number, "MsgBlockNum", blockObj.Header().Number)
+			consensus.getLogger().Warn("[OnPrepared] Block header is not verified successfully", "error", err, "inChain", consensus.ChainReader.CurrentHeader().Number, "MsgBlockNum", blockObj.Header().Number)
+			return
+		}
+		if consensus.BlockVerifier == nil {
+			// do nothing
+		} else if err := consensus.BlockVerifier(&blockObj); err != nil {
+			consensus.getLogger().Info("[OnPrepared] Block verification faied")
 			return
 		}
 	}
 
-	consensus.getLogger().Debug("[OnPrepared] Prepared message and block added", "MsgViewID", recvMsg.ViewID, "MsgBlockNum", recvMsg.BlockNum, "blockHash", recvMsg.BlockHash)
 	consensus.pbftLog.AddBlock(&blockObj)
 	recvMsg.Block = []byte{} // save memory space
 	consensus.pbftLog.AddMessage(recvMsg)
+	consensus.getLogger().Debug("[OnPrepared] Prepared message and block added", "MsgViewID", recvMsg.ViewID, "MsgBlockNum", recvMsg.BlockNum, "blockHash", recvMsg.BlockHash)
 
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
@@ -646,8 +679,8 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		return
 	}
 
-	consensus.getLogger().Debug("[OnCommitted] Committed message added", "MsgViewID", recvMsg.ViewID, "MsgBlockNum", recvMsg.BlockNum)
 	consensus.pbftLog.AddMessage(recvMsg)
+	consensus.getLogger().Debug("[OnCommitted] Committed message added", "MsgViewID", recvMsg.ViewID, "MsgBlockNum", recvMsg.BlockNum)
 
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()

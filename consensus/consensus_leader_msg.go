@@ -21,6 +21,7 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 	}
 	consensusMsg := message.GetConsensus()
 	consensus.populateMessageFields(consensusMsg)
+	consensusMsg.Payload = consensus.blockHeader
 
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
 	if err != nil {
