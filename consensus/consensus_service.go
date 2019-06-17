@@ -331,11 +331,13 @@ func (consensus *Consensus) ResetState() {
 	consensus.getLogger().Debug("[ResetState] Resetting consensus state", "Phase", consensus.phase)
 	consensus.switchPhase(Announce, true)
 	consensus.blockHash = [32]byte{}
+	consensus.blockHeader = []byte{}
+	consensus.block = []byte{}
 	consensus.prepareSigs = map[string]*bls.Sign{}
 	consensus.commitSigs = map[string]*bls.Sign{}
 
-	prepareBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.LeaderPubKey)
-	commitBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.LeaderPubKey)
+	prepareBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, nil)
+	commitBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, nil)
 	consensus.prepareBitmap = prepareBitmap
 	consensus.commitBitmap = commitBitmap
 	consensus.aggregatedPrepareSig = nil
