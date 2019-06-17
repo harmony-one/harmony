@@ -17,7 +17,8 @@ const genesisString = "https://harmony.one 'Open Consensus for 10B' 2019.06.01 $
 type DeployAccount struct {
 	Index        string // index
 	Address      string // account address
-	DummyKey     string // account private BLS key (To be removed)
+	BlsPriKey    string
+	DummyKey     string
 	BlsPublicKey string // account public BLS key
 	ShardID      uint32 // shardID of the account
 	Updated      string
