@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -30,6 +31,7 @@ import (
 	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -460,6 +462,43 @@ func blsPubKeyToString(k *bls.PublicKey) string {
 		return "<nil>"
 	}
 	return k.SerializeToHexStr()
+}
+
+type genesisNode struct {
+	ShardID     uint32
+	MemberIndex int
+	NodeID      types.NodeID
+}
+
+var (
+	genesisCatalogOnce          sync.Once
+	genesisNodeByStakingAddress = make(map[common.Address]*genesisNode)
+	genesisNodeByConsensusKey   = make(map[types.BlsPublicKey]*genesisNode)
+)
+
+func initGenesisCatalog() {
+	genesisShardState := core.GetInitShardState()
+	for _, committee := range genesisShardState {
+		for i, nodeID := range committee.NodeList {
+			genesisNode := &genesisNode{
+				ShardID:     committee.ShardID,
+				MemberIndex: i,
+				NodeID:      nodeID,
+			}
+			genesisNodeByStakingAddress[nodeID.EcdsaAddress] = genesisNode
+			genesisNodeByConsensusKey[nodeID.BlsPublicKey] = genesisNode
+		}
+	}
+}
+
+func getGenesisNodeByStakingAddress(address common.Address) *genesisNode {
+	genesisCatalogOnce.Do(initGenesisCatalog)
+	return genesisNodeByStakingAddress[address]
+}
+
+func getGenesisNodeByConsensusKey(key types.BlsPublicKey) *genesisNode {
+	genesisCatalogOnce.Do(initGenesisCatalog)
+	return genesisNodeByConsensusKey[key]
 }
 
 func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) int {
