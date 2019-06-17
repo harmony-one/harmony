@@ -84,9 +84,9 @@ message ConsensusRequest {
   uint64 block_num = 2;
   uint32 shard_id = 3;
   bytes block_hash = 4;
-  bytes sender_pubkey = 5;
-  bytes payload = 6;
-  bytes block = 7;
+  bytes block = 5;
+  bytes sender_pubkey = 6;
+  bytes payload = 7;
 }
 
 message DrandRequest {
