@@ -20,6 +20,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	pb "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 
 	"github.com/harmony-one/harmony/api/proto"
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
@@ -55,7 +56,7 @@ func (node *Node) ReceiveGlobalMessage() {
 			//utils.GetLogInstance().Info("[PUBSUB]", "received global msg", len(msg), "sender", sender)
 			if err == nil {
 				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
-				go node.messageHandler(msg[5:], string(sender))
+				go node.messageHandler(msg[5:], sender)
 			}
 		}
 	}
@@ -74,7 +75,7 @@ func (node *Node) ReceiveGroupMessage() {
 			//utils.GetLogInstance().Info("[PUBSUB]", "received group msg", len(msg), "sender", sender)
 			if err == nil {
 				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
-				go node.messageHandler(msg[5:], string(sender))
+				go node.messageHandler(msg[5:], sender)
 			}
 		}
 	}
@@ -94,14 +95,14 @@ func (node *Node) ReceiveClientGroupMessage() {
 			// utils.GetLogInstance().Info("[CLIENT]", "received group msg", len(msg), "sender", sender, "error", err)
 			if err == nil {
 				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
-				go node.messageHandler(msg[5:], string(sender))
+				go node.messageHandler(msg[5:], sender)
 			}
 		}
 	}
 }
 
 // messageHandler parses the message and dispatch the actions
-func (node *Node) messageHandler(content []byte, sender string) {
+func (node *Node) messageHandler(content []byte, sender libp2p_peer.ID) {
 	msgCategory, err := proto.GetMessageCategory(content)
 	if err != nil {
 		utils.GetLogInstance().Error("Read node type failed", "err", err, "node", node)
@@ -454,9 +455,10 @@ func (node *Node) AddNewBlock(newBlock *types.Block) {
 	}
 }
 
-func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
-	if sender != "" {
-		_, ok := node.duplicatedPing.LoadOrStore(sender, true)
+func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) int {
+	senderStr := string(sender)
+	if senderStr != "" {
+		_, ok := node.duplicatedPing.LoadOrStore(senderStr, true)
 		if ok {
 			// duplicated ping message return
 			return 0
