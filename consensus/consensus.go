@@ -19,6 +19,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
+	"github.com/harmony-one/harmony/internal/memprofiling"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 )
@@ -103,6 +104,8 @@ type Consensus struct {
 	blockHash [32]byte
 	// Block to run consensus on
 	block []byte
+	// BlockHeader to run consensus on
+	blockHeader []byte
 	// Array of block hashes.
 	blockHashes [][32]byte
 	// Shard Id which this node belongs to
@@ -275,6 +278,7 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 
 	consensus.uniqueIDInstance = utils.GetUniqueValidatorIDInstance()
 
+	memprofiling.GetMemProfiling().Add("consensus.pbftLog", consensus.pbftLog)
 	return &consensus, nil
 }
 
