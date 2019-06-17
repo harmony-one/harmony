@@ -1,7 +1,7 @@
 package node
 
 import (
-	"bytes"
+	"fmt"
 	"sync"
 	"time"
 
@@ -200,18 +200,30 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 	response := &downloader_pb.DownloaderResponse{}
 	switch request.Type {
 	case downloader_pb.DownloaderRequest_HEADER:
-		var startHeaderHash []byte
 		if request.BlockHash == nil {
-			tmp := node.Blockchain().Genesis().Hash()
-			startHeaderHash = tmp[:]
-		} else {
-			startHeaderHash = request.BlockHash
+			return response, fmt.Errorf("[SYNC] GetBlockHashes Request BlockHash is NIL")
 		}
-		for block := node.Blockchain().CurrentBlock(); block != nil; block = node.Blockchain().GetBlockByHash(block.Header().ParentHash) {
+		if request.Size == 0 || request.Size > syncing.BatchSize {
+			return response, fmt.Errorf("[SYNC] GetBlockHashes Request contains invalid Size %v", request.Size)
+		}
+		size := uint64(request.Size)
+		var startHashHeader common.Hash
+		copy(startHashHeader[:], request.BlockHash[:])
+		startBlock := node.Blockchain().GetBlockByHash(startHashHeader)
+		if startBlock == nil {
+			return response, fmt.Errorf("[SYNC] GetBlockHashes Request cannot find startHash %v", startHashHeader)
+		}
+		startHeight := startBlock.NumberU64()
+		endHeight := node.Blockchain().CurrentBlock().NumberU64()
+		if startHeight >= endHeight {
+			return response, fmt.Errorf("[SYNC] GetBlockHashes Request failed. I am not higher than requested node, my Height %v, request node Height %v", endHeight, startHeight)
+		}
+		if endHeight-startHeight > size {
+			endHeight = startHeight + size
+		}
+		for blockNum := startHeight; blockNum <= endHeight; blockNum++ {
+			block := node.Blockchain().GetBlockByNumber(blockNum)
 			blockHash := block.Hash()
-			if bytes.Compare(blockHash[:], startHeaderHash) == 0 {
-				break
-			}
 			response.Payload = append(response.Payload, blockHash[:])
 		}
 
