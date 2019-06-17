@@ -457,13 +457,6 @@ func (node *Node) AddNewBlock(newBlock *types.Block) {
 	}
 }
 
-func blsPubKeyToString(k *bls.PublicKey) string {
-	if k == nil {
-		return "<nil>"
-	}
-	return k.SerializeToHexStr()
-}
-
 type genesisNode struct {
 	ShardID     uint32
 	MemberIndex int
