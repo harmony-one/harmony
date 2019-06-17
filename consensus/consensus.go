@@ -405,15 +405,6 @@ func NewGenesisStakeInfoFinder() (*GenesisStakeInfoFinder, error) {
 		byAccount: make(map[common.Address][]*structs.StakeInfo),
 	}
 	for idx, account := range genesis.GenesisAccounts {
-		// TODO: this is old code. Will remove when migration will be successful.
-		// blsSecretKeyHex := account.BlsPriKey
-		// blsSecretKey := bls.SecretKey{}
-		// if err := blsSecretKey.DeserializeHexStr(blsSecretKeyHex); err != nil {
-		// 	return nil, ctxerror.New("cannot convert BLS secret key",
-		// 		"accountIndex", idx,
-		// 	).WithCause(err)
-		// }
-		// pub := blsSecretKey.GetPublicKey()
 		pub := &bls.PublicKey{}
 		pub.DeserializeHexStr(account.BlsPublicKey)
 		var blsPublicKey types.BlsPublicKey
