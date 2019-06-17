@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	mrand "math/rand"
 	"net"
@@ -241,19 +240,4 @@ func GetPortFromDiff(port string, diff int) string {
 	}
 	GetLogInstance().Error("error on parsing port.")
 	return ""
-}
-
-// ReadStringFromFile reads string from a file.
-func ReadStringFromFile(fileName string) (string, error) {
-	data, err := ioutil.ReadFile(fileName)
-	if err != nil {
-		return "", err
-	}
-	return string(data), nil
-}
-
-func check(err error) {
-	if err != nil {
-		panic(err)
-	}
 }
