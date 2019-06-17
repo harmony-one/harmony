@@ -9,18 +9,11 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"os"
-	"path/filepath"
 	"time"
 
 	ffi_bls "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/crypto/bls"
-)
-
-// Constants for bls lib.
-const (
-	BlsPriKeyStore = ".hmy/blsstore/"
 )
 
 func toISO8601(t time.Time) string {
@@ -35,55 +28,8 @@ func toISO8601(t time.Time) string {
 		t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), tz)
 }
 
-// WritePrivateKeyWithPassPhrase encrypt the key with passphrase and write into disk.
-func WritePrivateKeyWithPassPhrase(privateKey *ffi_bls.SecretKey, passphrase string) string {
-	publickKey := privateKey.GetPublicKey()
-	fileName := publickKey.SerializeToHexStr() + ".key"
-	privateKeyHex := privateKey.SerializeToHexStr()
-	// Encrypt with passphrase
-	encryptedPrivateKeyStr := encrypt([]byte(privateKeyHex), passphrase)
-
-	// Write to file.
-	err := WriteToFile(fileName, encryptedPrivateKeyStr)
-	check(err)
-	return fileName
-}
-
-func visit(files *[]string) filepath.WalkFunc {
-	return func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			log.Fatal(err)
-		}
-		fi, err := os.Stat(path)
-		if !fi.Mode().IsDir() {
-			*files = append(*files, path)
-		}
-		return nil
-	}
-}
-
-// FindBlsPriKey finds bls private key from bls private store with passphrase.
-func FindBlsPriKey(BlsPublicKey, blsPass string, consensusPriKey *ffi_bls.SecretKey) bool {
-	var files []string
-	var err error
-	if _, err = os.Stat(BlsPriKeyStore); os.IsNotExist(err) {
-		return false
-	}
-
-	err = filepath.Walk(BlsPriKeyStore, visit(&files))
-	check(err)
-	for _, f := range files {
-		k := LoadBlsKeyWithPassPhrase(f, blsPass)
-		if k.GetPublicKey().SerializeToHexStr() == BlsPublicKey {
-			consensusPriKey = k
-			return true
-		}
-	}
-	return false
-}
-
 // GenBlsKeyWithPassPhrase generates bls key with passphrase and write into disk.
-func GenBlsKeyWithPassPhrase(passphrase string) (*ffi_bls.SecretKey, string) {
+func GenBlsKeyWithPassPhrase(passphrase string) (*ffi_bls.SecretKey, string, error) {
 	privateKey := bls.RandPrivateKey()
 	publickKey := privateKey.GetPublicKey()
 	fileName := publickKey.SerializeToHexStr() + ".key"
@@ -92,32 +38,36 @@ func GenBlsKeyWithPassPhrase(passphrase string) (*ffi_bls.SecretKey, string) {
 	encryptedPrivateKeyStr := encrypt([]byte(privateKeyHex), passphrase)
 	// Write to file.
 	err := WriteToFile(fileName, encryptedPrivateKeyStr)
-	check(err)
-	return privateKey, fileName
+	return privateKey, fileName, err
 }
 
 // WriteToFile will print any string of text to a file safely by
 // checking for errors and syncing at the end.
 func WriteToFile(filename string, data string) error {
 	file, err := os.Create(filename)
-	check(err)
+	if err != nil {
+		return err
+	}
 	defer file.Close()
-
 	_, err = io.WriteString(file, data)
-	check(err)
+	if err != nil {
+		return err
+	}
 	return file.Sync()
 }
 
 // LoadBlsKeyWithPassPhrase loads bls key with passphrase.
-func LoadBlsKeyWithPassPhrase(fileName, passphrase string) *ffi_bls.SecretKey {
+func LoadBlsKeyWithPassPhrase(fileName, passphrase string) (*ffi_bls.SecretKey, error) {
 	encryptedPrivateKeyBytes, err := ioutil.ReadFile(fileName)
-	check(err)
+	if err != nil {
+		return nil, err
+	}
 	encryptedPrivateKeyStr := string(encryptedPrivateKeyBytes)
 	decryptedBytes := decrypt(encryptedPrivateKeyStr, passphrase)
 
 	priKey := &ffi_bls.SecretKey{}
 	priKey.DeserializeHexStr(string(decryptedBytes))
-	return priKey
+	return priKey, nil
 }
 
 func createHash(key string) string {
@@ -163,10 +113,4 @@ func decrypt(encryptedStr string, passphrase string) []byte {
 		panic(err.Error())
 	}
 	return plaintext
-}
-
-func check(err error) {
-	if err != nil {
-		panic(err)
-	}
 }

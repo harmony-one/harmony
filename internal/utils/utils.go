@@ -244,10 +244,12 @@ func GetPortFromDiff(port string, diff int) string {
 }
 
 // ReadStringFromFile reads string from a file.
-func ReadStringFromFile(fileName string) string {
+func ReadStringFromFile(fileName string) (string, error) {
 	data, err := ioutil.ReadFile(fileName)
-	check(err)
-	return string(data)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
 }
 
 func check(err error) {
