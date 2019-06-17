@@ -103,7 +103,7 @@ var (
 	enableMemProfiling = flag.Bool("enableMemProfiling", false, "Enable memsize logging.")
 	enableGC           = flag.Bool("enableGC", true, "Enable calling garbage collector manually .")
 	blsKeyFile         = flag.String("blskey_file", "", "The encrypted file of bls serialized private key by passphrase.")
-	blsPassFile        = flag.String("blspass_file", "", "The file containing passphrase to decrypt the encrypted bls file.")
+	blsPass            = flag.String("blspass", "", "The file containing passphrase to decrypt the encrypted bls file.")
 
 	// logConn logs incoming/outgoing connections
 	logConn = flag.Bool("log_conn", false, "log incoming/outgoing connections")
@@ -227,8 +227,8 @@ func initSetup() {
 
 func setUpConsensusKey(nodeConfig *nodeconfig.ConfigType) {
 	// If FN node running, they should either specify blsPrivateKey or the file with passphrase
-	if *blsKeyFile != "" && *blsPassFile != "" {
-		passPhrase, err := utils.ReadStringFromFile(*blsPassFile)
+	if *blsKeyFile != "" && *blsPass != "" {
+		passPhrase, err := utils.GetPassphraseFromSource(*blsPass)
 		if err != nil {
 			fmt.Printf("error when reading passphrase file: %v\n", err)
 			os.Exit(100)
@@ -240,7 +240,7 @@ func setUpConsensusKey(nodeConfig *nodeconfig.ConfigType) {
 		}
 		if !genesis.IsBlsPublicKeyWhiteListed(consensusPriKey.GetPublicKey().SerializeToHexStr()) {
 			fmt.Println("Your bls key is not whitelisted")
-			os.Exit(101)
+			os.Exit(100)
 		}
 
 		// Consensus keys are the BLS12-381 keys used to sign consensus messages
