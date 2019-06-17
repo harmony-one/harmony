@@ -502,6 +502,9 @@ func getGenesisNodeByConsensusKey(key types.BlsPublicKey) *genesisNode {
 }
 
 func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) int {
+	logger := utils.GetLogInstance().New("sender", sender)
+	getLogger := func() log.Logger { return utils.WithCallerSkip(logger, 1) }
+
 	senderStr := string(sender)
 	if senderStr != "" {
 		_, ok := node.duplicatedPing.LoadOrStore(senderStr, true)
@@ -522,6 +525,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) i
 	peer.Port = ping.Node.Port
 	peer.PeerID = ping.Node.PeerID
 	peer.ConsensusPubKey = nil
+	logger = logger.New("ip", peer.IP, "port", peer.Port, "peerID", peer.PeerID)
 
 	if ping.Node.PubKey != nil {
 		peer.ConsensusPubKey = &bls.PublicKey{}
@@ -529,11 +533,24 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) i
 			utils.GetLogInstance().Error("UnmarshalBinary Failed", "error", err)
 			return -1
 		}
+		logger = logger.New(
+			"peerConsensusPubKey", peer.ConsensusPubKey.SerializeToHexStr())
 	}
 
-	utils.GetLogger().Info("received ping message",
-		"ip", peer.IP, "port", peer.Port, "peerID", peer.PeerID,
-		"blsPubKey", blsPubKeyToString(peer.ConsensusPubKey))
+	var k types.BlsPublicKey
+	if err := k.FromLibBLSPublicKey(peer.ConsensusPubKey); err != nil {
+		err = ctxerror.New("cannot convert BLS public key").WithCause(err)
+		ctxerror.Log15(getLogger().Warn, err)
+	}
+	if genesisNode := getGenesisNodeByConsensusKey(k); genesisNode != nil {
+		logger = logger.New(
+			"genesisShardID", genesisNode.ShardID,
+			"genesisMemberIndex", genesisNode.MemberIndex,
+			"genesisStakingAccount", common2.MustAddressToBech32(genesisNode.NodeID.EcdsaAddress))
+	} else {
+		logger.Info("cannot find genesis node", "k", hex.EncodeToString(k[:]))
+	}
+	getLogger().Info("received ping message")
 
 	// add to incoming peer list
 	//node.host.AddIncomingPeer(*peer)
