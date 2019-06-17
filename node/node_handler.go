@@ -455,6 +455,13 @@ func (node *Node) AddNewBlock(newBlock *types.Block) {
 	}
 }
 
+func blsPubKeyToString(k *bls.PublicKey) string {
+	if k == nil {
+		return "<nil>"
+	}
+	return k.SerializeToHexStr()
+}
+
 func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) int {
 	senderStr := string(sender)
 	if senderStr != "" {
@@ -485,7 +492,9 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) i
 		}
 	}
 
-	//	utils.GetLogInstance().Debug("[pingMessageHandler]", "incoming peer", peer)
+	utils.GetLogger().Info("received ping message",
+		"ip", peer.IP, "port", peer.Port, "peerID", peer.PeerID,
+		"blsPubKey", blsPubKeyToString(peer.ConsensusPubKey))
 
 	// add to incoming peer list
 	//node.host.AddIncomingPeer(*peer)
