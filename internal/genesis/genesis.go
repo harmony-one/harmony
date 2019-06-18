@@ -53,19 +53,19 @@ func FindAccount(address string) (int, *DeployAccount) {
 	return 0, nil
 }
 
-// IsBlsPublicKeyWhiteListed returns true if the given key is white listed.
-func IsBlsPublicKeyWhiteListed(blsPublicKey string) bool {
-	for _, item := range GenesisFNAccounts {
+// IsBlsPublicKeyIndex returns index and DeployAccount.
+func IsBlsPublicKeyIndex(blsPublicKey string) (int, *DeployAccount) {
+	for i, item := range GenesisAccounts {
 		if item.BlsPublicKey == blsPublicKey {
-			return true
+			return i, &item
 		}
 	}
-	for _, item := range GenesisAccounts {
+	for i, item := range GenesisFNAccounts {
 		if item.BlsPublicKey == blsPublicKey {
-			return true
+			return i + 8, &item
 		}
 	}
-	return false
+	return -1, nil
 }
 
 // GenesisBeaconAccountPriKey is the private key of genesis beacon account.

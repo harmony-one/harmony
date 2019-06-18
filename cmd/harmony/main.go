@@ -87,8 +87,6 @@ var (
 	onlyLogTps       = flag.Bool("only_log_tps", false, "Only log TPS if true")
 	//Leader needs to have a minimal number of peers to start consensus
 	minPeers = flag.Int("min_peers", 100, "Minimal number of Peers in shard")
-	// Key file to store the private key of staking account.
-	stakingKeyFile = flag.String("staking_key", "./.stakingkey", "the private key file of the harmony node")
 	// Key file to store the private key
 	keyFile = flag.String("key", "./.hmykey", "the p2p key file of the harmony node")
 	// isGenesis indicates this node is a genesis node
@@ -116,8 +114,6 @@ var (
 	// "fd:number", or "stdin" form.
 	// See “PASS PHRASE ARGUMENTS” section of openssl(1) for details.
 	hmyPass = flag.String("pass", "", "how to get passphrase for the key")
-
-	stakingAccounts = flag.String("accounts", "", "account addresses of the node")
 
 	ks             *keystore.KeyStore
 	myAccount      accounts.Account
@@ -170,29 +166,8 @@ func initSetup() {
 
 	ks = hmykey.GetHmyKeyStore()
 
-	allAccounts := ks.Accounts()
-
 	// TODO: lc try to enable multiple staking accounts per node
-	accountIndex, genesisAccount = genesis.FindAccount(*stakingAccounts)
-
-	if genesisAccount == nil {
-		fmt.Printf("Can't find the account address: %v\n", *stakingAccounts)
-		os.Exit(100)
-	}
-
-	foundAccount := false
-	for _, account := range allAccounts {
-		if common.ParseAddr(genesisAccount.Address) == account.Address {
-			myAccount = account
-			foundAccount = true
-			break
-		}
-	}
-
-	if !foundAccount {
-		fmt.Printf("Can't find the matching account key: %v\n", genesisAccount.Address)
-		os.Exit(101)
-	}
+	accountIndex, genesisAccount = setUpConsensusKeyAndReturnIndex(nodeconfig.GetDefaultConfig())
 
 	genesisAccount.ShardID = uint32(accountIndex % core.GenesisShardNum)
 
@@ -200,32 +175,13 @@ func initSetup() {
 	fmt.Printf("Key URL: %s\n", myAccount.URL)
 	fmt.Printf("My Genesis Account: %v\n", *genesisAccount)
 
-	var myPass string
-	if !*hmyNoPass {
-		if *hmyPass == "" {
-			myPass = utils.AskForPassphrase("Passphrase: ")
-		} else if pass, err := utils.GetPassphraseFromSource(*hmyPass); err != nil {
-			fmt.Printf("Cannot read passphrase: %s\n", err)
-			os.Exit(3)
-		} else {
-			myPass = pass
-		}
-		err := ks.Unlock(myAccount, myPass)
-		if err != nil {
-			fmt.Printf("Wrong Passphrase! Unable to unlock account key!\n")
-			os.Exit(3)
-		}
-	}
-
 	// Set up manual call for garbage collection.
 	if *enableGC {
 		memprofiling.MaybeCallGCPeriodically()
 	}
-
-	hmykey.SetHmyPass(myPass)
 }
 
-func setUpConsensusKey(nodeConfig *nodeconfig.ConfigType) {
+func setUpConsensusKeyAndReturnIndex(nodeConfig *nodeconfig.ConfigType) (int, *genesis.DeployAccount) {
 	// If FN node running, they should either specify blsPrivateKey or the file with passphrase
 	if *blsKeyFile != "" && *blsPass != "" {
 		passPhrase, err := utils.GetPassphraseFromSource(*blsPass)
@@ -238,8 +194,9 @@ func setUpConsensusKey(nodeConfig *nodeconfig.ConfigType) {
 			fmt.Printf("error when loading bls key, err :%v\n", err)
 			os.Exit(100)
 		}
-		if !genesis.IsBlsPublicKeyWhiteListed(consensusPriKey.GetPublicKey().SerializeToHexStr()) {
-			fmt.Println("Your bls key is not whitelisted")
+		index, acc := genesis.IsBlsPublicKeyIndex(consensusPriKey.GetPublicKey().SerializeToHexStr())
+		if index < 0 {
+			fmt.Println("Can not found your bls key.")
 			os.Exit(100)
 		}
 
@@ -249,10 +206,11 @@ func setUpConsensusKey(nodeConfig *nodeconfig.ConfigType) {
 			fmt.Println("error to get consensus keys.")
 			os.Exit(100)
 		}
-	} else {
-		fmt.Println("Internal nodes need to have pass to decrypt blskey")
-		os.Exit(101)
+		return index, acc
 	}
+	fmt.Println("Internal nodes need to have pass to decrypt blskey")
+	os.Exit(101)
+	return -1, nil
 }
 
 func createGlobalConfig() *nodeconfig.ConfigType {
@@ -282,7 +240,8 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	nodeConfig.ShardID = uint32(genesisAccount.ShardID)
 
 	// Set up consensus keys.
-	setUpConsensusKey(nodeConfig)
+	setUpConsensusKeyAndReturnIndex(nodeConfig)
+
 	// P2p private key is used for secure message transfer between p2p nodes.
 	nodeConfig.P2pPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
