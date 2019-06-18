@@ -63,6 +63,10 @@ var (
 	// New subcommands
 	newCommand          = flag.NewFlagSet("new", flag.ExitOnError)
 	newCommandNoPassPtr = newCommand.Bool("nopass", false, "The account has no pass phrase")
+	// -pass takes on "pass:password", "env:var", "file:pathname",
+	// "fd:number", or "stdin" form.
+	// See “PASS PHRASE ARGUMENTS” section of openssl(1) for details.
+	newCommandPassPtr = newCommand.String("pass", "", "how to get passphrase for the key")
 
 	// List subcommands
 	listCommand = flag.NewFlagSet("list", flag.ExitOnError)
@@ -128,6 +132,7 @@ func main() {
 		fmt.Println("Actions:")
 		fmt.Println("    1. new           - Generates a new account and store the private key locally")
 		fmt.Println("        --nopass         - The private key has no passphrase (for test only)")
+		fmt.Println("        --pass           - The passphrase for the private key, in the format of: pass:password, env:var, file:pathname, fd:number, or stdin")
 		fmt.Println("    2. list          - Lists all accounts in local keystore")
 		fmt.Println("    3. removeAll     - Removes all accounts in local keystore")
 		fmt.Println("    4. import        - Imports a new account by private key")
@@ -277,14 +282,22 @@ func processNewCommnad() {
 		return
 	}
 	noPass := *newCommandNoPassPtr
+	pass := *newCommandPassPtr
 	password := ""
 
 	if !noPass {
-		password = utils.AskForPassphrase("Passphrase: ")
-		password2 := utils.AskForPassphrase("Passphrase again: ")
-		if password != password2 {
-			fmt.Printf("Passphrase doesn't match. Please try again!\n")
+		if pass == "" {
+			password = utils.AskForPassphrase("Passphrase: ")
+			password2 := utils.AskForPassphrase("Passphrase again: ")
+			if password != password2 {
+				fmt.Printf("Passphrase doesn't match. Please try again!\n")
+				os.Exit(3)
+			}
+		} else if newPass, err := utils.GetPassphraseFromSource(pass); err != nil {
+			fmt.Printf("Cannot read passphrase: %s\n", err)
 			os.Exit(3)
+		} else {
+			password = newPass
 		}
 	}
 
