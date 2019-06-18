@@ -10,6 +10,13 @@ set -eo pipefail
 
 export GO111MODULE=on
 
+if [ -f "blspass.txt" ]
+then
+   echo "blspass.txt already in local."
+else
+   aws s3 cp s3://harmony-pass/blspass.txt blspass.txt
+fi
+
 function check_result() {
    find $log_folder -name leader-*.log > $log_folder/all-leaders.txt
    find $log_folder -name validator-*.log > $log_folder/all-validators.txt
@@ -154,8 +161,20 @@ sleep 2
 # Start nodes
 i=0
 while IFS='' read -r line || [[ -n "$line" ]]; do
-  IFS=' ' read ip port mode account <<< $line
-  args=("${base_args[@]}" -ip "${ip}" -port "${port}" -key "/tmp/${ip}-${port}.key" -db_dir "db-${ip}-${port}" -accounts "${account}")
+  IFS=' ' read ip port mode account blspub <<< $line
+  if [ "${mode}" == "explorer" ]
+    then
+      args=("${base_args[@]}" -ip "${ip}" -port "${port}" -key "/tmp/${ip}-${port}.key" -db_dir "db-${ip}-${port}")
+    else
+      if [ -f "${blspub}.key" ]
+        then
+          echo ""${blspub}.key" already in local."
+       else
+          aws s3 cp "s3://harmony-secret-keys/bls-test/${blspub}.key" .
+      fi
+
+      args=("${base_args[@]}" -ip "${ip}" -port "${port}" -key "/tmp/${ip}-${port}.key" -db_dir "db-${ip}-${port}" -accounts "${account}" -blspass file:blspass.txt -blskey_file "${blspub}.key")
+  fi
   case "${mode}" in
   leader*|validator*) args=("${args[@]}" -is_genesis);;
   esac

@@ -27,7 +27,7 @@ const (
 	// GenesisShardSize is the size of each shard at genesis
 	GenesisShardSize = 100
 	// GenesisShardHarmonyNodes is the number of harmony node at each shard
-	GenesisShardHarmonyNodes = 76
+	GenesisShardHarmonyNodes = 72
 	// CuckooRate is the percentage of nodes getting reshuffled in the second step of cuckoo resharding.
 	CuckooRate = 0.1
 )
@@ -227,12 +227,6 @@ func GetInitShardState() types.ShardState {
 		for j := 0; j < GenesisShardHarmonyNodes; j++ {
 			index := i + j*GenesisShardNum // The initial account to use for genesis nodes
 
-			// TODO: Old code. Will remove it later as long as the migration works.
-			// priKey := bls.SecretKey{}
-			// priKey.DeserializeHexStr(genesis.GenesisAccounts[index].BlsPriKey)
-			// pubKey := types.BlsPublicKey{}
-			// pubKey.FromLibBLSPublicKey(priKey.GetPublicKey())
-
 			pub := &bls.PublicKey{}
 			pub.DeserializeHexStr(genesis.GenesisAccounts[index].BlsPublicKey)
 			pubKey := types.BlsPublicKey{}
@@ -245,10 +239,6 @@ func GetInitShardState() types.ShardState {
 		// add FN runner's key
 		for j := GenesisShardHarmonyNodes; j < GenesisShardSize; j++ {
 			index := i + (j-GenesisShardHarmonyNodes)*GenesisShardNum
-
-			// TODO: this is old code. We will remove as long as the migration works.
-			// priKey := bls.SecretKey{}
-			// priKey.DeserializeHexStr(genesis.GenesisFNAccounts[index].BlsPriKey)
 
 			pub := &bls.PublicKey{}
 			pub.DeserializeHexStr(genesis.GenesisFNAccounts[index].BlsPublicKey)

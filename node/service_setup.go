@@ -9,7 +9,6 @@ import (
 	"github.com/harmony-one/harmony/api/service/discovery"
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/api/service/networkinfo"
-	"github.com/harmony-one/harmony/api/service/randomness"
 	"github.com/harmony-one/harmony/api/service/staking"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -61,7 +60,9 @@ func (node *Node) setupForBeaconLeader() {
 	// Register new block service.
 	node.serviceManager.RegisterService(service.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReadyv2))
 	// Register randomness service
-	node.serviceManager.RegisterService(service.Randomness, randomness.New(node.DRand))
+	// TODO: Disable drand. Currently drand isn't functioning but we want to compeletely turn it off for full protection.
+	// Enable it back after mainnet.
+	// node.serviceManager.RegisterService(service.Randomness, randomness.New(node.DRand))
 }
 
 func (node *Node) setupForBeaconValidator() {

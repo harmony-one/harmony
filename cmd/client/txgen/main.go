@@ -110,13 +110,12 @@ func setUpTXGen() *node.Node {
 	startIdx := 0
 	endIdx := startIdx + core.GenesisShardSize
 	for _, acct := range genesis.GenesisAccounts[startIdx:endIdx] {
-		secretKey := bls2.SecretKey{}
-		if err := secretKey.DeserializeHexStr(acct.BlsPriKey); err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "cannot parse secret key: %v\n",
-				err)
+		pub := &bls2.PublicKey{}
+		if err := pub.DeserializeHexStr(acct.BlsPublicKey); err != nil {
+			fmt.Printf("Can not deserialize public key. err: %v", err)
 			os.Exit(1)
 		}
-		consensusObj.PublicKeys = append(consensusObj.PublicKeys, secretKey.GetPublicKey())
+		consensusObj.PublicKeys = append(consensusObj.PublicKeys, pub)
 	}
 	txGen.NodeConfig.SetRole(nodeconfig.ClientNode)
 	if shardID == 0 {

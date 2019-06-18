@@ -12,18 +12,18 @@ import (
 
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/harmony-one/bls/ffi/go/bls"
+
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/accounts/keystore"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/drand"
+	"github.com/harmony-one/harmony/internal/blsgen"
 	"github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
 	hmykey "github.com/harmony-one/harmony/internal/keystore"
-	memprofiling "github.com/harmony-one/harmony/internal/memprofiling"
+	"github.com/harmony-one/harmony/internal/memprofiling"
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -104,6 +104,8 @@ var (
 	shardID            = flag.Int("shard_id", -1, "the shard ID of this node")
 	enableMemProfiling = flag.Bool("enableMemProfiling", false, "Enable memsize logging.")
 	enableGC           = flag.Bool("enableGC", true, "Enable calling garbage collector manually .")
+	blsKeyFile         = flag.String("blskey_file", "", "The encrypted file of bls serialized private key by passphrase.")
+	blsPass            = flag.String("blspass", "", "The file containing passphrase to decrypt the encrypted bls file.")
 
 	// logConn logs incoming/outgoing connections
 	logConn = flag.Bool("log_conn", false, "log incoming/outgoing connections")
@@ -112,6 +114,10 @@ var (
 
 	// -nopass is false by default.  The keyfile must be encrypted.
 	hmyNoPass = flag.Bool("nopass", false, "No passphrase for the key (testing only)")
+	// -pass takes on "pass:password", "env:var", "file:pathname",
+	// "fd:number", or "stdin" form.
+	// See “PASS PHRASE ARGUMENTS” section of openssl(1) for details.
+	hmyPass = flag.String("pass", "", "how to get passphrase for the key")
 
 	stakingAccounts = flag.String("accounts", "", "account addresses of the node")
 
@@ -165,7 +171,7 @@ func initSetup() {
 	}
 
 	if !*isExplorer { // Explorer node doesn't need the following setup
-		setupConsensusKeys()
+		setupECDSAKeys()
 	} else {
 		genesisAccount = &genesis.DeployAccount{}
 		genesisAccount.ShardID = uint32(*shardID)
@@ -177,7 +183,7 @@ func initSetup() {
 	}
 }
 
-func setupConsensusKeys() {
+func setupECDSAKeys() {
 	ks = hmykey.GetHmyKeyStore()
 
 	allAccounts := ks.Accounts()
@@ -186,7 +192,7 @@ func setupConsensusKeys() {
 	accountIndex, genesisAccount = genesis.FindAccount(*stakingAccounts)
 
 	if genesisAccount == nil {
-		fmt.Printf("Can't find the account address: %v!\n", *stakingAccounts)
+		fmt.Printf("Can't find the account address: %v\n", *stakingAccounts)
 		os.Exit(100)
 	}
 
@@ -200,7 +206,7 @@ func setupConsensusKeys() {
 	}
 
 	if !foundAccount {
-		fmt.Printf("Can't find the matching account key: %v!\n", genesisAccount.Address)
+		fmt.Printf("Can't find the matching account key: %v\n", genesisAccount.Address)
 		os.Exit(101)
 	}
 
@@ -212,7 +218,14 @@ func setupConsensusKeys() {
 
 	var myPass string
 	if !*hmyNoPass {
-		myPass = utils.AskForPassphrase("Passphrase: ")
+		if *hmyPass == "" {
+			myPass = utils.AskForPassphrase("Passphrase: ")
+		} else if pass, err := utils.GetPassphraseFromSource(*hmyPass); err != nil {
+			fmt.Printf("Cannot read passphrase: %s\n", err)
+			os.Exit(3)
+		} else {
+			myPass = pass
+		}
 		err := ks.Unlock(myAccount, myPass)
 		if err != nil {
 			fmt.Printf("Wrong Passphrase! Unable to unlock account key!\n")
@@ -220,6 +233,36 @@ func setupConsensusKeys() {
 		}
 	}
 	hmykey.SetHmyPass(myPass)
+}
+
+func setUpBLSKey(nodeConfig *nodeconfig.ConfigType) {
+	// If FN node running, they should either specify blsPrivateKey or the file with passphrase
+	if *blsKeyFile != "" && *blsPass != "" {
+		passPhrase, err := utils.GetPassphraseFromSource(*blsPass)
+		if err != nil {
+			fmt.Printf("error when reading passphrase file: %v\n", err)
+			os.Exit(100)
+		}
+		consensusPriKey, err := blsgen.LoadBlsKeyWithPassPhrase(*blsKeyFile, passPhrase)
+		if err != nil {
+			fmt.Printf("error when loading bls key, err :%v\n", err)
+			os.Exit(100)
+		}
+		if !genesis.IsBlsPublicKeyWhiteListed(consensusPriKey.GetPublicKey().SerializeToHexStr()) {
+			fmt.Println("Your bls key is not whitelisted")
+			os.Exit(100)
+		}
+
+		// Consensus keys are the BLS12-381 keys used to sign consensus messages
+		nodeConfig.ConsensusPriKey, nodeConfig.ConsensusPubKey = consensusPriKey, consensusPriKey.GetPublicKey()
+		if nodeConfig.ConsensusPriKey == nil || nodeConfig.ConsensusPubKey == nil {
+			fmt.Println("error to get consensus keys.")
+			os.Exit(100)
+		}
+	} else {
+		fmt.Println("Internal nodes need to have pass to decrypt blskey")
+		os.Exit(101)
+	}
 }
 
 func createGlobalConfig() *nodeconfig.ConfigType {
@@ -250,34 +293,19 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 		nodeConfig.ShardID = uint32(genesisAccount.ShardID)
 
 		// Key Setup ================= [Start]
-		consensusPriKey := &bls.SecretKey{}
-
-		if *isGenesis {
-			err := consensusPriKey.DeserializeHexStr(genesisAccount.BlsPriKey)
-			if err != nil {
-				panic(fmt.Errorf("Failed to parse BLS private key: %s, %s", genesisAccount.BlsPriKey, err))
-			}
-		} else {
-			// NewNode won't work
-			/*
-				err := consensusPriKey.DeserializeHexStr(genesis.NewNodeAccounts[])
-				if err != nil {
-					panic(fmt.Errorf("generate key error"))
-				}
-			*/
-		}
-
-		// Consensus keys are the BLS12-381 keys used to sign consensus messages
-		nodeConfig.ConsensusPriKey, nodeConfig.ConsensusPubKey = consensusPriKey, consensusPriKey.GetPublicKey()
-		if nodeConfig.ConsensusPriKey == nil || nodeConfig.ConsensusPubKey == nil {
-			panic(fmt.Errorf("Failed to initialize BLS keys: %s", consensusPriKey.SerializeToHexStr()))
+		// Set up consensus keys.
+		setUpBLSKey(nodeConfig)
+		// P2p private key is used for secure message transfer between p2p nodes.
+		nodeConfig.P2pPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
+		if err != nil {
+			panic(err)
 		}
 		// Key Setup ================= [End]
 	}
 
 	nodeConfig.SelfPeer = p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nodeConfig.ConsensusPubKey}
 
-	if accountIndex < core.GenesisShardNum { // The first node in a shard is the leader at genesis
+	if accountIndex < core.GenesisShardNum && !*isExplorer { // The first node in a shard is the leader at genesis
 		nodeConfig.Leader = nodeConfig.SelfPeer
 		nodeConfig.StringRole = "leader"
 	} else {
@@ -292,7 +320,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 
 	nodeConfig.Host, err = p2pimpl.NewHost(&nodeConfig.SelfPeer, nodeConfig.P2pPriKey)
 	if *logConn {
-		nodeConfig.Host.GetP2PHost().Network().Notify(utils.ConnLogger)
+		nodeConfig.Host.GetP2PHost().Network().Notify(utils.NewConnLogger(utils.GetLogInstance()))
 	}
 	if err != nil {
 		panic("unable to new host in harmony")
@@ -401,14 +429,12 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentNode.NodeConfig.ConsensusPubKey = nodeConfig.ConsensusPubKey
 	currentNode.NodeConfig.ConsensusPriKey = nodeConfig.ConsensusPriKey
 
-	// Add randomness protocol
-	// TODO: enable drand only for beacon chain
-	// TODO: put this in a better place other than main.
-	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of drand later.
-	dRand := drand.New(nodeConfig.Host, nodeConfig.ShardID, []p2p.Peer{}, nodeConfig.Leader, currentNode.ConfirmedBlockChannel, nodeConfig.ConsensusPriKey)
-	currentNode.Consensus.RegisterPRndChannel(dRand.PRndChannel)
-	currentNode.Consensus.RegisterRndChannel(dRand.RndChannel)
-	currentNode.DRand = dRand
+	// TODO: Disable drand. Currently drand isn't functioning but we want to compeletely turn it off for full protection.
+	// Enable it back after mainnet.
+	// dRand := drand.New(nodeConfig.Host, nodeConfig.ShardID, []p2p.Peer{}, nodeConfig.Leader, currentNode.ConfirmedBlockChannel, nodeConfig.ConsensusPriKey)
+	// currentNode.Consensus.RegisterPRndChannel(dRand.PRndChannel)
+	// currentNode.Consensus.RegisterRndChannel(dRand.RndChannel)
+	// currentNode.DRand = dRand
 
 	// This needs to be executed after consensus and drand are setup
 	if !*isNewNode || *shardID > -1 { // initial staking new node doesn't need to initialize shard state

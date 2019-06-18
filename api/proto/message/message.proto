@@ -82,31 +82,35 @@ message StakingRequest {
 message ConsensusRequest {
   uint32 view_id = 1;
   uint64 block_num = 2;
-  bytes block_hash = 3;
-  bytes sender_pubkey = 4;
-  bytes payload = 5;
+  uint32 shard_id = 3;
+  bytes block_hash = 4;
+  bytes block = 5;
+  bytes sender_pubkey = 6;
+  bytes payload = 7;
 }
 
 message DrandRequest {
-  bytes sender_pubkey = 1;
-  bytes block_hash = 2;
-  bytes payload = 3;
+  uint32 shard_id = 1;
+  bytes sender_pubkey = 2;
+  bytes block_hash = 3;
+  bytes payload = 4;
 }
 
 message ViewChangeRequest {
     uint32 view_id = 1;
     uint64 block_num = 2;
-    bytes sender_pubkey = 3;
-    bytes leader_pubkey = 4;
-    bytes payload = 5; // message payload: either m1 type or m2 type 
-    bytes viewchange_sig = 6; // signature on payload
-    bytes viewid_sig = 7; // signature on view_id
+    uint32 shard_id = 3;
+    bytes sender_pubkey = 4;
+    bytes leader_pubkey = 5;
+    bytes payload = 6; // message payload: either m1 type or m2 type
+    bytes viewchange_sig = 7; // signature on payload
+    bytes viewid_sig = 8; // signature on view_id
                         
     // below is for newview message only
     // only need 1 valid m1 type message which is in payload
-    bytes m2_aggsigs = 8; // m2: |nil|
-    bytes m2_bitmap = 9;
-    bytes m3_aggsigs = 10; // m3: |viewID|
-    bytes m3_bitmap= 11;
+    bytes m2_aggsigs = 9; // m2: |nil|
+    bytes m2_bitmap = 10;
+    bytes m3_aggsigs = 11; // m3: |viewID|
+    bytes m3_bitmap= 12;
 
 }

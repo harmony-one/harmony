@@ -89,6 +89,12 @@ func (dRand *DRand) ProcessMessageLeader(payload []byte) {
 		utils.GetLogInstance().Error("Failed to unmarshal message payload.", "err", err, "dRand", dRand)
 	}
 
+	if message.GetDrand().ShardId != dRand.ShardID {
+		utils.GetLogInstance().Warn("Received drand message from different shard",
+			"myShardId", dRand.ShardID, "receivedShardId", message.GetDrand().ShardId)
+		return
+	}
+
 	switch message.Type {
 	case msg_pb.MessageType_DRAND_COMMIT:
 		dRand.processCommitMessage(message)
