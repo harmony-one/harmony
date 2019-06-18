@@ -399,7 +399,11 @@ func processBlsgenCommand() {
 		}
 	}
 
-	privateKey, fileName := blsgen.GenBlsKeyWithPassPhrase(password)
+	privateKey, fileName, err := blsgen.GenBlsKeyWithPassPhrase(password)
+	if err != nil {
+		fmt.Printf("error when generating bls key: %v\n", err)
+		os.Exit(100)
+	}
 	publickKey := privateKey.GetPublicKey()
 	fmt.Printf("Bls private key: %s\n", privateKey.SerializeToHexStr())
 	fmt.Printf("Bls public key: %s\n", publickKey.SerializeToHexStr())
