@@ -17,14 +17,12 @@ const genesisString = "https://harmony.one 'Open Consensus for 10B' 2019.06.01 $
 type DeployAccount struct {
 	Index        string // index
 	Address      string // account address
-	BlsPriKey    string
-	DummyKey     string
 	BlsPublicKey string // account public BLS key
 	ShardID      uint32 // shardID of the account
 }
 
 func (d DeployAccount) String() string {
-	return fmt.Sprintf("%s/%s:%d", d.Address, d.DummyKey, d.ShardID)
+	return fmt.Sprintf("%s/%s:%d", d.Address, d.BlsPublicKey, d.ShardID)
 }
 
 // BeaconAccountPriKey is the func which generates a constant private key.
