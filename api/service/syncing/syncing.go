@@ -107,8 +107,19 @@ type StateSync struct {
 	syncMux            sync.Mutex
 }
 
-// level = 0 only clean "old" blocks, level > 0 clean up everything
-func (ss *StateSync) cleanCache(level int) {
+func (ss *StateSync) purgeAllBlocksFromCache() {
+	ss.syncMux.Lock()
+	defer ss.syncMux.Unlock()
+	ss.commonBlocks = make(map[int]*types.Block)
+	ss.lastMileBlocks = nil
+	ss.syncConfig.ForEachPeer(func(configPeer *SyncPeerConfig) (brk bool) {
+		configPeer.blockHashes = nil
+		configPeer.newBlocks = nil
+		return
+	})
+}
+
+func (ss *StateSync) purgeOldBlocksFromCache() {
 	ss.syncMux.Lock()
 	defer ss.syncMux.Unlock()
 	ss.commonBlocks = make(map[int]*types.Block)
@@ -116,15 +127,6 @@ func (ss *StateSync) cleanCache(level int) {
 		configPeer.blockHashes = nil
 		return
 	})
-	if level > 0 {
-		ss.commonBlocks = make(map[int]*types.Block)
-		ss.lastMileBlocks = nil
-		ss.syncConfig.ForEachPeer(func(configPeer *SyncPeerConfig) (brk bool) {
-			configPeer.blockHashes = nil
-			configPeer.newBlocks = nil
-			return
-		})
-	}
 }
 
 // AddLastMileBlock add the lastest a few block into queue for syncing
@@ -325,9 +327,10 @@ func (ss *StateSync) GetConsensusHashes(startHash []byte, size uint32) bool {
 				}
 				if len(response.Payload) > int(size+1) {
 					utils.GetLogInstance().Warn("[Sync] GetConsensusHashes: receive more blockHahses than request!", "requestSize", size, "respondSize", len(response.Payload))
-					return
+					peerConfig.blockHashes = response.Payload[:size+1]
+				} else {
+					peerConfig.blockHashes = response.Payload
 				}
-				peerConfig.blockHashes = response.Payload
 			}()
 			return
 		})
@@ -680,9 +683,9 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, willJo
 			size = BatchSize
 		}
 		ss.ProcessStateSync(startHash[:], size, bc, worker)
-		ss.cleanCache(0)
+		ss.purgeOldBlocksFromCache()
 	}
-	ss.cleanCache(1)
+	ss.purgeAllBlocksFromCache()
 }
 
 // GetSyncingPort returns the syncing port.
