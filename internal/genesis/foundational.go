@@ -114,5 +114,6 @@ var GenesisFNAccounts = [...]DeployAccount{
 	{Index: "109", Address: "one1xhffyq90exjvmsz3vcykqkdqggrcedf7zdcvt8", BlsPublicKey: "04bd80917f8a95b5074eeb3e413f810585eed1974057080d7f1422928113d3cb8a36d6d8e665dae71148a28d74d59b95"},
 	{Index: "110", Address: "one1y469t49t34c7sylrd9pthfam6xmlz5p3zh2zdj", BlsPublicKey: "effc27695b63bdf62d46f83bc145ad491c893697513cbe25ca86927e8fb846657423e269727aa7bea36d8ffb66ae0d17"},
 	{Index: "111", Address: "one15n4k4d7cw5wyyf3pt3fnwuvcweuxmmq0knpnyh", BlsPublicKey: "04bd80917f8a95b5074eeb3e413f810585eed1974057080d7f1422928113d3cb8a36d6d8e665dae71148a28d74d59b95"},
-	Peter is testing how to edit and push on github	
+	{Index: "112", Address: "one12zjkjpj0zp3lq4k3hnld5w0t5f933pntdjw0z9", BlsPublicKey: "a02d5f463e817ec864c450e9fe727ec7ff820956fe294eec264b95d7aeebef5ad1153a744558045ef75f872e7207568f"},
+	{Index: "113", Address: "one1vhqp3g7epjzvemr2w6rc4xglen53vwlnkdpgzy", BlsPublicKey: "cfd385fd66adc6a39cf1f1e27c7b6f0a8edfa2e2475e9389b4fa6b74373949933185c956899bad3c134e2331ce039f11"},
 }
