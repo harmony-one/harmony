@@ -240,9 +240,8 @@ func GetInitShardState() types.ShardState {
 		for j := GenesisShardHarmonyNodes; j < GenesisShardSize; j++ {
 			index := i + (j-GenesisShardHarmonyNodes)*GenesisShardNum
 
-			priKey := &bls.SecretKey{}
-			priKey.DeserializeHexStr(genesis.GenesisFNAccounts[index].DummyKey)
-			pub := priKey.GetPublicKey()
+			pub := &bls.PublicKey{}
+			pub.DeserializeHexStr(genesis.GenesisFNAccounts[index].BlsPublicKey)
 
 			pubKey := types.BlsPublicKey{}
 			pubKey.FromLibBLSPublicKey(pub)
