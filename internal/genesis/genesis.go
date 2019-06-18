@@ -21,7 +21,6 @@ type DeployAccount struct {
 	DummyKey     string
 	BlsPublicKey string // account public BLS key
 	ShardID      uint32 // shardID of the account
-	Updated      string
 }
 
 func (d DeployAccount) String() string {
