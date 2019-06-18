@@ -21,8 +21,7 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 	}
 	consensusMsg := message.GetConsensus()
 	consensus.populateMessageFields(consensusMsg)
-	// n byte of block header
-	consensusMsg.Payload = consensus.block // TODO: send only block header in the announce phase.
+	consensusMsg.Payload = consensus.blockHeader
 
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
 	if err != nil {
@@ -43,6 +42,8 @@ func (consensus *Consensus) constructPreparedMessage() ([]byte, *bls.Sign) {
 
 	consensusMsg := message.GetConsensus()
 	consensus.populateMessageFields(consensusMsg)
+	// add block content in prepared message for slow validators to catchup
+	consensusMsg.Block = consensus.block
 
 	//// Payload
 	buffer := bytes.NewBuffer([]byte{})

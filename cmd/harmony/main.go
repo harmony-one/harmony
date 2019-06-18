@@ -253,9 +253,9 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	consensusPriKey := &bls.SecretKey{}
 
 	if *isGenesis {
-		err := consensusPriKey.DeserializeHexStr(genesisAccount.BlsPriKey)
+		err := consensusPriKey.DeserializeHexStr(genesisAccount.DummyKey)
 		if err != nil {
-			panic(fmt.Errorf("Failed to parse BLS private key: %s, %s", genesisAccount.BlsPriKey, err))
+			panic(fmt.Errorf("Failed to parse BLS private key: %s, %s", genesisAccount.DummyKey, err))
 		}
 	} else {
 		// NewNode won't work
@@ -291,7 +291,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 
 	nodeConfig.Host, err = p2pimpl.NewHost(&nodeConfig.SelfPeer, nodeConfig.P2pPriKey)
 	if *logConn {
-		nodeConfig.Host.GetP2PHost().Network().Notify(utils.ConnLogger)
+		nodeConfig.Host.GetP2PHost().Network().Notify(utils.NewConnLogger(utils.GetLogInstance()))
 	}
 	if err != nil {
 		panic("unable to new host in harmony")

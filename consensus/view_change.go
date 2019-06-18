@@ -367,6 +367,10 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			binary.LittleEndian.PutUint64(blockNumBytes, consensus.blockNum)
 			commitPayload := append(blockNumBytes, consensus.blockHash[:]...)
 			consensus.commitSigs[consensus.PubKey.SerializeToHexStr()] = consensus.priKey.SignHash(commitPayload)
+			if err = consensus.commitBitmap.SetKey(consensus.PubKey, true); err != nil {
+				consensus.getLogger().Debug("[OnViewChange] New Leader commit bitmap set failed")
+				return
+			}
 		}
 
 		consensus.mode.SetViewID(recvMsg.ViewID)

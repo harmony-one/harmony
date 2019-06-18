@@ -27,6 +27,7 @@ type PbftMessage struct {
 	ViewID        uint32
 	BlockNum      uint64
 	BlockHash     common.Hash
+	Block         []byte
 	SenderPubkey  *bls.PublicKey
 	LeaderPubkey  *bls.PublicKey
 	Payload       []byte
@@ -217,6 +218,9 @@ func ParsePbftMessage(msg *msg_pb.Message) (*PbftMessage, error) {
 	copy(pbftMsg.BlockHash[:], consensusMsg.BlockHash[:])
 	pbftMsg.Payload = make([]byte, len(consensusMsg.Payload))
 	copy(pbftMsg.Payload[:], consensusMsg.Payload[:])
+	pbftMsg.Block = make([]byte, len(consensusMsg.Block))
+	copy(pbftMsg.Block[:], consensusMsg.Block[:])
+
 	pubKey, err := bls_cosi.BytesToBlsPublicKey(consensusMsg.SenderPubkey)
 	if err != nil {
 		return nil, err
