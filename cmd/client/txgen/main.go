@@ -112,7 +112,7 @@ func setUpTXGen() *node.Node {
 	for _, acct := range genesis.GenesisAccounts[startIdx:endIdx] {
 		pub := &bls2.PublicKey{}
 		if err := pub.DeserializeHexStr(acct.BlsPublicKey); err != nil {
-			fmt.Println("Can not deserialize publickey")
+			fmt.Printf("Can not deserialize public key. err: %v", err)
 			os.Exit(1)
 		}
 		consensusObj.PublicKeys = append(consensusObj.PublicKeys, pub)
