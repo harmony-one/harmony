@@ -111,7 +111,14 @@ var GenesisFNAccounts = [...]DeployAccount{
 	{Index: "106", Address: "one1ughluft6keduyy8v8nhczkyfmcc2qhe9wxpmrz", BlsPublicKey: "edde5546ec7c94a212068f4d5e6e8008e0ee6701e510517a4185b1a9831a8a0cdf05309f550c0907cbd644e3ded9a787"},
 	{Index: "107", Address: "one1j7urgfm48rj9zl6rl8s3lg9mawkhcrf78mqdsz", BlsPublicKey: "0a8599d805dfdf109de0fb849e73c12d4738dbe5de3f01093626947207f1611756382e8e743dae22b3b4e5fe67ce6d16"},
 	{Index: "108", Address: "one1vme5xkhn8mtff325jz0frcy8k5zru88zz75gn5", BlsPublicKey: "d95ac66d3fe763baa607d6828e75107947d8152c21eb58d877163b8d4902cb62e0d984dfb13547d717bd1fdc46c0f419"},
-	{Index: "109", Address: "one1xhffyq90exjvmsz3vcykqkdqggrcedf7zdcvt8", BlsPublicKey: "04bd80917f8a95b5074eeb3e413f810585eed1974057080d7f1422928113d3cb8a36d6d8e665dae71148a28d74d59b95"},
+
+	{Index: "109", Address: "one176nrt06rjmg9qunhf0z7wdhphdjtpq94y73d7s", BlsPublicKey: "577ff3c1e04184eb28ec4ea1f0ca0fe8e60723cdd0bb4a637f2ed4b809f967b76b990417ca3e7a3de5f38de850d27a0c"},
 	{Index: "110", Address: "one1y469t49t34c7sylrd9pthfam6xmlz5p3zh2zdj", BlsPublicKey: "effc27695b63bdf62d46f83bc145ad491c893697513cbe25ca86927e8fb846657423e269727aa7bea36d8ffb66ae0d17"},
 	{Index: "111", Address: "one15n4k4d7cw5wyyf3pt3fnwuvcweuxmmq0knpnyh", BlsPublicKey: "04bd80917f8a95b5074eeb3e413f810585eed1974057080d7f1422928113d3cb8a36d6d8e665dae71148a28d74d59b95"},
+
+	{Index: "112", Address: "one1yeay879a7dln5ltnchytx8eennpz332qn7yjx3", BlsPublicKey: "ad94bb49728b51a77b8912e70e260b37b8dab638988ead18413f772546944e2b42370e570cc1e01a862de82c1e7b0081"},
+	{Index: "113", Address: "one1yqu97zy04zy0cu6mr2gddvs94d4j2zums7ttvt", BlsPublicKey: "0a551033f14306b088545b07ee0f8919b6bbe41d1fe220dc37749b8fdc71ae01dc520f786c8dd3af4bc9cf1fc4b4168f"},
+	{Index: "114", Address: "one17tka7fdf9s95c597e2petfrqtnylcksvnuelzz", BlsPublicKey: "14552cf51cdac18b399590bf3266a0032719f4a3e86a4cd31bb80eed2b016dfaac19aaa3694c06f428d30fe771dc6385"},
+	{Index: "115", Address: "one1zfare9m39n3m4h5sj6rpfdkatzheww3zs8ctwg", BlsPublicKey: "56d2e4fd4f3702dba733b02657e660edbfd759cb4adb04f262dcddf72ce2b57873e7c1ddca82619731d7a1a99503c383"},
+	{Index: "116", Address: "one1cxc5j0ygyrkq4lsvln3amdu3ys239jqzk56ykc", BlsPublicKey: "56d2e4fd4f3702dba733b02657e660edbfd759cb4adb04f262dcddf72ce2b57873e7c1ddca82619731d7a1a99503c383"},
 }
