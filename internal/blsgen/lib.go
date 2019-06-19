@@ -158,10 +158,18 @@ func decryptNonHumanReadable(data []byte, passphrase string) ([]byte, error) {
 }
 
 // LoadNonHumanReadableBlsKeyWithPassPhrase loads bls key with passphrase.
-func LoadNonHumanReadableBlsKeyWithPassPhrase(fileName, passphrase string) (*ffi_bls.SecretKey, error) {
+func LoadNonHumanReadableBlsKeyWithPassPhrase(fileName, passFile string) (*ffi_bls.SecretKey, error) {
 	encryptedPrivateKeyBytes, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		return nil, err
+	}
+	data, err := ioutil.ReadFile(passFile)
+	if err != nil {
+		return nil, err
+	}
+	passphrase := string(data)
+	for len(passphrase) > 0 && passphrase[len(passphrase)-1] == '\n' {
+		passphrase = passphrase[:len(passphrase)-1]
 	}
 	decryptedBytes, err := decryptNonHumanReadable(encryptedPrivateKeyBytes, passphrase)
 	if err != nil {
