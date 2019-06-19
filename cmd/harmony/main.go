@@ -229,9 +229,6 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	// The initial genesis nodes are sequentially put into genesis shards based on their accountIndex
 	nodeConfig.ShardID = uint32(genesisAccount.ShardID)
 
-	// Set up consensus keys.
-	// setUpConsensusKeyAndReturnIndex(nodeConfig)
-
 	// P2p private key is used for secure message transfer between p2p nodes.
 	nodeConfig.P2pPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
