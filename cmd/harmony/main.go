@@ -102,6 +102,7 @@ var (
 	enableGC           = flag.Bool("enableGC", true, "Enable calling garbage collector manually .")
 	blsKeyFile         = flag.String("blskey_file", "", "The encrypted file of bls serialized private key by passphrase.")
 	blsPass            = flag.String("blspass", "", "The file containing passphrase to decrypt the encrypted bls file.")
+	blsPassphrase      string
 
 	// logConn logs incoming/outgoing connections
 	logConn = flag.Bool("log_conn", false, "log incoming/outgoing connections")
@@ -182,35 +183,24 @@ func initSetup() {
 }
 
 func setUpConsensusKeyAndReturnIndex(nodeConfig *nodeconfig.ConfigType) (int, *genesis.DeployAccount) {
-	// If FN node running, they should either specify blsPrivateKey or the file with passphrase
-	if *blsKeyFile != "" && *blsPass != "" {
-		passPhrase, err := utils.GetPassphraseFromSource(*blsPass)
-		if err != nil {
-			fmt.Printf("error when reading passphrase file: %v\n", err)
-			os.Exit(100)
-		}
-		consensusPriKey, err := blsgen.LoadBlsKeyWithPassPhrase(*blsKeyFile, passPhrase)
-		if err != nil {
-			fmt.Printf("error when loading bls key, err :%v\n", err)
-			os.Exit(100)
-		}
-		index, acc := genesis.IsBlsPublicKeyIndex(consensusPriKey.GetPublicKey().SerializeToHexStr())
-		if index < 0 {
-			fmt.Println("Can not found your bls key.")
-			os.Exit(100)
-		}
-
-		// Consensus keys are the BLS12-381 keys used to sign consensus messages
-		nodeConfig.ConsensusPriKey, nodeConfig.ConsensusPubKey = consensusPriKey, consensusPriKey.GetPublicKey()
-		if nodeConfig.ConsensusPriKey == nil || nodeConfig.ConsensusPubKey == nil {
-			fmt.Println("error to get consensus keys.")
-			os.Exit(100)
-		}
-		return index, acc
+	consensusPriKey, err := blsgen.LoadBlsKeyWithPassPhrase(*blsKeyFile, blsPassphrase)
+	if err != nil {
+		fmt.Printf("error when loading bls key, err :%v\n", err)
+		os.Exit(100)
 	}
-	fmt.Println("Internal nodes need to have pass to decrypt blskey")
-	os.Exit(101)
-	return -1, nil
+	index, acc := genesis.IsBlsPublicKeyIndex(consensusPriKey.GetPublicKey().SerializeToHexStr())
+	if index < 0 {
+		fmt.Println("Can not found your bls key.")
+		os.Exit(100)
+	}
+
+	// Consensus keys are the BLS12-381 keys used to sign consensus messages
+	nodeConfig.ConsensusPriKey, nodeConfig.ConsensusPubKey = consensusPriKey, consensusPriKey.GetPublicKey()
+	if nodeConfig.ConsensusPriKey == nil || nodeConfig.ConsensusPubKey == nil {
+		fmt.Println("error to get consensus keys.")
+		os.Exit(100)
+	}
+	return index, acc
 }
 
 func createGlobalConfig() *nodeconfig.ConfigType {
@@ -392,6 +382,18 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 func main() {
 	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
 	flag.Parse()
+
+	// If FN node running, they should either specify blsPrivateKey or the file with passphrase
+	if *blsKeyFile == "" || *blsPass == "" {
+		fmt.Println("Internal nodes need to have pass to decrypt blskey")
+		os.Exit(101)
+	}
+	passphrase, err := utils.GetPassphraseFromSource(*blsPass)
+	if err != nil {
+		fmt.Printf("error when reading passphrase file: %v\n", err)
+		os.Exit(100)
+	}
+	blsPassphrase = passphrase
 
 	// Configure log parameters
 	utils.SetLogContext(*port, *ip)
