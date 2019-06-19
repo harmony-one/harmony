@@ -41,10 +41,10 @@ func (client *Client) Close() {
 }
 
 // GetBlockHashes gets block hashes from all the peers by calling grpc request.
-func (client *Client) GetBlockHashes(startHash []byte) *pb.DownloaderResponse {
+func (client *Client) GetBlockHashes(startHash []byte, size uint32) *pb.DownloaderResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_HEADER, BlockHash: startHash}
+	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_HEADER, BlockHash: startHash, Size: size}
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
 		utils.GetLogInstance().Info("[SYNC] GetBlockHashes query failed", "error", err)
