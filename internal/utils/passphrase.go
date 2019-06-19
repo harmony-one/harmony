@@ -37,6 +37,12 @@ func readAllAsString(r io.Reader) (data string, err error) {
 //
 // The source can be "pass:password", "env:var", "file:pathname", "fd:number",
 // or "stdin".  See “PASS PHRASE ARGUMENTS” section of openssl(1) for details.
+//
+// When "stdin" or "fd:" is used,
+// the standard input or the given file descriptor is exhausted.
+// Therefore, this function should be called at most once per program
+// invocation; the second call, if any, may return an empty string if "stdin"
+// or "fd" is used.
 func GetPassphraseFromSource(src string) (pass string, err error) {
 	switch src {
 	case "stdin":

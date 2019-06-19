@@ -16,6 +16,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
@@ -351,7 +352,7 @@ func accumulateRewards(
 		}
 		numAccounts++
 		account := member.EcdsaAddress
-		signers = append(signers, account.Hex())
+		signers = append(signers, common2.MustAddressToBech32(account))
 		state.AddBalance(account, BlockReward)
 		totalAmount = new(big.Int).Add(totalAmount, BlockReward)
 	}
