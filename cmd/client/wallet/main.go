@@ -157,6 +157,7 @@ func main() {
 		fmt.Println("        --nopass         - The private key has no passphrase (for test only)")
 		fmt.Println("   11. format        - Shows different encoding formats of specific address")
 		fmt.Println("        --address        - The address to display the different encoding formats for")
+		fmt.Println("   12. rawBlsConveter - Take raw bls private and generate encrypted bls file.")
 		os.Exit(1)
 	}
 
@@ -219,6 +220,8 @@ ARG:
 		processTransferCommand()
 	case "format":
 		formatAddressCommand()
+	case "rawBlsConverter":
+		rawBlsConverter()
 	default:
 		fmt.Printf("Unknown action: %s\n", os.Args[1])
 		flag.PrintDefaults()
