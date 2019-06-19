@@ -62,6 +62,9 @@ func LoadBlsKeyWithPassPhrase(fileName, passphrase string) (*ffi_bls.SecretKey, 
 	if err != nil {
 		return nil, err
 	}
+	for len(passphrase) > 0 && passphrase[len(passphrase)-1] == '\n' {
+		passphrase = passphrase[:len(passphrase)-1]
+	}
 	encryptedPrivateKeyStr := string(encryptedPrivateKeyBytes)
 	decryptedBytes := decrypt(encryptedPrivateKeyStr, passphrase)
 
