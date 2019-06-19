@@ -297,7 +297,12 @@ func (node *Node) validateNewShardState(block *types.Block, stakeInfo *map[commo
 		// We aren't expecting to reshard, so proceed to sign
 		return nil
 	}
-	proposed := header.ShardState
+	var shardState *types.ShardState
+	err := rlp.DecodeBytes(header.ShardState, shardState)
+	if err != nil {
+		return err
+	}
+	proposed := *shardState
 	if block.ShardID() == 0 {
 		// Beacon validators independently recalculate the master state and
 		// compare it against the proposed copy.
@@ -428,15 +433,25 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 				ctxerror.Log15(utils.GetLogInstance().Error, e)
 			}
 		}
-		node.transitionIntoNextEpoch(newBlockHeader.ShardState)
+		shardState, err := newBlockHeader.GetShardState()
+		if err != nil {
+			e := ctxerror.New("cannot get shard state from header").WithCause(err)
+			ctxerror.Log15(utils.GetLogInstance().Error, e)
+		} else {
+			node.transitionIntoNextEpoch(shardState)
+		}
 	}
 }
 
 func (node *Node) broadcastEpochShardState(newBlock *types.Block) error {
+	shardState, err := newBlock.Header().GetShardState()
+	if err != nil {
+		return err
+	}
 	epochShardStateMessage := proto_node.ConstructEpochShardStateMessage(
 		types.EpochShardState{
 			Epoch:      newBlock.Header().Epoch.Uint64() + 1,
-			ShardState: newBlock.Header().ShardState,
+			ShardState: shardState,
 		},
 	)
 	return node.host.SendMessageToGroups(
@@ -448,7 +463,7 @@ func (node *Node) broadcastEpochShardState(newBlock *types.Block) error {
 func (node *Node) AddNewBlock(newBlock *types.Block) {
 	blockNum, err := node.Blockchain().InsertChain([]*types.Block{newBlock})
 	if err != nil {
-		utils.GetLogInstance().Debug("Error Adding new block to blockchain", "blockNum", blockNum, "hash", newBlock.Header().Hash(), "Error", err)
+		utils.GetLogInstance().Debug("Error Adding new block to blockchain", "blockNum", blockNum, "parentHash", newBlock.Header().ParentHash, "hash", newBlock.Header().Hash(), "Error", err)
 	} else {
 		utils.GetLogInstance().Info("Added New Block to Blockchain!!!", "blockNum", blockNum, "hash", newBlock.Header().Hash(), "by node", node.SelfPeer)
 	}

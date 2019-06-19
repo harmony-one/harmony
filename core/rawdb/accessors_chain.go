@@ -358,7 +358,9 @@ func WriteBlock(db DatabaseWriter, block *types.Block) {
 		// Genesis block; record this block's epoch and block numbers.
 		writeOne()
 	}
-	if len(block.Header().ShardState) > 0 {
+
+	// TODO: don't change epoch based on shard state presence
+	if len(block.Header().ShardState) > 0 && block.NumberU64() != 0 {
 		// End-of-epoch block; record the next epoch after this block.
 		epoch = new(big.Int).Add(epoch, common.Big1)
 		epochBlockNum = new(big.Int).Add(epochBlockNum, common.Big1)
@@ -430,13 +432,20 @@ func WriteShardState(
 			"epoch", epoch,
 		).WithCause(err)
 	}
+	return WriteShardStateBytes(db, epoch, data)
+}
+
+// WriteShardStateBytes stores sharding state into database.
+func WriteShardStateBytes(
+	db DatabaseWriter, epoch *big.Int, data []byte,
+) (err error) {
 	if err = db.Put(shardStateKey(epoch), data); err != nil {
 		return ctxerror.New("cannot write sharding state",
 			"epoch", epoch,
 		).WithCause(err)
 	}
 	utils.GetLogger().Info("wrote sharding state",
-		"epoch", epoch, "numShards", len(shardState))
+		"epoch", epoch, "numShards", len(data))
 	return nil
 }
 

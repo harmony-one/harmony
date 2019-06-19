@@ -322,8 +322,8 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		node.BlockChannel = make(chan *types.Block)
 		node.ConfirmedBlockChannel = make(chan *types.Block)
 		node.BeaconBlockChannel = make(chan *types.Block)
-		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, params.TestChainConfig, chain)
-		node.Worker = worker.New(params.TestChainConfig, chain, node.Consensus, node.Consensus.SelfAddress, node.Consensus.ShardID)
+		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, node.Blockchain().Config(), chain)
+		node.Worker = worker.New(node.Blockchain().Config(), chain, node.Consensus, node.Consensus.SelfAddress, node.Consensus.ShardID)
 
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 		// the sequence number is the next block number to be added in consensus protocol, which is always one more than current chain header block

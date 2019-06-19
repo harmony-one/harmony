@@ -8,7 +8,6 @@ import (
 
 	"github.com/harmony-one/harmony/common/config"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
@@ -16,7 +15,6 @@ import (
 
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -42,24 +40,21 @@ type genesisInitializer struct {
 func (gi *genesisInitializer) InitChainDB(db ethdb.Database, shardID uint32) error {
 	shardState := core.GetInitShardState()
 	if shardID != 0 {
-		// store only the local shard
+		// store only the local shard for shard chains
 		c := shardState.FindCommitteeByID(shardID)
 		if c == nil {
 			return errors.New("cannot find local shard in genesis")
 		}
 		shardState = types.ShardState{*c}
 	}
-	if err := rawdb.WriteShardState(db, common.Big0, shardState); err != nil {
-		return ctxerror.New("cannot store epoch shard state").WithCause(err)
-	}
-	if err := gi.node.SetupGenesisBlock(db, shardID); err != nil {
+	if err := gi.node.SetupGenesisBlock(db, shardID, shardState); err != nil {
 		return ctxerror.New("cannot setup genesis block").WithCause(err)
 	}
 	return nil
 }
 
 // SetupGenesisBlock sets up a genesis blockchain.
-func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32) error {
+func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardState types.ShardState) error {
 	utils.GetLogger().Info("setting up a brand new chain database",
 		"shardID", shardID)
 	if shardID == node.Consensus.ShardID {
@@ -93,12 +88,15 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32) error {
 		// AddNodeAddressesToGenesisAlloc(genesisAlloc)
 	}
 
+	// Initialize shard state
 	// TODO: add ShardID into chainconfig and change ChainID to NetworkID
 	chainConfig.ChainID = big.NewInt(int64(shardID)) // Use ChainID as piggybacked ShardID
 	gspec := core.Genesis{
-		Config:  &chainConfig,
-		Alloc:   genesisAlloc,
-		ShardID: shardID,
+		Config:         &chainConfig,
+		Alloc:          genesisAlloc,
+		ShardID:        shardID,
+		ShardStateHash: myShardState.Hash(),
+		ShardState:     myShardState.DeepCopy(),
 	}
 
 	// Store genesis block into db.

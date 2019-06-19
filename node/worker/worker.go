@@ -114,7 +114,9 @@ func (w *Worker) UpdateCurrent() error {
 	timestamp := time.Now().Unix()
 	// New block's epoch is the same as parent's...
 	epoch := new(big.Int).Set(parent.Header().Epoch)
-	if len(parent.Header().ShardState) > 0 {
+
+	// TODO: Don't depend on sharding state for epoch change.
+	if len(parent.Header().ShardState) > 0 && parent.NumberU64() != 0 {
 		// ... except if parent has a resharding assignment it increases by 1.
 		epoch = epoch.Add(epoch, common.Big1)
 	}
@@ -181,7 +183,9 @@ func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus_en
 	timestamp := time.Now().Unix()
 	// New block's epoch is the same as parent's...
 	epoch := new(big.Int).Set(parent.Header().Epoch)
-	if len(parent.Header().ShardState) > 0 {
+
+	// TODO: Don't depend on sharding state for epoch change.
+	if len(parent.Header().ShardState) > 0 && parent.NumberU64() != 0 {
 		// ... except if parent has a resharding assignment it increases by 1.
 		epoch = epoch.Add(epoch, common.Big1)
 	}

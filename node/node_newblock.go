@@ -124,8 +124,7 @@ func (node *Node) proposeBeaconShardState(block *types.Block) error {
 	if err != nil {
 		return err
 	}
-	block.AddShardState(shardState)
-	return nil
+	return block.AddShardState(shardState)
 }
 
 func (node *Node) proposeLocalShardState(block *types.Block) {
@@ -153,5 +152,8 @@ func (node *Node) proposeLocalShardState(block *types.Block) {
 		getLogger().Info("beacon committee disowned us; proposing nothing")
 		// Leave local proposal empty to signal the end of shard (disbanding).
 	}
-	block.AddShardState(localShardState)
+	err := block.AddShardState(localShardState)
+	if err != nil {
+		getLogger().Error("Failed proposin local shard state", "error", err)
+	}
 }

@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/binary"
+	"errors"
 	"math/big"
 	"math/rand"
 	"sort"
@@ -25,9 +26,9 @@ const (
 	// GenesisShardNum is the number of shard at genesis
 	GenesisShardNum = 4
 	// GenesisShardSize is the size of each shard at genesis
-	GenesisShardSize = 100
+	GenesisShardSize = 5
 	// GenesisShardHarmonyNodes is the number of harmony node at each shard
-	GenesisShardHarmonyNodes = 72
+	GenesisShardHarmonyNodes = 5
 	// CuckooRate is the percentage of nodes getting reshuffled in the second step of cuckoo resharding.
 	CuckooRate = 0.1
 )
@@ -159,6 +160,9 @@ func GetEpochFromBlockNumber(blockNumber uint64) uint64 {
 
 // GetShardingStateFromBlockChain will retrieve random seed and shard map from beacon chain for given a epoch
 func GetShardingStateFromBlockChain(bc *BlockChain, epoch *big.Int) (*ShardingState, error) {
+	if bc == nil {
+		return nil, errors.New("no blockchain is supplied to get shard state")
+	}
 	shardState, err := bc.ReadShardState(epoch)
 	if err != nil {
 		return nil, err
@@ -221,6 +225,7 @@ func (ss *ShardingState) UpdateShardingState(stakeInfo *map[common.Address]*stru
 
 // GetInitShardState returns the initial shard state at genesis.
 func GetInitShardState() types.ShardState {
+	utils.GetLogInstance().Info("Generating Genesis Shard State.")
 	shardState := types.ShardState{}
 	for i := 0; i < GenesisShardNum; i++ {
 		com := types.Committee{ShardID: uint32(i)}

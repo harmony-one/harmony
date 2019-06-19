@@ -43,8 +43,8 @@ func TestGetHashFromNodeList(t *testing.T) {
 	h1 := GetHashFromNodeList(l1)
 	h2 := GetHashFromNodeList(l2)
 
-	if bytes.Compare(h1, h2) != 0 {
-		t.Error("node list l1 and l2 should have equal hash")
+	if bytes.Compare(h1, h2) == 0 {
+		t.Error("node list l1 and l2 should be different")
 	}
 }
 
@@ -71,17 +71,17 @@ func TestHash(t *testing.T) {
 	com3 := Committee{
 		ShardID: 2,
 		NodeList: []NodeID{
-			{common.Address{0x66}, blsPubKey6},
-			{common.Address{0x55}, blsPubKey5},
 			{common.Address{0x44}, blsPubKey4},
+			{common.Address{0x55}, blsPubKey5},
+			{common.Address{0x66}, blsPubKey6},
 		},
 	}
 	com4 := Committee{
 		ShardID: 22,
 		NodeList: []NodeID{
-			{common.Address{0x11}, blsPubKey1},
 			{common.Address{0x12}, blsPubKey11},
 			{common.Address{0x23}, blsPubKey22},
+			{common.Address{0x11}, blsPubKey1},
 		},
 	}
 
