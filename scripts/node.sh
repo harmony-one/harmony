@@ -143,7 +143,8 @@ case "${BLSKEYFILE}" in
          BLSKEYFILE="${f}"
          ;;
       *)
-         err 69 "multiple key files found (${f}, ${BLSKEYFILE}); please use -k to specify"
+         [ "${f}" -ef "${BLSKEYFILE}" ] || \
+            err 69 "multiple key files found (${f}, ${BLSKEYFILE}); please use -k to specify"
          ;;
       esac
    done
