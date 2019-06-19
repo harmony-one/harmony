@@ -101,6 +101,10 @@ var (
 
 	formatCommand    = flag.NewFlagSet("format", flag.ExitOnError)
 	formatAddressPtr = formatCommand.String("address", "", "Specify the account address to display different encoding formats")
+
+	blsrecoveryCommand = flag.NewFlagSet("blsRecovery", flag.ExitOnError)
+	blsPass            = blsrecoveryCommand.String("pass", "", "Passphrase to decrypt the bls file.")
+	blsFile            = blsrecoveryCommand.String("file", "", "Non-human readable bls file.")
 )
 
 var (
@@ -157,6 +161,9 @@ func main() {
 		fmt.Println("        --nopass         - The private key has no passphrase (for test only)")
 		fmt.Println("   11. format        - Shows different encoding formats of specific address")
 		fmt.Println("        --address        - The address to display the different encoding formats for")
+		fmt.Println("   10. blsRecovery    - Recover non-human readable file.")
+		fmt.Println("        --pass           - The file containg the passphrase to decrypt the bls key.")
+		fmt.Println("        --file           - Non-human readable bls file.")
 		os.Exit(1)
 	}
 
@@ -219,6 +226,8 @@ ARG:
 		processTransferCommand()
 	case "format":
 		formatAddressCommand()
+	case "blsrecovery":
+		blsRecoveryCommand()
 	default:
 		fmt.Printf("Unknown action: %s\n", os.Args[1])
 		flag.PrintDefaults()
@@ -503,6 +512,28 @@ func formatAddressCommand() {
 
 		fmt.Printf("account address in Bech32: %s\n", common2.MustAddressToBech32(address))
 		fmt.Printf("account address in Base16 (deprecated): %s\n", address.Hex())
+	}
+}
+
+func blsRecoveryCommand() {
+	if err := blsrecoveryCommand.Parse(os.Args[2:]); err != nil {
+		fmt.Println(ctxerror.New("failed to parse flags").WithCause(err))
+		return
+	}
+
+	if *blsPass == "" || *blsFile == "" {
+		fmt.Println("Please specify the --file and --pass for bls passphrase.")
+	} else {
+		priKey, err := blsgen.LoadNonHumanReadableBlsKeyWithPassPhrase(*blsFile, *blsPass)
+		if err != nil {
+			fmt.Printf("Not able to load non-human readable bls key. err:%v", err)
+			os.Exit(100)
+		}
+		fileName, err := blsgen.WritePriKeyWithPassPhrase(priKey, *blsPass)
+		if err != nil {
+			fmt.Println("Error to read non-human readable bls")
+		}
+		fmt.Printf("Generated human readabled bls key and wrote at %s. Please use the same passphrase to decrypt the private key.\n", fileName)
 	}
 }
 
