@@ -13,6 +13,7 @@ import (
 	"time"
 
 	ffi_bls "github.com/harmony-one/bls/ffi/go/bls"
+
 	"github.com/harmony-one/harmony/crypto/bls"
 )
 
@@ -83,8 +84,7 @@ func LoadBlsKeyWithPassPhrase(fileName, passphrase string) (*ffi_bls.SecretKey, 
 	for len(passphrase) > 0 && passphrase[len(passphrase)-1] == '\n' {
 		passphrase = passphrase[:len(passphrase)-1]
 	}
-	encryptedPrivateKeyStr := string(encryptedPrivateKeyBytes)
-	decryptedBytes, err := decrypt(encryptedPrivateKeyStr, passphrase)
+	decryptedBytes, err := decrypt(encryptedPrivateKeyBytes, passphrase)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +114,24 @@ func encrypt(data []byte, passphrase string) (string, error) {
 	return hex.EncodeToString(ciphertext), nil
 }
 
-func decrypt(encryptedStr string, passphrase string) ([]byte, error) {
+func decrypt(encrypted []byte, passphrase string) (decrypted []byte, err error) {
+	unhexed := make([]byte, hex.DecodedLen(len(encrypted)))
+	if _, err = hex.Decode(unhexed, encrypted); err == nil {
+		if decrypted, err = decryptRaw(unhexed, passphrase); err == nil {
+			return decrypted, nil
+		}
+	}
+	// At this point err != nil, either from hex decode or from decryptRaw.
+	decrypted, binErr := decryptRaw(encrypted, passphrase)
+	if binErr != nil {
+		// Disregard binary decryption error and return the original error,
+		// because our canonical form is hex and not binary.
+		return nil, err
+	}
+	return decrypted, nil
+}
+
+func decryptRaw(data []byte, passphrase string) ([]byte, error) {
 	var err error
 	key := []byte(createHash(passphrase))
 	block, err := aes.NewCipher(key)
@@ -125,11 +142,6 @@ func decrypt(encryptedStr string, passphrase string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	data, err := hex.DecodeString(encryptedStr)
-	if err != nil {
-		return nil, err
-	}
-
 	nonceSize := gcm.NonceSize()
 	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
 	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
