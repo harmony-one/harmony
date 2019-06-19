@@ -133,10 +133,6 @@ var (
 )
 
 func initSetup() {
-	if *versionFlag {
-		printVersion(os.Args[0])
-	}
-
 	// Set port and ip to global config.
 	nodeconfig.GetDefaultConfig().Port = *port
 	nodeconfig.GetDefaultConfig().IP = *ip
@@ -379,6 +375,10 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 func main() {
 	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
 	flag.Parse()
+
+	if *versionFlag {
+		printVersion(os.Args[0])
+	}
 
 	// If FN node running, they should either specify blsPrivateKey or the file with passphrase
 	if *blsKeyFile == "" || *blsPass == "" {
