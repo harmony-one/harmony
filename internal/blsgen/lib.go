@@ -35,9 +35,12 @@ func GenBlsKeyWithPassPhrase(passphrase string) (*ffi_bls.SecretKey, string, err
 	fileName := publickKey.SerializeToHexStr() + ".key"
 	privateKeyHex := privateKey.SerializeToHexStr()
 	// Encrypt with passphrase
-	encryptedPrivateKeyStr := encrypt([]byte(privateKeyHex), passphrase)
+	encryptedPrivateKeyStr, err := encrypt([]byte(privateKeyHex), passphrase)
+	if err != nil {
+		return nil, "", err
+	}
 	// Write to file.
-	err := WriteToFile(fileName, encryptedPrivateKeyStr)
+	err = WriteToFile(fileName, encryptedPrivateKeyStr)
 	return privateKey, fileName, err
 }
 
@@ -62,8 +65,14 @@ func LoadBlsKeyWithPassPhrase(fileName, passphrase string) (*ffi_bls.SecretKey, 
 	if err != nil {
 		return nil, err
 	}
+	for len(passphrase) > 0 && passphrase[len(passphrase)-1] == '\n' {
+		passphrase = passphrase[:len(passphrase)-1]
+	}
 	encryptedPrivateKeyStr := string(encryptedPrivateKeyBytes)
-	decryptedBytes := decrypt(encryptedPrivateKeyStr, passphrase)
+	decryptedBytes, err := decrypt(encryptedPrivateKeyStr, passphrase)
+	if err != nil {
+		return nil, err
+	}
 
 	priKey := &ffi_bls.SecretKey{}
 	priKey.DeserializeHexStr(string(decryptedBytes))
@@ -76,41 +85,38 @@ func createHash(key string) string {
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 
-func encrypt(data []byte, passphrase string) string {
+func encrypt(data []byte, passphrase string) (string, error) {
 	block, _ := aes.NewCipher([]byte(createHash(passphrase)))
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		panic(err.Error())
+		return "", err
 	}
 	nonce := make([]byte, gcm.NonceSize())
 	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
-		panic(err.Error())
+		return "", err
 	}
 	ciphertext := gcm.Seal(nonce, nonce, data, nil)
-	return hex.EncodeToString(ciphertext)
+	return hex.EncodeToString(ciphertext), nil
 }
 
-func decrypt(encryptedStr string, passphrase string) []byte {
+func decrypt(encryptedStr string, passphrase string) ([]byte, error) {
 	var err error
 	key := []byte(createHash(passphrase))
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		panic(err.Error())
+		return nil, err
 	}
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		panic(err.Error())
+		return nil, err
 	}
 	data, err := hex.DecodeString(encryptedStr)
 	if err != nil {
-		panic(err.Error())
+		return nil, err
 	}
 
 	nonceSize := gcm.NonceSize()
 	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
 	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
-	if err != nil {
-		panic(err.Error())
-	}
-	return plaintext
+	return plaintext, err
 }
