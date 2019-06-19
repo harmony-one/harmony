@@ -25,6 +25,7 @@ const (
 	lastMileThreshold = 4
 	inSyncThreshold   = 1  // unit in number of block
 	SyncFrequency     = 10 // unit in second
+	MinConnectedPeers = 5  // minimum number of peers connected to in node syncing
 )
 
 // getNeighborPeers is a helper function to return list of peers
@@ -91,21 +92,22 @@ func (node *Node) DoSyncing(bc *core.BlockChain, worker *worker.Worker, getPeers
 
 	logger := utils.GetLogInstance()
 	getLogger := func() log.Logger { return utils.WithCallerSkip(logger, 1) }
+	logger = logger.New("syncID", node.GetSyncID())
 SyncingLoop:
 	for {
 		select {
 		case <-ticker.C:
 			if node.stateSync == nil {
 				node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
-				logger = logger.New("syncID", node.GetSyncID())
 				getLogger().Debug("initialized state sync")
 			}
-			if node.stateSync.GetActivePeerNumber() == 0 {
+			if node.stateSync.GetActivePeerNumber() < MinConnectedPeers {
 				peers := getPeers()
 				if err := node.stateSync.CreateSyncConfig(peers, false); err != nil {
 					ctxerror.Log15(utils.GetLogInstance().Debug, err)
 					continue SyncingLoop
 				}
+				getLogger().Debug("[SYNC] Get Active Peers", "len", node.stateSync.GetActivePeerNumber())
 			}
 			if node.stateSync.IsOutOfSync(bc) {
 				node.stateMutex.Lock()
