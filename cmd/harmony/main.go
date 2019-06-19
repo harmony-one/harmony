@@ -18,7 +18,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/blsgen"
 	"github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/configs/node"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
 	hmykey "github.com/harmony-one/harmony/internal/keystore"
