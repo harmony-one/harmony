@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"strings"
 	"testing"
 )
 
@@ -28,12 +27,19 @@ func fileToLines(filePath string) (lines []string, err error) {
 }
 
 func testGenesisccounts(t *testing.T) {
-	lines, err := fileToLines("/home/ec2-user/tmp/alloneaccounts.txt")
+	ones, err := fileToLines("one-acc.txt")
 	if err != nil {
 		t.Fatal("ReadFile failed", err)
 	}
 
-	for i, line := range lines {
-		fmt.Printf("   {Index: \"%v\", Address: \"%v\", BlsPublicKey: \"%v\"},\n", GenesisAccounts[i].Index, strings.Trim(line, " "), GenesisAccounts[i].BlsPublicKey)
+	bls, err := fileToLines("bls-pub.txt")
+	if err != nil {
+		t.Fatal("ReadFile failed", err)
+	}
+
+	index := 404
+	for i, one := range ones {
+		fmt.Printf("   {Index: \" %v \", Address: \"%v\", BlsPublicKey: \"%v\"},\n", index, one, bls[i])
+		index++
 	}
 }

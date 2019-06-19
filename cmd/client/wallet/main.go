@@ -400,15 +400,23 @@ func processExportPriKeyCommand() {
 func processBlsgenCommand() {
 	newCommand.Parse(os.Args[2:])
 	noPass := *newCommandNoPassPtr
+	pass := *newCommandPassPtr
 	// Default password is an empty string
 	password := ""
 
 	if !noPass {
-		password = utils.AskForPassphrase("Passphrase: ")
-		password2 := utils.AskForPassphrase("Passphrase again: ")
-		if password != password2 {
-			fmt.Printf("Passphrase doesn't match. Please try again!\n")
+		if pass == "" {
+			password = utils.AskForPassphrase("Passphrase: ")
+			password2 := utils.AskForPassphrase("Passphrase again: ")
+			if password != password2 {
+				fmt.Printf("Passphrase doesn't match. Please try again!\n")
+				os.Exit(3)
+			}
+		} else if newPass, err := utils.GetPassphraseFromSource(pass); err != nil {
+			fmt.Printf("Cannot read passphrase: %s\n", err)
 			os.Exit(3)
+		} else {
+			password = newPass
 		}
 	}
 
