@@ -13,13 +13,12 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 
-	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/accounts/keystore"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/blsgen"
 	"github.com/harmony-one/harmony/internal/common"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
 	hmykey "github.com/harmony-one/harmony/internal/keystore"
@@ -117,7 +116,6 @@ var (
 	hmyPass = flag.String("pass", "", "how to get passphrase for the key")
 
 	ks             *keystore.KeyStore
-	myAccount      accounts.Account
 	genesisAccount *genesis.DeployAccount
 	accountIndex   int
 
@@ -168,8 +166,6 @@ func initSetup() {
 
 	genesisAccount.ShardID = uint32(accountIndex % core.GenesisShardNum)
 
-	fmt.Printf("My Account: %s\n", common.MustAddressToBech32(myAccount.Address))
-	fmt.Printf("Key URL: %s\n", myAccount.URL)
 	fmt.Printf("My Genesis Account: %v\n", *genesisAccount)
 
 	// Set up manual call for garbage collection.
@@ -282,7 +278,8 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 	currentNode := node.New(nodeConfig.Host, currentConsensus, chainDBFactory, *isArchival)
 	currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
-	currentNode.StakingAccount = myAccount
+	// TODO: add staking support
+	// currentNode.StakingAccount = myAccount
 	utils.GetLogInstance().Info("node account set",
 		"address", common.MustAddressToBech32(currentNode.StakingAccount.Address))
 
