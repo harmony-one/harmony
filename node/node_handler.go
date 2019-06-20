@@ -132,10 +132,10 @@ func (node *Node) messageHandler(content []byte, sender libp2p_peer.ID) {
 	switch msgCategory {
 	case proto.Consensus:
 		msgPayload, _ := proto.GetConsensusMessagePayload(content)
-		node.ConsensusMessageHandler(msgPayload)
 		if node.NodeConfig.Role() == nodeconfig.ExplorerNode {
-			utils.GetLogInstance().Debug("[Explorer] Got new message")
 			node.ExplorerMessageHandler(msgPayload)
+		} else {
+			node.ConsensusMessageHandler(msgPayload)
 		}
 	case proto.DRand:
 		msgPayload, _ := proto.GetDRandMessagePayload(content)
@@ -883,6 +883,7 @@ func (node *Node) ConsensusMessageHandler(msgPayload []byte) {
 // ExplorerMessageHandler passes received message in node_handler to explorer service
 func (node *Node) ExplorerMessageHandler(payload []byte) {
 	if len(payload) == 0 {
+		utils.GetLogger().Debug("Payload is empty")
 		return
 	}
 	msg := &msg_pb.Message{}
@@ -926,14 +927,14 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 		explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, true).Dump(block, block.NumberU64())
 
 		node.Consensus.PbftLog.DeleteBlockByNumber(block.NumberU64())
-	} else if msg.Type == msg_pb.MessageType_ANNOUNCE {
+	} else if msg.Type == msg_pb.MessageType_PREPARED {
 
 		recvMsg, err := consensus.ParsePbftMessage(msg)
 		if err != nil {
 			utils.GetLogInstance().Debug("[Explorer] onAnnounce unable to parse msg", "error", err)
 			return
 		}
-		block := recvMsg.Payload
+		block := recvMsg.Block
 
 		var blockObj types.Block
 		err = rlp.DecodeBytes(block, &blockObj)

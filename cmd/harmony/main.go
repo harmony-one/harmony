@@ -217,7 +217,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 
 	nodeConfig := nodeconfig.GetDefaultConfig()
 
-	if !*isExplorer { // Explorer node doesn't need the following setup
+	if !*isExplorer {
 		// Specified Shard ID override calculated Shard ID
 		if *shardID >= 0 {
 			utils.GetLogInstance().Info("ShardID Override", "original", genesisAccount.ShardID, "override", *shardID)
@@ -243,6 +243,8 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 		if err != nil {
 			panic(err)
 		}
+	} else {
+		nodeConfig = nodeconfig.GetShardConfig(uint32(*shardID))
 	}
 
 	nodeConfig.SelfPeer = p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nodeConfig.ConsensusPubKey}
@@ -439,7 +441,11 @@ func main() {
 	//	go currentNode.SupportBeaconSyncing()
 	//}
 
-	utils.GetLogInstance().Info("==== New Harmony Node ====",
+	startMsg := "==== New Harmony Node ===="
+	if *isExplorer {
+		startMsg = "==== New Explorer Node ===="
+	}
+	utils.GetLogInstance().Info(startMsg,
 		"BlsPubKey", hex.EncodeToString(nodeConfig.ConsensusPubKey.Serialize()),
 		"ShardID", nodeConfig.ShardID,
 		"ShardGroupID", nodeConfig.GetShardGroupID(),

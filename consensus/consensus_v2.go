@@ -830,11 +830,12 @@ func (consensus *Consensus) tryCatchup() {
 
 // Start waits for the next new block and run consensus
 func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan struct{}, stoppedChan chan struct{}, startChannel chan struct{}) {
-	if nodeconfig.GetDefaultConfig().IsLeader() {
-		<-startChannel
-	}
 	go func() {
-		consensus.getLogger().Info("[ConsensusMainLoop] Start consensus", "time", time.Now())
+		if nodeconfig.GetDefaultConfig().IsLeader() {
+			consensus.getLogger().Info("[ConsensusMainLoop] Waiting for consensus start", "time", time.Now())
+			<-startChannel
+		}
+		consensus.getLogger().Info("[ConsensusMainLoop] Consensus started", "time", time.Now())
 		defer close(stoppedChan)
 		ticker := time.NewTicker(3 * time.Second)
 		consensus.consensusTimeout[timeoutBootstrap].Start()
