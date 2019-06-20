@@ -14,6 +14,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
+	ffi_bls "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/accounts/keystore"
 	"github.com/harmony-one/harmony/api/client"
@@ -101,6 +102,13 @@ var (
 
 	formatCommand    = flag.NewFlagSet("format", flag.ExitOnError)
 	formatAddressPtr = formatCommand.String("address", "", "Specify the account address to display different encoding formats")
+
+	blsrecoveryCommand = flag.NewFlagSet("blsRecovery", flag.ExitOnError)
+	blsPass            = blsrecoveryCommand.String("pass", "", "Passphrase to decrypt the bls file.")
+	blsFile            = blsrecoveryCommand.String("file", "", "Non-human readable bls file.")
+
+	blsImportCommand = flag.NewFlagSet("importBls", flag.ExitOnError)
+	blsKey           = blsImportCommand.String("key", "", "The raw private key.")
 )
 
 var (
@@ -157,6 +165,11 @@ func main() {
 		fmt.Println("        --nopass         - The private key has no passphrase (for test only)")
 		fmt.Println("   11. format        - Shows different encoding formats of specific address")
 		fmt.Println("        --address        - The address to display the different encoding formats for")
+		fmt.Println("   12. blsRecovery    - Recover non-human readable file.")
+		fmt.Println("        --pass           - The file containg the passphrase to decrypt the bls key.")
+		fmt.Println("        --file           - Non-human readable bls file.")
+		fmt.Println("   13. importBls      - Convert raw private key into encrypted bls key.")
+		fmt.Println("        --key            - Raw private key.")
 		os.Exit(1)
 	}
 
@@ -219,6 +232,10 @@ ARG:
 		processTransferCommand()
 	case "format":
 		formatAddressCommand()
+	case "blsRecovery":
+		blsRecoveryCommand()
+	case "importBls":
+		importBls()
 	default:
 		fmt.Printf("Unknown action: %s\n", os.Args[1])
 		flag.PrintDefaults()
@@ -503,6 +520,70 @@ func formatAddressCommand() {
 
 		fmt.Printf("account address in Bech32: %s\n", common2.MustAddressToBech32(address))
 		fmt.Printf("account address in Base16 (deprecated): %s\n", address.Hex())
+	}
+}
+
+func blsRecoveryCommand() {
+	if err := blsrecoveryCommand.Parse(os.Args[2:]); err != nil {
+		fmt.Println(ctxerror.New("failed to parse flags").WithCause(err))
+		return
+	}
+
+	if *blsPass == "" || *blsFile == "" {
+		fmt.Println("Please specify the --file and --pass for bls passphrase.")
+	} else {
+		priKey, err := blsgen.LoadNonHumanReadableBlsKeyWithPassPhrase(*blsFile, *blsPass)
+		if err != nil {
+			fmt.Printf("Not able to load non-human readable bls key. err:%v", err)
+			os.Exit(100)
+		}
+		fileName, err := blsgen.WritePriKeyWithPassPhrase(priKey, *blsPass)
+		if err != nil {
+			fmt.Println("Error to read non-human readable bls")
+		}
+		fmt.Printf("Generated human readabled bls key and wrote at %s. Please use the same passphrase to decrypt the private key.\n", fileName)
+	}
+}
+
+func importBls() {
+	if err := blsImportCommand.Parse(os.Args[2:]); err != nil {
+		fmt.Println(ctxerror.New("failed to parse flags").WithCause(err))
+		return
+	}
+
+	if *blsKey != "" {
+		privateKey := &ffi_bls.SecretKey{}
+		err := privateKey.DeserializeHexStr(*blsKey)
+		if err != nil {
+			fmt.Printf("Your raw private key is not valid.\n Err: %v\n", err)
+			os.Exit(101)
+		}
+		passphrase := utils.AskForPassphrase("Passphrase: ")
+		passphrase2 := utils.AskForPassphrase("Passphrase again: ")
+		if passphrase != passphrase2 {
+			fmt.Printf("Passphrase doesn't match. Please try again!\n")
+			os.Exit(3)
+		}
+
+		fileName, err := blsgen.WritePriKeyWithPassPhrase(privateKey, passphrase)
+		if err != nil {
+			fmt.Printf("Can not generate encrypted bls file.\n Err: %v\n", err)
+			os.Exit(101)
+		} else {
+			fmt.Printf("Your encrypted bls file with the passphrased is written at %s.\n", fileName)
+		}
+		privateKey2, err := blsgen.LoadBlsKeyWithPassPhrase(fileName, passphrase)
+		if err != nil {
+			fmt.Printf("Error when loading the private key with the passphrase. Err: %v", err)
+			os.Exit(101)
+		}
+		if !privateKey.IsEqual(privateKey2) {
+			fmt.Println("The loaded private key does not match your private key.")
+			os.Exit(101)
+		}
+		fmt.Println("We loaded the file and the loaded private key DOES match your private key!")
+	} else {
+		fmt.Println("Please specify the hexadecimal private key string using --key")
 	}
 }
 
