@@ -36,7 +36,7 @@ valid_ip () {
 health_report () {
     # Block heights
     lastSynchBlock=$(tac latest/validator*.log | grep -Eoim1 '"OtherHeight":[0-9]+' | cut -d: -f2)
-    [ -z $lastSynchBlock ] && lastSynchBlock=Unknown
+    [ -z "$lastSynchBlock" ] && lastSynchBlock=Unknown
 
     chainLength=$(jq -r 'select(.msg == "[TryCatchup] Adding block to chain") | .myBlock' ./latest/v*.log | tail -1 | cut -d: -f2)
     [ -z "$chainLength" ] && chainLength=Unknown
@@ -45,11 +45,11 @@ health_report () {
     [ -z "$synchStatus" ] && synchStatus=Unknown
 
     lengthOfChain=$(tac latest/validator*.log | grep -Eoim1 '"OtherHeight":[0-9]+' | cut -d: -f2)
-    [ -z $lengthOfChain ] && lengthOfChain=Unknown
+    [ -z "$lengthOfChain" ] && lengthOfChain=Unknown
 
     # Shard number
     my_shard=$(grep -Eom1 "shardID\"\:[0-9]+" latest/validator*.log | cut -d: -f2)
-    [ -z $my_shard ] && lengthOfChain=Unknown
+    [ -z "$my_shard" ] && lengthOfChain=Unknown
 
     # Public IP
     ip=$(dig -4 @resolver1.opendns.com ANY myip.opendns.com +short)
