@@ -193,7 +193,9 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	}
 
 	if consensus.checkViewID(recvMsg) != nil {
-		consensus.getLogger().Debug("[OnAnnounce] ViewID check failed", "MsgViewID", recvMsg.ViewID, "msgBlockNum", recvMsg.BlockNum)
+		if consensus.mode.Mode() == Normal {
+			consensus.getLogger().Debug("[OnAnnounce] ViewID check failed", "MsgViewID", recvMsg.ViewID, "msgBlockNum", recvMsg.BlockNum)
+		}
 		return
 	}
 	consensus.prepare()
@@ -421,7 +423,9 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	}
 
 	if consensus.checkViewID(recvMsg) != nil {
-		consensus.getLogger().Debug("[OnPrepared] ViewID check failed", "MsgViewID", recvMsg.ViewID, "MsgBlockNum", recvMsg.BlockNum)
+		if consensus.mode.Mode() == Normal {
+			consensus.getLogger().Debug("[OnPrepared] ViewID check failed", "MsgViewID", recvMsg.ViewID, "MsgBlockNum", recvMsg.BlockNum)
+		}
 		return
 	}
 	if recvMsg.BlockNum > consensus.blockNum {
