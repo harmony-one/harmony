@@ -49,6 +49,15 @@ function myip() {
    fi
 }
 
+function check_root
+{
+   if [[ $EUID -ne 0 ]]; then
+      msg "this script must be run as root to setup environment"
+      msg please use \"sudo ${progname}\"
+      exit 1
+   fi
+}
+
 function add_env
 {
    filename=$1
@@ -58,6 +67,8 @@ function add_env
 
 function setup_env
 {
+   check_root
+
 # setup environment variables, may not be nessary
    sysctl -w net.core.somaxconn=1024
    sysctl -w net.core.netdev_max_backlog=65536
@@ -78,21 +89,19 @@ function setup_env
 }
 
 ######## main #########
-if [[ $EUID -ne 0 ]]; then
-   msg "this script must be run as root"
-   msg please use \"sudo $0\"
-   exit 1
-fi
-
 print_usage() {
    cat <<- ENDEND
-	usage: ${progname} [-1ch] [-k KEYFILE]
-	-c              back up database/logs and start clean
-	 		(use only when directed by Harmony)
-	-1		do not loop; run once and exit
-	-h		print this help and exit
-	-k KEYFILE	use the given BLS key file (default: autodetect)
-	ENDEND
+
+usage: ${progname} [-1ch] [-k KEYFILE]
+   -c             back up database/logs and start clean
+                  (use only when directed by Harmony)
+   -1             do not loop; run once and exit
+   -h             print this help and exit
+   -k KEYFILE     use the given BLS key file (default: autodetect)
+   -s             run setup env only (must run as root)
+   -S             run the ${progname} as non-root user (default: run as root)
+
+ENDEND
 }
 
 usage() {
@@ -101,14 +110,15 @@ usage() {
    exit 64  # EX_USAGE
 }
 
-unset start_clean loop
+unset start_clean loop run_as_root
 start_clean=false
 loop=true
+run_as_root=true
 ${BLSKEYFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk: opt
+while getopts :1chk:sS opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
@@ -117,6 +127,8 @@ do
    1) loop=false;;
    h) print_usage; exit 0;;
    k) BLSKEYFILE="${OPTARG}";;
+   s) setup_env; exit 0;;
+   S) run_as_root=false ;;
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
@@ -127,6 +139,10 @@ case $# in
    usage "extra arguments at the end ($*)"
    ;;
 esac
+
+if ${run_as_root}; then
+   check_root
+fi
 
 case "${BLSKEYFILE}" in
 "")
@@ -193,7 +209,9 @@ NODE_PORT=9000
 PUB_IP=
 
 if [ "$OS" == "Linux" ]; then
-   setup_env
+   if ${run_as_root}; then
+      setup_env
+   fi
 # Kill existing soldier/node
    fuser -k -n tcp $NODE_PORT
 fi
