@@ -15,6 +15,7 @@ import (
 	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	netconfig "github.com/harmony-one/harmony/internal/configs/net"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
@@ -27,11 +28,6 @@ const (
 	inSyncThreshold   = 1  // unit in number of block
 	SyncFrequency     = 10 // unit in second
 	MinConnectedPeers = 5  // minimum number of peers connected to in node syncing
-)
-
-var (
-	// DNS harmony dns server for harmony nodes IP
-	DNS = [4]string{"s0.t.hmny.io", "s1.t.hmny.io", "s2.t.hmny.io", "s3.t.hmny.io"}
 )
 
 // getNeighborPeers is a helper function to return list of peers
@@ -75,7 +71,7 @@ func (node *Node) GetSyncingPeers() []p2p.Peer {
 // the GetSyncingPeers return a bunch of "new" peers, all of them are out of sync
 func (node *Node) GetPeersFromDNS() []p2p.Peer {
 	shardID := node.Consensus.ShardID
-	dns := DNS[shardID]
+	dns := netconfig.DNS[shardID]
 	addrs, err := net.LookupHost(dns)
 	if err != nil {
 		utils.GetLogInstance().Debug("GetPeersFromDNS cannot find peers", "error", err)
@@ -86,7 +82,6 @@ func (node *Node) GetPeersFromDNS() []p2p.Peer {
 	for _, addr := range addrs {
 		peers = append(peers, p2p.Peer{IP: addr, Port: port})
 	}
-	//utils.GetLogInstance().Debug("dns server returns:", "addrs", addrs)
 	return peers
 }
 
