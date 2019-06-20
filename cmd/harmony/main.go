@@ -85,7 +85,7 @@ var (
 	versionFlag      = flag.Bool("version", false, "Output version info")
 	onlyLogTps       = flag.Bool("only_log_tps", false, "Only log TPS if true")
 
-	dnsFlag = flag.Bool("dns", false, "use harmony dns nodes if true; use libp2p peer discovery if false")
+	dnsFlag = flag.Bool("dns", true, "use harmony dns nodes if true; use libp2p peer discovery if false")
 	//Leader needs to have a minimal number of peers to start consensus
 	minPeers = flag.Int("min_peers", 100, "Minimal number of Peers in shard")
 	// Key file to store the private key
