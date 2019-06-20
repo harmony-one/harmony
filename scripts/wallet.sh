@@ -6,11 +6,11 @@ REL=drum
 
 case "$OS" in
     Darwin)
-        FOLDER=release/${REL}/darwin-x86_64/
+        FOLDER=release/darwin-x86_64/${REL}/
         BIN=( wallet libbls384_256.dylib libcrypto.1.0.0.dylib libgmp.10.dylib libgmpxx.4.dylib libmcl.dylib )
         ;;
     Linux)
-        FOLDER=release/${REL}/linux-x86_64/
+        FOLDER=release/linux-x86_64/${REL}/
         BIN=( wallet libbls384_256.so libcrypto.so.10 libgmp.so.10 libgmpxx.so.4 libmcl.so )
         ;;
     *)
@@ -43,7 +43,19 @@ Commands:
         --amount         - The amount of token to transfer
         --shardID        - The shard Id for the transfer
         --inputData      - Base64-encoded input data to embed in the transaction
-    8. blsgen        - Generates bls keys with passphrase and store the private key locally
+    8. export        - Export account key to a new file
+        --account        - Specify the account to export. Empty will export every key.
+    9. exportPriKey  - Export account private key
+        --account        - Specify the account to export private key.
+    10. blsgen        - Generate a bls key and store private key locally.
+        --nopass         - The private key has no passphrase (for test only)
+    11. format        - Shows different encoding formats of specific address
+        --address        - The address to display the different encoding formats for
+    12. blsRecovery    - Recover non-human readable file.
+        --pass           - The file containg the passphrase to decrypt the bls key.
+        --file           - Non-human readable bls file.
+    13. importBls      - Convert raw private key into encrypted bls key.
+        --key            - Raw private key.
 EOT
 }
 
