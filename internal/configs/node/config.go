@@ -28,6 +28,7 @@ const (
 	NewNode
 	ClientNode
 	WalletNode
+	ExplorerNode
 )
 
 func (role Role) String() string {
@@ -48,6 +49,8 @@ func (role Role) String() string {
 		return "ClientNode"
 	case WalletNode:
 		return "WalletNode"
+	case ExplorerNode:
+		return "ExplorerNode"
 	}
 	return "Unknown"
 }

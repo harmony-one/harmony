@@ -162,11 +162,18 @@ sleep 2
 i=0
 while IFS='' read -r line || [[ -n "$line" ]]; do
   IFS=' ' read ip port mode account blspub <<< $line
-  if [ -f "${blspub}.key" ]
+  if [ "${mode}" == "explorer" ]
     then
-      echo ""${blspub}.key" already in local."
-   else
-      aws s3 cp "s3://harmony-secret-keys/bls-test/${blspub}.key" .
+      args=("${base_args[@]}" -ip "${ip}" -port "${port}" -key "/tmp/${ip}-${port}.key" -db_dir "db-${ip}-${port}")
+    else
+      if [ -f "${blspub}.key" ]
+        then
+          echo ""${blspub}.key" already in local."
+       else
+          aws s3 cp "s3://harmony-secret-keys/bls-test/${blspub}.key" .
+      fi
+
+      args=("${base_args[@]}" -ip "${ip}" -port "${port}" -key "/tmp/${ip}-${port}.key" -db_dir "db-${ip}-${port}" -accounts "${account}" -blspass file:blspass.txt -blskey_file "${blspub}.key")
   fi
 
   args=("${base_args[@]}" -ip "${ip}" -port "${port}" -key "/tmp/${ip}-${port}.key" -db_dir "db-${ip}-${port}" -blspass file:blspass.txt -blskey_file "${blspub}.key")
@@ -175,6 +182,7 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
   esac
   case "${mode}" in leader*) args=("${args[@]}" -is_leader);; esac
   case "${mode}" in *archival|archival) args=("${args[@]}" -is_archival);; esac
+  case "${mode}" in explorer*) args=("${args[@]}" -is_genesis=false -is_explorer=true -shard_id=0);; esac
   case "${mode}" in
   newnode)
     "${SYNC}" || continue

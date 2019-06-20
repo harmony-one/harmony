@@ -84,7 +84,7 @@ func (storage *Storage) GetDB() *ethdb.LDBDatabase {
 }
 
 // Dump extracts information from block and index them into lvdb for explorer.
-func (storage *Storage) Dump(block *types.Block, height uint32) {
+func (storage *Storage) Dump(block *types.Block, height uint64) {
 	utils.GetLogInstance().Info("Dumping block ", "block height", height)
 	if block == nil {
 		return

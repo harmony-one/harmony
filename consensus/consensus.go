@@ -34,8 +34,8 @@ var (
 
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
-	// pbftLog stores the pbft messages and blocks during PBFT process
-	pbftLog *PbftLog
+	// PbftLog stores the pbft messages and blocks during PBFT process
+	PbftLog *PbftLog
 	// phase: different phase of PBFT protocol: pre-prepare, prepare, commit, finish etc
 	phase PbftPhase
 	// mode: indicate a node is in normal or viewchanging mode
@@ -231,7 +231,7 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 	consensus.blockNumLowChan = make(chan struct{})
 
 	// pbft related
-	consensus.pbftLog = NewPbftLog()
+	consensus.PbftLog = NewPbftLog()
 	consensus.phase = Announce
 	consensus.mode = PbftMode{mode: Normal}
 	// pbft timeout
@@ -283,7 +283,7 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 
 	consensus.uniqueIDInstance = utils.GetUniqueValidatorIDInstance()
 
-	memprofiling.GetMemProfiling().Add("consensus.pbftLog", consensus.pbftLog)
+	memprofiling.GetMemProfiling().Add("consensus.pbftLog", consensus.PbftLog)
 	return &consensus, nil
 }
 

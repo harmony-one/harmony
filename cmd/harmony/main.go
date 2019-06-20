@@ -96,7 +96,9 @@ var (
 	isArchival = flag.Bool("is_archival", true, "false makes node faster by turning caching off")
 	// delayCommit is the commit-delay timer, used by Harmony nodes
 	delayCommit = flag.String("delay_commit", "0ms", "how long to delay sending commit messages in consensus, ex: 500ms, 1s")
-	//isNewNode indicates this node is a new node
+	// isExplorer indicates this node is a node to serve explorer
+	isExplorer = flag.Bool("is_explorer", false, "true means this node is a node to serve explorer")
+	// isNewNode indicates this node is a new node
 	isNewNode          = flag.Bool("is_newnode", false, "true means this node is a new node")
 	shardID            = flag.Int("shard_id", -1, "the shard ID of this node")
 	enableMemProfiling = flag.Bool("enableMemProfiling", false, "Enable memsize logging.")
@@ -161,6 +163,20 @@ func initSetup() {
 		utils.BootNodes = bootNodeAddrs
 	}
 
+	if !*isExplorer { // Explorer node doesn't need the following setup
+		setupECDSAKeys()
+	} else {
+		genesisAccount = &genesis.DeployAccount{}
+		genesisAccount.ShardID = uint32(*shardID)
+	}
+
+	// Set up manual call for garbage collection.
+	if *enableGC {
+		memprofiling.MaybeCallGCPeriodically()
+	}
+}
+
+func setupECDSAKeys() {
 	ks = hmykey.GetHmyKeyStore()
 
 	// TODO: lc try to enable multiple staking accounts per node
@@ -203,42 +219,49 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 
 	nodeConfig := nodeconfig.GetDefaultConfig()
 
-	// Specified Shard ID override calculated Shard ID
-	if *shardID >= 0 {
-		utils.GetLogInstance().Info("ShardID Override", "original", genesisAccount.ShardID, "override", *shardID)
-		genesisAccount.ShardID = uint32(*shardID)
-	}
-
-	if !*isNewNode {
-		nodeConfig = nodeconfig.GetShardConfig(uint32(genesisAccount.ShardID))
-	} else {
-		myShardID = 0 // This should be default value as new node doesn't belong to any shard.
+	if !*isExplorer {
+		// Specified Shard ID override calculated Shard ID
 		if *shardID >= 0 {
-			utils.GetLogInstance().Info("ShardID Override", "original", myShardID, "override", *shardID)
-			myShardID = uint32(*shardID)
-			nodeConfig = nodeconfig.GetShardConfig(myShardID)
+			utils.GetLogInstance().Info("ShardID Override", "original", genesisAccount.ShardID, "override", *shardID)
+			genesisAccount.ShardID = uint32(*shardID)
 		}
+
+		if !*isNewNode {
+			nodeConfig = nodeconfig.GetShardConfig(uint32(genesisAccount.ShardID))
+		} else {
+			myShardID = 0 // This should be default value as new node doesn't belong to any shard.
+			if *shardID >= 0 {
+				utils.GetLogInstance().Info("ShardID Override", "original", myShardID, "override", *shardID)
+				myShardID = uint32(*shardID)
+				nodeConfig = nodeconfig.GetShardConfig(myShardID)
+			}
+		}
+
+		// Set up consensus keys.
+		setUpConsensusKeyAndReturnIndex(nodeConfig)
+
+		// P2p private key is used for secure message transfer between p2p nodes.
+		nodeConfig.P2pPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		nodeConfig = nodeconfig.GetShardConfig(uint32(*shardID))
 	}
 
-	// The initial genesis nodes are sequentially put into genesis shards based on their accountIndex
-	nodeConfig.ShardID = uint32(genesisAccount.ShardID)
+	nodeConfig.SelfPeer = p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nodeConfig.ConsensusPubKey}
 
-	// Set up consensus keys.
-	setUpConsensusKeyAndReturnIndex(nodeConfig)
+	if accountIndex < core.GenesisShardNum && !*isExplorer { // The first node in a shard is the leader at genesis
+		nodeConfig.Leader = nodeConfig.SelfPeer
+		nodeConfig.StringRole = "leader"
+	} else {
+		nodeConfig.StringRole = "validator"
+	}
 
 	// P2p private key is used for secure message transfer between p2p nodes.
 	nodeConfig.P2pPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
 		panic(err)
-	}
-
-	nodeConfig.SelfPeer = p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nodeConfig.ConsensusPubKey}
-
-	if accountIndex < core.GenesisShardNum { // The first node in a shard is the leader at genesis
-		nodeConfig.Leader = nodeConfig.SelfPeer
-		nodeConfig.StringRole = "leader"
-	} else {
-		nodeConfig.StringRole = "validator"
 	}
 
 	nodeConfig.Host, err = p2pimpl.NewHost(&nodeConfig.SelfPeer, nodeConfig.P2pPriKey)
@@ -329,6 +352,11 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 				currentNode.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
 				currentNode.NodeConfig.SetClientGroupID(p2p.NewClientGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
 			}
+		} else if *isExplorer {
+			currentNode.NodeConfig.SetRole(nodeconfig.ExplorerNode)
+			currentNode.NodeConfig.SetIsLeader(false)
+			currentNode.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(*shardID)))
+			currentNode.NodeConfig.SetClientGroupID(p2p.NewClientGroupIDByShardID(p2p.ShardID(*shardID)))
 		} else if nodeConfig.StringRole == "leader" {
 			currentNode.NodeConfig.SetRole(nodeconfig.ShardLeader)
 			currentNode.NodeConfig.SetIsLeader(true)
@@ -416,7 +444,11 @@ func main() {
 	//	go currentNode.SupportBeaconSyncing()
 	//}
 
-	utils.GetLogInstance().Info("==== New Harmony Node ====",
+	startMsg := "==== New Harmony Node ===="
+	if *isExplorer {
+		startMsg = "==== New Explorer Node ===="
+	}
+	utils.GetLogInstance().Info(startMsg,
 		"BlsPubKey", hex.EncodeToString(nodeConfig.ConsensusPubKey.Serialize()),
 		"ShardID", nodeConfig.ShardID,
 		"ShardGroupID", nodeConfig.GetShardGroupID(),

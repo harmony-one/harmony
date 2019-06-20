@@ -100,6 +100,18 @@ func (log *PbftLog) DeleteBlocksLessThan(number uint64) {
 	log.blocks = log.blocks.Difference(found)
 }
 
+// DeleteBlockByNumber deletes block of specific number
+func (log *PbftLog) DeleteBlockByNumber(number uint64) {
+	found := mapset.NewSet()
+	it := log.Blocks().Iterator()
+	for block := range it.C {
+		if block.(*types.Block).NumberU64() == number {
+			found.Add(block)
+		}
+	}
+	log.blocks = log.blocks.Difference(found)
+}
+
 // DeleteMessagesLessThan deletes messages less than given block number
 func (log *PbftLog) DeleteMessagesLessThan(number uint64) {
 	found := mapset.NewSet()
