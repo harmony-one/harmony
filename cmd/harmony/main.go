@@ -84,6 +84,8 @@ var (
 	metricsReportURL = flag.String("metrics_report_url", "", "If set, reports metrics to this URL.")
 	versionFlag      = flag.Bool("version", false, "Output version info")
 	onlyLogTps       = flag.Bool("only_log_tps", false, "Only log TPS if true")
+
+	dnsFlag = flag.Bool("dns", false, "use harmony dns nodes if true; use libp2p peer discovery if false")
 	//Leader needs to have a minimal number of peers to start consensus
 	minPeers = flag.Int("min_peers", 100, "Minimal number of Peers in shard")
 	// Key file to store the private key
@@ -280,6 +282,7 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// Current node.
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 	currentNode := node.New(nodeConfig.Host, currentConsensus, chainDBFactory, *isArchival)
+	currentNode.SetDNSFlag(*dnsFlag)
 	currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
 	// TODO: add staking support
 	// currentNode.StakingAccount = myAccount
