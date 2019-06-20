@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 
-	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/accounts/keystore"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
@@ -87,14 +86,12 @@ var (
 	onlyLogTps       = flag.Bool("only_log_tps", false, "Only log TPS if true")
 	//Leader needs to have a minimal number of peers to start consensus
 	minPeers = flag.Int("min_peers", 100, "Minimal number of Peers in shard")
-	// Key file to store the private key of staking account.
-	stakingKeyFile = flag.String("staking_key", "./.stakingkey", "the private key file of the harmony node")
 	// Key file to store the private key
 	keyFile = flag.String("key", "./.hmykey", "the p2p key file of the harmony node")
 	// isGenesis indicates this node is a genesis node
 	isGenesis = flag.Bool("is_genesis", true, "true means this node is a genesis node")
 	// isArchival indicates this node is an archival node that will save and archive current blockchain
-	isArchival = flag.Bool("is_archival", false, "true means this node is a archival node")
+	isArchival = flag.Bool("is_archival", true, "false makes node faster by turning caching off")
 	// delayCommit is the commit-delay timer, used by Harmony nodes
 	delayCommit = flag.String("delay_commit", "0ms", "how long to delay sending commit messages in consensus, ex: 500ms, 1s")
 	// isExplorer indicates this node is a node to serve explorer
@@ -106,6 +103,7 @@ var (
 	enableGC           = flag.Bool("enableGC", true, "Enable calling garbage collector manually .")
 	blsKeyFile         = flag.String("blskey_file", "", "The encrypted file of bls serialized private key by passphrase.")
 	blsPass            = flag.String("blspass", "", "The file containing passphrase to decrypt the encrypted bls file.")
+	blsPassphrase      string
 
 	// logConn logs incoming/outgoing connections
 	logConn = flag.Bool("log_conn", false, "log incoming/outgoing connections")
@@ -119,10 +117,7 @@ var (
 	// See “PASS PHRASE ARGUMENTS” section of openssl(1) for details.
 	hmyPass = flag.String("pass", "", "how to get passphrase for the key")
 
-	stakingAccounts = flag.String("accounts", "", "account addresses of the node")
-
 	ks             *keystore.KeyStore
-	myAccount      accounts.Account
 	genesisAccount *genesis.DeployAccount
 	accountIndex   int
 
@@ -138,10 +133,6 @@ var (
 )
 
 func initSetup() {
-	if *versionFlag {
-		printVersion(os.Args[0])
-	}
-
 	// Set port and ip to global config.
 	nodeconfig.GetDefaultConfig().Port = *port
 	nodeconfig.GetDefaultConfig().IP = *ip
@@ -186,83 +177,38 @@ func initSetup() {
 func setupECDSAKeys() {
 	ks = hmykey.GetHmyKeyStore()
 
-	allAccounts := ks.Accounts()
-
 	// TODO: lc try to enable multiple staking accounts per node
-	accountIndex, genesisAccount = genesis.FindAccount(*stakingAccounts)
-
-	if genesisAccount == nil {
-		fmt.Printf("Can't find the account address: %v\n", *stakingAccounts)
-		os.Exit(100)
-	}
-
-	foundAccount := false
-	for _, account := range allAccounts {
-		if common.ParseAddr(genesisAccount.Address) == account.Address {
-			myAccount = account
-			foundAccount = true
-			break
-		}
-	}
-
-	if !foundAccount {
-		fmt.Printf("Can't find the matching account key: %v\n", genesisAccount.Address)
-		os.Exit(101)
-	}
+	accountIndex, genesisAccount = setUpConsensusKeyAndReturnIndex(nodeconfig.GetDefaultConfig())
 
 	genesisAccount.ShardID = uint32(accountIndex % core.GenesisShardNum)
 
-	fmt.Printf("My Account: %s\n", common.MustAddressToBech32(myAccount.Address))
-	fmt.Printf("Key URL: %s\n", myAccount.URL)
 	fmt.Printf("My Genesis Account: %v\n", *genesisAccount)
 
-	var myPass string
-	if !*hmyNoPass {
-		if *hmyPass == "" {
-			myPass = utils.AskForPassphrase("Passphrase: ")
-		} else if pass, err := utils.GetPassphraseFromSource(*hmyPass); err != nil {
-			fmt.Printf("Cannot read passphrase: %s\n", err)
-			os.Exit(3)
-		} else {
-			myPass = pass
-		}
-		err := ks.Unlock(myAccount, myPass)
-		if err != nil {
-			fmt.Printf("Wrong Passphrase! Unable to unlock account key!\n")
-			os.Exit(3)
-		}
+	// Set up manual call for garbage collection.
+	if *enableGC {
+		memprofiling.MaybeCallGCPeriodically()
 	}
-	hmykey.SetHmyPass(myPass)
 }
 
-func setUpBLSKey(nodeConfig *nodeconfig.ConfigType) {
-	// If FN node running, they should either specify blsPrivateKey or the file with passphrase
-	if *blsKeyFile != "" && *blsPass != "" {
-		passPhrase, err := utils.GetPassphraseFromSource(*blsPass)
-		if err != nil {
-			fmt.Printf("error when reading passphrase file: %v\n", err)
-			os.Exit(100)
-		}
-		consensusPriKey, err := blsgen.LoadBlsKeyWithPassPhrase(*blsKeyFile, passPhrase)
-		if err != nil {
-			fmt.Printf("error when loading bls key, err :%v\n", err)
-			os.Exit(100)
-		}
-		if !genesis.IsBlsPublicKeyWhiteListed(consensusPriKey.GetPublicKey().SerializeToHexStr()) {
-			fmt.Println("Your bls key is not whitelisted")
-			os.Exit(100)
-		}
-
-		// Consensus keys are the BLS12-381 keys used to sign consensus messages
-		nodeConfig.ConsensusPriKey, nodeConfig.ConsensusPubKey = consensusPriKey, consensusPriKey.GetPublicKey()
-		if nodeConfig.ConsensusPriKey == nil || nodeConfig.ConsensusPubKey == nil {
-			fmt.Println("error to get consensus keys.")
-			os.Exit(100)
-		}
-	} else {
-		fmt.Println("Internal nodes need to have pass to decrypt blskey")
-		os.Exit(101)
+func setUpConsensusKeyAndReturnIndex(nodeConfig *nodeconfig.ConfigType) (int, *genesis.DeployAccount) {
+	consensusPriKey, err := blsgen.LoadBlsKeyWithPassPhrase(*blsKeyFile, blsPassphrase)
+	if err != nil {
+		fmt.Printf("error when loading bls key, err :%v\n", err)
+		os.Exit(100)
 	}
+	index, acc := genesis.IsBlsPublicKeyIndex(consensusPriKey.GetPublicKey().SerializeToHexStr())
+	if index < 0 {
+		fmt.Println("Can not found your bls key.")
+		os.Exit(100)
+	}
+
+	// Consensus keys are the BLS12-381 keys used to sign consensus messages
+	nodeConfig.ConsensusPriKey, nodeConfig.ConsensusPubKey = consensusPriKey, consensusPriKey.GetPublicKey()
+	if nodeConfig.ConsensusPriKey == nil || nodeConfig.ConsensusPubKey == nil {
+		fmt.Println("error to get consensus keys.")
+		os.Exit(100)
+	}
+	return index, acc
 }
 
 func createGlobalConfig() *nodeconfig.ConfigType {
@@ -289,18 +235,14 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 			}
 		}
 
-		// The initial genesis nodes are sequentially put into genesis shards based on their accountIndex
-		nodeConfig.ShardID = uint32(genesisAccount.ShardID)
-
-		// Key Setup ================= [Start]
 		// Set up consensus keys.
-		setUpBLSKey(nodeConfig)
+		setUpConsensusKeyAndReturnIndex(nodeConfig)
+
 		// P2p private key is used for secure message transfer between p2p nodes.
 		nodeConfig.P2pPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
 		if err != nil {
 			panic(err)
 		}
-		// Key Setup ================= [End]
 	}
 
 	nodeConfig.SelfPeer = p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nodeConfig.ConsensusPubKey}
@@ -360,16 +302,10 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 	currentNode := node.New(nodeConfig.Host, currentConsensus, chainDBFactory, *isArchival)
 	currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
-	currentNode.StakingAccount = myAccount
+	// TODO: add staking support
+	// currentNode.StakingAccount = myAccount
 	utils.GetLogInstance().Info("node account set",
 		"address", common.MustAddressToBech32(currentNode.StakingAccount.Address))
-
-	if gsif, err := consensus.NewGenesisStakeInfoFinder(); err == nil {
-		currentConsensus.SetStakeInfoFinder(gsif)
-	} else {
-		_, _ = fmt.Fprintf(os.Stderr, "Cannot initialize stake info: %v\n", err)
-		os.Exit(1)
-	}
 
 	// TODO: refactor the creation of blockchain out of node.New()
 	currentConsensus.ChainReader = currentNode.Blockchain()
@@ -465,6 +401,22 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 func main() {
 	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
 	flag.Parse()
+
+	if *versionFlag {
+		printVersion(os.Args[0])
+	}
+
+	// If FN node running, they should either specify blsPrivateKey or the file with passphrase
+	if *blsKeyFile == "" || *blsPass == "" {
+		fmt.Println("Internal nodes need to have pass to decrypt blskey")
+		os.Exit(101)
+	}
+	passphrase, err := utils.GetPassphraseFromSource(*blsPass)
+	if err != nil {
+		fmt.Printf("error when reading passphrase file: %v\n", err)
+		os.Exit(100)
+	}
+	blsPassphrase = passphrase
 
 	// Configure log parameters
 	utils.SetLogContext(*port, *ip)

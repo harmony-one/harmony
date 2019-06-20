@@ -223,6 +223,7 @@ func (s *Service) createRawStakingMessage() []byte {
 		bytesData,
 	)
 
+	// This is currently not called.
 	hmykey.Unlock(s.account)
 	if signedTx, err := hmykey.SignTx(s.account, tx); err == nil {
 		ts := types.Transactions{signedTx}

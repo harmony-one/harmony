@@ -13,6 +13,7 @@ import (
 	"time"
 
 	ffi_bls "github.com/harmony-one/bls/ffi/go/bls"
+
 	"github.com/harmony-one/harmony/crypto/bls"
 )
 
@@ -35,10 +36,28 @@ func GenBlsKeyWithPassPhrase(passphrase string) (*ffi_bls.SecretKey, string, err
 	fileName := publickKey.SerializeToHexStr() + ".key"
 	privateKeyHex := privateKey.SerializeToHexStr()
 	// Encrypt with passphrase
-	encryptedPrivateKeyStr := encrypt([]byte(privateKeyHex), passphrase)
+	encryptedPrivateKeyStr, err := encrypt([]byte(privateKeyHex), passphrase)
+	if err != nil {
+		return nil, "", err
+	}
 	// Write to file.
-	err := WriteToFile(fileName, encryptedPrivateKeyStr)
+	err = WriteToFile(fileName, encryptedPrivateKeyStr)
 	return privateKey, fileName, err
+}
+
+// WritePriKeyWithPassPhrase writes encrypted key with passphrase.
+func WritePriKeyWithPassPhrase(privateKey *ffi_bls.SecretKey, passphrase string) (string, error) {
+	publickKey := privateKey.GetPublicKey()
+	fileName := publickKey.SerializeToHexStr() + ".key"
+	privateKeyHex := privateKey.SerializeToHexStr()
+	// Encrypt with passphrase
+	encryptedPrivateKeyStr, err := encrypt([]byte(privateKeyHex), passphrase)
+	if err != nil {
+		return "", err
+	}
+	// Write to file.
+	err = WriteToFile(fileName, encryptedPrivateKeyStr)
+	return fileName, err
 }
 
 // WriteToFile will print any string of text to a file safely by
@@ -62,8 +81,13 @@ func LoadBlsKeyWithPassPhrase(fileName, passphrase string) (*ffi_bls.SecretKey, 
 	if err != nil {
 		return nil, err
 	}
-	encryptedPrivateKeyStr := string(encryptedPrivateKeyBytes)
-	decryptedBytes := decrypt(encryptedPrivateKeyStr, passphrase)
+	for len(passphrase) > 0 && passphrase[len(passphrase)-1] == '\n' {
+		passphrase = passphrase[:len(passphrase)-1]
+	}
+	decryptedBytes, err := decrypt(encryptedPrivateKeyBytes, passphrase)
+	if err != nil {
+		return nil, err
+	}
 
 	priKey := &ffi_bls.SecretKey{}
 	priKey.DeserializeHexStr(string(decryptedBytes))
@@ -76,32 +100,62 @@ func createHash(key string) string {
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 
-func encrypt(data []byte, passphrase string) string {
+func encrypt(data []byte, passphrase string) (string, error) {
 	block, _ := aes.NewCipher([]byte(createHash(passphrase)))
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		panic(err.Error())
+		return "", err
 	}
 	nonce := make([]byte, gcm.NonceSize())
 	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
-		panic(err.Error())
+		return "", err
 	}
 	ciphertext := gcm.Seal(nonce, nonce, data, nil)
-	return hex.EncodeToString(ciphertext)
+	return hex.EncodeToString(ciphertext), nil
 }
 
-func decrypt(encryptedStr string, passphrase string) []byte {
+func decrypt(encrypted []byte, passphrase string) (decrypted []byte, err error) {
+	unhexed := make([]byte, hex.DecodedLen(len(encrypted)))
+	if _, err = hex.Decode(unhexed, encrypted); err == nil {
+		if decrypted, err = decryptRaw(unhexed, passphrase); err == nil {
+			return decrypted, nil
+		}
+	}
+	// At this point err != nil, either from hex decode or from decryptRaw.
+	decrypted, binErr := decryptRaw(encrypted, passphrase)
+	if binErr != nil {
+		// Disregard binary decryption error and return the original error,
+		// because our canonical form is hex and not binary.
+		return nil, err
+	}
+	return decrypted, nil
+}
+
+func decryptRaw(data []byte, passphrase string) ([]byte, error) {
 	var err error
 	key := []byte(createHash(passphrase))
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		panic(err.Error())
+		return nil, err
 	}
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		panic(err.Error())
+		return nil, err
 	}
-	data, err := hex.DecodeString(encryptedStr)
+	nonceSize := gcm.NonceSize()
+	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+	return plaintext, err
+}
+
+func decryptNonHumanReadable(data []byte, passphrase string) ([]byte, error) {
+	var err error
+	key := []byte(createHash(passphrase))
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	gcm, err := cipher.NewGCM(block)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -110,7 +164,31 @@ func decrypt(encryptedStr string, passphrase string) []byte {
 	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
 	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
-		panic(err.Error())
+		return nil, err
 	}
-	return plaintext
+	return plaintext, nil
+}
+
+// LoadNonHumanReadableBlsKeyWithPassPhrase loads bls key with passphrase.
+func LoadNonHumanReadableBlsKeyWithPassPhrase(fileName, passFile string) (*ffi_bls.SecretKey, error) {
+	encryptedPrivateKeyBytes, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		return nil, err
+	}
+	data, err := ioutil.ReadFile(passFile)
+	if err != nil {
+		return nil, err
+	}
+	passphrase := string(data)
+	for len(passphrase) > 0 && passphrase[len(passphrase)-1] == '\n' {
+		passphrase = passphrase[:len(passphrase)-1]
+	}
+	decryptedBytes, err := decryptNonHumanReadable(encryptedPrivateKeyBytes, passphrase)
+	if err != nil {
+		return nil, err
+	}
+
+	priKey := &ffi_bls.SecretKey{}
+	priKey.DeserializeHexStr(string(decryptedBytes))
+	return priKey, nil
 }

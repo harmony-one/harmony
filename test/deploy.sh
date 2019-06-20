@@ -175,6 +175,8 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
 
       args=("${base_args[@]}" -ip "${ip}" -port "${port}" -key "/tmp/${ip}-${port}.key" -db_dir "db-${ip}-${port}" -accounts "${account}" -blspass file:blspass.txt -blskey_file "${blspub}.key")
   fi
+
+  args=("${base_args[@]}" -ip "${ip}" -port "${port}" -key "/tmp/${ip}-${port}.key" -db_dir "db-${ip}-${port}" -blspass file:blspass.txt -blskey_file "${blspub}.key")
   case "${mode}" in
   leader*|validator*) args=("${args[@]}" -is_genesis);;
   esac

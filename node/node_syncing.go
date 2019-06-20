@@ -1,7 +1,7 @@
 package node
 
 import (
-	"bytes"
+	"fmt"
 	"sync"
 	"time"
 
@@ -25,6 +25,7 @@ const (
 	lastMileThreshold = 4
 	inSyncThreshold   = 1  // unit in number of block
 	SyncFrequency     = 10 // unit in second
+	MinConnectedPeers = 5  // minimum number of peers connected to in node syncing
 )
 
 // getNeighborPeers is a helper function to return list of peers
@@ -91,21 +92,22 @@ func (node *Node) DoSyncing(bc *core.BlockChain, worker *worker.Worker, getPeers
 
 	logger := utils.GetLogInstance()
 	getLogger := func() log.Logger { return utils.WithCallerSkip(logger, 1) }
+	logger = logger.New("syncID", node.GetSyncID())
 SyncingLoop:
 	for {
 		select {
 		case <-ticker.C:
 			if node.stateSync == nil {
 				node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
-				logger = logger.New("syncID", node.GetSyncID())
 				getLogger().Debug("initialized state sync")
 			}
-			if node.stateSync.GetActivePeerNumber() == 0 {
+			if node.stateSync.GetActivePeerNumber() < MinConnectedPeers {
 				peers := getPeers()
 				if err := node.stateSync.CreateSyncConfig(peers, false); err != nil {
 					ctxerror.Log15(utils.GetLogInstance().Debug, err)
 					continue SyncingLoop
 				}
+				getLogger().Debug("[SYNC] Get Active Peers", "len", node.stateSync.GetActivePeerNumber())
 			}
 			if node.stateSync.IsOutOfSync(bc) {
 				node.stateMutex.Lock()
@@ -200,18 +202,31 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 	response := &downloader_pb.DownloaderResponse{}
 	switch request.Type {
 	case downloader_pb.DownloaderRequest_HEADER:
-		var startHeaderHash []byte
 		if request.BlockHash == nil {
-			tmp := node.Blockchain().Genesis().Hash()
-			startHeaderHash = tmp[:]
-		} else {
-			startHeaderHash = request.BlockHash
+			return response, fmt.Errorf("[SYNC] GetBlockHashes Request BlockHash is NIL")
 		}
-		for block := node.Blockchain().CurrentBlock(); block != nil; block = node.Blockchain().GetBlockByHash(block.Header().ParentHash) {
-			blockHash := block.Hash()
-			if bytes.Compare(blockHash[:], startHeaderHash) == 0 {
+		if request.Size == 0 || request.Size > syncing.BatchSize {
+			return response, fmt.Errorf("[SYNC] GetBlockHashes Request contains invalid Size %v", request.Size)
+		}
+		size := uint64(request.Size)
+		var startHashHeader common.Hash
+		copy(startHashHeader[:], request.BlockHash[:])
+		startBlock := node.Blockchain().GetBlockByHash(startHashHeader)
+		if startBlock == nil {
+			return response, fmt.Errorf("[SYNC] GetBlockHashes Request cannot find startHash %v", startHashHeader)
+		}
+		startHeight := startBlock.NumberU64()
+		endHeight := node.Blockchain().CurrentBlock().NumberU64()
+		if startHeight >= endHeight {
+			return response, fmt.Errorf("[SYNC] GetBlockHashes Request failed. I am not higher than requested node, my Height %v, request node Height %v", endHeight, startHeight)
+		}
+
+		for blockNum := startHeight; blockNum <= startHeight+size; blockNum++ {
+			block := node.Blockchain().GetBlockByNumber(blockNum)
+			if block == nil {
 				break
 			}
+			blockHash := block.Hash()
 			response.Payload = append(response.Payload, blockHash[:])
 		}
 

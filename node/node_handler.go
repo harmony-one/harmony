@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -26,6 +27,7 @@ import (
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 
 	"github.com/harmony-one/harmony/api/proto"
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
@@ -35,6 +37,7 @@ import (
 	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -61,7 +64,7 @@ func (node *Node) ReceiveGlobalMessage() {
 			//utils.GetLogInstance().Info("[PUBSUB]", "received global msg", len(msg), "sender", sender)
 			if err == nil {
 				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
-				go node.messageHandler(msg[5:], string(sender))
+				go node.messageHandler(msg[5:], sender)
 			}
 		}
 	}
@@ -80,7 +83,7 @@ func (node *Node) ReceiveGroupMessage() {
 			//utils.GetLogInstance().Info("[PUBSUB]", "received group msg", len(msg), "sender", sender)
 			if err == nil {
 				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
-				go node.messageHandler(msg[5:], string(sender))
+				go node.messageHandler(msg[5:], sender)
 			}
 		}
 	}
@@ -100,14 +103,14 @@ func (node *Node) ReceiveClientGroupMessage() {
 			// utils.GetLogInstance().Info("[CLIENT]", "received group msg", len(msg), "sender", sender, "error", err)
 			if err == nil {
 				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
-				go node.messageHandler(msg[5:], string(sender))
+				go node.messageHandler(msg[5:], sender)
 			}
 		}
 	}
 }
 
 // messageHandler parses the message and dispatch the actions
-func (node *Node) messageHandler(content []byte, sender string) {
+func (node *Node) messageHandler(content []byte, sender libp2p_peer.ID) {
 	msgCategory, err := proto.GetMessageCategory(content)
 	if err != nil {
 		utils.GetLogInstance().Error("Read node type failed", "err", err, "node", node)
@@ -464,9 +467,50 @@ func (node *Node) AddNewBlock(newBlock *types.Block) {
 	}
 }
 
-func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
-	if sender != "" {
-		_, ok := node.duplicatedPing.LoadOrStore(sender, true)
+type genesisNode struct {
+	ShardID     uint32
+	MemberIndex int
+	NodeID      types.NodeID
+}
+
+var (
+	genesisCatalogOnce          sync.Once
+	genesisNodeByStakingAddress = make(map[common.Address]*genesisNode)
+	genesisNodeByConsensusKey   = make(map[types.BlsPublicKey]*genesisNode)
+)
+
+func initGenesisCatalog() {
+	genesisShardState := core.GetInitShardState()
+	for _, committee := range genesisShardState {
+		for i, nodeID := range committee.NodeList {
+			genesisNode := &genesisNode{
+				ShardID:     committee.ShardID,
+				MemberIndex: i,
+				NodeID:      nodeID,
+			}
+			genesisNodeByStakingAddress[nodeID.EcdsaAddress] = genesisNode
+			genesisNodeByConsensusKey[nodeID.BlsPublicKey] = genesisNode
+		}
+	}
+}
+
+func getGenesisNodeByStakingAddress(address common.Address) *genesisNode {
+	genesisCatalogOnce.Do(initGenesisCatalog)
+	return genesisNodeByStakingAddress[address]
+}
+
+func getGenesisNodeByConsensusKey(key types.BlsPublicKey) *genesisNode {
+	genesisCatalogOnce.Do(initGenesisCatalog)
+	return genesisNodeByConsensusKey[key]
+}
+
+func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) int {
+	logger := utils.GetLogInstance().New("sender", sender)
+	getLogger := func() log.Logger { return utils.WithCallerSkip(logger, 1) }
+
+	senderStr := string(sender)
+	if senderStr != "" {
+		_, ok := node.duplicatedPing.LoadOrStore(senderStr, true)
 		if ok {
 			// duplicated ping message return
 			return 0
@@ -484,6 +528,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 	peer.Port = ping.Node.Port
 	peer.PeerID = ping.Node.PeerID
 	peer.ConsensusPubKey = nil
+	logger = logger.New("ip", peer.IP, "port", peer.Port, "peerID", peer.PeerID)
 
 	if ping.Node.PubKey != nil {
 		peer.ConsensusPubKey = &bls.PublicKey{}
@@ -491,9 +536,24 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender string) int {
 			utils.GetLogInstance().Error("UnmarshalBinary Failed", "error", err)
 			return -1
 		}
+		logger = logger.New(
+			"peerConsensusPubKey", peer.ConsensusPubKey.SerializeToHexStr())
 	}
 
-	//	utils.GetLogInstance().Debug("[pingMessageHandler]", "incoming peer", peer)
+	var k types.BlsPublicKey
+	if err := k.FromLibBLSPublicKey(peer.ConsensusPubKey); err != nil {
+		err = ctxerror.New("cannot convert BLS public key").WithCause(err)
+		ctxerror.Log15(getLogger().Warn, err)
+	}
+	if genesisNode := getGenesisNodeByConsensusKey(k); genesisNode != nil {
+		logger = logger.New(
+			"genesisShardID", genesisNode.ShardID,
+			"genesisMemberIndex", genesisNode.MemberIndex,
+			"genesisStakingAccount", common2.MustAddressToBech32(genesisNode.NodeID.EcdsaAddress))
+	} else {
+		logger.Info("cannot find genesis node", "k", hex.EncodeToString(k[:]))
+	}
+	getLogger().Info("received ping message")
 
 	// add to incoming peer list
 	//node.host.AddIncomingPeer(*peer)
