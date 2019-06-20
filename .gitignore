@@ -69,3 +69,9 @@ test/.bnkey
 
 # exported keys
 .hmy/*.key
+
+# blspass
+blspass.txt
+
+# local test db
+db-127.0.0.1-*
