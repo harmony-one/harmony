@@ -3,6 +3,7 @@ package node
 import (
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/harmony-one/harmony/consensus"
@@ -28,7 +29,7 @@ func TestAddNewBlock(t *testing.T) {
 
 	selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
 	node.Worker.CommitTransactions(selectedTxs)
-	block, _ := node.Worker.Commit()
+	block, _ := node.Worker.Commit([]byte{}, []byte{}, 0, common.Address{})
 
 	node.AddNewBlock(block)
 
@@ -54,7 +55,7 @@ func TestVerifyNewBlock(t *testing.T) {
 
 	selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
 	node.Worker.CommitTransactions(selectedTxs)
-	block, _ := node.Worker.Commit()
+	block, _ := node.Worker.Commit([]byte{}, []byte{}, 0, common.Address{})
 
 	if err := node.VerifyNewBlock(block); err != nil {
 		t.Error("New block is not verified successfully:", err)

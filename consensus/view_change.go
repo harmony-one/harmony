@@ -205,6 +205,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		return
 	}
 
+	// TODO: if difference is only one, new leader can still propose the same committed block to avoid another view change
 	if consensus.blockNum > recvMsg.BlockNum {
 		consensus.getLogger().Debug("[onViewChange] Message BlockNum Is Low", "MsgBlockNum", recvMsg.BlockNum)
 		return

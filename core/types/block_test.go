@@ -81,34 +81,7 @@ var (
 	}
 )
 
-func TestBlock_SetPrepareSig(t *testing.T) {
-	tests := []struct {
-		name    string
-		sig     []byte
-		signers []byte
-	}{
-		{"55AA", pat48Hex55, pat48HexAA},
-		{"AA55", pat48HexAA, pat48Hex55},
-		{"PiE", pat48Pi, pat48E},
-		{"EPi", pat48E, pat48Pi},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			b := &Block{header: &Header{}}
-			b.SetPrepareSig(tt.sig, tt.signers)
-			if !bytes.Equal(tt.sig, b.header.PrepareSignature[:]) {
-				t.Errorf("signature mismatch: expected %+v, actual %+v",
-					tt.sig, b.header.PrepareSignature)
-			}
-			if !bytes.Equal(tt.signers, b.header.PrepareBitmap) {
-				t.Errorf("signature mismatch: expected %+v, actual %+v",
-					tt.signers, b.header.PrepareBitmap)
-			}
-		})
-	}
-}
-
-func TestBlock_SetCommitSig(t *testing.T) {
+func TestBlock_SetLastCommitSig(t *testing.T) {
 	tests := []struct {
 		name    string
 		sig     []byte
@@ -122,14 +95,14 @@ func TestBlock_SetCommitSig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := &Block{header: &Header{}}
-			b.SetCommitSig(tt.sig, tt.signers)
-			if !bytes.Equal(tt.sig, b.header.CommitSignature[:]) {
+			b.SetLastCommitSig(tt.sig, tt.signers)
+			if !bytes.Equal(tt.sig, b.header.LastCommitSignature[:]) {
 				t.Errorf("signature mismatch: expected %+v, actual %+v",
-					tt.sig, b.header.CommitSignature)
+					tt.sig, b.header.LastCommitSignature)
 			}
-			if !bytes.Equal(tt.signers, b.header.CommitBitmap) {
+			if !bytes.Equal(tt.signers, b.header.LastCommitBitmap) {
 				t.Errorf("signature mismatch: expected %+v, actual %+v",
-					tt.signers, b.header.CommitBitmap)
+					tt.signers, b.header.LastCommitBitmap)
 			}
 		})
 	}

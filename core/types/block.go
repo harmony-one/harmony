@@ -84,19 +84,18 @@ type Header struct {
 	Extra       []byte         `json:"extraData"        gencodec:"required"`
 	MixDigest   common.Hash    `json:"mixHash"          gencodec:"required"`
 	// Additional Fields
-	Epoch            *big.Int    `json:"epoch"            gencodec:"required"`
-	ShardID          uint32      `json:"shardID"          gencodec:"required"`
-	PrepareSignature [96]byte    `json:"prepareSignature" gencodec:"required"`
-	PrepareBitmap    []byte      `json:"prepareBitmap"    gencodec:"required"` // Contains which validator signed
-	CommitSignature  [96]byte    `json:"commitSignature"  gencodec:"required"`
-	CommitBitmap     []byte      `json:"commitBitmap"     gencodec:"required"` // Contains which validator signed
-	Vrf              [32]byte    `json:"vrf"`
-	VrfProof         [96]byte    `json:"vrfProof"`
-	Vdf              [258]byte   `json:"vdf"`
-	VdfProof         [258]byte   `json:"vdfProof"`
-	ShardStateHash   common.Hash `json:"shardStateRoot"`
-	ShardState       []byte      `json:"shardState"`
-	CrossLinks       []byte      `json:"crossLinks"`
+	ViewID              uint32      `json:"viewID"           gencodec:"required"`
+	Epoch               *big.Int    `json:"epoch"            gencodec:"required"`
+	ShardID             uint32      `json:"shardID"          gencodec:"required"`
+	LastCommitSignature [96]byte    `json:"lastCommitSignature"  gencodec:"required"`
+	LastCommitBitmap    []byte      `json:"lastCommitBitmap"     gencodec:"required"` // Contains which validator signed
+	Vrf                 [32]byte    `json:"vrf"`
+	VrfProof            [96]byte    `json:"vrfProof"`
+	Vdf                 [258]byte   `json:"vdf"`
+	VdfProof            [258]byte   `json:"vdfProof"`
+	ShardStateHash      common.Hash `json:"shardStateRoot"`
+	ShardState          []byte      `json:"shardState"`
+	CrossLinks          []byte      `json:"crossLinks"`
 }
 
 // field type overrides for gencodec
@@ -178,26 +177,15 @@ type Block struct {
 	ReceivedFrom interface{}
 }
 
-// SetPrepareSig sets the block's prepare group signature.
-func (b *Block) SetPrepareSig(sig []byte, signers []byte) {
-	if len(sig) != len(b.header.PrepareSignature) {
-		utils.GetLogInstance().Warn("SetPrepareSig: sig size mismatch",
+// SetLastCommitSig sets the last block's commit group signature.
+func (b *Block) SetLastCommitSig(sig []byte, signers []byte) {
+	if len(sig) != len(b.header.LastCommitSignature) {
+		utils.GetLogInstance().Warn("SetLastCommitSig: sig size mismatch",
 			"srcLen", len(sig),
-			"dstLen", len(b.header.PrepareSignature))
+			"dstLen", len(b.header.LastCommitSignature))
 	}
-	copy(b.header.PrepareSignature[:], sig[:])
-	b.header.PrepareBitmap = append(signers[:0:0], signers...)
-}
-
-// SetCommitSig sets the block's commit group signature.
-func (b *Block) SetCommitSig(sig []byte, signers []byte) {
-	if len(sig) != len(b.header.CommitSignature) {
-		utils.GetLogInstance().Warn("SetCommitSig: sig size mismatch",
-			"srcLen", len(sig),
-			"dstLen", len(b.header.CommitSignature))
-	}
-	copy(b.header.CommitSignature[:], sig[:])
-	b.header.CommitBitmap = append(signers[:0:0], signers...)
+	copy(b.header.LastCommitSignature[:], sig[:])
+	b.header.LastCommitBitmap = append(signers[:0:0], signers...)
 }
 
 // DeprecatedTd is an old relic for extracting the TD of a block. It is in the

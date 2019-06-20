@@ -340,7 +340,7 @@ func accumulateRewards(
 	if err != nil {
 		return ctxerror.New("cannot create group sig mask").WithCause(err)
 	}
-	if err := mask.SetMask(parentHeader.CommitBitmap); err != nil {
+	if err := mask.SetMask(header.LastCommitBitmap); err != nil {
 		return ctxerror.New("cannot set group sig mask bits").WithCause(err)
 	}
 	totalAmount := big.NewInt(0)

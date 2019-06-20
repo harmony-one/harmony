@@ -15,6 +15,7 @@ import (
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
@@ -736,6 +737,26 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	return
 }
 
+// LastCommitSig returns the byte array of aggregated commit signature and bitmap of last block
+func (consensus *Consensus) LastCommitSig() ([]byte, []byte, error) {
+	if consensus.blockNum <= 1 {
+		return nil, nil, nil
+	}
+	msgs := consensus.PbftLog.GetMessagesByTypeSeq(msg_pb.MessageType_COMMITTED, consensus.blockNum-1)
+	if len(msgs) != 1 {
+		return nil, nil, ctxerror.New("SetLastCommitSig failed with wrong number of committed message", "numCommittedMsg", len(msgs))
+	}
+	//#### Read payload data from committed msg
+	aggSig := make([]byte, 96)
+	bitmap := make([]byte, len(msgs[0].Payload)-96)
+	offset := 0
+	copy(aggSig[:], msgs[0].Payload[offset:offset+96])
+	offset += 96
+	copy(bitmap[:], msgs[0].Payload[offset:])
+	//#### END Read payload data from committed msg
+	return aggSig, bitmap, nil
+}
+
 // try to catch up if fall behind
 func (consensus *Consensus) tryCatchup() {
 	consensus.getLogger().Info("[TryCatchup] commit new blocks")
@@ -783,28 +804,6 @@ func (consensus *Consensus) tryCatchup() {
 		consensus.viewID = msgs[0].ViewID + 1
 		consensus.LeaderPubKey = msgs[0].SenderPubkey
 
-		//#### Read payload data from committed msg
-		aggSig := make([]byte, 96)
-		bitmap := make([]byte, len(msgs[0].Payload)-96)
-		offset := 0
-		copy(aggSig[:], msgs[0].Payload[offset:offset+96])
-		offset += 96
-		copy(bitmap[:], msgs[0].Payload[offset:])
-		//#### END Read payload data from committed msg
-
-		//#### Read payload data from prepared msg
-		prepareSig := make([]byte, 96)
-		prepareBitmap := make([]byte, len(msg.Payload)-96)
-		offset = 0
-		copy(prepareSig[:], msg.Payload[offset:offset+96])
-		offset += 96
-		copy(prepareBitmap[:], msg.Payload[offset:])
-		//#### END Read payload data from committed msg
-
-		// Put the signatures into the block
-		block.SetPrepareSig(prepareSig, prepareBitmap)
-
-		block.SetCommitSig(aggSig, bitmap)
 		consensus.getLogger().Info("[TryCatchup] Adding block to chain")
 		consensus.OnConsensusDone(block)
 		consensus.ResetState()
@@ -828,8 +827,8 @@ func (consensus *Consensus) tryCatchup() {
 		consensus.consensusTimeout[timeoutViewChange].Stop()
 	}
 	// clean up old log
-	consensus.PbftLog.DeleteBlocksLessThan(consensus.blockNum)
-	consensus.PbftLog.DeleteMessagesLessThan(consensus.blockNum)
+	consensus.PbftLog.DeleteBlocksLessThan(consensus.blockNum - 1)
+	consensus.PbftLog.DeleteMessagesLessThan(consensus.blockNum - 1)
 }
 
 // Start waits for the next new block and run consensus
