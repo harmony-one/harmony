@@ -7,7 +7,6 @@ import (
 	"math/rand"
 	"os"
 	"path"
-	"runtime"
 	"sync"
 	"time"
 
@@ -135,8 +134,6 @@ func main() {
 	if *versionFlag {
 		printVersion(os.Args[0])
 	}
-	// Add GOMAXPROCS to achieve max performance.
-	runtime.GOMAXPROCS(1024)
 	// Logging setup
 	utils.SetLogContext(*port, *ip)
 	utils.SetLogVerbosity(log.Lvl(*verbosity))
@@ -240,7 +237,6 @@ pushLoop:
 		select {
 		case shardID := <-readySignal:
 			lock := sync.Mutex{}
-			utils.GetLogInstance().Warn("STARTING TX GEN PUSH LOOP", "gomaxprocs", runtime.GOMAXPROCS(0))
 			txs, err := GenerateSimulatedTransactionsAccount(uint32(shardID), txGen, setting)
 			if err != nil {
 				utils.GetLogInstance().Debug("Error in Generating Txns", "Err", err)

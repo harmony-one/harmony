@@ -7,7 +7,6 @@ import (
 	"math/rand"
 	"os"
 	"path"
-	"runtime"
 	"time"
 
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -148,9 +147,6 @@ func initSetup() {
 
 	// Set default keystore Dir
 	hmykey.DefaultKeyStoreDir = *keystoreDir
-
-	// Add GOMAXPROCS to achieve max performance.
-	runtime.GOMAXPROCS(1024)
 
 	// Set up randomization seed.
 	rand.Seed(int64(time.Now().Nanosecond()))
