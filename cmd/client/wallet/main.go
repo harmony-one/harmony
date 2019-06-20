@@ -583,7 +583,7 @@ func importBls() {
 		}
 		fmt.Println("We loaded the file and the loaded private key DOES match your private key!")
 	} else {
-		fmt.Println("The private key should not be empty.")
+		fmt.Println("Please specify the hexadecimal private key string using --key")
 	}
 }
 
