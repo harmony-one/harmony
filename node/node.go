@@ -507,6 +507,7 @@ func (node *Node) AccountManager() *accounts.Manager {
 	return node.accountManager
 }
 
+// SetDNSFlag indicates whether use harmony dns server to get peer info for node syncing
 func (node *Node) SetDNSFlag(flag bool) {
 	utils.GetLogInstance().Info("SetDNSFlag", "flag", flag)
 	node.dnsFlag = flag
