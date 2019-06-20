@@ -145,8 +145,9 @@ type Committee struct {
 
 // DeepCopy returns a deep copy of the receiver.
 func (c Committee) DeepCopy() Committee {
-	r := c
-	r.NodeList = r.NodeList.DeepCopy()
+	r := Committee{}
+	r.ShardID = c.ShardID
+	r.NodeList = c.NodeList.DeepCopy()
 	return r
 }
 
@@ -165,16 +166,13 @@ func CompareCommittee(c1, c2 *Committee) int {
 }
 
 // GetHashFromNodeList will sort the list, then use Keccak256 to hash the list
-// notice that the input nodeList will be modified (sorted)
+// NOTE: do not modify the underlining content for hash
 func GetHashFromNodeList(nodeList []NodeID) []byte {
 	// in general, nodeList should not be empty
 	if nodeList == nil || len(nodeList) == 0 {
 		return []byte{}
 	}
 
-	sort.Slice(nodeList, func(i, j int) bool {
-		return CompareNodeIDByBLSKey(nodeList[i], nodeList[j]) == -1
-	})
 	d := sha3.NewLegacyKeccak256()
 	for i := range nodeList {
 		d.Write(nodeList[i].Serialize())
@@ -186,12 +184,13 @@ func GetHashFromNodeList(nodeList []NodeID) []byte {
 func (ss ShardState) Hash() (h common.Hash) {
 	// TODO ek – this sorting really doesn't belong here; it should instead
 	//  be made an explicit invariant to be maintained and, if needed, checked.
-	sort.Slice(ss, func(i, j int) bool {
-		return ss[i].ShardID < ss[j].ShardID
+	copy := ss.DeepCopy()
+	sort.Slice(copy, func(i, j int) bool {
+		return copy[i].ShardID < copy[j].ShardID
 	})
 	d := sha3.NewLegacyKeccak256()
-	for i := range ss {
-		hash := GetHashFromNodeList(ss[i].NodeList)
+	for i := range copy {
+		hash := GetHashFromNodeList(copy[i].NodeList)
 		d.Write(hash)
 	}
 	d.Sum(h[:0])

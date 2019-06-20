@@ -95,8 +95,8 @@ type Header struct {
 	Vdf              [258]byte   `json:"vdf"`
 	VdfProof         [258]byte   `json:"vdfProof"`
 	ShardStateHash   common.Hash `json:"shardStateRoot"`
-	ShardState       ShardState  `json:"shardState"`
-	CrossLinks       [][]byte    `json:"crossLinks"`
+	ShardState       []byte      `json:"shardState"`
+	CrossLinks       []byte      `json:"crossLinks"`
 }
 
 // field type overrides for gencodec
@@ -133,6 +133,16 @@ func (h *Header) Logger(logger log.Logger) log.Logger {
 	)
 }
 
+// GetShardState returns the deserialized shard state object.
+func (h *Header) GetShardState() (ShardState, error) {
+	shardState := ShardState{}
+	err := rlp.DecodeBytes(h.ShardState, &shardState)
+	if err != nil {
+		return nil, err
+	}
+	return shardState, nil
+}
+
 func rlpHash(x interface{}) (h common.Hash) {
 	hw := sha3.NewLegacyKeccak256()
 	rlp.Encode(hw, x)
@@ -159,6 +169,7 @@ type Block struct {
 
 	// Td is used by package core to store the total difficulty
 	// of the chain up to and including the block.
+	// TODO: use it as chain weight (e.g. signatures/stakes)
 	td *big.Int
 
 	// These fields are used by package eth to track
@@ -226,7 +237,7 @@ type storageblock struct {
 // are ignored and set to values derived from the given txs,
 // and receipts.
 func NewBlock(header *Header, txs []*Transaction, receipts []*Receipt) *Block {
-	b := &Block{header: CopyHeader(header), td: new(big.Int)}
+	b := &Block{header: CopyHeader(header)}
 
 	// TODO: panic if len(txs) != len(receipts)
 	if len(txs) == 0 {
@@ -265,9 +276,20 @@ func CopyHeader(h *Header) *Header {
 	if cpy.Number = new(big.Int); h.Number != nil {
 		cpy.Number.Set(h.Number)
 	}
+	if cpy.Epoch = new(big.Int); h.Epoch != nil {
+		cpy.Epoch.Set(h.Epoch)
+	}
 	if len(h.Extra) > 0 {
 		cpy.Extra = make([]byte, len(h.Extra))
 		copy(cpy.Extra, h.Extra)
+	}
+	if len(h.ShardState) > 0 {
+		cpy.ShardState = make([]byte, len(h.ShardState))
+		copy(cpy.ShardState, h.ShardState)
+	}
+	if len(h.CrossLinks) > 0 {
+		cpy.CrossLinks = make([]byte, len(h.CrossLinks))
+		copy(cpy.CrossLinks, h.CrossLinks)
 	}
 	return &cpy
 }
@@ -485,12 +507,17 @@ func (b *Block) AddVrf(vrf [32]byte) {
 }
 
 // AddShardState add shardState into block header
-func (b *Block) AddShardState(shardState ShardState) {
+func (b *Block) AddShardState(shardState ShardState) error {
 	// Make a copy because ShardState.Hash() internally sorts entries.
 	// Store the sorted copy.
 	shardState = append(shardState[:0:0], shardState...)
 	b.header.ShardStateHash = shardState.Hash()
-	b.header.ShardState = shardState
+	data, err := rlp.EncodeToBytes(shardState)
+	if err != nil {
+		return err
+	}
+	b.header.ShardState = data
+	return nil
 }
 
 // Logger returns a sub-logger with block contexts added.

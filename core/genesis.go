@@ -25,6 +25,8 @@ import (
 	"math/big"
 	"os"
 
+	"github.com/ethereum/go-ethereum/rlp"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
@@ -50,13 +52,12 @@ type Genesis struct {
 	ShardID        uint32              `json:"shardID"`
 	Timestamp      uint64              `json:"timestamp"`
 	ExtraData      []byte              `json:"extraData"`
-	GasLimit       uint64              `json:"gasLimit"   gencodec:"required"`
-	Difficulty     *big.Int            `json:"difficulty" gencodec:"required"`
+	GasLimit       uint64              `json:"gasLimit"       gencodec:"required"`
 	Mixhash        common.Hash         `json:"mixHash"`
 	Coinbase       common.Address      `json:"coinbase"`
-	Alloc          GenesisAlloc        `json:"alloc"      gencodec:"required"`
-	ShardStateHash common.Hash         `json:"shardStateHash"`
-	ShardState     types.ShardState    `json:"shardState"`
+	Alloc          GenesisAlloc        `json:"alloc"          gencodec:"required"`
+	ShardStateHash common.Hash         `json:"shardStateHash" gencodec:"required"`
+	ShardState     types.ShardState    `json:"shardState"     gencodec:"required"`
 
 	// These fields are used for consensus tests. Please don't use them
 	// in actual genesis blocks.
@@ -238,6 +239,11 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 		}
 	}
 	root := statedb.IntermediateRoot(false)
+	shardStateBytes, err := rlp.EncodeToBytes(g.ShardState)
+	if err != nil {
+		utils.GetLogInstance().Error("failed to rlp-serialize genesis shard state")
+		os.Exit(1)
+	}
 	head := &types.Header{
 		Number:         new(big.Int).SetUint64(g.Number),
 		Epoch:          big.NewInt(0),
@@ -251,7 +257,7 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 		Coinbase:       g.Coinbase,
 		Root:           root,
 		ShardStateHash: g.ShardStateHash,
-		// ShardState is absent in epoch block; genesis shard state is implied
+		ShardState:     shardStateBytes,
 	}
 	if g.GasLimit == 0 {
 		head.GasLimit = 10000000000 // TODO(RJ): figure out better solution. // params.GenesisGasLimit
@@ -269,12 +275,18 @@ func (g *Genesis) Commit(db ethdb.Database) (*types.Block, error) {
 	if block.Number().Sign() != 0 {
 		return nil, fmt.Errorf("can't commit genesis block with number > 0")
 	}
-	rawdb.WriteTd(db, block.Hash(), block.NumberU64(), g.Difficulty)
+
 	rawdb.WriteBlock(db, block)
 	rawdb.WriteReceipts(db, block.Hash(), block.NumberU64(), nil)
 	rawdb.WriteCanonicalHash(db, block.Hash(), block.NumberU64())
 	rawdb.WriteHeadBlockHash(db, block.Hash())
 	rawdb.WriteHeadHeaderHash(db, block.Hash())
+
+	err := rawdb.WriteShardStateBytes(db, block.Header().Epoch, block.Header().ShardState)
+
+	if err != nil {
+		log.Crit("Failed to store genesis shard state", "err", err)
+	}
 
 	config := g.Config
 	if config == nil {
@@ -303,12 +315,11 @@ func GenesisBlockForTesting(db ethdb.Database, addr common.Address, balance *big
 // DefaultGenesisBlock returns the Ethereum main net genesis block.
 func DefaultGenesisBlock() *Genesis {
 	return &Genesis{
-		Config:     params.MainnetChainConfig,
-		Nonce:      66,
-		ExtraData:  hexutil.MustDecode("0x11bbe8db4e347b4e8c937c1c8370e4b5ed33adb3db69cbdb7a38e1e50b1b82fa"),
-		GasLimit:   5000,
-		Difficulty: big.NewInt(17179869184),
-		Alloc:      decodePrealloc("empty"),
+		Config:    params.MainnetChainConfig,
+		Nonce:     66,
+		ExtraData: hexutil.MustDecode("0x11bbe8db4e347b4e8c937c1c8370e4b5ed33adb3db69cbdb7a38e1e50b1b82fa"),
+		GasLimit:  5000,
+		Alloc:     decodePrealloc("empty"),
 	}
 }
 
@@ -321,10 +332,9 @@ func DeveloperGenesisBlock(period uint64, faucet common.Address) *Genesis {
 
 	// Assemble and return the genesis with the precompiles and faucet pre-funded
 	return &Genesis{
-		Config:     &config,
-		ExtraData:  append(append(make([]byte, 32), faucet[:]...), make([]byte, 65)...),
-		GasLimit:   6283185,
-		Difficulty: big.NewInt(1),
+		Config:    &config,
+		ExtraData: append(append(make([]byte, 32), faucet[:]...), make([]byte, 65)...),
+		GasLimit:  6283185,
 		Alloc: map[common.Address]GenesisAccount{
 			common.BytesToAddress([]byte{1}): {Balance: big.NewInt(1)}, // ECRecover
 			common.BytesToAddress([]byte{2}): {Balance: big.NewInt(1)}, // SHA256

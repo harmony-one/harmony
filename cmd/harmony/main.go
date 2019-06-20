@@ -379,7 +379,7 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 
 	// This needs to be executed after consensus and drand are setup
 	if !*isNewNode || *shardID > -1 { // initial staking new node doesn't need to initialize shard state
-		// TODO: Have a better why to distinguish non-genesis node
+		// TODO: Have a better way to distinguish non-genesis node
 		if err := currentNode.InitShardState(*shardID == -1 && !*isNewNode); err != nil {
 			ctxerror.Crit(utils.GetLogger(), err, "InitShardState failed",
 				"shardID", *shardID, "isNewNode", *isNewNode)
