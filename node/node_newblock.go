@@ -79,7 +79,17 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 							ctxerror.New("cannot commit transactions").
 								WithCause(err))
 					}
-					newBlock, err := node.Worker.Commit()
+					sig, mask, err := node.Consensus.LastCommitSig()
+					if err != nil {
+						ctxerror.Log15(utils.GetLogger().Error,
+							ctxerror.New("Cannot got commit signatures from last block").
+								WithCause(err))
+						continue
+					}
+					viewID := node.Consensus.GetViewID()
+					addr := node.StakingAccount.Address
+					// add aggregated commit signatures from last block, except for the first two blocks
+					newBlock, err := node.Worker.Commit(sig, mask, viewID, addr)
 					if err != nil {
 						ctxerror.Log15(utils.GetLogger().Error,
 							ctxerror.New("cannot commit new block").

@@ -41,6 +41,7 @@ func (consensus *Consensus) constructViewChangeMessage() []byte {
 		msgToSign = append(preparedMsg.BlockHash[:], preparedMsg.Payload...)
 		vcMsg.Payload = append(msgToSign[:0:0], msgToSign...)
 	}
+
 	consensus.getLogger().Debug("[constructViewChangeMessage]", "m1Payload", vcMsg.Payload, "pubKey", consensus.PubKey.SerializeToHexStr())
 
 	sign := consensus.priKey.SignHash(msgToSign)

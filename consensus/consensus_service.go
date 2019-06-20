@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -227,9 +228,63 @@ func (consensus *Consensus) VerifyHeaders(chain consensus_engine.ChainReader, he
 	return abort, results
 }
 
+// retrievePublicKeysFromLastBlock finds the public keys of last block's committee
+func retrievePublicKeysFromLastBlock(bc consensus_engine.ChainReader, header *types.Header) ([]*bls.PublicKey, error) {
+	parentHeader := bc.GetHeaderByHash(header.ParentHash)
+	if parentHeader == nil {
+		return nil, ctxerror.New("cannot find parent block header in DB",
+			"parentHash", header.ParentHash)
+	}
+	parentShardState, err := bc.ReadShardState(parentHeader.Epoch)
+	if err != nil {
+		return nil, ctxerror.New("cannot read shard state",
+			"epoch", parentHeader.Epoch,
+		).WithCause(err)
+	}
+	parentCommittee := parentShardState.FindCommitteeByID(parentHeader.ShardID)
+	if parentCommittee == nil {
+		return nil, ctxerror.New("cannot find shard in the shard state",
+			"parentBlockNumber", parentHeader.Number,
+			"shardID", parentHeader.ShardID,
+		)
+	}
+	var committerKeys []*bls.PublicKey
+	for _, member := range parentCommittee.NodeList {
+		committerKey := new(bls.PublicKey)
+		err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
+		if err != nil {
+			return nil, ctxerror.New("cannot convert BLS public key",
+				"blsPublicKey", member.BlsPublicKey).WithCause(err)
+		}
+		committerKeys = append(committerKeys, committerKey)
+	}
+	return committerKeys, nil
+}
+
 // VerifySeal implements consensus.Engine, checking whether the given block satisfies
-// the PoW difficulty requirements.
+// the PoS difficulty requirements, i.e. >= 2f+1 valid signatures from the committee
 func (consensus *Consensus) VerifySeal(chain consensus_engine.ChainReader, header *types.Header) error {
+	publicKeys, err := retrievePublicKeysFromLastBlock(chain, header)
+	if err != nil {
+		return ctxerror.New("[VerifySeal] Cannot retrieve publickeys from last block").WithCause(err)
+	}
+	payload := append(header.LastCommitSignature[:], header.LastCommitBitmap...)
+	aggSig, mask, err := readSignatureBitmapByPublicKeys(payload, publicKeys)
+	if err != nil {
+		return ctxerror.New("[VerifySeal] Unable to deserialize the LastCommitSignature and LastCommitBitmap in Block Header").WithCause(err)
+	}
+	// TODO: use the quorum of last block instead
+	if count := utils.CountOneBits(mask.Bitmap); count < consensus.Quorum() {
+		return ctxerror.New("[VerifySeal] Not enough signature in LastCommitSignature from Block Header", "need", consensus.Quorum(), "got", count)
+	}
+
+	blockNumHash := make([]byte, 8)
+	binary.LittleEndian.PutUint64(blockNumHash, header.Number.Uint64()-1)
+	lastCommitPayload := append(blockNumHash, header.ParentHash[:]...)
+
+	if !aggSig.VerifyHash(mask.AggregatePublic, lastCommitPayload) {
+		return ctxerror.New("[VerifySeal] Unable to verify aggregated signature from last block", "lastBlockNum", header.Number.Uint64()-1, "lastBlockHash", header.ParentHash)
+	}
 	return nil
 }
 
@@ -468,9 +523,19 @@ func (consensus *Consensus) ReadSignatureBitmapPayload(recvPayload []byte, offse
 	if offset+96 > len(recvPayload) {
 		return nil, nil, errors.New("payload not have enough length")
 	}
+	sigAndBitmapPayload := recvPayload[offset:]
+	return readSignatureBitmapByPublicKeys(sigAndBitmapPayload, consensus.PublicKeys)
+}
+
+// readSignatureBitmapByPublicKeys read the payload of signature and bitmap based on public keys
+func readSignatureBitmapByPublicKeys(recvPayload []byte, publicKeys []*bls.PublicKey) (*bls.Sign, *bls_cosi.Mask, error) {
+	if len(recvPayload) < 96 {
+		return nil, nil, errors.New("payload not have enough length")
+	}
 	payload := append(recvPayload[:0:0], recvPayload...)
 	//#### Read payload data
 	// 96 byte of multi-sig
+	offset := 0
 	multiSig := payload[offset : offset+96]
 	offset += 96
 	// bitmap
@@ -482,7 +547,7 @@ func (consensus *Consensus) ReadSignatureBitmapPayload(recvPayload []byte, offse
 	if err != nil {
 		return nil, nil, errors.New("unable to deserialize multi-signature from payload")
 	}
-	mask, err := bls_cosi.NewMask(consensus.PublicKeys, nil)
+	mask, err := bls_cosi.NewMask(publicKeys, nil)
 	if err != nil {
 		utils.GetLogInstance().Warn("onNewView unable to setup mask for prepared message", "err", err)
 		return nil, nil, errors.New("unable to setup mask from payload")

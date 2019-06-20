@@ -4,9 +4,8 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
-
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
@@ -157,7 +156,14 @@ func (w *Worker) GetCurrentReceipts() []*types.Receipt {
 }
 
 // Commit generate a new block for the new txs.
-func (w *Worker) Commit() (*types.Block, error) {
+func (w *Worker) Commit(sig []byte, signers []byte, viewID uint32, addr common.Address) (*types.Block, error) {
+	if len(sig) > 0 && len(signers) > 0 {
+		copy(w.current.header.LastCommitSignature[:], sig[:])
+		w.current.header.LastCommitBitmap = append(signers[:0:0], signers...)
+	}
+	w.current.header.Coinbase = addr
+	w.current.header.ViewID = viewID
+
 	s := w.current.state.Copy()
 	block, err := w.engine.Finalize(w.chain, w.current.header, s, w.current.txs, w.current.receipts)
 	if err != nil {

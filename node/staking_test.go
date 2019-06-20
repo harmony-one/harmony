@@ -40,7 +40,7 @@ func TestUpdateStakingList(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
 		node.Worker.CommitTransactions(selectedTxs)
-		block, _ := node.Worker.Commit()
+		block, _ := node.Worker.Commit([]byte{}, []byte{}, 0, common.Address{})
 
 		node.AddNewBlock(block)
 	}
