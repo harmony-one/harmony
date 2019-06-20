@@ -105,6 +105,7 @@ func (m *Manager) GetServices() map[Type]Interface {
 
 // Register registers new service to service store.
 func (m *Manager) Register(t Type, service Interface) {
+	utils.GetLogInstance().Info("Register Service", "service", t)
 	if m.services == nil {
 		m.services = make(map[Type]Interface)
 	}
@@ -143,6 +144,7 @@ func (m *Manager) TakeAction(action *Action) {
 		return
 	}
 	if service, ok := m.services[action.ServiceType]; ok {
+		utils.GetLogInstance().Info("Take Action", "action", action.Action, "service", action.ServiceType)
 		switch action.Action {
 		case Start:
 			service.StartService()

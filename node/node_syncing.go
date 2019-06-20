@@ -2,6 +2,7 @@ package node
 
 import (
 	"fmt"
+	"net"
 	"sync"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	netconfig "github.com/harmony-one/harmony/internal/configs/net"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
@@ -65,6 +67,24 @@ func (node *Node) GetSyncingPeers() []p2p.Peer {
 	return node.getNeighborPeers(&node.Neighbors)
 }
 
+// GetPeersFromDNS get peers from our DNS server; TODO: temp fix for resolve node syncing
+// the GetSyncingPeers return a bunch of "new" peers, all of them are out of sync
+func (node *Node) GetPeersFromDNS() []p2p.Peer {
+	shardID := node.Consensus.ShardID
+	dns := netconfig.DNS[shardID]
+	addrs, err := net.LookupHost(dns)
+	if err != nil {
+		utils.GetLogInstance().Debug("GetPeersFromDNS cannot find peers", "error", err)
+		return nil
+	}
+	port := syncing.GetSyncingPort(node.SelfPeer.Port)
+	peers := []p2p.Peer{}
+	for _, addr := range addrs {
+		peers = append(peers, p2p.Peer{IP: addr, Port: port})
+	}
+	return peers
+}
+
 // DoBeaconSyncing update received beaconchain blocks and downloads missing beacon chain blocks
 func (node *Node) DoBeaconSyncing() {
 	for {
@@ -92,19 +112,19 @@ func (node *Node) DoSyncing(bc *core.BlockChain, worker *worker.Worker, getPeers
 
 	logger := utils.GetLogInstance()
 	getLogger := func() log.Logger { return utils.WithCallerSkip(logger, 1) }
-	logger = logger.New("syncID", node.GetSyncID())
 SyncingLoop:
 	for {
 		select {
 		case <-ticker.C:
 			if node.stateSync == nil {
 				node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
+				logger = logger.New("syncID", node.GetSyncID())
 				getLogger().Debug("initialized state sync")
 			}
 			if node.stateSync.GetActivePeerNumber() < MinConnectedPeers {
 				peers := getPeers()
 				if err := node.stateSync.CreateSyncConfig(peers, false); err != nil {
-					ctxerror.Log15(utils.GetLogInstance().Debug, err)
+					getLogger().Debug("[SYNC] create peers error", "error", err)
 					continue SyncingLoop
 				}
 				getLogger().Debug("[SYNC] Get Active Peers", "len", node.stateSync.GetActivePeerNumber())
@@ -143,7 +163,11 @@ func (node *Node) SupportSyncing() {
 	node.StartSyncingServer()
 	go node.SendNewBlockToUnsync()
 
-	go node.DoSyncing(node.Blockchain(), node.Worker, node.GetSyncingPeers, true)
+	if node.dnsFlag {
+		go node.DoSyncing(node.Blockchain(), node.Worker, node.GetPeersFromDNS, true)
+	} else {
+		go node.DoSyncing(node.Blockchain(), node.Worker, node.GetSyncingPeers, true)
+	}
 }
 
 // InitSyncingServer starts downloader server.

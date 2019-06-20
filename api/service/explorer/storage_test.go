@@ -50,7 +50,7 @@ func TestDump(t *testing.T) {
 
 	block := types.NewBlock(&types.Header{Number: big.NewInt(314)}, txs, nil)
 	ins := GetStorageInstance("1.1.1.1", "3333", true)
-	ins.Dump(block, uint32(1))
+	ins.Dump(block, uint64(1))
 	db := ins.GetDB()
 
 	res, err := db.Get([]byte(BlockHeightKey))
@@ -77,7 +77,7 @@ func TestUpdateAddressStorage(t *testing.T) {
 
 	block := types.NewBlock(&types.Header{Number: big.NewInt(314)}, txs, nil)
 	ins := GetStorageInstance("1.1.1.1", "3333", true)
-	ins.Dump(block, uint32(1))
+	ins.Dump(block, uint64(1))
 	db := ins.GetDB()
 
 	res, err := db.Get([]byte(BlockHeightKey))

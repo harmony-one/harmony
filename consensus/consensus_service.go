@@ -463,8 +463,8 @@ func (consensus *Consensus) SetBlockNum(blockNum uint64) {
 	consensus.blockNum = blockNum
 }
 
-// read the payload for signature and bitmap; offset is the beginning position of reading
-func (consensus *Consensus) readSignatureBitmapPayload(recvPayload []byte, offset int) (*bls.Sign, *bls_cosi.Mask, error) {
+// ReadSignatureBitmapPayload read the payload for signature and bitmap; offset is the beginning position of reading
+func (consensus *Consensus) ReadSignatureBitmapPayload(recvPayload []byte, offset int) (*bls.Sign, *bls_cosi.Mask, error) {
 	if offset+96 > len(recvPayload) {
 		return nil, nil, errors.New("payload not have enough length")
 	}

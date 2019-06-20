@@ -2,6 +2,7 @@
 package consensus // consensus
 
 import (
+	"fmt"
 	"math/big"
 	"sync"
 	"time"
@@ -33,8 +34,8 @@ var (
 
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
-	// pbftLog stores the pbft messages and blocks during PBFT process
-	pbftLog *PbftLog
+	// PbftLog stores the pbft messages and blocks during PBFT process
+	PbftLog *PbftLog
 	// phase: different phase of PBFT protocol: pre-prepare, prepare, commit, finish etc
 	phase PbftPhase
 	// mode: indicate a node is in normal or viewchanging mode
@@ -230,7 +231,7 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 	consensus.blockNumLowChan = make(chan struct{})
 
 	// pbft related
-	consensus.pbftLog = NewPbftLog()
+	consensus.PbftLog = NewPbftLog()
 	consensus.phase = Announce
 	consensus.mode = PbftMode{mode: Normal}
 	// pbft timeout
@@ -256,6 +257,9 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 		consensus.priKey = blsPriKey
 		consensus.PubKey = blsPriKey.GetPublicKey()
 		utils.GetLogInstance().Info("my pubkey is", "pubkey", consensus.PubKey.SerializeToHexStr())
+	} else {
+		utils.GetLogInstance().Error("the bls key is nil")
+		return nil, fmt.Errorf("nil bls key, aborting")
 	}
 
 	// viewID has to be initialized as the height of the blockchain during initialization
@@ -279,7 +283,7 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 
 	consensus.uniqueIDInstance = utils.GetUniqueValidatorIDInstance()
 
-	memprofiling.GetMemProfiling().Add("consensus.pbftLog", consensus.pbftLog)
+	memprofiling.GetMemProfiling().Add("consensus.pbftLog", consensus.PbftLog)
 	return &consensus, nil
 }
 
@@ -405,7 +409,7 @@ func NewGenesisStakeInfoFinder() (*GenesisStakeInfoFinder, error) {
 		byNodeKey: make(map[types.BlsPublicKey][]*structs.StakeInfo),
 		byAccount: make(map[common.Address][]*structs.StakeInfo),
 	}
-	for idx, account := range genesis.GenesisAccounts {
+	for idx, account := range genesis.HarmonyAccounts {
 		pub := &bls.PublicKey{}
 		pub.DeserializeHexStr(account.BlsPublicKey)
 		var blsPublicKey types.BlsPublicKey

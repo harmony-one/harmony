@@ -5,11 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	bls2 "github.com/harmony-one/harmony/crypto/bls"
-	common2 "github.com/harmony-one/harmony/internal/common"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	bls2 "github.com/harmony-one/harmony/crypto/bls"
 
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
@@ -30,81 +28,6 @@ func TestNew(test *testing.T) {
 
 	if !dRand.IsLeader {
 		test.Error("dRand should belong to a leader")
-	}
-}
-
-func TestGetValidatorPeers(test *testing.T) {
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902", ConsensusPubKey: bls2.RandPrivateKey().GetPublicKey()}
-	validator := p2p.Peer{IP: "127.0.0.1", Port: "9905", ConsensusPubKey: bls2.RandPrivateKey().GetPublicKey()}
-	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
-	host, err := p2pimpl.NewHost(&leader, priKey)
-	if err != nil {
-		test.Fatalf("newhost failure: %v", err)
-	}
-	dRand := New(host, 0, []p2p.Peer{leader, validator}, leader, nil, bls2.RandPrivateKey())
-
-	if !dRand.IsLeader {
-		test.Error("dRand should belong to a leader")
-	}
-
-	countValidatorPeers := len(dRand.GetValidatorPeers())
-
-	if countValidatorPeers != 2 {
-		test.Error("Count of validator peers doesn't match, got", countValidatorPeers)
-	}
-}
-
-func TestAddPeers(test *testing.T) {
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902", ConsensusPubKey: bls2.RandPrivateKey().GetPublicKey()}
-	validator := p2p.Peer{IP: "127.0.0.1", Port: "9905", ConsensusPubKey: bls2.RandPrivateKey().GetPublicKey()}
-	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
-	host, err := p2pimpl.NewHost(&leader, priKey)
-	if err != nil {
-		test.Fatalf("newhost failure: %v", err)
-	}
-	dRand := New(host, 0, []p2p.Peer{leader, validator}, leader, nil, bls2.RandPrivateKey())
-
-	if !dRand.IsLeader {
-		test.Error("dRand should belong to a leader")
-	}
-
-	newPeer := p2p.Peer{IP: "127.0.0.1", Port: "9907"}
-	countValidatorPeers := dRand.AddPeers([]*p2p.Peer{&newPeer})
-
-	if countValidatorPeers != 1 {
-		test.Error("Unable to add new peer")
-	}
-
-	if len(dRand.GetValidatorPeers()) != 3 {
-		test.Errorf("Number of validators doesn't match, actual count = %d expected count = 3", len(dRand.GetValidatorPeers()))
-	}
-}
-
-func TestGetValidatorByPeerId(test *testing.T) {
-	leaderPriKey := bls2.RandPrivateKey()
-	leaderPubKey := bls2.RandPrivateKey().GetPublicKey()
-	validatorPubKey := bls2.RandPrivateKey().GetPublicKey()
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902", ConsensusPubKey: leaderPubKey}
-	validator := p2p.Peer{IP: "127.0.0.1", Port: "9905", ConsensusPubKey: validatorPubKey}
-	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
-	host, err := p2pimpl.NewHost(&leader, priKey)
-	if err != nil {
-		test.Fatalf("newhost failure: %v", err)
-	}
-	dRand := New(host, 0, []p2p.Peer{leader, validator}, leader, nil, leaderPriKey)
-
-	if !dRand.IsLeader {
-		test.Error("dRand should belong to a leader")
-	}
-
-	validatorAddress := common2.MustAddressToBech32(utils.GetAddressFromBlsPubKey(validatorPubKey))
-
-	if dRand.getValidatorPeerByAddress(validatorAddress) == nil {
-		test.Error("Unable to get validator by Peerid")
-	}
-
-	if dRand.getValidatorPeerByAddress("random address") != nil {
-		test.Error("Found validator for absent validatorId")
 	}
 }
 

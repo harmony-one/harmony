@@ -637,6 +637,8 @@ func (ss *StateSync) getMaxPeerHeight() uint64 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			//debug
+			//utils.GetLogInstance().Warn("[Sync] getMaxPeerHeight", "IP", peerConfig.ip, "Port", peerConfig.port)
 			response := peerConfig.client.GetBlockChainHeight()
 			ss.syncMux.Lock()
 			if response != nil && maxHeight < response.BlockHeight {

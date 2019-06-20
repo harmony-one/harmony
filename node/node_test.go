@@ -24,14 +24,15 @@ import (
 var testDBFactory = &shardchain.MemDBFactory{}
 
 func TestNewNode(t *testing.T) {
-	pubKey := bls2.RandPrivateKey().GetPublicKey()
+	blsKey := bls2.RandPrivateKey()
+	pubKey := blsKey.GetPublicKey()
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", ConsensusPubKey: pubKey}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2pimpl.NewHost(&leader, priKey)
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := consensus.New(host, 0, leader, nil)
+	consensus, err := consensus.New(host, 0, leader, blsKey)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
@@ -50,7 +51,8 @@ func TestNewNode(t *testing.T) {
 }
 
 func TestGetSyncingPeers(t *testing.T) {
-	pubKey := bls2.RandPrivateKey().GetPublicKey()
+	blsKey := bls2.RandPrivateKey()
+	pubKey := blsKey.GetPublicKey()
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", ConsensusPubKey: pubKey}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2pimpl.NewHost(&leader, priKey)
@@ -58,7 +60,7 @@ func TestGetSyncingPeers(t *testing.T) {
 		t.Fatalf("newhost failure: %v", err)
 	}
 
-	consensus, err := consensus.New(host, 0, leader, nil)
+	consensus, err := consensus.New(host, 0, leader, blsKey)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
@@ -92,7 +94,8 @@ func TestAddPeers(t *testing.T) {
 			ConsensusPubKey: pubKey2,
 		},
 	}
-	pubKey := bls2.RandPrivateKey().GetPublicKey()
+	blsKey := bls2.RandPrivateKey()
+	pubKey := blsKey.GetPublicKey()
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8982", ConsensusPubKey: pubKey}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "8985"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
@@ -100,7 +103,7 @@ func TestAddPeers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := consensus.New(host, 0, leader, nil)
+	consensus, err := consensus.New(host, 0, leader, blsKey)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
@@ -138,7 +141,8 @@ func TestAddBeaconPeer(t *testing.T) {
 			PeerID:          "4567",
 		},
 	}
-	pubKey := bls2.RandPrivateKey().GetPublicKey()
+	blsKey := bls2.RandPrivateKey()
+	pubKey := blsKey.GetPublicKey()
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8982", ConsensusPubKey: pubKey}
 	validator := p2p.Peer{IP: "127.0.0.1", Port: "8985"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
@@ -146,7 +150,7 @@ func TestAddBeaconPeer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := consensus.New(host, 0, leader, nil)
+	consensus, err := consensus.New(host, 0, leader, blsKey)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
@@ -212,7 +216,8 @@ func exitServer() {
 }
 
 func TestPingPongHandler(t *testing.T) {
-	pubKey := bls2.RandPrivateKey().GetPublicKey()
+	blsKey := bls2.RandPrivateKey()
+	pubKey := blsKey.GetPublicKey()
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8881", ConsensusPubKey: pubKey}
 	//   validator := p2p.Peer{IP: "127.0.0.1", Port: "9991"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
@@ -220,7 +225,7 @@ func TestPingPongHandler(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := consensus.New(host, 0, leader, nil)
+	consensus, err := consensus.New(host, 0, leader, blsKey)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
