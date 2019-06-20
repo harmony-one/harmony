@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-## sudo yum install -q -y jq
+sudo yum install -q -y jq
 
 usage () {
    cat << EOT
@@ -67,13 +67,12 @@ health_report () {
     #echo "Your Node Version : "
     echo -e "\n====== HEALTH ======\n"
     LD_LIBRARY_PATH=$(pwd) ./harmony -version
-    echo "Current Length of Chain:" $chainLength
-    echo "Your Sync Status:" $synchStatus
-    echo "Latest Block Synchronized:" $lastSynchBlock
-    echo "Your Chain Length:" $chainLength
-    echo "Your Shard:" $my_shard
     echo "Your IP:" $ip
-    echo "Total Blocks Received After Syncing:" $bingos
+    echo "Your Shard:" $my_shard
+    echo "Your Sync Status:" $synchStatus
+    echo "Your Current Length of Chain:" $chainLength
+    echo "Your Latest Block Synchronized:" $lastSynchBlock
+    echo "Your Total Blocks Received After Syncing:" $bingos
     ./wallet.sh balances
 }
 
@@ -82,7 +81,7 @@ address_report () {
     address_field=$(grep -o '"address":"[a-z0-9]*' "${filename}")
     base16=$(cut -d\" -f4 <<< "${address_field}")
     bech32=$(./wallet.sh format --address 0x${base16} | head -n1 | awk -F: '{print $2}' | awk '{$1=$1}1')
-    curl -s https://raw.githubusercontent.com/harmony-one/harmony/master/internal/genesis/foundational.go | grep -qom1 "${bech32}"
+    curl -s https://raw.githubusercontent.com/harmony-one/harmony/master/internal/genesis/foundational.go | cat | cat | grep -qom1 "${bech32}"
     echo -e "\n====== ADDRESS ======\n"
     if [ $? -eq 0 ]; then
         echo "SUCCESS: "${bech32}" FOUND in our foundational list!"
