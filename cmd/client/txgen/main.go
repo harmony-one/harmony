@@ -109,7 +109,7 @@ func setUpTXGen() *node.Node {
 	consensusObj.PublicKeys = nil
 	startIdx := 0
 	endIdx := startIdx + core.GenesisShardSize
-	for _, acct := range genesis.GenesisAccounts[startIdx:endIdx] {
+	for _, acct := range genesis.HarmonyAccounts[startIdx:endIdx] {
 		pub := &bls2.PublicKey{}
 		if err := pub.DeserializeHexStr(acct.BlsPublicKey); err != nil {
 			fmt.Printf("Can not deserialize public key. err: %v", err)
