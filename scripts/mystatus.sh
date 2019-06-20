@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+## sudo yum install -q -y jq
+
 usage () {
    cat << EOT
 Usage: $0 [option] command
@@ -33,10 +35,16 @@ valid_ip () {
 
 health_report () {
     # Block heights
-    heightStatus=$(tac latest/validator*.log | grep -Eom1 '"myHeight":[0-9]+' | cut -d: -f2)
-    [ -z $heightStatus ] && heightStatus=Unknown
+    lastSynchBlock=$(tac latest/validator*.log | grep -Eoim1 '"OtherHeight":[0-9]+' | cut -d: -f2)
+    [ -z $lastSynchBlock ] && lastSynchBlock=Unknown
 
-    lengthOfChain=$(tac latest/validator*.log | grep -Eom1 '"otherHeight":[0-9]+' | cut -d: -f2)
+    chainLength=$(jq -r 'select(.msg == "[TryCatchup] Adding block to chain") | .myBlock' ./latest/v*.log | tail -1 | cut -d: -f2)
+    [ -z "$chainLength" ] && chainLength=Unknown
+
+    synchStatus=$(jq -r 'select(.msg == "Node is in sync" or .msg == "Node is out of sync") | .msg' ./latest/v*.log | tail -1 | cut -d: -f2)
+    [ -z "$synchStatus" ] && synchStatus=Unknown
+
+    lengthOfChain=$(tac latest/validator*.log | grep -Eoim1 '"OtherHeight":[0-9]+' | cut -d: -f2)
     [ -z $lengthOfChain ] && lengthOfChain=Unknown
 
     # Shard number
@@ -59,8 +67,10 @@ health_report () {
     #echo "Your Node Version : "
     echo -e "\n====== HEALTH ======\n"
     LD_LIBRARY_PATH=$(pwd) ./harmony -version
-    echo "Current Length of Chain:" $lengthOfChain
-    echo "Your Sync Status:" $heightStatus
+    echo "Current Length of Chain:" $chainLength
+    echo "Your Sync Status:" $synchStatus
+    echo "Latest Block Synchronized:" $lastSynchBlock
+    echo "Your Chain Length:" $chainLength
     echo "Your Shard:" $my_shard
     echo "Your IP:" $ip
     echo "Total Blocks Received After Syncing:" $bingos
@@ -86,6 +96,7 @@ address_report () {
 while getopts "h" opt; do
     case $opt in
         h|*)
+            echo "GETOPTS"
             usage
             exit 1
             ;;
@@ -93,7 +104,7 @@ while getopts "h" opt; do
 done
 shift $(($OPTIND - 1))
 
-[ $# -eq 0 ] && usage && exit 1
+[ $# -eq 0 ] && address_report && health_report && exit 1
 
 while :; do
     case "$1" in
@@ -111,9 +122,11 @@ while :; do
             shift
             ;;
         '')
+            echo "EMPTY"
             exit 0
             ;;
         *)
+            echo "**********"
             usage
             exit 1
             ;;
