@@ -70,7 +70,7 @@ type Shard struct {
 
 // NewBlock ...
 func NewBlock(block *types.Block, height int) *Block {
-	// TODO(ricl): use block.Header().CommitBitmap and GetPubKeyFromMask
+	// TODO(ricl): use block.Header().LastCommitBitmap and GetPubKeyFromMask
 	return &Block{
 		Height:     strconv.Itoa(height),
 		ID:         block.Hash().Hex(),

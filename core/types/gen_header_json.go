@@ -33,7 +33,7 @@ func (h Header) MarshalJSON() ([]byte, error) {
 	}
 	var enc Header
 	enc.ParentHash = h.ParentHash
-	enc.Coinbase = h.Coinbase
+	enc.Coinbase = h.Proposer
 	enc.Root = h.Root
 	enc.TxHash = h.TxHash
 	enc.ReceiptHash = h.ReceiptHash
@@ -75,7 +75,7 @@ func (h *Header) UnmarshalJSON(input []byte) error {
 	if dec.Coinbase == nil {
 		return errors.New("missing required field 'miner' for Header")
 	}
-	h.Coinbase = *dec.Coinbase
+	h.Proposer = *dec.Coinbase
 	if dec.Root == nil {
 		return errors.New("missing required field 'stateRoot' for Header")
 	}

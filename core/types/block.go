@@ -72,7 +72,7 @@ func (n *BlockNonce) UnmarshalText(input []byte) error {
 // Header represents a block header in the Ethereum blockchain.
 type Header struct {
 	ParentHash  common.Hash    `json:"parentHash"       gencodec:"required"`
-	Coinbase    common.Address `json:"miner"            gencodec:"required"`
+	Proposer    common.Address `json:"proposer"         gencodec:"required"`
 	Root        common.Hash    `json:"stateRoot"        gencodec:"required"`
 	TxHash      common.Hash    `json:"transactionsRoot" gencodec:"required"`
 	ReceiptHash common.Hash    `json:"receiptsRoot"     gencodec:"required"`
@@ -84,19 +84,17 @@ type Header struct {
 	Extra       []byte         `json:"extraData"        gencodec:"required"`
 	MixDigest   common.Hash    `json:"mixHash"          gencodec:"required"`
 	// Additional Fields
-	Epoch            *big.Int    `json:"epoch"            gencodec:"required"`
-	ShardID          uint32      `json:"shardID"          gencodec:"required"`
-	PrepareSignature [96]byte    `json:"prepareSignature" gencodec:"required"`
-	PrepareBitmap    []byte      `json:"prepareBitmap"    gencodec:"required"` // Contains which validator signed
-	CommitSignature  [96]byte    `json:"commitSignature"  gencodec:"required"`
-	CommitBitmap     []byte      `json:"commitBitmap"     gencodec:"required"` // Contains which validator signed
-	Vrf              [32]byte    `json:"vrf"`
-	VrfProof         [96]byte    `json:"vrfProof"`
-	Vdf              [258]byte   `json:"vdf"`
-	VdfProof         [258]byte   `json:"vdfProof"`
-	ShardStateHash   common.Hash `json:"shardStateRoot"`
-	ShardState       ShardState  `json:"shardState"`
-	CrossLinks       [][]byte    `json:"crossLinks"`
+	Epoch               *big.Int    `json:"epoch"            gencodec:"required"`
+	ShardID             uint32      `json:"shardID"          gencodec:"required"`
+	LastCommitSignature [96]byte    `json:"lastCommitSignature"  gencodec:"required"`
+	LastCommitBitmap    []byte      `json:"lastCommitBitmap"     gencodec:"required"` // Contains which validator signed for last block
+	Vrf                 [32]byte    `json:"vrf"            rlp:"nil"`
+	VrfProof            [96]byte    `json:"vrfProof"       rlp:"nil"`
+	Vdf                 [258]byte   `json:"vdf"            rlp:"nil"`
+	VdfProof            [258]byte   `json:"vdfProof"       rlp:"nil"`
+	ShardStateHash      common.Hash `json:"shardStateRoot" rlp:"nil"`
+	ShardState          ShardState  `json:"shardState"     rlp:"nil"`
+	CrossLinks          [][]byte    `json:"crossLinks"     rlp:"nil"`
 }
 
 // field type overrides for gencodec
@@ -167,26 +165,15 @@ type Block struct {
 	ReceivedFrom interface{}
 }
 
-// SetPrepareSig sets the block's prepare group signature.
-func (b *Block) SetPrepareSig(sig []byte, signers []byte) {
-	if len(sig) != len(b.header.PrepareSignature) {
-		utils.GetLogInstance().Warn("SetPrepareSig: sig size mismatch",
-			"srcLen", len(sig),
-			"dstLen", len(b.header.PrepareSignature))
-	}
-	copy(b.header.PrepareSignature[:], sig[:])
-	b.header.PrepareBitmap = append(signers[:0:0], signers...)
-}
-
 // SetCommitSig sets the block's commit group signature.
 func (b *Block) SetCommitSig(sig []byte, signers []byte) {
-	if len(sig) != len(b.header.CommitSignature) {
+	if len(sig) != len(b.header.LastCommitSignature) {
 		utils.GetLogInstance().Warn("SetCommitSig: sig size mismatch",
 			"srcLen", len(sig),
-			"dstLen", len(b.header.CommitSignature))
+			"dstLen", len(b.header.LastCommitSignature))
 	}
-	copy(b.header.CommitSignature[:], sig[:])
-	b.header.CommitBitmap = append(signers[:0:0], signers...)
+	copy(b.header.LastCommitSignature[:], sig[:])
+	b.header.LastCommitBitmap = append(signers[:0:0], signers...)
 }
 
 // DeprecatedTd is an old relic for extracting the TD of a block. It is in the
@@ -348,8 +335,8 @@ func (b *Block) ShardID() uint32 { return b.header.ShardID }
 // Bloom returns header bloom.
 func (b *Block) Bloom() ethtypes.Bloom { return b.header.Bloom }
 
-// Coinbase returns header coinbase.
-func (b *Block) Coinbase() common.Address { return b.header.Coinbase }
+// Proposer returns header coinbase.
+func (b *Block) Coinbase() common.Address { return b.header.Proposer }
 
 // Root returns header root.
 func (b *Block) Root() common.Hash { return b.header.Root }

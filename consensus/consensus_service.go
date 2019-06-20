@@ -61,7 +61,7 @@ func (consensus *Consensus) SealHash(header *types.Header) (hash common.Hash) {
 	// TODO: update with new fields
 	if err := rlp.Encode(hasher, []interface{}{
 		header.ParentHash,
-		header.Coinbase,
+		header.Proposer,
 		header.Root,
 		header.TxHash,
 		header.ReceiptHash,

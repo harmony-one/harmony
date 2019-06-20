@@ -797,9 +797,6 @@ func (consensus *Consensus) tryCatchup() {
 		copy(prepareBitmap[:], msg.Payload[offset:])
 		//#### END Read payload data from committed msg
 
-		// Put the signatures into the block
-		block.SetPrepareSig(prepareSig, prepareBitmap)
-
 		block.SetCommitSig(aggSig, bitmap)
 		consensus.getLogger().Info("[TryCatchup] Adding block to chain")
 		consensus.OnConsensusDone(block)

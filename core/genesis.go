@@ -248,7 +248,7 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 		GasLimit:       g.GasLimit,
 		GasUsed:        g.GasUsed,
 		MixDigest:      g.Mixhash,
-		Coinbase:       g.Coinbase,
+		Proposer:       g.Coinbase,
 		Root:           root,
 		ShardStateHash: g.ShardStateHash,
 		// ShardState is absent in epoch block; genesis shard state is implied
