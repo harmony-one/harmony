@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
+	"github.com/harmony-one/harmony/common/config"
 	"math"
 	"math/big"
 	"os"
@@ -403,55 +404,55 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 
 	node.AddNewBlock(newBlock)
 
-	// Update contract deployer's nonce so default contract like faucet can issue transaction with current nonce
-	nonce := node.GetNonceOfAddress(crypto.PubkeyToAddress(node.ContractDeployerKey.PublicKey))
-	atomic.StoreUint64(&node.ContractDeployerCurrentNonce, nonce)
-
-	for _, tx := range newBlock.Transactions() {
-		msg, err := tx.AsMessage(types.HomesteadSigner{})
-		if err != nil {
-			utils.GetLogInstance().Error("Error when parsing tx into message")
-		}
-		if _, ok := node.AddressNonce.Load(msg.From()); ok {
-			nonce := node.GetNonceOfAddress(msg.From())
-			node.AddressNonce.Store(msg.From(), nonce)
-		}
-	}
-
-	if node.Consensus.ShardID == 0 {
+	if config.Network != config.Mainnet {
 		// Update contract deployer's nonce so default contract like faucet can issue transaction with current nonce
 		nonce := node.GetNonceOfAddress(crypto.PubkeyToAddress(node.ContractDeployerKey.PublicKey))
 		atomic.StoreUint64(&node.ContractDeployerCurrentNonce, nonce)
 
-		// TODO: enable drand only for beacon chain
-		// ConfirmedBlockChannel which is listened by drand leader who will initiate DRG if its a epoch block (first block of a epoch)
-		if node.DRand != nil {
-			go func() {
-				node.ConfirmedBlockChannel <- newBlock
-			}()
-		}
-
-		// TODO: update staking information once per epoch.
-		node.UpdateStakingList(node.QueryStakeInfo())
-		node.printStakingList()
-	}
-	newBlockHeader := newBlock.Header()
-	if newBlockHeader.ShardStateHash != (common.Hash{}) {
-		if node.Consensus.ShardID == 0 {
-			// TODO ek – this is a temp hack until beacon chain sync is fixed
-			// End-of-epoch block on beacon chain; block's EpochState is the
-			// master resharding table.  Broadcast it to the network.
-			if err := node.broadcastEpochShardState(newBlock); err != nil {
-				e := ctxerror.New("cannot broadcast shard state").WithCause(err)
-				ctxerror.Log15(utils.GetLogInstance().Error, e)
+		for _, tx := range newBlock.Transactions() {
+			msg, err := tx.AsMessage(types.HomesteadSigner{})
+			if err != nil {
+				utils.GetLogInstance().Error("Error when parsing tx into message")
+			}
+			if _, ok := node.AddressNonce.Load(msg.From()); ok {
+				nonce := node.GetNonceOfAddress(msg.From())
+				node.AddressNonce.Store(msg.From(), nonce)
 			}
 		}
-		shardState, err := newBlockHeader.GetShardState()
-		if err != nil {
-			e := ctxerror.New("cannot get shard state from header").WithCause(err)
-			ctxerror.Log15(utils.GetLogInstance().Error, e)
-		} else {
-			node.transitionIntoNextEpoch(shardState)
+
+
+		// TODO: Enable the following after v0
+		if node.Consensus.ShardID == 0 {
+			// TODO: enable drand only for beacon chain
+			// ConfirmedBlockChannel which is listened by drand leader who will initiate DRG if its a epoch block (first block of a epoch)
+			if node.DRand != nil {
+				go func() {
+					node.ConfirmedBlockChannel <- newBlock
+				}()
+			}
+
+			// TODO: update staking information once per epoch.
+			node.UpdateStakingList(node.QueryStakeInfo())
+			node.printStakingList()
+		}
+		newBlockHeader := newBlock.Header()
+		if newBlockHeader.ShardStateHash != (common.Hash{}) {
+			if node.Consensus.ShardID == 0 {
+				// TODO ek – this is a temp hack until beacon chain sync is fixed
+				// End-of-epoch block on beacon chain; block's EpochState is the
+				// master resharding table.  Broadcast it to the network.
+				if err := node.broadcastEpochShardState(newBlock); err != nil {
+					e := ctxerror.New("cannot broadcast shard state").WithCause(err)
+					ctxerror.Log15(utils.GetLogInstance().Error, e)
+				}
+			}
+			shardState, err := newBlockHeader.GetShardState()
+			if err != nil {
+				e := ctxerror.New("cannot get shard state from header").WithCause(err)
+				ctxerror.Log15(utils.GetLogInstance().Error, e)
+			} else {
+				node.transitionIntoNextEpoch(shardState)
+			}
 		}
 	}
 }

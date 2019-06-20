@@ -237,7 +237,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 		copy(startHashHeader[:], request.BlockHash[:])
 		startBlock := node.Blockchain().GetBlockByHash(startHashHeader)
 		if startBlock == nil {
-			return response, fmt.Errorf("[SYNC] GetBlockHashes Request cannot find startHash %v", startHashHeader)
+			return response, fmt.Errorf("[SYNC] GetBlockHashes Request cannot find startHash %s", startHashHeader.Hex())
 		}
 		startHeight := startBlock.NumberU64()
 		endHeight := node.Blockchain().CurrentBlock().NumberU64()

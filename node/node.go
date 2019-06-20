@@ -8,9 +8,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/common/config"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/api/client"
@@ -289,20 +290,11 @@ func (node *Node) GetSyncID() [SyncIDLength]byte {
 
 // New creates a new node.
 func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardchain.DBFactory, isArchival bool) *Node {
-	var err error
-
 	node := Node{}
 	copy(node.syncID[:], GenerateRandomString(SyncIDLength))
 	if host != nil {
 		node.host = host
 		node.SelfPeer = host.GetSelfPeer()
-	}
-
-	// Create test keys.  Genesis will later need this.
-	node.TestBankKeys, err = CreateTestBankKeys(TestAccountNumber)
-	if err != nil {
-		utils.GetLogInstance().Crit("Error while creating test keys",
-			"error", err)
 	}
 
 	collection := shardchain.NewCollection(
@@ -332,26 +324,36 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 
 		// Add Faucet contract to all shards, so that on testnet, we can demo wallet in explorer
 		// TODO (leo): we need to have support of cross-shard tx later so that the token can be transferred from beacon chain shard to other tx shards.
-		if node.isFirstTime {
-			// Setup one time smart contracts
-			//node.AddFaucetContractToPendingTransactions()
-		} else {
-			node.AddContractKeyAndAddress(scFaucet)
-		}
-
-		if node.Consensus.ShardID == 0 {
-			// Contracts only exist in beacon chain
+		if config.Network != config.Mainnet {
 			if node.isFirstTime {
 				// Setup one time smart contracts
-				node.CurrentStakes = make(map[common.Address]*structs.StakeInfo)
-				node.AddStakingContractToPendingTransactions() //This will save the latest information about staked nodes in current staked
+				//node.AddFaucetContractToPendingTransactions()
 			} else {
-				node.AddContractKeyAndAddress(scStaking)
+				node.AddContractKeyAndAddress(scFaucet)
+			}
+
+			if node.Consensus.ShardID == 0 {
+				// Contracts only exist in beacon chain
+				if node.isFirstTime {
+					// Setup one time smart contracts
+					node.CurrentStakes = make(map[common.Address]*structs.StakeInfo)
+					node.AddStakingContractToPendingTransactions() //This will save the latest information about staked nodes in current staked
+				} else {
+					node.AddContractKeyAndAddress(scStaking)
+				}
+			}
+
+			node.ContractCaller = contracts.NewContractCaller(node.Blockchain(), node.Blockchain().Config())
+
+			// Create test keys.  Genesis will later need this.
+			var err error
+			node.TestBankKeys, err = CreateTestBankKeys(TestAccountNumber)
+			if err != nil {
+				utils.GetLogInstance().Crit("Error while creating test keys",
+					"error", err)
 			}
 		}
 	}
-
-	node.ContractCaller = contracts.NewContractCaller(node.Blockchain(), params.TestChainConfig)
 
 	if consensusObj != nil && nodeconfig.GetDefaultConfig().IsLeader() {
 		node.State = NodeLeader

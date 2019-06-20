@@ -10,6 +10,8 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/harmony-one/harmony/common/config"
+
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 
@@ -98,6 +100,8 @@ var (
 	delayCommit = flag.String("delay_commit", "0ms", "how long to delay sending commit messages in consensus, ex: 500ms, 1s")
 	// isExplorer indicates this node is a node to serve explorer
 	isExplorer = flag.Bool("is_explorer", false, "true means this node is a node to serve explorer")
+	// networkType indicates the type of the network
+	networkType = flag.String("network_type", "mainnet", "type of the network: mainnet, testnet, devnet...")
 	// isNewNode indicates this node is a new node
 	isNewNode          = flag.Bool("is_newnode", false, "true means this node is a new node")
 	shardID            = flag.Int("shard_id", -1, "the shard ID of this node")
@@ -135,6 +139,15 @@ var (
 )
 
 func initSetup() {
+	switch *networkType {
+	case "mainnet":
+		config.Network = config.Mainnet
+	case "testnet":
+		config.Network = config.Testnet
+	case "devnet":
+		config.Network = config.Devnet
+	}
+
 	// Set port and ip to global config.
 	nodeconfig.GetDefaultConfig().Port = *port
 	nodeconfig.GetDefaultConfig().IP = *ip
