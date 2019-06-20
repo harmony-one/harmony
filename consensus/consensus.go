@@ -2,6 +2,7 @@
 package consensus // consensus
 
 import (
+	"fmt"
 	"math/big"
 	"sync"
 	"time"
@@ -256,6 +257,9 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 		consensus.priKey = blsPriKey
 		consensus.PubKey = blsPriKey.GetPublicKey()
 		utils.GetLogInstance().Info("my pubkey is", "pubkey", consensus.PubKey.SerializeToHexStr())
+	} else {
+		utils.GetLogInstance().Error("the bls key is nil")
+		return nil, fmt.Errorf("nil bls key, aborting")
 	}
 
 	// viewID has to be initialized as the height of the blockchain during initialization
