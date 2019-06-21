@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
-	"github.com/harmony-one/harmony/common/config"
 	"math"
 	"math/big"
 	"os"
@@ -16,6 +15,8 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
+
+	"github.com/harmony-one/harmony/common/config"
 
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/consensus"
@@ -419,7 +420,6 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 				node.AddressNonce.Store(msg.From(), nonce)
 			}
 		}
-
 
 		// TODO: Enable the following after v0
 		if node.Consensus.ShardID == 0 {
