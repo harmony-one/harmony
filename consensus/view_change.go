@@ -38,7 +38,7 @@ const (
 // PbftMode contains mode and viewID of viewchanging
 type PbftMode struct {
 	mode   Mode
-	viewID uint32
+	viewID uint64
 	mux    sync.Mutex
 }
 
@@ -79,19 +79,19 @@ func (pm *PbftMode) SetMode(m Mode) {
 }
 
 // ViewID return the current viewchanging id
-func (pm *PbftMode) ViewID() uint32 {
+func (pm *PbftMode) ViewID() uint64 {
 	return pm.viewID
 }
 
 // SetViewID sets the viewchanging id accordingly
-func (pm *PbftMode) SetViewID(viewID uint32) {
+func (pm *PbftMode) SetViewID(viewID uint64) {
 	pm.mux.Lock()
 	defer pm.mux.Unlock()
 	pm.viewID = viewID
 }
 
 // GetViewID returns the current viewchange viewID
-func (pm *PbftMode) GetViewID() uint32 {
+func (pm *PbftMode) GetViewID() uint64 {
 	return pm.viewID
 }
 
@@ -161,7 +161,7 @@ func createTimeout() map[TimeoutType]*utils.Timeout {
 }
 
 // startViewChange send a  new view change
-func (consensus *Consensus) startViewChange(viewID uint32) {
+func (consensus *Consensus) startViewChange(viewID uint64) {
 	if consensus.disableViewChange {
 		return
 	}
@@ -249,8 +249,8 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	// add self m3 type message signature and bitmap
 	_, ok3 := consensus.viewIDSigs[consensus.PubKey.SerializeToHexStr()]
 	if !ok3 {
-		viewIDBytes := make([]byte, 4)
-		binary.LittleEndian.PutUint32(viewIDBytes, recvMsg.ViewID)
+		viewIDBytes := make([]byte, 8)
+		binary.LittleEndian.PutUint64(viewIDBytes, recvMsg.ViewID)
 		consensus.viewIDSigs[consensus.PubKey.SerializeToHexStr()] = consensus.priKey.SignHash(viewIDBytes)
 		consensus.viewIDBitmap.SetKey(consensus.PubKey, true)
 	}
@@ -331,8 +331,8 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		consensus.getLogger().Debug("[onViewChange] Already Received M3(ViewID) message from the validator", "senderKey.SerializeToHexStr()", senderKey.SerializeToHexStr())
 		return
 	}
-	viewIDHash := make([]byte, 4)
-	binary.LittleEndian.PutUint32(viewIDHash, recvMsg.ViewID)
+	viewIDHash := make([]byte, 8)
+	binary.LittleEndian.PutUint64(viewIDHash, recvMsg.ViewID)
 	if !recvMsg.ViewidSig.VerifyHash(recvMsg.SenderPubkey, viewIDHash) {
 		consensus.getLogger().Warn("[onViewChange] Failed to Verify M3 Message Signature", "MsgViewID", recvMsg.ViewID)
 		return
@@ -416,8 +416,8 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	m3Sig := recvMsg.M3AggSig
 	m3Mask := recvMsg.M3Bitmap
 
-	viewIDBytes := make([]byte, 4)
-	binary.LittleEndian.PutUint32(viewIDBytes, recvMsg.ViewID)
+	viewIDBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(viewIDBytes, recvMsg.ViewID)
 	// check total number of sigs >= 2f+1
 	if count := utils.CountOneBits(m3Mask.Bitmap); count < consensus.Quorum() {
 		consensus.getLogger().Debug("[onNewView] Not Have Enough M3 (ViewID) Signature", "need", consensus.Quorum(), "have", count)

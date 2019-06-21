@@ -49,7 +49,7 @@ type Consensus struct {
 	delayCommit time.Duration
 
 	// Consensus rounds whose commit phase finished
-	commitFinishChan chan uint32
+	commitFinishChan chan uint64
 
 	// 2 types of timeouts: normal and viewchange
 	consensusTimeout map[TimeoutType]*utils.Timeout
@@ -99,8 +99,7 @@ type Consensus struct {
 	// the publickey of leader
 	LeaderPubKey *bls.PublicKey
 
-	// Consensus Id (View Id) - 4 byte
-	viewID uint32 // TODO(chao): change it to uint64 or add overflow checking mechanism
+	viewID uint64
 
 	// Blockhash - 32 byte
 	blockHash [32]byte
@@ -270,7 +269,7 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 	consensus.MsgChan = make(chan []byte)
 	consensus.syncReadyChan = make(chan struct{})
 	consensus.syncNotReadyChan = make(chan struct{})
-	consensus.commitFinishChan = make(chan uint32)
+	consensus.commitFinishChan = make(chan uint64)
 
 	consensus.ReadySignal = make(chan struct{})
 	if nodeconfig.GetDefaultConfig().IsLeader() {

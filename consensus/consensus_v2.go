@@ -562,7 +562,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 
 	if !quorumWasMet && quorumIsMet {
 		consensus.getLogger().Info("[OnCommit] 2/3 Enough commits received", "NumCommits", len(commitSigs))
-		go func(viewID uint32) {
+		go func(viewID uint64) {
 			time.Sleep(2 * time.Second)
 			consensus.getLogger().Debug("[OnCommit] Commit Grace Period Ended", "NumCommits", len(commitSigs))
 			consensus.commitFinishChan <- viewID
@@ -570,7 +570,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	}
 
 	if rewardThresholdIsMet {
-		go func(viewID uint32) {
+		go func(viewID uint64) {
 			consensus.commitFinishChan <- viewID
 			consensus.getLogger().Debug("[OnCommit] 90% Enough commits received", "NumCommits", len(commitSigs))
 		}(consensus.viewID)

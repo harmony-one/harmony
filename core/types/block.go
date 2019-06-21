@@ -84,7 +84,7 @@ type Header struct {
 	Extra       []byte         `json:"extraData"        gencodec:"required"`
 	MixDigest   common.Hash    `json:"mixHash"          gencodec:"required"`
 	// Additional Fields
-	ViewID              uint32      `json:"viewID"           gencodec:"required"`
+	ViewID              *big.Int    `json:"viewID"           gencodec:"required"`
 	Epoch               *big.Int    `json:"epoch"            gencodec:"required"`
 	ShardID             uint32      `json:"shardID"          gencodec:"required"`
 	LastCommitSignature [96]byte    `json:"lastCommitSignature"  gencodec:"required"`

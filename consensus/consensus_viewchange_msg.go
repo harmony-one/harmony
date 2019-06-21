@@ -20,7 +20,7 @@ func (consensus *Consensus) constructViewChangeMessage() []byte {
 	}
 
 	vcMsg := message.GetViewchange()
-	vcMsg.ViewId = consensus.mode.GetViewID()
+	vcMsg.ViewId = consensus.mode.ViewID()
 	vcMsg.BlockNum = consensus.blockNum
 	vcMsg.ShardId = consensus.ShardID
 	// sender address
@@ -51,8 +51,8 @@ func (consensus *Consensus) constructViewChangeMessage() []byte {
 		utils.GetLogger().Error("unable to serialize m1/m2 view change message signature")
 	}
 
-	viewIDBytes := make([]byte, 4)
-	binary.LittleEndian.PutUint32(viewIDBytes, consensus.mode.ViewID())
+	viewIDBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(viewIDBytes, consensus.mode.ViewID())
 	sign1 := consensus.priKey.SignHash(viewIDBytes)
 	if sign1 != nil {
 		vcMsg.ViewidSig = sign1.Serialize()

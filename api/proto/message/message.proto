@@ -80,7 +80,7 @@ message StakingRequest {
 }
 
 message ConsensusRequest {
-  uint32 view_id = 1;
+  uint64 view_id = 1;
   uint64 block_num = 2;
   uint32 shard_id = 3;
   bytes block_hash = 4;
@@ -97,7 +97,7 @@ message DrandRequest {
 }
 
 message ViewChangeRequest {
-    uint32 view_id = 1;
+    uint64 view_id = 1;
     uint64 block_num = 2;
     uint32 shard_id = 3;
     bytes sender_pubkey = 4;

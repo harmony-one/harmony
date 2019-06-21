@@ -152,7 +152,7 @@ func (consensus *Consensus) GetNodeIDs() []libp2p_peer.ID {
 }
 
 // GetViewID returns the consensus ID
-func (consensus *Consensus) GetViewID() uint32 {
+func (consensus *Consensus) GetViewID() uint64 {
 	return consensus.viewID
 }
 
@@ -474,7 +474,7 @@ func (consensus *Consensus) verifyViewChangeSenderKey(msg *msg_pb.Message) (*bls
 }
 
 // SetViewID set the viewID to the height of the blockchain
-func (consensus *Consensus) SetViewID(height uint32) {
+func (consensus *Consensus) SetViewID(height uint64) {
 	consensus.viewID = height
 }
 

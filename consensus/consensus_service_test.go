@@ -84,7 +84,7 @@ func TestSetViewID(t *testing.T) {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
 
-	height := uint32(1000)
+	height := uint64(1000)
 	consensus.SetViewID(height)
 	if consensus.viewID != height {
 		t.Errorf("Cannot set consensus ID. Got: %v, Expected: %v", consensus.viewID, height)

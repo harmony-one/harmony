@@ -24,7 +24,7 @@ type PbftLog struct {
 // PbftMessage is the record of pbft messages received by a node during PBFT process
 type PbftMessage struct {
 	MessageType   msg_pb.MessageType
-	ViewID        uint32
+	ViewID        uint64
 	BlockNum      uint64
 	BlockHash     common.Hash
 	Block         []byte
@@ -130,7 +130,7 @@ func (log *PbftLog) AddMessage(msg *PbftMessage) {
 }
 
 // GetMessagesByTypeSeqViewHash returns pbft messages with matching type, blockNum, viewID and blockHash
-func (log *PbftLog) GetMessagesByTypeSeqViewHash(typ msg_pb.MessageType, blockNum uint64, viewID uint32, blockHash common.Hash) []*PbftMessage {
+func (log *PbftLog) GetMessagesByTypeSeqViewHash(typ msg_pb.MessageType, blockNum uint64, viewID uint64, blockHash common.Hash) []*PbftMessage {
 	found := []*PbftMessage{}
 	it := log.Messages().Iterator()
 	for msg := range it.C {
@@ -172,7 +172,7 @@ func (log *PbftLog) HasMatchingAnnounce(blockNum uint64, blockHash common.Hash) 
 }
 
 // HasMatchingViewAnnounce returns whether the log contains announce type message with given blockNum, viewID and blockHash
-func (log *PbftLog) HasMatchingViewAnnounce(blockNum uint64, viewID uint32, blockHash common.Hash) bool {
+func (log *PbftLog) HasMatchingViewAnnounce(blockNum uint64, viewID uint64, blockHash common.Hash) bool {
 	found := log.GetMessagesByTypeSeqViewHash(msg_pb.MessageType_ANNOUNCE, blockNum, viewID, blockHash)
 	return len(found) == 1
 }
@@ -184,13 +184,13 @@ func (log *PbftLog) HasMatchingPrepared(blockNum uint64, blockHash common.Hash) 
 }
 
 // HasMatchingViewPrepared returns whether the log contains prepared message with given blockNum, viewID and blockHash
-func (log *PbftLog) HasMatchingViewPrepared(blockNum uint64, viewID uint32, blockHash common.Hash) bool {
+func (log *PbftLog) HasMatchingViewPrepared(blockNum uint64, viewID uint64, blockHash common.Hash) bool {
 	found := log.GetMessagesByTypeSeqViewHash(msg_pb.MessageType_PREPARED, blockNum, viewID, blockHash)
 	return len(found) == 1
 }
 
 // GetMessagesByTypeSeqView returns pbft messages with matching type, blockNum and viewID
-func (log *PbftLog) GetMessagesByTypeSeqView(typ msg_pb.MessageType, blockNum uint64, viewID uint32) []*PbftMessage {
+func (log *PbftLog) GetMessagesByTypeSeqView(typ msg_pb.MessageType, blockNum uint64, viewID uint64) []*PbftMessage {
 	found := []*PbftMessage{}
 	it := log.Messages().Iterator()
 	for msg := range it.C {
@@ -208,7 +208,7 @@ func (log *PbftLog) FindMessageByMaxViewID(msgs []*PbftMessage) *PbftMessage {
 		return nil
 	}
 	maxIdx := -1
-	maxViewID := uint32(0)
+	maxViewID := uint64(0)
 	for k, v := range msgs {
 		if v.ViewID >= maxViewID {
 			maxIdx = k
