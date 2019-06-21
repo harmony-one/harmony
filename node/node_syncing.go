@@ -15,7 +15,6 @@ import (
 	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	netconfig "github.com/harmony-one/harmony/internal/configs/net"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
@@ -70,8 +69,11 @@ func (node *Node) GetSyncingPeers() []p2p.Peer {
 // GetPeersFromDNS get peers from our DNS server; TODO: temp fix for resolve node syncing
 // the GetSyncingPeers return a bunch of "new" peers, all of them are out of sync
 func (node *Node) GetPeersFromDNS() []p2p.Peer {
+	if node.dnsZone == "" {
+		return nil
+	}
 	shardID := node.Consensus.ShardID
-	dns := netconfig.DNS[shardID]
+	dns := fmt.Sprintf("s%d.%s", shardID, node.dnsZone)
 	addrs, err := net.LookupHost(dns)
 	if err != nil {
 		utils.GetLogInstance().Debug("GetPeersFromDNS cannot find peers", "error", err)
@@ -163,7 +165,7 @@ func (node *Node) SupportSyncing() {
 	node.StartSyncingServer()
 	go node.SendNewBlockToUnsync()
 
-	if node.dnsFlag {
+	if node.dnsZone != "" {
 		go node.DoSyncing(node.Blockchain(), node.Worker, node.GetPeersFromDNS, true)
 	} else {
 		go node.DoSyncing(node.Blockchain(), node.Worker, node.GetSyncingPeers, true)
