@@ -9,10 +9,9 @@ import (
 	"path"
 	"time"
 
-	"github.com/harmony-one/bls/ffi/go/bls"
-
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/harmony-one/bls/ffi/go/bls"
 
 	"github.com/harmony-one/harmony/accounts/keystore"
 	"github.com/harmony-one/harmony/consensus"
@@ -101,8 +100,11 @@ var (
 	isExplorer = flag.Bool("is_explorer", false, "true means this node is a node to serve explorer")
 	// networkType indicates the type of the network
 	networkType = flag.String("network_type", "mainnet", "type of the network: mainnet, testnet, devnet...")
+	// blockPeriod indicates the how long the leader waits to propose a new block.
+	blockPeriod = flag.Int("block_period", 10, "how long in second the leader waits to propose a new block.")
 	// isNewNode indicates this node is a new node
-	isNewNode          = flag.Bool("is_newnode", false, "true means this node is a new node")
+	isNewNode = flag.Bool("is_newnode", false, "true means this node is a new node")
+	// shardID indicates the shard ID of this node
 	shardID            = flag.Int("shard_id", -1, "the shard ID of this node")
 	enableMemProfiling = flag.Bool("enableMemProfiling", false, "Enable memsize logging.")
 	enableGC           = flag.Bool("enableGC", true, "Enable calling garbage collector manually .")
@@ -386,6 +388,9 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	}
 	currentNode.NodeConfig.ConsensusPubKey = nodeConfig.ConsensusPubKey
 	currentNode.NodeConfig.ConsensusPriKey = nodeConfig.ConsensusPriKey
+
+	// Setup block period for currentNode.
+	currentNode.BlockPeriod = time.Duration(*blockPeriod) * time.Second
 
 	// TODO: Disable drand. Currently drand isn't functioning but we want to compeletely turn it off for full protection.
 	// Enable it back after mainnet.

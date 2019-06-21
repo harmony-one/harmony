@@ -634,9 +634,6 @@ func (consensus *Consensus) finalizeCommits() {
 
 	consensus.getLogger().Info("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!", "BlockNum", beforeCatchupNum, "ViewId", beforeCatchupViewID, "BlockHash", block.Hash(), "index", consensus.getIndexOfPubKey(consensus.PubKey))
 
-	// TODO: wait for validators receive committed message; remove this temporary delay
-	time.Sleep(time.Second)
-
 	// Send signal to Node so the new block can be added and new round of consensus can be triggered
 	consensus.ReadySignal <- struct{}{}
 }

@@ -19,7 +19,6 @@ const (
 	FirstTimeThreshold = 2
 	ConsensusTimeOut   = 30
 	PeriodicBlock      = 1 * time.Second
-	BlockPeriod        = 10 * time.Second
 )
 
 // WaitForConsensusReadyv2 listen for the readiness signal from consensus and generate new block for consensus.
@@ -54,7 +53,7 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 				}
 			case <-readySignal:
 				firstTry := true
-				deadline := time.Now().Add(BlockPeriod)
+				deadline := time.Now().Add(node.BlockPeriod)
 				for {
 					if !firstTry {
 						time.Sleep(PeriodicBlock)
@@ -70,7 +69,7 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 					if len(node.pendingTransactions) < threshold && time.Now().Before(deadline) {
 						continue
 					}
-					deadline = time.Now().Add(BlockPeriod)
+					deadline = time.Now().Add(node.BlockPeriod)
 					// Normal tx block consensus
 					selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
 					utils.GetLogInstance().Info("PROPOSING NEW BLOCK ------------------------------------------------", "blockNum", node.Blockchain().CurrentBlock().NumberU64()+1, "threshold", threshold, "selectedTxs", len(selectedTxs))
