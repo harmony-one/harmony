@@ -35,6 +35,9 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 		firstTime := true
 		timeoutCount := 0
 		var newBlock *types.Block
+
+		// Set up the very first deadline.
+		deadline := time.Now().Add(node.BlockPeriod)
 		for {
 			// keep waiting for Consensus ready
 			select {
@@ -53,7 +56,6 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 				}
 			case <-readySignal:
 				firstTry := true
-				deadline := time.Now().Add(node.BlockPeriod)
 				for {
 					if !firstTry {
 						time.Sleep(PeriodicBlock)
@@ -69,7 +71,6 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 					if len(node.pendingTransactions) < threshold && time.Now().Before(deadline) {
 						continue
 					}
-					deadline = time.Now().Add(node.BlockPeriod)
 					// Normal tx block consensus
 					selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
 					utils.GetLogInstance().Info("PROPOSING NEW BLOCK ------------------------------------------------", "blockNum", node.Blockchain().CurrentBlock().NumberU64()+1, "threshold", threshold, "selectedTxs", len(selectedTxs))
@@ -101,6 +102,8 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 					} else {
 						utils.GetLogInstance().Debug("Successfully proposed new block", "blockNum", newBlock.NumberU64(), "numTxs", newBlock.Transactions().Len())
 
+						// Set deadline will be BlockPeriod from now at this place. Anounce stage happens right after this.
+						deadline = time.Now().Add(node.BlockPeriod)
 						// Send the new block to Consensus so it can be confirmed.
 						node.BlockChannel <- newBlock
 						break
