@@ -198,6 +198,8 @@ type Node struct {
 	}
 
 	isFirstTime bool // the node was started with a fresh database
+	// How long in second the leader needs to wait to propose a new block.
+	BlockPeriod time.Duration
 }
 
 // Blockchain returns the blockchain for the node's current shard.
