@@ -97,6 +97,8 @@ var (
 	delayCommit = flag.String("delay_commit", "0ms", "how long to delay sending commit messages in consensus, ex: 500ms, 1s")
 	// isExplorer indicates this node is a node to serve explorer
 	isExplorer = flag.Bool("is_explorer", false, "true means this node is a node to serve explorer")
+	// networkType indicates the type of the network
+	networkType = flag.String("network_type", "mainnet", "type of the network: mainnet, testnet, devnet...")
 	// isNewNode indicates this node is a new node
 	isNewNode          = flag.Bool("is_newnode", false, "true means this node is a new node")
 	shardID            = flag.Int("shard_id", -1, "the shard ID of this node")
@@ -243,6 +245,18 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 		}
 	} else {
 		nodeConfig = nodeconfig.GetShardConfig(uint32(*shardID))
+	}
+
+	// Set network type
+	switch *networkType {
+	case "mainnet":
+		nodeConfig.SetNetworkType(nodeconfig.Mainnet)
+	case "testnet":
+		nodeConfig.SetNetworkType(nodeconfig.Testnet)
+	case "devnet":
+		nodeConfig.SetNetworkType(nodeconfig.Devnet)
+	default:
+		panic(fmt.Sprintf("invalid network type: %s", *networkType))
 	}
 
 	nodeConfig.SelfPeer = p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nodeConfig.ConsensusPubKey}

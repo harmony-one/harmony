@@ -6,7 +6,9 @@ import (
 	"math/rand"
 	"strings"
 
-	"github.com/harmony-one/harmony/common/config"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+
+	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -17,18 +19,19 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	common2 "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
 const (
-	// TestAccountNumber is the number of test accounts
+	// GenesisFund is the initial total fund in the genesis block for mainnet.
+	GenesisFund = 12600000000
+	// TestAccountNumber is the number of test accounts for testnet/devnet/
 	TestAccountNumber = 100
-	// TotalInitFund is the initial total fund for the contract deployer.
-	TotalInitFund = 12600000000
-	// InitFreeFundInEther is the initial fund for permissioned accounts.
-	InitFreeFundInEther = 100
+	// ContractDeployerInitFund is the initial fund for the contract deployer account in testnet/devnet.
+	ContractDeployerInitFund = 100000000
+	// InitFreeFund is the initial fund for permissioned accounts for testnet/devnet/
+	InitFreeFund = 100
 )
 
 // genesisInitializer is a shardchain.DBInitializer adapter.
@@ -47,14 +50,12 @@ func (gi *genesisInitializer) InitChainDB(db ethdb.Database, shardID uint32) err
 		}
 		shardState = types.ShardState{*c}
 	}
-	if err := gi.node.SetupGenesisBlock(db, shardID, shardState); err != nil {
-		return ctxerror.New("cannot setup genesis block").WithCause(err)
-	}
+	gi.node.SetupGenesisBlock(db, shardID, shardState)
 	return nil
 }
 
 // SetupGenesisBlock sets up a genesis blockchain.
-func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardState types.ShardState) error {
+func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardState types.ShardState) {
 	utils.GetLogger().Info("setting up a brand new chain database",
 		"shardID", shardID)
 	if shardID == node.Consensus.ShardID {
@@ -66,10 +67,15 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 	genesisAlloc := make(core.GenesisAlloc)
 	chainConfig := params.ChainConfig{}
 
-	switch config.Network {
-	case config.Mainnet:
+	switch node.NodeConfig.GetNetworkType() {
+	case nodeconfig.Mainnet:
 		chainConfig = *params.MainnetChainConfig
-	case config.Testnet:
+		foundationAddress := common.HexToAddress("0xE25ABC3f7C3d5fB7FB81EAFd421FF1621A61107c")
+		genesisFunds := big.NewInt(GenesisFund)
+		genesisFunds = genesisFunds.Mul(genesisFunds, big.NewInt(denominations.One))
+		genesisAlloc[foundationAddress] = core.GenesisAccount{Balance: genesisFunds}
+	case nodeconfig.Testnet:
+	case nodeconfig.Devnet:
 		chainConfig = *params.TestnetChainConfig
 		// Tests account for txgen to use
 		node.AddTestingAddresses(genesisAlloc, TestAccountNumber)
@@ -77,20 +83,16 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 		// Smart contract deployer account used to deploy initial smart contract
 		contractDeployerKey, _ := ecdsa.GenerateKey(crypto.S256(), strings.NewReader("Test contract key string stream that is fixed so that generated test key are deterministic every time"))
 		contractDeployerAddress := crypto.PubkeyToAddress(contractDeployerKey.PublicKey)
-		contractDeployerFunds := big.NewInt(TotalInitFund)
+		contractDeployerFunds := big.NewInt(ContractDeployerInitFund)
 		contractDeployerFunds = contractDeployerFunds.Mul(contractDeployerFunds, big.NewInt(denominations.One))
 		genesisAlloc[contractDeployerAddress] = core.GenesisAccount{Balance: contractDeployerFunds}
 		node.ContractDeployerKey = contractDeployerKey
 	}
 
-	if shardID == 0 {
-		// Accounts used by validator/nodes to stake and participate in the network.
-		// AddNodeAddressesToGenesisAlloc(genesisAlloc)
-	}
-
 	// Initialize shard state
 	// TODO: add ShardID into chainconfig and change ChainID to NetworkID
 	chainConfig.ChainID = big.NewInt(int64(shardID)) // Use ChainID as piggybacked ShardID
+
 	gspec := core.Genesis{
 		Config:         &chainConfig,
 		Alloc:          genesisAlloc,
@@ -100,9 +102,7 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 	}
 
 	// Store genesis block into db.
-	_, err := gspec.Commit(db)
-
-	return err
+	gspec.MustCommit(db)
 }
 
 // CreateTestBankKeys deterministically generates testing addresses.
@@ -128,7 +128,7 @@ func CreateTestBankKeys(numAddresses int) (keys []*ecdsa.PrivateKey, err error) 
 func (node *Node) AddTestingAddresses(gAlloc core.GenesisAlloc, numAddress int) {
 	for _, testBankKey := range node.TestBankKeys {
 		testBankAddress := crypto.PubkeyToAddress(testBankKey.PublicKey)
-		testBankFunds := big.NewInt(InitFreeFundInEther)
+		testBankFunds := big.NewInt(InitFreeFund)
 		testBankFunds = testBankFunds.Mul(testBankFunds, big.NewInt(denominations.One))
 		gAlloc[testBankAddress] = core.GenesisAccount{Balance: testBankFunds}
 	}
@@ -138,7 +138,7 @@ func (node *Node) AddTestingAddresses(gAlloc core.GenesisAlloc, numAddress int) 
 // including the account used by the nodes of the initial beacon chain and later new nodes.
 func AddNodeAddressesToGenesisAlloc(genesisAlloc core.GenesisAlloc) {
 	for _, account := range genesis.HarmonyAccounts {
-		testBankFunds := big.NewInt(InitFreeFundInEther)
+		testBankFunds := big.NewInt(InitFreeFund)
 		testBankFunds = testBankFunds.Mul(testBankFunds, big.NewInt(denominations.One))
 		address := common2.ParseAddr(account.Address)
 		genesisAlloc[address] = core.GenesisAccount{Balance: testBankFunds}
