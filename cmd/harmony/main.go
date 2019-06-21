@@ -9,6 +9,8 @@ import (
 	"path"
 	"time"
 
+	"github.com/harmony-one/bls/ffi/go/bls"
+
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 
@@ -245,6 +247,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 		}
 	} else {
 		nodeConfig = nodeconfig.GetShardConfig(uint32(*shardID))
+		nodeConfig.ConsensusPriKey = &bls.SecretKey{} // set dummy bls key for consensus object
 	}
 
 	// Set network type
