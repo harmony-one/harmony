@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+sudo yum install -q -y jq
+
 usage () {
    cat << EOT
 Usage: $0 [option] command
@@ -33,15 +35,21 @@ valid_ip () {
 
 health_report () {
     # Block heights
-    heightStatus=$(tac latest/validator*.log | grep -Eom1 '"myHeight":[0-9]+' | cut -d: -f2)
-    [ -z $heightStatus ] && heightStatus=Unknown
+    lastSynchBlock=$(tac latest/validator*.log | grep -Eoim1 '"OtherHeight":[0-9]+' | cut -d: -f2)
+    [ -z "$lastSynchBlock" ] && lastSynchBlock=Unknown
 
-    lengthOfChain=$(tac latest/validator*.log | grep -Eom1 '"otherHeight":[0-9]+' | cut -d: -f2)
-    [ -z $lengthOfChain ] && lengthOfChain=Unknown
+    chainLength=$(jq -r 'select(.msg == "[TryCatchup] Adding block to chain") | .myBlock' ./latest/v*.log | tail -1 | cut -d: -f2)
+    [ -z "$chainLength" ] && chainLength=Unknown
+
+    synchStatus=$(jq -r 'select(.msg == "Node is in sync" or .msg == "Node is out of sync") | .msg' ./latest/v*.log | tail -1 | cut -d: -f2)
+    [ -z "$synchStatus" ] && synchStatus=Unknown
+
+    lengthOfChain=$(tac latest/validator*.log | grep -Eoim1 '"OtherHeight":[0-9]+' | cut -d: -f2)
+    [ -z "$lengthOfChain" ] && lengthOfChain=Unknown
 
     # Shard number
     my_shard=$(grep -Eom1 "shardID\"\:[0-9]+" latest/validator*.log | cut -d: -f2)
-    [ -z $my_shard ] && lengthOfChain=Unknown
+    [ -z "$my_shard" ] && lengthOfChain=Unknown
 
     # Public IP
     ip=$(dig -4 @resolver1.opendns.com ANY myip.opendns.com +short)
@@ -59,11 +67,12 @@ health_report () {
     #echo "Your Node Version : "
     echo -e "\n====== HEALTH ======\n"
     LD_LIBRARY_PATH=$(pwd) ./harmony -version
-    echo "Current Length of Chain:" $lengthOfChain
-    echo "Your Sync Status:" $heightStatus
-    echo "Your Shard:" $my_shard
     echo "Your IP:" $ip
-    echo "Total Blocks Received After Syncing:" $bingos
+    echo "Your Shard:" $my_shard
+    echo "Your Sync Status:" $synchStatus
+    echo "Your Current Length of Chain:" $chainLength
+    echo "Your Latest Block Synchronized:" $lastSynchBlock
+    echo "Your Total Blocks Received After Syncing:" $bingos
     ./wallet.sh balances
 }
 
@@ -72,7 +81,7 @@ address_report () {
     address_field=$(grep -o '"address":"[a-z0-9]*' "${filename}")
     base16=$(cut -d\" -f4 <<< "${address_field}")
     bech32=$(./wallet.sh format --address 0x${base16} | head -n1 | awk -F: '{print $2}' | awk '{$1=$1}1')
-    curl -s https://raw.githubusercontent.com/harmony-one/harmony/master/internal/genesis/foundational.go | grep -qom1 "${bech32}"
+    curl -s https://raw.githubusercontent.com/harmony-one/harmony/master/internal/genesis/foundational.go | cat | cat | grep -qom1 "${bech32}"
     echo -e "\n====== ADDRESS ======\n"
     if [ $? -eq 0 ]; then
         echo "SUCCESS: "${bech32}" FOUND in our foundational list!"
@@ -86,6 +95,7 @@ address_report () {
 while getopts "h" opt; do
     case $opt in
         h|*)
+            echo "GETOPTS"
             usage
             exit 1
             ;;
@@ -93,7 +103,7 @@ while getopts "h" opt; do
 done
 shift $(($OPTIND - 1))
 
-[ $# -eq 0 ] && usage && exit 1
+[ $# -eq 0 ] && address_report && health_report && exit 1
 
 while :; do
     case "$1" in
@@ -111,9 +121,11 @@ while :; do
             shift
             ;;
         '')
+            echo "EMPTY"
             exit 0
             ;;
         *)
+            echo "**********"
             usage
             exit 1
             ;;
