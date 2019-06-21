@@ -146,6 +146,8 @@ func initSetup() {
 		config.Network = config.Testnet
 	case "devnet":
 		config.Network = config.Devnet
+	default:
+		panic(fmt.Sprintf("invalid network type: %s", *networkType))
 	}
 
 	// Set port and ip to global config.
