@@ -646,7 +646,7 @@ func processTransferCommand() {
 	shardIDToAccountState := FetchBalance(senderAddress)
 
 	state := shardIDToAccountState[shardID]
-	if state != nil {
+	if state == nil {
 		fmt.Printf("Failed connecting to the shard %d\n", shardID)
 		return
 	}
