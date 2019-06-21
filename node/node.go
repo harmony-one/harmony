@@ -508,7 +508,7 @@ func (node *Node) AccountManager() *accounts.Manager {
 	return node.accountManager
 }
 
-// SetDNSFlag indicates whether use harmony dns server to get peer info for node syncing
+// SetDNSZone sets the DNS zone to use to get peer info for node syncing
 func (node *Node) SetDNSZone(zone string) {
 	utils.GetLogger().Info("using DNS zone to get peers", "zone", zone)
 	node.dnsZone = zone
