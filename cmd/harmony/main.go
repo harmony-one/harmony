@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"math/rand"
 	"os"
 	"path"
@@ -18,7 +19,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/blsgen"
 	"github.com/harmony-one/harmony/internal/common"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
 	hmykey "github.com/harmony-one/harmony/internal/keystore"
@@ -249,6 +250,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 		}
 	} else {
 		nodeConfig = nodeconfig.GetShardConfig(uint32(*shardID))
+		nodeConfig.ConsensusPriKey = &bls.SecretKey{}  // set dummy bls key for consensus object
 	}
 
 	// Set network type

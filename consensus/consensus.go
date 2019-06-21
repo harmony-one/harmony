@@ -2,6 +2,7 @@
 package consensus // consensus
 
 import (
+	"fmt"
 	"math/big"
 	"sync"
 	"time"
@@ -17,7 +18,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	common2 "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/configs/node"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/internal/memprofiling"
@@ -258,6 +259,7 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 		utils.GetLogInstance().Info("my pubkey is", "pubkey", consensus.PubKey.SerializeToHexStr())
 	} else {
 		utils.GetLogInstance().Error("the bls key is nil")
+		return nil, fmt.Errorf("nil bls key, aborting")
 	}
 
 	// viewID has to be initialized as the height of the blockchain during initialization
