@@ -32,7 +32,7 @@ const (
 type Model struct {
 	AttackEnabled             bool
 	attackType                Type
-	ViewIDThreshold           uint32
+	ViewIDThreshold           uint64
 	readyByConsensusThreshold bool
 }
 
@@ -59,7 +59,7 @@ func (attack *Model) SetAttackEnabled(AttackEnabled bool) {
 	attack.AttackEnabled = AttackEnabled
 	if AttackEnabled {
 		attack.attackType = Type(rand.Intn(3))
-		attack.ViewIDThreshold = uint32(ViewIDThresholdMin + rand.Intn(ViewIDThresholdMax-ViewIDThresholdMin))
+		attack.ViewIDThreshold = uint64(ViewIDThresholdMin + rand.Intn(ViewIDThresholdMax-ViewIDThresholdMin))
 	}
 }
 
@@ -105,7 +105,7 @@ func (attack *Model) IncorrectResponse() bool {
 }
 
 // UpdateConsensusReady enables an attack type given the current viewID.
-func (attack *Model) UpdateConsensusReady(viewID uint32) {
+func (attack *Model) UpdateConsensusReady(viewID uint64) {
 	if viewID > attack.ViewIDThreshold {
 		attack.readyByConsensusThreshold = true
 	}
