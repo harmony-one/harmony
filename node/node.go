@@ -124,7 +124,7 @@ type Node struct {
 	stateSync              *syncing.StateSync
 	beaconSync             *syncing.StateSync
 	peerRegistrationRecord map[string]*syncConfig // record registration time (unixtime) of peers begin in syncing
-	dnsFlag                bool
+	dnsZone                string
 
 	// The p2p host used to send/receive p2p messages
 	host p2p.Host
@@ -508,8 +508,8 @@ func (node *Node) AccountManager() *accounts.Manager {
 	return node.accountManager
 }
 
-// SetDNSFlag indicates whether use harmony dns server to get peer info for node syncing
-func (node *Node) SetDNSFlag(flag bool) {
-	utils.GetLogInstance().Info("SetDNSFlag", "flag", flag)
-	node.dnsFlag = flag
+// SetDNSZone sets the DNS zone to use to get peer info for node syncing
+func (node *Node) SetDNSZone(zone string) {
+	utils.GetLogger().Info("using DNS zone to get peers", "zone", zone)
+	node.dnsZone = zone
 }
