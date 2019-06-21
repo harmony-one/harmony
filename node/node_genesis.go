@@ -75,6 +75,7 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 		genesisFunds = genesisFunds.Mul(genesisFunds, big.NewInt(denominations.One))
 		genesisAlloc[foundationAddress] = core.GenesisAccount{Balance: genesisFunds}
 	case nodeconfig.Testnet:
+		fallthrough
 	case nodeconfig.Devnet:
 		chainConfig = *params.TestnetChainConfig
 		// Tests account for txgen to use
