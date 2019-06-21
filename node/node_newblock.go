@@ -55,12 +55,7 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 					}
 				}
 			case <-readySignal:
-				firstTry := true
 				for {
-					if !firstTry {
-						time.Sleep(PeriodicBlock)
-					}
-					firstTry = false
 					// threshold and firstTime are for the test-only built-in smart contract tx.
 					// TODO: remove in production
 					threshold := DefaultThreshold
@@ -69,6 +64,7 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 						firstTime = false
 					}
 					if len(node.pendingTransactions) < threshold && time.Now().Before(deadline) {
+						time.Sleep(PeriodicBlock)
 						continue
 					}
 					// Normal tx block consensus
