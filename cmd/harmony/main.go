@@ -10,8 +10,6 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/harmony-one/harmony/common/config"
-
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 
@@ -139,17 +137,6 @@ var (
 )
 
 func initSetup() {
-	switch *networkType {
-	case "mainnet":
-		config.Network = config.Mainnet
-	case "testnet":
-		config.Network = config.Testnet
-	case "devnet":
-		config.Network = config.Devnet
-	default:
-		panic(fmt.Sprintf("invalid network type: %s", *networkType))
-	}
-
 	// Set port and ip to global config.
 	nodeconfig.GetDefaultConfig().Port = *port
 	nodeconfig.GetDefaultConfig().IP = *ip
@@ -262,6 +249,18 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 		}
 	} else {
 		nodeConfig = nodeconfig.GetShardConfig(uint32(*shardID))
+	}
+
+	// Set network type
+	switch *networkType {
+	case "mainnet":
+		nodeConfig.SetNetworkType(nodeconfig.Mainnet)
+	case "testnet":
+		nodeConfig.SetNetworkType(nodeconfig.Testnet)
+	case "devnet":
+		nodeConfig.SetNetworkType(nodeconfig.Devnet)
+	default:
+		panic(fmt.Sprintf("invalid network type: %s", *networkType))
 	}
 
 	nodeConfig.SelfPeer = p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nodeConfig.ConsensusPubKey}

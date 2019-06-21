@@ -8,8 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/harmony-one/harmony/common/config"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -291,6 +289,14 @@ func (node *Node) GetSyncID() [SyncIDLength]byte {
 // New creates a new node.
 func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardchain.DBFactory, isArchival bool) *Node {
 	node := Node{}
+
+	// Get the node config that's created in the harmony.go program.
+	if consensusObj != nil {
+		node.NodeConfig = nodeconfig.GetShardConfig(consensusObj.ShardID)
+	} else {
+		node.NodeConfig = nodeconfig.GetDefaultConfig()
+	}
+
 	copy(node.syncID[:], GenerateRandomString(SyncIDLength))
 	if host != nil {
 		node.host = host
@@ -324,7 +330,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 
 		// Add Faucet contract to all shards, so that on testnet, we can demo wallet in explorer
 		// TODO (leo): we need to have support of cross-shard tx later so that the token can be transferred from beacon chain shard to other tx shards.
-		if config.Network != config.Mainnet {
+		if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
 			if node.isFirstTime {
 				// Setup one time smart contracts
 				node.AddFaucetContractToPendingTransactions()
@@ -376,13 +382,6 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 	node.peerRegistrationRecord = make(map[string]*syncConfig)
 
 	node.startConsensus = make(chan struct{})
-
-	// Get the node config that's created in the harmony.go program.
-	if consensusObj != nil {
-		node.NodeConfig = nodeconfig.GetShardConfig(consensusObj.ShardID)
-	} else {
-		node.NodeConfig = nodeconfig.GetDefaultConfig()
-	}
 
 	return &node
 }

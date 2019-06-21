@@ -55,6 +55,31 @@ func (role Role) String() string {
 	return "Unknown"
 }
 
+// NetworkType describes the type of Harmony network
+type NetworkType int
+
+// Constants for NetworkType
+const (
+	Mainnet NetworkType = iota
+	Testnet
+	Devnet
+)
+
+func (network NetworkType) String() string {
+	switch network {
+	case Mainnet:
+		return "Mainnet"
+	case Testnet:
+		return "Testnet"
+	case Devnet:
+		return "Devnet"
+	}
+	return "Unknown"
+}
+
+// Network is the type of Harmony network
+var Network = Testnet
+
 // Global is the index of the global node configuration
 const (
 	Global    = 0
@@ -87,6 +112,8 @@ type ConfigType struct {
 
 	SelfPeer p2p.Peer
 	Leader   p2p.Peer
+
+	networkType NetworkType
 }
 
 // configs is a list of node configuration.
@@ -201,4 +228,14 @@ func (conf *ConfigType) IsLeader() bool {
 // Role returns the role
 func (conf *ConfigType) Role() Role {
 	return conf.role
+}
+
+// SetNetworkType set the networkType
+func (conf *ConfigType) SetNetworkType(networkType NetworkType) {
+	conf.networkType = networkType
+}
+
+// GetNetworkType gets the networkType
+func (conf *ConfigType) GetNetworkType() NetworkType {
+	return conf.networkType
 }

@@ -6,9 +6,9 @@ import (
 	"math/rand"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/common"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 
-	"github.com/harmony-one/harmony/common/config"
+	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -67,14 +67,15 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 	genesisAlloc := make(core.GenesisAlloc)
 	chainConfig := params.ChainConfig{}
 
-	switch config.Network {
-	case config.Mainnet:
+	switch node.NodeConfig.GetNetworkType() {
+	case nodeconfig.Mainnet:
 		chainConfig = *params.MainnetChainConfig
 		foundationAddress := common.HexToAddress("0xE25ABC3f7C3d5fB7FB81EAFd421FF1621A61107c")
 		genesisFunds := big.NewInt(GenesisFund)
 		genesisFunds = genesisFunds.Mul(genesisFunds, big.NewInt(denominations.One))
 		genesisAlloc[foundationAddress] = core.GenesisAccount{Balance: genesisFunds}
-	case config.Testnet:
+	case nodeconfig.Testnet:
+	case nodeconfig.Devnet:
 		chainConfig = *params.TestnetChainConfig
 		// Tests account for txgen to use
 		node.AddTestingAddresses(genesisAlloc, TestAccountNumber)

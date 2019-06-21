@@ -16,8 +16,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/harmony-one/harmony/common/config"
-
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/consensus"
 
@@ -405,7 +403,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 
 	node.AddNewBlock(newBlock)
 
-	if config.Network != config.Mainnet {
+	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
 		// Update contract deployer's nonce so default contract like faucet can issue transaction with current nonce
 		nonce := node.GetNonceOfAddress(crypto.PubkeyToAddress(node.ContractDeployerKey.PublicKey))
 		atomic.StoreUint64(&node.ContractDeployerCurrentNonce, nonce)
