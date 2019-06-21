@@ -327,7 +327,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		if config.Network != config.Mainnet {
 			if node.isFirstTime {
 				// Setup one time smart contracts
-				//node.AddFaucetContractToPendingTransactions()
+				node.AddFaucetContractToPendingTransactions()
 			} else {
 				node.AddContractKeyAndAddress(scFaucet)
 			}

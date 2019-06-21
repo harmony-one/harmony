@@ -24,14 +24,14 @@ import (
 )
 
 const (
-	// TestAccountNumber is the number of test accounts
-	TestAccountNumber = 100
-	// GenesisFund is the initial total fund in the genesis block.
+	// GenesisFund is the initial total fund in the genesis block for mainnet.
 	GenesisFund = 12600000000
-	// TotalInitFund is the initial total fund for the contract deployer.
-	TotalInitFund = 100000000
-	// InitFreeFundInEther is the initial fund for permissioned accounts.
-	InitFreeFundInEther = 100
+	// TestAccountNumber is the number of test accounts for testnet/devnet/
+	TestAccountNumber = 100
+	// ContractDeployerInitFund is the initial fund for the contract deployer account in testnet/devnet.
+	ContractDeployerInitFund = 100000000
+	// InitFreeFund is the initial fund for permissioned accounts for testnet/devnet/
+	InitFreeFund = 100
 )
 
 // genesisInitializer is a shardchain.DBInitializer adapter.
@@ -82,7 +82,7 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 		// Smart contract deployer account used to deploy initial smart contract
 		contractDeployerKey, _ := ecdsa.GenerateKey(crypto.S256(), strings.NewReader("Test contract key string stream that is fixed so that generated test key are deterministic every time"))
 		contractDeployerAddress := crypto.PubkeyToAddress(contractDeployerKey.PublicKey)
-		contractDeployerFunds := big.NewInt(TotalInitFund)
+		contractDeployerFunds := big.NewInt(ContractDeployerInitFund)
 		contractDeployerFunds = contractDeployerFunds.Mul(contractDeployerFunds, big.NewInt(denominations.One))
 		genesisAlloc[contractDeployerAddress] = core.GenesisAccount{Balance: contractDeployerFunds}
 		node.ContractDeployerKey = contractDeployerKey
@@ -127,7 +127,7 @@ func CreateTestBankKeys(numAddresses int) (keys []*ecdsa.PrivateKey, err error) 
 func (node *Node) AddTestingAddresses(gAlloc core.GenesisAlloc, numAddress int) {
 	for _, testBankKey := range node.TestBankKeys {
 		testBankAddress := crypto.PubkeyToAddress(testBankKey.PublicKey)
-		testBankFunds := big.NewInt(InitFreeFundInEther)
+		testBankFunds := big.NewInt(InitFreeFund)
 		testBankFunds = testBankFunds.Mul(testBankFunds, big.NewInt(denominations.One))
 		gAlloc[testBankAddress] = core.GenesisAccount{Balance: testBankFunds}
 	}
@@ -137,7 +137,7 @@ func (node *Node) AddTestingAddresses(gAlloc core.GenesisAlloc, numAddress int) 
 // including the account used by the nodes of the initial beacon chain and later new nodes.
 func AddNodeAddressesToGenesisAlloc(genesisAlloc core.GenesisAlloc) {
 	for _, account := range genesis.HarmonyAccounts {
-		testBankFunds := big.NewInt(InitFreeFundInEther)
+		testBankFunds := big.NewInt(InitFreeFund)
 		testBankFunds = testBankFunds.Mul(testBankFunds, big.NewInt(denominations.One))
 		address := common2.ParseAddr(account.Address)
 		genesisAlloc[address] = core.GenesisAccount{Balance: testBankFunds}
