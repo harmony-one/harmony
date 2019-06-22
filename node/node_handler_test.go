@@ -7,6 +7,7 @@ import (
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/harmony-one/harmony/consensus"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
@@ -25,6 +26,8 @@ func TestAddNewBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
+	nodeconfig.GetDefaultConfig().SetNetworkType(nodeconfig.Devnet)
+	nodeconfig.GetShardConfig(0).SetNetworkType(nodeconfig.Devnet)
 	node := New(host, consensus, testDBFactory, false)
 
 	selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock, common.Address{})
