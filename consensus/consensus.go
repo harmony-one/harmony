@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
+
 	"github.com/harmony-one/harmony/common/denominations"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/contracts/structs"
@@ -26,11 +27,8 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 )
 
-// Block reward per block signature.
-// TODO ek – per sig per stake
-var (
-	BlockReward = big.NewInt(denominations.One / 10)
-)
+// BlockReward is the block reward, to be split evenly among block signers.
+var BlockReward = new(big.Int).Mul(big.NewInt(30), big.NewInt(denominations.One))
 
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
@@ -343,21 +341,27 @@ func accumulateRewards(
 		return ctxerror.New("cannot set group sig mask bits").WithCause(err)
 	}
 	totalAmount := big.NewInt(0)
-	numAccounts := 0
+	var accounts []common.Address
 	signers := []string{}
 	for idx, member := range parentCommittee.NodeList {
 		if signed, err := mask.IndexEnabled(idx); err != nil {
 			return ctxerror.New("cannot check for committer bit",
 				"committerIndex", idx,
 			).WithCause(err)
-		} else if !signed {
-			continue
+		} else if signed {
+			accounts = append(accounts, member.EcdsaAddress)
 		}
-		numAccounts++
-		account := member.EcdsaAddress
+	}
+	numAccounts := big.NewInt(int64(len(accounts)))
+	last := new(big.Int)
+	for i, account := range accounts {
+		cur := new(big.Int)
+		cur.Mul(BlockReward, big.NewInt(int64(i+1))).Div(cur, numAccounts)
+		diff := new(big.Int).Sub(cur, last)
 		signers = append(signers, common2.MustAddressToBech32(account))
-		state.AddBalance(account, BlockReward)
-		totalAmount = new(big.Int).Add(totalAmount, BlockReward)
+		state.AddBalance(account, diff)
+		totalAmount = new(big.Int).Add(totalAmount, diff)
+		last = cur
 	}
 	getLogger().Debug("【Block Reward] Successfully paid out block reward",
 		"NumAccounts", numAccounts,
