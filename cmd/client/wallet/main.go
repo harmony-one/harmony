@@ -112,6 +112,7 @@ var (
 
 	getBlsPublicCommand = flag.NewFlagSet("getBlsPublic", flag.ExitOnError)
 	blsKey2             = getBlsPublicCommand.String("key", "", "The raw private key.")
+	blsFile2            = getBlsPublicCommand.String("file", "", "The encrypted bls file.")
 )
 
 var (
@@ -175,6 +176,7 @@ func main() {
 		fmt.Println("        --key            - Raw private key.")
 		fmt.Println("   14. getBlsPublic   - Show Bls public key given raw private bls key.")
 		fmt.Println("        --key            - Raw private key.")
+		fmt.Println("        --file           - encrypted bls file.")
 		os.Exit(1)
 	}
 
@@ -606,6 +608,19 @@ func getBlsPublic() {
 		if err != nil {
 			fmt.Printf("Your raw private key is not valid.\n Err: %v\n", err)
 			os.Exit(101)
+		}
+		fmt.Printf("Your bls public key is: %s\n", privateKey.GetPublicKey().SerializeToHexStr())
+	} else if *blsFile2 != "" {
+		password := utils.AskForPassphrase("Passphrase: ")
+		password2 := utils.AskForPassphrase("Passphrase again: ")
+		if password != password2 {
+			fmt.Printf("Passphrase doesn't match. Please try again!\n")
+			os.Exit(100)
+		}
+		privateKey, err := blsgen.LoadBlsKeyWithPassPhrase(*blsFile2, password)
+		if err != nil {
+			fmt.Printf("error when loading bls key, err :%v\n", err)
+			os.Exit(100)
 		}
 		fmt.Printf("Your bls public key is: %s\n", privateKey.GetPublicKey().SerializeToHexStr())
 	} else {
