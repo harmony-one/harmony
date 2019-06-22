@@ -164,7 +164,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		return
 	}
 	if consensus.mode.Mode() == Normal {
-		if err = consensus.VerifyHeader(consensus.ChainReader, &headerObj, false); err != nil {
+		if err = consensus.VerifyHeader(consensus.ChainReader, &headerObj, true); err != nil {
 			consensus.getLogger().Warn("[OnAnnounce] Block content is not verified successfully", "error", err, "inChain", consensus.ChainReader.CurrentHeader().Number, "MsgBlockNum", headerObj.Number)
 			return
 		}
@@ -397,7 +397,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		return
 	}
 	if consensus.mode.Mode() == Normal {
-		if err := consensus.VerifyHeader(consensus.ChainReader, blockObj.Header(), false); err != nil {
+		if err := consensus.VerifyHeader(consensus.ChainReader, blockObj.Header(), true); err != nil {
 			consensus.getLogger().Warn("[OnPrepared] Block header is not verified successfully", "error", err, "inChain", consensus.ChainReader.CurrentHeader().Number, "MsgBlockNum", blockObj.Header().Number)
 			return
 		}
