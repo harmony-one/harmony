@@ -58,6 +58,7 @@ Commands:
         --key            - Raw private key.
     14. getBlsPublic   - Show Bls public key given raw private bls key.
         --key            - Raw private key.
+		--file           - encrypted bls file.
 EOT
 }
 
