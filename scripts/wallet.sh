@@ -56,6 +56,8 @@ Commands:
         --file           - Non-human readable bls file.
     13. importBls      - Convert raw private key into encrypted bls key.
         --key            - Raw private key.
+    14. getBlsPublic   - Show Bls public key given raw private bls key.
+        --key            - Raw private key.
 EOT
 }
 
