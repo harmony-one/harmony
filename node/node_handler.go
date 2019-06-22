@@ -47,7 +47,7 @@ import (
 
 const (
 	// MaxNumberOfTransactionsPerBlock is the max number of transaction per a block.
-	MaxNumberOfTransactionsPerBlock = 8000 // Disable tx processing
+	MaxNumberOfTransactionsPerBlock = 8000
 	consensusTimeout                = 30 * time.Second
 )
 

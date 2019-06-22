@@ -9,6 +9,7 @@ import (
 
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 )
@@ -74,7 +75,10 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 
 					coinbase := node.Consensus.SelfAddress
 					// Normal tx block consensus
-					selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock, coinbase)
+					selectedTxs := types.Transactions{} // Empty transaction list
+					if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
+						selectedTxs = node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock, coinbase)
+					}
 					utils.GetLogInstance().Info("PROPOSING NEW BLOCK ------------------------------------------------", "blockNum", node.Blockchain().CurrentBlock().NumberU64()+1, "threshold", threshold, "selectedTxs", len(selectedTxs))
 					if err := node.Worker.CommitTransactions(selectedTxs, coinbase); err != nil {
 						ctxerror.Log15(utils.GetLogger().Error,
