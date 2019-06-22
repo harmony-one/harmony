@@ -139,6 +139,12 @@ var (
 		"Do not propose view change (testing only)")
 )
 
+const (
+	MainNet = "mainnet"
+	TestNet = "testnet"
+	DevNet  = "devnet"
+)
+
 func initSetup() {
 	// Set port and ip to global config.
 	nodeconfig.GetDefaultConfig().Port = *port
@@ -254,11 +260,11 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 
 	// Set network type
 	switch *networkType {
-	case "mainnet":
+	case MainNet:
 		nodeConfig.SetNetworkType(nodeconfig.Mainnet)
-	case "testnet":
+	case TestNet:
 		nodeConfig.SetNetworkType(nodeconfig.Testnet)
-	case "devnet":
+	case DevNet:
 		nodeConfig.SetNetworkType(nodeconfig.Devnet)
 	default:
 		panic(fmt.Sprintf("invalid network type: %s", *networkType))
@@ -487,8 +493,12 @@ func main() {
 	}
 	go currentNode.SupportSyncing()
 	currentNode.ServiceManagerSetup()
-	if err := currentNode.StartRPC(*port); err != nil {
-		ctxerror.Warn(utils.GetLogger(), err, "StartRPC failed")
+
+	// RPC for SDK not supported for mainnet.
+	if *networkType != MainNet {
+		if err := currentNode.StartRPC(*port); err != nil {
+			ctxerror.Warn(utils.GetLogger(), err, "StartRPC failed")
+		}
 	}
 	currentNode.RunServices()
 	currentNode.StartServer()
