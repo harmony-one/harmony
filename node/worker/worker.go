@@ -167,7 +167,8 @@ func (w *Worker) Commit(sig []byte, signers []byte, viewID uint64, coinbase comm
 
 	s := w.current.state.Copy()
 
-	block, err := w.engine.Finalize(w.chain, w.current.header, s, w.current.txs, w.current.receipts)
+	copyHeader := types.CopyHeader(w.current.header)
+	block, err := w.engine.Finalize(w.chain, copyHeader, s, w.current.txs, w.current.receipts)
 	if err != nil {
 		return nil, ctxerror.New("cannot finalize block").WithCause(err)
 	}

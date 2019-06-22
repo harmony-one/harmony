@@ -265,6 +265,9 @@ func CopyHeader(h *Header) *Header {
 	if cpy.Number = new(big.Int); h.Number != nil {
 		cpy.Number.Set(h.Number)
 	}
+	if cpy.ViewID = new(big.Int); h.ViewID != nil {
+		cpy.ViewID.Set(h.ViewID)
+	}
 	if cpy.Epoch = new(big.Int); h.Epoch != nil {
 		cpy.Epoch.Set(h.Epoch)
 	}
