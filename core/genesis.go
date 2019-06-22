@@ -259,9 +259,6 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 		ShardStateHash: g.ShardStateHash,
 		ShardState:     shardStateBytes,
 	}
-	if g.GasLimit == 0 {
-		head.GasLimit = 10000000000 // TODO(RJ): figure out better solution. // params.GenesisGasLimit
-	}
 	statedb.Commit(false)
 	statedb.Database().TrieDB().Commit(root, true)
 

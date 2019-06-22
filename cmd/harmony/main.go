@@ -302,6 +302,8 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// TODO: consensus object shouldn't start here
 	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of consensus later.
 	currentConsensus, err := consensus.New(nodeConfig.Host, nodeConfig.ShardID, nodeConfig.Leader, nodeConfig.ConsensusPriKey)
+	currentConsensus.SelfAddress = common.ParseAddr(genesisAccount.Address)
+
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error :%v \n", err)
 		os.Exit(1)

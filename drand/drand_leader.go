@@ -121,7 +121,7 @@ func (dRand *DRand) processCommitMessage(message *msg_pb.Message) {
 		utils.GetLogInstance().Debug("Failed to deserialize BLS public key", "error", err)
 		return
 	}
-	validatorAddress := utils.GetBlsAddress(senderPubKey)
+	validatorAddress := senderPubKey.SerializeToHexStr()
 
 	if !dRand.IsValidatorInCommittee(validatorAddress) {
 		utils.GetLogInstance().Error("Invalid validator", "validatorAddress", validatorAddress)

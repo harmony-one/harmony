@@ -71,10 +71,12 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 					if len(node.pendingTransactions) < threshold && time.Now().Before(deadline) {
 						continue
 					}
+
+					coinbase := node.Consensus.SelfAddress
 					// Normal tx block consensus
-					selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
+					selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock, coinbase)
 					utils.GetLogInstance().Info("PROPOSING NEW BLOCK ------------------------------------------------", "blockNum", node.Blockchain().CurrentBlock().NumberU64()+1, "threshold", threshold, "selectedTxs", len(selectedTxs))
-					if err := node.Worker.CommitTransactions(selectedTxs); err != nil {
+					if err := node.Worker.CommitTransactions(selectedTxs, coinbase); err != nil {
 						ctxerror.Log15(utils.GetLogger().Error,
 							ctxerror.New("cannot commit transactions").
 								WithCause(err))
@@ -87,9 +89,8 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 						continue
 					}
 					viewID := node.Consensus.GetViewID()
-					addr := node.StakingAccount.Address
 					// add aggregated commit signatures from last block, except for the first two blocks
-					newBlock, err := node.Worker.Commit(sig, mask, viewID, addr)
+					newBlock, err := node.Worker.Commit(sig, mask, viewID, coinbase)
 					if err != nil {
 						ctxerror.Log15(utils.GetLogger().Error,
 							ctxerror.New("cannot commit new block").

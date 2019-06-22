@@ -241,6 +241,7 @@ func NewBlock(header *Header, txs []*Transaction, receipts []*Receipt) *Block {
 	} else {
 		b.header.ReceiptHash = DeriveSha(Receipts(receipts))
 		b.header.Bloom = CreateBloom(receipts)
+		utils.GetLogInstance().Info("Receipt Root Proposed2", "root", b.header.ReceiptHash.Hex(), "len", len(receipts))
 	}
 
 	return b

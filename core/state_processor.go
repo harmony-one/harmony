@@ -25,6 +25,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/ctxerror"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // StateProcessor is a basic Processor, which takes care of transitioning
@@ -68,7 +69,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {
 		statedb.Prepare(tx.Hash(), block.Hash(), i)
-		receipt, _, err := ApplyTransaction(p.config, p.bc, nil, gp, statedb, header, tx, usedGas, cfg)
+		receipt, _, err := ApplyTransaction(p.config, p.bc, &block.Header().Coinbase, gp, statedb, header, tx, usedGas, cfg)
 		if err != nil {
 			return nil, nil, 0, err
 		}
@@ -93,6 +94,11 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	if err != nil {
 		return nil, 0, err
 	}
+	utils.GetLogInstance().Info("Root before transaction", "root", statedb.IntermediateRoot(false).Bytes())
+	utils.GetLogInstance().Info("config", "config", config)
+	utils.GetLogInstance().Info("tx", "txHash", tx.Hash(), "tx", tx)
+	utils.GetLogInstance().Info("header", "header", header)
+	utils.GetLogInstance().Info("author", "author", author)
 	// Create a new context to be used in the EVM environment
 	context := NewEVMContext(msg, header, bc, author)
 	// Create a new environment which holds all relevant information
@@ -112,6 +118,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	}
 	*usedGas += gas
 
+	utils.GetLogInstance().Info("Root after transaction", "root", statedb.IntermediateRoot(false).Bytes())
 	// Create a new receipt for the transaction, storing the intermediate root and gas used by the tx
 	// based on the eip phase, we're passing whether the root touch-delete accounts.
 	receipt := types.NewReceipt(root, failed, *usedGas)

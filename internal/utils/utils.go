@@ -225,14 +225,6 @@ func IsPrivateIP(ip net.IP) bool {
 	return false
 }
 
-// GetBlsAddress returns the address of consensus BLS pubKey.
-func GetBlsAddress(key *bls.PublicKey) common.Address {
-	addr := common.Address{}
-	addrBytes := key.GetAddress()
-	addr.SetBytes(addrBytes[:])
-	return addr
-}
-
 // GetPortFromDiff returns the port from base and the diff.
 func GetPortFromDiff(port string, diff int) string {
 	if portNum, err := strconv.Atoi(port); err == nil {

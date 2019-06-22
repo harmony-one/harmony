@@ -6,9 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/crypto/pki"
-	p2p "github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/p2p"
 	crypto "github.com/libp2p/go-libp2p-crypto"
 	"github.com/stretchr/testify/assert"
 )
@@ -205,30 +203,4 @@ func TestStringsToPeers(t *testing.T) {
 			}
 		}
 	}
-}
-
-func TestGetBlsAddress(t *testing.T) {
-	pubKey1 := pki.GetBLSPrivateKeyFromInt(333).GetPublicKey()
-	pubKey2 := pki.GetBLSPrivateKeyFromInt(1024).GetPublicKey()
-	tests := []struct {
-		key      *bls.PublicKey
-		expected string
-	}{
-		{
-			pubKey1,
-			"0x489e9EC9863A29B086Fb979cefCA02277FbE513d",
-		},
-		{
-			pubKey2,
-			"0x836a098a5E04015c2c331657a1B90DBCb154fb37",
-		},
-	}
-
-	for _, test := range tests {
-		result := GetBlsAddress(test.key)
-		if result.Hex() != test.expected {
-			t.Errorf("Hex Of %x is: %s, got: %s", test.key, test.expected, result.Hex())
-		}
-	}
-
 }

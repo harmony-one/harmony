@@ -47,7 +47,7 @@ import (
 
 const (
 	// MaxNumberOfTransactionsPerBlock is the max number of transaction per a block.
-	MaxNumberOfTransactionsPerBlock = 8000
+	MaxNumberOfTransactionsPerBlock = 8000 // Disable tx processing
 	consensusTimeout                = 30 * time.Second
 )
 
@@ -565,7 +565,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) i
 			"genesisMemberIndex", genesisNode.MemberIndex,
 			"genesisStakingAccount", common2.MustAddressToBech32(genesisNode.NodeID.EcdsaAddress))
 	} else {
-		logger.Info("cannot find genesis node", "k", hex.EncodeToString(k[:]))
+		logger.Info("cannot find genesis node", "BlsPubKey", peer.ConsensusPubKey)
 	}
 	getLogger().Info("received ping message")
 

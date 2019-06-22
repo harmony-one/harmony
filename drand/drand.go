@@ -4,7 +4,6 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/crypto/hash"
 
 	protobuf "github.com/golang/protobuf/proto"
@@ -14,13 +13,12 @@ import (
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/vrf"
 	"github.com/harmony-one/harmony/crypto/vrf/p256"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 )
 
 // DRand is the main struct which contains state for the distributed randomness protocol.
 type DRand struct {
-	vrfs                  *map[common.Address][]byte // Key is the address hex
+	vrfs                  *map[string][]byte // Key is the address hex
 	bitmap                *bls_cosi.Mask
 	pRand                 *[32]byte
 	rand                  *[32]byte
@@ -37,8 +35,8 @@ type DRand struct {
 	// Public keys of the committee including leader and validators
 	PublicKeys []*bls.PublicKey
 	// The addresses of my committee
-	CommitteeAddresses map[common.Address]bool
-	pubKeyLock         sync.Mutex
+	CommitteePublicKeys map[string]bool
+	pubKeyLock          sync.Mutex
 
 	// private/public keys of current node
 	priKey *bls.SecretKey
@@ -52,7 +50,7 @@ type DRand struct {
 	IsLeader bool
 
 	// Leader or validator address
-	SelfAddress common.Address
+	SelfAddress string
 
 	// The p2p host used to send/receive p2p messages
 	host p2p.Host
@@ -84,12 +82,12 @@ func New(host p2p.Host, ShardID uint32, peers []p2p.Peer, leader p2p.Peer, confi
 	}
 
 	dRand.leader = leader
-	dRand.CommitteeAddresses = map[common.Address]bool{}
+	dRand.CommitteePublicKeys = map[string]bool{}
 	for _, peer := range peers {
-		dRand.CommitteeAddresses[utils.GetBlsAddress(peer.ConsensusPubKey)] = true
+		dRand.CommitteePublicKeys[peer.ConsensusPubKey.SerializeToHexStr()] = true
 	}
 
-	dRand.vrfs = &map[common.Address][]byte{}
+	dRand.vrfs = &map[string][]byte{}
 
 	// Initialize cosign bitmap
 	allPublicKeys := make([]*bls.PublicKey, 0)
@@ -107,7 +105,7 @@ func New(host p2p.Host, ShardID uint32, peers []p2p.Peer, leader p2p.Peer, confi
 	dRand.rand = nil
 
 	// For now use socket address as ID
-	dRand.SelfAddress = utils.GetBlsAddress(selfPeer.ConsensusPubKey)
+	dRand.SelfAddress = selfPeer.ConsensusPubKey.SerializeToHexStr()
 
 	// Set private key for myself so that I can sign messages.
 	if blsPriKey != nil {
@@ -180,14 +178,14 @@ func verifyMessageSig(signerPubKey *bls.PublicKey, message *msg_pb.Message) erro
 }
 
 // IsValidatorInCommittee returns whether the given validator BLS address is part of my committee
-func (dRand *DRand) IsValidatorInCommittee(validatorBlsAddress common.Address) bool {
-	_, ok := dRand.CommitteeAddresses[validatorBlsAddress]
+func (dRand *DRand) IsValidatorInCommittee(validatorBlsPubKey string) bool {
+	_, ok := dRand.CommitteePublicKeys[validatorBlsPubKey]
 	return ok
 }
 
 // ResetState resets the state of the randomness protocol
 func (dRand *DRand) ResetState() {
-	dRand.vrfs = &map[common.Address][]byte{}
+	dRand.vrfs = &map[string][]byte{}
 
 	bitmap, _ := bls_cosi.NewMask(dRand.PublicKeys, dRand.leader.ConsensusPubKey)
 	dRand.bitmap = bitmap
@@ -205,9 +203,9 @@ func (dRand *DRand) SetLeaderPubKey(k []byte) error {
 func (dRand *DRand) UpdatePublicKeys(pubKeys []*bls.PublicKey) int {
 	dRand.pubKeyLock.Lock()
 	dRand.PublicKeys = append(pubKeys[:0:0], pubKeys...)
-	dRand.CommitteeAddresses = map[common.Address]bool{}
+	dRand.CommitteePublicKeys = map[string]bool{}
 	for _, pubKey := range dRand.PublicKeys {
-		dRand.CommitteeAddresses[utils.GetBlsAddress(pubKey)] = true
+		dRand.CommitteePublicKeys[pubKey.SerializeToHexStr()] = true
 	}
 	// TODO: use pubkey to identify leader rather than p2p.Peer.
 	dRand.leader = p2p.Peer{ConsensusPubKey: pubKeys[0]}

@@ -127,6 +127,9 @@ var onceForConfigs sync.Once
 func GetShardConfig(shardID uint32) *ConfigType {
 	onceForConfigs.Do(func() {
 		shardConfigs = make([]ConfigType, MaxShards)
+		for i := range shardConfigs {
+			shardConfigs[i].ShardID = uint32(i)
+		}
 	})
 	if int(shardID) >= cap(shardConfigs) {
 		return nil

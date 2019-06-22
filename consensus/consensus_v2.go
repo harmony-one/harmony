@@ -117,7 +117,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 	if err := consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
 		consensus.getLogger().Warn("[Announce] Cannot send announce message", "groupID", p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID)))
 	} else {
-		consensus.getLogger().Debug("[Announce] Sent Announce Message!!", "BlockHash", block.Hash(), "BlockNum", block.NumberU64())
+		consensus.getLogger().Debug("[Announce] Sent Announce Message!!", "BlockHash", block.Hash(), "BlockNum", block.NumberU64(), "announce receipt hash", block.ReceiptHash(), "announce receipt hash2", block.Header().ReceiptHash)
 	}
 
 	consensus.getLogger().Debug("[Announce] Switching phase", "From", consensus.phase, "To", Prepare)

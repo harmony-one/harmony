@@ -4,6 +4,8 @@ import (
 	"math/big"
 	"sync"
 
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
@@ -20,7 +22,7 @@ import (
 type Collection interface {
 	// ShardChain returns the blockchain for the given shard,
 	// opening one as necessary.
-	ShardChain(shardID uint32) (*core.BlockChain, error)
+	ShardChain(shardID uint32, networkType nodeconfig.NetworkType) (*core.BlockChain, error)
 
 	// CloseShardChain closes the given shard chain.
 	CloseShardChain(shardID uint32) error
@@ -59,7 +61,7 @@ func NewCollection(
 
 // ShardChain returns the blockchain for the given shard,
 // opening one as necessary.
-func (sc *CollectionImpl) ShardChain(shardID uint32) (*core.BlockChain, error) {
+func (sc *CollectionImpl) ShardChain(shardID uint32, networkType nodeconfig.NetworkType) (*core.BlockChain, error) {
 	sc.mtx.Lock()
 	defer sc.mtx.Unlock()
 	if bc, ok := sc.pool[shardID]; ok {
@@ -90,8 +92,19 @@ func (sc *CollectionImpl) ShardChain(shardID uint32) (*core.BlockChain, error) {
 	if sc.disableCache {
 		cacheConfig = &core.CacheConfig{Disabled: true}
 	}
-	chainConfig := *params.TestChainConfig
+
+	chainConfig := params.ChainConfig{}
+	switch networkType {
+	case nodeconfig.Mainnet:
+		chainConfig = *params.MainnetChainConfig
+	case nodeconfig.Testnet:
+		fallthrough
+	case nodeconfig.Devnet:
+		chainConfig = *params.TestnetChainConfig
+	}
+
 	chainConfig.ChainID = big.NewInt(int64(shardID))
+
 	bc, err := core.NewBlockChain(
 		db, cacheConfig, &chainConfig, sc.engine, vm.Config{}, nil,
 	)
