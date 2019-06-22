@@ -22,8 +22,6 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-
-	common2 "github.com/harmony-one/harmony/internal/common"
 )
 
 // precompiledTest defines the input/output pairs for precompiled contract tests.
@@ -339,7 +337,7 @@ var bn256PairingTests = []precompiledTest{
 }
 
 func testPrecompiled(addr string, test precompiledTest, t *testing.T) {
-	p := PrecompiledContractsByzantium[common2.ParseAddr(addr)]
+	p := PrecompiledContractsByzantium[common.HexToAddress(addr)]
 	in := common.Hex2Bytes(test.input)
 	contract := NewContract(AccountRef(common.HexToAddress("1337")),
 		nil, new(big.Int), p.RequiredGas(in))
@@ -356,7 +354,7 @@ func benchmarkPrecompiled(addr string, test precompiledTest, bench *testing.B) {
 	if test.noBenchmark {
 		return
 	}
-	p := PrecompiledContractsByzantium[common2.ParseAddr(addr)]
+	p := PrecompiledContractsByzantium[common.HexToAddress(addr)]
 	in := common.Hex2Bytes(test.input)
 	reqGas := p.RequiredGas(in)
 	contract := NewContract(AccountRef(common.HexToAddress("1337")),

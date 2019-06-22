@@ -1,9 +1,10 @@
 package shardchain
 
 import (
+	"math/big"
 	"sync"
 
-	"github.com/harmony-one/harmony/internal/configs/node"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -102,7 +103,7 @@ func (sc *CollectionImpl) ShardChain(shardID uint32, networkType nodeconfig.Netw
 		chainConfig = *params.TestnetChainConfig
 	}
 
-	//chainConfig.ChainID = big.NewInt(int64(shardID))
+	chainConfig.ChainID = big.NewInt(int64(shardID))
 
 	bc, err := core.NewBlockChain(
 		db, cacheConfig, &chainConfig, sc.engine, vm.Config{}, nil,

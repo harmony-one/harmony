@@ -33,7 +33,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/harmony-one/harmony/core/types"
-	common2 "github.com/harmony-one/harmony/internal/common"
 )
 
 // Tests that updating a state trie does not leak any database writes prior to
@@ -281,7 +280,7 @@ func newTestAction(addr common.Address, r *rand.Rand) testAction {
 	action := actions[r.Intn(len(actions))]
 	var nameargs []string
 	if !action.noAddr {
-		nameargs = append(nameargs, common2.MustAddressToBech32(addr))
+		nameargs = append(nameargs, addr.Hex())
 	}
 	for _, i := range action.args {
 		action.args[i] = rand.Int63n(100)
@@ -367,7 +366,7 @@ func (test *snapshotTest) checkEqual(state, checkstate *DB) error {
 		var err error
 		checkeq := func(op string, a, b interface{}) bool {
 			if err == nil && !reflect.DeepEqual(a, b) {
-				err = fmt.Errorf("got %s(%s) == %v, want %v", op, common2.MustAddressToBech32(addr), a, b)
+				err = fmt.Errorf("got %s(%s) == %v, want %v", op, addr.Hex(), a, b)
 				return false
 			}
 			return true

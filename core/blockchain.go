@@ -1696,7 +1696,8 @@ func (bc *BlockChain) GetVdfByNumber(number uint64) [32]byte {
 		return [32]byte{}
 	}
 	result := [32]byte{}
-	copy(result[:], header.Vdf[:32])
+	//copy(result[:], header.Vdf[:32])
+	// TODO: add real vdf
 	return result
 }
 
@@ -1706,7 +1707,9 @@ func (bc *BlockChain) GetVrfByNumber(number uint64) [32]byte {
 	if header == nil {
 		return [32]byte{}
 	}
-	return header.Vrf
+	//return header.Vrf
+	// TODO: add real vrf
+	return [32]byte{}
 }
 
 // GetShardState returns the shard state for the given epoch,

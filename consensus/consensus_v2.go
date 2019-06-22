@@ -895,7 +895,7 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 						// Verify the randomness
 						_ = blockHash
 						consensus.getLogger().Info("[ConsensusMainLoop] Adding randomness into new block", "rnd", rnd)
-						newBlock.AddVdf([258]byte{}) // TODO(HB): add real vdf
+						// newBlock.AddVdf([258]byte{}) // TODO(HB): add real vdf
 					} else {
 						//consensus.getLogger().Info("Failed to get randomness", "error", err)
 					}

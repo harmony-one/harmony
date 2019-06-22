@@ -266,6 +266,11 @@ func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 	// TODO ek – where do we verify parent-child invariants,
 	//  e.g. "child.Number == child.IsGenesis() ? 0 : parent.Number+1"?
+	if newBlock.ShardID() != node.Blockchain().ShardID() {
+		return ctxerror.New("wrong shard ID",
+			"my shard ID", node.Blockchain().ShardID(),
+			"new block's shard ID", newBlock.ShardID())
+	}
 	err := node.Blockchain().ValidateNewBlock(newBlock)
 	if err != nil {
 		return ctxerror.New("cannot ValidateNewBlock",
@@ -275,7 +280,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 	}
 
 	// TODO: verify the vrf randomness
-	_ = newBlock.Header().Vrf
+	// _ = newBlock.Header().Vrf
 
 	err = node.validateNewShardState(newBlock, &node.CurrentStakes)
 	if err != nil {
@@ -423,35 +428,38 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 		if node.Consensus.ShardID == 0 {
 			// TODO: enable drand only for beacon chain
 			// ConfirmedBlockChannel which is listened by drand leader who will initiate DRG if its a epoch block (first block of a epoch)
-			if node.DRand != nil {
-				go func() {
-					node.ConfirmedBlockChannel <- newBlock
-				}()
-			}
+			//if node.DRand != nil {
+			//	go func() {
+			//		node.ConfirmedBlockChannel <- newBlock
+			//	}()
+			//}
 
+			// TODO: enable staking
 			// TODO: update staking information once per epoch.
-			node.UpdateStakingList(node.QueryStakeInfo())
-			node.printStakingList()
+			//node.UpdateStakingList(node.QueryStakeInfo())
+			//node.printStakingList()
 		}
-		newBlockHeader := newBlock.Header()
-		if newBlockHeader.ShardStateHash != (common.Hash{}) {
-			if node.Consensus.ShardID == 0 {
-				// TODO ek – this is a temp hack until beacon chain sync is fixed
-				// End-of-epoch block on beacon chain; block's EpochState is the
-				// master resharding table.  Broadcast it to the network.
-				if err := node.broadcastEpochShardState(newBlock); err != nil {
-					e := ctxerror.New("cannot broadcast shard state").WithCause(err)
-					ctxerror.Log15(utils.GetLogInstance().Error, e)
-				}
-			}
-			shardState, err := newBlockHeader.GetShardState()
-			if err != nil {
-				e := ctxerror.New("cannot get shard state from header").WithCause(err)
-				ctxerror.Log15(utils.GetLogInstance().Error, e)
-			} else {
-				node.transitionIntoNextEpoch(shardState)
-			}
-		}
+
+		// TODO: enable shard state update
+		//newBlockHeader := newBlock.Header()
+		//if newBlockHeader.ShardStateHash != (common.Hash{}) {
+		//	if node.Consensus.ShardID == 0 {
+		//		// TODO ek – this is a temp hack until beacon chain sync is fixed
+		//		// End-of-epoch block on beacon chain; block's EpochState is the
+		//		// master resharding table.  Broadcast it to the network.
+		//		if err := node.broadcastEpochShardState(newBlock); err != nil {
+		//			e := ctxerror.New("cannot broadcast shard state").WithCause(err)
+		//			ctxerror.Log15(utils.GetLogInstance().Error, e)
+		//		}
+		//	}
+		//	shardState, err := newBlockHeader.GetShardState()
+		//	if err != nil {
+		//		e := ctxerror.New("cannot get shard state from header").WithCause(err)
+		//		ctxerror.Log15(utils.GetLogInstance().Error, e)
+		//	} else {
+		//		node.transitionIntoNextEpoch(shardState)
+		//	}
+		//}
 	}
 }
 
@@ -477,7 +485,7 @@ func (node *Node) AddNewBlock(newBlock *types.Block) {
 	if err != nil {
 		utils.GetLogInstance().Debug("Error Adding new block to blockchain", "blockNum", blockNum, "parentHash", newBlock.Header().ParentHash, "hash", newBlock.Header().Hash(), "Error", err)
 	} else {
-		utils.GetLogInstance().Info("Added New Block to Blockchain!!!", "blockNum", blockNum, "hash", newBlock.Header().Hash(), "by node", node.SelfPeer)
+		utils.GetLogInstance().Info("Added New Block to Blockchain!!!", "blockNum", blockNum, "hash", newBlock.Header().Hash().Hex())
 	}
 }
 

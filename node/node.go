@@ -204,7 +204,7 @@ type Node struct {
 
 // Blockchain returns the blockchain for the node's current shard.
 func (node *Node) Blockchain() *core.BlockChain {
-	shardID := node.Consensus.ShardID
+	shardID := node.NodeConfig.ShardID
 	bc, err := node.shardChains.ShardChain(shardID, node.NodeConfig.GetNetworkType())
 	if err != nil {
 		err = ctxerror.New("cannot get shard chain", "shardID", shardID).
