@@ -109,6 +109,9 @@ var (
 
 	blsImportCommand = flag.NewFlagSet("importBls", flag.ExitOnError)
 	blsKey           = blsImportCommand.String("key", "", "The raw private key.")
+
+	getBlsPublicCommand = flag.NewFlagSet("getBlsPublic", flag.ExitOnError)
+	blsKey2             = getBlsPublicCommand.String("key", "", "The raw private key.")
 )
 
 var (
@@ -169,6 +172,8 @@ func main() {
 		fmt.Println("        --pass           - The file containg the passphrase to decrypt the bls key.")
 		fmt.Println("        --file           - Non-human readable bls file.")
 		fmt.Println("   13. importBls      - Convert raw private key into encrypted bls key.")
+		fmt.Println("        --key            - Raw private key.")
+		fmt.Println("   14. getBlsPublic   - Show Bls public key given raw private bls key.")
 		fmt.Println("        --key            - Raw private key.")
 		os.Exit(1)
 	}
@@ -236,6 +241,8 @@ ARG:
 		blsRecoveryCommand()
 	case "importBls":
 		importBls()
+	case "getBlsPublic":
+		getBlsPublic()
 	default:
 		fmt.Printf("Unknown action: %s\n", os.Args[1])
 		flag.PrintDefaults()
@@ -582,6 +589,25 @@ func importBls() {
 			os.Exit(101)
 		}
 		fmt.Println("We loaded the file and the loaded private key DOES match your private key!")
+	} else {
+		fmt.Println("Please specify the hexadecimal private key string using --key")
+	}
+}
+
+func getBlsPublic() {
+	if err := getBlsPublicCommand.Parse(os.Args[2:]); err != nil {
+		fmt.Println(ctxerror.New("failed to parse flags").WithCause(err))
+		return
+	}
+
+	if *blsKey2 != "" {
+		privateKey := &ffi_bls.SecretKey{}
+		err := privateKey.DeserializeHexStr(*blsKey2)
+		if err != nil {
+			fmt.Printf("Your raw private key is not valid.\n Err: %v\n", err)
+			os.Exit(101)
+		}
+		fmt.Printf("Your bls public key is: %s\n", privateKey.GetPublicKey().SerializeToHexStr())
 	} else {
 		fmt.Println("Please specify the hexadecimal private key string using --key")
 	}
