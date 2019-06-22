@@ -264,6 +264,9 @@ func retrievePublicKeysFromLastBlock(bc consensus_engine.ChainReader, header *ty
 // VerifySeal implements consensus.Engine, checking whether the given block satisfies
 // the PoS difficulty requirements, i.e. >= 2f+1 valid signatures from the committee
 func (consensus *Consensus) VerifySeal(chain consensus_engine.ChainReader, header *types.Header) error {
+	if chain.CurrentHeader().Number.Uint64() <= uint64(1) {
+		return nil
+	}
 	publicKeys, err := retrievePublicKeysFromLastBlock(chain, header)
 	if err != nil {
 		return ctxerror.New("[VerifySeal] Cannot retrieve publickeys from last block").WithCause(err)
