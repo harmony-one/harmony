@@ -33,8 +33,7 @@ type Worker struct {
 	chain   *core.BlockChain
 	current *environment // An environment for current running cycle.
 
-	coinbase common.Address
-	engine   consensus_engine.Engine
+	engine consensus_engine.Engine
 
 	gasFloor uint64
 	gasCeil  uint64
@@ -43,7 +42,7 @@ type Worker struct {
 }
 
 // SelectTransactionsForNewBlock selects transactions for new block.
-func (w *Worker) SelectTransactionsForNewBlock(txs types.Transactions, maxNumTxs int) (types.Transactions, types.Transactions, types.Transactions) {
+func (w *Worker) SelectTransactionsForNewBlock(txs types.Transactions, maxNumTxs int, coinbase common.Address) (types.Transactions, types.Transactions, types.Transactions) {
 	if w.current.gasPool == nil {
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit)
 	}
@@ -55,7 +54,7 @@ func (w *Worker) SelectTransactionsForNewBlock(txs types.Transactions, maxNumTxs
 			invalid = append(invalid, tx)
 		}
 		snap := w.current.state.Snapshot()
-		_, err := w.commitTransaction(tx, w.coinbase)
+		_, err := w.commitTransaction(tx, coinbase)
 		if len(selected) > maxNumTxs {
 			unselected = append(unselected, tx)
 		} else {
@@ -68,7 +67,7 @@ func (w *Worker) SelectTransactionsForNewBlock(txs types.Transactions, maxNumTxs
 			}
 		}
 	}
-	err := w.UpdateCurrent()
+	err := w.UpdateCurrent(coinbase)
 	if err != nil {
 		log.Debug("Failed updating worker's state", "Error", err)
 	}
@@ -90,13 +89,13 @@ func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 }
 
 // CommitTransactions commits transactions.
-func (w *Worker) CommitTransactions(txs types.Transactions) error {
+func (w *Worker) CommitTransactions(txs types.Transactions, coinbase common.Address) error {
 	if w.current.gasPool == nil {
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit)
 	}
 	for _, tx := range txs {
 		snap := w.current.state.Snapshot()
-		_, err := w.commitTransaction(tx, w.coinbase)
+		_, err := w.commitTransaction(tx, coinbase)
 		if err != nil {
 			w.current.state.RevertToSnapshot(snap)
 			return err
@@ -107,7 +106,7 @@ func (w *Worker) CommitTransactions(txs types.Transactions) error {
 }
 
 // UpdateCurrent updates the current environment with the current state and header.
-func (w *Worker) UpdateCurrent() error {
+func (w *Worker) UpdateCurrent(coinbase common.Address) error {
 	parent := w.chain.CurrentBlock()
 	num := parent.Number()
 	timestamp := time.Now().Unix()
@@ -126,6 +125,7 @@ func (w *Worker) UpdateCurrent() error {
 		Time:       big.NewInt(timestamp),
 		Epoch:      epoch,
 		ShardID:    w.chain.ShardID(),
+		Coinbase:   coinbase,
 	}
 	return w.makeCurrent(parent, header)
 }
@@ -156,17 +156,19 @@ func (w *Worker) GetCurrentReceipts() []*types.Receipt {
 }
 
 // Commit generate a new block for the new txs.
-func (w *Worker) Commit(sig []byte, signers []byte, viewID uint64, addr common.Address) (*types.Block, error) {
+func (w *Worker) Commit(sig []byte, signers []byte, viewID uint64, coinbase common.Address) (*types.Block, error) {
 	if len(sig) > 0 && len(signers) > 0 {
 		copy(w.current.header.LastCommitSignature[:], sig[:])
 		w.current.header.LastCommitBitmap = append(signers[:0:0], signers...)
 	}
-	w.current.header.Coinbase = addr
+	w.current.header.Coinbase = coinbase
 	w.current.header.ViewID = new(big.Int)
 	w.current.header.ViewID.SetUint64(viewID)
 
 	s := w.current.state.Copy()
-	block, err := w.engine.Finalize(w.chain, w.current.header, s, w.current.txs, w.current.receipts)
+
+	copyHeader := types.CopyHeader(w.current.header)
+	block, err := w.engine.Finalize(w.chain, copyHeader, s, w.current.txs, w.current.receipts)
 	if err != nil {
 		return nil, ctxerror.New("cannot finalize block").WithCause(err)
 	}
@@ -174,7 +176,7 @@ func (w *Worker) Commit(sig []byte, signers []byte, viewID uint64, addr common.A
 }
 
 // New create a new worker object.
-func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus_engine.Engine, coinbase common.Address, shardID uint32) *Worker {
+func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus_engine.Engine, shardID uint32) *Worker {
 	worker := &Worker{
 		config: config,
 		chain:  chain,
@@ -182,7 +184,6 @@ func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus_en
 	}
 	worker.gasFloor = 500000000000000000
 	worker.gasCeil = 1000000000000000000
-	worker.coinbase = coinbase
 	worker.shardID = shardID
 
 	parent := worker.chain.CurrentBlock()

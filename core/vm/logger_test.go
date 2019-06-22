@@ -46,10 +46,7 @@ type dummyStatedb struct {
 	state.DB
 }
 
-// GetRefund ...
-func (*dummyStatedb) GetRefund() uint64 {
-	return 1337
-}
+func (*dummyStatedb) GetRefund() uint64 { return 1337 }
 
 func TestStoreCapture(t *testing.T) {
 	var (

@@ -204,8 +204,8 @@ type Node struct {
 
 // Blockchain returns the blockchain for the node's current shard.
 func (node *Node) Blockchain() *core.BlockChain {
-	shardID := node.Consensus.ShardID
-	bc, err := node.shardChains.ShardChain(shardID)
+	shardID := node.NodeConfig.ShardID
+	bc, err := node.shardChains.ShardChain(shardID, node.NodeConfig.GetNetworkType())
 	if err != nil {
 		err = ctxerror.New("cannot get shard chain", "shardID", shardID).
 			WithCause(err)
@@ -216,7 +216,7 @@ func (node *Node) Blockchain() *core.BlockChain {
 
 // Beaconchain returns the beaconchain from node.
 func (node *Node) Beaconchain() *core.BlockChain {
-	bc, err := node.shardChains.ShardChain(0)
+	bc, err := node.shardChains.ShardChain(0, node.NodeConfig.GetNetworkType())
 	if err != nil {
 		err = ctxerror.New("cannot get beaconchain").WithCause(err)
 		ctxerror.Log15(utils.GetLogger().Crit, err)
@@ -250,9 +250,9 @@ func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
 
 // Take out a subset of valid transactions from the pending transaction list
 // Note the pending transaction list will then contain the rest of the txs
-func (node *Node) getTransactionsForNewBlock(maxNumTxs int) types.Transactions {
+func (node *Node) getTransactionsForNewBlock(maxNumTxs int, coinbase common.Address) types.Transactions {
 	node.pendingTxMutex.Lock()
-	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(node.pendingTransactions, maxNumTxs)
+	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(node.pendingTransactions, maxNumTxs, coinbase)
 
 	node.pendingTransactions = unselected
 	node.reducePendingTransactions()
@@ -324,7 +324,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		node.ConfirmedBlockChannel = make(chan *types.Block)
 		node.BeaconBlockChannel = make(chan *types.Block)
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, node.Blockchain().Config(), chain)
-		node.Worker = worker.New(node.Blockchain().Config(), chain, node.Consensus, node.Consensus.SelfAddress, node.Consensus.ShardID)
+		node.Worker = worker.New(node.Blockchain().Config(), chain, node.Consensus, node.Consensus.ShardID)
 
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 		// the sequence number is the next block number to be added in consensus protocol, which is always one more than current chain header block
@@ -363,6 +363,8 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		}
 	}
 
+	utils.GetLogInstance().Info("Genesis block hash",
+		"hash", node.Blockchain().GetBlockByNumber(0).Hash().Hex(), "state root", node.Blockchain().GetBlockByNumber(0).Header().Root.Hex())
 	if consensusObj != nil && nodeconfig.GetDefaultConfig().IsLeader() {
 		node.State = NodeLeader
 	} else {

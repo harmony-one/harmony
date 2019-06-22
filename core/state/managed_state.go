@@ -28,7 +28,7 @@ type account struct {
 	nonces      []bool
 }
 
-// ManagedState is the managed state.
+// ManagedState ...
 type ManagedState struct {
 	*DB
 

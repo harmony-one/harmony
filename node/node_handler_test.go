@@ -27,8 +27,8 @@ func TestAddNewBlock(t *testing.T) {
 	}
 	node := New(host, consensus, testDBFactory, false)
 
-	selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
-	node.Worker.CommitTransactions(selectedTxs)
+	selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock, common.Address{})
+	node.Worker.CommitTransactions(selectedTxs, common.Address{})
 	block, _ := node.Worker.Commit([]byte{}, []byte{}, 0, common.Address{})
 
 	node.AddNewBlock(block)
@@ -53,8 +53,8 @@ func TestVerifyNewBlock(t *testing.T) {
 	}
 	node := New(host, consensus, testDBFactory, false)
 
-	selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
-	node.Worker.CommitTransactions(selectedTxs)
+	selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock, common.Address{})
+	node.Worker.CommitTransactions(selectedTxs, common.Address{})
 	block, _ := node.Worker.Commit([]byte{}, []byte{}, 0, common.Address{})
 
 	if err := node.VerifyNewBlock(block); err != nil {

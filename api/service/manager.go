@@ -144,7 +144,6 @@ func (m *Manager) TakeAction(action *Action) {
 		return
 	}
 	if service, ok := m.services[action.ServiceType]; ok {
-		utils.GetLogInstance().Info("Take Action", "action", action.Action, "service", action.ServiceType)
 		switch action.Action {
 		case Start:
 			service.StartService()

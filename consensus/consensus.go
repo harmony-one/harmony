@@ -250,8 +250,6 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 
 	consensus.validators.Store(leader.ConsensusPubKey.SerializeToHexStr(), leader)
 
-	consensus.SelfAddress = utils.GetBlsAddress(selfPeer.ConsensusPubKey)
-
 	if blsPriKey != nil {
 		consensus.priKey = blsPriKey
 		consensus.PubKey = blsPriKey.GetPublicKey()

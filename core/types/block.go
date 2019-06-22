@@ -89,13 +89,8 @@ type Header struct {
 	ShardID             uint32      `json:"shardID"          gencodec:"required"`
 	LastCommitSignature [96]byte    `json:"lastCommitSignature"  gencodec:"required"`
 	LastCommitBitmap    []byte      `json:"lastCommitBitmap"     gencodec:"required"` // Contains which validator signed
-	Vrf                 [32]byte    `json:"vrf"`
-	VrfProof            [96]byte    `json:"vrfProof"`
-	Vdf                 [258]byte   `json:"vdf"`
-	VdfProof            [258]byte   `json:"vdfProof"`
 	ShardStateHash      common.Hash `json:"shardStateRoot"`
 	ShardState          []byte      `json:"shardState"`
-	CrossLinks          []byte      `json:"crossLinks"`
 }
 
 // field type overrides for gencodec
@@ -264,6 +259,9 @@ func CopyHeader(h *Header) *Header {
 	if cpy.Number = new(big.Int); h.Number != nil {
 		cpy.Number.Set(h.Number)
 	}
+	if cpy.ViewID = new(big.Int); h.ViewID != nil {
+		cpy.ViewID.Set(h.ViewID)
+	}
 	if cpy.Epoch = new(big.Int); h.Epoch != nil {
 		cpy.Epoch.Set(h.Epoch)
 	}
@@ -275,10 +273,10 @@ func CopyHeader(h *Header) *Header {
 		cpy.ShardState = make([]byte, len(h.ShardState))
 		copy(cpy.ShardState, h.ShardState)
 	}
-	if len(h.CrossLinks) > 0 {
-		cpy.CrossLinks = make([]byte, len(h.CrossLinks))
-		copy(cpy.CrossLinks, h.CrossLinks)
-	}
+	//if len(h.CrossLinks) > 0 {
+	//	cpy.CrossLinks = make([]byte, len(h.CrossLinks))
+	//	copy(cpy.CrossLinks, h.CrossLinks)
+	//}
 	return &cpy
 }
 
@@ -484,15 +482,15 @@ func Number(b1, b2 *Block) bool {
 	return b1.header.Number.Cmp(b2.header.Number) < 0
 }
 
-// AddVdf add vdf into block header
-func (b *Block) AddVdf(vdf [258]byte) {
-	b.header.Vdf = vdf
-}
-
-// AddVrf add vrf into block header
-func (b *Block) AddVrf(vrf [32]byte) {
-	b.header.Vrf = vrf
-}
+//// AddVdf add vdf into block header
+//func (b *Block) AddVdf(vdf [258]byte) {
+//	b.header.Vdf = vdf
+//}
+//
+//// AddVrf add vrf into block header
+//func (b *Block) AddVrf(vrf [32]byte) {
+//	b.header.Vrf = vrf
+//}
 
 // AddShardState add shardState into block header
 func (b *Block) AddShardState(shardState ShardState) error {

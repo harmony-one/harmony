@@ -195,7 +195,7 @@ syncLoop:
 				if block.NumberU64()-txGen.Blockchain().CurrentBlock().NumberU64() == 1 {
 					txGen.AddNewBlock(block)
 					stateMutex.Lock()
-					if err := txGen.Worker.UpdateCurrent(); err != nil {
+					if err := txGen.Worker.UpdateCurrent(block.Coinbase()); err != nil {
 						ctxerror.Warn(utils.GetLogger(), err,
 							"(*Worker).UpdateCurrent failed")
 					}

@@ -18,6 +18,7 @@ import (
 	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/core/types"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/internal/utils"
 )
@@ -127,6 +128,9 @@ func (node *Node) QueryStakeInfo() *structs.StakeInfoReturnValue {
 }
 
 func (node *Node) getDeployedStakingContract() common.Address {
+	if node.NodeConfig.GetNetworkType() == nodeconfig.Mainnet {
+		return common.Address{}
+	}
 	return node.StakingContractAddress
 }
 
@@ -169,6 +173,9 @@ func (node *Node) AddFaucetContractToPendingTransactions() {
 
 // CallFaucetContract invokes the faucet contract to give the walletAddress initial money
 func (node *Node) CallFaucetContract(address common.Address) common.Hash {
+	if node.NodeConfig.GetNetworkType() == nodeconfig.Mainnet {
+		return common.Hash{}
+	}
 	// Temporary code to workaround explorer issue for searching new addresses (https://github.com/harmony-one/harmony/issues/503)
 	nonce := atomic.AddUint64(&node.ContractDeployerCurrentNonce, 1)
 	tx, _ := types.SignTx(types.NewTransaction(nonce-1, address, node.Consensus.ShardID, big.NewInt(0), params.TxGasContractCreation*10, nil, nil), types.HomesteadSigner{}, node.ContractDeployerKey)

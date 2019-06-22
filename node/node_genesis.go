@@ -2,19 +2,18 @@ package node
 
 import (
 	"crypto/ecdsa"
+	"errors"
 	"math/big"
 	"math/rand"
 	"strings"
 
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-
 	"github.com/ethereum/go-ethereum/common"
+
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/pkg/errors"
-
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -58,7 +57,7 @@ func (gi *genesisInitializer) InitChainDB(db ethdb.Database, shardID uint32) err
 func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardState types.ShardState) {
 	utils.GetLogger().Info("setting up a brand new chain database",
 		"shardID", shardID)
-	if shardID == node.Consensus.ShardID {
+	if shardID == node.NodeConfig.ShardID {
 		node.isFirstTime = true
 	}
 
@@ -70,10 +69,12 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 	switch node.NodeConfig.GetNetworkType() {
 	case nodeconfig.Mainnet:
 		chainConfig = *params.MainnetChainConfig
-		foundationAddress := common.HexToAddress("0xE25ABC3f7C3d5fB7FB81EAFd421FF1621A61107c")
-		genesisFunds := big.NewInt(GenesisFund)
-		genesisFunds = genesisFunds.Mul(genesisFunds, big.NewInt(denominations.One))
-		genesisAlloc[foundationAddress] = core.GenesisAccount{Balance: genesisFunds}
+		if shardID == 0 {
+			foundationAddress := common.HexToAddress("0xE25ABC3f7C3d5fB7FB81EAFd421FF1621A61107c")
+			genesisFunds := big.NewInt(GenesisFund)
+			genesisFunds = genesisFunds.Mul(genesisFunds, big.NewInt(denominations.One))
+			genesisAlloc[foundationAddress] = core.GenesisAccount{Balance: genesisFunds}
+		}
 	case nodeconfig.Testnet:
 		fallthrough
 	case nodeconfig.Devnet:
@@ -98,6 +99,7 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 		Config:         &chainConfig,
 		Alloc:          genesisAlloc,
 		ShardID:        shardID,
+		GasLimit:       params.GenesisGasLimit * 1000,
 		ShardStateHash: myShardState.Hash(),
 		ShardState:     myShardState.DeepCopy(),
 	}

@@ -33,7 +33,8 @@ func (dRand *DRand) WaitForEpochBlock(blockChannel chan *types.Block, stopChan c
 				if core.IsEpochLastBlock(newBlock) {
 					dRand.init(newBlock)
 				}
-				pRnd := newBlock.Header().Vrf
+				// TODO: use real vrf
+				pRnd := [32]byte{} //newBlock.Header().Vrf
 				zeros := [32]byte{}
 				if core.IsEpochBlock(newBlock) && !bytes.Equal(pRnd[:], zeros[:]) {
 					// The epoch block should contain the randomness preimage pRnd
@@ -121,7 +122,7 @@ func (dRand *DRand) processCommitMessage(message *msg_pb.Message) {
 		utils.GetLogInstance().Debug("Failed to deserialize BLS public key", "error", err)
 		return
 	}
-	validatorAddress := utils.GetBlsAddress(senderPubKey)
+	validatorAddress := senderPubKey.SerializeToHexStr()
 
 	if !dRand.IsValidatorInCommittee(validatorAddress) {
 		utils.GetLogInstance().Error("Invalid validator", "validatorAddress", validatorAddress)

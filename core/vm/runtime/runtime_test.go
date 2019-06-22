@@ -149,7 +149,6 @@ func BenchmarkCall(b *testing.B) {
 		}
 	}
 }
-
 func benchmarkEVMCreate(bench *testing.B, code string) {
 	var (
 		statedb, _ = state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
