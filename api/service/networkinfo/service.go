@@ -48,9 +48,6 @@ const (
 
 	// register to bootnode every ticker
 	dhtTicker = 6 * time.Hour
-
-	// wait for peerinfo.
-	peerInfoWait = time.Second
 )
 
 // New returns role conversion service.
@@ -164,46 +161,38 @@ func (s *Service) DoService() {
 		return
 	}
 	tick := time.NewTicker(dhtTicker)
-	peerInfoTick := time.NewTicker(peerInfoWait)
 	for {
 		select {
-		case <-peerInfoTick.C:
-			select {
-			case peer := <-s.peerInfo:
-				if peer.ID != s.Host.GetP2PHost().ID() && len(peer.ID) > 0 {
-					//	utils.GetLogInstance().Info("Found Peer", "peer", peer.ID, "addr", peer.Addrs, "my ID", s.Host.GetP2PHost().ID())
-					if err := s.Host.GetP2PHost().Connect(ctx, peer); err != nil {
-						utils.GetLogInstance().Warn("can't connect to peer node", "error", err, "peer", peer)
-						// break if the node can't connect to peers, waiting for another peer
-						break
-					} else {
-						utils.GetLogInstance().Info("connected to peer node", "peer", peer)
-					}
-					// figure out the public ip/port
-					var ip, port string
+		case peer := <-s.peerInfo:
+			if peer.ID != s.Host.GetP2PHost().ID() && len(peer.ID) > 0 {
+				//	utils.GetLogInstance().Info("Found Peer", "peer", peer.ID, "addr", peer.Addrs, "my ID", s.Host.GetP2PHost().ID())
+				if err := s.Host.GetP2PHost().Connect(ctx, peer); err != nil {
+					utils.GetLogInstance().Warn("can't connect to peer node", "error", err, "peer", peer)
+					// break if the node can't connect to peers, waiting for another peer
+					break
+				} else {
+					utils.GetLogInstance().Info("connected to peer node", "peer", peer)
+				}
+				// figure out the public ip/port
+				var ip, port string
 
-					for _, addr := range peer.Addrs {
-						netaddr, err := manet.ToNetAddr(addr)
-						if err != nil {
-							continue
-						}
-						nip := netaddr.(*net.TCPAddr).IP
-						if (nip.IsGlobalUnicast() && !utils.IsPrivateIP(nip)) || cgnPrefix.Contains(nip) {
-							ip = nip.String()
-							port = fmt.Sprintf("%d", netaddr.(*net.TCPAddr).Port)
-							break
-						}
+				for _, addr := range peer.Addrs {
+					netaddr, err := manet.ToNetAddr(addr)
+					if err != nil {
+						continue
 					}
-					if ip != "" {
-						p := p2p.Peer{IP: ip, Port: port, PeerID: peer.ID, Addrs: peer.Addrs}
-						utils.GetLogInstance().Info("Notify peerChan", "peer", p)
-						if s.peerChan != nil {
-							s.peerChan <- p
-						}
+					nip := netaddr.(*net.TCPAddr).IP
+					if (nip.IsGlobalUnicast() && !utils.IsPrivateIP(nip)) || cgnPrefix.Contains(nip) {
+						ip = nip.String()
+						port = fmt.Sprintf("%d", netaddr.(*net.TCPAddr).Port)
+						break
 					}
 				}
-			default:
-				utils.GetLogInstance().Info("Got no peer from peerInfo")
+				p := p2p.Peer{IP: ip, Port: port, PeerID: peer.ID, Addrs: peer.Addrs}
+				utils.GetLogInstance().Info("Notify peerChan", "peer", p)
+				if s.peerChan != nil {
+					s.peerChan <- p
+				}
 			}
 		case <-s.stopChan:
 			return
