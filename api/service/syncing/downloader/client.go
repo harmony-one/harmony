@@ -24,7 +24,7 @@ func ClientSetup(ip, port string) *Client {
 	var err error
 	client.conn, err = grpc.Dial(fmt.Sprintf(ip+":"+port), client.opts...)
 	if err != nil {
-		utils.GetLogInstance().Info("client.go:ClientSetup fail to dial: ", "error", err)
+		utils.GetLogInstance().Info("[SYNC] client.go:ClientSetup fail to dial: ", "error", err)
 		return nil
 	}
 	utils.GetLogInstance().Info("[SYNC] grpc connect successfully", "ip", ip, "port", port)
@@ -36,7 +36,7 @@ func ClientSetup(ip, port string) *Client {
 func (client *Client) Close() {
 	err := client.conn.Close()
 	if err != nil {
-		utils.GetLogInstance().Info("unable to close connection ")
+		utils.GetLogInstance().Info("[SYNC] unable to close connection ")
 	}
 }
 

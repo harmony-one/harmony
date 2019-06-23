@@ -37,14 +37,14 @@ func (s *Server) Start(ip, port string) (*grpc.Server, error) {
 	addr := net.JoinHostPort("", port)
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		log.Fatalf("[SYNC] failed to listen: %v", err)
 	}
 	var opts []grpc.ServerOption
 	grpcServer := grpc.NewServer(opts...)
 	pb.RegisterDownloaderServer(grpcServer, s)
 	go func() {
 		if err := grpcServer.Serve(lis); err != nil {
-			ctxerror.Warn(utils.GetLogger(), err, "(*grpc.Server).Serve failed")
+			ctxerror.Warn(utils.GetLogger(), err, "[SYNC] (*grpc.Server).Serve failed")
 		}
 	}()
 

@@ -207,7 +207,7 @@ func (peerConfig *SyncPeerConfig) GetBlocks(hashes [][]byte) ([][]byte, error) {
 
 // CreateSyncConfig creates SyncConfig for StateSync object.
 func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error {
-	utils.GetLogInstance().Debug("CreateSyncConfig: len of peers", "len", len(peers), "isBeacon", isBeacon)
+	utils.GetLogInstance().Debug("[SYNC] CreateSyncConfig: len of peers", "len", len(peers), "isBeacon", isBeacon)
 	if len(peers) == 0 {
 		return ctxerror.New("[SYNC] no peers to connect to")
 	}
@@ -326,7 +326,7 @@ func (ss *StateSync) GetConsensusHashes(startHash []byte, size uint32) bool {
 					return
 				}
 				if len(response.Payload) > int(size+1) {
-					utils.GetLogInstance().Warn("[Sync] GetConsensusHashes: receive more blockHahses than request!", "requestSize", size, "respondSize", len(response.Payload))
+					utils.GetLogInstance().Warn("[SYNC] GetConsensusHashes: receive more blockHahses than request!", "requestSize", size, "respondSize", len(response.Payload))
 					peerConfig.blockHashes = response.Payload[:size+1]
 				} else {
 					peerConfig.blockHashes = response.Payload
@@ -339,13 +339,13 @@ func (ss *StateSync) GetConsensusHashes(startHash []byte, size uint32) bool {
 			break
 		}
 		if count > TimesToFail {
-			utils.GetLogInstance().Info("GetConsensusHashes: reached retry limit")
+			utils.GetLogInstance().Info("[SYNC] GetConsensusHashes: reached retry limit")
 			return false
 		}
 		count++
 		time.Sleep(SleepTimeAfterNonConsensusBlockHashes)
 	}
-	utils.GetLogInstance().Info("syncing: Finished getting consensus block hashes.")
+	utils.GetLogInstance().Info("[SYNC] Finished getting consensus block hashes.")
 	return true
 }
 
@@ -361,7 +361,7 @@ func (ss *StateSync) generateStateSyncTaskQueue(bc *core.BlockChain) {
 		brk = true
 		return
 	})
-	utils.GetLogInstance().Info("syncing: Finished generateStateSyncTaskQueue", "length", ss.stateSyncTaskQueue.Len())
+	utils.GetLogInstance().Info("[SYNC] Finished generateStateSyncTaskQueue", "length", ss.stateSyncTaskQueue.Len())
 }
 
 // downloadBlocks downloads blocks from state sync task queue.
@@ -503,15 +503,15 @@ func (ss *StateSync) updateBlockAndStatus(block *types.Block, bc *core.BlockChai
 	utils.GetLogInstance().Info("[SYNC] Current Block", "blockHex", bc.CurrentBlock().Hash().Hex())
 	_, err := bc.InsertChain([]*types.Block{block})
 	if err != nil {
-		utils.GetLogInstance().Debug("Error adding new block to blockchain", "Error", err)
+		utils.GetLogInstance().Debug("[SYNC] Error adding new block to blockchain", "Error", err)
 
-		utils.GetLogInstance().Debug("Rolling back current block!", "block", bc.CurrentBlock())
+		utils.GetLogInstance().Debug("[SYNC] Rolling back current block!", "block", bc.CurrentBlock())
 		bc.Rollback([]common.Hash{bc.CurrentBlock().Hash()})
 		return false
 	}
 	ss.syncMux.Lock()
 	if err := worker.UpdateCurrent(block.Header().Coinbase); err != nil {
-		ctxerror.Warn(utils.GetLogger(), err, "(*Worker).UpdateCurrent failed")
+		ctxerror.Warn(utils.GetLogger(), err, "[SYNC] (*Worker).UpdateCurrent failed")
 	}
 	ss.syncMux.Unlock()
 	utils.GetLogInstance().Info("[SYNC] new block added to blockchain", "blockHeight", bc.CurrentBlock().NumberU64(), "blockHex", bc.CurrentBlock().Hash().Hex())
