@@ -162,6 +162,7 @@ NUM_NN=0
 
 sleep 2
 
+mkdir -p .hmy
 # Start nodes
 i=0
 while IFS='' read -r line || [[ -n "$line" ]]; do
@@ -174,13 +175,13 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
         then
           echo ""${blspub}.key" already in local."
        else
-          aws s3 cp "s3://harmony-secret-keys/bls-test/${blspub}.key" .
+          aws s3 cp "s3://harmony-secret-keys/bls-test/${blspub}.key" .hmy
       fi
 
-      args=("${base_args[@]}" -ip "${ip}" -port "${port}" -key "/tmp/${ip}-${port}.key" -db_dir "db-${ip}-${port}" -accounts "${account}" -blspass file:blspass.txt -blskey_file "${blspub}.key")
+      args=("${base_args[@]}" -ip "${ip}" -port "${port}" -key "/tmp/${ip}-${port}.key" -db_dir "db-${ip}-${port}" -accounts "${account}" -blspass file:blspass.txt -blskey_file ".hmy/${blspub}.key")
   fi
 
-  args=("${base_args[@]}" -ip "${ip}" -port "${port}" -key "/tmp/${ip}-${port}.key" -db_dir "db-${ip}-${port}" -blspass file:blspass.txt -blskey_file "${blspub}.key" -dns=false -network_type="mainnet")
+  args=("${base_args[@]}" -ip "${ip}" -port "${port}" -key "/tmp/${ip}-${port}.key" -db_dir "db-${ip}-${port}" -blspass file:blspass.txt -blskey_file ".hmy/${blspub}.key" -dns=false -network_type="mainnet")
   case "${mode}" in
   leader*|validator*) args=("${args[@]}" -is_genesis);;
   esac
