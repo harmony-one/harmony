@@ -18,6 +18,7 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/api/proto/node"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 )
@@ -25,6 +26,7 @@ import (
 // PingMessageType defines the data structure of the Ping message
 type PingMessageType struct {
 	Version uint16 // version of the protocol
+	NodeVer string // version of the node binary
 	Node    node.Info
 }
 
@@ -51,6 +53,7 @@ func NewPingMessage(peer p2p.Peer, isClient bool) *PingMessageType {
 	ping := new(PingMessageType)
 
 	ping.Version = proto.ProtocolVersion
+	ping.NodeVer = nodeconfig.GetVersion()
 	ping.Node.IP = peer.IP
 	ping.Node.Port = peer.Port
 	ping.Node.PeerID = peer.PeerID

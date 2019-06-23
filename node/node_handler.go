@@ -550,7 +550,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) i
 	peer.Port = ping.Node.Port
 	peer.PeerID = ping.Node.PeerID
 	peer.ConsensusPubKey = nil
-	logger = logger.New("ip", peer.IP, "port", peer.Port, "peerID", peer.PeerID)
+	logger = logger.New("ip", peer.IP, "port", peer.Port, "peerID", peer.PeerID, "peerVer", ping.NodeVer)
 
 	if ping.Node.PubKey != nil {
 		peer.ConsensusPubKey = &bls.PublicKey{}
