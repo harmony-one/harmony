@@ -834,6 +834,14 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 		if nodeconfig.GetDefaultConfig().IsLeader() {
 			consensus.getLogger().Info("[ConsensusMainLoop] Waiting for consensus start", "time", time.Now())
 			<-startChannel
+
+			if nodeconfig.GetDefaultConfig().IsLeader() {
+				// send a signal to indicate it's ready to run consensus
+				// this signal is consumed by node object to create a new block and in turn trigger a new consensus on it
+				go func() {
+					consensus.ReadySignal <- struct{}{}
+				}()
+			}
 		}
 		consensus.getLogger().Info("[ConsensusMainLoop] Consensus started", "time", time.Now())
 		defer close(stoppedChan)
