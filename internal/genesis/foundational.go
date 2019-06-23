@@ -146,4 +146,12 @@ var FoundationalNodeAccounts = [...]DeployAccount{
 	{Index: "141", Address: "one1ljvq9tkvfp583zzl85mgjh3qjvjufnuwmn7krv", BlsPublicKey: "37644619ae24ffa2ab63dde85f8116effddaa500c6e28c57a5f100cb8a97262ed97f671d903a9c32a53301eec1100b96"},
 	{Index: "142", Address: "one12c23ekslj469g0g0tu9jcvecfkla7rahmrhe37", BlsPublicKey: "19101de3d0578c3146a1904f25a3344a998dcb0a18433dc5cc977d05f378676b0652b4a64fa8dff6c819cfd52dc94c14"},
 	{Index: "143", Address: "one19l9equxmql4jkcah8g4f6qva732npajarffj6q", BlsPublicKey: "f531f442dc19d2967fbcdcab68e77b16bc49cd05698ed8a56b39f3704315915c2b2b0175be6982be7238290b3504d487"},
+	{Index: "144", Address: "one1nq5dglmw0vunsa34mve8sdyrkhfd0373v4xgtv", BlsPublicKey: "a48d7cd3f3004cf2cecd4d4eba14d257da046f13ff461fedc2c3daaf725776e9a96ef38098a9a04f968f9c2287fc220d"},
+	{Index: "145", Address: "one1qmgqawpflw4pu9ytryz69mrk0mhhsswdmjgfrj", BlsPublicKey: "013116498f069ab0b1e3bb1043e45283c9fb8641eed8470d77d59bc8a42fca53ce6d3714ceb5c37aa71e3d1839b25690"},
+	{Index: "146", Address: "one1h7c7pgwnht4nns40k6swdzwy8xn9uvl0e65e49", BlsPublicKey: "05f9655186ef16363e2ae14629bc0fef17781bac5eed7875e3b442e57e45340115f6d087035f626a84832479c9a54a03"},
+	{Index: "147", Address: "one1cwzleselrsq3x76vjzy7u65a9tqmsrcne2w83h", BlsPublicKey: "783841b0eaea497e2f894d482b6bde16b96359cb837a9f7dc3bf89abcb45b75e8ea597d60d2e89775c6fb37164fa3694"},
+	{Index: "148", Address: "one1kkcw2y5d9w9celf0vu025hflyxu33gekmntx9u", BlsPublicKey: "b12b30b10c9b002ec0832d061025b99a695052800ebf642299fd439be505322208543566efda12b524b284ce5ea06510"},
+	{Index: "149", Address: "one1n3gzyslx97aw6fccdxk0msatnxkk2yhtwytwsa", BlsPublicKey: "7d6fce0f309ab32074050abb2194fd223daace09878fdf52c76c5c0895d18a6efef1d3237b6e6e167d74e9126dbd130b"},
+	{Index: "150", Address: "one175jcxcdk2xlmccndr2mux3c8se8gsmddesg5ed", BlsPublicKey: "74a8762803bfbe8893540480cc9f789914b56f86a1458c38d5bf1b6737cd149a28f761bec95f3e9cf4095fb55a6e7294"},
+	{Index: "151", Address: "one1wp6fqpjejvejfeyal9pwpzn9nfac04zu0p026e", BlsPublicKey: "275c1dc193dbee87691182613c56cdc919bbe55ff89aeb5913d7f55f6e139b9fe39b9a123fbe0681b6480539777ffa04"},
 }
