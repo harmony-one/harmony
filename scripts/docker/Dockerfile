@@ -7,7 +7,7 @@ EXPOSE 9000/tcp 14555/tcp 6000/tcp
 
 VOLUME ["/harmony/db", "/harmony/log"]
 
-# Default BN for drum
+# Default BN for R3
 ENV BN_MA "/ip4/100.26.90.187/tcp/9874/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv,/ip4/54.213.43.194/tcp/9874/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9"
 ENV NODE_PORT "9000"
 ENV NODE_ACCOUNT_ID ""
