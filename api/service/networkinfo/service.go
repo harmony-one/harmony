@@ -46,7 +46,7 @@ var (
 const (
 	waitInRetry       = 2 * time.Second
 	connectionTimeout = 3 * time.Minute
-	findPeerInterval  = 30 * time.Second
+	findPeerInterval  = 60 * time.Second
 
 	// register to bootnode every ticker
 	dhtTicker = 6 * time.Hour
