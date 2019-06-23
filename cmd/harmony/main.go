@@ -101,7 +101,7 @@ var (
 	// networkType indicates the type of the network
 	networkType = flag.String("network_type", "mainnet", "type of the network: mainnet, testnet, devnet...")
 	// blockPeriod indicates the how long the leader waits to propose a new block.
-	blockPeriod = flag.Int("block_period", 10, "how long in second the leader waits to propose a new block.")
+	blockPeriod = flag.Int("block_period", 8, "how long in second the leader waits to propose a new block.")
 	// isNewNode indicates this node is a new node
 	isNewNode = flag.Bool("is_newnode", false, "true means this node is a new node")
 	// shardID indicates the shard ID of this node

@@ -481,11 +481,11 @@ func (node *Node) broadcastEpochShardState(newBlock *types.Block) error {
 
 // AddNewBlock is usedd to add new block into the blockchain.
 func (node *Node) AddNewBlock(newBlock *types.Block) {
-	blockNum, err := node.Blockchain().InsertChain([]*types.Block{newBlock})
+	_, err := node.Blockchain().InsertChain([]*types.Block{newBlock})
 	if err != nil {
-		utils.GetLogInstance().Debug("Error Adding new block to blockchain", "blockNum", blockNum, "parentHash", newBlock.Header().ParentHash, "hash", newBlock.Header().Hash(), "Error", err)
+		utils.GetLogInstance().Debug("Error Adding new block to blockchain", "blockNum", newBlock.NumberU64(), "parentHash", newBlock.Header().ParentHash, "hash", newBlock.Header().Hash(), "Error", err)
 	} else {
-		utils.GetLogInstance().Info("Added New Block to Blockchain!!!", "blockNum", blockNum, "hash", newBlock.Header().Hash().Hex())
+		utils.GetLogInstance().Info("Added New Block to Blockchain!!!", "blockNum", newBlock.NumberU64(), "hash", newBlock.Header().Hash().Hex())
 	}
 }
 
