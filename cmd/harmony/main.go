@@ -203,7 +203,7 @@ func setUpConsensusKeyAndReturnIndex(nodeConfig *nodeconfig.ConfigType) (int, *g
 	pubKey := consensusPriKey.GetPublicKey()
 	index, acc := genesis.IsBlsPublicKeyIndex(pubKey.SerializeToHexStr())
 	if index < 0 {
-		fmt.Printf("can not found your bls key: %s\n", pubKey.SerializeToHexStr())
+		fmt.Printf("cannot find your BLS key in the genesis/FN tables: %s\n", pubKey.SerializeToHexStr())
 		os.Exit(100)
 	}
 
