@@ -65,6 +65,7 @@ USAGE: $ME [OPTIONS] config_file_name [extra args to node]
    -s shards      number of shards (default: $SHARDS)
    -n             dryrun mode (default: $DRYRUN)
    -S             disable sync test (default: $SYNC)
+   -B             don't build the binary
 
 This script will build all the binaries and start harmony and txgen based on the configuration file.
 
@@ -88,7 +89,7 @@ SHARDS=2
 SYNC=true
 DRYRUN=
 
-while getopts "hdtD:m:s:nS" option; do
+while getopts "hdtD:m:s:nSB" option; do
    case $option in
       h) usage ;;
       d) DB=true ;;
@@ -98,6 +99,7 @@ while getopts "hdtD:m:s:nS" option; do
       s) SHARDS=$OPTARG ;;
       n) DRYRUN=echo ;;
       S) SYNC=false ;;
+      B) NOBUILD=true ;;
    esac
 done
 
@@ -126,12 +128,14 @@ cleanup
 # and you won't be able to turn it off. With `go build` generating one
 # exe, the dialog will only pop up once at the very first time.
 # Also it's recommended to use `go build` for testing the whole exe. 
-pushd $ROOT
-echo "compiling ..."
-go build -o bin/harmony cmd/harmony/main.go
-go build -o bin/txgen cmd/client/txgen/main.go
-go build -o bin/bootnode cmd/bootnode/main.go
-popd
+if [ "${NOBUILD}" != "true" ]; then
+   pushd $ROOT
+   echo "compiling ..."
+   go build -o bin/harmony cmd/harmony/main.go
+   go build -o bin/txgen cmd/client/txgen/main.go
+   go build -o bin/bootnode cmd/bootnode/main.go
+   popd
+fi
 
 # Create a tmp folder for logs
 t=`date +"%Y%m%d-%H%M%S"`
