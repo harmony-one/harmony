@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	manet "github.com/multiformats/go-multiaddr-net"
+
 	"github.com/ethereum/go-ethereum/rpc"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -14,7 +16,6 @@ import (
 	libp2pdis "github.com/libp2p/go-libp2p-discovery"
 	libp2pdht "github.com/libp2p/go-libp2p-kad-dht"
 	peerstore "github.com/libp2p/go-libp2p-peerstore"
-	manet "github.com/multiformats/go-multiaddr-net"
 )
 
 // Service is the network info service.
@@ -45,6 +46,7 @@ var (
 const (
 	waitInRetry       = 2 * time.Second
 	connectionTimeout = 3 * time.Minute
+	findPeerInterval  = 30 * time.Second
 
 	// register to bootnode every ticker
 	dhtTicker = 6 * time.Hour
@@ -143,64 +145,75 @@ func (s *Service) Run() {
 		return
 	}
 
-	var err error
-	s.peerInfo, err = s.discovery.FindPeers(ctx, string(s.Rendezvous))
-	if err != nil {
-		utils.GetLogInstance().Error("FindPeers", "error", err)
-		return
-	}
-
 	go s.DoService()
 }
 
 // DoService does network info.
 func (s *Service) DoService() {
-	_, cgnPrefix, err := net.ParseCIDR("100.64.0.0/10")
-	if err != nil {
-		utils.GetLogInstance().Error("can't parse CIDR", "error", err)
-		return
-	}
 	tick := time.NewTicker(dhtTicker)
 	for {
 		select {
-		case peer := <-s.peerInfo:
-			if peer.ID != s.Host.GetP2PHost().ID() && len(peer.ID) > 0 {
-				//	utils.GetLogInstance().Info("Found Peer", "peer", peer.ID, "addr", peer.Addrs, "my ID", s.Host.GetP2PHost().ID())
-				if err := s.Host.GetP2PHost().Connect(ctx, peer); err != nil {
-					utils.GetLogInstance().Warn("can't connect to peer node", "error", err, "peer", peer)
-					// break if the node can't connect to peers, waiting for another peer
-					break
-				} else {
-					utils.GetLogInstance().Info("connected to peer node", "peer", peer)
-				}
-				// figure out the public ip/port
-				var ip, port string
-
-				for _, addr := range peer.Addrs {
-					netaddr, err := manet.ToNetAddr(addr)
-					if err != nil {
-						continue
-					}
-					nip := netaddr.(*net.TCPAddr).IP
-					if (nip.IsGlobalUnicast() && !utils.IsPrivateIP(nip)) || cgnPrefix.Contains(nip) {
-						ip = nip.String()
-						port = fmt.Sprintf("%d", netaddr.(*net.TCPAddr).Port)
-						break
-					}
-				}
-				p := p2p.Peer{IP: ip, Port: port, PeerID: peer.ID, Addrs: peer.Addrs}
-				utils.GetLogInstance().Info("Notify peerChan", "peer", p)
-				if s.peerChan != nil {
-					s.peerChan <- p
-				}
-			}
 		case <-s.stopChan:
 			return
 		case <-tick.C:
 			libp2pdis.Advertise(ctx, s.discovery, string(s.Rendezvous))
 			utils.GetLogInstance().Info("Successfully announced!", "Rendezvous", string(s.Rendezvous))
+		default:
+			var err error
+			s.peerInfo, err = s.discovery.FindPeers(ctx, string(s.Rendezvous))
+			if err != nil {
+				utils.GetLogInstance().Error("FindPeers", "error", err)
+				return
+			}
+
+			s.findPeers()
+			time.Sleep(findPeerInterval)
 		}
 	}
+}
+
+func (s *Service) findPeers() {
+	_, cgnPrefix, err := net.ParseCIDR("100.64.0.0/10")
+	if err != nil {
+		utils.GetLogInstance().Error("can't parse CIDR", "error", err)
+		return
+	}
+	for peer := range s.peerInfo {
+		utils.GetLogInstance().Info("Got peers", "peer", peer)
+		if peer.ID != s.Host.GetP2PHost().ID() && len(peer.ID) > 0 {
+			//	utils.GetLogInstance().Info("Found Peer", "peer", peer.ID, "addr", peer.Addrs, "my ID", s.Host.GetP2PHost().ID())
+			if err := s.Host.GetP2PHost().Connect(ctx, peer); err != nil {
+				utils.GetLogInstance().Warn("can't connect to peer node", "error", err, "peer", peer)
+				// break if the node can't connect to peers, waiting for another peer
+				break
+			} else {
+				utils.GetLogInstance().Info("connected to peer node", "peer", peer)
+			}
+			// figure out the public ip/port
+			var ip, port string
+
+			for _, addr := range peer.Addrs {
+				netaddr, err := manet.ToNetAddr(addr)
+				if err != nil {
+					continue
+				}
+				nip := netaddr.(*net.TCPAddr).IP
+				if (nip.IsGlobalUnicast() && !utils.IsPrivateIP(nip)) || cgnPrefix.Contains(nip) {
+					ip = nip.String()
+					port = fmt.Sprintf("%d", netaddr.(*net.TCPAddr).Port)
+					break
+				}
+			}
+			p := p2p.Peer{IP: ip, Port: port, PeerID: peer.ID, Addrs: peer.Addrs}
+			utils.GetLogInstance().Info("Notify peerChan", "peer", p)
+			if s.peerChan != nil {
+				s.peerChan <- p
+			}
+		}
+	}
+
+	utils.GetLogInstance().Info("PeerInfo Channel Closed.")
+	return
 }
 
 // StopService stops network info service.
