@@ -46,6 +46,7 @@ var (
 const (
 	waitInRetry       = 2 * time.Second
 	connectionTimeout = 3 * time.Minute
+	findPeerInterval  = 1 * time.Minute
 
 	// register to bootnode every ticker
 	dhtTicker = 6 * time.Hour
@@ -166,7 +167,7 @@ func (s *Service) DoService() {
 			}
 
 			s.findPeers()
-			time.Sleep(60 * time.Second)
+			time.Sleep(findPeerInterval)
 		}
 	}
 }
