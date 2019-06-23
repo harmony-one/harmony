@@ -56,26 +56,14 @@ func (role Role) String() string {
 }
 
 // NetworkType describes the type of Harmony network
-type NetworkType int
+type NetworkType string
 
 // Constants for NetworkType
 const (
-	Mainnet NetworkType = iota
-	Testnet
-	Devnet
+	Mainnet = "mainnet"
+	Testnet = "testnet"
+	Devnet  = "devnet"
 )
-
-func (network NetworkType) String() string {
-	switch network {
-	case Mainnet:
-		return "Mainnet"
-	case Testnet:
-		return "Testnet"
-	case Devnet:
-		return "Devnet"
-	}
-	return "Unknown"
-}
 
 // Network is the type of Harmony network
 var Network = Testnet
