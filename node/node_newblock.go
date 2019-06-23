@@ -17,7 +17,7 @@ import (
 // Constants of lower bound limit of a new block.
 const (
 	ConsensusTimeOut = 30
-	PeriodicBlock    = 1 * time.Second
+	PeriodicBlock    = 200 * time.Millisecond
 )
 
 // WaitForConsensusReadyv2 listen for the readiness signal from consensus and generate new block for consensus.
@@ -86,7 +86,7 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 						log.Debug("Failed updating worker's state", "Error", err)
 						continue
 					}
-					newBlock, err := node.Worker.Commit(sig, mask, viewID, coinbase)
+					newBlock, err = node.Worker.Commit(sig, mask, viewID, coinbase)
 
 					if err != nil {
 						ctxerror.Log15(utils.GetLogger().Error,
