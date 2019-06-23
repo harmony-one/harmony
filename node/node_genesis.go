@@ -94,8 +94,9 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 	// Initialize shard state
 	// TODO: add ShardID into chainconfig and change ChainID to NetworkID
 	chainConfig.ChainID = big.NewInt(int64(shardID)) // Use ChainID as piggybacked ShardID
+	var gspec core.Genesis{}
 	if shardID == 0 {
-		gspec := core.Genesis{
+		gspec = core.Genesis{
 			Config:         &chainConfig,
 			Alloc:          genesisAlloc,
 			ShardID:        shardID,
@@ -105,7 +106,7 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 			ShardState:     myShardState.DeepCopy(),
 		}
 	} else {
-		gspec := core.Genesis{
+		gspec = core.Genesis{
 			Config:         &chainConfig,
 			Alloc:          genesisAlloc,
 			ShardID:        shardID,
