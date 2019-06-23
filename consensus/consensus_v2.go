@@ -103,6 +103,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 	}
 
 	consensus.PbftLog.AddMessage(pbftMsg)
+	consensus.getLogger().Debug("[Announce] Added Announce message in pbftLog", "MsgblockHash", pbftMsg.BlockHash, "MsgViewID", pbftMsg.ViewID, "MsgBlockNum", pbftMsg.BlockNum)
 	consensus.PbftLog.AddBlock(block)
 
 	// Leader sign the block hash itself
@@ -247,7 +248,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 
 	if !consensus.PbftLog.HasMatchingViewAnnounce(consensus.blockNum, consensus.viewID, recvMsg.BlockHash) {
 		consensus.getLogger().Debug("[OnPrepare] No Matching Announce message", "MsgblockHash", recvMsg.BlockHash, "MsgBlockNum", recvMsg.BlockNum)
-		return
+		//return
 	}
 
 	validatorPubKey := recvMsg.SenderPubkey.SerializeToHexStr()
