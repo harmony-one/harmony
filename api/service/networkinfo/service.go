@@ -143,14 +143,19 @@ func (s *Service) Run() {
 		return
 	}
 
-	var err error
-	s.peerInfo, err = s.discovery.FindPeers(ctx, string(s.Rendezvous))
-	if err != nil {
-		utils.GetLogInstance().Error("FindPeers", "error", err)
-		return
-	}
+	go func() {
+		for {
+			var err error
+			s.peerInfo, err = s.discovery.FindPeers(ctx, string(s.Rendezvous))
+			if err != nil {
+				utils.GetLogInstance().Error("FindPeers", "error", err)
+				return
+			}
 
-	go s.DoService()
+			s.DoService()
+			time.Sleep(60 * time.Second)
+		}
+	}()
 }
 
 // DoService does network info.
@@ -163,7 +168,11 @@ func (s *Service) DoService() {
 	tick := time.NewTicker(dhtTicker)
 	for {
 		select {
-		case peer := <-s.peerInfo:
+		case peer, ok := <-s.peerInfo:
+			if !ok {
+				utils.GetLogInstance().Info("PeerInfo Channel Closed.")
+				return
+			}
 			if peer.ID != s.Host.GetP2PHost().ID() && len(peer.ID) > 0 {
 				//	utils.GetLogInstance().Info("Found Peer", "peer", peer.ID, "addr", peer.Addrs, "my ID", s.Host.GetP2PHost().ID())
 				if err := s.Host.GetP2PHost().Connect(ctx, peer); err != nil {
