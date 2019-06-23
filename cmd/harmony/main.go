@@ -55,8 +55,8 @@ func InitLDBDatabase(ip string, port string, freshDB bool, isBeacon bool) (*ethd
 	return ethdb.NewLDBDatabase(dbFileName, 0, 0)
 }
 
-func printVersion(me string) {
-	fmt.Fprintf(os.Stderr, "Harmony (C) 2018. %v, version %v-%v (%v %v)\n", path.Base(me), version, commit, builtBy, builtAt)
+func printVersion() {
+	fmt.Fprintln(os.Stderr, nodeconfig.GetVersion())
 	os.Exit(0)
 }
 
@@ -432,8 +432,9 @@ func main() {
 	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
 	flag.Parse()
 
+	nodeconfig.SetVersion(fmt.Sprintf("Harmony (C) 2018. %v, version %v-%v (%v %v)", path.Base(os.Args[0]), version, commit, builtBy, builtAt))
 	if *versionFlag {
-		printVersion(os.Args[0])
+		printVersion()
 	}
 
 	// If FN node running, they should either specify blsPrivateKey or the file with passphrase

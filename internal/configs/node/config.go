@@ -74,6 +74,8 @@ const (
 	MaxShards = 32 // maximum number of shards. It is also the maxium number of configs.
 )
 
+var version string
+
 // ConfigType is the structure of all node related configuration variables
 type ConfigType struct {
 	// The three groupID design, please refer to https://github.com/harmony-one/harmony/blob/master/node/node.md#libp2p-integration
@@ -229,4 +231,14 @@ func (conf *ConfigType) SetNetworkType(networkType NetworkType) {
 // GetNetworkType gets the networkType
 func (conf *ConfigType) GetNetworkType() NetworkType {
 	return conf.networkType
+}
+
+// SetVersion set the version of the node binary
+func SetVersion(ver string) {
+	version = ver
+}
+
+// GetVersion return the version of the node binary
+func GetVersion() string {
+	return version
 }
