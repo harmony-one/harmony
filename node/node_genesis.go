@@ -94,16 +94,26 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 	// Initialize shard state
 	// TODO: add ShardID into chainconfig and change ChainID to NetworkID
 	chainConfig.ChainID = big.NewInt(int64(shardID)) // Use ChainID as piggybacked ShardID
-
-	gspec := core.Genesis{
-		Config:         &chainConfig,
-		Alloc:          genesisAlloc,
-		ShardID:        shardID,
-		GasLimit:       params.GenesisGasLimit * 1000,
-		ShardStateHash: myShardState.Hash(),
-		ShardState:     myShardState.DeepCopy(),
+	if shardID == 0 {
+		gspec := core.Genesis{
+			Config:         &chainConfig,
+			Alloc:          genesisAlloc,
+			ShardID:        shardID,
+			ExtraData:      []byte("Harmony for One and All. Open Consensus for 10B."),
+			GasLimit:       params.GenesisGasLimit * 1000,
+			ShardStateHash: myShardState.Hash(),
+			ShardState:     myShardState.DeepCopy(),
+		}
+	} else {
+		gspec := core.Genesis{
+			Config:         &chainConfig,
+			Alloc:          genesisAlloc,
+			ShardID:        shardID,
+			GasLimit:       params.GenesisGasLimit * 1000,
+			ShardStateHash: myShardState.Hash(),
+			ShardState:     myShardState.DeepCopy(),
+		}
 	}
-
 	// Store genesis block into db.
 	gspec.MustCommit(db)
 }
