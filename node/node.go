@@ -72,8 +72,8 @@ func (state State) String() string {
 }
 
 const (
-	maxBroadcastNodes       = 10                  // broadcast at most maxBroadcastNodes peers that need in sync
-	broadcastTimeout  int64 = 3 * 60 * 1000000000 // 3 mins
+	maxBroadcastNodes       = 10              // broadcast at most maxBroadcastNodes peers that need in sync
+	broadcastTimeout  int64 = 60 * 1000000000 // 1 mins
 	//SyncIDLength is the length of bytes for syncID
 	SyncIDLength = 20
 )

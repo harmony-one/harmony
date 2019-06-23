@@ -24,10 +24,10 @@ func ClientSetup(ip, port string) *Client {
 	var err error
 	client.conn, err = grpc.Dial(fmt.Sprintf(ip+":"+port), client.opts...)
 	if err != nil {
-		utils.GetLogInstance().Info("[SYNC] client.go:ClientSetup fail to dial: ", "error", err)
+		utils.GetLogInstance().Info("[SYNC] client.go:ClientSetup fail to dial: ", "IP", ip, "error", err)
 		return nil
 	}
-	utils.GetLogInstance().Info("[SYNC] grpc connect successfully", "ip", ip, "port", port)
+	utils.GetLogInstance().Info("[SYNC] grpc connect successfully", "IP", ip)
 	client.dlClient = pb.NewDownloaderClient(client.conn)
 	return &client
 }

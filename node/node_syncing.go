@@ -197,9 +197,6 @@ func (node *Node) SendNewBlockToUnsync() {
 			continue
 		}
 
-		// really need to have a unique id independent of ip/port
-		utils.GetLogInstance().Debug("[SYNC] peerRegistration Record", "selfPubKey", node.Consensus.PubKey.SerializeToHexStr(), "number", len(node.peerRegistrationRecord))
-
 		for peerID, config := range node.peerRegistrationRecord {
 			elapseTime := time.Now().UnixNano() - config.timestamp
 			if elapseTime > broadcastTimeout {
