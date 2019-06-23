@@ -268,13 +268,6 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 	consensus.commitFinishChan = make(chan uint64)
 
 	consensus.ReadySignal = make(chan struct{})
-	if nodeconfig.GetDefaultConfig().IsLeader() {
-		// send a signal to indicate it's ready to run consensus
-		// this signal is consumed by node object to create a new block and in turn trigger a new consensus on it
-		go func() {
-			consensus.ReadySignal <- struct{}{}
-		}()
-	}
 
 	consensus.uniqueIDInstance = utils.GetUniqueValidatorIDInstance()
 

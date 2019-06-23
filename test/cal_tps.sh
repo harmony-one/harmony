@@ -61,7 +61,7 @@ done
 FILES=$(cat $VALIDATORS) 
 for i in $FILES; do
     peer=`echo $i | cut -f 5 -d - | cut -f 1 -d .`
-    num=`grep "Inserted new block" $i | tail -n 1 | cut -f 6 -d , | grep -Eo [0-9]+`
+    num=`grep "Added New Block to Blockchain" $i | tail -n 1 | cut -f 6 -d , | grep -Eo [0-9]+`
     echo "peerID": $peer, "numOfConsensus": $num
 done
 
