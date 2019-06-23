@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"os"
 	"path"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -785,40 +786,47 @@ func FetchBalance(address common.Address) []*AccountState {
 		result = append(result, nil)
 	}
 
+	var wg sync.WaitGroup
+	wg.Add(walletProfile.Shards)
+
 	for shardID := 0; shardID < walletProfile.Shards; shardID++ {
-		balance := big.NewInt(0)
-		var nonce uint64
+		go func(shardID int) {
+			defer wg.Done()
+			balance := big.NewInt(0)
+			var nonce uint64
 
-		result[uint32(shardID)] = &AccountState{balance, 0}
+			result[uint32(shardID)] = &AccountState{balance, 0}
 
-	LOOP:
-		for j := 0; j < len(walletProfile.RPCServer[shardID]); j++ {
-			for retry := 0; retry < rpcRetry; retry++ {
-				server := walletProfile.RPCServer[shardID][j]
-				client, err := clientService.NewClient(server.IP, server.Port)
-				if err != nil {
-					continue
-				}
+		LOOP:
+			for j := 0; j < len(walletProfile.RPCServer[shardID]); j++ {
+				for retry := 0; retry < rpcRetry; retry++ {
+					server := walletProfile.RPCServer[shardID][j]
+					client, err := clientService.NewClient(server.IP, server.Port)
+					if err != nil {
+						continue
+					}
 
-				log.Debug("FetchBalance", "server", server)
-				response, err := client.GetBalance(address)
-				if err != nil {
-					log.Info("failed to get balance, retrying ...")
-					time.Sleep(200 * time.Millisecond)
-					continue
+					log.Debug("FetchBalance", "server", server)
+					response, err := client.GetBalance(address)
+					if err != nil {
+						log.Info("failed to get balance, retrying ...")
+						time.Sleep(200 * time.Millisecond)
+						continue
+					}
+					log.Debug("FetchBalance", "response", response)
+					respBalance := big.NewInt(0)
+					respBalance.SetBytes(response.Balance)
+					if balance.Cmp(respBalance) < 0 {
+						balance.SetBytes(response.Balance)
+						nonce = response.Nonce
+					}
+					break LOOP
 				}
-				log.Debug("FetchBalance", "response", response)
-				respBalance := big.NewInt(0)
-				respBalance.SetBytes(response.Balance)
-				if balance.Cmp(respBalance) < 0 {
-					balance.SetBytes(response.Balance)
-					nonce = response.Nonce
-				}
-				break LOOP
 			}
-		}
-		result[shardID] = &AccountState{balance, nonce}
+			result[shardID] = &AccountState{balance, nonce}
+		}(shardID)
 	}
+	wg.Wait()
 	return result
 }
 
