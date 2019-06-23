@@ -244,7 +244,8 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 		startHeight := startBlock.NumberU64()
 		endHeight := node.Blockchain().CurrentBlock().NumberU64()
 		if startHeight >= endHeight {
-			return response, fmt.Errorf("[SYNC] GetBlockHashes Request failed. I am not higher than requested node, my Height %v, request node Height %v", endHeight, startHeight)
+			utils.GetLogInstance().Debug("[SYNC] GetBlockHashes Request: I am not higher than requested node", "myHeight", endHeight, "requestHeight", startHeight)
+			return response, nil
 		}
 
 		for blockNum := startHeight; blockNum <= startHeight+size; blockNum++ {
