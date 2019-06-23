@@ -1,6 +1,6 @@
 #!/bin/bash
 
-DOCKER_IMAGE=harmonyone/node:drum
+DOCKER_IMAGE=harmonyone/node:R3
 
 function usage()
 {
