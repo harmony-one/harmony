@@ -176,7 +176,8 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 			consensus.getLogger().Debug("[OnAnnounce] Leader is malicious", "leaderKey", consensus.LeaderPubKey.SerializeToHexStr())
 			consensus.startViewChange(consensus.viewID + 1)
 		}
-		return
+		consensus.getLogger().Debug("[OnAnnounce] Announce message received again", "leaderKey", consensus.LeaderPubKey.SerializeToHexStr())
+		//return
 	}
 
 	consensus.getLogger().Debug("[OnAnnounce] Announce message Added", "MsgViewID", recvMsg.ViewID, "MsgBlockNum", recvMsg.BlockNum)
