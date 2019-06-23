@@ -76,7 +76,7 @@ func (node *Node) GetPeersFromDNS() []p2p.Peer {
 	dns := fmt.Sprintf("s%d.%s", shardID, node.dnsZone)
 	addrs, err := net.LookupHost(dns)
 	if err != nil {
-		utils.GetLogInstance().Debug("GetPeersFromDNS cannot find peers", "error", err)
+		utils.GetLogInstance().Debug("[SYNC] GetPeersFromDNS cannot find peers", "error", err)
 		return nil
 	}
 	port := syncing.GetSyncingPort(node.SelfPeer.Port)
@@ -121,7 +121,7 @@ SyncingLoop:
 			if node.stateSync == nil {
 				node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
 				logger = logger.New("syncID", node.GetSyncID())
-				getLogger().Debug("initialized state sync")
+				getLogger().Debug("[SYNC] initialized state sync")
 			}
 			if node.stateSync.GetActivePeerNumber() < MinConnectedPeers {
 				peers := getPeers()
@@ -181,7 +181,7 @@ func (node *Node) InitSyncingServer() {
 
 // StartSyncingServer starts syncing server.
 func (node *Node) StartSyncingServer() {
-	utils.GetLogInstance().Info("support_syncing: StartSyncingServer")
+	utils.GetLogInstance().Info("[SYNC] support_syncing: StartSyncingServer")
 	if node.downloaderServer.GrpcServer == nil {
 		node.downloaderServer.Start(node.SelfPeer.IP, syncing.GetSyncingPort(node.SelfPeer.Port))
 	}
