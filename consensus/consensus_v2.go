@@ -403,7 +403,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		if consensus.BlockVerifier == nil {
 			// do nothing
 		} else if err := consensus.BlockVerifier(&blockObj); err != nil {
-			consensus.getLogger().Info("[OnPrepared] Block verification faied")
+			consensus.getLogger().Info("[OnPrepared] Block verification failed", "error", err)
 			return
 		}
 	}

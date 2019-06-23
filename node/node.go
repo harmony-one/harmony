@@ -370,8 +370,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		}
 	}
 
-	utils.GetLogInstance().Info("Genesis block hash",
-		"hash", node.Blockchain().GetBlockByNumber(0).Hash().Hex(), "state root", node.Blockchain().GetBlockByNumber(0).Header().Root.Hex())
+	utils.GetLogInstance().Info("Genesis block hash", "genesis block header", node.Blockchain().GetBlockByNumber(0).Header())
 	if consensusObj != nil && nodeconfig.GetDefaultConfig().IsLeader() {
 		node.State = NodeLeader
 	} else {
