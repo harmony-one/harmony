@@ -168,13 +168,13 @@ func (log *PbftLog) GetMessagesByTypeSeqHash(typ msg_pb.MessageType, blockNum ui
 // HasMatchingAnnounce returns whether the log contains announce type message with given blockNum, blockHash
 func (log *PbftLog) HasMatchingAnnounce(blockNum uint64, blockHash common.Hash) bool {
 	found := log.GetMessagesByTypeSeqHash(msg_pb.MessageType_ANNOUNCE, blockNum, blockHash)
-	return len(found) == 1
+	return len(found) >= 1
 }
 
 // HasMatchingViewAnnounce returns whether the log contains announce type message with given blockNum, viewID and blockHash
 func (log *PbftLog) HasMatchingViewAnnounce(blockNum uint64, viewID uint64, blockHash common.Hash) bool {
 	found := log.GetMessagesByTypeSeqViewHash(msg_pb.MessageType_ANNOUNCE, blockNum, viewID, blockHash)
-	return len(found) == 1
+	return len(found) >= 1
 }
 
 // HasMatchingPrepared returns whether the log contains prepared message with given blockNum, viewID and blockHash
@@ -186,7 +186,7 @@ func (log *PbftLog) HasMatchingPrepared(blockNum uint64, blockHash common.Hash) 
 // HasMatchingViewPrepared returns whether the log contains prepared message with given blockNum, viewID and blockHash
 func (log *PbftLog) HasMatchingViewPrepared(blockNum uint64, viewID uint64, blockHash common.Hash) bool {
 	found := log.GetMessagesByTypeSeqViewHash(msg_pb.MessageType_PREPARED, blockNum, viewID, blockHash)
-	return len(found) == 1
+	return len(found) >= 1
 }
 
 // GetMessagesByTypeSeqView returns pbft messages with matching type, blockNum and viewID

@@ -102,6 +102,7 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 		GasLimit:       params.GenesisGasLimit * 1000,
 		ShardStateHash: myShardState.Hash(),
 		ShardState:     myShardState.DeepCopy(),
+		ExtraData:      []byte("Harmony for One and All. Open Consensus for 10B."),
 	}
 
 	// Store genesis block into db.

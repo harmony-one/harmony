@@ -28,7 +28,7 @@ import (
 )
 
 // BlockReward is the block reward, to be split evenly among block signers.
-var BlockReward = new(big.Int).Mul(big.NewInt(30), big.NewInt(denominations.One))
+var BlockReward = new(big.Int).Mul(big.NewInt(24), big.NewInt(denominations.One))
 
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {

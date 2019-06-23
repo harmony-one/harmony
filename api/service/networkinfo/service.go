@@ -46,7 +46,7 @@ var (
 const (
 	waitInRetry       = 2 * time.Second
 	connectionTimeout = 3 * time.Minute
-	findPeerInterval  = 30 * time.Second
+	findPeerInterval  = 60 * time.Second
 
 	// register to bootnode every ticker
 	dhtTicker = 6 * time.Hour
@@ -179,7 +179,6 @@ func (s *Service) findPeers() {
 		return
 	}
 	for peer := range s.peerInfo {
-		utils.GetLogInstance().Info("Got peers", "peer", peer)
 		if peer.ID != s.Host.GetP2PHost().ID() && len(peer.ID) > 0 {
 			//	utils.GetLogInstance().Info("Found Peer", "peer", peer.ID, "addr", peer.Addrs, "my ID", s.Host.GetP2PHost().ID())
 			if err := s.Host.GetP2PHost().Connect(ctx, peer); err != nil {

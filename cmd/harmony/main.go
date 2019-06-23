@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"os"
 	"path"
+	"runtime"
 	"time"
 
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -140,6 +141,9 @@ var (
 )
 
 func initSetup() {
+	// Add GOMAXPROCS to achieve max performance.
+	runtime.GOMAXPROCS(runtime.NumCPU() * 4)
+
 	// Set port and ip to global config.
 	nodeconfig.GetDefaultConfig().Port = *port
 	nodeconfig.GetDefaultConfig().IP = *ip
@@ -281,7 +285,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	}
 
 	nodeConfig.Host, err = p2pimpl.NewHost(&nodeConfig.SelfPeer, nodeConfig.P2pPriKey)
-	if *logConn {
+	if *logConn && nodeConfig.GetNetworkType() != nodeconfig.Mainnet {
 		nodeConfig.Host.GetP2PHost().Network().Notify(utils.NewConnLogger(utils.GetLogInstance()))
 	}
 	if err != nil {
