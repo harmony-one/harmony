@@ -45,7 +45,7 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 			case <-time.After(ConsensusTimeOut * time.Second):
 				if node.Consensus.PubKey.IsEqual(node.Consensus.LeaderPubKey) {
 					utils.GetLogInstance().Debug("Leader consensus timeout, retry!", "count", timeoutCount)
-					node.Consensus.ResetState()
+					//node.Consensus.ResetState()
 					timeoutCount++
 					if newBlock != nil {
 						// Send the new block to Consensus so it can be confirmed.
