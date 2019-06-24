@@ -1,7 +1,7 @@
 @ECHO OFF
 
 SET SELF=%0
-SET DOCKER_IMAGE=harmonyone/node:R3
+SET DOCKER_IMAGE=harmonyone/node:r3
 
 WHERE docker >NUL 2>&1
 IF %ERRORLEVEL% NEQ 0 (
