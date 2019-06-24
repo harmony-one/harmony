@@ -176,7 +176,7 @@ esac
 
 BUCKET=pub.harmony.one
 OS=$(uname -s)
-REL=R3
+REL=r3
 
 if [ "$OS" == "Darwin" ]; then
    FOLDER=release/darwin-x86_64/$REL/
