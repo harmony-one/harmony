@@ -54,8 +54,8 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 				}
 			case <-readySignal:
 				for {
+					time.Sleep(PeriodicBlock)
 					if time.Now().Before(deadline) {
-						time.Sleep(PeriodicBlock)
 						continue
 					}
 

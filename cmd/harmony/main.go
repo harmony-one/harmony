@@ -104,7 +104,8 @@ var (
 	// blockPeriod indicates the how long the leader waits to propose a new block.
 	blockPeriod = flag.Int("block_period", 8, "how long in second the leader waits to propose a new block.")
 	// isNewNode indicates this node is a new node
-	isNewNode = flag.Bool("is_newnode", false, "true means this node is a new node")
+	isNewNode      = flag.Bool("is_newnode", false, "true means this node is a new node")
+	leaderOverride = flag.Bool("leader_override", false, "true means override the default leader role and acts as validator")
 	// shardID indicates the shard ID of this node
 	shardID            = flag.Int("shard_id", -1, "the shard ID of this node")
 	enableMemProfiling = flag.Bool("enableMemProfiling", false, "Enable memsize logging.")
@@ -271,7 +272,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 
 	nodeConfig.SelfPeer = p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nodeConfig.ConsensusPubKey}
 
-	if accountIndex < core.GenesisShardNum && !*isExplorer { // The first node in a shard is the leader at genesis
+	if accountIndex < core.GenesisShardNum && !*isExplorer && !*leaderOverride { // The first node in a shard is the leader at genesis
 		nodeConfig.Leader = nodeConfig.SelfPeer
 		nodeConfig.StringRole = "leader"
 	} else {
