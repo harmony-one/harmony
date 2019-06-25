@@ -128,6 +128,21 @@ var (
 )
 
 func initSetup() {
+	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
+	flag.Parse()
+
+	nodeconfig.SetVersion(fmt.Sprintf("Harmony (C) 2018. %v, version %v-%v (%v %v)", path.Base(os.Args[0]), version, commit, builtBy, builtAt))
+	if *versionFlag {
+		printVersion()
+	}
+
+	// maybe request passphrase for bls key.
+	passphraseForBls()
+
+	// Configure log parameters
+	utils.SetLogContext(*port, *ip)
+	utils.SetLogVerbosity(log.Lvl(*verbosity))
+
 	// Add GOMAXPROCS to achieve max performance.
 	runtime.GOMAXPROCS(runtime.NumCPU() * 4)
 
@@ -163,6 +178,20 @@ func initSetup() {
 	if *enableGC {
 		memprofiling.MaybeCallGCPeriodically()
 	}
+}
+
+func passphraseForBls() {
+	// If FN node running, they should either specify blsPrivateKey or the file with passphrase
+	if *blsKeyFile == "" || *blsPass == "" {
+		fmt.Println("Internal nodes need to have pass to decrypt blskey")
+		os.Exit(101)
+	}
+	passphrase, err := utils.GetPassphraseFromSource(*blsPass)
+	if err != nil {
+		fmt.Printf("error when reading passphrase file: %v\n", err)
+		os.Exit(100)
+	}
+	blsPassphrase = passphrase
 }
 
 func setupECDSAKeys() {
@@ -416,26 +445,6 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 }
 
 func main() {
-	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
-	flag.Parse()
-
-	nodeconfig.SetVersion(fmt.Sprintf("Harmony (C) 2018. %v, version %v-%v (%v %v)", path.Base(os.Args[0]), version, commit, builtBy, builtAt))
-	if *versionFlag {
-		printVersion()
-	}
-
-	// If FN node running, they should either specify blsPrivateKey or the file with passphrase
-	if *blsKeyFile == "" || *blsPass == "" {
-		fmt.Println("Internal nodes need to have pass to decrypt blskey")
-		os.Exit(101)
-	}
-	passphrase, err := utils.GetPassphraseFromSource(*blsPass)
-	if err != nil {
-		fmt.Printf("error when reading passphrase file: %v\n", err)
-		os.Exit(100)
-	}
-	blsPassphrase = passphrase
-
 	initSetup()
 	nodeConfig := createGlobalConfig()
 
