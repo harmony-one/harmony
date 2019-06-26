@@ -74,7 +74,10 @@ const (
 	// TODO ek – inflate to disable resharding until we can 1) fix shard
 	//  state mutation bug and 2) implement key passphrase recycle across
 	//  process restart (exec) for shard migration
-	BlocksPerEpoch = 1000000000000
+	// TODO lc - set to 10800, aproximiately 1 day per epoch based on 8
+	// seconds per block
+	// BlocksPerEpoch = 10800
+	BlocksPerEpoch = 5
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	BlockChainVersion = 3
@@ -1651,14 +1654,18 @@ func (bc *BlockChain) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscript
 func (bc *BlockChain) ReadShardState(epoch *big.Int) (types.ShardState, error) {
 	cacheKey := string(epoch.Bytes())
 	if cached, ok := bc.shardStateCache.Get(cacheKey); ok {
-		shardState := cached.(types.ShardState)
-		return shardState, nil
+		shardState, ok := cached.(types.ShardState)
+		if ok {
+			utils.GetLogger().Debug("read shard state from cache", "shardState", shardState)
+			return shardState, nil
+		}
 	}
 	shardState, err := rawdb.ReadShardState(bc.db, epoch)
 	if err != nil {
 		return nil, err
 	}
 	bc.shardStateCache.Add(cacheKey, shardState)
+	utils.GetLogger().Debug("read shard state from rawdb", "shardState", shardState)
 	return shardState, nil
 }
 
