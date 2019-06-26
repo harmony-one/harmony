@@ -65,6 +65,11 @@ func IsBlsPublicKeyIndex(blsPublicKey string) (int, *DeployAccount) {
 			return i + 8, &item
 		}
 	}
+	for i, item := range FoundationalSwapOneNodeAccounts {
+		if item.BlsPublicKey == blsPublicKey {
+			return i + 8, &item
+		}
+	}
 	return -1, nil
 }
 
