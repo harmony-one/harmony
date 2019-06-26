@@ -13,7 +13,6 @@ import (
 	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/core/types"
 	common2 "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/internal/utils"
 )
@@ -23,12 +22,17 @@ const (
 	GenesisEpoch = 0
 	// FirstEpoch is the number of the first epoch.
 	FirstEpoch = 1
+	// SwapEpochOne is the number of epoch for the first swap
+	SwapEpochOne = 3
+)
+
+var (
 	// GenesisShardNum is the number of shard at genesis
-	GenesisShardNum = 4
+	GenesisShardNum = 1
 	// GenesisShardSize is the size of each shard at genesis
-	GenesisShardSize = 150
+	GenesisShardSize = 5
 	// GenesisShardHarmonyNodes is the number of harmony node at each shard
-	GenesisShardHarmonyNodes = 112
+	GenesisShardHarmonyNodes = 4
 	// CuckooRate is the percentage of nodes getting reshuffled in the second step of cuckoo resharding.
 	CuckooRate = 0.1
 )
@@ -181,9 +185,20 @@ func CalculateNewShardState(
 	bc *BlockChain, epoch *big.Int,
 	stakeInfo *map[common.Address]*structs.StakeInfo,
 ) (types.ShardState, error) {
+	utils.GetLogInstance().Warn("CalculateNewShardState", "epoch", epoch)
+
 	if epoch.Cmp(big.NewInt(GenesisEpoch)) == 0 {
+		utils.GetLogInstance().Warn("GetInitShardState", "epoch", GenesisEpoch)
 		return GetInitShardState(), nil
 	}
+	// Swap Epoch One
+	if epoch.Cmp(big.NewInt(SwapEpochOne)) > 0 {
+		utils.GetLogInstance().Warn("GetSwapOneShardState", "epoch", SwapEpochOne)
+		return GetSwapOneShardState(), nil
+	}
+
+	return GetInitShardState(), nil
+	/* The following code won't be exercised
 	prevEpoch := new(big.Int).Sub(epoch, common.Big1)
 	ss, err := GetShardingStateFromBlockChain(bc, prevEpoch)
 	if err != nil {
@@ -194,6 +209,7 @@ func CalculateNewShardState(
 	utils.GetLogInstance().Info("Cuckoo Rate", "percentage", CuckooRate)
 	ss.Reshard(newNodeList, CuckooRate)
 	return ss.shardState, nil
+	*/
 }
 
 // UpdateShardingState remove the unstaked nodes and returns the newly staked node Ids.
@@ -225,7 +241,6 @@ func (ss *ShardingState) UpdateShardingState(stakeInfo *map[common.Address]*stru
 
 // GetInitShardState returns the initial shard state at genesis.
 func GetInitShardState() types.ShardState {
-	utils.GetLogInstance().Info("Generating Genesis Shard State.")
 	shardState := types.ShardState{}
 	for i := 0; i < GenesisShardNum; i++ {
 		com := types.Committee{ShardID: uint32(i)}
@@ -256,5 +271,43 @@ func GetInitShardState() types.ShardState {
 		}
 		shardState = append(shardState, com)
 	}
+	utils.GetLogInstance().Info("GetInitShardState", "shardState", shardState)
+	return shardState
+}
+
+// GetSwapOneShardState returns the initial shard state at genesis.
+func GetSwapOneShardState() types.ShardState {
+	utils.GetLogInstance().Info("Generating Swap One Shard State.")
+	shardState := types.ShardState{}
+	for i := 0; i < GenesisShardNum; i++ {
+		com := types.Committee{ShardID: uint32(i)}
+		for j := 0; j < GenesisShardHarmonyNodes; j++ {
+			index := i + j*GenesisShardNum // The initial account to use for genesis nodes
+
+			pub := &bls.PublicKey{}
+			pub.DeserializeHexStr(genesis.HarmonyAccounts[index].BlsPublicKey)
+			pubKey := types.BlsPublicKey{}
+			pubKey.FromLibBLSPublicKey(pub)
+			// TODO: directly read address for bls too
+			curNodeID := types.NodeID{common2.ParseAddr(genesis.HarmonyAccounts[index].Address), pubKey}
+			com.NodeList = append(com.NodeList, curNodeID)
+		}
+
+		// add FN runner's key
+		for j := GenesisShardHarmonyNodes; j < GenesisShardSize; j++ {
+			index := i + (j-GenesisShardHarmonyNodes)*GenesisShardNum
+
+			pub := &bls.PublicKey{}
+			pub.DeserializeHexStr(genesis.FoundationalSwapOneNodeAccounts[index].BlsPublicKey)
+
+			pubKey := types.BlsPublicKey{}
+			pubKey.FromLibBLSPublicKey(pub)
+			// TODO: directly read address for bls too
+			curNodeID := types.NodeID{common2.ParseAddr(genesis.FoundationalSwapOneNodeAccounts[index].Address), pubKey}
+			com.NodeList = append(com.NodeList, curNodeID)
+		}
+		shardState = append(shardState, com)
+	}
+	utils.GetLogInstance().Info("GetSwapOneShardState", "shardState", shardState)
 	return shardState
 }
