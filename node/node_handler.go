@@ -813,7 +813,7 @@ func (node *Node) transitionIntoNextEpoch(shardState types.ShardState) {
 		publicKeys = append(publicKeys, key)
 	}
 	node.Consensus.UpdatePublicKeys(publicKeys)
-	node.DRand.UpdatePublicKeys(publicKeys)
+	//	node.DRand.UpdatePublicKeys(publicKeys)
 
 	if node.Blockchain().ShardID() == myShardID {
 		getLogger().Info("staying in the same shard")
