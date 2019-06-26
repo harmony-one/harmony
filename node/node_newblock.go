@@ -113,6 +113,8 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 }
 
 func (node *Node) proposeShardState(block *types.Block) error {
+   return node.proposeBeaconShardState(block)
+   /*
 	switch node.Consensus.ShardID {
 	case 0:
 		return node.proposeBeaconShardState(block)
@@ -120,6 +122,7 @@ func (node *Node) proposeShardState(block *types.Block) error {
 		node.proposeLocalShardState(block)
 		return nil
 	}
+   */
 }
 
 func (node *Node) proposeBeaconShardState(block *types.Block) error {
