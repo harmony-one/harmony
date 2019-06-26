@@ -83,6 +83,9 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 
 // ExplorerMessageHandler passes received message in node_handler to explorer service
 func (node *Node) commitBlockForExplorer(block *types.Block) {
+	if block.ShardID() != node.NodeConfig.ShardID {
+		return
+	}
 	// Dump new block into level db.
 	utils.GetLogInstance().Info("[Explorer] Committing block into explorer DB", "blockNum", block.NumberU64())
 	explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, true).Dump(block, block.NumberU64())
