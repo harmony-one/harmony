@@ -494,6 +494,7 @@ func Number(b1, b2 *Block) bool {
 
 // AddShardState add shardState into block header
 func (b *Block) AddShardState(shardState ShardState) error {
+	utils.GetLogInstance().Info("AddShardState", "height", b.NumberU64(), "shardState", shardState)
 	// Make a copy because ShardState.Hash() internally sorts entries.
 	// Store the sorted copy.
 	shardState = append(shardState[:0:0], shardState...)
@@ -504,6 +505,13 @@ func (b *Block) AddShardState(shardState ShardState) error {
 	}
 	b.header.ShardState = data
 	return nil
+}
+
+// DecodeShardState decode the shard state from []byte using rlp
+func DecodeShardState(data []byte) (ShardState, error) {
+	var ss ShardState
+	err := rlp.DecodeBytes(data, &ss)
+	return ss, err
 }
 
 // Logger returns a sub-logger with block contexts added.
