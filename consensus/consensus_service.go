@@ -179,15 +179,6 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int {
 	// TODO: use pubkey to identify leader rather than p2p.Peer.
 	consensus.leader = p2p.Peer{ConsensusPubKey: pubKeys[0]}
 	consensus.LeaderPubKey = pubKeys[0]
-	prepareBitmap, err := bls_cosi.NewMask(consensus.PublicKeys, consensus.LeaderPubKey)
-	if err == nil {
-		consensus.prepareBitmap = prepareBitmap
-	}
-
-	commitBitmap, err := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.ConsensusPubKey)
-	if err == nil {
-		consensus.commitBitmap = commitBitmap
-	}
 
 	utils.GetLogInstance().Info("My Leader", "info", consensus.LeaderPubKey.SerializeToHexStr())
 	consensus.pubKeyLock.Unlock()
