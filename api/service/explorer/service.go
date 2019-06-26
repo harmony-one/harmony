@@ -267,30 +267,19 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 	id := r.FormValue("id")
 	key := GetAddressKey(id)
 
-	var result interface{}
+	utils.GetLogInstance().Info("Querying address", "address", id)
+	data := &Data{}
 	defer func() {
-		if err := json.NewEncoder(w).Encode(result); err != nil {
+		if err := json.NewEncoder(w).Encode(data.Address); err != nil {
 			ctxerror.Warn(utils.WithCallerSkip(utils.GetLogInstance(), 1), err,
 				"cannot JSON-encode address")
 		}
 	}()
-	data := &Data{}
 	if id == "" {
 		return
 	}
-	db := s.storage.GetDB()
-	bytes, err := db.Get([]byte(key))
-	if err != nil {
-		ctxerror.Warn(utils.GetLogger(), err, "cannot read address", "id", id)
-		return
-	}
-	var address Address
-	if err = rlp.DecodeBytes(bytes, &address); err != nil {
-		utils.GetLogger().Warn("cannot convert data from DB", "id", id)
-		return
-	}
-	data.Address = address
-
+	data.Address.ID = id
+	// Try to populate the banace by directly calling get balance.
 	// Check the balance from blockchain rather than local DB dump
 	if s.GetAccountBalance != nil {
 		address := common2.ParseAddr(id)
@@ -300,7 +289,16 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	result = data.Address
+	db := s.storage.GetDB()
+	bytes, err := db.Get([]byte(key))
+	if err != nil {
+		ctxerror.Warn(utils.GetLogger(), err, "cannot read address from db", "id", id)
+		return
+	}
+	if err = rlp.DecodeBytes(bytes, &data.Address); err != nil {
+		utils.GetLogger().Warn("cannot convert data from DB", "id", id)
+		return
+	}
 }
 
 // GetExplorerNodeCount serves /nodes end-point.
