@@ -166,6 +166,24 @@ func (consensus *Consensus) DebugPrintPublicKeys() {
 	utils.GetLogInstance().Debug("PublicKeys:", "#", len(consensus.PublicKeys))
 }
 
+// UpdateBlsPublicKeys will update bls keys of the consensus only
+func (consensus *Consensus) UpdateBlsPublicKeys(pubKeys []*bls.PublicKey) int {
+	consensus.pubKeyLock.Lock()
+	consensus.PublicKeys = append(pubKeys[:0:0], pubKeys...)
+	consensus.CommitteePublicKeys = map[string]bool{}
+	utils.GetLogInstance().Info("My Committee")
+	for _, pubKey := range consensus.PublicKeys {
+		utils.GetLogInstance().Info("Member", "BlsPubKey", pubKey.SerializeToHexStr())
+		consensus.CommitteePublicKeys[pubKey.SerializeToHexStr()] = true
+	}
+	prepareBitmap, err := bls_cosi.NewMask(consensus.PublicKeys, consensus.LeaderPubKey)
+	if err == nil {
+		consensus.prepareBitmap = prepareBitmap
+	}
+	consensus.pubKeyLock.Unlock()
+	return len(consensus.PublicKeys)
+}
+
 // UpdatePublicKeys updates the PublicKeys variable, protected by a mutex
 func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int {
 	consensus.pubKeyLock.Lock()
