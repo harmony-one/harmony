@@ -408,6 +408,32 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 
 	node.AddNewBlock(newBlock)
 
+	// Update Public Keys
+	newBlockHeader := newBlock.Header()
+
+	newShardState, err := node.Blockchain().ReadShardState(newBlockHeader.Epoch)
+	utils.GetLogInstance().Info("PostConsensusProcessing:", "shardState", newShardState, "epoch", newBlockHeader.Epoch)
+
+	if err != nil {
+		utils.GetLogInstance().Info("PostConsensusProcessing: cannot read shard state", "epoch", newBlockHeader.Epoch)
+		return
+	}
+	// Update public keys
+	var publicKeys []*bls.PublicKey
+	committee := newShardState.FindCommitteeByID(node.Consensus.ShardID)
+	for idx, nodeID := range committee.NodeList {
+		key := &bls.PublicKey{}
+		err := key.Deserialize(nodeID.BlsPublicKey[:])
+		if err != nil {
+			utils.GetLogInstance().Error("Failed to deserialize BLS public key in shard state",
+				"idx", idx,
+				"error", err)
+			return
+		}
+		publicKeys = append(publicKeys, key)
+	}
+	node.Consensus.UpdateBlsPublicKeys(publicKeys)
+
 	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
 		// Update contract deployer's nonce so default contract like faucet can issue transaction with current nonce
 		nonce := node.GetNonceOfAddress(crypto.PubkeyToAddress(node.ContractDeployerKey.PublicKey))
@@ -818,8 +844,7 @@ func (node *Node) transitionIntoNextEpoch(shardState types.ShardState) {
 		}
 		publicKeys = append(publicKeys, key)
 	}
-	node.Consensus.UpdatePublicKeys(publicKeys)
-	//	node.DRand.UpdatePublicKeys(publicKeys)
+	node.Consensus.UpdateBlsPublicKeys(publicKeys)
 
 	if node.Blockchain().ShardID() == myShardID {
 		getLogger().Info("staying in the same shard")
