@@ -117,7 +117,6 @@ func DeserializeBlockchainSyncMessage(d []byte) (*BlockchainSyncMessage, error) 
 	err := decoder.Decode(&blockchainSyncMessage)
 	if err != nil {
 		utils.GetLogger().Crit("Error", err)
-		panic(err)
 	}
 	return &blockchainSyncMessage, err
 }

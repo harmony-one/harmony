@@ -64,7 +64,6 @@ func ConvertFixedDataIntoByteArray(data interface{}) []byte {
 	err := binary.Write(buff, binary.BigEndian, data)
 	if err != nil {
 		GetLogger().Crit("Failed to convert fixed data into byte array", "err", err)
-		panic(err)
 	}
 	return buff.Bytes()
 }
