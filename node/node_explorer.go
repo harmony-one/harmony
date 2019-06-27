@@ -97,7 +97,7 @@ func (node *Node) AddNewBlockForExplorer() {
 			utils.GetLogInstance().Info("Adding new block for explorer node", "blockHeight", blocks[0].NumberU64())
 			node.AddNewBlock(blocks[0])
 			// Clean up the blocks to avoid OOM.
-			node.Consensus.PbftLog.DeleteBlockByNumber(blocks[0].NumberU64())
+			node.Consensus.PbftLog.DeleteBlockByNumber(blocks[0].NumberU64() + 1)
 		}
 	}
 }
