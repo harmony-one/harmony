@@ -95,9 +95,13 @@ func (node *Node) AddNewBlockForExplorer() {
 				utils.GetLogInstance().Error("We should have not received more than one block with the same block height.")
 			}
 			utils.GetLogInstance().Info("Adding new block for explorer node", "blockHeight", blocks[0].NumberU64())
-			node.AddNewBlock(blocks[0])
-			// Clean up the blocks to avoid OOM.
-			node.Consensus.PbftLog.DeleteBlockByNumber(blocks[0].NumberU64())
+			if err := node.AddNewBlock(blocks[0]); err == nil {
+				// Clean up the blocks to avoid OOM.
+				node.Consensus.PbftLog.DeleteBlockByNumber(blocks[0].NumberU64() + 1)
+
+			} else {
+				utils.GetLogInstance().Error("Error when adding new block for explorer node", "error", err)
+			}
 		}
 	}
 }

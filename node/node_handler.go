@@ -400,7 +400,9 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 		utils.GetLogInstance().Info("BINGO !!! Reached Consensus", "ViewID", node.Consensus.GetViewID())
 	}
 
-	node.AddNewBlock(newBlock)
+	if err := node.AddNewBlock(newBlock); err != nil {
+		utils.GetLogInstance().Error("Error when adding new block", "err", err)
+	}
 
 	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
 		// Update contract deployer's nonce so default contract like faucet can issue transaction with current nonce
@@ -474,13 +476,14 @@ func (node *Node) broadcastEpochShardState(newBlock *types.Block) error {
 }
 
 // AddNewBlock is usedd to add new block into the blockchain.
-func (node *Node) AddNewBlock(newBlock *types.Block) {
+func (node *Node) AddNewBlock(newBlock *types.Block) error {
 	_, err := node.Blockchain().InsertChain([]*types.Block{newBlock})
 	if err != nil {
 		utils.GetLogInstance().Debug("Error Adding new block to blockchain", "blockNum", newBlock.NumberU64(), "parentHash", newBlock.Header().ParentHash, "hash", newBlock.Header().Hash(), "Error", err)
 	} else {
 		utils.GetLogInstance().Info("Added New Block to Blockchain!!!", "blockNum", newBlock.NumberU64(), "hash", newBlock.Header().Hash().Hex())
 	}
+	return err
 }
 
 type genesisNode struct {

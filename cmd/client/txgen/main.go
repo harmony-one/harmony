@@ -193,7 +193,9 @@ syncLoop:
 			if txGen.Consensus.ShardID == shardID {
 				utils.GetLogInstance().Info("Got block from leader", "txNum", len(block.Transactions()), "shardID", shardID, "preHash", block.ParentHash().Hex(), "currentBlock", txGen.Blockchain().CurrentBlock().NumberU64(), "incoming block", block.NumberU64())
 				if block.NumberU64()-txGen.Blockchain().CurrentBlock().NumberU64() == 1 {
-					txGen.AddNewBlock(block)
+					if err := txGen.AddNewBlock(block); err != nil {
+						utils.GetLogInstance().Error("Error when adding new block", "error", err)
+					}
 					stateMutex.Lock()
 					if err := txGen.Worker.UpdateCurrent(block.Coinbase()); err != nil {
 						ctxerror.Warn(utils.GetLogger(), err,
