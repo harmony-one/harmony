@@ -3,6 +3,7 @@ package client
 import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 )
 
@@ -23,6 +24,6 @@ func NewClient(host p2p.Host, shardID uint32) *Client {
 	client.host = host
 	client.ShardID = shardID
 	// Logger
-	client.log = log.New()
+	client.log = utils.GetLogInstance()
 	return &client
 }

@@ -6,14 +6,13 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/harmony-one/harmony/internal/utils"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/harmony/core/types"
+	peer "github.com/libp2p/go-libp2p-peer"
 
 	"github.com/harmony-one/harmony/api/proto"
-	peer "github.com/libp2p/go-libp2p-peer"
+	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // MessageType is to indicate the specific type of message under Node category
@@ -105,7 +104,8 @@ func SerializeBlockchainSyncMessage(blockchainSyncMessage *BlockchainSyncMessage
 	encoder := gob.NewEncoder(&result)
 	err := encoder.Encode(blockchainSyncMessage)
 	if err != nil {
-		log.Panic(err)
+		utils.GetLogger().Crit("Error", err)
+		panic(err)
 	}
 	return result.Bytes()
 }
@@ -116,7 +116,8 @@ func DeserializeBlockchainSyncMessage(d []byte) (*BlockchainSyncMessage, error) 
 	decoder := gob.NewDecoder(bytes.NewReader(d))
 	err := decoder.Decode(&blockchainSyncMessage)
 	if err != nil {
-		log.Panic(err)
+		utils.GetLogger().Crit("Error", err)
+		panic(err)
 	}
 	return &blockchainSyncMessage, err
 }

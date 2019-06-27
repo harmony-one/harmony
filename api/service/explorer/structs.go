@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 /*
@@ -89,7 +90,7 @@ func GetTransaction(tx *types.Transaction, accountBlock *types.Block) *Transacti
 	}
 	msg, err := tx.AsMessage(types.HomesteadSigner{})
 	if err != nil {
-		Log.Error("Error when parsing tx into message")
+		utils.GetLogger().Error("Error when parsing tx into message", "err", err)
 	}
 	return &Transaction{
 		ID:        tx.Hash().Hex(),

@@ -7,8 +7,8 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
+
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -22,9 +22,6 @@ const (
 	TXPrefix        = "tx"
 	AddressPrefix   = "ad"
 )
-
-// Log is the temporary log for storage.
-var Log = log.New()
 
 // GetBlockInfoKey ...
 func GetBlockInfoKey(id int) string {

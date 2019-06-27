@@ -7,7 +7,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -74,7 +73,7 @@ func New(host p2p.Host, account accounts.Account, beaconChain *core.BlockChain, 
 
 // StartService starts staking service.
 func (s *Service) StartService() {
-	log.Info("Start Staking Service")
+	utils.GetLogger().Info("Start Staking Service")
 	s.Run()
 }
 
