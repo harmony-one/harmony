@@ -85,6 +85,7 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 // AddNewBlockForExplorer add new block for explorer.
 func (node *Node) AddNewBlockForExplorer() {
 	utils.GetLogInstance().Info("Add new block for explorer")
+	// Search for the next block in PbftLog and commit the block into blockchain for explorer node.
 	for {
 		blocks := node.Consensus.PbftLog.GetBlocksByNumber(node.Blockchain().CurrentBlock().NumberU64() + 1)
 		if len(blocks) > 1 {
