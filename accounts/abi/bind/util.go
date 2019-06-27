@@ -22,8 +22,9 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // WaitMined waits for tx to be mined on the blockchain.
@@ -32,7 +33,7 @@ func WaitMined(ctx context.Context, b DeployBackend, tx *types.Transaction) (*ty
 	queryTicker := time.NewTicker(time.Second)
 	defer queryTicker.Stop()
 
-	logger := log.New("hash", tx.Hash())
+	logger := utils.GetLogInstance().New("hash", tx.Hash())
 	for {
 		receipt, err := b.TransactionReceipt(ctx, tx.Hash())
 		if receipt != nil {
