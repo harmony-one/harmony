@@ -32,20 +32,11 @@ func printVersion(me string) {
 	os.Exit(0)
 }
 
-func initLogFile(logFolder, ip, port string) {
-	// Setup a logger to stdout and log file.
-	if err := os.MkdirAll(logFolder, 0755); err != nil {
-		panic(err)
-	}
-	logFileName := fmt.Sprintf("./%v/bootnode-%v-%v.log", logFolder, ip, port)
-	fileHandler := log.Must.FileHandler(logFileName, log.JSONFormat()) // Log to file
-	utils.AddLogHandler(fileHandler)
-}
-
 func main() {
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9876", "port of the node.")
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
+	logMaxSize := flag.Int("log_max_size", 100, "the max size in megabytes of the log file before it gets rotated")
 	keyFile := flag.String("key", "./.bnkey", "the private key file of the bootnode")
 	versionFlag := flag.Bool("version", false, "Output version info")
 	verbosity := flag.Int("verbosity", 5, "Logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail (default: 5)")
@@ -60,7 +51,10 @@ func main() {
 	// Logging setup
 	utils.SetLogContext(*port, *ip)
 	utils.SetLogVerbosity(log.Lvl(*verbosity))
-	initLogFile(*logFolder, *ip, *port)
+	filename := fmt.Sprintf("%v/bootnode-%v-%v.log", *logFolder, *ip, *port)
+	if err := utils.AddLogFile(filename, *logMaxSize); err != nil {
+		panic(err)
+	}
 
 	privKey, _, err := utils.LoadKeyFromFile(*keyFile)
 	if err != nil {

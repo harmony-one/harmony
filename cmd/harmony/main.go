@@ -61,25 +61,11 @@ func printVersion() {
 	os.Exit(0)
 }
 
-func initLogFile(logFolder, role, ip, port string, onlyLogTps bool) {
-	// Setup a logger to stdout and log file.
-	if err := os.MkdirAll(logFolder, 0755); err != nil {
-		panic(err)
-	}
-	logFileName := fmt.Sprintf("./%v/%s-%v-%v.log", logFolder, role, ip, port)
-	fileHandler := log.Must.FileHandler(logFileName, log.JSONFormat())
-	utils.AddLogHandler(fileHandler)
-
-	if onlyLogTps {
-		matchFilterHandler := log.MatchFilterHandler("msg", "TPS Report", utils.GetLogInstance().GetHandler())
-		utils.GetLogInstance().SetHandler(matchFilterHandler)
-	}
-}
-
 var (
 	ip               = flag.String("ip", "127.0.0.1", "ip of the node")
 	port             = flag.String("port", "9000", "port of the node.")
 	logFolder        = flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
+	logMaxSize       = flag.Int("log_max_size", 100, "the max size in megabytes of the log file before it gets rotated")
 	freshDB          = flag.Bool("fresh_db", false, "true means the existing disk based db will be removed")
 	profile          = flag.Bool("profile", false, "Turn on profiling (CPU, Memory).")
 	metricsReportURL = flag.String("metrics_report_url", "", "If set, reports metrics to this URL.")
@@ -151,10 +137,6 @@ func initSetup() {
 
 	// Setup mem profiling.
 	memprofiling.GetMemProfiling().Config()
-
-	// Logging setup
-	utils.SetLogContext(*port, *ip)
-	utils.SetLogVerbosity(log.Lvl(*verbosity))
 
 	// Set default keystore Dir
 	hmykey.DefaultKeyStoreDir = *keystoreDir
@@ -454,13 +436,20 @@ func main() {
 	}
 	blsPassphrase = passphrase
 
-	// Configure log parameters
-	utils.SetLogContext(*port, *ip)
-	utils.SetLogVerbosity(log.Lvl(*verbosity))
-
 	initSetup()
 	nodeConfig := createGlobalConfig()
-	initLogFile(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps)
+
+	// Logging setup
+	utils.SetLogContext(*port, *ip)
+	utils.SetLogVerbosity(log.Lvl(*verbosity))
+	filename := fmt.Sprintf("%v/%s-%v-%v.log", *logFolder, nodeConfig.StringRole, *ip, *port)
+	if err := utils.AddLogFile(filename, *logMaxSize); err != nil {
+		panic(err)
+	}
+	if *onlyLogTps {
+		matchFilterHandler := log.MatchFilterHandler("msg", "TPS Report", utils.GetLogInstance().GetHandler())
+		utils.GetLogInstance().SetHandler(matchFilterHandler)
+	}
 
 	// Start Profiler for leader if profile argument is on
 	if nodeConfig.StringRole == "leader" && (*profile || *metricsReportURL != "") {
