@@ -88,11 +88,12 @@ func (node *Node) AddNewBlockForExplorer() {
 	// Search for the next block in PbftLog and commit the block into blockchain for explorer node.
 	for {
 		blocks := node.Consensus.PbftLog.GetBlocksByNumber(node.Blockchain().CurrentBlock().NumberU64() + 1)
-		if len(blocks) > 1 {
-			utils.GetLogInstance().Error("We should have not received more than one block with the same block height.")
-		} else if len(blocks) == 0 {
+		if len(blocks) == 0 {
 			break
 		} else {
+			if len(blocks) > 1 {
+				utils.GetLogInstance().Error("We should have not received more than one block with the same block height.")
+			}
 			utils.GetLogInstance().Info("Adding new block for explorer node", "blockHeight", blocks[0].NumberU64())
 			node.AddNewBlock(blocks[0])
 			// Clean up the blocks to avoid OOM.
