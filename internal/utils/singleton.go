@@ -3,6 +3,7 @@
 package utils
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/natefinch/lumberjack"
+	"github.com/rs/zerolog"
 )
 
 var (
@@ -26,6 +28,10 @@ var (
 	logHandlers  []log.Handler    // sub handlers of glogger
 	logVerbosity log.Lvl
 	onceForLog   sync.Once
+
+	// ZeroLog
+	zeroLogger      *zerolog.Logger
+	zeroLoggerLevel zerolog.Level
 )
 
 // SetLogContext used to print out loggings of node with port and ip.
@@ -33,6 +39,7 @@ var (
 func SetLogContext(_port, _ip string) {
 	port = _port
 	ip = _ip
+	setZeroLogContext(_port, _ip)
 }
 
 // SetLogVerbosity specifies the verbosity of global logger
@@ -41,22 +48,19 @@ func SetLogVerbosity(verbosity log.Lvl) {
 	if glogger != nil {
 		glogger.Verbosity(logVerbosity)
 	}
+	updateZeroLogLevel(int(verbosity))
 }
 
 // AddLogFile creates a StreamHandler that outputs JSON logs
 // into rotating files with specified max file size
-func AddLogFile(filepath string, maxSize int) error {
-	if err := os.MkdirAll(path.Dir(filepath), 0755); err != nil {
-		return err
-	}
-
+func AddLogFile(filepath string, maxSize int) {
 	AddLogHandler(log.StreamHandler(&lumberjack.Logger{
 		Filename: filepath,
 		MaxSize:  maxSize,
 		Compress: true,
 	}, log.JSONFormat()))
 
-	return nil
+	setZeroLoggerFileOutput(filepath, maxSize)
 }
 
 // AddLogHandler add a log handler
@@ -101,4 +105,64 @@ func GetLogInstance() log.Logger {
 		log.Root().SetHandler(glogger)
 	})
 	return logInstance
+}
+
+// ZeroLog
+func setZeroLogContext(port string, ip string) {
+	childLogger := Logger().
+		With().
+		Str("port", port).
+		Str("ip", ip).
+		Logger()
+	zeroLogger = &childLogger
+}
+
+// SetZeroLoggerFileOutput sets zeroLogger's output stream
+// to destinated filepath with log file rotation.
+func setZeroLoggerFileOutput(filepath string, maxSize int) error {
+	dir := path.Dir(filepath)
+	filename := path.Base(filepath)
+
+	// Initialize ZeroLogger if it hasn't been already
+	// TODO: zerolog filename prefix can be removed once all loggers
+	// has been replaced
+	childLogger := Logger().Output(&lumberjack.Logger{
+		Filename: fmt.Sprintf("%s/zerolog-%s", dir, filename),
+		MaxSize:  maxSize,
+		Compress: true,
+	})
+	zeroLogger = &childLogger
+
+	return nil
+}
+
+// Logger returns a zerolog.Logger singleton
+func Logger() *zerolog.Logger {
+	if zeroLogger == nil {
+		logger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr}).
+			Level(zeroLoggerLevel).
+			With().
+			Caller().
+			Timestamp().
+			Logger()
+		zeroLogger = &logger
+	}
+	return zeroLogger
+}
+
+func updateZeroLogLevel(level int) {
+	switch level {
+	case 0:
+		zeroLoggerLevel = zerolog.Disabled
+	case 1:
+		zeroLoggerLevel = zerolog.ErrorLevel
+	case 2:
+		zeroLoggerLevel = zerolog.WarnLevel
+	case 3:
+		zeroLoggerLevel = zerolog.InfoLevel
+	default:
+		zeroLoggerLevel = zerolog.DebugLevel
+	}
+	childLogger := Logger().Level(zeroLoggerLevel)
+	zeroLogger = &childLogger
 }
