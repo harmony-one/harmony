@@ -7,11 +7,12 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
+
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/internal/hmyapi"
 	"github.com/harmony-one/harmony/internal/hmyapi/filters"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 const (
@@ -81,7 +82,7 @@ func (node *Node) startHTTP(endpoint string, apis []rpc.API, modules []string, c
 		return err
 	}
 
-	log.Info("HTTP endpoint opened", "url", fmt.Sprintf("http://%s", endpoint), "cors", strings.Join(cors, ","), "vhosts", strings.Join(vhosts, ","))
+	utils.GetLogger().Info("HTTP endpoint opened", "url", fmt.Sprintf("http://%s", endpoint), "cors", strings.Join(cors, ","), "vhosts", strings.Join(vhosts, ","))
 	// All listeners booted successfully
 	httpListener = listener
 	httpHandler = handler
@@ -95,7 +96,7 @@ func (node *Node) stopHTTP() {
 		httpListener.Close()
 		httpListener = nil
 
-		log.Info("HTTP endpoint closed", "url", fmt.Sprintf("http://%s", httpEndpoint))
+		utils.GetLogger().Info("HTTP endpoint closed", "url", fmt.Sprintf("http://%s", httpEndpoint))
 	}
 	if httpHandler != nil {
 		httpHandler.Stop()
@@ -113,7 +114,7 @@ func (node *Node) startWS(endpoint string, apis []rpc.API, modules []string, wsO
 	if err != nil {
 		return err
 	}
-	log.Info("WebSocket endpoint opened", "url", fmt.Sprintf("ws://%s", listener.Addr()))
+	utils.GetLogger().Info("WebSocket endpoint opened", "url", fmt.Sprintf("ws://%s", listener.Addr()))
 	// All listeners booted successfully
 	wsListener = listener
 	wsHandler = handler
@@ -127,7 +128,7 @@ func (node *Node) stopWS() {
 		wsListener.Close()
 		wsListener = nil
 
-		log.Info("WebSocket endpoint closed", "url", fmt.Sprintf("ws://%s", wsEndpoint))
+		utils.GetLogger().Info("WebSocket endpoint closed", "url", fmt.Sprintf("ws://%s", wsEndpoint))
 	}
 	if wsHandler != nil {
 		wsHandler.Stop()

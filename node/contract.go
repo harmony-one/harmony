@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 
 	"github.com/harmony-one/harmony/common/denominations"
@@ -138,7 +137,7 @@ func (node *Node) getDeployedStakingContract() common.Address {
 func (node *Node) GetNonceOfAddress(address common.Address) uint64 {
 	state, err := node.Blockchain().State()
 	if err != nil {
-		log.Error("Failed to get chain state", "Error", err)
+		utils.GetLogger().Error("Failed to get chain state", "Error", err)
 		return 0
 	}
 	return state.GetNonce(address)
@@ -148,7 +147,7 @@ func (node *Node) GetNonceOfAddress(address common.Address) uint64 {
 func (node *Node) GetBalanceOfAddress(address common.Address) (*big.Int, error) {
 	state, err := node.Blockchain().State()
 	if err != nil {
-		log.Error("Failed to get chain state", "Error", err)
+		utils.GetLogger().Error("Failed to get chain state", "Error", err)
 		return nil, err
 	}
 	return state.GetBalance(address), nil

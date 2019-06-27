@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
@@ -14,6 +13,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/ctxerror"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // environment is the worker's current environment and holds all of the current state information.
@@ -61,7 +61,7 @@ func (w *Worker) SelectTransactionsForNewBlock(txs types.Transactions, maxNumTxs
 			if err != nil {
 				w.current.state.RevertToSnapshot(snap)
 				invalid = append(invalid, tx)
-				log.Debug("Invalid transaction", "Error", err)
+				utils.GetLogger().Debug("Invalid transaction", "Error", err)
 			} else {
 				selected = append(selected, tx)
 			}
