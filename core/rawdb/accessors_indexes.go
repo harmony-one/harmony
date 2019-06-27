@@ -18,9 +18,10 @@ package rawdb
 
 import (
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
+
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // ReadTxLookupEntry retrieves the positional metadata associated with a transaction
@@ -32,7 +33,7 @@ func ReadTxLookupEntry(db DatabaseReader, hash common.Hash) (common.Hash, uint64
 	}
 	var entry TxLookupEntry
 	if err := rlp.DecodeBytes(data, &entry); err != nil {
-		log.Error("Invalid transaction lookup entry RLP", "hash", hash, "err", err)
+		utils.GetLogger().Error("Invalid transaction lookup entry RLP", "hash", hash, "err", err)
 		return common.Hash{}, 0, 0
 	}
 	return entry.BlockHash, entry.BlockIndex, entry.Index
@@ -49,10 +50,10 @@ func WriteTxLookupEntries(db DatabaseWriter, block *types.Block) {
 		}
 		data, err := rlp.EncodeToBytes(entry)
 		if err != nil {
-			log.Crit("Failed to encode transaction lookup entry", "err", err)
+			utils.GetLogger().Crit("Failed to encode transaction lookup entry", "err", err)
 		}
 		if err := db.Put(txLookupKey(tx.Hash()), data); err != nil {
-			log.Crit("Failed to store transaction lookup entry", "err", err)
+			utils.GetLogger().Crit("Failed to store transaction lookup entry", "err", err)
 		}
 	}
 }
@@ -71,7 +72,7 @@ func ReadTransaction(db DatabaseReader, hash common.Hash) (*types.Transaction, c
 	}
 	body := ReadBody(db, blockHash, blockNumber)
 	if body == nil || len(body.Transactions) <= int(txIndex) {
-		log.Error("Transaction referenced missing", "number", blockNumber, "hash", blockHash, "index", txIndex)
+		utils.GetLogger().Error("Transaction referenced missing", "number", blockNumber, "hash", blockHash, "index", txIndex)
 		return nil, common.Hash{}, 0, 0
 	}
 	return body.Transactions[txIndex], blockHash, blockNumber, txIndex
@@ -86,7 +87,7 @@ func ReadReceipt(db DatabaseReader, hash common.Hash) (*types.Receipt, common.Ha
 	}
 	receipts := ReadReceipts(db, blockHash, blockNumber)
 	if len(receipts) <= int(receiptIndex) {
-		log.Error("Receipt refereced missing", "number", blockNumber, "hash", blockHash, "index", receiptIndex)
+		utils.GetLogger().Error("Receipt refereced missing", "number", blockNumber, "hash", blockHash, "index", receiptIndex)
 		return nil, common.Hash{}, 0, 0
 	}
 	return receipts[receiptIndex], blockHash, blockNumber, receiptIndex
@@ -102,6 +103,6 @@ func ReadBloomBits(db DatabaseReader, bit uint, section uint64, head common.Hash
 // section and bit index.
 func WriteBloomBits(db DatabaseWriter, bit uint, section uint64, head common.Hash, bits []byte) {
 	if err := db.Put(bloomBitsKey(bit, section, head), bits); err != nil {
-		log.Crit("Failed to store bloom bits", "err", err)
+		utils.GetLogger().Crit("Failed to store bloom bits", "err", err)
 	}
 }

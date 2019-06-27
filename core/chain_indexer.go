@@ -28,8 +28,10 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // ChainIndexerBackend defines the methods needed to process chain segments in
@@ -107,7 +109,7 @@ func NewChainIndexer(chainDb ethdb.Database, indexDb ethdb.Database, backend Cha
 		sectionSize: section,
 		confirmsReq: confirm,
 		throttling:  throttling,
-		log:         log.New("type", kind),
+		log:         utils.GetLogInstance().New("type", kind),
 	}
 	// Initialize database dependent fields and start the updater
 	c.loadValidSections()
