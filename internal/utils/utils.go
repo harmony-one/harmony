@@ -71,11 +71,7 @@ func ConvertFixedDataIntoByteArray(data interface{}) []byte {
 
 // GetUniqueIDFromIPPort --
 func GetUniqueIDFromIPPort(ip, port string) uint32 {
-	reg, err := regexp.Compile("[^0-9]+")
-	if err != nil {
-		GetLogger().Crit("Regex Compilation Failed", "err", err)
-		panic(err)
-	}
+	reg, _ := regexp.Compile("[^0-9]+")
 	socketID := reg.ReplaceAllString(ip+port, "") // A integer Id formed by unique IP/PORT pair
 	value, _ := strconv.Atoi(socketID)
 	return uint32(value)
