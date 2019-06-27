@@ -16,7 +16,7 @@ import (
 
 // Constants of lower bound limit of a new block.
 const (
-	ConsensusTimeOut = 30
+	ConsensusTimeOut = 20
 	PeriodicBlock    = 200 * time.Millisecond
 )
 
