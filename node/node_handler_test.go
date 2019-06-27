@@ -34,7 +34,10 @@ func TestAddNewBlock(t *testing.T) {
 	node.Worker.CommitTransactions(selectedTxs, common.Address{})
 	block, _ := node.Worker.Commit([]byte{}, []byte{}, 0, common.Address{})
 
-	node.AddNewBlock(block)
+	err := node.AddNewBlock(block)
+	if err != nil {
+		t.Errorf("error when adding new block %v", err)
+	}
 
 	if node.Blockchain().CurrentBlock().NumberU64() != 1 {
 		t.Error("New block is not added successfully")
