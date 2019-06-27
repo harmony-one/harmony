@@ -25,14 +25,13 @@ import (
 	"math/big"
 	"os"
 
-	"github.com/ethereum/go-ethereum/rlp"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/rlp"
+
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -163,10 +162,10 @@ func SetupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig
 	stored := rawdb.ReadCanonicalHash(db, 0)
 	if (stored == common.Hash{}) {
 		if genesis == nil {
-			log.Info("Writing default main-net genesis block")
+			utils.GetLogger().Info("Writing default main-net genesis block")
 			genesis = DefaultGenesisBlock()
 		} else {
-			log.Info("Writing custom genesis block")
+			utils.GetLogger().Info("Writing custom genesis block")
 		}
 		block, err := genesis.Commit(db)
 		return genesis.Config, block.Hash(), err
@@ -184,7 +183,7 @@ func SetupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig
 	newcfg := genesis.configOrDefault(stored)
 	storedcfg := rawdb.ReadChainConfig(db, stored)
 	if storedcfg == nil {
-		log.Warn("Found genesis block without chain config")
+		utils.GetLogger().Warn("Found genesis block without chain config")
 		rawdb.WriteChainConfig(db, stored, newcfg)
 		return newcfg, stored, nil
 	}
@@ -282,7 +281,7 @@ func (g *Genesis) Commit(db ethdb.Database) (*types.Block, error) {
 	err := rawdb.WriteShardStateBytes(db, block.Header().Epoch, block.Header().ShardState)
 
 	if err != nil {
-		log.Crit("Failed to store genesis shard state", "err", err)
+		utils.GetLogger().Crit("Failed to store genesis shard state", "err", err)
 	}
 
 	config := g.Config

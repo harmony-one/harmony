@@ -29,10 +29,10 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/harmony-one/harmony/accounts"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // Minimum amount of time between cache reloads. This limit applies if the platform does
@@ -236,7 +236,7 @@ func (ac *accountCache) scanAccounts() error {
 	// Scan the entire folder metadata for file changes
 	creates, deletes, updates, err := ac.fileC.scan(ac.keydir)
 	if err != nil {
-		log.Debug("Failed to reload keystore contents", "err", err)
+		utils.GetLogger().Debug("Failed to reload keystore contents", "err", err)
 		return err
 	}
 	if creates.Cardinality() == 0 && deletes.Cardinality() == 0 && updates.Cardinality() == 0 {
@@ -252,7 +252,7 @@ func (ac *accountCache) scanAccounts() error {
 	readAccount := func(path string) *accounts.Account {
 		fd, err := os.Open(path)
 		if err != nil {
-			log.Trace("Failed to open keystore file", "path", path, "err", err)
+			utils.GetLogger().Trace("Failed to open keystore file", "path", path, "err", err)
 			return nil
 		}
 		defer fd.Close()
@@ -263,9 +263,9 @@ func (ac *accountCache) scanAccounts() error {
 		addr := common2.ParseAddr(key.Address)
 		switch {
 		case err != nil:
-			log.Debug("Failed to decode keystore key", "path", path, "err", err)
+			utils.GetLogger().Debug("Failed to decode keystore key", "path", path, "err", err)
 		case (addr == common.Address{}):
-			log.Debug("Failed to decode keystore key", "path", path, "err", "missing or zero address")
+			utils.GetLogger().Debug("Failed to decode keystore key", "path", path, "err", "missing or zero address")
 		default:
 			return &accounts.Account{
 				Address: addr,
@@ -298,6 +298,6 @@ func (ac *accountCache) scanAccounts() error {
 	case ac.notify <- struct{}{}:
 	default:
 	}
-	log.Trace("Handled keystore changes", "time", end.Sub(start))
+	utils.GetLogger().Trace("Handled keystore changes", "time", end.Sub(start))
 	return nil
 }

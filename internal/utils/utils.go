@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	mrand "math/rand"
 	"net"
 	"os"
@@ -64,17 +63,14 @@ func ConvertFixedDataIntoByteArray(data interface{}) []byte {
 	buff := new(bytes.Buffer)
 	err := binary.Write(buff, binary.BigEndian, data)
 	if err != nil {
-		log.Panic(err)
+		GetLogger().Crit("Failed to convert fixed data into byte array", "err", err)
 	}
 	return buff.Bytes()
 }
 
 // GetUniqueIDFromIPPort --
 func GetUniqueIDFromIPPort(ip, port string) uint32 {
-	reg, err := regexp.Compile("[^0-9]+")
-	if err != nil {
-		log.Panic("Regex Compilation Failed", "err", err)
-	}
+	reg, _ := regexp.Compile("[^0-9]+")
 	socketID := reg.ReplaceAllString(ip+port, "") // A integer Id formed by unique IP/PORT pair
 	value, _ := strconv.Atoi(socketID)
 	return uint32(value)
@@ -199,15 +195,16 @@ func LoadKeyFromFile(keyfile string) (key p2p_crypto.PrivKey, pk p2p_crypto.PubK
 	var keyStruct PrivKeyStore
 	err = Load(keyfile, &keyStruct)
 	if err != nil {
-		log.Print("No priviate key can be loaded from file", "keyfile", keyfile)
-		log.Print("Using random private key")
+		GetLogger().Info("No priviate key can be loaded from file", "keyfile", keyfile)
+		GetLogger().Info("Using random private key")
 		key, pk, err = GenKeyP2PRand()
 		if err != nil {
-			log.Panic("LoadKeyFromFile", "GenKeyP2PRand Error", err)
+			GetLogger().Crit("LoadKeyFromFile", "GenKeyP2PRand Error", err)
+			panic(err)
 		}
 		err = SaveKeyToFile(keyfile, key)
 		if err != nil {
-			log.Print("LoadKeyFromFile", "failed to save key to keyfile", err)
+			GetLogger().Error("failed to save key to keyfile", "keyfile", err)
 		}
 		return key, pk, nil
 	}

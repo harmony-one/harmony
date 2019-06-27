@@ -28,12 +28,13 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
+	lru "github.com/hashicorp/golang-lru"
+
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
-	lru "github.com/hashicorp/golang-lru"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 const (
@@ -143,7 +144,7 @@ func (hc *HeaderChain) WriteHeader(header *types.Header) (status WriteStatus, er
 
 	// Irrelevant of the canonical status, write the td and header to the database
 	//if err := hc.WriteTd(hash, number, externTd); err != nil {
-	//	//	log.Crit("Failed to write header total difficulty", "err", err)
+	//	//	utils.GetLogger().Crit("Failed to write header total difficulty", "err", err)
 	//	//}
 	//rawdb.WriteHeader(hc.chainDb, header)
 
@@ -206,7 +207,7 @@ func (hc *HeaderChain) ValidateHeaderChain(chain []*types.Header, checkFreq int)
 	for i := 1; i < len(chain); i++ {
 		if chain[i].Number.Uint64() != chain[i-1].Number.Uint64()+1 || chain[i].ParentHash != chain[i-1].Hash() {
 			// Chain broke ancestry, log a message (programming error) and skip insertion
-			log.Error("Non contiguous header insert", "number", chain[i].Number, "hash", chain[i].Hash(),
+			utils.GetLogger().Error("Non contiguous header insert", "number", chain[i].Number, "hash", chain[i].Hash(),
 				"parent", chain[i].ParentHash, "prevnumber", chain[i-1].Number, "prevhash", chain[i-1].Hash())
 
 			return 0, fmt.Errorf("non contiguous insert: item %d is #%d [%x…], item %d is #%d [%x…] (parent [%x…])", i-1, chain[i-1].Number,
@@ -232,7 +233,7 @@ func (hc *HeaderChain) ValidateHeaderChain(chain []*types.Header, checkFreq int)
 	//for i, _ := range chain {
 	//	// If the chain is terminating, stop processing blocks
 	//	if hc.procInterrupt() {
-	//		log.Debug("Premature abort during headers verification")
+	//		utils.GetLogger().Debug("Premature abort during headers verification")
 	//		return 0, errors.New("aborted")
 	//	}
 	//
@@ -260,7 +261,7 @@ func (hc *HeaderChain) InsertHeaderChain(chain []*types.Header, writeHeader WhCa
 	for i, header := range chain {
 		// Short circuit insertion if shutting down
 		if hc.procInterrupt() {
-			log.Debug("Premature abort during headers import")
+			utils.GetLogger().Debug("Premature abort during headers import")
 			return i, errors.New("aborted")
 		}
 		// If the header's already known, skip it, otherwise store
@@ -286,7 +287,7 @@ func (hc *HeaderChain) InsertHeaderChain(chain []*types.Header, writeHeader WhCa
 	if stats.ignored > 0 {
 		context = append(context, []interface{}{"ignored", stats.ignored}...)
 	}
-	log.Info("Imported new block headers", context...)
+	utils.GetLogger().Info("Imported new block headers", context...)
 
 	return 0, nil
 }

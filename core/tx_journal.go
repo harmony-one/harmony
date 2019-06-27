@@ -22,9 +22,10 @@ import (
 	"os"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
+
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // errNoActiveJournal is returned if a transaction is attempted to be inserted
@@ -82,7 +83,7 @@ func (journal *txJournal) load(add func([]*types.Transaction) []error) error {
 	loadBatch := func(txs types.Transactions) {
 		for _, err := range add(txs) {
 			if err != nil {
-				log.Debug("Failed to add journaled transaction", "err", err)
+				utils.GetLogger().Debug("Failed to add journaled transaction", "err", err)
 				dropped++
 			}
 		}
@@ -111,7 +112,7 @@ func (journal *txJournal) load(add func([]*types.Transaction) []error) error {
 			batch = batch[:0]
 		}
 	}
-	log.Info("Loaded local transaction journal", "transactions", total, "dropped", dropped)
+	utils.GetLogger().Info("Loaded local transaction journal", "transactions", total, "dropped", dropped)
 
 	return failure
 }
@@ -160,7 +161,7 @@ func (journal *txJournal) rotate(all map[common.Address]types.Transactions) erro
 		return err
 	}
 	journal.writer = sink
-	log.Info("Regenerated local transaction journal", "transactions", journaled, "accounts", len(all))
+	utils.GetLogger().Info("Regenerated local transaction journal", "transactions", journaled, "accounts", len(all))
 
 	return nil
 }

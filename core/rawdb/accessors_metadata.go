@@ -20,9 +20,10 @@ import (
 	"encoding/json"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
+
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // ReadDatabaseVersion retrieves the version number of the database.
@@ -39,7 +40,7 @@ func ReadDatabaseVersion(db DatabaseReader) int {
 func WriteDatabaseVersion(db DatabaseWriter, version int) {
 	enc, _ := rlp.EncodeToBytes(version)
 	if err := db.Put(databaseVerisionKey, enc); err != nil {
-		log.Crit("Failed to store the database version", "err", err)
+		utils.GetLogger().Crit("Failed to store the database version", "err", err)
 	}
 }
 
@@ -51,7 +52,7 @@ func ReadChainConfig(db DatabaseReader, hash common.Hash) *params.ChainConfig {
 	}
 	var config params.ChainConfig
 	if err := json.Unmarshal(data, &config); err != nil {
-		log.Error("Invalid chain config JSON", "hash", hash, "err", err)
+		utils.GetLogger().Error("Invalid chain config JSON", "hash", hash, "err", err)
 		return nil
 	}
 	return &config
@@ -64,10 +65,10 @@ func WriteChainConfig(db DatabaseWriter, hash common.Hash, cfg *params.ChainConf
 	}
 	data, err := json.Marshal(cfg)
 	if err != nil {
-		log.Crit("Failed to JSON encode chain config", "err", err)
+		utils.GetLogger().Crit("Failed to JSON encode chain config", "err", err)
 	}
 	if err := db.Put(configKey(hash), data); err != nil {
-		log.Crit("Failed to store chain config", "err", err)
+		utils.GetLogger().Crit("Failed to store chain config", "err", err)
 	}
 }
 
@@ -82,7 +83,7 @@ func ReadPreimage(db DatabaseReader, hash common.Hash) []byte {
 func WritePreimages(db DatabaseWriter, number uint64, preimages map[common.Hash][]byte) {
 	for hash, preimage := range preimages {
 		if err := db.Put(preimageKey(hash), preimage); err != nil {
-			log.Crit("Failed to store trie preimage", "err", err)
+			utils.GetLogger().Crit("Failed to store trie preimage", "err", err)
 		}
 	}
 	preimageCounter.Inc(int64(len(preimages)))
