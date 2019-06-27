@@ -142,6 +142,14 @@ func initSetup() {
 	// Configure log parameters
 	utils.SetLogContext(*port, *ip)
 	utils.SetLogVerbosity(log.Lvl(*verbosity))
+	filename := fmt.Sprintf("%v/validator-%v-%v.log", *logFolder, *ip, *port)
+	if err := utils.AddLogFile(filename, *logMaxSize); err != nil {
+		panic(err)
+	}
+	if *onlyLogTps {
+		matchFilterHandler := log.MatchFilterHandler("msg", "TPS Report", utils.GetLogInstance().GetHandler())
+		utils.GetLogInstance().SetHandler(matchFilterHandler)
+	}
 
 	// Add GOMAXPROCS to achieve max performance.
 	runtime.GOMAXPROCS(runtime.NumCPU() * 4)
@@ -447,18 +455,6 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 func main() {
 	initSetup()
 	nodeConfig := createGlobalConfig()
-
-	// Logging setup
-	utils.SetLogContext(*port, *ip)
-	utils.SetLogVerbosity(log.Lvl(*verbosity))
-	filename := fmt.Sprintf("%v/%s-%v-%v.log", *logFolder, nodeConfig.StringRole, *ip, *port)
-	if err := utils.AddLogFile(filename, *logMaxSize); err != nil {
-		panic(err)
-	}
-	if *onlyLogTps {
-		matchFilterHandler := log.MatchFilterHandler("msg", "TPS Report", utils.GetLogInstance().GetHandler())
-		utils.GetLogInstance().SetHandler(matchFilterHandler)
-	}
 
 	// Start Profiler for leader if profile argument is on
 	if nodeConfig.StringRole == "leader" && (*profile || *metricsReportURL != "") {
