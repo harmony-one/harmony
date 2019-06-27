@@ -603,3 +603,51 @@ func (consensus *Consensus) getLogger() log.Logger {
 	logger := consensus.logger(utils.GetLogInstance())
 	return logger
 }
+
+// retrieve corresponding blsPublicKey from Coinbase Address
+func (consensus *Consensus) getLeaderPubKeyFromCoinbase(header *types.Header) (*bls.PublicKey, error) {
+	shardState, err := consensus.ChainReader.ReadShardState(header.Epoch)
+	if err != nil {
+		return nil, ctxerror.New("cannot read shard state",
+			"epoch", header.Epoch,
+			"coinbaseAddr", header.Coinbase,
+		).WithCause(err)
+	}
+
+	committee := shardState.FindCommitteeByID(header.ShardID)
+	if committee == nil {
+		return nil, ctxerror.New("cannot find shard in the shard state",
+			"blockNum", header.Number,
+			"shardID", header.ShardID,
+			"coinbaseAddr", header.Coinbase,
+		)
+	}
+	committerKey := new(bls.PublicKey)
+	for _, member := range committee.NodeList {
+		if member.EcdsaAddress == header.Coinbase {
+			err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
+			if err != nil {
+				return nil, ctxerror.New("cannot convert BLS public key",
+					"blsPublicKey", member.BlsPublicKey,
+					"coinbaseAddr", header.Coinbase).WithCause(err)
+			}
+			return committerKey, nil
+		}
+	}
+	return nil, ctxerror.New("cannot find corresponding BLS Public Key", "coinbaseAddr", header.Coinbase)
+}
+
+// update consensus information before join consensus after state syncing
+func (consensus *Consensus) updateConsensusInformation() {
+	header := consensus.ChainReader.CurrentHeader()
+	consensus.SetBlockNum(header.Number.Uint64() + 1)
+	consensus.SetViewID(header.ViewID.Uint64() + 1)
+	leaderPubKey, err := consensus.getLeaderPubKeyFromCoinbase(header)
+	if err != nil || leaderPubKey == nil {
+		consensus.getLogger().Debug("[SYNC] Unable to get leaderPubKey from coinbase", "error", err)
+		consensus.ignoreViewIDCheck = true
+	} else {
+		consensus.getLogger().Debug("[SYNC] Most Recent LeaderPubKey Updated Based on BlockChain", "leaderPubKey", leaderPubKey.SerializeToHexStr())
+		consensus.LeaderPubKey = leaderPubKey
+	}
+}
