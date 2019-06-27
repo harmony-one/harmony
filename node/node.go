@@ -200,6 +200,8 @@ type Node struct {
 	isFirstTime bool // the node was started with a fresh database
 	// How long in second the leader needs to wait to propose a new block.
 	BlockPeriod time.Duration
+
+	currentExplorerBlockHeight uint64 // The current block height of explorer.
 }
 
 // Blockchain returns the blockchain for the node's current shard.
