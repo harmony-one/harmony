@@ -60,6 +60,7 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 			return
 		}
 
+		node.AddNewBlockForExplorer(block)
 		node.commitBlockForExplorer(block)
 	} else if msg.Type == msg_pb.MessageType_PREPARED {
 
@@ -79,6 +80,13 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 		node.Consensus.PbftLog.AddBlock(&blockObj)
 	}
 	return
+}
+
+// AddNewBlockForExplorer add new block for explorer.
+func (node *Node) AddNewBlockForExplorer(block *types.Block) {
+	// TODO: Currently assumping blocks come in order.
+	utils.GetLogInstance().Info("Add new block for explorer")
+	node.AddNewBlock(block)
 }
 
 // ExplorerMessageHandler passes received message in node_handler to explorer service
