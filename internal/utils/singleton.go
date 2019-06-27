@@ -5,10 +5,12 @@ package utils
 import (
 	"io"
 	"os"
+	"path"
 	"sync"
 	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/natefinch/lumberjack"
 )
 
 var (
@@ -39,6 +41,22 @@ func SetLogVerbosity(verbosity log.Lvl) {
 	if glogger != nil {
 		glogger.Verbosity(logVerbosity)
 	}
+}
+
+// AddLogFile creates a StreamHandler that outputs JSON logs
+// into rotating files with specified max file size
+func AddLogFile(filepath string, maxSize int) error {
+	if err := os.MkdirAll(path.Dir(filepath), 0755); err != nil {
+		return err
+	}
+
+	AddLogHandler(log.StreamHandler(&lumberjack.Logger{
+		Filename: filepath,
+		MaxSize:  maxSize,
+		Compress: true,
+	}, log.JSONFormat()))
+
+	return nil
 }
 
 // AddLogHandler add a log handler

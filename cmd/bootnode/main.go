@@ -32,19 +32,6 @@ func printVersion(me string) {
 	os.Exit(0)
 }
 
-func initLogFile(logFolder, ip, port string, logMaxSize int) {
-	// Setup a logger to stdout and log file.
-	if err := os.MkdirAll(logFolder, 0755); err != nil {
-		panic(err)
-	}
-	utils.AddLogHandler(
-		log.StreamHandler(&lumberjack.Logger{
-			Filename: fmt.Sprintf("./%v/bootnode-%v-%v.log", logFolder, ip, port),
-			MaxSize:  logMaxSize,
-			Compress: true,
-		}, log.JSONFormat()))
-}
-
 func main() {
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9876", "port of the node.")
@@ -64,7 +51,10 @@ func main() {
 	// Logging setup
 	utils.SetLogContext(*port, *ip)
 	utils.SetLogVerbosity(log.Lvl(*verbosity))
-	initLogFile(*logFolder, *ip, *port, *logMaxSize)
+	filename := fmt.Sprintf("%v/bootnode-%v-%v.log", *logFolder, *ip, *port)
+	if err := utils.AddLogFile(filename, *logMaxSize); err != nil {
+		panic(err)
+	}
 
 	privKey, _, err := utils.LoadKeyFromFile(*keyFile)
 	if err != nil {

@@ -30,7 +30,6 @@ import (
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
-	"github.com/natefinch/lumberjack"
 )
 
 var (
@@ -60,24 +59,6 @@ func InitLDBDatabase(ip string, port string, freshDB bool, isBeacon bool) (*ethd
 func printVersion() {
 	fmt.Fprintln(os.Stderr, nodeconfig.GetVersion())
 	os.Exit(0)
-}
-
-func initLogFile(logFolder, role, ip, port string, onlyLogTps bool, logMaxSize int) {
-	// Setup a logger to stdout and log file.
-	if err := os.MkdirAll(logFolder, 0755); err != nil {
-		panic(err)
-	}
-	utils.AddLogHandler(
-		log.StreamHandler(&lumberjack.Logger{
-			Filename: fmt.Sprintf("./%v/%s-%v-%v.log", logFolder, role, ip, port),
-			MaxSize:  logMaxSize,
-			Compress: true,
-		}, log.JSONFormat()))
-
-	if onlyLogTps {
-		matchFilterHandler := log.MatchFilterHandler("msg", "TPS Report", utils.GetLogInstance().GetHandler())
-		utils.GetLogInstance().SetHandler(matchFilterHandler)
-	}
 }
 
 var (
@@ -156,10 +137,6 @@ func initSetup() {
 
 	// Setup mem profiling.
 	memprofiling.GetMemProfiling().Config()
-
-	// Logging setup
-	utils.SetLogContext(*port, *ip)
-	utils.SetLogVerbosity(log.Lvl(*verbosity))
 
 	// Set default keystore Dir
 	hmykey.DefaultKeyStoreDir = *keystoreDir
@@ -459,13 +436,20 @@ func main() {
 	}
 	blsPassphrase = passphrase
 
-	// Configure log parameters
-	utils.SetLogContext(*port, *ip)
-	utils.SetLogVerbosity(log.Lvl(*verbosity))
-
 	initSetup()
 	nodeConfig := createGlobalConfig()
-	initLogFile(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps, *logMaxSize)
+
+	// Logging setup
+	utils.SetLogContext(*port, *ip)
+	utils.SetLogVerbosity(log.Lvl(*verbosity))
+	filename := fmt.Sprintf("%v/%s-%v-%v.log", *logFolder, nodeConfig.StringRole, *ip, *port)
+	if err := utils.AddLogFile(filename, *logMaxSize); err != nil {
+		panic(err)
+	}
+	if *onlyLogTps {
+		matchFilterHandler := log.MatchFilterHandler("msg", "TPS Report", utils.GetLogInstance().GetHandler())
+		utils.GetLogInstance().SetHandler(matchFilterHandler)
+	}
 
 	// Start Profiler for leader if profile argument is on
 	if nodeConfig.StringRole == "leader" && (*profile || *metricsReportURL != "") {
