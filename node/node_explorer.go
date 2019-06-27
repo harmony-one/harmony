@@ -60,7 +60,7 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 			return
 		}
 
-		node.AddNewBlockForExplorer(block)
+		node.AddNewBlockForExplorer()
 		node.commitBlockForExplorer(block)
 	} else if msg.Type == msg_pb.MessageType_PREPARED {
 
@@ -83,10 +83,21 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 }
 
 // AddNewBlockForExplorer add new block for explorer.
-func (node *Node) AddNewBlockForExplorer(block *types.Block) {
-	// TODO: Currently assumping blocks come in order.
+func (node *Node) AddNewBlockForExplorer() {
 	utils.GetLogInstance().Info("Add new block for explorer")
-	node.AddNewBlock(block)
+	for {
+		blocks := node.Consensus.PbftLog.GetBlocksByNumber(node.Blockchain().CurrentBlock().NumberU64() + 1)
+		if len(blocks) > 1 {
+			utils.GetLogInstance().Error("We should have not received more than one block with the same block height.")
+		} else if len(blocks) == 0 {
+			break
+		} else {
+			utils.GetLogInstance().Info("Adding new block for explorer node", "blockHeight", blocks[0].NumberU64())
+			node.AddNewBlock(blocks[0])
+			// Clean up the blocks to avoid OOM.
+			node.Consensus.PbftLog.DeleteBlockByNumber(blocks[0].NumberU64())
+		}
+	}
 }
 
 // ExplorerMessageHandler passes received message in node_handler to explorer service
