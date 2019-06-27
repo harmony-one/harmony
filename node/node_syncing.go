@@ -15,6 +15,7 @@ import (
 	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
@@ -163,12 +164,19 @@ func (node *Node) SupportBeaconSyncing() {
 func (node *Node) SupportSyncing() {
 	node.InitSyncingServer()
 	node.StartSyncingServer()
-	go node.SendNewBlockToUnsync()
+
+	// Check if the current node is explorer node.
+	isExplorerNode := node.NodeConfig.Role() == nodeconfig.ExplorerNode
+
+	// Send new block to unsync node if the current node is not explorer node.
+	if !isExplorerNode {
+		go node.SendNewBlockToUnsync()
+	}
 
 	if node.dnsZone != "" {
-		go node.DoSyncing(node.Blockchain(), node.Worker, node.GetPeersFromDNS, true)
+		go node.DoSyncing(node.Blockchain(), node.Worker, node.GetPeersFromDNS, !isExplorerNode)
 	} else {
-		go node.DoSyncing(node.Blockchain(), node.Worker, node.GetSyncingPeers, true)
+		go node.DoSyncing(node.Blockchain(), node.Worker, node.GetSyncingPeers, !isExplorerNode)
 	}
 }
 
