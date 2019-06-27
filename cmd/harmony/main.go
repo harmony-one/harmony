@@ -30,6 +30,7 @@ import (
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
+	"github.com/natefinch/lumberjack"
 )
 
 var (
@@ -61,14 +62,17 @@ func printVersion() {
 	os.Exit(0)
 }
 
-func initLogFile(logFolder, role, ip, port string, onlyLogTps bool) {
+func initLogFile(logFolder, role, ip, port string, onlyLogTps bool, logMaxSize int) {
 	// Setup a logger to stdout and log file.
 	if err := os.MkdirAll(logFolder, 0755); err != nil {
 		panic(err)
 	}
-	logFileName := fmt.Sprintf("./%v/%s-%v-%v.log", logFolder, role, ip, port)
-	fileHandler := log.Must.FileHandler(logFileName, log.JSONFormat())
-	utils.AddLogHandler(fileHandler)
+	utils.AddLogHandler(
+		log.StreamHandler(&lumberjack.Logger{
+			Filename: fmt.Sprintf("./%v/%s-%v-%v.log", logFolder, role, ip, port),
+			MaxSize:  logMaxSize,
+			Compress: true,
+		}, log.JSONFormat()))
 
 	if onlyLogTps {
 		matchFilterHandler := log.MatchFilterHandler("msg", "TPS Report", utils.GetLogInstance().GetHandler())
@@ -80,6 +84,7 @@ var (
 	ip               = flag.String("ip", "127.0.0.1", "ip of the node")
 	port             = flag.String("port", "9000", "port of the node.")
 	logFolder        = flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
+	logMaxSize       = flag.Int("log_max_size", 100, "the max size in megabytes of the log file before it gets rotated")
 	freshDB          = flag.Bool("fresh_db", false, "true means the existing disk based db will be removed")
 	profile          = flag.Bool("profile", false, "Turn on profiling (CPU, Memory).")
 	metricsReportURL = flag.String("metrics_report_url", "", "If set, reports metrics to this URL.")
@@ -460,7 +465,7 @@ func main() {
 
 	initSetup()
 	nodeConfig := createGlobalConfig()
-	initLogFile(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps)
+	initLogFile(*logFolder, nodeConfig.StringRole, *ip, *port, *onlyLogTps, *logMaxSize)
 
 	// Start Profiler for leader if profile argument is on
 	if nodeConfig.StringRole == "leader" && (*profile || *metricsReportURL != "") {
