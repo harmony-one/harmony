@@ -9,7 +9,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
 
 	"github.com/harmony-one/harmony/common/denominations"
@@ -251,9 +250,9 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 	if blsPriKey != nil {
 		consensus.priKey = blsPriKey
 		consensus.PubKey = blsPriKey.GetPublicKey()
-		utils.GetLogInstance().Info("my pubkey is", "pubkey", consensus.PubKey.SerializeToHexStr())
+		utils.Logger().Info().Str("publicKey", consensus.PubKey.SerializeToHexStr()).Msg("My Public Key")
 	} else {
-		utils.GetLogInstance().Error("the bls key is nil")
+		utils.Logger().Error().Msg("the bls key is nil")
 		return nil, fmt.Errorf("nil bls key, aborting")
 	}
 
@@ -281,8 +280,6 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 func accumulateRewards(
 	bc consensus_engine.ChainReader, state *state.DB, header *types.Header,
 ) error {
-	logger := header.Logger(utils.GetLogInstance())
-	getLogger := func() log.Logger { return utils.WithCallerSkip(logger, 1) }
 	blockNum := header.Number.Uint64()
 	if blockNum == 0 {
 		// Epoch block has no parent to reward.
@@ -354,10 +351,11 @@ func accumulateRewards(
 		totalAmount = new(big.Int).Add(totalAmount, diff)
 		last = cur
 	}
-	getLogger().Debug("【Block Reward] Successfully paid out block reward",
-		"NumAccounts", numAccounts,
-		"TotalAmount", totalAmount,
-		"Signers", signers)
+	utils.Logger().Debug().
+		Str("NumAccounts", numAccounts.String()).
+		Str("TotalAmount", totalAmount.String()).
+		Strs("Signers", signers).
+		Msg("[Block Reward] Successfully paid out block reward")
 	return nil
 }
 
@@ -377,9 +375,7 @@ func (f *GenesisStakeInfoFinder) FindStakeInfoByNodeKey(
 ) []*structs.StakeInfo {
 	var pk types.BlsPublicKey
 	if err := pk.FromLibBLSPublicKey(key); err != nil {
-		ctxerror.Log15(utils.GetLogInstance().Warn, ctxerror.New(
-			"cannot convert BLS public key",
-		).WithCause(err))
+		utils.Logger().Warn().Err(err).Msg("cannot convert BLS public key")
 		return nil
 	}
 	l, _ := f.byNodeKey[pk]
