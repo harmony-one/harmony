@@ -74,7 +74,7 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 		}
 		block := recvMsg.Block
 
-		var blockObj *types.Block
+		blockObj := &types.Block{}
 		err = rlp.DecodeBytes(block, blockObj)
 		// Add the block into Pbft log.
 		node.Consensus.PbftLog.AddBlock(blockObj)
@@ -106,11 +106,14 @@ func (node *Node) AddNewBlockForExplorer() {
 				// Clean up the blocks to avoid OOM.
 				node.Consensus.PbftLog.DeleteBlockByNumber(blocks[0].NumberU64())
 				// Do dump all blocks from state sycning for explorer one time
+				// TODO: some blocks can be dumped before state syncing finished.
+				// And they would be dumped again here. Please fix it.
 				once.Do(func() {
+					utils.GetLogInstance().Info("[Explorer] Populating explorer data from state synced blocks", "starting height", int64(blocks[0].NumberU64())-1)
 					go func() {
-						for blockHeight := blocks[0].NumberU64() - 1; blockHeight >= 0; blockHeight-- {
+						for blockHeight := int64(blocks[0].NumberU64()) - 1; blockHeight >= 0; blockHeight-- {
 							explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, true).Dump(
-								node.Blockchain().GetBlockByNumber(blockHeight), blockHeight)
+								node.Blockchain().GetBlockByNumber(uint64(blockHeight)), uint64(blockHeight))
 						}
 					}()
 				})

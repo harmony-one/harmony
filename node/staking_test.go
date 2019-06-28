@@ -44,7 +44,7 @@ func TestUpdateStakingList(t *testing.T) {
 
 		err := node.AddNewBlock(block)
 		if err != nil {
-			t.Errorf("newhost failure: %v", err)
+			t.Errorf("Error when adding new block: %v", err)
 		}
 	}
 

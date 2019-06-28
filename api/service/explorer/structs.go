@@ -51,6 +51,7 @@ type Block struct {
 	NextBlock  RefBlock       `json:"nextBlock"`
 	TXs        []*Transaction `json:"txs"`
 	Signers    []string       `json:"signers"`
+	ExtraData  string         `json:"extra_data"`
 }
 
 // RefBlock ...
@@ -80,6 +81,7 @@ func NewBlock(block *types.Block, height int) *Block {
 		MerkleRoot: block.Hash().Hex(),
 		Bytes:      strconv.Itoa(int(block.Size())),
 		Signers:    []string{},
+		ExtraData:  string(block.Extra()),
 	}
 }
 

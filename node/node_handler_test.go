@@ -34,7 +34,7 @@ func TestAddNewBlock(t *testing.T) {
 	node.Worker.CommitTransactions(selectedTxs, common.Address{})
 	block, _ := node.Worker.Commit([]byte{}, []byte{}, 0, common.Address{})
 
-	err := node.AddNewBlock(block)
+	err = node.AddNewBlock(block)
 	if err != nil {
 		t.Errorf("error when adding new block %v", err)
 	}
