@@ -2,6 +2,7 @@ package node
 
 import (
 	"encoding/binary"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
@@ -11,6 +12,8 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 )
+
+var once sync.Once
 
 // ExplorerMessageHandler passes received message in node_handler to explorer service
 func (node *Node) ExplorerMessageHandler(payload []byte) {
@@ -55,7 +58,7 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 		block := node.Consensus.PbftLog.GetBlockByHash(recvMsg.BlockHash)
 
 		if block == nil {
-			utils.GetLogInstance().Info("Haven't received the block before the committed msg", "msgBlock", recvMsg.BlockNum)
+			utils.GetLogInstance().Info("[Explorer] Haven't received the block before the committed msg", "msgBlock", recvMsg.BlockNum)
 			node.Consensus.PbftLog.AddMessage(recvMsg)
 			return
 		}
@@ -71,20 +74,24 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 		}
 		block := recvMsg.Block
 
-		var blockObj types.Block
-		err = rlp.DecodeBytes(block, &blockObj)
+		var blockObj *types.Block
+		err = rlp.DecodeBytes(block, blockObj)
+		// Add the block into Pbft log.
+		node.Consensus.PbftLog.AddBlock(blockObj)
+		// Try to search for MessageType_COMMITTED message from pbft log.
 		msgs := node.Consensus.PbftLog.GetMessagesByTypeSeqHash(msg_pb.MessageType_COMMITTED, blockObj.NumberU64(), blockObj.Hash())
+		// If found, then add the new block into blockchain db.
 		if len(msgs) > 0 {
-			node.commitBlockForExplorer(&blockObj)
+			node.AddNewBlockForExplorer()
+			node.commitBlockForExplorer(blockObj)
 		}
-		node.Consensus.PbftLog.AddBlock(&blockObj)
 	}
 	return
 }
 
 // AddNewBlockForExplorer add new block for explorer.
 func (node *Node) AddNewBlockForExplorer() {
-	utils.GetLogInstance().Info("Add new block for explorer")
+	utils.GetLogInstance().Info("[Explorer] Add new block for explorer")
 	// Search for the next block in PbftLog and commit the block into blockchain for explorer node.
 	for {
 		blocks := node.Consensus.PbftLog.GetBlocksByNumber(node.Blockchain().CurrentBlock().NumberU64() + 1)
@@ -92,15 +99,23 @@ func (node *Node) AddNewBlockForExplorer() {
 			break
 		} else {
 			if len(blocks) > 1 {
-				utils.GetLogInstance().Error("We should have not received more than one block with the same block height.")
+				utils.GetLogInstance().Error("[Explorer] We should have not received more than one block with the same block height.")
 			}
 			utils.GetLogInstance().Info("Adding new block for explorer node", "blockHeight", blocks[0].NumberU64())
 			if err := node.AddNewBlock(blocks[0]); err == nil {
 				// Clean up the blocks to avoid OOM.
-				node.Consensus.PbftLog.DeleteBlockByNumber(blocks[0].NumberU64() + 1)
-
+				node.Consensus.PbftLog.DeleteBlockByNumber(blocks[0].NumberU64())
+				// Do dump all blocks from state sycning for explorer one time
+				once.Do(func() {
+					go func() {
+						for blockHeight := blocks[0].NumberU64() - 1; blockHeight >= 0; blockHeight-- {
+							explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, true).Dump(
+								node.Blockchain().GetBlockByNumber(blockHeight), blockHeight)
+						}
+					}()
+				})
 			} else {
-				utils.GetLogInstance().Error("Error when adding new block for explorer node", "error", err)
+				utils.GetLogInstance().Error("[Explorer] Error when adding new block for explorer node", "error", err)
 			}
 		}
 	}
