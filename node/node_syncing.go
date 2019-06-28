@@ -136,7 +136,9 @@ SyncingLoop:
 				node.stateMutex.Lock()
 				node.State = NodeNotInSync
 				node.stateMutex.Unlock()
-				node.Consensus.BlocksNotSynchronized()
+				if willJoinConsensus {
+					node.Consensus.BlocksNotSynchronized()
+				}
 				node.stateSync.SyncLoop(bc, worker, willJoinConsensus, false)
 				if willJoinConsensus {
 					node.stateMutex.Lock()
