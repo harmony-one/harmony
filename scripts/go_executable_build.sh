@@ -145,9 +145,9 @@ function upload_wallet
 
    case "$OS" in
       "Linux")
-         FOLDER=release/$REL/linux-x86_64 ;;
+         FOLDER=release/linux-x86_64/$REL ;;
       "Darwin")
-         FOLDER=release/$REL/darwin-x86_64 ;;
+         FOLDER=release/darwin-x86_64/$REL ;;
       *)
          echo "Unsupported OS: $OS"
          return ;;
