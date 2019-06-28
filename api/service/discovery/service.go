@@ -42,16 +42,16 @@ func New(h p2p.Host, config service.NodeConfig, peerChan chan p2p.Peer, addPeer 
 
 // StartService starts discovery service.
 func (s *Service) StartService() {
-	utils.GetLogInstance().Info("Starting discovery service.")
+	utils.Logger().Info().Msg("Starting discovery service")
 	s.Init()
 	s.Run()
 }
 
 // StopService shutdowns discovery service.
 func (s *Service) StopService() {
-	utils.GetLogInstance().Info("Shutting down discovery service.")
+	utils.Logger().Info().Msg("Shutting down discovery service")
 	s.stopChan <- struct{}{}
-	utils.GetLogInstance().Info("discovery service stopped.")
+	utils.Logger().Info().Msg("discovery service stopped")
 }
 
 // NotifyService receives notification from service manager
@@ -59,11 +59,11 @@ func (s *Service) NotifyService(params map[string]interface{}) {
 	data := params["peer"]
 	action, ok := data.(p2p.GroupAction)
 	if !ok {
-		utils.GetLogInstance().Error("Wrong data type passed to NotifyService")
+		utils.Logger().Error().Msg("Wrong data type passed to NotifyService")
 		return
 	}
 
-	utils.GetLogInstance().Info("[DISCOVERY]", "got notified", action)
+	utils.Logger().Info().Interface("got notified", action).Msg("[DISCOVERY]")
 	s.actionChan <- action
 }
 
@@ -77,7 +77,7 @@ func (s *Service) contactP2pPeers() {
 
 	pingMsg := proto_discovery.NewPingMessage(s.host.GetSelfPeer(), s.config.IsClient)
 
-	utils.GetLogInstance().Info("Constructing Ping Message", "myPing", pingMsg)
+	utils.Logger().Info().Interface("myPing", pingMsg).Msg("Constructing Ping Message")
 	msgBuf := host.ConstructP2pMessage(byte(0), pingMsg.ConstructPingMessage())
 	s.sentPingMessage(s.config.ShardGroupID, msgBuf)
 
@@ -85,7 +85,7 @@ func (s *Service) contactP2pPeers() {
 		select {
 		case peer, ok := <-s.peerChan:
 			if !ok {
-				utils.GetLogInstance().Debug("[DISCOVERY] No More Peer!")
+				utils.Logger().Debug().Msg("[DISCOVERY] No More Peer!")
 				break
 			}
 			// TODO (leo) this one assumes all peers received in the channel are beacon chain node
@@ -97,9 +97,9 @@ func (s *Service) contactP2pPeers() {
 			}
 			// Add to outgoing peer list
 			// s.host.AddOutgoingPeer(peer)
-			// utils.GetLogInstance().Debug("[DISCOVERY]", "add outgoing peer", peer)
+			// utils.Logger().Debug().Interface("add outgoing peer", peer).Msg("[DISCOVERY]")
 		case <-s.stopChan:
-			utils.GetLogInstance().Debug("[DISCOVERY] stop pinging ...")
+			utils.Logger().Debug().Msg("[DISCOVERY] stop pinging ...")
 			return
 		case action := <-s.actionChan:
 			s.config.Actions[action.Name] = action.Action
@@ -135,13 +135,13 @@ func (s *Service) sentPingMessage(g p2p.GroupID, msgBuf []byte) {
 		err = s.host.SendMessageToGroups([]p2p.GroupID{s.config.ShardGroupID}, msgBuf)
 	}
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to send ping message", "group", g)
+		utils.Logger().Error().Str("group", string(g)).Msg("Failed to send ping message")
 	}
 }
 
 // Init is to initialize for discoveryService.
 func (s *Service) Init() {
-	utils.GetLogInstance().Info("Init discovery service")
+	utils.Logger().Info().Msg("Init discovery service")
 }
 
 // SetMessageChan sets up message channel to service.

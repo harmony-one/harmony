@@ -79,7 +79,7 @@ func New(h p2p.Host, rendezvous p2p.GroupID, peerChan chan p2p.Peer, bootnodes u
 func (s *Service) StartService() {
 	err := s.Init()
 	if err != nil {
-		utils.GetLogInstance().Error("Service Init Failed", "error", err)
+		utils.Logger().Error().Err(err).Msg("Service Init Failed")
 		return
 	}
 	s.Run()
@@ -88,11 +88,11 @@ func (s *Service) StartService() {
 
 // Init initializes role conversion service.
 func (s *Service) Init() error {
-	utils.GetLogInstance().Info("Init networkinfo service")
+	utils.Logger().Info().Msg("Init networkinfo service")
 
 	// Bootstrap the DHT. In the default configuration, this spawns a Background
 	// thread that will refresh the peer table every five minutes.
-	utils.GetLogInstance().Debug("Bootstrapping the DHT")
+	utils.Logger().Debug().Msg("Bootstrapping the DHT")
 	if err := s.dht.Bootstrap(ctx); err != nil {
 		return fmt.Errorf("error bootstrap dht: %s", err)
 	}
@@ -111,10 +111,10 @@ func (s *Service) Init() error {
 			defer wg.Done()
 			for i := 0; i < ConnectionRetry; i++ {
 				if err := s.Host.GetP2PHost().Connect(ctx, *peerinfo); err != nil {
-					utils.GetLogInstance().Warn("can't connect to bootnode", "error", err, "try", i)
+					utils.Logger().Warn().Err(err).Int("try", i).Msg("can't connect to bootnode")
 					time.Sleep(waitInRetry)
 				} else {
-					utils.GetLogInstance().Info("connected to bootnode", "node", *peerinfo, "try", i)
+					utils.Logger().Info().Int("try", i).Interface("node", *peerinfo).Msg("connected to bootnode")
 					// it is okay if any bootnode is connected
 					connected = true
 					break
@@ -129,10 +129,10 @@ func (s *Service) Init() error {
 	}
 
 	// We use a rendezvous point "shardID" to announce our location.
-	utils.GetLogInstance().Info("Announcing ourselves...", "Rendezvous", string(s.Rendezvous))
+	utils.Logger().Info().Str("Rendezvous", string(s.Rendezvous)).Msg("Announcing ourselves...")
 	s.discovery = libp2pdis.NewRoutingDiscovery(s.dht)
 	libp2pdis.Advertise(ctx, s.discovery, string(s.Rendezvous))
-	utils.GetLogInstance().Info("Successfully announced!")
+	utils.Logger().Info().Msg("Successfully announced!")
 
 	return nil
 }
@@ -141,7 +141,7 @@ func (s *Service) Init() error {
 func (s *Service) Run() {
 	defer close(s.stoppedChan)
 	if s.discovery == nil {
-		utils.GetLogInstance().Error("discovery is not initialized")
+		utils.Logger().Error().Msg("discovery is not initialized")
 		return
 	}
 
@@ -157,12 +157,12 @@ func (s *Service) DoService() {
 			return
 		case <-tick.C:
 			libp2pdis.Advertise(ctx, s.discovery, string(s.Rendezvous))
-			utils.GetLogInstance().Info("Successfully announced!", "Rendezvous", string(s.Rendezvous))
+			utils.Logger().Info().Str("Rendezvous", string(s.Rendezvous)).Msg("Successfully announced!")
 		default:
 			var err error
 			s.peerInfo, err = s.discovery.FindPeers(ctx, string(s.Rendezvous))
 			if err != nil {
-				utils.GetLogInstance().Error("FindPeers", "error", err)
+				utils.Logger().Error().Err(err).Msg("FindPeers")
 				return
 			}
 
@@ -175,18 +175,22 @@ func (s *Service) DoService() {
 func (s *Service) findPeers() {
 	_, cgnPrefix, err := net.ParseCIDR("100.64.0.0/10")
 	if err != nil {
-		utils.GetLogInstance().Error("can't parse CIDR", "error", err)
+		utils.Logger().Error().Err(err).Msg("can't parse CIDR")
 		return
 	}
 	for peer := range s.peerInfo {
 		if peer.ID != s.Host.GetP2PHost().ID() && len(peer.ID) > 0 {
-			//	utils.GetLogInstance().Info("Found Peer", "peer", peer.ID, "addr", peer.Addrs, "my ID", s.Host.GetP2PHost().ID())
+			// utils.Logger().Info().
+			// 	Interface("peer", peer.ID).
+			// 	Interface("addr", peer.Addrs).
+			// 	Interface("my ID", s.Host.GetP2PHost().ID()).
+			// 	Msg("Found Peer")
 			if err := s.Host.GetP2PHost().Connect(ctx, peer); err != nil {
-				utils.GetLogInstance().Warn("can't connect to peer node", "error", err, "peer", peer)
+				utils.Logger().Warn().Err(err).Interface("peer", peer).Msg("can't connect to peer node")
 				// break if the node can't connect to peers, waiting for another peer
 				break
 			} else {
-				utils.GetLogInstance().Info("connected to peer node", "peer", peer)
+				utils.Logger().Info().Interface("peer", peer).Msg("connected to peer node")
 			}
 			// figure out the public ip/port
 			var ip, port string
@@ -204,30 +208,30 @@ func (s *Service) findPeers() {
 				}
 			}
 			p := p2p.Peer{IP: ip, Port: port, PeerID: peer.ID, Addrs: peer.Addrs}
-			utils.GetLogInstance().Info("Notify peerChan", "peer", p)
+			utils.Logger().Info().Interface("peer", p).Msg("Notify peerChan")
 			if s.peerChan != nil {
 				s.peerChan <- p
 			}
 		}
 	}
 
-	utils.GetLogInstance().Info("PeerInfo Channel Closed.")
+	utils.Logger().Info().Msg("PeerInfo Channel Closed")
 	return
 }
 
 // StopService stops network info service.
 func (s *Service) StopService() {
-	utils.GetLogInstance().Info("Stopping network info service.")
+	utils.Logger().Info().Msg("Stopping network info service")
 	defer s.cancel()
 
 	if !s.started {
-		utils.GetLogInstance().Info("Service didn't started. Exit.")
+		utils.Logger().Info().Msg("Service didn't started. Exit")
 		return
 	}
 
 	s.stopChan <- struct{}{}
 	<-s.stoppedChan
-	utils.GetLogInstance().Info("Network info service stopped.")
+	utils.Logger().Info().Msg("Network info service stopped")
 }
 
 // NotifyService notify service

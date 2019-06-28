@@ -169,7 +169,10 @@ func (ss *StateSync) AddNewBlock(peerHash []byte, block *types.Block) {
 	pc.mux.Lock()
 	defer pc.mux.Unlock()
 	pc.newBlocks = append(pc.newBlocks, block)
-	utils.GetLogInstance().Debug("[SYNC] new block received", "total", len(pc.newBlocks), "blockHeight", block.NumberU64())
+	utils.Logger().Debug().
+		Int("total", len(pc.newBlocks)).
+		Uint64("blockHeight", block.NumberU64()).
+		Msg("[SYNC] new block received")
 }
 
 // CreateTestSyncPeerConfig used for testing.
@@ -207,7 +210,11 @@ func (peerConfig *SyncPeerConfig) GetBlocks(hashes [][]byte) ([][]byte, error) {
 
 // CreateSyncConfig creates SyncConfig for StateSync object.
 func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error {
-	utils.GetLogInstance().Debug("[SYNC] CreateSyncConfig: len of peers", "len", len(peers), "isBeacon", isBeacon)
+	utils.Logger().Debug().
+		Int("len", len(peers)).
+		Bool("isBeacon", isBeacon).
+		Msg("[SYNC] CreateSyncConfig: len of peers")
+
 	if len(peers) == 0 {
 		return ctxerror.New("[SYNC] no peers to connect to")
 	}
@@ -230,7 +237,10 @@ func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error {
 		}(peer)
 	}
 	wg.Wait()
-	utils.GetLogInstance().Info("[SYNC] Finished making connection to peers.", "len", len(ss.syncConfig.peers), "isBeacon", isBeacon)
+	utils.Logger().Info().
+		Int("len", len(ss.syncConfig.peers)).
+		Bool("isBeacon", isBeacon).
+		Msg("[SYNC] Finished making connection to peers")
 
 	return nil
 }
@@ -304,7 +314,10 @@ func (sc *SyncConfig) GetBlockHashesConsensusAndCleanUp() bool {
 		return CompareSyncPeerConfigByblockHashes(sc.peers[i], sc.peers[j]) == -1
 	})
 	maxFirstID, maxCount := sc.getHowManyMaxConsensus()
-	utils.GetLogInstance().Info("[SYNC] block consensus hashes", "maxFirstID", maxFirstID, "maxCount", maxCount)
+	utils.Logger().Info().
+		Int("maxFirstID", maxFirstID).
+		Int("maxCount", maxCount).
+		Msg("[SYNC] block consensus hashes")
 	if float64(maxCount) >= ConsensusRatio*float64(len(sc.peers)) {
 		sc.cleanUpPeers(maxFirstID)
 		return true
@@ -326,7 +339,10 @@ func (ss *StateSync) GetConsensusHashes(startHash []byte, size uint32) bool {
 					return
 				}
 				if len(response.Payload) > int(size+1) {
-					utils.GetLogInstance().Warn("[SYNC] GetConsensusHashes: receive more blockHahses than request!", "requestSize", size, "respondSize", len(response.Payload))
+					utils.Logger().Warn().
+						Uint32("requestSize", size).
+						Int("respondSize", len(response.Payload)).
+						Msg("[SYNC] GetConsensusHashes: receive more blockHahses than request!")
 					peerConfig.blockHashes = response.Payload[:size+1]
 				} else {
 					peerConfig.blockHashes = response.Payload
@@ -339,13 +355,13 @@ func (ss *StateSync) GetConsensusHashes(startHash []byte, size uint32) bool {
 			break
 		}
 		if count > TimesToFail {
-			utils.GetLogInstance().Info("[SYNC] GetConsensusHashes: reached retry limit")
+			utils.Logger().Info().Msg("[SYNC] GetConsensusHashes: reached retry limit")
 			return false
 		}
 		count++
 		time.Sleep(SleepTimeAfterNonConsensusBlockHashes)
 	}
-	utils.GetLogInstance().Info("[SYNC] Finished getting consensus block hashes.")
+	utils.Logger().Info().Msg("[SYNC] Finished getting consensus block hashes")
 	return true
 }
 
@@ -354,14 +370,17 @@ func (ss *StateSync) generateStateSyncTaskQueue(bc *core.BlockChain) {
 	ss.syncConfig.ForEachPeer(func(configPeer *SyncPeerConfig) (brk bool) {
 		for id, blockHash := range configPeer.blockHashes {
 			if err := ss.stateSyncTaskQueue.Put(SyncBlockTask{index: id, blockHash: blockHash}); err != nil {
-				ctxerror.Warn(utils.GetLogger(), err, "cannot add task",
-					"taskIndex", id, "taskBlock", hex.EncodeToString(blockHash))
+				utils.Logger().Warn().
+					Err(err).
+					Int("taskIndex", id).
+					Str("taskBlock", hex.EncodeToString(blockHash)).
+					Msg("cannot add task")
 			}
 		}
 		brk = true
 		return
 	})
-	utils.GetLogInstance().Info("[SYNC] Finished generateStateSyncTaskQueue", "length", ss.stateSyncTaskQueue.Len())
+	utils.Logger().Info().Int64("length", ss.stateSyncTaskQueue.Len()).Msg("[SYNC] Finished generateStateSyncTaskQueue")
 }
 
 // downloadBlocks downloads blocks from state sync task queue.
@@ -376,7 +395,7 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 			for !stateSyncTaskQueue.Empty() {
 				task, err := ss.stateSyncTaskQueue.Poll(1, time.Millisecond)
 				if err == queue.ErrTimeout || len(task) == 0 {
-					utils.GetLogInstance().Debug("[SYNC] ss.stateSyncTaskQueue poll timeout", "error", err)
+					utils.Logger().Error().Err(err).Msg("[SYNC] ss.stateSyncTaskQueue poll timeout")
 					break
 				}
 				syncTask := task[0].(SyncBlockTask)
@@ -384,14 +403,16 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 				payload, err := peerConfig.GetBlocks([][]byte{syncTask.blockHash})
 				if err != nil || len(payload) == 0 {
 					count++
-					utils.GetLogInstance().Debug("[SYNC] GetBlocks failed", "failNumber", count)
+					utils.Logger().Error().Err(err).Int("failNumber", count).Msg("[SYNC] GetBlocks failed")
 					if count > TimesToFail {
 						break
 					}
 					if err := ss.stateSyncTaskQueue.Put(syncTask); err != nil {
-						ctxerror.Warn(utils.GetLogger(), err, "cannot add task",
-							"taskIndex", syncTask.index,
-							"taskBlock", hex.EncodeToString(syncTask.blockHash))
+						utils.Logger().Warn().
+							Err(err).
+							Int("taskIndex", syncTask.index).
+							Str("taskBlock", hex.EncodeToString(syncTask.blockHash)).
+							Msg("cannot add task")
 					}
 					continue
 				}
@@ -402,14 +423,16 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 
 				if err != nil {
 					count++
-					utils.GetLogInstance().Debug("[SYNC] downloadBlocks: failed to DecodeBytes from received new block")
+					utils.Logger().Error().Err(err).Msg("[SYNC] downloadBlocks: failed to DecodeBytes from received new block")
 					if count > TimesToFail {
 						break
 					}
 					if err := ss.stateSyncTaskQueue.Put(syncTask); err != nil {
-						ctxerror.Warn(utils.GetLogger(), err, "cannot add task",
-							"taskIndex", syncTask.index,
-							"taskBlock", hex.EncodeToString(syncTask.blockHash))
+						utils.Logger().Warn().
+							Err(err).
+							Int("taskIndex", syncTask.index).
+							Str("taskBlock", hex.EncodeToString(syncTask.blockHash)).
+							Msg("cannot add task")
 					}
 					continue
 				}
@@ -421,7 +444,7 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 		return
 	})
 	wg.Wait()
-	utils.GetLogInstance().Info("[SYNC] Finished downloadBlocks.")
+	utils.Logger().Info().Msg("[SYNC] Finished downloadBlocks")
 }
 
 // CompareBlockByHash compares two block by hash, it will be used in sort the blocks
@@ -475,7 +498,12 @@ func (ss *StateSync) getMaxConsensusBlockFromParentHash(parentHash common.Hash) 
 		return CompareBlockByHash(candidateBlocks[i], candidateBlocks[j]) == -1
 	})
 	maxFirstID, maxCount := GetHowManyMaxConsensus(candidateBlocks)
-	utils.GetLogInstance().Debug("[SYNC] Find block with matching parenthash", "parentHash", parentHash, "hash", candidateBlocks[maxFirstID].Hash(), "maxCount", maxCount)
+	hash := candidateBlocks[maxFirstID].Hash()
+	utils.Logger().Debug().
+		Bytes("parentHash", parentHash[:]).
+		Bytes("hash", hash[:]).
+		Int("maxCount", maxCount).
+		Msg("[SYNC] Find block with matching parenthash")
 	return candidateBlocks[maxFirstID]
 }
 
@@ -500,21 +528,24 @@ func (ss *StateSync) getBlockFromLastMileBlocksByParentHash(parentHash common.Ha
 }
 
 func (ss *StateSync) updateBlockAndStatus(block *types.Block, bc *core.BlockChain, worker *worker.Worker) bool {
-	utils.GetLogInstance().Info("[SYNC] Current Block", "blockHex", bc.CurrentBlock().Hash().Hex())
+	utils.Logger().Info().Str("blockHex", bc.CurrentBlock().Hash().Hex()).Msg("[SYNC] Current Block")
 	_, err := bc.InsertChain([]*types.Block{block})
 	if err != nil {
-		utils.GetLogInstance().Debug("[SYNC] Error adding new block to blockchain", "Error", err)
+		utils.Logger().Error().Err(err).Msg("[SYNC] Error adding new block to blockchain")
 
-		utils.GetLogInstance().Debug("[SYNC] Rolling back current block!", "block", bc.CurrentBlock())
+		utils.Logger().Debug().Interface("block", bc.CurrentBlock()).Msg("[SYNC] Rolling back current block!")
 		bc.Rollback([]common.Hash{bc.CurrentBlock().Hash()})
 		return false
 	}
 	ss.syncMux.Lock()
 	if err := worker.UpdateCurrent(block.Header().Coinbase); err != nil {
-		ctxerror.Warn(utils.GetLogger(), err, "[SYNC] (*Worker).UpdateCurrent failed")
+		utils.Logger().Warn().Err(err).Msg("[SYNC] (*Worker).UpdateCurrent failed")
 	}
 	ss.syncMux.Unlock()
-	utils.GetLogInstance().Info("[SYNC] new block added to blockchain", "blockHeight", bc.CurrentBlock().NumberU64(), "blockHex", bc.CurrentBlock().Hash().Hex())
+	utils.Logger().Info().
+		Uint64("blockHeight", bc.CurrentBlock().NumberU64()).
+		Str("blockHex", bc.CurrentBlock().Hash().Hex()).
+		Msg("[SYNC] new block added to blockchain")
 	return true
 }
 
@@ -578,7 +609,7 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 func (ss *StateSync) ProcessStateSync(startHash []byte, size uint32, bc *core.BlockChain, worker *worker.Worker) {
 	// Gets consensus hashes.
 	if !ss.GetConsensusHashes(startHash, size) {
-		utils.GetLogInstance().Debug("[SYNC] ProcessStateSync unable to reach consensus on ss.GetConsensusHashes")
+		utils.Logger().Debug().Msg("[SYNC] ProcessStateSync unable to reach consensus on ss.GetConsensusHashes")
 		return
 	}
 	ss.generateStateSyncTaskQueue(bc)
@@ -603,26 +634,34 @@ func (peerConfig *SyncPeerConfig) registerToBroadcast(peerHash []byte, ip, port 
 // return number of successful registration
 func (ss *StateSync) RegisterNodeInfo() int {
 	registrationNumber := RegistrationNumber
-	utils.GetLogInstance().Debug("[SYNC] node registration to peers",
-		"registrationNumber", registrationNumber,
-		"activePeerNumber", len(ss.syncConfig.peers))
+	utils.Logger().Debug().
+		Int("registrationNumber", registrationNumber).
+		Int("activePeerNumber", len(ss.syncConfig.peers)).
+		Msg("[SYNC] node registration to peers")
 
 	count := 0
 	ss.syncConfig.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
+		logger := utils.Logger().With().Str("peerPort", peerConfig.port).Str("peerIP", peerConfig.ip).Logger()
 		if count >= registrationNumber {
 			brk = true
 			return
 		}
 		if peerConfig.ip == ss.selfip && peerConfig.port == GetSyncingPort(ss.selfport) {
-			utils.GetLogInstance().Debug("[SYNC] skip self", "peerport", peerConfig.port, "selfport", ss.selfport, "selfsyncport", GetSyncingPort(ss.selfport))
+			logger.Debug().
+				Str("selfport", ss.selfport).
+				Str("selfsyncport", GetSyncingPort(ss.selfport)).
+				Msg("[SYNC] skip self")
 			return
 		}
 		err := peerConfig.registerToBroadcast(ss.selfPeerHash[:], ss.selfip, ss.selfport)
 		if err != nil {
-			utils.GetLogInstance().Debug("[SYNC] register failed to peer", "ip", peerConfig.ip, "port", peerConfig.port, "selfPeerHash", ss.selfPeerHash)
+			logger.Debug().
+				Bytes("selfPeerHash", ss.selfPeerHash[:]).
+				Msg("[SYNC] register failed to peer")
 			return
 		}
-		utils.GetLogInstance().Debug("[SYNC] register success", "ip", peerConfig.ip, "port", peerConfig.port)
+
+		logger.Debug().Msg("[SYNC] register success")
 		count++
 		return
 	})
@@ -638,7 +677,7 @@ func (ss *StateSync) getMaxPeerHeight() uint64 {
 		go func() {
 			defer wg.Done()
 			//debug
-			//utils.GetLogInstance().Warn("[Sync] getMaxPeerHeight", "IP", peerConfig.ip, "Port", peerConfig.port)
+			// utils.Logger().Warn().Str("IP", peerConfig.ip).Str("Port", peerConfig.port).Msg("[Sync] getMaxPeerHeight")
 			response := peerConfig.client.GetBlockChainHeight()
 			ss.syncMux.Lock()
 			if response != nil && maxHeight < response.BlockHeight {
@@ -663,7 +702,11 @@ func (ss *StateSync) IsSameBlockchainHeight(bc *core.BlockChain) (uint64, bool) 
 func (ss *StateSync) IsOutOfSync(bc *core.BlockChain) bool {
 	otherHeight := ss.getMaxPeerHeight()
 	currentHeight := bc.CurrentBlock().NumberU64()
-	utils.GetLogInstance().Debug("[SYNC] Checking sync status", "OtherHeight", otherHeight, "MyHeight", currentHeight, "IsOutOfSync", currentHeight+inSyncThreshold < otherHeight)
+	utils.Logger().Debug().
+		Uint64("OtherHeight", otherHeight).
+		Uint64("MyHeight", currentHeight).
+		Bool("IsOutOfSync", currentHeight+inSyncThreshold < otherHeight).
+		Msg("[SYNC] Checking sync status")
 	return currentHeight+inSyncThreshold < otherHeight
 }
 
@@ -676,7 +719,7 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, willJo
 		otherHeight := ss.getMaxPeerHeight()
 		currentHeight := bc.CurrentBlock().NumberU64()
 		if currentHeight >= otherHeight {
-			utils.GetLogInstance().Info("[SYNC] Node is now IN SYNC!")
+			utils.Logger().Info().Msg("[SYNC] Node is now IN SYNC!")
 			break
 		}
 		startHash := bc.CurrentBlock().Hash()
