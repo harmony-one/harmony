@@ -99,9 +99,10 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 		Config:         &chainConfig,
 		Alloc:          genesisAlloc,
 		ShardID:        shardID,
-		GasLimit:       params.GenesisGasLimit * 1000,
+		GasLimit:       params.GenesisGasLimit,
 		ShardStateHash: myShardState.Hash(),
 		ShardState:     myShardState.DeepCopy(),
+		Timestamp:      1561734000, // GMT: Friday, June 28, 2019 3:00:00 PM. PST: Friday, June 28, 2019 8:00:00 AM
 		ExtraData:      []byte("Harmony for One and All. Open Consensus for 10B."),
 	}
 
