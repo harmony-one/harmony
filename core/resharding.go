@@ -65,7 +65,7 @@ func (ss *ShardingState) assignNewNodes(newNodeList []types.NodeID) {
 		if id < len(ss.shardState) {
 			ss.shardState[id].NodeList = append(ss.shardState[id].NodeList, nid)
 		} else {
-			utils.GetLogInstance().Error("assignNewNodes", "index out of range", len(ss.shardState), "id", id)
+			utils.Logger().Error().Int("id", id).Int("shardState Count", len(ss.shardState)).Msg("assignNewNodes index out of range")
 		}
 	}
 }
@@ -123,7 +123,7 @@ func (ss *ShardingState) Reshard(newNodeList []types.NodeID, percent float64) {
 
 	// Put leader back
 	if len(leaders) < ss.numShards {
-		utils.GetLogInstance().Error("Not enough leaders to assign to shards")
+		utils.Logger().Error().Msg("Not enough leaders to assign to shards")
 	}
 	for i := 0; i < ss.numShards; i++ {
 		ss.shardState[i].NodeList = append([]types.NodeID{leaders[i]}, ss.shardState[i].NodeList...)
@@ -191,7 +191,7 @@ func CalculateNewShardState(
 			WithCause(err)
 	}
 	newNodeList := ss.UpdateShardingState(stakeInfo)
-	utils.GetLogInstance().Info("Cuckoo Rate", "percentage", CuckooRate)
+	utils.Logger().Info().Float64("percentage", CuckooRate).Msg("Cuckoo Rate")
 	ss.Reshard(newNodeList, CuckooRate)
 	return ss.shardState, nil
 }
@@ -225,7 +225,7 @@ func (ss *ShardingState) UpdateShardingState(stakeInfo *map[common.Address]*stru
 
 // GetInitShardState returns the initial shard state at genesis.
 func GetInitShardState() types.ShardState {
-	utils.GetLogInstance().Info("Generating Genesis Shard State.")
+	utils.Logger().Info().Msg("Generating Genesis Shard State.")
 	shardState := types.ShardState{}
 	for i := 0; i < GenesisShardNum; i++ {
 		com := types.Committee{ShardID: uint32(i)}

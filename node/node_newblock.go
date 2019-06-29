@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -138,32 +137,34 @@ func (node *Node) proposeBeaconShardState(block *types.Block) error {
 }
 
 func (node *Node) proposeLocalShardState(block *types.Block) {
-	logger := block.Logger(utils.GetLogInstance())
-	getLogger := func() log.Logger { return utils.WithCallerSkip(logger, 1) }
+	logger := block.Logger(utils.Logger())
 	// TODO ek – read this from beaconchain once BC sync is fixed
 	if node.nextShardState.master == nil {
-		getLogger().Debug("yet to receive master proposal from beaconchain")
+		logger.Debug().Msg("yet to receive master proposal from beaconchain")
 		return
 	}
-	logger = logger.New(
-		"nextEpoch", node.nextShardState.master.Epoch,
-		"proposeTime", node.nextShardState.proposeTime)
+
+	nlogger := logger.With().
+		Uint64("nextEpoch", node.nextShardState.master.Epoch).
+		Time("proposeTime", node.nextShardState.proposeTime).
+		Logger()
+	logger = &nlogger
 	if time.Now().Before(node.nextShardState.proposeTime) {
-		getLogger().Debug("still waiting for shard state to propagate")
+		logger.Debug().Msg("still waiting for shard state to propagate")
 		return
 	}
 	masterShardState := node.nextShardState.master.ShardState
 	var localShardState types.ShardState
 	committee := masterShardState.FindCommitteeByID(block.ShardID())
 	if committee != nil {
-		getLogger().Info("found local shard info; proposing it")
+		logger.Info().Msg("found local shard info; proposing it")
 		localShardState = append(localShardState, *committee)
 	} else {
-		getLogger().Info("beacon committee disowned us; proposing nothing")
+		logger.Info().Msg("beacon committee disowned us; proposing nothing")
 		// Leave local proposal empty to signal the end of shard (disbanding).
 	}
 	err := block.AddShardState(localShardState)
 	if err != nil {
-		getLogger().Error("Failed proposin local shard state", "error", err)
+		logger.Error().Err(err).Msg("Failed proposin local shard state")
 	}
 }

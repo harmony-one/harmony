@@ -164,15 +164,24 @@ var DefaultTxPoolConfig = TxPoolConfig{
 func (config *TxPoolConfig) sanitize() TxPoolConfig {
 	conf := *config
 	if conf.Rejournal < time.Second {
-		utils.GetLogger().Warn("Sanitizing invalid txpool journal time", "provided", conf.Rejournal, "updated", time.Second)
+		utils.Logger().Warn().
+			Dur("provided", conf.Rejournal).
+			Dur("updated", time.Second).
+			Msg("Sanitizing invalid txpool journal time")
 		conf.Rejournal = time.Second
 	}
 	if conf.PriceLimit < 1 {
-		utils.GetLogger().Warn("Sanitizing invalid txpool price limit", "provided", conf.PriceLimit, "updated", DefaultTxPoolConfig.PriceLimit)
+		utils.Logger().Warn().
+			Uint64("provided", conf.PriceLimit).
+			Uint64("updated", DefaultTxPoolConfig.PriceLimit).
+			Msg("Sanitizing invalid txpool price limit")
 		conf.PriceLimit = DefaultTxPoolConfig.PriceLimit
 	}
 	if conf.PriceBump < 1 {
-		utils.GetLogger().Warn("Sanitizing invalid txpool price bump", "provided", conf.PriceBump, "updated", DefaultTxPoolConfig.PriceBump)
+		utils.Logger().Warn().
+			Uint64("provided", conf.PriceBump).
+			Uint64("updated", DefaultTxPoolConfig.PriceBump).
+			Msg("Sanitizing invalid txpool price bump")
 		conf.PriceBump = DefaultTxPoolConfig.PriceBump
 	}
 	return conf
@@ -236,7 +245,7 @@ func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig, chain block
 	}
 	pool.locals = newAccountSet(pool.signer)
 	for _, addr := range config.Locals {
-		utils.GetLogger().Info("Setting new local account", "address", addr)
+		utils.Logger().Info().Interface("address", addr).Msg("Setting new local account")
 		pool.locals.add(addr)
 	}
 	pool.priced = newTxPricedList(pool.all)
@@ -247,10 +256,10 @@ func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig, chain block
 		pool.journal = newTxJournal(config.Journal)
 
 		if err := pool.journal.load(pool.AddLocals); err != nil {
-			utils.GetLogger().Warn("Failed to load transaction journal", "err", err)
+			utils.Logger().Warn().Err(err).Msg("Failed to load transaction journal")
 		}
 		if err := pool.journal.rotate(pool.local()); err != nil {
-			utils.GetLogger().Warn("Failed to rotate transaction journal", "err", err)
+			utils.Logger().Warn().Err(err).Msg("Failed to rotate transaction journal")
 		}
 	}
 	// Subscribe events from blockchain
@@ -311,7 +320,11 @@ func (pool *TxPool) loop() {
 			pool.mu.RUnlock()
 
 			if pending != prevPending || queued != prevQueued || stales != prevStales {
-				utils.GetLogger().Debug("Transaction pool status report", "executable", pending, "queued", queued, "stales", stales)
+				utils.Logger().Debug().
+					Int("executable", pending).
+					Int("queued", queued).
+					Int("stales", stales).
+					Msg("Transaction pool status report")
 				prevPending, prevQueued, prevStales = pending, queued, stales
 			}
 
@@ -337,7 +350,7 @@ func (pool *TxPool) loop() {
 			if pool.journal != nil {
 				pool.mu.Lock()
 				if err := pool.journal.rotate(pool.local()); err != nil {
-					utils.GetLogger().Warn("Failed to rotate local tx journal", "err", err)
+					utils.Logger().Warn().Err(err).Msg("Failed to rotate local tx journal")
 				}
 				pool.mu.Unlock()
 			}
@@ -366,7 +379,7 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 		newNum := newHead.Number.Uint64()
 
 		if depth := uint64(math.Abs(float64(oldNum) - float64(newNum))); depth > 64 {
-			utils.GetLogger().Debug("Skipping deep transaction reorg", "depth", depth)
+			utils.Logger().Debug().Uint64("depth", depth).Msg("Skipping deep transaction reorg")
 		} else {
 			// Reorg seems shallow enough to pull in all transactions into memory
 			var discarded, included types.Transactions
@@ -378,26 +391,38 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 			for rem.NumberU64() > add.NumberU64() {
 				discarded = append(discarded, rem.Transactions()...)
 				if rem = pool.chain.GetBlock(rem.ParentHash(), rem.NumberU64()-1); rem == nil {
-					utils.GetLogger().Error("Unrooted old chain seen by tx pool", "block", oldHead.Number, "hash", oldHead.Hash())
+					utils.Logger().Error().
+						Str("block", oldHead.Number.String()).
+						Str("hash", oldHead.Hash().TerminalString()).
+						Msg("Unrooted old chain seen by tx pool")
 					return
 				}
 			}
 			for add.NumberU64() > rem.NumberU64() {
 				included = append(included, add.Transactions()...)
 				if add = pool.chain.GetBlock(add.ParentHash(), add.NumberU64()-1); add == nil {
-					utils.GetLogger().Error("Unrooted new chain seen by tx pool", "block", newHead.Number, "hash", newHead.Hash())
+					utils.Logger().Error().
+						Str("block", newHead.Number.String()).
+						Str("hash", newHead.Hash().TerminalString()).
+						Msg("Unrooted new chain seen by tx pool")
 					return
 				}
 			}
 			for rem.Hash() != add.Hash() {
 				discarded = append(discarded, rem.Transactions()...)
 				if rem = pool.chain.GetBlock(rem.ParentHash(), rem.NumberU64()-1); rem == nil {
-					utils.GetLogger().Error("Unrooted old chain seen by tx pool", "block", oldHead.Number, "hash", oldHead.Hash())
+					utils.Logger().Error().
+						Str("block", oldHead.Number.String()).
+						Str("hash", oldHead.Hash().TerminalString()).
+						Msg("Unrooted old chain seen by tx pool")
 					return
 				}
 				included = append(included, add.Transactions()...)
 				if add = pool.chain.GetBlock(add.ParentHash(), add.NumberU64()-1); add == nil {
-					utils.GetLogger().Error("Unrooted new chain seen by tx pool", "block", newHead.Number, "hash", newHead.Hash())
+					utils.Logger().Error().
+						Str("block", newHead.Number.String()).
+						Str("hash", newHead.Hash().TerminalString()).
+						Msg("Unrooted new chain seen by tx pool")
 					return
 				}
 			}
@@ -410,7 +435,7 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 	}
 	statedb, err := pool.chain.StateAt(newHead.Root)
 	if err != nil {
-		utils.GetLogger().Error("Failed to reset txpool state", "err", err)
+		utils.Logger().Error().Err(err).Msg("Failed to reset txpool state")
 		return
 	}
 	pool.currentState = statedb
@@ -418,7 +443,7 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 	pool.currentMaxGas = newHead.GasLimit
 
 	// Inject any transactions discarded due to reorgs
-	utils.GetLogger().Debug("Reinjecting stale transactions", "count", len(reinject))
+	utils.Logger().Debug().Int("count", len(reinject)).Msg("Reinjecting stale transactions")
 	//senderCacher.recover(pool.signer, reinject)
 	pool.addTxsLocked(reinject, false)
 
@@ -450,7 +475,7 @@ func (pool *TxPool) Stop() {
 	if pool.journal != nil {
 		pool.journal.close()
 	}
-	utils.GetLogger().Info("Transaction pool stopped")
+	utils.Logger().Info().Msg("Transaction pool stopped")
 }
 
 // SubscribeNewTxsEvent registers a subscription of NewTxsEvent and
@@ -477,7 +502,7 @@ func (pool *TxPool) SetGasPrice(price *big.Int) {
 	for _, tx := range pool.priced.Cap(price, pool.locals) {
 		pool.removeTx(tx.Hash(), false)
 	}
-	utils.GetLogger().Info("Transaction pool price threshold updated", "price", price)
+	utils.Logger().Info().Str("price", price.String()).Msg("Transaction pool price threshold updated")
 }
 
 // State returns the virtual managed state of the transaction pool.
@@ -620,15 +645,16 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 // whitelisted, preventing any associated transaction from being dropped out of
 // the pool due to pricing constraints.
 func (pool *TxPool) add(tx *types.Transaction, local bool) (bool, error) {
+	logger := utils.Logger().With().Stack().Logger()
 	// If the transaction is already known, discard it
 	hash := tx.Hash()
 	if pool.all.Get(hash) != nil {
-		utils.GetLogger().Trace("Discarding already known transaction", "hash", hash)
+		logger.Warn().Str("hash", hash.TerminalString()).Msg("Discarding already known transaction")
 		return false, fmt.Errorf("known transaction: %x", hash)
 	}
 	// If the transaction fails basic validation, discard it
 	if err := pool.validateTx(tx, local); err != nil {
-		utils.GetLogger().Trace("Discarding invalid transaction", "hash", hash, "err", err)
+		logger.Warn().Err(err).Str("hash", hash.TerminalString()).Msg("Discarding invalid transaction")
 		invalidTxCounter.Inc(1)
 		return false, err
 	}
@@ -636,14 +662,20 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (bool, error) {
 	if uint64(pool.all.Count()) >= pool.config.GlobalSlots+pool.config.GlobalQueue {
 		// If the new transaction is underpriced, don't accept it
 		if !local && pool.priced.Underpriced(tx, pool.locals) {
-			utils.GetLogger().Trace("Discarding underpriced transaction", "hash", hash, "price", tx.GasPrice())
+			logger.Warn().
+				Str("hash", hash.TerminalString()).
+				Str("price", tx.GasPrice().String()).
+				Msg("Discarding underpriced transaction")
 			underpricedTxCounter.Inc(1)
 			return false, ErrUnderpriced
 		}
 		// New transaction is better than our worse ones, make room for it
 		drop := pool.priced.Discard(pool.all.Count()-int(pool.config.GlobalSlots+pool.config.GlobalQueue-1), pool.locals)
 		for _, tx := range drop {
-			utils.GetLogger().Trace("Discarding freshly underpriced transaction", "hash", tx.Hash(), "price", tx.GasPrice())
+			logger.Warn().
+				Str("hash", tx.Hash().TerminalString()).
+				Str("price", tx.GasPrice().String()).
+				Msg("Discarding freshly underpriced transaction")
 			underpricedTxCounter.Inc(1)
 			pool.removeTx(tx.Hash(), false)
 		}
@@ -667,7 +699,11 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (bool, error) {
 		pool.priced.Put(tx)
 		pool.journalTx(from, tx)
 
-		utils.GetLogger().Trace("Pooled new executable transaction", "hash", hash, "from", from, "to", tx.To())
+		logger.Warn().
+			Str("hash", tx.Hash().TerminalString()).
+			Interface("from", from).
+			Interface("to", tx.To()).
+			Msg("Pooled new executable transaction")
 
 		// We've directly injected a replacement transaction, notify subsystems
 		// go pool.txFeed.Send(NewTxsEvent{types.Transactions{tx}})
@@ -682,13 +718,17 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (bool, error) {
 	// Mark local addresses and journal local transactions
 	if local {
 		if !pool.locals.contains(from) {
-			utils.GetLogger().Info("Setting new local account", "address", from)
+			utils.Logger().Info().Interface("address", from).Msg("Setting new local account")
 			pool.locals.add(from)
 		}
 	}
 	pool.journalTx(from, tx)
 
-	utils.GetLogger().Trace("Pooled new future transaction", "hash", hash, "from", from, "to", tx.To())
+	logger.Warn().
+		Str("hash", hash.TerminalString()).
+		Interface("from", from).
+		Interface("to", tx.To()).
+		Msg("Pooled new future transaction")
 	return replace, nil
 }
 
@@ -736,7 +776,7 @@ func (pool *TxPool) journalTx(from common.Address, tx *types.Transaction) {
 		return
 	}
 	if err := pool.journal.insert(tx); err != nil {
-		utils.GetLogger().Warn("Failed to journal local transaction", "err", err)
+		utils.Logger().Warn().Err(err).Msg("Failed to journal local transaction")
 	}
 }
 
@@ -933,6 +973,7 @@ func (pool *TxPool) removeTx(hash common.Hash, outofbound bool) {
 func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 	// Track the promoted transactions to broadcast them at once
 	var promoted []*types.Transaction
+	logger := utils.Logger().With().Stack().Logger()
 
 	// Gather all the accounts potentially needing updates
 	if accounts == nil {
@@ -950,7 +991,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 		// Drop all transactions that are deemed too old (low nonce)
 		for _, tx := range list.Forward(pool.currentState.GetNonce(addr)) {
 			hash := tx.Hash()
-			utils.GetLogger().Trace("Removed old queued transaction", "hash", hash)
+			logger.Warn().Str("hash", hash.TerminalString()).Msg("Removed old queued transaction")
 			pool.all.Remove(hash)
 			pool.priced.Removed()
 		}
@@ -958,7 +999,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 		drops, _ := list.Filter(pool.currentState.GetBalance(addr), pool.currentMaxGas)
 		for _, tx := range drops {
 			hash := tx.Hash()
-			utils.GetLogger().Trace("Removed unpayable queued transaction", "hash", hash)
+			logger.Warn().Str("hash", hash.TerminalString()).Msg("Removed unpayable queued transaction")
 			pool.all.Remove(hash)
 			pool.priced.Removed()
 			queuedNofundsCounter.Inc(1)
@@ -967,7 +1008,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 		for _, tx := range list.Ready(pool.pendingState.GetNonce(addr)) {
 			hash := tx.Hash()
 			if pool.promoteTx(addr, hash, tx) {
-				utils.GetLogger().Trace("Promoting queued transaction", "hash", hash)
+				logger.Warn().Str("hash", hash.TerminalString()).Msg("Promoting queued transaction")
 				promoted = append(promoted, tx)
 			}
 		}
@@ -978,7 +1019,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 				pool.all.Remove(hash)
 				pool.priced.Removed()
 				queuedRateLimitCounter.Inc(1)
-				utils.GetLogger().Trace("Removed cap-exceeding queued transaction", "hash", hash)
+				logger.Warn().Str("hash", hash.TerminalString()).Msg("Removed cap-exceeding queued transaction")
 			}
 		}
 		// Delete the entire queue entry if it became empty.
@@ -1031,7 +1072,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 							if nonce := tx.Nonce(); pool.pendingState.GetNonce(offenders[i]) > nonce {
 								pool.pendingState.SetNonce(offenders[i], nonce)
 							}
-							utils.GetLogger().Trace("Removed fairness-exceeding pending transaction", "hash", hash)
+							logger.Warn().Str("hash", hash.TerminalString()).Msg("Removed fairness-exceeding pending transaction")
 						}
 						pending--
 					}
@@ -1053,7 +1094,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 						if nonce := tx.Nonce(); pool.pendingState.GetNonce(addr) > nonce {
 							pool.pendingState.SetNonce(addr, nonce)
 						}
-						utils.GetLogger().Trace("Removed fairness-exceeding pending transaction", "hash", hash)
+						logger.Warn().Str("hash", hash.TerminalString()).Msg("Removed fairness-exceeding pending transaction")
 					}
 					pending--
 				}
@@ -1108,13 +1149,15 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 // are moved back into the future queue.
 func (pool *TxPool) demoteUnexecutables() {
 	// Iterate over all accounts and demote any non-executable transactions
+	logger := utils.Logger().With().Stack().Logger()
+
 	for addr, list := range pool.pending {
 		nonce := pool.currentState.GetNonce(addr)
 
 		// Drop all transactions that are deemed too old (low nonce)
 		for _, tx := range list.Forward(nonce) {
 			hash := tx.Hash()
-			utils.GetLogger().Trace("Removed old pending transaction", "hash", hash)
+			logger.Warn().Str("hash", hash.TerminalString()).Msg("Removed old pending transaction")
 			pool.all.Remove(hash)
 			pool.priced.Removed()
 		}
@@ -1122,21 +1165,21 @@ func (pool *TxPool) demoteUnexecutables() {
 		drops, invalids := list.Filter(pool.currentState.GetBalance(addr), pool.currentMaxGas)
 		for _, tx := range drops {
 			hash := tx.Hash()
-			utils.GetLogger().Trace("Removed unpayable pending transaction", "hash", hash)
+			logger.Warn().Str("hash", hash.TerminalString()).Msg("Removed unpayable pending transaction")
 			pool.all.Remove(hash)
 			pool.priced.Removed()
 			pendingNofundsCounter.Inc(1)
 		}
 		for _, tx := range invalids {
 			hash := tx.Hash()
-			utils.GetLogger().Trace("Demoting pending transaction", "hash", hash)
+			logger.Warn().Str("hash", hash.TerminalString()).Msg("Demoting pending transaction")
 			pool.enqueueTx(hash, tx)
 		}
 		// If there's a gap in front, alert (should never happen) and postpone all transactions
 		if list.Len() > 0 && list.txs.Get(nonce) == nil {
 			for _, tx := range list.Cap(0) {
 				hash := tx.Hash()
-				utils.GetLogger().Error("Demoting invalidated transaction", "hash", hash)
+				logger.Error().Str("hash", hash.TerminalString()).Msg("Demoting invalidated transaction")
 				pool.enqueueTx(hash, tx)
 			}
 		}
