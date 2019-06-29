@@ -74,7 +74,7 @@ func ReadTransaction(db DatabaseReader, hash common.Hash) (*types.Transaction, c
 	if body == nil || len(body.Transactions) <= int(txIndex) {
 		utils.Logger().Error().
 			Uint64("number", blockNumber).
-			Bytes("hash", blockHash.Bytes()).
+			Str("hash", blockHash.Hex()).
 			Uint64("index", txIndex).
 			Msg("Transaction referenced missing")
 		return nil, common.Hash{}, 0, 0
@@ -93,7 +93,7 @@ func ReadReceipt(db DatabaseReader, hash common.Hash) (*types.Receipt, common.Ha
 	if len(receipts) <= int(receiptIndex) {
 		utils.Logger().Error().
 			Uint64("number", blockNumber).
-			Bytes("hash", blockHash.Bytes()).
+			Str("hash", blockHash.Hex()).
 			Uint64("index", receiptIndex).
 			Msg("Receipt refereced missing")
 		return nil, common.Hash{}, 0, 0

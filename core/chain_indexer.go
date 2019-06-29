@@ -286,8 +286,8 @@ func (c *ChainIndexer) newHead(head uint64, reorg bool) {
 				if syncedHead != c.checkpointHead {
 					c.log.Error().
 						Uint64("number", c.checkpointSections*c.sectionSize-1).
-						Str("expected", c.checkpointHead.TerminalString()).
-						Str("synced", syncedHead.TerminalString()).
+						Str("expected", c.checkpointHead.Hex()).
+						Str("synced", syncedHead.Hex()).
 						Msg("Synced chain does not match checkpoint")
 					return
 				}

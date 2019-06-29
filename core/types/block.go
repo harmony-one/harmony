@@ -121,7 +121,7 @@ func (h *Header) Size() common.StorageSize {
 func (h *Header) Logger(logger *zerolog.Logger) *zerolog.Logger {
 	nlogger := logger.
 		With().
-		Bytes("blockHash", h.Hash().Bytes()).
+		Str("blockHash", h.Hash().Hex()).
 		Uint32("blockShard", h.ShardID).
 		Str("blockEpoch", h.Epoch.String()).
 		Str("blockNumber", h.Number.String()).

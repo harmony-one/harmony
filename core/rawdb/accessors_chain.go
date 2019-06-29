@@ -150,7 +150,7 @@ func ReadHeader(db DatabaseReader, hash common.Hash, number uint64) *types.Heade
 	}
 	header := new(types.Header)
 	if err := rlp.Decode(bytes.NewReader(data), header); err != nil {
-		utils.Logger().Error().Err(err).Bytes("hash", hash.Bytes()).Msg("Invalid block header RLP")
+		utils.Logger().Error().Err(err).Str("hash", hash.Hex()).Msg("Invalid block header RLP")
 		return nil
 	}
 	return header
@@ -219,7 +219,7 @@ func ReadBody(db DatabaseReader, hash common.Hash, number uint64) *types.Body {
 	}
 	body := new(types.Body)
 	if err := rlp.Decode(bytes.NewReader(data), body); err != nil {
-		utils.Logger().Error().Err(err).Bytes("hash", hash.Bytes()).Msg("Invalid block body RLP")
+		utils.Logger().Error().Err(err).Str("hash", hash.Hex()).Msg("Invalid block body RLP")
 		return nil
 	}
 	return body
@@ -249,7 +249,7 @@ func ReadTd(db DatabaseReader, hash common.Hash, number uint64) *big.Int {
 	}
 	td := new(big.Int)
 	if err := rlp.Decode(bytes.NewReader(data), td); err != nil {
-		utils.Logger().Error().Err(err).Bytes("hash", hash.Bytes()).Msg("Invalid block total difficulty RLP")
+		utils.Logger().Error().Err(err).Str("hash", hash.Hex()).Msg("Invalid block total difficulty RLP")
 		return nil
 	}
 	return td
@@ -283,7 +283,7 @@ func ReadReceipts(db DatabaseReader, hash common.Hash, number uint64) types.Rece
 	// Convert the receipts from their storage form to their internal representation
 	storageReceipts := []*types.ReceiptForStorage{}
 	if err := rlp.DecodeBytes(data, &storageReceipts); err != nil {
-		utils.Logger().Error().Err(err).Bytes("hash", hash.Bytes()).Msg("Invalid receipt array RLP")
+		utils.Logger().Error().Err(err).Str("hash", hash.Hex()).Msg("Invalid receipt array RLP")
 		return nil
 	}
 	receipts := make(types.Receipts, len(storageReceipts))

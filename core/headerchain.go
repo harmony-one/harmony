@@ -209,10 +209,10 @@ func (hc *HeaderChain) ValidateHeaderChain(chain []*types.Header, checkFreq int)
 			// Chain broke ancestry, log a message (programming error) and skip insertion
 			utils.Logger().Error().
 				Str("number", chain[i].Number.String()).
-				Str("hash", chain[i].Hash().TerminalString()).
-				Str("parent", chain[i].ParentHash.TerminalString()).
+				Str("hash", chain[i].Hash().Hex()).
+				Str("parent", chain[i].ParentHash.Hex()).
 				Str("prevnumber", chain[i-1].Number.String()).
-				Str("prevhash", chain[i-1].Hash().TerminalString()).
+				Str("prevhash", chain[i-1].Hash().Hex()).
 				Msg("Non contiguous header insert")
 
 			return 0, fmt.Errorf("non contiguous insert: item %d is #%d [%x…], item %d is #%d [%x…] (parent [%x…])", i-1, chain[i-1].Number,
@@ -286,7 +286,7 @@ func (hc *HeaderChain) InsertHeaderChain(chain []*types.Header, writeHeader WhCa
 		Int("count", stats.processed).
 		Str("elapsed", common.PrettyDuration(time.Since(start)).String()).
 		Str("number", last.Number.String()).
-		Str("hash", last.Hash().TerminalString())
+		Str("hash", last.Hash().Hex())
 
 	if timestamp := time.Unix(last.Time.Int64(), 0); time.Since(timestamp) > time.Minute {
 		context = context.Str("age", common.PrettyAge(timestamp).String())
