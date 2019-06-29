@@ -107,7 +107,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 
 	consensus.PbftLog.AddMessage(pbftMsg)
 	consensus.getLogger().Debug().
-		Bytes("MsgblockHash", pbftMsg.BlockHash[:]).
+		Str("MsgblockHash", pbftMsg.BlockHash.Hex()).
 		Uint64("MsgViewID", pbftMsg.ViewID).
 		Uint64("MsgBlockNum", pbftMsg.BlockNum).
 		Msg("[Announce] Added Announce message in pbftLog")
@@ -127,7 +127,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 			Msg("[Announce] Cannot send announce message")
 	} else {
 		consensus.getLogger().Info().
-			Bytes("BlockHash", block.Hash().Bytes()).
+			Str("BlockHash", block.Hash().Hex()).
 			Uint64("BlockNum", block.NumberU64()).
 			Msg("[Announce] Sent Announce Message!!")
 	}
@@ -470,7 +470,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		consensus.getLogger().Warn().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Bytes("MsgBlockHash", recvMsg.BlockHash[:]).
-			Bytes("blockObjHash", blockObj.Header().Hash().Bytes()).
+			Str("blockObjHash", blockObj.Header().Hash().Hex()).
 			Msg("[OnPrepared] BlockHash not match")
 		return
 	}

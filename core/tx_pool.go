@@ -393,7 +393,7 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 				if rem = pool.chain.GetBlock(rem.ParentHash(), rem.NumberU64()-1); rem == nil {
 					utils.Logger().Error().
 						Str("block", oldHead.Number.String()).
-						Str("hash", oldHead.Hash().TerminalString()).
+						Str("hash", oldHead.Hash().Hex()).
 						Msg("Unrooted old chain seen by tx pool")
 					return
 				}
@@ -403,7 +403,7 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 				if add = pool.chain.GetBlock(add.ParentHash(), add.NumberU64()-1); add == nil {
 					utils.Logger().Error().
 						Str("block", newHead.Number.String()).
-						Str("hash", newHead.Hash().TerminalString()).
+						Str("hash", newHead.Hash().Hex()).
 						Msg("Unrooted new chain seen by tx pool")
 					return
 				}
@@ -413,7 +413,7 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 				if rem = pool.chain.GetBlock(rem.ParentHash(), rem.NumberU64()-1); rem == nil {
 					utils.Logger().Error().
 						Str("block", oldHead.Number.String()).
-						Str("hash", oldHead.Hash().TerminalString()).
+						Str("hash", oldHead.Hash().Hex()).
 						Msg("Unrooted old chain seen by tx pool")
 					return
 				}
@@ -421,7 +421,7 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 				if add = pool.chain.GetBlock(add.ParentHash(), add.NumberU64()-1); add == nil {
 					utils.Logger().Error().
 						Str("block", newHead.Number.String()).
-						Str("hash", newHead.Hash().TerminalString()).
+						Str("hash", newHead.Hash().Hex()).
 						Msg("Unrooted new chain seen by tx pool")
 					return
 				}
@@ -649,12 +649,12 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (bool, error) {
 	// If the transaction is already known, discard it
 	hash := tx.Hash()
 	if pool.all.Get(hash) != nil {
-		logger.Warn().Str("hash", hash.TerminalString()).Msg("Discarding already known transaction")
+		logger.Warn().Str("hash", hash.Hex()).Msg("Discarding already known transaction")
 		return false, fmt.Errorf("known transaction: %x", hash)
 	}
 	// If the transaction fails basic validation, discard it
 	if err := pool.validateTx(tx, local); err != nil {
-		logger.Warn().Err(err).Str("hash", hash.TerminalString()).Msg("Discarding invalid transaction")
+		logger.Warn().Err(err).Str("hash", hash.Hex()).Msg("Discarding invalid transaction")
 		invalidTxCounter.Inc(1)
 		return false, err
 	}
@@ -663,7 +663,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (bool, error) {
 		// If the new transaction is underpriced, don't accept it
 		if !local && pool.priced.Underpriced(tx, pool.locals) {
 			logger.Warn().
-				Str("hash", hash.TerminalString()).
+				Str("hash", hash.Hex()).
 				Str("price", tx.GasPrice().String()).
 				Msg("Discarding underpriced transaction")
 			underpricedTxCounter.Inc(1)
@@ -673,7 +673,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (bool, error) {
 		drop := pool.priced.Discard(pool.all.Count()-int(pool.config.GlobalSlots+pool.config.GlobalQueue-1), pool.locals)
 		for _, tx := range drop {
 			logger.Warn().
-				Str("hash", tx.Hash().TerminalString()).
+				Str("hash", tx.Hash().Hex()).
 				Str("price", tx.GasPrice().String()).
 				Msg("Discarding freshly underpriced transaction")
 			underpricedTxCounter.Inc(1)
@@ -700,7 +700,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (bool, error) {
 		pool.journalTx(from, tx)
 
 		logger.Warn().
-			Str("hash", tx.Hash().TerminalString()).
+			Str("hash", tx.Hash().Hex()).
 			Interface("from", from).
 			Interface("to", tx.To()).
 			Msg("Pooled new executable transaction")
@@ -725,7 +725,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (bool, error) {
 	pool.journalTx(from, tx)
 
 	logger.Warn().
-		Str("hash", hash.TerminalString()).
+		Str("hash", hash.Hex()).
 		Interface("from", from).
 		Interface("to", tx.To()).
 		Msg("Pooled new future transaction")
@@ -991,7 +991,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 		// Drop all transactions that are deemed too old (low nonce)
 		for _, tx := range list.Forward(pool.currentState.GetNonce(addr)) {
 			hash := tx.Hash()
-			logger.Warn().Str("hash", hash.TerminalString()).Msg("Removed old queued transaction")
+			logger.Warn().Str("hash", hash.Hex()).Msg("Removed old queued transaction")
 			pool.all.Remove(hash)
 			pool.priced.Removed()
 		}
@@ -999,7 +999,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 		drops, _ := list.Filter(pool.currentState.GetBalance(addr), pool.currentMaxGas)
 		for _, tx := range drops {
 			hash := tx.Hash()
-			logger.Warn().Str("hash", hash.TerminalString()).Msg("Removed unpayable queued transaction")
+			logger.Warn().Str("hash", hash.Hex()).Msg("Removed unpayable queued transaction")
 			pool.all.Remove(hash)
 			pool.priced.Removed()
 			queuedNofundsCounter.Inc(1)
@@ -1008,7 +1008,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 		for _, tx := range list.Ready(pool.pendingState.GetNonce(addr)) {
 			hash := tx.Hash()
 			if pool.promoteTx(addr, hash, tx) {
-				logger.Warn().Str("hash", hash.TerminalString()).Msg("Promoting queued transaction")
+				logger.Warn().Str("hash", hash.Hex()).Msg("Promoting queued transaction")
 				promoted = append(promoted, tx)
 			}
 		}
@@ -1019,7 +1019,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 				pool.all.Remove(hash)
 				pool.priced.Removed()
 				queuedRateLimitCounter.Inc(1)
-				logger.Warn().Str("hash", hash.TerminalString()).Msg("Removed cap-exceeding queued transaction")
+				logger.Warn().Str("hash", hash.Hex()).Msg("Removed cap-exceeding queued transaction")
 			}
 		}
 		// Delete the entire queue entry if it became empty.
@@ -1072,7 +1072,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 							if nonce := tx.Nonce(); pool.pendingState.GetNonce(offenders[i]) > nonce {
 								pool.pendingState.SetNonce(offenders[i], nonce)
 							}
-							logger.Warn().Str("hash", hash.TerminalString()).Msg("Removed fairness-exceeding pending transaction")
+							logger.Warn().Str("hash", hash.Hex()).Msg("Removed fairness-exceeding pending transaction")
 						}
 						pending--
 					}
@@ -1094,7 +1094,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 						if nonce := tx.Nonce(); pool.pendingState.GetNonce(addr) > nonce {
 							pool.pendingState.SetNonce(addr, nonce)
 						}
-						logger.Warn().Str("hash", hash.TerminalString()).Msg("Removed fairness-exceeding pending transaction")
+						logger.Warn().Str("hash", hash.Hex()).Msg("Removed fairness-exceeding pending transaction")
 					}
 					pending--
 				}
@@ -1157,7 +1157,7 @@ func (pool *TxPool) demoteUnexecutables() {
 		// Drop all transactions that are deemed too old (low nonce)
 		for _, tx := range list.Forward(nonce) {
 			hash := tx.Hash()
-			logger.Warn().Str("hash", hash.TerminalString()).Msg("Removed old pending transaction")
+			logger.Warn().Str("hash", hash.Hex()).Msg("Removed old pending transaction")
 			pool.all.Remove(hash)
 			pool.priced.Removed()
 		}
@@ -1165,21 +1165,21 @@ func (pool *TxPool) demoteUnexecutables() {
 		drops, invalids := list.Filter(pool.currentState.GetBalance(addr), pool.currentMaxGas)
 		for _, tx := range drops {
 			hash := tx.Hash()
-			logger.Warn().Str("hash", hash.TerminalString()).Msg("Removed unpayable pending transaction")
+			logger.Warn().Str("hash", hash.Hex()).Msg("Removed unpayable pending transaction")
 			pool.all.Remove(hash)
 			pool.priced.Removed()
 			pendingNofundsCounter.Inc(1)
 		}
 		for _, tx := range invalids {
 			hash := tx.Hash()
-			logger.Warn().Str("hash", hash.TerminalString()).Msg("Demoting pending transaction")
+			logger.Warn().Str("hash", hash.Hex()).Msg("Demoting pending transaction")
 			pool.enqueueTx(hash, tx)
 		}
 		// If there's a gap in front, alert (should never happen) and postpone all transactions
 		if list.Len() > 0 && list.txs.Get(nonce) == nil {
 			for _, tx := range list.Cap(0) {
 				hash := tx.Hash()
-				logger.Error().Str("hash", hash.TerminalString()).Msg("Demoting invalidated transaction")
+				logger.Error().Str("hash", hash.Hex()).Msg("Demoting invalidated transaction")
 				pool.enqueueTx(hash, tx)
 			}
 		}
