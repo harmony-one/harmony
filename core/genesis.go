@@ -162,10 +162,10 @@ func SetupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig
 	stored := rawdb.ReadCanonicalHash(db, 0)
 	if (stored == common.Hash{}) {
 		if genesis == nil {
-			utils.GetLogger().Info("Writing default main-net genesis block")
+			utils.Logger().Info().Msg("Writing default main-net genesis block")
 			genesis = DefaultGenesisBlock()
 		} else {
-			utils.GetLogger().Info("Writing custom genesis block")
+			utils.Logger().Info().Msg("Writing custom genesis block")
 		}
 		block, err := genesis.Commit(db)
 		return genesis.Config, block.Hash(), err
@@ -183,7 +183,7 @@ func SetupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig
 	newcfg := genesis.configOrDefault(stored)
 	storedcfg := rawdb.ReadChainConfig(db, stored)
 	if storedcfg == nil {
-		utils.GetLogger().Warn("Found genesis block without chain config")
+		utils.Logger().Warn().Msg("Found genesis block without chain config")
 		rawdb.WriteChainConfig(db, stored, newcfg)
 		return newcfg, stored, nil
 	}
@@ -225,7 +225,7 @@ func (g *Genesis) configOrDefault(ghash common.Hash) *params.ChainConfig {
 // to the given database (or discards it if nil).
 func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 	if db == nil {
-		utils.GetLogInstance().Error("db should be initialized")
+		utils.Logger().Error().Msg("db should be initialized")
 		os.Exit(1)
 	}
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(db))
@@ -240,7 +240,7 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 	root := statedb.IntermediateRoot(false)
 	shardStateBytes, err := rlp.EncodeToBytes(g.ShardState)
 	if err != nil {
-		utils.GetLogInstance().Error("failed to rlp-serialize genesis shard state")
+		utils.Logger().Error().Msg("failed to rlp-serialize genesis shard state")
 		os.Exit(1)
 	}
 	head := &types.Header{
@@ -281,7 +281,7 @@ func (g *Genesis) Commit(db ethdb.Database) (*types.Block, error) {
 	err := rawdb.WriteShardStateBytes(db, block.Header().Epoch, block.Header().ShardState)
 
 	if err != nil {
-		utils.GetLogger().Crit("Failed to store genesis shard state", "err", err)
+		utils.Logger().Error().Err(err).Msg("Failed to store genesis shard state")
 	}
 
 	config := g.Config

@@ -144,7 +144,7 @@ func (hc *HeaderChain) WriteHeader(header *types.Header) (status WriteStatus, er
 
 	// Irrelevant of the canonical status, write the td and header to the database
 	//if err := hc.WriteTd(hash, number, externTd); err != nil {
-	//	//	utils.GetLogger().Crit("Failed to write header total difficulty", "err", err)
+	//	//	utils.Logger().Error().Err(err).Msg("Failed to write header total difficulty")
 	//	//}
 	//rawdb.WriteHeader(hc.chainDb, header)
 
@@ -207,8 +207,13 @@ func (hc *HeaderChain) ValidateHeaderChain(chain []*types.Header, checkFreq int)
 	for i := 1; i < len(chain); i++ {
 		if chain[i].Number.Uint64() != chain[i-1].Number.Uint64()+1 || chain[i].ParentHash != chain[i-1].Hash() {
 			// Chain broke ancestry, log a message (programming error) and skip insertion
-			utils.GetLogger().Error("Non contiguous header insert", "number", chain[i].Number, "hash", chain[i].Hash(),
-				"parent", chain[i].ParentHash, "prevnumber", chain[i-1].Number, "prevhash", chain[i-1].Hash())
+			utils.Logger().Error().
+				Str("number", chain[i].Number.String()).
+				Str("hash", chain[i].Hash().TerminalString()).
+				Str("parent", chain[i].ParentHash.TerminalString()).
+				Str("prevnumber", chain[i-1].Number.String()).
+				Str("prevhash", chain[i-1].Hash().TerminalString()).
+				Msg("Non contiguous header insert")
 
 			return 0, fmt.Errorf("non contiguous insert: item %d is #%d [%x…], item %d is #%d [%x…] (parent [%x…])", i-1, chain[i-1].Number,
 				chain[i-1].Hash().Bytes()[:4], i, chain[i].Number, chain[i].Hash().Bytes()[:4], chain[i].ParentHash[:4])
@@ -233,7 +238,7 @@ func (hc *HeaderChain) ValidateHeaderChain(chain []*types.Header, checkFreq int)
 	//for i, _ := range chain {
 	//	// If the chain is terminating, stop processing blocks
 	//	if hc.procInterrupt() {
-	//		utils.GetLogger().Debug("Premature abort during headers verification")
+	//		utils.Logger().Debug().Msg("Premature abort during headers verification")
 	//		return 0, errors.New("aborted")
 	//	}
 	//
@@ -261,7 +266,7 @@ func (hc *HeaderChain) InsertHeaderChain(chain []*types.Header, writeHeader WhCa
 	for i, header := range chain {
 		// Short circuit insertion if shutting down
 		if hc.procInterrupt() {
-			utils.GetLogger().Debug("Premature abort during headers import")
+			utils.Logger().Debug().Msg("Premature abort during headers import")
 			return i, errors.New("aborted")
 		}
 		// If the header's already known, skip it, otherwise store
@@ -277,17 +282,20 @@ func (hc *HeaderChain) InsertHeaderChain(chain []*types.Header, writeHeader WhCa
 	// Report some public statistics so the user has a clue what's going on
 	last := chain[len(chain)-1]
 
-	context := []interface{}{
-		"count", stats.processed, "elapsed", common.PrettyDuration(time.Since(start)),
-		"number", last.Number, "hash", last.Hash(),
-	}
+	context := utils.Logger().With().
+		Int("count", stats.processed).
+		Str("elapsed", common.PrettyDuration(time.Since(start)).String()).
+		Str("number", last.Number.String()).
+		Str("hash", last.Hash().TerminalString())
+
 	if timestamp := time.Unix(last.Time.Int64(), 0); time.Since(timestamp) > time.Minute {
-		context = append(context, []interface{}{"age", common.PrettyAge(timestamp)}...)
+		context = context.Str("age", common.PrettyAge(timestamp).String())
 	}
 	if stats.ignored > 0 {
-		context = append(context, []interface{}{"ignored", stats.ignored}...)
+		context = context.Int("ignored", stats.ignored)
 	}
-	utils.GetLogger().Info("Imported new block headers", context...)
+	logger := context.Logger()
+	logger.Info().Msg("Imported new block headers")
 
 	return 0, nil
 }
