@@ -351,7 +351,7 @@ func accumulateRewards(
 		totalAmount = new(big.Int).Add(totalAmount, diff)
 		last = cur
 	}
-	utils.Logger().Debug().
+	header.Logger(utils.Logger()).Debug().
 		Str("NumAccounts", numAccounts.String()).
 		Str("TotalAmount", totalAmount.String()).
 		Strs("Signers", signers).
