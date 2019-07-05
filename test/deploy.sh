@@ -19,7 +19,7 @@ fi
 
 function check_result() {
    find $log_folder -name leader-*.log > $log_folder/all-leaders.txt
-   find $log_folder -name validator-*.log > $log_folder/all-validators.txt
+   find $log_folder -name zerolog-validator-*.log > $log_folder/all-validators.txt
    find $log_folder -name archival-*.log >> $log_folder/all-validators.txt
 
    echo ====== RESULTS ======
@@ -204,7 +204,7 @@ done < $config
 
 if [ "$TXGEN" == "true" ]; then
    echo "launching txgen ... wait"
-#   sleep 2
+   # sleep 2
    line=$(grep client $config)
    IFS=' ' read ip port mode account <<< $line
    if [ "$mode" == "client" ]; then
