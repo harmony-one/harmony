@@ -101,7 +101,11 @@ usage: ${progname} [-1ch] [-k KEYFILE]
    -s             run setup env only (must run as root)
    -S             run the ${progname} as non-root user (default: run as root)
    -p passfile    use the given BLS passphrase file
+   -D             do not download Harmony binaries (default: download when start)
 
+example:
+
+   ${progname} -S -k mybls.key
 
 ENDEND
 }
@@ -112,15 +116,16 @@ usage() {
    exit 64  # EX_USAGE
 }
 
-unset start_clean loop run_as_root blspass
+unset start_clean loop run_as_root blspass do_not_download
 start_clean=false
 loop=true
 run_as_root=true
+do_not_download=false
 ${BLSKEYFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp: opt
+while getopts :1chk:sSp:D opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
@@ -132,6 +137,7 @@ do
    s) setup_env; exit 0;;
    S) run_as_root=false ;;
    p) blspass="${OPTARG}";;
+   D) do_not_download=true;;
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
@@ -192,11 +198,12 @@ fi
 
 # clean up old files
 for bin in "${BIN[@]}"; do
-   rm -f ${bin}
+   ${do_not_download} || rm -f ${bin}
 done
 
 download_binaries() {
    local outdir
+   ${do_not_download} && return 0
    outdir="${1:-.}"
    mkdir -p "${outdir}"
    for bin in "${BIN[@]}"; do
