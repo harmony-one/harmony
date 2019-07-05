@@ -100,6 +100,12 @@ usage: ${progname} [-1ch] [-k KEYFILE]
    -k KEYFILE     use the given BLS key file (default: autodetect)
    -s             run setup env only (must run as root)
    -S             run the ${progname} as non-root user (default: run as root)
+   -p passfile    use the given BLS passphrase file
+   -D             do not download Harmony binaries (default: download when start)
+
+example:
+
+   ${progname} -S -k mybls.key
 
 ENDEND
 }
@@ -110,15 +116,16 @@ usage() {
    exit 64  # EX_USAGE
 }
 
-unset start_clean loop run_as_root
+unset start_clean loop run_as_root blspass do_not_download
 start_clean=false
 loop=true
 run_as_root=true
+do_not_download=false
 ${BLSKEYFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sS opt
+while getopts :1chk:sSp:D opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
@@ -129,6 +136,8 @@ do
    k) BLSKEYFILE="${OPTARG}";;
    s) setup_env; exit 0;;
    S) run_as_root=false ;;
+   p) blspass="${OPTARG}";;
+   D) do_not_download=true;;
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
@@ -189,11 +198,12 @@ fi
 
 # clean up old files
 for bin in "${BIN[@]}"; do
-   rm -f ${bin}
+   ${do_not_download} || rm -f ${bin}
 done
 
 download_binaries() {
    local outdir
+   ${do_not_download} && return 0
    outdir="${1:-.}"
    mkdir -p "${outdir}"
    for bin in "${BIN[@]}"; do
@@ -337,18 +347,30 @@ kill_node() {
 } > harmony-update.out 2>&1 &
 check_update_pid=$!
 
-unset -v passphrase
-read -rsp "Enter passphrase for the BLS key file ${BLSKEYFILE}: " passphrase
-echo
+if [ -z "${blspass}" ]; then
+   unset -v passphrase
+   read -rsp "Enter passphrase for the BLS key file ${BLSKEYFILE}: " passphrase
+   echo
+elif [ ! -f "${blspass}" ]; then
+   err 10 "can't find the ${blspass} file"
+fi
 
 while :
 do
    msg "############### Running Harmony Process ###############"
    if [ "$OS" == "Linux" ]; then
    # Run Harmony Node
-      echo -n "${passphrase}" | LD_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -blskey_file "${BLSKEYFILE}" -blspass stdin
+      if [ -z "${blspass}" ]; then
+         echo -n "${passphrase}" | LD_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -blskey_file "${BLSKEYFILE}" -blspass stdin
+      else
+         LD_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -blskey_file "${BLSKEYFILE}" -blspass file:${blspass}
+      fi
    else
-      echo -n "${passphrase}" | DYLD_FALLBACK_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -blskey_file "${BLSKEYFILE}" -blspass stdin
+      if [ -z "${blspass}" ]; then
+         echo -n "${passphrase}" | DYLD_FALLBACK_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -blskey_file "${BLSKEYFILE}" -blspass stdin
+      else
+         DYLD_FALLBACK_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -blskey_file "${BLSKEYFILE}" -blspass file:${blspass}
+      fi
    fi || msg "node process finished with status $?"
    ${loop} || break
    msg "restarting in 10s..."
