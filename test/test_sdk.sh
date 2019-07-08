@@ -1,3 +1,4 @@
+# to install gsed for MacOS: brew install gnu-sed
 ./test/kill_node.sh
 rm -rf tmp_log*
 gsed -i 's/GenesisShardNum = 4/GenesisShardNum = 1/' core/resharding.go
