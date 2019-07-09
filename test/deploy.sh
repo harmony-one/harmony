@@ -152,7 +152,7 @@ echo "bootnode launched." + " $BN_MA"
 
 unset -v base_args
 declare -a base_args args
-base_args=(-log_folder "${log_folder}" -min_peers "${MIN}" -bootnodes "${BN_MA}" -nopass)
+base_args=(-log_folder "${log_folder}" -min_peers "${MIN}" -bootnodes "${BN_MA}")
 if "${DB}"
 then
   base_args=("${base_args[@]}" -db_supported)
@@ -175,13 +175,15 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
         then
           echo ""${blspub}.key" already in local."
        else
-          aws s3 cp "s3://harmony-secret-keys/bls-test/${blspub}.key" .hmy
+          if [ ! -e .hmy/${blspub}.key ]; then
+             aws s3 cp "s3://harmony-secret-keys/bls-dummy/${blspub}.key" .hmy
+          fi
       fi
 
       args=("${base_args[@]}" -ip "${ip}" -port "${port}" -key "/tmp/${ip}-${port}.key" -db_dir "db-${ip}-${port}" -accounts "${account}" -blspass file:blspass.txt -blskey_file ".hmy/${blspub}.key")
   fi
 
-  args=("${base_args[@]}" -ip "${ip}" -port "${port}" -key "/tmp/${ip}-${port}.key" -db_dir "db-${ip}-${port}" -blspass file:blspass.txt -blskey_file ".hmy/${blspub}.key" -dns=false -network_type="mainnet")
+  args=("${base_args[@]}" -ip "${ip}" -port "${port}" -key "/tmp/${ip}-${port}.key" -db_dir "db-${ip}-${port}" -blspass file:blspass.txt -blskey_file ".hmy/${blspub}.key" -dns=false -network_type="testnet")
   case "${mode}" in
   leader*|validator*) args=("${args[@]}" -is_genesis);;
   esac
