@@ -15,7 +15,6 @@ import (
 	common2 "github.com/harmony-one/harmony/internal/common"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/ctxerror"
-	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -234,6 +233,9 @@ func GetInitShardState() types.ShardState {
 	genesisShardNum := int(initShardingConfig.NumShards())
 	genesisShardHarmonyNodes := initShardingConfig.NumHarmonyOperatedNodesPerShard()
 	genesisShardSize := initShardingConfig.NumNodesPerShard()
+	genesisHmyAccounts := initShardingConfig.HmyAccounts()
+	genesisFnAccounts := initShardingConfig.FnAccounts()
+
 	shardState := types.ShardState{}
 	for i := 0; i < genesisShardNum; i++ {
 		com := types.Committee{ShardID: uint32(i)}
@@ -241,11 +243,11 @@ func GetInitShardState() types.ShardState {
 			index := i + j*genesisShardNum // The initial account to use for genesis nodes
 
 			pub := &bls.PublicKey{}
-			pub.DeserializeHexStr(genesis.HarmonyAccounts[index].BlsPublicKey)
+			pub.DeserializeHexStr(genesisHmyAccounts[index].BlsPublicKey)
 			pubKey := types.BlsPublicKey{}
 			pubKey.FromLibBLSPublicKey(pub)
 			// TODO: directly read address for bls too
-			curNodeID := types.NodeID{common2.ParseAddr(genesis.HarmonyAccounts[index].Address), pubKey}
+			curNodeID := types.NodeID{common2.ParseAddr(genesisHmyAccounts[index].Address), pubKey}
 			com.NodeList = append(com.NodeList, curNodeID)
 		}
 
@@ -254,12 +256,12 @@ func GetInitShardState() types.ShardState {
 			index := i + (j-genesisShardHarmonyNodes)*genesisShardNum
 
 			pub := &bls.PublicKey{}
-			pub.DeserializeHexStr(genesis.FoundationalNodeAccounts[index].BlsPublicKey)
+			pub.DeserializeHexStr(genesisFnAccounts[index].BlsPublicKey)
 
 			pubKey := types.BlsPublicKey{}
 			pubKey.FromLibBLSPublicKey(pub)
 			// TODO: directly read address for bls too
-			curNodeID := types.NodeID{common2.ParseAddr(genesis.FoundationalNodeAccounts[index].Address), pubKey}
+			curNodeID := types.NodeID{common2.ParseAddr(genesisFnAccounts[index].Address), pubKey}
 			com.NodeList = append(com.NodeList, curNodeID)
 		}
 		shardState = append(shardState, com)

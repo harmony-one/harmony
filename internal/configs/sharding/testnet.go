@@ -1,6 +1,10 @@
 package shardingconfig
 
-import "math/big"
+import (
+	"math/big"
+
+	"github.com/harmony-one/harmony/internal/genesis"
+)
 
 // TestnetSchedule is the long-running public testnet sharding
 // configuration schedule.
@@ -15,4 +19,4 @@ func (testnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	}
 }
 
-var testnetV0 = MustNewInstance(2, 150, 150)
+var testnetV0 = MustNewInstance(2, 5, 5, genesis.TNHarmonyAccounts, genesis.FoundationalNodeAccounts)

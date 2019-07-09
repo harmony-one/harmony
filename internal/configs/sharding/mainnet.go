@@ -1,6 +1,10 @@
 package shardingconfig
 
-import "math/big"
+import (
+	"math/big"
+
+	"github.com/harmony-one/harmony/internal/genesis"
+)
 
 // MainnetSchedule is the mainnet sharding configuration schedule.
 var MainnetSchedule mainnetSchedule
@@ -18,7 +22,7 @@ func (mainnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	}
 }
 
-var mainnetV0 = MustNewInstance(4, 150, 112)
+var mainnetV0 = MustNewInstance(4, 150, 112, genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts)
 
 //var mainnetV2 = MustNewInstance(8, 200, 100)
 //var mainnet6400 = MustNewInstance(16, 400, 50)

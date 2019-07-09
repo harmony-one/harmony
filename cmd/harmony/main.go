@@ -210,10 +210,15 @@ func passphraseForBls() {
 func setupECDSAKeys() {
 	ks = hmykey.GetHmyKeyStore()
 
-	// TODO: lc try to enable multiple staking accounts per node
-	accountIndex, genesisAccount = setUpConsensusKeyAndReturnIndex(nodeconfig.GetDefaultConfig())
-
 	genesisShardingConfig := core.ShardingSchedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch))
+	pubKey := setUpConsensusKeyAndReturnIndex(nodeconfig.GetDefaultConfig())
+
+	index, genesisAccount := genesisShardingConfig.FindAccount(pubKey.SerializeToHexStr())
+	if index < 0 {
+		fmt.Printf("cannot find your BLS key in the genesis/FN tables: %s\n", pubKey.SerializeToHexStr())
+		os.Exit(100)
+	}
+
 	genesisAccount.ShardID = uint32(accountIndex) % genesisShardingConfig.NumShards()
 
 	fmt.Printf("My Genesis Account: %v\n", *genesisAccount)
@@ -224,18 +229,13 @@ func setupECDSAKeys() {
 	}
 }
 
-func setUpConsensusKeyAndReturnIndex(nodeConfig *nodeconfig.ConfigType) (int, *genesis.DeployAccount) {
+func setUpConsensusKeyAndReturnIndex(nodeConfig *nodeconfig.ConfigType) *bls.PublicKey {
 	consensusPriKey, err := blsgen.LoadBlsKeyWithPassPhrase(*blsKeyFile, blsPassphrase)
 	if err != nil {
 		fmt.Printf("error when loading bls key, err :%v\n", err)
 		os.Exit(100)
 	}
 	pubKey := consensusPriKey.GetPublicKey()
-	index, acc := genesis.IsBlsPublicKeyIndex(pubKey.SerializeToHexStr())
-	if index < 0 {
-		fmt.Printf("cannot find your BLS key in the genesis/FN tables: %s\n", pubKey.SerializeToHexStr())
-		os.Exit(100)
-	}
 
 	// Consensus keys are the BLS12-381 keys used to sign consensus messages
 	nodeConfig.ConsensusPriKey, nodeConfig.ConsensusPubKey = consensusPriKey, consensusPriKey.GetPublicKey()
@@ -243,7 +243,7 @@ func setUpConsensusKeyAndReturnIndex(nodeConfig *nodeconfig.ConfigType) (int, *g
 		fmt.Println("error to get consensus keys.")
 		os.Exit(100)
 	}
-	return index, acc
+	return pubKey
 }
 
 func createGlobalConfig() *nodeconfig.ConfigType {
@@ -472,7 +472,7 @@ func main() {
 			*devnetHarmonySize = *devnetShardSize
 		}
 		devnetConfig, err := shardingconfig.NewInstance(
-			uint32(*devnetNumShards), *devnetShardSize, *devnetHarmonySize)
+			uint32(*devnetNumShards), *devnetShardSize, *devnetHarmonySize, genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts)
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "invalid devnet sharding config: %s",
 				err)
