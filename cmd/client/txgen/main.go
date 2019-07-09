@@ -106,8 +106,9 @@ func setUpTXGen() *node.Node {
 	consensusObj.SetStakeInfoFinder(gsif)
 	consensusObj.ChainReader = txGen.Blockchain()
 	consensusObj.PublicKeys = nil
+	genesisShardingConfig := core.ShardingSchedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch))
 	startIdx := 0
-	endIdx := startIdx + core.GenesisShardSize
+	endIdx := startIdx + genesisShardingConfig.NumNodesPerShard()
 	for _, acct := range genesis.HarmonyAccounts[startIdx:endIdx] {
 		pub := &bls2.PublicKey{}
 		if err := pub.DeserializeHexStr(acct.BlsPublicKey); err != nil {
@@ -128,6 +129,7 @@ func setUpTXGen() *node.Node {
 
 	return txGen
 }
+
 func main() {
 	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress")
 	flag.Parse()

@@ -13,6 +13,7 @@ import (
 	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/core/types"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -23,12 +24,6 @@ const (
 	GenesisEpoch = 0
 	// FirstEpoch is the number of the first epoch.
 	FirstEpoch = 1
-	// GenesisShardNum is the number of shard at genesis
-	GenesisShardNum = 4
-	// GenesisShardSize is the size of each shard at genesis
-	GenesisShardSize = 150
-	// GenesisShardHarmonyNodes is the number of harmony node at each shard
-	GenesisShardHarmonyNodes = 112
 	// CuckooRate is the percentage of nodes getting reshuffled in the second step of cuckoo resharding.
 	CuckooRate = 0.1
 )
@@ -223,14 +218,27 @@ func (ss *ShardingState) UpdateShardingState(stakeInfo *map[common.Address]*stru
 	return newAddresses
 }
 
+// TODO ek – shardingSchedule should really be part of a general-purpose network
+//  configuration.  We are OK for the time being,
+//  until the day we should let one node process join multiple networks.
+
+// ShardingSchedule is the sharding configuration schedule.
+// Depends on the type of the network.  Defaults to the mainnet schedule.
+var ShardingSchedule shardingconfig.Schedule = shardingconfig.MainnetSchedule
+
 // GetInitShardState returns the initial shard state at genesis.
 func GetInitShardState() types.ShardState {
 	utils.Logger().Info().Msg("Generating Genesis Shard State.")
+	initShardingConfig := ShardingSchedule.InstanceForEpoch(
+		big.NewInt(GenesisEpoch))
+	genesisShardNum := int(initShardingConfig.NumShards())
+	genesisShardHarmonyNodes := initShardingConfig.NumHarmonyOperatedNodesPerShard()
+	genesisShardSize := initShardingConfig.NumNodesPerShard()
 	shardState := types.ShardState{}
-	for i := 0; i < GenesisShardNum; i++ {
+	for i := 0; i < genesisShardNum; i++ {
 		com := types.Committee{ShardID: uint32(i)}
-		for j := 0; j < GenesisShardHarmonyNodes; j++ {
-			index := i + j*GenesisShardNum // The initial account to use for genesis nodes
+		for j := 0; j < genesisShardHarmonyNodes; j++ {
+			index := i + j*genesisShardNum // The initial account to use for genesis nodes
 
 			pub := &bls.PublicKey{}
 			pub.DeserializeHexStr(genesis.HarmonyAccounts[index].BlsPublicKey)
@@ -242,8 +250,8 @@ func GetInitShardState() types.ShardState {
 		}
 
 		// add FN runner's key
-		for j := GenesisShardHarmonyNodes; j < GenesisShardSize; j++ {
-			index := i + (j-GenesisShardHarmonyNodes)*GenesisShardNum
+		for j := genesisShardHarmonyNodes; j < genesisShardSize; j++ {
+			index := i + (j-genesisShardHarmonyNodes)*genesisShardNum
 
 			pub := &bls.PublicKey{}
 			pub.DeserializeHexStr(genesis.FoundationalNodeAccounts[index].BlsPublicKey)

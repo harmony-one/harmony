@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"math/big"
 	"math/rand"
 	"os"
 	"path"
@@ -20,6 +21,7 @@ import (
 	"github.com/harmony-one/harmony/internal/blsgen"
 	"github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
 	hmykey "github.com/harmony-one/harmony/internal/keystore"
@@ -99,6 +101,11 @@ var (
 	blsKeyFile         = flag.String("blskey_file", "", "The encrypted file of bls serialized private key by passphrase.")
 	blsPass            = flag.String("blspass", "", "The file containing passphrase to decrypt the encrypted bls file.")
 	blsPassphrase      string
+
+	// Sharding configuration parameters for devnet
+	devnetNumShards   = flag.Uint("dn_num_shards", 2, "number of shards for -network_type=devnet (default: 2)")
+	devnetShardSize   = flag.Int("dn_shard_size", 10, "number of nodes per shard for -network_type=devnet (default 10)")
+	devnetHarmonySize = flag.Int("dn_hmy_size", -1, "number of Harmony-operated nodes per shard for -network_type=devnet; negative (default) means equal to -dn_shard_size")
 
 	// logConn logs incoming/outgoing connections
 	logConn = flag.Bool("log_conn", false, "log incoming/outgoing connections")
@@ -206,7 +213,8 @@ func setupECDSAKeys() {
 	// TODO: lc try to enable multiple staking accounts per node
 	accountIndex, genesisAccount = setUpConsensusKeyAndReturnIndex(nodeconfig.GetDefaultConfig())
 
-	genesisAccount.ShardID = uint32(accountIndex % core.GenesisShardNum)
+	genesisShardingConfig := core.ShardingSchedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch))
+	genesisAccount.ShardID = uint32(accountIndex) % genesisShardingConfig.NumShards()
 
 	fmt.Printf("My Genesis Account: %v\n", *genesisAccount)
 
@@ -289,7 +297,9 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 
 	nodeConfig.SelfPeer = p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nodeConfig.ConsensusPubKey}
 
-	if accountIndex < core.GenesisShardNum && !*isExplorer && !*leaderOverride { // The first node in a shard is the leader at genesis
+	genesisShardingConfig := core.ShardingSchedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch))
+	genesisShardNum := int(genesisShardingConfig.NumShards())
+	if accountIndex < genesisShardNum && !*isExplorer && !*leaderOverride { // The first node in a shard is the leader at genesis
 		nodeConfig.Leader = nodeConfig.SelfPeer
 		nodeConfig.StringRole = "leader"
 	} else {
@@ -452,6 +462,24 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 
 func main() {
 	initSetup()
+	switch *networkType {
+	case nodeconfig.Mainnet:
+		core.ShardingSchedule = shardingconfig.MainnetSchedule
+	case nodeconfig.Testnet:
+		core.ShardingSchedule = shardingconfig.TestnetSchedule
+	case nodeconfig.Devnet:
+		if *devnetHarmonySize < 0 {
+			*devnetHarmonySize = *devnetShardSize
+		}
+		devnetConfig, err := shardingconfig.NewInstance(
+			uint32(*devnetNumShards), *devnetShardSize, *devnetHarmonySize)
+		if err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "invalid devnet sharding config: %s",
+				err)
+			os.Exit(1)
+		}
+		core.ShardingSchedule = shardingconfig.NewFixedSchedule(devnetConfig)
+	}
 	nodeConfig := createGlobalConfig()
 
 	// Start Profiler for leader if profile argument is on
