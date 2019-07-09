@@ -112,13 +112,6 @@ var (
 
 	keystoreDir = flag.String("keystore", hmykey.DefaultKeyStoreDir, "The default keystore directory")
 
-	// -nopass is false by default.  The keyfile must be encrypted.
-	hmyNoPass = flag.Bool("nopass", false, "No passphrase for the key (testing only)")
-	// -pass takes on "pass:password", "env:var", "file:pathname",
-	// "fd:number", or "stdin" form.
-	// See “PASS PHRASE ARGUMENTS” section of openssl(1) for details.
-	hmyPass = flag.String("pass", "", "how to get passphrase for the key")
-
 	ks             *keystore.KeyStore
 	genesisAccount *genesis.DeployAccount
 	accountIndex   int
