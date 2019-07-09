@@ -114,7 +114,6 @@ var (
 
 	ks             *keystore.KeyStore
 	genesisAccount *genesis.DeployAccount
-	accountIndex   int
 
 	// logging verbosity
 	verbosity = flag.Int("verbosity", 5, "Logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail (default: 5)")
@@ -127,14 +126,7 @@ var (
 		"Do not propose view change (testing only)")
 )
 
-func initSetup() {
-	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
-	flag.Parse()
-
-	nodeconfig.SetVersion(fmt.Sprintf("Harmony (C) 2019. %v, version %v-%v (%v %v)", path.Base(os.Args[0]), version, commit, builtBy, builtAt))
-	if *versionFlag {
-		printVersion()
-	}
+func initSetup() (bool, uint32) {
 
 	// maybe request passphrase for bls key.
 	passphraseForBls()
@@ -173,8 +165,10 @@ func initSetup() {
 		utils.BootNodes = bootNodeAddrs
 	}
 
+	var isLeader bool
+	var sid uint32
 	if !*isExplorer { // Explorer node doesn't need the following setup
-		setupECDSAKeys()
+		isLeader, sid = setupECDSAKeys()
 	} else {
 		genesisAccount = &genesis.DeployAccount{}
 		genesisAccount.ShardID = uint32(*shardID)
@@ -184,6 +178,7 @@ func initSetup() {
 	if *enableGC {
 		memprofiling.MaybeCallGCPeriodically()
 	}
+	return isLeader, sid
 }
 
 func passphraseForBls() {
@@ -200,19 +195,20 @@ func passphraseForBls() {
 	blsPassphrase = passphrase
 }
 
-func setupECDSAKeys() {
+func setupECDSAKeys() (bool, uint32) {
 	ks = hmykey.GetHmyKeyStore()
 
 	genesisShardingConfig := core.ShardingSchedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch))
 	pubKey := setUpConsensusKeyAndReturnIndex(nodeconfig.GetDefaultConfig())
 
-	index, genesisAccount := genesisShardingConfig.FindAccount(pubKey.SerializeToHexStr())
+	var index int
+	index, genesisAccount = genesisShardingConfig.FindAccount(pubKey.SerializeToHexStr())
 	if index < 0 {
 		fmt.Printf("cannot find your BLS key in the genesis/FN tables: %s\n", pubKey.SerializeToHexStr())
 		os.Exit(100)
 	}
 
-	genesisAccount.ShardID = uint32(accountIndex) % genesisShardingConfig.NumShards()
+	genesisAccount.ShardID = uint32(index) % genesisShardingConfig.NumShards()
 
 	fmt.Printf("My Genesis Account: %v\n", *genesisAccount)
 
@@ -220,6 +216,7 @@ func setupECDSAKeys() {
 	if *enableGC {
 		memprofiling.MaybeCallGCPeriodically()
 	}
+	return index < int(genesisShardingConfig.NumShards()), genesisAccount.ShardID
 }
 
 func setUpConsensusKeyAndReturnIndex(nodeConfig *nodeconfig.ConfigType) *bls.PublicKey {
@@ -239,7 +236,7 @@ func setUpConsensusKeyAndReturnIndex(nodeConfig *nodeconfig.ConfigType) *bls.Pub
 	return pubKey
 }
 
-func createGlobalConfig() *nodeconfig.ConfigType {
+func createGlobalConfig(isLeader bool, sid uint32) *nodeconfig.ConfigType {
 	var err error
 	var myShardID uint32
 
@@ -248,12 +245,12 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	if !*isExplorer {
 		// Specified Shard ID override calculated Shard ID
 		if *shardID >= 0 {
-			utils.GetLogInstance().Info("ShardID Override", "original", genesisAccount.ShardID, "override", *shardID)
+			utils.GetLogInstance().Info("ShardID Override", "original", sid, "override", *shardID)
 			genesisAccount.ShardID = uint32(*shardID)
 		}
 
 		if !*isNewNode {
-			nodeConfig = nodeconfig.GetShardConfig(uint32(genesisAccount.ShardID))
+			nodeConfig = nodeconfig.GetShardConfig(sid)
 		} else {
 			myShardID = 0 // This should be default value as new node doesn't belong to any shard.
 			if *shardID >= 0 {
@@ -290,9 +287,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 
 	nodeConfig.SelfPeer = p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nodeConfig.ConsensusPubKey}
 
-	genesisShardingConfig := core.ShardingSchedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch))
-	genesisShardNum := int(genesisShardingConfig.NumShards())
-	if accountIndex < genesisShardNum && !*isExplorer && !*leaderOverride { // The first node in a shard is the leader at genesis
+	if isLeader && !*isExplorer && !*leaderOverride { // The first node in a shard is the leader at genesis
 		nodeConfig.Leader = nodeConfig.SelfPeer
 		nodeConfig.StringRole = "leader"
 	} else {
@@ -454,7 +449,14 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 }
 
 func main() {
-	initSetup()
+	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
+	flag.Parse()
+
+	nodeconfig.SetVersion(fmt.Sprintf("Harmony (C) 2019. %v, version %v-%v (%v %v)", path.Base(os.Args[0]), version, commit, builtBy, builtAt))
+	if *versionFlag {
+		printVersion()
+	}
+
 	switch *networkType {
 	case nodeconfig.Mainnet:
 		core.ShardingSchedule = shardingconfig.MainnetSchedule
@@ -473,7 +475,8 @@ func main() {
 		}
 		core.ShardingSchedule = shardingconfig.NewFixedSchedule(devnetConfig)
 	}
-	nodeConfig := createGlobalConfig()
+	isLeader, sid := initSetup()
+	nodeConfig := createGlobalConfig(isLeader, sid)
 
 	// Start Profiler for leader if profile argument is on
 	if nodeConfig.StringRole == "leader" && (*profile || *metricsReportURL != "") {
