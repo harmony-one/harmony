@@ -88,7 +88,7 @@ var (
 	// isExplorer indicates this node is a node to serve explorer
 	isExplorer = flag.Bool("is_explorer", false, "true means this node is a node to serve explorer")
 	// networkType indicates the type of the network
-	networkType = flag.String("network_type", "mainnet", "type of the network: mainnet, testnet, devnet...")
+	networkType = flag.String("network_type", "mainnet", "type of the network: mainnet, testnet, devnet, local...")
 	// blockPeriod indicates the how long the leader waits to propose a new block.
 	blockPeriod = flag.Int("block_period", 8, "how long in second the leader waits to propose a new block.")
 	// isNewNode indicates this node is a new node
@@ -279,6 +279,8 @@ func createGlobalConfig(isLeader bool, sid uint32) *nodeconfig.ConfigType {
 		nodeConfig.SetNetworkType(nodeconfig.Mainnet)
 	case nodeconfig.Testnet:
 		nodeConfig.SetNetworkType(nodeconfig.Testnet)
+	case nodeconfig.Localnet:
+		nodeConfig.SetNetworkType(nodeconfig.Localnet)
 	case nodeconfig.Devnet:
 		nodeConfig.SetNetworkType(nodeconfig.Devnet)
 	default:
@@ -462,6 +464,8 @@ func main() {
 		core.ShardingSchedule = shardingconfig.MainnetSchedule
 	case nodeconfig.Testnet:
 		core.ShardingSchedule = shardingconfig.TestnetSchedule
+	case nodeconfig.Localnet:
+		core.ShardingSchedule = shardingconfig.LocalnetSchedule
 	case nodeconfig.Devnet:
 		if *devnetHarmonySize < 0 {
 			*devnetHarmonySize = *devnetShardSize

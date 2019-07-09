@@ -77,6 +77,8 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 	case nodeconfig.Testnet:
 		AddDemoAddressesToGenesisAlloc(genesisAlloc)
 		fallthrough
+	case nodeconfig.Localnet:
+		fallthrough
 	case nodeconfig.Devnet:
 		chainConfig = *params.TestnetChainConfig
 		// Tests account for txgen to use
