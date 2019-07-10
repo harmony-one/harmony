@@ -199,7 +199,7 @@ func setupECDSAKeys() (bool, uint32) {
 	ks = hmykey.GetHmyKeyStore()
 
 	genesisShardingConfig := core.ShardingSchedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch))
-	pubKey := setUpConsensusKeyAndReturnIndex(nodeconfig.GetDefaultConfig())
+	pubKey := setUpConsensusKey(nodeconfig.GetDefaultConfig())
 
 	var index int
 	index, genesisAccount = genesisShardingConfig.FindAccount(pubKey.SerializeToHexStr())
@@ -219,7 +219,7 @@ func setupECDSAKeys() (bool, uint32) {
 	return index < int(genesisShardingConfig.NumShards()), genesisAccount.ShardID
 }
 
-func setUpConsensusKeyAndReturnIndex(nodeConfig *nodeconfig.ConfigType) *bls.PublicKey {
+func setUpConsensusKey(nodeConfig *nodeconfig.ConfigType) *bls.PublicKey {
 	consensusPriKey, err := blsgen.LoadBlsKeyWithPassPhrase(*blsKeyFile, blsPassphrase)
 	if err != nil {
 		fmt.Printf("error when loading bls key, err :%v\n", err)
@@ -261,7 +261,7 @@ func createGlobalConfig(isLeader bool, sid uint32) *nodeconfig.ConfigType {
 		}
 
 		// Set up consensus keys.
-		setUpConsensusKeyAndReturnIndex(nodeConfig)
+		setUpConsensusKey(nodeConfig)
 
 		// P2p private key is used for secure message transfer between p2p nodes.
 		nodeConfig.P2pPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
