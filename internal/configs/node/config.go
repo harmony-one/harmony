@@ -60,9 +60,10 @@ type NetworkType string
 
 // Constants for NetworkType
 const (
-	Mainnet = "mainnet"
-	Testnet = "testnet"
-	Devnet  = "devnet"
+	Mainnet  = "mainnet"
+	Testnet  = "testnet"
+	Devnet   = "devnet"
+	Localnet = "localnet"
 )
 
 // Network is the type of Harmony network

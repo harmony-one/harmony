@@ -15,7 +15,6 @@ import (
 	common2 "github.com/harmony-one/harmony/internal/common"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/ctxerror"
-	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -228,38 +227,45 @@ var ShardingSchedule shardingconfig.Schedule = shardingconfig.MainnetSchedule
 
 // GetInitShardState returns the initial shard state at genesis.
 func GetInitShardState() types.ShardState {
-	utils.Logger().Info().Msg("Generating Genesis Shard State.")
-	initShardingConfig := ShardingSchedule.InstanceForEpoch(
-		big.NewInt(GenesisEpoch))
-	genesisShardNum := int(initShardingConfig.NumShards())
-	genesisShardHarmonyNodes := initShardingConfig.NumHarmonyOperatedNodesPerShard()
-	genesisShardSize := initShardingConfig.NumNodesPerShard()
+	return GetShardState(big.NewInt(GenesisEpoch))
+}
+
+// GetShardState returns the shard state based on epoch number
+func GetShardState(epoch *big.Int) types.ShardState {
+	utils.Logger().Info().Int64("epoch", epoch.Int64()).Msg("Get Shard State of Epoch.")
+	shardingConfig := ShardingSchedule.InstanceForEpoch(epoch)
+	shardNum := int(shardingConfig.NumShards())
+	shardHarmonyNodes := shardingConfig.NumHarmonyOperatedNodesPerShard()
+	shardSize := shardingConfig.NumNodesPerShard()
+	hmyAccounts := shardingConfig.HmyAccounts()
+	fnAccounts := shardingConfig.FnAccounts()
+
 	shardState := types.ShardState{}
-	for i := 0; i < genesisShardNum; i++ {
+	for i := 0; i < shardNum; i++ {
 		com := types.Committee{ShardID: uint32(i)}
-		for j := 0; j < genesisShardHarmonyNodes; j++ {
-			index := i + j*genesisShardNum // The initial account to use for genesis nodes
+		for j := 0; j < shardHarmonyNodes; j++ {
+			index := i + j*shardNum // The initial account to use for genesis nodes
 
 			pub := &bls.PublicKey{}
-			pub.DeserializeHexStr(genesis.HarmonyAccounts[index].BlsPublicKey)
+			pub.DeserializeHexStr(hmyAccounts[index].BlsPublicKey)
 			pubKey := types.BlsPublicKey{}
 			pubKey.FromLibBLSPublicKey(pub)
 			// TODO: directly read address for bls too
-			curNodeID := types.NodeID{common2.ParseAddr(genesis.HarmonyAccounts[index].Address), pubKey}
+			curNodeID := types.NodeID{common2.ParseAddr(hmyAccounts[index].Address), pubKey}
 			com.NodeList = append(com.NodeList, curNodeID)
 		}
 
 		// add FN runner's key
-		for j := genesisShardHarmonyNodes; j < genesisShardSize; j++ {
-			index := i + (j-genesisShardHarmonyNodes)*genesisShardNum
+		for j := shardHarmonyNodes; j < shardSize; j++ {
+			index := i + (j-shardHarmonyNodes)*shardNum
 
 			pub := &bls.PublicKey{}
-			pub.DeserializeHexStr(genesis.FoundationalNodeAccounts[index].BlsPublicKey)
+			pub.DeserializeHexStr(fnAccounts[index].BlsPublicKey)
 
 			pubKey := types.BlsPublicKey{}
 			pubKey.FromLibBLSPublicKey(pub)
 			// TODO: directly read address for bls too
-			curNodeID := types.NodeID{common2.ParseAddr(genesis.FoundationalNodeAccounts[index].Address), pubKey}
+			curNodeID := types.NodeID{common2.ParseAddr(fnAccounts[index].Address), pubKey}
 			com.NodeList = append(com.NodeList, curNodeID)
 		}
 		shardState = append(shardState, com)

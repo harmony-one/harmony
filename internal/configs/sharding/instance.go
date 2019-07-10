@@ -1,17 +1,24 @@
 package shardingconfig
 
-import "github.com/harmony-one/harmony/internal/ctxerror"
+import (
+	"github.com/harmony-one/harmony/internal/ctxerror"
+	"github.com/harmony-one/harmony/internal/genesis"
+)
 
 type instance struct {
 	numShards                       uint32
 	numNodesPerShard                int
 	numHarmonyOperatedNodesPerShard int
+	hmyAccounts                     []genesis.DeployAccount
+	fnAccounts                      []genesis.DeployAccount
 }
 
 // NewInstance creates and validates a new sharding configuration based
 // upon given parameters.
 func NewInstance(
 	numShards uint32, numNodesPerShard, numHarmonyOperatedNodesPerShard int,
+	hmyAccounts []genesis.DeployAccount,
+	fnAccounts []genesis.DeployAccount,
 ) (Instance, error) {
 	if numShards < 1 {
 		return nil, ctxerror.New("sharding config must have at least one shard",
@@ -36,6 +43,8 @@ func NewInstance(
 		numShards:                       numShards,
 		numNodesPerShard:                numNodesPerShard,
 		numHarmonyOperatedNodesPerShard: numHarmonyOperatedNodesPerShard,
+		hmyAccounts:                     hmyAccounts,
+		fnAccounts:                      fnAccounts,
 	}, nil
 }
 
@@ -44,9 +53,11 @@ func NewInstance(
 // It is intended to be used for static initialization.
 func MustNewInstance(
 	numShards uint32, numNodesPerShard, numHarmonyOperatedNodesPerShard int,
+	hmyAccounts []genesis.DeployAccount,
+	fnAccounts []genesis.DeployAccount,
 ) Instance {
 	sc, err := NewInstance(
-		numShards, numNodesPerShard, numHarmonyOperatedNodesPerShard)
+		numShards, numNodesPerShard, numHarmonyOperatedNodesPerShard, hmyAccounts, fnAccounts)
 	if err != nil {
 		panic(err)
 	}
@@ -67,4 +78,32 @@ func (sc instance) NumNodesPerShard() int {
 // that are operated by Harmony.
 func (sc instance) NumHarmonyOperatedNodesPerShard() int {
 	return sc.numHarmonyOperatedNodesPerShard
+}
+
+// HmyAccounts returns the list of Harmony accounts
+func (sc instance) HmyAccounts() []genesis.DeployAccount {
+	return sc.hmyAccounts
+}
+
+// FnAccounts returns the list of Foundational Node accounts
+func (sc instance) FnAccounts() []genesis.DeployAccount {
+	return sc.fnAccounts
+}
+
+// FindAccount returns the deploy account based on the blskey, and if the account is a leader
+// or not in the bootstrapping process.
+func (sc instance) FindAccount(blsPubKey string) (bool, *genesis.DeployAccount) {
+	for i, item := range sc.hmyAccounts {
+		if item.BlsPublicKey == blsPubKey {
+			item.ShardID = uint32(i) % sc.numShards
+			return uint32(i) < sc.numShards, &item
+		}
+	}
+	for i, item := range sc.fnAccounts {
+		if item.BlsPublicKey == blsPubKey {
+			item.ShardID = uint32(i) % sc.numShards
+			return false, &item
+		}
+	}
+	return false, nil
 }

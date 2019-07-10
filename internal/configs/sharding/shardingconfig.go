@@ -4,6 +4,8 @@ package shardingconfig
 
 import (
 	"math/big"
+
+	"github.com/harmony-one/harmony/internal/genesis"
 )
 
 // Schedule returns the sharding configuration instance for the given
@@ -23,4 +25,13 @@ type Instance interface {
 	// NumHarmonyOperatedNodesPerShard returns number of nodes in each shard
 	// that are operated by Harmony.
 	NumHarmonyOperatedNodesPerShard() int
+
+	// HmyAccounts returns a list of Harmony accounts
+	HmyAccounts() []genesis.DeployAccount
+
+	// FnAccounts returns a list of Foundational node accounts
+	FnAccounts() []genesis.DeployAccount
+
+	// FindAccount returns the deploy account based on the blskey
+	FindAccount(blsPubKey string) (bool, *genesis.DeployAccount)
 }
