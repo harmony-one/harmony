@@ -33,5 +33,5 @@ type Instance interface {
 	FnAccounts() []genesis.DeployAccount
 
 	// FindAccount returns the deploy account based on the blskey
-	FindAccount(blsPubKey string) (int, *genesis.DeployAccount)
+	FindAccount(blsPubKey string) (bool, *genesis.DeployAccount)
 }
