@@ -176,7 +176,7 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
           echo ""${blspub}.key" already in local."
        else
           if [ ! -e .hmy/${blspub}.key ]; then
-             aws s3 cp "s3://harmony-secret-keys/bls-dummy/${blspub}.key" .hmy
+             aws s3 cp "s3://harmony-secret-keys/bls-test/${blspub}.key" .hmy
           fi
       fi
 
