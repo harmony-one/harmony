@@ -89,12 +89,19 @@ You may build the src/harmony.go locally and run local test.
 
 ### Running local test
 
-The deploy.sh script creates a local environment of Harmony blockchain devnet based on the configuration file.
+The debug.sh script calls test/deploy.sh script to create a local environment of Harmony blockchain devnet based on the configuration file.
 The configuration file configures number of nodes and their IP/Port.
-The script starts one local beacon chain node, the blockchain nodes, and run a transactional generator program which generates and sends simulated transactions to the local blockchain.
+The script starts 2 shards and 7 nodes in each shard.
 
 ```bash
-./test/deploy.sh ./test/configs/beaconchain40.txt
+./test/debug.sh
+```
+
+### Test local blockchain
+```bash
+source scripts/setup_bls_build_flags.sh
+./bin/wallet list
+./bin/wallet -p balances
 ```
 
 ## Testing
