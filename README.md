@@ -60,27 +60,23 @@ You can  run the script `./scripts/go_executable_build.sh` to build all the exec
 
 ### Build individual executables
 
-Initialize BLS 
-```
-source scripts/setup_bls_build_flags.sh
-```
-
 Harmony server / main node:
 
-```
-go build -o bin/harmony cmd/harmony/main.go
+```bash
+./scripts/go_executable_build.sh harmony
+
 ```
 
 Wallet:
 
-```
-go build -o bin/wallet cmd/client/wallet/main.go
+```bash
+./scripts/go_executable_build.sh wallet
 ```
 
 Tx Generator:
 
-```
-go build -o bin/txgen cmd/client/txgen/main.go
+```bash
+./scripts/go_executable_build.sh txgen
 ```
 
 ## Usage
@@ -101,7 +97,12 @@ The script starts 2 shards and 7 nodes in each shard.
 ```bash
 source scripts/setup_bls_build_flags.sh
 ./bin/wallet list
-./bin/wallet -p balances
+./bin/wallet -p local balances
+```
+
+### Terminate the local blockchain
+```bash
+./test/kill_nodes.sh
 ```
 
 ## Testing
