@@ -805,7 +805,7 @@ func FetchBalance(address common.Address) []*AccountState {
 			for rpcServerID := 0; rpcServerID < len(walletProfile.RPCServer[shardID]); rpcServerID++ {
 				go func(rpcServerID int) {
 					defer wgShard.Done()
-					log.Debug("Launched goroutiune");
+					log.Debug("Launched goroutiune")
 					for retry := 0; retry < rpcRetry; retry++ {
 						server := walletProfile.RPCServer[shardID][rpcServerID]
 						client, err := clientService.NewClient(server.IP, server.Port)
