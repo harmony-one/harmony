@@ -3,9 +3,11 @@
 # stat.sh - Check foundational node status/statistics (requires 'bc' installed)
 
 # Get timestamps
-created=$(grep -i -m 1 allocated latest/*.log |cut -f 7-9 -d ":" |cut -f 1 -d "." |cut -c 2- | tr T \ )
+created=$(grep -i -m 1 allocated latest/*.log |cut -f 7-9 -d ":" |\
+          cut -f 1 -d "." |cut -c 2- |tr T \ )
 bingolist=$(grep -i bingo latest/*.log)
-lastbingo=$(echo "$bingolist" |tail -n 1 |cut -f 2 -d 'r' |cut -c 16-34 | tr T \ )
+lastbingo=$(echo "$bingolist" |tail -n 1 |cut -f 2 -d 'r' |\
+            cut -c 16-34 |tr T \ )
 latest=$(echo "$bingolist" |tail -n 1 |cut -f 2 -d 'T' |cut -c 1-14)
 bingos=$(echo "$bingolist" |tail -n 2 |cut -f 2 -d 'T' |cut -c 7-14)
 time1=$(date -d "$lastbingo" +%s)
@@ -18,9 +20,9 @@ echo -e '    Date and time     :  \c' && date
 # Check validation status
 if [[ $time1 -ge $time2 ]]
     then
-        echo '    Node status       :  Validating OK!'
+        echo "    Node status       :  Validating OK!"
     else
-        echo '    Node status       :  NOT OK, PANIC!!!'
+        echo "    Node status       :  NOT OK, PANIC!!!"
 fi
 
 # Fetch current and previous bingo time
@@ -56,15 +58,17 @@ numshards=$(echo "$balances" |grep -c "Shard")
 declare -a bal
 for (( i=0; i < $numshards; i++ ))
 do
-    bal[$i]=$(echo "$balances" |grep "d $i" |cut -f 2 -d ":" |cut -f 1 -d "," | rev | cut -c 5- | rev)
+    bal[$i]=$(echo "$balances" |grep "d $i" |cut -f 2 -d ":" |\
+              cut -f 1 -d "," |rev |cut -c 5- |rev)
 done
 curbal=$(echo "${bal[@]/%/+}0" | bc)
 
-# Store previous balance and time if 24 hours has passed, or if node has been restarted/prevtime doesn't exist
+# Store previous balance and time if 24 hours has passed,
+# or if node has been restarted/prevtime doesn't exist
 if [ $passed -ge 86400 ] || [ $starttime -ge $prevtime ]
     then
-        echo $curbal > prevbal
-        echo $curtime > prevtime
+        echo "$curbal" > prevbal
+        echo "$curtime" > prevtime
         prevtime=$curtime
         passed=0
 fi
@@ -79,7 +83,11 @@ if [[ $passed != 0 ]]
         daily=0
 fi
 
-# Show results
+# Calculate time difference
+((sec=passed%60, passed/=60, min=passed%60, hrs=passed/60))
+timestamp=$(printf "%02d:%02d:%02d" $hrs $min $sec)
+
+# Show address and balances
 echo "$balances" |grep -i "address"
 for (( b=0; i < ${#bal[@]}; b++ ))
 do
@@ -89,18 +97,14 @@ do
     fi
 done
 echo
-echo -e '    Saved Bal. Diff.  :  \c'
-echo $reward
-echo -e '    Time Since Saved  :  \c'
-((sec=passed%60, passed/=60, min=passed%60, hrs=passed/60))
-timestamp=$(printf "%02d:%02d:%02d" $hrs $min $sec)
 
-echo $timestamp
-echo -e '    Est. Rewards (24h):  \c'
-echo $daily
+# Show differences and results
+echo "    Saved Bal. Diff.  :  $reward"
+echo "    Time Since Saved  :  $timestamp"
+echo "    Est. Rewards (24h):  $daily"
 
 # Find and show the time of the latest bingo
-echo -e '    Latest Bingo      :  \c' && echo $latest
+echo "    Latest Bingo      :  $latest"
 
 # Fetch the time/seconds of the last two bingos
 bingo1=$(echo $bingos |cut -c 1-8)
@@ -113,5 +117,6 @@ if (( $(echo "$bingo2 <= $bingo1" |bc -l) ))
 fi
 
 # Calculate and show the time difference
-echo -e '    Last Bingo Intrvl : ' $(echo $bingo2-$bingo1 | bc -l) 'seconds'
+difference=$(echo $bingo2-$bingo1 | bc -l)
+echo "    Last Bingo Intrvl :  $difference seconds"
 echo
