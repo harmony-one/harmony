@@ -47,7 +47,15 @@ func main() {
 	if err != nil {
 		fmt.Errorf("Failed to get hmy_getBlockByNumber %v: %v", blockNumber, err)
 	}
-	fmt.Printf("hmy_getBlockByNumber(%v): %v\n", blockNumber, block)
+	fmt.Printf("hmy_getBlockByNumber(%v):\n", blockNumber)
+	fmt.Printf("number: %v\n", block.Number().Text(16))
+	fmt.Printf("hash: %v\n", block.Hash().String())
+	fmt.Printf("parentHash: %v\n", block.ParentHash().String())
+	fmt.Printf("timestamp: %v\n", block.Time().Text(16))
+	fmt.Printf("size: %v\n", block.Size())
+	fmt.Printf("miner: %v\n", block.Coinbase().String())
+	fmt.Printf("receiptsRoot: %v\n", block.ReceiptHash().String())
+	fmt.Printf("transactionsRoot: %v\n", block.TxHash().String())
 
 	block, err = client.BlockByNumber(ctx, nil)
 	if err != nil {
