@@ -3,18 +3,15 @@ package hmyclient
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math/big"
 
+	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/core/types"
 )
-
-// NotFound is returned by API methods if the requested item does not exist.
-var NotFound = errors.New("not found")
 
 // Client defines typed wrappers for the Ethereum RPC API.
 type Client struct {
@@ -51,7 +48,7 @@ func (c *Client) BlockNumber(ctx context.Context) (hexutil.Uint64, error) {
 	if err != nil {
 		return 0, err
 	} else if len(raw) == 0 {
-		return 0, NotFound
+		return 0, ethereum.NotFound
 	}
 	var blockNumber hexutil.Uint64
 	if err := json.Unmarshal(raw, &blockNumber); err != nil {
@@ -96,7 +93,7 @@ func (c *Client) getBlock(ctx context.Context, method string, args ...interface{
 	if err != nil {
 		return nil, err
 	} else if len(raw) == 0 {
-		return nil, NotFound
+		return nil, ethereum.NotFound
 	}
 	// Decode header and transactions.
 	var head *types.Header
