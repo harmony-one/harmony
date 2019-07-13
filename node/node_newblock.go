@@ -80,11 +80,6 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 					viewID := node.Consensus.GetViewID()
 					// add aggregated commit signatures from last block, except for the first two blocks
 
-					err = node.Worker.UpdateCurrent(coinbase)
-					if err != nil {
-						utils.GetLogger().Debug("Failed updating worker's state", "Error", err)
-						continue
-					}
 					newBlock, err = node.Worker.Commit(sig, mask, viewID, coinbase)
 
 					if err != nil {
