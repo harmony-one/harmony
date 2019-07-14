@@ -69,7 +69,7 @@ func (n *BlockNonce) UnmarshalText(input []byte) error {
 	return hexutil.UnmarshalFixedText("BlockNonce", input, n[:])
 }
 
-// Header represents a block header in the Ethereum blockchain.
+// Header represents a block header in the Harmony blockchain.
 type Header struct {
 	ParentHash  common.Hash    `json:"parentHash"       gencodec:"required"`
 	Coinbase    common.Address `json:"miner"            gencodec:"required"`
