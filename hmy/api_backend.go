@@ -3,9 +3,11 @@ package hmy
 import (
 	"context"
 	"errors"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/bloombits"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
@@ -16,6 +18,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/core/vm"
 )
 
 // APIBackend An implementation of internal/hmyapi/Backend. Full client.
@@ -205,4 +208,18 @@ func (b *APIBackend) GetBalance(address common.Address) (*hexutil.Big, error) {
 // NetVersion returns net version
 func (b *APIBackend) NetVersion() uint64 {
 	return b.hmy.NetVersion()
+}
+
+// GetEVM returns a new EVM entity
+func (b *APIBackend) GetEVM(ctx context.Context, msg core.Message, state *state.DB, header *types.Header) (*vm.EVM, func() error, error) {
+	state.SetBalance(msg.From(), math.MaxBig256)
+	vmError := func() error { return nil }
+
+	context := core.NewEVMContext(msg, header, b.hmy.BlockChain(), nil)
+	return vm.NewEVM(context, state, b.hmy.blockchain.Config(), *b.hmy.blockchain.GetVMConfig()), vmError, nil
+}
+
+// RPCGasCap returns the gas cap of rpc
+func (b *APIBackend) RPCGasCap() *big.Int {
+	return b.hmy.RPCGasCap // TODO(ricl): should be hmy.config.RPCGasCap
 }
