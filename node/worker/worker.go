@@ -67,9 +67,6 @@ func (w *Worker) SelectTransactionsForNewBlock(txs types.Transactions, maxNumTxs
 			}
 		}
 	}
-	if err := w.UpdateCurrent(coinbase); err != nil {
-		utils.GetLogger().Error("Failed updating worker's state", "Error", err)
-	}
 	return selected, unselected, invalid
 }
 
