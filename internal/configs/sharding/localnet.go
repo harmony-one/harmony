@@ -23,6 +23,8 @@ func (localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	}
 }
 
-var localnetV0 = MustNewInstance(2, 7, 5, genesis.LocalHarmonyAccounts, genesis.LocalFnAccounts)
-var localnetV1 = MustNewInstance(2, 7, 5, genesis.LocalHarmonyAccountsV1, genesis.LocalFnAccountsV1)
-var localnetV2 = MustNewInstance(2, 7, 4, genesis.LocalHarmonyAccountsV2, genesis.LocalFnAccountsV2)
+var reshardingEpoch = []*big.Int{big.NewInt(10), big.NewInt(20)}
+
+var localnetV0 = MustNewInstance(2, 7, 5, genesis.LocalHarmonyAccounts, genesis.LocalFnAccounts, reshardingEpoch)
+var localnetV1 = MustNewInstance(2, 7, 5, genesis.LocalHarmonyAccountsV1, genesis.LocalFnAccountsV1, reshardingEpoch)
+var localnetV2 = MustNewInstance(2, 7, 4, genesis.LocalHarmonyAccountsV2, genesis.LocalFnAccountsV2, reshardingEpoch)
