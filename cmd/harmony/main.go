@@ -217,12 +217,10 @@ func createGlobalConfig(isLeader bool) *nodeconfig.ConfigType {
 	var err error
 
 	nodeConfig := nodeconfig.GetShardConfig(genesisAccount.ShardID)
-	if !*isExplorer {
+	if !*isExplorer && !*isNewNode {
 		// Set up consensus keys.
 		setUpConsensusKey(nodeConfig)
-
 	} else {
-		nodeConfig = nodeconfig.GetShardConfig(uint32(*shardID))
 		nodeConfig.ConsensusPriKey = &bls.SecretKey{} // set dummy bls key for consensus object
 	}
 
@@ -441,7 +439,7 @@ func main() {
 	}
 
 	isLeader := false
-	if !*isExplorer { // Explorer node doesn't need the following setup
+	if !*isExplorer && !*isNewNode { // Explorer node doesn't need the following setup
 		isLeader = setupGenesisAccount()
 	}
 	if *shardID >= 0 {
