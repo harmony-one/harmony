@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
 
-	"github.com/harmony-one/harmony/accounts/keystore"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/blsgen"
@@ -111,7 +110,6 @@ var (
 
 	keystoreDir = flag.String("keystore", hmykey.DefaultKeyStoreDir, "The default keystore directory")
 
-	ks             *keystore.KeyStore
 	genesisAccount = &genesis.DeployAccount{}
 
 	// logging verbosity
@@ -184,8 +182,6 @@ func passphraseForBls() {
 }
 
 func setupGenesisAccount() (isLeader bool) {
-	ks = hmykey.GetHmyKeyStore()
-
 	genesisShardingConfig := core.ShardingSchedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch))
 	pubKey := setUpConsensusKey(nodeconfig.GetDefaultConfig())
 
