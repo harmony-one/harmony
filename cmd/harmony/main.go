@@ -193,11 +193,6 @@ func setupGenesisAccount() (isLeader bool) {
 
 	fmt.Printf("My Genesis Account: %v\n", *genesisAccount)
 
-	// Set up manual call for garbage collection.
-	if *enableGC {
-		memprofiling.MaybeCallGCPeriodically()
-	}
-
 	return isLeader
 }
 
@@ -439,6 +434,11 @@ func main() {
 	}
 
 	initSetup()
+
+	// Set up manual call for garbage collection.
+	if *enableGC {
+		memprofiling.MaybeCallGCPeriodically()
+	}
 
 	isLeader := false
 	if !*isExplorer { // Explorer node doesn't need the following setup
