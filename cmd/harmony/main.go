@@ -336,29 +336,23 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 		}
 	} else {
 		if *isNewNode {
-			currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
-			currentNode.NodeConfig.SetClientGroupID(p2p.GroupIDBeaconClient)
-			currentNode.NodeConfig.SetBeaconGroupID(p2p.GroupIDBeacon)
-			if *shardID > -1 {
-				// I will be a validator (single leader is fixed for now)
+			currentNode.NodeConfig.SetIsLeader(false) // newnode can't be the leader
+			if nodeConfig.ShardID == 0 {              // Beacon chain
+				nodeConfig.SetIsBeacon(true)
+				currentNode.NodeConfig.SetRole(nodeconfig.BeaconValidator)
+				currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
+				currentNode.NodeConfig.SetClientGroupID(p2p.GroupIDBeaconClient)
+			} else {
 				currentNode.NodeConfig.SetRole(nodeconfig.ShardValidator)
-				currentNode.NodeConfig.SetIsLeader(false)
 				currentNode.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
 				currentNode.NodeConfig.SetClientGroupID(p2p.NewClientGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
 			}
-		} else if *isExplorer {
+		}
+		if *isExplorer {
 			currentNode.NodeConfig.SetRole(nodeconfig.ExplorerNode)
 			currentNode.NodeConfig.SetIsLeader(false)
 			currentNode.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(*shardID)))
 			currentNode.NodeConfig.SetClientGroupID(p2p.NewClientGroupIDByShardID(p2p.ShardID(*shardID)))
-		} else if nodeConfig.StringRole == "leader" {
-			currentNode.NodeConfig.SetRole(nodeconfig.ShardLeader)
-			currentNode.NodeConfig.SetIsLeader(true)
-			currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDUnknown)
-		} else {
-			currentNode.NodeConfig.SetRole(nodeconfig.ShardValidator)
-			currentNode.NodeConfig.SetIsLeader(false)
-			currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDUnknown)
 		}
 	}
 	currentNode.NodeConfig.ConsensusPubKey = nodeConfig.ConsensusPubKey
