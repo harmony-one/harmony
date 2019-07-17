@@ -212,6 +212,9 @@ func (b *APIBackend) NetVersion() uint64 {
 
 // GetEVM returns a new EVM entity
 func (b *APIBackend) GetEVM(ctx context.Context, msg core.Message, state *state.DB, header *types.Header) (*vm.EVM, func() error, error) {
+	// TODO(ricl): The code is borrowed from [go-ethereum](https://github.com/ethereum/go-ethereum/blob/40cdcf8c47ff094775aca08fd5d94051f9cf1dbb/les/api_backend.go#L114)
+	// [question](https://ethereum.stackexchange.com/q/72977/54923)
+	// Might need to reconsider the SetBalance behavior
 	state.SetBalance(msg.From(), math.MaxBig256)
 	vmError := func() error { return nil }
 

@@ -115,6 +115,9 @@ func doCall(ctx context.Context, b Backend, args CallArgs, blockNr rpc.BlockNumb
 	// Set sender address or use a default if none specified
 	var addr common.Address
 	if args.From == nil {
+		// TODO(ricl): this logic was borrowed from [go-ethereum](https://github.com/ethereum/go-ethereum/blob/f578d41ee6b3087f8021fd561a0b5665aea3dba6/internal/ethapi/api.go#L738)
+		// [question](https://ethereum.stackexchange.com/questions/72979/why-does-the-docall-function-use-the-first-account-by-default)
+		// Might need to reconsider the logic
 		if wallets := b.AccountManager().Wallets(); len(wallets) > 0 {
 			if accounts := wallets[0].Accounts(); len(accounts) > 0 {
 				addr = accounts[0].Address
