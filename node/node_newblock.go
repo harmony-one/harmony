@@ -85,6 +85,7 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 						utils.GetLogger().Debug("Failed updating worker's state", "Error", err)
 						continue
 					}
+
 					newBlock, err = node.Worker.Commit(sig, mask, viewID, coinbase)
 
 					if err != nil {
