@@ -1844,3 +1844,8 @@ func (bc *BlockChain) StoreEpochBlockNumber(
 func (bc *BlockChain) ChainDB() ethdb.Database {
 	return bc.db
 }
+
+// GetVMConfig returns the block chain VM config.
+func (bc *BlockChain) GetVMConfig() *vm.Config {
+	return &bc.vmConfig
+}
