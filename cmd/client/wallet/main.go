@@ -794,7 +794,6 @@ func FetchBalance(address common.Address) []*AccountState {
 			defer wg.Done()
 			balance := big.NewInt(0)
 			var nonce uint64
-
 			result[uint32(shardID)] = &AccountState{balance, 0}
 
 			var wgShard sync.WaitGroup
@@ -804,9 +803,8 @@ func FetchBalance(address common.Address) []*AccountState {
 
 			for rpcServerID := 0; rpcServerID < len(walletProfile.RPCServer[shardID]); rpcServerID++ {
 				go func(rpcServerID int) {
-					defer wgShard.Done()
-					log.Debug("Launched goroutiune")
 					for retry := 0; retry < rpcRetry; retry++ {
+
 						server := walletProfile.RPCServer[shardID][rpcServerID]
 						client, err := clientService.NewClient(server.IP, server.Port)
 						if err != nil {
@@ -823,13 +821,16 @@ func FetchBalance(address common.Address) []*AccountState {
 						log.Debug("FetchBalance", "response", response)
 						respBalance := big.NewInt(0)
 						respBalance.SetBytes(response.Balance)
+
 						mutexAccountState.Lock()
 						if balance.Cmp(respBalance) < 0 {
 							balance.SetBytes(response.Balance)
 							nonce = response.Nonce
 						}
 						mutexAccountState.Unlock()
+						break
 					}
+					wgShard.Done()
 				}(rpcServerID)
 			}
 			wgShard.Wait()
