@@ -235,31 +235,22 @@ func (node *Node) reducePendingTransactions() {
 
 // Add new transactions to the pending transaction list.
 func (node *Node) addPendingTransactions(newTxs types.Transactions) {
-	// if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
-	if true {
-		node.pendingTxMutex.Lock()
-		node.pendingTransactions = append(node.pendingTransactions, newTxs...)
-		node.reducePendingTransactions()
-		node.pendingTxMutex.Unlock()
-		utils.GetLogInstance().Info("Got more transactions", "num", len(newTxs), "totalPending", len(node.pendingTransactions))
-	}
+	node.pendingTxMutex.Lock()
+	node.pendingTransactions = append(node.pendingTransactions, newTxs...)
+	node.reducePendingTransactions()
+	node.pendingTxMutex.Unlock()
+	utils.GetLogInstance().Info("Got more transactions", "num", len(newTxs), "totalPending", len(node.pendingTransactions))
 }
 
 // AddPendingTransaction adds one new transaction to the pending transaction list.
 func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
-	// if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
-	if true {
-		node.addPendingTransactions(types.Transactions{newTx})
-		utils.GetLogInstance().Debug("Got ONE more transaction", "totalPending", len(node.pendingTransactions))
-	}
+	node.addPendingTransactions(types.Transactions{newTx})
+	utils.GetLogInstance().Debug("Got ONE more transaction", "totalPending", len(node.pendingTransactions))
 }
 
 // Take out a subset of valid transactions from the pending transaction list
 // Note the pending transaction list will then contain the rest of the txs
 func (node *Node) getTransactionsForNewBlock(maxNumTxs int, coinbase common.Address) types.Transactions {
-	// if node.NodeConfig.GetNetworkType() == nodeconfig.Mainnet {
-	// 	return types.Transactions{}
-	// }
 	node.pendingTxMutex.Lock()
 	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(node.pendingTransactions, maxNumTxs, coinbase)
 
@@ -341,8 +332,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 
 		// Add Faucet contract to all shards, so that on testnet, we can demo wallet in explorer
 		// TODO (leo): we need to have support of cross-shard tx later so that the token can be transferred from beacon chain shard to other tx shards.
-		// if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
-		if true {
+		if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
 			if node.isFirstTime {
 				// Setup one time smart contracts
 				node.AddFaucetContractToPendingTransactions()

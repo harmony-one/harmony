@@ -404,8 +404,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 		utils.GetLogInstance().Error("Error when adding new block", "err", err)
 	}
 
-	// if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
-	if true {
+	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
 		// Update contract deployer's nonce so default contract like faucet can issue transaction with current nonce
 		nonce := node.GetNonceOfAddress(crypto.PubkeyToAddress(node.ContractDeployerKey.PublicKey))
 		atomic.StoreUint64(&node.ContractDeployerCurrentNonce, nonce)

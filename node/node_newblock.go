@@ -59,13 +59,9 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 
 					coinbase := node.Consensus.SelfAddress
 					// Normal tx block consensus
-					selectedTxs := types.Transactions{} // Empty transaction list
-					// if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
-					if true {
-						selectedTxs = node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock, coinbase)
-						if err := node.Worker.UpdateCurrent(coinbase); err != nil {
-							utils.GetLogger().Error("Failed updating worker's state", "Error", err)
-						}
+					selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock, coinbase)
+					if err := node.Worker.UpdateCurrent(coinbase); err != nil {
+						utils.GetLogger().Error("Failed updating worker's state", "Error", err)
 					}
 					utils.GetLogInstance().Info("PROPOSING NEW BLOCK ------------------------------------------------", "blockNum", node.Blockchain().CurrentBlock().NumberU64()+1, "selectedTxs", len(selectedTxs))
 					if err := node.Worker.CommitTransactions(selectedTxs, coinbase); err != nil {
@@ -83,11 +79,6 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 					viewID := node.Consensus.GetViewID()
 					// add aggregated commit signatures from last block, except for the first two blocks
 
-					// err = node.Worker.UpdateCurrent(coinbase)
-					// if err != nil {
-					// 	utils.GetLogger().Debug("Failed updating worker's state", "Error", err)
-					// 	continue
-					// }
 					newBlock, err = node.Worker.Commit(sig, mask, viewID, coinbase)
 
 					if err != nil {

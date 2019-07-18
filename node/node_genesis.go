@@ -74,7 +74,6 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 			genesisFunds = genesisFunds.Mul(genesisFunds, big.NewInt(denominations.One))
 			genesisAlloc[foundationAddress] = core.GenesisAccount{Balance: genesisFunds}
 		}
-		fallthrough
 	case nodeconfig.Testnet:
 		fallthrough
 	case nodeconfig.Localnet:

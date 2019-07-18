@@ -264,8 +264,7 @@ func createGlobalConfig(isLeader bool) *nodeconfig.ConfigType {
 	}
 
 	nodeConfig.Host, err = p2pimpl.NewHost(&nodeConfig.SelfPeer, nodeConfig.P2pPriKey)
-	// if *logConn && nodeConfig.GetNetworkType() != nodeconfig.Mainnet {
-	if *logConn && true {
+	if *logConn {
 		nodeConfig.Host.GetP2PHost().Network().Notify(utils.NewConnLogger(utils.GetLogInstance()))
 	}
 	if err != nil {
@@ -481,12 +480,9 @@ func main() {
 	go currentNode.SupportSyncing()
 	currentNode.ServiceManagerSetup()
 
-	// RPC for SDK not supported for mainnet.
-	// if *networkType != nodeconfig.Mainnet {
-	if true {
-		if err := currentNode.StartRPC(*port); err != nil {
-			ctxerror.Warn(utils.GetLogger(), err, "StartRPC failed")
-		}
+	// Enable SDK RPC.
+	if err := currentNode.StartRPC(*port); err != nil {
+		ctxerror.Warn(utils.GetLogger(), err, "StartRPC failed")
 	}
 	currentNode.RunServices()
 	currentNode.StartServer()
