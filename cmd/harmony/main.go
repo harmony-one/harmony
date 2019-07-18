@@ -185,7 +185,19 @@ func setupGenesisAccount() (isLeader bool) {
 	genesisShardingConfig := core.ShardingSchedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch))
 	pubKey := setUpConsensusKey(nodeconfig.GetDefaultConfig())
 
-	isLeader, genesisAccount = genesisShardingConfig.FindAccount(pubKey.SerializeToHexStr())
+	reshardingEpoch := genesisShardingConfig.ReshardingEpoch()
+	if reshardingEpoch != nil && len(reshardingEpoch) > 0 {
+		for _, epoch := range reshardingEpoch {
+			config := core.ShardingSchedule.InstanceForEpoch(epoch)
+			isLeader, genesisAccount = config.FindAccount(pubKey.SerializeToHexStr())
+			if genesisAccount != nil {
+				break
+			}
+		}
+	} else {
+		isLeader, genesisAccount = genesisShardingConfig.FindAccount(pubKey.SerializeToHexStr())
+	}
+
 	if genesisAccount == nil {
 		fmt.Printf("cannot find your BLS key in the genesis/FN tables: %s\n", pubKey.SerializeToHexStr())
 		os.Exit(100)
@@ -433,7 +445,7 @@ func main() {
 	}
 
 	isLeader := false
-	if !*isExplorer && !*isNewNode { // Explorer node doesn't need the following setup
+	if !*isExplorer { // Explorer node doesn't need the following setup
 		isLeader = setupGenesisAccount()
 	}
 	if *shardID >= 0 {
