@@ -8,9 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/rlp"
-
-	"github.com/harmony-one/harmony/internal/ctxerror"
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/rs/zerolog/log"
 )
 
 // Constants for storage.
@@ -63,11 +61,11 @@ func (storage *Storage) Init(ip, port string, remove bool) {
 	if remove {
 		var err = os.RemoveAll(dbFileName)
 		if err != nil {
-			utils.Logger().Error().Err(err).Msg("Failed to remove existing database files")
+			log.Error().Err(err).Msg("Failed to remove existing database files.")
 		}
 	}
 	if storage.db, err = ethdb.NewLDBDatabase(dbFileName, 0, 0); err != nil {
-		utils.Logger().Error().Err(err).Msg("Failed to create new database")
+		log.Error().Err(err).Msg("Failed to create new database.")
 	}
 }
 
@@ -78,26 +76,26 @@ func (storage *Storage) GetDB() *ethdb.LDBDatabase {
 
 // Dump get time and current connections number and index them into lvdb for monitoring service.
 func (storage *Storage) Dump(connectionsNumber int, currentTime int) {
-	utils.Logger().Info().Int("Unix Time", currentTime).Msg("Store current connections number")
+	log.Info().Msgf("Store current connections number %d at time %d", connectionsNumber, currentTime)
 
 	batch := storage.db.NewBatch()
 	// Update current connections number.
 	if err := batch.Put([]byte(CurrentConnectionsNumberKey), []byte(strconv.Itoa(connectionsNumber))); err != nil {
-		utils.Logger().Warn().Err(err).Msg("cannot batch current connections number")
+		log.Warn().Err(err).Msg("Cannot batch current connections number.")
 	}
 
 	// Store connections number for current time.
 	connectionsNumberData, err := rlp.EncodeToBytes(connectionsNumber)
 	if err == nil {
 		if err := batch.Put([]byte(GetConnectionsNumberKey(currentTime)), connectionsNumberData); err != nil {
-			utils.Logger().Warn().Err(err).Msg("cannot batch connections number")
+			log.Warn().Err(err).Msg("Cannot batch connections number.")
 		}
 	} else {
-		utils.Logger().Error().Err(err).Msg("Failed to serialize connections number")
+		log.Error().Err(err).Msg("Failed to serialize connections number.")
 	}
 
 	if err := batch.Write(); err != nil {
-		ctxerror.Warn(utils.GetLogger(), err, "cannot write batch")
+		log.Warn().Err(err).Msg("Cannot write batch.")
 	}
 }
 
@@ -112,7 +110,7 @@ func (storage *Storage) ReadConnectionsNumbersFromDB(since, until int) []int {
 		}
 		connectionsNumber := 0
 		if rlp.DecodeBytes(data, connectionsNumber) != nil {
-			utils.Logger().Error().Msg("Error on getting from db")
+			log.Error().Msg("Error on getting from db.")
 			os.Exit(1)
 		}
 		connectionsNumbers = append(connectionsNumbers, connectionsNumber)

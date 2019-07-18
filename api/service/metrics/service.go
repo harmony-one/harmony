@@ -10,12 +10,12 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/gorilla/mux"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/client_golang/prometheus/push"
+	"github.com/rs/zerolog/log"
 )
 
 // Constants for metrics service.
@@ -61,15 +61,15 @@ var (
 	})
 	nodeBalanceCounter = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "node_balance",
-		Help: "Get current node balance",
+		Help: "Get current node balance.",
 	})
 	lastConsensusGauge = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "last_consensus",
-		Help: "Get last consensus time",
+		Help: "Get last consensus time.",
 	})
 	blockRewardGauge = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "block_reward",
-		Help: "Get last block reward",
+		Help: "Get last block reward.",
 	})
 )
 
@@ -98,13 +98,13 @@ func New(selfPeer *p2p.Peer, blsPublicKey, pushgatewayIP, pushgatewayPort string
 
 // StartService starts metrics service.
 func (s *Service) StartService() {
-	utils.Logger().Info().Msg("Starting metrics service.")
+	log.Info().Msg("Starting metrics service.")
 	s.Run()
 }
 
 // StopService shutdowns metrics service.
 func (s *Service) StopService() {
-	utils.Logger().Info().Msg("Shutting down metrics service.")
+	log.Info().Msg("Shutting down metrics service.")
 	metricsPush <- -1
 }
 
@@ -113,7 +113,7 @@ func GetMetricsServicePort(nodePort string) string {
 	if port, err := strconv.Atoi(nodePort); err == nil {
 		return fmt.Sprintf("%d", port-metricsServicePortDifference)
 	}
-	utils.Logger().Error().Msg("error on parsing.")
+	log.Error().Msg("Error on parsing.")
 	return ""
 }
 
@@ -131,11 +131,11 @@ func (s *Service) Run() {
 	go s.PushMetrics()
 
 	//s.router.Path("/connectionsstats").Queries("since", "{[0-9]*?}", "until", "{[0-9]*?}").HandlerFunc(s.GetConnectionsStats).Methods("GET")
-	utils.Logger().Info().Str("port", GetMetricsServicePort(s.Port)).Msg("Listening")
+	log.Info().Str("port", GetMetricsServicePort(s.Port)).Msg("Listening.")
 	go func() {
 		http.Handle("/node_metrics", promhttp.Handler())
 		if err := http.ListenAndServe(addr, nil); err != nil {
-			utils.Logger().Warn().Err(err).Msg("http.ListenAndServe()")
+			log.Warn().Err(err).Msg("http.ListenAndServe()")
 		}
 	}()
 	return
@@ -181,7 +181,7 @@ func (s *Service) PushMetrics() {
 			break
 		}
 		if err := s.pusher.Add(); err != nil {
-			fmt.Println("Could not push to Pushgateway:", err)
+			log.Error().Err(err).Msg("Could not push to a prometheus pushgateway.")
 		}
 	}
 	return

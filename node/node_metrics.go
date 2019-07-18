@@ -7,7 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	metrics "github.com/harmony-one/harmony/api/service/metrics"
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/rs/zerolog/log"
 )
 
 // Metrics events types
@@ -23,7 +23,7 @@ func (node *Node) UpdateBlockHeightForMetrics(prevBlockHeight uint64) uint64 {
 	if curBlockHeight == prevBlockHeight {
 		return prevBlockHeight
 	}
-	utils.GetLogInstance().Info("Updating metrics block height", "blockHeight", curBlockHeight)
+	log.Info().Msgf("Updating metrics block height %d", curBlockHeight)
 	metrics.UpdateBlockHeight(curBlockHeight)
 	return curBlockHeight
 }
@@ -34,7 +34,7 @@ func (node *Node) UpdateConnectionsNumberForMetrics(prevNumPeers int) int {
 	if curNumPeers == prevNumPeers {
 		return prevNumPeers
 	}
-	utils.GetLogInstance().Info("Updating metrics connections number", "connectionsNumber", curNumPeers)
+	log.Info().Msgf("Updating metrics connections number %d", curNumPeers)
 	metrics.UpdateConnectionsNumber(curNumPeers)
 	return curNumPeers
 }
@@ -49,14 +49,14 @@ func (node *Node) UpdateBalanceForMetrics(prevBalance *big.Int) *big.Int {
 	if err != nil || curBalance.Cmp(prevBalance) == 0 {
 		return prevBalance
 	}
-	utils.GetLogInstance().Info("Updating metrics node balance", "nodeBalance", curBalance)
+	log.Info().Msgf("Updating metrics node balance %d", curBalance.Uint64())
 	metrics.UpdateNodeBalance(curBalance)
 	return curBalance
 }
 
 // CollectMetrics collects metrics: block height, connections number, node balance, block reward, last consensus, accepted blocks.
 func (node *Node) CollectMetrics() {
-	utils.GetLogInstance().Info("[Metrics Service] Update metrics")
+	log.Info().Msg("[Metrics Service] Update metrics")
 	prevNumPeers := 0
 	prevBlockHeight := uint64(0)
 	prevBalance := big.NewInt(0)
