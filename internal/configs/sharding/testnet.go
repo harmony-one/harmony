@@ -19,4 +19,5 @@ func (testnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	}
 }
 
-var testnetV0 = MustNewInstance(2, 150, 150, genesis.TNHarmonyAccounts, genesis.FoundationalNodeAccounts)
+var testnetReshardingEpoch = make([]*big.Int, 0)
+var testnetV0 = MustNewInstance(2, 150, 150, genesis.TNHarmonyAccounts, genesis.FoundationalNodeAccounts, testnetReshardingEpoch)

@@ -64,7 +64,6 @@ USAGE: $ME [OPTIONS] config_file_name [extra args to node]
    -m min_peers   minimal number of peers to start consensus (default: $MIN)
    -s shards      number of shards (default: $SHARDS)
    -n             dryrun mode (default: $DRYRUN)
-   -S             disable sync test (default: $SYNC)
    -B             don't build the binary
 
 This script will build all the binaries and start harmony and txgen based on the configuration file.
@@ -85,10 +84,10 @@ TXGEN=true
 DURATION=
 MIN=3
 SHARDS=2
-SYNC=true
 DRYRUN=
+SYNC=true
 
-while getopts "htD:m:s:nSB" option; do
+while getopts "htD:m:s:nB" option; do
    case $option in
       h) usage ;;
       t) TXGEN=false ;;
@@ -96,7 +95,6 @@ while getopts "htD:m:s:nSB" option; do
       m) MIN=$OPTARG ;;
       s) SHARDS=$OPTARG ;;
       n) DRYRUN=echo ;;
-      S) SYNC=false ;;
       B) NOBUILD=true ;;
    esac
 done
@@ -180,9 +178,9 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
   case "${mode}" in explorer*) args=("${args[@]}" -is_genesis=false -is_explorer=true -shard_id=0);; esac
   case "${mode}" in
   newnode)
-    "${SYNC}" || continue
     sleep "${NUM_NN}"
     NUM_NN=$((${NUM_NN} + 30))
+    args=("${args[@]}" -is_newnode)
     ;;
   esac
   case "${mode}" in

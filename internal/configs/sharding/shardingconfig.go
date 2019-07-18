@@ -34,4 +34,7 @@ type Instance interface {
 
 	// FindAccount returns the deploy account based on the blskey
 	FindAccount(blsPubKey string) (bool, *genesis.DeployAccount)
+
+	// ReshardingEpoch return list of Epoch while off-chain resharding happens
+	ReshardingEpoch() []*big.Int
 }
