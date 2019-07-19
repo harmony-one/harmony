@@ -442,6 +442,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			Uint64("viewID", consensus.viewID).
 			Uint64("block", consensus.blockNum).
 			Msg("[onViewChange] I am the New Leader")
+		consensus.generateNewVrf = true
 	}
 }
 

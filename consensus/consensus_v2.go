@@ -12,12 +12,14 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
+	vrf_bls "github.com/harmony-one/harmony/crypto/vrf/bls"
 )
 
 // handleMessageUpdate will update the consensus state according to received message
@@ -198,6 +200,38 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 				Str("MsgBlockNum", headerObj.Number.String()).
 				Msg("[OnAnnounce] Block content is not verified successfully")
 			return
+		}
+
+		zeroBytes := make([]byte, 32)
+		if !bytes.Equal(headerObj.Vrf[:], zeroBytes) {
+			vrfPk := vrf_bls.NewVRFVerifier(consensus.LeaderPubKey)
+
+			var blockHash [32]byte
+			previousHeader := consensus.ChainReader.GetHeaderByNumber(headerObj.Number.Uint64() - 1)
+			previousHash := previousHeader.Hash()
+			copy(blockHash[:], previousHash[:])
+
+			hash, err := vrfPk.ProofToHash(blockHash[:], headerObj.VrfProof[:])
+			if err != nil {
+				consensus.getLogger().Warn().
+					Err(err).
+					Str("MsgBlockNum", headerObj.Number.String()).
+					Msg("[OnAnnounce] VRF verification error")
+				return
+			}
+
+			if hash != headerObj.Vrf {
+				consensus.getLogger().Warn().
+					Str("MsgBlockNum", headerObj.Number.String()).
+					Msg("[OnAnnounce] VRF proof is not valid")
+				return
+			}
+
+			consensus.pendingVrfs = append(consensus.pendingVrfs, headerObj.Vrf)
+			consensus.getLogger().Warn().
+				Uint64("MsgBlockNum", headerObj.Number.Uint64()).
+				Int("VRF numbers", len(consensus.pendingVrfs)).
+				Msg("[OnAnnounce] validated the new VRF")
 		}
 	}
 
@@ -1023,21 +1057,33 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 					Uint64("MsgBlockNum", newBlock.NumberU64()).
 					Msg("[ConsensusMainLoop] Received Proposed New Block!")
 				if consensus.ShardID == 0 {
-					// TODO ek/rj - re-enable this after fixing DRand
-					//if core.IsEpochBlock(newBlock) { // Only beacon chain do randomness generation
-					//	// Receive pRnd from DRG protocol
-					//	consensus.getLogger().Debug("[DRG] Waiting for pRnd")
-					//	pRndAndBitmap := <-consensus.PRndChannel
-					//	consensus.getLogger().Debug("[DRG] Got pRnd", "pRnd", pRndAndBitmap)
-					//	pRnd := [32]byte{}
-					//	copy(pRnd[:], pRndAndBitmap[:32])
-					//	bitmap := pRndAndBitmap[32:]
-					//	vrfBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, consensus.leader.ConsensusPubKey)
-					//	vrfBitmap.SetMask(bitmap)
-					//
-					//	// TODO: check validity of pRnd
-					//	newBlock.AddVrf(pRnd)
-					//}
+					if core.IsEpochBlock(newBlock) {
+						consensus.pendingVrfs = nil
+					}
+
+					if (consensus.generateNewVrf) {
+						sk := vrf_bls.NewVRFSigner(consensus.priKey)
+
+						var blockHash [32]byte
+						previousHeader := consensus.ChainReader.GetHeaderByNumber(newBlock.NumberU64() - 1)
+						previousHash   := previousHeader.Hash()
+						copy(blockHash[:], previousHash[:])
+
+						vrf, proof := sk.Evaluate(blockHash[:])
+
+						vrfProof := [96]byte{}
+						copy(vrfProof[:], proof[:96])
+						newBlock.AddVrf(vrf)
+						newBlock.AddVrfProof(vrfProof)
+
+						consensus.pendingVrfs = append(consensus.pendingVrfs, vrf)
+						consensus.getLogger().Debug().
+							Uint64("MsgBlockNum", newBlock.NumberU64()).
+							Int("VRF numbers", len(consensus.pendingVrfs)).
+							Msg("[ConsensusMainLoop] Leader generated a VRF")
+
+						consensus.generateNewVrf = false
+					}
 
 					rnd, blockHash, err := consensus.GetNextRnd()
 					if err == nil {
