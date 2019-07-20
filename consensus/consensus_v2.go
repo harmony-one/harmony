@@ -228,7 +228,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 			}
 
 			consensus.pendingVrfs = append(consensus.pendingVrfs, headerObj.Vrf)
-			consensus.getLogger().Warn().
+			consensus.getLogger().Info().
 				Uint64("MsgBlockNum", headerObj.Number.Uint64()).
 				Int("VRF numbers", len(consensus.pendingVrfs)).
 				Msg("[OnAnnounce] validated the new VRF")
@@ -1077,7 +1077,7 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 						newBlock.AddVrfProof(vrfProof)
 
 						consensus.pendingVrfs = append(consensus.pendingVrfs, vrf)
-						consensus.getLogger().Debug().
+						consensus.getLogger().Info().
 							Uint64("MsgBlockNum", newBlock.NumberU64()).
 							Int("VRF numbers", len(consensus.pendingVrfs)).
 							Msg("[ConsensusMainLoop] Leader generated a VRF")
