@@ -1,2 +1,2 @@
-protoc -I ./ metrics.proto --go_out=plugins=grpc:./
-# protoc -I ./ metrics.proto --go_out=./
+protoc -I ./ monitoringservice.proto --go_out=plugins=grpc:./
+# protoc -I ./ monitoringservice.proto --go_out=./

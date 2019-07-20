@@ -1,8 +1,8 @@
 syntax = "proto3";
-package message;
+package monitoringservice;
 
 
-service MonitoringService {
+service ClientService {
   rpc Process(Request) returns (Response) {}
 }
 

@@ -1,4 +1,4 @@
-package message
+package monitoringservice
 
 import (
 	"context"
@@ -36,7 +36,7 @@ func (client *Client) Close() error {
 	return client.conn.Close()
 }
 
-// Process processes message.
+// Process processes request.
 func (client *Client) Process(request *Request) (*Response, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

@@ -1,4 +1,4 @@
-package explorer
+package monitoringservice
 
 import (
 	"context"
@@ -10,10 +10,10 @@ import (
 	"os"
 	"strconv"
 
+	"google.golang.org/grpc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/gorilla/mux"
 	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -24,31 +24,18 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 )
 
-// Constants for explorer service.
+// Constants for monitoring service.
 const (
-	monitoringServicePortDifference = 5000
+	monitoringServicePortDifference = 29000
 )
-
-// HTTPrror is an HTTP error.
-type HTTPError struct {
-	Code int
-	Msg  string
-}
-
-//
-type ConnectionsLog struct {
-	Time int
-	ConnectionsNumber int
-}
 
 // Service is the struct for monitoring service.
 type Service struct {
-	router            *mux.Router
 	IP                string
 	Port              string
 	GetNodeIDs        func() []libp2p_peer.ID
-	storage           *MetricsStorage
-	server            *rpc.Server
+	storage           *Storage
+	server            *grpc.Server
 	messageChan       chan *msg_pb.Message
 }
 
@@ -64,53 +51,42 @@ func New(selfPeer *p2p.Peer, GetNodeIDs func() []libp2p_peer.ID) *Service {
 // StartService starts monitoring service.
 func (s *Service) StartService() {
 	utils.Logger().Info().Msg("Starting explorer service.")
-	s.Init(true)
-	s.server = s.Run()
+	s.Run(true)
 }
 
 // StopService shutdowns monitoring service.
 func (s *Service) StopService() {
 	utils.Logger().Info().Msg("Shutting down monitoring service.")
-	if err := s.server.Shutdown(context.Background()); err != nil {
-		utils.Logger().Error().Err(err).Msg("Error when shutting down monitoring server")
-	} else {
-		utils.Logger().Info().Msg("Shutting down monitoring server successufully")
-	}
+	s.server.Stop()
 }
 
 // GetMonitoringServicePort returns the port serving monitorign service dashboard. This port is monitoringServicePortDifference less than the node port.
 func GetMonitoringSerivcePort(nodePort string) string {
 	if port, err := strconv.Atoi(nodePort); err == nil {
-		return fmt.Sprintf("%d", port-monitoringServicePortDifference)
+		return fmt.Sprintf("%d", nodePort-monitoringServicePortDifference)
 	}
 	utils.Logger().Error().Msg("error on parsing.")
 	return ""
 }
 
-// Init is to initialize for MonitoringService.
-func (s *Service) Init(remove bool) {
-	s.storage = GetStorageInstance(s.IP, s.Port, remove)
-}
 
 // Run is to run serving monitoring service.
-func (s *Service) Run() *http.Server {
-	// Init address.
-	addr := net.JoinHostPort("", GetMonitoringServicePort(s.Port))
-
-	s.router = mux.NewRouter()
-	// Set up router for connections number.
-	s.router.Path("/connectionsNumber").Queries("since", "{[0-9]*?}", "until", "{[0-9]*?}").HandlerFunc(s.GetMonitoringSerivceConnectionsNumber).Methods("GET")
-	s.router.Path("/connectionsNumber").HandlerFunc(s.GetMonitoringSerivceConnectionsNumber)
-
-	// Do serving now.
-	utils.Logger().Info().Str("port", GetMonitoringServicePort(s.Port)).Msg("Listening")
-	server := &http.Server{Addr: addr, Handler: s.router}
+func (s *Service) Run(remove bool) (*Server, error) {
+	s.storage = GetStorageInstance(s.IP, s.Port, remove)
+	addr := net.JoinHostPort(s.IP, s.Port-monitoringServicePortDifference)
+	lis, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
+	var opts []grpc.ServerOption
+	s.server = grpc.NewServer(opts...)
+	RegisterClientServiceServer(s.server, s)
 	go func() {
-		if err := server.ListenAndServe(); err != nil {
-			utils.Logger().Warn().Err(err).Msg("server.ListenAndServe()")
+		if err := s.server.Serve(lis); err != nil {
+			utils.Logger().Warn().Err(err).Msg("server.Serve() failed")
 		}
 	}()
-	return server
+	return s.server, nil
 }
 
 // ReadConnectionsNumberFromDB returns a list of connections numbers to server connections number end-point.
@@ -137,8 +113,38 @@ func (s *Service) ReadConnectionsNumberFromDB(since, until uint) []uint {
 	return connectionsNumbers
 }
 
+
+// Process processes the Request and returns Response
+func (s *Service) Process(ctx context.Context, request *Request) (*Response, error) {
+	if request.GetMetricsType() != MetricsType_CONNECTIONS_NUMBER {
+		return &Response{}, ErrWrongMessage
+	}
+	connectionsNumbersRequest := request.GetConnectionsNumbersRequest()
+	since := connectionsNumbersRequest.GetSince() == nil ? 0 : connectionsNumbersRequest.GetSince()
+	until := connectionsNumbersRequest.GetUntil() == nil ? 0 : connectionsNumbersRequest.GetUntil()
+
+
+	connectionsNumbers := s.ReadConnectionsNumbersDB(since, until)
+	parsedConnectionsNumbers := []*ConnectionsNumber{}
+	for currentTime, connectionsNumber := range connectionsNumbers {
+		parsedConnectionsNumbers = append(parsedConnectionsNumbers, ConnectionsNumber{Time: currentTime, ConnectionsNumber: connectionsNumber})
+	}
+
+	ret := &Response{
+		Response: &Response_ConnectionsNumbersResponse{
+			MetricsType: MetricsType_CONNECTIONS_NUMBER,
+			ConnectionsNumbersResponse: &ConnectionsNumbersResponse{
+				ConnnectionsNumbers: parsedConnectionsNumbers
+			},
+		},
+	}
+	return ret, nil
+}
+
+
+// For rpc/http later
 // GetMonitoringServiceConnectionsNumber serves end-point /connectionsNumber
-func (s *Service) GetMonitoringSerivceConnectionsNumber(w http.ResponseWriter, r *http.Request) {
+/*func (s *Service) GetMonitoringSerivceConnectionsNumber(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	since := r.FormValue("since")
 	until := r.FormValue("until")
@@ -179,7 +185,7 @@ func (s *Service) GetMonitoringSerivceConnectionsNumber(w http.ResponseWriter, r
 	}
 
 	return
-}
+}*/
 
 // NotifyService notify service
 func (s *Service) NotifyService(params map[string]interface{}) {

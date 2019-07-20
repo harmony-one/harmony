@@ -1,4 +1,4 @@
-package explorer
+package monitoringservice
 
 import (
 	"fmt"
