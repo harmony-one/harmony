@@ -172,9 +172,9 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int {
 	consensus.pubKeyLock.Lock()
 	consensus.PublicKeys = append(pubKeys[:0:0], pubKeys...)
 	consensus.CommitteePublicKeys = map[string]bool{}
-	utils.Logger().Info().Msg("My Committee")
-	for _, pubKey := range consensus.PublicKeys {
-		utils.Logger().Info().Str("BlsPubKey", pubKey.SerializeToHexStr()).Msg("Member")
+	utils.Logger().Info().Msg("My Committee updated")
+	for i, pubKey := range consensus.PublicKeys {
+		utils.Logger().Info().Int("index", i).Str("BlsPubKey", pubKey.SerializeToHexStr()).Msg("Member")
 		consensus.CommitteePublicKeys[pubKey.SerializeToHexStr()] = true
 	}
 	// TODO: use pubkey to identify leader rather than p2p.Peer.
@@ -268,8 +268,7 @@ func (consensus *Consensus) VerifySeal(chain consensus_engine.ChainReader, heade
 	if err != nil {
 		return ctxerror.New("[VerifySeal] Unable to deserialize the LastCommitSignature and LastCommitBitmap in Block Header").WithCause(err)
 	}
-	// TODO: use the quorum of last block instead
-	if count := utils.CountOneBits(mask.Bitmap); count < consensus.Quorum() {
+	if count := utils.CountOneBits(mask.Bitmap); count < consensus.PreviousQuorum() {
 		return ctxerror.New("[VerifySeal] Not enough signature in LastCommitSignature from Block Header", "need", consensus.Quorum(), "got", count)
 	}
 
@@ -473,6 +472,16 @@ func (consensus *Consensus) verifyViewChangeSenderKey(msg *msg_pb.Message) (*bls
 // SetViewID set the viewID to the height of the blockchain
 func (consensus *Consensus) SetViewID(height uint64) {
 	consensus.viewID = height
+}
+
+// SetMode sets the mode of consensus
+func (consensus *Consensus) SetMode(mode Mode) {
+	consensus.mode.SetMode(mode)
+}
+
+// Mode returns the mode of consensus
+func (consensus *Consensus) Mode() Mode {
+	return consensus.mode.Mode()
 }
 
 // RegisterPRndChannel registers the channel for receiving randomness preimage from DRG protocol

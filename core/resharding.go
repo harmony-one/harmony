@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"math/big"
 	"math/rand"
@@ -271,4 +272,28 @@ func GetShardState(epoch *big.Int) types.ShardState {
 		shardState = append(shardState, com)
 	}
 	return shardState
+}
+
+// GetPublicKeys returns the publickeys given epoch and shardID
+func GetPublicKeys(epoch *big.Int, shardID uint32) []*bls.PublicKey {
+	shardState := GetShardState(epoch)
+
+	// Update validator public keys
+	committee := shardState.FindCommitteeByID(shardID)
+	if committee == nil {
+		utils.Logger().Warn().Uint32("shardID", shardID).Uint64("epoch", epoch.Uint64()).Msg("Cannot find committee")
+		return nil
+	}
+	pubKeys := []*bls.PublicKey{}
+	for _, node := range committee.NodeList {
+		pubKey := &bls.PublicKey{}
+		pubKeyBytes := node.BlsPublicKey[:]
+		err := pubKey.Deserialize(pubKeyBytes)
+		if err != nil {
+			utils.Logger().Warn().Str("pubKeyBytes", hex.EncodeToString(pubKeyBytes)).Msg("Cannot Deserialize pubKey")
+			return nil
+		}
+		pubKeys = append(pubKeys, pubKey)
+	}
+	return pubKeys
 }

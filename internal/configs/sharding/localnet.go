@@ -13,8 +13,8 @@ var LocalnetSchedule localnetSchedule
 type localnetSchedule struct{}
 
 const (
-	localnetV1Epoch = 10
-	localnetV2Epoch = 20
+	localnetV1Epoch = 1
+	localnetV2Epoch = 2
 )
 
 func (localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
