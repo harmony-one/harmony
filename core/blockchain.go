@@ -1747,12 +1747,16 @@ func (bc *BlockChain) WriteShardState(
 func (bc *BlockChain) WriteShardStateBytes(
 	epoch *big.Int, shardState []byte,
 ) error {
+	decodeShardState := types.ShardState{}
+	if err := rlp.DecodeBytes(shardState, &decodeShardState); err != nil {
+		return err
+	}
 	err := rawdb.WriteShardStateBytes(bc.db, epoch, shardState)
 	if err != nil {
 		return err
 	}
 	cacheKey := string(epoch.Bytes())
-	bc.shardStateCache.Add(cacheKey, shardState)
+	bc.shardStateCache.Add(cacheKey, decodeShardState)
 	return nil
 }
 

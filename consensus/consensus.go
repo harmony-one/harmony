@@ -96,6 +96,9 @@ type Consensus struct {
 	// the publickey of leader
 	LeaderPubKey *bls.PublicKey
 
+	// number of publickeys of previous epoch
+	numPrevPubKeys int
+
 	viewID uint64
 
 	// Blockhash - 32 byte
@@ -198,6 +201,10 @@ func (consensus *Consensus) WaitForSyncing() {
 // Quorum returns the consensus quorum of the current committee (2f+1).
 func (consensus *Consensus) Quorum() int {
 	return len(consensus.PublicKeys)*2/3 + 1
+}
+
+func (consensus *Consensus) PreviousQuorum() int {
+	return consensus.numPrevPubKeys*2/3 + 1
 }
 
 // RewardThreshold returns the threshold to stop accepting commit messages

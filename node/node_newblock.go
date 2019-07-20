@@ -97,7 +97,7 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 							ctxerror.New("cannot commit new block").
 								WithCause(err))
 						continue
-					} else if err := node.proposeShardState(newBlock); err != nil {
+					} else if err := node.proposeShardStateWithoutBeaconSync(newBlock); err != nil {
 						ctxerror.Log15(utils.GetLogger().Error,
 							ctxerror.New("cannot add shard state").
 								WithCause(err))
@@ -110,10 +110,20 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 						node.BlockChannel <- newBlock
 						break
 					}
+
 				}
 			}
 		}
 	}()
+}
+
+func (node *Node) proposeShardStateWithoutBeaconSync(block *types.Block) error {
+	if !core.IsEpochLastBlock(block) {
+		return nil
+	}
+	nextEpoch := new(big.Int).Add(block.Header().Epoch, common.Big1)
+	shardState := core.GetShardState(nextEpoch)
+	return block.AddShardState(shardState)
 }
 
 func (node *Node) proposeShardState(block *types.Block) error {

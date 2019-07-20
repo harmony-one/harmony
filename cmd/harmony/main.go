@@ -229,7 +229,7 @@ func createGlobalConfig(isLeader bool) *nodeconfig.ConfigType {
 	var err error
 
 	nodeConfig := nodeconfig.GetShardConfig(genesisAccount.ShardID)
-	if !*isExplorer && !*isNewNode {
+	if !*isExplorer {
 		// Set up consensus keys.
 		setUpConsensusKey(nodeConfig)
 	} else {
@@ -300,6 +300,11 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	}
 	currentConsensus.SetCommitDelay(commitDelay)
 	currentConsensus.MinPeers = *minPeers
+
+	if *isNewNode {
+		currentConsensus.SetMode(consensus.Listening)
+	}
+
 	if *disableViewChange {
 		currentConsensus.DisableViewChangeForTestingOnly()
 	}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
+	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -12,6 +13,7 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -35,6 +37,11 @@ func (consensus *Consensus) handleMessageUpdate(payload []byte) {
 	// when node is in ViewChanging mode, it still accepts normal message into PbftLog to avoid possible trap forever
 	// but drop PREPARE and COMMIT which are message types for leader
 	if consensus.mode.Mode() == ViewChanging && (msg.Type == msg_pb.MessageType_PREPARE || msg.Type == msg_pb.MessageType_COMMIT) {
+		return
+	}
+
+	// listening mode only listening to committed message
+	if consensus.mode.Mode() == Listening && msg.Type != msg_pb.MessageType_COMMITTED {
 		return
 	}
 
@@ -761,6 +768,29 @@ func (consensus *Consensus) finalizeCommits() {
 func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	consensus.getLogger().Debug().Msg("[OnCommitted] Receive committed message")
 
+	// TODO: this is temp hack for update new node's committee information; remove it after staking and resharding finished
+	if consensus.mode.Mode() == Listening {
+		recvMsg, err := ParsePbftMessage(msg)
+		if err != nil {
+			consensus.getLogger().Warn().Msg("[OnCommitted] unable to parse msg")
+			return
+		}
+		if recvMsg.BlockNum%core.BlocksPerEpoch == core.BlocksPerEpoch-1 {
+			epoch := recvMsg.BlockNum / uint64(core.BlocksPerEpoch)
+			nextEpoch := new(big.Int).Add(big.NewInt(int64(epoch)), common.Big1)
+			pubKeys := core.GetPublicKeys(nextEpoch, consensus.ShardID)
+			consensus.getLogger().Info().Int("numKeys", len(pubKeys)).Msg("[OnCommitted] Update Shard Info and PublicKeys")
+			for _, key := range pubKeys {
+				if key.IsEqual(consensus.PubKey) {
+					consensus.getLogger().Info().Uint64("blockNum", recvMsg.BlockNum).Msg("[OnCommitted] Successfully updated public keys for next epoch")
+					consensus.UpdatePublicKeys(pubKeys)
+					consensus.mode.SetMode(Normal)
+				}
+			}
+		}
+		return
+	}
+
 	if consensus.PubKey.IsEqual(consensus.LeaderPubKey) && consensus.mode.Mode() == Normal {
 		return
 	}
@@ -937,6 +967,13 @@ func (consensus *Consensus) tryCatchup() {
 		consensus.OnConsensusDone(block)
 		consensus.ResetState()
 
+		if core.IsEpochLastBlock(block) {
+			consensus.numPrevPubKeys = len(consensus.PublicKeys)
+			nextEpoch := new(big.Int).Add(block.Header().Epoch, common.Big1)
+			pubKeys := core.GetPublicKeys(nextEpoch, block.Header().ShardID)
+			consensus.UpdatePublicKeys(pubKeys)
+		}
+
 		select {
 		case consensus.VerifiedNewBlock <- block:
 		default:
@@ -992,7 +1029,7 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 			select {
 			case <-ticker.C:
 				for k, v := range consensus.consensusTimeout {
-					if consensus.mode.Mode() == Syncing {
+					if consensus.mode.Mode() == Syncing || consensus.mode.Mode() == Listening {
 						v.Stop()
 					}
 					if !v.CheckExpire() {
