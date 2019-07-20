@@ -29,7 +29,7 @@ const (
 	monitoringServicePortDifference = 5000
 )
 
-// HTTPError is an HTTP error.
+// HTTPrror is an HTTP error.
 type HTTPError struct {
 	Code int
 	Msg  string
@@ -48,7 +48,7 @@ type Service struct {
 	Port              string
 	GetNodeIDs        func() []libp2p_peer.ID
 	storage           *MetricsStorage
-	server            *http.Server
+	server            *rpc.Server
 	messageChan       chan *msg_pb.Message
 }
 
@@ -137,7 +137,7 @@ func (s *Service) ReadConnectionsNumberFromDB(since, until uint) []uint {
 	return connectionsNumbers
 }
 
-// GetExplorerBlocks serves end-point /blocks
+// GetMonitoringServiceConnectionsNumber serves end-point /connectionsNumber
 func (s *Service) GetMonitoringSerivceConnectionsNumber(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	since := r.FormValue("since")
@@ -151,12 +151,13 @@ func (s *Service) GetMonitoringSerivceConnectionsNumber(w http.ResponseWriter, r
 			utils.Logger().Warn().Err(err).Msg("cannot JSON-encode connections")
 		}
 	}()
-
-	if since == "" {
-		return
+	var sinceInt int
+	var err error
+	if (since == "") {
+		since = 0, err = nil
+	} else {
+		sinceInt, err = strconv.Atoi(since)
 	}
-	db := s.storage.GetDB()
-	sinceInt, err := strconv.Atoi(since)
 	if err != nil {
 		utils.Logger().Warn().Err(err).Str("since", since).Msg("invalid since parameter")
 		return
@@ -174,30 +175,9 @@ func (s *Service) GetMonitoringSerivceConnectionsNumber(w http.ResponseWriter, r
 
 	connectionsNumbers := s.ReadConnectionsNumbersDB(sinceInt, untilInt)
 	for currentTime, connectionsNumber := range connectionsNumbers {
-		if accountBlocks[id-1] == nil {
-			block.PrevBlock = RefBlock{
-				ID:     "",
-				Height: "",
-			}
-		} else {
-			block.PrevBlock = RefBlock{
-				ID:     accountBlocks[id-1].Hash().Hex(),
-				Height: strconv.Itoa(id + fromInt - 2),
-			}
-		}
-		if accountBlocks[id+1] == nil {
-			block.NextBlock = RefBlock{
-				ID:     "",
-				Height: "",
-			}
-		} else {
-			block.NextBlock = RefBlock{
-				ID:     accountBlocks[id+1].Hash().Hex(),
-				Height: strconv.Itoa(id + fromInt),
-			}
-		}
 		data.ConnectionsNumbers = append(data.ConnectionsNumbers, ConnectionsLog{Time: currentTime, ConnectionsNumber: connectionsNumber})
 	}
+
 	return
 }
 
