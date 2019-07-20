@@ -151,10 +151,10 @@ type Consensus struct {
 	disableViewChange bool
 
 	// If true, the leader will generate a new VRF
-	generateNewVrf    bool
+	generateNewVrf bool
 
 	// A list of pending VRFs received in this epoch
-	pendingVrfs        [][32]byte
+	pendingVrfs [][32]byte
 }
 
 // SetCommitDelay sets the commit message delay.  If set to non-zero,

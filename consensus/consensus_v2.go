@@ -14,12 +14,12 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	vrf_bls "github.com/harmony-one/harmony/crypto/vrf/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
-	vrf_bls "github.com/harmony-one/harmony/crypto/vrf/bls"
 )
 
 // handleMessageUpdate will update the consensus state according to received message
@@ -1061,12 +1061,12 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 						consensus.pendingVrfs = nil
 					}
 
-					if (consensus.generateNewVrf) {
+					if consensus.generateNewVrf {
 						sk := vrf_bls.NewVRFSigner(consensus.priKey)
 
 						var blockHash [32]byte
 						previousHeader := consensus.ChainReader.GetHeaderByNumber(newBlock.NumberU64() - 1)
-						previousHash   := previousHeader.Hash()
+						previousHash := previousHeader.Hash()
 						copy(blockHash[:], previousHash[:])
 
 						vrf, proof := sk.Evaluate(blockHash[:])
