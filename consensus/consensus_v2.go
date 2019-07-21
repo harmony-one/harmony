@@ -775,11 +775,17 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 			consensus.getLogger().Warn().Msg("[OnCommitted] unable to parse msg")
 			return
 		}
+		// check whether the block is the last block of epoch
 		if recvMsg.BlockNum%core.BlocksPerEpoch == core.BlocksPerEpoch-1 {
 			epoch := recvMsg.BlockNum / uint64(core.BlocksPerEpoch)
 			nextEpoch := new(big.Int).Add(big.NewInt(int64(epoch)), common.Big1)
 			pubKeys := core.GetPublicKeys(nextEpoch, consensus.ShardID)
+			if len(pubKeys) == 0 {
+				consensus.getLogger().Info().Msg("[OnCommitted] PublicKeys is Empty, Cannot update public keys")
+				return
+			}
 			consensus.getLogger().Info().Int("numKeys", len(pubKeys)).Msg("[OnCommitted] Update Shard Info and PublicKeys")
+
 			for _, key := range pubKeys {
 				if key.IsEqual(consensus.PubKey) {
 					consensus.getLogger().Info().Uint64("blockNum", recvMsg.BlockNum).Msg("[OnCommitted] Successfully updated public keys for next epoch")
@@ -971,7 +977,10 @@ func (consensus *Consensus) tryCatchup() {
 			consensus.numPrevPubKeys = len(consensus.PublicKeys)
 			nextEpoch := new(big.Int).Add(block.Header().Epoch, common.Big1)
 			pubKeys := core.GetPublicKeys(nextEpoch, block.Header().ShardID)
-			consensus.UpdatePublicKeys(pubKeys)
+			if len(pubKeys) != 0 {
+				consensus.getLogger().Info().Msg("[TryCatchup] PublicKeys is Updated")
+				consensus.UpdatePublicKeys(pubKeys)
+			}
 		}
 
 		select {
