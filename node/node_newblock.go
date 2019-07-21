@@ -110,7 +110,6 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 						node.BlockChannel <- newBlock
 						break
 					}
-
 				}
 			}
 		}

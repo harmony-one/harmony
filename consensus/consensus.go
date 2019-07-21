@@ -203,6 +203,7 @@ func (consensus *Consensus) Quorum() int {
 	return len(consensus.PublicKeys)*2/3 + 1
 }
 
+// PreviousQuorum returns the quorum size of previous epoch
 func (consensus *Consensus) PreviousQuorum() int {
 	return consensus.numPrevPubKeys*2/3 + 1
 }
