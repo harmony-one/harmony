@@ -22,8 +22,6 @@ import (
 const (
 	// GenesisEpoch is the number of the genesis epoch.
 	GenesisEpoch = 0
-	// FirstEpoch is the number of the first epoch.
-	FirstEpoch = 1
 	// CuckooRate is the percentage of nodes getting reshuffled in the second step of cuckoo resharding.
 	CuckooRate = 0.1
 )
