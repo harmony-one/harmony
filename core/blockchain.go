@@ -67,14 +67,6 @@ const (
 	shardCacheLimit     = 2
 	epochCacheLimit     = 10
 
-	// BlocksPerEpoch is the number of blocks in one epoch
-	// currently set to small number for testing
-	// in future, this need to be adjusted dynamically instead of constant
-	// TODO ek – inflate to disable resharding until we can 1) fix shard
-	//  state mutation bug and 2) implement key passphrase recycle across
-	//  process restart (exec) for shard migration
-	BlocksPerEpoch = 1000000000000
-
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	BlockChainVersion = 3
 )
@@ -233,12 +225,12 @@ func (bc *BlockChain) ValidateNewBlock(block *types.Block) error {
 
 // IsEpochBlock returns whether this block is the first block of an epoch.
 func IsEpochBlock(block *types.Block) bool {
-	return block.NumberU64()%BlocksPerEpoch == 0
+	return block.NumberU64()%ShardingSchedule.BlocksPerEpoch() == 0
 }
 
 // IsEpochLastBlock returns whether this block is the last block of an epoch.
 func IsEpochLastBlock(block *types.Block) bool {
-	return block.NumberU64()%BlocksPerEpoch == BlocksPerEpoch-1
+	return block.NumberU64()%ShardingSchedule.BlocksPerEpoch() == ShardingSchedule.BlocksPerEpoch()-1
 }
 
 func (bc *BlockChain) getProcInterrupt() bool {

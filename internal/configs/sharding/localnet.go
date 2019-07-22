@@ -28,6 +28,10 @@ func (localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	}
 }
 
+func (localnetSchedule) BlocksPerEpoch() uint64 {
+	return 10
+}
+
 var localnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(localnetV1Epoch), big.NewInt(localnetV2Epoch)}
 
 var localnetV0 = MustNewInstance(2, 7, 5, genesis.LocalHarmonyAccounts, genesis.LocalFnAccounts, localnetReshardingEpoch)
