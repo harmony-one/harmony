@@ -22,6 +22,10 @@ func (mainnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	}
 }
 
+func (mainnetSchedule) BlocksPerEpoch() uint64 {
+	return 1000000000000
+}
+
 var mainnetReshardingEpoch = make([]*big.Int, 0)
 var mainnetV0 = MustNewInstance(4, 150, 112, genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, mainnetReshardingEpoch)
 
