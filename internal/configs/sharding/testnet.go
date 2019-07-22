@@ -30,7 +30,7 @@ func (testnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 
 func (testnetSchedule) BlocksPerEpoch() uint64 {
 	// 8 seconds per block, roughly 86400 blocks, around one day
-	return 10800
+	return 60
 }
 
 var testnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(testnetV1Epoch), big.NewInt(testnetV2Epoch)}
