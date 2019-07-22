@@ -40,20 +40,20 @@ func (consensus *Consensus) WaitForNewRandomness() {
 }
 
 // GetNextRnd returns the oldest available randomness along with the hash of the block there randomness preimage is committed.
-func (consensus *Consensus) GetNextRnd() ([32]byte, [32]byte, error) {
+func (consensus *Consensus) GetNextRnd() ([258]byte, [258]byte, error) {
 	if len(consensus.pendingRnds) == 0 {
-		return [32]byte{}, [32]byte{}, errors.New("No available randomness")
+		return [258]byte{}, [258]byte{}, errors.New("No available randomness")
 	}
 	vdfOutput := consensus.pendingRnds[0]
 
 	//pop the first vdfOutput from the list
 	consensus.pendingRnds = consensus.pendingRnds[1:]
 
-	rnd := [32]byte{}
-	blockHash := [32]byte{}
-	copy(rnd[:], vdfOutput[:32])
-	copy(blockHash[:], vdfOutput[32:])
-	return rnd, blockHash, nil
+	vdf := [258]byte{}
+	proof := [258]byte{}
+	copy(vdf[:], vdfOutput[:258])
+	copy(proof[:], vdfOutput[258:])
+	return vdf, proof, nil
 }
 
 // SealHash returns the hash of a block prior to it being sealed.
@@ -481,7 +481,7 @@ func (consensus *Consensus) RegisterPRndChannel(pRndChannel chan []byte) {
 }
 
 // RegisterRndChannel registers the channel for receiving final randomness from DRG protocol
-func (consensus *Consensus) RegisterRndChannel(rndChannel chan [64]byte) {
+func (consensus *Consensus) RegisterRndChannel(rndChannel chan [516]byte) {
 	consensus.RndChannel = rndChannel
 }
 

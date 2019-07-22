@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/vdf/src/vdf_go"
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core"
@@ -20,6 +21,10 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
+)
+
+const (
+	vdfDifficulty = 5000 // This takes about 20s to finish the vdf
 )
 
 // handleMessageUpdate will update the consensus state according to received message
@@ -1083,16 +1088,48 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 							Msg("[ConsensusMainLoop] Leader generated a VRF")
 
 						consensus.generateNewVrf = false
+
+						//if len(consensus.pendingVrfs) >= consensus.Quorum() {
+						if len(consensus.pendingVrfs) >= 1 {
+							// Bitwise XOR on all the submitted vrfs
+							vdfSeed := [32]byte{}
+							for _, vrf := range consensus.pendingVrfs {
+								for i := 0; i < len(vdfSeed); i++ {
+									vdfSeed[i] = vdfSeed[i] ^ vrf[i]
+								}
+							}
+
+							consensus.pendingVrfs = nil
+							consensus.getLogger().Info().
+								Bytes("vdf seed = ", vdfSeed[:]).
+								Msg("[DRG] VDF computation started")
+
+							go func() {
+								vdf := vdf_go.New(vdfDifficulty, vdfSeed)
+								outputChannel := vdf.GetOutputChannel()
+								start := time.Now()
+								vdf.Execute()
+								duration := time.Now().Sub(start)
+								consensus.getLogger().Info().
+									Dur("duration", duration).
+									Msg("VDF computation finished")
+								output := <-outputChannel
+								consensus.RndChannel <- output
+							}()
+						}
+
+
 					}
 
-					rnd, blockHash, err := consensus.GetNextRnd()
+					vdf, proof, err := consensus.GetNextRnd()
 					if err == nil {
 						// Verify the randomness
-						_ = blockHash
+						_ = vdf
 						consensus.getLogger().Info().
-							Bytes("rnd", rnd[:]).
+							Bytes("vdf", vdf[:]).
 							Msg("[ConsensusMainLoop] Adding randomness into new block")
-						// newBlock.AddVdf([258]byte{}) // TODO(HB): add real vdf
+							newBlock.AddVdf(vdf)
+						   	newBlock.AddVdfProof(proof)
 					} else {
 						//consensus.getLogger().Info("Failed to get randomness", "error", err)
 					}
