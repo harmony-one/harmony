@@ -4,6 +4,11 @@ import (
 	"math/big"
 )
 
+const (
+	// VLBPE is a Very Large Block Per Epoch
+	VLBPE = 1000000000000
+)
+
 type fixedSchedule struct {
 	instance Instance
 }
@@ -15,7 +20,7 @@ func (s fixedSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 }
 
 func (s fixedSchedule) BlocksPerEpoch() uint64 {
-	return 1000000000000
+	return VLBPE
 }
 
 // NewFixedSchedule returns a sharding configuration schedule that uses the
