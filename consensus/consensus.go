@@ -131,8 +131,8 @@ type Consensus struct {
 	// Channel for DRG protocol to send pRnd (preimage of randomness resulting from combined vrf randomnesses) to consensus. The first 32 bytes are randomness, the rest is for bitmap.
 	PRndChannel chan []byte
 	// Channel for DRG protocol to send the final randomness to consensus. The first 32 bytes are the randomness and the last 32 bytes are the hash of the block where the corresponding pRnd was generated
-	RndChannel  chan [516]byte
-	pendingRnds [][516]byte // A list of pending randomness
+	RndChannel  chan [548]byte
+	pendingRnds [][548]byte // A list of pending randomness
 
 	uniqueIDInstance *utils.UniqueValidatorID
 

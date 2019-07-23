@@ -1069,13 +1069,12 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 					if consensus.generateNewVrf {
 						sk := vrf_bls.NewVRFSigner(consensus.priKey)
 
-						var blockHash [32]byte
+						blockHash := [32]byte{}
 						previousHeader := consensus.ChainReader.GetHeaderByNumber(newBlock.NumberU64() - 1)
 						previousHash := previousHeader.Hash()
 						copy(blockHash[:], previousHash[:])
 
 						vrf, proof := sk.Evaluate(blockHash[:])
-
 						vrfProof := [96]byte{}
 						copy(vrfProof[:], proof[:96])
 						newBlock.AddVrf(vrf)
@@ -1086,26 +1085,26 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 							Uint64("MsgBlockNum", newBlock.NumberU64()).
 							Int("VRF numbers", len(consensus.pendingVrfs)).
 							Msg("[ConsensusMainLoop] Leader generated a VRF")
-
 						consensus.generateNewVrf = false
 
 						//if len(consensus.pendingVrfs) >= consensus.Quorum() {
 						if len(consensus.pendingVrfs) >= 1 {
-							// Bitwise XOR on all the submitted vrfs
-							vdfSeed := [32]byte{}
-							for _, vrf := range consensus.pendingVrfs {
-								for i := 0; i < len(vdfSeed); i++ {
-									vdfSeed[i] = vdfSeed[i] ^ vrf[i]
+							// Bitwise XOR on 2/3  of consensus quorum the submitted vrfs
+							RandPreimage := [32]byte{}
+							//for i := 0; i < consensus.Quorum(); i++ {
+							for i := 0; i < 1; i++ {
+								for j := 0; j < len(RandPreimage); j++ {
+									RandPreimage[i] = RandPreimage[i] ^ consensus.pendingVrfs[i][j]
 								}
 							}
 
 							consensus.pendingVrfs = nil
 							consensus.getLogger().Info().
-								Bytes("vdf seed = ", vdfSeed[:]).
+								Bytes("vdf seed = ", RandPreimage[:]).
 								Msg("[DRG] VDF computation started")
 
 							go func() {
-								vdf := vdf_go.New(vdfDifficulty, vdfSeed)
+								vdf := vdf_go.New(vdfDifficulty, RandPreimage)
 								outputChannel := vdf.GetOutputChannel()
 								start := time.Now()
 								vdf.Execute()
@@ -1114,14 +1113,20 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 									Dur("duration", duration).
 									Msg("VDF computation finished")
 								output := <-outputChannel
-								consensus.RndChannel <- output
+
+								// The first 516 bytes are the VDF+proof and the last 32 bytes are XORed VRF as seed
+								rndBytes := [548]byte{}
+								copy(rndBytes[:516], output[:])
+								copy(rndBytes[516:], RandPreimage[:])
+
+								consensus.RndChannel <- rndBytes
 							}()
 						}
 
 
 					}
 
-					vdf, proof, err := consensus.GetNextRnd()
+					vdf, seed, err := consensus.GetNextRnd()
 					if err == nil {
 						// Verify the randomness
 						_ = vdf
@@ -1129,7 +1134,7 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 							Bytes("vdf", vdf[:]).
 							Msg("[ConsensusMainLoop] Adding randomness into new block")
 							newBlock.AddVdf(vdf)
-						   	newBlock.AddVdfProof(proof)
+						   	newBlock.AddRandPreimage(seed)
 					} else {
 						//consensus.getLogger().Info("Failed to get randomness", "error", err)
 					}
