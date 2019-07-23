@@ -499,12 +499,12 @@ func (b *Block) AddVrfProof(proof [96]byte) {
 	b.header.VrfProof = proof
 }
 
-// AddVdf add vdf into block header
+// AddVdf add vdf and proof into block header
 func (b *Block) AddVdf(vdf [516]byte) {
 	b.header.Vdf = vdf
 }
 
-// AddVdfProof add vdf proof into block header
+// AddRandPreimage add the seed of VDF (VDF xor)
 func (b *Block) AddRandPreimage(RandPreimage [32]byte) {
 	b.header.RandPreimage = RandPreimage
 }
