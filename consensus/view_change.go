@@ -33,6 +33,7 @@ const (
 	Normal Mode = iota
 	ViewChanging
 	Syncing
+	Listening
 )
 
 // PbftMode contains mode and viewID of viewchanging
@@ -55,6 +56,8 @@ func (mode Mode) String() string {
 		return "ViewChanging"
 	} else if mode == Syncing {
 		return "Sycning"
+	} else if mode == Listening {
+		return "Listening"
 	}
 	return "Unknown"
 }

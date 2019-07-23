@@ -1,6 +1,8 @@
 package shardingconfig
 
 import (
+	"math/big"
+
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
 )
@@ -11,6 +13,7 @@ type instance struct {
 	numHarmonyOperatedNodesPerShard int
 	hmyAccounts                     []genesis.DeployAccount
 	fnAccounts                      []genesis.DeployAccount
+	reshardingEpoch                 []*big.Int
 }
 
 // NewInstance creates and validates a new sharding configuration based
@@ -19,6 +22,7 @@ func NewInstance(
 	numShards uint32, numNodesPerShard, numHarmonyOperatedNodesPerShard int,
 	hmyAccounts []genesis.DeployAccount,
 	fnAccounts []genesis.DeployAccount,
+	reshardingEpoch []*big.Int,
 ) (Instance, error) {
 	if numShards < 1 {
 		return nil, ctxerror.New("sharding config must have at least one shard",
@@ -45,6 +49,7 @@ func NewInstance(
 		numHarmonyOperatedNodesPerShard: numHarmonyOperatedNodesPerShard,
 		hmyAccounts:                     hmyAccounts,
 		fnAccounts:                      fnAccounts,
+		reshardingEpoch:                 reshardingEpoch,
 	}, nil
 }
 
@@ -55,9 +60,10 @@ func MustNewInstance(
 	numShards uint32, numNodesPerShard, numHarmonyOperatedNodesPerShard int,
 	hmyAccounts []genesis.DeployAccount,
 	fnAccounts []genesis.DeployAccount,
+	reshardingEpoch []*big.Int,
 ) Instance {
 	sc, err := NewInstance(
-		numShards, numNodesPerShard, numHarmonyOperatedNodesPerShard, hmyAccounts, fnAccounts)
+		numShards, numNodesPerShard, numHarmonyOperatedNodesPerShard, hmyAccounts, fnAccounts, reshardingEpoch)
 	if err != nil {
 		panic(err)
 	}
@@ -106,4 +112,9 @@ func (sc instance) FindAccount(blsPubKey string) (bool, *genesis.DeployAccount) 
 		}
 	}
 	return false, nil
+}
+
+// ReshardingEpoch returns the list of epoch number
+func (sc instance) ReshardingEpoch() []*big.Int {
+	return sc.reshardingEpoch
 }

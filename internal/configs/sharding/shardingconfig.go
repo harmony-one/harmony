@@ -12,6 +12,9 @@ import (
 // epoch.
 type Schedule interface {
 	InstanceForEpoch(epoch *big.Int) Instance
+
+	// BlocksPerEpoch returns the number of blocks per each Epoch
+	BlocksPerEpoch() uint64
 }
 
 // Instance is one sharding configuration instance.
@@ -34,4 +37,7 @@ type Instance interface {
 
 	// FindAccount returns the deploy account based on the blskey
 	FindAccount(blsPubKey string) (bool, *genesis.DeployAccount)
+
+	// ReshardingEpoch returns a list of Epoch while off-chain resharding happens
+	ReshardingEpoch() []*big.Int
 }

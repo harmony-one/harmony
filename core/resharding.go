@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"math/big"
 	"math/rand"
@@ -21,8 +22,6 @@ import (
 const (
 	// GenesisEpoch is the number of the genesis epoch.
 	GenesisEpoch = 0
-	// FirstEpoch is the number of the first epoch.
-	FirstEpoch = 1
 	// CuckooRate is the percentage of nodes getting reshuffled in the second step of cuckoo resharding.
 	CuckooRate = 0.1
 )
@@ -137,19 +136,19 @@ func Shuffle(list []types.NodeID) {
 
 // GetBlockNumberFromEpoch calculates the block number where epoch sharding information is stored
 func GetBlockNumberFromEpoch(epoch uint64) uint64 {
-	number := epoch * uint64(BlocksPerEpoch) // currently we use the first block in each epoch
+	number := epoch * ShardingSchedule.BlocksPerEpoch() // currently we use the first block in each epoch
 	return number
 }
 
 // GetLastBlockNumberFromEpoch calculates the last block number for the given
 // epoch.  TODO ek – this is a temp hack.
 func GetLastBlockNumberFromEpoch(epoch uint64) uint64 {
-	return (epoch+1)*BlocksPerEpoch - 1
+	return (epoch+1)*ShardingSchedule.BlocksPerEpoch() - 1
 }
 
 // GetEpochFromBlockNumber calculates the epoch number the block belongs to
 func GetEpochFromBlockNumber(blockNumber uint64) uint64 {
-	return blockNumber / uint64(BlocksPerEpoch)
+	return blockNumber / ShardingSchedule.BlocksPerEpoch()
 }
 
 // GetShardingStateFromBlockChain will retrieve random seed and shard map from beacon chain for given a epoch
@@ -271,4 +270,28 @@ func GetShardState(epoch *big.Int) types.ShardState {
 		shardState = append(shardState, com)
 	}
 	return shardState
+}
+
+// GetPublicKeys returns the publickeys given epoch and shardID
+func GetPublicKeys(epoch *big.Int, shardID uint32) []*bls.PublicKey {
+	shardState := GetShardState(epoch)
+
+	// Update validator public keys
+	committee := shardState.FindCommitteeByID(shardID)
+	if committee == nil {
+		utils.Logger().Warn().Uint32("shardID", shardID).Uint64("epoch", epoch.Uint64()).Msg("Cannot find committee")
+		return nil
+	}
+	pubKeys := []*bls.PublicKey{}
+	for _, node := range committee.NodeList {
+		pubKey := &bls.PublicKey{}
+		pubKeyBytes := node.BlsPublicKey[:]
+		err := pubKey.Deserialize(pubKeyBytes)
+		if err != nil {
+			utils.Logger().Warn().Str("pubKeyBytes", hex.EncodeToString(pubKeyBytes)).Msg("Cannot Deserialize pubKey")
+			return nil
+		}
+		pubKeys = append(pubKeys, pubKey)
+	}
+	return pubKeys
 }
