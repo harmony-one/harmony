@@ -1131,12 +1131,12 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 						// Verify the randomness
 						_ = vdf
 						consensus.getLogger().Info().
-							Bytes("vdf", vdf[:]).
+							Bytes("VDF", vdf[:]).
 							Msg("[ConsensusMainLoop] Adding randomness into new block")
 							newBlock.AddVdf(vdf)
 						   	newBlock.AddRandPreimage(seed)
 					} else {
-						//consensus.getLogger().Info("Failed to get randomness", "error", err)
+						//consensus.getLogger().Error().Err(err). Msg("[ConsensusMainLoop] Failed to get randomness")
 					}
 				}
 

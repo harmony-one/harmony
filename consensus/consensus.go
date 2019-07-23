@@ -274,6 +274,9 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 
 	consensus.ReadySignal = make(chan struct{})
 
+	// channel for receiving newly generated VDF
+	consensus.RndChannel = make(chan [548]byte)
+
 	consensus.uniqueIDInstance = utils.GetUniqueValidatorIDInstance()
 
 	// enable the VRF generation flag for the first master
