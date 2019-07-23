@@ -27,15 +27,15 @@ const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 type MetricsType int32
 
 const (
-	MetricsType_CONNECTIONS_NUMBERS MetricsType = 0
+	MetricsType_CONNECTIONS_STATS MetricsType = 0
 )
 
 var MetricsType_name = map[int32]string{
-	0: "CONNECTIONS_NUMBERS",
+	0: "CONNECTIONS_STATS",
 }
 
 var MetricsType_value = map[string]int32{
-	"CONNECTIONS_NUMBERS": 0,
+	"CONNECTIONS_STATS": 0,
 }
 
 func (x MetricsType) String() string {
@@ -46,7 +46,54 @@ func (MetricsType) EnumDescriptor() ([]byte, []int) {
 	return fileDescriptor_9b849e0e333a202a, []int{0}
 }
 
-type ConnectionsNumbersRequest struct {
+type ConnectionsStats struct {
+	Time                 int32    `protobuf:"varint,1,opt,name=time,proto3" json:"time,omitempty"`
+	ConnectionsNumber    int32    `protobuf:"varint,2,opt,name=connections_number,json=connectionsNumber,proto3" json:"connections_number,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *ConnectionsStats) Reset()         { *m = ConnectionsStats{} }
+func (m *ConnectionsStats) String() string { return proto.CompactTextString(m) }
+func (*ConnectionsStats) ProtoMessage()    {}
+func (*ConnectionsStats) Descriptor() ([]byte, []int) {
+	return fileDescriptor_9b849e0e333a202a, []int{0}
+}
+
+func (m *ConnectionsStats) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_ConnectionsStats.Unmarshal(m, b)
+}
+func (m *ConnectionsStats) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_ConnectionsStats.Marshal(b, m, deterministic)
+}
+func (m *ConnectionsStats) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ConnectionsStats.Merge(m, src)
+}
+func (m *ConnectionsStats) XXX_Size() int {
+	return xxx_messageInfo_ConnectionsStats.Size(m)
+}
+func (m *ConnectionsStats) XXX_DiscardUnknown() {
+	xxx_messageInfo_ConnectionsStats.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ConnectionsStats proto.InternalMessageInfo
+
+func (m *ConnectionsStats) GetTime() int32 {
+	if m != nil {
+		return m.Time
+	}
+	return 0
+}
+
+func (m *ConnectionsStats) GetConnectionsNumber() int32 {
+	if m != nil {
+		return m.ConnectionsNumber
+	}
+	return 0
+}
+
+type ConnectionsStatsRequest struct {
 	Since                int32    `protobuf:"varint,1,opt,name=since,proto3" json:"since,omitempty"`
 	Until                int32    `protobuf:"varint,2,opt,name=until,proto3" json:"until,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
@@ -54,49 +101,88 @@ type ConnectionsNumbersRequest struct {
 	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *ConnectionsNumbersRequest) Reset()         { *m = ConnectionsNumbersRequest{} }
-func (m *ConnectionsNumbersRequest) String() string { return proto.CompactTextString(m) }
-func (*ConnectionsNumbersRequest) ProtoMessage()    {}
-func (*ConnectionsNumbersRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_9b849e0e333a202a, []int{0}
+func (m *ConnectionsStatsRequest) Reset()         { *m = ConnectionsStatsRequest{} }
+func (m *ConnectionsStatsRequest) String() string { return proto.CompactTextString(m) }
+func (*ConnectionsStatsRequest) ProtoMessage()    {}
+func (*ConnectionsStatsRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_9b849e0e333a202a, []int{1}
 }
 
-func (m *ConnectionsNumbersRequest) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_ConnectionsNumbersRequest.Unmarshal(m, b)
+func (m *ConnectionsStatsRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_ConnectionsStatsRequest.Unmarshal(m, b)
 }
-func (m *ConnectionsNumbersRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_ConnectionsNumbersRequest.Marshal(b, m, deterministic)
+func (m *ConnectionsStatsRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_ConnectionsStatsRequest.Marshal(b, m, deterministic)
 }
-func (m *ConnectionsNumbersRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ConnectionsNumbersRequest.Merge(m, src)
+func (m *ConnectionsStatsRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ConnectionsStatsRequest.Merge(m, src)
 }
-func (m *ConnectionsNumbersRequest) XXX_Size() int {
-	return xxx_messageInfo_ConnectionsNumbersRequest.Size(m)
+func (m *ConnectionsStatsRequest) XXX_Size() int {
+	return xxx_messageInfo_ConnectionsStatsRequest.Size(m)
 }
-func (m *ConnectionsNumbersRequest) XXX_DiscardUnknown() {
-	xxx_messageInfo_ConnectionsNumbersRequest.DiscardUnknown(m)
+func (m *ConnectionsStatsRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_ConnectionsStatsRequest.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_ConnectionsNumbersRequest proto.InternalMessageInfo
+var xxx_messageInfo_ConnectionsStatsRequest proto.InternalMessageInfo
 
-func (m *ConnectionsNumbersRequest) GetSince() int32 {
+func (m *ConnectionsStatsRequest) GetSince() int32 {
 	if m != nil {
 		return m.Since
 	}
 	return 0
 }
 
-func (m *ConnectionsNumbersRequest) GetUntil() int32 {
+func (m *ConnectionsStatsRequest) GetUntil() int32 {
 	if m != nil {
 		return m.Until
 	}
 	return 0
 }
 
+type ConnectionsStatsResponse struct {
+	ConnectionsStats     []*ConnectionsStats `protobuf:"bytes,1,rep,name=connections_stats,json=connectionsStats,proto3" json:"connections_stats,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}            `json:"-"`
+	XXX_unrecognized     []byte              `json:"-"`
+	XXX_sizecache        int32               `json:"-"`
+}
+
+func (m *ConnectionsStatsResponse) Reset()         { *m = ConnectionsStatsResponse{} }
+func (m *ConnectionsStatsResponse) String() string { return proto.CompactTextString(m) }
+func (*ConnectionsStatsResponse) ProtoMessage()    {}
+func (*ConnectionsStatsResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_9b849e0e333a202a, []int{2}
+}
+
+func (m *ConnectionsStatsResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_ConnectionsStatsResponse.Unmarshal(m, b)
+}
+func (m *ConnectionsStatsResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_ConnectionsStatsResponse.Marshal(b, m, deterministic)
+}
+func (m *ConnectionsStatsResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ConnectionsStatsResponse.Merge(m, src)
+}
+func (m *ConnectionsStatsResponse) XXX_Size() int {
+	return xxx_messageInfo_ConnectionsStatsResponse.Size(m)
+}
+func (m *ConnectionsStatsResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_ConnectionsStatsResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ConnectionsStatsResponse proto.InternalMessageInfo
+
+func (m *ConnectionsStatsResponse) GetConnectionsStats() []*ConnectionsStats {
+	if m != nil {
+		return m.ConnectionsStats
+	}
+	return nil
+}
+
 type Request struct {
 	MetricsType MetricsType `protobuf:"varint,1,opt,name=metrics_type,json=metricsType,proto3,enum=monitoringservice.MetricsType" json:"metrics_type,omitempty"`
 	// Types that are valid to be assigned to Request:
-	//	*Request_ConnectionsNumbersRequest
+	//	*Request_ConnectionsStatsRequest
 	Request              isRequest_Request `protobuf_oneof:"request"`
 	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
 	XXX_unrecognized     []byte            `json:"-"`
@@ -107,7 +193,7 @@ func (m *Request) Reset()         { *m = Request{} }
 func (m *Request) String() string { return proto.CompactTextString(m) }
 func (*Request) ProtoMessage()    {}
 func (*Request) Descriptor() ([]byte, []int) {
-	return fileDescriptor_9b849e0e333a202a, []int{1}
+	return fileDescriptor_9b849e0e333a202a, []int{3}
 }
 
 func (m *Request) XXX_Unmarshal(b []byte) error {
@@ -132,18 +218,18 @@ func (m *Request) GetMetricsType() MetricsType {
 	if m != nil {
 		return m.MetricsType
 	}
-	return MetricsType_CONNECTIONS_NUMBERS
+	return MetricsType_CONNECTIONS_STATS
 }
 
 type isRequest_Request interface {
 	isRequest_Request()
 }
 
-type Request_ConnectionsNumbersRequest struct {
-	ConnectionsNumbersRequest *ConnectionsNumbersRequest `protobuf:"bytes,2,opt,name=connections_numbers_request,json=connectionsNumbersRequest,proto3,oneof"`
+type Request_ConnectionsStatsRequest struct {
+	ConnectionsStatsRequest *ConnectionsStatsRequest `protobuf:"bytes,2,opt,name=connections_stats_request,json=connectionsStatsRequest,proto3,oneof"`
 }
 
-func (*Request_ConnectionsNumbersRequest) isRequest_Request() {}
+func (*Request_ConnectionsStatsRequest) isRequest_Request() {}
 
 func (m *Request) GetRequest() isRequest_Request {
 	if m != nil {
@@ -152,9 +238,9 @@ func (m *Request) GetRequest() isRequest_Request {
 	return nil
 }
 
-func (m *Request) GetConnectionsNumbersRequest() *ConnectionsNumbersRequest {
-	if x, ok := m.GetRequest().(*Request_ConnectionsNumbersRequest); ok {
-		return x.ConnectionsNumbersRequest
+func (m *Request) GetConnectionsStatsRequest() *ConnectionsStatsRequest {
+	if x, ok := m.GetRequest().(*Request_ConnectionsStatsRequest); ok {
+		return x.ConnectionsStatsRequest
 	}
 	return nil
 }
@@ -162,14 +248,14 @@ func (m *Request) GetConnectionsNumbersRequest() *ConnectionsNumbersRequest {
 // XXX_OneofWrappers is for the internal use of the proto package.
 func (*Request) XXX_OneofWrappers() []interface{} {
 	return []interface{}{
-		(*Request_ConnectionsNumbersRequest)(nil),
+		(*Request_ConnectionsStatsRequest)(nil),
 	}
 }
 
 type Response struct {
 	MetricsType MetricsType `protobuf:"varint,1,opt,name=metrics_type,json=metricsType,proto3,enum=monitoringservice.MetricsType" json:"metrics_type,omitempty"`
 	// Types that are valid to be assigned to Response:
-	//	*Response_ConnectionsNumbersResponse
+	//	*Response_ConnectionsStatsResponse
 	Response             isResponse_Response `protobuf_oneof:"response"`
 	XXX_NoUnkeyedLiteral struct{}            `json:"-"`
 	XXX_unrecognized     []byte              `json:"-"`
@@ -180,7 +266,7 @@ func (m *Response) Reset()         { *m = Response{} }
 func (m *Response) String() string { return proto.CompactTextString(m) }
 func (*Response) ProtoMessage()    {}
 func (*Response) Descriptor() ([]byte, []int) {
-	return fileDescriptor_9b849e0e333a202a, []int{2}
+	return fileDescriptor_9b849e0e333a202a, []int{4}
 }
 
 func (m *Response) XXX_Unmarshal(b []byte) error {
@@ -205,18 +291,18 @@ func (m *Response) GetMetricsType() MetricsType {
 	if m != nil {
 		return m.MetricsType
 	}
-	return MetricsType_CONNECTIONS_NUMBERS
+	return MetricsType_CONNECTIONS_STATS
 }
 
 type isResponse_Response interface {
 	isResponse_Response()
 }
 
-type Response_ConnectionsNumbersResponse struct {
-	ConnectionsNumbersResponse *ConnectionsNumbersResponse `protobuf:"bytes,2,opt,name=connections_numbers_response,json=connectionsNumbersResponse,proto3,oneof"`
+type Response_ConnectionsStatsResponse struct {
+	ConnectionsStatsResponse *ConnectionsStatsResponse `protobuf:"bytes,2,opt,name=connections_stats_response,json=connectionsStatsResponse,proto3,oneof"`
 }
 
-func (*Response_ConnectionsNumbersResponse) isResponse_Response() {}
+func (*Response_ConnectionsStatsResponse) isResponse_Response() {}
 
 func (m *Response) GetResponse() isResponse_Response {
 	if m != nil {
@@ -225,9 +311,9 @@ func (m *Response) GetResponse() isResponse_Response {
 	return nil
 }
 
-func (m *Response) GetConnectionsNumbersResponse() *ConnectionsNumbersResponse {
-	if x, ok := m.GetResponse().(*Response_ConnectionsNumbersResponse); ok {
-		return x.ConnectionsNumbersResponse
+func (m *Response) GetConnectionsStatsResponse() *ConnectionsStatsResponse {
+	if x, ok := m.GetResponse().(*Response_ConnectionsStatsResponse); ok {
+		return x.ConnectionsStatsResponse
 	}
 	return nil
 }
@@ -235,132 +321,46 @@ func (m *Response) GetConnectionsNumbersResponse() *ConnectionsNumbersResponse {
 // XXX_OneofWrappers is for the internal use of the proto package.
 func (*Response) XXX_OneofWrappers() []interface{} {
 	return []interface{}{
-		(*Response_ConnectionsNumbersResponse)(nil),
+		(*Response_ConnectionsStatsResponse)(nil),
 	}
-}
-
-type ConnectionsNumbersResponse struct {
-	ConnectionsNumbers   []*ConnectionsNumber `protobuf:"bytes,1,rep,name=connections_numbers,json=connectionsNumbers,proto3" json:"connections_numbers,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}             `json:"-"`
-	XXX_unrecognized     []byte               `json:"-"`
-	XXX_sizecache        int32                `json:"-"`
-}
-
-func (m *ConnectionsNumbersResponse) Reset()         { *m = ConnectionsNumbersResponse{} }
-func (m *ConnectionsNumbersResponse) String() string { return proto.CompactTextString(m) }
-func (*ConnectionsNumbersResponse) ProtoMessage()    {}
-func (*ConnectionsNumbersResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_9b849e0e333a202a, []int{3}
-}
-
-func (m *ConnectionsNumbersResponse) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_ConnectionsNumbersResponse.Unmarshal(m, b)
-}
-func (m *ConnectionsNumbersResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_ConnectionsNumbersResponse.Marshal(b, m, deterministic)
-}
-func (m *ConnectionsNumbersResponse) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ConnectionsNumbersResponse.Merge(m, src)
-}
-func (m *ConnectionsNumbersResponse) XXX_Size() int {
-	return xxx_messageInfo_ConnectionsNumbersResponse.Size(m)
-}
-func (m *ConnectionsNumbersResponse) XXX_DiscardUnknown() {
-	xxx_messageInfo_ConnectionsNumbersResponse.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_ConnectionsNumbersResponse proto.InternalMessageInfo
-
-func (m *ConnectionsNumbersResponse) GetConnectionsNumbers() []*ConnectionsNumber {
-	if m != nil {
-		return m.ConnectionsNumbers
-	}
-	return nil
-}
-
-type ConnectionsNumber struct {
-	Time                 int32    `protobuf:"varint,1,opt,name=time,proto3" json:"time,omitempty"`
-	ConnectionsNumber    int32    `protobuf:"varint,2,opt,name=connections_number,json=connectionsNumber,proto3" json:"connections_number,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *ConnectionsNumber) Reset()         { *m = ConnectionsNumber{} }
-func (m *ConnectionsNumber) String() string { return proto.CompactTextString(m) }
-func (*ConnectionsNumber) ProtoMessage()    {}
-func (*ConnectionsNumber) Descriptor() ([]byte, []int) {
-	return fileDescriptor_9b849e0e333a202a, []int{4}
-}
-
-func (m *ConnectionsNumber) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_ConnectionsNumber.Unmarshal(m, b)
-}
-func (m *ConnectionsNumber) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_ConnectionsNumber.Marshal(b, m, deterministic)
-}
-func (m *ConnectionsNumber) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ConnectionsNumber.Merge(m, src)
-}
-func (m *ConnectionsNumber) XXX_Size() int {
-	return xxx_messageInfo_ConnectionsNumber.Size(m)
-}
-func (m *ConnectionsNumber) XXX_DiscardUnknown() {
-	xxx_messageInfo_ConnectionsNumber.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_ConnectionsNumber proto.InternalMessageInfo
-
-func (m *ConnectionsNumber) GetTime() int32 {
-	if m != nil {
-		return m.Time
-	}
-	return 0
-}
-
-func (m *ConnectionsNumber) GetConnectionsNumber() int32 {
-	if m != nil {
-		return m.ConnectionsNumber
-	}
-	return 0
 }
 
 func init() {
 	proto.RegisterEnum("monitoringservice.MetricsType", MetricsType_name, MetricsType_value)
-	proto.RegisterType((*ConnectionsNumbersRequest)(nil), "monitoringservice.ConnectionsNumbersRequest")
+	proto.RegisterType((*ConnectionsStats)(nil), "monitoringservice.ConnectionsStats")
+	proto.RegisterType((*ConnectionsStatsRequest)(nil), "monitoringservice.ConnectionsStatsRequest")
+	proto.RegisterType((*ConnectionsStatsResponse)(nil), "monitoringservice.ConnectionsStatsResponse")
 	proto.RegisterType((*Request)(nil), "monitoringservice.Request")
 	proto.RegisterType((*Response)(nil), "monitoringservice.Response")
-	proto.RegisterType((*ConnectionsNumbersResponse)(nil), "monitoringservice.ConnectionsNumbersResponse")
-	proto.RegisterType((*ConnectionsNumber)(nil), "monitoringservice.ConnectionsNumber")
 }
 
 func init() { proto.RegisterFile("monitoringservice.proto", fileDescriptor_9b849e0e333a202a) }
 
 var fileDescriptor_9b849e0e333a202a = []byte{
-	// 354 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x53, 0xdf, 0x4e, 0xf2, 0x30,
-	0x14, 0xdf, 0xbe, 0x4f, 0x04, 0xcf, 0xd4, 0x48, 0x31, 0x01, 0x86, 0x31, 0x64, 0x31, 0x86, 0x18,
-	0xe1, 0x62, 0x3e, 0x81, 0x4c, 0x22, 0x5e, 0x30, 0x4c, 0x01, 0x6f, 0x97, 0xd0, 0x34, 0xa6, 0x09,
-	0x6b, 0x47, 0x5b, 0x4c, 0x78, 0x42, 0x6f, 0x7c, 0x28, 0xe3, 0x3a, 0x82, 0xc9, 0xb6, 0x84, 0x0b,
-	0xef, 0x76, 0xfa, 0x3b, 0xe7, 0xf7, 0xe7, 0xe4, 0x0c, 0x9a, 0xb1, 0xe0, 0x4c, 0x0b, 0xc9, 0xf8,
-	0xbb, 0xa2, 0xf2, 0x83, 0x11, 0x3a, 0x48, 0xa4, 0xd0, 0x02, 0xd5, 0x73, 0x80, 0xf7, 0x0c, 0xed,
-	0x40, 0x70, 0x4e, 0x89, 0x66, 0x82, 0xab, 0x70, 0x13, 0x2f, 0xa9, 0x54, 0x98, 0xae, 0x37, 0x54,
-	0x69, 0x74, 0x09, 0x15, 0xc5, 0x38, 0xa1, 0x2d, 0xbb, 0x6b, 0xf7, 0x2a, 0xd8, 0x14, 0x3f, 0xaf,
-	0x1b, 0xae, 0xd9, 0xaa, 0xf5, 0xcf, 0xbc, 0xa6, 0x85, 0xf7, 0x69, 0x43, 0x75, 0x37, 0xf7, 0x08,
-	0xa7, 0x31, 0xd5, 0x92, 0x11, 0x15, 0xe9, 0x6d, 0x62, 0xc6, 0xcf, 0xfd, 0xeb, 0x41, 0xde, 0xd7,
-	0xc4, 0xb4, 0xcd, 0xb7, 0x09, 0xc5, 0x4e, 0xbc, 0x2f, 0x10, 0x87, 0x0e, 0xd9, 0xfb, 0x8a, 0xb8,
-	0x31, 0x16, 0x49, 0xa3, 0x90, 0x4a, 0x3b, 0xfe, 0x7d, 0x01, 0x63, 0x69, 0x9a, 0xb1, 0x85, 0xdb,
-	0xa4, 0x0c, 0x1c, 0x9e, 0x40, 0x35, 0xe3, 0xf6, 0xbe, 0x6c, 0xa8, 0x61, 0xaa, 0x12, 0xc1, 0x15,
-	0xfd, 0x8b, 0x28, 0x6b, 0xb8, 0x2a, 0x8e, 0x62, 0x24, 0xb2, 0x2c, 0xfd, 0x03, 0xb3, 0x98, 0xa1,
-	0xb1, 0x85, 0x5d, 0x52, 0x8a, 0x0e, 0x01, 0x6a, 0x3b, 0x7a, 0x4f, 0x81, 0x5b, 0xce, 0x83, 0x16,
-	0xd0, 0x28, 0x30, 0xd7, 0xb2, 0xbb, 0xff, 0x7b, 0x8e, 0x7f, 0x73, 0x88, 0x27, 0x8c, 0xf2, 0x46,
-	0xbc, 0x37, 0xa8, 0xe7, 0x1a, 0x11, 0x82, 0x23, 0xcd, 0xe2, 0xdd, 0x35, 0xa5, 0xdf, 0xa8, 0x0f,
-	0x28, 0xaf, 0x9f, 0x5d, 0x56, 0x3d, 0x47, 0x7c, 0x77, 0x0b, 0xce, 0xaf, 0x3d, 0xa3, 0x26, 0x34,
-	0x82, 0x69, 0x18, 0x8e, 0x82, 0xf9, 0xcb, 0x34, 0x9c, 0x45, 0xe1, 0x62, 0x32, 0x1c, 0xe1, 0xd9,
-	0x85, 0xe5, 0x2f, 0xe0, 0x2c, 0x58, 0x31, 0xca, 0xf5, 0xcc, 0xd8, 0x46, 0x4f, 0x50, 0x7d, 0x95,
-	0x82, 0x50, 0xa5, 0x90, 0x5b, 0x90, 0x2a, 0x3b, 0x03, 0xb7, 0x53, 0x88, 0x65, 0x9b, 0xb4, 0x96,
-	0xc7, 0xe9, 0x7f, 0xf4, 0xf0, 0x1d, 0x00, 0x00, 0xff, 0xff, 0x5a, 0x5f, 0xbc, 0x9d, 0x62, 0x03,
-	0x00, 0x00,
+	// 360 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x93, 0xc1, 0x4e, 0xfa, 0x40,
+	0x10, 0xc6, 0xdb, 0xff, 0x5f, 0x04, 0xa7, 0x6a, 0x60, 0xa3, 0xa1, 0x62, 0x62, 0x48, 0xf5, 0x40,
+	0x30, 0x72, 0xa8, 0x4f, 0x00, 0x95, 0x04, 0x0f, 0x16, 0xd2, 0x96, 0x73, 0x23, 0x9b, 0x8d, 0x6e,
+	0xa4, 0xbb, 0x75, 0x77, 0x31, 0xe1, 0xf1, 0xbc, 0xf8, 0x5c, 0x86, 0x6e, 0x11, 0x42, 0x6b, 0xc2,
+	0xc1, 0x5b, 0x67, 0xbf, 0x99, 0xdf, 0x7c, 0xdf, 0x24, 0x85, 0x66, 0xc2, 0x19, 0x55, 0x5c, 0x50,
+	0xf6, 0x22, 0x89, 0xf8, 0xa0, 0x98, 0xf4, 0x52, 0xc1, 0x15, 0x47, 0x8d, 0x82, 0xe0, 0x4c, 0xa1,
+	0xee, 0x71, 0xc6, 0x08, 0x56, 0x94, 0x33, 0x19, 0xaa, 0x67, 0x25, 0x11, 0x82, 0x03, 0x45, 0x13,
+	0x62, 0x9b, 0x6d, 0xb3, 0x53, 0x09, 0xb2, 0x6f, 0x74, 0x07, 0x08, 0x6f, 0xfa, 0x62, 0xb6, 0x48,
+	0x66, 0x44, 0xd8, 0xff, 0xb2, 0x8e, 0xc6, 0x96, 0xe2, 0x67, 0x82, 0x33, 0x84, 0xe6, 0x2e, 0x36,
+	0x20, 0xef, 0x0b, 0x22, 0x15, 0x3a, 0x83, 0x8a, 0xa4, 0x0c, 0xaf, 0xf1, 0xba, 0x58, 0xbd, 0x2e,
+	0x98, 0xa2, 0xf3, 0x1c, 0xa9, 0x0b, 0x67, 0x0e, 0x76, 0x11, 0x23, 0x53, 0xce, 0x24, 0x41, 0x13,
+	0xd8, 0xde, 0x1b, 0xcb, 0x95, 0x68, 0x9b, 0xed, 0xff, 0x1d, 0xcb, 0xbd, 0xee, 0x15, 0x2f, 0x50,
+	0xe0, 0xd4, 0xf1, 0xce, 0x8b, 0xf3, 0x69, 0x42, 0x75, 0xed, 0xb2, 0x0f, 0xc7, 0x09, 0x51, 0x82,
+	0x62, 0x19, 0xab, 0x65, 0xaa, 0xcd, 0x9e, 0xba, 0x57, 0x25, 0xe0, 0x27, 0xdd, 0x16, 0x2d, 0x53,
+	0x12, 0x58, 0xc9, 0xa6, 0x40, 0xaf, 0x70, 0x51, 0x30, 0x18, 0x0b, 0xcd, 0xcf, 0x62, 0x5a, 0x6e,
+	0x77, 0x1f, 0xa3, 0x7a, 0x62, 0x64, 0x04, 0x4d, 0x5c, 0x2e, 0x0d, 0x8e, 0xa0, 0x9a, 0x73, 0x9d,
+	0x2f, 0x13, 0x6a, 0x3f, 0x27, 0xfa, 0x83, 0x10, 0x6f, 0xd0, 0x2a, 0x0b, 0xa1, 0x17, 0xe4, 0x29,
+	0x6e, 0xf7, 0x4a, 0xa1, 0x47, 0x46, 0x46, 0x60, 0xe3, 0x5f, 0xb4, 0x01, 0x40, 0x6d, 0x8d, 0xee,
+	0xde, 0x80, 0xb5, 0x65, 0x0a, 0x9d, 0x43, 0xc3, 0x1b, 0xfb, 0xfe, 0xd0, 0x8b, 0x1e, 0xc7, 0x7e,
+	0x18, 0x87, 0x51, 0x3f, 0x0a, 0xeb, 0x86, 0x3b, 0x85, 0x13, 0x6f, 0x4e, 0x09, 0x53, 0xa1, 0xde,
+	0x8b, 0x1e, 0xa0, 0x3a, 0x11, 0x1c, 0x13, 0x29, 0x51, 0xab, 0xc4, 0x56, 0x7e, 0xb1, 0xd6, 0x65,
+	0xa9, 0xa6, 0x57, 0x3b, 0xc6, 0xec, 0x30, 0xfb, 0x5f, 0xee, 0xbf, 0x03, 0x00, 0x00, 0xff, 0xff,
+	0x2b, 0x82, 0x28, 0x8c, 0x4a, 0x03, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.

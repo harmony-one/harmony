@@ -27,6 +27,7 @@ const (
 	ClientSupport
 	SupportExplorer
 	Consensus
+	MonitoringService
 	Randomness
 	BlockProposal
 	NetworkInfo
@@ -45,6 +46,8 @@ func (t Type) String() string {
 		return "SupportExplorer"
 	case ClientSupport:
 		return "ClientSupport"
+	case MonitoringService:
+		return "MonitoringService"
 	case Consensus:
 		return "Consensus"
 	case Randomness:

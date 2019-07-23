@@ -7,34 +7,35 @@ service ClientService {
 }
 
 enum MetricsType {
-	CONNECTIONS_NUMBERS = 0;
+	CONNECTIONS_STATS = 0;
 }
 
-message ConnectionsNumbersRequest {
+message ConnectionsStats {
+	int32 time = 1;
+	int32 connections_number = 2;
+}
+
+
+message ConnectionsStatsRequest {
 	int32 since = 1;
 	int32 until = 2;
+}
+
+message ConnectionsStatsResponse {
+	repeated ConnectionsStats connections_stats = 1;
 }
 
 
 message Request {
 	MetricsType metrics_type = 1;
 	oneof request {
-		ConnectionsNumbersRequest connections_numbers_request = 2;
+		ConnectionsStatsRequest connections_stats_request = 2;
 	}
 }
 
 message Response {
 	MetricsType metrics_type = 1;
 	oneof response {
-		ConnectionsNumbersResponse connections_numbers_response = 2;
+		ConnectionsStatsResponse connections_stats_response = 2;
 	}
-}
-
-message ConnectionsNumbersResponse {
-	repeated ConnectionsNumber connections_numbers = 1;
-}
-
-message ConnectionsNumber {
-	int32 time = 1;
-	int32 connections_number = 2;
 }

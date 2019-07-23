@@ -200,6 +200,8 @@ type Node struct {
 	isFirstTime bool // the node was started with a fresh database
 	// How long in second the leader needs to wait to propose a new block.
 	BlockPeriod time.Duration
+
+	metricsStorage *utils.MetricsStorage
 }
 
 // Blockchain returns the blockchain for the node's current shard.
@@ -387,6 +389,9 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 	// start the goroutine to receive global message, used for cross-shard TX
 	// FIXME (leo): we use beacon client topic as the global topic for now
 	go node.ReceiveGlobalMessage()
+
+	// start the goroutine to collect and store metrics into ldb.
+	go node.CollectMetrics()
 
 	// Setup initial state of syncing.
 	node.peerRegistrationRecord = make(map[string]*syncConfig)

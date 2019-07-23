@@ -2,31 +2,22 @@ package monitoringservice
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"math/big"
 	"net"
-	"net/http"
-	"os"
 	"strconv"
 
 	"google.golang.org/grpc"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
-	"github.com/harmony-one/harmony/core/types"
-	common2 "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 )
 
 // Constants for monitoring service.
 const (
-	monitoringServicePortDifference = 29000
+	monitoringServicePortDifference = 900
 )
 
 // Service is the struct for monitoring service.
@@ -34,7 +25,7 @@ type Service struct {
 	IP                string
 	Port              string
 	GetNodeIDs        func() []libp2p_peer.ID
-	storage           *Storage
+	storage           *utils.MetricsStorage
 	server            *grpc.Server
 	messageChan       chan *msg_pb.Message
 }
@@ -63,7 +54,7 @@ func (s *Service) StopService() {
 // GetMonitoringServicePort returns the port serving monitorign service dashboard. This port is monitoringServicePortDifference less than the node port.
 func GetMonitoringSerivcePort(nodePort string) string {
 	if port, err := strconv.Atoi(nodePort); err == nil {
-		return fmt.Sprintf("%d", nodePort-monitoringServicePortDifference)
+		return fmt.Sprintf("%d", port-monitoringServicePortDifference)
 	}
 	utils.Logger().Error().Msg("error on parsing.")
 	return ""
@@ -71,13 +62,14 @@ func GetMonitoringSerivcePort(nodePort string) string {
 
 
 // Run is to run serving monitoring service.
-func (s *Service) Run(remove bool) (*Server, error) {
-	s.storage = GetStorageInstance(s.IP, s.Port, remove)
-	addr := net.JoinHostPort(s.IP, s.Port-monitoringServicePortDifference)
-	lis, err := net.Listen("tcp", addr)
+func (s *Service) Run(remove bool) (*grpc.Server, error) {
+	s.storage = utils.GetMetricsStorageInstance(s.IP, s.Port, remove)
+	port, err := strconv.Atoi(s.Port); 
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		return nil, err
 	}
+	addr := net.JoinHostPort(s.IP, strconv.Itoa(port-monitoringServicePortDifference))
+	lis, err := net.Listen("tcp", addr)
 	var opts []grpc.ServerOption
 	s.server = grpc.NewServer(opts...)
 	RegisterClientServiceServer(s.server, s)
@@ -89,52 +81,28 @@ func (s *Service) Run(remove bool) (*Server, error) {
 	return s.server, nil
 }
 
-// ReadConnectionsNumberFromDB returns a list of connections numbers to server connections number end-point.
-func (s *Service) ReadConnectionsNumberFromDB(since, until uint) []uint {
-	connectionsNumbers := []uint
-	for i := since; i <= until; i++ {
-		if i < 0 {
-			connectionsNumbers = append(connectionsNumbers, nil)
-			continue
-		}
-		key := GetConnectionsNumberKey(i)
-		data, err := storage.db.Get([]byte(key))
-		if err != nil {
-			connectionsNumbers = append(connectionsNumbers, nil)
-			continue
-		}
-		connectionsNumber := uint(0)
-		if rlp.DecodeBytes(data, block) != nil {
-			utils.Logger().Error().Msg("Error on getting from db")
-			os.Exit(1)
-		}
-		connectionsNumbers = append(connectionsNumbers, connectionsNumber)
-	}
-	return connectionsNumbers
-}
 
 
 // Process processes the Request and returns Response
 func (s *Service) Process(ctx context.Context, request *Request) (*Response, error) {
-	if request.GetMetricsType() != MetricsType_CONNECTIONS_NUMBER {
-		return &Response{}, ErrWrongMessage
+	if request.GetMetricsType() != MetricsType_CONNECTIONS_STATS {
+		return &Response{}, nil
 	}
-	connectionsNumbersRequest := request.GetConnectionsNumbersRequest()
-	since := connectionsNumbersRequest.GetSince() == nil ? 0 : connectionsNumbersRequest.GetSince()
-	until := connectionsNumbersRequest.GetUntil() == nil ? 0 : connectionsNumbersRequest.GetUntil()
+	connectionsStatsRequest := request.GetConnectionsStatsRequest()
+	since := int(connectionsStatsRequest.GetSince())
+	until := int(connectionsStatsRequest.GetUntil())
 
-
-	connectionsNumbers := s.ReadConnectionsNumbersDB(since, until)
-	parsedConnectionsNumbers := []*ConnectionsNumber{}
+	connectionsNumbers := s.storage.ReadConnectionsNumbersFromDB(since, until)
+	parsedConnectionsStats := []*ConnectionsStats{}
 	for currentTime, connectionsNumber := range connectionsNumbers {
-		parsedConnectionsNumbers = append(parsedConnectionsNumbers, ConnectionsNumber{Time: currentTime, ConnectionsNumber: connectionsNumber})
+		parsedConnectionsStats = append(parsedConnectionsStats, &ConnectionsStats{Time: int32(currentTime), ConnectionsNumber: int32(connectionsNumber)})
 	}
 
 	ret := &Response{
-		Response: &Response_ConnectionsNumbersResponse{
-			MetricsType: MetricsType_CONNECTIONS_NUMBER,
-			ConnectionsNumbersResponse: &ConnectionsNumbersResponse{
-				ConnnectionsNumbers: parsedConnectionsNumbers
+		MetricsType: MetricsType_CONNECTIONS_STATS,
+		Response: &Response_ConnectionsStatsResponse{
+			ConnectionsStatsResponse: &ConnectionsStatsResponse{
+				ConnectionsStats: parsedConnectionsStats,
 			},
 		},
 	}

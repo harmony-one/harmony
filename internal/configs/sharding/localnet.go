@@ -13,8 +13,8 @@ var LocalnetSchedule localnetSchedule
 type localnetSchedule struct{}
 
 const (
-	localnetV1Epoch = 10
-	localnetV2Epoch = 20
+	localnetV1Epoch = 1
+	localnetV2Epoch = 2
 )
 
 func (localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
@@ -26,6 +26,10 @@ func (localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	default: // genesis
 		return localnetV0
 	}
+}
+
+func (localnetSchedule) BlocksPerEpoch() uint64 {
+	return 10
 }
 
 var localnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(localnetV1Epoch), big.NewInt(localnetV2Epoch)}

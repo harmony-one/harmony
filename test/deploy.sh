@@ -179,7 +179,7 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
   case "${mode}" in
   newnode)
     sleep "${NUM_NN}"
-    NUM_NN=$((${NUM_NN} + 30))
+    NUM_NN=$((${NUM_NN} + 1))
     args=("${args[@]}" -is_newnode)
     ;;
   esac

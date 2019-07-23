@@ -1,15 +1,14 @@
-package monitoringservice
+package metrics
 
 import (
 	"fmt"
-	"os"
 	"strconv"
+	"os"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/rlp"
 
-	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 )
@@ -33,7 +32,7 @@ func GetConnectionsNumberKey(moment int) string {
 
 
 var storage *Storage
-var once sync.Once
+var onceMetrics sync.Once
 
 // Storage dump the block info into leveldb.
 type Storage struct {
@@ -42,16 +41,16 @@ type Storage struct {
 
 // GetStorageInstance returns attack model by using singleton pattern.
 func GetStorageInstance(ip, port string, remove bool) *Storage {
-	once.Do(func() {
+	onceMetrics.Do(func() {
 		storage = &Storage{}
 		storage.Init(ip, port, remove)
 	})
-	return storage
+	return Storage
 }
 
 // Init initializes connections number storage.
-func (storage *Storage) Init(ip, port string, remove bool) {
-	dbFileName := "/tmp/monitoring_service_storage_" + ip + "_" + port
+func (Storage *Storage) Init(ip, port string, remove bool) {
+	dbFileName := "/.hmy/db-metrics-" + ip + "-" + port
 	var err error
 	if remove {
 		var err = os.RemoveAll(dbFileName)
@@ -70,11 +69,8 @@ func (storage *Storage) GetDB() *ethdb.LDBDatabase {
 }
 
 // Dump get time and current connections number and index them into lvdb for monitoring service.
-func (storage *Storage) Dump(connectionsNumber int, currentTime int) {
+func (Storage *Storage) Dump(connectionsNumber int, currentTime int) {
 	utils.Logger().Info().Int("Unix Time", currentTime).Msg("Store current connections number")
-	if block == nil {
-		return
-	}
 
 	batch := storage.db.NewBatch()
 	// Update current connections number.
@@ -95,4 +91,24 @@ func (storage *Storage) Dump(connectionsNumber int, currentTime int) {
 	if err := batch.Write(); err != nil {
 		ctxerror.Warn(utils.GetLogger(), err, "cannot write batch")
 	}
+}
+
+
+// ReadConnectionsNumberFromDB returns a list of connections numbers to server connections number end-point.
+func (Storage *Storage) ReadConnectionsNumbersFromDB(since, until int) []int {
+	connectionsNumbers := make([]int, 0)
+	for i := since; i <= until; i++ {
+		key := GetConnectionsNumberKey(i)
+		data, err := Storage.db.Get([]byte(key))
+		if err != nil {
+			continue
+		}
+		connectionsNumber := 0
+		if rlp.DecodeBytes(data, connectionsNumber) != nil {
+			utils.Logger().Error().Msg("Error on getting from db")
+			os.Exit(1)
+		}
+		connectionsNumbers = append(connectionsNumbers, connectionsNumber)
+	}
+	return connectionsNumbers
 }
