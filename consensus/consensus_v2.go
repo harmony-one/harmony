@@ -238,6 +238,20 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 				Int("VRF numbers", len(consensus.pendingVrfs)).
 				Msg("[OnAnnounce] validated the new VRF")
 		}
+
+		if !bytes.Equal(headerObj.RandPreimage[:], zeroBytes) {
+			vdf := vdf_go.New(vdfDifficulty, headerObj.RandPreimage)
+			if vdf.Verify(headerObj.Vdf) {
+				consensus.getLogger().Info().
+					Uint64("MsgBlockNum", headerObj.Number.Uint64()).
+					Msg("[OnAnnounce] validated the new VDF")
+			} else {
+				consensus.getLogger().Warn().
+					Str("MsgBlockNum", headerObj.Number.String()).
+					Msg("[OnAnnounce] VDF proof is not valid")
+				return
+			}
+		}
 	}
 
 	logMsgs := consensus.PbftLog.GetMessagesByTypeSeqView(msg_pb.MessageType_ANNOUNCE, recvMsg.BlockNum, recvMsg.ViewID)
@@ -1122,8 +1136,6 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 								consensus.RndChannel <- rndBytes
 							}()
 						}
-
-
 					}
 
 					vdf, seed, err := consensus.GetNextRnd()
