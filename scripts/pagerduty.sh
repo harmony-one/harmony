@@ -26,16 +26,16 @@ RESOLVE="\
 JSON_HEADER="Content-Type: application/json"
 POSTURL="https://events.pagerduty.com/v2/enqueue"
 
-# Bingo check constants
+# Validation check constants
 if [[ -f "triggered" ]]
   then
     triggered=$(< triggered)
   else
     triggered=false
 fi
-lastbingo=$(tail -n 1000 latest/*.log | tac | grep -ai -m 1 bingo)
-bingotime=$(echo $lastbingo | cut -f 2 -d 'r' | cut -c 16-34 | tr T \ )
-latest=$(date -d "$bingotime" +%s)
+validation=$(tail -n 1000 $LOGFILE | tac | grep -ai -m 1 "bingo\|hooray")
+timestamp=$(echo $validation | cut -f 3 -d 't' | cut -c 4-22 | tr T \ )
+latest=$(date -d "$timestamp" +%s)
 curtime=$(date +%s)
 delay=60
 
