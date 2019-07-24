@@ -34,8 +34,6 @@ function cleanup() {
        echo 'Killed process: '$pid
        $DRYRUN kill -9 $pid 2> /dev/null
    done
-   rm -rf ./db/harmony_*
-   rm -rf ./db*
 }
 
 function killnode() {
@@ -175,7 +173,7 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
         then
           echo ""${blspub}.key" already in local."
        else
-          aws s3 cp "s3://harmony-secret-keys/bls-test/${blspub}.key" .hmy
+          aws s3 cp "s3://harmony-secret-keys/bls/${blspub}.key" .hmy
       fi
 
       args=("${base_args[@]}" -ip "${ip}" -port "${port}" -key "/tmp/${ip}-${port}.key" -db_dir "db-${ip}-${port}" -accounts "${account}" -blspass file:blspass.txt -blskey_file ".hmy/${blspub}.key")
