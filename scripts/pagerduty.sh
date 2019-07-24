@@ -2,8 +2,8 @@
 
 # Pagerduty constants
 LOGFILE="/home/tmp_log/log-20190628.153354/*.log"
-LOG=$(tail -n 1000 $logfile)
-SHARD_NUM=$(echo "$log" | grep -oE -m 1 "Shard\":.?" | rev | cut -c 1)
+LOG=$(tail -n 1000 $LOGFILE)
+SHARD_NUM=$(echo "$LOG" | grep -oE -m 1 "Shard\":.?" | rev | cut -c 1)
 IP=$(dig -4 @resolver1.opendns.com ANY myip.opendns.com +short)
 KEY="5d11f6173899423689b6fc98691930de"
 TRIGGER="\
@@ -33,7 +33,7 @@ if [[ -f "triggered" ]]
   else
     triggered=false
 fi
-validation=$(tail -n 1000 $LOGFILE | tac | grep -ai -m 1 "bingo\|hooray")
+validation=$(echo "$LOG" | tac | grep -ai -m 1 "bingo\|hooray")
 timestamp=$(echo $validation | cut -f 3 -d 't' | cut -c 4-22 | tr T \ )
 latest=$(date -d "$timestamp" +%s)
 curtime=$(date +%s)
