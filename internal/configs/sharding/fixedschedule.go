@@ -23,6 +23,10 @@ func (s fixedSchedule) BlocksPerEpoch() uint64 {
 	return VLBPE
 }
 
+func (s fixedSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
+	return big.NewInt(int64(blockNum / s.BlocksPerEpoch()))
+}
+
 // NewFixedSchedule returns a sharding configuration schedule that uses the
 // given config instance for all epochs.  Useful for testing.
 func NewFixedSchedule(instance Instance) Schedule {

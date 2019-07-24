@@ -15,6 +15,9 @@ type Schedule interface {
 
 	// BlocksPerEpoch returns the number of blocks per each Epoch
 	BlocksPerEpoch() uint64
+
+	// CalcEpochNumber returns the epoch number based on the block number
+	CalcEpochNumber(blockNum uint64) *big.Int
 }
 
 // Instance is one sharding configuration instance.

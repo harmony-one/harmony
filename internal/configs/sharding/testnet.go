@@ -15,6 +15,9 @@ type testnetSchedule struct{}
 const (
 	testnetV1Epoch = 1
 	testnetV2Epoch = 2
+
+	testnetEpochBlock1 = 77
+	threeOne           = 111
 )
 
 func (testnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
@@ -30,7 +33,17 @@ func (testnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 
 func (testnetSchedule) BlocksPerEpoch() uint64 {
 	// 8 seconds per block, roughly 86400 blocks, around one day
-	return 60
+	return threeOne
+}
+
+func (ts testnetSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
+	blocks := ts.BlocksPerEpoch()
+	switch {
+	case blockNum > testnetEpochBlock1:
+		return big.NewInt(int64((blockNum - testnetEpochBlock1) / blocks))
+	default:
+		return big.NewInt(0)
+	}
 }
 
 var testnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(testnetV1Epoch), big.NewInt(testnetV2Epoch)}
