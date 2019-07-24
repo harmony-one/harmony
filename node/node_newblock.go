@@ -7,7 +7,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 
-	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -64,7 +63,7 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 					}
 
 					//TODO: remove it after shard0 fix
-					if node.Blockchain().CurrentBlock().NumberU64() == consensus.ReProposeBlockNum && firstTime {
+					if node.Consensus.NeedsBlockRecovery(node.Blockchain().CurrentBlock().NumberU64()) && firstTime {
 						firstTime = false
 						newBlock := node.Blockchain().CurrentBlock()
 						node.BlockChannel <- newBlock

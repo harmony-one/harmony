@@ -336,8 +336,8 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 		// the sequence number is the next block number to be added in consensus protocol, which is always one more than current chain header block
 		// TODO: remove it after fix
-		if chain.CurrentBlock().NumberU64() == consensus.ReProposeBlockNum {
-			node.Consensus.SetBlockNum(consensus.ReProposeBlockNum)
+		if node.Consensus.NeedsBlockRecovery(chain.CurrentBlock().NumberU64()) {
+			node.Consensus.SetBlockNum(node.Consensus.RecoveryBlockNumber(node.Consensus.ShardID))
 		} else {
 			node.Consensus.SetBlockNum(chain.CurrentBlock().NumberU64() + 1)
 		}
