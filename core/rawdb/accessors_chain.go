@@ -448,6 +448,27 @@ func WriteShardStateBytes(
 	return nil
 }
 
+// ReadLastCommits retrieves LastCommits.
+func ReadLastCommits(db DatabaseReader) ([]byte, error) {
+	var data []byte
+	data, err := db.Get(lastCommitsKey)
+	if err != nil {
+		return nil, ctxerror.New("cannot read last commits from rawdb").WithCause(err)
+	}
+	return data, nil
+}
+
+// WriteLastCommits stores last commits into database.
+func WriteLastCommits(
+	db DatabaseWriter, data []byte,
+) (err error) {
+	if err = db.Put(lastCommitsKey, data); err != nil {
+		return ctxerror.New("cannot write last commits").WithCause(err)
+	}
+	utils.GetLogger().Info("wrote last commits", "numShards", len(data))
+	return nil
+}
+
 // ReadEpochBlockNumber retrieves the epoch block number for the given epoch,
 // or nil if the given epoch is not found in the database.
 func ReadEpochBlockNumber(db DatabaseReader, epoch *big.Int) (*big.Int, error) {
