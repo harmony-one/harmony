@@ -333,28 +333,23 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 			nodeConfig.SetIsBeacon(true)
 			if nodeConfig.StringRole == "leader" {
 				currentNode.NodeConfig.SetRole(nodeconfig.BeaconLeader)
-				currentNode.NodeConfig.SetIsLeader(true)
 			} else {
 				currentNode.NodeConfig.SetRole(nodeconfig.BeaconValidator)
-				currentNode.NodeConfig.SetIsLeader(false)
 			}
 			currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
 			currentNode.NodeConfig.SetClientGroupID(p2p.GroupIDBeaconClient)
 		} else {
 			if nodeConfig.StringRole == "leader" {
 				currentNode.NodeConfig.SetRole(nodeconfig.ShardLeader)
-				currentNode.NodeConfig.SetIsLeader(true)
 			} else {
 				currentNode.NodeConfig.SetRole(nodeconfig.ShardValidator)
-				currentNode.NodeConfig.SetIsLeader(false)
 			}
 			currentNode.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
 			currentNode.NodeConfig.SetClientGroupID(p2p.NewClientGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
 		}
 	} else {
 		if *isNewNode {
-			currentNode.NodeConfig.SetIsLeader(false) // newnode can't be the leader
-			if nodeConfig.ShardID == 0 {              // Beacon chain
+			if nodeConfig.ShardID == 0 { // Beacon chain
 				nodeConfig.SetIsBeacon(true)
 				currentNode.NodeConfig.SetRole(nodeconfig.BeaconValidator)
 				currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
@@ -367,7 +362,6 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 		}
 		if *isExplorer {
 			currentNode.NodeConfig.SetRole(nodeconfig.ExplorerNode)
-			currentNode.NodeConfig.SetIsLeader(false)
 			currentNode.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(*shardID)))
 			currentNode.NodeConfig.SetClientGroupID(p2p.NewClientGroupIDByShardID(p2p.ShardID(*shardID)))
 		}

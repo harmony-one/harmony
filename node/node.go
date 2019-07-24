@@ -270,7 +270,7 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int, coinbase common.Addr
 
 // MaybeKeepSendingPongMessage keeps sending pong message if the current node is a leader.
 func (node *Node) MaybeKeepSendingPongMessage() {
-	if nodeconfig.GetDefaultConfig().IsLeader() {
+	if node.Consensus.IsLeader() {
 		go node.SendPongMessage()
 	}
 }
@@ -371,11 +371,6 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 	}
 
 	utils.GetLogInstance().Info("Genesis block hash", "genesis block header", node.Blockchain().GetBlockByNumber(0).Header())
-	if consensusObj != nil && nodeconfig.GetDefaultConfig().IsLeader() {
-		node.State = NodeLeader
-	} else {
-		node.State = NodeInit
-	}
 
 	// start the goroutine to receive client message
 	// client messages are sent by clients, like txgen, wallet
@@ -459,8 +454,6 @@ func (node *Node) AddPeers(peers []*p2p.Peer) int {
 	// Only leader needs to add the peer info into consensus
 	// Validators will receive the updated peer info from Leader via pong message
 	// TODO: remove this after fully migrating to beacon chain-based committee membership
-	//if count > 0 && node.NodeConfig.IsLeader() {
-	//	node.Consensus.AddPeers(peers)
 	//	// TODO: make peers into a context object shared by consensus and drand
 	//	node.DRand.AddPeers(peers)
 	//}
