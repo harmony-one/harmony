@@ -151,7 +151,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	}
 
 	// TODO: remove it after shard0 fix
-	if recvMsg.BlockNum == ReProposeBlockNum {
+	if consensus.NeedsBlockRecovery(recvMsg.BlockNum) {
 		consensus.getLogger().Debug("[OnAnnounce] Announce message Added", "MsgViewID", recvMsg.ViewID, "MsgBlockNum", recvMsg.BlockNum)
 		consensus.PbftLog.AddMessage(recvMsg)
 		consensus.mutex.Lock()
@@ -369,7 +369,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	consensus.getLogger().Info("[OnPrepared] Received prepared message", "MsgBlockNum", recvMsg.BlockNum, "MsgViewID", recvMsg.ViewID)
 
 	// TODO: remove it after fix
-	if recvMsg.BlockNum == ReProposeBlockNum {
+	if consensus.NeedsBlockRecovery(recvMsg.BlockNum) {
 		block := recvMsg.Block
 		var blockObj types.Block
 		err = rlp.DecodeBytes(block, &blockObj)
@@ -715,7 +715,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	}
 
 	// TODO: remove it after fix
-	if recvMsg.BlockNum == ReProposeBlockNum {
+	if consensus.NeedsBlockRecovery(recvMsg.BlockNum) {
 		consensus.PbftLog.AddMessage(recvMsg)
 		consensus.getLogger().Debug("[OnCommitted] Committed message added", "MsgViewID", recvMsg.ViewID, "MsgBlockNum", recvMsg.BlockNum)
 
@@ -848,7 +848,7 @@ func (consensus *Consensus) tryCatchup() {
 			break
 		}
 
-		if block.NumberU64() == ReProposeBlockNum && block.NumberU64() == consensus.ChainReader.CurrentHeader().Number.Uint64() {
+		if consensus.NeedsBlockRecovery(block.NumberU64()) && block.NumberU64() == consensus.ChainReader.CurrentHeader().Number.Uint64() {
 			consensus.getLogger().Info("[TryCatchup] Skip Commit ReProposeBlock")
 			consensus.blockNum = block.NumberU64() + 1
 			consensus.viewID = msgs[0].ViewID + 1
@@ -856,7 +856,7 @@ func (consensus *Consensus) tryCatchup() {
 			return
 		}
 
-		if block.NumberU64() == ReProposeBlockNum && block.NumberU64() != consensus.ChainReader.CurrentHeader().Number.Uint64() {
+		if consensus.NeedsBlockRecovery(block.NumberU64()) && block.NumberU64() != consensus.ChainReader.CurrentHeader().Number.Uint64() {
 			consensus.getLogger().Info("[TryCatchup] Commit ReProposeBlock")
 			consensus.blockNum = block.NumberU64() + 1
 			consensus.viewID = msgs[0].ViewID + 1

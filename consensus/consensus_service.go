@@ -651,3 +651,25 @@ func (consensus *Consensus) updateConsensusInformation() {
 		consensus.LeaderPubKey = leaderPubKey
 	}
 }
+
+// NeedsBlockRecovery returns true if the current block needs recovery
+func (consensus *Consensus) NeedsBlockRecovery(blockNum uint64) bool {
+	switch {
+	case blockNum == ReProposeBlockNumShard0 && consensus.ShardID == 0:
+		return true
+	case blockNum == ReProposeBlockNumShard2 && consensus.ShardID == 2:
+		return true
+	}
+	return false
+}
+
+// RecoveryBlockNumber returns the recovery block number of a shard
+func (consensus *Consensus) RecoveryBlockNumber(shardID uint32) uint64 {
+	switch {
+	case consensus.ShardID == 0:
+		return ReProposeBlockNumShard0
+	case consensus.ShardID == 2:
+		return ReProposeBlockNumShard2
+	}
+	return 0
+}
