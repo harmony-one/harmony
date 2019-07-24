@@ -15,6 +15,8 @@ const (
 	maxLogSize        uint32        = 1000
 	// threshold between received consensus message blockNum and my blockNum
 	consensusBlockNumBuffer uint64 = 2
+	// ReProposeBlockNum: leader propose this block from it's database and validators accept them
+	ReProposeBlockNum uint64 = 270108
 )
 
 // TimeoutType is the type of timeout in view change protocol
