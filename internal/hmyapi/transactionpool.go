@@ -171,7 +171,10 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 	// Assign receipt status or post state.
 	if len(receipt.PostState) > 0 {
 		fields["root"] = hexutil.Bytes(receipt.PostState)
+		// fields["root"] = hexutil.Bytes(receipt.PostState)
 	} else {
+		// 0x0 failed
+		// 0x1 success
 		fields["status"] = hexutil.Uint(receipt.Status)
 	}
 	if receipt.Logs == nil {
