@@ -15,7 +15,6 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -148,7 +147,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 
 func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	consensus.getLogger().Debug().Msg("[OnAnnounce] Receive announce message")
-	if consensus.PubKey.IsEqual(consensus.LeaderPubKey) && consensus.mode.Mode() == Normal {
+	if consensus.IsLeader() && consensus.mode.Mode() == Normal {
 		return
 	}
 
@@ -274,7 +273,7 @@ func (consensus *Consensus) prepare() {
 
 // TODO: move to consensus_leader.go later
 func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
-	if !consensus.PubKey.IsEqual(consensus.LeaderPubKey) {
+	if !consensus.IsLeader() {
 		return
 	}
 
@@ -398,7 +397,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 
 func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	consensus.getLogger().Debug().Msg("[OnPrepared] Received Prepared message")
-	if consensus.PubKey.IsEqual(consensus.LeaderPubKey) && consensus.mode.Mode() == Normal {
+	if consensus.IsLeader() && consensus.mode.Mode() == Normal {
 		return
 	}
 
@@ -578,7 +577,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 
 // TODO: move it to consensus_leader.go later
 func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
-	if !consensus.PubKey.IsEqual(consensus.LeaderPubKey) {
+	if !consensus.IsLeader() {
 		return
 	}
 
@@ -797,7 +796,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		return
 	}
 
-	if consensus.PubKey.IsEqual(consensus.LeaderPubKey) && consensus.mode.Mode() == Normal {
+	if consensus.IsLeader() && consensus.mode.Mode() == Normal {
 		return
 	}
 
@@ -1014,17 +1013,16 @@ func (consensus *Consensus) tryCatchup() {
 // Start waits for the next new block and run consensus
 func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan struct{}, stoppedChan chan struct{}, startChannel chan struct{}) {
 	go func() {
-		if nodeconfig.GetDefaultConfig().IsLeader() {
+		if consensus.IsLeader() {
 			consensus.getLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Waiting for consensus start")
 			<-startChannel
 
-			if nodeconfig.GetDefaultConfig().IsLeader() {
-				// send a signal to indicate it's ready to run consensus
-				// this signal is consumed by node object to create a new block and in turn trigger a new consensus on it
-				go func() {
-					consensus.ReadySignal <- struct{}{}
-				}()
-			}
+			// send a signal to indicate it's ready to run consensus
+			// this signal is consumed by node object to create a new block and in turn trigger a new consensus on it
+			go func() {
+				consensus.getLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Send ReadySignal")
+				consensus.ReadySignal <- struct{}{}
+			}()
 		}
 		consensus.getLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Consensus started")
 		defer close(stoppedChan)

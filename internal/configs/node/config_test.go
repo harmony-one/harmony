@@ -13,19 +13,9 @@ func TestNodeConfigSingleton(t *testing.T) {
 	// get the singleton variable
 	c := GetShardConfig(Global)
 
-	c.SetIsLeader(true)
-
-	if !c.IsLeader() {
-		t.Errorf("IsLeader = %v, expected = %v", c.IsLeader(), true)
-	}
-
 	c.SetBeaconGroupID(p2p.GroupIDBeacon)
 
 	d := GetShardConfig(Global)
-
-	if !d.IsLeader() {
-		t.Errorf("IsLeader = %v, expected = %v", d.IsLeader(), true)
-	}
 
 	g := d.GetBeaconGroupID()
 

@@ -18,7 +18,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	common2 "github.com/harmony-one/harmony/internal/common"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/internal/memprofiling"
@@ -240,13 +239,6 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 	consensus.mode = PbftMode{mode: Normal}
 	// pbft timeout
 	consensus.consensusTimeout = createTimeout()
-
-	selfPeer := host.GetSelfPeer()
-	if leader.Port == selfPeer.Port && leader.IP == selfPeer.IP {
-		nodeconfig.GetDefaultConfig().SetIsLeader(true)
-	} else {
-		nodeconfig.GetDefaultConfig().SetIsLeader(false)
-	}
 
 	consensus.prepareSigs = map[string]*bls.Sign{}
 	consensus.commitSigs = map[string]*bls.Sign{}

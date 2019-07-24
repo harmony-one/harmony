@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/harmony-one/harmony/crypto/bls"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
@@ -23,10 +22,6 @@ func TestNew(test *testing.T) {
 	}
 	if consensus.viewID != 0 {
 		test.Errorf("Consensus Id is initialized to the wrong value: %d", consensus.viewID)
-	}
-
-	if !nodeconfig.GetDefaultConfig().IsLeader() {
-		test.Error("Consensus should belong to a leader")
 	}
 
 	if consensus.ReadySignal == nil {
