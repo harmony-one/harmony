@@ -16,7 +16,6 @@ type NodeConfig struct {
 	Client       p2p.GroupID                    // the client group ID of the shard
 	IsClient     bool                           // whether this node is a client node, such as wallet/txgen
 	IsBeacon     bool                           // whether this node is a beacon node or not
-	IsLeader     bool                           // whether this node is a leader or not
 	ShardID      uint32                         // shardID of this node
 	Actions      map[p2p.GroupID]p2p.ActionType // actions on the groups
 }

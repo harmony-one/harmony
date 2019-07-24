@@ -22,7 +22,6 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -398,7 +397,7 @@ func (consensus *Consensus) ResetState() {
 // Returns a string representation of this consensus
 func (consensus *Consensus) String() string {
 	var duty string
-	if nodeconfig.GetDefaultConfig().IsLeader() {
+	if consensus.IsLeader() {
 		duty = "LDR" // leader
 	} else {
 		duty = "VLD" // validator
@@ -666,4 +665,13 @@ func (consensus *Consensus) updateConsensusInformation() {
 			Msg("[SYNC] Most Recent LeaderPubKey Updated Based on BlockChain")
 		consensus.LeaderPubKey = leaderPubKey
 	}
+}
+
+// IsLeader check if the node is a leader or not by comparing the public key of
+// the node with the leader public key
+func (consensus *Consensus) IsLeader() bool {
+	if consensus.PubKey != nil && consensus.LeaderPubKey != nil {
+		return consensus.PubKey.IsEqual(consensus.LeaderPubKey)
+	}
+	return false
 }
