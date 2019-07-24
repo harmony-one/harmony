@@ -126,14 +126,15 @@ type BlockChain struct {
 	currentBlock     atomic.Value // Current head of the block chain
 	currentFastBlock atomic.Value // Current head of the fast-sync chain (may be above the block chain!)
 
-	stateCache      state.Database // State database to reuse between imports (contains state cache)
-	bodyCache       *lru.Cache     // Cache for the most recent block bodies
-	bodyRLPCache    *lru.Cache     // Cache for the most recent block bodies in RLP encoded format
-	receiptsCache   *lru.Cache     // Cache for the most recent receipts per block
-	blockCache      *lru.Cache     // Cache for the most recent entire blocks
-	futureBlocks    *lru.Cache     // future blocks are blocks added for later processing
-	shardStateCache *lru.Cache
-	epochCache      *lru.Cache // Cache epoch number → first block number
+	stateCache       state.Database // State database to reuse between imports (contains state cache)
+	bodyCache        *lru.Cache     // Cache for the most recent block bodies
+	bodyRLPCache     *lru.Cache     // Cache for the most recent block bodies in RLP encoded format
+	receiptsCache    *lru.Cache     // Cache for the most recent receipts per block
+	blockCache       *lru.Cache     // Cache for the most recent entire blocks
+	futureBlocks     *lru.Cache     // future blocks are blocks added for later processing
+	shardStateCache  *lru.Cache
+	lastCommitsCache *lru.Cache
+	epochCache       *lru.Cache // Cache epoch number → first block number
 
 	quit    chan struct{} // blockchain quit channel
 	running int32         // running must be called atomically
@@ -1690,6 +1691,10 @@ func (bc *BlockChain) WriteShardStateBytes(
 
 // ReadLastCommits retrieves last commits.
 func (bc *BlockChain) ReadLastCommits() ([]byte, error) {
+	if cached, ok := bc.lastCommitsCache.Get("lastCommits"); ok {
+		lastCommits := cached.([]byte)
+		return lastCommits, nil
+	}
 	lastCommits, err := rawdb.ReadLastCommits(bc.db)
 	if err != nil {
 		return nil, err
@@ -1703,6 +1708,7 @@ func (bc *BlockChain) WriteLastCommits(lastCommits []byte) error {
 	if err != nil {
 		return err
 	}
+	bc.lastCommitsCache.Add("lastCommits", lastCommits)
 	return nil
 }
 

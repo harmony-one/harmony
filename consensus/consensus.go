@@ -73,7 +73,7 @@ type Consensus struct {
 	vcLock       sync.Mutex // mutex for view change
 
 	// The chain reader for the blockchain this consensus is working on
-	Chain *core.BlockChain
+	ChainReader *core.BlockChain
 
 	// map of nodeID to validator Peer object
 	validators sync.Map // key is the hex string of the blsKey, value is p2p.Peer

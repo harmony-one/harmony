@@ -359,7 +359,7 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 		"address", common.MustAddressToBech32(currentNode.StakingAccount.Address))
 
 	// TODO: refactor the creation of blockchain out of node.New()
-	currentConsensus.Chain = currentNode.Blockchain()
+	currentConsensus.ChainReader = currentNode.Blockchain()
 
 	// TODO: the setup should only based on shard state
 	if *isGenesis {
