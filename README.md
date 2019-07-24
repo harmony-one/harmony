@@ -21,42 +21,38 @@ The required go version is: **go1.12**
 
 ```bash
 export GOPATH=$HOME/<path_of_your_choice>
-export CGO_CFLAGS="-I$GOPATH/src/github.com/harmony-one/bls/include -I$GOPATH/src/github.com/harmony-one/mcl/include -I/usr/local/opt/openssl/include"
-export CGO_LDFLAGS="-L$GOPATH/src/github.com/harmony-one/bls/lib -L/usr/local/opt/openssl/lib"
-export LD_LIBRARY_PATH=$GOPATH/src/github.com/harmony-one/bls/lib:$GOPATH/src/github.com/harmony-one/mcl/lib:/usr/local/opt/openssl/lib
-export LIBRARY_PATH=$LD_LIBRARY_PATH
-export DYLD_FALLBACK_LIBRARY_PATH=$LD_LIBRARY_PATH
 
 mkdir -p $HOME/<path_of_your_choice>/src/github.com/harmony-one
 
 cd $HOME/<path_of_your_choice>/src/github.com/harmony-one
 
 git clone git@github.com:harmony-one/mcl.git
-
-cd mcl && make -j4 && cd ..
-
 git clone git@github.com:harmony-one/bls.git
-
-cd bls && make BLS_SWAP_G=1 -j4 && cd ..
-
 git clone git@github.com:harmony-one/harmony.git
 
 cd harmony
 
-export GO111MODULE=on
-
-./scripts/go_executable_build.sh
+make
 
 ```
 
 ## Build
 
+If you want to bypass the Makefile:
+
+```bash
+export CGO_CFLAGS="-I$GOPATH/src/github.com/harmony-one/bls/include -I$GOPATH/src/github.com/harmony-one/mcl/include -I/usr/local/opt/openssl/include"
+export CGO_LDFLAGS="-L$GOPATH/src/github.com/harmony-one/bls/lib -L/usr/local/opt/openssl/lib"
+export LD_LIBRARY_PATH=$GOPATH/src/github.com/harmony-one/bls/lib:$GOPATH/src/github.com/harmony-one/mcl/lib:/usr/local/opt/openssl/lib
+export LIBRARY_PATH=$LD_LIBRARY_PATH
+export DYLD_FALLBACK_LIBRARY_PATH=$LD_LIBRARY_PATH
+export GO111MODULE=on
+```
 Note : Some of our scripts require bash 4.x support, please [install bash 4.x](http://tldrdevnotes.com/bash-upgrade-3-4-macos) on MacOS X.
-Make sure you set `export GO111MODULE=on`.
 
 ### Build all executables
 
-You can  run the script `./scripts/go_executable_build.sh` to build all the executables.
+You can run the script `./scripts/go_executable_build.sh` to build all the executables.
 
 ### Build individual executables
 
