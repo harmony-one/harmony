@@ -104,7 +104,7 @@ func setUpTXGen() *node.Node {
 	txGen := node.New(myhost, consensusObj, chainDBFactory, false) //Changed it : no longer archival node.
 	txGen.Client = client.NewClient(txGen.GetHost(), uint32(shardID))
 	consensusObj.SetStakeInfoFinder(gsif)
-	consensusObj.ChainReader = txGen.Blockchain()
+	consensusObj.Chain = txGen.Blockchain()
 	consensusObj.PublicKeys = nil
 	startIdx := 0
 	endIdx := startIdx + core.GenesisShardSize

@@ -10,7 +10,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 )
 
-// ChainReader defines a small collection of methods needed to access the local
+// Chain defines a small collection of methods needed to access the local
 // blockchain during header and/or uncle verification.
 // Note this reader interface is still in process of being integrated with the BFT consensus.
 type ChainReader interface {

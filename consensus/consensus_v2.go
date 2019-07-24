@@ -164,8 +164,8 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		return
 	}
 	if consensus.mode.Mode() == Normal {
-		if err = consensus.VerifyHeader(consensus.ChainReader, &headerObj, true); err != nil {
-			consensus.getLogger().Warn("[OnAnnounce] Block content is not verified successfully", "error", err, "inChain", consensus.ChainReader.CurrentHeader().Number, "MsgBlockNum", headerObj.Number)
+		if err = consensus.VerifyHeader(consensus.Chain, &headerObj, true); err != nil {
+			consensus.getLogger().Warn("[OnAnnounce] Block content is not verified successfully", "error", err, "inChain", consensus.Chain.CurrentHeader().Number, "MsgBlockNum", headerObj.Number)
 			return
 		}
 	}
@@ -398,8 +398,8 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		return
 	}
 	if consensus.mode.Mode() == Normal {
-		if err := consensus.VerifyHeader(consensus.ChainReader, blockObj.Header(), true); err != nil {
-			consensus.getLogger().Warn("[OnPrepared] Block header is not verified successfully", "error", err, "inChain", consensus.ChainReader.CurrentHeader().Number, "MsgBlockNum", blockObj.Header().Number)
+		if err := consensus.VerifyHeader(consensus.Chain, blockObj.Header(), true); err != nil {
+			consensus.getLogger().Warn("[OnPrepared] Block header is not verified successfully", "error", err, "inChain", consensus.Chain.CurrentHeader().Number, "MsgBlockNum", blockObj.Header().Number)
 			return
 		}
 		if consensus.BlockVerifier == nil {
@@ -598,6 +598,7 @@ func (consensus *Consensus) finalizeCommits() {
 		return
 	}
 	consensus.PbftLog.AddMessage(pbftMsg)
+	consensus.Chain.WriteLastCommits(pbftMsg.Payload)
 
 	// find correct block content
 	block := consensus.PbftLog.GetBlockByHash(consensus.blockHash)
@@ -691,6 +692,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	}
 
 	consensus.PbftLog.AddMessage(recvMsg)
+	consensus.Chain.WriteLastCommits(recvMsg.Payload)
 	consensus.getLogger().Debug("[OnCommitted] Committed message added", "MsgViewID", recvMsg.ViewID, "MsgBlockNum", recvMsg.BlockNum)
 
 	consensus.mutex.Lock()
@@ -740,17 +742,21 @@ func (consensus *Consensus) LastCommitSig() ([]byte, []byte, error) {
 	if consensus.blockNum <= 1 {
 		return nil, nil, nil
 	}
-	msgs := consensus.PbftLog.GetMessagesByTypeSeq(msg_pb.MessageType_COMMITTED, consensus.blockNum-1)
-	if len(msgs) != 1 {
-		return nil, nil, ctxerror.New("SetLastCommitSig failed with wrong number of committed message", "numCommittedMsg", len(msgs))
+	lastCommits, err := consensus.Chain.ReadLastCommits()
+	if err != nil || len(lastCommits) < 96 {
+		msgs := consensus.PbftLog.GetMessagesByTypeSeq(msg_pb.MessageType_COMMITTED, consensus.blockNum-1)
+		if len(msgs) != 1 {
+			return nil, nil, ctxerror.New("GetLastCommitSig failed with wrong number of committed message", "numCommittedMsg", len(msgs))
+		}
+		lastCommits = msgs[0].Payload
 	}
 	//#### Read payload data from committed msg
 	aggSig := make([]byte, 96)
-	bitmap := make([]byte, len(msgs[0].Payload)-96)
+	bitmap := make([]byte, len(lastCommits)-96)
 	offset := 0
-	copy(aggSig[:], msgs[0].Payload[offset:offset+96])
+	copy(aggSig[:], lastCommits[offset:offset+96])
 	offset += 96
-	copy(bitmap[:], msgs[0].Payload[offset:])
+	copy(bitmap[:], lastCommits[offset:])
 	//#### END Read payload data from committed msg
 	return aggSig, bitmap, nil
 }
@@ -784,7 +790,7 @@ func (consensus *Consensus) tryCatchup() {
 			return
 		}
 
-		if block.ParentHash() != consensus.ChainReader.CurrentHeader().Hash() {
+		if block.ParentHash() != consensus.Chain.CurrentHeader().Hash() {
 			consensus.getLogger().Debug("[TryCatchup] parent block hash not match")
 			break
 		}
@@ -875,7 +881,7 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 				consensus.getLogger().Info("Node is in sync")
 
 			case <-consensus.syncNotReadyChan:
-				consensus.SetBlockNum(consensus.ChainReader.CurrentHeader().Number.Uint64() + 1)
+				consensus.SetBlockNum(consensus.Chain.CurrentHeader().Number.Uint64() + 1)
 				consensus.mode.SetMode(Syncing)
 				consensus.getLogger().Info("Node is out of sync")
 

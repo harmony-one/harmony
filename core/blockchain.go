@@ -1688,6 +1688,24 @@ func (bc *BlockChain) WriteShardStateBytes(
 	return nil
 }
 
+// ReadLastCommits retrieves last commits.
+func (bc *BlockChain) ReadLastCommits() ([]byte, error) {
+	lastCommits, err := rawdb.ReadLastCommits(bc.db)
+	if err != nil {
+		return nil, err
+	}
+	return lastCommits, nil
+}
+
+// WriteLastCommits saves the commits of last block.
+func (bc *BlockChain) WriteLastCommits(lastCommits []byte) error {
+	err := rawdb.WriteLastCommits(bc.db, lastCommits)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // GetVdfByNumber retrieves the rand seed given the block number, return 0 if not exist
 func (bc *BlockChain) GetVdfByNumber(number uint64) [32]byte {
 	header := bc.GetHeaderByNumber(number)

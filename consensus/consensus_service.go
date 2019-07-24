@@ -606,7 +606,7 @@ func (consensus *Consensus) getLogger() log.Logger {
 
 // retrieve corresponding blsPublicKey from Coinbase Address
 func (consensus *Consensus) getLeaderPubKeyFromCoinbase(header *types.Header) (*bls.PublicKey, error) {
-	shardState, err := consensus.ChainReader.ReadShardState(header.Epoch)
+	shardState, err := consensus.Chain.ReadShardState(header.Epoch)
 	if err != nil {
 		return nil, ctxerror.New("cannot read shard state",
 			"epoch", header.Epoch,
@@ -639,7 +639,7 @@ func (consensus *Consensus) getLeaderPubKeyFromCoinbase(header *types.Header) (*
 
 // update consensus information before join consensus after state syncing
 func (consensus *Consensus) updateConsensusInformation() {
-	header := consensus.ChainReader.CurrentHeader()
+	header := consensus.Chain.CurrentHeader()
 	consensus.SetBlockNum(header.Number.Uint64() + 1)
 	consensus.SetViewID(header.ViewID.Uint64() + 1)
 	leaderPubKey, err := consensus.getLeaderPubKeyFromCoinbase(header)
