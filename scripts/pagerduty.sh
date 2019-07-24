@@ -10,7 +10,7 @@ TRIGGER="\
 {\
   \"routing_key\": \"$KEY\",\
   \"event_action\": \"trigger\",\
-  \"dedup_key\": \"$IP\",\
+  \"dedup_key\": \"validating-$IP\",\
   \"payload\": {\
     \"summary\": \"Node NOT validating: Shard-$SHARD_NUM: $IP\",\
     \"source\": \"$IP\",\
@@ -21,7 +21,7 @@ RESOLVE="\
 {\
   \"routing_key\": \"$KEY\",\
   \"event_action\": \"resolve\",\
-  \"dedup_key\": \"$IP\"\
+  \"dedup_key\": \"validating-$IP\"\
 }"
 JSON_HEADER="Content-Type: application/json"
 POSTURL="https://events.pagerduty.com/v2/enqueue"
