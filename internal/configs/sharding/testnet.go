@@ -40,9 +40,19 @@ func (ts testnetSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
 	blocks := ts.BlocksPerEpoch()
 	switch {
 	case blockNum > testnetEpochBlock1:
-		return big.NewInt(int64((blockNum - testnetEpochBlock1) / blocks))
+		return big.NewInt(int64((blockNum-testnetEpochBlock1)/blocks) + 1)
 	default:
 		return big.NewInt(0)
+	}
+}
+
+func (ts testnetSchedule) IsLastBlock(blockNum uint64) bool {
+	blocks := ts.BlocksPerEpoch()
+	switch {
+	case blockNum == testnetEpochBlock1:
+		return true
+	default:
+		return ((blockNum-testnetEpochBlock1)%blocks == blocks-1)
 	}
 }
 

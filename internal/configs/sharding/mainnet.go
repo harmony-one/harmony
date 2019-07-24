@@ -35,9 +35,19 @@ func (ms mainnetSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
 	blocks := ms.BlocksPerEpoch()
 	switch {
 	case blockNum > mainnetEpochBlock1:
-		return big.NewInt(int64((blockNum - mainnetEpochBlock1) / blocks))
+		return big.NewInt(int64((blockNum-mainnetEpochBlock1)/blocks) + 1)
 	default:
 		return big.NewInt(0)
+	}
+}
+
+func (ms mainnetSchedule) IsLastBlock(blockNum uint64) bool {
+	blocks := ms.BlocksPerEpoch()
+	switch {
+	case blockNum == mainnetEpochBlock1:
+		return true
+	default:
+		return ((blockNum-mainnetEpochBlock1)%blocks == blocks-1)
 	}
 }
 

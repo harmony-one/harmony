@@ -230,7 +230,7 @@ func IsEpochBlock(block *types.Block) bool {
 
 // IsEpochLastBlock returns whether this block is the last block of an epoch.
 func IsEpochLastBlock(block *types.Block) bool {
-	return block.NumberU64()%ShardingSchedule.BlocksPerEpoch() == ShardingSchedule.BlocksPerEpoch()-1
+	return ShardingSchedule.IsLastBlock(block.NumberU64())
 }
 
 func (bc *BlockChain) getProcInterrupt() bool {
