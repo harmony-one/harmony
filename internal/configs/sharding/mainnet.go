@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	mainnetEpochBlock1 = 288888
-	fiveOne            = 11111
+	mainnetEpochBlock1 = 294912 // 18 * 2^14
+	blocksPerShard     = 16384  // 2^14
 )
 
 // MainnetSchedule is the mainnet sharding configuration schedule.
@@ -28,7 +28,7 @@ func (mainnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 }
 
 func (mainnetSchedule) BlocksPerEpoch() uint64 {
-	return fiveOne
+	return blocksPerShard
 }
 
 func (ms mainnetSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
