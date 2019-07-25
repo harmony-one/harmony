@@ -36,8 +36,8 @@ delay=60
 ### Pagerduty
 if [[ $(($curtime - $latest)) -gt $delay ]]; then
     # Trigger an alert
-    trigger=$(curl -X POST -H "$HEADER" -d "$TRIGGER" "$POSTURL")
+    trigger=$(curl -s -X POST -H "$HEADER" -d "$TRIGGER" "$POSTURL")
 else
     # Resolve an alert
-    resolve=$(curl -X POST -H "$HEADER" -d "$RESOLVE" "$POSTURL")
+    resolve=$(curl -s -X POST -H "$HEADER" -d "$RESOLVE" "$POSTURL")
 fi
