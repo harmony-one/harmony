@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	mainnetEpochBlock1 = 288887
+	mainnetEpochBlock1 = 288888
 	fiveOne            = 11111
 )
 
@@ -34,7 +34,7 @@ func (mainnetSchedule) BlocksPerEpoch() uint64 {
 func (ms mainnetSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
 	blocks := ms.BlocksPerEpoch()
 	switch {
-	case blockNum > mainnetEpochBlock1:
+	case blockNum >= mainnetEpochBlock1:
 		return big.NewInt(int64((blockNum-mainnetEpochBlock1)/blocks) + 1)
 	default:
 		return big.NewInt(0)
@@ -44,7 +44,7 @@ func (ms mainnetSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
 func (ms mainnetSchedule) IsLastBlock(blockNum uint64) bool {
 	blocks := ms.BlocksPerEpoch()
 	switch {
-	case blockNum == mainnetEpochBlock1:
+	case blockNum == mainnetEpochBlock1-1:
 		return true
 	default:
 		return ((blockNum-mainnetEpochBlock1)%blocks == blocks-1)

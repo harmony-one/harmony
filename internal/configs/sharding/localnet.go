@@ -16,7 +16,7 @@ const (
 	localnetV1Epoch = 1
 	localnetV2Epoch = 2
 
-	localnetEpochBlock1 = 35
+	localnetEpochBlock1 = 36
 	twoOne              = 11
 )
 
@@ -38,7 +38,7 @@ func (localnetSchedule) BlocksPerEpoch() uint64 {
 func (ls localnetSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
 	blocks := ls.BlocksPerEpoch()
 	switch {
-	case blockNum > localnetEpochBlock1:
+	case blockNum >= localnetEpochBlock1:
 		return big.NewInt(int64((blockNum-localnetEpochBlock1)/blocks) + 1)
 	default:
 		return big.NewInt(0)
@@ -48,7 +48,7 @@ func (ls localnetSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
 func (ls localnetSchedule) IsLastBlock(blockNum uint64) bool {
 	blocks := ls.BlocksPerEpoch()
 	switch {
-	case blockNum == localnetEpochBlock1:
+	case blockNum == localnetEpochBlock1-1:
 		return true
 	default:
 		return ((blockNum-localnetEpochBlock1)%blocks == blocks-1)

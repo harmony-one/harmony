@@ -16,7 +16,7 @@ const (
 	testnetV1Epoch = 1
 	testnetV2Epoch = 2
 
-	testnetEpochBlock1 = 77
+	testnetEpochBlock1 = 78
 	threeOne           = 111
 )
 
@@ -39,7 +39,7 @@ func (testnetSchedule) BlocksPerEpoch() uint64 {
 func (ts testnetSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
 	blocks := ts.BlocksPerEpoch()
 	switch {
-	case blockNum > testnetEpochBlock1:
+	case blockNum >= testnetEpochBlock1:
 		return big.NewInt(int64((blockNum-testnetEpochBlock1)/blocks) + 1)
 	default:
 		return big.NewInt(0)
@@ -49,7 +49,7 @@ func (ts testnetSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
 func (ts testnetSchedule) IsLastBlock(blockNum uint64) bool {
 	blocks := ts.BlocksPerEpoch()
 	switch {
-	case blockNum == testnetEpochBlock1:
+	case blockNum == testnetEpochBlock1-1:
 		return true
 	default:
 		return ((blockNum-testnetEpochBlock1)%blocks == blocks-1)
