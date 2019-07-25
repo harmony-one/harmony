@@ -29,7 +29,6 @@ import (
 	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	common2 "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -148,10 +147,9 @@ func (node *Node) messageHandler(content []byte, sender libp2p_peer.ID) {
 		utils.Logger().Debug().Msg("NET: Received staking message")
 		msgPayload, _ := proto.GetStakingMessagePayload(content)
 		// Only beacon leader processes staking txn
-		if node.NodeConfig.Role() != nodeconfig.BeaconLeader {
-			return
+		if node.Consensus != nil && node.Consensus.ShardID == 0 && node.Consensus.IsLeader() {
+			node.processStakingMessage(msgPayload)
 		}
-		node.processStakingMessage(msgPayload)
 	case proto.Node:
 		actionType := proto_node.MessageType(msgType)
 		switch actionType {
@@ -173,10 +171,11 @@ func (node *Node) messageHandler(content []byte, sender libp2p_peer.ID) {
 				} else {
 					// for non-beaconchain node, subscribe to beacon block broadcast
 					role := node.NodeConfig.Role()
-					if proto_node.BlockMessageType(msgPayload[0]) == proto_node.Sync && (role == nodeconfig.ShardValidator || role == nodeconfig.ShardLeader || role == nodeconfig.NewNode) {
+					if proto_node.BlockMessageType(msgPayload[0]) == proto_node.Sync && role == nodeconfig.Validator {
 						utils.Logger().Info().
 							Uint64("block", blocks[0].NumberU64()).
 							Msg("Block being handled by block channel")
+
 						for _, block := range blocks {
 							node.BeaconBlockChannel <- block
 						}
@@ -590,16 +589,6 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) i
 		err = ctxerror.New("cannot convert BLS public key").WithCause(err)
 		ctxerror.Log15(utils.GetLogger().Warn, err)
 	}
-	if genesisNode := getGenesisNodeByConsensusKey(k); genesisNode != nil {
-		utils.Logger().Info().
-			Uint32("genesisShardID", genesisNode.ShardID).
-			Int("genesisMemberIndex", genesisNode.MemberIndex).
-			Str("genesisStakingAccount", common2.MustAddressToBech32(genesisNode.NodeID.EcdsaAddress))
-	} else {
-		utils.Logger().Info().
-			Str("BlsPubKey", peer.ConsensusPubKey.SerializeToHexStr()).
-			Msg("cannot find genesis node")
-	}
 	utils.Logger().Info().
 		Str("Peer Version", ping.NodeVer).
 		Interface("PeerID", peer).
@@ -766,7 +755,7 @@ func (node *Node) epochShardStateMessageHandler(msgPayload []byte) error {
 	if err != nil {
 		return ctxerror.New("Can't get shard state message").WithCause(err)
 	}
-	if node.Consensus == nil && node.NodeConfig.Role() != nodeconfig.NewNode {
+	if node.Consensus == nil {
 		return nil
 	}
 	receivedEpoch := big.NewInt(int64(epochShardState.Epoch))

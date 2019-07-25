@@ -41,10 +41,12 @@ func (client *Client) Close() {
 }
 
 // GetBlockHashes gets block hashes from all the peers by calling grpc request.
-func (client *Client) GetBlockHashes(startHash []byte, size uint32) *pb.DownloaderResponse {
+func (client *Client) GetBlockHashes(startHash []byte, size uint32, ip, port string) *pb.DownloaderResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_HEADER, BlockHash: startHash, Size: size}
+	request.Ip = ip
+	request.Port = port
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("[SYNC] GetBlockHashes query failed")
@@ -109,13 +111,13 @@ func (client *Client) PushNewBlock(selfPeerHash [20]byte, blockHash []byte, time
 }
 
 // GetBlockChainHeight gets the blockheight from peer
-func (client *Client) GetBlockChainHeight() *pb.DownloaderResponse {
+func (client *Client) GetBlockChainHeight() (*pb.DownloaderResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_BLOCKHEIGHT}
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg("[SYNC] unable to get blockchain height")
+		return nil, err
 	}
-	return response
+	return response, nil
 }
