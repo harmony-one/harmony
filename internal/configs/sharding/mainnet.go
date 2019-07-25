@@ -6,6 +6,11 @@ import (
 	"github.com/harmony-one/harmony/internal/genesis"
 )
 
+const (
+	mainnetEpochBlock1 = 294912 // 18 * 2^14
+	blocksPerShard     = 16384  // 2^14
+)
+
 // MainnetSchedule is the mainnet sharding configuration schedule.
 var MainnetSchedule mainnetSchedule
 
@@ -23,7 +28,27 @@ func (mainnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 }
 
 func (mainnetSchedule) BlocksPerEpoch() uint64 {
-	return 1000000000000
+	return blocksPerShard
+}
+
+func (ms mainnetSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
+	blocks := ms.BlocksPerEpoch()
+	switch {
+	case blockNum >= mainnetEpochBlock1:
+		return big.NewInt(int64((blockNum-mainnetEpochBlock1)/blocks) + 1)
+	default:
+		return big.NewInt(0)
+	}
+}
+
+func (ms mainnetSchedule) IsLastBlock(blockNum uint64) bool {
+	blocks := ms.BlocksPerEpoch()
+	switch {
+	case blockNum == mainnetEpochBlock1-1:
+		return true
+	default:
+		return ((blockNum-mainnetEpochBlock1)%blocks == blocks-1)
+	}
 }
 
 var mainnetReshardingEpoch = make([]*big.Int, 0)

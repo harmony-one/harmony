@@ -15,6 +15,9 @@ type localnetSchedule struct{}
 const (
 	localnetV1Epoch = 1
 	localnetV2Epoch = 2
+
+	localnetEpochBlock1 = 36
+	twoOne              = 11
 )
 
 func (localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
@@ -29,7 +32,27 @@ func (localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 }
 
 func (localnetSchedule) BlocksPerEpoch() uint64 {
-	return 10
+	return twoOne
+}
+
+func (ls localnetSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
+	blocks := ls.BlocksPerEpoch()
+	switch {
+	case blockNum >= localnetEpochBlock1:
+		return big.NewInt(int64((blockNum-localnetEpochBlock1)/blocks) + 1)
+	default:
+		return big.NewInt(0)
+	}
+}
+
+func (ls localnetSchedule) IsLastBlock(blockNum uint64) bool {
+	blocks := ls.BlocksPerEpoch()
+	switch {
+	case blockNum == localnetEpochBlock1-1:
+		return true
+	default:
+		return ((blockNum-localnetEpochBlock1)%blocks == blocks-1)
+	}
 }
 
 var localnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(localnetV1Epoch), big.NewInt(localnetV2Epoch)}

@@ -775,9 +775,9 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 			return
 		}
 		// check whether the block is the last block of epoch
-		if recvMsg.BlockNum%core.ShardingSchedule.BlocksPerEpoch() == core.ShardingSchedule.BlocksPerEpoch()-1 {
-			epoch := recvMsg.BlockNum / core.ShardingSchedule.BlocksPerEpoch()
-			nextEpoch := new(big.Int).Add(big.NewInt(int64(epoch)), common.Big1)
+		if core.ShardingSchedule.IsLastBlock(recvMsg.BlockNum) {
+			epoch := core.ShardingSchedule.CalcEpochNumber(recvMsg.BlockNum)
+			nextEpoch := new(big.Int).Add(epoch, common.Big1)
 			pubKeys := core.GetPublicKeys(nextEpoch, consensus.ShardID)
 			if len(pubKeys) == 0 {
 				consensus.getLogger().Info().Msg("[OnCommitted] PublicKeys is Empty, Cannot update public keys")
