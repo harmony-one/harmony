@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	// RetryInterval is the interval for message retry
+	// RetryIntervalInSec is the interval for message retry
 	RetryIntervalInSec = 10
 )
 
@@ -41,7 +41,7 @@ func NewMessageSender(host p2p.Host) *MessageSender {
 	return &MessageSender{host: host, retryTimes: int(phaseDuration.Seconds()) / RetryIntervalInSec}
 }
 
-// UpdateBlockNum updates the block number
+// Reset resets the sender's state for new block
 func (sender *MessageSender) Reset(blockNum uint64) {
 	sender.blockNumMutex.Lock()
 	sender.blockNum = blockNum
@@ -70,7 +70,7 @@ func (sender *MessageSender) SendWithRetry(blockNum uint64, msgType msg_pb.Messa
 	return sender.host.SendMessageToGroups(groups, p2pMsg)
 }
 
-// Send sends message without retry logic.
+// SendWithoutRetry sends message without retry logic.
 func (sender *MessageSender) SendWithoutRetry(groups []p2p.GroupID, p2pMsg []byte) error {
 	return sender.host.SendMessageToGroups(groups, p2pMsg)
 }
