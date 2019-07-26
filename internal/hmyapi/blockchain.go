@@ -19,7 +19,8 @@ import (
 )
 
 const (
-	defaultGasPrice = params.GWei
+	defaultGasPrice    = params.GWei
+	defaultFromAddress = "0x0000000000000000000000000000000000000000"
 )
 
 // PublicBlockChainAPI provides an API to access the Harmony blockchain.
@@ -118,11 +119,15 @@ func doCall(ctx context.Context, b Backend, args CallArgs, blockNr rpc.BlockNumb
 		// TODO(ricl): this logic was borrowed from [go-ethereum](https://github.com/ethereum/go-ethereum/blob/f578d41ee6b3087f8021fd561a0b5665aea3dba6/internal/ethapi/api.go#L738)
 		// [question](https://ethereum.stackexchange.com/questions/72979/why-does-the-docall-function-use-the-first-account-by-default)
 		// Might need to reconsider the logic
-		if wallets := b.AccountManager().Wallets(); len(wallets) > 0 {
-			if accounts := wallets[0].Accounts(); len(accounts) > 0 {
-				addr = accounts[0].Address
-			}
-		}
+		// if wallets := b.AccountManager().Wallets(); len(wallets) > 0 {
+		// 	if accounts := wallets[0].Accounts(); len(accounts) > 0 {
+		// 		addr = accounts[0].Address
+		// 	}
+		// }
+		// The logic in ethereum is to pick a random address managed under the account manager.
+		// Currently Harmony no longers support the account manager.
+		// Any address does not affect the logic of this call.
+		addr = common.HexToAddress(defaultFromAddress)
 	} else {
 		addr = *args.From
 	}
