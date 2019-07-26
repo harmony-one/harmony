@@ -377,7 +377,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		consensus.mode.SetViewID(recvMsg.ViewID)
 		msgToSend := consensus.constructNewViewMessage()
 		consensus.getLogger().Warn("[onViewChange] Sent NewView Message", "len(M1Payload)", len(consensus.m1Payload), "M1Payload", consensus.m1Payload)
-		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
+		consensus.msgSender.SendWithRetry(consensus.blockNum, msg_pb.MessageType_NEWVIEW, []p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 
 		consensus.viewID = recvMsg.ViewID
 		consensus.ResetViewChangeState()

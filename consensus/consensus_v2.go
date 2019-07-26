@@ -114,7 +114,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 	}
 
 	// Construct broadcast p2p message
-	if err := consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
+	if err := consensus.msgSender.SendWithRetry(consensus.blockNum, msg_pb.MessageType_ANNOUNCE, []p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
 		consensus.getLogger().Warn("[Announce] Cannot send announce message", "groupID", p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID)))
 	} else {
 		consensus.getLogger().Info("[Announce] Sent Announce Message!!", "BlockHash", block.Hash(), "BlockNum", block.NumberU64())
@@ -210,7 +210,7 @@ func (consensus *Consensus) prepare() {
 	// Construct and send prepare message
 	msgToSend := consensus.constructPrepareMessage()
 	// TODO: this will not return immediatey, may block
-	if err := consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
+	if err := consensus.msgSender.SendWithoutRetry([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
 		consensus.getLogger().Warn("[OnAnnounce] Cannot send prepare message")
 	} else {
 		consensus.getLogger().Info("[OnAnnounce] Sent Prepare Message!!", "BlockHash", hex.EncodeToString(consensus.blockHash[:]))
@@ -319,11 +319,14 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 			return
 		}
 
-		if err := consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
+		if err := consensus.msgSender.SendWithRetry(consensus.blockNum, msg_pb.MessageType_PREPARED, []p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
 			consensus.getLogger().Warn("[OnPrepare] Cannot send prepared message")
 		} else {
 			consensus.getLogger().Debug("[OnPrepare] Sent Prepared Message!!", "BlockHash", consensus.blockHash, "BlockNum", consensus.blockNum)
 		}
+		consensus.msgSender.StopRetry(msg_pb.MessageType_ANNOUNCE)
+		consensus.msgSender.StopRetry(msg_pb.MessageType_COMMITTED) // Stop retry committed msg of last consensus
+
 		consensus.getLogger().Debug("[OnPrepare] Switching phase", "From", consensus.phase, "To", Commit)
 		consensus.switchPhase(Commit, true)
 	}
@@ -462,7 +465,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		time.Sleep(consensus.delayCommit)
 	}
 
-	if err := consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
+	if err := consensus.msgSender.SendWithoutRetry([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
 		consensus.getLogger().Warn("[OnPrepared] Cannot send commit message!!")
 	} else {
 		consensus.getLogger().Info("[OnPrepared] Sent Commit Message!!", "BlockHash", consensus.blockHash, "BlockNum", consensus.blockNum)
@@ -568,6 +571,8 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 			consensus.getLogger().Debug("[OnCommit] Commit Grace Period Ended", "NumCommits", len(commitSigs))
 			consensus.commitFinishChan <- viewID
 		}(consensus.viewID)
+
+		consensus.msgSender.StopRetry(msg_pb.MessageType_PREPARED)
 	}
 
 	if rewardThresholdIsMet {
@@ -612,10 +617,10 @@ func (consensus *Consensus) finalizeCommits() {
 		return
 	}
 	// if leader success finalize the block, send committed message to validators
-	if err := consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
+	if err := consensus.msgSender.SendWithRetry(block.NumberU64(), msg_pb.MessageType_COMMITTED, []p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
 		consensus.getLogger().Warn("[Finalizing] Cannot send committed message", "error", err)
 	} else {
-		consensus.getLogger().Info("[Finalizing] Sent Committed Message", "BlockHash", consensus.blockHash, "BlockNum", consensus.blockNum)
+		consensus.getLogger().Info("[Finalizing] Sent Committed Message", "BlockHash", block.Hash(), "BlockNum", block.NumberU64())
 	}
 
 	consensus.reportMetrics(*block)
@@ -917,6 +922,7 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 
 				startTime = time.Now()
 				consensus.getLogger().Debug("[ConsensusMainLoop] STARTING CONSENSUS", "numTxs", len(newBlock.Transactions()), "consensus", consensus, "startTime", startTime, "publicKeys", len(consensus.PublicKeys))
+				consensus.msgSender.Reset(newBlock.NumberU64())
 				consensus.announce(newBlock)
 
 			case msg := <-consensus.MsgChan:
