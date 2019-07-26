@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -75,6 +74,9 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 					selectedTxs := types.Transactions{} // Empty transaction list
 					if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
 						selectedTxs = node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock, coinbase)
+						if err := node.Worker.UpdateCurrent(coinbase); err != nil {
+							utils.GetLogger().Error("Failed updating worker's state", "Error", err)
+						}
 					}
 					utils.GetLogInstance().Info("PROPOSING NEW BLOCK ------------------------------------------------", "blockNum", node.Blockchain().CurrentBlock().NumberU64()+1, "selectedTxs", len(selectedTxs))
 					if err := node.Worker.CommitTransactions(selectedTxs, coinbase); err != nil {
@@ -92,11 +94,13 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 					viewID := node.Consensus.GetViewID()
 					// add aggregated commit signatures from last block, except for the first two blocks
 
-					err = node.Worker.UpdateCurrent(coinbase)
-					if err != nil {
-						utils.GetLogger().Debug("Failed updating worker's state", "Error", err)
-						continue
+					if node.NodeConfig.GetNetworkType() == nodeconfig.Mainnet {
+						if err = node.Worker.UpdateCurrent(coinbase); err != nil {
+							utils.GetLogger().Debug("Failed updating worker's state", "Error", err)
+							continue
+						}
 					}
+
 					newBlock, err = node.Worker.Commit(sig, mask, viewID, coinbase)
 
 					if err != nil {
@@ -104,7 +108,7 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 							ctxerror.New("cannot commit new block").
 								WithCause(err))
 						continue
-					} else if err := node.proposeShardState(newBlock); err != nil {
+					} else if err := node.proposeShardStateWithoutBeaconSync(newBlock); err != nil {
 						ctxerror.Log15(utils.GetLogger().Error,
 							ctxerror.New("cannot add shard state").
 								WithCause(err))
@@ -121,6 +125,15 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 			}
 		}
 	}()
+}
+
+func (node *Node) proposeShardStateWithoutBeaconSync(block *types.Block) error {
+	if !core.IsEpochLastBlock(block) {
+		return nil
+	}
+	nextEpoch := new(big.Int).Add(block.Header().Epoch, common.Big1)
+	shardState := core.GetShardState(nextEpoch)
+	return block.AddShardState(shardState)
 }
 
 func (node *Node) proposeShardState(block *types.Block) error {
@@ -149,32 +162,34 @@ func (node *Node) proposeBeaconShardState(block *types.Block) error {
 }
 
 func (node *Node) proposeLocalShardState(block *types.Block) {
-	logger := block.Logger(utils.GetLogInstance())
-	getLogger := func() log.Logger { return utils.WithCallerSkip(logger, 1) }
+	logger := block.Logger(utils.Logger())
 	// TODO ek – read this from beaconchain once BC sync is fixed
 	if node.nextShardState.master == nil {
-		getLogger().Debug("yet to receive master proposal from beaconchain")
+		logger.Debug().Msg("yet to receive master proposal from beaconchain")
 		return
 	}
-	logger = logger.New(
-		"nextEpoch", node.nextShardState.master.Epoch,
-		"proposeTime", node.nextShardState.proposeTime)
+
+	nlogger := logger.With().
+		Uint64("nextEpoch", node.nextShardState.master.Epoch).
+		Time("proposeTime", node.nextShardState.proposeTime).
+		Logger()
+	logger = &nlogger
 	if time.Now().Before(node.nextShardState.proposeTime) {
-		getLogger().Debug("still waiting for shard state to propagate")
+		logger.Debug().Msg("still waiting for shard state to propagate")
 		return
 	}
 	masterShardState := node.nextShardState.master.ShardState
 	var localShardState types.ShardState
 	committee := masterShardState.FindCommitteeByID(block.ShardID())
 	if committee != nil {
-		getLogger().Info("found local shard info; proposing it")
+		logger.Info().Msg("found local shard info; proposing it")
 		localShardState = append(localShardState, *committee)
 	} else {
-		getLogger().Info("beacon committee disowned us; proposing nothing")
+		logger.Info().Msg("beacon committee disowned us; proposing nothing")
 		// Leave local proposal empty to signal the end of shard (disbanding).
 	}
 	err := block.AddShardState(localShardState)
 	if err != nil {
-		getLogger().Error("Failed proposin local shard state", "error", err)
+		logger.Error().Err(err).Msg("Failed proposin local shard state")
 	}
 }

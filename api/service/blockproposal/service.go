@@ -40,10 +40,10 @@ func (s *Service) Run(stopChan chan struct{}, stoppedChan chan struct{}) {
 
 // StopService stops block proposal service.
 func (s *Service) StopService() {
-	utils.GetLogInstance().Info("Stopping block proposal service.")
+	utils.Logger().Info().Msg("Stopping block proposal service.")
 	s.stopChan <- struct{}{}
 	<-s.stoppedChan
-	utils.GetLogInstance().Info("Role conversion stopped.")
+	utils.Logger().Info().Msg("Role conversion stopped.")
 }
 
 // NotifyService notify service

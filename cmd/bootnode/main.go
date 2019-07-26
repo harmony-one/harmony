@@ -51,10 +51,7 @@ func main() {
 	// Logging setup
 	utils.SetLogContext(*port, *ip)
 	utils.SetLogVerbosity(log.Lvl(*verbosity))
-	filename := fmt.Sprintf("%v/bootnode-%v-%v.log", *logFolder, *ip, *port)
-	if err := utils.AddLogFile(filename, *logMaxSize); err != nil {
-		panic(err)
-	}
+	utils.AddLogFile(fmt.Sprintf("%v/bootnode-%v-%v.log", *logFolder, *ip, *port), *logMaxSize)
 
 	privKey, _, err := utils.LoadKeyFromFile(*keyFile)
 	if err != nil {

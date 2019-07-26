@@ -41,14 +41,14 @@ func ReadCanonicalHash(db DatabaseReader, number uint64) common.Hash {
 // WriteCanonicalHash stores the hash assigned to a canonical block number.
 func WriteCanonicalHash(db DatabaseWriter, hash common.Hash, number uint64) {
 	if err := db.Put(headerHashKey(number), hash.Bytes()); err != nil {
-		utils.GetLogger().Crit("Failed to store number to hash mapping", "err", err)
+		utils.Logger().Error().Msg("Failed to store number to hash mapping")
 	}
 }
 
 // DeleteCanonicalHash removes the number to hash canonical mapping.
 func DeleteCanonicalHash(db DatabaseDeleter, number uint64) {
 	if err := db.Delete(headerHashKey(number)); err != nil {
-		utils.GetLogger().Crit("Failed to delete number to hash mapping", "err", err)
+		utils.Logger().Error().Msg("Failed to delete number to hash mapping")
 	}
 }
 
@@ -74,7 +74,7 @@ func ReadHeadHeaderHash(db DatabaseReader) common.Hash {
 // WriteHeadHeaderHash stores the hash of the current canonical head header.
 func WriteHeadHeaderHash(db DatabaseWriter, hash common.Hash) {
 	if err := db.Put(headHeaderKey, hash.Bytes()); err != nil {
-		utils.GetLogger().Crit("Failed to store last header's hash", "err", err)
+		utils.Logger().Error().Msg("Failed to store last header's hash")
 	}
 }
 
@@ -90,7 +90,7 @@ func ReadHeadBlockHash(db DatabaseReader) common.Hash {
 // WriteHeadBlockHash stores the head block's hash.
 func WriteHeadBlockHash(db DatabaseWriter, hash common.Hash) {
 	if err := db.Put(headBlockKey, hash.Bytes()); err != nil {
-		utils.GetLogger().Crit("Failed to store last block's hash", "err", err)
+		utils.Logger().Error().Msg("Failed to store last block's hash")
 	}
 }
 
@@ -106,7 +106,7 @@ func ReadHeadFastBlockHash(db DatabaseReader) common.Hash {
 // WriteHeadFastBlockHash stores the hash of the current fast-sync head block.
 func WriteHeadFastBlockHash(db DatabaseWriter, hash common.Hash) {
 	if err := db.Put(headFastBlockKey, hash.Bytes()); err != nil {
-		utils.GetLogger().Crit("Failed to store last fast block's hash", "err", err)
+		utils.Logger().Error().Msg("Failed to store last fast block's hash")
 	}
 }
 
@@ -124,7 +124,7 @@ func ReadFastTrieProgress(db DatabaseReader) uint64 {
 // retrieving it across restarts.
 func WriteFastTrieProgress(db DatabaseWriter, count uint64) {
 	if err := db.Put(fastTrieProgressKey, new(big.Int).SetUint64(count).Bytes()); err != nil {
-		utils.GetLogger().Crit("Failed to store fast sync trie progress", "err", err)
+		utils.Logger().Error().Msg("Failed to store fast sync trie progress")
 	}
 }
 
@@ -150,7 +150,7 @@ func ReadHeader(db DatabaseReader, hash common.Hash, number uint64) *types.Heade
 	}
 	header := new(types.Header)
 	if err := rlp.Decode(bytes.NewReader(data), header); err != nil {
-		utils.GetLogger().Error("Invalid block header RLP", "hash", hash, "err", err)
+		utils.Logger().Error().Err(err).Str("hash", hash.Hex()).Msg("Invalid block header RLP")
 		return nil
 	}
 	return header
@@ -167,26 +167,26 @@ func WriteHeader(db DatabaseWriter, header *types.Header) {
 	)
 	key := headerNumberKey(hash)
 	if err := db.Put(key, encoded); err != nil {
-		utils.GetLogger().Crit("Failed to store hash to number mapping", "err", err)
+		utils.Logger().Error().Msg("Failed to store hash to number mapping")
 	}
 	// Write the encoded header
 	data, err := rlp.EncodeToBytes(header)
 	if err != nil {
-		utils.GetLogger().Crit("Failed to RLP encode header", "err", err)
+		utils.Logger().Error().Msg("Failed to RLP encode header")
 	}
 	key = headerKey(number, hash)
 	if err := db.Put(key, data); err != nil {
-		utils.GetLogger().Crit("Failed to store header", "err", err)
+		utils.Logger().Error().Msg("Failed to store header")
 	}
 }
 
 // DeleteHeader removes all block header data associated with a hash.
 func DeleteHeader(db DatabaseDeleter, hash common.Hash, number uint64) {
 	if err := db.Delete(headerKey(number, hash)); err != nil {
-		utils.GetLogger().Crit("Failed to delete header", "err", err)
+		utils.Logger().Error().Msg("Failed to delete header")
 	}
 	if err := db.Delete(headerNumberKey(hash)); err != nil {
-		utils.GetLogger().Crit("Failed to delete hash to number mapping", "err", err)
+		utils.Logger().Error().Msg("Failed to delete hash to number mapping")
 	}
 }
 
@@ -199,7 +199,7 @@ func ReadBodyRLP(db DatabaseReader, hash common.Hash, number uint64) rlp.RawValu
 // WriteBodyRLP stores an RLP encoded block body into the database.
 func WriteBodyRLP(db DatabaseWriter, hash common.Hash, number uint64, rlp rlp.RawValue) {
 	if err := db.Put(blockBodyKey(number, hash), rlp); err != nil {
-		utils.GetLogger().Crit("Failed to store block body", "err", err)
+		utils.Logger().Error().Msg("Failed to store block body")
 	}
 }
 
@@ -219,7 +219,7 @@ func ReadBody(db DatabaseReader, hash common.Hash, number uint64) *types.Body {
 	}
 	body := new(types.Body)
 	if err := rlp.Decode(bytes.NewReader(data), body); err != nil {
-		utils.GetLogger().Error("Invalid block body RLP", "hash", hash, "err", err)
+		utils.Logger().Error().Err(err).Str("hash", hash.Hex()).Msg("Invalid block body RLP")
 		return nil
 	}
 	return body
@@ -229,7 +229,7 @@ func ReadBody(db DatabaseReader, hash common.Hash, number uint64) *types.Body {
 func WriteBody(db DatabaseWriter, hash common.Hash, number uint64, body *types.Body) {
 	data, err := rlp.EncodeToBytes(body)
 	if err != nil {
-		utils.GetLogger().Crit("Failed to RLP encode body", "err", err)
+		utils.Logger().Error().Msg("Failed to RLP encode body")
 	}
 	WriteBodyRLP(db, hash, number, data)
 }
@@ -237,7 +237,7 @@ func WriteBody(db DatabaseWriter, hash common.Hash, number uint64, body *types.B
 // DeleteBody removes all block body data associated with a hash.
 func DeleteBody(db DatabaseDeleter, hash common.Hash, number uint64) {
 	if err := db.Delete(blockBodyKey(number, hash)); err != nil {
-		utils.GetLogger().Crit("Failed to delete block body", "err", err)
+		utils.Logger().Error().Msg("Failed to delete block body")
 	}
 }
 
@@ -249,7 +249,7 @@ func ReadTd(db DatabaseReader, hash common.Hash, number uint64) *big.Int {
 	}
 	td := new(big.Int)
 	if err := rlp.Decode(bytes.NewReader(data), td); err != nil {
-		utils.GetLogger().Error("Invalid block total difficulty RLP", "hash", hash, "err", err)
+		utils.Logger().Error().Err(err).Str("hash", hash.Hex()).Msg("Invalid block total difficulty RLP")
 		return nil
 	}
 	return td
@@ -259,17 +259,17 @@ func ReadTd(db DatabaseReader, hash common.Hash, number uint64) *big.Int {
 func WriteTd(db DatabaseWriter, hash common.Hash, number uint64, td *big.Int) {
 	data, err := rlp.EncodeToBytes(td)
 	if err != nil {
-		utils.GetLogger().Crit("Failed to RLP encode block total difficulty", "err", err)
+		utils.Logger().Error().Msg("Failed to RLP encode block total difficulty")
 	}
 	if err := db.Put(headerTDKey(number, hash), data); err != nil {
-		utils.GetLogger().Crit("Failed to store block total difficulty", "err", err)
+		utils.Logger().Error().Msg("Failed to store block total difficulty")
 	}
 }
 
 // DeleteTd removes all block total difficulty data associated with a hash.
 func DeleteTd(db DatabaseDeleter, hash common.Hash, number uint64) {
 	if err := db.Delete(headerTDKey(number, hash)); err != nil {
-		utils.GetLogger().Crit("Failed to delete block total difficulty", "err", err)
+		utils.Logger().Error().Msg("Failed to delete block total difficulty")
 	}
 }
 
@@ -283,7 +283,7 @@ func ReadReceipts(db DatabaseReader, hash common.Hash, number uint64) types.Rece
 	// Convert the receipts from their storage form to their internal representation
 	storageReceipts := []*types.ReceiptForStorage{}
 	if err := rlp.DecodeBytes(data, &storageReceipts); err != nil {
-		utils.GetLogger().Error("Invalid receipt array RLP", "hash", hash, "err", err)
+		utils.Logger().Error().Err(err).Str("hash", hash.Hex()).Msg("Invalid receipt array RLP")
 		return nil
 	}
 	receipts := make(types.Receipts, len(storageReceipts))
@@ -302,18 +302,18 @@ func WriteReceipts(db DatabaseWriter, hash common.Hash, number uint64, receipts 
 	}
 	bytes, err := rlp.EncodeToBytes(storageReceipts)
 	if err != nil {
-		utils.GetLogger().Crit("Failed to encode block receipts", "err", err)
+		utils.Logger().Error().Msg("Failed to encode block receipts")
 	}
 	// Store the flattened receipt slice
 	if err := db.Put(blockReceiptsKey(number, hash), bytes); err != nil {
-		utils.GetLogger().Crit("Failed to store block receipts", "err", err)
+		utils.Logger().Error().Msg("Failed to store block receipts")
 	}
 }
 
 // DeleteReceipts removes all receipt data associated with a block hash.
 func DeleteReceipts(db DatabaseDeleter, hash common.Hash, number uint64) {
 	if err := db.Delete(blockReceiptsKey(number, hash)); err != nil {
-		utils.GetLogger().Crit("Failed to delete block receipts", "err", err)
+		utils.Logger().Error().Msg("Failed to delete block receipts")
 	}
 }
 
@@ -349,7 +349,7 @@ func WriteBlock(db DatabaseWriter, block *types.Block) {
 	epochBlockNum := block.Number()
 	writeOne := func() {
 		if err := WriteEpochBlockNumber(db, epoch, epochBlockNum); err != nil {
-			ctxerror.Log15(utils.GetLogInstance().Error, err)
+			utils.Logger().Error().Err(err).Msg("Failed to write epoch block number")
 		}
 	}
 	// A block may be a genesis block AND end-of-epoch block at the same time.
@@ -443,8 +443,7 @@ func WriteShardStateBytes(
 			"epoch", epoch,
 		).WithCause(err)
 	}
-	utils.GetLogger().Info("wrote sharding state",
-		"epoch", epoch, "numShards", len(data))
+	utils.Logger().Info().Str("epoch", epoch.String()).Int("numShards", len(data)).Msg("wrote sharding state")
 	return nil
 }
 

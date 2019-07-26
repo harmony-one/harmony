@@ -27,7 +27,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/rs/zerolog"
 
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
@@ -92,7 +92,7 @@ type ChainIndexer struct {
 
 	throttling time.Duration // Disk throttling to prevent a heavy upgrade from hogging resources
 
-	log  log.Logger
+	log  *zerolog.Logger
 	lock sync.RWMutex
 }
 
@@ -100,6 +100,7 @@ type ChainIndexer struct {
 // chain segments of a given size after certain number of confirmations passed.
 // The throttling parameter might be used to prevent database thrashing.
 func NewChainIndexer(chainDb ethdb.Database, indexDb ethdb.Database, backend ChainIndexerBackend, section, confirm uint64, throttling time.Duration, kind string) *ChainIndexer {
+	logger := utils.Logger().With().Str("type", kind).Logger()
 	c := &ChainIndexer{
 		chainDb:     chainDb,
 		indexDb:     indexDb,
@@ -109,7 +110,7 @@ func NewChainIndexer(chainDb ethdb.Database, indexDb ethdb.Database, backend Cha
 		sectionSize: section,
 		confirmsReq: confirm,
 		throttling:  throttling,
-		log:         utils.GetLogInstance().New("type", kind),
+		log:         &logger,
 	}
 	// Initialize database dependent fields and start the updater
 	c.loadValidSections()
@@ -283,7 +284,11 @@ func (c *ChainIndexer) newHead(head uint64, reorg bool) {
 				// syncing reached the checkpoint, verify section head
 				syncedHead := rawdb.ReadCanonicalHash(c.chainDb, c.checkpointSections*c.sectionSize-1)
 				if syncedHead != c.checkpointHead {
-					c.log.Error("Synced chain does not match checkpoint", "number", c.checkpointSections*c.sectionSize-1, "expected", c.checkpointHead, "synced", syncedHead)
+					c.log.Error().
+						Uint64("number", c.checkpointSections*c.sectionSize-1).
+						Str("expected", c.checkpointHead.Hex()).
+						Str("synced", syncedHead.Hex()).
+						Msg("Synced chain does not match checkpoint")
 					return
 				}
 			}
@@ -320,7 +325,7 @@ func (c *ChainIndexer) updateLoop() {
 				if time.Since(updated) > 8*time.Second {
 					if c.knownSections > c.storedSections+1 {
 						updating = true
-						c.log.Info("Upgrading chain index", "percentage", c.storedSections*100/c.knownSections)
+						c.log.Info().Uint64("percentage", c.storedSections*100/c.knownSections).Msg("Upgrading chain index")
 					}
 					updated = time.Now()
 				}
@@ -340,7 +345,7 @@ func (c *ChainIndexer) updateLoop() {
 						return
 					default:
 					}
-					c.log.Error("Section processing failed", "error", err)
+					c.log.Error().Err(err).Msg("Section processing failed")
 				}
 				c.lock.Lock()
 
@@ -350,16 +355,16 @@ func (c *ChainIndexer) updateLoop() {
 					c.setValidSections(section + 1)
 					if c.storedSections == c.knownSections && updating {
 						updating = false
-						c.log.Info("Finished upgrading chain index")
+						c.log.Info().Msg("Finished upgrading chain index")
 					}
 					c.cascadedHead = c.storedSections*c.sectionSize - 1
 					for _, child := range c.children {
-						c.log.Trace("Cascading chain index update", "head", c.cascadedHead)
+						c.log.Warn().Uint64("head", c.cascadedHead).Msg("Cascading chain index update")
 						child.newHead(c.cascadedHead, false)
 					}
 				} else {
 					// If processing failed, don't retry until further notification
-					c.log.Debug("Chain index processing failed", "section", section, "err", err)
+					c.log.Debug().Err(err).Uint64("section", section).Msg("Chain index processing failed")
 					c.knownSections = c.storedSections
 				}
 			}
@@ -382,7 +387,7 @@ func (c *ChainIndexer) updateLoop() {
 // held while processing, the continuity can be broken by a long reorg, in which
 // case the function returns with an error.
 func (c *ChainIndexer) processSection(section uint64, lastHead common.Hash) (common.Hash, error) {
-	c.log.Trace("Processing new chain section", "section", section)
+	c.log.Warn().Uint64("section", section).Msg("Processing new chain section")
 
 	// Reset and partial processing
 

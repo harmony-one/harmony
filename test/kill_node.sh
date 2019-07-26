@@ -5,3 +5,5 @@ do
     echo 'Killed process: '$pid
     kill -9 $pid
 done
+
+rm -rf db-127.0.0.1-*

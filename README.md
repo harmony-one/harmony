@@ -60,27 +60,23 @@ You can  run the script `./scripts/go_executable_build.sh` to build all the exec
 
 ### Build individual executables
 
-Initialize BLS 
-```
-source scripts/setup_bls_build_flags.sh
-```
-
 Harmony server / main node:
 
-```
-go build -o bin/harmony cmd/harmony/main.go
+```bash
+./scripts/go_executable_build.sh harmony
+
 ```
 
 Wallet:
 
-```
-go build -o bin/wallet cmd/client/wallet/main.go
+```bash
+./scripts/go_executable_build.sh wallet
 ```
 
 Tx Generator:
 
-```
-go build -o bin/txgen cmd/client/txgen/main.go
+```bash
+./scripts/go_executable_build.sh txgen
 ```
 
 ## Usage
@@ -89,12 +85,24 @@ You may build the src/harmony.go locally and run local test.
 
 ### Running local test
 
-The deploy.sh script creates a local environment of Harmony blockchain devnet based on the configuration file.
+The debug.sh script calls test/deploy.sh script to create a local environment of Harmony blockchain devnet based on the configuration file.
 The configuration file configures number of nodes and their IP/Port.
-The script starts one local beacon chain node, the blockchain nodes, and run a transactional generator program which generates and sends simulated transactions to the local blockchain.
+The script starts 2 shards and 7 nodes in each shard.
 
 ```bash
-./test/deploy.sh ./test/configs/beaconchain40.txt
+./test/debug.sh
+```
+
+### Test local blockchain
+```bash
+source scripts/setup_bls_build_flags.sh
+./bin/wallet list
+./bin/wallet -p local balances
+```
+
+### Terminate the local blockchain
+```bash
+./test/kill_nodes.sh
 ```
 
 ## Testing

@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -33,39 +32,6 @@ func BeaconAccountPriKey() *ecdsa.PrivateKey {
 		os.Exit(111)
 	}
 	return prikey
-}
-
-// FindAccount find the DeployAccount based on the account address, and the account index
-// the account address could be from HarmonyAccounts or from FoundationalNodeAccounts
-// the account index can be used to determin the shard of the account
-func FindAccount(address string) (int, *DeployAccount) {
-	addr := common.ParseAddr(address)
-	for i, acc := range HarmonyAccounts {
-		if addr == common.ParseAddr(acc.Address) {
-			return i, &acc
-		}
-	}
-	for i, acc := range FoundationalNodeAccounts {
-		if addr == common.ParseAddr(acc.Address) {
-			return i + 8, &acc
-		}
-	}
-	return 0, nil
-}
-
-// IsBlsPublicKeyIndex returns index and DeployAccount.
-func IsBlsPublicKeyIndex(blsPublicKey string) (int, *DeployAccount) {
-	for i, item := range HarmonyAccounts {
-		if item.BlsPublicKey == blsPublicKey {
-			return i, &item
-		}
-	}
-	for i, item := range FoundationalNodeAccounts {
-		if item.BlsPublicKey == blsPublicKey {
-			return i + 8, &item
-		}
-	}
-	return -1, nil
 }
 
 // GenesisBeaconAccountPriKey is the private key of genesis beacon account.

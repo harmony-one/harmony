@@ -25,7 +25,7 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to sign and marshal the Announce message", "error", err)
+		utils.Logger().Error().Err(err).Msg("Failed to sign and marshal the Announce message")
 	}
 	return proto.ConstructConsensusMessage(marshaledMessage)
 }
@@ -60,7 +60,7 @@ func (consensus *Consensus) constructPreparedMessage() ([]byte, *bls.Sign) {
 
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to sign and marshal the Prepared message", "error", err)
+		utils.Logger().Error().Err(err).Msg("Failed to sign and marshal the Prepared message")
 	}
 	return proto.ConstructConsensusMessage(marshaledMessage), aggSig
 }
@@ -93,7 +93,7 @@ func (consensus *Consensus) constructCommittedMessage() ([]byte, *bls.Sign) {
 
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to sign and marshal the Committed message", "error", err)
+		utils.Logger().Error().Err(err).Msg("Failed to sign and marshal the Committed message")
 	}
 	return proto.ConstructConsensusMessage(marshaledMessage), aggSig
 }

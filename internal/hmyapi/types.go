@@ -105,7 +105,7 @@ func RPCMarshalBlock(b *types.Block, inclTx bool, fullTx bool) (map[string]inter
 		"size":             hexutil.Uint64(b.Size()),
 		"gasLimit":         hexutil.Uint64(head.GasLimit),
 		"gasUsed":          hexutil.Uint64(head.GasUsed),
-		"timestamp":        head.Time, // TODO(ricl): should be hexutil.Uint64
+		"timestamp":        hexutil.Uint64(head.Time.Uint64()),
 		"transactionsRoot": head.TxHash,
 		"receiptsRoot":     head.ReceiptHash,
 	}
@@ -157,4 +157,14 @@ func newRPCTransactionFromBlockIndex(b *types.Block, index uint64) *RPCTransacti
 		return nil
 	}
 	return newRPCTransaction(txs[index], b.Hash(), b.NumberU64(), index)
+}
+
+// CallArgs represents the arguments for a call.
+type CallArgs struct {
+	From     *common.Address `json:"from"`
+	To       *common.Address `json:"to"`
+	Gas      *hexutil.Uint64 `json:"gas"`
+	GasPrice *hexutil.Big    `json:"gasPrice"`
+	Value    *hexutil.Big    `json:"value"`
+	Data     *hexutil.Bytes  `json:"data"`
 }

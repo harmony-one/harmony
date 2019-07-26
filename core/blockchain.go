@@ -68,14 +68,6 @@ const (
 	commitsCacheLimit   = 10
 	epochCacheLimit     = 10
 
-	// BlocksPerEpoch is the number of blocks in one epoch
-	// currently set to small number for testing
-	// in future, this need to be adjusted dynamically instead of constant
-	// TODO ek – inflate to disable resharding until we can 1) fix shard
-	//  state mutation bug and 2) implement key passphrase recycle across
-	//  process restart (exec) for shard migration
-	BlocksPerEpoch = 1000000000000
-
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	BlockChainVersion = 3
 )
@@ -236,13 +228,14 @@ func (bc *BlockChain) ValidateNewBlock(block *types.Block) error {
 }
 
 // IsEpochBlock returns whether this block is the first block of an epoch.
+// TODO: lc this is not used
 func IsEpochBlock(block *types.Block) bool {
-	return block.NumberU64()%BlocksPerEpoch == 0
+	return block.NumberU64()%ShardingSchedule.BlocksPerEpoch() == 0
 }
 
 // IsEpochLastBlock returns whether this block is the last block of an epoch.
 func IsEpochLastBlock(block *types.Block) bool {
-	return block.NumberU64()%BlocksPerEpoch == BlocksPerEpoch-1
+	return ShardingSchedule.IsLastBlock(block.NumberU64())
 }
 
 func (bc *BlockChain) getProcInterrupt() bool {
@@ -256,20 +249,23 @@ func (bc *BlockChain) loadLastState() error {
 	head := rawdb.ReadHeadBlockHash(bc.db)
 	if head == (common.Hash{}) {
 		// Corrupt or empty database, init from scratch
-		utils.GetLogger().Warn("Empty database, resetting chain")
+		utils.Logger().Warn().Msg("Empty database, resetting chain")
 		return bc.Reset()
 	}
 	// Make sure the entire head block is available
 	currentBlock := bc.GetBlockByHash(head)
 	if currentBlock == nil {
 		// Corrupt or empty database, init from scratch
-		utils.GetLogger().Warn("Head block missing, resetting chain", "hash", head)
+		utils.Logger().Warn().Bytes("hash", head.Bytes()).Msg("Head block missing, resetting chain")
 		return bc.Reset()
 	}
 	// Make sure the state associated with the block is available
 	if _, err := state.New(currentBlock.Root(), bc.stateCache); err != nil {
 		// Dangling block without a state associated, init from scratch
-		utils.GetLogger().Warn("Head state missing, repairing chain", "number", currentBlock.Number(), "hash", currentBlock.Hash())
+		utils.Logger().Warn().
+			Str("number", currentBlock.Number().String()).
+			Str("hash", currentBlock.Hash().Hex()).
+			Msg("Head state missing, repairing chain")
 		if err := bc.repair(&currentBlock); err != nil {
 			return err
 		}
@@ -301,9 +297,24 @@ func (bc *BlockChain) loadLastState() error {
 	blockTd := bc.GetTd(currentBlock.Hash(), currentBlock.NumberU64())
 	fastTd := bc.GetTd(currentFastBlock.Hash(), currentFastBlock.NumberU64())
 
-	utils.GetLogger().Info("Loaded most recent local header", "number", currentHeader.Number, "hash", currentHeader.Hash(), "td", headerTd, "age", common.PrettyAge(time.Unix(currentHeader.Time.Int64(), 0)))
-	utils.GetLogger().Info("Loaded most recent local full block", "number", currentBlock.Number(), "hash", currentBlock.Hash(), "td", blockTd, "age", common.PrettyAge(time.Unix(currentBlock.Time().Int64(), 0)))
-	utils.GetLogger().Info("Loaded most recent local fast block", "number", currentFastBlock.Number(), "hash", currentFastBlock.Hash(), "td", fastTd, "age", common.PrettyAge(time.Unix(currentFastBlock.Time().Int64(), 0)))
+	utils.Logger().Info().
+		Str("number", currentHeader.Number.String()).
+		Str("hash", currentHeader.Hash().Hex()).
+		Str("td", headerTd.String()).
+		Str("age", common.PrettyAge(time.Unix(currentHeader.Time.Int64(), 0)).String()).
+		Msg("Loaded most recent local header")
+	utils.Logger().Info().
+		Str("number", currentBlock.Number().String()).
+		Str("hash", currentBlock.Hash().Hex()).
+		Str("td", blockTd.String()).
+		Str("age", common.PrettyAge(time.Unix(currentBlock.Time().Int64(), 0)).String()).
+		Msg("Loaded most recent local full block")
+	utils.Logger().Info().
+		Str("number", currentFastBlock.Number().String()).
+		Str("hash", currentFastBlock.Hash().Hex()).
+		Str("td", fastTd.String()).
+		Str("age", common.PrettyAge(time.Unix(currentFastBlock.Time().Int64(), 0)).String()).
+		Msg("Loaded most recent local fast block")
 
 	return nil
 }
@@ -313,7 +324,7 @@ func (bc *BlockChain) loadLastState() error {
 // though, the head may be further rewound if block bodies are missing (non-archive
 // nodes after a fast sync).
 func (bc *BlockChain) SetHead(head uint64) error {
-	utils.GetLogger().Warn("Rewinding blockchain", "target", head)
+	utils.Logger().Warn().Uint64("target", head).Msg("Rewinding blockchain")
 
 	bc.mu.Lock()
 	defer bc.mu.Unlock()
@@ -379,7 +390,10 @@ func (bc *BlockChain) FastSyncCommitHead(hash common.Hash) error {
 	bc.currentBlock.Store(block)
 	bc.mu.Unlock()
 
-	utils.GetLogger().Info("Committed new head block", "number", block.Number(), "hash", hash)
+	utils.Logger().Info().
+		Str("number", block.Number().String()).
+		Str("hash", hash.Hex()).
+		Msg("Committed new head block")
 	return nil
 }
 
@@ -481,7 +495,10 @@ func (bc *BlockChain) repair(head **types.Block) error {
 	for {
 		// Abort if we've rewound to a head block that does have associated state
 		if _, err := state.New((*head).Root(), bc.stateCache); err == nil {
-			utils.GetLogger().Info("Rewound blockchain to past state", "number", (*head).Number(), "hash", (*head).Hash())
+			utils.Logger().Info().
+				Str("number", (*head).Number().String()).
+				Str("hash", (*head).Hash().Hex()).
+				Msg("Rewound blockchain to past state")
 			return nil
 		}
 		// Otherwise rewind one block and recheck state availability there
@@ -502,7 +519,7 @@ func (bc *BlockChain) ExportN(w io.Writer, first uint64, last uint64) error {
 	if first > last {
 		return fmt.Errorf("export failed: first (%d) is greater than last (%d)", first, last)
 	}
-	utils.GetLogger().Info("Exporting batch of blocks", "count", last-first+1)
+	utils.Logger().Info().Uint64("count", last-first+1).Msg("Exporting batch of blocks")
 
 	start, reported := time.Now(), time.Now()
 	for nr := first; nr <= last; nr++ {
@@ -514,7 +531,10 @@ func (bc *BlockChain) ExportN(w io.Writer, first uint64, last uint64) error {
 			return err
 		}
 		if time.Since(reported) >= statsReportLimit {
-			utils.GetLogger().Info("Exporting blocks", "exported", block.NumberU64()-first, "elapsed", common.PrettyDuration(time.Since(start)))
+			utils.Logger().Info().
+				Uint64("exported", block.NumberU64()-first).
+				Str("elapsed", common.PrettyDuration(time.Since(start)).String()).
+				Msg("Exporting blocks")
 			reported = time.Now()
 		}
 	}
@@ -730,9 +750,13 @@ func (bc *BlockChain) Stop() {
 			if number := bc.CurrentBlock().NumberU64(); number > offset {
 				recent := bc.GetBlockByNumber(number - offset)
 
-				utils.GetLogger().Info("Writing cached state to disk", "block", recent.Number(), "hash", recent.Hash(), "root", recent.Root())
+				utils.Logger().Info().
+					Str("block", recent.Number().String()).
+					Str("hash", recent.Hash().Hex()).
+					Str("root", recent.Root().Hex()).
+					Msg("Writing cached state to disk")
 				if err := triedb.Commit(recent.Root(), true); err != nil {
-					utils.GetLogger().Error("Failed to commit recent state trie", "err", err)
+					utils.Logger().Error().Err(err).Msg("Failed to commit recent state trie")
 				}
 			}
 		}
@@ -740,10 +764,10 @@ func (bc *BlockChain) Stop() {
 			triedb.Dereference(bc.triegc.PopItem().(common.Hash))
 		}
 		if size, _ := triedb.Size(); size != 0 {
-			utils.GetLogger().Error("Dangling trie nodes after full cleanup")
+			utils.Logger().Error().Msg("Dangling trie nodes after full cleanup")
 		}
 	}
-	utils.GetLogger().Info("Blockchain manager stopped")
+	utils.Logger().Info().Msg("Blockchain manager stopped")
 }
 
 func (bc *BlockChain) procFutureBlocks() {
@@ -846,8 +870,13 @@ func (bc *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain [
 	// Do a sanity check that the provided chain is actually ordered and linked
 	for i := 1; i < len(blockChain); i++ {
 		if blockChain[i].NumberU64() != blockChain[i-1].NumberU64()+1 || blockChain[i].ParentHash() != blockChain[i-1].Hash() {
-			utils.GetLogger().Error("Non contiguous receipt insert", "number", blockChain[i].Number(), "hash", blockChain[i].Hash(), "parent", blockChain[i].ParentHash(),
-				"prevnumber", blockChain[i-1].Number(), "prevhash", blockChain[i-1].Hash())
+			utils.Logger().Error().
+				Str("number", blockChain[i].Number().String()).
+				Str("hash", blockChain[i].Hash().Hex()).
+				Str("parent", blockChain[i].ParentHash().Hex()).
+				Str("prevnumber", blockChain[i-1].Number().String()).
+				Str("prevhash", blockChain[i-1].Hash().Hex()).
+				Msg("Non contiguous receipt insert")
 			return 0, fmt.Errorf("non contiguous insert: item %d is #%d [%x…], item %d is #%d [%x…] (parent [%x…])", i-1, blockChain[i-1].NumberU64(),
 				blockChain[i-1].Hash().Bytes()[:4], i, blockChain[i].NumberU64(), blockChain[i].Hash().Bytes()[:4], blockChain[i].ParentHash().Bytes()[:4])
 		}
@@ -912,15 +941,15 @@ func (bc *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain [
 	}
 	bc.mu.Unlock()
 
-	context := []interface{}{
-		"count", stats.processed, "elapsed", common.PrettyDuration(time.Since(start)),
-		"number", head.Number(), "hash", head.Hash(), "age", common.PrettyAge(time.Unix(head.Time().Int64(), 0)),
-		"size", common.StorageSize(bytes),
-	}
-	if stats.ignored > 0 {
-		context = append(context, []interface{}{"ignored", stats.ignored}...)
-	}
-	utils.GetLogger().Info("Imported new block receipts", context...)
+	utils.Logger().Info().
+		Int32("count", stats.processed).
+		Str("elapsed", common.PrettyDuration(time.Since(start)).String()).
+		Str("age", common.PrettyAge(time.Unix(head.Time().Int64(), 0)).String()).
+		Str("head", head.Number().String()).
+		Str("hash", head.Hash().Hex()).
+		Str("size", common.StorageSize(bytes).String()).
+		Int32("ignored", stats.ignored).
+		Msg("Imported new block receipts")
 
 	return 0, nil
 }
@@ -989,7 +1018,11 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 				// If we're exceeding limits but haven't reached a large enough memory gap,
 				// warn the user that the system is becoming unstable.
 				if chosen < lastWrite+triesInMemory && bc.gcproc >= 2*bc.cacheConfig.TrieTimeLimit {
-					utils.GetLogger().Info("State in memory for too long, committing", "time", bc.gcproc, "allowance", bc.cacheConfig.TrieTimeLimit, "optimum", float64(chosen-lastWrite)/triesInMemory)
+					utils.Logger().Info().
+						Dur("time", bc.gcproc).
+						Dur("allowance", bc.cacheConfig.TrieTimeLimit).
+						Float64("optimum", float64(chosen-lastWrite)/triesInMemory).
+						Msg("State in memory for too long, committing")
 				}
 				// Flush an entire trie and restart the counters
 				triedb.Commit(header.Root, true)
@@ -1057,15 +1090,16 @@ func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 	if err == nil {
 		for idx, block := range chain {
 			header := block.Header()
-			header.Logger(utils.GetLogger()).Info("added block to chain",
-				"segmentIndex", idx,
-				"parentHash", header.ParentHash)
+			header.Logger(utils.Logger()).Info().
+				Int("segmentIndex", idx).
+				Str("parentHash", header.ParentHash.Hex()).
+				Msg("added block to chain")
+
 			if header.ShardStateHash != (common.Hash{}) {
 				epoch := new(big.Int).Add(header.Epoch, common.Big1)
 				err = bc.WriteShardStateBytes(epoch, header.ShardState)
 				if err != nil {
-					ctxerror.Log15(header.Logger(utils.GetLogger()).Warn,
-						ctxerror.New("cannot store shard state").WithCause(err))
+					header.Logger(utils.Logger()).Warn().Err(err).Msg("cannot store shard state")
 				}
 			}
 		}
@@ -1085,8 +1119,13 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 	for i := 1; i < len(chain); i++ {
 		if chain[i].NumberU64() != chain[i-1].NumberU64()+1 || chain[i].ParentHash() != chain[i-1].Hash() {
 			// Chain broke ancestry, log a message (programming error) and skip insertion
-			utils.GetLogger().Error("Non contiguous block insert", "number", chain[i].Number(), "hash", chain[i].Hash(),
-				"parent", chain[i].ParentHash(), "prevnumber", chain[i-1].Number(), "prevhash", chain[i-1].Hash())
+			utils.Logger().Error().
+				Str("number", chain[i].Number().String()).
+				Str("hash", chain[i].Hash().Hex()).
+				Str("parent", chain[i].ParentHash().Hex()).
+				Str("prevnumber", chain[i-1].Number().String()).
+				Str("prevhash", chain[i-1].Hash().Hex()).
+				Msg("Non contiguous block insert")
 
 			return 0, nil, nil, fmt.Errorf("non contiguous insert: item %d is #%d [%x…], item %d is #%d [%x…] (parent [%x…])", i-1, chain[i-1].NumberU64(),
 				chain[i-1].Hash().Bytes()[:4], i, chain[i].NumberU64(), chain[i].Hash().Bytes()[:4], chain[i].ParentHash().Bytes()[:4])
@@ -1126,7 +1165,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 	for i, block := range chain {
 		// If the chain is terminating, stop processing blocks
 		if atomic.LoadInt32(&bc.procInterrupt) == 1 {
-			utils.GetLogger().Debug("Premature abort during blocks processing")
+			utils.Logger().Debug().Msg("Premature abort during blocks processing")
 			break
 		}
 		// Wait for the block's verification to complete
@@ -1230,11 +1269,17 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 		if err != nil {
 			return i, events, coalescedLogs, err
 		}
+		logger := utils.Logger().With().
+			Str("number", block.Number().String()).
+			Str("hash", block.Hash().Hex()).
+			Int("uncles", len(block.Uncles())).
+			Int("txs", len(block.Transactions())).
+			Uint64("gas", block.GasUsed()).
+			Str("elapsed", common.PrettyDuration(time.Since(bstart)).String()).
+			Logger()
 		switch status {
 		case CanonStatTy:
-			utils.GetLogger().Info("Inserted new block", "number", block.Number(), "hash", block.Hash(), "uncles", len(block.Uncles()),
-				"txs", len(block.Transactions()), "gas", block.GasUsed(), "elapsed", common.PrettyDuration(time.Since(bstart)))
-
+			logger.Info().Msg("Inserted new block")
 			coalescedLogs = append(coalescedLogs, logs...)
 			blockInsertTimer.UpdateSince(bstart)
 			events = append(events, ChainEvent{block, block.Hash(), logs})
@@ -1244,9 +1289,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 			bc.gcproc += proctime
 
 		case SideStatTy:
-			utils.GetLogger().Debug("Inserted forked block", "number", block.Number(), "hash", block.Hash(), "elapsed",
-				common.PrettyDuration(time.Since(bstart)), "txs", len(block.Transactions()), "gas", block.GasUsed(), "uncles", len(block.Uncles()))
-
+			logger.Debug().Msg("Inserted forked block")
 			blockInsertTimer.UpdateSince(bstart)
 			events = append(events, ChainSideEvent{block})
 		}
@@ -1290,23 +1333,30 @@ func (st *insertStats) report(chain []*types.Block, index int, cache common.Stor
 			end = chain[index]
 			txs = countTransactions(chain[st.lastIndex : index+1])
 		)
-		context := []interface{}{
-			"blocks", st.processed, "txs", txs, "mgas", float64(st.usedGas) / 1000000,
-			"elapsed", common.PrettyDuration(elapsed), "mgasps", float64(st.usedGas) * 1000 / float64(elapsed),
-			"number", end.Number(), "hash", end.Hash(),
-		}
+
+		context := utils.Logger().With().
+			Int("blocks", st.processed).
+			Int("txs", txs).
+			Float64("mgas", float64(st.usedGas)/1000000).
+			Str("elapsed", common.PrettyDuration(elapsed).String()).
+			Float64("mgasps", float64(st.usedGas)*1000/float64(elapsed)).
+			Str("number", end.Number().String()).
+			Str("hash", end.Hash().Hex()).
+			Str("cache", cache.String())
+
 		if timestamp := time.Unix(end.Time().Int64(), 0); time.Since(timestamp) > time.Minute {
-			context = append(context, []interface{}{"age", common.PrettyAge(timestamp)}...)
+			context = context.Str("age", common.PrettyAge(timestamp).String())
 		}
-		context = append(context, []interface{}{"cache", cache}...)
 
 		if st.queued > 0 {
-			context = append(context, []interface{}{"queued", st.queued}...)
+			context = context.Int("queued", st.queued)
 		}
 		if st.ignored > 0 {
-			context = append(context, []interface{}{"ignored", st.ignored}...)
+			context = context.Int("ignored", st.ignored)
 		}
-		utils.GetLogger().Info("Imported new chain segment", context...)
+
+		logger := context.Logger()
+		logger.Info().Msg("Imported new chain segment")
 
 		*st = insertStats{startTime: now, lastIndex: index + 1}
 	}
@@ -1392,14 +1442,25 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 	}
 	// Ensure the user sees large reorgs
 	if len(oldChain) > 0 && len(newChain) > 0 {
-		logFn := utils.GetLogger().Debug
+		logEvent := utils.Logger().Debug()
 		if len(oldChain) > 63 {
-			logFn = utils.GetLogger().Warn
+			logEvent = utils.Logger().Warn()
 		}
-		logFn("Chain split detected", "number", commonBlock.Number(), "hash", commonBlock.Hash(),
-			"drop", len(oldChain), "dropfrom", oldChain[0].Hash(), "add", len(newChain), "addfrom", newChain[0].Hash())
+		logEvent.
+			Str("number", commonBlock.Number().String()).
+			Str("hash", commonBlock.Hash().Hex()).
+			Int("drop", len(oldChain)).
+			Str("dropfrom", oldChain[0].Hash().Hex()).
+			Int("add", len(newChain)).
+			Str("addfrom", newChain[0].Hash().Hex()).
+			Msg("Chain split detected")
 	} else {
-		utils.GetLogger().Error("Impossible reorg, please file an issue", "oldnum", oldBlock.Number(), "oldhash", oldBlock.Hash(), "newnum", newBlock.Number(), "newhash", newBlock.Hash())
+		utils.Logger().Error().
+			Str("oldnum", oldBlock.Number().String()).
+			Str("oldhash", oldBlock.Hash().Hex()).
+			Str("newnum", newBlock.Number().String()).
+			Str("newhash", newBlock.Hash().Hex()).
+			Msg("Impossible reorg, please file an issue")
 	}
 	// Insert the new chain, taking care of the proper incremental order
 	var addedTxs types.Transactions
@@ -1494,7 +1555,7 @@ func (bc *BlockChain) reportBlock(block *types.Block, receipts types.Receipts, e
 	for _, receipt := range receipts {
 		receiptString += fmt.Sprintf("\t%v\n", receipt)
 	}
-	utils.GetLogger().Error(fmt.Sprintf(`
+	utils.Logger().Error().Msgf(`
 ########## BAD BLOCK #########
 Chain config: %v
 
@@ -1504,7 +1565,7 @@ Hash: 0x%x
 
 Error: %v
 ##############################
-`, bc.chainConfig, block.Number(), block.Hash(), receiptString, err))
+`, bc.chainConfig, block.Number(), block.Hash(), receiptString, err)
 }
 
 // InsertHeaderChain attempts to insert the given header chain in to the local
@@ -1683,12 +1744,16 @@ func (bc *BlockChain) WriteShardState(
 func (bc *BlockChain) WriteShardStateBytes(
 	epoch *big.Int, shardState []byte,
 ) error {
+	decodeShardState := types.ShardState{}
+	if err := rlp.DecodeBytes(shardState, &decodeShardState); err != nil {
+		return err
+	}
 	err := rawdb.WriteShardStateBytes(bc.db, epoch, shardState)
 	if err != nil {
 		return err
 	}
 	cacheKey := string(epoch.Bytes())
-	bc.shardStateCache.Add(cacheKey, shardState)
+	bc.shardStateCache.Add(cacheKey, decodeShardState)
 	return nil
 }
 
@@ -1741,7 +1806,8 @@ func (bc *BlockChain) GetVrfByNumber(number uint64) [32]byte {
 // GetShardState returns the shard state for the given epoch,
 // creating one if needed.
 func (bc *BlockChain) GetShardState(
-	epoch *big.Int, stakeInfo *map[common.Address]*structs.StakeInfo,
+	epoch *big.Int,
+	stakeInfo *map[common.Address]*structs.StakeInfo,
 ) (types.ShardState, error) {
 	shardState, err := bc.ReadShardState(epoch)
 	if err == nil { // TODO ek – distinguish ErrNotFound
@@ -1755,7 +1821,7 @@ func (bc *BlockChain) GetShardState(
 	if err != nil {
 		return nil, err
 	}
-	utils.GetLogger().Debug("saved new shard state", "epoch", epoch)
+	utils.Logger().Debug().Str("epoch", epoch.String()).Msg("saved new shard state")
 	return shardState, nil
 }
 
@@ -1801,4 +1867,9 @@ func (bc *BlockChain) StoreEpochBlockNumber(
 // In eth, chainDB is initialized within Ethereum object
 func (bc *BlockChain) ChainDB() ethdb.Database {
 	return bc.db
+}
+
+// GetVMConfig returns the block chain VM config.
+func (bc *BlockChain) GetVMConfig() *vm.Config {
+	return &bc.vmConfig
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"math/big"
 	"math/rand"
 	"os"
 	"path"
@@ -14,17 +15,16 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
 
-	"github.com/harmony-one/harmony/accounts/keystore"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/blsgen"
 	"github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
 	hmykey "github.com/harmony-one/harmony/internal/keystore"
 	"github.com/harmony-one/harmony/internal/memprofiling"
-	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node"
@@ -86,7 +86,7 @@ var (
 	// isExplorer indicates this node is a node to serve explorer
 	isExplorer = flag.Bool("is_explorer", false, "true means this node is a node to serve explorer")
 	// networkType indicates the type of the network
-	networkType = flag.String("network_type", "mainnet", "type of the network: mainnet, testnet, devnet...")
+	networkType = flag.String("network_type", "mainnet", "type of the network: mainnet, testnet, devnet, localnet")
 	// blockPeriod indicates the how long the leader waits to propose a new block.
 	blockPeriod = flag.Int("block_period", 8, "how long in second the leader waits to propose a new block.")
 	// isNewNode indicates this node is a new node
@@ -100,21 +100,17 @@ var (
 	blsPass            = flag.String("blspass", "", "The file containing passphrase to decrypt the encrypted bls file.")
 	blsPassphrase      string
 
+	// Sharding configuration parameters for devnet
+	devnetNumShards   = flag.Uint("dn_num_shards", 2, "number of shards for -network_type=devnet (default: 2)")
+	devnetShardSize   = flag.Int("dn_shard_size", 10, "number of nodes per shard for -network_type=devnet (default 10)")
+	devnetHarmonySize = flag.Int("dn_hmy_size", -1, "number of Harmony-operated nodes per shard for -network_type=devnet; negative (default) means equal to -dn_shard_size")
+
 	// logConn logs incoming/outgoing connections
 	logConn = flag.Bool("log_conn", false, "log incoming/outgoing connections")
 
 	keystoreDir = flag.String("keystore", hmykey.DefaultKeyStoreDir, "The default keystore directory")
 
-	// -nopass is false by default.  The keyfile must be encrypted.
-	hmyNoPass = flag.Bool("nopass", false, "No passphrase for the key (testing only)")
-	// -pass takes on "pass:password", "env:var", "file:pathname",
-	// "fd:number", or "stdin" form.
-	// See “PASS PHRASE ARGUMENTS” section of openssl(1) for details.
-	hmyPass = flag.String("pass", "", "how to get passphrase for the key")
-
-	ks             *keystore.KeyStore
-	genesisAccount *genesis.DeployAccount
-	accountIndex   int
+	genesisAccount = &genesis.DeployAccount{}
 
 	// logging verbosity
 	verbosity = flag.Int("verbosity", 5, "Logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail (default: 5)")
@@ -123,18 +119,10 @@ var (
 	dbDir = flag.String("db_dir", "", "blockchain database directory")
 
 	// Disable view change.
-	disableViewChange = flag.Bool("disable_view_change", false,
-		"Do not propose view change (testing only)")
+	disableViewChange = flag.Bool("disable_view_change", false, "Do not propose view change (testing only)")
 )
 
 func initSetup() {
-	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
-	flag.Parse()
-
-	nodeconfig.SetVersion(fmt.Sprintf("Harmony (C) 2019. %v, version %v-%v (%v %v)", path.Base(os.Args[0]), version, commit, builtBy, builtAt))
-	if *versionFlag {
-		printVersion()
-	}
 
 	// maybe request passphrase for bls key.
 	passphraseForBls()
@@ -142,10 +130,8 @@ func initSetup() {
 	// Configure log parameters
 	utils.SetLogContext(*port, *ip)
 	utils.SetLogVerbosity(log.Lvl(*verbosity))
-	filename := fmt.Sprintf("%v/validator-%v-%v.log", *logFolder, *ip, *port)
-	if err := utils.AddLogFile(filename, *logMaxSize); err != nil {
-		panic(err)
-	}
+	utils.AddLogFile(fmt.Sprintf("%v/validator-%v-%v.log", *logFolder, *ip, *port), *logMaxSize)
+
 	if *onlyLogTps {
 		matchFilterHandler := log.MatchFilterHandler("msg", "TPS Report", utils.GetLogInstance().GetHandler())
 		utils.GetLogInstance().SetHandler(matchFilterHandler)
@@ -175,13 +161,6 @@ func initSetup() {
 		utils.BootNodes = bootNodeAddrs
 	}
 
-	if !*isExplorer { // Explorer node doesn't need the following setup
-		setupECDSAKeys()
-	} else {
-		genesisAccount = &genesis.DeployAccount{}
-		genesisAccount.ShardID = uint32(*shardID)
-	}
-
 	// Set up manual call for garbage collection.
 	if *enableGC {
 		memprofiling.MaybeCallGCPeriodically()
@@ -202,34 +181,40 @@ func passphraseForBls() {
 	blsPassphrase = passphrase
 }
 
-func setupECDSAKeys() {
-	ks = hmykey.GetHmyKeyStore()
+func setupGenesisAccount() (isLeader bool) {
+	genesisShardingConfig := core.ShardingSchedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch))
+	pubKey := setUpConsensusKey(nodeconfig.GetDefaultConfig())
 
-	// TODO: lc try to enable multiple staking accounts per node
-	accountIndex, genesisAccount = setUpConsensusKeyAndReturnIndex(nodeconfig.GetDefaultConfig())
+	reshardingEpoch := genesisShardingConfig.ReshardingEpoch()
+	if reshardingEpoch != nil && len(reshardingEpoch) > 0 {
+		for _, epoch := range reshardingEpoch {
+			config := core.ShardingSchedule.InstanceForEpoch(epoch)
+			isLeader, genesisAccount = config.FindAccount(pubKey.SerializeToHexStr())
+			if genesisAccount != nil {
+				break
+			}
+		}
+	} else {
+		isLeader, genesisAccount = genesisShardingConfig.FindAccount(pubKey.SerializeToHexStr())
+	}
 
-	genesisAccount.ShardID = uint32(accountIndex % core.GenesisShardNum)
+	if genesisAccount == nil {
+		fmt.Printf("cannot find your BLS key in the genesis/FN tables: %s\n", pubKey.SerializeToHexStr())
+		os.Exit(100)
+	}
 
 	fmt.Printf("My Genesis Account: %v\n", *genesisAccount)
 
-	// Set up manual call for garbage collection.
-	if *enableGC {
-		memprofiling.MaybeCallGCPeriodically()
-	}
+	return isLeader
 }
 
-func setUpConsensusKeyAndReturnIndex(nodeConfig *nodeconfig.ConfigType) (int, *genesis.DeployAccount) {
+func setUpConsensusKey(nodeConfig *nodeconfig.ConfigType) *bls.PublicKey {
 	consensusPriKey, err := blsgen.LoadBlsKeyWithPassPhrase(*blsKeyFile, blsPassphrase)
 	if err != nil {
 		fmt.Printf("error when loading bls key, err :%v\n", err)
 		os.Exit(100)
 	}
 	pubKey := consensusPriKey.GetPublicKey()
-	index, acc := genesis.IsBlsPublicKeyIndex(pubKey.SerializeToHexStr())
-	if index < 0 {
-		fmt.Printf("cannot find your BLS key in the genesis/FN tables: %s\n", pubKey.SerializeToHexStr())
-		os.Exit(100)
-	}
 
 	// Consensus keys are the BLS12-381 keys used to sign consensus messages
 	nodeConfig.ConsensusPriKey, nodeConfig.ConsensusPubKey = consensusPriKey, consensusPriKey.GetPublicKey()
@@ -237,43 +222,17 @@ func setUpConsensusKeyAndReturnIndex(nodeConfig *nodeconfig.ConfigType) (int, *g
 		fmt.Println("error to get consensus keys.")
 		os.Exit(100)
 	}
-	return index, acc
+	return pubKey
 }
 
-func createGlobalConfig() *nodeconfig.ConfigType {
+func createGlobalConfig(isLeader bool) *nodeconfig.ConfigType {
 	var err error
-	var myShardID uint32
 
-	nodeConfig := nodeconfig.GetDefaultConfig()
-
+	nodeConfig := nodeconfig.GetShardConfig(genesisAccount.ShardID)
 	if !*isExplorer {
-		// Specified Shard ID override calculated Shard ID
-		if *shardID >= 0 {
-			utils.GetLogInstance().Info("ShardID Override", "original", genesisAccount.ShardID, "override", *shardID)
-			genesisAccount.ShardID = uint32(*shardID)
-		}
-
-		if !*isNewNode {
-			nodeConfig = nodeconfig.GetShardConfig(uint32(genesisAccount.ShardID))
-		} else {
-			myShardID = 0 // This should be default value as new node doesn't belong to any shard.
-			if *shardID >= 0 {
-				utils.GetLogInstance().Info("ShardID Override", "original", myShardID, "override", *shardID)
-				myShardID = uint32(*shardID)
-				nodeConfig = nodeconfig.GetShardConfig(myShardID)
-			}
-		}
-
 		// Set up consensus keys.
-		setUpConsensusKeyAndReturnIndex(nodeConfig)
-
-		// P2p private key is used for secure message transfer between p2p nodes.
-		nodeConfig.P2pPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
-		if err != nil {
-			panic(err)
-		}
+		setUpConsensusKey(nodeConfig)
 	} else {
-		nodeConfig = nodeconfig.GetShardConfig(uint32(*shardID))
 		nodeConfig.ConsensusPriKey = &bls.SecretKey{} // set dummy bls key for consensus object
 	}
 
@@ -283,25 +242,26 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 		nodeConfig.SetNetworkType(nodeconfig.Mainnet)
 	case nodeconfig.Testnet:
 		nodeConfig.SetNetworkType(nodeconfig.Testnet)
+	case nodeconfig.Localnet:
+		nodeConfig.SetNetworkType(nodeconfig.Localnet)
 	case nodeconfig.Devnet:
 		nodeConfig.SetNetworkType(nodeconfig.Devnet)
 	default:
 		panic(fmt.Sprintf("invalid network type: %s", *networkType))
 	}
 
-	nodeConfig.SelfPeer = p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nodeConfig.ConsensusPubKey}
-
-	if accountIndex < core.GenesisShardNum && !*isExplorer && !*leaderOverride { // The first node in a shard is the leader at genesis
-		nodeConfig.Leader = nodeConfig.SelfPeer
-		nodeConfig.StringRole = "leader"
-	} else {
-		nodeConfig.StringRole = "validator"
-	}
-
 	// P2p private key is used for secure message transfer between p2p nodes.
 	nodeConfig.P2pPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
 		panic(err)
+	}
+	nodeConfig.SelfPeer = p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nodeConfig.ConsensusPubKey}
+
+	if isLeader && !*isExplorer && !*leaderOverride { // The first node in a shard is the leader at genesis
+		nodeConfig.Leader = nodeConfig.SelfPeer
+		nodeConfig.StringRole = "leader"
+	} else {
+		nodeConfig.StringRole = "validator"
 	}
 
 	nodeConfig.Host, err = p2pimpl.NewHost(&nodeConfig.SelfPeer, nodeConfig.P2pPriKey)
@@ -340,6 +300,11 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	}
 	currentConsensus.SetCommitDelay(commitDelay)
 	currentConsensus.MinPeers = *minPeers
+
+	if *isNewNode {
+		currentConsensus.SetMode(consensus.Listening)
+	}
+
 	if *disableViewChange {
 		currentConsensus.DisableViewChangeForTestingOnly()
 	}
@@ -368,49 +333,37 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 			nodeConfig.SetIsBeacon(true)
 			if nodeConfig.StringRole == "leader" {
 				currentNode.NodeConfig.SetRole(nodeconfig.BeaconLeader)
-				currentNode.NodeConfig.SetIsLeader(true)
 			} else {
 				currentNode.NodeConfig.SetRole(nodeconfig.BeaconValidator)
-				currentNode.NodeConfig.SetIsLeader(false)
 			}
 			currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
 			currentNode.NodeConfig.SetClientGroupID(p2p.GroupIDBeaconClient)
 		} else {
 			if nodeConfig.StringRole == "leader" {
 				currentNode.NodeConfig.SetRole(nodeconfig.ShardLeader)
-				currentNode.NodeConfig.SetIsLeader(true)
 			} else {
 				currentNode.NodeConfig.SetRole(nodeconfig.ShardValidator)
-				currentNode.NodeConfig.SetIsLeader(false)
 			}
 			currentNode.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
 			currentNode.NodeConfig.SetClientGroupID(p2p.NewClientGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
 		}
 	} else {
 		if *isNewNode {
-			currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
-			currentNode.NodeConfig.SetClientGroupID(p2p.GroupIDBeaconClient)
-			currentNode.NodeConfig.SetBeaconGroupID(p2p.GroupIDBeacon)
-			if *shardID > -1 {
-				// I will be a validator (single leader is fixed for now)
+			if nodeConfig.ShardID == 0 { // Beacon chain
+				nodeConfig.SetIsBeacon(true)
+				currentNode.NodeConfig.SetRole(nodeconfig.BeaconValidator)
+				currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
+				currentNode.NodeConfig.SetClientGroupID(p2p.GroupIDBeaconClient)
+			} else {
 				currentNode.NodeConfig.SetRole(nodeconfig.ShardValidator)
-				currentNode.NodeConfig.SetIsLeader(false)
 				currentNode.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
 				currentNode.NodeConfig.SetClientGroupID(p2p.NewClientGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
 			}
-		} else if *isExplorer {
+		}
+		if *isExplorer {
 			currentNode.NodeConfig.SetRole(nodeconfig.ExplorerNode)
-			currentNode.NodeConfig.SetIsLeader(false)
 			currentNode.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(*shardID)))
 			currentNode.NodeConfig.SetClientGroupID(p2p.NewClientGroupIDByShardID(p2p.ShardID(*shardID)))
-		} else if nodeConfig.StringRole == "leader" {
-			currentNode.NodeConfig.SetRole(nodeconfig.ShardLeader)
-			currentNode.NodeConfig.SetIsLeader(true)
-			currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDUnknown)
-		} else {
-			currentNode.NodeConfig.SetRole(nodeconfig.ShardValidator)
-			currentNode.NodeConfig.SetIsLeader(false)
-			currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDUnknown)
 		}
 	}
 	currentNode.NodeConfig.ConsensusPubKey = nodeConfig.ConsensusPubKey
@@ -453,18 +406,55 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 }
 
 func main() {
-	initSetup()
-	nodeConfig := createGlobalConfig()
+	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
+	flag.Parse()
 
-	// Start Profiler for leader if profile argument is on
-	if nodeConfig.StringRole == "leader" && (*profile || *metricsReportURL != "") {
-		prof := profiler.GetProfiler()
-		prof.Config(nodeConfig.ShardID, *metricsReportURL)
-		if *profile {
-			prof.Start()
-		}
+	nodeconfig.SetVersion(fmt.Sprintf("Harmony (C) 2019. %v, version %v-%v (%v %v)", path.Base(os.Args[0]), version, commit, builtBy, builtAt))
+	if *versionFlag {
+		printVersion()
 	}
+
+	switch *networkType {
+	case nodeconfig.Mainnet:
+		core.ShardingSchedule = shardingconfig.MainnetSchedule
+	case nodeconfig.Testnet:
+		core.ShardingSchedule = shardingconfig.TestnetSchedule
+	case nodeconfig.Localnet:
+		core.ShardingSchedule = shardingconfig.LocalnetSchedule
+	case nodeconfig.Devnet:
+		if *devnetHarmonySize < 0 {
+			*devnetHarmonySize = *devnetShardSize
+		}
+		// TODO (leo): use a passing list of accounts here
+		devnetConfig, err := shardingconfig.NewInstance(
+			uint32(*devnetNumShards), *devnetShardSize, *devnetHarmonySize, genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, nil)
+		if err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "invalid devnet sharding config: %s",
+				err)
+			os.Exit(1)
+		}
+		core.ShardingSchedule = shardingconfig.NewFixedSchedule(devnetConfig)
+	}
+
+	initSetup()
+
+	// Set up manual call for garbage collection.
+	if *enableGC {
+		memprofiling.MaybeCallGCPeriodically()
+	}
+
+	isLeader := false
+	if !*isExplorer { // Explorer node doesn't need the following setup
+		isLeader = setupGenesisAccount()
+	}
+	if *shardID >= 0 {
+		utils.GetLogInstance().Info("ShardID Override", "original", genesisAccount.ShardID, "override", *shardID)
+		genesisAccount.ShardID = uint32(*shardID)
+	}
+
+	nodeConfig := createGlobalConfig(isLeader)
 	currentNode := setUpConsensusAndNode(nodeConfig)
+
 	//if consensus.ShardID != 0 {
 	//	go currentNode.SupportBeaconSyncing()
 	//}

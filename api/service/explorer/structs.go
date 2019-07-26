@@ -92,7 +92,7 @@ func GetTransaction(tx *types.Transaction, accountBlock *types.Block) *Transacti
 	}
 	msg, err := tx.AsMessage(types.HomesteadSigner{})
 	if err != nil {
-		utils.GetLogger().Error("Error when parsing tx into message", "err", err)
+		utils.Logger().Error().Err(err).Msg("Error when parsing tx into message")
 	}
 	return &Transaction{
 		ID:        tx.Hash().Hex(),

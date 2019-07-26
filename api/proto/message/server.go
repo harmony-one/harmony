@@ -10,7 +10,6 @@ import (
 	"net"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 
 	"google.golang.org/grpc"
@@ -45,11 +44,11 @@ func (s *Server) Process(ctx context.Context, message *Message) (*Response, erro
 
 		key, err := crypto.HexToECDSA(priKey)
 		if err != nil {
-			utils.GetLogInstance().Error("Error when HexToECDSA")
+			utils.Logger().Error().Msg("Error when HexToECDSA")
 		}
 		address := crypto.PubkeyToAddress(key.PublicKey)
 
-		utils.GetLogInstance().Info("Enter:", "amount", amount, "for address", address)
+		utils.Logger().Info().Int64("amount", amount).Bytes("address", address[:]).Msg("Enter")
 		if err := s.CreateTransactionForEnterMethod(amount, priKey); err != nil {
 			return nil, ErrEnterMethod
 		}
@@ -60,7 +59,7 @@ func (s *Server) Process(ctx context.Context, message *Message) (*Response, erro
 		for _, balance := range balances {
 			stringBalances = append(stringBalances, balance.String())
 		}
-		utils.GetLogInstance().Info("getPlayers", "players", players, "balances", stringBalances)
+		utils.Logger().Info().Strs("players", players).Strs("balances", stringBalances).Msg("getPlayers")
 		ret := &Response{
 			Response: &Response_LotteryResponse{
 				LotteryResponse: &LotteryResponse{
@@ -91,7 +90,7 @@ func (s *Server) Start() (*grpc.Server, error) {
 	RegisterClientServiceServer(s.server, s)
 	go func() {
 		if err := s.server.Serve(lis); err != nil {
-			ctxerror.Warn(utils.GetLogger(), err, "server.Serve() failed")
+			utils.Logger().Warn().Err(err).Msg("server.Serve() failed")
 		}
 	}()
 	return s.server, nil
