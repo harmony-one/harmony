@@ -27,9 +27,6 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 		// Setup stoppedChan
 		defer close(stoppedChan)
 
-		// TODO: remove it later
-		firstTime := true
-
 		utils.GetLogInstance().Debug("Waiting for Consensus ready")
 		time.Sleep(30 * time.Second) // Wait for other nodes to be ready (test-only)
 
@@ -59,14 +56,6 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 					time.Sleep(PeriodicBlock)
 					if time.Now().Before(deadline) {
 						continue
-					}
-
-					//TODO: remove it after shard0 fix
-					if node.Consensus.NeedsBlockRecovery(node.Blockchain().CurrentBlock().NumberU64()) && firstTime {
-						firstTime = false
-						newBlock := node.Blockchain().CurrentBlock()
-						node.BlockChannel <- newBlock
-						break
 					}
 
 					coinbase := node.Consensus.SelfAddress
