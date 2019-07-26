@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	defaultGasPrice     = params.GWei
-	defaultFromtAddress = "0x1a3e7a44ee21101d7D64FBf29B0F6F1fc295F723"
+	defaultGasPrice    = params.GWei
+	defaultFromAddress = "0x0000000000000000000000000000000000000000"
 )
 
 // PublicBlockChainAPI provides an API to access the Harmony blockchain.
@@ -127,7 +127,7 @@ func doCall(ctx context.Context, b Backend, args CallArgs, blockNr rpc.BlockNumb
 		// The logic in ethereum is to pick a random address managed under the account manager.
 		// Currently Harmony no longers support the account manager.
 		// Any address does not affect the logic of this call.
-		addr = common.HexToAddress(defaultFromtAddress)
+		addr = common.HexToAddress(defaultFromAddress)
 	} else {
 		addr = *args.From
 	}
