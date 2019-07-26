@@ -6,7 +6,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -27,9 +26,6 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 	go func() {
 		// Setup stoppedChan
 		defer close(stoppedChan)
-
-		// TODO: remove it later
-		firstTime := true
 
 		utils.GetLogInstance().Debug("Waiting for Consensus ready")
 		time.Sleep(30 * time.Second) // Wait for other nodes to be ready (test-only)
@@ -60,14 +56,6 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 					time.Sleep(PeriodicBlock)
 					if time.Now().Before(deadline) {
 						continue
-					}
-
-					//TODO: remove it after shard0 fix
-					if node.Blockchain().CurrentBlock().NumberU64() == consensus.ReProposeBlockNum && firstTime {
-						firstTime = false
-						newBlock := node.Blockchain().CurrentBlock()
-						node.BlockChannel <- newBlock
-						break
 					}
 
 					coinbase := node.Consensus.SelfAddress
