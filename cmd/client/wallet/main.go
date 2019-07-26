@@ -794,35 +794,47 @@ func FetchBalance(address common.Address) []*AccountState {
 			defer wg.Done()
 			balance := big.NewInt(0)
 			var nonce uint64
-
 			result[uint32(shardID)] = &AccountState{balance, 0}
 
-		LOOP:
-			for j := 0; j < len(walletProfile.RPCServer[shardID]); j++ {
-				for retry := 0; retry < rpcRetry; retry++ {
-					server := walletProfile.RPCServer[shardID][j]
-					client, err := clientService.NewClient(server.IP, server.Port)
-					if err != nil {
-						continue
-					}
+			var wgShard sync.WaitGroup
+			wgShard.Add(len(walletProfile.RPCServer[shardID]))
 
-					log.Debug("FetchBalance", "server", server)
-					response, err := client.GetBalance(address)
-					if err != nil {
-						log.Info("failed to get balance, retrying ...")
-						time.Sleep(200 * time.Millisecond)
-						continue
+			var mutexAccountState = &sync.Mutex{}
+
+			for rpcServerID := 0; rpcServerID < len(walletProfile.RPCServer[shardID]); rpcServerID++ {
+				go func(rpcServerID int) {
+					for retry := 0; retry < rpcRetry; retry++ {
+
+						server := walletProfile.RPCServer[shardID][rpcServerID]
+						client, err := clientService.NewClient(server.IP, server.Port)
+						if err != nil {
+							continue
+						}
+
+						log.Debug("FetchBalance", "server", server)
+						response, err := client.GetBalance(address)
+						if err != nil {
+							log.Info("failed to get balance, retrying ...")
+							time.Sleep(200 * time.Millisecond)
+							continue
+						}
+						log.Debug("FetchBalance", "response", response)
+						respBalance := big.NewInt(0)
+						respBalance.SetBytes(response.Balance)
+
+						mutexAccountState.Lock()
+						if balance.Cmp(respBalance) < 0 {
+							balance.SetBytes(response.Balance)
+							nonce = response.Nonce
+						}
+						mutexAccountState.Unlock()
+						break
 					}
-					log.Debug("FetchBalance", "response", response)
-					respBalance := big.NewInt(0)
-					respBalance.SetBytes(response.Balance)
-					if balance.Cmp(respBalance) < 0 {
-						balance.SetBytes(response.Balance)
-						nonce = response.Nonce
-					}
-					break LOOP
-				}
+					wgShard.Done()
+				}(rpcServerID)
 			}
+			wgShard.Wait()
+
 			result[shardID] = &AccountState{balance, nonce}
 		}(shardID)
 	}

@@ -26,7 +26,7 @@ func (dRand *DRand) constructCommitMessage(vrf [32]byte, proof []byte) []byte {
 	drandMsg.Payload = append(drandMsg.Payload, (*dRand.vrfPubKey).Serialize()...)
 	marshaledMessage, err := dRand.signAndMarshalDRandMessage(message)
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to sign and marshal the commit message", "error", err)
+		utils.Logger().Error().Err(err).Msg("Failed to sign and marshal the commit message")
 	}
 	return proto.ConstructDRandMessage(marshaledMessage)
 }

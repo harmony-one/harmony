@@ -40,7 +40,7 @@ func ReadDatabaseVersion(db DatabaseReader) int {
 func WriteDatabaseVersion(db DatabaseWriter, version int) {
 	enc, _ := rlp.EncodeToBytes(version)
 	if err := db.Put(databaseVerisionKey, enc); err != nil {
-		utils.GetLogger().Crit("Failed to store the database version", "err", err)
+		utils.Logger().Error().Err(err).Msg("Failed to store the database version")
 	}
 }
 
@@ -52,7 +52,7 @@ func ReadChainConfig(db DatabaseReader, hash common.Hash) *params.ChainConfig {
 	}
 	var config params.ChainConfig
 	if err := json.Unmarshal(data, &config); err != nil {
-		utils.GetLogger().Error("Invalid chain config JSON", "hash", hash, "err", err)
+		utils.Logger().Error().Err(err).Bytes("hash", hash.Bytes()).Msg("Invalid chain config JSON")
 		return nil
 	}
 	return &config
@@ -65,10 +65,10 @@ func WriteChainConfig(db DatabaseWriter, hash common.Hash, cfg *params.ChainConf
 	}
 	data, err := json.Marshal(cfg)
 	if err != nil {
-		utils.GetLogger().Crit("Failed to JSON encode chain config", "err", err)
+		utils.Logger().Error().Err(err).Msg("Failed to JSON encode chain config")
 	}
 	if err := db.Put(configKey(hash), data); err != nil {
-		utils.GetLogger().Crit("Failed to store chain config", "err", err)
+		utils.Logger().Error().Err(err).Msg("Failed to store chain config")
 	}
 }
 
@@ -83,7 +83,7 @@ func ReadPreimage(db DatabaseReader, hash common.Hash) []byte {
 func WritePreimages(db DatabaseWriter, number uint64, preimages map[common.Hash][]byte) {
 	for hash, preimage := range preimages {
 		if err := db.Put(preimageKey(hash), preimage); err != nil {
-			utils.GetLogger().Crit("Failed to store trie preimage", "err", err)
+			utils.Logger().Error().Err(err).Msg("Failed to store trie preimage")
 		}
 	}
 	preimageCounter.Inc(int64(len(preimages)))

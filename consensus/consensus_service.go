@@ -10,11 +10,11 @@ import (
 	"github.com/harmony-one/harmony/crypto/hash"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	libp2p_peer "github.com/libp2p/go-libp2p-peer"
+	"github.com/rs/zerolog"
 	"golang.org/x/crypto/sha3"
 
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -22,7 +22,6 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -73,7 +72,7 @@ func (consensus *Consensus) SealHash(header *types.Header) (hash common.Hash) {
 		header.Time,
 		header.Extra,
 	}); err != nil {
-		ctxerror.Warn(utils.GetLogger(), err, "rlp.Encode failed")
+		utils.Logger().Warn().Err(err).Msg("rlp.Encode failed")
 	}
 	hasher.Sum(hash[:0])
 	return hash
@@ -109,7 +108,9 @@ func (consensus *Consensus) populateMessageFields(request *msg_pb.ConsensusReque
 
 	// sender address
 	request.SenderPubkey = consensus.PubKey.Serialize()
-	consensus.getLogger().Debug("[populateMessageFields]", "SenderKey", consensus.PubKey.SerializeToHexStr())
+	consensus.getLogger().Debug().
+		Str("senderKey", consensus.PubKey.SerializeToHexStr()).
+		Msg("[populateMessageFields]")
 }
 
 // Signs the consensus message and returns the marshaled message.
@@ -158,12 +159,11 @@ func (consensus *Consensus) GetViewID() uint64 {
 
 // DebugPrintPublicKeys print all the PublicKeys in string format in Consensus
 func (consensus *Consensus) DebugPrintPublicKeys() {
+	var keys []string
 	for _, k := range consensus.PublicKeys {
-		str := fmt.Sprintf("%s", hex.EncodeToString(k.Serialize()))
-		utils.GetLogInstance().Debug("pk:", "string", str)
+		keys = append(keys, hex.EncodeToString(k.Serialize()))
 	}
-
-	utils.GetLogInstance().Debug("PublicKeys:", "#", len(consensus.PublicKeys))
+	utils.Logger().Debug().Strs("PublicKeys", keys).Int("count", len(keys)).Msgf("Debug Public Keys")
 }
 
 // UpdatePublicKeys updates the PublicKeys variable, protected by a mutex
@@ -171,16 +171,16 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int {
 	consensus.pubKeyLock.Lock()
 	consensus.PublicKeys = append(pubKeys[:0:0], pubKeys...)
 	consensus.CommitteePublicKeys = map[string]bool{}
-	utils.GetLogInstance().Info("My Committee")
-	for _, pubKey := range consensus.PublicKeys {
-		utils.GetLogInstance().Info("Member", "BlsPubKey", pubKey.SerializeToHexStr())
+	utils.Logger().Info().Msg("My Committee updated")
+	for i, pubKey := range consensus.PublicKeys {
+		utils.Logger().Info().Int("index", i).Str("BlsPubKey", pubKey.SerializeToHexStr()).Msg("Member")
 		consensus.CommitteePublicKeys[pubKey.SerializeToHexStr()] = true
 	}
 	// TODO: use pubkey to identify leader rather than p2p.Peer.
 	consensus.leader = p2p.Peer{ConsensusPubKey: pubKeys[0]}
 	consensus.LeaderPubKey = pubKeys[0]
 
-	utils.GetLogInstance().Info("My Leader", "info", consensus.LeaderPubKey.SerializeToHexStr())
+	utils.Logger().Info().Str("info", consensus.LeaderPubKey.SerializeToHexStr()).Msg("My Leader")
 	consensus.pubKeyLock.Unlock()
 	// reset states after update public keys
 	consensus.ResetState()
@@ -267,8 +267,7 @@ func (consensus *Consensus) VerifySeal(chain consensus_engine.ChainReader, heade
 	if err != nil {
 		return ctxerror.New("[VerifySeal] Unable to deserialize the LastCommitSignature and LastCommitBitmap in Block Header").WithCause(err)
 	}
-	// TODO: use the quorum of last block instead
-	if count := utils.CountOneBits(mask.Bitmap); count < consensus.Quorum() {
+	if count := utils.CountOneBits(mask.Bitmap); count < consensus.PreviousQuorum() {
 		return ctxerror.New("[VerifySeal] Not enough signature in LastCommitSignature from Block Header", "need", consensus.Quorum(), "got", count)
 	}
 
@@ -377,7 +376,9 @@ func (consensus *Consensus) GetViewIDSigsArray() []*bls.Sign {
 
 // ResetState resets the state of the consensus
 func (consensus *Consensus) ResetState() {
-	consensus.getLogger().Debug("[ResetState] Resetting consensus state", "Phase", consensus.phase)
+	consensus.getLogger().Debug().
+		Str("Phase", consensus.phase.String()).
+		Msg("[ResetState] Resetting consensus state")
 	consensus.switchPhase(Announce, true)
 	consensus.blockHash = [32]byte{}
 	consensus.blockHeader = []byte{}
@@ -396,7 +397,7 @@ func (consensus *Consensus) ResetState() {
 // Returns a string representation of this consensus
 func (consensus *Consensus) String() string {
 	var duty string
-	if nodeconfig.GetDefaultConfig().IsLeader() {
+	if consensus.IsLeader() {
 		duty = "LDR" // leader
 	} else {
 		duty = "VLD" // validator
@@ -472,6 +473,16 @@ func (consensus *Consensus) SetViewID(height uint64) {
 	consensus.viewID = height
 }
 
+// SetMode sets the mode of consensus
+func (consensus *Consensus) SetMode(mode Mode) {
+	consensus.mode.SetMode(mode)
+}
+
+// Mode returns the mode of consensus
+func (consensus *Consensus) Mode() Mode {
+	return consensus.mode.Mode()
+}
+
 // RegisterPRndChannel registers the channel for receiving randomness preimage from DRG protocol
 func (consensus *Consensus) RegisterPRndChannel(pRndChannel chan []byte) {
 	consensus.PRndChannel = pRndChannel
@@ -494,8 +505,14 @@ func (consensus *Consensus) checkViewID(msg *PbftMessage) error {
 		consensus.LeaderPubKey = msg.SenderPubkey
 		consensus.ignoreViewIDCheck = false
 		consensus.consensusTimeout[timeoutConsensus].Start()
-		utils.GetLogger().Debug("viewID and leaderKey override", "viewID", consensus.viewID, "leaderKey", consensus.LeaderPubKey.SerializeToHexStr()[:20])
-		utils.GetLogger().Debug("Start consensus timer", "viewID", consensus.viewID, "block", consensus.blockNum)
+		utils.Logger().Debug().
+			Uint64("viewID", consensus.viewID).
+			Str("leaderKey", consensus.LeaderPubKey.SerializeToHexStr()[:20]).
+			Msg("viewID and leaderKey override")
+		utils.Logger().Debug().
+			Uint64("viewID", consensus.viewID).
+			Uint64("block", consensus.blockNum).
+			Msg("Start consensus timer")
 		return nil
 	} else if msg.ViewID > consensus.viewID {
 		return consensus_engine.ErrViewIDNotMatch
@@ -543,11 +560,11 @@ func readSignatureBitmapByPublicKeys(recvPayload []byte, publicKeys []*bls.Publi
 	}
 	mask, err := bls_cosi.NewMask(publicKeys, nil)
 	if err != nil {
-		utils.GetLogInstance().Warn("onNewView unable to setup mask for prepared message", "err", err)
+		utils.Logger().Warn().Err(err).Msg("onNewView unable to setup mask for prepared message")
 		return nil, nil, errors.New("unable to setup mask from payload")
 	}
 	if err := mask.SetMask(bitmap); err != nil {
-		ctxerror.Warn(utils.GetLogger(), err, "mask.SetMask failed")
+		utils.Logger().Warn().Err(err).Msg("mask.SetMask failed")
 	}
 	return &aggSig, mask, nil
 }
@@ -557,13 +574,14 @@ func (consensus *Consensus) reportMetrics(block types.Block) {
 	timeElapsed := endTime.Sub(startTime)
 	numOfTxs := len(block.Transactions())
 	tps := float64(numOfTxs) / timeElapsed.Seconds()
-	utils.GetLogInstance().Info("TPS Report",
-		"numOfTXs", numOfTxs,
-		"startTime", startTime,
-		"endTime", endTime,
-		"timeElapsed", timeElapsed,
-		"TPS", tps,
-		"consensus", consensus)
+	utils.Logger().Info().
+		Int("numOfTXs", numOfTxs).
+		Time("startTime", startTime).
+		Time("endTime", endTime).
+		Dur("timeElapsed", endTime.Sub(startTime)).
+		Float64("TPS", tps).
+		Interface("consensus", consensus).
+		Msg("TPS Report")
 
 	// Post metrics
 	profiler := profiler.GetProfiler()
@@ -588,20 +606,15 @@ func (consensus *Consensus) reportMetrics(block types.Block) {
 	profiler.LogMetrics(metrics)
 }
 
-// logger returns a sub-logger with consensus contexts added.
-func (consensus *Consensus) logger(logger log.Logger) log.Logger {
-	return logger.New(
-		"myBlock", consensus.blockNum,
-		"myViewID", consensus.viewID,
-		"phase", consensus.phase,
-		"mode", consensus.mode.Mode(),
-	)
-}
-
 // getLogger returns logger for consensus contexts added
-func (consensus *Consensus) getLogger() log.Logger {
-	logger := consensus.logger(utils.GetLogInstance())
-	return logger
+func (consensus *Consensus) getLogger() *zerolog.Logger {
+	logger := utils.Logger().With().
+		Uint64("myBlock", consensus.blockNum).
+		Uint64("myViewID", consensus.viewID).
+		Interface("phase", consensus.phase).
+		Str("mode", consensus.mode.Mode().String()).
+		Logger()
+	return &logger
 }
 
 // retrieve corresponding blsPublicKey from Coinbase Address
@@ -644,10 +657,12 @@ func (consensus *Consensus) updateConsensusInformation() {
 	consensus.SetViewID(header.ViewID.Uint64() + 1)
 	leaderPubKey, err := consensus.getLeaderPubKeyFromCoinbase(header)
 	if err != nil || leaderPubKey == nil {
-		consensus.getLogger().Debug("[SYNC] Unable to get leaderPubKey from coinbase", "error", err)
+		consensus.getLogger().Debug().Err(err).Msg("[SYNC] Unable to get leaderPubKey from coinbase")
 		consensus.ignoreViewIDCheck = true
 	} else {
-		consensus.getLogger().Debug("[SYNC] Most Recent LeaderPubKey Updated Based on BlockChain", "leaderPubKey", leaderPubKey.SerializeToHexStr())
+		consensus.getLogger().Debug().
+			Str("leaderPubKey", leaderPubKey.SerializeToHexStr()).
+			Msg("[SYNC] Most Recent LeaderPubKey Updated Based on BlockChain")
 		consensus.LeaderPubKey = leaderPubKey
 	}
 }
@@ -680,4 +695,13 @@ func (consensus *Consensus) RecoveryBlockNumber(shardID uint32) uint64 {
 		return ReProposeBlockNumShard3
 	}
 	return 0
+}
+
+// IsLeader check if the node is a leader or not by comparing the public key of
+// the node with the leader public key
+func (consensus *Consensus) IsLeader() bool {
+	if consensus.PubKey != nil && consensus.LeaderPubKey != nil {
+		return consensus.PubKey.IsEqual(consensus.LeaderPubKey)
+	}
+	return false
 }

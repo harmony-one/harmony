@@ -5,21 +5,22 @@ USER=$(whoami)
 
 . "${ROOT}/scripts/setup_bls_build_flags.sh"
 
-set -x
+# set -x
 set -eo pipefail
 
 export GO111MODULE=on
 
-if [ -f "blspass.txt" ]
+mkdir -p .hmy
+if [ -f ".hmy/blspass.txt" ]
 then
-   echo "blspass.txt already in local."
+   echo ".hmy/blspass.txt already in local."
 else
-   aws s3 cp s3://harmony-pass/blspass.txt blspass.txt
+   touch .hmy/blspass.txt
 fi
 
 function check_result() {
    find $log_folder -name leader-*.log > $log_folder/all-leaders.txt
-   find $log_folder -name validator-*.log > $log_folder/all-validators.txt
+   find $log_folder -name zerolog-validator-*.log > $log_folder/all-validators.txt
    find $log_folder -name archival-*.log >> $log_folder/all-validators.txt
 
    echo ====== RESULTS ======
@@ -34,6 +35,8 @@ function cleanup() {
        echo 'Killed process: '$pid
        $DRYRUN kill -9 $pid 2> /dev/null
    done
+   rm -rf ./db/harmony_*
+   rm -rf ./db-127.0.0.1-*
 }
 
 function killnode() {
@@ -56,13 +59,11 @@ function usage {
 USAGE: $ME [OPTIONS] config_file_name [extra args to node]
 
    -h             print this help message
-   -d             enable db support (default: $DB)
    -t             toggle txgen (default: $TXGEN)
    -D duration    txgen run duration (default: $DURATION)
    -m min_peers   minimal number of peers to start consensus (default: $MIN)
    -s shards      number of shards (default: $SHARDS)
    -n             dryrun mode (default: $DRYRUN)
-   -S             disable sync test (default: $SYNC)
    -B             don't build the binary
 
 This script will build all the binaries and start harmony and txgen based on the configuration file.
@@ -79,24 +80,21 @@ EOU
 DEFAULT_DURATION_NOSYNC=60
 DEFAULT_DURATION_SYNC=200
 
-DB=false
 TXGEN=true
 DURATION=
 MIN=3
 SHARDS=2
-SYNC=true
 DRYRUN=
+SYNC=true
 
-while getopts "hdtD:m:s:nSB" option; do
+while getopts "htD:m:s:nB" option; do
    case $option in
       h) usage ;;
-      d) DB=true ;;
       t) TXGEN=false ;;
       D) DURATION=$OPTARG ;;
       m) MIN=$OPTARG ;;
       s) SHARDS=$OPTARG ;;
       n) DRYRUN=echo ;;
-      S) SYNC=false ;;
       B) NOBUILD=true ;;
    esac
 done
@@ -150,17 +148,11 @@ echo "bootnode launched." + " $BN_MA"
 
 unset -v base_args
 declare -a base_args args
-base_args=(-log_folder "${log_folder}" -min_peers "${MIN}" -bootnodes "${BN_MA}" -nopass)
-if "${DB}"
-then
-  base_args=("${base_args[@]}" -db_supported)
-fi
-
+base_args=(-log_folder "${log_folder}" -min_peers "${MIN}" -bootnodes "${BN_MA}" -network_type="localnet" -blspass file:.hmy/blspass.txt -dns=false)
 NUM_NN=0
 
 sleep 2
 
-mkdir -p .hmy
 # Start nodes
 i=0
 while IFS='' read -r line || [[ -n "$line" ]]; do
@@ -169,17 +161,15 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
     then
       args=("${base_args[@]}" -ip "${ip}" -port "${port}" -key "/tmp/${ip}-${port}.key" -db_dir "db-${ip}-${port}")
     else
-      if [ -f "${blspub}.key" ]
-        then
-          echo ""${blspub}.key" already in local."
-       else
-          aws s3 cp "s3://harmony-secret-keys/bls/${blspub}.key" .hmy
+      if [ ! -e .hmy/${blspub}.key ]; then
+         echo "missing blskey .hmy/${blspub}.key"
+         echo "skipping this node"
+         continue
       fi
 
-      args=("${base_args[@]}" -ip "${ip}" -port "${port}" -key "/tmp/${ip}-${port}.key" -db_dir "db-${ip}-${port}" -accounts "${account}" -blspass file:blspass.txt -blskey_file ".hmy/${blspub}.key")
+      args=("${base_args[@]}" -ip "${ip}" -port "${port}" -key "/tmp/${ip}-${port}.key" -db_dir "db-${ip}-${port}" -blskey_file ".hmy/${blspub}.key")
   fi
 
-  args=("${base_args[@]}" -ip "${ip}" -port "${port}" -key "/tmp/${ip}-${port}.key" -db_dir "db-${ip}-${port}" -blspass file:blspass.txt -blskey_file ".hmy/${blspub}.key" -dns=false -network_type="mainnet")
   case "${mode}" in
   leader*|validator*) args=("${args[@]}" -is_genesis);;
   esac
@@ -188,9 +178,9 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
   case "${mode}" in explorer*) args=("${args[@]}" -is_genesis=false -is_explorer=true -shard_id=0);; esac
   case "${mode}" in
   newnode)
-    "${SYNC}" || continue
     sleep "${NUM_NN}"
-    NUM_NN=$((${NUM_NN} + 30))
+    NUM_NN=$((${NUM_NN} + 1))
+    args=("${args[@]}" -is_newnode)
     ;;
   esac
   case "${mode}" in
@@ -202,7 +192,7 @@ done < $config
 
 if [ "$TXGEN" == "true" ]; then
    echo "launching txgen ... wait"
-#   sleep 2
+   # sleep 2
    line=$(grep client $config)
    IFS=' ' read ip port mode account <<< $line
    if [ "$mode" == "client" ]; then

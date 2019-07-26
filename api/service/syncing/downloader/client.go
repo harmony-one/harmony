@@ -24,10 +24,10 @@ func ClientSetup(ip, port string) *Client {
 	var err error
 	client.conn, err = grpc.Dial(fmt.Sprintf(ip+":"+port), client.opts...)
 	if err != nil {
-		utils.GetLogInstance().Info("[SYNC] client.go:ClientSetup fail to dial: ", "IP", ip, "error", err)
+		utils.Logger().Error().Err(err).Str("ip", ip).Msg("[SYNC] client.go:ClientSetup fail to dial")
 		return nil
 	}
-	utils.GetLogInstance().Info("[SYNC] grpc connect successfully", "IP", ip)
+	utils.Logger().Info().Str("ip", ip).Msg("[SYNC] grpc connect successfully")
 	client.dlClient = pb.NewDownloaderClient(client.conn)
 	return &client
 }
@@ -36,7 +36,7 @@ func ClientSetup(ip, port string) *Client {
 func (client *Client) Close() {
 	err := client.conn.Close()
 	if err != nil {
-		utils.GetLogInstance().Info("[SYNC] unable to close connection ")
+		utils.Logger().Info().Msg("[SYNC] unable to close connection")
 	}
 }
 
@@ -47,7 +47,7 @@ func (client *Client) GetBlockHashes(startHash []byte, size uint32) *pb.Download
 	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_HEADER, BlockHash: startHash, Size: size}
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
-		utils.GetLogInstance().Info("[SYNC] GetBlockHashes query failed", "error", err)
+		utils.Logger().Error().Err(err).Msg("[SYNC] GetBlockHashes query failed")
 	}
 	return response
 }
@@ -64,7 +64,7 @@ func (client *Client) GetBlocks(hashes [][]byte) *pb.DownloaderResponse {
 	}
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
-		utils.GetLogInstance().Info("[SYNC] downloader/client.go:GetBlocks query failed.", "error", err)
+		utils.Logger().Error().Err(err).Msg("[SYNC] downloader/client.go:GetBlocks query failed")
 	}
 	return response
 }
@@ -81,7 +81,7 @@ func (client *Client) Register(hash []byte, ip, port string) *pb.DownloaderRespo
 	request.Port = port
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil || response == nil {
-		utils.GetLogInstance().Info("[SYNC] client.go:Register failed.", "error", err, "response", response)
+		utils.Logger().Error().Err(err).Interface("response", response).Msg("[SYNC] client.go:Register failed")
 	}
 	return response
 }
@@ -103,7 +103,7 @@ func (client *Client) PushNewBlock(selfPeerHash [20]byte, blockHash []byte, time
 
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
-		utils.GetLogInstance().Info("[SYNC] unable to send new block to unsync node", "error", err)
+		utils.Logger().Error().Err(err).Msg("[SYNC] unable to send new block to unsync node")
 	}
 	return response
 }
@@ -115,7 +115,7 @@ func (client *Client) GetBlockChainHeight() *pb.DownloaderResponse {
 	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_BLOCKHEIGHT}
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
-		utils.GetLogInstance().Info("[SYNC] unable to get blockchain height", "error", err)
+		utils.Logger().Error().Err(err).Msg("[SYNC] unable to get blockchain height")
 	}
 	return response
 }

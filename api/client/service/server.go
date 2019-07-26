@@ -9,7 +9,6 @@ import (
 	proto "github.com/harmony-one/harmony/api/client/service/proto"
 	"github.com/harmony-one/harmony/core/state"
 	common2 "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 
 	"google.golang.org/grpc"
@@ -70,7 +69,7 @@ func (s *Server) Start(ip, port string) (*grpc.Server, error) {
 	proto.RegisterClientServiceServer(grpcServer, s)
 	go func() {
 		if err := grpcServer.Serve(lis); err != nil {
-			ctxerror.Warn(utils.GetLogger(), err, "grpcServer.Serve() failed")
+			utils.Logger().Warn().Err(err).Msg("grpcServer.Serve() failed")
 		}
 	}()
 	return grpcServer, nil

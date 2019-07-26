@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"math/big"
 	"math/rand"
@@ -13,22 +14,14 @@ import (
 	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/core/types"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/ctxerror"
-	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
 const (
 	// GenesisEpoch is the number of the genesis epoch.
 	GenesisEpoch = 0
-	// FirstEpoch is the number of the first epoch.
-	FirstEpoch = 1
-	// GenesisShardNum is the number of shard at genesis
-	GenesisShardNum = 4
-	// GenesisShardSize is the size of each shard at genesis
-	GenesisShardSize = 150
-	// GenesisShardHarmonyNodes is the number of harmony node at each shard
-	GenesisShardHarmonyNodes = 112
 	// CuckooRate is the percentage of nodes getting reshuffled in the second step of cuckoo resharding.
 	CuckooRate = 0.1
 )
@@ -65,7 +58,7 @@ func (ss *ShardingState) assignNewNodes(newNodeList []types.NodeID) {
 		if id < len(ss.shardState) {
 			ss.shardState[id].NodeList = append(ss.shardState[id].NodeList, nid)
 		} else {
-			utils.GetLogInstance().Error("assignNewNodes", "index out of range", len(ss.shardState), "id", id)
+			utils.Logger().Error().Int("id", id).Int("shardState Count", len(ss.shardState)).Msg("assignNewNodes index out of range")
 		}
 	}
 }
@@ -123,7 +116,7 @@ func (ss *ShardingState) Reshard(newNodeList []types.NodeID, percent float64) {
 
 	// Put leader back
 	if len(leaders) < ss.numShards {
-		utils.GetLogInstance().Error("Not enough leaders to assign to shards")
+		utils.Logger().Error().Msg("Not enough leaders to assign to shards")
 	}
 	for i := 0; i < ss.numShards; i++ {
 		ss.shardState[i].NodeList = append([]types.NodeID{leaders[i]}, ss.shardState[i].NodeList...)
@@ -142,20 +135,22 @@ func Shuffle(list []types.NodeID) {
 }
 
 // GetBlockNumberFromEpoch calculates the block number where epoch sharding information is stored
+// TODO lc - use ShardingSchedule function
 func GetBlockNumberFromEpoch(epoch uint64) uint64 {
-	number := epoch * uint64(BlocksPerEpoch) // currently we use the first block in each epoch
+	number := epoch * ShardingSchedule.BlocksPerEpoch() // currently we use the first block in each epoch
 	return number
 }
 
 // GetLastBlockNumberFromEpoch calculates the last block number for the given
 // epoch.  TODO ek – this is a temp hack.
+// TODO lc - use ShardingSchedule function
 func GetLastBlockNumberFromEpoch(epoch uint64) uint64 {
-	return (epoch+1)*BlocksPerEpoch - 1
+	return (epoch+1)*ShardingSchedule.BlocksPerEpoch() - 1
 }
 
 // GetEpochFromBlockNumber calculates the epoch number the block belongs to
 func GetEpochFromBlockNumber(blockNumber uint64) uint64 {
-	return blockNumber / uint64(BlocksPerEpoch)
+	return ShardingSchedule.CalcEpochNumber(blockNumber).Uint64()
 }
 
 // GetShardingStateFromBlockChain will retrieve random seed and shard map from beacon chain for given a epoch
@@ -191,7 +186,7 @@ func CalculateNewShardState(
 			WithCause(err)
 	}
 	newNodeList := ss.UpdateShardingState(stakeInfo)
-	utils.GetLogInstance().Info("Cuckoo Rate", "percentage", CuckooRate)
+	utils.Logger().Info().Float64("percentage", CuckooRate).Msg("Cuckoo Rate")
 	ss.Reshard(newNodeList, CuckooRate)
 	return ss.shardState, nil
 }
@@ -223,38 +218,82 @@ func (ss *ShardingState) UpdateShardingState(stakeInfo *map[common.Address]*stru
 	return newAddresses
 }
 
+// TODO ek – shardingSchedule should really be part of a general-purpose network
+//  configuration.  We are OK for the time being,
+//  until the day we should let one node process join multiple networks.
+
+// ShardingSchedule is the sharding configuration schedule.
+// Depends on the type of the network.  Defaults to the mainnet schedule.
+var ShardingSchedule shardingconfig.Schedule = shardingconfig.MainnetSchedule
+
 // GetInitShardState returns the initial shard state at genesis.
 func GetInitShardState() types.ShardState {
-	utils.GetLogInstance().Info("Generating Genesis Shard State.")
+	return GetShardState(big.NewInt(GenesisEpoch))
+}
+
+// GetShardState returns the shard state based on epoch number
+func GetShardState(epoch *big.Int) types.ShardState {
+	utils.Logger().Info().Int64("epoch", epoch.Int64()).Msg("Get Shard State of Epoch.")
+	shardingConfig := ShardingSchedule.InstanceForEpoch(epoch)
+	shardNum := int(shardingConfig.NumShards())
+	shardHarmonyNodes := shardingConfig.NumHarmonyOperatedNodesPerShard()
+	shardSize := shardingConfig.NumNodesPerShard()
+	hmyAccounts := shardingConfig.HmyAccounts()
+	fnAccounts := shardingConfig.FnAccounts()
+
 	shardState := types.ShardState{}
-	for i := 0; i < GenesisShardNum; i++ {
+	for i := 0; i < shardNum; i++ {
 		com := types.Committee{ShardID: uint32(i)}
-		for j := 0; j < GenesisShardHarmonyNodes; j++ {
-			index := i + j*GenesisShardNum // The initial account to use for genesis nodes
+		for j := 0; j < shardHarmonyNodes; j++ {
+			index := i + j*shardNum // The initial account to use for genesis nodes
 
 			pub := &bls.PublicKey{}
-			pub.DeserializeHexStr(genesis.HarmonyAccounts[index].BlsPublicKey)
+			pub.DeserializeHexStr(hmyAccounts[index].BlsPublicKey)
 			pubKey := types.BlsPublicKey{}
 			pubKey.FromLibBLSPublicKey(pub)
 			// TODO: directly read address for bls too
-			curNodeID := types.NodeID{common2.ParseAddr(genesis.HarmonyAccounts[index].Address), pubKey}
+			curNodeID := types.NodeID{common2.ParseAddr(hmyAccounts[index].Address), pubKey}
 			com.NodeList = append(com.NodeList, curNodeID)
 		}
 
 		// add FN runner's key
-		for j := GenesisShardHarmonyNodes; j < GenesisShardSize; j++ {
-			index := i + (j-GenesisShardHarmonyNodes)*GenesisShardNum
+		for j := shardHarmonyNodes; j < shardSize; j++ {
+			index := i + (j-shardHarmonyNodes)*shardNum
 
 			pub := &bls.PublicKey{}
-			pub.DeserializeHexStr(genesis.FoundationalNodeAccounts[index].BlsPublicKey)
+			pub.DeserializeHexStr(fnAccounts[index].BlsPublicKey)
 
 			pubKey := types.BlsPublicKey{}
 			pubKey.FromLibBLSPublicKey(pub)
 			// TODO: directly read address for bls too
-			curNodeID := types.NodeID{common2.ParseAddr(genesis.FoundationalNodeAccounts[index].Address), pubKey}
+			curNodeID := types.NodeID{common2.ParseAddr(fnAccounts[index].Address), pubKey}
 			com.NodeList = append(com.NodeList, curNodeID)
 		}
 		shardState = append(shardState, com)
 	}
 	return shardState
+}
+
+// GetPublicKeys returns the publickeys given epoch and shardID
+func GetPublicKeys(epoch *big.Int, shardID uint32) []*bls.PublicKey {
+	shardState := GetShardState(epoch)
+
+	// Update validator public keys
+	committee := shardState.FindCommitteeByID(shardID)
+	if committee == nil {
+		utils.Logger().Warn().Uint32("shardID", shardID).Uint64("epoch", epoch.Uint64()).Msg("Cannot find committee")
+		return nil
+	}
+	pubKeys := []*bls.PublicKey{}
+	for _, node := range committee.NodeList {
+		pubKey := &bls.PublicKey{}
+		pubKeyBytes := node.BlsPublicKey[:]
+		err := pubKey.Deserialize(pubKeyBytes)
+		if err != nil {
+			utils.Logger().Warn().Str("pubKeyBytes", hex.EncodeToString(pubKeyBytes)).Msg("Cannot Deserialize pubKey")
+			return nil
+		}
+		pubKeys = append(pubKeys, pubKey)
+	}
+	return pubKeys
 }
