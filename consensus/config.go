@@ -17,8 +17,6 @@ const (
 	consensusBlockNumBuffer uint64 = 2
 	// ReProposeBlockNumShard0: leader propose this block from it's database and validators accept them
 	ReProposeBlockNumShard0 uint64 = 270108
-	// ReProposeBlockNumShard1: leader propose this block from it's database and validators accept them
-	ReProposeBlockNumShard1 uint64 = 275559
 	// ReProposeBlockNumShard2: leader propose this block from it's database and validators accept them
 	ReProposeBlockNumShard2 uint64 = 275057
 )

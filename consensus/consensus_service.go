@@ -672,8 +672,6 @@ func (consensus *Consensus) NeedsBlockRecovery(blockNum uint64) bool {
 	switch {
 	case blockNum == ReProposeBlockNumShard0 && consensus.ShardID == 0:
 		return true
-	case blockNum == ReProposeBlockNumShard1 && consensus.ShardID == 1:
-		return true
 	case blockNum == ReProposeBlockNumShard2 && consensus.ShardID == 2:
 		return true
 	}
@@ -685,8 +683,6 @@ func (consensus *Consensus) RecoveryBlockNumber(shardID uint32) uint64 {
 	switch {
 	case consensus.ShardID == 0:
 		return ReProposeBlockNumShard0
-	case consensus.ShardID == 1:
-		return ReProposeBlockNumShard1
 	case consensus.ShardID == 2:
 		return ReProposeBlockNumShard2
 	}
