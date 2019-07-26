@@ -177,8 +177,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		return
 	}
 
-	// TODO: remove it after shard0 fix
-	if consensus.NeedsBlockRecovery(recvMsg.BlockNum) {
+	if recvMsg.BlockNum == ReProposeBlockNum {
 		consensus.getLogger().Debug().
 			Uint64("MsgViewID", recvMsg.ViewID).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
@@ -440,7 +439,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		Msg("[OnPrepared] Received prepared message")
 
 	// TODO: remove it after fix
-	if consensus.NeedsBlockRecovery(recvMsg.BlockNum) {
+	if recvMsg.BlockNum == ReProposeBlockNum {
 		block := recvMsg.Block
 		var blockObj types.Block
 		err = rlp.DecodeBytes(block, &blockObj)
@@ -886,7 +885,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	}
 
 	// TODO: remove it after fix
-	if consensus.NeedsBlockRecovery(recvMsg.BlockNum) {
+	if recvMsg.BlockNum == ReProposeBlockNum {
 		consensus.PbftLog.AddMessage(recvMsg)
 		consensus.getLogger().Debug().
 			Uint64("MsgViewID", recvMsg.ViewID).
@@ -1036,7 +1035,7 @@ func (consensus *Consensus) tryCatchup() {
 			break
 		}
 
-		if consensus.NeedsBlockRecovery(block.NumberU64()) && block.NumberU64() == consensus.ChainReader.CurrentHeader().Number.Uint64() {
+		if block.NumberU64() == ReProposeBlockNum && block.NumberU64() == consensus.ChainReader.CurrentHeader().Number.Uint64() {
 			consensus.getLogger().Info().Msg("[TryCatchup] Skip Commit ReProposeBlock")
 			consensus.blockNum = block.NumberU64() + 1
 			consensus.viewID = msgs[0].ViewID + 1
@@ -1044,7 +1043,7 @@ func (consensus *Consensus) tryCatchup() {
 			return
 		}
 
-		if consensus.NeedsBlockRecovery(block.NumberU64()) && block.NumberU64() != consensus.ChainReader.CurrentHeader().Number.Uint64() {
+		if block.NumberU64() == ReProposeBlockNum && block.NumberU64() != consensus.ChainReader.CurrentHeader().Number.Uint64() {
 			consensus.getLogger().Info().Msg("[TryCatchup] Commit ReProposeBlock")
 			consensus.blockNum = block.NumberU64() + 1
 			consensus.viewID = msgs[0].ViewID + 1
