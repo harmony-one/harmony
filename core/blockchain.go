@@ -224,6 +224,7 @@ func (bc *BlockChain) ValidateNewBlock(block *types.Block) error {
 }
 
 // IsEpochBlock returns whether this block is the first block of an epoch.
+// TODO: lc this is not used
 func IsEpochBlock(block *types.Block) bool {
 	return block.NumberU64()%ShardingSchedule.BlocksPerEpoch() == 0
 }
