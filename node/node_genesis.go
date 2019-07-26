@@ -75,9 +75,9 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 			genesisAlloc[foundationAddress] = core.GenesisAccount{Balance: genesisFunds}
 		}
 	case nodeconfig.Testnet:
+		AddDemoAddressesToGenesisAlloc(genesisAlloc)
 		fallthrough
 	case nodeconfig.Localnet:
-		AddDemoAddressesToGenesisAlloc(genesisAlloc)
 		fallthrough
 	case nodeconfig.Devnet:
 		chainConfig = *params.TestnetChainConfig
