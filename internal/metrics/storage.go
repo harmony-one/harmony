@@ -45,7 +45,7 @@ func GetStorageInstance(ip, port string, remove bool) *Storage {
 		storage = &Storage{}
 		storage.Init(ip, port, remove)
 	})
-	return Storage
+	return storage
 }
 
 // Init initializes connections number storage.
@@ -64,11 +64,11 @@ func (Storage *Storage) Init(ip, port string, remove bool) {
 }
 
 // GetDB returns the LDBDatabase of the storage.
-func (storage *Storage) GetDB() *ethdb.LDBDatabase {
-	return storage.db
+func (Storage *Storage) GetDB() *ethdb.LDBDatabase {
+	return Storage.db
 }
 
-// Dump get time and current connections number and index them into lvdb for monitoring service.
+// Dump gets time and current connections number and index them into lvdb for monitoring service.
 func (Storage *Storage) Dump(connectionsNumber int, currentTime int) {
 	utils.Logger().Info().Int("Unix Time", currentTime).Msg("Store current connections number")
 
@@ -94,7 +94,7 @@ func (Storage *Storage) Dump(connectionsNumber int, currentTime int) {
 }
 
 
-// ReadConnectionsNumberFromDB returns a list of connections numbers to server connections number end-point.
+// ReadConnectionsNumbersFromDB returns a list of connections numbers to server connections number end-point.
 func (Storage *Storage) ReadConnectionsNumbersFromDB(since, until int) []int {
 	connectionsNumbers := make([]int, 0)
 	for i := since; i <= until; i++ {

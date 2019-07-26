@@ -70,7 +70,7 @@ func (s *Service) StopService() {
 }
 
 // GetMonitoringServicePort returns the port serving monitorign service dashboard. This port is monitoringServicePortDifference less than the node port.
-func GetMonitoringSerivcePort(nodePort string) string {
+func GetMonitoringServicePort(nodePort string) string {
 	if port, err := strconv.Atoi(nodePort); err == nil {
 		return fmt.Sprintf("%d", port-monitoringServicePortDifference)
 	}

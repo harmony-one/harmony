@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc"
 )
 
+// Constants for client service.
 const (
 	Port = "29000"
 )
@@ -25,7 +26,7 @@ func NewClient(ip string) *Client {
 	client := Client{}
 	client.opts = append(client.opts, grpc.WithInsecure())
 	var err error
-	client.conn, err = grpc.Dial(fmt.Sprintf("%s:%s", ip, "29000"), client.opts...)
+	client.conn, err = grpc.Dial(fmt.Sprintf("%s:%s", ip, Port), client.opts...)
 	if err != nil {
 		log.Fatalf("fail to dial: %v", err)
 		return nil
