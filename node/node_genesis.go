@@ -8,6 +8,9 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
+
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
@@ -15,10 +18,8 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	common2 "github.com/harmony-one/harmony/internal/common"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/internal/utils"
-	demo "github.com/harmony-one/harmony/test/demo"
 )
 
 const (
@@ -154,7 +155,7 @@ func AddNodeAddressesToGenesisAlloc(genesisAlloc core.GenesisAlloc) {
 
 // AddDemoAddressesToGenesisAlloc funds demo addresses with free fund.
 func AddDemoAddressesToGenesisAlloc(genesisAlloc core.GenesisAlloc) {
-	for _, account := range demo.DemoAccounts {
+	for _, account := range DemoAccounts {
 		testBankFunds := big.NewInt(InitFreeFund)
 		testBankFunds = testBankFunds.Mul(testBankFunds, big.NewInt(params.Ether))
 		address := common.HexToAddress(account.Address)
