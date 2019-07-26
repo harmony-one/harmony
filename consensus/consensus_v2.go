@@ -179,7 +179,10 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 
 	// TODO: remove it after shard0 fix
 	if consensus.NeedsBlockRecovery(recvMsg.BlockNum) {
-		consensus.getLogger().Debug("[OnAnnounce] Announce message Added", "MsgViewID", recvMsg.ViewID, "MsgBlockNum", recvMsg.BlockNum)
+		consensus.getLogger().Debug().
+			Uint64("MsgViewID", recvMsg.ViewID).
+			Uint64("MsgBlockNum", recvMsg.BlockNum).
+			Msg("[OnAnnounce] Announce message Added")
 		consensus.PbftLog.AddMessage(recvMsg)
 		consensus.mutex.Lock()
 		defer consensus.mutex.Unlock()
@@ -442,13 +445,20 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		var blockObj types.Block
 		err = rlp.DecodeBytes(block, &blockObj)
 		if err != nil {
-			consensus.getLogger().Warn("[OnPrepared] Unparseable block header data", "error", err, "MsgBlockNum", recvMsg.BlockNum)
+			consensus.getLogger().Warn().
+				Err(err).
+				Uint64("MsgBlockNum", recvMsg.BlockNum).
+				Msg("[OnPrepared] Unparseable block header data")
 			return
 		}
 		consensus.PbftLog.AddBlock(&blockObj)
 		recvMsg.Block = []byte{} // save memory space
 		consensus.PbftLog.AddMessage(recvMsg)
-		consensus.getLogger().Debug("[OnPrepared] Prepared message and block added", "MsgViewID", recvMsg.ViewID, "MsgBlockNum", recvMsg.BlockNum, "blockHash", recvMsg.BlockHash)
+		consensus.getLogger().Debug().
+			Uint64("MsgViewID", recvMsg.ViewID).
+			Uint64("MsgBlockNum", recvMsg.BlockNum).
+			Bytes("blockHash", recvMsg.BlockHash[:]).
+			Msg("[OnPrepared] Prepared message and block added")
 
 		// add block field
 		blockPayload := make([]byte, len(block))
@@ -462,12 +472,19 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		msgToSend := consensus.constructCommitMessage(commitPayload)
 
 		if err := consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
-			consensus.getLogger().Warn("[OnPrepared] Cannot send commit message!!")
+			consensus.getLogger().Warn().
+				Msg("[OnPrepared] Cannot send commit message!!")
 		} else {
-			consensus.getLogger().Info("[OnPrepared] Sent Commit Message!!", "BlockHash", consensus.blockHash, "BlockNum", consensus.blockNum)
+			consensus.getLogger().Info().
+				Bytes("BlockHash", consensus.blockHash[:]).
+				Uint64("BlockNum", consensus.blockNum).
+				Msg("[OnPrepared] Sent Commit Message!!")
 		}
 
-		consensus.getLogger().Debug("[OnPrepared] Switching phase", "From", consensus.phase, "To", Commit)
+		consensus.getLogger().Debug().
+			Str("From", string(consensus.phase)).
+			Str("To", string(Commit)).
+			Msg("[OnPrepared] Switching phase")
 		consensus.switchPhase(Commit, true)
 		return
 	}
@@ -871,14 +888,19 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	// TODO: remove it after fix
 	if consensus.NeedsBlockRecovery(recvMsg.BlockNum) {
 		consensus.PbftLog.AddMessage(recvMsg)
-		consensus.getLogger().Debug("[OnCommitted] Committed message added", "MsgViewID", recvMsg.ViewID, "MsgBlockNum", recvMsg.BlockNum)
+		consensus.getLogger().Debug().
+			Uint64("MsgViewID", recvMsg.ViewID).
+			Uint64("MsgBlockNum", recvMsg.BlockNum).
+			Msg("[OnCommitted] Committed message added")
 
 		consensus.tryCatchup()
 		if consensus.consensusTimeout[timeoutBootstrap].IsActive() {
 			consensus.consensusTimeout[timeoutBootstrap].Stop()
-			consensus.getLogger().Debug("[OnCommitted] Start consensus timer; stop bootstrap timer only once")
+			consensus.getLogger().Debug().
+				Msg("[OnCommitted] Start consensus timer; stop bootstrap timer only once")
 		} else {
-			consensus.getLogger().Debug("[OnCommitted] Start consensus timer")
+			consensus.getLogger().Debug().
+				Msg("[OnCommitted] Start consensus timer")
 		}
 		consensus.consensusTimeout[timeoutConsensus].Start()
 		return
@@ -1015,7 +1037,7 @@ func (consensus *Consensus) tryCatchup() {
 		}
 
 		if consensus.NeedsBlockRecovery(block.NumberU64()) && block.NumberU64() == consensus.ChainReader.CurrentHeader().Number.Uint64() {
-			consensus.getLogger().Info("[TryCatchup] Skip Commit ReProposeBlock")
+			consensus.getLogger().Info().Msg("[TryCatchup] Skip Commit ReProposeBlock")
 			consensus.blockNum = block.NumberU64() + 1
 			consensus.viewID = msgs[0].ViewID + 1
 			consensus.ResetState()
@@ -1023,7 +1045,7 @@ func (consensus *Consensus) tryCatchup() {
 		}
 
 		if consensus.NeedsBlockRecovery(block.NumberU64()) && block.NumberU64() != consensus.ChainReader.CurrentHeader().Number.Uint64() {
-			consensus.getLogger().Info("[TryCatchup] Commit ReProposeBlock")
+			consensus.getLogger().Info().Msg("[TryCatchup] Commit ReProposeBlock")
 			consensus.blockNum = block.NumberU64() + 1
 			consensus.viewID = msgs[0].ViewID + 1
 			consensus.OnConsensusDone(block)
