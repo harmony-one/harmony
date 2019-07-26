@@ -270,7 +270,7 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int, coinbase common.Addr
 
 // MaybeKeepSendingPongMessage keeps sending pong message if the current node is a leader.
 func (node *Node) MaybeKeepSendingPongMessage() {
-	if node.Consensus.IsLeader() {
+	if node.Consensus != nil && node.Consensus.IsLeader() {
 		go node.SendPongMessage()
 	}
 }
