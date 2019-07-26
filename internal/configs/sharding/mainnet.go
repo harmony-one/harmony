@@ -7,8 +7,9 @@ import (
 )
 
 const (
-	mainnetEpochBlock1 = 294912 // 18 * 2^14
+	mainnetEpochBlock1 = 327680 // 20 * 2^14
 	blocksPerShard     = 16384  // 2^14
+	mainnetV1Epoch     = 1
 )
 
 // MainnetSchedule is the mainnet sharding configuration schedule.
@@ -18,10 +19,9 @@ type mainnetSchedule struct{}
 
 func (mainnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
-	//case epoch.Cmp(big.NewInt(1000)) >= 0:
-	//	return mainnet6400
-	//case epoch.Cmp(big.NewInt(100)) >= 0:
-	//	return mainnetV2
+	case epoch.Cmp(big.NewInt(mainnetV1Epoch)) >= 0:
+		// first resharding epoch around 07/29/2019 7:30am PDT
+		return mainnetV1
 	default: // genesis
 		return mainnetV0
 	}
@@ -53,8 +53,9 @@ func (ms mainnetSchedule) IsLastBlock(blockNum uint64) bool {
 	}
 }
 
-var mainnetReshardingEpoch = make([]*big.Int, 0)
+var mainnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(mainnetV1Epoch)}
 var mainnetV0 = MustNewInstance(4, 150, 112, genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, mainnetReshardingEpoch)
+var mainnetV1 = MustNewInstance(4, 151, 112, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1, mainnetReshardingEpoch)
 
 //var mainnetV2 = MustNewInstance(8, 200, 100)
 //var mainnet6400 = MustNewInstance(16, 400, 50)

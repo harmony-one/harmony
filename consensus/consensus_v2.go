@@ -711,6 +711,7 @@ func (consensus *Consensus) finalizeCommits() {
 		return
 	}
 	consensus.PbftLog.AddMessage(pbftMsg)
+	consensus.ChainReader.WriteLastCommits(pbftMsg.Payload)
 
 	// find correct block content
 	block := consensus.PbftLog.GetBlockByHash(consensus.blockHash)
@@ -819,6 +820,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		consensus.getLogger().Warn().Msg("[OnCommitted] unable to parse msg")
 		return
 	}
+
 	if recvMsg.BlockNum < consensus.blockNum {
 		consensus.getLogger().Info().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
@@ -852,6 +854,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	}
 
 	consensus.PbftLog.AddMessage(recvMsg)
+	consensus.ChainReader.WriteLastCommits(recvMsg.Payload)
 	consensus.getLogger().Debug().
 		Uint64("MsgViewID", recvMsg.ViewID).
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
@@ -904,17 +907,21 @@ func (consensus *Consensus) LastCommitSig() ([]byte, []byte, error) {
 	if consensus.blockNum <= 1 {
 		return nil, nil, nil
 	}
-	msgs := consensus.PbftLog.GetMessagesByTypeSeq(msg_pb.MessageType_COMMITTED, consensus.blockNum-1)
-	if len(msgs) != 1 {
-		return nil, nil, ctxerror.New("SetLastCommitSig failed with wrong number of committed message", "numCommittedMsg", len(msgs))
+	lastCommits, err := consensus.ChainReader.ReadLastCommits()
+	if err != nil || len(lastCommits) < 96 {
+		msgs := consensus.PbftLog.GetMessagesByTypeSeq(msg_pb.MessageType_COMMITTED, consensus.blockNum-1)
+		if len(msgs) != 1 {
+			return nil, nil, ctxerror.New("GetLastCommitSig failed with wrong number of committed message", "numCommittedMsg", len(msgs))
+		}
+		lastCommits = msgs[0].Payload
 	}
 	//#### Read payload data from committed msg
 	aggSig := make([]byte, 96)
-	bitmap := make([]byte, len(msgs[0].Payload)-96)
+	bitmap := make([]byte, len(lastCommits)-96)
 	offset := 0
-	copy(aggSig[:], msgs[0].Payload[offset:offset+96])
+	copy(aggSig[:], lastCommits[offset:offset+96])
 	offset += 96
-	copy(bitmap[:], msgs[0].Payload[offset:])
+	copy(bitmap[:], lastCommits[offset:])
 	//#### END Read payload data from committed msg
 	return aggSig, bitmap, nil
 }
