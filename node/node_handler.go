@@ -3,7 +3,6 @@ package node
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
 	"errors"
 	"math"
 	"math/big"
@@ -17,7 +16,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	pb "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -55,7 +53,7 @@ func (node *Node) ReceiveGlobalMessage() {
 		}
 		msg, sender, err := node.globalGroupReceiver.Receive(ctx)
 		if sender != node.host.GetID() {
-			//utils.GetLogInstance().Info("[PUBSUB]", "received global msg", len(msg), "sender", sender)
+			//utils.Logger().Info("[PUBSUB]", "received global msg", len(msg), "sender", sender)
 			if err == nil {
 				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
 				go node.messageHandler(msg[5:], sender)
@@ -74,7 +72,7 @@ func (node *Node) ReceiveGroupMessage() {
 		}
 		msg, sender, err := node.shardGroupReceiver.Receive(ctx)
 		if sender != node.host.GetID() {
-			//utils.GetLogInstance().Info("[PUBSUB]", "received group msg", len(msg), "sender", sender)
+			//utils.Logger().Info("[PUBSUB]", "received group msg", len(msg), "sender", sender)
 			if err == nil {
 				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
 				go node.messageHandler(msg[5:], sender)
@@ -94,7 +92,7 @@ func (node *Node) ReceiveClientGroupMessage() {
 		}
 		msg, sender, err := node.clientReceiver.Receive(ctx)
 		if sender != node.host.GetID() {
-			// utils.GetLogInstance().Info("[CLIENT]", "received group msg", len(msg), "sender", sender, "error", err)
+			// utils.Logger().Info("[CLIENT]", "received group msg", len(msg), "sender", sender, "error", err)
 			if err == nil {
 				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
 				go node.messageHandler(msg[5:], sender)
@@ -107,19 +105,25 @@ func (node *Node) ReceiveClientGroupMessage() {
 func (node *Node) messageHandler(content []byte, sender libp2p_peer.ID) {
 	msgCategory, err := proto.GetMessageCategory(content)
 	if err != nil {
-		utils.GetLogInstance().Error("Read node type failed", "err", err, "node", node)
+		utils.Logger().Error().
+			Err(err).
+			Msg("messageHandler get message category failed")
 		return
 	}
 
 	msgType, err := proto.GetMessageType(content)
 	if err != nil {
-		utils.GetLogInstance().Error("Read action type failed", "err", err, "node", node)
+		utils.Logger().Error().
+			Err(err).
+			Msg("messageHandler get message type failed")
 		return
 	}
 
 	msgPayload, err := proto.GetMessagePayload(content)
 	if err != nil {
-		utils.GetLogInstance().Error("Read message payload failed", "err", err, "node", node)
+		utils.Logger().Error().
+			Err(err).
+			Msg("messageHandler get message payload failed")
 		return
 	}
 
@@ -141,7 +145,7 @@ func (node *Node) messageHandler(content []byte, sender libp2p_peer.ID) {
 			}
 		}
 	case proto.Staking:
-		utils.GetLogInstance().Info("NET: Received staking message")
+		utils.Logger().Debug().Msg("NET: Received staking message")
 		msgPayload, _ := proto.GetStakingMessagePayload(content)
 		// Only beacon leader processes staking txn
 		if node.NodeConfig.Role() != nodeconfig.BeaconLeader {
@@ -152,29 +156,33 @@ func (node *Node) messageHandler(content []byte, sender libp2p_peer.ID) {
 		actionType := proto_node.MessageType(msgType)
 		switch actionType {
 		case proto_node.Transaction:
-			utils.GetLogInstance().Info("NET: received message: Node/Transaction")
+			utils.Logger().Debug().Msg("NET: received message: Node/Transaction")
 			node.transactionMessageHandler(msgPayload)
 		case proto_node.Block:
-			utils.GetLogInstance().Info("NET: received message: Node/Block")
+			utils.Logger().Debug().Msg("NET: received message: Node/Block")
 			blockMsgType := proto_node.BlockMessageType(msgPayload[0])
 			switch blockMsgType {
 			case proto_node.Sync:
-				utils.GetLogInstance().Info("NET: received message: Node/Sync")
+				utils.Logger().Debug().Msg("NET: received message: Node/Sync")
 				var blocks []*types.Block
 				err := rlp.DecodeBytes(msgPayload[1:], &blocks)
 				if err != nil {
-					utils.GetLogInstance().Error("block sync", "error", err)
+					utils.Logger().Error().
+						Err(err).
+						Msg("block sync")
 				} else {
 					// for non-beaconchain node, subscribe to beacon block broadcast
 					role := node.NodeConfig.Role()
 					if proto_node.BlockMessageType(msgPayload[0]) == proto_node.Sync && (role == nodeconfig.ShardValidator || role == nodeconfig.ShardLeader || role == nodeconfig.NewNode) {
-						utils.GetLogInstance().Info("Block being handled by block channel", "self peer", node.SelfPeer, "block", blocks[0].NumberU64())
+						utils.Logger().Info().
+							Uint64("block", blocks[0].NumberU64()).
+							Msg("Block being handled by block channel")
 						for _, block := range blocks {
 							node.BeaconBlockChannel <- block
 						}
 					}
 					if node.Client != nil && node.Client.UpdateBlocks != nil && blocks != nil {
-						utils.GetLogInstance().Info("Block being handled by client by", "self peer", node.SelfPeer)
+						utils.Logger().Info().Msg("Block being handled by client")
 						node.Client.UpdateBlocks(blocks)
 					}
 				}
@@ -189,7 +197,8 @@ func (node *Node) messageHandler(content []byte, sender libp2p_peer.ID) {
 			}
 		}
 	default:
-		utils.GetLogInstance().Error("Unknown", "MsgCategory", msgCategory)
+		utils.Logger().Error().
+			Str("Unknown MsgCateogry", string(msgCategory))
 	}
 }
 
@@ -200,13 +209,17 @@ func (node *Node) processStakingMessage(msgPayload []byte) {
 		stakingRequest := msg.GetStaking()
 		txs := types.Transactions{}
 		if err = rlp.DecodeBytes(stakingRequest.Transaction, &txs); err == nil {
-			utils.GetLogInstance().Info("Successfully added staking transaction to pending list.")
+			utils.Logger().Info().Msg("Successfully added staking transaction to pending list.")
 			node.addPendingTransactions(txs)
 		} else {
-			utils.GetLogInstance().Error("Failed to unmarshal staking transaction list", "error", err)
+			utils.Logger().Error().
+				Err(err).
+				Msg("Failed to unmarshal staking transaction list")
 		}
 	} else {
-		utils.GetLogInstance().Error("Failed to unmarshal staking msg payload", "error", err)
+		utils.Logger().Error().
+			Err(err).
+			Msg("Failed to unmarshal staking msg payload")
 	}
 }
 
@@ -218,7 +231,9 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 		txs := types.Transactions{}
 		err := rlp.Decode(bytes.NewReader(msgPayload[1:]), &txs) // skip the Send messge type
 		if err != nil {
-			utils.GetLogInstance().Error("Failed to deserialize transaction list", "error", err)
+			utils.Logger().Error().
+				Err(err).
+				Msg("Failed to deserialize transaction list")
 		}
 		node.addPendingTransactions(txs)
 
@@ -251,7 +266,7 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 // TODO (lc): broadcast the new blocks to new nodes doing state sync
 func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 	if node.ClientPeer != nil {
-		utils.GetLogInstance().Debug("Sending new block to client", "client", node.ClientPeer)
+		utils.Logger().Info().Msg("Broadcasting new block to client")
 		node.host.SendMessageToGroups([]p2p.GroupID{node.NodeConfig.GetClientGroupID()}, host.ConstructP2pMessage(byte(0), proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock})))
 	}
 }
@@ -398,11 +413,15 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 	if node.Consensus.PubKey.IsEqual(node.Consensus.LeaderPubKey) {
 		node.BroadcastNewBlock(newBlock)
 	} else {
-		utils.GetLogInstance().Info("BINGO !!! Reached Consensus", "ViewID", node.Consensus.GetViewID())
+		utils.Logger().Info().
+			Uint64("ViewID", node.Consensus.GetViewID()).
+			Msg("BINGO !!! Reached Consensus")
 	}
 
 	if err := node.AddNewBlock(newBlock); err != nil {
-		utils.GetLogInstance().Error("Error when adding new block", "err", err)
+		utils.Logger().Error().
+			Err(err).
+			Msg("Error when adding new block")
 	}
 
 	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
@@ -413,7 +432,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 		for _, tx := range newBlock.Transactions() {
 			msg, err := tx.AsMessage(types.HomesteadSigner{})
 			if err != nil {
-				utils.GetLogInstance().Error("Error when parsing tx into message")
+				utils.Logger().Error().Msg("Error when parsing tx into message")
 			}
 			if _, ok := node.AddressNonce.Load(msg.From()); ok {
 				nonce := node.GetNonceOfAddress(msg.From())
@@ -446,13 +465,13 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 		//		// master resharding table.  Broadcast it to the network.
 		//		if err := node.broadcastEpochShardState(newBlock); err != nil {
 		//			e := ctxerror.New("cannot broadcast shard state").WithCause(err)
-		//			ctxerror.Log15(utils.GetLogInstance().Error, e)
+		//			ctxerror.Log15(utils.Logger().Error, e)
 		//		}
 		//	}
 		//	shardState, err := newBlockHeader.GetShardState()
 		//	if err != nil {
 		//		e := ctxerror.New("cannot get shard state from header").WithCause(err)
-		//		ctxerror.Log15(utils.GetLogInstance().Error, e)
+		//		ctxerror.Log15(utils.Logger().Error, e)
 		//	} else {
 		//		node.transitionIntoNextEpoch(shardState)
 		//	}
@@ -480,9 +499,17 @@ func (node *Node) broadcastEpochShardState(newBlock *types.Block) error {
 func (node *Node) AddNewBlock(newBlock *types.Block) error {
 	_, err := node.Blockchain().InsertChain([]*types.Block{newBlock})
 	if err != nil {
-		utils.GetLogInstance().Debug("Error Adding new block to blockchain", "blockNum", newBlock.NumberU64(), "parentHash", newBlock.Header().ParentHash, "hash", newBlock.Header().Hash(), "Error", err)
+		utils.Logger().Error().
+			Err(err).
+			Uint64("blockNum", newBlock.NumberU64()).
+			Bytes("parentHash", newBlock.Header().ParentHash.Bytes()[:]).
+			Bytes("hash", newBlock.Header().Hash().Bytes()[:]).
+			Msg("Error Adding new block to blockchain")
 	} else {
-		utils.GetLogInstance().Info("Added New Block to Blockchain!!!", "blockNum", newBlock.NumberU64(), "hash", newBlock.Header().Hash().Hex())
+		utils.Logger().Info().
+			Uint64("blockNum", newBlock.NumberU64()).
+			Str("hash", newBlock.Header().Hash().Hex()).
+			Msg("Added New Block to Blockchain!!!")
 	}
 	return err
 }
@@ -525,9 +552,6 @@ func getGenesisNodeByConsensusKey(key types.BlsPublicKey) *genesisNode {
 }
 
 func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) int {
-	logger := utils.GetLogInstance().New("sender", sender)
-	getLogger := func() log.Logger { return utils.WithCallerSkip(logger, 1) }
-
 	senderStr := string(sender)
 	if senderStr != "" {
 		_, ok := node.duplicatedPing.LoadOrStore(senderStr, true)
@@ -539,7 +563,9 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) i
 
 	ping, err := proto_discovery.GetPingMessage(msgPayload)
 	if err != nil {
-		utils.GetLogInstance().Error("Can't get Ping Message", "error", err)
+		utils.Logger().Error().
+			Err(err).
+			Msg("Can't get Ping Message")
 		return -1
 	}
 
@@ -548,43 +574,52 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) i
 	peer.Port = ping.Node.Port
 	peer.PeerID = ping.Node.PeerID
 	peer.ConsensusPubKey = nil
-	logger = logger.New("ip", peer.IP, "port", peer.Port, "peerID", peer.PeerID, "peerVer", ping.NodeVer)
 
 	if ping.Node.PubKey != nil {
 		peer.ConsensusPubKey = &bls.PublicKey{}
 		if err := peer.ConsensusPubKey.Deserialize(ping.Node.PubKey[:]); err != nil {
-			utils.GetLogInstance().Error("UnmarshalBinary Failed", "error", err)
+			utils.Logger().Error().
+				Err(err).
+				Msg("UnmarshalBinary Failed")
 			return -1
 		}
-		logger = logger.New(
-			"peerConsensusPubKey", peer.ConsensusPubKey.SerializeToHexStr())
 	}
 
 	var k types.BlsPublicKey
 	if err := k.FromLibBLSPublicKey(peer.ConsensusPubKey); err != nil {
 		err = ctxerror.New("cannot convert BLS public key").WithCause(err)
-		ctxerror.Log15(getLogger().Warn, err)
+		ctxerror.Log15(utils.GetLogger().Warn, err)
 	}
 	if genesisNode := getGenesisNodeByConsensusKey(k); genesisNode != nil {
-		logger = logger.New(
-			"genesisShardID", genesisNode.ShardID,
-			"genesisMemberIndex", genesisNode.MemberIndex,
-			"genesisStakingAccount", common2.MustAddressToBech32(genesisNode.NodeID.EcdsaAddress))
+		utils.Logger().Info().
+			Uint32("genesisShardID", genesisNode.ShardID).
+			Int("genesisMemberIndex", genesisNode.MemberIndex).
+			Str("genesisStakingAccount", common2.MustAddressToBech32(genesisNode.NodeID.EcdsaAddress))
 	} else {
-		logger.Info("cannot find genesis node", "BlsPubKey", peer.ConsensusPubKey)
+		utils.Logger().Info().
+			Str("BlsPubKey", peer.ConsensusPubKey.SerializeToHexStr()).
+			Msg("cannot find genesis node")
 	}
-	getLogger().Info("received ping message")
+	utils.Logger().Info().
+		Str("Peer Version", ping.NodeVer).
+		Interface("PeerID", peer).
+		Msg("received ping message")
 
 	// add to incoming peer list
 	//node.host.AddIncomingPeer(*peer)
 	node.host.ConnectHostPeer(*peer)
 
 	if ping.Node.Role == proto_node.ClientRole {
-		utils.GetLogInstance().Info("Add Client Peer to Node", "Client", peer)
+		utils.Logger().Info().
+			Str("Client", peer.String()).
+			Msg("Add Client Peer to Node")
 		node.ClientPeer = peer
 	} else {
 		node.AddPeers([]*p2p.Peer{peer})
-		utils.GetLogInstance().Info("Add Peer to Node", "Peer", peer, "# Peers", len(node.Consensus.PublicKeys))
+		utils.Logger().Info().
+			Str("Peer", peer.String()).
+			Int("# Peers", len(node.Consensus.PublicKeys)).
+			Msg("Add Peer to Node")
 	}
 
 	return 1
@@ -608,12 +643,18 @@ func (node *Node) SendPongMessage() {
 
 			// no peers, wait for another tick
 			if numPeersNow == 0 {
-				utils.GetLogInstance().Info("[PONG] No peers, continue", "numPeers", numPeers, "numPeersNow", numPeersNow)
+				utils.Logger().Info().
+					Int("numPeers", numPeers).
+					Int("numPeersNow", numPeersNow).
+					Msg("[PONG] No peers, continue")
 				continue
 			}
 			// new peers added
 			if numPeersNow != numPeers {
-				utils.GetLogInstance().Info("[PONG] Different number of peers", "numPeers", numPeers, "numPeersNow", numPeersNow)
+				utils.Logger().Info().
+					Int("numPeers", numPeers).
+					Int("numPeersNow", numPeersNow).
+					Msg("[PONG] Different number of peers")
 				sentMessage = false
 			} else {
 				// stable number of peers, sent the pong message
@@ -623,10 +664,15 @@ func (node *Node) SendPongMessage() {
 					buffer := pong.ConstructPongMessage()
 					err := node.host.SendMessageToGroups([]p2p.GroupID{node.NodeConfig.GetShardGroupID()}, host.ConstructP2pMessage(byte(0), buffer))
 					if err != nil {
-						utils.GetLogInstance().Error("[PONG] Failed to send pong message", "group", node.NodeConfig.GetShardGroupID())
+						utils.Logger().Error().
+							Str("group", string(node.NodeConfig.GetShardGroupID())).
+							Msg("[PONG] Failed to send pong message")
 						continue
 					} else {
-						utils.GetLogInstance().Info("[PONG] Sent pong message to", "group", node.NodeConfig.GetShardGroupID(), "# nodes", numPeersNow)
+						utils.Logger().Info().
+							Str("group", string(node.NodeConfig.GetShardGroupID())).
+							Int("# nodes", numPeersNow).
+							Msg("[PONG] Sent pong message to")
 					}
 					sentMessage = true
 
@@ -634,7 +680,7 @@ func (node *Node) SendPongMessage() {
 					if firstTime {
 						// Leader stops sending ping message
 						node.serviceManager.TakeAction(&service.Action{Action: service.Stop, ServiceType: service.PeerDiscovery})
-						utils.GetLogInstance().Info("[PONG] StartConsensus")
+						utils.Logger().Info().Msg("[PONG] StartConsensus")
 						node.startConsensus <- struct{}{}
 						firstTime = false
 					}
@@ -649,47 +695,36 @@ func (node *Node) SendPongMessage() {
 			buffer := pong.ConstructPongMessage()
 			err := node.host.SendMessageToGroups([]p2p.GroupID{node.NodeConfig.GetShardGroupID()}, host.ConstructP2pMessage(byte(0), buffer))
 			if err != nil {
-				utils.GetLogInstance().Error("[PONG] Failed to send regular pong message", "group", node.NodeConfig.GetShardGroupID())
+				utils.Logger().Error().
+					Str("group", string(node.NodeConfig.GetShardGroupID())).
+					Msg("[PONG] Failed to send regular pong message")
 				continue
 			} else {
-				utils.GetLogInstance().Info("[PONG] Sent regular pong message to", "group", node.NodeConfig.GetShardGroupID(), "# nodes", len(peers))
+				utils.Logger().Info().
+					Str("group", string(node.NodeConfig.GetShardGroupID())).
+					Int("# nodes", len(peers)).
+					Msg("[PONG] Sent regular pong message to")
 			}
 		}
 	}
 }
 
 func (node *Node) pongMessageHandler(msgPayload []byte) int {
-	utils.GetLogInstance().Info("Got Pong Message")
 	pong, err := proto_discovery.GetPongMessage(msgPayload)
 	if err != nil {
-		utils.GetLogInstance().Error("Can't get Pong Message", "error", err)
+		utils.Logger().Error().
+			Err(err).
+			Msg("Can't get Pong Message")
 		return -1
 	}
 
 	if pong.ShardID != node.Consensus.ShardID {
-		utils.GetLogInstance().Error(
-			"Received Pong message for the wrong shard",
-			"receivedShardID", pong.ShardID,
-			"expectedShardID", node.Consensus.ShardID)
+		utils.Logger().Error().
+			Uint32("receivedShardID", pong.ShardID).
+			Uint32("expectedShardID", node.Consensus.ShardID).
+			Msg("Received Pong message for the wrong shard")
 		return 0
 	}
-
-	// set the leader pub key is the first thing to do
-	// otherwise, we may not be able to validate the consensus messages received
-	// which will result in first consensus timeout
-	// TODO: remove this after fully migrating to beacon chain-based committee membership
-	//err = node.Consensus.SetLeaderPubKey(pong.LeaderPubKey)
-	//if err != nil {
-	//	utils.GetLogInstance().Error("Unmarshal Consensus Leader PubKey Failed", "error", err)
-	//} else {
-	//	utils.GetLogInstance().Info("Set Consensus Leader PubKey", "key", node.Consensus.GetLeaderPubKey())
-	//}
-	//err = node.DRand.SetLeaderPubKey(pong.LeaderPubKey)
-	//if err != nil {
-	//	utils.GetLogInstance().Error("Unmarshal DRand Leader PubKey Failed", "error", err)
-	//} else {
-	//	utils.GetLogInstance().Info("Set DRand Leader PubKey", "key", node.Consensus.GetLeaderPubKey())
-	//}
 
 	peers := make([]*p2p.Peer, 0)
 
@@ -703,7 +738,9 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 		if len(p.PubKey) != 0 { // TODO: add the check in bls library
 			err = peer.ConsensusPubKey.Deserialize(p.PubKey[:])
 			if err != nil {
-				utils.GetLogInstance().Error("UnmarshalBinary Failed", "error", err)
+				utils.Logger().Error().
+					Err(err).
+					Msg("Deserialize ConsensusPubKey Failed")
 				continue
 			}
 		}
@@ -712,28 +749,6 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 
 	if len(peers) > 0 {
 		node.AddPeers(peers)
-	}
-
-	// Reset Validator PublicKeys every time we receive PONG message from Leader
-	// The PublicKeys has to be idential across the shard on every node
-	// TODO (lc): we need to handle RemovePeer situation
-	publicKeys := make([]*bls.PublicKey, 0)
-
-	// Create the the PubKey from the []byte sent from leader
-	for _, k := range pong.PubKeys {
-		key := bls.PublicKey{}
-		err = key.Deserialize(k[:])
-		if err != nil {
-			utils.GetLogInstance().Error("UnmarshalBinary Failed PubKeys", "error", err)
-			continue
-		}
-		publicKeys = append(publicKeys, &key)
-	}
-
-	utils.GetLogInstance().Debug("[pongMessageHandler]", "#keys", len(publicKeys), "#peers", len(peers))
-
-	if node.State == NodeWaitToJoin {
-		node.State = NodeReadyForConsensus
 	}
 
 	// Stop discovery service after received pong message
@@ -747,8 +762,6 @@ func (node *Node) pongMessageHandler(msgPayload []byte) int {
 }
 
 func (node *Node) epochShardStateMessageHandler(msgPayload []byte) error {
-	logger := utils.GetLogInstance()
-	getLogger := func() log.Logger { return utils.WithCallerSkip(logger, 1) }
 	epochShardState, err := proto_node.DeserializeEpochShardStateFromMessage(msgPayload)
 	if err != nil {
 		return ctxerror.New("Can't get shard state message").WithCause(err)
@@ -757,7 +770,10 @@ func (node *Node) epochShardStateMessageHandler(msgPayload []byte) error {
 		return nil
 	}
 	receivedEpoch := big.NewInt(int64(epochShardState.Epoch))
-	getLogger().Info("received new shard state", "epoch", receivedEpoch)
+	utils.Logger().Info().
+		Int64("epoch", receivedEpoch.Int64()).
+		Msg("received new shard state")
+
 	node.nextShardState.master = epochShardState
 	if node.Consensus.IsLeader() {
 		// Wait a bit to allow the master table to reach other validators.
@@ -778,18 +794,17 @@ func (node *Node) epochShardStateMessageHandler(msgPayload []byte) error {
 	return nil
 }
 
+/*
 func (node *Node) transitionIntoNextEpoch(shardState types.ShardState) {
-	logger := utils.GetLogInstance()
-	getLogger := func() log.Logger { return utils.WithCallerSkip(logger, 1) }
-
 	logger = logger.New(
 		"blsPubKey", hex.EncodeToString(node.Consensus.PubKey.Serialize()),
 		"curShard", node.Blockchain().ShardID(),
 		"curLeader", node.Consensus.IsLeader())
 	for _, c := range shardState {
-		logger.Debug("new shard information",
-			"shardID", c.ShardID,
-			"nodeList", c.NodeList)
+		utils.Logger().Debug().
+			Uint32("shardID", c.ShardID).
+			Str("nodeList", c.NodeList).
+         Msg("new shard information")
 	}
 	myShardID, isNextLeader := findRoleInShardState(
 		node.Consensus.PubKey, shardState)
@@ -829,6 +844,7 @@ func (node *Node) transitionIntoNextEpoch(shardState types.ShardState) {
 		restartProcess(getRestartArguments(myShardID))
 	}
 }
+*/
 
 func findRoleInShardState(
 	key *bls.PublicKey, state types.ShardState,
@@ -847,12 +863,20 @@ func findRoleInShardState(
 func restartProcess(args []string) {
 	execFile, err := getBinaryPath()
 	if err != nil {
-		utils.GetLogInstance().Crit("Failed to get program path when restarting program", "error", err, "file", execFile)
+		utils.Logger().Error().
+			Err(err).
+			Str("file", execFile).
+			Msg("Failed to get program path when restarting program")
 	}
-	utils.GetLogInstance().Info("Restarting program", "args", args, "env", os.Environ())
+	utils.Logger().Info().
+		Strs("args", args).
+		Strs("env", os.Environ()).
+		Msg("Restarting program")
 	err = syscall.Exec(execFile, args, os.Environ())
 	if err != nil {
-		utils.GetLogInstance().Crit("Failed to restart program after resharding", "error", err)
+		utils.Logger().Error().
+			Err(err).
+			Msg("Failed to restart program after resharding")
 	}
 	panic("syscall.Exec() is not supposed to return")
 }
