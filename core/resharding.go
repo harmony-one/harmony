@@ -210,7 +210,10 @@ func (ss *ShardingState) UpdateShardingState(stakeInfo *map[common.Address]*stru
 	for addr, info := range *stakeInfo {
 		_, ok := oldBlsPublicKeys[info.BlsPublicKey]
 		if !ok {
-			newAddresses = append(newAddresses, types.NodeID{addr, info.BlsPublicKey})
+			newAddresses = append(newAddresses, types.NodeID{
+				EcdsaAddress: addr,
+				BlsPublicKey: info.BlsPublicKey,
+			})
 		}
 	}
 	return newAddresses
@@ -250,7 +253,10 @@ func GetShardState(epoch *big.Int) types.ShardState {
 			pubKey := types.BlsPublicKey{}
 			pubKey.FromLibBLSPublicKey(pub)
 			// TODO: directly read address for bls too
-			curNodeID := types.NodeID{common2.ParseAddr(hmyAccounts[index].Address), pubKey}
+			curNodeID := types.NodeID{
+				EcdsaAddress: common2.ParseAddr(hmyAccounts[index].Address),
+				BlsPublicKey: pubKey,
+			}
 			com.NodeList = append(com.NodeList, curNodeID)
 		}
 
@@ -264,7 +270,10 @@ func GetShardState(epoch *big.Int) types.ShardState {
 			pubKey := types.BlsPublicKey{}
 			pubKey.FromLibBLSPublicKey(pub)
 			// TODO: directly read address for bls too
-			curNodeID := types.NodeID{common2.ParseAddr(fnAccounts[index].Address), pubKey}
+			curNodeID := types.NodeID{
+				EcdsaAddress: common2.ParseAddr(fnAccounts[index].Address),
+				BlsPublicKey: pubKey,
+			}
 			com.NodeList = append(com.NodeList, curNodeID)
 		}
 		shardState = append(shardState, com)

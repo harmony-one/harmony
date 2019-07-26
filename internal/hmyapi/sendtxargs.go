@@ -15,7 +15,7 @@ import (
 type SendTxArgs struct {
 	From     common.Address  `json:"from"`
 	To       *common.Address `json:"to"`
-	ShardID  uint32          `json:"shardID`
+	ShardID  uint32          `json:"shardID"`
 	Gas      *hexutil.Uint64 `json:"gas"`
 	GasPrice *hexutil.Big    `json:"gasPrice"`
 	Value    *hexutil.Big    `json:"value"`
