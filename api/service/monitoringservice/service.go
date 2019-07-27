@@ -7,6 +7,7 @@ import (
 	"net/http"
 	
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/push"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/gorilla/mux"
 	"google.golang.org/grpc"
@@ -22,10 +23,14 @@ import (
 const (
 	monitoringServicePortDifference = 900
 	monitoringServiceHTTPPortDifference = 2000
+	pushgatewayAddr = "http://127.0.0.1:26000"
 )
 
-var defaultServersIPs = []string{"127.0.0.1", "127.0.0.1"}
-var defaultServersPorts = []string{"32000", "32001"}
+const (
+	CONNECTIONS_NUBMER_PUSH int = 0
+	BLOCK_HEIGHT_PUSH int = 1
+)
+
 
 
 // Service is the struct for monitoring service.
@@ -36,11 +41,14 @@ type Service struct {
 	GetNodeIDs        func() []libp2p_peer.ID
 	storage           *utils.MetricsStorage
 	server            *grpc.Server
-	httpServer        *http.Server
+	httpServer        *http.Server	
+	pusher 			  *push.Pusher
 	messageChan       chan *msg_pb.Message
 }
 
 var (
+	metricsPush = make(chan int, 0)
+
 	blockHeightGauge = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "block_height",
 		Help: "Get current block height.",
@@ -73,21 +81,14 @@ func New(selfPeer *p2p.Peer, GetNodeIDs func() []libp2p_peer.ID) *Service {
 // StartService starts monitoring service.
 func (s *Service) StartService() {
 	utils.Logger().Info().Msg("Starting monitoring service.")
-	s.InitMetrics()
 	s.Run()
 }
 
 // StopService shutdowns monitoring service.
 func (s *Service) StopService() {
 	utils.Logger().Info().Msg("Shutting down monitoring service.")
+	metricsPush <- -1
 	s.server.Stop()
-}
-
-// Init metrics, block height, connections number
-
-func (s *Service) InitMetrics() {
-	prometheus.MustRegister(blockHeightGauge)
-	prometheus.MustRegister(connectionsNumberGauge)
 }
 
 // GetMonitoringServicePort returns the port serving monitorign service dashboard. This port is monitoringServicePortDifference less than the node port.
@@ -113,6 +114,13 @@ func (s *Service) Run() {
 	// Init address.
 	addr := net.JoinHostPort("", GetMonitoringServiceHTTPPort(s.Port))
 
+	registry := prometheus.NewRegistry()
+	registry.MustRegister(blockHeightGauge, connectionsNumberGauge)
+
+	s.pusher = push.New(pushgatewayAddr, "metrics").Gatherer(registry)
+	
+	go s.PushMetrics()
+
 	//s.router.Path("/connectionsstats").Queries("since", "{[0-9]*?}", "until", "{[0-9]*?}").HandlerFunc(s.GetConnectionsStats).Methods("GET")
 	http.Handle("/metrics", promhttp.Handler())
 	utils.Logger().Info().Str("port", GetMonitoringServiceHTTPPort(s.Port)).Msg("Listening")
@@ -127,18 +135,30 @@ func (s *Service) Run() {
 
 func UpdateBlockHeight(blockHeight uint64, blockTime int64) {
 	blockHeightGauge.Set(float64(blockHeight))
+	metricsPush <- CONNECTIONS_NUBMER_PUSH
 }
 
 func UpdateConnectionsNumber(connectionsNumber int) {
 	connectionsNumberGauge.Set(float64(connectionsNumber))
+	metricsPush <- BLOCK_HEIGHT_PUSH
 }
-
-
 
 func (s *Service) PushMetrics() {
+	for metricType := range metricsPush {
+		if metricType == -1 {
+			break
+		}
+		if metricType == CONNECTIONS_NUBMER_PUSH {
+			s.pusher.Collector(connectionsNumberGauge)
+		} else {
+			s.pusher.Collector(blockHeightGauge)
+		}
+		if err := s.pusher.Add(); err != nil {
+			fmt.Println("Could not push to Pushgateway:", err)
+		}
+	}
 	return
 }
-
 
 // Run is to run http serving monitoring service.
 /*
