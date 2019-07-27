@@ -228,9 +228,13 @@ func (bc *BlockChain) ValidateNewBlock(block *types.Block) error {
 }
 
 // IsEpochBlock returns whether this block is the first block of an epoch.
-// TODO: lc this is not used
+// by checking if the previous block is the last block of the previous epoch
 func IsEpochBlock(block *types.Block) bool {
-	return block.NumberU64()%ShardingSchedule.BlocksPerEpoch() == 0
+	if block.NumberU64() == 0 {
+		// genesis block is the first epoch block
+		return true
+	}
+	return ShardingSchedule.IsLastBlock(block.NumberU64() - 1)
 }
 
 // IsEpochLastBlock returns whether this block is the last block of an epoch.
