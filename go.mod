@@ -14,9 +14,9 @@ require (
 	github.com/ethereum/go-ethereum v1.8.27
 	github.com/fjl/memsize v0.0.0-20180929194037-2a09253e352a
 	github.com/garslo/gogen v0.0.0-20170307003452-d6ebae628c7c // indirect
-	github.com/go-stack/stack v1.8.0 // indirect
+	github.com/go-kit/kit v0.9.0
 	github.com/golang/mock v1.3.1
-	github.com/golang/protobuf v1.3.0
+	github.com/golang/protobuf v1.3.1
 	github.com/golangci/golangci-lint v1.17.1
 	github.com/gorilla/handlers v1.4.0
 	github.com/gorilla/mux v1.7.2
@@ -42,6 +42,7 @@ require (
 	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.8.1
+	github.com/prometheus/client_golang v1.0.0
 	github.com/rjeczalik/notify v0.9.2
 	github.com/rs/cors v1.6.0 // indirect
 	github.com/rs/zerolog v1.14.3

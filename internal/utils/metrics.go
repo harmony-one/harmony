@@ -17,6 +17,15 @@ import (
 const (
 	CurrentConnectionsNumberKey = "cnk"
 	ConnectionsNumberPrefix = "cnp"
+	BalancePrefix = "bp"
+	BlocksSuccessPrefix = "bsp"
+	BlocksProcessedPrefix = "bpp"
+	TransactionsSuccessPrefix = "tsp"
+	TrnascationsProcessedPrefix = "tpp"
+	NodeCPUPrefix = "ncp"
+	NodeTrafficPrefix = "ntp"
+	LeaderTimePrefix = "ltp"
+	ConsensusFramePrefix = "cfp"
 )
 
 // BToMb ...
@@ -98,7 +107,6 @@ func (storage *MetricsStorage) Dump(connectionsNumber int, currentTime int) {
 		ctxerror.Warn(GetLogger(), err, "cannot write batch")
 	}
 }
-
 
 // ReadConnectionsNumberFromDB returns a list of connections numbers to server connections number end-point.
 func (storage *MetricsStorage) ReadConnectionsNumbersFromDB(since, until int) []int {
