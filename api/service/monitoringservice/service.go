@@ -71,6 +71,16 @@ type ConnectionsStatsHTTP struct {
 
 // New returns monitoring service.
 func New(selfPeer *p2p.Peer, GetNodeIDs func() []libp2p_peer.ID) *Service {
+
+	blockHeightGauge = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "block_height_" + selfPeer.PeerID.String(),
+		Help: "Get current block height.",
+	})
+
+	connectionsNumberGauge = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "connections_number_" + selfPeer.PeerID.String(),
+		Help: "Get current connections number for a node.",
+	})
 	return &Service{
 		IP:                selfPeer.IP,
 		Port:              selfPeer.Port,
@@ -151,11 +161,6 @@ func (s *Service) PushMetrics() {
 		if metricType == -1 {
 			break
 		}
-		/*if metricType == ConnectionsNumberPush {
-			s.pusher.Collector(connectionsNumberGauge)
-		} else {
-			s.pusher.Collector(blockHeightGauge)
-		}*/
 		if err := s.pusher.Add(); err != nil {
 			fmt.Println("Could not push to Pushgateway:", err)
 		}
