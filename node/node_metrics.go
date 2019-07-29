@@ -43,14 +43,11 @@ func (node *Node) UpdateBlockHeightForMetrics() {
 
 // Collect and store metrics into metrics ldb
 func (node *Node) CollectMetrics() {
-	utils.Logger().Info().Msg("Init metrics db.")
-	node.metricsStorage = utils.GetMetricsStorageInstance(node.ClientPeer.IP, node.ClientPeer.Port, true)
+	// utils.Logger().Info().Msg("Init metrics db.")
+	//node.metricsStorage = utils.GetMetricsStorageInstance(node.ClientPeer.IP, node.ClientPeer.Port, true)
 	// flush peers number each second
    	go node.UpdateBlockHeightForMetrics()
    	go node.UpdateConnectionsNumberForMetrics()
-    for _ = range time.Tick(1000 * time.Millisecond) {
-    	node.metricsStorage.Dump(node.numPeers, int(time.Now().Unix()))
-   	}
 }
 
 
