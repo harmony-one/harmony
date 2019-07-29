@@ -1,15 +1,16 @@
 package node
 
 import (
+	"time"
     metrics	"github.com/harmony-one/harmony/api/service/monitoringservice"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
-// Update connections number for monitoring service.
+// UpdateConnectionsNumberForMetrics uppdates connections number for monitoring service.
 func (node *Node) UpdateConnectionsNumberForMetrics() {
 	utils.GetLogInstance().Info("[Monitoring Service] Update connections number for metrics")
 	prevNumPeers := node.numPeers
-	for {
+	for range time.Tick(1000 * time.Millisecond) {
 		curNumPeers := node.numPeers
 		if curNumPeers == prevNumPeers {
 			continue
@@ -20,11 +21,11 @@ func (node *Node) UpdateConnectionsNumberForMetrics() {
 	}
 }
 
-// Update block height for monitoring service.
+// UpdateBlockHeightForMetrics updates block height for monitoring service.
 func (node *Node) UpdateBlockHeightForMetrics() {
 	utils.GetLogInstance().Info("[Monitoring Service] Update block height for metrics")
 	prevBlockHeight := node.Blockchain().CurrentBlock().NumberU64()
-	for {
+	for range time.Tick(3000 * time.Millisecond) {
 		curBlock := node.Blockchain().CurrentBlock()
 		curBlockHeight := curBlock.NumberU64()
 		if curBlockHeight == prevBlockHeight {
@@ -38,13 +39,11 @@ func (node *Node) UpdateBlockHeightForMetrics() {
 	}
 }
 
-// Collect and store metrics into metrics ldb
+// Collects metrics.
 func (node *Node) CollectMetrics() {
 	// utils.Logger().Info().Msg("Init metrics db.")
 	//node.metricsStorage = utils.GetMetricsStorageInstance(node.ClientPeer.IP, node.ClientPeer.Port, true)
 	// flush peers number each second
-   	go node.UpdateBlockHeightForMetrics()
-   	go node.UpdateConnectionsNumberForMetrics()
 }
 
 

@@ -24,13 +24,9 @@ const (
 	monitoringServicePortDifference = 900
 	monitoringServiceHTTPPortDifference = 2000
 	pushgatewayAddr = "http://127.0.0.1:26000"
+	ConnectionsNumberPush int = 0
+	BlockHeightPush int = 1
 )
-
-const (
-	CONNECTIONS_NUBMER_PUSH int = 0
-	BLOCK_HEIGHT_PUSH int = 1
-)
-
 
 
 // Service is the struct for monitoring service.
@@ -46,8 +42,9 @@ type Service struct {
 	messageChan       chan *msg_pb.Message
 }
 
+// init vars for prometheus
 var (
-	metricsPush = make(chan int, 0)
+	metricsPush = make(chan int)
 
 	blockHeightGauge = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "block_height",
@@ -60,11 +57,14 @@ var (
 	})
 )
 
+
+// ConnectionsLog struct for connections stats for prometheus
 type ConnectionsLog struct {
 	Time int
 	ConnectionsNumber int
 }
 
+// ConnectionsStatsHTTP struct for returning all connections logs
 type ConnectionsStatsHTTP struct {
 	ConnectionsLogs []ConnectionsLog
 }
@@ -118,13 +118,13 @@ func (s *Service) Run() {
 	registry.MustRegister(blockHeightGauge, connectionsNumberGauge)
 
 	s.pusher = push.New(pushgatewayAddr, "metrics").Gatherer(registry)
-	
+
 	go s.PushMetrics()
 
 	//s.router.Path("/connectionsstats").Queries("since", "{[0-9]*?}", "until", "{[0-9]*?}").HandlerFunc(s.GetConnectionsStats).Methods("GET")
-	http.Handle("/metrics", promhttp.Handler())
 	utils.Logger().Info().Str("port", GetMonitoringServiceHTTPPort(s.Port)).Msg("Listening")
 	go func() {
+		http.Handle("/metrics", promhttp.Handler())
 		if err := http.ListenAndServe(addr, nil); err != nil {
 			utils.Logger().Warn().Err(err).Msg("http.ListenAndServe()")
 		}
@@ -132,23 +132,26 @@ func (s *Service) Run() {
 	return
 }
 
-
+// UpdateBlockHeight updates block height.
 func UpdateBlockHeight(blockHeight uint64, blockTime int64) {
 	blockHeightGauge.Set(float64(blockHeight))
-	metricsPush <- CONNECTIONS_NUBMER_PUSH
+	metricsPush <- ConnectionsNumberPush
 }
 
+
+// UpdateConnectionsNumber updates connections number.
 func UpdateConnectionsNumber(connectionsNumber int) {
 	connectionsNumberGauge.Set(float64(connectionsNumber))
-	metricsPush <- BLOCK_HEIGHT_PUSH
+	metricsPush <- BlockHeightPush
 }
 
+// PushMetrics pushes metrics updates to prometheus pushgateway.
 func (s *Service) PushMetrics() {
 	for metricType := range metricsPush {
 		if metricType == -1 {
 			break
 		}
-		if metricType == CONNECTIONS_NUBMER_PUSH {
+		if metricType == ConnectionsNumberPush {
 			s.pusher.Collector(connectionsNumberGauge)
 		} else {
 			s.pusher.Collector(blockHeightGauge)
