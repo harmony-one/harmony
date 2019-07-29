@@ -151,11 +151,11 @@ func (s *Service) PushMetrics() {
 		if metricType == -1 {
 			break
 		}
-		if metricType == ConnectionsNumberPush {
+		/*if metricType == ConnectionsNumberPush {
 			s.pusher.Collector(connectionsNumberGauge)
 		} else {
 			s.pusher.Collector(blockHeightGauge)
-		}
+		}*/
 		if err := s.pusher.Add(); err != nil {
 			fmt.Println("Could not push to Pushgateway:", err)
 		}
