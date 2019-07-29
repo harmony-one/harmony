@@ -9,7 +9,7 @@ import (
 // UpdateConnectionsNumberForMetrics uppdates connections number for monitoring service.
 func (node *Node) UpdateConnectionsNumberForMetrics() {
 	utils.GetLogInstance().Info("[Monitoring Service] Update connections number for metrics")
-	prevNumPeers := node.numPeers
+	prevNumPeers := 0
 	for range time.Tick(1000 * time.Millisecond) {
 		curNumPeers := node.numPeers
 		if curNumPeers == prevNumPeers {
@@ -24,7 +24,7 @@ func (node *Node) UpdateConnectionsNumberForMetrics() {
 // UpdateBlockHeightForMetrics updates block height for monitoring service.
 func (node *Node) UpdateBlockHeightForMetrics() {
 	utils.GetLogInstance().Info("[Monitoring Service] Update block height for metrics")
-	prevBlockHeight := node.Blockchain().CurrentBlock().NumberU64()
+	prevBlockHeight := uint64(0)
 	for range time.Tick(3000 * time.Millisecond) {
 		curBlock := node.Blockchain().CurrentBlock()
 		curBlockHeight := curBlock.NumberU64()
