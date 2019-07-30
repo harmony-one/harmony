@@ -2,25 +2,10 @@ package node
 
 import (
 	"time"
-	
-    metrics	"github.com/harmony-one/harmony/api/service/monitoringservice"
+
+	metrics	"github.com/harmony-one/harmony/api/service/monitoringservice"
 	"github.com/harmony-one/harmony/internal/utils"
 )
-
-// UpdateConnectionsNumberForMetrics uppdates connections number for monitoring service.
-func (node *Node) UpdateConnectionsNumberForMetrics() {
-	utils.GetLogInstance().Info("[Monitoring Service] Update connections number for metrics")
-	prevNumPeers := 0
-	for range time.Tick(1000 * time.Millisecond) {
-		curNumPeers := node.numPeers
-		if curNumPeers == prevNumPeers {
-			continue
-		}
-
-		metrics.UpdateConnectionsNumber(curNumPeers)
-		prevNumPeers = curNumPeers
-	}
-}
 
 // UpdateBlockHeightForMetrics updates block height for monitoring service.
 func (node *Node) UpdateBlockHeightForMetrics() {
@@ -37,6 +22,21 @@ func (node *Node) UpdateBlockHeightForMetrics() {
 
 		metrics.UpdateBlockHeight(curBlockHeight, curBlock.Header().Time.Int64())
 		prevBlockHeight = curBlockHeight
+	}
+}
+
+// UpdateConnectionsNumberForMetrics uppdates connections number for monitoring service.
+func (node *Node) UpdateConnectionsNumberForMetrics() {
+	utils.GetLogInstance().Info("[Monitoring Service] Update connections number for metrics")
+	prevNumPeers := 0
+	for range time.Tick(1000 * time.Millisecond) {
+		curNumPeers := node.numPeers
+		if curNumPeers == prevNumPeers {
+			continue
+		}
+
+		metrics.UpdateConnectionsNumber(curNumPeers)
+		prevNumPeers = curNumPeers
 	}
 }
 

@@ -8,33 +8,34 @@ import (
 
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/rlp"
+
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // Constants for storage.
 const (
-	ConnectionsNumberPrefix = "cnp"
-	ConsensusFramePrefix = "cfp"
+	ConnectionsNumberPrefix 	= "cnp"
+	ConsensusFramePrefix 		= "cfp"
 	CurrentConnectionsNumberKey = "cnk"
-	BalancePrefix = "bp"
-	BlocksProcessedPrefix = "bpp"
-	BlocksSuccessPrefix = "bsp"
-	NodeCPUPrefix = "ncp"
-	NodeTrafficPrefix = "ntp"
-	LeaderTimePrefix = "ltp"
+	BalancePrefix 				= "bp"
+	BlocksProcessedPrefix 		= "bpp"
+	BlocksSuccessPrefix 		= "bsp"
+	LeaderTimePrefix 			= "ltp"
+	NodeCPUPrefix 				= "ncp"
+	NodeTrafficPrefix 			= "ntp"
 	TranscationsProcessedPrefix = "tpp"
-	TransactionsSuccessPrefix = "tsp"
+	TransactionsSuccessPrefix 	= "tsp"
 )
-
-// GetCurrentConnectionsNumberKey ...
-func GetCurrentConnectionsNumberKey(currentTime int) string {
-	return fmt.Sprintf("%s_%d", CurrentConnectionsNumberKey, currentTime)
-}
 
 // GetConnectionsNumberKey ...
 func GetConnectionsNumberKey(moment int) string {
 	return fmt.Sprintf("%s_%d", ConnectionsNumberPrefix, moment)
+}
+
+// GetCurrentConnectionsNumberKey ...
+func GetCurrentConnectionsNumberKey(currentTime int) string {
+	return fmt.Sprintf("%s_%d", CurrentConnectionsNumberKey, currentTime)
 }
 
 // storage instance

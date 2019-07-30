@@ -5,7 +5,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
-	
+
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/gorilla/mux"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -13,42 +13,40 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/push"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/client_golang/prometheus/push"
 	"google.golang.org/grpc"
 )
 
 // Constants for monitoring service.
 const (
-	ConnectionsNumberPush int = 0
-	BlockHeightPush int = 1
-	monitoringServicePortDifference = 900
+	ConnectionsNumberPush 			int = 0
+	BlockHeightPush 				int = 1
+	monitoringServicePortDifference 	= 900
 	monitoringServiceHTTPPortDifference = 2000
-	pushgatewayAddr = "http://127.0.0.1:26000"
+	pushgatewayAddr 					= "http://127.0.0.1:26000"
 )
 
 // Service is the struct for monitoring service.
 type Service struct {
-	router            *mux.Router
-	IP                string
-	Port              string
-	GetNodeIDs        func() []libp2p_peer.ID
-	storage           *MetricsStorage
-	server            *grpc.Server
-	httpServer        *http.Server	
-	pusher 			  *push.Pusher
-	messageChan       chan *msg_pb.Message
+	router      *mux.Router
+	IP          string
+	Port        string
+	GetNodeIDs  func() []libp2p_peer.ID
+	storage     *MetricsStorage
+	server      *grpc.Server
+	httpServer  *http.Server	
+	pusher 		*push.Pusher
+	messageChan chan *msg_pb.Message
 }
 
 // init vars for prometheus
 var (
 	metricsPush = make(chan int)
-
 	blockHeightGauge = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "block_height",
 		Help: "Get current block height.",
 	})
-
 	connectionsNumberGauge = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "connections_number",
 		Help: "Get current connections number for a node.",
@@ -57,7 +55,7 @@ var (
 
 // ConnectionsLog struct for connections stats for prometheus
 type ConnectionsLog struct {
-	Time int
+	Time 			  int
 	ConnectionsNumber int
 }
 
@@ -79,9 +77,9 @@ func New(selfPeer *p2p.Peer, GetNodeIDs func() []libp2p_peer.ID) *Service {
 		Help: "Get current connections number for a node.",
 	})
 	return &Service{
-		IP:                selfPeer.IP,
-		Port:              selfPeer.Port,
-		GetNodeIDs:        GetNodeIDs,
+		IP:         selfPeer.IP,
+		Port:       selfPeer.Port,
+		GetNodeIDs: GetNodeIDs,
 	}
 }
 
@@ -204,7 +202,7 @@ func (s *Service) RunHTTP() *http.Server {
 // Run is to run serving monitoring service.
 /*func (s *Service) Run(remove bool) (*grpc.Server, error) {
 	s.storage = utils.GetMetricsStorageInstance(s.IP, s.Port, remove)
-	port, err := strconv.Atoi(s.Port); 
+	port, err := strconv.Atoi(s.Port)
 	if err != nil {
 		return nil, err
 	}
