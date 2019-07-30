@@ -1,4 +1,4 @@
-package monitoringservice
+package metrics
 
 import (
 	"fmt"
@@ -18,16 +18,16 @@ import (
 	"google.golang.org/grpc"
 )
 
-// Constants for monitoring service.
+// Constants for metrics service.
 const (
-	ConnectionsNumberPush 			int = 0
-	BlockHeightPush 				int = 1
-	monitoringServicePortDifference 	= 900
-	monitoringServiceHTTPPortDifference = 2000
-	pushgatewayAddr 					= "http://127.0.0.1:26000"
+	ConnectionsNumberPush               int = 0
+	BlockHeightPush                     int = 1
+	metricsServicePortDifference         = 900
+	metricsServiceHTTPPortDifference     = 2000
+	pushgatewayAddr                         = "http://127.0.0.1:26000"
 )
 
-// Service is the struct for monitoring service.
+// Service is the struct for metrics service.
 type Service struct {
 	router      *mux.Router
 	IP          string
@@ -35,8 +35,8 @@ type Service struct {
 	GetNodeIDs  func() []libp2p_peer.ID
 	storage     *MetricsStorage
 	server      *grpc.Server
-	httpServer  *http.Server	
-	pusher 		*push.Pusher
+	httpServer  *http.Server
+	pusher      *push.Pusher
 	messageChan chan *msg_pb.Message
 }
 
@@ -55,7 +55,7 @@ var (
 
 // ConnectionsLog struct for connections stats for prometheus
 type ConnectionsLog struct {
-	Time 			  int
+	Time              int
 	ConnectionsNumber int
 }
 
@@ -64,14 +64,12 @@ type ConnectionsStatsHTTP struct {
 	ConnectionsLogs []ConnectionsLog
 }
 
-// New returns monitoring service.
+// New returns metrics service.
 func New(selfPeer *p2p.Peer, GetNodeIDs func() []libp2p_peer.ID) *Service {
-
 	blockHeightGauge = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "block_height_" + selfPeer.PeerID.String(),
 		Help: "Get current block height.",
 	})
-
 	connectionsNumberGauge = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "connections_number_" + selfPeer.PeerID.String(),
 		Help: "Get current connections number for a node.",
@@ -83,41 +81,41 @@ func New(selfPeer *p2p.Peer, GetNodeIDs func() []libp2p_peer.ID) *Service {
 	}
 }
 
-// StartService starts monitoring service.
+// StartService starts metrics service.
 func (s *Service) StartService() {
-	utils.Logger().Info().Msg("Starting monitoring service.")
+	utils.Logger().Info().Msg("Starting metrics service.")
 	s.Run()
 }
 
-// StopService shutdowns monitoring service.
+// StopService shutdowns metrics service.
 func (s *Service) StopService() {
-	utils.Logger().Info().Msg("Shutting down monitoring service.")
+	utils.Logger().Info().Msg("Shutting down metrics service.")
 	metricsPush <- -1
 	s.server.Stop()
 }
 
-// GetMonitoringServicePort returns the port serving monitorign service dashboard. This port is monitoringServicePortDifference less than the node port.
-func GetMonitoringServicePort(nodePort string) string {
+// GetMetricsServicePort returns the port serving metrics service dashboard. This port is metricsServicePortDifference less than the node port.
+func GetMetricsServicePort(nodePort string) string {
 	if port, err := strconv.Atoi(nodePort); err == nil {
-		return fmt.Sprintf("%d", port-monitoringServicePortDifference)
+		return fmt.Sprintf("%d", port-metricsServicePortDifference)
 	}
 	utils.Logger().Error().Msg("error on parsing.")
 	return ""
 }
 
-// GetMonitoringServiceHTTPPort returns the port serving monitorign service dashboard. This port is monitoringServicePortDifference less than the node port.
-func GetMonitoringServiceHTTPPort(nodePort string) string {
+// GetMetricsServiceHTTPPort returns the port serving metrics service dashboard. This port is metricsServicePortDifference less than the node port.
+func GetMetricsServiceHTTPPort(nodePort string) string {
 	if port, err := strconv.Atoi(nodePort); err == nil {
-		return fmt.Sprintf("%d", port-monitoringServiceHTTPPortDifference)
+		return fmt.Sprintf("%d", port-metricsServiceHTTPPortDifference)
 	}
 	utils.Logger().Error().Msg("error on parsing.")
 	return ""
 }
 
-// Run is to run http serving monitoring service.
+// Run is to run http serving metrics service.
 func (s *Service) Run() {
 	// Init address.
-	addr := net.JoinHostPort("", GetMonitoringServiceHTTPPort(s.Port))
+	addr := net.JoinHostPort("", GetMetricsServiceHTTPPort(s.Port))
 
 	registry := prometheus.NewRegistry()
 	registry.MustRegister(blockHeightGauge, connectionsNumberGauge)
@@ -127,7 +125,7 @@ func (s *Service) Run() {
 	go s.PushMetrics()
 
 	//s.router.Path("/connectionsstats").Queries("since", "{[0-9]*?}", "until", "{[0-9]*?}").HandlerFunc(s.GetConnectionsStats).Methods("GET")
-	utils.Logger().Info().Str("port", GetMonitoringServiceHTTPPort(s.Port)).Msg("Listening")
+	utils.Logger().Info().Str("port", GetMetricsServiceHTTPPort(s.Port)).Msg("Listening")
 	go func() {
 		http.Handle("/metrics", promhttp.Handler())
 		if err := http.ListenAndServe(addr, nil); err != nil {

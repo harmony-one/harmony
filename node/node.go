@@ -389,10 +389,10 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 	go node.ReceiveGlobalMessage()
 
 	// start the goroutine to update block height for metrics
-   	go node.UpdateBlockHeightForMetrics()
-   	
+	go node.UpdateBlockHeightForMetrics()
+
 	// start the goroutine to update number of connections for metrics
-   	go node.UpdateConnectionsNumberForMetrics()
+	go node.UpdateConnectionsNumberForMetrics()
 
 	// Setup initial state of syncing.
 	node.peerRegistrationRecord = make(map[string]*syncConfig)

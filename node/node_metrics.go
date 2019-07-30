@@ -3,13 +3,13 @@ package node
 import (
 	"time"
 
-	metrics	"github.com/harmony-one/harmony/api/service/monitoringservice"
+	metrics "github.com/harmony-one/harmony/api/service/metrics"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // UpdateBlockHeightForMetrics updates block height for monitoring service.
 func (node *Node) UpdateBlockHeightForMetrics() {
-	utils.GetLogInstance().Info("[Monitoring Service] Update block height for metrics")
+	utils.GetLogInstance().Info("[Metrics Service] Update block height for metrics")
 	prevBlockHeight := uint64(0)
 	for range time.Tick(3000 * time.Millisecond) {
 		curBlock := node.Blockchain().CurrentBlock()
@@ -27,7 +27,7 @@ func (node *Node) UpdateBlockHeightForMetrics() {
 
 // UpdateConnectionsNumberForMetrics uppdates connections number for monitoring service.
 func (node *Node) UpdateConnectionsNumberForMetrics() {
-	utils.GetLogInstance().Info("[Monitoring Service] Update connections number for metrics")
+	utils.GetLogInstance().Info("[Metrics Service] Update connections number for metrics")
 	prevNumPeers := 0
 	for range time.Tick(1000 * time.Millisecond) {
 		curNumPeers := node.numPeers

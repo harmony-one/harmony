@@ -1,4 +1,4 @@
-package monitoringservice
+package metrics
 
 import (
 	"fmt"
@@ -15,17 +15,17 @@ import (
 
 // Constants for storage.
 const (
-	ConnectionsNumberPrefix 	= "cnp"
-	ConsensusFramePrefix 		= "cfp"
+	ConnectionsNumberPrefix     = "cnp"
+	ConsensusFramePrefix        = "cfp"
 	CurrentConnectionsNumberKey = "cnk"
-	BalancePrefix 				= "bp"
-	BlocksProcessedPrefix 		= "bpp"
-	BlocksSuccessPrefix 		= "bsp"
-	LeaderTimePrefix 			= "ltp"
-	NodeCPUPrefix 				= "ncp"
-	NodeTrafficPrefix 			= "ntp"
+	BalancePrefix               = "bp"
+	BlocksProcessedPrefix       = "bpp"
+	BlocksSuccessPrefix         = "bsp"
+	LeaderTimePrefix            = "ltp"
+	NodeCPUPrefix               = "ncp"
+	NodeTrafficPrefix           = "ntp"
 	TranscationsProcessedPrefix = "tpp"
-	TransactionsSuccessPrefix 	= "tsp"
+	TransactionsSuccessPrefix   = "tsp"
 )
 
 // GetConnectionsNumberKey ...

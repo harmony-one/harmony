@@ -1,4 +1,4 @@
-package monitoringservice
+package metrics
 
 import (
 	"context"
