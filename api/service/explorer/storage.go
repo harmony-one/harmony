@@ -67,11 +67,11 @@ func (storage *Storage) Init(ip, port string, remove bool) {
 	if remove {
 		var err = os.RemoveAll(dbFileName)
 		if err != nil {
-			utils.GetLogInstance().Error(err.Error())
+			utils.Logger().Error().Err(err).Msg("Failed to remove existing database files")
 		}
 	}
 	if storage.db, err = ethdb.NewLDBDatabase(dbFileName, 0, 0); err != nil {
-		utils.GetLogInstance().Error(err.Error())
+		utils.Logger().Error().Err(err).Msg("Failed to create new database")
 	}
 }
 
@@ -82,7 +82,7 @@ func (storage *Storage) GetDB() *ethdb.LDBDatabase {
 
 // Dump extracts information from block and index them into lvdb for explorer.
 func (storage *Storage) Dump(block *types.Block, height uint64) {
-	utils.GetLogInstance().Info("Dumping block ", "block height", height)
+	utils.Logger().Info().Uint64("block height", height).Msg("Dumping block")
 	if block == nil {
 		return
 	}
@@ -90,17 +90,17 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 	batch := storage.db.NewBatch()
 	// Update block height.
 	if err := batch.Put([]byte(BlockHeightKey), []byte(strconv.Itoa(int(height)))); err != nil {
-		ctxerror.Warn(utils.GetLogger(), err, "cannot batch block height")
+		utils.Logger().Warn().Err(err).Msg("cannot batch block height")
 	}
 
 	// Store block.
 	blockData, err := rlp.EncodeToBytes(block)
 	if err == nil {
 		if err := batch.Put([]byte(GetBlockKey(int(height))), blockData); err != nil {
-			ctxerror.Warn(utils.GetLogger(), err, "cannot batch block data")
+			utils.Logger().Warn().Err(err).Msg("cannot batch block data")
 		}
 	} else {
-		utils.GetLogInstance().Debug("Failed to serialize block ", "error", err)
+		utils.Logger().Error().Err(err).Msg("Failed to serialize block")
 	}
 
 	// Store txs
@@ -123,10 +123,10 @@ func (storage *Storage) UpdateTXStorage(batch ethdb.Batch, explorerTransaction *
 	if data, err := rlp.EncodeToBytes(explorerTransaction); err == nil {
 		key := GetTXKey(tx.Hash().Hex())
 		if err := batch.Put([]byte(key), data); err != nil {
-			ctxerror.Warn(utils.GetLogger(), err, "cannot batch TX")
+			utils.Logger().Warn().Err(err).Msg("cannot batch TX")
 		}
 	} else {
-		utils.GetLogInstance().Error("EncodeRLP transaction error")
+		utils.Logger().Error().Msg("EncodeRLP transaction error")
 	}
 }
 
@@ -146,18 +146,19 @@ func (storage *Storage) UpdateAddressStorage(batch ethdb.Batch, adr string, expl
 		if err == nil {
 			address.Balance.Add(address.Balance, tx.Value())
 		} else {
-			utils.GetLogInstance().Error("Failed to error", "err", err)
+			utils.Logger().Error().Err(err).Msg("Failed to error")
 		}
 	} else {
 		address.Balance = tx.Value()
 	}
 	address.ID = adr
 	address.TXs = append(address.TXs, explorerTransaction)
-	if encoded, err := rlp.EncodeToBytes(address); err == nil {
+	encoded, err := rlp.EncodeToBytes(address)
+	if err == nil {
 		if err := batch.Put([]byte(key), encoded); err != nil {
-			ctxerror.Warn(utils.GetLogger(), err, "cannot batch address")
+			utils.Logger().Warn().Err(err).Msg("cannot batch address")
 		}
 	} else {
-		utils.GetLogInstance().Error("Can not encode address account.")
+		utils.Logger().Error().Err(err).Msg("cannot encode address account")
 	}
 }

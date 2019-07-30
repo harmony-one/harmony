@@ -59,18 +59,18 @@ func New(selfPeer *p2p.Peer, GetNodeIDs func() []libp2p_peer.ID, GetAccountBalan
 
 // StartService starts explorer service.
 func (s *Service) StartService() {
-	utils.GetLogInstance().Info("Starting explorer service.")
+	utils.Logger().Info().Msg("Starting explorer service.")
 	s.Init(true)
 	s.server = s.Run()
 }
 
 // StopService shutdowns explorer service.
 func (s *Service) StopService() {
-	utils.GetLogInstance().Info("Shutting down explorer service.")
+	utils.Logger().Info().Msg("Shutting down explorer service.")
 	if err := s.server.Shutdown(context.Background()); err != nil {
-		utils.GetLogInstance().Error("Error when shutting down explorer server", "error", err)
+		utils.Logger().Error().Err(err).Msg("Error when shutting down explorer server")
 	} else {
-		utils.GetLogInstance().Info("Shutting down explorer server successufully")
+		utils.Logger().Info().Msg("Shutting down explorer server successufully")
 	}
 }
 
@@ -79,7 +79,7 @@ func GetExplorerPort(nodePort string) string {
 	if port, err := strconv.Atoi(nodePort); err == nil {
 		return fmt.Sprintf("%d", port-explorerPortDifference)
 	}
-	utils.GetLogInstance().Error("error on parsing.")
+	utils.Logger().Error().Msg("error on parsing.")
 	return ""
 }
 
@@ -115,11 +115,11 @@ func (s *Service) Run() *http.Server {
 	s.router.Path("/shard").HandlerFunc(s.GetExplorerShard)
 
 	// Do serving now.
-	utils.GetLogInstance().Info("Listening on ", "port: ", GetExplorerPort(s.Port))
+	utils.Logger().Info().Str("port", GetExplorerPort(s.Port)).Msg("Listening")
 	server := &http.Server{Addr: addr, Handler: s.router}
 	go func() {
 		if err := server.ListenAndServe(); err != nil {
-			ctxerror.Warn(utils.GetLogger(), err, "server.ListenAndServe()")
+			utils.Logger().Warn().Err(err).Msg("server.ListenAndServe()")
 		}
 	}()
 	return server
@@ -141,7 +141,7 @@ func (s *Service) ReadBlocksFromDB(from, to int) []*types.Block {
 		}
 		block := new(types.Block)
 		if rlp.DecodeBytes(data, block) != nil {
-			utils.GetLogInstance().Error("Error on getting from db")
+			utils.Logger().Error().Msg("Error on getting from db")
 			os.Exit(1)
 		}
 		blocks = append(blocks, block)
@@ -160,8 +160,7 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 	}
 	defer func() {
 		if err := json.NewEncoder(w).Encode(data.Blocks); err != nil {
-			ctxerror.Warn(utils.WithCallerSkip(utils.GetLogInstance(), 1), err,
-				"cannot JSON-encode blocks")
+			utils.Logger().Warn().Err(err).Msg("cannot JSON-encode blocks")
 		}
 	}()
 
@@ -171,8 +170,7 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 	db := s.storage.GetDB()
 	fromInt, err := strconv.Atoi(from)
 	if err != nil {
-		ctxerror.Warn(utils.GetLogger(), err, "invalid from parameter",
-			"from", from)
+		utils.Logger().Warn().Err(err).Str("from", from).Msg("invalid from parameter")
 		return
 	}
 	var toInt int
@@ -188,7 +186,7 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 		toInt, err = strconv.Atoi(to)
 	}
 	if err != nil {
-		ctxerror.Warn(utils.GetLogger(), err, "invalid to parameter", "to", to)
+		utils.Logger().Warn().Err(err).Str("to", to).Msg("invalid to parameter")
 		return
 	}
 
@@ -240,8 +238,7 @@ func (s *Service) GetExplorerTransaction(w http.ResponseWriter, r *http.Request)
 	data := &Data{}
 	defer func() {
 		if err := json.NewEncoder(w).Encode(data.TX); err != nil {
-			ctxerror.Warn(utils.WithCallerSkip(utils.GetLogInstance(), 1), err,
-				"cannot JSON-encode TX")
+			utils.Logger().Warn().Err(err).Msg("cannot JSON-encode TX")
 		}
 	}()
 	if id == "" {
@@ -250,12 +247,12 @@ func (s *Service) GetExplorerTransaction(w http.ResponseWriter, r *http.Request)
 	db := s.storage.GetDB()
 	bytes, err := db.Get([]byte(GetTXKey(id)))
 	if err != nil {
-		ctxerror.Warn(utils.GetLogger(), err, "cannot read TX", "id", id)
+		utils.Logger().Warn().Err(err).Str("id", id).Msg("cannot read TX")
 		return
 	}
 	tx := new(Transaction)
 	if rlp.DecodeBytes(bytes, tx) != nil {
-		utils.GetLogger().Warn("cannot convert data from DB", "id", id)
+		utils.Logger().Warn().Str("id", id).Msg("cannot convert data from DB")
 		return
 	}
 	data.TX = *tx
@@ -267,7 +264,7 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 	id := r.FormValue("id")
 	key := GetAddressKey(id)
 
-	utils.GetLogInstance().Info("Querying address", "address", id)
+	utils.Logger().Info().Str("address", id).Msg("Querying address")
 	data := &Data{}
 	defer func() {
 		if err := json.NewEncoder(w).Encode(data.Address); err != nil {
@@ -292,11 +289,11 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 	db := s.storage.GetDB()
 	bytes, err := db.Get([]byte(key))
 	if err != nil {
-		ctxerror.Warn(utils.GetLogger(), err, "cannot read address from db", "id", id)
+		utils.Logger().Warn().Err(err).Str("id", id).Msg("cannot read address from db")
 		return
 	}
 	if err = rlp.DecodeBytes(bytes, &data.Address); err != nil {
-		utils.GetLogger().Warn("cannot convert data from DB", "id", id)
+		utils.Logger().Warn().Str("id", id).Msg("cannot convert data from DB")
 		return
 	}
 }
@@ -305,7 +302,7 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 func (s *Service) GetExplorerNodeCount(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(len(s.GetNodeIDs())); err != nil {
-		ctxerror.Warn(utils.GetLogger(), err, "cannot JSON-encode node count")
+		utils.Logger().Warn().Msg("cannot JSON-encode node count")
 	}
 }
 
@@ -319,7 +316,7 @@ func (s *Service) GetExplorerShard(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	if err := json.NewEncoder(w).Encode(Shard{Nodes: nodes}); err != nil {
-		ctxerror.Warn(utils.GetLogger(), err, "cannot JSON-encode shard info")
+		utils.Logger().Warn().Msg("cannot JSON-encode shard info")
 	}
 }
 

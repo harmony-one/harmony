@@ -46,14 +46,14 @@ type Transaction struct {
 }
 
 type txdata struct {
-	AccountNonce uint64          `json:"nonce"    gencodec:"required"`
-	Price        *big.Int        `json:"gasPrice" gencodec:"required"`
-	GasLimit     uint64          `json:"gas"      gencodec:"required"`
-	ShardID      uint32          `json:"shardID"  gencodec:"required"`
-	ToShardID    uint32          `json:"toShardID" rlp:"nil"` // for cross-shard tx's destination shard ID; nil means intra-shard tx
-	Recipient    *common.Address `json:"to"       rlp:"nil"`  // nil means contract creation
-	Amount       *big.Int        `json:"value"    gencodec:"required"`
-	Payload      []byte          `json:"input"    gencodec:"required"`
+	AccountNonce uint64          `json:"nonce"      gencodec:"required"`
+	Price        *big.Int        `json:"gasPrice"   gencodec:"required"`
+	GasLimit     uint64          `json:"gas"        gencodec:"required"`
+	ShardID      uint32          `json:"shardID"    gencodec:"required"`
+	ToShardID    uint32          `json:"toShardID"  gencodec:"required"`
+	Recipient    *common.Address `json:"to"         rlp:"nil"` // nil means contract creation
+	Amount       *big.Int        `json:"value"      gencodec:"required"`
+	Payload      []byte          `json:"input"      gencodec:"required"`
 
 	// Signature values
 	V *big.Int `json:"v" gencodec:"required"`

@@ -51,10 +51,7 @@ func main() {
 	// Logging setup
 	utils.SetLogContext(*port, *ip)
 	utils.SetLogVerbosity(log.Lvl(*verbosity))
-	filename := fmt.Sprintf("%v/bootnode-%v-%v.log", *logFolder, *ip, *port)
-	if err := utils.AddLogFile(filename, *logMaxSize); err != nil {
-		panic(err)
-	}
+	utils.AddLogFile(fmt.Sprintf("%v/bootnode-%v-%v.log", *logFolder, *ip, *port), *logMaxSize)
 
 	privKey, _, err := utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
@@ -68,7 +65,7 @@ func main() {
 		panic(err)
 	}
 
-	log.Info("bootnode", "BN_MA", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, host.GetID().Pretty()))
+	fmt.Printf("bootnode BN_MA=%s", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, host.GetID().Pretty()))
 
 	if *logConn {
 		host.GetP2PHost().Network().Notify(utils.NewConnLogger(utils.GetLogInstance()))

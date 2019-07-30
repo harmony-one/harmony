@@ -104,8 +104,7 @@ func SerializeBlockchainSyncMessage(blockchainSyncMessage *BlockchainSyncMessage
 	encoder := gob.NewEncoder(&result)
 	err := encoder.Encode(blockchainSyncMessage)
 	if err != nil {
-		utils.GetLogger().Crit("Error", err)
-		panic(err)
+		utils.Logger().Error().Err(err).Msg("Failed to serialize blockchain sync message")
 	}
 	return result.Bytes()
 }
@@ -116,7 +115,7 @@ func DeserializeBlockchainSyncMessage(d []byte) (*BlockchainSyncMessage, error) 
 	decoder := gob.NewDecoder(bytes.NewReader(d))
 	err := decoder.Decode(&blockchainSyncMessage)
 	if err != nil {
-		utils.GetLogger().Crit("Error", err)
+		utils.Logger().Error().Err(err).Msg("Failed to deserialize blockchain sync message")
 	}
 	return &blockchainSyncMessage, err
 }
@@ -166,7 +165,7 @@ func ConstructEpochShardStateMessage(epochShardState types.EpochShardState) []by
 	encoder := gob.NewEncoder(byteBuffer)
 	err := encoder.Encode(epochShardState)
 	if err != nil {
-		utils.GetLogInstance().Error("[ConstructEpochShardStateMessage] Encode", "error", err)
+		utils.Logger().Error().Err(err).Msg("[ConstructEpochShardStateMessage] Encode")
 		return nil
 	}
 	return byteBuffer.Bytes()
@@ -181,7 +180,7 @@ func DeserializeEpochShardStateFromMessage(payload []byte) (*types.EpochShardSta
 	err := decoder.Decode(epochShardState)
 
 	if err != nil {
-		utils.GetLogInstance().Error("[GetEpochShardStateFromMessage] Decode", "error", err)
+		utils.Logger().Error().Err(err).Msg("[GetEpochShardStateFromMessage] Decode")
 		return nil, fmt.Errorf("Decode epoch shard state Error")
 	}
 

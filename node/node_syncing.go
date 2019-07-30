@@ -13,6 +13,7 @@ import (
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
 	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
+	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -27,7 +28,7 @@ const (
 	lastMileThreshold = 4
 	inSyncThreshold   = 1  // unit in number of block
 	SyncFrequency     = 10 // unit in second
-	MinConnectedPeers = 5  // minimum number of peers connected to in node syncing
+	MinConnectedPeers = 10 // minimum number of peers connected to in node syncing
 )
 
 // getNeighborPeers is a helper function to return list of peers
@@ -136,11 +137,11 @@ SyncingLoop:
 				node.stateMutex.Lock()
 				node.State = NodeNotInSync
 				node.stateMutex.Unlock()
-				if willJoinConsensus {
+				if willJoinConsensus && node.Consensus.Mode() != consensus.Listening {
 					node.Consensus.BlocksNotSynchronized()
 				}
 				node.stateSync.SyncLoop(bc, worker, willJoinConsensus, false)
-				if willJoinConsensus {
+				if willJoinConsensus && node.Consensus.Mode() != consensus.Listening {
 					node.stateMutex.Lock()
 					node.State = NodeReadyForConsensus
 					node.stateMutex.Unlock()
@@ -150,7 +151,7 @@ SyncingLoop:
 			node.stateMutex.Lock()
 			node.State = NodeReadyForConsensus
 			node.stateMutex.Unlock()
-			if willJoinConsensus {
+			if willJoinConsensus && node.Consensus.Mode() != consensus.Listening {
 				node.Consensus.WaitForSyncing()
 			}
 		}

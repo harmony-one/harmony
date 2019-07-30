@@ -78,7 +78,7 @@ func NewBlock(block *types.Block, height int) *Block {
 		ID:         block.Hash().Hex(),
 		TXCount:    strconv.Itoa(block.Transactions().Len()),
 		Timestamp:  strconv.Itoa(int(block.Time().Int64() * 1000)),
-		MerkleRoot: block.Hash().Hex(),
+		MerkleRoot: block.Root().Hex(),
 		Bytes:      strconv.Itoa(int(block.Size())),
 		Signers:    []string{},
 		ExtraData:  string(block.Extra()),
@@ -92,7 +92,7 @@ func GetTransaction(tx *types.Transaction, accountBlock *types.Block) *Transacti
 	}
 	msg, err := tx.AsMessage(types.HomesteadSigner{})
 	if err != nil {
-		utils.GetLogger().Error("Error when parsing tx into message", "err", err)
+		utils.Logger().Error().Err(err).Msg("Error when parsing tx into message")
 	}
 	return &Transaction{
 		ID:        tx.Hash().Hex(),

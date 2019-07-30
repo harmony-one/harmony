@@ -25,7 +25,7 @@ func New(blockChannel chan *types.Block, consensus *consensus.Consensus, startCh
 
 // StartService starts consensus service.
 func (s *Service) StartService() {
-	utils.GetLogInstance().Info("[consensus/service] Starting consensus service.")
+	utils.Logger().Info().Msg("[consensus/service] Starting consensus service.")
 	s.stopChan = make(chan struct{})
 	s.stoppedChan = make(chan struct{})
 	s.consensus.Start(s.blockChannel, s.stopChan, s.stoppedChan, s.startChan)
@@ -34,10 +34,10 @@ func (s *Service) StartService() {
 
 // StopService stops consensus service.
 func (s *Service) StopService() {
-	utils.GetLogInstance().Info("Stopping consensus service.")
+	utils.Logger().Info().Msg("Stopping consensus service.")
 	s.stopChan <- struct{}{}
 	<-s.stoppedChan
-	utils.GetLogInstance().Info("Consensus service stopped.")
+	utils.Logger().Info().Msg("Consensus service stopped.")
 }
 
 // NotifyService notify service

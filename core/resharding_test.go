@@ -48,7 +48,10 @@ func fakeGetInitShardState(numberOfShards, numOfNodes int) types.ShardState {
 			nid := strconv.Itoa(int(rand.Int63()))
 			blsPubKey := [48]byte{}
 			copy(blsPubKey1[:], []byte(nid))
-			com.NodeList = append(com.NodeList, types.NodeID{common.BytesToAddress([]byte(nid)), blsPubKey})
+			com.NodeList = append(com.NodeList, types.NodeID{
+				EcdsaAddress: common.BytesToAddress([]byte(nid)),
+				BlsPublicKey: blsPubKey,
+			})
 		}
 		shardState = append(shardState, com)
 	}
@@ -63,7 +66,10 @@ func fakeNewNodeList(seed int64) []types.NodeID {
 		nid := strconv.Itoa(int(rand.Int63()))
 		blsPubKey := [48]byte{}
 		copy(blsPubKey1[:], []byte(nid))
-		nodeList = append(nodeList, types.NodeID{common.BytesToAddress([]byte(nid)), blsPubKey})
+		nodeList = append(nodeList, types.NodeID{
+			EcdsaAddress: common.BytesToAddress([]byte(nid)),
+			BlsPublicKey: blsPubKey,
+		})
 	}
 	return nodeList
 }
@@ -75,16 +81,16 @@ func TestFakeNewNodeList(t *testing.T) {
 
 func TestShuffle(t *testing.T) {
 	nodeList := []types.NodeID{
-		{common.Address{0x12}, blsPubKey1},
-		{common.Address{0x22}, blsPubKey2},
-		{common.Address{0x32}, blsPubKey3},
-		{common.Address{0x42}, blsPubKey4},
-		{common.Address{0x52}, blsPubKey5},
-		{common.Address{0x62}, blsPubKey6},
-		{common.Address{0x72}, blsPubKey7},
-		{common.Address{0x82}, blsPubKey8},
-		{common.Address{0x92}, blsPubKey9},
-		{common.Address{0x02}, blsPubKey10},
+		{EcdsaAddress: common.Address{0x12}, BlsPublicKey: blsPubKey1},
+		{EcdsaAddress: common.Address{0x22}, BlsPublicKey: blsPubKey2},
+		{EcdsaAddress: common.Address{0x32}, BlsPublicKey: blsPubKey3},
+		{EcdsaAddress: common.Address{0x42}, BlsPublicKey: blsPubKey4},
+		{EcdsaAddress: common.Address{0x52}, BlsPublicKey: blsPubKey5},
+		{EcdsaAddress: common.Address{0x62}, BlsPublicKey: blsPubKey6},
+		{EcdsaAddress: common.Address{0x72}, BlsPublicKey: blsPubKey7},
+		{EcdsaAddress: common.Address{0x82}, BlsPublicKey: blsPubKey8},
+		{EcdsaAddress: common.Address{0x92}, BlsPublicKey: blsPubKey9},
+		{EcdsaAddress: common.Address{0x02}, BlsPublicKey: blsPubKey10},
 	}
 
 	cpList := []types.NodeID{}
@@ -115,12 +121,12 @@ func TestUpdateShardState(t *testing.T) {
 	shardState := fakeGetInitShardState(6, 10)
 	ss := &ShardingState{epoch: 1, rnd: 42, shardState: shardState, numShards: len(shardState)}
 	newNodeList := []types.NodeID{
-		{common.Address{0x12}, blsPubKey1},
-		{common.Address{0x22}, blsPubKey2},
-		{common.Address{0x32}, blsPubKey3},
-		{common.Address{0x42}, blsPubKey4},
-		{common.Address{0x52}, blsPubKey5},
-		{common.Address{0x62}, blsPubKey6},
+		{EcdsaAddress: common.Address{0x12}, BlsPublicKey: blsPubKey1},
+		{EcdsaAddress: common.Address{0x22}, BlsPublicKey: blsPubKey2},
+		{EcdsaAddress: common.Address{0x32}, BlsPublicKey: blsPubKey3},
+		{EcdsaAddress: common.Address{0x42}, BlsPublicKey: blsPubKey4},
+		{EcdsaAddress: common.Address{0x52}, BlsPublicKey: blsPubKey5},
+		{EcdsaAddress: common.Address{0x62}, BlsPublicKey: blsPubKey6},
 	}
 
 	ss.Reshard(newNodeList, 0.2)
@@ -131,9 +137,9 @@ func TestAssignNewNodes(t *testing.T) {
 	shardState := fakeGetInitShardState(2, 2)
 	ss := &ShardingState{epoch: 1, rnd: 42, shardState: shardState, numShards: len(shardState)}
 	newNodes := []types.NodeID{
-		{common.Address{0x12}, blsPubKey1},
-		{common.Address{0x22}, blsPubKey2},
-		{common.Address{0x32}, blsPubKey3},
+		{EcdsaAddress: common.Address{0x12}, BlsPublicKey: blsPubKey1},
+		{EcdsaAddress: common.Address{0x22}, BlsPublicKey: blsPubKey2},
+		{EcdsaAddress: common.Address{0x32}, BlsPublicKey: blsPubKey3},
 	}
 
 	ss.assignNewNodes(newNodes)

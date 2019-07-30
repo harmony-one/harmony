@@ -83,7 +83,7 @@ func (journal *txJournal) load(add func([]*types.Transaction) []error) error {
 	loadBatch := func(txs types.Transactions) {
 		for _, err := range add(txs) {
 			if err != nil {
-				utils.GetLogger().Debug("Failed to add journaled transaction", "err", err)
+				utils.Logger().Error().Err(err).Msg("Failed to add journaled transaction")
 				dropped++
 			}
 		}
@@ -112,7 +112,10 @@ func (journal *txJournal) load(add func([]*types.Transaction) []error) error {
 			batch = batch[:0]
 		}
 	}
-	utils.GetLogger().Info("Loaded local transaction journal", "transactions", total, "dropped", dropped)
+	utils.Logger().Info().
+		Int("transactions", total).
+		Int("dropped", dropped).
+		Msg("Loaded local transaction journal")
 
 	return failure
 }
@@ -161,7 +164,10 @@ func (journal *txJournal) rotate(all map[common.Address]types.Transactions) erro
 		return err
 	}
 	journal.writer = sink
-	utils.GetLogger().Info("Regenerated local transaction journal", "transactions", journaled, "accounts", len(all))
+	utils.Logger().Info().
+		Int("transactions", journaled).
+		Int("accounts", len(all)).
+		Msg("Regenerated local transaction journal")
 
 	return nil
 }

@@ -29,8 +29,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/rs/zerolog"
 	"golang.org/x/crypto/sha3"
 
 	"github.com/harmony-one/harmony/internal/utils"
@@ -69,7 +69,7 @@ func (n *BlockNonce) UnmarshalText(input []byte) error {
 	return hexutil.UnmarshalFixedText("BlockNonce", input, n[:])
 }
 
-// Header represents a block header in the Ethereum blockchain.
+// Header represents a block header in the Harmony blockchain.
 type Header struct {
 	ParentHash  common.Hash    `json:"parentHash"       gencodec:"required"`
 	Coinbase    common.Address `json:"miner"            gencodec:"required"`
@@ -118,13 +118,15 @@ func (h *Header) Size() common.StorageSize {
 }
 
 // Logger returns a sub-logger with block contexts added.
-func (h *Header) Logger(logger log.Logger) log.Logger {
-	return logger.New(
-		"blockHash", h.Hash(),
-		"blockShard", h.ShardID,
-		"blockEpoch", h.Epoch,
-		"blockNumber", h.Number,
-	)
+func (h *Header) Logger(logger *zerolog.Logger) *zerolog.Logger {
+	nlogger := logger.
+		With().
+		Str("blockHash", h.Hash().Hex()).
+		Uint32("blockShard", h.ShardID).
+		Str("blockEpoch", h.Epoch.String()).
+		Str("blockNumber", h.Number.String()).
+		Logger()
+	return &nlogger
 }
 
 // GetShardState returns the deserialized shard state object.
@@ -175,9 +177,10 @@ type Block struct {
 // SetLastCommitSig sets the last block's commit group signature.
 func (b *Block) SetLastCommitSig(sig []byte, signers []byte) {
 	if len(sig) != len(b.header.LastCommitSignature) {
-		utils.GetLogInstance().Warn("SetLastCommitSig: sig size mismatch",
-			"srcLen", len(sig),
-			"dstLen", len(b.header.LastCommitSignature))
+		utils.Logger().Warn().
+			Int("srcLen", len(sig)).
+			Int("dstLen", len(b.header.LastCommitSignature)).
+			Msg("SetLastCommitSig: sig size mismatch")
 	}
 	copy(b.header.LastCommitSignature[:], sig[:])
 	b.header.LastCommitBitmap = append(signers[:0:0], signers...)
@@ -436,7 +439,7 @@ func (b *Block) Hash() common.Hash {
 	//if hash := b.hash.Load(); hash != nil {
 	//	return hash.(common.Hash)
 	//}
-	//b.Logger(utils.GetLogger()).Debug("finalizing and caching block hash")
+	// b.Logger(utils.Logger()).Debug().Msg("finalizing and caching block hash")
 	v := b.header.Hash()
 	b.hash.Store(v)
 	return v
@@ -507,6 +510,6 @@ func (b *Block) AddShardState(shardState ShardState) error {
 }
 
 // Logger returns a sub-logger with block contexts added.
-func (b *Block) Logger(logger log.Logger) log.Logger {
+func (b *Block) Logger(logger *zerolog.Logger) *zerolog.Logger {
 	return b.header.Logger(logger)
 }

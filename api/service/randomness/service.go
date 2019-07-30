@@ -29,10 +29,10 @@ func (s *Service) StartService() {
 
 // StopService stops randomness generation service.
 func (s *Service) StopService() {
-	utils.GetLogInstance().Info("Stopping random generation service.")
+	utils.Logger().Info().Msg("Stopping random generation service")
 	s.stopChan <- struct{}{}
 	<-s.stoppedChan
-	utils.GetLogInstance().Info("Random generation stopped.")
+	utils.Logger().Info().Msg("Random generation stopped")
 }
 
 // NotifyService notify service

@@ -6,7 +6,6 @@ import (
 	"net"
 
 	pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 
 	"google.golang.org/grpc"
@@ -44,7 +43,7 @@ func (s *Server) Start(ip, port string) (*grpc.Server, error) {
 	pb.RegisterDownloaderServer(grpcServer, s)
 	go func() {
 		if err := grpcServer.Serve(lis); err != nil {
-			ctxerror.Warn(utils.GetLogger(), err, "[SYNC] (*grpc.Server).Serve failed")
+			utils.Logger().Warn().Err(err).Msg("[SYNC] (*grpc.Server).Serve failed")
 		}
 	}()
 

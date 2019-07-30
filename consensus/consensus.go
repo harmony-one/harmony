@@ -11,7 +11,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
 
 	"github.com/harmony-one/harmony/common/denominations"
@@ -21,7 +20,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	common2 "github.com/harmony-one/harmony/internal/common"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/internal/memprofiling"
@@ -98,6 +96,9 @@ type Consensus struct {
 	SelfAddress common.Address
 	// the publickey of leader
 	LeaderPubKey *bls.PublicKey
+
+	// number of publickeys of previous epoch
+	numPrevPubKeys int
 
 	viewID uint64
 
@@ -205,6 +206,11 @@ func (consensus *Consensus) Quorum() int {
 	return len(consensus.PublicKeys)*2/3 + 1
 }
 
+// PreviousQuorum returns the quorum size of previous epoch
+func (consensus *Consensus) PreviousQuorum() int {
+	return consensus.numPrevPubKeys*2/3 + 1
+}
+
 // RewardThreshold returns the threshold to stop accepting commit messages
 // when leader receives enough signatures for block reward
 func (consensus *Consensus) RewardThreshold() int {
@@ -239,13 +245,6 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 	// pbft timeout
 	consensus.consensusTimeout = createTimeout()
 
-	selfPeer := host.GetSelfPeer()
-	if leader.Port == selfPeer.Port && leader.IP == selfPeer.IP {
-		nodeconfig.GetDefaultConfig().SetIsLeader(true)
-	} else {
-		nodeconfig.GetDefaultConfig().SetIsLeader(false)
-	}
-
 	consensus.prepareSigs = map[string]*bls.Sign{}
 	consensus.commitSigs = map[string]*bls.Sign{}
 
@@ -256,9 +255,9 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 	if blsPriKey != nil {
 		consensus.priKey = blsPriKey
 		consensus.PubKey = blsPriKey.GetPublicKey()
-		utils.GetLogInstance().Info("my pubkey is", "pubkey", consensus.PubKey.SerializeToHexStr())
+		utils.Logger().Info().Str("publicKey", consensus.PubKey.SerializeToHexStr()).Msg("My Public Key")
 	} else {
-		utils.GetLogInstance().Error("the bls key is nil")
+		utils.Logger().Error().Msg("the bls key is nil")
 		return nil, fmt.Errorf("nil bls key, aborting")
 	}
 
@@ -286,8 +285,6 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 func accumulateRewards(
 	bc consensus_engine.ChainReader, state *state.DB, header *types.Header,
 ) error {
-	logger := header.Logger(utils.GetLogInstance())
-	getLogger := func() log.Logger { return utils.WithCallerSkip(logger, 1) }
 	blockNum := header.Number.Uint64()
 	if blockNum == 0 {
 		// Epoch block has no parent to reward.
@@ -359,10 +356,11 @@ func accumulateRewards(
 		totalAmount = new(big.Int).Add(totalAmount, diff)
 		last = cur
 	}
-	getLogger().Debug("【Block Reward] Successfully paid out block reward",
-		"NumAccounts", numAccounts,
-		"TotalAmount", totalAmount,
-		"Signers", signers)
+	header.Logger(utils.Logger()).Debug().
+		Str("NumAccounts", numAccounts.String()).
+		Str("TotalAmount", totalAmount.String()).
+		Strs("Signers", signers).
+		Msg("[Block Reward] Successfully paid out block reward")
 	return nil
 }
 
@@ -382,9 +380,7 @@ func (f *GenesisStakeInfoFinder) FindStakeInfoByNodeKey(
 ) []*structs.StakeInfo {
 	var pk types.BlsPublicKey
 	if err := pk.FromLibBLSPublicKey(key); err != nil {
-		ctxerror.Log15(utils.GetLogInstance().Warn, ctxerror.New(
-			"cannot convert BLS public key",
-		).WithCause(err))
+		utils.Logger().Warn().Err(err).Msg("cannot convert BLS public key")
 		return nil
 	}
 	l, _ := f.byNodeKey[pk]
