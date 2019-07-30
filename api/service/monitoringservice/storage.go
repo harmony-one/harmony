@@ -2,44 +2,40 @@ package monitoringservice
 
 import (
 	"fmt"
-	"strconv"
 	"os"
+	"strconv"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/rlp"
-
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // Constants for storage.
 const (
-	CurrentConnectionsNumberKey = "cnk"
 	ConnectionsNumberPrefix = "cnp"
+	ConsensusFramePrefix = "cfp"
+	CurrentConnectionsNumberKey = "cnk"
 	BalancePrefix = "bp"
-	BlocksSuccessPrefix = "bsp"
 	BlocksProcessedPrefix = "bpp"
-	TransactionsSuccessPrefix = "tsp"
-	TrnascationsProcessedPrefix = "tpp"
+	BlocksSuccessPrefix = "bsp"
 	NodeCPUPrefix = "ncp"
 	NodeTrafficPrefix = "ntp"
 	LeaderTimePrefix = "ltp"
-	ConsensusFramePrefix = "cfp"
+	TranscationsProcessedPrefix = "tpp"
+	TransactionsSuccessPrefix = "tsp"
 )
-
 
 // GetCurrentConnectionsNumberKey ...
 func GetCurrentConnectionsNumberKey(currentTime int) string {
 	return fmt.Sprintf("%s_%d", CurrentConnectionsNumberKey, currentTime)
 }
 
-
 // GetConnectionsNumberKey ...
 func GetConnectionsNumberKey(moment int) string {
 	return fmt.Sprintf("%s_%d", ConnectionsNumberPrefix, moment)
 }
-
 
 // storage instance
 var storage *MetricsStorage

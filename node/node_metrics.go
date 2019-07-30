@@ -2,6 +2,7 @@ package node
 
 import (
 	"time"
+	
     metrics	"github.com/harmony-one/harmony/api/service/monitoringservice"
 	"github.com/harmony-one/harmony/internal/utils"
 )
@@ -39,9 +40,7 @@ func (node *Node) UpdateBlockHeightForMetrics() {
 	}
 }
 
-
-/*
-// AddNewBlockForExplorer add new block for explorer.
+/*//AddNewBlockForExplorer add new block for explorer.
 func (node *Node) UpdateNodeBalance() {
 	utils.GetLogInstance().Info("[Monitoring Service] Update block reward for metrics")
 	// Search for the next block in PbftLog and commit the block into blockchain for explorer node.

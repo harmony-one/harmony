@@ -3,31 +3,29 @@ package monitoringservice
 import (
 	"fmt"
 	"net"
-	"strconv"
 	"net/http"
+	"strconv"
 	
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/push"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/gorilla/mux"
-	"google.golang.org/grpc"
 	"github.com/ethereum/go-ethereum/rpc"
-	libp2p_peer "github.com/libp2p/go-libp2p-peer"
-
+	"github.com/gorilla/mux"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+	libp2p_peer "github.com/libp2p/go-libp2p-peer"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/push"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"google.golang.org/grpc"
 )
 
 // Constants for monitoring service.
 const (
+	ConnectionsNumberPush int = 0
+	BlockHeightPush int = 1
 	monitoringServicePortDifference = 900
 	monitoringServiceHTTPPortDifference = 2000
 	pushgatewayAddr = "http://127.0.0.1:26000"
-	ConnectionsNumberPush int = 0
-	BlockHeightPush int = 1
 )
-
 
 // Service is the struct for monitoring service.
 type Service struct {
@@ -56,7 +54,6 @@ var (
 		Help: "Get current connections number for a node.",
 	})
 )
-
 
 // ConnectionsLog struct for connections stats for prometheus
 type ConnectionsLog struct {
@@ -148,7 +145,6 @@ func UpdateBlockHeight(blockHeight uint64, blockTime int64) {
 	metricsPush <- ConnectionsNumberPush
 }
 
-
 // UpdateConnectionsNumber updates connections number.
 func UpdateConnectionsNumber(connectionsNumber int) {
 	connectionsNumberGauge.Set(float64(connectionsNumber))
@@ -166,6 +162,21 @@ func (s *Service) PushMetrics() {
 		}
 	}
 	return
+}
+
+// NotifyService notify service
+func (s *Service) NotifyService(params map[string]interface{}) {
+	return
+}
+
+// SetMessageChan sets up message channel to service.
+func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {
+	s.messageChan = messageChan
+}
+
+// APIs for the services.
+func (s *Service) APIs() []rpc.API {
+	return nil
 }
 
 // Run is to run http serving monitoring service.
@@ -190,9 +201,6 @@ func (s *Service) RunHTTP() *http.Server {
 	return httpServer
 }*/
 
-
-
-
 // Run is to run serving monitoring service.
 /*func (s *Service) Run(remove bool) (*grpc.Server, error) {
 	s.storage = utils.GetMetricsStorageInstance(s.IP, s.Port, remove)
@@ -212,8 +220,6 @@ func (s *Service) RunHTTP() *http.Server {
 	}()
 	return s.server, nil
 }
-
-
 
 // Process processes the Request and returns Response
 func (s *Service) Process(ctx context.Context, request *Request) (*Response, error) {
@@ -240,7 +246,6 @@ func (s *Service) Process(ctx context.Context, request *Request) (*Response, err
 	}
 	return ret, nil
 }*/
-
 
 // For http/rpc
 // GetConnectionsLog serves end-point /ConnectionsLog
@@ -275,19 +280,3 @@ func (s *Service) Process(ctx context.Context, request *Request) (*Response, err
 
 	return
 }*/
-
-
-// NotifyService notify service
-func (s *Service) NotifyService(params map[string]interface{}) {
-	return
-}
-
-// SetMessageChan sets up message channel to service.
-func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {
-	s.messageChan = messageChan
-}
-
-// APIs for the services.
-func (s *Service) APIs() []rpc.API {
-	return nil
-}
