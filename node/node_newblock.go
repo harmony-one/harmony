@@ -15,8 +15,7 @@ import (
 
 // Constants of lower bound limit of a new block.
 const (
-	ConsensusTimeOut = 20
-	PeriodicBlock    = 200 * time.Millisecond
+	PeriodicBlock = 200 * time.Millisecond
 )
 
 // WaitForConsensusReadyv2 listen for the readiness signal from consensus and generate new block for consensus.
@@ -30,7 +29,6 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 		utils.GetLogInstance().Debug("Waiting for Consensus ready")
 		time.Sleep(30 * time.Second) // Wait for other nodes to be ready (test-only)
 
-		timeoutCount := 0
 		var newBlock *types.Block
 
 		// Set up the very first deadline.
@@ -41,16 +39,6 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 			case <-stopChan:
 				utils.GetLogInstance().Debug("Consensus new block proposal: STOPPED!")
 				return
-			case <-time.After(ConsensusTimeOut * time.Second):
-				if node.Consensus.PubKey.IsEqual(node.Consensus.LeaderPubKey) {
-					utils.GetLogInstance().Debug("Leader consensus timeout, retry!", "count", timeoutCount)
-					//node.Consensus.ResetState()
-					timeoutCount++
-					if newBlock != nil {
-						// Send the new block to Consensus so it can be confirmed.
-						node.BlockChannel <- newBlock
-					}
-				}
 			case <-readySignal:
 				for {
 					time.Sleep(PeriodicBlock)
