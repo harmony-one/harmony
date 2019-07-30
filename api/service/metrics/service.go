@@ -20,11 +20,11 @@ import (
 
 // Constants for metrics service.
 const (
-	ConnectionsNumberPush               int = 0
-	BlockHeightPush                     int = 1
+	ConnectionsNumberPush            int = 0
+	BlockHeightPush                  int = 1
 	metricsServicePortDifference         = 900
 	metricsServiceHTTPPortDifference     = 2000
-	pushgatewayAddr                         = "http://127.0.0.1:26000"
+	pushgatewayAddr                      = "http://127.0.0.1:26000"
 )
 
 // Service is the struct for metrics service.
@@ -33,7 +33,7 @@ type Service struct {
 	IP          string
 	Port        string
 	GetNodeIDs  func() []libp2p_peer.ID
-	storage     *MetricsStorage
+	storage     *Storage
 	server      *grpc.Server
 	httpServer  *http.Server
 	pusher      *push.Pusher
@@ -42,7 +42,7 @@ type Service struct {
 
 // init vars for prometheus
 var (
-	metricsPush = make(chan int)
+	metricsPush      = make(chan int)
 	blockHeightGauge = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "block_height",
 		Help: "Get current block height.",
