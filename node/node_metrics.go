@@ -39,17 +39,9 @@ func (node *Node) UpdateBlockHeightForMetrics() {
 	}
 }
 
-// Collects metrics.
-func (node *Node) CollectMetrics() {
-	// utils.Logger().Info().Msg("Init metrics db.")
-	//node.metricsStorage = utils.GetMetricsStorageInstance(node.ClientPeer.IP, node.ClientPeer.Port, true)
-	// flush peers number each second
-}
 
-
-
-// AddNewBlockForExplorer add new block for explorer.
 /*
+// AddNewBlockForExplorer add new block for explorer.
 func (node *Node) UpdateNodeBalance() {
 	utils.GetLogInstance().Info("[Monitoring Service] Update block reward for metrics")
 	// Search for the next block in PbftLog and commit the block into blockchain for explorer node.

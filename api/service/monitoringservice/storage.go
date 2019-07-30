@@ -45,7 +45,7 @@ func GetConnectionsNumberKey(moment int) string {
 var storage *MetricsStorage
 var onceMetrics sync.Once
 
-// Storage dump the block info into leveldb.
+// MetricsStorage storage dump the block info into leveldb.
 type MetricsStorage struct {
 	db *ethdb.LDBDatabase
 }

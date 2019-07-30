@@ -35,7 +35,7 @@ type Service struct {
 	IP                string
 	Port              string
 	GetNodeIDs        func() []libp2p_peer.ID
-	storage           *utils.MetricsStorage
+	storage           *MetricsStorage
 	server            *grpc.Server
 	httpServer        *http.Server	
 	pusher 			  *push.Pusher
