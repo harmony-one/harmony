@@ -664,6 +664,7 @@ func (consensus *Consensus) updateConsensusInformation() {
 			Str("leaderPubKey", leaderPubKey.SerializeToHexStr()).
 			Msg("[SYNC] Most Recent LeaderPubKey Updated Based on BlockChain")
 		consensus.LeaderPubKey = leaderPubKey
+		consensus.mode.SetMode(Normal)
 	}
 }
 

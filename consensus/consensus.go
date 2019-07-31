@@ -142,6 +142,8 @@ type Consensus struct {
 
 	// The p2p host used to send/receive p2p messages
 	host p2p.Host
+	// MessageSender takes are of sending consensus message and the corresponding retry logic.
+	msgSender *MessageSender
 
 	// Staking information finder
 	stakeInfoFinder StakeInfoFinder
@@ -233,6 +235,7 @@ type StakeInfoFinder interface {
 func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKey) (*Consensus, error) {
 	consensus := Consensus{}
 	consensus.host = host
+	consensus.msgSender = NewMessageSender(host)
 	consensus.blockNumLowChan = make(chan struct{})
 
 	// pbft related

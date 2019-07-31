@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	mainnetEpochBlock1 = 327680 // 20 * 2^14
+	mainnetEpochBlock1 = 344064 // 21 * 2^14
 	blocksPerShard     = 16384  // 2^14
 	mainnetV1Epoch     = 1
 )
@@ -20,7 +20,7 @@ type mainnetSchedule struct{}
 func (mainnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
 	case epoch.Cmp(big.NewInt(mainnetV1Epoch)) >= 0:
-		// first resharding epoch around 07/29/2019 7:30am PDT
+		// first resharding epoch around 07/30/2019 10:30pm PDT
 		return mainnetV1
 	default: // genesis
 		return mainnetV0
@@ -55,7 +55,7 @@ func (ms mainnetSchedule) IsLastBlock(blockNum uint64) bool {
 
 var mainnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(mainnetV1Epoch)}
 var mainnetV0 = MustNewInstance(4, 150, 112, genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, mainnetReshardingEpoch)
-var mainnetV1 = MustNewInstance(4, 151, 112, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1, mainnetReshardingEpoch)
+var mainnetV1 = MustNewInstance(4, 152, 112, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1, mainnetReshardingEpoch)
 
 //var mainnetV2 = MustNewInstance(8, 200, 100)
 //var mainnet6400 = MustNewInstance(16, 400, 50)

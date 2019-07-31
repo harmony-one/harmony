@@ -28,7 +28,7 @@ const (
 	lastMileThreshold = 4
 	inSyncThreshold   = 1  // unit in number of block
 	SyncFrequency     = 10 // unit in second
-	MinConnectedPeers = 5  // minimum number of peers connected to in node syncing
+	MinConnectedPeers = 10 // minimum number of peers connected to in node syncing
 )
 
 // getNeighborPeers is a helper function to return list of peers
