@@ -119,7 +119,6 @@ func setUpTXGen() *node.Node {
 	}
 	txGen.NodeConfig.SetRole(nodeconfig.ClientNode)
 	if shardID == 0 {
-		txGen.NodeConfig.SetIsBeacon(true)
 		txGen.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
 	} else {
 		txGen.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(shardID)))

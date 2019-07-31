@@ -16,11 +16,11 @@ const (
 	localnetV1Epoch = 1
 	localnetV2Epoch = 2
 
-	localnetEpochBlock1 = 36
-	twoOne              = 11
+	localnetEpochBlock1 = 10
+	twoOne              = 5
 
 	localnetVdfDifficulty = 5000 // This takes about 10s to finish the vdf
-)
+
 
 func (localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {

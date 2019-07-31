@@ -51,22 +51,30 @@ func TestCalcEpochNumber(t *testing.T) {
 		},
 		{
 			327680,
-			big.NewInt(1),
+			big.NewInt(0),
 		},
 		{
 			344064,
-			big.NewInt(2),
+			big.NewInt(1),
 		},
 		{
 			344063,
+			big.NewInt(0),
+		},
+		{
+			344065,
 			big.NewInt(1),
+		},
+		{
+			360448,
+			big.NewInt(2),
 		},
 	}
 
-	for _, test := range tests {
+	for i, test := range tests {
 		ep := MainnetSchedule.CalcEpochNumber(test.block)
 		if ep.Cmp(test.epoch) != 0 {
-			t.Errorf("CalcEpochNumber error: got %v, expect %v\n", ep, test.epoch)
+			t.Errorf("CalcEpochNumber error: index %v, got %v, expect %v\n", i, ep, test.epoch)
 		}
 	}
 }
