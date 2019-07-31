@@ -90,30 +90,6 @@ type ConnectionsStatsHTTP struct {
 
 // New returns metrics service.
 func New(selfPeer *p2p.Peer, blsPublicKey, pushgatewayIP, pushgatewayPort string, GetNodeIDs func() []libp2p_peer.ID) *Service {
-	blockHeightCounter = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "block_height_" + blsPublicKey,
-		Help: "Get current block height.",
-	})
-	blockHeightGauge = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "block_height_" + blsPublicKey,
-		Help: "Get current block height.",
-	})
-	connectionsNumberGauge = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "connections_number_" + blsPublicKey,
-		Help: "Get current connections number for a node.",
-	})
-	nodeBalanceGauge = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "node_balance_" + blsPublicKey,
-		Help: "Get current node balance",
-	})
-	lastConsensusGauge = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "last_consensus_" + blsPublicKey,
-		Help: "Get last consensus time",
-	})
-	blockRewardGauge = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "block_reward_" + blsPublicKey,
-		Help: "Get last block reward",
-	})
 	return &Service{
 		BlsPublicKey:    blsPublicKey,
 		IP:              selfPeer.IP,
