@@ -792,7 +792,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 				consensus.getLogger().Info().Msg("[OnCommitted] PublicKeys is Empty, Cannot update public keys")
 				return
 			}
-			consensus.getLogger().Info().Int("numKeys", len(pubKeys)).Msg("[OnCommitted] Update Shard Info and PublicKeys")
+			consensus.getLogger().Info().Int("numKeys", len(pubKeys)).Msg("[OnCommitted] Try to Update Shard Info and PublicKeys")
 
 			for _, key := range pubKeys {
 				if key.IsEqual(consensus.PubKey) {

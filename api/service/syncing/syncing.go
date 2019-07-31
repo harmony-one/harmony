@@ -334,8 +334,12 @@ func (ss *StateSync) GetConsensusHashes(startHash []byte, size uint32) bool {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				response := peerConfig.client.GetBlockHashes(startHash, size)
+				response := peerConfig.client.GetBlockHashes(startHash, size, ss.selfip, ss.selfport)
 				if response == nil {
+					utils.Logger().Warn().
+						Str("peer IP", peerConfig.ip).
+						Str("peer Port", peerConfig.port).
+						Msg("[SYNC] GetConsensusHashes Nil Response")
 					return
 				}
 				if len(response.Payload) > int(size+1) {
@@ -677,8 +681,12 @@ func (ss *StateSync) getMaxPeerHeight() uint64 {
 		go func() {
 			defer wg.Done()
 			//debug
-			// utils.Logger().Warn().Str("IP", peerConfig.ip).Str("Port", peerConfig.port).Msg("[Sync] getMaxPeerHeight")
-			response := peerConfig.client.GetBlockChainHeight()
+			// utils.Logger().Warn().Str("IP", peerConfig.ip).Str("Port", peerConfig.port).Msg("[Sync]getMaxPeerHeight")
+			response, err := peerConfig.client.GetBlockChainHeight()
+			if err != nil {
+				utils.Logger().Warn().Err(err).Str("IP", peerConfig.ip).Str("Port", peerConfig.port).Msg("[Sync]GetBlockChainHeight failed")
+				return
+			}
 			ss.syncMux.Lock()
 			if response != nil && maxHeight < response.BlockHeight {
 				maxHeight = response.BlockHeight
