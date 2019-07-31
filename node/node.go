@@ -237,13 +237,18 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 	node.pendingTransactions = append(node.pendingTransactions, newTxs...)
 	node.reducePendingTransactions()
 	node.pendingTxMutex.Unlock()
-	utils.GetLogInstance().Info("Got more transactions", "num", len(newTxs), "totalPending", len(node.pendingTransactions))
+	utils.Logger().Info().
+	Msg("Got more transactions").
+	Int("num", len(newTxns)).
+	Int("totalPending", len(node.pendingTransactions))
 }
 
 // AddPendingTransaction adds one new transaction to the pending transaction list.
 func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
 	node.addPendingTransactions(types.Transactions{newTx})
-	utils.GetLogInstance().Debug("Got ONE more transaction", "totalPending", len(node.pendingTransactions))
+	utils.Logger().Debug().
+	Int("totalPending", len(node.pendingTransactions)).
+	Msg("Got ONE more transaction")
 }
 
 // Take out a subset of valid transactions from the pending transaction list
@@ -254,7 +259,11 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int) types.Transactions {
 
 	node.pendingTransactions = unselected
 	node.reducePendingTransactions()
-	utils.GetLogInstance().Debug("Selecting Transactions", "remainPending", len(node.pendingTransactions), "selected", len(selected), "invalidDiscarded", len(invalid))
+	utils.Logger().Debug().
+	Int("remainPending", len(node.pendingTransactions)).
+	Int("selected", len(selected)).
+	Int("invalidDiscarded", len(invalid)).
+	Msg("Selecting Transactions")
 	node.pendingTxMutex.Unlock()
 	return selected
 }
@@ -300,8 +309,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 	// Create test keys.  Genesis will later need this.
 	node.TestBankKeys, err = CreateTestBankKeys(TestAccountNumber)
 	if err != nil {
-		utils.GetLogInstance().Crit("Error while creating test keys",
-			"error", err)
+		utils.Logger().Error().Err(err).Msg("Error while creating test keys")
 	}
 
 	collection := shardchain.NewCollection(
@@ -485,17 +493,17 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 	var err error
 	node.shardGroupReceiver, err = node.host.GroupReceiver(node.NodeConfig.GetShardGroupID())
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to create shard receiver", "msg", err)
+		utils.Logger().Error().Err(err).Msg("Failed to create shard receiver")
 	}
 
 	node.globalGroupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to create global receiver", "msg", err)
+		utils.Logger().Error().Err(err).Msg("Failed to create global receiver")
 	}
 
 	node.clientReceiver, err = node.host.GroupReceiver(node.NodeConfig.GetClientGroupID())
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to create client receiver", "msg", err)
+		utils.Logger().Error().Err(err).Msg("Failed to create client receiver")
 	}
 	return nodeConfig, chanPeer
 }

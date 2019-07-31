@@ -21,7 +21,7 @@ func TestAddNewBlock(t *testing.T) {
 	}
 	consensus, err := consensus.New(host, 0, leader, nil)
 	if err != nil {
-		t.Fatalf("Cannot craeate consensus: %v", err)
+		t.Fatalf("Cannot create consensus: %v", err)
 	}
 	node := New(host, consensus, testDBFactory, false)
 

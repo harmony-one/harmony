@@ -30,7 +30,7 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 		// Setup stoppedChan
 		defer close(stoppedChan)
 
-		utils.GetLogInstance().Debug("Waiting for Consensus ready")
+		utils.Logger().Info().Msg("Waiting for Consensus ready")
 		time.Sleep(30 * time.Second) // Wait for other nodes to be ready (test-only)
 
 		firstTime := true
@@ -38,7 +38,7 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 			// keep waiting for Consensus ready
 			select {
 			case <-stopChan:
-				utils.GetLogInstance().Debug("Consensus propose new block: STOPPED!")
+				utils.Logger().Info().Msg("Consensus propose new block: STOPPED!")
 				return
 
 			case <-readySignal:
@@ -62,25 +62,22 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 					deadline = time.Now().Add(BlockPeriod)
 					// Normal tx block consensus
 					selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock)
-					utils.GetLogInstance().Info("PROPOSING NEW BLOCK ------------------------------------------------", "blockNum", node.Blockchain().CurrentBlock().NumberU64()+1, "threshold", threshold, "selectedTxs", len(selectedTxs))
+					utils.Logger().Msg("PROPOSING NEW BLOCK ------------------------------------------------").
+					Info("blockNum", node.Blockchain().CurrentBlock().NumberU64()+1).
+					Str("threshold", threshold).
+					Int("selectedTxs", len(selectedTxs))
 					if err := node.Worker.CommitTransactions(selectedTxs); err != nil {
-						ctxerror.Log15(utils.GetLogger().Error,
-							ctxerror.New("cannot commit transactions").
-								WithCause(err))
+						utils.Logger().Warn().Err(err).Msg("cannot commit transactions")
 					}
 					block, err := node.Worker.Commit()
 					if err != nil {
-						ctxerror.Log15(utils.GetLogger().Error,
-							ctxerror.New("cannot commit new block").
-								WithCause(err))
+						cutils.Logger().Warn().Err(err).Msg("cannot commit new block")
 						continue
 					} else if err := node.proposeShardState(block); err != nil {
-						ctxerror.Log15(utils.GetLogger().Error,
-							ctxerror.New("cannot add shard state").
-								WithCause(err))
+						utils.Logger().Warn().Err(err).Msg("cannot add shard state")
 					} else {
 						newBlock := block
-						utils.GetLogInstance().Debug("Successfully proposed new block", "blockNum", block.NumberU64(), "numTxs", block.Transactions().Len())
+						utils.Logger().Info().Int("blockNum", block.NumberU64()).Int("numTxs", block.Transactions().Len()).Msg("Successfully proposed new block")
 
 						// Send the new block to Consensus so it can be confirmed.
 						node.BlockChannel <- newBlock
@@ -119,7 +116,7 @@ func (node *Node) proposeBeaconShardState(block *types.Block) error {
 }
 
 func (node *Node) proposeLocalShardState(block *types.Block) {
-	logger := block.Logger(utils.GetLogInstance())
+	logger := block.Logger(utils.Logger())
 	getLogger := func() log.Logger { return utils.WithCallerSkip(logger, 1) }
 	// TODO ek – read this from beaconchain once BC sync is fixed
 	if node.nextShardState.master == nil {
