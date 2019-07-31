@@ -18,6 +18,8 @@ const (
 
 	localnetEpochBlock1 = 10
 	twoOne              = 5
+
+	localnetVdfDifficulty = 5000 // This takes about 10s to finish the vdf
 )
 
 func (localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
@@ -55,6 +57,10 @@ func (ls localnetSchedule) IsLastBlock(blockNum uint64) bool {
 	default:
 		return ((blockNum-localnetEpochBlock1)%blocks == blocks-1)
 	}
+}
+
+func (ls localnetSchedule) VdfDifficulty() int {
+	return localnetVdfDifficulty
 }
 
 var localnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(localnetV1Epoch), big.NewInt(localnetV2Epoch)}

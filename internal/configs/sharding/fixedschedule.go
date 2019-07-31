@@ -32,6 +32,10 @@ func (s fixedSchedule) IsLastBlock(blockNum uint64) bool {
 	return blockNum%blocks == blocks-1
 }
 
+func (s fixedSchedule) VdfDifficulty() int {
+	return mainnetVdfDifficulty
+}
+
 // NewFixedSchedule returns a sharding configuration schedule that uses the
 // given config instance for all epochs.  Useful for testing.
 func NewFixedSchedule(instance Instance) Schedule {
