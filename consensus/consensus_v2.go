@@ -1136,37 +1136,37 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 								}
 							}
 						}
+					}
 
-						vdfOutput, seed, err := consensus.GetNextRnd()
-						if err == nil {
-							vdfInProgress = false
-							// Verify the randomness
-							vdfObject := vdf_go.New(core.ShardingSchedule.VdfDifficulty(), seed)
-							if !vdfObject.Verify(vdfOutput) {
-								consensus.getLogger().Warn().
+					vdfOutput, seed, err := consensus.GetNextRnd()
+					if err == nil {
+						vdfInProgress = false
+						// Verify the randomness
+						vdfObject := vdf_go.New(core.ShardingSchedule.VdfDifficulty(), seed)
+						if !vdfObject.Verify(vdfOutput) {
+							consensus.getLogger().Warn().
+								Uint64("MsgBlockNum", newBlock.NumberU64()).
+								Uint64("Epoch", newBlock.Header().Epoch.Uint64()).
+								Msg("[ConsensusMainLoop] failed to verify the VDF output")
+						} else {
+							//write the VDF only if VDF has not been generated
+							_, err := consensus.ChainReader.ReadEpochVdfBlockNum(newBlock.Header().Epoch)
+							if err == nil {
+								consensus.getLogger().Info().
 									Uint64("MsgBlockNum", newBlock.NumberU64()).
 									Uint64("Epoch", newBlock.Header().Epoch.Uint64()).
-									Msg("[ConsensusMainLoop] failed to verify the VDF output")
+									Msg("[ConsensusMainLoop] VDF has already been generated previously")
 							} else {
-								//write the VDF only if VDF has not been generated
-								_, err := consensus.ChainReader.ReadEpochVdfBlockNum(newBlock.Header().Epoch)
-								if err == nil {
-									consensus.getLogger().Info().
-										Uint64("MsgBlockNum", newBlock.NumberU64()).
-										Uint64("Epoch", newBlock.Header().Epoch.Uint64()).
-										Msg("[ConsensusMainLoop] VDF has already been generated previously")
-								} else {
-									consensus.getLogger().Info().
-										Uint64("MsgBlockNum", newBlock.NumberU64()).
-										Uint64("Epoch", newBlock.Header().Epoch.Uint64()).
-										Msg("[ConsensusMainLoop] Generated a new VDF")
+								consensus.getLogger().Info().
+									Uint64("MsgBlockNum", newBlock.NumberU64()).
+									Uint64("Epoch", newBlock.Header().Epoch.Uint64()).
+									Msg("[ConsensusMainLoop] Generated a new VDF")
 
-									newBlock.AddVdf(vdfOutput[:])
-								}
+								newBlock.AddVdf(vdfOutput[:])
 							}
-						} else {
-							//consensus.getLogger().Error().Err(err). Msg("[ConsensusMainLoop] Failed to get randomness")
 						}
+					} else {
+						//consensus.getLogger().Error().Err(err). Msg("[ConsensusMainLoop] Failed to get randomness")
 					}
 				}
 
