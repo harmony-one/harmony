@@ -160,11 +160,6 @@ func initSetup() {
 		}
 		utils.BootNodes = bootNodeAddrs
 	}
-
-	// Set up manual call for garbage collection.
-	if *enableGC {
-		memprofiling.MaybeCallGCPeriodically()
-	}
 }
 
 func passphraseForBls() {
