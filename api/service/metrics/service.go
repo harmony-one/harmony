@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"fmt"
+	"math/big"
 	"net"
 	"net/http"
 	"strconv"
@@ -20,29 +21,40 @@ import (
 
 // Constants for metrics service.
 const (
-	ConnectionsNumberPush               int = 0
-	BlockHeightPush                     int = 1
+	ConnectionsNumberPush            int = 0
+	BlockHeightPush                  int = 1
+	NodeBalancePush                  int = 2
+	LastConsensusPush                int = 3
+	BlockRewardPush                  int = 4
 	metricsServicePortDifference         = 900
 	metricsServiceHTTPPortDifference     = 2000
-	pushgatewayAddr                         = "http://127.0.0.1:26000"
+	defaultPushgatewayAddr               = "http://127.0.0.1:26000"
 )
 
 // Service is the struct for metrics service.
 type Service struct {
-	router      *mux.Router
-	IP          string
-	Port        string
-	GetNodeIDs  func() []libp2p_peer.ID
-	storage     *MetricsStorage
-	server      *grpc.Server
-	httpServer  *http.Server
-	pusher      *push.Pusher
-	messageChan chan *msg_pb.Message
+	router          *mux.Router
+	BlsPublicKey    string
+	IP              string
+	Port            string
+	PushgatewayIP   string
+	PushgatewayPort string
+	GetNodeIDs      func() []libp2p_peer.ID
+	storage         *Storage
+	server          *grpc.Server
+	httpServer      *http.Server
+	pusher          *push.Pusher
+	messageChan     chan *msg_pb.Message
 }
 
 // init vars for prometheus
 var (
-	metricsPush = make(chan int)
+	curBlockHeight     = uint64(0)
+	metricsPush        = make(chan int)
+	blockHeightCounter = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "block_height",
+		Help: "Get current block height.",
+	})
 	blockHeightGauge = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "block_height",
 		Help: "Get current block height.",
@@ -50,6 +62,18 @@ var (
 	connectionsNumberGauge = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "connections_number",
 		Help: "Get current connections number for a node.",
+	})
+	nodeBalanceGauge = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "node_balance",
+		Help: "Get current node balance",
+	})
+	lastConsensusGauge = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "last_consensus",
+		Help: "Get last consensus time",
+	})
+	blockRewardGauge = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "block_reward",
+		Help: "Get last block reward",
 	})
 )
 
@@ -65,19 +89,38 @@ type ConnectionsStatsHTTP struct {
 }
 
 // New returns metrics service.
-func New(selfPeer *p2p.Peer, GetNodeIDs func() []libp2p_peer.ID) *Service {
+func New(selfPeer *p2p.Peer, blsPublicKey, pushgatewayIP, pushgatewayPort string, GetNodeIDs func() []libp2p_peer.ID) *Service {
+	blockHeightCounter = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "block_height_" + blsPublicKey,
+		Help: "Get current block height.",
+	})
 	blockHeightGauge = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "block_height_" + selfPeer.PeerID.String(),
+		Name: "block_height_" + blsPublicKey,
 		Help: "Get current block height.",
 	})
 	connectionsNumberGauge = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "connections_number_" + selfPeer.PeerID.String(),
+		Name: "connections_number_" + blsPublicKey,
 		Help: "Get current connections number for a node.",
 	})
+	nodeBalanceGauge = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "node_balance_" + blsPublicKey,
+		Help: "Get current node balance",
+	})
+	lastConsensusGauge = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "last_consensus_" + blsPublicKey,
+		Help: "Get last consensus time",
+	})
+	blockRewardGauge = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "block_reward_" + blsPublicKey,
+		Help: "Get last block reward",
+	})
 	return &Service{
-		IP:         selfPeer.IP,
-		Port:       selfPeer.Port,
-		GetNodeIDs: GetNodeIDs,
+		BlsPublicKey:    blsPublicKey,
+		IP:              selfPeer.IP,
+		Port:            selfPeer.Port,
+		PushgatewayIP:   pushgatewayIP,
+		PushgatewayPort: pushgatewayPort,
+		GetNodeIDs:      GetNodeIDs,
 	}
 }
 
@@ -114,20 +157,22 @@ func GetMetricsServiceHTTPPort(nodePort string) string {
 
 // Run is to run http serving metrics service.
 func (s *Service) Run() {
+	// Init local storage for metrics.
+	//s.storage = GetStorageInstance(s.IP, s.Port, false)
 	// Init address.
 	addr := net.JoinHostPort("", GetMetricsServiceHTTPPort(s.Port))
 
 	registry := prometheus.NewRegistry()
-	registry.MustRegister(blockHeightGauge, connectionsNumberGauge)
+	registry.MustRegister(blockHeightCounter, connectionsNumberGauge, nodeBalanceGauge, lastConsensusGauge, blockRewardGauge, blockHeightGauge)
 
-	s.pusher = push.New(pushgatewayAddr, "metrics").Gatherer(registry)
+	s.pusher = push.New("http://"+s.PushgatewayIP+":"+s.PushgatewayPort, "metrics").Gatherer(registry)
 
 	go s.PushMetrics()
 
 	//s.router.Path("/connectionsstats").Queries("since", "{[0-9]*?}", "until", "{[0-9]*?}").HandlerFunc(s.GetConnectionsStats).Methods("GET")
 	utils.Logger().Info().Str("port", GetMetricsServiceHTTPPort(s.Port)).Msg("Listening")
 	go func() {
-		http.Handle("/metrics", promhttp.Handler())
+		http.Handle("/node_metrics", promhttp.Handler())
 		if err := http.ListenAndServe(addr, nil); err != nil {
 			utils.Logger().Warn().Err(err).Msg("http.ListenAndServe()")
 		}
@@ -136,9 +181,29 @@ func (s *Service) Run() {
 }
 
 // UpdateBlockHeight updates block height.
-func UpdateBlockHeight(blockHeight uint64, blockTime int64) {
-	blockHeightGauge.Set(float64(blockHeight))
+func UpdateBlockHeight(blockHeight uint64) {
+	blockHeightCounter.Add(float64(blockHeight) - float64(curBlockHeight))
+	blockHeightGauge.Set(float64(blockHeight) - float64(curBlockHeight))
+	curBlockHeight = blockHeight
 	metricsPush <- ConnectionsNumberPush
+}
+
+// UpdateNodeBalance updates node balance.
+func UpdateNodeBalance(balance *big.Int) {
+	nodeBalanceGauge.Set(float64(balance.Uint64()))
+	metricsPush <- NodeBalancePush
+}
+
+// UpdateBlockReward updates block reward.
+func UpdateBlockReward(blockReward *big.Int) {
+	blockRewardGauge.Set(float64(blockReward.Uint64()))
+	metricsPush <- BlockRewardPush
+}
+
+// UpdateLastConsensus updates last consensus time.
+func UpdateLastConsensus(consensusTime int64) {
+	lastConsensusGauge.Set(float64(consensusTime))
+	metricsPush <- LastConsensusPush
 }
 
 // UpdateConnectionsNumber updates connections number.

@@ -39,25 +39,25 @@ func GetCurrentConnectionsNumberKey(currentTime int) string {
 }
 
 // storage instance
-var storage *MetricsStorage
+var storage *Storage
 var onceMetrics sync.Once
 
-// MetricsStorage storage dump the block info into leveldb.
-type MetricsStorage struct {
+// Storage storage dump the block info into leveldb.
+type Storage struct {
 	db *ethdb.LDBDatabase
 }
 
-// GetMetricsStorageInstance returns attack model by using singleton pattern.
-func GetMetricsStorageInstance(ip, port string, remove bool) *MetricsStorage {
+// GetStorageInstance returns attack model by using singleton pattern.
+func GetStorageInstance(ip, port string, remove bool) *Storage {
 	onceMetrics.Do(func() {
-		storage = &MetricsStorage{}
+		storage = &Storage{}
 		storage.Init(ip, port, remove)
 	})
 	return storage
 }
 
 // Init initializes connections number storage.
-func (storage *MetricsStorage) Init(ip, port string, remove bool) {
+func (storage *Storage) Init(ip, port string, remove bool) {
 	dbFileName := "/.hmy/db-metrics-" + ip + "-" + port
 	var err error
 	if remove {
@@ -72,12 +72,12 @@ func (storage *MetricsStorage) Init(ip, port string, remove bool) {
 }
 
 // GetDB returns the LDBDatabase of the storage.
-func (storage *MetricsStorage) GetDB() *ethdb.LDBDatabase {
+func (storage *Storage) GetDB() *ethdb.LDBDatabase {
 	return storage.db
 }
 
 // Dump get time and current connections number and index them into lvdb for monitoring service.
-func (storage *MetricsStorage) Dump(connectionsNumber int, currentTime int) {
+func (storage *Storage) Dump(connectionsNumber int, currentTime int) {
 	utils.Logger().Info().Int("Unix Time", currentTime).Msg("Store current connections number")
 
 	batch := storage.db.NewBatch()
@@ -102,7 +102,7 @@ func (storage *MetricsStorage) Dump(connectionsNumber int, currentTime int) {
 }
 
 // ReadConnectionsNumbersFromDB returns a list of connections numbers to server connections number end-point.
-func (storage *MetricsStorage) ReadConnectionsNumbersFromDB(since, until int) []int {
+func (storage *Storage) ReadConnectionsNumbersFromDB(since, until int) []int {
 	connectionsNumbers := make([]int, 0)
 	for i := since; i <= until; i++ {
 		key := GetConnectionsNumberKey(i)

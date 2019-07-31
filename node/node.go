@@ -84,6 +84,12 @@ type syncConfig struct {
 	client    *downloader.Client
 }
 
+// MetricsEvent for metrics event.
+type MetricsEvent struct {
+	Event int
+	Time  int64
+}
+
 // Node represents a protocol-participating node in the network
 type Node struct {
 	Consensus             *consensus.Consensus // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
@@ -200,6 +206,9 @@ type Node struct {
 	isFirstTime bool // the node was started with a fresh database
 	// How long in second the leader needs to wait to propose a new block.
 	BlockPeriod time.Duration
+
+	// channel events for metrics
+	metricsChan chan *MetricsEvent
 }
 
 // Blockchain returns the blockchain for the node's current shard.
@@ -388,11 +397,8 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 	// FIXME (leo): we use beacon client topic as the global topic for now
 	go node.ReceiveGlobalMessage()
 
-	// start the goroutine to update block height for metrics
-	go node.UpdateBlockHeightForMetrics()
-
-	// start the goroutine to update number of connections for metrics
-	go node.UpdateConnectionsNumberForMetrics()
+	// start the goroutine to collect metrics
+	go node.CollectMetrics()
 
 	// Setup initial state of syncing.
 	node.peerRegistrationRecord = make(map[string]*syncConfig)
@@ -488,11 +494,13 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 	chanPeer := make(chan p2p.Peer)
 
 	nodeConfig := service.NodeConfig{
-		IsBeacon:     node.NodeConfig.IsBeacon(),
-		IsClient:     node.NodeConfig.IsClient(),
-		Beacon:       p2p.GroupIDBeacon,
-		ShardGroupID: node.NodeConfig.GetShardGroupID(),
-		Actions:      make(map[p2p.GroupID]p2p.ActionType),
+		PushgatewayIP:   node.NodeConfig.GetPushgatewayIP(),
+		PushgatewayPort: node.NodeConfig.GetPushgatewayPort(),
+		IsBeacon:        node.NodeConfig.IsBeacon(),
+		IsClient:        node.NodeConfig.IsClient(),
+		Beacon:          p2p.GroupIDBeacon,
+		ShardGroupID:    node.NodeConfig.GetShardGroupID(),
+		Actions:         make(map[p2p.GroupID]p2p.ActionType),
 	}
 
 	if nodeConfig.IsClient {

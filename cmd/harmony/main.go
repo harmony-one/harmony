@@ -120,6 +120,10 @@ var (
 
 	// Disable view change.
 	disableViewChange = flag.Bool("disable_view_change", false, "Do not propose view change (testing only)")
+
+	// pushgateway ip and port
+	pushgatewayIP   = flag.String("pushgateway_ip", "grafana.harmony.one", "metrics view ip")
+	pushgatewayPort = flag.String("pushgateway_port", "9091", "metrics view port")
 )
 
 func initSetup() {
@@ -250,6 +254,9 @@ func createGlobalConfig(isLeader bool) *nodeconfig.ConfigType {
 		panic(fmt.Sprintf("invalid network type: %s", *networkType))
 	}
 
+	nodeConfig.SetPushgatewayIP(*pushgatewayIP)
+	nodeConfig.SetPushgatewayPort(*pushgatewayPort)
+
 	// P2p private key is used for secure message transfer between p2p nodes.
 	nodeConfig.P2pPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
@@ -325,6 +332,10 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 
 	// TODO: refactor the creation of blockchain out of node.New()
 	currentConsensus.ChainReader = currentNode.Blockchain()
+
+	// Set up prometheus pushgateway for metrics monitoring serivce.
+	currentNode.NodeConfig.SetPushgatewayIP(nodeConfig.PushgatewayIP)
+	currentNode.NodeConfig.SetPushgatewayPort(nodeConfig.PushgatewayPort)
 
 	// TODO: the setup should only based on shard state
 	if *isGenesis {
