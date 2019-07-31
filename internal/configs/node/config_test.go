@@ -13,19 +13,9 @@ func TestNodeConfigSingleton(t *testing.T) {
 	// get the singleton variable
 	c := GetShardConfig(Global)
 
-	c.SetIsLeader(true)
-
-	if !c.IsLeader() {
-		t.Errorf("IsLeader = %v, expected = %v", c.IsLeader(), true)
-	}
-
 	c.SetBeaconGroupID(p2p.GroupIDBeacon)
 
 	d := GetShardConfig(Global)
-
-	if !d.IsLeader() {
-		t.Errorf("IsLeader = %v, expected = %v", d.IsLeader(), true)
-	}
 
 	g := d.GetBeaconGroupID()
 
@@ -36,23 +26,12 @@ func TestNodeConfigSingleton(t *testing.T) {
 
 func TestNodeConfigMultiple(t *testing.T) {
 	// init 3 configs
-	c := GetShardConfig(2)
 	d := GetShardConfig(1)
 	e := GetShardConfig(0)
 	f := GetShardConfig(42)
 
 	if f != nil {
 		t.Errorf("expecting nil, got: %v", f)
-	}
-
-	if c.IsBeacon() != false {
-		t.Errorf("expecting the node to not be beacon yet, got: %v", c.IsBeacon())
-	}
-
-	c.SetIsBeacon(true)
-
-	if c.IsBeacon() != true {
-		t.Errorf("expecting the node to be beacon, got: %v", c.IsBeacon())
 	}
 
 	d.SetShardGroupID("abcd")
@@ -68,13 +47,5 @@ func TestNodeConfigMultiple(t *testing.T) {
 	e.SetIsClient(false)
 	if e.IsClient() != false {
 		t.Errorf("expecting false, got: %v", e.IsClient())
-	}
-
-	c.SetRole(NewNode)
-	if c.Role() != NewNode {
-		t.Errorf("expecting NewNode, got: %s", c.Role())
-	}
-	if c.Role().String() != "NewNode" {
-		t.Errorf("expecting NewNode, got: %s", c.Role().String())
 	}
 }

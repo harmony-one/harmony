@@ -135,6 +135,7 @@ func Shuffle(list []types.NodeID) {
 }
 
 // GetBlockNumberFromEpoch calculates the block number where epoch sharding information is stored
+// TODO lc - use ShardingSchedule function
 func GetBlockNumberFromEpoch(epoch uint64) uint64 {
 	number := epoch * ShardingSchedule.BlocksPerEpoch() // currently we use the first block in each epoch
 	return number
@@ -142,13 +143,14 @@ func GetBlockNumberFromEpoch(epoch uint64) uint64 {
 
 // GetLastBlockNumberFromEpoch calculates the last block number for the given
 // epoch.  TODO ek – this is a temp hack.
+// TODO lc - use ShardingSchedule function
 func GetLastBlockNumberFromEpoch(epoch uint64) uint64 {
 	return (epoch+1)*ShardingSchedule.BlocksPerEpoch() - 1
 }
 
 // GetEpochFromBlockNumber calculates the epoch number the block belongs to
 func GetEpochFromBlockNumber(blockNumber uint64) uint64 {
-	return blockNumber / ShardingSchedule.BlocksPerEpoch()
+	return ShardingSchedule.CalcEpochNumber(blockNumber).Uint64()
 }
 
 // GetShardingStateFromBlockChain will retrieve random seed and shard map from beacon chain for given a epoch
@@ -210,7 +212,10 @@ func (ss *ShardingState) UpdateShardingState(stakeInfo *map[common.Address]*stru
 	for addr, info := range *stakeInfo {
 		_, ok := oldBlsPublicKeys[info.BlsPublicKey]
 		if !ok {
-			newAddresses = append(newAddresses, types.NodeID{addr, info.BlsPublicKey})
+			newAddresses = append(newAddresses, types.NodeID{
+				EcdsaAddress: addr,
+				BlsPublicKey: info.BlsPublicKey,
+			})
 		}
 	}
 	return newAddresses
@@ -250,7 +255,10 @@ func GetShardState(epoch *big.Int) types.ShardState {
 			pubKey := types.BlsPublicKey{}
 			pubKey.FromLibBLSPublicKey(pub)
 			// TODO: directly read address for bls too
-			curNodeID := types.NodeID{common2.ParseAddr(hmyAccounts[index].Address), pubKey}
+			curNodeID := types.NodeID{
+				EcdsaAddress: common2.ParseAddr(hmyAccounts[index].Address),
+				BlsPublicKey: pubKey,
+			}
 			com.NodeList = append(com.NodeList, curNodeID)
 		}
 
@@ -264,7 +272,10 @@ func GetShardState(epoch *big.Int) types.ShardState {
 			pubKey := types.BlsPublicKey{}
 			pubKey.FromLibBLSPublicKey(pub)
 			// TODO: directly read address for bls too
-			curNodeID := types.NodeID{common2.ParseAddr(fnAccounts[index].Address), pubKey}
+			curNodeID := types.NodeID{
+				EcdsaAddress: common2.ParseAddr(fnAccounts[index].Address),
+				BlsPublicKey: pubKey,
+			}
 			com.NodeList = append(com.NodeList, curNodeID)
 		}
 		shardState = append(shardState, com)

@@ -15,8 +15,7 @@ import (
 
 // Constants of lower bound limit of a new block.
 const (
-	ConsensusTimeOut = 20
-	PeriodicBlock    = 200 * time.Millisecond
+	PeriodicBlock = 200 * time.Millisecond
 )
 
 // WaitForConsensusReadyv2 listen for the readiness signal from consensus and generate new block for consensus.
@@ -27,10 +26,10 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 		// Setup stoppedChan
 		defer close(stoppedChan)
 
-		utils.GetLogInstance().Debug("Waiting for Consensus ready")
+		utils.Logger().Debug().
+			Msg("Waiting for Consensus ready")
 		time.Sleep(30 * time.Second) // Wait for other nodes to be ready (test-only)
 
-		timeoutCount := 0
 		var newBlock *types.Block
 
 		// Set up the very first deadline.
@@ -39,18 +38,9 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 			// keep waiting for Consensus ready
 			select {
 			case <-stopChan:
-				utils.GetLogInstance().Debug("Consensus new block proposal: STOPPED!")
+				utils.Logger().Debug().
+					Msg("Consensus new block proposal: STOPPED!")
 				return
-			case <-time.After(ConsensusTimeOut * time.Second):
-				if node.Consensus.PubKey.IsEqual(node.Consensus.LeaderPubKey) {
-					utils.GetLogInstance().Debug("Leader consensus timeout, retry!", "count", timeoutCount)
-					//node.Consensus.ResetState()
-					timeoutCount++
-					if newBlock != nil {
-						// Send the new block to Consensus so it can be confirmed.
-						node.BlockChannel <- newBlock
-					}
-				}
 			case <-readySignal:
 				for {
 					time.Sleep(PeriodicBlock)
@@ -64,10 +54,15 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 					if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
 						selectedTxs = node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock, coinbase)
 						if err := node.Worker.UpdateCurrent(coinbase); err != nil {
-							utils.GetLogger().Error("Failed updating worker's state", "Error", err)
+							utils.Logger().Error().
+								Err(err).
+								Msg("Failed updating worker's state")
 						}
 					}
-					utils.GetLogInstance().Info("PROPOSING NEW BLOCK ------------------------------------------------", "blockNum", node.Blockchain().CurrentBlock().NumberU64()+1, "selectedTxs", len(selectedTxs))
+					utils.Logger().Info().
+						Uint64("blockNum", node.Blockchain().CurrentBlock().NumberU64()+1).
+						Int("selectedTxs", len(selectedTxs)).
+						Msg("PROPOSING NEW BLOCK ------------------------------------------------")
 					if err := node.Worker.CommitTransactions(selectedTxs, coinbase); err != nil {
 						ctxerror.Log15(utils.GetLogger().Error,
 							ctxerror.New("cannot commit transactions").
@@ -85,7 +80,9 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 
 					if node.NodeConfig.GetNetworkType() == nodeconfig.Mainnet {
 						if err = node.Worker.UpdateCurrent(coinbase); err != nil {
-							utils.GetLogger().Debug("Failed updating worker's state", "Error", err)
+							utils.Logger().Debug().
+								Err(err).
+								Msg("Failed updating worker's state")
 							continue
 						}
 					}
@@ -102,7 +99,10 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 							ctxerror.New("cannot add shard state").
 								WithCause(err))
 					} else {
-						utils.GetLogInstance().Debug("Successfully proposed new block", "blockNum", newBlock.NumberU64(), "numTxs", newBlock.Transactions().Len())
+						utils.Logger().Debug().
+							Uint64("blockNum", newBlock.NumberU64()).
+							Int("numTxs", newBlock.Transactions().Len()).
+							Msg("Successfully proposed new block")
 
 						// Set deadline will be BlockPeriod from now at this place. Announce stage happens right after this.
 						deadline = time.Now().Add(node.BlockPeriod)

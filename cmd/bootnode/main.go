@@ -65,7 +65,7 @@ func main() {
 		panic(err)
 	}
 
-	log.Info("bootnode", "BN_MA", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, host.GetID().Pretty()))
+	fmt.Printf("bootnode BN_MA=%s", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, host.GetID().Pretty()))
 
 	if *logConn {
 		host.GetP2PHost().Network().Notify(utils.NewConnLogger(utils.GetLogInstance()))

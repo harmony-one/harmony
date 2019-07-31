@@ -35,6 +35,7 @@ var (
 	httpModules      = []string{"hmy", "net"}
 	httpVirtualHosts = []string{"*"}
 	httpTimeouts     = rpc.DefaultHTTPTimeouts
+	httpOrigins      = []string{"*"}
 
 	wsModules = []string{"net", "web3"}
 	wsOrigins = []string{"*"}
@@ -56,7 +57,7 @@ func (node *Node) StartRPC(nodePort string) error {
 	port, _ := strconv.Atoi(nodePort)
 
 	httpEndpoint = fmt.Sprintf(":%v", port+rpcHTTPPortOffset)
-	if err := node.startHTTP(httpEndpoint, apis, httpModules, nil, httpVirtualHosts, httpTimeouts); err != nil {
+	if err := node.startHTTP(httpEndpoint, apis, httpModules, httpOrigins, httpVirtualHosts, httpTimeouts); err != nil {
 		return err
 	}
 

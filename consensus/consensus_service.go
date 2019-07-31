@@ -22,7 +22,6 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -40,20 +39,21 @@ func (consensus *Consensus) WaitForNewRandomness() {
 }
 
 // GetNextRnd returns the oldest available randomness along with the hash of the block there randomness preimage is committed.
-func (consensus *Consensus) GetNextRnd() ([32]byte, [32]byte, error) {
+func (consensus *Consensus) GetNextRnd() ([vdFAndProofSize]byte, [32]byte, error) {
 	if len(consensus.pendingRnds) == 0 {
-		return [32]byte{}, [32]byte{}, errors.New("No available randomness")
+		return [vdFAndProofSize]byte{}, [32]byte{}, errors.New("No available randomness")
 	}
 	vdfOutput := consensus.pendingRnds[0]
+
+	vdfBytes := [vdFAndProofSize]byte{}
+	seed := [32]byte{}
+	copy(vdfBytes[:], vdfOutput[:vdFAndProofSize])
+	copy(seed[:], vdfOutput[vdFAndProofSize:])
 
 	//pop the first vdfOutput from the list
 	consensus.pendingRnds = consensus.pendingRnds[1:]
 
-	rnd := [32]byte{}
-	blockHash := [32]byte{}
-	copy(rnd[:], vdfOutput[:32])
-	copy(blockHash[:], vdfOutput[32:])
-	return rnd, blockHash, nil
+	return vdfBytes, seed, nil
 }
 
 // SealHash returns the hash of a block prior to it being sealed.
@@ -398,7 +398,7 @@ func (consensus *Consensus) ResetState() {
 // Returns a string representation of this consensus
 func (consensus *Consensus) String() string {
 	var duty string
-	if nodeconfig.GetDefaultConfig().IsLeader() {
+	if consensus.IsLeader() {
 		duty = "LDR" // leader
 	} else {
 		duty = "VLD" // validator
@@ -490,7 +490,7 @@ func (consensus *Consensus) RegisterPRndChannel(pRndChannel chan []byte) {
 }
 
 // RegisterRndChannel registers the channel for receiving final randomness from DRG protocol
-func (consensus *Consensus) RegisterRndChannel(rndChannel chan [64]byte) {
+func (consensus *Consensus) RegisterRndChannel(rndChannel chan [548]byte) {
 	consensus.RndChannel = rndChannel
 }
 
@@ -665,5 +665,15 @@ func (consensus *Consensus) updateConsensusInformation() {
 			Str("leaderPubKey", leaderPubKey.SerializeToHexStr()).
 			Msg("[SYNC] Most Recent LeaderPubKey Updated Based on BlockChain")
 		consensus.LeaderPubKey = leaderPubKey
+		consensus.mode.SetMode(Normal)
 	}
+}
+
+// IsLeader check if the node is a leader or not by comparing the public key of
+// the node with the leader public key
+func (consensus *Consensus) IsLeader() bool {
+	if consensus.PubKey != nil && consensus.LeaderPubKey != nil {
+		return consensus.PubKey.IsEqual(consensus.LeaderPubKey)
+	}
+	return false
 }

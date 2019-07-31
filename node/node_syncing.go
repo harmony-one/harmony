@@ -28,7 +28,7 @@ const (
 	lastMileThreshold = 4
 	inSyncThreshold   = 1  // unit in number of block
 	SyncFrequency     = 10 // unit in second
-	MinConnectedPeers = 5  // minimum number of peers connected to in node syncing
+	MinConnectedPeers = 10 // minimum number of peers connected to in node syncing
 )
 
 // getNeighborPeers is a helper function to return list of peers
@@ -228,7 +228,7 @@ func (node *Node) SendNewBlockToUnsync() {
 }
 
 // CalculateResponse implements DownloadInterface on Node object.
-func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*downloader_pb.DownloaderResponse, error) {
+func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, incomingPeer string) (*downloader_pb.DownloaderResponse, error) {
 	response := &downloader_pb.DownloaderResponse{}
 	switch request.Type {
 	case downloader_pb.DownloaderRequest_HEADER:
@@ -248,7 +248,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest) (*
 		startHeight := startBlock.NumberU64()
 		endHeight := node.Blockchain().CurrentBlock().NumberU64()
 		if startHeight >= endHeight {
-			utils.GetLogInstance().Debug("[SYNC] GetBlockHashes Request: I am not higher than requested node", "myHeight", endHeight, "requestHeight", startHeight)
+			utils.GetLogInstance().Debug("[SYNC] GetBlockHashes Request: I am not higher than requested node", "myHeight", endHeight, "requestHeight", startHeight, "incomingIP", request.Ip, "incomingPort", request.Port, "incomingPeer", incomingPeer)
 			return response, nil
 		}
 

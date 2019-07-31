@@ -2,15 +2,11 @@ package node
 
 import (
 	"crypto/ecdsa"
-	"encoding/hex"
 	"fmt"
-	"math/big"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/api/client"
 	clientService "github.com/harmony-one/harmony/api/client/service"
@@ -279,7 +275,7 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int, coinbase common.Addr
 
 // MaybeKeepSendingPongMessage keeps sending pong message if the current node is a leader.
 func (node *Node) MaybeKeepSendingPongMessage() {
-	if nodeconfig.GetDefaultConfig().IsLeader() {
+	if node.Consensus != nil && node.Consensus.IsLeader() {
 		go node.SendPongMessage()
 	}
 }
@@ -380,11 +376,6 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 	}
 
 	utils.GetLogInstance().Info("Genesis block hash", "genesis block header", node.Blockchain().GetBlockByNumber(0).Header())
-	if consensusObj != nil && nodeconfig.GetDefaultConfig().IsLeader() {
-		node.State = NodeLeader
-	} else {
-		node.State = NodeInit
-	}
 
 	// start the goroutine to receive client message
 	// client messages are sent by clients, like txgen, wallet
@@ -408,46 +399,41 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 	return &node
 }
 
-// InitShardState initialize genesis shard state and update committee pub keys for consensus and drand
-func (node *Node) InitShardState(isGenesis bool) (err error) {
-	logger := utils.GetLogInstance().New("isGenesis", isGenesis)
-	getLogger := func() log.Logger { return utils.WithCallerSkip(logger, 1) }
+// InitShardState initialize shard state from latest epoch and update committee pub keys for consensus and drand
+func (node *Node) InitShardState() (err error) {
 	if node.Consensus == nil {
-		getLogger().Crit("consensus is nil; cannot figure out shard ID")
+		return ctxerror.New("[InitShardState] consenus is nil; Cannot figure out shardID")
 	}
 	shardID := node.Consensus.ShardID
-	logger = logger.New("shardID", shardID)
-	getLogger().Info("initializing shard state")
 
 	// Get genesis epoch shard state from chain
-	genesisEpoch := big.NewInt(core.GenesisEpoch)
-	shardState, err := node.Beaconchain().GetShardState(genesisEpoch, nil)
-	if err != nil {
-		return ctxerror.New("cannot read genesis shard state").WithCause(err)
+	blockNum := node.Blockchain().CurrentBlock().NumberU64()
+	node.Consensus.SetMode(consensus.Listening)
+	epoch := core.ShardingSchedule.CalcEpochNumber(blockNum)
+	utils.Logger().Info().
+		Uint64("blockNum", blockNum).
+		Uint32("shardID", shardID).
+		Uint64("epoch", epoch.Uint64()).
+		Msg("[InitShardState] Try To Get PublicKeys from database")
+	pubKeys := core.GetPublicKeys(epoch, shardID)
+	if len(pubKeys) == 0 {
+		return ctxerror.New(
+			"[InitShardState] PublicKeys is Empty, Cannot update public keys",
+			"shardID", shardID,
+			"blockNum", blockNum)
 	}
-	getLogger().Info("Successfully loaded epoch shard state")
 
-	// Update validator public keys
-	committee := shardState.FindCommitteeByID(shardID)
-	if committee == nil {
-		return ctxerror.New("our shard is not found in genesis shard state",
-			"shardID", shardID)
-	}
-	pubKeys := []*bls.PublicKey{}
-	for _, node := range committee.NodeList {
-		pubKey := &bls.PublicKey{}
-		pubKeyBytes := node.BlsPublicKey[:]
-		err = pubKey.Deserialize(pubKeyBytes)
-		if err != nil {
-			return ctxerror.New("cannot deserialize BLS public key",
-				"shardID", shardID,
-				"pubKeyBytes", hex.EncodeToString(pubKeyBytes),
-			).WithCause(err)
+	for _, key := range pubKeys {
+		if key.IsEqual(node.Consensus.PubKey) {
+			utils.Logger().Info().
+				Uint64("blockNum", blockNum).
+				Int("numPubKeys", len(pubKeys)).
+				Msg("[InitShardState] Successfully updated public keys")
+			node.Consensus.UpdatePublicKeys(pubKeys)
+			node.Consensus.SetMode(consensus.Normal)
+			return nil
 		}
-		pubKeys = append(pubKeys, pubKey)
 	}
-	getLogger().Info("initialized shard state", "numPubKeys", len(pubKeys))
-	node.Consensus.UpdatePublicKeys(pubKeys)
 	// TODO: Disable drand. Currently drand isn't functioning but we want to compeletely turn it off for full protection.
 	// node.DRand.UpdatePublicKeys(pubKeys)
 	return nil
@@ -471,8 +457,6 @@ func (node *Node) AddPeers(peers []*p2p.Peer) int {
 	// Only leader needs to add the peer info into consensus
 	// Validators will receive the updated peer info from Leader via pong message
 	// TODO: remove this after fully migrating to beacon chain-based committee membership
-	//if count > 0 && node.NodeConfig.IsLeader() {
-	//	node.Consensus.AddPeers(peers)
 	//	// TODO: make peers into a context object shared by consensus and drand
 	//	node.DRand.AddPeers(peers)
 	//}
@@ -496,7 +480,6 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 	nodeConfig := service.NodeConfig{
 		PushgatewayIP:   node.NodeConfig.GetPushgatewayIP(),
 		PushgatewayPort: node.NodeConfig.GetPushgatewayPort(),
-		IsBeacon:        node.NodeConfig.IsBeacon(),
 		IsClient:        node.NodeConfig.IsClient(),
 		Beacon:          p2p.GroupIDBeacon,
 		ShardGroupID:    node.NodeConfig.GetShardGroupID(),

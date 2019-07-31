@@ -57,15 +57,17 @@ var (
 )
 
 const (
-	bodyCacheLimit      = 256
-	blockCacheLimit     = 256
-	receiptsCacheLimit  = 32
-	maxFutureBlocks     = 256
-	maxTimeFutureBlocks = 30
-	badBlockLimit       = 10
-	triesInMemory       = 128
-	shardCacheLimit     = 2
-	epochCacheLimit     = 10
+	bodyCacheLimit       = 256
+	blockCacheLimit      = 256
+	receiptsCacheLimit   = 32
+	maxFutureBlocks      = 256
+	maxTimeFutureBlocks  = 30
+	badBlockLimit        = 10
+	triesInMemory        = 128
+	shardCacheLimit      = 2
+	commitsCacheLimit    = 10
+	epochCacheLimit      = 10
+	randomnessCacheLimit = 10
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	BlockChainVersion = 3
@@ -118,14 +120,16 @@ type BlockChain struct {
 	currentBlock     atomic.Value // Current head of the block chain
 	currentFastBlock atomic.Value // Current head of the fast-sync chain (may be above the block chain!)
 
-	stateCache      state.Database // State database to reuse between imports (contains state cache)
-	bodyCache       *lru.Cache     // Cache for the most recent block bodies
-	bodyRLPCache    *lru.Cache     // Cache for the most recent block bodies in RLP encoded format
-	receiptsCache   *lru.Cache     // Cache for the most recent receipts per block
-	blockCache      *lru.Cache     // Cache for the most recent entire blocks
-	futureBlocks    *lru.Cache     // future blocks are blocks added for later processing
-	shardStateCache *lru.Cache
-	epochCache      *lru.Cache // Cache epoch number → first block number
+	stateCache       state.Database // State database to reuse between imports (contains state cache)
+	bodyCache        *lru.Cache     // Cache for the most recent block bodies
+	bodyRLPCache     *lru.Cache     // Cache for the most recent block bodies in RLP encoded format
+	receiptsCache    *lru.Cache     // Cache for the most recent receipts per block
+	blockCache       *lru.Cache     // Cache for the most recent entire blocks
+	futureBlocks     *lru.Cache     // future blocks are blocks added for later processing
+	shardStateCache  *lru.Cache
+	lastCommitsCache *lru.Cache
+	epochCache       *lru.Cache // Cache epoch number → first block number
+	randomnessCache  *lru.Cache // Cache for vrf/vdf
 
 	quit    chan struct{} // blockchain quit channel
 	running int32         // running must be called atomically
@@ -159,26 +163,30 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	futureBlocks, _ := lru.New(maxFutureBlocks)
 	badBlocks, _ := lru.New(badBlockLimit)
 	shardCache, _ := lru.New(shardCacheLimit)
+	commitsCache, _ := lru.New(commitsCacheLimit)
 	epochCache, _ := lru.New(epochCacheLimit)
+	randomnessCache, _ := lru.New(randomnessCacheLimit)
 
 	bc := &BlockChain{
-		chainConfig:     chainConfig,
-		cacheConfig:     cacheConfig,
-		db:              db,
-		triegc:          prque.New(nil),
-		stateCache:      state.NewDatabase(db),
-		quit:            make(chan struct{}),
-		shouldPreserve:  shouldPreserve,
-		bodyCache:       bodyCache,
-		bodyRLPCache:    bodyRLPCache,
-		receiptsCache:   receiptsCache,
-		blockCache:      blockCache,
-		futureBlocks:    futureBlocks,
-		shardStateCache: shardCache,
-		epochCache:      epochCache,
-		engine:          engine,
-		vmConfig:        vmConfig,
-		badBlocks:       badBlocks,
+		chainConfig:      chainConfig,
+		cacheConfig:      cacheConfig,
+		db:               db,
+		triegc:           prque.New(nil),
+		stateCache:       state.NewDatabase(db),
+		quit:             make(chan struct{}),
+		shouldPreserve:   shouldPreserve,
+		bodyCache:        bodyCache,
+		bodyRLPCache:     bodyRLPCache,
+		receiptsCache:    receiptsCache,
+		blockCache:       blockCache,
+		futureBlocks:     futureBlocks,
+		shardStateCache:  shardCache,
+		lastCommitsCache: commitsCache,
+		epochCache:       epochCache,
+		randomnessCache:  randomnessCache,
+		engine:           engine,
+		vmConfig:         vmConfig,
+		badBlocks:        badBlocks,
 	}
 	bc.SetValidator(NewBlockValidator(chainConfig, bc, engine))
 	bc.SetProcessor(NewStateProcessor(chainConfig, bc, engine))
@@ -224,13 +232,18 @@ func (bc *BlockChain) ValidateNewBlock(block *types.Block) error {
 }
 
 // IsEpochBlock returns whether this block is the first block of an epoch.
+// by checking if the previous block is the last block of the previous epoch
 func IsEpochBlock(block *types.Block) bool {
-	return block.NumberU64()%ShardingSchedule.BlocksPerEpoch() == 0
+	if block.NumberU64() == 0 {
+		// genesis block is the first epoch block
+		return true
+	}
+	return ShardingSchedule.IsLastBlock(block.NumberU64() - 1)
 }
 
 // IsEpochLastBlock returns whether this block is the last block of an epoch.
 func IsEpochLastBlock(block *types.Block) bool {
-	return block.NumberU64()%ShardingSchedule.BlocksPerEpoch() == ShardingSchedule.BlocksPerEpoch()-1
+	return ShardingSchedule.IsLastBlock(block.NumberU64())
 }
 
 func (bc *BlockChain) getProcInterrupt() bool {
@@ -1293,6 +1306,37 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 
 		cache, _ := bc.stateCache.TrieDB().Size()
 		stats.report(chain, i, cache)
+
+		//check non zero VRF field in header and add to local db
+		if len(block.Vrf()) > 0 {
+			vrfBlockNumbers, _ := bc.ReadEpochVrfBlockNums(block.Header().Epoch)
+			if (len(vrfBlockNumbers) > 0) && (vrfBlockNumbers[len(vrfBlockNumbers)-1] == block.NumberU64()) {
+				utils.Logger().Error().
+					Str("number", chain[i].Number().String()).
+					Str("epoch", block.Header().Epoch.String()).
+					Msg("VRF block number is already in local db")
+			} else {
+				vrfBlockNumbers = append(vrfBlockNumbers, block.NumberU64())
+				err = bc.WriteEpochVrfBlockNums(block.Header().Epoch, vrfBlockNumbers)
+				if err != nil {
+					utils.Logger().Error().
+						Str("number", chain[i].Number().String()).
+						Str("epoch", block.Header().Epoch.String()).
+						Msg("failed to write VRF block number to local db")
+				}
+			}
+		}
+
+		//check non zero Vdf in header and add to local db
+		if len(block.Vdf()) > 0 {
+			err = bc.WriteEpochVdfBlockNum(block.Header().Epoch, block.Number())
+			if err != nil {
+				utils.Logger().Error().
+					Str("number", chain[i].Number().String()).
+					Str("epoch", block.Header().Epoch.String()).
+					Msg("failed to write VDF block number to local db")
+			}
+		}
 	}
 	// Append a single chain head event if we've progressed the chain
 	if lastCanon != nil && bc.CurrentBlock().Hash() == lastCanon.Hash() {
@@ -1752,27 +1796,46 @@ func (bc *BlockChain) WriteShardStateBytes(
 	return nil
 }
 
+// ReadLastCommits retrieves last commits.
+func (bc *BlockChain) ReadLastCommits() ([]byte, error) {
+	if cached, ok := bc.lastCommitsCache.Get("lastCommits"); ok {
+		lastCommits := cached.([]byte)
+		return lastCommits, nil
+	}
+	lastCommits, err := rawdb.ReadLastCommits(bc.db)
+	if err != nil {
+		return nil, err
+	}
+	return lastCommits, nil
+}
+
+// WriteLastCommits saves the commits of last block.
+func (bc *BlockChain) WriteLastCommits(lastCommits []byte) error {
+	err := rawdb.WriteLastCommits(bc.db, lastCommits)
+	if err != nil {
+		return err
+	}
+	bc.lastCommitsCache.Add("lastCommits", lastCommits)
+	return nil
+}
+
 // GetVdfByNumber retrieves the rand seed given the block number, return 0 if not exist
-func (bc *BlockChain) GetVdfByNumber(number uint64) [32]byte {
+func (bc *BlockChain) GetVdfByNumber(number uint64) []byte {
 	header := bc.GetHeaderByNumber(number)
 	if header == nil {
-		return [32]byte{}
+		return []byte{}
 	}
-	result := [32]byte{}
-	//copy(result[:], header.Vdf[:32])
-	// TODO: add real vdf
-	return result
+
+	return header.Vdf
 }
 
 // GetVrfByNumber retrieves the randomness preimage given the block number, return 0 if not exist
-func (bc *BlockChain) GetVrfByNumber(number uint64) [32]byte {
+func (bc *BlockChain) GetVrfByNumber(number uint64) []byte {
 	header := bc.GetHeaderByNumber(number)
 	if header == nil {
-		return [32]byte{}
+		return []byte{}
 	}
-	//return header.Vrf
-	// TODO: add real vrf
-	return [32]byte{}
+	return header.Vrf
 }
 
 // GetShardState returns the shard state for the given epoch,
@@ -1832,6 +1895,78 @@ func (bc *BlockChain) StoreEpochBlockNumber(
 		).WithCause(err)
 	}
 	return nil
+}
+
+// ReadEpochVrfBlockNums retrieves block numbers with valid VRF for the specified epoch
+func (bc *BlockChain) ReadEpochVrfBlockNums(epoch *big.Int) ([]uint64, error) {
+	vrfNumbers := []uint64{}
+	if cached, ok := bc.randomnessCache.Get("vrf-" + string(epoch.Bytes())); ok {
+		encodedVrfNumbers := cached.([]byte)
+		if err := rlp.DecodeBytes(encodedVrfNumbers, &vrfNumbers); err != nil {
+			return nil, err
+		}
+		return vrfNumbers, nil
+	}
+
+	encodedVrfNumbers, err := rawdb.ReadEpochVrfBlockNums(bc.db, epoch)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := rlp.DecodeBytes(encodedVrfNumbers, &vrfNumbers); err != nil {
+		return nil, err
+	}
+	return vrfNumbers, nil
+}
+
+// WriteEpochVrfBlockNums saves block numbers with valid VRF for the specified epoch
+func (bc *BlockChain) WriteEpochVrfBlockNums(epoch *big.Int, vrfNumbers []uint64) error {
+	encodedVrfNumbers, err := rlp.EncodeToBytes(vrfNumbers)
+	if err != nil {
+		return err
+	}
+
+	err = rawdb.WriteEpochVrfBlockNums(bc.db, epoch, encodedVrfNumbers)
+	if err != nil {
+		return err
+	}
+	bc.randomnessCache.Add("vrf-"+string(epoch.Bytes()), encodedVrfNumbers)
+	return nil
+}
+
+// ReadEpochVdfBlockNum retrieves block number with valid VDF for the specified epoch
+func (bc *BlockChain) ReadEpochVdfBlockNum(epoch *big.Int) (*big.Int, error) {
+	if cached, ok := bc.randomnessCache.Get("vdf-" + string(epoch.Bytes())); ok {
+		encodedVdfNumber := cached.([]byte)
+		return new(big.Int).SetBytes(encodedVdfNumber), nil
+	}
+
+	encodedVdfNumber, err := rawdb.ReadEpochVdfBlockNum(bc.db, epoch)
+	if err != nil {
+		return nil, err
+	}
+	return new(big.Int).SetBytes(encodedVdfNumber), nil
+}
+
+// WriteEpochVdfBlockNum saves block number with valid VDF for the specified epoch
+func (bc *BlockChain) WriteEpochVdfBlockNum(epoch *big.Int, blockNum *big.Int) error {
+	err := rawdb.WriteEpochVdfBlockNum(bc.db, epoch, blockNum.Bytes())
+	if err != nil {
+		return err
+	}
+
+	bc.randomnessCache.Add("vdf-"+string(epoch.Bytes()), blockNum.Bytes())
+	return nil
+}
+
+// IsSameLeaderAsPreviousBlock retrieves a block from the database by number, caching it
+func (bc *BlockChain) IsSameLeaderAsPreviousBlock(block *types.Block) bool {
+	if block.NumberU64() == 0 {
+		return false
+	}
+
+	previousBlock := bc.GetBlockByNumber(block.NumberU64() - 1)
+	return block.Coinbase() == previousBlock.Coinbase()
 }
 
 // ChainDB ...

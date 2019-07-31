@@ -36,7 +36,7 @@ function cleanup() {
        $DRYRUN kill -9 $pid 2> /dev/null
    done
    rm -rf ./db/harmony_*
-   rm -rf ./db*
+   rm -rf ./db-127.0.0.1-*
 }
 
 function killnode() {
@@ -176,13 +176,6 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
   case "${mode}" in leader*) args=("${args[@]}" -is_leader);; esac
   case "${mode}" in *archival|archival) args=("${args[@]}" -is_archival);; esac
   case "${mode}" in explorer*) args=("${args[@]}" -is_genesis=false -is_explorer=true -shard_id=0);; esac
-  case "${mode}" in
-  newnode)
-    sleep "${NUM_NN}"
-    NUM_NN=$((${NUM_NN} + 1))
-    args=("${args[@]}" -is_newnode)
-    ;;
-  esac
   case "${mode}" in
   client) ;;
   *) $DRYRUN "${ROOT}/bin/harmony" "${args[@]}" "${extra_args[@]}" 2>&1 | tee -a "${LOG_FILE}" &;;

@@ -165,8 +165,7 @@ func (s *Service) Run() {
 	registry := prometheus.NewRegistry()
 	registry.MustRegister(blockHeightCounter, connectionsNumberGauge, nodeBalanceGauge, lastConsensusGauge, blockRewardGauge, blockHeightGauge)
 
-	s.pusher = push.New("http://"+s.PushgatewayIP+":"+s.PushgatewayPort, "metrics").Gatherer(registry)
-
+	s.pusher = push.New("http://"+s.PushgatewayIP+":"+s.PushgatewayPort, "node_metrics").Gatherer(registry).Grouping("node_id", s.BlsPublicKey+"_"+s.IP+":"+s.Port)
 	go s.PushMetrics()
 
 	//s.router.Path("/connectionsstats").Queries("since", "{[0-9]*?}", "until", "{[0-9]*?}").HandlerFunc(s.GetConnectionsStats).Methods("GET")

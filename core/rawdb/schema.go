@@ -55,6 +55,7 @@ var (
 	bloomBitsPrefix = []byte("B") // bloomBitsPrefix + bit (uint16 big endian) + section (uint64 big endian) + hash -> bloom bits
 
 	shardStatePrefix = []byte("ss") // shardStatePrefix + num (uint64 big endian) + hash -> shardState
+	lastCommitsKey   = []byte("LastCommits")
 
 	preimagePrefix = []byte("secure-key-")      // preimagePrefix + hash -> preimage
 	configPrefix   = []byte("ethereum-config-") // config prefix for the db
@@ -62,6 +63,12 @@ var (
 	// epochBlockNumberPrefix + epoch (big.Int.Bytes())
 	// -> epoch block number (big.Int.Bytes())
 	epochBlockNumberPrefix = []byte("harmony-epoch-block-number-")
+
+	// epochVrfBlockNumbersPrefix  + epoch (big.Int.Bytes())
+	epochVrfBlockNumbersPrefix = []byte("epoch-vrf-block-numbers-")
+
+	// epochVdfBlockNumberPrefix  + epoch (big.Int.Bytes())
+	epochVdfBlockNumberPrefix = []byte("epoch-vdf-block-number-")
 
 	// Chain index prefixes (use `i` + single byte to avoid mixing data types).
 	BloomBitsIndexPrefix = []byte("iB") // BloomBitsIndexPrefix is the data table of a chain indexer to track its progress
@@ -146,4 +153,12 @@ func shardStateKey(epoch *big.Int) []byte {
 
 func epochBlockNumberKey(epoch *big.Int) []byte {
 	return append(epochBlockNumberPrefix, epoch.Bytes()...)
+}
+
+func epochVrfBlockNumbersKey(epoch *big.Int) []byte {
+	return append(epochVrfBlockNumbersPrefix, epoch.Bytes()...)
+}
+
+func epochVdfBlockNumberKey(epoch *big.Int) []byte {
+	return append(epochVdfBlockNumberPrefix, epoch.Bytes()...)
 }

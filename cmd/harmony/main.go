@@ -88,9 +88,7 @@ var (
 	// networkType indicates the type of the network
 	networkType = flag.String("network_type", "mainnet", "type of the network: mainnet, testnet, devnet, localnet")
 	// blockPeriod indicates the how long the leader waits to propose a new block.
-	blockPeriod = flag.Int("block_period", 8, "how long in second the leader waits to propose a new block.")
-	// isNewNode indicates this node is a new node
-	isNewNode      = flag.Bool("is_newnode", false, "true means this node is a new node")
+	blockPeriod    = flag.Int("block_period", 8, "how long in second the leader waits to propose a new block.")
 	leaderOverride = flag.Bool("leader_override", false, "true means override the default leader role and acts as validator")
 	// shardID indicates the shard ID of this node
 	shardID            = flag.Int("shard_id", -1, "the shard ID of this node")
@@ -110,7 +108,7 @@ var (
 
 	keystoreDir = flag.String("keystore", hmykey.DefaultKeyStoreDir, "The default keystore directory")
 
-	genesisAccount = &genesis.DeployAccount{}
+	initialAccount = &genesis.DeployAccount{}
 
 	// logging verbosity
 	verbosity = flag.Int("verbosity", 5, "Logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail (default: 5)")
@@ -164,11 +162,6 @@ func initSetup() {
 		}
 		utils.BootNodes = bootNodeAddrs
 	}
-
-	// Set up manual call for garbage collection.
-	if *enableGC {
-		memprofiling.MaybeCallGCPeriodically()
-	}
 }
 
 func passphraseForBls() {
@@ -185,34 +178,34 @@ func passphraseForBls() {
 	blsPassphrase = passphrase
 }
 
-func setupGenesisAccount() (isLeader bool) {
+func setupInitialAccount() (isLeader bool) {
 	genesisShardingConfig := core.ShardingSchedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch))
-	pubKey := setUpConsensusKey(nodeconfig.GetDefaultConfig())
+	pubKey := setupConsensusKey(nodeconfig.GetDefaultConfig())
 
 	reshardingEpoch := genesisShardingConfig.ReshardingEpoch()
 	if reshardingEpoch != nil && len(reshardingEpoch) > 0 {
 		for _, epoch := range reshardingEpoch {
 			config := core.ShardingSchedule.InstanceForEpoch(epoch)
-			isLeader, genesisAccount = config.FindAccount(pubKey.SerializeToHexStr())
-			if genesisAccount != nil {
+			isLeader, initialAccount = config.FindAccount(pubKey.SerializeToHexStr())
+			if initialAccount != nil {
 				break
 			}
 		}
 	} else {
-		isLeader, genesisAccount = genesisShardingConfig.FindAccount(pubKey.SerializeToHexStr())
+		isLeader, initialAccount = genesisShardingConfig.FindAccount(pubKey.SerializeToHexStr())
 	}
 
-	if genesisAccount == nil {
+	if initialAccount == nil {
 		fmt.Printf("cannot find your BLS key in the genesis/FN tables: %s\n", pubKey.SerializeToHexStr())
 		os.Exit(100)
 	}
 
-	fmt.Printf("My Genesis Account: %v\n", *genesisAccount)
+	fmt.Printf("My Genesis Account: %v\n", *initialAccount)
 
 	return isLeader
 }
 
-func setUpConsensusKey(nodeConfig *nodeconfig.ConfigType) *bls.PublicKey {
+func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) *bls.PublicKey {
 	consensusPriKey, err := blsgen.LoadBlsKeyWithPassPhrase(*blsKeyFile, blsPassphrase)
 	if err != nil {
 		fmt.Printf("error when loading bls key, err :%v\n", err)
@@ -229,13 +222,13 @@ func setUpConsensusKey(nodeConfig *nodeconfig.ConfigType) *bls.PublicKey {
 	return pubKey
 }
 
-func createGlobalConfig(isLeader bool) *nodeconfig.ConfigType {
+func createGlobalConfig() *nodeconfig.ConfigType {
 	var err error
 
-	nodeConfig := nodeconfig.GetShardConfig(genesisAccount.ShardID)
+	nodeConfig := nodeconfig.GetShardConfig(initialAccount.ShardID)
 	if !*isExplorer {
 		// Set up consensus keys.
-		setUpConsensusKey(nodeConfig)
+		setupConsensusKey(nodeConfig)
 	} else {
 		nodeConfig.ConsensusPriKey = &bls.SecretKey{} // set dummy bls key for consensus object
 	}
@@ -264,13 +257,6 @@ func createGlobalConfig(isLeader bool) *nodeconfig.ConfigType {
 	}
 	nodeConfig.SelfPeer = p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nodeConfig.ConsensusPubKey}
 
-	if isLeader && !*isExplorer && !*leaderOverride { // The first node in a shard is the leader at genesis
-		nodeConfig.Leader = nodeConfig.SelfPeer
-		nodeConfig.StringRole = "leader"
-	} else {
-		nodeConfig.StringRole = "validator"
-	}
-
 	nodeConfig.Host, err = p2pimpl.NewHost(&nodeConfig.SelfPeer, nodeConfig.P2pPriKey)
 	if *logConn && nodeConfig.GetNetworkType() != nodeconfig.Mainnet {
 		nodeConfig.Host.GetP2PHost().Network().Notify(utils.NewConnLogger(utils.GetLogInstance()))
@@ -279,22 +265,17 @@ func createGlobalConfig(isLeader bool) *nodeconfig.ConfigType {
 		panic("unable to new host in harmony")
 	}
 
-	if err := nodeConfig.Host.AddPeer(&nodeConfig.Leader); err != nil {
-		ctxerror.Warn(utils.GetLogger(), err, "(*p2p.Host).AddPeer failed",
-			"peer", &nodeConfig.Leader)
-	}
-
 	nodeConfig.DBDir = *dbDir
 
 	return nodeConfig
 }
 
-func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
+func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// Consensus object.
 	// TODO: consensus object shouldn't start here
 	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of consensus later.
 	currentConsensus, err := consensus.New(nodeConfig.Host, nodeConfig.ShardID, nodeConfig.Leader, nodeConfig.ConsensusPriKey)
-	currentConsensus.SelfAddress = common.ParseAddr(genesisAccount.Address)
+	currentConsensus.SelfAddress = common.ParseAddr(initialAccount.Address)
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error :%v \n", err)
@@ -308,10 +289,6 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentConsensus.SetCommitDelay(commitDelay)
 	currentConsensus.MinPeers = *minPeers
 
-	if *isNewNode {
-		currentConsensus.SetMode(consensus.Listening)
-	}
-
 	if *disableViewChange {
 		currentConsensus.DisableViewChangeForTestingOnly()
 	}
@@ -324,7 +301,6 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	} else if *dnsFlag {
 		currentNode.SetDNSZone("t.hmny.io")
 	}
-	currentNode.NodeConfig.SetRole(nodeconfig.NewNode)
 	// TODO: add staking support
 	// currentNode.StakingAccount = myAccount
 	utils.GetLogInstance().Info("node account set",
@@ -337,50 +313,19 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentNode.NodeConfig.SetPushgatewayIP(nodeConfig.PushgatewayIP)
 	currentNode.NodeConfig.SetPushgatewayPort(nodeConfig.PushgatewayPort)
 
-	// TODO: the setup should only based on shard state
-	if *isGenesis {
-		// TODO: need change config file and use switch instead of complicated "if else" condition
-		if nodeConfig.ShardID == 0 { // Beacon chain
-			nodeConfig.SetIsBeacon(true)
-			if nodeConfig.StringRole == "leader" {
-				currentNode.NodeConfig.SetRole(nodeconfig.BeaconLeader)
-				currentNode.NodeConfig.SetIsLeader(true)
-			} else {
-				currentNode.NodeConfig.SetRole(nodeconfig.BeaconValidator)
-				currentNode.NodeConfig.SetIsLeader(false)
-			}
+	if *isExplorer {
+		currentNode.NodeConfig.SetRole(nodeconfig.ExplorerNode)
+		currentNode.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(*shardID)))
+		currentNode.NodeConfig.SetClientGroupID(p2p.NewClientGroupIDByShardID(p2p.ShardID(*shardID)))
+	} else {
+		if nodeConfig.ShardID == 0 {
+			currentNode.NodeConfig.SetRole(nodeconfig.Validator)
 			currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
 			currentNode.NodeConfig.SetClientGroupID(p2p.GroupIDBeaconClient)
 		} else {
-			if nodeConfig.StringRole == "leader" {
-				currentNode.NodeConfig.SetRole(nodeconfig.ShardLeader)
-				currentNode.NodeConfig.SetIsLeader(true)
-			} else {
-				currentNode.NodeConfig.SetRole(nodeconfig.ShardValidator)
-				currentNode.NodeConfig.SetIsLeader(false)
-			}
+			currentNode.NodeConfig.SetRole(nodeconfig.Validator)
 			currentNode.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
 			currentNode.NodeConfig.SetClientGroupID(p2p.NewClientGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
-		}
-	} else {
-		if *isNewNode {
-			currentNode.NodeConfig.SetIsLeader(false) // newnode can't be the leader
-			if nodeConfig.ShardID == 0 {              // Beacon chain
-				nodeConfig.SetIsBeacon(true)
-				currentNode.NodeConfig.SetRole(nodeconfig.BeaconValidator)
-				currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
-				currentNode.NodeConfig.SetClientGroupID(p2p.GroupIDBeaconClient)
-			} else {
-				currentNode.NodeConfig.SetRole(nodeconfig.ShardValidator)
-				currentNode.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
-				currentNode.NodeConfig.SetClientGroupID(p2p.NewClientGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
-			}
-		}
-		if *isExplorer {
-			currentNode.NodeConfig.SetRole(nodeconfig.ExplorerNode)
-			currentNode.NodeConfig.SetIsLeader(false)
-			currentNode.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(*shardID)))
-			currentNode.NodeConfig.SetClientGroupID(p2p.NewClientGroupIDByShardID(p2p.ShardID(*shardID)))
 		}
 	}
 	currentNode.NodeConfig.ConsensusPubKey = nodeConfig.ConsensusPubKey
@@ -397,12 +342,9 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// currentNode.DRand = dRand
 
 	// This needs to be executed after consensus and drand are setup
-	if !*isNewNode || *shardID > -1 { // initial staking new node doesn't need to initialize shard state
-		// TODO: Have a better way to distinguish non-genesis node
-		if err := currentNode.InitShardState(*shardID == -1 && !*isNewNode); err != nil {
-			ctxerror.Crit(utils.GetLogger(), err, "InitShardState failed",
-				"shardID", *shardID, "isNewNode", *isNewNode)
-		}
+	if err := currentNode.InitShardState(); err != nil {
+		ctxerror.Crit(utils.GetLogger(), err, "InitShardState failed",
+			"shardID", *shardID)
 	}
 
 	// Set the consensus ID to be the current block number
@@ -460,17 +402,17 @@ func main() {
 		memprofiling.MaybeCallGCPeriodically()
 	}
 
-	isLeader := false
-	if !*isExplorer { // Explorer node doesn't need the following setup
-		isLeader = setupGenesisAccount()
-	}
-	if *shardID >= 0 {
-		utils.GetLogInstance().Info("ShardID Override", "original", genesisAccount.ShardID, "override", *shardID)
-		genesisAccount.ShardID = uint32(*shardID)
+	if !*isExplorer {
+		setupInitialAccount()
 	}
 
-	nodeConfig := createGlobalConfig(isLeader)
-	currentNode := setUpConsensusAndNode(nodeConfig)
+	if *shardID >= 0 {
+		utils.GetLogInstance().Info("ShardID Override", "original", initialAccount.ShardID, "override", *shardID)
+		initialAccount.ShardID = uint32(*shardID)
+	}
+
+	nodeConfig := createGlobalConfig()
+	currentNode := setupConsensusAndNode(nodeConfig)
 
 	//if consensus.ShardID != 0 {
 	//	go currentNode.SupportBeaconSyncing()

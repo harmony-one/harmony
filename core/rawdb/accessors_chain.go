@@ -447,6 +447,27 @@ func WriteShardStateBytes(
 	return nil
 }
 
+// ReadLastCommits retrieves LastCommits.
+func ReadLastCommits(db DatabaseReader) ([]byte, error) {
+	var data []byte
+	data, err := db.Get(lastCommitsKey)
+	if err != nil {
+		return nil, ctxerror.New("cannot read last commits from rawdb").WithCause(err)
+	}
+	return data, nil
+}
+
+// WriteLastCommits stores last commits into database.
+func WriteLastCommits(
+	db DatabaseWriter, data []byte,
+) (err error) {
+	if err = db.Put(lastCommitsKey, data); err != nil {
+		return ctxerror.New("cannot write last commits").WithCause(err)
+	}
+	utils.GetLogger().Info("wrote last commits", "numShards", len(data))
+	return nil
+}
+
 // ReadEpochBlockNumber retrieves the epoch block number for the given epoch,
 // or nil if the given epoch is not found in the database.
 func ReadEpochBlockNumber(db DatabaseReader, epoch *big.Int) (*big.Int, error) {
@@ -457,8 +478,27 @@ func ReadEpochBlockNumber(db DatabaseReader, epoch *big.Int) (*big.Int, error) {
 	return new(big.Int).SetBytes(data), nil
 }
 
-// WriteEpochBlockNumber stores the given epoch-number-to-epoch-block-number
-// in the database.
+// WriteEpochBlockNumber stores the given epoch-number-to-epoch-block-number in the database.
 func WriteEpochBlockNumber(db DatabaseWriter, epoch, blockNum *big.Int) error {
 	return db.Put(epochBlockNumberKey(epoch), blockNum.Bytes())
+}
+
+// ReadEpochVrfBlockNums retrieves the VRF block numbers for the given epoch
+func ReadEpochVrfBlockNums(db DatabaseReader, epoch *big.Int) ([]byte, error) {
+	return db.Get(epochVrfBlockNumbersKey(epoch))
+}
+
+// WriteEpochVrfBlockNums stores the VRF block numbers for the given epoch
+func WriteEpochVrfBlockNums(db DatabaseWriter, epoch *big.Int, data []byte) error {
+	return db.Put(epochVrfBlockNumbersKey(epoch), data)
+}
+
+// ReadEpochVdfBlockNum retrieves the VDF block number for the given epoch
+func ReadEpochVdfBlockNum(db DatabaseReader, epoch *big.Int) ([]byte, error) {
+	return db.Get(epochVdfBlockNumberKey(epoch))
+}
+
+// WriteEpochVdfBlockNum stores the VDF block number for the given epoch
+func WriteEpochVdfBlockNum(db DatabaseWriter, epoch *big.Int, data []byte) error {
+	return db.Put(epochVdfBlockNumberKey(epoch), data)
 }

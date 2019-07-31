@@ -15,6 +15,15 @@ type Schedule interface {
 
 	// BlocksPerEpoch returns the number of blocks per each Epoch
 	BlocksPerEpoch() uint64
+
+	// CalcEpochNumber returns the epoch number based on the block number
+	CalcEpochNumber(blockNum uint64) *big.Int
+
+	// IsLastBlock check if the block is the last block in the epoch
+	IsLastBlock(blockNum uint64) bool
+
+	// VDFDifficulty returns number of iterations for VDF calculation
+	VdfDifficulty() int
 }
 
 // Instance is one sharding configuration instance.
