@@ -18,7 +18,6 @@
 package core
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -1309,8 +1308,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 		stats.report(chain, i, cache)
 
 		//check non zero VRF field in header and add to local db
-		zeroVrfBytes := make([]byte, 32)
-		if !bytes.Equal(block.Header().Vrf[:], zeroVrfBytes) {
+		if len(block.Vrf()) > 0 {
 			vrfBlockNumbers, _ := bc.ReadEpochVrfBlockNums(block.Header().Epoch)
 			if (len(vrfBlockNumbers) > 0) && (vrfBlockNumbers[len(vrfBlockNumbers)-1] == block.NumberU64()) {
 				utils.Logger().Error().
@@ -1329,9 +1327,8 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 			}
 		}
 
-		//check non zero VDF field in header and add to local db
-		zeroVdfBytes := make([]byte, 258)
-		if !bytes.Equal(block.Header().Vdf[:], zeroVdfBytes) {
+		//check non zero Vdf in header and add to local db
+		if len(block.Vdf()) > 0 {
 			err = bc.WriteEpochVdfBlockNum(block.Header().Epoch, block.Number())
 			if err != nil {
 				utils.Logger().Error().
@@ -1823,22 +1820,20 @@ func (bc *BlockChain) WriteLastCommits(lastCommits []byte) error {
 }
 
 // GetVdfByNumber retrieves the rand seed given the block number, return 0 if not exist
-func (bc *BlockChain) GetVdfByNumber(number uint64) [32]byte {
+func (bc *BlockChain) GetVdfByNumber(number uint64) []byte {
 	header := bc.GetHeaderByNumber(number)
 	if header == nil {
-		return [32]byte{}
+		return []byte{}
 	}
-	result := [32]byte{}
-	//copy(result[:], header.Vdf[:32])
-	// TODO: add real vdf
-	return result
+
+	return header.Vdf
 }
 
 // GetVrfByNumber retrieves the randomness preimage given the block number, return 0 if not exist
-func (bc *BlockChain) GetVrfByNumber(number uint64) [32]byte {
+func (bc *BlockChain) GetVrfByNumber(number uint64) []byte {
 	header := bc.GetHeaderByNumber(number)
 	if header == nil {
-		return [32]byte{}
+		return []byte{}
 	}
 	return header.Vrf
 }

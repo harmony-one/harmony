@@ -211,16 +211,14 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		//VRF/VDF is only generated in the beach chain
 		if consensus.ShardID == 0 {
 			//validate the VRF with proof if a non zero VRF is found in header
-			zeroVrfBytes := make([]byte, 32)
-			if !bytes.Equal(headerObj.Vrf[:], zeroVrfBytes) {
+			if len(headerObj.Vrf) > 0 {
 				if !consensus.ValidateVrfAndProof(headerObj) {
 					return
 				}
 			}
 
 			//validate the VDF with proof if a non zero VDF is found in header
-			zeroVdfBytes := make([]byte, 258)
-			if !bytes.Equal(headerObj.Vdf[:], zeroVdfBytes) {
+			if len(headerObj.Vdf) > 0 {
 				if !consensus.ValidateVdfAndProof(headerObj) {
 					return
 				}
@@ -1163,12 +1161,7 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 										Uint64("Epoch", newBlock.Header().Epoch.Uint64()).
 										Msg("[ConsensusMainLoop] Generated a new VDF")
 
-									vdf := [258]byte{}
-									proof := [258]byte{}
-									copy(vdf[:], vdfOutput[:258])
-									copy(proof[:], vdfOutput[258:])
-									newBlock.AddVdf(vdf)
-									newBlock.AddVdfProof(proof)
+									newBlock.AddVdf(vdfOutput[:])
 								}
 							}
 						} else {
@@ -1214,10 +1207,7 @@ func (consensus *Consensus) GenerateVrfAndProof(newBlock *types.Block, vrfBlockN
 	copy(blockHash[:], previousHash[:])
 
 	vrf, proof := sk.Evaluate(blockHash[:])
-	vrfProof := [96]byte{}
-	copy(vrfProof[:], proof[:96])
-	newBlock.AddVrf(vrf)
-	newBlock.AddVrfProof(vrfProof)
+	newBlock.AddVrf(append(vrf[:], proof...))
 
 	consensus.getLogger().Info().
 		Uint64("MsgBlockNum", newBlock.NumberU64()).
@@ -1237,7 +1227,9 @@ func (consensus *Consensus) ValidateVrfAndProof(headerObj types.Header) bool {
 	previousHash := previousHeader.Hash()
 	copy(blockHash[:], previousHash[:])
 
-	hash, err := vrfPk.ProofToHash(blockHash[:], headerObj.VrfProof[:])
+	vrfProof := [96]byte{}
+	copy(vrfProof[:], headerObj.Vrf[32:])
+	hash, err := vrfPk.ProofToHash(blockHash[:], vrfProof[:])
 	if err != nil {
 		consensus.getLogger().Warn().
 			Err(err).
@@ -1246,7 +1238,7 @@ func (consensus *Consensus) ValidateVrfAndProof(headerObj types.Header) bool {
 		return false
 	}
 
-	if hash != headerObj.Vrf {
+	if !bytes.Equal(hash[:], headerObj.Vrf[:32]) {
 		consensus.getLogger().Warn().
 			Str("MsgBlockNum", headerObj.Number.String()).
 			Msg("[OnAnnounce] VRF proof is not valid")
@@ -1307,14 +1299,13 @@ func (consensus *Consensus) ValidateVdfAndProof(headerObj types.Header) bool {
 			Msg("[OnAnnounce] failed to read VRF block numbers for VDF computation")
 	}
 
-	seed := [32]byte{}
-
 	//extra check to make sure there's no index out of range error
 	//it can happen if epoch is messed up, i.e. VDF ouput is generated in the next epoch
 	if consensus.VdfSeedSize() > len(vrfBlockNumbers) {
 		return false
 	}
 
+	seed := [32]byte{}
 	for i := 0; i < consensus.VdfSeedSize(); i++ {
 		previousVrf := consensus.ChainReader.GetVrfByNumber(vrfBlockNumbers[i])
 		for j := 0; j < len(seed); j++ {
@@ -1324,8 +1315,7 @@ func (consensus *Consensus) ValidateVdfAndProof(headerObj types.Header) bool {
 
 	vdfObject := vdf_go.New(core.ShardingSchedule.VdfDifficulty(), seed)
 	vdfOutput := [516]byte{}
-	copy(vdfOutput[:258], headerObj.Vdf[:])
-	copy(vdfOutput[258:], headerObj.VdfProof[:])
+	copy(vdfOutput[:], headerObj.Vdf)
 	if vdfObject.Verify(vdfOutput) {
 		consensus.getLogger().Info().
 			Str("MsgBlockNum", headerObj.Number.String()).

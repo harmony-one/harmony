@@ -90,10 +90,8 @@ type Header struct {
 	LastCommitSignature [96]byte    `json:"lastCommitSignature"  gencodec:"required"`
 	LastCommitBitmap    []byte      `json:"lastCommitBitmap"     gencodec:"required"` // Contains which validator signed
 	ShardStateHash      common.Hash `json:"shardStateRoot"`
-	Vrf                 [32]byte    `json:"vrf"`
-	VrfProof            [96]byte    `json:"vrfProof"`
-	Vdf                 [258]byte   `json:"vdf"`
-	VdfProof            [258]byte   `json:"VdfProof"`
+	Vrf                 []byte      `json:"vrf"`
+	Vdf                 []byte      `json:"vdf"`
 	ShardState          []byte      `json:"shardState"`
 }
 
@@ -280,6 +278,14 @@ func CopyHeader(h *Header) *Header {
 		cpy.ShardState = make([]byte, len(h.ShardState))
 		copy(cpy.ShardState, h.ShardState)
 	}
+	if len(h.Vrf) > 0 {
+		cpy.Vrf = make([]byte, len(h.Vrf))
+		copy(cpy.Vrf, h.Vrf)
+	}
+	if len(h.Vdf) > 0 {
+		cpy.Vdf = make([]byte, len(h.Vdf))
+		copy(cpy.Vdf, h.Vdf)
+	}
 	//if len(h.CrossLinks) > 0 {
 	//	cpy.CrossLinks = make([]byte, len(h.CrossLinks))
 	//	copy(cpy.CrossLinks, h.CrossLinks)
@@ -387,6 +393,12 @@ func (b *Block) Header() *Header { return CopyHeader(b.header) }
 // Body returns the non-header content of the block.
 func (b *Block) Body() *Body { return &Body{b.transactions, b.uncles} }
 
+// Vdf returns header Vdf.
+func (b *Block) Vdf() []byte { return common.CopyBytes(b.header.Vdf) }
+
+// Vrf returns header Vrf.
+func (b *Block) Vrf() []byte { return common.CopyBytes(b.header.Vrf) }
+
 // Size returns the true RLP encoded storage size of the block, either by encoding
 // and returning it, or returning a previsouly cached value.
 func (b *Block) Size() common.StorageSize {
@@ -490,23 +502,13 @@ func Number(b1, b2 *Block) bool {
 }
 
 // AddVrf add vrf into block header
-func (b *Block) AddVrf(vrf [32]byte) {
+func (b *Block) AddVrf(vrf []byte) {
 	b.header.Vrf = vrf
 }
 
-// AddVrfProof add vrf into block header
-func (b *Block) AddVrfProof(proof [96]byte) {
-	b.header.VrfProof = proof
-}
-
 // AddVdf add vdf into block header
-func (b *Block) AddVdf(vdf [258]byte) {
+func (b *Block) AddVdf(vdf []byte) {
 	b.header.Vdf = vdf
-}
-
-// AddVdfProof add vdf and proof into block header
-func (b *Block) AddVdfProof(proof [258]byte) {
-	b.header.VdfProof = proof
 }
 
 // AddShardState add shardState into block header
