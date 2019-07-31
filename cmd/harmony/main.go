@@ -301,10 +301,6 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentConsensus.SetCommitDelay(commitDelay)
 	currentConsensus.MinPeers = *minPeers
 
-	if *isNewNode {
-		currentConsensus.SetMode(consensus.Listening)
-	}
-
 	if *disableViewChange {
 		currentConsensus.DisableViewChangeForTestingOnly()
 	}
@@ -398,6 +394,9 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentConsensus.BlockVerifier = currentNode.VerifyNewBlock
 	currentConsensus.OnConsensusDone = currentNode.PostConsensusProcessing
 	currentNode.State = node.NodeWaitToJoin
+
+	// update consensus information based on the blockchain
+	currentConsensus.UpdateConsensusInformation()
 
 	// Watching currentNode and currentConsensus.
 	memprofiling.GetMemProfiling().Add("currentNode", currentNode)

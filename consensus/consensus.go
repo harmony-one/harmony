@@ -38,6 +38,10 @@ type Consensus struct {
 	phase PbftPhase
 	// mode: indicate a node is in normal or viewchanging mode
 	mode PbftMode
+
+	// epoch: current epoch number
+	epoch uint64
+
 	// blockNum: the next blockNumber that PBFT is going to agree on, should be equal to the blockNumber of next block
 	blockNum uint64
 	// channel to receive consensus message
