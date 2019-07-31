@@ -1101,9 +1101,9 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 					if !consensus.ChainReader.IsSameLeaderAsPreviousBlock(newBlock) {
 						vrfBlockNumbers, err := consensus.ChainReader.ReadEpochVrfBlockNums(newBlock.Header().Epoch)
 						if err != nil {
-							consensus.getLogger().Error().Err(err).
+							consensus.getLogger().Info().
 								Uint64("MsgBlockNum", newBlock.NumberU64()).
-								Msg("[ConsensusMainLoop] failed to read VRF block number from local db")
+								Msg("[ConsensusMainLoop] no VRF block number from local db")
 						}
 
 						//check if VRF is already generated for the current block

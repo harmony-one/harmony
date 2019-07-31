@@ -1962,7 +1962,7 @@ func (bc *BlockChain) WriteEpochVdfBlockNum(epoch *big.Int, blockNum *big.Int) e
 // IsSameLeaderAsPreviousBlock retrieves a block from the database by number, caching it
 func (bc *BlockChain) IsSameLeaderAsPreviousBlock(block *types.Block) bool {
 	if block.NumberU64() == 0 {
-		return true
+		return false
 	}
 
 	previousBlock := bc.GetBlockByNumber(block.NumberU64() - 1)

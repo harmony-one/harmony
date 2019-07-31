@@ -39,16 +39,16 @@ func (consensus *Consensus) WaitForNewRandomness() {
 }
 
 // GetNextRnd returns the oldest available randomness along with the hash of the block there randomness preimage is committed.
-func (consensus *Consensus) GetNextRnd() ([516]byte, [32]byte, error) {
+func (consensus *Consensus) GetNextRnd() ([vdFAndProofSize]byte, [32]byte, error) {
 	if len(consensus.pendingRnds) == 0 {
-		return [516]byte{}, [32]byte{}, errors.New("No available randomness")
+		return [vdFAndProofSize]byte{}, [32]byte{}, errors.New("No available randomness")
 	}
 	vdfOutput := consensus.pendingRnds[0]
 
-	vdfBytes := [516]byte{}
+	vdfBytes := [vdFAndProofSize]byte{}
 	seed := [32]byte{}
-	copy(vdfBytes[:], vdfOutput[:516])
-	copy(seed[:], vdfOutput[516:])
+	copy(vdfBytes[:], vdfOutput[:vdFAndProofSize])
+	copy(seed[:], vdfOutput[vdFAndProofSize:])
 
 	//pop the first vdfOutput from the list
 	consensus.pendingRnds = consensus.pendingRnds[1:]

@@ -11,7 +11,7 @@ const (
 	blocksPerShard     = 16384  // 2^14
 	mainnetV1Epoch     = 1
 
-	mainnetVdfDifficulty = 100000 // This takes about 200s to finish the vdf
+	mainnetVdfDifficulty = 50000 // This takes about 100s to finish the vdf
 )
 
 // MainnetSchedule is the mainnet sharding configuration schedule.
