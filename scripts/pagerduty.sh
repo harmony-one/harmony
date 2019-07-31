@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 ### Log variables
-LOGFILE="/home/tmp_log/log-20190628.153354/*.log"
+LOGFILE="/home/tmp_log/log-20190628.153354/zerolog*.log"
 LOG=$(tail -n 1000 $LOGFILE)
 
 ### POST constants
