@@ -21,6 +21,9 @@ type Schedule interface {
 
 	// IsLastBlock check if the block is the last block in the epoch
 	IsLastBlock(blockNum uint64) bool
+
+	// VDFDifficulty returns number of iterations for VDF calculation
+	VdfDifficulty() int
 }
 
 // Instance is one sharding configuration instance.

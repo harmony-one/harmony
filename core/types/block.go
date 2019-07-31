@@ -90,6 +90,10 @@ type Header struct {
 	LastCommitSignature [96]byte    `json:"lastCommitSignature"  gencodec:"required"`
 	LastCommitBitmap    []byte      `json:"lastCommitBitmap"     gencodec:"required"` // Contains which validator signed
 	ShardStateHash      common.Hash `json:"shardStateRoot"`
+	Vrf                 [32]byte    `json:"vrf"`
+	VrfProof            [96]byte    `json:"vrfProof"`
+	Vdf                 [258]byte   `json:"vdf"`
+	VdfProof            [258]byte   `json:"VdfProof"`
 	ShardState          []byte      `json:"shardState"`
 }
 
@@ -485,15 +489,25 @@ func Number(b1, b2 *Block) bool {
 	return b1.header.Number.Cmp(b2.header.Number) < 0
 }
 
-//// AddVdf add vdf into block header
-//func (b *Block) AddVdf(vdf [258]byte) {
-//	b.header.Vdf = vdf
-//}
-//
-//// AddVrf add vrf into block header
-//func (b *Block) AddVrf(vrf [32]byte) {
-//	b.header.Vrf = vrf
-//}
+// AddVrf add vrf into block header
+func (b *Block) AddVrf(vrf [32]byte) {
+	b.header.Vrf = vrf
+}
+
+// AddVrfProof add vrf into block header
+func (b *Block) AddVrfProof(proof [96]byte) {
+	b.header.VrfProof = proof
+}
+
+// AddVdf add vdf into block header
+func (b *Block) AddVdf(vdf [258]byte) {
+	b.header.Vdf = vdf
+}
+
+// AddVdfProof add vdf and proof into block header
+func (b *Block) AddVdfProof(proof [258]byte) {
+	b.header.VdfProof = proof
+}
 
 // AddShardState add shardState into block header
 func (b *Block) AddShardState(shardState ShardState) error {

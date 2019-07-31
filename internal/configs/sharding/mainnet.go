@@ -10,6 +10,8 @@ const (
 	mainnetEpochBlock1 = 327680 // 20 * 2^14
 	blocksPerShard     = 16384  // 2^14
 	mainnetV1Epoch     = 1
+
+	mainnetVdfDifficulty = 100000 // This takes about 200s to finish the vdf
 )
 
 // MainnetSchedule is the mainnet sharding configuration schedule.
@@ -51,6 +53,10 @@ func (ms mainnetSchedule) IsLastBlock(blockNum uint64) bool {
 	default:
 		return ((blockNum-mainnetEpochBlock1)%blocks == blocks-1)
 	}
+}
+
+func (ms mainnetSchedule) VdfDifficulty() int {
+	return mainnetVdfDifficulty
 }
 
 var mainnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(mainnetV1Epoch)}

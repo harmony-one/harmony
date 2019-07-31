@@ -7,11 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/harmony-one/harmony/core"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/core"
 
 	"github.com/harmony-one/harmony/common/denominations"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
@@ -134,9 +133,9 @@ type Consensus struct {
 
 	// Channel for DRG protocol to send pRnd (preimage of randomness resulting from combined vrf randomnesses) to consensus. The first 32 bytes are randomness, the rest is for bitmap.
 	PRndChannel chan []byte
-	// Channel for DRG protocol to send the final randomness to consensus. The first 32 bytes are the randomness and the last 32 bytes are the hash of the block where the corresponding pRnd was generated
-	RndChannel  chan [64]byte
-	pendingRnds [][64]byte // A list of pending randomness
+	// Channel for DRG protocol to send VDF. The first 516 bytes are the VDF/Proof and the last 32 bytes are the seed for deriving VDF
+	RndChannel  chan [548]byte
+	pendingRnds [][548]byte // A list of pending randomness
 
 	uniqueIDInstance *utils.UniqueValidatorID
 
@@ -209,6 +208,11 @@ func (consensus *Consensus) PreviousQuorum() int {
 	return consensus.numPrevPubKeys*2/3 + 1
 }
 
+// VdfSeedSize returns the number of VRFs for VDF computation
+func (consensus *Consensus) VdfSeedSize() int {
+	return len(consensus.PublicKeys) * 2 / 3
+}
+
 // RewardThreshold returns the threshold to stop accepting commit messages
 // when leader receives enough signatures for block reward
 func (consensus *Consensus) RewardThreshold() int {
@@ -269,6 +273,9 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 	consensus.commitFinishChan = make(chan uint64)
 
 	consensus.ReadySignal = make(chan struct{})
+
+	// channel for receiving newly generated VDF
+	consensus.RndChannel = make(chan [548]byte)
 
 	consensus.uniqueIDInstance = utils.GetUniqueValidatorIDInstance()
 
