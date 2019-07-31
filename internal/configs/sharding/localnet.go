@@ -20,7 +20,7 @@ const (
 	twoOne              = 5
 
 	localnetVdfDifficulty = 5000 // This takes about 10s to finish the vdf
-
+)
 
 func (localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
