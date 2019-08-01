@@ -122,6 +122,9 @@ type Consensus struct {
 	// global consensus mutex
 	mutex sync.Mutex
 
+	// consensus information update mutex
+	infoMutex sync.Mutex
+
 	// Signal channel for starting a new consensus process
 	ReadySignal chan struct{}
 	// The post-consensus processing func passed from Node object

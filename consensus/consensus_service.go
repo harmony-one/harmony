@@ -410,8 +410,8 @@ func (consensus *Consensus) String() string {
 
 // ToggleConsensusCheck flip the flag of whether ignore viewID check during consensus process
 func (consensus *Consensus) ToggleConsensusCheck() {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
+	consensus.infoMutex.Lock()
+	defer consensus.infoMutex.Unlock()
 	consensus.ignoreViewIDCheck = !consensus.ignoreViewIDCheck
 }
 
@@ -526,15 +526,15 @@ func (consensus *Consensus) checkViewID(msg *PbftMessage) error {
 
 // SetBlockNum sets the blockNum in consensus object, called at node bootstrap
 func (consensus *Consensus) SetBlockNum(blockNum uint64) {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
+	consensus.infoMutex.Lock()
+	defer consensus.infoMutex.Unlock()
 	consensus.blockNum = blockNum
 }
 
 // SetEpochNum sets the epoch in consensus object
 func (consensus *Consensus) SetEpochNum(epoch uint64) {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
+	consensus.infoMutex.Lock()
+	defer consensus.infoMutex.Unlock()
 	consensus.epoch = epoch
 }
 
@@ -618,6 +618,7 @@ func (consensus *Consensus) reportMetrics(block types.Block) {
 // getLogger returns logger for consensus contexts added
 func (consensus *Consensus) getLogger() *zerolog.Logger {
 	logger := utils.Logger().With().
+		Uint64("myEpoch", consensus.epoch).
 		Uint64("myBlock", consensus.blockNum).
 		Uint64("myViewID", consensus.viewID).
 		Interface("phase", consensus.phase).
@@ -674,8 +675,6 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	var hasError bool
 
 	header := consensus.ChainReader.CurrentHeader()
-	consensus.SetBlockNum(header.Number.Uint64() + 1)
-	consensus.SetViewID(header.ViewID.Uint64() + 1)
 
 	epoch := header.Epoch
 	curPubKeys := core.GetPublicKeys(epoch, header.ShardID)
@@ -686,6 +685,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	if core.IsEpochLastBlockByHeader(header) {
 		// increase epoch by one if it's the last block
 		consensus.SetEpochNum(epoch.Uint64() + 1)
+		consensus.getLogger().Info().Uint64("headerNum", header.Number.Uint64()).Msg("[UpdateConsensusInformation] Epoch updated for next epoch")
 		nextEpoch := new(big.Int).Add(epoch, common.Big1)
 		pubKeys = core.GetPublicKeys(nextEpoch, header.ShardID)
 	} else {
@@ -705,7 +705,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	consensus.UpdatePublicKeys(pubKeys)
 
 	// take care of possible leader change during the epoch
-	if !core.IsEpochLastBlockByHeader(header) {
+	if !core.IsEpochLastBlockByHeader(header) && header.Number.Uint64() != 0 {
 		leaderPubKey, err := consensus.getLeaderPubKeyFromCoinbase(header)
 		if err != nil || leaderPubKey == nil {
 			consensus.getLogger().Debug().Err(err).Msg("[SYNC] Unable to get leaderPubKey from coinbase")

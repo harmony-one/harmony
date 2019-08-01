@@ -403,6 +403,8 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 
 	if err := node.AddNewBlock(newBlock); err != nil {
 		utils.GetLogInstance().Error("Error when adding new block", "err", err)
+	} else if core.IsEpochLastBlock(newBlock) {
+		node.Consensus.UpdateConsensusInformation()
 	}
 
 	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {

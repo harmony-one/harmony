@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
-	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -13,7 +12,6 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
-	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -39,8 +37,8 @@ func (consensus *Consensus) handleMessageUpdate(payload []byte) {
 		return
 	}
 
-	// listening mode only listening to committed message
-	if consensus.mode.Mode() == Listening && msg.Type != msg_pb.MessageType_COMMITTED {
+	// listening mode will skip consensus process
+	if consensus.mode.Mode() == Listening {
 		return
 	}
 
@@ -776,35 +774,6 @@ func (consensus *Consensus) finalizeCommits() {
 func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	consensus.getLogger().Debug().Msg("[OnCommitted] Receive committed message")
 
-	// TODO: this is temp hack for update new node's committee information; remove it after staking and resharding finished
-	if consensus.mode.Mode() == Listening {
-		recvMsg, err := ParsePbftMessage(msg)
-		if err != nil {
-			consensus.getLogger().Warn().Msg("[OnCommitted] unable to parse msg")
-			return
-		}
-		// check whether the block is the last block of epoch
-		if core.ShardingSchedule.IsLastBlock(recvMsg.BlockNum) {
-			epoch := core.ShardingSchedule.CalcEpochNumber(recvMsg.BlockNum)
-			nextEpoch := new(big.Int).Add(epoch, common.Big1)
-			pubKeys := core.GetPublicKeys(nextEpoch, consensus.ShardID)
-			if len(pubKeys) == 0 {
-				consensus.getLogger().Info().Msg("[OnCommitted] PublicKeys is Empty, Cannot update public keys")
-				return
-			}
-			consensus.getLogger().Info().Int("numKeys", len(pubKeys)).Msg("[OnCommitted] Update Shard Info and PublicKeys")
-
-			for _, key := range pubKeys {
-				if key.IsEqual(consensus.PubKey) {
-					consensus.getLogger().Info().Uint64("blockNum", recvMsg.BlockNum).Msg("[OnCommitted] Successfully updated public keys for next epoch")
-					consensus.UpdatePublicKeys(pubKeys)
-					consensus.mode.SetMode(Normal)
-				}
-			}
-		}
-		return
-	}
-
 	if consensus.IsLeader() && consensus.mode.Mode() == Normal {
 		return
 	}
@@ -987,16 +956,6 @@ func (consensus *Consensus) tryCatchup() {
 		consensus.OnConsensusDone(block)
 		consensus.ResetState()
 
-		if core.IsEpochLastBlock(block) {
-			consensus.numPrevPubKeys = len(consensus.PublicKeys)
-			nextEpoch := new(big.Int).Add(block.Header().Epoch, common.Big1)
-			pubKeys := core.GetPublicKeys(nextEpoch, block.Header().ShardID)
-			if len(pubKeys) != 0 {
-				consensus.getLogger().Info().Msg("[TryCatchup] PublicKeys is Updated")
-				consensus.UpdatePublicKeys(pubKeys)
-			}
-		}
-
 		select {
 		case consensus.VerifiedNewBlock <- block:
 		default:
@@ -1069,9 +1028,11 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 					}
 				}
 			case <-consensus.syncReadyChan:
+				consensus.SetBlockNum(consensus.ChainReader.CurrentHeader().Number.Uint64() + 1)
+				consensus.SetViewID(consensus.ChainReader.CurrentHeader().ViewID.Uint64() + 1)
 				mode := consensus.UpdateConsensusInformation()
 				consensus.mode.SetMode(mode)
-				consensus.getLogger().Info().Msg("Node is in sync")
+				consensus.getLogger().Info().Str("Mode", mode.String()).Msg("Node is in sync")
 
 			case <-consensus.syncNotReadyChan:
 				consensus.SetBlockNum(consensus.ChainReader.CurrentHeader().Number.Uint64() + 1)
