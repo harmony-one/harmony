@@ -16,8 +16,8 @@ const (
 	localnetV1Epoch = 1
 	localnetV2Epoch = 2
 
-	localnetEpochBlock1 = 36
-	twoOne              = 11
+	localnetEpochBlock1 = 20
+	twoOne              = 5
 )
 
 func (localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
