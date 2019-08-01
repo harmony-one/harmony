@@ -28,7 +28,7 @@ const (
 
 // UpdateStakingList updates staking list from the given StakeInfo query result.
 func (node *Node) UpdateStakingList(stakeInfoReturnValue *structs.StakeInfoReturnValue) {
-	utils.GetLogInstance().Info("Updating staking list", "contractState", stakeInfoReturnValue)
+	utils.Logger().Str("contractState", stakeInfoReturnValue).Msg("Updating staking list")
 	if stakeInfoReturnValue == nil {
 		return
 	}
@@ -60,13 +60,19 @@ func (node *Node) UpdateStakingList(stakeInfoReturnValue *structs.StakeInfoRetur
 }
 
 func (node *Node) printStakingList() {
-	utils.GetLogInstance().Info("\n")
-	utils.GetLogInstance().Info("CURRENT STAKING INFO [START] ------------------------------------")
+	utils.Logger().Info().Msg("\n")
+	utils.Logger().Info().Msg("CURRENT STAKING INFO [START] ------------------------------------")
 	for addr, stakeInfo := range node.CurrentStakes {
-		utils.GetLogInstance().Info("", "Address", addr, "BlsPubKey", hex.EncodeToString(stakeInfo.BlsPublicKey[:]), "BlockNum", stakeInfo.BlockNum, "lockPeriodCount", stakeInfo.LockPeriodCount, "amount", stakeInfo.Amount)
+		utils.Logger().Info().
+		Str("Address", addr).
+		Str("BlsPubKey", hex.EncodeToString(stakeInfo.BlsPublicKey[:])).
+		Uint64("BlockNum", stakeInfo.BlockNum).
+		Int("lockPeriodCount", stakeInfo.LockPeriodCount).
+		Int("amount", stakeInfo.Amount).
+		Msg("")
 	}
-	utils.GetLogInstance().Info("CURRENT STAKING INFO [END}   ------------------------------------")
-	utils.GetLogInstance().Info("\n")
+	utils.Logger().Info().Msg("CURRENT STAKING INFO [END}   ------------------------------------")
+	utils.Logger().Info().Msg("\n")
 }
 
 //The first four bytes of the call data for a function call specifies the function to be called.

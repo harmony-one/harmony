@@ -83,7 +83,11 @@ func (node *Node) startHTTP(endpoint string, apis []rpc.API, modules []string, c
 		return err
 	}
 
-	utils.GetLogger().Info("HTTP endpoint opened", "url", fmt.Sprintf("http://%s", endpoint), "cors", strings.Join(cors, ","), "vhosts", strings.Join(vhosts, ","))
+	utils.Logger().Info().
+	Str("url", fmt.Sprintf("http://%s", endpoint)).
+	Str("cors", strings.Join(cors, ",")).
+	Str("vhosts", strings.Join(vhosts, ",")).
+	Msg("HTTP endpoint opened")
 	// All listeners booted successfully
 	httpListener = listener
 	httpHandler = handler
@@ -97,7 +101,7 @@ func (node *Node) stopHTTP() {
 		httpListener.Close()
 		httpListener = nil
 
-		utils.GetLogger().Info("HTTP endpoint closed", "url", fmt.Sprintf("http://%s", httpEndpoint))
+		utils.Logger().Info().Str("url", fmt.Sprintf("http://%s", httpEndpoint)).Msg("HTTP endpoint closed")
 	}
 	if httpHandler != nil {
 		httpHandler.Stop()
@@ -115,7 +119,7 @@ func (node *Node) startWS(endpoint string, apis []rpc.API, modules []string, wsO
 	if err != nil {
 		return err
 	}
-	utils.GetLogger().Info("WebSocket endpoint opened", "url", fmt.Sprintf("ws://%s", listener.Addr()))
+	utils.Logger().Info().Str("url", fmt.Sprintf("ws://%s", listener.Addr())).Msg("WebSocket endpoint opened")
 	// All listeners booted successfully
 	wsListener = listener
 	wsHandler = handler
@@ -129,7 +133,7 @@ func (node *Node) stopWS() {
 		wsListener.Close()
 		wsListener = nil
 
-		utils.GetLogger().Info("WebSocket endpoint closed", "url", fmt.Sprintf("ws://%s", wsEndpoint))
+		utils.Logger().Info().Str("url", fmt.Sprintf("ws://%s", wsEndpoint)).Msg("WebSocket endpoint closed")
 	}
 	if wsHandler != nil {
 		wsHandler.Stop()

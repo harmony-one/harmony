@@ -55,7 +55,7 @@ func (gi *genesisInitializer) InitChainDB(db ethdb.Database, shardID uint32) err
 
 // SetupGenesisBlock sets up a genesis blockchain.
 func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardState types.ShardState) {
-	utils.GetLogger().Info("setting up a brand new chain database",
+	utils.Logger().Info().Msg("setting up a brand new chain database",
 		"shardID", shardID)
 	if shardID == node.NodeConfig.ShardID {
 		node.isFirstTime = true
