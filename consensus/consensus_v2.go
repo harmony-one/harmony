@@ -1069,7 +1069,8 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 					}
 				}
 			case <-consensus.syncReadyChan:
-				consensus.UpdateConsensusInformation()
+				mode := consensus.UpdateConsensusInformation()
+				consensus.mode.SetMode(mode)
 				consensus.getLogger().Info().Msg("Node is in sync")
 
 			case <-consensus.syncNotReadyChan:

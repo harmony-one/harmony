@@ -396,7 +396,8 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentNode.State = node.NodeWaitToJoin
 
 	// update consensus information based on the blockchain
-	currentConsensus.UpdateConsensusInformation()
+	mode := currentConsensus.UpdateConsensusInformation()
+	currentConsensus.SetMode(mode)
 
 	// Watching currentNode and currentConsensus.
 	memprofiling.GetMemProfiling().Add("currentNode", currentNode)

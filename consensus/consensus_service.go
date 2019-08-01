@@ -665,10 +665,14 @@ func (consensus *Consensus) getLeaderPubKeyFromCoinbase(header *types.Header) (*
 // after node is initialized; node is only available after consensus is initialized
 // we need call this function separately after create consensus object
 // 2. after state syncing is finished
-func (consensus *Consensus) UpdateConsensusInformation() {
+// It will return the mode:
+// (a) node not in committed: Listening mode
+// (b) node in committed but has any err during processing: Syncing mode
+// (c) node in committed and everything looks good: Normal mode
+func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	var pubKeys []*bls.PublicKey
+	var hasError bool
 
-	consensus.mode.SetMode(Syncing)
 	header := consensus.ChainReader.CurrentHeader()
 	consensus.SetBlockNum(header.Number.Uint64() + 1)
 	consensus.SetViewID(header.ViewID.Uint64() + 1)
@@ -691,36 +695,41 @@ func (consensus *Consensus) UpdateConsensusInformation() {
 
 	if len(pubKeys) == 0 {
 		consensus.getLogger().Warn().Msg("[UpdateConsensusInformation] PublicKeys is Nil")
-		return
+		hasError = true
+	}
+
+	// update public keys committee
+	consensus.getLogger().Info().
+		Int("numPubKeys", len(pubKeys)).
+		Msg("[UpdateConsensusInformation] Successfully updated public keys")
+	consensus.UpdatePublicKeys(pubKeys)
+
+	// take care of possible leader change during the epoch
+	if !core.IsEpochLastBlockByHeader(header) {
+		leaderPubKey, err := consensus.getLeaderPubKeyFromCoinbase(header)
+		if err != nil || leaderPubKey == nil {
+			consensus.getLogger().Debug().Err(err).Msg("[SYNC] Unable to get leaderPubKey from coinbase")
+			consensus.ignoreViewIDCheck = true
+			hasError = true
+		} else {
+			consensus.getLogger().Debug().
+				Str("leaderPubKey", leaderPubKey.SerializeToHexStr()).
+				Msg("[SYNC] Most Recent LeaderPubKey Updated Based on BlockChain")
+			consensus.LeaderPubKey = leaderPubKey
+		}
 	}
 
 	for _, key := range pubKeys {
-		// only update publicKeys when node is in committee
+		// in committee
 		if key.IsEqual(consensus.PubKey) {
-			consensus.mode.SetMode(Normal)
-			consensus.getLogger().Info().
-				Int("numPubKeys", len(pubKeys)).
-				Msg("[UpdateConsensusInformation] Successfully updated public keys")
-			consensus.UpdatePublicKeys(pubKeys)
-
-			// take care of possible leader change during the epoch
-			if !core.IsEpochLastBlockByHeader(header) {
-				leaderPubKey, err := consensus.getLeaderPubKeyFromCoinbase(header)
-				if err != nil || leaderPubKey == nil {
-					consensus.mode.SetMode(Syncing)
-					consensus.getLogger().Debug().Err(err).Msg("[SYNC] Unable to get leaderPubKey from coinbase")
-					consensus.ignoreViewIDCheck = true
-				} else {
-					consensus.getLogger().Debug().
-						Str("leaderPubKey", leaderPubKey.SerializeToHexStr()).
-						Msg("[SYNC] Most Recent LeaderPubKey Updated Based on BlockChain")
-					consensus.LeaderPubKey = leaderPubKey
-				}
+			if hasError {
+				return Syncing
 			}
-			return
+			return Normal
 		}
 	}
-	consensus.mode.SetMode(Listening)
+	// not in committee
+	return Listening
 }
 
 // IsLeader check if the node is a leader or not by comparing the public key of
