@@ -8,6 +8,8 @@ import (
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
 	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -395,6 +397,14 @@ func (c *clientServiceClient) Process(ctx context.Context, in *Request, opts ...
 // ClientServiceServer is the server API for ClientService service.
 type ClientServiceServer interface {
 	Process(context.Context, *Request) (*Response, error)
+}
+
+// UnimplementedClientServiceServer can be embedded to have forward compatible implementations.
+type UnimplementedClientServiceServer struct {
+}
+
+func (*UnimplementedClientServiceServer) Process(ctx context.Context, req *Request) (*Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Process not implemented")
 }
 
 func RegisterClientServiceServer(s *grpc.Server, srv ClientServiceServer) {

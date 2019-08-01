@@ -50,20 +50,21 @@ type Service struct {
 // init vars for prometheus
 var (
 	curBlockHeight     = uint64(0)
+	curBalance         = big.NewInt(0)
 	metricsPush        = make(chan int)
 	blockHeightCounter = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "block_height",
 		Help: "Get current block height.",
 	})
-	blockHeightGauge = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "block_height",
-		Help: "Get current block height.",
+	blocksAcceptedGauge = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "blocks_accepted",
+		Help: "Get accepted blocks.",
 	})
 	connectionsNumberGauge = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "connections_number",
 		Help: "Get current connections number for a node.",
 	})
-	nodeBalanceGauge = prometheus.NewGauge(prometheus.GaugeOpts{
+	nodeBalanceCounter = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "node_balance",
 		Help: "Get current node balance",
 	})
@@ -139,7 +140,7 @@ func (s *Service) Run() {
 	addr := net.JoinHostPort("", GetMetricsServiceHTTPPort(s.Port))
 
 	registry := prometheus.NewRegistry()
-	registry.MustRegister(blockHeightCounter, connectionsNumberGauge, nodeBalanceGauge, lastConsensusGauge, blockRewardGauge, blockHeightGauge)
+	registry.MustRegister(blockHeightCounter, connectionsNumberGauge, nodeBalanceCounter, lastConsensusGauge, blockRewardGauge, blocksAcceptedGauge)
 
 	s.pusher = push.New("http://"+s.PushgatewayIP+":"+s.PushgatewayPort, "node_metrics").Gatherer(registry).Grouping("node_id", s.BlsPublicKey+"_"+s.IP+":"+s.Port)
 	go s.PushMetrics()
@@ -158,14 +159,15 @@ func (s *Service) Run() {
 // UpdateBlockHeight updates block height.
 func UpdateBlockHeight(blockHeight uint64) {
 	blockHeightCounter.Add(float64(blockHeight) - float64(curBlockHeight))
-	blockHeightGauge.Set(float64(blockHeight) - float64(curBlockHeight))
+	blocksAcceptedGauge.Set(float64(blockHeight) - float64(curBlockHeight))
 	curBlockHeight = blockHeight
-	metricsPush <- ConnectionsNumberPush
+	metricsPush <- BlockHeightPush
 }
 
 // UpdateNodeBalance updates node balance.
 func UpdateNodeBalance(balance *big.Int) {
-	nodeBalanceGauge.Set(float64(balance.Uint64()))
+	nodeBalanceCounter.Add(float64(balance.Uint64()) - float64(curBalance.Uint64()))
+	curBalance = balance
 	metricsPush <- NodeBalancePush
 }
 
@@ -184,7 +186,7 @@ func UpdateLastConsensus(consensusTime int64) {
 // UpdateConnectionsNumber updates connections number.
 func UpdateConnectionsNumber(connectionsNumber int) {
 	connectionsNumberGauge.Set(float64(connectionsNumber))
-	metricsPush <- BlockHeightPush
+	metricsPush <- ConnectionsNumberPush
 }
 
 // PushMetrics pushes metrics updates to prometheus pushgateway.
