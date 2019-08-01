@@ -16,19 +16,16 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/client_golang/prometheus/push"
-	"google.golang.org/grpc"
 )
 
 // Constants for metrics service.
 const (
-	ConnectionsNumberPush            int = 0
-	BlockHeightPush                  int = 1
-	NodeBalancePush                  int = 2
-	LastConsensusPush                int = 3
-	BlockRewardPush                  int = 4
-	metricsServicePortDifference         = 900
-	metricsServiceHTTPPortDifference     = 2000
-	defaultPushgatewayAddr               = "http://127.0.0.1:26000"
+	ConnectionsNumberPush        int = 0
+	BlockHeightPush              int = 1
+	NodeBalancePush              int = 2
+	LastConsensusPush            int = 3
+	BlockRewardPush              int = 4
+	metricsServicePortDifference     = 2000
 )
 
 // Service is the struct for metrics service.
@@ -41,8 +38,6 @@ type Service struct {
 	PushgatewayPort string
 	GetNodeIDs      func() []libp2p_peer.ID
 	storage         *Storage
-	server          *grpc.Server
-	httpServer      *http.Server
 	pusher          *push.Pusher
 	messageChan     chan *msg_pb.Message
 }
@@ -111,7 +106,6 @@ func (s *Service) StartService() {
 func (s *Service) StopService() {
 	utils.Logger().Info().Msg("Shutting down metrics service.")
 	metricsPush <- -1
-	s.server.Stop()
 }
 
 // GetMetricsServicePort returns the port serving metrics service dashboard. This port is metricsServicePortDifference less than the node port.
@@ -123,30 +117,21 @@ func GetMetricsServicePort(nodePort string) string {
 	return ""
 }
 
-// GetMetricsServiceHTTPPort returns the port serving metrics service dashboard. This port is metricsServicePortDifference less than the node port.
-func GetMetricsServiceHTTPPort(nodePort string) string {
-	if port, err := strconv.Atoi(nodePort); err == nil {
-		return fmt.Sprintf("%d", port-metricsServiceHTTPPortDifference)
-	}
-	utils.Logger().Error().Msg("error on parsing.")
-	return ""
-}
-
 // Run is to run http serving metrics service.
 func (s *Service) Run() {
 	// Init local storage for metrics.
 	//s.storage = GetStorageInstance(s.IP, s.Port, false)
 	// Init address.
-	addr := net.JoinHostPort("", GetMetricsServiceHTTPPort(s.Port))
+	addr := net.JoinHostPort("", GetMetricsServicePort(s.Port))
 
 	registry := prometheus.NewRegistry()
 	registry.MustRegister(blockHeightCounter, connectionsNumberGauge, nodeBalanceCounter, lastConsensusGauge, blockRewardGauge, blocksAcceptedGauge)
 
-	s.pusher = push.New("http://"+s.PushgatewayIP+":"+s.PushgatewayPort, "node_metrics").Gatherer(registry).Grouping("node_id", s.BlsPublicKey+"_"+s.IP+":"+s.Port)
+	s.pusher = push.New("http://"+s.PushgatewayIP+":"+s.PushgatewayPort, "node_metrics").Gatherer(registry).Grouping("instance", s.IP+":"+s.Port).Grouping("bls_key", s.BlsPublicKey)
 	go s.PushMetrics()
 
 	//s.router.Path("/connectionsstats").Queries("since", "{[0-9]*?}", "until", "{[0-9]*?}").HandlerFunc(s.GetConnectionsStats).Methods("GET")
-	utils.Logger().Info().Str("port", GetMetricsServiceHTTPPort(s.Port)).Msg("Listening")
+	utils.Logger().Info().Str("port", GetMetricsServicePort(s.Port)).Msg("Listening")
 	go func() {
 		http.Handle("/node_metrics", promhttp.Handler())
 		if err := http.ListenAndServe(addr, nil); err != nil {
