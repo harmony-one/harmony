@@ -28,7 +28,7 @@ const (
 
 // UpdateStakingList updates staking list from the given StakeInfo query result.
 func (node *Node) UpdateStakingList(stakeInfoReturnValue *structs.StakeInfoReturnValue) {
-	utils.Logger().Str("contractState", stakeInfoReturnValue).Msg("Updating staking list")
+	utils.Logger().Info().Interface("contractState", stakeInfoReturnValue).Msg("Updating staking list")
 	if stakeInfoReturnValue == nil {
 		return
 	}
@@ -64,11 +64,11 @@ func (node *Node) printStakingList() {
 	utils.Logger().Info().Msg("CURRENT STAKING INFO [START] ------------------------------------")
 	for addr, stakeInfo := range node.CurrentStakes {
 		utils.Logger().Info().
-		Str("Address", addr).
+		Str("Address", addr.String()).
 		Str("BlsPubKey", hex.EncodeToString(stakeInfo.BlsPublicKey[:])).
-		Uint64("BlockNum", stakeInfo.BlockNum).
-		Int("lockPeriodCount", stakeInfo.LockPeriodCount).
-		Int("amount", stakeInfo.Amount).
+		Interface("BlockNum", stakeInfo.BlockNum).
+		Interface("lockPeriodCount", stakeInfo.LockPeriodCount).
+		Interface("amount", stakeInfo.Amount).
 		Msg("")
 	}
 	utils.Logger().Info().Msg("CURRENT STAKING INFO [END}   ------------------------------------")

@@ -18,7 +18,7 @@ var once sync.Once
 // ExplorerMessageHandler passes received message in node_handler to explorer service
 func (node *Node) ExplorerMessageHandler(payload []byte) {
 	if len(payload) == 0 {
-		utils.Logger().Error().Err(err).Msg("Payload is empty")
+		utils.Logger().Error().Msg("Payload is empty")
 		return
 	}
 	msg := &msg_pb.Message{}
@@ -43,7 +43,10 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 
 		// check has 2f+1 signatures
 		if count := utils.CountOneBits(mask.Bitmap); count < node.Consensus.Quorum() {
-			utils.Logger().Error().Err(err).Str("need", node.Consensus.Quorum()).Str("have", count)("[Explorer] not have enough signature")
+			utils.Logger().Error().
+			Int("need", node.Consensus.Quorum()).
+			Int("have", count).
+			Msg("[Explorer] not have enough signature")
 			return
 		}
 
@@ -51,14 +54,19 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 		binary.LittleEndian.PutUint64(blockNumHash, recvMsg.BlockNum)
 		commitPayload := append(blockNumHash, recvMsg.BlockHash[:]...)
 		if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
-			utils.Logger().Error().Err(err).Str("msgBlock", recvMsg.BlockNum).Msg("[Explorer] Failed to verify the multi signature for commit phase")
+			utils.Logger().
+			Error().Err(err).
+			Uint64("msgBlock", recvMsg.BlockNum).
+			Msg("[Explorer] Failed to verify the multi signature for commit phase")
 			return
 		}
 
 		block := node.Consensus.PbftLog.GetBlockByHash(recvMsg.BlockHash)
 
 		if block == nil {
-			utils.Logger().Info().Str("msgBlock", recvMsg.BlockNum).Msg("[Explorer] Haven't received the block before the committed msg")
+			utils.Logger().Info().
+			Uint64("msgBlock", recvMsg.BlockNum).
+			Msg("[Explorer] Haven't received the block before the committed msg")
 			node.Consensus.PbftLog.AddMessage(recvMsg)
 			return
 		}
@@ -99,7 +107,7 @@ func (node *Node) AddNewBlockForExplorer() {
 			break
 		} else {
 			if len(blocks) > 1 {
-				utils.Logger().Error().Err(err).Msg("[Explorer] We should have not received more than one block with the same block height.")
+				utils.Logger().Error().Msg("[Explorer] We should have not received more than one block with the same block height.")
 			}
 			utils.Logger().Info().Uint64("blockHeight", blocks[0].NumberU64()).Msg("Adding new block for explorer node")
 			if err := node.AddNewBlock(blocks[0]); err == nil {
@@ -109,7 +117,8 @@ func (node *Node) AddNewBlockForExplorer() {
 				// TODO: some blocks can be dumped before state syncing finished.
 				// And they would be dumped again here. Please fix it.
 				once.Do(func() {
-					utils.Logger().Info().Uint64("starting height", int64(blocks[0].NumberU64())-1).Msg("[Explorer] Populating explorer data from state synced blocks")
+					utils.Logger().Info().Int64("starting height", int64(blocks[0].NumberU64())-1).
+					Msg("[Explorer] Populating explorer data from state synced blocks")
 					go func() {
 						for blockHeight := int64(blocks[0].NumberU64()) - 1; blockHeight >= 0; blockHeight-- {
 							explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, true).Dump(

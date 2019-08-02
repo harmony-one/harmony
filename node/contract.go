@@ -178,7 +178,7 @@ func (node *Node) CallFaucetContract(address common.Address) common.Hash {
 	// Temporary code to workaround explorer issue for searching new addresses (https://github.com/harmony-one/harmony/issues/503)
 	nonce := atomic.AddUint64(&node.ContractDeployerCurrentNonce, 1)
 	tx, _ := types.SignTx(types.NewTransaction(nonce-1, address, node.Consensus.ShardID, big.NewInt(0), params.TxGasContractCreation*10, nil, nil), types.HomesteadSigner{}, node.ContractDeployerKey)
-	utils.Logger().Info().Str("Address", common2.MustAddressToBech32(address))("Sending placeholder token to ")
+	utils.Logger().Info().Str("Address", common2.MustAddressToBech32(address)).Msg("Sending placeholder token to ")
 	node.addPendingTransactions(types.Transactions{tx})
 	// END Temporary code
 
@@ -228,6 +228,6 @@ func (node *Node) AddContractKeyAndAddress(t builtInSC) {
 		stakingPrivKey := genesis.GenesisBeaconAccountPriKey
 		node.StakingContractAddress = crypto.CreateAddress(crypto.PubkeyToAddress(stakingPrivKey.PublicKey), uint64(0))
 	default:
-		utils.Logger().Error().Err(err).Str("unknown SC", t)("AddContractKeyAndAddress")
+		utils.Logger().Error().Interface("unknown SC", t).Msg("AddContractKeyAndAddress")
 	}
 }

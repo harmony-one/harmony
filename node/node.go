@@ -244,7 +244,7 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
 	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
 		node.addPendingTransactions(types.Transactions{newTx})
-		utils.Logger().Error().Err(err).Int("totalPending", len(node.pendingTransactions)).Msg("Got ONE more transaction")
+		utils.Logger().Error().Int("totalPending", len(node.pendingTransactions)).Msg("Got ONE more transaction")
 	}
 }
 
@@ -259,7 +259,7 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int, coinbase common.Addr
 
 	node.pendingTransactions = unselected
 	node.reducePendingTransactions()
-	utils.Logger().Error().Err(err).
+	utils.Logger().Error().
 	Int("remainPending", len(node.pendingTransactions)).
 	Int("selected", len(selected)).
 	Int("invalidDiscarded", len(invalid)).
@@ -369,7 +369,9 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		}
 	}
 
-	utils.Logger().Info().Str("genesis block header", node.Blockchain().GetBlockByNumber(0).Header()).Msg("Genesis block hash")
+	utils.Logger().Info().
+	Interface("genesis block header", node.Blockchain().GetBlockByNumber(0).Header()).
+	Msg("Genesis block hash")
 
 	// start the goroutine to receive client message
 	// client messages are sent by clients, like txgen, wallet

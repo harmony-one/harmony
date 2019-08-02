@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
+	
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/harmony-one/harmony/api/service/syncing"
@@ -114,24 +114,22 @@ func (node *Node) DoBeaconSyncing() {
 func (node *Node) DoSyncing(bc *core.BlockChain, worker *worker.Worker, getPeers func() []p2p.Peer, willJoinConsensus bool) {
 	ticker := time.NewTicker(SyncFrequency * time.Second)
 
-	logger := utils.Logger()
-	getLogger := func() log.Logger { return utils.WithCallerSkip(logger, 1) }
 SyncingLoop:
 	for {
 		select {
 		case <-ticker.C:
 			if node.stateSync == nil {
 				node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
-				logger = logger.New("syncID", node.GetSyncID())
-				Logger().Debug().Msg("[SYNC] initialized state sync")
+				
+				utils.Logger().Debug().Msg("[SYNC] initialized state sync")
 			}
 			if node.stateSync.GetActivePeerNumber() < MinConnectedPeers {
 				peers := getPeers()
 				if err := node.stateSync.CreateSyncConfig(peers, false); err != nil {
-					Logger().Debug().Msg("[SYNC] create peers error")
+					utils.Logger().Debug().Msg("[SYNC] create peers error")
 					continue SyncingLoop
 				}
-				Logger().Debug().Int("len", node.stateSync.GetActivePeerNumber()).Msg("[SYNC] Get Active Peers")
+				utils.Logger().Debug().Int("len", node.stateSync.GetActivePeerNumber()).Msg("[SYNC] Get Active Peers")
 			}
 			if node.stateSync.IsOutOfSync(bc) {
 				node.stateMutex.Lock()
@@ -297,7 +295,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		var blockObj types.Block
 		err := rlp.DecodeBytes(request.BlockHash, &blockObj)
 		if err != nil {
-			utils.Logger().Warn().Error().Err(err).Msg("[SYNC] unable to decode received new block")
+			utils.Logger().Warn().Msg("[SYNC] unable to decode received new block")
 			return response, err
 		}
 		node.stateSync.AddNewBlock(request.PeerHash, &blockObj)
@@ -310,7 +308,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		defer node.stateMutex.Unlock()
 		if _, ok := node.peerRegistrationRecord[peerID]; ok {
 			response.Type = downloader_pb.DownloaderResponse_FAIL
-			utils.Logger().Warn().Err(err).
+			utils.Logger().Warn().
 			Interface("ip", ip).
 			Interface("port", port).
 			Msg("[SYNC] peerRegistration record already exists")
@@ -324,7 +322,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 			syncPort := syncing.GetSyncingPort(port)
 			client := downloader.ClientSetup(ip, syncPort)
 			if client == nil {
-				utils.Logger().Warn().Err(err).
+				utils.Logger().Warn().
 				Str("ip", ip).
 				Str("port", port).
 				Msg("[SYNC] unable to setup client for peerID")
@@ -343,7 +341,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		if node.State == NodeNotInSync {
 			count := node.stateSync.RegisterNodeInfo()
 			utils.Logger().Debug().
-			Str("number", count).
+			Int("number", count).
 			Msg("[SYNC] extra node registered")
 		}
 	}
