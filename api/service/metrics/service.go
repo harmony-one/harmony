@@ -120,7 +120,7 @@ func GetMetricsServicePort(nodePort string) string {
 // Run is to run http serving metrics service.
 func (s *Service) Run() {
 	// Init local storage for metrics.
-	//s.storage = GetStorageInstance(s.IP, s.Port, false)
+	s.storage = GetStorageInstance(s.IP, s.Port, false)
 	// Init address.
 	addr := net.JoinHostPort("", GetMetricsServicePort(s.Port))
 
@@ -145,6 +145,7 @@ func (s *Service) Run() {
 func UpdateBlockHeight(blockHeight uint64) {
 	blockHeightCounter.Add(float64(blockHeight) - float64(curBlockHeight))
 	blocksAcceptedGauge.Set(float64(blockHeight) - float64(curBlockHeight))
+	s.storage.Dump(blockHeight, BlockHeightPrefix)
 	curBlockHeight = blockHeight
 	metricsPush <- BlockHeightPush
 }
@@ -152,6 +153,7 @@ func UpdateBlockHeight(blockHeight uint64) {
 // UpdateNodeBalance updates node balance.
 func UpdateNodeBalance(balance *big.Int) {
 	nodeBalanceCounter.Add(float64(balance.Uint64()) - float64(curBalance.Uint64()))
+	s.storage.Dump(balance, NodeBalancePrefix)
 	curBalance = balance
 	metricsPush <- NodeBalancePush
 }
@@ -159,18 +161,21 @@ func UpdateNodeBalance(balance *big.Int) {
 // UpdateBlockReward updates block reward.
 func UpdateBlockReward(blockReward *big.Int) {
 	blockRewardGauge.Set(float64(blockReward.Uint64()))
+	s.storage.Dump(blockReward, BlockRewardPrefix)
 	metricsPush <- BlockRewardPush
 }
 
 // UpdateLastConsensus updates last consensus time.
 func UpdateLastConsensus(consensusTime int64) {
 	lastConsensusGauge.Set(float64(consensusTime))
+	s.storage.Dump(consensusTime, ConsensusTimePrefix)
 	metricsPush <- LastConsensusPush
 }
 
 // UpdateConnectionsNumber updates connections number.
 func UpdateConnectionsNumber(connectionsNumber int) {
 	connectionsNumberGauge.Set(float64(connectionsNumber))
+	s.storage.Dump(connectionsNumber, ConnectionsNumberPrefix)
 	metricsPush <- ConnectionsNumberPush
 }
 
