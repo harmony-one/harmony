@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/ethereumproject/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/rs/zerolog/log"
 )

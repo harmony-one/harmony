@@ -16,7 +16,6 @@ require (
 	github.com/ethereumproject/go-ethereum v5.5.2+incompatible
 	github.com/fjl/memsize v0.0.0-20180929194037-2a09253e352a
 	github.com/garslo/gogen v0.0.0-20170307003452-d6ebae628c7c // indirect
-	github.com/go-kit/kit v0.9.0
 	github.com/golang/mock v1.3.1
 	github.com/golang/protobuf v1.3.1
 	github.com/golangci/golangci-lint v1.17.1
@@ -30,7 +29,6 @@ require (
 	github.com/ipfs/go-datastore v0.0.5
 	github.com/ipfs/go-log v0.0.1
 	github.com/karalabe/hid v1.0.0 // indirect
-	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/libp2p/go-libp2p v0.1.1
 	github.com/libp2p/go-libp2p-crypto v0.1.0
 	github.com/libp2p/go-libp2p-discovery v0.1.0
