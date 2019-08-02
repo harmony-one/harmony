@@ -3,9 +3,8 @@ package metrics
 import (
 	"fmt"
 	"os"
-	"reflect"
-	"strconv"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -14,18 +13,18 @@ import (
 
 // Constants for storage.
 const (
-	ConnectionsNumberPrefix     = "cnp"
-	BalancePrefix               = "bap"
-	BlockHeightPrefix           = "bhp"
-	BlocksPrefix                = "bp"
-	ConsensusTimePrefix         = "ltp"
-	BlockRewardPrefix           = "brp"
-	TransactionsPrefix          = "tsp"
+	BalancePrefix           = "bap"
+	BlockHeightPrefix       = "bhp"
+	BlocksPrefix            = "bp"
+	BlockRewardPrefix       = "brp"
+	ConnectionsNumberPrefix = "cnp"
+	ConsensusTimePrefix     = "ltp"
+	TransactionsPrefix      = "tsp"
 )
 
-// GetKey returns key by name and pushed time momemnt.
-func GetKey(name string, moment int) string {
-	return fmt.Sprintf("%s_%d", name, moment)
+// GetKey returns key by prefix and pushed time momemnt.
+func GetKey(prefix string, moment int64) string {
+	return fmt.Sprintf("%s_%d", prefix, moment)
 }
 
 // storage instance
@@ -66,15 +65,15 @@ func (storage *Storage) GetDB() *ethdb.LDBDatabase {
 	return storage.db
 }
 
-// Dump data into lvdb.
-func (storage *Storage) Dump(value interface{}, name string) error {
+// Dump data into lvdb by value and prefix.
+func (storage *Storage) Dump(value interface{}, prefix string) error {
 	currentTime := time.Now().Unix()
-	log.Info().Msgf("Store %s %v at time %d", name, value, currentTime)
+	log.Info().Msgf("Store %s %v at time %d", prefix, value, currentTime)
 
 	batch := storage.db.NewBatch()
 	// Update database.
-	if err := batch.Put([]byte(GetKey(name, currentTime)), []byte(fmt.Sprintf("%v", value)); err != nil {
-		log.Warn().Err(err).Msgf("Cannot batch %s.", name)
+	if err := batch.Put([]byte(GetKey(prefix, currentTime)), []byte(fmt.Sprintf("%v", value))); err != nil {
+		log.Warn().Err(err).Msgf("Cannot batch %s.", prefix)
 		return err
 	}
 
@@ -85,15 +84,15 @@ func (storage *Storage) Dump(value interface{}, name string) error {
 	return nil
 }
 
-// Read returns data list of a particular metric by since, until, name readType.
-func (storage *Storage) Read(since, until int, name string, readType reflect.Type) []interface{} {
-	dataList := make([]readType, 0)
+// Read returns data list of a particular metric by since, until, prefix, interface.
+func (storage *Storage) Read(since, until int64, prefix string, varType interface{}) []interface{} {
+	dataList := make([]interface{}, 0)
 	for i := since; i <= until; i++ {
-		data, err := storage.db.Get([]byte(GetKey(name, i)))
+		data, err := storage.db.Get([]byte(GetKey(prefix, i)))
 		if err != nil {
 			continue
 		}
-		decodedData := 0
+		decodedData := varType
 		if rlp.DecodeBytes(data, decodedData) != nil {
 			log.Error().Msg("Error on getting data from db.")
 			os.Exit(1)
