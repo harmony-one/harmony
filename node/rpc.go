@@ -84,10 +84,10 @@ func (node *Node) startHTTP(endpoint string, apis []rpc.API, modules []string, c
 	}
 
 	utils.Logger().Info().
-	Str("url", fmt.Sprintf("http://%s", endpoint)).
-	Str("cors", strings.Join(cors, ",")).
-	Str("vhosts", strings.Join(vhosts, ",")).
-	Msg("HTTP endpoint opened")
+		Str("url", fmt.Sprintf("http://%s", endpoint)).
+		Str("cors", strings.Join(cors, ",")).
+		Str("vhosts", strings.Join(vhosts, ",")).
+		Msg("HTTP endpoint opened")
 	// All listeners booted successfully
 	httpListener = listener
 	httpHandler = handler

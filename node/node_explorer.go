@@ -44,9 +44,9 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 		// check has 2f+1 signatures
 		if count := utils.CountOneBits(mask.Bitmap); count < node.Consensus.Quorum() {
 			utils.Logger().Error().
-			Int("need", node.Consensus.Quorum()).
-			Int("have", count).
-			Msg("[Explorer] not have enough signature")
+				Int("need", node.Consensus.Quorum()).
+				Int("have", count).
+				Msg("[Explorer] not have enough signature")
 			return
 		}
 
@@ -55,9 +55,9 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 		commitPayload := append(blockNumHash, recvMsg.BlockHash[:]...)
 		if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
 			utils.Logger().
-			Error().Err(err).
-			Uint64("msgBlock", recvMsg.BlockNum).
-			Msg("[Explorer] Failed to verify the multi signature for commit phase")
+				Error().Err(err).
+				Uint64("msgBlock", recvMsg.BlockNum).
+				Msg("[Explorer] Failed to verify the multi signature for commit phase")
 			return
 		}
 
@@ -65,8 +65,8 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 
 		if block == nil {
 			utils.Logger().Info().
-			Uint64("msgBlock", recvMsg.BlockNum).
-			Msg("[Explorer] Haven't received the block before the committed msg")
+				Uint64("msgBlock", recvMsg.BlockNum).
+				Msg("[Explorer] Haven't received the block before the committed msg")
 			node.Consensus.PbftLog.AddMessage(recvMsg)
 			return
 		}
@@ -118,7 +118,7 @@ func (node *Node) AddNewBlockForExplorer() {
 				// And they would be dumped again here. Please fix it.
 				once.Do(func() {
 					utils.Logger().Info().Int64("starting height", int64(blocks[0].NumberU64())-1).
-					Msg("[Explorer] Populating explorer data from state synced blocks")
+						Msg("[Explorer] Populating explorer data from state synced blocks")
 					go func() {
 						for blockHeight := int64(blocks[0].NumberU64()) - 1; blockHeight >= 0; blockHeight-- {
 							explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, true).Dump(

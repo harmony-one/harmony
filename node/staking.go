@@ -64,12 +64,12 @@ func (node *Node) printStakingList() {
 	utils.Logger().Info().Msg("CURRENT STAKING INFO [START] ------------------------------------")
 	for addr, stakeInfo := range node.CurrentStakes {
 		utils.Logger().Info().
-		Str("Address", addr.String()).
-		Str("BlsPubKey", hex.EncodeToString(stakeInfo.BlsPublicKey[:])).
-		Interface("BlockNum", stakeInfo.BlockNum).
-		Interface("lockPeriodCount", stakeInfo.LockPeriodCount).
-		Interface("amount", stakeInfo.Amount).
-		Msg("")
+			Str("Address", addr.String()).
+			Str("BlsPubKey", hex.EncodeToString(stakeInfo.BlsPublicKey[:])).
+			Interface("BlockNum", stakeInfo.BlockNum).
+			Interface("lockPeriodCount", stakeInfo.LockPeriodCount).
+			Interface("amount", stakeInfo.Amount).
+			Msg("")
 	}
 	utils.Logger().Info().Msg("CURRENT STAKING INFO [END}   ------------------------------------")
 	utils.Logger().Info().Msg("\n")

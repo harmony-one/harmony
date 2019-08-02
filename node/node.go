@@ -260,10 +260,10 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int, coinbase common.Addr
 	node.pendingTransactions = unselected
 	node.reducePendingTransactions()
 	utils.Logger().Error().
-	Int("remainPending", len(node.pendingTransactions)).
-	Int("selected", len(selected)).
-	Int("invalidDiscarded", len(invalid)).
-	Msg("Selecting Transactions")
+		Int("remainPending", len(node.pendingTransactions)).
+		Int("selected", len(selected)).
+		Int("invalidDiscarded", len(invalid)).
+		Msg("Selecting Transactions")
 	node.pendingTxMutex.Unlock()
 	return selected
 }
@@ -370,8 +370,8 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 	}
 
 	utils.Logger().Info().
-	Interface("genesis block header", node.Blockchain().GetBlockByNumber(0).Header()).
-	Msg("Genesis block hash")
+		Interface("genesis block header", node.Blockchain().GetBlockByNumber(0).Header()).
+		Msg("Genesis block hash")
 
 	// start the goroutine to receive client message
 	// client messages are sent by clients, like txgen, wallet

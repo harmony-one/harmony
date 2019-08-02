@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	
+
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/harmony-one/harmony/api/service/syncing"
@@ -120,7 +120,7 @@ SyncingLoop:
 		case <-ticker.C:
 			if node.stateSync == nil {
 				node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
-				
+
 				utils.Logger().Debug().Msg("[SYNC] initialized state sync")
 			}
 			if node.stateSync.GetActivePeerNumber() < MinConnectedPeers {
@@ -247,13 +247,13 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		endHeight := node.Blockchain().CurrentBlock().NumberU64()
 		if startHeight >= endHeight {
 			utils.Logger().
-			Debug().
-		    Uint64("myHeight", endHeight).
-			Uint64("requestHeight", startHeight).
-			Str("incomingIP", request.Ip).
-			Str("incomingPort", request.Port).
-			Str("incomingPeer", incomingPeer).
-			Msg("[SYNC] GetBlockHashes Request: I am not higher than requested node")
+				Debug().
+				Uint64("myHeight", endHeight).
+				Uint64("requestHeight", startHeight).
+				Str("incomingIP", request.Ip).
+				Str("incomingPort", request.Port).
+				Str("incomingPeer", incomingPeer).
+				Msg("[SYNC] GetBlockHashes Request: I am not higher than requested node")
 			return response, nil
 		}
 
@@ -287,8 +287,8 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 	case downloader_pb.DownloaderRequest_NEWBLOCK:
 		if node.State != NodeNotInSync {
 			utils.Logger().Debug().
-			Str("state", node.State.String()).
-			Msg("[SYNC] new block received, but state is")
+				Str("state", node.State.String()).
+				Msg("[SYNC] new block received, but state is")
 			response.Type = downloader_pb.DownloaderResponse_INSYNC
 			return response, nil
 		}
@@ -309,9 +309,9 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		if _, ok := node.peerRegistrationRecord[peerID]; ok {
 			response.Type = downloader_pb.DownloaderResponse_FAIL
 			utils.Logger().Warn().
-			Interface("ip", ip).
-			Interface("port", port).
-			Msg("[SYNC] peerRegistration record already exists")
+				Interface("ip", ip).
+				Interface("port", port).
+				Msg("[SYNC] peerRegistration record already exists")
 			return response, nil
 		} else if len(node.peerRegistrationRecord) >= maxBroadcastNodes {
 			response.Type = downloader_pb.DownloaderResponse_FAIL
@@ -323,17 +323,17 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 			client := downloader.ClientSetup(ip, syncPort)
 			if client == nil {
 				utils.Logger().Warn().
-				Str("ip", ip).
-				Str("port", port).
-				Msg("[SYNC] unable to setup client for peerID")
+					Str("ip", ip).
+					Str("port", port).
+					Msg("[SYNC] unable to setup client for peerID")
 				return response, nil
 			}
 			config := &syncConfig{timestamp: time.Now().UnixNano(), client: client}
 			node.peerRegistrationRecord[peerID] = config
 			utils.Logger().Debug().
-			Str("ip", ip).
-			Str("port", port).
-			Msg("[SYNC] register peerID success")
+				Str("ip", ip).
+				Str("port", port).
+				Msg("[SYNC] register peerID success")
 			response.Type = downloader_pb.DownloaderResponse_SUCCESS
 		}
 
@@ -341,8 +341,8 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		if node.State == NodeNotInSync {
 			count := node.stateSync.RegisterNodeInfo()
 			utils.Logger().Debug().
-			Int("number", count).
-			Msg("[SYNC] extra node registered")
+				Int("number", count).
+				Msg("[SYNC] extra node registered")
 		}
 	}
 	return response, nil
