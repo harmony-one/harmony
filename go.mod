@@ -10,10 +10,8 @@ require (
 	github.com/cespare/cp v1.1.1
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
-	github.com/denisbrodbeck/machineid v1.0.1 // indirect
 	github.com/edsrzf/mmap-go v1.0.0 // indirect
 	github.com/ethereum/go-ethereum v1.8.27
-	github.com/ethereumproject/go-ethereum v5.5.2+incompatible
 	github.com/fjl/memsize v0.0.0-20180929194037-2a09253e352a
 	github.com/garslo/gogen v0.0.0-20170307003452-d6ebae628c7c // indirect
 	github.com/golang/mock v1.3.1
@@ -29,6 +27,7 @@ require (
 	github.com/ipfs/go-datastore v0.0.5
 	github.com/ipfs/go-log v0.0.1
 	github.com/karalabe/hid v1.0.0 // indirect
+	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/libp2p/go-libp2p v0.1.1
 	github.com/libp2p/go-libp2p-crypto v0.1.0
 	github.com/libp2p/go-libp2p-discovery v0.1.0
