@@ -10,12 +10,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// Metrics events types
-const (
-	BlockReward      = 1
-	ConsensusReached = 2
-)
-
 // UpdateBlockHeightForMetrics updates block height for metrics service.
 func (node *Node) UpdateBlockHeightForMetrics(prevBlockHeight uint64) uint64 {
 	curBlock := node.Blockchain().CurrentBlock()
@@ -54,25 +48,28 @@ func (node *Node) UpdateBalanceForMetrics(prevBalance *big.Int) *big.Int {
 	return curBalance
 }
 
+// UpdateLastConsensusTimeForMetrics uppdates last consensus reached time for metrics service.
+func (node *Node) UpdateLastConsensusTimeForMetrics(prevLastConsensusTime int64) int64 {
+	lastConsensusTime := node.lastConsensusTime
+	if lastConsensusTime == prevLastConsensusTime {
+		return prevLastConsensusTime
+	}
+	log.Info().Msgf("Updating metrics last consensus time reached %d", lastConsensusTime)
+	metrics.UpdateLastConsensus(lastConsensusTime)
+	return lastConsensusTime
+}
+
 // CollectMetrics collects metrics: block height, connections number, node balance, block reward, last consensus, accepted blocks.
 func (node *Node) CollectMetrics() {
 	log.Info().Msg("[Metrics Service] Update metrics")
 	prevNumPeers := 0
 	prevBlockHeight := uint64(0)
 	prevBalance := big.NewInt(0)
+	prevLastConsensusTime := int64(0)
 	for range time.Tick(100 * time.Millisecond) {
 		prevBlockHeight = node.UpdateBlockHeightForMetrics(prevBlockHeight)
 		prevNumPeers = node.UpdateConnectionsNumberForMetrics(prevNumPeers)
 		prevBalance = node.UpdateBalanceForMetrics(prevBalance)
-		select {
-		case event := <-node.metricsChan:
-			switch event.Event {
-			case ConsensusReached:
-				metrics.UpdateLastConsensus(event.Time)
-			case BlockReward:
-				metrics.UpdateBlockReward(big.NewInt(0))
-			}
-		default:
-		}
+		prevLastConsensusTime = node.UpdateLastConsensusTimeForMetrics(prevLastConsensusTime)
 	}
 }

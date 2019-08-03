@@ -80,12 +80,6 @@ type syncConfig struct {
 	client    *downloader.Client
 }
 
-// MetricsEvent for metrics event.
-type MetricsEvent struct {
-	Event int
-	Time  int64
-}
-
 // Node represents a protocol-participating node in the network
 type Node struct {
 	Consensus             *consensus.Consensus // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
@@ -203,8 +197,8 @@ type Node struct {
 	// How long in second the leader needs to wait to propose a new block.
 	BlockPeriod time.Duration
 
-	// channel events for metrics
-	metricsChan chan *MetricsEvent
+	// last time consensus reached for metrics
+	lastConsensusTime int64
 }
 
 // Blockchain returns the blockchain for the node's current shard.
