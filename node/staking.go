@@ -60,8 +60,6 @@ func (node *Node) UpdateStakingList(stakeInfoReturnValue *structs.StakeInfoRetur
 }
 
 func (node *Node) printStakingList() {
-	utils.Logger().Info().Msg("\n")
-	utils.Logger().Info().Msg("CURRENT STAKING INFO [START] ------------------------------------")
 	for addr, stakeInfo := range node.CurrentStakes {
 		utils.Logger().Info().
 			Str("Address", addr.String()).
