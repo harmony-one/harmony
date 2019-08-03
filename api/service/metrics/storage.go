@@ -8,7 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/rs/zerolog/log"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // Constants for storage.
@@ -52,11 +52,11 @@ func (storage *Storage) Init(ip, port string, remove bool) {
 	if remove {
 		var err = os.RemoveAll(dbFileName)
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to remove existing database files.")
+			utils.Logger().Error().Err(err).Msg("Failed to remove existing database files.")
 		}
 	}
 	if storage.db, err = ethdb.NewLDBDatabase(dbFileName, 0, 0); err != nil {
-		log.Error().Err(err).Msg("Failed to create new database.")
+		utils.Logger().Error().Err(err).Msg("Failed to create new database.")
 	}
 }
 
@@ -68,17 +68,17 @@ func (storage *Storage) GetDB() *ethdb.LDBDatabase {
 // Dump data into lvdb by value and prefix.
 func (storage *Storage) Dump(value interface{}, prefix string) error {
 	currentTime := time.Now().Unix()
-	log.Info().Msgf("Store %s %v at time %d", prefix, value, currentTime)
-
+	utils.Logger().Info().Msgf("Store %s %v at time %d", prefix, value, currentTime)
+	if storage.db == nil {
+	}
 	batch := storage.db.NewBatch()
 	// Update database.
 	if err := batch.Put([]byte(GetKey(prefix, currentTime)), []byte(fmt.Sprintf("%v", value))); err != nil {
-		log.Warn().Err(err).Msgf("Cannot batch %s.", prefix)
+		utils.Logger().Warn().Err(err).Msgf("Cannot batch %s.", prefix)
 		return err
 	}
-
 	if err := batch.Write(); err != nil {
-		log.Warn().Err(err).Msg("Cannot write batch.")
+		utils.Logger().Warn().Err(err).Msg("Cannot write batch.")
 		return err
 	}
 	return nil
@@ -94,7 +94,7 @@ func (storage *Storage) Read(since, until int64, prefix string, varType interfac
 		}
 		decodedData := varType
 		if rlp.DecodeBytes(data, decodedData) != nil {
-			log.Error().Msg("Error on getting data from db.")
+			utils.Logger().Error().Msg("Error on getting data from db.")
 			os.Exit(1)
 		}
 		dataList = append(dataList, decodedData)

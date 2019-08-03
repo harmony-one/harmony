@@ -8,14 +8,13 @@ import (
 	"strconv"
 
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/gorilla/mux"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/client_golang/prometheus/push"
-	"github.com/rs/zerolog/log"
 )
 
 // Constants for metrics service.
@@ -30,7 +29,6 @@ const (
 
 // Service is the struct for metrics service.
 type Service struct {
-	router          *mux.Router
 	BlsPublicKey    string
 	IP              string
 	Port            string
@@ -102,13 +100,13 @@ func New(selfPeer *p2p.Peer, blsPublicKey, pushgatewayIP, pushgatewayPort string
 
 // StartService starts metrics service.
 func (s *Service) StartService() {
-	log.Info().Msg("Starting metrics service.")
+	utils.Logger().Info().Msg("Starting metrics service.")
 	s.Run()
 }
 
 // StopService shutdowns metrics service.
 func (s *Service) StopService() {
-	log.Info().Msg("Shutting down metrics service.")
+	utils.Logger().Info().Msg("Shutting down metrics service.")
 	metricsPush <- -1
 }
 
@@ -117,7 +115,7 @@ func GetMetricsServicePort(nodePort string) string {
 	if port, err := strconv.Atoi(nodePort); err == nil {
 		return fmt.Sprintf("%d", port-metricsServicePortDifference)
 	}
-	log.Error().Msg("Error on parsing.")
+	utils.Logger().Error().Msg("Error on parsing.")
 	return ""
 }
 
@@ -133,13 +131,12 @@ func (s *Service) Run() {
 
 	s.pusher = push.New("http://"+s.PushgatewayIP+":"+s.PushgatewayPort, "node_metrics").Gatherer(registry).Grouping("instance", s.IP+":"+s.Port).Grouping("bls_key", s.BlsPublicKey)
 	go s.PushMetrics()
-
-	//s.router.Path("/connectionsstats").Queries("since", "{[0-9]*?}", "until", "{[0-9]*?}").HandlerFunc(s.GetConnectionsStats).Methods("GET")
-	log.Info().Str("port", GetMetricsServicePort(s.Port)).Msg("Listening.")
+	// Pull metrics http server
+	utils.Logger().Info().Str("port", GetMetricsServicePort(s.Port)).Msg("Listening.")
 	go func() {
 		http.Handle("/node_metrics", promhttp.Handler())
 		if err := http.ListenAndServe(addr, nil); err != nil {
-			log.Warn().Err(err).Msg("http.ListenAndServe()")
+			utils.Logger().Warn().Err(err).Msg("http.ListenAndServe()")
 		}
 	}()
 	return
@@ -188,12 +185,13 @@ func (s *Service) PushMetrics() {
 			break
 		}
 		if err := s.pusher.Add(); err != nil {
-			log.Error().Err(err).Msg("Could not push to a prometheus pushgateway.")
+			utils.Logger().Error().Err(err).Msg("Could not push to a prometheus pushgateway.")
 		}
-		switch metricType {
+		/*switch metricType {
 		case ConnectionsNumberPush:
 			s.storage.Dump(curConnectionsNumber, ConnectionsNumberPrefix)
 		case BlockHeightPush:
+			fmt.Println("LOL")
 			s.storage.Dump(curBlockHeight, BlockHeightPrefix)
 			s.storage.Dump(curBlocks, BlocksPrefix)
 		case BlockRewardPush:
@@ -202,7 +200,7 @@ func (s *Service) PushMetrics() {
 			s.storage.Dump(curBalance, BalancePrefix)
 		case LastConsensusPush:
 			s.storage.Dump(lastConsensusTime, ConsensusTimePrefix)
-		}
+		}*/
 	}
 	return
 }
