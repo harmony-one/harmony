@@ -71,8 +71,6 @@ func (node *Node) printStakingList() {
 			Interface("amount", stakeInfo.Amount).
 			Msg("")
 	}
-	utils.Logger().Info().Msg("CURRENT STAKING INFO [END}   ------------------------------------")
-	utils.Logger().Info().Msg("\n")
 }
 
 //The first four bytes of the call data for a function call specifies the function to be called.
