@@ -18,32 +18,35 @@ var once sync.Once
 // ExplorerMessageHandler passes received message in node_handler to explorer service
 func (node *Node) ExplorerMessageHandler(payload []byte) {
 	if len(payload) == 0 {
-		utils.GetLogger().Debug("Payload is empty")
+		utils.Logger().Error().Msg("Payload is empty")
 		return
 	}
 	msg := &msg_pb.Message{}
 	err := protobuf.Unmarshal(payload, msg)
 	if err != nil {
-		utils.GetLogger().Error("Failed to unmarshal message payload.", "err", err)
+		utils.Logger().Error().Err(err).Msg("Failed to unmarshal message payload.")
 		return
 	}
 
 	if msg.Type == msg_pb.MessageType_COMMITTED {
 		recvMsg, err := consensus.ParsePbftMessage(msg)
 		if err != nil {
-			utils.GetLogInstance().Debug("[Explorer] onCommitted unable to parse msg", "error", err)
+			utils.Logger().Error().Err(err).Msg("[Explorer] onCommitted unable to parse msg")
 			return
 		}
 
 		aggSig, mask, err := node.Consensus.ReadSignatureBitmapPayload(recvMsg.Payload, 0)
 		if err != nil {
-			utils.GetLogInstance().Debug("[Explorer] readSignatureBitmapPayload failed", "error", err)
+			utils.Logger().Error().Err(err).Msg("[Explorer] readSignatureBitmapPayload failed")
 			return
 		}
 
 		// check has 2f+1 signatures
 		if count := utils.CountOneBits(mask.Bitmap); count < node.Consensus.Quorum() {
-			utils.GetLogInstance().Debug("[Explorer] not have enough signature", "need", node.Consensus.Quorum(), "have", count)
+			utils.Logger().Error().
+				Int("need", node.Consensus.Quorum()).
+				Int("have", count).
+				Msg("[Explorer] not have enough signature")
 			return
 		}
 
@@ -51,14 +54,19 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 		binary.LittleEndian.PutUint64(blockNumHash, recvMsg.BlockNum)
 		commitPayload := append(blockNumHash, recvMsg.BlockHash[:]...)
 		if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
-			utils.GetLogInstance().Debug("[Explorer] Failed to verify the multi signature for commit phase", "msgBlock", recvMsg.BlockNum)
+			utils.Logger().
+				Error().Err(err).
+				Uint64("msgBlock", recvMsg.BlockNum).
+				Msg("[Explorer] Failed to verify the multi signature for commit phase")
 			return
 		}
 
 		block := node.Consensus.PbftLog.GetBlockByHash(recvMsg.BlockHash)
 
 		if block == nil {
-			utils.GetLogInstance().Info("[Explorer] Haven't received the block before the committed msg", "msgBlock", recvMsg.BlockNum)
+			utils.Logger().Info().
+				Uint64("msgBlock", recvMsg.BlockNum).
+				Msg("[Explorer] Haven't received the block before the committed msg")
 			node.Consensus.PbftLog.AddMessage(recvMsg)
 			return
 		}
@@ -69,7 +77,7 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 
 		recvMsg, err := consensus.ParsePbftMessage(msg)
 		if err != nil {
-			utils.GetLogInstance().Debug("[Explorer] Unable to parse Prepared msg", "error", err)
+			utils.Logger().Error().Err(err).Msg("[Explorer] Unable to parse Prepared msg")
 			return
 		}
 		block := recvMsg.Block
@@ -91,7 +99,7 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 
 // AddNewBlockForExplorer add new block for explorer.
 func (node *Node) AddNewBlockForExplorer() {
-	utils.GetLogInstance().Info("[Explorer] Add new block for explorer")
+	utils.Logger().Info().Msg("[Explorer] Add new block for explorer")
 	// Search for the next block in PbftLog and commit the block into blockchain for explorer node.
 	for {
 		blocks := node.Consensus.PbftLog.GetBlocksByNumber(node.Blockchain().CurrentBlock().NumberU64() + 1)
@@ -99,9 +107,9 @@ func (node *Node) AddNewBlockForExplorer() {
 			break
 		} else {
 			if len(blocks) > 1 {
-				utils.GetLogInstance().Error("[Explorer] We should have not received more than one block with the same block height.")
+				utils.Logger().Error().Msg("[Explorer] We should have not received more than one block with the same block height.")
 			}
-			utils.GetLogInstance().Info("Adding new block for explorer node", "blockHeight", blocks[0].NumberU64())
+			utils.Logger().Info().Uint64("blockHeight", blocks[0].NumberU64()).Msg("Adding new block for explorer node")
 			if err := node.AddNewBlock(blocks[0]); err == nil {
 				// Clean up the blocks to avoid OOM.
 				node.Consensus.PbftLog.DeleteBlockByNumber(blocks[0].NumberU64())
@@ -109,7 +117,8 @@ func (node *Node) AddNewBlockForExplorer() {
 				// TODO: some blocks can be dumped before state syncing finished.
 				// And they would be dumped again here. Please fix it.
 				once.Do(func() {
-					utils.GetLogInstance().Info("[Explorer] Populating explorer data from state synced blocks", "starting height", int64(blocks[0].NumberU64())-1)
+					utils.Logger().Info().Int64("starting height", int64(blocks[0].NumberU64())-1).
+						Msg("[Explorer] Populating explorer data from state synced blocks")
 					go func() {
 						for blockHeight := int64(blocks[0].NumberU64()) - 1; blockHeight >= 0; blockHeight-- {
 							explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, true).Dump(
@@ -118,7 +127,7 @@ func (node *Node) AddNewBlockForExplorer() {
 					}()
 				})
 			} else {
-				utils.GetLogInstance().Error("[Explorer] Error when adding new block for explorer node", "error", err)
+				utils.Logger().Error().Err(err).Msg("[Explorer] Error when adding new block for explorer node")
 			}
 		}
 	}
@@ -130,7 +139,7 @@ func (node *Node) commitBlockForExplorer(block *types.Block) {
 		return
 	}
 	// Dump new block into level db.
-	utils.GetLogInstance().Info("[Explorer] Committing block into explorer DB", "blockNum", block.NumberU64())
+	utils.Logger().Info().Uint64("blockNum", block.NumberU64()).Msg("[Explorer] Committing block into explorer DB")
 	explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, true).Dump(block, block.NumberU64())
 
 	curNum := block.NumberU64()
