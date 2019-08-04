@@ -13,6 +13,7 @@ const (
 	mainnetV2Epoch     = 5
 
 	mainnetVdfDifficulty = 50000 // This takes about 100s to finish the vdf
+	mainnetConsensusRatio = float64(0.66)
 )
 
 // MainnetSchedule is the mainnet sharding configuration schedule.
@@ -61,6 +62,11 @@ func (ms mainnetSchedule) IsLastBlock(blockNum uint64) bool {
 
 func (ms mainnetSchedule) VdfDifficulty() int {
 	return mainnetVdfDifficulty
+}
+
+// ConsensusRatio ratio of new nodes vs consensus total nodes
+func (ms mainnetSchedule) ConsensusRatio() float64 {
+	return mainnetConsensusRatio
 }
 
 var mainnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(mainnetV1Epoch)}

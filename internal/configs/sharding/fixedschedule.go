@@ -36,6 +36,11 @@ func (s fixedSchedule) VdfDifficulty() int {
 	return mainnetVdfDifficulty
 }
 
+// ConsensusRatio ratio of new nodes vs consensus total nodes
+func (s fixedSchedule) ConsensusRatio() float64 {
+	return mainnetConsensusRatio
+}
+
 // NewFixedSchedule returns a sharding configuration schedule that uses the
 // given config instance for all epochs.  Useful for testing.
 func NewFixedSchedule(instance Instance) Schedule {

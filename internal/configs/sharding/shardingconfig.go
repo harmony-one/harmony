@@ -24,6 +24,9 @@ type Schedule interface {
 
 	// VDFDifficulty returns number of iterations for VDF calculation
 	VdfDifficulty() int
+
+	// ConsensusRatio ratio of new nodes vs consensus total nodes
+	ConsensusRatio() float64
 }
 
 // Instance is one sharding configuration instance.
