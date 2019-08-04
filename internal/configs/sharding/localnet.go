@@ -19,7 +19,7 @@ const (
 	localnetEpochBlock1 = 10
 	twoOne              = 5
 
-	localnetVdfDifficulty = 5000 // This takes about 10s to finish the vdf
+	localnetVdfDifficulty  = 5000 // This takes about 10s to finish the vdf
 	localnetConsensusRatio = float64(0.1)
 )
 
@@ -65,7 +65,7 @@ func (ls localnetSchedule) VdfDifficulty() int {
 }
 
 // ConsensusRatio ratio of new nodes vs consensus total nodes
-func (ls localnetSchedule)  ConsensusRatio() float64 {
+func (ls localnetSchedule) ConsensusRatio() float64 {
 	return localnetConsensusRatio
 }
 

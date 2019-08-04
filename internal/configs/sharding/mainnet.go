@@ -12,7 +12,7 @@ const (
 	mainnetV1Epoch     = 1
 	mainnetV2Epoch     = 5
 
-	mainnetVdfDifficulty = 50000 // This takes about 100s to finish the vdf
+	mainnetVdfDifficulty  = 50000 // This takes about 100s to finish the vdf
 	mainnetConsensusRatio = float64(0.66)
 )
 
