@@ -18,6 +18,8 @@ const (
 
 	testnetEpochBlock1 = 78
 	threeOne           = 111
+
+	testnetVdfDifficulty = 10000 // This takes about 20s to finish the vdf
 )
 
 func (testnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
@@ -56,6 +58,10 @@ func (ts testnetSchedule) IsLastBlock(blockNum uint64) bool {
 	default:
 		return ((blockNum-testnetEpochBlock1)%blocks == blocks-1)
 	}
+}
+
+func (ts testnetSchedule) VdfDifficulty() int {
+	return testnetVdfDifficulty
 }
 
 var testnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(testnetV1Epoch), big.NewInt(testnetV2Epoch)}

@@ -21,11 +21,7 @@ type Role byte
 // All constants for different node roles.
 const (
 	Unknown Role = iota
-	ShardLeader
-	ShardValidator
-	BeaconLeader
-	BeaconValidator
-	NewNode
+	Validator
 	ClientNode
 	WalletNode
 	ExplorerNode
@@ -35,16 +31,8 @@ func (role Role) String() string {
 	switch role {
 	case Unknown:
 		return "Unknown"
-	case ShardLeader:
-		return "ShardLeader"
-	case ShardValidator:
-		return "ShardValidator"
-	case BeaconLeader:
-		return "BeaconLeader"
-	case BeaconValidator:
-		return "BeaconValidator"
-	case NewNode:
-		return "NewNode"
+	case Validator:
+		return "Validator"
 	case ClientNode:
 		return "ClientNode"
 	case WalletNode:
@@ -145,7 +133,7 @@ func GetDefaultConfig() *ConfigType {
 }
 
 func (conf *ConfigType) String() string {
-	return fmt.Sprintf("%s/%s/%s:%v,%v,%v", conf.beacon, conf.group, conf.client, conf.isClient, conf.IsBeacon(), conf.ShardID)
+	return fmt.Sprintf("%s/%s/%s:%v,%v", conf.beacon, conf.group, conf.client, conf.isClient, conf.ShardID)
 }
 
 // SetBeaconGroupID set the groupID for beacon group
@@ -166,11 +154,6 @@ func (conf *ConfigType) SetClientGroupID(g p2p.GroupID) {
 // SetIsClient set the isClient configuration
 func (conf *ConfigType) SetIsClient(b bool) {
 	conf.isClient = b
-}
-
-// SetIsBeacon sets the isBeacon configuration
-func (conf *ConfigType) SetIsBeacon(b bool) {
-	conf.isBeacon = b
 }
 
 // SetShardID set the ShardID
@@ -201,11 +184,6 @@ func (conf *ConfigType) GetClientGroupID() p2p.GroupID {
 // IsClient returns the isClient configuration
 func (conf *ConfigType) IsClient() bool {
 	return conf.isClient
-}
-
-// IsBeacon returns the isBeacon configuration
-func (conf *ConfigType) IsBeacon() bool {
-	return conf.isBeacon
 }
 
 // Role returns the role

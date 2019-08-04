@@ -9,6 +9,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/peer"
 )
 
 // Constants for downloader server.
@@ -24,7 +25,15 @@ type Server struct {
 
 // Query returns the feature at the given point.
 func (s *Server) Query(ctx context.Context, request *pb.DownloaderRequest) (*pb.DownloaderResponse, error) {
-	response, err := s.downloadInterface.CalculateResponse(request)
+	var pinfo string
+	// retrieve ip/port information; used for debug only
+	p, ok := peer.FromContext(ctx)
+	if !ok {
+		pinfo = ""
+	} else {
+		pinfo = p.Addr.String()
+	}
+	response, err := s.downloadInterface.CalculateResponse(request, pinfo)
 	if err != nil {
 		return nil, err
 	}
