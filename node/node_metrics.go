@@ -35,7 +35,8 @@ func (node *Node) UpdateConnectionsNumberForMetrics(prevNumPeers int) int {
 
 // UpdateBalanceForMetrics uppdates node balance for metrics service.
 func (node *Node) UpdateBalanceForMetrics(prevBalance *big.Int) *big.Int {
-	_, account := core.ShardingSchedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch)).FindAccount(node.NodeConfig.ConsensusPubKey.SerializeToHexStr())
+	instance := core.ShardingSchedule.InstanceForEpoch(big.NewInt(int64(core.GetEpochFromBlockNumber(node.Blockchain().CurrentBlock().NumberU64()))))
+	_, account := instance.FindAccount(node.NodeConfig.ConsensusPubKey.SerializeToHexStr())
 	if account == nil {
 		return prevBalance
 	}
