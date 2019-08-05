@@ -8,6 +8,7 @@ import (
 	"github.com/harmony-one/harmony/api/service/consensus"
 	"github.com/harmony-one/harmony/api/service/discovery"
 	"github.com/harmony-one/harmony/api/service/explorer"
+	"github.com/harmony-one/harmony/api/service/metrics"
 	"github.com/harmony-one/harmony/api/service/networkinfo"
 	"github.com/harmony-one/harmony/api/service/staking"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -28,13 +29,64 @@ func (node *Node) setupForValidator() {
 	node.serviceManager.RegisterService(service.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReadyv2))
 	// Register client support service.
 	node.serviceManager.RegisterService(service.ClientSupport, clientsupport.New(node.Blockchain().State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
+	// Register new metrics service
+	node.serviceManager.RegisterService(service.Metrics, metrics.New(&node.SelfPeer, node.NodeConfig.ConsensusPubKey.SerializeToHexStr(), node.NodeConfig.GetPushgatewayIP(), node.NodeConfig.GetPushgatewayPort(), node.Consensus.GetNodeIDs))
+}
 
+func (node *Node) setupForShardValidator() {
+	nodeConfig, chanPeer := node.initNodeConfiguration()
+
+	// Register client support service.
+	node.serviceManager.RegisterService(service.ClientSupport, clientsupport.New(node.Blockchain().State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
+	// Register peer discovery service. "0" is the beacon shard ID. No need to do staking for beacon chain node.
+	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer, node.AddBeaconPeer))
+	// Register networkinfo service. "0" is the beacon shard ID
+	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, node.NodeConfig.GetShardGroupID(), chanPeer, nil))
+	// Register consensus service.
+	node.serviceManager.RegisterService(service.Consensus, consensus.New(node.BlockChannel, node.Consensus, node.startConsensus))
+	// Register new block service.
+	node.serviceManager.RegisterService(service.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReadyv2))
+	// Register new metrics service
+	node.serviceManager.RegisterService(service.Metrics, metrics.New(&node.SelfPeer, node.NodeConfig.ConsensusPubKey.SerializeToHexStr(), node.NodeConfig.GetPushgatewayIP(), node.NodeConfig.GetPushgatewayPort(), node.Consensus.GetNodeIDs))
+}
+
+func (node *Node) setupForBeaconLeader() {
+	nodeConfig, chanPeer := node.initNodeConfiguration()
+
+	// Register peer discovery service. No need to do staking for beacon chain node.
+	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer, nil))
+	// Register networkinfo service.
+	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, node.NodeConfig.GetShardGroupID(), chanPeer, nil))
+	// Register client support service.
+	node.serviceManager.RegisterService(service.ClientSupport, clientsupport.New(node.Blockchain().State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
+	// Register consensus service.
+	node.serviceManager.RegisterService(service.Consensus, consensus.New(node.BlockChannel, node.Consensus, node.startConsensus))
+	// Register new block service.
+	node.serviceManager.RegisterService(service.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReadyv2))
 	// Register randomness service
 	// TODO: Disable drand. Currently drand isn't functioning but we want to compeletely turn it off for full protection.
 	// Enable it back after mainnet.
 	// Need Dynamically enable for beacon validators
 	// node.serviceManager.RegisterService(service.Randomness, randomness.New(node.DRand))
+	// Register new metrics service
+	node.serviceManager.RegisterService(service.Metrics, metrics.New(&node.SelfPeer, node.NodeConfig.ConsensusPubKey.SerializeToHexStr(), node.NodeConfig.GetPushgatewayIP(), node.NodeConfig.GetPushgatewayPort(), node.Consensus.GetNodeIDs))
+}
 
+func (node *Node) setupForBeaconValidator() {
+	nodeConfig, chanPeer := node.initNodeConfiguration()
+
+	// Register peer discovery service. No need to do staking for beacon chain node.
+	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer, nil))
+	// Register networkinfo service.
+	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, node.NodeConfig.GetShardGroupID(), chanPeer, nil))
+	// Register consensus service.
+	node.serviceManager.RegisterService(service.Consensus, consensus.New(node.BlockChannel, node.Consensus, node.startConsensus))
+	// Register new block service.
+	node.serviceManager.RegisterService(service.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReadyv2))
+	// Register client support service.
+	node.serviceManager.RegisterService(service.ClientSupport, clientsupport.New(node.Blockchain().State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
+	// Register new metrics service
+	node.serviceManager.RegisterService(service.Metrics, metrics.New(&node.SelfPeer, node.NodeConfig.ConsensusPubKey.SerializeToHexStr(), node.NodeConfig.GetPushgatewayIP(), node.NodeConfig.GetPushgatewayPort(), node.Consensus.GetNodeIDs))
 }
 
 func (node *Node) setupForNewNode() {
@@ -49,6 +101,8 @@ func (node *Node) setupForNewNode() {
 	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, node.NodeConfig.GetBeaconGroupID(), chanPeer, nil))
 
 	// TODO: how to restart networkinfo and discovery service after receiving shard id info from beacon chain?
+	// Register new metrics service
+	node.serviceManager.RegisterService(service.Metrics, metrics.New(&node.SelfPeer, node.NodeConfig.ConsensusPubKey.SerializeToHexStr(), node.NodeConfig.GetPushgatewayIP(), node.NodeConfig.GetPushgatewayPort(), node.Consensus.GetNodeIDs))
 }
 
 func (node *Node) setupForClientNode() {
@@ -58,6 +112,8 @@ func (node *Node) setupForClientNode() {
 	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer, node.AddBeaconPeer))
 	// Register networkinfo service. "0" is the beacon shard ID
 	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer, nil))
+	// Register new metrics service
+	node.serviceManager.RegisterService(service.Metrics, metrics.New(&node.SelfPeer, node.NodeConfig.ConsensusPubKey.SerializeToHexStr(), node.NodeConfig.GetPushgatewayIP(), node.NodeConfig.GetPushgatewayPort(), node.Consensus.GetNodeIDs))
 }
 
 func (node *Node) setupForExplorerNode() {
@@ -96,7 +152,7 @@ func (node *Node) ServiceManagerSetup() {
 // RunServices runs registered services.
 func (node *Node) RunServices() {
 	if node.serviceManager == nil {
-		utils.Logger().Info().Msg("Service manager is not set up yet.")
+		utils.GetLogInstance().Info("Service manager is not set up yet.")
 		return
 	}
 	node.serviceManager.RunServices()
@@ -105,7 +161,7 @@ func (node *Node) RunServices() {
 // StopServices runs registered services.
 func (node *Node) StopServices() {
 	if node.serviceManager == nil {
-		utils.Logger().Info().Msg("Service manager is not set up yet.")
+		utils.GetLogInstance().Info("Service manager is not set up yet.")
 		return
 	}
 	node.serviceManager.StopServicesByRole([]service.Type{})

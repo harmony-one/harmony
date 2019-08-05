@@ -118,6 +118,10 @@ var (
 
 	// Disable view change.
 	disableViewChange = flag.Bool("disable_view_change", false, "Do not propose view change (testing only)")
+
+	// pushgateway ip and port
+	pushgatewayIP   = flag.String("pushgateway_ip", "grafana.harmony.one", "metrics view ip")
+	pushgatewayPort = flag.String("pushgateway_port", "9091", "metrics view port")
 )
 
 func initSetup() {
@@ -243,6 +247,9 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 		panic(fmt.Sprintf("invalid network type: %s", *networkType))
 	}
 
+	nodeConfig.SetPushgatewayIP(*pushgatewayIP)
+	nodeConfig.SetPushgatewayPort(*pushgatewayPort)
+
 	// P2p private key is used for secure message transfer between p2p nodes.
 	nodeConfig.P2pPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
@@ -302,6 +309,10 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// TODO: refactor the creation of blockchain out of node.New()
 	currentConsensus.ChainReader = currentNode.Blockchain()
 
+	// Set up prometheus pushgateway for metrics monitoring serivce.
+	currentNode.NodeConfig.SetPushgatewayIP(nodeConfig.PushgatewayIP)
+	currentNode.NodeConfig.SetPushgatewayPort(nodeConfig.PushgatewayPort)
+
 	if *isExplorer {
 		currentNode.NodeConfig.SetRole(nodeconfig.ExplorerNode)
 		currentNode.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(*shardID)))
@@ -316,7 +327,6 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 			currentNode.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
 			currentNode.NodeConfig.SetClientGroupID(p2p.NewClientGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
 		}
-
 	}
 	currentNode.NodeConfig.ConsensusPubKey = nodeConfig.ConsensusPubKey
 	currentNode.NodeConfig.ConsensusPriKey = nodeConfig.ConsensusPriKey
