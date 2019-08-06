@@ -14,6 +14,9 @@ const (
 
 	mainnetVdfDifficulty  = 50000 // This takes about 100s to finish the vdf
 	mainnetConsensusRatio = float64(0.66)
+
+	// TODO: remove it after randomness feature turned on mainnet
+	mainnetRandomnessStartingEpoch = 10
 )
 
 // MainnetSchedule is the mainnet sharding configuration schedule.
@@ -67,6 +70,12 @@ func (ms mainnetSchedule) VdfDifficulty() int {
 // ConsensusRatio ratio of new nodes vs consensus total nodes
 func (ms mainnetSchedule) ConsensusRatio() float64 {
 	return mainnetConsensusRatio
+}
+
+// TODO: remove it after randomness feature turned on mainnet
+//RandonnessStartingEpoch returns starting epoch of randonness generation
+func (ms mainnetSchedule) RandomnessStartingEpoch() uint64 {
+	return mainnetRandomnessStartingEpoch
 }
 
 var mainnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(mainnetV1Epoch), big.NewInt(mainnetV2Epoch)}
