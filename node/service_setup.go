@@ -30,7 +30,9 @@ func (node *Node) setupForValidator() {
 	// Register client support service.
 	node.serviceManager.RegisterService(service.ClientSupport, clientsupport.New(node.Blockchain().State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
 	// Register new metrics service
-	node.serviceManager.RegisterService(service.Metrics, metrics.New(&node.SelfPeer, node.NodeConfig.ConsensusPubKey.SerializeToHexStr(), node.NodeConfig.GetPushgatewayIP(), node.NodeConfig.GetPushgatewayPort(), node.Consensus.GetNodeIDs))
+	if node.NodeConfig.GetMetricsFlag() {
+		node.serviceManager.RegisterService(service.Metrics, metrics.New(&node.SelfPeer, node.NodeConfig.ConsensusPubKey.SerializeToHexStr(), node.NodeConfig.GetPushgatewayIP(), node.NodeConfig.GetPushgatewayPort(), node.Consensus.GetNodeIDs))
+	}
 
 	// Register randomness service
 	// TODO: Disable drand. Currently drand isn't functioning but we want to compeletely turn it off for full protection.
@@ -51,8 +53,9 @@ func (node *Node) setupForNewNode() {
 	// Register networkinfo service. "0" is the beacon shard ID
 	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, node.NodeConfig.GetBeaconGroupID(), chanPeer, nil))
 	// Register new metrics service
-	node.serviceManager.RegisterService(service.Metrics, metrics.New(&node.SelfPeer, node.NodeConfig.ConsensusPubKey.SerializeToHexStr(), node.NodeConfig.GetPushgatewayIP(), node.NodeConfig.GetPushgatewayPort(), node.Consensus.GetNodeIDs))
-
+	if node.NodeConfig.GetMetricsFlag() {
+		node.serviceManager.RegisterService(service.Metrics, metrics.New(&node.SelfPeer, node.NodeConfig.ConsensusPubKey.SerializeToHexStr(), node.NodeConfig.GetPushgatewayIP(), node.NodeConfig.GetPushgatewayPort(), node.Consensus.GetNodeIDs))
+	}
 	// TODO: how to restart networkinfo and discovery service after receiving shard id info from beacon chain?
 }
 
@@ -64,7 +67,9 @@ func (node *Node) setupForClientNode() {
 	// Register networkinfo service. "0" is the beacon shard ID
 	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer, nil))
 	// Register new metrics service
-	node.serviceManager.RegisterService(service.Metrics, metrics.New(&node.SelfPeer, node.NodeConfig.ConsensusPubKey.SerializeToHexStr(), node.NodeConfig.GetPushgatewayIP(), node.NodeConfig.GetPushgatewayPort(), node.Consensus.GetNodeIDs))
+	if node.NodeConfig.GetMetricsFlag() {
+		node.serviceManager.RegisterService(service.Metrics, metrics.New(&node.SelfPeer, node.NodeConfig.ConsensusPubKey.SerializeToHexStr(), node.NodeConfig.GetPushgatewayIP(), node.NodeConfig.GetPushgatewayPort(), node.Consensus.GetNodeIDs))
+	}
 }
 
 func (node *Node) setupForExplorerNode() {
