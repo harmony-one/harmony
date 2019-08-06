@@ -19,7 +19,7 @@ const (
 	BlockRewardPrefix       = "brp"
 	ConnectionsNumberPrefix = "cnp"
 	ConsensusTimePrefix     = "ltp"
-	TransactionsPrefix      = "tsp"
+	TxPoolPrefix            = "tpp"
 )
 
 // GetKey returns key by prefix and pushed time momemnt.
@@ -73,7 +73,7 @@ func (storage *Storage) Dump(value interface{}, prefix string) error {
 	}
 	batch := storage.db.NewBatch()
 	// Update database.
-	if err := batch.Put([]byte(GetKey(prefix, currentTime)), []byte(fmt.Sprintf("%v", value))); err != nil {
+	if err := batch.Put([]byte(GetKey(prefix, currentTime)), []byte(fmt.Sprintf("%v", value.(interface{})))); err != nil {
 		utils.Logger().Warn().Err(err).Msgf("Cannot batch %s.", prefix)
 		return err
 	}

@@ -36,6 +36,12 @@ func (node *Node) UpdateConnectionsNumberForMetrics(prevNumPeers int) int {
 	return curNumPeers
 }
 
+// UpdateTxPoolSizeForMetrics updates tx pool size for metrics service.
+func (node *Node) UpdateTxPoolSizeForMetrics(txPoolSize uint64) {
+	utils.Logger().Info().Msgf("Updating metrics tx pool size %d", txPoolSize)
+	metrics.UpdateTxPoolSize(txPoolSize)
+}
+
 // UpdateBalanceForMetrics uppdates node balance for metrics service.
 func (node *Node) UpdateBalanceForMetrics(prevBalance *big.Int) *big.Int {
 	curBalance, err := node.GetBalanceOfAddress(node.Consensus.SelfAddress)
@@ -65,10 +71,11 @@ func (node *Node) CollectMetrics() {
 	prevBlockHeight := uint64(0)
 	prevBalance := big.NewInt(0)
 	prevLastConsensusTime := int64(0)
-	for range time.Tick(1000 * time.Millisecond) {
+	for range time.Tick(100 * time.Millisecond) {
 		prevBlockHeight = node.UpdateBlockHeightForMetrics(prevBlockHeight)
 		prevNumPeers = node.UpdateConnectionsNumberForMetrics(prevNumPeers)
 		prevBalance = node.UpdateBalanceForMetrics(prevBalance)
 		prevLastConsensusTime = node.UpdateLastConsensusTimeForMetrics(prevLastConsensusTime)
+		node.UpdateTxPoolSizeForMetrics(node.TxPool.GetTxPoolSize())
 	}
 }

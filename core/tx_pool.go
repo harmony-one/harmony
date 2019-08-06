@@ -463,6 +463,11 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 	pool.promoteExecutables(nil)
 }
 
+// GetTxPoolSize returns tx pool size.
+func (pool *TxPool) GetTxPoolSize() uint64 {
+	return uint64(len(pool.pending)) + uint64(len(pool.queue))
+}
+
 // Stop terminates the transaction pool.
 func (pool *TxPool) Stop() {
 	// Unsubscribe all subscriptions registered from txpool

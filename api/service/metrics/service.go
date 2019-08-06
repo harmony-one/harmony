@@ -26,6 +26,7 @@ const (
 	NodeBalancePush              int = 2
 	LastConsensusPush            int = 3
 	BlockRewardPush              int = 4
+	TxPoolPush                   int = 5
 	metricsServicePortDifference     = 2000
 )
 
@@ -44,6 +45,7 @@ type Service struct {
 
 // init vars for prometheus
 var (
+	curTxPoolSize        = uint64(0)
 	curBlockHeight       = uint64(0)
 	curBlocks            = uint64(0)
 	curBalance           = big.NewInt(0)
@@ -54,6 +56,10 @@ var (
 	blockHeightCounter   = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "block_height",
 		Help: "Get current block height.",
+	})
+	txPoolGauge = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "tx_pool_size",
+		Help: "Get current tx pool size.",
 	})
 	blocksAcceptedGauge = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "blocks_accepted",
@@ -129,7 +135,7 @@ func (s *Service) Run() {
 	addr := net.JoinHostPort("", GetMetricsServicePort(s.Port))
 
 	registry := prometheus.NewRegistry()
-	registry.MustRegister(blockHeightCounter, connectionsNumberGauge, nodeBalanceCounter, lastConsensusGauge, blockRewardGauge, blocksAcceptedGauge)
+	registry.MustRegister(blockHeightCounter, connectionsNumberGauge, nodeBalanceCounter, lastConsensusGauge, blockRewardGauge, blocksAcceptedGauge, txPoolGauge)
 
 	s.pusher = push.New("http://"+s.PushgatewayIP+":"+s.PushgatewayPort, "node_metrics").Gatherer(registry).Grouping("instance", s.IP+":"+s.Port).Grouping("bls_key", s.BlsPublicKey)
 	go s.PushMetrics()
@@ -176,6 +182,13 @@ func UpdateNodeBalance(balance *big.Int) {
 	metricsPush <- NodeBalancePush
 }
 
+// UpdateTxPoolSize updates tx pool size.
+func UpdateTxPoolSize(txPoolSize uint64) {
+	txPoolGauge.Set(float64(txPoolSize))
+	curTxPoolSize = txPoolSize
+	metricsPush <- TxPoolPush
+}
+
 // UpdateBlockReward updates block reward.
 func UpdateBlockReward(blockReward *big.Int) {
 	blockRewardGauge.Set(FormatBalance(blockReward))
@@ -219,6 +232,8 @@ func (s *Service) PushMetrics() {
 			s.storage.Dump(curBalance, BalancePrefix)
 		case LastConsensusPush:
 			s.storage.Dump(lastConsensusTime, ConsensusTimePrefix)
+		case TxPoolPush:
+			s.storage.Dump(curTxPoolSize, TxPoolPrefix)
 		}*/
 	}
 	return
