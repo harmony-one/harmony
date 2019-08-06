@@ -502,3 +502,13 @@ func ReadEpochVdfBlockNum(db DatabaseReader, epoch *big.Int) ([]byte, error) {
 func WriteEpochVdfBlockNum(db DatabaseWriter, epoch *big.Int, data []byte) error {
 	return db.Put(epochVdfBlockNumberKey(epoch), data)
 }
+
+// ReadCrossLinkShardBlock retrieves the blockHash given shardID and blockNum
+func ReadCrossLinkShardBlock(db DatabaseReader, shardID uint32, blockNum uint64) ([]byte, error) {
+	return db.Get(crosslinkKey(shardID, blockNum))
+}
+
+// WriteCrossLinkShardBlock stores the blockHash given shardID and blockNum
+func WriteCrossLinkShardBlock(db DatabaseWriter, shardID uint32, blockNum uint64, data []byte) error {
+	return db.Put(crosslinkKey(shardID, blockNum), data)
+}

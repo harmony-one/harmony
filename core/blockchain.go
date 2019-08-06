@@ -1959,6 +1959,26 @@ func (bc *BlockChain) WriteEpochVdfBlockNum(epoch *big.Int, blockNum *big.Int) e
 	return nil
 }
 
+// WriteCrossLinks saves the hashes of crosslinks by shardID and blockNum combination key
+func (bc *BlockChain) WriteCrossLinks(cls []types.CrossLink) error {
+	var err error
+	for _, cl := range cls {
+		err = rawdb.WriteCrossLinkShardBlock(bc.db, cl.ShardID(), cl.BlockNum(), cl.Bytes())
+	}
+	return err
+}
+
+// ReadCrossLink retrieves crosslink hash given shardID and blockNum
+func (bc *BlockChain) ReadCrossLinkHash(shardID uint32, blockNum uint64) (common.Hash, error) {
+	h, err := rawdb.ReadCrossLinkShardBlock(bc.db, shardID, blockNum)
+	if err != nil {
+		return common.Hash{}, err
+	}
+	hash := common.Hash{}
+	hash.SetBytes(h)
+	return hash, nil
+}
+
 // IsSameLeaderAsPreviousBlock retrieves a block from the database by number, caching it
 func (bc *BlockChain) IsSameLeaderAsPreviousBlock(block *types.Block) bool {
 	if block.NumberU64() == 0 {

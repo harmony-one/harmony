@@ -60,6 +60,8 @@ var (
 	preimagePrefix = []byte("secure-key-")      // preimagePrefix + hash -> preimage
 	configPrefix   = []byte("ethereum-config-") // config prefix for the db
 
+	crosslinkPrefix = []byte("crosslink") // prefix for crosslink
+
 	// epochBlockNumberPrefix + epoch (big.Int.Bytes())
 	// -> epoch block number (big.Int.Bytes())
 	epochBlockNumberPrefix = []byte("harmony-epoch-block-number-")
@@ -161,4 +163,12 @@ func epochVrfBlockNumbersKey(epoch *big.Int) []byte {
 
 func epochVdfBlockNumberKey(epoch *big.Int) []byte {
 	return append(epochVdfBlockNumberPrefix, epoch.Bytes()...)
+}
+
+func crosslinkKey(shardID uint32, blockNum uint64) []byte {
+	sbKey := make([]byte, 12)
+	binary.BigEndian.PutUint32(sbKey, shardID)
+	binary.BigEndian.PutUint64(sbKey[4:], blockNum)
+	key := append(crosslinkPrefix, sbKey...)
+	return key
 }
