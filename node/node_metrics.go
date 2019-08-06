@@ -5,7 +5,7 @@ import (
 	"time"
 
 	metrics "github.com/harmony-one/harmony/api/service/metrics"
-	"github.com/rs/zerolog/log"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // UpdateBlockHeightForMetrics updates block height for metrics service.
@@ -15,11 +15,11 @@ func (node *Node) UpdateBlockHeightForMetrics(prevBlockHeight uint64) uint64 {
 	if curBlockHeight == prevBlockHeight {
 		return prevBlockHeight
 	}
-	log.Info().Msgf("Updating metrics block height %d", curBlockHeight)
+	utils.Logger().Info().Msgf("Updating metrics block height %d", curBlockHeight)
 	metrics.UpdateBlockHeight(curBlockHeight)
 	blockReward := node.Consensus.GetBlockReward()
 	if blockReward != nil {
-		log.Info().Msgf("Updating metrics block reward %d", blockReward.Uint64())
+		utils.Logger().Info().Msgf("Updating metrics block reward %d", blockReward.Uint64())
 		metrics.UpdateBlockReward(blockReward)
 	}
 	return curBlockHeight
@@ -31,7 +31,7 @@ func (node *Node) UpdateConnectionsNumberForMetrics(prevNumPeers int) int {
 	if curNumPeers == prevNumPeers {
 		return prevNumPeers
 	}
-	log.Info().Msgf("Updating metrics connections number %d", curNumPeers)
+	utils.Logger().Info().Msgf("Updating metrics connections number %d", curNumPeers)
 	metrics.UpdateConnectionsNumber(curNumPeers)
 	return curNumPeers
 }
@@ -42,7 +42,7 @@ func (node *Node) UpdateBalanceForMetrics(prevBalance *big.Int) *big.Int {
 	if err != nil || curBalance.Cmp(prevBalance) == 0 {
 		return prevBalance
 	}
-	log.Info().Msgf("Updating metrics node balance %d", curBalance.Uint64())
+	utils.Logger().Info().Msgf("Updating metrics node balance %d", curBalance.Uint64())
 	metrics.UpdateNodeBalance(curBalance)
 	return curBalance
 }
@@ -53,14 +53,14 @@ func (node *Node) UpdateLastConsensusTimeForMetrics(prevLastConsensusTime int64)
 	if lastConsensusTime == prevLastConsensusTime {
 		return prevLastConsensusTime
 	}
-	log.Info().Msgf("Updating metrics last consensus time reached %d", lastConsensusTime)
+	utils.Logger().Info().Msgf("Updating metrics last consensus time reached %d", lastConsensusTime)
 	metrics.UpdateLastConsensus(lastConsensusTime)
 	return lastConsensusTime
 }
 
 // CollectMetrics collects metrics: block height, connections number, node balance, block reward, last consensus, accepted blocks.
 func (node *Node) CollectMetrics() {
-	log.Info().Msg("[Metrics Service] Update metrics")
+	utils.Logger().Info().Msg("[Metrics Service] Update metrics")
 	prevNumPeers := 0
 	prevBlockHeight := uint64(0)
 	prevBalance := big.NewInt(0)

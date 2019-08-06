@@ -376,7 +376,7 @@ func accumulateRewards(
 		diff := new(big.Int).Sub(cur, last)
 		signers = append(signers, common2.MustAddressToBech32(account))
 		if account == nodeAddress {
-			nodeReward = diff 
+			nodeReward = diff
 		}
 		state.AddBalance(account, diff)
 		totalAmount = new(big.Int).Add(totalAmount, diff)

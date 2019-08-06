@@ -31,7 +31,7 @@ var (
 
 	// ZeroLog
 	zeroLogger      *zerolog.Logger
-	zeroLoggerLevel zerolog.Level = zerolog.Disabled
+	zeroLoggerLevel = zerolog.Disabled
 )
 
 // SetLogContext used to print out loggings of node with port and ip.
