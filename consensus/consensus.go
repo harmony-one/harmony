@@ -159,6 +159,9 @@ type Consensus struct {
 
 	// If true, this consensus will not propose view change.
 	disableViewChange bool
+
+	// last node block reward for metrics
+	lastBlockReward *big.Int
 }
 
 // SetCommitDelay sets the commit message delay.  If set to non-zero,
@@ -226,6 +229,11 @@ func (consensus *Consensus) RewardThreshold() int {
 	return len(consensus.PublicKeys) * 9 / 10
 }
 
+// GetBlockReward returns last node block reward
+func (consensus *Consensus) GetBlockReward() *big.Int {
+	return consensus.lastBlockReward
+}
+
 // StakeInfoFinder finds the staking account for the given consensus key.
 type StakeInfoFinder interface {
 	// FindStakeInfoByNodeKey returns a list of staking information matching
@@ -281,6 +289,7 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 	consensus.commitFinishChan = make(chan uint64)
 
 	consensus.ReadySignal = make(chan struct{})
+	consensus.lastBlockReward = big.NewInt(0)
 
 	// channel for receiving newly generated VDF
 	consensus.RndChannel = make(chan [vdfAndSeedSize]byte)
@@ -294,36 +303,37 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 // accumulateRewards credits the coinbase of the given block with the mining
 // reward. The total reward consists of the static block reward and rewards for
 // included uncles. The coinbase of each uncle block is also rewarded.
+// Returns node block reward or error.
 func accumulateRewards(
-	bc consensus_engine.ChainReader, state *state.DB, header *types.Header,
-) error {
+	bc consensus_engine.ChainReader, state *state.DB, header *types.Header, nodeAddress common.Address,
+) (*big.Int, error) {
 	blockNum := header.Number.Uint64()
 	if blockNum == 0 {
 		// Epoch block has no parent to reward.
-		return nil
+		return nil, nil
 	}
 	// TODO ek – retrieving by parent number (blockNum - 1) doesn't work,
 	//  while it is okay with hash.  Sounds like DB inconsistency.
 	//  Figure out why.
 	parentHeader := bc.GetHeaderByHash(header.ParentHash)
 	if parentHeader == nil {
-		return ctxerror.New("cannot find parent block header in DB",
+		return nil, ctxerror.New("cannot find parent block header in DB",
 			"parentHash", header.ParentHash)
 	}
 	if parentHeader.Number.Cmp(common.Big0) == 0 {
 		// Parent is an epoch block,
 		// which is not signed in the usual manner therefore rewards nothing.
-		return nil
+		return nil, nil
 	}
 	parentShardState, err := bc.ReadShardState(parentHeader.Epoch)
 	if err != nil {
-		return ctxerror.New("cannot read shard state",
+		return nil, ctxerror.New("cannot read shard state",
 			"epoch", parentHeader.Epoch,
 		).WithCause(err)
 	}
 	parentCommittee := parentShardState.FindCommitteeByID(parentHeader.ShardID)
 	if parentCommittee == nil {
-		return ctxerror.New("cannot find shard in the shard state",
+		return nil, ctxerror.New("cannot find shard in the shard state",
 			"parentBlockNumber", parentHeader.Number,
 			"shardID", parentHeader.ShardID,
 		)
@@ -333,24 +343,24 @@ func accumulateRewards(
 		committerKey := new(bls.PublicKey)
 		err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
 		if err != nil {
-			return ctxerror.New("cannot convert BLS public key",
+			return nil, ctxerror.New("cannot convert BLS public key",
 				"blsPublicKey", member.BlsPublicKey).WithCause(err)
 		}
 		committerKeys = append(committerKeys, committerKey)
 	}
 	mask, err := bls_cosi.NewMask(committerKeys, nil)
 	if err != nil {
-		return ctxerror.New("cannot create group sig mask").WithCause(err)
+		return nil, ctxerror.New("cannot create group sig mask").WithCause(err)
 	}
 	if err := mask.SetMask(header.LastCommitBitmap); err != nil {
-		return ctxerror.New("cannot set group sig mask bits").WithCause(err)
+		return nil, ctxerror.New("cannot set group sig mask bits").WithCause(err)
 	}
 	totalAmount := big.NewInt(0)
 	var accounts []common.Address
 	signers := []string{}
 	for idx, member := range parentCommittee.NodeList {
 		if signed, err := mask.IndexEnabled(idx); err != nil {
-			return ctxerror.New("cannot check for committer bit",
+			return nil, ctxerror.New("cannot check for committer bit",
 				"committerIndex", idx,
 			).WithCause(err)
 		} else if signed {
@@ -359,11 +369,15 @@ func accumulateRewards(
 	}
 	numAccounts := big.NewInt(int64(len(accounts)))
 	last := new(big.Int)
+	nodeReward := big.NewInt(0)
 	for i, account := range accounts {
 		cur := new(big.Int)
 		cur.Mul(BlockReward, big.NewInt(int64(i+1))).Div(cur, numAccounts)
 		diff := new(big.Int).Sub(cur, last)
 		signers = append(signers, common2.MustAddressToBech32(account))
+		if account == nodeAddress {
+			nodeReward = diff 
+		}
 		state.AddBalance(account, diff)
 		totalAmount = new(big.Int).Add(totalAmount, diff)
 		last = cur
@@ -373,7 +387,7 @@ func accumulateRewards(
 		Str("TotalAmount", totalAmount.String()).
 		Strs("Signers", signers).
 		Msg("[Block Reward] Successfully paid out block reward")
-	return nil
+	return nodeReward, nil
 }
 
 // GenesisStakeInfoFinder is a stake info finder implementation using only

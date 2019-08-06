@@ -19,6 +19,8 @@ import (
 
 // Constants for metrics service.
 const (
+	BalanceScale                 int = 18
+	BalancePrecision             int = 13
 	ConnectionsNumberPush        int = 0
 	BlockHeightPush              int = 1
 	NodeBalancePush              int = 2
@@ -142,6 +144,23 @@ func (s *Service) Run() {
 	return
 }
 
+// FormatBalanace formats big.Int balance with precision.
+func FormatBalance(balance *big.Int) float64 {
+	stringBalance := balance.String()
+	if len(stringBalance) < BalanceScale {
+		return 0.0
+	}
+	if len(stringBalance) == BalanceScale {
+		stringBalance = "0."+stringBalance[len(stringBalance)-BalanceScale:len(stringBalance)-BalancePrecision]
+	} else {
+		stringBalance = stringBalance[:len(stringBalance)-BalanceScale]+"."+stringBalance[len(stringBalance)-BalanceScale:len(stringBalance)-BalancePrecision]
+	}
+	if res, err := strconv.ParseFloat(stringBalance, 64); err == nil {
+		return res
+	}
+	return 0.0
+}
+
 // UpdateBlockHeight updates block height.
 func UpdateBlockHeight(blockHeight uint64) {
 	blockHeightCounter.Add(float64(blockHeight) - float64(curBlockHeight))
@@ -152,14 +171,14 @@ func UpdateBlockHeight(blockHeight uint64) {
 
 // UpdateNodeBalance updates node balance.
 func UpdateNodeBalance(balance *big.Int) {
-	nodeBalanceCounter.Add(float64(balance.Uint64()) - float64(curBalance.Uint64()))
+	nodeBalanceCounter.Add(FormatBalance(balance) - FormatBalance(curBalance))
 	curBalance = balance
 	metricsPush <- NodeBalancePush
 }
 
 // UpdateBlockReward updates block reward.
 func UpdateBlockReward(blockReward *big.Int) {
-	blockRewardGauge.Set(float64(blockReward.Uint64()))
+	blockRewardGauge.Set(FormatBalance(blockReward))
 	lastBlockReward = blockReward
 	metricsPush <- BlockRewardPush
 }

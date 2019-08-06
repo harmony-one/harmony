@@ -4,9 +4,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	metrics "github.com/harmony-one/harmony/api/service/metrics"
-	"github.com/harmony-one/harmony/core"
 	"github.com/rs/zerolog/log"
 )
 
@@ -19,6 +17,11 @@ func (node *Node) UpdateBlockHeightForMetrics(prevBlockHeight uint64) uint64 {
 	}
 	log.Info().Msgf("Updating metrics block height %d", curBlockHeight)
 	metrics.UpdateBlockHeight(curBlockHeight)
+	blockReward := node.Consensus.GetBlockReward()
+	if blockReward != nil {
+		log.Info().Msgf("Updating metrics block reward %d", blockReward.Uint64())
+		metrics.UpdateBlockReward(blockReward)
+	}
 	return curBlockHeight
 }
 
@@ -35,12 +38,7 @@ func (node *Node) UpdateConnectionsNumberForMetrics(prevNumPeers int) int {
 
 // UpdateBalanceForMetrics uppdates node balance for metrics service.
 func (node *Node) UpdateBalanceForMetrics(prevBalance *big.Int) *big.Int {
-	instance := core.ShardingSchedule.InstanceForEpoch(big.NewInt(int64(core.GetEpochFromBlockNumber(node.Blockchain().CurrentBlock().NumberU64()))))
-	_, account := instance.FindAccount(node.NodeConfig.ConsensusPubKey.SerializeToHexStr())
-	if account == nil {
-		return prevBalance
-	}
-	curBalance, err := node.GetBalanceOfAddress(common.HexToAddress(account.Address))
+	curBalance, err := node.GetBalanceOfAddress(node.Consensus.SelfAddress)
 	if err != nil || curBalance.Cmp(prevBalance) == 0 {
 		return prevBalance
 	}
@@ -67,7 +65,7 @@ func (node *Node) CollectMetrics() {
 	prevBlockHeight := uint64(0)
 	prevBalance := big.NewInt(0)
 	prevLastConsensusTime := int64(0)
-	for range time.Tick(100 * time.Millisecond) {
+	for range time.Tick(1000 * time.Millisecond) {
 		prevBlockHeight = node.UpdateBlockHeightForMetrics(prevBlockHeight)
 		prevNumPeers = node.UpdateConnectionsNumberForMetrics(prevNumPeers)
 		prevBalance = node.UpdateBalanceForMetrics(prevBalance)
