@@ -36,6 +36,12 @@ func (node *Node) UpdateConnectionsNumberForMetrics(prevNumPeers int) int {
 	return curNumPeers
 }
 
+// UpdateTxPoolSizeForMetrics updates tx pool size for metrics service.
+func (node *Node) UpdateTxPoolSizeForMetrics(txPoolSize uint64) {
+	utils.Logger().Info().Msgf("Updating metrics tx pool size %d", txPoolSize)
+	metrics.UpdateTxPoolSize(txPoolSize)
+}
+
 // UpdateBalanceForMetrics uppdates node balance for metrics service.
 func (node *Node) UpdateBalanceForMetrics(prevBalance *big.Int) *big.Int {
 	curBalance, err := node.GetBalanceOfAddress(node.Consensus.SelfAddress)
@@ -58,6 +64,17 @@ func (node *Node) UpdateLastConsensusTimeForMetrics(prevLastConsensusTime int64)
 	return lastConsensusTime
 }
 
+// UpdateIsLeaderForMetrics updates if node is a leader now for metrics serivce.
+func (node *Node) UpdateIsLeaderForMetrics() {
+	if node.Consensus.LeaderPubKey.SerializeToHexStr() == node.Consensus.PubKey.SerializeToHexStr() {
+		utils.Logger().Info().Msgf("Node %s is a leader now", node.Consensus.PubKey.SerializeToHexStr())
+		metrics.UpdateIsLeader(true)
+	} else {
+		utils.Logger().Info().Msgf("Node %s is not a leader now", node.Consensus.PubKey.SerializeToHexStr())
+		metrics.UpdateIsLeader(false)
+	}
+}
+
 // CollectMetrics collects metrics: block height, connections number, node balance, block reward, last consensus, accepted blocks.
 func (node *Node) CollectMetrics() {
 	utils.Logger().Info().Msg("[Metrics Service] Update metrics")
@@ -65,10 +82,12 @@ func (node *Node) CollectMetrics() {
 	prevBlockHeight := uint64(0)
 	prevBalance := big.NewInt(0)
 	prevLastConsensusTime := int64(0)
-	for range time.Tick(1000 * time.Millisecond) {
+	for range time.Tick(100 * time.Millisecond) {
 		prevBlockHeight = node.UpdateBlockHeightForMetrics(prevBlockHeight)
 		prevNumPeers = node.UpdateConnectionsNumberForMetrics(prevNumPeers)
 		prevBalance = node.UpdateBalanceForMetrics(prevBalance)
 		prevLastConsensusTime = node.UpdateLastConsensusTimeForMetrics(prevLastConsensusTime)
+		node.UpdateTxPoolSizeForMetrics(node.TxPool.GetTxPoolSize())
+		node.UpdateIsLeaderForMetrics()
 	}
 }

@@ -102,6 +102,7 @@ usage: ${progname} [-1ch] [-k KEYFILE]
    -S             run the ${progname} as non-root user (default: run as root)
    -p passfile    use the given BLS passphrase file
    -D             do not download Harmony binaries (default: download when start)
+   -m             collect and upload node metrics to harmony prometheus + grafana
 
 example:
 
@@ -121,6 +122,7 @@ start_clean=false
 loop=true
 run_as_root=true
 do_not_download=false
+metrics=false
 ${BLSKEYFILE=}
 
 unset OPTIND OPTARG opt
@@ -138,6 +140,7 @@ do
    S) run_as_root=false ;;
    p) blspass="${OPTARG}";;
    D) do_not_download=true;;
+   m) metrics=true;;
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
@@ -217,6 +220,9 @@ download_binaries || err 69 "initial node software update failed"
 
 NODE_PORT=9000
 PUB_IP=
+METRICS=
+PUSHGATEWAY_IP=
+PUSHGATEWAY_PORT=
 
 if [ "$OS" == "Linux" ]; then
    if ${run_as_root}; then
@@ -361,15 +367,15 @@ do
    if [ "$OS" == "Linux" ]; then
    # Run Harmony Node
       if [ -z "${blspass}" ]; then
-         echo -n "${passphrase}" | LD_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -blskey_file "${BLSKEYFILE}" -blspass stdin
+         echo -n "${passphrase}" | LD_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -blskey_file "${BLSKEYFILE}" -blspass stdin -metrics $METRICS -pushgateway_ip $PUSHGATEWAY_IP -pushgateway_port $PUSHGATEWAY_PORT
       else
-         LD_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -blskey_file "${BLSKEYFILE}" -blspass file:${blspass}
+         LD_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -blskey_file "${BLSKEYFILE}" -blspass file:${blspass} -metrics $METRICS -pushgateway_ip $PUSHGATEWAY_IP -pushgateway_port $PUSHGATEWAY_PORT
       fi
    else
       if [ -z "${blspass}" ]; then
-         echo -n "${passphrase}" | DYLD_FALLBACK_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -blskey_file "${BLSKEYFILE}" -blspass stdin
+         echo -n "${passphrase}" | DYLD_FALLBACK_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -blskey_file "${BLSKEYFILE}" -blspass stdin -metrics $METRICS -pushgateway_ip $PUSHGATEWAY_IP -pushgateway_port $PUSHGATEWAY_PORT
       else
-         DYLD_FALLBACK_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -blskey_file "${BLSKEYFILE}" -blspass file:${blspass}
+         DYLD_FALLBACK_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -blskey_file "${BLSKEYFILE}" -blspass file:${blspass} -metrics $METRICS -pushgateway_ip $PUSHGATEWAY_IP -pushgateway_port $PUSHGATEWAY_PORT
       fi
    fi || msg "node process finished with status $?"
    ${loop} || break

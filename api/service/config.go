@@ -20,6 +20,7 @@ type NodeConfig struct {
 	Actions         map[p2p.GroupID]p2p.ActionType // actions on the groups
 	PushgatewayIP   string                         // prometheus pushgateway ip
 	PushgatewayPort string                         // prometheus pushgateway port
+	MetricsFlag     bool                           // flag to collect metrics or not
 }
 
 // GroupIDShards is a map of ShardGroupID ID

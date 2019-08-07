@@ -19,7 +19,8 @@ const (
 	BlockRewardPrefix       = "brp"
 	ConnectionsNumberPrefix = "cnp"
 	ConsensusTimePrefix     = "ltp"
-	TransactionsPrefix      = "tsp"
+	IsLeaderPrefix          = "ilp"
+	TxPoolPrefix            = "tpp"
 )
 
 // GetKey returns key by prefix and pushed time momemnt.
@@ -47,7 +48,7 @@ func GetStorageInstance(ip, port string, remove bool) *Storage {
 
 // Init initializes storage.
 func (storage *Storage) Init(ip, port string, remove bool) {
-	dbFileName := "/.hmy/db-metrics-" + ip + "-" + port
+	dbFileName := "/tmp/db_metrics_" + ip + "_" + port
 	var err error
 	if remove {
 		var err = os.RemoveAll(dbFileName)
@@ -67,13 +68,11 @@ func (storage *Storage) GetDB() *ethdb.LDBDatabase {
 
 // Dump data into lvdb by value and prefix.
 func (storage *Storage) Dump(value interface{}, prefix string) error {
-	currentTime := time.Now().Unix()
+	currentTime := time.Now().UnixNano()
 	utils.Logger().Info().Msgf("Store %s %v at time %d", prefix, value, currentTime)
-	if storage.db == nil {
-	}
 	batch := storage.db.NewBatch()
 	// Update database.
-	if err := batch.Put([]byte(GetKey(prefix, currentTime)), []byte(fmt.Sprintf("%v", value))); err != nil {
+	if err := batch.Put([]byte(GetKey(prefix, currentTime)), []byte(fmt.Sprintf("%v", value.(interface{})))); err != nil {
 		utils.Logger().Warn().Err(err).Msgf("Cannot batch %s.", prefix)
 		return err
 	}
