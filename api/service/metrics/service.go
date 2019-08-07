@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"fmt"
+	"math"
 	"math/big"
 	"net"
 	"net/http"
@@ -158,19 +159,9 @@ func (s *Service) Run() {
 
 // FormatBalance formats big.Int balance with precision.
 func FormatBalance(balance *big.Int) float64 {
-	stringBalance := balance.String()
-	if len(stringBalance) < BalanceScale {
-		return 0.0
-	}
-	if len(stringBalance) == BalanceScale {
-		stringBalance = "0." + stringBalance[len(stringBalance)-BalanceScale:len(stringBalance)-BalancePrecision]
-	} else {
-		stringBalance = stringBalance[:len(stringBalance)-BalanceScale] + "." + stringBalance[len(stringBalance)-BalanceScale:len(stringBalance)-BalancePrecision]
-	}
-	if res, err := strconv.ParseFloat(stringBalance, 64); err == nil {
-		return res
-	}
-	return 0.0
+	scaledBalance := new(big.Float).Quo(new(big.Float).SetInt(balance), new(big.Float).SetFloat64(math.Pow10(BalanceScale)))
+	floatBalance, _ := scaledBalance.Float64()
+	return floatBalance
 }
 
 // UpdateBlockHeight updates block height.
