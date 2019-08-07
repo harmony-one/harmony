@@ -11,6 +11,9 @@ import (
 	"runtime"
 	"time"
 
+	common2 "github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/internal/common"
+
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -18,7 +21,6 @@ import (
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/blsgen"
-	"github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -120,6 +122,11 @@ var (
 
 	// Disable view change.
 	disableViewChange = flag.Bool("disable_view_change", false, "Do not propose view change (testing only)")
+
+	// Bad block revert
+	doRevertBefore = flag.Int("do_revert_before", 408701, "If the current block is less than do_revert_before, revert all blocks until (including) revert_to block")
+	revertTo       = flag.Int("revert_to", 407735, "The revert will rollback all blocks until and including block number revert_to")
+	revertShardID  = flag.Int("revert_shard_id", 3, "The shard id where the revert will happen")
 )
 
 func initSetup() {
@@ -308,6 +315,24 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// Current node.
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 	currentNode := node.New(nodeConfig.Host, currentConsensus, chainDBFactory, *isArchival)
+
+	////// Temporary fix for 8-6 incident /////////
+	chain := currentNode.Blockchain()
+	curNum := chain.CurrentBlock().NumberU64()
+	if chain.ShardID() == uint32(*revertShardID) && curNum < uint64(*doRevertBefore) && curNum >= uint64(*revertTo) {
+		utils.GetLogInstance().Warn("[WARNING] Reverting blocks",
+			"to", *revertTo, "curBlock", curNum)
+		// Remove invalid blocks
+		for chain.CurrentBlock().NumberU64() >= uint64(*revertTo) {
+			curBlock := chain.CurrentBlock()
+			rollbacks := []common2.Hash{curBlock.Hash()}
+			chain.Rollback(rollbacks)
+			sigAndBitMap := append(curBlock.Header().LastCommitSignature[:], curBlock.Header().LastCommitBitmap...)
+			chain.WriteLastCommits(sigAndBitMap)
+		}
+	}
+	///////////////////////////////////////////////
+
 	if *dnsZone != "" {
 		currentNode.SetDNSZone(*dnsZone)
 	} else if *dnsFlag {
