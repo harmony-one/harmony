@@ -55,6 +55,7 @@ func TestCommitteeAccounts(test *testing.T) {
 	testAccounts(test, HarmonyAccounts)
 	testAccounts(test, TNHarmonyAccounts)
 	testAccounts(test, TNFoundationalAccounts)
+	testAccounts(test, PangaeaAccounts)
 }
 
 func testAccounts(test *testing.T, accounts []DeployAccount) {
