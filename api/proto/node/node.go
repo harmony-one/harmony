@@ -27,7 +27,6 @@ const (
 	PING // node send ip/pki to register with leader
 	PONG // node broadcast pubK
 	ShardState
-	// TODO: add more types
 )
 
 // BlockchainSyncMessage is a struct for blockchain sync message.
@@ -96,6 +95,9 @@ type BlockMessageType int
 // Block sync message subtype
 const (
 	Sync BlockMessageType = iota
+
+	Header  // used for crosslink from beacon chain to shard chain
+	Receipt // cross-shard transaction receipts
 )
 
 // SerializeBlockchainSyncMessage serializes BlockchainSyncMessage.
