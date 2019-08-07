@@ -68,14 +68,11 @@ func (ms mainnetSchedule) VdfDifficulty() int {
 	return mainnetVdfDifficulty
 }
 
-<<<<<<< HEAD
 // ConsensusRatio ratio of new nodes vs consensus total nodes
 func (ms mainnetSchedule) ConsensusRatio() float64 {
 	return mainnetConsensusRatio
 }
 
-var mainnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(mainnetV1Epoch), big.NewInt(mainnetV2Epoch)}
-=======
 func (ms mainnetSchedule) MaxTxAmountLimit() *big.Int {
 	return big.NewInt(mainnetMaxTxAmountLimit)
 }
@@ -96,7 +93,7 @@ func (ms mainnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 	}
 }
 
-var mainnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(mainnetV1Epoch)}
+var mainnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(mainnetV1Epoch), big.NewInt(mainnetV2Epoch)}
 
 var mainnetV0 = MustNewInstance(4, 150, 112, genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, mainnetReshardingEpoch)
 var mainnetV1 = MustNewInstance(4, 152, 112, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1, mainnetReshardingEpoch)
