@@ -257,7 +257,7 @@ func (node *Node) getTransactionsForNewBlock(coinbase common.Address) types.Tran
 	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(node.pendingTransactions, core.ShardingSchedule.TxsThrottleConfig(), coinbase)
 	node.pendingTransactions = unselected
 	node.reducePendingTransactions()
-	utils.Logger().Error().
+	utils.Logger().Info().
 		Int("remainPending", len(node.pendingTransactions)).
 		Int("selected", len(selected)).
 		Int("invalidDiscarded", len(invalid)).

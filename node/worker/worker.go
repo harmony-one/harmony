@@ -65,16 +65,26 @@ func (w *Worker) throttleTxs(selected types.Transactions, txsThrottleConfig *sha
 
 	// already selected max num txs
 	if len(selected) > (*txsThrottleConfig).MaxTxsPerBlockLimit {
+		utils.Logger().Debug().
+			Int("MaxTxsPerBlockLimit", (*txsThrottleConfig).MaxTxsPerBlockLimit).
+			Msg("Throttling tx with max txs per block limit")
 		return sender, shardingconfig.Unselect
 	}
 
 	// throttle a single sender sending too many transactions in one block
 	if ((*txsThrottleConfig).MaxTxAmountLimit).Cmp(tx.Value()) < 0 {
+		utils.Logger().Debug().
+			Uint64("MaxTxAmountLimit", (*txsThrottleConfig).MaxTxAmountLimit.Uint64()).
+			Uint64("Tx amount", tx.Value().Uint64()).
+			Msg("Throttling tx with max amount limit")
 		return sender, shardingconfig.Invalid
 	}
 
 	// throttle too large transaction
 	if txnCnts[sender] >= (*txsThrottleConfig).MaxTxsPerAccountInBlockLimit {
+		utils.Logger().Debug().
+			Uint64("MaxTxsPerAccountInBlockLimit", (*txsThrottleConfig).MaxTxsPerAccountInBlockLimit).
+			Msg("Throttling tx with max txs per account in a single block limit")
 		return sender, shardingconfig.Unselect
 	}
 
@@ -102,17 +112,19 @@ func (w *Worker) SelectTransactionsForNewBlock(txs types.Transactions, txsThrott
 		switch flag {
 		case shardingconfig.Unselect:
 			unselected = append(unselected, tx)
-			utils.GetLogger().Debug("Throttle transaction", "TxThrottleFlag", flag)
+			utils.Logger().Info().Str("txThrottleFlag", flag.String()).Msg("Transaction Throttle flag")
+
 		case shardingconfig.Invalid:
 			invalid = append(invalid, tx)
-			utils.GetLogger().Debug("Throttle transaction", "TxThrottleFlag", flag)
+			utils.Logger().Info().Str("txThrottleFlag", flag.String()).Msg("Transaction Throttle flag")
+
 		case shardingconfig.Select:
 			snap := w.current.state.Snapshot()
 			_, err := w.commitTransaction(tx, coinbase)
 			if err != nil {
 				w.current.state.RevertToSnapshot(snap)
 				invalid = append(invalid, tx)
-				utils.GetLogger().Debug("Invalid transaction", "Error", err)
+				utils.Logger().Error().Err(err).Str("txThrottleFlag", flag.String()).Msg("Transaction Throttle flag")
 			} else {
 				selected = append(selected, tx)
 				txnCnts[sender]++
