@@ -398,20 +398,27 @@ fi
 while :
 do
    msg "############### Running Harmony Process ###############"
-   if [ "$OS" == "Linux" ]; then
-   # Run Harmony Node
-      if [ -z "${blspass}" ]; then
-         echo -n "${passphrase}" | LD_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -blskey_file "${BLSKEYFILE}" -blspass stdin -metrics $METRICS -pushgateway_ip $PUSHGATEWAY_IP -pushgateway_port $PUSHGATEWAY_PORT
-      else
-         LD_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -blskey_file "${BLSKEYFILE}" -blspass file:${blspass} -metrics $METRICS -pushgateway_ip $PUSHGATEWAY_IP -pushgateway_port $PUSHGATEWAY_PORT
-      fi
-   else
-      if [ -z "${blspass}" ]; then
-         echo -n "${passphrase}" | DYLD_FALLBACK_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -blskey_file "${BLSKEYFILE}" -blspass stdin -metrics $METRICS -pushgateway_ip $PUSHGATEWAY_IP -pushgateway_port $PUSHGATEWAY_PORT
-      else
-         DYLD_FALLBACK_LIBRARY_PATH=$(pwd) ./harmony -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -blskey_file "${BLSKEYFILE}" -blspass file:${blspass} -metrics $METRICS -pushgateway_ip $PUSHGATEWAY_IP -pushgateway_port $PUSHGATEWAY_PORT
-      fi
-   fi || msg "node process finished with status $?"
+   args=(
+      -bootnodes "${BN_MA}"
+      -ip "${PUB_IP}"
+      -port "${NODE_PORT}"
+      -is_genesis
+      -blskey_file "${BLSKEYFILE}"
+      -metrics "${metrics}"
+      -pushgateway_ip "${PUSHGATEWAY_IP}"
+      -pushgateway_port "${PUSHGATEWAY_PORT}"
+   )
+   case "$OS" in
+   Darwin) ld_path_var=DYLD_FALLBACK_LIBRARY_PATH;;
+   *) ld_path_var=LD_LIBRARY_PATH;;
+   esac
+   run() {
+      env "${ld_path_var}=$(pwd)" ./harmony "${args[@]}" "${@}"
+   }
+   case "${blspass:+set}" in
+   "") echo -n "${passphrase}" | run -blspass stdin;;
+   *) run -blspass file:${blspass};;
+   esac || msg "node process finished with status $?"
    ${loop} || break
    msg "restarting in 10s..."
    sleep 10
