@@ -50,12 +50,10 @@ type NetworkType string
 const (
 	Mainnet  = "mainnet"
 	Testnet  = "testnet"
+	Pangaea  = "pangaea"
 	Devnet   = "devnet"
 	Localnet = "localnet"
 )
-
-// Network is the type of Harmony network
-var Network = Testnet
 
 // Global is the index of the global node configuration
 const (

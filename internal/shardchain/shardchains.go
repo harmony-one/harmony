@@ -97,11 +97,7 @@ func (sc *CollectionImpl) ShardChain(shardID uint32, networkType nodeconfig.Netw
 	switch networkType {
 	case nodeconfig.Mainnet:
 		chainConfig = *params.MainnetChainConfig
-	case nodeconfig.Testnet:
-		fallthrough
-	case nodeconfig.Localnet:
-		fallthrough
-	case nodeconfig.Devnet:
+	default: // all other network types share testnet config
 		chainConfig = *params.TestnetChainConfig
 	}
 
