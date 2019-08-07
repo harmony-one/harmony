@@ -76,6 +76,7 @@ type ConfigType struct {
 	Port     string      // Port of the node.
 	IP       string      // IP of the node.
 
+	MetricsFlag     bool   // collect and upload metrics flag
 	PushgatewayIP   string // metrics pushgateway prometheus ip
 	PushgatewayPort string // metrics pushgateway prometheus port
 	StringRole      string
@@ -174,6 +175,16 @@ func (conf *ConfigType) SetPushgatewayIP(ip string) {
 // SetPushgatewayPort set the pushgateway port
 func (conf *ConfigType) SetPushgatewayPort(port string) {
 	conf.PushgatewayPort = port
+}
+
+// SetMetricsFlag set the metrics flag
+func (conf *ConfigType) SetMetricsFlag(flag bool) {
+	conf.MetricsFlag = flag
+}
+
+// GetMetricsFlag get the metrics flag
+func (conf *ConfigType) GetMetricsFlag() bool {
+	return conf.MetricsFlag
 }
 
 // GetPushgatewayIP get the pushgateway ip

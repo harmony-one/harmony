@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"fmt"
+	"math"
 	"math/big"
 	"net"
 	"net/http"
@@ -26,6 +27,8 @@ const (
 	NodeBalancePush              int = 2
 	LastConsensusPush            int = 3
 	BlockRewardPush              int = 4
+	TxPoolPush                   int = 5
+	IsLeaderPush                 int = 6
 	metricsServicePortDifference     = 2000
 )
 
@@ -44,16 +47,26 @@ type Service struct {
 
 // init vars for prometheus
 var (
+	curTxPoolSize        = uint64(0)
 	curBlockHeight       = uint64(0)
 	curBlocks            = uint64(0)
 	curBalance           = big.NewInt(0)
 	curConnectionsNumber = 0
+	curIsLeader          = false
 	lastBlockReward      = big.NewInt(0)
 	lastConsensusTime    = int64(0)
 	metricsPush          = make(chan int)
 	blockHeightCounter   = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "block_height",
 		Help: "Get current block height.",
+	})
+	txPoolGauge = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "tx_pool_size",
+		Help: "Get current tx pool size.",
+	})
+	isLeaderGauge = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "is_leader",
+		Help: "Is node a leader now.",
 	})
 	blocksAcceptedGauge = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "blocks_accepted",
@@ -129,7 +142,7 @@ func (s *Service) Run() {
 	addr := net.JoinHostPort("", GetMetricsServicePort(s.Port))
 
 	registry := prometheus.NewRegistry()
-	registry.MustRegister(blockHeightCounter, connectionsNumberGauge, nodeBalanceCounter, lastConsensusGauge, blockRewardGauge, blocksAcceptedGauge)
+	registry.MustRegister(blockHeightCounter, connectionsNumberGauge, nodeBalanceCounter, lastConsensusGauge, blockRewardGauge, blocksAcceptedGauge, txPoolGauge, isLeaderGauge)
 
 	s.pusher = push.New("http://"+s.PushgatewayIP+":"+s.PushgatewayPort, "node_metrics").Gatherer(registry).Grouping("instance", s.IP+":"+s.Port).Grouping("bls_key", s.BlsPublicKey)
 	go s.PushMetrics()
@@ -146,19 +159,9 @@ func (s *Service) Run() {
 
 // FormatBalance formats big.Int balance with precision.
 func FormatBalance(balance *big.Int) float64 {
-	stringBalance := balance.String()
-	if len(stringBalance) < BalanceScale {
-		return 0.0
-	}
-	if len(stringBalance) == BalanceScale {
-		stringBalance = "0." + stringBalance[len(stringBalance)-BalanceScale:len(stringBalance)-BalancePrecision]
-	} else {
-		stringBalance = stringBalance[:len(stringBalance)-BalanceScale] + "." + stringBalance[len(stringBalance)-BalanceScale:len(stringBalance)-BalancePrecision]
-	}
-	if res, err := strconv.ParseFloat(stringBalance, 64); err == nil {
-		return res
-	}
-	return 0.0
+	scaledBalance := new(big.Float).Quo(new(big.Float).SetInt(balance), new(big.Float).SetFloat64(math.Pow10(BalanceScale)))
+	floatBalance, _ := scaledBalance.Float64()
+	return floatBalance
 }
 
 // UpdateBlockHeight updates block height.
@@ -174,6 +177,13 @@ func UpdateNodeBalance(balance *big.Int) {
 	nodeBalanceCounter.Add(FormatBalance(balance) - FormatBalance(curBalance))
 	curBalance = balance
 	metricsPush <- NodeBalancePush
+}
+
+// UpdateTxPoolSize updates tx pool size.
+func UpdateTxPoolSize(txPoolSize uint64) {
+	txPoolGauge.Set(float64(txPoolSize))
+	curTxPoolSize = txPoolSize
+	metricsPush <- TxPoolPush
 }
 
 // UpdateBlockReward updates block reward.
@@ -197,6 +207,17 @@ func UpdateConnectionsNumber(connectionsNumber int) {
 	metricsPush <- ConnectionsNumberPush
 }
 
+// UpdateIsLeader updates if node is a leader.
+func UpdateIsLeader(isLeader bool) {
+	if isLeader {
+		isLeaderGauge.Set(1.0)
+	} else {
+		isLeaderGauge.Set(0.0)
+	}
+	curIsLeader = isLeader
+	metricsPush <- IsLeaderPush
+}
+
 // PushMetrics pushes metrics updates to prometheus pushgateway.
 func (s *Service) PushMetrics() {
 	for metricType := range metricsPush {
@@ -205,21 +226,25 @@ func (s *Service) PushMetrics() {
 		}
 		if err := s.pusher.Add(); err != nil {
 			utils.Logger().Error().Err(err).Msg("Could not push to a prometheus pushgateway.")
+			// Dump metrics to db if couldn't push to prometheus
+			switch metricType {
+			case ConnectionsNumberPush:
+				s.storage.Dump(curConnectionsNumber, ConnectionsNumberPrefix)
+			case BlockHeightPush:
+				s.storage.Dump(curBlockHeight, BlockHeightPrefix)
+				s.storage.Dump(curBlocks, BlocksPrefix)
+			case BlockRewardPush:
+				s.storage.Dump(lastBlockReward, BlockHeightPrefix)
+			case NodeBalancePush:
+				s.storage.Dump(curBalance, BalancePrefix)
+			case LastConsensusPush:
+				s.storage.Dump(lastConsensusTime, ConsensusTimePrefix)
+			case TxPoolPush:
+				s.storage.Dump(curTxPoolSize, TxPoolPrefix)
+			case IsLeaderPush:
+				s.storage.Dump(curIsLeader, IsLeaderPrefix)
+			}
 		}
-		/*switch metricType {
-		case ConnectionsNumberPush:
-			s.storage.Dump(curConnectionsNumber, ConnectionsNumberPrefix)
-		case BlockHeightPush:
-			fmt.Println("LOL")
-			s.storage.Dump(curBlockHeight, BlockHeightPrefix)
-			s.storage.Dump(curBlocks, BlocksPrefix)
-		case BlockRewardPush:
-			s.storage.Dump(lastBlockReward, BlockHeightPrefix)
-		case NodeBalancePush:
-			s.storage.Dump(curBalance, BalancePrefix)
-		case LastConsensusPush:
-			s.storage.Dump(lastConsensusTime, ConsensusTimePrefix)
-		}*/
 	}
 	return
 }

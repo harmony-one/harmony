@@ -119,9 +119,10 @@ var (
 	// Disable view change.
 	disableViewChange = flag.Bool("disable_view_change", false, "Do not propose view change (testing only)")
 
-	// pushgateway ip and port
-	pushgatewayIP   = flag.String("pushgateway_ip", "grafana.harmony.one", "metrics view ip")
-	pushgatewayPort = flag.String("pushgateway_port", "9091", "metrics view port")
+	// metrics flag to collct meetrics or not, pushgateway ip and port for metrics
+	metricsFlag     = flag.Bool("metrics", false, "Collect and upload node metrics")
+	pushgatewayIP   = flag.String("pushgateway_ip", "grafana.harmony.one", "Metrics view ip")
+	pushgatewayPort = flag.String("pushgateway_port", "9091", "Metrics view port")
 )
 
 func initSetup() {
@@ -244,6 +245,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 
 	nodeConfig.SetPushgatewayIP(*pushgatewayIP)
 	nodeConfig.SetPushgatewayPort(*pushgatewayPort)
+	nodeConfig.SetMetricsFlag(*metricsFlag)
 
 	// P2p private key is used for secure message transfer between p2p nodes.
 	nodeConfig.P2pPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
@@ -307,6 +309,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// Set up prometheus pushgateway for metrics monitoring serivce.
 	currentNode.NodeConfig.SetPushgatewayIP(nodeConfig.PushgatewayIP)
 	currentNode.NodeConfig.SetPushgatewayPort(nodeConfig.PushgatewayPort)
+	currentNode.NodeConfig.SetMetricsFlag(nodeConfig.MetricsFlag)
 
 	if *isExplorer {
 		currentNode.NodeConfig.SetRole(nodeconfig.ExplorerNode)
