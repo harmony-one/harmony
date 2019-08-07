@@ -406,11 +406,17 @@ do
       -port "${NODE_PORT}"
       -is_genesis
       -blskey_file "${BLSKEYFILE}"
-      -metrics "${metrics}"
-      -pushgateway_ip "${PUSHGATEWAY_IP}"
-      -pushgateway_port "${PUSHGATEWAY_PORT}"
       -network_type="${network_type}"
    )
+   case "${metrics}" in
+   true)
+      args+=(
+         -metrics "${metrics}"
+         -pushgateway_ip "${PUSHGATEWAY_IP}"
+         -pushgateway_port "${PUSHGATEWAY_PORT}"
+      )
+      ;;
+   esac
    case "$OS" in
    Darwin) ld_path_var=DYLD_FALLBACK_LIBRARY_PATH;;
    *) ld_path_var=LD_LIBRARY_PATH;;
