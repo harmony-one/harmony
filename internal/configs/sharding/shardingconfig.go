@@ -27,6 +27,18 @@ type Schedule interface {
 
 	// ConsensusRatio ratio of new nodes vs consensus total nodes
 	ConsensusRatio() float64
+
+	// Max amount limit for a valid transaction
+	MaxTxAmountLimit() *big.Int
+
+	// Max number of transactions of a particular account per block level
+	MaxTxsPerAccountInBlockLimit() uint64
+
+	// Max total number of transactions in a block
+	MaxTxsPerBlockLimit() int
+
+	// configuration for throttling pending transactions
+	TxsThrottleConfig() *TxsThrottleConfig
 }
 
 // Instance is one sharding configuration instance.
@@ -52,4 +64,38 @@ type Instance interface {
 
 	// ReshardingEpoch returns a list of Epoch while off-chain resharding happens
 	ReshardingEpoch() []*big.Int
+}
+
+// TxThrottleFlag indicates the throttling flag for a particular transaction
+type TxThrottleFlag int
+
+// Enum for different TxThrottleFlag
+const (
+	Select TxThrottleFlag = iota
+	Unselect
+	Invalid
+)
+
+func (result TxThrottleFlag) String() string {
+	switch result {
+	case Select:
+		return "Select"
+	case Unselect:
+		return "Unselect"
+	case Invalid:
+		return "Invalid"
+	}
+	return "Unknown"
+}
+
+// TxsThrottleConfig contains configuration for throttling pending transactions per node block
+type TxsThrottleConfig struct {
+	// Max amount limit for a valid transaction
+	MaxTxAmountLimit *big.Int
+
+	// Max number of transactions of a particular account per block level
+	MaxTxsPerAccountInBlockLimit uint64
+
+	// Max total number of transactions in a block
+	MaxTxsPerBlockLimit int
 }

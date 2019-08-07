@@ -12,6 +12,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 )
@@ -41,11 +42,54 @@ type Worker struct {
 	shardID uint32
 }
 
+// Returns a tuple where the first value is the txs sender account address,
+// the second is the throttling result enum for the transaction of interest.
+// Throttling happens based on the amount, frequency, etc.
+func (w *Worker) throttleTxs(selected types.Transactions, txsThrottleConfig *shardingconfig.TxsThrottleConfig, txnCnts map[common.Address]uint64, tx *types.Transaction) (common.Address, shardingconfig.TxThrottleFlag) {
+	chainID := tx.ChainID()
+	// Depending on the presence of the chain ID, sign with EIP155 or homestead
+	var s types.Signer
+	if chainID != nil {
+		s = types.NewEIP155Signer(chainID)
+	} else {
+		s = types.HomesteadSigner{}
+	}
+
+	var sender common.Address
+	msg, err := tx.AsMessage(s)
+	if err != nil {
+		utils.Logger().Error().Msg("Error when parsing tx into message")
+	} else {
+		sender = msg.From()
+	}
+
+	// already selected max num txs
+	if len(selected) > (*txsThrottleConfig).MaxTxsPerBlockLimit {
+		return sender, shardingconfig.Unselect
+	}
+
+	// throttle a single sender sending too many transactions in one block
+	if ((*txsThrottleConfig).MaxTxAmountLimit).Cmp(tx.Value()) < 0 {
+		return sender, shardingconfig.Invalid
+	}
+
+	// throttle too large transaction
+	if txnCnts[sender] >= (*txsThrottleConfig).MaxTxsPerAccountInBlockLimit {
+		return sender, shardingconfig.Unselect
+	}
+
+	return sender, shardingconfig.Select
+}
+
 // SelectTransactionsForNewBlock selects transactions for new block.
-func (w *Worker) SelectTransactionsForNewBlock(txs types.Transactions, maxNumTxs int, coinbase common.Address) (types.Transactions, types.Transactions, types.Transactions) {
+func (w *Worker) SelectTransactionsForNewBlock(txs types.Transactions, txsThrottleConfig *shardingconfig.TxsThrottleConfig, coinbase common.Address) (types.Transactions, types.Transactions, types.Transactions) {
 	if w.current.gasPool == nil {
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit)
 	}
+
+	// used for per account transaction frequency throttling
+	txnCnts := make(map[common.Address]uint64)
+
 	selected := types.Transactions{}
 	unselected := types.Transactions{}
 	invalid := types.Transactions{}
@@ -53,17 +97,25 @@ func (w *Worker) SelectTransactionsForNewBlock(txs types.Transactions, maxNumTxs
 		if tx.ShardID() != w.shardID {
 			invalid = append(invalid, tx)
 		}
-		snap := w.current.state.Snapshot()
-		_, err := w.commitTransaction(tx, coinbase)
-		if len(selected) > maxNumTxs {
+
+		sender, flag := w.throttleTxs(selected, txsThrottleConfig, txnCnts, tx)
+		switch flag {
+		case shardingconfig.Unselect:
 			unselected = append(unselected, tx)
-		} else {
+			utils.GetLogger().Debug("Throttle transaction", "TxThrottleFlag", flag)
+		case shardingconfig.Invalid:
+			invalid = append(invalid, tx)
+			utils.GetLogger().Debug("Throttle transaction", "TxThrottleFlag", flag)
+		case shardingconfig.Select:
+			snap := w.current.state.Snapshot()
+			_, err := w.commitTransaction(tx, coinbase)
 			if err != nil {
 				w.current.state.RevertToSnapshot(snap)
 				invalid = append(invalid, tx)
 				utils.GetLogger().Debug("Invalid transaction", "Error", err)
 			} else {
 				selected = append(selected, tx)
+				txnCnts[sender]++
 			}
 		}
 	}

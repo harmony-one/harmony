@@ -20,6 +20,10 @@ const (
 	threeOne           = 111
 
 	testnetVdfDifficulty = 10000 // This takes about 20s to finish the vdf
+
+	testnetMaxTxAmountLimit             = 1000
+	testnetMaxTxsPerAccountInBlockLimit = 100
+	testnetMaxTxsPerBlockLimit          = 8000
 )
 
 func (testnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
@@ -67,6 +71,26 @@ func (ts testnetSchedule) VdfDifficulty() int {
 // ConsensusRatio ratio of new nodes vs consensus total nodes
 func (ts testnetSchedule) ConsensusRatio() float64 {
 	return mainnetConsensusRatio
+}
+
+func (ts testnetSchedule) MaxTxAmountLimit() *big.Int {
+	return big.NewInt(testnetMaxTxAmountLimit)
+}
+
+func (ts testnetSchedule) MaxTxsPerAccountInBlockLimit() uint64 {
+	return testnetMaxTxsPerAccountInBlockLimit
+}
+
+func (ts testnetSchedule) MaxTxsPerBlockLimit() int {
+	return testnetMaxTxsPerBlockLimit
+}
+
+func (ts testnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
+	return &TxsThrottleConfig{
+		MaxTxAmountLimit:             big.NewInt(testnetMaxTxAmountLimit),
+		MaxTxsPerAccountInBlockLimit: testnetMaxTxsPerAccountInBlockLimit,
+		MaxTxsPerBlockLimit:          testnetMaxTxsPerBlockLimit,
+	}
 }
 
 var testnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(testnetV1Epoch), big.NewInt(testnetV2Epoch)}
