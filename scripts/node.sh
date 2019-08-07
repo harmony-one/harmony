@@ -149,7 +149,7 @@ do
 done
 shift $((${OPTIND} - 1))
 
-unset -v bootnodes REL
+unset -v bootnodes REL network_type
 
 case "${network}" in
 main)
@@ -160,6 +160,7 @@ main)
     /ip4/99.81.170.167/tcp/12019/p2p/QmRVbTpEYup8dSaURZfF6ByrMTSKa4UyUzJhSjahFzRqNj
   )
   REL=r3
+  network_type=mainnet
   ;;
 beta)
   err 69 "${network}: unsupported yet"
@@ -172,6 +173,7 @@ pangaea)
     /ip4/99.81.170.167/tcp/9867/p2p/QmRVbTpEYup8dSaURZfF6ByrMTSKa4UyUzJhSjahFzRqNj
   )
   REL=master
+  network_type=pangaea
   ;;
 *)
   err 64 "${network}: invalid network"
@@ -407,6 +409,7 @@ do
       -metrics "${metrics}"
       -pushgateway_ip "${PUSHGATEWAY_IP}"
       -pushgateway_port "${PUSHGATEWAY_PORT}"
+      -network_type="${network_type}"
    )
    case "$OS" in
    Darwin) ld_path_var=DYLD_FALLBACK_LIBRARY_PATH;;
