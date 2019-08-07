@@ -14,6 +14,10 @@ const (
 
 	mainnetVdfDifficulty  = 50000 // This takes about 100s to finish the vdf
 	mainnetConsensusRatio = float64(0.66)
+
+	mainnetMaxTxAmountLimit             = 1000
+	mainnetMaxTxsPerAccountInBlockLimit = 100
+	mainnetMaxTxsPerBlockLimit          = 8000
 )
 
 // MainnetSchedule is the mainnet sharding configuration schedule.
@@ -64,12 +68,36 @@ func (ms mainnetSchedule) VdfDifficulty() int {
 	return mainnetVdfDifficulty
 }
 
+<<<<<<< HEAD
 // ConsensusRatio ratio of new nodes vs consensus total nodes
 func (ms mainnetSchedule) ConsensusRatio() float64 {
 	return mainnetConsensusRatio
 }
 
 var mainnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(mainnetV1Epoch), big.NewInt(mainnetV2Epoch)}
+=======
+func (ms mainnetSchedule) MaxTxAmountLimit() *big.Int {
+	return big.NewInt(mainnetMaxTxAmountLimit)
+}
+
+func (ms mainnetSchedule) MaxTxsPerAccountInBlockLimit() uint64 {
+	return mainnetMaxTxsPerAccountInBlockLimit
+}
+
+func (ms mainnetSchedule) MaxTxsPerBlockLimit() int {
+	return mainnetMaxTxsPerBlockLimit
+}
+
+func (ms mainnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
+	return &TxsThrottleConfig{
+		MaxTxAmountLimit:             big.NewInt(mainnetMaxTxAmountLimit),
+		MaxTxsPerAccountInBlockLimit: mainnetMaxTxsPerAccountInBlockLimit,
+		MaxTxsPerBlockLimit:          mainnetMaxTxsPerBlockLimit,
+	}
+}
+
+var mainnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(mainnetV1Epoch)}
+
 var mainnetV0 = MustNewInstance(4, 150, 112, genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, mainnetReshardingEpoch)
 var mainnetV1 = MustNewInstance(4, 152, 112, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1, mainnetReshardingEpoch)
 var mainnetV2 = MustNewInstance(4, 200, 148, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV2, mainnetReshardingEpoch)
