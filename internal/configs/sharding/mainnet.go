@@ -12,6 +12,10 @@ const (
 	mainnetV1Epoch     = 1
 
 	mainnetVdfDifficulty = 50000 // This takes about 100s to finish the vdf
+
+	mainnetMaxTxAmountLimit             = 1000
+	mainnetMaxTxsPerAccountInBlockLimit = 100
+	mainnetMaxTxsPerBlockLimit          = 8000
 )
 
 // MainnetSchedule is the mainnet sharding configuration schedule.
@@ -57,6 +61,26 @@ func (ms mainnetSchedule) IsLastBlock(blockNum uint64) bool {
 
 func (ms mainnetSchedule) VdfDifficulty() int {
 	return mainnetVdfDifficulty
+}
+
+func (ms mainnetSchedule) MaxTxAmountLimit() *big.Int {
+	return big.NewInt(mainnetMaxTxAmountLimit)
+}
+
+func (ms mainnetSchedule) MaxTxsPerAccountInBlockLimit() uint64 {
+	return mainnetMaxTxsPerAccountInBlockLimit
+}
+
+func (ms mainnetSchedule) MaxTxsPerBlockLimit() int {
+	return mainnetMaxTxsPerBlockLimit
+}
+
+func (ms mainnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
+	return &TxsThrottleConfig{
+		MaxTxAmountLimit:             big.NewInt(mainnetMaxTxAmountLimit),
+		MaxTxsPerAccountInBlockLimit: mainnetMaxTxsPerAccountInBlockLimit,
+		MaxTxsPerBlockLimit:          mainnetMaxTxsPerBlockLimit,
+	}
 }
 
 var mainnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(mainnetV1Epoch)}

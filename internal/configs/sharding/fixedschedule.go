@@ -36,6 +36,26 @@ func (s fixedSchedule) VdfDifficulty() int {
 	return mainnetVdfDifficulty
 }
 
+func (s fixedSchedule) MaxTxAmountLimit() *big.Int {
+	return big.NewInt(mainnetMaxTxAmountLimit)
+}
+
+func (s fixedSchedule) MaxTxsPerAccountInBlockLimit() uint64 {
+	return mainnetMaxTxsPerAccountInBlockLimit
+}
+
+func (s fixedSchedule) MaxTxsPerBlockLimit() int {
+	return mainnetMaxTxsPerBlockLimit
+}
+
+func (s fixedSchedule) TxsThrottleConfig() *TxsThrottleConfig {
+	return &TxsThrottleConfig{
+		MaxTxAmountLimit:             big.NewInt(mainnetMaxTxAmountLimit),
+		MaxTxsPerAccountInBlockLimit: mainnetMaxTxsPerAccountInBlockLimit,
+		MaxTxsPerBlockLimit:          mainnetMaxTxsPerBlockLimit,
+	}
+}
+
 // NewFixedSchedule returns a sharding configuration schedule that uses the
 // given config instance for all epochs.  Useful for testing.
 func NewFixedSchedule(instance Instance) Schedule {

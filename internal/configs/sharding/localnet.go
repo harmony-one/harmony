@@ -20,6 +20,10 @@ const (
 	twoOne              = 5
 
 	localnetVdfDifficulty = 5000 // This takes about 10s to finish the vdf
+
+	localnetMaxTxAmountLimit             = 1000
+	localnetMaxTxsPerAccountInBlockLimit = 100
+	localnetMaxTxsPerBlockLimit          = 8000
 )
 
 func (localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
@@ -61,6 +65,26 @@ func (ls localnetSchedule) IsLastBlock(blockNum uint64) bool {
 
 func (ls localnetSchedule) VdfDifficulty() int {
 	return localnetVdfDifficulty
+}
+
+func (ls localnetSchedule) MaxTxAmountLimit() *big.Int {
+	return big.NewInt(localnetMaxTxAmountLimit)
+}
+
+func (ls localnetSchedule) MaxTxsPerAccountInBlockLimit() uint64 {
+	return localnetMaxTxsPerAccountInBlockLimit
+}
+
+func (ls localnetSchedule) MaxTxsPerBlockLimit() int {
+	return localnetMaxTxsPerBlockLimit
+}
+
+func (ls localnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
+	return &TxsThrottleConfig{
+		MaxTxAmountLimit:             big.NewInt(localnetMaxTxAmountLimit),
+		MaxTxsPerAccountInBlockLimit: localnetMaxTxsPerAccountInBlockLimit,
+		MaxTxsPerBlockLimit:          localnetMaxTxsPerBlockLimit,
+	}
 }
 
 var localnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(localnetV1Epoch), big.NewInt(localnetV2Epoch)}
