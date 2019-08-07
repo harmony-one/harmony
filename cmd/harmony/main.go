@@ -124,8 +124,9 @@ var (
 	disableViewChange = flag.Bool("disable_view_change", false, "Do not propose view change (testing only)")
 
 	// Bad block revert
-	doRevertBefore = flag.Int("do_revert_before", 0, "If the current block is less than do_revert_before, revert all blocks until (including) revert_to block")
-	revertTo       = flag.Int("revert_to", 0, "The revert will rollback all blocks until and including block number revert_to")
+	doRevertBefore = flag.Int("do_revert_before", 408701, "If the current block is less than do_revert_before, revert all blocks until (including) revert_to block")
+	revertTo       = flag.Int("revert_to", 407735, "The revert will rollback all blocks until and including block number revert_to")
+	revertShardID  = flag.Int("revert_shard_id", 3, "The shard id where the revert will happen")
 )
 
 func initSetup() {
@@ -318,7 +319,7 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	////// Temporary fix for 8-6 incident /////////
 	chain := currentNode.Blockchain()
 	curNum := chain.CurrentBlock().NumberU64()
-	if curNum < uint64(*doRevertBefore) && curNum >= uint64(*revertTo) {
+	if chain.ShardID() == uint32(*revertShardID) && curNum < uint64(*doRevertBefore) && curNum >= uint64(*revertTo) {
 		utils.GetLogInstance().Warn("[WARNING] Reverting blocks",
 			"to", *revertTo, "curBlock", curNum)
 		// Remove invalid blocks
