@@ -16,7 +16,7 @@ const (
 	localnetV1Epoch = 1
 	localnetV2Epoch = 2
 
-	localnetEpochBlock1 = 10
+	localnetEpochBlock1 = 10000000000000 // resharding disabled for testing transactions
 	twoOne              = 5
 
 	localnetVdfDifficulty  = 5000 // This takes about 10s to finish the vdf
