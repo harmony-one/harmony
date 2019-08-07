@@ -24,6 +24,9 @@ const (
 	localnetMaxTxAmountLimit             = 1000
 	localnetMaxTxsPerAccountInBlockLimit = 100
 	localnetMaxTxsPerBlockLimit          = 8000
+
+	localnetVdfDifficulty  = 5000 // This takes about 10s to finish the vdf
+	localnetConsensusRatio = float64(0.1)
 )
 
 func (localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
@@ -85,6 +88,11 @@ func (ls localnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 		MaxTxsPerAccountInBlockLimit: localnetMaxTxsPerAccountInBlockLimit,
 		MaxTxsPerBlockLimit:          localnetMaxTxsPerBlockLimit,
 	}
+}
+
+// ConsensusRatio ratio of new nodes vs consensus total nodes
+func (ls localnetSchedule) ConsensusRatio() float64 {
+	return localnetConsensusRatio
 }
 
 var localnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(localnetV1Epoch), big.NewInt(localnetV2Epoch)}

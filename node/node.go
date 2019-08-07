@@ -191,6 +191,9 @@ type Node struct {
 	isFirstTime bool // the node was started with a fresh database
 	// How long in second the leader needs to wait to propose a new block.
 	BlockPeriod time.Duration
+
+	// last time consensus reached for metrics
+	lastConsensusTime int64
 }
 
 // Blockchain returns the blockchain for the node's current shard.
@@ -232,7 +235,7 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 		node.pendingTransactions = append(node.pendingTransactions, newTxs...)
 		node.reducePendingTransactions()
 		node.pendingTxMutex.Unlock()
-		utils.GetLogInstance().Info("Got more transactions", "num", len(newTxs), "totalPending", len(node.pendingTransactions))
+		utils.Logger().Info().Int("num", len(newTxs)).Int("totalPending", len(node.pendingTransactions)).Msg("Got more transactions")
 	}
 }
 
@@ -240,7 +243,7 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
 	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
 		node.addPendingTransactions(types.Transactions{newTx})
-		utils.GetLogInstance().Debug("Got ONE more transaction", "totalPending", len(node.pendingTransactions))
+		utils.Logger().Error().Int("totalPending", len(node.pendingTransactions)).Msg("Got ONE more transaction")
 	}
 }
 
@@ -254,7 +257,11 @@ func (node *Node) getTransactionsForNewBlock(coinbase common.Address) types.Tran
 	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(node.pendingTransactions, core.ShardingSchedule.TxsThrottleConfig(), coinbase)
 	node.pendingTransactions = unselected
 	node.reducePendingTransactions()
-	utils.GetLogInstance().Debug("Selecting Transactions", "remainPending", len(node.pendingTransactions), "selected", len(selected), "invalidDiscarded", len(invalid))
+	utils.Logger().Error().
+		Int("remainPending", len(node.pendingTransactions)).
+		Int("selected", len(selected)).
+		Int("invalidDiscarded", len(invalid)).
+		Msg("Selecting Transactions")
 	node.pendingTxMutex.Unlock()
 	return selected
 }
@@ -355,13 +362,14 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 			var err error
 			node.TestBankKeys, err = CreateTestBankKeys(TestAccountNumber)
 			if err != nil {
-				utils.GetLogInstance().Crit("Error while creating test keys",
-					"error", err)
+				utils.Logger().Error().Err(err).Msg("Error while creating test keys")
 			}
 		}
 	}
 
-	utils.GetLogInstance().Info("Genesis block hash", "genesis block header", node.Blockchain().GetBlockByNumber(0).Header())
+	utils.Logger().Info().
+		Interface("genesis block header", node.Blockchain().GetBlockByNumber(0).Header()).
+		Msg("Genesis block hash")
 
 	// start the goroutine to receive client message
 	// client messages are sent by clients, like txgen, wallet
@@ -373,6 +381,9 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 	// start the goroutine to receive global message, used for cross-shard TX
 	// FIXME (leo): we use beacon client topic as the global topic for now
 	go node.ReceiveGlobalMessage()
+
+	// start the goroutine to collect metrics
+	go node.CollectMetrics()
 
 	// Setup initial state of syncing.
 	node.peerRegistrationRecord = make(map[string]*syncConfig)
@@ -461,10 +472,12 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 	chanPeer := make(chan p2p.Peer)
 
 	nodeConfig := service.NodeConfig{
-		IsClient:     node.NodeConfig.IsClient(),
-		Beacon:       p2p.GroupIDBeacon,
-		ShardGroupID: node.NodeConfig.GetShardGroupID(),
-		Actions:      make(map[p2p.GroupID]p2p.ActionType),
+		PushgatewayIP:   node.NodeConfig.GetPushgatewayIP(),
+		PushgatewayPort: node.NodeConfig.GetPushgatewayPort(),
+		IsClient:        node.NodeConfig.IsClient(),
+		Beacon:          p2p.GroupIDBeacon,
+		ShardGroupID:    node.NodeConfig.GetShardGroupID(),
+		Actions:         make(map[p2p.GroupID]p2p.ActionType),
 	}
 
 	if nodeConfig.IsClient {
@@ -476,17 +489,17 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 	var err error
 	node.shardGroupReceiver, err = node.host.GroupReceiver(node.NodeConfig.GetShardGroupID())
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to create shard receiver", "msg", err)
+		utils.Logger().Error().Err(err).Msg("Failed to create shard receiver")
 	}
 
 	node.globalGroupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to create global receiver", "msg", err)
+		utils.Logger().Error().Err(err).Msg("Failed to create global receiver")
 	}
 
 	node.clientReceiver, err = node.host.GroupReceiver(node.NodeConfig.GetClientGroupID())
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to create client receiver", "msg", err)
+		utils.Logger().Error().Err(err).Msg("Failed to create client receiver")
 	}
 	return nodeConfig, chanPeer
 }
@@ -498,6 +511,6 @@ func (node *Node) AccountManager() *accounts.Manager {
 
 // SetDNSZone sets the DNS zone to use to get peer info for node syncing
 func (node *Node) SetDNSZone(zone string) {
-	utils.GetLogger().Info("using DNS zone to get peers", "zone", zone)
+	utils.Logger().Info().Str("zone", zone).Msg("using DNS zone to get peers")
 	node.dnsZone = zone
 }

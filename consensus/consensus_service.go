@@ -287,9 +287,11 @@ func (consensus *Consensus) VerifySeal(chain consensus_engine.ChainReader, heade
 func (consensus *Consensus) Finalize(chain consensus_engine.ChainReader, header *types.Header, state *state.DB, txs []*types.Transaction, receipts []*types.Receipt) (*types.Block, error) {
 	// Accumulate any block and uncle rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
-	if err := accumulateRewards(chain, state, header); err != nil {
+	blockReward, err := accumulateRewards(chain, state, header, consensus.SelfAddress)
+	if err != nil {
 		return nil, ctxerror.New("cannot pay block reward").WithCause(err)
 	}
+	consensus.lastBlockReward = blockReward
 	header.Root = state.IntermediateRoot(false)
 	return types.NewBlock(header, txs, receipts), nil
 }

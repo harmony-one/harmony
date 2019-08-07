@@ -88,6 +88,11 @@ func (ts testnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 	}
 }
 
+// ConsensusRatio ratio of new nodes vs consensus total nodes
+func (ts testnetSchedule) ConsensusRatio() float64 {
+	return testnetConsensusRatio
+}
+
 var testnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(testnetV1Epoch), big.NewInt(testnetV2Epoch)}
 
 var testnetV0 = MustNewInstance(2, 150, 150, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch)

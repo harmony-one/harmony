@@ -407,6 +407,8 @@ func (node *Node) validateNewShardState(block *types.Block, stakeInfo *map[commo
 // 1. add the new block to blockchain
 // 2. [leader] send new block to the client
 func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
+	// Update last consensus time for metrics
+	node.lastConsensusTime = time.Now().Unix()
 	if node.Consensus.PubKey.IsEqual(node.Consensus.LeaderPubKey) {
 		node.BroadcastNewBlock(newBlock)
 	} else {

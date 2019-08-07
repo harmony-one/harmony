@@ -25,7 +25,6 @@ import (
 
 // Constants for syncing.
 const (
-	ConsensusRatio                               = float64(0.66)
 	SleepTimeAfterNonConsensusBlockHashes        = time.Second * 30
 	TimesToFail                                  = 5 // Downloadblocks service retry limit
 	RegistrationNumber                           = 3
@@ -318,7 +317,7 @@ func (sc *SyncConfig) GetBlockHashesConsensusAndCleanUp() bool {
 		Int("maxFirstID", maxFirstID).
 		Int("maxCount", maxCount).
 		Msg("[SYNC] block consensus hashes")
-	if float64(maxCount) >= ConsensusRatio*float64(len(sc.peers)) {
+	if float64(maxCount) >= core.ShardingSchedule.ConsensusRatio()*float64(len(sc.peers)) {
 		sc.cleanUpPeers(maxFirstID)
 		return true
 	}

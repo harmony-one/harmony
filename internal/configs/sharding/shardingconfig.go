@@ -36,6 +36,9 @@ type Schedule interface {
 
 	// configuration for throttling pending transactions
 	TxsThrottleConfig() *TxsThrottleConfig
+
+	// ConsensusRatio ratio of new nodes vs consensus total nodes
+	ConsensusRatio() float64
 }
 
 // Instance is one sharding configuration instance.
