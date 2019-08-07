@@ -236,7 +236,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	// Set network type
 	netType := nodeconfig.NetworkType(*networkType)
 	switch netType {
-	case nodeconfig.Mainnet, nodeconfig.Testnet, nodeconfig.Localnet, nodeconfig.Devnet:
+	case nodeconfig.Mainnet, nodeconfig.Testnet, nodeconfig.Pangaea, nodeconfig.Localnet, nodeconfig.Devnet:
 		nodeConfig.SetNetworkType(netType)
 	default:
 		panic(fmt.Sprintf("invalid network type: %s", *networkType))
@@ -373,6 +373,8 @@ func main() {
 		core.ShardingSchedule = shardingconfig.MainnetSchedule
 	case nodeconfig.Testnet:
 		core.ShardingSchedule = shardingconfig.TestnetSchedule
+	case nodeconfig.Pangaea:
+		core.ShardingSchedule = shardingconfig.PangaeaSchedule
 	case nodeconfig.Localnet:
 		core.ShardingSchedule = shardingconfig.LocalnetSchedule
 	case nodeconfig.Devnet:

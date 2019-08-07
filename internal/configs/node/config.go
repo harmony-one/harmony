@@ -50,6 +50,7 @@ type NetworkType string
 const (
 	Mainnet  = "mainnet"
 	Testnet  = "testnet"
+	Pangaea  = "pangaea"
 	Devnet   = "devnet"
 	Localnet = "localnet"
 )
