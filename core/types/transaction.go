@@ -50,7 +50,7 @@ type txdata struct {
 	Price        *big.Int        `json:"gasPrice"   gencodec:"required"`
 	GasLimit     uint64          `json:"gas"        gencodec:"required"`
 	ShardID      uint32          `json:"shardID"    gencodec:"required"`
-	ToShardID    uint32          `json:"toShardID"  gencodec:"required"`
+	ToShardID    uint32          `json:"toShardID"`
 	Recipient    *common.Address `json:"to"         rlp:"nil"` // nil means contract creation
 	Amount       *big.Int        `json:"value"      gencodec:"required"`
 	Payload      []byte          `json:"input"      gencodec:"required"`
@@ -111,6 +111,34 @@ func newTransaction(nonce uint64, to *common.Address, shardID uint32, amount *bi
 	return &Transaction{data: d}
 }
 
+// create new cross-shard transaction
+func newCrossShardTransaction(nonce uint64, to *common.Address, shardID uint32, toShardID uint32, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte) *Transaction {
+	if len(data) > 0 {
+		data = common.CopyBytes(data)
+	}
+	d := txdata{
+		AccountNonce: nonce,
+		Recipient:    to,
+		ShardID:      shardID,
+		ToShardID:    toShardID,
+		Payload:      data,
+		Amount:       new(big.Int),
+		GasLimit:     gasLimit,
+		Price:        new(big.Int),
+		V:            new(big.Int),
+		R:            new(big.Int),
+		S:            new(big.Int),
+	}
+	if amount != nil {
+		d.Amount.Set(amount)
+	}
+	if gasPrice != nil {
+		d.Price.Set(gasPrice)
+	}
+
+	return &Transaction{data: d}
+}
+
 // ChainID returns which chain id this transaction was signed for (if at all)
 func (tx *Transaction) ChainID() *big.Int {
 	return deriveChainID(tx.data.V)
@@ -119,6 +147,11 @@ func (tx *Transaction) ChainID() *big.Int {
 // ShardID returns which shard id this transaction was signed for (if at all)
 func (tx *Transaction) ShardID() uint32 {
 	return tx.data.ShardID
+}
+
+// ToShardID returns the destination shard id this transaction is going to
+func (tx *Transaction) ToShardID() uint32 {
+	return tx.data.ToShardID
 }
 
 // Protected returns whether the transaction is protected from replay protection.
