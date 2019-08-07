@@ -55,9 +55,6 @@ const (
 	Localnet = "localnet"
 )
 
-// Network is the type of Harmony network
-var Network = Testnet
-
 // Global is the index of the global node configuration
 const (
 	Global    = 0
