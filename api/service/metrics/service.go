@@ -218,23 +218,23 @@ func (s *Service) PushMetrics() {
 		}
 		if err := s.pusher.Add(); err != nil {
 			utils.Logger().Error().Err(err).Msg("Could not push to a prometheus pushgateway.")
+			// Dump metrics to db if couldn't push to prometheus
+			switch metricType {
+			case ConnectionsNumberPush:
+				s.storage.Dump(curConnectionsNumber, ConnectionsNumberPrefix)
+			case BlockHeightPush:
+				s.storage.Dump(curBlockHeight, BlockHeightPrefix)
+				s.storage.Dump(curBlocks, BlocksPrefix)
+			case BlockRewardPush:
+				s.storage.Dump(lastBlockReward, BlockHeightPrefix)
+			case NodeBalancePush:
+				s.storage.Dump(curBalance, BalancePrefix)
+			case LastConsensusPush:
+				s.storage.Dump(lastConsensusTime, ConsensusTimePrefix)
+			case TxPoolPush:
+				s.storage.Dump(curTxPoolSize, TxPoolPrefix)
+			}
 		}
-		/*switch metricType {
-		case ConnectionsNumberPush:
-			s.storage.Dump(curConnectionsNumber, ConnectionsNumberPrefix)
-		case BlockHeightPush:
-			fmt.Println("LOL")
-			s.storage.Dump(curBlockHeight, BlockHeightPrefix)
-			s.storage.Dump(curBlocks, BlocksPrefix)
-		case BlockRewardPush:
-			s.storage.Dump(lastBlockReward, BlockHeightPrefix)
-		case NodeBalancePush:
-			s.storage.Dump(curBalance, BalancePrefix)
-		case LastConsensusPush:
-			s.storage.Dump(lastConsensusTime, ConsensusTimePrefix)
-		case TxPoolPush:
-			s.storage.Dump(curTxPoolSize, TxPoolPrefix)
-		}*/
 	}
 	return
 }
