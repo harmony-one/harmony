@@ -103,6 +103,7 @@ usage: ${progname} [-1ch] [-k KEYFILE]
    -p passfile    use the given BLS passphrase file
    -D             do not download Harmony binaries (default: download when start)
    -m             collect and upload node metrics to harmony prometheus + grafana
+   -N network     join the given network (main, beta, pangaea; default: main)
 
 example:
 
@@ -117,17 +118,18 @@ usage() {
    exit 64  # EX_USAGE
 }
 
-unset start_clean loop run_as_root blspass do_not_download
+unset start_clean loop run_as_root blspass do_not_download metrics network
 start_clean=false
 loop=true
 run_as_root=true
 do_not_download=false
 metrics=false
+network=main
 ${BLSKEYFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp:D opt
+while getopts :1chk:sSp:DmN: opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
@@ -141,10 +143,40 @@ do
    p) blspass="${OPTARG}";;
    D) do_not_download=true;;
    m) metrics=true;;
+   N) network="${OPTARG}";;
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
 shift $((${OPTIND} - 1))
+
+unset -v bootnodes REL
+
+case "${network}" in
+main)
+  bootnodes=(
+    /ip4/100.26.90.187/tcp/9874/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
+    /ip4/54.213.43.194/tcp/9874/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9
+    /ip4/13.113.101.219/tcp/12019/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX
+    /ip4/99.81.170.167/tcp/12019/p2p/QmRVbTpEYup8dSaURZfF6ByrMTSKa4UyUzJhSjahFzRqNj
+  )
+  REL=r3
+  ;;
+beta)
+  err 69 "${network}: unsupported yet"
+  ;;
+pangaea)
+  bootnodes=(
+    /ip4/100.26.90.187/tcp/9867/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
+    /ip4/54.213.43.194/tcp/9867/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9
+    /ip4/13.113.101.219/tcp/9867/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX
+    /ip4/99.81.170.167/tcp/9867/p2p/QmRVbTpEYup8dSaURZfF6ByrMTSKa4UyUzJhSjahFzRqNj
+  )
+  REL=master
+  ;;
+*)
+  err 64 "${network}: invalid network"
+  ;;
+esac
 
 case $# in
 [1-9]*)
@@ -188,7 +220,6 @@ esac
 
 BUCKET=pub.harmony.one
 OS=$(uname -s)
-REL=r3
 
 if [ "$OS" == "Darwin" ]; then
    FOLDER=release/darwin-x86_64/$REL/
@@ -235,8 +266,11 @@ fi
 # find my public ip address
 myip
 
-# public boot node multiaddress
-BN_MA=/ip4/100.26.90.187/tcp/9874/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv,/ip4/54.213.43.194/tcp/9874/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9,/ip4/13.113.101.219/tcp/12019/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX,/ip4/99.81.170.167/tcp/12019/p2p/QmRVbTpEYup8dSaURZfF6ByrMTSKa4UyUzJhSjahFzRqNj
+unset -v BN_MA bn
+for bn in "${bootnodes[@]}"
+do
+  BN_MA="${BN_MA+"${BN_MA},"}${bn}"
+done
 
 if ${start_clean}
 then
