@@ -383,8 +383,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 	go node.ReceiveGlobalMessage()
 
 	// start the goroutine to collect metrics
-	// currently broken: fix https://github.com/harmony-one/harmony/pull/1296
-	// go node.CollectMetrics()
+	go node.CollectMetrics()
 
 	// Setup initial state of syncing.
 	node.peerRegistrationRecord = make(map[string]*syncConfig)

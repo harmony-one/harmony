@@ -37,6 +37,26 @@ func (pangaeaSchedule) ConsensusRatio() float64 {
 	return mainnetConsensusRatio
 }
 
+func (pangaeaSchedule) MaxTxAmountLimit() *big.Int {
+	return big.NewInt(mainnetMaxTxAmountLimit)
+}
+
+func (pangaeaSchedule) MaxTxsPerAccountInBlockLimit() uint64 {
+	return mainnetMaxTxsPerAccountInBlockLimit
+}
+
+func (pangaeaSchedule) MaxTxsPerBlockLimit() int {
+	return mainnetMaxTxsPerBlockLimit
+}
+
+func (pangaeaSchedule) TxsThrottleConfig() *TxsThrottleConfig {
+	return &TxsThrottleConfig{
+		MaxTxAmountLimit:             big.NewInt(mainnetMaxTxAmountLimit),
+		MaxTxsPerAccountInBlockLimit: mainnetMaxTxsPerAccountInBlockLimit,
+		MaxTxsPerBlockLimit:          mainnetMaxTxsPerBlockLimit,
+	}
+}
+
 var pangaeaReshardingEpoch = []*big.Int{common.Big0}
 
 var pangaeaV0 = MustNewInstance(
