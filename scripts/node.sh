@@ -149,7 +149,7 @@ do
 done
 shift $((${OPTIND} - 1))
 
-unset -v bootnodes REL network_type
+unset -v bootnodes REL network_type dns_zone
 
 case "${network}" in
 main)
@@ -161,6 +161,7 @@ main)
   )
   REL=r3
   network_type=mainnet
+  dns_zone=t.hmny.io
   ;;
 beta)
   bootnodes=(
@@ -170,6 +171,7 @@ beta)
   )
   REL=testnet
   network_type=testnet
+  dns_zone=
   ;;
 pangaea)
   bootnodes=(
@@ -180,6 +182,7 @@ pangaea)
   )
   REL=master
   network_type=pangaea
+  dns_zone=p.hmny.io
   ;;
 *)
   err 64 "${network}: invalid network"
@@ -413,6 +416,7 @@ do
       -is_genesis
       -blskey_file "${BLSKEYFILE}"
       -network_type="${network_type}"
+      -dns_zone="${dns_zone}"
    )
    case "${metrics}" in
    true)
