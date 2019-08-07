@@ -319,6 +319,8 @@ func setUpConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	chain := currentNode.Blockchain()
 	curNum := chain.CurrentBlock().NumberU64()
 	if curNum < uint64(*doRevertBefore) && curNum >= uint64(*revertTo) {
+		utils.GetLogInstance().Warn("[WARNING] Reverting blocks",
+			"to", *revertTo, "curBlock", curNum)
 		// Remove invalid blocks
 		for chain.CurrentBlock().NumberU64() >= uint64(*revertTo) {
 			curBlock := chain.CurrentBlock()
