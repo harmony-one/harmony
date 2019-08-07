@@ -19,6 +19,7 @@ const (
 	BlockRewardPrefix       = "brp"
 	ConnectionsNumberPrefix = "cnp"
 	ConsensusTimePrefix     = "ltp"
+	IsLeaderPrefix          = "ilp"
 	TxPoolPrefix            = "tpp"
 )
 

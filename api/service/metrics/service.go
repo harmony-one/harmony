@@ -27,6 +27,7 @@ const (
 	LastConsensusPush            int = 3
 	BlockRewardPush              int = 4
 	TxPoolPush                   int = 5
+	IsLeaderPush                 int = 6
 	metricsServicePortDifference     = 2000
 )
 
@@ -50,6 +51,7 @@ var (
 	curBlocks            = uint64(0)
 	curBalance           = big.NewInt(0)
 	curConnectionsNumber = 0
+	curIsLeader          = false
 	lastBlockReward      = big.NewInt(0)
 	lastConsensusTime    = int64(0)
 	metricsPush          = make(chan int)
@@ -60,6 +62,10 @@ var (
 	txPoolGauge = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "tx_pool_size",
 		Help: "Get current tx pool size.",
+	})
+	isLeaderGauge = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "is_leader",
+		Help: "Is node a leader now.",
 	})
 	blocksAcceptedGauge = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "blocks_accepted",
@@ -135,7 +141,7 @@ func (s *Service) Run() {
 	addr := net.JoinHostPort("", GetMetricsServicePort(s.Port))
 
 	registry := prometheus.NewRegistry()
-	registry.MustRegister(blockHeightCounter, connectionsNumberGauge, nodeBalanceCounter, lastConsensusGauge, blockRewardGauge, blocksAcceptedGauge, txPoolGauge)
+	registry.MustRegister(blockHeightCounter, connectionsNumberGauge, nodeBalanceCounter, lastConsensusGauge, blockRewardGauge, blocksAcceptedGauge, txPoolGauge, isLeaderGauge)
 
 	s.pusher = push.New("http://"+s.PushgatewayIP+":"+s.PushgatewayPort, "node_metrics").Gatherer(registry).Grouping("instance", s.IP+":"+s.Port).Grouping("bls_key", s.BlsPublicKey)
 	go s.PushMetrics()
@@ -210,6 +216,17 @@ func UpdateConnectionsNumber(connectionsNumber int) {
 	metricsPush <- ConnectionsNumberPush
 }
 
+// UpdateIsLeader updates if node is a leader.
+func UpdateIsLeader(isLeader bool) {
+	if isLeader {
+		isLeaderGauge.Set(1.0)
+	} else {
+		isLeaderGauge.Set(0.0)
+	}
+	curIsLeader = isLeader
+	metricsPush <- IsLeaderPush
+}
+
 // PushMetrics pushes metrics updates to prometheus pushgateway.
 func (s *Service) PushMetrics() {
 	for metricType := range metricsPush {
@@ -233,6 +250,8 @@ func (s *Service) PushMetrics() {
 				s.storage.Dump(lastConsensusTime, ConsensusTimePrefix)
 			case TxPoolPush:
 				s.storage.Dump(curTxPoolSize, TxPoolPrefix)
+			case IsLeaderPush:
+				s.storage.Dump(curIsLeader, IsLeaderPrefix)
 			}
 		}
 	}
