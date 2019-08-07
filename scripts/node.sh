@@ -104,6 +104,7 @@ usage: ${progname} [-1ch] [-k KEYFILE]
    -D             do not download Harmony binaries (default: download when start)
    -m             collect and upload node metrics to harmony prometheus + grafana
    -N network     join the given network (main, beta, pangaea; default: main)
+   -t             equivalent to -N pangaea (deprecated)
 
 example:
 
@@ -129,7 +130,7 @@ ${BLSKEYFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp:DmN: opt
+while getopts :1chk:sSp:DmN:t opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
@@ -144,6 +145,7 @@ do
    D) do_not_download=true;;
    m) metrics=true;;
    N) network="${OPTARG}";;
+   t) network=pangaea;;
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
