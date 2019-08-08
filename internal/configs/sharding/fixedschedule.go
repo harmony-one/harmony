@@ -2,6 +2,8 @@ package shardingconfig
 
 import (
 	"math/big"
+
+	"github.com/harmony-one/harmony/common/denominations"
 )
 
 const (
@@ -42,7 +44,9 @@ func (s fixedSchedule) ConsensusRatio() float64 {
 }
 
 func (s fixedSchedule) MaxTxAmountLimit() *big.Int {
-	return big.NewInt(mainnetMaxTxAmountLimit)
+	amountBigInt := big.NewInt(int64(mainnetMaxTxAmountLimit * denominations.Nano))
+	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(denominations.Nano))
+	return amountBigInt
 }
 
 func (s fixedSchedule) MaxTxsPerAccountInBlockLimit() uint64 {
@@ -55,9 +59,9 @@ func (s fixedSchedule) MaxTxsPerBlockLimit() int {
 
 func (s fixedSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 	return &TxsThrottleConfig{
-		MaxTxAmountLimit:             big.NewInt(mainnetMaxTxAmountLimit),
-		MaxTxsPerAccountInBlockLimit: mainnetMaxTxsPerAccountInBlockLimit,
-		MaxTxsPerBlockLimit:          mainnetMaxTxsPerBlockLimit,
+		MaxTxAmountLimit:             s.MaxTxAmountLimit(),
+		MaxTxsPerAccountInBlockLimit: s.MaxTxsPerAccountInBlockLimit(),
+		MaxTxsPerBlockLimit:          s.MaxTxsPerBlockLimit(),
 	}
 }
 

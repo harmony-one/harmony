@@ -3,6 +3,7 @@ package shardingconfig
 import (
 	"math/big"
 
+	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/internal/genesis"
 )
 
@@ -21,8 +22,8 @@ const (
 
 	testnetVdfDifficulty = 10000 // This takes about 20s to finish the vdf
 
-	testnetMaxTxAmountLimit             = 1000
-	testnetMaxTxsPerAccountInBlockLimit = 100
+	testnetMaxTxAmountLimit             = 1e3 // unit is in One
+	testnetMaxTxsPerAccountInBlockLimit = 10
 	testnetMaxTxsPerBlockLimit          = 8000
 )
 
@@ -74,7 +75,9 @@ func (ts testnetSchedule) ConsensusRatio() float64 {
 }
 
 func (ts testnetSchedule) MaxTxAmountLimit() *big.Int {
-	return big.NewInt(testnetMaxTxAmountLimit)
+	amountBigInt := big.NewInt(int64(testnetMaxTxAmountLimit * denominations.Nano))
+	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(denominations.Nano))
+	return amountBigInt
 }
 
 func (ts testnetSchedule) MaxTxsPerAccountInBlockLimit() uint64 {
@@ -87,9 +90,9 @@ func (ts testnetSchedule) MaxTxsPerBlockLimit() int {
 
 func (ts testnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 	return &TxsThrottleConfig{
-		MaxTxAmountLimit:             big.NewInt(testnetMaxTxAmountLimit),
-		MaxTxsPerAccountInBlockLimit: testnetMaxTxsPerAccountInBlockLimit,
-		MaxTxsPerBlockLimit:          testnetMaxTxsPerBlockLimit,
+		MaxTxAmountLimit:             ts.MaxTxAmountLimit(),
+		MaxTxsPerAccountInBlockLimit: ts.MaxTxsPerAccountInBlockLimit(),
+		MaxTxsPerBlockLimit:          ts.MaxTxsPerBlockLimit(),
 	}
 }
 

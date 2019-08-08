@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/internal/genesis"
 )
 
@@ -13,11 +14,11 @@ var PangaeaSchedule pangaeaSchedule
 
 type pangaeaSchedule struct{}
 
-func (pangaeaSchedule) InstanceForEpoch(epoch *big.Int) Instance {
+func (ps pangaeaSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	return pangaeaV0
 }
 
-func (pangaeaSchedule) BlocksPerEpoch() uint64 {
+func (ps pangaeaSchedule) BlocksPerEpoch() uint64 {
 	return 10800 // 1 day with 8 seconds/block
 }
 
@@ -29,31 +30,33 @@ func (ps pangaeaSchedule) IsLastBlock(blockNum uint64) bool {
 	return (blockNum+1)%ps.BlocksPerEpoch() == 0
 }
 
-func (pangaeaSchedule) VdfDifficulty() int {
+func (ps pangaeaSchedule) VdfDifficulty() int {
 	return testnetVdfDifficulty
 }
 
-func (pangaeaSchedule) ConsensusRatio() float64 {
+func (ps pangaeaSchedule) ConsensusRatio() float64 {
 	return mainnetConsensusRatio
 }
 
-func (pangaeaSchedule) MaxTxAmountLimit() *big.Int {
-	return big.NewInt(mainnetMaxTxAmountLimit)
+func (ps pangaeaSchedule) MaxTxAmountLimit() *big.Int {
+	amountBigInt := big.NewInt(int64(mainnetMaxTxAmountLimit * denominations.Nano))
+	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(denominations.Nano))
+	return amountBigInt
 }
 
-func (pangaeaSchedule) MaxTxsPerAccountInBlockLimit() uint64 {
+func (ps pangaeaSchedule) MaxTxsPerAccountInBlockLimit() uint64 {
 	return mainnetMaxTxsPerAccountInBlockLimit
 }
 
-func (pangaeaSchedule) MaxTxsPerBlockLimit() int {
+func (ps pangaeaSchedule) MaxTxsPerBlockLimit() int {
 	return mainnetMaxTxsPerBlockLimit
 }
 
-func (pangaeaSchedule) TxsThrottleConfig() *TxsThrottleConfig {
+func (ps pangaeaSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 	return &TxsThrottleConfig{
-		MaxTxAmountLimit:             big.NewInt(mainnetMaxTxAmountLimit),
-		MaxTxsPerAccountInBlockLimit: mainnetMaxTxsPerAccountInBlockLimit,
-		MaxTxsPerBlockLimit:          mainnetMaxTxsPerBlockLimit,
+		MaxTxAmountLimit:             ps.MaxTxAmountLimit(),
+		MaxTxsPerAccountInBlockLimit: ps.MaxTxsPerAccountInBlockLimit(),
+		MaxTxsPerBlockLimit:          ps.MaxTxsPerBlockLimit(),
 	}
 }
 

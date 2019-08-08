@@ -112,11 +112,17 @@ func (w *Worker) SelectTransactionsForNewBlock(txs types.Transactions, txsThrott
 		switch flag {
 		case shardingconfig.Unselect:
 			unselected = append(unselected, tx)
-			utils.Logger().Info().Str("txThrottleFlag", flag.String()).Msg("Transaction Throttle flag")
+			utils.Logger().Info().
+				Str("Transaction Id", tx.Hash().Hex()).
+				Str("txThrottleFlag", flag.String()).
+				Msg("Transaction Throttle flag")
 
 		case shardingconfig.Invalid:
 			invalid = append(invalid, tx)
-			utils.Logger().Info().Str("txThrottleFlag", flag.String()).Msg("Transaction Throttle flag")
+			utils.Logger().Info().
+				Str("txThrottleFlag", flag.String()).
+				Str("Transaction Id", tx.Hash().Hex()).
+				Msg("Transaction Throttle flag")
 
 		case shardingconfig.Select:
 			snap := w.current.state.Snapshot()
@@ -124,7 +130,11 @@ func (w *Worker) SelectTransactionsForNewBlock(txs types.Transactions, txsThrott
 			if err != nil {
 				w.current.state.RevertToSnapshot(snap)
 				invalid = append(invalid, tx)
-				utils.Logger().Error().Err(err).Str("txThrottleFlag", flag.String()).Msg("Transaction Throttle flag")
+				utils.Logger().Error().
+					Err(err).
+					Str("Transaction Id", tx.Hash().Hex()).
+					Str("txThrottleFlag", flag.String()).
+					Msg("Transaction Throttle flag")
 			} else {
 				selected = append(selected, tx)
 				txnCnts[sender]++

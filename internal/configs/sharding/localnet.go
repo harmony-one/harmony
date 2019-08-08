@@ -3,6 +3,7 @@ package shardingconfig
 import (
 	"math/big"
 
+	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/internal/genesis"
 )
 
@@ -22,8 +23,8 @@ const (
 	localnetVdfDifficulty  = 5000 // This takes about 10s to finish the vdf
 	localnetConsensusRatio = float64(0.1)
 
-	localnetMaxTxAmountLimit             = 1000
-	localnetMaxTxsPerAccountInBlockLimit = 100
+	localnetMaxTxAmountLimit             = 1e2 // unit is in One
+	localnetMaxTxsPerAccountInBlockLimit = 2
 	localnetMaxTxsPerBlockLimit          = 8000
 )
 
@@ -38,7 +39,7 @@ func (localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	}
 }
 
-func (localnetSchedule) BlocksPerEpoch() uint64 {
+func (ls localnetSchedule) BlocksPerEpoch() uint64 {
 	return twoOne
 }
 
@@ -74,7 +75,9 @@ func (ls localnetSchedule) ConsensusRatio() float64 {
 }
 
 func (ls localnetSchedule) MaxTxAmountLimit() *big.Int {
-	return big.NewInt(localnetMaxTxAmountLimit)
+	amountBigInt := big.NewInt(int64(localnetMaxTxAmountLimit * denominations.Nano))
+	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(denominations.Nano))
+	return amountBigInt
 }
 
 func (ls localnetSchedule) MaxTxsPerAccountInBlockLimit() uint64 {
@@ -87,9 +90,9 @@ func (ls localnetSchedule) MaxTxsPerBlockLimit() int {
 
 func (ls localnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 	return &TxsThrottleConfig{
-		MaxTxAmountLimit:             big.NewInt(localnetMaxTxAmountLimit),
-		MaxTxsPerAccountInBlockLimit: localnetMaxTxsPerAccountInBlockLimit,
-		MaxTxsPerBlockLimit:          localnetMaxTxsPerBlockLimit,
+		MaxTxAmountLimit:             ls.MaxTxAmountLimit(),
+		MaxTxsPerAccountInBlockLimit: ls.MaxTxsPerAccountInBlockLimit(),
+		MaxTxsPerBlockLimit:          ls.MaxTxsPerBlockLimit(),
 	}
 }
 
