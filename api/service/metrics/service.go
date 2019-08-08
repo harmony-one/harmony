@@ -4,17 +4,13 @@ import (
 	"fmt"
 	"math"
 	"math/big"
-	"net"
-	"net/http"
 	"strconv"
 
 	"github.com/ethereum/go-ethereum/rpc"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
-	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/client_golang/prometheus/push"
 )
 
@@ -39,7 +35,6 @@ type Service struct {
 	Port            string
 	PushgatewayIP   string
 	PushgatewayPort string
-	GetNodeIDs      func() []libp2p_peer.ID
 	storage         *Storage
 	pusher          *push.Pusher
 	messageChan     chan *msg_pb.Message
@@ -76,7 +71,7 @@ var (
 		Name: "connections_number",
 		Help: "Get current connections number for a node.",
 	})
-	nodeBalanceCounter = prometheus.NewCounter(prometheus.CounterOpts{
+	nodeBalanceGauge = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "node_balance",
 		Help: "Get current node balance.",
 	})
@@ -90,26 +85,14 @@ var (
 	})
 )
 
-// ConnectionsLog struct for connections stats for prometheus
-type ConnectionsLog struct {
-	Time              int
-	ConnectionsNumber int
-}
-
-// ConnectionsStatsHTTP struct for returning all connections logs
-type ConnectionsStatsHTTP struct {
-	ConnectionsLogs []ConnectionsLog
-}
-
 // New returns metrics service.
-func New(selfPeer *p2p.Peer, blsPublicKey, pushgatewayIP, pushgatewayPort string, GetNodeIDs func() []libp2p_peer.ID) *Service {
+func New(selfPeer *p2p.Peer, blsPublicKey, pushgatewayIP, pushgatewayPort string) *Service {
 	return &Service{
 		BlsPublicKey:    blsPublicKey,
 		IP:              selfPeer.IP,
 		Port:            selfPeer.Port,
 		PushgatewayIP:   pushgatewayIP,
 		PushgatewayPort: pushgatewayPort,
-		GetNodeIDs:      GetNodeIDs,
 	}
 }
 
@@ -138,23 +121,11 @@ func GetMetricsServicePort(nodePort string) string {
 func (s *Service) Run() {
 	// Init local storage for metrics.
 	s.storage = GetStorageInstance(s.IP, s.Port, true)
-	// Init address.
-	addr := net.JoinHostPort("", GetMetricsServicePort(s.Port))
-
 	registry := prometheus.NewRegistry()
-	registry.MustRegister(blockHeightCounter, connectionsNumberGauge, nodeBalanceCounter, lastConsensusGauge, blockRewardGauge, blocksAcceptedGauge, txPoolGauge, isLeaderGauge)
+	registry.MustRegister(blockHeightCounter, connectionsNumberGauge, nodeBalanceGauge, lastConsensusGauge, blockRewardGauge, blocksAcceptedGauge, txPoolGauge, isLeaderGauge)
 
 	s.pusher = push.New("http://"+s.PushgatewayIP+":"+s.PushgatewayPort, "node_metrics").Gatherer(registry).Grouping("instance", s.IP+":"+s.Port).Grouping("bls_key", s.BlsPublicKey)
 	go s.PushMetrics()
-	// Pull metrics http server
-	utils.Logger().Info().Str("port", GetMetricsServicePort(s.Port)).Msg("Listening.")
-	go func() {
-		http.Handle("/node_metrics", promhttp.Handler())
-		if err := http.ListenAndServe(addr, nil); err != nil {
-			utils.Logger().Warn().Err(err).Msg("http.ListenAndServe()")
-		}
-	}()
-	return
 }
 
 // FormatBalance formats big.Int balance with precision.
@@ -174,7 +145,7 @@ func UpdateBlockHeight(blockHeight uint64) {
 
 // UpdateNodeBalance updates node balance.
 func UpdateNodeBalance(balance *big.Int) {
-	nodeBalanceCounter.Add(FormatBalance(balance) - FormatBalance(curBalance))
+	nodeBalanceGauge.Set(FormatBalance(balance))
 	curBalance = balance
 	metricsPush <- NodeBalancePush
 }
@@ -226,8 +197,8 @@ func (s *Service) PushMetrics() {
 		}
 		if err := s.pusher.Add(); err != nil {
 			utils.Logger().Error().Err(err).Msg("Could not push to a prometheus pushgateway.")
-			// Dump metrics to db if couldn't push to prometheus
-			switch metricType {
+			// No dump for now, not necessarily for metrics and consumes memory, doesn't restore from db anyway.
+			/* switch metricType {
 			case ConnectionsNumberPush:
 				s.storage.Dump(curConnectionsNumber, ConnectionsNumberPrefix)
 			case BlockHeightPush:
@@ -243,7 +214,7 @@ func (s *Service) PushMetrics() {
 				s.storage.Dump(curTxPoolSize, TxPoolPrefix)
 			case IsLeaderPush:
 				s.storage.Dump(curIsLeader, IsLeaderPrefix)
-			}
+			}*/
 		}
 	}
 	return
