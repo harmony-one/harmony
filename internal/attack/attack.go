@@ -77,9 +77,9 @@ func (attack *Model) NodeKilledByItSelf() {
 
 	if rand.Intn(HitRate) == 0 {
 		utils.Logger().
-		Error().
-		Interface("PID: ", os.Getpid()).
-		Msg("******************Killing myself******************")
+			Error().
+			Interface("PID: ", os.Getpid()).
+			Msg("******************Killing myself******************")
 		os.Exit(1)
 	}
 }
@@ -91,9 +91,9 @@ func (attack *Model) DelayResponse() {
 	}
 	if rand.Intn(HitRate) == 0 {
 		utils.Logger().
-		Error().
-		Interface("PID: ", os.Getpid()).
-		Msg("******************Model: DelayResponse******************")
+			Error().
+			Interface("PID: ", os.Getpid()).
+			Msg("******************Model: DelayResponse******************")
 		time.Sleep(DelayResponseDuration)
 	}
 }
@@ -105,9 +105,9 @@ func (attack *Model) IncorrectResponse() bool {
 	}
 	if rand.Intn(HitRate) == 0 {
 		utils.Logger().
-		Error().
-		Interface("PID: ", os.Getpid()).
-		Msg("******************Model: IncorrectResponse******************")
+			Error().
+			Interface("PID: ", os.Getpid()).
+			Msg("******************Model: IncorrectResponse******************")
 		return true
 	}
 	return false

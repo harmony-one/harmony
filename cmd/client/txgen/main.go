@@ -167,10 +167,10 @@ func main() {
 	start := time.Now()
 	totalTime := float64(*duration)
 	utils.Logger().
-	Error().
-	Interface("totalTime", totalTime).
-	Bool("RunForever", isDurationForever(totalTime)).
-	Msg("Total Duration")
+		Error().
+		Interface("totalTime", totalTime).
+		Bool("RunForever", isDurationForever(totalTime)).
+		Msg("Total Duration")
 	ticker := time.NewTicker(checkFrequency * time.Second)
 	txGen.DoSyncWithoutConsensus()
 syncLoop:
@@ -178,21 +178,21 @@ syncLoop:
 		t := time.Now()
 		if totalTime > 0 && t.Sub(start).Seconds() >= totalTime {
 			utils.Logger().
-			Error().
-			Int("duration", (int(t.Sub(start)))).
-			Interface("startTime", start).
-			Interface("totalTime", totalTime).
-			Msg("Generator timer ended in syncLoop.")
+				Error().
+				Int("duration", (int(t.Sub(start)))).
+				Interface("startTime", start).
+				Interface("totalTime", totalTime).
+				Msg("Generator timer ended in syncLoop.")
 			break syncLoop
 		}
 		select {
 		case <-ticker.C:
 			if txGen.State.String() == "NodeReadyForConsensus" {
 				utils.Logger().
-				Error().
-				Interface("txgen node", txGen.SelfPeer).
-				Str("Node State", txGen.State.String()).
-				Msg("Generator is now in Sync.")
+					Error().
+					Interface("txgen node", txGen.SelfPeer).
+					Str("Node State", txGen.State.String()).
+					Msg("Generator is now in Sync.")
 				ticker.Stop()
 				break syncLoop
 			}
@@ -202,18 +202,18 @@ syncLoop:
 	// This func is used to update the client's blockchain when new blocks are received from the leaders
 	updateBlocksFunc := func(blocks []*types.Block) {
 		utils.Logger().
-		Info().
-		Uint64("block num", blocks[0].NumberU64()).
-		Msg("[Txgen] Received new block")
+			Info().
+			Uint64("block num", blocks[0].NumberU64()).
+			Msg("[Txgen] Received new block")
 		for _, block := range blocks {
 			shardID := block.ShardID()
 			if txGen.Consensus.ShardID == shardID {
 				utils.Logger().Info().Int("txNum", len(block.Transactions())).
-				Interface("shardID", shardID).
-				Interface("preHash", block.ParentHash().Hex()).
-				Uint64("currentBlock", txGen.Blockchain().CurrentBlock().NumberU64()).
-				Uint64("incoming block", block.NumberU64()).
-				Msg("Got block from leader")
+					Interface("shardID", shardID).
+					Interface("preHash", block.ParentHash().Hex()).
+					Uint64("currentBlock", txGen.Blockchain().CurrentBlock().NumberU64()).
+					Uint64("incoming block", block.NumberU64()).
+					Msg("Got block from leader")
 				if block.NumberU64()-txGen.Blockchain().CurrentBlock().NumberU64() == 1 {
 					if err := txGen.AddNewBlock(block); err != nil {
 						utils.Logger().Error().Err(err).Msg("Error when adding new block")
@@ -243,17 +243,17 @@ pushLoop:
 	for {
 		t := time.Now()
 		utils.Logger().
-		Error().
-		Float64("running time", t.Sub(start).Seconds()).
-		Interface("totaltime", totalTime).
-		Msg("Current running time")
+			Error().
+			Float64("running time", t.Sub(start).Seconds()).
+			Interface("totaltime", totalTime).
+			Msg("Current running time")
 		if !isDurationForever(totalTime) && t.Sub(start).Seconds() >= totalTime {
 			utils.Logger().
-			Error().
-			Int("duration", (int(t.Sub(start)))).
-			Interface("startTime", start).
-			Interface("totalTime", totalTime).
-			Msg("Generator timer ended.")
+				Error().
+				Int("duration", (int(t.Sub(start)))).
+				Interface("startTime", start).
+				Interface("totalTime", totalTime).
+				Msg("Generator timer ended.")
 			break pushLoop
 		}
 		if shardID != 0 {

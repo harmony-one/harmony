@@ -48,9 +48,9 @@ func (m *MemProfiling) Config() {
 		Handler: m.h,
 	}
 	utils.Logger().
-	Info().
-	Interface("port", utils.GetPortFromDiff(nodeconfig.GetDefaultConfig().Port, MemProfilingPortDiff)).
-	Msg("running mem profiling")
+		Info().
+		Interface("port", utils.GetPortFromDiff(nodeconfig.GetDefaultConfig().Port, MemProfilingPortDiff)).
+		Msg("running mem profiling")
 }
 
 // Add adds variables to watch for profiling.

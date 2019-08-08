@@ -292,9 +292,9 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// TODO: add staking support
 	// currentNode.StakingAccount = myAccount
 	utils.Logger().
-	Info().
-	Interface("address", common.MustAddressToBech32(currentNode.StakingAccount.Address)).
-	Msg("node account set")
+		Info().
+		Interface("address", common.MustAddressToBech32(currentNode.StakingAccount.Address)).
+		Msg("node account set")
 
 	// TODO: refactor the creation of blockchain out of node.New()
 	currentConsensus.ChainReader = currentNode.Blockchain()
@@ -395,9 +395,9 @@ func main() {
 
 	if *shardID >= 0 {
 		utils.Logger().Info().
-		Interface("original", initialAccount.ShardID).
-		Interface("override", *shardID).
-		Msg("ShardID Override")
+			Interface("original", initialAccount.ShardID).
+			Interface("override", *shardID).
+			Msg("ShardID Override")
 		initialAccount.ShardID = uint32(*shardID)
 	}
 
@@ -413,16 +413,16 @@ func main() {
 		startMsg = "==== New Explorer Node ===="
 	}
 	utils.Logger().
-	Info().
-	Str("", startMsg).
-	Interface("BlsPubKey", hex.EncodeToString(nodeConfig.ConsensusPubKey.Serialize())).
-	Interface("ShardID", nodeConfig.ShardID).
-	Interface("ShardGroupID", nodeConfig.GetShardGroupID()).
-	Interface("BeaconGroupID", nodeConfig.GetBeaconGroupID()).
-	Interface("ClientGroupID", nodeConfig.GetClientGroupID()).
-	Interface("ClientGroupID", nodeConfig.GetClientGroupID()).
-	Interface("Role", currentNode.NodeConfig.Role()).
-	Interface("multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s",
+		Info().
+		Str("", startMsg).
+		Interface("BlsPubKey", hex.EncodeToString(nodeConfig.ConsensusPubKey.Serialize())).
+		Interface("ShardID", nodeConfig.ShardID).
+		Interface("ShardGroupID", nodeConfig.GetShardGroupID()).
+		Interface("BeaconGroupID", nodeConfig.GetBeaconGroupID()).
+		Interface("ClientGroupID", nodeConfig.GetClientGroupID()).
+		Interface("ClientGroupID", nodeConfig.GetClientGroupID()).
+		Interface("Role", currentNode.NodeConfig.Role()).
+		Interface("multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s",
 			*ip, *port, nodeConfig.Host.GetID().Pretty()))
 
 	if *enableMemProfiling {

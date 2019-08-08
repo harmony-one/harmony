@@ -47,11 +47,11 @@ func (profiler *Profiler) LogMemory() {
 		info, _ := profiler.proc.MemoryInfo()
 		memMap, _ := profiler.proc.MemoryMaps(false)
 		utils.Logger().
-		Info().
-		Interface("info", info).
-		Interface("map", memMap).
-		Interface("shardID", profiler.shardID).
-		Msg("Mem Report")
+			Info().
+			Interface("info", info).
+			Interface("map", memMap).
+			Interface("shardID", profiler.shardID).
+			Msg("Mem Report")
 
 		time.Sleep(3 * time.Second)
 	}
@@ -64,11 +64,11 @@ func (profiler *Profiler) LogCPU() {
 		percent, _ := profiler.proc.CPUPercent()
 		times, _ := profiler.proc.Times()
 		utils.Logger().
-		Info().
-		Interface("percent", percent).
-		Interface("times", times).
-		Interface("shardID", profiler.shardID).
-		Msg("CPU Report")
+			Info().
+			Interface("percent", percent).
+			Interface("times", times).
+			Interface("shardID", profiler.shardID).
+			Msg("CPU Report")
 
 		time.Sleep(3 * time.Second)
 	}
