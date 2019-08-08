@@ -223,23 +223,18 @@ func (node *Node) Beaconchain() *core.BlockChain {
 	return bc
 }
 
-func (node *Node) reducePendingTransactions() {
-	// If length of pendingTransactions is greater than TxPoolLimit then by greedy take the TxPoolLimit recent transactions.
-	if len(node.pendingTransactions) > TxPoolLimit+TxPoolLimit {
-		curLen := len(node.pendingTransactions)
-		node.pendingTransactions = append(types.Transactions(nil), node.pendingTransactions[curLen-TxPoolLimit:]...)
-		utils.GetLogger().Info("mem stat reduce pending transaction")
-	}
-}
-
 // Add new transactions to the pending transaction list.
 func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
-		node.pendingTxMutex.Lock()
-		node.pendingTransactions = append(node.pendingTransactions, newTxs...)
-		node.reducePendingTransactions()
-		node.pendingTxMutex.Unlock()
-		utils.Logger().Info().Int("num", len(newTxs)).Int("totalPending", len(node.pendingTransactions)).Msg("Got more transactions")
+		node.TxPool.AddPendingTransactions(newTxs)
+	}
+}
+
+// AddPendingTransaction adds one new transaction to the pending transaction list.
+func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
+	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
+			node.addPendingTransactions(types.Transactions{newTx})
+			utils.Logger().Error().Int("totalPending", len(node.pendingTransactions)).Msg("Got ONE more transaction")
 	}
 }
 
@@ -249,18 +244,7 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int, coinbase common.Addr
 	if node.NodeConfig.GetNetworkType() == nodeconfig.Mainnet {
 		return types.Transactions{}
 	}
-	node.pendingTxMutex.Lock()
-	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(node.pendingTransactions, maxNumTxs, coinbase)
-
-	node.pendingTransactions = unselected
-	node.reducePendingTransactions()
-	utils.Logger().Error().
-		Int("remainPending", len(node.pendingTransactions)).
-		Int("selected", len(selected)).
-		Int("invalidDiscarded", len(invalid)).
-		Msg("Selecting Transactions")
-	node.pendingTxMutex.Unlock()
-	return selected
+	return node.TxPool.GetTransactionsForNewBlock(maxNumTxs, coinbase)
 }
 
 // MaybeKeepSendingPongMessage keeps sending pong message if the current node is a leader.
@@ -325,8 +309,8 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		node.BlockChannel = make(chan *types.Block)
 		node.ConfirmedBlockChannel = make(chan *types.Block)
 		node.BeaconBlockChannel = make(chan *types.Block)
-		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, node.Blockchain().Config(), chain)
 		node.Worker = worker.New(node.Blockchain().Config(), chain, node.Consensus, node.Consensus.ShardID)
+		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, node.Blockchain().Config(), chain, node.Worker)
 
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 		// the sequence number is the next block number to be added in consensus protocol, which is always one more than current chain header block

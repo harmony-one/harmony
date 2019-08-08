@@ -31,7 +31,6 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/params"
-
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -103,6 +102,11 @@ var (
 	underpricedTxCounter = metrics.NewRegisteredCounter("txpool/underpriced", nil)
 )
 
+// WorkerInterface does selecting transactions for new block.
+type WorkerInterface interface {
+	SelectTransactionsForNewBlock(txs types.Transactions, maxNumTxs int, coinbase common.Address) (types.Transactions, types.Transactions, types.Transactions)
+}
+
 // TxStatus is the current status of a transaction as seen by the pool.
 type TxStatus uint
 
@@ -145,7 +149,9 @@ type TxPoolConfig struct {
 // DefaultTxPoolConfig contains the default configurations for the transaction
 // pool.
 var DefaultTxPoolConfig = TxPoolConfig{
-	Journal:   "transactions.rlp",
+	// Journal:   "transactions.rlp",
+	// Disable Journal as of now.
+	Journal:   "",
 	Rejournal: time.Hour,
 
 	PriceLimit: 1,
@@ -213,6 +219,10 @@ type TxPool struct {
 	locals  *accountSet // Set of local transaction to exempt from eviction rules
 	journal *txJournal  // Journal of local transaction to back up to disk
 
+	// pendingTransactions migrated from node.go
+	pendingTransactions types.Transactions // All the transactions received but not yet processed for Consensus
+	worker              WorkerInterface
+
 	pending map[common.Address]*txList   // All currently processable transactions
 	queue   map[common.Address]*txList   // Queued but non-processable transactions
 	beats   map[common.Address]time.Time // Last heartbeat from each known account
@@ -226,7 +236,9 @@ type TxPool struct {
 
 // NewTxPool creates a new transaction pool to gather, sort and filter inbound
 // transactions from the network.
-func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig, chain blockChain) *TxPool {
+// chaincondfig is initialized with MainnetChainConfig or TestnetChainConfig.
+// See params/config.go in ethereum code.
+func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig, chain blockChain, worker WorkerInterface) *TxPool {
 	// Sanitize the input to ensure no vulnerable gas prices are set
 	config = (&config).sanitize()
 
@@ -235,13 +247,15 @@ func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig, chain block
 		config:      config,
 		chainconfig: chainconfig,
 		chain:       chain,
-		signer:      types.NewEIP155Signer(chainconfig.ChainID),
+		// signer:      types.NewEIP155Signer(chainconfig.ChainID),
+		signer:      types.HomesteadSigner{},
 		pending:     make(map[common.Address]*txList),
 		queue:       make(map[common.Address]*txList),
 		beats:       make(map[common.Address]time.Time),
 		all:         newTxLookup(),
 		chainHeadCh: make(chan ChainHeadEvent, chainHeadChanSize),
 		gasPrice:    new(big.Int).SetUint64(config.PriceLimit),
+		worker:      worker,
 	}
 	pool.locals = newAccountSet(pool.signer)
 	for _, addr := range config.Locals {
@@ -262,12 +276,18 @@ func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig, chain block
 			utils.Logger().Warn().Err(err).Msg("Failed to rotate transaction journal")
 		}
 	}
+	// TODO(minhdoan): enable this when needed.
 	// Subscribe events from blockchain
-	pool.chainHeadSub = pool.chain.SubscribeChainHeadEvent(pool.chainHeadCh)
+	// pool.chainHeadSub = pool.chain.SubscribeChainHeadEvent(pool.chainHeadCh)
 
+	// TODO(minhdoan): currently disable this loop as we do not need to handle all coming events.
+	// Specifically we do not have to handle
+	// * report stats
+	// * inactive account transaction eviction
+	// * local transaction journal rotation
 	// Start the event loop and return
-	pool.wg.Add(1)
-	go pool.loop()
+	// pool.wg.Add(1)
+	// go pool.loop()
 
 	return pool
 }
@@ -300,9 +320,9 @@ func (pool *TxPool) loop() {
 		case ev := <-pool.chainHeadCh:
 			if ev.Block != nil {
 				pool.mu.Lock()
-				//if pool.chainconfig.IsHomestead(ev.Block.Number()) {
-				//	pool.homestead = true
-				//}
+				if pool.chainconfig.IsHomestead(ev.Block.Number()) {
+					pool.homestead = true
+				}
 				//pool.reset(head.Header(), ev.Block.Header())
 				//head = ev.Block
 
@@ -365,6 +385,43 @@ func (pool *TxPool) lockedReset(oldHead, newHead *types.Header) {
 	defer pool.mu.Unlock()
 
 	pool.reset(oldHead, newHead)
+}
+
+// reducePendingTransactions temporarily reduces the pending transactions.
+func (pool *TxPool) reducePendingTransactions() {
+	// If length of pendingTransactions is greater than TxPoolLimit then by greedy take the TxPoolLimit recent transactions.
+	if len(pool.pendingTransactions) > int(pool.config.GlobalQueue)*2 {
+		curLen := len(pool.pendingTransactions)
+		pool.pendingTransactions = append(types.Transactions(nil), pool.pendingTransactions[curLen-int(pool.config.GlobalQueue):]...)
+		utils.GetLogger().Info("mem stat reduce pending transaction")
+	}
+}
+
+// GetTransactionsForNewBlock takes out a subset of valid transactions from the
+// pending transaction list
+// Note the pending transaction list will then contain the rest of the txs
+func (pool *TxPool) GetTransactionsForNewBlock(maxNumTxs int, coinbase common.Address) types.Transactions {
+	pool.mu.Lock()
+	defer pool.mu.Unlock()
+	selected, unselected, invalid := pool.worker.SelectTransactionsForNewBlock(pool.pendingTransactions, maxNumTxs, coinbase)
+
+	pool.pendingTransactions = unselected
+	pool.reducePendingTransactions()
+	utils.Logger().Error().
+		Int("remainPending", len(pool.pendingTransactions)).
+		Int("selected", len(selected)).
+		Int("invalidDiscarded", len(invalid)).
+		Msg("Selecting Transactions")
+	return selected
+}
+
+// AddPendingTransactions adds new transactions to the pending transaction list.
+func (pool *TxPool) AddPendingTransactions(newTxs types.Transactions) {
+	pool.mu.Lock()
+	defer pool.mu.Unlock()
+	pool.pendingTransactions = append(pool.pendingTransactions, newTxs...)
+	pool.reducePendingTransactions()
+	utils.Logger().Info().Int("num", len(newTxs)).Int("totalPending", len(pool.pendingTransactions)).Msg("Got more transactions")
 }
 
 // reset retrieves the current state of the blockchain and ensures the content
@@ -469,6 +526,7 @@ func (pool *TxPool) GetTxPoolSize() uint64 {
 }
 
 // Stop terminates the transaction pool.
+// TODO(minhdoan): Currently it is not used as we disable the loop.
 func (pool *TxPool) Stop() {
 	// Unsubscribe all subscriptions registered from txpool
 	pool.scope.Close()
@@ -485,6 +543,7 @@ func (pool *TxPool) Stop() {
 
 // SubscribeNewTxsEvent registers a subscription of NewTxsEvent and
 // starts sending event to the given channel.
+// Currently it is not used as we disable the loop.
 func (pool *TxPool) SubscribeNewTxsEvent(ch chan<- NewTxsEvent) event.Subscription {
 	return pool.scope.Track(pool.txFeed.Subscribe(ch))
 }
@@ -727,7 +786,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (bool, error) {
 			pool.locals.add(from)
 		}
 	}
-	pool.journalTx(from, tx)
+	// pool.journalTx(from, tx)
 
 	logger.Warn().
 		Str("hash", hash.Hex()).
