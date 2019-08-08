@@ -243,14 +243,6 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 	}
 }
 
-// AddPendingTransaction adds one new transaction to the pending transaction list.
-func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
-	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
-		node.addPendingTransactions(types.Transactions{newTx})
-		utils.Logger().Error().Int("totalPending", len(node.pendingTransactions)).Msg("Got ONE more transaction")
-	}
-}
-
 // Take out a subset of valid transactions from the pending transaction list
 // Note the pending transaction list will then contain the rest of the txs
 func (node *Node) getTransactionsForNewBlock(maxNumTxs int, coinbase common.Address) types.Transactions {
