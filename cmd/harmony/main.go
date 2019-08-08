@@ -130,11 +130,6 @@ func initSetup() {
 	utils.SetLogVerbosity(log.Lvl(*verbosity))
 	utils.AddLogFile(fmt.Sprintf("%v/validator-%v-%v.log", *logFolder, *ip, *port), *logMaxSize)
 
-	if *onlyLogTps {
-		matchFilterHandler := log.MatchFilterHandler("msg", "TPS Report", utils.GetLogInstance().GetHandler())
-		utils.GetLogInstance().SetHandler(matchFilterHandler)
-	}
-
 	// Add GOMAXPROCS to achieve max performance.
 	runtime.GOMAXPROCS(runtime.NumCPU() * 4)
 
@@ -296,8 +291,10 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	}
 	// TODO: add staking support
 	// currentNode.StakingAccount = myAccount
-	utils.GetLogInstance().Info("node account set",
-		"address", common.MustAddressToBech32(currentNode.StakingAccount.Address))
+	utils.Logger().
+	Info().
+	Interface("address", common.MustAddressToBech32(currentNode.StakingAccount.Address)).
+	Msg("node account set")
 
 	// TODO: refactor the creation of blockchain out of node.New()
 	currentConsensus.ChainReader = currentNode.Blockchain()
@@ -341,7 +338,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	height := currentNode.Blockchain().CurrentBlock().NumberU64()
 
 	currentConsensus.SetViewID(height)
-	utils.GetLogInstance().Info("Init Blockchain", "height", height)
+	utils.Logger().Info().Interface("height", height).Msg("Init Blockchain")
 
 	// Assign closure functions to the consensus object
 	currentConsensus.BlockVerifier = currentNode.VerifyNewBlock
@@ -397,7 +394,10 @@ func main() {
 	}
 
 	if *shardID >= 0 {
-		utils.GetLogInstance().Info("ShardID Override", "original", initialAccount.ShardID, "override", *shardID)
+		utils.Logger().Info().
+		Interface("original", initialAccount.ShardID).
+		Interface("override", *shardID).
+		Msg("ShardID Override")
 		initialAccount.ShardID = uint32(*shardID)
 	}
 
@@ -412,14 +412,17 @@ func main() {
 	if *isExplorer {
 		startMsg = "==== New Explorer Node ===="
 	}
-	utils.GetLogInstance().Info(startMsg,
-		"BlsPubKey", hex.EncodeToString(nodeConfig.ConsensusPubKey.Serialize()),
-		"ShardID", nodeConfig.ShardID,
-		"ShardGroupID", nodeConfig.GetShardGroupID(),
-		"BeaconGroupID", nodeConfig.GetBeaconGroupID(),
-		"ClientGroupID", nodeConfig.GetClientGroupID(),
-		"Role", currentNode.NodeConfig.Role(),
-		"multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s",
+	utils.Logger().
+	Info().
+	Str("", startMsg).
+	Interface("BlsPubKey", hex.EncodeToString(nodeConfig.ConsensusPubKey.Serialize())).
+	Interface("ShardID", nodeConfig.ShardID).
+	Interface("ShardGroupID", nodeConfig.GetShardGroupID()).
+	Interface("BeaconGroupID", nodeConfig.GetBeaconGroupID()).
+	Interface("ClientGroupID", nodeConfig.GetClientGroupID()).
+	Interface("ClientGroupID", nodeConfig.GetClientGroupID()).
+	Interface("Role", currentNode.NodeConfig.Role()).
+	Interface("multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s",
 			*ip, *port, nodeConfig.Host.GetID().Pretty()))
 
 	if *enableMemProfiling {

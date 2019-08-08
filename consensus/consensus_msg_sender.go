@@ -105,9 +105,21 @@ func (sender *MessageSender) Retry(msgRetry *MessageRetry) {
 
 		msgRetry.retryCount++
 		if err := sender.host.SendMessageToGroups(msgRetry.groups, msgRetry.p2pMsg); err != nil {
-			utils.GetLogInstance().Warn("[Retry] Failed re-sending consensus message", "groupID", msgRetry.groups, "blockNum", msgRetry.blockNum, "MsgType", msgRetry.msgType, "RetryCount", msgRetry.retryCount)
+			utils.Logger().
+			Error().
+			Interface("groupID", msgRetry.groups).
+			Interface("blockNum", msgRetry.blockNum).
+			Interface("MsgType", msgRetry.msgType).
+			Interface("RetryCount", msgRetry.retryCount).
+			Msg("[Retry] Failed re-sending consensus message")
 		} else {
-			utils.GetLogInstance().Info("[Retry] Successfully resent consensus message", "groupID", msgRetry.groups, "blockNum", msgRetry.blockNum, "MsgType", msgRetry.msgType, "RetryCount", msgRetry.retryCount)
+			utils.Logger().
+			Info().
+			Interface("groupID", msgRetry.groups).
+			Interface("blockNum", msgRetry.blockNum).
+			Interface("MsgType", msgRetry.msgType).
+			Interface("RetryCount", msgRetry.retryCount).
+			Msg("[Retry] Successfully resent consensus message")
 		}
 	}
 }

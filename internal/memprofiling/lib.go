@@ -47,7 +47,10 @@ func (m *MemProfiling) Config() {
 		Addr:    fmt.Sprintf("%s:%s", nodeconfig.GetDefaultConfig().IP, utils.GetPortFromDiff(nodeconfig.GetDefaultConfig().Port, MemProfilingPortDiff)),
 		Handler: m.h,
 	}
-	utils.GetLogInstance().Info("running mem profiling", "port", utils.GetPortFromDiff(nodeconfig.GetDefaultConfig().Port, MemProfilingPortDiff))
+	utils.Logger().
+	Info().
+	Interface("port", utils.GetPortFromDiff(nodeconfig.GetDefaultConfig().Port, MemProfilingPortDiff)).
+	Msg("running mem profiling")
 }
 
 // Add adds variables to watch for profiling.
@@ -67,7 +70,7 @@ func (m *MemProfiling) Add(name string, v interface{}) {
 func (m *MemProfiling) Start() {
 	go m.s.ListenAndServe()
 	m.PeriodicallyScanMemSize()
-	utils.GetLogInstance().Info("Start memprofiling.")
+	utils.Logger().Info().Msg("Start memprofiling.")
 }
 
 // Stop stops mem profiling.
@@ -86,7 +89,7 @@ func (m *MemProfiling) PeriodicallyScanMemSize() {
 				for k, v := range m.observedObject {
 					s := memsize.Scan(v)
 					r := s.Report()
-					utils.GetLogInstance().Info(fmt.Sprintf("memsize report for %s:\n %s", k, r))
+					utils.Logger().Info().Interface(k, r).Msg("memsize report for %s:\n %s")
 				}
 				m.mu.Unlock()
 			}
