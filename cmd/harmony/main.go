@@ -173,7 +173,7 @@ func passphraseForBls() {
 	}
 	passphrase, err := utils.GetPassphraseFromSource(*blsPass)
 	if err != nil {
-		fmt.Printf("error when reading passphrase file: %v\n", err)
+		fmt.Fprintf(os.Stderr, "ERROR when reading passphrase file: %v\n", err)
 		os.Exit(100)
 	}
 	blsPassphrase = passphrase
@@ -197,7 +197,7 @@ func setupInitialAccount() (isLeader bool) {
 	}
 
 	if initialAccount == nil {
-		fmt.Printf("cannot find your BLS key in the genesis/FN tables: %s\n", pubKey.SerializeToHexStr())
+		fmt.Fprintf(os.Stderr, "ERROR cannot find your BLS key in the genesis/FN tables: %s\n", pubKey.SerializeToHexStr())
 		os.Exit(100)
 	}
 
@@ -209,7 +209,7 @@ func setupInitialAccount() (isLeader bool) {
 func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) *bls.PublicKey {
 	consensusPriKey, err := blsgen.LoadBlsKeyWithPassPhrase(*blsKeyFile, blsPassphrase)
 	if err != nil {
-		fmt.Printf("error when loading bls key, err :%v\n", err)
+		fmt.Fprintf(os.Stderr, "ERROR when loading bls key, err :%v\n", err)
 		os.Exit(100)
 	}
 	pubKey := consensusPriKey.GetPublicKey()
@@ -280,7 +280,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	}
 	commitDelay, err := time.ParseDuration(*delayCommit)
 	if err != nil || commitDelay < 0 {
-		_, _ = fmt.Fprintf(os.Stderr, "invalid commit delay %#v", *delayCommit)
+		_, _ = fmt.Fprintf(os.Stderr, "ERROR invalid commit delay %#v", *delayCommit)
 		os.Exit(1)
 	}
 	currentConsensus.SetCommitDelay(commitDelay)
@@ -388,7 +388,7 @@ func main() {
 		devnetConfig, err := shardingconfig.NewInstance(
 			uint32(*devnetNumShards), *devnetShardSize, *devnetHarmonySize, genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, nil)
 		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "invalid devnet sharding config: %s",
+			_, _ = fmt.Fprintf(os.Stderr, "ERROR invalid devnet sharding config: %s",
 				err)
 			os.Exit(1)
 		}
