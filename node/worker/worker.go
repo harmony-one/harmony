@@ -46,7 +46,7 @@ type Worker struct {
 // Returns a tuple where the first value is the txs sender account address,
 // the second is the throttling result enum for the transaction of interest.
 // Throttling happens based on the amount, frequency, etc.
-func (w *Worker) throttleTxs(selected types.Transactions, txsThrottleConfig *shardingconfig.TxsThrottleConfig, txnCnts types.BlockTxsCounts, tx *types.Transaction) (common.Address, shardingconfig.TxThrottleFlag) {
+func (w *Worker) throttleTxs(selected types.Transactions, recentTxsStats types.RecentTxsStats, txsThrottleConfig *shardingconfig.TxsThrottleConfig, tx *types.Transaction) (common.Address, shardingconfig.TxThrottleFlag) {
 	chainID := tx.ChainID()
 	// Depending on the presence of the chain ID, sign with EIP155 or homestead
 	var s types.Signer
@@ -82,7 +82,11 @@ func (w *Worker) throttleTxs(selected types.Transactions, txsThrottleConfig *sha
 	}
 
 	// throttle too large transaction
-	if txnCnts[sender] >= (*txsThrottleConfig).MaxTxsPerAccountInBlockLimit {
+	var numTxsPastHour uint64
+	for _, blockTxsCounts := range recentTxsStats {
+		numTxsPastHour += blockTxsCounts[sender]
+	}
+	if numTxsPastHour >= (*txsThrottleConfig).MaxTxsPerAccountInBlockLimit {
 		utils.Logger().Debug().
 			Uint64("MaxTxsPerAccountInBlockLimit", (*txsThrottleConfig).MaxTxsPerAccountInBlockLimit).
 			Msg("Throttling tx with max txs per account in a single block limit")
@@ -93,13 +97,10 @@ func (w *Worker) throttleTxs(selected types.Transactions, txsThrottleConfig *sha
 }
 
 // SelectTransactionsForNewBlock selects transactions for new block.
-func (w *Worker) SelectTransactionsForNewBlock(txs types.Transactions, txsThrottleConfig *shardingconfig.TxsThrottleConfig, coinbase common.Address) (types.Transactions, types.Transactions, types.Transactions, types.BlockTxsCounts) {
+func (w *Worker) SelectTransactionsForNewBlock(newBlockNum uint64, txs types.Transactions, recentTxsStats types.RecentTxsStats, txsThrottleConfig *shardingconfig.TxsThrottleConfig, coinbase common.Address) (types.Transactions, types.Transactions, types.Transactions) {
 	if w.current.gasPool == nil {
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit)
 	}
-
-	// used for per account transaction frequency throttling
-	txnCnts := types.BlockTxsCounts{}
 
 	selected := types.Transactions{}
 	unselected := types.Transactions{}
@@ -109,7 +110,7 @@ func (w *Worker) SelectTransactionsForNewBlock(txs types.Transactions, txsThrott
 			invalid = append(invalid, tx)
 		}
 
-		sender, flag := w.throttleTxs(selected, txsThrottleConfig, txnCnts, tx)
+		sender, flag := w.throttleTxs(selected, recentTxsStats, txsThrottleConfig, tx)
 		switch flag {
 		case shardingconfig.Unselect:
 			unselected = append(unselected, tx)
@@ -138,11 +139,11 @@ func (w *Worker) SelectTransactionsForNewBlock(txs types.Transactions, txsThrott
 					Msg("Transaction Throttle flag")
 			} else {
 				selected = append(selected, tx)
-				txnCnts[sender]++
+				recentTxsStats[newBlockNum][sender]++
 			}
 		}
 	}
-	return selected, unselected, invalid, txnCnts
+	return selected, unselected, invalid
 }
 
 func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {

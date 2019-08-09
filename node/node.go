@@ -255,17 +255,21 @@ func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
 // Note the pending transaction list will then contain the rest of the txs
 func (node *Node) getTransactionsForNewBlock(coinbase common.Address) types.Transactions {
 	node.pendingTxMutex.Lock()
-	selected, unselected, invalid, blockTxsCounts := node.Worker.SelectTransactionsForNewBlock(node.pendingTransactions, core.ShardingSchedule.TxsThrottleConfig(), coinbase)
 
-	node.pendingTransactions = unselected
-	node.reducePendingTransactions()
-	node.recentTxsStats[node.Consensus.ChainReader.CurrentHeader().Number.Uint64()+1] = blockTxsCounts
+	// update recentTxsStats and initiailize for the new block
+	newBlockNum := node.Consensus.ChainReader.CurrentHeader().Number.Uint64() + 1
 	for blockNum := range node.recentTxsStats {
-		blockNumPastHour := (time.Hour / time.Second) / node.BlockPeriod
-		if blockNum < node.Consensus.ChainReader.CurrentHeader().Number.Uint64()-uint64(blockNumPastHour) {
+		blockNumHourAgo := (time.Hour / time.Second) / node.BlockPeriod
+		if blockNum < node.Consensus.ChainReader.CurrentHeader().Number.Uint64()-uint64(blockNumHourAgo) {
 			delete(node.recentTxsStats, blockNum)
 		}
 	}
+	node.recentTxsStats[newBlockNum] = types.BlockTxsCounts{}
+
+	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(newBlockNum, node.pendingTransactions, node.recentTxsStats, core.ShardingSchedule.TxsThrottleConfig(), coinbase)
+
+	node.pendingTransactions = unselected
+	node.reducePendingTransactions()
 
 	utils.Logger().Info().
 		Int("remainPending", len(node.pendingTransactions)).
