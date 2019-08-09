@@ -20,7 +20,7 @@ const (
 	localnetEpochBlock1 = 20
 	twoOne              = 5
 
-	localnetMaxTxAmountNanoLimit           = 1e2 // unit is in One
+	localnetMaxTxAmountLimit               = 1e2 // unit is in One
 	localnetMaxNumRecentTxsPerAccountLimit = 2
 	localnetMaxTxsPerBlockLimit            = 8000
 )
@@ -62,9 +62,9 @@ func (ls localnetSchedule) IsLastBlock(blockNum uint64) bool {
 	}
 }
 
-func (ls localnetSchedule) MaxTxAmountNanoLimit() *big.Int {
-	amountBigInt := big.NewInt(localnetMaxTxAmountNanoLimit)
-	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(denominations.Nano))
+func (ls localnetSchedule) MaxTxAmountLimit() *big.Int {
+	amountBigInt := big.NewInt(localnetMaxTxAmountLimit)
+	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(denominations.One))
 	return amountBigInt
 }
 
@@ -78,7 +78,7 @@ func (ls localnetSchedule) MaxTxsPerBlockLimit() int {
 
 func (ls localnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 	return &TxsThrottleConfig{
-		MaxTxAmountNanoLimit:           ls.MaxTxAmountNanoLimit(),
+		MaxTxAmountLimit:               ls.MaxTxAmountLimit(),
 		MaxNumRecentTxsPerAccountLimit: ls.MaxNumRecentTxsPerAccountLimit(),
 		MaxTxsPerBlockLimit:            ls.MaxTxsPerBlockLimit(),
 	}

@@ -20,7 +20,7 @@ const (
 	testnetEpochBlock1 = 78
 	threeOne           = 111
 
-	testnetMaxTxAmountNanoLimit           = 1e3 // unit is in One
+	testnetMaxTxAmountLimit               = 1e3 // unit is in One
 	testnetMaxNumRecentTxsPerAccountLimit = 10
 	testnetMaxTxsPerBlockLimit            = 8000
 )
@@ -63,9 +63,9 @@ func (ts testnetSchedule) IsLastBlock(blockNum uint64) bool {
 	}
 }
 
-func (ts testnetSchedule) MaxTxAmountNanoLimit() *big.Int {
-	amountBigInt := big.NewInt(testnetMaxTxAmountNanoLimit)
-	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(denominations.Nano))
+func (ts testnetSchedule) MaxTxAmountLimit() *big.Int {
+	amountBigInt := big.NewInt(testnetMaxTxAmountLimit)
+	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(denominations.One))
 	return amountBigInt
 }
 
@@ -79,7 +79,7 @@ func (ts testnetSchedule) MaxTxsPerBlockLimit() int {
 
 func (ts testnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 	return &TxsThrottleConfig{
-		MaxTxAmountNanoLimit:           ts.MaxTxAmountNanoLimit(),
+		MaxTxAmountLimit:               ts.MaxTxAmountLimit(),
 		MaxNumRecentTxsPerAccountLimit: ts.MaxNumRecentTxsPerAccountLimit(),
 		MaxTxsPerBlockLimit:            ts.MaxTxsPerBlockLimit(),
 	}
