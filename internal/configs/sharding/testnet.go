@@ -3,6 +3,7 @@ package shardingconfig
 import (
 	"math/big"
 
+	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/internal/genesis"
 )
 
@@ -18,6 +19,10 @@ const (
 
 	testnetEpochBlock1 = 78
 	threeOne           = 111
+
+	testnetMaxTxAmountLimit             = 1e3 // unit is in One
+	testnetMaxTxsPerAccountInBlockLimit = 10
+	testnetMaxTxsPerBlockLimit          = 8000
 )
 
 func (testnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
@@ -55,6 +60,28 @@ func (ts testnetSchedule) IsLastBlock(blockNum uint64) bool {
 		return true
 	default:
 		return ((blockNum-testnetEpochBlock1)%blocks == blocks-1)
+	}
+}
+
+func (ts testnetSchedule) MaxTxAmountLimit() *big.Int {
+	amountBigInt := big.NewInt(int64(testnetMaxTxAmountLimit * denominations.Nano))
+	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(denominations.Nano))
+	return amountBigInt
+}
+
+func (ts testnetSchedule) MaxTxsPerAccountInBlockLimit() uint64 {
+	return testnetMaxTxsPerAccountInBlockLimit
+}
+
+func (ts testnetSchedule) MaxTxsPerBlockLimit() int {
+	return testnetMaxTxsPerBlockLimit
+}
+
+func (ts testnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
+	return &TxsThrottleConfig{
+		MaxTxAmountLimit:             ts.MaxTxAmountLimit(),
+		MaxTxsPerAccountInBlockLimit: ts.MaxTxsPerAccountInBlockLimit(),
+		MaxTxsPerBlockLimit:          ts.MaxTxsPerBlockLimit(),
 	}
 }
 

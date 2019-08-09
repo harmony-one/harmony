@@ -2,6 +2,8 @@ package shardingconfig
 
 import (
 	"math/big"
+
+	"github.com/harmony-one/harmony/common/denominations"
 )
 
 const (
@@ -30,6 +32,28 @@ func (s fixedSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
 func (s fixedSchedule) IsLastBlock(blockNum uint64) bool {
 	blocks := s.BlocksPerEpoch()
 	return blockNum%blocks == blocks-1
+}
+
+func (s fixedSchedule) MaxTxAmountLimit() *big.Int {
+	amountBigInt := big.NewInt(int64(mainnetMaxTxAmountLimit * denominations.Nano))
+	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(denominations.Nano))
+	return amountBigInt
+}
+
+func (s fixedSchedule) MaxTxsPerAccountInBlockLimit() uint64 {
+	return mainnetMaxTxsPerAccountInBlockLimit
+}
+
+func (s fixedSchedule) MaxTxsPerBlockLimit() int {
+	return mainnetMaxTxsPerBlockLimit
+}
+
+func (s fixedSchedule) TxsThrottleConfig() *TxsThrottleConfig {
+	return &TxsThrottleConfig{
+		MaxTxAmountLimit:             s.MaxTxAmountLimit(),
+		MaxTxsPerAccountInBlockLimit: s.MaxTxsPerAccountInBlockLimit(),
+		MaxTxsPerBlockLimit:          s.MaxTxsPerBlockLimit(),
+	}
 }
 
 // NewFixedSchedule returns a sharding configuration schedule that uses the
