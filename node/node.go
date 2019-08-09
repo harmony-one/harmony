@@ -257,7 +257,9 @@ func (node *Node) getTransactionsForNewBlock(coinbase common.Address) types.Tran
 	node.pendingTxMutex.Lock()
 
 	// update recentTxsStats and initiailize for the new block
-	newBlockNum := node.Consensus.ChainReader.CurrentHeader().Number.Uint64() + 1
+
+	// the next block number to be added in consensus protocol, which is always one more than current chain header block
+	newBlockNum := node.Blockchain().CurrentBlock().NumberU64() + 1
 	for blockNum := range node.recentTxsStats {
 		blockNumHourAgo := (time.Hour / time.Second) / node.BlockPeriod
 		if blockNum < node.Consensus.ChainReader.CurrentHeader().Number.Uint64()-uint64(blockNumHourAgo) {
