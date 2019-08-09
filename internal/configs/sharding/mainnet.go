@@ -16,7 +16,7 @@ const (
 	mainnetV0_3Epoch   = 8
 	mainnetV0_4Epoch   = 10
 
-	mainnetMaxTxAmountNanoLimit           = 1e3 // unit is in One
+	mainnetMaxTxAmountLimit               = 1e3 // unit is in One
 	mainnetMaxNumRecentTxsPerAccountLimit = 10
 	mainnetMaxTxsPerBlockLimit            = 8000
 )
@@ -71,9 +71,9 @@ func (ms mainnetSchedule) IsLastBlock(blockNum uint64) bool {
 	}
 }
 
-func (ms mainnetSchedule) MaxTxAmountNanoLimit() *big.Int {
-	amountBigInt := big.NewInt(mainnetMaxTxAmountNanoLimit)
-	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(denominations.Nano))
+func (ms mainnetSchedule) MaxTxAmountLimit() *big.Int {
+	amountBigInt := big.NewInt(mainnetMaxTxAmountLimit)
+	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(denominations.One))
 	return amountBigInt
 }
 
@@ -87,7 +87,7 @@ func (ms mainnetSchedule) MaxTxsPerBlockLimit() int {
 
 func (ms mainnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 	return &TxsThrottleConfig{
-		MaxTxAmountNanoLimit:           ms.MaxTxAmountNanoLimit(),
+		MaxTxAmountLimit:               ms.MaxTxAmountLimit(),
 		MaxNumRecentTxsPerAccountLimit: ms.MaxNumRecentTxsPerAccountLimit(),
 		MaxTxsPerBlockLimit:            ms.MaxTxsPerBlockLimit(),
 	}

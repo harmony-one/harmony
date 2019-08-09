@@ -23,7 +23,7 @@ type Schedule interface {
 	IsLastBlock(blockNum uint64) bool
 
 	// Max amount limit for a valid transaction
-	MaxTxAmountNanoLimit() *big.Int
+	MaxTxAmountLimit() *big.Int
 
 	// Max number of transactions of a particular account per block level
 	MaxNumRecentTxsPerAccountLimit() uint64
@@ -60,10 +60,12 @@ type Instance interface {
 	ReshardingEpoch() []*big.Int
 }
 
-// TxThrottleFlag indicates the throttling flag for a particular transaction
+// TxThrottleFlag is the throttling flag for each transaction
+// Refer below enum declaration for more context.
 type TxThrottleFlag int
 
-// Enum for different TxThrottleFlag
+// TxThrottleFlag is determined per transaction
+// during the new block proposal and pending transactions throttling
 const (
 	TxSelect TxThrottleFlag = iota
 	TxUnselect
@@ -85,7 +87,7 @@ func (result TxThrottleFlag) String() string {
 // TxsThrottleConfig contains configuration for throttling pending transactions per node block
 type TxsThrottleConfig struct {
 	// Max amount limit for a valid transaction
-	MaxTxAmountNanoLimit *big.Int
+	MaxTxAmountLimit *big.Int
 
 	// Max number of transactions of a particular account for the past hour
 	MaxNumRecentTxsPerAccountLimit uint64
