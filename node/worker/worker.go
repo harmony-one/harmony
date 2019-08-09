@@ -128,7 +128,10 @@ func (w *Worker) SelectTransactionsForNewBlock(newBlockNum uint64, txs types.Tra
 
 			} else {
 				selected = append(selected, tx)
-				recentTxsStats[newBlockNum][sender]++
+				// handle the case when msg was not able to extracted from tx
+				if len(sender.String()) > 0 {
+					recentTxsStats[newBlockNum][sender]++
+				}
 			}
 		}
 
