@@ -28,8 +28,11 @@ type Schedule interface {
 	// Max number of transactions of a particular account per block level
 	MaxNumRecentTxsPerAccountLimit() uint64
 
-	// Max total number of transactions in a block
-	MaxTxsPerBlockLimit() int
+	// Max total number of transactions allowed as pending transactions in transaction pool
+	MaxTxPoolSizeLimit() int
+
+	// Max total number of transactions allowed to be processed per block
+	MaxNumTxsPerBlockLimit() int
 
 	// configuration for throttling pending transactions
 	TxsThrottleConfig() *TxsThrottleConfig
@@ -92,6 +95,9 @@ type TxsThrottleConfig struct {
 	// Max number of transactions of a particular account for the past hour
 	MaxNumRecentTxsPerAccountLimit uint64
 
-	// Max total number of transactions in a block
-	MaxTxsPerBlockLimit int
+	// Max total number of transactions allowed as pending transactions in transaction pool
+	MaxTxPoolSizeLimit int
+
+	// Max total number of transactions allowed to be processed per block
+	MaxNumTxsPerBlockLimit int
 }

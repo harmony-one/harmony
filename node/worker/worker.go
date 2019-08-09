@@ -66,10 +66,10 @@ func (w *Worker) throttleTxs(selected types.Transactions, recentTxsStats types.R
 	}
 
 	// already selected max num txs
-	if len(selected) > txsThrottleConfig.MaxTxsPerBlockLimit {
-		utils.GetLogInstance().Info("Throttling tx with max txs per block limit",
+	if len(selected) > txsThrottleConfig.MaxNumTxsPerBlockLimit {
+		utils.GetLogInstance().Info("Throttling tx with max num txs per block limit",
 			"tx Id", tx.Hash().Hex(),
-			"MaxTxsPerBlockLimit", txsThrottleConfig.MaxTxsPerBlockLimit)
+			"MaxNumTxsPerBlockLimit", txsThrottleConfig.MaxNumTxsPerBlockLimit)
 		return sender, shardingconfig.TxUnselect
 	}
 
@@ -143,7 +143,17 @@ func (w *Worker) SelectTransactionsForNewBlock(newBlockNum uint64, txs types.Tra
 				"Transaction Id", tx.Hash().Hex(),
 				"txThrottleFlag", flag.String())
 		}
+
+		utils.GetLogInstance().Info("Transaction gas limit info",
+			"Transaction Id", tx.Hash().Hex(),
+			"tx gas limit", tx.Gas())
 	}
+
+	utils.GetLogInstance().Info("Block gas limit and usage info",
+		"newBlockNum", newBlockNum,
+		"block gas limit", w.current.header.GasLimit,
+		"block gas used", w.current.header.GasUsed)
+
 	return selected, unselected, invalid
 }
 

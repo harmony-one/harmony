@@ -15,7 +15,8 @@ const (
 
 	mainnetMaxTxAmountLimit               = 1e3 // unit is in One
 	mainnetMaxNumRecentTxsPerAccountLimit = 10
-	mainnetMaxTxsPerBlockLimit            = 8000
+	mainnetMaxTxPoolSizeLimit             = 8000
+	mainnetMaxNumTxsPerBlockLimit         = 1000
 )
 
 // MainnetSchedule is the mainnet sharding configuration schedule.
@@ -72,15 +73,20 @@ func (ms mainnetSchedule) MaxNumRecentTxsPerAccountLimit() uint64 {
 	return mainnetMaxNumRecentTxsPerAccountLimit
 }
 
-func (ms mainnetSchedule) MaxTxsPerBlockLimit() int {
-	return mainnetMaxTxsPerBlockLimit
+func (ms mainnetSchedule) MaxTxPoolSizeLimit() int {
+	return mainnetMaxTxPoolSizeLimit
+}
+
+func (ms mainnetSchedule) MaxNumTxsPerBlockLimit() int {
+	return mainnetMaxNumTxsPerBlockLimit
 }
 
 func (ms mainnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 	return &TxsThrottleConfig{
 		MaxTxAmountLimit:               ms.MaxTxAmountLimit(),
 		MaxNumRecentTxsPerAccountLimit: ms.MaxNumRecentTxsPerAccountLimit(),
-		MaxTxsPerBlockLimit:            ms.MaxTxsPerBlockLimit(),
+		MaxTxPoolSizeLimit:             ms.MaxTxPoolSizeLimit(),
+		MaxNumTxsPerBlockLimit:         ms.MaxNumTxsPerBlockLimit(),
 	}
 }
 

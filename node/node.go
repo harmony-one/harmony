@@ -226,7 +226,7 @@ func (node *Node) Beaconchain() *core.BlockChain {
 }
 
 func (node *Node) reducePendingTransactions() {
-	txPoolLimit := core.ShardingSchedule.MaxTxsPerBlockLimit()
+	txPoolLimit := core.ShardingSchedule.MaxTxPoolSizeLimit()
 	curLen := len(node.pendingTransactions)
 
 	// If length of pendingTransactions is greater than TxPoolLimit then by greedy take the TxPoolLimit recent transactions.
