@@ -234,29 +234,22 @@ func (node *Node) reducePendingTransactions() {
 
 // Add new transactions to the pending transaction list.
 func (node *Node) addPendingTransactions(newTxs types.Transactions) {
-	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
-		node.pendingTxMutex.Lock()
-		node.pendingTransactions = append(node.pendingTransactions, newTxs...)
-		node.reducePendingTransactions()
-		node.pendingTxMutex.Unlock()
-		utils.Logger().Info().Int("num", len(newTxs)).Int("totalPending", len(node.pendingTransactions)).Msg("Got more transactions")
-	}
+	node.pendingTxMutex.Lock()
+	node.pendingTransactions = append(node.pendingTransactions, newTxs...)
+	node.reducePendingTransactions()
+	node.pendingTxMutex.Unlock()
+	utils.Logger().Info().Int("num", len(newTxs)).Int("totalPending", len(node.pendingTransactions)).Msg("Got more transactions")
 }
 
 // AddPendingTransaction adds one new transaction to the pending transaction list.
 func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
-	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
-		node.addPendingTransactions(types.Transactions{newTx})
-		utils.Logger().Error().Int("totalPending", len(node.pendingTransactions)).Msg("Got ONE more transaction")
-	}
+	node.addPendingTransactions(types.Transactions{newTx})
+	utils.Logger().Error().Int("totalPending", len(node.pendingTransactions)).Msg("Got ONE more transaction")
 }
 
 // Take out a subset of valid transactions from the pending transaction list
 // Note the pending transaction list will then contain the rest of the txs
 func (node *Node) getTransactionsForNewBlock(maxNumTxs int, coinbase common.Address) types.Transactions {
-	if node.NodeConfig.GetNetworkType() == nodeconfig.Mainnet {
-		return types.Transactions{}
-	}
 	node.pendingTxMutex.Lock()
 	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(node.pendingTransactions, maxNumTxs, coinbase)
 
