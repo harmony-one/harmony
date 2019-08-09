@@ -264,7 +264,7 @@ func (node *Node) getTransactionsForNewBlock(coinbase common.Address) types.Tran
 			delete(node.recentTxsStats, blockNum)
 		}
 	}
-	node.recentTxsStats[newBlockNum] = types.BlockTxsCounts{}
+	node.recentTxsStats[newBlockNum] = make(types.BlockTxsCounts)
 
 	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(newBlockNum, node.pendingTransactions, node.recentTxsStats, core.ShardingSchedule.TxsThrottleConfig(), coinbase)
 
@@ -344,6 +344,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		node.ConfirmedBlockChannel = make(chan *types.Block)
 		node.BeaconBlockChannel = make(chan *types.Block)
 
+		node.recentTxsStats = make(types.RecentTxsStats)
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, node.Blockchain().Config(), chain)
 		node.Worker = worker.New(node.Blockchain().Config(), chain, node.Consensus, node.Consensus.ShardID)
 
