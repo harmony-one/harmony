@@ -125,7 +125,9 @@ func (w *Worker) SelectTransactionsForNewBlock(newBlockNum uint64, txs types.Tra
 			if err != nil {
 				w.current.state.RevertToSnapshot(snap)
 				invalid = append(invalid, tx)
-
+				utils.GetLogInstance().Error("Commit transaction error",
+					"Transaction Id", tx.Hash().Hex(),
+					"err", err)
 			} else {
 				selected = append(selected, tx)
 				// handle the case when msg was not able to extracted from tx
