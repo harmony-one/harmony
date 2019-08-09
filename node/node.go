@@ -271,11 +271,11 @@ func (node *Node) getTransactionsForNewBlock(coinbase common.Address) types.Tran
 	node.pendingTransactions = unselected
 	node.reducePendingTransactions()
 
-	utils.Logger().Info().
-		Int("remainPending", len(node.pendingTransactions)).
-		Int("selected", len(selected)).
-		Int("invalidDiscarded", len(invalid)).
-		Msg("Selecting Transactions")
+	utils.GetLogInstance().Info(
+		"msg", "Selecting Transactions",
+		"newBlockNum", newBlockNum,
+		"remainPending", len(node.pendingTransactions),
+		"invalidDiscarded", len(invalid))
 	node.pendingTxMutex.Unlock()
 
 	return selected
