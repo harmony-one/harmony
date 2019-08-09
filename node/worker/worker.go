@@ -46,7 +46,7 @@ type Worker struct {
 // Returns a tuple where the first value is the txs sender account address,
 // the second is the throttling result enum for the transaction of interest.
 // Throttling happens based on the amount, frequency, etc.
-func (w *Worker) throttleTxs(selected types.Transactions, txsThrottleConfig *shardingconfig.TxsThrottleConfig, txnCnts map[common.Address]uint64, tx *types.Transaction) (common.Address, shardingconfig.TxThrottleFlag) {
+func (w *Worker) throttleTxs(selected types.Transactions, txsThrottleConfig *shardingconfig.TxsThrottleConfig, txnCnts types.BlockTxsCounts, tx *types.Transaction) (common.Address, shardingconfig.TxThrottleFlag) {
 	chainID := tx.ChainID()
 	// Depending on the presence of the chain ID, sign with EIP155 or homestead
 	var s types.Signer
@@ -93,13 +93,13 @@ func (w *Worker) throttleTxs(selected types.Transactions, txsThrottleConfig *sha
 }
 
 // SelectTransactionsForNewBlock selects transactions for new block.
-func (w *Worker) SelectTransactionsForNewBlock(txs types.Transactions, txsThrottleConfig *shardingconfig.TxsThrottleConfig, coinbase common.Address) (types.Transactions, types.Transactions, types.Transactions) {
+func (w *Worker) SelectTransactionsForNewBlock(txs types.Transactions, txsThrottleConfig *shardingconfig.TxsThrottleConfig, coinbase common.Address) (types.Transactions, types.Transactions, types.Transactions, types.BlockTxsCounts) {
 	if w.current.gasPool == nil {
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit)
 	}
 
 	// used for per account transaction frequency throttling
-	txnCnts := make(map[common.Address]uint64)
+	txnCnts := types.BlockTxsCounts{}
 
 	selected := types.Transactions{}
 	unselected := types.Transactions{}
@@ -142,7 +142,7 @@ func (w *Worker) SelectTransactionsForNewBlock(txs types.Transactions, txsThrott
 			}
 		}
 	}
-	return selected, unselected, invalid
+	return selected, unselected, invalid, txnCnts
 }
 
 func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {

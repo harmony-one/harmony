@@ -92,6 +92,7 @@ type Node struct {
 	BeaconBlockChannel    chan *types.Block    // The channel to send beacon blocks for non-beaconchain nodes
 	pendingTransactions   types.Transactions   // All the transactions received but not yet processed for Consensus
 	pendingTxMutex        sync.Mutex
+	recentTxsStats        types.RecentTxsStats
 	DRand                 *drand.DRand // The instance for distributed randomness protocol
 
 	// Shard databases
@@ -226,9 +227,10 @@ func (node *Node) Beaconchain() *core.BlockChain {
 
 func (node *Node) reducePendingTransactions() {
 	txPoolLimit := core.ShardingSchedule.MaxTxsPerBlockLimit()
+	curLen := len(node.pendingTransactions)
+
 	// If length of pendingTransactions is greater than TxPoolLimit then by greedy take the TxPoolLimit recent transactions.
-	if len(node.pendingTransactions) > txPoolLimit+txPoolLimit {
-		curLen := len(node.pendingTransactions)
+	if curLen > txPoolLimit+txPoolLimit {
 		node.pendingTransactions = append(types.Transactions(nil), node.pendingTransactions[curLen-txPoolLimit:]...)
 		utils.GetLogger().Info("mem stat reduce pending transaction")
 	}
@@ -253,16 +255,25 @@ func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
 // Note the pending transaction list will then contain the rest of the txs
 func (node *Node) getTransactionsForNewBlock(coinbase common.Address) types.Transactions {
 	node.pendingTxMutex.Lock()
-	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(node.pendingTransactions, core.ShardingSchedule.TxsThrottleConfig(), coinbase)
+	selected, unselected, invalid, blockTxsCounts := node.Worker.SelectTransactionsForNewBlock(node.pendingTransactions, core.ShardingSchedule.TxsThrottleConfig(), coinbase)
 
 	node.pendingTransactions = unselected
 	node.reducePendingTransactions()
+	node.recentTxsStats[node.Consensus.ChainReader.CurrentHeader().Number.Uint64()+1] = blockTxsCounts
+	for blockNum := range node.recentTxsStats {
+		blockNumPastHour := (time.Hour / time.Second) / node.BlockPeriod
+		if blockNum < node.Consensus.ChainReader.CurrentHeader().Number.Uint64()-uint64(blockNumPastHour) {
+			delete(node.recentTxsStats, blockNum)
+		}
+	}
+
 	utils.Logger().Info().
 		Int("remainPending", len(node.pendingTransactions)).
 		Int("selected", len(selected)).
 		Int("invalidDiscarded", len(invalid)).
 		Msg("Selecting Transactions")
 	node.pendingTxMutex.Unlock()
+
 	return selected
 }
 
@@ -328,6 +339,9 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		node.BlockChannel = make(chan *types.Block)
 		node.ConfirmedBlockChannel = make(chan *types.Block)
 		node.BeaconBlockChannel = make(chan *types.Block)
+
+		node.recentTxsStats = make(types.RecentTxsStats)
+
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, node.Blockchain().Config(), chain)
 		node.Worker = worker.New(node.Blockchain().Config(), chain, node.Consensus, node.Consensus.ShardID)
 
