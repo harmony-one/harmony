@@ -271,8 +271,7 @@ func (node *Node) getTransactionsForNewBlock(coinbase common.Address) types.Tran
 	node.pendingTransactions = unselected
 	node.reducePendingTransactions()
 
-	utils.GetLogInstance().Info(
-		"msg", "Selecting Transactions",
+	utils.GetLogInstance().Info("Selecting Transactions",
 		"newBlockNum", newBlockNum,
 		"remainPending", len(node.pendingTransactions),
 		"invalidDiscarded", len(invalid))
@@ -506,17 +505,17 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 	var err error
 	node.shardGroupReceiver, err = node.host.GroupReceiver(node.NodeConfig.GetShardGroupID())
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to create shard receiver", "msg", err)
+		utils.GetLogInstance().Error("Failed to create shard receiver", "err", err)
 	}
 
 	node.globalGroupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to create global receiver", "msg", err)
+		utils.GetLogInstance().Error("Failed to create global receiver", "err", err)
 	}
 
 	node.clientReceiver, err = node.host.GroupReceiver(node.NodeConfig.GetClientGroupID())
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to create client receiver", "msg", err)
+		utils.GetLogInstance().Error("Failed to create client receiver", "err", err)
 	}
 	return nodeConfig, chanPeer
 }

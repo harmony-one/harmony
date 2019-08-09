@@ -34,8 +34,8 @@ func (s fixedSchedule) IsLastBlock(blockNum uint64) bool {
 	return blockNum%blocks == blocks-1
 }
 
-func (s fixedSchedule) MaxTxAmountLimit() *big.Int {
-	amountBigInt := big.NewInt(int64(mainnetMaxTxAmountLimit * denominations.Nano))
+func (s fixedSchedule) MaxTxAmountNanoLimit() *big.Int {
+	amountBigInt := big.NewInt(mainnetMaxTxAmountNanoLimit)
 	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(denominations.Nano))
 	return amountBigInt
 }
@@ -50,7 +50,7 @@ func (s fixedSchedule) MaxTxsPerBlockLimit() int {
 
 func (s fixedSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 	return &TxsThrottleConfig{
-		MaxTxAmountLimit:               s.MaxTxAmountLimit(),
+		MaxTxAmountNanoLimit:           s.MaxTxAmountNanoLimit(),
 		MaxNumRecentTxsPerAccountLimit: s.MaxNumRecentTxsPerAccountLimit(),
 		MaxTxsPerBlockLimit:            s.MaxTxsPerBlockLimit(),
 	}
