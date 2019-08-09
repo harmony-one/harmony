@@ -295,6 +295,8 @@ func (tx *Transaction) RawSignatureValues() (*big.Int, *big.Int, *big.Int) {
 // Transactions is a Transaction slice type for basic sorting.
 type Transactions []*Transaction
 
+// TODO: put these temp custom txs data structures into other places to keep Transaction type code clean.
+
 // RecentTxsStats is a recent transactions stats map tracking stats like BlockTxsCounts.
 type RecentTxsStats map[uint64]BlockTxsCounts
 

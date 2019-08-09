@@ -22,7 +22,8 @@ const (
 
 	testnetMaxTxAmountLimit               = 1e3 // unit is in One
 	testnetMaxNumRecentTxsPerAccountLimit = 10
-	testnetMaxTxsPerBlockLimit            = 8000
+	testnetMaxTxPoolSizeLimit             = 8000
+	testnetMaxNumTxsPerBlockLimit         = 1000
 )
 
 func (testnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
@@ -73,15 +74,20 @@ func (ts testnetSchedule) MaxNumRecentTxsPerAccountLimit() uint64 {
 	return testnetMaxNumRecentTxsPerAccountLimit
 }
 
-func (ts testnetSchedule) MaxTxsPerBlockLimit() int {
-	return testnetMaxTxsPerBlockLimit
+func (ts testnetSchedule) MaxTxPoolSizeLimit() int {
+	return testnetMaxTxPoolSizeLimit
+}
+
+func (ts testnetSchedule) MaxNumTxsPerBlockLimit() int {
+	return testnetMaxNumTxsPerBlockLimit
 }
 
 func (ts testnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 	return &TxsThrottleConfig{
 		MaxTxAmountLimit:               ts.MaxTxAmountLimit(),
 		MaxNumRecentTxsPerAccountLimit: ts.MaxNumRecentTxsPerAccountLimit(),
-		MaxTxsPerBlockLimit:            ts.MaxTxsPerBlockLimit(),
+		MaxTxPoolSizeLimit:             ts.MaxTxPoolSizeLimit(),
+		MaxNumTxsPerBlockLimit:         ts.MaxNumTxsPerBlockLimit(),
 	}
 }
 
