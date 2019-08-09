@@ -505,10 +505,8 @@ func main() {
 	currentNode.ServiceManagerSetup()
 
 	// RPC for SDK not supported for mainnet.
-	if *networkType != nodeconfig.Mainnet {
-		if err := currentNode.StartRPC(*port); err != nil {
-			ctxerror.Warn(utils.GetLogger(), err, "StartRPC failed")
-		}
+	if err := currentNode.StartRPC(*port); err != nil {
+		ctxerror.Warn(utils.GetLogger(), err, "StartRPC failed")
 	}
 	currentNode.RunServices()
 	currentNode.StartServer()
