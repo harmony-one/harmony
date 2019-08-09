@@ -40,8 +40,8 @@ func (s fixedSchedule) MaxTxAmountLimit() *big.Int {
 	return amountBigInt
 }
 
-func (s fixedSchedule) MaxNumTxsPerAccountPastHourLimit() uint64 {
-	return mainnetMaxNumTxsPerAccountPastHourLimit
+func (s fixedSchedule) MaxNumRecentTxsPerAccountLimit() uint64 {
+	return mainnetMaxNumRecentTxsPerAccountLimit
 }
 
 func (s fixedSchedule) MaxTxsPerBlockLimit() int {
@@ -50,9 +50,9 @@ func (s fixedSchedule) MaxTxsPerBlockLimit() int {
 
 func (s fixedSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 	return &TxsThrottleConfig{
-		MaxTxAmountLimit:                 s.MaxTxAmountLimit(),
-		MaxNumTxsPerAccountPastHourLimit: s.MaxNumTxsPerAccountPastHourLimit(),
-		MaxTxsPerBlockLimit:              s.MaxTxsPerBlockLimit(),
+		MaxTxAmountLimit:               s.MaxTxAmountLimit(),
+		MaxNumRecentTxsPerAccountLimit: s.MaxNumRecentTxsPerAccountLimit(),
+		MaxTxsPerBlockLimit:            s.MaxTxsPerBlockLimit(),
 	}
 }
 

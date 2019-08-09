@@ -69,7 +69,7 @@ func (w *Worker) throttleTxs(selected types.Transactions, recentTxsStats types.R
 		utils.Logger().Debug().
 			Int("MaxTxsPerBlockLimit", (*txsThrottleConfig).MaxTxsPerBlockLimit).
 			Msg("Throttling tx with max txs per block limit")
-		return sender, shardingconfig.Unselect
+		return sender, shardingconfig.TxUnselect
 	}
 
 	// throttle a single sender sending too many transactions in one block
@@ -78,7 +78,7 @@ func (w *Worker) throttleTxs(selected types.Transactions, recentTxsStats types.R
 			Uint64("MaxTxAmountLimit", (*txsThrottleConfig).MaxTxAmountLimit.Uint64()).
 			Uint64("Tx amount", tx.Value().Uint64()).
 			Msg("Throttling tx with max amount limit")
-		return sender, shardingconfig.Invalid
+		return sender, shardingconfig.TxInvalid
 	}
 
 	// throttle too large transaction
@@ -86,14 +86,14 @@ func (w *Worker) throttleTxs(selected types.Transactions, recentTxsStats types.R
 	for _, blockTxsCounts := range recentTxsStats {
 		numTxsPastHour += blockTxsCounts[sender]
 	}
-	if numTxsPastHour >= (*txsThrottleConfig).MaxNumTxsPerAccountPastHourLimit {
+	if numTxsPastHour >= (*txsThrottleConfig).MaxNumRecentTxsPerAccountLimit {
 		utils.Logger().Debug().
-			Uint64("MaxNumTxsPerAccountPastHourLimit", (*txsThrottleConfig).MaxNumTxsPerAccountPastHourLimit).
+			Uint64("MaxNumRecentTxsPerAccountLimit", (*txsThrottleConfig).MaxNumRecentTxsPerAccountLimit).
 			Msg("Throttling tx with max txs per account in a single block limit")
-		return sender, shardingconfig.Unselect
+		return sender, shardingconfig.TxUnselect
 	}
 
-	return sender, shardingconfig.Select
+	return sender, shardingconfig.TxSelect
 }
 
 // SelectTransactionsForNewBlock selects transactions for new block.
@@ -112,21 +112,21 @@ func (w *Worker) SelectTransactionsForNewBlock(newBlockNum uint64, txs types.Tra
 
 		sender, flag := w.throttleTxs(selected, recentTxsStats, txsThrottleConfig, tx)
 		switch flag {
-		case shardingconfig.Unselect:
+		case shardingconfig.TxUnselect:
 			unselected = append(unselected, tx)
 			utils.Logger().Info().
 				Str("Transaction Id", tx.Hash().Hex()).
 				Str("txThrottleFlag", flag.String()).
 				Msg("Transaction Throttle flag")
 
-		case shardingconfig.Invalid:
+		case shardingconfig.TxInvalid:
 			invalid = append(invalid, tx)
 			utils.Logger().Info().
 				Str("txThrottleFlag", flag.String()).
 				Str("Transaction Id", tx.Hash().Hex()).
 				Msg("Transaction Throttle flag")
 
-		case shardingconfig.Select:
+		case shardingconfig.TxSelect:
 			snap := w.current.state.Snapshot()
 			_, err := w.commitTransaction(tx, coinbase)
 			if err != nil {
