@@ -1,7 +1,6 @@
 package node
 
 import (
-	"math/big"
 	"time"
 
 	metrics "github.com/harmony-one/harmony/api/service/metrics"
@@ -43,14 +42,13 @@ func (node *Node) UpdateTxPoolSizeForMetrics(txPoolSize uint64) {
 }
 
 // UpdateBalanceForMetrics uppdates node balance for metrics service.
-func (node *Node) UpdateBalanceForMetrics(prevBalance *big.Int) *big.Int {
+func (node *Node) UpdateBalanceForMetrics() {
 	curBalance, err := node.GetBalanceOfAddress(node.Consensus.SelfAddress)
-	if err != nil || curBalance.Cmp(prevBalance) == 0 {
-		return prevBalance
+	if err != nil {
+		return
 	}
 	utils.Logger().Info().Msgf("Updating metrics node balance %d", curBalance.Uint64())
 	metrics.UpdateNodeBalance(curBalance)
-	return curBalance
 }
 
 // UpdateLastConsensusTimeForMetrics uppdates last consensus reached time for metrics service.
@@ -80,13 +78,12 @@ func (node *Node) CollectMetrics() {
 	utils.Logger().Info().Msg("[Metrics Service] Update metrics")
 	prevNumPeers := 0
 	prevBlockHeight := uint64(0)
-	prevBalance := big.NewInt(0)
 	prevLastConsensusTime := int64(0)
 	for range time.Tick(100 * time.Millisecond) {
 		prevBlockHeight = node.UpdateBlockHeightForMetrics(prevBlockHeight)
 		prevNumPeers = node.UpdateConnectionsNumberForMetrics(prevNumPeers)
-		prevBalance = node.UpdateBalanceForMetrics(prevBalance)
 		prevLastConsensusTime = node.UpdateLastConsensusTimeForMetrics(prevLastConsensusTime)
+		node.UpdateBalanceForMetrics()
 		node.UpdateTxPoolSizeForMetrics(node.TxPool.GetTxPoolSize())
 		node.UpdateIsLeaderForMetrics()
 	}
