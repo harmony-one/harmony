@@ -65,21 +65,21 @@ type TxThrottleFlag int
 
 // Enum for different TxThrottleFlag
 const (
-	Select TxThrottleFlag = iota
-	Unselect
-	Invalid
+	TxSelect TxThrottleFlag = iota
+	TxUnselect
+	TxInvalid
 )
 
 func (result TxThrottleFlag) String() string {
 	switch result {
-	case Select:
-		return "Select"
-	case Unselect:
-		return "Unselect"
-	case Invalid:
-		return "Invalid"
+	case TxSelect:
+		return "TxSelect"
+	case TxUnselect:
+		return "TxUnselect"
+	case TxInvalid:
+		return "TxInvalid"
 	}
-	return "Unknown"
+	return "TxThrottleUnknown"
 }
 
 // TxsThrottleConfig contains configuration for throttling pending transactions per node block
