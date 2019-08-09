@@ -16,7 +16,7 @@ const (
 	mainnetConsensusRatio = float64(0.66)
 
 	// TODO: remove it after randomness feature turned on mainnet
-	mainnetRandomnessStartingEpoch = 10
+	mainnetRandomnessStartingEpoch = 100000
 )
 
 // MainnetSchedule is the mainnet sharding configuration schedule.
