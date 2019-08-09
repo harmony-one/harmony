@@ -225,10 +225,11 @@ func (node *Node) Beaconchain() *core.BlockChain {
 }
 
 func (node *Node) reducePendingTransactions() {
+	txPoolLimit := core.ShardingSchedule.MaxTxsPerBlockLimit()
 	// If length of pendingTransactions is greater than TxPoolLimit then by greedy take the TxPoolLimit recent transactions.
-	if len(node.pendingTransactions) > TxPoolLimit+TxPoolLimit {
+	if len(node.pendingTransactions) > txPoolLimit+txPoolLimit {
 		curLen := len(node.pendingTransactions)
-		node.pendingTransactions = append(types.Transactions(nil), node.pendingTransactions[curLen-TxPoolLimit:]...)
+		node.pendingTransactions = append(types.Transactions(nil), node.pendingTransactions[curLen-txPoolLimit:]...)
 		utils.GetLogger().Info("mem stat reduce pending transaction")
 	}
 }
@@ -254,16 +255,20 @@ func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
 
 // Take out a subset of valid transactions from the pending transaction list
 // Note the pending transaction list will then contain the rest of the txs
-func (node *Node) getTransactionsForNewBlock(maxNumTxs int, coinbase common.Address) types.Transactions {
+func (node *Node) getTransactionsForNewBlock(coinbase common.Address) types.Transactions {
 	if node.NodeConfig.GetNetworkType() == nodeconfig.Mainnet {
 		return types.Transactions{}
 	}
 	node.pendingTxMutex.Lock()
-	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(node.pendingTransactions, maxNumTxs, coinbase)
+	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(node.pendingTransactions, core.ShardingSchedule.TxsThrottleConfig(), coinbase)
 
 	node.pendingTransactions = unselected
 	node.reducePendingTransactions()
-	utils.GetLogInstance().Debug("Selecting Transactions", "remainPending", len(node.pendingTransactions), "selected", len(selected), "invalidDiscarded", len(invalid))
+	utils.Logger().Info().
+		Int("remainPending", len(node.pendingTransactions)).
+		Int("selected", len(selected)).
+		Int("invalidDiscarded", len(invalid)).
+		Msg("Selecting Transactions")
 	node.pendingTxMutex.Unlock()
 	return selected
 }

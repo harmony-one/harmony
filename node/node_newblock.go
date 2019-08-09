@@ -50,7 +50,7 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 					// Normal tx block consensus
 					selectedTxs := types.Transactions{} // Empty transaction list
 					if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
-						selectedTxs = node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock, coinbase)
+						selectedTxs = node.getTransactionsForNewBlock(coinbase)
 						if err := node.Worker.UpdateCurrent(coinbase); err != nil {
 							utils.GetLogger().Error("Failed updating worker's state", "Error", err)
 						}
