@@ -12,6 +12,7 @@ const (
 	blocksPerShard     = 16384  // 2^14
 	mainnetV1Epoch     = 1
 	mainnetV2Epoch     = 5
+	mainnetV3Epoch     = 8
 
 	mainnetMaxTxAmountLimit               = 1e3 // unit is in One
 	mainnetMaxNumRecentTxsPerAccountLimit = 10
@@ -26,6 +27,9 @@ type mainnetSchedule struct{}
 
 func (mainnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
+	case epoch.Cmp(big.NewInt(mainnetV3Epoch)) >= 0:
+		// eighth resharding epoch around 08/10/2019 6:00pm PDT
+		return mainnetV3
 	case epoch.Cmp(big.NewInt(mainnetV2Epoch)) >= 0:
 		// fifth resharding epoch around 08/06/2019 2:30am PDT
 		return mainnetV2
@@ -90,11 +94,12 @@ func (ms mainnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 	}
 }
 
-var mainnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(mainnetV1Epoch), big.NewInt(mainnetV2Epoch)}
+var mainnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(mainnetV1Epoch), big.NewInt(mainnetV2Epoch), big.NewInt(mainnetV3Epoch)}
 
 var mainnetV0 = MustNewInstance(4, 150, 112, genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, mainnetReshardingEpoch)
 var mainnetV1 = MustNewInstance(4, 152, 112, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1, mainnetReshardingEpoch)
 var mainnetV2 = MustNewInstance(4, 200, 148, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV2, mainnetReshardingEpoch)
+var mainnetV3 = MustNewInstance(4, 210, 148, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV3, mainnetReshardingEpoch)
 
 //var mainnetV2 = MustNewInstance(8, 200, 100)
 //var mainnet6400 = MustNewInstance(16, 400, 50)
