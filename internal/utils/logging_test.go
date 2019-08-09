@@ -70,8 +70,8 @@ func TestWithCaller(t *testing.T) {
 }
 
 func TestGetLogger(t *testing.T) {
-	oldHandler := Logger().GetHandler()
-	defer Logger().SetHandler(oldHandler)
+	oldHandler := GetLogInstance().GetHandler()
+	defer GetLogInstance().SetHandler(oldHandler)
 	ctrl := gomock.NewController(t)
 	handler := mock_log.NewMockHandler(ctrl)
 	handler.EXPECT().Log(matchers.Struct{
@@ -84,6 +84,6 @@ func TestGetLogger(t *testing.T) {
 			"funcLine", 88, // keep this in sync with Debug() call below
 		},
 	})
-	Logger().SetHandler(handler)
+	GetLogInstance().SetHandler(handler)
 	GetLogger().Debug("omg")
 }

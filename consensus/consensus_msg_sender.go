@@ -108,17 +108,17 @@ func (sender *MessageSender) Retry(msgRetry *MessageRetry) {
 			utils.Logger().
 				Error().
 				Interface("groupID", msgRetry.groups).
-				Interface("blockNum", msgRetry.blockNum).
+				Uint64("blockNum", msgRetry.blockNum).
 				Interface("MsgType", msgRetry.msgType).
-				Interface("RetryCount", msgRetry.retryCount).
+				Int("RetryCount", msgRetry.retryCount).
 				Msg("[Retry] Failed re-sending consensus message")
 		} else {
 			utils.Logger().
 				Info().
 				Interface("groupID", msgRetry.groups).
-				Interface("blockNum", msgRetry.blockNum).
+				Uint64("blockNum", msgRetry.blockNum).
 				Interface("MsgType", msgRetry.msgType).
-				Interface("RetryCount", msgRetry.retryCount).
+				Int("RetryCount", msgRetry.retryCount).
 				Msg("[Retry] Successfully resent consensus message")
 		}
 	}

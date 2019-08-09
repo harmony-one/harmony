@@ -151,7 +151,7 @@ func main() {
 		MaxNumTxsPerBatch: *numTxns,
 	}
 	shardID := *shardIDFlag
-	utils.Logger().Error().Interface("cx ratio", *crossShardRatio).Msg("Cross Shard Ratio Is Set But not used")
+	utils.Logger().Error().Interface("crossShardRatio", *crossShardRatio).Msg("Cross Shard Ratio Is Set But not used")
 
 	// TODO(Richard): refactor this chuck to a single method
 	// Setup a logger to stdout and log file.
@@ -168,7 +168,7 @@ func main() {
 	totalTime := float64(*duration)
 	utils.Logger().
 		Error().
-		Interface("totalTime", totalTime).
+		Float64("totalTime", totalTime).
 		Bool("RunForever", isDurationForever(totalTime)).
 		Msg("Total Duration")
 	ticker := time.NewTicker(checkFrequency * time.Second)
@@ -181,7 +181,7 @@ syncLoop:
 				Error().
 				Int("duration", (int(t.Sub(start)))).
 				Interface("startTime", start).
-				Interface("totalTime", totalTime).
+				Float64("totalTime", totalTime).
 				Msg("Generator timer ended in syncLoop.")
 			break syncLoop
 		}
@@ -191,7 +191,7 @@ syncLoop:
 				utils.Logger().
 					Error().
 					Interface("txgen node", txGen.SelfPeer).
-					Str("Node State", txGen.State.String()).
+					Str("nodeState", txGen.State.String()).
 					Msg("Generator is now in Sync.")
 				ticker.Stop()
 				break syncLoop
@@ -209,8 +209,8 @@ syncLoop:
 			shardID := block.ShardID()
 			if txGen.Consensus.ShardID == shardID {
 				utils.Logger().Info().Int("txNum", len(block.Transactions())).
-					Interface("shardID", shardID).
-					Interface("preHash", block.ParentHash().Hex()).
+					Uint32("shardID", shardID).
+					Str("preHash", block.ParentHash().Hex()).
 					Uint64("currentBlock", txGen.Blockchain().CurrentBlock().NumberU64()).
 					Uint64("incoming block", block.NumberU64()).
 					Msg("Got block from leader")
@@ -245,14 +245,14 @@ pushLoop:
 		utils.Logger().
 			Error().
 			Float64("running time", t.Sub(start).Seconds()).
-			Interface("totaltime", totalTime).
+			Float64("totaltime", totalTime).
 			Msg("Current running time")
 		if !isDurationForever(totalTime) && t.Sub(start).Seconds() >= totalTime {
 			utils.Logger().
 				Error().
 				Int("duration", (int(t.Sub(start)))).
 				Interface("startTime", start).
-				Interface("totalTime", totalTime).
+				Float64("totalTime", totalTime).
 				Msg("Generator timer ended.")
 			break pushLoop
 		}

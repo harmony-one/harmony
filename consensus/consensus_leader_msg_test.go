@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/harmony/api/proto"
@@ -63,10 +62,10 @@ func TestConstructPreparedMessage(test *testing.T) {
 	consensus.prepareSigs[validatorPubKey.SerializeToHexStr()] = validatorPriKey.Sign(message)
 	// According to RJ these failures are benign.
 	if err := consensus.prepareBitmap.SetKey(leaderPubKey, true); err != nil {
-		test.Log(ctxerror.New("prepareBitmap.SetKey").WithCause(err))
+                test.Error("prepareBitmap.SetKey leaderPubKey")
 	}
 	if err := consensus.prepareBitmap.SetKey(validatorPubKey, true); err != nil {
-		test.Log(ctxerror.New("prepareBitmap.SetKey").WithCause(err))
+                test.Error("prepareBitmap.SetKey validatorPubKey")
 	}
 
 	msgBytes, _ := consensus.constructPreparedMessage()

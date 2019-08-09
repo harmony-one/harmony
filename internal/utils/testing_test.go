@@ -10,7 +10,7 @@ import (
 )
 
 func TestExampleTestLogRedirectorUsingGetLogInstance(t *testing.T) {
-	tlr := NewTestLogRedirector(Logger(), t)
+	tlr := NewTestLogRedirector(GetLogInstance(), t)
 	defer tlr.Close()
 
 	// Everything logged via GetLogInstance(),
@@ -23,11 +23,11 @@ func TestExampleTestLogRedirectorUsingGetLogInstance(t *testing.T) {
 }
 
 func terenasMenethil() {
-	utils.Logger().Info().Msg("what are you doing my son")
+	GetLogInstance().Info("what are you doing my son")
 }
 
 func arthasMenethil() {
-	utils.Logger().Warn().Msg("succeding you father")
+	GetLogInstance().Warn("succeding you father")
 }
 
 func TestNewTestLogRedirector(t *testing.T) {

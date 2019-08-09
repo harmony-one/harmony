@@ -139,7 +139,7 @@ func doCall(ctx context.Context, b Backend, args CallArgs, blockNr rpc.BlockNumb
 	if globalGasCap != nil && globalGasCap.Uint64() < gas {
 		utils.Logger().
 			Error().
-			Interface("requested", gas).
+			Uint64("requested", gas).
 			Interface("cap", globalGasCap).
 			Msg("Caller gas above allowance, capping")
 		gas = globalGasCap.Uint64()

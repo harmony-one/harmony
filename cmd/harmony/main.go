@@ -293,7 +293,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// currentNode.StakingAccount = myAccount
 	utils.Logger().
 		Info().
-		Interface("address", common.MustAddressToBech32(currentNode.StakingAccount.Address)).
+		Str("address", common.MustAddressToBech32(currentNode.StakingAccount.Address)).
 		Msg("node account set")
 
 	// TODO: refactor the creation of blockchain out of node.New()
@@ -338,7 +338,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	height := currentNode.Blockchain().CurrentBlock().NumberU64()
 
 	currentConsensus.SetViewID(height)
-	utils.Logger().Info().Interface("height", height).Msg("Init Blockchain")
+	utils.Logger().Info().Uint64("height", height).Msg("Init Blockchain")
 
 	// Assign closure functions to the consensus object
 	currentConsensus.BlockVerifier = currentNode.VerifyNewBlock
@@ -395,8 +395,8 @@ func main() {
 
 	if *shardID >= 0 {
 		utils.Logger().Info().
-			Interface("original", initialAccount.ShardID).
-			Interface("override", *shardID).
+			Uint32("original", initialAccount.ShardID).
+			Int("override", *shardID).
 			Msg("ShardID Override")
 		initialAccount.ShardID = uint32(*shardID)
 	}
@@ -414,16 +414,16 @@ func main() {
 	}
 	utils.Logger().
 		Info().
-		Str("", startMsg).
-		Interface("BlsPubKey", hex.EncodeToString(nodeConfig.ConsensusPubKey.Serialize())).
-		Interface("ShardID", nodeConfig.ShardID).
+		Str("BlsPubKey", hex.EncodeToString(nodeConfig.ConsensusPubKey.Serialize())).
+		Uint32("ShardID", nodeConfig.ShardID).
 		Interface("ShardGroupID", nodeConfig.GetShardGroupID()).
 		Interface("BeaconGroupID", nodeConfig.GetBeaconGroupID()).
 		Interface("ClientGroupID", nodeConfig.GetClientGroupID()).
 		Interface("ClientGroupID", nodeConfig.GetClientGroupID()).
 		Interface("Role", currentNode.NodeConfig.Role()).
-		Interface("multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s",
-			*ip, *port, nodeConfig.Host.GetID().Pretty()))
+		Str("multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s",
+			*ip, *port, nodeConfig.Host.GetID().Pretty())).
+		Msg(startMsg)
 
 	if *enableMemProfiling {
 		memprofiling.GetMemProfiling().Start()

@@ -49,7 +49,7 @@ func (m *MemProfiling) Config() {
 	}
 	utils.Logger().
 		Info().
-		Interface("port", utils.GetPortFromDiff(nodeconfig.GetDefaultConfig().Port, MemProfilingPortDiff)).
+		Str("port", utils.GetPortFromDiff(nodeconfig.GetDefaultConfig().Port, MemProfilingPortDiff)).
 		Msg("running mem profiling")
 }
 
@@ -89,7 +89,7 @@ func (m *MemProfiling) PeriodicallyScanMemSize() {
 				for k, v := range m.observedObject {
 					s := memsize.Scan(v)
 					r := s.Report()
-					utils.Logger().Info().Interface(k, r).Msg("memsize report for %s:\n %s")
+					utils.Logger().Info().Str(k, r).Msg("memsize report for %s:\n %s")
 				}
 				m.mu.Unlock()
 			}

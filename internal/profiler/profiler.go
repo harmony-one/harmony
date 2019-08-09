@@ -50,7 +50,7 @@ func (profiler *Profiler) LogMemory() {
 			Info().
 			Interface("info", info).
 			Interface("map", memMap).
-			Interface("shardID", profiler.shardID).
+			Uint32("shardID", profiler.shardID).
 			Msg("Mem Report")
 
 		time.Sleep(3 * time.Second)
@@ -65,9 +65,9 @@ func (profiler *Profiler) LogCPU() {
 		times, _ := profiler.proc.Times()
 		utils.Logger().
 			Info().
-			Interface("percent", percent).
+			Float64("percent", percent).
 			Interface("times", times).
-			Interface("shardID", profiler.shardID).
+			Uint32("shardID", profiler.shardID).
 			Msg("CPU Report")
 
 		time.Sleep(3 * time.Second)
