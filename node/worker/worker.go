@@ -59,24 +59,25 @@ func (w *Worker) throttleTxs(selected types.Transactions, recentTxsStats types.R
 	var sender common.Address
 	msg, err := tx.AsMessage(s)
 	if err != nil {
-		utils.GetLogInstance().Error("Error when parsing tx into message", "msg", err)
+		utils.GetLogInstance().Error("Error when parsing tx into message",
+			"tx Id", tx.Hash().Hex(), "err", err)
 	} else {
 		sender = msg.From()
 	}
 
 	// already selected max num txs
-	if len(selected) > (*txsThrottleConfig).MaxTxsPerBlockLimit {
-		utils.GetLogInstance().Info(
-			"msg", "Throttling tx with max txs per block limit",
+	if len(selected) > txsThrottleConfig.MaxTxsPerBlockLimit {
+		utils.GetLogInstance().Info("Throttling tx with max txs per block limit",
+			"tx Id", tx.Hash().Hex(),
 			"MaxTxsPerBlockLimit", txsThrottleConfig.MaxTxsPerBlockLimit)
 		return sender, shardingconfig.TxUnselect
 	}
 
 	// throttle a single sender sending too many transactions in one block
-	if (txsThrottleConfig.MaxTxAmountLimit).Cmp(tx.Value()) < 0 {
-		utils.GetLogInstance().Info(
-			"msg", "Throttling tx with max amount limit",
-			"MaxTxAmountLimit", txsThrottleConfig.MaxTxAmountLimit.Uint64(),
+	if txsThrottleConfig.MaxTxAmountNanoLimit.Cmp(tx.Value()) < 0 {
+		utils.GetLogInstance().Info("Throttling tx with max amount limit",
+			"tx Id", tx.Hash().Hex(),
+			"MaxTxAmountNanoLimit", txsThrottleConfig.MaxTxAmountNanoLimit.Uint64(),
 			"Tx amount", tx.Value().Uint64())
 		return sender, shardingconfig.TxInvalid
 	}
@@ -87,8 +88,8 @@ func (w *Worker) throttleTxs(selected types.Transactions, recentTxsStats types.R
 		numTxsPastHour += blockTxsCounts[sender]
 	}
 	if numTxsPastHour >= txsThrottleConfig.MaxNumRecentTxsPerAccountLimit {
-		utils.GetLogInstance().Info(
-			"msg", "Throttling tx with max txs per account in a single block limit",
+		utils.GetLogInstance().Info("Throttling tx with max txs per account in a single block limit",
+			"tx Id", tx.Hash().Hex(),
 			"MaxNumRecentTxsPerAccountLimit", txsThrottleConfig.MaxNumRecentTxsPerAccountLimit)
 		return sender, shardingconfig.TxUnselect
 	}
@@ -133,8 +134,7 @@ func (w *Worker) SelectTransactionsForNewBlock(newBlockNum uint64, txs types.Tra
 
 		// log invalid or unselected txs
 		if flag == shardingconfig.TxUnselect || flag == shardingconfig.TxInvalid {
-			utils.GetLogInstance().Info(
-				"msg", "Transaction Throttle flag",
+			utils.GetLogInstance().Info("Transaction Throttle flag",
 				"Transaction Id", tx.Hash().Hex(),
 				"txThrottleFlag", flag.String())
 		}

@@ -23,7 +23,7 @@ type Schedule interface {
 	IsLastBlock(blockNum uint64) bool
 
 	// Max amount limit for a valid transaction
-	MaxTxAmountLimit() *big.Int
+	MaxTxAmountNanoLimit() *big.Int
 
 	// Max number of transactions of a particular account per block level
 	MaxNumRecentTxsPerAccountLimit() uint64
@@ -85,7 +85,7 @@ func (result TxThrottleFlag) String() string {
 // TxsThrottleConfig contains configuration for throttling pending transactions per node block
 type TxsThrottleConfig struct {
 	// Max amount limit for a valid transaction
-	MaxTxAmountLimit *big.Int
+	MaxTxAmountNanoLimit *big.Int
 
 	// Max number of transactions of a particular account for the past hour
 	MaxNumRecentTxsPerAccountLimit uint64
