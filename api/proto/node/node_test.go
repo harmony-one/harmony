@@ -88,7 +88,7 @@ func TestConstructBlocksSyncMessage(t *testing.T) {
 		t.Fatalf("statedb.Database().TrieDB().Commit() failed: %s", err)
 	}
 
-	block1 := types.NewBlock(head, nil, nil)
+	block1 := types.NewBlock(head, nil, nil, nil)
 
 	blocks := []*types.Block{
 		block1,

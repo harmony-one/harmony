@@ -96,7 +96,8 @@ func (b *BlockGen) AddTxWithChain(bc *BlockChain, tx *types.Transaction) {
 		b.SetCoinbase(common.Address{})
 	}
 	b.statedb.Prepare(tx.Hash(), common.Hash{}, len(b.txs))
-	receipt, _, err := ApplyTransaction(b.config, bc, &b.header.Coinbase, b.gasPool, b.statedb, b.header, tx, &b.header.GasUsed, vm.Config{})
+	// TODO (chao): may need to add cxReceipt for BlockGen
+	receipt, _, _, err := ApplyTransaction(b.config, bc, &b.header.Coinbase, b.gasPool, b.statedb, b.header, tx, &b.header.GasUsed, vm.Config{})
 	if err != nil {
 		panic(err)
 	}
@@ -185,7 +186,8 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 		}
 		if b.engine != nil {
 			// Finalize and seal the block
-			block, err := b.engine.Finalize(chainreader, b.header, statedb, b.txs, b.receipts)
+			// TODO (chao): add cxReceipt in the last input
+			block, err := b.engine.Finalize(chainreader, b.header, statedb, b.txs, b.receipts, nil)
 			if err != nil {
 				panic(err)
 			}

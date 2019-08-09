@@ -9,13 +9,13 @@ import (
 )
 
 func TestIsEpochBlock(t *testing.T) {
-	block1 := types.NewBlock(&types.Header{Number: big.NewInt(10)}, nil, nil)
-	block2 := types.NewBlock(&types.Header{Number: big.NewInt(0)}, nil, nil)
-	block3 := types.NewBlock(&types.Header{Number: big.NewInt(344064)}, nil, nil)
-	block4 := types.NewBlock(&types.Header{Number: big.NewInt(77)}, nil, nil)
-	block5 := types.NewBlock(&types.Header{Number: big.NewInt(78)}, nil, nil)
-	block6 := types.NewBlock(&types.Header{Number: big.NewInt(188)}, nil, nil)
-	block7 := types.NewBlock(&types.Header{Number: big.NewInt(189)}, nil, nil)
+	block1 := types.NewBlock(&types.Header{Number: big.NewInt(10)}, nil, nil, nil)
+	block2 := types.NewBlock(&types.Header{Number: big.NewInt(0)}, nil, nil, nil)
+	block3 := types.NewBlock(&types.Header{Number: big.NewInt(344064)}, nil, nil, nil)
+	block4 := types.NewBlock(&types.Header{Number: big.NewInt(77)}, nil, nil, nil)
+	block5 := types.NewBlock(&types.Header{Number: big.NewInt(78)}, nil, nil, nil)
+	block6 := types.NewBlock(&types.Header{Number: big.NewInt(188)}, nil, nil, nil)
+	block7 := types.NewBlock(&types.Header{Number: big.NewInt(189)}, nil, nil, nil)
 	tests := []struct {
 		schedule shardingconfig.Schedule
 		block    *types.Block

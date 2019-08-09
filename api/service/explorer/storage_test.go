@@ -48,7 +48,7 @@ func TestDump(t *testing.T) {
 	tx3 := types.NewTransaction(3, common.BytesToAddress([]byte{0x33}), 0, big.NewInt(333), 3333, big.NewInt(33333), []byte{0x33, 0x33, 0x33})
 	txs := []*types.Transaction{tx1, tx2, tx3}
 
-	block := types.NewBlock(&types.Header{Number: big.NewInt(314)}, txs, nil)
+	block := types.NewBlock(&types.Header{Number: big.NewInt(314)}, txs, nil, nil)
 	ins := GetStorageInstance("1.1.1.1", "3333", true)
 	ins.Dump(block, uint64(1))
 	db := ins.GetDB()
@@ -75,7 +75,7 @@ func TestUpdateAddressStorage(t *testing.T) {
 	tx3 := types.NewTransaction(3, common.BytesToAddress([]byte{0x33}), 0, big.NewInt(333), 3333, big.NewInt(33333), []byte{0x33, 0x33, 0x33})
 	txs := []*types.Transaction{tx1, tx2, tx3}
 
-	block := types.NewBlock(&types.Header{Number: big.NewInt(314)}, txs, nil)
+	block := types.NewBlock(&types.Header{Number: big.NewInt(314)}, txs, nil, nil)
 	ins := GetStorageInstance("1.1.1.1", "3333", true)
 	ins.Dump(block, uint64(1))
 	db := ins.GetDB()

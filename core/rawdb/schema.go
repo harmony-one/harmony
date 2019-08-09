@@ -62,6 +62,8 @@ var (
 
 	crosslinkPrefix = []byte("crosslink") // prefix for crosslink
 
+	cxReceiptPrefix = []byte("cxReceipt") // prefix for cross shard transaction receipt
+
 	// epochBlockNumberPrefix + epoch (big.Int.Bytes())
 	// -> epoch block number (big.Int.Bytes())
 	epochBlockNumberPrefix = []byte("harmony-epoch-block-number-")
@@ -171,4 +173,9 @@ func crosslinkKey(shardID uint32, blockNum uint64) []byte {
 	binary.BigEndian.PutUint64(sbKey[4:], blockNum)
 	key := append(crosslinkPrefix, sbKey...)
 	return key
+}
+
+// cxReceiptKey = cxReceiptsPrefix + num (uint64 big endian) + hash
+func cxReceiptKey(number uint64, hash common.Hash) []byte {
+	return append(append(cxReceiptPrefix, encodeBlockNumber(number)...), hash.Bytes()...)
 }

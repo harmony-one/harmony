@@ -512,3 +512,38 @@ func ReadCrossLinkShardBlock(db DatabaseReader, shardID uint32, blockNum uint64)
 func WriteCrossLinkShardBlock(db DatabaseWriter, shardID uint32, blockNum uint64, data []byte) error {
 	return db.Put(crosslinkKey(shardID, blockNum), data)
 }
+
+// ReadCXReceipts retrieves all the transaction receipts belonging to a block.
+func ReadCXReceipts(db DatabaseReader, hash common.Hash, number uint64) types.CXReceipts {
+	// Retrieve the flattened receipt slice
+	data, _ := db.Get(cxReceiptKey(number, hash))
+	if len(data) == 0 {
+		return nil
+	}
+	// Convert the cross shard tx receipts from their storage form to their internal representation
+	cxReceipts := types.CXReceipts{}
+	if err := rlp.DecodeBytes(data, &cxReceipts); err != nil {
+		utils.Logger().Error().Err(err).Str("hash", hash.Hex()).Msg("Invalid cross-shard tx receipt array RLP")
+		return nil
+	}
+	return cxReceipts
+}
+
+// WriteCXReceipts stores all the transaction receipts belonging to a block.
+func WriteCXReceipts(db DatabaseWriter, hash common.Hash, number uint64, receipts types.CXReceipts) {
+	bytes, err := rlp.EncodeToBytes(receipts)
+	if err != nil {
+		utils.Logger().Error().Msg("Failed to encode cross shard tx receipts")
+	}
+	// Store the receipt slice
+	if err := db.Put(cxReceiptKey(number, hash), bytes); err != nil {
+		utils.Logger().Error().Msg("Failed to store block receipts")
+	}
+}
+
+// DeleteCXReceipts removes all receipt data associated with a block hash.
+func DeleteCXReceipts(db DatabaseDeleter, hash common.Hash, number uint64) {
+	if err := db.Delete(cxReceiptKey(number, hash)); err != nil {
+		utils.Logger().Error().Msg("Failed to delete cross shard tx receipts")
+	}
+}

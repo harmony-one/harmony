@@ -74,7 +74,7 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 // transition, such as amount of used gas, the receipt roots and the state root
 // itself. ValidateState returns a database batch if the validation was a success
 // otherwise nil and an error is returned.
-func (v *BlockValidator) ValidateState(block, parent *types.Block, statedb *state.DB, receipts types.Receipts, usedGas uint64) error {
+func (v *BlockValidator) ValidateState(block, parent *types.Block, statedb *state.DB, receipts types.Receipts, cxReceipts types.CXReceipts, usedGas uint64) error {
 	header := block.Header()
 	if block.GasUsed() != usedGas {
 		return fmt.Errorf("invalid gas used (remote: %d local: %d)", block.GasUsed(), usedGas)
@@ -89,6 +89,11 @@ func (v *BlockValidator) ValidateState(block, parent *types.Block, statedb *stat
 	receiptSha := types.DeriveSha(receipts)
 	if receiptSha != header.ReceiptHash {
 		return fmt.Errorf("invalid receipt root hash (remote: %x local: %x)", header.ReceiptHash, receiptSha)
+	}
+
+	cxsSha := types.DeriveSha(cxReceipts)
+	if cxsSha != header.CXReceiptHash {
+		return fmt.Errorf("invalid cross shard receipt root hash (remote: %x local: %x)", header.CXReceiptHash, cxsSha)
 	}
 	// Validate the state root against the received state root and throw
 	// an error if they don't match.

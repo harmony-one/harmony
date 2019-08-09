@@ -217,13 +217,13 @@ func (bc *BlockChain) ValidateNewBlock(block *types.Block) error {
 	}
 
 	// Process block using the parent state as reference point.
-	receipts, _, usedGas, err := bc.processor.Process(block, state, bc.vmConfig)
+	receipts, cxReceipts, _, usedGas, err := bc.processor.Process(block, state, bc.vmConfig)
 	if err != nil {
 		bc.reportBlock(block, receipts, err)
 		return err
 	}
 
-	err = bc.Validator().ValidateState(block, bc.CurrentBlock(), state, receipts, usedGas)
+	err = bc.Validator().ValidateState(block, bc.CurrentBlock(), state, receipts, cxReceipts, usedGas)
 	if err != nil {
 		bc.reportBlock(block, receipts, err)
 		return err
@@ -1259,13 +1259,13 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 			return i, events, coalescedLogs, err
 		}
 		// Process block using the parent state as reference point.
-		receipts, logs, usedGas, err := bc.processor.Process(block, state, bc.vmConfig)
+		receipts, cxReceipts, logs, usedGas, err := bc.processor.Process(block, state, bc.vmConfig)
 		if err != nil {
 			bc.reportBlock(block, receipts, err)
 			return i, events, coalescedLogs, err
 		}
 		// Validate the state using the default validator
-		err = bc.Validator().ValidateState(block, parent, state, receipts, usedGas)
+		err = bc.Validator().ValidateState(block, parent, state, receipts, cxReceipts, usedGas)
 		if err != nil {
 			bc.reportBlock(block, receipts, err)
 			return i, events, coalescedLogs, err
@@ -1968,7 +1968,7 @@ func (bc *BlockChain) WriteCrossLinks(cls []types.CrossLink) error {
 	return err
 }
 
-// ReadCrossLink retrieves crosslink hash given shardID and blockNum
+// ReadCrossLinkHash retrieves crosslink hash given shardID and blockNum
 func (bc *BlockChain) ReadCrossLinkHash(shardID uint32, blockNum uint64) (common.Hash, error) {
 	h, err := rawdb.ReadCrossLinkShardBlock(bc.db, shardID, blockNum)
 	if err != nil {

@@ -24,6 +24,7 @@ type environment struct {
 	header   *types.Header
 	txs      []*types.Transaction
 	receipts []*types.Receipt
+	cxs      []*types.CXReceipt // cross shard transaction receipts (source shard)
 }
 
 // Worker is the main object which takes care of submitting new work to consensus engine
@@ -73,13 +74,14 @@ func (w *Worker) SelectTransactionsForNewBlock(txs types.Transactions, maxNumTxs
 func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
 	snap := w.current.state.Snapshot()
 
-	receipt, _, err := core.ApplyTransaction(w.config, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, vm.Config{})
+	receipt, cx, _, err := core.ApplyTransaction(w.config, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, vm.Config{})
 	if err != nil {
 		w.current.state.RevertToSnapshot(snap)
 		return nil, err
 	}
 	w.current.txs = append(w.current.txs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)
+	w.current.cxs = append(w.current.cxs, cx)
 
 	return receipt.Logs, nil
 }
@@ -151,6 +153,11 @@ func (w *Worker) GetCurrentReceipts() []*types.Receipt {
 	return w.current.receipts
 }
 
+// GetCurrentCXReceipts get the receipts generated starting from the last state.
+func (w *Worker) GetCurrentCXReceipts() []*types.CXReceipt {
+	return w.current.cxs
+}
+
 // Commit generate a new block for the new txs.
 func (w *Worker) Commit(sig []byte, signers []byte, viewID uint64, coinbase common.Address) (*types.Block, error) {
 	if len(sig) > 0 && len(signers) > 0 {
@@ -164,7 +171,7 @@ func (w *Worker) Commit(sig []byte, signers []byte, viewID uint64, coinbase comm
 	s := w.current.state.Copy()
 
 	copyHeader := types.CopyHeader(w.current.header)
-	block, err := w.engine.Finalize(w.chain, copyHeader, s, w.current.txs, w.current.receipts)
+	block, err := w.engine.Finalize(w.chain, copyHeader, s, w.current.txs, w.current.receipts, w.current.cxs)
 	if err != nil {
 		return nil, ctxerror.New("cannot finalize block").WithCause(err)
 	}
