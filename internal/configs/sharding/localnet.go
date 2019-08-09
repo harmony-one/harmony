@@ -20,9 +20,9 @@ const (
 	localnetEpochBlock1 = 20
 	twoOne              = 5
 
-	localnetMaxTxAmountLimit             = 1e2 // unit is in One
-	localnetMaxTxsPerAccountInBlockLimit = 2
-	localnetMaxTxsPerBlockLimit          = 8000
+	localnetMaxTxAmountLimit                 = 1e2 // unit is in One
+	localnetMaxNumTxsPerAccountPastHourLimit = 2
+	localnetMaxTxsPerBlockLimit              = 8000
 )
 
 func (localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
@@ -68,8 +68,8 @@ func (ls localnetSchedule) MaxTxAmountLimit() *big.Int {
 	return amountBigInt
 }
 
-func (ls localnetSchedule) MaxTxsPerAccountInBlockLimit() uint64 {
-	return localnetMaxTxsPerAccountInBlockLimit
+func (ls localnetSchedule) MaxNumTxsPerAccountPastHourLimit() uint64 {
+	return localnetMaxNumTxsPerAccountPastHourLimit
 }
 
 func (ls localnetSchedule) MaxTxsPerBlockLimit() int {
@@ -78,9 +78,9 @@ func (ls localnetSchedule) MaxTxsPerBlockLimit() int {
 
 func (ls localnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 	return &TxsThrottleConfig{
-		MaxTxAmountLimit:             ls.MaxTxAmountLimit(),
-		MaxTxsPerAccountInBlockLimit: ls.MaxTxsPerAccountInBlockLimit(),
-		MaxTxsPerBlockLimit:          ls.MaxTxsPerBlockLimit(),
+		MaxTxAmountLimit:                 ls.MaxTxAmountLimit(),
+		MaxNumTxsPerAccountPastHourLimit: ls.MaxNumTxsPerAccountPastHourLimit(),
+		MaxTxsPerBlockLimit:              ls.MaxTxsPerBlockLimit(),
 	}
 }
 

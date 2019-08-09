@@ -26,7 +26,7 @@ type Schedule interface {
 	MaxTxAmountLimit() *big.Int
 
 	// Max number of transactions of a particular account per block level
-	MaxTxsPerAccountInBlockLimit() uint64
+	MaxNumTxsPerAccountPastHourLimit() uint64
 
 	// Max total number of transactions in a block
 	MaxTxsPerBlockLimit() int
@@ -87,8 +87,8 @@ type TxsThrottleConfig struct {
 	// Max amount limit for a valid transaction
 	MaxTxAmountLimit *big.Int
 
-	// Max number of transactions of a particular account per block level
-	MaxTxsPerAccountInBlockLimit uint64
+	// Max number of transactions of a particular account for the past hour
+	MaxNumTxsPerAccountPastHourLimit uint64
 
 	// Max total number of transactions in a block
 	MaxTxsPerBlockLimit int

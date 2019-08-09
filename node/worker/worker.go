@@ -86,9 +86,9 @@ func (w *Worker) throttleTxs(selected types.Transactions, recentTxsStats types.R
 	for _, blockTxsCounts := range recentTxsStats {
 		numTxsPastHour += blockTxsCounts[sender]
 	}
-	if numTxsPastHour >= (*txsThrottleConfig).MaxTxsPerAccountInBlockLimit {
+	if numTxsPastHour >= (*txsThrottleConfig).MaxNumTxsPerAccountPastHourLimit {
 		utils.Logger().Debug().
-			Uint64("MaxTxsPerAccountInBlockLimit", (*txsThrottleConfig).MaxTxsPerAccountInBlockLimit).
+			Uint64("MaxNumTxsPerAccountPastHourLimit", (*txsThrottleConfig).MaxNumTxsPerAccountPastHourLimit).
 			Msg("Throttling tx with max txs per account in a single block limit")
 		return sender, shardingconfig.Unselect
 	}
