@@ -92,6 +92,7 @@ var (
 	transferReceiverPtr   = transferCommand.String("to", "", "Specify the receiver account")
 	transferAmountPtr     = transferCommand.Float64("amount", 0, "Specify the amount to transfer")
 	transferShardIDPtr    = transferCommand.Int("shardID", 0, "Specify the shard ID for the transfer")
+	transferToShardIDPtr  = transferCommand.Int("toShardID", 0, "Specify the shard ID for the transfer")
 	transferInputDataPtr  = transferCommand.String("inputData", "", "Base64-encoded input data to embed in the transaction")
 	transferSenderPassPtr = transferCommand.String("pass", "", "Passphrase of the sender's private key")
 
@@ -652,6 +653,7 @@ func processTransferCommand() {
 	receiver := *transferReceiverPtr
 	amount := *transferAmountPtr
 	shardID := *transferShardIDPtr
+	toShardID := *transferToShardIDPtr
 	base64InputData := *transferInputDataPtr
 	senderPass := *transferSenderPassPtr
 
@@ -662,7 +664,7 @@ func processTransferCommand() {
 		return
 	}
 
-	if shardID == -1 {
+	if shardID == -1 || toShardID == -1 {
 		fmt.Println("Please specify the shard ID for the transfer (e.g. --shardID=0)")
 		return
 	}
@@ -708,9 +710,18 @@ func processTransferCommand() {
 		return
 	}
 
-	tx := types.NewTransaction(
-		state.nonce, receiverAddress, uint32(shardID), amountBigInt,
-		gas, nil, inputData)
+	fromShard := uint32(shardID)
+	toShard := uint32(toShardID)
+	var tx *types.Transaction
+	if fromShard == toShard {
+		tx = types.NewTransaction(
+			state.nonce, receiverAddress, fromShard, amountBigInt,
+			gas, nil, inputData)
+	} else {
+		tx = types.NewCrossShardTransaction(
+			state.nonce, receiverAddress, fromShard, toShard, amountBigInt,
+			gas, nil, inputData, types.SubtractionOnly)
+	}
 
 	account, err := ks.Find(accounts.Account{Address: senderAddress})
 	if err != nil {
