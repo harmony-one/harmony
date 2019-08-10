@@ -366,6 +366,9 @@ func (b *Block) MixDigest() common.Hash { return b.header.MixDigest }
 // ShardID is the header ShardID
 func (b *Block) ShardID() uint32 { return b.header.ShardID }
 
+// Epoch is the header Epoch
+func (b *Block) Epoch() *big.Int { return b.header.Epoch }
+
 // Bloom returns header bloom.
 func (b *Block) Bloom() ethtypes.Bloom { return b.header.Bloom }
 

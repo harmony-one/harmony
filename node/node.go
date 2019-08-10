@@ -392,6 +392,10 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		go node.CollectMetrics()
 	}
 
+	if node.NodeConfig.Role() == nodeconfig.ExplorerNode {
+		go node.CommitCommittee()
+	}
+
 	// Setup initial state of syncing.
 	node.peerRegistrationRecord = make(map[string]*syncConfig)
 

@@ -21,6 +21,7 @@ const (
 	BlockPrefix     = "b"
 	TXPrefix        = "tx"
 	AddressPrefix   = "ad"
+	CommitteePrefix = "cp"
 )
 
 // GetBlockInfoKey ...
@@ -41,6 +42,11 @@ func GetBlockKey(id int) string {
 // GetTXKey ...
 func GetTXKey(hash string) string {
 	return fmt.Sprintf("%s_%s", TXPrefix, hash)
+}
+
+// GetCommitteeKey ...
+func GetCommitteeKey(shardID uint32, epoch uint64) string {
+	return fmt.Sprintf("%s_%d_%d", TXPrefix, shardID, epoch)
 }
 
 var storage *Storage
@@ -113,6 +119,25 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 		storage.UpdateTXStorage(batch, explorerTransaction, tx)
 		storage.UpdateAddress(batch, explorerTransaction, tx)
 	}
+	if err := batch.Write(); err != nil {
+		ctxerror.Warn(utils.GetLogger(), err, "cannot write batch")
+	}
+}
+
+// DumpCommittee commits validators for shardNum and epoch.
+func (storage *Storage) DumpCommittee(shardID uint32, epoch uint64, committee types.Committee) {
+	utils.Logger().Info().Msg("Dumping committees")
+	batch := storage.db.NewBatch()
+	// Store committees.
+	committeeData, err := rlp.EncodeToBytes(committee)
+	if err == nil {
+		if err := batch.Put([]byte(GetCommitteeKey(shardID, epoch)), committeeData); err != nil {
+			utils.Logger().Warn().Err(err).Msg("cannot batch committees")
+		}
+	} else {
+		utils.Logger().Error().Err(err).Msg("Failed to serialize committees")
+	}
+
 	if err := batch.Write(); err != nil {
 		ctxerror.Warn(utils.GetLogger(), err, "cannot write batch")
 	}

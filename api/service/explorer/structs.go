@@ -28,6 +28,17 @@ type Address struct {
 	TXs     []*Transaction `json:"txs"`
 }
 
+// Committee ...
+type Committee struct {
+	Validators []*Validator `json:"validators"`
+}
+
+// Validator ...
+type Validator struct {
+	Address string   `json:"address"`
+	Stake   *big.Int `json:"stake"`
+}
+
 // Transaction ...
 type Transaction struct {
 	ID        string   `json:"id"`

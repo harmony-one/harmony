@@ -41,6 +41,7 @@ type Service struct {
 	IP                string
 	Port              string
 	GetNodeIDs        func() []libp2p_peer.ID
+	ShardID           uint32
 	storage           *Storage
 	server            *http.Server
 	messageChan       chan *msg_pb.Message
@@ -48,10 +49,11 @@ type Service struct {
 }
 
 // New returns explorer service.
-func New(selfPeer *p2p.Peer, GetNodeIDs func() []libp2p_peer.ID, GetAccountBalance func(common.Address) (*big.Int, error)) *Service {
+func New(selfPeer *p2p.Peer, shardID uint32, GetNodeIDs func() []libp2p_peer.ID, GetAccountBalance func(common.Address) (*big.Int, error)) *Service {
 	return &Service{
 		IP:                selfPeer.IP,
 		Port:              selfPeer.Port,
+		ShardID:           shardID,
 		GetNodeIDs:        GetNodeIDs,
 		GetAccountBalance: GetAccountBalance,
 	}
@@ -113,6 +115,10 @@ func (s *Service) Run() *http.Server {
 	// Set up router for shard
 	s.router.Path("/shard").Queries("id", "{[0-9]*?}").HandlerFunc(s.GetExplorerShard).Methods("GET")
 	s.router.Path("/shard").HandlerFunc(s.GetExplorerShard)
+
+	// Set up router for committee.
+	s.router.Path("/committee").Queries("shard_num", "{[0-9]*?}", "epoch", "{[0-9]*?}").HandlerFunc(s.GetCommittee).Methods("GET")
+	s.router.Path("/committee").HandlerFunc(s.GetCommittee).Methods("GET")
 
 	// Do serving now.
 	utils.Logger().Info().Str("port", GetExplorerPort(s.Port)).Msg("Listening")
@@ -256,6 +262,52 @@ func (s *Service) GetExplorerTransaction(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	data.TX = *tx
+}
+
+// GetCommittee servers /comittee end-point.
+func (s *Service) GetCommittee(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	shardIDRead := r.FormValue("shard_id")
+	epochRead := r.FormValue("epoch")
+	shardID := uint64(0)
+	epoch := uint64(0)
+	var err error
+	if shardIDRead != "" {
+		shardID, err = strconv.ParseUint(shardIDRead, 10, 32)
+		if err != nil {
+			utils.Logger().Warn().Err(err).Msg("cannot read shard id")
+		}
+	}
+	if epochRead != "" {
+		epoch, err = strconv.ParseUint(epochRead, 10, 64)
+		if err != nil {
+			utils.Logger().Warn().Err(err).Msg("cannot read shard epoch")
+		}
+	}
+	if s.ShardID != uint32(shardID) {
+		utils.Logger().Warn().Err(err).Msg("incorrect shard id")
+		return
+	}
+	db := s.storage.GetDB()
+	bytes, err := db.Get([]byte(GetCommitteeKey(uint32(shardID), epoch)))
+	if err != nil {
+		utils.Logger().Warn().Err(err).Msg("cannot read committee")
+		return
+	}
+	committee := &types.Committee{}
+	if rlp.DecodeBytes(bytes, committee) != nil {
+		utils.Logger().Warn().Msg("cannot convert data from DB")
+		return
+	}
+	validators := &Committee{}
+	for _, validator := range committee.NodeList {
+		validatorStake := big.NewInt(0)
+		validatorStake, err = s.GetAccountBalance(validator.EcdsaAddress)
+		validators.Validators = append(validators.Validators, &Validator{Address: common2.MustAddressToBech32(validator.EcdsaAddress), Stake: validatorStake})
+	}
+	if err := json.NewEncoder(w).Encode(validators); err != nil {
+		utils.Logger().Warn().Err(err).Msg("cannot JSON-encode committee")
+	}
 }
 
 // GetExplorerAddress serves /address end-point.

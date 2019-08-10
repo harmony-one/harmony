@@ -3,6 +3,7 @@ package node
 import (
 	"encoding/binary"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
@@ -133,7 +134,7 @@ func (node *Node) AddNewBlockForExplorer() {
 	}
 }
 
-// ExplorerMessageHandler passes received message in node_handler to explorer service
+// ExplorerMessageHandler passes received message in node_handler to explorer service.
 func (node *Node) commitBlockForExplorer(block *types.Block) {
 	if block.ShardID() != node.NodeConfig.ShardID {
 		return
@@ -146,5 +147,28 @@ func (node *Node) commitBlockForExplorer(block *types.Block) {
 	if curNum-100 > 0 {
 		node.Consensus.PbftLog.DeleteBlocksLessThan(curNum - 100)
 		node.Consensus.PbftLog.DeleteMessagesLessThan(curNum - 100)
+	}
+}
+
+// CommitCommittee commits committee with shard id and epoch to explorer service.
+func (node *Node) CommitCommittee() {
+	blockHeight := uint64(0)
+	for range time.Tick(1000 * time.Millisecond) {
+		curBlock := node.Blockchain().CurrentBlock()
+		curBlockHeight := curBlock.NumberU64()
+		if curBlockHeight == blockHeight {
+			continue
+		}
+		blockHeight = curBlockHeight
+		state, err := node.Blockchain().ReadShardState(curBlock.Epoch())
+		if err != nil {
+			utils.Logger().Error().Err(err).Msg("[Explorer] Error reading shard state")
+			continue
+		}
+		for _, committee := range state {
+			if committee.ShardID == curBlock.ShardID() {
+				explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).DumpCommittee(curBlock.ShardID(), curBlock.Epoch().Uint64(), committee)
+			}
+		}
 	}
 }
