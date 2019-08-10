@@ -39,6 +39,7 @@ var (
 // TransactionType different types of transactions
 type TransactionType byte
 
+// Different Transaction Types
 const (
 	SameShardTx     TransactionType = iota
 	SubtractionOnly                 // only subtract tokens from source shard account
