@@ -33,6 +33,11 @@ func TestGetTXKey(t *testing.T) {
 	assert.Equal(t, GetTXKey("abcd"), "tx_abcd", "error")
 }
 
+// Test for GetCommitteeKey
+func TestGetCommitteeKey(t *testing.T) {
+	assert.Equal(t, GetCommitteeKey(uint32(0), uint64(0)), "cp_0_0", "error")
+}
+
 func TestInit(t *testing.T) {
 	ins := GetStorageInstance("1.1.1.1", "3333", true)
 	if err := ins.GetDB().Put([]byte{1}, []byte{2}); err != nil {

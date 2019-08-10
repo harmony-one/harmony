@@ -56,6 +56,7 @@ type Block struct {
 	ID         string         `json:"id"`
 	TXCount    string         `json:"txCount"`
 	Timestamp  string         `json:"timestamp"`
+	BlockTime  int64          `json:"blockTime"`
 	MerkleRoot string         `json:"merkleRoot"`
 	PrevBlock  RefBlock       `json:"prevBlock"`
 	Bytes      string         `json:"bytes"`

@@ -210,11 +210,13 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if accountBlocks[id-1] == nil {
+			block.BlockTime = int64(0)
 			block.PrevBlock = RefBlock{
 				ID:     "",
 				Height: "",
 			}
 		} else {
+			block.BlockTime = accountBlock.Time().Int64() - accountBlocks[id-1].Time().Int64()
 			block.PrevBlock = RefBlock{
 				ID:     accountBlocks[id-1].Hash().Hex(),
 				Height: strconv.Itoa(id + fromInt - 2),

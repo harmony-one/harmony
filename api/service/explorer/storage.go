@@ -46,7 +46,7 @@ func GetTXKey(hash string) string {
 
 // GetCommitteeKey ...
 func GetCommitteeKey(shardID uint32, epoch uint64) string {
-	return fmt.Sprintf("%s_%d_%d", TXPrefix, shardID, epoch)
+	return fmt.Sprintf("%s_%d_%d", CommitteePrefix, shardID, epoch)
 }
 
 var storage *Storage
