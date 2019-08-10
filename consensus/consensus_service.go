@@ -5,7 +5,10 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 	"time"
+
+	"github.com/harmony-one/harmony/core"
 
 	"github.com/harmony-one/harmony/crypto/hash"
 
@@ -677,5 +680,14 @@ func (consensus *Consensus) IsLeader() bool {
 	if consensus.PubKey != nil && consensus.LeaderPubKey != nil {
 		return consensus.PubKey.IsEqual(consensus.LeaderPubKey)
 	}
+	return false
+}
+
+// NeedsRandomNumberGeneration returns true if the current epoch needs random number generation
+func (consensus *Consensus) NeedsRandomNumberGeneration(epoch *big.Int) bool {
+	if consensus.ShardID == 0 && epoch.Uint64() >= core.ShardingSchedule.RandomnessStartingEpoch() {
+		return true
+	}
+
 	return false
 }
