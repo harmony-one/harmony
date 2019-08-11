@@ -72,7 +72,7 @@ func (client *Client) GetBlocks(hashes [][]byte) *pb.DownloaderResponse {
 // Register will register node's ip/port information to peers receive newly created blocks in future
 // hash is the bytes of "ip:port" string representation
 func (client *Client) Register(hash []byte, ip, port string) *pb.DownloaderResponse {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_REGISTER}
 	request.PeerHash = make([]byte, len(hash))
