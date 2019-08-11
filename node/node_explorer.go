@@ -113,7 +113,7 @@ func (node *Node) AddNewBlockForExplorer() {
 			if err := node.AddNewBlock(blocks[0]); err == nil {
 				// Clean up the blocks to avoid OOM.
 				node.Consensus.PbftLog.DeleteBlockByNumber(blocks[0].NumberU64())
-				// Do dump all blocks from state sycning for explorer one time
+				// Do dump all blocks from state syncing for explorer one time
 				// TODO: some blocks can be dumped before state syncing finished.
 				// And they would be dumped again here. Please fix it.
 				once.Do(func() {
