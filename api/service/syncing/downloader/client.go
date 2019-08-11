@@ -47,7 +47,7 @@ func (client *Client) GetBlockHashes(startHash []byte, size uint32) *pb.Download
 	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_HEADER, BlockHash: startHash, Size: size}
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg("[SYNC] GetBlockHashes query failed")
+		utils.Logger().Error().Err(err).Str("target", client.conn.Target()).Msg("[SYNC] GetBlockHashes query failed")
 	}
 	return response
 }
@@ -64,7 +64,7 @@ func (client *Client) GetBlocks(hashes [][]byte) *pb.DownloaderResponse {
 	}
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg("[SYNC] downloader/client.go:GetBlocks query failed")
+		utils.Logger().Error().Err(err).Str("target", client.conn.Target()).Msg("[SYNC] downloader/client.go:GetBlocks query failed")
 	}
 	return response
 }
@@ -81,7 +81,7 @@ func (client *Client) Register(hash []byte, ip, port string) *pb.DownloaderRespo
 	request.Port = port
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil || response == nil {
-		utils.Logger().Error().Err(err).Interface("response", response).Msg("[SYNC] client.go:Register failed")
+		utils.Logger().Error().Err(err).Str("target", client.conn.Target()).Interface("response", response).Msg("[SYNC] client.go:Register failed")
 	}
 	return response
 }
@@ -103,7 +103,7 @@ func (client *Client) PushNewBlock(selfPeerHash [20]byte, blockHash []byte, time
 
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg("[SYNC] unable to send new block to unsync node")
+		utils.Logger().Error().Err(err).Str("target", client.conn.Target()).Msg("[SYNC] unable to send new block to unsync node")
 	}
 	return response
 }
