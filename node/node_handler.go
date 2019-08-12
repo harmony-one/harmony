@@ -841,10 +841,10 @@ func findRoleInShardState(
 	key *bls.PublicKey, state types.ShardState,
 ) (shardID uint32, isLeader bool) {
 	keyBytes := key.Serialize()
-	for idx, shard := range state {
+	for _, shard := range state {
 		for nodeIdx, nodeID := range shard.NodeList {
 			if bytes.Compare(nodeID.BlsPublicKey[:], keyBytes) == 0 {
-				return uint32(idx), nodeIdx == 0
+				return shard.ShardID, nodeIdx == 0
 			}
 		}
 	}
