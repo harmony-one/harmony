@@ -11,12 +11,8 @@ const (
 	blocksPerShard     = 16384  // 2^14
 	mainnetV1Epoch     = 1
 	mainnetV2Epoch     = 5
-
-	mainnetVdfDifficulty  = 50000 // This takes about 100s to finish the vdf
-	mainnetConsensusRatio = float64(0.66)
-
-	// TODO: remove it after randomness feature turned on mainnet
-	mainnetRandomnessStartingEpoch = 100000
+	mainnetV3Epoch     = 8
+	mainnetV4Epoch     = 10
 )
 
 // MainnetSchedule is the mainnet sharding configuration schedule.
@@ -26,6 +22,12 @@ type mainnetSchedule struct{}
 
 func (mainnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
+	case epoch.Cmp(big.NewInt(mainnetV4Epoch)) >= 0:
+		// tenth resharding epoch around 08/13/2019 9:00pm PDT
+		return mainnetV4
+	case epoch.Cmp(big.NewInt(mainnetV3Epoch)) >= 0:
+		// eighth resharding epoch around 08/10/2019 6:00pm PDT
+		return mainnetV3
 	case epoch.Cmp(big.NewInt(mainnetV2Epoch)) >= 0:
 		// fifth resharding epoch around 08/06/2019 2:30am PDT
 		return mainnetV2
@@ -63,25 +65,12 @@ func (ms mainnetSchedule) IsLastBlock(blockNum uint64) bool {
 	}
 }
 
-func (ms mainnetSchedule) VdfDifficulty() int {
-	return mainnetVdfDifficulty
-}
-
-// ConsensusRatio ratio of new nodes vs consensus total nodes
-func (ms mainnetSchedule) ConsensusRatio() float64 {
-	return mainnetConsensusRatio
-}
-
-// TODO: remove it after randomness feature turned on mainnet
-//RandonnessStartingEpoch returns starting epoch of randonness generation
-func (ms mainnetSchedule) RandomnessStartingEpoch() uint64 {
-	return mainnetRandomnessStartingEpoch
-}
-
-var mainnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(mainnetV1Epoch), big.NewInt(mainnetV2Epoch)}
+var mainnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(mainnetV1Epoch), big.NewInt(mainnetV2Epoch), big.NewInt(mainnetV3Epoch), big.NewInt(mainnetV4Epoch)}
 var mainnetV0 = MustNewInstance(4, 150, 112, genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, mainnetReshardingEpoch)
 var mainnetV1 = MustNewInstance(4, 152, 112, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1, mainnetReshardingEpoch)
 var mainnetV2 = MustNewInstance(4, 200, 148, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV2, mainnetReshardingEpoch)
+var mainnetV3 = MustNewInstance(4, 210, 148, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV3, mainnetReshardingEpoch)
+var mainnetV4 = MustNewInstance(4, 215, 148, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV4, mainnetReshardingEpoch)
 
 //var mainnetV2 = MustNewInstance(8, 200, 100)
 //var mainnet6400 = MustNewInstance(16, 400, 50)
