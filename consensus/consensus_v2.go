@@ -111,7 +111,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 
 	consensus.PbftLog.AddMessage(pbftMsg)
 	consensus.getLogger().Debug().
-		Str("MsgblockHash", pbftMsg.BlockHash.Hex()).
+		Str("MsgBlockHash", pbftMsg.BlockHash.Hex()).
 		Uint64("MsgViewID", pbftMsg.ViewID).
 		Uint64("MsgBlockNum", pbftMsg.BlockNum).
 		Msg("[Announce] Added Announce message in pbftLog")
@@ -132,8 +132,8 @@ func (consensus *Consensus) announce(block *types.Block) {
 			Msg("[Announce] Cannot send announce message")
 	} else {
 		consensus.getLogger().Info().
-			Str("BlockHash", block.Hash().Hex()).
-			Uint64("BlockNum", block.NumberU64()).
+			Str("blockHash", block.Hash().Hex()).
+			Uint64("blockNum", block.NumberU64()).
 			Msg("[Announce] Sent Announce Message!!")
 	}
 
@@ -159,7 +159,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		consensus.getLogger().Warn().
 			Str("senderKey", senderKey.SerializeToHexStr()).
 			Str("leaderKey", consensus.LeaderPubKey.SerializeToHexStr()).
-			Msg("[OnAnnounce] SenderKey not match leader PubKey")
+			Msg("[OnAnnounce] SenderKey does not match leader PubKey")
 		return
 	}
 	if err = verifyMessageSig(senderKey, msg); err != nil {
@@ -191,8 +191,9 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	if recvMsg.BlockNum < consensus.blockNum || recvMsg.BlockNum != headerObj.Number.Uint64() {
 		consensus.getLogger().Debug().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
-			Str("BlockNum", headerObj.Number.String()).
-			Msg("[OnAnnounce] BlockNum not match")
+			Uint64("blockNum", consensus.blockNum).
+			Uint64("hdrBlockNum", headerObj.Number.Uint64()).
+			Msg("[OnAnnounce] BlockNum does not match")
 		return
 	}
 	if consensus.mode.Mode() == Normal {
@@ -261,7 +262,7 @@ func (consensus *Consensus) prepare() {
 		consensus.getLogger().Warn().Err(err).Msg("[OnAnnounce] Cannot send prepare message")
 	} else {
 		consensus.getLogger().Info().
-			Str("BlockHash", hex.EncodeToString(consensus.blockHash[:])).
+			Str("blockHash", hex.EncodeToString(consensus.blockHash[:])).
 			Msg("[OnAnnounce] Sent Prepare Message!!")
 	}
 	consensus.getLogger().Debug().
@@ -297,6 +298,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		consensus.getLogger().Debug().
 			Uint64("MsgViewID", recvMsg.ViewID).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
+			Uint64("blockNum", consensus.blockNum).
 			Msg("[OnPrepare] Message ViewId or BlockNum not match")
 		return
 	}
@@ -305,6 +307,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		consensus.getLogger().Debug().
 			Uint64("MsgViewID", recvMsg.ViewID).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
+			Uint64("blockNum", consensus.blockNum).
 			Msg("[OnPrepare] No Matching Announce message")
 		//return
 	}
@@ -382,8 +385,8 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 			consensus.getLogger().Warn().Msg("[OnPrepare] Cannot send prepared message")
 		} else {
 			consensus.getLogger().Debug().
-				Bytes("BlockHash", consensus.blockHash[:]).
-				Uint64("BlockNum", consensus.blockNum).
+				Bytes("blockHash", consensus.blockHash[:]).
+				Uint64("blockNum", consensus.blockNum).
 				Msg("[OnPrepare] Sent Prepared Message!!")
 		}
 		consensus.msgSender.StopRetry(msg_pb.MessageType_ANNOUNCE)
@@ -530,6 +533,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	if recvMsg.BlockNum > consensus.blockNum {
 		consensus.getLogger().Debug().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
+			Uint64("blockNum", consensus.blockNum).
 			Msg("[OnPrepared] Future Block Received, ignoring!!")
 		return
 	}
@@ -564,8 +568,8 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		consensus.getLogger().Warn().Msg("[OnPrepared] Cannot send commit message!!")
 	} else {
 		consensus.getLogger().Info().
-			Uint64("BlockNum", consensus.blockNum).
-			Bytes("BlockHash", consensus.blockHash[:]).
+			Uint64("blockNum", consensus.blockNum).
+			Bytes("blockHash", consensus.blockHash[:]).
 			Msg("[OnPrepared] Sent Commit Message!!")
 	}
 
@@ -604,6 +608,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		consensus.getLogger().Debug().
 			Uint64("MsgViewID", recvMsg.ViewID).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
+			Uint64("blockNum", consensus.blockNum).
 			Str("ValidatorPubKey", recvMsg.SenderPubkey.SerializeToHexStr()).
 			Msg("[OnCommit] BlockNum/viewID not match")
 		return
@@ -613,6 +618,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		consensus.getLogger().Debug().
 			Bytes("MsgBlockHash", recvMsg.BlockHash[:]).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
+			Uint64("blockNum", consensus.blockNum).
 			Msg("[OnCommit] Cannot find matching blockhash")
 		return
 	}
@@ -620,6 +626,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	if !consensus.PbftLog.HasMatchingPrepared(consensus.blockNum, recvMsg.BlockHash) {
 		consensus.getLogger().Debug().
 			Bytes("blockHash", recvMsg.BlockHash[:]).
+			Uint64("blockNum", consensus.blockNum).
 			Msg("[OnCommit] Cannot find matching prepared message")
 		return
 	}
@@ -739,8 +746,8 @@ func (consensus *Consensus) finalizeCommits() {
 		consensus.getLogger().Warn().Err(err).Msg("[Finalizing] Cannot send committed message")
 	} else {
 		consensus.getLogger().Info().
-			Bytes("BlockHash", consensus.blockHash[:]).
-			Uint64("BlockNum", consensus.blockNum).
+			Bytes("blockHash", consensus.blockHash[:]).
+			Uint64("blockNum", consensus.blockNum).
 			Msg("[Finalizing] Sent Committed Message")
 	}
 
@@ -761,9 +768,9 @@ func (consensus *Consensus) finalizeCommits() {
 	consensus.consensusTimeout[timeoutConsensus].Start()
 
 	consensus.getLogger().Info().
-		Uint64("BlockNum", beforeCatchupNum).
+		Uint64("blockNum", beforeCatchupNum).
 		Uint64("ViewId", beforeCatchupViewID).
-		Str("BlockHash", block.Hash().String()).
+		Str("blockHash", block.Hash().String()).
 		Int("index", consensus.getIndexOfPubKey(consensus.PubKey)).
 		Msg("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!")
 
@@ -801,6 +808,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	if recvMsg.BlockNum < consensus.blockNum {
 		consensus.getLogger().Info().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
+			Uint64("blockNum", consensus.blockNum).
 			Msg("[OnCommitted] Received Old Blocks!!")
 		return
 	}
@@ -971,7 +979,7 @@ func (consensus *Consensus) tryCatchup() {
 		consensus.getLogger().Info().
 			Uint64("From", currentBlockNum).
 			Uint64("To", consensus.blockNum).
-			Msg("[TryCatchup] Catched up!")
+			Msg("[TryCatchup] Caught up!")
 		consensus.switchPhase(Announce, true)
 	}
 	// catup up and skip from view change trap
@@ -1004,7 +1012,7 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 		consensus.consensusTimeout[timeoutBootstrap].Start()
 		consensus.getLogger().Debug().
 			Uint64("viewID", consensus.viewID).
-			Uint64("block", consensus.blockNum).
+			Uint64("blockNum", consensus.blockNum).
 			Msg("[ConsensusMainLoop] Start bootstrap timeout (only once)")
 		for {
 			select {
