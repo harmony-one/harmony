@@ -175,7 +175,11 @@ func crosslinkKey(shardID uint32, blockNum uint64) []byte {
 	return key
 }
 
-// cxReceiptKey = cxReceiptsPrefix + num (uint64 big endian) + hash
-func cxReceiptKey(number uint64, hash common.Hash) []byte {
-	return append(append(cxReceiptPrefix, encodeBlockNumber(number)...), hash.Bytes()...)
+// cxReceiptKey = cxReceiptsPrefix + shardID + num (uint64 big endian) + hash
+func cxReceiptKey(shardID uint32, number uint64, hash common.Hash) []byte {
+	sKey := make([]byte, 4)
+	binary.BigEndian.PutUint32(sKey, shardID)
+	tmp := append(cxReceiptPrefix, sKey...)
+	tmp1 := append(tmp, encodeBlockNumber(number)...)
+	return append(tmp1, hash.Bytes()...)
 }

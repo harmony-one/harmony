@@ -124,6 +124,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	//receipt.Logs = statedb.GetLogs(tx.Hash())
 	receipt.Bloom = types.CreateBloom(types.Receipts{receipt})
 
-	// TODO (chao): add logic for CXReceipt
-	return receipt, nil, gas, err
+	cxReceipt := &types.CXReceipt{tx.Hash(), msg.Nonce(), msg.From(), *msg.To(), tx.ShardID(), tx.ToShardID(), msg.Value()}
+
+	return receipt, cxReceipt, gas, err
 }

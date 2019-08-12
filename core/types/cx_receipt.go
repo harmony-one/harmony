@@ -9,6 +9,7 @@ import (
 
 // CXReceipt represents a receipt for cross-shard transaction
 type CXReceipt struct {
+	TxHash    common.Hash // hash of the cross shard transaction in source shard
 	Nonce     uint64
 	From      common.Address
 	To        common.Address
@@ -30,4 +31,14 @@ func (cs CXReceipts) Swap(i, j int) { cs[i], cs[j] = cs[j], cs[i] }
 func (cs CXReceipts) GetRlp(i int) []byte {
 	enc, _ := rlp.EncodeToBytes(cs[i])
 	return enc
+}
+
+// ShardID returns the destination shardID of the cxReceipt
+func (cs CXReceipts) ToShardID(i int) uint32 {
+	return cs[i].ToShardID
+}
+
+// NewCrossShardReceipt creates a cross shard receipt
+func NewCrossShardReceipt(txHash common.Hash, nonce uint64, from common.Address, to common.Address, shardID uint32, toShardID uint32, amount *big.Int) *CXReceipt {
+	return &CXReceipt{TxHash: txHash, Nonce: nonce, From: from, To: to, ShardID: shardID, ToShardID: toShardID, Amount: amount}
 }

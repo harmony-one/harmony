@@ -207,3 +207,10 @@ func (r Receipts) GetRlp(i int) []byte {
 	}
 	return bytes
 }
+
+// ShardID returns 0, arbitrary value
+// This function is NOT used, just to compatible with DerivableList interface
+func (r Receipts) ToShardID(i int) uint32 {
+	_ = r[i]
+	return 0
+}

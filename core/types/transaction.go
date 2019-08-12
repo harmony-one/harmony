@@ -378,6 +378,11 @@ func (s Transactions) GetRlp(i int) []byte {
 	return enc
 }
 
+// ShardID returns the destination shardID of given transaction
+func (s Transactions) ToShardID(i int) uint32 {
+	return s[i].data.ToShardID
+}
+
 // TxDifference returns a new set which is the difference between a and b.
 func TxDifference(a, b Transactions) Transactions {
 	keep := make(Transactions, 0, len(a))
