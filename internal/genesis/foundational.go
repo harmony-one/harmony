@@ -316,11 +316,11 @@ var FoundationalNodeAccountsV0_1 = []DeployAccount{
 	{Index: "155", Address: "one10uyfuzaztcccz97w29v0k64rzmhj4k862kfh5q", BlsPublicKey: "e75e5a222bd9e9004385d593194606f48b3e6bf8a95c68830ea1cd8f56bbcdedcb680c9598c66230ea0c2b79a6c58296"},
 	{Index: "156", Address: "one1s3dx73sa5dzrksmds5recptale8pxsa4d4hzt4", BlsPublicKey: "87d4f6c37073a108b94a6e7799f62b2051c44892328bdcb8e5dd4f4596b1ba2952947c744b5daf183e9f8361282c9101"},
 	{Index: "157", Address: "one1vfglvsfuk52025r5apqlfaqky37462tsdjeemf", BlsPublicKey: "6d320742fbff3aa1877aadb9316a865edbdecb0fb74fc973272d73ec1deaff131b653c3ab7a2b26753c717347f450a00"},
-	{Index: "158", Address: "one1pjn8zz5av5ddenaxmu6qrs381xuapygkeatxga", BlsPublicKey: "71c907378831009328f28db0e324848767b58e49eae1f2774e81276e25732bfea5ed8a567fed15afb010be05b9732b16"},
+	{Index: "158", Address: "one1pjn8zz5av5ddenaxmu6qrs38lxuapygkeatxga", BlsPublicKey: "71c907378831009328f28db0e324848767b58e49eae1f2774e81276e25732bfea5ed8a567fed15afb010be05b9732b16"},
 	{Index: "159", Address: "one1fzh923dkauvyye7w68nc38j2dw54gldu5mheaz", BlsPublicKey: "b5c94a5071f942c77f3599098430b8f2dbd6da70c5ef830192bdef5638908cd1fa188059d7aecc8b721116b946c4cc8e"},
 }
 
-// FoundationalNodeAccountsV0_2 are the accounts for the foundational nodes from Epoch 2.
+// FoundationalNodeAccountsV0_2 are the accounts for the foundational nodes from Epoch 5.
 var FoundationalNodeAccountsV0_2 = []DeployAccount{
 	{Index: "0", Address: "one1y0xcf40fg65n2ehm8fx5vda4thrkymhpg45ecj", BlsPublicKey: "9e70e8d76851f6e8dc648255acdd57bb5c49cdae7571aed43f86e9f140a6343caed2ffa860919d03e0912411fee4850a"},
 	{Index: "1", Address: "one18lp2w7ghhuajdpzl8zqeddza97u92wtkfcwpjk", BlsPublicKey: "fce3097d9fc234d34d6eaef3eecd0365d435d1118f69f2da1ed2a69ba725270771572e40347c222aca784cb973307b11"},
@@ -532,7 +532,7 @@ var FoundationalNodeAccountsV0_2 = []DeployAccount{
 	{Index: "207", Address: "one1zr57fc7txdwvcwd6w2rn4yg6tdy0j0tjhvyj8f", BlsPublicKey: "76ac6c7d29e5e47874619816d6a441645adb0138bd02aa71d5b654cfeb9bdc1d4dd66d4e493100d48aeb558824d63408"},
 }
 
-// FoundationalNodeAccountsV0_3 are the accounts for the foundational nodes from Epoch 3.
+// FoundationalNodeAccountsV0_3 are the accounts for the foundational nodes from Epoch 8.
 var FoundationalNodeAccountsV0_3 = []DeployAccount{
 	{Index: "0", Address: "one1y0xcf40fg65n2ehm8fx5vda4thrkymhpg45ecj", BlsPublicKey: "9e70e8d76851f6e8dc648255acdd57bb5c49cdae7571aed43f86e9f140a6343caed2ffa860919d03e0912411fee4850a"},
 	{Index: "1", Address: "one18lp2w7ghhuajdpzl8zqeddza97u92wtkfcwpjk", BlsPublicKey: "fce3097d9fc234d34d6eaef3eecd0365d435d1118f69f2da1ed2a69ba725270771572e40347c222aca784cb973307b11"},
@@ -784,7 +784,7 @@ var FoundationalNodeAccountsV0_3 = []DeployAccount{
 	{Index: "247", Address: "one12adq0qpa64fp9yrwemawetapsxyv5964553rz3", BlsPublicKey: "c46b4c64ca8a76d11d4dc1472a928949e973b46ab41e0e2abdb9fd42b58791874a70796b8b747717f4206dc3fe571912"},
 }
 
-// FoundationalNodeAccountsV0_4 are the accounts for the foundational nodes from Epoch 4.
+// FoundationalNodeAccountsV0_4 are the accounts for the foundational nodes from Epoch 10.
 var FoundationalNodeAccountsV0_4 = []DeployAccount{
 	{Index: "0", Address: "one1y0xcf40fg65n2ehm8fx5vda4thrkymhpg45ecj", BlsPublicKey: "9e70e8d76851f6e8dc648255acdd57bb5c49cdae7571aed43f86e9f140a6343caed2ffa860919d03e0912411fee4850a"},
 	{Index: "1", Address: "one18lp2w7ghhuajdpzl8zqeddza97u92wtkfcwpjk", BlsPublicKey: "fce3097d9fc234d34d6eaef3eecd0365d435d1118f69f2da1ed2a69ba725270771572e40347c222aca784cb973307b11"},
@@ -1036,7 +1036,7 @@ var FoundationalNodeAccountsV0_4 = []DeployAccount{
 	{Index: "247", Address: "one12adq0qpa64fp9yrwemawetapsxyv5964553rz3", BlsPublicKey: "c46b4c64ca8a76d11d4dc1472a928949e973b46ab41e0e2abdb9fd42b58791874a70796b8b747717f4206dc3fe571912"},
 	{Index: "248", Address: "one1dy45f05wtdyx8rn824j3fslc8sv0c50ksu8fwu", BlsPublicKey: "ca027bf6ca93fa5afd4b4145d3fe2738b9778b3a18ae43511a1c1ca827fad879f34c2fa450f39c37dceeed98e5de2480"},
 	{Index: "249", Address: "one1vzurzrkmzlvus7dwcguzdlt6pz6zgnuxdvsjaz", BlsPublicKey: "217dbe8eeeedba0b2917012dedb0e13f50462afee6e843b9c38d9a8bafc4c2c1fb60186eea9d89cd71aa18943f9bbc13"},
-	{Index: "250", Address: "one1tecqw55n0dlcau4y26el35j5yr2yq4eku7ppcm", BlsPublicKey: "dde49e99ace7570f08fe666b86f8dleb7f84e09e4961609d570511ae88314ae39da6ba1883bf99e50f341cb87a7a7597"},
+	{Index: "250", Address: "one12g4tzvgcg7lvqfrye9h5qvwz24psccsp3r2rew", BlsPublicKey: "08a80ef165db6660b7eb092905b401b28fde486be42ba5f72622033f45d4d23ba49bec50999de2906af74b1352ccfc99"},
 	{Index: "251", Address: "one1ltdr7wke9swudj022dnkkwrsgzsaqdtvhpuuqu", BlsPublicKey: "6a3d429b7eecc85bbd2db8c8fc88c57ce5ad71d314f34d393ce22618c62df9dd78210aff109fea7b5607fd055e303380"},
 	{Index: "252", Address: "one1ygq5gu7vtgfff65mcqvhsjxpadrygwc25k37zx", BlsPublicKey: "20eaf3d7968ac65d5508c4b4728fbfd34ac0c874d96b4d8809a09144aeeb30c35a5dd9e39dcdeb706a2490fb7ba5c507"},
 	{Index: "253", Address: "one1029yaac9572k79f4dq93838azru7qsg3hrzxdc", BlsPublicKey: "4dfdde892c9d61269e0884fc5eccea27a79de584b2a80ca2fe529d381ada513e8d6c1f884cb4e72aabe1a6b431a6f317"},
@@ -1054,4 +1054,8 @@ var FoundationalNodeAccountsV0_4 = []DeployAccount{
 	{Index: "265", Address: "one1e06d6ldcr846z866wtdzm4c5h0zrlazgacz30u", BlsPublicKey: "7ab1ca94c701efacd2511eb12106cc0e0da35ef5d25574a79d0e38a0ee931657d9d10c7c4867df8b732d28041e8daa09"},
 	{Index: "266", Address: "one1efyllkjzayyc72xna69qp64s6aw02ak9sfcxle", BlsPublicKey: "ca3cf15d43efa692e4fc8db6ebe0f63b23f12d4347ce399d67a243375e2f04bfe90e7a8f435b89c5774b061d73ab3485"},
 	{Index: "267", Address: "one1ypjapaa5mhtu32tc4ezg5d5xxl6mnl5qd9qff9", BlsPublicKey: "d93e40e252d36f40678ddda2837603eaa6510430ec223cc10421fe3add924b75320c647ba2cb9ba4eda7d286849b2f0f"},
+	{Index: "268", Address: "one1mkx7gu70c47c83uee5agnp9zx20h3eqz3rau2d", BlsPublicKey: "f8b63af7bb83cf6fd963354a40e857a4b9b6ae3072bb8db6104070436cc7ba684e4c34ba2156c710eee3c69d6ab79981"},
+	{Index: "269", Address: "one1z37zj4dvmlcvuy3n3ajq57pzvn2fuxvzh2uzwc", BlsPublicKey: "625c3b79a01fee63728e21a7cec7560655df565a07f1090333f167a45acaf2d8e66eedf8feb1faf4ede1be773a8e5895"},
+	{Index: "270", Address: "one1n0q9vc37g9h6hjplkjjnll7uxz59mnceml67g4", BlsPublicKey: "fa656869591dd33dfb8c395a70303b82e8eefd19f535ce1ea71a9a2e68a74a1e0c8a203f65fd1452c579e7ffed238603"},
+	{Index: "271", Address: "one1lp4spvwyfk9xpnwvn6wk6s49edmysgwmkdy4tj", BlsPublicKey: "9bc2c7dc0ad6c6f0294a615018b386ce2c863a62e96de0f6000f6c05f307eeafb07e2a2b68c69e09367831f42171e589"},
 }
