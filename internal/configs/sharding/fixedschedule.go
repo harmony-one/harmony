@@ -2,6 +2,7 @@ package shardingconfig
 
 import (
 	"math/big"
+	"time"
 
 	"github.com/harmony-one/harmony/common/denominations"
 )
@@ -52,12 +53,17 @@ func (s fixedSchedule) MaxNumTxsPerBlockLimit() int {
 	return mainnetMaxNumTxsPerBlockLimit
 }
 
+func (s fixedSchedule) RecentTxDuration() time.Duration {
+	return mainnetRecentTxDuration
+}
+
 func (s fixedSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 	return &TxsThrottleConfig{
 		MaxTxAmountLimit:               s.MaxTxAmountLimit(),
 		MaxNumRecentTxsPerAccountLimit: s.MaxNumRecentTxsPerAccountLimit(),
 		MaxTxPoolSizeLimit:             s.MaxTxPoolSizeLimit(),
 		MaxNumTxsPerBlockLimit:         s.MaxNumTxsPerBlockLimit(),
+		RecentTxDuration:               s.RecentTxDuration(),
 	}
 }
 

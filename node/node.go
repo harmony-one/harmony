@@ -259,12 +259,14 @@ func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
 func (node *Node) getTransactionsForNewBlock(coinbase common.Address) types.Transactions {
 	node.pendingTxMutex.Lock()
 
+	txsThrottleConfig := core.ShardingSchedule.TxsThrottleConfig()
+
 	// the next block number to be added in consensus protocol, which is always one more than current chain header block
 	newBlockNum := node.Blockchain().CurrentBlock().NumberU64() + 1
 
-	// remove old (currently > 1 hr) blockNum keys from recentTxsStats and initiailize for the new block
+	// remove old (> txsThrottleConfigRecentTxDuration) blockNum keys from recentTxsStats and initiailize for the new block
 	for blockNum := range node.recentTxsStats {
-		blockNumHourAgo := uint64(time.Hour / node.BlockPeriod)
+		blockNumHourAgo := uint64(txsThrottleConfig.RecentTxDuration / node.BlockPeriod)
 
 		if blockNumHourAgo < newBlockNum-blockNum {
 			delete(node.recentTxsStats, blockNum)
@@ -272,7 +274,7 @@ func (node *Node) getTransactionsForNewBlock(coinbase common.Address) types.Tran
 	}
 	node.recentTxsStats[newBlockNum] = make(types.BlockTxsCounts)
 
-	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(newBlockNum, node.pendingTransactions, node.recentTxsStats, core.ShardingSchedule.TxsThrottleConfig(), coinbase)
+	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(newBlockNum, node.pendingTransactions, node.recentTxsStats, txsThrottleConfig, coinbase)
 
 	node.pendingTransactions = unselected
 	node.reducePendingTransactions()

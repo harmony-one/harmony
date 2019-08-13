@@ -4,6 +4,7 @@ package shardingconfig
 
 import (
 	"math/big"
+	"time"
 
 	"github.com/harmony-one/harmony/internal/genesis"
 )
@@ -33,6 +34,9 @@ type Schedule interface {
 
 	// Max total number of transactions allowed to be processed per block
 	MaxNumTxsPerBlockLimit() int
+
+	// How long "recent" means for transaction in time Duration unit
+	RecentTxDuration() time.Duration
 
 	// configuration for throttling pending transactions
 	TxsThrottleConfig() *TxsThrottleConfig
@@ -91,6 +95,9 @@ func (result TxThrottleFlag) String() string {
 type TxsThrottleConfig struct {
 	// Max amount limit for a valid transaction
 	MaxTxAmountLimit *big.Int
+
+	// Max number of transactions of a particular account for the past hour
+	RecentTxDuration time.Duration
 
 	// Max number of transactions of a particular account for the past hour
 	MaxNumRecentTxsPerAccountLimit uint64

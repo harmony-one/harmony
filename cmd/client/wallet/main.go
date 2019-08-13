@@ -91,6 +91,7 @@ var (
 	transferSenderPtr     = transferCommand.String("from", "0", "Specify the sender account address or index")
 	transferReceiverPtr   = transferCommand.String("to", "", "Specify the receiver account")
 	transferAmountPtr     = transferCommand.Float64("amount", 0, "Specify the amount to transfer")
+	transferGasPricePtr   = transferCommand.Uint64("gasPrice", 0, "Specify the gas price amount. Unit is Nano.")
 	transferShardIDPtr    = transferCommand.Int("shardID", 0, "Specify the shard ID for the transfer")
 	transferInputDataPtr  = transferCommand.String("inputData", "", "Base64-encoded input data to embed in the transaction")
 	transferSenderPassPtr = transferCommand.String("pass", "", "Passphrase of the sender's private key")
@@ -651,6 +652,7 @@ func processTransferCommand() {
 	sender := *transferSenderPtr
 	receiver := *transferReceiverPtr
 	amount := *transferAmountPtr
+	gasPrice := *transferGasPricePtr
 	shardID := *transferShardIDPtr
 	base64InputData := *transferInputDataPtr
 	senderPass := *transferSenderPassPtr
@@ -708,9 +710,12 @@ func processTransferCommand() {
 		return
 	}
 
+	gasPriceBigInt := big.NewInt(int64(gasPrice))
+	gasPriceBigInt = gasPriceBigInt.Mul(gasPriceBigInt, big.NewInt(denominations.Nano))
+
 	tx := types.NewTransaction(
 		state.nonce, receiverAddress, uint32(shardID), amountBigInt,
-		gas, nil, inputData)
+		gas, gasPriceBigInt, inputData)
 
 	account, err := ks.Find(accounts.Account{Address: senderAddress})
 	if err != nil {
