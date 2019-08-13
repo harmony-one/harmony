@@ -11,9 +11,10 @@ import (
 const (
 	mainnetEpochBlock1 = 344064 // 21 * 2^14
 	blocksPerShard     = 16384  // 2^14
-	mainnetV1Epoch     = 1
-	mainnetV2Epoch     = 5
-	mainnetV3Epoch     = 8
+	mainnetV0_1Epoch   = 1
+	mainnetV0_2Epoch   = 5
+	mainnetV0_3Epoch   = 8
+	mainnetV0_4Epoch   = 10
 
 	mainnetMaxTxAmountLimit               = 1e3 // unit is in One
 	mainnetMaxNumRecentTxsPerAccountLimit = 1e2
@@ -29,15 +30,18 @@ type mainnetSchedule struct{}
 
 func (mainnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
-	case epoch.Cmp(big.NewInt(mainnetV3Epoch)) >= 0:
+	case epoch.Cmp(big.NewInt(mainnetV0_4Epoch)) >= 0:
+		// tenth resharding epoch around 08/13/2019 9:00pm PDT
+		return mainnetV0_4
+	case epoch.Cmp(big.NewInt(mainnetV0_3Epoch)) >= 0:
 		// eighth resharding epoch around 08/10/2019 6:00pm PDT
-		return mainnetV3
-	case epoch.Cmp(big.NewInt(mainnetV2Epoch)) >= 0:
+		return mainnetV0_3
+	case epoch.Cmp(big.NewInt(mainnetV0_2Epoch)) >= 0:
 		// fifth resharding epoch around 08/06/2019 2:30am PDT
-		return mainnetV2
-	case epoch.Cmp(big.NewInt(mainnetV1Epoch)) >= 0:
+		return mainnetV0_2
+	case epoch.Cmp(big.NewInt(mainnetV0_1Epoch)) >= 0:
 		// first resharding epoch around 07/30/2019 10:30pm PDT
-		return mainnetV1
+		return mainnetV0_1
 	default: // genesis
 		return mainnetV0
 	}
@@ -101,12 +105,13 @@ func (ms mainnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 	}
 }
 
-var mainnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(mainnetV1Epoch), big.NewInt(mainnetV2Epoch), big.NewInt(mainnetV3Epoch)}
+var mainnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(mainnetV0_1Epoch), big.NewInt(mainnetV0_2Epoch), big.NewInt(mainnetV0_3Epoch), big.NewInt(mainnetV0_4Epoch)}
 
 var mainnetV0 = MustNewInstance(4, 150, 112, genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, mainnetReshardingEpoch)
-var mainnetV1 = MustNewInstance(4, 152, 112, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1, mainnetReshardingEpoch)
-var mainnetV2 = MustNewInstance(4, 200, 148, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV2, mainnetReshardingEpoch)
-var mainnetV3 = MustNewInstance(4, 210, 148, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV3, mainnetReshardingEpoch)
+var mainnetV0_1 = MustNewInstance(4, 152, 112, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV0_1, mainnetReshardingEpoch)
+var mainnetV0_2 = MustNewInstance(4, 200, 148, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV0_2, mainnetReshardingEpoch)
+var mainnetV0_3 = MustNewInstance(4, 210, 148, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV0_3, mainnetReshardingEpoch)
+var mainnetV0_4 = MustNewInstance(4, 216, 148, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV0_4, mainnetReshardingEpoch)
 
-//var mainnetV2 = MustNewInstance(8, 200, 100)
-//var mainnet6400 = MustNewInstance(16, 400, 50)
+//var mainnetV1 = MustNewInstance(4, 400, 280)
+//var mainnetV2 = MustNewInstance(6, 400, 199)
