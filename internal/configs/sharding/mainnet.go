@@ -2,6 +2,7 @@ package shardingconfig
 
 import (
 	"math/big"
+	"time"
 
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/internal/genesis"
@@ -17,9 +18,10 @@ const (
 	mainnetV0_4Epoch   = 10
 
 	mainnetMaxTxAmountLimit               = 1e3 // unit is in One
-	mainnetMaxNumRecentTxsPerAccountLimit = 10
+	mainnetMaxNumRecentTxsPerAccountLimit = 1e2
 	mainnetMaxTxPoolSizeLimit             = 8000
 	mainnetMaxNumTxsPerBlockLimit         = 1000
+	mainnetRecentTxDuration               = time.Hour
 )
 
 // MainnetSchedule is the mainnet sharding configuration schedule.
@@ -90,12 +92,17 @@ func (ms mainnetSchedule) MaxNumTxsPerBlockLimit() int {
 	return mainnetMaxNumTxsPerBlockLimit
 }
 
+func (ms mainnetSchedule) RecentTxDuration() time.Duration {
+	return mainnetRecentTxDuration
+}
+
 func (ms mainnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 	return &TxsThrottleConfig{
 		MaxTxAmountLimit:               ms.MaxTxAmountLimit(),
 		MaxNumRecentTxsPerAccountLimit: ms.MaxNumRecentTxsPerAccountLimit(),
 		MaxTxPoolSizeLimit:             ms.MaxTxPoolSizeLimit(),
 		MaxNumTxsPerBlockLimit:         ms.MaxNumTxsPerBlockLimit(),
+		RecentTxDuration:               ms.RecentTxDuration(),
 	}
 }
 

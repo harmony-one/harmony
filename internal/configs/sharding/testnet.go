@@ -2,6 +2,7 @@ package shardingconfig
 
 import (
 	"math/big"
+	"time"
 
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/internal/genesis"
@@ -21,9 +22,10 @@ const (
 	threeOne           = 111
 
 	testnetMaxTxAmountLimit               = 1e3 // unit is in One
-	testnetMaxNumRecentTxsPerAccountLimit = 10
+	testnetMaxNumRecentTxsPerAccountLimit = 1e2
 	testnetMaxTxPoolSizeLimit             = 8000
 	testnetMaxNumTxsPerBlockLimit         = 1000
+	testnetRecentTxDuration               = time.Hour
 )
 
 func (testnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
@@ -82,12 +84,17 @@ func (ts testnetSchedule) MaxNumTxsPerBlockLimit() int {
 	return testnetMaxNumTxsPerBlockLimit
 }
 
+func (ts testnetSchedule) RecentTxDuration() time.Duration {
+	return testnetRecentTxDuration
+}
+
 func (ts testnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 	return &TxsThrottleConfig{
 		MaxTxAmountLimit:               ts.MaxTxAmountLimit(),
 		MaxNumRecentTxsPerAccountLimit: ts.MaxNumRecentTxsPerAccountLimit(),
 		MaxTxPoolSizeLimit:             ts.MaxTxPoolSizeLimit(),
 		MaxNumTxsPerBlockLimit:         ts.MaxNumTxsPerBlockLimit(),
+		RecentTxDuration:               ts.RecentTxDuration(),
 	}
 }
 
