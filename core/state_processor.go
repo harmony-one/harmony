@@ -89,9 +89,11 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 // indicating the block was invalid.
 func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.DB, header *types.Header, tx *types.Transaction, usedGas *uint64, cfg vm.Config) (*types.Receipt, *types.CXReceipt, uint64, error) {
 	msg, err := tx.AsMessage(types.MakeSigner(config, header.Number))
-	if err != nil {
+	// skip signer err for additiononly tx
+	if err != nil && msg.TxType() != types.AdditionOnly {
 		return nil, nil, 0, err
 	}
+
 	// Create a new context to be used in the EVM environment
 	context := NewEVMContext(msg, header, bc, author)
 	// Create a new environment which holds all relevant information

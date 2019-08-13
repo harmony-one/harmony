@@ -172,7 +172,7 @@ func (st *StateTransition) buyGas() error {
 
 func (st *StateTransition) preCheck() error {
 	// Make sure this transaction's nonce is correct.
-	if st.msg.CheckNonce() {
+	if st.msg.CheckNonce() && st.txType != types.AdditionOnly {
 		nonce := st.state.GetNonce(st.msg.From())
 		if nonce < st.msg.Nonce() {
 			return ErrNonceTooHigh
@@ -223,8 +223,13 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 		// The only possible consensus-error would be if there wasn't
 		// sufficient balance to make the transfer happen. The first
 		// balance transfer may never fail.
+
 		if vmerr == vm.ErrInsufficientBalance {
-			return nil, 0, false, vmerr
+			if st.txType != types.AdditionOnly {
+				return nil, 0, false, vmerr
+			} else {
+				vmerr = nil
+			}
 		}
 	}
 	st.refundGas()
