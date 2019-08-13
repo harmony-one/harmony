@@ -1,22 +1,18 @@
 package node
 
 import (
-<<<<<<< HEAD
 	"encoding/binary"
 
-	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/bls/ffi/go/bls"
-=======
 	"bytes"
 	"encoding/base64"
-	"encoding/binary"
+
+	"github.com/harmony-one/bls/ffi/go/bls"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
->>>>>>> 0780a1c75a321b4e3d5890a814d695916030c6b5
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/ctxerror"

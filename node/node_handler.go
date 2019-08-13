@@ -287,7 +287,6 @@ func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 	}
 }
 
-<<<<<<< HEAD
 // BroadcastCrossLinkHeader is called by consensus leader to send the new header as cross link to beacon chain.
 func (node *Node) BroadcastCrossLinkHeader(newBlock *types.Block) {
 	utils.Logger().Info().Msgf("Broadcasting new header to beacon chain groupID %s", node.NodeConfig)
@@ -304,7 +303,8 @@ func (node *Node) BroadcastCrossLinkHeader(newBlock *types.Block) {
 	lastThreeHeaders = append(lastThreeHeaders, newBlock.Header())
 
 	node.host.SendMessageToGroups([]p2p.GroupID{node.NodeConfig.GetBeaconGroupID()}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCrossLinkHeadersMessage(lastThreeHeaders)))
-=======
+}
+
 // BroadcastCXReceipts broadcasts cross shard receipts to correspoding
 // destination shards
 func (node *Node) BroadcastCXReceipts(newBlock *types.Block) {
@@ -333,8 +333,6 @@ func (node *Node) BroadcastCXReceipts(newBlock *types.Block) {
 		groupID := p2p.ShardID(i)
 		go node.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(groupID)}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCXReceiptsMessage(cxReceipts, merkleProof)))
 	}
-
->>>>>>> 0780a1c75a321b4e3d5890a814d695916030c6b5
 }
 
 // VerifyNewBlock is called by consensus participants to verify the block (account model) they are running consensus on
@@ -584,11 +582,8 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 
 	if node.Consensus.PubKey.IsEqual(node.Consensus.LeaderPubKey) {
 		node.BroadcastNewBlock(newBlock)
-<<<<<<< HEAD
 		node.BroadcastCrossLinkHeader(newBlock)
-=======
 		node.BroadcastCXReceipts(newBlock)
->>>>>>> 0780a1c75a321b4e3d5890a814d695916030c6b5
 	} else {
 		utils.Logger().Info().
 			Uint64("ViewID", node.Consensus.GetViewID()).
