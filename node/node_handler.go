@@ -287,6 +287,7 @@ func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 	}
 }
 
+<<<<<<< HEAD
 // BroadcastCrossLinkHeader is called by consensus leader to send the new header as cross link to beacon chain.
 func (node *Node) BroadcastCrossLinkHeader(newBlock *types.Block) {
 	utils.Logger().Info().Msgf("Broadcasting new header to beacon chain groupID %s", node.NodeConfig)
@@ -303,6 +304,37 @@ func (node *Node) BroadcastCrossLinkHeader(newBlock *types.Block) {
 	lastThreeHeaders = append(lastThreeHeaders, newBlock.Header())
 
 	node.host.SendMessageToGroups([]p2p.GroupID{node.NodeConfig.GetBeaconGroupID()}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCrossLinkHeadersMessage(lastThreeHeaders)))
+=======
+// BroadcastCXReceipts broadcasts cross shard receipts to correspoding
+// destination shards
+func (node *Node) BroadcastCXReceipts(newBlock *types.Block) {
+	epoch := newBlock.Header().Epoch
+	shardingConfig := core.ShardingSchedule.InstanceForEpoch(epoch)
+	shardNum := int(shardingConfig.NumShards())
+	myShardID := node.Consensus.ShardID
+	utils.Logger().Info().Int("shardNum", shardNum).Uint32("myShardID", myShardID).Uint64("blockNum", newBlock.NumberU64()).Msg("[BroadcastCXReceipts]")
+
+	for i := 0; i < shardNum; i++ {
+		if i == int(myShardID) {
+			continue
+		}
+		cxReceipts, err := node.Blockchain().CXReceipts(uint32(i), newBlock.NumberU64(), newBlock.Hash())
+		if err != nil || len(cxReceipts) == 0 {
+			//utils.Logger().Warn().Err(err).Uint32("ToShardID", uint32(i)).Int("numCXReceipts", len(cxReceipts)).Msg("[BroadcastCXReceipts] No CXReceipts found")
+			continue
+		}
+		merkleProof, err := node.Blockchain().CXMerkleProof(uint32(i), newBlock)
+		if err != nil {
+			utils.Logger().Warn().Uint32("ToShardID", uint32(i)).Msg("[BroadcastCXReceipts] Unable to get merkleProof")
+			continue
+		}
+		utils.Logger().Info().Uint32("ToShardID", uint32(i)).Msg("[BroadcastCXReceipts] CXReceipts and MerkleProof Found")
+
+		groupID := p2p.ShardID(i)
+		go node.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(groupID)}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCXReceiptsMessage(cxReceipts, merkleProof)))
+	}
+
+>>>>>>> 0780a1c75a321b4e3d5890a814d695916030c6b5
 }
 
 // VerifyNewBlock is called by consensus participants to verify the block (account model) they are running consensus on
@@ -541,20 +573,26 @@ func (node *Node) validateNewShardState(block *types.Block, stakeInfo *map[commo
 // PostConsensusProcessing is called by consensus participants, after consensus is done, to:
 // 1. add the new block to blockchain
 // 2. [leader] send new block to the client
+// 3. [leader] send cross shard tx receipts to destination shard
 func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
-	if node.Consensus.PubKey.IsEqual(node.Consensus.LeaderPubKey) {
-		node.BroadcastNewBlock(newBlock)
-		node.BroadcastCrossLinkHeader(newBlock)
-	} else {
-		utils.Logger().Info().
-			Uint64("ViewID", node.Consensus.GetViewID()).
-			Msg("BINGO !!! Reached Consensus")
-	}
-
 	if err := node.AddNewBlock(newBlock); err != nil {
 		utils.Logger().Error().
 			Err(err).
 			Msg("Error when adding new block")
+		return
+	}
+
+	if node.Consensus.PubKey.IsEqual(node.Consensus.LeaderPubKey) {
+		node.BroadcastNewBlock(newBlock)
+<<<<<<< HEAD
+		node.BroadcastCrossLinkHeader(newBlock)
+=======
+		node.BroadcastCXReceipts(newBlock)
+>>>>>>> 0780a1c75a321b4e3d5890a814d695916030c6b5
+	} else {
+		utils.Logger().Info().
+			Uint64("ViewID", node.Consensus.GetViewID()).
+			Msg("BINGO !!! Reached Consensus")
 	}
 
 	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {

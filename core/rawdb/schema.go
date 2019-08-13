@@ -64,7 +64,8 @@ var (
 	crosslinkPrefix          = []byte("crosslink")             // prefix for crosslink
 	tempCrosslinkPrefix      = []byte("tempCrosslink")         // prefix for tempCrosslink
 
-	cxReceiptPrefix = []byte("cxReceipt") // prefix for cross shard transaction receipt
+	cxReceiptPrefix     = []byte("cxReceipt")     // prefix for cross shard transaction receipt
+	cxReceiptHashPrefix = []byte("cxReceiptHash") // prefix for cross shard transaction receipt hash
 
 	// epochBlockNumberPrefix + epoch (big.Int.Bytes())
 	// -> epoch block number (big.Int.Bytes())

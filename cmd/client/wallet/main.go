@@ -719,7 +719,7 @@ func processTransferCommand() {
 			gas, nil, inputData)
 	} else {
 		tx = types.NewCrossShardTransaction(
-			state.nonce, receiverAddress, fromShard, toShard, amountBigInt,
+			state.nonce, &receiverAddress, fromShard, toShard, amountBigInt,
 			gas, nil, inputData, types.SubtractionOnly)
 	}
 
