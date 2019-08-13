@@ -245,11 +245,7 @@ func NewBlock(header *Header, txs []*Transaction, receipts []*Receipt, cxs []*CX
 		b.header.Bloom = CreateBloom(receipts)
 	}
 
-	if len(cxs) == 0 {
-		b.header.CXReceiptHash = EmptyRootHash
-	} else {
-		b.header.CXReceiptHash = DeriveSha(CXReceipts(cxs))
-	}
+	b.header.CXReceiptHash = DeriveMultipleShardsSha(CXReceipts(cxs))
 
 	return b
 }

@@ -106,8 +106,8 @@ func NewTransaction(nonce uint64, to common.Address, shardID uint32, amount *big
 }
 
 // NewCrossShardTransaction returns new cross shard transaction
-func NewCrossShardTransaction(nonce uint64, to common.Address, shardID uint32, toShardID uint32, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte, txType TransactionType) *Transaction {
-	return newCrossShardTransaction(nonce, &to, shardID, toShardID, amount, gasLimit, gasPrice, data, txType)
+func NewCrossShardTransaction(nonce uint64, to *common.Address, shardID uint32, toShardID uint32, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte, txType TransactionType) *Transaction {
+	return newCrossShardTransaction(nonce, to, shardID, toShardID, amount, gasLimit, gasPrice, data, txType)
 }
 
 // NewContractCreation returns same shard contract transaction.
@@ -378,9 +378,14 @@ func (s Transactions) GetRlp(i int) []byte {
 	return enc
 }
 
-// ShardID returns the destination shardID of given transaction
+// ToShardID returns the destination shardID of given transaction
 func (s Transactions) ToShardID(i int) uint32 {
 	return s[i].data.ToShardID
+}
+
+// MaxToShardID returns 0, arbitrary value, NOT use
+func (s Transactions) MaxToShardID() uint32 {
+	return 0
 }
 
 // TxDifference returns a new set which is the difference between a and b.

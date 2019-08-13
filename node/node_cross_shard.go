@@ -1,8 +1,15 @@
 package node
 
 import (
+	"bytes"
+	"encoding/base64"
+	"encoding/binary"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 
+	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 )
@@ -22,7 +29,56 @@ func (node *Node) ProcessHeaderMessage(msgPayload []byte) {
 
 // ProcessReceiptMessage store the receipts and merkle proof in local data store
 func (node *Node) ProcessReceiptMessage(msgPayload []byte) {
-	// TODO: add logic
+	cxmsg := proto_node.CXReceiptsMessage{}
+	if err := rlp.DecodeBytes(msgPayload, &cxmsg); err != nil {
+		utils.Logger().Error().Err(err).Msg("[ProcessReceiptMessage] Unable to Decode message Payload")
+		return
+	}
+	merkleProof := cxmsg.MKP
+	myShardRoot := common.Hash{}
+
+	var foundMyShard bool
+	byteBuffer := bytes.NewBuffer([]byte{})
+	if len(merkleProof.ShardID) == 0 {
+		utils.Logger().Warn().Msg("[ProcessReceiptMessage] There is No non-empty destination shards")
+		return
+	} else {
+		for j := 0; j < len(merkleProof.ShardID); j++ {
+			sKey := make([]byte, 4)
+			binary.BigEndian.PutUint32(sKey, merkleProof.ShardID[j])
+			byteBuffer.Write(sKey)
+			byteBuffer.Write(merkleProof.CXShardHash[j][:])
+			if merkleProof.ShardID[j] == node.Consensus.ShardID {
+				foundMyShard = true
+				myShardRoot = merkleProof.CXShardHash[j]
+			}
+		}
+	}
+
+	if !foundMyShard {
+		utils.Logger().Warn().Msg("[ProcessReceiptMessage] Not Found My Shard in CXReceipt Message")
+		return
+	}
+
+	hash := crypto.Keccak256Hash(byteBuffer.Bytes())
+	utils.Logger().Debug().Interface("hash", hash).Msg("[ProcessReceiptMessage] RootHash of the CXReceipts")
+	// TODO chao: use crosslink from beacon sync to verify the hash
+
+	cxReceipts := cxmsg.CXS
+	sha := types.DeriveSha(cxReceipts)
+	if sha != myShardRoot {
+		utils.Logger().Warn().Interface("calculated", sha).Interface("got", myShardRoot).Msg("[ProcessReceiptMessage] Trie Root of CXReceipts Not Match")
+		return
+	}
+
+	txs := types.Transactions{}
+	inputData, _ := base64.StdEncoding.DecodeString("")
+	for _, cx := range cxReceipts {
+		// TODO chao: add gas fee to incentivize
+		tx := types.NewCrossShardTransaction(0, cx.To, cx.ShardID, cx.ToShardID, cx.Amount, 0, nil, inputData, types.AdditionOnly)
+		txs = append(txs, tx)
+	}
+	node.addPendingTransactions(txs)
 }
 
 // ProcessCrossShardTx verify and process cross shard transaction on destination shard

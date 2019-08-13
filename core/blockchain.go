@@ -980,7 +980,7 @@ func (bc *BlockChain) WriteBlockWithoutState(block *types.Block, td *big.Int) (e
 }
 
 // WriteBlockWithState writes the block and all associated state to the database.
-func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.Receipt, state *state.DB) (status WriteStatus, err error) {
+func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.Receipt, cxReceipts []*types.CXReceipt, state *state.DB) (status WriteStatus, err error) {
 	bc.wg.Add(1)
 	defer bc.wg.Done()
 
@@ -1052,6 +1052,17 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 	// Write other block data using a batch.
 	batch := bc.db.NewBatch()
 	rawdb.WriteReceipts(batch, block.Hash(), block.NumberU64(), receipts)
+
+	epoch := block.Header().Epoch
+	shardingConfig := ShardingSchedule.InstanceForEpoch(epoch)
+	shardNum := int(shardingConfig.NumShards())
+	for i := 0; i < shardNum; i++ {
+		if i == int(block.ShardID()) {
+			continue
+		}
+		shardReceipts := GetToShardReceipts(cxReceipts, uint32(i))
+		rawdb.WriteCXReceipts(batch, uint32(i), block.NumberU64(), block.Hash(), shardReceipts)
+	}
 
 	// If the total difficulty is higher than our known, add it to the canonical chain
 	// Second clause in the if statement reduces the vulnerability to selfish mining.
@@ -1273,7 +1284,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 		proctime := time.Since(bstart)
 
 		// Write the block to the chain and get the status.
-		status, err := bc.WriteBlockWithState(block, receipts, state)
+		status, err := bc.WriteBlockWithState(block, receipts, cxReceipts, state)
 		if err != nil {
 			return i, events, coalescedLogs, err
 		}
@@ -1999,4 +2010,53 @@ func (bc *BlockChain) ChainDB() ethdb.Database {
 // GetVMConfig returns the block chain VM config.
 func (bc *BlockChain) GetVMConfig() *vm.Config {
 	return &bc.vmConfig
+}
+
+// GetToShardReceipts filters the cross shard receipts with given destination shardID
+func GetToShardReceipts(cxReceipts types.CXReceipts, shardID uint32) types.CXReceipts {
+	cxs := types.CXReceipts{}
+	for i := range cxReceipts {
+		cx := cxReceipts[i]
+		if cx.ToShardID == shardID {
+			cxs = append(cxs, cx)
+		}
+	}
+	return cxs
+}
+
+// CXReceipts retrieves the cross shard transaction receipts of a given shard
+func (bc *BlockChain) CXReceipts(shardID uint32, blockNum uint64, blockHash common.Hash) (types.CXReceipts, error) {
+	cxs, err := rawdb.ReadCXReceipts(bc.db, shardID, blockNum, blockHash)
+	if err != nil || len(cxs) == 0 {
+		return nil, err
+	}
+	return cxs, nil
+}
+
+// CXMerkleProof calculates the cross shard transaction merkle proof of a given destination shard
+func (bc *BlockChain) CXMerkleProof(shardID uint32, block *types.Block) (*types.CXMerkleProof, error) {
+	proof := &types.CXMerkleProof{BlockHash: block.Hash(), CXReceiptHash: block.Header().CXReceiptHash, CXShardHash: []common.Hash{}, ShardID: []uint32{}}
+	cxs, err := rawdb.ReadCXReceipts(bc.db, shardID, block.NumberU64(), block.Hash())
+	if err != nil || cxs == nil {
+		return nil, err
+	}
+
+	epoch := block.Header().Epoch
+	shardingConfig := ShardingSchedule.InstanceForEpoch(epoch)
+	shardNum := int(shardingConfig.NumShards())
+
+	for i := 0; i < shardNum; i++ {
+		receipts, err := bc.CXReceipts(uint32(i), block.NumberU64(), block.Hash())
+		if err != nil || len(receipts) == 0 {
+			continue
+		} else {
+			hash := types.DeriveSha(receipts)
+			proof.CXShardHash = append(proof.CXShardHash, hash)
+			proof.ShardID = append(proof.ShardID, uint32(i))
+		}
+	}
+	if len(proof.ShardID) == 0 {
+		return nil, nil
+	}
+	return proof, nil
 }
