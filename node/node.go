@@ -90,10 +90,8 @@ type Node struct {
 	BlockChannel          chan *types.Block    // The channel to send newly proposed blocks
 	ConfirmedBlockChannel chan *types.Block    // The channel to send confirmed blocks
 	BeaconBlockChannel    chan *types.Block    // The channel to send beacon blocks for non-beaconchain nodes
-	pendingTransactions   types.Transactions   // All the transactions received but not yet processed for Consensus
-	pendingTxMutex        sync.Mutex
-	recentTxsStats        types.RecentTxsStats
-	DRand                 *drand.DRand // The instance for distributed randomness protocol
+
+	DRand *drand.DRand // The instance for distributed randomness protocol
 
 	// Shard databases
 	shardChains shardchain.Collection
@@ -112,7 +110,12 @@ type Node struct {
 	// BeaconNeighbors store only neighbor nodes in the beacon chain shard
 	BeaconNeighbors sync.Map // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
 
-	TxPool       *core.TxPool
+	TxPool *core.TxPool // TODO migrate to TxPool from pendingTransactions list below
+
+	pendingTransactions types.Transactions // All the transactions received but not yet processed for Consensus
+	pendingTxMutex      sync.Mutex
+	recentTxsStats      types.RecentTxsStats
+
 	Worker       *worker.Worker
 	BeaconWorker *worker.Worker // worker for beacon chain
 
@@ -256,13 +259,14 @@ func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
 func (node *Node) getTransactionsForNewBlock(coinbase common.Address) types.Transactions {
 	node.pendingTxMutex.Lock()
 
-	// update recentTxsStats and initiailize for the new block
-
 	// the next block number to be added in consensus protocol, which is always one more than current chain header block
 	newBlockNum := node.Blockchain().CurrentBlock().NumberU64() + 1
+
+	// remove old (currently > 1 hr) blockNum keys from recentTxsStats and initiailize for the new block
 	for blockNum := range node.recentTxsStats {
-		blockNumHourAgo := (time.Hour / time.Second) / node.BlockPeriod
-		if blockNum < node.Consensus.ChainReader.CurrentHeader().Number.Uint64()-uint64(blockNumHourAgo) {
+		blockNumHourAgo := uint64(time.Hour / node.BlockPeriod)
+
+		if blockNumHourAgo < newBlockNum-blockNum {
 			delete(node.recentTxsStats, blockNum)
 		}
 	}
