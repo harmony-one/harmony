@@ -55,7 +55,7 @@ func (mode Mode) String() string {
 	} else if mode == ViewChanging {
 		return "ViewChanging"
 	} else if mode == Syncing {
-		return "Sycning"
+		return "Syncing"
 	} else if mode == Listening {
 		return "Listening"
 	}
