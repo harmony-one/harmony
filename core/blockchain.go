@@ -246,6 +246,12 @@ func IsEpochLastBlock(block *types.Block) bool {
 	return ShardingSchedule.IsLastBlock(block.NumberU64())
 }
 
+// IsEpochLastBlockByHeader returns whether this block is the last block of an epoch
+// given block header
+func IsEpochLastBlockByHeader(header *types.Header) bool {
+	return ShardingSchedule.IsLastBlock(header.Number.Uint64())
+}
+
 func (bc *BlockChain) getProcInterrupt() bool {
 	return atomic.LoadInt32(&bc.procInterrupt) == 1
 }

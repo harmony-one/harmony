@@ -423,6 +423,8 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 		utils.Logger().Error().
 			Err(err).
 			Msg("Error when adding new block")
+	} else if core.IsEpochLastBlock(newBlock) {
+		node.Consensus.UpdateConsensusInformation()
 	}
 
 	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
