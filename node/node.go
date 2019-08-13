@@ -3,6 +3,7 @@ package node
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"math/big"
 	"sync"
 	"time"
 
@@ -45,6 +46,10 @@ const (
 const (
 	// TxPoolLimit is the limit of transaction pool.
 	TxPoolLimit = 20000
+	// MaxTxAmountLimit is the limit of amount of transaction value.
+	MaxTxAmountLimit = 1000
+	// MaxNumRecentTxsPerAccountLimit is the limit of max recent txs per account.
+	MaxNumRecentTxsPerAccountLimit = 1000
 )
 
 func (state State) String() string {
@@ -199,6 +204,8 @@ type Node struct {
 
 	// last time consensus reached for metrics
 	lastConsensusTime int64
+
+	recentTxsStats map[uint64]map[common.Address]int
 }
 
 // Blockchain returns the blockchain for the node's current shard.
@@ -232,9 +239,67 @@ func (node *Node) reducePendingTransactions() {
 	}
 }
 
+// clean up old txs stats.
+func (node *Node) cleanUpRecentTxs() {
+	for blockNum := range node.recentTxsStats {
+		blockNumHourAgo := (time.Hour / node.BlockPeriod)
+		if blockNum < node.Consensus.ChainReader.CurrentHeader().Number.Uint64()-uint64(blockNumHourAgo) {
+			delete(node.recentTxsStats, blockNum)
+		}
+	}
+}
+
+func valueInWei(ones int) *big.Int {
+	return big.NewInt(int64(ones)).Mul(big.NewInt(int64(ones)), big.NewInt(1e18))
+}
+
+func removeOverLimitAmountTxs(newTxs types.Transactions) types.Transactions {
+	res := types.Transactions{}
+	for _, tx := range newTxs {
+		if tx.Value().Cmp(valueInWei(MaxTxAmountLimit)) > 0 {
+			utils.GetLogInstance().Info("Throttling tx with max amount limit",
+				"tx Id", tx.Hash().Hex(),
+				"MaxTxAmountLimit", valueInWei(MaxTxAmountLimit),
+				"Tx amount", tx.Value())
+		} else {
+			res = append(res, tx)
+		}
+	}
+	return res
+}
+
+func (node *Node) numTxsPastHour(sender common.Address) int {
+	res := 0
+	for _, stat := range node.recentTxsStats {
+		if val, ok := stat[sender]; ok {
+			res += val
+		}
+	}
+	return res
+}
+
+// DefaultSigner is homestead signer.
+var DefaultSigner = types.HomesteadSigner{}
+
+func (node *Node) removeByNumTxsPastHour(newTxs types.Transactions) types.Transactions {
+	res := types.Transactions{}
+	for _, tx := range newTxs {
+		if sender, err := types.Sender(DefaultSigner, tx); err == nil {
+			if node.numTxsPastHour(sender) < MaxNumRecentTxsPerAccountLimit {
+				res = append(res, tx)
+			}
+		}
+	}
+	return res
+}
+
 // Add new transactions to the pending transaction list.
 func (node *Node) addPendingTransactions(newTxs types.Transactions) {
+	newTxs = removeOverLimitAmountTxs(newTxs)
+	newTxs = node.removeByNumTxsPastHour(newTxs)
 	node.pendingTxMutex.Lock()
+
+	node.cleanUpRecentTxs()
 	node.pendingTransactions = append(node.pendingTransactions, newTxs...)
 	node.reducePendingTransactions()
 	node.pendingTxMutex.Unlock()
@@ -249,9 +314,17 @@ func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
 
 // Take out a subset of valid transactions from the pending transaction list
 // Note the pending transaction list will then contain the rest of the txs
-func (node *Node) getTransactionsForNewBlock(maxNumTxs int, coinbase common.Address) types.Transactions {
+func (node *Node) getTransactionsForNewBlock(maxNumTxs int, recentTxsStats map[uint64]map[common.Address]int, coinbase common.Address) types.Transactions {
 	node.pendingTxMutex.Lock()
-	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(node.pendingTransactions, maxNumTxs, coinbase)
+
+	newBlockNum := node.Blockchain().CurrentBlock().NumberU64() + 1
+
+	var txStat map[common.Address]int
+	if recentTxsStats != nil {
+		recentTxsStats[newBlockNum] = make(map[common.Address]int)
+		txStat = recentTxsStats[newBlockNum]
+	}
+	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(node.pendingTransactions, maxNumTxs, txStat, coinbase)
 
 	node.pendingTransactions = unselected
 	node.reducePendingTransactions()
@@ -326,6 +399,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		node.BlockChannel = make(chan *types.Block)
 		node.ConfirmedBlockChannel = make(chan *types.Block)
 		node.BeaconBlockChannel = make(chan *types.Block)
+		node.recentTxsStats = make(map[uint64]map[common.Address]int)
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, node.Blockchain().Config(), chain)
 		node.Worker = worker.New(node.Blockchain().Config(), chain, node.Consensus, node.Consensus.ShardID)
 

@@ -49,7 +49,7 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 
 					coinbase := node.Consensus.SelfAddress
 					// Normal tx block consensus
-					selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock, coinbase)
+					selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock, node.recentTxsStats, coinbase)
 					if err := node.Worker.UpdateCurrent(coinbase); err != nil {
 						utils.Logger().Error().
 							Err(err).

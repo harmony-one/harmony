@@ -41,8 +41,11 @@ type Worker struct {
 	shardID uint32
 }
 
+// DefaultSigner is homestead signer.
+var DefaultSigner = types.HomesteadSigner{}
+
 // SelectTransactionsForNewBlock selects transactions for new block.
-func (w *Worker) SelectTransactionsForNewBlock(txs types.Transactions, maxNumTxs int, coinbase common.Address) (types.Transactions, types.Transactions, types.Transactions) {
+func (w *Worker) SelectTransactionsForNewBlock(txs types.Transactions, maxNumTxs int, txsStats map[common.Address]int, coinbase common.Address) (types.Transactions, types.Transactions, types.Transactions) {
 	if w.current.gasPool == nil {
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit)
 	}
@@ -50,11 +53,19 @@ func (w *Worker) SelectTransactionsForNewBlock(txs types.Transactions, maxNumTxs
 	unselected := types.Transactions{}
 	invalid := types.Transactions{}
 	for _, tx := range txs {
+		// Checking invalid txs
 		if tx.ShardID() != w.shardID {
 			invalid = append(invalid, tx)
+			continue
+		}
+		// Checking invalid txs
+		sender, err := types.Sender(DefaultSigner, tx)
+		if err != nil {
+			invalid = append(invalid, tx)
+			continue
 		}
 		snap := w.current.state.Snapshot()
-		_, err := w.commitTransaction(tx, coinbase)
+		_, err = w.commitTransaction(tx, coinbase)
 		if len(selected) > maxNumTxs {
 			unselected = append(unselected, tx)
 		} else {
@@ -64,6 +75,7 @@ func (w *Worker) SelectTransactionsForNewBlock(txs types.Transactions, maxNumTxs
 				utils.GetLogger().Debug("Invalid transaction", "Error", err)
 			} else {
 				selected = append(selected, tx)
+				txsStats[sender]++
 			}
 		}
 	}
