@@ -378,7 +378,7 @@ func (s Transactions) GetRlp(i int) []byte {
 	return enc
 }
 
-// ShardID returns the destination shardID of given transaction
+// ToShardID returns the destination shardID of given transaction
 func (s Transactions) ToShardID(i int) uint32 {
 	return s[i].data.ToShardID
 }

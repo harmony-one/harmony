@@ -571,6 +571,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	}
 
 	// Construct and send the commit message
+	// TODO: should only sign on block hash
 	blockNumBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(blockNumBytes, consensus.blockNum)
 	commitPayload := append(blockNumBytes, consensus.blockHash[:]...)

@@ -89,6 +89,8 @@ type Node struct {
 	pendingTransactions   types.Transactions   // All the transactions received but not yet processed for Consensus
 	pendingTxMutex        sync.Mutex
 	DRand                 *drand.DRand // The instance for distributed randomness protocol
+	pendingCrossLinks     []*types.Header
+	pendingClMutex        sync.Mutex
 
 	// Shard databases
 	shardChains shardchain.Collection
@@ -347,16 +349,16 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 				node.AddContractKeyAndAddress(scFaucet)
 			}
 
-			if node.Consensus.ShardID == 0 {
-				// Contracts only exist in beacon chain
-				if node.isFirstTime {
-					// Setup one time smart contracts
-					node.CurrentStakes = make(map[common.Address]*structs.StakeInfo)
-					node.AddStakingContractToPendingTransactions() //This will save the latest information about staked nodes in current staked
-				} else {
-					node.AddContractKeyAndAddress(scStaking)
-				}
-			}
+			//if node.Consensus.ShardID == 0 {
+			//	// Contracts only exist in beacon chain
+			//	if node.isFirstTime {
+			//		// Setup one time smart contracts
+			//		node.CurrentStakes = make(map[common.Address]*structs.StakeInfo)
+			//		node.AddStakingContractToPendingTransactions() //This will save the latest information about staked nodes in current staked
+			//	} else {
+			//		node.AddContractKeyAndAddress(scStaking)
+			//	}
+			//}
 
 			node.ContractCaller = contracts.NewContractCaller(node.Blockchain(), node.Blockchain().Config())
 

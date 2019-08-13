@@ -504,13 +504,31 @@ func WriteEpochVdfBlockNum(db DatabaseWriter, epoch *big.Int, data []byte) error
 }
 
 // ReadCrossLinkShardBlock retrieves the blockHash given shardID and blockNum
-func ReadCrossLinkShardBlock(db DatabaseReader, shardID uint32, blockNum uint64) ([]byte, error) {
+func ReadCrossLinkShardBlock(db DatabaseReader, shardID uint32, blockNum uint64, temp bool) ([]byte, error) {
+	if temp {
+		// cross link received but haven't committed into blockchain with consensus
+		return db.Get(tempCrosslinkKey(shardID, blockNum))
+	}
 	return db.Get(crosslinkKey(shardID, blockNum))
 }
 
 // WriteCrossLinkShardBlock stores the blockHash given shardID and blockNum
-func WriteCrossLinkShardBlock(db DatabaseWriter, shardID uint32, blockNum uint64, data []byte) error {
+func WriteCrossLinkShardBlock(db DatabaseWriter, shardID uint32, blockNum uint64, data []byte, temp bool) error {
+	if temp {
+		// cross link received but haven't committed into blockchain with consensus
+		return db.Put(tempCrosslinkKey(shardID, blockNum), data)
+	}
 	return db.Put(crosslinkKey(shardID, blockNum), data)
+}
+
+// ReadShardLastCrossLink read the last cross link of a shard
+func ReadShardLastCrossLink(db DatabaseReader, shardID uint32) ([]byte, error) {
+	return db.Get(shardLastCrosslinkKey(shardID))
+}
+
+// WriteShardLastCrossLink stores the last cross link of a shard
+func WriteShardLastCrossLink(db DatabaseWriter, shardID uint32, data []byte) error {
+	return db.Put(shardLastCrosslinkKey(shardID), data)
 }
 
 // ReadCXReceipts retrieves all the transaction receipts belonging to a block.

@@ -60,7 +60,9 @@ var (
 	preimagePrefix = []byte("secure-key-")      // preimagePrefix + hash -> preimage
 	configPrefix   = []byte("ethereum-config-") // config prefix for the db
 
-	crosslinkPrefix = []byte("crosslink") // prefix for crosslink
+	shardLastCrosslinkPrefix = []byte("shard-last-cross-link") // prefix for shard last crosslink
+	crosslinkPrefix          = []byte("crosslink")             // prefix for crosslink
+	tempCrosslinkPrefix      = []byte("tempCrosslink")         // prefix for tempCrosslink
 
 	cxReceiptPrefix = []byte("cxReceipt") // prefix for cross shard transaction receipt
 
@@ -167,11 +169,26 @@ func epochVdfBlockNumberKey(epoch *big.Int) []byte {
 	return append(epochVdfBlockNumberPrefix, epoch.Bytes()...)
 }
 
+func shardLastCrosslinkKey(shardID uint32) []byte {
+	sbKey := make([]byte, 4)
+	binary.BigEndian.PutUint32(sbKey, shardID)
+	key := append(crosslinkPrefix, sbKey...)
+	return key
+}
+
 func crosslinkKey(shardID uint32, blockNum uint64) []byte {
 	sbKey := make([]byte, 12)
 	binary.BigEndian.PutUint32(sbKey, shardID)
 	binary.BigEndian.PutUint64(sbKey[4:], blockNum)
 	key := append(crosslinkPrefix, sbKey...)
+	return key
+}
+
+func tempCrosslinkKey(shardID uint32, blockNum uint64) []byte {
+	sbKey := make([]byte, 12)
+	binary.BigEndian.PutUint32(sbKey, shardID)
+	binary.BigEndian.PutUint64(sbKey[4:], blockNum)
+	key := append(tempCrosslinkPrefix, sbKey...)
 	return key
 }
 

@@ -12,7 +12,7 @@ type CXReceipt struct {
 	TxHash    common.Hash // hash of the cross shard transaction in source shard
 	Nonce     uint64
 	From      common.Address
-	To        common.Address
+	To        *common.Address
 	ShardID   uint32
 	ToShardID uint32
 	Amount    *big.Int
@@ -33,12 +33,12 @@ func (cs CXReceipts) GetRlp(i int) []byte {
 	return enc
 }
 
-// ShardID returns the destination shardID of the cxReceipt
+// ToShardID returns the destination shardID of the cxReceipt
 func (cs CXReceipts) ToShardID(i int) uint32 {
 	return cs[i].ToShardID
 }
 
 // NewCrossShardReceipt creates a cross shard receipt
-func NewCrossShardReceipt(txHash common.Hash, nonce uint64, from common.Address, to common.Address, shardID uint32, toShardID uint32, amount *big.Int) *CXReceipt {
+func NewCrossShardReceipt(txHash common.Hash, nonce uint64, from common.Address, to *common.Address, shardID uint32, toShardID uint32, amount *big.Int) *CXReceipt {
 	return &CXReceipt{TxHash: txHash, Nonce: nonce, From: from, To: to, ShardID: shardID, ToShardID: toShardID, Amount: amount}
 }
