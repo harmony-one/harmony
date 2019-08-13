@@ -70,7 +70,7 @@ var mainnetV0 = MustNewInstance(4, 150, 112, genesis.HarmonyAccounts, genesis.Fo
 var mainnetV0_1 = MustNewInstance(4, 152, 112, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV0_1, mainnetReshardingEpoch)
 var mainnetV0_2 = MustNewInstance(4, 200, 148, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV0_2, mainnetReshardingEpoch)
 var mainnetV0_3 = MustNewInstance(4, 210, 148, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV0_3, mainnetReshardingEpoch)
-var mainnetV0_4 = MustNewInstance(4, 215, 148, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV0_4, mainnetReshardingEpoch)
+var mainnetV0_4 = MustNewInstance(4, 216, 148, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV0_4, mainnetReshardingEpoch)
 
-//var mainnetV0_2 = MustNewInstance(8, 200, 100)
-//var mainnet6400 = MustNewInstance(16, 400, 50)
+//var mainnetV1 = MustNewInstance(4, 400, 280)
+//var mainnetV2 = MustNewInstance(6, 400, 199)

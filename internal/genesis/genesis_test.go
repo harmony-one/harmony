@@ -51,7 +51,10 @@ func testGenesisccounts(t *testing.T) {
 
 func TestCommitteeAccounts(test *testing.T) {
 	testAccounts(test, FoundationalNodeAccounts)
-	testAccounts(test, FoundationalNodeAccountsV1)
+	testAccounts(test, FoundationalNodeAccountsV0_1)
+	testAccounts(test, FoundationalNodeAccountsV0_2)
+	testAccounts(test, FoundationalNodeAccountsV0_3)
+	testAccounts(test, FoundationalNodeAccountsV0_4)
 	testAccounts(test, HarmonyAccounts)
 	testAccounts(test, TNHarmonyAccounts)
 	testAccounts(test, TNFoundationalAccounts)
