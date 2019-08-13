@@ -295,15 +295,6 @@ func (tx *Transaction) RawSignatureValues() (*big.Int, *big.Int, *big.Int) {
 // Transactions is a Transaction slice type for basic sorting.
 type Transactions []*Transaction
 
-// TODO: put these temp custom txs data structures into other places to keep Transaction type code clean.
-
-// RecentTxsStats is a recent transactions stats map tracking stats like BlockTxsCounts.
-type RecentTxsStats map[uint64]BlockTxsCounts
-
-// BlockTxsCounts is a transactions counts map of
-// the number of transactions made by each account in a block on this node.
-type BlockTxsCounts map[common.Address]uint64
-
 // Len returns the length of s.
 func (s Transactions) Len() int { return len(s) }
 
@@ -494,3 +485,10 @@ func (m Message) Data() []byte {
 func (m Message) CheckNonce() bool {
 	return m.checkNonce
 }
+
+// RecentTxsStats is a recent transactions stats map tracking stats like BlockTxsCounts.
+type RecentTxsStats map[uint64]BlockTxsCounts
+
+// BlockTxsCounts is a transactions counts map of
+// the number of transactions made by each account in a block on this node.
+type BlockTxsCounts map[common.Address]uint64

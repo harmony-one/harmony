@@ -91,7 +91,7 @@ func (w *Worker) throttleTxs(selected types.Transactions, recentTxsStats types.R
 		utils.GetLogInstance().Info("Throttling tx with max txs per account in a single block limit",
 			"tx Id", tx.Hash().Hex(),
 			"MaxNumRecentTxsPerAccountLimit", txsThrottleConfig.MaxNumRecentTxsPerAccountLimit)
-		return sender, shardingconfig.TxUnselect
+		return sender, shardingconfig.TxInvalid
 	}
 
 	return sender, shardingconfig.TxSelect
