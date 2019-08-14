@@ -47,17 +47,8 @@ type Worker struct {
 // the second is the throttling result enum for the transaction of interest.
 // Throttling happens based on the amount, frequency, etc.
 func (w *Worker) throttleTxs(selected types.Transactions, recentTxsStats types.RecentTxsStats, txsThrottleConfig *shardingconfig.TxsThrottleConfig, tx *types.Transaction) (common.Address, shardingconfig.TxThrottleFlag) {
-	chainID := tx.ChainID()
-	// Depending on the presence of the chain ID, sign with EIP155 or homestead
-	var s types.Signer
-	if chainID != nil {
-		s = types.NewEIP155Signer(chainID)
-	} else {
-		s = types.HomesteadSigner{}
-	}
-
 	var sender common.Address
-	msg, err := tx.AsMessage(s)
+	msg, err := tx.AsMessage(types.MakeSigner(w.config, w.chain.CurrentBlock().Number()))
 	if err != nil {
 		utils.GetLogInstance().Error("Error when parsing tx into message",
 			"tx Id", tx.Hash().Hex(), "err", err)

@@ -33,10 +33,11 @@ import (
 )
 
 var (
-	version string
-	builtBy string
-	builtAt string
-	commit  string
+	version   string
+	builtBy   string
+	builtAt   string
+	commit    string
+	nextNonce uint64
 )
 
 func printVersion(me string) {
@@ -213,18 +214,14 @@ func processStressTestCommand() {
 
 	*/
 
+	fmt.Println("Creating wallet node")
+	walletNode := createWalletNode()
+
 	senderAddress := common2.ParseAddr("one1uyshu2jgv8w465yc8kkny36thlt2wvel89tcmg")
 	receiverAddress := common2.ParseAddr("one1spshr72utf6rwxseaz339j09ed8p6f8ke370zj")
 	shardID := 1
 
-	walletNode := createWalletNode()
-
-	shardIDToAccountState := FetchBalance(senderAddress)
-	state := shardIDToAccountState[shardID]
-
-	balance := state.balance
-	// amount 1/10th of the balance
-	amountBigInt := balance.Div(balance, big.NewInt(10))
+	fmt.Printf("Sender account: %s:\n", common2.MustAddressToBech32(senderAddress))
 
 	// default inputData
 	data := make([]byte, 0)
@@ -235,12 +232,49 @@ func processStressTestCommand() {
 	gasPriceBigInt := big.NewInt(int64(gasPrice))
 	gasPriceBigInt = gasPriceBigInt.Mul(gasPriceBigInt, big.NewInt(denominations.Nano))
 
+	fmt.Printf("gas limit: %d, gas price: %d", gasLimit, gasPriceBigInt.Uint64())
+
 	senderPass := ""
 
-	for i := 0; i < 4; i++ {
-		currNonce := state.nonce
+	var shardIDToAccountStateSender []*AccountState
+	var shardIDToAccountStateReceiver []*AccountState
+	var senderState *AccountState
+	var receiverState *AccountState
+	var retry uint32
+
+	for i := 0; i < 10; i++ {
+		for retry = 0; retry < 10; retry++ {
+			shardIDToAccountStateSender = FetchBalance(senderAddress)
+			shardIDToAccountStateReceiver = FetchBalance(receiverAddress)
+
+			senderState = shardIDToAccountStateSender[shardID]
+			receiverState = shardIDToAccountStateReceiver[shardID]
+
+			if senderState.nonce == nextNonce {
+				break
+			}
+			time.Sleep(3 * time.Second)
+			fmt.Printf(".")
+		}
+
+		if retry == 10 {
+			fmt.Printf("\nRetry expired. Num txs made: %d\n", i)
+			break
+		}
+
+		nextNonce++
+
+		senderBalance := senderState.balance
+		receiverBalance := receiverState.balance
+
+		// amount 1/10th of the balance
+		amountBigInt := senderBalance.Div(senderBalance, big.NewInt(10))
+
+		fmt.Printf("\nsender: balance (shard %d:  %s, nonce: %v)\n", shardID, convertBalanceIntoReadableFormat(senderBalance), senderState.nonce)
+		fmt.Printf("receiver balance (shard %d:  %s, nonce: %v)\n", shardID, convertBalanceIntoReadableFormat(receiverBalance), receiverState.nonce)
+
 		tx := types.NewTransaction(
-			currNonce, receiverAddress, uint32(shardID), amountBigInt,
+			senderState.nonce, receiverAddress, uint32(shardID), amountBigInt,
 			gasLimit, gasPriceBigInt, data)
 
 		account, _ := ks.Find(accounts.Account{Address: senderAddress})
@@ -253,21 +287,10 @@ func processStressTestCommand() {
 			fmt.Println(ctxerror.New("submitTransaction failed",
 				"tx", tx, "shardID", shardID).WithCause(err))
 		}
-
-		for retry := 0; retry < 10; retry++ {
-			accountStates := FetchBalance(senderAddress)
-			state = accountStates[shardID]
-			fmt.Println("state.nonce", state.nonce)
-			if state.nonce == currNonce+1 {
-				break
-			}
-			time.Sleep(3 * time.Second)
-		}
 	}
 
-	fmt.Printf("Sender Account: %s:\n", common2.MustAddressToBech32(senderAddress))
 	for shardID, balanceNonce := range FetchBalance(senderAddress) {
-		fmt.Printf("    Balance in Shard %d:  %s, nonce: %v \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance), balanceNonce.nonce)
+		fmt.Printf("    Final: Balance in Shard %d:  %s, nonce: %v \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance), balanceNonce.nonce)
 	}
 }
 
