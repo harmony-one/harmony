@@ -25,7 +25,7 @@ const (
 	localnetMaxNumRecentTxsPerAccountLimit = 2
 	localnetMaxTxPoolSizeLimit             = 8000
 	localnetMaxNumTxsPerBlockLimit         = 1000
-	localnetRecentTxDuration               = 100 * time.Second
+	localnetRecentTxDuration               = 10 * time.Second
 )
 
 func (localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
