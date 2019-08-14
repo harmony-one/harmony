@@ -90,9 +90,8 @@ type Node struct {
 	BlockChannel          chan *types.Block    // The channel to send newly proposed blocks
 	ConfirmedBlockChannel chan *types.Block    // The channel to send confirmed blocks
 	BeaconBlockChannel    chan *types.Block    // The channel to send beacon blocks for non-beaconchain nodes
-	pendingTransactions   types.Transactions   // All the transactions received but not yet processed for Consensus
-	pendingTxMutex        sync.Mutex
-	DRand                 *drand.DRand // The instance for distributed randomness protocol
+
+	DRand *drand.DRand // The instance for distributed randomness protocol
 
 	// Shard databases
 	shardChains shardchain.Collection
@@ -111,7 +110,12 @@ type Node struct {
 	// BeaconNeighbors store only neighbor nodes in the beacon chain shard
 	BeaconNeighbors sync.Map // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
 
-	TxPool       *core.TxPool
+	TxPool *core.TxPool // TODO migrate to TxPool from pendingTransactions list below
+
+	pendingTransactions types.Transactions // All the transactions received but not yet processed for Consensus
+	pendingTxMutex      sync.Mutex
+	recentTxsStats      types.RecentTxsStats
+
 	Worker       *worker.Worker
 	BeaconWorker *worker.Worker // worker for beacon chain
 
@@ -225,46 +229,61 @@ func (node *Node) Beaconchain() *core.BlockChain {
 }
 
 func (node *Node) reducePendingTransactions() {
+	txPoolLimit := core.ShardingSchedule.MaxTxPoolSizeLimit()
+	curLen := len(node.pendingTransactions)
+
 	// If length of pendingTransactions is greater than TxPoolLimit then by greedy take the TxPoolLimit recent transactions.
-	if len(node.pendingTransactions) > TxPoolLimit+TxPoolLimit {
-		curLen := len(node.pendingTransactions)
-		node.pendingTransactions = append(types.Transactions(nil), node.pendingTransactions[curLen-TxPoolLimit:]...)
+	if curLen > txPoolLimit+txPoolLimit {
+		node.pendingTransactions = append(types.Transactions(nil), node.pendingTransactions[curLen-txPoolLimit:]...)
 		utils.GetLogger().Info("mem stat reduce pending transaction")
 	}
 }
 
 // Add new transactions to the pending transaction list.
 func (node *Node) addPendingTransactions(newTxs types.Transactions) {
-	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
-		node.pendingTxMutex.Lock()
-		node.pendingTransactions = append(node.pendingTransactions, newTxs...)
-		node.reducePendingTransactions()
-		node.pendingTxMutex.Unlock()
-		utils.GetLogInstance().Info("Got more transactions", "num", len(newTxs), "totalPending", len(node.pendingTransactions))
-	}
+	node.pendingTxMutex.Lock()
+	node.pendingTransactions = append(node.pendingTransactions, newTxs...)
+	node.reducePendingTransactions()
+	node.pendingTxMutex.Unlock()
+	utils.GetLogInstance().Info("Got more transactions", "num", len(newTxs), "totalPending", len(node.pendingTransactions))
 }
 
 // AddPendingTransaction adds one new transaction to the pending transaction list.
 func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
-	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
-		node.addPendingTransactions(types.Transactions{newTx})
-		utils.GetLogInstance().Debug("Got ONE more transaction", "totalPending", len(node.pendingTransactions))
-	}
+	node.addPendingTransactions(types.Transactions{newTx})
+	utils.GetLogInstance().Debug("Got ONE more transaction", "totalPending", len(node.pendingTransactions))
 }
 
 // Take out a subset of valid transactions from the pending transaction list
 // Note the pending transaction list will then contain the rest of the txs
-func (node *Node) getTransactionsForNewBlock(maxNumTxs int, coinbase common.Address) types.Transactions {
-	if node.NodeConfig.GetNetworkType() == nodeconfig.Mainnet {
-		return types.Transactions{}
-	}
+func (node *Node) getTransactionsForNewBlock(coinbase common.Address) types.Transactions {
 	node.pendingTxMutex.Lock()
-	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(node.pendingTransactions, maxNumTxs, coinbase)
+
+	txsThrottleConfig := core.ShardingSchedule.TxsThrottleConfig()
+
+	// the next block number to be added in consensus protocol, which is always one more than current chain header block
+	newBlockNum := node.Blockchain().CurrentBlock().NumberU64() + 1
+
+	// remove old (> txsThrottleConfigRecentTxDuration) blockNum keys from recentTxsStats and initiailize for the new block
+	for blockNum := range node.recentTxsStats {
+		recentTxsBlockNumGap := uint64(txsThrottleConfig.RecentTxDuration / node.BlockPeriod)
+		if recentTxsBlockNumGap < newBlockNum-blockNum {
+			delete(node.recentTxsStats, blockNum)
+		}
+	}
+	node.recentTxsStats[newBlockNum] = make(types.BlockTxsCounts)
+
+	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(newBlockNum, node.pendingTransactions, node.recentTxsStats, txsThrottleConfig, coinbase)
 
 	node.pendingTransactions = unselected
 	node.reducePendingTransactions()
-	utils.GetLogInstance().Debug("Selecting Transactions", "remainPending", len(node.pendingTransactions), "selected", len(selected), "invalidDiscarded", len(invalid))
+
+	utils.GetLogInstance().Info("Selecting Transactions",
+		"newBlockNum", newBlockNum,
+		"remainPending", len(node.pendingTransactions),
+		"invalidDiscarded", len(invalid))
 	node.pendingTxMutex.Unlock()
+
 	return selected
 }
 
@@ -330,6 +349,8 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		node.BlockChannel = make(chan *types.Block)
 		node.ConfirmedBlockChannel = make(chan *types.Block)
 		node.BeaconBlockChannel = make(chan *types.Block)
+
+		node.recentTxsStats = make(types.RecentTxsStats)
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, node.Blockchain().Config(), chain)
 		node.Worker = worker.New(node.Blockchain().Config(), chain, node.Consensus, node.Consensus.ShardID)
 
@@ -491,17 +512,17 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 	var err error
 	node.shardGroupReceiver, err = node.host.GroupReceiver(node.NodeConfig.GetShardGroupID())
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to create shard receiver", "msg", err)
+		utils.GetLogInstance().Error("Failed to create shard receiver", "err", err)
 	}
 
 	node.globalGroupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to create global receiver", "msg", err)
+		utils.GetLogInstance().Error("Failed to create global receiver", "err", err)
 	}
 
 	node.clientReceiver, err = node.host.GroupReceiver(node.NodeConfig.GetClientGroupID())
 	if err != nil {
-		utils.GetLogInstance().Error("Failed to create client receiver", "msg", err)
+		utils.GetLogInstance().Error("Failed to create client receiver", "err", err)
 	}
 	return nodeConfig, chanPeer
 }

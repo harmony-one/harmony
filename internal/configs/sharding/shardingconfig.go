@@ -4,6 +4,7 @@ package shardingconfig
 
 import (
 	"math/big"
+	"time"
 
 	"github.com/harmony-one/harmony/internal/genesis"
 )
@@ -21,6 +22,24 @@ type Schedule interface {
 
 	// IsLastBlock check if the block is the last block in the epoch
 	IsLastBlock(blockNum uint64) bool
+
+	// Max amount limit for a valid transaction
+	MaxTxAmountLimit() *big.Int
+
+	// Max number of transactions of a particular account per block level
+	MaxNumRecentTxsPerAccountLimit() uint64
+
+	// Max total number of transactions allowed as pending transactions in transaction pool
+	MaxTxPoolSizeLimit() int
+
+	// Max total number of transactions allowed to be processed per block
+	MaxNumTxsPerBlockLimit() int
+
+	// How long "recent" means for transaction in time Duration unit
+	RecentTxDuration() time.Duration
+
+	// configuration for throttling pending transactions
+	TxsThrottleConfig() *TxsThrottleConfig
 }
 
 // Instance is one sharding configuration instance.
@@ -46,4 +65,46 @@ type Instance interface {
 
 	// ReshardingEpoch returns a list of Epoch while off-chain resharding happens
 	ReshardingEpoch() []*big.Int
+}
+
+// TxThrottleFlag is the throttling flag for each transaction
+// Refer below enum declaration for more context.
+type TxThrottleFlag int
+
+// TxThrottleFlag is determined per transaction
+// during the new block proposal and pending transactions throttling
+const (
+	TxSelect TxThrottleFlag = iota
+	TxUnselect
+	TxInvalid
+)
+
+func (result TxThrottleFlag) String() string {
+	switch result {
+	case TxSelect:
+		return "TxSelect"
+	case TxUnselect:
+		return "TxUnselect"
+	case TxInvalid:
+		return "TxInvalid"
+	}
+	return "TxThrottleUnknown"
+}
+
+// TxsThrottleConfig contains configuration for throttling pending transactions per node block
+type TxsThrottleConfig struct {
+	// Max amount limit for a valid transaction
+	MaxTxAmountLimit *big.Int
+
+	// Max number of transactions of a particular account for the past hour
+	RecentTxDuration time.Duration
+
+	// Max number of transactions of a particular account for the past hour
+	MaxNumRecentTxsPerAccountLimit uint64
+
+	// Max total number of transactions allowed as pending transactions in transaction pool
+	MaxTxPoolSizeLimit int
+
+	// Max total number of transactions allowed to be processed per block
+	MaxNumTxsPerBlockLimit int
 }

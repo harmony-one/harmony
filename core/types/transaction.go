@@ -19,6 +19,7 @@ package types
 import (
 	"container/heap"
 	"errors"
+	"fmt"
 	"io"
 	"math/big"
 	"sync/atomic"
@@ -27,6 +28,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
+	common2 "github.com/harmony-one/harmony/internal/common"
 )
 
 // no go:generate gencodec -type txdata -field-override txdataMarshaling -out gen_tx_json.go
@@ -484,4 +486,31 @@ func (m Message) Data() []byte {
 // CheckNonce returns checkNonce of Message.
 func (m Message) CheckNonce() bool {
 	return m.checkNonce
+}
+
+// RecentTxsStats is a recent transactions stats map tracking stats like BlockTxsCounts.
+type RecentTxsStats map[uint64]BlockTxsCounts
+
+// String returns the string formatted representation of RecentTxsStats
+func (rts RecentTxsStats) String() string {
+	ret := "{ "
+	for blockNum, blockTxsCounts := range rts {
+		ret += fmt.Sprintf("blockNum:%d=%s", blockNum, blockTxsCounts.String())
+	}
+	ret += " }"
+	return ret
+}
+
+// BlockTxsCounts is a transactions counts map of
+// the number of transactions made by each account in a block on this node.
+type BlockTxsCounts map[common.Address]uint64
+
+// String returns the string formatted representation of BlockTxsCounts
+func (btc BlockTxsCounts) String() string {
+	ret := "{ "
+	for sender, numTxs := range btc {
+		ret += fmt.Sprintf("%s:%d,", common2.MustAddressToBech32(sender), numTxs)
+	}
+	ret += " }"
+	return ret
 }

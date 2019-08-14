@@ -2,7 +2,9 @@ package shardingconfig
 
 import (
 	"math/big"
+	"time"
 
+	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/internal/genesis"
 )
 
@@ -13,6 +15,12 @@ const (
 	mainnetV0_2Epoch   = 5
 	mainnetV0_3Epoch   = 8
 	mainnetV0_4Epoch   = 10
+
+	mainnetMaxTxAmountLimit               = 1e3 // unit is interface{} One
+	mainnetMaxNumRecentTxsPerAccountLimit = 1e2
+	mainnetMaxTxPoolSizeLimit             = 8000
+	mainnetMaxNumTxsPerBlockLimit         = 1000
+	mainnetRecentTxDuration               = time.Hour
 )
 
 // MainnetSchedule is the mainnet sharding configuration schedule.
@@ -65,7 +73,40 @@ func (ms mainnetSchedule) IsLastBlock(blockNum uint64) bool {
 	}
 }
 
+func (ms mainnetSchedule) MaxTxAmountLimit() *big.Int {
+	amountBigInt := big.NewInt(mainnetMaxTxAmountLimit)
+	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(denominations.One))
+	return amountBigInt
+}
+
+func (ms mainnetSchedule) MaxNumRecentTxsPerAccountLimit() uint64 {
+	return mainnetMaxNumRecentTxsPerAccountLimit
+}
+
+func (ms mainnetSchedule) MaxTxPoolSizeLimit() int {
+	return mainnetMaxTxPoolSizeLimit
+}
+
+func (ms mainnetSchedule) MaxNumTxsPerBlockLimit() int {
+	return mainnetMaxNumTxsPerBlockLimit
+}
+
+func (ms mainnetSchedule) RecentTxDuration() time.Duration {
+	return mainnetRecentTxDuration
+}
+
+func (ms mainnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
+	return &TxsThrottleConfig{
+		MaxTxAmountLimit:               ms.MaxTxAmountLimit(),
+		MaxNumRecentTxsPerAccountLimit: ms.MaxNumRecentTxsPerAccountLimit(),
+		MaxTxPoolSizeLimit:             ms.MaxTxPoolSizeLimit(),
+		MaxNumTxsPerBlockLimit:         ms.MaxNumTxsPerBlockLimit(),
+		RecentTxDuration:               ms.RecentTxDuration(),
+	}
+}
+
 var mainnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(mainnetV0_1Epoch), big.NewInt(mainnetV0_2Epoch), big.NewInt(mainnetV0_3Epoch), big.NewInt(mainnetV0_4Epoch)}
+
 var mainnetV0 = MustNewInstance(4, 150, 112, genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, mainnetReshardingEpoch)
 var mainnetV0_1 = MustNewInstance(4, 152, 112, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV0_1, mainnetReshardingEpoch)
 var mainnetV0_2 = MustNewInstance(4, 200, 148, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV0_2, mainnetReshardingEpoch)

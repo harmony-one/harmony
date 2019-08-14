@@ -2,6 +2,9 @@ package shardingconfig
 
 import (
 	"math/big"
+	"time"
+
+	"github.com/harmony-one/harmony/common/denominations"
 )
 
 const (
@@ -30,6 +33,38 @@ func (s fixedSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
 func (s fixedSchedule) IsLastBlock(blockNum uint64) bool {
 	blocks := s.BlocksPerEpoch()
 	return blockNum%blocks == blocks-1
+}
+
+func (s fixedSchedule) MaxTxAmountLimit() *big.Int {
+	amountBigInt := big.NewInt(mainnetMaxTxAmountLimit)
+	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(denominations.One))
+	return amountBigInt
+}
+
+func (s fixedSchedule) MaxNumRecentTxsPerAccountLimit() uint64 {
+	return mainnetMaxNumRecentTxsPerAccountLimit
+}
+
+func (s fixedSchedule) MaxTxPoolSizeLimit() int {
+	return mainnetMaxTxPoolSizeLimit
+}
+
+func (s fixedSchedule) MaxNumTxsPerBlockLimit() int {
+	return mainnetMaxNumTxsPerBlockLimit
+}
+
+func (s fixedSchedule) RecentTxDuration() time.Duration {
+	return mainnetRecentTxDuration
+}
+
+func (s fixedSchedule) TxsThrottleConfig() *TxsThrottleConfig {
+	return &TxsThrottleConfig{
+		MaxTxAmountLimit:               s.MaxTxAmountLimit(),
+		MaxNumRecentTxsPerAccountLimit: s.MaxNumRecentTxsPerAccountLimit(),
+		MaxTxPoolSizeLimit:             s.MaxTxPoolSizeLimit(),
+		MaxNumTxsPerBlockLimit:         s.MaxNumTxsPerBlockLimit(),
+		RecentTxDuration:               s.RecentTxDuration(),
+	}
 }
 
 // NewFixedSchedule returns a sharding configuration schedule that uses the
