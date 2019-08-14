@@ -1119,13 +1119,15 @@ func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 				err = bc.WriteShardStateBytes(epoch, header.ShardState)
 				if err != nil {
 					header.Logger(utils.Logger()).Warn().Err(err).Msg("cannot store shard state")
+					return n, err
 				}
 			}
 			if len(header.CrossLinks) > 0 {
 				crossLinks := &types.CrossLinks{}
-				err := rlp.DecodeBytes(header.CrossLinks, crossLinks)
+				err = rlp.DecodeBytes(header.CrossLinks, crossLinks)
 				if err != nil {
 					header.Logger(utils.Logger()).Warn().Err(err).Msg("[insertChain] cannot parse cross links")
+					return n, err
 				}
 				for _, crossLink := range *crossLinks {
 					bc.WriteCrossLinks(types.CrossLinks{crossLink}, false)

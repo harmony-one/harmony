@@ -165,7 +165,7 @@ func ConstructBlocksSyncMessage(blocks []*types.Block) []byte {
 	return byteBuffer.Bytes()
 }
 
-// ConstructCrossLinkHeadersMessage constructs cross link header message to send blocks to beacon chain
+// ConstructCrossLinkHeadersMessage constructs cross link header message to send to beacon chain
 func ConstructCrossLinkHeadersMessage(headers []*types.Header) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
 	byteBuffer.WriteByte(byte(Block))
