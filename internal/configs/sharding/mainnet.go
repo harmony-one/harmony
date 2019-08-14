@@ -11,13 +11,12 @@ import (
 const (
 	mainnetEpochBlock1 = 344064 // 21 * 2^14
 	blocksPerShard     = 16384  // 2^14
-
 	mainnetV0_1Epoch   = 1
 	mainnetV0_2Epoch   = 5
 	mainnetV0_3Epoch   = 8
 	mainnetV0_4Epoch   = 10
 
-	mainnetMaxTxAmountLimit               = 1e3 // unit is in One
+	mainnetMaxTxAmountLimit               = 1e3 // unit is interface{} One
 	mainnetMaxNumRecentTxsPerAccountLimit = 1e2
 	mainnetMaxTxPoolSizeLimit             = 8000
 	mainnetMaxNumTxsPerBlockLimit         = 1000
