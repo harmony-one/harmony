@@ -158,16 +158,16 @@ func (node *Node) ProcessReceiptMessage(msgPayload []byte) {
 	if len(merkleProof.ShardID) == 0 {
 		utils.Logger().Warn().Msg("[ProcessReceiptMessage] There is No non-empty destination shards")
 		return
-	} else {
-		for j := 0; j < len(merkleProof.ShardID); j++ {
-			sKey := make([]byte, 4)
-			binary.BigEndian.PutUint32(sKey, merkleProof.ShardID[j])
-			byteBuffer.Write(sKey)
-			byteBuffer.Write(merkleProof.CXShardHash[j][:])
-			if merkleProof.ShardID[j] == node.Consensus.ShardID {
-				foundMyShard = true
-				myShardRoot = merkleProof.CXShardHash[j]
-			}
+	}
+
+	for j := 0; j < len(merkleProof.ShardID); j++ {
+		sKey := make([]byte, 4)
+		binary.BigEndian.PutUint32(sKey, merkleProof.ShardID[j])
+		byteBuffer.Write(sKey)
+		byteBuffer.Write(merkleProof.CXShardHash[j][:])
+		if merkleProof.ShardID[j] == node.Consensus.ShardID {
+			foundMyShard = true
+			myShardRoot = merkleProof.CXShardHash[j]
 		}
 	}
 
