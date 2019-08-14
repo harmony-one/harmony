@@ -268,7 +268,7 @@ func processStressTestCommand() {
 		receiverBalance := receiverState.balance
 
 		// amount 1/10th of the balance
-		amountBigInt := senderBalance.Div(senderBalance, big.NewInt(1))
+		amountBigInt := senderBalance.Div(senderBalance, big.NewInt(10))
 
 		fmt.Printf("\nsender: balance (shard %d:  %s, nonce: %v)\n", shardID, convertBalanceIntoReadableFormat(senderBalance), senderState.nonce)
 		fmt.Printf("receiver balance (shard %d:  %s, nonce: %v)\n", shardID, convertBalanceIntoReadableFormat(receiverBalance), receiverState.nonce)
