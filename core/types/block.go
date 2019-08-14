@@ -125,8 +125,8 @@ func (h *Header) Logger(logger *zerolog.Logger) *zerolog.Logger {
 		With().
 		Str("blockHash", h.Hash().Hex()).
 		Uint32("blockShard", h.ShardID).
-		Str("blockEpoch", h.Epoch.String()).
-		Str("blockNumber", h.Number.String()).
+		Uint64("blockEpoch", h.Epoch.Uint64()).
+		Uint64("blockNumber", h.Number.Uint64()).
 		Logger()
 	return &nlogger
 }
