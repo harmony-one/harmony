@@ -342,8 +342,13 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 	// Verify lastCommitSig
 	if newBlock.NumberU64() > 1 {
 		header := newBlock.Header()
-		shardState, err := node.Blockchain().ReadShardState(header.Epoch)
-		committee := shardState.FindCommitteeByID(header.ShardID)
+		parentBlock := node.Blockchain().GetBlockByNumber(newBlock.NumberU64() - 1)
+		if parentBlock == nil {
+			return ctxerror.New("[VerifyNewBlock] Failed to get parent block", "shardID", header.ShardID, "blockNum", header.Number)
+		}
+		parentHeader := parentBlock.Header()
+		shardState, err := node.Blockchain().ReadShardState(parentHeader.Epoch)
+		committee := shardState.FindCommitteeByID(parentHeader.ShardID)
 
 		if err != nil || committee == nil {
 			return ctxerror.New("[VerifyNewBlock] Failed to read shard state for cross link header", "shardID", header.ShardID, "blockNum", header.Number).WithCause(err)
@@ -364,7 +369,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 			return ctxerror.New("[VerifyNewBlock] cannot convert BLS public key", "shardID", header.ShardID, "blockNum", header.Number).WithCause(err)
 		}
 
-		mask, err := bls_cosi.NewMask(node.Consensus.PublicKeys, nil)
+		mask, err := bls_cosi.NewMask(committerKeys, nil)
 		if err != nil {
 			return ctxerror.New("[VerifyNewBlock] cannot create group sig mask", "shardID", header.ShardID, "blockNum", header.Number).WithCause(err)
 		}
@@ -382,7 +387,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 		binary.LittleEndian.PutUint64(blockNumBytes, header.Number.Uint64()-1)
 		commitPayload := append(blockNumBytes, header.ParentHash[:]...)
 		if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
-			return ctxerror.New("[VerifyNewBlock] Failed to verify the signature for last commit sig", "shardID", header.ShardID, "blockNum", header.Number, "keys", committerKeys, "consensusPubKeys", node.Consensus.PublicKeys)
+			return ctxerror.New("[VerifyNewBlock] Failed to verify the signature for last commit sig", "shardID", header.ShardID, "blockNum", header.Number)
 		}
 	}
 	// End Verify lastCommitSig
