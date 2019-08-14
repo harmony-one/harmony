@@ -6,12 +6,16 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	libp2p "github.com/libp2p/go-libp2p"
 	libp2p_crypto "github.com/libp2p/go-libp2p-core/crypto"
+	libp2p_disc "github.com/libp2p/go-libp2p-core/discovery"
 	libp2p_host "github.com/libp2p/go-libp2p-core/host"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	libp2p_peerstore "github.com/libp2p/go-libp2p-core/peerstore"
+	libp2p_disc_impl "github.com/libp2p/go-libp2p-discovery"
+	libp2p_dht_impl "github.com/libp2p/go-libp2p-kad-dht"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
@@ -37,6 +41,24 @@ type pubsub interface {
 	Subscribe(topic string, opts ...libp2p_pubsub.SubOpt) (*libp2p_pubsub.Subscription, error)
 }
 
+// discoverer captures the consumer/discoverer part of the service discovery
+// interface we expect from libp2p.
+// See "github.com/libp2p/go-libp2p-core/discovery".Discoverer for details.
+type discoverer interface {
+	FindPeers(
+		ctx context.Context, ns string, opts ...libp2p_disc.Option,
+	) (peers <-chan libp2p_peer.AddrInfo, err error)
+}
+
+// advertiser captures the provider/advertiser part of the service discovery
+// interface we expect from libp2p.
+// See "github.com/libp2p/go-libp2p-core/discovery".Advertiser for details.
+type advertiser interface {
+	Advertise(
+		ctx context.Context, ns string, opts ...libp2p_disc.Option,
+	) (ttl time.Duration, err error)
+}
+
 // HostV2 is the version 2 p2p host
 type HostV2 struct {
 	h      libp2p_host.Host
@@ -50,6 +72,12 @@ type HostV2 struct {
 
 	// logger
 	logger *zerolog.Logger
+
+	// DHT-based content/peer/service routing
+	dht  *libp2p_dht_impl.IpfsDHT
+	adv  advertiser
+	disc discoverer
+}
 }
 
 // SendMessageToGroups sends a message to one or more multicast groups.
@@ -172,6 +200,11 @@ func New(self *p2p.Peer, priKey libp2p_crypto.PrivKey) *HostV2 {
 	// pubsub, err := libp2p_pubsub.NewFloodSub(ctx, p2pHost)
 	catchError(err)
 
+	dht, err := libp2p_dht_impl.New(ctx, p2pHost)
+	catchError(err)
+
+	disc := libp2p_disc_impl.NewRoutingDiscovery(dht)
+
 	self.PeerID = p2pHost.ID()
 
 	subLogger := logger.With().Str("hostID", p2pHost.ID().Pretty()).Logger()
@@ -182,6 +215,10 @@ func New(self *p2p.Peer, priKey libp2p_crypto.PrivKey) *HostV2 {
 		self:   *self,
 		priKey: priKey,
 		logger: &subLogger,
+
+		dht:  dht,
+		adv:  disc,
+		disc: disc,
 	}
 
 	h.logger.Debug().
@@ -205,6 +242,9 @@ func (host *HostV2) GetSelfPeer() p2p.Peer {
 
 // Close closes the host
 func (host *HostV2) Close() error {
+	if err := host.dht.Close(); err != nil {
+		host.logger.Warn().Err(err).Msg("cannot close DHT")
+	}
 	return host.h.Close()
 }
 
