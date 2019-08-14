@@ -11,6 +11,7 @@ import (
 const (
 	mainnetEpochBlock1 = 344064 // 21 * 2^14
 	blocksPerShard     = 16384  // 2^14
+
 	mainnetV0_1Epoch   = 1
 	mainnetV0_2Epoch   = 5
 	mainnetV0_3Epoch   = 8
