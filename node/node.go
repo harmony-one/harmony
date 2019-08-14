@@ -265,8 +265,8 @@ func (node *Node) getTransactionsForNewBlock(coinbase common.Address) types.Tran
 	newBlockNum := node.Blockchain().CurrentBlock().NumberU64() + 1
 
 	// remove old (> txsThrottleConfigRecentTxDuration) blockNum keys from recentTxsStats and initiailize for the new block
-	recentTxsBlockNumGap := uint64(txsThrottleConfig.RecentTxDuration / node.BlockPeriod)
 	for blockNum := range node.recentTxsStats {
+		recentTxsBlockNumGap := uint64(txsThrottleConfig.RecentTxDuration / node.BlockPeriod)
 		if recentTxsBlockNumGap < newBlockNum-blockNum {
 			delete(node.recentTxsStats, blockNum)
 		}
