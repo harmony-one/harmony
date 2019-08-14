@@ -13,10 +13,10 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 
 	libp2p "github.com/libp2p/go-libp2p"
-	libp2p_crypto "github.com/libp2p/go-libp2p-crypto"
-	libp2p_host "github.com/libp2p/go-libp2p-host"
-	libp2p_peer "github.com/libp2p/go-libp2p-peer"
-	libp2p_peerstore "github.com/libp2p/go-libp2p-peerstore"
+	libp2p_crypto "github.com/libp2p/go-libp2p-core/crypto"
+	libp2p_host "github.com/libp2p/go-libp2p-core/host"
+	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
+	libp2p_peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	ma "github.com/multiformats/go-multiaddr"
 )
@@ -228,7 +228,7 @@ func (host *HostV2) ConnectHostPeer(peer p2p.Peer) {
 		host.logger.Error().Err(err).Interface("peer", peer).Msg("ConnectHostPeer")
 		return
 	}
-	peerInfo, err := libp2p_peerstore.InfoFromP2pAddr(peerAddr)
+	peerInfo, err := libp2p_peer.AddrInfoFromP2pAddr(peerAddr)
 	if err != nil {
 		host.logger.Error().Err(err).Interface("peer", peer).Msg("ConnectHostPeer")
 		return
