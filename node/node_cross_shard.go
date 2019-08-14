@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -189,9 +190,14 @@ func (node *Node) ProcessReceiptMessage(msgPayload []byte) {
 
 	txs := types.Transactions{}
 	inputData, _ := base64.StdEncoding.DecodeString("")
+	gas, err := core.IntrinsicGas(inputData, false, true)
+	if err != nil {
+		utils.Logger().Warn().Err(err).Msg("cannot calculate required gas")
+		return
+	}
 	for _, cx := range cxReceipts {
 		// TODO chao: add gas fee to incentivize
-		tx := types.NewCrossShardTransaction(0, cx.To, cx.ShardID, cx.ToShardID, cx.Amount, 0, nil, inputData, types.AdditionOnly)
+		tx := types.NewCrossShardTransaction(0, cx.To, cx.ToShardID, cx.ToShardID, cx.Amount, gas, nil, inputData, types.AdditionOnly)
 		txs = append(txs, tx)
 	}
 	node.addPendingTransactions(txs)
