@@ -242,7 +242,7 @@ func processStressTestCommand() {
 	var receiverState *AccountState
 	var retry uint32
 
-	for i := 0; i < 10; i++ {
+	for i := 0; ; i++ {
 		for retry = 0; retry < 10; retry++ {
 			shardIDToAccountStateSender = FetchBalance(senderAddress)
 			shardIDToAccountStateReceiver = FetchBalance(receiverAddress)
@@ -268,10 +268,15 @@ func processStressTestCommand() {
 		receiverBalance := receiverState.balance
 
 		// amount 1/10th of the balance
-		amountBigInt := senderBalance.Div(senderBalance, big.NewInt(10))
+		amountBigInt := senderBalance.Div(senderBalance, big.NewInt(1))
 
 		fmt.Printf("\nsender: balance (shard %d:  %s, nonce: %v)\n", shardID, convertBalanceIntoReadableFormat(senderBalance), senderState.nonce)
 		fmt.Printf("receiver balance (shard %d:  %s, nonce: %v)\n", shardID, convertBalanceIntoReadableFormat(receiverBalance), receiverState.nonce)
+
+		// stop stress testing here after printing out the final balance
+		if i == 10 {
+			break
+		}
 
 		tx := types.NewTransaction(
 			senderState.nonce, receiverAddress, uint32(shardID), amountBigInt,

@@ -69,7 +69,7 @@ func (w *Worker) throttleTxs(selected types.Transactions, recentTxsStats types.R
 		utils.GetLogInstance().Info("Throttling tx with max amount limit",
 			"tx Id", tx.Hash().Hex(),
 			"MaxTxAmountLimit", txsThrottleConfig.MaxTxAmountLimit.Uint64(),
-			"Tx amount", tx.Value().Uint64())
+			"Tx amount", tx.Value())
 		return sender, shardingconfig.TxInvalid
 	}
 
