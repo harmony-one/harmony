@@ -68,19 +68,19 @@ bootnode = /ip4/99.81.170.167/tcp/9867/p2p/QmRVbTpEYup8dSaURZfF6ByrMTSKa4UyUzJhS
 shards = 4
 
 [pangaea.shard0.rpc]
-rpc = l0.p.hmny.io:14555
-rpc = s0.p.hmny.io:14555
+rpc = 35.163.109.212:14555 # 4-PANGAEA-explorer_node-od-2019-08-07_21_04_30
+rpc = 52.90.150.67:14555 # 1-PANGAEA-leader-od-2019-08-07_21_03_57
 
 [pangaea.shard1.rpc]
-rpc = l1.p.hmny.io:14555
-rpc = s1.p.hmny.io:14555
+rpc = 18.218.100.167:14555 # 2-PANGAEA-explorer_node-od-2019-08-07_21_04_30
+rpc = 3.16.123.229:14555 # 2-PANGAEA-leader-od-2019-08-07_21_03_57
 
 [pangaea.shard2.rpc]
-rpc = l2.p.hmny.io:14555
-rpc = s2.p.hmny.io:14555
+rpc = 34.242.85.86:14555 # 8-PANGAEA-explorer_node-od-2019-08-07_21_04_30
+rpc = 52.51.16.220:14555 # 8-PANGAEA-leader-od-2019-08-07_21_03_57
 
 [pangaea.shard3.rpc]
-rpc = l3.p.hmny.io:14555
-rpc = s3.p.hmny.io:14555
+rpc = 3.80.89.174:14555 # 1-PANGAEA-explorer_node-od-2019-08-07_21_04_30
+rpc = 54.213.145.224:14555 # 4-PANGAEA-leader-od-2019-08-07_21_03_57
 `
 )
