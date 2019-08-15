@@ -95,7 +95,7 @@ type Header struct {
 	Vrf                 []byte      `json:"vrf"`
 	Vdf                 []byte      `json:"vdf"`
 	ShardState          []byte      `json:"shardState"`
-	CrossLink           []byte      `json:"crossLink"`
+	CrossLinks          []byte      `json:"crossLink"`
 }
 
 // field type overrides for gencodec

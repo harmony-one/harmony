@@ -4,6 +4,8 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/rlp"
+
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/harmony-one/harmony/core"
@@ -87,7 +89,71 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 						}
 					}
 
-					newBlock, err = node.Worker.Commit(sig, mask, viewID, coinbase)
+					if node.NodeConfig.ShardID == 0 {
+						curBlock := node.Blockchain().CurrentBlock()
+						numShards := core.ShardingSchedule.InstanceForEpoch(curBlock.Header().Epoch).NumShards()
+
+						shardCrossLinks := make([]types.CrossLinks, numShards)
+
+						for i := 0; i < int(numShards); i++ {
+							curShardID := uint32(i)
+							lastLink, err := node.Blockchain().ReadShardLastCrossLink(curShardID)
+
+							blockNum := big.NewInt(0)
+							blockNumoffset := 0
+							if err == nil && lastLink != nil {
+								blockNumoffset = 1
+								blockNum = lastLink.BlockNum()
+							}
+
+							for true {
+								link, err := node.Blockchain().ReadCrossLink(curShardID, blockNum.Uint64()+uint64(blockNumoffset), true)
+								if err != nil || link == nil {
+									break
+								}
+
+								if link.BlockNum().Uint64() > 1 {
+									err := node.VerifyCrosslinkHeader(lastLink.Header(), link.Header())
+									if err != nil {
+										utils.Logger().Debug().
+											Err(err).
+											Msgf("[CrossLink] Failed verifying temp cross link %d", link.BlockNum().Uint64())
+										break
+									}
+									lastLink = link
+								}
+								shardCrossLinks[i] = append(shardCrossLinks[i], *link)
+
+								blockNumoffset++
+							}
+
+						}
+
+						crossLinksToPropose := types.CrossLinks{}
+						for _, crossLinks := range shardCrossLinks {
+							crossLinksToPropose = append(crossLinksToPropose, crossLinks...)
+						}
+						if len(crossLinksToPropose) != 0 {
+							crossLinksToPropose.Sort()
+
+							data, err := rlp.EncodeToBytes(crossLinksToPropose)
+							if err != nil {
+								utils.Logger().Debug().
+									Err(err).
+									Msg("Failed encoding cross links")
+								continue
+							}
+							newBlock, err = node.Worker.CommitWithCrossLinks(sig, mask, viewID, coinbase, data)
+							utils.Logger().Debug().
+								Uint64("blockNum", newBlock.NumberU64()).
+								Int("numCrossLinks", len(crossLinksToPropose)).
+								Msg("Successfully added cross links into new block")
+						} else {
+							newBlock, err = node.Worker.Commit(sig, mask, viewID, coinbase)
+						}
+					} else {
+						newBlock, err = node.Worker.Commit(sig, mask, viewID, coinbase)
+					}
 
 					if err != nil {
 						ctxerror.Log15(utils.GetLogger().Error,

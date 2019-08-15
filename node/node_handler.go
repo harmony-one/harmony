@@ -3,6 +3,7 @@ package node
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"math"
 	"math/big"
@@ -29,6 +30,7 @@ import (
 	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -190,10 +192,10 @@ func (node *Node) messageHandler(content []byte, sender libp2p_peer.ID) {
 
 			case proto_node.Header:
 				// only beacon chain will accept the header from other shards
-				if node.Consensus.ShardID != 0 {
+				utils.Logger().Debug().Msg("NET: received message: Node/Header")
+				if node.NodeConfig.ShardID != 0 {
 					return
 				}
-				utils.Logger().Debug().Msg("NET: received message: Node/Header")
 				node.ProcessHeaderMessage(msgPayload[1:]) // skip first byte which is blockMsgType
 
 			case proto_node.Receipt:
@@ -285,6 +287,24 @@ func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 	}
 }
 
+// BroadcastCrossLinkHeader is called by consensus leader to send the new header as cross link to beacon chain.
+func (node *Node) BroadcastCrossLinkHeader(newBlock *types.Block) {
+	utils.Logger().Info().Msgf("Broadcasting new header to beacon chain groupID %s", node.NodeConfig)
+	lastThreeHeaders := []*types.Header{}
+
+	block := node.Blockchain().GetBlockByNumber(newBlock.NumberU64() - 2)
+	if block != nil {
+		lastThreeHeaders = append(lastThreeHeaders, block.Header())
+	}
+	block = node.Blockchain().GetBlockByNumber(newBlock.NumberU64() - 1)
+	if block != nil {
+		lastThreeHeaders = append(lastThreeHeaders, block.Header())
+	}
+	lastThreeHeaders = append(lastThreeHeaders, newBlock.Header())
+
+	node.host.SendMessageToGroups([]p2p.GroupID{node.NodeConfig.GetBeaconGroupID()}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCrossLinkHeadersMessage(lastThreeHeaders)))
+}
+
 // BroadcastCXReceipts broadcasts cross shard receipts to correspoding
 // destination shards
 func (node *Node) BroadcastCXReceipts(newBlock *types.Block) {
@@ -313,13 +333,65 @@ func (node *Node) BroadcastCXReceipts(newBlock *types.Block) {
 		groupID := p2p.ShardID(i)
 		go node.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(groupID)}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCXReceiptsMessage(cxReceipts, merkleProof)))
 	}
-
 }
 
 // VerifyNewBlock is called by consensus participants to verify the block (account model) they are running consensus on
 func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 	// TODO ek – where do we verify parent-child invariants,
 	//  e.g. "child.Number == child.IsGenesis() ? 0 : parent.Number+1"?
+	// Verify lastCommitSig
+	if newBlock.NumberU64() > 1 {
+		header := newBlock.Header()
+		parentBlock := node.Blockchain().GetBlockByNumber(newBlock.NumberU64() - 1)
+		if parentBlock == nil {
+			return ctxerror.New("[VerifyNewBlock] Failed to get parent block", "shardID", header.ShardID, "blockNum", header.Number)
+		}
+		parentHeader := parentBlock.Header()
+		shardState, err := node.Blockchain().ReadShardState(parentHeader.Epoch)
+		committee := shardState.FindCommitteeByID(parentHeader.ShardID)
+
+		if err != nil || committee == nil {
+			return ctxerror.New("[VerifyNewBlock] Failed to read shard state for cross link header", "shardID", header.ShardID, "blockNum", header.Number).WithCause(err)
+		}
+		var committerKeys []*bls.PublicKey
+
+		parseKeysSuccess := true
+		for _, member := range committee.NodeList {
+			committerKey := new(bls.PublicKey)
+			err = member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
+			if err != nil {
+				parseKeysSuccess = false
+				break
+			}
+			committerKeys = append(committerKeys, committerKey)
+		}
+		if !parseKeysSuccess {
+			return ctxerror.New("[VerifyNewBlock] cannot convert BLS public key", "shardID", header.ShardID, "blockNum", header.Number).WithCause(err)
+		}
+
+		mask, err := bls_cosi.NewMask(committerKeys, nil)
+		if err != nil {
+			return ctxerror.New("[VerifyNewBlock] cannot create group sig mask", "shardID", header.ShardID, "blockNum", header.Number).WithCause(err)
+		}
+		if err := mask.SetMask(header.LastCommitBitmap); err != nil {
+			return ctxerror.New("[VerifyNewBlock] cannot set group sig mask bits", "shardID", header.ShardID, "blockNum", header.Number).WithCause(err)
+		}
+
+		aggSig := bls.Sign{}
+		err = aggSig.Deserialize(header.LastCommitSignature[:])
+		if err != nil {
+			return ctxerror.New("[VerifyNewBlock] unable to deserialize multi-signature from payload").WithCause(err)
+		}
+
+		blockNumBytes := make([]byte, 8)
+		binary.LittleEndian.PutUint64(blockNumBytes, header.Number.Uint64()-1)
+		commitPayload := append(blockNumBytes, header.ParentHash[:]...)
+		if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
+			return ctxerror.New("[VerifyNewBlock] Failed to verify the signature for last commit sig", "shardID", header.ShardID, "blockNum", header.Number)
+		}
+	}
+	// End Verify lastCommitSig
+
 	if newBlock.ShardID() != node.Blockchain().ShardID() {
 		return ctxerror.New("wrong shard ID",
 			"my shard ID", node.Blockchain().ShardID(),
@@ -331,6 +403,56 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 			"blockHash", newBlock.Hash(),
 			"numTx", len(newBlock.Transactions()),
 		).WithCause(err)
+	}
+
+	// Verify cross links
+	if node.NodeConfig.ShardID == 0 && len(newBlock.Header().CrossLinks) > 0 {
+		crossLinks := &types.CrossLinks{}
+		err := rlp.DecodeBytes(newBlock.Header().CrossLinks, crossLinks)
+		if err != nil {
+			return ctxerror.New("[CrossLinkVerification] failed to decode cross links",
+				"blockHash", newBlock.Hash(),
+				"crossLinks", len(newBlock.Header().CrossLinks),
+			).WithCause(err)
+		}
+		for i, crossLink := range *crossLinks {
+			lastLink := &types.CrossLink{}
+			if i == 0 {
+				if crossLink.BlockNum().Uint64() > 0 {
+					lastLink, err = node.Blockchain().ReadShardLastCrossLink(crossLink.ShardID())
+					if err != nil {
+						return ctxerror.New("[CrossLinkVerification] no last cross link found 1",
+							"blockHash", newBlock.Hash(),
+							"crossLink", lastLink,
+						).WithCause(err)
+					}
+				} else {
+					lastLink = &crossLink
+				}
+			} else {
+				if (*crossLinks)[i-1].Header().ShardID != crossLink.Header().ShardID {
+					lastLink, err = node.Blockchain().ReadShardLastCrossLink(crossLink.ShardID())
+					if err != nil {
+						return ctxerror.New("[CrossLinkVerification] no last cross link found 2",
+							"blockHash", newBlock.Hash(),
+							"crossLink", lastLink,
+						).WithCause(err)
+					}
+				} else {
+					lastLink = &(*crossLinks)[i-1]
+				}
+			}
+
+			if crossLink.BlockNum().Uint64() != 0 { // TODO: verify genesis block
+				err = node.VerifyCrosslinkHeader(lastLink.Header(), crossLink.Header())
+				if err != nil {
+					return ctxerror.New("cannot ValidateNewBlock",
+						"blockHash", newBlock.Hash(),
+						"numTx", len(newBlock.Transactions()),
+					).WithCause(err)
+				}
+			}
+		}
 	}
 
 	// TODO: verify the vrf randomness
@@ -465,6 +587,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 
 	if node.Consensus.PubKey.IsEqual(node.Consensus.LeaderPubKey) {
 		node.BroadcastNewBlock(newBlock)
+		node.BroadcastCrossLinkHeader(newBlock)
 		node.BroadcastCXReceipts(newBlock)
 	} else {
 		utils.Logger().Info().

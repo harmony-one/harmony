@@ -1119,10 +1119,24 @@ func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 				err = bc.WriteShardStateBytes(epoch, header.ShardState)
 				if err != nil {
 					header.Logger(utils.Logger()).Warn().Err(err).Msg("cannot store shard state")
+					return n, err
+				}
+			}
+			if len(header.CrossLinks) > 0 {
+				crossLinks := &types.CrossLinks{}
+				err = rlp.DecodeBytes(header.CrossLinks, crossLinks)
+				if err != nil {
+					header.Logger(utils.Logger()).Warn().Err(err).Msg("[insertChain] cannot parse cross links")
+					return n, err
+				}
+				for _, crossLink := range *crossLinks {
+					bc.WriteCrossLinks(types.CrossLinks{crossLink}, false)
+					bc.WriteShardLastCrossLink(crossLink.ShardID(), crossLink)
 				}
 			}
 		}
 	}
+
 	return n, err
 }
 
@@ -1971,23 +1985,54 @@ func (bc *BlockChain) WriteEpochVdfBlockNum(epoch *big.Int, blockNum *big.Int) e
 }
 
 // WriteCrossLinks saves the hashes of crosslinks by shardID and blockNum combination key
-func (bc *BlockChain) WriteCrossLinks(cls []types.CrossLink) error {
+// temp=true is to write the just received cross link that's not committed into blockchain with consensus
+func (bc *BlockChain) WriteCrossLinks(cls []types.CrossLink, temp bool) error {
 	var err error
-	for _, cl := range cls {
-		err = rawdb.WriteCrossLinkShardBlock(bc.db, cl.ShardID(), cl.BlockNum(), cl.Bytes())
+	for i := 0; i < len(cls); i++ {
+		cl := cls[i]
+		err = rawdb.WriteCrossLinkShardBlock(bc.db, cl.ShardID(), cl.BlockNum().Uint64(), cl.Serialize(), temp)
 	}
 	return err
 }
 
-// ReadCrossLinkHash retrieves crosslink hash given shardID and blockNum
-func (bc *BlockChain) ReadCrossLinkHash(shardID uint32, blockNum uint64) (common.Hash, error) {
-	h, err := rawdb.ReadCrossLinkShardBlock(bc.db, shardID, blockNum)
+// ReadCrossLink retrieves crosslink given shardID and blockNum.
+// temp=true is to retrieve the just received cross link that's not committed into blockchain with consensus
+func (bc *BlockChain) ReadCrossLink(shardID uint32, blockNum uint64, temp bool) (*types.CrossLink, error) {
+	bytes, err := rawdb.ReadCrossLinkShardBlock(bc.db, shardID, blockNum, temp)
 	if err != nil {
-		return common.Hash{}, err
+		return nil, err
 	}
-	hash := common.Hash{}
-	hash.SetBytes(h)
-	return hash, nil
+	crossLink, err := types.DeserializeCrossLink(bytes)
+
+	return crossLink, err
+}
+
+// WriteShardLastCrossLink saves the last crosslink of a shard
+// temp=true is to write the just received cross link that's not committed into blockchain with consensus
+func (bc *BlockChain) WriteShardLastCrossLink(shardID uint32, cl types.CrossLink) error {
+	return rawdb.WriteShardLastCrossLink(bc.db, cl.ShardID(), cl.Serialize())
+}
+
+// ReadShardLastCrossLink retrieves the last crosslink of a shard.
+func (bc *BlockChain) ReadShardLastCrossLink(shardID uint32) (*types.CrossLink, error) {
+	bytes, err := rawdb.ReadShardLastCrossLink(bc.db, shardID)
+	if err != nil {
+		return nil, err
+	}
+	crossLink, err := types.DeserializeCrossLink(bytes)
+
+	return crossLink, err
+}
+
+// ReadLastShardCrossLink retrieves last crosslink of a shard.
+func (bc *BlockChain) ReadLastShardCrossLink(shardID uint32, blockNum uint64, temp bool) (*types.CrossLink, error) {
+	bytes, err := rawdb.ReadCrossLinkShardBlock(bc.db, shardID, blockNum, temp)
+	if err != nil {
+		return nil, err
+	}
+	crossLink, err := types.DeserializeCrossLink(bytes)
+
+	return crossLink, err
 }
 
 // IsSameLeaderAsPreviousBlock retrieves a block from the database by number, caching it
