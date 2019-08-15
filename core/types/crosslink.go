@@ -24,7 +24,7 @@ func (cl CrossLink) Header() *Header {
 	return cl.ChainHeader
 }
 
-// ShardID returns shardID
+// ShardIDs returns shardID
 func (cl CrossLink) ShardID() uint32 {
 	return cl.ChainHeader.ShardID
 }

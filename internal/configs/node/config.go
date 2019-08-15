@@ -73,7 +73,7 @@ type ConfigType struct {
 	client   p2p.GroupID // the client group ID of the shard
 	isClient bool        // whether this node is a client node, such as wallet/txgen
 	isBeacon bool        // whether this node is beacon node doing consensus or not
-	ShardID  uint32      // ShardID of this node
+	ShardID  uint32      // ShardIDs of this node
 	role     Role        // Role of the node
 	Port     string      // Port of the node.
 	IP       string      // IP of the node.
@@ -156,7 +156,7 @@ func (conf *ConfigType) SetIsClient(b bool) {
 	conf.isClient = b
 }
 
-// SetShardID set the ShardID
+// SetShardID set the ShardIDs
 func (conf *ConfigType) SetShardID(s uint32) {
 	conf.ShardID = s
 }

@@ -403,7 +403,7 @@ func (consensus *Consensus) String() string {
 	} else {
 		duty = "VLD" // validator
 	}
-	return fmt.Sprintf("[duty:%s, PubKey:%s, ShardID:%v]",
+	return fmt.Sprintf("[duty:%s, PubKey:%s, ShardIDs:%v]",
 		duty, consensus.PubKey.SerializeToHexStr(), consensus.ShardID)
 }
 

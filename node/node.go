@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/api/proto/node"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/api/client"
@@ -91,6 +93,9 @@ type Node struct {
 	DRand                 *drand.DRand // The instance for distributed randomness protocol
 	pendingCrossLinks     []*types.Header
 	pendingClMutex        sync.Mutex
+
+	pendingCXReceipts []*node.CXReceiptsMessage // All the receipts received but not yet processed for Consensus
+	pendingCXMutex    sync.Mutex
 
 	// Shard databases
 	shardChains shardchain.Collection
@@ -250,6 +255,16 @@ func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
 	}
 }
 
+// AddPendingReceipts adds one receipt message to pending list.
+func (node *Node) AddPendingReceipts(receipts *node.CXReceiptsMessage) {
+	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
+		node.pendingCXMutex.Lock()
+		node.pendingCXReceipts = append(node.pendingCXReceipts, receipts)
+		node.pendingCXMutex.Unlock()
+		utils.Logger().Error().Int("totalPendingReceipts", len(node.pendingCXReceipts)).Msg("Got ONE more receipt message")
+	}
+}
+
 // Take out a subset of valid transactions from the pending transaction list
 // Note the pending transaction list will then contain the rest of the txs
 func (node *Node) getTransactionsForNewBlock(maxNumTxs int, coinbase common.Address) types.Transactions {
@@ -349,7 +364,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 				node.AddContractKeyAndAddress(scFaucet)
 			}
 
-			//if node.Consensus.ShardID == 0 {
+			//if node.Consensus.ShardIDs == 0 {
 			//	// Contracts only exist in beacon chain
 			//	if node.isFirstTime {
 			//		// Setup one time smart contracts
