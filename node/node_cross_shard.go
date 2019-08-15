@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 
 	"bytes"
-	"encoding/base64"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 
@@ -13,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
-	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -156,19 +154,20 @@ func (node *Node) ProcessReceiptMessage(msgPayload []byte) {
 
 	var foundMyShard bool
 	byteBuffer := bytes.NewBuffer([]byte{})
-	if len(merkleProof.ShardID) == 0 {
+	if len(merkleProof.ShardIDs) == 0 {
 		utils.Logger().Warn().Msg("[ProcessReceiptMessage] There is No non-empty destination shards")
 		return
 	}
 
-	for j := 0; j < len(merkleProof.ShardID); j++ {
+	// Find receipts with my shard as destination
+	for j := 0; j < len(merkleProof.ShardIDs); j++ {
 		sKey := make([]byte, 4)
-		binary.BigEndian.PutUint32(sKey, merkleProof.ShardID[j])
+		binary.BigEndian.PutUint32(sKey, merkleProof.ShardIDs[j])
 		byteBuffer.Write(sKey)
-		byteBuffer.Write(merkleProof.CXShardHash[j][:])
-		if merkleProof.ShardID[j] == node.Consensus.ShardID {
+		byteBuffer.Write(merkleProof.CXShardHashes[j][:])
+		if merkleProof.ShardIDs[j] == node.Consensus.ShardID {
 			foundMyShard = true
-			myShardRoot = merkleProof.CXShardHash[j]
+			myShardRoot = merkleProof.CXShardHashes[j]
 		}
 	}
 
@@ -177,30 +176,30 @@ func (node *Node) ProcessReceiptMessage(msgPayload []byte) {
 		return
 	}
 
+	// Check whether the receipts matches the receipt merkle root
+	receiptsForMyShard := cxmsg.Receipts
+	sha := types.DeriveSha(receiptsForMyShard)
+	if sha != myShardRoot {
+		utils.Logger().Warn().Interface("calculated", sha).Interface("got", myShardRoot).Msg("[ProcessReceiptMessage] Trie Root of ReadCXReceipts Not Match")
+		return
+	}
+
+	if len(receiptsForMyShard) == 0 {
+		return
+	}
+
+	sourceShardID := merkleProof.ShardID
+	sourceBlockNum := merkleProof.BlockNum
+	sourceBlockHash := merkleProof.BlockHash
+	// TODO: check message signature is from the nodes of source shard.
+	node.Blockchain().WriteCXReceipts(sourceShardID, sourceBlockNum.Uint64(), sourceBlockHash, receiptsForMyShard, true)
+
+	// Check merkle proof with crosslink of the source shard
 	hash := crypto.Keccak256Hash(byteBuffer.Bytes())
 	utils.Logger().Debug().Interface("hash", hash).Msg("[ProcessReceiptMessage] RootHash of the CXReceipts")
 	// TODO chao: use crosslink from beacon sync to verify the hash
 
-	cxReceipts := cxmsg.Receipts
-	sha := types.DeriveSha(cxReceipts)
-	if sha != myShardRoot {
-		utils.Logger().Warn().Interface("calculated", sha).Interface("got", myShardRoot).Msg("[ProcessReceiptMessage] Trie Root of CXReceipts Not Match")
-		return
-	}
-
-	txs := types.Transactions{}
-	inputData, _ := base64.StdEncoding.DecodeString("")
-	gas, err := core.IntrinsicGas(inputData, false, true)
-	if err != nil {
-		utils.Logger().Warn().Err(err).Msg("cannot calculate required gas")
-		return
-	}
-	for _, cx := range cxReceipts {
-		// TODO chao: add gas fee to incentivize
-		tx := types.NewCrossShardTransaction(0, cx.To, cx.ShardID, cx.ToShardID, cx.Amount, gas, nil, inputData)
-		txs = append(txs, tx)
-	}
-	node.addPendingTransactions(txs)
+	node.AddPendingReceipts(&cxmsg)
 }
 
 // ProcessCrossShardTx verify and process cross shard transaction on destination shard

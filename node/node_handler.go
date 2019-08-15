@@ -318,9 +318,9 @@ func (node *Node) BroadcastCXReceipts(newBlock *types.Block) {
 		if i == int(myShardID) {
 			continue
 		}
-		cxReceipts, err := node.Blockchain().CXReceipts(uint32(i), newBlock.NumberU64(), newBlock.Hash())
+		cxReceipts, err := node.Blockchain().ReadCXReceipts(uint32(i), newBlock.NumberU64(), newBlock.Hash(), false)
 		if err != nil || len(cxReceipts) == 0 {
-			//utils.Logger().Warn().Err(err).Uint32("ToShardID", uint32(i)).Int("numCXReceipts", len(cxReceipts)).Msg("[BroadcastCXReceipts] No CXReceipts found")
+			//utils.Logger().Warn().Err(err).Uint32("ToShardID", uint32(i)).Int("numCXReceipts", len(cxReceipts)).Msg("[BroadcastCXReceipts] No ReadCXReceipts found")
 			continue
 		}
 		merkleProof, err := node.Blockchain().CXMerkleProof(uint32(i), newBlock)
@@ -328,7 +328,7 @@ func (node *Node) BroadcastCXReceipts(newBlock *types.Block) {
 			utils.Logger().Warn().Uint32("ToShardID", uint32(i)).Msg("[BroadcastCXReceipts] Unable to get merkleProof")
 			continue
 		}
-		utils.Logger().Info().Uint32("ToShardID", uint32(i)).Msg("[BroadcastCXReceipts] CXReceipts and MerkleProof Found")
+		utils.Logger().Info().Uint32("ToShardID", uint32(i)).Msg("[BroadcastCXReceipts] ReadCXReceipts and MerkleProof Found")
 
 		groupID := p2p.ShardID(i)
 		go node.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(groupID)}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCXReceiptsMessage(cxReceipts, merkleProof)))
@@ -630,7 +630,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 		// TODO: enable shard state update
 		//newBlockHeader := newBlock.Header()
 		//if newBlockHeader.ShardStateHash != (common.Hash{}) {
-		//	if node.Consensus.ShardID == 0 {
+		//	if node.Consensus.ShardIDs == 0 {
 		//		// TODO ek – this is a temp hack until beacon chain sync is fixed
 		//		// End-of-epoch block on beacon chain; block's EpochState is the
 		//		// master resharding table.  Broadcast it to the network.
@@ -959,11 +959,11 @@ func (node *Node) epochShardStateMessageHandler(msgPayload []byte) error {
 func (node *Node) transitionIntoNextEpoch(shardState types.ShardState) {
 	logger = logger.New(
 		"blsPubKey", hex.EncodeToString(node.Consensus.PubKey.Serialize()),
-		"curShard", node.Blockchain().ShardID(),
+		"curShard", node.Blockchain().ShardIDs(),
 		"curLeader", node.Consensus.IsLeader())
 	for _, c := range shardState {
 		utils.Logger().Debug().
-			Uint32("shardID", c.ShardID).
+			Uint32("shardID", c.ShardIDs).
 			Str("nodeList", c.NodeList).
          Msg("new shard information")
 	}
@@ -995,7 +995,7 @@ func (node *Node) transitionIntoNextEpoch(shardState types.ShardState) {
 	node.Consensus.UpdatePublicKeys(publicKeys)
 	//	node.DRand.UpdatePublicKeys(publicKeys)
 
-	if node.Blockchain().ShardID() == myShardID {
+	if node.Blockchain().ShardIDs() == myShardID {
 		getLogger().Info("staying in the same shard")
 	} else {
 		getLogger().Info("moving to another shard")

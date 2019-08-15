@@ -65,6 +65,7 @@ var (
 	tempCrosslinkPrefix      = []byte("tempCrosslink")         // prefix for tempCrosslink
 
 	cxReceiptPrefix     = []byte("cxReceipt")     // prefix for cross shard transaction receipt
+	tempCxReceiptPrefix = []byte("tempCxReceipt") // prefix for temporary cross shard transaction receipt
 	cxReceiptHashPrefix = []byte("cxReceiptHash") // prefix for cross shard transaction receipt hash
 
 	// epochBlockNumberPrefix + epoch (big.Int.Bytes())
@@ -177,27 +178,27 @@ func shardLastCrosslinkKey(shardID uint32) []byte {
 	return key
 }
 
-func crosslinkKey(shardID uint32, blockNum uint64) []byte {
+func crosslinkKey(shardID uint32, blockNum uint64, temp bool) []byte {
+	prefix := crosslinkPrefix
+	if temp {
+		prefix = tempCrosslinkPrefix
+	}
 	sbKey := make([]byte, 12)
 	binary.BigEndian.PutUint32(sbKey, shardID)
 	binary.BigEndian.PutUint64(sbKey[4:], blockNum)
-	key := append(crosslinkPrefix, sbKey...)
-	return key
-}
-
-func tempCrosslinkKey(shardID uint32, blockNum uint64) []byte {
-	sbKey := make([]byte, 12)
-	binary.BigEndian.PutUint32(sbKey, shardID)
-	binary.BigEndian.PutUint64(sbKey[4:], blockNum)
-	key := append(tempCrosslinkPrefix, sbKey...)
+	key := append(prefix, sbKey...)
 	return key
 }
 
 // cxReceiptKey = cxReceiptsPrefix + shardID + num (uint64 big endian) + hash
-func cxReceiptKey(shardID uint32, number uint64, hash common.Hash) []byte {
+func cxReceiptKey(shardID uint32, number uint64, hash common.Hash, temp bool) []byte {
+	prefix := cxReceiptPrefix
+	if temp {
+		prefix = tempCxReceiptPrefix
+	}
 	sKey := make([]byte, 4)
 	binary.BigEndian.PutUint32(sKey, shardID)
-	tmp := append(cxReceiptPrefix, sKey...)
+	tmp := append(prefix, sKey...)
 	tmp1 := append(tmp, encodeBlockNumber(number)...)
 	return append(tmp1, hash.Bytes()...)
 }

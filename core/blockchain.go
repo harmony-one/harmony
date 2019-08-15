@@ -405,7 +405,7 @@ func (bc *BlockChain) FastSyncCommitHead(hash common.Hash) error {
 	return nil
 }
 
-// ShardID returns the shard Id of the blockchain.
+// ShardIDs returns the shard Id of the blockchain.
 func (bc *BlockChain) ShardID() uint32 {
 	return uint32(bc.chainConfig.ChainID.Int64())
 }
@@ -1061,7 +1061,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 			continue
 		}
 		shardReceipts := GetToShardReceipts(cxReceipts, uint32(i))
-		rawdb.WriteCXReceipts(batch, uint32(i), block.NumberU64(), block.Hash(), shardReceipts)
+		rawdb.WriteCXReceipts(batch, uint32(i), block.NumberU64(), block.Hash(), shardReceipts, false)
 	}
 
 	// If the total difficulty is higher than our known, add it to the canonical chain
@@ -2008,7 +2008,6 @@ func (bc *BlockChain) ReadCrossLink(shardID uint32, blockNum uint64, temp bool) 
 }
 
 // WriteShardLastCrossLink saves the last crosslink of a shard
-// temp=true is to write the just received cross link that's not committed into blockchain with consensus
 func (bc *BlockChain) WriteShardLastCrossLink(shardID uint32, cl types.CrossLink) error {
 	return rawdb.WriteShardLastCrossLink(bc.db, cl.ShardID(), cl.Serialize())
 }
@@ -2016,17 +2015,6 @@ func (bc *BlockChain) WriteShardLastCrossLink(shardID uint32, cl types.CrossLink
 // ReadShardLastCrossLink retrieves the last crosslink of a shard.
 func (bc *BlockChain) ReadShardLastCrossLink(shardID uint32) (*types.CrossLink, error) {
 	bytes, err := rawdb.ReadShardLastCrossLink(bc.db, shardID)
-	if err != nil {
-		return nil, err
-	}
-	crossLink, err := types.DeserializeCrossLink(bytes)
-
-	return crossLink, err
-}
-
-// ReadLastShardCrossLink retrieves last crosslink of a shard.
-func (bc *BlockChain) ReadLastShardCrossLink(shardID uint32, blockNum uint64, temp bool) (*types.CrossLink, error) {
-	bytes, err := rawdb.ReadCrossLinkShardBlock(bc.db, shardID, blockNum, temp)
 	if err != nil {
 		return nil, err
 	}
@@ -2069,19 +2057,33 @@ func GetToShardReceipts(cxReceipts types.CXReceipts, shardID uint32) types.CXRec
 	return cxs
 }
 
-// CXReceipts retrieves the cross shard transaction receipts of a given shard
-func (bc *BlockChain) CXReceipts(shardID uint32, blockNum uint64, blockHash common.Hash) (types.CXReceipts, error) {
-	cxs, err := rawdb.ReadCXReceipts(bc.db, shardID, blockNum, blockHash)
+// ReadCXReceipts retrieves the cross shard transaction receipts of a given shard
+// temp=true is to retrieve the just received receipts that's not committed into blockchain with consensus
+func (bc *BlockChain) ReadCXReceipts(shardID uint32, blockNum uint64, blockHash common.Hash, temp bool) (types.CXReceipts, error) {
+	cxs, err := rawdb.ReadCXReceipts(bc.db, shardID, blockNum, blockHash, temp)
 	if err != nil || len(cxs) == 0 {
 		return nil, err
 	}
 	return cxs, nil
 }
 
+// WriteCXReceipts saves the cross shard transaction receipts of a given shard
+// temp=true is to store the just received receipts that's not committed into blockchain with consensus
+func (bc *BlockChain) WritePendingCXReceipts(shardID uint32, blockNum uint64, blockHash common.Hash, receipts types.CXReceipts, temp bool) error {
+	return rawdb.WriteCXReceipts(bc.db, shardID, blockNum, blockHash, receipts, temp)
+}
+
+// WriteCXReceipts saves the cross shard transaction receipts of a given shard
+// temp=true is to store the just received receipts that's not committed into blockchain with consensus
+func (bc *BlockChain) WriteCXReceipts(shardID uint32, blockNum uint64, blockHash common.Hash, receipts types.CXReceipts, temp bool) error {
+	return rawdb.WriteCXReceipts(bc.db, shardID, blockNum, blockHash, receipts, temp)
+}
+
 // CXMerkleProof calculates the cross shard transaction merkle proof of a given destination shard
 func (bc *BlockChain) CXMerkleProof(shardID uint32, block *types.Block) (*types.CXMerkleProof, error) {
-	proof := &types.CXMerkleProof{BlockHash: block.Hash(), CXReceiptHash: block.Header().OutgoingReceiptHash, CXShardHash: []common.Hash{}, ShardID: []uint32{}}
-	cxs, err := rawdb.ReadCXReceipts(bc.db, shardID, block.NumberU64(), block.Hash())
+	proof := &types.CXMerkleProof{BlockNum: block.Number(), BlockHash: block.Hash(), ShardID: block.ShardID(), CXReceiptHash: block.Header().OutgoingReceiptHash, CXShardHashes: []common.Hash{}, ShardIDs: []uint32{}}
+	cxs, err := rawdb.ReadCXReceipts(bc.db, shardID, block.NumberU64(), block.Hash(), false)
+
 	if err != nil || cxs == nil {
 		return nil, err
 	}
@@ -2091,16 +2093,16 @@ func (bc *BlockChain) CXMerkleProof(shardID uint32, block *types.Block) (*types.
 	shardNum := int(shardingConfig.NumShards())
 
 	for i := 0; i < shardNum; i++ {
-		receipts, err := bc.CXReceipts(uint32(i), block.NumberU64(), block.Hash())
+		receipts, err := bc.ReadCXReceipts(uint32(i), block.NumberU64(), block.Hash(), false)
 		if err != nil || len(receipts) == 0 {
 			continue
 		} else {
 			hash := types.DeriveSha(receipts)
-			proof.CXShardHash = append(proof.CXShardHash, hash)
-			proof.ShardID = append(proof.ShardID, uint32(i))
+			proof.CXShardHashes = append(proof.CXShardHashes, hash)
+			proof.ShardIDs = append(proof.ShardIDs, uint32(i))
 		}
 	}
-	if len(proof.ShardID) == 0 {
+	if len(proof.ShardIDs) == 0 {
 		return nil, nil
 	}
 	return proof, nil

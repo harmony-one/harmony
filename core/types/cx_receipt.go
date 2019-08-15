@@ -18,7 +18,7 @@ type CXReceipt struct {
 	Amount    *big.Int
 }
 
-// CXReceipts is a list of CXReceipt
+// ReadCXReceipts is a list of CXReceipt
 type CXReceipts []*CXReceipt
 
 // Len returns the length of s.
@@ -65,8 +65,10 @@ func NewCrossShardReceipt(txHash common.Hash, nonce uint64, from common.Address,
 
 // CXMerkleProof represents the merkle proof of a collection of ordered cross shard transactions
 type CXMerkleProof struct {
-	BlockHash     common.Hash   // block header's hash
+	BlockNum      *big.Int      // block header's hash
+	BlockHash     common.Hash   // block header's Hash
+	ShardID       uint32        // block header's shardID
 	CXReceiptHash common.Hash   // root hash of the cross shard receipts in a given block
-	ShardID       []uint32      // order list, records destination shardID
-	CXShardHash   []common.Hash // ordered hash list, each hash corresponds to one destination shard's receipts root hash
+	ShardIDs      []uint32      // order list, records destination shardID
+	CXShardHashes []common.Hash // ordered hash list, each hash corresponds to one destination shard's receipts root hash
 }
