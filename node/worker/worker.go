@@ -112,6 +112,18 @@ func (w *Worker) CommitTransactions(txs types.Transactions, coinbase common.Addr
 	return nil
 }
 
+// CommitReceipts commits a list of receipts.
+func (w *Worker) CommitReceipts(receiptsList []types.CXReceipts, coinbase common.Address) error {
+	if w.current.gasPool == nil {
+		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit)
+	}
+	for _, receipts := range receiptsList {
+		// TODO: apply receipt
+		_ = receipts
+	}
+	return nil
+}
+
 // UpdateCurrent updates the current environment with the current state and header.
 func (w *Worker) UpdateCurrent(coinbase common.Address) error {
 	parent := w.chain.CurrentBlock()

@@ -34,7 +34,7 @@ const (
 	GroupIDUnknown           GroupID = "B1acKh0lE"
 )
 
-// ShardIDs defines the ID of a shard
+// ShardID defines the ID of a shard
 type ShardID uint32
 
 // NewGroupIDByShardID returns a new groupID for a shard

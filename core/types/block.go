@@ -368,7 +368,7 @@ func (b *Block) NumberU64() uint64 { return b.header.Number.Uint64() }
 // MixDigest is the header mix digest.
 func (b *Block) MixDigest() common.Hash { return b.header.MixDigest }
 
-// ShardIDs is the header ShardIDs
+// ShardID is the header ShardIDs
 func (b *Block) ShardID() uint32 { return b.header.ShardID }
 
 // Bloom returns header bloom.
@@ -389,7 +389,7 @@ func (b *Block) TxHash() common.Hash { return b.header.TxHash }
 // ReceiptHash returns header receipt hash.
 func (b *Block) ReceiptHash() common.Hash { return b.header.ReceiptHash }
 
-// CXReceiptHash returns header cross shard receipt hash.
+// OutgoingReceiptHash returns header cross shard receipt hash.
 func (b *Block) OutgoingReceiptHash() common.Hash { return b.header.OutgoingReceiptHash }
 
 // Extra returns header extra.

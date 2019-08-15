@@ -720,7 +720,7 @@ func processTransferCommand() {
 	} else {
 		tx = types.NewCrossShardTransaction(
 			state.nonce, &receiverAddress, fromShard, toShard, amountBigInt,
-			gas, nil, inputData, types.SubtractionOnly)
+			gas, nil, inputData)
 	}
 
 	account, err := ks.Find(accounts.Account{Address: senderAddress})
