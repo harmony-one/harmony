@@ -44,6 +44,7 @@ const (
 	SameShardTx     TransactionType = iota
 	SubtractionOnly                 // only subtract tokens from source shard account
 	AdditionOnly                    // only add tokens to destination shard account
+	InvalidTx
 )
 
 // Transaction struct.
@@ -76,7 +77,6 @@ type txdata struct {
 	Recipient    *common.Address `json:"to"         rlp:"nil"` // nil means contract creation
 	Amount       *big.Int        `json:"value"      gencodec:"required"`
 	Payload      []byte          `json:"input"      gencodec:"required"`
-	TxType       TransactionType
 
 	// Signature values
 	V *big.Int `json:"v" gencodec:"required"`
@@ -96,7 +96,6 @@ type txdataMarshaling struct {
 	V            *hexutil.Big
 	R            *hexutil.Big
 	S            *hexutil.Big
-	// TODO: add ShardID, ToShardID, TxType ?
 }
 
 // NewTransaction returns new transaction, this method is to create same shard transaction
@@ -105,11 +104,8 @@ func NewTransaction(nonce uint64, to common.Address, shardID uint32, amount *big
 }
 
 // NewCrossShardTransaction returns new cross shard transaction
-func NewCrossShardTransaction(nonce uint64, to *common.Address, shardID uint32, toShardID uint32, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte, txType TransactionType) *Transaction {
-	if shardID == toShardID {
-		return newTransaction(nonce, to, shardID, amount, gasLimit, gasPrice, data)
-	}
-	return newCrossShardTransaction(nonce, to, shardID, toShardID, amount, gasLimit, gasPrice, data, txType)
+func NewCrossShardTransaction(nonce uint64, to *common.Address, shardID uint32, toShardID uint32, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte) *Transaction {
+	return newCrossShardTransaction(nonce, to, shardID, toShardID, amount, gasLimit, gasPrice, data)
 }
 
 // NewContractCreation returns same shard contract transaction.
@@ -127,7 +123,6 @@ func newTransaction(nonce uint64, to *common.Address, shardID uint32, amount *bi
 		ShardID:      shardID,
 		ToShardID:    shardID,
 		Payload:      data,
-		TxType:       SameShardTx,
 		Amount:       new(big.Int),
 		GasLimit:     gasLimit,
 		Price:        new(big.Int),
@@ -145,7 +140,7 @@ func newTransaction(nonce uint64, to *common.Address, shardID uint32, amount *bi
 	return &Transaction{data: d}
 }
 
-func newCrossShardTransaction(nonce uint64, to *common.Address, shardID uint32, toShardID uint32, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte, txType TransactionType) *Transaction {
+func newCrossShardTransaction(nonce uint64, to *common.Address, shardID uint32, toShardID uint32, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte) *Transaction {
 	if len(data) > 0 {
 		data = common.CopyBytes(data)
 	}
@@ -155,7 +150,6 @@ func newCrossShardTransaction(nonce uint64, to *common.Address, shardID uint32, 
 		ShardID:      shardID,
 		ToShardID:    toShardID,
 		Payload:      data,
-		TxType:       txType,
 		Amount:       new(big.Int),
 		GasLimit:     gasLimit,
 		Price:        new(big.Int),
@@ -186,11 +180,6 @@ func (tx *Transaction) ShardID() uint32 {
 // ToShardID returns the destination shard id this transaction is going to
 func (tx *Transaction) ToShardID() uint32 {
 	return tx.data.ToShardID
-}
-
-// TxType returns the type of transaction
-func (tx *Transaction) TxType() TransactionType {
-	return tx.data.TxType
 }
 
 // Protected returns whether the transaction is protected from replay protection.
@@ -332,7 +321,6 @@ func (tx *Transaction) AsMessage(s Signer) (Message, error) {
 		to:         tx.data.Recipient,
 		amount:     tx.data.Amount,
 		data:       tx.data.Payload,
-		txType:     tx.data.TxType,
 		checkNonce: true,
 	}
 
@@ -513,11 +501,10 @@ type Message struct {
 	gasPrice   *big.Int
 	data       []byte
 	checkNonce bool
-	txType     TransactionType
 }
 
 // NewMessage returns new message.
-func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte, checkNonce bool, txType TransactionType) Message {
+func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte, checkNonce bool) Message {
 	return Message{
 		from:       from,
 		to:         to,
@@ -527,7 +514,6 @@ func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *b
 		gasPrice:   gasPrice,
 		data:       data,
 		checkNonce: checkNonce,
-		txType:     txType,
 	}
 }
 
@@ -569,9 +555,4 @@ func (m Message) Data() []byte {
 // CheckNonce returns checkNonce of Message.
 func (m Message) CheckNonce() bool {
 	return m.checkNonce
-}
-
-// TxType returns the transaction type of the Message
-func (m Message) TxType() TransactionType {
-	return m.txType
 }

@@ -88,22 +88,17 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 }
 
 // return true if it is valid
-func verifyTransactionType(header *types.Header, tx *types.Transaction) error {
-	switch tx.TxType() {
-	case types.SameShardTx:
-		if tx.ShardID() == tx.ToShardID() && header.ShardID == tx.ShardID() {
-			return nil
-		}
-	case types.SubtractionOnly:
-		if tx.ShardID() != tx.ToShardID() && header.ShardID == tx.ShardID() {
-			return nil
-		}
-	case types.AdditionOnly:
-		if tx.ShardID() != tx.ToShardID() && header.ShardID == tx.ToShardID() {
-			return nil
-		}
+func getTransactionType(header *types.Header, tx *types.Transaction) types.TransactionType {
+	if tx.ShardID() == tx.ToShardID() && header.ShardID == tx.ShardID() {
+		return types.SameShardTx
 	}
-	return fmt.Errorf("Invalid Transaction Type: %v", tx.TxType())
+	if tx.ShardID() != tx.ToShardID() && header.ShardID == tx.ShardID() {
+		return types.SubtractionOnly
+	}
+	if tx.ShardID() != tx.ToShardID() && header.ShardID == tx.ToShardID() {
+		return types.AdditionOnly
+	}
+	return types.InvalidTx
 }
 
 // ApplyTransaction attempts to apply a transaction to the given state database
@@ -111,17 +106,19 @@ func verifyTransactionType(header *types.Header, tx *types.Transaction) error {
 // for the transaction, gas used and an error if the transaction failed,
 // indicating the block was invalid.
 func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.DB, header *types.Header, tx *types.Transaction, usedGas *uint64, cfg vm.Config) (*types.Receipt, *types.CXReceipt, uint64, error) {
-	if err := verifyTransactionType(header, tx); err != nil {
-		return nil, nil, 0, err
+	txType := getTransactionType(header, tx)
+	if txType == types.InvalidTx {
+		return nil, nil, 0, fmt.Errorf("Invalid Transaction Type")
 	}
 	msg, err := tx.AsMessage(types.MakeSigner(config, header.Number))
 	// skip signer err for additiononly tx
-	if err != nil && msg.TxType() != types.AdditionOnly {
+	if err != nil && txType != types.AdditionOnly {
 		return nil, nil, 0, err
 	}
 
 	// Create a new context to be used in the EVM environment
 	context := NewEVMContext(msg, header, bc, author)
+	context.TxType = txType
 	// Create a new environment which holds all relevant information
 	// about the transaction and calling mechanisms.
 	vmenv := vm.NewEVM(context, statedb, config, cfg)
@@ -153,7 +150,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	receipt.Bloom = types.CreateBloom(types.Receipts{receipt})
 
 	var cxReceipt *types.CXReceipt
-	if tx.TxType() == types.SubtractionOnly {
+	if txType == types.SubtractionOnly {
 		cxReceipt = &types.CXReceipt{tx.Hash(), msg.Nonce(), msg.From(), msg.To(), tx.ShardID(), tx.ToShardID(), msg.Value()}
 	} else {
 		cxReceipt = nil

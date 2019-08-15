@@ -45,8 +45,8 @@ func (cl CrossLink) StateRoot() common.Hash {
 }
 
 // CxReceiptsRoot returns hash of cross shard receipts
-func (cl CrossLink) CxReceiptsRoot() common.Hash {
-	return cl.ChainHeader.CXReceiptHash
+func (cl CrossLink) OutgoingReceiptsRoot() common.Hash {
+	return cl.ChainHeader.OutgoingReceiptHash
 }
 
 // Serialize returns bytes of cross link rlp-encoded content

@@ -60,7 +60,6 @@ type StateTransition struct {
 	data       []byte
 	state      vm.StateDB
 	evm        *vm.EVM
-	txType     types.TransactionType
 }
 
 // Message represents a message sent to a contract.
@@ -76,8 +75,6 @@ type Message interface {
 	Nonce() uint64
 	CheckNonce() bool
 	Data() []byte
-
-	TxType() types.TransactionType
 }
 
 // IntrinsicGas computes the 'intrinsic gas' for a message with the given data.
@@ -123,7 +120,6 @@ func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition 
 		value:    msg.Value(),
 		data:     msg.Data(),
 		state:    evm.StateDB,
-		txType:   msg.TxType(),
 	}
 }
 
@@ -172,7 +168,7 @@ func (st *StateTransition) buyGas() error {
 
 func (st *StateTransition) preCheck() error {
 	// Make sure this transaction's nonce is correct.
-	if st.msg.CheckNonce() && st.txType != types.AdditionOnly {
+	if st.msg.CheckNonce() && st.evm.Context.TxType != types.AdditionOnly {
 		nonce := st.state.GetNonce(st.msg.From())
 		if nonce < st.msg.Nonce() {
 			return ErrNonceTooHigh
@@ -215,10 +211,10 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 		ret, _, st.gas, vmerr = evm.Create(sender, st.data, st.gas, st.value)
 	} else {
 		// Increment the nonce for the next transaction
-		if st.txType != types.AdditionOnly {
+		if st.evm.Context.TxType != types.AdditionOnly {
 			st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
 		}
-		ret, st.gas, vmerr = evm.Call(sender, st.to(), st.data, st.gas, st.value, st.txType)
+		ret, st.gas, vmerr = evm.Call(sender, st.to(), st.data, st.gas, st.value)
 	}
 	if vmerr != nil {
 		utils.Logger().Debug().Err(vmerr).Msg("VM returned with error")
@@ -227,7 +223,7 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 		// balance transfer may never fail.
 
 		if vmerr == vm.ErrInsufficientBalance {
-			if st.txType != types.AdditionOnly {
+			if st.evm.Context.TxType != types.AdditionOnly {
 				return nil, 0, false, vmerr
 			}
 			vmerr = nil

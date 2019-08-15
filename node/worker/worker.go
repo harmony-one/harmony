@@ -77,13 +77,14 @@ func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	snap := w.current.state.Snapshot()
 
 	receipt, cx, _, err := core.ApplyTransaction(w.config, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, vm.Config{})
-	if err != nil && tx.TxType() != types.AdditionOnly {
+	if err != nil {
+		fmt.Println("hehe", "applyTransaction failed", err)
 		w.current.state.RevertToSnapshot(snap)
 		return nil, err
 	}
 	if receipt == nil {
-		utils.Logger().Warn().Interface("tx", tx).Interface("cx", cx).Interface("txType", tx.TxType()).Msg("Receipt is Nil!")
-		return nil, fmt.Errorf("Receipt is Nil, txType=%v", tx.TxType())
+		utils.Logger().Warn().Interface("tx", tx).Interface("cx", cx).Msg("Receipt is Nil!")
+		return nil, fmt.Errorf("Receipt is Nil")
 	}
 	w.current.txs = append(w.current.txs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)

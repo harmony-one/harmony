@@ -2080,7 +2080,7 @@ func (bc *BlockChain) CXReceipts(shardID uint32, blockNum uint64, blockHash comm
 
 // CXMerkleProof calculates the cross shard transaction merkle proof of a given destination shard
 func (bc *BlockChain) CXMerkleProof(shardID uint32, block *types.Block) (*types.CXMerkleProof, error) {
-	proof := &types.CXMerkleProof{BlockHash: block.Hash(), CXReceiptHash: block.Header().CXReceiptHash, CXShardHash: []common.Hash{}, ShardID: []uint32{}}
+	proof := &types.CXMerkleProof{BlockHash: block.Hash(), CXReceiptHash: block.Header().OutgoingReceiptHash, CXShardHash: []common.Hash{}, ShardID: []uint32{}}
 	cxs, err := rawdb.ReadCXReceipts(bc.db, shardID, block.NumberU64(), block.Hash())
 	if err != nil || cxs == nil {
 		return nil, err

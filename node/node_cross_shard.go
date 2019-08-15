@@ -197,7 +197,7 @@ func (node *Node) ProcessReceiptMessage(msgPayload []byte) {
 	}
 	for _, cx := range cxReceipts {
 		// TODO chao: add gas fee to incentivize
-		tx := types.NewCrossShardTransaction(0, cx.To, cx.ShardID, cx.ToShardID, cx.Amount, gas, nil, inputData, types.AdditionOnly)
+		tx := types.NewCrossShardTransaction(0, cx.To, cx.ShardID, cx.ToShardID, cx.Amount, gas, nil, inputData)
 		txs = append(txs, tx)
 	}
 	node.addPendingTransactions(txs)

@@ -156,7 +156,7 @@ func doCall(ctx context.Context, b Backend, args CallArgs, blockNr rpc.BlockNumb
 	}
 
 	// Create new call message
-	msg := types.NewMessage(addr, args.To, 0, value, gas, gasPrice, data, false, types.SameShardTx)
+	msg := types.NewMessage(addr, args.To, 0, value, gas, gasPrice, data, false)
 
 	// Setup context so it may be cancelled the call has completed
 	// or, in case of unmetered gas, setup a context with a timeout.

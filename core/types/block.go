@@ -71,12 +71,12 @@ func (n *BlockNonce) UnmarshalText(input []byte) error {
 
 // Header represents a block header in the Harmony blockchain.
 type Header struct {
-	ParentHash    common.Hash    `json:"parentHash"       gencodec:"required"`
-	Coinbase      common.Address `json:"miner"            gencodec:"required"`
-	Root          common.Hash    `json:"stateRoot"        gencodec:"required"`
-	TxHash        common.Hash    `json:"transactionsRoot" gencodec:"required"`
-	ReceiptHash   common.Hash    `json:"receiptsRoot"     gencodec:"required"`
-	CXReceiptHash common.Hash    `json:"outgoingReceiptsRoot"     gencodec:"required"`
+	ParentHash          common.Hash    `json:"parentHash"       gencodec:"required"`
+	Coinbase            common.Address `json:"miner"            gencodec:"required"`
+	Root                common.Hash    `json:"stateRoot"        gencodec:"required"`
+	TxHash              common.Hash    `json:"transactionsRoot" gencodec:"required"`
+	ReceiptHash         common.Hash    `json:"receiptsRoot"     gencodec:"required"`
+	OutgoingReceiptHash common.Hash    `json:"outgoingReceiptsRoot"     gencodec:"required"`
 	//IncomingReceiptHash common.Hash    `json:"incomingReceiptsRoot" gencodec:"required"`
 	Bloom     ethtypes.Bloom `json:"logsBloom"        gencodec:"required"`
 	Number    *big.Int       `json:"number"           gencodec:"required"`
@@ -246,7 +246,7 @@ func NewBlock(header *Header, txs []*Transaction, receipts []*Receipt, cxs []*CX
 		b.header.Bloom = CreateBloom(receipts)
 	}
 
-	b.header.CXReceiptHash = DeriveMultipleShardsSha(CXReceipts(cxs))
+	b.header.OutgoingReceiptHash = DeriveMultipleShardsSha(CXReceipts(cxs))
 
 	return b
 }
@@ -390,7 +390,7 @@ func (b *Block) TxHash() common.Hash { return b.header.TxHash }
 func (b *Block) ReceiptHash() common.Hash { return b.header.ReceiptHash }
 
 // CXReceiptHash returns header cross shard receipt hash.
-func (b *Block) CXReceiptHash() common.Hash { return b.header.CXReceiptHash }
+func (b *Block) OutgoingReceiptHash() common.Hash { return b.header.OutgoingReceiptHash }
 
 // Extra returns header extra.
 func (b *Block) Extra() []byte { return common.CopyBytes(b.header.Extra) }

@@ -92,8 +92,8 @@ func (v *BlockValidator) ValidateState(block, parent *types.Block, statedb *stat
 	}
 
 	cxsSha := types.DeriveMultipleShardsSha(cxReceipts)
-	if cxsSha != header.CXReceiptHash {
-		return fmt.Errorf("invalid cross shard receipt root hash (remote: %x local: %x)", header.CXReceiptHash, cxsSha)
+	if cxsSha != header.OutgoingReceiptHash {
+		return fmt.Errorf("invalid cross shard receipt root hash (remote: %x local: %x)", header.OutgoingReceiptHash, cxsSha)
 	}
 	// Validate the state root against the received state root and throw
 	// an error if they don't match.
