@@ -42,7 +42,7 @@ rpc = 127.0.0.1:14560
 bootnode = /ip4/54.213.43.194/tcp/9868/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9
 bootnode = /ip4/100.26.90.187/tcp/9868/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
 bootnode = /ip4/13.113.101.219/tcp/12018/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX
-shards = 4
+shards = 2
 
 [beta.shard0.rpc]
 rpc = l0.b.hmny.io:14555
@@ -51,14 +51,6 @@ rpc = s0.b.hmny.io:14555
 [beta.shard1.rpc]
 rpc = l1.b.hmny.io:14555
 rpc = s1.b.hmny.io:14555
-
-[beta.shard2.rpc]
-rpc = l2.b.hmny.io:14555
-rpc = s2.b.hmny.io:14555
-
-[beta.shard3.rpc]
-rpc = l3.b.hmny.io:14555
-rpc = s3.b.hmny.io:14555
 
 [pangaea]
 bootnode = /ip4/100.26.90.187/tcp/9867/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
