@@ -405,7 +405,7 @@ func (bc *BlockChain) FastSyncCommitHead(hash common.Hash) error {
 	return nil
 }
 
-// ShardIDs returns the shard Id of the blockchain.
+// ShardID returns the shard Id of the blockchain.
 func (bc *BlockChain) ShardID() uint32 {
 	return uint32(bc.chainConfig.ChainID.Int64())
 }
@@ -2065,12 +2065,6 @@ func (bc *BlockChain) ReadCXReceipts(shardID uint32, blockNum uint64, blockHash 
 		return nil, err
 	}
 	return cxs, nil
-}
-
-// WriteCXReceipts saves the cross shard transaction receipts of a given shard
-// temp=true is to store the just received receipts that's not committed into blockchain with consensus
-func (bc *BlockChain) WritePendingCXReceipts(shardID uint32, blockNum uint64, blockHash common.Hash, receipts types.CXReceipts, temp bool) error {
-	return rawdb.WriteCXReceipts(bc.db, shardID, blockNum, blockHash, receipts, temp)
 }
 
 // WriteCXReceipts saves the cross shard transaction receipts of a given shard

@@ -2,6 +2,10 @@ package node
 
 import (
 	"encoding/binary"
+	"errors"
+	"math/big"
+
+	"github.com/harmony-one/harmony/core"
 
 	"bytes"
 
@@ -205,4 +209,57 @@ func (node *Node) ProcessReceiptMessage(msgPayload []byte) {
 // ProcessCrossShardTx verify and process cross shard transaction on destination shard
 func (node *Node) ProcessCrossShardTx(blocks []*types.Block) {
 	// TODO: add logic
+}
+
+// ProposeCrossLinkDataForBeaconchain propose cross links for beacon chain new block
+func (node *Node) ProposeCrossLinkDataForBeaconchain() ([]byte, error) {
+	curBlock := node.Blockchain().CurrentBlock()
+	numShards := core.ShardingSchedule.InstanceForEpoch(curBlock.Header().Epoch).NumShards()
+
+	shardCrossLinks := make([]types.CrossLinks, numShards)
+
+	for i := 0; i < int(numShards); i++ {
+		curShardID := uint32(i)
+		lastLink, err := node.Blockchain().ReadShardLastCrossLink(curShardID)
+
+		blockNum := big.NewInt(0)
+		blockNumoffset := 0
+		if err == nil && lastLink != nil {
+			blockNumoffset = 1
+			blockNum = lastLink.BlockNum()
+		}
+
+		for true {
+			link, err := node.Blockchain().ReadCrossLink(curShardID, blockNum.Uint64()+uint64(blockNumoffset), true)
+			if err != nil || link == nil {
+				break
+			}
+
+			if link.BlockNum().Uint64() > 1 {
+				err := node.VerifyCrosslinkHeader(lastLink.Header(), link.Header())
+				if err != nil {
+					utils.Logger().Debug().
+						Err(err).
+						Msgf("[CrossLink] Failed verifying temp cross link %d", link.BlockNum().Uint64())
+					break
+				}
+				lastLink = link
+			}
+			shardCrossLinks[i] = append(shardCrossLinks[i], *link)
+
+			blockNumoffset++
+		}
+
+	}
+
+	crossLinksToPropose := types.CrossLinks{}
+	for _, crossLinks := range shardCrossLinks {
+		crossLinksToPropose = append(crossLinksToPropose, crossLinks...)
+	}
+	if len(crossLinksToPropose) != 0 {
+		crossLinksToPropose.Sort()
+
+		return rlp.EncodeToBytes(crossLinksToPropose)
+	}
+	return []byte{}, errors.New("No cross link to propose")
 }

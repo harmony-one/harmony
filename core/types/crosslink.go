@@ -24,7 +24,7 @@ func (cl CrossLink) Header() *Header {
 	return cl.ChainHeader
 }
 
-// ShardIDs returns shardID
+// ShardID returns shardID
 func (cl CrossLink) ShardID() uint32 {
 	return cl.ChainHeader.ShardID
 }
@@ -44,7 +44,7 @@ func (cl CrossLink) StateRoot() common.Hash {
 	return cl.ChainHeader.Root
 }
 
-// CxReceiptsRoot returns hash of cross shard receipts
+// OutgoingReceiptsRoot returns hash of cross shard receipts
 func (cl CrossLink) OutgoingReceiptsRoot() common.Hash {
 	return cl.ChainHeader.OutgoingReceiptHash
 }

@@ -18,7 +18,7 @@ type CXReceipt struct {
 	Amount    *big.Int
 }
 
-// ReadCXReceipts is a list of CXReceipt
+// CXReceipts is a list of CXReceipt
 type CXReceipts []*CXReceipt
 
 // Len returns the length of s.
