@@ -108,7 +108,7 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 								newBlock, err = node.Worker.CommitWithCrossLinks(sig, mask, viewID, coinbase, data)
 								utils.Logger().Debug().
 									Uint64("blockNum", newBlock.NumberU64()).
-									Int("numCrossLinks", len(data)).
+									Int("numCrossLinks", len(crossLinksToPropose)).
 									Msg("Successfully added cross links into new block")
 							}
 						} else {

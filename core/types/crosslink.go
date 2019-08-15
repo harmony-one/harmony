@@ -74,3 +74,10 @@ func (cls CrossLinks) Sort() {
 		return cls[i].ShardID() < cls[j].ShardID() || (cls[i].ShardID() == cls[j].ShardID() && cls[i].BlockNum().Cmp(cls[j].BlockNum()) < 0)
 	})
 }
+
+// IsSorted checks whether the cross links are sorted
+func (cls CrossLinks) IsSorted() bool {
+	return sort.SliceIsSorted(cls, func(i, j int) bool {
+		return cls[i].ShardID() < cls[j].ShardID() || (cls[i].ShardID() == cls[j].ShardID() && cls[i].BlockNum().Cmp(cls[j].BlockNum()) < 0)
+	})
+}

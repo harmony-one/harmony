@@ -20,6 +20,8 @@ const (
 	threeOne           = 111
 
 	testnetVdfDifficulty = 10000 // This takes about 20s to finish the vdf
+
+	testnetFirstCrossLinkBlock = 100
 )
 
 func (testnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
@@ -62,6 +64,10 @@ func (ts testnetSchedule) IsLastBlock(blockNum uint64) bool {
 
 func (ts testnetSchedule) VdfDifficulty() int {
 	return testnetVdfDifficulty
+}
+
+func (ts testnetSchedule) FirstCrossLinkBlock() uint64 {
+	return testnetFirstCrossLinkBlock
 }
 
 // ConsensusRatio ratio of new nodes vs consensus total nodes
