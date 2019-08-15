@@ -723,7 +723,13 @@ func processTransferCommand() {
 		return
 	}
 
-	err = ks.Unlock(account, senderPass)
+	newPass, err := utils.GetPassphraseFromSource(senderPass)
+	if err != nil {
+		fmt.Printf("Cannot read passphrase: %s\n", err)
+		os.Exit(3)
+	}
+
+	err = ks.Unlock(account, newPass)
 	if err != nil {
 		fmt.Printf("Unlock account failed! %v\n", err)
 		return
