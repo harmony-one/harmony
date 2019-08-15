@@ -10,7 +10,6 @@ import (
 // CXReceipt represents a receipt for cross-shard transaction
 type CXReceipt struct {
 	TxHash    common.Hash // hash of the cross shard transaction in source shard
-	Nonce     uint64
 	From      common.Address
 	To        *common.Address
 	ShardID   uint32
@@ -59,8 +58,8 @@ func (cs CXReceipts) MaxToShardID() uint32 {
 }
 
 // NewCrossShardReceipt creates a cross shard receipt
-func NewCrossShardReceipt(txHash common.Hash, nonce uint64, from common.Address, to *common.Address, shardID uint32, toShardID uint32, amount *big.Int) *CXReceipt {
-	return &CXReceipt{TxHash: txHash, Nonce: nonce, From: from, To: to, ShardID: shardID, ToShardID: toShardID, Amount: amount}
+func NewCrossShardReceipt(txHash common.Hash, from common.Address, to *common.Address, shardID uint32, toShardID uint32, amount *big.Int) *CXReceipt {
+	return &CXReceipt{TxHash: txHash, From: from, To: to, ShardID: shardID, ToShardID: toShardID, Amount: amount}
 }
 
 // CXMerkleProof represents the merkle proof of a collection of ordered cross shard transactions
@@ -71,4 +70,20 @@ type CXMerkleProof struct {
 	CXReceiptHash common.Hash   // root hash of the cross shard receipts in a given block
 	ShardIDs      []uint32      // order list, records destination shardID
 	CXShardHashes []common.Hash // ordered hash list, each hash corresponds to one destination shard's receipts root hash
+}
+
+// CalculateIncomingReceiptsHash calculates the incoming receipts list hash
+// the list is already sorted by shardID and then by blockNum before calling this function
+// or the list is from the block field which is already sorted
+func CalculateIncomingReceiptsHash(receiptsList []CXReceipts) common.Hash {
+	if len(receiptsList) == 0 {
+		return EmptyRootHash
+	}
+
+	incomingReceipts := CXReceipts{}
+	for _, receipts := range receiptsList {
+		incomingReceipts = append(incomingReceipts, receipts...)
+	}
+
+	return DeriveSha(incomingReceipts)
 }

@@ -223,6 +223,7 @@ func (node *Node) ProcessReceiptMessage(msgPayload []byte) {
 	}
 
 	// Find receipts with my shard as destination
+	// and prepare to calculate source shard outgoing cxreceipts root hash
 	for j := 0; j < len(merkleProof.ShardIDs); j++ {
 		sKey := make([]byte, 4)
 		binary.BigEndian.PutUint32(sKey, merkleProof.ShardIDs[j])
@@ -241,12 +242,6 @@ func (node *Node) ProcessReceiptMessage(msgPayload []byte) {
 
 	// Check whether the receipts matches the receipt merkle root
 	receiptsForMyShard := cxmsg.Receipts
-	sha := types.DeriveSha(receiptsForMyShard)
-	if sha != myShardRoot {
-		utils.Logger().Warn().Interface("calculated", sha).Interface("got", myShardRoot).Msg("[ProcessReceiptMessage] Trie Root of ReadCXReceipts Not Match")
-		return
-	}
-
 	if len(receiptsForMyShard) == 0 {
 		return
 	}
@@ -254,13 +249,24 @@ func (node *Node) ProcessReceiptMessage(msgPayload []byte) {
 	sourceShardID := merkleProof.ShardID
 	sourceBlockNum := merkleProof.BlockNum
 	sourceBlockHash := merkleProof.BlockHash
-	// TODO: check message signature is from the nodes of source shard.
-	node.Blockchain().WriteCXReceipts(sourceShardID, sourceBlockNum.Uint64(), sourceBlockHash, receiptsForMyShard, true)
+	sourceOutgoingCXReceiptsHash := merkleProof.CXReceiptHash
 
-	// Check merkle proof with crosslink of the source shard
-	hash := crypto.Keccak256Hash(byteBuffer.Bytes())
-	utils.Logger().Debug().Interface("hash", hash).Msg("[ProcessReceiptMessage] RootHash of the CXReceipts")
-	// TODO chao: use crosslink from beacon sync to verify the hash
+	sha := types.DeriveSha(receiptsForMyShard)
+	// (1) verify the CXReceipts trie root match
+	if sha != myShardRoot {
+		utils.Logger().Warn().Uint32("sourceShardID", sourceShardID).Interface("sourceBlockNum", sourceBlockNum).Interface("calculated", sha).Interface("got", myShardRoot).Msg("[ProcessReceiptMessage] Trie Root of ReadCXReceipts Not Match")
+		return
+	}
+
+	// (2) verify the outgoingCXReceiptsHash match
+	outgoingHashFromSourceShard := crypto.Keccak256Hash(byteBuffer.Bytes())
+	if outgoingHashFromSourceShard != sourceOutgoingCXReceiptsHash {
+		utils.Logger().Warn().Uint32("sourceShardID", sourceShardID).Interface("sourceBlockNum", sourceBlockNum).Interface("calculated", outgoingHashFromSourceShard).Interface("got", sourceOutgoingCXReceiptsHash).Msg("[ProcessReceiptMessage] IncomingReceiptRootHash from source shard not match")
+		return
+	}
+
+	// TODO: (3) check message signature is from the nodes of source shard.
+	node.Blockchain().WriteCXReceipts(sourceShardID, sourceBlockNum.Uint64(), sourceBlockHash, receiptsForMyShard, true)
 
 	node.AddPendingReceipts(&cxmsg)
 }

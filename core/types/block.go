@@ -77,14 +77,14 @@ type Header struct {
 	TxHash              common.Hash    `json:"transactionsRoot" gencodec:"required"`
 	ReceiptHash         common.Hash    `json:"receiptsRoot"     gencodec:"required"`
 	OutgoingReceiptHash common.Hash    `json:"outgoingReceiptsRoot"     gencodec:"required"`
-	//IncomingReceiptHash common.Hash    `json:"incomingReceiptsRoot" gencodec:"required"`
-	Bloom     ethtypes.Bloom `json:"logsBloom"        gencodec:"required"`
-	Number    *big.Int       `json:"number"           gencodec:"required"`
-	GasLimit  uint64         `json:"gasLimit"         gencodec:"required"`
-	GasUsed   uint64         `json:"gasUsed"          gencodec:"required"`
-	Time      *big.Int       `json:"timestamp"        gencodec:"required"`
-	Extra     []byte         `json:"extraData"        gencodec:"required"`
-	MixDigest common.Hash    `json:"mixHash"          gencodec:"required"`
+	IncomingReceiptHash common.Hash    `json:"incomingReceiptsRoot" gencodec:"required"`
+	Bloom               ethtypes.Bloom `json:"logsBloom"        gencodec:"required"`
+	Number              *big.Int       `json:"number"           gencodec:"required"`
+	GasLimit            uint64         `json:"gasLimit"         gencodec:"required"`
+	GasUsed             uint64         `json:"gasUsed"          gencodec:"required"`
+	Time                *big.Int       `json:"timestamp"        gencodec:"required"`
+	Extra               []byte         `json:"extraData"        gencodec:"required"`
+	MixDigest           common.Hash    `json:"mixHash"          gencodec:"required"`
 	// Additional Fields
 	ViewID              *big.Int    `json:"viewID"           gencodec:"required"`
 	Epoch               *big.Int    `json:"epoch"            gencodec:"required"`
@@ -160,9 +160,10 @@ type Body struct {
 
 // Block represents an entire block in the Ethereum blockchain.
 type Block struct {
-	header       *Header
-	uncles       []*Header
-	transactions Transactions
+	header           *Header
+	uncles           []*Header
+	transactions     Transactions
+	incomingReceipts CXReceipts
 
 	// caches
 	hash atomic.Value
@@ -227,7 +228,7 @@ type storageblock struct {
 // The values of TxHash, UncleHash, ReceiptHash and Bloom in header
 // are ignored and set to values derived from the given txs,
 // and receipts.
-func NewBlock(header *Header, txs []*Transaction, receipts []*Receipt, cxs []*CXReceipt) *Block {
+func NewBlock(header *Header, txs []*Transaction, receipts []*Receipt, outcxs []*CXReceipt, incxs []*CXReceipt) *Block {
 	b := &Block{header: CopyHeader(header)}
 
 	// TODO: panic if len(txs) != len(receipts)
@@ -246,7 +247,15 @@ func NewBlock(header *Header, txs []*Transaction, receipts []*Receipt, cxs []*CX
 		b.header.Bloom = CreateBloom(receipts)
 	}
 
-	b.header.OutgoingReceiptHash = DeriveMultipleShardsSha(CXReceipts(cxs))
+	b.header.OutgoingReceiptHash = DeriveMultipleShardsSha(CXReceipts(outcxs))
+
+	if len(incxs) == 0 {
+		b.header.IncomingReceiptHash = EmptyRootHash
+	} else {
+		b.header.IncomingReceiptHash = DeriveSha(CXReceipts(incxs))
+		b.incomingReceipts = make(CXReceipts, len(incxs))
+		copy(b.incomingReceipts, incxs)
+	}
 
 	return b
 }
@@ -338,6 +347,11 @@ func (b *Block) Uncles() []*Header {
 // Transactions returns transactions.
 func (b *Block) Transactions() Transactions {
 	return b.transactions
+}
+
+// IncomingReceipts returns verified outgoing receipts
+func (b *Block) IncomingReceipts() CXReceipts {
+	return b.incomingReceipts
 }
 
 // Transaction returns Transaction.

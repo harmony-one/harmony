@@ -58,7 +58,9 @@ func NewStateProcessor(config *params.ChainConfig, bc *BlockChain, engine consen
 func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.Config) (types.Receipts, types.CXReceipts, []*types.Log, uint64, error) {
 	var (
 		receipts types.Receipts
-		cxs      types.CXReceipts
+		outcxs   types.CXReceipts
+
+		incxs    = block.IncomingReceipts()
 		usedGas  = new(uint64)
 		header   = block.Header()
 		coinbase = block.Header().Coinbase
@@ -74,17 +76,22 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 		}
 		receipts = append(receipts, receipt)
 		if cxReceipt != nil {
-			cxs = append(cxs, cxReceipt)
+			outcxs = append(outcxs, cxReceipt)
 		}
 		allLogs = append(allLogs, receipt.Logs...)
 	}
+
+	for _, cx := range block.IncomingReceipts() {
+		ApplyIncomingReceipt(statedb, cx)
+	}
+
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
-	_, err := p.engine.Finalize(p.bc, header, statedb, block.Transactions(), receipts, cxs)
+	_, err := p.engine.Finalize(p.bc, header, statedb, block.Transactions(), receipts, outcxs, incxs)
 	if err != nil {
 		return nil, nil, nil, 0, ctxerror.New("cannot finalize block").WithCause(err)
 	}
 
-	return receipts, cxs, allLogs, *usedGas, nil
+	return receipts, outcxs, allLogs, *usedGas, nil
 }
 
 // return true if it is valid
@@ -94,9 +101,6 @@ func getTransactionType(header *types.Header, tx *types.Transaction) types.Trans
 	}
 	if tx.ShardID() != tx.ToShardID() && header.ShardID == tx.ShardID() {
 		return types.SubtractionOnly
-	}
-	if tx.ShardID() != tx.ToShardID() && header.ShardID == tx.ToShardID() {
-		return types.AdditionOnly
 	}
 	return types.InvalidTx
 }
@@ -112,7 +116,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	}
 	msg, err := tx.AsMessage(types.MakeSigner(config, header.Number))
 	// skip signer err for additiononly tx
-	if err != nil && txType != types.AdditionOnly {
+	if err != nil {
 		return nil, nil, 0, err
 	}
 
@@ -151,7 +155,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 
 	var cxReceipt *types.CXReceipt
 	if txType == types.SubtractionOnly {
-		cxReceipt = &types.CXReceipt{tx.Hash(), msg.Nonce(), msg.From(), msg.To(), tx.ShardID(), tx.ToShardID(), msg.Value()}
+		cxReceipt = &types.CXReceipt{tx.Hash(), msg.From(), msg.To(), tx.ShardID(), tx.ToShardID(), msg.Value()}
 	} else {
 		cxReceipt = nil
 	}
