@@ -714,15 +714,9 @@ func processTransferCommand() {
 	fromShard := uint32(shardID)
 	toShard := uint32(toShardID)
 	var tx *types.Transaction
-	if fromShard == toShard {
-		tx = types.NewTransaction(
-			state.nonce, receiverAddress, fromShard, amountBigInt,
-			gas, nil, inputData)
-	} else {
-		tx = types.NewCrossShardTransaction(
-			state.nonce, &receiverAddress, fromShard, toShard, amountBigInt,
-			gas, nil, inputData)
-	}
+	tx = types.NewCrossShardTransaction(
+		state.nonce, &receiverAddress, fromShard, toShard, amountBigInt,
+		gas, nil, inputData)
 
 	account, err := ks.Find(accounts.Account{Address: senderAddress})
 	if err != nil {
