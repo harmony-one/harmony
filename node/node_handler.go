@@ -19,6 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	pb "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 
 	"github.com/harmony-one/harmony/api/proto"
@@ -416,6 +417,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 	} else {
 		utils.Logger().Info().
 			Uint64("ViewID", node.Consensus.GetViewID()).
+			Str("MyAddress", common2.MustAddressToBech32(node.Consensus.SelfAddress)).
 			Msg("BINGO !!! Reached Consensus")
 	}
 
