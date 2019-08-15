@@ -460,25 +460,38 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 		}
 
 		// TODO: enable shard state update
-		//newBlockHeader := newBlock.Header()
-		//if newBlockHeader.ShardStateHash != (common.Hash{}) {
-		//	if node.Consensus.ShardID == 0 {
-		//		// TODO ek – this is a temp hack until beacon chain sync is fixed
-		//		// End-of-epoch block on beacon chain; block's EpochState is the
-		//		// master resharding table.  Broadcast it to the network.
-		//		if err := node.broadcastEpochShardState(newBlock); err != nil {
-		//			e := ctxerror.New("cannot broadcast shard state").WithCause(err)
-		//			ctxerror.Log15(utils.Logger().Error, e)
-		//		}
-		//	}
-		//	shardState, err := newBlockHeader.GetShardState()
-		//	if err != nil {
-		//		e := ctxerror.New("cannot get shard state from header").WithCause(err)
-		//		ctxerror.Log15(utils.Logger().Error, e)
-		//	} else {
-		//		node.transitionIntoNextEpoch(shardState)
-		//	}
-		//}
+		newBlockHeader := newBlock.Header()
+		if newBlockHeader.ShardStateHash != (common.Hash{}) {
+			if node.Consensus.ShardID == 0 && node.Consensus.IsLeader() {
+				// TODO ek – this is a temp hack until beacon chain sync is fixed
+				// End-of-epoch block on beacon chain; block's EpochState is the
+				// master resharding table.  Broadcast it to the network.
+
+				if err := node.broadcastEpochShardState(newBlock); err != nil {
+					utils.Logger().Error().Err(err).
+						Uint64("BlockNum", newBlockHeader.Number.Uint64()).
+						Msg("ShardState !!! Error cannot broadcast shard state")
+				} else {
+					utils.Logger().Info().
+						Uint64("BlockNum", newBlockHeader.Number.Uint64()).
+						Uint64("Epoch", newBlock.Header().Epoch.Uint64()).
+						Msg("ShardState !!! broadcastEpochShardState")
+				}
+			}
+
+			shardState, err := newBlockHeader.GetShardState()
+			if err != nil {
+				utils.Logger().Error().Err(err).
+					Uint64("Epoch", newBlock.Header().Epoch.Uint64()).
+					Msg("ShardState !!! Error cannot get shard state from header")
+			} else {
+				node.transitionIntoNextEpoch(shardState)
+				utils.Logger().Info().
+				Uint64("BlockNum", newBlockHeader.Number.Uint64()).
+				Uint64("Epoch", newBlockHeader.Epoch.Uint64()).
+				Msg("ShardState !!! transitionIntoNextEpoch")
+			}
+		}
 	}
 }
 
@@ -778,7 +791,8 @@ func (node *Node) epochShardStateMessageHandler(msgPayload []byte) error {
 	}
 	// TODO ek – this should be done from replaying beaconchain once
 	//  beaconchain sync is fixed
-	err = node.Beaconchain().WriteShardState(
+	//err = node.Beaconchain().WriteShardState(
+	err = node.Consensus.ChainReader.WriteShardState(
 		receivedEpoch, epochShardState.ShardState)
 	if err != nil {
 		return ctxerror.New("cannot store shard state", "epoch", receivedEpoch).
@@ -787,30 +801,29 @@ func (node *Node) epochShardStateMessageHandler(msgPayload []byte) error {
 	return nil
 }
 
-/*
+
 func (node *Node) transitionIntoNextEpoch(shardState types.ShardState) {
-	logger = logger.New(
-		"blsPubKey", hex.EncodeToString(node.Consensus.PubKey.Serialize()),
-		"curShard", node.Blockchain().ShardID(),
-		"curLeader", node.Consensus.IsLeader())
-	for _, c := range shardState {
-		utils.Logger().Debug().
-			Uint32("shardID", c.ShardID).
-			Str("nodeList", c.NodeList).
-         Msg("new shard information")
-	}
-	myShardID, isNextLeader := findRoleInShardState(
+	idx, isNextLeader := findRoleInShardState(
 		node.Consensus.PubKey, shardState)
-	logger = logger.New(
-		"nextShard", myShardID,
-		"nextLeader", isNextLeader)
+
+	myShardID := shardState[idx].ShardID
+
+	utils.Logger().Info().
+		Uint64("currentBlock", node.Blockchain().CurrentBlock().NumberU64()).
+		Uint64("currentEpoch", node.Blockchain().CurrentBlock().Header().Epoch.Uint64()).
+		Int("num of shards", len(shardState)).
+		Uint32("curShard",node.Blockchain().ShardID()).
+		Bool("curLeader", node.Consensus.IsLeader()).
+		Uint32("nextShard",myShardID).
+		Bool("nextLeader", isNextLeader).
+		Msg("ShardState !!! leader information in transitionIntoNextEpoch")
 
 	if myShardID == math.MaxUint32 {
-		getLogger().Info("Somehow I got kicked out. Exiting")
+		utils.Logger().Info().Msg("Somehow I got kicked out. Exiting")
 		os.Exit(8) // 8 represents it's a loop and the program restart itself
 	}
 
-	myShardState := shardState[myShardID]
+	myShardState := shardState[idx]
 
 	// Update public keys
 	var publicKeys []*bls.PublicKey
@@ -818,9 +831,9 @@ func (node *Node) transitionIntoNextEpoch(shardState types.ShardState) {
 		key := &bls.PublicKey{}
 		err := key.Deserialize(nodeID.BlsPublicKey[:])
 		if err != nil {
-			getLogger().Error("Failed to deserialize BLS public key in shard state",
-				"idx", idx,
-				"error", err)
+			utils.Logger().Error().Err(err).
+			Int("idx", idx).
+			Msg("Failed to deserialize BLS public key in shard state")
 		}
 		publicKeys = append(publicKeys, key)
 	}
@@ -828,16 +841,16 @@ func (node *Node) transitionIntoNextEpoch(shardState types.ShardState) {
 	//	node.DRand.UpdatePublicKeys(publicKeys)
 
 	if node.Blockchain().ShardID() == myShardID {
-		getLogger().Info("staying in the same shard")
+		utils.Logger().Info().Msg("staying in the same shard")
 	} else {
-		getLogger().Info("moving to another shard")
+		utils.Logger().Info().Msg("moving to another shard")
 		if err := node.shardChains.Close(); err != nil {
-			getLogger().Error("cannot close shard chains", "error", err)
+			utils.Logger().Error().Err(err).Msg("cannot close shard chains")
 		}
-		restartProcess(getRestartArguments(myShardID))
+		//restartProcess(getRestartArguments(myShardID))
 	}
 }
-*/
+
 
 func findRoleInShardState(
 	key *bls.PublicKey, state types.ShardState,

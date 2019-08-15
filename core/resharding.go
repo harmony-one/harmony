@@ -1,7 +1,6 @@
 package core
 
 import (
-	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"math/big"
@@ -164,9 +163,9 @@ func GetShardingStateFromBlockChain(bc *BlockChain, epoch *big.Int) (*ShardingSt
 	}
 	shardState = shardState.DeepCopy()
 
-	blockNumber := GetBlockNumberFromEpoch(epoch.Uint64())
-	rndSeedBytes := bc.GetVdfByNumber(blockNumber)
-	rndSeed := binary.BigEndian.Uint64(rndSeedBytes[:])
+	//blockNumber := GetBlockNumberFromEpoch(epoch.Uint64())
+	//rndSeedBytes := bc.GetVdfByNumber(blockNumber)
+	rndSeed := uint64(0)// binary.BigEndian.Uint64(rndSeedBytes[:])
 
 	return &ShardingState{epoch: epoch.Uint64(), rnd: rndSeed, shardState: shardState, numShards: len(shardState)}, nil
 }
