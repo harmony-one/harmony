@@ -105,7 +105,8 @@ func (sc *CollectionImpl) ShardChain(shardID uint32, networkType nodeconfig.Netw
 		chainConfig = *params.TestnetChainConfig
 	}
 
-	chainConfig.ChainID = big.NewInt(int64(shardID))
+	// TODO: use 1 as mainnet, change to networkID instead
+	chainConfig.ChainID = big.NewInt(1)
 
 	bc, err := core.NewBlockChain(
 		db, cacheConfig, &chainConfig, sc.engine, vm.Config{}, nil,
