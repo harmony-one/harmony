@@ -21,6 +21,8 @@ const (
 
 	localnetVdfDifficulty  = 5000 // This takes about 10s to finish the vdf
 	localnetConsensusRatio = float64(0.1)
+
+	localnetFirstCrossLinkBlock = 13
 )
 
 func (localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
@@ -62,6 +64,10 @@ func (ls localnetSchedule) IsLastBlock(blockNum uint64) bool {
 
 func (ls localnetSchedule) VdfDifficulty() int {
 	return localnetVdfDifficulty
+}
+
+func (ls localnetSchedule) FirstCrossLinkBlock() uint64 {
+	return localnetFirstCrossLinkBlock
 }
 
 // ConsensusRatio ratio of new nodes vs consensus total nodes

@@ -1129,6 +1129,10 @@ func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 					header.Logger(utils.Logger()).Warn().Err(err).Msg("[insertChain] cannot parse cross links")
 					return n, err
 				}
+				if !crossLinks.IsSorted() {
+					header.Logger(utils.Logger()).Warn().Err(err).Msg("[insertChain] cross links are not sorted")
+					return n, errors.New("proposed cross links are not sorted")
+				}
 				for _, crossLink := range *crossLinks {
 					bc.WriteCrossLinks(types.CrossLinks{crossLink}, false)
 					bc.WriteShardLastCrossLink(crossLink.ShardID(), crossLink)
