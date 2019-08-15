@@ -35,7 +35,7 @@ func (node *Node) ProcessReceiptMessage(msgPayload []byte) {
 		utils.Logger().Error().Err(err).Msg("[ProcessReceiptMessage] Unable to Decode message Payload")
 		return
 	}
-	merkleProof := cxmsg.MKP
+	merkleProof := cxmsg.MerkleProof
 	myShardRoot := common.Hash{}
 
 	var foundMyShard bool
@@ -65,7 +65,7 @@ func (node *Node) ProcessReceiptMessage(msgPayload []byte) {
 	utils.Logger().Debug().Interface("hash", hash).Msg("[ProcessReceiptMessage] RootHash of the CXReceipts")
 	// TODO chao: use crosslink from beacon sync to verify the hash
 
-	cxReceipts := cxmsg.CXS
+	cxReceipts := cxmsg.Receipts
 	sha := types.DeriveSha(cxReceipts)
 	if sha != myShardRoot {
 		utils.Logger().Warn().Interface("calculated", sha).Interface("got", myShardRoot).Msg("[ProcessReceiptMessage] Trie Root of CXReceipts Not Match")
@@ -81,7 +81,7 @@ func (node *Node) ProcessReceiptMessage(msgPayload []byte) {
 	}
 	for _, cx := range cxReceipts {
 		// TODO chao: add gas fee to incentivize
-		tx := types.NewCrossShardTransaction(0, cx.To, cx.ToShardID, cx.ToShardID, cx.Amount, gas, nil, inputData, types.AdditionOnly)
+		tx := types.NewCrossShardTransaction(0, cx.To, cx.ShardID, cx.ToShardID, cx.Amount, gas, nil, inputData, types.AdditionOnly)
 		txs = append(txs, tx)
 	}
 	node.addPendingTransactions(txs)

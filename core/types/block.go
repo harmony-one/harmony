@@ -76,14 +76,15 @@ type Header struct {
 	Root          common.Hash    `json:"stateRoot"        gencodec:"required"`
 	TxHash        common.Hash    `json:"transactionsRoot" gencodec:"required"`
 	ReceiptHash   common.Hash    `json:"receiptsRoot"     gencodec:"required"`
-	CXReceiptHash common.Hash    `json:"cxReceiptsRoot"     gencodec:"required"`
-	Bloom         ethtypes.Bloom `json:"logsBloom"        gencodec:"required"`
-	Number        *big.Int       `json:"number"           gencodec:"required"`
-	GasLimit      uint64         `json:"gasLimit"         gencodec:"required"`
-	GasUsed       uint64         `json:"gasUsed"          gencodec:"required"`
-	Time          *big.Int       `json:"timestamp"        gencodec:"required"`
-	Extra         []byte         `json:"extraData"        gencodec:"required"`
-	MixDigest     common.Hash    `json:"mixHash"          gencodec:"required"`
+	CXReceiptHash common.Hash    `json:"outgoingReceiptsRoot"     gencodec:"required"`
+	//IncomingReceiptHash common.Hash    `json:"incomingReceiptsRoot" gencodec:"required"`
+	Bloom     ethtypes.Bloom `json:"logsBloom"        gencodec:"required"`
+	Number    *big.Int       `json:"number"           gencodec:"required"`
+	GasLimit  uint64         `json:"gasLimit"         gencodec:"required"`
+	GasUsed   uint64         `json:"gasUsed"          gencodec:"required"`
+	Time      *big.Int       `json:"timestamp"        gencodec:"required"`
+	Extra     []byte         `json:"extraData"        gencodec:"required"`
+	MixDigest common.Hash    `json:"mixHash"          gencodec:"required"`
 	// Additional Fields
 	ViewID              *big.Int    `json:"viewID"           gencodec:"required"`
 	Epoch               *big.Int    `json:"epoch"            gencodec:"required"`

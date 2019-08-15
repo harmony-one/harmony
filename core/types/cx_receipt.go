@@ -29,18 +29,27 @@ func (cs CXReceipts) Swap(i, j int) { cs[i], cs[j] = cs[j], cs[i] }
 
 // GetRlp implements Rlpable and returns the i'th element of s in rlp.
 func (cs CXReceipts) GetRlp(i int) []byte {
+	if len(cs) == 0 {
+		return []byte{}
+	}
 	enc, _ := rlp.EncodeToBytes(cs[i])
 	return enc
 }
 
 // ToShardID returns the destination shardID of the cxReceipt
 func (cs CXReceipts) ToShardID(i int) uint32 {
+	if len(cs) == 0 {
+		return 0
+	}
 	return cs[i].ToShardID
 }
 
 // MaxToShardID returns the maximum destination shardID of cxReceipts
 func (cs CXReceipts) MaxToShardID() uint32 {
 	maxShardID := uint32(0)
+	if len(cs) == 0 {
+		return maxShardID
+	}
 	for i := 0; i < len(cs); i++ {
 		if maxShardID < cs[i].ToShardID {
 			maxShardID = cs[i].ToShardID

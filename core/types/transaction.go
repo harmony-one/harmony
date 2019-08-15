@@ -76,8 +76,7 @@ type txdata struct {
 	Recipient    *common.Address `json:"to"         rlp:"nil"` // nil means contract creation
 	Amount       *big.Int        `json:"value"      gencodec:"required"`
 	Payload      []byte          `json:"input"      gencodec:"required"`
-
-	TxType TransactionType `json:"transactionType" gencodec:"required"`
+	TxType       TransactionType
 
 	// Signature values
 	V *big.Int `json:"v" gencodec:"required"`
@@ -107,6 +106,9 @@ func NewTransaction(nonce uint64, to common.Address, shardID uint32, amount *big
 
 // NewCrossShardTransaction returns new cross shard transaction
 func NewCrossShardTransaction(nonce uint64, to *common.Address, shardID uint32, toShardID uint32, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte, txType TransactionType) *Transaction {
+	if shardID == toShardID {
+		return newTransaction(nonce, to, shardID, amount, gasLimit, gasPrice, data)
+	}
 	return newCrossShardTransaction(nonce, to, shardID, toShardID, amount, gasLimit, gasPrice, data, txType)
 }
 

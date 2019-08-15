@@ -52,8 +52,9 @@ func (w *Worker) SelectTransactionsForNewBlock(txs types.Transactions, maxNumTxs
 	unselected := types.Transactions{}
 	invalid := types.Transactions{}
 	for _, tx := range txs {
-		if tx.ShardID() != w.shardID {
+		if tx.ShardID() != w.shardID && tx.ToShardID() != w.shardID {
 			invalid = append(invalid, tx)
+			continue
 		}
 		snap := w.current.state.Snapshot()
 		_, err := w.commitTransaction(tx, coinbase)
@@ -86,7 +87,9 @@ func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	}
 	w.current.txs = append(w.current.txs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)
-	w.current.cxs = append(w.current.cxs, cx)
+	if cx != nil {
+		w.current.cxs = append(w.current.cxs, cx)
+	}
 
 	return receipt.Logs, nil
 }

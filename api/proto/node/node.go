@@ -37,8 +37,8 @@ type BlockchainSyncMessage struct {
 
 // CXReceiptsMessage carrys the cross shard receipts and merkle proof
 type CXReceiptsMessage struct {
-	CXS types.CXReceipts
-	MKP *types.CXMerkleProof
+	Receipts    types.CXReceipts
+	MerkleProof *types.CXMerkleProof
 }
 
 // BlockchainSyncMessageType represents BlockchainSyncMessageType type.
@@ -197,7 +197,7 @@ func DeserializeEpochShardStateFromMessage(payload []byte) (*types.EpochShardSta
 
 // ConstructCXReceiptsMessage constructs cross shard receipts and merkle proof
 func ConstructCXReceiptsMessage(cxs types.CXReceipts, mkp *types.CXMerkleProof) []byte {
-	msg := &CXReceiptsMessage{CXS: cxs, MKP: mkp}
+	msg := &CXReceiptsMessage{Receipts: cxs, MerkleProof: mkp}
 
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
 	byteBuffer.WriteByte(byte(Block))
@@ -205,7 +205,7 @@ func ConstructCXReceiptsMessage(cxs types.CXReceipts, mkp *types.CXMerkleProof) 
 	by, err := rlp.EncodeToBytes(msg)
 
 	if err != nil {
-		log.Fatal(err)
+		utils.Logger().Error().Err(err).Msg("[ConstructCXReceiptsMessage] Encode CXReceiptsMessage Error")
 		return []byte{}
 	}
 	byteBuffer.Write(by)

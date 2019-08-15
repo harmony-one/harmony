@@ -67,6 +67,9 @@ func DeriveOneShardSha(list DerivableList, shardID uint32) common.Hash {
 // else, return |shard0|trieHash0|shard1|trieHash1|...| for non-empty destination shards
 func DeriveMultipleShardsSha(list DerivableList) common.Hash {
 	by := []byte{}
+	if list.Len() == 0 {
+		return EmptyRootHash
+	}
 	for i := 0; i <= int(list.MaxToShardID()); i++ {
 		shardHash := DeriveOneShardSha(list, uint32(i))
 		if shardHash == EmptyRootHash {

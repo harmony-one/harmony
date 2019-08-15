@@ -17,6 +17,8 @@
 package core
 
 import (
+	"fmt"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
@@ -71,7 +73,9 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 			return nil, nil, nil, 0, err
 		}
 		receipts = append(receipts, receipt)
-		cxs = append(cxs, cxReceipt)
+		if cxReceipt != nil {
+			cxs = append(cxs, cxReceipt)
+		}
 		allLogs = append(allLogs, receipt.Logs...)
 	}
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
@@ -83,11 +87,33 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 	return receipts, cxs, allLogs, *usedGas, nil
 }
 
+// return true if it is valid
+func verifyTransactionType(header *types.Header, tx *types.Transaction) error {
+	switch tx.TxType() {
+	case types.SameShardTx:
+		if tx.ShardID() == tx.ToShardID() && header.ShardID == tx.ShardID() {
+			return nil
+		}
+	case types.SubtractionOnly:
+		if tx.ShardID() != tx.ToShardID() && header.ShardID == tx.ShardID() {
+			return nil
+		}
+	case types.AdditionOnly:
+		if tx.ShardID() != tx.ToShardID() && header.ShardID == tx.ToShardID() {
+			return nil
+		}
+	}
+	return fmt.Errorf("Invalid Transaction Type: %v", tx.TxType())
+}
+
 // ApplyTransaction attempts to apply a transaction to the given state database
 // and uses the input parameters for its environment. It returns the receipt
 // for the transaction, gas used and an error if the transaction failed,
 // indicating the block was invalid.
 func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.DB, header *types.Header, tx *types.Transaction, usedGas *uint64, cfg vm.Config) (*types.Receipt, *types.CXReceipt, uint64, error) {
+	if err := verifyTransactionType(header, tx); err != nil {
+		return nil, nil, 0, err
+	}
 	msg, err := tx.AsMessage(types.MakeSigner(config, header.Number))
 	// skip signer err for additiononly tx
 	if err != nil && msg.TxType() != types.AdditionOnly {
@@ -126,7 +152,12 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	//receipt.Logs = statedb.GetLogs(tx.Hash())
 	receipt.Bloom = types.CreateBloom(types.Receipts{receipt})
 
-	cxReceipt := &types.CXReceipt{tx.Hash(), msg.Nonce(), msg.From(), msg.To(), tx.ShardID(), tx.ToShardID(), msg.Value()}
+	var cxReceipt *types.CXReceipt
+	if tx.TxType() == types.SubtractionOnly {
+		cxReceipt = &types.CXReceipt{tx.Hash(), msg.Nonce(), msg.From(), msg.To(), tx.ShardID(), tx.ToShardID(), msg.Value()}
+	} else {
+		cxReceipt = nil
+	}
 
 	return receipt, cxReceipt, gas, err
 }
