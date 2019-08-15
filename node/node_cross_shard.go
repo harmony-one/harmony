@@ -46,8 +46,6 @@ func (node *Node) ProcessHeaderMessage(msgPayload []byte) {
 			if header.Number.Uint64() >= firstCrossLinkBlock {
 				// Only process cross link starting from FirstCrossLinkBlock
 				crossLinkHeadersToProcess = append(crossLinkHeadersToProcess, header)
-				utils.Logger().Debug().
-					Msgf("[ProcessingHeader] BlockNum %d", header.Number)
 			}
 		}
 
