@@ -97,8 +97,8 @@ func (node *Node) VerifyCrosslinkHeader(prevHeader, header *types.Header) error 
 	}
 
 	// Verify signature of the new cross link header
-	shardState, err := node.Blockchain().ReadShardState(header.Epoch)
-	committee := shardState.FindCommitteeByID(header.ShardID)
+	shardState, err := node.Blockchain().ReadShardState(prevHeader.Epoch)
+	committee := shardState.FindCommitteeByID(prevHeader.ShardID)
 
 	if err != nil || committee == nil {
 		return ctxerror.New("[CrossLink] Failed to read shard state for cross link header", "shardID", header.ShardID, "blockNum", header.Number).WithCause(err)
