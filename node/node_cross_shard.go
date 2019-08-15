@@ -212,7 +212,7 @@ func (node *Node) ProcessCrossShardTx(blocks []*types.Block) {
 }
 
 // ProposeCrossLinkDataForBeaconchain propose cross links for beacon chain new block
-func (node *Node) ProposeCrossLinkDataForBeaconchain() ([]byte, error) {
+func (node *Node) ProposeCrossLinkDataForBeaconchain() (types.CrossLinks, error) {
 	curBlock := node.Blockchain().CurrentBlock()
 	numShards := core.ShardingSchedule.InstanceForEpoch(curBlock.Header().Epoch).NumShards()
 
@@ -259,7 +259,7 @@ func (node *Node) ProposeCrossLinkDataForBeaconchain() ([]byte, error) {
 	if len(crossLinksToPropose) != 0 {
 		crossLinksToPropose.Sort()
 
-		return rlp.EncodeToBytes(crossLinksToPropose)
+		return crossLinksToPropose, nil
 	}
-	return []byte{}, errors.New("No cross link to propose")
+	return types.CrossLinks{}, errors.New("No cross link to propose")
 }

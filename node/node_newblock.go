@@ -2,7 +2,10 @@ package node
 
 import (
 	"math/big"
+	"sort"
 	"time"
+
+	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/ethereum/go-ethereum/common"
 
@@ -88,21 +91,7 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 					}
 
 					// Propose cross shard receipts
-					receiptsList := []types.CXReceipts{}
-					node.pendingCXMutex.Lock()
-					for _, receiptMsg := range node.pendingCXReceipts {
-						sourceShardID := receiptMsg.MerkleProof.ShardID
-						sourceBlockNum := receiptMsg.MerkleProof.BlockNum
-
-						beaconChain := node.Blockchain() // TODO: read from real beacon chain
-						crossLink, err := beaconChain.ReadCrossLink(sourceShardID, sourceBlockNum.Uint64(), false)
-						if err == nil {
-							if crossLink.ChainHeader.Hash() == receiptMsg.MerkleProof.BlockHash && crossLink.ChainHeader.OutgoingReceiptHash == receiptMsg.MerkleProof.CXReceiptHash {
-								receiptsList = append(receiptsList, receiptMsg.Receipts)
-							}
-						}
-					}
-					node.pendingCXMutex.Unlock()
+					receiptsList := node.proposeReceipts()
 					if len(receiptsList) != 0 {
 						if err := node.Worker.CommitReceipts(receiptsList, coinbase); err != nil {
 							ctxerror.Log15(utils.GetLogger().Error,
@@ -112,13 +101,16 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 					}
 
 					if node.NodeConfig.ShardID == 0 {
-						data, err := node.ProposeCrossLinkDataForBeaconchain()
+						crossLinksToPropose, err := node.ProposeCrossLinkDataForBeaconchain()
 						if err == nil {
-							newBlock, err = node.Worker.CommitWithCrossLinks(sig, mask, viewID, coinbase, data)
-							utils.Logger().Debug().
-								Uint64("blockNum", newBlock.NumberU64()).
-								Int("numCrossLinks", len(data)).
-								Msg("Successfully added cross links into new block")
+							data, err := rlp.EncodeToBytes(crossLinksToPropose)
+							if err == nil {
+								newBlock, err = node.Worker.CommitWithCrossLinks(sig, mask, viewID, coinbase, data)
+								utils.Logger().Debug().
+									Uint64("blockNum", newBlock.NumberU64()).
+									Int("numCrossLinks", len(data)).
+									Msg("Successfully added cross links into new block")
+							}
 						} else {
 							newBlock, err = node.Worker.Commit(sig, mask, viewID, coinbase)
 						}
@@ -218,4 +210,28 @@ func (node *Node) proposeLocalShardState(block *types.Block) {
 	if err != nil {
 		logger.Error().Err(err).Msg("Failed proposin local shard state")
 	}
+}
+
+func (node *Node) proposeReceipts() []types.CXReceipts {
+	receiptsList := []types.CXReceipts{}
+	node.pendingCXMutex.Lock()
+
+	sort.Slice(node.pendingCXReceipts, func(i, j int) bool {
+		return node.pendingCXReceipts[i].MerkleProof.ShardID < node.pendingCXReceipts[j].MerkleProof.ShardID || (node.pendingCXReceipts[i].MerkleProof.ShardID == node.pendingCXReceipts[j].MerkleProof.ShardID && node.pendingCXReceipts[i].MerkleProof.BlockNum.Cmp(node.pendingCXReceipts[j].MerkleProof.BlockNum) < 0)
+	})
+
+	for _, receiptMsg := range node.pendingCXReceipts {
+		sourceShardID := receiptMsg.MerkleProof.ShardID
+		sourceBlockNum := receiptMsg.MerkleProof.BlockNum
+
+		beaconChain := node.Blockchain() // TODO: read from real beacon chain
+		crossLink, err := beaconChain.ReadCrossLink(sourceShardID, sourceBlockNum.Uint64(), false)
+		if err == nil {
+			if crossLink.ChainHeader.Hash() == receiptMsg.MerkleProof.BlockHash && crossLink.ChainHeader.OutgoingReceiptHash == receiptMsg.MerkleProof.CXReceiptHash {
+				receiptsList = append(receiptsList, receiptMsg.Receipts)
+			}
+		}
+	}
+	node.pendingCXMutex.Unlock()
+	return receiptsList
 }
