@@ -227,9 +227,8 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 		if vmerr == vm.ErrInsufficientBalance {
 			if st.txType != types.AdditionOnly {
 				return nil, 0, false, vmerr
-			} else {
-				vmerr = nil
 			}
+			vmerr = nil
 		}
 	}
 	st.refundGas()

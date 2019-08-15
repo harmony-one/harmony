@@ -165,6 +165,17 @@ func ConstructBlocksSyncMessage(blocks []*types.Block) []byte {
 	return byteBuffer.Bytes()
 }
 
+// ConstructCrossLinkHeadersMessage constructs cross link header message to send to beacon chain
+func ConstructCrossLinkHeadersMessage(headers []*types.Header) []byte {
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
+	byteBuffer.WriteByte(byte(Block))
+	byteBuffer.WriteByte(byte(Header))
+
+	headersData, _ := rlp.EncodeToBytes(headers)
+	byteBuffer.Write(headersData)
+	return byteBuffer.Bytes()
+}
+
 // ConstructEpochShardStateMessage contructs epoch shard state message
 func ConstructEpochShardStateMessage(epochShardState types.EpochShardState) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})

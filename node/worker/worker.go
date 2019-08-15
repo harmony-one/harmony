@@ -163,8 +163,8 @@ func (w *Worker) GetCurrentCXReceipts() []*types.CXReceipt {
 	return w.current.cxs
 }
 
-// Commit generate a new block for the new txs.
-func (w *Worker) Commit(sig []byte, signers []byte, viewID uint64, coinbase common.Address) (*types.Block, error) {
+// CommitWithCrossLinks generate a new block with cross links for the new txs.
+func (w *Worker) CommitWithCrossLinks(sig []byte, signers []byte, viewID uint64, coinbase common.Address, crossLinks []byte) (*types.Block, error) {
 	if len(sig) > 0 && len(signers) > 0 {
 		copy(w.current.header.LastCommitSignature[:], sig[:])
 		w.current.header.LastCommitBitmap = append(signers[:0:0], signers...)
@@ -172,6 +172,7 @@ func (w *Worker) Commit(sig []byte, signers []byte, viewID uint64, coinbase comm
 	w.current.header.Coinbase = coinbase
 	w.current.header.ViewID = new(big.Int)
 	w.current.header.ViewID.SetUint64(viewID)
+	w.current.header.CrossLinks = crossLinks
 
 	s := w.current.state.Copy()
 
@@ -181,6 +182,11 @@ func (w *Worker) Commit(sig []byte, signers []byte, viewID uint64, coinbase comm
 		return nil, ctxerror.New("cannot finalize block").WithCause(err)
 	}
 	return block, nil
+}
+
+// Commit generate a new block for the new txs.
+func (w *Worker) Commit(sig []byte, signers []byte, viewID uint64, coinbase common.Address) (*types.Block, error) {
+	return w.CommitWithCrossLinks(sig, signers, viewID, coinbase, []byte{})
 }
 
 // New create a new worker object.
