@@ -56,11 +56,12 @@ func (node *Node) ProcessHeaderMessage(msgPayload []byte) {
 		for _, header := range crossLinkHeadersToProcess {
 			exist, err := node.Blockchain().ReadCrossLink(header.ShardID, header.Number.Uint64(), false)
 			if err == nil && exist != nil {
-				// Cross link already exists, skip
+				utils.Logger().Debug().
+					Msgf("[ProcessingHeader] Cross Link already exists, pass. Block num: %d", header.Number)
 				continue
 			}
 
-			if header.Number.Uint64() == firstCrossLinkBlock { // Directly trust the first cross-link
+			if header.Number.Uint64() > firstCrossLinkBlock { // Directly trust the first cross-link
 				// Sanity check on the previous link with the new link
 				previousLink, err := node.Blockchain().ReadCrossLink(header.ShardID, header.Number.Uint64()-1, false)
 				if err != nil {
@@ -178,7 +179,7 @@ func (node *Node) ProposeCrossLinkDataForBeaconchain() (types.CrossLinks, error)
 				break
 			}
 
-			if link.BlockNum().Uint64() > 1 {
+			if link.BlockNum().Uint64() > firstCrossLinkBlock {
 				err := node.VerifyCrosslinkHeader(lastLink.Header(), link.Header())
 				if err != nil {
 					utils.Logger().Debug().
