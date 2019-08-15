@@ -10,6 +10,7 @@ func TestFoundationalNodeAccounts(t *testing.T) {
 		// V0_3 exempted due to historical mistakes (dups at 187/204 & 202/205)
 		//"V0_3": FoundationalNodeAccountsV0_3,
 		"V0_4": FoundationalNodeAccountsV0_4,
+		"V1":   FoundationalNodeAccountsV1,
 	} {
 		t.Run(name, func(t *testing.T) { testDeployAccounts(t, accounts) })
 	}
