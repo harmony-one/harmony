@@ -25,8 +25,8 @@ type environment struct {
 	header   *types.Header
 	txs      []*types.Transaction
 	receipts []*types.Receipt
-	outcxs   []*types.CXReceipt // cross shard transaction receipts (source shard)
-	incxs    []*types.CXReceipt // cross shard receipts (desitinatin shard)
+	outcxs   []*types.CXReceipt       // cross shard transaction receipts (source shard)
+	incxs    []*types.CXReceiptsProof // cross shard receipts and its proof (desitinatin shard)
 }
 
 // Worker is the main object which takes care of submitting new work to consensus engine
@@ -113,13 +113,19 @@ func (w *Worker) CommitTransactions(txs types.Transactions, coinbase common.Addr
 }
 
 // CommitReceipts commits a list of already verified incoming cross shard receipts
-func (w *Worker) CommitReceipts(receiptsList []types.CXReceipts, coinbase common.Address) error {
+func (w *Worker) CommitReceipts(receiptsList []*types.CXReceiptsProof, coinbase common.Address) error {
 	if w.current.gasPool == nil {
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit)
 	}
-	w.current.header.IncomingReceiptHash = types.CalculateIncomingReceiptsHash(receiptsList)
-	for _, receipts := range receiptsList {
-		w.current.incxs = append(w.current.incxs, receipts...)
+
+	if len(receiptsList) == 0 {
+		w.current.header.IncomingReceiptHash = types.EmptyRootHash
+	} else {
+		w.current.header.IncomingReceiptHash = types.DeriveSha(types.CXReceiptsProofs(receiptsList))
+	}
+
+	for _, cx := range receiptsList {
+		w.current.incxs = append(w.current.incxs, cx)
 	}
 	return nil
 }
@@ -180,7 +186,7 @@ func (w *Worker) OutgoingReceipts() []*types.CXReceipt {
 }
 
 // IncomingReceipts get incoming receipts in destination shard that is received from source shard
-func (w *Worker) IncomingReceipts() []*types.CXReceipt {
+func (w *Worker) IncomingReceipts() []*types.CXReceiptsProof {
 	return w.current.incxs
 }
 

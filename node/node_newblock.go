@@ -89,7 +89,7 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 					}
 
 					// Propose cross shard receipts
-					receiptsList := node.proposeReceipts()
+					receiptsList := node.proposeReceiptsProof()
 					if len(receiptsList) != 0 {
 						if err := node.Worker.CommitReceipts(receiptsList, coinbase); err != nil {
 							ctxerror.Log15(utils.GetLogger().Error,
@@ -210,28 +210,28 @@ func (node *Node) proposeLocalShardState(block *types.Block) {
 	}
 }
 
-func (node *Node) proposeReceipts() []types.CXReceipts {
-	receiptsList := []types.CXReceipts{}
+func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
+	receiptsList := []*types.CXReceiptsProof{}
 	node.pendingCXMutex.Lock()
 
 	sort.Slice(node.pendingCXReceipts, func(i, j int) bool {
 		return node.pendingCXReceipts[i].MerkleProof.ShardID < node.pendingCXReceipts[j].MerkleProof.ShardID || (node.pendingCXReceipts[i].MerkleProof.ShardID == node.pendingCXReceipts[j].MerkleProof.ShardID && node.pendingCXReceipts[i].MerkleProof.BlockNum.Cmp(node.pendingCXReceipts[j].MerkleProof.BlockNum) < 0)
 	})
 
-	for _, receiptMsg := range node.pendingCXReceipts {
-		//		sourceShardID := receiptMsg.MerkleProof.ShardID
-		//		sourceBlockNum := receiptMsg.MerkleProof.BlockNum
+	for _, cxp := range node.pendingCXReceipts {
+		//		sourceShardID := cxp.MerkleProof.ShardID
+		//		sourceBlockNum := cxp.MerkleProof.BlockNum
 		//
 		//		beaconChain := node.Blockchain() // TODO: read from real beacon chain
 		//		crossLink, err := beaconChain.ReadCrossLink(sourceShardID, sourceBlockNum.Uint64(), false)
 		//		if err == nil {
 		//			// verify the source block hash is from a finalized block
-		//			if crossLink.ChainHeader.Hash() == receiptMsg.MerkleProof.BlockHash && crossLink.ChainHeader.OutgoingReceiptHash == receiptMsg.MerkleProof.CXReceiptHash {
-		//				receiptsList = append(receiptsList, receiptMsg.Receipts)
+		//			if crossLink.ChainHeader.Hash() == cxp.MerkleProof.BlockHash && crossLink.ChainHeader.OutgoingReceiptHash == cxp.MerkleProof.CXReceiptHash {
+		//				receiptsList = append(receiptsList, cxp.Receipts)
 		//			}
 		//		}
 		// TODO: remove it after beacon chain sync is ready, for pass the test only
-		receiptsList = append(receiptsList, receiptMsg.Receipts)
+		receiptsList = append(receiptsList, cxp)
 	}
 	node.pendingCXMutex.Unlock()
 	return receiptsList

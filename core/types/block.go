@@ -163,7 +163,7 @@ type Block struct {
 	header           *Header
 	uncles           []*Header
 	transactions     Transactions
-	incomingReceipts CXReceipts
+	incomingReceipts CXReceiptsProofs
 
 	// caches
 	hash atomic.Value
@@ -228,7 +228,7 @@ type storageblock struct {
 // The values of TxHash, UncleHash, ReceiptHash and Bloom in header
 // are ignored and set to values derived from the given txs,
 // and receipts.
-func NewBlock(header *Header, txs []*Transaction, receipts []*Receipt, outcxs []*CXReceipt, incxs []*CXReceipt) *Block {
+func NewBlock(header *Header, txs []*Transaction, receipts []*Receipt, outcxs []*CXReceipt, incxs []*CXReceiptsProof) *Block {
 	b := &Block{header: CopyHeader(header)}
 
 	// TODO: panic if len(txs) != len(receipts)
@@ -252,8 +252,8 @@ func NewBlock(header *Header, txs []*Transaction, receipts []*Receipt, outcxs []
 	if len(incxs) == 0 {
 		b.header.IncomingReceiptHash = EmptyRootHash
 	} else {
-		b.header.IncomingReceiptHash = DeriveSha(CXReceipts(incxs))
-		b.incomingReceipts = make(CXReceipts, len(incxs))
+		b.header.IncomingReceiptHash = DeriveSha(CXReceiptsProofs(incxs))
+		b.incomingReceipts = make(CXReceiptsProofs, len(incxs))
 		copy(b.incomingReceipts, incxs)
 	}
 
@@ -350,7 +350,7 @@ func (b *Block) Transactions() Transactions {
 }
 
 // IncomingReceipts returns verified outgoing receipts
-func (b *Block) IncomingReceipts() CXReceipts {
+func (b *Block) IncomingReceipts() CXReceiptsProofs {
 	return b.incomingReceipts
 }
 

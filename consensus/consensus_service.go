@@ -284,7 +284,7 @@ func (consensus *Consensus) VerifySeal(chain consensus_engine.ChainReader, heade
 
 // Finalize implements consensus.Engine, accumulating the block rewards,
 // setting the final state and assembling the block.
-func (consensus *Consensus) Finalize(chain consensus_engine.ChainReader, header *types.Header, state *state.DB, txs []*types.Transaction, receipts []*types.Receipt, outcxs []*types.CXReceipt, incxs []*types.CXReceipt) (*types.Block, error) {
+func (consensus *Consensus) Finalize(chain consensus_engine.ChainReader, header *types.Header, state *state.DB, txs []*types.Transaction, receipts []*types.Receipt, outcxs []*types.CXReceipt, incxs []*types.CXReceiptsProof) (*types.Block, error) {
 	// Accumulate any block and uncle rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
 	if err := accumulateRewards(chain, state, header); err != nil {

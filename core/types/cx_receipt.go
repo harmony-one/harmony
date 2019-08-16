@@ -1,10 +1,15 @@
 package types
 
 import (
+	"bytes"
+	"encoding/binary"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
+
+	"github.com/harmony-one/harmony/internal/ctxerror"
 )
 
 // CXReceipt represents a receipt for cross-shard transaction
@@ -72,18 +77,105 @@ type CXMerkleProof struct {
 	CXShardHashes []common.Hash // ordered hash list, each hash corresponds to one destination shard's receipts root hash
 }
 
-// CalculateIncomingReceiptsHash calculates the incoming receipts list hash
-// the list is already sorted by shardID and then by blockNum before calling this function
-// or the list is from the block field which is already sorted
-func CalculateIncomingReceiptsHash(receiptsList []CXReceipts) common.Hash {
-	if len(receiptsList) == 0 {
-		return EmptyRootHash
+// CXReceiptsProof carrys the cross shard receipts and merkle proof
+type CXReceiptsProof struct {
+	Receipts    CXReceipts
+	MerkleProof *CXMerkleProof
+}
+
+// CXReceiptsProofs is a list of CXReceiptsProof
+type CXReceiptsProofs []*CXReceiptsProof
+
+// Len returns the length of s.
+func (cs CXReceiptsProofs) Len() int { return len(cs) }
+
+// Swap swaps the i'th and the j'th element in s.
+func (cs CXReceiptsProofs) Swap(i, j int) { cs[i], cs[j] = cs[j], cs[i] }
+
+// GetRlp implements Rlpable and returns the i'th element of s in rlp.
+func (cs CXReceiptsProofs) GetRlp(i int) []byte {
+	if len(cs) == 0 {
+		return []byte{}
+	}
+	enc, _ := rlp.EncodeToBytes(cs[i])
+	return enc
+}
+
+// ToShardID returns the destination shardID of the cxReceipt
+// Not used
+func (cs CXReceiptsProofs) ToShardID(i int) uint32 {
+	return 0
+}
+
+// MaxToShardID returns the maximum destination shardID of cxReceipts
+// Not used
+func (cs CXReceiptsProofs) MaxToShardID() uint32 {
+	return 0
+}
+
+// GetToShardID get the destination shardID, return error if there is more than one unique shardID
+func (cxp *CXReceiptsProof) GetToShardID() (uint32, error) {
+	var shardID uint32
+	if cxp == nil || len(cxp.Receipts) == 0 {
+		return uint32(0), ctxerror.New("[GetShardID] CXReceiptsProof or its receipts is NIL")
+	}
+	for i, cx := range cxp.Receipts {
+		if i == 0 {
+			shardID = cx.ToShardID
+		} else if shardID == cx.ToShardID {
+			continue
+		} else {
+			return shardID, ctxerror.New("[GetShardID] CXReceiptsProof contains distinct ToShardID")
+		}
+	}
+	return shardID, nil
+}
+
+// IsValidCXReceiptsProof checks whether the given CXReceiptsProof is consistency with itself
+// Remaining to check whether there is a corresonding block finalized
+func (cxp *CXReceiptsProof) IsValidCXReceiptsProof() error {
+	toShardID, err := cxp.GetToShardID()
+	if err != nil {
+		return ctxerror.New("[IsValidCXReceiptsProof] invalid shardID").WithCause(err)
 	}
 
-	incomingReceipts := CXReceipts{}
-	for _, receipts := range receiptsList {
-		incomingReceipts = append(incomingReceipts, receipts...)
+	merkleProof := cxp.MerkleProof
+	shardRoot := common.Hash{}
+	foundMatchingShardID := false
+	byteBuffer := bytes.NewBuffer([]byte{})
+
+	// prepare to calculate source shard outgoing cxreceipts root hash
+	for j := 0; j < len(merkleProof.ShardIDs); j++ {
+		sKey := make([]byte, 4)
+		binary.BigEndian.PutUint32(sKey, merkleProof.ShardIDs[j])
+		byteBuffer.Write(sKey)
+		byteBuffer.Write(merkleProof.CXShardHashes[j][:])
+		if merkleProof.ShardIDs[j] == toShardID {
+			shardRoot = merkleProof.CXShardHashes[j]
+			foundMatchingShardID = true
+		}
 	}
 
-	return DeriveSha(incomingReceipts)
+	if !foundMatchingShardID {
+		return ctxerror.New("[IsValidCXReceiptsProof] Didn't find matching shardID")
+	}
+
+	sourceShardID := merkleProof.ShardID
+	sourceBlockNum := merkleProof.BlockNum
+	sourceOutgoingCXReceiptsHash := merkleProof.CXReceiptHash
+
+	sha := DeriveSha(cxp.Receipts)
+
+	// (1) verify the CXReceipts trie root match
+	if sha != shardRoot {
+		return ctxerror.New("[IsValidCXReceiptsProof] Trie Root of ReadCXReceipts Not Match", "sourceShardID", sourceShardID, "sourceBlockNum", sourceBlockNum, "calculated", sha, "got", shardRoot)
+	}
+
+	// (2) verify the outgoingCXReceiptsHash match
+	outgoingHashFromSourceShard := crypto.Keccak256Hash(byteBuffer.Bytes())
+	if outgoingHashFromSourceShard != sourceOutgoingCXReceiptsHash {
+		return ctxerror.New("[ProcessReceiptMessage] IncomingReceiptRootHash from source shard not match", "sourceShardID", sourceShardID, "sourceBlockNum", sourceBlockNum, "calculated", outgoingHashFromSourceShard, "got", sourceOutgoingCXReceiptsHash)
+	}
+
+	return nil
 }

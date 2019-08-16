@@ -232,11 +232,14 @@ func (fs FrontierSigner) Sender(tx *Transaction) (common.Address, error) {
 }
 
 func recoverPlain(sighash common.Hash, R, S, Vb *big.Int, homestead bool) (common.Address, error) {
+	V := byte(Vb.Uint64() - 27)
+	fmt.Println("ops0", "R", R, "S", S, "V", V)
 	if Vb.BitLen() > 8 {
+		fmt.Println("ops1", "R", R, "S", S, "V", V)
 		return common.Address{}, ErrInvalidSig
 	}
-	V := byte(Vb.Uint64() - 27)
 	if !crypto.ValidateSignatureValues(V, R, S, homestead) {
+		fmt.Println("ops2", "R", R, "S", S, "V", V)
 		return common.Address{}, ErrInvalidSig
 	}
 	// encode the signature in uncompressed format

@@ -136,11 +136,20 @@ func ApplyMessage(evm *vm.EVM, msg Message, gp *GasPool) ([]byte, uint64, bool, 
 }
 
 // ApplyIncomingReceipt will add amount into ToAddress in the receipt
-func ApplyIncomingReceipt(db *state.DB, cx *types.CXReceipt) {
-	if cx == nil || cx.To == nil {
+func ApplyIncomingReceipt(db *state.DB, cxp *types.CXReceiptsProof) {
+	if cxp == nil {
 		return
 	}
-	db.AddBalance(*cx.To, cx.Amount)
+
+	// TODO: how to charge gas here?
+	for _, cx := range cxp.Receipts {
+		utils.GetLogInstance().Debug("hehe add incoming receipts")
+		if cx == nil || cx.To == nil { // should not happend
+			utils.Logger().Warn().Msg("ApplyIncomingReceipts: Invalid incoming receipt!!")
+			continue
+		}
+		db.AddBalance(*cx.To, cx.Amount)
+	}
 }
 
 // to returns the recipient of the message.
