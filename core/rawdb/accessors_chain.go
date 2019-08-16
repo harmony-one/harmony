@@ -29,6 +29,13 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
+// Indicate whether the receipts corresponding to a blockHash is unspent or not
+// use a default blockHash as indicator which should be collision resistent
+var (
+	SpentHash common.Hash = common.Hash{0x01}
+	EmptyHash common.Hash = common.Hash{}
+)
+
 // ReadCanonicalHash retrieves the hash assigned to a canonical block number.
 func ReadCanonicalHash(db DatabaseReader, number uint64) common.Hash {
 	data, _ := db.Get(headerHashKey(number))
@@ -555,4 +562,47 @@ func DeleteCXReceipts(db DatabaseDeleter, shardID uint32, number uint64, hash co
 	if err := db.Delete(cxReceiptKey(shardID, number, hash, temp)); err != nil {
 		utils.Logger().Error().Msg("Failed to delete cross shard tx receipts")
 	}
+}
+
+// ReadCXReceiptsProofUnspent check whether a CXReceiptsProof is unspent, true means not spent
+func ReadCXReceiptsProofUnspent(db DatabaseReader, shardID uint32, number uint64) (common.Hash, error) {
+	data, err := db.Get(cxReceiptUnspentKey(shardID, number))
+	if err != nil || len(data) == 0 {
+		return common.Hash{}, ctxerror.New("[ReadCXReceiptsProofUnspent] Cannot find the key", "shardID", shardID, "number", number).WithCause(err)
+	}
+	return common.BytesToHash(data), nil
+}
+
+// TryWriteCXReceiptsProofUnspent check whether a CXReceiptsProof is unspent, write to database if unspent
+func TryWriteCXReceiptsProofUnspent(dbr DatabaseReader, dbw DatabaseWriter, shardID uint32, number uint64, blockHash common.Hash) error {
+	hash, _ := ReadCXReceiptsProofUnspent(dbr, shardID, number)
+	// only write to database for the first time given a specified block number
+	if hash == EmptyHash {
+		return dbw.Put(cxReceiptUnspentKey(shardID, number), blockHash.Bytes())
+	}
+	return ctxerror.New("[TryWriteCXReceiptsProofUnspent] blockHash already exist", "had", hash, "tryPut", blockHash)
+}
+
+// DeleteCXReceiptsProofUnspent removes unspent indicator of a given blockHash
+func DeleteCXReceiptsProofUnspent(db DatabaseDeleter, shardID uint32, number uint64) {
+	if err := db.Delete(cxReceiptUnspentKey(shardID, number)); err != nil {
+		utils.Logger().Error().Msg("Failed to delete receipts unspent indicator")
+	}
+}
+
+// ReadCXReceiptsProofUnspentCheckpoint returns the last unspent blocknumber
+func ReadCXReceiptsProofUnspentCheckpoint(db DatabaseReader, shardID uint32) (uint64, error) {
+	by, err := db.Get(cxReceiptUnspentCheckpointKey(shardID))
+	if err != nil {
+		return 0, ctxerror.New("[ReadCXReceiptsProofUnspent] Cannot Unspent Checkpoint", "shardID", shardID).WithCause(err)
+	}
+	lastCheckpoint := binary.BigEndian.Uint64(by[:])
+	return lastCheckpoint, nil
+}
+
+// WriteCXReceiptsProofUnspentCheckpoint check whether a CXReceiptsProof is unspent, true means not spent
+func WriteCXReceiptsProofUnspentCheckpoint(db DatabaseWriter, shardID uint32, blockNum uint64) error {
+	by := make([]byte, 8)
+	binary.BigEndian.PutUint64(by[:], blockNum)
+	return db.Put(cxReceiptUnspentCheckpointKey(shardID), by)
 }
