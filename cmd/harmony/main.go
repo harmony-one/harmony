@@ -11,9 +11,6 @@ import (
 	"runtime"
 	"time"
 
-	common2 "github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/internal/common"
-
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -21,6 +18,7 @@ import (
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/blsgen"
+	"github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -125,11 +123,6 @@ var (
 	metricsFlag     = flag.Bool("metrics", false, "Collect and upload node metrics")
 	pushgatewayIP   = flag.String("pushgateway_ip", "grafana.harmony.one", "Metrics view ip")
 	pushgatewayPort = flag.String("pushgateway_port", "9091", "Metrics view port")
-
-	// Bad block revert
-	doRevertBefore = flag.Int("do_revert_before", 410000, "If the current block is less than do_revert_before, revert all blocks until (including) revert_to block")
-	revertTo       = flag.Int("revert_to", 407735, "The revert will rollback all blocks until and including block number revert_to")
-	revertShardID  = flag.Int("revert_shard_id", 3, "The shard id where the revert will happen")
 )
 
 func initSetup() {
@@ -274,6 +267,16 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	return nodeConfig
 }
 
+func _HarmonyNotice(shardID uint32) {
+	tick := time.NewTicker(20 * time.Second)
+	for {
+		select {
+		case <-tick.C:
+			utils.GetLogger().Info("Please wait for the blockain bootstrapping process", "Shard", shardID)
+		}
+	}
+}
+
 func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// Consensus object.
 	// TODO: consensus object shouldn't start here
@@ -301,22 +304,11 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 	currentNode := node.New(nodeConfig.Host, currentConsensus, chainDBFactory, *isArchival)
 
-	////// Temporary fix for 8-6 incident /////////
+	// Temporary Pangaea fix to stop shard0/shard1 nodes, so that the shard can be rebooted
 	chain := currentNode.Blockchain()
-	curNum := chain.CurrentBlock().NumberU64()
-	if chain.ShardID() == uint32(*revertShardID) && curNum < uint64(*doRevertBefore) && curNum >= uint64(*revertTo) {
-		utils.GetLogInstance().Warn("[WARNING] Reverting blocks",
-			"to", *revertTo, "curBlock", curNum)
-		// Remove invalid blocks
-		for chain.CurrentBlock().NumberU64() >= uint64(*revertTo) {
-			curBlock := chain.CurrentBlock()
-			rollbacks := []common2.Hash{curBlock.Hash()}
-			chain.Rollback(rollbacks)
-			sigAndBitMap := append(curBlock.Header().LastCommitSignature[:], curBlock.Header().LastCommitBitmap...)
-			chain.WriteLastCommits(sigAndBitMap)
-		}
+	if (chain.ShardID() == uint32(0) || chain.ShardID() == uint32(1)) && core.ShardingSchedule == shardingconfig.PangaeaSchedule {
+		_HarmonyNotice(chain.ShardID())
 	}
-	///////////////////////////////////////////////
 
 	if *dnsZone != "" {
 		currentNode.SetDNSZone(*dnsZone)
