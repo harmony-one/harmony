@@ -278,37 +278,52 @@ func (s *Service) GetCommittee(w http.ResponseWriter, r *http.Request) {
 		shardID, err = strconv.ParseUint(shardIDRead, 10, 32)
 		if err != nil {
 			utils.Logger().Warn().Err(err).Msg("cannot read shard id")
+			w.WriteHeader(400)
+			return
 		}
 	}
 	if epochRead != "" {
 		epoch, err = strconv.ParseUint(epochRead, 10, 64)
 		if err != nil {
 			utils.Logger().Warn().Err(err).Msg("cannot read shard epoch")
+			w.WriteHeader(400)
+			return
 		}
 	}
 	if s.ShardID != uint32(shardID) {
-		utils.Logger().Warn().Err(err).Msg("incorrect shard id")
+		utils.Logger().Warn().Msg("incorrect shard id")
+		w.WriteHeader(400)
 		return
 	}
 	db := s.storage.GetDB()
 	bytes, err := db.Get([]byte(GetCommitteeKey(uint32(shardID), epoch)))
 	if err != nil {
 		utils.Logger().Warn().Err(err).Msg("cannot read committee")
+		w.WriteHeader(500)
 		return
 	}
 	committee := &types.Committee{}
-	if rlp.DecodeBytes(bytes, committee) != nil {
-		utils.Logger().Warn().Msg("cannot convert data from DB")
+	if err := rlp.DecodeBytes(bytes, committee); err != nil {
+		utils.Logger().Warn().Err(err).Msg("cannot decode committee data from DB")
+		w.WriteHeader(500)
 		return
 	}
 	validators := &Committee{}
 	for _, validator := range committee.NodeList {
-		validatorStake := big.NewInt(0)
-		validatorStake, err = s.GetAccountBalance(validator.EcdsaAddress)
-		validators.Validators = append(validators.Validators, &Validator{Address: common2.MustAddressToBech32(validator.EcdsaAddress), Stake: validatorStake})
+		validatorBalance := big.NewInt(0)
+		validatorBalance, err := s.GetAccountBalance(validator.EcdsaAddress)
+		if err != nil {
+			continue
+		}
+		oneAddress, err := common2.AddressToBech32(validator.EcdsaAddress)
+		if err != nil {
+			continue
+		}
+		validators.Validators = append(validators.Validators, &Validator{Address: oneAddress, Balance: validatorBalance})
 	}
 	if err := json.NewEncoder(w).Encode(validators); err != nil {
 		utils.Logger().Warn().Err(err).Msg("cannot JSON-encode committee")
+		w.WriteHeader(500)
 	}
 }
 

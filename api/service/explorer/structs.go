@@ -36,7 +36,7 @@ type Committee struct {
 // Validator ...
 type Validator struct {
 	Address string   `json:"address"`
-	Stake   *big.Int `json:"stake"`
+	Balance *big.Int `json:"balance"`
 }
 
 // Transaction ...
