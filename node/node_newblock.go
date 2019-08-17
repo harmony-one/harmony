@@ -90,14 +90,6 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 					viewID := node.Consensus.GetViewID()
 					// add aggregated commit signatures from last block, except for the first two blocks
 
-					if node.NodeConfig.GetNetworkType() == nodeconfig.Mainnet {
-						if err = node.Worker.UpdateCurrent(coinbase); err != nil {
-							utils.Logger().Debug().
-								Err(err).
-								Msg("Failed updating worker's state")
-							continue
-						}
-					}
 
 					if node.NodeConfig.ShardID == 0 {
 						crossLinksToPropose, err := node.ProposeCrossLinkDataForBeaconchain()
@@ -212,7 +204,8 @@ func (node *Node) proposeLocalShardState(block *types.Block) {
 }
 
 func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
-	receiptsList := []*types.CXReceiptsProof{}
+	validReceiptsList := []*types.CXReceiptsProof{}
+	pendingReceiptsList := []*types.CXReceiptsProof{}
 	node.pendingCXMutex.Lock()
 
 	sort.Slice(node.pendingCXReceipts, func(i, j int) bool {
@@ -232,8 +225,9 @@ func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
 		//			}
 		//		}
 		// TODO: remove it after beacon chain sync is ready, for pass the test only
-		receiptsList = append(receiptsList, cxp)
+		validReceiptsList = append(validReceiptsList, cxp)
 	}
+	node.pendingCXReceipts = pendingReceiptsList
 	node.pendingCXMutex.Unlock()
-	return receiptsList
+	return validReceiptsList
 }

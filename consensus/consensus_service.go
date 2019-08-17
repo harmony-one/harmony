@@ -290,7 +290,7 @@ func (consensus *Consensus) Finalize(chain consensus_engine.ChainReader, header 
 	if err := accumulateRewards(chain, state, header); err != nil {
 		return nil, ctxerror.New("cannot pay block reward").WithCause(err)
 	}
-	header.Root = state.IntermediateRoot(false)
+	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 	return types.NewBlock(header, txs, receipts, outcxs, incxs), nil
 }
 

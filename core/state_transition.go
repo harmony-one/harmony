@@ -147,6 +147,7 @@ func ApplyIncomingReceipt(db *state.DB, cxp *types.CXReceiptsProof) {
 			utils.Logger().Warn().Msg("ApplyIncomingReceipts: Invalid incoming receipt!!")
 			continue
 		}
+		utils.Logger().Info().Msgf("ApplyIncomingReceipts: ADDING BALANCE %d", cx.Amount)
 		db.AddBalance(*cx.To, cx.Amount)
 	}
 }
