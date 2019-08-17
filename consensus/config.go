@@ -11,7 +11,7 @@ const (
 
 	// timeout duration for announce/prepare/commit
 	phaseDuration     time.Duration = 60 * time.Second
-	bootstrapDuration time.Duration = 300 * time.Second
+	bootstrapDuration time.Duration = 600 * time.Second
 	maxLogSize        uint32        = 1000
 	// threshold between received consensus message blockNum and my blockNum
 	consensusBlockNumBuffer uint64 = 2

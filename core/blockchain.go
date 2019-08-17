@@ -246,6 +246,12 @@ func IsEpochLastBlock(block *types.Block) bool {
 	return ShardingSchedule.IsLastBlock(block.NumberU64())
 }
 
+// IsEpochLastBlockByHeader returns whether this block is the last block of an epoch
+// given block header
+func IsEpochLastBlockByHeader(header *types.Header) bool {
+	return ShardingSchedule.IsLastBlock(header.Number.Uint64())
+}
+
 func (bc *BlockChain) getProcInterrupt() bool {
 	return atomic.LoadInt32(&bc.procInterrupt) == 1
 }
@@ -1961,7 +1967,7 @@ func (bc *BlockChain) WriteEpochVdfBlockNum(epoch *big.Int, blockNum *big.Int) e
 
 // IsSameLeaderAsPreviousBlock retrieves a block from the database by number, caching it
 func (bc *BlockChain) IsSameLeaderAsPreviousBlock(block *types.Block) bool {
-	if block.NumberU64() == 0 {
+	if IsEpochBlock(block) {
 		return false
 	}
 

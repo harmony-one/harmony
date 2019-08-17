@@ -69,6 +69,12 @@ func (ts testnetSchedule) ConsensusRatio() float64 {
 	return mainnetConsensusRatio
 }
 
+// TODO: remove it after randomness feature turned on mainnet
+//RandonnessStartingEpoch returns starting epoch of randonness generation
+func (ts testnetSchedule) RandomnessStartingEpoch() uint64 {
+	return mainnetRandomnessStartingEpoch
+}
+
 var testnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(testnetV1Epoch), big.NewInt(testnetV2Epoch)}
 
 var testnetV0 = MustNewInstance(2, 150, 150, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch)

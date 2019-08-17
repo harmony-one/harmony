@@ -41,6 +41,12 @@ func (s fixedSchedule) ConsensusRatio() float64 {
 	return mainnetConsensusRatio
 }
 
+// TODO: remove it after randomness feature turned on mainnet
+//RandonnessStartingEpoch returns starting epoch of randonness generation
+func (s fixedSchedule) RandomnessStartingEpoch() uint64 {
+	return mainnetRandomnessStartingEpoch
+}
+
 // NewFixedSchedule returns a sharding configuration schedule that uses the
 // given config instance for all epochs.  Useful for testing.
 func NewFixedSchedule(instance Instance) Schedule {

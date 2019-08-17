@@ -5,7 +5,10 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 	"time"
+
+	"github.com/harmony-one/harmony/core"
 
 	"github.com/harmony-one/harmony/crypto/hash"
 
@@ -411,8 +414,8 @@ func (consensus *Consensus) String() string {
 
 // ToggleConsensusCheck flip the flag of whether ignore viewID check during consensus process
 func (consensus *Consensus) ToggleConsensusCheck() {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
+	consensus.infoMutex.Lock()
+	defer consensus.infoMutex.Unlock()
 	consensus.ignoreViewIDCheck = !consensus.ignoreViewIDCheck
 }
 
@@ -527,9 +530,16 @@ func (consensus *Consensus) checkViewID(msg *PbftMessage) error {
 
 // SetBlockNum sets the blockNum in consensus object, called at node bootstrap
 func (consensus *Consensus) SetBlockNum(blockNum uint64) {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
+	consensus.infoMutex.Lock()
+	defer consensus.infoMutex.Unlock()
 	consensus.blockNum = blockNum
+}
+
+// SetEpochNum sets the epoch in consensus object
+func (consensus *Consensus) SetEpochNum(epoch uint64) {
+	consensus.infoMutex.Lock()
+	defer consensus.infoMutex.Unlock()
+	consensus.epoch = epoch
 }
 
 // ReadSignatureBitmapPayload read the payload for signature and bitmap; offset is the beginning position of reading
@@ -612,6 +622,7 @@ func (consensus *Consensus) reportMetrics(block types.Block) {
 // getLogger returns logger for consensus contexts added
 func (consensus *Consensus) getLogger() *zerolog.Logger {
 	logger := utils.Logger().With().
+		Uint64("myEpoch", consensus.epoch).
 		Uint64("myBlock", consensus.blockNum).
 		Uint64("myViewID", consensus.viewID).
 		Interface("phase", consensus.phase).
@@ -653,22 +664,76 @@ func (consensus *Consensus) getLeaderPubKeyFromCoinbase(header *types.Header) (*
 	return nil, ctxerror.New("cannot find corresponding BLS Public Key", "coinbaseAddr", header.Coinbase)
 }
 
-// update consensus information before join consensus after state syncing
-func (consensus *Consensus) updateConsensusInformation() {
+// UpdateConsensusInformation will update shard information (epoch, publicKeys, blockNum, viewID)
+// based on the local blockchain. It is called in two cases for now:
+// 1. consensus object initialization. because of current dependency where chainreader is only available
+// after node is initialized; node is only available after consensus is initialized
+// we need call this function separately after create consensus object
+// 2. after state syncing is finished
+// It will return the mode:
+// (a) node not in committed: Listening mode
+// (b) node in committed but has any err during processing: Syncing mode
+// (c) node in committed and everything looks good: Normal mode
+func (consensus *Consensus) UpdateConsensusInformation() Mode {
+	var pubKeys []*bls.PublicKey
+	var hasError bool
+
 	header := consensus.ChainReader.CurrentHeader()
-	consensus.SetBlockNum(header.Number.Uint64() + 1)
-	consensus.SetViewID(header.ViewID.Uint64() + 1)
-	leaderPubKey, err := consensus.getLeaderPubKeyFromCoinbase(header)
-	if err != nil || leaderPubKey == nil {
-		consensus.getLogger().Debug().Err(err).Msg("[SYNC] Unable to get leaderPubKey from coinbase")
-		consensus.ignoreViewIDCheck = true
+
+	epoch := header.Epoch
+	curPubKeys := core.GetPublicKeys(epoch, header.ShardID)
+	consensus.numPrevPubKeys = len(curPubKeys)
+
+	consensus.getLogger().Info().Msg("[UpdateConsensusInformation] Updating.....")
+
+	if core.IsEpochLastBlockByHeader(header) {
+		// increase epoch by one if it's the last block
+		consensus.SetEpochNum(epoch.Uint64() + 1)
+		consensus.getLogger().Info().Uint64("headerNum", header.Number.Uint64()).Msg("[UpdateConsensusInformation] Epoch updated for next epoch")
+		nextEpoch := new(big.Int).Add(epoch, common.Big1)
+		pubKeys = core.GetPublicKeys(nextEpoch, header.ShardID)
 	} else {
-		consensus.getLogger().Debug().
-			Str("leaderPubKey", leaderPubKey.SerializeToHexStr()).
-			Msg("[SYNC] Most Recent LeaderPubKey Updated Based on BlockChain")
-		consensus.LeaderPubKey = leaderPubKey
-		consensus.mode.SetMode(Normal)
+		consensus.SetEpochNum(epoch.Uint64())
+		pubKeys = curPubKeys
 	}
+
+	if len(pubKeys) == 0 {
+		consensus.getLogger().Warn().Msg("[UpdateConsensusInformation] PublicKeys is Nil")
+		hasError = true
+	}
+
+	// update public keys committee
+	consensus.getLogger().Info().
+		Int("numPubKeys", len(pubKeys)).
+		Msg("[UpdateConsensusInformation] Successfully updated public keys")
+	consensus.UpdatePublicKeys(pubKeys)
+
+	// take care of possible leader change during the epoch
+	if !core.IsEpochLastBlockByHeader(header) && header.Number.Uint64() != 0 {
+		leaderPubKey, err := consensus.getLeaderPubKeyFromCoinbase(header)
+		if err != nil || leaderPubKey == nil {
+			consensus.getLogger().Debug().Err(err).Msg("[SYNC] Unable to get leaderPubKey from coinbase")
+			consensus.ignoreViewIDCheck = true
+			hasError = true
+		} else {
+			consensus.getLogger().Debug().
+				Str("leaderPubKey", leaderPubKey.SerializeToHexStr()).
+				Msg("[SYNC] Most Recent LeaderPubKey Updated Based on BlockChain")
+			consensus.LeaderPubKey = leaderPubKey
+		}
+	}
+
+	for _, key := range pubKeys {
+		// in committee
+		if key.IsEqual(consensus.PubKey) {
+			if hasError {
+				return Syncing
+			}
+			return Normal
+		}
+	}
+	// not in committee
+	return Listening
 }
 
 // IsLeader check if the node is a leader or not by comparing the public key of
@@ -677,5 +742,14 @@ func (consensus *Consensus) IsLeader() bool {
 	if consensus.PubKey != nil && consensus.LeaderPubKey != nil {
 		return consensus.PubKey.IsEqual(consensus.LeaderPubKey)
 	}
+	return false
+}
+
+// NeedsRandomNumberGeneration returns true if the current epoch needs random number generation
+func (consensus *Consensus) NeedsRandomNumberGeneration(epoch *big.Int) bool {
+	if consensus.ShardID == 0 && epoch.Uint64() >= core.ShardingSchedule.RandomnessStartingEpoch() {
+		return true
+	}
+
 	return false
 }

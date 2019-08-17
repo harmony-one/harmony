@@ -51,7 +51,10 @@ func testGenesisccounts(t *testing.T) {
 
 func TestCommitteeAccounts(test *testing.T) {
 	testAccounts(test, FoundationalNodeAccounts)
-	testAccounts(test, FoundationalNodeAccountsV1)
+	testAccounts(test, FoundationalNodeAccountsV0_1)
+	testAccounts(test, FoundationalNodeAccountsV0_2)
+	testAccounts(test, FoundationalNodeAccountsV0_3)
+	testAccounts(test, FoundationalNodeAccountsV0_4)
 	testAccounts(test, HarmonyAccounts)
 	testAccounts(test, TNHarmonyAccounts)
 	testAccounts(test, TNFoundationalAccounts)
@@ -63,19 +66,19 @@ func testAccounts(test *testing.T, accounts []DeployAccount) {
 	for _, account := range accounts {
 		accIndex, _ := strconv.Atoi(strings.Trim(account.Index, " "))
 		if accIndex != index {
-			test.Error("Account index not in sequence", account.Index)
+			test.Error("Account index", account.Index, "not in sequence")
 		}
 		index++
 
 		_, _, err := bech32.Decode(account.Address)
 		if err != nil {
-			test.Error("Account address is not valid bech32 address", err)
+			test.Error("Account address", account.Address, "is not valid:", err)
 		}
 
 		pubKey := bls.PublicKey{}
 		err = pubKey.DeserializeHexStr(account.BlsPublicKey)
 		if err != nil {
-			test.Error("Account bls public key is not valid", err)
+			test.Error("Account bls public key", account.BlsPublicKey, "is not valid:", err)
 		}
 	}
 }

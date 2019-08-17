@@ -51,7 +51,7 @@ var (
 	lastBlockReward      = big.NewInt(0)
 	lastConsensusTime    = int64(0)
 	metricsPush          = make(chan int)
-	blockHeightCounter   = prometheus.NewCounter(prometheus.CounterOpts{
+	blockHeightGauge     = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "block_height",
 		Help: "Get current block height.",
 	})
@@ -122,7 +122,7 @@ func (s *Service) Run() {
 	// Init local storage for metrics.
 	s.storage = GetStorageInstance(s.IP, s.Port, true)
 	registry := prometheus.NewRegistry()
-	registry.MustRegister(blockHeightCounter, connectionsNumberGauge, nodeBalanceGauge, lastConsensusGauge, blockRewardGauge, blocksAcceptedGauge, txPoolGauge, isLeaderGauge)
+	registry.MustRegister(blockHeightGauge, connectionsNumberGauge, nodeBalanceGauge, lastConsensusGauge, blockRewardGauge, blocksAcceptedGauge, txPoolGauge, isLeaderGauge)
 
 	s.pusher = push.New("http://"+s.PushgatewayIP+":"+s.PushgatewayPort, "node_metrics").Gatherer(registry).Grouping("instance", s.IP+":"+s.Port).Grouping("bls_key", s.BlsPublicKey)
 	go s.PushMetrics()
@@ -137,7 +137,7 @@ func FormatBalance(balance *big.Int) float64 {
 
 // UpdateBlockHeight updates block height.
 func UpdateBlockHeight(blockHeight uint64) {
-	blockHeightCounter.Add(float64(blockHeight) - float64(curBlockHeight))
+	blockHeightGauge.Set(float64(blockHeight))
 	blocksAcceptedGauge.Set(float64(blockHeight) - float64(curBlockHeight))
 	curBlockHeight = blockHeight
 	metricsPush <- BlockHeightPush

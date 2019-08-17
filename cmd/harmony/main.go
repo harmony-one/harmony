@@ -267,6 +267,16 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	return nodeConfig
 }
 
+func _HarmonyNotice(shardID uint32) {
+	tick := time.NewTicker(20 * time.Second)
+	for {
+		select {
+		case <-tick.C:
+			utils.GetLogger().Info("Please wait for the blockain bootstrapping process", "Shard", shardID)
+		}
+	}
+}
+
 func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// Consensus object.
 	// TODO: consensus object shouldn't start here
@@ -293,6 +303,13 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// Current node.
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 	currentNode := node.New(nodeConfig.Host, currentConsensus, chainDBFactory, *isArchival)
+
+	// Temporary Pangaea fix to stop shard0/shard1 nodes, so that the shard can be rebooted
+	chain := currentNode.Blockchain()
+	if (chain.ShardID() == uint32(0) || chain.ShardID() == uint32(1)) && core.ShardingSchedule == shardingconfig.PangaeaSchedule {
+		_HarmonyNotice(chain.ShardID())
+	}
+
 	if *dnsZone != "" {
 		currentNode.SetDNSZone(*dnsZone)
 	} else if *dnsFlag {
@@ -355,6 +372,10 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentConsensus.BlockVerifier = currentNode.VerifyNewBlock
 	currentConsensus.OnConsensusDone = currentNode.PostConsensusProcessing
 	currentNode.State = node.NodeWaitToJoin
+
+	// update consensus information based on the blockchain
+	mode := currentConsensus.UpdateConsensusInformation()
+	currentConsensus.SetMode(mode)
 
 	// Watching currentNode and currentConsensus.
 	memprofiling.GetMemProfiling().Add("currentNode", currentNode)
