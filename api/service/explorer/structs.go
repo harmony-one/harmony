@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -85,6 +86,21 @@ type Shard struct {
 // NewBlock ...
 func NewBlock(block *types.Block, height int) *Block {
 	// TODO(ricl): use block.Header().CommitBitmap and GetPubKeyFromMask
+	signers := []string{}
+	state, err := block.Header().GetShardState()
+	if err == nil {
+		for _, committee := range state {
+			if committee.ShardID == block.ShardID() {
+				for _, validator := range committee.NodeList {
+					oneAddress, err := common.AddressToBech32(validator.EcdsaAddress)
+					if err != nil {
+						continue
+					}
+					signers = append(signers, oneAddress)
+				}
+			}
+		}
+	}
 	return &Block{
 		Height:     strconv.Itoa(height),
 		ID:         block.Hash().Hex(),
@@ -92,7 +108,7 @@ func NewBlock(block *types.Block, height int) *Block {
 		Timestamp:  strconv.Itoa(int(block.Time().Int64() * 1000)),
 		MerkleRoot: block.Root().Hex(),
 		Bytes:      strconv.Itoa(int(block.Size())),
-		Signers:    []string{},
+		Signers:    signers,
 		ExtraData:  string(block.Extra()),
 	}
 }
