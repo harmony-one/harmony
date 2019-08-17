@@ -42,15 +42,7 @@ type sigCache struct {
 // MakeSigner returns a Signer based on the given chain config and block number.
 func MakeSigner(config *params.ChainConfig, blockNumber *big.Int) Signer {
 	var signer Signer
-	switch {
-	// TODO (chao) clean up different forks in ETH code
-	case config.IsEIP155(blockNumber):
-		signer = NewEIP155Signer(config.ChainID)
-	case config.IsHomestead(blockNumber):
-		signer = HomesteadSigner{}
-	default:
-		signer = FrontierSigner{}
-	}
+	signer = NewEIP155Signer(config.ChainID)
 	return signer
 }
 
@@ -233,13 +225,12 @@ func (fs FrontierSigner) Sender(tx *Transaction) (common.Address, error) {
 
 func recoverPlain(sighash common.Hash, R, S, Vb *big.Int, homestead bool) (common.Address, error) {
 	V := byte(Vb.Uint64() - 27)
-	fmt.Println("ops0", "R", R, "S", S, "V", V)
 	if Vb.BitLen() > 8 {
-		fmt.Println("ops1", "R", R, "S", S, "V", V)
+		fmt.Println("ops1", "R", R, "S", S, "V", V, "IsHomestead", homestead)
 		return common.Address{}, ErrInvalidSig
 	}
 	if !crypto.ValidateSignatureValues(V, R, S, homestead) {
-		fmt.Println("ops2", "R", R, "S", S, "V", V)
+		fmt.Println("ops2", "R", R, "S", S, "V", V, "IsHomestead", homestead)
 		return common.Address{}, ErrInvalidSig
 	}
 	// encode the signature in uncompressed format

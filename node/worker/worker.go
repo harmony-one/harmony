@@ -125,6 +125,10 @@ func (w *Worker) CommitReceipts(receiptsList []*types.CXReceiptsProof, coinbase 
 	}
 
 	for _, cx := range receiptsList {
+		core.ApplyIncomingReceipt(w.current.state, cx)
+	}
+
+	for _, cx := range receiptsList {
 		w.current.incxs = append(w.current.incxs, cx)
 	}
 	return nil

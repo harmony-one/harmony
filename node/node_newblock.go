@@ -64,6 +64,17 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 						Uint64("blockNum", node.Blockchain().CurrentBlock().NumberU64()+1).
 						Int("selectedTxs", len(selectedTxs)).
 						Msg("PROPOSING NEW BLOCK ------------------------------------------------")
+
+						// Propose cross shard receipts
+					receiptsList := node.proposeReceiptsProof()
+					if len(receiptsList) != 0 {
+						if err := node.Worker.CommitReceipts(receiptsList, coinbase); err != nil {
+							ctxerror.Log15(utils.GetLogger().Error,
+								ctxerror.New("cannot commit receipts").
+									WithCause(err))
+						}
+					}
+
 					if err := node.Worker.CommitTransactions(selectedTxs, coinbase); err != nil {
 						ctxerror.Log15(utils.GetLogger().Error,
 							ctxerror.New("cannot commit transactions").
@@ -85,16 +96,6 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 								Err(err).
 								Msg("Failed updating worker's state")
 							continue
-						}
-					}
-
-					// Propose cross shard receipts
-					receiptsList := node.proposeReceiptsProof()
-					if len(receiptsList) != 0 {
-						if err := node.Worker.CommitReceipts(receiptsList, coinbase); err != nil {
-							ctxerror.Log15(utils.GetLogger().Error,
-								ctxerror.New("cannot commit receipts").
-									WithCause(err))
 						}
 					}
 

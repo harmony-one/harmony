@@ -143,7 +143,6 @@ func ApplyIncomingReceipt(db *state.DB, cxp *types.CXReceiptsProof) {
 
 	// TODO: how to charge gas here?
 	for _, cx := range cxp.Receipts {
-		utils.GetLogInstance().Debug("hehe add incoming receipts")
 		if cx == nil || cx.To == nil { // should not happend
 			utils.Logger().Warn().Msg("ApplyIncomingReceipts: Invalid incoming receipt!!")
 			continue

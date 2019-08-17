@@ -67,6 +67,11 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 		allLogs  []*types.Log
 		gp       = new(GasPool).AddGas(block.GasLimit())
 	)
+
+	for _, cx := range block.IncomingReceipts() {
+		ApplyIncomingReceipt(statedb, cx)
+	}
+
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {
 		statedb.Prepare(tx.Hash(), block.Hash(), i)
@@ -79,10 +84,6 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 			outcxs = append(outcxs, cxReceipt)
 		}
 		allLogs = append(allLogs, receipt.Logs...)
-	}
-
-	for _, cx := range block.IncomingReceipts() {
-		ApplyIncomingReceipt(statedb, cx)
 	}
 
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
