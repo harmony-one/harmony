@@ -27,6 +27,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -148,6 +149,10 @@ func ApplyIncomingReceipt(db *state.DB, cxp *types.CXReceiptsProof) {
 			continue
 		}
 		utils.Logger().Info().Msgf("ApplyIncomingReceipts: ADDING BALANCE %d", cx.Amount)
+
+		if !db.Exist(*cx.To) {
+			db.CreateAccount(*cx.To)
+		}
 		db.AddBalance(*cx.To, cx.Amount)
 	}
 }

@@ -65,16 +65,6 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 						Int("selectedTxs", len(selectedTxs)).
 						Msg("PROPOSING NEW BLOCK ------------------------------------------------")
 
-						// Propose cross shard receipts
-					receiptsList := node.proposeReceiptsProof()
-					if len(receiptsList) != 0 {
-						if err := node.Worker.CommitReceipts(receiptsList, coinbase); err != nil {
-							ctxerror.Log15(utils.GetLogger().Error,
-								ctxerror.New("cannot commit receipts").
-									WithCause(err))
-						}
-					}
-
 					if err := node.Worker.CommitTransactions(selectedTxs, coinbase); err != nil {
 						ctxerror.Log15(utils.GetLogger().Error,
 							ctxerror.New("cannot commit transactions").
@@ -87,9 +77,19 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 								WithCause(err))
 						continue
 					}
+
+					// Propose cross shard receipts
+					receiptsList := node.proposeReceiptsProof()
+					if len(receiptsList) != 0 {
+						if err := node.Worker.CommitReceipts(receiptsList, coinbase); err != nil {
+							ctxerror.Log15(utils.GetLogger().Error,
+								ctxerror.New("cannot commit receipts").
+									WithCause(err))
+						}
+					}
+
 					viewID := node.Consensus.GetViewID()
 					// add aggregated commit signatures from last block, except for the first two blocks
-
 
 					if node.NodeConfig.ShardID == 0 {
 						crossLinksToPropose, err := node.ProposeCrossLinkDataForBeaconchain()
