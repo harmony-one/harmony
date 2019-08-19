@@ -126,22 +126,17 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 
 // DumpCommittee commits validators for shardNum and epoch.
 func (storage *Storage) DumpCommittee(shardID uint32, epoch uint64, committee types.Committee) error {
-	utils.Logger().Info().Msg("Dumping committees")
 	batch := storage.db.NewBatch()
 	// Store committees.
 	committeeData, err := rlp.EncodeToBytes(committee)
 	if err == nil {
 		if err := batch.Put([]byte(GetCommitteeKey(shardID, epoch)), committeeData); err != nil {
-			utils.Logger().Warn().Err(err).Msg("cannot batch committees")
 			return err
 		}
 	} else {
-		utils.Logger().Error().Err(err).Msg("Failed to serialize committees")
 		return err
 	}
-
 	if err := batch.Write(); err != nil {
-		ctxerror.Warn(utils.GetLogger(), err, "cannot write batch")
 		return err
 	}
 	return nil

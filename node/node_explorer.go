@@ -163,7 +163,11 @@ func (node *Node) CommitCommittee() {
 		}
 		for _, committee := range state {
 			if committee.ShardID == curBlock.ShardID() {
-				explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).DumpCommittee(curBlock.ShardID(), curBlock.Epoch().Uint64(), committee)
+				utils.Logger().Info().Msg("[Explorer] Dumping committee")
+				err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).DumpCommittee(curBlock.ShardID(), curBlock.Epoch().Uint64(), committee)
+				if err != nil {
+					utils.Logger().Warn().Err(err).Msgf("[Explorer] Eror dumping committee for block %d", curBlock.NumberU64())
+				}
 			}
 		}
 	}
