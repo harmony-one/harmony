@@ -187,7 +187,7 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 		if b.engine != nil {
 			// Finalize and seal the block
 			// TODO (chao): add cxReceipt in the last input
-			block, err := b.engine.Finalize(chainreader, b.header, statedb, b.txs, b.receipts, nil)
+			block, err := b.engine.Finalize(chainreader, b.header, statedb, b.txs, b.receipts, nil, nil)
 			if err != nil {
 				panic(err)
 			}

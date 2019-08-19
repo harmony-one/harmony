@@ -406,8 +406,9 @@ func (bc *BlockChain) FastSyncCommitHead(hash common.Hash) error {
 }
 
 // ShardID returns the shard Id of the blockchain.
+// TODO: use a better solution before resharding shuffle nodes to different shards
 func (bc *BlockChain) ShardID() uint32 {
-	return uint32(bc.chainConfig.ChainID.Int64())
+	return bc.CurrentBlock().ShardID()
 }
 
 // GasLimit returns the gas limit of the current HEAD block.
@@ -1105,7 +1106,6 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 	n, events, logs, err := bc.insertChain(chain)
 	bc.PostChainEvents(events, logs)
-	// TODO ek – make this a post-chain event
 	if err == nil {
 		for idx, block := range chain {
 			header := block.Header()
@@ -2104,4 +2104,45 @@ func (bc *BlockChain) CXMerkleProof(shardID uint32, block *types.Block) (*types.
 		return nil, nil
 	}
 	return proof, nil
+}
+
+// NextCXReceiptsProofUnspentCheckpoint returns the next checkpoint blockNum
+func (bc *BlockChain) NextCXReceiptsProofUnpentCheckpoint(currentNum uint64, shardID uint32) uint64 {
+	lastCheckpoint, _ := rawdb.ReadCXReceiptsProofUnspentCheckpoint(bc.db, shardID)
+	newCheckpoint := lastCheckpoint
+
+	// the new checkpoint will not exceed currentNum+1
+	for num := lastCheckpoint; num <= currentNum+1; num++ {
+		hash, _ := rawdb.ReadCXReceiptsProofUnspent(bc.db, shardID, num)
+		if hash == rawdb.EmptyHash {
+			// TODO: check if there is IncompingReceiptsHash in crosslink header
+			// if the rootHash is non-empty, it means incomingReceipts are not delivered
+			// otherwise, it means there is no cross-shard transactions for this block
+			newCheckpoint = num
+			continue
+		}
+		if hash == rawdb.SpentHash {
+			newCheckpoint = num
+			continue
+		}
+		// the first unspent blockHash found, break the loop
+		newCheckpoint = num
+		break
+	}
+	return newCheckpoint
+}
+
+// UpdateCXReceiptsProofUnspentAndCheckpoint will update the checkpoint and clean unspent receipts upto checkpoint
+func (bc *BlockChain) UpdateCXReceiptsProofUnspentAndCheckpoint(currentNum uint64, shardID uint32) {
+	lastCheckpoint, err := rawdb.ReadCXReceiptsProofUnspentCheckpoint(bc.db, shardID)
+	if err != nil {
+		utils.Logger().Warn().Msg("[UpdateCXReceiptsProofUnspentAndCheckpoint] Canot get lastCheckpoint")
+	}
+	newCheckpoint := bc.NextCXReceiptsProofUnpentCheckpoint(currentNum, shardID)
+	if lastCheckpoint == newCheckpoint {
+		return
+	}
+	for num := lastCheckpoint; num < newCheckpoint; num++ {
+		rawdb.DeleteCXReceiptsProofUnspent(bc.db, shardID, num)
+	}
 }

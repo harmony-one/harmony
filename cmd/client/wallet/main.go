@@ -714,15 +714,9 @@ func processTransferCommand() {
 	fromShard := uint32(shardID)
 	toShard := uint32(toShardID)
 	var tx *types.Transaction
-	if fromShard == toShard {
-		tx = types.NewTransaction(
-			state.nonce, receiverAddress, fromShard, amountBigInt,
-			gas, nil, inputData)
-	} else {
-		tx = types.NewCrossShardTransaction(
-			state.nonce, &receiverAddress, fromShard, toShard, amountBigInt,
-			gas, nil, inputData)
-	}
+	tx = types.NewCrossShardTransaction(
+		state.nonce, &receiverAddress, fromShard, toShard, amountBigInt,
+		gas, nil, inputData)
 
 	account, err := ks.Find(accounts.Account{Address: senderAddress})
 	if err != nil {
@@ -738,7 +732,7 @@ func processTransferCommand() {
 
 	fmt.Printf("Unlock account succeeded! '%v'\n", senderPass)
 
-	tx, err = ks.SignTx(account, tx, nil)
+	tx, err = ks.SignTx(account, tx, big.NewInt(1))
 	if err != nil {
 		fmt.Printf("SignTx Error: %v\n", err)
 		return

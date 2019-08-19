@@ -282,16 +282,16 @@ func (consensus *Consensus) VerifySeal(chain consensus_engine.ChainReader, heade
 	return nil
 }
 
-// Finalize implements consensus.Engine, accumulating the block and uncle rewards,
+// Finalize implements consensus.Engine, accumulating the block rewards,
 // setting the final state and assembling the block.
-func (consensus *Consensus) Finalize(chain consensus_engine.ChainReader, header *types.Header, state *state.DB, txs []*types.Transaction, receipts []*types.Receipt, cxreceipts []*types.CXReceipt) (*types.Block, error) {
+func (consensus *Consensus) Finalize(chain consensus_engine.ChainReader, header *types.Header, state *state.DB, txs []*types.Transaction, receipts []*types.Receipt, outcxs []*types.CXReceipt, incxs []*types.CXReceiptsProof) (*types.Block, error) {
 	// Accumulate any block and uncle rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
 	if err := accumulateRewards(chain, state, header); err != nil {
 		return nil, ctxerror.New("cannot pay block reward").WithCause(err)
 	}
-	header.Root = state.IntermediateRoot(false)
-	return types.NewBlock(header, txs, receipts, cxreceipts), nil
+	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
+	return types.NewBlock(header, txs, receipts, outcxs, incxs), nil
 }
 
 // Sign on the hash of the message

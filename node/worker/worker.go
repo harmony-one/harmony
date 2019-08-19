@@ -25,7 +25,8 @@ type environment struct {
 	header   *types.Header
 	txs      []*types.Transaction
 	receipts []*types.Receipt
-	cxs      []*types.CXReceipt // cross shard transaction receipts (source shard)
+	outcxs   []*types.CXReceipt       // cross shard transaction receipts (source shard)
+	incxs    []*types.CXReceiptsProof // cross shard receipts and its proof (desitinatin shard)
 }
 
 // Worker is the main object which takes care of submitting new work to consensus engine
@@ -78,7 +79,6 @@ func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 
 	receipt, cx, _, err := core.ApplyTransaction(w.config, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, vm.Config{})
 	if err != nil {
-		fmt.Println("hehe", "applyTransaction failed", err)
 		w.current.state.RevertToSnapshot(snap)
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	w.current.txs = append(w.current.txs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)
 	if cx != nil {
-		w.current.cxs = append(w.current.cxs, cx)
+		w.current.outcxs = append(w.current.outcxs, cx)
 	}
 
 	return receipt.Logs, nil
@@ -112,14 +112,24 @@ func (w *Worker) CommitTransactions(txs types.Transactions, coinbase common.Addr
 	return nil
 }
 
-// CommitReceipts commits a list of receipts.
-func (w *Worker) CommitReceipts(receiptsList []types.CXReceipts, coinbase common.Address) error {
+// CommitReceipts commits a list of already verified incoming cross shard receipts
+func (w *Worker) CommitReceipts(receiptsList []*types.CXReceiptsProof) error {
 	if w.current.gasPool == nil {
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit)
 	}
-	for _, receipts := range receiptsList {
-		// TODO: apply receipt
-		_ = receipts
+
+	if len(receiptsList) == 0 {
+		w.current.header.IncomingReceiptHash = types.EmptyRootHash
+	} else {
+		w.current.header.IncomingReceiptHash = types.DeriveSha(types.CXReceiptsProofs(receiptsList))
+	}
+
+	for _, cx := range receiptsList {
+		core.ApplyIncomingReceipt(w.config, w.current.state, w.current.header, cx)
+	}
+
+	for _, cx := range receiptsList {
+		w.current.incxs = append(w.current.incxs, cx)
 	}
 	return nil
 }
@@ -174,9 +184,14 @@ func (w *Worker) GetCurrentReceipts() []*types.Receipt {
 	return w.current.receipts
 }
 
-// GetCurrentCXReceipts get the receipts generated starting from the last state.
-func (w *Worker) GetCurrentCXReceipts() []*types.CXReceipt {
-	return w.current.cxs
+// OutgoingReceipts get the receipts generated starting from the last state.
+func (w *Worker) OutgoingReceipts() []*types.CXReceipt {
+	return w.current.outcxs
+}
+
+// IncomingReceipts get incoming receipts in destination shard that is received from source shard
+func (w *Worker) IncomingReceipts() []*types.CXReceiptsProof {
+	return w.current.incxs
 }
 
 // CommitWithCrossLinks generate a new block with cross links for the new txs.
@@ -193,7 +208,7 @@ func (w *Worker) CommitWithCrossLinks(sig []byte, signers []byte, viewID uint64,
 	s := w.current.state.Copy()
 
 	copyHeader := types.CopyHeader(w.current.header)
-	block, err := w.engine.Finalize(w.chain, copyHeader, s, w.current.txs, w.current.receipts, w.current.cxs)
+	block, err := w.engine.Finalize(w.chain, copyHeader, s, w.current.txs, w.current.receipts, w.current.outcxs, w.current.incxs)
 	if err != nil {
 		return nil, ctxerror.New("cannot finalize block").WithCause(err)
 	}

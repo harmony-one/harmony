@@ -5,17 +5,10 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/harmony-one/harmony/core"
-
-	"bytes"
-
-	"github.com/harmony-one/bls/ffi/go/bls"
-
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 
-	proto_node "github.com/harmony-one/harmony/api/proto/node"
+	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -90,6 +83,17 @@ func (node *Node) ProcessHeaderMessage(msgPayload []byte) {
 		node.pendingCrossLinks = append(node.pendingCrossLinks, headersToQuque...)
 		node.pendingClMutex.Unlock()
 	}
+}
+
+func (node *Node) verifyIncomingReceipts(block *types.Block) error {
+	cxps := block.IncomingReceipts()
+	for _, cxp := range cxps {
+		if err := cxp.IsValidCXReceiptsProof(); err != nil {
+			return ctxerror.New("[verifyIncomingReceipts] verification failed").WithCause(err)
+		}
+	}
+	// TODO: add crosslink blockHeaderHash checking
+	return nil
 }
 
 // VerifyCrosslinkHeader verifies the header is valid against the prevHeader.
@@ -207,62 +211,23 @@ func (node *Node) ProposeCrossLinkDataForBeaconchain() (types.CrossLinks, error)
 
 // ProcessReceiptMessage store the receipts and merkle proof in local data store
 func (node *Node) ProcessReceiptMessage(msgPayload []byte) {
-	cxmsg := proto_node.CXReceiptsMessage{}
-	if err := rlp.DecodeBytes(msgPayload, &cxmsg); err != nil {
+	cxp := types.CXReceiptsProof{}
+	if err := rlp.DecodeBytes(msgPayload, &cxp); err != nil {
 		utils.Logger().Error().Err(err).Msg("[ProcessReceiptMessage] Unable to Decode message Payload")
 		return
 	}
-	merkleProof := cxmsg.MerkleProof
-	myShardRoot := common.Hash{}
 
-	var foundMyShard bool
-	byteBuffer := bytes.NewBuffer([]byte{})
-	if len(merkleProof.ShardIDs) == 0 {
-		utils.Logger().Warn().Msg("[ProcessReceiptMessage] There is No non-empty destination shards")
+	if err := cxp.IsValidCXReceiptsProof(); err != nil {
+		utils.Logger().Error().Err(err).Msg("[ProcessReceiptMessage] Invalid CXReceiptsProof")
 		return
 	}
 
-	// Find receipts with my shard as destination
-	for j := 0; j < len(merkleProof.ShardIDs); j++ {
-		sKey := make([]byte, 4)
-		binary.BigEndian.PutUint32(sKey, merkleProof.ShardIDs[j])
-		byteBuffer.Write(sKey)
-		byteBuffer.Write(merkleProof.CXShardHashes[j][:])
-		if merkleProof.ShardIDs[j] == node.Consensus.ShardID {
-			foundMyShard = true
-			myShardRoot = merkleProof.CXShardHashes[j]
-		}
-	}
-
-	if !foundMyShard {
-		utils.Logger().Warn().Msg("[ProcessReceiptMessage] Not Found My Shard in CXReceipt Message")
-		return
-	}
-
-	// Check whether the receipts matches the receipt merkle root
-	receiptsForMyShard := cxmsg.Receipts
-	sha := types.DeriveSha(receiptsForMyShard)
-	if sha != myShardRoot {
-		utils.Logger().Warn().Interface("calculated", sha).Interface("got", myShardRoot).Msg("[ProcessReceiptMessage] Trie Root of ReadCXReceipts Not Match")
-		return
-	}
-
-	if len(receiptsForMyShard) == 0 {
-		return
-	}
-
-	sourceShardID := merkleProof.ShardID
-	sourceBlockNum := merkleProof.BlockNum
-	sourceBlockHash := merkleProof.BlockHash
 	// TODO: check message signature is from the nodes of source shard.
-	node.Blockchain().WriteCXReceipts(sourceShardID, sourceBlockNum.Uint64(), sourceBlockHash, receiptsForMyShard, true)
 
-	// Check merkle proof with crosslink of the source shard
-	hash := crypto.Keccak256Hash(byteBuffer.Bytes())
-	utils.Logger().Debug().Interface("hash", hash).Msg("[ProcessReceiptMessage] RootHash of the CXReceipts")
-	// TODO chao: use crosslink from beacon sync to verify the hash
+	// TODO: remove it in future if not useful
+	node.Blockchain().WriteCXReceipts(cxp.MerkleProof.ShardID, cxp.MerkleProof.BlockNum.Uint64(), cxp.MerkleProof.BlockHash, cxp.Receipts, true)
 
-	node.AddPendingReceipts(&cxmsg)
+	node.AddPendingReceipts(&cxp)
 }
 
 // ProcessCrossShardTx verify and process cross shard transaction on destination shard

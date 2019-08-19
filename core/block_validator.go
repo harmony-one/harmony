@@ -95,6 +95,7 @@ func (v *BlockValidator) ValidateState(block, parent *types.Block, statedb *stat
 	if cxsSha != header.OutgoingReceiptHash {
 		return fmt.Errorf("invalid cross shard receipt root hash (remote: %x local: %x)", header.OutgoingReceiptHash, cxsSha)
 	}
+
 	// Validate the state root against the received state root and throw
 	// an error if they don't match.
 	if root := statedb.IntermediateRoot(v.config.IsEIP158(header.Number)); header.Root != root {

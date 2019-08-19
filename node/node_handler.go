@@ -331,7 +331,7 @@ func (node *Node) BroadcastCXReceipts(newBlock *types.Block) {
 		utils.Logger().Info().Uint32("ToShardID", uint32(i)).Msg("[BroadcastCXReceipts] ReadCXReceipts and MerkleProof Found")
 
 		groupID := p2p.ShardID(i)
-		go node.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(groupID)}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCXReceiptsMessage(cxReceipts, merkleProof)))
+		go node.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(groupID)}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCXReceiptsProof(cxReceipts, merkleProof)))
 	}
 }
 
@@ -365,6 +365,12 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 		if err != nil {
 			return err
 		}
+	}
+
+	err = node.verifyIncomingReceipts(newBlock)
+	if err != nil {
+		return ctxerror.New("[VerifyNewBlock] Cannot ValidateNewBlock", "blockHash", newBlock.Hash(),
+			"numIncomingReceipts", len(newBlock.IncomingReceipts())).WithCause(err)
 	}
 
 	// TODO: verify the vrf randomness

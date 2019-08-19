@@ -6,8 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/harmony-one/harmony/api/proto/node"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/api/client"
@@ -94,7 +92,7 @@ type Node struct {
 	pendingCrossLinks     []*types.Header
 	pendingClMutex        sync.Mutex
 
-	pendingCXReceipts []*node.CXReceiptsMessage // All the receipts received but not yet processed for Consensus
+	pendingCXReceipts []*types.CXReceiptsProof // All the receipts received but not yet processed for Consensus
 	pendingCXMutex    sync.Mutex
 
 	// Shard databases
@@ -256,7 +254,7 @@ func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
 }
 
 // AddPendingReceipts adds one receipt message to pending list.
-func (node *Node) AddPendingReceipts(receipts *node.CXReceiptsMessage) {
+func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
 		node.pendingCXMutex.Lock()
 		node.pendingCXReceipts = append(node.pendingCXReceipts, receipts)
@@ -276,7 +274,7 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int, coinbase common.Addr
 
 	node.pendingTransactions = unselected
 	node.reducePendingTransactions()
-	utils.Logger().Error().
+	utils.Logger().Info().
 		Int("remainPending", len(node.pendingTransactions)).
 		Int("selected", len(selected)).
 		Int("invalidDiscarded", len(invalid)).
