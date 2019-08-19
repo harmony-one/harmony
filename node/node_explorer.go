@@ -3,13 +3,13 @@ package node
 import (
 	"encoding/binary"
 	"sync"
-	"time"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 )
@@ -152,14 +152,10 @@ func (node *Node) commitBlockForExplorer(block *types.Block) {
 
 // CommitCommittee commits committee with shard id and epoch to explorer service.
 func (node *Node) CommitCommittee() {
-	blockHeight := uint64(0)
-	for range time.Tick(1000 * time.Millisecond) {
-		curBlock := node.Blockchain().CurrentBlock()
-		curBlockHeight := curBlock.NumberU64()
-		if curBlockHeight == blockHeight {
-			continue
-		}
-		blockHeight = curBlockHeight
+	events := make(chan core.ChainHeadEvent)
+	node.Blockchain().SubscribeChainHeadEvent(events)
+	for event := range events {
+		curBlock := event.Block
 		state, err := node.Blockchain().ReadShardState(curBlock.Epoch())
 		if err != nil {
 			utils.Logger().Error().Err(err).Msg("[Explorer] Error reading shard state")

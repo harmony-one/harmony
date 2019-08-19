@@ -93,7 +93,8 @@ func TestDumpCommittee(t *testing.T) {
 	shardID := uint32(0)
 	epoch := uint64(0)
 	ins := GetStorageInstance("1.1.1.1", "3333", true)
-	ins.DumpCommittee(shardID, epoch, committee)
+	err = ins.DumpCommittee(shardID, epoch, committee)
+	assert.Nil(t, err, "should be nil")
 	db := ins.GetDB()
 
 	data, err := db.Get([]byte(GetCommitteeKey(shardID, epoch)))
