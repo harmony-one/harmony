@@ -406,6 +406,7 @@ func (bc *BlockChain) FastSyncCommitHead(hash common.Hash) error {
 }
 
 // ShardID returns the shard Id of the blockchain.
+// TODO: use a better solution before resharding shuffle nodes to different shards
 func (bc *BlockChain) ShardID() uint32 {
 	return bc.CurrentBlock().ShardID()
 }
@@ -1105,7 +1106,6 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 	n, events, logs, err := bc.insertChain(chain)
 	bc.PostChainEvents(events, logs)
-	// TODO ek – make this a post-chain event
 	if err == nil {
 		for idx, block := range chain {
 			header := block.Header()

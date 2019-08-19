@@ -27,6 +27,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/ctxerror"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // StateProcessor is a basic Processor, which takes care of transitioning
@@ -68,10 +69,6 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 		gp       = new(GasPool).AddGas(block.GasLimit())
 	)
 
-	for _, cx := range block.IncomingReceipts() {
-		ApplyIncomingReceipt(statedb, cx)
-	}
-
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {
 		statedb.Prepare(tx.Hash(), block.Hash(), i)
@@ -84,6 +81,10 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 			outcxs = append(outcxs, cxReceipt)
 		}
 		allLogs = append(allLogs, receipt.Logs...)
+	}
+
+	for _, cx := range block.IncomingReceipts() {
+		ApplyIncomingReceipt(p.config, statedb, header, cx)
 	}
 
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
@@ -162,4 +163,26 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	}
 
 	return receipt, cxReceipt, gas, err
+}
+
+// ApplyIncomingReceipt will add amount into ToAddress in the receipt
+func ApplyIncomingReceipt(config *params.ChainConfig, db *state.DB, header *types.Header, cxp *types.CXReceiptsProof) {
+	if cxp == nil {
+		return
+	}
+
+	// TODO: how to charge gas here?
+	for _, cx := range cxp.Receipts {
+		if cx == nil || cx.To == nil { // should not happend
+			utils.Logger().Warn().Msg("ApplyIncomingReceipts: Invalid incoming receipt!!")
+			continue
+		}
+		utils.Logger().Info().Msgf("ApplyIncomingReceipts: ADDING BALANCE %d", cx.Amount)
+
+		if !db.Exist(*cx.To) {
+			db.CreateAccount(*cx.To)
+		}
+		db.AddBalance(*cx.To, cx.Amount)
+		db.IntermediateRoot(config.IsEIP158(header.Number)).Bytes()
+	}
 }

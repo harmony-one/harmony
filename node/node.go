@@ -274,7 +274,7 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int, coinbase common.Addr
 
 	node.pendingTransactions = unselected
 	node.reducePendingTransactions()
-	utils.Logger().Error().
+	utils.Logger().Info().
 		Int("remainPending", len(node.pendingTransactions)).
 		Int("selected", len(selected)).
 		Int("invalidDiscarded", len(invalid)).

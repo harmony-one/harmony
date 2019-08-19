@@ -81,7 +81,7 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 					// Propose cross shard receipts
 					receiptsList := node.proposeReceiptsProof()
 					if len(receiptsList) != 0 {
-						if err := node.Worker.CommitReceipts(receiptsList, coinbase); err != nil {
+						if err := node.Worker.CommitReceipts(receiptsList); err != nil {
 							ctxerror.Log15(utils.GetLogger().Error,
 								ctxerror.New("cannot commit receipts").
 									WithCause(err))

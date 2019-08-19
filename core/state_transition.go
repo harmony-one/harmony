@@ -24,10 +24,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/params"
 
-	"github.com/harmony-one/harmony/core/state"
-	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -134,27 +131,6 @@ func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition 
 // state and would never be accepted within a block.
 func ApplyMessage(evm *vm.EVM, msg Message, gp *GasPool) ([]byte, uint64, bool, error) {
 	return NewStateTransition(evm, msg, gp).TransitionDb()
-}
-
-// ApplyIncomingReceipt will add amount into ToAddress in the receipt
-func ApplyIncomingReceipt(db *state.DB, cxp *types.CXReceiptsProof) {
-	if cxp == nil {
-		return
-	}
-
-	// TODO: how to charge gas here?
-	for _, cx := range cxp.Receipts {
-		if cx == nil || cx.To == nil { // should not happend
-			utils.Logger().Warn().Msg("ApplyIncomingReceipts: Invalid incoming receipt!!")
-			continue
-		}
-		utils.Logger().Info().Msgf("ApplyIncomingReceipts: ADDING BALANCE %d", cx.Amount)
-
-		if !db.Exist(*cx.To) {
-			db.CreateAccount(*cx.To)
-		}
-		db.AddBalance(*cx.To, cx.Amount)
-	}
 }
 
 // to returns the recipient of the message.

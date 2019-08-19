@@ -113,7 +113,7 @@ func (w *Worker) CommitTransactions(txs types.Transactions, coinbase common.Addr
 }
 
 // CommitReceipts commits a list of already verified incoming cross shard receipts
-func (w *Worker) CommitReceipts(receiptsList []*types.CXReceiptsProof, coinbase common.Address) error {
+func (w *Worker) CommitReceipts(receiptsList []*types.CXReceiptsProof) error {
 	if w.current.gasPool == nil {
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit)
 	}
@@ -125,7 +125,7 @@ func (w *Worker) CommitReceipts(receiptsList []*types.CXReceiptsProof, coinbase 
 	}
 
 	for _, cx := range receiptsList {
-		core.ApplyIncomingReceipt(w.current.state, cx)
+		core.ApplyIncomingReceipt(w.config, w.current.state, w.current.header, cx)
 	}
 
 	for _, cx := range receiptsList {
