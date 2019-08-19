@@ -9,6 +9,7 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 )
@@ -133,7 +134,7 @@ func (node *Node) AddNewBlockForExplorer() {
 	}
 }
 
-// ExplorerMessageHandler passes received message in node_handler to explorer service
+// ExplorerMessageHandler passes received message in node_handler to explorer service.
 func (node *Node) commitBlockForExplorer(block *types.Block) {
 	if block.ShardID() != node.NodeConfig.ShardID {
 		return
@@ -146,5 +147,28 @@ func (node *Node) commitBlockForExplorer(block *types.Block) {
 	if curNum-100 > 0 {
 		node.Consensus.PbftLog.DeleteBlocksLessThan(curNum - 100)
 		node.Consensus.PbftLog.DeleteMessagesLessThan(curNum - 100)
+	}
+}
+
+// CommitCommittee commits committee with shard id and epoch to explorer service.
+func (node *Node) CommitCommittee() {
+	events := make(chan core.ChainHeadEvent)
+	node.Blockchain().SubscribeChainHeadEvent(events)
+	for event := range events {
+		curBlock := event.Block
+		state, err := node.Blockchain().ReadShardState(curBlock.Epoch())
+		if err != nil {
+			utils.Logger().Error().Err(err).Msg("[Explorer] Error reading shard state")
+			continue
+		}
+		for _, committee := range state {
+			if committee.ShardID == curBlock.ShardID() {
+				utils.Logger().Info().Msg("[Explorer] Dumping committee")
+				err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).DumpCommittee(curBlock.ShardID(), curBlock.Epoch().Uint64(), committee)
+				if err != nil {
+					utils.Logger().Warn().Err(err).Msgf("[Explorer] Eror dumping committee for block %d", curBlock.NumberU64())
+				}
+			}
+		}
 	}
 }

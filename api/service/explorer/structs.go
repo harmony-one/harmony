@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -28,6 +29,17 @@ type Address struct {
 	TXs     []*Transaction `json:"txs"`
 }
 
+// Committee contains list of node validators of a particular shard and epoch.
+type Committee struct {
+	Validators []*Validator `json:"validators"`
+}
+
+// Validator contains harmony validator node address and its balance.
+type Validator struct {
+	Address string   `json:"address"`
+	Balance *big.Int `json:"balance"`
+}
+
 // Transaction ...
 type Transaction struct {
 	ID        string   `json:"id"`
@@ -45,6 +57,7 @@ type Block struct {
 	ID         string         `json:"id"`
 	TXCount    string         `json:"txCount"`
 	Timestamp  string         `json:"timestamp"`
+	BlockTime  int64          `json:"blockTime"`
 	MerkleRoot string         `json:"merkleRoot"`
 	PrevBlock  RefBlock       `json:"prevBlock"`
 	Bytes      string         `json:"bytes"`
@@ -73,6 +86,21 @@ type Shard struct {
 // NewBlock ...
 func NewBlock(block *types.Block, height int) *Block {
 	// TODO(ricl): use block.Header().CommitBitmap and GetPubKeyFromMask
+	signers := []string{}
+	state, err := block.Header().GetShardState()
+	if err == nil {
+		for _, committee := range state {
+			if committee.ShardID == block.ShardID() {
+				for _, validator := range committee.NodeList {
+					oneAddress, err := common.AddressToBech32(validator.EcdsaAddress)
+					if err != nil {
+						continue
+					}
+					signers = append(signers, oneAddress)
+				}
+			}
+		}
+	}
 	return &Block{
 		Height:     strconv.Itoa(height),
 		ID:         block.Hash().Hex(),
@@ -80,7 +108,7 @@ func NewBlock(block *types.Block, height int) *Block {
 		Timestamp:  strconv.Itoa(int(block.Time().Int64() * 1000)),
 		MerkleRoot: block.Root().Hex(),
 		Bytes:      strconv.Itoa(int(block.Size())),
-		Signers:    []string{},
+		Signers:    signers,
 		ExtraData:  string(block.Extra()),
 	}
 }

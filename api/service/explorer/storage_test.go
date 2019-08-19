@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -30,6 +31,11 @@ func TestGetBlockKey(t *testing.T) {
 // Test for GetTXKey
 func TestGetTXKey(t *testing.T) {
 	assert.Equal(t, GetTXKey("abcd"), "tx_abcd", "error")
+}
+
+// Test for GetCommitteeKey
+func TestGetCommitteeKey(t *testing.T) {
+	assert.Equal(t, GetCommitteeKey(uint32(0), uint64(0)), "cp_0_0", "error")
 }
 
 func TestInit(t *testing.T) {
@@ -67,6 +73,37 @@ func TestDump(t *testing.T) {
 	blockData, err := rlp.EncodeToBytes(block)
 	assert.Nil(t, err, "should be nil")
 	assert.Equal(t, bytes.Compare(data, blockData), 0, "should be equal")
+}
+
+func TestDumpCommittee(t *testing.T) {
+	blsPubKey1 := new(bls.PublicKey)
+	blsPubKey2 := new(bls.PublicKey)
+	err := blsPubKey1.DeserializeHexStr("1c1fb28d2de96e82c3d9b4917eb54412517e2763112a3164862a6ed627ac62e87ce274bb4ea36e6a61fb66a15c263a06")
+	assert.Nil(t, err, "should be nil")
+	err = blsPubKey2.DeserializeHexStr("02c8ff0b88f313717bc3a627d2f8bb172ba3ad3bb9ba3ecb8eed4b7c878653d3d4faf769876c528b73f343967f74a917")
+	assert.Nil(t, err, "should be nil")
+	BlsPublicKey1 := new(types.BlsPublicKey)
+	BlsPublicKey2 := new(types.BlsPublicKey)
+	BlsPublicKey1.FromLibBLSPublicKey(blsPubKey1)
+	BlsPublicKey2.FromLibBLSPublicKey(blsPubKey2)
+	nodeID1 := types.NodeID{EcdsaAddress: common.HexToAddress("52789f18a342da8023cc401e5d2b14a6b710fba9"), BlsPublicKey: *BlsPublicKey1}
+	nodeID2 := types.NodeID{EcdsaAddress: common.HexToAddress("7c41e0668b551f4f902cfaec05b5bdca68b124ce"), BlsPublicKey: *BlsPublicKey2}
+	nodeIDList := []types.NodeID{nodeID1, nodeID2}
+	committee := types.Committee{ShardID: uint32(0), NodeList: nodeIDList}
+	shardID := uint32(0)
+	epoch := uint64(0)
+	ins := GetStorageInstance("1.1.1.1", "3333", true)
+	err = ins.DumpCommittee(shardID, epoch, committee)
+	if err != nil {
+		assert.Nilf(t, err, "should be nil, but %s", err.Error())
+	}
+	db := ins.GetDB()
+
+	data, err := db.Get([]byte(GetCommitteeKey(shardID, epoch)))
+	assert.Nil(t, err, "should be nil")
+	committeeData, err := rlp.EncodeToBytes(committee)
+	assert.Nil(t, err, "should be nil")
+	assert.Equal(t, bytes.Compare(data, committeeData), 0, "should be equal")
 }
 
 func TestUpdateAddressStorage(t *testing.T) {

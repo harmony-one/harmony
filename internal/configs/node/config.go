@@ -207,6 +207,11 @@ func (conf *ConfigType) GetShardGroupID() p2p.GroupID {
 	return conf.group
 }
 
+// GetShardID returns the shardID.
+func (conf *ConfigType) GetShardID() uint32 {
+	return conf.ShardID
+}
+
 // GetClientGroupID returns the groupID for client group
 func (conf *ConfigType) GetClientGroupID() p2p.GroupID {
 	return conf.client
