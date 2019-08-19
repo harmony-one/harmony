@@ -94,7 +94,9 @@ func TestDumpCommittee(t *testing.T) {
 	epoch := uint64(0)
 	ins := GetStorageInstance("1.1.1.1", "3333", true)
 	err = ins.DumpCommittee(shardID, epoch, committee)
-	assert.Nilf(t, err, "should be nil, but %s", err.Error())
+	if err != nil {
+		assert.Nilf(t, err, "should be nil, but %s", err.Error())
+	}
 	db := ins.GetDB()
 
 	data, err := db.Get([]byte(GetCommitteeKey(shardID, epoch)))

@@ -129,11 +129,10 @@ func (storage *Storage) DumpCommittee(shardID uint32, epoch uint64, committee ty
 	batch := storage.db.NewBatch()
 	// Store committees.
 	committeeData, err := rlp.EncodeToBytes(committee)
-	if err == nil {
-		if err := batch.Put([]byte(GetCommitteeKey(shardID, epoch)), committeeData); err != nil {
-			return err
-		}
-	} else {
+	if err != nil {
+		return err
+	}
+	if err := batch.Put([]byte(GetCommitteeKey(shardID, epoch)), committeeData); err != nil {
 		return err
 	}
 	if err := batch.Write(); err != nil {
