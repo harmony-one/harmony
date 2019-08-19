@@ -2,11 +2,11 @@ package node
 
 import (
 	"crypto/ecdsa"
-	"fmt"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/api/client"
 	clientService "github.com/harmony-one/harmony/api/client/service"
@@ -98,19 +98,15 @@ type Node struct {
 	// Shard databases
 	shardChains shardchain.Collection
 
+	// TODO ek – pingpong is gone, ClientPeer is no longer initialized correctly
 	ClientPeer *p2p.Peer      // The peer for the harmony tx generator client, used for leaders to return proof-of-accept
 	Client     *client.Client // The presence of a client object means this node will also act as a client
 	SelfPeer   p2p.Peer       // TODO(minhdoan): it could be duplicated with Self below whose is Alok work.
 	BCPeers    []p2p.Peer     // list of Beacon Chain Peers.  This is needed by all nodes.
 
 	// TODO: Neighbors should store only neighbor nodes in the same shard
-	Neighbors  sync.Map   // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
-	numPeers   int        // Number of Peers
 	State      State      // State of the Node
 	stateMutex sync.Mutex // mutex for change node state
-
-	// BeaconNeighbors store only neighbor nodes in the beacon chain shard
-	BeaconNeighbors sync.Map // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
 
 	TxPool       *core.TxPool
 	Worker       *worker.Worker
@@ -172,9 +168,6 @@ type Node struct {
 
 	// Duplicated Ping Message Received
 	duplicatedPing sync.Map
-
-	// Channel to notify consensus service to really start consensus
-	startConsensus chan struct{}
 
 	// node configuration, including group ID, shard ID, etc
 	NodeConfig *nodeconfig.ConfigType
@@ -281,13 +274,6 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int, coinbase common.Addr
 		Msg("Selecting Transactions")
 	node.pendingTxMutex.Unlock()
 	return selected
-}
-
-// MaybeKeepSendingPongMessage keeps sending pong message if the current node is a leader.
-func (node *Node) MaybeKeepSendingPongMessage() {
-	if node.Consensus != nil && node.Consensus.IsLeader() {
-		go node.SendPongMessage()
-	}
 }
 
 // StartServer starts a server and process the requests by a handler.
@@ -402,8 +388,6 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 	// Setup initial state of syncing.
 	node.peerRegistrationRecord = make(map[string]*syncConfig)
 
-	node.startConsensus = make(chan struct{})
-
 	return &node
 }
 
@@ -447,44 +431,9 @@ func (node *Node) InitShardState() (err error) {
 	return nil
 }
 
-// AddPeers adds neighbors nodes
-func (node *Node) AddPeers(peers []*p2p.Peer) int {
-	count := 0
-	for _, p := range peers {
-		key := fmt.Sprintf("%s:%s:%s", p.IP, p.Port, p.PeerID)
-		_, ok := node.Neighbors.LoadOrStore(key, *p)
-		if !ok {
-			// !ok means new peer is stored
-			count++
-			node.host.AddPeer(p)
-			node.numPeers++
-			continue
-		}
-	}
-
-	// Only leader needs to add the peer info into consensus
-	// Validators will receive the updated peer info from Leader via pong message
-	// TODO: remove this after fully migrating to beacon chain-based committee membership
-	//	// TODO: make peers into a context object shared by consensus and drand
-	//	node.DRand.AddPeers(peers)
-	//}
-	return count
-}
-
-// AddBeaconPeer adds beacon chain neighbors nodes
-// Return false means new neighbor peer was added
-// Return true means redundant neighbor peer wasn't added
-func (node *Node) AddBeaconPeer(p *p2p.Peer) bool {
-	key := fmt.Sprintf("%s:%s:%s", p.IP, p.Port, p.PeerID)
-	_, ok := node.BeaconNeighbors.LoadOrStore(key, *p)
-	return ok
-}
-
 // isBeacon = true if the node is beacon node
 // isClient = true if the node light client(txgen,wallet)
-func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
-	chanPeer := make(chan p2p.Peer)
-
+func (node *Node) initNodeConfiguration() service.NodeConfig {
 	nodeConfig := service.NodeConfig{
 		IsClient:     node.NodeConfig.IsClient(),
 		Beacon:       p2p.GroupIDBeacon,
@@ -513,7 +462,7 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to create client receiver")
 	}
-	return nodeConfig, chanPeer
+	return nodeConfig
 }
 
 // AccountManager ...

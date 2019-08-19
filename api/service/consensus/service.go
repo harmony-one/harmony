@@ -14,13 +14,12 @@ type Service struct {
 	consensus    *consensus.Consensus
 	stopChan     chan struct{}
 	stoppedChan  chan struct{}
-	startChan    chan struct{}
 	messageChan  chan *msg_pb.Message
 }
 
 // New returns consensus service.
-func New(blockChannel chan *types.Block, consensus *consensus.Consensus, startChan chan struct{}) *Service {
-	return &Service{blockChannel: blockChannel, consensus: consensus, startChan: startChan}
+func New(blockChannel chan *types.Block, consensus *consensus.Consensus) *Service {
+	return &Service{blockChannel: blockChannel, consensus: consensus}
 }
 
 // StartService starts consensus service.
@@ -28,7 +27,7 @@ func (s *Service) StartService() {
 	utils.Logger().Info().Msg("[consensus/service] Starting consensus service.")
 	s.stopChan = make(chan struct{})
 	s.stoppedChan = make(chan struct{})
-	s.consensus.Start(s.blockChannel, s.stopChan, s.stoppedChan, s.startChan)
+	s.consensus.Start(s.blockChannel, s.stopChan, s.stoppedChan)
 	s.consensus.WaitForNewRandomness()
 }
 

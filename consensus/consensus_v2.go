@@ -1046,12 +1046,9 @@ func (consensus *Consensus) tryCatchup() {
 }
 
 // Start waits for the next new block and run consensus
-func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan struct{}, stoppedChan chan struct{}, startChannel chan struct{}) {
+func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan struct{}, stoppedChan chan struct{}) {
 	go func() {
 		if consensus.IsLeader() {
-			consensus.getLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Waiting for consensus start")
-			<-startChannel
-
 			// send a signal to indicate it's ready to run consensus
 			// this signal is consumed by node object to create a new block and in turn trigger a new consensus on it
 			go func() {

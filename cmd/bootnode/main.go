@@ -68,7 +68,7 @@ func main() {
 	fmt.Printf("bootnode BN_MA=%s", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, host.GetID().Pretty()))
 
 	if *logConn {
-		host.GetP2PHost().Network().Notify(utils.NewConnLogger(utils.GetLogInstance()))
+		host.GetP2PHost().Network().Notify(utils.NewConnLogger(*utils.Logger()))
 	}
 
 	dataStore := dsync.MutexWrap(ds.NewMapDatastore())

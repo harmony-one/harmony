@@ -11,7 +11,6 @@ import (
 type Host interface {
 	GetSelfPeer() Peer
 	Close() error
-	AddPeer(*Peer) error
 	GetID() libp2p_peer.ID
 	GetP2PHost() libp2p_host.Host
 	GetPeerCount() int

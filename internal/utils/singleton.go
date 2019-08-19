@@ -30,6 +30,7 @@ var (
 	onceForLog   sync.Once
 
 	// ZeroLog
+	zeroLoggerOnce  sync.Once
 	zeroLogger      *zerolog.Logger
 	zeroLoggerLevel zerolog.Level = zerolog.Disabled
 )
@@ -138,7 +139,7 @@ func setZeroLoggerFileOutput(filepath string, maxSize int) error {
 
 // Logger returns a zerolog.Logger singleton
 func Logger() *zerolog.Logger {
-	if zeroLogger == nil {
+	zeroLoggerOnce.Do(func() {
 		logger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr}).
 			Level(zeroLoggerLevel).
 			With().
@@ -146,7 +147,7 @@ func Logger() *zerolog.Logger {
 			Timestamp().
 			Logger()
 		zeroLogger = &logger
-	}
+	})
 	return zeroLogger
 }
 

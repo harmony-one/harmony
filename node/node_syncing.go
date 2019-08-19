@@ -1,9 +1,10 @@
 package node
 
 import (
+	"encoding/base64"
 	"fmt"
 	"net"
-	"sync"
+	"strconv"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -21,6 +22,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/p2p/host/hostv2"
 )
 
 // Constants related to doing syncing.
@@ -30,20 +32,6 @@ const (
 	SyncFrequency     = 10 // unit in second
 	MinConnectedPeers = 10 // minimum number of peers connected to in node syncing
 )
-
-// getNeighborPeers is a helper function to return list of peers
-// based on different neightbor map
-func (node *Node) getNeighborPeers(neighbor *sync.Map) []p2p.Peer {
-	tmp := []p2p.Peer{}
-	neighbor.Range(func(k, v interface{}) bool {
-		p := v.(p2p.Peer)
-		t := p.Port
-		p.Port = syncing.GetSyncingPort(t)
-		tmp = append(tmp, p)
-		return true
-	})
-	return tmp
-}
 
 // DoSyncWithoutConsensus gets sync-ed to blockchain without joining consensus
 func (node *Node) DoSyncWithoutConsensus() {
@@ -58,14 +46,38 @@ func (node *Node) IsSameHeight() (uint64, bool) {
 	return node.stateSync.IsSameBlockchainHeight(node.Blockchain())
 }
 
+func (node *Node) getSyncingPeers(shardID p2p.ShardID) []p2p.Peer {
+	groupID := p2p.NewGroupIDByShardID(shardID)
+	peers, err := node.host.(*hostv2.HostV2).GroupPeers(groupID)
+	if err != nil {
+		groupIDBase64 := base64.StdEncoding.EncodeToString([]byte(groupID))
+		utils.Logger().Warn().
+			Str("group_id", groupIDBase64).
+			Err(err).
+			Msg("cannot get syncing peers")
+	}
+	var syncingPeers []p2p.Peer
+	for _, peer := range peers {
+		port, err := strconv.ParseUint(peer.Port, 10, 16)
+		if err != nil {
+			utils.Logger().Warn().Interface("peer", peer).Msg("invalid port")
+			continue
+		}
+		syncingPeer := peer
+		syncingPeer.Port = fmt.Sprint(port - syncing.SyncingPortDifference)
+		syncingPeers = append(syncingPeers, syncingPeer)
+	}
+	return syncingPeers
+}
+
 // GetBeaconSyncingPeers returns a list of peers for beaconchain syncing
 func (node *Node) GetBeaconSyncingPeers() []p2p.Peer {
-	return node.getNeighborPeers(&node.BeaconNeighbors)
+	return node.getSyncingPeers(0)
 }
 
 // GetSyncingPeers returns list of peers for regular shard syncing.
 func (node *Node) GetSyncingPeers() []p2p.Peer {
-	return node.getNeighborPeers(&node.Neighbors)
+	return node.getSyncingPeers(p2p.ShardID(node.Blockchain().ShardID()))
 }
 
 // GetPeersFromDNS get peers from our DNS server; TODO: temp fix for resolve node syncing

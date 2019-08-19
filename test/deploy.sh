@@ -87,7 +87,10 @@ SHARDS=2
 DRYRUN=
 SYNC=true
 
-while getopts "htD:m:s:nB" option; do
+unset -v log_conn
+log_conn=false
+
+while getopts "htD:m:s:nBC" option; do
    case $option in
       h) usage ;;
       t) TXGEN=false ;;
@@ -96,6 +99,7 @@ while getopts "htD:m:s:nB" option; do
       s) SHARDS=$OPTARG ;;
       n) DRYRUN=echo ;;
       B) NOBUILD=true ;;
+      C) log_conn=true ;;
    esac
 done
 
@@ -149,6 +153,10 @@ echo "bootnode launched." + " $BN_MA"
 unset -v base_args
 declare -a base_args args
 base_args=(-log_folder "${log_folder}" -min_peers "${MIN}" -bootnodes "${BN_MA}" -network_type="localnet" -blspass file:.hmy/blspass.txt -dns=false)
+if ${log_conn}
+then
+   base_args+=(-log_conn=true)
+fi
 NUM_NN=0
 
 sleep 2

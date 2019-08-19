@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"encoding/base64"
 	"encoding/hex"
 	"flag"
 	"fmt"
@@ -9,11 +11,14 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"sync"
 	"time"
 
+	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/libp2p/go-libp2p-core/peer"
 
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
@@ -29,6 +34,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/p2p/host/hostv2"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 )
 
@@ -251,16 +257,98 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	nodeConfig.SelfPeer = p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nodeConfig.ConsensusPubKey}
 
 	nodeConfig.Host, err = p2pimpl.NewHost(&nodeConfig.SelfPeer, nodeConfig.P2pPriKey)
-	if *logConn && nodeConfig.GetNetworkType() != nodeconfig.Mainnet {
-		nodeConfig.Host.GetP2PHost().Network().Notify(utils.NewConnLogger(utils.GetLogInstance()))
-	}
 	if err != nil {
 		panic("unable to new host in harmony")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	if err := initP2P(ctx, nodeConfig.Host.(*hostv2.HostV2)); err != nil {
+		utils.Logger().Fatal().Err(err).Msg("cannot initialize P2P")
+	}
+
+	if *logConn && nodeConfig.GetNetworkType() != nodeconfig.Mainnet {
+		nodeConfig.Host.GetP2PHost().Network().Notify(utils.NewConnLogger(*utils.Logger()))
 	}
 
 	nodeConfig.DBDir = *dbDir
 
 	return nodeConfig
+}
+
+func initP2P(ctx context.Context, h *hostv2.HostV2) error {
+	// TODO ek – revisit when we increase number of shards.
+	//  We need to start/stop advertising our shard membership across shard
+	//  change, and we need to start/stop discovering shard members as their
+	//  number scales.
+	var bootnodes []peer.AddrInfo
+	for _, ma := range utils.BootNodes {
+		if ai, err := peer.AddrInfoFromP2pAddr(ma); err == nil {
+			bootnodes = append(bootnodes, *ai)
+		} else {
+			utils.Logger().Warn().Err(err).Str("multiaddr", ma.String()).
+				Msg("cannot convert bootnode multiaddr into addrinfo")
+		}
+	}
+	bootLogger := utils.Logger().With().Interface("bootnodes", bootnodes).Logger()
+	bootLogger.Debug().Msg("bootstrapping P2P network")
+	if err := h.Bootstrap(ctx, bootnodes); err != nil {
+		bootLogger.Warn().Err(err).
+			Msg("cannot bootstrap P2P network - expect stalls")
+	}
+	bootLogger.Debug().Msg("bootstrapped P2P network")
+
+	epochSchedule := core.ShardingSchedule.InstanceForEpoch(ethCommon.Big0)
+	numShards := p2p.ShardID(epochSchedule.NumShards())
+	min := 0
+	shardSize := epochSchedule.NumNodesPerShard()
+	for i := shardSize; i > 0; i >>= 1 {
+		min++
+	}
+	// min == floor(log2(shardSize)) + 1
+	limit := min * 3 / 2 // 50% buffer
+	if limit > shardSize {
+		limit = shardSize
+	}
+	cooldown := 5 * time.Second
+	discCtx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+	defer cancel()
+	shardGroupID := p2p.NewGroupIDByShardID(p2p.ShardID(initialAccount.ShardID))
+	h.JoinGroup(shardGroupID)
+	h.JoinGroup(p2p.GroupIDGlobal)
+	utils.Logger().Debug().
+		Int("min_peers", min).
+		Int("max_peers", limit).
+		Msg("discovering group peers")
+	var wg sync.WaitGroup
+	for shardID := p2p.ShardID(0); shardID < numShards; shardID++ {
+		groupID := p2p.NewGroupIDByShardID(shardID)
+		wg.Add(1)
+		go func(shardID p2p.ShardID, groupID p2p.GroupID) {
+			defer wg.Done()
+			groupIDBase64 := base64.StdEncoding.EncodeToString([]byte(groupID))
+			logger := utils.Logger().With().
+				Uint32("shard_id", uint32(shardID)).
+				Str("group_id", groupIDBase64).
+				Logger()
+			h.DiscoverGroup(groupID, limit, cooldown)
+			for {
+				peers, err := h.WaitForGroupPeers(discCtx, groupID)
+				switch {
+				case err != nil:
+					logger.Warn().Err(err).Msg("failed to discover group peers")
+				case len(peers) < min:
+					logger.Debug().Interface("peers", peers).Msg("not enough peers")
+				default:
+					logger.Info().Interface("peers", peers).Msg("found group peers")
+					return
+				}
+			}
+		}(shardID, groupID)
+	}
+	utils.Logger().Debug().Msg("waiting for initial group peers")
+	wg.Wait()
+	utils.Logger().Info().Msg("finished initializing P2P network")
+	return nil
 }
 
 func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
