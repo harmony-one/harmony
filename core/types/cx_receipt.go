@@ -174,7 +174,7 @@ func (cxp *CXReceiptsProof) IsValidCXReceiptsProof() error {
 	// (2) verify the outgoingCXReceiptsHash match
 	outgoingHashFromSourceShard := crypto.Keccak256Hash(byteBuffer.Bytes())
 	if outgoingHashFromSourceShard != sourceOutgoingCXReceiptsHash {
-		return ctxerror.New("[ProcessReceiptMessage] IncomingReceiptRootHash from source shard not match", "sourceShardID", sourceShardID, "sourceBlockNum", sourceBlockNum, "calculated", outgoingHashFromSourceShard, "got", sourceOutgoingCXReceiptsHash)
+		return ctxerror.New("[IsValidCXReceiptsProof] IncomingReceiptRootHash from source shard not match", "sourceShardID", sourceShardID, "sourceBlockNum", sourceBlockNum, "calculated", outgoingHashFromSourceShard, "got", sourceOutgoingCXReceiptsHash)
 	}
 
 	return nil

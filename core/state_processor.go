@@ -83,6 +83,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 		allLogs = append(allLogs, receipt.Logs...)
 	}
 
+	// incomingReceipts should always be processed after transactions (to be consistent with the block proposal)
 	for _, cx := range block.IncomingReceipts() {
 		ApplyIncomingReceipt(p.config, statedb, header, cx)
 	}
