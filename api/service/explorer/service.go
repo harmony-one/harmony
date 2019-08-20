@@ -117,7 +117,7 @@ func (s *Service) Run() *http.Server {
 	s.router.Path("/shard").HandlerFunc(s.GetExplorerShard)
 
 	// Set up router for committee.
-	s.router.Path("/committee").Queries("shard_num", "{[0-9]*?}", "epoch", "{[0-9]*?}").HandlerFunc(s.GetCommittee).Methods("GET")
+	s.router.Path("/committee").Queries("shard_id", "{[0-9]*?}", "epoch", "{[0-9]*?}").HandlerFunc(s.GetCommittee).Methods("GET")
 	s.router.Path("/committee").HandlerFunc(s.GetCommittee).Methods("GET")
 
 	// Do serving now.
