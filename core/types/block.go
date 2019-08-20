@@ -207,9 +207,9 @@ type StorageBlock Block
 
 // "external" block encoding. used for eth protocol, etc.
 type extblock struct {
-	Header *Header
-	Txs    []*Transaction
-	Uncles []*Header
+	Header           *Header
+	Txs              []*Transaction
+	Uncles           []*Header
 	IncomingReceipts CXReceiptsProofs
 }
 
@@ -323,9 +323,9 @@ func (b *Block) DecodeRLP(s *rlp.Stream) error {
 // EncodeRLP serializes b into the Ethereum RLP block format.
 func (b *Block) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, extblock{
-		Header: b.header,
-		Txs:    b.transactions,
-		Uncles: b.uncles,
+		Header:           b.header,
+		Txs:              b.transactions,
+		Uncles:           b.uncles,
 		IncomingReceipts: b.incomingReceipts,
 	})
 }
