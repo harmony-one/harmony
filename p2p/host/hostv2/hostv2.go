@@ -24,6 +24,7 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	"github.com/whyrusleeping/go-logging"
 
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -287,8 +288,14 @@ func (host *HostV2) Peerstore() libp2p_peerstore.Peerstore {
 	return host.h.Peerstore()
 }
 
+var logOnce sync.Once
+
 // New creates a host for p2p communication
 func New(self *p2p.Peer, priKey libp2p_crypto.PrivKey) *HostV2 {
+	logOnce.Do(func() {
+		logging.SetBackend(GoLoggingBackend)
+		utils.Logger().Debug().Msg("installed go-logging logger backends")
+	})
 	listenAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", self.Port))
 	// TODO: Convert to zerolog or internal logger interface
 	logger := utils.Logger()
