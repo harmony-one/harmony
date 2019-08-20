@@ -9,8 +9,10 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"strconv"
 	"time"
 
+	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -291,6 +293,17 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 	currentNode := node.New(nodeConfig.Host, currentConsensus, chainDBFactory, *isArchival)
 	switch {
+	case *networkType == nodeconfig.Localnet:
+		epochConfig := core.ShardingSchedule.InstanceForEpoch(ethCommon.Big0)
+		selfPort, err := strconv.ParseUint(*port, 10, 16)
+		if err != nil {
+			utils.Logger().Fatal().
+				Err(err).
+				Str("self_port_string", *port).
+				Msg("cannot convert self port string into port number")
+		}
+		currentNode.SyncingPeerProvider = node.NewLocalSyncingPeerProvider(
+			6000, uint16(selfPort), epochConfig.NumShards(), uint32(epochConfig.NumNodesPerShard()))
 	case *dnsZone != "":
 		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider(*dnsZone, syncing.GetSyncingPort(*port))
 	case *dnsFlag:

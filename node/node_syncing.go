@@ -123,6 +123,43 @@ func (p *DNSSyncingPeerProvider) SyncingPeers(shardID uint32) (peers []p2p.Peer,
 	return peers, nil
 }
 
+// LocalSyncingPeerProvider uses localnet deployment convention to synthesize
+// syncing peers.
+type LocalSyncingPeerProvider struct {
+	basePort, selfPort   uint16
+	numShards, shardSize uint32
+}
+
+// NewLocalSyncingPeerProvider returns a provider that synthesizes syncing
+// peers given the network configuration
+func NewLocalSyncingPeerProvider(
+	basePort, selfPort uint16, numShards, shardSize uint32,
+) *LocalSyncingPeerProvider {
+	return &LocalSyncingPeerProvider{
+		basePort:  basePort,
+		selfPort:  selfPort,
+		numShards: numShards,
+		shardSize: shardSize,
+	}
+}
+
+// SyncingPeers returns local syncing peers using the sharding configuration.
+func (p *LocalSyncingPeerProvider) SyncingPeers(shardID uint32) (peers []p2p.Peer, err error) {
+	if shardID >= p.numShards {
+		return nil, errors.Errorf(
+			"shard ID %d out of range 0..%d", shardID, p.numShards-1)
+	}
+	firstPort := uint32(p.basePort) + shardID
+	endPort := uint32(p.basePort) + p.numShards*p.shardSize
+	for port := firstPort; port < endPort; port += p.numShards {
+		if port == uint32(p.selfPort) {
+			continue // do not sync from self
+		}
+		peers = append(peers, p2p.Peer{IP: "127.0.0.1", Port: fmt.Sprint(port)})
+	}
+	return peers, nil
+}
+
 // DoBeaconSyncing update received beaconchain blocks and downloads missing beacon chain blocks
 func (node *Node) DoBeaconSyncing() {
 	for {
