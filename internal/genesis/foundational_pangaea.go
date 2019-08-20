@@ -2,10 +2,10 @@ package genesis
 
 // PangaeaAccounts are the accounts for the Pangaea nodes
 var PangaeaAccounts = []DeployAccount{
-	{Index: "0", Address: "one104raxhv2gfk7syf42jqs7t3gwpewylh28z5rgv", BlsPublicKey: "88a10274dc63dbd0731b2b8d436656edc999f1e60b4510e032f004189d43e076ac7ed2a1a4b7f9ebe1e5391ff51a3601"},
-	{Index: "1", Address: "one1tc8525rnajj2ldn52z75y0w9rvdlat7uem7atr", BlsPublicKey: "6fcccf6105c23d45f7c1e5becb7bab33ae329cf0a3b18f80e8c4194effa29b2a26fe5c7fa8f461e82bf0d6f6dfbba018"},
-	{Index: "2", Address: "one1g2dlhygsf0yckcvehdvvkk57melwempqjk44el", BlsPublicKey: "8ddbb90bacf203c54d260deda3f1a7d7a03a90c316d8eaff353fb9c02ee13c6fd181112e2b9cb0c84d2ffc61a0fccc8f"},
-	{Index: "3", Address: "one1q769x04mmlfcj5fqup2n7tst92egca4uj2dujp", BlsPublicKey: "1c0d5e8b81407e4928be5188dfa66bea6841111675ea1e3de07a0ab941432930b91ddd38f4946d651c8096750ad14082"},
+	{Index: "0", Address: "one1p6fk3rrnj4xn3y52l7z548cwrutvhknwn9h746", BlsPublicKey: "f81bafc3ecfd762455446cd623b94f0b6d0f6702a86818e97e4088745cd75fd1d655363992128050389284e5c43c3a07"},
+	{Index: "1", Address: "one1ayheatgq738nrxrs8fvcz0nwe6hjjjk73s9lm5", BlsPublicKey: "657aee70c12eba698f72455b19e1a3c2005f7078fa3df0efb11ae0d9a06a26e4e0a977de4713cd3df8d740dd9327ac98"},
+	{Index: "2", Address: "one1226jy9hards63p2hh5g38q0ul8uhlyxrtfrmlf", BlsPublicKey: "36ce7b8febfae802ace33505970a8b178bbf6d19620eee13c206d9126505b9bd23028818035971cb1bf8e3135a93a700"},
+	{Index: "3", Address: "one1l6ncjexkx3dfgcnjg39ju565m97u64kg9ajta4", BlsPublicKey: "b0434397f57f9b3ecb8a067f0513cd4a241873f1e81385a3a36419fb09d38acbdf6583b1b6c1547a9ed6fd7fa3389581"},
 	{Index: "4", Address: "one1hrqzk47rcuuhg88al5xspry8d4652r03j5fej6", BlsPublicKey: "68997549f99566819a5104036ad8b2e6674639cae4aae79125a4209ba6bbf3608678d239e2c76cbb286081aae210e302"},
 	{Index: "5", Address: "one1wrau8zpzq4g034pl9kkrupmhrf0e2sknkjldwq", BlsPublicKey: "28449f23cdae7bad685e694252878aa068274b4f68341b3b82097d01620f456f6ada8cd8f64f63445a28c5018eeb5903"},
 	{Index: "6", Address: "one1ml4kpquwxvgh358xsnafzxhlessnxft07agn3n", BlsPublicKey: "79b3cdd972a276e740c794a20657b4881f47fc657cac075e90a5317b427d2f86d62fc61870f399a17aaaeb9fa597f510"},
