@@ -700,6 +700,8 @@ func (host *HostV2) WaitForGroupPeers(
 // JoinGroup joins the given broadcast group.
 // TODO ek – this should be rolled into group receivers
 func (host *HostV2) JoinGroup(id p2p.GroupID) {
+	id64 := base64.StdEncoding.EncodeToString([]byte(id))
+	utils.Logger().Debug().Str("group_id", id64).Msg("joining group")
 	libp2p_disc_impl.Advertise(context.Background(), host.adv, string(id))
 }
 
