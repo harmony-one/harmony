@@ -166,6 +166,9 @@ func initSetup() {
 }
 
 func passphraseForBls() {
+	if *isExplorer {
+		return
+	}
 	// If FN node running, they should either specify blsPrivateKey or the file with passphrase
 	if *blsKeyFile == "" || *blsPass == "" {
 		fmt.Println("Internal nodes need to have pass to decrypt blskey")
