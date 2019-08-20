@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
 
+	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/blsgen"
@@ -289,10 +290,13 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// Current node.
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 	currentNode := node.New(nodeConfig.Host, currentConsensus, chainDBFactory, *isArchival)
-	if *dnsZone != "" {
-		currentNode.SetDNSZone(*dnsZone)
-	} else if *dnsFlag {
-		currentNode.SetDNSZone("t.hmny.io")
+	switch {
+	case *dnsZone != "":
+		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider(*dnsZone, syncing.GetSyncingPort(*port))
+	case *dnsFlag:
+		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider("t.hmny.io", syncing.GetSyncingPort(*port))
+	default:
+		currentNode.SyncingPeerProvider = node.NewLegacySyncingPeerProvider(currentNode)
 	}
 	// TODO: add staking support
 	// currentNode.StakingAccount = myAccount
