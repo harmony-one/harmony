@@ -35,12 +35,10 @@ require (
 	github.com/libp2p/go-libp2p-discovery v0.1.0
 	github.com/libp2p/go-libp2p-host v0.1.0
 	github.com/libp2p/go-libp2p-kad-dht v0.1.1
-	github.com/libp2p/go-libp2p-net v0.1.0
 	github.com/libp2p/go-libp2p-peer v0.2.0
 	github.com/libp2p/go-libp2p-peerstore v0.1.0
 	github.com/libp2p/go-libp2p-pubsub v0.1.0
 	github.com/multiformats/go-multiaddr v0.0.4
-	github.com/multiformats/go-multiaddr-net v0.0.1
 	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.8.1
@@ -56,7 +54,6 @@ require (
 	golang.org/x/crypto v0.0.0-20190513172903-22d7a77e9e5f
 	golang.org/x/lint v0.0.0-20190409202823-959b441ac422
 	golang.org/x/tools v0.0.0-20190521203540-521d6ed310dd
-	google.golang.org/appengine v1.4.0 // indirect
 	google.golang.org/grpc v1.21.1
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
 	gopkg.in/ini.v1 v1.42.0
