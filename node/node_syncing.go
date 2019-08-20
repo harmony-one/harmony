@@ -48,25 +48,26 @@ func (node *Node) IsSameHeight() (uint64, bool) {
 
 func (node *Node) getSyncingPeers(shardID p2p.ShardID) []p2p.Peer {
 	groupID := p2p.NewGroupIDByShardID(shardID)
+	groupIDBase64 := base64.StdEncoding.EncodeToString([]byte(groupID))
+	logger := utils.Logger().With().Str("group_id", groupIDBase64).Logger()
 	peers, err := node.host.(*hostv2.HostV2).GroupPeers(groupID)
 	if err != nil {
-		groupIDBase64 := base64.StdEncoding.EncodeToString([]byte(groupID))
-		utils.Logger().Warn().
-			Str("group_id", groupIDBase64).
-			Err(err).
-			Msg("cannot get syncing peers")
+		logger.Err(err).Msg("cannot get syncing peers")
 	}
 	var syncingPeers []p2p.Peer
 	for _, peer := range peers {
 		port, err := strconv.ParseUint(peer.Port, 10, 16)
 		if err != nil {
-			utils.Logger().Warn().Interface("peer", peer).Msg("invalid port")
+			logger.Warn().Interface("peer", peer).Msg("invalid port")
 			continue
 		}
 		syncingPeer := peer
 		syncingPeer.Port = fmt.Sprint(port - syncing.SyncingPortDifference)
 		syncingPeers = append(syncingPeers, syncingPeer)
 	}
+	logger.Debug().
+		Int("num_peers", len(syncingPeers)).
+		Msg("found syncing peers")
 	return syncingPeers
 }
 

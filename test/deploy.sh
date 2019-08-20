@@ -54,6 +54,7 @@ USAGE: $ME [OPTIONS] config_file_name [extra args to node]
    -s shards      number of shards (default: $SHARDS)
    -n             dryrun mode (default: $DRYRUN)
    -B             don't build the binary
+   -C             log connections
 
 This script will build all the binaries and start harmony and txgen based on the configuration file.
 
