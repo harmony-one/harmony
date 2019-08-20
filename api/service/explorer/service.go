@@ -104,7 +104,7 @@ func (s *Service) Run() *http.Server {
 	s.router.Path("/tx").HandlerFunc(s.GetExplorerTransaction)
 
 	// Set up router for address.
-	s.router.Path("/address").Queries("id", fmt.Sprintf("{([0-9A-Fa-fx]*?)|(one1[%s]{38})}", bech32.Charset)).HandlerFunc(s.GetExplorerAddress).Methods("GET")
+	s.router.Path("/address").Queries("id", fmt.Sprintf("{([0-9A-Fa-fx]*?)|(t?one1[%s]{38})}", bech32.Charset)).HandlerFunc(s.GetExplorerAddress).Methods("GET")
 	s.router.Path("/address").HandlerFunc(s.GetExplorerAddress)
 
 	// Set up router for node count.
