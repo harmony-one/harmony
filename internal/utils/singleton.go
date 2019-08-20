@@ -7,6 +7,8 @@ import (
 	"io"
 	"os"
 	"path"
+	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -137,18 +139,67 @@ func setZeroLoggerFileOutput(filepath string, maxSize int) error {
 	return nil
 }
 
-// Logger returns a zerolog.Logger singleton
-func Logger() *zerolog.Logger {
+// ZerologCallerHook is a hook that adds caller file/line/function info.
+// It differs from zerolog's own Caller method in three ways: It logs filename
+// and line number separately in caller_file (string) and caller_line (int)
+// fields, it logs only basename of the source file and not the full path,
+// closing a builder host information leak, and it includes a package-qualified
+// caller information in caller_func (string).
+type ZerologCallerHook struct {
+	// Number of extra frames to skip.  Use from logging bridges.
+	Skip int
+}
+
+// Run adds caller file/line/function info to the given event.
+func (h ZerologCallerHook) Run(e *zerolog.Event, level zerolog.Level, message string) {
+	pcs := make([]uintptr, 1)
+	// 4 == runtime.Callers()+ZerologCallerHook.Run()+Event.msg()+Event.Msg()
+	if runtime.Callers(4+h.Skip, pcs) == 0 || pcs[0] == 0 {
+		return
+	}
+	frame, _ := runtime.CallersFrames(pcs).Next()
+	var fun, pkg string
+	s := frame.Function
+	slash := strings.LastIndexByte(s, '/')
+	if slash >= 0 {
+		s = s[slash+1:]
+	}
+	dot := strings.IndexByte(s, '.')
+	switch {
+	case dot >= 0:
+		fun = s[dot+1:]
+		pkg = frame.Function[:len(frame.Function)-len(fun)-1]
+	case slash >= 0:
+		fun = ""
+		pkg = frame.Function
+	default:
+		fun = frame.Function
+		pkg = ""
+	}
+	e.Str("caller_file", path.Base(frame.File))
+	e.Int("caller_line", frame.Line)
+	e.Str("caller_pkg", pkg)
+	e.Str("caller_func", fun)
+}
+
+// RawLogger returns the zerolog.Logger singleton without caller hook.
+func RawLogger() *zerolog.Logger {
 	zeroLoggerOnce.Do(func() {
+		zerolog.TimeFieldFormat = "2006-01-02T15:04:05.999999999Z"
 		logger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr}).
 			Level(zeroLoggerLevel).
 			With().
-			Caller().
 			Timestamp().
 			Logger()
 		zeroLogger = &logger
 	})
 	return zeroLogger
+}
+
+// Logger returns the zerolog.Logger singleton with caller hook.
+func Logger() *zerolog.Logger {
+	logger := RawLogger().Hook(ZerologCallerHook{})
+	return &logger
 }
 
 func updateZeroLogLevel(level int) {
