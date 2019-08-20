@@ -19,6 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/libp2p/go-libp2p-core/peer"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
@@ -309,6 +310,12 @@ func initP2P(ctx context.Context, h *hostv2.HostV2) error {
 	if limit > shardSize {
 		limit = shardSize
 	}
+	pubsub.GossipSubD = min
+	pubsub.GossipSubDlo = (min*2 + 1) / 3 // 50% lower
+	if pubsub.GossipSubDlo < 1 {
+		pubsub.GossipSubDlo = 1
+	}
+	pubsub.GossipSubDhi = limit
 	cooldown := 5 * time.Second
 	discCtx, cancel := context.WithTimeout(ctx, 1*time.Minute)
 	defer cancel()
