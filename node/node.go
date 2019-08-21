@@ -387,15 +387,6 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 	// FIXME (leo): we use beacon client topic as the global topic for now
 	go node.ReceiveGlobalMessage()
 
-	// if metrics flag is set start the goroutine to collect metrics
-	if node.NodeConfig.MetricsFlag {
-		go node.CollectMetrics()
-	}
-
-	if node.NodeConfig.Role() == nodeconfig.ExplorerNode {
-		go node.CommitCommittee()
-	}
-
 	// Setup initial state of syncing.
 	node.peerRegistrationRecord = make(map[string]*syncConfig)
 

@@ -152,10 +152,13 @@ func (node *Node) commitBlockForExplorer(block *types.Block) {
 
 // CommitCommittee commits committee with shard id and epoch to explorer service.
 func (node *Node) CommitCommittee() {
-	events := make(chan core.ChainHeadEvent)
-	node.Blockchain().SubscribeChainHeadEvent(events)
+	events := make(chan core.ChainEvent)
+	node.Blockchain().SubscribeChainEvent(events)
 	for event := range events {
 		curBlock := event.Block
+		if curBlock == nil {
+			continue
+		}
 		state, err := node.Blockchain().ReadShardState(curBlock.Epoch())
 		if err != nil {
 			utils.Logger().Error().Err(err).Msg("[Explorer] Error reading shard state")
@@ -166,7 +169,7 @@ func (node *Node) CommitCommittee() {
 				utils.Logger().Info().Msg("[Explorer] Dumping committee")
 				err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).DumpCommittee(curBlock.ShardID(), curBlock.Epoch().Uint64(), committee)
 				if err != nil {
-					utils.Logger().Warn().Err(err).Msgf("[Explorer] Eror dumping committee for block %d", curBlock.NumberU64())
+					utils.Logger().Warn().Err(err).Msgf("[Explorer] Error dumping committee for block %d", curBlock.NumberU64())
 				}
 			}
 		}
