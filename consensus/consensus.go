@@ -10,15 +10,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/core"
 
-	"github.com/harmony-one/harmony/common/denominations"
-	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/contracts/structs"
-	"github.com/harmony-one/harmony/core/state"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
-	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/internal/memprofiling"
@@ -30,9 +26,6 @@ const (
 	vdFAndProofSize = 516 // size of VDF and Proof
 	vdfAndSeedSize  = 548 // size of VDF/Proof and Seed
 )
-
-// BlockReward is the block reward, to be split evenly among block signers.
-var BlockReward = new(big.Int).Mul(big.NewInt(24), big.NewInt(denominations.One))
 
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
@@ -289,91 +282,6 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 
 	memprofiling.GetMemProfiling().Add("consensus.pbftLog", consensus.PbftLog)
 	return &consensus, nil
-}
-
-// accumulateRewards credits the coinbase of the given block with the mining
-// reward. The total reward consists of the static block reward and rewards for
-// included uncles. The coinbase of each uncle block is also rewarded.
-func accumulateRewards(
-	bc consensus_engine.ChainReader, state *state.DB, header *types.Header,
-) error {
-	blockNum := header.Number.Uint64()
-	if blockNum == 0 {
-		// Epoch block has no parent to reward.
-		return nil
-	}
-	// TODO ek – retrieving by parent number (blockNum - 1) doesn't work,
-	//  while it is okay with hash.  Sounds like DB inconsistency.
-	//  Figure out why.
-	parentHeader := bc.GetHeaderByHash(header.ParentHash)
-	if parentHeader == nil {
-		return ctxerror.New("cannot find parent block header in DB",
-			"parentHash", header.ParentHash)
-	}
-	if parentHeader.Number.Cmp(common.Big0) == 0 {
-		// Parent is an epoch block,
-		// which is not signed in the usual manner therefore rewards nothing.
-		return nil
-	}
-	parentShardState, err := bc.ReadShardState(parentHeader.Epoch)
-	if err != nil {
-		return ctxerror.New("cannot read shard state",
-			"epoch", parentHeader.Epoch,
-		).WithCause(err)
-	}
-	parentCommittee := parentShardState.FindCommitteeByID(parentHeader.ShardID)
-	if parentCommittee == nil {
-		return ctxerror.New("cannot find shard in the shard state",
-			"parentBlockNumber", parentHeader.Number,
-			"shardID", parentHeader.ShardID,
-		)
-	}
-	var committerKeys []*bls.PublicKey
-	for _, member := range parentCommittee.NodeList {
-		committerKey := new(bls.PublicKey)
-		err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
-		if err != nil {
-			return ctxerror.New("cannot convert BLS public key",
-				"blsPublicKey", member.BlsPublicKey).WithCause(err)
-		}
-		committerKeys = append(committerKeys, committerKey)
-	}
-	mask, err := bls_cosi.NewMask(committerKeys, nil)
-	if err != nil {
-		return ctxerror.New("cannot create group sig mask").WithCause(err)
-	}
-	if err := mask.SetMask(header.LastCommitBitmap); err != nil {
-		return ctxerror.New("cannot set group sig mask bits").WithCause(err)
-	}
-	totalAmount := big.NewInt(0)
-	var accounts []common.Address
-	signers := []string{}
-	for idx, member := range parentCommittee.NodeList {
-		if signed, err := mask.IndexEnabled(idx); err != nil {
-			return ctxerror.New("cannot check for committer bit",
-				"committerIndex", idx,
-			).WithCause(err)
-		} else if signed {
-			accounts = append(accounts, member.EcdsaAddress)
-		}
-	}
-	numAccounts := big.NewInt(int64(len(accounts)))
-	last := new(big.Int)
-	for i, account := range accounts {
-		cur := new(big.Int)
-		cur.Mul(BlockReward, big.NewInt(int64(i+1))).Div(cur, numAccounts)
-		diff := new(big.Int).Sub(cur, last)
-		signers = append(signers, common2.MustAddressToBech32(account))
-		state.AddBalance(account, diff)
-		totalAmount = new(big.Int).Add(totalAmount, diff)
-		last = cur
-	}
-	header.Logger(utils.Logger()).Debug().
-		Str("NumAccounts", numAccounts.String()).
-		Str("TotalAmount", totalAmount.String()).
-		Strs("Signers", signers).
-		Msg("[Block Reward] Successfully paid out block reward")
-	return nil
 }
 
 // GenesisStakeInfoFinder is a stake info finder implementation using only

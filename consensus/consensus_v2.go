@@ -16,6 +16,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	vrf_bls "github.com/harmony-one/harmony/crypto/vrf/bls"
+	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -200,7 +201,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		return
 	}
 	if consensus.mode.Mode() == Normal {
-		if err = consensus.VerifyHeader(consensus.ChainReader, &headerObj, true); err != nil {
+		if err = chain.Engine.VerifyHeader(consensus.ChainReader, &headerObj, true); err != nil {
 			consensus.getLogger().Warn().
 				Err(err).
 				Str("inChain", consensus.ChainReader.CurrentHeader().Number.String()).
@@ -505,7 +506,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		return
 	}
 	if consensus.mode.Mode() == Normal {
-		if err := consensus.VerifyHeader(consensus.ChainReader, blockObj.Header(), true); err != nil {
+		if err := chain.Engine.VerifyHeader(consensus.ChainReader, blockObj.Header(), true); err != nil {
 			consensus.getLogger().Warn().
 				Err(err).
 				Str("inChain", consensus.ChainReader.CurrentHeader().Number.String()).

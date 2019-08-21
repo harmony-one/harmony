@@ -23,6 +23,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/drand"
+	"github.com/harmony-one/harmony/internal/chain"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/shardchain"
@@ -338,7 +339,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 	chainConfig.ChainID = big.NewInt(1)
 
 	collection := shardchain.NewCollection(
-		chainDBFactory, &genesisInitializer{&node}, consensusObj, &chainConfig)
+		chainDBFactory, &genesisInitializer{&node}, chain.Engine, &chainConfig)
 	if isArchival {
 		collection.DisableCache()
 	}
@@ -349,18 +350,18 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		node.Consensus = consensusObj
 
 		// Load the chains.
-		chain := node.Blockchain() // this also sets node.isFirstTime if the DB is fresh
+		blockchain := node.Blockchain() // this also sets node.isFirstTime if the DB is fresh
 		_ = node.Beaconchain()
 
 		node.BlockChannel = make(chan *types.Block)
 		node.ConfirmedBlockChannel = make(chan *types.Block)
 		node.BeaconBlockChannel = make(chan *types.Block)
-		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, node.Blockchain().Config(), chain)
-		node.Worker = worker.New(node.Blockchain().Config(), chain, node.Consensus, node.Consensus.ShardID)
+		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, node.Blockchain().Config(), blockchain)
+		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine, node.Consensus.ShardID)
 
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 		// the sequence number is the next block number to be added in consensus protocol, which is always one more than current chain header block
-		node.Consensus.SetBlockNum(chain.CurrentBlock().NumberU64() + 1)
+		node.Consensus.SetBlockNum(blockchain.CurrentBlock().NumberU64() + 1)
 
 		// Add Faucet contract to all shards, so that on testnet, we can demo wallet in explorer
 		// TODO (leo): we need to have support of cross-shard tx later so that the token can be transferred from beacon chain shard to other tx shards.
