@@ -281,9 +281,11 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 // NOTE: For now, just send to the client (basically not broadcasting)
 // TODO (lc): broadcast the new blocks to new nodes doing state sync
 func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
-	if node.ClientPeer != nil {
-		utils.Logger().Info().Msg("Broadcasting new block to client")
-		node.host.SendMessageToGroups([]p2p.GroupID{node.NodeConfig.GetClientGroupID()}, host.ConstructP2pMessage(byte(0), proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock})))
+	utils.Logger().Info().Msg("broadcasting new block")
+	groups := []p2p.GroupID{node.NodeConfig.GetClientGroupID()}
+	msg := host.ConstructP2pMessage(byte(0), proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock}))
+	if err := node.host.SendMessageToGroups(groups, msg); err != nil {
+		utils.Logger().Warn().Err(err).Msg("cannot broadcast new block")
 	}
 }
 
