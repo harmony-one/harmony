@@ -3,10 +3,13 @@ package node
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"math/big"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/params"
+
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/api/client"
 	clientService "github.com/harmony-one/harmony/api/client/service"
@@ -20,6 +23,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/drand"
+	"github.com/harmony-one/harmony/internal/chain"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/shardchain"
@@ -206,7 +210,7 @@ type Node struct {
 // Blockchain returns the blockchain for the node's current shard.
 func (node *Node) Blockchain() *core.BlockChain {
 	shardID := node.NodeConfig.ShardID
-	bc, err := node.shardChains.ShardChain(shardID, node.NodeConfig.GetNetworkType())
+	bc, err := node.shardChains.ShardChain(shardID)
 	if err != nil {
 		err = ctxerror.New("cannot get shard chain", "shardID", shardID).
 			WithCause(err)
@@ -217,7 +221,7 @@ func (node *Node) Blockchain() *core.BlockChain {
 
 // Beaconchain returns the beaconchain from node.
 func (node *Node) Beaconchain() *core.BlockChain {
-	bc, err := node.shardChains.ShardChain(0, node.NodeConfig.GetNetworkType())
+	bc, err := node.shardChains.ShardChain(0)
 	if err != nil {
 		err = ctxerror.New("cannot get beaconchain").WithCause(err)
 		ctxerror.Log15(utils.GetLogger().Crit, err)
@@ -327,8 +331,15 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		node.SelfPeer = host.GetSelfPeer()
 	}
 
+	chainConfig := *params.TestnetChainConfig
+	if node.NodeConfig.GetNetworkType() == nodeconfig.Mainnet {
+		chainConfig = *params.MainnetChainConfig
+	}
+	// TODO: use 1 as mainnet, change to networkID instead
+	chainConfig.ChainID = big.NewInt(1)
+
 	collection := shardchain.NewCollection(
-		chainDBFactory, &genesisInitializer{&node}, consensusObj)
+		chainDBFactory, &genesisInitializer{&node}, chain.Engine, &chainConfig)
 	if isArchival {
 		collection.DisableCache()
 	}
@@ -339,18 +350,21 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		node.Consensus = consensusObj
 
 		// Load the chains.
-		chain := node.Blockchain() // this also sets node.isFirstTime if the DB is fresh
-		_ = node.Beaconchain()
+		blockchain := node.Blockchain() // this also sets node.isFirstTime if the DB is fresh
+		beaconChain := node.Beaconchain()
 
 		node.BlockChannel = make(chan *types.Block)
 		node.ConfirmedBlockChannel = make(chan *types.Block)
 		node.BeaconBlockChannel = make(chan *types.Block)
-		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, node.Blockchain().Config(), chain)
-		node.Worker = worker.New(node.Blockchain().Config(), chain, node.Consensus, node.Consensus.ShardID)
+		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, node.Blockchain().Config(), blockchain)
+		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine, node.Consensus.ShardID)
+		if node.Blockchain().ShardID() != 0 {
+			node.BeaconWorker = worker.New(node.Beaconchain().Config(), beaconChain, chain.Engine, node.Consensus.ShardID)
+		}
 
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 		// the sequence number is the next block number to be added in consensus protocol, which is always one more than current chain header block
-		node.Consensus.SetBlockNum(chain.CurrentBlock().NumberU64() + 1)
+		node.Consensus.SetBlockNum(blockchain.CurrentBlock().NumberU64() + 1)
 
 		// Add Faucet contract to all shards, so that on testnet, we can demo wallet in explorer
 		// TODO (leo): we need to have support of cross-shard tx later so that the token can be transferred from beacon chain shard to other tx shards.
