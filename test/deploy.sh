@@ -1,6 +1,12 @@
 #!/bin/bash
 
-ROOT=$(dirname $0)/..
+unset -v progdir
+case "${0}" in
+*/*) progdir="${0%/*}" ;;
+*) progdir=.  ;;
+esac
+
+ROOT="${progdir}/.."
 USER=$(whoami)
 
 . "${ROOT}/scripts/setup_bls_build_flags.sh"
@@ -30,24 +36,7 @@ function check_result() {
 }
 
 function cleanup() {
-   for pid in `/bin/ps -fu $USER| grep "harmony\|txgen\|soldier\|commander\|profiler\|bootnode" | grep -v "grep" | grep -v "vi" | awk '{print $2}'`;
-   do
-       echo 'Killed process: '$pid
-       $DRYRUN kill -9 $pid 2> /dev/null
-   done
-   rm -rf ./db/harmony_*
-   rm -rf ./db-127.0.0.1-*
-}
-
-function killnode() {
-   local port=$1
-
-   if [ -n "port" ]; then
-      pid=$(/bin/ps -fu $USER | grep "harmony" | grep "$port" | awk '{print $2}')
-      echo "killing node with port: $port"
-      $DRYRUN kill -9 $pid 2> /dev/null
-      echo "node with port: $port is killed"
-   fi
+   "${progdir}/kill_node.sh"
 }
 
 trap cleanup SIGINT SIGTERM
