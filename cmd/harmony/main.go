@@ -422,9 +422,9 @@ func main() {
 	nodeConfig := createGlobalConfig()
 	currentNode := setupConsensusAndNode(nodeConfig)
 
-	//if consensus.ShardIDs != 0 {
-	//	go currentNode.SupportBeaconSyncing()
-	//}
+	if currentNode.Blockchain().ShardID() != 0 {
+		go currentNode.SupportBeaconSyncing()
+	}
 
 	startMsg := "==== New Harmony Node ===="
 	if *isExplorer {
