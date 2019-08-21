@@ -15,6 +15,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -86,9 +87,10 @@ func (s *PublicBlockChainAPI) GetStorageAt(ctx context.Context, address common.A
 // GetBalance returns the amount of Nano for the given address in the state of the
 // given block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta
 // block numbers are also allowed.
-func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (*hexutil.Big, error) {
+func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address string, blockNr rpc.BlockNumber) (*hexutil.Big, error) {
 	// TODO: currently only get latest balance. Will add complete logic later.
-	return s.b.GetBalance(address)
+	adr := internal_common.ParseAddr(address)
+	return s.b.GetBalance(adr)
 }
 
 // BlockNumber returns the block number of the chain head.
