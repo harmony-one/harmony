@@ -23,6 +23,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	ethCommon "github.com/ethereum/go-ethereum/common"
 )
 
 func TestIsBech32Address(t *testing.T) {
@@ -136,6 +138,15 @@ func BenchmarkAddressBech32(b *testing.B) {
 	testAddr := HexToAddress("0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed")
 	for n := 0; n < b.N; n++ {
 		testAddr.Bech32()
+	}
+}
+
+func TestAddressToBech32(t *testing.T) {
+	adr := ethCommon.HexToAddress("0x15a128e599b74842bccba860311efa92991bffb5")
+	if address, err := AddressToBech32(adr); err == nil {
+		if address != "one1zksj3evekayy90xt4psrz8h6j2v3hla4qwz4ur" {
+			t.Errorf("error on parseAddr")
+		}
 	}
 }
 
