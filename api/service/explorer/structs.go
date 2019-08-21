@@ -64,6 +64,7 @@ type Block struct {
 	NextBlock  RefBlock       `json:"nextBlock"`
 	TXs        []*Transaction `json:"txs"`
 	Signers    []string       `json:"signers"`
+	Epoch      uint64         `json:"epoch"`
 	ExtraData  string         `json:"extra_data"`
 }
 
@@ -100,6 +101,8 @@ func NewBlock(block *types.Block, height int) *Block {
 				}
 			}
 		}
+	} else {
+		utils.Logger().Warn().Err(err).Msgf("bad state block %d", block.NumberU64())
 	}
 	return &Block{
 		Height:     strconv.Itoa(height),
@@ -109,6 +112,7 @@ func NewBlock(block *types.Block, height int) *Block {
 		MerkleRoot: block.Root().Hex(),
 		Bytes:      strconv.Itoa(int(block.Size())),
 		Signers:    signers,
+		Epoch:      block.Epoch().Uint64(),
 		ExtraData:  string(block.Extra()),
 	}
 }

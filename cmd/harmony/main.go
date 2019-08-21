@@ -167,6 +167,9 @@ func initSetup() {
 
 func passphraseForBls() {
 	// If FN node running, they should either specify blsPrivateKey or the file with passphrase
+	if *isExplorer {
+		return
+	}
 	if *blsKeyFile == "" || *blsPass == "" {
 		fmt.Println("Internal nodes need to have pass to decrypt blskey")
 		os.Exit(101)
@@ -450,5 +453,16 @@ func main() {
 		}
 	}
 	currentNode.RunServices()
+
+	// Run additional node collectors
+	// Collect node metrics if metrics flag is set
+	if currentNode.NodeConfig.GetMetricsFlag() {
+		go currentNode.CollectMetrics()
+	}
+	// Commit committtee if node role is explorer
+	if currentNode.NodeConfig.Role() == nodeconfig.ExplorerNode {
+		go currentNode.CommitCommittee()
+	}
+
 	currentNode.StartServer()
 }

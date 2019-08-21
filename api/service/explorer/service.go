@@ -296,7 +296,26 @@ func (s *Service) GetCommittee(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(400)
 		return
 	}
+	// fetch current epoch if epoch is 0
 	db := s.storage.GetDB()
+	if epoch == 0 {
+		bytes, err := db.Get([]byte(BlockHeightKey))
+		blockHeight, err := strconv.Atoi(string(bytes))
+		if err != nil {
+			utils.Logger().Warn().Err(err).Msg("cannot decode block height from DB")
+			w.WriteHeader(500)
+			return
+		}
+		key := GetBlockKey(blockHeight)
+		data, err := db.Get([]byte(key))
+		block := new(types.Block)
+		if rlp.DecodeBytes(data, block) != nil {
+			utils.Logger().Warn().Err(err).Msg("cannot get block from db")
+			w.WriteHeader(500)
+			return
+		}
+		epoch = block.Epoch().Uint64()
+	}
 	bytes, err := db.Get([]byte(GetCommitteeKey(uint32(shardID), epoch)))
 	if err != nil {
 		utils.Logger().Warn().Err(err).Msg("cannot read committee")
