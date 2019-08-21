@@ -3,10 +3,13 @@ package node
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"math/big"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/params"
+
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/api/client"
 	clientService "github.com/harmony-one/harmony/api/client/service"
@@ -206,7 +209,7 @@ type Node struct {
 // Blockchain returns the blockchain for the node's current shard.
 func (node *Node) Blockchain() *core.BlockChain {
 	shardID := node.NodeConfig.ShardID
-	bc, err := node.shardChains.ShardChain(shardID, node.NodeConfig.GetNetworkType())
+	bc, err := node.shardChains.ShardChain(shardID)
 	if err != nil {
 		err = ctxerror.New("cannot get shard chain", "shardID", shardID).
 			WithCause(err)
@@ -217,7 +220,7 @@ func (node *Node) Blockchain() *core.BlockChain {
 
 // Beaconchain returns the beaconchain from node.
 func (node *Node) Beaconchain() *core.BlockChain {
-	bc, err := node.shardChains.ShardChain(0, node.NodeConfig.GetNetworkType())
+	bc, err := node.shardChains.ShardChain(0)
 	if err != nil {
 		err = ctxerror.New("cannot get beaconchain").WithCause(err)
 		ctxerror.Log15(utils.GetLogger().Crit, err)
@@ -327,8 +330,15 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		node.SelfPeer = host.GetSelfPeer()
 	}
 
+	chainConfig := *params.TestnetChainConfig
+	if node.NodeConfig.GetNetworkType() == nodeconfig.Mainnet {
+		chainConfig = *params.MainnetChainConfig
+	}
+	// TODO: use 1 as mainnet, change to networkID instead
+	chainConfig.ChainID = big.NewInt(1)
+
 	collection := shardchain.NewCollection(
-		chainDBFactory, &genesisInitializer{&node}, consensusObj)
+		chainDBFactory, &genesisInitializer{&node}, consensusObj, &chainConfig)
 	if isArchival {
 		collection.DisableCache()
 	}
