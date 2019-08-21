@@ -125,7 +125,7 @@ type Node struct {
 	stateSync              *syncing.StateSync
 	beaconSync             *syncing.StateSync
 	peerRegistrationRecord map[string]*syncConfig // record registration time (unixtime) of peers begin in syncing
-	dnsZone                string
+	SyncingPeerProvider    SyncingPeerProvider
 
 	// The p2p host used to send/receive p2p messages
 	host p2p.Host
@@ -519,10 +519,4 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 // AccountManager ...
 func (node *Node) AccountManager() *accounts.Manager {
 	return node.accountManager
-}
-
-// SetDNSZone sets the DNS zone to use to get peer info for node syncing
-func (node *Node) SetDNSZone(zone string) {
-	utils.Logger().Info().Str("zone", zone).Msg("using DNS zone to get peers")
-	node.dnsZone = zone
 }

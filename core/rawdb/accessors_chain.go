@@ -32,8 +32,8 @@ import (
 // Indicate whether the receipts corresponding to a blockHash is unspent or not
 // use a default blockHash as indicator which should be collision resistent
 var (
-	SpentHash common.Hash = common.Hash{0x01}
-	EmptyHash common.Hash = common.Hash{}
+	SpentHash = common.Hash{0x01}
+	EmptyHash = common.Hash{}
 )
 
 // ReadCanonicalHash retrieves the hash assigned to a canonical block number.

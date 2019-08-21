@@ -2107,7 +2107,7 @@ func (bc *BlockChain) CXMerkleProof(shardID uint32, block *types.Block) (*types.
 }
 
 // NextCXReceiptsProofUnspentCheckpoint returns the next checkpoint blockNum
-func (bc *BlockChain) NextCXReceiptsProofUnpentCheckpoint(currentNum uint64, shardID uint32) uint64 {
+func (bc *BlockChain) NextCXReceiptsProofUnspentCheckpoint(currentNum uint64, shardID uint32) uint64 {
 	lastCheckpoint, _ := rawdb.ReadCXReceiptsProofUnspentCheckpoint(bc.db, shardID)
 	newCheckpoint := lastCheckpoint
 
@@ -2138,7 +2138,7 @@ func (bc *BlockChain) UpdateCXReceiptsProofUnspentAndCheckpoint(currentNum uint6
 	if err != nil {
 		utils.Logger().Warn().Msg("[UpdateCXReceiptsProofUnspentAndCheckpoint] Canot get lastCheckpoint")
 	}
-	newCheckpoint := bc.NextCXReceiptsProofUnpentCheckpoint(currentNum, shardID)
+	newCheckpoint := bc.NextCXReceiptsProofUnspentCheckpoint(currentNum, shardID)
 	if lastCheckpoint == newCheckpoint {
 		return
 	}
