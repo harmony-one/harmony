@@ -7,6 +7,7 @@ SRC[harmony]=cmd/harmony/main.go
 SRC[txgen]=cmd/client/txgen/main.go
 SRC[bootnode]=cmd/bootnode/main.go
 SRC[wallet]="cmd/client/wallet/main.go cmd/client/wallet/generated_wallet.ini.go"
+SRC[harmony_network]="cmd/client/harmony_network/main.go"
 
 BINDIR=bin
 BUCKET=unique-bucket-bin
@@ -191,6 +192,6 @@ case "$ACTION" in
    "build") build_only ;;
    "upload") upload ;;
    "pubwallet") upload_wallet ;;
-   "harmony"|"wallet"|"txgen"|"bootnode") build_only $ACTION ;;
+   "harmony"|"wallet"|"txgen"|"bootnode"|"harmony_network") build_only $ACTION ;;
    *) usage ;;
 esac
