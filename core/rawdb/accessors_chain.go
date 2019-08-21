@@ -573,7 +573,8 @@ func ReadCXReceiptsProofUnspent(db DatabaseReader, shardID uint32, number uint64
 	return common.BytesToHash(data), nil
 }
 
-// WriteCXReceiptsProofUnspent check whether a CXReceiptsProof is unspent, write to database if unspent
+// WriteCXReceiptsProofUnspent write CXReceiptsProof status into database
+// Depending the written value: SpentHash (spent), its own blockHash (unspent)
 func WriteCXReceiptsProofUnspent(dbw DatabaseWriter, cxp *types.CXReceiptsProof) error {
 	shardID := cxp.MerkleProof.ShardID
 	blockNum := cxp.MerkleProof.BlockNum.Uint64()

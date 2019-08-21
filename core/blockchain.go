@@ -1065,10 +1065,13 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 		rawdb.WriteCXReceipts(batch, uint32(i), block.NumberU64(), block.Hash(), shardReceipts, false)
 	}
 
+	// Mark incomingReceipts in the block as spent
+	bc.MarkCXReceiptsSpent(block)
+
 	// If the total difficulty is higher than our known, add it to the canonical chain
 	// Second clause in the if statement reduces the vulnerability to selfish mining.
 	// Please refer to http://www.cs.cornell.edu/~ie53/publications/btcProcFC.pdf
-	// TODO: figure out reorg issue
+	// TODO: Remove reorg code, it's not used in our code
 	reorg := true
 	if reorg {
 		// Reorganise the chain if the parent is not the head block

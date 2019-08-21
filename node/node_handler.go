@@ -633,8 +633,6 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 			Msg("BINGO !!! Reached Consensus")
 	}
 
-	// mark incomingReceipts as spent and clean up
-	node.Blockchain().MarkCXReceiptsSpent(newBlock)
 	node.Blockchain().CleanCXReceiptsCheckpointsByBlock(newBlock)
 
 	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
