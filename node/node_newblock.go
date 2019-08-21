@@ -214,8 +214,8 @@ func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
 	})
 
 	for _, cxp := range node.pendingCXReceipts {
-		//		sourceShardID := cxp.MerkleProof.ShardID
-		//		sourceBlockNum := cxp.MerkleProof.BlockNum
+		//sourceShardID := cxp.MerkleProof.ShardID
+		//sourceBlockNum := cxp.MerkleProof.BlockNum
 		//
 		//		beaconChain := node.Blockchain() // TODO: read from real beacon chain
 		//		crossLink, err := beaconChain.ReadCrossLink(sourceShardID, sourceBlockNum.Uint64(), false)
@@ -225,6 +225,12 @@ func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
 		//				receiptsList = append(receiptsList, cxp.Receipts)
 		//			}
 		//		}
+
+		// check double spent
+		if !node.Blockchain().CheckUnspent(cxp) {
+			continue
+		}
+
 		// TODO: remove it after beacon chain sync is ready, for pass the test only
 		validReceiptsList = append(validReceiptsList, cxp)
 	}

@@ -614,6 +614,7 @@ func (node *Node) validateNewShardState(block *types.Block, stakeInfo *map[commo
 // 1. add the new block to blockchain
 // 2. [leader] send new block to the client
 // 3. [leader] send cross shard tx receipts to destination shard
+// 4. mark incomingReceipts as spent
 func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 	if err := node.AddNewBlock(newBlock); err != nil {
 		utils.Logger().Error().
@@ -631,6 +632,10 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 			Uint64("ViewID", node.Consensus.GetViewID()).
 			Msg("BINGO !!! Reached Consensus")
 	}
+
+	// mark incomingReceipts as spent and clean up
+	node.Blockchain().MarkCXReceiptsSpent(newBlock)
+	node.Blockchain().CleanCXReceiptsCheckpointsByBlock(newBlock)
 
 	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
 		// Update contract deployer's nonce so default contract like faucet can issue transaction with current nonce

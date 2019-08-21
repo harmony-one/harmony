@@ -564,7 +564,7 @@ func DeleteCXReceipts(db DatabaseDeleter, shardID uint32, number uint64, hash co
 	}
 }
 
-// ReadCXReceiptsProofUnspent check whether a CXReceiptsProof is unspent, true means not spent
+// ReadCXReceiptsProofUnspent check whether a CXReceiptsProof is unspent
 func ReadCXReceiptsProofUnspent(db DatabaseReader, shardID uint32, number uint64) (common.Hash, error) {
 	data, err := db.Get(cxReceiptUnspentKey(shardID, number))
 	if err != nil || len(data) == 0 {
@@ -573,14 +573,12 @@ func ReadCXReceiptsProofUnspent(db DatabaseReader, shardID uint32, number uint64
 	return common.BytesToHash(data), nil
 }
 
-// TryWriteCXReceiptsProofUnspent check whether a CXReceiptsProof is unspent, write to database if unspent
-func TryWriteCXReceiptsProofUnspent(dbr DatabaseReader, dbw DatabaseWriter, shardID uint32, number uint64, blockHash common.Hash) error {
-	hash, _ := ReadCXReceiptsProofUnspent(dbr, shardID, number)
-	// only write to database for the first time given a specified block number
-	if hash == EmptyHash {
-		return dbw.Put(cxReceiptUnspentKey(shardID, number), blockHash.Bytes())
-	}
-	return ctxerror.New("[TryWriteCXReceiptsProofUnspent] blockHash already exist", "had", hash, "tryPut", blockHash)
+// WriteCXReceiptsProofUnspent check whether a CXReceiptsProof is unspent, write to database if unspent
+func WriteCXReceiptsProofUnspent(dbw DatabaseWriter, cxp *types.CXReceiptsProof) error {
+	shardID := cxp.MerkleProof.ShardID
+	blockNum := cxp.MerkleProof.BlockNum.Uint64()
+	blockHash := cxp.MerkleProof.BlockHash
+	return dbw.Put(cxReceiptUnspentKey(shardID, blockNum), blockHash.Bytes())
 }
 
 // DeleteCXReceiptsProofUnspent removes unspent indicator of a given blockHash

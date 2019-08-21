@@ -2106,8 +2106,8 @@ func (bc *BlockChain) CXMerkleProof(shardID uint32, block *types.Block) (*types.
 	return proof, nil
 }
 
-// NextCXReceiptsProofUnspentCheckpoint returns the next checkpoint blockNum
-func (bc *BlockChain) NextCXReceiptsProofUnspentCheckpoint(currentNum uint64, shardID uint32) uint64 {
+// NextCXReceiptsCheckpoint returns the next checkpoint blockNum
+func (bc *BlockChain) NextCXReceiptsCheckpoint(currentNum uint64, shardID uint32) uint64 {
 	lastCheckpoint, _ := rawdb.ReadCXReceiptsProofUnspentCheckpoint(bc.db, shardID)
 	newCheckpoint := lastCheckpoint
 
@@ -2132,17 +2132,57 @@ func (bc *BlockChain) NextCXReceiptsProofUnspentCheckpoint(currentNum uint64, sh
 	return newCheckpoint
 }
 
-// UpdateCXReceiptsProofUnspentAndCheckpoint will update the checkpoint and clean unspent receipts upto checkpoint
-func (bc *BlockChain) UpdateCXReceiptsProofUnspentAndCheckpoint(currentNum uint64, shardID uint32) {
+// cleanCXReceiptsCheckpoints will update the checkpoint and clean spent receipts upto checkpoint
+func (bc *BlockChain) cleanCXReceiptsCheckpoints(shardID uint32, currentNum uint64) {
 	lastCheckpoint, err := rawdb.ReadCXReceiptsProofUnspentCheckpoint(bc.db, shardID)
 	if err != nil {
-		utils.Logger().Warn().Msg("[UpdateCXReceiptsProofUnspentAndCheckpoint] Canot get lastCheckpoint")
+		utils.Logger().Warn().Msg("[cleanCXReceiptsCheckpoints] Canot get lastCheckpoint")
 	}
-	newCheckpoint := bc.NextCXReceiptsProofUnspentCheckpoint(currentNum, shardID)
+	newCheckpoint := bc.NextCXReceiptsCheckpoint(currentNum, shardID)
 	if lastCheckpoint == newCheckpoint {
 		return
 	}
+	utils.Logger().Debug().Uint64("lastCheckpoint", lastCheckpoint).Uint64("newCheckpont", newCheckpoint).Msg("[CleanCXReceiptsCheckpoints]")
 	for num := lastCheckpoint; num < newCheckpoint; num++ {
 		rawdb.DeleteCXReceiptsProofUnspent(bc.db, shardID, num)
+	}
+}
+
+// MarkCXReceiptsSpent mark the incomingReceipts in a block as spent
+// avoid double spent
+func (bc *BlockChain) MarkCXReceiptsSpent(block *types.Block) {
+	for _, cxp := range block.IncomingReceipts() {
+		rawdb.WriteCXReceiptsProofUnspent(bc.db, cxp)
+	}
+}
+
+// CheckUnspent checks whether a CXReceiptsProof is unspent
+func (bc *BlockChain) CheckUnspent(cxp *types.CXReceiptsProof) bool {
+	shardID := cxp.MerkleProof.ShardID
+	blockNum := cxp.MerkleProof.BlockNum.Uint64()
+	blockHash := cxp.MerkleProof.BlockHash
+	hash, _ := rawdb.ReadCXReceiptsProofUnspent(bc.db, shardID, blockNum)
+	if hash == rawdb.EmptyHash || hash == blockHash {
+		return true
+	}
+	return false
+}
+
+// CleanCXReceiptsCheckpointsByBlock cleans checkpoints based on incomingReceipts of the given block
+func (bc *BlockChain) CleanCXReceiptsCheckpointsByBlock(block *types.Block) {
+	m := make(map[uint32]uint64)
+	for _, cxp := range block.IncomingReceipts() {
+		shardID := cxp.MerkleProof.ShardID
+		blockNum := cxp.MerkleProof.BlockNum.Uint64()
+		if _, ok := m[shardID]; !ok {
+			m[shardID] = blockNum
+		} else if m[shardID] < blockNum {
+			m[shardID] = blockNum
+		}
+	}
+
+	for k, v := range m {
+		utils.Logger().Debug().Uint32("shardID", k).Uint64("blockNum", v).Msg("[CleanCXReceiptsCheckpoints] Cleaning CXReceiptsProof upto")
+		bc.cleanCXReceiptsCheckpoints(k, v)
 	}
 }

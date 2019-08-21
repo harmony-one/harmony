@@ -91,6 +91,9 @@ func (node *Node) verifyIncomingReceipts(block *types.Block) error {
 		if err := cxp.IsValidCXReceiptsProof(); err != nil {
 			return ctxerror.New("[verifyIncomingReceipts] verification failed").WithCause(err)
 		}
+		if !node.Blockchain().CheckUnspent(cxp) {
+			return ctxerror.New("[verifyIncomingReceipts] Double Spent!")
+		}
 	}
 	// TODO: add crosslink blockHeaderHash checking
 	return nil
