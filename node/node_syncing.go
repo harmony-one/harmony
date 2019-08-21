@@ -17,7 +17,6 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
@@ -166,9 +165,11 @@ func (node *Node) DoBeaconSyncing() {
 		select {
 		case beaconBlock := <-node.BeaconBlockChannel:
 			if node.beaconSync == nil {
+				utils.Logger().Info().Msg("initializing beacon sync")
 				node.beaconSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
 			}
 			if node.beaconSync.GetActivePeerNumber() == 0 {
+				utils.Logger().Info().Msg("no peers; bootstrapping beacon sync config")
 				peers, err := node.SyncingPeerProvider.SyncingPeers(0)
 				if err != nil {
 					utils.Logger().Warn().
@@ -177,7 +178,7 @@ func (node *Node) DoBeaconSyncing() {
 					continue
 				}
 				if err := node.beaconSync.CreateSyncConfig(peers, true); err != nil {
-					ctxerror.Log15(utils.GetLogInstance().Debug, err)
+					utils.Logger().Warn().Err(err).Msg("cannot create beacon sync config")
 					continue
 				}
 			}
