@@ -17,7 +17,12 @@
 package core
 
 import (
+	"encoding/binary"
 	"fmt"
+
+	"github.com/harmony-one/bls/ffi/go/bls"
+	bls2 "github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 
 	"github.com/ethereum/go-ethereum/params"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
@@ -100,6 +105,59 @@ func (v *BlockValidator) ValidateState(block, parent *types.Block, statedb *stat
 	// an error if they don't match.
 	if root := statedb.IntermediateRoot(v.config.IsEIP158(header.Number)); header.Root != root {
 		return fmt.Errorf("invalid merkle root (remote: %x local: %x)", header.Root, root)
+	}
+	return nil
+}
+
+// VerifyBlockLastCommitSigs verifies the last commit sigs of the block
+func VerifyBlockLastCommitSigs(bc *BlockChain, block *types.Block) error {
+	header := block.Header()
+	parentBlock := bc.GetBlockByNumber(block.NumberU64() - 1)
+	if parentBlock == nil {
+		return ctxerror.New("[VerifyNewBlock] Failed to get parent block", "shardID", header.ShardID, "blockNum", header.Number)
+	}
+	parentHeader := parentBlock.Header()
+	shardState, err := bc.ReadShardState(parentHeader.Epoch)
+	committee := shardState.FindCommitteeByID(parentHeader.ShardID)
+
+	if err != nil || committee == nil {
+		return ctxerror.New("[VerifyNewBlock] Failed to read shard state for cross link header", "shardID", header.ShardID, "blockNum", header.Number).WithCause(err)
+	}
+	var committerKeys []*bls.PublicKey
+
+	parseKeysSuccess := true
+	for _, member := range committee.NodeList {
+		committerKey := new(bls.PublicKey)
+		err = member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
+		if err != nil {
+			parseKeysSuccess = false
+			break
+		}
+		committerKeys = append(committerKeys, committerKey)
+	}
+	if !parseKeysSuccess {
+		return ctxerror.New("[VerifyNewBlock] cannot convert BLS public key", "shardID", header.ShardID, "blockNum", header.Number).WithCause(err)
+	}
+
+	mask, err := bls2.NewMask(committerKeys, nil)
+	if err != nil {
+		return ctxerror.New("[VerifyNewBlock] cannot create group sig mask", "shardID", header.ShardID, "blockNum", header.Number).WithCause(err)
+	}
+	if err := mask.SetMask(header.LastCommitBitmap); err != nil {
+		return ctxerror.New("[VerifyNewBlock] cannot set group sig mask bits", "shardID", header.ShardID, "blockNum", header.Number).WithCause(err)
+	}
+
+	aggSig := bls.Sign{}
+	err = aggSig.Deserialize(header.LastCommitSignature[:])
+	if err != nil {
+		return ctxerror.New("[VerifyNewBlock] unable to deserialize multi-signature from payload").WithCause(err)
+	}
+
+	blockNumBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(blockNumBytes, header.Number.Uint64()-1)
+	commitPayload := append(blockNumBytes, header.ParentHash[:]...)
+	if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
+		return ctxerror.New("[VerifyNewBlock] Failed to verify the signature for last commit sig", "shardID", header.ShardID, "blockNum", header.Number)
 	}
 	return nil
 }

@@ -3,7 +3,6 @@ package node
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
 	"errors"
 	"math"
 	"math/big"
@@ -30,7 +29,6 @@ import (
 	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -343,7 +341,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 	//  e.g. "child.Number == child.IsGenesis() ? 0 : parent.Number+1"?
 
 	if newBlock.NumberU64() > 1 {
-		err := node.VerifyBlockLastCommitSigs(newBlock)
+		err := core.VerifyBlockLastCommitSigs(node.Blockchain(), newBlock)
 		if err != nil {
 			return err
 		}
@@ -446,59 +444,6 @@ func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
 				).WithCause(err)
 			}
 		}
-	}
-	return nil
-}
-
-// VerifyBlockLastCommitSigs verifies the last commit sigs of the block
-func (node *Node) VerifyBlockLastCommitSigs(block *types.Block) error {
-	header := block.Header()
-	parentBlock := node.Blockchain().GetBlockByNumber(block.NumberU64() - 1)
-	if parentBlock == nil {
-		return ctxerror.New("[VerifyNewBlock] Failed to get parent block", "shardID", header.ShardID, "blockNum", header.Number)
-	}
-	parentHeader := parentBlock.Header()
-	shardState, err := node.Blockchain().ReadShardState(parentHeader.Epoch)
-	committee := shardState.FindCommitteeByID(parentHeader.ShardID)
-
-	if err != nil || committee == nil {
-		return ctxerror.New("[VerifyNewBlock] Failed to read shard state for cross link header", "shardID", header.ShardID, "blockNum", header.Number).WithCause(err)
-	}
-	var committerKeys []*bls.PublicKey
-
-	parseKeysSuccess := true
-	for _, member := range committee.NodeList {
-		committerKey := new(bls.PublicKey)
-		err = member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
-		if err != nil {
-			parseKeysSuccess = false
-			break
-		}
-		committerKeys = append(committerKeys, committerKey)
-	}
-	if !parseKeysSuccess {
-		return ctxerror.New("[VerifyNewBlock] cannot convert BLS public key", "shardID", header.ShardID, "blockNum", header.Number).WithCause(err)
-	}
-
-	mask, err := bls_cosi.NewMask(committerKeys, nil)
-	if err != nil {
-		return ctxerror.New("[VerifyNewBlock] cannot create group sig mask", "shardID", header.ShardID, "blockNum", header.Number).WithCause(err)
-	}
-	if err := mask.SetMask(header.LastCommitBitmap); err != nil {
-		return ctxerror.New("[VerifyNewBlock] cannot set group sig mask bits", "shardID", header.ShardID, "blockNum", header.Number).WithCause(err)
-	}
-
-	aggSig := bls.Sign{}
-	err = aggSig.Deserialize(header.LastCommitSignature[:])
-	if err != nil {
-		return ctxerror.New("[VerifyNewBlock] unable to deserialize multi-signature from payload").WithCause(err)
-	}
-
-	blockNumBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(blockNumBytes, header.Number.Uint64()-1)
-	commitPayload := append(blockNumBytes, header.ParentHash[:]...)
-	if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
-		return ctxerror.New("[VerifyNewBlock] Failed to verify the signature for last commit sig", "shardID", header.ShardID, "blockNum", header.Number)
 	}
 	return nil
 }
