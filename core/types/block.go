@@ -154,8 +154,9 @@ func rlpHash(x interface{}) (h common.Hash) {
 // Body is a simple (mutable, non-safe) data container for storing and moving
 // a block's data contents (transactions and uncles) together.
 type Body struct {
-	Transactions []*Transaction
-	Uncles       []*Header
+	Transactions     []*Transaction
+	Uncles           []*Header
+	IncomingReceipts CXReceiptsProofs
 }
 
 // Block represents an entire block in the Ethereum blockchain.
@@ -419,7 +420,7 @@ func (b *Block) Extra() []byte { return common.CopyBytes(b.header.Extra) }
 func (b *Block) Header() *Header { return CopyHeader(b.header) }
 
 // Body returns the non-header content of the block.
-func (b *Block) Body() *Body { return &Body{b.transactions, b.uncles} }
+func (b *Block) Body() *Body { return &Body{b.transactions, b.uncles, b.incomingReceipts} }
 
 // Vdf returns header Vdf.
 func (b *Block) Vdf() []byte { return common.CopyBytes(b.header.Vdf) }
@@ -464,11 +465,12 @@ func (b *Block) WithSeal(header *Header) *Block {
 }
 
 // WithBody returns a new block with the given transaction and uncle contents.
-func (b *Block) WithBody(transactions []*Transaction, uncles []*Header) *Block {
+func (b *Block) WithBody(transactions []*Transaction, uncles []*Header, incomingReceipts CXReceiptsProofs) *Block {
 	block := &Block{
-		header:       CopyHeader(b.header),
-		transactions: make([]*Transaction, len(transactions)),
-		uncles:       make([]*Header, len(uncles)),
+		header:           CopyHeader(b.header),
+		transactions:     make([]*Transaction, len(transactions)),
+		uncles:           make([]*Header, len(uncles)),
+		incomingReceipts: incomingReceipts,
 	}
 	copy(block.transactions, transactions)
 	for i := range uncles {

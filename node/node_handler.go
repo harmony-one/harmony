@@ -179,7 +179,7 @@ func (node *Node) messageHandler(content []byte, sender libp2p_peer.ID) {
 							if block.ShardID() == 0 {
 								utils.Logger().Info().
 									Uint64("block", blocks[0].NumberU64()).
-									Msgf("Block being handled by block channel %d %d %s", block.NumberU64(), block.ShardID(), block.IncomingReceipts())
+									Msgf("Block being handled by block channel %d %d", block.NumberU64(), block.ShardID())
 								node.BeaconBlockChannel <- block
 							}
 						}
@@ -281,7 +281,7 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 // NOTE: For now, just send to the client (basically not broadcasting)
 // TODO (lc): broadcast the new blocks to new nodes doing state sync
 func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
-	utils.Logger().Info().Msgf("broadcasting new block %d %s", newBlock.NumberU64(), newBlock.IncomingReceipts())
+	utils.Logger().Info().Msgf("broadcasting new block %d", newBlock.NumberU64())
 	groups := []p2p.GroupID{node.NodeConfig.GetClientGroupID()}
 	msg := host.ConstructP2pMessage(byte(0), proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock}))
 	if err := node.host.SendMessageToGroups(groups, msg); err != nil {

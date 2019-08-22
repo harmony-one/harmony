@@ -544,7 +544,7 @@ func (ss *StateSync) updateBlockAndStatus(block *types.Block, bc *core.BlockChai
 
 	_, err := bc.InsertChain([]*types.Block{block})
 	if err != nil {
-		utils.Logger().Error().Err(err).Msgf("[SYNC] Error adding new block to blockchain %d %d %s", block.NumberU64(), block.ShardID(), block.IncomingReceipts())
+		utils.Logger().Error().Err(err).Msgf("[SYNC] Error adding new block to blockchain %d %d", block.NumberU64(), block.ShardID())
 
 		utils.Logger().Debug().Interface("block", bc.CurrentBlock()).Msg("[SYNC] Rolling back current block!")
 		bc.Rollback([]common.Hash{bc.CurrentBlock().Hash()})
@@ -567,7 +567,6 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 	// update blocks created before node start sync
 	parentHash := bc.CurrentBlock().Hash()
 	for {
-		utils.Logger().Warn().Msg("[SYNC] 111")
 		block := ss.getBlockFromOldBlocksByParentHash(parentHash)
 		if block == nil {
 			break
@@ -585,7 +584,6 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 	// update blocks after node start sync
 	parentHash = bc.CurrentBlock().Hash()
 	for {
-		utils.Logger().Warn().Msg("[SYNC] 222")
 		block := ss.getMaxConsensusBlockFromParentHash(parentHash)
 		if block == nil {
 			break
@@ -608,7 +606,6 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 	// update last mile blocks if any
 	parentHash = bc.CurrentBlock().Hash()
 	for {
-		utils.Logger().Warn().Msg("[SYNC] 333")
 		block := ss.getBlockFromLastMileBlocksByParentHash(parentHash)
 		if block == nil {
 			break
