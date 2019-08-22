@@ -172,14 +172,16 @@ func (node *Node) messageHandler(content []byte, sender libp2p_peer.ID) {
 					// for non-beaconchain node, subscribe to beacon block broadcast
 					role := node.NodeConfig.Role()
 					if role == nodeconfig.Validator {
-						utils.Logger().Info().
-							Uint64("block", blocks[0].NumberU64()).
-							Msg("Block being handled by block channel")
 
 						go node.ProcessCrossShardTx(blocks)
 
 						for _, block := range blocks {
-							node.BeaconBlockChannel <- block
+							if block.ShardID() == 0 {
+								utils.Logger().Info().
+									Uint64("block", blocks[0].NumberU64()).
+									Msgf("Block being handled by block channel %d %d %s", block.NumberU64(), block.ShardID(), block.IncomingReceipts())
+								node.BeaconBlockChannel <- block
+							}
 						}
 					}
 					if node.Client != nil && node.Client.UpdateBlocks != nil && blocks != nil {
@@ -279,7 +281,7 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 // NOTE: For now, just send to the client (basically not broadcasting)
 // TODO (lc): broadcast the new blocks to new nodes doing state sync
 func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
-	utils.Logger().Info().Msg("broadcasting new block")
+	utils.Logger().Info().Msgf("broadcasting new block %d %s", newBlock.NumberU64(), newBlock.IncomingReceipts())
 	groups := []p2p.GroupID{node.NodeConfig.GetClientGroupID()}
 	msg := host.ConstructP2pMessage(byte(0), proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock}))
 	if err := node.host.SendMessageToGroups(groups, msg); err != nil {
@@ -568,7 +570,9 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 	}
 
 	if node.Consensus.PubKey.IsEqual(node.Consensus.LeaderPubKey) {
-		node.BroadcastNewBlock(newBlock)
+		if node.NodeConfig.ShardID == 0 {
+			node.BroadcastNewBlock(newBlock)
+		}
 		node.BroadcastCrossLinkHeader(newBlock)
 		node.BroadcastCXReceipts(newBlock)
 	} else {
