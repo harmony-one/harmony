@@ -1137,6 +1137,7 @@ func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 					return n, errors.New("proposed cross links are not sorted")
 				}
 				for _, crossLink := range *crossLinks {
+					utils.Logger().Info().Interface("crosslink", crossLink).Msg("hehehe")
 					bc.WriteCrossLinks(types.CrossLinks{crossLink}, false)
 					bc.WriteShardLastCrossLink(crossLink.ShardID(), crossLink)
 				}

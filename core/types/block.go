@@ -301,10 +301,14 @@ func CopyHeader(h *Header) *Header {
 		cpy.Vdf = make([]byte, len(h.Vdf))
 		copy(cpy.Vdf, h.Vdf)
 	}
-	//if len(h.CrossLinks) > 0 {
-	//	cpy.CrossLinks = make([]byte, len(h.CrossLinks))
-	//	copy(cpy.CrossLinks, h.CrossLinks)
-	//}
+	if len(h.CrossLinks) > 0 {
+		cpy.CrossLinks = make([]byte, len(h.CrossLinks))
+		copy(cpy.CrossLinks, h.CrossLinks)
+	}
+	if len(h.LastCommitBitmap) > 0 {
+		cpy.LastCommitBitmap = make([]byte, len(h.LastCommitBitmap))
+		copy(cpy.LastCommitBitmap, h.LastCommitBitmap)
+	}
 	return &cpy
 }
 

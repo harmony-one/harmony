@@ -101,10 +101,26 @@ func (node *Node) verifyIncomingReceipts(block *types.Block) error {
 		if _, ok := m[hash]; ok {
 			return ctxerror.New("[verifyIncomingReceipts] Double Spent!")
 		}
-
 		m[hash] = true
+
+		sourceShardID := cxp.MerkleProof.ShardID
+		sourceBlockNum := cxp.MerkleProof.BlockNum
+		beaconChain := node.Beaconchain() // TODO: read from real beacon chain
+		crossLink, err := beaconChain.ReadCrossLink(sourceShardID, sourceBlockNum.Uint64(), false)
+		if err == nil {
+			// verify the source block hash is from a finalized block
+			if crossLink.ChainHeader.Hash() == cxp.MerkleProof.BlockHash && crossLink.ChainHeader.OutgoingReceiptHash == cxp.MerkleProof.CXReceiptHash {
+				utils.Logger().Debug().Msg("hehe00")
+				continue
+			} else {
+				utils.Logger().Debug().Msg("hehe11")
+				return ctxerror.New("[verifyIncomingReceipts] crosslink verification failed")
+			}
+		} else {
+			utils.Logger().Debug().Msg("hehe22")
+			return ctxerror.New("[verifyIncomingReceipts] crosslink not exists yet")
+		}
 	}
-	// TODO: add crosslink blockHeaderHash checking
 	return nil
 }
 
