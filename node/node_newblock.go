@@ -228,22 +228,12 @@ func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
 			m[hash] = true
 		}
 
-		sourceShardID := cxp.MerkleProof.ShardID
-		sourceBlockNum := cxp.MerkleProof.BlockNum
-
-		beaconChain := node.Beaconchain() // TODO: read from real beacon chain
-		crossLink, err := beaconChain.ReadCrossLink(sourceShardID, sourceBlockNum.Uint64(), false)
-		if err == nil {
-			// verify the source block hash is from a finalized block
-			if crossLink.ChainHeader.Hash() == cxp.MerkleProof.BlockHash && crossLink.ChainHeader.OutgoingReceiptHash == cxp.MerkleProof.CXReceiptHash {
-				utils.Logger().Debug().Msg("hehe0")
-				validReceiptsList = append(validReceiptsList, cxp)
-			} else {
-				utils.Logger().Debug().Msg("hehe1")
+		if err := node.compareCrosslinkWithReceipts(cxp); err != nil {
+			if err != ErrCrosslinkVerificationFail {
+				pendingReceiptsList = append(pendingReceiptsList, cxp)
 			}
 		} else {
-			utils.Logger().Debug().Msg("hehe2")
-			pendingReceiptsList = append(pendingReceiptsList, cxp)
+			validReceiptsList = append(validReceiptsList, cxp)
 		}
 	}
 	node.pendingCXReceipts = pendingReceiptsList
