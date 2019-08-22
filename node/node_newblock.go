@@ -213,9 +213,11 @@ func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
 		return node.pendingCXReceipts[i].MerkleProof.ShardID < node.pendingCXReceipts[j].MerkleProof.ShardID || (node.pendingCXReceipts[i].MerkleProof.ShardID == node.pendingCXReceipts[j].MerkleProof.ShardID && node.pendingCXReceipts[i].MerkleProof.BlockNum.Cmp(node.pendingCXReceipts[j].MerkleProof.BlockNum) < 0)
 	})
 
+	m := make(map[common.Hash]bool)
+
 	for _, cxp := range node.pendingCXReceipts {
-		//		sourceShardID := cxp.MerkleProof.ShardID
-		//		sourceBlockNum := cxp.MerkleProof.BlockNum
+		//sourceShardID := cxp.MerkleProof.ShardID
+		//sourceBlockNum := cxp.MerkleProof.BlockNum
 		//
 		//		beaconChain := node.Blockchain() // TODO: read from real beacon chain
 		//		crossLink, err := beaconChain.ReadCrossLink(sourceShardID, sourceBlockNum.Uint64(), false)
@@ -225,6 +227,19 @@ func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
 		//				receiptsList = append(receiptsList, cxp.Receipts)
 		//			}
 		//		}
+
+		// check double spent
+		if node.Blockchain().IsSpent(cxp) {
+			continue
+		}
+		hash := cxp.MerkleProof.BlockHash
+		// ignore duplicated receipts
+		if _, ok := m[hash]; ok {
+			continue
+		} else {
+			m[hash] = true
+		}
+
 		// TODO: remove it after beacon chain sync is ready, for pass the test only
 		validReceiptsList = append(validReceiptsList, cxp)
 	}

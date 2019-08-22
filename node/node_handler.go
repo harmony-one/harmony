@@ -632,6 +632,8 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 			Msg("BINGO !!! Reached Consensus")
 	}
 
+	node.Blockchain().CleanCXReceiptsCheckpointsByBlock(newBlock)
+
 	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
 		// Update contract deployer's nonce so default contract like faucet can issue transaction with current nonce
 		nonce := node.GetNonceOfAddress(crypto.PubkeyToAddress(node.ContractDeployerKey.PublicKey))

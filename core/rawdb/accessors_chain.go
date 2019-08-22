@@ -29,11 +29,11 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
-// Indicate whether the receipts corresponding to a blockHash is unspent or not
-// use a default blockHash as indicator which should be collision resistent
-var (
-	SpentHash = common.Hash{0x01}
-	EmptyHash = common.Hash{}
+// Indicate whether the receipts corresponding to a blockHash is spent or not
+const (
+	SpentByte byte = iota
+	UnspentByte
+	NAByte // not exist
 )
 
 // ReadCanonicalHash retrieves the hash assigned to a canonical block number.
@@ -564,28 +564,25 @@ func DeleteCXReceipts(db DatabaseDeleter, shardID uint32, number uint64, hash co
 	}
 }
 
-// ReadCXReceiptsProofUnspent check whether a CXReceiptsProof is unspent, true means not spent
-func ReadCXReceiptsProofUnspent(db DatabaseReader, shardID uint32, number uint64) (common.Hash, error) {
-	data, err := db.Get(cxReceiptUnspentKey(shardID, number))
+// ReadCXReceiptsProofSpent check whether a CXReceiptsProof is unspent
+func ReadCXReceiptsProofSpent(db DatabaseReader, shardID uint32, number uint64) (byte, error) {
+	data, err := db.Get(cxReceiptSpentKey(shardID, number))
 	if err != nil || len(data) == 0 {
-		return common.Hash{}, ctxerror.New("[ReadCXReceiptsProofUnspent] Cannot find the key", "shardID", shardID, "number", number).WithCause(err)
+		return NAByte, ctxerror.New("[ReadCXReceiptsProofSpent] Cannot find the key", "shardID", shardID, "number", number).WithCause(err)
 	}
-	return common.BytesToHash(data), nil
+	return data[0], nil
 }
 
-// TryWriteCXReceiptsProofUnspent check whether a CXReceiptsProof is unspent, write to database if unspent
-func TryWriteCXReceiptsProofUnspent(dbr DatabaseReader, dbw DatabaseWriter, shardID uint32, number uint64, blockHash common.Hash) error {
-	hash, _ := ReadCXReceiptsProofUnspent(dbr, shardID, number)
-	// only write to database for the first time given a specified block number
-	if hash == EmptyHash {
-		return dbw.Put(cxReceiptUnspentKey(shardID, number), blockHash.Bytes())
-	}
-	return ctxerror.New("[TryWriteCXReceiptsProofUnspent] blockHash already exist", "had", hash, "tryPut", blockHash)
+// WriteCXReceiptsProofSpent write CXReceiptsProof as spent into database
+func WriteCXReceiptsProofSpent(dbw DatabaseWriter, cxp *types.CXReceiptsProof) error {
+	shardID := cxp.MerkleProof.ShardID
+	blockNum := cxp.MerkleProof.BlockNum.Uint64()
+	return dbw.Put(cxReceiptSpentKey(shardID, blockNum), []byte{SpentByte})
 }
 
-// DeleteCXReceiptsProofUnspent removes unspent indicator of a given blockHash
-func DeleteCXReceiptsProofUnspent(db DatabaseDeleter, shardID uint32, number uint64) {
-	if err := db.Delete(cxReceiptUnspentKey(shardID, number)); err != nil {
+// DeleteCXReceiptsProofSpent removes unspent indicator of a given blockHash
+func DeleteCXReceiptsProofSpent(db DatabaseDeleter, shardID uint32, number uint64) {
+	if err := db.Delete(cxReceiptSpentKey(shardID, number)); err != nil {
 		utils.Logger().Error().Msg("Failed to delete receipts unspent indicator")
 	}
 }

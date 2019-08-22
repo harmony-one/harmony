@@ -69,9 +69,9 @@ func NewCrossShardReceipt(txHash common.Hash, from common.Address, to *common.Ad
 
 // CXMerkleProof represents the merkle proof of a collection of ordered cross shard transactions
 type CXMerkleProof struct {
-	BlockNum      *big.Int      // block header's hash
-	BlockHash     common.Hash   // block header's Hash
-	ShardID       uint32        // block header's shardID
+	BlockNum      *big.Int      // blockNumber of source shard
+	BlockHash     common.Hash   // blockHash of source shard
+	ShardID       uint32        // shardID of source shard
 	CXReceiptHash common.Hash   // root hash of the cross shard receipts in a given block
 	ShardIDs      []uint32      // order list, records destination shardID
 	CXShardHashes []common.Hash // ordered hash list, each hash corresponds to one destination shard's receipts root hash

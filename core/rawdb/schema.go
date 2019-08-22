@@ -67,7 +67,7 @@ var (
 	cxReceiptPrefix                  = []byte("cxReceipt")                  // prefix for cross shard transaction receipt
 	tempCxReceiptPrefix              = []byte("tempCxReceipt")              // prefix for temporary cross shard transaction receipt
 	cxReceiptHashPrefix              = []byte("cxReceiptHash")              // prefix for cross shard transaction receipt hash
-	cxReceiptUnspentPrefix           = []byte("cxReceiptUnspent")           // prefix for indicator of unspent of cxReceiptsProof
+	cxReceiptSpentPrefix             = []byte("cxReceiptSpent")             // prefix for indicator of unspent of cxReceiptsProof
 	cxReceiptUnspentCheckpointPrefix = []byte("cxReceiptUnspentCheckpoint") // prefix for cxReceiptsProof unspent checkpoint
 
 	// epochBlockNumberPrefix + epoch (big.Int.Bytes())
@@ -205,16 +205,16 @@ func cxReceiptKey(shardID uint32, number uint64, hash common.Hash, temp bool) []
 	return append(tmp1, hash.Bytes()...)
 }
 
-// cxReceiptUnspentKey = cxReceiptsUnspentPrefix + shardID + num (uint64 big endian)
-func cxReceiptUnspentKey(shardID uint32, number uint64) []byte {
-	prefix := cxReceiptUnspentPrefix
+// cxReceiptSpentKey = cxReceiptsSpentPrefix + shardID + num (uint64 big endian)
+func cxReceiptSpentKey(shardID uint32, number uint64) []byte {
+	prefix := cxReceiptSpentPrefix
 	sKey := make([]byte, 4)
 	binary.BigEndian.PutUint32(sKey, shardID)
 	tmp := append(prefix, sKey...)
 	return append(tmp, encodeBlockNumber(number)...)
 }
 
-// cxReceiptUnspentCheckpointKey = cxReceiptsUnspentCheckpointPrefix + shardID + num (uint64 big endian) + hash
+// cxReceiptUnspentCheckpointKey = cxReceiptsUnspentCheckpointPrefix + shardID
 func cxReceiptUnspentCheckpointKey(shardID uint32) []byte {
 	prefix := cxReceiptUnspentCheckpointPrefix
 	sKey := make([]byte, 4)
