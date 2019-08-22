@@ -360,6 +360,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 				continue
 			}
 			encodedBlock, err := rlp.EncodeToBytes(block)
+
 			if err == nil {
 				response.Payload = append(response.Payload, encodedBlock)
 			}

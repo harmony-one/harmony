@@ -119,7 +119,7 @@ func (node *Node) compareCrosslinkWithReceipts(cxp *types.CXReceiptsProof) error
 	if shardID == 0 {
 		block := beaconChain.GetBlockByNumber(blockNum)
 		if block == nil {
-			return ctxerror.New("[compareCrosslinkWithReceipts] Cannot get beaconchain heaer", "blockNum", blockNum, "shardID", shardID)
+			return ctxerror.New("[compareCrosslinkWithReceipts] Cannot get beaconchain header", "blockNum", blockNum, "shardID", shardID)
 		}
 		hash = block.Hash()
 		outgoingReceiptHash = block.OutgoingReceiptHash()
