@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -30,19 +29,6 @@ var (
 func init() {
 	rootCmd.PersistentFlags().BoolVarP(&Verbose, "version", "v", false, "verbose output")
 
-	cmdKeys := &cobra.Command{
-		Use:   "keys",
-		Short: "Add or view local private keys",
-		Long: `
-Manage your local keys
-`,
-		Args: cobra.MinimumNArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
-			// u := url.URL{Scheme: "ws", Host: "localhost:9090", Path: "/"}
-			fmt.Println("Print: " + strings.Join(args, " "))
-		},
-	}
-
 	cmdVersion := &cobra.Command{
 		Use:   "version",
 		Short: "Show version",
@@ -52,7 +38,7 @@ Manage your local keys
 		},
 	}
 
-	rootCmd.AddCommand(cmdKeys, cmdVersion)
+	rootCmd.AddCommand(cmdVersion)
 }
 
 func Execute(version, builtBy, builtAt, commit string) {
