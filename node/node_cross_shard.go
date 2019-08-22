@@ -100,9 +100,9 @@ func (node *Node) verifyIncomingReceipts(block *types.Block) error {
 		// ignore duplicated receipts
 		if _, ok := m[hash]; ok {
 			return ctxerror.New("[verifyIncomingReceipts] Double Spent!")
-		} else {
-			m[hash] = true
 		}
+
+		m[hash] = true
 	}
 	// TODO: add crosslink blockHeaderHash checking
 	return nil

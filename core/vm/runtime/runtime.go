@@ -26,7 +26,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/core/state"
-	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 )
 
@@ -117,7 +116,6 @@ func Execute(code, input []byte, cfg *Config) ([]byte, *state.DB, error) {
 		input,
 		cfg.GasLimit,
 		cfg.Value,
-		types.SameShardTx,
 	)
 
 	return ret, cfg.State, err
@@ -166,7 +164,6 @@ func Call(address common.Address, input []byte, cfg *Config) ([]byte, uint64, er
 		input,
 		cfg.GasLimit,
 		cfg.Value,
-		types.SameShardTx,
 	)
 
 	return ret, leftOverGas, err

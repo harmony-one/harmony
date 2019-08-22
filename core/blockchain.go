@@ -2157,7 +2157,7 @@ func (bc *BlockChain) cleanCXReceiptsCheckpoints(shardID uint32, currentNum uint
 	}
 }
 
-// WriteCXReceiptsSpent mark the CXReceiptsProof list with given unspent status
+// WriteCXReceiptsProofSpent mark the CXReceiptsProof list with given unspent status
 // true: unspent, false: spent
 func (bc *BlockChain) WriteCXReceiptsProofSpent(cxps []*types.CXReceiptsProof) {
 	for _, cxp := range cxps {

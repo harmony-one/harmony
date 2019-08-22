@@ -532,6 +532,16 @@ func (ss *StateSync) getBlockFromLastMileBlocksByParentHash(parentHash common.Ha
 
 func (ss *StateSync) updateBlockAndStatus(block *types.Block, bc *core.BlockChain, worker *worker.Worker) bool {
 	utils.Logger().Info().Str("blockHex", bc.CurrentBlock().Hash().Hex()).Msg("[SYNC] Current Block")
+
+	// Verify block signatures
+	if block.NumberU64() > 1 {
+		err := core.VerifyBlockLastCommitSigs(bc, block)
+		if err != nil {
+			utils.Logger().Error().Err(err).Msgf("[SYNC] failed verifying signatures for new block %d", block.NumberU64())
+			return false
+		}
+	}
+
 	_, err := bc.InsertChain([]*types.Block{block})
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("[SYNC] Error adding new block to blockchain")
@@ -726,7 +736,7 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, willJo
 		otherHeight := ss.getMaxPeerHeight()
 		currentHeight := bc.CurrentBlock().NumberU64()
 		if currentHeight >= otherHeight {
-			utils.Logger().Info().Msg("[SYNC] Node is now IN SYNC!")
+			utils.Logger().Info().Msgf("[SYNC] Node is now IN SYNC! (ShardID: %d)", bc.ShardID())
 			break
 		}
 		startHash := bc.CurrentBlock().Hash()
