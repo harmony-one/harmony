@@ -614,7 +614,6 @@ func (node *Node) validateNewShardState(block *types.Block, stakeInfo *map[commo
 // 1. add the new block to blockchain
 // 2. [leader] send new block to the client
 // 3. [leader] send cross shard tx receipts to destination shard
-// 4. mark incomingReceipts as spent
 func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 	if err := node.AddNewBlock(newBlock); err != nil {
 		utils.Logger().Error().

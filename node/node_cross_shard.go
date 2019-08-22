@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -86,13 +87,21 @@ func (node *Node) ProcessHeaderMessage(msgPayload []byte) {
 }
 
 func (node *Node) verifyIncomingReceipts(block *types.Block) error {
+	m := make(map[common.Hash]bool)
 	cxps := block.IncomingReceipts()
 	for _, cxp := range cxps {
 		if err := cxp.IsValidCXReceiptsProof(); err != nil {
 			return ctxerror.New("[verifyIncomingReceipts] verification failed").WithCause(err)
 		}
-		if !node.Blockchain().CheckUnspent(cxp) {
+		if node.Blockchain().IsSpent(cxp) {
 			return ctxerror.New("[verifyIncomingReceipts] Double Spent!")
+		}
+		hash := cxp.MerkleProof.BlockHash
+		// ignore duplicated receipts
+		if _, ok := m[hash]; ok {
+			return ctxerror.New("[verifyIncomingReceipts] Double Spent!")
+		} else {
+			m[hash] = true
 		}
 	}
 	// TODO: add crosslink blockHeaderHash checking
@@ -227,7 +236,7 @@ func (node *Node) ProcessReceiptMessage(msgPayload []byte) {
 
 	// TODO: check message signature is from the nodes of source shard.
 
-	// TODO: remove it in future if not useful
+	// TODO: remove in future if not useful
 	node.Blockchain().WriteCXReceipts(cxp.MerkleProof.ShardID, cxp.MerkleProof.BlockNum.Uint64(), cxp.MerkleProof.BlockHash, cxp.Receipts, true)
 
 	node.AddPendingReceipts(&cxp)
