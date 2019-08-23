@@ -177,14 +177,12 @@ beta)
   ;;
 pangaea)
   bootnodes=(
-    /ip4/100.26.90.187/tcp/9867/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
-    /ip4/54.213.43.194/tcp/9867/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9
-    /ip4/13.113.101.219/tcp/9867/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX
-    /ip4/99.81.170.167/tcp/9867/p2p/QmRVbTpEYup8dSaURZfF6ByrMTSKa4UyUzJhSjahFzRqNj
+    /ip4/54.86.126.90/tcp/9867/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
+    /ip4/52.40.84.2/tcp/9867/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9
   )
   REL=master
   network_type=pangaea
-  dns_zone=p.hmny.io
+  dns_zone=pga.hmny.io
   ;;
 *)
   err 64 "${network}: invalid network"

@@ -40,7 +40,11 @@ func (pangaeaSchedule) ConsensusRatio() float64 {
 var pangaeaReshardingEpoch = []*big.Int{common.Big0}
 
 var pangaeaV0 = MustNewInstance(
-	4, 250, 230, genesis.PangaeaAccounts, genesis.FoundationalPangaeaAccounts, pangaeaReshardingEpoch)
+	4, 250, 20, genesis.PangaeaAccounts, genesis.FoundationalPangaeaAccounts, pangaeaReshardingEpoch)
+
+func (pangaeaSchedule) FirstCrossLinkBlock() uint64 {
+	return testnetFirstCrossLinkBlock
+}
 
 // TODO: remove it after randomness feature turned on mainnet
 //RandonnessStartingEpoch returns starting epoch of randonness generation

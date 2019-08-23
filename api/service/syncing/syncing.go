@@ -31,6 +31,7 @@ const (
 	SyncingPortDifference                        = 3000
 	inSyncThreshold                              = 0    // when peerBlockHeight - myBlockHeight <= inSyncThreshold, it's ready to join consensus
 	BatchSize                             uint32 = 1000 //maximum size for one query of block hashes
+	SyncLoopFrequency                            = 1    // unit in second
 )
 
 // SyncPeerConfig is peer config to sync.
@@ -532,9 +533,19 @@ func (ss *StateSync) getBlockFromLastMileBlocksByParentHash(parentHash common.Ha
 
 func (ss *StateSync) updateBlockAndStatus(block *types.Block, bc *core.BlockChain, worker *worker.Worker) bool {
 	utils.Logger().Info().Str("blockHex", bc.CurrentBlock().Hash().Hex()).Msg("[SYNC] Current Block")
+
+	// Verify block signatures
+	if block.NumberU64() > 1 {
+		err := core.VerifyBlockLastCommitSigs(bc, block)
+		if err != nil {
+			utils.Logger().Error().Err(err).Msgf("[SYNC] failed verifying signatures for new block %d", block.NumberU64())
+			return false
+		}
+	}
+
 	_, err := bc.InsertChain([]*types.Block{block})
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg("[SYNC] Error adding new block to blockchain")
+		utils.Logger().Error().Err(err).Msgf("[SYNC] Error adding new block to blockchain %d %d", block.NumberU64(), block.ShardID())
 
 		utils.Logger().Debug().Interface("block", bc.CurrentBlock()).Msg("[SYNC] Rolling back current block!")
 		bc.Rollback([]common.Hash{bc.CurrentBlock().Hash()})
@@ -722,20 +733,24 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, willJo
 	if !isBeacon {
 		ss.RegisterNodeInfo()
 	}
+	ticker := time.NewTicker(SyncLoopFrequency * time.Second)
 	for {
-		otherHeight := ss.getMaxPeerHeight()
-		currentHeight := bc.CurrentBlock().NumberU64()
-		if currentHeight >= otherHeight {
-			utils.Logger().Info().Msg("[SYNC] Node is now IN SYNC!")
-			break
+		select {
+		case <-ticker.C:
+			otherHeight := ss.getMaxPeerHeight()
+			currentHeight := bc.CurrentBlock().NumberU64()
+			if currentHeight >= otherHeight {
+				utils.Logger().Info().Msgf("[SYNC] Node is now IN SYNC! (ShardID: %d)", bc.ShardID())
+				break
+			}
+			startHash := bc.CurrentBlock().Hash()
+			size := uint32(otherHeight - currentHeight)
+			if size > BatchSize {
+				size = BatchSize
+			}
+			ss.ProcessStateSync(startHash[:], size, bc, worker)
+			ss.purgeOldBlocksFromCache()
 		}
-		startHash := bc.CurrentBlock().Hash()
-		size := uint32(otherHeight - currentHeight)
-		if size > BatchSize {
-			size = BatchSize
-		}
-		ss.ProcessStateSync(startHash[:], size, bc, worker)
-		ss.purgeOldBlocksFromCache()
 	}
 	ss.purgeAllBlocksFromCache()
 }

@@ -36,6 +36,10 @@ func (s fixedSchedule) VdfDifficulty() int {
 	return mainnetVdfDifficulty
 }
 
+func (s fixedSchedule) FirstCrossLinkBlock() uint64 {
+	return mainnetFirstCrossLinkBlock
+}
+
 // ConsensusRatio ratio of new nodes vs consensus total nodes
 func (s fixedSchedule) ConsensusRatio() float64 {
 	return mainnetConsensusRatio
