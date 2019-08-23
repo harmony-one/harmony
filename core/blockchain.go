@@ -816,7 +816,7 @@ const (
 func (bc *BlockChain) Rollback(chain []common.Hash) {
 	bc.mu.Lock()
 	defer bc.mu.Unlock()
-	
+
 	for i := len(chain) - 1; i >= 0; i-- {
 		hash := chain[i]
 
