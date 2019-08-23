@@ -20,6 +20,9 @@ const (
 	mainnetV0_2Epoch = 5
 	mainnetV0_3Epoch = 8
 	mainnetV0_4Epoch = 10
+
+	// TODO: RJ use epoch for the transition
+	mainnetFirstCrossLinkBlock = 524288 // 32 * 2^14
 )
 
 // MainnetSchedule is the mainnet sharding configuration schedule.
@@ -74,6 +77,10 @@ func (ms mainnetSchedule) IsLastBlock(blockNum uint64) bool {
 
 func (ms mainnetSchedule) VdfDifficulty() int {
 	return mainnetVdfDifficulty
+}
+
+func (ms mainnetSchedule) FirstCrossLinkBlock() uint64 {
+	return mainnetFirstCrossLinkBlock
 }
 
 // ConsensusRatio ratio of new nodes vs consensus total nodes

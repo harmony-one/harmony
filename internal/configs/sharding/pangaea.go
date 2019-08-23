@@ -33,6 +33,10 @@ func (pangaeaSchedule) VdfDifficulty() int {
 	return testnetVdfDifficulty
 }
 
+func (pangaeaSchedule) FirstCrossLinkBlock() uint64 {
+	return mainnetFirstCrossLinkBlock
+}
+
 func (pangaeaSchedule) ConsensusRatio() float64 {
 	return mainnetConsensusRatio
 }

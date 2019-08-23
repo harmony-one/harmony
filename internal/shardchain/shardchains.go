@@ -1,10 +1,7 @@
 package shardchain
 
 import (
-	"math/big"
 	"sync"
-
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -22,7 +19,7 @@ import (
 type Collection interface {
 	// ShardChain returns the blockchain for the given shard,
 	// opening one as necessary.
-	ShardChain(shardID uint32, networkType nodeconfig.NetworkType) (*core.BlockChain, error)
+	ShardChain(shardID uint32) (*core.BlockChain, error)
 
 	// CloseShardChain closes the given shard chain.
 	CloseShardChain(shardID uint32) error
@@ -40,6 +37,7 @@ type CollectionImpl struct {
 	mtx          sync.Mutex
 	pool         map[uint32]*core.BlockChain
 	disableCache bool
+	chainConfig  *params.ChainConfig
 }
 
 // NewCollection creates and returns a new shard chain collection.
@@ -50,18 +48,20 @@ type CollectionImpl struct {
 // the factory is brand new (empty).
 func NewCollection(
 	dbFactory DBFactory, dbInit DBInitializer, engine engine.Engine,
+	chainConfig *params.ChainConfig,
 ) *CollectionImpl {
 	return &CollectionImpl{
-		dbFactory: dbFactory,
-		dbInit:    dbInit,
-		engine:    engine,
-		pool:      make(map[uint32]*core.BlockChain),
+		dbFactory:   dbFactory,
+		dbInit:      dbInit,
+		engine:      engine,
+		pool:        make(map[uint32]*core.BlockChain),
+		chainConfig: chainConfig,
 	}
 }
 
 // ShardChain returns the blockchain for the given shard,
 // opening one as necessary.
-func (sc *CollectionImpl) ShardChain(shardID uint32, networkType nodeconfig.NetworkType) (*core.BlockChain, error) {
+func (sc *CollectionImpl) ShardChain(shardID uint32) (*core.BlockChain, error) {
 	sc.mtx.Lock()
 	defer sc.mtx.Unlock()
 	if bc, ok := sc.pool[shardID]; ok {
@@ -93,18 +93,8 @@ func (sc *CollectionImpl) ShardChain(shardID uint32, networkType nodeconfig.Netw
 		cacheConfig = &core.CacheConfig{Disabled: true}
 	}
 
-	chainConfig := params.ChainConfig{}
-	switch networkType {
-	case nodeconfig.Mainnet:
-		chainConfig = *params.MainnetChainConfig
-	default: // all other network types share testnet config
-		chainConfig = *params.TestnetChainConfig
-	}
-
-	chainConfig.ChainID = big.NewInt(int64(shardID))
-
 	bc, err := core.NewBlockChain(
-		db, cacheConfig, &chainConfig, sc.engine, vm.Config{}, nil,
+		db, cacheConfig, sc.chainConfig, sc.engine, vm.Config{}, nil,
 	)
 	if err != nil {
 		return nil, ctxerror.New("cannot create blockchain").WithCause(err)

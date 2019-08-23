@@ -9,12 +9,15 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"strconv"
 	"time"
 
+	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
 
+	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/blsgen"
@@ -166,9 +169,6 @@ func initSetup() {
 }
 
 func passphraseForBls() {
-	if *isExplorer {
-		return
-	}
 	// If FN node running, they should either specify blsPrivateKey or the file with passphrase
 	if *isExplorer {
 		return
@@ -299,11 +299,24 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// Current node.
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 	currentNode := node.New(nodeConfig.Host, currentConsensus, chainDBFactory, *isArchival)
-
-	if *dnsZone != "" {
-		currentNode.SetDNSZone(*dnsZone)
-	} else if *dnsFlag {
-		currentNode.SetDNSZone("t.hmny.io")
+	switch {
+	case *networkType == nodeconfig.Localnet:
+		epochConfig := core.ShardingSchedule.InstanceForEpoch(ethCommon.Big0)
+		selfPort, err := strconv.ParseUint(*port, 10, 16)
+		if err != nil {
+			utils.Logger().Fatal().
+				Err(err).
+				Str("self_port_string", *port).
+				Msg("cannot convert self port string into port number")
+		}
+		currentNode.SyncingPeerProvider = node.NewLocalSyncingPeerProvider(
+			6000, uint16(selfPort), epochConfig.NumShards(), uint32(epochConfig.NumNodesPerShard()))
+	case *dnsZone != "":
+		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider(*dnsZone, syncing.GetSyncingPort(*port))
+	case *dnsFlag:
+		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider("t.hmny.io", syncing.GetSyncingPort(*port))
+	default:
+		currentNode.SyncingPeerProvider = node.NewLegacySyncingPeerProvider(currentNode)
 	}
 	// TODO: add staking support
 	// currentNode.StakingAccount = myAccount
@@ -313,11 +326,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// TODO: refactor the creation of blockchain out of node.New()
 	currentConsensus.ChainReader = currentNode.Blockchain()
 
-	// Set up prometheus pushgateway for metrics monitoring serivce.
-	currentNode.NodeConfig.SetPushgatewayIP(nodeConfig.PushgatewayIP)
-	currentNode.NodeConfig.SetPushgatewayPort(nodeConfig.PushgatewayPort)
-	currentNode.NodeConfig.SetMetricsFlag(nodeConfig.MetricsFlag)
-
+	currentNode.NodeConfig.SetBeaconGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(0)))
 	if *isExplorer {
 		currentNode.NodeConfig.SetRole(nodeconfig.ExplorerNode)
 		currentNode.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(*shardID)))
@@ -341,7 +350,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 
 	// TODO: Disable drand. Currently drand isn't functioning but we want to compeletely turn it off for full protection.
 	// Enable it back after mainnet.
-	// dRand := drand.New(nodeConfig.Host, nodeConfig.ShardID, []p2p.Peer{}, nodeConfig.Leader, currentNode.ConfirmedBlockChannel, nodeConfig.ConsensusPriKey)
+	// dRand := drand.New(nodeConfig.Host, nodeConfig.ShardIDs, []p2p.Peer{}, nodeConfig.Leader, currentNode.ConfirmedBlockChannel, nodeConfig.ConsensusPriKey)
 	// currentNode.Consensus.RegisterPRndChannel(dRand.PRndChannel)
 	// currentNode.Consensus.RegisterRndChannel(dRand.RndChannel)
 	// currentNode.DRand = dRand
@@ -418,16 +427,16 @@ func main() {
 	}
 
 	if *shardID >= 0 {
-		utils.GetLogInstance().Info("ShardID Override", "original", initialAccount.ShardID, "override", *shardID)
+		utils.GetLogInstance().Info("ShardIDs Override", "original", initialAccount.ShardID, "override", *shardID)
 		initialAccount.ShardID = uint32(*shardID)
 	}
 
 	nodeConfig := createGlobalConfig()
 	currentNode := setupConsensusAndNode(nodeConfig)
 
-	//if consensus.ShardID != 0 {
-	//	go currentNode.SupportBeaconSyncing()
-	//}
+	if currentNode.Blockchain().ShardID() != 0 {
+		go currentNode.SupportBeaconSyncing()
+	}
 
 	startMsg := "==== New Harmony Node ===="
 	if *isExplorer {
@@ -435,7 +444,7 @@ func main() {
 	}
 	utils.GetLogInstance().Info(startMsg,
 		"BlsPubKey", hex.EncodeToString(nodeConfig.ConsensusPubKey.Serialize()),
-		"ShardID", nodeConfig.ShardID,
+		"ShardIDs", nodeConfig.ShardID,
 		"ShardGroupID", nodeConfig.GetShardGroupID(),
 		"BeaconGroupID", nodeConfig.GetBeaconGroupID(),
 		"ClientGroupID", nodeConfig.GetClientGroupID(),

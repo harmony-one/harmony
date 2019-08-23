@@ -38,7 +38,7 @@ var LocalHarmonyAccountsV1 = []DeployAccount{
 
 // LocalFnAccountsV1 are the accounts for the initial FN used for local test.
 var LocalFnAccountsV1 = []DeployAccount{
-	{Index: " 0 ", Address: "one1a50tun737ulcvwy0yvve0pvu5skq0kjargvhwe", BlsPublicKey: "4235d4ae2219093632c61db4f71ff0c32bdb56463845f8477c2086af1fe643194d3709575707148cad4f835f2fc4ea05"},
+	{Index: " 0 ", Address: "one1a50tun737ulcvwy0yvve0pvu5skq0kjargvhwe", BlsPublicKey: "52ecce5f64db21cbe374c9268188f5d2cdd5bec1a3112276a350349860e35fb81f8cfe447a311e0550d961cf25cb988d"},
 	{Index: " 1 ", Address: "one1uyshu2jgv8w465yc8kkny36thlt2wvel89tcmg", BlsPublicKey: "a547a9bf6fdde4f4934cde21473748861a3cc0fe8bbb5e57225a29f483b05b72531f002f8187675743d819c955a86100"},
 	{Index: " 2 ", Address: "one103q7qe5t2505lypvltkqtddaef5tzfxwsse4z7", BlsPublicKey: "678ec9670899bf6af85b877058bea4fc1301a5a3a376987e826e3ca150b80e3eaadffedad0fedfa111576fa76ded980c"},
 	{Index: " 3 ", Address: "one129r9pj3sk0re76f7zs3qz92rggmdgjhtwge62k", BlsPublicKey: "63f479f249c59f0486fda8caa2ffb247209489dae009dfde6144ff38c370230963d360dffd318cfb26c213320e89a512"},
@@ -54,13 +54,17 @@ var LocalHarmonyAccountsV2 = []DeployAccount{
 	{Index: " 5 ", Address: "one1est2gxcvavmtnzc7mhd73gzadm3xxcv5zczdtw", BlsPublicKey: "776f3b8704f4e1092a302a60e84f81e476c212d6f458092b696df420ea19ff84a6179e8e23d090b9297dc041600bc100"},
 	{Index: " 6 ", Address: "one1spshr72utf6rwxseaz339j09ed8p6f8ke370zj", BlsPublicKey: "2d61379e44a772e5757e27ee2b3874254f56073e6bd226eb8b160371cc3c18b8c4977bd3dcb71fd57dc62bf0e143fd08"},
 	{Index: " 7 ", Address: "one1a0x3d6xpmr6f8wsyaxd9v36pytvp48zckswvv9", BlsPublicKey: "c4e4708b6cf2a2ceeb59981677e9821eebafc5cf483fb5364a28fa604cc0ce69beeed40f3f03815c9e196fdaec5f1097"},
+	{Index: " 8 ", Address: "one1d2rngmem4x2c6zxsjjz29dlah0jzkr0k2n88wc", BlsPublicKey: "86dc2fdc2ceec18f6923b99fd86a68405c132e1005cf1df72dca75db0adfaeb53d201d66af37916d61f079f34f21fb96"},
+	{Index: " 9 ", Address: "one1658znfwf40epvy7e46cqrmzyy54h4n0qa73nep", BlsPublicKey: "49d15743b36334399f9985feb0753430a2b287b2d68b84495bbb15381854cbf01bca9d1d9f4c9c8f18509b2bfa6bd40f"},
+	{Index: " 10 ", Address: "one1z05g55zamqzfw9qs432n33gycdmyvs38xjemyl", BlsPublicKey: "95117937cd8c09acd2dfae847d74041a67834ea88662a7cbed1e170350bc329e53db151e5a0ef3e712e35287ae954818"},
+	{Index: " 11 ", Address: "one1ljznytjyn269azvszjlcqvpcj6hjm822yrcp2e", BlsPublicKey: "68ae289d73332872ec8d04ac256ca0f5453c88ad392730c5741b6055bc3ec3d086ab03637713a29f459177aaa8340615"},
 }
 
 // LocalFnAccountsV2 are the accounts for the initial FN used for local test.
 var LocalFnAccountsV2 = []DeployAccount{
 	{Index: " 0 ", Address: "one1a50tun737ulcvwy0yvve0pvu5skq0kjargvhwe", BlsPublicKey: "52ecce5f64db21cbe374c9268188f5d2cdd5bec1a3112276a350349860e35fb81f8cfe447a311e0550d961cf25cb988d"},
-	{Index: " 1 ", Address: "one1uyshu2jgv8w465yc8kkny36thlt2wvel89tcmg", BlsPublicKey: "1c1fb28d2de96e82c3d9b4917eb54412517e2763112a3164862a6ed627ac62e87ce274bb4ea36e6a61fb66a15c263a06"},
-	{Index: " 2 ", Address: "one103q7qe5t2505lypvltkqtddaef5tzfxwsse4z7", BlsPublicKey: "b179c4fdc0bee7bd0b6698b792837dd13404d3f985b59d4a9b1cd0641a76651e271518b61abbb6fbebd4acf963358604"},
+	{Index: " 1 ", Address: "one1uyshu2jgv8w465yc8kkny36thlt2wvel89tcmg", BlsPublicKey: "a547a9bf6fdde4f4934cde21473748861a3cc0fe8bbb5e57225a29f483b05b72531f002f8187675743d819c955a86100"},
+	{Index: " 2 ", Address: "one103q7qe5t2505lypvltkqtddaef5tzfxwsse4z7", BlsPublicKey: "678ec9670899bf6af85b877058bea4fc1301a5a3a376987e826e3ca150b80e3eaadffedad0fedfa111576fa76ded980c"},
 	{Index: " 3 ", Address: "one129r9pj3sk0re76f7zs3qz92rggmdgjhtwge62k", BlsPublicKey: "63f479f249c59f0486fda8caa2ffb247209489dae009dfde6144ff38c370230963d360dffd318cfb26c213320e89a512"},
 	{Index: " 4 ", Address: "one1d2rngmem4x2c6zxsjjz29dlah0jzkr0k2n88wc", BlsPublicKey: "16513c487a6bb76f37219f3c2927a4f281f9dd3fd6ed2e3a64e500de6545cf391dd973cc228d24f9bd01efe94912e714"},
 	{Index: " 5 ", Address: "one1658znfwf40epvy7e46cqrmzyy54h4n0qa73nep", BlsPublicKey: "576d3c48294e00d6be4a22b07b66a870ddee03052fe48a5abbd180222e5d5a1f8946a78d55b025de21635fd743bbad90"},
@@ -68,6 +72,4 @@ var LocalFnAccountsV2 = []DeployAccount{
 	{Index: " 7 ", Address: "one1d7jfnr6yraxnrycgaemyktkmhmajhp8kl0yahv", BlsPublicKey: "f47238daef97d60deedbde5302d05dea5de67608f11f406576e363661f7dcbc4a1385948549b31a6c70f6fde8a391486"},
 	{Index: " 8 ", Address: "one1r4zyyjqrulf935a479sgqlpa78kz7zlcg2jfen", BlsPublicKey: "fc4b9c535ee91f015efff3f32fbb9d32cdd9bfc8a837bb3eee89b8fff653c7af2050a4e147ebe5c7233dc2d5df06ee0a"},
 	{Index: " 9 ", Address: "one1p7ht2d4kl8ve7a8jxw746yfnx4wnfxtp8jqxwe", BlsPublicKey: "ca86e551ee42adaaa6477322d7db869d3e203c00d7b86c82ebee629ad79cb6d57b8f3db28336778ec2180e56a8e07296"},
-	{Index: " 10 ", Address: "one1z05g55zamqzfw9qs432n33gycdmyvs38xjemyl", BlsPublicKey: "95117937cd8c09acd2dfae847d74041a67834ea88662a7cbed1e170350bc329e53db151e5a0ef3e712e35287ae954818"},
-	{Index: " 11 ", Address: "one1ljznytjyn269azvszjlcqvpcj6hjm822yrcp2e", BlsPublicKey: "68ae289d73332872ec8d04ac256ca0f5453c88ad392730c5741b6055bc3ec3d086ab03637713a29f459177aaa8340615"},
 }
