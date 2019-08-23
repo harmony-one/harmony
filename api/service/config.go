@@ -11,13 +11,16 @@ import (
 // cyclic imports
 type NodeConfig struct {
 	// The three groupID design, please refer to https://github.com/harmony-one/harmony/blob/master/node/node.md#libp2p-integration
-	Beacon       p2p.GroupID                    // the beacon group ID
-	ShardGroupID p2p.GroupID                    // the group ID of the shard
-	Client       p2p.GroupID                    // the client group ID of the shard
-	IsClient     bool                           // whether this node is a client node, such as wallet/txgen
-	IsBeacon     bool                           // whether this node is a beacon node or not
-	ShardID      uint32                         // shardID of this node
-	Actions      map[p2p.GroupID]p2p.ActionType // actions on the groups
+	Beacon          p2p.GroupID                    // the beacon group ID
+	ShardGroupID    p2p.GroupID                    // the group ID of the shard
+	Client          p2p.GroupID                    // the client group ID of the shard
+	IsClient        bool                           // whether this node is a client node, such as wallet/txgen
+	IsBeacon        bool                           // whether this node is a beacon node or not
+	ShardID         uint32                         // shardID of this node
+	Actions         map[p2p.GroupID]p2p.ActionType // actions on the groups
+	PushgatewayIP   string                         // prometheus pushgateway ip
+	PushgatewayPort string                         // prometheus pushgateway port
+	MetricsFlag     bool                           // flag to collect metrics or not
 }
 
 // GroupIDShards is a map of ShardGroupID ID

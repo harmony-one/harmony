@@ -50,12 +50,10 @@ type NetworkType string
 const (
 	Mainnet  = "mainnet"
 	Testnet  = "testnet"
+	Pangaea  = "pangaea"
 	Devnet   = "devnet"
 	Localnet = "localnet"
 )
-
-// Network is the type of Harmony network
-var Network = Testnet
 
 // Global is the index of the global node configuration
 const (
@@ -78,6 +76,9 @@ type ConfigType struct {
 	Port     string      // Port of the node.
 	IP       string      // IP of the node.
 
+	MetricsFlag     bool   // collect and upload metrics flag
+	PushgatewayIP   string // metrics pushgateway prometheus ip
+	PushgatewayPort string // metrics pushgateway prometheus port
 	StringRole      string
 	Host            p2p.Host
 	StakingPriKey   *ecdsa.PrivateKey
@@ -166,6 +167,36 @@ func (conf *ConfigType) SetRole(r Role) {
 	conf.role = r
 }
 
+// SetPushgatewayIP set the pushgateway ip
+func (conf *ConfigType) SetPushgatewayIP(ip string) {
+	conf.PushgatewayIP = ip
+}
+
+// SetPushgatewayPort set the pushgateway port
+func (conf *ConfigType) SetPushgatewayPort(port string) {
+	conf.PushgatewayPort = port
+}
+
+// SetMetricsFlag set the metrics flag
+func (conf *ConfigType) SetMetricsFlag(flag bool) {
+	conf.MetricsFlag = flag
+}
+
+// GetMetricsFlag get the metrics flag
+func (conf *ConfigType) GetMetricsFlag() bool {
+	return conf.MetricsFlag
+}
+
+// GetPushgatewayIP get the pushgateway ip
+func (conf *ConfigType) GetPushgatewayIP() string {
+	return conf.PushgatewayIP
+}
+
+// GetPushgatewayPort get the pushgateway port
+func (conf *ConfigType) GetPushgatewayPort() string {
+	return conf.PushgatewayPort
+}
+
 // GetBeaconGroupID returns the groupID for beacon group
 func (conf *ConfigType) GetBeaconGroupID() p2p.GroupID {
 	return conf.beacon
@@ -174,6 +205,11 @@ func (conf *ConfigType) GetBeaconGroupID() p2p.GroupID {
 // GetShardGroupID returns the groupID for shard group
 func (conf *ConfigType) GetShardGroupID() p2p.GroupID {
 	return conf.group
+}
+
+// GetShardID returns the shardID.
+func (conf *ConfigType) GetShardID() uint32 {
+	return conf.ShardID
 }
 
 // GetClientGroupID returns the groupID for client group

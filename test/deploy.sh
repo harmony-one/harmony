@@ -1,6 +1,12 @@
 #!/bin/bash
 
-ROOT=$(dirname $0)/..
+unset -v progdir
+case "${0}" in
+*/*) progdir="${0%/*}" ;;
+*) progdir=.  ;;
+esac
+
+ROOT="${progdir}/.."
 USER=$(whoami)
 
 . "${ROOT}/scripts/setup_bls_build_flags.sh"
@@ -30,24 +36,7 @@ function check_result() {
 }
 
 function cleanup() {
-   for pid in `/bin/ps -fu $USER| grep "harmony\|txgen\|soldier\|commander\|profiler\|bootnode" | grep -v "grep" | grep -v "vi" | awk '{print $2}'`;
-   do
-       echo 'Killed process: '$pid
-       $DRYRUN kill -9 $pid 2> /dev/null
-   done
-   rm -rf ./db/harmony_*
-   rm -rf ./db-127.0.0.1-*
-}
-
-function killnode() {
-   local port=$1
-
-   if [ -n "port" ]; then
-      pid=$(/bin/ps -fu $USER | grep "harmony" | grep "$port" | awk '{print $2}')
-      echo "killing node with port: $port"
-      $DRYRUN kill -9 $pid 2> /dev/null
-      echo "node with port: $port is killed"
-   fi
+   "${progdir}/kill_node.sh"
 }
 
 trap cleanup SIGINT SIGTERM
@@ -64,6 +53,7 @@ USAGE: $ME [OPTIONS] config_file_name [extra args to node]
    -m min_peers   minimal number of peers to start consensus (default: $MIN)
    -s shards      number of shards (default: $SHARDS)
    -n             dryrun mode (default: $DRYRUN)
+   -N network     network type (default: $NETWORK)
    -B             don't build the binary
 
 This script will build all the binaries and start harmony and txgen based on the configuration file.
@@ -80,14 +70,15 @@ EOU
 DEFAULT_DURATION_NOSYNC=60
 DEFAULT_DURATION_SYNC=200
 
-TXGEN=true
+TXGEN=false
 DURATION=
 MIN=3
 SHARDS=2
 DRYRUN=
 SYNC=true
+NETWORK=localnet
 
-while getopts "htD:m:s:nB" option; do
+while getopts "htD:m:s:nBN:" option; do
    case $option in
       h) usage ;;
       t) TXGEN=false ;;
@@ -96,6 +87,7 @@ while getopts "htD:m:s:nB" option; do
       s) SHARDS=$OPTARG ;;
       n) DRYRUN=echo ;;
       B) NOBUILD=true ;;
+      N) NETWORK=$OPTARG ;;
    esac
 done
 
@@ -148,7 +140,7 @@ echo "bootnode launched." + " $BN_MA"
 
 unset -v base_args
 declare -a base_args args
-base_args=(-log_folder "${log_folder}" -min_peers "${MIN}" -bootnodes "${BN_MA}" -network_type="localnet" -blspass file:.hmy/blspass.txt -dns=false)
+base_args=(-log_folder "${log_folder}" -min_peers "${MIN}" -bootnodes "${BN_MA}" -network_type="$NETWORK" -blspass file:.hmy/blspass.txt -dns=false)
 NUM_NN=0
 
 sleep 2

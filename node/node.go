@@ -205,6 +205,9 @@ type Node struct {
 	isFirstTime bool // the node was started with a fresh database
 	// How long in second the leader needs to wait to propose a new block.
 	BlockPeriod time.Duration
+
+	// last time consensus reached for metrics
+	lastConsensusTime int64
 }
 
 // Blockchain returns the blockchain for the node's current shard.
@@ -500,10 +503,12 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 	chanPeer := make(chan p2p.Peer)
 
 	nodeConfig := service.NodeConfig{
-		IsClient:     node.NodeConfig.IsClient(),
-		Beacon:       p2p.GroupIDBeacon,
-		ShardGroupID: node.NodeConfig.GetShardGroupID(),
-		Actions:      make(map[p2p.GroupID]p2p.ActionType),
+		PushgatewayIP:   node.NodeConfig.GetPushgatewayIP(),
+		PushgatewayPort: node.NodeConfig.GetPushgatewayPort(),
+		IsClient:        node.NodeConfig.IsClient(),
+		Beacon:          p2p.GroupIDBeacon,
+		ShardGroupID:    node.NodeConfig.GetShardGroupID(),
+		Actions:         make(map[p2p.GroupID]p2p.ActionType),
 	}
 
 	if nodeConfig.IsClient {

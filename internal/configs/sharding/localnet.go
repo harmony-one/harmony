@@ -22,7 +22,8 @@ const (
 	localnetVdfDifficulty  = 5000 // This takes about 10s to finish the vdf
 	localnetConsensusRatio = float64(0.1)
 
-	localnetFirstCrossLinkBlock = 3
+	localnetFirstCrossLinkBlock     = 3
+	localnetRandomnessStartingEpoch = 0
 )
 
 func (localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
@@ -73,6 +74,12 @@ func (ls localnetSchedule) FirstCrossLinkBlock() uint64 {
 // ConsensusRatio ratio of new nodes vs consensus total nodes
 func (ls localnetSchedule) ConsensusRatio() float64 {
 	return localnetConsensusRatio
+}
+
+// TODO: remove it after randomness feature turned on mainnet
+//RandonnessStartingEpoch returns starting epoch of randonness generation
+func (ls localnetSchedule) RandomnessStartingEpoch() uint64 {
+	return localnetRandomnessStartingEpoch
 }
 
 var localnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(localnetV1Epoch), big.NewInt(localnetV2Epoch)}

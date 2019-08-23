@@ -128,8 +128,8 @@ func (h *Header) Logger(logger *zerolog.Logger) *zerolog.Logger {
 		With().
 		Str("blockHash", h.Hash().Hex()).
 		Uint32("blockShard", h.ShardID).
-		Str("blockEpoch", h.Epoch.String()).
-		Str("blockNumber", h.Number.String()).
+		Uint64("blockEpoch", h.Epoch.Uint64()).
+		Uint64("blockNumber", h.Number.Uint64()).
 		Logger()
 	return &nlogger
 }
@@ -391,6 +391,9 @@ func (b *Block) MixDigest() common.Hash { return b.header.MixDigest }
 
 // ShardID is the header ShardIDs
 func (b *Block) ShardID() uint32 { return b.header.ShardID }
+
+// Epoch is the header Epoch
+func (b *Block) Epoch() *big.Int { return b.header.Epoch }
 
 // Bloom returns header bloom.
 func (b *Block) Bloom() ethtypes.Bloom { return b.header.Bloom }

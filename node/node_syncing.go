@@ -13,7 +13,6 @@ import (
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
 	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
-	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -224,11 +223,11 @@ SyncingLoop:
 				node.stateMutex.Lock()
 				node.State = NodeNotInSync
 				node.stateMutex.Unlock()
-				if willJoinConsensus && node.Consensus.Mode() != consensus.Listening {
+				if willJoinConsensus {
 					node.Consensus.BlocksNotSynchronized()
 				}
 				node.stateSync.SyncLoop(bc, worker, willJoinConsensus, false)
-				if willJoinConsensus && node.Consensus.Mode() != consensus.Listening {
+				if willJoinConsensus {
 					node.stateMutex.Lock()
 					node.State = NodeReadyForConsensus
 					node.stateMutex.Unlock()
@@ -238,9 +237,6 @@ SyncingLoop:
 			node.stateMutex.Lock()
 			node.State = NodeReadyForConsensus
 			node.stateMutex.Unlock()
-			if willJoinConsensus && node.Consensus.Mode() != consensus.Listening {
-				node.Consensus.WaitForSyncing()
-			}
 		}
 	}
 }

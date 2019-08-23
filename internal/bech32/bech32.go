@@ -5,6 +5,9 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Charset Copied from https://github.com/btcsuite/btcutil/blob/9e5f4b9a998d263e3ce9c56664a7816001ac8000/bech32/bech32.go#L12
+const Charset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+
 // ConvertAndEncode converts from a base64 encoded byte string to base32
 // encoded byte string and then to bech32.
 func ConvertAndEncode(hrp string, data []byte) (string, error) {

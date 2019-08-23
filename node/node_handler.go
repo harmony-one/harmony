@@ -565,8 +565,12 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 			Err(err).
 			Msg("Error when adding new block")
 		return
+	} else if core.IsEpochLastBlock(newBlock) {
+		node.Consensus.UpdateConsensusInformation()
 	}
 
+	// Update last consensus time for metrics
+	node.lastConsensusTime = time.Now().Unix()
 	if node.Consensus.PubKey.IsEqual(node.Consensus.LeaderPubKey) {
 		if node.NodeConfig.ShardID == 0 {
 			node.BroadcastNewBlock(newBlock)

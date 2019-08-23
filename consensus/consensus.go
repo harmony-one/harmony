@@ -35,6 +35,10 @@ type Consensus struct {
 	phase PbftPhase
 	// mode: indicate a node is in normal or viewchanging mode
 	mode PbftMode
+
+	// epoch: current epoch number
+	epoch uint64
+
 	// blockNum: the next blockNumber that PBFT is going to agree on, should be equal to the blockNumber of next block
 	blockNum uint64
 	// channel to receive consensus message
@@ -115,6 +119,9 @@ type Consensus struct {
 	// global consensus mutex
 	mutex sync.Mutex
 
+	// consensus information update mutex
+	infoMutex sync.Mutex
+
 	// Signal channel for starting a new consensus process
 	ReadySignal chan struct{}
 	// The post-consensus processing func passed from Node object
@@ -152,6 +159,9 @@ type Consensus struct {
 
 	// If true, this consensus will not propose view change.
 	disableViewChange bool
+
+	// last node block reward for metrics
+	lastBlockReward *big.Int
 }
 
 // SetCommitDelay sets the commit message delay.  If set to non-zero,
@@ -219,6 +229,11 @@ func (consensus *Consensus) RewardThreshold() int {
 	return len(consensus.PublicKeys) * 9 / 10
 }
 
+// GetBlockReward returns last node block reward
+func (consensus *Consensus) GetBlockReward() *big.Int {
+	return consensus.lastBlockReward
+}
+
 // StakeInfoFinder finds the staking account for the given consensus key.
 type StakeInfoFinder interface {
 	// FindStakeInfoByNodeKey returns a list of staking information matching
@@ -274,6 +289,7 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 	consensus.commitFinishChan = make(chan uint64)
 
 	consensus.ReadySignal = make(chan struct{})
+	consensus.lastBlockReward = big.NewInt(0)
 
 	// channel for receiving newly generated VDF
 	consensus.RndChannel = make(chan [vdfAndSeedSize]byte)

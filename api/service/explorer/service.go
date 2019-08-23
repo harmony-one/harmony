@@ -18,6 +18,7 @@ import (
 
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/bech32"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -41,6 +42,7 @@ type Service struct {
 	IP                string
 	Port              string
 	GetNodeIDs        func() []libp2p_peer.ID
+	ShardID           uint32
 	storage           *Storage
 	server            *http.Server
 	messageChan       chan *msg_pb.Message
@@ -48,10 +50,11 @@ type Service struct {
 }
 
 // New returns explorer service.
-func New(selfPeer *p2p.Peer, GetNodeIDs func() []libp2p_peer.ID, GetAccountBalance func(common.Address) (*big.Int, error)) *Service {
+func New(selfPeer *p2p.Peer, shardID uint32, GetNodeIDs func() []libp2p_peer.ID, GetAccountBalance func(common.Address) (*big.Int, error)) *Service {
 	return &Service{
 		IP:                selfPeer.IP,
 		Port:              selfPeer.Port,
+		ShardID:           shardID,
 		GetNodeIDs:        GetNodeIDs,
 		GetAccountBalance: GetAccountBalance,
 	}
@@ -103,7 +106,7 @@ func (s *Service) Run() *http.Server {
 	s.router.Path("/tx").HandlerFunc(s.GetExplorerTransaction)
 
 	// Set up router for address.
-	s.router.Path("/address").Queries("id", "{[0-9A-Fa-fx]*?}").HandlerFunc(s.GetExplorerAddress).Methods("GET")
+	s.router.Path("/address").Queries("id", fmt.Sprintf("{([0-9A-Fa-fx]*?)|(t?one1[%s]{38})}", bech32.Charset)).HandlerFunc(s.GetExplorerAddress).Methods("GET")
 	s.router.Path("/address").HandlerFunc(s.GetExplorerAddress)
 
 	// Set up router for node count.
@@ -113,6 +116,10 @@ func (s *Service) Run() *http.Server {
 	// Set up router for shard
 	s.router.Path("/shard").Queries("id", "{[0-9]*?}").HandlerFunc(s.GetExplorerShard).Methods("GET")
 	s.router.Path("/shard").HandlerFunc(s.GetExplorerShard)
+
+	// Set up router for committee.
+	s.router.Path("/committee").Queries("shard_id", "{[0-9]*?}", "epoch", "{[0-9]*?}").HandlerFunc(s.GetCommittee).Methods("GET")
+	s.router.Path("/committee").HandlerFunc(s.GetCommittee).Methods("GET")
 
 	// Do serving now.
 	utils.Logger().Info().Str("port", GetExplorerPort(s.Port)).Msg("Listening")
@@ -204,11 +211,13 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if accountBlocks[id-1] == nil {
+			block.BlockTime = int64(0)
 			block.PrevBlock = RefBlock{
 				ID:     "",
 				Height: "",
 			}
 		} else {
+			block.BlockTime = accountBlock.Time().Int64() - accountBlocks[id-1].Time().Int64()
 			block.PrevBlock = RefBlock{
 				ID:     accountBlocks[id-1].Hash().Hex(),
 				Height: strconv.Itoa(id + fromInt - 2),
@@ -256,6 +265,86 @@ func (s *Service) GetExplorerTransaction(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	data.TX = *tx
+}
+
+// GetCommittee servers /comittee end-point.
+func (s *Service) GetCommittee(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	shardIDRead := r.FormValue("shard_id")
+	epochRead := r.FormValue("epoch")
+	shardID := uint64(0)
+	epoch := uint64(0)
+	var err error
+	if shardIDRead != "" {
+		shardID, err = strconv.ParseUint(shardIDRead, 10, 32)
+		if err != nil {
+			utils.Logger().Warn().Err(err).Msg("cannot read shard id")
+			w.WriteHeader(400)
+			return
+		}
+	}
+	if epochRead != "" {
+		epoch, err = strconv.ParseUint(epochRead, 10, 64)
+		if err != nil {
+			utils.Logger().Warn().Err(err).Msg("cannot read shard epoch")
+			w.WriteHeader(400)
+			return
+		}
+	}
+	if s.ShardID != uint32(shardID) {
+		utils.Logger().Warn().Msg("incorrect shard id")
+		w.WriteHeader(400)
+		return
+	}
+	// fetch current epoch if epoch is 0
+	db := s.storage.GetDB()
+	if epoch == 0 {
+		bytes, err := db.Get([]byte(BlockHeightKey))
+		blockHeight, err := strconv.Atoi(string(bytes))
+		if err != nil {
+			utils.Logger().Warn().Err(err).Msg("cannot decode block height from DB")
+			w.WriteHeader(500)
+			return
+		}
+		key := GetBlockKey(blockHeight)
+		data, err := db.Get([]byte(key))
+		block := new(types.Block)
+		if rlp.DecodeBytes(data, block) != nil {
+			utils.Logger().Warn().Err(err).Msg("cannot get block from db")
+			w.WriteHeader(500)
+			return
+		}
+		epoch = block.Epoch().Uint64()
+	}
+	bytes, err := db.Get([]byte(GetCommitteeKey(uint32(shardID), epoch)))
+	if err != nil {
+		utils.Logger().Warn().Err(err).Msg("cannot read committee")
+		w.WriteHeader(500)
+		return
+	}
+	committee := &types.Committee{}
+	if err := rlp.DecodeBytes(bytes, committee); err != nil {
+		utils.Logger().Warn().Err(err).Msg("cannot decode committee data from DB")
+		w.WriteHeader(500)
+		return
+	}
+	validators := &Committee{}
+	for _, validator := range committee.NodeList {
+		validatorBalance := big.NewInt(0)
+		validatorBalance, err := s.GetAccountBalance(validator.EcdsaAddress)
+		if err != nil {
+			continue
+		}
+		oneAddress, err := common2.AddressToBech32(validator.EcdsaAddress)
+		if err != nil {
+			continue
+		}
+		validators.Validators = append(validators.Validators, &Validator{Address: oneAddress, Balance: validatorBalance})
+	}
+	if err := json.NewEncoder(w).Encode(validators); err != nil {
+		utils.Logger().Warn().Err(err).Msg("cannot JSON-encode committee")
+		w.WriteHeader(500)
+	}
 }
 
 // GetExplorerAddress serves /address end-point.

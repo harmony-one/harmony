@@ -121,6 +121,11 @@ var (
 
 	// Disable view change.
 	disableViewChange = flag.Bool("disable_view_change", false, "Do not propose view change (testing only)")
+
+	// metrics flag to collct meetrics or not, pushgateway ip and port for metrics
+	metricsFlag     = flag.Bool("metrics", false, "Collect and upload node metrics")
+	pushgatewayIP   = flag.String("pushgateway_ip", "grafana.harmony.one", "Metrics view ip")
+	pushgatewayPort = flag.String("pushgateway_port", "9091", "Metrics view port")
 )
 
 func initSetup() {
@@ -164,14 +169,20 @@ func initSetup() {
 }
 
 func passphraseForBls() {
+	if *isExplorer {
+		return
+	}
 	// If FN node running, they should either specify blsPrivateKey or the file with passphrase
+	if *isExplorer {
+		return
+	}
 	if *blsKeyFile == "" || *blsPass == "" {
 		fmt.Println("Internal nodes need to have pass to decrypt blskey")
 		os.Exit(101)
 	}
 	passphrase, err := utils.GetPassphraseFromSource(*blsPass)
 	if err != nil {
-		fmt.Printf("error when reading passphrase file: %v\n", err)
+		fmt.Fprintf(os.Stderr, "ERROR when reading passphrase file: %v\n", err)
 		os.Exit(100)
 	}
 	blsPassphrase = passphrase
@@ -195,7 +206,7 @@ func setupInitialAccount() (isLeader bool) {
 	}
 
 	if initialAccount == nil {
-		fmt.Printf("cannot find your BLS key in the genesis/FN tables: %s\n", pubKey.SerializeToHexStr())
+		fmt.Fprintf(os.Stderr, "ERROR cannot find your BLS key in the genesis/FN tables: %s\n", pubKey.SerializeToHexStr())
 		os.Exit(100)
 	}
 
@@ -207,7 +218,7 @@ func setupInitialAccount() (isLeader bool) {
 func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) *bls.PublicKey {
 	consensusPriKey, err := blsgen.LoadBlsKeyWithPassPhrase(*blsKeyFile, blsPassphrase)
 	if err != nil {
-		fmt.Printf("error when loading bls key, err :%v\n", err)
+		fmt.Fprintf(os.Stderr, "ERROR when loading bls key, err :%v\n", err)
 		os.Exit(100)
 	}
 	pubKey := consensusPriKey.GetPublicKey()
@@ -233,18 +244,17 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	}
 
 	// Set network type
-	switch *networkType {
-	case nodeconfig.Mainnet:
-		nodeConfig.SetNetworkType(nodeconfig.Mainnet)
-	case nodeconfig.Testnet:
-		nodeConfig.SetNetworkType(nodeconfig.Testnet)
-	case nodeconfig.Localnet:
-		nodeConfig.SetNetworkType(nodeconfig.Localnet)
-	case nodeconfig.Devnet:
-		nodeConfig.SetNetworkType(nodeconfig.Devnet)
+	netType := nodeconfig.NetworkType(*networkType)
+	switch netType {
+	case nodeconfig.Mainnet, nodeconfig.Testnet, nodeconfig.Pangaea, nodeconfig.Localnet, nodeconfig.Devnet:
+		nodeConfig.SetNetworkType(netType)
 	default:
 		panic(fmt.Sprintf("invalid network type: %s", *networkType))
 	}
+
+	nodeConfig.SetPushgatewayIP(*pushgatewayIP)
+	nodeConfig.SetPushgatewayPort(*pushgatewayPort)
+	nodeConfig.SetMetricsFlag(*metricsFlag)
 
 	// P2p private key is used for secure message transfer between p2p nodes.
 	nodeConfig.P2pPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
@@ -279,7 +289,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	}
 	commitDelay, err := time.ParseDuration(*delayCommit)
 	if err != nil || commitDelay < 0 {
-		_, _ = fmt.Fprintf(os.Stderr, "invalid commit delay %#v", *delayCommit)
+		_, _ = fmt.Fprintf(os.Stderr, "ERROR invalid commit delay %#v", *delayCommit)
 		os.Exit(1)
 	}
 	currentConsensus.SetCommitDelay(commitDelay)
@@ -292,6 +302,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// Current node.
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 	currentNode := node.New(nodeConfig.Host, currentConsensus, chainDBFactory, *isArchival)
+
 	switch {
 	case *networkType == nodeconfig.Localnet:
 		epochConfig := core.ShardingSchedule.InstanceForEpoch(ethCommon.Big0)
@@ -310,6 +321,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider("t.hmny.io", syncing.GetSyncingPort(*port))
 	default:
 		currentNode.SyncingPeerProvider = node.NewLegacySyncingPeerProvider(currentNode)
+
 	}
 	// TODO: add staking support
 	// currentNode.StakingAccount = myAccount
@@ -319,7 +331,11 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// TODO: refactor the creation of blockchain out of node.New()
 	currentConsensus.ChainReader = currentNode.Blockchain()
 
-	currentNode.NodeConfig.SetBeaconGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(0)))
+	// Set up prometheus pushgateway for metrics monitoring serivce.
+	currentNode.NodeConfig.SetPushgatewayIP(nodeConfig.PushgatewayIP)
+	currentNode.NodeConfig.SetPushgatewayPort(nodeConfig.PushgatewayPort)
+	currentNode.NodeConfig.SetMetricsFlag(nodeConfig.MetricsFlag)
+
 	if *isExplorer {
 		currentNode.NodeConfig.SetRole(nodeconfig.ExplorerNode)
 		currentNode.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(*shardID)))
@@ -334,7 +350,6 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 			currentNode.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
 			currentNode.NodeConfig.SetClientGroupID(p2p.NewClientGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
 		}
-
 	}
 	currentNode.NodeConfig.ConsensusPubKey = nodeConfig.ConsensusPubKey
 	currentNode.NodeConfig.ConsensusPriKey = nodeConfig.ConsensusPriKey
@@ -366,6 +381,10 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentConsensus.OnConsensusDone = currentNode.PostConsensusProcessing
 	currentNode.State = node.NodeWaitToJoin
 
+	// update consensus information based on the blockchain
+	mode := currentConsensus.UpdateConsensusInformation()
+	currentConsensus.SetMode(mode)
+
 	// Watching currentNode and currentConsensus.
 	memprofiling.GetMemProfiling().Add("currentNode", currentNode)
 	memprofiling.GetMemProfiling().Add("currentConsensus", currentConsensus)
@@ -386,6 +405,8 @@ func main() {
 		core.ShardingSchedule = shardingconfig.MainnetSchedule
 	case nodeconfig.Testnet:
 		core.ShardingSchedule = shardingconfig.TestnetSchedule
+	case nodeconfig.Pangaea:
+		core.ShardingSchedule = shardingconfig.PangaeaSchedule
 	case nodeconfig.Localnet:
 		core.ShardingSchedule = shardingconfig.LocalnetSchedule
 	case nodeconfig.Devnet:
@@ -396,7 +417,7 @@ func main() {
 		devnetConfig, err := shardingconfig.NewInstance(
 			uint32(*devnetNumShards), *devnetShardSize, *devnetHarmonySize, genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, nil)
 		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "invalid devnet sharding config: %s",
+			_, _ = fmt.Fprintf(os.Stderr, "ERROR invalid devnet sharding config: %s",
 				err)
 			os.Exit(1)
 		}
@@ -453,5 +474,16 @@ func main() {
 		}
 	}
 	currentNode.RunServices()
+
+	// Run additional node collectors
+	// Collect node metrics if metrics flag is set
+	if currentNode.NodeConfig.GetMetricsFlag() {
+		go currentNode.CollectMetrics()
+	}
+	// Commit committtee if node role is explorer
+	if currentNode.NodeConfig.Role() == nodeconfig.ExplorerNode {
+		go currentNode.CommitCommittee()
+	}
+
 	currentNode.StartServer()
 }

@@ -94,8 +94,8 @@ func CompareBlsPublicKey(k1, k2 BlsPublicKey) int {
 
 // NodeID represents node id (BLS address).
 type NodeID struct {
-	EcdsaAddress common.Address
-	BlsPublicKey BlsPublicKey
+	EcdsaAddress common.Address `json:"ecdsa_address"`
+	BlsPublicKey BlsPublicKey   `json:"bls_pubkey"`
 }
 
 // CompareNodeID compares two node IDs.
@@ -139,8 +139,8 @@ func CompareNodeIDList(l1, l2 NodeIDList) int {
 
 // Committee contains the active nodes in one shard
 type Committee struct {
-	ShardID  uint32
-	NodeList NodeIDList
+	ShardID  uint32     `json:"shard_id"`
+	NodeList NodeIDList `json:"node_list"`
 }
 
 // DeepCopy returns a deep copy of the receiver.

@@ -49,7 +49,7 @@ func (client *Client) GetBlockHashes(startHash []byte, size uint32, ip, port str
 	request.Port = port
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg("[SYNC] GetBlockHashes query failed")
+		utils.Logger().Error().Err(err).Str("target", client.conn.Target()).Msg("[SYNC] GetBlockHashes query failed")
 	}
 	return response
 }
@@ -66,7 +66,7 @@ func (client *Client) GetBlocks(hashes [][]byte) *pb.DownloaderResponse {
 	}
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg("[SYNC] downloader/client.go:GetBlocks query failed")
+		utils.Logger().Error().Err(err).Str("target", client.conn.Target()).Msg("[SYNC] downloader/client.go:GetBlocks query failed")
 	}
 	return response
 }
@@ -74,7 +74,7 @@ func (client *Client) GetBlocks(hashes [][]byte) *pb.DownloaderResponse {
 // Register will register node's ip/port information to peers receive newly created blocks in future
 // hash is the bytes of "ip:port" string representation
 func (client *Client) Register(hash []byte, ip, port string) *pb.DownloaderResponse {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_REGISTER}
 	request.PeerHash = make([]byte, len(hash))
@@ -83,7 +83,7 @@ func (client *Client) Register(hash []byte, ip, port string) *pb.DownloaderRespo
 	request.Port = port
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil || response == nil {
-		utils.Logger().Error().Err(err).Interface("response", response).Msg("[SYNC] client.go:Register failed")
+		utils.Logger().Error().Err(err).Str("target", client.conn.Target()).Interface("response", response).Msg("[SYNC] client.go:Register failed")
 	}
 	return response
 }
@@ -105,7 +105,7 @@ func (client *Client) PushNewBlock(selfPeerHash [20]byte, blockHash []byte, time
 
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg("[SYNC] unable to send new block to unsync node")
+		utils.Logger().Error().Err(err).Str("target", client.conn.Target()).Msg("[SYNC] unable to send new block to unsync node")
 	}
 	return response
 }
