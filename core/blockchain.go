@@ -822,18 +822,22 @@ func (bc *BlockChain) Rollback(chain []common.Hash) {
 		hash := chain[i]
 
 		currentHeader := bc.hc.CurrentHeader()
-		if currentHeader.Hash() == hash {
+		if currentHeader != nil && currentHeader.Hash() == hash {
 			bc.hc.SetCurrentHeader(bc.GetHeader(currentHeader.ParentHash, currentHeader.Number.Uint64()-1))
 		}
-		if currentFastBlock := bc.CurrentFastBlock(); currentFastBlock.Hash() == hash {
+		if currentFastBlock := bc.CurrentFastBlock(); currentFastBlock != nil && currentFastBlock.Hash() == hash {
 			newFastBlock := bc.GetBlock(currentFastBlock.ParentHash(), currentFastBlock.NumberU64()-1)
-			bc.currentFastBlock.Store(newFastBlock)
-			rawdb.WriteHeadFastBlockHash(bc.db, newFastBlock.Hash())
+			if newFastBlock != nil {
+				bc.currentFastBlock.Store(newFastBlock)
+				rawdb.WriteHeadFastBlockHash(bc.db, newFastBlock.Hash())
+			}
 		}
-		if currentBlock := bc.CurrentBlock(); currentBlock.Hash() == hash {
+		if currentBlock := bc.CurrentBlock(); currentBlock != nil && currentBlock.Hash() == hash {
 			newBlock := bc.GetBlock(currentBlock.ParentHash(), currentBlock.NumberU64()-1)
-			bc.currentBlock.Store(newBlock)
-			rawdb.WriteHeadBlockHash(bc.db, newBlock.Hash())
+			if newBlock != nil {
+				bc.currentBlock.Store(newBlock)
+				rawdb.WriteHeadBlockHash(bc.db, newBlock.Hash())
+			}
 		}
 	}
 }
@@ -1264,21 +1268,24 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 			var winner []*types.Block
 
 			parent := bc.GetBlock(block.ParentHash(), block.NumberU64()-1)
-			for !bc.HasState(parent.Root()) {
+			for parent != nil && !bc.HasState(parent.Root()) {
 				winner = append(winner, parent)
 				parent = bc.GetBlock(parent.ParentHash(), parent.NumberU64()-1)
 			}
 			for j := 0; j < len(winner)/2; j++ {
 				winner[j], winner[len(winner)-1-j] = winner[len(winner)-1-j], winner[j]
 			}
-			// Import all the pruned blocks to make the state available
-			bc.chainmu.Unlock()
-			_, evs, logs, err := bc.insertChain(winner)
-			bc.chainmu.Lock()
-			events, coalescedLogs = evs, logs
+			// Prune in case non-empty winner chain
+			if len(winner) > 0 {
+				// Import all the pruned blocks to make the state available
+				bc.chainmu.Unlock()
+				_, evs, logs, err := bc.insertChain(winner)
+				bc.chainmu.Lock()
+				events, coalescedLogs = evs, logs
 
-			if err != nil {
-				return i, events, coalescedLogs, err
+				if err != nil {
+					return i, events, coalescedLogs, err
+				}
 			}
 
 		case err != nil:
