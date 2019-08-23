@@ -271,8 +271,3 @@ func (node *Node) ProcessReceiptMessage(msgPayload []byte) {
 
 	node.AddPendingReceipts(&cxp)
 }
-
-// ProcessCrossShardTx verify and process cross shard transaction on destination shard
-func (node *Node) ProcessCrossShardTx(blocks []*types.Block) {
-	// TODO: add logic
-}

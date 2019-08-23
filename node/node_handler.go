@@ -176,8 +176,6 @@ func (node *Node) messageHandler(content []byte, sender libp2p_peer.ID) {
 							Uint64("block", blocks[0].NumberU64()).
 							Msg("Block being handled by block channel")
 
-						go node.ProcessCrossShardTx(blocks)
-
 						for _, block := range blocks {
 							if block.ShardID() == 0 {
 								utils.Logger().Info().
@@ -284,8 +282,8 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 // NOTE: For now, just send to the client (basically not broadcasting)
 // TODO (lc): broadcast the new blocks to new nodes doing state sync
 func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
-	utils.Logger().Info().Msgf("broadcasting new block %d", newBlock.NumberU64())
 	groups := []p2p.GroupID{node.NodeConfig.GetClientGroupID()}
+	utils.Logger().Info().Msgf("broadcasting new block %d, group %s", newBlock.NumberU64(), groups[0])
 	msg := host.ConstructP2pMessage(byte(0), proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock}))
 	if err := node.host.SendMessageToGroups(groups, msg); err != nil {
 		utils.Logger().Warn().Err(err).Msg("cannot broadcast new block")

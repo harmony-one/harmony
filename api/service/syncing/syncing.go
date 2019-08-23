@@ -31,6 +31,7 @@ const (
 	SyncingPortDifference                        = 3000
 	inSyncThreshold                              = 0    // when peerBlockHeight - myBlockHeight <= inSyncThreshold, it's ready to join consensus
 	BatchSize                             uint32 = 1000 //maximum size for one query of block hashes
+	SyncLoopFrequency                            = 1    // unit in second
 )
 
 // SyncPeerConfig is peer config to sync.
@@ -732,20 +733,24 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, willJo
 	if !isBeacon {
 		ss.RegisterNodeInfo()
 	}
+	ticker := time.NewTicker(SyncLoopFrequency * time.Second)
 	for {
-		otherHeight := ss.getMaxPeerHeight()
-		currentHeight := bc.CurrentBlock().NumberU64()
-		if currentHeight >= otherHeight {
-			utils.Logger().Info().Msgf("[SYNC] Node is now IN SYNC! (ShardID: %d)", bc.ShardID())
-			break
+		select {
+		case <-ticker.C:
+			otherHeight := ss.getMaxPeerHeight()
+			currentHeight := bc.CurrentBlock().NumberU64()
+			if currentHeight >= otherHeight {
+				utils.Logger().Info().Msgf("[SYNC] Node is now IN SYNC! (ShardID: %d)", bc.ShardID())
+				break
+			}
+			startHash := bc.CurrentBlock().Hash()
+			size := uint32(otherHeight - currentHeight)
+			if size > BatchSize {
+				size = BatchSize
+			}
+			ss.ProcessStateSync(startHash[:], size, bc, worker)
+			ss.purgeOldBlocksFromCache()
 		}
-		startHash := bc.CurrentBlock().Hash()
-		size := uint32(otherHeight - currentHeight)
-		if size > BatchSize {
-			size = BatchSize
-		}
-		ss.ProcessStateSync(startHash[:], size, bc, worker)
-		ss.purgeOldBlocksFromCache()
 	}
 	ss.purgeAllBlocksFromCache()
 }
