@@ -2,7 +2,9 @@ package shardingconfig
 
 import (
 	"math/big"
+	"time"
 
+	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/internal/genesis"
 )
 
@@ -24,6 +26,12 @@ const (
 
 	localnetFirstCrossLinkBlock     = 3
 	localnetRandomnessStartingEpoch = 0
+
+	localnetMaxTxAmountLimit               = 1e2 // unit is in One
+	localnetMaxNumRecentTxsPerAccountLimit = 2
+	localnetMaxTxPoolSizeLimit             = 8000
+	localnetMaxNumTxsPerBlockLimit         = 1000
+	localnetRecentTxDuration               = 10 * time.Second
 )
 
 func (localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
@@ -37,7 +45,7 @@ func (localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	}
 }
 
-func (localnetSchedule) BlocksPerEpoch() uint64 {
+func (ls localnetSchedule) BlocksPerEpoch() uint64 {
 	return twoOne
 }
 
@@ -80,6 +88,38 @@ func (ls localnetSchedule) ConsensusRatio() float64 {
 //RandonnessStartingEpoch returns starting epoch of randonness generation
 func (ls localnetSchedule) RandomnessStartingEpoch() uint64 {
 	return localnetRandomnessStartingEpoch
+}
+
+func (ls localnetSchedule) MaxTxAmountLimit() *big.Int {
+	amountBigInt := big.NewInt(localnetMaxTxAmountLimit)
+	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(denominations.One))
+	return amountBigInt
+}
+
+func (ls localnetSchedule) MaxNumRecentTxsPerAccountLimit() uint64 {
+	return localnetMaxNumRecentTxsPerAccountLimit
+}
+
+func (ls localnetSchedule) MaxTxPoolSizeLimit() int {
+	return localnetMaxTxPoolSizeLimit
+}
+
+func (ls localnetSchedule) MaxNumTxsPerBlockLimit() int {
+	return localnetMaxNumTxsPerBlockLimit
+}
+
+func (ls localnetSchedule) RecentTxDuration() time.Duration {
+	return localnetRecentTxDuration
+}
+
+func (ls localnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
+	return &TxsThrottleConfig{
+		MaxTxAmountLimit:               ls.MaxTxAmountLimit(),
+		MaxNumRecentTxsPerAccountLimit: ls.MaxNumRecentTxsPerAccountLimit(),
+		MaxTxPoolSizeLimit:             ls.MaxTxPoolSizeLimit(),
+		MaxNumTxsPerBlockLimit:         ls.MaxNumTxsPerBlockLimit(),
+		RecentTxDuration:               ls.RecentTxDuration(),
+	}
 }
 
 var localnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(localnetV1Epoch), big.NewInt(localnetV2Epoch)}
