@@ -95,8 +95,8 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 					if node.NodeConfig.ShardID == 0 {
 						crossLinksToPropose, err := node.ProposeCrossLinkDataForBeaconchain()
 						if err == nil {
-							data, err := rlp.EncodeToBytes(crossLinksToPropose)
-							if err == nil {
+							data, localErr := rlp.EncodeToBytes(crossLinksToPropose)
+							if localErr == nil {
 								newBlock, err = node.Worker.CommitWithCrossLinks(sig, mask, viewID, coinbase, data)
 								utils.Logger().Debug().
 									Uint64("blockNum", newBlock.NumberU64()).
@@ -138,7 +138,7 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 }
 
 func (node *Node) proposeShardStateWithoutBeaconSync(block *types.Block) error {
-	if !core.IsEpochLastBlock(block) {
+	if block == nil || !core.IsEpochLastBlock(block) {
 		return nil
 	}
 	nextEpoch := new(big.Int).Add(block.Header().Epoch, common.Big1)

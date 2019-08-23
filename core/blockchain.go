@@ -1138,6 +1138,7 @@ func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 				}
 				for _, crossLink := range *crossLinks {
 					bc.WriteCrossLinks(types.CrossLinks{crossLink}, false)
+					bc.DeleteCrossLinks(types.CrossLinks{crossLink}, true)
 					bc.WriteShardLastCrossLink(crossLink.ShardID(), crossLink)
 				}
 			}
@@ -1998,6 +1999,17 @@ func (bc *BlockChain) WriteCrossLinks(cls []types.CrossLink, temp bool) error {
 	for i := 0; i < len(cls); i++ {
 		cl := cls[i]
 		err = rawdb.WriteCrossLinkShardBlock(bc.db, cl.ShardID(), cl.BlockNum().Uint64(), cl.Serialize(), temp)
+	}
+	return err
+}
+
+// DeleteCrossLinks removes the hashes of crosslinks by shardID and blockNum combination key
+// temp=true is to write the just received cross link that's not committed into blockchain with consensus
+func (bc *BlockChain) DeleteCrossLinks(cls []types.CrossLink, temp bool) error {
+	var err error
+	for i := 0; i < len(cls); i++ {
+		cl := cls[i]
+		err = rawdb.DeleteCrossLinkShardBlock(bc.db, cl.ShardID(), cl.BlockNum().Uint64(), temp)
 	}
 	return err
 }

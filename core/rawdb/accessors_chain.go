@@ -519,6 +519,11 @@ func WriteCrossLinkShardBlock(db DatabaseWriter, shardID uint32, blockNum uint64
 	return db.Put(crosslinkKey(shardID, blockNum, temp), data)
 }
 
+// DeleteCrossLinkShardBlock deletes the blockHash given shardID and blockNum
+func DeleteCrossLinkShardBlock(db DatabaseDeleter, shardID uint32, blockNum uint64, temp bool) error {
+	return db.Delete(crosslinkKey(shardID, blockNum, temp))
+}
+
 // ReadShardLastCrossLink read the last cross link of a shard
 func ReadShardLastCrossLink(db DatabaseReader, shardID uint32) ([]byte, error) {
 	return db.Get(shardLastCrosslinkKey(shardID))

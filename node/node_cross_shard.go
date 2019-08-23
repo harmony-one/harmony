@@ -119,7 +119,7 @@ func (node *Node) compareCrosslinkWithReceipts(cxp *types.CXReceiptsProof) error
 	if shardID == 0 {
 		block := beaconChain.GetBlockByNumber(blockNum)
 		if block == nil {
-			return ctxerror.New("[compareCrosslinkWithReceipts] Cannot get beaconchain heaer", "blockNum", blockNum, "shardID", shardID)
+			return ctxerror.New("[compareCrosslinkWithReceipts] Cannot get beaconchain header", "blockNum", blockNum, "shardID", shardID)
 		}
 		hash = block.Hash()
 		outgoingReceiptHash = block.OutgoingReceiptHash()
@@ -224,6 +224,12 @@ func (node *Node) ProposeCrossLinkDataForBeaconchain() (types.CrossLinks, error)
 			}
 
 			if link.BlockNum().Uint64() > firstCrossLinkBlock {
+				if lastLink == nil {
+					utils.Logger().Debug().
+						Err(err).
+						Msgf("[CrossLink] Haven't received the first cross link %d", link.BlockNum().Uint64())
+					break
+				}
 				err := node.VerifyCrosslinkHeader(lastLink.Header(), link.Header())
 				if err != nil {
 					utils.Logger().Debug().
@@ -270,9 +276,4 @@ func (node *Node) ProcessReceiptMessage(msgPayload []byte) {
 	node.Blockchain().WriteCXReceipts(cxp.MerkleProof.ShardID, cxp.MerkleProof.BlockNum.Uint64(), cxp.MerkleProof.BlockHash, cxp.Receipts, true)
 
 	node.AddPendingReceipts(&cxp)
-}
-
-// ProcessCrossShardTx verify and process cross shard transaction on destination shard
-func (node *Node) ProcessCrossShardTx(blocks []*types.Block) {
-	// TODO: add logic
 }
