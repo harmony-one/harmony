@@ -228,19 +228,18 @@ func (node *Node) ProposeCrossLinkDataForBeaconchain() (types.CrossLinks, error)
 					utils.Logger().Debug().
 						Err(err).
 						Msgf("[CrossLink] Haven't received the first cross link %d", link.BlockNum().Uint64())
-					break
+				} else {
+					err := node.VerifyCrosslinkHeader(lastLink.Header(), link.Header())
+					if err != nil {
+						utils.Logger().Debug().
+							Err(err).
+							Msgf("[CrossLink] Failed verifying temp cross link %d", link.BlockNum().Uint64())
+						break
+					}
 				}
-				err := node.VerifyCrosslinkHeader(lastLink.Header(), link.Header())
-				if err != nil {
-					utils.Logger().Debug().
-						Err(err).
-						Msgf("[CrossLink] Failed verifying temp cross link %d", link.BlockNum().Uint64())
-					break
-				}
-				lastLink = link
 			}
 			shardCrossLinks[i] = append(shardCrossLinks[i], *link)
-
+			lastLink = link
 			blockNumoffset++
 		}
 	}

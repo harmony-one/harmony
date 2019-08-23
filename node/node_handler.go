@@ -289,7 +289,7 @@ func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 
 // BroadcastCrossLinkHeader is called by consensus leader to send the new header as cross link to beacon chain.
 func (node *Node) BroadcastCrossLinkHeader(newBlock *types.Block) {
-	utils.Logger().Info().Msgf("Broadcasting new header to beacon chain groupID %s", node.NodeConfig)
+	utils.Logger().Info().Msgf("Broadcasting new header to beacon chain groupID %s", node.NodeConfig.GetBeaconGroupID())
 	lastThreeHeaders := []*types.Header{}
 
 	block := node.Blockchain().GetBlockByNumber(newBlock.NumberU64() - 2)
@@ -574,8 +574,9 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 	if node.Consensus.PubKey.IsEqual(node.Consensus.LeaderPubKey) {
 		if node.NodeConfig.ShardID == 0 {
 			node.BroadcastNewBlock(newBlock)
+		} else {
+			node.BroadcastCrossLinkHeader(newBlock)
 		}
-		node.BroadcastCrossLinkHeader(newBlock)
 		node.BroadcastCXReceipts(newBlock)
 	} else {
 		utils.Logger().Info().
