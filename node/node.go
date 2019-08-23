@@ -252,13 +252,13 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 	node.pendingTransactions = append(node.pendingTransactions, newTxs...)
 	node.reducePendingTransactions()
 	node.pendingTxMutex.Unlock()
-	utils.GetLogInstance().Info("Got more transactions", "num", len(newTxs), "totalPending", len(node.pendingTransactions))
+	utils.Logger().Info().Int("length of newTxs", len(newTxs)).Int("totalPending", len(node.pendingTransactions)).Msg("Got more transactions")
 }
 
 // AddPendingTransaction adds one new transaction to the pending transaction list.
 func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
 	node.addPendingTransactions(types.Transactions{newTx})
-	utils.GetLogInstance().Debug("Got ONE more transaction", "totalPending", len(node.pendingTransactions))
+	utils.Logger().Debug().Int("totalPending", len(node.pendingTransactions)).Msg("Got ONE more transaction")
 }
 
 // AddPendingReceipts adds one receipt message to pending list.
