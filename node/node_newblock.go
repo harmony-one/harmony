@@ -51,15 +51,17 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 					}
 
 					coinbase := node.Consensus.SelfAddress
+					if err := node.Worker.UpdateCurrent(coinbase); err != nil {
+						utils.Logger().Error().
+							Err(err).
+							Msg("Failed updating worker's state")
+						continue
+					}
+
 					// Normal tx block consensus
 					selectedTxs := types.Transactions{} // Empty transaction list
 					if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
 						selectedTxs = node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock, coinbase)
-						if err := node.Worker.UpdateCurrent(coinbase); err != nil {
-							utils.Logger().Error().
-								Err(err).
-								Msg("Failed updating worker's state")
-						}
 					}
 					utils.Logger().Info().
 						Uint64("blockNum", node.Blockchain().CurrentBlock().NumberU64()+1).
@@ -93,8 +95,8 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 					// add aggregated commit signatures from last block, except for the first two blocks
 
 					if node.NodeConfig.ShardID == 0 {
-						crossLinksToPropose, err := node.ProposeCrossLinkDataForBeaconchain()
-						if err == nil {
+						crossLinksToPropose, localErr := node.ProposeCrossLinkDataForBeaconchain()
+						if localErr == nil {
 							data, localErr := rlp.EncodeToBytes(crossLinksToPropose)
 							if localErr == nil {
 								newBlock, err = node.Worker.CommitWithCrossLinks(sig, mask, viewID, coinbase, data)
