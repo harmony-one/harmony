@@ -361,7 +361,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 
 	// TODO: Disable drand. Currently drand isn't functioning but we want to compeletely turn it off for full protection.
 	// Enable it back after mainnet.
-	// dRand := drand.New(nodeConfig.Host, nodeConfig.ShardIDs, []p2p.Peer{}, nodeConfig.Leader, currentNode.ConfirmedBlockChannel, nodeConfig.ConsensusPriKey)
+	// dRand := drand.New(nodeConfig.Host, nodeConfig.ShardID, []p2p.Peer{}, nodeConfig.Leader, currentNode.ConfirmedBlockChannel, nodeConfig.ConsensusPriKey)
 	// currentNode.Consensus.RegisterPRndChannel(dRand.PRndChannel)
 	// currentNode.Consensus.RegisterRndChannel(dRand.RndChannel)
 	// currentNode.DRand = dRand
@@ -438,7 +438,7 @@ func main() {
 	}
 
 	if *shardID >= 0 {
-		utils.GetLogInstance().Info("ShardIDs Override", "original", initialAccount.ShardID, "override", *shardID)
+		utils.GetLogInstance().Info("ShardID Override", "original", initialAccount.ShardID, "override", *shardID)
 		initialAccount.ShardID = uint32(*shardID)
 	}
 
@@ -455,7 +455,7 @@ func main() {
 	}
 	utils.GetLogInstance().Info(startMsg,
 		"BlsPubKey", hex.EncodeToString(nodeConfig.ConsensusPubKey.Serialize()),
-		"ShardIDs", nodeConfig.ShardID,
+		"ShardID", nodeConfig.ShardID,
 		"ShardGroupID", nodeConfig.GetShardGroupID(),
 		"BeaconGroupID", nodeConfig.GetBeaconGroupID(),
 		"ClientGroupID", nodeConfig.GetClientGroupID(),

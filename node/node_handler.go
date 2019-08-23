@@ -621,7 +621,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 		// TODO: enable shard state update
 		//newBlockHeader := newBlock.Header()
 		//if newBlockHeader.ShardStateHash != (common.Hash{}) {
-		//	if node.Consensus.ShardIDs == 0 {
+		//	if node.Consensus.ShardID == 0 {
 		//		// TODO ek – this is a temp hack until beacon chain sync is fixed
 		//		// End-of-epoch block on beacon chain; block's EpochState is the
 		//		// master resharding table.  Broadcast it to the network.
@@ -950,11 +950,11 @@ func (node *Node) epochShardStateMessageHandler(msgPayload []byte) error {
 func (node *Node) transitionIntoNextEpoch(shardState types.ShardState) {
 	logger = logger.New(
 		"blsPubKey", hex.EncodeToString(node.Consensus.PubKey.Serialize()),
-		"curShard", node.Blockchain().ShardIDs(),
+		"curShard", node.Blockchain().ShardID(),
 		"curLeader", node.Consensus.IsLeader())
 	for _, c := range shardState {
 		utils.Logger().Debug().
-			Uint32("shardID", c.ShardIDs).
+			Uint32("shardID", c.ShardID).
 			Str("nodeList", c.NodeList).
          Msg("new shard information")
 	}
@@ -986,7 +986,7 @@ func (node *Node) transitionIntoNextEpoch(shardState types.ShardState) {
 	node.Consensus.UpdatePublicKeys(publicKeys)
 	//	node.DRand.UpdatePublicKeys(publicKeys)
 
-	if node.Blockchain().ShardIDs() == myShardID {
+	if node.Blockchain().ShardID() == myShardID {
 		getLogger().Info("staying in the same shard")
 	} else {
 		getLogger().Info("moving to another shard")

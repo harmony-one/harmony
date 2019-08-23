@@ -379,7 +379,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 				node.AddContractKeyAndAddress(scFaucet)
 			}
 
-			//if node.Consensus.ShardIDs == 0 {
+			//if node.Consensus.ShardID == 0 {
 			//	// Contracts only exist in beacon chain
 			//	if node.isFirstTime {
 			//		// Setup one time smart contracts
