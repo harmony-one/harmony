@@ -216,18 +216,6 @@ func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
 	m := make(map[common.Hash]bool)
 
 	for _, cxp := range node.pendingCXReceipts {
-		//sourceShardID := cxp.MerkleProof.ShardID
-		//sourceBlockNum := cxp.MerkleProof.BlockNum
-		//
-		//		beaconChain := node.Blockchain() // TODO: read from real beacon chain
-		//		crossLink, err := beaconChain.ReadCrossLink(sourceShardID, sourceBlockNum.Uint64(), false)
-		//		if err == nil {
-		//			// verify the source block hash is from a finalized block
-		//			if crossLink.ChainHeader.Hash() == cxp.MerkleProof.BlockHash && crossLink.ChainHeader.OutgoingReceiptHash == cxp.MerkleProof.CXReceiptHash {
-		//				receiptsList = append(receiptsList, cxp.Receipts)
-		//			}
-		//		}
-
 		// check double spent
 		if node.Blockchain().IsSpent(cxp) {
 			continue
@@ -240,8 +228,13 @@ func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
 			m[hash] = true
 		}
 
-		// TODO: remove it after beacon chain sync is ready, for pass the test only
-		validReceiptsList = append(validReceiptsList, cxp)
+		if err := node.compareCrosslinkWithReceipts(cxp); err != nil {
+			if err != ErrCrosslinkVerificationFail {
+				pendingReceiptsList = append(pendingReceiptsList, cxp)
+			}
+		} else {
+			validReceiptsList = append(validReceiptsList, cxp)
+		}
 	}
 	node.pendingCXReceipts = pendingReceiptsList
 	node.pendingCXMutex.Unlock()

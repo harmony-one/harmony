@@ -101,11 +101,41 @@ func (node *Node) verifyIncomingReceipts(block *types.Block) error {
 		if _, ok := m[hash]; ok {
 			return ctxerror.New("[verifyIncomingReceipts] Double Spent!")
 		}
-
 		m[hash] = true
+
+		if err := node.compareCrosslinkWithReceipts(cxp); err != nil {
+			return err
+		}
 	}
-	// TODO: add crosslink blockHeaderHash checking
 	return nil
+}
+
+func (node *Node) compareCrosslinkWithReceipts(cxp *types.CXReceiptsProof) error {
+	var hash, outgoingReceiptHash common.Hash
+
+	shardID := cxp.MerkleProof.ShardID
+	blockNum := cxp.MerkleProof.BlockNum.Uint64()
+	beaconChain := node.Beaconchain()
+	if shardID == 0 {
+		block := beaconChain.GetBlockByNumber(blockNum)
+		if block == nil {
+			return ctxerror.New("[compareCrosslinkWithReceipts] Cannot get beaconchain header", "blockNum", blockNum, "shardID", shardID)
+		}
+		hash = block.Hash()
+		outgoingReceiptHash = block.OutgoingReceiptHash()
+	} else {
+		crossLink, err := beaconChain.ReadCrossLink(shardID, blockNum, false)
+		if err != nil {
+			return ctxerror.New("[compareCrosslinkWithReceipts] Cannot get crosslink", "blockNum", blockNum, "shardID", shardID).WithCause(err)
+		}
+		hash = crossLink.ChainHeader.Hash()
+		outgoingReceiptHash = crossLink.ChainHeader.OutgoingReceiptHash
+	}
+	// verify the source block hash is from a finalized block
+	if hash == cxp.MerkleProof.BlockHash && outgoingReceiptHash == cxp.MerkleProof.CXReceiptHash {
+		return nil
+	}
+	return ErrCrosslinkVerificationFail
 }
 
 // VerifyCrosslinkHeader verifies the header is valid against the prevHeader.
@@ -240,9 +270,4 @@ func (node *Node) ProcessReceiptMessage(msgPayload []byte) {
 	node.Blockchain().WriteCXReceipts(cxp.MerkleProof.ShardID, cxp.MerkleProof.BlockNum.Uint64(), cxp.MerkleProof.BlockHash, cxp.Receipts, true)
 
 	node.AddPendingReceipts(&cxp)
-}
-
-// ProcessCrossShardTx verify and process cross shard transaction on destination shard
-func (node *Node) ProcessCrossShardTx(blocks []*types.Block) {
-	// TODO: add logic
 }

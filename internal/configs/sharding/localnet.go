@@ -22,7 +22,7 @@ const (
 	localnetVdfDifficulty  = 5000 // This takes about 10s to finish the vdf
 	localnetConsensusRatio = float64(0.1)
 
-	localnetFirstCrossLinkBlock = 13
+	localnetFirstCrossLinkBlock = 3
 )
 
 func (localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {

@@ -132,7 +132,6 @@ func (cxp *CXReceiptsProof) GetToShardID() (uint32, error) {
 }
 
 // IsValidCXReceiptsProof checks whether the given CXReceiptsProof is consistency with itself
-// Remaining to check whether there is a corresonding block finalized
 func (cxp *CXReceiptsProof) IsValidCXReceiptsProof() error {
 	toShardID, err := cxp.GetToShardID()
 	if err != nil {
