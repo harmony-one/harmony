@@ -3,10 +3,13 @@ package node
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"math/big"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/params"
+
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/api/client"
 	clientService "github.com/harmony-one/harmony/api/client/service"
@@ -20,6 +23,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/drand"
+	"github.com/harmony-one/harmony/internal/chain"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/shardchain"
@@ -89,6 +93,11 @@ type Node struct {
 	pendingTransactions   types.Transactions   // All the transactions received but not yet processed for Consensus
 	pendingTxMutex        sync.Mutex
 	DRand                 *drand.DRand // The instance for distributed randomness protocol
+	pendingCrossLinks     []*types.Header
+	pendingClMutex        sync.Mutex
+
+	pendingCXReceipts []*types.CXReceiptsProof // All the receipts received but not yet processed for Consensus
+	pendingCXMutex    sync.Mutex
 
 	// Shard databases
 	shardChains shardchain.Collection
@@ -120,7 +129,7 @@ type Node struct {
 	stateSync              *syncing.StateSync
 	beaconSync             *syncing.StateSync
 	peerRegistrationRecord map[string]*syncConfig // record registration time (unixtime) of peers begin in syncing
-	dnsZone                string
+	SyncingPeerProvider    SyncingPeerProvider
 
 	// The p2p host used to send/receive p2p messages
 	host p2p.Host
@@ -204,7 +213,7 @@ type Node struct {
 // Blockchain returns the blockchain for the node's current shard.
 func (node *Node) Blockchain() *core.BlockChain {
 	shardID := node.NodeConfig.ShardID
-	bc, err := node.shardChains.ShardChain(shardID, node.NodeConfig.GetNetworkType())
+	bc, err := node.shardChains.ShardChain(shardID)
 	if err != nil {
 		err = ctxerror.New("cannot get shard chain", "shardID", shardID).
 			WithCause(err)
@@ -215,7 +224,7 @@ func (node *Node) Blockchain() *core.BlockChain {
 
 // Beaconchain returns the beaconchain from node.
 func (node *Node) Beaconchain() *core.BlockChain {
-	bc, err := node.shardChains.ShardChain(0, node.NodeConfig.GetNetworkType())
+	bc, err := node.shardChains.ShardChain(0)
 	if err != nil {
 		err = ctxerror.New("cannot get beaconchain").WithCause(err)
 		ctxerror.Log15(utils.GetLogger().Crit, err)
@@ -251,6 +260,16 @@ func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
 	}
 }
 
+// AddPendingReceipts adds one receipt message to pending list.
+func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
+	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
+		node.pendingCXMutex.Lock()
+		node.pendingCXReceipts = append(node.pendingCXReceipts, receipts)
+		node.pendingCXMutex.Unlock()
+		utils.Logger().Error().Int("totalPendingReceipts", len(node.pendingCXReceipts)).Msg("Got ONE more receipt message")
+	}
+}
+
 // Take out a subset of valid transactions from the pending transaction list
 // Note the pending transaction list will then contain the rest of the txs
 func (node *Node) getTransactionsForNewBlock(maxNumTxs int, coinbase common.Address) types.Transactions {
@@ -262,7 +281,7 @@ func (node *Node) getTransactionsForNewBlock(maxNumTxs int, coinbase common.Addr
 
 	node.pendingTransactions = unselected
 	node.reducePendingTransactions()
-	utils.Logger().Error().
+	utils.Logger().Info().
 		Int("remainPending", len(node.pendingTransactions)).
 		Int("selected", len(selected)).
 		Int("invalidDiscarded", len(invalid)).
@@ -315,8 +334,15 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		node.SelfPeer = host.GetSelfPeer()
 	}
 
+	chainConfig := *params.TestnetChainConfig
+	if node.NodeConfig.GetNetworkType() == nodeconfig.Mainnet {
+		chainConfig = *params.MainnetChainConfig
+	}
+	// TODO: use 1 as mainnet, change to networkID instead
+	chainConfig.ChainID = big.NewInt(1)
+
 	collection := shardchain.NewCollection(
-		chainDBFactory, &genesisInitializer{&node}, consensusObj)
+		chainDBFactory, &genesisInitializer{&node}, chain.Engine, &chainConfig)
 	if isArchival {
 		collection.DisableCache()
 	}
@@ -327,18 +353,21 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		node.Consensus = consensusObj
 
 		// Load the chains.
-		chain := node.Blockchain() // this also sets node.isFirstTime if the DB is fresh
-		_ = node.Beaconchain()
+		blockchain := node.Blockchain() // this also sets node.isFirstTime if the DB is fresh
+		beaconChain := node.Beaconchain()
 
 		node.BlockChannel = make(chan *types.Block)
 		node.ConfirmedBlockChannel = make(chan *types.Block)
 		node.BeaconBlockChannel = make(chan *types.Block)
-		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, node.Blockchain().Config(), chain)
-		node.Worker = worker.New(node.Blockchain().Config(), chain, node.Consensus, node.Consensus.ShardID)
+		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, node.Blockchain().Config(), blockchain)
+		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine, node.Consensus.ShardID)
+		if node.Blockchain().ShardID() != 0 {
+			node.BeaconWorker = worker.New(node.Beaconchain().Config(), beaconChain, chain.Engine, node.Consensus.ShardID)
+		}
 
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 		// the sequence number is the next block number to be added in consensus protocol, which is always one more than current chain header block
-		node.Consensus.SetBlockNum(chain.CurrentBlock().NumberU64() + 1)
+		node.Consensus.SetBlockNum(blockchain.CurrentBlock().NumberU64() + 1)
 
 		// Add Faucet contract to all shards, so that on testnet, we can demo wallet in explorer
 		// TODO (leo): we need to have support of cross-shard tx later so that the token can be transferred from beacon chain shard to other tx shards.
@@ -350,16 +379,16 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 				node.AddContractKeyAndAddress(scFaucet)
 			}
 
-			if node.Consensus.ShardID == 0 {
-				// Contracts only exist in beacon chain
-				if node.isFirstTime {
-					// Setup one time smart contracts
-					node.CurrentStakes = make(map[common.Address]*structs.StakeInfo)
-					node.AddStakingContractToPendingTransactions() //This will save the latest information about staked nodes in current staked
-				} else {
-					node.AddContractKeyAndAddress(scStaking)
-				}
-			}
+			//if node.Consensus.ShardID == 0 {
+			//	// Contracts only exist in beacon chain
+			//	if node.isFirstTime {
+			//		// Setup one time smart contracts
+			//		node.CurrentStakes = make(map[common.Address]*structs.StakeInfo)
+			//		node.AddStakingContractToPendingTransactions() //This will save the latest information about staked nodes in current staked
+			//	} else {
+			//		node.AddContractKeyAndAddress(scStaking)
+			//	}
+			//}
 
 			node.ContractCaller = contracts.NewContractCaller(node.Blockchain(), node.Blockchain().Config())
 
@@ -509,10 +538,4 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 // AccountManager ...
 func (node *Node) AccountManager() *accounts.Manager {
 	return node.accountManager
-}
-
-// SetDNSZone sets the DNS zone to use to get peer info for node syncing
-func (node *Node) SetDNSZone(zone string) {
-	utils.Logger().Info().Str("zone", zone).Msg("using DNS zone to get peers")
-	node.dnsZone = zone
 }

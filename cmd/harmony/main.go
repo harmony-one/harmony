@@ -9,12 +9,15 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"strconv"
 	"time"
 
+	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
 
+	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/blsgen"
@@ -300,10 +303,25 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 	currentNode := node.New(nodeConfig.Host, currentConsensus, chainDBFactory, *isArchival)
 
-	if *dnsZone != "" {
-		currentNode.SetDNSZone(*dnsZone)
-	} else if *dnsFlag {
-		currentNode.SetDNSZone("t.hmny.io")
+	switch {
+	case *networkType == nodeconfig.Localnet:
+		epochConfig := core.ShardingSchedule.InstanceForEpoch(ethCommon.Big0)
+		selfPort, err := strconv.ParseUint(*port, 10, 16)
+		if err != nil {
+			utils.Logger().Fatal().
+				Err(err).
+				Str("self_port_string", *port).
+				Msg("cannot convert self port string into port number")
+		}
+		currentNode.SyncingPeerProvider = node.NewLocalSyncingPeerProvider(
+			6000, uint16(selfPort), epochConfig.NumShards(), uint32(epochConfig.NumNodesPerShard()))
+	case *dnsZone != "":
+		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider(*dnsZone, syncing.GetSyncingPort(*port))
+	case *dnsFlag:
+		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider("t.hmny.io", syncing.GetSyncingPort(*port))
+	default:
+		currentNode.SyncingPeerProvider = node.NewLegacySyncingPeerProvider(currentNode)
+
 	}
 	// TODO: add staking support
 	// currentNode.StakingAccount = myAccount
@@ -317,6 +335,8 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentNode.NodeConfig.SetPushgatewayIP(nodeConfig.PushgatewayIP)
 	currentNode.NodeConfig.SetPushgatewayPort(nodeConfig.PushgatewayPort)
 	currentNode.NodeConfig.SetMetricsFlag(nodeConfig.MetricsFlag)
+
+	currentNode.NodeConfig.SetBeaconGroupID(p2p.NewGroupIDByShardID(0))
 
 	if *isExplorer {
 		currentNode.NodeConfig.SetRole(nodeconfig.ExplorerNode)
@@ -425,9 +445,9 @@ func main() {
 	nodeConfig := createGlobalConfig()
 	currentNode := setupConsensusAndNode(nodeConfig)
 
-	//if consensus.ShardID != 0 {
-	//	go currentNode.SupportBeaconSyncing()
-	//}
+	if currentNode.Blockchain().ShardID() != 0 {
+		go currentNode.SupportBeaconSyncing()
+	}
 
 	startMsg := "==== New Harmony Node ===="
 	if *isExplorer {

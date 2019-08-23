@@ -5,11 +5,12 @@ import (
 	"math/rand"
 	"testing"
 
+	chain2 "github.com/harmony-one/harmony/internal/chain"
+
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/common/denominations"
-	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
@@ -37,10 +38,10 @@ func TestNewWorker(t *testing.T) {
 
 	genesis := gspec.MustCommit(database)
 	_ = genesis
-	chain, _ := core.NewBlockChain(database, nil, gspec.Config, consensus.NewFaker(), vm.Config{}, nil)
+	chain, _ := core.NewBlockChain(database, nil, gspec.Config, chain2.Engine, vm.Config{}, nil)
 
 	// Create a new worker
-	worker := New(params.TestChainConfig, chain, consensus.NewFaker(), 0)
+	worker := New(params.TestChainConfig, chain, chain2.Engine, 0)
 
 	if worker.GetCurrentState().GetBalance(crypto.PubkeyToAddress(testBankKey.PublicKey)).Cmp(testBankFunds) != 0 {
 		t.Error("Worker state is not setup correctly")
@@ -54,15 +55,15 @@ func TestCommitTransactions(t *testing.T) {
 		gspec    = core.Genesis{
 			Config:  chainConfig,
 			Alloc:   core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
-			ShardID: 10,
+			ShardID: 0,
 		}
 	)
 
 	gspec.MustCommit(database)
-	chain, _ := core.NewBlockChain(database, nil, gspec.Config, consensus.NewFaker(), vm.Config{}, nil)
+	chain, _ := core.NewBlockChain(database, nil, gspec.Config, chain2.Engine, vm.Config{}, nil)
 
 	// Create a new worker
-	worker := New(params.TestChainConfig, chain, consensus.NewFaker(), 0)
+	worker := New(params.TestChainConfig, chain, chain2.Engine, 0)
 
 	// Generate a test tx
 	baseNonce := worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(testBankKey.PublicKey))

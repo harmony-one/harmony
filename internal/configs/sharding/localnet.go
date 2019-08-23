@@ -22,7 +22,7 @@ const (
 	localnetVdfDifficulty  = 5000 // This takes about 10s to finish the vdf
 	localnetConsensusRatio = float64(0.1)
 
-	// TODO: remove it after randomness feature turned on mainnet
+	localnetFirstCrossLinkBlock     = 3
 	localnetRandomnessStartingEpoch = 0
 )
 
@@ -67,6 +67,10 @@ func (ls localnetSchedule) VdfDifficulty() int {
 	return localnetVdfDifficulty
 }
 
+func (ls localnetSchedule) FirstCrossLinkBlock() uint64 {
+	return localnetFirstCrossLinkBlock
+}
+
 // ConsensusRatio ratio of new nodes vs consensus total nodes
 func (ls localnetSchedule) ConsensusRatio() float64 {
 	return localnetConsensusRatio
@@ -82,4 +86,4 @@ var localnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(localnetV1Epo
 
 var localnetV0 = MustNewInstance(2, 7, 5, genesis.LocalHarmonyAccounts, genesis.LocalFnAccounts, localnetReshardingEpoch)
 var localnetV1 = MustNewInstance(2, 7, 5, genesis.LocalHarmonyAccountsV1, genesis.LocalFnAccountsV1, localnetReshardingEpoch)
-var localnetV2 = MustNewInstance(2, 10, 4, genesis.LocalHarmonyAccountsV2, genesis.LocalFnAccountsV2, localnetReshardingEpoch)
+var localnetV2 = MustNewInstance(2, 9, 6, genesis.LocalHarmonyAccountsV2, genesis.LocalFnAccountsV2, localnetReshardingEpoch)

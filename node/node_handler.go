@@ -171,13 +171,15 @@ func (node *Node) messageHandler(content []byte, sender libp2p_peer.ID) {
 				} else {
 					// for non-beaconchain node, subscribe to beacon block broadcast
 					role := node.NodeConfig.Role()
-					if proto_node.BlockMessageType(msgPayload[0]) == proto_node.Sync && role == nodeconfig.Validator {
-						utils.Logger().Info().
-							Uint64("block", blocks[0].NumberU64()).
-							Msg("Block being handled by block channel")
+					if role == nodeconfig.Validator {
 
 						for _, block := range blocks {
-							node.BeaconBlockChannel <- block
+							if block.ShardID() == 0 {
+								utils.Logger().Info().
+									Uint64("block", blocks[0].NumberU64()).
+									Msgf("Block being handled by block channel %d %d", block.NumberU64(), block.ShardID())
+								node.BeaconBlockChannel <- block
+							}
 						}
 					}
 					if node.Client != nil && node.Client.UpdateBlocks != nil && blocks != nil {
@@ -185,6 +187,19 @@ func (node *Node) messageHandler(content []byte, sender libp2p_peer.ID) {
 						node.Client.UpdateBlocks(blocks)
 					}
 				}
+
+			case proto_node.Header:
+				// only beacon chain will accept the header from other shards
+				utils.Logger().Debug().Msg("NET: received message: Node/Header")
+				if node.NodeConfig.ShardID != 0 {
+					return
+				}
+				node.ProcessHeaderMessage(msgPayload[1:]) // skip first byte which is blockMsgType
+
+			case proto_node.Receipt:
+				utils.Logger().Debug().Msg("NET: received message: Node/Receipt")
+				node.ProcessReceiptMessage(msgPayload[1:]) // skip first byte which is blockMsgType
+
 			}
 		case proto_node.PING:
 			node.pingMessageHandler(msgPayload, sender)
@@ -264,9 +279,59 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 // NOTE: For now, just send to the client (basically not broadcasting)
 // TODO (lc): broadcast the new blocks to new nodes doing state sync
 func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
-	if node.ClientPeer != nil {
-		utils.Logger().Info().Msg("Broadcasting new block to client")
-		node.host.SendMessageToGroups([]p2p.GroupID{node.NodeConfig.GetClientGroupID()}, host.ConstructP2pMessage(byte(0), proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock})))
+	groups := []p2p.GroupID{node.NodeConfig.GetClientGroupID()}
+	utils.Logger().Info().Msgf("broadcasting new block %d, group %s", newBlock.NumberU64(), groups[0])
+	msg := host.ConstructP2pMessage(byte(0), proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock}))
+	if err := node.host.SendMessageToGroups(groups, msg); err != nil {
+		utils.Logger().Warn().Err(err).Msg("cannot broadcast new block")
+	}
+}
+
+// BroadcastCrossLinkHeader is called by consensus leader to send the new header as cross link to beacon chain.
+func (node *Node) BroadcastCrossLinkHeader(newBlock *types.Block) {
+	utils.Logger().Info().Msgf("Broadcasting new header to beacon chain groupID %s", node.NodeConfig.GetBeaconGroupID())
+	lastThreeHeaders := []*types.Header{}
+
+	block := node.Blockchain().GetBlockByNumber(newBlock.NumberU64() - 2)
+	if block != nil {
+		lastThreeHeaders = append(lastThreeHeaders, block.Header())
+	}
+	block = node.Blockchain().GetBlockByNumber(newBlock.NumberU64() - 1)
+	if block != nil {
+		lastThreeHeaders = append(lastThreeHeaders, block.Header())
+	}
+	lastThreeHeaders = append(lastThreeHeaders, newBlock.Header())
+
+	node.host.SendMessageToGroups([]p2p.GroupID{node.NodeConfig.GetBeaconGroupID()}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCrossLinkHeadersMessage(lastThreeHeaders)))
+}
+
+// BroadcastCXReceipts broadcasts cross shard receipts to correspoding
+// destination shards
+func (node *Node) BroadcastCXReceipts(newBlock *types.Block) {
+	epoch := newBlock.Header().Epoch
+	shardingConfig := core.ShardingSchedule.InstanceForEpoch(epoch)
+	shardNum := int(shardingConfig.NumShards())
+	myShardID := node.Consensus.ShardID
+	utils.Logger().Info().Int("shardNum", shardNum).Uint32("myShardID", myShardID).Uint64("blockNum", newBlock.NumberU64()).Msg("[BroadcastCXReceipts]")
+
+	for i := 0; i < shardNum; i++ {
+		if i == int(myShardID) {
+			continue
+		}
+		cxReceipts, err := node.Blockchain().ReadCXReceipts(uint32(i), newBlock.NumberU64(), newBlock.Hash(), false)
+		if err != nil || len(cxReceipts) == 0 {
+			//utils.Logger().Warn().Err(err).Uint32("ToShardID", uint32(i)).Int("numCXReceipts", len(cxReceipts)).Msg("[BroadcastCXReceipts] No ReadCXReceipts found")
+			continue
+		}
+		merkleProof, err := node.Blockchain().CXMerkleProof(uint32(i), newBlock)
+		if err != nil {
+			utils.Logger().Warn().Uint32("ToShardID", uint32(i)).Msg("[BroadcastCXReceipts] Unable to get merkleProof")
+			continue
+		}
+		utils.Logger().Info().Uint32("ToShardID", uint32(i)).Msg("[BroadcastCXReceipts] ReadCXReceipts and MerkleProof Found")
+
+		groupID := p2p.ShardID(i)
+		go node.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(groupID)}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCXReceiptsProof(cxReceipts, merkleProof)))
 	}
 }
 
@@ -274,6 +339,13 @@ func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 	// TODO ek – where do we verify parent-child invariants,
 	//  e.g. "child.Number == child.IsGenesis() ? 0 : parent.Number+1"?
+
+	if newBlock.NumberU64() > 1 {
+		err := core.VerifyBlockLastCommitSigs(node.Blockchain(), newBlock)
+		if err != nil {
+			return err
+		}
+	}
 	if newBlock.ShardID() != node.Blockchain().ShardID() {
 		return ctxerror.New("wrong shard ID",
 			"my shard ID", node.Blockchain().ShardID(),
@@ -287,6 +359,20 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 		).WithCause(err)
 	}
 
+	// Verify cross links
+	if node.NodeConfig.ShardID == 0 {
+		err := node.VerifyBlockCrossLinks(newBlock)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = node.verifyIncomingReceipts(newBlock)
+	if err != nil {
+		return ctxerror.New("[VerifyNewBlock] Cannot ValidateNewBlock", "blockHash", newBlock.Hash(),
+			"numIncomingReceipts", len(newBlock.IncomingReceipts())).WithCause(err)
+	}
+
 	// TODO: verify the vrf randomness
 	// _ = newBlock.Header().Vrf
 
@@ -295,6 +381,70 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 	//	if err != nil {
 	//		return ctxerror.New("failed to verify sharding state").WithCause(err)
 	//	}
+	return nil
+}
+
+// VerifyBlockCrossLinks verifies the cross links of the block
+func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
+	if len(block.Header().CrossLinks) == 0 {
+		return nil
+	}
+	crossLinks := &types.CrossLinks{}
+	err := rlp.DecodeBytes(block.Header().CrossLinks, crossLinks)
+	if err != nil {
+		return ctxerror.New("[CrossLinkVerification] failed to decode cross links",
+			"blockHash", block.Hash(),
+			"crossLinks", len(block.Header().CrossLinks),
+		).WithCause(err)
+	}
+
+	if !crossLinks.IsSorted() {
+		return ctxerror.New("[CrossLinkVerification] cross links are not sorted",
+			"blockHash", block.Hash(),
+			"crossLinks", len(block.Header().CrossLinks),
+		)
+	}
+
+	firstCrossLinkBlock := core.ShardingSchedule.FirstCrossLinkBlock()
+
+	for i, crossLink := range *crossLinks {
+		lastLink := &types.CrossLink{}
+		if i == 0 {
+			if crossLink.BlockNum().Uint64() > firstCrossLinkBlock {
+				lastLink, err = node.Blockchain().ReadShardLastCrossLink(crossLink.ShardID())
+				if err != nil {
+					return ctxerror.New("[CrossLinkVerification] no last cross link found 1",
+						"blockHash", block.Hash(),
+						"crossLink", lastLink,
+					).WithCause(err)
+				}
+			}
+		} else {
+			if (*crossLinks)[i-1].Header().ShardID != crossLink.Header().ShardID {
+				if crossLink.BlockNum().Uint64() > firstCrossLinkBlock {
+					lastLink, err = node.Blockchain().ReadShardLastCrossLink(crossLink.ShardID())
+					if err != nil {
+						return ctxerror.New("[CrossLinkVerification] no last cross link found 2",
+							"blockHash", block.Hash(),
+							"crossLink", lastLink,
+						).WithCause(err)
+					}
+				}
+			} else {
+				lastLink = &(*crossLinks)[i-1]
+			}
+		}
+
+		if crossLink.BlockNum().Uint64() > firstCrossLinkBlock { // TODO: verify genesis block
+			err = node.VerifyCrosslinkHeader(lastLink.Header(), crossLink.Header())
+			if err != nil {
+				return ctxerror.New("cannot ValidateNewBlock",
+					"blockHash", block.Hash(),
+					"numTx", len(block.Transactions()),
+				).WithCause(err)
+			}
+		}
+	}
 	return nil
 }
 
@@ -408,24 +558,33 @@ func (node *Node) validateNewShardState(block *types.Block, stakeInfo *map[commo
 // PostConsensusProcessing is called by consensus participants, after consensus is done, to:
 // 1. add the new block to blockchain
 // 2. [leader] send new block to the client
+// 3. [leader] send cross shard tx receipts to destination shard
 func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
+	if err := node.AddNewBlock(newBlock); err != nil {
+		utils.Logger().Error().
+			Err(err).
+			Msg("Error when adding new block")
+		return
+	} else if core.IsEpochLastBlock(newBlock) {
+		node.Consensus.UpdateConsensusInformation()
+	}
+
 	// Update last consensus time for metrics
 	node.lastConsensusTime = time.Now().Unix()
 	if node.Consensus.PubKey.IsEqual(node.Consensus.LeaderPubKey) {
-		node.BroadcastNewBlock(newBlock)
+		if node.NodeConfig.ShardID == 0 {
+			node.BroadcastNewBlock(newBlock)
+		} else {
+			node.BroadcastCrossLinkHeader(newBlock)
+		}
+		node.BroadcastCXReceipts(newBlock)
 	} else {
 		utils.Logger().Info().
 			Uint64("ViewID", node.Consensus.GetViewID()).
 			Msg("BINGO !!! Reached Consensus")
 	}
 
-	if err := node.AddNewBlock(newBlock); err != nil {
-		utils.Logger().Error().
-			Err(err).
-			Msg("Error when adding new block")
-	} else if core.IsEpochLastBlock(newBlock) {
-		node.Consensus.UpdateConsensusInformation()
-	}
+	node.Blockchain().CleanCXReceiptsCheckpointsByBlock(newBlock)
 
 	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
 		// Update contract deployer's nonce so default contract like faucet can issue transaction with current nonce
