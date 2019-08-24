@@ -218,6 +218,7 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 		// The only possible consensus-error would be if there wasn't
 		// sufficient balance to make the transfer happen. The first
 		// balance transfer may never fail.
+
 		if vmerr == vm.ErrInsufficientBalance {
 			return nil, 0, false, vmerr
 		}
