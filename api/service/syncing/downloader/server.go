@@ -6,7 +6,7 @@ import (
 	"net"
 
 	pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/pkg/utils"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/peer"

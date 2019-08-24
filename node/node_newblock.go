@@ -11,7 +11,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/ctxerror"
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/pkg/utils"
 )
 
 // Constants of lower bound limit of a new block.

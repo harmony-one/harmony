@@ -8,8 +8,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	proto "github.com/harmony-one/harmony/api/client/service/proto"
 	"github.com/harmony-one/harmony/core/state"
-	common2 "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/utils"
+	common2 "github.com/harmony-one/harmony/pkg/common"
+	"github.com/harmony-one/harmony/pkg/utils"
 
 	"google.golang.org/grpc"
 )

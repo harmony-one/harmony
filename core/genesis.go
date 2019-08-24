@@ -35,7 +35,7 @@ import (
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/pkg/utils"
 )
 
 // no go:generate gencodec -type Genesis -field-override genesisSpecMarshaling -out gen_genesis.go

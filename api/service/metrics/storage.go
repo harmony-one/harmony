@@ -8,7 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/pkg/utils"
 )
 
 // Constants for storage.

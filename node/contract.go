@@ -16,10 +16,10 @@ import (
 	"github.com/harmony-one/harmony/contracts"
 	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/core/types"
-	common2 "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/genesis"
-	"github.com/harmony-one/harmony/internal/utils"
+	common2 "github.com/harmony-one/harmony/pkg/common"
+	"github.com/harmony-one/harmony/pkg/utils"
 )
 
 // Constants related to smart contract.

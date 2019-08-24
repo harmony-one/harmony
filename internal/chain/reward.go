@@ -11,9 +11,9 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
-	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/pkg/utils"
+	common2 "github.com/harmony-one/harmony/pkg/common"
 )
 
 // BlockReward is the block reward, to be split evenly among block signers.

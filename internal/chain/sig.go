@@ -6,7 +6,7 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/pkg/utils"
 )
 
 // ReadSignatureBitmapByPublicKeys read the payload of signature and bitmap based on public keys

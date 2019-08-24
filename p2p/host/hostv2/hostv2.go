@@ -9,7 +9,7 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/pkg/utils"
 	"github.com/harmony-one/harmony/p2p"
 
 	libp2p "github.com/libp2p/go-libp2p"

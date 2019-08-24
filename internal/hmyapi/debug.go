@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/pkg/utils"
 )
 
 // DebugAPI Internal JSON RPC for debugging purpose

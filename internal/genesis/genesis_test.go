@@ -12,7 +12,7 @@ import (
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 
-	"github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/pkg/common"
 )
 
 func TestString(t *testing.T) {

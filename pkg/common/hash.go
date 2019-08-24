@@ -9,7 +9,7 @@ import (
 	"reflect"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/pkg/utils"
 )
 
 // Lengths of hashes in bytes.

@@ -5,7 +5,7 @@ import (
 
 	libp2p_crypto "github.com/libp2p/go-libp2p-crypto"
 
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/pkg/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host/hostv2"
 )

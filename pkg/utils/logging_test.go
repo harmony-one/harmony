@@ -8,14 +8,14 @@ import (
 	"github.com/golang/mock/gomock"
 
 	matchers "github.com/harmony-one/harmony/gomock_matchers"
-	"github.com/harmony-one/harmony/internal/utils/mock_log"
+	"github.com/harmony-one/harmony/pkg/utils/mock_log"
 )
 
 //go:generate mockgen -destination mock_log/logger.go github.com/ethereum/go-ethereum/log Logger
 //go:generate mockgen -destination mock_log/handler.go github.com/ethereum/go-ethereum/log Handler
 
 const (
-	thisPkg  = "github.com/harmony-one/harmony/internal/utils"
+	thisPkg  = "github.com/harmony-one/harmony/pkg/utils"
 	thisFile = "logging_test.go"
 )
 

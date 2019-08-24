@@ -1,6 +1,6 @@
 package main
 
-import "github.com/harmony-one/harmony/internal/utils"
+import "github.com/harmony-one/harmony/pkg/utils"
 
 // Embed the default wallet.ini file into defaultWalletIni string literal constant
 func main() {

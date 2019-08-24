@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/pkg/utils"
 )
 
 // Constants used for attack model.

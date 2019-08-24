@@ -25,7 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/pkg/utils"
 )
 
 // errNoActiveJournal is returned if a transaction is attempted to be inserted

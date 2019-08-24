@@ -6,8 +6,8 @@ import (
 	"strconv"
 
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/pkg/common"
+	"github.com/harmony-one/harmony/pkg/utils"
 )
 
 /*

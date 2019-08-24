@@ -7,7 +7,7 @@ import (
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/pkg/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 )

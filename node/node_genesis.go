@@ -17,9 +17,9 @@ import (
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/genesis"
-	"github.com/harmony-one/harmony/internal/utils"
+	common2 "github.com/harmony-one/harmony/pkg/common"
+	"github.com/harmony-one/harmony/pkg/utils"
 )
 
 const (

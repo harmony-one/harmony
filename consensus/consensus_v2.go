@@ -17,9 +17,9 @@ import (
 	vrf_bls "github.com/harmony-one/harmony/crypto/vrf/bls"
 	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/ctxerror"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
+	"github.com/harmony-one/harmony/pkg/utils"
 	"github.com/harmony-one/vdf/src/vdf_go"
 )
 

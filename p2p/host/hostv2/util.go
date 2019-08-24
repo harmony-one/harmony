@@ -1,6 +1,6 @@
 package hostv2
 
-import "github.com/harmony-one/harmony/internal/utils"
+import "github.com/harmony-one/harmony/pkg/utils"
 
 func catchError(err error) {
 	if err != nil {

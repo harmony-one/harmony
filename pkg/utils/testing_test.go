@@ -6,7 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/golang/mock/gomock"
 
-	mock_utils "github.com/harmony-one/harmony/internal/utils/mock"
+	mock_utils "github.com/harmony-one/harmony/pkg/utils/mock"
 )
 
 func TestExampleTestLogRedirectorUsingGetLogInstance(t *testing.T) {

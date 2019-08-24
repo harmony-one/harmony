@@ -6,7 +6,7 @@ import (
 
 	"github.com/harmony-one/harmony/crypto/bls"
 
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/pkg/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 )

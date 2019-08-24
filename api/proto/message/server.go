@@ -10,7 +10,7 @@ import (
 	"net"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/pkg/utils"
 
 	"google.golang.org/grpc"
 )

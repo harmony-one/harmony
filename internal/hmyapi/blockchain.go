@@ -15,8 +15,8 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	internal_common "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/utils"
+	common2 "github.com/harmony-one/harmony/pkg/common"
+	"github.com/harmony-one/harmony/pkg/utils"
 )
 
 const (
@@ -89,7 +89,7 @@ func (s *PublicBlockChainAPI) GetStorageAt(ctx context.Context, address common.A
 // block numbers are also allowed.
 func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address string, blockNr rpc.BlockNumber) (*hexutil.Big, error) {
 	// TODO: currently only get latest balance. Will add complete logic later.
-	adr := internal_common.ParseAddr(address)
+	adr := common2.ParseAddr(address)
 	return s.b.GetBalance(adr)
 }
 

@@ -4,7 +4,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/drand"
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/pkg/utils"
 )
 
 // Service is the randomness generation service.

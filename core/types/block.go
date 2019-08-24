@@ -33,7 +33,7 @@ import (
 	"github.com/rs/zerolog"
 	"golang.org/x/crypto/sha3"
 
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/pkg/utils"
 )
 
 // Constants for block.

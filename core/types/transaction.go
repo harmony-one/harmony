@@ -28,7 +28,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
-	common2 "github.com/harmony-one/harmony/internal/common"
+	common2 "github.com/harmony-one/harmony/pkg/common"
 )
 
 // no go:generate gencodec -type txdata -field-override txdataMarshaling -out gen_tx_json.go

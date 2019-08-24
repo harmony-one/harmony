@@ -31,7 +31,7 @@ import (
 
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/pkg/utils"
 )
 
 // ChainIndexerBackend defines the methods needed to process chain segments in

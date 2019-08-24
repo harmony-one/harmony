@@ -11,7 +11,7 @@ import (
 	"github.com/fjl/memsize"
 	"github.com/fjl/memsize/memsizeui"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/pkg/utils"
 )
 
 // Constants for mem profiling.

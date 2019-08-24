@@ -33,7 +33,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/harmony-one/harmony/core/types"
-	common2 "github.com/harmony-one/harmony/internal/common"
+	common2 "github.com/harmony-one/harmony/pkg/common"
 )
 
 // Tests that updating a state trie does not leak any database writes prior to

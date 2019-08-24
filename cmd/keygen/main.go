@@ -10,7 +10,7 @@ import (
 
 	crypto2 "github.com/ethereum/go-ethereum/crypto"
 
-	"github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/pkg/common"
 )
 
 var (

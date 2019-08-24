@@ -12,7 +12,7 @@ import (
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/internal/hmyapi"
 	"github.com/harmony-one/harmony/internal/hmyapi/filters"
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/pkg/utils"
 )
 
 const (

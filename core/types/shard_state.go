@@ -9,8 +9,8 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"golang.org/x/crypto/sha3"
 
-	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
+	common2 "github.com/harmony-one/harmony/pkg/common"
 )
 
 // EpochShardState is the shard state of an epoch

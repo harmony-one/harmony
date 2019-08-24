@@ -12,7 +12,7 @@ import (
 
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/pkg/utils"
 )
 
 // MessageType is to indicate the specific type of message under Node category

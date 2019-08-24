@@ -8,8 +8,8 @@ import (
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/harmony-one/harmony/internal/bech32"
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/pkg/bech32"
+	"github.com/harmony-one/harmony/pkg/utils"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/sha3"
 )

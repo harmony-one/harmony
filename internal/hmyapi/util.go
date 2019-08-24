@@ -7,8 +7,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/harmony-one/harmony/core/types"
-	common2 "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/utils"
+	common2 "github.com/harmony-one/harmony/pkg/common"
+	"github.com/harmony-one/harmony/pkg/utils"
 )
 
 // SubmitTransaction is a helper function that submits tx to txPool and logs a message.

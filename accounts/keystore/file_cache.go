@@ -26,7 +26,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/pkg/utils"
 )
 
 // fileCache is a cache of files seen during scan of keystore.

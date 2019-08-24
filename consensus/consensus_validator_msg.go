@@ -3,7 +3,7 @@ package consensus
 import (
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/pkg/utils"
 )
 
 // Construct the prepare message to send to leader (assumption the consensus data is already verified)

@@ -13,7 +13,7 @@ import (
 	client "github.com/harmony-one/harmony/api/client/service/proto"
 	proto "github.com/harmony-one/harmony/api/client/service/proto"
 	"github.com/harmony-one/harmony/core/state"
-	common2 "github.com/harmony-one/harmony/internal/common"
+	common2 "github.com/harmony-one/harmony/pkg/common"
 
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"

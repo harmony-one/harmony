@@ -26,7 +26,7 @@ import (
 
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/ctxerror"
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/pkg/utils"
 )
 
 // Indicate whether the receipts corresponding to a blockHash is spent or not

@@ -4,7 +4,7 @@ import (
 	"time"
 
 	metrics "github.com/harmony-one/harmony/api/service/metrics"
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/pkg/utils"
 )
 
 // UpdateBlockHeightForMetrics updates block height for metrics service.

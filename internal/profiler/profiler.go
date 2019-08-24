@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/pkg/utils"
 	"github.com/shirou/gopsutil/process"
 )
 
