@@ -7,6 +7,7 @@ import (
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
@@ -73,6 +74,12 @@ func (s *Service) Run() {
 }
 
 func (s *Service) contactP2pPeers() {
+	nodeConfig := nodeconfig.GetShardConfig(s.config.ShardID)
+	// Don't send ping message for Explorer Node
+	if nodeConfig.Role() == nodeconfig.ExplorerNode {
+		return
+	}
+
 	tick := time.NewTicker(5 * time.Second)
 
 	pingMsg := proto_discovery.NewPingMessage(s.host.GetSelfPeer(), s.config.IsClient)
