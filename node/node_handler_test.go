@@ -30,7 +30,7 @@ func TestAddNewBlock(t *testing.T) {
 	nodeconfig.GetShardConfig(0).SetNetworkType(nodeconfig.Devnet)
 	node := New(host, consensus, testDBFactory, false)
 
-	selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock, common.Address{})
+	selectedTxs := node.getTransactionsForNewBlock(common.Address{})
 	node.Worker.CommitTransactions(selectedTxs, common.Address{})
 	block, _ := node.Worker.Commit([]byte{}, []byte{}, 0, common.Address{})
 
@@ -59,7 +59,7 @@ func TestVerifyNewBlock(t *testing.T) {
 	}
 	node := New(host, consensus, testDBFactory, false)
 
-	selectedTxs := node.getTransactionsForNewBlock(MaxNumberOfTransactionsPerBlock, common.Address{})
+	selectedTxs := node.getTransactionsForNewBlock(common.Address{})
 	node.Worker.CommitTransactions(selectedTxs, common.Address{})
 	block, _ := node.Worker.Commit([]byte{}, []byte{}, 0, common.Address{})
 

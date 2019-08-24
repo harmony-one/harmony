@@ -2,8 +2,10 @@ package shardingconfig
 
 import (
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/common/denominations"
 
 	"github.com/harmony-one/harmony/internal/genesis"
 )
@@ -50,4 +52,36 @@ func (pangaeaSchedule) FirstCrossLinkBlock() uint64 {
 //RandonnessStartingEpoch returns starting epoch of randonness generation
 func (pangaeaSchedule) RandomnessStartingEpoch() uint64 {
 	return mainnetRandomnessStartingEpoch
+}
+
+func (pangaeaSchedule) MaxTxAmountLimit() *big.Int {
+	amountBigInt := big.NewInt(mainnetMaxTxAmountLimit)
+	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(denominations.One))
+	return amountBigInt
+}
+
+func (pangaeaSchedule) MaxNumRecentTxsPerAccountLimit() uint64 {
+	return mainnetMaxNumRecentTxsPerAccountLimit
+}
+
+func (pangaeaSchedule) MaxTxPoolSizeLimit() int {
+	return mainnetMaxTxPoolSizeLimit
+}
+
+func (pangaeaSchedule) MaxNumTxsPerBlockLimit() int {
+	return mainnetMaxNumTxsPerBlockLimit
+}
+
+func (pangaeaSchedule) RecentTxDuration() time.Duration {
+	return mainnetRecentTxDuration
+}
+
+func (ps pangaeaSchedule) TxsThrottleConfig() *TxsThrottleConfig {
+	return &TxsThrottleConfig{
+		MaxTxAmountLimit:               ps.MaxTxAmountLimit(),
+		MaxNumRecentTxsPerAccountLimit: ps.MaxNumRecentTxsPerAccountLimit(),
+		MaxTxPoolSizeLimit:             ps.MaxTxPoolSizeLimit(),
+		MaxNumTxsPerBlockLimit:         ps.MaxNumTxsPerBlockLimit(),
+		RecentTxDuration:               ps.RecentTxDuration(),
+	}
 }
