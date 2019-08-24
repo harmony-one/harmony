@@ -13,7 +13,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	core_state "github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -105,7 +104,7 @@ func fundFaucetContract(chain *core.BlockChain) {
 	fmt.Println("--------- Funding addresses for Faucet Contract Call ---------")
 	fmt.Println()
 
-	contractworker = pkgworker.New(params.TestChainConfig, chain, consensus.NewFaker(), 0)
+	contractworker = pkgworker.New(params.TestChainConfig, chain, chain.Engine(), 0)
 	nonce = contractworker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(FaucetPriKey.PublicKey))
 	dataEnc = common.FromHex(FaucetContractBinary)
 	ftx, _ := types.SignTx(types.NewContractCreation(nonce, 0, big.NewInt(7000000000000000000), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, FaucetPriKey)
@@ -331,7 +330,7 @@ func playStakingContract(chain *core.BlockChain) {
 
 func main() {
 	genesis := gspec.MustCommit(database)
-	chain, _ := core.NewBlockChain(database, nil, gspec.Config, consensus.NewFaker(), vm.Config{}, nil)
+	chain, _ := core.NewBlockChain(database, nil, gspec.Config, chain.Engine(), vm.Config{}, nil)
 
 	txpool := core.NewTxPool(core.DefaultTxPoolConfig, chainConfig, chain)
 
@@ -345,7 +344,7 @@ func main() {
 	//// Generate a small n-block chain and an uncle block for it
 	n := 3
 	if n > 0 {
-		blocks, _ := core.GenerateChain(chainConfig, genesis, consensus.NewFaker(), database, n, func(i int, gen *core.BlockGen) {
+		blocks, _ := core.GenerateChain(chainConfig, genesis, chain.Engine(), database, n, func(i int, gen *core.BlockGen) {
 			gen.SetCoinbase(FaucetAddress)
 			gen.SetShardID(0)
 			gen.AddTx(pendingTxs[i])

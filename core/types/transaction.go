@@ -19,6 +19,7 @@ package types
 import (
 	"container/heap"
 	"errors"
+	"fmt"
 	"io"
 	"math/big"
 	"sync/atomic"
@@ -27,6 +28,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
+	common2 "github.com/harmony-one/harmony/internal/common"
 )
 
 // no go:generate gencodec -type txdata -field-override txdataMarshaling -out gen_tx_json.go
@@ -36,6 +38,17 @@ var (
 	ErrInvalidSig = errors.New("invalid transaction v, r, s values")
 )
 
+// TransactionType different types of transactions
+type TransactionType byte
+
+// Different Transaction Types
+const (
+	SameShardTx     TransactionType = iota
+	SubtractionOnly                 // only subtract tokens from source shard account
+	AdditionOnly                    // only add tokens to destination shard account
+	InvalidTx
+)
+
 // Transaction struct.
 type Transaction struct {
 	data txdata
@@ -43,6 +56,18 @@ type Transaction struct {
 	hash atomic.Value
 	size atomic.Value
 	from atomic.Value
+}
+
+//String print mode string
+func (txType TransactionType) String() string {
+	if txType == SameShardTx {
+		return "SameShardTx"
+	} else if txType == SubtractionOnly {
+		return "SubtractionOnly"
+	} else if txType == AdditionOnly {
+		return "AdditionOnly"
+	}
+	return "Unknown"
 }
 
 type txdata struct {
@@ -75,12 +100,17 @@ type txdataMarshaling struct {
 	S            *hexutil.Big
 }
 
-// NewTransaction returns new transaction.
+// NewTransaction returns new transaction, this method is to create same shard transaction
 func NewTransaction(nonce uint64, to common.Address, shardID uint32, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte) *Transaction {
 	return newTransaction(nonce, &to, shardID, amount, gasLimit, gasPrice, data)
 }
 
-// NewContractCreation returns contract transaction.
+// NewCrossShardTransaction returns new cross shard transaction
+func NewCrossShardTransaction(nonce uint64, to *common.Address, shardID uint32, toShardID uint32, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte) *Transaction {
+	return newCrossShardTransaction(nonce, to, shardID, toShardID, amount, gasLimit, gasPrice, data)
+}
+
+// NewContractCreation returns same shard contract transaction.
 func NewContractCreation(nonce uint64, shardID uint32, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte) *Transaction {
 	return newTransaction(nonce, nil, shardID, amount, gasLimit, gasPrice, data)
 }
@@ -93,6 +123,34 @@ func newTransaction(nonce uint64, to *common.Address, shardID uint32, amount *bi
 		AccountNonce: nonce,
 		Recipient:    to,
 		ShardID:      shardID,
+		ToShardID:    shardID,
+		Payload:      data,
+		Amount:       new(big.Int),
+		GasLimit:     gasLimit,
+		Price:        new(big.Int),
+		V:            new(big.Int),
+		R:            new(big.Int),
+		S:            new(big.Int),
+	}
+	if amount != nil {
+		d.Amount.Set(amount)
+	}
+	if gasPrice != nil {
+		d.Price.Set(gasPrice)
+	}
+
+	return &Transaction{data: d}
+}
+
+func newCrossShardTransaction(nonce uint64, to *common.Address, shardID uint32, toShardID uint32, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte) *Transaction {
+	if len(data) > 0 {
+		data = common.CopyBytes(data)
+	}
+	d := txdata{
+		AccountNonce: nonce,
+		Recipient:    to,
+		ShardID:      shardID,
+		ToShardID:    toShardID,
 		Payload:      data,
 		Amount:       new(big.Int),
 		GasLimit:     gasLimit,
@@ -119,6 +177,11 @@ func (tx *Transaction) ChainID() *big.Int {
 // ShardID returns which shard id this transaction was signed for (if at all)
 func (tx *Transaction) ShardID() uint32 {
 	return tx.data.ShardID
+}
+
+// ToShardID returns the destination shard id this transaction is going to
+func (tx *Transaction) ToShardID() uint32 {
+	return tx.data.ToShardID
 }
 
 // Protected returns whether the transaction is protected from replay protection.
@@ -307,6 +370,16 @@ func (s Transactions) GetRlp(i int) []byte {
 	return enc
 }
 
+// ToShardID returns the destination shardID of given transaction
+func (s Transactions) ToShardID(i int) uint32 {
+	return s[i].data.ToShardID
+}
+
+// MaxToShardID returns 0, arbitrary value, NOT use
+func (s Transactions) MaxToShardID() uint32 {
+	return 0
+}
+
 // TxDifference returns a new set which is the difference between a and b.
 func TxDifference(a, b Transactions) Transactions {
 	keep := make(Transactions, 0, len(a))
@@ -484,4 +557,31 @@ func (m Message) Data() []byte {
 // CheckNonce returns checkNonce of Message.
 func (m Message) CheckNonce() bool {
 	return m.checkNonce
+}
+
+// RecentTxsStats is a recent transactions stats map tracking stats like BlockTxsCounts.
+type RecentTxsStats map[uint64]BlockTxsCounts
+
+// String returns the string formatted representation of RecentTxsStats
+func (rts RecentTxsStats) String() string {
+	ret := "{ "
+	for blockNum, blockTxsCounts := range rts {
+		ret += fmt.Sprintf("blockNum:%d=%s", blockNum, blockTxsCounts.String())
+	}
+	ret += " }"
+	return ret
+}
+
+// BlockTxsCounts is a transactions counts map of
+// the number of transactions made by each account in a block on this node.
+type BlockTxsCounts map[common.Address]uint64
+
+// String returns the string formatted representation of BlockTxsCounts
+func (btc BlockTxsCounts) String() string {
+	ret := "{ "
+	for sender, numTxs := range btc {
+		ret += fmt.Sprintf("%s:%d,", common2.MustAddressToBech32(sender), numTxs)
+	}
+	ret += " }"
+	return ret
 }

@@ -29,6 +29,13 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
+// Indicate whether the receipts corresponding to a blockHash is spent or not
+const (
+	SpentByte byte = iota
+	UnspentByte
+	NAByte // not exist
+)
+
 // ReadCanonicalHash retrieves the hash assigned to a canonical block number.
 func ReadCanonicalHash(db DatabaseReader, number uint64) common.Hash {
 	data, _ := db.Get(headerHashKey(number))
@@ -332,7 +339,7 @@ func ReadBlock(db DatabaseReader, hash common.Hash, number uint64) *types.Block 
 	if body == nil {
 		return nil
 	}
-	return types.NewBlockWithHeader(header).WithBody(body.Transactions, body.Uncles)
+	return types.NewBlockWithHeader(header).WithBody(body.Transactions, body.Uncles, body.IncomingReceipts)
 }
 
 // WriteBlock serializes a block into the database, header and body separately.
@@ -464,7 +471,6 @@ func WriteLastCommits(
 	if err = db.Put(lastCommitsKey, data); err != nil {
 		return ctxerror.New("cannot write last commits").WithCause(err)
 	}
-	utils.GetLogger().Info("wrote last commits", "numShards", len(data))
 	return nil
 }
 
@@ -501,4 +507,104 @@ func ReadEpochVdfBlockNum(db DatabaseReader, epoch *big.Int) ([]byte, error) {
 // WriteEpochVdfBlockNum stores the VDF block number for the given epoch
 func WriteEpochVdfBlockNum(db DatabaseWriter, epoch *big.Int, data []byte) error {
 	return db.Put(epochVdfBlockNumberKey(epoch), data)
+}
+
+// ReadCrossLinkShardBlock retrieves the blockHash given shardID and blockNum
+func ReadCrossLinkShardBlock(db DatabaseReader, shardID uint32, blockNum uint64, temp bool) ([]byte, error) {
+	return db.Get(crosslinkKey(shardID, blockNum, temp))
+}
+
+// WriteCrossLinkShardBlock stores the blockHash given shardID and blockNum
+func WriteCrossLinkShardBlock(db DatabaseWriter, shardID uint32, blockNum uint64, data []byte, temp bool) error {
+	return db.Put(crosslinkKey(shardID, blockNum, temp), data)
+}
+
+// DeleteCrossLinkShardBlock deletes the blockHash given shardID and blockNum
+func DeleteCrossLinkShardBlock(db DatabaseDeleter, shardID uint32, blockNum uint64, temp bool) error {
+	return db.Delete(crosslinkKey(shardID, blockNum, temp))
+}
+
+// ReadShardLastCrossLink read the last cross link of a shard
+func ReadShardLastCrossLink(db DatabaseReader, shardID uint32) ([]byte, error) {
+	return db.Get(shardLastCrosslinkKey(shardID))
+}
+
+// WriteShardLastCrossLink stores the last cross link of a shard
+func WriteShardLastCrossLink(db DatabaseWriter, shardID uint32, data []byte) error {
+	return db.Put(shardLastCrosslinkKey(shardID), data)
+}
+
+// ReadCXReceipts retrieves all the transactions of receipts given destination shardID, number and blockHash
+func ReadCXReceipts(db DatabaseReader, shardID uint32, number uint64, hash common.Hash, temp bool) (types.CXReceipts, error) {
+	data, err := db.Get(cxReceiptKey(shardID, number, hash, temp))
+	if len(data) == 0 || err != nil {
+		utils.Logger().Info().Err(err).Uint64("number", number).Int("dataLen", len(data)).Msg("ReadCXReceipts")
+		return nil, err
+	}
+	cxReceipts := types.CXReceipts{}
+	if err := rlp.DecodeBytes(data, &cxReceipts); err != nil {
+		utils.Logger().Error().Err(err).Str("hash", hash.Hex()).Msg("Invalid cross-shard tx receipt array RLP")
+		return nil, err
+	}
+	return cxReceipts, nil
+}
+
+// WriteCXReceipts stores all the transaction receipts given destination shardID, blockNumber and blockHash
+func WriteCXReceipts(db DatabaseWriter, shardID uint32, number uint64, hash common.Hash, receipts types.CXReceipts, temp bool) error {
+	bytes, err := rlp.EncodeToBytes(receipts)
+	if err != nil {
+		utils.Logger().Error().Msg("[WriteCXReceipts] Failed to encode cross shard tx receipts")
+	}
+	// Store the receipt slice
+	if err := db.Put(cxReceiptKey(shardID, number, hash, temp), bytes); err != nil {
+		utils.Logger().Error().Msg("[WriteCXReceipts] Failed to store cxreceipts")
+	}
+	return err
+}
+
+// DeleteCXReceipts removes all receipt data associated with a block hash.
+func DeleteCXReceipts(db DatabaseDeleter, shardID uint32, number uint64, hash common.Hash, temp bool) {
+	if err := db.Delete(cxReceiptKey(shardID, number, hash, temp)); err != nil {
+		utils.Logger().Error().Msg("Failed to delete cross shard tx receipts")
+	}
+}
+
+// ReadCXReceiptsProofSpent check whether a CXReceiptsProof is unspent
+func ReadCXReceiptsProofSpent(db DatabaseReader, shardID uint32, number uint64) (byte, error) {
+	data, err := db.Get(cxReceiptSpentKey(shardID, number))
+	if err != nil || len(data) == 0 {
+		return NAByte, ctxerror.New("[ReadCXReceiptsProofSpent] Cannot find the key", "shardID", shardID, "number", number).WithCause(err)
+	}
+	return data[0], nil
+}
+
+// WriteCXReceiptsProofSpent write CXReceiptsProof as spent into database
+func WriteCXReceiptsProofSpent(dbw DatabaseWriter, cxp *types.CXReceiptsProof) error {
+	shardID := cxp.MerkleProof.ShardID
+	blockNum := cxp.MerkleProof.BlockNum.Uint64()
+	return dbw.Put(cxReceiptSpentKey(shardID, blockNum), []byte{SpentByte})
+}
+
+// DeleteCXReceiptsProofSpent removes unspent indicator of a given blockHash
+func DeleteCXReceiptsProofSpent(db DatabaseDeleter, shardID uint32, number uint64) {
+	if err := db.Delete(cxReceiptSpentKey(shardID, number)); err != nil {
+		utils.Logger().Error().Msg("Failed to delete receipts unspent indicator")
+	}
+}
+
+// ReadCXReceiptsProofUnspentCheckpoint returns the last unspent blocknumber
+func ReadCXReceiptsProofUnspentCheckpoint(db DatabaseReader, shardID uint32) (uint64, error) {
+	by, err := db.Get(cxReceiptUnspentCheckpointKey(shardID))
+	if err != nil {
+		return 0, ctxerror.New("[ReadCXReceiptsProofUnspent] Cannot Unspent Checkpoint", "shardID", shardID).WithCause(err)
+	}
+	lastCheckpoint := binary.BigEndian.Uint64(by[:])
+	return lastCheckpoint, nil
+}
+
+// WriteCXReceiptsProofUnspentCheckpoint check whether a CXReceiptsProof is unspent, true means not spent
+func WriteCXReceiptsProofUnspentCheckpoint(db DatabaseWriter, shardID uint32, blockNum uint64) error {
+	by := make([]byte, 8)
+	binary.BigEndian.PutUint64(by[:], blockNum)
+	return db.Put(cxReceiptUnspentCheckpointKey(shardID), by)
 }

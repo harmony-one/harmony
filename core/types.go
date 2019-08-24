@@ -32,7 +32,7 @@ type Validator interface {
 
 	// ValidateState validates the given statedb and optionally the receipts and
 	// gas used.
-	ValidateState(block, parent *types.Block, state *state.DB, receipts types.Receipts, usedGas uint64) error
+	ValidateState(block, parent *types.Block, state *state.DB, receipts types.Receipts, cxs types.CXReceipts, usedGas uint64) error
 }
 
 // Processor is an interface for processing blocks using a given initial state.
@@ -42,5 +42,5 @@ type Validator interface {
 // of gas used in the process and return an error if any of the internal rules
 // failed.
 type Processor interface {
-	Process(block *types.Block, statedb *state.DB, cfg vm.Config) (types.Receipts, []*types.Log, uint64, error)
+	Process(block *types.Block, statedb *state.DB, cfg vm.Config) (types.Receipts, types.CXReceipts, []*types.Log, uint64, error)
 }

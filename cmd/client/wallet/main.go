@@ -91,7 +91,9 @@ var (
 	transferSenderPtr     = transferCommand.String("from", "0", "Specify the sender account address or index")
 	transferReceiverPtr   = transferCommand.String("to", "", "Specify the receiver account")
 	transferAmountPtr     = transferCommand.Float64("amount", 0, "Specify the amount to transfer")
+	transferGasPricePtr   = transferCommand.Uint64("gasPrice", 0, "Specify the gas price amount. Unit is Nano.")
 	transferShardIDPtr    = transferCommand.Int("shardID", 0, "Specify the shard ID for the transfer")
+	transferToShardIDPtr  = transferCommand.Int("toShardID", 0, "Specify the destination shard ID for the transfer")
 	transferInputDataPtr  = transferCommand.String("inputData", "", "Base64-encoded input data to embed in the transaction")
 	transferSenderPassPtr = transferCommand.String("pass", "", "Passphrase of the sender's private key")
 
@@ -160,6 +162,7 @@ func main() {
 		fmt.Println("        --to             - The receiver account's address")
 		fmt.Println("        --amount         - The amount of token to transfer")
 		fmt.Println("        --shardID        - The shard Id for the transfer")
+		fmt.Println("        --toShardID      - The destination shard Id for the transfer")
 		fmt.Println("        --inputData      - Base64-encoded input data to embed in the transaction")
 		fmt.Println("        --pass           - Passphrase of sender's private key")
 		fmt.Println("    8. export        - Export account key to a new file")
@@ -651,7 +654,9 @@ func processTransferCommand() {
 	sender := *transferSenderPtr
 	receiver := *transferReceiverPtr
 	amount := *transferAmountPtr
+	gasPrice := *transferGasPricePtr
 	shardID := *transferShardIDPtr
+	toShardID := *transferToShardIDPtr
 	base64InputData := *transferInputDataPtr
 	senderPass := *transferSenderPassPtr
 
@@ -662,7 +667,7 @@ func processTransferCommand() {
 		return
 	}
 
-	if shardID == -1 {
+	if shardID == -1 || toShardID == -1 {
 		fmt.Println("Please specify the shard ID for the transfer (e.g. --shardID=0)")
 		return
 	}
@@ -708,9 +713,16 @@ func processTransferCommand() {
 		return
 	}
 
-	tx := types.NewTransaction(
-		state.nonce, receiverAddress, uint32(shardID), amountBigInt,
-		gas, nil, inputData)
+	fromShard := uint32(shardID)
+	toShard := uint32(toShardID)
+	var tx *types.Transaction
+
+	gasPriceBigInt := big.NewInt(int64(gasPrice))
+	gasPriceBigInt = gasPriceBigInt.Mul(gasPriceBigInt, big.NewInt(denominations.Nano))
+
+	tx = types.NewCrossShardTransaction(
+		state.nonce, &receiverAddress, fromShard, toShard, amountBigInt,
+		gas, gasPriceBigInt, inputData)
 
 	account, err := ks.Find(accounts.Account{Address: senderAddress})
 	if err != nil {
@@ -718,7 +730,13 @@ func processTransferCommand() {
 		return
 	}
 
-	err = ks.Unlock(account, senderPass)
+	newPass, err := utils.GetPassphraseFromSource(senderPass)
+	if err != nil {
+		fmt.Printf("Cannot read passphrase: %s\n", err)
+		os.Exit(3)
+	}
+
+	err = ks.Unlock(account, newPass)
 	if err != nil {
 		fmt.Printf("Unlock account failed! %v\n", err)
 		return
@@ -726,7 +744,7 @@ func processTransferCommand() {
 
 	fmt.Printf("Unlock account succeeded! '%v'\n", senderPass)
 
-	tx, err = ks.SignTx(account, tx, nil)
+	tx, err = ks.SignTx(account, tx, big.NewInt(1))
 	if err != nil {
 		fmt.Printf("SignTx Error: %v\n", err)
 		return
