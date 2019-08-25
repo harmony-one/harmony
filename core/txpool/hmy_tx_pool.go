@@ -91,8 +91,13 @@ func (pool *HmyTxPool) removeByNumTxsPastHour(newTxs types.Transactions) types.T
 	return res
 }
 
-// Add new transactions to the pending transaction list.
-func (pool *HmyTxPool) addPendingTransactions(newTxs types.Transactions) {
+// GetTxPoolSize returns tx pool size.
+func (pool *HmyTxPool) GetTxPoolSize() int {
+	return len(pool.pendingTransactions)
+}
+
+// AddPendingTransactions add new transactions to the pending transaction list.
+func (pool *HmyTxPool) AddPendingTransactions(newTxs types.Transactions) {
 	newTxs = pool.removeOverLimitAmountTxs(newTxs)
 	newTxs = pool.removeByNumTxsPastHour(newTxs)
 	pool.pendingTxMutex.Lock()
@@ -106,7 +111,7 @@ func (pool *HmyTxPool) addPendingTransactions(newTxs types.Transactions) {
 
 // AddPendingTransaction adds one new transaction to the pending transaction list.
 func (pool *HmyTxPool) AddPendingTransaction(newTx *types.Transaction) {
-	pool.addPendingTransactions(types.Transactions{newTx})
+	pool.AddPendingTransactions(types.Transactions{newTx})
 	utils.Logger().Error().Int("totalPending", len(pool.pendingTransactions)).Msg("Got ONE more transaction")
 }
 

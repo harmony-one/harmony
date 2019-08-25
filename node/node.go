@@ -21,6 +21,7 @@ import (
 	"github.com/harmony-one/harmony/contracts"
 	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/txpool"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/drand"
 	"github.com/harmony-one/harmony/internal/chain"
@@ -116,7 +117,7 @@ type Node struct {
 	// BeaconNeighbors store only neighbor nodes in the beacon chain shard
 	BeaconNeighbors sync.Map // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
 
-	TxPool       *core.TxPool
+	TxPool       *txpool.HmyTxPool
 	Worker       *worker.Worker
 	BeaconWorker *worker.Worker // worker for beacon chain
 
@@ -244,11 +245,7 @@ func (node *Node) reducePendingTransactions() {
 // Add new transactions to the pending transaction list.
 func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
-		node.pendingTxMutex.Lock()
-		node.pendingTransactions = append(node.pendingTransactions, newTxs...)
-		node.reducePendingTransactions()
-		node.pendingTxMutex.Unlock()
-		utils.Logger().Info().Int("num", len(newTxs)).Int("totalPending", len(node.pendingTransactions)).Msg("Got more transactions")
+		node.TxPool.AddPendingTransactions(newTxs)
 	}
 }
 
@@ -359,7 +356,8 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		node.BlockChannel = make(chan *types.Block)
 		node.ConfirmedBlockChannel = make(chan *types.Block)
 		node.BeaconBlockChannel = make(chan *types.Block)
-		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, node.Blockchain().Config(), blockchain)
+		// node.TxPool = txpool.NewTxPool(core.DefaultTxPoolConfig, node.Blockchain().Config(), blockchain)
+		node.TxPool = txpool.NewHmyTxPool(node.BlockPeriod, node.Blockchain())
 		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine, node.Consensus.ShardID)
 		if node.Blockchain().ShardID() != 0 {
 			node.BeaconWorker = worker.New(node.Beaconchain().Config(), beaconChain, chain.Engine, node.Consensus.ShardID)

@@ -84,7 +84,7 @@ func (node *Node) CollectMetrics() {
 		prevNumPeers = node.UpdateConnectionsNumberForMetrics(prevNumPeers)
 		prevLastConsensusTime = node.UpdateLastConsensusTimeForMetrics(prevLastConsensusTime)
 		node.UpdateBalanceForMetrics()
-		node.UpdateTxPoolSizeForMetrics(node.TxPool.GetTxPoolSize())
+		node.UpdateTxPoolSizeForMetrics(uint64(node.TxPool.GetTxPoolSize()))
 		node.UpdateIsLeaderForMetrics()
 	}
 }

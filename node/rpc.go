@@ -46,7 +46,8 @@ var (
 // StartRPC start RPC service
 func (node *Node) StartRPC(nodePort string) error {
 	// Gather all the possible APIs to surface
-	harmony, _ = hmy.New(node, node.TxPool, new(event.TypeMux))
+	// TODO(add txpool instead of nil)
+	harmony, _ = hmy.New(node, nil, new(event.TypeMux))
 
 	apis := node.APIs()
 
