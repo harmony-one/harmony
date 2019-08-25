@@ -53,19 +53,6 @@ func TestConstructTransactionListMessageAccount(t *testing.T) {
 	}
 }
 
-func TestConstructRequestTransactionsMessage(t *testing.T) {
-	txIDs := [][]byte{
-		{1, 2},
-		{3, 4},
-	}
-
-	buf := ConstructRequestTransactionsMessage(txIDs)
-
-	if len(buf) == 0 {
-		t.Error("Failed to contruct request transaction message")
-	}
-}
-
 func TestConstructBlocksSyncMessage(t *testing.T) {
 
 	db := ethdb.NewMemDatabase()

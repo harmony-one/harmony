@@ -51,7 +51,6 @@ type TransactionMessageType int
 // Constant of transaction message subtype
 const (
 	Send TransactionMessageType = iota
-	Request
 	Unlock
 )
 
@@ -134,17 +133,6 @@ func ConstructTransactionListMessageAccount(transactions types.Transactions) []b
 		return []byte{} // TODO(RJ): better handle of the error
 	}
 	byteBuffer.Write(txs)
-	return byteBuffer.Bytes()
-}
-
-// ConstructRequestTransactionsMessage constructs serialized transactions
-func ConstructRequestTransactionsMessage(transactionIds [][]byte) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
-	byteBuffer.WriteByte(byte(Transaction))
-	byteBuffer.WriteByte(byte(Request))
-	for _, txID := range transactionIds {
-		byteBuffer.Write(txID)
-	}
 	return byteBuffer.Bytes()
 }
 
