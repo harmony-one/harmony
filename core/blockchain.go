@@ -1072,7 +1072,10 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 			continue
 		}
 		shardReceipts := GetToShardReceipts(cxReceipts, uint32(i))
-		rawdb.WriteCXReceipts(batch, uint32(i), block.NumberU64(), block.Hash(), shardReceipts, false)
+		err := rawdb.WriteCXReceipts(batch, uint32(i), block.NumberU64(), block.Hash(), shardReceipts, false)
+		if err != nil {
+			utils.Logger().Debug().Err(err).Interface("shardReceipts", shardReceipts).Int("toShardID", i).Msg("WriteCXReceipts cannot write into database")
+		}
 	}
 
 	// Mark incomingReceipts in the block as spent
