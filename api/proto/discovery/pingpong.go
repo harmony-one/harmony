@@ -1,11 +1,9 @@
 /*
-Package proto/discovery implements the discovery ping/pong protocol among nodes.
+Package proto/discovery implements the discovery ping protocol among nodes.
 
-pingpong.go adds support of ping/pong messages.
+pingpong.go adds support of ping messages.
 
 ping: from node to peers, sending IP/Port/PubKey info
-pong: peer responds to ping messages, sending all pubkeys known by peer
-
 */
 
 package discovery
@@ -15,7 +13,6 @@ import (
 	"encoding/gob"
 	"fmt"
 
-	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/api/proto/node"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -30,22 +27,8 @@ type PingMessageType struct {
 	Node    node.Info
 }
 
-// PongMessageType defines the data structure of the Pong message
-type PongMessageType struct {
-	ShardID      uint32
-	Version      uint16 // version of the protocol
-	Peers        []node.Info
-	PubKeys      [][]byte // list of publickKeys, has to be identical among all validators/leaders
-	LeaderPubKey []byte   // public key of shard leader
-}
-
 func (p PingMessageType) String() string {
 	return fmt.Sprintf("ping:%v/%v=>%v:%v/%v", p.Node.Role, p.Version, p.Node.IP, p.Node.Port, p.Node.PubKey)
-}
-
-func (p PongMessageType) String() string {
-	str := fmt.Sprintf("pong:%v=>length:%v, keys:%v, leader:%v\n", p.Version, len(p.Peers), len(p.PubKeys), len(p.LeaderPubKey))
-	return str
 }
 
 // NewPingMessage creates a new Ping message based on the p2p.Peer input
@@ -68,40 +51,6 @@ func NewPingMessage(peer p2p.Peer, isClient bool) *PingMessageType {
 	return ping
 }
 
-// NewPongMessage creates a new Pong message based on a list of p2p.Peer and a list of publicKeys
-func NewPongMessage(peers []p2p.Peer, pubKeys []*bls.PublicKey, leaderKey *bls.PublicKey, shardID uint32) *PongMessageType {
-	pong := new(PongMessageType)
-	pong.ShardID = shardID
-	pong.PubKeys = make([][]byte, 0)
-
-	pong.Version = proto.ProtocolVersion
-	pong.Peers = make([]node.Info, 0)
-
-	var err error
-	for _, p := range peers {
-		n := node.Info{}
-		n.IP = p.IP
-		n.Port = p.Port
-		n.PeerID = p.PeerID
-		n.PubKey = p.ConsensusPubKey.Serialize()
-		if err != nil {
-			fmt.Printf("Error Marshal PubKey: %v", err)
-			continue
-		}
-		pong.Peers = append(pong.Peers, n)
-	}
-
-	for _, p := range pubKeys {
-		key := p.Serialize()
-
-		pong.PubKeys = append(pong.PubKeys, key)
-	}
-
-	pong.LeaderPubKey = leaderKey.Serialize()
-
-	return pong
-}
-
 // GetPingMessage deserializes the Ping Message from a list of byte
 func GetPingMessage(payload []byte) (*PingMessageType, error) {
 	ping := new(PingMessageType)
@@ -118,24 +67,6 @@ func GetPingMessage(payload []byte) (*PingMessageType, error) {
 	return ping, nil
 }
 
-// GetPongMessage deserializes the Pong Message from a list of byte
-func GetPongMessage(payload []byte) (*PongMessageType, error) {
-	pong := new(PongMessageType)
-	pong.Peers = make([]node.Info, 0)
-	pong.PubKeys = make([][]byte, 0)
-
-	r := bytes.NewBuffer(payload)
-	decoder := gob.NewDecoder(r)
-	err := decoder.Decode(pong)
-
-	if err != nil {
-		utils.Logger().Error().Err(err).Msg("[GetPongMessage] Decode")
-		return nil, fmt.Errorf("Decode Pong Error")
-	}
-
-	return pong, nil
-}
-
 // ConstructPingMessage contructs ping message from node to leader
 func (p PingMessageType) ConstructPingMessage() []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
@@ -145,20 +76,6 @@ func (p PingMessageType) ConstructPingMessage() []byte {
 	err := encoder.Encode(p)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("[ConstructPingMessage] Encode")
-		return nil
-	}
-	return byteBuffer.Bytes()
-}
-
-// ConstructPongMessage contructs pong message from leader to node
-func (p PongMessageType) ConstructPongMessage() []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
-	byteBuffer.WriteByte(byte(node.PONG))
-
-	encoder := gob.NewEncoder(byteBuffer)
-	err := encoder.Encode(p)
-	if err != nil {
-		utils.Logger().Error().Err(err).Msg("[ConstructPongMessage] Encode")
 		return nil
 	}
 	return byteBuffer.Bytes()

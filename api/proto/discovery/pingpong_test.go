@@ -37,8 +37,6 @@ var (
 			ConsensusPubKey: pubKey2,
 		},
 	}
-	e2 = "pong:1=>length:2"
-
 	leaderPubKey = pki.GetBLSPrivateKeyFromInt(888).GetPublicKey()
 
 	pubKeys = []*bls.PublicKey{pubKey1, pubKey2}
@@ -61,13 +59,6 @@ func TestString(test *testing.T) {
 	if strings.Compare(r3, e3) != 0 {
 		test.Errorf("expect: %v, got: %v", e3, r3)
 	}
-
-	pong1 := NewPongMessage(p2, pubKeys, leaderPubKey, 0)
-	r2 := fmt.Sprintf("%v", *pong1)
-
-	if !strings.HasPrefix(r2, e2) {
-		test.Errorf("expect: %v, got: %v", e2, r2)
-	}
 }
 
 func TestSerialize(test *testing.T) {
@@ -83,21 +74,5 @@ func TestSerialize(test *testing.T) {
 	}
 	if !reflect.DeepEqual(ping, ping1) {
 		test.Error("Serialize/Deserialze Ping Message Failed")
-	}
-
-	pong1 := NewPongMessage(p2, pubKeys, leaderPubKey, 0)
-	buf2 = pong1.ConstructPongMessage()
-
-	msg2, err := proto.GetMessagePayload(buf2)
-	if err != nil {
-		test.Error("GetMessagePayload Failed!")
-	}
-	pong, err := GetPongMessage(msg2)
-	if err != nil {
-		test.Error("Pong failed!")
-	}
-
-	if !reflect.DeepEqual(pong, pong1) {
-		test.Error("Serialize/Deserialze Pong Message Failed")
 	}
 }

@@ -74,19 +74,18 @@ func (s *Service) Run() {
 }
 
 func (s *Service) contactP2pPeers() {
+	pingInterval := 5
+
 	nodeConfig := nodeconfig.GetShardConfig(s.config.ShardID)
 	// Don't send ping message for Explorer Node
 	if nodeConfig.Role() == nodeconfig.ExplorerNode {
 		return
 	}
-
-	tick := time.NewTicker(5 * time.Second)
-
 	pingMsg := proto_discovery.NewPingMessage(s.host.GetSelfPeer(), s.config.IsClient)
 
-	utils.Logger().Info().Interface("myPing", pingMsg).Msg("Constructing Ping Message")
 	msgBuf := host.ConstructP2pMessage(byte(0), pingMsg.ConstructPingMessage())
 	s.sentPingMessage(s.config.ShardGroupID, msgBuf)
+	utils.Logger().Info().Interface("[PING]", pingMsg).Msg("Sent Ping Message")
 
 	for {
 		select {
@@ -102,29 +101,20 @@ func (s *Service) contactP2pPeers() {
 					s.addBeaconPeerFunc(&peer)
 				}
 			}
-			// Add to outgoing peer list
-			// s.host.AddOutgoingPeer(peer)
-			// utils.Logger().Debug().Interface("add outgoing peer", peer).Msg("[DISCOVERY]")
 		case <-s.stopChan:
-			utils.Logger().Debug().Msg("[DISCOVERY] stop pinging ...")
 			return
-		case action := <-s.actionChan:
-			s.config.Actions[action.Name] = action.Action
-		case <-tick.C:
-			for g, a := range s.config.Actions {
-				if a == p2p.ActionPause {
-					// Received Pause Message, to reduce the frequency of ping message to every 1 minute
-					// TODO (leo) use different timer tick for different group, mainly differentiate beacon and regular shards
-					// beacon ping could be less frequent than regular shard
-					tick.Stop()
-					tick = time.NewTicker(5 * time.Minute)
-				}
-
-				if a == p2p.ActionStart || a == p2p.ActionResume || a == p2p.ActionPause {
-					s.sentPingMessage(g, msgBuf)
-				}
-			}
 		}
+
+		s.sentPingMessage(s.config.ShardGroupID, msgBuf)
+		utils.Logger().Info().Interface("[PING]", pingMsg).Msg("Sent Ping Message")
+
+		// the longest sleep is 3600 seconds
+		if pingInterval >= 3600 {
+			pingInterval = 3600
+		} else {
+			pingInterval *= 2
+		}
+		time.Sleep(time.Duration(pingInterval) * time.Second)
 	}
 }
 

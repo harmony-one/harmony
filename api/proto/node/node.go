@@ -25,7 +25,6 @@ const (
 	Client
 	_    // used to be Control
 	PING // node send ip/pki to register with leader
-	PONG // node broadcast pubK
 	ShardState
 )
 

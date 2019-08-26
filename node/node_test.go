@@ -13,8 +13,6 @@ import (
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/shardchain"
 
-	"github.com/harmony-one/bls/ffi/go/bls"
-
 	"github.com/harmony-one/harmony/drand"
 
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
@@ -284,51 +282,9 @@ func sendPingMessage(node *Node, leader p2p.Peer) {
 	_ = ping2.ConstructPingMessage()
 }
 
-func sendPongMessage(node *Node, leader p2p.Peer) {
-	pubKey1 := pki.GetBLSPrivateKeyFromInt(333).GetPublicKey()
-	pubKey2 := pki.GetBLSPrivateKeyFromInt(444).GetPublicKey()
-	p1 := p2p.Peer{
-		IP:              "127.0.0.1",
-		Port:            "9998",
-		ConsensusPubKey: pubKey1,
-	}
-	p2 := p2p.Peer{
-		IP:              "127.0.0.1",
-		Port:            "9999",
-		ConsensusPubKey: pubKey2,
-	}
-
-	pubKeys := []*bls.PublicKey{pubKey1, pubKey2}
-	leaderPubKey := pki.GetBLSPrivateKeyFromInt(888).GetPublicKey()
-
-	pong1 := proto_discovery.NewPongMessage([]p2p.Peer{p1, p2}, pubKeys, leaderPubKey, 0)
-	_ = pong1.ConstructPongMessage()
-}
-
 func exitServer() {
 	fmt.Println("wait 5 seconds to terminate the process ...")
 	time.Sleep(5 * time.Second)
 
 	os.Exit(0)
-}
-
-func TestPingPongHandler(t *testing.T) {
-	blsKey := bls2.RandPrivateKey()
-	pubKey := blsKey.GetPublicKey()
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "8881", ConsensusPubKey: pubKey}
-	//   validator := p2p.Peer{IP: "127.0.0.1", Port: "9991"}
-	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
-	host, err := p2pimpl.NewHost(&leader, priKey)
-	if err != nil {
-		t.Fatalf("newhost failure: %v", err)
-	}
-	consensus, err := consensus.New(host, 0, leader, blsKey)
-	if err != nil {
-		t.Fatalf("Cannot craeate consensus: %v", err)
-	}
-	node := New(host, consensus, testDBFactory, false)
-	//go sendPingMessage(leader)
-	go sendPongMessage(node, leader)
-	go exitServer()
-	node.StartServer()
 }

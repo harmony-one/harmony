@@ -304,13 +304,6 @@ func (node *Node) getTransactionsForNewBlock(coinbase common.Address) types.Tran
 	return selected
 }
 
-// MaybeKeepSendingPongMessage keeps sending pong message if the current node is a leader.
-func (node *Node) MaybeKeepSendingPongMessage() {
-	if node.Consensus != nil && node.Consensus.IsLeader() {
-		go node.SendPongMessage()
-	}
-}
-
 // StartServer starts a server and process the requests by a handler.
 func (node *Node) StartServer() {
 	select {}
@@ -436,6 +429,8 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 
 	node.startConsensus = make(chan struct{})
 
+	go node.bootstrapConsensus()
+
 	return &node
 }
 
@@ -494,12 +489,6 @@ func (node *Node) AddPeers(peers []*p2p.Peer) int {
 		}
 	}
 
-	// Only leader needs to add the peer info into consensus
-	// Validators will receive the updated peer info from Leader via pong message
-	// TODO: remove this after fully migrating to beacon chain-based committee membership
-	//	// TODO: make peers into a context object shared by consensus and drand
-	//	node.DRand.AddPeers(peers)
-	//}
 	return count
 }
 
