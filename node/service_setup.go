@@ -88,10 +88,6 @@ func (node *Node) setupForExplorerNode() {
 
 // ServiceManagerSetup setups service store.
 func (node *Node) ServiceManagerSetup() {
-	// Run pingpong message protocol for all type of nodes.
-	// TODO(investigation): This is supposed to move to discovery service but it did not work when trying to move there.
-	node.MaybeKeepSendingPongMessage()
-
 	node.serviceManager = &service.Manager{}
 	node.serviceMessageChan = make(map[service.Type]chan *msg_pb.Message)
 	switch node.NodeConfig.Role() {
