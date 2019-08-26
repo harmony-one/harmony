@@ -785,11 +785,11 @@ func (node *Node) bootstrapConsensus() {
 			if numPeersNow == 0 {
 				utils.Logger().Info().
 					Int("numPeersNow", numPeersNow).
-					Msg("[PONG] No peers, continue")
+					Msg("No peers, continue")
 				continue
 			}
 			if numPeersNow >= node.Consensus.MinPeers {
-				utils.Logger().Info().Msg("[PONG] StartConsensus")
+				utils.Logger().Info().Msg("[bootstrap] StartConsensus")
 				node.startConsensus <- struct{}{}
 				return
 			}
