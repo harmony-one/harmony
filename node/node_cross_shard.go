@@ -42,6 +42,8 @@ func (node *Node) ProcessHeaderMessage(msgPayload []byte) {
 				crossLinkHeadersToProcess = append(crossLinkHeadersToProcess, header)
 			}
 		}
+		utils.Logger().Debug().
+			Msgf("[ProcessingHeader] number of crosslink headers to propose %d, firstCrossLinkBlock %d", len(crossLinkHeadersToProcess), firstCrossLinkBlock)
 
 		headersToQuque := []*types.Header{}
 
@@ -60,6 +62,8 @@ func (node *Node) ProcessHeaderMessage(msgPayload []byte) {
 					previousLink, err = node.Blockchain().ReadCrossLink(header.ShardID, header.Number.Uint64()-1, true)
 					if err != nil {
 						headersToQuque = append(headersToQuque, header)
+						utils.Logger().Debug().Err(err).
+							Msg("[ProcessingHeader] ReadCrossLink cannot read previousLink")
 						continue
 					}
 				}
