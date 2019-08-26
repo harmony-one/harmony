@@ -9,6 +9,7 @@ import (
 	"path"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/natefinch/lumberjack"
@@ -139,6 +140,7 @@ func setZeroLoggerFileOutput(filepath string, maxSize int) error {
 // Logger returns a zerolog.Logger singleton
 func Logger() *zerolog.Logger {
 	if zeroLogger == nil {
+		zerolog.TimeFieldFormat = time.RFC3339Nano
 		logger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr}).
 			Level(zeroLoggerLevel).
 			With().
