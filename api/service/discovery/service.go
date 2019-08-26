@@ -85,7 +85,6 @@ func (s *Service) contactP2pPeers() {
 
 	msgBuf := host.ConstructP2pMessage(byte(0), pingMsg.ConstructPingMessage())
 	s.sentPingMessage(s.config.ShardGroupID, msgBuf)
-	utils.Logger().Info().Interface("[PING]", pingMsg).Msg("Sent Ping Message")
 
 	for {
 		select {
@@ -106,7 +105,6 @@ func (s *Service) contactP2pPeers() {
 		}
 
 		s.sentPingMessage(s.config.ShardGroupID, msgBuf)
-		utils.Logger().Info().Interface("[PING]", pingMsg).Msg("Sent Ping Message")
 
 		// the longest sleep is 3600 seconds
 		if pingInterval >= 3600 {

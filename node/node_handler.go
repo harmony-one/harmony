@@ -724,20 +724,6 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) i
 	peer.PeerID = ping.Node.PeerID
 	peer.ConsensusPubKey = nil
 
-	utils.Logger().Info().
-		Str("Peer Version", ping.NodeVer).
-		Interface("PeerID", peer).
-		Msg("[PING] received ping message")
-
-	senderStr := string(sender)
-	if senderStr != "" {
-		_, ok := node.duplicatedPing.LoadOrStore(senderStr, true)
-		if ok {
-			// duplicated ping message return
-			return 0
-		}
-	}
-
 	if ping.Node.PubKey != nil {
 		peer.ConsensusPubKey = &bls.PublicKey{}
 		if err := peer.ConsensusPubKey.Deserialize(ping.Node.PubKey[:]); err != nil {
@@ -748,10 +734,21 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) i
 		}
 	}
 
-	var k types.BlsPublicKey
-	if err := k.FromLibBLSPublicKey(peer.ConsensusPubKey); err != nil {
-		err = ctxerror.New("cannot convert BLS public key").WithCause(err)
-		ctxerror.Log15(utils.GetLogger().Warn, err)
+	utils.Logger().Info().
+		Str("Version", ping.NodeVer).
+		Str("BlsKey", peer.ConsensusPubKey.SerializeToHexStr()).
+		Str("IP", peer.IP).
+		Str("Port", peer.Port).
+		Interface("PeerID", peer.PeerID).
+		Msg("[PING] PeerInfo")
+
+	senderStr := string(sender)
+	if senderStr != "" {
+		_, ok := node.duplicatedPing.LoadOrStore(senderStr, true)
+		if ok {
+			// duplicated ping message return
+			return 0
+		}
 	}
 
 	// add to incoming peer list
