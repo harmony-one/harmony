@@ -27,11 +27,11 @@ const (
 	localnetFirstCrossLinkBlock     = 3
 	localnetRandomnessStartingEpoch = 0
 
-	localnetMaxTxAmountLimit               = 1e2 // unit is in One
-	localnetMaxNumRecentTxsPerAccountLimit = 2
+	localnetMaxTxAmountLimit               = 1e3 // unit is in One
+	localnetMaxNumRecentTxsPerAccountLimit = 1e2
 	localnetMaxTxPoolSizeLimit             = 8000
 	localnetMaxNumTxsPerBlockLimit         = 1000
-	localnetRecentTxDuration               = 10 * time.Second
+	localnetRecentTxDuration               = time.Hour
 )
 
 func (localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
