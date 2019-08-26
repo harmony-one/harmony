@@ -14,6 +14,7 @@ import (
 	"github.com/harmony-one/harmony/api/client"
 	clientService "github.com/harmony-one/harmony/api/client/service"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
@@ -30,6 +31,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
+	p2p_host "github.com/harmony-one/harmony/p2p/host"
 )
 
 // State is a state of a node.
@@ -246,6 +248,14 @@ func (node *Node) reducePendingTransactions() {
 	}
 }
 
+func (node *Node) tryBroadcast(tx *types.Transaction) {
+	msg := proto_node.ConstructTransactionListMessageAccount(types.Transactions{tx})
+
+	if err := node.host.SendMessageToGroups([]p2p.GroupID{node.NodeConfig.GetShardGroupID()}, p2p_host.ConstructP2pMessage(byte(0), msg)); err != nil {
+		utils.Logger().Error().Msg("Error when trying to broadcast tx")
+	}
+}
+
 // Add new transactions to the pending transaction list.
 func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 	node.pendingTxMutex.Lock()
@@ -256,8 +266,13 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 }
 
 // AddPendingTransaction adds one new transaction to the pending transaction list.
+// This is only called from SDK.
 func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
-	node.addPendingTransactions(types.Transactions{newTx})
+	if node.NodeConfig.ShardID == newTx.ShardID() {
+		node.addPendingTransactions(types.Transactions{newTx})
+	} else {
+		node.tryBroadcast(newTx)
+	}
 	utils.Logger().Debug().Int("totalPending", len(node.pendingTransactions)).Msg("Got ONE more transaction")
 }
 
