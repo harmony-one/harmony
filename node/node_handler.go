@@ -245,28 +245,6 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 				Msg("Failed to deserialize transaction list")
 		}
 		node.addPendingTransactions(txs)
-
-	case proto_node.Request:
-		reader := bytes.NewBuffer(msgPayload[1:])
-		txIDs := make(map[[32]byte]bool)
-		buf := make([]byte, 32) // 32 byte hash Id
-		for {
-			_, err := reader.Read(buf)
-			if err != nil {
-				break
-			}
-
-			var txID [32]byte
-			copy(txID[:], buf)
-			txIDs[txID] = true
-		}
-
-		var txToReturn []*types.Transaction
-		for _, tx := range node.pendingTransactions {
-			if txIDs[tx.Hash()] {
-				txToReturn = append(txToReturn, tx)
-			}
-		}
 	}
 }
 
