@@ -51,6 +51,8 @@ const (
 const (
 	// TxPoolLimit is the limit of transaction pool.
 	TxPoolLimit = 20000
+	// NumTryBroadCast is the number of times trying to broadcast
+	NumTryBroadCast = 3
 )
 
 func (state State) String() string {
@@ -253,8 +255,13 @@ func (node *Node) tryBroadcast(tx *types.Transaction) {
 
 	shardGroupID := p2p.NewGroupIDByShardID(p2p.ShardID(tx.ShardID()))
 	utils.Logger().Info().Str("shardGroupID", string(shardGroupID)).Msg("tryBroadcast")
-	if err := node.host.SendMessageToGroups([]p2p.GroupID{shardGroupID}, p2p_host.ConstructP2pMessage(byte(0), msg)); err != nil {
-		utils.Logger().Error().Msg("Error when trying to broadcast tx")
+
+	for attempt := 0; attempt < NumTryBroadCast; attempt++ {
+		if err := node.host.SendMessageToGroups([]p2p.GroupID{shardGroupID}, p2p_host.ConstructP2pMessage(byte(0), msg)); err != nil && attempt < NumTryBroadCast {
+			utils.Logger().Error().Int("attempt", attempt).Msg("Error when trying to broadcast tx")
+		} else {
+			break
+		}
 	}
 }
 
