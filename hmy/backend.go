@@ -11,6 +11,7 @@ import (
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // Harmony implements the Harmony full node service.
@@ -31,6 +32,7 @@ type Harmony struct {
 
 	nodeAPI NodeAPI
 
+	shardID uint32
 	// aka network version, which is used to identify which network we are using
 	networkID uint64
 	// TODO(ricl): put this into config object
@@ -50,7 +52,7 @@ type NodeAPI interface {
 
 // New creates a new Harmony object (including the
 // initialisation of the common Harmony object)
-func New(nodeAPI NodeAPI, txPool *core.TxPool, eventMux *event.TypeMux) (*Harmony, error) {
+func New(nodeAPI NodeAPI, txPool *core.TxPool, eventMux *event.TypeMux, shardID uint32) (*Harmony, error) {
 	chainDb := nodeAPI.Blockchain().ChainDB()
 	hmy := &Harmony{
 		shutdownChan:   make(chan bool),
@@ -63,7 +65,9 @@ func New(nodeAPI NodeAPI, txPool *core.TxPool, eventMux *event.TypeMux) (*Harmon
 		bloomIndexer:   NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms),
 		nodeAPI:        nodeAPI,
 		networkID:      1, // TODO(ricl): this should be from config
+		shardID:        shardID,
 	}
+	utils.GetLogger().Info("Minh_harmony", "shardid", shardID)
 
 	hmy.APIBackend = &APIBackend{hmy}
 

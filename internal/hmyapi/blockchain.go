@@ -197,3 +197,22 @@ func doCall(ctx context.Context, b Backend, args CallArgs, blockNr rpc.BlockNumb
 	}
 	return res, gas, failed, err
 }
+
+// GetShardingStructure returns an array of sharding structures.
+func (s *PublicBlockChainAPI) GetShardingStructure(ctx context.Context) ([]map[string]interface{}, error) {
+	res := []map[string]interface{}{
+		map[string]interface{}{
+			"shardID": 0,
+			"http":    "http://127.0.0.1:9500",
+			"ws":      "ws://127.0.0.1:9500",
+			"current": s.b.GetShardID() == 0,
+		},
+		map[string]interface{}{
+			"shardID": 1,
+			"http":    "http://127.0.0.1:9501",
+			"ws":      "ws://127.0.0.1:9501",
+			"current": s.b.GetShardID() == 1,
+		},
+	}
+	return res, nil
+}
