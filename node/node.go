@@ -251,7 +251,9 @@ func (node *Node) reducePendingTransactions() {
 func (node *Node) tryBroadcast(tx *types.Transaction) {
 	msg := proto_node.ConstructTransactionListMessageAccount(types.Transactions{tx})
 
-	if err := node.host.SendMessageToGroups([]p2p.GroupID{node.NodeConfig.GetShardGroupID()}, p2p_host.ConstructP2pMessage(byte(0), msg)); err != nil {
+	shardGroupID := p2p.NewGroupIDByShardID(p2p.ShardID(tx.ShardID()))
+	utils.Logger().Info().Str("shardGroupID", string(shardGroupID)).Msg("tryBroadcast")
+	if err := node.host.SendMessageToGroups([]p2p.GroupID{shardGroupID}, p2p_host.ConstructP2pMessage(byte(0), msg)); err != nil {
 		utils.Logger().Error().Msg("Error when trying to broadcast tx")
 	}
 }
@@ -268,9 +270,10 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 // AddPendingTransaction adds one new transaction to the pending transaction list.
 // This is only called from SDK.
 func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
-	if node.NodeConfig.ShardID == newTx.ShardID() {
+	if node.Consensus.IsLeader() && newTx.ShardID() == node.NodeConfig.ShardID {
 		node.addPendingTransactions(types.Transactions{newTx})
 	} else {
+		utils.Logger().Info().Str("Hash", newTx.Hash().Hex()).Msg("Broadcasting Tx")
 		node.tryBroadcast(newTx)
 	}
 	utils.Logger().Debug().Int("totalPending", len(node.pendingTransactions)).Msg("Got ONE more transaction")
