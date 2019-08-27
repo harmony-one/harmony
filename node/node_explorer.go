@@ -100,7 +100,7 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 
 // AddNewBlockForExplorer add new block for explorer.
 func (node *Node) AddNewBlockForExplorer() {
-	utils.Logger().Info().Msg("[Explorer] Add new block for explorer")
+	utils.Logger().Debug().Msg("[Explorer] Add new block for explorer")
 	// Search for the next block in PbftLog and commit the block into blockchain for explorer node.
 	for {
 		blocks := node.Consensus.PbftLog.GetBlocksByNumber(node.Blockchain().CurrentBlock().NumberU64() + 1)
@@ -110,7 +110,7 @@ func (node *Node) AddNewBlockForExplorer() {
 			if len(blocks) > 1 {
 				utils.Logger().Error().Msg("[Explorer] We should have not received more than one block with the same block height.")
 			}
-			utils.Logger().Info().Uint64("blockHeight", blocks[0].NumberU64()).Msg("Adding new block for explorer node")
+			utils.Logger().Debug().Uint64("blockHeight", blocks[0].NumberU64()).Msg("Adding new block for explorer node")
 			if err := node.AddNewBlock(blocks[0]); err == nil {
 				// Clean up the blocks to avoid OOM.
 				node.Consensus.PbftLog.DeleteBlockByNumber(blocks[0].NumberU64())
@@ -166,7 +166,7 @@ func (node *Node) CommitCommittee() {
 		}
 		for _, committee := range state {
 			if committee.ShardID == curBlock.ShardID() {
-				utils.Logger().Info().Msg("[Explorer] Dumping committee")
+				utils.Logger().Debug().Msg("[Explorer] Dumping committee")
 				err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).DumpCommittee(curBlock.ShardID(), curBlock.Epoch().Uint64(), committee)
 				if err != nil {
 					utils.Logger().Warn().Err(err).Msgf("[Explorer] Error dumping committee for block %d", curBlock.NumberU64())

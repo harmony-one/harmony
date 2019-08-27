@@ -43,16 +43,16 @@ func New(h p2p.Host, config service.NodeConfig, peerChan chan p2p.Peer, addPeer 
 
 // StartService starts discovery service.
 func (s *Service) StartService() {
-	utils.Logger().Info().Msg("Starting discovery service")
+	utils.Logger().Debug().Msg("Starting discovery service")
 	s.Init()
 	s.Run()
 }
 
 // StopService shutdowns discovery service.
 func (s *Service) StopService() {
-	utils.Logger().Info().Msg("Shutting down discovery service")
+	utils.Logger().Debug().Msg("Shutting down discovery service")
 	s.stopChan <- struct{}{}
-	utils.Logger().Info().Msg("discovery service stopped")
+	utils.Logger().Debug().Msg("discovery service stopped")
 }
 
 // NotifyService receives notification from service manager
@@ -64,7 +64,7 @@ func (s *Service) NotifyService(params map[string]interface{}) {
 		return
 	}
 
-	utils.Logger().Info().Interface("got notified", action).Msg("[DISCOVERY]")
+	utils.Logger().Debug().Interface("got notified", action).Msg("[DISCOVERY]")
 	s.actionChan <- action
 }
 
@@ -130,13 +130,13 @@ func (s *Service) sentPingMessage(g p2p.GroupID, msgBuf []byte) {
 		err = s.host.SendMessageToGroups([]p2p.GroupID{s.config.ShardGroupID}, msgBuf)
 	}
 	if err != nil {
-		utils.Logger().Error().Str("group", string(g)).Msg("Failed to send ping message")
+		utils.Logger().Error().Err(err).Str("group", string(g)).Msg("Failed to send ping message")
 	}
 }
 
 // Init is to initialize for discoveryService.
 func (s *Service) Init() {
-	utils.Logger().Info().Msg("Init discovery service")
+	utils.Logger().Debug().Msg("Init discovery service")
 }
 
 // SetMessageChan sets up message channel to service.

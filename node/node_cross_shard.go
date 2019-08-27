@@ -62,7 +62,7 @@ func (node *Node) ProcessHeaderMessage(msgPayload []byte) {
 					previousLink, err = node.Blockchain().ReadCrossLink(header.ShardID, header.Number.Uint64()-1, true)
 					if err != nil {
 						headersToQuque = append(headersToQuque, header)
-						utils.Logger().Debug().Err(err).
+						utils.Logger().Error().Err(err).
 							Msg("[ProcessingHeader] ReadCrossLink cannot read previousLink")
 						continue
 					}
@@ -70,7 +70,7 @@ func (node *Node) ProcessHeaderMessage(msgPayload []byte) {
 
 				err = node.VerifyCrosslinkHeader(previousLink.Header(), header)
 				if err != nil {
-					utils.Logger().Warn().
+					utils.Logger().Error().
 						Err(err).
 						Msgf("[ProcessingHeader] Failed to verify new cross link header for shardID %d, blockNum %d", header.ShardID, header.Number)
 					continue
@@ -229,13 +229,13 @@ func (node *Node) ProposeCrossLinkDataForBeaconchain() (types.CrossLinks, error)
 
 			if link.BlockNum().Uint64() > firstCrossLinkBlock {
 				if lastLink == nil {
-					utils.Logger().Debug().
+					utils.Logger().Error().
 						Err(err).
 						Msgf("[CrossLink] Haven't received the first cross link %d", link.BlockNum().Uint64())
 				} else {
 					err := node.VerifyCrosslinkHeader(lastLink.Header(), link.Header())
 					if err != nil {
-						utils.Logger().Debug().
+						utils.Logger().Error().
 							Err(err).
 							Msgf("[CrossLink] Failed verifying temp cross link %d", link.BlockNum().Uint64())
 						break
