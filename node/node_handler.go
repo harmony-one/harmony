@@ -315,7 +315,7 @@ func (node *Node) BroadcastCXReceipts(newBlock *types.Block) {
 		}
 		cxReceipts, err := node.Blockchain().ReadCXReceipts(uint32(i), newBlock.NumberU64(), newBlock.Hash(), false)
 		if err != nil || len(cxReceipts) == 0 {
-			//utils.Logger().Warn().Err(err).Uint32("ToShardID", uint32(i)).Int("numCXReceipts", len(cxReceipts)).Msg("[BroadcastCXReceipts] No ReadCXReceipts found")
+			utils.Logger().Warn().Err(err).Uint32("ToShardID", uint32(i)).Int("numCXReceipts", len(cxReceipts)).Msg("[BroadcastCXReceipts] No ReadCXReceipts found")
 			continue
 		}
 		merkleProof, err := node.Blockchain().CXMerkleProof(uint32(i), newBlock)
