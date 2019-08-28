@@ -13,6 +13,7 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+	badger "github.com/ipfs/go-ds-badger"
 	libp2pdis "github.com/libp2p/go-libp2p-discovery"
 	libp2pdht "github.com/libp2p/go-libp2p-kad-dht"
 	peerstore "github.com/libp2p/go-libp2p-peerstore"
@@ -56,10 +57,12 @@ const (
 func New(h p2p.Host, rendezvous p2p.GroupID, peerChan chan p2p.Peer, bootnodes utils.AddrList) *Service {
 	var cancel context.CancelFunc
 	ctx, cancel = context.WithTimeout(context.Background(), connectionTimeout)
-	dht, err := libp2pdht.New(ctx, h.GetP2PHost())
+	dataStore, err := badger.NewDatastore(fmt.Sprintf(".dht-%s-%s", h.GetSelfPeer().IP, h.GetSelfPeer().Port), nil)
 	if err != nil {
 		panic(err)
 	}
+
+	dht := libp2pdht.NewDHT(ctx, h.GetP2PHost(), dataStore)
 
 	return &Service{
 		Host:        h,

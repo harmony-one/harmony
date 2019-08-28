@@ -25,7 +25,7 @@ require (
 	github.com/harmony-one/vdf v1.0.0
 	github.com/hashicorp/golang-lru v0.5.1
 	github.com/iancoleman/strcase v0.0.0-20190422225806-e506e3ef7365
-	github.com/ipfs/go-datastore v0.0.5
+	github.com/ipfs/go-ds-badger v0.0.5
 	github.com/ipfs/go-log v0.0.1
 	github.com/karalabe/hid v1.0.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
