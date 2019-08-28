@@ -3,6 +3,7 @@ package networkinfo
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net"
 	"sync"
 	"time"
@@ -36,16 +37,16 @@ type Service struct {
 
 // ConnectionRetry set the number of retry of connection to bootnode in case the initial connection is failed
 var (
-	// retry for 10 minutes and give up then
-	ConnectionRetry = 300
+	// retry for 60 minutes and give up then
+	ConnectionRetry = 360
 
 	// context
 	ctx context.Context
 )
 
 const (
-	waitInRetry       = 2 * time.Second
-	connectionTimeout = 3 * time.Minute
+	waitInRetry       = 10
+	connectionTimeout = 30 * time.Minute
 	findPeerInterval  = 60 * time.Second
 
 	// register to bootnode every ticker
@@ -112,7 +113,7 @@ func (s *Service) Init() error {
 			for i := 0; i < ConnectionRetry; i++ {
 				if err := s.Host.GetP2PHost().Connect(ctx, *peerinfo); err != nil {
 					utils.Logger().Warn().Err(err).Int("try", i).Msg("can't connect to bootnode")
-					time.Sleep(waitInRetry)
+					time.Sleep(time.Duration(5+rand.Intn(waitInRetry)) * time.Second) // sleep for 5-15 seconds
 				} else {
 					utils.Logger().Info().Int("try", i).Interface("node", *peerinfo).Msg("connected to bootnode")
 					// it is okay if any bootnode is connected
