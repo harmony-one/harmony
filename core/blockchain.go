@@ -2222,3 +2222,59 @@ func (bc *BlockChain) CleanCXReceiptsCheckpointsByBlock(block *types.Block) {
 		bc.cleanCXReceiptsCheckpoints(k, v)
 	}
 }
+
+// FindLatestCrossLinkHeader returns the latest crosslink's blocknum by shardID
+func (bc *BlockChain) FindLatestCrossLinkHeader(shardID uint32) (uint64, error) {
+	header := bc.CurrentHeader()
+	if header == nil {
+		return 0, ctxerror.New("[FindLatestCrossLinkHeader] CurrentHeader is Nil")
+	}
+	if header.ShardID != 0 {
+		return 0, ctxerror.New("[FindLatestCrossLinkHeader] Non Beaconchain don't have crosslink")
+	}
+	firstCrossLinkBlock := ShardingSchedule.FirstCrossLinkBlock()
+	if header.Number.Uint64() < firstCrossLinkBlock {
+		return 0, ctxerror.New("[FindLatestCrossLinkHeader] BlockNumber less than firstCrossLinkBlock", "firstCrossLinkBlock", firstCrossLinkBlock)
+	}
+
+	latestBlockNum := uint64(0)
+
+Loop:
+	for {
+		if header == nil || header.Number.Uint64() < firstCrossLinkBlock {
+			break
+		}
+		if len(header.CrossLinks) > 0 {
+			crossLinks := &types.CrossLinks{}
+			if err := rlp.DecodeBytes(header.CrossLinks, crossLinks); err != nil {
+				utils.Logger().Info().Msg("[FindLatestCrossLinkHeader] CrossLink Decoding Error")
+				if block := bc.GetBlockByHash(header.ParentHash); block != nil {
+					header = block.Header()
+				} else {
+					header = nil
+				}
+				continue Loop
+			}
+			for _, crossLink := range *crossLinks {
+				if crossLink.ChainHeader.ShardID == shardID {
+					blockNum := crossLink.ChainHeader.Number.Uint64()
+					if latestBlockNum < blockNum {
+						latestBlockNum = blockNum
+					}
+				}
+			}
+			break
+		}
+		if block := bc.GetBlockByHash(header.ParentHash); block != nil {
+			header = block.Header()
+		} else {
+			header = nil
+		}
+	}
+
+	if latestBlockNum > 0 {
+		utils.Logger().Debug().Uint64("BlockNum", latestBlockNum).Msg("[FindLatestCrossLinkHeader] Find Latest CrossLink Header")
+		return latestBlockNum, nil
+	}
+	return 0, ctxerror.New("[FindLatestCrossLinkHeader] CrossLinkNotFind")
+}
