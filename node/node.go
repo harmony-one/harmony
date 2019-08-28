@@ -237,7 +237,7 @@ func (node *Node) reducePendingTransactions() {
 	// If length of pendingTransactions is greater than TxPoolLimit then by greedy take the TxPoolLimit recent transactions.
 	if curLen > txPoolLimit+txPoolLimit {
 		node.pendingTransactions = append(types.Transactions(nil), node.pendingTransactions[curLen-txPoolLimit:]...)
-		utils.GetLogger().Info("mem stat reduce pending transaction")
+		utils.Logger().Info().Msg("mem stat reduce pending transaction")
 	}
 }
 

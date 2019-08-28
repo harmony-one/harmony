@@ -63,7 +63,9 @@ func ConvertFixedDataIntoByteArray(data interface{}) []byte {
 	buff := new(bytes.Buffer)
 	err := binary.Write(buff, binary.BigEndian, data)
 	if err != nil {
-		GetLogger().Crit("Failed to convert fixed data into byte array", "err", err)
+		Logger().Error().
+			AnErr("err", err).
+			Msg("Failed to convert fixed data into byte array")
 	}
 	return buff.Bytes()
 }
@@ -195,16 +197,22 @@ func LoadKeyFromFile(keyfile string) (key p2p_crypto.PrivKey, pk p2p_crypto.PubK
 	var keyStruct PrivKeyStore
 	err = Load(keyfile, &keyStruct)
 	if err != nil {
-		GetLogger().Info("No priviate key can be loaded from file", "keyfile", keyfile)
-		GetLogger().Info("Using random private key")
+		Logger().Info().
+			Str("keyfile", keyfile).
+			Msg("No private key can be loaded from file")
+		Logger().Info().Msg("Using random private key")
 		key, pk, err = GenKeyP2PRand()
 		if err != nil {
-			GetLogger().Crit("LoadKeyFromFile", "GenKeyP2PRand Error", err)
+			Logger().Error().
+				AnErr("GenKeyP2PRand Error", err).
+				Msg("LoadedKeyFromFile")
 			panic(err)
 		}
 		err = SaveKeyToFile(keyfile, key)
 		if err != nil {
-			GetLogger().Error("failed to save key to keyfile", "keyfile", err)
+			Logger().Error().
+				AnErr("keyfile", err).
+				Msg("failed to save key to keyfile")
 		}
 		return key, pk, nil
 	}
