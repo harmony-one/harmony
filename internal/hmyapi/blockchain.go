@@ -108,7 +108,9 @@ func (s *PublicBlockChainAPI) Call(ctx context.Context, args CallArgs, blockNr r
 
 func doCall(ctx context.Context, b Backend, args CallArgs, blockNr rpc.BlockNumber, vmCfg vm.Config, timeout time.Duration, globalGasCap *big.Int) ([]byte, uint64, bool, error) {
 	defer func(start time.Time) {
-		utils.GetLogInstance().Debug("Executing EVM call finished", "runtime", time.Since(start))
+		utils.Logger().Debug().
+			Dur("runtime", time.Since(start)).
+			Msg("Executing EVM call finished")
 	}(time.Now())
 
 	state, header, err := b.StateAndHeaderByNumber(ctx, blockNr)
@@ -139,7 +141,10 @@ func doCall(ctx context.Context, b Backend, args CallArgs, blockNr rpc.BlockNumb
 		gas = uint64(*args.Gas)
 	}
 	if globalGasCap != nil && globalGasCap.Uint64() < gas {
-		utils.GetLogInstance().Warn("Caller gas above allowance, capping", "requested", gas, "cap", globalGasCap)
+		utils.Logger().Warn().
+			Uint64("requested", gas).
+			Uint64("cap", globalGasCap.Uint64()).
+			Msg("Caller gas above allowance, capping")
 		gas = globalGasCap.Uint64()
 	}
 	gasPrice := new(big.Int).SetUint64(defaultGasPrice)

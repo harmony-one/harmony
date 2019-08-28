@@ -47,7 +47,9 @@ func (m *MemProfiling) Config() {
 		Addr:    fmt.Sprintf("%s:%s", nodeconfig.GetDefaultConfig().IP, utils.GetPortFromDiff(nodeconfig.GetDefaultConfig().Port, MemProfilingPortDiff)),
 		Handler: m.h,
 	}
-	utils.GetLogInstance().Info("running mem profiling", "port", utils.GetPortFromDiff(nodeconfig.GetDefaultConfig().Port, MemProfilingPortDiff))
+	utils.Logger().Info().
+		Str("port", utils.GetPortFromDiff(nodeconfig.GetDefaultConfig().Port, MemProfilingPortDiff)).
+		Msgf("running mem profiling")
 }
 
 // Add adds variables to watch for profiling.
@@ -67,7 +69,7 @@ func (m *MemProfiling) Add(name string, v interface{}) {
 func (m *MemProfiling) Start() {
 	go m.s.ListenAndServe()
 	m.PeriodicallyScanMemSize()
-	utils.GetLogInstance().Info("Start memprofiling.")
+	utils.Logger().Info().Msg("Start memprofiling.")
 }
 
 // Stop stops mem profiling.
@@ -86,7 +88,7 @@ func (m *MemProfiling) PeriodicallyScanMemSize() {
 				for k, v := range m.observedObject {
 					s := memsize.Scan(v)
 					r := s.Report()
-					utils.GetLogInstance().Info(fmt.Sprintf("memsize report for %s:\n %s", k, r))
+					utils.Logger().Info().Msgf("memsize report for %s:\n %s", k, r)
 				}
 				m.mu.Unlock()
 			}
@@ -120,11 +122,11 @@ func MaybeCallGCPeriodically() {
 func PrintMemUsage(msg string) {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
-	utils.GetLogInstance().Info(msg,
-		"alloc", bToMb(m.Alloc),
-		"totalalloc", bToMb(m.TotalAlloc),
-		"sys", bToMb(m.Sys),
-		"numgc", m.NumGC)
+	utils.Logger().Info().
+		Uint64("alloc", bToMb(m.Alloc)).
+		Uint64("totalalloc", bToMb(m.TotalAlloc)).
+		Uint64("sys", bToMb(m.Sys)).
+		Uint32("numgc", m.NumGC)
 }
 
 func bToMb(b uint64) uint64 {
