@@ -198,11 +198,31 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	accountBlocks := s.ReadBlocksFromDB(fromInt, toInt)
+	curEpoch := int64(-1)
+	committee := &types.Committee{}
 	for id, accountBlock := range accountBlocks {
 		if id == 0 || id == len(accountBlocks)-1 || accountBlock == nil {
 			continue
 		}
 		block := NewBlock(accountBlock, id+fromInt-1)
+		if len(block.Signers) == 0 {
+			if int64(block.Epoch) > curEpoch {
+				if bytes, err := db.Get([]byte(GetCommitteeKey(uint32(s.ShardID), block.Epoch))); err == nil {
+					committee = &types.Committee{}
+					if err = rlp.DecodeBytes(bytes, committee); err != nil {
+						utils.Logger().Warn().Err(err).Msg("cannot read committee for new epoch")
+					}
+				}
+				curEpoch = int64(block.Epoch)
+			}
+			for i, validator := range committee.NodeList {
+				oneAddress, err := common2.AddressToBech32(validator.EcdsaAddress)
+				if err != nil && accountBlock.Header().LastCommitBitmap[i] != 0x0 {
+					continue
+				}
+				block.Signers = append(block.Signers, oneAddress)
+			}
+		}
 		// Populate transactions
 		for _, tx := range accountBlock.Transactions() {
 			transaction := GetTransaction(tx, accountBlock)

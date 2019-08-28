@@ -92,17 +92,15 @@ func NewBlock(block *types.Block, height int) *Block {
 	if err == nil {
 		for _, committee := range state {
 			if committee.ShardID == block.ShardID() {
-				for _, validator := range committee.NodeList {
+				for i, validator := range committee.NodeList {
 					oneAddress, err := common.AddressToBech32(validator.EcdsaAddress)
-					if err != nil {
+					if err != nil && block.Header().LastCommitBitmap[i] != 0x0 {
 						continue
 					}
 					signers = append(signers, oneAddress)
 				}
 			}
 		}
-	} else {
-		utils.Logger().Warn().Err(err).Msgf("bad state block %d", block.NumberU64())
 	}
 	return &Block{
 		Height:     strconv.Itoa(height),
