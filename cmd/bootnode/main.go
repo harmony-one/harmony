@@ -14,8 +14,7 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 
-	ds "github.com/ipfs/go-datastore"
-	dsync "github.com/ipfs/go-datastore/sync"
+	badger "github.com/ipfs/go-ds-badger"
 
 	kaddht "github.com/libp2p/go-libp2p-kad-dht"
 )
@@ -74,7 +73,10 @@ func main() {
 	// set the KValue to 50 for DHT
 	// 50 is the size of every bucket in the DHT
 	kaddht.KValue = 50
-	dataStore := dsync.MutexWrap(ds.NewMapDatastore())
+	dataStore, err := badger.NewDatastore(fmt.Sprintf(".dht-%s-%s", *ip, *port), nil)
+	if err != nil {
+		panic(err)
+	}
 	dht := kaddht.NewDHT(context.Background(), host.GetP2PHost(), dataStore)
 
 	if err := dht.Bootstrap(context.Background()); err != nil {
