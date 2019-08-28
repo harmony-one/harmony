@@ -78,3 +78,4 @@ db-127.0.0.1-*
 
 # dht storage
 .dht
+.dht-*
