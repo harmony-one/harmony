@@ -71,6 +71,9 @@ func main() {
 		host.GetP2PHost().Network().Notify(utils.NewConnLogger(utils.GetLogInstance()))
 	}
 
+	// set the KValue to 50 for DHT
+	// 50 is the size of every bucket in the DHT
+	kaddht.KValue = 50
 	dataStore := dsync.MutexWrap(ds.NewMapDatastore())
 	dht := kaddht.NewDHT(context.Background(), host.GetP2PHost(), dataStore)
 
