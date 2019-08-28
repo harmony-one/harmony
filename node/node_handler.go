@@ -36,7 +36,8 @@ import (
 )
 
 const (
-	consensusTimeout = 30 * time.Second
+	consensusTimeout   = 30 * time.Second
+	crossLinkBatchSize = 7
 )
 
 // ReceiveGlobalMessage use libp2p pubsub mechanism to receive global broadcast messages
@@ -264,10 +265,12 @@ func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 func (node *Node) BroadcastCrossLinkHeader(newBlock *types.Block) {
 	utils.Logger().Info().Msgf("Broadcasting new header to beacon chain groupID %s", node.NodeConfig.GetBeaconGroupID())
 	headers := []*types.Header{}
-	latestBlockNum, err := node.Beaconchain().FindLatestCrossLinkHeader(newBlock.ShardID())
+	lastLink, err := node.Beaconchain().ReadShardLastCrossLink(newBlock.ShardID())
+	var latestBlockNum uint64
 
 	// if cannot find latest crosslink header, broadcast latest 3 block headers
 	if err != nil {
+		utils.Logger().Debug().Err(err).Msg("[BroadcastCrossLinkHeader] ReadShardLastCrossLink Failed")
 		block := node.Blockchain().GetBlockByNumber(newBlock.NumberU64() - 2)
 		if block != nil {
 			headers = append(headers, block.Header())
@@ -278,7 +281,11 @@ func (node *Node) BroadcastCrossLinkHeader(newBlock *types.Block) {
 		}
 		headers = append(headers, newBlock.Header())
 	} else {
+		latestBlockNum = lastLink.BlockNum().Uint64()
 		for blockNum := latestBlockNum + 1; blockNum <= newBlock.NumberU64(); blockNum++ {
+			if blockNum > latestBlockNum+crossLinkBatchSize {
+				break
+			}
 			block := node.Blockchain().GetBlockByNumber(blockNum)
 			if block != nil {
 				headers = append(headers, block.Header())

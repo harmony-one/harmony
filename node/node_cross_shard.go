@@ -49,6 +49,9 @@ func (node *Node) ProcessHeaderMessage(msgPayload []byte) {
 		headersToQuque := []*types.Header{}
 
 		for _, header := range crossLinkHeadersToProcess {
+			if len(headersToQuque) > crossLinkBatchSize {
+				break
+			}
 			exist, err := node.Blockchain().ReadCrossLink(header.ShardID, header.Number.Uint64(), false)
 			if err == nil && exist != nil {
 				utils.Logger().Debug().
