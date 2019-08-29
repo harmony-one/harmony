@@ -810,9 +810,8 @@ func FetchBalance(address common.Address) []*AccountState {
 	for shardID := 0; shardID < walletProfile.Shards; shardID++ {
 		go func(shardID int) {
 			defer wg.Done()
-			balance := big.NewInt(0)
+			balance := big.NewInt(-1)
 			var nonce uint64
-			result[uint32(shardID)] = &AccountState{balance, 0}
 
 			var wgShard sync.WaitGroup
 			wgShard.Add(len(walletProfile.RPCServer[shardID]))
@@ -852,8 +851,9 @@ func FetchBalance(address common.Address) []*AccountState {
 				}(rpcServerID)
 			}
 			wgShard.Wait()
-
-			result[shardID] = &AccountState{balance, nonce}
+			if balance.Cmp(big.NewInt(-1)) > 0 {
+				result[shardID] = &AccountState{balance, nonce}
+			}
 		}(shardID)
 	}
 	wg.Wait()
