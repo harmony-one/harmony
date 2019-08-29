@@ -1150,7 +1150,9 @@ func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 					return n, errors.New("proposed cross links are not sorted")
 				}
 				for _, crossLink := range *crossLinks {
-					bc.WriteCrossLinks(types.CrossLinks{crossLink}, false)
+					if err := bc.WriteCrossLinks(types.CrossLinks{crossLink}, false); err == nil {
+						utils.Logger().Info().Uint64("blockNum", crossLink.BlockNum().Uint64()).Uint32("shardID", crossLink.ShardID()).Msg("[InsertChain] Cross Link Added to Beaconchain")
+					}
 					bc.DeleteCrossLinks(types.CrossLinks{crossLink}, true)
 					bc.WriteShardLastCrossLink(crossLink.ShardID(), crossLink)
 				}
