@@ -8,14 +8,14 @@
 
 ALL_PASS="TRUE"
 VERBOSE="FALSE"
-
 ### SETUP COMMANDLINE FLAGS ###
+
 while getopts "lbv" OPTION; do
 	case $OPTION in
 	b)
 		NETWORK="betanet"
-		declare -A PORT=( [POST]="http://l0.b.hmny.io:9500" [GET]="107.21.71.80:5000/" )
-		BLOCK_0_HASH=$(curl -s --location --request POST "http://l0.b.hmny.io:9500" \
+		declare -A PORT=( [POST]="http://l0.b.hmny.io:9500/" [GET]="http://l0.b.hmny.io:5000/" )
+		BLOCK_0_HASH=$(curl --location --request POST "http://l0.b.hmny.io:9500" \
 			  --header "Content-Type: application/json" \
 			  --data "{\"jsonrpc\":\"2.0\",\"method\":\"hmy_getBlockByNumber\",\"params\":[\"0x1\", true],\"id\":1}" | jq -r '.result.hash')
 		;;
@@ -32,8 +32,9 @@ while getopts "lbv" OPTION; do
 	esac
 		done
 
+if [ $OPTIND -eq 1 ]; then echo "No options were passed, -l for localnet, -b for betanet, -v to view logs of either"; exit;  fi
+
 declare -A GETDATA=( [GET_blocks]="blocks?from=0&to=0" [GET_tx]="tx?id=0" [GET_address]="address?id=0" [GET_node-count]="node-count" [GET_shard]="shard?id=0" [GET_committee]="committee?shard_id=0&epoch=0" )
-echo $BLOCK_0_HASH
 declare -A POSTDATA
 
 if [ "$NETWORK" == "localnet" ]; then
@@ -63,7 +64,6 @@ if [ "$NETWORK" == "localnet" ]; then
 	POSTDATA[net_version]="net_version\",\"params\":[]"
 	POSTDATA[hmy_protocolVersion]="hmy_protocolVersion\",\"params\":[]"
 fi
-
 
 if [ "$NETWORK" == "betanet" ]; then
 	POSTDATA[hmy_getBlockByHash]="hmy_getBlockByHash\",\"params\":[\"$BETANET_BLOCK_0_HASH\", true]"
@@ -129,15 +129,11 @@ RESPONSES[hmy_protocolVersion]=""
 
 ### Processes GET requests and stores reponses in RESPONSES ###
 function GET_requests() {
-	echo "${!GETDATA[@]}"
 	for K in "${!GETDATA[@]}"; 
 	do
 		RESPONSES[$K]=$(curl -s --location --request GET "${PORT[GET]}${GETDATA[$K]}" \
 	  		--header "Content-Type: application/json" \
 			--data "")
-
-		echo "$K"
-		echo ${RESPONSES[$K]}
 	done
 }
 
@@ -149,6 +145,32 @@ function POST_requests() {
 	  		--header "Content-Type: application/json" \
 			--data "{\"jsonrpc\":\"2.0\",\"method\":\"${POSTDATA[$K]},\"id\":1}")"
 	
+	done
+}
+
+function log_API_responses() {
+	for K in "${!GETDATA[@]}"; 
+	do
+		echo "FUNCTION:"
+		echo "$K"
+		echo "REQUEST:"
+		echo ${GETDATA[$K]}
+		echo "RESPONSE:"
+		echo ${RESPONSES[$K]}
+		echo
+		echo
+	done
+
+	for K in "${!POSTDATA[@]}"; 
+	do 
+		echo "FUNCTION:"
+		echo "$K"
+		echo "REQUEST:"
+		echo ${POSTDATA[$K]}
+		echo "RESPONSE:"
+		echo ${RESPONSES[$K]}
+		echo
+		echo
 	done
 }
 
