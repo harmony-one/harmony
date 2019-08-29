@@ -222,6 +222,7 @@ func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
 	for _, cxp := range node.pendingCXReceipts {
 		// check double spent
 		if node.Blockchain().IsSpent(cxp) {
+			utils.Logger().Debug().Interface("cxp", cxp).Msg("[proposeReceiptsProof] CXReceipt is spent")
 			continue
 		}
 		hash := cxp.MerkleProof.BlockHash
@@ -233,15 +234,17 @@ func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
 		}
 
 		if err := node.compareCrosslinkWithReceipts(cxp); err != nil {
+			utils.Logger().Debug().Err(err).Interface("cxp", cxp).Msg("[proposeReceiptsProof] CrossLink Verify Fail")
 			if err != ErrCrosslinkVerificationFail {
 				pendingReceiptsList = append(pendingReceiptsList, cxp)
 			}
 		} else {
+			utils.Logger().Debug().Interface("cxp", cxp).Msg("[proposeReceiptsProof] CXReceipts Added")
 			validReceiptsList = append(validReceiptsList, cxp)
 		}
 	}
 	node.pendingCXReceipts = pendingReceiptsList
 	node.pendingCXMutex.Unlock()
-	utils.Logger().Debug().Msgf("[proposeReceiptsProof] number of validReceipts %d", len(validReceiptsList))
+	utils.Logger().Debug().Msgf("[proposeReceiptsProof] number of validReceipts %d, pendingReceipts %d", len(validReceiptsList), len(pendingReceiptsList))
 	return validReceiptsList
 }
