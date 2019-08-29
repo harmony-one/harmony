@@ -95,7 +95,7 @@ func Transfer(db vm.StateDB, sender, recipient common.Address, amount *big.Int, 
 	if txType == types.SameShardTx || txType == types.SubtractionOnly {
 		db.SubBalance(sender, amount)
 	}
-	if txType == types.SameShardTx || txType == types.AdditionOnly {
+	if txType == types.SameShardTx {
 		db.AddBalance(recipient, amount)
 	}
 }

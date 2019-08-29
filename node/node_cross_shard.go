@@ -115,6 +115,15 @@ func (node *Node) verifyIncomingReceipts(block *types.Block) error {
 			return err
 		}
 	}
+
+	incomingReceiptHash := types.EmptyRootHash
+	if len(cxps) > 0 {
+		incomingReceiptHash = types.DeriveSha(cxps)
+	}
+	if incomingReceiptHash != block.Header().IncomingReceiptHash {
+		return ctxerror.New("[verifyIncomingReceipts] Invalid IncomingReceiptHash in block header")
+	}
+
 	return nil
 }
 
@@ -236,6 +245,7 @@ func (node *Node) ProposeCrossLinkDataForBeaconchain() (types.CrossLinks, error)
 					utils.Logger().Error().
 						Err(err).
 						Msgf("[CrossLink] Haven't received the first cross link %d", link.BlockNum().Uint64())
+					break
 				} else {
 					err := node.VerifyCrosslinkHeader(lastLink.Header(), link.Header())
 					if err != nil {
@@ -277,11 +287,7 @@ func (node *Node) ProcessReceiptMessage(msgPayload []byte) {
 		return
 	}
 
-	// TODO: check message signature is from the nodes of source shard.
-
-	// TODO: remove in future if not useful
-	node.Blockchain().WriteCXReceipts(cxp.MerkleProof.ShardID, cxp.MerkleProof.BlockNum.Uint64(), cxp.MerkleProof.BlockHash, cxp.Receipts, true)
-
 	utils.Logger().Debug().Interface("cxp", cxp).Msg("[ProcessReceiptMessage] Add CXReceiptsProof to pending Receipts")
+	// TODO: integrate with txpool
 	node.AddPendingReceipts(&cxp)
 }
