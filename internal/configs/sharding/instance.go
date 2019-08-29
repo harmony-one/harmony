@@ -7,6 +7,18 @@ import (
 	"github.com/harmony-one/harmony/internal/genesis"
 )
 
+// NetworkID is the network type of the blockchain.
+type NetworkID byte
+
+//Consensus and other message categories
+const (
+	MainNet NetworkID = iota
+	TestNet
+	LocalNet
+	Pangaea
+	DevNet
+)
+
 type instance struct {
 	numShards                       uint32
 	numNodesPerShard                int
@@ -14,6 +26,7 @@ type instance struct {
 	hmyAccounts                     []genesis.DeployAccount
 	fnAccounts                      []genesis.DeployAccount
 	reshardingEpoch                 []*big.Int
+	networkID                       NetworkID
 }
 
 // NewInstance creates and validates a new sharding configuration based
@@ -23,6 +36,7 @@ func NewInstance(
 	hmyAccounts []genesis.DeployAccount,
 	fnAccounts []genesis.DeployAccount,
 	reshardingEpoch []*big.Int,
+	networkID NetworkID,
 ) (Instance, error) {
 	if numShards < 1 {
 		return nil, ctxerror.New("sharding config must have at least one shard",
@@ -50,6 +64,7 @@ func NewInstance(
 		hmyAccounts:                     hmyAccounts,
 		fnAccounts:                      fnAccounts,
 		reshardingEpoch:                 reshardingEpoch,
+		networkID:                       networkID,
 	}, nil
 }
 
@@ -61,9 +76,10 @@ func MustNewInstance(
 	hmyAccounts []genesis.DeployAccount,
 	fnAccounts []genesis.DeployAccount,
 	reshardingEpoch []*big.Int,
+	networkID NetworkID,
 ) Instance {
 	sc, err := NewInstance(
-		numShards, numNodesPerShard, numHarmonyOperatedNodesPerShard, hmyAccounts, fnAccounts, reshardingEpoch)
+		numShards, numNodesPerShard, numHarmonyOperatedNodesPerShard, hmyAccounts, fnAccounts, reshardingEpoch, networkID)
 	if err != nil {
 		panic(err)
 	}
