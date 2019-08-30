@@ -414,13 +414,13 @@ func main() {
 		}
 		// TODO (leo): use a passing list of accounts here
 		devnetConfig, err := shardingconfig.NewInstance(
-			uint32(*devnetNumShards), *devnetShardSize, *devnetHarmonySize, genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, nil, shardingconfig.DevNet)
+			uint32(*devnetNumShards), *devnetShardSize, *devnetHarmonySize, genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, nil)
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "ERROR invalid devnet sharding config: %s",
 				err)
 			os.Exit(1)
 		}
-		core.ShardingSchedule = shardingconfig.NewFixedSchedule(devnetConfig)
+		core.ShardingSchedule = shardingconfig.NewFixedSchedule(devnetConfig, shardingconfig.DevNet)
 	}
 
 	initSetup()

@@ -42,7 +42,7 @@ func (pangaeaSchedule) ConsensusRatio() float64 {
 var pangaeaReshardingEpoch = []*big.Int{common.Big0}
 
 var pangaeaV0 = MustNewInstance(
-	4, 250, 20, genesis.PangaeaAccounts, genesis.FoundationalPangaeaAccounts, pangaeaReshardingEpoch, Pangaea)
+	4, 250, 20, genesis.PangaeaAccounts, genesis.FoundationalPangaeaAccounts, pangaeaReshardingEpoch)
 
 func (pangaeaSchedule) FirstCrossLinkBlock() uint64 {
 	return testnetFirstCrossLinkBlock
@@ -84,4 +84,8 @@ func (ps pangaeaSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 		MaxNumTxsPerBlockLimit:         ps.MaxNumTxsPerBlockLimit(),
 		RecentTxDuration:               ps.RecentTxDuration(),
 	}
+}
+
+func (pangaeaSchedule) GetNetworkID() NetworkID {
+	return Pangaea
 }
