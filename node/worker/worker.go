@@ -92,6 +92,7 @@ func (w *Worker) SelectTransactionsForNewBlock(newBlockNum uint64, txs types.Tra
 	for _, tx := range txs {
 		if tx.ShardID() != w.shardID {
 			invalid = append(invalid, tx)
+			continue
 		}
 
 		sender, flag := w.throttleTxs(selected, recentTxsStats, txsThrottleConfig, tx)
