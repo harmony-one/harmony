@@ -161,7 +161,7 @@ main)
     /ip4/13.113.101.219/tcp/12019/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX
     /ip4/99.81.170.167/tcp/12019/p2p/QmRVbTpEYup8dSaURZfF6ByrMTSKa4UyUzJhSjahFzRqNj
   )
-  REL=s3
+  REL=mainnet
   network_type=mainnet
   dns_zone=t.hmny.io
   ;;
@@ -248,7 +248,7 @@ done
 
 any_new_binaries() {
    local outdir
-   ${do_not_download} && return 1
+   ${do_not_download} && return 0
    outdir="${1:-.}"
    mkdir -p "${outdir}"
    curl http://${BUCKET}.s3.amazonaws.com/${FOLDER}md5sum.txt -o "${outdir}/md5sum.txt" || return $?
@@ -268,7 +268,12 @@ download_binaries() {
    (cd "${outdir}" && exec openssl sha256 "${BIN[@]}") > "${outdir}/harmony-checksums.txt"
 }
 
-download_binaries || err 69 "initial node software update failed"
+if any_new_binaries staging
+then
+   msg "binaries did not change"
+else
+   download_binaries || err 69 "initial node software update failed"
+fi
 
 NODE_PORT=9000
 PUB_IP=
