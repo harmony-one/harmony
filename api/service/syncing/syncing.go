@@ -692,7 +692,7 @@ func (ss *StateSync) getMaxPeerHeight() uint64 {
 		go func() {
 			defer wg.Done()
 			//debug
-			// utils.Logger().Warn().Str("IP", peerConfig.ip).Str("Port", peerConfig.port).Msg("[Sync]getMaxPeerHeight")
+			utils.Logger().Debug().Str("IP", peerConfig.ip).Str("Port", peerConfig.port).Msg("[Sync]getMaxPeerHeight")
 			response, err := peerConfig.client.GetBlockChainHeight()
 			if err != nil {
 				utils.Logger().Warn().Err(err).Str("IP", peerConfig.ip).Str("Port", peerConfig.port).Msg("[Sync]GetBlockChainHeight failed")
@@ -736,14 +736,15 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, willJo
 	}
 	// remove SyncLoopFrequency
 	ticker := time.NewTicker(SyncLoopFrequency * time.Second)
+Loop:
 	for {
 		select {
 		case <-ticker.C:
 			otherHeight := ss.getMaxPeerHeight()
 			currentHeight := bc.CurrentBlock().NumberU64()
 			if currentHeight >= otherHeight {
-				utils.Logger().Info().Msgf("[SYNC] Node is now IN SYNC! (ShardID: %d)", bc.ShardID())
-				break
+				utils.Logger().Info().Msgf("[SYNC] Node is now IN SYNC! (ShardID: %d, otherHeight: %d, currentHeight: %d)", bc.ShardID(), otherHeight, currentHeight)
+				break Loop
 			}
 			startHash := bc.CurrentBlock().Hash()
 			size := uint32(otherHeight - currentHeight)
