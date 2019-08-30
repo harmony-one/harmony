@@ -16,14 +16,13 @@ var _ = (*txdataMarshaling)(nil)
 // MarshalJSON marshals as JSON.
 func (t txdata) MarshalJSON() ([]byte, error) {
 	type txdata struct {
-		AccountNonce hexutil.Uint64  `json:"nonce"      gencodec:"required"`
-		Price        *hexutil.Big    `json:"gasPrice"   gencodec:"required"`
-		GasLimit     hexutil.Uint64  `json:"gas"        gencodec:"required"`
-		ShardID      uint32          `json:"shardID"    gencodec:"required"`
-		ToShardID    uint32          `json:"toShardID"`
-		Recipient    *common.Address `json:"to"         rlp:"nil"`
-		Amount       *hexutil.Big    `json:"value"      gencodec:"required"`
-		Payload      hexutil.Bytes   `json:"input"      gencodec:"required"`
+		AccountNonce hexutil.Uint64  `json:"nonce"    gencodec:"required"`
+		ShardID      uint32          `json:"shardID"  gencodec:"required"`
+		Price        *hexutil.Big    `json:"gasPrice" gencodec:"required"`
+		GasLimit     hexutil.Uint64  `json:"gas"      gencodec:"required"`
+		Recipient    *common.Address `json:"to"       rlp:"nil"`
+		Amount       *hexutil.Big    `json:"value"    gencodec:"required"`
+		Payload      hexutil.Bytes   `json:"input"    gencodec:"required"`
 		V            *hexutil.Big    `json:"v" gencodec:"required"`
 		R            *hexutil.Big    `json:"r" gencodec:"required"`
 		S            *hexutil.Big    `json:"s" gencodec:"required"`
@@ -31,10 +30,9 @@ func (t txdata) MarshalJSON() ([]byte, error) {
 	}
 	var enc txdata
 	enc.AccountNonce = hexutil.Uint64(t.AccountNonce)
+	enc.ShardID = t.ShardID
 	enc.Price = (*hexutil.Big)(t.Price)
 	enc.GasLimit = hexutil.Uint64(t.GasLimit)
-	enc.ShardID = t.ShardID
-	enc.ToShardID = t.ToShardID
 	enc.Recipient = t.Recipient
 	enc.Amount = (*hexutil.Big)(t.Amount)
 	enc.Payload = t.Payload
@@ -48,14 +46,13 @@ func (t txdata) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON unmarshals from JSON.
 func (t *txdata) UnmarshalJSON(input []byte) error {
 	type txdata struct {
-		AccountNonce *hexutil.Uint64 `json:"nonce"      gencodec:"required"`
-		Price        *hexutil.Big    `json:"gasPrice"   gencodec:"required"`
-		GasLimit     *hexutil.Uint64 `json:"gas"        gencodec:"required"`
-		ShardID      *uint32         `json:"shardID"    gencodec:"required"`
-		ToShardID    *uint32         `json:"toShardID"`
-		Recipient    *common.Address `json:"to"         rlp:"nil"`
-		Amount       *hexutil.Big    `json:"value"      gencodec:"required"`
-		Payload      *hexutil.Bytes  `json:"input"      gencodec:"required"`
+		AccountNonce *hexutil.Uint64 `json:"nonce"    gencodec:"required"`
+		ShardID      *uint32         `json:"shardID"  gencodec:"required"`
+		Price        *hexutil.Big    `json:"gasPrice" gencodec:"required"`
+		GasLimit     *hexutil.Uint64 `json:"gas"      gencodec:"required"`
+		Recipient    *common.Address `json:"to"       rlp:"nil"`
+		Amount       *hexutil.Big    `json:"value"    gencodec:"required"`
+		Payload      *hexutil.Bytes  `json:"input"    gencodec:"required"`
 		V            *hexutil.Big    `json:"v" gencodec:"required"`
 		R            *hexutil.Big    `json:"r" gencodec:"required"`
 		S            *hexutil.Big    `json:"s" gencodec:"required"`
@@ -69,6 +66,10 @@ func (t *txdata) UnmarshalJSON(input []byte) error {
 		return errors.New("missing required field 'nonce' for txdata")
 	}
 	t.AccountNonce = uint64(*dec.AccountNonce)
+	if dec.ShardID == nil {
+		return errors.New("missing required field 'shardID' for txdata")
+	}
+	t.ShardID = *dec.ShardID
 	if dec.Price == nil {
 		return errors.New("missing required field 'gasPrice' for txdata")
 	}
@@ -77,13 +78,6 @@ func (t *txdata) UnmarshalJSON(input []byte) error {
 		return errors.New("missing required field 'gas' for txdata")
 	}
 	t.GasLimit = uint64(*dec.GasLimit)
-	if dec.ShardID == nil {
-		return errors.New("missing required field 'shardID' for txdata")
-	}
-	t.ShardID = *dec.ShardID
-	if dec.ToShardID != nil {
-		t.ToShardID = *dec.ToShardID
-	}
 	if dec.Recipient != nil {
 		t.Recipient = dec.Recipient
 	}

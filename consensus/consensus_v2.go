@@ -15,7 +15,6 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	vrf_bls "github.com/harmony-one/harmony/crypto/vrf/bls"
-	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -201,7 +200,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		return
 	}
 	if consensus.mode.Mode() == Normal {
-		if err = chain.Engine.VerifyHeader(consensus.ChainReader, &headerObj, true); err != nil {
+		if err = consensus.VerifyHeader(consensus.ChainReader, &headerObj, true); err != nil {
 			consensus.getLogger().Warn().
 				Err(err).
 				Str("inChain", consensus.ChainReader.CurrentHeader().Number.String()).
@@ -508,7 +507,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		return
 	}
 	if consensus.mode.Mode() == Normal {
-		if err := chain.Engine.VerifyHeader(consensus.ChainReader, blockObj.Header(), true); err != nil {
+		if err := consensus.VerifyHeader(consensus.ChainReader, blockObj.Header(), true); err != nil {
 			consensus.getLogger().Warn().
 				Err(err).
 				Str("inChain", consensus.ChainReader.CurrentHeader().Number.String()).
@@ -575,7 +574,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	}
 
 	// Construct and send the commit message
-	// TODO: should only sign on block hash
 	blockNumBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(blockNumBytes, consensus.blockNum)
 	commitPayload := append(blockNumBytes, consensus.blockHash[:]...)

@@ -135,7 +135,6 @@ func (s *Service) Init() error {
 	utils.Logger().Info().Str("Rendezvous", string(s.Rendezvous)).Msg("Announcing ourselves...")
 	s.discovery = libp2pdis.NewRoutingDiscovery(s.dht)
 	libp2pdis.Advertise(ctx, s.discovery, string(s.Rendezvous))
-	libp2pdis.Advertise(ctx, s.discovery, string(p2p.GroupIDBeaconClient))
 	utils.Logger().Info().Msg("Successfully announced!")
 
 	return nil
@@ -161,7 +160,6 @@ func (s *Service) DoService() {
 			return
 		case <-tick.C:
 			libp2pdis.Advertise(ctx, s.discovery, string(s.Rendezvous))
-			libp2pdis.Advertise(ctx, s.discovery, string(p2p.GroupIDBeaconClient))
 			utils.Logger().Info().Str("Rendezvous", string(s.Rendezvous)).Msg("Successfully announced!")
 		default:
 			var err error
