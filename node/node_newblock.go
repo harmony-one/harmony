@@ -103,11 +103,8 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 									Uint64("blockNum", newBlock.NumberU64()).
 									Int("numCrossLinks", len(crossLinksToPropose)).
 									Msg("Successfully added cross links into new block")
-							} else {
-								utils.Logger().Debug().Err(localErr).Msg("ops0 ProposeCrossLinkDataForBeaconchain Failed")
 							}
 						} else {
-							utils.Logger().Debug().Err(localErr).Msg("ops1 ProposeCrossLinkDataForBeaconchain Failed")
 							newBlock, err = node.Worker.Commit(sig, mask, viewID, coinbase)
 						}
 					} else {

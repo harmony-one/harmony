@@ -336,7 +336,6 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 	if node.NodeConfig.ShardID == 0 {
 		err := node.VerifyBlockCrossLinks(newBlock)
 		if err != nil {
-			utils.Logger().Debug().Err(err).Msg("ops2 VerifyBlockCrossLinks Failed")
 			return err
 		}
 	}
