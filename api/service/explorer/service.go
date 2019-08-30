@@ -206,7 +206,6 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 		if id == 0 || id == len(accountBlocks)-1 || accountBlock == nil {
 			continue
 		}
-		utils.Logger().Info().Msgf("Block %d", id+fromInt-1)
 		block := NewBlock(accountBlock, id+fromInt-1)
 		if int64(block.Epoch) > curEpoch {
 			if bytes, err := db.Get([]byte(GetCommitteeKey(uint32(s.ShardID), block.Epoch))); err == nil {
@@ -238,7 +237,6 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 			if err == nil {
 				for _, validator := range committee.NodeList {
 					oneAddress, err := common2.AddressToBech32(validator.EcdsaAddress)
-					utils.Logger().Info().Msgf("Validator address %s", oneAddress)
 					if err != nil {
 						continue
 					}
