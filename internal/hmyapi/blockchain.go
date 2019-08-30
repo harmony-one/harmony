@@ -17,6 +17,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	internal_common "github.com/harmony-one/harmony/internal/common"
+	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -65,29 +66,67 @@ func (s *PublicBlockChainAPI) GetBlockByHash(ctx context.Context, blockHash comm
 
 // GetShardingStructure returns an array of sharding structures.
 func (s *PublicBlockChainAPI) GetShardingStructure(ctx context.Context) ([]map[string]interface{}, error) {
-	res := []map[string]interface{}{
-		map[string]interface{}{
-			"shardID": "0",
-			"http":    "http://127.0.0.1:800",
-			"wss":     "wss://127.0.0.1:800",
-		},
-		map[string]interface{}{
-			"shardID": "1",
-			"http":    "http://127.0.0.1:800",
-			"wss":     "wss://127.0.0.1:800",
-		},
-		map[string]interface{}{
-			"shardID": "2",
-			"http":    "http://127.0.0.1:800",
-			"wss":     "wss://127.0.0.1:800",
-		},
-		map[string]interface{}{
-			"shardID": "3",
-			"http":    "http://127.0.0.1:800",
-			"wss":     "wss://127.0.0.1:800",
-		},
+	if core.ShardingSchedule.GetNetworkID() == shardingconfig.MainNet {
+		return []map[string]interface{}{
+			map[string]interface{}{
+				"shardID": "0",
+				"http":    "http://s0.t.hmy.io",
+				"ws":      "ws://s0.t.hmy.io",
+			},
+			map[string]interface{}{
+				"shardID": "1",
+				"http":    "http://s1.t.hmy.io",
+				"ws":      "ws://s1.t.hmy.io",
+			},
+			map[string]interface{}{
+				"shardID": "2",
+				"http":    "http://s2.t.hmy.io",
+				"ws":      "ws://s2.t.hmy.io",
+			},
+			map[string]interface{}{
+				"shardID": "3",
+				"http":    "http://s3.t.hmy.io",
+				"ws":      "ws://s3.t.hmy.io",
+			},
+		}, nil
+	} else if core.ShardingSchedule.GetNetworkID() == shardingconfig.TestNet {
+		return []map[string]interface{}{
+			map[string]interface{}{
+				"shardID": "0",
+				"http":    "http://127.0.0.1:800",
+				"ws":      "ws://127.0.0.1:800",
+			},
+			map[string]interface{}{
+				"shardID": "1",
+				"http":    "http://127.0.0.1:800",
+				"ws":      "ws://127.0.0.1:800",
+			},
+			map[string]interface{}{
+				"shardID": "2",
+				"http":    "http://127.0.0.1:800",
+				"ws":      "ws://127.0.0.1:800",
+			},
+			map[string]interface{}{
+				"shardID": "3",
+				"http":    "http://127.0.0.1:800",
+				"ws":      "ws://127.0.0.1:800",
+			},
+		}, nil
+	} else {
+		return []map[string]interface{}{
+			map[string]interface{}{
+				"shardID": "0",
+				"http":    "http://127.0.0.1:9500",
+				"ws":      "ws://127.0.0.1:9500",
+			},
+			map[string]interface{}{
+				"shardID": "1",
+				"http":    "http://127.0.0.1:9501",
+				"ws":      "ws://127.0.0.1:9501",
+			},
+		}, nil
 	}
-	return res, nil
+
 }
 
 // GetCode returns the code stored at the given address in the state for the given block number.
