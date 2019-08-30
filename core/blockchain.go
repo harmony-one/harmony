@@ -1130,6 +1130,7 @@ func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 				Str("parentHash", header.ParentHash.Hex()).
 				Msg("added block to chain")
 
+				// TODO: move into WriteBlockWithState
 			if header.ShardStateHash != (common.Hash{}) {
 				epoch := new(big.Int).Add(header.Epoch, common.Big1)
 				err = bc.WriteShardStateBytes(epoch, header.ShardState)
@@ -1138,6 +1139,8 @@ func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 					return n, err
 				}
 			}
+
+			// TODO: move into WriteBlockWithState
 			if len(header.CrossLinks) > 0 {
 				crossLinks := &types.CrossLinks{}
 				err = rlp.DecodeBytes(header.CrossLinks, crossLinks)
@@ -2154,7 +2157,7 @@ func (bc *BlockChain) NextCXReceiptsCheckpoint(currentNum uint64, shardID uint32
 	for num := lastCheckpoint; num <= currentNum+1; num++ {
 		by, _ := rawdb.ReadCXReceiptsProofSpent(bc.db, shardID, num)
 		if by == rawdb.NAByte {
-			// TODO: check if there is IncompingReceiptsHash in crosslink header
+			// TODO chao: check if there is IncompingReceiptsHash in crosslink header
 			// if the rootHash is non-empty, it means incomingReceipts are not delivered
 			// otherwise, it means there is no cross-shard transactions for this block
 			newCheckpoint = num

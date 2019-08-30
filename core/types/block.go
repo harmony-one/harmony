@@ -473,9 +473,10 @@ func (b *Block) WithBody(transactions []*Transaction, uncles []*Header, incoming
 		header:           CopyHeader(b.header),
 		transactions:     make([]*Transaction, len(transactions)),
 		uncles:           make([]*Header, len(uncles)),
-		incomingReceipts: incomingReceipts,
+		incomingReceipts: make([]*CXReceiptsProof, len(incomingReceipts)),
 	}
 	copy(block.transactions, transactions)
+	copy(block.incomingReceipts, incomingReceipts)
 	for i := range uncles {
 		block.uncles[i] = CopyHeader(uncles[i])
 	}
