@@ -21,7 +21,6 @@ const (
 	localnetEpochBlock1 = 10
 	twoOne              = 5
 
-	localnetVdfDifficulty  = 5000 // This takes about 10s to finish the vdf
 	localnetConsensusRatio = float64(0.1)
 
 	localnetMaxTxAmountLimit               = 1e3 // unit is in One
@@ -66,10 +65,6 @@ func (ls localnetSchedule) IsLastBlock(blockNum uint64) bool {
 	default:
 		return ((blockNum-localnetEpochBlock1)%blocks == blocks-1)
 	}
-}
-
-func (ls localnetSchedule) VdfDifficulty() int {
-	return localnetVdfDifficulty
 }
 
 // ConsensusRatio ratio of new nodes vs consensus total nodes

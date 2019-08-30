@@ -35,10 +35,6 @@ func (s fixedSchedule) IsLastBlock(blockNum uint64) bool {
 	return blockNum%blocks == blocks-1
 }
 
-func (s fixedSchedule) VdfDifficulty() int {
-	return mainnetVdfDifficulty
-}
-
 // ConsensusRatio ratio of new nodes vs consensus total nodes
 func (s fixedSchedule) ConsensusRatio() float64 {
 	return mainnetConsensusRatio

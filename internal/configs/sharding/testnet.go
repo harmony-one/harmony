@@ -21,8 +21,6 @@ const (
 	testnetEpochBlock1 = 78
 	threeOne           = 111
 
-	testnetVdfDifficulty = 10000 // This takes about 20s to finish the vdf
-
 	testnetMaxTxAmountLimit               = 1e3 // unit is in One
 	testnetMaxNumRecentTxsPerAccountLimit = 1e2
 	testnetMaxTxPoolSizeLimit             = 8000
@@ -66,10 +64,6 @@ func (ts testnetSchedule) IsLastBlock(blockNum uint64) bool {
 	default:
 		return ((blockNum-testnetEpochBlock1)%blocks == blocks-1)
 	}
-}
-
-func (ts testnetSchedule) VdfDifficulty() int {
-	return testnetVdfDifficulty
 }
 
 // ConsensusRatio ratio of new nodes vs consensus total nodes

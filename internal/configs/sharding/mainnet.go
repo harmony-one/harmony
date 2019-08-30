@@ -12,7 +12,6 @@ const (
 	mainnetEpochBlock1 = 344064 // 21 * 2^14
 	blocksPerShard     = 16384  // 2^14
 
-	mainnetVdfDifficulty  = 50000 // This takes about 100s to finish the vdf
 	mainnetConsensusRatio = float64(0.66)
 
 	mainnetV0_1Epoch = 1
@@ -79,10 +78,6 @@ func (ms mainnetSchedule) IsLastBlock(blockNum uint64) bool {
 	default:
 		return ((blockNum-mainnetEpochBlock1)%blocks == blocks-1)
 	}
-}
-
-func (ms mainnetSchedule) VdfDifficulty() int {
-	return mainnetVdfDifficulty
 }
 
 // ConsensusRatio ratio of new nodes vs consensus total nodes

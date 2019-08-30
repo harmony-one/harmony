@@ -23,9 +23,6 @@ type Schedule interface {
 	// IsLastBlock check if the block is the last block in the epoch
 	IsLastBlock(blockNum uint64) bool
 
-	// VDFDifficulty returns number of iterations for VDF calculation
-	VdfDifficulty() int
-
 	// ConsensusRatio ratio of new nodes vs consensus total nodes
 	ConsensusRatio() float64
 

@@ -31,10 +31,6 @@ func (ps pangaeaSchedule) IsLastBlock(blockNum uint64) bool {
 	return (blockNum+1)%ps.BlocksPerEpoch() == 0
 }
 
-func (pangaeaSchedule) VdfDifficulty() int {
-	return testnetVdfDifficulty
-}
-
 func (pangaeaSchedule) ConsensusRatio() float64 {
 	return mainnetConsensusRatio
 }
