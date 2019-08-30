@@ -121,6 +121,10 @@ func (ts testnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 	}
 }
 
+func (ts testnetSchedule) GetNetworkID() NetworkID {
+	return TestNet
+}
+
 var testnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(testnetV1Epoch), big.NewInt(testnetV2Epoch)}
 
 var testnetV0 = MustNewInstance(2, 150, 150, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch)

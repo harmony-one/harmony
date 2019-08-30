@@ -122,6 +122,10 @@ func (ls localnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 	}
 }
 
+func (ls localnetSchedule) GetNetworkID() NetworkID {
+	return LocalNet
+}
+
 var localnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(localnetV1Epoch), big.NewInt(localnetV2Epoch)}
 
 var localnetV0 = MustNewInstance(2, 7, 5, genesis.LocalHarmonyAccounts, genesis.LocalFnAccounts, localnetReshardingEpoch)

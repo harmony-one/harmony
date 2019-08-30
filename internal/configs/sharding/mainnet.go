@@ -137,6 +137,10 @@ func (ms mainnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 	}
 }
 
+func (ms mainnetSchedule) GetNetworkID() NetworkID {
+	return MainNet
+}
+
 var mainnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(mainnetV0_1Epoch), big.NewInt(mainnetV0_2Epoch), big.NewInt(mainnetV0_3Epoch), big.NewInt(mainnetV0_4Epoch), big.NewInt(mainnetV1Epoch)}
 
 var mainnetV0 = MustNewInstance(4, 150, 112, genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, mainnetReshardingEpoch)
