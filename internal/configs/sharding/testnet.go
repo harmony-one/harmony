@@ -77,12 +77,6 @@ func (ts testnetSchedule) ConsensusRatio() float64 {
 	return mainnetConsensusRatio
 }
 
-// TODO: remove it after randomness feature turned on mainnet
-//RandonnessStartingEpoch returns starting epoch of randonness generation
-func (ts testnetSchedule) RandomnessStartingEpoch() uint64 {
-	return mainnetRandomnessStartingEpoch
-}
-
 func (ts testnetSchedule) MaxTxAmountLimit() *big.Int {
 	amountBigInt := big.NewInt(testnetMaxTxAmountLimit)
 	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(denominations.One))

@@ -210,7 +210,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		}
 
 		//VRF/VDF is only generated in the beach chain
-		if consensus.NeedsRandomNumberGeneration(headerObj.Epoch) {
+		if consensus.ShardID == 0 {
 			//validate the VRF with proof if a non zero VRF is found in header
 			if len(headerObj.Vrf) > 0 {
 				if !consensus.ValidateVrfAndProof(headerObj) {
@@ -1075,14 +1075,13 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 					Msg("[ConsensusMainLoop] Received Proposed New Block!")
 
 				//VRF/VDF is only generated in the beacon chain
-				if consensus.NeedsRandomNumberGeneration(newBlock.Header().Epoch) {
+				if consensus.ShardID == 0 {
 					// generate VRF if the current block has a new leader
 					if !consensus.ChainReader.IsSameLeaderAsPreviousBlock(newBlock) {
 						vrfBlockNumbers, err := consensus.ChainReader.ReadEpochVrfBlockNums(newBlock.Header().Epoch)
 						if err != nil {
 							consensus.getLogger().Info().
 								Uint64("MsgBlockNum", newBlock.NumberU64()).
-								Uint64("Epoch", newBlock.Header().Epoch.Uint64()).
 								Msg("[ConsensusMainLoop] no VRF block number from local db")
 						}
 

@@ -744,12 +744,3 @@ func (consensus *Consensus) IsLeader() bool {
 	}
 	return false
 }
-
-// NeedsRandomNumberGeneration returns true if the current epoch needs random number generation
-func (consensus *Consensus) NeedsRandomNumberGeneration(epoch *big.Int) bool {
-	if consensus.ShardID == 0 && epoch.Uint64() >= core.ShardingSchedule.RandomnessStartingEpoch() {
-		return true
-	}
-
-	return false
-}

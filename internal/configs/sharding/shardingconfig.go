@@ -29,10 +29,6 @@ type Schedule interface {
 	// ConsensusRatio ratio of new nodes vs consensus total nodes
 	ConsensusRatio() float64
 
-	// TODO: remove it after randomness feature turned on mainnet
-	//RandomnessStartingEpoch returns starting epoch of randonness generation
-	RandomnessStartingEpoch() uint64
-
 	// Max amount limit for a valid transaction
 	MaxTxAmountLimit() *big.Int
 
