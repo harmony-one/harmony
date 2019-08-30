@@ -744,7 +744,7 @@ func processTransferCommand() {
 
 	fmt.Printf("Unlock account succeeded! '%v'\n", senderPass)
 
-	tx, err = ks.SignTx(account, tx, big.NewInt(1))
+	tx, err = ks.SignTx(account, tx, nil)
 	if err != nil {
 		fmt.Printf("SignTx Error: %v\n", err)
 		return
