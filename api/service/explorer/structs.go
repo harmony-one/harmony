@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -88,7 +87,7 @@ type Shard struct {
 func NewBlock(block *types.Block, height int) *Block {
 	// TODO(ricl): use block.Header().CommitBitmap and GetPubKeyFromMask
 	signers := []string{}
-	state, err := block.Header().GetShardState()
+	/*state, err := block.Header().GetShardState()
 	if err == nil {
 		for _, committee := range state {
 			if committee.ShardID == block.ShardID() {
@@ -101,7 +100,7 @@ func NewBlock(block *types.Block, height int) *Block {
 				}
 			}
 		}
-	}
+	}*/
 	return &Block{
 		Height:     strconv.Itoa(height),
 		ID:         block.Hash().Hex(),
