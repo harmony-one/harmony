@@ -161,7 +161,7 @@ main)
     /ip4/13.113.101.219/tcp/12019/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX
     /ip4/99.81.170.167/tcp/12019/p2p/QmRVbTpEYup8dSaURZfF6ByrMTSKa4UyUzJhSjahFzRqNj
   )
-  REL=r3
+  REL=s3
   network_type=mainnet
   dns_zone=t.hmny.io
   ;;
@@ -234,17 +234,27 @@ OS=$(uname -s)
 
 if [ "$OS" == "Darwin" ]; then
    FOLDER=release/darwin-x86_64/$REL/
-   BIN=( harmony libbls384_256.dylib libcrypto.1.0.0.dylib libgmp.10.dylib libgmpxx.4.dylib libmcl.dylib )
+   BIN=( harmony libbls384_256.dylib libcrypto.1.0.0.dylib libgmp.10.dylib libgmpxx.4.dylib libmcl.dylib md5sum.txt )
 fi
 if [ "$OS" == "Linux" ]; then
    FOLDER=release/linux-x86_64/$REL/
-   BIN=( harmony libbls384_256.so libcrypto.so.10 libgmp.so.10 libgmpxx.so.4 libmcl.so )
+   BIN=( harmony libbls384_256.so libcrypto.so.10 libgmp.so.10 libgmpxx.so.4 libmcl.so md5sum.txt )
 fi
 
 # clean up old files
 for bin in "${BIN[@]}"; do
    ${do_not_download} || rm -f ${bin}
 done
+
+any_new_binaries() {
+   local outdir
+   ${do_not_download} && return 1
+   outdir="${1:-.}"
+   mkdir -p "${outdir}"
+   curl http://${BUCKET}.s3.amazonaws.com/${FOLDER}md5sum.txt -o "${outdir}/md5sum.txt" || return $?
+   diff $outdir/md5sum.txt md5sum.txt
+   return $?
+}
 
 download_binaries() {
    local outdir
@@ -380,6 +390,11 @@ kill_node() {
    do
       msg "re-downloading binaries in 5m"
       sleep 300
+      if any_new_binaries staging
+      then
+         msg "binaries did not change"
+         continue
+      fi
       while ! download_binaries staging
       do
          msg "staging download failed; retrying in 30s"
