@@ -13,8 +13,7 @@ const (
 )
 
 type fixedSchedule struct {
-	instance  Instance
-	networkID NetworkID
+	instance Instance
 }
 
 // InstanceForEpoch returns the fixed sharding configuration instance regardless
@@ -88,11 +87,11 @@ func (s fixedSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 }
 
 func (s fixedSchedule) GetNetworkID() NetworkID {
-	return s.networkID
+	return DevNet
 }
 
 // NewFixedSchedule returns a sharding configuration schedule that uses the
 // given config instance for all epochs.  Useful for testing.
-func NewFixedSchedule(instance Instance, networkID NetworkID) Schedule {
-	return fixedSchedule{instance: instance, networkID: networkID}
+func NewFixedSchedule(instance Instance) Schedule {
+	return fixedSchedule{instance: instance}
 }

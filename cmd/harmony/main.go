@@ -420,7 +420,7 @@ func main() {
 				err)
 			os.Exit(1)
 		}
-		core.ShardingSchedule = shardingconfig.NewFixedSchedule(devnetConfig, shardingconfig.DevNet)
+		core.ShardingSchedule = shardingconfig.NewFixedSchedule(devnetConfig)
 	}
 
 	initSetup()
