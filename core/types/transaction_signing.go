@@ -42,7 +42,14 @@ type sigCache struct {
 // MakeSigner returns a Signer based on the given chain config and block number.
 func MakeSigner(config *params.ChainConfig, blockNumber *big.Int) Signer {
 	var signer Signer
-	signer = NewEIP155Signer(config.ChainID)
+	switch {
+	case config.IsEIP155(blockNumber):
+		signer = NewEIP155Signer(config.ChainID)
+	case config.IsHomestead(blockNumber):
+		signer = HomesteadSigner{}
+	default:
+		signer = FrontierSigner{}
+	}
 	return signer
 }
 
@@ -154,6 +161,8 @@ func (s EIP155Signer) Hash(tx *Transaction) common.Hash {
 		tx.data.AccountNonce,
 		tx.data.Price,
 		tx.data.GasLimit,
+		tx.data.ShardID,
+		tx.data.ToShardID,
 		tx.data.Recipient,
 		tx.data.Amount,
 		tx.data.Payload,
