@@ -39,7 +39,6 @@ func (node *Node) ProcessHeaderMessage(msgPayload []byte) {
 		for _, header := range headers {
 			if header.Number.Uint64() >= firstCrossLinkBlock {
 				// Only process cross link starting from FirstCrossLinkBlock
-				utils.Logger().Debug().Msgf("[ProcessHeaderMessage] Add Pending CrossLink, shardID %d, blockNum %d", header.ShardID, header.Number)
 				crossLinkHeadersToProcess = append(crossLinkHeadersToProcess, header)
 			}
 		}
@@ -49,13 +48,10 @@ func (node *Node) ProcessHeaderMessage(msgPayload []byte) {
 		headersToQuque := []*types.Header{}
 
 		for _, header := range crossLinkHeadersToProcess {
-			if len(headersToQuque) > crossLinkBatchSize {
-				break
-			}
 			exist, err := node.Blockchain().ReadCrossLink(header.ShardID, header.Number.Uint64(), false)
 			if err == nil && exist != nil {
 				utils.Logger().Debug().
-					Msgf("[ProcessingHeader] Cross Link already exists, pass. Block num: %d, shardID %d", header.Number, header.ShardID)
+					Msgf("[ProcessingHeader] Cross Link already exists, pass. Block num: %d", header.Number)
 				continue
 			}
 
@@ -67,7 +63,7 @@ func (node *Node) ProcessHeaderMessage(msgPayload []byte) {
 					if err != nil {
 						headersToQuque = append(headersToQuque, header)
 						utils.Logger().Error().Err(err).
-							Msgf("[ProcessingHeader] ReadCrossLink cannot read previousLink with number %d, shardID %d", header.Number.Uint64()-1, header.ShardID)
+							Msg("[ProcessingHeader] ReadCrossLink cannot read previousLink")
 						continue
 					}
 				}

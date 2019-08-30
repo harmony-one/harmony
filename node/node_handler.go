@@ -36,8 +36,7 @@ import (
 )
 
 const (
-	consensusTimeout   = 30 * time.Second
-	crossLinkBatchSize = 7
+	consensusTimeout = 30 * time.Second
 )
 
 // ReceiveGlobalMessage use libp2p pubsub mechanism to receive global broadcast messages
@@ -264,40 +263,19 @@ func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 // BroadcastCrossLinkHeader is called by consensus leader to send the new header as cross link to beacon chain.
 func (node *Node) BroadcastCrossLinkHeader(newBlock *types.Block) {
 	utils.Logger().Info().Msgf("Broadcasting new header to beacon chain groupID %s", node.NodeConfig.GetBeaconGroupID())
-	headers := []*types.Header{}
-	lastLink, err := node.Beaconchain().ReadShardLastCrossLink(newBlock.ShardID())
-	var latestBlockNum uint64
+	lastThreeHeaders := []*types.Header{}
 
-	// if cannot find latest crosslink header, broadcast latest 3 block headers
-	if err != nil {
-		utils.Logger().Debug().Err(err).Msg("[BroadcastCrossLinkHeader] ReadShardLastCrossLink Failed")
-		block := node.Blockchain().GetBlockByNumber(newBlock.NumberU64() - 2)
-		if block != nil {
-			headers = append(headers, block.Header())
-		}
-		block = node.Blockchain().GetBlockByNumber(newBlock.NumberU64() - 1)
-		if block != nil {
-			headers = append(headers, block.Header())
-		}
-		headers = append(headers, newBlock.Header())
-	} else {
-		latestBlockNum = lastLink.BlockNum().Uint64()
-		for blockNum := latestBlockNum + 1; blockNum <= newBlock.NumberU64(); blockNum++ {
-			if blockNum > latestBlockNum+crossLinkBatchSize {
-				break
-			}
-			block := node.Blockchain().GetBlockByNumber(blockNum)
-			if block != nil {
-				headers = append(headers, block.Header())
-			}
-		}
+	block := node.Blockchain().GetBlockByNumber(newBlock.NumberU64() - 2)
+	if block != nil {
+		lastThreeHeaders = append(lastThreeHeaders, block.Header())
 	}
+	block = node.Blockchain().GetBlockByNumber(newBlock.NumberU64() - 1)
+	if block != nil {
+		lastThreeHeaders = append(lastThreeHeaders, block.Header())
+	}
+	lastThreeHeaders = append(lastThreeHeaders, newBlock.Header())
 
-	utils.Logger().Info().Msgf("[BroadcastCrossLinkHeader] Broadcasting Block Headers, latestBlockNum %d, currentBlockNum %d, Number of Headers %d", latestBlockNum, newBlock.NumberU64(), len(headers))
-	for _, header := range headers {
-		utils.Logger().Debug().Msgf("[BroadcastCrossLinkHeader] Broadcasting %d", header.Number.Uint64())
-	}
-	node.host.SendMessageToGroups([]p2p.GroupID{node.NodeConfig.GetBeaconGroupID()}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCrossLinkHeadersMessage(headers)))
+	node.host.SendMessageToGroups([]p2p.GroupID{node.NodeConfig.GetBeaconGroupID()}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCrossLinkHeadersMessage(lastThreeHeaders)))
 }
 
 // BroadcastCXReceipts broadcasts cross shard receipts to correspoding
