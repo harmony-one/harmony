@@ -187,7 +187,7 @@ func (node *Node) messageHandler(content []byte, sender libp2p_peer.ID) {
 
 			case proto_node.Header:
 				// only beacon chain will accept the header from other shards
-				utils.Logger().Debug().Uint32("shardID", node.NodeConfig.ShardID).Msg("NET: received message: Node/Header")
+				utils.Logger().Debug().Msg("NET: received message: Node/Header")
 				if node.NodeConfig.ShardID != 0 {
 					return
 				}
