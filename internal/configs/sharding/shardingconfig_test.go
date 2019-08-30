@@ -15,28 +15,20 @@ func TestMainnetInstanceForEpoch(t *testing.T) {
 			mainnetV0,
 		},
 		{
-			big.NewInt(1),
-			mainnetV0_1,
+			big.NewInt(12),
+			mainnetV1,
 		},
 		{
-			big.NewInt(5),
-			mainnetV0_2,
+			big.NewInt(19),
+			mainnetV1_1,
 		},
 		{
-			big.NewInt(6),
-			mainnetV0_2,
+			big.NewInt(21),
+			mainnetV1_2,
 		},
 		{
 			big.NewInt(8),
 			mainnetV0_3,
-		},
-		{
-			big.NewInt(10),
-			mainnetV0_4,
-		},
-		{
-			big.NewInt(11),
-			mainnetV0_4,
 		},
 	}
 
