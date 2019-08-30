@@ -960,7 +960,7 @@ func (consensus *Consensus) tryCatchup() {
 		if consensus.BlockVerifier == nil {
 			// do nothing
 		} else if err := consensus.BlockVerifier(block); err != nil {
-			consensus.getLogger().Info().Err(err).Msg("[TryCatchup]block verification faied")
+			consensus.getLogger().Info().Msg("[TryCatchup]block verification faied")
 			return
 		}
 
