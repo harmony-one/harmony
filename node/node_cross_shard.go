@@ -278,6 +278,5 @@ func (node *Node) ProcessReceiptMessage(msgPayload []byte) {
 	// TODO: remove in future if not useful
 	node.Blockchain().WriteCXReceipts(cxp.MerkleProof.ShardID, cxp.MerkleProof.BlockNum.Uint64(), cxp.MerkleProof.BlockHash, cxp.Receipts, true)
 
-	utils.Logger().Debug().Msg("[ProcessReceiptMessage] Add CXReceiptsProof to pending Receipts")
 	node.AddPendingReceipts(&cxp)
 }

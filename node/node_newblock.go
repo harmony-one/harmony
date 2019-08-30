@@ -242,6 +242,5 @@ func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
 	}
 	node.pendingCXReceipts = pendingReceiptsList
 	node.pendingCXMutex.Unlock()
-	utils.Logger().Debug().Msgf("[proposeReceiptsProof] number of validReceipts %d", len(validReceiptsList))
 	return validReceiptsList
 }
