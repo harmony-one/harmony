@@ -29,9 +29,6 @@ type Schedule interface {
 	// ConsensusRatio ratio of new nodes vs consensus total nodes
 	ConsensusRatio() float64
 
-	// FirstCrossLinkBlock returns the first cross link block number that will be accepted into beacon chain
-	FirstCrossLinkBlock() uint64
-
 	// TODO: remove it after randomness feature turned on mainnet
 	//RandomnessStartingEpoch returns starting epoch of randonness generation
 	RandomnessStartingEpoch() uint64

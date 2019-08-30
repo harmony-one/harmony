@@ -28,7 +28,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
-
 	"github.com/harmony-one/harmony/core/types"
 )
 
@@ -676,6 +675,6 @@ func (db *DB) Commit(deleteEmptyObjects bool) (root common.Hash, err error) {
 		}
 		return nil
 	})
-	//log.Debug("Trie cache stats after commit", "misses", trie.CacheMisses(), "unloads", trie.CacheUnloads())
+	log.Debug("Trie cache stats after commit", "misses", trie.CacheMisses(), "unloads", trie.CacheUnloads())
 	return root, err
 }

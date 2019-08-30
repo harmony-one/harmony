@@ -207,14 +207,3 @@ func (r Receipts) GetRlp(i int) []byte {
 	}
 	return bytes
 }
-
-// ToShardID returns 0, arbitrary value
-// This function is NOT used, just to compatible with DerivableList interface
-func (r Receipts) ToShardID(i int) uint32 {
-	return 0
-}
-
-// MaxToShardID returns 0, arbitrary value, NOT used
-func (r Receipts) MaxToShardID() uint32 {
-	return 0
-}

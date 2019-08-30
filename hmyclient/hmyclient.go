@@ -119,7 +119,7 @@ func (c *Client) getBlock(ctx context.Context, method string, args ...interface{
 		}
 		txs[i] = tx.tx
 	}
-	return types.NewBlockWithHeader(head).WithBody(txs, []*types.Header{}, nil), nil
+	return types.NewBlockWithHeader(head).WithBody(txs, []*types.Header{}), nil
 }
 
 func toBlockNumArg(number *big.Int) string {

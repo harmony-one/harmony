@@ -6,8 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/harmony-one/harmony/internal/chain"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	client "github.com/harmony-one/harmony/api/client/service/proto"
@@ -17,6 +15,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/vm"
 )
@@ -63,7 +62,7 @@ func TestFetchAccountState(test *testing.T) {
 
 	genesis := gspec.MustCommit(database)
 	_ = genesis
-	chain, _ := core.NewBlockChain(database, nil, gspec.Config, chain.Engine, vm.Config{}, nil)
+	chain, _ := core.NewBlockChain(database, nil, gspec.Config, consensus.NewFaker(), vm.Config{}, nil)
 
 	hash := common.Hash{}
 	hash.SetBytes([]byte("hello"))
@@ -100,7 +99,7 @@ func TestGetStakingContractInfo(test *testing.T) {
 
 	genesis := gspec.MustCommit(database)
 	_ = genesis
-	chain, _ := core.NewBlockChain(database, nil, gspec.Config, chain.Engine, vm.Config{}, nil)
+	chain, _ := core.NewBlockChain(database, nil, gspec.Config, consensus.NewFaker(), vm.Config{}, nil)
 
 	hash := common.Hash{}
 	hash.SetBytes([]byte("hello"))

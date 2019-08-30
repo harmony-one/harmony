@@ -26,6 +26,7 @@ const (
 	_    // used to be Control
 	PING // node send ip/pki to register with leader
 	ShardState
+	// TODO: add more types
 )
 
 // BlockchainSyncMessage is a struct for blockchain sync message.
@@ -93,9 +94,6 @@ type BlockMessageType int
 // Block sync message subtype
 const (
 	Sync BlockMessageType = iota
-
-	Header  // used for crosslink from beacon chain to shard chain
-	Receipt // cross-shard transaction receipts
 )
 
 // SerializeBlockchainSyncMessage serializes BlockchainSyncMessage.
@@ -146,17 +144,6 @@ func ConstructBlocksSyncMessage(blocks []*types.Block) []byte {
 	return byteBuffer.Bytes()
 }
 
-// ConstructCrossLinkHeadersMessage constructs cross link header message to send to beacon chain
-func ConstructCrossLinkHeadersMessage(headers []*types.Header) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
-	byteBuffer.WriteByte(byte(Block))
-	byteBuffer.WriteByte(byte(Header))
-
-	headersData, _ := rlp.EncodeToBytes(headers)
-	byteBuffer.Write(headersData)
-	return byteBuffer.Bytes()
-}
-
 // ConstructEpochShardStateMessage contructs epoch shard state message
 func ConstructEpochShardStateMessage(epochShardState types.EpochShardState) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
@@ -185,21 +172,4 @@ func DeserializeEpochShardStateFromMessage(payload []byte) (*types.EpochShardSta
 	}
 
 	return epochShardState, nil
-}
-
-// ConstructCXReceiptsProof constructs cross shard receipts and merkle proof
-func ConstructCXReceiptsProof(cxs types.CXReceipts, mkp *types.CXMerkleProof) []byte {
-	msg := &types.CXReceiptsProof{Receipts: cxs, MerkleProof: mkp}
-
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
-	byteBuffer.WriteByte(byte(Block))
-	byteBuffer.WriteByte(byte(Receipt))
-	by, err := rlp.EncodeToBytes(msg)
-
-	if err != nil {
-		utils.Logger().Error().Err(err).Msg("[ConstructCXReceiptsProof] Encode CXReceiptsProof Error")
-		return []byte{}
-	}
-	byteBuffer.Write(by)
-	return byteBuffer.Bytes()
 }
