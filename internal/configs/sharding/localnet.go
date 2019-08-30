@@ -21,11 +21,7 @@ const (
 	localnetEpochBlock1 = 10
 	twoOne              = 5
 
-	localnetVdfDifficulty  = 5000 // This takes about 10s to finish the vdf
 	localnetConsensusRatio = float64(0.1)
-
-	// TODO: remove it after randomness feature turned on mainnet
-	localnetRandomnessStartingEpoch = 0
 
 	localnetMaxTxAmountLimit               = 1e3 // unit is in One
 	localnetMaxNumRecentTxsPerAccountLimit = 1e2
@@ -71,19 +67,9 @@ func (ls localnetSchedule) IsLastBlock(blockNum uint64) bool {
 	}
 }
 
-func (ls localnetSchedule) VdfDifficulty() int {
-	return localnetVdfDifficulty
-}
-
 // ConsensusRatio ratio of new nodes vs consensus total nodes
 func (ls localnetSchedule) ConsensusRatio() float64 {
 	return localnetConsensusRatio
-}
-
-// TODO: remove it after randomness feature turned on mainnet
-//RandonnessStartingEpoch returns starting epoch of randonness generation
-func (ls localnetSchedule) RandomnessStartingEpoch() uint64 {
-	return localnetRandomnessStartingEpoch
 }
 
 func (ls localnetSchedule) MaxTxAmountLimit() *big.Int {

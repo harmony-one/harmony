@@ -21,8 +21,6 @@ const (
 	testnetEpochBlock1 = 78
 	threeOne           = 111
 
-	testnetVdfDifficulty = 10000 // This takes about 20s to finish the vdf
-
 	testnetMaxTxAmountLimit               = 1e3 // unit is in One
 	testnetMaxNumRecentTxsPerAccountLimit = 1e2
 	testnetMaxTxPoolSizeLimit             = 8000
@@ -68,19 +66,9 @@ func (ts testnetSchedule) IsLastBlock(blockNum uint64) bool {
 	}
 }
 
-func (ts testnetSchedule) VdfDifficulty() int {
-	return testnetVdfDifficulty
-}
-
 // ConsensusRatio ratio of new nodes vs consensus total nodes
 func (ts testnetSchedule) ConsensusRatio() float64 {
 	return mainnetConsensusRatio
-}
-
-// TODO: remove it after randomness feature turned on mainnet
-//RandonnessStartingEpoch returns starting epoch of randonness generation
-func (ts testnetSchedule) RandomnessStartingEpoch() uint64 {
-	return mainnetRandomnessStartingEpoch
 }
 
 func (ts testnetSchedule) MaxTxAmountLimit() *big.Int {

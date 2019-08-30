@@ -57,17 +57,16 @@ var (
 )
 
 const (
-	bodyCacheLimit       = 256
-	blockCacheLimit      = 256
-	receiptsCacheLimit   = 32
-	maxFutureBlocks      = 256
-	maxTimeFutureBlocks  = 30
-	badBlockLimit        = 10
-	triesInMemory        = 128
-	shardCacheLimit      = 2
-	commitsCacheLimit    = 10
-	epochCacheLimit      = 10
-	randomnessCacheLimit = 10
+	bodyCacheLimit      = 256
+	blockCacheLimit     = 256
+	receiptsCacheLimit  = 32
+	maxFutureBlocks     = 256
+	maxTimeFutureBlocks = 30
+	badBlockLimit       = 10
+	triesInMemory       = 128
+	shardCacheLimit     = 2
+	commitsCacheLimit   = 10
+	epochCacheLimit     = 10
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	BlockChainVersion = 3
@@ -129,7 +128,6 @@ type BlockChain struct {
 	shardStateCache  *lru.Cache
 	lastCommitsCache *lru.Cache
 	epochCache       *lru.Cache // Cache epoch number → first block number
-	randomnessCache  *lru.Cache // Cache for vrf/vdf
 
 	quit    chan struct{} // blockchain quit channel
 	running int32         // running must be called atomically
@@ -165,7 +163,6 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	shardCache, _ := lru.New(shardCacheLimit)
 	commitsCache, _ := lru.New(commitsCacheLimit)
 	epochCache, _ := lru.New(epochCacheLimit)
-	randomnessCache, _ := lru.New(randomnessCacheLimit)
 
 	bc := &BlockChain{
 		chainConfig:      chainConfig,
@@ -183,7 +180,6 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		shardStateCache:  shardCache,
 		lastCommitsCache: commitsCache,
 		epochCache:       epochCache,
-		randomnessCache:  randomnessCache,
 		engine:           engine,
 		vmConfig:         vmConfig,
 		badBlocks:        badBlocks,
@@ -1319,37 +1315,6 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 
 		cache, _ := bc.stateCache.TrieDB().Size()
 		stats.report(chain, i, cache)
-
-		//check non zero VRF field in header and add to local db
-		if len(block.Vrf()) > 0 {
-			vrfBlockNumbers, _ := bc.ReadEpochVrfBlockNums(block.Header().Epoch)
-			if (len(vrfBlockNumbers) > 0) && (vrfBlockNumbers[len(vrfBlockNumbers)-1] == block.NumberU64()) {
-				utils.Logger().Error().
-					Str("number", chain[i].Number().String()).
-					Str("epoch", block.Header().Epoch.String()).
-					Msg("VRF block number is already in local db")
-			} else {
-				vrfBlockNumbers = append(vrfBlockNumbers, block.NumberU64())
-				err = bc.WriteEpochVrfBlockNums(block.Header().Epoch, vrfBlockNumbers)
-				if err != nil {
-					utils.Logger().Error().
-						Str("number", chain[i].Number().String()).
-						Str("epoch", block.Header().Epoch.String()).
-						Msg("failed to write VRF block number to local db")
-				}
-			}
-		}
-
-		//check non zero Vdf in header and add to local db
-		if len(block.Vdf()) > 0 {
-			err = bc.WriteEpochVdfBlockNum(block.Header().Epoch, block.Number())
-			if err != nil {
-				utils.Logger().Error().
-					Str("number", chain[i].Number().String()).
-					Str("epoch", block.Header().Epoch.String()).
-					Msg("failed to write VDF block number to local db")
-			}
-		}
 	}
 	// Append a single chain head event if we've progressed the chain
 	if lastCanon != nil && bc.CurrentBlock().Hash() == lastCanon.Hash() {
@@ -1833,22 +1798,26 @@ func (bc *BlockChain) WriteLastCommits(lastCommits []byte) error {
 }
 
 // GetVdfByNumber retrieves the rand seed given the block number, return 0 if not exist
-func (bc *BlockChain) GetVdfByNumber(number uint64) []byte {
+func (bc *BlockChain) GetVdfByNumber(number uint64) [32]byte {
 	header := bc.GetHeaderByNumber(number)
 	if header == nil {
-		return []byte{}
+		return [32]byte{}
 	}
-
-	return header.Vdf
+	result := [32]byte{}
+	//copy(result[:], header.Vdf[:32])
+	// TODO: add real vdf
+	return result
 }
 
 // GetVrfByNumber retrieves the randomness preimage given the block number, return 0 if not exist
-func (bc *BlockChain) GetVrfByNumber(number uint64) []byte {
+func (bc *BlockChain) GetVrfByNumber(number uint64) [32]byte {
 	header := bc.GetHeaderByNumber(number)
 	if header == nil {
-		return []byte{}
+		return [32]byte{}
 	}
-	return header.Vrf
+	//return header.Vrf
+	// TODO: add real vrf
+	return [32]byte{}
 }
 
 // GetShardState returns the shard state for the given epoch,
@@ -1908,78 +1877,6 @@ func (bc *BlockChain) StoreEpochBlockNumber(
 		).WithCause(err)
 	}
 	return nil
-}
-
-// ReadEpochVrfBlockNums retrieves block numbers with valid VRF for the specified epoch
-func (bc *BlockChain) ReadEpochVrfBlockNums(epoch *big.Int) ([]uint64, error) {
-	vrfNumbers := []uint64{}
-	if cached, ok := bc.randomnessCache.Get("vrf-" + string(epoch.Bytes())); ok {
-		encodedVrfNumbers := cached.([]byte)
-		if err := rlp.DecodeBytes(encodedVrfNumbers, &vrfNumbers); err != nil {
-			return nil, err
-		}
-		return vrfNumbers, nil
-	}
-
-	encodedVrfNumbers, err := rawdb.ReadEpochVrfBlockNums(bc.db, epoch)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := rlp.DecodeBytes(encodedVrfNumbers, &vrfNumbers); err != nil {
-		return nil, err
-	}
-	return vrfNumbers, nil
-}
-
-// WriteEpochVrfBlockNums saves block numbers with valid VRF for the specified epoch
-func (bc *BlockChain) WriteEpochVrfBlockNums(epoch *big.Int, vrfNumbers []uint64) error {
-	encodedVrfNumbers, err := rlp.EncodeToBytes(vrfNumbers)
-	if err != nil {
-		return err
-	}
-
-	err = rawdb.WriteEpochVrfBlockNums(bc.db, epoch, encodedVrfNumbers)
-	if err != nil {
-		return err
-	}
-	bc.randomnessCache.Add("vrf-"+string(epoch.Bytes()), encodedVrfNumbers)
-	return nil
-}
-
-// ReadEpochVdfBlockNum retrieves block number with valid VDF for the specified epoch
-func (bc *BlockChain) ReadEpochVdfBlockNum(epoch *big.Int) (*big.Int, error) {
-	if cached, ok := bc.randomnessCache.Get("vdf-" + string(epoch.Bytes())); ok {
-		encodedVdfNumber := cached.([]byte)
-		return new(big.Int).SetBytes(encodedVdfNumber), nil
-	}
-
-	encodedVdfNumber, err := rawdb.ReadEpochVdfBlockNum(bc.db, epoch)
-	if err != nil {
-		return nil, err
-	}
-	return new(big.Int).SetBytes(encodedVdfNumber), nil
-}
-
-// WriteEpochVdfBlockNum saves block number with valid VDF for the specified epoch
-func (bc *BlockChain) WriteEpochVdfBlockNum(epoch *big.Int, blockNum *big.Int) error {
-	err := rawdb.WriteEpochVdfBlockNum(bc.db, epoch, blockNum.Bytes())
-	if err != nil {
-		return err
-	}
-
-	bc.randomnessCache.Add("vdf-"+string(epoch.Bytes()), blockNum.Bytes())
-	return nil
-}
-
-// IsSameLeaderAsPreviousBlock retrieves a block from the database by number, caching it
-func (bc *BlockChain) IsSameLeaderAsPreviousBlock(block *types.Block) bool {
-	if IsEpochBlock(block) {
-		return false
-	}
-
-	previousBlock := bc.GetBlockByNumber(block.NumberU64() - 1)
-	return block.Coinbase() == previousBlock.Coinbase()
 }
 
 // ChainDB ...

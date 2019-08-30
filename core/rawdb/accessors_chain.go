@@ -478,27 +478,8 @@ func ReadEpochBlockNumber(db DatabaseReader, epoch *big.Int) (*big.Int, error) {
 	return new(big.Int).SetBytes(data), nil
 }
 
-// WriteEpochBlockNumber stores the given epoch-number-to-epoch-block-number in the database.
+// WriteEpochBlockNumber stores the given epoch-number-to-epoch-block-number
+// in the database.
 func WriteEpochBlockNumber(db DatabaseWriter, epoch, blockNum *big.Int) error {
 	return db.Put(epochBlockNumberKey(epoch), blockNum.Bytes())
-}
-
-// ReadEpochVrfBlockNums retrieves the VRF block numbers for the given epoch
-func ReadEpochVrfBlockNums(db DatabaseReader, epoch *big.Int) ([]byte, error) {
-	return db.Get(epochVrfBlockNumbersKey(epoch))
-}
-
-// WriteEpochVrfBlockNums stores the VRF block numbers for the given epoch
-func WriteEpochVrfBlockNums(db DatabaseWriter, epoch *big.Int, data []byte) error {
-	return db.Put(epochVrfBlockNumbersKey(epoch), data)
-}
-
-// ReadEpochVdfBlockNum retrieves the VDF block number for the given epoch
-func ReadEpochVdfBlockNum(db DatabaseReader, epoch *big.Int) ([]byte, error) {
-	return db.Get(epochVdfBlockNumberKey(epoch))
-}
-
-// WriteEpochVdfBlockNum stores the VDF block number for the given epoch
-func WriteEpochVdfBlockNum(db DatabaseWriter, epoch *big.Int, data []byte) error {
-	return db.Put(epochVdfBlockNumberKey(epoch), data)
 }

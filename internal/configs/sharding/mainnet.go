@@ -12,11 +12,7 @@ const (
 	mainnetEpochBlock1 = 344064 // 21 * 2^14
 	blocksPerShard     = 16384  // 2^14
 
-	mainnetVdfDifficulty  = 50000 // This takes about 100s to finish the vdf
 	mainnetConsensusRatio = float64(0.66)
-
-	// TODO: remove it after randomness feature turned on mainnet
-	mainnetRandomnessStartingEpoch = 100000
 
 	mainnetV0_1Epoch = 1
 	mainnetV0_2Epoch = 5
@@ -84,19 +80,9 @@ func (ms mainnetSchedule) IsLastBlock(blockNum uint64) bool {
 	}
 }
 
-func (ms mainnetSchedule) VdfDifficulty() int {
-	return mainnetVdfDifficulty
-}
-
 // ConsensusRatio ratio of new nodes vs consensus total nodes
 func (ms mainnetSchedule) ConsensusRatio() float64 {
 	return mainnetConsensusRatio
-}
-
-// TODO: remove it after randomness feature turned on mainnet
-//RandonnessStartingEpoch returns starting epoch of randonness generation
-func (ms mainnetSchedule) RandomnessStartingEpoch() uint64 {
-	return mainnetRandomnessStartingEpoch
 }
 
 func (ms mainnetSchedule) MaxTxAmountLimit() *big.Int {

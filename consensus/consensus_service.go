@@ -42,21 +42,20 @@ func (consensus *Consensus) WaitForNewRandomness() {
 }
 
 // GetNextRnd returns the oldest available randomness along with the hash of the block there randomness preimage is committed.
-func (consensus *Consensus) GetNextRnd() ([vdFAndProofSize]byte, [32]byte, error) {
+func (consensus *Consensus) GetNextRnd() ([32]byte, [32]byte, error) {
 	if len(consensus.pendingRnds) == 0 {
-		return [vdFAndProofSize]byte{}, [32]byte{}, errors.New("No available randomness")
+		return [32]byte{}, [32]byte{}, errors.New("No available randomness")
 	}
 	vdfOutput := consensus.pendingRnds[0]
-
-	vdfBytes := [vdFAndProofSize]byte{}
-	seed := [32]byte{}
-	copy(vdfBytes[:], vdfOutput[:vdFAndProofSize])
-	copy(seed[:], vdfOutput[vdFAndProofSize:])
 
 	//pop the first vdfOutput from the list
 	consensus.pendingRnds = consensus.pendingRnds[1:]
 
-	return vdfBytes, seed, nil
+	rnd := [32]byte{}
+	blockHash := [32]byte{}
+	copy(rnd[:], vdfOutput[:32])
+	copy(blockHash[:], vdfOutput[32:])
+	return rnd, blockHash, nil
 }
 
 // SealHash returns the hash of a block prior to it being sealed.
@@ -495,7 +494,7 @@ func (consensus *Consensus) RegisterPRndChannel(pRndChannel chan []byte) {
 }
 
 // RegisterRndChannel registers the channel for receiving final randomness from DRG protocol
-func (consensus *Consensus) RegisterRndChannel(rndChannel chan [548]byte) {
+func (consensus *Consensus) RegisterRndChannel(rndChannel chan [64]byte) {
 	consensus.RndChannel = rndChannel
 }
 
@@ -742,14 +741,5 @@ func (consensus *Consensus) IsLeader() bool {
 	if consensus.PubKey != nil && consensus.LeaderPubKey != nil {
 		return consensus.PubKey.IsEqual(consensus.LeaderPubKey)
 	}
-	return false
-}
-
-// NeedsRandomNumberGeneration returns true if the current epoch needs random number generation
-func (consensus *Consensus) NeedsRandomNumberGeneration(epoch *big.Int) bool {
-	if consensus.ShardID == 0 && epoch.Uint64() >= core.ShardingSchedule.RandomnessStartingEpoch() {
-		return true
-	}
-
 	return false
 }

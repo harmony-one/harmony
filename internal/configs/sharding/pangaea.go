@@ -31,10 +31,6 @@ func (ps pangaeaSchedule) IsLastBlock(blockNum uint64) bool {
 	return (blockNum+1)%ps.BlocksPerEpoch() == 0
 }
 
-func (pangaeaSchedule) VdfDifficulty() int {
-	return testnetVdfDifficulty
-}
-
 func (pangaeaSchedule) ConsensusRatio() float64 {
 	return mainnetConsensusRatio
 }
@@ -43,12 +39,6 @@ var pangaeaReshardingEpoch = []*big.Int{common.Big0}
 
 var pangaeaV0 = MustNewInstance(
 	4, 250, 20, genesis.PangaeaAccounts, genesis.FoundationalPangaeaAccounts, pangaeaReshardingEpoch)
-
-// TODO: remove it after randomness feature turned on mainnet
-//RandonnessStartingEpoch returns starting epoch of randonness generation
-func (pangaeaSchedule) RandomnessStartingEpoch() uint64 {
-	return mainnetRandomnessStartingEpoch
-}
 
 func (pangaeaSchedule) MaxTxAmountLimit() *big.Int {
 	amountBigInt := big.NewInt(mainnetMaxTxAmountLimit)
