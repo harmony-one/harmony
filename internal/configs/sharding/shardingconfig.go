@@ -32,6 +32,9 @@ type Schedule interface {
 	// FirstCrossLinkBlock returns the first cross link block number that will be accepted into beacon chain
 	FirstCrossLinkBlock() uint64
 
+	// EIP155Block returns the first block number starting from which the new signing algorithm proposed in EIP155 is used.
+	EIP155Block() uint64
+
 	// TODO: remove it after randomness feature turned on mainnet
 	//RandomnessStartingEpoch returns starting epoch of randonness generation
 	RandomnessStartingEpoch() uint64

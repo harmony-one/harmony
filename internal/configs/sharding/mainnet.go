@@ -15,7 +15,8 @@ const (
 	mainnetVdfDifficulty  = 50000 // This takes about 100s to finish the vdf
 	mainnetConsensusRatio = float64(0.66)
 
-	mainnetFirstCrossLinkBlock = 524288 // 32 * 2^14
+	mainnetFirstCrossLinkBlock = 589824 // 36 * 2^14
+	mainnetEIP155Block         = 589824 // 36 * 2^14
 
 	// TODO: remove it after randomness feature turned on mainnet
 	mainnetRandomnessStartingEpoch = 100000
@@ -92,6 +93,10 @@ func (ms mainnetSchedule) VdfDifficulty() int {
 
 func (ms mainnetSchedule) FirstCrossLinkBlock() uint64 {
 	return mainnetFirstCrossLinkBlock
+}
+
+func (ms mainnetSchedule) EIP155Block() uint64 {
+	return mainnetEIP155Block
 }
 
 // ConsensusRatio ratio of new nodes vs consensus total nodes

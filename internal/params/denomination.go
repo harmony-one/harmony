@@ -14,31 +14,15 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package vm
+package params
 
-import (
-	"fmt"
-
-	"github.com/harmony-one/harmony/internal/params"
+// These are the multipliers for ether denominations.
+// Example: To get the wei value of an amount in 'gwei', use
+//
+//    new(big.Int).Mul(value, big.NewInt(params.GWei))
+//
+const (
+	Wei   = 1
+	GWei  = 1e9
+	Ether = 1e18
 )
-
-func makeStackFunc(pop, push int) stackValidationFunc {
-	return func(stack *Stack) error {
-		if err := stack.require(pop); err != nil {
-			return err
-		}
-
-		if stack.len()+push-pop > int(params.StackLimit) {
-			return fmt.Errorf("stack limit reached %d (%d)", stack.len(), params.StackLimit)
-		}
-		return nil
-	}
-}
-
-func makeDupStackFunc(n int) stackValidationFunc {
-	return makeStackFunc(n, n+1)
-}
-
-func makeSwapStackFunc(n int) stackValidationFunc {
-	return makeStackFunc(n, n)
-}

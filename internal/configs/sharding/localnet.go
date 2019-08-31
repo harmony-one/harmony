@@ -25,6 +25,7 @@ const (
 	localnetConsensusRatio = float64(0.1)
 
 	localnetFirstCrossLinkBlock     = 3
+	localnetEIP155Block             = 0
 	localnetRandomnessStartingEpoch = 0
 
 	localnetMaxTxAmountLimit               = 1e3 // unit is in One
@@ -77,6 +78,10 @@ func (ls localnetSchedule) VdfDifficulty() int {
 
 func (ls localnetSchedule) FirstCrossLinkBlock() uint64 {
 	return localnetFirstCrossLinkBlock
+}
+
+func (ls localnetSchedule) EIP155Block() uint64 {
+	return localnetEIP155Block
 }
 
 // ConsensusRatio ratio of new nodes vs consensus total nodes

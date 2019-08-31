@@ -48,6 +48,10 @@ func (pangaeaSchedule) FirstCrossLinkBlock() uint64 {
 	return testnetFirstCrossLinkBlock
 }
 
+func (pangaeaSchedule) EIP155Block() uint64 {
+	return testnetEIP155Block
+}
+
 // TODO: remove it after randomness feature turned on mainnet
 //RandonnessStartingEpoch returns starting epoch of randonness generation
 func (pangaeaSchedule) RandomnessStartingEpoch() uint64 {
