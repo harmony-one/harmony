@@ -251,7 +251,7 @@ any_new_binaries() {
    ${do_not_download} && return 0
    outdir="${1:-.}"
    mkdir -p "${outdir}"
-   curl http://${BUCKET}.s3.amazonaws.com/${FOLDER}md5sum.txt -o "${outdir}/md5sum.txt" || return $?
+   curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}md5sum.txt -o "${outdir}/md5sum.txt" || return $?
    diff $outdir/md5sum.txt md5sum.txt
    return $?
 }
@@ -262,7 +262,7 @@ download_binaries() {
    outdir="${1:-.}"
    mkdir -p "${outdir}"
    for bin in "${BIN[@]}"; do
-      curl http://${BUCKET}.s3.amazonaws.com/${FOLDER}${bin} -o "${outdir}/${bin}" || return $?
+      curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}${bin} -o "${outdir}/${bin}" || return $?
    done
    chmod +x "${outdir}/harmony"
    (cd "${outdir}" && exec openssl sha256 "${BIN[@]}") > "${outdir}/harmony-checksums.txt"
