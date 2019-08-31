@@ -27,6 +27,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // Indicate whether the receipts corresponding to a blockHash is spent or not
@@ -412,7 +413,7 @@ func FindCommonAncestor(db DatabaseReader, a, b *types.Header) *types.Header {
 // ReadShardState retrieves sharding state.
 func ReadShardState(
 	db DatabaseReader, epoch *big.Int,
-) (shardState types.ShardState, err error) {
+) (shardState shard.ShardState, err error) {
 	var data []byte
 	data, err = db.Get(shardStateKey(epoch))
 	if err != nil {
@@ -430,7 +431,7 @@ func ReadShardState(
 
 // WriteShardState stores sharding state into database.
 func WriteShardState(
-	db DatabaseWriter, epoch *big.Int, shardState types.ShardState,
+	db DatabaseWriter, epoch *big.Int, shardState shard.ShardState,
 ) (err error) {
 	data, err := rlp.EncodeToBytes(shardState)
 	if err != nil {

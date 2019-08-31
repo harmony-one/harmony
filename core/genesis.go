@@ -36,6 +36,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // no go:generate gencodec -type Genesis -field-override genesisSpecMarshaling -out gen_genesis.go
@@ -56,7 +57,7 @@ type Genesis struct {
 	Coinbase       common.Address      `json:"coinbase"`
 	Alloc          GenesisAlloc        `json:"alloc"          gencodec:"required"`
 	ShardStateHash common.Hash         `json:"shardStateHash" gencodec:"required"`
-	ShardState     types.ShardState    `json:"shardState"     gencodec:"required"`
+	ShardState     shard.ShardState    `json:"shardState"     gencodec:"required"`
 
 	// These fields are used for consensus tests. Please don't use them
 	// in actual genesis blocks.

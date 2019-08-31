@@ -32,6 +32,7 @@ import (
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
 	p2p_host "github.com/harmony-one/harmony/p2p/host"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // State is a state of a node.
@@ -201,7 +202,7 @@ type Node struct {
 	// Next shard state
 	nextShardState struct {
 		// The received master shard state
-		master *types.EpochShardState
+		master *shard.EpochShardState
 
 		// When for a leader to propose the next shard state,
 		// or for a validator to wait for a proposal before view change.

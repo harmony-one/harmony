@@ -46,6 +46,7 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
 )
 
 var (
@@ -1805,10 +1806,10 @@ func (bc *BlockChain) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscript
 }
 
 // ReadShardState retrieves sharding state given the epoch number.
-func (bc *BlockChain) ReadShardState(epoch *big.Int) (types.ShardState, error) {
+func (bc *BlockChain) ReadShardState(epoch *big.Int) (shard.ShardState, error) {
 	cacheKey := string(epoch.Bytes())
 	if cached, ok := bc.shardStateCache.Get(cacheKey); ok {
-		shardState := cached.(types.ShardState)
+		shardState := cached.(shard.ShardState)
 		return shardState, nil
 	}
 	shardState, err := rawdb.ReadShardState(bc.db, epoch)
@@ -1821,7 +1822,7 @@ func (bc *BlockChain) ReadShardState(epoch *big.Int) (types.ShardState, error) {
 
 // WriteShardState saves the given sharding state under the given epoch number.
 func (bc *BlockChain) WriteShardState(
-	epoch *big.Int, shardState types.ShardState,
+	epoch *big.Int, shardState shard.ShardState,
 ) error {
 	shardState = shardState.DeepCopy()
 	err := rawdb.WriteShardState(bc.db, epoch, shardState)
@@ -1837,7 +1838,7 @@ func (bc *BlockChain) WriteShardState(
 func (bc *BlockChain) WriteShardStateBytes(
 	epoch *big.Int, shardState []byte,
 ) error {
-	decodeShardState := types.ShardState{}
+	decodeShardState := shard.ShardState{}
 	if err := rlp.DecodeBytes(shardState, &decodeShardState); err != nil {
 		return err
 	}
@@ -1897,7 +1898,7 @@ func (bc *BlockChain) GetVrfByNumber(number uint64) []byte {
 func (bc *BlockChain) GetShardState(
 	epoch *big.Int,
 	stakeInfo *map[common.Address]*structs.StakeInfo,
-) (types.ShardState, error) {
+) (shard.ShardState, error) {
 	shardState, err := bc.ReadShardState(epoch)
 	if err == nil { // TODO ek – distinguish ErrNotFound
 		return shardState, err

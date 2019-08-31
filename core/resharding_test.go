@@ -8,7 +8,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/shard"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -38,17 +39,17 @@ func init() {
 	copy(blsPubKey10[:], []byte("random key 10"))
 }
 
-func fakeGetInitShardState(numberOfShards, numOfNodes int) types.ShardState {
+func fakeGetInitShardState(numberOfShards, numOfNodes int) shard.ShardState {
 	rand.Seed(int64(42))
-	shardState := types.ShardState{}
+	shardState := shard.ShardState{}
 	for i := 0; i < numberOfShards; i++ {
 		sid := uint32(i)
-		com := types.Committee{ShardID: sid}
+		com := shard.Committee{ShardID: sid}
 		for j := 0; j < numOfNodes; j++ {
 			nid := strconv.Itoa(int(rand.Int63()))
 			blsPubKey := [48]byte{}
 			copy(blsPubKey1[:], []byte(nid))
-			com.NodeList = append(com.NodeList, types.NodeID{
+			com.NodeList = append(com.NodeList, shard.NodeID{
 				EcdsaAddress: common.BytesToAddress([]byte(nid)),
 				BlsPublicKey: blsPubKey,
 			})
@@ -58,15 +59,15 @@ func fakeGetInitShardState(numberOfShards, numOfNodes int) types.ShardState {
 	return shardState
 }
 
-func fakeNewNodeList(seed int64) []types.NodeID {
+func fakeNewNodeList(seed int64) []shard.NodeID {
 	rand.Seed(seed)
 	numNewNodes := rand.Intn(10)
-	nodeList := []types.NodeID{}
+	nodeList := []shard.NodeID{}
 	for i := 0; i < numNewNodes; i++ {
 		nid := strconv.Itoa(int(rand.Int63()))
 		blsPubKey := [48]byte{}
 		copy(blsPubKey1[:], []byte(nid))
-		nodeList = append(nodeList, types.NodeID{
+		nodeList = append(nodeList, shard.NodeID{
 			EcdsaAddress: common.BytesToAddress([]byte(nid)),
 			BlsPublicKey: blsPubKey,
 		})
@@ -80,7 +81,7 @@ func TestFakeNewNodeList(t *testing.T) {
 }
 
 func TestShuffle(t *testing.T) {
-	nodeList := []types.NodeID{
+	nodeList := []shard.NodeID{
 		{EcdsaAddress: common.Address{0x12}, BlsPublicKey: blsPubKey1},
 		{EcdsaAddress: common.Address{0x22}, BlsPublicKey: blsPubKey2},
 		{EcdsaAddress: common.Address{0x32}, BlsPublicKey: blsPubKey3},
@@ -93,7 +94,7 @@ func TestShuffle(t *testing.T) {
 		{EcdsaAddress: common.Address{0x02}, BlsPublicKey: blsPubKey10},
 	}
 
-	cpList := []types.NodeID{}
+	cpList := []shard.NodeID{}
 	cpList = append(cpList, nodeList...)
 	Shuffle(nodeList)
 	cnt := 0
@@ -120,7 +121,7 @@ func TestSortCommitteeBySize(t *testing.T) {
 func TestUpdateShardState(t *testing.T) {
 	shardState := fakeGetInitShardState(6, 10)
 	ss := &ShardingState{epoch: 1, rnd: 42, shardState: shardState, numShards: len(shardState)}
-	newNodeList := []types.NodeID{
+	newNodeList := []shard.NodeID{
 		{EcdsaAddress: common.Address{0x12}, BlsPublicKey: blsPubKey1},
 		{EcdsaAddress: common.Address{0x22}, BlsPublicKey: blsPubKey2},
 		{EcdsaAddress: common.Address{0x32}, BlsPublicKey: blsPubKey3},
@@ -136,7 +137,7 @@ func TestUpdateShardState(t *testing.T) {
 func TestAssignNewNodes(t *testing.T) {
 	shardState := fakeGetInitShardState(2, 2)
 	ss := &ShardingState{epoch: 1, rnd: 42, shardState: shardState, numShards: len(shardState)}
-	newNodes := []types.NodeID{
+	newNodes := []shard.NodeID{
 		{EcdsaAddress: common.Address{0x12}, BlsPublicKey: blsPubKey1},
 		{EcdsaAddress: common.Address{0x22}, BlsPublicKey: blsPubKey2},
 		{EcdsaAddress: common.Address{0x32}, BlsPublicKey: blsPubKey3},

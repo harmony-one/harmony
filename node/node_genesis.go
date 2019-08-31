@@ -9,17 +9,17 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
+
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/core/types"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
 )
 
 const (
@@ -47,14 +47,14 @@ func (gi *genesisInitializer) InitChainDB(db ethdb.Database, shardID uint32) err
 		if c == nil {
 			return errors.New("cannot find local shard in genesis")
 		}
-		shardState = types.ShardState{*c}
+		shardState = shard.ShardState{*c}
 	}
 	gi.node.SetupGenesisBlock(db, shardID, shardState)
 	return nil
 }
 
 // SetupGenesisBlock sets up a genesis blockchain.
-func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardState types.ShardState) {
+func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardState shard.ShardState) {
 	utils.Logger().Info().Interface("shardID", shardID).Msg("setting up a brand new chain database")
 	if shardID == node.NodeConfig.ShardID {
 		node.isFirstTime = true

@@ -8,6 +8,7 @@ import (
 
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // ChainReader defines a small collection of methods needed to access the local
@@ -33,7 +34,7 @@ type ChainReader interface {
 	GetBlock(hash common.Hash, number uint64) *types.Block
 
 	// ReadShardState retrieves sharding state given the epoch number.
-	ReadShardState(epoch *big.Int) (types.ShardState, error)
+	ReadShardState(epoch *big.Int) (shard.ShardState, error)
 }
 
 // Engine is an algorithm agnostic consensus engine.

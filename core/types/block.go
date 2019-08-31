@@ -34,6 +34,7 @@ import (
 	"golang.org/x/crypto/sha3"
 
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // Constants for block.
@@ -135,8 +136,8 @@ func (h *Header) Logger(logger *zerolog.Logger) *zerolog.Logger {
 }
 
 // GetShardState returns the deserialized shard state object.
-func (h *Header) GetShardState() (ShardState, error) {
-	shardState := ShardState{}
+func (h *Header) GetShardState() (shard.ShardState, error) {
+	shardState := shard.ShardState{}
 	err := rlp.DecodeBytes(h.ShardState, &shardState)
 	if err != nil {
 		return nil, err
@@ -546,7 +547,7 @@ func (b *Block) AddVdf(vdf []byte) {
 }
 
 // AddShardState add shardState into block header
-func (b *Block) AddShardState(shardState ShardState) error {
+func (b *Block) AddShardState(shardState shard.ShardState) error {
 	// Make a copy because ShardState.Hash() internally sorts entries.
 	// Store the sorted copy.
 	shardState = append(shardState[:0:0], shardState...)
