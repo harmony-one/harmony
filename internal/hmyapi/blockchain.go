@@ -69,14 +69,16 @@ func (s *PublicBlockChainAPI) GetShardingStructure(ctx context.Context) ([]map[s
 	if core.ShardingSchedule.GetNetworkID() == shardingconfig.MainNet {
 		return []map[string]interface{}{
 			map[string]interface{}{
+				"current": s.b.GetShardID() == 0,
 				"shardID": "0",
 				"http":    "http://s0.t.hmy.io:9500",
 				"ws":      "ws://s0.t.hmy.io:9800",
 			},
 			map[string]interface{}{
+				"current": s.b.GetShardID() == 1,
 				"shardID": "1",
 				"http":    "http://s1.t.hmy.io:9500",
-				"ws":      "ws://s1.t.hmy.io",
+				"ws":      "ws://s1.t.hmy.io:9800",
 			},
 			map[string]interface{}{
 				"shardID": "2",
@@ -99,7 +101,7 @@ func (s *PublicBlockChainAPI) GetShardingStructure(ctx context.Context) ([]map[s
 			map[string]interface{}{
 				"shardID": "1",
 				"http":    "http://s1.b.hmy.io:9500",
-				"ws":      "ws://s1.s.hmy.io",
+				"ws":      "ws://s1.s.hmy.io:9800",
 			},
 		}, nil
 	} else {
