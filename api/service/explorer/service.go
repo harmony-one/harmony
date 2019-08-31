@@ -16,8 +16,10 @@ import (
 	"github.com/gorilla/mux"
 	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 
+	"github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
+	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/bech32"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -198,11 +200,54 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	accountBlocks := s.ReadBlocksFromDB(fromInt, toInt)
+	curEpoch := int64(-1)
+	committee := &types.Committee{}
 	for id, accountBlock := range accountBlocks {
 		if id == 0 || id == len(accountBlocks)-1 || accountBlock == nil {
 			continue
 		}
 		block := NewBlock(accountBlock, id+fromInt-1)
+		if int64(block.Epoch) > curEpoch {
+			if bytes, err := db.Get([]byte(GetCommitteeKey(uint32(s.ShardID), block.Epoch))); err == nil {
+				committee = &types.Committee{}
+				if err = rlp.DecodeBytes(bytes, committee); err != nil {
+					utils.Logger().Warn().Err(err).Msg("cannot read committee for new epoch")
+				}
+			} else {
+				state, err := accountBlock.Header().GetShardState()
+				if err == nil {
+					for _, shardCommittee := range state {
+						if shardCommittee.ShardID == accountBlock.ShardID() {
+							committee = &shardCommittee
+							break
+						}
+					}
+				}
+			}
+			curEpoch = int64(block.Epoch)
+		}
+		pubkeys := make([]*bls.PublicKey, len(committee.NodeList))
+		for i, validator := range committee.NodeList {
+			pubkeys[i] = new(bls.PublicKey)
+			validator.BlsPublicKey.ToLibBLSPublicKey(pubkeys[i])
+		}
+		mask, err := bls2.NewMask(pubkeys, nil)
+		if err == nil && accountBlocks[id+1] != nil {
+			err = mask.SetMask(accountBlocks[id+1].Header().LastCommitBitmap)
+			if err == nil {
+				for _, validator := range committee.NodeList {
+					oneAddress, err := common2.AddressToBech32(validator.EcdsaAddress)
+					if err != nil {
+						continue
+					}
+					blsPublicKey := new(bls.PublicKey)
+					validator.BlsPublicKey.ToLibBLSPublicKey(blsPublicKey)
+					if ok, err := mask.KeyEnabled(blsPublicKey); err == nil && ok {
+						block.Signers = append(block.Signers, oneAddress)
+					}
+				}
+			}
+		}
 		// Populate transactions
 		for _, tx := range accountBlock.Transactions() {
 			transaction := GetTransaction(tx, accountBlock)
