@@ -241,11 +241,6 @@ if [ "$OS" == "Linux" ]; then
    BIN=( harmony libbls384_256.so libcrypto.so.10 libgmp.so.10 libgmpxx.so.4 libmcl.so md5sum.txt )
 fi
 
-# clean up old files
-for bin in "${BIN[@]}"; do
-   ${do_not_download} || rm -f ${bin}
-done
-
 any_new_binaries() {
    local outdir
    ${do_not_download} && return 0
