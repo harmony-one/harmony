@@ -246,9 +246,14 @@ any_new_binaries() {
    ${do_not_download} && return 0
    outdir="${1:-.}"
    mkdir -p "${outdir}"
-   curl http://${BUCKET}.s3.amazonaws.com/${FOLDER}md5sum.txt -o "${outdir}/md5sum.txt" || return $?
-   diff $outdir/md5sum.txt md5sum.txt
-   return $?
+   curl http://${BUCKET}.s3.amazonaws.com/${FOLDER}md5sum.txt -o "${outdir}/md5sum.txt.new" || return $?
+   if diff $outdir/md5sum.txt.new md5sum.txt
+   then
+      rm "${outdir}/md5sum.txt.new"
+   else
+      mv "${outdir}/md5sum.txt.new" "${outdir}/md5sum.txt"
+      return 1
+   fi
 }
 
 download_binaries() {
