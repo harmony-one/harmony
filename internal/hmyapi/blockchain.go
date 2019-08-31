@@ -70,46 +70,36 @@ func (s *PublicBlockChainAPI) GetShardingStructure(ctx context.Context) ([]map[s
 		return []map[string]interface{}{
 			map[string]interface{}{
 				"shardID": "0",
-				"http":    "http://s0.t.hmy.io",
-				"ws":      "ws://s0.t.hmy.io",
+				"http":    "http://s0.t.hmy.io:9500",
+				"ws":      "ws://s0.t.hmy.io:9800",
 			},
 			map[string]interface{}{
 				"shardID": "1",
-				"http":    "http://s1.t.hmy.io",
+				"http":    "http://s1.t.hmy.io:9500",
 				"ws":      "ws://s1.t.hmy.io",
 			},
 			map[string]interface{}{
 				"shardID": "2",
-				"http":    "http://s2.t.hmy.io",
-				"ws":      "ws://s2.t.hmy.io",
+				"http":    "http://s2.t.hmy.io:9500",
+				"ws":      "ws://s2.t.hmy.io:9800",
 			},
 			map[string]interface{}{
 				"shardID": "3",
-				"http":    "http://s3.t.hmy.io",
-				"ws":      "ws://s3.t.hmy.io",
+				"http":    "http://s3.t.hmy.io:9500",
+				"ws":      "ws://s3.t.hmy.io:9800",
 			},
 		}, nil
 	} else if core.ShardingSchedule.GetNetworkID() == shardingconfig.TestNet {
 		return []map[string]interface{}{
 			map[string]interface{}{
 				"shardID": "0",
-				"http":    "http://127.0.0.1:800",
-				"ws":      "ws://127.0.0.1:800",
+				"http":    "http://s0.b.hmy.io:9500",
+				"ws":      "ws://s0.s.hmy.io:9800",
 			},
 			map[string]interface{}{
 				"shardID": "1",
-				"http":    "http://127.0.0.1:800",
-				"ws":      "ws://127.0.0.1:800",
-			},
-			map[string]interface{}{
-				"shardID": "2",
-				"http":    "http://127.0.0.1:800",
-				"ws":      "ws://127.0.0.1:800",
-			},
-			map[string]interface{}{
-				"shardID": "3",
-				"http":    "http://127.0.0.1:800",
-				"ws":      "ws://127.0.0.1:800",
+				"http":    "http://s1.b.hmy.io:9500",
+				"ws":      "ws://s1.s.hmy.io",
 			},
 		}, nil
 	} else {
@@ -117,12 +107,12 @@ func (s *PublicBlockChainAPI) GetShardingStructure(ctx context.Context) ([]map[s
 			map[string]interface{}{
 				"shardID": "0",
 				"http":    "http://127.0.0.1:9500",
-				"ws":      "ws://127.0.0.1:9500",
+				"ws":      "ws://127.0.0.1:9800",
 			},
 			map[string]interface{}{
 				"shardID": "1",
 				"http":    "http://127.0.0.1:9501",
-				"ws":      "ws://127.0.0.1:9501",
+				"ws":      "ws://127.0.0.1:9801",
 			},
 		}, nil
 	}
