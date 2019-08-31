@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/harmony-one/harmony/common/denominations"
+
 	"math/big"
 	"time"
 
@@ -15,12 +17,11 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	internal_common "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
 const (
-	defaultGasPrice    = params.GWei
+	defaultGasPrice    = denominations.Nano
 	defaultFromAddress = "0x0000000000000000000000000000000000000000"
 )
 
