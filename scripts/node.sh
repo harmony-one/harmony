@@ -256,6 +256,42 @@ any_new_binaries() {
    fi
 }
 
+extract_checksum() {
+   awk -v basename="${1}" '
+      {
+         s = $0;
+      }
+      # strip hash and following space; skip line if unsuccessful
+      sub(/^[0-9a-f]+ /, "", s) == 0 { next; }
+      # save hash
+      { hash = substr($0, 1, length($0) - length(s) - 1); }
+      # strip executable indicator (space or asterisk); skip line if unsuccessful
+      sub(/^[* ]/, "", s) == 0 { next; }
+      # leave basename only
+      { sub(/^.*\//, "", s); }
+      # if basename matches, print the hash and basename
+      s == basename { printf "%s  %s\n", hash, basename; }
+   '
+}
+
+verify_checksum() {
+   local dir file checksum_file checksum_for_file
+   dir="${1}"
+   file="${2}"
+   checksum_file="${3}"
+   [ -f "${dir}/${checksum_file}" ] || return 0
+   checksum_for_file="${dir}/${checksum_file}::${file}"
+   extract_checksum "${file}" < "${dir}/${checksum_file}" > "${dir}/${checksum_for_file}"
+   [ -s "${dir}/${checksum_for_file}" ] || return 0
+   if ! (cd "${dir}" && exec md5sum -c --status "${checksum_for_file}")
+   then
+      msg "checksum FAILED for ${file}"
+      return 1
+   fi
+   return 0
+}
+
+
 download_binaries() {
    local outdir
    ${do_not_download} && return 0
@@ -263,6 +299,8 @@ download_binaries() {
    mkdir -p "${outdir}"
    for bin in "${BIN[@]}"; do
       curl http://${BUCKET}.s3.amazonaws.com/${FOLDER}${bin} -o "${outdir}/${bin}" || return $?
+      verify_checksum "${outdir}" "${bin}" md5sum.txt || return $?
+      msg "downloaded ${bin}"
    done
    chmod +x "${outdir}/harmony"
    (cd "${outdir}" && exec openssl sha256 "${BIN[@]}") > "${outdir}/harmony-checksums.txt"
