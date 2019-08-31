@@ -8,7 +8,6 @@ import (
 
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 )
@@ -74,15 +73,6 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 					}
 					viewID := node.Consensus.GetViewID()
 					// add aggregated commit signatures from last block, except for the first two blocks
-
-					if node.NodeConfig.GetNetworkType() == nodeconfig.Mainnet {
-						if err = node.Worker.UpdateCurrent(coinbase); err != nil {
-							utils.Logger().Debug().
-								Err(err).
-								Msg("Failed updating worker's state")
-							continue
-						}
-					}
 
 					newBlock, err = node.Worker.Commit(sig, mask, viewID, coinbase)
 
