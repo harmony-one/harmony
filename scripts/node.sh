@@ -306,7 +306,7 @@ download_binaries() {
    (cd "${outdir}" && exec openssl sha256 "${BIN[@]}") > "${outdir}/harmony-checksums.txt"
 }
 
-if any_new_binaries staging
+if any_new_binaries
 then
    msg "binaries did not change"
 else
