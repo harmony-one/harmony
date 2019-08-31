@@ -43,10 +43,6 @@ func (s fixedSchedule) FirstCrossLinkBlock() uint64 {
 	return mainnetFirstCrossLinkBlock
 }
 
-func (s fixedSchedule) EIP155Block() uint64 {
-	return mainnetEIP155Block
-}
-
 // ConsensusRatio ratio of new nodes vs consensus total nodes
 func (s fixedSchedule) ConsensusRatio() float64 {
 	return mainnetConsensusRatio

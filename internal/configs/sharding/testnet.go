@@ -24,7 +24,6 @@ const (
 	testnetVdfDifficulty = 10000 // This takes about 20s to finish the vdf
 
 	testnetFirstCrossLinkBlock = 100
-	testnetEIP155Block         = 0
 
 	testnetMaxTxAmountLimit               = 1e3 // unit is in One
 	testnetMaxNumRecentTxsPerAccountLimit = 1e2
@@ -77,10 +76,6 @@ func (ts testnetSchedule) VdfDifficulty() int {
 
 func (ts testnetSchedule) FirstCrossLinkBlock() uint64 {
 	return testnetFirstCrossLinkBlock
-}
-
-func (ts testnetSchedule) EIP155Block() uint64 {
-	return testnetEIP155Block
 }
 
 // ConsensusRatio ratio of new nodes vs consensus total nodes
