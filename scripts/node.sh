@@ -241,20 +241,56 @@ if [ "$OS" == "Linux" ]; then
    BIN=( harmony libbls384_256.so libcrypto.so.10 libgmp.so.10 libgmpxx.so.4 libmcl.so md5sum.txt )
 fi
 
-# clean up old files
-for bin in "${BIN[@]}"; do
-   ${do_not_download} || rm -f ${bin}
-done
-
 any_new_binaries() {
    local outdir
    ${do_not_download} && return 0
    outdir="${1:-.}"
    mkdir -p "${outdir}"
-   curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}md5sum.txt -o "${outdir}/md5sum.txt" || return $?
-   diff $outdir/md5sum.txt md5sum.txt
-   return $?
+   curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}md5sum.txt -o "${outdir}/md5sum.txt.new" || return $?
+   if diff $outdir/md5sum.txt.new md5sum.txt
+   then
+      rm "${outdir}/md5sum.txt.new"
+   else
+      mv "${outdir}/md5sum.txt.new" "${outdir}/md5sum.txt"
+      return 1
+   fi
 }
+
+extract_checksum() {
+   awk -v basename="${1}" '
+      {
+         s = $0;
+      }
+      # strip hash and following space; skip line if unsuccessful
+      sub(/^[0-9a-f]+ /, "", s) == 0 { next; }
+      # save hash
+      { hash = substr($0, 1, length($0) - length(s) - 1); }
+      # strip executable indicator (space or asterisk); skip line if unsuccessful
+      sub(/^[* ]/, "", s) == 0 { next; }
+      # leave basename only
+      { sub(/^.*\//, "", s); }
+      # if basename matches, print the hash and basename
+      s == basename { printf "%s  %s\n", hash, basename; }
+   '
+}
+
+verify_checksum() {
+   local dir file checksum_file checksum_for_file
+   dir="${1}"
+   file="${2}"
+   checksum_file="${3}"
+   [ -f "${dir}/${checksum_file}" ] || return 0
+   checksum_for_file="${dir}/${checksum_file}::${file}"
+   extract_checksum "${file}" < "${dir}/${checksum_file}" > "${dir}/${checksum_for_file}"
+   [ -s "${dir}/${checksum_for_file}" ] || return 0
+   if ! (cd "${dir}" && exec md5sum -c --status "${checksum_for_file}")
+   then
+      msg "checksum FAILED for ${file}"
+      return 1
+   fi
+   return 0
+}
+
 
 download_binaries() {
    local outdir
@@ -263,12 +299,14 @@ download_binaries() {
    mkdir -p "${outdir}"
    for bin in "${BIN[@]}"; do
       curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}${bin} -o "${outdir}/${bin}" || return $?
+      verify_checksum "${outdir}" "${bin}" md5sum.txt || return $?
+      msg "downloaded ${bin}"
    done
    chmod +x "${outdir}/harmony"
    (cd "${outdir}" && exec openssl sha256 "${BIN[@]}") > "${outdir}/harmony-checksums.txt"
 }
 
-if any_new_binaries staging
+if any_new_binaries
 then
    msg "binaries did not change"
 else
