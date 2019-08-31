@@ -45,7 +45,6 @@ type TransactionType byte
 const (
 	SameShardTx     TransactionType = iota
 	SubtractionOnly                 // only subtract tokens from source shard account
-	AdditionOnly                    // only add tokens to destination shard account
 	InvalidTx
 )
 
@@ -64,8 +63,8 @@ func (txType TransactionType) String() string {
 		return "SameShardTx"
 	} else if txType == SubtractionOnly {
 		return "SubtractionOnly"
-	} else if txType == AdditionOnly {
-		return "AdditionOnly"
+	} else if txType == InvalidTx {
+		return "InvalidTx"
 	}
 	return "Unknown"
 }

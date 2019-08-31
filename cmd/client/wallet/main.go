@@ -92,8 +92,8 @@ var (
 	transferReceiverPtr   = transferCommand.String("to", "", "Specify the receiver account")
 	transferAmountPtr     = transferCommand.Float64("amount", 0, "Specify the amount to transfer")
 	transferGasPricePtr   = transferCommand.Uint64("gasPrice", 0, "Specify the gas price amount. Unit is Nano.")
-	transferShardIDPtr    = transferCommand.Int("shardID", 0, "Specify the shard ID for the transfer")
-	transferToShardIDPtr  = transferCommand.Int("toShardID", 0, "Specify the destination shard ID for the transfer")
+	transferShardIDPtr    = transferCommand.Int("shardID", -1, "Specify the shard ID for the transfer")
+	transferToShardIDPtr  = transferCommand.Int("toShardID", -1, "Specify the destination shard ID for the transfer")
 	transferInputDataPtr  = transferCommand.String("inputData", "", "Base64-encoded input data to embed in the transaction")
 	transferSenderPassPtr = transferCommand.String("pass", "", "Passphrase of the sender's private key")
 

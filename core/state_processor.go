@@ -85,7 +85,10 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 
 	// incomingReceipts should always be processed after transactions (to be consistent with the block proposal)
 	for _, cx := range block.IncomingReceipts() {
-		ApplyIncomingReceipt(p.config, statedb, header, cx)
+		err := ApplyIncomingReceipt(p.config, statedb, header, cx)
+		if err != nil {
+			return nil, nil, nil, 0, ctxerror.New("cannot apply incoming receipts").WithCause(err)
+		}
 	}
 
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
@@ -102,7 +105,9 @@ func getTransactionType(header *types.Header, tx *types.Transaction) types.Trans
 	if tx.ShardID() == tx.ToShardID() && header.ShardID == tx.ShardID() {
 		return types.SameShardTx
 	}
-	if tx.ShardID() != tx.ToShardID() && header.ShardID == tx.ShardID() {
+	numShards := ShardingSchedule.InstanceForEpoch(header.Epoch).NumShards()
+	// Assuming here all the shards are consecutive from 0 to n-1, n is total number of shards
+	if tx.ShardID() != tx.ToShardID() && header.ShardID == tx.ShardID() && tx.ToShardID() < numShards {
 		return types.SubtractionOnly
 	}
 	return types.InvalidTx
@@ -167,16 +172,15 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 }
 
 // ApplyIncomingReceipt will add amount into ToAddress in the receipt
-func ApplyIncomingReceipt(config *params.ChainConfig, db *state.DB, header *types.Header, cxp *types.CXReceiptsProof) {
+func ApplyIncomingReceipt(config *params.ChainConfig, db *state.DB, header *types.Header, cxp *types.CXReceiptsProof) error {
 	if cxp == nil {
-		return
+		return nil
 	}
 
 	// TODO: how to charge gas here?
 	for _, cx := range cxp.Receipts {
 		if cx == nil || cx.To == nil { // should not happend
-			utils.Logger().Warn().Msg("ApplyIncomingReceipts: Invalid incoming receipt!!")
-			continue
+			return ctxerror.New("ApplyIncomingReceipts: Invalid incomingReceipt!", "receipt", cx)
 		}
 		utils.Logger().Info().Msgf("ApplyIncomingReceipts: ADDING BALANCE %d", cx.Amount)
 
@@ -186,4 +190,5 @@ func ApplyIncomingReceipt(config *params.ChainConfig, db *state.DB, header *type
 		db.AddBalance(*cx.To, cx.Amount)
 		db.IntermediateRoot(config.IsEIP158(header.Number)).Bytes()
 	}
+	return nil
 }

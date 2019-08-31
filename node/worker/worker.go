@@ -93,7 +93,7 @@ func (w *Worker) SelectTransactionsForNewBlock(newBlockNum uint64, txs types.Tra
 	unselected := types.Transactions{}
 	invalid := types.Transactions{}
 	for _, tx := range txs {
-		if tx.ShardID() != w.shardID && tx.ToShardID() != w.shardID {
+		if tx.ShardID() != w.shardID {
 			invalid = append(invalid, tx)
 			continue
 		}
@@ -186,7 +186,10 @@ func (w *Worker) CommitReceipts(receiptsList []*types.CXReceiptsProof) error {
 	}
 
 	for _, cx := range receiptsList {
-		core.ApplyIncomingReceipt(w.config, w.current.state, w.current.header, cx)
+		err := core.ApplyIncomingReceipt(w.config, w.current.state, w.current.header, cx)
+		if err != nil {
+			return ctxerror.New("cannot apply receiptsList").WithCause(err)
+		}
 	}
 
 	for _, cx := range receiptsList {

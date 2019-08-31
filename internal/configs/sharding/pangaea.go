@@ -89,3 +89,7 @@ func (ps pangaeaSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 		RecentTxDuration:               ps.RecentTxDuration(),
 	}
 }
+
+func (pangaeaSchedule) GetNetworkID() NetworkID {
+	return Pangaea
+}

@@ -7,6 +7,18 @@ import (
 	"github.com/harmony-one/harmony/internal/genesis"
 )
 
+// NetworkID is the network type of the blockchain.
+type NetworkID byte
+
+//Consensus and other message categories
+const (
+	MainNet NetworkID = iota
+	TestNet
+	LocalNet
+	Pangaea
+	DevNet
+)
+
 type instance struct {
 	numShards                       uint32
 	numNodesPerShard                int
@@ -117,4 +129,9 @@ func (sc instance) FindAccount(blsPubKey string) (bool, *genesis.DeployAccount) 
 // ReshardingEpoch returns the list of epoch number
 func (sc instance) ReshardingEpoch() []*big.Int {
 	return sc.reshardingEpoch
+}
+
+// ReshardingEpoch returns the list of epoch number
+func (sc instance) GetNetworkID() NetworkID {
+	return DevNet
 }

@@ -233,10 +233,10 @@ func (fs FrontierSigner) Sender(tx *Transaction) (common.Address, error) {
 }
 
 func recoverPlain(sighash common.Hash, R, S, Vb *big.Int, homestead bool) (common.Address, error) {
-	V := byte(Vb.Uint64() - 27)
 	if Vb.BitLen() > 8 {
 		return common.Address{}, ErrInvalidSig
 	}
+	V := byte(Vb.Uint64() - 27)
 	if !crypto.ValidateSignatureValues(V, R, S, homestead) {
 		return common.Address{}, ErrInvalidSig
 	}

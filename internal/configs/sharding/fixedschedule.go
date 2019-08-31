@@ -90,6 +90,10 @@ func (s fixedSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 	}
 }
 
+func (s fixedSchedule) GetNetworkID() NetworkID {
+	return DevNet
+}
+
 // NewFixedSchedule returns a sharding configuration schedule that uses the
 // given config instance for all epochs.  Useful for testing.
 func NewFixedSchedule(instance Instance) Schedule {

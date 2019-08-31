@@ -56,6 +56,9 @@ type Schedule interface {
 
 	// configuration for throttling pending transactions
 	TxsThrottleConfig() *TxsThrottleConfig
+
+	// GetNetworkID() return networkID type.
+	GetNetworkID() NetworkID
 }
 
 // Instance is one sharding configuration instance.

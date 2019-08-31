@@ -355,6 +355,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 	}
 
 	// Verify cross links
+	// TODO: move into ValidateNewBlock
 	if node.NodeConfig.ShardID == 0 {
 		err := node.VerifyBlockCrossLinks(newBlock)
 		if err != nil {
@@ -363,6 +364,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 		}
 	}
 
+	// TODO: move into ValidateNewBlock
 	err = node.verifyIncomingReceipts(newBlock)
 	if err != nil {
 		return ctxerror.New("[VerifyNewBlock] Cannot ValidateNewBlock", "blockHash", newBlock.Hash(),
@@ -566,6 +568,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 	}
 
 	// Update last consensus time for metrics
+	// TODO: randomly selected a few validators to broadcast messages instead of only leader broadcast
 	node.lastConsensusTime = time.Now().Unix()
 	if node.Consensus.PubKey.IsEqual(node.Consensus.LeaderPubKey) {
 		if node.NodeConfig.ShardID == 0 {
@@ -580,6 +583,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 			Msg("BINGO !!! Reached Consensus")
 	}
 
+	// TODO chao: Write New checkpoint after clean
 	node.Blockchain().CleanCXReceiptsCheckpointsByBlock(newBlock)
 
 	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
