@@ -16,9 +16,9 @@ import (
 	common2 "github.com/harmony-one/harmony/internal/common"
 
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/internal/params"
 )
 
 var (

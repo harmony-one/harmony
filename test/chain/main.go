@@ -12,11 +12,11 @@ import (
 	"github.com/harmony-one/harmony/crypto/hash"
 
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/core"
 	core_state "github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/internal/params"
 	pkgworker "github.com/harmony-one/harmony/node/worker"
 )
 

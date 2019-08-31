@@ -19,7 +19,7 @@ package vm
 import (
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/params"
+	"github.com/harmony-one/harmony/internal/params"
 )
 
 // Gas costs

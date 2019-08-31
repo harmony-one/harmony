@@ -19,7 +19,7 @@ package vm
 import (
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/params"
+	"github.com/harmony-one/harmony/internal/params"
 )
 
 func makeStackFunc(pop, push int) stackValidationFunc {

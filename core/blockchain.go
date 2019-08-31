@@ -33,9 +33,9 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/metrics"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
+	"github.com/harmony-one/harmony/internal/params"
 	lru "github.com/hashicorp/golang-lru"
 
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"

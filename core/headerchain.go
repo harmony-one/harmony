@@ -28,7 +28,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/params"
+	"github.com/harmony-one/harmony/internal/params"
 	lru "github.com/hashicorp/golang-lru"
 
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"

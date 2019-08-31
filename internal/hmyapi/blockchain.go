@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/harmony-one/harmony/common/denominations"
+
 	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -20,7 +21,7 @@ import (
 )
 
 const (
-	defaultGasPrice    = params.GWei
+	defaultGasPrice    = denominations.Nano
 	defaultFromAddress = "0x0000000000000000000000000000000000000000"
 )
 

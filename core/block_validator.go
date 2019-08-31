@@ -24,10 +24,10 @@ import (
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 
-	"github.com/ethereum/go-ethereum/params"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/params"
 )
 
 // BlockValidator is responsible for validating block headers, uncles and
