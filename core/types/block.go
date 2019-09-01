@@ -113,7 +113,7 @@ type headerMarshaling struct {
 // Hash returns the block hash of the header, which is simply the keccak256 hash of its
 // RLP encoding.
 func (h *Header) Hash() common.Hash {
-	return rlpHash(h)
+	return RLPHash(h)
 }
 
 // Size returns the approximate memory used by all internal contents. It is used
@@ -145,7 +145,8 @@ func (h *Header) GetShardState() (shard.ShardState, error) {
 	return shardState, nil
 }
 
-func rlpHash(x interface{}) (h common.Hash) {
+// RLPHash hashes the RLP representation of the given object.
+func RLPHash(x interface{}) (h common.Hash) {
 	hw := sha3.NewLegacyKeccak256()
 	rlp.Encode(hw, x)
 	hw.Sum(h[:0])
@@ -453,7 +454,7 @@ func (c *writeCounter) Write(b []byte) (int, error) {
 
 // CalcUncleHash returns rlp hash of uncles.
 func CalcUncleHash(uncles []*Header) common.Hash {
-	return rlpHash(uncles)
+	return RLPHash(uncles)
 }
 
 // WithSeal returns a new block with the data from b but the header replaced with
